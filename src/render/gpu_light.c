@@ -2,9 +2,9 @@
  * @file render/gpu_light.c
  * @brief Light uniforms, the cluster pass and the light bindings of the forward pass.
  *
- * Every view with point or spot lights runs the engine compute shader etc/shaders/cluster.wgsl
- * before it draws: it lists, per cluster of the view frustum, the lights that reach it, so a
- * fragment only shades the lights of its own cluster.
+ * Every view with point or spot lights runs etc/shaders/cluster.wgsl before it draws: it lists,
+ * per cluster of the view frustum, the lights that reach it in one shared light index list, so
+ * a fragment only shades the lights of its own cluster.
  */
 
 #include "gpu.h"
@@ -20,15 +20,54 @@
 /** Depth slices of the view frustum */
 #define BOX_GPU_CLUSTER_Z (24)
 
-/** Lights a cluster lists at most */
-#define BOX_GPU_CLUSTER_MAX (128)
-
 /** Clusters per axis of one workgroup of the cluster shader */
 #define BOX_GPU_CLUSTER_GROUP (4)
 
-/** Bytes of the cluster buffer of a view */
-#define BOX_GPU_CLUSTER_SIZE ((uint64_t)BOX_GPU_CLUSTER_X * BOX_GPU_CLUSTER_Y * \
-    BOX_GPU_CLUSTER_Z * (BOX_GPU_CLUSTER_MAX + 1) * sizeof(uint32_t))
+/** Clusters of a view */
+#define BOX_GPU_CLUSTER_COUNT ((uint64_t)BOX_GPU_CLUSTER_X * BOX_GPU_CLUSTER_Y * BOX_GPU_CLUSTER_Z)
+
+/** Words before the light index list: the allocated entries, then offset and count per cluster */
+#define BOX_GPU_CLUSTER_HEADER (1 + 2 * BOX_GPU_CLUSTER_COUNT)
+
+/** Largest cluster buffer, the default maxStorageBufferBindingSize of WebGPU */
+#define BOX_GPU_CLUSTER_BYTES_MAX ((uint64_t)128 * 1024 * 1024)
+
+/** Point and spot lights the cluster buffer of box_gpu_light_clusters_new lists in every cluster */
+#define BOX_GPU_CLUSTER_SHARED_LIGHTS (128)
+
+/** The cluster pass warned that a light index list cannot hold every light of every cluster */
+static bool box_gpu_cluster_warned;
+
+/** Get the bytes of a cluster buffer whose light index list holds every light in every cluster.
+ *
+ * @param lights Point and spot lights
+ * @return The bytes, at most BOX_GPU_CLUSTER_BYTES_MAX
+ */
+static uint64_t box_gpu_cluster_bytes(
+    uint64_t lights)
+{
+    uint64_t result = (BOX_GPU_CLUSTER_HEADER + BOX_GPU_CLUSTER_COUNT * lights) * sizeof(uint32_t);
+
+    return result < BOX_GPU_CLUSTER_BYTES_MAX ? result : BOX_GPU_CLUSTER_BYTES_MAX;
+}
+
+/** Create a cluster buffer.
+ *
+ * @param gpu The backend
+ * @param bytes Bytes of the buffer
+ * @return The buffer
+ */
+static WGPUBuffer box_gpu_cluster_buffer_new(
+    box_gpu_t *gpu,
+    uint64_t bytes)
+{
+    WGPUBufferDescriptor desc = {
+        .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
+        .size = bytes
+    };
+
+    return wgpuDeviceCreateBuffer(gpu->device, &desc);
+}
 
 void box_gpu_light_init(
     box_gpu_t *gpu)
@@ -140,29 +179,61 @@ void box_gpu_light_uniforms(
     u->grid[0] = BOX_GPU_CLUSTER_X;
     u->grid[1] = BOX_GPU_CLUSTER_Y;
     u->grid[2] = BOX_GPU_CLUSTER_Z;
-    u->grid[3] = BOX_GPU_CLUSTER_MAX;
+    u->grid[3] = 0;
 }
 
-/** Get the cluster buffer of a view slot, created on first use.
+/** Count the point and spot lights a view shades with.
+ *
+ * @param gpu The backend
+ * @param v The view
+ * @return The lights after the directional ones that the light buffer holds
+ */
+static uint64_t box_gpu_cluster_lights(
+    box_gpu_t *gpu,
+    const box_render_view_t *v)
+{
+    box_gpu_buffer_t *b = box_gpu_light_buffer(gpu, v);
+    uint32_t capacity = b ? b->size / (uint32_t)sizeof(box_render_light_t) : 0;
+    uint32_t count = glm_min(v->lights.count, capacity);
+
+    return count > v->lights.directional ? count - v->lights.directional : 0;
+}
+
+/** Get the cluster buffer of a view slot, sized for the lights of the view.
+ *
+ * The light index list holds the next power of two of the lights in every cluster, so lights
+ * that come and go do not recreate it each frame; it shrinks when it is four times too large.
  *
  * @param gpu The backend
  * @param slot Slot of the view in the view buffer
+ * @param v The view
  * @return The buffer
  */
 static WGPUBuffer box_gpu_cluster_buffer(
     box_gpu_t *gpu,
-    int32_t slot)
+    int32_t slot,
+    const box_render_view_t *v)
 {
-    WGPUBufferDescriptor desc = {
-        .usage = WGPUBufferUsage_Storage,
-        .size = BOX_GPU_CLUSTER_SIZE
-    };
-    while (ecs_vec_count(&gpu->clusters) <= slot) {
-        *ecs_vec_append_t(NULL, &gpu->clusters, WGPUBuffer) =
-            wgpuDeviceCreateBuffer(gpu->device, &desc);
+    uint64_t lights = box_gpu_cluster_lights(gpu, v), rounded = 1;
+    while (rounded < lights) {
+        rounded <<= 1;
     }
 
-    return *ecs_vec_get_t(&gpu->clusters, WGPUBuffer, slot);
+    uint64_t needed = box_gpu_cluster_bytes(lights);
+    uint64_t target = box_gpu_cluster_bytes(rounded);
+    while (ecs_vec_count(&gpu->clusters) <= slot) {
+        *ecs_vec_append_t(NULL, &gpu->clusters, WGPUBuffer) =
+            box_gpu_cluster_buffer_new(gpu, target);
+    }
+
+    WGPUBuffer *result = ecs_vec_get_t(&gpu->clusters, WGPUBuffer, slot);
+    uint64_t size = wgpuBufferGetSize(*result);
+    if (size < needed || size > 4 * target) {
+        wgpuBufferRelease(*result);
+        *result = box_gpu_cluster_buffer_new(gpu, target);
+    }
+
+    return *result;
 }
 
 /** Get the cluster pipeline, created again when the cluster shader was recompiled.
@@ -237,10 +308,20 @@ void box_gpu_light_cluster_with(
         goto done;
     }
 
+    uint64_t size = wgpuBufferGetSize(clusters);
+    uint64_t lights = box_gpu_cluster_lights(gpu, v);
+    if (size < box_gpu_cluster_bytes(lights) && !box_gpu_cluster_warned) {
+        ecs_warn("the light index list of a view holds %u entries, %u lights in every cluster "
+            "need more: a cluster may not list every light that reaches it",
+            (uint32_t)(size / sizeof(uint32_t) - BOX_GPU_CLUSTER_HEADER),
+            (uint32_t)lights);
+        box_gpu_cluster_warned = true;
+    }
+
     WGPUBindGroupEntry entries[3] = {
         { .binding = 0, .buffer = uniforms, .size = sizeof(box_gpu_view_uniforms_t) },
         { .binding = 1, .buffer = b->buffer, .size = b->size },
-        { .binding = 2, .buffer = clusters, .size = BOX_GPU_CLUSTER_SIZE }
+        { .binding = 2, .buffer = clusters, .size = size }
     };
     WGPUBindGroupDescriptor desc = {
         .layout = gpu->cluster_layout,
@@ -248,6 +329,7 @@ void box_gpu_light_cluster_with(
         .entries = entries
     };
     WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &desc);
+    wgpuCommandEncoderClearBuffer(encoder, clusters, 0, sizeof(uint32_t));
     WGPUComputePassEncoder pass = wgpuCommandEncoderBeginComputePass(encoder, NULL);
     wgpuComputePassEncoderSetPipeline(pass, pipeline);
     wgpuComputePassEncoderSetBindGroup(pass, 0, group, 1, &offset);
@@ -270,7 +352,7 @@ void box_gpu_light_cluster(
 {
     if (v->lights.enabled && v->lights.count > v->lights.directional) {
         box_gpu_light_cluster_with(gpu, encoder, v, gpu->view_buffer,
-            (uint32_t)(slot * BOX_GPU_VIEW_STRIDE), box_gpu_cluster_buffer(gpu, slot));
+            (uint32_t)(slot * BOX_GPU_VIEW_STRIDE), box_gpu_cluster_buffer(gpu, slot, v));
     }
 }
 
@@ -286,7 +368,7 @@ WGPUBindGroup box_gpu_light_group_with(
     WGPUBindGroupEntry entries[5] = {
         { .binding = 0, .buffer = uniforms, .size = sizeof(box_gpu_view_uniforms_t) },
         { .binding = 1, .buffer = lights, .size = size },
-        { .binding = 2, .buffer = clusters, .size = BOX_GPU_CLUSTER_SIZE },
+        { .binding = 2, .buffer = clusters, .size = wgpuBufferGetSize(clusters) },
         { .binding = 3, .textureView = shadow },
         { .binding = 4, .sampler = gpu->shadow_sampler }
     };
@@ -305,18 +387,13 @@ WGPUBindGroup box_gpu_light_group(
     int32_t slot)
 {
     return box_gpu_light_group_with(gpu, v, gpu->view_buffer,
-        box_gpu_cluster_buffer(gpu, slot), box_gpu_shadow_binding(gpu, v));
+        box_gpu_cluster_buffer(gpu, slot, v), box_gpu_shadow_binding(gpu, v));
 }
 
 WGPUBuffer box_gpu_light_clusters_new(
     box_gpu_t *gpu)
 {
-    WGPUBufferDescriptor desc = {
-        .usage = WGPUBufferUsage_Storage,
-        .size = BOX_GPU_CLUSTER_SIZE
-    };
-
-    return wgpuDeviceCreateBuffer(gpu->device, &desc);
+    return box_gpu_cluster_buffer_new(gpu, box_gpu_cluster_bytes(BOX_GPU_CLUSTER_SHARED_LIGHTS));
 }
 
 #endif

@@ -301,7 +301,7 @@ typedef struct box_gpu_view_uniforms_t {
     vec4 ambient_ground;            /**< Linear ambient light from below */
     vec4 cluster;                   /**< Inverse projection scale of x and y, slice near, far */
     uint32_t lights[4];             /**< Directional lights, lights, lit, orthographic */
-    uint32_t grid[4];               /**< Clusters per axis, lights per cluster at most */
+    uint32_t grid[4];               /**< Clusters per axis, unused */
     mat4 shadow_matrix[BOX_RENDER_SHADOW_CASCADES]; /**< World to shadow clip per cascade */
     vec4 shadow_split;              /**< View depth each cascade ends at */
     vec4 shadow_bias;               /**< Depth added to the compared depth per cascade */
@@ -829,7 +829,7 @@ WGPUBindGroup box_gpu_light_group_with(
     WGPUBuffer clusters,
     WGPUTextureView shadow);
 
-/** Create a cluster buffer.
+/** Create a cluster buffer whose light index list holds 128 lights in every cluster.
  *
  * @param gpu The backend
  * @return The buffer, released by the caller
