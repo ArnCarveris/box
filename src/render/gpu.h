@@ -704,6 +704,22 @@ void box_gpu_draw_fini(
 void box_gpu_forward_reset(
     box_gpu_t *gpu);
 
+/** Create a forward pipeline from a mesh or 2D shape module inside an error scope, to find out
+ * whether the module fits the pipeline layout before it replaces the module that renders.
+ *
+ * wgpu-native reports the scope at once; the browser reports it later, so there the check
+ * passes and an invalid pipeline shows as a device error.
+ *
+ * @param gpu The backend
+ * @param handle Handle of the shader
+ * @param shader The module
+ * @return NULL when the pipeline is valid, else the error, which the caller frees
+ */
+char* box_gpu_forward_check(
+    box_gpu_t *gpu,
+    uint32_t handle,
+    WGPUShaderModule shader);
+
 /** Create or release a mesh from a BOX_RENDER_MESH resource.
  *
  * @param gpu The backend
