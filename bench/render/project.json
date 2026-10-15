@@ -51,7 +51,8 @@
                 "benchcases": [
                     "static_1000",
                     "moving_1000",
-                    "scenes_1000"
+                    "scenes_1000",
+                    "moving_modes_1000"
                 ]
             },
             {
