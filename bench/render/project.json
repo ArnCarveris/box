@@ -90,7 +90,9 @@
                     "none",
                     "unbaked",
                     "converged",
-                    "converged_bounces"
+                    "converged_bounces",
+                    "static_change_100k",
+                    "edge_change_100k"
                 ]
             },
             {

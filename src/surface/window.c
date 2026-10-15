@@ -19,15 +19,57 @@
 #include <objc/message.h>
 #include <objc/runtime.h>
 
+/** Seconds after which the refresh rate of a window is read again without a move or a change
+ * of the monitors, so a changed display mode is noticed */
+#define BOX_WINDOW_REFRESH_RECHECK (2.0)
+
 /** A glfw window and its layer */
 struct box_window_t {
     GLFWwindow *window;               /**< The glfw window */
     void *layer;                      /**< CAMetalLayer of the content view */
     box_input_glfw_target_t input;    /**< World and surface the input events go to */
+    float refresh;                    /**< Refresh rate of the display when last read */
+    int32_t refresh_moves;            /**< box_window_moves at the last read, -1 never */
+    double refresh_time;              /**< glfw time when the refresh rate was read */
 };
 
 /** Windows open in the process, glfw terminates when the last one closes */
 static int32_t box_window_count = 0;
+
+/** Moves and resizes of windows and changes of the monitors, which may change the display a
+ * window is on */
+static int32_t box_window_moves = 0;
+
+/** Count a move of a window.
+ *
+ * @param window The glfw window
+ * @param x Left edge in screen coordinates
+ * @param y Top edge in screen coordinates
+ */
+static void box_window_moved(
+    GLFWwindow *window,
+    int x,
+    int y)
+{
+    (void)window;
+    (void)x;
+    (void)y;
+    box_window_moves ++;
+}
+
+/** Count a monitor that was connected or disconnected.
+ *
+ * @param monitor The monitor
+ * @param event GLFW_CONNECTED or GLFW_DISCONNECTED
+ */
+static void box_window_monitor(
+    GLFWmonitor *monitor,
+    int event)
+{
+    (void)monitor;
+    (void)event;
+    box_window_moves ++;
+}
 
 /** Report a glfw error.
  *
@@ -78,6 +120,8 @@ box_window_t* box_window_new(
         goto done;
     }
 
+    glfwSetMonitorCallback(box_window_monitor);
+
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     window = glfwCreateWindow(width, height, title, NULL, NULL);
     if (!window) {
@@ -91,6 +135,8 @@ box_window_t* box_window_new(
     result = ecs_os_calloc_t(box_window_t);
     result->window = window;
     result->layer = box_window_metal_layer(window);
+    result->refresh_moves = -1;
+    glfwSetWindowPosCallback(window, box_window_moved);
     box_window_count ++;
     result->input.world = ECS_CONST_CAST(ecs_world_t*, ecs_get_world(world));
     result->input.surface = surface;
@@ -146,12 +192,59 @@ void box_window_resize(
     int32_t height)
 {
     glfwSetWindowSize(window->window, width, height);
+    box_window_moves ++;
 }
 
 void* box_window_layer(
     box_window_t *window)
 {
     return window->layer;
+}
+
+/** Read the refresh rate of the monitor under the center of a window from glfw.
+ *
+ * @param window The window
+ * @return Refresh rate in Hz, 0 when unknown
+ */
+static float box_window_read_refresh(
+    box_window_t *window)
+{
+    int count = 0, x = 0, y = 0, w = 0, h = 0, i;
+    GLFWmonitor **monitors = glfwGetMonitors(&count);
+    GLFWmonitor *monitor = glfwGetPrimaryMonitor();
+    const GLFWvidmode *mode;
+    glfwGetWindowPos(window->window, &x, &y);
+    glfwGetWindowSize(window->window, &w, &h);
+    for (i = 0; i < count; i ++) {
+        int mx = 0, my = 0;
+        const GLFWvidmode *m = glfwGetVideoMode(monitors[i]);
+        glfwGetMonitorPos(monitors[i], &mx, &my);
+        if (m && x + w / 2 >= mx && x + w / 2 < mx + m->width &&
+            y + h / 2 >= my && y + h / 2 < my + m->height)
+        {
+            monitor = monitors[i];
+            break;
+        }
+    }
+
+    mode = monitor ? glfwGetVideoMode(monitor) : NULL;
+
+    return mode ? (float)mode->refreshRate : 0;
+}
+
+float box_window_refresh(
+    box_window_t *window)
+{
+    double now = glfwGetTime();
+    if (window->refresh_moves != box_window_moves ||
+        now - window->refresh_time >= BOX_WINDOW_REFRESH_RECHECK)
+    {
+        window->refresh = box_window_read_refresh(window);
+        window->refresh_moves = box_window_moves;
+        window->refresh_time = now;
+    }
+
+    return window->refresh;
 }
 
 bool box_window_closed(
@@ -223,6 +316,14 @@ void* box_window_layer(
     (void)window;
 
     return NULL;
+}
+
+float box_window_refresh(
+    box_window_t *window)
+{
+    (void)window;
+
+    return 0;
 }
 
 bool box_window_closed(

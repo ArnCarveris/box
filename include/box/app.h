@@ -33,6 +33,19 @@ extern "C" {
 /** Frame rate the module sets in App before the command line is parsed */
 #define BOX_APP_FPS (60)
 
+/** Frames the ranges of FrameTiming cover, the most recent ones */
+#define BOX_FRAME_WINDOW (240)
+
+/** Milliseconds the delta_time of a frame may differ from the wall time since the previous one.
+ *
+ * The delta is either measured or snapped to whole vsyncs, so it only differs from the measured
+ * interval by the wake up jitter of the frame loop, which stays well under a millisecond.
+ */
+#define BOX_FRAME_TOLERANCE_MS (1.0)
+
+/** Intervals beyond this many target intervals count as a dropped frame */
+#define BOX_FRAME_DROPPED (1.5)
+
 /** Settings of the process, filled from the command line before the world runs.
  *
  * A headless run needs a frame limit or a timeout, is refused on an oversubscribed machine
@@ -43,12 +56,13 @@ ECS_STRUCT(App, {
     int32_t frames;     /**< Stop after this many frames, 0 for no limit */
     double timeout;     /**< Stop after this many seconds, 0 for none, negative for infinite */
     float cpu_budget;   /**< Percent of one core a headless run may use, default 100, 0 no limit */
-    float fps;          /**< Target frame rate, default 60, 0 uncapped with a measured delta */
+    float fps;          /**< Frame rate cap, default 60, 0 uncapped; headless the fixed step */
     int32_t port;       /**< Port of the command endpoints, 0 disables them */
     int32_t surface_width;  /**< Width of the Surface created when there is no window, 0 none */
     int32_t surface_height; /**< Height of the Surface a run creates when it has none */
     bool unguarded;     /**< A headless run starts on an oversubscribed machine */
     bool unpaced;       /**< A headless run ignores its CPU budget */
+    bool realtime;      /**< Headless, delta_time is measured like a window's, set by PerfRun */
     char *scene;        /**< Script file loaded before the first frame, NULL for none */
 });
 
@@ -59,6 +73,40 @@ ECS_STRUCT(AppStatus, {
     double slept;       /**< Wall seconds the CPU budget has slept in total */
     char *tmp_dir;      /**< Folder for temporary files of a headless process, else NULL */
     bool running;       /**< box_app_run is stepping the world */
+});
+
+/** Range of a frame time over the recent frames, in milliseconds */
+ECS_STRUCT(FrameRange, {
+    double min;   /**< Smallest value */
+    double max;   /**< Largest value */
+    double mean;  /**< Mean value */
+});
+
+/** Timing of the recent frames, written by the engine at the start of every frame.
+ *
+ * delta is the unscaled delta_time the world advanced with, interval the wall time between the
+ * starts of two frames and error their difference. With vsync the delta is the refreshes the
+ * frame before is shown for, timed by the measured refresh rate, so it matches the display.
+ */
+ECS_STRUCT(FrameTiming, {
+    int32_t frames;         /**< Frames the ranges cover, at most BOX_FRAME_WINDOW */
+    double target_ms;       /**< Interval of the App.fps cap, 0 when uncapped */
+    bool vsync;             /**< Frames present with vsync, which paces them */
+    bool fixed;             /**< Headless fixed step: delta is 1 / App.fps, not measured */
+    float refresh_rate;     /**< Display refresh rate measured from the frame times, 0 while
+                             *   the estimate is not complete */
+    bool smoothing;         /**< The last delta was snapped to whole refresh periods */
+    double delta_ms;        /**< Delta of the last frame */
+    double interval_ms;     /**< Interval before the last frame */
+    FrameRange delta;       /**< Deltas of the recent frames */
+    FrameRange interval;    /**< Intervals of the recent frames */
+    FrameRange error;       /**< Absolute difference of delta and interval of the recent frames */
+    FrameRange present;     /**< Intervals between the presents of the recent frames */
+    int32_t late;           /**< Recent frames whose error exceeds BOX_FRAME_TOLERANCE_MS */
+    int32_t dropped;        /**< Recent frames longer than BOX_FRAME_DROPPED target intervals */
+    int64_t total;          /**< Frames since the world started */
+    int64_t total_late;     /**< Frames since the world started with an error over tolerance */
+    int64_t total_dropped;  /**< Dropped frames since the world started */
 });
 
 /** Register the box.app module.
@@ -82,6 +130,17 @@ int box_app_parse(
     ecs_world_t *world,
     int argc,
     char *argv[]);
+
+/** Block the calling thread with an OS sleep until a time on the ecs_os_get_time clock.
+ *
+ * Sleeps 60% of the time left until less than 0.1 ms is left, then the rest, so timer leeway
+ * cannot overshoot by more than a few dozen microseconds. It never busy waits.
+ *
+ * @param deadline Seconds on the clock of ecs_os_get_time
+ * @return The clock after the wait
+ */
+double box_wait_until(
+    double deadline);
 
 /** Run the world with the settings of the App singleton until a stop condition is met.
  *

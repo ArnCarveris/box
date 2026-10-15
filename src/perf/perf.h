@@ -46,6 +46,20 @@ typedef struct box_perf_t {
     int32_t cull_last[3]; /**< Visible, frustum and occlusion culled counts of the last sample */
     double cull_sum[3];   /**< Sums of the visible, frustum and occlusion culled samples */
     box_perf_priority_t priority; /**< Schedule of the pacing thread during the run */
+    double begin;         /**< Perf clock at the start of the current frame, 0 for none */
+    double os_begin;      /**< OS clock at the start of the previous frame, 0 for none */
+    double cpu;           /**< Process CPU seconds when the measurement started */
+    double wall;          /**< OS clock when the measurement started */
+    int32_t presented;    /**< RenderStatus.presented when the measurement started */
+    int32_t presents_bad; /**< Uneven presents of RenderStatus when the measurement started */
+    int32_t mismatches;   /**< RenderStatus.delta_mismatches when the measurement started */
+    bool boost;           /**< A fly run holds the boost key */
+    double boost_time;    /**< Perf clock of the last boost toggle of a fly run */
+    vec3 last;            /**< Position of the camera in the previous measured frame */
+    bool has_last;        /**< last holds a position */
+    double wake;          /**< Seconds the pacing thread is learned to wake after a sleep ends */
+    double wake_jitter;   /**< Mean deviation of the wake up latency from wake */
+    int32_t wake_samples; /**< Latency samples taken during the run */
     int32_t bake_left;    /**< Probes the bakes had left when they last progressed */
     int32_t bake_stalled; /**< Warmup frames since the bakes last progressed */
 } box_perf_t;
@@ -65,8 +79,9 @@ extern double (*box_perf_clock)(void);
 /** Replacement for sleeping, NULL for the real sleep. Receives the seconds to sleep. */
 extern void (*box_perf_sleep)(double seconds);
 
-/** Give the calling thread a real-time schedule of one frame per interval, on macOS a
- * time-constraint policy. Other platforms keep their schedule.
+/** Give the calling thread a real-time schedule of one frame per interval: on macOS a
+ * time-constraint policy, on Linux SCHED_FIFO where the user may (CAP_SYS_NICE or an RLIMIT_RTPRIO
+ * above 0). Other platforms keep their schedule and rely on the learned wake up latency.
  *
  * @param priority The schedule to update, a schedule of another thread is reset first
  * @param interval Seconds per frame, the period and the deadline of every frame
