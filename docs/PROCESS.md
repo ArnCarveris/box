@@ -64,7 +64,9 @@ part that does not fit in a command. Read `CLAUDE.md` for the house rules and
 
    It first removes every `tests*.json` of an earlier delivery, writes one report per
    project into the task's `deliverable/`, merges them into `tests.json` (which lists
-   under `broken` every run that crashed without a report), copies the benchmark report to `bench.json` and exits non
+   under `broken` every run that crashed without a report), copies the benchmark report to `bench.json` (one
+   `bench_<project>.json` per project when `--bench` names several, after removing the
+   `bench.json` and `bench_<project>.json` of an earlier delivery) and exits non
    zero when anything failed. Add a `deliverable/README.md` of under 20 lines and
    the screenshots of the task's own scene.
 
@@ -78,8 +80,9 @@ part that does not fit in a command. Read `CLAUDE.md` for the house rules and
    [Closing a task](#closing-a-task) and closes it once the verification passes.
 
 10. **Close.** `python3 project/pm.py done <epic>/<task>` refuses while
-    `tests.json` or `bench.json` is missing, while the review loop has not passed, or
-    while a report predates the review, and prints what it wants; a task that
+    `tests.json` or a bench report (`bench.json`, or the `bench_<project>.json` reports of a
+    multi-project delivery) is missing, while the review loop has not passed, or
+    while a report predates the review (each `bench_<project>.json` must be fresh), and prints what it wants; a task that
     changes nothing that runs per frame sets `"bench": false` in its
     `progress.json` instead. `--force` completes past a missing deliverable and says
     so, but never past the review loop: only `--skip-review "<reason>"` closes a task
