@@ -299,4 +299,11 @@ void box_cmd_input_init(
 void box_cmd_render_init(
     ecs_world_t *world);
 
+/** Register the fps and frames commands that print the frame timing.
+ *
+ * @param world The world
+ */
+void box_cmd_frames_init(
+    ecs_world_t *world);
+
 #endif

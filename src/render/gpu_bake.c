@@ -234,6 +234,81 @@ static void box_gpu_volume_write(
     ecs_os_free(probes);
 }
 
+/** Write the validity mask of a volume, after copying one probe buffer into the other for a
+ * BOX_RENDER_VOLUME_COPY; the probes keep their values otherwise.
+ *
+ * @param gpu The backend
+ * @param v The volume
+ * @param desc The op, followed by the mask
+ */
+static void box_gpu_volume_keep(
+    box_gpu_t *gpu,
+    box_gpu_volume_t *v,
+    const box_render_volume_desc_t *desc)
+{
+    if (desc->op == BOX_RENDER_VOLUME_COPY && desc->from < 2) {
+        WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
+        wgpuCommandEncoderCopyBufferToBuffer(encoder, v->probes[desc->from], 0,
+            v->probes[1 - desc->from], 0, (uint64_t)v->count * BOX_GPU_PROBE_SIZE);
+        WGPUCommandBuffer commands = wgpuCommandEncoderFinish(encoder, NULL);
+        wgpuQueueSubmit(gpu->queue, 1, &commands);
+        wgpuCommandBufferRelease(commands);
+        wgpuCommandEncoderRelease(encoder);
+    }
+
+    wgpuQueueWriteBuffer(gpu->queue, v->valid, 0, desc + 1,
+        (size_t)(v->count + 31) / 32 * sizeof(uint32_t));
+}
+
+/** Copy the probes of both buffers of a volume that a resized grid keeps into the volume of
+ * that grid, one run of x per row the two grids share.
+ *
+ * @param gpu The backend
+ * @param from The volume of the old grid
+ * @param to The volume of the new grid, already filled
+ * @param desc The resize: new size, old size and the shift from new to old indices
+ */
+static void box_gpu_volume_carry(
+    box_gpu_t *gpu,
+    const box_gpu_volume_t *from,
+    box_gpu_volume_t *to,
+    const box_render_volume_desc_t *desc)
+{
+    const uint32_t *n = desc->size, *o = desc->old_size;
+    const int32_t *d = desc->shift;
+    int32_t x0 = glm_max(0, -d[0]), x1 = glm_min((int32_t)n[0], (int32_t)o[0] - d[0]);
+    int32_t y, z, i;
+    uint64_t probes = (uint64_t)o[0] * o[1] * o[2];
+    if (x1 <= x0 || probes != from->count) {
+        goto done;
+    }
+
+    WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
+    for (z = 0; z < (int32_t)n[2]; z ++) {
+        for (y = 0; y < (int32_t)n[1]; y ++) {
+            int32_t oy = y + d[1], oz = z + d[2];
+            if (oy < 0 || oz < 0 || oy >= (int32_t)o[1] || oz >= (int32_t)o[2]) {
+                continue;
+            }
+
+            uint64_t src = (uint64_t)(x0 + d[0]) + ((uint64_t)oy + (uint64_t)oz * o[1]) * o[0];
+            uint64_t dst = (uint64_t)x0 + ((uint64_t)y + (uint64_t)z * n[1]) * n[0];
+            for (i = 0; i < 2; i ++) {
+                wgpuCommandEncoderCopyBufferToBuffer(encoder, from->probes[i],
+                    src * BOX_GPU_PROBE_SIZE, to->probes[i], dst * BOX_GPU_PROBE_SIZE,
+                    (uint64_t)(x1 - x0) * BOX_GPU_PROBE_SIZE);
+            }
+        }
+    }
+
+    WGPUCommandBuffer commands = wgpuCommandEncoderFinish(encoder, NULL);
+    wgpuQueueSubmit(gpu->queue, 1, &commands);
+    wgpuCommandBufferRelease(commands);
+    wgpuCommandEncoderRelease(encoder);
+done:
+    return;
+}
+
 /** Release a texture view when it exists.
  *
  * @param view The view, set to NULL
@@ -1126,6 +1201,17 @@ void box_gpu_bake_apply(
     bool valid = desc && desc->probes &&
         (uint64_t)desc->size[0] * desc->size[1] * desc->size[2] == desc->probes &&
         size >= sizeof(box_render_volume_desc_t) + words * sizeof(uint32_t);
+    bool resize = valid && v && op == BOX_RENDER_UPDATE && desc->op == BOX_RENDER_VOLUME_RESIZE;
+    if (resize) {
+        box_gpu_volume_t *grown = box_gpu_volume_new(gpu, desc->probes);
+        box_gpu_volume_write(gpu, grown, desc);
+        box_gpu_volume_carry(gpu, v, grown, desc);
+        box_gpu_volume_free(v);
+        ecs_map_remove(&gpu->volumes, handle);
+        ecs_map_insert_ptr(&gpu->volumes, handle, grown);
+        goto done;
+    }
+
     if (v && (op == BOX_RENDER_DESTROY || !valid || op == BOX_RENDER_CREATE ||
         v->count != desc->probes))
     {
@@ -1147,9 +1233,13 @@ void box_gpu_bake_apply(
     if (!v) {
         v = box_gpu_volume_new(gpu, desc->probes);
         ecs_map_insert_ptr(&gpu->volumes, handle, v);
+        box_gpu_volume_write(gpu, v, desc);
+    } else if (op == BOX_RENDER_CREATE || desc->op == BOX_RENDER_VOLUME_FILL) {
+        box_gpu_volume_write(gpu, v, desc);
+    } else {
+        box_gpu_volume_keep(gpu, v, desc);
     }
 
-    box_gpu_volume_write(gpu, v, desc);
 done:
     return;
 }

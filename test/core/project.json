@@ -177,6 +177,32 @@
                     "child_follows_parent",
                     "moving_child"
                 ]
+            },
+            {
+                "id": "FrameClock",
+                "testcases": [
+                    "timing_measures_delta_and_interval",
+                    "late_delta_counted",
+                    "dropped_frame_counted",
+                    "headless_steps_fixed_delta",
+                    "cap_sleeps_rest_of_frame",
+                    "vsync_paces_without_cap",
+                    "vsync_delta_smoothed",
+                    "swap_interval_follows_cap",
+                    "cadence_delta_matches_display",
+                    "cap_does_not_spin",
+                    "wait_does_not_spin",
+                    "fps_command",
+                    "long_run_59_94_hz_no_drift",
+                    "long_run_143_98_hz_no_drift",
+                    "late_gpu_repeats_frame",
+                    "fences_end_with_backend",
+                    "smoothing_follows_display_change",
+                    "cap_guard_never_binds_paced",
+                    "cap_guard_bounds_runaway",
+                    "cadence_repeats",
+                    "window_presents_follow_cadence"
+                ]
             }
         ]
     }

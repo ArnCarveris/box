@@ -245,6 +245,7 @@ typedef struct box_render_target_desc_t {
     int32_t point_width;    /**< Width in points cameras are sized by, the width when 0 */
     int32_t point_height;   /**< Height in points cameras are sized by, the height when 0 */
     bool vsync;             /**< A window presents with vertical sync */
+    float refresh;          /**< Refresh rate in Hz of the display of a window, 0 unknown */
     bool texture;           /**< Materials sample the image, so it renders before other targets */
 } box_render_target_desc_t;
 
@@ -271,6 +272,15 @@ typedef struct box_render_texture_desc_t {
 /** Coefficients of an L2 spherical harmonic: one for band 0, three for 1 and five for 2 */
 #define BOX_RENDER_SH_COEFFICIENTS (9)
 
+/** What an update of a BOX_RENDER_VOLUME does */
+typedef enum box_render_volume_op_t {
+    BOX_RENDER_VOLUME_FILL = 0, /**< Fill every probe of both buffers with sh, write the mask */
+    BOX_RENDER_VOLUME_MASK = 1, /**< Write the mask only, the probes keep their values */
+    BOX_RENDER_VOLUME_COPY = 2, /**< Copy probe buffer from into the other one, then the mask */
+    BOX_RENDER_VOLUME_RESIZE = 3 /**< Take the new grid, fill it with sh, keep the probes of both
+                                  *   buffers it shares with the old grid, then the mask */
+} box_render_volume_op_t;
+
 /** Description of a BOX_RENDER_VOLUME create or update, followed by the validity mask.
  *
  * Probe (x, y, z) is at origin + (x, y, z) * spacing, stored x fastest, then y, then z. A
@@ -278,8 +288,8 @@ typedef struct box_render_texture_desc_t {
  * evaluated as E(n) / pi in place of the hemisphere ambient.
  *
  * It has two probe buffers, so a pass reads the one the previous pass wrote. The mask has one
- * bit per probe, (probes + 31) / 32 words, set outside static geometry. A create fills every
- * probe of both buffers with sh; an update of the same grid refills them and the mask.
+ * bit per probe, (probes + 31) / 32 words, set where views sample the probe. A create fills
+ * every probe of both buffers with sh and writes the mask; an update does what its op says.
  */
 typedef struct box_render_volume_desc_t {
     float origin[3];        /**< World position of the first probe */
@@ -287,6 +297,10 @@ typedef struct box_render_volume_desc_t {
     uint32_t size[3];       /**< Probes per axis, at least 1 */
     uint32_t probes;        /**< Probes of the grid, the product of size */
     float sh[BOX_RENDER_SH_COEFFICIENTS][4]; /**< Linear rgb irradiance coefficients, w unused */
+    uint32_t op;            /**< box_render_volume_op_t of an update */
+    uint32_t from;          /**< Probe buffer a BOX_RENDER_VOLUME_COPY reads, 0 or 1 */
+    int32_t shift[3];       /**< Old grid index of probe 0 of a resize per axis, new + shift */
+    uint32_t old_size[3];   /**< Probes per axis of the grid before a resize */
 } box_render_volume_desc_t;
 
 /** A probe the backend captures: six faces around its position, projected onto its SH */
@@ -418,6 +432,11 @@ typedef struct box_render_packet_t {
     int64_t frame;          /**< Frame the packet was extracted in */
     double time;            /**< World time at the end of the frame, in seconds */
     float delta;            /**< Seconds the frame advanced the world */
+    float fps;              /**< Frame rate cap of the frame, App.fps, 0 when uncapped */
+    bool vsync;             /**< A window target of the frame presents with vsync */
+    float refresh;          /**< Refresh rate in Hz of the display of that window, 0 unknown */
+    int32_t presents;       /**< Refreshes the frame is shown for, set by the submit, 0 when
+                             *   presentation does not pace it */
     uint32_t anisotropy;    /**< Anisotropic samples of the texture samplers, 1 to 16 */
     ecs_vec_t resources;    /**< box_render_resource_t in the order they were made */
     ecs_vec_t uploads;      /**< box_render_upload_t in the order they were made */
@@ -442,6 +461,10 @@ typedef struct box_render_backend_t {
     void (*render)(void*, const box_render_packet_t*); /**< Render a packet, valid until return */
     void (*fini)(void*);        /**< Release what init created */
     void (*free)(void*);        /**< Free ctx on the main thread, NULL when the caller owns it */
+    uint64_t (*fence)(void*);   /**< Mark the work render submitted so far, 0 when unsupported */
+    void (*wait)(void*, uint64_t); /**< Block until the GPU finished the work of a fence */
+    bool (*done)(void*, uint64_t); /**< Check without blocking whether a fence is done, NULL
+                                    *   when only the time a wait takes tells */
 } box_render_backend_t;
 
 /** Backend that renders nothing and records what it received, the default backend */
@@ -763,6 +786,31 @@ void box_render_lights_stats(
     const ecs_world_t *world,
     box_render_lights_stats_t *stats);
 
+/** Get the state of the light extract of a world, valid as long as the world.
+ *
+ * @param world The world
+ * @return The state, NULL without the light extract
+ */
+const void* box_render_lights_state(
+    const ecs_world_t *world);
+
+/** Get the lights the light extract collected for a scene in this frame.
+ *
+ * The directional lights come first, then the point and spot lights, in query order; a scene
+ * without light entities has none here and is lit by the default sun.
+ *
+ * @param state The state of the light extract
+ * @param scene The scene, 0 for the default scene
+ * @param count Receives the number of lights
+ * @param entities Receives the entity of each light
+ * @return The lights, NULL when the scene has none
+ */
+const box_render_light_t* box_render_lights_scene(
+    const void *state,
+    ecs_entity_t scene,
+    int32_t *count,
+    const ecs_entity_t **entities);
+
 /** Register the cached query that knows the scene of every entity in a scene.
  *
  * @param world The world
@@ -905,8 +953,8 @@ bool box_render_bake_probe(
  * progress counts nothing.
  *
  * @param world The world
- * @return Probe captures of every pass not reported yet, 0 when every bake that can progress
- *         converged
+ * @return Probe captures of every pass not reported yet, those of the probes a change queued
+ *         included, 0 when every bake that can progress converged
  */
 int32_t box_render_bake_pending(
     const ecs_world_t *world);
@@ -1248,6 +1296,75 @@ void box_render_ring_pause(
  */
 void box_render_ring_sync(
     box_render_ring_t *ring);
+
+/** Compute how many refreshes a frame is shown for so that vsync paces a frame rate cap, the
+ * swap interval of Vulkan, EGL and D3D (Unity's vSyncCount) that webgpu does not expose.
+ *
+ * The refresh rate may be off by BOX_RENDER_REFRESH_SLACK, as reported rates are whole Hz.
+ *
+ * @param refresh Refresh rate of the display in Hz, 0 when unknown
+ * @param fps Frame rate cap, 0 for none
+ * @return The interval, 1 without a cap or with a cap at or above the refresh rate, 0 when
+ *         the refresh rate is unknown or not a whole multiple of the cap
+ */
+int32_t box_render_swap_interval(
+    float refresh,
+    float fps);
+
+/** Compute the refreshes the next frame is shown for: the swap interval, or for a cap between
+ * two whole multiples a cadence that alternates between them, like a 3:2 pulldown, so the
+ * frames average the cap and each is shown for whole refreshes the delta can match.
+ *
+ * @param phase Refreshes owed to the frames so far, 0 at the start of a cadence
+ * @param refresh Refresh rate of the display in Hz, 0 when unknown
+ * @param fps Frame rate cap, 0 for none
+ * @return The refreshes, 0 when the refresh rate is unknown
+ */
+int32_t box_render_cadence_next(
+    double *phase,
+    float refresh,
+    float fps);
+
+/** Count the frames after which the refreshes of box_render_cadence_next repeat.
+ *
+ * @param refresh Refresh rate of the display in Hz, 0 when unknown
+ * @param fps Frame rate cap, 0 for none
+ * @return 1 for a swap interval, the frames of one cycle of a cadence, 0 when the refresh
+ *         rate is unknown or the cadence does not repeat within BOX_RENDER_CADENCE_MAX frames
+ */
+int32_t box_render_cadence_cycle(
+    float refresh,
+    float fps);
+
+/** Frames a cadence repeats within at most for box_render_cadence_cycle */
+#define BOX_RENDER_CADENCE_MAX (240)
+
+/** Count the presents of a frame to a window: the frame is presented again until it was shown
+ * for its refreshes, since webgpu has no swap interval.
+ *
+ * @param window The target presents to a window surface
+ * @param vsync The window presents with vertical sync
+ * @param presents Refreshes the packet is shown for
+ * @return Presents of the frame, at least 1
+ */
+int32_t box_render_window_presents(
+    bool window,
+    bool vsync,
+    int32_t presents);
+
+/** Decide whether a target renders into a scene texture that a blit copies to its image: when
+ * the render size differs from the image, or when a vsync window may present a frame again,
+ * which needs the frame kept in a texture of its own.
+ *
+ * @param desc The description of the target
+ * @param window The target presents to a window surface
+ * @param fps Frame rate cap of the frame, 0 for none
+ * @return Whether the target needs the scene texture
+ */
+bool box_render_target_scene(
+    const box_render_target_desc_t *desc,
+    bool window,
+    float fps);
 
 /** Read the counters of a ring.
  *
