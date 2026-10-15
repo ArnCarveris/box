@@ -174,7 +174,7 @@ unchanged.
 compiles in an error scope, keeping the old module on failure. Compile errors come back into
 `ShaderStatus` as `file:line: message`, mapped through a per line source table. Engine shaders
 live in `etc/shaders` (blit, mesh, shape2d, scatter, cull, cluster, shadow, bloom, ssao, fog,
-tonemap, exposure) with shared includes. `tools/wgsl_check.mjs` validates them with Tint.
+tonemap, exposure, bake_sh) with shared includes. `tools/wgsl_check.mjs` validates them with Tint.
 
 ## Scenes
 
@@ -217,8 +217,9 @@ are keyed by texture entities; normal maps use a cotangent frame (no tangents).
 
 ## Renderer passes
 
-For each target the backend applies resource changes and uploads, runs the scatter pass, then
-for each view in packet order (creation order, only views whose camera has a `Camera`):
+For each packet the backend applies resource changes and uploads, runs the scatter pass and
+the probe captures (see Lights, baked lighting), then for each target and each view in packet
+order (creation order, only views whose camera has a `Camera`):
 
 1. Effects begin: a view with enabled effects renders into an `rgba16float` target.
 2. Light clustering (`cluster.wgsl`, only with point or spot lights).
@@ -280,7 +281,50 @@ the baked lighting settings: `probe_spacing` 2, `bounces` 2, `capture_size` 16, 
 `bounds_padding` 1 and `cache` (`".box/bake"`, owned string, empty for none), all set by the
 constructor and taken literally otherwise. Adding it makes the engine add `LightBakeStatus`
 (`probes`, `baked`, `pass`, `converged`, `cache_hit`), removed with it. `NoBake` keeps a static
-shape out of the captures. These are data only for now: nothing samples a volume yet.
+shape out of the captures; a static shape has neither `DynamicTransform` nor `ManualTransform`.
+
+**Probe volume.** `RenderExtractBake` (`src/render/bake.c`) places a grid per baked scene over
+the static bounds of its spatial index (`box_spatial_static_bounds`) plus `bounds_padding`,
+`probe_spacing` apart (ceil(extent / spacing) + 1 per axis, centered, spacing widened above
+262144 probes), again only when the index or the settings change. Probes inside the oriented
+bounds of a static captured shape are invalid. The volume is a `BOX_RENDER_VOLUME` resource
+(`gpu_bake.c`): a grid uniform, 9 rgb L2 SH irradiance coefficients per probe
+(Ramamoorthi-Hanrahan, Sloan's basis) and a validity bit mask, filled with the exact SH of the
+hemisphere ambient when it is created or the ambient changes. A view with `lighting.baked`
+binds it as group 3 of `mesh.wgsl`, whose `ambient()` term blends the 8 surrounding valid
+probes with DDGI style wrap weights; other views bind a 1x1x1 volume that keeps the
+hemisphere, so a scene without `LightBake` renders exactly as before.
+
+**Probe captures.** Every frame the bake extract moves the unbaked valid probes nearest to the
+cameras of the views of the scene into the packet as a bake batch with the lights of the scene.
+The queue is kept sorted by camera distance and sorted again only when probes return to it or a
+camera moved more than a probe spacing. The number per frame is `budget_ms` over the GPU time
+per probe, an average of measurements, at most 256. The time comes from timestamp queries around
+the captures of a packet (requested natively and by `apps/boxrun/shell.html` when the adapter
+has `timestamp-query`, resolved a packet later because Metal writes pass timestamps when the
+pass completes, read back without waiting, measurements over a second dropped); without them it
+is the CPU time from recording until the queue reports the work done, which includes waits and
+errs on the expensive side. On the render thread the captures run before the targets, in chunks
+of at most 32 probes per command buffer: six 90 degree faces of `capture_size` texels per probe
+render the opaque static batches of the scene with the forward pipeline into an rgba16float
+array, culled per face by frustum and 1 px size, without history, effects or 2D. Batches carry a
+`bake` key only in scenes with `LightBake` (opaque 3D shapes without `DynamicTransform`,
+`ManualTransform` or `NoBake`; the draw observers re-key on changes), so other scenes batch as
+before. The faces are lit by the lights of the scene with a black ambient term; the sun is
+shadowed by one cascade fitted around the bounding sphere of the static bounds (`gpu_shadow.c`),
+point and spot lights are clustered per face and unshadowed. `bake_sh.wgsl` then projects each
+probe: radiance times the SH basis times the exact solid angle of each texel, texels nothing
+covered seeing the hemisphere ambient as a + 1.5 b y so an open probe equals the hemisphere,
+then the clamped cosine convolution per band. The backend reports every probe it captured; a
+probe of a rendered packet it did not report (a missing pipeline or volume, a dropped packet) is
+queued again. Probes not captured yet keep their ambient values, so a partial bake blends in.
+`LightBakeStatus.baked` counts reported probes, `pass` is 1, `converged` is set when every valid
+probe was reported, and `error` explains a `capture_size` outside 1 to 256, which bakes nothing;
+a new grid or ambient starts the pass again. A headless run captures every probe left in each
+packet, so its frames show the converged bake. `PerfRun` warms up again while a bake that can
+progress (valid settings, `budget_ms` above 0, a view of its scene, the GPU backend) has probes
+left, and gives up with an error after 300 frames without progress. `budget_ms` 0 never bakes.
+Only one pass is baked: the captures see emission and direct light, one bounce.
 
 ## Spatial index
 
@@ -291,14 +335,17 @@ changed shapes and subtree roots; `SpatialUpdate` (`EcsOnStore`) places only tho
 shapes are marked stale and placed by the first query after a frame, so an idle frame pays
 nothing. Queries (`src/spatial/spatial.h`) are scoped to one scene: nearest ray with a narrow
 phase filter, all hits sorted, box and sphere overlap, entity bounds. `box_controller_move`
-uses them for collision. Bounds are boxes; there is no mesh level narrow phase and no picking.
+uses them for collision, `box_spatial_static_bounds` gives the box around the static shapes of
+a scene to the bake. Bounds are boxes; there is no mesh level narrow phase and no picking.
 
 ## Text, layout and UI
 
 **Text.** `Text {value, size, line_height, width, align, font}` and `Font {path}`
 (`box.text.DefaultFont` is B612 in `etc/fonts`). Fonts load with stb_truetype on the job system.
 Glyph MSDFs are generated lazily per glyph on workers into RGBA8 atlas pages that grow and then
-page. Layout handles UTF-8, kerning, newlines, word breaks and alignment; the block is centered
+page. Font data is untrusted: a face without units per em fails to load, and a glyph whose box
+is larger than a page (1024 minus spacing) is drawn as the missing glyph with one warning per
+font load; atlas placement makes at most `BOX_TEXT_PLACE_TRIES` passes. Layout handles UTF-8, kerning, newlines, word breaks and alignment; the block is centered
 on the origin and measured into `TextBounds`. Glyphs are slots of the 2D batches keyed by atlas
 page (`src/render/text_draw.c`), shaded by `shape2d.wgsl`. No shaping (ligatures, RTL).
 
@@ -323,9 +370,17 @@ culling with occlusion, 1 px minimum size and the shadow defaults.
 
 ## Input and controllers
 
-`box.input` has two sources: a platform hook (`box_input_platform_push`, glfw and browser
-backends not implemented) and a synthetic queue applied in order with per event frame delays.
-`InputUpdate` writes the `Input` singleton and emits script events at `box.input.screen`.
+`box.input` has two sources: a platform hook (`box_input_platform_t` with `poll`, `free` and
+`capture` callbacks, events pushed with `box_input_platform_push`) and a synthetic queue applied
+in order with per event frame delays. The glfw backend (`box_input_glfw_attach` when a window
+opens, `box_input_glfw_detach` before it closes) and the browser backend (`box_input_web_attach`
+on the canvas) stamp each event with the surface of its window; only events of the focused
+surface (`Input.surface`) apply. `InputUpdate` writes the `Input` singleton and emits script
+events at `box.input.screen`. Setting `Input.capture` captures the cursor while input is
+focused: glfw's disabled cursor with raw motion natively, the Pointer Lock API in the browser,
+granted at the next click or key. `Mouse.captured` says when the platform holds it, `InputCaptured`
+events report a lock the browser takes or ends, and Escape or a refused lock clears the request
+with an `InputCapture` event.
 `Action` entities get an `ActionState` (down, pressed, released, start, delta, drag) written by
 `ActionUpdate`; `Binding` entities (key, modifiers) map keys to actions, and script events
 `on.pressed`, `on.held`, `on.dragged`, `on.released` fire for them. Real input is ignored while
@@ -348,7 +403,12 @@ A `Terminal` session has a cwd; every line goes to the session log and `commands
 are script functions registered with `box_command_register` (`src/command`):
 
 - Shell and components: `cd`, `ls`, `touch`, `rm`, `mv`, `man`, `add`, `remove`, `set`, `get`,
-  `clear`, guarded against flecs aborts. flecs entities are read only.
+  `clear`, guarded against flecs aborts. flecs entities are read only. `rm`, `mv`, `add`,
+  `remove`, `set` and `clear` refuse modules, sessions (any `Terminal` entity) and everything in
+  their scope ("belongs to a module or session"), so one session cannot close, rewire or retune
+  another session or the module state (`TerminalHost`, `TerminalServer`, `TerminalLimits`);
+  the host changes those from C or script. Without a `TerminalHost` commands fail with
+  "box.command is not imported", `box_terminal_new` returns 0 and requests get HTTP 503.
 - Search: `query`, `iter`, `next`, `done`, `has`, `grep`, `grep_recur`. Iteration re-runs the
   query from an offset, so no iterator stays open.
 - Scripts: `script_read`, `script_write`, `script_patch`, `script_grep`, limited to the working
@@ -393,7 +453,7 @@ deletes the scene the next frame.
   delta and number of differing pixels), writing an HTML report; `--update-baseline` refreshes.
 - Performance scenes: `box.perf` `PerfRun` (fps 30/60/90/120) paces frames to the target
   interval, orbits a camera around the bounds of every shape and counts intervals outside 10%
-  as errors; `PerfStatus` and a JSON report carry the numbers. `tools/integration.py perf` runs
+  as errors, warming up again while a bake has not converged; `PerfStatus` and a JSON report carry the numbers. `tools/integration.py perf` runs
   `test/integration/perf`. `test/perf` uses a fake clock so it is machine independent.
 - Benchmarks: `bench/{core,controller,render,scene,transform,ui}` and `tools/bench.py` report
   median, confidence interval and percentiles; `--baseline` flags changes beyond 5%.

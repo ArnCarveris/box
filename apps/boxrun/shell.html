@@ -43,7 +43,8 @@
     if (!adapter) {
       throw new Error('No WebGPU adapter.');
     }
-    return adapter.requestDevice();
+    var features = adapter.features.has('timestamp-query') ? ['timestamp-query'] : [];
+    return adapter.requestDevice({ requiredFeatures: features });
   }).then(function (device) {
     device.lost.then(function (info) {
       if (info.reason !== 'destroyed') {

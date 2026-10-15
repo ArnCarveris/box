@@ -1620,3 +1620,188 @@ void Picking_capture_cleared_when_deleted(void) {
 
     ecs_fini(world);
 }
+
+void Picking_focused_surface_views(void) {
+    // input_fixes/multi_window_input
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_assert(ecs_script(world, { .code =
+        "using flecs.script\n"
+        "using box.transform\n"
+        "using box.geometry\n"
+        "using box.camera\n"
+        "using box.view\n"
+        "using box.surface\n"
+        "using box.picking\n"
+        "template Probe {\n"
+        "  mut clicks: i32 = 0\n"
+        "  async {\n"
+        "    while true {\n"
+        "      await on.click(this)\n"
+        "      clicks = clicks + 1\n"
+        "    }\n"
+        "  }\n"
+        "}\n"
+        "cam_a {\n"
+        "  Position: {0, 0, 10}\n"
+        "  Camera: {}\n"
+        "}\n"
+        "cam_b {\n"
+        "  Position: {100, 0, 10}\n"
+        "  Camera: {}\n"
+        "}\n"
+        "cube_a {\n"
+        "  Position: {0, 0, 0}\n"
+        "  Box: {2, 2, 2}\n"
+        "  Interactive\n"
+        "  Probe: {}\n"
+        "}\n"
+        "cube_b {\n"
+        "  Position: {100, 0, 0}\n"
+        "  Box: {2, 2, 2}\n"
+        "  Interactive\n"
+        "  Probe: {}\n"
+        "}\n"
+        "views_a {\n"
+        "  view { View: {camera: cam_a} }\n"
+        "}\n"
+        "views_b {\n"
+        "  view { View: {camera: cam_b} }\n"
+        "}\n"
+        "surface_a {\n"
+        "  Surface: {width: 1280, height: 720, view_root: views_a}\n"
+        "}\n"
+        "surface_b {\n"
+        "  Surface: {width: 1280, height: 720, view_root: views_b}\n"
+        "}\n" }) != 0);
+
+    typedef struct { int32_t clicks; } Mut;
+    ecs_entity_t mut = ecs_lookup(world, "Probe.mut");
+    ecs_entity_t cube_a = ecs_lookup(world, "cube_a");
+    ecs_entity_t cube_b = ecs_lookup(world, "cube_b");
+    ecs_entity_t surface_a = ecs_lookup(world, "surface_a");
+    ecs_entity_t surface_b = ecs_lookup(world, "surface_b");
+    ecs_progress(world, 0);
+
+    box_input_platform_push(world, &(InputEvent){
+        .kind = InputFocus, .code = 1, .surface = surface_b });
+    ecs_progress(world, 0);
+    test_uint(ecs_singleton_get(world, Input)->surface, surface_b);
+
+    ecs_entity_t s = box_terminal_new(world);
+    ecs_os_free(box_terminal_run(world, s, "mouse.click left [640, 360]", NULL));
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_int(((const Mut*)ecs_get_id(world, cube_b, mut))->clicks, 1);
+    test_int(((const Mut*)ecs_get_id(world, cube_a, mut))->clicks, 0);
+
+    box_input_platform_push(world, &(InputEvent){
+        .kind = InputFocus, .code = 1, .surface = surface_a });
+    ecs_progress(world, 0);
+    ecs_os_free(box_terminal_run(world, s, "mouse.click left [640, 360]", NULL));
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_int(((const Mut*)ecs_get_id(world, cube_b, mut))->clicks, 1);
+    test_int(((const Mut*)ecs_get_id(world, cube_a, mut))->clicks, 1);
+
+    box_input_platform_push(world, &(InputEvent){
+        .kind = InputMove, .value = { 640, 360 }, .surface = surface_b });
+    box_input_platform_push(world, &(InputEvent){
+        .kind = InputKeyDown, .key = KeyMouseLeft, .surface = surface_b });
+    box_input_platform_push(world, &(InputEvent){
+        .kind = InputKeyUp, .key = KeyMouseLeft, .surface = surface_b });
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_int(((const Mut*)ecs_get_id(world, cube_b, mut))->clicks, 1);
+    test_int(((const Mut*)ecs_get_id(world, cube_a, mut))->clicks, 1);
+
+    ecs_fini(world);
+}
+
+void Picking_focus_click_without_move(void) {
+    // input_fixes/multi_window_input
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_assert(ecs_script(world, { .code =
+        "using flecs.script\n"
+        "using box.transform\n"
+        "using box.geometry\n"
+        "using box.camera\n"
+        "using box.view\n"
+        "using box.surface\n"
+        "using box.picking\n"
+        "template Probe {\n"
+        "  mut clicks: i32 = 0\n"
+        "  async {\n"
+        "    while true {\n"
+        "      await on.click(this)\n"
+        "      clicks = clicks + 1\n"
+        "    }\n"
+        "  }\n"
+        "}\n"
+        "cam_a {\n"
+        "  Position: {0, 0, 10}\n"
+        "  Camera: {}\n"
+        "}\n"
+        "cam_b {\n"
+        "  Position: {100, 0, 10}\n"
+        "  Camera: {}\n"
+        "}\n"
+        "cube_a {\n"
+        "  Position: {0, 0, 0}\n"
+        "  Box: {2, 2, 2}\n"
+        "  Interactive\n"
+        "  Probe: {}\n"
+        "}\n"
+        "cube_b {\n"
+        "  Position: {100, 0, 0}\n"
+        "  Box: {2, 2, 2}\n"
+        "  Interactive\n"
+        "  Probe: {}\n"
+        "}\n"
+        "views_a {\n"
+        "  view { View: {camera: cam_a} }\n"
+        "}\n"
+        "views_b {\n"
+        "  view { View: {camera: cam_b} }\n"
+        "}\n"
+        "surface_a {\n"
+        "  Surface: {width: 1280, height: 720, view_root: views_a}\n"
+        "}\n"
+        "surface_b {\n"
+        "  Surface: {width: 1280, height: 720, view_root: views_b}\n"
+        "}\n" }) != 0);
+
+    typedef struct { int32_t clicks; } Mut;
+    ecs_entity_t mut = ecs_lookup(world, "Probe.mut");
+    ecs_entity_t cube_a = ecs_lookup(world, "cube_a");
+    ecs_entity_t cube_b = ecs_lookup(world, "cube_b");
+    ecs_entity_t surface_a = ecs_lookup(world, "surface_a");
+    ecs_entity_t surface_b = ecs_lookup(world, "surface_b");
+    ecs_progress(world, 0);
+
+    box_input_platform_push(world, &(InputEvent){
+        .kind = InputFocus, .code = 1, .surface = surface_a });
+    box_input_platform_push(world, &(InputEvent){
+        .kind = InputMove, .value = { 100, 50 }, .surface = surface_a });
+    ecs_progress(world, 0);
+
+    box_input_platform_push(world, &(InputEvent){
+        .kind = InputMove, .value = { 640, 360 }, .surface = surface_b });
+    ecs_progress(world, 0);
+
+    box_input_platform_push(world, &(InputEvent){
+        .kind = InputFocus, .code = 1, .surface = surface_b });
+    box_input_platform_push(world, &(InputEvent){
+        .kind = InputKeyDown, .key = KeyMouseLeft, .surface = surface_b });
+    box_input_platform_push(world, &(InputEvent){
+        .kind = InputKeyUp, .key = KeyMouseLeft, .surface = surface_b });
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_int(((const Mut*)ecs_get_id(world, cube_b, mut))->clicks, 1);
+    test_int(((const Mut*)ecs_get_id(world, cube_a, mut))->clicks, 0);
+
+    ecs_fini(world);
+}

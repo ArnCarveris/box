@@ -81,7 +81,10 @@
                     "align_lines",
                     "many_glyphs",
                     "dynamic_transform",
-                    "module_child_fini"
+                    "module_child_fini",
+                    "oversized_glyph_missing",
+                    "oversized_warns_once_per_font",
+                    "font_without_units_fails"
                 ]
             },
             {
@@ -133,7 +136,9 @@
                     "capture_drag_across_second_view",
                     "capture_release_outside",
                     "capture_cleared_after_release",
-                    "capture_cleared_when_deleted"
+                    "capture_cleared_when_deleted",
+                    "focused_surface_views",
+                    "focus_click_without_move"
                 ]
             },
             {

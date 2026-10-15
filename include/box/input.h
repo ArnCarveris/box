@@ -73,7 +73,9 @@ ECS_ENUM(InputEventKind, {
     InputRelease,    /**< The synthetic cursor is unpinned, the real pointer resumes */
     InputReset,      /**< Every held key, button and action is released, the cursor unpinned */
     InputActionDown, /**< A synthetic hold of an action starts */
-    InputActionUp    /**< A synthetic hold of an action ends */
+    InputActionUp,   /**< A synthetic hold of an action ends */
+    InputCapture,    /**< Sets Input.capture to code, a platform sends 0 when it ends a capture */
+    InputCaptured    /**< The platform took (code 1) or let go (code 0) of the cursor */
 });
 
 /** One device event, pushed by the platform or queued as synthetic input */
@@ -86,6 +88,7 @@ ECS_STRUCT(InputEvent, {
     bool repeat;         /**< A platform key down repeated while the key is held */
     int32_t delay;       /**< Frames a synthetic event waits after the one before it */
     ecs_entity_t action; /**< Action of an action event */
+    ecs_entity_t surface; /**< Surface whose window sent a platform event, 0 for any surface */
 });
 
 /** Cursor and wheel state of the current frame */
@@ -95,15 +98,23 @@ ECS_STRUCT(Mouse, {
     vec2 normalized; /**< Cursor over the window size, 0..1 from the top left */
     vec2 scroll;     /**< Wheel offset of this frame */
     bool pinned;     /**< A synthetic cursor is pinned, platform movement is ignored */
+    bool captured;   /**< The platform holds the cursor: hidden, kept in the window, unbounded */
 });
 
-/** Device state of the current frame, written by the InputUpdate system */
+/** Device state of the current frame, written by the InputUpdate system.
+ *
+ * The application sets capture to capture the cursor while input is focused, through glfw's
+ * disabled cursor with raw motion natively and Pointer Lock in the browser, which grants it at
+ * the next click or key; mouse.captured says when the platform holds it.
+ */
 ECS_STRUCT(Input, {
     KeyState keys[104]; /**< State of every key and mouse button, indexed by Key */
     Mouse mouse;        /**< Cursor and wheel state */
     char *text;         /**< Text typed this frame as UTF-8, owned, NULL for none */
     vec2 size;          /**< Window size in points, 0 until a resize event */
     bool focused;       /**< Platform input is applied, false ignores it */
+    ecs_entity_t surface; /**< Surface with the input focus, 0 until one gains it */
+    bool capture;       /**< Capture the cursor while input is focused, for mouse look */
 });
 
 /** A named game action, an entity that bindings and synthetic input drive */
@@ -152,10 +163,27 @@ ECS_STRUCT(ActionEvent, {
     float drag_y;        /**< Vertical cursor movement since the action went down */
 });
 
+/** Capture or release the cursor in the window of a surface.
+ *
+ * A backend that captures later pushes an InputCaptured event when it does.
+ *
+ * @param world The world
+ * @param surface The surface, 0 for every window of the world
+ * @param captured Whether the cursor is captured
+ * @param ctx The ctx of the backend
+ * @return Whether the cursor is captured when the call returns
+ */
+typedef bool (*box_input_capture_t)(
+    ecs_world_t *world,
+    ecs_entity_t surface,
+    bool captured,
+    void *ctx);
+
 /** Backend that feeds real device input, such as glfw or the browser */
 typedef struct box_input_platform_t {
     void (*poll)(ecs_world_t *world, void *ctx); /**< Pushes the OS events at frame start */
     void (*free)(void *ctx);                     /**< Releases ctx, NULL when not needed */
+    box_input_capture_t capture;                 /**< Captures the cursor, NULL when it cannot */
     void *ctx;                                   /**< Backend state passed to the callbacks */
 } box_input_platform_t;
 
@@ -189,6 +217,9 @@ void box_input_platform_set(
  *
  * Cursor moves are ignored while a synthetic cursor is pinned; focus and resize events
  * always apply. The delay of the event is ignored.
+ *
+ * Only events of Input.surface apply, or of any surface while it is 0. A focus gain of another
+ * surface releases the held keys; a surface gaining focus takes its last size and cursor.
  *
  * @param world The world
  * @param event The event
@@ -274,6 +305,53 @@ bool box_input_dom_on_key(
     bool down,
     bool repeat,
     bool shortcut);
+
+/** Pointer state of the browser backend: the cursor and the pointer lock of the canvas */
+typedef struct box_input_dom_pointer_t {
+    vec2 cursor; /**< Cursor in surface points, moved by the movement of events while locked */
+    bool want;   /**< The device asked for the pointer lock */
+    bool locked; /**< The canvas holds the pointer lock */
+} box_input_dom_pointer_t;
+
+/** Push the cursor move of a browser mouse event: its position, or while the pointer is locked
+ * the cursor moved by the movement of the event, unbounded by the canvas.
+ *
+ * @param world The world
+ * @param pointer The pointer state
+ * @param position Cursor position of the event in surface points
+ * @param movement movementX and movementY of the event in surface points
+ */
+void box_input_dom_on_move(
+    ecs_world_t *world,
+    box_input_dom_pointer_t *pointer,
+    const vec2 position,
+    const vec2 movement);
+
+/** Track a pointerlockchange: pushes InputCaptured when the lock starts or ends, and
+ * InputCapture 0 when a wanted lock ends while the page keeps the focus (Escape).
+ *
+ * @param world The world
+ * @param pointer The pointer state
+ * @param locked Whether the canvas holds the lock now
+ * @param page_focused Whether the document has the focus, false when a blur ended the lock
+ * @return Whether the lock must be exited because nothing wants it
+ */
+bool box_input_dom_on_lock(
+    ecs_world_t *world,
+    box_input_dom_pointer_t *pointer,
+    bool locked,
+    bool page_focused);
+
+/** Track a pointerlockerror: a refused lock that is wanted clears Input.capture.
+ *
+ * @param world The world
+ * @param pointer The pointer state
+ * @param page_focused Whether the document has the focus
+ */
+void box_input_dom_on_lock_error(
+    ecs_world_t *world,
+    box_input_dom_pointer_t *pointer,
+    bool page_focused);
 
 /** Push the platform event of a browser wheel event in the units of glfw: one per wheel
  * notch, positive y when the wheel turns away from the user.

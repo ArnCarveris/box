@@ -58,6 +58,12 @@
 /** Effect passes, HDR targets and the state effects keep across frames */
 typedef struct box_gpu_effects_t box_gpu_effects_t;
 
+/** Edge in texels of the shadow map of the probe captures */
+#define BOX_GPU_CAPTURE_SHADOW_RESOLUTION (2048)
+
+/** Textures, pipelines and timing of the probe captures */
+typedef struct box_gpu_bake_t box_gpu_bake_t;
+
 /** Forward pipelines by color format, blend mode and back face mode, at most */
 #define BOX_GPU_FORWARD_PIPELINES (64)
 
@@ -383,6 +389,11 @@ typedef struct box_gpu_t {
     WGPUBuffer shadow_buffer;       /**< Cascade matrices of the views of a target */
     int32_t shadow_capacity;        /**< Views the cascade buffer holds */
     ecs_vec_t shadow_data;          /**< Bytes of the cascade matrices of a target */
+    WGPUTexture capture_shadow;     /**< Shadow map of the probe captures, one cascade */
+    WGPUTextureView capture_shadow_view; /**< Array view the captures sample */
+    WGPUTextureView capture_shadow_layer; /**< View the casters render into */
+    WGPUBuffer capture_shadow_buffer; /**< Matrix of the cascade of the captures */
+    WGPUBindGroup capture_shadow_group; /**< Binds the matrix to the shadow pipeline */
     WGPUBindGroupLayout instance_layout; /**< Binds the instance buffer of a batch */
     box_gpu_cull_t cull;            /**< Cull pass state */
     WGPUBindGroupLayout scatter_layout; /**< Bind group layout of the scatter pass */
@@ -399,6 +410,8 @@ typedef struct box_gpu_t {
     uint32_t canvas;                /**< Target presented on the page canvas, 0 for none */
     box_gpu_effects_t *effects;     /**< Effect passes of the views */
     uint32_t rendering;             /**< Target that is rendering, materials cannot sample it */
+    bool timestamps;                /**< The device has timestamp queries */
+    box_gpu_bake_t *bake;           /**< Probe captures, created on the first capture */
 } box_gpu_t;
 
 /** Fields of the counters of the backend */
@@ -646,6 +659,28 @@ WGPUBindGroup box_gpu_bake_group(
     box_gpu_t *gpu,
     const box_render_view_t *v);
 
+/** Render the probe captures of a packet and project them onto the SH of their volumes.
+ *
+ * @param gpu The backend
+ * @param packet The packet, after its resources, uploads and scatters applied
+ */
+void box_gpu_bake_capture(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
+
+/** Record the draws of the cull view of a face of a probe capture into its render pass.
+ *
+ * @param gpu The backend
+ * @param pass The render pass, with an rgba16float color target
+ * @param packet The packet
+ * @param slot Slot of the cull view of the face
+ */
+void box_gpu_draw_capture(
+    box_gpu_t *gpu,
+    WGPURenderPassEncoder pass,
+    const box_render_packet_t *packet,
+    int32_t slot);
+
 /** Create the layouts the forward pass shares.
  *
  * @param gpu The backend
@@ -759,6 +794,47 @@ void box_gpu_light_cluster(
     const box_render_view_t *v,
     int32_t slot);
 
+/** Record the cluster pass of a view with explicit buffers, when it has point or spot lights.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder
+ * @param v The view
+ * @param uniforms Buffer with the uniforms of the view
+ * @param offset Byte offset of the uniforms in the buffer
+ * @param clusters Cluster buffer the pass writes
+ */
+void box_gpu_light_cluster_with(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    const box_render_view_t *v,
+    WGPUBuffer uniforms,
+    uint32_t offset,
+    WGPUBuffer clusters);
+
+/** Create the bind group of the forward pass of a view with explicit buffers.
+ *
+ * @param gpu The backend
+ * @param v The view
+ * @param uniforms Buffer with the uniforms, bound with a dynamic offset
+ * @param clusters Cluster buffer of the view
+ * @param shadow Array view of the shadow map the view samples
+ * @return The bind group, released by the caller
+ */
+WGPUBindGroup box_gpu_light_group_with(
+    box_gpu_t *gpu,
+    const box_render_view_t *v,
+    WGPUBuffer uniforms,
+    WGPUBuffer clusters,
+    WGPUTextureView shadow);
+
+/** Create a cluster buffer.
+ *
+ * @param gpu The backend
+ * @return The buffer, released by the caller
+ */
+WGPUBuffer box_gpu_light_clusters_new(
+    box_gpu_t *gpu);
+
 /** Create the bind group of the forward pass of a view: its uniforms, lights, clusters and
  * shadow map.
  *
@@ -824,6 +900,35 @@ void box_gpu_shadow_render(
     const box_render_packet_t *packet,
     int32_t index,
     int32_t slot);
+
+/** Fit the cascade of the probe captures around the bounding sphere of static bounds.
+ *
+ * @param min Minimum corner of the bounds
+ * @param max Maximum corner of the bounds
+ * @param direction Direction toward the light
+ * @param out Receives the cascade
+ */
+void box_gpu_shadow_capture_fit(
+    const float *min,
+    const float *max,
+    const float *direction,
+    box_render_cascade_t *out);
+
+/** Render the casters of the cull view of the capture cascade into the capture shadow map.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder
+ * @param packet The packet
+ * @param slot Slot of the cull view, whose cascade 0 holds the casters
+ * @param cascade The cascade
+ * @return The array view the captures sample, the empty map without a shadow pipeline
+ */
+WGPUTextureView box_gpu_shadow_capture(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    const box_render_packet_t *packet,
+    int32_t slot,
+    const box_render_cascade_t *cascade);
 
 /** Get the shadow map a view samples.
  *
@@ -989,6 +1094,47 @@ void box_gpu_cull_add(
  */
 void box_gpu_cull_upload(
     box_gpu_t *gpu);
+
+/** Forget the cull views, before the cull views of a batch of probe captures are added.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_cull_reset(
+    box_gpu_t *gpu);
+
+/** Add a cull view of a probe capture: a face, or the cascade of its sun.
+ *
+ * It draws the batches of the scene with bake set, the shadow casters among them for a
+ * cascade, tested against the frustum and, with pixels, the smallest projected size.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ * @param scene Scene of the captures
+ * @param slot Slot that identifies the cull view
+ * @param cascade 0 for the cascade, -1 for a face
+ * @param view_proj World to clip space of the face or cascade
+ * @param pixels Pixels per unit at w 1 of a face, 0 to test the frustum only
+ */
+void box_gpu_cull_capture_add(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet,
+    ecs_entity_t scene,
+    int32_t slot,
+    int32_t cascade,
+    mat4 view_proj,
+    float pixels);
+
+/** Record the dispatches of every cull view in one compute pass.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder
+ * @param writes Timestamps the compute pass writes, NULL for none
+ * @return Whether the pass was recorded
+ */
+bool box_gpu_cull_record_all(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    const WGPUPassTimestampWrites *writes);
 
 /** Record the cull dispatches of a view and its cascades that run before the view draws.
  *

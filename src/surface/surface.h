@@ -18,6 +18,7 @@ typedef struct box_window_t box_window_t;
  * In the browser no window opens, but the page canvas sends its input events to the world.
  *
  * @param world The world or a stage of it
+ * @param surface The surface the window presents, stamped on its input events
  * @param width Width in points
  * @param height Height in points
  * @param title Title of the window
@@ -25,6 +26,7 @@ typedef struct box_window_t box_window_t;
  */
 box_window_t* box_window_new(
     ecs_world_t *world,
+    ecs_entity_t surface,
     int32_t width,
     int32_t height,
     const char *title);
@@ -36,7 +38,7 @@ box_window_t* box_window_new(
 void box_window_free(
     box_window_t *window);
 
-/** Process the events of every window. */
+/** Process the events of every window, once per frame in SurfacePoll. */
 void box_window_poll(void);
 
 /** Read the size of the framebuffer of a window.

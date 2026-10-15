@@ -895,7 +895,8 @@ done:
     return result;
 }
 
-/** Find the surface the window cursor is on: the first surface without a texture.
+/** Find the surface the window cursor is on: Input.surface, the surface with the input focus,
+ * else the first surface without a texture.
  *
  * Its size is the window size of Input once known, else the size the surface requests, else
  * the default surface size.
@@ -910,14 +911,24 @@ static void box_pick_input_surface(
     box_pick_surface_t *out)
 {
     const Input *in = ecs_singleton_get(world, Input);
+    const Surface *focused = in && in->surface && ecs_is_alive(world, in->surface) ?
+        ecs_get(world, in->surface, Surface) : NULL;
     ecs_entity_t first = 0;
+    ecs_iter_t it;
+    int32_t i;
     out->view_root = 0;
     out->width = BOX_SURFACE_WIDTH;
     out->height = BOX_SURFACE_HEIGHT;
-    ecs_iter_t it = ecs_query_iter(world, st->surfaces);
+    if (focused && !focused->texture) {
+        out->view_root = focused->view_root;
+        out->width = (float)focused->width;
+        out->height = (float)focused->height;
+        goto size;
+    }
+
+    it = ecs_query_iter(world, st->surfaces);
     while (ecs_query_next(&it)) {
         const Surface *s = ecs_field(&it, Surface, 0);
-        int32_t i;
         for (i = 0; i < it.count; i ++) {
             if (!s[i].texture && (!first || it.entities[i] < first)) {
                 first = it.entities[i];
@@ -928,6 +939,7 @@ static void box_pick_input_surface(
         }
     }
 
+size:
     if (in && in->size[0] > 0 && in->size[1] > 0) {
         out->width = in->size[0];
         out->height = in->size[1];

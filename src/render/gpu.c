@@ -214,6 +214,7 @@ static void box_gpu_device_init(
 
     gpu->device = emscripten_webgpu_get_device();
     gpu->queue = wgpuDeviceGetQueue(gpu->device);
+    gpu->timestamps = wgpuDeviceHasFeature(gpu->device, WGPUFeatureName_TimestampQuery);
 done:
     return;
 }
@@ -252,6 +253,12 @@ static void box_gpu_device_init(
     box_gpu_t *gpu)
 {
     WGPUDeviceDescriptor desc = WGPU_DEVICE_DESCRIPTOR_INIT;
+    WGPUFeatureName timestamps = WGPUFeatureName_TimestampQuery;
+    if (wgpuAdapterHasFeature(gpu->adapter, timestamps)) {
+        desc.requiredFeatureCount = 1;
+        desc.requiredFeatures = &timestamps;
+    }
+
     desc.uncapturedErrorCallbackInfo.callback = box_gpu_on_error;
     desc.uncapturedErrorCallbackInfo.userdata1 = gpu;
     desc.deviceLostCallbackInfo.mode = WGPUCallbackMode_AllowSpontaneous;
@@ -264,6 +271,7 @@ static void box_gpu_device_init(
     });
     if (gpu->device) {
         gpu->queue = wgpuDeviceGetQueue(gpu->device);
+        gpu->timestamps = wgpuDeviceHasFeature(gpu->device, timestamps);
     }
 }
 
@@ -361,7 +369,7 @@ static void box_gpu_targets_render(
     }
 }
 
-/** Apply the target and shader resources of a packet and render its targets.
+/** Apply the resources of a packet, capture its probes and render its targets.
  *
  * @param ctx The backend
  * @param packet The packet
@@ -412,6 +420,7 @@ static void box_gpu_render(
     box_gpu_texture_mips(gpu);
     box_gpu_upload(gpu, packet);
     box_gpu_scatter(gpu, packet);
+    box_gpu_bake_capture(gpu, packet);
     box_gpu_targets_render(gpu, packet);
 
     box_gpu_effects_sweep(gpu, packet);

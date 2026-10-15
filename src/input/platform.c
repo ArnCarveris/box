@@ -355,3 +355,48 @@ void box_input_dom_on_wheel(
         .value = { (float)(-dx * scale), (float)(-dy * scale) }
     });
 }
+
+void box_input_dom_on_move(
+    ecs_world_t *world,
+    box_input_dom_pointer_t *pointer,
+    const vec2 position,
+    const vec2 movement)
+{
+    int32_t i;
+    for (i = 0; i < 2; i ++) {
+        pointer->cursor[i] = pointer->locked ? pointer->cursor[i] + movement[i] : position[i];
+    }
+
+    box_input_platform_push(world, &(InputEvent){
+        .kind = InputMove, .value = { pointer->cursor[0], pointer->cursor[1] } });
+}
+
+bool box_input_dom_on_lock(
+    ecs_world_t *world,
+    box_input_dom_pointer_t *pointer,
+    bool locked,
+    bool page_focused)
+{
+    bool was = pointer->locked;
+    bool result = locked && !pointer->want;
+    pointer->locked = locked;
+    if (locked != was && !result) {
+        box_input_platform_push(world, &(InputEvent){ .kind = InputCaptured, .code = locked });
+    }
+
+    if (was && !locked && pointer->want && page_focused) {
+        box_input_platform_push(world, &(InputEvent){ .kind = InputCapture, .code = 0 });
+    }
+
+    return result;
+}
+
+void box_input_dom_on_lock_error(
+    ecs_world_t *world,
+    box_input_dom_pointer_t *pointer,
+    bool page_focused)
+{
+    if (pointer->want && page_focused) {
+        box_input_platform_push(world, &(InputEvent){ .kind = InputCapture, .code = 0 });
+    }
+}
