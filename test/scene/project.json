@@ -34,7 +34,8 @@
                     "missing_view_hidden",
                     "deleted_target_hidden",
                     "from_script",
-                    "drawn_at_projection"
+                    "drawn_at_projection",
+                    "transformed_once_per_frame"
                 ]
             },
             {
