@@ -74,6 +74,8 @@ struct box_render_ring_t {
     int32_t presents_early;         /**< Present intervals under 0.9 frame intervals */
     int32_t delta_mismatches;       /**< Shown intervals that differ from the packet delta */
     int32_t device_losses;          /**< Backend restarts after the device was lost */
+    int32_t generation;             /**< Generation of the backend state, which the acquire
+                                     *   publishes in backend.generation for the extract */
     box_render_shown_t pending;     /**< Frame on the simulated display not yet shown */
 };
 
@@ -342,8 +344,9 @@ done:
 /** Show the pending frame of a simulated display and run the fini of the backend on the
  * calling thread when its init ran, so no fence outlives the device it belongs to.
  *
- * A stop after an init, whether it succeeded or failed, bumps the generation of the backend,
- * so the next extract sends everything again.
+ * A stop after an init, whether it succeeded or failed, bumps the generation of the backend:
+ * the next acquire publishes it, so its extract sends everything again, and packets built for
+ * the previous generation are dropped instead of rendered.
  *
  * @param ring The ring
  */
@@ -360,7 +363,11 @@ static void box_render_backend_stop(
         ring->backend.fini(ring->backend.ctx);
     }
 
-    ring->backend.generation += ring->backend_ready || ring->backend_failed;
+    if (ring->backend_ready || ring->backend_failed) {
+        ecs_os_mutex_lock(ring->lock);
+        ring->generation ++;
+        ecs_os_mutex_unlock(ring->lock);
+    }
 
     ring->backend_ready = false;
     ring->backend_failed = false;
@@ -369,6 +376,8 @@ static void box_render_backend_stop(
 /** Restart a backend that lost its device on the thread that renders, before its next packet,
  * as wgpu and Dawn applications do from the device lost callback: the stop bumps the
  * generation, so the extract sends the whole scene to the new device.
+ *
+ * A failed init drops the packets that follow, as a failed first init does.
  *
  * @param ring The ring
  */
@@ -382,10 +391,30 @@ static void box_render_backend_recover(
     box_render_backend_stop(ring);
     box_render_backend_start(ring);
     ecs_os_mutex_lock(ring->lock);
-    ring->device_losses ++;
+    ring->device_losses += ring->backend_ready;
     ecs_os_mutex_unlock(ring->lock);
 done:
     return;
+}
+
+/** Recover a lost backend and render a packet unless it was built for an older generation of
+ * the backend, whose resources the backend no longer has.
+ *
+ * @param ring The ring
+ * @param p The packet
+ */
+static void box_render_take(
+    box_render_ring_t *ring,
+    const box_render_packet_t *p)
+{
+    bool current;
+    box_render_backend_recover(ring);
+    ecs_os_mutex_lock(ring->lock);
+    current = p->generation == ring->generation;
+    ecs_os_mutex_unlock(ring->lock);
+    if (current) {
+        box_render_consume(ring, p);
+    }
 }
 
 /** Check whether the render thread may take a packet, called with the lock held.
@@ -443,8 +472,7 @@ static void* box_render_thread_main(
 
         box_render_packet_t *p = box_render_ring_slot(ring, ring->taken ++);
         ecs_os_mutex_unlock(ring->lock);
-        box_render_backend_recover(ring);
-        box_render_consume(ring, p);
+        box_render_take(ring, p);
         ecs_os_mutex_lock(ring->lock);
         ring->released ++;
         ecs_os_cond_broadcast(ring->can_write);
@@ -632,8 +660,10 @@ box_render_packet_t* box_render_ring_acquire(
     }
 
     result = box_render_ring_slot(ring, ring->acquired ++);
+    ring->backend.generation = ring->generation;
     ecs_os_mutex_unlock(ring->lock);
     box_render_packet_reset(result);
+    result->generation = ring->backend.generation;
 
     return result;
 }
@@ -685,8 +715,7 @@ void box_render_ring_submit(
     ring->submitted ++;
     ring->taken ++;
     ecs_os_mutex_unlock(ring->lock);
-    box_render_backend_recover(ring);
-    box_render_consume(ring, p);
+    box_render_take(ring, p);
     ecs_os_mutex_lock(ring->lock);
     ring->released ++;
     ecs_os_mutex_unlock(ring->lock);
@@ -703,9 +732,11 @@ void box_render_ring_set_backend(
         ring->backend.free(ring->backend.ctx);
     }
 
-    int32_t generation = ring->backend.generation + 1;
+    ecs_os_mutex_lock(ring->lock);
+    ring->generation ++;
     ring->backend = *backend;
-    ring->backend.generation = generation;
+    ring->backend.generation = ring->generation;
+    ecs_os_mutex_unlock(ring->lock);
     ring->backend_set = true;
 }
 

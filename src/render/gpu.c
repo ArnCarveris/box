@@ -96,7 +96,8 @@ static void box_gpu_on_device(
     }
 }
 
-/** Count and log an error no error scope caught.
+/** Count and log an error no error scope caught, unless the device is lost: releasing what
+ * belonged to a lost device reports errors, and the ring recovers from the loss itself.
  *
  * @param device The device
  * @param type Kind of error
@@ -114,8 +115,10 @@ static void box_gpu_on_error(
     (void)device;
     (void)type;
     (void)userdata2;
-    box_gpu_count(userdata1, BOX_GPU_STAT_ERRORS);
-    box_gpu_report("webgpu device error", message);
+    if (!((box_gpu_t*)userdata1)->lost) {
+        box_gpu_count(userdata1, BOX_GPU_STAT_ERRORS);
+        box_gpu_report("webgpu device error", message);
+    }
 }
 
 /** Flag the loss of the device for the ring, and count and log it unless it was destroyed.

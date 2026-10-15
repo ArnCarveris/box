@@ -267,8 +267,12 @@ the browser reports its error scopes later). Before each packet the ring asks th
 `lost` callback whether the device was lost (the wgpu device lost callback sets it, as does
 `box_render_gpu_lose_device`, which destroys the device to test this); it then stops and starts
 the backend on the thread that renders, which recreates the device, and the stop bumps the
-backend generation so the extract sends the whole scene again. `RenderStatus.device_losses`
-counts the recoveries. In the browser the page reports a lost device and does not recover.
+backend generation so the extract sends the whole scene again. The ring keeps the generation
+under its lock and publishes it in the acquire, which stamps the packet with it; a packet built
+for an older generation (in flight when the device was lost) is dropped, not rendered, so no
+delta reaches a device that lacks its resources, and errors of the lost device are not
+reported. `RenderStatus.device_losses` counts the recoveries whose new device was created. In
+the browser the page reports a lost device and does not recover.
 
 **Culling.** A compute pass tests each draw's instances (mesh bounds moved by the model matrix)
 against the clip planes and `min_dimension_px` and writes visible slots plus indirect draw args.

@@ -455,6 +455,8 @@ typedef struct box_render_packet_t {
     ecs_vec_t bakes;        /**< box_render_bake_batch_t, the probe captures of the frame */
     ecs_vec_t probes;       /**< box_render_probe_capture_t of the bake batches */
     ecs_vec_t data;         /**< Bytes the resources and uploads point into */
+    int32_t generation;     /**< Backend generation the extract built it for, the ring drops a
+                             *   packet of an older generation instead of rendering it */
 } box_render_packet_t;
 
 /** A renderer: the only code that receives packets, always called from one thread.
