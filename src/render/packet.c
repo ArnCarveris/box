@@ -60,7 +60,10 @@ void box_render_packet_reset(
     ecs_vec_clear(&p->bakes);
     ecs_vec_clear(&p->probes);
     ecs_vec_clear(&p->data);
-    if (capacity > BOX_RENDER_DATA_KEEP && used < capacity / BOX_RENDER_DATA_TRIM_FILL) {
+    if (capacity > BOX_RENDER_DATA_KEEP && (used <= BOX_RENDER_DATA_KEEP ||
+        used < capacity / BOX_RENDER_DATA_TRIM_FILL))
+    {
+        p->data_peak = p->data_idle && p->data_peak > used ? p->data_peak : used;
         p->data_idle ++;
     } else {
         p->data_idle = 0;
@@ -68,7 +71,7 @@ void box_render_packet_reset(
 
     if (p->data_idle >= BOX_RENDER_DATA_TRIM_RESETS) {
         ecs_vec_fini_t(NULL, &p->data, uint8_t);
-        ecs_vec_init_t(NULL, &p->data, uint8_t, 0);
+        ecs_vec_init_t(NULL, &p->data, uint8_t, p->data_peak);
         p->data_idle = 0;
     }
 }

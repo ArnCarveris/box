@@ -95,8 +95,9 @@
 /** Flag of a texture handle that samples the image of the target in its low bits */
 #define BOX_RENDER_TEXTURE_TARGET (0x80000000u)
 
-/** Bytes of packet data a reused packet always keeps; a larger block is freed once the frames
- * used under a BOX_RENDER_DATA_TRIM_FILL share of it for BOX_RENDER_DATA_TRIM_RESETS resets */
+/** Bytes of packet data a reused packet always keeps; a larger block shrinks to the largest frame
+ * of BOX_RENDER_DATA_TRIM_RESETS resets in a row that fit in this size or used under a
+ * BOX_RENDER_DATA_TRIM_FILL share of it */
 #define BOX_RENDER_DATA_KEEP (16 * 1024 * 1024)
 
 /** Divisor of the capacity of a large data block under which a frame counts as using little */
@@ -466,6 +467,7 @@ typedef struct box_render_packet_t {
                              *   packet of an older generation instead of rendering it */
     int32_t data_idle;      /**< Resets in a row whose frame used little of a data block above
                              *   BOX_RENDER_DATA_KEEP, see BOX_RENDER_DATA_TRIM_RESETS */
+    int32_t data_peak;      /**< Largest data of those frames, the size the block shrinks to */
 } box_render_packet_t;
 
 /** A renderer: the only code that receives packets, always called from one thread.
@@ -1129,7 +1131,8 @@ void box_render_packet_fini(
     box_render_packet_t *p);
 
 /** Empty a packet and keep its storage, except a data block above BOX_RENDER_DATA_KEEP that
- * the frames used little of for BOX_RENDER_DATA_TRIM_RESETS resets in a row.
+ * the frames used little of for BOX_RENDER_DATA_TRIM_RESETS resets in a row, which shrinks to
+ * the largest of those frames.
  *
  * @param p The packet
  */
