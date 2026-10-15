@@ -370,6 +370,7 @@ void Spatial_update_dynamic_100k_1pct(
 
     bench_counter(b, "moved_in_tree_per_frame", frame ? (double)moved / frame : 0);
     bench_counter(b, "rebound_per_frame", frame ? (double)rebound / frame : 0);
+    bench_counter(b, "sah_cost", box_bvh_cost(&box_spatial_of(world)->root->trees[1]));
     ecs_os_free(shapes);
     ecs_fini(world);
 }

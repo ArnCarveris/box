@@ -353,7 +353,7 @@ bakes.
 with fat leaves for `DynamicTransform` shapes. Both are binary trees whose 64 byte nodes hold the
 boxes of both children (a child is a node or an item, so a node over two items is a two item
 leaf). The build bins all three axes for the surface area heuristic; inserts descend to the
-cheapest sibling and the four closest ancestors try the Box2D v3 rotation that lowers area most.
+cheapest sibling and every ancestor tries the Box2D v3 rotation that lowers its area most.
 A static move refits its ancestors exactly (shrinking too) when one of its four closest ancestors
 still contains it, and is inserted again otherwise. A fat leaf has a
 margin and reaches four times the displacement per frame ahead, at most four margins (a larger

@@ -15,9 +15,6 @@
 /** Ancestors that may still contain a moved exact item before it is inserted again */
 #define BOX_BVH_GROW_LEVELS (4)
 
-/** Ancestors of an inserted item that try a rotation */
-#define BOX_BVH_ROTATE_LEVELS (4)
-
 /** Depth below which a build stops weighing splits and halves the leaves */
 #define BOX_BVH_MAX_SAH_DEPTH (48)
 
@@ -472,7 +469,7 @@ static void box_bvh_rotate(
  *
  * @param tree The tree
  * @param node The first node to fit
- * @param rotate Try a rotation at the first BOX_BVH_ROTATE_LEVELS nodes, after an insert
+ * @param rotate Try a rotation at every node, after an insert
  * @param settle Stop at the first node whose box did not change or after BOX_BVH_GROW_LEVELS
  * nodes, after a move that one of those nodes still contains, above which boxes only shrink
  */
@@ -489,7 +486,7 @@ static void box_bvh_fix(
             box_bvh_refit_height(tree, node);
         }
 
-        if (rotate && level < BOX_BVH_ROTATE_LEVELS) {
+        if (rotate) {
             box_bvh_rotate(tree, node);
         }
 
