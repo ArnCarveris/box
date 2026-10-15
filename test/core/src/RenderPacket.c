@@ -33,6 +33,21 @@ static void ExtractContents(ecs_iter_t *it) {
     desc[1] = 36;
 }
 
+/** Bytes of packet data ExtractLarge appends per frame, above BOX_RENDER_DATA_KEEP */
+#define RENDER_PACKET_LARGE (20 * 1024 * 1024)
+
+/** Bytes ExtractLarge appends: RENDER_PACKET_LARGE, or 64 to let the workload drop */
+static uint32_t extract_large_size = RENDER_PACKET_LARGE;
+
+static void ExtractLarge(ecs_iter_t *it) {
+    box_render_packet_t *p = box_render_packet(it->world);
+    uint8_t *bytes = box_render_packet_upload(p, 11, 0, extract_large_size);
+    uint32_t i;
+    for (i = 0; i < extract_large_size; i += 4096) {
+        bytes[i] = (uint8_t)i;
+    }
+}
+
 static void* UnpauseLater(void *arg) {
     (void)arg;
     ecs_sleepf(0.05);
@@ -578,4 +593,91 @@ void RenderPacket_headless_fixed_delta(void) {
 
     ecs_fini(world);
     box_render_null_free(null);
+}
+
+void RenderPacket_no_alloc_after_warmup_large(void) {
+    // render_fixes/packet_data_trim
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    extract_large_size = RENDER_PACKET_LARGE;
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "ExtractLarge" }),
+        .phase = RenderExtract,
+        .callback = ExtractLarge
+    });
+
+    int32_t i;
+    for (i = 0; i < 10; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_sync(world);
+    int64_t before = ecs_os_api_malloc_count + ecs_os_api_calloc_count +
+        ecs_os_api_realloc_count;
+    for (i = 0; i < 100; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_sync(world);
+    int64_t after = ecs_os_api_malloc_count + ecs_os_api_calloc_count +
+        ecs_os_api_realloc_count;
+    test_int(after - before, 0);
+
+    ecs_fini(world);
+}
+
+void RenderPacket_large_data_released_after_drop(void) {
+    // render_fixes/packet_data_trim
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    extract_large_size = RENDER_PACKET_LARGE;
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "ExtractLarge" }),
+        .phase = RenderExtract,
+        .callback = ExtractLarge
+    });
+
+    int32_t i;
+    for (i = 0; i < 10; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_sync(world);
+    extract_large_size = 64;
+    for (i = 0; i < 10; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_sync(world);
+    extract_large_size = RENDER_PACKET_LARGE;
+    int64_t before = ecs_os_api_malloc_count + ecs_os_api_calloc_count +
+        ecs_os_api_realloc_count;
+    for (i = 0; i < 10; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_sync(world);
+    int64_t after = ecs_os_api_malloc_count + ecs_os_api_calloc_count +
+        ecs_os_api_realloc_count;
+    test_int(after - before, 0);
+
+    extract_large_size = 64;
+    for (i = 0; i < 1000; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_sync(world);
+    extract_large_size = RENDER_PACKET_LARGE;
+    before = ecs_os_api_malloc_count + ecs_os_api_calloc_count + ecs_os_api_realloc_count;
+    for (i = 0; i < 10; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_sync(world);
+    after = ecs_os_api_malloc_count + ecs_os_api_calloc_count + ecs_os_api_realloc_count;
+    test_assert(after - before > 0);
+
+    ecs_fini(world);
 }
