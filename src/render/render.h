@@ -155,7 +155,8 @@ typedef struct box_render_light_t {
 /** The lights a view is shaded with: the light buffer of its scene and its ambient light */
 typedef struct box_render_view_lights_t {
     bool enabled;            /**< Shade with the lights, else draw base color and emission */
-    uint32_t buffer;         /**< Handle of the light buffer, 0 for the default sun */
+    uint32_t buffer;         /**< Handle of the light buffer, BOX_RENDER_BUFFER_LIGHT_FIRST for
+                              *   the shared buffer of the default sun */
     uint32_t directional;    /**< Directional lights at the start of the buffer */
     uint32_t count;          /**< Lights in the buffer, the directional ones included */
     float ambient_sky[4];    /**< Linear ambient light from above */
@@ -315,11 +316,12 @@ typedef struct box_render_probe_capture_t {
 /** The probe captures of one pass of the volume of one scene in a packet.
  *
  * Each probe renders six faces of the batches of the scene with bake set, lit by the lights
- * of the scene, the sun shadowed by one cascade over the bounds, the ambient term from the
- * source buffer (black for the first pass), and is written into the target buffer.
+ * of the batch, the first directional one shadowed by one cascade over the bounds, the ambient
+ * term from the source buffer (black for the first pass), and is written into the target.
  *
- * Texels no shape covers see the hemisphere ambient. Captures run before the targets, in the
- * order of the packet, so a pass may read the buffer an earlier batch of the packet wrote.
+ * The direct light of the Baked lights at the probe is added, occluded by its faces' depth;
+ * texels no shape covers see the hemisphere ambient. Captures run before the targets, in packet
+ * order, so a pass may read the buffer an earlier batch of the packet wrote.
  */
 typedef struct box_render_bake_batch_t {
     uint32_t volume;        /**< Handle of the volume the probes are written into */
@@ -329,7 +331,12 @@ typedef struct box_render_bake_batch_t {
     int32_t target;         /**< Probe buffer the probes are written into, 0 or 1 */
     ecs_entity_t scene;     /**< Scene root of the batches the faces draw */
     int32_t size;           /**< Edge of a face in texels */
-    box_render_view_lights_t lights; /**< Lights of the scene, enabled */
+    box_render_view_lights_t lights; /**< Lights the faces are shaded with, enabled: the Mixed
+                                      *   and Baked lights of the scene over a black source, the
+                                      *   Mixed ones over a source that holds the Baked ones */
+    uint32_t baked;         /**< Light buffer of the Baked lights of the scene, 0 for none */
+    uint32_t baked_count;   /**< Baked lights in that buffer */
+    uint32_t baked_directional; /**< Directional lights at the start of that buffer */
     float bounds_min[3];    /**< Minimum corner of the static bounds of the scene */
     float bounds_max[3];    /**< Maximum corner of the static bounds of the scene */
     int32_t first;          /**< First probe of the batch in the probes of the packet */
@@ -617,6 +624,31 @@ bool box_render_gpu_stats(
     ecs_world_t *world,
     box_render_gpu_stats_t *stats);
 
+/** When the GPU backend applies the outcome of a shader compile.
+ *
+ * Natively an outcome arrives during the compile, in the browser after the frame; tests pick
+ * a delayed delivery to run the asynchronous path of the browser natively.
+ */
+typedef enum box_render_compile_delivery_t {
+    BOX_RENDER_COMPILE_AT_ONCE = 0,     /**< During the compile, the native default */
+    BOX_RENDER_COMPILE_HOLD = 1,        /**< Held until the delivery changes */
+    BOX_RENDER_COMPILE_NEXT_PACKET = 2, /**< At the start of the next packet, oldest first */
+    BOX_RENDER_COMPILE_NEWEST_FIRST = 3 /**< At the start of the next packet, newest first */
+} box_render_compile_delivery_t;
+
+/** Set when the GPU backend of a world applies shader compile outcomes, for tests.
+ *
+ * Outcomes held when the delivery returns to BOX_RENDER_COMPILE_AT_ONCE are applied at the
+ * start of the next packet, oldest first.
+ *
+ * @param world The world
+ * @param delivery When outcomes are applied
+ * @return Whether the world renders with the GPU backend
+ */
+bool box_render_gpu_compile_delivery(
+    ecs_world_t *world,
+    box_render_compile_delivery_t delivery);
+
 /** Take the oldest shader compile result the GPU backend of a world has not handed out yet.
  *
  * @param world The world
@@ -798,23 +830,6 @@ void box_render_lights_stats(
  */
 const void* box_render_lights_state(
     const ecs_world_t *world);
-
-/** Get the lights the light extract collected for a scene in this frame.
- *
- * The directional lights come first, then the point and spot lights, in query order; a scene
- * without light entities has none here and is lit by the default sun.
- *
- * @param state The state of the light extract
- * @param scene The scene, 0 for the default scene
- * @param count Receives the number of lights
- * @param entities Receives the entity of each light
- * @return The lights, NULL when the scene has none
- */
-const box_render_light_t* box_render_lights_scene(
-    const void *state,
-    ecs_entity_t scene,
-    int32_t *count,
-    const ecs_entity_t **entities);
 
 /** Register the cached query that knows the scene of every entity in a scene.
  *

@@ -58,12 +58,16 @@ double box_wait_until(
 
 bool box_app_oversubscribed(
     double load,
-    int32_t cores)
+    int32_t cores,
+    float budget)
 {
-    return load > (double)cores;
+    double claim = budget > 0 ? (double)budget / 100.0 : 1.0;
+
+    return load + claim > (double)cores;
 }
 
-int box_app_guard(void)
+int box_app_guard(
+    float budget)
 {
     int result = 0;
 #ifndef __EMSCRIPTEN__
@@ -73,8 +77,9 @@ int box_app_guard(void)
         cores = 1;
     }
 
-    if (getloadavg(&load, 1) == 1 && box_app_oversubscribed(load, (int32_t)cores)) {
-        ecs_err("cpu oversubscribed: load %.1f on %d cores", load, (int)cores);
+    if (getloadavg(&load, 1) == 1 && box_app_oversubscribed(load, (int32_t)cores, budget)) {
+        ecs_err("cpu oversubscribed: load %.1f plus a claim of %.2f cores on %d cores", load,
+            budget > 0 ? (double)budget / 100.0 : 1.0, (int)cores);
         result = -1;
     }
 #endif
