@@ -67,17 +67,18 @@ ECS_ENUM(SizeMode, {
  *
  * A growing element adds its fit size to the fit of its parent, takes a weighted share of the
  * free space along the main axis and stretches to the content box across or in DirectionNone.
+ * A fitting element narrows to that box down to its content minimum, as Clay compresses.
  *
- * With content_min the share or stretch never goes below the fit size, as the automatic minimum
- * of CSS flex items. A weight of 0 takes no share and keeps the minimum, so the fit size with
- * content_min.
+ * The content minimum is the widest word of a text that wraps, else the fit size. With
+ * content_min a share or stretch never goes below it, as CSS flex items. A weight of 0 takes no
+ * share and keeps the minimum. Fixed sizes never change.
  */
 ECS_STRUCT(Sizing, {
     SizeMode mode;    /**< How the size is computed */
     float value;      /**< Size for SizeModeFixed, weight for SizeModeGrow, 1 in a new LayoutItem */
     float min;        /**< Smallest size, 0 for no limit */
     float max;        /**< Largest size, 0 for no limit */
-    bool content_min; /**< A Grow size never goes below the fit size, true in a new LayoutItem */
+    bool content_min; /**< A Grow size keeps the content minimum, true in a new LayoutItem */
 });
 
 /** Sizing and placement of an element inside the layout of its parent */

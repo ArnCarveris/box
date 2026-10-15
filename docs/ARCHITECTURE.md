@@ -154,7 +154,11 @@ target in the same frame. `RenderExtract` and `RenderSubmit` are phases that dep
 descendant) are recomputed every frame. `ManualTransform` means the application writes
 `WorldTransform`; its static descendants follow when it is written with `ecs_set` or followed
 by `ecs_modified`, not by a write through a pointer alone. Hierarchies use `ChildOf` or the
-`Parent` component.
+`Parent` component. `TransformStatic` passes every entity whose `WorldTransform` it changed (the
+computed roots and the descendants it wrote) to the functions registered with
+`box_transform_on_moved`. Draws and the spatial index follow static moves only through it and
+walk no subtree of their own, so a `Position` set fires no transform observer in render or
+spatial; only `DrawsOnPositionZ`, which keeps the 2D draw order, still fires.
 
 ## Surfaces and the GPU device
 
@@ -205,11 +209,11 @@ persistent batches keyed by scene, mesh, pipeline (shader, blend, back face, tex
 whether they are dynamic; removed slots are filled with the last one. An instance is 128 bytes
 (model matrix with scale, normal data, color, emissive, metallic/roughness, UV transform).
 
-Observers on shape, material, transform, hierarchy and scene components queue changed entities,
-so an unchanged frame visits and uploads nothing (`RenderStatus.upload_bytes`). Static batches
-upload changes into a change buffer that `scatter.wgsl` scatters into their slots; entities with
-`DynamicTransform` or `DynamicMaterial` fill dynamic batches every frame from cached queries. A
-batch is one instanced indirect draw and is limited to 1M instances.
+Observers on shape, material, hierarchy and scene components and `box_transform_on_moved` queue
+changed entities, so an unchanged frame visits and uploads nothing (`RenderStatus.upload_bytes`).
+Static batches upload changes into a change buffer that `scatter.wgsl` scatters into their slots;
+entities with `DynamicTransform` or `DynamicMaterial` fill dynamic batches every frame from cached
+queries. A batch is one instanced indirect draw and is limited to 1M instances.
 
 Materials: `Rgb`, `PbrMaterial`, `Emissive`, `Opacity` and `Tint` resolve on the CPU, composed
 root down, into the instance. `BlendMode`, `BackFaceMode` and alpha below 1 key the batch.
@@ -347,16 +351,17 @@ bakes.
 `box.spatial` keeps, per scene, an index over world AABBs of shapes (unit mesh bounds times
 `ShapeMesh` scale, placed by `WorldTransform`): a static BVH (binned SAH build, SAH insert with
 AVL rotations) and a dynamic BVH with fat leaves for `DynamicTransform` shapes. Observers queue
-changed shapes and subtree roots; `SpatialUpdate` (`EcsOnStore`) places only those. Dynamic
-shapes are marked stale and placed by the first query after a frame, so an idle frame pays
-nothing. Queries (`src/spatial/spatial.h`) are scoped to one scene: nearest ray with a narrow
-phase filter, all hits sorted, box and sphere overlap, entity bounds. `box_controller_move`
-uses them for collision, `box_spatial_static_bounds` gives the box around the static shapes of
-a scene to the bake. Bounds are boxes; there is no mesh level narrow phase and no picking.
+changed shapes and `box_transform_on_moved` the moved static entities; `SpatialUpdate`
+(`EcsOnStore`) places only those. Dynamic shapes are marked stale and placed by the first query
+after a frame, so an idle frame pays nothing. Queries (`src/spatial/spatial.h`) are scoped to
+one scene: nearest ray with a narrow phase filter, all hits sorted, box and sphere overlap,
+entity bounds. `box_controller_move` uses them for collision, `box_spatial_static_bounds` gives
+the box around the static shapes of a scene to the bake. Bounds are boxes; there is no mesh
+level narrow phase and no picking.
 
 ## Text, layout and UI
 
-**Text.** `Text {value, size, line_height, width, align, font}` and `Font {path}`
+**Text.** `Text {value, size, line_height, width, align, wrap, font}` and `Font {path}`
 (`box.text.DefaultFont` is B612 in `etc/fonts`). Fonts load with stb_truetype on the job system.
 Glyph MSDFs are generated lazily per glyph on workers into RGBA8 atlas pages that grow and then
 page. Font data is untrusted: a face without units per em fails to load, and a glyph whose box
@@ -376,8 +381,13 @@ pixels: rows and columns, fit and grow sizing with weights, min/max, padding, sp
 and `DirectionNone` anchoring with x/y offsets. `LayoutItem` sets per child sizing. A growing
 child adds its fit size to the fit of its parent and takes a weighted share of the free space
 along the main axis, or stretches to the content box across it. With `Sizing.content_min` (on in
-a new `LayoutItem`, off in a C literal) it never gets less than its fit size, the automatic
-minimum of CSS flex items; the console opts out so its panel keeps its fraction of the surface. Observers
+a new `LayoutItem`, off in a C literal) it never gets less than its content minimum, the
+automatic minimum of CSS flex items; the console opts out so its panel keeps its fraction of the
+surface. The tree is solved in Clay's order: widths are measured and resolved, every
+`Text` takes its resolved width through the hooks box.text registers (`layout_text.h`), then
+heights are measured and resolved. Fitting elements narrow to their parent down to their
+content minimum (the widest word of a wrapping text, else the fit size), which propagates to
+every ancestor. `Text.wrap = TextWrapNewlines` opts a text out; the console does. Observers
 mark elements; `LayoutUpdate` (`EcsPostUpdate`) relays out the trees of marked elements and writes
 `Position` x/y, `LayoutBounds` and `Rect` only where they changed. A reorder through
 `ecs_set_child_order` needs `ecs_modified(parent, Layout)`.

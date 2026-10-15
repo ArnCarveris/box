@@ -106,6 +106,40 @@ void Layout_one_leaf_resizes_10k(
     ecs_fini(world);
 }
 
+void Layout_rewrap_100_paragraphs(
+    bench_t *b)
+{
+    // ui_fixes/text_wrap
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    ecs_entity_t font = ecs_lookup(world, "box.text.DefaultFont");
+    ecs_entity_t panel = ecs_new(world);
+    ecs_set(world, panel, Layout, { .direction = DirectionColumn, .spacing = 4 });
+    ecs_set(world, panel, LayoutItem, { .width = { SizeModeFixed, 300 } });
+    int32_t i;
+    for (i = 0; i < 100; i ++) {
+        ecs_entity_t p = ecs_new_w_pair(world, EcsChildOf, panel);
+        ecs_set(world, p, Text, { .size = 16, .font = font, .value =
+            "A paragraph of a few dozen words that a panel of a few hundred points "
+            "wide breaks into several lines, and breaks again when the panel resizes" });
+        ecs_set(world, p, LayoutItem, { .width = { SizeModeGrow, 1, .content_min = true } });
+    }
+
+    ecs_progress(world, 0);
+    float width = 300;
+    bench_set_items(b, 100);
+    while (bench_iter(b)) {
+        width = width == 300 ? 400 : 300;
+        ecs_set(world, panel, LayoutItem, { .width = { SizeModeFixed, width } });
+        ecs_progress(world, 0);
+    }
+
+    ecs_fini(world);
+}
+
 void Layout_idle_frame_10k(
     bench_t *b)
 {

@@ -76,7 +76,8 @@
                     "moved_in_post_update",
                     "moved_in_pre_store",
                     "moved_in_on_store",
-                    "parent_moved_in_pre_store"
+                    "parent_moved_in_pre_store",
+                    "manual_parent_moved_in_pre_store"
                 ]
             }
         ]
