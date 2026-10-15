@@ -903,3 +903,100 @@ void Instancing_manual_parent_moved_in_on_store(void) {
     ecs_os_free(path);
     ecs_fini(world);
 }
+
+void Instancing_mesh3_prefab_instances(void) {
+    // core_fixes/mesh3_inherit
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 25, .near_ = 0.1f,
+        .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t surface = ecs_new(world);
+    ecs_set(world, surface, Surface, {.width = 320, .height = 200,
+        .write_to_file = "mesh3_prefab.png", .resolution_scale = 1});
+
+    Mesh3 m = {0};
+    ecs_vec_init_t(NULL, &m.vertices, vec3, 4);
+    ecs_vec_init_t(NULL, &m.indices, uint32_t, 6);
+    ecs_vec_set_count_t(NULL, &m.vertices, vec3, 4);
+    ecs_vec_set_count_t(NULL, &m.indices, uint32_t, 6);
+    vec3 *p = ecs_vec_first_t(&m.vertices, vec3);
+    const float corners[4][2] = { { -1, -1 }, { 1, -1 }, { 1, 1 }, { -1, 1 } };
+    const uint32_t tris[6] = { 0, 1, 2, 0, 2, 3 };
+    ecs_os_memcpy(ecs_vec_first(&m.indices), tris, sizeof(tris));
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        glm_vec3_copy((vec3){ 0.15f * corners[i][0], 0.15f * corners[i][1], 0.0f }, p[i]);
+    }
+
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_set_ptr(world, prefab, Mesh3, &m);
+    ecs_set(world, prefab, Rgb, {0, 0, 0});
+    ecs_set(world, prefab, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, prefab, Emissive, {.strength = 1, .color = {255, 0, 0}});
+    ecs_entity_t instances[1000];
+    for (i = 0; i < 1000; i ++) {
+        instances[i] = ecs_new_w_pair(world, EcsIsA, prefab);
+        ecs_set(world, instances[i], Position,
+            {-19.5f + (float)(i % 40), -12 + (float)(i / 40), 0});
+    }
+
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    char *path = flecs_asprintf("%s/mesh3_prefab.png",
+        ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_int(w, 320);
+    for (i = 0; i < 1000; i ++) {
+        int32_t x = 8 * (i % 40) + 4, y = 196 - 8 * (i / 40);
+        test_assert(px[(y * 320 + x) * 4] > 200);
+        test_assert(px[(y * 320 + x + 2) * 4] < 40);
+    }
+
+    stbi_image_free(px);
+
+    for (i = 0; i < 4; i ++) {
+        glm_vec3_copy((vec3){ 0.375f * corners[i][0], 0.375f * corners[i][1], 0.0f }, p[i]);
+    }
+
+    ecs_set_ptr(world, prefab, Mesh3, &m);
+    for (i = 0; i < 4; i ++) {
+        glm_vec3_copy((vec3){ 0.15f * corners[i][0], 0.15f * corners[i][1], 0.0f }, p[i]);
+    }
+
+    ecs_set_ptr(world, instances[0], Mesh3, &m);
+    ecs_vec_fini_t(NULL, &m.vertices, vec3);
+    ecs_vec_fini_t(NULL, &m.indices, uint32_t);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    for (i = 0; i < 1000; i ++) {
+        int32_t x = 8 * (i % 40) + 4, y = 196 - 8 * (i / 40);
+        test_assert(px[(y * 320 + x) * 4] > 200);
+        if (i) {
+            test_assert(px[(y * 320 + x + 2) * 4] > 200);
+        } else {
+            test_assert(px[(y * 320 + x + 2) * 4] < 40);
+        }
+
+        test_assert(px[(y * 320 + x + 4) * 4] < 40);
+    }
+
+    stbi_image_free(px);
+    ecs_os_free(path);
+    ecs_fini(world);
+}

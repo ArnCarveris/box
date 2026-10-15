@@ -227,7 +227,11 @@
                     "cache_shared",
                     "update_content",
                     "ensure_modified_leak",
-                    "scale"
+                    "scale",
+                    "prefab_instances_share",
+                    "prefab_instance_override",
+                    "prefab_update",
+                    "prefab_delete"
                 ]
             },
             {

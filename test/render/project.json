@@ -166,7 +166,8 @@
                     "box_created_in_on_store",
                     "box_moved_in_on_store",
                     "manual_parent_move_updates_children",
-                    "manual_parent_moved_in_on_store"
+                    "manual_parent_moved_in_on_store",
+                    "mesh3_prefab_instances"
                 ]
             },
             {
