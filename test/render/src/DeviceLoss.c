@@ -79,3 +79,77 @@ void DeviceLoss_pipeline_error_keeps_previous(void) {
     ecs_os_free(png);
     ecs_fini(world);
 }
+
+void DeviceLoss_lost_device_recovers(void) {
+    // render_fixes/device_loss
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    const char *tmp = ecs_singleton_get(world, AppStatus)->tmp_dir;
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 6});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}},
+        .lighting.enabled = true});
+    ecs_entity_t box = ecs_new(world);
+    ecs_set(world, box, Position, {1, 0, 0});
+    ecs_set(world, box, Box, {2, 2, 2});
+    ecs_set(world, box, Rgb, {200, 200, 200});
+    ecs_set(world, box, PbrMaterial, {.roughness = 1});
+    ecs_entity_t light = ecs_new(world);
+    ecs_set(world, light, Position, {1, 0, 2});
+    ecs_set(world, light, PointLight, {.intensity = 4, .range = 4});
+    ecs_entity_t label = ecs_new(world);
+    ecs_set(world, label, Position, {-2, 1, 0});
+    ecs_set(world, label, Text, {.value = "Box", .size = 1,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "lost.png",
+        .resolution_scale = 1});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    test_int(ecs_singleton_get(world, RenderStatus)->device_losses, 0);
+
+    char *path = flecs_asprintf("%s/lost.png", tmp);
+    int w = 0, h = 0, n = 0, i, lit = 0, wrong = 0;
+    unsigned char *before = stbi_load(path, &w, &h, &n, 4);
+    test_assert(before != NULL);
+    for (i = 0; i < w * h; i ++) {
+        lit += before[i * 4] > 8 || before[i * 4 + 1] > 8 || before[i * 4 + 2] > 8;
+    }
+
+    test_assert(lit > 64 * 64 / 8);
+
+    ecs_log_set_level(-4);
+    box_render_gpu_lose_device(world);
+    for (i = 0; i < 8 && !ecs_singleton_get(world, RenderStatus)->device_losses; i ++) {
+        ecs_progress(world, 0);
+        box_render_sync(world);
+    }
+
+    ecs_log_set_level(-1);
+    test_int(ecs_singleton_get(world, RenderStatus)->device_losses, 1);
+
+    remove(path);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    unsigned char *after = stbi_load(path, &w, &h, &n, 4);
+    test_assert(after != NULL);
+    for (i = 0; i < w * h * 4; i ++) {
+        wrong += abs((int)after[i] - (int)before[i]) > 2;
+    }
+
+    test_int(wrong, 0);
+    test_int(ecs_singleton_get(world, RenderStatus)->device_losses, 1);
+
+    stbi_image_free(after);
+    stbi_image_free(before);
+    ecs_os_free(path);
+    ecs_fini(world);
+}

@@ -39,7 +39,8 @@
             {
                 "id": "DeviceLoss",
                 "testcases": [
-                    "pipeline_error_keeps_previous"
+                    "pipeline_error_keeps_previous",
+                    "lost_device_recovers"
                 ]
             },
             {
