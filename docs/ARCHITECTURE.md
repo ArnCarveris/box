@@ -437,7 +437,8 @@ since the last frame (`wgpuQueueWriteTexture`). `Font.atlas_pages` (4 for a new 
 atlas budget: a glyph that needs a page beyond it clears the least recently used page that no laid
 out Text shows, and the glyphs of that page are generated again on their next use. Generation follows msdfgen 1.9+: perpendicular distance selection, the overlapping contour
 combiner (contours that overlap, such as composite glyphs, leave no seam) and its error correction
-(`src/text/msdf_correct.c`, edge priority with the distance checked at edges). Font data is untrusted: a face without units per em fails to load, and a glyph whose box
+(`src/text/msdf_correct.c`, edge priority without a distance check, after the scanline sign pass as
+msdfgen runs it with `-scanline`); cusps are pushed apart first, as msdfgen normalizes shapes. Font data is untrusted: a face without units per em fails to load, and a glyph whose box
 is larger than a page (1024 minus spacing) is drawn as the missing glyph with one warning per
 font load; atlas placement makes at most `BOX_TEXT_PLACE_TRIES` passes. A font whose table
 directory, tables or `loca` entries (one per glyph plus the end, each inside `glyf`) lie
@@ -452,7 +453,8 @@ word breaks and alignment; the block is centered
 on the origin and measured into `TextBounds`. Glyphs are slots of the 2D batches keyed by atlas
 page (`src/render/text_draw.c`), shaded by `shape2d.wgsl`, which samples the field at level 0
 (a mip averages the channels and breaks the median), scales it to screen pixels as msdfgen's
-screenPxRange does and fades a glyph whose range drops below one pixel. No shaping (ligatures, RTL).
+screenPxRange does, but from the Euclidean footprint of a pixel so rotation changes nothing, and
+fades a glyph whose range drops below one pixel. No shaping (ligatures, RTL).
 
 **Layout.** `Layout` on a parent arranges its children in `OrderedChildren` order in logical
 pixels: rows and columns, fit and grow sizing with weights, min/max, padding, spacing, alignment,
