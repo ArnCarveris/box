@@ -1788,3 +1788,146 @@ void Spatial_dynamic_fast_mover_exact_bounds(void) {
     ecs_vec_fini_t(NULL, &out, ecs_entity_t);
     ecs_fini(world);
 }
+
+void Spatial_dynamic_resized_at_rest(void) {
+    // spatial_perf/dynamic_bounds
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t e = ecs_new(world);
+    ecs_add(world, e, DynamicTransform);
+    ecs_set(world, e, Position, {0, 0, 0});
+    ecs_set(world, e, Box, {1, 1, 1});
+    ecs_progress(world, 0);
+    ecs_vec_t out;
+    ecs_vec_init_t(NULL, &out, ecs_entity_t, 0);
+    test_int(box_spatial_overlap_sphere(world, 0, (vec3){1.2f, 0, 0}, 0.1f, &out), 0);
+
+    ecs_set(world, e, Box, {3, 1, 1});
+    ecs_progress(world, 0);
+    vec3 min, max;
+    test_assert(box_spatial_bounds(world, e, NULL, min, max));
+    test_flt(min[0], -1.5f);
+    test_flt(max[0], 1.5f);
+    test_flt(max[2], 0.5f);
+    test_int(box_spatial_overlap_sphere(world, 0, (vec3){1.2f, 0, 0}, 0.1f, &out), 1);
+    box_spatial_hit_t hit = {0};
+    box_spatial_ray_t ray = { .origin = {1.2f, 0, -5}, .dir = {0, 0, 1} };
+    test_assert(box_spatial_ray(world, &ray, &hit));
+    test_uint(hit.entity, e);
+    test_flt(hit.distance, 4.5f);
+
+    ecs_set(world, e, Box, {1, 1, 1});
+    ecs_progress(world, 0);
+    ecs_vec_clear(&out);
+    test_int(box_spatial_overlap_sphere(world, 0, (vec3){1.2f, 0, 0}, 0.1f, &out), 0);
+    test_assert(!box_spatial_ray(world, &ray, &hit));
+
+    ecs_vec_fini_t(NULL, &out, ecs_entity_t);
+    ecs_fini(world);
+}
+
+void Spatial_dynamic_moved_without_queries(void) {
+    // spatial_perf/dynamic_bounds
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    enum { COUNT = 300, ROUNDS = 6, FRAMES = 5, QUERIES = 20 };
+    ecs_entity_t *shapes = ecs_os_malloc_n(ecs_entity_t, COUNT);
+    vec3 *start = ecs_os_malloc_n(vec3, COUNT);
+    vec3 *min = ecs_os_malloc_n(vec3, COUNT);
+    vec3 *max = ecs_os_malloc_n(vec3, COUNT);
+    ecs_entity_t *expect = ecs_os_malloc_n(ecs_entity_t, COUNT);
+    int32_t i, r, f, q, a;
+    srand(31);
+    for (i = 0; i < COUNT; i ++) {
+        for (a = 0; a < 3; a ++) {
+            start[i][a] = (float)rand() / (float)RAND_MAX * 60.0f - 30.0f;
+        }
+
+        shapes[i] = ecs_new(world);
+        ecs_add(world, shapes[i], DynamicTransform);
+        ecs_set(world, shapes[i], Position, {start[i][0], start[i][1], start[i][2]});
+        ecs_set(world, shapes[i], Rotation, {0, 0, 0});
+        ecs_set(world, shapes[i], Box, {1, 2, 0.5f});
+    }
+
+    ecs_progress(world, 0);
+    ecs_vec_t out;
+    ecs_vec_init_t(NULL, &out, ecs_entity_t, 0);
+    for (r = 0; r < ROUNDS; r ++) {
+        for (f = 0; f < FRAMES; f ++) {
+            for (i = 0; i < COUNT; i ++) {
+                Position *p = ecs_get_mut(world, shapes[i], Position);
+                Rotation *rot = ecs_get_mut(world, shapes[i], Rotation);
+                int32_t kind = (i + r) % 5;
+                if (kind == 0 && f == FRAMES - 1) {
+                    *p = (Position){start[i][0], start[i][1], start[i][2]};
+                    *rot = (Rotation){0, 0, 0};
+                } else if (kind == 0) {
+                    p->x += 0.4f;
+                    rot->y += 0.5f;
+                } else if (kind == 1 && f == 0) {
+                    p->z += 30.0f;
+                } else if (kind == 2 && f < 2) {
+                    rot->x += 0.4f;
+                } else if (kind == 3 && f < 2) {
+                    p->y += 0.3f;
+                }
+            }
+
+            ecs_progress(world, 0);
+        }
+
+        for (i = 0; i < COUNT; i ++) {
+            const WorldTransform *t = ecs_get(world, shapes[i], WorldTransform);
+            vec3 got_min, got_max;
+            for (a = 0; a < 3; a ++) {
+                float e = (fabsf(t->m[0][a]) * 1.0f + fabsf(t->m[1][a]) * 2.0f +
+                    fabsf(t->m[2][a]) * 0.5f) * 0.5f;
+                min[i][a] = t->m[3][a] - e;
+                max[i][a] = t->m[3][a] + e;
+            }
+
+            test_assert(box_spatial_bounds(world, shapes[i], NULL, got_min, got_max));
+            for (a = 0; a < 3; a ++) {
+                test_assert(fabsf(got_min[a] - min[i][a]) < 1e-3f);
+                test_assert(fabsf(got_max[a] - max[i][a]) < 1e-3f);
+            }
+        }
+
+        for (q = 0; q < QUERIES; q ++) {
+            int32_t count = 0;
+            float c[3], h = 2.0f + (float)rand() / (float)RAND_MAX * 6.0f;
+            for (a = 0; a < 3; a ++) {
+                c[a] = (float)rand() / (float)RAND_MAX * 70.0f - 35.0f;
+            }
+
+            for (i = 0; i < COUNT; i ++) {
+                bool hit = true;
+                for (a = 0; a < 3; a ++) {
+                    hit = hit && min[i][a] <= c[a] + h && max[i][a] >= c[a] - h;
+                }
+
+                if (hit) {
+                    expect[count ++] = shapes[i];
+                }
+            }
+
+            ecs_vec_clear(&out);
+            test_int(box_spatial_overlap_box(world, 0, (vec3){c[0] - h, c[1] - h, c[2] - h},
+                (vec3){c[0] + h, c[1] + h, c[2] + h}, &out), count);
+            qsort(expect, (size_t)count, sizeof(ecs_entity_t), entity_compare);
+            qsort(ecs_vec_first(&out), (size_t)count, sizeof(ecs_entity_t), entity_compare);
+            for (i = 0; i < count; i ++) {
+                test_uint(*ecs_vec_get_t(&out, ecs_entity_t, i), expect[i]);
+            }
+        }
+    }
+
+    ecs_vec_fini_t(NULL, &out, ecs_entity_t);
+    ecs_os_free(shapes);
+    ecs_os_free(start);
+    ecs_os_free(min);
+    ecs_os_free(max);
+    ecs_os_free(expect);
+    ecs_fini(world);
+}

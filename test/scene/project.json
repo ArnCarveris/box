@@ -82,7 +82,9 @@
                     "dynamic_rotated_in_place",
                     "dynamic_shape_removed_and_added_back",
                     "dynamic_to_static_and_back",
-                    "dynamic_fast_mover_exact_bounds"
+                    "dynamic_fast_mover_exact_bounds",
+                    "dynamic_resized_at_rest",
+                    "dynamic_moved_without_queries"
                 ]
             }
         ]
