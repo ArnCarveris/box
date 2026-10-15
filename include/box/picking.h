@@ -32,6 +32,15 @@ extern "C" {
  */
 extern ECS_TAG_DECLARE(Interactive);
 
+/** Makes an element take the pointer events that hit it or its children, its LayoutBounds or
+ * shape, so they do not pass to the views rendered before, such as the 3D scene under a HUD.
+ *
+ * An Interactive entity on the path of the hit still handles the event; otherwise the blocker
+ * does, like an Interactive entity: it is the handler, a press on it captures the pointer, and
+ * the event bubbles from the hit to it. Without it a hit nothing handles passes through.
+ */
+extern ECS_TAG_DECLARE(InputBlocker);
+
 /** Added to the entity the pointer events go to while the cursor is over it.
  *
  * While a button holds a capture it stays on the captured entity, whatever is under the cursor. */
@@ -43,7 +52,7 @@ extern ECS_TAG_DECLARE(Pressed);
 /** What the cursor picked, a singleton written by the engine and read only for applications */
 ECS_STRUCT(PickStatus, {
     ecs_entity_t target;  /**< Entity the pointer events go to, 0 for box.input.screen */
-    ecs_entity_t handler; /**< Interactive entity that handles them, 0 when none does */
+    ecs_entity_t handler; /**< Interactive or InputBlocker entity that handles them, or 0 */
     ecs_entity_t view;    /**< View whose ray found target */
     ecs_entity_t pressed; /**< Target of the press while a button is held, 0 otherwise */
     ecs_entity_t hit;     /**< Nearest entity in the front most view that hit one, 0 for none */

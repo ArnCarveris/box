@@ -384,7 +384,10 @@ with an `InputCapture` event.
 `Action` entities get an `ActionState` (down, pressed, released, start, delta, drag) written by
 `ActionUpdate`; `Binding` entities (key, modifiers) map keys to actions, and script events
 `on.pressed`, `on.held`, `on.dragged`, `on.released` fire for them. Real input is ignored while
-unfocused. Picking is not implemented.
+unfocused. `box.picking` routes pointer events to the entity under the cursor, front view
+first, bubbling to the first `Interactive` ancestor; a hit nothing handles passes to the views
+rendered before, unless an `InputBlocker` element on its path takes it, so a HUD panel with
+`InputBlocker` keeps clicks from the 3D scene.
 
 `CameraController` and `FirstPersonController` read only `ActionState`, never devices. Default
 actions live under `box.controllers.camera` and `box.controllers.first_person` and stay disabled

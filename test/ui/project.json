@@ -170,6 +170,13 @@
                     "paste_long",
                     "null_text"
                 ]
+            },
+            {
+                "id": "Blocking",
+                "testcases": [
+                    "stops_pass_through",
+                    "press_stays_on_panel"
+                ]
             }
         ]
     }

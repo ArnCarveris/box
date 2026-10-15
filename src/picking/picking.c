@@ -11,6 +11,7 @@
 
 ECS_COMPONENT_DECLARE(PickingState);
 ECS_TAG_DECLARE(Interactive);
+ECS_TAG_DECLARE(InputBlocker);
 ECS_TAG_DECLARE(Hovered);
 ECS_TAG_DECLARE(Pressed);
 
@@ -435,6 +436,7 @@ void BoxPickingImport(
     ECS_IMPORT(world, BoxSpatial);
 
     ECS_TAG_DEFINE(world, Interactive);
+    ECS_TAG_DEFINE(world, InputBlocker);
     ECS_TAG_DEFINE(world, Hovered);
     ECS_TAG_DEFINE(world, Pressed);
     ECS_META_COMPONENT(world, PickStatus);
