@@ -37,6 +37,12 @@
                 ]
             },
             {
+                "id": "DeviceLoss",
+                "testcases": [
+                    "pipeline_error_keeps_previous"
+                ]
+            },
+            {
                 "id": "Restart",
                 "testcases": [
                     "main_thread_toggle_keeps_scene"
