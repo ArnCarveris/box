@@ -42,6 +42,13 @@
 /** Quadratic curves a cubic curve is approximated by */
 #define BOX_MSDF_CUBIC_SPLIT (4)
 
+/** Dot product of the directions at a vertex below which, minus one, the vertex is a cusp
+ * (msdfgen's MSDFGEN_CORNER_DOT_EPSILON) */
+#define BOX_MSDF_CUSP_DOT (0.000001)
+
+/** Overshoot of the turn that pushes the curves of a cusp apart (msdfgen) */
+#define BOX_MSDF_DECONVERGE (1.11111111111111111)
+
 /** Largest magnitude of a value before quantization, far beyond the 0 to 1 that is kept */
 #define BOX_MSDF_VALUE_LIMIT (1e6)
 
@@ -735,6 +742,86 @@ static void box_msdf_color_contour(
     ecs_vec_fini_t(NULL, &corners, int32_t);
 }
 
+/** Order two edges that leave a corner in opposite directions, after msdfgen's
+ * convergentCurveOrdering: the sign of the cross product of the points of both edges at the
+ * same small distance from the corner.
+ *
+ * @param a The edge that ends at the corner
+ * @param b The edge that starts at the corner
+ * @return 1 when b lies counter clockwise of a near the corner, -1 when clockwise, 0 for a tie
+ */
+static int32_t box_msdf_convergent_order(
+    const box_msdf_edge_t *a,
+    const box_msdf_edge_t *b)
+{
+    box_msdf_point_t corner = b->p[0];
+    box_msdf_point_t a1 = box_msdf_sub(a->degree == 2 ? a->p[1] : a->p[0], corner);
+    box_msdf_point_t b1 = box_msdf_sub(b->degree == 2 ? b->p[1] : b->p[2], corner);
+    box_msdf_point_t a2 = { 0.0, 0.0 }, b2 = { 0.0, 0.0 };
+    int32_t result = 0;
+    if (a->degree == 2) {
+        a2 = box_msdf_sub(box_msdf_sub(a->p[0], a->p[1]), a1);
+    }
+
+    if (b->degree == 2) {
+        b2 = box_msdf_sub(box_msdf_sub(b->p[2], b->p[1]), b1);
+    }
+
+    a1 = (box_msdf_point_t){ a1.x * a->degree, a1.y * a->degree };
+    b1 = (box_msdf_point_t){ b1.x * b->degree, b1.y * b->degree };
+    double as = box_msdf_length(a1), bs = box_msdf_length(b1);
+    double third = as * box_msdf_cross(a1, b2) + bs * box_msdf_cross(a2, b1);
+    double fourth = as * bs * box_msdf_cross(a2, b2);
+    if (third != 0.0) {
+        result = third > 0.0 ? 1 : -1;
+    } else if (fourth != 0.0) {
+        result = fourth > 0.0 ? 1 : -1;
+    }
+
+    return result;
+}
+
+/** Push apart the curves of every cusp of the last contour, where the edges before and after a
+ * vertex leave it in opposite directions, after msdfgen's Shape::normalize.
+ *
+ * The control point of each curve turns its tangent away from the other by a tiny angle, so the
+ * distances of the two edges no longer tie beyond the tip. A line keeps its direction.
+ *
+ * @param shape The shape
+ */
+static void box_msdf_deconverge(
+    box_msdf_shape_t *shape)
+{
+    int32_t count = *ecs_vec_last_t(&shape->contours, int32_t);
+    int32_t i, first = ecs_vec_count(&shape->edges) - count;
+    box_msdf_edge_t *edges = ecs_vec_get_t(&shape->edges, box_msdf_edge_t, first);
+    double eps = BOX_MSDF_CUSP_DOT - 1.0;
+    double factor = BOX_MSDF_DECONVERGE * sqrt(1.0 - eps * eps) / eps;
+    for (i = 0; i < count && count > 1; i ++) {
+        box_msdf_edge_t *a = &edges[(i + count - 1) % count], *b = &edges[i];
+        box_msdf_point_t da = box_msdf_normalize(box_msdf_direction(a, 1.0));
+        box_msdf_point_t db = box_msdf_normalize(box_msdf_direction(b, 0.0));
+        if (box_msdf_dot(da, db) >= eps) {
+            continue;
+        }
+
+        box_msdf_point_t axis = box_msdf_normalize(box_msdf_sub(db, da));
+        double f = box_msdf_convergent_order(a, b) < 0 ? -factor : factor;
+        axis = (box_msdf_point_t){ axis.x * f, axis.y * f };
+        if (a->degree == 2) {
+            double len = box_msdf_length(box_msdf_sub(a->p[1], a->p[2]));
+            a->p[1].x -= axis.y * len;
+            a->p[1].y += axis.x * len;
+        }
+
+        if (b->degree == 2) {
+            double len = box_msdf_length(box_msdf_sub(b->p[1], b->p[0]));
+            b->p[1].x += axis.y * len;
+            b->p[1].y -= axis.x * len;
+        }
+    }
+}
+
 /** Close the contour being built and color its edges.
  *
  * @param shape The shape
@@ -754,6 +841,7 @@ static void box_msdf_close(
         goto done;
     }
 
+    box_msdf_deconverge(shape);
     box_msdf_color_contour(shape, &seed);
 done:
     return;
