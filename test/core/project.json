@@ -191,7 +191,9 @@
                 "testcases": [
                     "texture_wait_timeout_warns",
                     "text_wait_timeout_warns",
-                    "ready_frame_does_not_warn"
+                    "ready_frame_does_not_warn",
+                    "many_stuck_textures_counted",
+                    "decoded_texture_not_named"
                 ]
             },
             {

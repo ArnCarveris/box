@@ -202,7 +202,8 @@ static int32_t box_text_working(
 #define BOX_TEXT_WARN_NAMES (4)
 
 /** In a headless run, wait for the font and glyph jobs in flight so a frame always sees the
- * same atlas, and warn with the fonts still loading when the wait gives up.
+ * same atlas, and warn when the wait gives up, naming the font loads not applied yet while
+ * font or glyph jobs are in flight.
  *
  * @param it The iterator of the system
  */
@@ -233,7 +234,7 @@ static void BoxTextFrame(
     }
 
     ecs_strbuf_t names = ECS_STRBUF_INIT;
-    int32_t loading = 0, i;
+    int32_t loading = 0, i, working = box_text_working(s->sync);
     ecs_iter_t fit = ecs_each_id(it->world, ecs_id(FontStatus));
     while (ecs_each_next(&fit)) {
         const FontStatus *status = ecs_field(&fit, FontStatus, 0);
@@ -243,7 +244,7 @@ static void BoxTextFrame(
                 continue;
             }
 
-            if (loading < BOX_TEXT_WARN_NAMES) {
+            if (working && loading < BOX_TEXT_WARN_NAMES) {
                 char *name = ecs_get_path(it->world, fit.entities[i]);
                 ecs_strbuf_appendstr(&names, loading ? ", " : " (");
                 ecs_strbuf_appendstr(&names, name);
@@ -258,18 +259,18 @@ static void BoxTextFrame(
         }
     }
 
-    if (loading > BOX_TEXT_WARN_NAMES) {
+    if (working && loading > BOX_TEXT_WARN_NAMES) {
         ecs_strbuf_append(&names, ", %d more", loading - BOX_TEXT_WARN_NAMES);
     }
 
-    if (loading) {
+    if (working && loading) {
         ecs_strbuf_appendstr(&names, ")");
     }
 
     char *list = ecs_strbuf_get(&names);
-    ecs_warn("headless text wait timed out after %.1f s: %d font(s) loading%s, "
-        "%d font or glyph job(s) in flight, %d job(s) running", waited, loading,
-        list ? list : "", box_text_working(s->sync), box_jobs_running(it->world));
+    ecs_warn("headless text wait timed out after %.1f s: %d font or glyph job(s) in flight, "
+        "%d job(s) running, %d font load(s) not applied yet%s", waited, working,
+        box_jobs_running(it->world), loading, list ? list : "");
     ecs_os_free(list);
 done:
     return;

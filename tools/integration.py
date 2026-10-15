@@ -337,6 +337,13 @@ def wait_for_cores(args):
     return round(waited, 3)
 
 
+def partial_output(data):
+    if isinstance(data, bytes):
+        return data.decode(errors="replace")
+
+    return data or ""
+
+
 def run_guarded(cmd, args, output, timeout, refused):
     log = ""
     code = -1
@@ -354,7 +361,7 @@ def run_guarded(cmd, args, output, timeout, refused):
             log = proc.stdout + proc.stderr
             code = proc.returncode
         except subprocess.TimeoutExpired as e:
-            log = "run timed out\n" + str(e.stdout or "") + str(e.stderr or "")
+            log = "run timed out\n" + partial_output(e.stdout) + partial_output(e.stderr)
             code = -1
             run["timed_out"] = True
         run["run_seconds"] = round(time.time() - start, 3)

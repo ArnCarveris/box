@@ -392,7 +392,10 @@ done:
     return;
 }
 
-/** Warn that a headless frame stopped waiting for textures, naming the ones still loading.
+/** Warn that a headless frame stopped waiting for textures.
+ *
+ * The loads whose result is not applied yet are named while decodes are in flight; without one
+ * they only wait for their completion, which runs later in the frame, and are only counted.
  *
  * @param world The world
  * @param t The registry
@@ -404,7 +407,7 @@ static void box_textures_warn_timeout(
     double waited)
 {
     ecs_strbuf_t names = ECS_STRBUF_INIT;
-    int32_t loading = 0, i;
+    int32_t loading = 0, i, decoding = box_texture_working(t->sync);
     ecs_iter_t it = ecs_each_id(world, ecs_id(TextureStatus));
     while (ecs_each_next(&it)) {
         const TextureStatus *status = ecs_field(&it, TextureStatus, 0);
@@ -413,7 +416,7 @@ static void box_textures_warn_timeout(
                 continue;
             }
 
-            if (loading < BOX_TEXTURE_WARN_NAMES) {
+            if (decoding && loading < BOX_TEXTURE_WARN_NAMES) {
                 const TexturePath *path = ecs_get(world, it.entities[i], TexturePath);
                 char *name = ecs_get_path(world, it.entities[i]);
                 ecs_strbuf_appendstr(&names, loading ? ", " : " (");
@@ -429,24 +432,24 @@ static void box_textures_warn_timeout(
         }
     }
 
-    if (loading > BOX_TEXTURE_WARN_NAMES) {
+    if (decoding && loading > BOX_TEXTURE_WARN_NAMES) {
         ecs_strbuf_append(&names, ", %d more", loading - BOX_TEXTURE_WARN_NAMES);
     }
 
-    if (loading) {
+    if (decoding && loading) {
         ecs_strbuf_appendstr(&names, ")");
     }
 
     char *list = ecs_strbuf_get(&names);
-    ecs_warn("headless texture wait timed out after %.1f s: %d texture(s) loading%s, "
-        "%d decode(s) in flight, %d job(s) running", waited, loading, list ? list : "",
-        box_texture_working(t->sync), box_jobs_running(world));
+    ecs_warn("headless texture wait timed out after %.1f s: %d decode(s) in flight, "
+        "%d job(s) running, %d texture load(s) not applied yet%s", waited, decoding,
+        box_jobs_running(world), loading, list ? list : "");
     ecs_os_free(list);
 }
 
 /** Load the textures again when the texture quality of the surfaces changed and, in a
  * headless run, wait for the decodes in flight so a frame always sees the same images, and
- * warn with the textures still loading when the wait gives up.
+ * warn when the wait gives up.
  *
  * @param it The iterator of the system
  */
