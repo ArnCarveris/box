@@ -17,7 +17,6 @@ typedef struct {
     LayoutItem item;    /**< LayoutItem of the element, fit on both axes when it has none */
     float shape[2];     /**< Size of the shape or text of the element */
     float pos[3];       /**< Position the element had */
-    float fit[2];       /**< Size of the content plus padding, or of the shape */
     float base[2];      /**< Fit size within min and max, what the element adds to its parent */
     float cmin[2];      /**< Narrowest the content of the element allows, within min and max */
     float longest;      /**< Widest word of the text of the element, its narrowest width */
@@ -39,6 +38,7 @@ typedef struct {
     ecs_vec_t roots;              /**< Roots of the trees to lay out this frame */
     ecs_vec_t nodes;              /**< Elements of the tree being laid out */
     ecs_entity_t text_bounds;     /**< The TextBounds component, 0 until it exists */
+    bool has_text;                /**< The tree being laid out has a text to wrap */
     bool writing;                 /**< The layout is writing its results */
 } box_layout_state_t;
 

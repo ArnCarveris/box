@@ -299,7 +299,7 @@ static float box_text_widest(
     return result;
 }
 
-/** Lay out a Text into its TextGlyphs and TextBounds, measuring it at Text.width first.
+/** Lay out a Text into its TextGlyphs and TextBounds, measuring it at Text.width.
  *
  * @param world The world
  * @param s The registry
@@ -341,7 +341,8 @@ static void box_text_typeset(
         ? text->line_height
         : (ascent - descent + gap) * px;
     float wrap = text->width > 0.0f ? text->width : 0.0f;
-    if (measure) {
+    bool apart = measure && glyphs->wrap > 0.0f;
+    if (apart) {
         box_text_run_t natural = box_text_run(world, s, font, str, px, wrap, true);
         glyphs->natural[0] = box_text_widest(s);
         glyphs->natural[1] = (float)ecs_vec_count(&s->lines) * metrics[2];
@@ -353,6 +354,12 @@ static void box_text_typeset(
     }
 
     box_text_run_t run = box_text_run(world, s, font, str, px, wrap, false);
+    if (measure && !apart) {
+        glyphs->natural[0] = box_text_widest(s);
+        glyphs->natural[1] = (float)ecs_vec_count(&s->lines) * metrics[2];
+        glyphs->longest = run.longest;
+    }
+
     box_text_emit(&run, font, text, metrics, glyphs, &bounds);
 write:
     ecs_modified(world, e, TextGlyphs);

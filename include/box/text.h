@@ -47,7 +47,8 @@ ECS_STRUCT(FontStatus, {
 /** A string drawn as one quad per glyph in the local XY plane of the entity, facing +Z.
  *
  * Lengths are logical pixels. The block of lines is centered on the origin, y up, and
- * measures TextBounds. Lines break at newlines and, with a width, between words.
+ * measures TextBounds. Lines break at newlines and, with a width, between words. In a layout,
+ * a Text with a Grow or Fixed width also wraps at the width the layout gives it.
  *
  * Color, opacity, emission and tint come from Rgb, Opacity, Emissive, Tint and BlendMode.
  */
