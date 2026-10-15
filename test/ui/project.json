@@ -147,6 +147,16 @@
                 ]
             },
             {
+                "id": "TextLines",
+                "testcases": [
+                    "small_sizes_scale_linearly",
+                    "small_size_ink_in_bounds",
+                    "kerning_pairs",
+                    "line_break_edges",
+                    "single_line_align_same"
+                ]
+            },
+            {
                 "id": "Screen",
                 "testcases": [
                     "hud_over_3d_scene",
