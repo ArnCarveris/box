@@ -14,6 +14,9 @@
 /** Depth below which a build stops weighing splits and halves the leaves */
 #define BOX_BVH_MAX_SAH_DEPTH (48)
 
+/** Margins by which a fat leaf may outgrow its fat bounds before it shrinks */
+#define BOX_BVH_SHRINK (4.0f)
+
 /** Entries a walk keeps on the stack before it allocates */
 #define BOX_BVH_STACK (64)
 
@@ -497,24 +500,59 @@ int32_t box_bvh_move(
     box_bvh_t *tree,
     int32_t leaf,
     const vec3 min,
+    const vec3 max)
+{
+    box_bvh_node_t *l = box_bvh_get(tree, leaf);
+    glm_vec3_copy(ECS_CONST_CAST(float*, min), l->min);
+    glm_vec3_copy(ECS_CONST_CAST(float*, max), l->max);
+
+    return box_bvh_grow(tree, leaf);
+}
+
+/** Grow bounds by a margin on every side and by a displacement on the side it points to.
+ *
+ * @param min Minimum corner of the bounds
+ * @param max Maximum corner of the bounds
+ * @param margin Slack on every side
+ * @param ahead The displacement
+ * @param fat_min Receives the minimum corner of the grown bounds
+ * @param fat_max Receives the maximum corner of the grown bounds
+ */
+static void box_bvh_fatten(
+    const vec3 min,
     const vec3 max,
-    float margin)
+    float margin,
+    const vec3 ahead,
+    vec3 fat_min,
+    vec3 fat_max)
+{
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        fat_min[i] = min[i] - margin + (ahead[i] < 0 ? ahead[i] : 0);
+        fat_max[i] = max[i] + margin + (ahead[i] > 0 ? ahead[i] : 0);
+    }
+}
+
+int32_t box_bvh_move_fat(
+    box_bvh_t *tree,
+    int32_t leaf,
+    const vec3 min,
+    const vec3 max,
+    float margin,
+    const vec3 ahead)
 {
     int32_t result = leaf;
     box_bvh_node_t *l = box_bvh_get(tree, leaf);
-    if (margin > 0) {
-        if (!box_bvh_contains(l->min, l->max, min, max)) {
-            vec3 fat_min, fat_max;
-            int32_t item = l->right;
-            glm_vec3_subs(ECS_CONST_CAST(float*, min), margin, fat_min);
-            glm_vec3_adds(ECS_CONST_CAST(float*, max), margin, fat_max);
-            box_bvh_remove(tree, leaf);
-            result = box_bvh_insert(tree, fat_min, fat_max, item);
-        }
-    } else {
-        glm_vec3_copy(ECS_CONST_CAST(float*, min), l->min);
-        glm_vec3_copy(ECS_CONST_CAST(float*, max), l->max);
-        result = box_bvh_grow(tree, leaf);
+    vec3 fat_min, fat_max, huge_min, huge_max;
+    box_bvh_fatten(min, max, margin, ahead, fat_min, fat_max);
+    glm_vec3_subs(fat_min, BOX_BVH_SHRINK * margin, huge_min);
+    glm_vec3_adds(fat_max, BOX_BVH_SHRINK * margin, huge_max);
+    bool keep = box_bvh_contains(l->min, l->max, min, max) &&
+        box_bvh_contains(huge_min, huge_max, l->min, l->max);
+    if (!keep) {
+        int32_t item = l->right;
+        box_bvh_remove(tree, leaf);
+        result = box_bvh_insert(tree, fat_min, fat_max, item);
     }
 
     return result;
