@@ -40,6 +40,8 @@ void box_render_packet_fini(
 void box_render_packet_reset(
     box_render_packet_t *p)
 {
+    int32_t used = ecs_vec_count(&p->data);
+    int32_t capacity = ecs_vec_size(&p->data);
     p->frame = 0;
     p->time = 0;
     p->delta = 0;
@@ -58,9 +60,19 @@ void box_render_packet_reset(
     ecs_vec_clear(&p->bakes);
     ecs_vec_clear(&p->probes);
     ecs_vec_clear(&p->data);
-    if (ecs_vec_size(&p->data) > BOX_RENDER_DATA_KEEP) {
+    if (capacity > BOX_RENDER_DATA_KEEP && (used <= BOX_RENDER_DATA_KEEP ||
+        used < capacity / BOX_RENDER_DATA_TRIM_FILL))
+    {
+        p->data_peak = p->data_idle && p->data_peak > used ? p->data_peak : used;
+        p->data_idle ++;
+    } else {
+        p->data_idle = 0;
+    }
+
+    if (p->data_idle >= BOX_RENDER_DATA_TRIM_RESETS) {
         ecs_vec_fini_t(NULL, &p->data, uint8_t);
-        ecs_vec_init_t(NULL, &p->data, uint8_t, 0);
+        ecs_vec_init_t(NULL, &p->data, uint8_t, p->data_peak);
+        p->data_idle = 0;
     }
 }
 

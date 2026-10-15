@@ -33,6 +33,26 @@ static void ExtractContents(ecs_iter_t *it) {
     desc[1] = 36;
 }
 
+/** Bytes of packet data ExtractLarge appends per frame, above BOX_RENDER_DATA_KEEP */
+#define RENDER_PACKET_LARGE (20 * 1024 * 1024)
+
+/** Bytes ExtractLarge appends: RENDER_PACKET_LARGE, or 64 to let the workload drop */
+static uint32_t extract_large_size = RENDER_PACKET_LARGE;
+
+static void ExtractLarge(ecs_iter_t *it) {
+    box_render_packet_t *p = box_render_packet(it->world);
+    uint8_t *bytes = box_render_packet_upload(p, 11, 0, extract_large_size);
+    uint32_t i;
+    for (i = 0; i < extract_large_size; i += 4096) {
+        bytes[i] = (uint8_t)(i >> 12);
+    }
+}
+
+static void DropPacket(void *ctx, const box_render_packet_t *packet) {
+    (void)ctx;
+    (void)packet;
+}
+
 static void* UnpauseLater(void *arg) {
     (void)arg;
     ecs_sleepf(0.05);
@@ -575,6 +595,301 @@ void RenderPacket_headless_fixed_delta(void) {
     test_int(null->frame, 4);
     test_flt(null->delta, 0.02f);
     test_flt(null->time, 0.1);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void RenderPacket_no_alloc_after_warmup_large(void) {
+    // render_fixes/packet_data_trim
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    box_render_backend_t backend = { .render = DropPacket };
+    box_render_set_backend(world, &backend);
+    ecs_singleton_set(world, RenderSettings, { .in_flight = 2 });
+    extract_large_size = RENDER_PACKET_LARGE;
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "ExtractLarge" }),
+        .phase = RenderExtract,
+        .callback = ExtractLarge
+    });
+
+    int32_t i, frames = BOX_RENDER_DATA_TRIM_RESETS * 2 * 2;
+    for (i = 0; i < 10; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_sync(world);
+    int64_t before = ecs_os_api_malloc_count + ecs_os_api_calloc_count +
+        ecs_os_api_realloc_count;
+    for (i = 0; i < frames; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_sync(world);
+    int64_t after = ecs_os_api_malloc_count + ecs_os_api_calloc_count +
+        ecs_os_api_realloc_count;
+    test_int(after - before, 0);
+
+    ecs_fini(world);
+}
+
+void RenderPacket_large_data_released_after_drop(void) {
+    // render_fixes/packet_data_trim
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    box_render_backend_t backend = { .render = DropPacket };
+    box_render_set_backend(world, &backend);
+    ecs_singleton_set(world, RenderSettings, { .in_flight = 2 });
+    extract_large_size = RENDER_PACKET_LARGE;
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "ExtractLarge" }),
+        .phase = RenderExtract,
+        .callback = ExtractLarge
+    });
+
+    int32_t i;
+    for (i = 0; i < 10; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_sync(world);
+    extract_large_size = 64;
+    for (i = 0; i < 10; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_sync(world);
+    extract_large_size = RENDER_PACKET_LARGE;
+    int64_t before = ecs_os_api_malloc_count + ecs_os_api_calloc_count +
+        ecs_os_api_realloc_count;
+    for (i = 0; i < 10; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_sync(world);
+    int64_t after = ecs_os_api_malloc_count + ecs_os_api_calloc_count +
+        ecs_os_api_realloc_count;
+    test_int(after - before, 0);
+
+    extract_large_size = 64;
+    for (i = 0; i < BOX_RENDER_DATA_TRIM_RESETS * 2 * 2; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_sync(world);
+    extract_large_size = RENDER_PACKET_LARGE;
+    before = ecs_os_api_malloc_count + ecs_os_api_calloc_count + ecs_os_api_realloc_count;
+    for (i = 0; i < 10; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_sync(world);
+    after = ecs_os_api_malloc_count + ecs_os_api_calloc_count + ecs_os_api_realloc_count;
+    test_assert(after - before > 0);
+
+    ecs_fini(world);
+}
+
+void RenderPacket_large_data_shrinks_when_load_settles(void) {
+    // render_fixes/packet_data_trim
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    box_render_backend_t backend = { .render = DropPacket };
+    box_render_set_backend(world, &backend);
+    ecs_singleton_set(world, RenderSettings, { .in_flight = 2 });
+    extract_large_size = RENDER_PACKET_LARGE;
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "ExtractLarge" }),
+        .phase = RenderExtract,
+        .callback = ExtractLarge
+    });
+
+    int32_t i, frames = BOX_RENDER_DATA_TRIM_RESETS * 2 * 2;
+    for (i = 0; i < 10; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_sync(world);
+    extract_large_size = RENDER_PACKET_LARGE / 2;
+    int64_t before = ecs_os_api_free_count;
+    for (i = 0; i < frames; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_sync(world);
+    test_assert(ecs_os_api_free_count - before >= 2);
+
+    before = ecs_os_api_malloc_count + ecs_os_api_calloc_count + ecs_os_api_realloc_count;
+    for (i = 0; i < frames; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_sync(world);
+    int64_t after = ecs_os_api_malloc_count + ecs_os_api_calloc_count +
+        ecs_os_api_realloc_count;
+    test_int(after - before, 0);
+
+    ecs_fini(world);
+}
+
+void RenderPacket_lowered_in_flight_releases_slots(void) {
+    // render_fixes/packet_slot_memory
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    box_render_backend_t backend = { .render = DropPacket };
+    box_render_set_backend(world, &backend);
+    ecs_singleton_set(world, RenderSettings, { .in_flight = 4 });
+    extract_large_size = RENDER_PACKET_LARGE;
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "ExtractLarge" }),
+        .phase = RenderExtract,
+        .callback = ExtractLarge
+    });
+
+    int32_t i;
+    for (i = 0; i < 12; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_sync(world);
+    int64_t before = ecs_os_api_free_count;
+    ecs_singleton_set(world, RenderSettings, { .in_flight = 1 });
+    for (i = 0; i < 4; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_sync(world);
+    test_assert(ecs_os_api_free_count - before >= 3);
+
+    before = ecs_os_api_malloc_count + ecs_os_api_calloc_count + ecs_os_api_realloc_count;
+    for (i = 0; i < 20; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_sync(world);
+    int64_t after = ecs_os_api_malloc_count + ecs_os_api_calloc_count +
+        ecs_os_api_realloc_count;
+    test_int(after - before, 0);
+
+    ecs_fini(world);
+}
+
+void RenderPacket_null_backend_copy_shrinks(void) {
+    // render_fixes/packet_slot_memory
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_singleton_set(world, RenderSettings, { .in_flight = 2 });
+    extract_large_size = RENDER_PACKET_LARGE;
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "ExtractLarge" }),
+        .phase = RenderExtract,
+        .callback = ExtractLarge
+    });
+
+    int32_t i;
+    for (i = 0; i < 10; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_sync(world);
+    int64_t before = ecs_os_api_malloc_count + ecs_os_api_calloc_count +
+        ecs_os_api_realloc_count;
+    for (i = 0; i < 20; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_sync(world);
+    int64_t after = ecs_os_api_malloc_count + ecs_os_api_calloc_count +
+        ecs_os_api_realloc_count;
+    test_int(after - before, 0);
+
+    extract_large_size = 64;
+    before = ecs_os_api_free_count;
+    for (i = 0; i < BOX_RENDER_DATA_TRIM_RESETS + 10; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_sync(world);
+    test_int(ecs_os_api_free_count - before, 1);
+
+    before = ecs_os_api_free_count;
+    for (i = 0; i < BOX_RENDER_DATA_TRIM_RESETS * 2; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_sync(world);
+    test_int(ecs_os_api_free_count - before, 2);
+
+    ecs_fini(world);
+}
+
+void RenderPacket_raised_in_flight_after_release(void) {
+    // render_fixes/packet_slot_memory
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+    ecs_singleton_set(world, RenderSettings, { .in_flight = 4 });
+    extract_large_size = RENDER_PACKET_LARGE;
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "ExtractLarge" }),
+        .phase = RenderExtract,
+        .callback = ExtractLarge
+    });
+
+    int32_t i, frames = 0;
+    for (i = 0; i < 8; i ++, frames ++) {
+        ecs_progress(world, 0);
+    }
+
+    ecs_singleton_set(world, RenderSettings, { .in_flight = 1 });
+    for (i = 0; i < 4; i ++, frames ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_sync(world);
+    ecs_singleton_set(world, RenderSettings, { .in_flight = 4 });
+    ecs_progress(world, 0);
+    frames ++;
+    box_render_sync(world);
+    box_render_pause(world, true);
+    for (i = 0; i < 4; i ++, frames ++) {
+        ecs_progress(world, 0);
+    }
+
+    test_int(ecs_singleton_get(world, RenderStatus)->in_flight, 4);
+    box_render_pause(world, false);
+    box_render_sync(world);
+
+    ecs_singleton_set(world, RenderSettings, { .in_flight = 2, .main_thread = true });
+    for (i = 0; i < 4; i ++, frames ++) {
+        ecs_progress(world, 0);
+    }
+
+    ecs_singleton_set(world, RenderSettings, { .in_flight = 3, .main_thread = true });
+    for (i = 0; i < 4; i ++, frames ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_sync(world);
+    test_int(null->packets, frames);
+    test_int(null->gaps, 0);
+    test_int(ecs_vec_count(&null->last.uploads), 1);
+    const box_render_upload_t *upload = ecs_vec_first_t(
+        &null->last.uploads, box_render_upload_t);
+    test_uint(upload->size, RENDER_PACKET_LARGE);
+    const uint8_t *bytes = box_render_packet_data(&null->last, upload->data);
+    for (i = 0; i < RENDER_PACKET_LARGE; i += 4096) {
+        test_int(bytes[i], (uint8_t)(i >> 12));
+    }
 
     ecs_fini(world);
     box_render_null_free(null);
