@@ -41,6 +41,7 @@ typedef struct {
     ecs_vec_t untagged;           /**< Children collect found without the child tag */
     ecs_entity_t child_tag;       /**< Tag of the children of a Layout the change query watches */
     const ecs_table_t *child_table; /**< Table of the last child collect checked */
+    bool child_prefab;            /**< That table is a prefab, its children are skipped */
     bool child_kept;              /**< That table has Parent, its children are kept */
     bool child_tagged;            /**< That table has the child tag */
     ecs_query_t *moved;           /**< Change query of the Position of tagged children */

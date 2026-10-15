@@ -109,6 +109,9 @@ ECS_STRUCT(TextureTransform, {
  * A texture entity has a TexturePath (box/texture.h), or is the texture of a Surface, whose
  * image of the same frame it then samples; until it loaded, or when it is missing, the layer
  * has no effect. Back faces drawn with BackFacePlain do not sample the textures.
+ *
+ * Minified albedo and emissive textures average linear light, the other layers the stored
+ * values; a texture shared by a color and a data layer is filtered as color in both.
  */
 ECS_STRUCT(PbrTextures, {
     ecs_entity_t albedo;    /**< Multiplied with the base color and opacity, display encoded */

@@ -1506,6 +1506,138 @@ void Layout_parent_reparent_instance_child(void) {
     ecs_fini(world);
 }
 
+void Layout_prefab_layout(void) {
+    // ui_fixes/prefab_layout_abort
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_set(world, prefab, Layout, { .direction = DirectionRow, .spacing = 2 });
+    ecs_entity_t pa = ecs_new_w_parent(world, prefab, "a");
+    ecs_set(world, pa, Rect, {10, 10});
+    ecs_entity_t pb = ecs_new_w_parent(world, prefab, "b");
+    ecs_set(world, pb, Layout, { .direction = DirectionColumn });
+    ecs_entity_t pc = ecs_new_w_parent(world, pb, "c");
+    ecs_set(world, pc, Rect, {20, 12});
+    ecs_entity_t i1 = ecs_new_w_pair(world, EcsIsA, prefab);
+    ecs_progress(world, 0);
+    ecs_entity_t i2 = ecs_new_w_pair(world, EcsIsA, prefab);
+    ecs_progress(world, 0);
+
+    test_flt(ecs_get(world, i1, LayoutBounds)->width, 32);
+    test_flt(ecs_get(world, i1, LayoutBounds)->height, 12);
+    test_flt(ecs_get(world, i2, LayoutBounds)->width, 32);
+    test_assert(!ecs_has(world, pa, Position));
+    test_assert(!ecs_has(world, pb, Position));
+
+    ecs_entity_t a = 0, b = 0;
+    ecs_iter_t it = ecs_children(world, i1);
+    while (ecs_children_next(&it)) {
+        for (int32_t c = 0; c < it.count; c ++) {
+            a = ecs_has(world, it.entities[c], Rect) ? it.entities[c] : a;
+            b = ecs_has(world, it.entities[c], Layout) ? it.entities[c] : b;
+        }
+    }
+
+    test_assert(a != 0);
+    test_assert(b != 0);
+    test_flt(ecs_get(world, a, Position)->x, -11);
+    test_flt(ecs_get(world, b, Position)->x, 6);
+    test_flt(ecs_get(world, b, LayoutBounds)->width, 20);
+
+    ecs_set(world, pa, Rect, {14, 10});
+    ecs_set(world, pc, Rect, {22, 12});
+    ecs_set(world, a, Rect, {30, 10});
+    ecs_progress(world, 0);
+
+    test_flt(ecs_get(world, i1, LayoutBounds)->width, 52);
+    test_assert(!ecs_has(world, pa, Position));
+
+    ecs_entity_t variant = ecs_new_w_id(world, EcsPrefab);
+    ecs_add_pair(world, variant, EcsIsA, prefab);
+    ecs_set(world, variant, Layout, { .direction = DirectionColumn, .spacing = 2 });
+    ecs_entity_t i3 = ecs_new_w_pair(world, EcsIsA, variant);
+    ecs_progress(world, 0);
+
+    const LayoutBounds *b3 = ecs_get(world, i3, LayoutBounds);
+    test_assert(b3 != NULL);
+    test_assert(ecs_owns(world, i3, LayoutBounds));
+    test_flt(b3->width, 22);
+    test_flt(b3->height, 24);
+
+    ecs_fini(world);
+}
+
+void Layout_prefab_child_of_tree(void) {
+    // ui_fixes/prefab_layout_abort
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t r = ecs_new(world);
+    ecs_set(world, r, Layout, { .direction = DirectionRow, .spacing = 2 });
+    ecs_entity_t c = ecs_new_w_pair(world, EcsChildOf, r);
+    ecs_set(world, c, Rect, {10, 10});
+    ecs_entity_t py = ecs_new_w_id(world, EcsPrefab);
+    ecs_add_pair(world, py, EcsChildOf, r);
+    ecs_set(world, py, Rect, {5, 5});
+    ecs_entity_t px = ecs_new_w_parent(world, r, "px");
+    ecs_add_id(world, px, EcsPrefab);
+    ecs_set(world, px, Rect, {7, 7});
+    ecs_entity_t iy = ecs_new_w_pair(world, EcsIsA, py);
+    ecs_entity_t ix = ecs_new_w_pair(world, EcsIsA, px);
+    ecs_progress(world, 0);
+
+    test_flt(ecs_get(world, r, LayoutBounds)->width, 10);
+    test_flt(ecs_get(world, r, LayoutBounds)->height, 10);
+    test_flt(ecs_get(world, c, Position)->x, 0);
+    test_assert(!ecs_has(world, py, Position));
+    test_assert(!ecs_has(world, px, Position));
+    test_assert(ecs_is_alive(world, iy));
+    test_assert(ecs_is_alive(world, ix));
+
+    ecs_set(world, c, Rect, {12, 10});
+    ecs_progress(world, 0);
+
+    test_flt(ecs_get(world, r, LayoutBounds)->width, 12);
+    test_assert(!ecs_has(world, py, Position));
+
+    ecs_fini(world);
+}
+
+void Layout_prefab_childof_and_slot(void) {
+    // ui_fixes/prefab_layout_abort
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t pb = ecs_new_w_id(world, EcsPrefab);
+    ecs_set(world, pb, Layout, { .direction = DirectionColumn, .spacing = 1 });
+    ecs_entity_t pb1 = ecs_new_w_pair(world, EcsChildOf, pb);
+    ecs_set(world, pb1, Rect, {8, 3});
+    ecs_entity_t pb2 = ecs_new_w_pair(world, EcsChildOf, pb);
+    ecs_set(world, pb2, Rect, {6, 3});
+    ecs_entity_t pa = ecs_new_w_id(world, EcsPrefab);
+    ecs_set(world, pa, Layout, { .direction = DirectionRow, .spacing = 2 });
+    ecs_entity_t pa1 = ecs_new_w_pair(world, EcsChildOf, pa);
+    ecs_set(world, pa1, Rect, {4, 4});
+    ecs_entity_t slot = ecs_new_w_pair(world, EcsIsA, pb);
+    ecs_add_pair(world, slot, EcsChildOf, pa);
+    ecs_entity_t ib = ecs_new_w_pair(world, EcsIsA, pb);
+    ecs_entity_t ia = ecs_new_w_pair(world, EcsIsA, pa);
+    ecs_progress(world, 0);
+
+    test_flt(ecs_get(world, ib, LayoutBounds)->width, 8);
+    test_flt(ecs_get(world, ib, LayoutBounds)->height, 7);
+    test_flt(ecs_get(world, ia, LayoutBounds)->width, 14);
+    test_flt(ecs_get(world, ia, LayoutBounds)->height, 7);
+    test_flt(ecs_get(world, pa, LayoutBounds)->width, 0);
+    test_flt(ecs_get(world, pb, LayoutBounds)->width, 0);
+    test_assert(!ecs_has(world, pb1, Position));
+    test_assert(!ecs_has(world, pa1, Position));
+    test_assert(!ecs_has(world, slot, Position));
+
+    ecs_fini(world);
+}
+
 void Layout_add_remove_child(void) {
     // ui/layout
     ecs_world_t *world = ecs_init();

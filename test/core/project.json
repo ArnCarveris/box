@@ -90,7 +90,11 @@
                     "env_sets_unguarded",
                     "env_zero_keeps_guard",
                     "env_unset_keeps_guard",
-                    "run_unguarded"
+                    "run_unguarded",
+                    "budget_adds_to_load",
+                    "no_limit_claims_one_core",
+                    "run_refuses_budget_above_cores",
+                    "run_unguarded_ignores_budget"
                 ]
             },
             {
@@ -102,7 +106,10 @@
                     "sleeps_when_over_budget",
                     "unpaced_never_sleeps",
                     "not_headless_never_sleeps",
-                    "env_sets_unpaced"
+                    "env_sets_unpaced",
+                    "budget_share_at_half",
+                    "budget_share_at_quarter",
+                    "idle_earns_no_credit"
                 ]
             },
             {
