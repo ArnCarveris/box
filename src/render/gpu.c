@@ -325,6 +325,7 @@ static int box_gpu_init(
 {
     box_gpu_t *gpu = ctx;
     int result = box_gpu_create(gpu);
+    gpu->fence_done = 0;
     if (result) {
         goto done;
     }
@@ -424,6 +425,98 @@ static void box_gpu_render(
     box_gpu_targets_render(gpu, packet);
 
     box_gpu_effects_sweep(gpu, packet);
+}
+
+#ifndef __EMSCRIPTEN__
+/** Remember that the queue finished the work of a fence.
+ *
+ * @param status Whether the work completed
+ * @param message Unused
+ * @param userdata1 The backend
+ * @param userdata2 The fence
+ */
+static void box_gpu_fence_done(
+    WGPUQueueWorkDoneStatus status,
+    WGPUStringView message,
+    void *userdata1,
+    void *userdata2)
+{
+    box_gpu_t *gpu = userdata1;
+    uint64_t fence = (uint64_t)(uintptr_t)userdata2;
+    (void)message;
+    if (status == WGPUQueueWorkDoneStatus_Success && fence > gpu->fence_done) {
+        gpu->fence_done = fence;
+    }
+}
+#endif
+
+/** Mark the work the backend submitted so far, so a wait can block until the GPU finished it.
+ *
+ * @param ctx The backend
+ * @return The fence, 0 when the platform cannot wait for one
+ */
+static uint64_t box_gpu_fence(
+    void *ctx)
+{
+    box_gpu_t *gpu = ctx;
+    uint64_t result = 0;
+#ifndef __EMSCRIPTEN__
+    WGPUCommandBuffer none = NULL;
+    if (gpu->queue) {
+        result = (uint64_t)wgpuQueueSubmitForIndex(gpu->queue, 0, &none) + 1;
+        wgpuQueueOnSubmittedWorkDone(gpu->queue, (WGPUQueueWorkDoneCallbackInfo){
+            .mode = WGPUCallbackMode_AllowSpontaneous,
+            .callback = box_gpu_fence_done,
+            .userdata1 = gpu,
+            .userdata2 = (void*)(uintptr_t)result
+        });
+    }
+#else
+    (void)gpu;
+#endif
+
+    return result;
+}
+
+/** Block until the GPU finished the work of a fence.
+ *
+ * @param ctx The backend
+ * @param fence The fence, 0 returns at once
+ */
+static void box_gpu_wait(
+    void *ctx,
+    uint64_t fence)
+{
+    box_gpu_t *gpu = ctx;
+#ifndef __EMSCRIPTEN__
+    WGPUSubmissionIndex index = (WGPUSubmissionIndex)(fence - 1);
+    if (fence && gpu->device) {
+        wgpuDevicePoll(gpu->device, true, &index);
+    }
+#else
+    (void)gpu;
+    (void)fence;
+#endif
+}
+
+/** Check without blocking whether the GPU finished the work of a fence.
+ *
+ * @param ctx The backend
+ * @param fence The fence, 0 is always done
+ * @return Whether the work is done
+ */
+static bool box_gpu_done(
+    void *ctx,
+    uint64_t fence)
+{
+    box_gpu_t *gpu = ctx;
+#ifndef __EMSCRIPTEN__
+    if (fence > gpu->fence_done && gpu->device) {
+        wgpuDevicePoll(gpu->device, false, NULL);
+    }
+#endif
+
+    return fence <= gpu->fence_done || !gpu->device;
 }
 
 /** Release a webgpu object when it exists.
@@ -560,7 +653,10 @@ box_render_backend_t box_render_gpu_backend(void)
         .init = box_gpu_init,
         .render = box_gpu_render,
         .fini = box_gpu_fini,
-        .free = box_gpu_free
+        .free = box_gpu_free,
+        .fence = box_gpu_fence,
+        .wait = box_gpu_wait,
+        .done = box_gpu_done
     };
 
     return result;

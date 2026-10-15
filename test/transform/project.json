@@ -899,6 +899,13 @@
                     "position_removed_passes_entity",
                     "ctx_free_on_fini"
                 ]
+            },
+            {
+                "id": "DynamicParentRuns",
+                "testcases": [
+                    "interleaved_parents",
+                    "parent_without_transform"
+                ]
             }
         ]
     }

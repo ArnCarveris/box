@@ -214,7 +214,7 @@ static void BoxTextFrame(
     }
 
     ecs_time_measure(&start);
-    while (box_text_working(s->sync)) {
+    while (box_text_working(s->sync) || box_jobs_running(it->world)) {
         ecs_time_t now = start;
         if (ecs_time_measure(&now) > BOX_TEXT_HEADLESS_WAIT) {
             break;

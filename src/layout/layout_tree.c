@@ -142,7 +142,34 @@ static int32_t box_layout_read(
     return result;
 }
 
+/** Keep the parent of a child the tree holds through Parent, to mark it when the child moves.
+ *
+ * @param world The world
+ * @param state The state of the layout module
+ * @param child The child
+ * @param parent Its parent
+ */
+static void box_layout_keep_parent(
+    const ecs_world_t *world,
+    box_layout_state_t *state,
+    ecs_entity_t child,
+    ecs_entity_t parent)
+{
+    ecs_table_t *table = ecs_get_table(world, child);
+    if (table != state->parent_table) {
+        state->parent_table = table;
+        state->parent_kept = table && ecs_table_has_id(world, table, ecs_id(EcsParent));
+    }
+
+    if (state->parent_kept) {
+        ecs_map_ensure(&state->parents, (ecs_map_key_t)child)[0] = (ecs_map_val_t)parent;
+    }
+}
+
 /** Collect a tree breadth first, so the children of an element are next to each other.
+ *
+ * The parent of a child the tree holds through Parent is kept, so moving it away marks the
+ * parent it leaves.
  *
  * @param world The world
  * @param state The state of the layout module
@@ -155,6 +182,7 @@ static void box_layout_collect(
 {
     ecs_vec_clear(&state->nodes);
     state->has_text = false;
+    state->parent_table = NULL;
     box_layout_read(world, state, root);
     int32_t i;
     for (i = 0; i < ecs_vec_count(&state->nodes); i ++) {
@@ -170,6 +198,7 @@ static void box_layout_collect(
             int32_t c;
             for (c = 0; c < it.count; c ++) {
                 box_layout_read(world, state, it.entities[c]);
+                box_layout_keep_parent(world, state, it.entities[c], e);
             }
         }
 

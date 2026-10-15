@@ -91,11 +91,14 @@ box_render_packet_t* box_render_packet(
     box_render_ring_t *ring = box_render_get_ring(world);
     box_render_packet_t *result = box_render_ring_current(ring);
     if (!result) {
-        const ecs_world_info_t *info = ecs_get_world_info(ecs_get_world(world));
+        const ecs_world_t *real = ecs_get_world(world);
+        const ecs_world_info_t *info = ecs_get_world_info(real);
+        const App *app = ecs_id(App) ? ecs_singleton_get(real, App) : NULL;
         result = box_render_ring_acquire(ring);
         result->frame = info->frame_count_total;
         result->time = info->world_time_total;
         result->delta = info->delta_time;
+        result->fps = app && app->fps > 0 ? app->fps : 0;
     }
 
     return result;

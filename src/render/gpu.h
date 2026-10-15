@@ -347,6 +347,7 @@ typedef struct box_gpu_t {
     WGPUAdapter adapter;            /**< The adapter */
     WGPUDevice device;              /**< The device */
     WGPUQueue queue;                /**< Queue of the device */
+    uint64_t fence_done;            /**< Last fence whose work the queue reported done */
     WGPUBindGroupLayout blit_layout; /**< Bind group layout of the blit */
     WGPUPipelineLayout blit_pipeline_layout; /**< Pipeline layout of the blit */
     WGPUSampler sampler;            /**< Linear sampler of the blit */

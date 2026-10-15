@@ -245,6 +245,7 @@ typedef struct box_render_target_desc_t {
     int32_t point_width;    /**< Width in points cameras are sized by, the width when 0 */
     int32_t point_height;   /**< Height in points cameras are sized by, the height when 0 */
     bool vsync;             /**< A window presents with vertical sync */
+    float refresh;          /**< Refresh rate in Hz of the display of a window, 0 unknown */
     bool texture;           /**< Materials sample the image, so it renders before other targets */
 } box_render_target_desc_t;
 
@@ -431,6 +432,11 @@ typedef struct box_render_packet_t {
     int64_t frame;          /**< Frame the packet was extracted in */
     double time;            /**< World time at the end of the frame, in seconds */
     float delta;            /**< Seconds the frame advanced the world */
+    float fps;              /**< Frame rate cap of the frame, App.fps, 0 when uncapped */
+    bool vsync;             /**< A window target of the frame presents with vsync */
+    float refresh;          /**< Refresh rate in Hz of the display of that window, 0 unknown */
+    int32_t presents;       /**< Refreshes the frame is shown for, set by the submit, 0 when
+                             *   presentation does not pace it */
     uint32_t anisotropy;    /**< Anisotropic samples of the texture samplers, 1 to 16 */
     ecs_vec_t resources;    /**< box_render_resource_t in the order they were made */
     ecs_vec_t uploads;      /**< box_render_upload_t in the order they were made */
@@ -455,6 +461,10 @@ typedef struct box_render_backend_t {
     void (*render)(void*, const box_render_packet_t*); /**< Render a packet, valid until return */
     void (*fini)(void*);        /**< Release what init created */
     void (*free)(void*);        /**< Free ctx on the main thread, NULL when the caller owns it */
+    uint64_t (*fence)(void*);   /**< Mark the work render submitted so far, 0 when unsupported */
+    void (*wait)(void*, uint64_t); /**< Block until the GPU finished the work of a fence */
+    bool (*done)(void*, uint64_t); /**< Check without blocking whether a fence is done, NULL
+                                    *   when only the time a wait takes tells */
 } box_render_backend_t;
 
 /** Backend that renders nothing and records what it received, the default backend */
@@ -1286,6 +1296,75 @@ void box_render_ring_pause(
  */
 void box_render_ring_sync(
     box_render_ring_t *ring);
+
+/** Compute how many refreshes a frame is shown for so that vsync paces a frame rate cap, the
+ * swap interval of Vulkan, EGL and D3D (Unity's vSyncCount) that webgpu does not expose.
+ *
+ * The refresh rate may be off by BOX_RENDER_REFRESH_SLACK, as reported rates are whole Hz.
+ *
+ * @param refresh Refresh rate of the display in Hz, 0 when unknown
+ * @param fps Frame rate cap, 0 for none
+ * @return The interval, 1 without a cap or with a cap at or above the refresh rate, 0 when
+ *         the refresh rate is unknown or not a whole multiple of the cap
+ */
+int32_t box_render_swap_interval(
+    float refresh,
+    float fps);
+
+/** Compute the refreshes the next frame is shown for: the swap interval, or for a cap between
+ * two whole multiples a cadence that alternates between them, like a 3:2 pulldown, so the
+ * frames average the cap and each is shown for whole refreshes the delta can match.
+ *
+ * @param phase Refreshes owed to the frames so far, 0 at the start of a cadence
+ * @param refresh Refresh rate of the display in Hz, 0 when unknown
+ * @param fps Frame rate cap, 0 for none
+ * @return The refreshes, 0 when the refresh rate is unknown
+ */
+int32_t box_render_cadence_next(
+    double *phase,
+    float refresh,
+    float fps);
+
+/** Count the frames after which the refreshes of box_render_cadence_next repeat.
+ *
+ * @param refresh Refresh rate of the display in Hz, 0 when unknown
+ * @param fps Frame rate cap, 0 for none
+ * @return 1 for a swap interval, the frames of one cycle of a cadence, 0 when the refresh
+ *         rate is unknown or the cadence does not repeat within BOX_RENDER_CADENCE_MAX frames
+ */
+int32_t box_render_cadence_cycle(
+    float refresh,
+    float fps);
+
+/** Frames a cadence repeats within at most for box_render_cadence_cycle */
+#define BOX_RENDER_CADENCE_MAX (240)
+
+/** Count the presents of a frame to a window: the frame is presented again until it was shown
+ * for its refreshes, since webgpu has no swap interval.
+ *
+ * @param window The target presents to a window surface
+ * @param vsync The window presents with vertical sync
+ * @param presents Refreshes the packet is shown for
+ * @return Presents of the frame, at least 1
+ */
+int32_t box_render_window_presents(
+    bool window,
+    bool vsync,
+    int32_t presents);
+
+/** Decide whether a target renders into a scene texture that a blit copies to its image: when
+ * the render size differs from the image, or when a vsync window may present a frame again,
+ * which needs the frame kept in a texture of its own.
+ *
+ * @param desc The description of the target
+ * @param window The target presents to a window surface
+ * @param fps Frame rate cap of the frame, 0 for none
+ * @return Whether the target needs the scene texture
+ */
+bool box_render_target_scene(
+    const box_render_target_desc_t *desc,
+    bool window,
+    float fps);
 
 /** Read the counters of a ring.
  *
