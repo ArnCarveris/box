@@ -230,12 +230,14 @@ static void box_surface_ctor(
 /** Give a surface its target handle and, unless it renders offscreen, its window.
  *
  * @param world The world
+ * @param e The surface entity
  * @param s The surface
  * @param impl The engine side of the surface
  * @param state The module state
  */
 static void box_surface_open(
     ecs_world_t *world,
+    ecs_entity_t e,
     const Surface *s,
     SurfaceImpl *impl,
     box_surface_state_t *state)
@@ -247,7 +249,8 @@ static void box_surface_open(
 
     impl->window_width = box_surface_points(s->width);
     impl->window_height = box_surface_points(s->height);
-    impl->window = box_window_new(world, impl->window_width, impl->window_height, "box");
+    impl->window = box_window_new(
+        world, e, impl->window_width, impl->window_height, "box");
     if (!impl->window) {
         ecs_warn("cannot open a window, the surface renders offscreen");
     }
@@ -405,7 +408,7 @@ static void box_surface_frame(
     box_render_target_desc_t desc;
     float clear[4];
     if (!impl->handle) {
-        box_surface_open(world, s, impl, state);
+        box_surface_open(world, e, s, impl, state);
         op = BOX_RENDER_CREATE;
     }
 
@@ -568,6 +571,51 @@ static void BoxSurfaceOnRemove(
     }
 }
 
+/** Test whether a world has a Surface that presents itself, one without a texture.
+ *
+ * @param world The world
+ * @return Whether such a surface exists
+ */
+static bool box_surface_has_window(
+    ecs_world_t *world)
+{
+    bool found = false;
+    int32_t i;
+    ecs_iter_t it = ecs_each(world, Surface);
+    while (ecs_each_next(&it)) {
+        const Surface *s = ecs_field(&it, Surface, 0);
+        for (i = 0; i < it.count && !found; i ++) {
+            found = s[i].texture == 0;
+        }
+    }
+
+    return found;
+}
+
+/** Create the Surface the command line asks for when the world has none that presents itself
+ * after its scene loaded, then disable the system: it decides once, on the first frame.
+ *
+ * @param it The iterator of the system
+ */
+static void BoxSurfaceFromApp(
+    ecs_iter_t *it)
+{
+    ecs_world_t *world = it->world;
+    const App *app = ecs_singleton_get(world, App);
+    if (app && app->surface_width > 0 && app->surface_height > 0 &&
+        !box_surface_has_window(world))
+    {
+        ecs_entity_t e = ecs_new(world);
+        Surface *s = ecs_ensure(world, e, Surface);
+        s->width = app->surface_width;
+        s->height = app->surface_height;
+        s->vsync = true;
+        ecs_modified(world, e, Surface);
+    }
+
+    ecs_enable(world, it->system, false);
+}
+
 void BoxSurfaceImport(
     ecs_world_t *world)
 {
@@ -611,8 +659,15 @@ void BoxSurfaceImport(
     });
 
     ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "SurfaceFromApp" }),
+        .phase = EcsPreFrame,
+        .immediate = true,
+        .run = BoxSurfaceFromApp
+    });
+
+    ecs_system(world, {
         .entity = ecs_entity(world, { .name = "SurfacePoll" }),
-        .phase = EcsOnLoad,
+        .phase = EcsPreFrame,
         .query.terms = {{ .id = ecs_id(SurfaceImpl), .inout = EcsIn }},
         .run = BoxSurfacePoll
     });

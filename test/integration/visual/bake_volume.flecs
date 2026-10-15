@@ -7,7 +7,7 @@ using box.light
 
 room {
   Scene: {}
-  LightBake: {probe_spacing: 1.5, bounds_padding: 1}
+  LightBake: {probe_spacing: 1.5, bounds_padding: 1, budget_ms: 0}
   AmbientLight: {sky: {150, 185, 255}, ground: {190, 110, 60}, intensity: 1.5}
 
   camera {

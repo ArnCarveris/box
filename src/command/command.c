@@ -116,9 +116,8 @@ box_terminal_host_t* box_terminal_host(
     const ecs_world_t *world)
 {
     const TerminalHost *th = ecs_singleton_get(world, TerminalHost);
-    ecs_assert(th != NULL, ECS_INVALID_OPERATION, "box.command is not imported");
 
-    return th->host;
+    return th ? th->host : NULL;
 }
 
 ecs_entity_t box_command_register(

@@ -90,7 +90,7 @@ static char* box_console_hold_spaces(
     return result ? result : ecs_os_strdup("");
 }
 
-/** Set the string, size and color of a text element when they differ.
+/** Set the string, size and color of a text element when they differ; console lines never wrap.
  *
  * @param world The world
  * @param e The element
@@ -110,7 +110,8 @@ static void box_console_text(
     const Text *cur = ecs_get(world, e, Text);
     char *str = box_console_hold_spaces(value, size);
     bool same = cur && cur->value && !strcmp(cur->value, str) &&
-        cur->size == console->font_size && cur->line_height == console->line_height;
+        cur->size == console->font_size && cur->line_height == console->line_height &&
+        cur->wrap == TextWrapNewlines;
     if (!same) {
         if (!cur) {
             ecs_add(world, e, Text);
@@ -122,6 +123,7 @@ static void box_console_text(
         str = NULL;
         t->size = console->font_size;
         t->line_height = console->line_height;
+        t->wrap = TextWrapNewlines;
         ecs_modified(world, e, Text);
     }
 

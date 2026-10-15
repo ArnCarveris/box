@@ -38,6 +38,8 @@ git -C .bake/bundles/flecs/default/src log -1 --format=%h; git -C ../../flecs lo
 bake3 --local-env                                         # build the library and the app
 bake3 run apps/boxrun --local-env -- --headless --frames 10  # headless run, exits after 10 frames
 bake3 run apps/boxrun --local-env -- etc/scenes/default.flecs  # open the default scene in a window
+bake3 run apps/boxrun --local-env -- --surface 1280x720 test/integration/visual/bake_bounces.flecs
+                                                          # a window for a scene without a Surface
 ```
 
 ## Browser build
@@ -84,5 +86,6 @@ Work is tracked with `project/pm.py`; `docs/PROCESS.md` describes the loop.
 ```sh
 python3 project/pm.py serve --host :: --port 8090        # status page on all interfaces
 python3 project/pm.py next 5                              # ready tasks
+python3 project/pm.py stage [<epic>[/<task>]]             # stage of open work, read across worktrees
 python3 project/pm.py check                               # validate the database
 ```

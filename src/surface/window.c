@@ -3,8 +3,8 @@
  * @brief glfw windows with a CAMetalLayer that the webgpu backend presents to.
  *
  * glfw requires the main thread, so windows are opened, polled and closed by systems and
- * hooks; only the layer is handed to the render thread. A window sends its input events to the
- * world that opened it; in the browser the canvas does, while the first target presents to it.
+ * hooks; only the layer is handed to the render thread. A window sends its input events, stamped
+ * with its surface, to the world that opened it; in the browser the canvas does.
  */
 
 #include "surface.h"
@@ -25,11 +25,12 @@
 
 /** A glfw window and its layer */
 struct box_window_t {
-    GLFWwindow *window;     /**< The glfw window */
-    void *layer;            /**< CAMetalLayer of the content view */
-    float refresh;          /**< Refresh rate of the display of the window when last read */
-    int32_t refresh_moves;  /**< box_window_moves when the refresh rate was read, -1 never */
-    double refresh_time;    /**< glfw time when the refresh rate was read */
+    GLFWwindow *window;               /**< The glfw window */
+    void *layer;                      /**< CAMetalLayer of the content view */
+    box_input_glfw_target_t input;    /**< World and surface the input events go to */
+    float refresh;                    /**< Refresh rate of the display when last read */
+    int32_t refresh_moves;            /**< box_window_moves at the last read, -1 never */
+    double refresh_time;              /**< glfw time when the refresh rate was read */
 };
 
 /** Windows open in the process, glfw terminates when the last one closes */
@@ -106,6 +107,7 @@ static void* box_window_metal_layer(
 
 box_window_t* box_window_new(
     ecs_world_t *world,
+    ecs_entity_t surface,
     int32_t width,
     int32_t height,
     const char *title)
@@ -136,7 +138,9 @@ box_window_t* box_window_new(
     result->refresh_moves = -1;
     glfwSetWindowPosCallback(window, box_window_moved);
     box_window_count ++;
-    box_input_glfw_attach(ECS_CONST_CAST(ecs_world_t*, ecs_get_world(world)), window);
+    result->input.world = ECS_CONST_CAST(ecs_world_t*, ecs_get_world(world));
+    result->input.surface = surface;
+    box_input_glfw_attach(&result->input, window);
 done:
     return result;
 }
@@ -144,6 +148,7 @@ done:
 void box_window_free(
     box_window_t *window)
 {
+    box_input_glfw_detach(window->window);
     glfwDestroyWindow(window->window);
     ecs_os_free(window);
     box_window_count --;
@@ -252,6 +257,7 @@ bool box_window_closed(
 
 box_window_t* box_window_new(
     ecs_world_t *world,
+    ecs_entity_t surface,
     int32_t width,
     int32_t height,
     const char *title)
@@ -259,7 +265,7 @@ box_window_t* box_window_new(
     (void)width;
     (void)height;
     (void)title;
-    box_input_web_attach(ECS_CONST_CAST(ecs_world_t*, ecs_get_world(world)));
+    box_input_web_attach(ECS_CONST_CAST(ecs_world_t*, ecs_get_world(world)), surface);
 
     return NULL;
 }

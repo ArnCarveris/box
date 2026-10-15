@@ -29,6 +29,7 @@ typedef struct box_jobs_t {
     box_job_t *pending_tail;      /**< Newest job waiting for a worker */
     box_job_t *free_list;         /**< Jobs that can be reused */
     int32_t count;                /**< Jobs that did not complete */
+    int32_t running;              /**< Jobs taken for work whose done flag is not set */
 } box_jobs_t;
 
 /** Private singleton that holds the pool of a world */
@@ -54,6 +55,7 @@ static box_job_t* box_jobs_take(
         }
 
         result->next_pending = NULL;
+        jobs->running ++;
     }
 
     return result;
@@ -76,6 +78,7 @@ static void* box_jobs_worker(
             job->desc.work(job->desc.ctx);
             ecs_os_mutex_lock(jobs->lock);
             job->done = true;
+            jobs->running --;
         } else {
             ecs_os_cond_wait(jobs->wake, jobs->lock);
         }
@@ -233,6 +236,7 @@ static void BoxJobsInline(
         job->desc.work(job->desc.ctx);
         ecs_os_mutex_lock(jobs->lock);
         job->done = true;
+        jobs->running --;
     }
 
     ecs_os_mutex_unlock(jobs->lock);
@@ -430,4 +434,18 @@ void BoxJobsImport(
         .run = BoxJobsInline,
         .ctx = jobs
     });
+}
+
+int32_t box_jobs_running(
+    ecs_world_t *world)
+{
+    box_jobs_t *jobs = box_jobs_get(world);
+    int32_t result = 0;
+    if (jobs) {
+        ecs_os_mutex_lock(jobs->lock);
+        result = jobs->running;
+        ecs_os_mutex_unlock(jobs->lock);
+    }
+
+    return result;
 }

@@ -36,6 +36,15 @@
                     "grow_column",
                     "grow_cross_axis",
                     "grow_direction_none",
+                    "grow_fit_column_widest",
+                    "grow_content_is_minimum",
+                    "grow_never_below_text",
+                    "grow_without_content_min",
+                    "grow_cross_axis_keeps_content",
+                    "grow_zero_weight_keeps_content",
+                    "grow_script_keeps_content",
+                    "grow_follows_shrinking_parent",
+                    "grow_opted_out_descendant_keeps_content",
                     "row_align",
                     "column_align",
                     "row_ignores_item_placement",
@@ -50,6 +59,10 @@
                     "transform_same_frame",
                     "same_in_every_scene",
                     "parent_component",
+                    "parent_reparent",
+                    "parent_reparent_to_plain_parent",
+                    "parent_reparent_to_deleted_parent",
+                    "parent_reparent_instance_child",
                     "add_remove_child",
                     "reparent",
                     "unchanged_tree_not_laid_out",
@@ -57,6 +70,23 @@
                     "script",
                     "module_child_fini",
                     "module_child_text_fini"
+                ]
+            },
+            {
+                "id": "Wrap",
+                "testcases": [
+                    "fixed_panel_grows_in_height",
+                    "panel_width_change_rewraps",
+                    "longest_word_is_minimum",
+                    "fixed_width_text",
+                    "fit_text_wraps_unless_newlines",
+                    "text_width_still_applies",
+                    "value_change_rewraps",
+                    "text_removed_drops_its_size",
+                    "leaving_the_tree_unwraps",
+                    "lines_align_in_the_box",
+                    "grow_paragraph_in_fit_card",
+                    "script_paragraph"
                 ]
             },
             {
@@ -81,7 +111,13 @@
                     "align_lines",
                     "many_glyphs",
                     "dynamic_transform",
-                    "module_child_fini"
+                    "module_child_fini",
+                    "oversized_glyph_missing",
+                    "oversized_warns_once_per_font",
+                    "font_without_units_fails",
+                    "recursive_composite_missing",
+                    "composite_limits",
+                    "font_tables_outside_file"
                 ]
             },
             {
@@ -133,7 +169,9 @@
                     "capture_drag_across_second_view",
                     "capture_release_outside",
                     "capture_cleared_after_release",
-                    "capture_cleared_when_deleted"
+                    "capture_cleared_when_deleted",
+                    "focused_surface_views",
+                    "focus_click_without_move"
                 ]
             },
             {
@@ -163,7 +201,19 @@
                     "follows_resize",
                     "scrollback_follows_height",
                     "paste_long",
+                    "panel_keeps_fraction_with_long_text",
                     "null_text"
+                ]
+            },
+            {
+                "id": "Blocking",
+                "testcases": [
+                    "stops_pass_through",
+                    "press_stays_on_panel",
+                    "mouse_binding",
+                    "camera_look_and_zoom",
+                    "hover_and_wheel",
+                    "render_to_texture"
                 ]
             }
         ]

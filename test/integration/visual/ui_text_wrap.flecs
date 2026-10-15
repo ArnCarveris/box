@@ -1,0 +1,89 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.layout
+using box.text
+
+camera {
+  Position: {0, 0, 100}
+  Camera: {ortho: true, ortho_scale: 1}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {236, 238, 242, 255}}}
+}
+
+panel {
+  Layout: {direction: Column, spacing: 10, padding: {12, 12, 12, 12}}
+  LayoutItem: {width: {mode: Fixed, value: 600}}
+  Rect: {1, 1}
+  Rgb: {40, 44, 56}
+  Border: {width: 2, radius: 12, color: {120, 140, 200, 255}}
+
+  title {
+    Position: {0, 0, 1}
+    Text: {value: "Wrapped paragraphs", size: 22}
+    Rgb: {250, 190, 60}
+  }
+
+  left {
+    Position: {0, 0, 1}
+    Text: {
+      value: "A paragraph without a LayoutItem fits its lines, then narrows to the panel and wraps between words, starting at the left edge of its box.",
+      size: 15
+    }
+    Rgb: {230, 232, 240}
+  }
+
+  columns {
+    Position: {0, 0, 1}
+    Layout: {direction: Row, spacing: 10}
+    LayoutItem: {width: {mode: Grow}}
+
+    center {
+      Position: {0, 0, 1}
+      Layout: {padding: {8, 8, 8, 8}}
+      LayoutItem: {width: {mode: Grow}}
+      Rect: {1, 1}
+      Rgb: {60, 66, 84}
+      Border: {radius: 8}
+
+      text {
+        Position: {0, 0, 1}
+        Text: {
+          value: "Centered lines share a column with a neighbour of twice the weight.",
+          size: 14, align: Center
+        }
+        LayoutItem: {width: {mode: Grow}}
+        Rgb: {120, 220, 140}
+      }
+    }
+
+    right {
+      Position: {0, 0, 1}
+      Layout: {padding: {8, 8, 8, 8}}
+      LayoutItem: {width: {mode: Grow, value: 2}}
+      Rect: {1, 1}
+      Rgb: {60, 66, 84}
+      Border: {radius: 8}
+
+      text {
+        Position: {0, 0, 1}
+        Text: {
+          value: "Right aligned lines end at the right edge of the column, whatever the length of the last word on each line.",
+          size: 14, align: Right
+        }
+        LayoutItem: {width: {mode: Grow}}
+        Rgb: {90, 160, 250}
+      }
+    }
+  }
+
+  nowrap {
+    Position: {0, 0, 1}
+    Text: {value: "Newlines only: this line keeps its length", size: 14, wrap: Newlines}
+    Rgb: {200, 110, 230}
+  }
+}

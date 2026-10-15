@@ -343,7 +343,7 @@ static void box_component_add(
     ecs_entity_t e = 0;
     ecs_id_t id = 0;
     char *member = NULL;
-    if (box_component_args(ctx, result, argv, BoxShellWrite, &e, &id, &member)) {
+    if (box_component_args(ctx, result, argv, BoxShellDelete, &e, &id, &member)) {
         goto done;
     }
 
@@ -379,7 +379,7 @@ static void box_component_remove(
     ecs_entity_t e = 0;
     ecs_id_t id = 0;
     char *member = NULL;
-    if (box_component_args(ctx, result, argv, BoxShellWrite, &e, &id, &member)) {
+    if (box_component_args(ctx, result, argv, BoxShellDelete, &e, &id, &member)) {
         goto done;
     }
 
@@ -446,7 +446,7 @@ static void box_component_set(
     char *member = NULL;
     const char *end;
     const void *cur;
-    if (box_component_args(ctx, result, argv, BoxShellWrite, &e, &id, &member) ||
+    if (box_component_args(ctx, result, argv, BoxShellDelete, &e, &id, &member) ||
         box_component_check(ctx, result, e, id, expr, true))
     {
         goto done;

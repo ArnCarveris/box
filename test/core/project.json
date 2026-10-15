@@ -36,7 +36,13 @@
                     "invalid_timeout",
                     "invalid_cpu_budget",
                     "invalid_port",
-                    "two_scenes"
+                    "two_scenes",
+                    "surface",
+                    "invalid_surface",
+                    "surface_created_when_none",
+                    "surface_not_created_when_present",
+                    "surface_created_next_to_texture_surface",
+                    "surface_first_frame"
                 ]
             },
             {
@@ -115,6 +121,7 @@
                     "ctx_free_after_complete",
                     "submit_without_work",
                     "pending_count",
+                    "running_until_done",
                     "set_workers_after_start",
                     "inline_runs_at_end_of_frame",
                     "shutdown_with_pending",

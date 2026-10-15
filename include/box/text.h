@@ -44,10 +44,17 @@ ECS_STRUCT(FontStatus, {
     char *error;      /**< Why the last load failed, NULL unless state is FontFailed */
 });
 
+/** How the lines of a Text in a layout follow the width the layout gives it */
+ECS_ENUM(TextWrap, {
+    TextWrapWords = 0,    /**< Lines break between words at that width and align within it */
+    TextWrapNewlines = 1  /**< The layout keeps the lines of Text.width, as Clay's wrap none */
+});
+
 /** A string drawn as one quad per glyph in the local XY plane of the entity, facing +Z.
  *
  * Lengths are logical pixels. The block of lines is centered on the origin, y up, and
- * measures TextBounds. Lines break at newlines and, with a width, between words.
+ * measures TextBounds. Lines break at newlines and, with a width, between words. In a layout a
+ * Text fits its lines at Text.width and narrows to its widest word in a narrower parent.
  *
  * Color, opacity, emission and tint come from Rgb, Opacity, Emissive, Tint and BlendMode.
  */
@@ -58,15 +65,17 @@ ECS_STRUCT(Text, {
     float width;        /**< Width lines wrap at, 0 to break at newlines only */
     Align align;        /**< Alignment of the lines inside the block */
     ecs_entity_t font;  /**< Entity with a Font, default box.text.DefaultFont, 0 for none */
+    TextWrap wrap;      /**< How the lines follow the width of a layout, TextWrapWords */
 });
 
 /** Size of the block of lines of a Text, in logical pixels, written by the engine.
  *
- * The width is the widest line without trailing spaces, the height the line count times the
- * line height. Both are 0 for an empty string, without a font or while the font is not loaded.
+ * The width is the widest line without trailing spaces, or the width a layout wraps the lines
+ * in when that is wider. The height is the line count times the line height. Both are 0 for an
+ * empty string, without a font or while the font is not loaded.
  */
 ECS_STRUCT(TextBounds, {
-    float width;  /**< Width of the widest line */
+    float width;  /**< Width of the block */
     float height; /**< Height of the lines */
 });
 

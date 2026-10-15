@@ -60,6 +60,8 @@ typedef struct box_perf_t {
     double wake;          /**< Seconds the pacing thread is learned to wake after a sleep ends */
     double wake_jitter;   /**< Mean deviation of the wake up latency from wake */
     int32_t wake_samples; /**< Latency samples taken during the run */
+    int32_t bake_left;    /**< Probes the bakes had left when they last progressed */
+    int32_t bake_stalled; /**< Warmup frames since the bakes last progressed */
 } box_perf_t;
 
 /** Distribution of a series of durations */

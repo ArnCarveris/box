@@ -1,29 +1,90 @@
 /**
  * @file input/platform_glfw.c
- * @brief The glfw backend: window callbacks push device events to the world owning the window.
+ * @brief The glfw backend: window callbacks push device events, stamped with the surface of the
+ * window, to the world owning the window.
  *
- * glfw runs the callbacks inside glfwPollEvents on the main thread, which the backend calls at
- * the start of InputUpdate, so the events of a frame apply in that frame.
+ * glfw runs the callbacks inside glfwPollEvents on the main thread, which box.surface calls once
+ * per frame in SurfacePoll (PreFrame), before InputUpdate (OnLoad) applies them.
  */
 
 #include "input.h"
 #include "platform.h"
-#include "../surface/surface.h"
 
 #ifdef BOX_PLATFORM_GLFW
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
-/** Get the world a window sends its events to.
+/** A window whose events go to a world */
+typedef struct box_glfw_window_t {
+    GLFWwindow *window;               /**< The glfw window */
+    box_input_glfw_target_t *target;  /**< World and surface of the window */
+} box_glfw_window_t;
+
+/** box_glfw_window_t of the attached windows; glfw is process wide and runs on the main thread */
+static ecs_vec_t box_glfw_windows;
+
+/** Capture or release the cursor in the windows of a surface: glfw's disabled cursor, which
+ * hides it, keeps it in the window and reports unbounded positions, with raw motion when the
+ * platform supports it, the backend capture callback.
+ *
+ * @param world The world
+ * @param surface The surface, 0 for every window of the world
+ * @param captured Whether the cursor is captured
+ * @param ctx Unused
+ * @return Whether the cursor is captured, glfw changes the mode at once
+ */
+static bool box_glfw_capture(
+    ecs_world_t *world,
+    ecs_entity_t surface,
+    bool captured,
+    void *ctx)
+{
+    box_glfw_window_t *windows = ecs_vec_first_t(&box_glfw_windows, box_glfw_window_t);
+    bool result = false;
+    int32_t i;
+    (void)ctx;
+    for (i = 0; i < ecs_vec_count(&box_glfw_windows); i ++) {
+        const box_input_glfw_target_t *t = windows[i].target;
+        if (t->world != world || (surface && t->surface != surface)) {
+            continue;
+        }
+
+        glfwSetInputMode(windows[i].window, GLFW_CURSOR,
+            captured ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+        if (glfwRawMouseMotionSupported()) {
+            glfwSetInputMode(windows[i].window, GLFW_RAW_MOUSE_MOTION,
+                captured ? GLFW_TRUE : GLFW_FALSE);
+        }
+
+        result = captured;
+    }
+
+    return result;
+}
+
+/** Start pushing the events of a window: its surface is stamped on them until the end.
  *
  * @param window The glfw window
- * @return The world
+ * @return The world the window sends its events to
  */
-static ecs_world_t* box_glfw_world(
+static ecs_world_t* box_glfw_begin(
     GLFWwindow *window)
 {
-    return glfwGetWindowUserPointer(window);
+    box_input_glfw_target_t *target = glfwGetWindowUserPointer(window);
+    box_input_platform_source(target->world, target->surface);
+
+    return target->world;
+}
+
+/** Stop stamping the surface of a window on pushed events.
+ *
+ * @param world The world of the window
+ */
+static void box_glfw_end(
+    ecs_world_t *world)
+{
+    box_input_platform_source(world, 0);
 }
 
 /** Push a key event.
@@ -41,9 +102,11 @@ static void box_glfw_key(
     int action,
     int mods)
 {
+    ecs_world_t *world = box_glfw_begin(window);
     (void)scancode;
     (void)mods;
-    box_input_glfw_on_key(box_glfw_world(window), key, action);
+    box_input_glfw_on_key(world, key, action);
+    box_glfw_end(world);
 }
 
 /** Push a mouse button event.
@@ -59,8 +122,24 @@ static void box_glfw_button(
     int action,
     int mods)
 {
+    ecs_world_t *world = box_glfw_begin(window);
     (void)mods;
-    box_input_glfw_on_button(box_glfw_world(window), button, action);
+    box_input_glfw_on_button(world, button, action);
+    box_glfw_end(world);
+}
+
+/** Push an event of a window.
+ *
+ * @param window The glfw window
+ * @param event The event
+ */
+static void box_glfw_push(
+    GLFWwindow *window,
+    const InputEvent *event)
+{
+    ecs_world_t *world = box_glfw_begin(window);
+    box_input_platform_push(world, event);
+    box_glfw_end(world);
 }
 
 /** Push a typed character.
@@ -72,8 +151,7 @@ static void box_glfw_char(
     GLFWwindow *window,
     unsigned int codepoint)
 {
-    box_input_platform_push(box_glfw_world(window), &(InputEvent){
-        .kind = InputText, .code = (int32_t)codepoint });
+    box_glfw_push(window, &(InputEvent){ .kind = InputText, .code = (int32_t)codepoint });
 }
 
 /** Push a cursor move in window points.
@@ -87,8 +165,7 @@ static void box_glfw_cursor(
     double x,
     double y)
 {
-    box_input_platform_push(box_glfw_world(window), &(InputEvent){
-        .kind = InputMove, .value = { (float)x, (float)y } });
+    box_glfw_push(window, &(InputEvent){ .kind = InputMove, .value = { (float)x, (float)y } });
 }
 
 /** Push a wheel movement.
@@ -102,11 +179,11 @@ static void box_glfw_scroll(
     double x,
     double y)
 {
-    box_input_platform_push(box_glfw_world(window), &(InputEvent){
-        .kind = InputScroll, .value = { (float)x, (float)y } });
+    box_glfw_push(window, &(InputEvent){ .kind = InputScroll, .value = { (float)x, (float)y } });
 }
 
-/** Push a focus change.
+/** Push a focus change. A gain first reports where the cursor is, because macOS sends no
+ * cursor moves to a window without focus and the click that focuses it has no move of its own.
  *
  * @param window The glfw window
  * @param focused Nonzero when the window has keyboard focus
@@ -115,8 +192,13 @@ static void box_glfw_focus(
     GLFWwindow *window,
     int focused)
 {
-    box_input_platform_push(box_glfw_world(window), &(InputEvent){
-        .kind = InputFocus, .code = focused ? 1 : 0 });
+    double x = 0, y = 0;
+    if (focused) {
+        glfwGetCursorPos(window, &x, &y);
+        box_glfw_cursor(window, x, y);
+    }
+
+    box_glfw_push(window, &(InputEvent){ .kind = InputFocus, .code = focused ? 1 : 0 });
 }
 
 /** Push a window size in points.
@@ -130,35 +212,21 @@ static void box_glfw_size(
     int width,
     int height)
 {
-    box_input_platform_push(box_glfw_world(window), &(InputEvent){
+    box_glfw_push(window, &(InputEvent){
         .kind = InputResize, .value = { (float)width, (float)height } });
 }
 
-/** Run the glfw callbacks of every window, the poll of the backend.
- *
- * @param world The world
- * @param ctx Unused
- */
-static void box_glfw_poll(
-    ecs_world_t *world,
-    void *ctx)
-{
-    (void)world;
-    (void)ctx;
-    box_window_poll();
-}
-
 void box_input_glfw_attach(
-    ecs_world_t *world,
+    box_input_glfw_target_t *target,
     void *window)
 {
     GLFWwindow *w = window;
     int width = 0, height = 0;
-    if (!ecs_lookup(world, "box.input")) {
+    if (!ecs_lookup(target->world, "box.input")) {
         goto done;
     }
 
-    glfwSetWindowUserPointer(w, world);
+    glfwSetWindowUserPointer(w, target);
     glfwSetKeyCallback(w, box_glfw_key);
     glfwSetMouseButtonCallback(w, box_glfw_button);
     glfwSetCharCallback(w, box_glfw_char);
@@ -168,21 +236,58 @@ void box_input_glfw_attach(
     glfwSetWindowSizeCallback(w, box_glfw_size);
     glfwGetWindowSize(w, &width, &height);
     box_glfw_size(w, width, height);
-    if (!box_input_device(world)->backend.poll) {
-        box_input_platform_set(world, &(box_input_platform_t){ .poll = box_glfw_poll });
+    if (glfwGetWindowAttrib(w, GLFW_FOCUSED)) {
+        box_glfw_focus(w, 1);
+    }
+
+    if (!box_glfw_windows.array) {
+        ecs_vec_init_t(NULL, &box_glfw_windows, box_glfw_window_t, 1);
+    }
+
+    ecs_vec_append_t(NULL, &box_glfw_windows, box_glfw_window_t)[0] =
+        (box_glfw_window_t){ .window = w, .target = target };
+    if (!box_input_device(target->world)->backend.poll &&
+        !box_input_device(target->world)->backend.capture)
+    {
+        box_input_platform_set(target->world, &(box_input_platform_t){
+            .capture = box_glfw_capture });
     }
 
 done:
     return;
 }
 
+void box_input_glfw_detach(
+    void *window)
+{
+    box_glfw_window_t *windows = ecs_vec_first_t(&box_glfw_windows, box_glfw_window_t);
+    int32_t i, count = ecs_vec_count(&box_glfw_windows);
+    for (i = 0; i < count; i ++) {
+        if (windows[i].window == window) {
+            windows[i] = windows[count - 1];
+            ecs_vec_remove_last(&box_glfw_windows);
+            break;
+        }
+    }
+
+    if (box_glfw_windows.array && !ecs_vec_count(&box_glfw_windows)) {
+        ecs_vec_fini_t(NULL, &box_glfw_windows, box_glfw_window_t);
+    }
+}
+
 #else
 
 void box_input_glfw_attach(
-    ecs_world_t *world,
+    box_input_glfw_target_t *target,
     void *window)
 {
-    (void)world;
+    (void)target;
+    (void)window;
+}
+
+void box_input_glfw_detach(
+    void *window)
+{
     (void)window;
 }
 

@@ -67,6 +67,11 @@ part that does not fit in a command. Read `CLAUDE.md` for the house rules and
    zero when anything failed. Add a `deliverable/README.md` of under 20 lines and
    the screenshots of the task's own scene.
 
+   Write the README, the review artefacts and the report back to the coordinator
+   one line per paragraph or list item, never hard-wrapped at a column width: the
+   status page renders them as markdown, and a line break inside a paragraph only
+   breaks it up.
+
 9. **Review.** The implementation agent stops after `pm deliver` and never runs
    `pm done`. The coordinator puts every task through the review loop described in
    [Closing a task](#closing-a-task) and closes it once the verification passes.
@@ -105,6 +110,20 @@ After each task:
    close with `pm done`. The review folder is part of the deliverable and shows in
    the task's deliverable listing on the status page.
 
+Like the README, review.md, response.md and the verification files are written one
+line per paragraph or list item (a finding's File, Problem and Expected are one line
+each), never hard-wrapped.
+
+The status page shows a task in three tabs: **Summary** (the deliverable README
+rendered as markdown, status, kind, test and bench counts and the deliverable files),
+**Review** (every finding as a card with its File, Problem and Expected and, per round,
+the response and the verification judgement with its evidence, plus the verdict) and
+**Process** (every step with its time: created, started, delivered, review, each
+response and verification round, redelivered, done). The tabs read
+`/api/report?path=<epic>/<task>`, which pm builds from `progress.json`, the `Date:`
+lines of the review artefacts and the report timestamps, never from git. An epic
+shows its deliverable README, a review overview of its tasks and a task timeline.
+
 Every date is UTC in ISO 8601 (`date -u +%Y-%m-%dT%H:%M:%SZ`) and is written when the
 artefact is written. These dates and the `timestamp` that `pm deliver` puts in every
 report are the one clock of the loop: committing, copying or touching the files
@@ -129,6 +148,37 @@ one closed with `--skip-review` as a warning that names the reason (`pm status` 
 the state the status page reads carry it too). The gate (`REVIEW_SINCE` in `pm.py`)
 covers every open task and every task started or completed on or after
 2026-10-14T22:50Z; tasks started and completed before it are exempt.
+
+## Stages
+
+Every task has a stage, derived from its status and the artefacts `pm review` parses:
+
+| Stage | When |
+| --- | --- |
+| not started | pending |
+| implementing | started, no `deliverable/tests.json` yet |
+| delivered | delivered, outside the review gate: `pm done` closes it |
+| delivered, awaiting review | delivered under the gate, no `review/review.md` yet |
+| review written, fix round 1 / fix round k | findings open, round k of `response.md` missing or incomplete |
+| verification round k | response round k written, `verification_r<k>.md` missing |
+| review artefacts malformed | a review artefact breaks the strict format or order (`pm review` lists the lines) |
+| ready to close | the loop has passed, waiting for the redelivery after the review or for `pm done` |
+| complete, complete (review skipped), discarded | closed |
+
+An epic is **open**, **closing** once every task is complete or discarded but the epic is not done, or
+**complete**, and counts its tasks per stage. The board shows the stage as a chip on every task card
+and a summary per epic in the sidebar, the panels show it next to the status, and the Process tab
+ends with the current stage after the last step. `/api/state` and `/api/report` carry it as `stage`.
+
+`python3 project/pm.py stage` prints every open epic with its open tasks, `pm stage <epic>` an epic
+and all its tasks, `pm stage <epic>/<task>` one task, each with what the stage waits for.
+
+Task work happens in worktrees of the main checkout, so `pm serve` and `pm stage` also read
+`project/db` from every worktree that `git worktree list` reports and show, per task, the copy with
+the most recent activity (the latest of the `progress.json` times, the report timestamps and the
+review `Date:` lines), labelled with the branch it came from; this checkout wins a tie. They only
+read the worktrees, skip one that disappears while it is read, and serve its deliverable files
+under `/worktree/<folder>/deliverable/`. A task that exists only in a worktree is not shown.
 
 ## Closing an epic
 

@@ -135,6 +135,14 @@ void box_input_platform_push(
     InputEvent *ev = ecs_vec_append_t(NULL, &dev->platform, InputEvent);
     *ev = *event;
     ev->delay = 0;
+    ev->surface = ev->surface ? ev->surface : dev->source;
+}
+
+void box_input_platform_source(
+    ecs_world_t *world,
+    ecs_entity_t surface)
+{
+    box_input_device(world)->source = surface;
 }
 
 void box_input_queue(

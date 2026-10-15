@@ -78,14 +78,19 @@ static void bench_render_extract(
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     box_render_draws_stats_t stats = {0};
+    int64_t observers = 0, sets = 0;
     bench_set_items(b, BENCH_STATIC + BENCH_DYNAMIC);
     while (bench_iter(b)) {
+        int64_t before = ecs_get_world_info(world)->observers_ran_total;
         y += 0.01f;
         for (i = 0; i < changed; i ++) {
             ecs_entity_t e = shapes[next];
             next = (next + 1) % BENCH_STATIC;
             ecs_set(world, e, Position, {(float)(next % BENCH_ROW), y, 0});
         }
+
+        observers += ecs_get_world_info(world)->observers_ran_total - before;
+        sets += changed;
 
         ecs_progress(world, 0);
         box_render_draws_stats(world, &stats);
@@ -94,6 +99,10 @@ static void bench_render_extract(
 
     bench_counter(b, "upload_bytes", (double)stats.upload_bytes);
     bench_counter(b, "scattered", (double)stats.scattered);
+    if (sets) {
+        bench_counter(b, "observers_per_set", (double)observers / (double)sets);
+    }
+
     if (baked) {
         bench_counter(b, "probes",
             (double)ecs_get(world, ecs_id(LightBake), LightBakeStatus)->probes);

@@ -29,6 +29,9 @@
 /** Width and height a page grows to before the next glyph starts a new page */
 #define BOX_TEXT_PAGE_MAX (1024)
 
+/** Most passes box_text_atlas_place makes over the pages before a glyph is drawn as missing */
+#define BOX_TEXT_PLACE_TRIES (8)
+
 /** First backend texture handle of atlas pages, the handles below belong to box.texture */
 #define BOX_TEXT_PAGE_FIRST (0x40000000u)
 
@@ -57,7 +60,10 @@ typedef struct box_text_glyph_t {
 
 /** Glyph quads of a Text, written by the layout and read by the renderer */
 typedef struct TextGlyphs {
-    ecs_vec_t glyphs; /**< box_text_glyph_t, in the order of the string */
+    ecs_vec_t glyphs;   /**< box_text_glyph_t, in the order of the string */
+    float box;          /**< Width box.layout gives the Text, 0 outside a layout */
+    float natural[2];   /**< Width and height of the block wrapped at Text.width only */
+    float longest;      /**< Width of the widest word, the narrowest the block wraps to */
 } TextGlyphs;
 
 /** Component id of TextGlyphs */
@@ -110,6 +116,8 @@ typedef struct box_text_font_t {
     ecs_vec_t pages;        /**< box_text_page_t*, the atlas of the face */
     bool requested;         /**< A Text uses the font, so the font loads */
     bool relayout;          /**< A page grew, the texts of the font lay out again */
+    bool oversized;         /**< A glyph of the face did not fit a page, which was logged */
+    bool malformed;         /**< A composite glyph of the face nests too deep, which was logged */
 } box_text_font_t;
 
 /** Main thread state of the fonts of a world */
@@ -255,6 +263,40 @@ void box_text_layout(
     box_text_state_t *s,
     ecs_entity_t e,
     const Text *text);
+
+/** Get the sizes box.layout fits a text element to, the measure hook of the layout.
+ *
+ * A Text gives the size of its lines at Text.width and its widest word, an element with only
+ * TextBounds gives that size.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param size Receives the width and height of the lines at Text.width
+ * @param least Receives the narrowest width the lines wrap to
+ * @param wraps Receives whether the element is a Text that takes the width of the layout
+ * @return False when the entity has no TextBounds
+ */
+bool box_text_measure(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    float *size,
+    float *least,
+    bool *wraps);
+
+/** Give a Text the width box.layout resolved, laying it out again on a change.
+ *
+ * Lines break at the width when it is narrower than the lines at Text.width, and align within
+ * it. A width of 0 lays the Text out on its own again.
+ *
+ * @param world The world
+ * @param e The entity, which has a Text
+ * @param width The width
+ * @return The height of the block
+ */
+float box_text_wrap_to(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    float width);
 
 /** Lay out every Text again whose font is one of the fonts that ask for it.
  *

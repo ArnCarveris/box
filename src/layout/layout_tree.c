@@ -2,18 +2,13 @@
  * @file layout/layout_tree.c
  * @brief Sizes and places the elements of one layout tree in logical pixels.
  *
- * Collects the tree breadth first, measures fit sizes from the leaves up, then resolves grow
- * sizes and positions from the root down and writes Position, LayoutBounds and Rect.
+ * Works one axis at a time as Clay does: widths are measured from the leaves up and resolved
+ * from the root down, texts wrap to their resolved width, then heights follow the same way.
+ * Positions come last, and the layout writes Position, LayoutBounds and Rect.
  */
 
 #include "layout_internal.h"
 #include <math.h>
-
-/** Size of a TextBounds value as the layout reads it */
-typedef struct {
-    float width;  /**< Width of the text */
-    float height; /**< Height of the text */
-} box_layout_text_t;
 
 /** Get the sizing of an element on one axis.
  *
@@ -49,6 +44,27 @@ static float box_layout_clamp(
 
     if (result < 0) {
         result = 0;
+    }
+
+    return result;
+}
+
+/** Bound the size of a growing element by its min, max and, with content_min, its content.
+ *
+ * @param c The element
+ * @param axis 0 for x, 1 for y
+ * @param v The share or stretch of the element
+ * @return The bounded size
+ */
+static float box_layout_grow_clamp(
+    const box_layout_node_t *c,
+    int32_t axis,
+    float v)
+{
+    const Sizing *s = box_layout_sizing(c, axis);
+    float result = box_layout_clamp(v, s);
+    if (s->content_min && result < c->cmin[axis]) {
+        result = c->cmin[axis];
     }
 
     return result;
@@ -104,14 +120,14 @@ static int32_t box_layout_read(
     }
 
     const Rect *r = ecs_get(world, e, Rect);
-    const box_layout_text_t *t = state->text_bounds ?
-        ecs_get_id(world, e, state->text_bounds) : NULL;
-    if (t) {
-        n->shape[0] = t->width;
-        n->shape[1] = t->height;
+    bool text = state->text.measure &&
+        state->text.measure(world, e, n->shape, &n->longest, &n->has_text);
+    state->has_text |= n->has_text;
+    if (text) {
+        n->longest = n->has_text ? n->longest : n->shape[0];
     } else if (r) {
-        n->shape[0] = r->width;
-        n->shape[1] = r->height;
+        n->shape[0] = n->item.width.mode == SizeModeGrow ? 0 : r->width;
+        n->shape[1] = n->item.height.mode == SizeModeGrow ? 0 : r->height;
     } else {
         const Circle *c = ecs_get(world, e, Circle);
         if (c) {
@@ -126,7 +142,34 @@ static int32_t box_layout_read(
     return result;
 }
 
+/** Keep the parent of a child the tree holds through Parent, to mark it when the child moves.
+ *
+ * @param world The world
+ * @param state The state of the layout module
+ * @param child The child
+ * @param parent Its parent
+ */
+static void box_layout_keep_parent(
+    const ecs_world_t *world,
+    box_layout_state_t *state,
+    ecs_entity_t child,
+    ecs_entity_t parent)
+{
+    ecs_table_t *table = ecs_get_table(world, child);
+    if (table != state->parent_table) {
+        state->parent_table = table;
+        state->parent_kept = table && ecs_table_has_id(world, table, ecs_id(EcsParent));
+    }
+
+    if (state->parent_kept) {
+        ecs_map_ensure(&state->parents, (ecs_map_key_t)child)[0] = (ecs_map_val_t)parent;
+    }
+}
+
 /** Collect a tree breadth first, so the children of an element are next to each other.
+ *
+ * The parent of a child the tree holds through Parent is kept, so moving it away marks the
+ * parent it leaves.
  *
  * @param world The world
  * @param state The state of the layout module
@@ -138,6 +181,8 @@ static void box_layout_collect(
     ecs_entity_t root)
 {
     ecs_vec_clear(&state->nodes);
+    state->has_text = false;
+    state->parent_table = NULL;
     box_layout_read(world, state, root);
     int32_t i;
     for (i = 0; i < ecs_vec_count(&state->nodes); i ++) {
@@ -153,6 +198,7 @@ static void box_layout_collect(
             int32_t c;
             for (c = 0; c < it.count; c ++) {
                 box_layout_read(world, state, it.entities[c]);
+                box_layout_keep_parent(world, state, it.entities[c], e);
             }
         }
 
@@ -169,102 +215,134 @@ static void box_layout_collect(
  *
  * @param c The child
  * @param axis 0 for x, 1 for y
+ * @param size The size of the child
  * @return The space the child needs
  */
 static float box_layout_extent(
     const box_layout_node_t *c,
-    int32_t axis)
+    int32_t axis,
+    float size)
 {
     float result;
     if (c->has_item) {
         int32_t anchor = axis ? (int32_t)c->item.v : (int32_t)c->item.h;
         float offset = fabsf(axis ? c->item.y : c->item.x);
-        result = c->base[axis] + (anchor == 1 ? 2 * offset : offset);
+        result = size + (anchor == 1 ? 2 * offset : offset);
     } else {
-        result = 2 * fabsf(c->pos[axis]) + c->base[axis];
+        result = 2 * fabsf(c->pos[axis]) + size;
     }
 
     return result;
 }
 
-/** Measure the fit size of an element from its children or its shape.
+/** Get the smallest size the parent of an element can give it on one axis.
+ *
+ * A fitting element can get its content minimum, a growing one too with content_min and else
+ * its min. A fixed element keeps its size.
+ *
+ * @param c The element, measured on the axis
+ * @param axis 0 for x, 1 for y
+ * @return The smallest size
+ */
+static float box_layout_least(
+    const box_layout_node_t *c,
+    int32_t axis)
+{
+    const Sizing *s = box_layout_sizing(c, axis);
+    float result = s->mode == SizeModeFixed ? c->base[axis] : c->cmin[axis];
+    if (s->mode == SizeModeGrow && !s->content_min) {
+        result = box_layout_clamp(0, s);
+    }
+
+    return result;
+}
+
+/** Measure the fit size and content minimum of an element on a range of axes.
  *
  * @param nodes The nodes of the tree
- * @param n The element, its children already measured
+ * @param n The element, its children already measured on the axes
+ * @param first First axis, 0 for x, 1 for y
+ * @param last Axis after the last one
  */
 static void box_layout_measure(
     box_layout_node_t *nodes,
-    box_layout_node_t *n)
+    box_layout_node_t *n,
+    int32_t first,
+    int32_t last)
 {
+    float fit[2] = { n->shape[0], n->shape[1] };
+    float least[2] = { n->has_text ? n->longest : n->shape[0], n->shape[1] };
     int32_t axis;
     if (n->has_layout) {
-        float content[2] = {0, 0};
         int32_t main = n->layout.direction == DirectionRow ? 0 :
             n->layout.direction == DirectionColumn ? 1 : -1;
+        const Padding *pad = &n->layout.padding;
+        float edges[2] = { pad->left + pad->right, pad->top + pad->bottom };
         int32_t i;
+        fit[0] = fit[1] = least[0] = least[1] = 0;
         for (i = 0; i < n->count; i ++) {
             const box_layout_node_t *c = &nodes[n->first + i];
-            for (axis = 0; axis < 2; axis ++) {
-                float v = main == -1 ? box_layout_extent(c, axis) : c->base[axis];
-                if (axis == main) {
-                    content[axis] += v;
-                } else if (v > content[axis]) {
-                    content[axis] = v;
+            for (axis = first; axis < last; axis ++) {
+                float v = c->base[axis], l = c->cmin[axis];
+                if (main == -1) {
+                    v = box_layout_extent(c, axis, v);
+                    l = box_layout_extent(c, axis, l);
                 }
+
+                fit[axis] = axis == main ? fit[axis] + v : fmaxf(fit[axis], v);
+                least[axis] = axis == main ? least[axis] + l : fmaxf(least[axis], l);
             }
         }
 
-        if (main != -1 && n->count > 1) {
-            content[main] += n->layout.spacing * (float)(n->count - 1);
+        for (axis = first; axis < last; axis ++) {
+            float gaps = axis == main && n->count > 1 ?
+                n->layout.spacing * (float)(n->count - 1) : 0;
+            fit[axis] += gaps + edges[axis];
+            least[axis] += gaps + edges[axis];
         }
-
-        const Padding *pad = &n->layout.padding;
-        n->fit[0] = content[0] + pad->left + pad->right;
-        n->fit[1] = content[1] + pad->top + pad->bottom;
-    } else {
-        n->fit[0] = n->shape[0];
-        n->fit[1] = n->shape[1];
     }
 
-    for (axis = 0; axis < 2; axis ++) {
+    for (axis = first; axis < last; axis ++) {
         const Sizing *s = box_layout_sizing(n, axis);
-        float size = s->mode == SizeModeFixed ? s->value : n->fit[axis];
-        n->size[axis] = box_layout_clamp(size, s);
-        n->base[axis] = s->mode == SizeModeGrow ?
-            box_layout_clamp(0, s) : n->size[axis];
+        n->size[axis] = box_layout_clamp(s->mode == SizeModeFixed ? s->value : fit[axis], s);
+        n->base[axis] = n->size[axis];
+        n->cmin[axis] = s->mode == SizeModeFixed ?
+            n->size[axis] : box_layout_clamp(least[axis], s);
     }
 }
 
 /** Share the free space of a row or column among its growing children by weight.
  *
- * A child whose share passes its min or max keeps the bound, and the rest is shared again.
+ * A share starts from zero. A child with content_min never gets less than its content
+ * minimum, so the children whose share is below it keep it and the others share the rest,
+ * which ends where Clay ends by growing its smallest elements first.
+ *
+ * A child whose share passes a bound keeps the bound, and the rest is shared again.
  *
  * @param nodes The nodes of the tree
  * @param n The parent
  * @param main The main axis of the parent
  * @param space The size of the content box on the main axis
+ * @return The size of the children and the spacing between them
  */
-static void box_layout_grow(
+static float box_layout_grow(
     box_layout_node_t *nodes,
     const box_layout_node_t *n,
     int32_t main,
     float space)
 {
-    float free = space;
-    int32_t i, pass;
-    if (n->count > 1) {
-        free -= n->layout.spacing * (float)(n->count - 1);
-    }
-
+    float gaps = n->count > 1 ? n->layout.spacing * (float)(n->count - 1) : 0;
+    float free = space - gaps, result = gaps;
+    int32_t i, pass, growing = 0;
     for (i = 0; i < n->count; i ++) {
         box_layout_node_t *c = &nodes[n->first + i];
         c->frozen = !box_layout_grows(c, main);
-        if (c->frozen) {
-            free -= c->size[main];
-        }
+        result += c->frozen ? c->size[main] : 0;
+        growing += !c->frozen;
     }
 
-    for (pass = 0; pass <= n->count; pass ++) {
+    free -= result - gaps;
+    for (pass = 0; growing && pass <= n->count; pass ++) {
         float weights = 0, over = 0;
         for (i = 0; i < n->count; i ++) {
             const box_layout_node_t *c = &nodes[n->first + i];
@@ -281,7 +359,7 @@ static void box_layout_grow(
             const Sizing *s = box_layout_sizing(c, main);
             float raw = free * fmaxf(s->value, 0.0f) / weights;
             if (!c->frozen) {
-                c->size[main] = box_layout_clamp(raw, s);
+                c->size[main] = box_layout_grow_clamp(c, main, raw);
                 over += c->size[main] - raw;
             }
         }
@@ -305,6 +383,13 @@ static void box_layout_grow(
 
         free = left;
     }
+
+    for (i = 0; growing && i < n->count; i ++) {
+        const box_layout_node_t *c = &nodes[n->first + i];
+        result += box_layout_grows(c, main) ? c->size[main] : 0;
+    }
+
+    return result;
 }
 
 /** Get the center of a child aligned in a box on one axis.
@@ -329,7 +414,126 @@ static float box_layout_align(
     return axis ? hi - from : lo + from;
 }
 
-/** Size and place the children of an element whose size is final.
+/** Narrow the children of a row or column that overflows it, down to their least size.
+ *
+ * The widest children narrow first to a common width, as Clay compresses its largest elements
+ * first; a child that reaches its least size keeps it and the others narrow further.
+ *
+ * @param nodes The nodes of the tree
+ * @param n The parent
+ * @param main The main axis of the parent
+ * @param space The size of the content box on the main axis
+ * @param total The size of the children and the spacing between them
+ */
+static void box_layout_shrink(
+    box_layout_node_t *nodes,
+    const box_layout_node_t *n,
+    int32_t main,
+    float space,
+    float total)
+{
+    float gaps = n->count > 1 ? n->layout.spacing * (float)(n->count - 1) : 0;
+    float avail = space - gaps;
+    int32_t i, pass, open = 0;
+    for (i = 0; total > space + 1e-4f && i < n->count; i ++) {
+        box_layout_node_t *c = &nodes[n->first + i];
+        c->frozen = !(c->size[main] > box_layout_least(c, main));
+        avail -= c->frozen ? c->size[main] : 0;
+        open += !c->frozen;
+    }
+
+    for (pass = 0; pass <= n->count && open; pass ++) {
+        float cap = avail / (float)open, over = 0;
+        for (i = 0; i < n->count; i ++) {
+            const box_layout_node_t *c = &nodes[n->first + i];
+            float least = box_layout_least(c, main);
+            float v = fminf(c->size[main], fmaxf(cap, least));
+            over += c->frozen ? 0 : v - cap;
+        }
+
+        for (i = 0; i < n->count; i ++) {
+            box_layout_node_t *c = &nodes[n->first + i];
+            float least = box_layout_least(c, main);
+            float v = fminf(c->size[main], fmaxf(cap, least));
+            bool keep = (over > 0 && v > cap) || (over < 0 && v < cap);
+            if (!c->frozen && (keep || fabsf(over) < 1e-4f)) {
+                c->size[main] = v;
+                c->frozen = keep;
+                avail -= keep ? v : 0;
+                open -= keep;
+            }
+        }
+
+        if (fabsf(over) < 1e-4f) {
+            break;
+        }
+    }
+}
+
+/** Get the content box of an element on one axis, empty when the padding passes the size.
+ *
+ * @param n The element, its size final
+ * @param axis 0 for x, 1 for y
+ * @param lo Receives the low edge
+ * @param hi Receives the high edge
+ */
+static void box_layout_content(
+    const box_layout_node_t *n,
+    int32_t axis,
+    float *lo,
+    float *hi)
+{
+    const Padding *pad = &n->layout.padding;
+    *lo = -n->size[axis] / 2 + (axis ? pad->bottom : pad->left);
+    *hi = n->size[axis] / 2 - (axis ? pad->top : pad->right);
+    if (*hi < *lo) {
+        *hi = *lo;
+    }
+}
+
+/** Size the children of an element whose size is final on a range of axes.
+ *
+ * @param nodes The nodes of the tree
+ * @param n The element
+ * @param first First axis, 0 for x, 1 for y
+ * @param last Axis after the last one
+ */
+static void box_layout_resolve(
+    box_layout_node_t *nodes,
+    const box_layout_node_t *n,
+    int32_t first,
+    int32_t last)
+{
+    float lo[2], hi[2];
+    int32_t i, axis, main = n->layout.direction == DirectionRow ? 0 :
+        n->layout.direction == DirectionColumn ? 1 : -1;
+    for (axis = first; axis < last; axis ++) {
+        box_layout_content(n, axis, &lo[axis], &hi[axis]);
+    }
+
+    for (i = 0; i < n->count; i ++) {
+        box_layout_node_t *c = &nodes[n->first + i];
+        for (axis = first; axis < last; axis ++) {
+            float space = hi[axis] - lo[axis];
+            if (axis == main) {
+                continue;
+            }
+
+            if (box_layout_grows(c, axis)) {
+                c->size[axis] = box_layout_grow_clamp(c, axis, space);
+            } else if (c->size[axis] > space) {
+                c->size[axis] = fmaxf(space, box_layout_least(c, axis));
+            }
+        }
+    }
+
+    if (main >= first && main < last) {
+        float total = box_layout_grow(nodes, n, main, hi[main] - lo[main]);
+        box_layout_shrink(nodes, n, main, hi[main] - lo[main], total);
+    }
+}
+
+/** Place the children of an element whose children are sized.
  *
  * @param nodes The nodes of the tree
  * @param n The element
@@ -338,30 +542,13 @@ static void box_layout_place(
     box_layout_node_t *nodes,
     const box_layout_node_t *n)
 {
-    const Padding *pad = &n->layout.padding;
-    float lo[2] = { -n->size[0] / 2 + pad->left, -n->size[1] / 2 + pad->bottom };
-    float hi[2] = { n->size[0] / 2 - pad->right, n->size[1] / 2 - pad->top };
-    float space[2] = { hi[0] - lo[0], hi[1] - lo[1] };
+    float lo[2], hi[2];
     int32_t main = n->layout.direction == DirectionRow ? 0 :
         n->layout.direction == DirectionColumn ? 1 : -1;
     int32_t align[2] = { (int32_t)n->layout.h, (int32_t)n->layout.v };
-    int32_t i, axis;
-    for (axis = 0; axis < 2; axis ++) {
-        if (space[axis] < 0) {
-            space[axis] = 0;
-            hi[axis] = lo[axis];
-        }
-    }
-
-    for (i = 0; i < n->count; i ++) {
-        box_layout_node_t *c = &nodes[n->first + i];
-        for (axis = 0; axis < 2; axis ++) {
-            if (axis != main && box_layout_grows(c, axis)) {
-                c->size[axis] = box_layout_clamp(space[axis], box_layout_sizing(c, axis));
-            }
-        }
-    }
-
+    int32_t i;
+    box_layout_content(n, 0, &lo[0], &hi[0]);
+    box_layout_content(n, 1, &lo[1], &hi[1]);
     if (main == -1) {
         for (i = 0; i < n->count; i ++) {
             box_layout_node_t *c = &nodes[n->first + i];
@@ -373,7 +560,6 @@ static void box_layout_place(
         goto done;
     }
 
-    box_layout_grow(nodes, n, main, space[main]);
     int32_t cross = 1 - main;
     float total = 0;
     for (i = 0; i < n->count; i ++) {
@@ -384,7 +570,8 @@ static void box_layout_place(
         total += n->layout.spacing * (float)(n->count - 1);
     }
 
-    float cursor = box_layout_align(0, space[main], total, align[main], 0) - total / 2;
+    float space = hi[main] - lo[main];
+    float cursor = box_layout_align(0, space, total, align[main], 0) - total / 2;
     for (i = 0; i < n->count; i ++) {
         box_layout_node_t *c = &nodes[n->first + i];
         float center = cursor + c->size[main] / 2;
@@ -397,6 +584,28 @@ static void box_layout_place(
 
 done:
     return;
+}
+
+/** Give the texts of a tree their resolved widths and take the heights they get.
+ *
+ * @param world The world
+ * @param state The state of the layout module
+ * @param nodes The nodes of the tree
+ * @param count Number of nodes
+ */
+static void box_layout_wrap(
+    ecs_world_t *world,
+    const box_layout_state_t *state,
+    box_layout_node_t *nodes,
+    int32_t count)
+{
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        box_layout_node_t *n = &nodes[i];
+        if (n->has_text) {
+            n->shape[1] = state->text.wrap(world, n->e, n->size[0]);
+        }
+    }
 }
 
 /** Write the computed size and position of an element where they changed.
@@ -425,6 +634,67 @@ static void box_layout_write(
     }
 }
 
+/** Size and place a tree without texts, both axes in one pass.
+ *
+ * @param nodes The nodes of the tree
+ * @param count Number of nodes
+ */
+static void box_layout_solve(
+    box_layout_node_t *nodes,
+    int32_t count)
+{
+    int32_t i;
+    for (i = count - 1; i >= 0; i --) {
+        box_layout_measure(nodes, &nodes[i], 0, 2);
+    }
+
+    for (i = 0; i < count; i ++) {
+        if (nodes[i].has_layout) {
+            box_layout_resolve(nodes, &nodes[i], 0, 2);
+            box_layout_place(nodes, &nodes[i]);
+        }
+    }
+}
+
+/** Size and place a tree with texts: widths, then the texts wrap, then heights.
+ *
+ * @param world The world
+ * @param state The state of the layout module
+ * @param nodes The nodes of the tree
+ * @param count Number of nodes
+ */
+static void box_layout_solve_text(
+    ecs_world_t *world,
+    box_layout_state_t *state,
+    box_layout_node_t *nodes,
+    int32_t count)
+{
+    int32_t i, axis;
+    for (axis = 0; axis < 2; axis ++) {
+        if (axis == 1) {
+            state->writing = true;
+            box_layout_wrap(world, state, nodes, count);
+            state->writing = false;
+        }
+
+        for (i = count - 1; i >= 0; i --) {
+            box_layout_measure(nodes, &nodes[i], axis, axis + 1);
+        }
+
+        for (i = 0; i < count; i ++) {
+            if (nodes[i].has_layout) {
+                box_layout_resolve(nodes, &nodes[i], axis, axis + 1);
+            }
+        }
+    }
+
+    for (i = 0; i < count; i ++) {
+        if (nodes[i].has_layout) {
+            box_layout_place(nodes, &nodes[i]);
+        }
+    }
+}
+
 void box_layout_tree(
     ecs_world_t *world,
     box_layout_state_t *state,
@@ -433,14 +703,10 @@ void box_layout_tree(
     box_layout_collect(world, state, root);
     box_layout_node_t *nodes = ecs_vec_first_t(&state->nodes, box_layout_node_t);
     int32_t i, count = ecs_vec_count(&state->nodes);
-    for (i = count - 1; i >= 0; i --) {
-        box_layout_measure(nodes, &nodes[i]);
-    }
-
-    for (i = 0; i < count; i ++) {
-        if (nodes[i].has_layout) {
-            box_layout_place(nodes, &nodes[i]);
-        }
+    if (state->has_text) {
+        box_layout_solve_text(world, state, nodes, count);
+    } else {
+        box_layout_solve(nodes, count);
     }
 
     state->writing = true;
