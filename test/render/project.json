@@ -511,7 +511,10 @@
             {
                 "id": "BlendedDraws",
                 "testcases": [
-                    "interleaved_batches_blend_back_to_front"
+                    "interleaved_batches_blend_back_to_front",
+                    "one_batch_is_few_draws",
+                    "interleaved_batches_one_draw_per_run",
+                    "long_run_blends_back_to_front"
                 ]
             },
             {

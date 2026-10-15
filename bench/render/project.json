@@ -124,7 +124,8 @@
             {
                 "id": "Blended",
                 "benchcases": [
-                    "gpu_10k"
+                    "gpu_10k",
+                    "gpu_10k_lit_culled"
                 ]
             },
             {

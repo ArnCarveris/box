@@ -38,10 +38,15 @@ static uint64_t bench_blended_instructions(void)
     return result;
 }
 
-void Blended_gpu_10k(
-    bench_t *b)
+/** Render frames of the blended boxes.
+ *
+ * @param b The benchmark
+ * @param lit Whether the view is lit and culls by frustum and occlusion, as the View ctor sets
+ */
+static void bench_blended(
+    bench_t *b,
+    bool lit)
 {
-    // render_fixes/blended_draws
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
     App *app = ecs_singleton_get_mut(world, App);
@@ -56,7 +61,14 @@ void Blended_gpu_10k(
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
-        .color = {30, 30, 40, 255}}});
+        .color = {30, 30, 40, 255}}, .lighting.enabled = lit,
+        .culling = {.enabled = lit, .occlusion = lit, .min_dimension_px = 1}});
+    if (lit) {
+        ecs_entity_t sun = ecs_new(world);
+        ecs_set(world, sun, Rotation, {0.5423041f, 2.3679806f, -0.4669112f});
+        ecs_set(world, sun, DirectionalLight, {.intensity = 1.5f});
+    }
+
     int32_t i;
     for (i = 0; i < BENCH_BLENDED_COUNT; i ++) {
         ecs_entity_t e = ecs_new(world);
@@ -92,4 +104,18 @@ void Blended_gpu_10k(
     bench_counter(b, "instructions", (double)(bench_blended_instructions() - start));
     bench_counter(b, "frames", frames);
     ecs_fini(world);
+}
+
+void Blended_gpu_10k(
+    bench_t *b)
+{
+    // render_fixes/blended_draws
+    bench_blended(b, false);
+}
+
+void Blended_gpu_10k_lit_culled(
+    bench_t *b)
+{
+    // render_fixes/blended_draws
+    bench_blended(b, true);
 }
