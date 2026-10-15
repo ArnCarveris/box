@@ -477,8 +477,8 @@ done:
 }
 
 /** Check the settings of a run and load its scene. ecs_script returns the entity of a managed
- * script also when it fails: a parse error leaves EcsScript without a script and an evaluation
- * error sets its error, so those tell whether the scene loaded.
+ * script also when it fails to parse or evaluate; both leave EcsScript without a script and
+ * set its error, which tell whether the scene loaded.
  *
  * @param world The world
  * @return 0 when the world may run, nonzero when it may not

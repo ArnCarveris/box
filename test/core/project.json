@@ -60,7 +60,8 @@
                     "run_loads_scene",
                     "run_missing_scene",
                     "run_invalid_scene_headless",
-                    "run_invalid_scene_windowed"
+                    "run_invalid_scene_windowed",
+                    "run_scene_evaluation_error"
                 ]
             },
             {
