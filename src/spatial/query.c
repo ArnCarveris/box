@@ -155,7 +155,7 @@ bool box_spatial_ray(
     box_spatial_walk_t w;
     if (box_spatial_ray_walk(world, ray, &w)) {
         int32_t i;
-        for (i = 0; i < 2; i ++) {
+        for (i = 0; i < (ray->ui ? BOX_SPATIAL_TREES : BOX_SPATIAL_UI); i ++) {
             box_bvh_ray(&w.scene->trees[i], &w.ray, &w.reach, box_spatial_visit_nearest, &w);
         }
     }
@@ -193,7 +193,7 @@ int32_t box_spatial_ray_all(
     if (box_spatial_ray_walk(world, ray, &w)) {
         int32_t i;
         w.out = hits;
-        for (i = 0; i < 2; i ++) {
+        for (i = 0; i < (ray->ui ? BOX_SPATIAL_TREES : BOX_SPATIAL_UI); i ++) {
             box_bvh_ray(&w.scene->trees[i], &w.ray, &w.reach, box_spatial_visit_all, &w);
         }
     }
@@ -221,7 +221,7 @@ int32_t box_spatial_overlap_box(
         .max = max
     };
     int32_t i;
-    for (i = 0; w.scene && i < 2; i ++) {
+    for (i = 0; w.scene && i < BOX_SPATIAL_UI; i ++) {
         box_bvh_overlap(&w.scene->trees[i], min, max, box_spatial_visit_box, &w);
     }
 
@@ -243,7 +243,7 @@ int32_t box_spatial_overlap_sphere(
         .radius = radius
     };
     int32_t i;
-    for (i = 0; w.scene && i < 2; i ++) {
+    for (i = 0; w.scene && i < BOX_SPATIAL_UI; i ++) {
         box_bvh_sphere(&w.scene->trees[i], center, radius, box_spatial_visit_sphere, &w);
     }
 

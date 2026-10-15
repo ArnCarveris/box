@@ -88,6 +88,13 @@
                 ]
             },
             {
+                "id": "SpatialElements",
+                "testcases": [
+                    "hidden_from_shape_queries",
+                    "follow_bounds_and_moves"
+                ]
+            },
+            {
                 "id": "SpatialChurn",
                 "testcases": [
                     "static_vs_brute_force"

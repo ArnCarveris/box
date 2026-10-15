@@ -21,6 +21,12 @@
 /** Tree of the entities with DynamicTransform */
 #define BOX_SPATIAL_DYNAMIC (1)
 
+/** Tree of the UI elements without a shape: LayoutBounds or TextBounds, exact like static */
+#define BOX_SPATIAL_UI (2)
+
+/** Number of trees of a scene */
+#define BOX_SPATIAL_TREES (3)
+
 /** Place of an entity in the index, added with every ShapeMesh */
 typedef struct SpatialProxy {
     ecs_entity_t scene; /**< Scene the entity is indexed in */
@@ -47,7 +53,7 @@ typedef struct box_spatial_item_t {
     vec3 min;            /**< Minimum corner of the world bounds */
     vec3 max;            /**< Maximum corner of the world bounds */
     int32_t next;        /**< Next free item when the item is free */
-    int32_t tree;        /**< BOX_SPATIAL_STATIC or BOX_SPATIAL_DYNAMIC */
+    int32_t tree;        /**< BOX_SPATIAL_STATIC, BOX_SPATIAL_DYNAMIC or BOX_SPATIAL_UI */
     uint32_t frame;      /**< Update in which the bounds were last set */
     bool moved;          /**< The static leaf of the item waits for the bounds of the item */
     bool stretched;      /**< The dynamic leaf of the item reaches ahead of its margin */
@@ -56,7 +62,7 @@ typedef struct box_spatial_item_t {
 /** The index of one scene */
 typedef struct box_spatial_scene_t {
     ecs_entity_t entity;  /**< The scene, 0 for the default scene */
-    box_bvh_t trees[2];   /**< Static and dynamic tree */
+    box_bvh_t trees[BOX_SPATIAL_TREES]; /**< Static, dynamic and UI tree */
     ecs_vec_t items;      /**< box_spatial_item_t by index */
     ecs_vec_t pending;    /**< int32_t, static items that wait for the next commit */
     ecs_vec_t moved;      /**< int32_t, static items whose leaf waits for their bounds */
@@ -150,7 +156,7 @@ box_spatial_scene_t* box_spatial_scene_ensure(
  *
  * @param s The scene
  * @param e The entity
- * @param tree BOX_SPATIAL_STATIC or BOX_SPATIAL_DYNAMIC
+ * @param tree BOX_SPATIAL_STATIC, BOX_SPATIAL_DYNAMIC or BOX_SPATIAL_UI
  * @param min Minimum corner of its world bounds
  * @param max Maximum corner of its world bounds
  * @param frame The current update
@@ -172,7 +178,7 @@ int32_t box_spatial_item_add(
  *
  * @param s The scene
  * @param item The item
- * @param tree BOX_SPATIAL_STATIC or BOX_SPATIAL_DYNAMIC
+ * @param tree BOX_SPATIAL_STATIC, BOX_SPATIAL_DYNAMIC or BOX_SPATIAL_UI
  * @param min Minimum corner of its world bounds
  * @param max Maximum corner of its world bounds
  * @param frame The current update
@@ -197,16 +203,16 @@ void box_spatial_item_remove(
     box_spatial_scene_t *s,
     int32_t item);
 
-/** Put the waiting static items of every scene in their tree and drop empty scenes.
+/** Put the waiting static and UI items of every scene in their tree and drop empty scenes.
  *
- * A scene with at least as many waiting items as its tree has leaves is built again.
+ * A tree with at least as many waiting items as it has leaves is built again.
  *
  * @param index The index
  */
 void box_spatial_commit(
     box_spatial_t *index);
 
-/** Give the leaves of the moved static items of every scene the bounds of their items.
+/** Give the leaves of the moved static and UI items of every scene the bounds of their items.
  *
  * @param index The index
  */
@@ -222,7 +228,7 @@ void box_spatial_move(
 int32_t box_spatial_settle(
     box_spatial_t *index);
 
-/** Build the static tree of a scene again from all its static items.
+/** Build the static and UI trees of a scene again from all their items.
  *
  * @param index The index, which owns the scratch buffers of the build
  * @param s The scene

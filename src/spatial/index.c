@@ -50,8 +50,11 @@ static box_spatial_scene_t* box_spatial_scene_new(
 {
     box_spatial_scene_t *s = ecs_os_calloc_t(box_spatial_scene_t);
     s->entity = scene;
-    box_bvh_init(&s->trees[BOX_SPATIAL_STATIC]);
-    box_bvh_init(&s->trees[BOX_SPATIAL_DYNAMIC]);
+    int32_t i;
+    for (i = 0; i < BOX_SPATIAL_TREES; i ++) {
+        box_bvh_init(&s->trees[i]);
+    }
+
     ecs_vec_init_t(NULL, &s->items, box_spatial_item_t, 0);
     ecs_vec_init_t(NULL, &s->pending, int32_t, 0);
     ecs_vec_init_t(NULL, &s->moved, int32_t, 0);
@@ -68,8 +71,11 @@ static box_spatial_scene_t* box_spatial_scene_new(
 static void box_spatial_scene_free(
     box_spatial_scene_t *s)
 {
-    box_bvh_fini(&s->trees[BOX_SPATIAL_STATIC]);
-    box_bvh_fini(&s->trees[BOX_SPATIAL_DYNAMIC]);
+    int32_t i;
+    for (i = 0; i < BOX_SPATIAL_TREES; i ++) {
+        box_bvh_fini(&s->trees[i]);
+    }
+
     ecs_vec_fini_t(NULL, &s->items, box_spatial_item_t);
     ecs_vec_fini_t(NULL, &s->pending, int32_t);
     ecs_vec_fini_t(NULL, &s->moved, int32_t);
@@ -303,21 +309,28 @@ static bool box_spatial_item_waits(
 {
     box_spatial_item_t *it = box_spatial_item(s, item);
 
-    return it->entity && it->tree == BOX_SPATIAL_STATIC &&
-        !box_bvh_has(&s->trees[BOX_SPATIAL_STATIC], item);
+    return it->entity && it->tree != BOX_SPATIAL_DYNAMIC &&
+        !box_bvh_has(&s->trees[it->tree], item);
 }
 
-void box_spatial_scene_rebuild(
+/** Build one exact tree of a scene again from all its items.
+ *
+ * @param index The index, which owns the scratch buffer of the build
+ * @param s The scene
+ * @param tree BOX_SPATIAL_STATIC or BOX_SPATIAL_UI
+ */
+static void box_spatial_tree_rebuild(
     box_spatial_t *index,
-    box_spatial_scene_t *s)
+    box_spatial_scene_t *s,
+    int32_t tree)
 {
     int32_t i, count = ecs_vec_count(&s->items), leaves = 0;
     ecs_vec_set_count_t(NULL, &index->leaves, box_bvh_leaf_t, count);
     box_bvh_leaf_t *leaf = ecs_vec_first(&index->leaves);
     for (i = 0; i < count; i ++) {
         box_spatial_item_t *it = box_spatial_item(s, i);
-        it->moved = false;
-        if (it->entity && it->tree == BOX_SPATIAL_STATIC) {
+        if (it->entity && it->tree == tree) {
+            it->moved = false;
             glm_vec3_copy(it->min, leaf[leaves].min);
             glm_vec3_copy(it->max, leaf[leaves].max);
             leaf[leaves].item = i;
@@ -325,7 +338,15 @@ void box_spatial_scene_rebuild(
         }
     }
 
-    box_bvh_build(&s->trees[BOX_SPATIAL_STATIC], leaf, leaves);
+    box_bvh_build(&s->trees[tree], leaf, leaves);
+}
+
+void box_spatial_scene_rebuild(
+    box_spatial_t *index,
+    box_spatial_scene_t *s)
+{
+    box_spatial_tree_rebuild(index, s, BOX_SPATIAL_STATIC);
+    box_spatial_tree_rebuild(index, s, BOX_SPATIAL_UI);
     ecs_vec_clear(&s->pending);
     ecs_vec_clear(&s->moved);
 }
@@ -343,7 +364,7 @@ static void box_spatial_scene_move(
         box_spatial_item_t *it = box_spatial_item(s, moved[i]);
         if (it->moved) {
             it->moved = false;
-            box_bvh_move(&s->trees[BOX_SPATIAL_STATIC], moved[i], it->min, it->max);
+            box_bvh_move(&s->trees[it->tree], moved[i], it->min, it->max);
         }
     }
 
@@ -359,25 +380,26 @@ static void box_spatial_scene_commit(
     box_spatial_t *index,
     box_spatial_scene_t *s)
 {
-    int32_t i, waiting = 0, count = ecs_vec_count(&s->pending);
+    int32_t i, waiting[BOX_SPATIAL_TREES] = {0}, count = ecs_vec_count(&s->pending);
     int32_t *pending = ecs_vec_first(&s->pending);
     if (!count) {
         goto done;
     }
 
     for (i = 0; i < count; i ++) {
-        waiting += box_spatial_item_waits(s, pending[i]);
+        waiting[box_spatial_item(s, pending[i])->tree] += box_spatial_item_waits(s, pending[i]);
     }
 
-    if (waiting >= s->trees[BOX_SPATIAL_STATIC].leaves) {
-        box_spatial_scene_rebuild(index, s);
-        goto done;
+    for (i = 0; i < BOX_SPATIAL_TREES; i ++) {
+        if (i != BOX_SPATIAL_DYNAMIC && waiting[i] && waiting[i] >= s->trees[i].leaves) {
+            box_spatial_tree_rebuild(index, s, i);
+        }
     }
 
     for (i = 0; i < count; i ++) {
         if (box_spatial_item_waits(s, pending[i])) {
             box_spatial_item_t *it = box_spatial_item(s, pending[i]);
-            box_bvh_insert(&s->trees[BOX_SPATIAL_STATIC], it->min, it->max, pending[i]);
+            box_bvh_insert(&s->trees[it->tree], it->min, it->max, pending[i]);
         }
     }
 
