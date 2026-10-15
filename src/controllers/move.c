@@ -35,8 +35,11 @@
 /** Steps a long move advances at the most; one that needs more stops short, never skips */
 #define BOX_MOVE_SWEEPS (1024)
 
-/** Longest step of a long move, in half radii: the region of shapes it reads at once */
+/** Shortest stretch of a long move, in half radii, that it reads the shapes for at once */
 #define BOX_MOVE_CHUNK (16)
+
+/** Shapes a read may hold before a long move reads them for a shorter stretch */
+#define BOX_MOVE_CROWD (64)
 
 /** Contact normals a move keeps to clip the velocity with */
 #define BOX_MOVE_NORMALS (8)
@@ -56,6 +59,8 @@ typedef struct box_move_t {
     vec3 region_min;                   /**< Minimum corner of the box the shapes were read for */
     vec3 region_max;                   /**< Maximum corner of the box the shapes were read for */
     bool region;                       /**< The shapes were read */
+    bool borrowed;                     /**< The shapes belong to the move this one forked from */
+    float ahead;                       /**< Stretch of motion the next read starts from */
     vec3 normals[BOX_MOVE_NORMALS];    /**< Normals of the contacts */
     int32_t normal_count;              /**< Normals kept */
     bool ground;                       /**< A contact was walkable */
@@ -162,17 +167,30 @@ static bool box_move_overlap(
  * @param m The move, its shapes and region are written
  * @param min Minimum corner of the box
  * @param max Maximum corner of the box
+ * @param crowd Most shapes the box may hold, the shapes are not read when it holds more
+ * @return false when the box holds more than crowd shapes
  */
-static void box_move_gather(
+static bool box_move_gather(
     box_move_t *m,
     const vec3 min,
-    const vec3 max)
+    const vec3 max,
+    int32_t crowd)
 {
     ecs_vec_t found;
     int32_t i, j, k, count;
+    bool result = false;
     ecs_vec_init_t(NULL, &found, ecs_entity_t, 0);
-    ecs_vec_clear(&m->shapes);
     count = box_spatial_overlap_box(m->world, m->body->scene, min, max, &found);
+    if (count > crowd) {
+        goto done;
+    }
+
+    if (m->borrowed) {
+        ecs_vec_init_t(NULL, &m->shapes, box_move_shape_t, count);
+        m->borrowed = false;
+    }
+
+    ecs_vec_clear(&m->shapes);
     for (i = 0; i < count; i ++) {
         ecs_entity_t e = *ecs_vec_get_t(&found, ecs_entity_t, i);
         box_move_shape_t s;
@@ -198,34 +216,52 @@ static void box_move_gather(
     glm_vec3_copy(ECS_CONST_CAST(float*, min), m->region_min);
     glm_vec3_copy(ECS_CONST_CAST(float*, max), m->region_max);
     m->region = true;
+    result = true;
+
+done:
     ecs_vec_fini_t(NULL, &found, ecs_entity_t);
+
+    return result;
 }
 
 /** Make sure the shapes read cover what the capsule can reach over a motion.
  *
- * The box grows by what a push can move the capsule and by the step and probe heights. A move
- * that leaves the region reads the shapes around its next stretch.
+ * The box grows by the step and probe heights. When the shapes read do not cover it, the move
+ * reads the shapes of the box.
+ *
+ * A box that holds more than BOX_MOVE_CROWD shapes is read for a quarter of the motion instead,
+ * down to least. The next read starts from twice the stretch that worked.
  *
  * @param m The move
  * @param pos The feet before the motion
- * @param motion The motion
+ * @param motion The motion, shortened to the stretch the shapes cover
+ * @param least Shortest stretch to read the shapes for
  */
 static void box_move_cover(
     box_move_t *m,
     const vec3 pos,
-    const vec3 motion)
+    vec3 motion,
+    float least)
 {
     const box_controller_body_t *body = m->body;
+    float len = glm_vec3_norm(motion);
+    bool done = false;
     vec3 min, max;
-    box_move_sweep(body, pos, motion, BOX_MOVE_MARGIN + body->radius * BOX_MOVE_FRACTION,
-        min, max);
-    min[1] -= body->probe;
-    max[1] += body->step;
-    if (!m->region || min[0] < m->region_min[0] || min[1] < m->region_min[1] ||
-        min[2] < m->region_min[2] || max[0] > m->region_max[0] ||
-        max[1] > m->region_max[1] || max[2] > m->region_max[2])
-    {
-        box_move_gather(m, min, max);
+    while (!done) {
+        box_move_sweep(body, pos, motion, BOX_MOVE_MARGIN, min, max);
+        min[1] -= body->probe;
+        max[1] += body->step;
+        done = m->region && min[0] >= m->region_min[0] && min[1] >= m->region_min[1] &&
+            min[2] >= m->region_min[2] && max[0] <= m->region_max[0] &&
+            max[1] <= m->region_max[1] && max[2] <= m->region_max[2];
+        done = done || box_move_gather(m, min, max, len > least ? BOX_MOVE_CROWD : INT32_MAX);
+        if (!done) {
+            float shorter = fmaxf(len * 0.25f, least);
+            glm_vec3_scale(motion, shorter / len, motion);
+            len = shorter;
+        } else {
+            m->ahead = len * 2;
+        }
     }
 }
 
@@ -244,18 +280,18 @@ static void box_move_init(
     const vec3 start,
     const vec3 motion)
 {
-    float len = glm_vec3_norm(ECS_CONST_CAST(float*, motion));
     float chunk = body->radius * BOX_MOVE_FRACTION * BOX_MOVE_CHUNK;
     vec3 first;
     ecs_os_memset_t(m, 0, box_move_t);
     m->world = world;
     m->body = body;
+    m->ahead = FLT_MAX;
     ecs_vec_init_t(NULL, &m->shapes, box_move_shape_t, 0);
-    glm_vec3_scale(ECS_CONST_CAST(float*, motion), len > chunk ? chunk / len : 1.0f, first);
-    box_move_cover(m, start, first);
+    glm_vec3_copy(ECS_CONST_CAST(float*, motion), first);
+    box_move_cover(m, start, first, chunk);
 }
 
-/** Copy a move for an attempt that may replace it, with its own shapes.
+/** Copy a move for an attempt that may replace it; it borrows the shapes until it reads its own.
  *
  * @param m The move
  * @param out The copy
@@ -265,17 +301,40 @@ static void box_move_fork(
     box_move_t *out)
 {
     *out = *m;
-    out->shapes = ecs_vec_copy_t(NULL, &m->shapes, box_move_shape_t);
+    out->borrowed = true;
 }
 
-/** Free the shapes of a move.
+/** Free the shapes of a move, unless it borrows them.
  *
  * @param m The move
  */
 static void box_move_fini(
     box_move_t *m)
 {
-    ecs_vec_fini_t(NULL, &m->shapes, box_move_shape_t);
+    if (!m->borrowed) {
+        ecs_vec_fini_t(NULL, &m->shapes, box_move_shape_t);
+    }
+}
+
+/** Let a move take the shapes an attempt it forked read for itself.
+ *
+ * @param m The move
+ * @param attempt The attempt, which keeps a borrowed reference
+ */
+static void box_move_take(
+    box_move_t *m,
+    box_move_t *attempt)
+{
+    if (!attempt->borrowed) {
+        box_move_fini(m);
+        m->shapes = attempt->shapes;
+        m->borrowed = false;
+        m->region = attempt->region;
+        m->ahead = attempt->ahead;
+        glm_vec3_copy(attempt->region_min, m->region_min);
+        glm_vec3_copy(attempt->region_max, m->region_max);
+        attempt->borrowed = true;
+    }
 }
 
 /** Test whether the body can stand on a contact.
@@ -489,9 +548,8 @@ static float box_move_clearance(
  * longer one advances conservatively: a step goes as far as the capsule is clear of every
  * shape and at least half the radius, so no length of motion skips over a shape.
  *
- * The motion still to go then loses what pushes into the shapes the step touched (collide and
- * slide), so a blocked motion ends where it is blocked instead of pushing on in small steps.
- * A step goes at most BOX_MOVE_CHUNK half radii, so it only tests the shapes near it.
+ * The rest of the motion loses what pushes into the shapes a step touched (collide and slide).
+ * A step only tests the shapes its sweep overlaps, read for the stretch ahead (box_move_cover).
  *
  * @param m The move
  * @param pos The feet, written in place
@@ -516,7 +574,8 @@ static void box_move_slide(
     } else if (len <= limit * BOX_MOVE_STEPS) {
         steps = len > limit ? (int32_t)ceilf(len / limit) : 1;
         glm_vec3_scale(ECS_CONST_CAST(float*, motion), 1.0f / (float)steps, dir);
-        box_move_cover(m, pos, motion);
+        glm_vec3_copy(ECS_CONST_CAST(float*, motion), ahead);
+        box_move_cover(m, pos, ahead, len);
         len = 0;
     } else {
         glm_vec3_copy(ECS_CONST_CAST(float*, motion), rest);
@@ -528,11 +587,12 @@ static void box_move_slide(
     }
 
     for (i = 0; i < BOX_MOVE_SWEEPS && len > BOX_MOVE_EPS; i ++) {
-        float step, far = fminf(len, chunk);
+        float step, far = fminf(len, m->ahead);
         glm_vec3_scale(rest, 1.0f / len, dir);
         glm_vec3_negate_to(dir, m->back);
         glm_vec3_scale(dir, far, ahead);
-        box_move_cover(m, pos, ahead);
+        box_move_cover(m, pos, ahead, fminf(far, chunk));
+        far = glm_vec3_norm(ahead);
         step = fminf(fmaxf(limit, box_move_clearance(m, pos, dir, limit, far)), far);
         glm_vec3_muladds(dir, step, pos);
         glm_vec3_scale(dir, len - step, rest);
@@ -593,11 +653,7 @@ static void box_move_step(
         m->ground = true;
         m->wall = attempt.wall;
         glm_vec3_copy(at, pos);
-        box_move_fini(m);
-        m->shapes = attempt.shapes;
-        m->region = attempt.region;
-        glm_vec3_copy(attempt.region_min, m->region_min);
-        glm_vec3_copy(attempt.region_max, m->region_max);
+        box_move_take(m, &attempt);
     } else {
         box_move_fini(&attempt);
     }
@@ -620,7 +676,9 @@ static void box_move_probe(
     attempt.ground = false;
     box_move_slide(&attempt, at, down);
     if (attempt.ground) {
-        box_move_fini(m);
+        box_move_take(m, &attempt);
+        attempt.shapes = m->shapes;
+        attempt.borrowed = m->borrowed;
         *m = attempt;
         glm_vec3_copy(at, pos);
     } else {
