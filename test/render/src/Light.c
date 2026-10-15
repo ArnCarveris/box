@@ -9,6 +9,7 @@
 #include <box.h>
 #include <bake_test.h>
 #include <stdlib.h>
+#include <math.h>
 #include "render.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -820,6 +821,109 @@ void Light_spot_light_lights_its_whole_cone(void) {
     test_assert(edge[0] > 200);
     test_assert(center[0] > 200);
     test_assert(far[0] > 100);
+
+    stbi_image_free(px);
+    ecs_os_free(path);
+    ecs_fini(world);
+}
+
+void Light_point_light_inverse_square(void) {
+    // lighting_fixes/point_falloff
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 6});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
+        .color = {0, 0, 0, 255}}, .lighting.enabled = true});
+    ecs_singleton_set(world, AmbientLight, {.intensity = 0});
+    ecs_entity_t wall = ecs_new(world);
+    ecs_set(world, wall, Position, {0, 0, -1});
+    ecs_set(world, wall, Box, {20, 20, 0.1f});
+    ecs_set(world, wall, Rgb, {255, 255, 255});
+    ecs_set(world, wall, PbrMaterial, {.roughness = 1});
+    ecs_entity_t light = ecs_new(world);
+    ecs_set(world, light, PointLight, {.intensity = 0.15f, .range = 40});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "falloff.png",
+        .resolution_scale = 1});
+    char *path = flecs_asprintf("%s/falloff.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    const float distances[3] = {0.5f, 1, 2};
+    double radiance[3];
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        ecs_set(world, light, Position, {0.125f, -0.125f, -0.95f + distances[i]});
+        ecs_progress(world, 0);
+        box_render_sync(world);
+        int w = 0, h = 0, n = 0;
+        unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+        test_assert(px != NULL);
+        double v = (double)px[(16 * 64 + 32) * 4 + 1] / 255.0;
+        radiance[i] = v <= 0.04045 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4);
+        stbi_image_free(px);
+    }
+
+    test_assert(radiance[0] < 0.95);
+    test_assert(radiance[2] > 0.01);
+    test_assert(fabs(radiance[1] - 0.15) < 0.015);
+    test_assert(fabs(radiance[1] / radiance[0] - 0.25) < 0.03);
+    test_assert(fabs(radiance[2] / radiance[1] - 0.25) < 0.03);
+
+    ecs_os_free(path);
+    ecs_fini(world);
+}
+
+void Light_point_light_fades_smoothly_to_range(void) {
+    // lighting_fixes/point_falloff
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 6});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
+        .color = {0, 0, 0, 255}}, .lighting.enabled = true});
+    ecs_singleton_set(world, AmbientLight, {.intensity = 0});
+    ecs_entity_t wall = ecs_new(world);
+    ecs_set(world, wall, Position, {0, 0, -1});
+    ecs_set(world, wall, Box, {20, 20, 0.1f});
+    ecs_set(world, wall, Rgb, {255, 255, 255});
+    ecs_set(world, wall, PbrMaterial, {.roughness = 1});
+    ecs_entity_t light = ecs_new(world);
+    ecs_set(world, light, Position, {0, 0, 1});
+    ecs_set(world, light, PointLight, {.intensity = 2, .range = 3});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "fade.png",
+        .resolution_scale = 1});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    char *path = flecs_asprintf("%s/fade.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    int32_t x;
+    double steepest = 0, prev = 1;
+    for (x = 32; x < 64; x ++) {
+        double v = (double)px[(16 * 64 + x) * 4 + 1] / 255.0;
+        v = v <= 0.04045 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4);
+        test_assert(v <= prev + 0.005);
+        steepest = prev - v > steepest && x > 32 ? prev - v : steepest;
+        prev = v;
+    }
+
+    test_assert(px[(16 * 64 + 32) * 4 + 1] > 100);
+    test_assert(px[(16 * 64 + 43) * 4 + 1] < 2);
+    test_assert(steepest < 0.08);
 
     stbi_image_free(px);
     ecs_os_free(path);

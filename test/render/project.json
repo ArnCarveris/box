@@ -263,7 +263,9 @@
                     "unchanged_lights_upload_nothing",
                     "component_defaults",
                     "cluster_lists_every_light",
-                    "spot_light_lights_its_whole_cone"
+                    "spot_light_lights_its_whole_cone",
+                    "point_light_inverse_square",
+                    "point_light_fades_smoothly_to_range"
                 ]
             },
             {
