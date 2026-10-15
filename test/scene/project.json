@@ -97,7 +97,8 @@
             {
                 "id": "SpatialChurn",
                 "testcases": [
-                    "static_vs_brute_force"
+                    "static_vs_brute_force",
+                    "coincident_vs_brute_force"
                 ]
             }
         ]

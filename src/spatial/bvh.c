@@ -24,6 +24,15 @@
 /** Entries a walk keeps on the stack before it allocates */
 #define BOX_BVH_STACK (64)
 
+/** No rotation while fitting ancestors */
+#define BOX_BVH_ROTATE_NONE (0)
+
+/** Rotations that balance the height of a node at no cost in area */
+#define BOX_BVH_ROTATE_HEIGHT (1)
+
+/** Rotations that lower the area of a node, else balance its height at no cost in area */
+#define BOX_BVH_ROTATE_AREA (2)
+
 /** Child reference of an item */
 #define BOX_BVH_ITEM(item) (-2 - (item))
 
@@ -425,22 +434,26 @@ static void box_bvh_swap(
     box_bvh_refit_height(tree, a);
 }
 
-/** Swap a child of a node with a grandchild when that lowers the area of the tree most.
+/** Find the swap of a child of a node with a grandchild that lowers the area of the tree most.
  *
  * Moving child B down next to grandchild G of the other child C, and G up, changes only the
  * box of C, so the rotation with the largest drop of that area wins (b2RotateNodes).
  *
  * @param tree The tree
- * @param a The node
+ * @param n The node, at least two high
+ * @param side Receives the side of the child that moves down, -1 when no swap lowers the area
+ * @param pick Receives the side of the grandchild that moves up
  */
-static void box_bvh_rotate(
-    box_bvh_t *tree,
-    int32_t a)
+static void box_bvh_rotate_area(
+    const box_bvh_t *tree,
+    const box_bvh_node_t *n,
+    int32_t *side,
+    int32_t *pick)
 {
-    box_bvh_node_t *n = box_bvh_get(tree, a);
     float best = 0;
-    int32_t s, k, side = -1, pick = -1;
-    for (s = 0; s < 2 && n->height >= 2; s ++) {
+    int32_t s, k;
+    *side = -1;
+    for (s = 0; s < 2; s ++) {
         int32_t p = n->child[1 - s];
         if (box_bvh_is_item(p)) {
             continue;
@@ -453,10 +466,70 @@ static void box_bvh_rotate(
                 n->min[s], n->max[s], pn->min[1 - k], pn->max[1 - k]);
             if (drop > best) {
                 best = drop;
-                side = s;
-                pick = k;
+                *side = s;
+                *pick = k;
             }
         }
+    }
+}
+
+/** Find the swap that balances a node whose children differ in height by more than one while
+ * every box keeps its size: the lower child moves down next to the lower grandchild of the
+ * higher one, which moves up, when the higher child keeps its box.
+ *
+ * Boxes at one spot cost the same area wherever they go, so the area rotations never move them
+ * and an insert chain of them would grow the tree one level per box.
+ *
+ * @param tree The tree
+ * @param n The node
+ * @param side Receives the side of the child that moves down, -1 for no swap
+ * @param pick Receives the side of the grandchild that moves up
+ */
+static void box_bvh_rotate_height(
+    const box_bvh_t *tree,
+    const box_bvh_node_t *n,
+    int32_t *side,
+    int32_t *pick)
+{
+    int32_t h0 = box_bvh_height(tree, n->child[0]), h1 = box_bvh_height(tree, n->child[1]);
+    int32_t high = h0 > h1 ? 0 : 1;
+    *side = -1;
+    if (h0 > h1 + 1 || h1 > h0 + 1) {
+        const box_bvh_node_t *pn = box_bvh_get(tree, n->child[high]);
+        int32_t up = box_bvh_height(tree, pn->child[0]) >= box_bvh_height(tree, pn->child[1]) ?
+            0 : 1;
+        vec3 min, max;
+        box_bvh_union(n->min[1 - high], n->max[1 - high], pn->min[1 - up], pn->max[1 - up],
+            min, max);
+        if (glm_vec3_eqv(min, ECS_CONST_CAST(float*, n->min[high])) &&
+            glm_vec3_eqv(max, ECS_CONST_CAST(float*, n->max[high])))
+        {
+            *side = 1 - high;
+            *pick = up;
+        }
+    }
+}
+
+/** Rotate a node with the swap that lowers its area most, else with one that balances its
+ * height at no cost in area.
+ *
+ * @param tree The tree
+ * @param a The node
+ * @param mode BOX_BVH_ROTATE_AREA, or BOX_BVH_ROTATE_HEIGHT for the balancing swap only
+ */
+static void box_bvh_rotate(
+    box_bvh_t *tree,
+    int32_t a,
+    int32_t mode)
+{
+    const box_bvh_node_t *n = box_bvh_get(tree, a);
+    int32_t side = -1, pick = 0;
+    if (n->height >= 2 && mode == BOX_BVH_ROTATE_AREA) {
+        box_bvh_rotate_area(tree, n, &side, &pick);
+    }
+
+    if (n->height >= 2 && side < 0) {
+        box_bvh_rotate_height(tree, n, &side, &pick);
     }
 
     if (side >= 0) {
@@ -469,14 +542,14 @@ static void box_bvh_rotate(
  *
  * @param tree The tree
  * @param node The first node to fit
- * @param rotate Try a rotation at every node, after an insert
+ * @param rotate BOX_BVH_ROTATE_AREA, BOX_BVH_ROTATE_HEIGHT or BOX_BVH_ROTATE_NONE
  * @param settle Stop at the first node whose box did not change or after BOX_BVH_GROW_LEVELS
  * nodes, after a move that one of those nodes still contains, above which boxes only shrink
  */
 static void box_bvh_fix(
     box_bvh_t *tree,
     int32_t node,
-    bool rotate,
+    int32_t rotate,
     bool settle)
 {
     int32_t level = 0;
@@ -486,8 +559,8 @@ static void box_bvh_fix(
             box_bvh_refit_height(tree, node);
         }
 
-        if (rotate) {
-            box_bvh_rotate(tree, node);
+        if (rotate != BOX_BVH_ROTATE_NONE) {
+            box_bvh_rotate(tree, node, rotate);
         }
 
         box_bvh_node_t *n = box_bvh_get(tree, node);
@@ -535,6 +608,7 @@ static int32_t box_bvh_sibling(
         }
 
         i = child[0] < child[1] ? 0 : 1;
+
         slot = 2 * ref + i;
         s_min = n->min[i];
         s_max = n->max[i];
@@ -544,11 +618,20 @@ static int32_t box_bvh_sibling(
     return slot;
 }
 
-void box_bvh_insert(
+/** Insert an item next to the sibling that grows the tree least, then fit its ancestors.
+ *
+ * @param tree The tree
+ * @param min Minimum corner of the item
+ * @param max Maximum corner of the item
+ * @param item The item, which is not in the tree
+ * @param rotate BOX_BVH_ROTATE_AREA or BOX_BVH_ROTATE_HEIGHT
+ */
+static void box_bvh_insert_rotate(
     box_bvh_t *tree,
     const vec3 min,
     const vec3 max,
-    int32_t item)
+    int32_t item,
+    int32_t rotate)
 {
     box_bvh_slots_ensure(tree, item);
     tree->leaves ++;
@@ -566,9 +649,18 @@ void box_bvh_insert(
     box_bvh_put(tree, 2 * node, sibling, s_min, s_max);
     box_bvh_put(tree, 2 * node + 1, BOX_BVH_ITEM(item), min, max);
     box_bvh_put(tree, slot, node, n_min, n_max);
-    box_bvh_fix(tree, node, true, false);
+    box_bvh_fix(tree, node, rotate, false);
 done:
     return;
+}
+
+void box_bvh_insert(
+    box_bvh_t *tree,
+    const vec3 min,
+    const vec3 max,
+    int32_t item)
+{
+    box_bvh_insert_rotate(tree, min, max, item, BOX_BVH_ROTATE_AREA);
 }
 
 void box_bvh_remove(
@@ -593,7 +685,7 @@ void box_bvh_remove(
     box_bvh_put(tree, up, sibling, min, max);
     box_bvh_release(tree, parent);
     if (up != BOX_BVH_ROOT) {
-        box_bvh_fix(tree, up >> 1, false, false);
+        box_bvh_fix(tree, up >> 1, BOX_BVH_ROTATE_NONE, false);
     }
 
 done:
@@ -621,7 +713,7 @@ void box_bvh_move(
         glm_vec3_copy(ECS_CONST_CAST(float*, min), s_min);
         glm_vec3_copy(ECS_CONST_CAST(float*, max), s_max);
         if (slot != BOX_BVH_ROOT) {
-            box_bvh_fix(tree, slot >> 1, false, true);
+            box_bvh_fix(tree, slot >> 1, BOX_BVH_ROTATE_NONE, true);
         }
     } else {
         box_bvh_remove(tree, item);
@@ -670,8 +762,10 @@ bool box_bvh_move_fat(
     bool keep = box_bvh_contains(l_min, l_max, min, max) &&
         box_bvh_contains(huge_min, huge_max, l_min, l_max);
     if (!keep) {
+        bool coherent = ahead[0] != 0 || ahead[1] != 0 || ahead[2] != 0;
         box_bvh_remove(tree, item);
-        box_bvh_insert(tree, fat_min, fat_max, item);
+        box_bvh_insert_rotate(tree, fat_min, fat_max, item,
+            coherent ? BOX_BVH_ROTATE_HEIGHT : BOX_BVH_ROTATE_AREA);
     }
 
     return !keep;

@@ -134,3 +134,78 @@ void SpatialChurn_static_vs_brute_force(void) {
     ecs_os_free(expect);
     ecs_fini(world);
 }
+
+void SpatialChurn_coincident_vs_brute_force(void) {
+    // spatial_perf/bvh_quality
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    enum { COUNT = 3000, FRAMES = 6, QUERIES = 20 };
+    ecs_entity_t *shapes = ecs_os_malloc_n(ecs_entity_t, COUNT);
+    vec3 *pos = ecs_os_malloc_n(vec3, COUNT);
+    float *size = ecs_os_malloc_n(float, COUNT);
+    ecs_entity_t *expect = ecs_os_malloc_n(ecs_entity_t, COUNT);
+    int32_t i, f, q, a;
+    srand(77);
+    for (i = 0; i < COUNT; i ++) {
+        glm_vec3_zero(pos[i]);
+        size[i] = i % 3 == 2 ? 0.0f : 1.0f;
+        shapes[i] = ecs_new(world);
+        if (i % 3 == 0) {
+            ecs_add(world, shapes[i], DynamicTransform);
+        }
+
+        ecs_set(world, shapes[i], Position, {0, 0, 0});
+        ecs_set(world, shapes[i], Box, {size[i], size[i], size[i]});
+    }
+
+    ecs_progress(world, 0);
+    ecs_vec_t out;
+    ecs_vec_init_t(NULL, &out, ecs_entity_t, 0);
+    test_int(box_spatial_overlap_box(world, 0, (vec3){-0.1f, -0.1f, -0.1f},
+        (vec3){0.1f, 0.1f, 0.1f}, &out), COUNT);
+    for (f = 0; f < FRAMES; f ++) {
+        for (i = f; i < COUNT; i += FRAMES) {
+            for (a = 0; a < 3; a ++) {
+                pos[i][a] = (float)rand() / (float)RAND_MAX * 60.0f - 30.0f;
+            }
+
+            ecs_set(world, shapes[i], Position, {pos[i][0], pos[i][1], pos[i][2]});
+        }
+
+        ecs_progress(world, 0);
+        for (q = 0; q < QUERIES; q ++) {
+            int32_t count = 0;
+            float c[3], h = (float)rand() / (float)RAND_MAX * 8.0f;
+            for (a = 0; a < 3; a ++) {
+                c[a] = q % 4 ? (float)rand() / (float)RAND_MAX * 60.0f - 30.0f : 0.0f;
+            }
+
+            for (i = 0; i < COUNT; i ++) {
+                bool hit = true;
+                for (a = 0; a < 3; a ++) {
+                    hit = hit && fabsf(pos[i][a] - c[a]) <= h + size[i] * 0.5f;
+                }
+
+                if (hit) {
+                    expect[count ++] = shapes[i];
+                }
+            }
+
+            ecs_vec_clear(&out);
+            test_int(box_spatial_overlap_box(world, 0, (vec3){c[0] - h, c[1] - h, c[2] - h},
+                (vec3){c[0] + h, c[1] + h, c[2] + h}, &out), count);
+            qsort(expect, (size_t)count, sizeof(ecs_entity_t), entity_compare);
+            qsort(ecs_vec_first(&out), (size_t)count, sizeof(ecs_entity_t), entity_compare);
+            for (i = 0; i < count; i ++) {
+                test_uint(*ecs_vec_get_t(&out, ecs_entity_t, i), expect[i]);
+            }
+        }
+    }
+
+    ecs_vec_fini_t(NULL, &out, ecs_entity_t);
+    ecs_os_free(shapes);
+    ecs_os_free(pos);
+    ecs_os_free(size);
+    ecs_os_free(expect);
+    ecs_fini(world);
+}

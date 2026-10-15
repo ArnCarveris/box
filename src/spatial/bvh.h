@@ -5,8 +5,9 @@
  * A binary tree whose nodes hold the boxes of both their children, so a walk tests two children
  * from one cache line; a child is a node or an item, so a node over two items is a leaf of two.
  *
- * Built top down with a surface area heuristic binned on all three axes, kept by inserting at
- * the cheapest sibling and by rotations on its path that lower the area most (Box2D v3).
+ * Built top down with SAH bins on all three axes. Inserts go to the cheapest sibling; ancestors
+ * take the rotation that lowers their area most (as Box2D v3 on create), else one that balances
+ * them at no cost in area, so boxes at one spot do not pile up. Coherent movers only balance.
  */
 
 #ifndef BOX_SPATIAL_BVH_H

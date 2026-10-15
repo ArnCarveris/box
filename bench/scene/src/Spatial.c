@@ -350,6 +350,7 @@ void Spatial_update_dynamic_100k_1pct(
     ecs_progress(world, 0);
     bench_spatial_manual(world);
     box_spatial_update(world);
+    float cost = box_bvh_cost(&box_spatial_of(world)->root->trees[1]);
     bench_set_items(b, 100000);
     while (bench_iter(b)) {
         bench_pause(b);
@@ -370,7 +371,7 @@ void Spatial_update_dynamic_100k_1pct(
 
     bench_counter(b, "moved_in_tree_per_frame", frame ? (double)moved / frame : 0);
     bench_counter(b, "rebound_per_frame", frame ? (double)rebound / frame : 0);
-    bench_counter(b, "sah_cost", box_bvh_cost(&box_spatial_of(world)->root->trees[1]));
+    bench_counter(b, "sah_cost", cost);
     ecs_os_free(shapes);
     ecs_fini(world);
 }
@@ -624,6 +625,76 @@ void Spatial_overlap_after_static_churn_100k(
     int32_t count = bench_spatial_overlap_100k(b, world);
     bench_counter(b, "results_per_query", (double)count / BENCH_QUERIES);
     bench_spatial_rebuilt_cost(b, world);
+    ecs_fini(world);
+}
+
+void Spatial_spawn_2k_at_one_spot(
+    bench_t *b)
+{
+    // spatial_perf/bvh_quality
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t *shapes = ecs_os_malloc_n(ecs_entity_t, 2000);
+    int32_t i;
+    bench_spatial_manual(world);
+    bench_set_items(b, 2000);
+    while (bench_iter(b)) {
+        for (i = 0; i < 2000; i ++) {
+            shapes[i] = ecs_new(world);
+            ecs_add(world, shapes[i], DynamicTransform);
+            ecs_set(world, shapes[i], Position, {5, 0, 5});
+            ecs_set(world, shapes[i], Box, {1, 1, 1});
+        }
+
+        ecs_progress(world, 0);
+        box_spatial_update(world);
+        for (i = 0; i < 2000; i ++) {
+            ecs_delete(world, shapes[i]);
+        }
+
+        box_spatial_update(world);
+    }
+
+    ecs_os_free(shapes);
+    ecs_fini(world);
+}
+
+void Spatial_update_dynamic_coincident_10k(
+    bench_t *b)
+{
+    // spatial_perf/bvh_quality
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t *shapes = ecs_os_malloc_n(ecs_entity_t, 10000);
+    box_spatial_stats_t stats = {0};
+    int32_t i, frame = 0, moved = 0;
+    for (i = 0; i < 10000; i ++) {
+        shapes[i] = ecs_new(world);
+        ecs_add(world, shapes[i], DynamicTransform);
+        ecs_set(world, shapes[i], Position, {0, 0, 0});
+        ecs_set(world, shapes[i], Box, {1, 1, 1});
+    }
+
+    ecs_progress(world, 0);
+    bench_spatial_manual(world);
+    box_spatial_update(world);
+    bench_set_items(b, 10000);
+    while (bench_iter(b)) {
+        bench_pause(b);
+        frame ++;
+        for (i = 0; i < 10000; i ++) {
+            ecs_get_mut(world, shapes[i], Position)->x += 0.1f;
+        }
+
+        ecs_progress(world, 0);
+        bench_resume(b);
+        box_spatial_update(world);
+        box_spatial_stats(world, &stats);
+        moved += stats.moved;
+    }
+
+    bench_counter(b, "moved_in_tree_per_frame", frame ? (double)moved / frame : 0);
+    ecs_os_free(shapes);
     ecs_fini(world);
 }
 
