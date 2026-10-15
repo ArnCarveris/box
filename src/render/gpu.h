@@ -331,13 +331,14 @@ typedef struct box_gpu_volume_uniforms_t {
     uint32_t size[4];               /**< Probes per axis, w is 1 when views sample the probes */
 } box_gpu_volume_uniforms_t;
 
-/** An irradiance probe volume: grid uniforms, SH of every probe and the validity mask */
+/** An irradiance probe volume: grid uniforms, two buffers with the SH of every probe, which
+ * the passes of a bake read and write in turn, and the validity mask */
 typedef struct box_gpu_volume_t {
     WGPUBuffer grid;                /**< box_gpu_volume_uniforms_t */
-    WGPUBuffer probes;              /**< BOX_RENDER_SH_COEFFICIENTS vec4 per probe */
+    WGPUBuffer probes[2];           /**< BOX_RENDER_SH_COEFFICIENTS vec4 per probe */
     WGPUBuffer valid;               /**< One bit per probe, set when views sample it */
     uint32_t count;                 /**< Probes of the volume */
-    WGPUBindGroup group;            /**< Binds the three buffers as group 3 of the forward pass */
+    WGPUBindGroup group[2];         /**< Binds the grid, a probe buffer and the mask as group 3 */
 } box_gpu_volume_t;
 
 /** The webgpu backend: device, shared objects and targets */

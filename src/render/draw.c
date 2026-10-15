@@ -174,6 +174,61 @@ done:
     return;
 }
 
+/** Remember the static entities whose transform input changed.
+ *
+ * The DynamicTransform filter runs in the callback, because a Not term on an inherited tag
+ * allocates for every event.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxDrawsOnStaticTransform(
+    ecs_iter_t *it)
+{
+    if (!box_transform_dynamic(it->world, it->table)) {
+        BoxDrawsOnTransform(it);
+    }
+}
+
+/** Remember the entities that gain or lose DynamicTransform, and as moved static entities
+ * the ones on the static side of the change that have a local transform.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxDrawsOnDynamicKind(
+    ecs_iter_t *it)
+{
+    const ecs_table_t *other = it->other_table;
+    BoxDrawsOnChange(it);
+    if (other && !box_transform_dynamic(it->world, other) &&
+        ecs_table_has_id(it->world, other, ecs_id(Position)) &&
+        !ecs_table_has_id(it->world, other, ManualTransform))
+    {
+        BoxDrawsOnTransform(it);
+    }
+}
+
+/** Remember the static entities whose WorldTransform was set, and the ManualTransform ones as
+ * roots of changed subtrees, since their static descendants follow them.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxDrawsOnStaticWorld(
+    ecs_iter_t *it)
+{
+    if (box_transform_dynamic(it->world, it->table)) {
+        goto done;
+    }
+
+    if (ecs_table_has_id(it->world, it->table, ManualTransform)) {
+        BoxDrawsOnMove(it);
+    } else {
+        BoxDrawsOnChange(it);
+    }
+
+done:
+    return;
+}
+
 /** Remember the entities whose parent changed as roots of changed subtrees, and make the 2D
  * draw order again.
  *
@@ -740,13 +795,10 @@ static void box_draws_observers(
     box_draws_material_observers(world, d);
     box_draws_observer(world, d, "DrawsOnDynamic", (ecs_observer_desc_t){
         .query.terms = {{ .id = DynamicTransform }},
-        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnChange);
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnDynamicKind);
     box_draws_observer(world, d, "DrawsOnWorldTransform", (ecs_observer_desc_t){
-        .query.terms = {
-            { .id = ecs_id(WorldTransform) },
-            { .id = DynamicTransform, .oper = EcsNot, .inout = EcsInOutFilter }
-        },
-        .events = { EcsOnSet } }, BoxDrawsOnChange);
+        .query.terms = {{ .id = ecs_id(WorldTransform) }},
+        .events = { EcsOnSet } }, BoxDrawsOnStaticWorld);
     box_draws_observer(world, d, "DrawsOnDynamicMaterial", (ecs_observer_desc_t){
         .query.terms = {{ .id = DynamicMaterial }},
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnMove);
@@ -792,10 +844,9 @@ static void box_draws_transform_observers(
         box_draws_observer(world, d, names[i], (ecs_observer_desc_t){
             .query.terms = {
                 { .id = components[i] },
-                { .id = DynamicTransform, .oper = EcsNot },
                 { .id = ManualTransform, .oper = EcsNot }
             },
-            .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnTransform);
+            .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnStaticTransform);
     }
 
     box_draws_observer(world, d, "DrawsOnPositionZ", (ecs_observer_desc_t){

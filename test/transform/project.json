@@ -665,7 +665,11 @@
                     "dynamic_parent_remove_scale_leaf",
                     "dynamic_parent_remove_position_mid",
                     "dynamic_parent_remove_position_mid_move_root",
-                    "dynamic_parent_remove_position_root"
+                    "dynamic_parent_remove_position_root",
+                    "static_childof_clear_parent",
+                    "static_parent_clear_parent",
+                    "dynamic_childof_clear_parent",
+                    "dynamic_parent_clear_parent"
                 ]
             },
             {
@@ -715,7 +719,12 @@
                     "manual_parent_static_child_composes",
                     "manual_parent_dynamic_child_composes",
                     "manual_parent_dynamic_child_follows_manual_change",
-                    "static_parent_manual_child_static_grandchild_composes"
+                    "static_parent_manual_child_static_grandchild_composes",
+                    "manual_childof_static_child_follows_manual_change",
+                    "manual_parent_static_child_follows_manual_change",
+                    "manual_childof_static_child_follows_modified",
+                    "manual_childof_static_child_follows_last_of_two_writes",
+                    "manual_childof_static_child_follows_write_every_frame"
                 ]
             },
             {
@@ -857,6 +866,23 @@
                     "static_100k_add_manual",
                     "static_100k_add_velocity",
                     "static_100k_shapes_add_dynamic_velocity"
+                ]
+            },
+            {
+                "id": "DynamicInherit",
+                "testcases": [
+                    "childof_velocity_child_keeps_moving",
+                    "parent_velocity_child_keeps_moving",
+                    "childof_angular_velocity_child_keeps_rotating",
+                    "childof_tagged_child_stays_dynamic",
+                    "parent_tagged_child_stays_dynamic",
+                    "childof_inherited_child_becomes_static",
+                    "childof_velocity_grandchild_under_inherited_child",
+                    "childof_child_regains_tag_from_new_dynamic_parent",
+                    "childof_child_tagged_after_parenting_stays_dynamic",
+                    "parent_child_tagged_after_parenting_stays_dynamic",
+                    "childof_child_tagged_after_progress_stays_dynamic",
+                    "script_tagged_child_stays_dynamic"
                 ]
             }
         ]

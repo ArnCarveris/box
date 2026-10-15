@@ -7,7 +7,8 @@
 
 /** Entities whose static transform must be recomputed this frame */
 typedef struct {
-    ecs_vec_t value; /**< Vector of ecs_entity_t */
+    ecs_vec_t value;  /**< Vector of ecs_entity_t */
+    ecs_vec_t manual; /**< ManualTransform entities whose WorldTransform was set */
 } TransformStaticDirtyEntities;
 
 static void transformTree(
@@ -24,16 +25,19 @@ static void TransformStaticDirtyEntities_free(
     TransformStaticDirtyEntities *ptr)
 {
     ecs_vec_fini_t(NULL, &ptr->value, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &ptr->manual, ecs_entity_t);
 }
 
 ECS_CTOR(TransformStaticDirtyEntities, ptr, {
     ecs_vec_init_t(NULL, &ptr->value, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &ptr->manual, ecs_entity_t, 0);
 })
 
 ECS_MOVE(TransformStaticDirtyEntities, dst, src, {
     TransformStaticDirtyEntities_free(dst);
     *dst = *src;
     ecs_vec_init_t(NULL, &src->value, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &src->manual, ecs_entity_t, 0);
 })
 
 ECS_DTOR(TransformStaticDirtyEntities, ptr, {
@@ -42,18 +46,61 @@ ECS_DTOR(TransformStaticDirtyEntities, ptr, {
 
 ECS_COMPONENT_DECLARE(TransformStaticDirtyEntities);
 
-/** Add entities with a changed transform input to the dirty list.
+/** Add the entities of an observer event to the dirty list.
+ *
+ * @param it The observer iterator
+ * @param add Whether to add the entities
+ */
+static void transformStaticDirty(
+    ecs_iter_t *it,
+    bool add)
+{
+    TransformStaticDirtyEntities *dirty = add ?
+        ecs_singleton_get_mut(it->world, TransformStaticDirtyEntities) : NULL;
+    if (dirty) {
+        for (int i = 0; i < it->count; i ++) {
+            ecs_vec_append_t(NULL, &dirty->value, ecs_entity_t)[0] = it->entities[i];
+        }
+    }
+}
+
+/** Add entities with a changed transform input to the dirty list, unless they are dynamic.
+ *
+ * The DynamicTransform filter runs in the callback, because a Not term on an inherited tag
+ * allocates for every event.
  *
  * @param it The observer iterator
  */
 static void TransformStatic_OnChange(
     ecs_iter_t *it)
 {
-    TransformStaticDirtyEntities *dirty = ecs_singleton_get_mut(
-        it->world, TransformStaticDirtyEntities);
+    transformStaticDirty(it,
+        !transformDeleting(it) && !box_transform_dynamic(it->world, it->table));
+}
+
+/** Add entities that stop being dynamic to the dirty list.
+ *
+ * @param it The observer iterator
+ */
+static void TransformStatic_OnStatic(
+    ecs_iter_t *it)
+{
+    transformStaticDirty(it,
+        !transformDeleting(it) && !box_transform_dynamic(it->world, it->other_table));
+}
+
+/** Add ManualTransform entities whose WorldTransform was set to the manual list.
+ *
+ * @param it The observer iterator
+ */
+static void TransformStatic_OnManual(
+    ecs_iter_t *it)
+{
+    TransformStaticDirtyEntities *dirty = box_transform_dynamic(it->world, it->table) ? NULL :
+        ecs_singleton_get_mut(it->world, TransformStaticDirtyEntities);
     if (dirty) {
         for (int i = 0; i < it->count; i ++) {
-            ecs_vec_append_t(NULL, &dirty->value, ecs_entity_t)[0] = it->entities[i];
+            ecs_vec_append_t(NULL, &dirty->manual, ecs_entity_t)[0] = it->entities[i];
         }
     }
 }
@@ -65,7 +112,9 @@ static void TransformStatic_OnChange(
 static void Transform_OnRemovePosition(
     ecs_iter_t *it)
 {
-    for (int i = 0; i < it->count; i ++) {
+    int count = transformDeleting(it) ? 0 : it->count;
+
+    for (int i = 0; i < count; i ++) {
         ecs_remove(it->stage, it->entities[i], WorldTransform);
         ecs_remove(it->stage, it->entities[i], WorldTransformVersion);
     }
@@ -178,6 +227,9 @@ static void transformTree(
 
 /** Transform a dirty entity and its children if not yet done this frame.
  *
+ * A ManualTransform entity keeps the world transform the application wrote; only its
+ * children are recomputed from it.
+ *
  * @param world The world
  * @param e The dirty entity
  * @param version The transform version of the current frame
@@ -188,8 +240,16 @@ static void transformRoot(
     uint64_t version)
 {
     WorldTransformVersion *v = NULL;
-    bool skip = !ecs_is_alive(world, e) || ecs_has(world, e, ManualTransform) ||
-        ecs_has(world, e, DynamicTransform);
+    bool skip = !ecs_is_alive(world, e) || ecs_has(world, e, DynamicTransform);
+
+    if (!skip && ecs_has(world, e, ManualTransform)) {
+        const WorldTransform *t = ecs_get(world, e, WorldTransform);
+        if (t) {
+            transformTree(world, e, t, version);
+        }
+
+        skip = true;
+    }
 
     if (!skip) {
         v = ecs_get_mut(world, e, WorldTransformVersion);
@@ -216,7 +276,23 @@ static void transformRoot(
     }
 }
 
-/** Transform all entities in the dirty list and clear the list.
+/** Order entity ids for qsort.
+ *
+ * @param a The first entity
+ * @param b The second entity
+ * @return Negative, zero or positive as a is below, equal to or above b
+ */
+static int transformCompareEntity(
+    const void *a,
+    const void *b)
+{
+    ecs_entity_t ea = *(const ecs_entity_t*)a, eb = *(const ecs_entity_t*)b;
+
+    return (ea > eb) - (ea < eb);
+}
+
+/** Transform all entities in the dirty list, then the subtrees of the manual list once per
+ * entity, and clear both lists.
  *
  * @param it The system iterator
  */
@@ -235,7 +311,20 @@ static void TransformStatic(
         transformRoot(it->world, entities[i], version);
     }
 
+    count = ecs_vec_count(&dirty->manual);
+    entities = ecs_vec_first(&dirty->manual);
+    if (count > 1) {
+        qsort(entities, (size_t)count, sizeof(ecs_entity_t), transformCompareEntity);
+    }
+
+    for (i = 0; i < count; i ++) {
+        if (!i || entities[i] != entities[i - 1]) {
+            transformRoot(it->world, entities[i], version);
+        }
+    }
+
     ecs_vec_clear(&dirty->value);
+    ecs_vec_clear(&dirty->manual);
 }
 
 void TransformStaticImport(
@@ -255,7 +344,6 @@ void TransformStaticImport(
         .entity = ecs_entity(world, { .name = "TransformStatic_OnPosition" }),
         .query.terms = {
             { .id = ecs_id(Position), .src.id = EcsSelf },
-            { .id = DynamicTransform, .oper = EcsNot },
             { .id = ManualTransform, .oper = EcsNot }
         },
         .events = { EcsOnSet, EcsOnRemove },
@@ -266,7 +354,6 @@ void TransformStaticImport(
         .entity = ecs_entity(world, { .name = "TransformStatic_OnRotation" }),
         .query.terms = {
             { .id = ecs_id(Rotation), .src.id = EcsSelf },
-            { .id = DynamicTransform, .oper = EcsNot },
             { .id = ManualTransform, .oper = EcsNot }
         },
         .events = { EcsOnSet, EcsOnRemove },
@@ -277,11 +364,27 @@ void TransformStaticImport(
         .entity = ecs_entity(world, { .name = "TransformStatic_OnScale" }),
         .query.terms = {
             { .id = ecs_id(Scale), .src.id = EcsSelf },
-            { .id = DynamicTransform, .oper = EcsNot },
             { .id = ManualTransform, .oper = EcsNot }
         },
         .events = { EcsOnSet, EcsOnRemove },
         .callback = TransformStatic_OnChange
+    });
+
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "TransformStatic_OnManual" }),
+        .query.terms = {
+            { .id = ecs_id(WorldTransform), .src.id = EcsSelf },
+            { .id = ManualTransform, .inout = EcsInOutFilter }
+        },
+        .events = { EcsOnSet },
+        .callback = TransformStatic_OnManual
+    });
+
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "TransformStatic_OnStatic" }),
+        .query.terms = {{ .id = DynamicTransform }},
+        .events = { EcsOnRemove },
+        .callback = TransformStatic_OnStatic
     });
 
     ecs_observer(world, {
@@ -298,7 +401,6 @@ void TransformStaticImport(
         .entity = ecs_entity(world, { .name = "TransformStatic_OnChildOf" }),
         .query.terms = {
             { .id = ecs_pair(EcsChildOf, EcsWildcard), .src.id = EcsSelf },
-            { .id = DynamicTransform, .oper = EcsNot },
             { .id = ManualTransform, .oper = EcsNot }
         },
         .events = { EcsOnAdd, EcsOnRemove },
@@ -309,7 +411,6 @@ void TransformStaticImport(
         .entity = ecs_entity(world, { .name = "TransformStatic_OnParent" }),
         .query.terms = {
             { .id = ecs_id(EcsParent), .src.id = EcsSelf },
-            { .id = DynamicTransform, .oper = EcsNot },
             { .id = ManualTransform, .oper = EcsNot }
         },
         .events = { EcsOnSet, EcsOnRemove },

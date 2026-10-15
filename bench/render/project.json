@@ -89,7 +89,8 @@
                 "benchcases": [
                     "none",
                     "unbaked",
-                    "converged"
+                    "converged",
+                    "converged_bounces"
                 ]
             },
             {

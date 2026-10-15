@@ -6,8 +6,9 @@
  * says; probes inside a static shape are invalid. Probes start as the SH of the hemisphere
  * ambient of the scene, so a view that samples them looks as it did with the hemisphere.
  *
- * Every frame the unbaked probes nearest to the cameras go into the packet as captures, as many
- * as budget_ms allows at the measured GPU time per probe; a headless run captures them all.
+ * Captures of the nearest unbaked probes go into each packet as budget_ms allows, all of them
+ * in a headless run, for bounces + 1 passes, each shading with the probes of the previous one.
+ * Views keep the probe buffer of the last complete pass while the next writes the other one.
  */
 
 #include "render.h"
@@ -36,17 +37,19 @@
 /** Error of a LightBake whose capture_size is out of range */
 #define BOX_BAKE_SIZE_ERROR "capture_size must be 1 to 256"
 
-/** Where a probe of the pass of a volume is */
-typedef enum box_bake_probe_state_t {
-    BOX_BAKE_OUTSIDE,       /**< Inside static geometry, it is not captured */
-    BOX_BAKE_QUEUED,        /**< Waiting for its capture */
-    BOX_BAKE_FLIGHT,        /**< In a packet, not reported captured yet */
-    BOX_BAKE_DONE           /**< The backend reported it captured */
-} box_bake_probe_state_t;
+/** Bounces a bake may have at most, as the range of Godot's LightmapGI */
+#define BOX_BAKE_BOUNCES_MAX (16)
+
+/** Error of a LightBake whose bounces is out of range */
+#define BOX_BAKE_BOUNCES_ERROR "bounces must be 0 to 16"
+
+/** Passes of a bake at most, the first one and one per bounce */
+#define BOX_BAKE_PASSES_MAX (BOX_BAKE_BOUNCES_MAX + 1)
 
 /** A probe in a packet whose capture the backend has not reported yet */
 typedef struct box_bake_flight_t {
     uint32_t probe;         /**< Index of the probe */
+    int32_t pass;           /**< Pass of the capture */
     int32_t packet;         /**< Number of the packet, as RenderStatus.submitted after it */
 } box_bake_flight_t;
 
@@ -79,7 +82,7 @@ typedef struct box_bake_volume_t {
     bool seen;              /**< A LightBake of the scene exists in this frame */
     bool sent;              /**< The backend has the volume with this grid */
     bool viewed;            /**< A view of the scene is in the packet of this frame */
-    bool converged;         /**< The backend reported every valid probe of the pass captured */
+    bool converged;         /**< The backend reported every pass of every valid probe */
     bool pending;           /**< The bake can progress this frame and has not converged */
     bool resort;            /**< The queue is sorted again before the next probes are taken */
     float sh[BOX_RENDER_SH_COEFFICIENTS][4]; /**< Irradiance the probes are filled with */
@@ -87,7 +90,7 @@ typedef struct box_bake_volume_t {
     ecs_vec_t valid;        /**< uint32_t, one bit per probe outside static geometry */
     ecs_vec_t queue;        /**< uint32_t, probes waiting for capture, the nearest last */
     ecs_vec_t flight;       /**< box_bake_flight_t, probes in packets not reported captured */
-    ecs_vec_t state;        /**< uint8_t box_bake_probe_state_t of every probe */
+    ecs_vec_t done;         /**< uint8_t, passes the backend reported for every probe */
     ecs_vec_t cameras;      /**< vec3, cameras of the views of the scene in this frame */
     ecs_vec_t sorted;       /**< vec3, cameras the queue was sorted for */
     box_render_view_lights_t lights; /**< Lights of the first view of the scene in this frame */
@@ -95,8 +98,16 @@ typedef struct box_bake_volume_t {
     vec3 max;               /**< Maximum corner of the static bounds of the grid */
     int32_t capture_size;   /**< LightBake.capture_size of this frame */
     float budget_ms;        /**< LightBake.budget_ms of this frame */
-    uint32_t generation;    /**< Number of the pass, so captures of an earlier one are ignored */
-    int32_t baked;          /**< Probes of the pass the backend reported captured */
+    int32_t bounces;        /**< LightBake.bounces of this frame */
+    uint32_t generation;    /**< Number of the bake, so captures of an earlier one are ignored */
+    int32_t passes;         /**< Passes of the bake, one more than its bounces */
+    int32_t submitted;      /**< Passes whose every probe went into a packet */
+    int32_t completed;      /**< Passes the backend reported for every valid probe */
+    int32_t valid_count;    /**< Probes outside static geometry, captured by every pass */
+    int32_t reported[BOX_BAKE_PASSES_MAX]; /**< Probes the backend reported per pass */
+    int32_t first;          /**< Probe buffer the first pass writes, later passes alternate */
+    int32_t display;        /**< Probe buffer the views sample */
+    bool filled;            /**< The buffer the views sample holds the ambient, no pass */
     const char *error;      /**< Why the volume bakes nothing, NULL for none */
 } box_bake_volume_t;
 
@@ -158,7 +169,7 @@ static box_bake_volume_t* box_bake_ensure(
         ecs_vec_init_t(NULL, &result->valid, uint32_t, 0);
         ecs_vec_init_t(NULL, &result->queue, uint32_t, 0);
         ecs_vec_init_t(NULL, &result->flight, box_bake_flight_t, 0);
-        ecs_vec_init_t(NULL, &result->state, uint8_t, 0);
+        ecs_vec_init_t(NULL, &result->done, uint8_t, 0);
         ecs_vec_init_t(NULL, &result->cameras, vec3, 0);
         ecs_vec_init_t(NULL, &result->sorted, vec3, 0);
     }
@@ -341,7 +352,9 @@ static void box_bake_status(
     const LightBakeStatus *status = v->entity && ecs_is_alive(it->world, v->entity)
         ? ecs_get(it->world, v->entity, LightBakeStatus)
         : NULL;
-    int32_t pass = v->probes ? 1 : 0;
+    int32_t pass = v->completed;
+    int32_t current = v->completed < v->passes ? v->completed : v->passes - 1;
+    int32_t baked = current >= 0 ? v->reported[current] : 0;
     if (!status) {
         goto done;
     }
@@ -349,12 +362,12 @@ static void box_bake_status(
     bool same_error = v->error
         ? status->error && !strcmp(status->error, v->error)
         : !status->error;
-    if (status->probes != v->probes || status->baked != v->baked || status->pass != pass ||
+    if (status->probes != v->probes || status->baked != baked || status->pass != pass ||
         status->converged != v->converged || !same_error)
     {
         LightBakeStatus value = *status;
         value.probes = v->probes;
-        value.baked = v->baked;
+        value.baked = baked;
         value.pass = pass;
         value.converged = v->converged;
         value.error = ECS_CONST_CAST(char*, v->error);
@@ -365,44 +378,63 @@ done:
     return;
 }
 
-/** Forget the pass of a volume: no probe is queued, in flight or baked.
+/** Forget the bake of a volume: no probe is queued, in flight or baked.
+ *
+ * The passes follow the bounces of this frame; bounces out of range bake one pass, which its
+ * error keeps from starting.
  *
  * @param v The volume
  */
 static void box_bake_clear(
     box_bake_volume_t *v)
 {
+    bool bounces = v->bounces >= 0 && v->bounces <= BOX_BAKE_BOUNCES_MAX;
     ecs_vec_clear(&v->queue);
     ecs_vec_clear(&v->flight);
-    ecs_vec_set_count_t(NULL, &v->state, uint8_t, v->probes);
+    ecs_vec_set_count_t(NULL, &v->done, uint8_t, v->probes);
     if (v->probes) {
-        ecs_os_memset(ecs_vec_first(&v->state), BOX_BAKE_OUTSIDE, v->probes);
+        ecs_os_memset(ecs_vec_first(&v->done), 0, v->probes);
     }
 
-    v->baked = 0;
+    ecs_os_memset(v->reported, 0, ECS_SIZEOF(v->reported));
+    v->passes = bounces ? v->bounces + 1 : 1;
+    v->submitted = 0;
+    v->completed = 0;
+    v->valid_count = 0;
     v->converged = false;
+    v->first = v->filled ? v->display : 1 - v->display;
     v->generation ++;
 }
 
-/** Start the pass of a volume again: every valid probe waits for its capture.
+/** Queue every valid probe of a volume for the captures of the next pass.
+ *
+ * @param v The volume
+ */
+static void box_bake_queue(
+    box_bake_volume_t *v)
+{
+    const uint32_t *valid = ecs_vec_first(&v->valid);
+    int32_t i;
+    ecs_vec_clear(&v->queue);
+    for (i = 0; valid && i < v->probes; i ++) {
+        if ((valid[i >> 5] >> (i & 31)) & 1u) {
+            *ecs_vec_append_t(NULL, &v->queue, uint32_t) = (uint32_t)i;
+        }
+    }
+
+    v->valid_count = ecs_vec_count(&v->queue);
+    v->resort = true;
+}
+
+/** Start the bake of a volume again from its first pass.
  *
  * @param v The volume
  */
 static void box_bake_restart(
     box_bake_volume_t *v)
 {
-    const uint32_t *valid = ecs_vec_first(&v->valid);
-    int32_t i;
     box_bake_clear(v);
-    uint8_t *state = ecs_vec_first(&v->state);
-    for (i = 0; valid && i < v->probes; i ++) {
-        if ((valid[i >> 5] >> (i & 31)) & 1u) {
-            *ecs_vec_append_t(NULL, &v->queue, uint32_t) = (uint32_t)i;
-            state[i] = BOX_BAKE_QUEUED;
-        }
-    }
-
-    v->resort = true;
+    box_bake_queue(v);
 }
 
 /** Get a volume handle.
@@ -591,6 +623,8 @@ static void box_bake_send(
     }
 
     v->sent = true;
+    v->filled = true;
+    v->display = 0;
     box_bake_restart(v);
 done:
     return;
@@ -606,7 +640,7 @@ static void box_bake_volume_fini(
     ecs_vec_fini_t(NULL, &v->valid, uint32_t);
     ecs_vec_fini_t(NULL, &v->queue, uint32_t);
     ecs_vec_fini_t(NULL, &v->flight, box_bake_flight_t);
-    ecs_vec_fini_t(NULL, &v->state, uint8_t);
+    ecs_vec_fini_t(NULL, &v->done, uint8_t);
     ecs_vec_fini_t(NULL, &v->cameras, vec3);
     ecs_vec_fini_t(NULL, &v->sorted, vec3);
 }
@@ -766,15 +800,13 @@ static void box_bake_pick(
 {
     int32_t i, n = ecs_vec_count(&v->queue);
     uint32_t *queue = ecs_vec_first(&v->queue);
-    uint8_t *state = ecs_vec_first(&v->state);
     for (i = n - 1; i >= n - count; i --) {
         box_render_probe_capture_t *out = ecs_vec_append_t(
             NULL, &p->probes, box_render_probe_capture_t);
         out->index = queue[i];
         box_bake_probe_position(v, queue[i], out->position);
-        state[queue[i]] = BOX_BAKE_FLIGHT;
         *ecs_vec_append_t(NULL, &v->flight, box_bake_flight_t) = (box_bake_flight_t){
-            .probe = queue[i], .packet = packet
+            .probe = queue[i], .pass = v->submitted, .packet = packet
         };
     }
 
@@ -809,15 +841,48 @@ static const char* box_bake_error(
     const box_bake_volume_t *v)
 {
     bool size = v->capture_size >= 1 && v->capture_size <= BOX_BAKE_SIZE_MAX;
+    bool bounces = v->bounces >= 0 && v->bounces <= BOX_BAKE_BOUNCES_MAX;
 
-    return size ? NULL : BOX_BAKE_SIZE_ERROR;
+    return !size ? BOX_BAKE_SIZE_ERROR : !bounces ? BOX_BAKE_BOUNCES_ERROR : NULL;
+}
+
+/** Add a batch of captures of the pass of a volume whose probes are queued to the packet.
+ *
+ * @param p The packet
+ * @param v The volume
+ * @param count Probes to take from the end of the queue
+ * @param packet Number of the packet, as RenderStatus.submitted after it
+ */
+static void box_bake_batch(
+    box_render_packet_t *p,
+    box_bake_volume_t *v,
+    int32_t count,
+    int32_t packet)
+{
+    int32_t pass = v->submitted;
+    box_render_bake_batch_t *batch = ecs_vec_append_t(NULL, &p->bakes, box_render_bake_batch_t);
+    ecs_os_memset_t(batch, 0, box_render_bake_batch_t);
+    batch->volume = v->handle;
+    batch->generation = v->generation;
+    batch->pass = pass;
+    batch->source = pass ? v->first ^ ((pass - 1) & 1) : BOX_RENDER_BAKE_BLACK;
+    batch->target = v->first ^ (pass & 1);
+    batch->scene = v->scene;
+    batch->size = v->capture_size;
+    batch->lights = v->lights;
+    batch->lights.enabled = true;
+    glm_vec3_copy(v->min, batch->bounds_min);
+    glm_vec3_copy(v->max, batch->bounds_max);
+    batch->first = ecs_vec_count(&p->probes);
+    batch->count = count;
+    box_bake_pick(v, count, p, packet);
 }
 
 /** Add the next captures of a volume to the packet.
  *
- * Nothing is captured with an invalid capture_size, without a budget, without probes left,
- * without a view of the scene in the packet or without the GPU backend. A headless run
- * captures every probe left.
+ * Once every probe of a pass is in a packet the views sample its buffer, which the captures
+ * fill before the targets draw, and the probes queue for the next pass. A headless run captures
+ * every pass left in one packet, each reading the buffer the batch before it wrote.
  *
  * @param b The state
  * @param p The packet
@@ -832,32 +897,33 @@ static void box_bake_schedule(
     bool headless,
     int32_t packet)
 {
-    int32_t left = ecs_vec_count(&v->queue);
-    if (!left) {
-        goto done;
-    }
+    int32_t budget = headless ? INT32_MAX : box_bake_budget(b, v);
+    bool more = true;
+    while (more && budget > 0 && v->submitted < v->passes) {
+        int32_t left = ecs_vec_count(&v->queue);
+        int32_t count = budget < left ? budget : left;
+        if (count < left) {
+            box_bake_sort(b, v);
+        }
 
-    int32_t count = headless ? left : box_bake_budget(b, v);
-    count = count < left ? count : left;
-    if (count < left) {
-        box_bake_sort(b, v);
-    }
+        if (count) {
+            box_bake_batch(p, v, count, packet);
+            budget -= count;
+        }
 
-    box_render_bake_batch_t *batch = ecs_vec_append_t(NULL, &p->bakes, box_render_bake_batch_t);
-    ecs_os_memset_t(batch, 0, box_render_bake_batch_t);
-    batch->volume = v->handle;
-    batch->generation = v->generation;
-    batch->scene = v->scene;
-    batch->size = v->capture_size;
-    batch->lights = v->lights;
-    batch->lights.enabled = true;
-    glm_vec3_copy(v->min, batch->bounds_min);
-    glm_vec3_copy(v->max, batch->bounds_max);
-    batch->first = ecs_vec_count(&p->probes);
-    batch->count = count;
-    box_bake_pick(v, count, p, packet);
-done:
-    return;
+        more = false;
+        if (count == left) {
+            v->display = v->first ^ (v->submitted & 1);
+            v->filled = false;
+            v->submitted ++;
+            ecs_vec_clear(&v->queue);
+            if (v->submitted < v->passes) {
+                box_bake_queue(v);
+            }
+
+            more = headless;
+        }
+    }
 }
 
 /** Mark the probes the backend reported captured as baked.
@@ -880,15 +946,15 @@ static void box_bake_captured(
         }
 
         if (!v || v->handle != r->volume || v->generation != r->generation ||
-            r->probe >= (uint32_t)v->probes)
+            r->probe >= (uint32_t)v->probes || r->pass < 0 || r->pass >= v->passes)
         {
             continue;
         }
 
-        uint8_t *state = ecs_vec_get_t(&v->state, uint8_t, (int32_t)r->probe);
-        if (*state == BOX_BAKE_FLIGHT) {
-            *state = BOX_BAKE_DONE;
-            v->baked ++;
+        uint8_t *done = ecs_vec_get_t(&v->done, uint8_t, (int32_t)r->probe);
+        if (*done == r->pass) {
+            (*done) ++;
+            v->reported[r->pass] ++;
         }
     }
 }
@@ -896,8 +962,9 @@ static void box_bake_captured(
 /** Queue the probes of the rendered packets of a volume again that the backend did not
  * capture, and forget the probes it reported.
  *
- * Probes are reported while their packet renders, before it is released, so a probe of a
- * released packet that is still in flight was skipped or its packet was dropped.
+ * A probe of a released packet that was not reported was skipped or its packet dropped. It goes
+ * back to the queue of its pass, or, when the next pass or the views already read that pass,
+ * the bake starts again.
  *
  * @param v The volume
  * @param rendered Packets the backend released, as RenderStatus.rendered
@@ -908,22 +975,47 @@ static void box_bake_requeue(
 {
     int32_t i, kept = 0, count = ecs_vec_count(&v->flight);
     box_bake_flight_t *flight = ecs_vec_first(&v->flight);
-    uint8_t *state = ecs_vec_first(&v->state);
+    const uint8_t *done = ecs_vec_first(&v->done);
+    bool restart = false;
     for (i = 0; i < count; i ++) {
-        if (state[flight[i].probe] != BOX_BAKE_FLIGHT) {
+        if (done[flight[i].probe] > flight[i].pass) {
             continue;
         }
 
-        if (flight[i].packet <= rendered) {
-            state[flight[i].probe] = BOX_BAKE_QUEUED;
+        if (flight[i].packet > rendered) {
+            flight[kept ++] = flight[i];
+        } else if (flight[i].pass == v->submitted) {
             *ecs_vec_append_t(NULL, &v->queue, uint32_t) = flight[i].probe;
             v->resort = true;
         } else {
-            flight[kept ++] = flight[i];
+            restart = true;
         }
     }
 
     ecs_vec_set_count_t(NULL, &v->flight, box_bake_flight_t, kept);
+    if (restart) {
+        box_bake_restart(v);
+    }
+}
+
+/** Count the passes of a volume the backend reported for every valid probe.
+ *
+ * @param v The volume
+ * @return Probe captures of every pass of the bake not reported yet
+ */
+static int32_t box_bake_complete(
+    box_bake_volume_t *v)
+{
+    int32_t i, result = 0;
+    while (v->completed < v->submitted && v->reported[v->completed] >= v->valid_count) {
+        v->completed ++;
+    }
+
+    for (i = 0; i < v->passes; i ++) {
+        result += v->valid_count - v->reported[i];
+    }
+
+    return result;
 }
 
 /** Take the GPU time of the captures the backend measured into the time per probe.
@@ -973,17 +1065,36 @@ static void box_bake_progress(
     for (i = 0; i < ecs_vec_count(&b->volumes); i ++) {
         box_bake_volume_t *v = ecs_vec_get_t(&b->volumes, box_bake_volume_t, i);
         box_bake_requeue(v, rendered);
+        box_bake_complete(v);
         v->error = box_bake_error(v);
-        v->converged = v->sent && v->probes && !ecs_vec_count(&v->queue) &&
-            !ecs_vec_count(&v->flight);
+        v->converged = v->sent && v->probes && v->completed == v->passes;
         v->pending = gpu && v->handle && v->sent && v->viewed && !v->error &&
             v->budget_ms > 0 && !v->converged;
         if (v->pending) {
             box_bake_schedule(b, p, v, app && app->headless, packet);
-            b->pending += ecs_vec_count(&v->queue) + ecs_vec_count(&v->flight);
+            b->pending += box_bake_complete(v);
         }
 
         box_bake_status(it, v);
+    }
+}
+
+/** Point the views of the packet that sample a volume at the probe buffer it shows.
+ *
+ * @param b The state
+ * @param p The packet
+ */
+static void box_bake_display(
+    const box_render_bake_t *b,
+    box_render_packet_t *p)
+{
+    int32_t i, count = ecs_vec_count(&p->views);
+    for (i = 0; i < count; i ++) {
+        box_render_view_t *rv = ecs_vec_get_t(&p->views, box_render_view_t, i);
+        const box_bake_volume_t *v = rv->volume ? box_bake_find(b, rv->scene) : NULL;
+        if (v) {
+            rv->volume_buffer = (uint32_t)v->display;
+        }
     }
 }
 
@@ -1032,6 +1143,11 @@ static void BoxRenderExtractBake(
             v->entity = qit.entities[row];
             v->capture_size = bakes[row].capture_size;
             v->budget_ms = bakes[row].budget_ms;
+            if (v->bounces != bakes[row].bounces) {
+                v->bounces = bakes[row].bounces;
+                box_bake_restart(v);
+            }
+
             if (!v->placed || changed || v->probe_spacing != bakes[row].probe_spacing ||
                 v->bounds_padding != bakes[row].bounds_padding)
             {
@@ -1052,6 +1168,7 @@ static void BoxRenderExtractBake(
     }
 
     box_bake_progress(it, b, p);
+    box_bake_display(b, p);
 }
 
 /** Free the state of the bake extract.
