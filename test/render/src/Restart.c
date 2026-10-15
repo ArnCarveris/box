@@ -71,14 +71,19 @@ void Restart_main_thread_toggle_keeps_scene(void) {
     char *path = flecs_asprintf("%s/restart.png", tmp);
     unsigned char *first = NULL;
     int32_t run, lit = 0;
-    for (run = 0; run < 3; run ++) {
+    for (run = 0; run < 5; run ++) {
+        bool main_thread = run % 2 == 1;
         remove(path);
         RenderSettings *settings = ecs_singleton_get_mut(world, RenderSettings);
-        settings->main_thread = run == 1;
+        settings->main_thread = main_thread;
         ecs_singleton_modified(world, RenderSettings);
         ecs_progress(world, 0);
-        ecs_progress(world, 0);
+        if (!run) {
+            ecs_progress(world, 0);
+        }
+
         box_render_sync(world);
+        test_bool(ecs_singleton_get(world, RenderStatus)->threaded, !main_thread);
 
         int w = 0, h = 0, n = 0, wrong = 0;
         unsigned char *img = stbi_load(path, &w, &h, &n, 4);

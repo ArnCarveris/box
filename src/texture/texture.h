@@ -29,7 +29,8 @@ typedef struct box_texture_t {
     ecs_entity_t entity;    /**< The texture entity */
     uint32_t generation;    /**< Bumped by every load request, older results are dropped */
     uint32_t handle;        /**< Backend handle, 0 before the first image was sent */
-    uint8_t *pixels;        /**< RGBA8 rows of an image the backend does not have yet */
+    uint8_t *pixels;        /**< RGBA8 rows of the image, kept after it was sent so a restarted
+                             *   backend gets it again in its first packet */
     int32_t width;          /**< Width of the current image */
     int32_t height;         /**< Height of the current image */
     bool loaded;            /**< A load succeeded, so the backend should have an image */
