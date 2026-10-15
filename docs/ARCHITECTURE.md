@@ -213,7 +213,9 @@ on an inheriting instance returns NULL), and instances lose the mesh when the pr
 is deleted. The other shapes are copied into instances. A mesh is sent once per backend as a
 resource create. Shapes live in persistent batches keyed by scene, mesh, pipeline (shader,
 blend, back face, textures) and whether they are dynamic; removed slots are filled with the last
-one. An instance is 128 bytes (model matrix with scale, normal data, color, emissive,
+one. The backend creates a forward pipeline per shader, color format, blend and back face on
+first use in a map without a limit, emptied when the mesh or 2D shape shader recompiles. An
+instance is 128 bytes (model matrix with scale, normal data, color, emissive,
 metallic/roughness, UV transform).
 
 Observers on shape, material, hierarchy and scene components and `box_transform_on_moved` queue

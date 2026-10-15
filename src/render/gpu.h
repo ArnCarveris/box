@@ -64,9 +64,6 @@ typedef struct box_gpu_effects_t box_gpu_effects_t;
 /** Textures, pipelines and timing of the probe captures */
 typedef struct box_gpu_bake_t box_gpu_bake_t;
 
-/** Forward pipelines by color format, blend mode and back face mode, at most */
-#define BOX_GPU_FORWARD_PIPELINES (64)
-
 /** A surface on the GPU: the image it presents and the image views render into */
 typedef struct box_gpu_target_t {
     uint32_t handle;                /**< Handle the main thread assigned */
@@ -316,15 +313,6 @@ typedef struct box_gpu_blit_t {
     WGPURenderPipeline pipeline;    /**< The pipeline */
 } box_gpu_blit_t;
 
-/** Pipeline of the forward pass for one shader, color format, blend mode and back face mode */
-typedef struct box_gpu_forward_t {
-    uint32_t shader;                /**< Shader handle, the mesh or the 2D shape shader */
-    WGPUTextureFormat format;       /**< Format of the color target */
-    uint32_t blend;                 /**< BlendMode */
-    uint32_t back_face;             /**< BackFaceMode */
-    WGPURenderPipeline pipeline;    /**< The pipeline */
-} box_gpu_forward_t;
-
 /** Uniforms of a probe volume, as in Volume of etc/shaders/mesh.wgsl */
 typedef struct box_gpu_volume_uniforms_t {
     float origin[4];                /**< First probe, w is the spacing */
@@ -365,8 +353,7 @@ typedef struct box_gpu_t {
     WGPUBindGroupLayout volume_layout; /**< Binds the probe volume a view samples */
     ecs_map_t volumes;              /**< Handle to box_gpu_volume_t */
     box_gpu_volume_t *no_volume;    /**< 1x1x1 volume of the views that use the hemisphere */
-    box_gpu_forward_t forward[BOX_GPU_FORWARD_PIPELINES]; /**< Forward pipelines */
-    int32_t forward_count;          /**< Forward pipelines created */
+    ecs_map_t forward;              /**< Forward pipeline by shader, format, blend, back face */
     WGPUBuffer view_buffer;         /**< Uniforms of the views of a target */
     int32_t view_capacity;          /**< Views the view buffer holds */
     WGPUBindGroupLayout cluster_layout; /**< Bind group layout of the cluster pass */

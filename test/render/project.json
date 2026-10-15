@@ -450,6 +450,12 @@
                 "testcases": [
                     "failed_recompile_keeps_module"
                 ]
+            },
+            {
+                "id": "PipelineCache",
+                "testcases": [
+                    "every_state_combination_draws"
+                ]
             }
         ]
     }
