@@ -310,6 +310,9 @@ static float box_move_covered(
 
 /** Start a move: read the shapes the capsule can reach on its first stretch.
  *
+ * A first stretch that holds few shapes is read again for the whole motion, so a long move
+ * through an open scene steps without stopping at the end of the first read.
+ *
  * @param world The world
  * @param m The move, initialized
  * @param body The body
@@ -333,6 +336,10 @@ static void box_move_init(
     ecs_vec_init_t(NULL, &m->shapes, box_move_shape_t, 0);
     glm_vec3_scale(ECS_CONST_CAST(float*, motion), len > m->ahead ? m->ahead / len : 1.0f, first);
     box_move_cover(m, start, first, chunk, 0);
+    if (len > chunk * BOX_MOVE_AHEAD && m->ahead == FLT_MAX) {
+        glm_vec3_copy(ECS_CONST_CAST(float*, motion), first);
+        box_move_cover(m, start, first, chunk, 0);
+    }
 }
 
 /** Copy a move for an attempt that may replace it; it borrows the shapes until it reads its own.
