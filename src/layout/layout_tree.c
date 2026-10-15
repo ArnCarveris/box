@@ -54,6 +54,27 @@ static float box_layout_clamp(
     return result;
 }
 
+/** Bound the size of a growing element by its min, max and, with content_min, its fit size.
+ *
+ * @param c The element
+ * @param axis 0 for x, 1 for y
+ * @param v The share or stretch of the element
+ * @return The bounded size
+ */
+static float box_layout_grow_clamp(
+    const box_layout_node_t *c,
+    int32_t axis,
+    float v)
+{
+    const Sizing *s = box_layout_sizing(c, axis);
+    float result = box_layout_clamp(v, s);
+    if (s->content_min && result < c->base[axis]) {
+        result = c->base[axis];
+    }
+
+    return result;
+}
+
 /** Test whether an element grows on an axis.
  *
  * @param n The element
@@ -110,8 +131,8 @@ static int32_t box_layout_read(
         n->shape[0] = t->width;
         n->shape[1] = t->height;
     } else if (r) {
-        n->shape[0] = r->width;
-        n->shape[1] = r->height;
+        n->shape[0] = n->item.width.mode == SizeModeGrow ? 0 : r->width;
+        n->shape[1] = n->item.height.mode == SizeModeGrow ? 0 : r->height;
     } else {
         const Circle *c = ecs_get(world, e, Circle);
         if (c) {
@@ -230,14 +251,17 @@ static void box_layout_measure(
         const Sizing *s = box_layout_sizing(n, axis);
         float size = s->mode == SizeModeFixed ? s->value : n->fit[axis];
         n->size[axis] = box_layout_clamp(size, s);
-        n->base[axis] = s->mode == SizeModeGrow ?
-            box_layout_clamp(0, s) : n->size[axis];
+        n->base[axis] = n->size[axis];
     }
 }
 
 /** Share the free space of a row or column among its growing children by weight.
  *
- * A child whose share passes its min or max keeps the bound, and the rest is shared again.
+ * A share starts from zero. A child with content_min never gets less than its fit size, so
+ * the children whose share is below their content keep their content and the others share
+ * the rest, which ends where Clay ends by growing its smallest elements first.
+ *
+ * A child whose share passes a bound keeps the bound, and the rest is shared again.
  *
  * @param nodes The nodes of the tree
  * @param n The parent
@@ -281,7 +305,7 @@ static void box_layout_grow(
             const Sizing *s = box_layout_sizing(c, main);
             float raw = free * fmaxf(s->value, 0.0f) / weights;
             if (!c->frozen) {
-                c->size[main] = box_layout_clamp(raw, s);
+                c->size[main] = box_layout_grow_clamp(c, main, raw);
                 over += c->size[main] - raw;
             }
         }
@@ -357,7 +381,7 @@ static void box_layout_place(
         box_layout_node_t *c = &nodes[n->first + i];
         for (axis = 0; axis < 2; axis ++) {
             if (axis != main && box_layout_grows(c, axis)) {
-                c->size[axis] = box_layout_clamp(space[axis], box_layout_sizing(c, axis));
+                c->size[axis] = box_layout_grow_clamp(c, axis, space[axis]);
             }
         }
     }

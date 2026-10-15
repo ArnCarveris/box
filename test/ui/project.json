@@ -36,6 +36,14 @@
                     "grow_column",
                     "grow_cross_axis",
                     "grow_direction_none",
+                    "grow_fit_column_widest",
+                    "grow_content_is_minimum",
+                    "grow_never_below_text",
+                    "grow_without_content_min",
+                    "grow_cross_axis_keeps_content",
+                    "grow_zero_weight_keeps_content",
+                    "grow_script_keeps_content",
+                    "grow_follows_shrinking_parent",
                     "row_align",
                     "column_align",
                     "row_ignores_item_placement",
@@ -171,6 +179,7 @@
                     "follows_resize",
                     "scrollback_follows_height",
                     "paste_long",
+                    "panel_keeps_fraction_with_long_text",
                     "null_text"
                 ]
             },

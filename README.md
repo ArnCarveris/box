@@ -38,6 +38,8 @@ git -C .bake/bundles/flecs/default/src log -1 --format=%h; git -C ../../flecs lo
 bake3 --local-env                                         # build the library and the app
 bake3 run apps/boxrun --local-env -- --headless --frames 10  # headless run, exits after 10 frames
 bake3 run apps/boxrun --local-env -- etc/scenes/default.flecs  # open the default scene in a window
+bake3 run apps/boxrun --local-env -- --surface 1280x720 test/integration/visual/bake_bounces.flecs
+                                                          # a window for a scene without a Surface
 ```
 
 ## Browser build

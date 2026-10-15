@@ -45,8 +45,12 @@ ECS_STRUCT(RenderStatus, {
 
 /** How a view culled its instances in the last frame the GPU finished, set on the View entity.
  *
- * Written by the engine a frame or two late, read only for applications. Every instance of the
- * scene counts once: drawn, frustum (or size) culled, or hidden behind closer geometry.
+ * Read only for applications. Every instance of the scene counts once: drawn, frustum (or size)
+ * culled, or hidden behind closer geometry.
+ *
+ * The counts are read back from the GPU without waiting and arrive a variable number of frames
+ * late, many while the GPU is behind as headless rendering does not wait for it; wait for `frame`
+ * to reach a frame instead of counting frames.
  */
 ECS_STRUCT(CullStatus, {
     int64_t frame;          /**< Frame the counts are from */

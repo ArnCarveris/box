@@ -773,3 +773,57 @@ void Instancing_box_moved_in_on_store(void) {
     ecs_os_free(path);
     ecs_fini(world);
 }
+
+void Instancing_manual_parent_move_updates_children(void) {
+    // core_fixes/manual_static_children
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 8, .near_ = 0.1f,
+        .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t surface = ecs_new(world);
+    ecs_set(world, surface, Surface, {.width = 32, .height = 32,
+        .write_to_file = "manual_move.png", .resolution_scale = 1});
+    ecs_entity_t parent = ecs_new(world);
+    ecs_add(world, parent, ManualTransform);
+    ecs_set(world, parent, WorldTransform, {{
+        {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, -2, 0, 1}}});
+    ecs_entity_t group = ecs_new_w_pair(world, EcsChildOf, parent);
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        ecs_entity_t c = ecs_new_w_pair(world, EcsChildOf, i < 2 ? parent : group);
+        ecs_set(world, c, Position, {-3.0f + 2.0f * (float)i, 0, 0});
+        ecs_set(world, c, Box, {1, 1, 1});
+        ecs_set(world, c, Rgb, {0, 0, 0});
+        ecs_set(world, c, PbrMaterial, {.metallic = 1, .roughness = 1});
+        ecs_set(world, c, Emissive, {.strength = 1, .color = {255, 0, 0}});
+    }
+
+    ecs_progress(world, 0);
+    ecs_set(world, parent, WorldTransform, {{
+        {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 2, 0, 1}}});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    char *path = flecs_asprintf("%s/manual_move.png",
+        ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    for (i = 0; i < 4; i ++) {
+        test_assert(px[(8 * 32 + 4 + 8 * i) * 4] > 200);
+        test_assert(px[(24 * 32 + 4 + 8 * i) * 4] < 40);
+    }
+
+    stbi_image_free(px);
+    ecs_os_free(path);
+    ecs_fini(world);
+}

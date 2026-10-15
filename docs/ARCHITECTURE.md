@@ -152,7 +152,9 @@ target in the same frame. `RenderExtract` and `RenderSubmit` are phases that dep
 `WorldTransform` is parent * T * R * S. Static entities are updated by observers and the
 `TransformStatic` system on change; entities with `DynamicTransform` (inherited by every
 descendant) are recomputed every frame. `ManualTransform` means the application writes
-`WorldTransform`. Hierarchies use `ChildOf` or the `Parent` component.
+`WorldTransform`; its static descendants follow when it is written with `ecs_set` or followed
+by `ecs_modified`, not by a write through a pointer alone. Hierarchies use `ChildOf` or the
+`Parent` component.
 
 ## Surfaces and the GPU device
 
@@ -371,7 +373,11 @@ page (`src/render/text_draw.c`), shaded by `shape2d.wgsl`. No shaping (ligatures
 
 **Layout.** `Layout` on a parent arranges its children in `OrderedChildren` order in logical
 pixels: rows and columns, fit and grow sizing with weights, min/max, padding, spacing, alignment,
-and `DirectionNone` anchoring with x/y offsets. `LayoutItem` sets per child sizing. Observers
+and `DirectionNone` anchoring with x/y offsets. `LayoutItem` sets per child sizing. A growing
+child adds its fit size to the fit of its parent and takes a weighted share of the free space
+along the main axis, or stretches to the content box across it. With `Sizing.content_min` (on in
+a new `LayoutItem`, off in a C literal) it never gets less than its fit size, the automatic
+minimum of CSS flex items; the console opts out so its panel keeps its fraction of the surface. Observers
 mark elements; `LayoutUpdate` (`EcsPostUpdate`) relays out the trees of marked elements and writes
 `Position` x/y, `LayoutBounds` and `Rect` only where they changed. A reorder through
 `ecs_set_child_order` needs `ecs_modified(parent, Layout)`.
