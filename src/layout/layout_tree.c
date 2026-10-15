@@ -144,14 +144,15 @@ static int32_t box_layout_read(
 
 /** Track a child the tree holds: keep its parent when it is held through Parent, so moving it
  * marks the parent it leaves, and note it when it lacks the child tag the Position change query
- * matches.
+ * matches. A prefab child is not part of the tree.
  *
  * @param world The world
  * @param state The state of the layout module
  * @param child The child
  * @param parent Its parent
+ * @return False for a prefab child, which the tree skips
  */
-static void box_layout_track(
+static bool box_layout_track(
     const ecs_world_t *world,
     box_layout_state_t *state,
     ecs_entity_t child,
@@ -160,22 +161,25 @@ static void box_layout_track(
     ecs_table_t *table = ecs_get_table(world, child);
     if (table != state->child_table) {
         state->child_table = table;
+        state->child_prefab = table && ecs_table_has_id(world, table, EcsPrefab);
         state->child_kept = table && ecs_table_has_id(world, table, ecs_id(EcsParent));
         state->child_tagged = table && ecs_table_has_id(world, table, state->child_tag);
     }
 
-    if (state->child_kept) {
+    if (!state->child_prefab && state->child_kept) {
         ecs_map_ensure(&state->parents, (ecs_map_key_t)child)[0] = (ecs_map_val_t)parent;
     }
 
-    if (!state->child_tagged) {
+    if (!state->child_prefab && !state->child_tagged) {
         *ecs_vec_append_t(NULL, &state->untagged, ecs_entity_t) = child;
     }
+
+    return !state->child_prefab;
 }
 
 /** Collect a tree breadth first, so the children of an element are next to each other.
  *
- * Every child is tracked (box_layout_track).
+ * Every child is tracked (box_layout_track), and prefab children are left out.
  *
  * @param world The world
  * @param state The state of the layout module
@@ -204,8 +208,9 @@ static void box_layout_collect(
         while (ecs_children_next(&it)) {
             int32_t c;
             for (c = 0; c < it.count; c ++) {
-                box_layout_read(world, state, it.entities[c]);
-                box_layout_track(world, state, it.entities[c], e);
+                if (box_layout_track(world, state, it.entities[c], e)) {
+                    box_layout_read(world, state, it.entities[c]);
+                }
             }
         }
 
