@@ -1562,8 +1562,8 @@ void Layout_prefab_layout(void) {
     const LayoutBounds *b3 = ecs_get(world, i3, LayoutBounds);
     test_assert(b3 != NULL);
     test_assert(ecs_owns(world, i3, LayoutBounds));
-    test_assert(b3->width >= 14);
-    test_assert(b3->height > 12);
+    test_flt(b3->width, 22);
+    test_flt(b3->height, 24);
 
     ecs_fini(world);
 }

@@ -209,7 +209,8 @@ static void box_layout_on_parent(
 /** Find the root of the layout tree of an element.
  *
  * The root is the highest ancestor reached through parents with Layout. An element outside
- * any tree has no root.
+ * any tree has no root, and neither has an element of a prefab: only instances are laid out,
+ * so the layout never adds its outputs to a prefab.
  *
  * @param world The world
  * @param e The element
@@ -228,6 +229,13 @@ static ecs_entity_t box_layout_root(
 
     if (result == e && !ecs_has(world, e, Layout) && !ecs_has(world, e, LayoutItem)) {
         result = 0;
+    }
+
+    for (parent = result; parent; parent = ecs_get_parent(world, parent)) {
+        if (ecs_has_id(world, parent, EcsPrefab)) {
+            result = 0;
+            break;
+        }
     }
 
     return result;
