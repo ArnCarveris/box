@@ -238,7 +238,11 @@
                     "gpu_inherited_from_prefab",
                     "gpu_svg_colors",
                     "gpu_albedo_mip_linear_average",
-                    "gpu_roughness_mip_stored_average"
+                    "gpu_roughness_mip_stored_average",
+                    "gpu_mip_data_then_color",
+                    "gpu_mip_shared_color_and_data",
+                    "gpu_mip_reload_keeps_color",
+                    "gpu_emissive_mip_linear_average"
                 ]
             },
             {
