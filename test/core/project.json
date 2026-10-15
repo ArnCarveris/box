@@ -102,7 +102,10 @@
                     "sleeps_when_over_budget",
                     "unpaced_never_sleeps",
                     "not_headless_never_sleeps",
-                    "env_sets_unpaced"
+                    "env_sets_unpaced",
+                    "budget_share_at_half",
+                    "budget_share_at_quarter",
+                    "idle_earns_no_credit"
                 ]
             },
             {
