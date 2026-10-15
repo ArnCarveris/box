@@ -74,7 +74,7 @@ parser only writes the `App` singleton:
 
 `box_app_run` refuses a headless run without `frames` or `timeout`, a headless run without its
 temporary folder, and a headless run on a machine whose load average plus the cores its budget
-claims (`cpu_budget / 100`, one core for 0, no limit) exceeds the core count unless
+claims (`cpu_budget / 100`; 0, no limit, counts as a floor of one core even though such a run may use more) exceeds the core count unless
 `App.unguarded` is set. It loads the
 scene as a managed script, starts the `TerminalServer` on `port` and steps the world until it
 quits. `BOX_TEST=1` sets `unguarded` and `unpaced` in every new world. The `AppFrame` system

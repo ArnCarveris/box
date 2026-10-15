@@ -78,8 +78,8 @@ int box_app_guard(
     }
 
     if (getloadavg(&load, 1) == 1 && box_app_oversubscribed(load, (int32_t)cores, budget)) {
-        ecs_err("cpu oversubscribed: load %.1f plus a budget of %.0f%% on %d cores", load,
-            (double)budget, (int)cores);
+        ecs_err("cpu oversubscribed: load %.1f plus a claim of %.2f cores on %d cores", load,
+            budget > 0 ? (double)budget / 100.0 : 1.0, (int)cores);
         result = -1;
     }
 #endif

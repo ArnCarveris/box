@@ -101,8 +101,9 @@ double box_app_wall_time(void);
  *
  * @param load Load average over the last minute
  * @param cores Number of online cores
- * @param budget Percentage of one core the process may use, 0 for no limit, which claims one
- *        core: the main thread when it runs flat out
+ * @param budget Percentage of one core the process may use, 0 for no limit, which counts as a
+ *        floor of one core: an unlimited run may use more, but counting every core would refuse it
+ *        at almost any load
  * @return Whether the load plus the cores the budget claims exceeds the core count
  */
 bool box_app_oversubscribed(
