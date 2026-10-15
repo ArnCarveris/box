@@ -295,6 +295,21 @@ light has intensity 0 is dark. `View.lighting.enabled` false draws base color an
 `cluster.wgsl` splits the view frustum into 16x9x24 clusters and lists up to 128 point or spot
 lights per cluster; `mesh.wgsl` shades every directional light plus the cluster's lights.
 
+**Light modes.** `DirectionalLight`, `PointLight` and `SpotLight` have a `bake` member of type
+`LightBakeMode`, following Unity's light modes (Godot's Dynamic, Disabled and Static bake modes):
+`Mixed`, the zero value and what the constructors set, lights directly in realtime and is captured
+by the bake; `Realtime` lights directly and is left out of the bake; `Baked` exists only in the
+probes and costs nothing per frame. In a scene with `LightBake` the light extract keeps two lists
+per scene, each in its own light buffer: the views (light buffer, clusters, `mesh.wgsl`) get the
+`Mixed` and `Realtime` lights, the probe captures the `Mixed` and `Baked` lights; a scene without
+`LightBake` has only the view list with every light, so every mode is realtime there. The first
+directional light of a list shadows what it lights: the views are shadowed by the first directional
+light that is not `Baked` (a baked sun never drives view shadows), the captures by the first one
+that is not `Realtime`. A scene with any light entity, whatever its mode, no longer gets the default
+sun. A mode change is a change of the capture list, so it rebakes through the light rules of
+Invalidation below: `Mixed` to `Realtime` or `Realtime` to `Baked` queues the light's reach, while
+`Mixed` to `Baked` and back leave the captures as they are and rebake nothing.
+
 **Bake settings.** `LightBake` on a `Scene` root (or a singleton for the default scene) holds
 the baked lighting settings: `probe_spacing` 2, `bounces` 2, `capture_size` 16, `budget_ms` 2,
 `bounds_padding` 1 and `cache` (`".box/bake"`, owned string, empty for none), all set by the
@@ -369,9 +384,10 @@ observers of their look (`Rgb`, `Emissive`, `PbrMaterial`, `BlendMode`, `BackFac
 nothing, deleted ones included, and nothing is recorded while no scene has `LightBake`. At extract
 the old and new bounds of each are checked again for probes inside geometry (newly invalid probes
 are hidden at once, newly valid ones shown with the next bake) and padded by `probe_spacing * (1 +
-bounces)`; the valid probes inside are queued. The light extract's lights of each scene are matched
-to the last frame by entity: a point or spot light added, removed or changed queues the probes
-within its old and new range, any directional light or the default sun every probe; an ambient
+bounces)`; the valid probes inside are queued. The capture lights of each scene (light modes
+above) are matched to the last frame by entity: a point or spot light added, removed or changed
+queues the probes within its old and new range, any directional light or the default sun (gained
+or lost) every probe; an ambient
 change after a bake, `bounces` and `capture_size` queue every probe too, while `budget_ms` changes
 nothing. When no bake is in progress the queued probes start a staged bake: a
 `BOX_RENDER_VOLUME_COPY` copies the shown probe buffer into the other one, every pass bakes the

@@ -1,6 +1,7 @@
 /**
  * @file render/bake.h
- * @brief State of the bake extract shared by bake.c and bake_change.c.
+ * @brief State of the bake extract shared by bake.c and bake_change.c, and the lights the light
+ * extract (lights.c) collects for the captures.
  */
 
 #ifndef BOX_RENDER_BAKE_H
@@ -71,7 +72,8 @@ typedef struct box_bake_volume_t {
     ecs_vec_t done;         /**< uint8_t, passes the backend reported for every probe */
     ecs_vec_t cameras;      /**< vec3, cameras of the views of the scene in this frame */
     ecs_vec_t sorted;       /**< vec3, cameras the queue was sorted for */
-    box_render_view_lights_t lights; /**< Lights of the first view of the scene in this frame */
+    box_render_view_lights_t lights; /**< Lights of the captures in this frame: the ambient of
+                                      *   the first view of the scene, its Mixed and Baked lights */
     vec3 min;               /**< Minimum corner of the static bounds of the grid */
     vec3 max;               /**< Maximum corner of the static bounds of the grid */
     int32_t capture_size;   /**< LightBake.capture_size of this frame */
@@ -209,6 +211,26 @@ void box_bake_lights(
     const ecs_world_t *world,
     box_render_bake_t *b,
     box_bake_volume_t *v);
+
+/** Get the lights the probe captures of a scene are lit with in this frame: its Mixed and Baked
+ * lights, directional first, the first of them shadowing the captures.
+ *
+ * A scene without light entities is lit by the default sun the views have, so out is left as it
+ * is then.
+ *
+ * @param state The state of the light extract
+ * @param scene The scene, 0 for the default scene
+ * @param out Receives the light buffer, the counts and the sun of those lights
+ * @param count Receives the number of lights
+ * @param entities Receives the entity of each light
+ * @return The lights, NULL when the scene has none or no LightBake
+ */
+const box_render_light_t* box_bake_scene_lights(
+    const void *state,
+    ecs_entity_t scene,
+    box_render_view_lights_t *out,
+    int32_t *count,
+    const ecs_entity_t **entities);
 
 /** Register the observers of the changes of static shapes that rebake the probes near them.
  *

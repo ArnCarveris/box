@@ -453,3 +453,51 @@ void LightModes_baked_sun_leaves_shadows_to_next(void) {
         stbi_image_free(images[i]);
     }
 }
+
+void LightModes_first_realtime_light_drops_default_sun(void) {
+    // baked_lighting/light_modes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t scene = ecs_new(world);
+    ecs_add(world, scene, Scene);
+    ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
+        .capture_size = 8, .budget_ms = 2, .bounces = 0});
+    ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, camera, Position, {0, 4, 10});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true,
+        .lighting.baked = true});
+    ecs_entity_t floor = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, floor, Position, {0, -0.1f, 0});
+    ecs_set(world, floor, Box, {16, 0.2f, 4});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 32, .height = 24, .resolution_scale = 1});
+
+    int32_t frames = 0;
+    while (!ecs_get(world, scene, LightBakeStatus)->converged && frames < 5000) {
+        ecs_progress(world, 0);
+        box_render_sync(world);
+        frames ++;
+    }
+
+    const LightBakeStatus *status = ecs_get(world, scene, LightBakeStatus);
+    test_bool(status->converged, true);
+    test_assert(status->baked > 0);
+
+    ecs_entity_t lamp = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, lamp, Position, {6, 1, 0});
+    ecs_set(world, lamp, PointLight, {.intensity = 2, .range = 2,
+        .bake = LightBakeModeRealtime});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    status = ecs_get(world, scene, LightBakeStatus);
+    test_bool(status->converged, false);
+    test_int(status->baked, 0);
+
+    ecs_fini(world);
+}

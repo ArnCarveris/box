@@ -544,8 +544,9 @@ static void box_bake_ambient(
     }
 }
 
-/** Point the views of the packet at the volume of their scene, take the ambient light and the
- * lights of the first view of every scene and collect the cameras of its views.
+/** Point the views of the packet at the volume of their scene, take the ambient light of the
+ * first view of every scene with the lights of its captures and collect the cameras of its
+ * views.
  *
  * @param world The world
  * @param b The state
@@ -556,7 +557,12 @@ static void box_bake_views(
     box_render_bake_t *b,
     box_render_packet_t *p)
 {
-    int32_t i, count = ecs_vec_count(&p->views);
+    int32_t i, count = ecs_vec_count(&p->views), lights = 0;
+    const ecs_entity_t *entities = NULL;
+    if (!b->lights_state) {
+        b->lights_state = box_render_lights_state(world);
+    }
+
     for (i = 0; i < count; i ++) {
         box_render_view_t *rv = ecs_vec_get_t(&p->views, box_render_view_t, i);
         box_bake_volume_t *v = box_bake_find(b, rv->scene);
@@ -570,6 +576,7 @@ static void box_bake_views(
         if (!v->viewed) {
             box_bake_ambient(&rv->lights, v->ambient);
             v->lights = rv->lights;
+            box_bake_scene_lights(b->lights_state, v->scene, &v->lights, &lights, &entities);
             v->viewed = true;
         }
 

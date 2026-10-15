@@ -491,17 +491,19 @@ void box_bake_lights(
 {
     int32_t count = 0, known = ecs_vec_count(&v->light_list);
     const ecs_entity_t *entities = NULL;
+    box_render_view_lights_t scratch = {0};
     if (!b->lights_state) {
         b->lights_state = box_render_lights_state(world);
     }
 
-    const box_render_light_t *lights = box_render_lights_scene(b->lights_state, v->scene,
-        &count, &entities);
+    const box_render_light_t *lights = box_bake_scene_lights(b->lights_state, v->scene,
+        &scratch, &count, &entities);
     if (!v->viewed || !v->sent || !v->probes) {
         goto done;
     }
 
-    bool sun = (v->baked_lights.buffer == 0) != (v->lights.buffer == 0);
+    bool sun = (v->baked_lights.buffer == BOX_RENDER_BUFFER_LIGHT_FIRST) !=
+        (v->lights.buffer == BOX_RENDER_BUFFER_LIGHT_FIRST);
     bool same = count == known && (!count ||
         (!ecs_os_memcmp(lights, ecs_vec_first(&v->light_list),
             count * ECS_SIZEOF(box_render_light_t)) &&
