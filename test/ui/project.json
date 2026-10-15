@@ -205,7 +205,8 @@
                     "scrollback_follows_height",
                     "paste_long",
                     "panel_keeps_fraction_with_long_text",
-                    "null_text"
+                    "null_text",
+                    "cursor_ill_formed"
                 ]
             },
             {

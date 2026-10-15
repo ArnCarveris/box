@@ -1346,3 +1346,17 @@ void Platform_dom_unwanted_lock(void) {
 
     ecs_fini(world);
 }
+
+void Platform_dom_key_ill_formed(void) {
+    // input_fixes/input_utf8
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    box_input_dom_on_key(world, "Unidentified", "\xED\xA0\x80", true, false, false);
+    box_input_dom_on_key(world, "Unidentified", "\xC0\xAF", true, false, false);
+    box_input_dom_on_key(world, "Unidentified", "\xF0\x9F\x98\x80", true, false, false);
+    ecs_progress(world, 0);
+    test_str(ecs_singleton_get(world, Input)->text, "\xF0\x9F\x98\x80");
+
+    ecs_fini(world);
+}
