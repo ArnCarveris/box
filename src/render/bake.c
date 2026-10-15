@@ -352,7 +352,7 @@ static void box_bake_status(
     const LightBakeStatus *status = v->entity && ecs_is_alive(it->world, v->entity)
         ? ecs_get(it->world, v->entity, LightBakeStatus)
         : NULL;
-    int32_t pass = v->completed > 0 ? v->completed - 1 : 0;
+    int32_t pass = v->completed;
     int32_t current = v->completed < v->passes ? v->completed : v->passes - 1;
     int32_t baked = current >= 0 ? v->reported[current] : 0;
     if (!status) {

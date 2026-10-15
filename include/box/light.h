@@ -75,9 +75,9 @@ ECS_STRUCT(LightBake, {
 ECS_STRUCT(LightBakeStatus, {
     int32_t probes;      /**< Probes of the volume */
     int32_t baked;       /**< Probes baked in the pass being baked, or in the last when converged */
-    int32_t pass;        /**< Bounces baked so far: completed passes after the first, which bakes
-                          *   direct light and emission; equals LightBake.bounces when converged */
-    bool converged;      /**< All bounces + 1 passes are baked */
+    int32_t pass;        /**< Completed capture passes: the first bakes direct light and emission,
+                          *   each later one a bounce; bounces + 1 when converged */
+    bool converged;      /**< All bounces + 1 passes are baked, pass equals bounces + 1 */
     bool cache_hit;      /**< The volume was loaded from the cache */
     char *error;         /**< Why nothing is baked, such as an invalid setting, NULL for none */
 });

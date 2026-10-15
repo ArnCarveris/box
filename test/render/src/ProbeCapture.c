@@ -53,7 +53,7 @@ void ProbeCapture_converges_in_bounded_frames(void) {
     test_assert(status->probes > 0);
     test_assert(status->baked > 0);
     test_assert(status->baked <= status->probes);
-    test_int(status->pass, 1);
+    test_int(status->pass, 2);
 
     ecs_fini(world);
 }
