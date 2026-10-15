@@ -10,6 +10,7 @@
 #include <box.h>
 #include <bake_bench.h>
 #include "spatial.h"
+#include "index.h"
 
 /** Shapes per row of the grid */
 #define BENCH_ROW (1000)
@@ -487,6 +488,103 @@ void Spatial_overlap_sparse_movers_100k(
     int32_t count = bench_spatial_overlap_100k(b, world);
     bench_counter(b, "results_per_query", (double)count / BENCH_QUERIES);
     ecs_os_free(shapes);
+    ecs_fini(world);
+}
+
+/** Create a world with 100k static shapes on the grid and move every hundredth of them by up
+ * to 3 units on each axis in each of 10 frames, 10k random moves in all.
+ *
+ * @return The world
+ */
+static ecs_world_t* bench_spatial_static_moves_world(void)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t *shapes = ecs_os_malloc_n(ecs_entity_t, 100000);
+    uint32_t seed = 37;
+    int32_t i, f;
+    for (i = 0; i < 100000; i ++) {
+        shapes[i] = ecs_new(world);
+        ecs_set(world, shapes[i], Position, {(float)(i % BENCH_ROW) * BENCH_SPACING, 0,
+            (float)(i / BENCH_ROW) * BENCH_SPACING});
+        ecs_set(world, shapes[i], Box, {1, 1, 1});
+    }
+
+    ecs_progress(world, 0);
+    for (f = 0; f < 10; f ++) {
+        for (i = 0; i < 100000; i += 100) {
+            ecs_entity_t e = shapes[i];
+            const Position *p = ecs_get(world, e, Position);
+            ecs_set(world, e, Position, {p->x + (bench_random(&seed) - 0.5f) * 6.0f, p->y,
+                p->z + (bench_random(&seed) - 0.5f) * 6.0f});
+        }
+
+        ecs_progress(world, 0);
+    }
+
+    box_spatial_update(world);
+    ecs_os_free(shapes);
+
+    return world;
+}
+
+/** Report the cost of the static tree, then of the tree built again from scratch.
+ *
+ * @param b The bench
+ * @param world The world
+ */
+static void bench_spatial_rebuilt_cost(
+    bench_t *b,
+    ecs_world_t *world)
+{
+    bench_counter(b, "sah_cost", box_bvh_cost(&box_spatial_of(world)->root->trees[0]));
+    box_spatial_rebuild(world);
+    bench_counter(b, "sah_cost_rebuilt",
+        box_bvh_cost(&box_spatial_of(world)->root->trees[0]));
+}
+
+void Spatial_ray_after_static_moves_100k(
+    bench_t *b)
+{
+    // spatial_perf/bvh_quality
+    ecs_world_t *world = bench_spatial_static_moves_world();
+    box_spatial_ray_t *rays = ecs_os_malloc_n(box_spatial_ray_t, BENCH_QUERIES);
+    uint32_t seed = 41;
+    int32_t i, hits = 0;
+    for (i = 0; i < BENCH_QUERIES; i ++) {
+        rays[i] = (box_spatial_ray_t){
+            .origin = { bench_random(&seed) * BENCH_ROW * BENCH_SPACING, 20,
+                bench_random(&seed) * 100 * BENCH_SPACING },
+            .dir = { bench_random(&seed) - 0.5f, -1, bench_random(&seed) - 0.5f }
+        };
+    }
+
+    bench_set_items(b, BENCH_QUERIES);
+    while (bench_iter(b)) {
+        hits = 0;
+        for (i = 0; i < BENCH_QUERIES; i ++) {
+            box_spatial_hit_t hit;
+            hits += box_spatial_ray(world, &rays[i], &hit);
+        }
+
+        bench_keep(hits);
+    }
+
+    bench_counter(b, "hits", hits);
+    bench_spatial_rebuilt_cost(b, world);
+    ecs_os_free(rays);
+    ecs_fini(world);
+}
+
+void Spatial_overlap_after_static_moves_100k(
+    bench_t *b)
+{
+    // spatial_perf/bvh_quality
+    ecs_world_t *world = bench_spatial_static_moves_world();
+    bench_set_items(b, BENCH_QUERIES);
+    int32_t count = bench_spatial_overlap_100k(b, world);
+    bench_counter(b, "results_per_query", (double)count / BENCH_QUERIES);
+    bench_spatial_rebuilt_cost(b, world);
     ecs_fini(world);
 }
 

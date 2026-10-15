@@ -765,6 +765,28 @@ void box_bvh_build(
     }
 }
 
+float box_bvh_cost(
+    const box_bvh_t *tree)
+{
+    int32_t i, count = ecs_vec_count(&tree->nodes);
+    float result = 0;
+    if (tree->root == BOX_BVH_NULL) {
+        goto done;
+    }
+
+    const box_bvh_node_t *root = box_bvh_get(tree, tree->root);
+    float area = box_bvh_area(root->min, root->max);
+    for (i = 0; i < count && area > 0; i ++) {
+        const box_bvh_node_t *n = box_bvh_get(tree, i);
+        if (n->height > 0) {
+            result += box_bvh_area(n->min, n->max) / area;
+        }
+    }
+
+done:
+    return result;
+}
+
 bool box_bvh_box_box(
     const vec3 a_min,
     const vec3 a_max,

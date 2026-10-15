@@ -144,6 +144,15 @@ void box_bvh_build(
     int32_t count,
     int32_t *nodes);
 
+/** Get the surface area heuristic cost of a hierarchy: the summed area of its inner nodes over
+ * the area of its root, the number of inner nodes a random ray through the root visits.
+ *
+ * @param tree The tree
+ * @return The cost, 0 for a tree without inner nodes
+ */
+float box_bvh_cost(
+    const box_bvh_t *tree);
+
 /** Get a node.
  *
  * @param tree The tree
