@@ -8,6 +8,21 @@
 #include <bake_test.h>
 #include <math.h>
 
+/** Disable the entity in the context while the left mouse button is held, as an action
+ * handler that closes a popup on any click would.
+ *
+ * @param it The iterator of the system
+ */
+static void DisableOnPress(
+    ecs_iter_t *it)
+{
+    const Input *in = ecs_singleton_get(it->world, Input);
+    ecs_entity_t e = *(ecs_entity_t*)it->ctx;
+    if (in && in->keys[KeyMouseLeft].down && !ecs_has_id(it->world, e, EcsDisabled)) {
+        ecs_enable(it->world, e, false);
+    }
+}
+
 void PickingCost_moves_in_one_frame_hover_last(void) {
     // spatial_perf/picking_cost
     ecs_world_t *world = ecs_init();
@@ -340,6 +355,231 @@ void PickingCost_dense_mesh_hits_surface(void) {
             test_assert(fabsf(status->point[1] - y) < 1e-3f);
             test_assert(fabsf(status->point[2] - z) < 2e-3f);
             test_assert(fabsf(status->distance - (9.9f - z)) < 2e-3f);
+        }
+    }
+
+    ecs_fini(world);
+}
+
+void PickingCost_disabled_on_press_not_targeted(void) {
+    // spatial_perf/picking_cost
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_assert(ecs_script(world, { .code =
+        "using box.transform\n"
+        "using box.camera\n"
+        "using box.view\n"
+        "hud {\n"
+        "  Scene: {}\n"
+        "  camera {\n"
+        "    Position: {0, 0, 100}\n"
+        "    Camera: {ortho: true, ortho_scale: 1}\n"
+        "  }\n"
+        "  popup {\n"
+        "    Position: {0, 0, 0}\n"
+        "  }\n"
+        "}\n"
+        "hud_view {\n"
+        "  View: {camera: hud.camera}\n"
+        "}\n" }) != 0);
+
+    ecs_entity_t popup = ecs_lookup(world, "hud.popup");
+    ecs_add(world, popup, Interactive);
+    ecs_set(world, popup, TextBounds, {100, 40});
+    ecs_system(world, {
+        .phase = EcsPostLoad,
+        .callback = DisableOnPress,
+        .ctx = &popup,
+        .immediate = true
+    });
+    ecs_progress(world, 0);
+    box_input_mouse_move(world, 640, 360, false);
+    ecs_progress(world, 0);
+    test_uint(ecs_singleton_get(world, PickStatus)->target, popup);
+
+    ecs_entity_t s = box_terminal_new(world);
+    ecs_os_free(box_terminal_run(world, s, "mouse.button left true", NULL));
+    ecs_progress(world, 0);
+    test_bool(ecs_has_id(world, popup, EcsDisabled), true);
+    test_uint(ecs_singleton_get(world, PickStatus)->target, 0);
+    test_uint(ecs_singleton_get(world, PickStatus)->pressed, 0);
+    test_bool(ecs_has(world, popup, Pressed), false);
+
+    ecs_fini(world);
+}
+
+void PickingCost_ui_wins_tie_with_shape(void) {
+    // spatial_perf/picking_cost
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_assert(ecs_script(world, { .code =
+        "using box.transform\n"
+        "using box.geometry\n"
+        "using box.camera\n"
+        "using box.view\n"
+        "using box.picking\n"
+        "hud {\n"
+        "  Scene: {}\n"
+        "  camera {\n"
+        "    Position: {0, 0, 100}\n"
+        "    Camera: {ortho: true, ortho_scale: 1}\n"
+        "  }\n"
+        "  slab {\n"
+        "    Position: {0, 0, 0}\n"
+        "    Box: {80, 80, 0}\n"
+        "    Interactive\n"
+        "  }\n"
+        "  label {\n"
+        "    Position: {0, 0, 0}\n"
+        "    Interactive\n"
+        "  }\n"
+        "}\n"
+        "hud_view {\n"
+        "  View: {camera: hud.camera}\n"
+        "}\n" }) != 0);
+
+    ecs_entity_t slab = ecs_lookup(world, "hud.slab");
+    ecs_entity_t label = ecs_lookup(world, "hud.label");
+    ecs_set(world, label, TextBounds, {40, 20});
+    ecs_progress(world, 0);
+
+    box_input_mouse_move(world, 640 + 10, 360, false);
+    ecs_progress(world, 0);
+    test_uint(ecs_singleton_get(world, PickStatus)->target, label);
+
+    box_input_mouse_move(world, 640 + 30, 360 + 25, false);
+    ecs_progress(world, 0);
+    test_uint(ecs_singleton_get(world, PickStatus)->target, slab);
+
+    ecs_fini(world);
+}
+
+void PickingCost_moves_around_wheel_and_key(void) {
+    // spatial_perf/picking_cost
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_assert(ecs_script(world, { .code =
+        "using flecs.script\n"
+        "using box.transform\n"
+        "using box.geometry\n"
+        "using box.camera\n"
+        "using box.view\n"
+        "using box.picking\n"
+        "template Probe {\n"
+        "  mut moves: i32 = 0\n"
+        "  mut scroll_x: f32 = 0\n"
+        "  async {\n"
+        "    while true {\n"
+        "      await on.move(this)\n"
+        "      moves = moves + 1\n"
+        "    }\n"
+        "  }\n"
+        "  async {\n"
+        "    while true {\n"
+        "      const e = await on.scroll(this)\n"
+        "      scroll_x = e.screen_x\n"
+        "    }\n"
+        "  }\n"
+        "}\n"
+        "hud {\n"
+        "  Scene: {}\n"
+        "  camera {\n"
+        "    Position: {0, 0, 100}\n"
+        "    Camera: {ortho: true, ortho_scale: 1}\n"
+        "  }\n"
+        "  a {\n"
+        "    Position: {-65, 0, 0}\n"
+        "    Rect: {60, 200}\n"
+        "    Interactive\n"
+        "    Probe: {}\n"
+        "  }\n"
+        "  b {\n"
+        "    Position: {30, 0, 0}\n"
+        "    Rect: {130, 200}\n"
+        "    Interactive\n"
+        "    Probe: {}\n"
+        "  }\n"
+        "}\n"
+        "hud_view {\n"
+        "  View: {camera: hud.camera}\n"
+        "}\n" }) != 0);
+
+    typedef struct { int32_t moves; float scroll_x; } Mut;
+    ecs_entity_t mut = ecs_lookup(world, "Probe.mut");
+    ecs_entity_t a = ecs_lookup(world, "hud.a");
+    ecs_entity_t b = ecs_lookup(world, "hud.b");
+    ecs_progress(world, 0);
+    box_input_mouse_move(world, 590, 360, false);
+    ecs_progress(world, 0);
+    int32_t a_moves = ((const Mut*)ecs_get_id(world, a, mut))->moves;
+    int32_t b_moves = ((const Mut*)ecs_get_id(world, b, mut))->moves;
+
+    box_input_mouse_move(world, 600, 360, false);
+    box_input_mouse_scroll(world, 0, 1);
+    box_input_mouse_move(world, 610, 360, false);
+    box_input_mouse_move(world, 620, 360, false);
+    ecs_progress(world, 0);
+    test_int(((const Mut*)ecs_get_id(world, a, mut))->moves, a_moves + 1);
+    test_int(((const Mut*)ecs_get_id(world, b, mut))->moves, b_moves + 1);
+    test_flt(((const Mut*)ecs_get_id(world, a, mut))->scroll_x, 600);
+    test_uint(ecs_singleton_get(world, PickStatus)->target, b);
+
+    box_input_mouse_release(world);
+    ecs_progress(world, 0);
+    box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = { 595, 360 } });
+    box_input_platform_push(world, &(InputEvent){ .kind = InputKeyDown, .key = KeyCtrlLeft });
+    box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = { 640, 360 } });
+    box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = { 650, 360 } });
+    ecs_progress(world, 0);
+    test_int(((const Mut*)ecs_get_id(world, a, mut))->moves, a_moves + 2);
+    test_int(((const Mut*)ecs_get_id(world, b, mut))->moves, b_moves + 2);
+    test_flt(ecs_singleton_get(world, PickStatus)->cursor[0], 650);
+    test_uint(ecs_singleton_get(world, PickStatus)->target, b);
+
+    box_input_platform_push(world, &(InputEvent){ .kind = InputKeyUp, .key = KeyCtrlLeft });
+    box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = { 600, 360 } });
+    box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = { 640, 360 } });
+    box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = { 650, 360 } });
+    ecs_progress(world, 0);
+    test_int(((const Mut*)ecs_get_id(world, a, mut))->moves, a_moves + 2);
+    test_int(((const Mut*)ecs_get_id(world, b, mut))->moves, b_moves + 3);
+
+    ecs_fini(world);
+}
+
+void PickingCost_dense_mesh_changed_after_pick(void) {
+    // spatial_perf/picking_cost
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 100, .near_ = 0.1f,
+        .far_ = 100});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    ecs_entity_t can = ecs_new(world);
+    ecs_set(world, can, Position, {0, 0, 0});
+    ecs_set(world, can, Cylinder, {.segments = 256, .length = 2, .radius = 1.5f});
+    ecs_progress(world, 0);
+
+    int32_t f, step;
+    float radius[3] = { 1.5f, 1.0f, 1.0f };
+    int32_t segments[3] = { 256, 256, 200 };
+    for (step = 0; step < 3; step ++) {
+        ecs_set(world, can, Cylinder, {.segments = segments[step], .length = 2,
+            .radius = radius[step]});
+        for (f = 0; f < 20; f ++) {
+            float x = f % 2 ? 0.6f : 0.5f;
+            float z = sqrtf(radius[step] * radius[step] - x * x);
+            box_input_mouse_move(world, 640 + x * 100, 360, false);
+            ecs_progress(world, 0);
+            const PickStatus *status = ecs_singleton_get(world, PickStatus);
+            test_uint(status->hit, can);
+            test_assert(fabsf(status->point[0] - x) < 1e-3f);
+            test_assert(fabsf(status->point[2] - z) < 2e-3f);
         }
     }
 

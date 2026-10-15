@@ -231,3 +231,40 @@ void Picking_move_over_hires_mesh(
     bench_counter(b, "hits", hits);
     ecs_fini(world);
 }
+
+void Picking_first_hover_dense_mesh(
+    bench_t *b)
+{
+    // spatial_perf/picking_cost
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 3});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f, .far_ = 100});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    int32_t i = 0, f, hits = 0;
+    while (bench_iter(b)) {
+        bench_pause(b);
+        ecs_entity_t ball = ecs_new(world);
+        ecs_set(world, ball, Position, {0, 0, 0});
+        ecs_set(world, ball, Sphere, {.segments = 192 + i % 64, .radius = 1});
+        box_input_mouse_move(world, 5, 5, false);
+        ecs_progress(world, 0);
+        bench_resume(b);
+        box_input_mouse_move(world, 640, 360, false);
+        ecs_progress(world, 0);
+        bench_pause(b);
+        hits += ecs_singleton_get(world, PickStatus)->hit == ball;
+        ecs_delete(world, ball);
+        for (f = 0; f < 610; f ++) {
+            ecs_progress(world, 0);
+        }
+
+        bench_resume(b);
+        i ++;
+    }
+
+    bench_counter(b, "hits", hits);
+    ecs_fini(world);
+}
