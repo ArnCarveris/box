@@ -290,7 +290,8 @@
                     "out_of_range_bakes_nothing",
                     "changing_bounces_restarts",
                     "image_stable_once_converged",
-                    "view_keeps_last_complete_pass"
+                    "view_keeps_last_complete_pass",
+                    "far_end_brightens_with_bounces"
                 ]
             },
             {

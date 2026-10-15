@@ -39,14 +39,19 @@ void Bounces_pass_reaches_bounces(void) {
     ecs_set(world, e, Surface, {.width = 32, .height = 24, .resolution_scale = 1});
 
     int32_t frame, last = 0, drops = 0, previous = 0;
-    bool seen[4] = {false, false, false, false};
+    bool seen[5] = {false, false, false, false, false};
     const LightBakeStatus *status = NULL;
     for (frame = 0; frame < 2000; frame ++) {
         ecs_progress(world, 0);
         status = ecs_get(world, scene, LightBakeStatus);
         test_assert(status->pass >= last);
-        test_assert(status->pass <= 3);
-        drops += status->baked < previous;
+        test_assert(status->pass <= 4);
+        test_bool(status->converged, status->pass == 4);
+        if (status->baked < previous) {
+            test_assert(status->pass > last);
+            drops ++;
+        }
+
         last = status->pass;
         previous = status->baked;
         seen[status->pass] = true;
@@ -56,10 +61,10 @@ void Bounces_pass_reaches_bounces(void) {
     }
 
     test_assert(status->converged);
-    test_int(status->pass, 3);
+    test_int(status->pass, 4);
     test_assert(status->baked > 0);
     test_int(drops, 3);
-    test_assert(seen[0] && seen[1] && seen[2] && seen[3]);
+    test_assert(seen[0] && seen[1] && seen[2] && seen[3] && seen[4]);
 
     ecs_fini(world);
 }
@@ -91,7 +96,7 @@ void Bounces_zero_bounces_bakes_one_pass(void) {
         ecs_progress(world, 0);
         status = ecs_get(world, scene, LightBakeStatus);
         test_assert(status->baked >= previous);
-        test_int(status->pass, 0);
+        test_int(status->pass, status->converged ? 1 : 0);
         previous = status->baked;
         if (status->converged) {
             break;
@@ -99,7 +104,7 @@ void Bounces_zero_bounces_bakes_one_pass(void) {
     }
 
     test_assert(status->converged);
-    test_int(status->pass, 0);
+    test_int(status->pass, 1);
     test_assert(status->baked > 0);
     test_assert(status->error == NULL);
 
@@ -150,7 +155,7 @@ void Bounces_out_of_range_bakes_nothing(void) {
 
         status = ecs_get(world, ecs_id(LightBake), LightBakeStatus);
         test_bool(status->converged, true);
-        test_int(status->pass, 16);
+        test_int(status->pass, 17);
         test_assert(status->error == NULL);
 
         ecs_fini(world);
@@ -189,7 +194,7 @@ void Bounces_changing_bounces_restarts(void) {
     }
 
     test_assert(status->converged);
-    test_int(status->pass, 1);
+    test_int(status->pass, 2);
     int32_t probes = status->baked;
 
     ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
@@ -209,7 +214,7 @@ void Bounces_changing_bounces_restarts(void) {
     }
 
     test_assert(status->converged);
-    test_int(status->pass, 2);
+    test_int(status->pass, 3);
     test_int(status->baked, probes);
 
     ecs_fini(world);
@@ -393,4 +398,94 @@ void Bounces_view_keeps_last_complete_pass(void) {
     stbi_image_free(shown);
     ecs_os_free(path);
     ecs_fini(world);
+}
+
+void Bounces_far_end_brightens_with_bounces(void) {
+    // baked_lighting/bounces
+    const int32_t bounces[3] = {0, 1, 3};
+    const float parts[4][6] = {
+        {0, -0.1f, 0, 6.4f, 0.2f, 2.8f}, {0, 1.2f, 1.3f, 6.4f, 2.4f, 0.2f},
+        {0, 1.2f, -1.3f, 6.4f, 2.4f, 0.2f}, {3.1f, 1.2f, 0, 0.2f, 2.4f, 2.4f}
+    };
+    int32_t far[3] = {0, 0, 0}, lit[3] = {0, 0, 0};
+    int32_t i, j, x, y;
+
+    for (i = 0; i < 3; i ++) {
+        ecs_world_t *world = ecs_init();
+        ECS_IMPORT(world, Box);
+        App *app = ecs_singleton_get_mut(world, App);
+        app->headless = true;
+        ecs_singleton_modified(world, App);
+
+        ecs_entity_t scene = ecs_new(world);
+        ecs_add(world, scene, Scene);
+        ecs_set(world, scene, LightBake, {.probe_spacing = 0.5f, .bounds_padding = -0.5f,
+            .capture_size = 16, .budget_ms = 2, .bounces = bounces[i]});
+        ecs_set(world, scene, AmbientLight, {.intensity = 0});
+        ecs_entity_t dark = ecs_new_w_pair(world, EcsChildOf, scene);
+        ecs_set(world, dark, DirectionalLight, {.intensity = 0});
+        ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
+        ecs_set(world, camera, Position, {0, 8, 0});
+        ecs_set(world, camera, Rotation, {-1.5708f, 0, 0});
+        ecs_set(world, camera, Camera, {.fov = 50, .near_ = 0.1f});
+        ecs_entity_t view = ecs_new(world);
+        ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
+            .color = {0, 0, 0, 255}}, .lighting.enabled = true, .lighting.baked = true});
+        ecs_entity_t ceiling = ecs_new_w_pair(world, EcsChildOf, scene);
+        ecs_set(world, ceiling, Position, {0, 2.4f, 0});
+        ecs_set(world, ceiling, Rotation, {1.5708f, 0, 0});
+        ecs_set(world, ceiling, Quad, {6.4f, 2.8f});
+        ecs_set(world, ceiling, Rgb, {250, 250, 250});
+        for (j = 0; j < 4; j ++) {
+            ecs_entity_t part = ecs_new_w_pair(world, EcsChildOf, scene);
+            ecs_set(world, part, Position, {parts[j][0], parts[j][1], parts[j][2]});
+            ecs_set(world, part, Box, {parts[j][3], parts[j][4], parts[j][5]});
+            ecs_set(world, part, Rgb, {250, 250, 250});
+        }
+
+        ecs_entity_t panel = ecs_new_w_pair(world, EcsChildOf, scene);
+        ecs_set(world, panel, Position, {-3.1f, 1.2f, 0});
+        ecs_set(world, panel, Box, {0.2f, 2.4f, 2.4f});
+        ecs_set(world, panel, Rgb, {0, 0, 0});
+        ecs_set(world, panel, Emissive, {.strength = 0.8f, .color = {255, 236, 210}});
+        ecs_entity_t e = ecs_new(world);
+        ecs_set(world, e, Surface, {.width = 160, .height = 120, .write_to_file = "far.png",
+            .resolution_scale = 1});
+        for (j = 0; j < 3; j ++) {
+            ecs_progress(world, 0);
+        }
+
+        box_render_sync(world);
+        ecs_progress(world, 0);
+        box_render_sync(world);
+        test_bool(ecs_get(world, scene, LightBakeStatus)->converged, true);
+
+        char *path = flecs_asprintf("%s/far.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
+        int w = 0, h = 0, n = 0;
+        unsigned char *image = stbi_load(path, &w, &h, &n, 4);
+        test_assert(image != NULL);
+        test_int(w, 160);
+        test_int(h, 120);
+        for (y = 56; y < 64; y ++) {
+            for (x = 0; x < 8; x ++) {
+                const unsigned char *l = &image[(y * w + 44 + x) * 4];
+                const unsigned char *f = &image[(y * w + 108 + x) * 4];
+                lit[i] += (l[0] + l[1] + l[2]) / 3;
+                far[i] += (f[0] + f[1] + f[2]) / 3;
+            }
+        }
+
+        lit[i] /= 64;
+        far[i] /= 64;
+        stbi_image_free(image);
+        ecs_os_free(path);
+        ecs_fini(world);
+    }
+
+    test_assert(far[1] > far[0] + 10);
+    test_assert(far[2] > far[1] + 10);
+    for (i = 0; i < 3; i ++) {
+        test_assert(far[i] < lit[i]);
+        test_assert(lit[i] < 255);
+    }
 }
