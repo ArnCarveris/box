@@ -3,18 +3,35 @@
  * @brief Textures, samplers and the texture layer bind groups of the webgpu backend.
  *
  * A texture is uploaded into its first mip level; the blit pipeline renders every further
- * level from the one above it. Batches bind their layers as one cached bind group.
+ * level from the one above it, in linear light for the color layers. Batches bind their
+ * layers as one cached bind group.
  */
 
 #include "gpu.h"
 
 #ifdef BOX_RENDER_WGPU
 
+/** Layers below this one sample color: albedo and emissive, decoded from sRGB */
+#define BOX_GPU_COLOR_LAYERS (2)
+
 /** Pixel of the default albedo, emissive and roughness layers */
 static const uint8_t box_gpu_white[4] = { 255, 255, 255, 255 };
 
 /** Pixel of the default normal layer, a normal along the surface normal */
 static const uint8_t box_gpu_flat[4] = { 128, 128, 255, 255 };
+
+/** Color space the mip levels of a texture are averaged in */
+typedef enum box_gpu_mip_space_t {
+    BOX_GPU_MIP_UNKNOWN,    /**< No layer bound the texture yet */
+    BOX_GPU_MIP_LINEAR,     /**< As stored, for the roughness, normal and distance layers */
+    BOX_GPU_MIP_SRGB        /**< In linear light through the sRGB view, for the color layers */
+} box_gpu_mip_space_t;
+
+/** A texture of the backend with the color space of its mip levels */
+typedef struct box_gpu_texture_entry_t {
+    box_gpu_texture_t base;     /**< The texture, first so the entry is used as one */
+    box_gpu_mip_space_t space;  /**< Space of the generated levels or of the layer that binds it */
+} box_gpu_texture_entry_t;
 
 /** Count the mip levels of a full chain.
  *
@@ -75,7 +92,8 @@ static box_gpu_texture_t* box_gpu_texture_new(
     uint32_t height,
     const uint8_t *pixels)
 {
-    box_gpu_texture_t *result = ecs_os_calloc_t(box_gpu_texture_t);
+    box_gpu_texture_entry_t *entry = ecs_os_calloc_t(box_gpu_texture_entry_t);
+    box_gpu_texture_t *result = &entry->base;
     WGPUTextureFormat srgb = BOX_GPU_TEXTURE_SRGB;
     result->mips = box_gpu_mip_count(width, height);
     WGPUTextureDescriptor desc = {
@@ -214,8 +232,10 @@ void box_gpu_texture_apply(
     const box_render_texture_desc_t *desc)
 {
     box_gpu_texture_t *tex = ecs_map_get_deref(&gpu->textures, box_gpu_texture_t, handle);
+    box_gpu_mip_space_t space = BOX_GPU_MIP_UNKNOWN;
     box_gpu_materials_clear(gpu);
     if (tex) {
+        space = ((box_gpu_texture_entry_t*)tex)->space;
         ecs_map_remove(&gpu->textures, handle);
         box_gpu_texture_free(tex);
     }
@@ -225,8 +245,9 @@ void box_gpu_texture_apply(
     }
 
     tex = box_gpu_texture_new(gpu, desc->width, desc->height, (const uint8_t*)(desc + 1));
+    ((box_gpu_texture_entry_t*)tex)->space = space;
     ecs_map_insert_ptr(&gpu->textures, handle, tex);
-    if (!tex->mipped) {
+    if (!tex->mipped && space != BOX_GPU_MIP_UNKNOWN) {
         *ecs_vec_append_t(NULL, &gpu->mips, uint32_t) = handle;
     }
 
@@ -236,23 +257,28 @@ done:
 
 /** Render the mip levels of a texture, each from the level above it.
  *
+ * The sRGB space samples and writes the levels through the sRGB view, so the filter averages
+ * linear light and the result is encoded again; the linear space averages the stored values.
+ *
  * @param gpu The backend
  * @param tex The texture
- * @param pipeline The blit pipeline of the texture format
+ * @param space BOX_GPU_MIP_SRGB or BOX_GPU_MIP_LINEAR
  * @param encoder The encoder the passes are recorded in
  */
 static void box_gpu_texture_mip_chain(
     box_gpu_t *gpu,
     box_gpu_texture_t *tex,
-    WGPURenderPipeline pipeline,
+    box_gpu_mip_space_t space,
     WGPUCommandEncoder encoder)
 {
+    WGPUTextureFormat format = space == BOX_GPU_MIP_SRGB
+        ? BOX_GPU_TEXTURE_SRGB
+        : BOX_GPU_TEXTURE_FORMAT;
+    WGPURenderPipeline pipeline = box_gpu_blit_pipeline(gpu, format);
     uint32_t level;
-    for (level = 1; level < tex->mips; level ++) {
-        WGPUTextureView src = box_gpu_texture_view(
-            tex->texture, BOX_GPU_TEXTURE_FORMAT, level - 1, 1);
-        WGPUTextureView dst = box_gpu_texture_view(
-            tex->texture, BOX_GPU_TEXTURE_FORMAT, level, 1);
+    for (level = 1; pipeline && level < tex->mips; level ++) {
+        WGPUTextureView src = box_gpu_texture_view(tex->texture, format, level - 1, 1);
+        WGPUTextureView dst = box_gpu_texture_view(tex->texture, format, level, 1);
         WGPUBindGroupEntry entries[2] = {
             { .binding = 0, .textureView = src },
             { .binding = 1, .sampler = gpu->sampler }
@@ -284,20 +310,17 @@ static void box_gpu_texture_mip_chain(
         wgpuTextureViewRelease(dst);
     }
 
-    tex->mipped = true;
+    if (pipeline) {
+        tex->mipped = true;
+        ((box_gpu_texture_entry_t*)tex)->space = space;
+    }
 }
 
 void box_gpu_texture_mips(
     box_gpu_t *gpu)
 {
     int32_t i, count = ecs_vec_count(&gpu->mips);
-    WGPURenderPipeline pipeline = NULL;
     if (!count) {
-        goto done;
-    }
-
-    pipeline = box_gpu_blit_pipeline(gpu, BOX_GPU_TEXTURE_FORMAT);
-    if (!pipeline) {
         goto done;
     }
 
@@ -306,7 +329,8 @@ void box_gpu_texture_mips(
         uint32_t handle = *ecs_vec_get_t(&gpu->mips, uint32_t, i);
         box_gpu_texture_t *tex = ecs_map_get_deref(&gpu->textures, box_gpu_texture_t, handle);
         if (tex && !tex->mipped) {
-            box_gpu_texture_mip_chain(gpu, tex, pipeline, encoder);
+            box_gpu_texture_mip_chain(
+                gpu, tex, ((box_gpu_texture_entry_t*)tex)->space, encoder);
         }
     }
 
@@ -383,6 +407,54 @@ static uint64_t box_gpu_material_hash(
     return h ^ (h >> 29);
 }
 
+/** Generate the mip levels of the textures a new bind group binds, in the space of their layers.
+ *
+ * A texture gets its levels when a layer first binds it; a color layer that binds a texture
+ * averaged as stored generates them again in linear light, which then stays. The passes are
+ * submitted before the draws of the frame that bind them.
+ *
+ * @param gpu The backend
+ * @param textures Texture handles of the layers, 0 for the default
+ */
+static void box_gpu_material_mips(
+    box_gpu_t *gpu,
+    const uint32_t *textures)
+{
+    WGPUCommandEncoder encoder = NULL;
+    int32_t i;
+    for (i = 0; i < BOX_RENDER_TEXTURE_SLOTS; i ++) {
+        box_gpu_texture_t *tex = textures[i] && !(textures[i] & BOX_RENDER_TEXTURE_TARGET)
+            ? ecs_map_get_deref(&gpu->textures, box_gpu_texture_t, textures[i])
+            : NULL;
+        bool color = i < BOX_GPU_COLOR_LAYERS;
+        box_gpu_mip_space_t space = tex
+            ? ((box_gpu_texture_entry_t*)tex)->space
+            : BOX_GPU_MIP_UNKNOWN;
+        if (!tex || tex->mips == 1 || (tex->mipped && (!color || space == BOX_GPU_MIP_SRGB))) {
+            continue;
+        }
+
+        if (color) {
+            space = BOX_GPU_MIP_SRGB;
+        } else if (space == BOX_GPU_MIP_UNKNOWN) {
+            space = BOX_GPU_MIP_LINEAR;
+        }
+
+        if (!encoder) {
+            encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
+        }
+
+        box_gpu_texture_mip_chain(gpu, tex, space, encoder);
+    }
+
+    if (encoder) {
+        WGPUCommandBuffer commands = wgpuCommandEncoderFinish(encoder, NULL);
+        wgpuQueueSubmit(gpu->queue, 1, &commands);
+        wgpuCommandBufferRelease(commands);
+        wgpuCommandEncoderRelease(encoder);
+    }
+}
+
 /** Get the view a layer binds: the texture of its handle or the default of the layer.
  *
  * @param gpu The backend
@@ -401,7 +473,7 @@ static WGPUTextureView box_gpu_material_view(
     box_gpu_target_t *target = handle & BOX_RENDER_TEXTURE_TARGET
         ? ecs_map_get_deref(&gpu->targets, box_gpu_target_t, handle & ~BOX_RENDER_TEXTURE_TARGET)
         : NULL;
-    bool color = slot < 2;
+    bool color = slot < BOX_GPU_COLOR_LAYERS;
     WGPUTextureView result = NULL;
     if (target && target->output_view) {
         result = target->output_view;
@@ -444,6 +516,7 @@ WGPUBindGroup box_gpu_material_group(
         m = m->next;
     }
 
+    box_gpu_material_mips(gpu, textures);
     for (i = 0; i < BOX_RENDER_TEXTURE_SLOTS; i ++) {
         entries[i] = (WGPUBindGroupEntry){
             .binding = (uint32_t)i,
