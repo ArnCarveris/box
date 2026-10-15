@@ -4,9 +4,13 @@
  *
  * Glyphs advance along a pen in logical pixels; a word that passes the width moves to the next
  * line, a word wider than the width breaks inside. The block is centered on the origin, y up.
+ * A Text is measured at Text.width for box.layout, which can wrap it narrower afterwards.
  */
 
 #include "text.h"
+
+/** Logical pixels a line may pass its width by, so a block wraps at its own measured width */
+#define BOX_TEXT_WRAP_SLACK (0.001f)
 
 /** State of the layout of one string */
 typedef struct box_text_run_t {
@@ -20,6 +24,7 @@ typedef struct box_text_run_t {
     int32_t line_start;     /**< First placed glyph of the line */
     int32_t word_start;     /**< First placed glyph of the current word */
     int32_t prev;           /**< Glyph index before the pen, -1 at the start of a line */
+    float longest;          /**< Width of the widest word so far */
     bool in_word;           /**< The last character was not a space */
 } box_text_run_t;
 
@@ -104,7 +109,7 @@ static void box_text_wrap(
         run->word_base = 0.0f;
     }
 
-    if (*x + advance > run->wrap && count > run->line_start) {
+    if (*x + advance > run->wrap + BOX_TEXT_WRAP_SLACK && count > run->line_start) {
         box_text_break(run, run->line_end, count);
         run->word_start = count;
         run->word_x = 0.0f;
@@ -165,7 +170,9 @@ static void box_text_char(
         run->in_word = true;
     }
 
-    if (run->wrap > 0.0f && x + advance > run->wrap && count > run->line_start) {
+    if (run->wrap > 0.0f && x + advance > run->wrap + BOX_TEXT_WRAP_SLACK &&
+        count > run->line_start)
+    {
         box_text_wrap(run, &x, advance);
     }
 
@@ -175,6 +182,10 @@ static void box_text_char(
     p->glyph = box_text_font_glyph(world, run->s, font, glyph);
     run->pen = x + advance;
     run->line_end = run->pen;
+    if (run->line_end - run->word_x > run->longest) {
+        run->longest = run->line_end - run->word_x;
+    }
+
 done:
     return;
 }
@@ -185,6 +196,7 @@ done:
  * @param font The font
  * @param text The Text
  * @param metrics Ascent, descent below the baseline and line height in logical pixels
+ * @param box Width the lines align in when it is wider than the widest line
  * @param out Receives the quads
  * @param bounds Receives the size of the block
  */
@@ -193,13 +205,14 @@ static void box_text_emit(
     const box_text_font_t *font,
     const Text *text,
     const float *metrics,
+    float box,
     TextGlyphs *out,
     TextBounds *bounds)
 {
     const box_text_placed_t *placed = ecs_vec_first(&run->s->placed);
     const float *widths = ecs_vec_first(&run->s->lines);
     int32_t i, lines = ecs_vec_count(&run->s->lines);
-    float width = 0.0f, size = text->size;
+    float width = box, size = text->size;
     float k = size / (float)BOX_TEXT_EM;
     for (i = 0; i < lines; i ++) {
         width = widths[i] > width ? widths[i] : width;
@@ -237,11 +250,71 @@ static void box_text_emit(
     }
 }
 
-void box_text_layout(
+/** Break a string into lines at a width, filling the placed and lines scratch of the registry.
+ *
+ * @param world The world
+ * @param s The registry
+ * @param font The font, its face loaded
+ * @param str The string
+ * @param px Logical pixels per font unit
+ * @param wrap Width lines break at, 0 for newlines only
+ * @return The finished run
+ */
+static box_text_run_t box_text_run(
+    ecs_world_t *world,
+    box_text_state_t *s,
+    box_text_font_t *font,
+    const char *str,
+    float px,
+    float wrap)
+{
+    box_text_run_t result = { .s = s, .wrap = wrap, .prev = -1 };
+    ecs_vec_clear(&s->placed);
+    ecs_vec_clear(&s->lines);
+    while (*str) {
+        box_text_char(world, &result, font, box_text_utf8(&str), px);
+    }
+
+    box_text_break(&result, result.line_end, ecs_vec_count(&s->placed));
+
+    return result;
+}
+
+/** Get the width of the widest line of the lines scratch of the registry.
+ *
+ * @param s The registry
+ * @return The width
+ */
+static float box_text_widest(
+    const box_text_state_t *s)
+{
+    const float *widths = ecs_vec_first(&s->lines);
+    int32_t i, lines = ecs_vec_count(&s->lines);
+    float result = 0.0f;
+    for (i = 0; i < lines; i ++) {
+        result = widths[i] > result ? widths[i] : result;
+    }
+
+    return result;
+}
+
+/** Lay out a Text into its TextGlyphs and TextBounds.
+ *
+ * The lines break at Text.width, which gives the sizes box.layout fits the Text to, and again
+ * at the width of the layout when that is narrower; they align within the width of the layout.
+ *
+ * @param world The world
+ * @param s The registry
+ * @param e The entity
+ * @param text Its Text
+ * @param measure Measure the Text again, false when only the width of the layout changed
+ */
+static void box_text_typeset(
     ecs_world_t *world,
     box_text_state_t *s,
     ecs_entity_t e,
-    const Text *text)
+    const Text *text,
+    bool measure)
 {
     TextGlyphs *glyphs = ecs_get_mut(world, e, TextGlyphs);
     const TextBounds *prev = ecs_get(world, e, TextBounds);
@@ -251,7 +324,12 @@ void box_text_layout(
         goto done;
     }
 
+    float was[3] = { glyphs->natural[0], glyphs->natural[1], glyphs->longest };
     ecs_vec_clear(&glyphs->glyphs);
+    if (measure) {
+        glyphs->natural[0] = glyphs->natural[1] = glyphs->longest = 0.0f;
+    }
+
     box_text_font_t *font = text->font ? box_text_font_of(world, s, text->font) : NULL;
     const char *str = text->value;
     if (!font || !font->face || !str || !str[0]) {
@@ -265,27 +343,81 @@ void box_text_layout(
     metrics[2] = text->line_height > 0.0f
         ? text->line_height
         : (ascent - descent + gap) * px;
-    box_text_run_t run = {
-        .s = s,
-        .wrap = text->width > 0.0f ? text->width : 0.0f,
-        .prev = -1
-    };
-    ecs_vec_clear(&s->placed);
-    ecs_vec_clear(&s->lines);
-    while (*str) {
-        box_text_char(world, &run, font, box_text_utf8(&str), px);
+    float wrap = text->width > 0.0f ? text->width : 0.0f;
+    float box = text->wrap == TextWrapWords ? glyphs->box : 0.0f;
+    bool narrow = !measure && box > 0.0f && box < glyphs->natural[0];
+    box_text_run_t run = box_text_run(world, s, font, str, px, narrow ? box : wrap);
+    if (measure) {
+        glyphs->natural[0] = box_text_widest(s);
+        glyphs->natural[1] = (float)ecs_vec_count(&s->lines) * metrics[2];
+        glyphs->longest = run.longest;
+        if (box > 0.0f && box < glyphs->natural[0]) {
+            run = box_text_run(world, s, font, str, px, box);
+        }
     }
 
-    box_text_break(&run, run.line_end, ecs_vec_count(&s->placed));
-    box_text_emit(&run, font, text, metrics, glyphs, &bounds);
+    box_text_emit(&run, font, text, metrics, box, glyphs, &bounds);
 write:
     ecs_modified(world, e, TextGlyphs);
-    if (!prev || prev->width != bounds.width || prev->height != bounds.height) {
+    bool moved = was[0] != glyphs->natural[0] || was[1] != glyphs->natural[1] ||
+        was[2] != glyphs->longest;
+    if (!prev || prev->width != bounds.width || prev->height != bounds.height || moved) {
         ecs_set_ptr(world, e, TextBounds, &bounds);
     }
 
 done:
     return;
+}
+
+void box_text_layout(
+    ecs_world_t *world,
+    box_text_state_t *s,
+    ecs_entity_t e,
+    const Text *text)
+{
+    box_text_typeset(world, s, e, text, true);
+}
+
+bool box_text_measure(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    float *size,
+    float *least,
+    bool *wraps)
+{
+    const TextBounds *b = ecs_get(world, e, TextBounds);
+    const Text *text = b ? ecs_get(world, e, Text) : NULL;
+    const TextGlyphs *glyphs = text ? ecs_get(world, e, TextGlyphs) : NULL;
+    *wraps = glyphs && text->wrap == TextWrapWords;
+    if (glyphs) {
+        size[0] = glyphs->natural[0];
+        size[1] = glyphs->natural[1];
+        *least = *wraps ? glyphs->longest : size[0];
+    } else if (b) {
+        size[0] = *least = b->width;
+        size[1] = b->height;
+    }
+
+    return b != NULL;
+}
+
+float box_text_wrap_to(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    float width)
+{
+    box_text_state_t *s = box_text_state_get(world);
+    TextGlyphs *glyphs = ecs_get_mut(world, e, TextGlyphs);
+    const Text *text = ecs_get(world, e, Text);
+    float box = width > 0.0f ? width : 0.0f;
+    if (s && glyphs && text && glyphs->box != box) {
+        glyphs->box = box;
+        box_text_typeset(world, s, e, text, false);
+    }
+
+    const TextBounds *b = ecs_get(world, e, TextBounds);
+
+    return b ? b->height : 0.0f;
 }
 
 /** Check whether a Text lays out again: its font asks for it, or every Text does.

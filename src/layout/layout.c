@@ -89,8 +89,10 @@ static void box_layout_mark_children(
         box_layout_mark(state, parent);
     }
 
+    ecs_entity_t text = state->text.component;
     if (ecs_table_has_id(it->world, it->table, ecs_id(Layout)) ||
-        ecs_table_has_id(it->world, it->table, ecs_id(LayoutItem)))
+        ecs_table_has_id(it->world, it->table, ecs_id(LayoutItem)) ||
+        (text && ecs_table_has_id(it->world, it->table, text)))
     {
         for (i = row; i < row + count; i ++) {
             box_layout_mark(state, it->entities[i]);
@@ -166,26 +168,44 @@ static int box_layout_compare(
     return (ea > eb) - (ea < eb);
 }
 
-/** Look up the TextBounds component and observe it once it exists.
+/** Layout observer: an element lost its Layout, so its children left the tree.
  *
- * @param world The world
- * @param state The state of the layout module
+ * @param it Iterator over the elements
  */
-static void box_layout_find_text(
-    ecs_world_t *world,
-    box_layout_state_t *state)
+static void box_layout_on_layout_remove(
+    ecs_iter_t *it)
 {
-    ecs_entity_t c = ecs_lookup_symbol(world, "TextBounds", false, false);
-    const EcsComponent *type = c ? ecs_get(world, c, EcsComponent) : NULL;
-    if (type && type->size == (ecs_size_t)(2 * sizeof(float))) {
-        state->text_bounds = c;
-        ecs_observer(world, {
-            .query.terms = {{ .id = c, .inout = EcsInOutNone }},
-            .events = { EcsOnSet, EcsOnRemove },
-            .callback = box_layout_on_element,
-            .ctx = state
-        });
+    box_layout_state_t *state = it->ctx;
+    int32_t i, c;
+    if (state->writing || !it->other_table || !ecs_table_get_type(it->other_table)->count) {
+        goto done;
     }
+
+    for (i = 0; i < it->count; i ++) {
+        ecs_iter_t ci = ecs_children(it->world, it->entities[i]);
+        while (ecs_children_next(&ci)) {
+            for (c = 0; c < ci.count; c ++) {
+                box_layout_mark(state, ci.entities[c]);
+            }
+        }
+    }
+
+done:
+    return;
+}
+
+void box_layout_text_register(
+    ecs_world_t *world,
+    const box_layout_text_t *text)
+{
+    box_layout_state_t *state = ecs_singleton_get(world, LayoutRegistry)->state;
+    state->text = *text;
+    ecs_observer(world, {
+        .query.terms = {{ .id = text->bounds, .inout = EcsInOutNone }},
+        .events = { EcsOnSet, EcsOnRemove },
+        .callback = box_layout_on_element,
+        .ctx = state
+    });
 }
 
 /** Size the elements that fill a surface to the size of the surface in points.
@@ -233,10 +253,6 @@ static void LayoutUpdate(
     ecs_world_t *world = it->world;
     box_layout_state_t *state = it->ctx;
     int32_t i, count = ecs_vec_count(&state->marks);
-    if (!state->text_bounds) {
-        box_layout_find_text(world, state);
-    }
-
     if (!count) {
         goto done;
     }
@@ -244,10 +260,16 @@ static void LayoutUpdate(
     ecs_entity_t *marks = ecs_vec_first_t(&state->marks, ecs_entity_t);
     ecs_vec_clear(&state->roots);
     for (i = 0; i < count; i ++) {
-        ecs_entity_t root = ecs_is_alive(world, marks[i]) ?
-            box_layout_root(world, marks[i]) : 0;
+        bool alive = ecs_is_alive(world, marks[i]);
+        ecs_entity_t root = alive ? box_layout_root(world, marks[i]) : 0;
         if (root) {
             *ecs_vec_append_t(NULL, &state->roots, ecs_entity_t) = root;
+        } else if (alive && state->text.wrap &&
+            ecs_has_id(world, marks[i], state->text.component))
+        {
+            state->writing = true;
+            state->text.wrap(world, marks[i], 0);
+            state->writing = false;
         }
     }
 
@@ -310,7 +332,7 @@ static void box_layout_registry_move(
     ecs_os_memset(src, 0, ti->size * count);
 }
 
-/** Construct LayoutItem values whose sizes have a value of one, the weight of a growing size.
+/** Construct LayoutItem values whose sizes have a weight of one and keep their content.
  *
  * @param ptr The components
  * @param count Number of components
@@ -325,7 +347,10 @@ static void box_layout_item_ctor(
     int32_t i;
     (void)ti;
     for (i = 0; i < count; i ++) {
-        values[i] = (LayoutItem){ .width = { .value = 1 }, .height = { .value = 1 } };
+        values[i] = (LayoutItem){
+            .width = { .value = 1, .content_min = true },
+            .height = { .value = 1, .content_min = true }
+        };
     }
 }
 
@@ -379,6 +404,14 @@ void BoxLayoutImport(
     }
 
     ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "LayoutOnLayoutRemove" }),
+        .query.terms = {{ .id = ecs_id(Layout), .inout = EcsInOutNone }},
+        .events = { EcsOnRemove },
+        .callback = box_layout_on_layout_remove,
+        .ctx = state
+    });
+
+    ecs_observer(world, {
         .entity = ecs_entity(world, { .name = "LayoutOnPosition" }),
         .query.terms = {{ .id = ecs_id(Position), .inout = EcsInOutNone }},
         .events = { EcsOnSet },
@@ -419,6 +452,4 @@ void BoxLayoutImport(
         .ctx = state,
         .immediate = true
     });
-
-    box_layout_find_text(world, state);
 }

@@ -5,6 +5,7 @@
 
 #include <box.h>
 #include <bake_test.h>
+#include <math.h>
 
 void Layout_row_places_children(void) {
     // ui/layout
@@ -503,6 +504,345 @@ void Layout_grow_direction_none(void) {
     test_flt(ecs_get(world, a, Rect)->height, 80);
     test_flt(ecs_get(world, a, Position)->x, 0);
     test_flt(ecs_get(world, a, Position)->y, 0);
+
+    ecs_fini(world);
+}
+
+void Layout_grow_fit_column_widest(void) {
+    // ui_fixes/grow_basis
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t p = ecs_new(world);
+    ecs_set(world, p, Layout, { .direction = DirectionColumn, .spacing = 4 });
+    ecs_entity_t a = ecs_new_w_pair(world, EcsChildOf, p);
+    ecs_set(world, a, Layout, { .direction = DirectionRow, .padding = { 5, 5, 5, 5 } });
+    ecs_set(world, a, LayoutItem, {
+        .width = { SizeModeGrow, 1 }, .height = { SizeModeGrow, 1 } });
+    ecs_set(world, a, Rect, {1, 1});
+    ecs_entity_t ta = ecs_new_w_pair(world, EcsChildOf, a);
+    ecs_set(world, ta, Rect, {40, 10});
+    ecs_entity_t b = ecs_new_w_pair(world, EcsChildOf, p);
+    ecs_set(world, b, Layout, { .direction = DirectionRow, .padding = { 5, 5, 5, 5 } });
+    ecs_set(world, b, LayoutItem, {
+        .width = { SizeModeGrow, 1 }, .height = { SizeModeGrow, 1 } });
+    ecs_set(world, b, Rect, {1, 1});
+    ecs_entity_t tb = ecs_new_w_pair(world, EcsChildOf, b);
+    ecs_set(world, tb, Rect, {80, 10});
+    ecs_progress(world, 0);
+
+    test_flt(ecs_get(world, p, LayoutBounds)->width, 90);
+    test_flt(ecs_get(world, p, LayoutBounds)->height, 44);
+    test_flt(ecs_get(world, a, LayoutBounds)->width, 90);
+    test_flt(ecs_get(world, a, LayoutBounds)->height, 20);
+    test_flt(ecs_get(world, b, LayoutBounds)->width, 90);
+    test_flt(ecs_get(world, b, LayoutBounds)->height, 20);
+    test_flt(ecs_get(world, a, Rect)->width, 90);
+    test_flt(ecs_get(world, a, Position)->x, 0);
+    test_flt(ecs_get(world, a, Position)->y, 12);
+    test_flt(ecs_get(world, b, Position)->y, -12);
+    test_flt(ecs_get(world, ta, Position)->x, -20);
+
+    ecs_fini(world);
+}
+
+void Layout_grow_content_is_minimum(void) {
+    // ui_fixes/grow_basis
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t p = ecs_new(world);
+    ecs_set(world, p, Layout, { .direction = DirectionRow });
+    ecs_set(world, p, LayoutItem, {
+        .width = { SizeModeFixed, 200 }, .height = { SizeModeFixed, 50 } });
+    ecs_entity_t a = ecs_new_w_pair(world, EcsChildOf, p);
+    ecs_set(world, a, Layout, { .direction = DirectionRow });
+    ecs_set(world, a, LayoutItem, { .width = { SizeModeGrow, 3, .content_min = true } });
+    ecs_entity_t ca = ecs_new_w_pair(world, EcsChildOf, a);
+    ecs_set(world, ca, Rect, {40, 10});
+    ecs_entity_t b = ecs_new_w_pair(world, EcsChildOf, p);
+    ecs_set(world, b, Layout, { .direction = DirectionRow });
+    ecs_set(world, b, LayoutItem, { .width = { SizeModeGrow, 1, .content_min = true } });
+    ecs_entity_t cb = ecs_new_w_pair(world, EcsChildOf, b);
+    ecs_set(world, cb, Rect, {80, 10});
+
+    ecs_entity_t q = ecs_new(world);
+    ecs_set(world, q, Layout, { .direction = DirectionRow, .spacing = 2 });
+    ecs_entity_t c = ecs_new_w_pair(world, EcsChildOf, q);
+    ecs_set(world, c, Layout, { .direction = DirectionRow });
+    ecs_set(world, c, LayoutItem, { .width = { SizeModeGrow, 1, .content_min = true } });
+    ecs_entity_t cc = ecs_new_w_pair(world, EcsChildOf, c);
+    ecs_set(world, cc, Rect, {40, 10});
+    ecs_entity_t d = ecs_new_w_pair(world, EcsChildOf, q);
+    ecs_set(world, d, Layout, { .direction = DirectionRow });
+    ecs_set(world, d, LayoutItem, { .width = { SizeModeGrow, 3, .content_min = true } });
+    ecs_entity_t cd = ecs_new_w_pair(world, EcsChildOf, d);
+    ecs_set(world, cd, Rect, {80, 10});
+    ecs_progress(world, 0);
+
+    test_flt(ecs_get(world, a, LayoutBounds)->width, 120);
+    test_flt(ecs_get(world, b, LayoutBounds)->width, 80);
+    test_flt(ecs_get(world, a, Position)->x, -40);
+    test_flt(ecs_get(world, b, Position)->x, 60);
+    test_flt(ecs_get(world, q, LayoutBounds)->width, 122);
+    test_flt(ecs_get(world, q, LayoutBounds)->height, 10);
+    test_flt(ecs_get(world, c, LayoutBounds)->width, 40);
+    test_flt(ecs_get(world, d, LayoutBounds)->width, 80);
+
+    ecs_fini(world);
+}
+
+void Layout_grow_never_below_text(void) {
+    // ui_fixes/grow_basis
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t hello = ecs_new(world);
+    ecs_set(world, hello, Text, {.value = "Hello", .size = 16,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
+    ecs_entity_t world_word = ecs_new(world);
+    ecs_set(world, world_word, Text, {.value = "world", .size = 16,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
+    ecs_entity_t p = ecs_new(world);
+    ecs_set(world, p, Layout, { .direction = DirectionRow });
+    ecs_set(world, p, LayoutItem, {
+        .width = { SizeModeFixed, 100 }, .height = { SizeModeFixed, 50 } });
+    ecs_entity_t f = ecs_new_w_pair(world, EcsChildOf, p);
+    ecs_set(world, f, LayoutItem, {
+        .width = { SizeModeFixed, 80 }, .height = { SizeModeFixed, 10 } });
+    ecs_entity_t t = ecs_new_w_pair(world, EcsChildOf, p);
+    ecs_set(world, t, Text, {.value = "Hello world", .size = 16,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
+    ecs_set(world, t, LayoutItem, {
+        .width = { SizeModeGrow, 1, .content_min = true },
+        .height = { SizeModeGrow, 1, .content_min = true } });
+
+    ecs_entity_t c = ecs_new(world);
+    ecs_set(world, c, Layout, { .direction = DirectionColumn });
+    ecs_set(world, c, LayoutItem, {
+        .width = { SizeModeFixed, 200 }, .height = { SizeModeFixed, 5 } });
+    ecs_entity_t u = ecs_new_w_pair(world, EcsChildOf, c);
+    ecs_set(world, u, Text, {.value = "Hello world", .size = 16,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
+    ecs_set(world, u, LayoutItem, { .height = { SizeModeGrow, 1, .content_min = true } });
+    ecs_progress(world, 0);
+
+    const TextBounds *tt = ecs_get(world, t, TextBounds);
+    test_assert(tt != NULL);
+    float widest = fmaxf(ecs_get(world, hello, TextBounds)->width,
+        ecs_get(world, world_word, TextBounds)->width);
+    test_assert(fabsf(ecs_get(world, t, LayoutBounds)->width - widest) < 0.01f);
+    test_assert(fabsf(tt->width - widest) < 0.01f);
+    test_flt(tt->height, 2 * ecs_get(world, hello, TextBounds)->height);
+    test_flt(ecs_get(world, t, LayoutBounds)->height, 50);
+    const TextBounds *tu = ecs_get(world, u, TextBounds);
+    test_assert(tu->height > 5);
+    test_flt(ecs_get(world, u, LayoutBounds)->height, tu->height);
+
+    ecs_fini(world);
+}
+
+void Layout_grow_without_content_min(void) {
+    // ui_fixes/grow_basis
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t p = ecs_new(world);
+    ecs_set(world, p, Layout, { .direction = DirectionRow });
+    ecs_set(world, p, LayoutItem, {
+        .width = { SizeModeFixed, 200 }, .height = { SizeModeFixed, 50 } });
+    ecs_entity_t a = ecs_new_w_pair(world, EcsChildOf, p);
+    ecs_set(world, a, Layout, { .direction = DirectionRow });
+    ecs_set(world, a, LayoutItem, { .width = { SizeModeGrow, 3 } });
+    ecs_entity_t ca = ecs_new_w_pair(world, EcsChildOf, a);
+    ecs_set(world, ca, Rect, {40, 10});
+    ecs_entity_t b = ecs_new_w_pair(world, EcsChildOf, p);
+    ecs_set(world, b, Layout, { .direction = DirectionRow });
+    ecs_set(world, b, LayoutItem, {
+        .width = { SizeModeGrow, 1 }, .height = { SizeModeGrow, 1 } });
+    ecs_entity_t cb = ecs_new_w_pair(world, EcsChildOf, b);
+    ecs_set(world, cb, Rect, {80, 70});
+    ecs_progress(world, 0);
+
+    test_flt(ecs_get(world, a, LayoutBounds)->width, 150);
+    test_flt(ecs_get(world, b, LayoutBounds)->width, 50);
+    test_flt(ecs_get(world, b, LayoutBounds)->height, 50);
+
+    ecs_fini(world);
+}
+
+void Layout_grow_cross_axis_keeps_content(void) {
+    // ui_fixes/grow_basis
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t p = ecs_new(world);
+    ecs_set(world, p, Layout, { .direction = DirectionRow });
+    ecs_set(world, p, LayoutItem, {
+        .width = { SizeModeFixed, 200 }, .height = { SizeModeFixed, 5 } });
+    ecs_entity_t t = ecs_new_w_pair(world, EcsChildOf, p);
+    ecs_set(world, t, Text, {.value = "Hello world", .size = 16,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
+    ecs_set(world, t, LayoutItem, { .height = { SizeModeGrow, 1, .content_min = true } });
+
+    ecs_entity_t q = ecs_new(world);
+    ecs_set(world, q, Layout, { .direction = DirectionNone });
+    ecs_set(world, q, LayoutItem, {
+        .width = { SizeModeFixed, 10 }, .height = { SizeModeFixed, 5 } });
+    ecs_entity_t u = ecs_new_w_pair(world, EcsChildOf, q);
+    ecs_set(world, u, Text, {.value = "Hello world", .size = 16,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
+    ecs_set(world, u, LayoutItem, {
+        .width = { SizeModeGrow, 1, .content_min = true },
+        .height = { SizeModeGrow, 1, .content_min = true } });
+
+    ecs_entity_t r = ecs_new(world);
+    ecs_set(world, r, Layout, { .direction = DirectionRow });
+    ecs_set(world, r, LayoutItem, {
+        .width = { SizeModeFixed, 200 }, .height = { SizeModeFixed, 40 } });
+    ecs_entity_t v = ecs_new_w_pair(world, EcsChildOf, r);
+    ecs_set(world, v, Text, {.value = "Hello world", .size = 16,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
+    ecs_set(world, v, LayoutItem, { .height = { SizeModeGrow, 1, .content_min = true } });
+    ecs_progress(world, 0);
+
+    const TextBounds *tt = ecs_get(world, t, TextBounds);
+    test_assert(tt != NULL);
+    test_assert(tt->height > 5);
+    test_assert(tt->width > 10);
+    test_flt(ecs_get(world, t, LayoutBounds)->height, tt->height);
+    const TextBounds *tu = ecs_get(world, u, TextBounds);
+    test_flt(tu->height, 2 * tt->height);
+    test_assert(fabsf(ecs_get(world, u, LayoutBounds)->width - tu->width) < 0.01f);
+    test_flt(ecs_get(world, u, LayoutBounds)->height, tu->height);
+    test_flt(ecs_get(world, v, LayoutBounds)->height, 40);
+
+    ecs_fini(world);
+}
+
+void Layout_grow_zero_weight_keeps_content(void) {
+    // ui_fixes/grow_basis
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t p = ecs_new(world);
+    ecs_set(world, p, Layout, { .direction = DirectionRow });
+    ecs_set(world, p, LayoutItem, {
+        .width = { SizeModeFixed, 300 }, .height = { SizeModeFixed, 50 } });
+    ecs_entity_t a = ecs_new_w_pair(world, EcsChildOf, p);
+    ecs_set(world, a, Layout, { .direction = DirectionRow });
+    ecs_set(world, a, LayoutItem, { .width = { SizeModeGrow, 0, .content_min = true } });
+    ecs_entity_t ca = ecs_new_w_pair(world, EcsChildOf, a);
+    ecs_set(world, ca, Rect, {40, 10});
+    ecs_entity_t b = ecs_new_w_pair(world, EcsChildOf, p);
+    ecs_set(world, b, LayoutItem, { .width = { SizeModeGrow, 1, .content_min = true } });
+    ecs_progress(world, 0);
+
+    test_flt(ecs_get(world, a, LayoutBounds)->width, 40);
+    test_flt(ecs_get(world, b, LayoutBounds)->width, 260);
+    test_flt(ecs_get(world, a, Position)->x, -130);
+    test_flt(ecs_get(world, b, Position)->x, 20);
+
+    ecs_set(world, a, LayoutItem, { .width = { SizeModeGrow, 0 } });
+    ecs_progress(world, 0);
+
+    test_flt(ecs_get(world, a, LayoutBounds)->width, 0);
+    test_flt(ecs_get(world, b, LayoutBounds)->width, 300);
+
+    ecs_fini(world);
+}
+
+void Layout_grow_script_keeps_content(void) {
+    // ui_fixes/grow_basis
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    const char *code =
+        "using box.layout\n"
+        "using box.geometry\n"
+        "row {\n"
+        "  Layout: {direction: Row}\n"
+        "  LayoutItem: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 20}}\n"
+        "  button {\n"
+        "    Layout: {direction: Row}\n"
+        "    LayoutItem: {width: {mode: Grow}}\n"
+        "    label { Rect: {80, 10} }\n"
+        "  }\n"
+        "  spacer { LayoutItem: {width: {mode: Grow}} }\n"
+        "}\n";
+    test_assert(ecs_script_run(world, "grow", code, NULL) == 0);
+    ecs_progress(world, 0);
+
+    ecs_entity_t button = ecs_lookup(world, "row.button");
+    test_flt(ecs_get(world, button, LayoutBounds)->width, 80);
+    test_flt(ecs_get(world, ecs_lookup(world, "row.spacer"), LayoutBounds)->width, 0);
+
+    ecs_fini(world);
+}
+
+void Layout_grow_opted_out_descendant_keeps_content(void) {
+    // ui_fixes/text_wrap
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t p = ecs_new(world);
+    ecs_set(world, p, Layout, { .direction = DirectionRow });
+    ecs_set(world, p, LayoutItem, {
+        .width = { SizeModeFixed, 100 }, .height = { SizeModeFixed, 20 } });
+    ecs_entity_t a = ecs_new_w_pair(world, EcsChildOf, p);
+    ecs_set(world, a, Layout, { .direction = DirectionColumn });
+    ecs_set(world, a, LayoutItem, { .width = { SizeModeGrow, 1, .content_min = true } });
+    ecs_entity_t b = ecs_new_w_pair(world, EcsChildOf, a);
+    ecs_set(world, b, Layout, { .direction = DirectionRow });
+    ecs_set(world, b, LayoutItem, { .width = { SizeModeGrow, 1 } });
+    ecs_entity_t rb = ecs_new_w_pair(world, EcsChildOf, b);
+    ecs_set(world, rb, Rect, {80, 10});
+    ecs_entity_t c = ecs_new_w_pair(world, EcsChildOf, p);
+    ecs_set(world, c, Layout, { .direction = DirectionRow });
+    ecs_set(world, c, LayoutItem, { .width = { SizeModeGrow, 1, .content_min = true } });
+    ecs_entity_t rc = ecs_new_w_pair(world, EcsChildOf, c);
+    ecs_set(world, rc, Rect, {80, 10});
+    ecs_progress(world, 0);
+
+    test_flt(ecs_get(world, a, LayoutBounds)->width, 80);
+    test_flt(ecs_get(world, b, LayoutBounds)->width, 80);
+    test_flt(ecs_get(world, c, LayoutBounds)->width, 80);
+
+    ecs_fini(world);
+}
+
+void Layout_grow_follows_shrinking_parent(void) {
+    // ui_fixes/grow_basis
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t p = ecs_new(world);
+    ecs_set(world, p, Layout, { .direction = DirectionRow });
+    ecs_set(world, p, LayoutItem, {
+        .width = { SizeModeFixed, 210 }, .height = { SizeModeFixed, 50 } });
+    ecs_entity_t a = ecs_new_w_pair(world, EcsChildOf, p);
+    ecs_set(world, a, Rect, {1, 1});
+    ecs_set(world, a, LayoutItem, {
+        .width = { SizeModeGrow, 1 }, .height = { SizeModeGrow, 1 } });
+    ecs_progress(world, 0);
+
+    test_flt(ecs_get(world, a, Rect)->width, 210);
+    test_flt(ecs_get(world, a, Rect)->height, 50);
+
+    ecs_set(world, p, LayoutItem, {
+        .width = { SizeModeFixed, 100 }, .height = { SizeModeFixed, 30 } });
+    ecs_progress(world, 0);
+
+    test_flt(ecs_get(world, a, LayoutBounds)->width, 100);
+    test_flt(ecs_get(world, a, LayoutBounds)->height, 30);
+    test_flt(ecs_get(world, a, Rect)->width, 100);
+    test_flt(ecs_get(world, a, Rect)->height, 30);
 
     ecs_fini(world);
 }

@@ -6,7 +6,7 @@
 #ifndef BOX_LAYOUT_INTERNAL_H
 #define BOX_LAYOUT_INTERNAL_H
 
-#include <box.h>
+#include "layout_text.h"
 
 /** One element of a layout tree, stored in breadth first order */
 typedef struct {
@@ -17,8 +17,9 @@ typedef struct {
     LayoutItem item;    /**< LayoutItem of the element, fit on both axes when it has none */
     float shape[2];     /**< Size of the shape or text of the element */
     float pos[3];       /**< Position the element had */
-    float fit[2];       /**< Size of the content plus padding, or of the shape */
-    float base[2];      /**< Size the element adds to the fit of its parent */
+    float base[2];      /**< Fit size within min and max, what the element adds to its parent */
+    float cmin[2];      /**< Narrowest the content of the element allows, within min and max */
+    float longest;      /**< Widest word of the text of the element, its narrowest width */
     float size[2];      /**< Computed size */
     float at[2];        /**< Computed position in the space of the parent */
     bool has_layout;    /**< The element has a Layout */
@@ -26,8 +27,9 @@ typedef struct {
     bool has_pos;       /**< The element has a Position */
     bool has_rect;      /**< The element has a Rect */
     bool rect_input;    /**< The Rect is the input of the element, not written */
+    bool has_text;      /**< The element is a text that takes the width of the layout */
     bool placed;        /**< The layout writes the position of the element */
-    bool frozen;        /**< The grow share of the element hit its min or max */
+    bool frozen;        /**< The grow share of the element hit a bound */
 } box_layout_node_t;
 
 /** State of the layout module, shared by its observers and its system */
@@ -35,7 +37,8 @@ typedef struct {
     ecs_vec_t marks;              /**< Elements changed since the last layout */
     ecs_vec_t roots;              /**< Roots of the trees to lay out this frame */
     ecs_vec_t nodes;              /**< Elements of the tree being laid out */
-    ecs_entity_t text_bounds;     /**< The TextBounds component, 0 until it exists */
+    box_layout_text_t text;       /**< Hooks of the texts, zero without box.text */
+    bool has_text;                /**< The tree being laid out has a text to wrap */
     bool writing;                 /**< The layout is writing its results */
 } box_layout_state_t;
 

@@ -361,7 +361,7 @@ level narrow phase and no picking.
 
 ## Text, layout and UI
 
-**Text.** `Text {value, size, line_height, width, align, font}` and `Font {path}`
+**Text.** `Text {value, size, line_height, width, align, wrap, font}` and `Font {path}`
 (`box.text.DefaultFont` is B612 in `etc/fonts`). Fonts load with stb_truetype on the job system.
 Glyph MSDFs are generated lazily per glyph on workers into RGBA8 atlas pages that grow and then
 page. Font data is untrusted: a face without units per em fails to load, and a glyph whose box
@@ -378,7 +378,16 @@ page (`src/render/text_draw.c`), shaded by `shape2d.wgsl`. No shaping (ligatures
 
 **Layout.** `Layout` on a parent arranges its children in `OrderedChildren` order in logical
 pixels: rows and columns, fit and grow sizing with weights, min/max, padding, spacing, alignment,
-and `DirectionNone` anchoring with x/y offsets. `LayoutItem` sets per child sizing. Observers
+and `DirectionNone` anchoring with x/y offsets. `LayoutItem` sets per child sizing. A growing
+child adds its fit size to the fit of its parent and takes a weighted share of the free space
+along the main axis, or stretches to the content box across it. With `Sizing.content_min` (on in
+a new `LayoutItem`, off in a C literal) it never gets less than its content minimum, the
+automatic minimum of CSS flex items; the console opts out so its panel keeps its fraction of the
+surface. The tree is solved in Clay's order: widths are measured and resolved, every
+`Text` takes its resolved width through the hooks box.text registers (`layout_text.h`), then
+heights are measured and resolved. Fitting elements narrow to their parent down to their
+content minimum (the widest word of a wrapping text, else the fit size), which propagates to
+every ancestor. `Text.wrap = TextWrapNewlines` opts a text out; the console does. Observers
 mark elements; `LayoutUpdate` (`EcsPostUpdate`) relays out the trees of marked elements and writes
 `Position` x/y, `LayoutBounds` and `Rect` only where they changed. A reorder through
 `ecs_set_child_order` needs `ecs_modified(parent, Layout)`.
