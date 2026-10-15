@@ -35,7 +35,8 @@
                 "id": "Frame",
                 "benchcases": [
                     "default_scope",
-                    "custom_scope"
+                    "custom_scope",
+                    "scope_lookups"
                 ]
             }
         ]

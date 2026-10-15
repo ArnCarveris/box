@@ -3,7 +3,8 @@
  * @brief Benchmarks for a frame of a world with one first person controller and one camera.
  *
  * The default case reads the default action scopes, the custom case scopes of its own that hold
- * every action by name, so the difference is what reading a custom scope costs per frame.
+ * every action by name, so the difference is what reading a custom scope costs per frame. The
+ * lookups case does only the 27 name lookups of those two controllers, in a bare flecs world.
  */
 
 #include <box.h>
@@ -69,4 +70,30 @@ void Frame_custom_scope(
 {
     // controller_fixes/controller_minor
     bench_frame_run(b, true);
+}
+
+void Frame_scope_lookups(
+    bench_t *b)
+{
+    // controller_fixes/controller_minor
+    ecs_world_t *world = ecs_init();
+    ecs_entity_t scope = ecs_entity(world, { .name = "keys" });
+    ecs_entity_t found = 0;
+    double run = 0;
+    int32_t i;
+    for (i = 0; i < 15; i ++) {
+        ecs_entity(world, { .name = bench_frame_actions[i], .parent = scope });
+    }
+
+    while (bench_iter(b)) {
+        for (i = 0; i < 27; i ++) {
+            found ^= ecs_lookup_child(world, scope, bench_frame_actions[i % 15]);
+        }
+
+        run ++;
+    }
+
+    bench_keep(found);
+    bench_counter(b, "frames_run", run);
+    ecs_fini(world);
 }
