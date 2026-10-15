@@ -237,7 +237,8 @@ static box_gpu_texture_t* box_gpu_texture_single(
     uint32_t width,
     uint32_t height)
 {
-    box_gpu_texture_t *result = ecs_os_calloc_t(box_gpu_texture_t);
+    box_gpu_texture_entry_t *entry = ecs_os_calloc_t(box_gpu_texture_entry_t);
+    box_gpu_texture_t *result = &entry->base;
     WGPUTextureFormat srgb = BOX_GPU_TEXTURE_SRGB;
     WGPUTextureDescriptor desc = {
         .usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst,
@@ -249,6 +250,7 @@ static box_gpu_texture_t* box_gpu_texture_single(
         .viewFormatCount = 1,
         .viewFormats = &srgb
     };
+    entry->space = BOX_GPU_MIP_LINEAR;
     result->mips = 1;
     result->mipped = true;
     result->texture = wgpuDeviceCreateTexture(gpu->device, &desc);
