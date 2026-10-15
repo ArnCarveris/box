@@ -16,6 +16,22 @@ static void Busy(ecs_iter_t *it) {
     }
 }
 
+/** Process CPU and wall time at a point of a frame */
+typedef struct {
+    bool marked;      /**< The mark was taken */
+    clock_t cpu;      /**< Process CPU time in clock ticks */
+    ecs_time_t wall;  /**< Wall time */
+} pacing_mark_t;
+
+static void MarkOnce(ecs_iter_t *it) {
+    pacing_mark_t *mark = it->ctx;
+    if (!mark->marked) {
+        mark->marked = true;
+        mark->cpu = clock();
+        ecs_os_get_time(&mark->wall);
+    }
+}
+
 void Pacing_sleep_over_budget(void) {
     // engine_core/app
     test_flt(box_app_pace(0.02, 0.02, 50), 0.02);
@@ -44,24 +60,26 @@ void Pacing_sleeps_when_over_budget(void) {
         .run = Busy
     });
 
+    pacing_mark_t start = {0};
+    ecs_system(world, {
+        .phase = EcsOnStore,
+        .run = MarkOnce,
+        .ctx = &start
+    });
+
     ecs_singleton_set(world, App, {
-        .headless = true, .frames = 6, .cpu_budget = 50, .unguarded = true });
+        .headless = true, .frames = 3, .cpu_budget = 10, .unguarded = true });
 
-    ecs_progress(world, 0);
-
-    clock_t cpu_start = clock();
-    ecs_time_t start;
-    ecs_os_get_time(&start);
-    for (int i = 0; i < 5; i ++) {
+    for (int i = 0; i < 3; i ++) {
         ecs_progress(world, 0);
     }
 
-    double wall = ecs_time_measure(&start);
-    double cpu = (double)(clock() - cpu_start) / (double)CLOCKS_PER_SEC;
+    double wall = ecs_time_measure(&start.wall);
+    double cpu = (double)(clock() - start.cpu) / (double)CLOCKS_PER_SEC;
     const AppStatus *status = ecs_singleton_get(world, AppStatus);
-    test_assert(cpu >= 0.1);
-    test_assert(cpu * 100.0 / 50.0 <= wall * 1.02);
-    test_assert(status->slept <= cpu * 100.0 / 50.0);
+    test_assert(cpu >= 0.04);
+    test_assert(cpu * 100.0 / 10.0 <= wall * 1.02);
+    test_assert(status->slept <= cpu * (100.0 / 10.0 - 1.0) * 1.02);
 
     ecs_fini(world);
 }
