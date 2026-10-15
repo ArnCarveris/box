@@ -498,7 +498,7 @@ void Bounces_colored_walls_bleed_with_bounces(void) {
         {0, 2, 2.1f, 4.4f, 4, 0.2f}, {-2.1f, 2, 0, 0.2f, 4, 4}, {2.1f, 2, 0, 0.2f, 4, 4}
     };
     const uint8_t colors[5][3] = {
-        {235, 235, 230}, {235, 235, 230}, {235, 235, 230}, {210, 30, 25}, {30, 200, 40}
+        {250, 250, 246}, {250, 250, 246}, {250, 250, 246}, {235, 30, 22}, {28, 215, 36}
     };
     float red[3] = {0, 0, 0}, green[3] = {0, 0, 0}, red_excess[3] = {0, 0, 0};
     float green_excess[3] = {0, 0, 0};
@@ -529,7 +529,7 @@ void Bounces_colored_walls_bleed_with_bounces(void) {
         ecs_set(world, ceiling, Position, {0, 4, 0});
         ecs_set(world, ceiling, Rotation, {1.5708f, 0, 0});
         ecs_set(world, ceiling, Quad, {4.4f, 4.4f});
-        ecs_set(world, ceiling, Rgb, {235, 235, 230});
+        ecs_set(world, ceiling, Rgb, {250, 250, 246});
         for (j = 0; j < 5; j ++) {
             ecs_entity_t part = ecs_new_w_pair(world, EcsChildOf, scene);
             ecs_set(world, part, Position, {parts[j][0], parts[j][1], parts[j][2]});
@@ -583,10 +583,10 @@ void Bounces_colored_walls_bleed_with_bounces(void) {
 
     test_assert(red[0] > 0.98f && red[0] < 1.02f);
     test_assert(green[0] > 0.98f && green[0] < 1.02f);
-    test_assert(red[1] > 1.1f && red[2] > 1.1f);
-    test_assert(green[1] > 1.1f && green[2] > 1.1f);
-    test_assert(red_excess[1] > red_excess[0] + 5);
-    test_assert(red_excess[2] > red_excess[1] + 1);
-    test_assert(green_excess[1] > green_excess[0] + 5);
-    test_assert(green_excess[2] > green_excess[1] + 1);
+    test_assert(red[1] > 1.15f && red[2] > 1.15f);
+    test_assert(green[1] > 1.15f && green[2] > 1.15f);
+    test_assert(red_excess[1] > red_excess[0] + 10);
+    test_assert(red_excess[2] > red_excess[1] + 2);
+    test_assert(green_excess[1] > green_excess[0] + 8);
+    test_assert(green_excess[2] > green_excess[1] + 2);
 }
