@@ -234,7 +234,8 @@ done:
  * step and probe heights, which its steps and probes then also reach.
  *
  * A box that holds more than BOX_MOVE_CROWD shapes is read for a quarter of the motion instead,
- * down to least. The next read starts from twice the stretch that worked.
+ * down to least. The next read starts from twice the stretch that worked, or from the whole
+ * motion when it held an eighth of that or less.
  *
  * @param m The move
  * @param pos The feet before the motion
@@ -267,6 +268,8 @@ static void box_move_cover(
             float shorter = fmaxf(len * 0.25f, least);
             glm_vec3_scale(motion, shorter / len, motion);
             len = shorter;
+        } else if (ecs_vec_count(&m->shapes) * 8 <= BOX_MOVE_CROWD) {
+            m->ahead = FLT_MAX;
         } else {
             m->ahead = len * 2;
         }
@@ -598,7 +601,7 @@ static void box_move_slide(
         steps = len > limit ? (int32_t)ceilf(len / limit) : 1;
         glm_vec3_scale(ECS_CONST_CAST(float*, motion), 1.0f / (float)steps, dir);
         glm_vec3_copy(ECS_CONST_CAST(float*, motion), ahead);
-        box_move_cover(m, pos, ahead, len, m->body->radius);
+        box_move_cover(m, pos, ahead, len, m->body->radius + BOX_MOVE_MARGIN);
         len = 0;
     } else {
         glm_vec3_copy(ECS_CONST_CAST(float*, motion), rest);
