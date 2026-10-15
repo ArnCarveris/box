@@ -1278,6 +1278,13 @@ bool box_render_gpu_cull_stats(
     }
 
     box_gpu_t *gpu = box_render_get_backend(world)->ctx;
+    bool renders = ecs_os_thread_self() == gpu->thread;
+    ecs_assert(renders, ECS_INVALID_OPERATION,
+        "box_render_gpu_cull_stats needs RenderSettings.main_thread and box_render_sync");
+    if (!renders) {
+        goto done;
+    }
+
     box_gpu_cull_t *c = &gpu->cull;
     int32_t words = ecs_vec_count(&c->arg_data);
     if (!c->args || !words) {

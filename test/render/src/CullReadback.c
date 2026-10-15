@@ -17,6 +17,7 @@ void CullReadback_older_frame_never_replaces_newer(void) {
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
+    ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
@@ -63,4 +64,32 @@ void CullReadback_older_frame_never_replaces_newer(void) {
     test_int(ecs_get(world, view, CullStatus)->visible, 1);
 
     ecs_fini(world);
+}
+
+void CullReadback_read_off_render_thread_aborts(void) {
+    // render_fixes/render_minor
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = false});
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    ecs_entity_t cube = ecs_new(world);
+    ecs_set(world, cube, Position, {0, 0, -5});
+    ecs_set(world, cube, Box, {1, 1, 1});
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 16, .height = 16, .resolution_scale = 1});
+    ecs_progress(world, 1.0f / 60);
+    box_render_sync(world);
+    test_bool(ecs_get(world, ecs_id(RenderStatus), RenderStatus)->threaded, true);
+
+    uint32_t word = 0;
+    ecs_os_api.abort_ = test_abort;
+    ecs_log_set_level(-5);
+    test_expect_abort();
+    box_render_gpu_read_buffer(world, BOX_RENDER_BUFFER_FIRST, 0, sizeof(word), &word);
 }

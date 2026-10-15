@@ -741,7 +741,8 @@ void box_render_use_gpu(
 /** Copy bytes of a buffer of the GPU backend of a world into memory, waiting for the copy.
  *
  * Only call this when the main thread renders (RenderSettings.main_thread), after
- * box_render_sync, so the device is used by one thread.
+ * box_render_sync, so the device is used by one thread; a call from another thread than the
+ * one that renders asserts, and returns false when asserts are compiled out.
  *
  * @param world The world
  * @param handle Handle of the buffer
@@ -760,7 +761,8 @@ bool box_render_gpu_read_buffer(
 /** Read back what the cull pass of a view kept in the last target the GPU backend rendered.
  *
  * Only call this when the main thread renders (RenderSettings.main_thread), after
- * box_render_sync, so the device is used by one thread.
+ * box_render_sync, so the device is used by one thread; a call from another thread than the
+ * one that renders asserts, and returns false when asserts are compiled out.
  *
  * @param world The world
  * @param view Entity with the View

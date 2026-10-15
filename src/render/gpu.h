@@ -412,6 +412,8 @@ typedef struct box_gpu_t {
     box_render_compile_delivery_t delivery; /**< When compile outcomes apply, under the lock */
     box_render_readback_delivery_t readbacks; /**< When cull counters publish, under the lock */
     box_render_gpu_stats_t stats;   /**< Counters read by the main thread */
+    box_render_gpu_stats_t pending; /**< Counter changes not yet published, render thread only */
+    ecs_os_thread_id_t thread;      /**< Thread that ran init, the only one using the device */
     uint32_t canvas;                /**< Target presented on the page canvas, 0 for none */
     box_gpu_effects_t *effects;     /**< Effect passes of the views */
     uint32_t rendering;             /**< Target that is rendering, materials cannot sample it */
@@ -483,7 +485,7 @@ void box_gpu_shader_report(
     const char *message,
     const char *label);
 
-/** Count an event of the backend.
+/** Count an event of the backend in the pending counters, without taking the lock.
  *
  * @param gpu The backend
  * @param stat The counter
@@ -491,6 +493,13 @@ void box_gpu_shader_report(
 void box_gpu_count(
     box_gpu_t *gpu,
     box_gpu_stat_t stat);
+
+/** Add the pending counters to the counters the main thread reads, under the lock once.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_stats_publish(
+    box_gpu_t *gpu);
 
 /** Create, reconfigure or release a target.
  *
