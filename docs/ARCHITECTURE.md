@@ -73,8 +73,9 @@ parser only writes the `App` singleton:
 | `<file>` | `scene` | Script loaded before the first frame |
 
 `box_app_run` refuses a headless run without `frames` or `timeout`, a headless run without its
-temporary folder, and a headless run on a machine whose load average exceeds its core count
-unless `App.unguarded` is set. It loads the
+temporary folder, and a headless run on a machine whose load average plus the cores its budget
+claims (`cpu_budget / 100`, one core for 0, no limit) exceeds the core count unless
+`App.unguarded` is set. It loads the
 scene as a managed script, starts the `TerminalServer` on `port` and steps the world until it
 quits. `BOX_TEST=1` sets `unguarded` and `unpaced` in every new world. The `AppFrame` system
 (`EcsPostFrame`) counts frames into `AppStatus.frame`, stops on `frames` or `timeout` and in a

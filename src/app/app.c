@@ -502,7 +502,7 @@ static int box_app_start(
         goto done;
     }
 
-    if (app->headless && !app->unguarded && box_app_guard()) {
+    if (app->headless && !app->unguarded && box_app_guard(app->cpu_budget)) {
         goto done;
     }
 

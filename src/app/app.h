@@ -97,21 +97,26 @@ double box_app_cpu_time(void);
  */
 double box_app_wall_time(void);
 
-/** Decide whether a machine is oversubscribed.
+/** Decide whether a machine is oversubscribed for a process with a CPU budget.
  *
  * @param load Load average over the last minute
  * @param cores Number of online cores
- * @return Whether the load exceeds the core count
+ * @param budget Percentage of one core the process may use, 0 for no limit, which claims one
+ *        core: the main thread when it runs flat out
+ * @return Whether the load plus the cores the budget claims exceeds the core count
  */
 bool box_app_oversubscribed(
     double load,
-    int32_t cores);
+    int32_t cores,
+    float budget);
 
-/** Refuse a headless start when the machine is oversubscribed.
+/** Refuse a headless start when the machine is oversubscribed for the CPU budget.
  *
+ * @param budget Percentage of one core the process may use, 0 for no limit
  * @return 0 when the process may start, nonzero when the machine is oversubscribed
  */
-int box_app_guard(void);
+int box_app_guard(
+    float budget);
 
 /** Compute the sleep that brings a process back within its CPU budget.
  *
