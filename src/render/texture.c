@@ -3,7 +3,7 @@
  * @brief Sends the images box.texture decoded to the backend and picks the sampler anisotropy.
  *
  * A texture gets a backend handle with its first image; a removed texture releases it. The
- * pixels are freed once they are in a packet, so a new backend loads every texture again.
+ * pixels stay after they are in a packet, so a new backend gets every image in its first one.
  * A texture entity a surface renders into resolves to the image of the target of the surface.
  */
 
