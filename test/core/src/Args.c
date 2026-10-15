@@ -5,6 +5,7 @@
 
 #include <box.h>
 #include <bake_test.h>
+#include "render.h"
 
 void Args_defaults(void) {
     // engine_core/app
@@ -269,4 +270,101 @@ void Args_two_scenes(void) {
     test_assert(box_app_parse(world, 3, argv) != 0);
 
     ecs_fini(world);
+}
+
+void Args_surface(void) {
+    // test_fixes/surface_option
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    char *argv[] = {"boxrun", "--surface", "800x600"};
+    test_int(box_app_parse(world, 3, argv), 0);
+
+    const App *app = ecs_singleton_get(world, App);
+    test_int(app->surface_width, 800);
+    test_int(app->surface_height, 600);
+
+    ecs_fini(world);
+}
+
+void Args_invalid_surface(void) {
+    // test_fixes/surface_option
+    const char *values[] = {"800", "800x", "x600", "0x600", "800x0", "-800x600", "800x-600",
+        "800x600x2", "800X600", " 800x600", "20000x600", "abc", ""};
+    int32_t i;
+    ecs_log_set_level(-4);
+    for (i = 0; i < (int32_t)(sizeof(values) / sizeof(values[0])); i ++) {
+        ecs_world_t *world = ecs_init();
+        ECS_IMPORT(world, Box);
+
+        char *argv[] = {"boxrun", "--surface", ECS_CONST_CAST(char*, values[i])};
+        test_assert(box_app_parse(world, 3, argv) != 0);
+
+        const App *app = ecs_singleton_get(world, App);
+        test_int(app->surface_width, 0);
+        test_int(app->surface_height, 0);
+
+        ecs_fini(world);
+    }
+}
+
+void Args_surface_created_when_none(void) {
+    // test_fixes/surface_option
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+
+    char *argv[] = {"boxrun", "--headless", "--frames", "3", "--surface", "320x200"};
+    test_int(box_app_parse(world, 6, argv), 0);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->unguarded = true;
+    app->unpaced = true;
+    test_int(box_app_run(world), 0);
+
+    test_int(ecs_count(world, Surface), 1);
+    ecs_iter_t it = ecs_each(world, Surface);
+    test_bool(ecs_each_next(&it), true);
+    const Surface *s = ecs_field(&it, Surface, 0);
+    test_int(s[0].width, 320);
+    test_int(s[0].height, 200);
+    test_flt(s[0].resolution_scale, 1);
+    test_flt(s[0].pixel_ratio, 1);
+    ecs_iter_fini(&it);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void Args_surface_not_created_when_present(void) {
+    // test_fixes/surface_option
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+
+    ecs_entity_t own = ecs_entity(world, { .name = "own" });
+    Surface *own_s = ecs_ensure(world, own, Surface);
+    own_s->width = 64;
+    own_s->height = 48;
+    ecs_modified(world, own, Surface);
+
+    char *argv[] = {"boxrun", "--headless", "--frames", "3", "--surface", "320x200"};
+    test_int(box_app_parse(world, 6, argv), 0);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->unguarded = true;
+    app->unpaced = true;
+    test_int(box_app_run(world), 0);
+
+    test_int(ecs_count(world, Surface), 1);
+    const Surface *s = ecs_get(world, own, Surface);
+    test_int(s->width, 64);
+    test_int(s->height, 48);
+
+    ecs_fini(world);
+    box_render_null_free(null);
 }

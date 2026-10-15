@@ -40,6 +40,42 @@ done:
     return result;
 }
 
+/** Parse a size written as <width>x<height>, both whole numbers from 1 to 16384.
+ *
+ * @param text The argument
+ * @param width Receives the width
+ * @param height Receives the height
+ * @return 0 when the argument is a valid size, nonzero when it is not
+ */
+static int box_app_size(
+    const char *text,
+    int32_t *width,
+    int32_t *height)
+{
+    char *end = NULL;
+    long w = 0, h = 0;
+    int result = -1;
+    if (!text || text[0] < '0' || text[0] > '9') {
+        goto done;
+    }
+
+    w = strtol(text, &end, 10);
+    if (end[0] != 'x' || end[1] < '0' || end[1] > '9') {
+        goto done;
+    }
+
+    h = strtol(end + 1, &end, 10);
+    if (end[0] || w < 1 || h < 1 || w > 16384 || h > 16384) {
+        goto done;
+    }
+
+    *width = (int32_t)w;
+    *height = (int32_t)h;
+    result = 0;
+done:
+    return result;
+}
+
 /** Parse the value of one option into the App singleton.
  *
  * @param app The App singleton
@@ -77,6 +113,8 @@ static int box_app_option(
             app->fps = (float)v;
             result = 0;
         }
+    } else if (!strcmp(flag, "surface")) {
+        result = box_app_size(value, &app->surface_width, &app->surface_height);
     } else if (!strcmp(flag, "port")) {
         if (!box_app_number(value, 0, &v) && v >= 0 && v <= 65535 && v == floor(v)) {
             app->port = (int32_t)v;
@@ -100,7 +138,8 @@ static bool box_app_has_value(
     const char *flag)
 {
     return !strcmp(flag, "frames") || !strcmp(flag, "timeout") ||
-        !strcmp(flag, "cpu-budget") || !strcmp(flag, "fps") || !strcmp(flag, "port");
+        !strcmp(flag, "cpu-budget") || !strcmp(flag, "fps") || !strcmp(flag, "port") ||
+        !strcmp(flag, "surface");
 }
 
 int box_app_parse(

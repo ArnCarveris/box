@@ -36,7 +36,11 @@
                     "invalid_timeout",
                     "invalid_cpu_budget",
                     "invalid_port",
-                    "two_scenes"
+                    "two_scenes",
+                    "surface",
+                    "invalid_surface",
+                    "surface_created_when_none",
+                    "surface_not_created_when_present"
                 ]
             },
             {

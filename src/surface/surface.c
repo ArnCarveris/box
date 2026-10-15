@@ -565,6 +565,30 @@ static void BoxSurfaceOnRemove(
     }
 }
 
+/** Create the Surface the command line asks for when the world has none after its scene
+ * loaded, then disable the system: it decides once, on the first frame.
+ *
+ * @param it The iterator of the system
+ */
+static void BoxSurfaceFromApp(
+    ecs_iter_t *it)
+{
+    ecs_world_t *world = it->world;
+    const App *app = ecs_singleton_get(world, App);
+    if (app && app->surface_width > 0 && app->surface_height > 0 &&
+        !ecs_count_id(world, ecs_id(Surface)))
+    {
+        ecs_entity_t e = ecs_new(world);
+        Surface *s = ecs_ensure(world, e, Surface);
+        s->width = app->surface_width;
+        s->height = app->surface_height;
+        s->vsync = true;
+        ecs_modified(world, e, Surface);
+    }
+
+    ecs_enable(world, it->system, false);
+}
+
 void BoxSurfaceImport(
     ecs_world_t *world)
 {
@@ -605,6 +629,13 @@ void BoxSurfaceImport(
         .query.terms = {{ .id = ecs_id(Surface) }},
         .events = { EcsOnRemove },
         .callback = BoxSurfaceOnRemove
+    });
+
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "SurfaceFromApp" }),
+        .phase = EcsPreFrame,
+        .immediate = true,
+        .run = BoxSurfaceFromApp
     });
 
     ecs_system(world, {
