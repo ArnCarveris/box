@@ -7,6 +7,8 @@
 #include <box.h>
 #include <bake_test.h>
 #include <math.h>
+#include "../../../src/geometry/mesh_cache.h"
+#include "../../../src/jobs/jobs.h"
 
 /** Disable the entity in the context while the left mouse button is held, as an action
  * handler that closes a popup on any click would.
@@ -575,6 +577,54 @@ void PickingCost_dense_mesh_changed_after_pick(void) {
             test_assert(fabsf(status->point[0] - x) < 1e-3f);
             test_assert(fabsf(status->point[2] - z) < 2e-3f);
         }
+    }
+
+    ecs_fini(world);
+}
+
+void PickingCost_dense_mesh_released_after_use(void) {
+    // spatial_perf/dense_mesh_release
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    test_int(box_jobs_set_workers(world, 0), 0);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 3});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f, .far_ = 100});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    ecs_progress(world, 0);
+    int32_t base = box_mesh_cache_count(cache);
+
+    ecs_entity_t ball = ecs_new(world);
+    ecs_set(world, ball, Position, {0, 0, 0});
+    ecs_set(world, ball, Sphere, {.segments = 128, .radius = 1});
+    int32_t f;
+    for (f = 0; f < 10; f ++) {
+        box_input_mouse_move(world, 640 + (float)f, 360, false);
+        ecs_progress(world, 0);
+    }
+
+    test_uint(ecs_singleton_get(world, PickStatus)->hit, ball);
+    test_int(box_mesh_cache_count(cache), base + 1);
+
+    ecs_delete(world, ball);
+    for (f = 0; f < 700; f ++) {
+        ecs_progress(world, 0);
+    }
+
+    test_int(box_mesh_cache_count(cache), base);
+
+    ball = ecs_new(world);
+    ecs_set(world, ball, Position, {0, 0, 0});
+    ecs_set(world, ball, Sphere, {.segments = 128, .radius = 0.5f});
+    ecs_progress(world, 0);
+    for (f = 0; f < 10; f ++) {
+        box_input_mouse_move(world, 640, 360 + (float)f, false);
+        ecs_progress(world, 0);
+        const PickStatus *status = ecs_singleton_get(world, PickStatus);
+        test_uint(status->hit, ball);
+        test_assert(fabsf(status->point[2] - 0.5f) < 2e-2f);
     }
 
     ecs_fini(world);

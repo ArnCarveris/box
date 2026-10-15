@@ -256,7 +256,8 @@
                     "disabled_on_press_not_targeted",
                     "ui_wins_tie_with_shape",
                     "moves_around_wheel_and_key",
-                    "dense_mesh_changed_after_pick"
+                    "dense_mesh_changed_after_pick",
+                    "dense_mesh_released_after_use"
                 ]
             },
             {
