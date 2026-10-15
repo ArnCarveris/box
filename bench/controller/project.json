@@ -20,7 +20,8 @@
                 "benchcases": [
                     "move_1m",
                     "move_blocked_1m",
-                    "frame_1m"
+                    "frame_1m",
+                    "fast_move_1m"
                 ]
             },
             {

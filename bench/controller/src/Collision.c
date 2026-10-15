@@ -3,7 +3,8 @@
  * @brief Benchmarks for controller collision in a scene with one million static shapes.
  *
  * Boxes, spheres, cylinders and cones stand on a 1000 x 1000 grid with a spacing of 1.5 units.
- * Move cases move first person sized capsules over the grid, the frame case walks one through it.
+ * Move cases move first person sized capsules over the grid (the fast case 100 units in one 0.5
+ * second frame), the frame case walks one through it.
  */
 
 #include <box.h>
@@ -25,6 +26,15 @@
 
 /** Seconds of a frame */
 #define BENCH_DT (1.0f / 60.0f)
+
+/** Moves per iteration of the fast move case */
+#define BENCH_FAST_MOVES (10)
+
+/** Units per second of the fast move case, a boosted camera */
+#define BENCH_FAST_SPEED (200.0f)
+
+/** Seconds of a frame of the fast move case */
+#define BENCH_FAST_DT (0.5f)
 
 /** Get a random number between 0 and 1.
  *
@@ -165,5 +175,47 @@ void Collision_frame_1m(
     const Position *p = ecs_get(world, fp, Position);
     bench_counter(b, "x", p->x);
     bench_counter(b, "z", p->z);
+    ecs_fini(world);
+}
+
+void Collision_fast_move_1m(
+    bench_t *b)
+{
+    // controller_fixes/substep_colliders
+    ecs_world_t *world = bench_collision_world();
+    box_controller_body_t body = {
+        .radius = 0.3f, .height = 1.85f, .step = 0.3f, .probe = 0.3f, .upright = true
+    };
+    Position *feet = ecs_os_malloc_n(Position, BENCH_FAST_MOVES);
+    vec3 *dir = ecs_os_malloc_n(vec3, BENCH_FAST_MOVES);
+    float extent = BENCH_ROW * BENCH_SPACING;
+    uint32_t seed = 11;
+    int32_t i;
+    float travelled = 0;
+    for (i = 0; i < BENCH_FAST_MOVES; i ++) {
+        float a = bench_random(&seed) * 6.2832f;
+        feet[i] = (Position){ 100 + bench_random(&seed) * (extent - 200), 0,
+            100 + bench_random(&seed) * (extent - 200) };
+        dir[i][0] = BENCH_FAST_SPEED * cosf(a);
+        dir[i][1] = 0;
+        dir[i][2] = BENCH_FAST_SPEED * sinf(a);
+    }
+
+    bench_set_items(b, BENCH_FAST_MOVES);
+    while (bench_iter(b)) {
+        travelled = 0;
+        for (i = 0; i < BENCH_FAST_MOVES; i ++) {
+            Position p = feet[i];
+            vec3 v = { dir[i][0], dir[i][1], dir[i][2] };
+            box_controller_move(world, &body, &p, v, BENCH_FAST_DT, NULL);
+            travelled += fabsf(p.x - feet[i].x) + fabsf(p.z - feet[i].z);
+        }
+
+        bench_keep(travelled);
+    }
+
+    bench_counter(b, "travelled", travelled / BENCH_FAST_MOVES);
+    ecs_os_free(dir);
+    ecs_os_free(feet);
     ecs_fini(world);
 }
