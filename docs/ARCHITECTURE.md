@@ -204,10 +204,15 @@ collapses to a point.
 
 `RenderExtractDraws` (`src/render/draw.c`) resolves 3D shapes to a shared unit mesh (keyed by
 topology and quantized proportions) plus an instance scale in the private `ShapeMesh`; radius
-and size are never baked. A mesh is sent once per backend as a resource create. Shapes live in
-persistent batches keyed by scene, mesh, pipeline (shader, blend, back face, textures) and
-whether they are dynamic; removed slots are filled with the last one. An instance is 128 bytes
-(model matrix with scale, normal data, color, emissive, metallic/roughness, UV transform).
+and size are never baked. Prefabs resolve their shape too: `Mesh3` is `(OnInstantiate, Inherit)`,
+so instances share the prefab's vertex data and copy the prefab's `ShapeMesh` instead of hashing
+it again. A prefab edit reaches every instance that does not override it (`ecs_set`; `ecs_get_mut`
+on an inheriting instance returns NULL), and instances lose the mesh when the prefab loses it or
+is deleted. The other shapes are copied into instances. A mesh is sent once per backend as a
+resource create. Shapes live in persistent batches keyed by scene, mesh, pipeline (shader,
+blend, back face, textures) and whether they are dynamic; removed slots are filled with the last
+one. An instance is 128 bytes (model matrix with scale, normal data, color, emissive,
+metallic/roughness, UV transform).
 
 Observers on shape, material, hierarchy and scene components and `box_transform_on_moved` queue
 changed entities, so an unchanged frame visits and uploads nothing (`RenderStatus.upload_bytes`).
@@ -290,17 +295,17 @@ constructor and taken literally otherwise. Adding it makes the engine add `Light
 shape out of the captures; a static shape has neither `DynamicTransform` nor `ManualTransform`.
 
 **Probe volume.** `RenderExtractBake` (`src/render/bake.c`) places a grid per baked scene over the
-static bounds of its spatial index (`box_spatial_static_bounds`) plus `bounds_padding`,
-`probe_spacing` apart (ceil(extent / spacing) + 1 per axis, centered, spacing widened above 262144
-probes), again only when the index or the settings change. Probes inside the oriented bounds of a
-static captured shape are invalid. The volume is a `BOX_RENDER_VOLUME` resource (`gpu_bake.c`): a
-grid uniform, two probe buffers of 9 rgb L2 SH irradiance coefficients per probe
-(Ramamoorthi-Hanrahan, Sloan's basis) and a validity bit mask, both buffers filled with the exact
-SH of the hemisphere ambient when it is created or the ambient changes. A view with
-`lighting.baked` binds it as group 3 of `mesh.wgsl` with the probe buffer the packet selects for
-the view (one bind group per buffer, same layout), whose `ambient()` term blends the 8 surrounding
-valid probes with DDGI style wrap weights; other views bind a 1x1x1 volume that keeps the
-hemisphere, so a scene without `LightBake` renders exactly as before.
+static bounds of its spatial index (`box_spatial_static_bounds`) plus `bounds_padding`, on the
+world lattice (k + 1/2) * `probe_spacing` inside the padded bounds (as Unity places adaptive probe
+volume bricks on a world grid; spacing widened above 262144 probes), again only when the index or
+the settings change. Probes inside the oriented bounds of a static captured shape are invalid. The
+volume is a `BOX_RENDER_VOLUME` resource (`gpu_bake.c`): a grid uniform, two probe buffers of 9 rgb
+L2 SH irradiance coefficients per probe (Ramamoorthi-Hanrahan, Sloan's basis) and a validity bit
+mask, both buffers filled with the exact SH of the hemisphere ambient when it is created or the
+ambient changes. A view with `lighting.baked` binds it as group 3 of `mesh.wgsl` with the probe
+buffer the packet selects for the view (one bind group per buffer, same layout), whose `ambient()`
+term blends the 8 surrounding valid probes with DDGI style wrap weights; other views bind a 1x1x1
+volume that keeps the hemisphere, so a scene without `LightBake` renders exactly as before.
 
 **Probe captures.** Every frame the bake extract moves the unbaked valid probes nearest to the
 cameras of the views of the scene into the packet as a bake batch with the lights of the scene. The
@@ -345,6 +350,31 @@ the converged bake. `PerfRun` warms up again while a bake that can progress (val
 `budget_ms` above 0, a view of its scene, the GPU backend) has probes left (captures of every
 remaining pass), and gives up with an error after 300 frames without progress. `budget_ms` 0 never
 bakes.
+
+**Invalidation.** `bake_change.c` queues the probes a change can reach instead of rebaking the
+volume, as Lumen invalidates its surface cache by the bounds of changed primitives. Static shapes
+come from `box_transform_on_moved` (their old bounds are still in the spatial index then) and from
+observers of their look (`Rgb`, `Emissive`, `PbrMaterial`, `BlendMode`, `BackFaceMode`,
+`TextureWrap`, `TextureTransform`, `ShapeMesh`, `PbrTextures` also through `IsA`, `Tint` and
+`Opacity` for every shape below the entity) and of `DynamicTransform`, `ManualTransform` and
+`NoBake` when the other flags leave the shape static; dynamic, manual and `NoBake` shapes queue
+nothing, deleted ones included, and nothing is recorded while no scene has `LightBake`. At extract
+the old and new bounds of each are checked again for probes inside geometry (newly invalid probes
+are hidden at once, newly valid ones shown with the next bake) and padded by `probe_spacing * (1 +
+bounces)`; the valid probes inside are queued. The light extract's lights of each scene are matched
+to the last frame by entity: a point or spot light added, removed or changed queues the probes
+within its old and new range, any directional light or the default sun every probe; an ambient
+change after a bake, `bounces` and `capture_size` queue every probe too, while `budget_ms` changes
+nothing. When no bake is in progress the queued probes start a staged bake: a
+`BOX_RENDER_VOLUME_COPY` copies the shown probe buffer into the other one, every pass bakes the
+queued probes there in place, and the views switch to it when the last pass is in a packet, seeing
+the probes it captured and those they saw before, so requeued probes keep their values until
+rebaked and probes that became valid stay hidden until a bake captured them. `converged` is false
+while probes are queued and `baked` counts the valid probes not waiting. Bounds that grow or shrink
+the grid resize it on its lattice: a `BOX_RENDER_VOLUME_RESIZE` fills the new grid and copies the
+rows of both probe buffers it shares with the old one, and only the new probes, hidden until baked,
+and the changed region are queued. A new `probe_spacing` places a new volume that bakes from the
+ambient.
 
 ## Spatial index
 

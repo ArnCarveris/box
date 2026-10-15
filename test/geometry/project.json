@@ -227,7 +227,12 @@
                     "cache_shared",
                     "update_content",
                     "ensure_modified_leak",
-                    "scale"
+                    "scale",
+                    "prefab_instances_share",
+                    "prefab_instance_override",
+                    "prefab_update",
+                    "prefab_delete",
+                    "prefab_remove"
                 ]
             },
             {
@@ -243,7 +248,8 @@
                     "bounds",
                     "prefab_instances",
                     "clone",
-                    "set_in_system"
+                    "set_in_system",
+                    "prefab_override_removed"
                 ]
             },
             {

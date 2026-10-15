@@ -18,7 +18,14 @@
 extern "C" {
 #endif
 
-/** Application authored mesh. */
+/** Application authored mesh.
+ *
+ * Mesh3 is (OnInstantiate, Inherit): prefab instances share the prefab's value instead of
+ * copying it, so editing the prefab's Mesh3 changes every instance that does not override it.
+ *
+ * An instance overrides the mesh with ecs_set or ecs_ensure; ecs_get_mut on an instance that
+ * inherits it returns NULL. Instances lose the mesh when the prefab loses it or is deleted.
+ */
 ECS_STRUCT(Mesh3, {
     ecs_vec(vec3) vertices;    /**< Vertex positions */
     ecs_vec(vec3) normals;     /**< Vertex normals, empty to derive them per face */

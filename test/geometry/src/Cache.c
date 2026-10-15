@@ -254,3 +254,31 @@ void Cache_set_in_system(void) {
 
     ecs_fini(world);
 }
+
+void Cache_prefab_override_removed(void) {
+    // core_fixes/mesh3_inherit
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+
+    ecs_entity_t p = ecs_new_w_id(world, EcsPrefab);
+    ecs_set(world, p, Box, {1, 1, 1});
+    ecs_entity_t i1 = ecs_new_w_pair(world, EcsIsA, p);
+    ecs_entity_t i2 = ecs_new_w_pair(world, EcsIsA, p);
+    ecs_set(world, i1, Box, {3, 3, 3});
+    test_flt(ecs_get(world, i1, ShapeMesh)->scale[0], 3.0f);
+
+    ecs_remove(world, i1, Box);
+    test_assert(!ecs_has(world, i1, Box));
+    test_assert(!ecs_has(world, i1, ShapeMesh));
+    const ShapeMesh *m2 = ecs_get(world, i2, ShapeMesh);
+    test_assert(m2 != NULL);
+    test_flt(m2->scale[0], 1.0f);
+
+    ecs_delete(world, i1);
+    ecs_delete(world, i2);
+    ecs_delete(world, p);
+    test_int(box_mesh_cache_count(cache), 0);
+
+    ecs_fini(world);
+}
