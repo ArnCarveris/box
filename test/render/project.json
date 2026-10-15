@@ -540,6 +540,12 @@
                     "equal_planes_projection_is_finite",
                     "valid_planes_after_invalid_draw"
                 ]
+            },
+            {
+                "id": "CullOrder",
+                "testcases": [
+                    "equal_depth_ties_render_identically"
+                ]
             }
         ]
     }

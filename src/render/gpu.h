@@ -226,6 +226,7 @@ typedef struct box_gpu_cull_uniforms_t {
     uint32_t jobs[4];               /**< First job, jobs, phase, counters of the cull view */
     mat4 view_proj;                 /**< World to clip space of the view */
     uint32_t hiz[4];                /**< Pyramid width, height and levels, 0 levels for none */
+    uint32_t scan[4];               /**< First scan word of a parallel dispatch, three unused */
 } box_gpu_cull_uniforms_t;
 
 /** What a view culled in a target, kept until its counters are read back */
@@ -259,8 +260,11 @@ typedef struct box_gpu_cluster_t {
 typedef struct box_gpu_cull_page_t {
     WGPUBuffer visible;             /**< Slots of the visible instances of its draws */
     WGPUBuffer lists;               /**< Slots of its listed jobs in draw order */
+    WGPUBuffer scan;                /**< Masks, counts and offsets of the workgroups culling it */
     uint64_t visible_size;          /**< Bytes of the visible buffer */
     uint64_t lists_size;            /**< Bytes of the list buffer */
+    uint64_t scan_size;             /**< Bytes of the scan buffer */
+    uint32_t scan_used;             /**< Scan words its parallel dispatches use */
     ecs_vec_t list_data;            /**< uint32_t, the slot lists of the target */
     uint32_t used;                  /**< Visible slots its draws use in the target */
     WGPUBindGroup group;            /**< Binds the shared buffers and its own */
@@ -280,6 +284,8 @@ typedef struct box_gpu_cull_t {
     WGPUPipelineLayout pipeline_layout; /**< Pipeline layout of the cull pass */
     WGPUComputePipeline parallel;   /**< Tests one instance per invocation, NULL without shader */
     WGPUComputePipeline ordered;    /**< Tests one job per invocation, keeping slot order */
+    WGPUComputePipeline scan;       /**< Turns the workgroup counts of a dispatch into offsets */
+    WGPUComputePipeline write;      /**< Writes the drawn slots of a dispatch at their offsets */
     WGPUBindGroupLayout hiz_first_layout; /**< Binds the depth and the first level */
     WGPUBindGroupLayout hiz_reduce_layout; /**< Binds a level and the level above it */
     WGPUPipelineLayout hiz_first_pipeline_layout; /**< Pipeline layout of the first level */

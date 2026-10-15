@@ -6,11 +6,33 @@
  * thread and wait for the GPU after every frame, so a case measures a whole frame.
  *
  * The offscreen cases see a tenth of the boxes; the city hides most of its street boxes.
+ * The instructions counter is what the process retired over the measured frames (macOS).
  */
 
 #include <box.h>
 #include <bake_bench.h>
 #include "render.h"
+#ifdef __APPLE__
+#include <libproc.h>
+#include <unistd.h>
+#endif
+
+/** Get the instructions the process retired so far.
+ *
+ * @return The instructions, 0 where the platform does not count them
+ */
+static uint64_t bench_cull_instructions(void)
+{
+    uint64_t result = 0;
+#ifdef __APPLE__
+    struct rusage_info_v4 info;
+    if (!proc_pid_rusage(getpid(), RUSAGE_INFO_V4, (rusage_info_t*)&info)) {
+        result = info.ri_instructions;
+    }
+#endif
+
+    return result;
+}
 
 /** Boxes along x */
 #define BENCH_CULL_X (400)
@@ -77,14 +99,19 @@ static void bench_cull(
         box_render_sync(world);
     }
 
+    double frames = 0;
+    uint64_t start = bench_cull_instructions();
     bench_set_items(b, BENCH_CULL_X * BENCH_CULL_Z);
     while (bench_iter(b)) {
         ecs_progress(world, 0);
         box_render_sync(world);
         box_render_gpu_read_buffer(world, BOX_RENDER_BUFFER_FIRST, 0, sizeof(word), &word);
         bench_keep(word);
+        frames ++;
     }
 
+    bench_counter(b, "instructions", (double)(bench_cull_instructions() - start));
+    bench_counter(b, "frames", frames);
     ecs_fini(world);
 }
 
@@ -152,14 +179,19 @@ static void bench_city(
         box_render_sync(world);
     }
 
+    double frames = 0;
+    uint64_t start = bench_cull_instructions();
     bench_set_items(b, BENCH_CITY * BENCH_CITY * 41);
     while (bench_iter(b)) {
         ecs_progress(world, 0);
         box_render_sync(world);
         box_render_gpu_read_buffer(world, BOX_RENDER_BUFFER_FIRST, 0, sizeof(word), &word);
         bench_keep(word);
+        frames ++;
     }
 
+    bench_counter(b, "instructions", (double)(bench_cull_instructions() - start));
+    bench_counter(b, "frames", frames);
     ecs_fini(world);
 }
 

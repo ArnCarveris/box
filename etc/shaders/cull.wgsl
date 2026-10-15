@@ -16,9 +16,14 @@
 // that comes into view is drawn the same frame. Cascades and views without occlusion run one
 // phase that draws everything in the frustum.
 //
-// cull_instances tests one instance per invocation of one job: a workgroup counts its drawn
-// instances and reserves their entries with one atomic, so the order within a draw is not
-// kept. cull_ordered tests one job per invocation in the order of its slots, for the blended
+// cull_instances tests one instance per invocation of one job and records which instances of
+// its workgroup it draws as a 64 bit mask with their count in the scan words of the dispatch.
+// cull_scan turns the counts of the workgroups into exclusive offsets, in workgroup order, and
+// writes the instance count of the draw; cull_write puts every drawn slot at the offset of its
+// workgroup plus the drawn slots before it in the mask. The visible slots keep slot order, so
+// exact depth ties resolve the same way every frame (a prefix sum stream compaction, GPU Gems 3
+// chapter 39, in passes because WebGPU gives no forward progress guarantee for a single pass
+// scan). cull_ordered tests one job per invocation in the order of its slots, for the blended
 // draws that are sorted back to front: their jobs list the slots (list is 1, first indexes
 // slot_lists), so a run of one batch in the sorted order is one draw. Both add the drawn and
 // the frustum culled instances to the counters of the cull view.
@@ -32,6 +37,7 @@ struct Cull {
     jobs: vec4u,
     view_proj: mat4x4f,
     hiz: vec4u,
+    scan: vec4u,
 };
 
 struct Job {
@@ -66,6 +72,7 @@ const PHASE_LATE: u32 = 2u;
 @group(0) @binding(3) var<storage, read_write> args: array<atomic<u32>>;
 @group(0) @binding(4) var<storage, read_write> counters: array<atomic<u32>>;
 @group(0) @binding(5) var<storage, read> slot_lists: array<u32>;
+@group(0) @binding(6) var<storage, read_write> scan_words: array<u32>;
 @group(1) @binding(0) var<storage, read> instances: array<Instance>;
 @group(2) @binding(0) var<storage, read_write> history: array<u32>;
 @group(2) @binding(1) var pyramid: texture_2d<f32>;
@@ -74,9 +81,14 @@ const PHASE_LATE: u32 = 2u;
 @group(0) @binding(9) var hiz_src: texture_2d<f32>;
 @group(0) @binding(10) var hiz_dst: texture_storage_2d<r32float, write>;
 
-var<workgroup> group_count: atomic<u32>;
+// Scan words per workgroup of a parallel dispatch: two mask words and the count, which
+// cull_scan replaces with the offset of the workgroup.
+const SCAN_WORDS: u32 = 3u;
+
+var<workgroup> group_mask: array<atomic<u32>, 2>;
 var<workgroup> group_culled: atomic<u32>;
-var<workgroup> group_base: u32;
+var<workgroup> scan_sums: array<u32, 64>;
+var<workgroup> scan_carry: u32;
 
 // Whether the world space box around an instance reaches into the frustum and is large enough.
 // The size is the diameter of the sphere around the box in pixels, tested only when the box is
@@ -196,48 +208,110 @@ fn base_of(job: Job) -> u32 {
 @compute @workgroup_size(64)
 fn cull_instances(
     @builtin(global_invocation_id) id: vec3u,
-    @builtin(local_invocation_index) local: u32)
+    @builtin(local_invocation_index) local: u32,
+    @builtin(workgroup_id) group: vec3u)
 {
     let job = jobs[cull.jobs.x];
     if (local == 0u) {
-        atomicStore(&group_count, 0u);
+        atomicStore(&group_mask[0], 0u);
+        atomicStore(&group_mask[1], 0u);
         atomicStore(&group_culled, 0u);
     }
 
     workgroupBarrier();
-    let slot = job.first + id.x;
-    var keep = false;
     if (id.x < job.count) {
-        let d = decide(job, slot);
-        keep = d.x;
+        let d = decide(job, job.first + id.x);
+        if (d.x) {
+            atomicOr(&group_mask[local / 32u], 1u << (local % 32u));
+        }
+
         if (d.y && cull.jobs.z != PHASE_EARLY) {
             atomicAdd(&group_culled, 1u);
         }
     }
 
-    var index = 0u;
-    if (keep) {
-        index = atomicAdd(&group_count, 1u);
-    }
-
     workgroupBarrier();
     if (local == 0u) {
-        let total = atomicLoad(&group_count);
+        let low = atomicLoad(&group_mask[0]);
+        let high = atomicLoad(&group_mask[1]);
+        let at = cull.scan.x + group.x * SCAN_WORDS;
+        scan_words[at] = low;
+        scan_words[at + 1u] = high;
+        scan_words[at + 2u] = countOneBits(low) + countOneBits(high);
         let culled = atomicLoad(&group_culled);
-        group_base = 0u;
-        if (total > 0u) {
-            group_base = atomicAdd(&args[args_of(job) * ARGS + 1u], total);
-            atomicAdd(&counters[cull.jobs.w * COUNTERS], total);
-        }
-
         if (culled > 0u) {
             atomicAdd(&counters[cull.jobs.w * COUNTERS + 1u], culled);
         }
     }
+}
 
-    let base = workgroupUniformLoad(&group_base);
-    if (keep) {
-        visible_slots[base_of(job) + base + index] = slot;
+// Exclusive offsets of the workgroups of a parallel dispatch, 64 at a time, and the instance
+// count of its draw. Runs as one workgroup.
+@compute @workgroup_size(64)
+fn cull_scan(@builtin(local_invocation_index) local: u32) {
+    let job = jobs[cull.jobs.x];
+    let groups = (job.count + 63u) / 64u;
+    if (local == 0u) {
+        scan_carry = 0u;
+    }
+
+    workgroupBarrier();
+    for (var start = 0u; start < groups; start += 64u) {
+        let g = start + local;
+        var own = 0u;
+        if (g < groups) {
+            own = scan_words[cull.scan.x + g * SCAN_WORDS + 2u];
+        }
+
+        scan_sums[local] = own;
+        workgroupBarrier();
+        for (var step = 1u; step < 64u; step *= 2u) {
+            var add = 0u;
+            if (local >= step) {
+                add = scan_sums[local - step];
+            }
+
+            workgroupBarrier();
+            scan_sums[local] += add;
+            workgroupBarrier();
+        }
+
+        let carry = scan_carry;
+        if (g < groups) {
+            scan_words[cull.scan.x + g * SCAN_WORDS + 2u] = carry + scan_sums[local] - own;
+        }
+
+        workgroupBarrier();
+        if (local == 63u) {
+            scan_carry = carry + scan_sums[63];
+        }
+
+        workgroupBarrier();
+    }
+
+    if (local == 0u) {
+        let total = scan_carry;
+        atomicStore(&args[args_of(job) * ARGS + 1u], total);
+        atomicAdd(&counters[cull.jobs.w * COUNTERS], total);
+    }
+}
+
+// Writes the drawn slots of a parallel dispatch at their offsets, in slot order.
+@compute @workgroup_size(64)
+fn cull_write(
+    @builtin(global_invocation_id) id: vec3u,
+    @builtin(local_invocation_index) local: u32,
+    @builtin(workgroup_id) group: vec3u)
+{
+    let job = jobs[cull.jobs.x];
+    let at = cull.scan.x + group.x * SCAN_WORDS;
+    let low = scan_words[at];
+    let mask = select(scan_words[at + 1u], low, local < 32u);
+    let bit = local % 32u;
+    if (id.x < job.count && ((mask >> bit) & 1u) != 0u) {
+        let below = countOneBits(mask & ((1u << bit) - 1u)) +
+            select(countOneBits(low), 0u, local < 32u);
+        visible_slots[base_of(job) + scan_words[at + 2u] + below] = job.first + id.x;
     }
 }
 

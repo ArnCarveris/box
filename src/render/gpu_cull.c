@@ -60,7 +60,7 @@ void box_gpu_cull_init(
         .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Compute,
         .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
     };
-    WGPUBindGroupLayoutEntry entries[6] = {
+    WGPUBindGroupLayoutEntry entries[7] = {
         {
             .binding = 0,
             .visibility = WGPUShaderStage_Compute,
@@ -94,13 +94,18 @@ void box_gpu_cull_init(
             .binding = 5,
             .visibility = WGPUShaderStage_Compute,
             .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
+        },
+        {
+            .binding = 6,
+            .visibility = WGPUShaderStage_Compute,
+            .buffer = { .type = WGPUBufferBindingType_Storage }
         }
     };
     int32_t i;
     gpu->instance_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
         &(WGPUBindGroupLayoutDescriptor){ .entryCount = 1, .entries = &instance });
     c->layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
-        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 6, .entries = entries });
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 7, .entries = entries });
     box_gpu_hiz_init(gpu);
     WGPUBindGroupLayout groups[3] = { c->layout, gpu->instance_layout, c->history_layout };
     c->pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
@@ -135,6 +140,40 @@ static void box_gpu_cull_release(
         wgpuBufferRelease(*buffer);
         *buffer = NULL;
     }
+}
+
+/** Release a compute pipeline when it exists.
+ *
+ * @param pipeline The pipeline, set to NULL
+ */
+static void box_gpu_cull_pipeline_release(
+    WGPUComputePipeline *pipeline)
+{
+    if (*pipeline) {
+        wgpuComputePipelineRelease(*pipeline);
+        *pipeline = NULL;
+    }
+}
+
+/** Create a compute pipeline of an entry point of the cull shader.
+ *
+ * @param gpu The backend
+ * @param module The cull shader
+ * @param entry Name of the entry point
+ * @return The pipeline
+ */
+static WGPUComputePipeline box_gpu_cull_pipeline(
+    box_gpu_t *gpu,
+    WGPUShaderModule module,
+    const char *entry)
+{
+    return wgpuDeviceCreateComputePipeline(gpu->device, &(WGPUComputePipelineDescriptor){
+        .layout = gpu->cull.pipeline_layout,
+        .compute = {
+            .module = module,
+            .entryPoint = { .data = entry, .length = WGPU_STRLEN }
+        }
+    });
 }
 
 void box_gpu_cull_fini(
@@ -172,6 +211,7 @@ void box_gpu_cull_fini(
 
         box_gpu_cull_release(&pg->visible);
         box_gpu_cull_release(&pg->lists);
+        box_gpu_cull_release(&pg->scan);
         ecs_vec_fini_t(NULL, &pg->list_data, uint32_t);
     }
 
@@ -186,11 +226,9 @@ void box_gpu_cull_fini(
         c->parallel = NULL;
     }
 
-    if (c->ordered) {
-        wgpuComputePipelineRelease(c->ordered);
-        c->ordered = NULL;
-    }
-
+    box_gpu_cull_pipeline_release(&c->ordered);
+    box_gpu_cull_pipeline_release(&c->scan);
+    box_gpu_cull_pipeline_release(&c->write);
     if (c->pipeline_layout) {
         wgpuPipelineLayoutRelease(c->pipeline_layout);
         c->pipeline_layout = NULL;
@@ -244,34 +282,18 @@ static bool box_gpu_cull_pipelines(
         goto done;
     }
 
-    if (c->parallel) {
-        wgpuComputePipelineRelease(c->parallel);
-    }
-
-    if (c->ordered) {
-        wgpuComputePipelineRelease(c->ordered);
-    }
-
-    c->parallel = wgpuDeviceCreateComputePipeline(gpu->device,
-        &(WGPUComputePipelineDescriptor){
-            .layout = c->pipeline_layout,
-            .compute = {
-                .module = s->module,
-                .entryPoint = { .data = "cull_instances", .length = WGPU_STRLEN }
-            }
-        });
-    c->ordered = wgpuDeviceCreateComputePipeline(gpu->device,
-        &(WGPUComputePipelineDescriptor){
-            .layout = c->pipeline_layout,
-            .compute = {
-                .module = s->module,
-                .entryPoint = { .data = "cull_ordered", .length = WGPU_STRLEN }
-            }
-        });
+    box_gpu_cull_pipeline_release(&c->parallel);
+    box_gpu_cull_pipeline_release(&c->ordered);
+    box_gpu_cull_pipeline_release(&c->scan);
+    box_gpu_cull_pipeline_release(&c->write);
+    c->parallel = box_gpu_cull_pipeline(gpu, s->module, "cull_instances");
+    c->ordered = box_gpu_cull_pipeline(gpu, s->module, "cull_ordered");
+    c->scan = box_gpu_cull_pipeline(gpu, s->module, "cull_scan");
+    c->write = box_gpu_cull_pipeline(gpu, s->module, "cull_write");
     box_gpu_hiz_pipelines(gpu, s->module);
     c->revision = s->revision;
 done:
-    return s && s->module && c->parallel && c->ordered;
+    return s && s->module && c->parallel && c->ordered && c->scan && c->write;
 }
 
 /** Record the outcome of the map of a counter copy.
@@ -537,6 +559,12 @@ static void box_gpu_cull_dispatch(
     u->jobs[0] = first;
     u->jobs[1] = count;
     u->jobs[2] = phase;
+    if (instances) {
+        box_gpu_cull_page_t *pg = ecs_vec_get_t(&c->pages, box_gpu_cull_page_t, (int32_t)page);
+        u->scan[0] = pg->scan_used;
+        pg->scan_used += (work + BOX_GPU_CULL_GROUP - 1) / BOX_GPU_CULL_GROUP * 3;
+    }
+
     box_gpu_cull_dispatch_t *d = ecs_vec_append_t(NULL, &c->dispatches, box_gpu_cull_dispatch_t);
     d->buffer = buffer;
     d->groups = (work + BOX_GPU_CULL_GROUP - 1) / BOX_GPU_CULL_GROUP;
@@ -565,6 +593,7 @@ static box_gpu_cull_page_t* box_gpu_cull_page_next(
 
     ecs_vec_clear(&result->list_data);
     result->used = 0;
+    result->scan_used = 0;
     c->page_count ++;
 
     return result;
@@ -1011,8 +1040,10 @@ static void box_gpu_cull_page_upload(
         (uint64_t)pg->used * sizeof(uint32_t), WGPUBufferUsage_Storage | WGPUBufferUsage_Vertex);
     grown |= box_gpu_cull_reserve(gpu, &pg->lists, &pg->lists_size,
         (uint64_t)lists * sizeof(uint32_t), WGPUBufferUsage_Storage);
+    grown |= box_gpu_cull_reserve(gpu, &pg->scan, &pg->scan_size,
+        (uint64_t)pg->scan_used * sizeof(uint32_t), WGPUBufferUsage_Storage);
     if (grown || !pg->group) {
-        WGPUBindGroupEntry entries[6] = {
+        WGPUBindGroupEntry entries[7] = {
             {
                 .binding = 0, .buffer = c->uniforms,
                 .size = sizeof(box_gpu_cull_uniforms_t)
@@ -1021,7 +1052,8 @@ static void box_gpu_cull_page_upload(
             { .binding = 2, .buffer = pg->visible, .size = pg->visible_size },
             { .binding = 3, .buffer = c->args, .size = c->args_size },
             { .binding = 4, .buffer = c->counters, .size = c->counters_size },
-            { .binding = 5, .buffer = pg->lists, .size = pg->lists_size }
+            { .binding = 5, .buffer = pg->lists, .size = pg->lists_size },
+            { .binding = 6, .buffer = pg->scan, .size = pg->scan_size }
         };
         if (pg->group) {
             wgpuBindGroupRelease(pg->group);
@@ -1029,7 +1061,7 @@ static void box_gpu_cull_page_upload(
 
         pg->group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
             .layout = c->layout,
-            .entryCount = 6,
+            .entryCount = 7,
             .entries = entries
         });
     }
@@ -1087,6 +1119,9 @@ done:
 
 /** Record the dispatches of the views of a slot in one phase.
  *
+ * Every parallel dispatch runs in three stages, each over all dispatches before the next:
+ * cull_instances, cull_scan and cull_write, so its draw keeps the order of its slots.
+ *
  * @param gpu The backend
  * @param encoder The encoder of the frame
  * @param slot Slot of the view in the view buffer, -1 for every cull view
@@ -1103,44 +1138,52 @@ static void box_gpu_cull_dispatches(
     box_gpu_cull_t *c = &gpu->cull;
     WGPUComputePassEncoder pass = NULL;
     WGPUComputePipeline bound = NULL;
-    int32_t i, d, count = ecs_vec_count(&c->views);
+    int32_t stage, i, d, count = ecs_vec_count(&c->views);
     if (!c->bound || !box_gpu_cull_pipelines(gpu)) {
         goto done;
     }
 
-    for (i = 0; i < count; i ++) {
-        const box_gpu_cull_view_t *cv = ecs_vec_get_t(&c->views, box_gpu_cull_view_t, i);
-        if (slot != -1 && cv->slot != slot) {
-            continue;
-        }
-
-        for (d = cv->first_dispatch; d < cv->first_dispatch + cv->dispatch_count; d ++) {
-            const box_gpu_cull_dispatch_t *dp = ecs_vec_get_t(
-                &c->dispatches, box_gpu_cull_dispatch_t, d);
-            box_gpu_buffer_t *b = ecs_map_get_deref(
-                &gpu->buffers, box_gpu_buffer_t, dp->buffer);
-            WGPUComputePipeline pipeline = dp->ordered ? c->ordered : c->parallel;
-            uint32_t offset = (uint32_t)d * BOX_GPU_CULL_STRIDE;
-            if (dp->late != late) {
+    for (stage = 0; stage < 3; stage ++) {
+        for (i = 0; i < count; i ++) {
+            const box_gpu_cull_view_t *cv = ecs_vec_get_t(&c->views, box_gpu_cull_view_t, i);
+            if (slot != -1 && cv->slot != slot) {
                 continue;
             }
 
-            if (!pass) {
-                pass = wgpuCommandEncoderBeginComputePass(encoder,
-                    &(WGPUComputePassDescriptor){ .timestampWrites = writes });
-            }
+            for (d = cv->first_dispatch; d < cv->first_dispatch + cv->dispatch_count; d ++) {
+                const box_gpu_cull_dispatch_t *dp = ecs_vec_get_t(
+                    &c->dispatches, box_gpu_cull_dispatch_t, d);
+                box_gpu_buffer_t *b = ecs_map_get_deref(
+                    &gpu->buffers, box_gpu_buffer_t, dp->buffer);
+                WGPUComputePipeline pipeline = stage == 1 ? c->scan : c->write;
+                uint32_t offset = (uint32_t)d * BOX_GPU_CULL_STRIDE;
+                if (dp->late != late || (stage && dp->ordered)) {
+                    continue;
+                }
 
-            if (pipeline != bound) {
-                wgpuComputePassEncoderSetPipeline(pass, pipeline);
-                bound = pipeline;
-            }
+                if (!stage) {
+                    pipeline = dp->ordered ? c->ordered : c->parallel;
+                }
 
-            wgpuComputePassEncoderSetBindGroup(pass, 0, ecs_vec_get_t(&c->pages,
-                box_gpu_cull_page_t, (int32_t)dp->page)->group, 1, &offset);
-            wgpuComputePassEncoderSetBindGroup(pass, 1, box_gpu_instance_group(gpu, b), 0, NULL);
-            wgpuComputePassEncoderSetBindGroup(pass, 2, dp->history ? dp->history : cv->group,
-                0, NULL);
-            wgpuComputePassEncoderDispatchWorkgroups(pass, dp->groups, 1, 1);
+                if (!pass) {
+                    pass = wgpuCommandEncoderBeginComputePass(encoder,
+                        &(WGPUComputePassDescriptor){ .timestampWrites = writes });
+                }
+
+                if (pipeline != bound) {
+                    wgpuComputePassEncoderSetPipeline(pass, pipeline);
+                    bound = pipeline;
+                }
+
+                wgpuComputePassEncoderSetBindGroup(pass, 0, ecs_vec_get_t(&c->pages,
+                    box_gpu_cull_page_t, (int32_t)dp->page)->group, 1, &offset);
+                wgpuComputePassEncoderSetBindGroup(pass, 1, box_gpu_instance_group(gpu, b),
+                    0, NULL);
+                wgpuComputePassEncoderSetBindGroup(pass, 2,
+                    dp->history ? dp->history : cv->group, 0, NULL);
+                wgpuComputePassEncoderDispatchWorkgroups(pass, stage == 1 ? 1 : dp->groups,
+                    1, 1);
+            }
         }
     }
 
