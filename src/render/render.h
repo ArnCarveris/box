@@ -95,8 +95,15 @@
 /** Flag of a texture handle that samples the image of the target in its low bits */
 #define BOX_RENDER_TEXTURE_TARGET (0x80000000u)
 
-/** Bytes of packet data a reused packet keeps, a larger block is freed when it is reset */
+/** Bytes of packet data a reused packet always keeps; a larger block is freed once the frames
+ * used under a BOX_RENDER_DATA_TRIM_FILL share of it for BOX_RENDER_DATA_TRIM_RESETS resets */
 #define BOX_RENDER_DATA_KEEP (16 * 1024 * 1024)
+
+/** Divisor of the capacity of a large data block under which a frame counts as using little */
+#define BOX_RENDER_DATA_TRIM_FILL (4)
+
+/** Resets in a row that use little of a large data block before the block is freed */
+#define BOX_RENDER_DATA_TRIM_RESETS (120)
 
 /** Phase after EcsOnStore in which modules append what a frame renders to its packet */
 extern ECS_DECLARE(RenderExtract);
@@ -457,6 +464,8 @@ typedef struct box_render_packet_t {
     ecs_vec_t data;         /**< Bytes the resources and uploads point into */
     int32_t generation;     /**< Backend generation the extract built it for, the ring drops a
                              *   packet of an older generation instead of rendering it */
+    int32_t data_idle;      /**< Resets in a row whose frame used little of a data block above
+                             *   BOX_RENDER_DATA_KEEP, see BOX_RENDER_DATA_TRIM_RESETS */
 } box_render_packet_t;
 
 /** A renderer: the only code that receives packets, always called from one thread.
@@ -1119,7 +1128,8 @@ void box_render_packet_init(
 void box_render_packet_fini(
     box_render_packet_t *p);
 
-/** Empty a packet and keep its storage.
+/** Empty a packet and keep its storage, except a data block above BOX_RENDER_DATA_KEEP that
+ * the frames used little of for BOX_RENDER_DATA_TRIM_RESETS resets in a row.
  *
  * @param p The packet
  */
