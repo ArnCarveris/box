@@ -93,6 +93,12 @@ part that does not fit in a command. Read `CLAUDE.md` for the house rules and
 
 The one way past it is `--waive-tests "<reason>"`, which closes the item and records `tests_waived` (the reason, the time and the failures) in `progress.json`, the way `--skip-review` records `review_skipped`; it is not recorded when every report passes, and reopening the item drops it. `pm check` reports every completed task or epic with a failing report as a problem and one closed with `--waive-tests` as a warning that names the reason; `pm status` and `pm review` print the reason too. A delivered task whose reports fail is in the stage **tests failing** until a passing `pm deliver`.
 
+## Unverified requirements
+
+A requirement item of the task or epic that no automated test or headless check verifies, because it was only checked by hand or not at all (for example "no real window was run"), is listed in a `## Not verified` section of `deliverable/README.md`, one line per item (a list marker is optional). It never hides under another heading such as Left out, which is for work the task did not take on; a section that only says `None.` lists nothing, and the section is left out when everything is verified. The reviewer raises every requirement that the change verifies only manually or not at all as a finding, so it is either verified in a fix round or ends up in the section.
+
+`pm review` prints each item as `not verified: <item>`, and once the loop has passed its next step is **gap** instead of done. `pm done` (task or epic) refuses an item whose README lists anything under Not verified, and `--force` and `--skip-review` do not pass it. The one way past it is `--accept-gap "<reason>"`, which the coordinator passes only after the user has accepted the gap; it records `gaps_accepted` in `progress.json` (the reason, who accepted it from `git config user.name`, the time and the items), is not recorded when the section lists nothing, and is dropped when the item reopens. The task's stage becomes **complete (gap accepted)** in the warning colour of the other waivers, with the reason and who accepted it as its detail (an epic shows them on its complete stage); `pm status` and `pm review` print the reason, and `pm check` reports a completed item with unverified items as a problem, or as a warning naming the reason when the gap was accepted.
+
 ## Closing a task
 
 After each task:
@@ -101,7 +107,9 @@ After each task:
    epic README, `DESIGN.md` and `CLAUDE.md`, and writes
    `deliverable/review/review.md`: a `Date: <UTC time>` line, then a `## Findings`
    section with one `### R<n> [blocker|major|minor] <title>` block per finding (File,
-   Problem, Expected), or `None.` when there is nothing to fix.
+   Problem, Expected), or `None.` when there is nothing to fix. Every requirement the
+   change verifies only manually or not at all is a finding (see
+   [Unverified requirements](#unverified-requirements)).
 2. **Respond.** An agent addresses every finding left open, by fixing the code with a
    test that proves it or by explaining with evidence why it is not a defect, and
    appends a `## Round <k>` section to `deliverable/review/response.md`: a
@@ -172,8 +180,8 @@ Every task has a stage, derived from its status and the artefacts `pm review` pa
 | review written, fix round 1 / fix round k | findings open, round k of `response.md` missing or incomplete |
 | verification round k | response round k written, `verification_r<k>.md` missing |
 | review artefacts malformed | a review artefact breaks the strict format or order (`pm review` lists the lines) |
-| ready to close | the loop has passed, waiting for the redelivery after the review or for `pm done` |
-| complete, complete (review skipped), complete (failing tests waived), discarded | closed; a waived completion names the `--waive-tests` reason |
+| ready to close | the loop has passed, waiting for the redelivery after the review, for `pm done` or, with items under Not verified, for the user to accept the gap |
+| complete, complete (review skipped), complete (failing tests waived), complete (gap accepted), discarded | closed; a waived completion names the `--waive-tests` reason, an accepted gap the `--accept-gap` reason and who accepted it |
 
 An epic is **open**, **closing** once every task is complete or discarded but the epic is not done, or
 **complete**, and counts its tasks per stage. The board shows the stage as a chip on every task card
