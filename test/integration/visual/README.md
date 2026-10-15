@@ -21,8 +21,12 @@ The runner appends a `visual_capture` entity with a `Surface` of 640x360 (`--siz
 bake3 run apps/boxrun --local-env=<name> -- --headless --frames 3 --timeout 120 --port 0 <scene>
 ```
 
-A headless run steps with a fixed delta, so the frame it writes is the same run after run. A
-run refused with `cpu oversubscribed` is retried. `--app` renders with another bake project and
+A headless run steps with a fixed delta, so the frame it writes is the same run after run. The
+runner builds the app once with `bake3 build` and runs every scene with a copy of that binary, so
+a build in the same environment during the suite cannot swap the binary halfway. A render the
+load guard refuses (`cpu oversubscribed`) waits for the load average to drop to the core count
+and runs again, up to `--load-wait` seconds (1800) for the whole run; a scene still refused then
+fails as `not rendered: cpu oversubscribed`, never as a difference. `--app` renders with another bake project and
 `--dir` takes scenes and baselines from another folder, which is how a game keeps its own:
 `python3 tools/integration.py visual --dir apps/<game>/test/visual --app <game>`.
 
@@ -42,6 +46,15 @@ brighter, red where it is darker, yellow where only the hue moved, at half stren
 channel moved more than 16, over a dimmed grey copy of the baseline where the pixels are
 identical. The `.log` of every scene holds the output of its run and `.run.flecs` the script
 that ran. The output folder ignores itself in git.
+
+## History
+
+Every run is also kept in `test/integration/out/history` (`--history` moves it), which a rerun
+never overwrites: `<run>/results.json` holds the commit at the start and end, the binary and its
+build time, and per scene the diff stats, exit code, attempts, guard refusals, load wait, load
+average before and after, render seconds and the error lines of its log; the render, baseline,
+diff, log and script of every failing scene are copied next to it. `runs.jsonl` has one summary
+line per run with the failing scenes. The last 30 runs are kept.
 
 ## Rules for a scene
 

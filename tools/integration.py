@@ -23,6 +23,16 @@ render is brighter, red where it is darker, yellow where only the hue moved, at 
 when no channel moved more than 16, over a dimmed grey copy of the baseline where the pixels are
 identical. --json writes the results in the bake3 test report format.
 
+The run builds the app once (bake3 build) and renders every scene with a copy of that binary, so
+a build in the same environment during the run cannot change the binary halfway. When the load
+guard refuses a render (load average above the core count), the run waits for the load to drop
+and tries again, up to --load-wait seconds for the whole run; a scene still refused then fails as
+"not rendered: cpu oversubscribed", never as a render difference. Every run is also kept in
+test/integration/out/history (--history moves it): <run>/results.json with every scene's diff
+stats, exit code, attempts, refusals, load wait, load before and after, render seconds and the
+error lines of its log, plus the render, baseline, diff, log and script of every failing scene,
+and one summary line per run in runs.jsonl. The last 30 runs are kept.
+
   integration.py perf [--dir dir] [--app project] [--env name] [--cfg mode] [--out dir]
                       [--size WxH] [--seconds s] [--cpu-budget pct] [--stall ms] [--max-load n]
                       [--json file] [scene ...]
@@ -73,6 +83,8 @@ MAX_PIXELS = 200
 RENDER_TIMEOUT = 120
 GUARD_RETRIES = 6
 GUARD_WAIT = 10
+GUARD_PAUSE = 2
+LOAD_WAIT = 1800
 PERF_TIMEOUT = 240
 PERF_FIELDS = ("target_fps", "frames", "errors", "slow", "fast", "min_ms", "mean_ms", "p50_ms",
                "p99_ms", "max_ms", "fps", "work_mean_ms", "work_p99_ms", "work_max_ms",
@@ -86,8 +98,8 @@ PERF_KEYS = PERF_FIELDS + ("drawn", "culled", "deg_per_frame", "cull_samples", "
     "%s_%s" % (name, end) for name in CULL_FIELDS for end in ("min", "max"))
 MAX_SETTLE_SECONDS = 1.0
 HISTORY_RUNS = 30
-VISUAL_KEYS = ("max", "mean", "px", "frames", "run_seconds", "exit", "attempts", "load_before",
-               "load_after")
+VISUAL_KEYS = ("max", "mean", "px", "frames", "run_seconds", "exit", "attempts", "refusals",
+               "load_wait", "load_before", "load_after")
 HISTORY_FILES = (".png", "_baseline.png", "_diff.png", ".log", ".run.flecs")
 LOG_NOTE = re.compile(r"error|warning|timed out|lost|failed|abort", re.IGNORECASE)
 LOG_NOTES = 20
@@ -291,6 +303,53 @@ def copy_sources(scene, folder):
         shutil.copyfile(source, os.path.join(folder, os.path.basename(source)))
 
 
+def wait_for_cores(args):
+    waited = 0
+    cores = os.cpu_count() or 1
+    load = load_average()
+    while load is not None and load > cores and args.load_budget > 0:
+        pause = min(GUARD_WAIT, args.load_budget)
+        time.sleep(pause)
+        args.load_budget -= pause
+        waited += pause
+        load = load_average()
+    return round(waited, 3)
+
+
+def app_binary(args):
+    project = app_project(args.app)
+    with open(os.path.join(ROOT, project, "project.json")) as f:
+        name = json.load(f)["id"].split(".")[-1]
+    env = os.path.join(ROOT, ".bake", "local_env", *([args.env] if args.env else []))
+    found = glob.glob(os.path.join(env, "build", name, "*-%s" % (args.cfg or "debug"), name))
+    return max(found, key=os.path.getmtime) if found else None
+
+
+def prepare_app(args, out):
+    env = "--local-env=" + args.env if args.env else "--local-env"
+    cmd = ["bake3", "build", app_project(args.app), env]
+    if args.cfg:
+        cmd += ["--cfg", args.cfg]
+    proc = subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True)
+    if proc.returncode:
+        sys.exit("building %s failed:\n%s" % (args.app, (proc.stdout + proc.stderr)[-4000:]))
+    binary = app_binary(args)
+    if not binary:
+        sys.exit("built %s but found no binary of it in the bake3 environment" % args.app)
+    folder = os.path.join(out, ".app")
+    os.makedirs(folder, exist_ok=True)
+    snapshot = os.path.join(folder, "%s-%d" % (os.path.basename(binary), os.getpid()))
+    shutil.copyfile(binary, snapshot)
+    os.chmod(snapshot, 0o755)
+    for stale in glob.glob(os.path.join(folder, "*")):
+        if stale != snapshot and time.time() - os.path.getmtime(stale) > 86400:
+            os.unlink(stale)
+    return snapshot, {"binary": display(binary),
+                      "built": time.strftime("%Y-%m-%dT%H:%M:%SZ",
+                                             time.gmtime(os.path.getmtime(binary))),
+                      "size": os.path.getsize(binary)}
+
+
 def render_scene(scene, png, args):
     width, height = (int(v) for v in args.size.lower().split("x"))
     with open(scene) as f:
@@ -300,18 +359,16 @@ def render_scene(scene, png, args):
     with open(harness, "w") as f:
         f.write("%s\n\nvisual_capture {\n  box.surface.Surface: {width: %d, height: %d, "
                 "write_to_file: \"%s\"}\n}\n" % (source.rstrip(), width, height, png))
-    env = "--local-env=" + args.env if args.env else "--local-env"
-    cmd = ["bake3", "run", app_project(args.app), env]
-    if args.cfg:
-        cmd += ["--cfg", args.cfg]
-    cmd += ["--", "--headless", "--frames", str(args.frames), "--timeout", str(RENDER_TIMEOUT),
-            "--port", "0", harness]
+    cmd = [args.binary, "--headless", "--frames", str(args.frames), "--timeout",
+           str(RENDER_TIMEOUT), "--port", "0", harness]
     log = ""
-    run = {"attempts": 0, "timed_out": False}
-    for attempt in range(GUARD_RETRIES):
+    code = -1
+    run = {"attempts": 0, "timed_out": False, "refusals": 0, "load_wait": 0}
+    while True:
+        run["load_wait"] += wait_for_cores(args)
         if os.path.exists(png):
             os.unlink(png)
-        run["attempts"] = attempt + 1
+        run["attempts"] += 1
         start = time.time()
         try:
             proc = subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True,
@@ -323,9 +380,16 @@ def render_scene(scene, png, args):
             code = -1
             run["timed_out"] = True
         run["run_seconds"] = round(time.time() - start, 3)
-        if "cpu oversubscribed" not in log or attempt + 1 == GUARD_RETRIES:
+        if "cpu oversubscribed" not in log:
             break
-        time.sleep(GUARD_WAIT)
+        run["refusals"] += 1
+        if args.load_budget <= 0:
+            break
+        pause = min(GUARD_PAUSE, args.load_budget)
+        time.sleep(pause)
+        args.load_budget -= pause
+        run["load_wait"] += pause
+    run["refused"] = "cpu oversubscribed" in log
     run["exit"] = code
     run["log_notes"] = [line.strip() for line in log.splitlines()
                         if LOG_NOTE.search(line)][:LOG_NOTES]
@@ -352,6 +416,10 @@ def run_scene(scene, baseline_dir, out, update, args):
     result.update(run)
     if not rendered:
         result["detail"] = "render failed, see %s.log" % name
+        if run.get("refused"):
+            result["detail"] = ("not rendered: cpu oversubscribed (load %s on %d cores) after "
+                                "waiting %d s for the load to drop" % (
+                                    load_average(), os.cpu_count() or 1, run["load_wait"]))
         tail = log.strip().splitlines()[-15:]
         print("\n".join("    " + line for line in tail))
     elif update:
@@ -502,7 +570,7 @@ def prune_history(history):
         shutil.rmtree(os.path.join(history, stale), ignore_errors=True)
 
 
-def write_history(results, out, directory, args, started, elapsed):
+def write_history(results, out, directory, args, started, elapsed, app, commit):
     history = os.path.abspath(args.history) if args.history else os.path.join(OUT_DIR,
                                                                                "history")
     run_id = "%s-%d" % (time.strftime("%Y%m%dT%H%M%SZ", time.gmtime(started)), os.getpid())
@@ -518,7 +586,8 @@ def write_history(results, out, directory, args, started, elapsed):
     summary = {
         "run": run_id,
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(started)),
-        "commit": git_commit(),
+        "commit": commit,
+        "commit_end": git_commit(),
         "dir": display(directory),
         "app": args.app,
         "env": args.env,
@@ -526,6 +595,7 @@ def write_history(results, out, directory, args, started, elapsed):
         "frames": args.frames,
         "size": args.size,
         "cores": os.cpu_count(),
+        "app_build": app,
         "elapsed": round(elapsed, 3),
         "passed": len(results) - len(failed),
         "failed": [{"scene": r["scene"], "detail": r.get("detail", ""),
@@ -555,6 +625,9 @@ def cmd_visual(args):
     if not scenes:
         sys.exit("no scenes in %s" % directory)
     start = time.time()
+    commit = git_commit()
+    args.binary, app = prepare_app(args, out)
+    args.load_budget = args.load_wait
     results = []
     for scene in scenes:
         r = run_scene(scene, baseline_dir, out, scene_name(scene) in updates, args)
@@ -563,7 +636,8 @@ def cmd_visual(args):
                               r.get("detail", "")))
     report = write_report(results, out, baseline_dir)
     failed = sum(1 for r in results if r["status"] != "pass")
-    history = write_history(results, out, directory, args, start, time.time() - start)
+    history = write_history(results, out, directory, args, start, time.time() - start, app,
+                            commit)
     print("history %s" % display(history))
     print("%d passed, %d failed, report %s" % (len(results) - failed, failed,
                                                display(report)))
@@ -801,6 +875,9 @@ def main():
     visual.add_argument("--update-baseline", action="append", metavar="SCENE",
                         help="store the render of this scene as its baseline")
     visual.add_argument("--json", help="write the results in the bake3 test report format")
+    visual.add_argument("--load-wait", type=float, default=LOAD_WAIT,
+                        help="seconds the whole run waits at most for the load average to drop "
+                        "to the core count when the load guard refuses a render")
     visual.add_argument("--history", help="folder that keeps every run, failures with their "
                         "renders, test/integration/out/history by default")
     visual.set_defaults(fn=cmd_visual)
