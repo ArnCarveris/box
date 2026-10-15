@@ -299,16 +299,23 @@ lights per cluster; `mesh.wgsl` shades every directional light plus the cluster'
 `LightBakeMode`, following Unity's light modes (Godot's Dynamic, Disabled and Static bake modes):
 `Mixed`, the zero value and what the constructors set, lights directly in realtime and is captured
 by the bake; `Realtime` lights directly and is left out of the bake; `Baked` exists only in the
-probes and costs nothing per frame. In a scene with `LightBake` the light extract keeps two lists
-per scene, each in its own light buffer: the views (light buffer, clusters, `mesh.wgsl`) get the
-`Mixed` and `Realtime` lights, the probe captures the `Mixed` and `Baked` lights; a scene without
-`LightBake` has only the view list with every light, so every mode is realtime there. The first
-directional light of a list shadows what it lights: the views are shadowed by the first directional
-light that is not `Baked` (a baked sun never drives view shadows), the captures by the first one
-that is not `Realtime`. A scene with any light entity, whatever its mode, no longer gets the default
-sun. A mode change is a change of the capture list, so it rebakes through the light rules of
-Invalidation below: `Mixed` to `Realtime` or `Realtime` to `Baked` queues the light's reach, while
-`Mixed` to `Baked` and back leave the captures as they are and rebake nothing.
+probes, its direct light as well as its bounce (as Unity's light probes hold the direct light of
+baked lights), and costs nothing per frame. In a scene with `LightBake` the views (light buffer,
+clusters, `mesh.wgsl`) get the `Mixed` and `Realtime` lights. The captures of a pass over a black
+ambient are lit by the `Mixed` and `Baked` lights; later passes, whose ambient term already holds
+the direct light of the `Baked` lights, by the `Mixed` ones only, so that light is not counted
+twice. `bake_sh.wgsl` adds the direct light of every `Baked` light at the probe to its SH (the
+light's irradiance times the basis in its direction, before the cosine convolution), occluded
+when the depth the capture faces kept toward the light (reversed, infinite far) shows a surface
+nearer than the light, for a directional light any surface. The light extract keeps these as
+separate lists with their own light buffers only once a light that is not `Mixed` appears; while
+every light is `Mixed` the captures use the view list and its buffer. A scene without `LightBake`
+has only the view list with every light, so every mode is realtime there. The first directional
+light of a list shadows what it lights: the views are shadowed by the first directional light that
+is not `Baked` (a baked sun never drives view shadows), the captures by the first one of their
+list, which is not `Realtime`. A scene with any light entity, whatever its mode, no longer gets the
+default sun. A mode change, `Mixed` to `Baked` included, is a change of the capture lights, so it
+queues the light's reach through the light rules of Invalidation below.
 
 **Bake settings.** `LightBake` on a `Scene` root (or a singleton for the default scene) holds
 the baked lighting settings: `probe_spacing` 2, `bounces` 2, `capture_size` 16, `budget_ms` 2,

@@ -4,7 +4,9 @@
  *
  * A case runs frames against a backend that drops the packets, so it measures the main thread:
  * gathering 1000 point lights into the light buffer of their scene and uploading it on change.
- * The modes case bakes its scene, so its lights go into a view and a capture list by bake mode.
+ *
+ * The baked cases have LightBake: all Mixed lights share the view list with the captures,
+ * cycling modes puts the lights into a view and three capture lists.
  */
 
 #include <box.h>
@@ -37,13 +39,13 @@ static void bench_light_drop(
  *
  * @param b The benchmark
  * @param moving Whether the parent moves every frame, so every light changes
- * @param modes Whether the scene has LightBake (that bakes nothing) and the lights cycle through
- * the Mixed, Realtime and Baked modes
+ * @param modes 0 without LightBake, 1 with LightBake (that bakes nothing) and Mixed lights, 3
+ * with LightBake and lights that cycle through the Mixed, Realtime and Baked modes
  */
 static void bench_light(
     bench_t *b,
     bool moving,
-    bool modes)
+    int32_t modes)
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -68,7 +70,7 @@ static void bench_light(
         ecs_set(world, e, Position,
             {(float)(i % BENCH_LIGHTS_ROW) * 2, 1, (float)(i / BENCH_LIGHTS_ROW) * 2});
         ecs_set(world, e, PointLight, {.intensity = 2, .range = 3,
-            .bake = modes ? (LightBakeMode)(i % 3) : LightBakeModeMixed});
+            .bake = modes ? (LightBakeMode)(i % modes) : LightBakeModeMixed});
         ecs_set(world, e, Rgb, {255, 200, 100});
     }
 
@@ -144,14 +146,14 @@ void Light_static_1000(
     bench_t *b)
 {
     // lighting/lights
-    bench_light(b, false, false);
+    bench_light(b, false, 0);
 }
 
 void Light_moving_1000(
     bench_t *b)
 {
     // lighting/lights
-    bench_light(b, true, false);
+    bench_light(b, true, 0);
 }
 
 void Light_scenes_1000(
@@ -165,5 +167,12 @@ void Light_moving_modes_1000(
     bench_t *b)
 {
     // baked_lighting/light_modes
-    bench_light(b, true, true);
+    bench_light(b, true, 3);
+}
+
+void Light_moving_mixed_1000(
+    bench_t *b)
+{
+    // baked_lighting/light_modes
+    bench_light(b, true, 1);
 }

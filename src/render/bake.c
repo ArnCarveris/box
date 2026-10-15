@@ -88,6 +88,7 @@ static box_bake_volume_t* box_bake_ensure(
         ecs_vec_init_t(NULL, &result->shown, uint32_t, 0);
         ecs_vec_init_t(NULL, &result->light_list, box_render_light_t, 0);
         ecs_vec_init_t(NULL, &result->light_entities, ecs_entity_t, 0);
+        ecs_vec_init_t(NULL, &result->light_modes, uint8_t, 0);
         ecs_vec_init_t(NULL, &result->cameras, vec3, 0);
         ecs_vec_init_t(NULL, &result->sorted, vec3, 0);
     }
@@ -557,8 +558,7 @@ static void box_bake_views(
     box_render_bake_t *b,
     box_render_packet_t *p)
 {
-    int32_t i, count = ecs_vec_count(&p->views), lights = 0;
-    const ecs_entity_t *entities = NULL;
+    int32_t i, count = ecs_vec_count(&p->views);
     if (!b->lights_state) {
         b->lights_state = box_render_lights_state(world);
     }
@@ -575,8 +575,7 @@ static void box_bake_views(
             : NULL;
         if (!v->viewed) {
             box_bake_ambient(&rv->lights, v->ambient);
-            v->lights = rv->lights;
-            box_bake_scene_lights(b->lights_state, v->scene, &v->lights, &lights, &entities);
+            box_bake_scene_lights(b->lights_state, v->scene, &rv->lights, &v->lights);
             v->viewed = true;
         }
 
@@ -869,6 +868,7 @@ static void box_bake_volume_fini(
     ecs_vec_fini_t(NULL, &v->shown, uint32_t);
     ecs_vec_fini_t(NULL, &v->light_list, box_render_light_t);
     ecs_vec_fini_t(NULL, &v->light_entities, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &v->light_modes, uint8_t);
     ecs_vec_fini_t(NULL, &v->cameras, vec3);
     ecs_vec_fini_t(NULL, &v->sorted, vec3);
 }
@@ -1085,8 +1085,11 @@ static void box_bake_batch(
 
     batch->scene = v->scene;
     batch->size = v->capture_size;
-    batch->lights = v->lights;
+    batch->lights = batch->source == BOX_RENDER_BAKE_BLACK ? v->lights.first : v->lights.later;
     batch->lights.enabled = true;
+    batch->baked = v->lights.baked;
+    batch->baked_count = v->lights.baked_count;
+    batch->baked_directional = v->lights.baked_directional;
     glm_vec3_copy(v->min, batch->bounds_min);
     glm_vec3_copy(v->max, batch->bounds_max);
     batch->first = ecs_vec_count(&p->probes);
@@ -1438,7 +1441,7 @@ static void BoxRenderExtractBake(
 
     box_bake_changes(world, b);
     for (i = 0; i < ecs_vec_count(&b->volumes); i ++) {
-        box_bake_lights(world, b, ecs_vec_get_t(&b->volumes, box_bake_volume_t, i));
+        box_bake_lights(b, ecs_vec_get_t(&b->volumes, box_bake_volume_t, i));
     }
 
     box_bake_progress(it, b, p);

@@ -34,8 +34,9 @@ extern "C" {
 ECS_ENUM(LightBakeMode, {
     LightBakeModeMixed = 0,    /**< Lights directly in realtime and contributes to the bake */
     LightBakeModeRealtime = 1, /**< Lights directly in realtime and is left out of the bake */
-    LightBakeModeBaked = 2     /**< Exists only in the probes of the bake: no direct light, no
-                                *   per frame cost and no view shadows */
+    LightBakeModeBaked = 2     /**< Exists only in the probes of the bake, its direct and
+                                *   bounced light alike: no realtime light, no per frame cost
+                                *   and no view shadows */
 });
 
 /** Directional light travelling along the entity's local +Z */
@@ -108,7 +109,7 @@ extern ECS_TAG_DECLARE(NoBake);
  * NoShadow shapes and blended shapes cast none.
  *
  * In a scene with LightBake the views are shadowed by the first directional light that is not
- * Baked and the probe captures by the first one that is not Realtime.
+ * Baked and the probe captures by the first one they shade surfaces with (see LightBakeMode).
  *
  * @param world The world
  */
