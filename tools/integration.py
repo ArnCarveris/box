@@ -23,15 +23,18 @@ render is brighter, red where it is darker, yellow where only the hue moved, at 
 when no channel moved more than 16, over a dimmed grey copy of the baseline where the pixels are
 identical. --json writes the results in the bake3 test report format.
 
-The run builds the app once (bake3 build) and renders every scene with a copy of that binary, so
-a build in the same environment during the run cannot change the binary halfway. When the load
-guard refuses a render (load average above the core count), the run waits for the load to drop
-and tries again, up to --load-wait seconds for the whole run; a scene still refused then fails as
-"not rendered: cpu oversubscribed", never as a render difference. Every run is also kept in
-test/integration/out/history (--history moves it): <run>/results.json with every scene's diff
-stats, exit code, attempts, refusals, load wait, load before and after, render seconds and the
-error lines of its log, plus the render, baseline, diff, log and script of every failing scene,
-and one summary line per run in runs.jsonl. The last 30 runs are kept.
+The run builds the app once (bake3 build) and renders every scene with a copy of that binary in
+.bake/integration, removed when the run ends, so a build in the same environment during the run
+cannot change the binary halfway. When the load guard refuses a render (load average above the
+core count), the run waits for the load to drop, printing a line when it starts waiting and every
+minute, and tries again, up to --load-wait seconds for the whole run; a scene still refused then
+fails as "not rendered: cpu oversubscribed", never as a render difference. When a commit that
+changes etc, src, include, apps or test/integration lands in the tree during the run, the run
+says so. Every run is also kept in test/integration/out/history (--history moves it):
+<run>/results.json with every scene's diff stats, exit code, attempts, refusals, load wait, load
+before, at the render and after, render seconds and the error lines of its log, plus the render,
+baseline, diff, log and script of every failing scene, and one summary line per run in
+runs.jsonl. The last 30 runs are kept.
 
   integration.py perf [--dir dir] [--app project] [--env name] [--cfg mode] [--out dir]
                       [--size WxH] [--seconds s] [--cpu-budget pct] [--stall ms] [--max-load n]
@@ -57,7 +60,8 @@ by default), which the pm page charts, with the 1 minute load average before and
 scene. --seconds measures that many seconds at every scene's target instead of its frames.
 --stall adds busy milliseconds to every frame to prove that the checks fail a slow scene.
 --max-load waits, up to --load-wait seconds, until the load average is at most n before every
-scene.
+scene. Like visual, perf runs every scene with one copy of the app built at the start and waits
+out load guard refusals, up to --guard-wait seconds for the whole run.
 """
 import argparse
 import glob
@@ -81,9 +85,12 @@ MAX_DELTA = 24
 PIXEL_DELTA = 16
 MAX_PIXELS = 200
 RENDER_TIMEOUT = 120
-GUARD_RETRIES = 6
 GUARD_WAIT = 10
 GUARD_PAUSE = 2
+GUARD_REPORT = 60
+SNAPSHOT_DIR = os.path.join(ROOT, ".bake", "integration")
+TREE_PATHS = ("etc", "src", "include", "apps", "test/integration")
+TREE_LIST = 10
 LOAD_WAIT = 1800
 PERF_TIMEOUT = 240
 PERF_FIELDS = ("target_fps", "frames", "errors", "slow", "fast", "min_ms", "mean_ms", "p50_ms",
@@ -94,12 +101,13 @@ PERF_FIELDS = ("target_fps", "frames", "errors", "slow", "fast", "min_ms", "mean
                "present_mean_ms", "cpu_percent", "cpu_ms", "fly", "travelled")
 CULL_FIELDS = ("visible", "frustum_culled", "occlusion_culled")
 PERF_KEYS = PERF_FIELDS + ("drawn", "culled", "deg_per_frame", "cull_samples", "cull_changes",
-                           "load_before", "load_after") + tuple(
+                           "load_before", "load_after", "attempts", "refusals", "load_wait",
+                           "load_run") + tuple(
     "%s_%s" % (name, end) for name in CULL_FIELDS for end in ("min", "max"))
 MAX_SETTLE_SECONDS = 1.0
 HISTORY_RUNS = 30
 VISUAL_KEYS = ("max", "mean", "px", "frames", "run_seconds", "exit", "attempts", "refusals",
-               "load_wait", "load_before", "load_after")
+               "load_wait", "load_before", "load_run", "load_after")
 HISTORY_FILES = (".png", "_baseline.png", "_diff.png", ".log", ".run.flecs")
 LOG_NOTE = re.compile(r"error|warning|timed out|lost|failed|abort", re.IGNORECASE)
 LOG_NOTES = 20
@@ -303,17 +311,70 @@ def copy_sources(scene, folder):
         shutil.copyfile(source, os.path.join(folder, os.path.basename(source)))
 
 
+def guard_budget(args):
+    return "%d of %d s" % (round(args.guard_wait - args.load_budget), round(args.guard_wait))
+
+
 def wait_for_cores(args):
     waited = 0
     cores = os.cpu_count() or 1
     load = load_average()
+    if load is not None and load > cores and args.load_budget > 0:
+        print("    waiting for the load average %.1f to drop to %d cores (guard wait %s used)"
+              % (load, cores, guard_budget(args)), flush=True)
     while load is not None and load > cores and args.load_budget > 0:
         pause = min(GUARD_WAIT, args.load_budget)
         time.sleep(pause)
         args.load_budget -= pause
         waited += pause
         load = load_average()
+        if waited % GUARD_REPORT < GUARD_WAIT and load is not None and load > cores:
+            print("    still waiting: load %.1f on %d cores after %d s (guard wait %s used)"
+                  % (load, cores, waited, guard_budget(args)), flush=True)
     return round(waited, 3)
+
+
+def run_guarded(cmd, args, output, timeout, refused):
+    log = ""
+    code = -1
+    run = {"attempts": 0, "timed_out": False, "refusals": 0, "load_wait": 0}
+    while True:
+        run["load_wait"] += wait_for_cores(args)
+        if os.path.exists(output):
+            os.unlink(output)
+        run["attempts"] += 1
+        run["load_run"] = load_average()
+        start = time.time()
+        try:
+            proc = subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True,
+                                  timeout=timeout)
+            log = proc.stdout + proc.stderr
+            code = proc.returncode
+        except subprocess.TimeoutExpired as e:
+            log = "run timed out\n" + str(e.stdout or "") + str(e.stderr or "")
+            code = -1
+            run["timed_out"] = True
+        run["run_seconds"] = round(time.time() - start, 3)
+        if not refused(log):
+            break
+        run["refusals"] += 1
+        if args.load_budget <= 0:
+            break
+        pause = min(GUARD_PAUSE, args.load_budget)
+        time.sleep(pause)
+        args.load_budget -= pause
+        run["load_wait"] += pause
+    run["refused"] = refused(log)
+    run["exit"] = code
+    run["log_notes"] = [line.strip() for line in log.splitlines()
+                        if LOG_NOTE.search(line)][:LOG_NOTES]
+    return code, log, run
+
+
+def refusal_detail(run, args):
+    return ("not rendered: cpu oversubscribed (load %s on %d cores) after this scene waited %d s "
+            "and the run %s of its guard wait" % (
+                load_average(), os.cpu_count() or 1, run["load_wait"], guard_budget(args)))
 
 
 def app_binary(args):
@@ -325,7 +386,7 @@ def app_binary(args):
     return max(found, key=os.path.getmtime) if found else None
 
 
-def prepare_app(args, out):
+def prepare_app(args):
     env = "--local-env=" + args.env if args.env else "--local-env"
     cmd = ["bake3", "build", app_project(args.app), env]
     if args.cfg:
@@ -336,14 +397,10 @@ def prepare_app(args, out):
     binary = app_binary(args)
     if not binary:
         sys.exit("built %s but found no binary of it in the bake3 environment" % args.app)
-    folder = os.path.join(out, ".app")
-    os.makedirs(folder, exist_ok=True)
-    snapshot = os.path.join(folder, "%s-%d" % (os.path.basename(binary), os.getpid()))
+    os.makedirs(SNAPSHOT_DIR, exist_ok=True)
+    snapshot = os.path.join(SNAPSHOT_DIR, "%s-%d" % (os.path.basename(binary), os.getpid()))
     shutil.copyfile(binary, snapshot)
     os.chmod(snapshot, 0o755)
-    for stale in glob.glob(os.path.join(folder, "*")):
-        if stale != snapshot and time.time() - os.path.getmtime(stale) > 86400:
-            os.unlink(stale)
     return snapshot, {"binary": display(binary),
                       "built": time.strftime("%Y-%m-%dT%H:%M:%SZ",
                                              time.gmtime(os.path.getmtime(binary))),
@@ -361,38 +418,8 @@ def render_scene(scene, png, args):
                 "write_to_file: \"%s\"}\n}\n" % (source.rstrip(), width, height, png))
     cmd = [args.binary, "--headless", "--frames", str(args.frames), "--timeout",
            str(RENDER_TIMEOUT), "--port", "0", harness]
-    log = ""
-    code = -1
-    run = {"attempts": 0, "timed_out": False, "refusals": 0, "load_wait": 0}
-    while True:
-        run["load_wait"] += wait_for_cores(args)
-        if os.path.exists(png):
-            os.unlink(png)
-        run["attempts"] += 1
-        start = time.time()
-        try:
-            proc = subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True,
-                                  timeout=RENDER_TIMEOUT * 2)
-            log = proc.stdout + proc.stderr
-            code = proc.returncode
-        except subprocess.TimeoutExpired as e:
-            log = "render timed out\n" + str(e.stdout or "") + str(e.stderr or "")
-            code = -1
-            run["timed_out"] = True
-        run["run_seconds"] = round(time.time() - start, 3)
-        if "cpu oversubscribed" not in log:
-            break
-        run["refusals"] += 1
-        if args.load_budget <= 0:
-            break
-        pause = min(GUARD_PAUSE, args.load_budget)
-        time.sleep(pause)
-        args.load_budget -= pause
-        run["load_wait"] += pause
-    run["refused"] = "cpu oversubscribed" in log
-    run["exit"] = code
-    run["log_notes"] = [line.strip() for line in log.splitlines()
-                        if LOG_NOTE.search(line)][:LOG_NOTES]
+    code, log, run = run_guarded(cmd, args, png, RENDER_TIMEOUT * 2,
+                                 lambda log: "cpu oversubscribed" in log)
     with open(os.path.join(os.path.dirname(png), scene_name(scene) + ".log"), "w") as f:
         f.write(log)
     return code == 0 and os.path.isfile(png), log, run
@@ -417,9 +444,7 @@ def run_scene(scene, baseline_dir, out, update, args):
     if not rendered:
         result["detail"] = "render failed, see %s.log" % name
         if run.get("refused"):
-            result["detail"] = ("not rendered: cpu oversubscribed (load %s on %d cores) after "
-                                "waiting %d s for the load to drop" % (
-                                    load_average(), os.cpu_count() or 1, run["load_wait"]))
+            result["detail"] = refusal_detail(run, args)
         tail = log.strip().splitlines()[-15:]
         print("\n".join("    " + line for line in tail))
     elif update:
@@ -564,13 +589,25 @@ def git_commit():
         return None
 
 
+def tree_changes(commit):
+    end = git_commit()
+    if not commit or not end or end == commit:
+        return []
+    try:
+        proc = subprocess.run(["git", "diff", "--name-only", commit, end, "--"] + list(TREE_PATHS),
+                              cwd=ROOT, text=True, capture_output=True, timeout=30)
+        return [line for line in proc.stdout.splitlines() if line.strip()]
+    except (OSError, subprocess.TimeoutExpired):
+        return []
+
+
 def prune_history(history):
     runs = sorted(d for d in os.listdir(history) if os.path.isdir(os.path.join(history, d)))
     for stale in runs[:-HISTORY_RUNS]:
         shutil.rmtree(os.path.join(history, stale), ignore_errors=True)
 
 
-def write_history(results, out, directory, args, started, elapsed, app, commit):
+def write_history(results, out, directory, args, started, elapsed, app, commit, changed):
     history = os.path.abspath(args.history) if args.history else os.path.join(OUT_DIR,
                                                                                "history")
     run_id = "%s-%d" % (time.strftime("%Y%m%dT%H%M%SZ", time.gmtime(started)), os.getpid())
@@ -588,6 +625,7 @@ def write_history(results, out, directory, args, started, elapsed, app, commit):
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(started)),
         "commit": commit,
         "commit_end": git_commit(),
+        "tree_changed": changed,
         "dir": display(directory),
         "app": args.app,
         "env": args.env,
@@ -599,7 +637,8 @@ def write_history(results, out, directory, args, started, elapsed, app, commit):
         "elapsed": round(elapsed, 3),
         "passed": len(results) - len(failed),
         "failed": [{"scene": r["scene"], "detail": r.get("detail", ""),
-                    "load_before": r.get("load_before")} for r in failed],
+                    "load_before": r.get("load_before"), "load_run": r.get("load_run")}
+                   for r in failed],
     }
     with open(os.path.join(folder, "results.json"), "w") as f:
         json.dump(dict(summary, results=results), f, indent=2)
@@ -626,18 +665,25 @@ def cmd_visual(args):
         sys.exit("no scenes in %s" % directory)
     start = time.time()
     commit = git_commit()
-    args.binary, app = prepare_app(args, out)
-    args.load_budget = args.load_wait
+    args.binary, app = prepare_app(args)
+    args.load_budget = args.guard_wait
     results = []
-    for scene in scenes:
-        r = run_scene(scene, baseline_dir, out, scene_name(scene) in updates, args)
-        results.append(r)
-        print("%s %s (%s)" % ("PASS" if r["status"] == "pass" else "FAIL", r["path"],
-                              r.get("detail", "")))
+    try:
+        for scene in scenes:
+            r = run_scene(scene, baseline_dir, out, scene_name(scene) in updates, args)
+            results.append(r)
+            print("%s %s (%s)" % ("PASS" if r["status"] == "pass" else "FAIL", r["path"],
+                                  r.get("detail", "")), flush=True)
+    finally:
+        os.unlink(args.binary)
+    changed = tree_changes(commit)
+    if changed:
+        print("the tree changed during the run (%s to %s): %s" % (
+            commit, git_commit(), ", ".join(changed[:TREE_LIST])))
     report = write_report(results, out, baseline_dir)
     failed = sum(1 for r in results if r["status"] != "pass")
     history = write_history(results, out, directory, args, start, time.time() - start, app,
-                            commit)
+                            commit, changed)
     print("history %s" % display(history))
     print("%d passed, %d failed, report %s" % (len(results) - failed, failed,
                                                display(report)))
@@ -683,35 +729,10 @@ def perf_script(scene, report, args):
 
 
 def perf_command(harness, args):
-    env = "--local-env=" + args.env if args.env else "--local-env"
-    cmd = ["bake3", "run", app_project(args.app), env]
-    if args.cfg:
-        cmd += ["--cfg", args.cfg]
-    cmd += ["--", "--headless", "--timeout", str(PERF_TIMEOUT), "--port", "0"]
+    cmd = [args.binary, "--headless", "--timeout", str(PERF_TIMEOUT), "--port", "0"]
     if args.cpu_budget is not None:
         cmd += ["--cpu-budget", str(args.cpu_budget)]
     return cmd + [harness]
-
-
-def run_perf_process(cmd, report):
-    log = ""
-    code = -1
-    for attempt in range(GUARD_RETRIES):
-        if os.path.exists(report):
-            os.unlink(report)
-        try:
-            proc = subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True,
-                                  timeout=PERF_TIMEOUT * 2)
-            log = proc.stdout + proc.stderr
-            code = proc.returncode
-        except subprocess.TimeoutExpired as e:
-            log = "perf run timed out\n" + str(e.stdout or "") + str(e.stderr or "")
-            code = -1
-        refused = "cpu oversubscribed" in log and not os.path.exists(report)
-        if not refused or attempt + 1 == GUARD_RETRIES:
-            break
-        time.sleep(GUARD_WAIT)
-    return code, log
 
 
 def perf_cull(data, result):
@@ -796,7 +817,10 @@ def run_perf_scene(scene, out, args):
         f.write(perf_script(scene, report, args))
     result["load_before"] = wait_for_load(args.max_load, args.load_wait)
     start = time.time()
-    code, log = run_perf_process(perf_command(harness, args), report)
+    code, log, run = run_guarded(perf_command(harness, args), args, report, PERF_TIMEOUT * 2,
+                                 lambda log: "cpu oversubscribed" in log and
+                                 not os.path.exists(report))
+    result.update({k: run[k] for k in ("attempts", "refusals", "load_wait", "load_run")})
     result["elapsed"] = round(time.time() - start, 6)
     result["load_after"] = load_average()
     with open(os.path.join(out, name + ".log"), "w") as f:
@@ -807,6 +831,8 @@ def run_perf_scene(scene, out, args):
             data = json.load(f)
     if code != 0 or not data:
         result["detail"] = "run failed (exit %d), see perf/%s.log" % (code, name)
+        if run.get("refused"):
+            result["detail"] = refusal_detail(run, args)
         print("\n".join("    " + line for line in log.strip().splitlines()[-15:]))
         return result
     for key in PERF_FIELDS:
@@ -837,13 +863,19 @@ def cmd_perf(args):
     if not scenes:
         sys.exit("no scenes in %s" % directory)
     start = time.time()
+    args.binary, _ = prepare_app(args)
+    args.load_budget = args.guard_wait
     results = []
-    for scene in scenes:
-        r = run_perf_scene(scene, out, args)
-        results.append(r)
-        print("%s %s (%s, load %s -> %s)" % ("PASS" if r["status"] == "pass" else "FAIL",
-                                              r["scene"], r.get("detail", ""),
-                                              r.get("load_before"), r.get("load_after")))
+    try:
+        for scene in scenes:
+            r = run_perf_scene(scene, out, args)
+            results.append(r)
+            print("%s %s (%s, load %s -> %s)" % ("PASS" if r["status"] == "pass" else "FAIL",
+                                                  r["scene"], r.get("detail", ""),
+                                                  r.get("load_before"), r.get("load_after")),
+                  flush=True)
+    finally:
+        os.unlink(args.binary)
     failed = sum(1 for r in results if r["status"] != "pass")
     path = os.path.join(base, "perf.json")
     with open(path, "w") as f:
@@ -875,7 +907,7 @@ def main():
     visual.add_argument("--update-baseline", action="append", metavar="SCENE",
                         help="store the render of this scene as its baseline")
     visual.add_argument("--json", help="write the results in the bake3 test report format")
-    visual.add_argument("--load-wait", type=float, default=LOAD_WAIT,
+    visual.add_argument("--load-wait", dest="guard_wait", type=float, default=LOAD_WAIT,
                         help="seconds the whole run waits at most for the load average to drop "
                         "to the core count when the load guard refuses a render")
     visual.add_argument("--history", help="folder that keeps every run, failures with their "
@@ -900,6 +932,9 @@ def main():
                       help="wait until the 1 minute load average is at most this")
     perf.add_argument("--load-wait", type=float, default=300,
                       help="seconds --max-load waits at most before running anyway")
+    perf.add_argument("--guard-wait", type=float, default=LOAD_WAIT,
+                      help="seconds the whole run waits at most for the load average to drop "
+                      "to the core count when the load guard refuses a run")
     perf.add_argument("--json", help="write the results in the bake3 test report format")
     perf.set_defaults(fn=cmd_perf)
     args = parser.parse_args()
