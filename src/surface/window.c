@@ -102,6 +102,7 @@ done:
 void box_window_free(
     box_window_t *window)
 {
+    box_input_glfw_detach(window->window);
     glfwDestroyWindow(window->window);
     ecs_os_free(window);
     box_window_count --;

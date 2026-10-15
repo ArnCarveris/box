@@ -15,6 +15,54 @@
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
+/** A window whose events go to a world */
+typedef struct box_glfw_window_t {
+    GLFWwindow *window;               /**< The glfw window */
+    box_input_glfw_target_t *target;  /**< World and surface of the window */
+} box_glfw_window_t;
+
+/** box_glfw_window_t of the attached windows; glfw is process wide and runs on the main thread */
+static ecs_vec_t box_glfw_windows;
+
+/** Capture or release the cursor in the windows of a surface: glfw's disabled cursor, which
+ * hides it, keeps it in the window and reports unbounded positions, with raw motion when the
+ * platform supports it, the backend capture callback.
+ *
+ * @param world The world
+ * @param surface The surface, 0 for every window of the world
+ * @param captured Whether the cursor is captured
+ * @param ctx Unused
+ * @return Whether the cursor is captured, glfw changes the mode at once
+ */
+static bool box_glfw_capture(
+    ecs_world_t *world,
+    ecs_entity_t surface,
+    bool captured,
+    void *ctx)
+{
+    box_glfw_window_t *windows = ecs_vec_first_t(&box_glfw_windows, box_glfw_window_t);
+    bool result = false;
+    int32_t i;
+    (void)ctx;
+    for (i = 0; i < ecs_vec_count(&box_glfw_windows); i ++) {
+        const box_input_glfw_target_t *t = windows[i].target;
+        if (t->world != world || (surface && t->surface != surface)) {
+            continue;
+        }
+
+        glfwSetInputMode(windows[i].window, GLFW_CURSOR,
+            captured ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+        if (glfwRawMouseMotionSupported()) {
+            glfwSetInputMode(windows[i].window, GLFW_RAW_MOUSE_MOTION,
+                captured ? GLFW_TRUE : GLFW_FALSE);
+        }
+
+        result = captured;
+    }
+
+    return result;
+}
+
 /** Start pushing the events of a window: its surface is stamped on them until the end.
  *
  * @param window The glfw window
@@ -192,8 +240,39 @@ void box_input_glfw_attach(
         box_glfw_focus(w, 1);
     }
 
+    if (!box_glfw_windows.array) {
+        ecs_vec_init_t(NULL, &box_glfw_windows, box_glfw_window_t, 1);
+    }
+
+    ecs_vec_append_t(NULL, &box_glfw_windows, box_glfw_window_t)[0] =
+        (box_glfw_window_t){ .window = w, .target = target };
+    if (!box_input_device(target->world)->backend.poll &&
+        !box_input_device(target->world)->backend.capture)
+    {
+        box_input_platform_set(target->world, &(box_input_platform_t){
+            .capture = box_glfw_capture });
+    }
+
 done:
     return;
+}
+
+void box_input_glfw_detach(
+    void *window)
+{
+    box_glfw_window_t *windows = ecs_vec_first_t(&box_glfw_windows, box_glfw_window_t);
+    int32_t i, count = ecs_vec_count(&box_glfw_windows);
+    for (i = 0; i < count; i ++) {
+        if (windows[i].window == window) {
+            windows[i] = windows[count - 1];
+            ecs_vec_remove_last(&box_glfw_windows);
+            break;
+        }
+    }
+
+    if (box_glfw_windows.array && !ecs_vec_count(&box_glfw_windows)) {
+        ecs_vec_fini_t(NULL, &box_glfw_windows, box_glfw_window_t);
+    }
 }
 
 #else
@@ -203,6 +282,12 @@ void box_input_glfw_attach(
     void *window)
 {
     (void)target;
+    (void)window;
+}
+
+void box_input_glfw_detach(
+    void *window)
+{
     (void)window;
 }
 

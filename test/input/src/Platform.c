@@ -895,3 +895,454 @@ void Platform_surfaces_focus_keeps_pinned_cursor(void) {
 
     ecs_fini(world);
 }
+
+static int32_t capture_calls = 0;
+static ecs_entity_t capture_surfaces[8];
+static bool capture_states[8];
+
+static bool CaptureRecord(ecs_world_t *world, ecs_entity_t surface, bool captured, void *ctx) {
+    (void)world;
+    (void)ctx;
+    if (capture_calls < 8) {
+        capture_surfaces[capture_calls] = surface;
+        capture_states[capture_calls] = captured;
+    }
+
+    capture_calls ++;
+
+    return captured;
+}
+
+static box_input_dom_pointer_t dom_pointer;
+static int32_t dom_releases = 0;
+
+static bool DomCapture(ecs_world_t *world, ecs_entity_t surface, bool captured, void *ctx) {
+    (void)world;
+    (void)surface;
+    (void)ctx;
+    dom_pointer.want = captured;
+    dom_releases += !captured;
+
+    return captured && dom_pointer.locked;
+}
+
+void Platform_capture_follows_request(void) {
+    // input_fixes/cursor_capture
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    capture_calls = 0;
+    surface_event_count = 0;
+    box_input_platform_set(world, &(box_input_platform_t){
+        .poll = SurfaceEventsPoll, .capture = CaptureRecord });
+
+    ecs_progress(world, 0);
+    test_int(capture_calls, 0);
+    test_bool(ecs_singleton_get(world, Input)->mouse.captured, false);
+
+    ecs_singleton_get_mut(world, Input)->capture = true;
+    ecs_singleton_modified(world, Input);
+    ecs_progress(world, 0);
+    test_int(capture_calls, 1);
+    test_uint(capture_surfaces[0], 0);
+    test_bool(capture_states[0], true);
+    test_bool(ecs_singleton_get(world, Input)->mouse.captured, true);
+
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_int(capture_calls, 1);
+    test_bool(ecs_singleton_get(world, Input)->mouse.captured, true);
+
+    ecs_singleton_get_mut(world, Input)->capture = false;
+    ecs_singleton_modified(world, Input);
+    ecs_progress(world, 0);
+    test_int(capture_calls, 2);
+    test_bool(capture_states[1], false);
+    test_bool(ecs_singleton_get(world, Input)->mouse.captured, false);
+
+    box_input_queue(world, &(InputEvent){ .kind = InputCapture, .code = 1 });
+    ecs_progress(world, 0);
+    test_int(capture_calls, 3);
+    test_bool(capture_states[2], true);
+    test_bool(ecs_singleton_get(world, Input)->capture, true);
+
+    ecs_fini(world);
+}
+
+void Platform_capture_follows_focus(void) {
+    // input_fixes/cursor_capture
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t a = ecs_new(world);
+    ecs_entity_t b = ecs_new(world);
+    capture_calls = 0;
+    surface_event_count = 0;
+    box_input_platform_set(world, &(box_input_platform_t){
+        .poll = SurfaceEventsPoll, .capture = CaptureRecord });
+
+    surface_events[0] = (InputEvent){ .kind = InputFocus, .surface = a, .code = 1 };
+    surface_event_count = 1;
+    ecs_singleton_get_mut(world, Input)->capture = true;
+    ecs_singleton_modified(world, Input);
+    ecs_progress(world, 0);
+    test_int(capture_calls, 1);
+    test_uint(capture_surfaces[0], a);
+    test_bool(capture_states[0], true);
+
+    surface_events[0] = (InputEvent){ .kind = InputFocus, .surface = a, .code = 0 };
+    surface_event_count = 1;
+    ecs_progress(world, 0);
+    const Input *in = ecs_singleton_get(world, Input);
+    test_int(capture_calls, 2);
+    test_uint(capture_surfaces[1], a);
+    test_bool(capture_states[1], false);
+    test_bool(in->mouse.captured, false);
+    test_bool(in->capture, true);
+
+    surface_events[0] = (InputEvent){ .kind = InputFocus, .surface = a, .code = 1 };
+    surface_event_count = 1;
+    ecs_progress(world, 0);
+    test_int(capture_calls, 3);
+    test_uint(capture_surfaces[2], a);
+    test_bool(capture_states[2], true);
+    test_bool(ecs_singleton_get(world, Input)->mouse.captured, true);
+
+    surface_events[0] = (InputEvent){ .kind = InputFocus, .surface = b, .code = 1 };
+    surface_event_count = 1;
+    ecs_progress(world, 0);
+    test_int(capture_calls, 5);
+    test_uint(capture_surfaces[3], a);
+    test_bool(capture_states[3], false);
+    test_uint(capture_surfaces[4], b);
+    test_bool(capture_states[4], true);
+
+    box_input_focus(world, false);
+    ecs_progress(world, 0);
+    test_int(capture_calls, 6);
+    test_uint(capture_surfaces[5], b);
+    test_bool(capture_states[5], false);
+
+    ecs_fini(world);
+}
+
+void Platform_capture_lost_by_platform(void) {
+    // input_fixes/cursor_capture
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    capture_calls = 0;
+    surface_event_count = 0;
+    box_input_platform_set(world, &(box_input_platform_t){
+        .poll = SurfaceEventsPoll, .capture = CaptureRecord });
+
+    ecs_singleton_get_mut(world, Input)->capture = true;
+    ecs_singleton_modified(world, Input);
+    ecs_progress(world, 0);
+    test_bool(ecs_singleton_get(world, Input)->mouse.captured, true);
+
+    surface_events[0] = (InputEvent){ .kind = InputCapture, .code = 0 };
+    surface_event_count = 1;
+    ecs_progress(world, 0);
+    const Input *in = ecs_singleton_get(world, Input);
+    test_bool(in->capture, false);
+    test_bool(in->mouse.captured, false);
+    test_int(capture_calls, 2);
+    test_bool(capture_states[1], false);
+
+    ecs_progress(world, 0);
+    test_int(capture_calls, 2);
+
+    ecs_fini(world);
+}
+
+void Platform_capture_backend_replaced(void) {
+    // input_fixes/cursor_capture
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    capture_calls = 0;
+    surface_event_count = 0;
+    ecs_singleton_get_mut(world, Input)->capture = true;
+    ecs_singleton_modified(world, Input);
+    ecs_progress(world, 0);
+    test_bool(ecs_singleton_get(world, Input)->mouse.captured, false);
+
+    box_input_platform_set(world, &(box_input_platform_t){ .capture = CaptureRecord });
+    ecs_progress(world, 0);
+    test_int(capture_calls, 1);
+    test_bool(capture_states[0], true);
+    test_bool(ecs_singleton_get(world, Input)->mouse.captured, true);
+
+    box_input_platform_set(world, NULL);
+    test_int(capture_calls, 2);
+    test_bool(capture_states[1], false);
+    ecs_progress(world, 0);
+    test_bool(ecs_singleton_get(world, Input)->mouse.captured, false);
+
+    ecs_fini(world);
+}
+
+void Platform_capture_starts_fresh_delta(void) {
+    // input_fixes/cursor_capture
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    capture_calls = 0;
+    surface_event_count = 0;
+    box_input_platform_set(world, &(box_input_platform_t){
+        .poll = SurfaceEventsPoll, .capture = CaptureRecord });
+
+    surface_events[0] = (InputEvent){ .kind = InputResize, .value = {800, 600} };
+    surface_events[1] = (InputEvent){ .kind = InputMove, .value = {780, 300} };
+    surface_event_count = 2;
+    ecs_singleton_get_mut(world, Input)->capture = true;
+    ecs_singleton_modified(world, Input);
+    ecs_progress(world, 0);
+
+    surface_events[0] = (InputEvent){ .kind = InputMove, .value = {400, 300} };
+    surface_event_count = 1;
+    ecs_progress(world, 0);
+    const Input *in = ecs_singleton_get(world, Input);
+    test_flt(in->mouse.delta[0], 0);
+    test_flt(in->mouse.delta[1], 0);
+
+    surface_events[0] = (InputEvent){ .kind = InputMove, .value = {410, 290} };
+    surface_event_count = 1;
+    ecs_progress(world, 0);
+    in = ecs_singleton_get(world, Input);
+    test_flt(in->mouse.delta[0], 10);
+    test_flt(in->mouse.delta[1], -10);
+
+    ecs_singleton_get_mut(world, Input)->capture = false;
+    ecs_singleton_modified(world, Input);
+    ecs_progress(world, 0);
+    surface_events[0] = (InputEvent){ .kind = InputMove, .value = {100, 100} };
+    surface_event_count = 1;
+    ecs_progress(world, 0);
+    in = ecs_singleton_get(world, Input);
+    test_flt(in->mouse.delta[0], 0);
+    test_flt(in->mouse.delta[1], 0);
+
+    ecs_fini(world);
+}
+
+void Platform_capture_synthetic_input(void) {
+    // input_fixes/cursor_capture
+    ecs_world_t *platform = ecs_init();
+    ECS_IMPORT(platform, Box);
+    ecs_world_t *synthetic = ecs_init();
+    ECS_IMPORT(synthetic, Box);
+
+    ecs_entity_t cam_p = ecs_new(platform);
+    ecs_add(platform, cam_p, CameraController);
+    ecs_entity_t cam_s = ecs_new(synthetic);
+    ecs_add(synthetic, cam_s, CameraController);
+    capture_calls = 0;
+    box_input_platform_set(platform, &(box_input_platform_t){ .capture = CaptureRecord });
+    ecs_singleton_get_mut(platform, Input)->capture = true;
+    ecs_singleton_modified(platform, Input);
+
+    box_input_sweep_t drag = {
+        .from = { 100, 100 }, .to = { 200, 150 }, .steps = 4, .frames = 4,
+        .button = KeyMouseRight
+    };
+    box_input_mouse_drag(platform, &drag);
+    box_input_mouse_drag(synthetic, &drag);
+    box_input_key_press(platform, KeyW, 3);
+    box_input_key_press(synthetic, KeyW, 3);
+    for (int32_t frame = 0; frame < 8; frame ++) {
+        ecs_progress(platform, 0.5f);
+        ecs_progress(synthetic, 0.5f);
+        test_bool(ecs_singleton_get(platform, Input)->mouse.captured, true);
+        const Rotation *rp = ecs_get(platform, cam_p, Rotation);
+        const Rotation *rs = ecs_get(synthetic, cam_s, Rotation);
+        test_flt(rp->x, rs->x);
+        test_flt(rp->y, rs->y);
+        const Position *pp = ecs_get(platform, cam_p, Position);
+        const Position *ps = ecs_get(synthetic, cam_s, Position);
+        test_flt(pp->z, ps->z);
+    }
+
+    test_assert(fabsf(ecs_get(platform, cam_p, Rotation)->y) > 0.1f);
+    test_assert(ecs_get(platform, cam_p, Position)->z < 0);
+    test_int(capture_calls, 1);
+
+    ecs_fini(platform);
+    ecs_fini(synthetic);
+}
+
+void Platform_dom_lock_moves_past_edge(void) {
+    // input_fixes/cursor_capture
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    dom_pointer = (box_input_dom_pointer_t){0};
+    box_input_platform_set(world, &(box_input_platform_t){ .capture = DomCapture });
+    box_input_platform_push(world, &(InputEvent){ .kind = InputResize, .value = {800, 600} });
+    box_input_dom_on_move(world, &dom_pointer, (vec2){400, 300}, (vec2){0, 0});
+    ecs_singleton_get_mut(world, Input)->capture = true;
+    ecs_singleton_modified(world, Input);
+    ecs_progress(world, 0);
+    test_bool(dom_pointer.want, true);
+    test_bool(ecs_singleton_get(world, Input)->mouse.captured, false);
+
+    test_bool(box_input_dom_on_lock(world, &dom_pointer, true, true), false);
+    ecs_progress(world, 0);
+    test_bool(ecs_singleton_get(world, Input)->mouse.captured, true);
+
+    float x = 400;
+    for (int32_t i = 0; i < 4; i ++) {
+        box_input_dom_on_move(world, &dom_pointer, (vec2){799, 300}, (vec2){250, -20});
+        ecs_progress(world, 0);
+        x += 250;
+        const Input *in = ecs_singleton_get(world, Input);
+        test_flt(in->mouse.delta[0], 250);
+        test_flt(in->mouse.delta[1], -20);
+        test_flt(in->mouse.position[0], x);
+    }
+
+    test_assert(ecs_singleton_get(world, Input)->mouse.position[0] > 800);
+
+    ecs_fini(world);
+}
+
+void Platform_dom_lock_escape_no_jump(void) {
+    // input_fixes/cursor_capture
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    dom_pointer = (box_input_dom_pointer_t){0};
+    dom_releases = 0;
+    box_input_platform_set(world, &(box_input_platform_t){ .capture = DomCapture });
+    box_input_platform_push(world, &(InputEvent){ .kind = InputResize, .value = {800, 600} });
+    box_input_dom_on_move(world, &dom_pointer, (vec2){400, 300}, (vec2){0, 0});
+    ecs_singleton_get_mut(world, Input)->capture = true;
+    ecs_singleton_modified(world, Input);
+    ecs_progress(world, 0);
+    box_input_dom_on_lock(world, &dom_pointer, true, true);
+    ecs_progress(world, 0);
+    for (int32_t i = 0; i < 10; i ++) {
+        box_input_dom_on_move(world, &dom_pointer, (vec2){799, 300}, (vec2){300, 0});
+        ecs_progress(world, 0);
+    }
+
+    test_flt(ecs_singleton_get(world, Input)->mouse.position[0], 3400);
+
+    test_bool(box_input_dom_on_lock(world, &dom_pointer, false, true), false);
+    box_input_dom_on_move(world, &dom_pointer, (vec2){120, 80}, (vec2){5, 5});
+    ecs_progress(world, 0);
+    const Input *in = ecs_singleton_get(world, Input);
+    test_flt(in->mouse.position[0], 120);
+    test_flt(in->mouse.position[1], 80);
+    test_flt(in->mouse.delta[0], 0);
+    test_flt(in->mouse.delta[1], 0);
+    test_bool(in->capture, false);
+    test_bool(in->mouse.captured, false);
+    test_int(dom_releases, 1);
+    test_bool(dom_pointer.want, false);
+
+    box_input_dom_on_move(world, &dom_pointer, (vec2){125, 83}, (vec2){5, 3});
+    ecs_progress(world, 0);
+    in = ecs_singleton_get(world, Input);
+    test_flt(in->mouse.delta[0], 5);
+    test_flt(in->mouse.delta[1], 3);
+
+    ecs_fini(world);
+}
+
+void Platform_dom_release_no_jump(void) {
+    // input_fixes/cursor_capture
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    dom_pointer = (box_input_dom_pointer_t){0};
+    box_input_platform_set(world, &(box_input_platform_t){ .capture = DomCapture });
+    box_input_dom_on_move(world, &dom_pointer, (vec2){400, 300}, (vec2){0, 0});
+    ecs_singleton_get_mut(world, Input)->capture = true;
+    ecs_singleton_modified(world, Input);
+    ecs_progress(world, 0);
+    box_input_dom_on_lock(world, &dom_pointer, true, true);
+    box_input_dom_on_move(world, &dom_pointer, (vec2){400, 300}, (vec2){900, 0});
+    ecs_progress(world, 0);
+
+    ecs_singleton_get_mut(world, Input)->capture = false;
+    ecs_singleton_modified(world, Input);
+    ecs_progress(world, 0);
+    test_bool(dom_pointer.want, false);
+    test_bool(ecs_singleton_get(world, Input)->mouse.captured, false);
+
+    box_input_dom_on_move(world, &dom_pointer, (vec2){400, 300}, (vec2){50, 0});
+    ecs_progress(world, 0);
+    test_flt(ecs_singleton_get(world, Input)->mouse.position[0], 1350);
+
+    box_input_dom_on_lock(world, &dom_pointer, false, true);
+    box_input_dom_on_move(world, &dom_pointer, (vec2){410, 300}, (vec2){10, 0});
+    ecs_progress(world, 0);
+    const Input *in = ecs_singleton_get(world, Input);
+    test_flt(in->mouse.position[0], 410);
+    test_flt(in->mouse.delta[0], 0);
+    test_bool(in->capture, false);
+
+    ecs_fini(world);
+}
+
+void Platform_dom_blur_keeps_request(void) {
+    // input_fixes/cursor_capture
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    dom_pointer = (box_input_dom_pointer_t){0};
+    box_input_platform_set(world, &(box_input_platform_t){ .capture = DomCapture });
+    ecs_singleton_get_mut(world, Input)->capture = true;
+    ecs_singleton_modified(world, Input);
+    ecs_progress(world, 0);
+    box_input_dom_on_lock(world, &dom_pointer, true, true);
+    ecs_progress(world, 0);
+
+    box_input_dom_on_lock(world, &dom_pointer, false, false);
+    box_input_platform_push(world, &(InputEvent){ .kind = InputFocus, .code = 0 });
+    ecs_progress(world, 0);
+    const Input *in = ecs_singleton_get(world, Input);
+    test_bool(in->capture, true);
+    test_bool(in->mouse.captured, false);
+    test_bool(dom_pointer.want, false);
+
+    box_input_platform_push(world, &(InputEvent){ .kind = InputFocus, .code = 1 });
+    ecs_progress(world, 0);
+    test_bool(dom_pointer.want, true);
+    test_bool(ecs_singleton_get(world, Input)->mouse.captured, false);
+
+    box_input_dom_on_lock(world, &dom_pointer, true, true);
+    ecs_progress(world, 0);
+    test_bool(ecs_singleton_get(world, Input)->mouse.captured, true);
+
+    ecs_fini(world);
+}
+
+void Platform_dom_unwanted_lock(void) {
+    // input_fixes/cursor_capture
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    dom_pointer = (box_input_dom_pointer_t){0};
+    box_input_platform_set(world, &(box_input_platform_t){ .capture = DomCapture });
+    test_bool(box_input_dom_on_lock(world, &dom_pointer, true, true), true);
+    ecs_progress(world, 0);
+    test_bool(ecs_singleton_get(world, Input)->mouse.captured, false);
+
+    box_input_dom_on_lock(world, &dom_pointer, false, true);
+    ecs_singleton_get_mut(world, Input)->capture = true;
+    ecs_singleton_modified(world, Input);
+    ecs_progress(world, 0);
+    test_bool(dom_pointer.want, true);
+
+    box_input_dom_on_lock_error(world, &dom_pointer, true);
+    ecs_progress(world, 0);
+    const Input *in = ecs_singleton_get(world, Input);
+    test_bool(in->capture, false);
+    test_bool(in->mouse.captured, false);
+    test_bool(dom_pointer.want, false);
+
+    ecs_fini(world);
+}

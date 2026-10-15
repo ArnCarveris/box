@@ -130,7 +130,18 @@
                     "surfaces_untagged_events",
                     "surfaces_deleted_surface",
                     "surfaces_focus_takes_cursor",
-                    "surfaces_focus_keeps_pinned_cursor"
+                    "surfaces_focus_keeps_pinned_cursor",
+                    "capture_follows_request",
+                    "capture_follows_focus",
+                    "capture_lost_by_platform",
+                    "capture_backend_replaced",
+                    "capture_starts_fresh_delta",
+                    "capture_synthetic_input",
+                    "dom_lock_moves_past_edge",
+                    "dom_lock_escape_no_jump",
+                    "dom_release_no_jump",
+                    "dom_blur_keeps_request",
+                    "dom_unwanted_lock"
                 ]
             }
         ]
