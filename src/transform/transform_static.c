@@ -373,6 +373,23 @@ void box_transform_on_moved(
         (TransformStaticListener){ .callback = callback, .ctx = ctx, .ctx_free = ctx_free };
 }
 
+/** Register an observer that uses the state, counting the reference it holds.
+ *
+ * @param world The world
+ * @param state The state
+ * @param desc The observer without context
+ */
+static void transformStaticObserver(
+    ecs_world_t *world,
+    transform_static_t *state,
+    ecs_observer_desc_t desc)
+{
+    desc.ctx = state;
+    desc.ctx_free = transformStaticRelease;
+    state->refs ++;
+    ecs_observer_init(world, &desc);
+}
+
 void TransformStaticImport(
     ecs_world_t *world)
 {
@@ -381,67 +398,56 @@ void TransformStaticImport(
     ecs_vec_init_t(NULL, &state->manual, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &state->moved, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &state->listeners, TransformStaticListener, 0);
-    state->refs = 8;
 
     ECS_COMPONENT_DEFINE(world, TransformStaticState);
     ecs_set_hooks(world, TransformStaticState, { .ctor = flecs_default_ctor });
     ecs_singleton_set(world, TransformStaticState, { .state = state });
 
-    ecs_observer(world, {
+    transformStaticObserver(world, state, (ecs_observer_desc_t){
         .entity = ecs_entity(world, { .name = "TransformStatic_OnPosition" }),
         .query.terms = {
             { .id = ecs_id(Position), .src.id = EcsSelf },
             { .id = ManualTransform, .oper = EcsNot }
         },
         .events = { EcsOnSet, EcsOnRemove },
-        .callback = TransformStatic_OnChange,
-        .ctx = state,
-        .ctx_free = transformStaticRelease
+        .callback = TransformStatic_OnChange
     });
 
-    ecs_observer(world, {
+    transformStaticObserver(world, state, (ecs_observer_desc_t){
         .entity = ecs_entity(world, { .name = "TransformStatic_OnRotation" }),
         .query.terms = {
             { .id = ecs_id(Rotation), .src.id = EcsSelf },
             { .id = ManualTransform, .oper = EcsNot }
         },
         .events = { EcsOnSet, EcsOnRemove },
-        .callback = TransformStatic_OnChange,
-        .ctx = state,
-        .ctx_free = transformStaticRelease
+        .callback = TransformStatic_OnChange
     });
 
-    ecs_observer(world, {
+    transformStaticObserver(world, state, (ecs_observer_desc_t){
         .entity = ecs_entity(world, { .name = "TransformStatic_OnScale" }),
         .query.terms = {
             { .id = ecs_id(Scale), .src.id = EcsSelf },
             { .id = ManualTransform, .oper = EcsNot }
         },
         .events = { EcsOnSet, EcsOnRemove },
-        .callback = TransformStatic_OnChange,
-        .ctx = state,
-        .ctx_free = transformStaticRelease
+        .callback = TransformStatic_OnChange
     });
 
-    ecs_observer(world, {
+    transformStaticObserver(world, state, (ecs_observer_desc_t){
         .entity = ecs_entity(world, { .name = "TransformStatic_OnManual" }),
         .query.terms = {
             { .id = ecs_id(WorldTransform), .src.id = EcsSelf },
             { .id = ManualTransform, .inout = EcsInOutFilter }
         },
         .events = { EcsOnSet },
-        .callback = TransformStatic_OnManual,
-        .ctx = state,
-        .ctx_free = transformStaticRelease
+        .callback = TransformStatic_OnManual
     });
 
-    ecs_observer(world, {
+    transformStaticObserver(world, state, (ecs_observer_desc_t){
         .entity = ecs_entity(world, { .name = "TransformStatic_OnStatic" }),
         .query.terms = {{ .id = DynamicTransform }},
         .events = { EcsOnRemove },
-        .callback = TransformStatic_OnStatic,
-        .ctx = state,
-        .ctx_free = transformStaticRelease
+        .callback = TransformStatic_OnStatic
     });
 
     ecs_observer(world, {
@@ -454,30 +460,27 @@ void TransformStaticImport(
         .callback = Transform_OnRemovePosition
     });
 
-    ecs_observer(world, {
+    transformStaticObserver(world, state, (ecs_observer_desc_t){
         .entity = ecs_entity(world, { .name = "TransformStatic_OnChildOf" }),
         .query.terms = {
             { .id = ecs_pair(EcsChildOf, EcsWildcard), .src.id = EcsSelf },
             { .id = ManualTransform, .oper = EcsNot }
         },
         .events = { EcsOnAdd, EcsOnRemove },
-        .callback = TransformStatic_OnChange,
-        .ctx = state,
-        .ctx_free = transformStaticRelease
+        .callback = TransformStatic_OnChange
     });
 
-    ecs_observer(world, {
+    transformStaticObserver(world, state, (ecs_observer_desc_t){
         .entity = ecs_entity(world, { .name = "TransformStatic_OnParent" }),
         .query.terms = {
             { .id = ecs_id(EcsParent), .src.id = EcsSelf },
             { .id = ManualTransform, .oper = EcsNot }
         },
         .events = { EcsOnSet, EcsOnRemove },
-        .callback = TransformStatic_OnChange,
-        .ctx = state,
-        .ctx_free = transformStaticRelease
+        .callback = TransformStatic_OnChange
     });
 
+    state->refs ++;
     ecs_system(world, {
         .entity = ecs_entity(world, {
             .name = "TransformStatic",
