@@ -57,7 +57,6 @@ typedef struct box_spatial_t {
     box_spatial_scene_t *root; /**< Index of the default scene */
     ecs_map_t scenes;          /**< Scene entity to its box_spatial_scene_t */
     ecs_vec_t dirty;           /**< ecs_entity_t, entities whose place may have changed */
-    ecs_vec_t moved;           /**< ecs_entity_t, roots of subtrees that moved */
     ecs_vec_t rescoped;        /**< ecs_entity_t, roots of subtrees that may change scene */
     ecs_vec_t walk;            /**< ecs_entity_t, stack of a subtree walk */
     ecs_vec_t leaves;          /**< box_bvh_leaf_t, scratch of a build */

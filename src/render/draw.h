@@ -132,7 +132,7 @@ typedef struct box_render_draws_t {
     ecs_vec_t free_batches;     /**< int32_t, indices of batches not in use */
     ecs_map_t lookup;           /**< Key hash to the index of the first batch plus one */
     ecs_vec_t dirty;            /**< ecs_entity_t, entities whose instance may have changed */
-    ecs_vec_t moved;            /**< ecs_entity_t, roots of subtrees that changed */
+    ecs_vec_t moved;            /**< ecs_entity_t, roots of subtrees whose parent changed */
     ecs_vec_t walk;             /**< ecs_entity_t, stack of a subtree walk */
     ecs_map_t meshes;           /**< Mesh handles the backend received */
     ecs_vec_t released;         /**< uint32_t, meshes to release this frame */

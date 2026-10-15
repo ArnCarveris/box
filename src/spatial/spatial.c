@@ -149,8 +149,8 @@ static void BoxSpatialOnChange(
     }
 }
 
-/** Mark the static entities whose WorldTransform was set; the subtree of a ManualTransform
- * entity arrives through box_transform_on_moved once its static descendants are computed.
+/** Mark the static entities whose WorldTransform was set; the descendants of a ManualTransform
+ * entity arrive through box_transform_on_moved once their static transform is computed.
  *
  * @param it The iterator of the observer
  */
@@ -162,23 +162,23 @@ static void BoxSpatialOnWorld(
     }
 }
 
-/** Remember the roots of the static subtrees whose transform was computed.
+/** Mark the entities whose static transform was computed.
  *
  * @param world The world
- * @param roots The roots
- * @param count Number of roots
+ * @param entities The entities
+ * @param count Number of entities
  * @param ctx The index
  */
 static void box_spatial_on_moved(
     ecs_world_t *world,
-    const ecs_entity_t *roots,
+    const ecs_entity_t *entities,
     int32_t count,
     void *ctx)
 {
-    box_spatial_t *index = ctx;
-    (void)world;
-    ecs_os_memcpy_n(ecs_vec_grow_t(NULL, &index->moved, ecs_entity_t, count), roots,
-        ecs_entity_t, count);
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        box_spatial_mark(world, ctx, entities[i], false);
+    }
 }
 
 /** Remember the entities of an observer event as roots of subtrees that may change scene.
@@ -453,7 +453,6 @@ static void box_spatial_process(
     index->stats.updated = 0;
     index->stats.moved = 0;
     box_spatial_walk(world, index, &index->rescoped, true);
-    box_spatial_walk(world, index, &index->moved, false);
     for (i = 0; i < ecs_vec_count(&index->dirty); i ++) {
         box_spatial_refresh(world, index, cache, *ecs_vec_get_t(&index->dirty, ecs_entity_t, i));
     }
@@ -550,7 +549,7 @@ static void box_spatial_observer(
     ecs_observer_init(world, &desc);
 }
 
-/** Follow static transforms: the entities whose WorldTransform was set, and the subtrees whose
+/** Follow static transforms: the entities whose WorldTransform was set, and the entities whose
  * static transform was computed through box_transform_on_moved.
  *
  * @param world The world

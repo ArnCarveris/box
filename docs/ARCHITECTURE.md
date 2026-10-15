@@ -154,9 +154,11 @@ target in the same frame. `RenderExtract` and `RenderSubmit` are phases that dep
 descendant) are recomputed every frame. `ManualTransform` means the application writes
 `WorldTransform`; its static descendants follow when it is written with `ecs_set` or followed
 by `ecs_modified`, not by a write through a pointer alone. Hierarchies use `ChildOf` or the
-`Parent` component. `TransformStatic` passes the roots of the static subtrees it computed to the
-functions registered with `box_transform_on_moved`; draws and the spatial index follow static
-moves only through it, so a `Position` set fires no render or spatial observer.
+`Parent` component. `TransformStatic` passes every entity whose `WorldTransform` it changed (the
+computed roots and the descendants it wrote) to the functions registered with
+`box_transform_on_moved`. Draws and the spatial index follow static moves only through it and
+walk no subtree of their own, so a `Position` set fires no transform observer in render or
+spatial; only `DrawsOnPositionZ`, which keeps the 2D draw order, still fires.
 
 ## Surfaces and the GPU device
 
@@ -349,13 +351,13 @@ bakes.
 `box.spatial` keeps, per scene, an index over world AABBs of shapes (unit mesh bounds times
 `ShapeMesh` scale, placed by `WorldTransform`): a static BVH (binned SAH build, SAH insert with
 AVL rotations) and a dynamic BVH with fat leaves for `DynamicTransform` shapes. Observers queue
-changed shapes and `box_transform_on_moved` the moved static subtrees; `SpatialUpdate`
-(`EcsOnStore`) places only those. Dynamic
-shapes are marked stale and placed by the first query after a frame, so an idle frame pays
-nothing. Queries (`src/spatial/spatial.h`) are scoped to one scene: nearest ray with a narrow
-phase filter, all hits sorted, box and sphere overlap, entity bounds. `box_controller_move`
-uses them for collision, `box_spatial_static_bounds` gives the box around the static shapes of
-a scene to the bake. Bounds are boxes; there is no mesh level narrow phase and no picking.
+changed shapes and `box_transform_on_moved` the moved static entities; `SpatialUpdate`
+(`EcsOnStore`) places only those. Dynamic shapes are marked stale and placed by the first query
+after a frame, so an idle frame pays nothing. Queries (`src/spatial/spatial.h`) are scoped to
+one scene: nearest ray with a narrow phase filter, all hits sorted, box and sphere overlap,
+entity bounds. `box_controller_move` uses them for collision, `box_spatial_static_bounds` gives
+the box around the static shapes of a scene to the bake. Bounds are boxes; there is no mesh
+level narrow phase and no picking.
 
 ## Text, layout and UI
 
