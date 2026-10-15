@@ -90,9 +90,15 @@ static void bench_delete_tree(
         runs ++;
     }
 
+#ifdef __APPLE__
     double scale = runs ? (double)bench_iterations(b) / (double)runs / 1e6 : 0;
     bench_counter(b, "delete_minstr", (double)deleted * scale);
     bench_counter(b, "frame_minstr", (double)framed * scale);
+#else
+    (void)deleted;
+    (void)framed;
+    (void)runs;
+#endif
 
     ecs_fini(world);
 }
