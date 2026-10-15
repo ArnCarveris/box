@@ -45,6 +45,8 @@ ECS_STRUCT(App, {
     float cpu_budget;   /**< Percent of one core a headless run may use, default 100, 0 no limit */
     float fps;          /**< Target frame rate, default 60, 0 uncapped with a measured delta */
     int32_t port;       /**< Port of the command endpoints, 0 disables them */
+    int32_t surface_width;  /**< Width of the Surface created when there is no window, 0 none */
+    int32_t surface_height; /**< Height of the Surface a run creates when it has none */
     bool unguarded;     /**< A headless run starts on an oversubscribed machine */
     bool unpaced;       /**< A headless run ignores its CPU budget */
     char *scene;        /**< Script file loaded before the first frame, NULL for none */
@@ -69,7 +71,7 @@ void BoxAppImport(
 /** Write command line arguments into the App singleton.
  *
  * Accepts --headless, --frames <n>, --timeout <s|infinite>, --cpu-budget <pct>,
- * --fps <n>, --port <n> and one scene file.
+ * --fps <n>, --port <n>, --surface <width>x<height> and one scene file.
  *
  * @param world The world
  * @param argc Argument count, including the executable

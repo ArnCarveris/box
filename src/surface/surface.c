@@ -565,6 +565,51 @@ static void BoxSurfaceOnRemove(
     }
 }
 
+/** Test whether a world has a Surface that presents itself, one without a texture.
+ *
+ * @param world The world
+ * @return Whether such a surface exists
+ */
+static bool box_surface_has_window(
+    ecs_world_t *world)
+{
+    bool found = false;
+    int32_t i;
+    ecs_iter_t it = ecs_each(world, Surface);
+    while (ecs_each_next(&it)) {
+        const Surface *s = ecs_field(&it, Surface, 0);
+        for (i = 0; i < it.count && !found; i ++) {
+            found = s[i].texture == 0;
+        }
+    }
+
+    return found;
+}
+
+/** Create the Surface the command line asks for when the world has none that presents itself
+ * after its scene loaded, then disable the system: it decides once, on the first frame.
+ *
+ * @param it The iterator of the system
+ */
+static void BoxSurfaceFromApp(
+    ecs_iter_t *it)
+{
+    ecs_world_t *world = it->world;
+    const App *app = ecs_singleton_get(world, App);
+    if (app && app->surface_width > 0 && app->surface_height > 0 &&
+        !box_surface_has_window(world))
+    {
+        ecs_entity_t e = ecs_new(world);
+        Surface *s = ecs_ensure(world, e, Surface);
+        s->width = app->surface_width;
+        s->height = app->surface_height;
+        s->vsync = true;
+        ecs_modified(world, e, Surface);
+    }
+
+    ecs_enable(world, it->system, false);
+}
+
 void BoxSurfaceImport(
     ecs_world_t *world)
 {
@@ -605,6 +650,13 @@ void BoxSurfaceImport(
         .query.terms = {{ .id = ecs_id(Surface) }},
         .events = { EcsOnRemove },
         .callback = BoxSurfaceOnRemove
+    });
+
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "SurfaceFromApp" }),
+        .phase = EcsPreFrame,
+        .immediate = true,
+        .run = BoxSurfaceFromApp
     });
 
     ecs_system(world, {
