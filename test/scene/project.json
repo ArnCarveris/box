@@ -86,6 +86,20 @@
                     "dynamic_resized_at_rest",
                     "dynamic_moved_without_queries"
                 ]
+            },
+            {
+                "id": "SpatialElements",
+                "testcases": [
+                    "hidden_from_shape_queries",
+                    "follow_bounds_and_moves"
+                ]
+            },
+            {
+                "id": "SpatialChurn",
+                "testcases": [
+                    "static_vs_brute_force",
+                    "coincident_vs_brute_force"
+                ]
             }
         ]
     }

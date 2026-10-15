@@ -123,7 +123,40 @@
                     "font_without_units_fails",
                     "recursive_composite_missing",
                     "composite_limits",
-                    "font_tables_outside_file"
+                    "font_tables_outside_file",
+                    "utf8_invalid_bytes_replaced",
+                    "utf8_overlong_replaced",
+                    "utf8_surrogates_replaced",
+                    "utf8_above_max_replaced",
+                    "utf8_valid_boundaries",
+                    "utf8_three_byte_glyph",
+                    "utf8_truncated_at_end"
+                ]
+            },
+            {
+                "id": "TextField",
+                "testcases": [
+                    "overlapping_contours_no_seam",
+                    "sharp_corners_large",
+                    "tiny_fades",
+                    "glyphs_added_mid_run",
+                    "budget_more_glyphs_than_a_page",
+                    "small_budget_reuses_pages",
+                    "cusp_glyph",
+                    "rotated_small_text_same_ink",
+                    "budget_keeps_shown_pages",
+                    "budget_values_in_one_frame",
+                    "budget_releases_idle_pages"
+                ]
+            },
+            {
+                "id": "TextLines",
+                "testcases": [
+                    "small_sizes_scale_linearly",
+                    "small_size_ink_in_bounds",
+                    "kerning_pairs",
+                    "line_break_edges",
+                    "single_line_align_same"
                 ]
             },
             {
@@ -209,6 +242,21 @@
                     "paste_long",
                     "panel_keeps_fraction_with_long_text",
                     "null_text"
+                ]
+            },
+            {
+                "id": "PickingCost",
+                "testcases": [
+                    "moves_in_one_frame_hover_last",
+                    "drag_moves_in_one_frame_keep_delta",
+                    "layout_element_follows_resize",
+                    "text_bounds_element",
+                    "disabled_layout_element",
+                    "dense_mesh_hits_surface",
+                    "disabled_on_press_not_targeted",
+                    "ui_wins_tie_with_shape",
+                    "moves_around_wheel_and_key",
+                    "dense_mesh_changed_after_pick"
                 ]
             },
             {
