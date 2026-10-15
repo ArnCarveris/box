@@ -343,7 +343,9 @@ a scene to the bake. Bounds are boxes; there is no mesh level narrow phase and n
 **Text.** `Text {value, size, line_height, width, align, font}` and `Font {path}`
 (`box.text.DefaultFont` is B612 in `etc/fonts`). Fonts load with stb_truetype on the job system.
 Glyph MSDFs are generated lazily per glyph on workers into RGBA8 atlas pages that grow and then
-page. Layout handles UTF-8, kerning, newlines, word breaks and alignment; the block is centered
+page. Font data is untrusted: a face without units per em fails to load, and a glyph whose box
+is larger than a page (1024 minus spacing) is drawn as the missing glyph with one warning per
+font load; atlas placement makes at most `BOX_TEXT_PLACE_TRIES` passes. Layout handles UTF-8, kerning, newlines, word breaks and alignment; the block is centered
 on the origin and measured into `TextBounds`. Glyphs are slots of the 2D batches keyed by atlas
 page (`src/render/text_draw.c`), shaded by `shape2d.wgsl`. No shaping (ligatures, RTL).
 
