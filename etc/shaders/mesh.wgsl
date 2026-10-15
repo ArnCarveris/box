@@ -254,13 +254,18 @@ fn brdf(s: Surface, v: vec3f, l: vec3f, radiance: vec3f) -> vec3f {
     return (diffuse + specular) * radiance * ndl;
 }
 
-// Radiance of a point or spot light at a position: a windowed inverse square falloff that
-// reaches zero at the range, times the smooth cone of a spot light.
+// Distance below which a point or spot light stops getting brighter, so a surface at the light
+// stays finite.
+const LIGHT_MIN_DISTANCE: f32 = 0.01;
+
+// Radiance of a point or spot light at a position: inverse square falloff, smoothly windowed
+// to zero at the range as in Frostbite's smoothDistanceAtt, times the smooth cone of a spot.
 fn attenuation(light: Light, l: vec3f, dist: f32) -> f32 {
     let ratio = dist / max(light.range, 1e-4);
     let window = clamp(1.0 - ratio * ratio * ratio * ratio, 0.0, 1.0);
     let cone = clamp(dot(-l, light.direction) * light.spot_scale + light.spot_offset, 0.0, 1.0);
-    return window * window / (dist * dist + 1.0) * cone * cone;
+    let near_ = max(dist, LIGHT_MIN_DISTANCE);
+    return window * window / (near_ * near_) * cone * cone;
 }
 
 // Light inputs. Every direct light the forward pass uses comes from here: the directional
@@ -276,10 +281,11 @@ fn lights_direct(s: Surface, v: vec3f, world: vec3f) -> vec3f {
     }
 
     if (view.lights.y > view.lights.x) {
-        let base = cluster_index(view, cluster_view_position(view, world)) * (view.grid.w + 1u);
-        let count = min(clusters[base], view.grid.w);
+        let cluster = cluster_index(view, cluster_view_position(view, world));
+        let first = 1u + 2u * cluster_count(view) + clusters[1u + 2u * cluster];
+        let count = clusters[2u + 2u * cluster];
         for (var i = 0u; i < count; i++) {
-            let light = lights[clusters[base + 1u + i]];
+            let light = lights[clusters[first + i]];
             let delta = light.position - world;
             let dist = length(delta);
             let l = delta / max(dist, 1e-4);

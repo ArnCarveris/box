@@ -1,9 +1,11 @@
 // Uniforms of a view and the lights of its scene, shared by the forward pass and the cluster
 // pass. The light buffer holds the directional lights first, then the point and spot lights.
 // The view frustum is cut into clusters: grid.x by grid.y tiles of the image and grid.z depth
-// slices spaced logarithmically from cluster.z to cluster.w. A cluster is grid.w + 1 words in
-// the cluster buffer: the number of lights that reach it and their indices. The shadow members
-// describe the cascaded shadow map of the first directional light, see shadow.wgsl.
+// slices spaced logarithmically from cluster.z to cluster.w. The cluster buffer starts with the
+// number of list entries the cluster pass allocated, then holds the offset and count of every
+// cluster, then the light index list: the lights of a cluster are count entries from its
+// offset. The shadow members describe the cascaded shadow map of the first directional light,
+// see shadow.wgsl.
 #pragma once
 
 struct View {
@@ -18,7 +20,7 @@ struct View {
     cluster: vec4f,
     // x: directional lights, y: lights, z: 1 when lit, w: 1 for an orthographic camera
     lights: vec4u,
-    // x, y, z: clusters per axis, w: lights a cluster lists at most
+    // x, y, z: clusters per axis, w: unused
     grid: vec4u,
     // World to shadow clip space of each cascade, reversed Z: 1 is nearest the light
     shadow_matrix: array<mat4x4f, 4>,
@@ -47,6 +49,11 @@ struct Light {
 fn cluster_view_position(v: View, world: vec3f) -> vec3f {
     let p = v.view * vec4f(world, 1.0);
     return vec3f(p.x, p.y, -p.z);
+}
+
+// Number of clusters of a view.
+fn cluster_count(v: View) -> u32 {
+    return v.grid.x * v.grid.y * v.grid.z;
 }
 
 // Distance in front of the camera at which a depth slice starts.

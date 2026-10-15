@@ -11,6 +11,7 @@
 
 #include "gpu.h"
 #include <math.h>
+#include <string.h>
 
 #ifdef BOX_RENDER_WGPU
 
@@ -460,6 +461,94 @@ static WGPURenderPipeline box_gpu_forward_create(
     };
 
     return wgpuDeviceCreateRenderPipeline(gpu->device, &desc);
+}
+
+#ifndef __EMSCRIPTEN__
+/** Keep the error a scope around a pipeline creation caught, as one line: the causes wgpu
+ * lists below its "Caused by:" line joined by ": ".
+ *
+ * @param status Whether the scope was popped
+ * @param type Kind of error, NoError when there was none
+ * @param message Error text
+ * @param userdata1 The char* that receives the error
+ * @param userdata2 Unused
+ */
+static void box_gpu_forward_on_scope(
+    WGPUPopErrorScopeStatus status,
+    WGPUErrorType type,
+    WGPUStringView message,
+    void *userdata1,
+    void *userdata2)
+{
+    ecs_strbuf_t buf = ECS_STRBUF_INIT;
+    const char *text = message.data ? message.data : "";
+    const char *end = text + (message.length == WGPU_STRLEN
+        ? ecs_os_strlen(text) : (ecs_size_t)message.length);
+    const char *line = text;
+    int32_t lines = 0;
+    (void)userdata2;
+    if (status != WGPUPopErrorScopeStatus_Success || type == WGPUErrorType_NoError) {
+        goto done;
+    }
+
+    while (line < end) {
+        const char *next = memchr(line, '\n', (size_t)(end - line));
+        const char *stop = next ? next : end;
+        while (line < stop && (*line == ' ' || *line == '\t')) {
+            line ++;
+        }
+
+        bool skip = line == stop || !strncmp(line, "Validation Error", 16) ||
+            !strncmp(line, "Caused by:", 10) || !strncmp(line, "In wgpu", 7);
+        if (!skip) {
+            ecs_strbuf_append(&buf, "%s%.*s", lines ++ ? ": " : "", (int)(stop - line), line);
+        }
+
+        line = next ? next + 1 : end;
+    }
+
+    if (!lines) {
+        ecs_strbuf_appendstr(&buf, "the pipeline cannot be created");
+    }
+
+    *(char**)userdata1 = ecs_strbuf_get(&buf);
+done:
+    ecs_strbuf_reset(&buf);
+}
+#endif
+
+char* box_gpu_forward_check(
+    box_gpu_t *gpu,
+    uint32_t handle,
+    WGPUShaderModule shader)
+{
+    char *result = NULL;
+#ifndef __EMSCRIPTEN__
+    WGPURenderPipeline pipeline;
+    if (!gpu->device || !gpu->mesh_layout) {
+        goto done;
+    }
+
+    wgpuDevicePushErrorScope(gpu->device, WGPUErrorFilter_Validation);
+    pipeline = box_gpu_forward_create(
+        gpu, handle, shader, WGPUTextureFormat_RGBA8Unorm, Opaque, BackFaceCull);
+    wgpuDevicePopErrorScope(gpu->device, (WGPUPopErrorScopeCallbackInfo){
+        .mode = WGPUCallbackMode_AllowSpontaneous,
+        .callback = box_gpu_forward_on_scope,
+        .userdata1 = &result
+    });
+    if (pipeline) {
+        wgpuRenderPipelineRelease(pipeline);
+    }
+
+done:
+#else
+    (void)gpu;
+    (void)handle;
+    (void)shader;
+#endif
+
+    return result;
 }
 
 /** Pack the state a forward pipeline is created for into its cache key.

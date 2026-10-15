@@ -142,6 +142,7 @@ void box_gpu_cull_fini(
         }
 
         box_gpu_cull_release(&r->buffer);
+        r->state = BOX_GPU_READBACK_FREE;
         ecs_vec_fini_t(NULL, &r->records, box_gpu_cull_record_t);
     }
 

@@ -37,6 +37,19 @@
                 ]
             },
             {
+                "id": "DeviceLoss",
+                "testcases": [
+                    "pipeline_error_keeps_previous",
+                    "lost_device_recovers"
+                ]
+            },
+            {
+                "id": "Restart",
+                "testcases": [
+                    "main_thread_toggle_keeps_scene"
+                ]
+            },
+            {
                 "id": "Capture",
                 "testcases": [
                     "cleared_surface",
@@ -47,7 +60,9 @@
                     "view_root_selects_clear",
                     "every_frame",
                     "main_thread",
-                    "relative_path_written_before_exit"
+                    "relative_path_written_before_exit",
+                    "frame_completes_while_pending",
+                    "completes_while_frames_run"
                 ]
             },
             {
@@ -261,7 +276,12 @@
                     "moved_light_follows_transform",
                     "many_point_lights",
                     "unchanged_lights_upload_nothing",
-                    "component_defaults"
+                    "component_defaults",
+                    "cluster_lists_every_light",
+                    "spot_light_lights_its_whole_cone",
+                    "cluster_list_grows_to_every_light",
+                    "point_light_inverse_square",
+                    "point_light_fades_smoothly_to_range"
                 ]
             },
             {

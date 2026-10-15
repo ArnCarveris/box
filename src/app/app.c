@@ -476,7 +476,9 @@ done:
     return result ? result : ecs_os_strdup(path);
 }
 
-/** Check the settings of a run and load its scene.
+/** Check the settings of a run and load its scene. ecs_script returns the entity of a managed
+ * script also when it fails to parse or evaluate; both leave EcsScript without a script and
+ * set its error, which tell whether the scene loaded.
  *
  * @param world The world
  * @return 0 when the world may run, nonzero when it may not
@@ -508,9 +510,10 @@ static int box_app_start(
 
     if (app->scene && app->scene[0]) {
         char *scene = box_app_scene_path(app->scene);
-        bool loaded = ecs_script(world, { .filename = scene }) != 0;
+        ecs_entity_t script = ecs_script(world, { .filename = scene });
+        const EcsScript *loaded = script ? ecs_get(world, script, EcsScript) : NULL;
         ecs_os_free(scene);
-        if (!loaded) {
+        if (!loaded || !loaded->script || loaded->error) {
             ecs_err("failed to load scene '%s'", app->scene);
             goto done;
         }

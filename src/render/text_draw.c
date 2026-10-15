@@ -14,6 +14,7 @@ ECS_COMPONENT_DECLARE(TextSlots);
 typedef struct box_draws_atlas_t {
     const void *backend;    /**< Context of the backend the pages were sent to */
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
+    int32_t generation;         /**< Generation of that backend, see box_render_backend_t */
 } box_draws_atlas_t;
 
 /** Construct TextSlots values without slots.
@@ -321,7 +322,8 @@ static void BoxRenderExtractTextAtlas(
     box_text_state_t *s = box_text_state_get(it->world);
     box_render_packet_t *p = box_render_packet(it->world);
     const box_render_backend_t *backend = box_render_get_backend(it->world);
-    bool resend = backend->ctx != state->backend || backend->render != state->render;
+    bool resend = backend->ctx != state->backend || backend->render != state->render ||
+        backend->generation != state->generation;
     int32_t i;
     if (!s) {
         goto done;
@@ -329,6 +331,7 @@ static void BoxRenderExtractTextAtlas(
 
     state->backend = backend->ctx;
     state->render = backend->render;
+    state->generation = backend->generation;
     for (i = 0; i < ecs_vec_count(&s->released) && !resend; i ++) {
         box_render_packet_resource(p, BOX_RENDER_TEXTURE, BOX_RENDER_DESTROY,
             *ecs_vec_get_t(&s->released, uint32_t, i), 0);

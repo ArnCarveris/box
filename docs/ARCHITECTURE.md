@@ -251,7 +251,28 @@ order (creation order, only views whose camera has a `Camera`):
 7. The effects chain, the last effect writing the sRGB target.
 
 After the views the target is blitted if its render size differs, presented, and for a capture
-copied to a readback buffer and written as PNG on the render thread.
+copied to a readback buffer. The render thread maps the buffer without waiting (wgpu's
+`map_async`, as Bevy's screenshots do) and goes on with the next packet; the map callback, which
+fires during a later submit or poll, writes the PNG (through a `.part` file and a rename) and
+counts it in the GPU stats. `box_render_sync`, and the shutdown of the backend, call the
+backend's `flush`, which blocks on the device until every pending capture is written, so a
+capture is on disk after a sync. The browser writes no captures: the frame warns once, and the
+`capture` and `render` commands fail with "captures are not available in the browser".
+
+**Pipeline errors and device loss.** A mesh or 2D shape module that compiled is checked before
+it replaces the module that renders: a forward pipeline is created from it inside a validation
+error scope, and a module that does not fit the pipeline layout is reported in `ShaderStatus`
+like a compile error while the previous module and its pipelines keep rendering (native only;
+the browser reports its error scopes later). Before each packet the ring asks the backend's
+`lost` callback whether the device was lost (the wgpu device lost callback sets it, as does
+`box_render_gpu_lose_device`, which destroys the device to test this); it then stops and starts
+the backend on the thread that renders, which recreates the device, and the stop bumps the
+backend generation so the extract sends the whole scene again. The ring keeps the generation
+under its lock and publishes it in the acquire, which stamps the packet with it; a packet built
+for an older generation (in flight when the device was lost) is dropped, not rendered, so no
+delta reaches a device that lacks its resources, and errors of the lost device are not
+reported. `RenderStatus.device_losses` counts the recoveries whose new device was created. In
+the browser the page reports a lost device and does not recover.
 
 **Culling.** A compute pass tests each draw's instances (mesh bounds moved by the model matrix)
 against the clip planes and `min_dimension_px` and writes visible slots plus indirect draw args.
@@ -286,14 +307,22 @@ in batch order.
 
 `DirectionalLight`, `PointLight`, `SpotLight` and `AmbientLight` take color from `Rgb`, position
 from `WorldTransform` and direction from the local +Z axis. Constructors give intensity 1, range
-10 and a 20/30 degree cone. `RenderExtractLights` collects the lights of each scene into a
+10 and a 20/30 degree cone. Point and spot lights fall off with the inverse square of the
+distance (clamped below 0.01), windowed to zero at their range as in Frostbite's
+`smoothDistanceAtt`; `include/box/light.h` documents the units. `RenderExtractLights` collects the lights of each scene into a
 storage buffer per scene, directional first, uploaded only when its bytes change. Every view
 gets the buffer, counts and ambient of the scene of its camera. `AmbientLight` (sky, ground,
 intensity) on a scene root, any entity of the scene or as a singleton for the default scene is
 summed per scene. A scene without light entities gets a default sun and sky, so a scene whose
 light has intensity 0 is dark. `View.lighting.enabled` false draws base color and emission only.
-`cluster.wgsl` splits the view frustum into 16x9x24 clusters and lists up to 128 point or spot
-lights per cluster; `mesh.wgsl` shades every directional light plus the cluster's lights.
+`cluster.wgsl` splits the view frustum into 16x9x24 clusters and lists the point and spot lights
+that reach each one (spot lights tested against their cone) in one light index list the
+clusters share. The list of a view starts at 32 lights per cluster (fewer with fewer lights);
+the entries a pass allocated are read back a few frames later and the list grows to the next
+power of two when they did not fit (up to every light in every cluster and the 128 MiB storage
+binding limit) or shrinks when it is four times too large. Until it grew, clusters past its end
+miss lights, chosen by the order of the atomic allocation, and a warning names the shortfall.
+`mesh.wgsl` shades every directional light plus the cluster's lights.
 
 **Light modes.** `DirectionalLight`, `PointLight` and `SpotLight` have a `bake` member of type
 `LightBakeMode`, following Unity's light modes (Godot's Dynamic, Disabled and Static bake modes):
@@ -540,8 +569,9 @@ frame); both are read live and do not apply to the `Terminal` entities of a scen
 (1 MiB, then `commands.log` moves to `commands.log.1`, logrotate style) and `images` (100) are
 read when a session opens and do not change open sessions. An image of `capture` or `render`
 counts against `images` from the moment it is named until it is deleted: naming one more
-deletes the oldest image the renderer is done with (written, or dropped once
-`RenderStatus.rendered` passed its packet), and when every kept image is still being written
+deletes the oldest image the renderer is done with (its packet rendered, as `RenderStatus.rendered`
+tells, and its readback no longer mapping, so the file is written or will never be), and when
+every kept image is still being written
 the command fails, so a burst of captures cannot leave files behind.
 
 **Captures.** `box_render_capture` queues a camera (or explicit settings); `RenderExtractCaptures`

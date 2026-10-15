@@ -64,6 +64,9 @@ typedef struct box_gpu_effects_t box_gpu_effects_t;
 /** Textures, pipelines and timing of the probe captures */
 typedef struct box_gpu_bake_t box_gpu_bake_t;
 
+/** A capture on its way from the GPU to its PNG file */
+typedef struct box_gpu_capture_t box_gpu_capture_t;
+
 /** A surface on the GPU: the image it presents and the image views render into */
 typedef struct box_gpu_target_t {
     uint32_t handle;                /**< Handle the main thread assigned */
@@ -79,13 +82,9 @@ typedef struct box_gpu_target_t {
     WGPUTexture depth;              /**< Depth texture of the views at the render size */
     WGPUTextureView depth_view;     /**< View of the depth texture */
     bool immediate;                 /**< The window can present without vertical sync */
-    WGPUBuffer readback;            /**< Buffer a capture copies the image into */
-    uint64_t readback_size;         /**< Bytes of the readback buffer */
-    uint8_t *pixels;                /**< Copy of the readback buffer the PNG is encoded from */
-    uint32_t capture_width;         /**< Width of the copied image */
-    uint32_t capture_height;        /**< Height of the copied image */
-    uint32_t capture_stride;        /**< Bytes per row of the copied image */
-    bool capture_pending;           /**< A copy was recorded and not yet written */
+    WGPUBuffer readback;            /**< Idle buffer the next capture copies the image into */
+    uint64_t readback_size;         /**< Bytes of the idle readback buffer */
+    box_gpu_capture_t *capture;     /**< Copy recorded in this frame, not yet mapped */
 } box_gpu_target_t;
 
 /** A compiled shader module */
@@ -236,6 +235,16 @@ typedef struct box_gpu_cull_readback_t {
     ecs_vec_t records;              /**< box_gpu_cull_record_t of the views */
 } box_gpu_cull_readback_t;
 
+/** The cluster buffer of a view slot and the read back of the entries its pass allocated */
+typedef struct box_gpu_cluster_t {
+    WGPUBuffer buffer;              /**< Allocated entries, offset and count per cluster, list */
+    uint64_t entries;               /**< Entries the light index list holds */
+    WGPUBuffer readback;            /**< Mappable copy of the allocated entries */
+    int32_t state;                  /**< Free, copied, mapping, mapped or failed */
+    int64_t frame;                  /**< Frame of the packet the copy was recorded in */
+    bool cut;                       /**< The last read back pass listed fewer lights than reach */
+} box_gpu_cluster_t;
+
 /** Copies of the cull counters in flight at most */
 #define BOX_GPU_CULL_READBACKS (4)
 
@@ -298,7 +307,7 @@ typedef struct box_gpu_view_uniforms_t {
     vec4 ambient_ground;            /**< Linear ambient light from below */
     vec4 cluster;                   /**< Inverse projection scale of x and y, slice near, far */
     uint32_t lights[4];             /**< Directional lights, lights, lit, orthographic */
-    uint32_t grid[4];               /**< Clusters per axis, lights per cluster at most */
+    uint32_t grid[4];               /**< Clusters per axis, unused */
     mat4 shadow_matrix[BOX_RENDER_SHADOW_CASCADES]; /**< World to shadow clip per cascade */
     vec4 shadow_split;              /**< View depth each cascade ends at */
     vec4 shadow_bias;               /**< Depth added to the compared depth per cascade */
@@ -360,7 +369,7 @@ typedef struct box_gpu_t {
     WGPUPipelineLayout cluster_pipeline_layout; /**< Pipeline layout of the cluster pass */
     WGPUComputePipeline cluster;    /**< Cluster pipeline, NULL until the shader exists */
     int32_t cluster_revision;       /**< Revision of the shader the pipeline was made with */
-    ecs_vec_t clusters;             /**< WGPUBuffer, the cluster buffer of each view slot */
+    ecs_vec_t clusters;             /**< box_gpu_cluster_t of each view slot */
     WGPUBuffer no_lights;           /**< Light buffer of a view whose light buffer is missing */
     ecs_vec_t view_data;            /**< Bytes of the view uniforms of a target */
     WGPUBindGroupLayout shadow_layout; /**< Bind group layout of the shadow pass */
@@ -402,6 +411,9 @@ typedef struct box_gpu_t {
     uint32_t rendering;             /**< Target that is rendering, materials cannot sample it */
     bool timestamps;                /**< The device has timestamp queries */
     box_gpu_bake_t *bake;           /**< Probe captures, created on the first capture */
+    ecs_vec_t captures;             /**< box_gpu_capture_t* whose readback is mapping */
+    bool lost;                      /**< The device was lost, the ring recreates it */
+    bool lose;                      /**< box_render_gpu_lose_device asked to destroy it */
 } box_gpu_t;
 
 /** Fields of the counters of the backend */
@@ -704,6 +716,22 @@ void box_gpu_draw_fini(
 void box_gpu_forward_reset(
     box_gpu_t *gpu);
 
+/** Create a forward pipeline from a mesh or 2D shape module inside an error scope, to find out
+ * whether the module fits the pipeline layout before it replaces the module that renders.
+ *
+ * wgpu-native reports the scope at once; the browser reports it later, so there the check
+ * passes and an invalid pipeline shows as a device error.
+ *
+ * @param gpu The backend
+ * @param handle Handle of the shader
+ * @param shader The module
+ * @return NULL when the pipeline is valid, else the error, which the caller frees
+ */
+char* box_gpu_forward_check(
+    box_gpu_t *gpu,
+    uint32_t handle,
+    WGPUShaderModule shader);
+
 /** Create or release a mesh from a BOX_RENDER_MESH resource.
  *
  * @param gpu The backend
@@ -829,7 +857,7 @@ WGPUBindGroup box_gpu_light_group_with(
     WGPUBuffer clusters,
     WGPUTextureView shadow);
 
-/** Create a cluster buffer.
+/** Create a cluster buffer whose light index list holds 128 lights in every cluster.
  *
  * @param gpu The backend
  * @return The buffer, released by the caller
@@ -1333,7 +1361,8 @@ void box_gpu_capture_encode(
     WGPUCommandEncoder encoder,
     WGPUTexture texture);
 
-/** Wait for the readback buffer of a target and write it to a PNG file.
+/** Map the copy the frame recorded without waiting for it; the map callback writes the PNG
+ * file once the GPU finished the copy, as wgpu's map_async does for Bevy's screenshots.
  *
  * @param gpu The backend
  * @param t The target
@@ -1344,12 +1373,32 @@ void box_gpu_capture_write(
     box_gpu_target_t *t,
     const char *path);
 
-/** Release the readback buffer of a target.
+/** Release the idle readback buffer of a target. Captures of the target that are still
+ * mapping complete on their own.
  *
  * @param t The target
  */
 void box_gpu_capture_fini(
     box_gpu_target_t *t);
+
+/** Block on the device until every capture that is mapping wrote its file, the flush callback
+ * of the backend; captures a wait does not complete are abandoned, so none outlives the device.
+ * The browser maps from its event loop, so there it returns at once.
+ *
+ * @param ctx The backend
+ */
+void box_gpu_capture_flush(
+    void *ctx);
+
+/** Check whether the capture of a file is still mapping, so the file may still be written.
+ *
+ * @param gpu The backend
+ * @param path The file
+ * @return Whether a capture of the file is mapping
+ */
+bool box_gpu_capture_pending(
+    box_gpu_t *gpu,
+    const char *path);
 
 #endif
 

@@ -595,10 +595,13 @@ static void BoxRenderExtractDraws(
         goto done;
     }
 
-    if (backend->ctx != d->backend || backend->render != d->render) {
+    if (backend->ctx != d->backend || backend->render != d->render ||
+        backend->generation != d->generation)
+    {
         box_draws_reset_backend(d, cache);
         d->backend = backend->ctx;
         d->render = backend->render;
+        d->generation = backend->generation;
     }
 
     d->stats.processed = 0;

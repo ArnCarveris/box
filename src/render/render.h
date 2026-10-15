@@ -455,6 +455,8 @@ typedef struct box_render_packet_t {
     ecs_vec_t bakes;        /**< box_render_bake_batch_t, the probe captures of the frame */
     ecs_vec_t probes;       /**< box_render_probe_capture_t of the bake batches */
     ecs_vec_t data;         /**< Bytes the resources and uploads point into */
+    int32_t generation;     /**< Backend generation the extract built it for, the ring drops a
+                             *   packet of an older generation instead of rendering it */
 } box_render_packet_t;
 
 /** A renderer: the only code that receives packets, always called from one thread.
@@ -472,6 +474,13 @@ typedef struct box_render_backend_t {
     void (*wait)(void*, uint64_t); /**< Block until the GPU finished the work of a fence */
     bool (*done)(void*, uint64_t); /**< Check without blocking whether a fence is done, NULL
                                     *   when only the time a wait takes tells */
+    void (*flush)(void*);       /**< Block until asynchronous work such as captures finished,
+                                 *   on the render thread, NULL when there is none */
+    bool (*lost)(void*);        /**< Check before a packet whether the device was lost, so the
+                                 *   ring restarts the backend, NULL when it cannot tell */
+    int32_t generation;         /**< Set by the ring, bumped at fini and on a new backend, as
+                                 *   init runs after or during the next extract; a change makes
+                                 *   the extract send everything again */
 } box_render_backend_t;
 
 /** Backend that renders nothing and records what it received, the default backend */
@@ -618,6 +627,25 @@ box_render_backend_t box_render_gpu_backend(void);
 bool box_render_gpu_stats(
     ecs_world_t *world,
     box_render_gpu_stats_t *stats);
+
+/** Check whether the GPU backend of a world may still write the capture of a file: its packet
+ * rendered and the readback of the image is still mapping.
+ *
+ * @param world The world
+ * @param path The file
+ * @return Whether a capture of the file is mapping
+ */
+bool box_render_gpu_capture_pending(
+    ecs_world_t *world,
+    const char *path);
+
+/** Destroy the device of the GPU backend of a world before its next packet, which loses it the
+ * way a driver reset or a removed GPU does, to test the recovery.
+ *
+ * @param world The world
+ */
+void box_render_gpu_lose_device(
+    ecs_world_t *world);
 
 /** When the GPU backend applies the outcome of a shader compile.
  *
@@ -1218,8 +1246,8 @@ void box_render_pause(
     ecs_world_t *world,
     bool paused);
 
-/** Wait until the backend rendered every submitted packet, also while the ring is held,
- * and bring RenderStatus up to date.
+/** Wait until the backend rendered every submitted packet, also while the ring is held, and
+ * flushed it, so every capture of those packets is written, and bring RenderStatus up to date.
  *
  * @param world The world
  */

@@ -169,8 +169,16 @@ static void box_gpu_compile_finish(
         compile->slot = NULL;
     }
 
-    if (compile->failed || !compile->module) {
-        const char *message = compile->message
+    char *invalid = NULL;
+    if (!compile->failed && compile->module && slot && compile->revision == slot->requested &&
+        (compile->handle == BOX_RENDER_SHADER_MESH ||
+            compile->handle == BOX_RENDER_SHADER_SHAPE2D))
+    {
+        invalid = box_gpu_forward_check(gpu, compile->handle, compile->module);
+    }
+
+    if (compile->failed || !compile->module || invalid) {
+        const char *message = invalid ? invalid : compile->message
             ? compile->message : "shader module creation failed";
         ecs_err("shader '%s' failed to compile: %s", compile->label, message);
         box_gpu_count(gpu, BOX_GPU_STAT_SHADER_ERROR);
@@ -189,6 +197,8 @@ static void box_gpu_compile_finish(
         ecs_map_remove(&gpu->shaders, compile->handle);
         ecs_os_free(slot);
     }
+
+    ecs_os_free(invalid);
 }
 
 /** Take the outcome of a compile; one that waits is finished and freed here.
