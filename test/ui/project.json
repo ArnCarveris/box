@@ -141,7 +141,8 @@
                     "tiny_fades",
                     "glyphs_added_mid_run",
                     "budget_more_glyphs_than_a_page",
-                    "small_budget_reuses_pages"
+                    "small_budget_reuses_pages",
+                    "cusp_glyph"
                 ]
             },
             {

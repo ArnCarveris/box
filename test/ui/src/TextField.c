@@ -17,6 +17,35 @@
 #define STB_IMAGE_STATIC
 #include <stb_image.h>
 
+/** Outline of B612 glyph 538 (U+E040, an hourglass): x, y in font units and 1 for on curve */
+static const int32_t text_field_hourglass[][3] = {
+    { 1000, 1400, 1 }, { 1000, 1306, 0 }, { 974, 1172, 0 }, { 932, 1075, 0 }, { 878, 1009, 0 },
+    { 822, 958, 0 }, { 768, 914, 0 }, { 726, 863, 0 }, { 700, 798, 0 }, { 700, 750, 1 },
+    { 700, 701, 0 }, { 744, 627, 0 }, { 811, 561, 0 }, { 889, 492, 0 }, { 956, 403, 0 },
+    { 1000, 283, 0 }, { 1000, 200, 1 }, { 1000, 0, 1 }, { 100, 0, 1 }, { 100, 200, 1 },
+    { 100, 284, 0 }, { 144, 402, 0 }, { 211, 491, 0 }, { 289, 560, 0 }, { 356, 626, 0 },
+    { 400, 700, 0 }, { 400, 750, 1 }, { 400, 810, 0 }, { 356, 884, 0 }, { 289, 945, 0 },
+    { 211, 1011, 0 }, { 144, 1115, 0 }, { 100, 1275, 0 }, { 100, 1400, 1 }, { 100, 1500, 1 },
+    { 1000, 1500, 1 }, { 550, 600, 1 }, { 552, 599, 0 }, { 560, 561, 0 }, { 569, 503, 0 },
+    { 581, 437, 0 }, { 590, 379, 0 }, { 598, 341, 0 }, { 600, 340, 1 }, { 652, 316, 0 },
+    { 728, 293, 0 }, { 776, 270, 0 }, { 799, 236, 0 }, { 799, 200, 1 }, { 899, 200, 1 },
+    { 899, 275, 0 }, { 855, 385, 0 }, { 788, 471, 0 }, { 711, 542, 0 }, { 644, 614, 0 },
+    { 600, 696, 0 }, { 600, 750, 1 }, { 600, 812, 0 }, { 644, 900, 0 }, { 711, 972, 0 },
+    { 788, 1038, 0 }, { 855, 1119, 0 }, { 899, 1225, 0 }, { 899, 1300, 1 }, { 200, 1300, 1 },
+    { 200, 1225, 0 }, { 244, 1120, 0 }, { 311, 1039, 0 }, { 389, 972, 0 }, { 456, 900, 0 },
+    { 500, 812, 0 }, { 500, 750, 1 }, { 500, 698, 0 }, { 456, 618, 0 }, { 389, 546, 0 },
+    { 312, 473, 0 }, { 245, 386, 0 }, { 200, 275, 0 }, { 200, 200, 1 }, { 301, 200, 1 },
+    { 301, 235, 0 }, { 324, 270, 0 }, { 372, 293, 0 }, { 446, 316, 0 }, { 498, 340, 1 },
+    { 500, 341, 0 }, { 508, 379, 0 }, { 518, 436, 0 }, { 529, 503, 0 }, { 540, 560, 0 },
+    { 548, 599, 0 }, { 550, 850, 1 }, { 550, 887, 0 }, { 516, 955, 0 }, { 465, 1016, 0 },
+    { 406, 1072, 0 }, { 355, 1125, 0 }, { 321, 1175, 0 }, { 321, 1200, 1 }, { 778, 1200, 1 },
+    { 778, 1175, 0 }, { 744, 1125, 0 }, { 694, 1072, 0 }, { 634, 1016, 0 }, { 584, 955, 0 },
+    { 550, 887, 0 }
+};
+
+/** Last point of each contour of text_field_hourglass */
+static const int32_t text_field_hourglass_ends[] = { 35, 90, 105 };
+
 void TextField_overlapping_contours_no_seam(void) {
     // ui_fixes/msdf_correction
     ecs_world_t *world = ecs_init();
@@ -627,4 +656,132 @@ void TextField_small_budget_reuses_pages(void) {
 
     remove(path);
     ecs_os_fini();
+}
+
+void TextField_cusp_glyph(void) {
+    // ui_fixes/msdf_correction
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {0, 0, 0});
+    ecs_set(world, e, Rgb, {255, 255, 255});
+    ecs_set(world, e, Text, {.value = "\xEE\x81\x80", .size = 320,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 400, .height = 400, .write_to_file = "cusp.png",
+        .resolution_scale = 1});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    static double line[2048][2];
+    int32_t contour_start[4], k, i, j, sub, n = 0;
+    for (k = 0; k < 3; k ++) {
+        int32_t first = k ? text_field_hourglass_ends[k - 1] + 1 : 0;
+        int32_t count = text_field_hourglass_ends[k] - first + 1;
+        double on[2] = { text_field_hourglass[first][0], text_field_hourglass[first][1] };
+        double ctrl[2] = { 0, 0 };
+        bool pending = false;
+        contour_start[k] = n;
+        line[n][0] = on[0];
+        line[n ++][1] = on[1];
+        for (j = 1; j <= count; j ++) {
+            const int32_t *q = text_field_hourglass[first + j % count];
+            double end[2] = { q[0], q[1] };
+            if (!q[2] && pending) {
+                end[0] = (ctrl[0] + q[0]) * 0.5;
+                end[1] = (ctrl[1] + q[1]) * 0.5;
+            }
+
+            if (!q[2] && !pending) {
+                ctrl[0] = q[0];
+                ctrl[1] = q[1];
+                pending = true;
+                continue;
+            }
+
+            for (sub = 1; sub <= 8; sub ++) {
+                double t = sub / 8.0;
+                double c0 = pending ? (1 - t) * (1 - t) : 1 - t, c2 = pending ? t * t : t;
+                double c1 = pending ? 2 * t * (1 - t) : 0;
+                line[n][0] = c0 * on[0] + c1 * ctrl[0] + c2 * end[0];
+                line[n ++][1] = c0 * on[1] + c1 * ctrl[1] + c2 * end[1];
+            }
+
+            on[0] = end[0];
+            on[1] = end[1];
+            pending = !q[2];
+            ctrl[0] = q[0];
+            ctrl[1] = q[1];
+        }
+
+        n --;
+    }
+
+    contour_start[3] = n;
+    char *png = flecs_asprintf("%s/cusp.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, c = 0, x, y;
+    unsigned char *px = stbi_load(png, &w, &h, &c, 4);
+    test_assert(px != NULL);
+    int32_t x0 = w, y0 = h, x1 = -1, y1 = -1;
+    for (y = 0; y < h; y ++) {
+        for (x = 0; x < w; x ++) {
+            if (px[(y * w + x) * 4] > 128) {
+                x0 = x < x0 ? x : x0;
+                y0 = y < y0 ? y : y0;
+                x1 = x > x1 ? x : x1;
+                y1 = y > y1 ? y : y1;
+            }
+        }
+    }
+
+    test_assert(x1 - x0 > 100);
+    double sx = (x1 + 1 - x0) / 900.0, sy = (y1 + 1 - y0) / 1500.0;
+    int32_t inner = 0, holes = 0, spill = 0;
+    for (y = 0; y < h; y ++) {
+        for (x = 0; x < w; x ++) {
+            int32_t sample, around = 0;
+            for (sample = 0; sample < 49; sample ++) {
+                double qx = 100 + (x + (sample % 7) * 0.5 - 1.0 - x0) / sx;
+                double qy = 1500 - (y + (sample / 7) * 0.5 - 1.0 - y0) / sy;
+                bool in = false;
+                for (k = 0; k < 3; k ++) {
+                    int32_t a = contour_start[k], m = contour_start[k + 1] - a;
+                    for (i = 0; i < m; i ++) {
+                        const double *pa = line[a + i], *pb = line[a + (i + 1) % m];
+                        if ((pa[1] > qy) != (pb[1] > qy) &&
+                            pa[0] + (qy - pa[1]) * (pb[0] - pa[0]) / (pb[1] - pa[1]) > qx)
+                        {
+                            in = !in;
+                        }
+                    }
+                }
+
+                around += in;
+            }
+
+            int32_t value = px[(y * w + x) * 4];
+            inner += around == 49;
+            holes += around == 49 && value < 235;
+            spill += around == 0 && value > 20;
+        }
+    }
+
+    test_assert(inner > 10000);
+    test_int(holes, 0);
+    test_assert(spill <= 2);
+    stbi_image_free(px);
+    ecs_os_free(png);
+    ecs_fini(world);
 }
