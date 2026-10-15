@@ -113,14 +113,29 @@ static void box_layout_on_childof(
 
 /** Parent observer: children were added to or removed from a parent.
  *
+ * An OnSet only sees the new parent, so the parent of every element is kept to mark the one
+ * an element moves away from.
+ *
  * @param it Iterator over the children
  */
 static void box_layout_on_parent(
     ecs_iter_t *it)
 {
+    box_layout_state_t *state = it->ctx;
     const EcsParent *p = ecs_field(it, EcsParent, 0);
     int32_t i;
     for (i = 0; i < it->count; i ++) {
+        ecs_map_key_t key = (ecs_map_key_t)it->entities[i];
+        ecs_map_val_t *prev = ecs_map_get(&state->parents, key);
+        if (it->event == EcsOnRemove) {
+            ecs_map_remove(&state->parents, key);
+        } else if (prev && (ecs_entity_t)*prev != p[i].value) {
+            box_layout_mark_children(it, i, 1, (ecs_entity_t)*prev);
+            *prev = (ecs_map_val_t)p[i].value;
+        } else if (!prev) {
+            ecs_map_insert(&state->parents, key, (ecs_map_val_t)p[i].value);
+        }
+
         box_layout_mark_children(it, i, 1, p[i].value);
     }
 }
@@ -310,6 +325,7 @@ static void box_layout_registry_dtor(
             ecs_vec_fini_t(NULL, &state->marks, ecs_entity_t);
             ecs_vec_fini_t(NULL, &state->roots, ecs_entity_t);
             ecs_vec_fini_t(NULL, &state->nodes, box_layout_node_t);
+            ecs_map_fini(&state->parents);
             ecs_os_free(state);
         }
     }
@@ -387,6 +403,7 @@ void BoxLayoutImport(
     ecs_vec_init_t(NULL, &state->marks, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &state->roots, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &state->nodes, box_layout_node_t, 0);
+    ecs_map_init(&state->parents, NULL);
     ecs_singleton_ensure(world, LayoutRegistry)->state = state;
 
     ecs_id_t elements[] = {
