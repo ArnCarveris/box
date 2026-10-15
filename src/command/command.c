@@ -31,7 +31,7 @@ static void box_terminal_session_dtor(
         }
 
         if (s[i].dir) {
-            box_terminal_rmtree(s[i].dir);
+            box_app_rmtree(s[i].dir);
             ecs_os_free(s[i].dir);
         }
 
@@ -42,7 +42,38 @@ static void box_terminal_session_dtor(
         }
 
         ecs_vec_fini_t(NULL, &s[i].entries, box_command_entry_t);
+        box_terminal_image_t *images = ecs_vec_first(&s[i].images);
+        for (j = 0; j < ecs_vec_count(&s[i].images); j ++) {
+            ecs_os_free(images[j].path);
+        }
+
+        ecs_vec_fini_t(NULL, &s[i].images, box_terminal_image_t);
         ecs_os_memset_t(&s[i], 0, TerminalSession);
+    }
+}
+
+/** Construct TerminalLimits values with the documented defaults.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_terminal_limits_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    TerminalLimits *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (TerminalLimits){
+            .sessions = BOX_TERMINAL_SESSIONS,
+            .idle_timeout = BOX_TERMINAL_IDLE_TIMEOUT,
+            .history = BOX_TERMINAL_HISTORY,
+            .log_size = BOX_TERMINAL_LOG_SIZE,
+            .images = BOX_TERMINAL_IMAGES
+        };
     }
 }
 
@@ -64,7 +95,7 @@ static void box_terminal_session_move(
     ecs_os_memset(src_ptr, 0, count * ti->size);
 }
 
-/** Stop the server, remove the session root this module created and free the host.
+/** Stop the server and free the host; the session root is removed with the temporary folder.
  *
  * @param world The world
  * @param ctx The host
@@ -76,10 +107,7 @@ static void box_terminal_host_fini(
     (void)world;
     box_terminal_host_t *host = ctx;
     box_endpoint_fini(host);
-    if (host->root) {
-        box_terminal_rmtree(host->root);
-        ecs_os_free(host->root);
-    }
+    ecs_os_free(host->root);
 
     ecs_os_free(host);
 }
@@ -88,9 +116,8 @@ box_terminal_host_t* box_terminal_host(
     const ecs_world_t *world)
 {
     const TerminalHost *th = ecs_singleton_get(world, TerminalHost);
-    ecs_assert(th != NULL, ECS_INVALID_OPERATION, "box.command is not imported");
 
-    return th->host;
+    return th ? th->host : NULL;
 }
 
 ecs_entity_t box_command_register(
@@ -143,6 +170,8 @@ void BoxCommandImport(
     box_owned_hooks(world, Terminal, BOX_OWNED_STR(Terminal, cwd));
     box_owned_hooks(world, TerminalStatus, BOX_OWNED_STR(TerminalStatus, dir));
     ECS_META_COMPONENT(world, TerminalServer);
+    ECS_META_COMPONENT(world, TerminalLimits);
+    ecs_set_hooks(world, TerminalLimits, { .ctor = box_terminal_limits_ctor });
     ECS_COMPONENT_DEFINE(world, TerminalSession);
     ECS_COMPONENT_DEFINE(world, CommandInfo);
     ECS_COMPONENT_DEFINE(world, TerminalHost);
@@ -163,6 +192,7 @@ void BoxCommandImport(
     box_terminal_host_t *host = ecs_os_calloc_t(box_terminal_host_t);
     host->world = world;
     ecs_singleton_set(world, TerminalHost, { .host = host });
+    ecs_singleton_add(world, TerminalLimits);
     ecs_atfini(world, box_terminal_host_fini, host);
 
     box_terminal_init(world, host);

@@ -81,7 +81,13 @@
                     "align_lines",
                     "many_glyphs",
                     "dynamic_transform",
-                    "module_child_fini"
+                    "module_child_fini",
+                    "oversized_glyph_missing",
+                    "oversized_warns_once_per_font",
+                    "font_without_units_fails",
+                    "recursive_composite_missing",
+                    "composite_limits",
+                    "font_tables_outside_file"
                 ]
             },
             {
@@ -133,7 +139,9 @@
                     "capture_drag_across_second_view",
                     "capture_release_outside",
                     "capture_cleared_after_release",
-                    "capture_cleared_when_deleted"
+                    "capture_cleared_when_deleted",
+                    "focused_surface_views",
+                    "focus_click_without_move"
                 ]
             },
             {
@@ -161,7 +169,20 @@
                     "covers_left_half",
                     "width_fraction",
                     "follows_resize",
-                    "scrollback_follows_height"
+                    "scrollback_follows_height",
+                    "paste_long",
+                    "null_text"
+                ]
+            },
+            {
+                "id": "Blocking",
+                "testcases": [
+                    "stops_pass_through",
+                    "press_stays_on_panel",
+                    "mouse_binding",
+                    "camera_look_and_zoom",
+                    "hover_and_wheel",
+                    "render_to_texture"
                 ]
             }
         ]

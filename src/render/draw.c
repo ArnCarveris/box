@@ -456,6 +456,48 @@ static ecs_entity_t box_draws_scene(
     return result;
 }
 
+/** Check whether a scene bakes its lighting, so captures tell its static shapes apart.
+ *
+ * @param world The world
+ * @param scene The scene, 0 for the default scene
+ * @return Whether the scene root, or for the default scene the singleton, has LightBake
+ */
+static bool box_draws_baked(
+    const ecs_world_t *world,
+    ecs_entity_t scene)
+{
+    ecs_entity_t e = scene ? scene : ecs_id(LightBake);
+
+    return ecs_has(world, e, LightBake);
+}
+
+/** Mark every shape in the batches of the scene of the entities of an observer event, after
+ * the scene got or lost LightBake, which changes the bake flag of their keys.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxDrawsOnLightBake(
+    ecs_iter_t *it)
+{
+    box_render_draws_t *d = it->ctx;
+    int32_t i, b, s;
+    for (i = 0; !ecs_is_fini(it->world) && i < it->count; i ++) {
+        ecs_entity_t scene = box_render_scene_of(it->world, it->entities[i]);
+        for (b = 0; b < ecs_vec_count(&d->batches); b ++) {
+            box_draw_batch_t *batch = box_draws_batch(d, b);
+            if (!batch->alive || batch->key.scene != scene || batch->key.atlas ||
+                batch->key.pipeline != BOX_RENDER_SHADER_MESH)
+            {
+                continue;
+            }
+
+            for (s = 0; s < ecs_vec_count(&batch->entities); s ++) {
+                box_draws_mark(it->world, d, *ecs_vec_get_t(&batch->entities, ecs_entity_t, s));
+            }
+        }
+    }
+}
+
 /** Compute the batch key of a shape.
  *
  * @param world The world
@@ -500,6 +542,9 @@ static void box_draws_key(
         ecs_get_target_for_id(world, e, EcsChildOf, DynamicMaterial) != 0;
     key->shadow = !shape2d && !ecs_has_id(world, e, NoShadow) &&
         !ecs_get_target_for_id(world, e, EcsChildOf, NoShadow);
+    key->bake = !shape2d && key->blend == Opaque && !ecs_has_id(world, e, DynamicTransform) &&
+        !ecs_has_id(world, e, ManualTransform) && !ecs_has_id(world, e, NoBake) &&
+        box_draws_baked(world, key->scene);
 }
 
 /** Bring the shape of a changed entity into the batch of its key and write its instance.
@@ -757,6 +802,15 @@ static void box_draws_observers(
     box_draws_observer(world, d, "DrawsOnDynamicMaterial", (ecs_observer_desc_t){
         .query.terms = {{ .id = DynamicMaterial }},
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnMove);
+    box_draws_observer(world, d, "DrawsOnNoBake", (ecs_observer_desc_t){
+        .query.terms = {{ .id = NoBake }},
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnChange);
+    box_draws_observer(world, d, "DrawsOnManualTransform", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ManualTransform }},
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnChange);
+    box_draws_observer(world, d, "DrawsOnLightBake", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ecs_id(LightBake) }},
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnLightBake);
     box_draws_observer(world, d, "DrawsOnNoShadow", (ecs_observer_desc_t){
         .query.terms = {{ .id = NoShadow }},
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnMove);

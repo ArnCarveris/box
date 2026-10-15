@@ -72,14 +72,25 @@ parser only writes the `App` singleton:
 | `--port <n>` | `port` | Command and REST port, default 27750, 0 disables |
 | `<file>` | `scene` | Script loaded before the first frame |
 
-`box_app_run` refuses a headless run without `frames` or `timeout`, and a headless run on a
-machine whose load average exceeds its core count unless `App.unguarded` is set. It loads the
+`box_app_run` refuses a headless run without `frames` or `timeout`, a headless run without its
+temporary folder, and a headless run on a machine whose load average exceeds its core count
+unless `App.unguarded` is set. It loads the
 scene as a managed script, starts the `TerminalServer` on `port` and steps the world until it
 quits. `BOX_TEST=1` sets `unguarded` and `unpaced` in every new world. The `AppFrame` system
 (`EcsPostFrame`) counts frames into `AppStatus.frame`, stops on `frames` or `timeout` and in a
 paced headless run sleeps for as long as the process exceeded its CPU budget. Setting
-`App.headless` creates `/tmp/box/<pid>` (`AppStatus.tmp_dir`), removed when the world is
-deleted. The browser build (`bake3 --target em apps/boxrun`) renders into `#canvas` with the
+`App.headless` creates `/tmp/box/<pid>` (`AppStatus.tmp_dir`).
+
+The temporary folder is private: `/tmp/box/<pid>` is made with mode 0700 and must be owned by
+the user. `/tmp/box` is accepted only when it is a real folder (not a link) owned by the user
+or by root and, when others can write it, sticky, so no other user can rename or replace the
+folder of a process; otherwise the run refuses to start (a new `/tmp/box` is made 0700, so on
+a shared machine either each user removes it or root owns it with mode 1777). A folder of the
+user already at `/tmp/box/<pid>` was left by a crashed run with the same pid and is removed
+first; a link, a file or a folder of another user there is refused and left alone. A refused
+folder leaves `tmp_dir` unset and quits the headless world, and `box_app_run` returns nonzero
+before the scene loads. The windowed terminal session root is the same folder. The worlds of
+one process share it, and the last one deleted removes it without following links. The browser build (`bake3 --target em apps/boxrun`) renders into `#canvas` with the
 page's WebGPU device and has no render thread and no workers.
 
 ## Threads
@@ -165,7 +176,7 @@ unchanged.
 compiles in an error scope, keeping the old module on failure. Compile errors come back into
 `ShaderStatus` as `file:line: message`, mapped through a per line source table. Engine shaders
 live in `etc/shaders` (blit, mesh, shape2d, scatter, cull, cluster, shadow, bloom, ssao, fog,
-tonemap, exposure) with shared includes. `tools/wgsl_check.mjs` validates them with Tint.
+tonemap, exposure, bake_sh) with shared includes. `tools/wgsl_check.mjs` validates them with Tint.
 
 ## Scenes
 
@@ -208,8 +219,9 @@ are keyed by texture entities; normal maps use a cotangent frame (no tangents).
 
 ## Renderer passes
 
-For each target the backend applies resource changes and uploads, runs the scatter pass, then
-for each view in packet order (creation order, only views whose camera has a `Camera`):
+For each packet the backend applies resource changes and uploads, runs the scatter pass and
+the probe captures (see Lights, baked lighting), then for each target and each view in packet
+order (creation order, only views whose camera has a `Camera`):
 
 1. Effects begin: a view with enabled effects renders into an `rgba16float` target.
 2. Light clustering (`cluster.wgsl`, only with point or spot lights).
@@ -271,7 +283,64 @@ the baked lighting settings: `probe_spacing` 2, `bounces` 2, `capture_size` 16, 
 `bounds_padding` 1 and `cache` (`".box/bake"`, owned string, empty for none), all set by the
 constructor and taken literally otherwise. Adding it makes the engine add `LightBakeStatus`
 (`probes`, `baked`, `pass`, `converged`, `cache_hit`), removed with it. `NoBake` keeps a static
-shape out of the captures. These are data only for now: nothing samples a volume yet.
+shape out of the captures; a static shape has neither `DynamicTransform` nor `ManualTransform`.
+
+**Probe volume.** `RenderExtractBake` (`src/render/bake.c`) places a grid per baked scene over the
+static bounds of its spatial index (`box_spatial_static_bounds`) plus `bounds_padding`,
+`probe_spacing` apart (ceil(extent / spacing) + 1 per axis, centered, spacing widened above 262144
+probes), again only when the index or the settings change. Probes inside the oriented bounds of a
+static captured shape are invalid. The volume is a `BOX_RENDER_VOLUME` resource (`gpu_bake.c`): a
+grid uniform, two probe buffers of 9 rgb L2 SH irradiance coefficients per probe
+(Ramamoorthi-Hanrahan, Sloan's basis) and a validity bit mask, both buffers filled with the exact
+SH of the hemisphere ambient when it is created or the ambient changes. A view with
+`lighting.baked` binds it as group 3 of `mesh.wgsl` with the probe buffer the packet selects for
+the view (one bind group per buffer, same layout), whose `ambient()` term blends the 8 surrounding
+valid probes with DDGI style wrap weights; other views bind a 1x1x1 volume that keeps the
+hemisphere, so a scene without `LightBake` renders exactly as before.
+
+**Probe captures.** Every frame the bake extract moves the unbaked valid probes nearest to the
+cameras of the views of the scene into the packet as a bake batch with the lights of the scene. The
+queue is kept sorted by camera distance and sorted again only when probes return to it or a camera
+moved more than a probe spacing. The number per frame is `budget_ms` over the GPU time per probe,
+an average of measurements, at most 256. The time comes from timestamp queries around the captures
+of a packet (requested natively and by `apps/boxrun/shell.html` when the adapter has
+`timestamp-query`, resolved a packet later because Metal writes pass timestamps when the pass
+completes, read back without waiting, measurements over a second dropped); without them it is the
+CPU time from recording until the queue reports the work done, which includes waits and errs on the
+expensive side. On the render thread the captures run before the targets, in chunks of at most 32
+probes per command buffer: six 90 degree faces of `capture_size` texels per probe render the opaque
+static batches of the scene with the forward pipeline into an rgba16float array, culled per face by
+frustum and 1 px size, without history, effects or 2D. Batches carry a `bake` key only in scenes
+with `LightBake` (opaque 3D shapes without `DynamicTransform`, `ManualTransform` or `NoBake`; the
+draw observers re-key on changes), so other scenes batch as before. The faces are lit by the lights
+of the scene and an ambient term from the batch's source buffer (below); the sun is shadowed by one
+cascade fitted around the bounding sphere of the static bounds (`gpu_shadow.c`), point and spot
+lights are clustered per face and unshadowed. `bake_sh.wgsl` then projects each probe: radiance
+times the SH basis times the exact solid angle of each texel, texels nothing covered seeing the
+hemisphere ambient as a + 1.5 b y so an open probe equals the hemisphere, then the clamped cosine
+convolution per band, written into the batch's target buffer.
+
+**Bounces.** A bake is `bounces + 1` capture passes over every valid probe (as Godot's LightmapGI,
+`bounces` 0 bakes direct light and emission only). The first pass shades its faces with a black
+ambient term (the 1x1x1 volume); every later pass binds the probe buffer the previous pass wrote as
+group 3, the way DDGI shades its rays with the previous irradiance, and writes the other buffer.
+Each bake batch in the packet carries its pass, source and target buffer, and each view the buffer
+it shows. Once every probe of a pass is in a packet, the views of that packet switch to its buffer
+(captures run before the targets) and the probes queue for the next pass, so views keep the last
+complete pass while the next one bakes; only a first pass over probes that still hold the ambient
+writes the shown buffer, so a fresh scene lights up probe by probe. The backend reports every probe
+it captured with its pass; a probe of a rendered packet it did not report (a missing pipeline or
+volume, a dropped packet) is queued again, or, when its pass was already read by the next pass or
+shown, the bake starts over. Probes not captured yet keep their ambient values, so a partial first
+pass blends in. `LightBakeStatus.pass` counts completed passes (0 to `bounces + 1`), `baked` the
+reported probes of the pass being baked, `converged` is set when `pass` reaches `bounces + 1`, and
+`error` explains a `capture_size` outside 1 to 256 or `bounces` outside 0 to 16, which bake
+nothing; a new grid, ambient or `bounces` starts the bake again. A headless run chains every pass
+left into each packet, each batch reading the buffer the one before it wrote, so its frames show
+the converged bake. `PerfRun` warms up again while a bake that can progress (valid settings,
+`budget_ms` above 0, a view of its scene, the GPU backend) has probes left (captures of every
+remaining pass), and gives up with an error after 300 frames without progress. `budget_ms` 0 never
+bakes.
 
 ## Spatial index
 
@@ -282,14 +351,23 @@ changed shapes and subtree roots; `SpatialUpdate` (`EcsOnStore`) places only tho
 shapes are marked stale and placed by the first query after a frame, so an idle frame pays
 nothing. Queries (`src/spatial/spatial.h`) are scoped to one scene: nearest ray with a narrow
 phase filter, all hits sorted, box and sphere overlap, entity bounds. `box_controller_move`
-uses them for collision. Bounds are boxes; there is no mesh level narrow phase and no picking.
+uses them for collision, `box_spatial_static_bounds` gives the box around the static shapes of
+a scene to the bake. Bounds are boxes; there is no mesh level narrow phase and no picking.
 
 ## Text, layout and UI
 
 **Text.** `Text {value, size, line_height, width, align, font}` and `Font {path}`
 (`box.text.DefaultFont` is B612 in `etc/fonts`). Fonts load with stb_truetype on the job system.
 Glyph MSDFs are generated lazily per glyph on workers into RGBA8 atlas pages that grow and then
-page. Layout handles UTF-8, kerning, newlines, word breaks and alignment; the block is centered
+page. Font data is untrusted: a face without units per em fails to load, and a glyph whose box
+is larger than a page (1024 minus spacing) is drawn as the missing glyph with one warning per
+font load; atlas placement makes at most `BOX_TEXT_PLACE_TRIES` passes. A font whose table
+directory, tables or `loca` entries (one per glyph plus the end, each inside `glyf`) lie
+outside the file fails to load. Before stb_truetype reads an outline, box walks the composite
+components of the glyph in the `glyf` table without recursion: more than 16 composite levels
+above a simple glyph (any cycle), more than 256 references in total, matching point offsets or
+records past the end of `glyf` draw the glyph as the missing glyph, again with one warning per
+font load. Layout handles UTF-8, kerning, newlines, word breaks and alignment; the block is centered
 on the origin and measured into `TextBounds`. Glyphs are slots of the 2D batches keyed by atlas
 page (`src/render/text_draw.c`), shaded by `shape2d.wgsl`. No shaping (ligatures, RTL).
 
@@ -314,13 +392,27 @@ culling with occlusion, 1 px minimum size and the shadow defaults.
 
 ## Input and controllers
 
-`box.input` has two sources: a platform hook (`box_input_platform_push`, glfw and browser
-backends not implemented) and a synthetic queue applied in order with per event frame delays.
-`InputUpdate` writes the `Input` singleton and emits script events at `box.input.screen`.
+`box.input` has two sources: a platform hook (`box_input_platform_t` with `poll`, `free` and
+`capture` callbacks, events pushed with `box_input_platform_push`) and a synthetic queue applied
+in order with per event frame delays. The glfw backend (`box_input_glfw_attach` when a window
+opens, `box_input_glfw_detach` before it closes) and the browser backend (`box_input_web_attach`
+on the canvas) stamp each event with the surface of its window; only events of the focused
+surface (`Input.surface`) apply. `InputUpdate` writes the `Input` singleton and emits script
+events at `box.input.screen`. Setting `Input.capture` captures the cursor while input is
+focused: glfw's disabled cursor with raw motion natively, the Pointer Lock API in the browser,
+granted at the next click or key. `Mouse.captured` says when the platform holds it, `InputCaptured`
+events report a lock the browser takes or ends, and Escape or a refused lock clears the request
+with an `InputCapture` event.
 `Action` entities get an `ActionState` (down, pressed, released, start, delta, drag) written by
 `ActionUpdate`; `Binding` entities (key, modifiers) map keys to actions, and script events
 `on.pressed`, `on.held`, `on.dragged`, `on.released` fire for them. Real input is ignored while
-unfocused. Picking is not implemented.
+unfocused. `box.picking` routes pointer events to the entity under the cursor, front view
+first, bubbling to the first `Interactive` ancestor; a hit nothing handles passes to the views
+rendered before, unless an `InputBlocker` element on its path takes it, so a HUD panel with
+`InputBlocker` keeps clicks from the 3D scene. Through the router's `blocks` callback the input
+layer asks picking, when a mouse button goes down or the wheel turns, whether a blocker is under
+the cursor: such a press keeps the bindings of that button up until its next press (like
+Godot's unhandled input), and such a wheel is left out of `Mouse.scroll`.
 
 `CameraController` and `FirstPersonController` read only `ActionState`, never devices. Default
 actions live under `box.controllers.camera` and `box.controllers.first_person` and stay disabled
@@ -339,7 +431,12 @@ A `Terminal` session has a cwd; every line goes to the session log and `commands
 are script functions registered with `box_command_register` (`src/command`):
 
 - Shell and components: `cd`, `ls`, `touch`, `rm`, `mv`, `man`, `add`, `remove`, `set`, `get`,
-  `clear`, guarded against flecs aborts. flecs entities are read only.
+  `clear`, guarded against flecs aborts. flecs entities are read only. `rm`, `mv`, `add`,
+  `remove`, `set` and `clear` refuse modules, sessions (any `Terminal` entity) and everything in
+  their scope ("belongs to a module or session"), so one session cannot close, rewire or retune
+  another session or the module state (`TerminalHost`, `TerminalServer`, `TerminalLimits`);
+  the host changes those from C or script. Without a `TerminalHost` commands fail with
+  "box.command is not imported", `box_terminal_new` returns 0 and requests get HTTP 503.
 - Search: `query`, `iter`, `next`, `done`, `has`, `grep`, `grep_recur`. Iteration re-runs the
   query from an offset, so no iterator stays open.
 - Scripts: `script_read`, `script_write`, `script_patch`, `script_grep`, limited to the working
@@ -350,6 +447,21 @@ are script functions registered with `box_command_register` (`src/command`):
 
 The HTTP server has no deferred reply, so commands that wait (`input.wait`, `capture`, `render`)
 answer at once with a pending state and the caller polls.
+
+**Limits.** Numeric arguments are range checked: an i32 outside the i32 range, a non finite
+f64, walk `steps` above 1000, `dur` above 36000 frames and `next` counts above 1000 fail with
+"is out of range, min to max" (a rejected `next` keeps the iteration). The `TerminalLimits`
+singleton holds the session bounds, with defaults from its constructor. `sessions` (16) caps
+the sessions `/terminal/new` keeps open (HTTP 400 "too many sessions") and `idle_timeout`
+(1800 s) closes such a session when it ran no command for that long (`TerminalIdle`, every
+frame); both are read live and do not apply to the `Terminal` entities of a scene. `history`
+(1000 lines, the `commands` output; `TerminalStatus.commands` stays the total), `log_size`
+(1 MiB, then `commands.log` moves to `commands.log.1`, logrotate style) and `images` (100) are
+read when a session opens and do not change open sessions. An image of `capture` or `render`
+counts against `images` from the moment it is named until it is deleted: naming one more
+deletes the oldest image the renderer is done with (written, or dropped once
+`RenderStatus.rendered` passed its packet), and when every kept image is still being written
+the command fails, so a burst of captures cannot leave files behind.
 
 **Captures.** `box_render_capture` queues a camera (or explicit settings); `RenderExtractCaptures`
 creates an offscreen target for one packet, an exclusive view assigned to it and a PNG path, and
@@ -369,7 +481,7 @@ deletes the scene the next frame.
   delta and number of differing pixels), writing an HTML report; `--update-baseline` refreshes.
 - Performance scenes: `box.perf` `PerfRun` (fps 30/60/90/120) paces frames to the target
   interval, orbits a camera around the bounds of every shape and counts intervals outside 10%
-  as errors; `PerfStatus` and a JSON report carry the numbers. `tools/integration.py perf` runs
+  as errors, warming up again while a bake has not converged; `PerfStatus` and a JSON report carry the numbers. `tools/integration.py perf` runs
   `test/integration/perf`. `test/perf` uses a fake clock so it is machine independent.
 - Benchmarks: `bench/{core,controller,render,scene,transform,ui}` and `tools/bench.py` report
   median, confidence interval and percentiles; `--baseline` flags changes beyond 5%.

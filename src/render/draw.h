@@ -45,6 +45,7 @@ typedef struct box_draw_key_t {
     uint8_t wrap;           /**< TextureWrap of the texture samplers */
     bool dynamic;           /**< Instances are uploaded every frame */
     bool shadow;            /**< Instances cast shadows, false under NoShadow */
+    bool bake;              /**< Static 3D instances without NoBake, drawn by probe captures */
     ecs_entity_t textures[BOX_RENDER_TEXTURE_SLOTS]; /**< Texture entities of PbrTextures */
     uint32_t atlas;         /**< Texture handle of the glyph atlas page of a glyph batch, or 0 */
 } box_draw_key_t;

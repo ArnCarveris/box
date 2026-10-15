@@ -45,7 +45,7 @@ static bool box_shell_builtin(
  *
  * @param world The world
  * @param e The entity
- * @return true when deleting the entity would break a module or a session
+ * @return true when changing or deleting the entity could break a module or a session
  */
 static bool box_shell_protected(
     const ecs_world_t *world,

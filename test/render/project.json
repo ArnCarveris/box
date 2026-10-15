@@ -270,6 +270,32 @@
                 ]
             },
             {
+                "id": "ProbeCapture",
+                "testcases": [
+                    "converges_in_bounded_frames",
+                    "zero_budget_never_converges",
+                    "dynamic_shape_lit_not_captured",
+                    "no_bake_removes_contribution",
+                    "perf_run_waits_for_convergence",
+                    "budget_spreads_over_frames",
+                    "invalid_capture_size_bakes_nothing",
+                    "perf_run_measures_zero_budget",
+                    "perf_run_ignores_unviewed_scene"
+                ]
+            },
+            {
+                "id": "Bounces",
+                "testcases": [
+                    "pass_reaches_bounces",
+                    "zero_bounces_bakes_one_pass",
+                    "out_of_range_bakes_nothing",
+                    "changing_bounces_restarts",
+                    "image_stable_once_converged",
+                    "view_keeps_last_complete_pass",
+                    "far_end_brightens_with_bounces"
+                ]
+            },
+            {
                 "id": "ProbeVolume",
                 "testcases": [
                     "probe_count_of_layout",

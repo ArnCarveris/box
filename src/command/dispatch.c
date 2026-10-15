@@ -4,6 +4,8 @@
  */
 
 #include "command.h"
+#include <errno.h>
+#include <math.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
@@ -151,32 +153,49 @@ static char* box_dispatch_rest(
 
 /** Convert a number or bool argument.
  *
- * @param type The parameter type
+ * @param world The world
+ * @param param The parameter
  * @param token The argument
  * @param out Receives the value
- * @return 0 on success, -1 when the argument is not a valid value
+ * @return NULL on success, an error message the caller frees otherwise
  */
-static int box_dispatch_scalar(
-    ecs_entity_t type,
+static char* box_dispatch_scalar(
+    ecs_world_t *world,
+    const ecs_script_parameter_t *param,
     const char *token,
     box_command_arg_t *out)
 {
-    char *end = NULL;
-    int result = 0;
-    if (type == ecs_id(ecs_i32_t)) {
-        out->i32 = (ecs_i32_t)strtol(token, &end, 10);
-    } else if (type == ecs_id(ecs_f64_t)) {
-        out->f64 = strtod(token, &end);
+    char *end = NULL, *result = NULL;
+    long long i = 0;
+    double f = 0;
+    errno = 0;
+    if (param->type == ecs_id(ecs_i32_t)) {
+        i = strtoll(token, &end, 10);
+    } else if (param->type == ecs_id(ecs_f64_t)) {
+        f = strtod(token, &end);
     } else if (!strcmp(token, "true") || !strcmp(token, "1") || !strcmp(token, "on")) {
         out->b = true;
     } else if (!strcmp(token, "false") || !strcmp(token, "0") || !strcmp(token, "off")) {
         out->b = false;
     } else {
-        result = -1;
+        end = ECS_CONST_CAST(char*, token);
     }
 
     if (end && (end == token || end[0])) {
-        result = -1;
+        result = flecs_asprintf(BOX_COMMAND_ERROR "%s: invalid %s '%s'",
+            param->name, ecs_get_name(world, param->type), token);
+    } else if (param->type == ecs_id(ecs_i32_t) &&
+        (errno == ERANGE || i < INT32_MIN || i > INT32_MAX))
+    {
+        result = flecs_asprintf(BOX_COMMAND_ERROR "%s: %s is out of range, %d to %d",
+            param->name, token, INT32_MIN, INT32_MAX);
+    } else if (param->type == ecs_id(ecs_f64_t) && !isfinite(f)) {
+        result = flecs_asprintf(BOX_COMMAND_ERROR "%s: %s is not a finite number",
+            param->name, token);
+    } else if (param->type == ecs_id(ecs_i32_t)) {
+        out->i32 = (ecs_i32_t)i;
+    } else if (param->type == ecs_id(ecs_f64_t)) {
+        out->f64 = f;
     }
 
     return result;
@@ -212,9 +231,8 @@ static char* box_dispatch_convert(
             result = flecs_asprintf(
                 BOX_COMMAND_ERROR "%s: no entity '%s'", param->name, token);
         }
-    } else if (box_dispatch_scalar(param->type, token, out)) {
-        result = flecs_asprintf(BOX_COMMAND_ERROR "%s: invalid %s '%s'",
-            param->name, ecs_get_name(world, param->type), token);
+    } else {
+        result = box_dispatch_scalar(world, param, token, out);
     }
 
 done:
@@ -340,7 +358,10 @@ void box_command_error(
     ecs_os_free(out[0]);
     out[0] = flecs_asprintf(BOX_COMMAND_ERROR "%s", msg);
     ecs_os_free(msg);
-    box_terminal_host(ctx->world)->failed = true;
+    box_terminal_host_t *host = box_terminal_host(ctx->world);
+    if (host) {
+        host->failed = true;
+    }
 }
 
 char* box_terminal_run(
@@ -352,6 +373,11 @@ char* box_terminal_run(
     box_command_line_t cl = {0};
     box_command_status_t st = { .failed = true };
     char *result = NULL;
+    if (!box_terminal_host(world)) {
+        result = ecs_os_strdup(BOX_COMMAND_ERROR BOX_COMMAND_NOT_IMPORTED);
+        goto done;
+    }
+
     if (!ecs_is_alive(world, session) || !ecs_has(world, session, TerminalSession)) {
         result = ecs_os_strdup(BOX_COMMAND_ERROR "not a terminal session");
         goto done;

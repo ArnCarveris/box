@@ -131,7 +131,7 @@ static uint64_t box_draws_hash(
         h = (h ^ (h >> 31)) * 0x9E3779B97F4A7C15ull + key->textures[i];
     }
 
-    h ^= (uint64_t)key->shadow * 0x94D049BB133111EBull;
+    h ^= ((uint64_t)key->shadow * 2 + key->bake) * 0x94D049BB133111EBull;
     h ^= ((uint64_t)key->atlas + 1) * 0xD6E8FEB86659FD93ull;
 
     return h ^ (h >> 29);
@@ -150,7 +150,7 @@ static bool box_draws_key_eq(
     return a->scene == b->scene && a->mesh == b->mesh && a->pipeline == b->pipeline &&
         a->blend == b->blend && a->back_face == b->back_face && a->dynamic == b->dynamic &&
         a->wrap == b->wrap && !ecs_os_memcmp(a->textures, b->textures, ECS_SIZEOF(a->textures)) &&
-        a->shadow == b->shadow && a->atlas == b->atlas;
+        a->shadow == b->shadow && a->bake == b->bake && a->atlas == b->atlas;
 }
 
 box_draw_batch_t* box_draws_batch(
@@ -703,6 +703,7 @@ static uint32_t box_draws_send_batch(
     out->blend = b->key.blend;
     out->back_face = b->key.back_face;
     out->shadow = b->key.shadow;
+    out->bake = b->key.bake;
     out->mesh = b->key.mesh;
     box_draws_batch_textures(d, b, out);
     out->instances = b->buffer;

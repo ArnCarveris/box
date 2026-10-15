@@ -24,6 +24,30 @@ extern "C" {
 /** Prefix of the message of a failed command */
 #define BOX_COMMAND_ERROR "error: "
 
+/** Most steps of a cursor walk (mouse.sweep, mouse.drag, action.drag) */
+#define BOX_COMMAND_STEPS_MAX (1000)
+
+/** Most frames a command argument such as dur may span */
+#define BOX_COMMAND_FRAMES_MAX (36000)
+
+/** Most rows a next command prints */
+#define BOX_COMMAND_NEXT_MAX (1000)
+
+/** Default of TerminalLimits.sessions */
+#define BOX_TERMINAL_SESSIONS (16)
+
+/** Default of TerminalLimits.idle_timeout in seconds */
+#define BOX_TERMINAL_IDLE_TIMEOUT (1800.0)
+
+/** Default of TerminalLimits.history */
+#define BOX_TERMINAL_HISTORY (1000)
+
+/** Default of TerminalLimits.log_size in bytes */
+#define BOX_TERMINAL_LOG_SIZE (1024 * 1024)
+
+/** Default of TerminalLimits.images */
+#define BOX_TERMINAL_IMAGES (100)
+
 /** A terminal session; adding it creates the session folder, removing it deletes it */
 ECS_STRUCT(Terminal, {
     char *cwd;          /**< Scope that entity arguments resolve against, NULL for the root */
@@ -38,6 +62,22 @@ ECS_STRUCT(TerminalStatus, {
 /** Singleton that serves the terminal, resource and REST endpoints on a port */
 ECS_STRUCT(TerminalServer, {
     int32_t port;       /**< Port to listen on, 0 stops the server */
+});
+
+/** Singleton with the limits of the terminal sessions, added with its defaults on import.
+ *
+ * The session cap and the idle timeout apply to sessions opened with box_terminal_new
+ * (/terminal/new), not to entities a scene gives a Terminal, and changes apply at once.
+ *
+ * history, log_size and images are read when a session opens: a change applies to sessions
+ * opened afterwards and leaves open sessions as they are.
+ */
+ECS_STRUCT(TerminalLimits, {
+    int32_t sessions;       /**< Sessions box_terminal_new keeps open at once */
+    double idle_timeout;    /**< Seconds without a command before such a session is closed */
+    int32_t history;        /**< Command lines a session keeps for the commands command */
+    int32_t log_size;       /**< Bytes of commands.log before it moves to commands.log.1 */
+    int32_t images;         /**< Images of the render commands a session keeps, pending too */
 });
 
 /** A parameter of a command, after the session parameter every command has */

@@ -271,3 +271,33 @@ bool box_spatial_bounds(
 
     return s != NULL;
 }
+
+bool box_spatial_static_bounds(
+    const ecs_world_t *world,
+    ecs_entity_t scene,
+    vec3 min,
+    vec3 max)
+{
+    const box_spatial_t *index = box_spatial_of(world);
+    const box_spatial_scene_t *s = index ? box_spatial_scene(index, scene) : NULL;
+    bool result = false;
+    int32_t i, count = s ? ecs_vec_count(&s->items) : 0;
+    const box_spatial_item_t *items = s ? ecs_vec_first(&s->items) : NULL;
+    for (i = 0; i < count; i ++) {
+        const box_spatial_item_t *it = &items[i];
+        if (!it->entity || it->tree != BOX_SPATIAL_STATIC) {
+            continue;
+        }
+
+        if (!result) {
+            glm_vec3_copy(ECS_CONST_CAST(float*, it->min), min);
+            glm_vec3_copy(ECS_CONST_CAST(float*, it->max), max);
+            result = true;
+        } else {
+            glm_vec3_minv(min, ECS_CONST_CAST(float*, it->min), min);
+            glm_vec3_maxv(max, ECS_CONST_CAST(float*, it->max), max);
+        }
+    }
+
+    return result;
+}

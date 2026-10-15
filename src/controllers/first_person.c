@@ -288,7 +288,8 @@ static void box_first_person_body(
         .radius = fp->radius,
         .height = height + BOX_FIRST_PERSON_HEAD,
         .step = walking ? step : 0,
-        .probe = walking && fp->velocity[1] <= 0 ? step : 0
+        .probe = walking && fp->velocity[1] <= 0 ? step : 0,
+        .upright = !fp->flying
     };
 }
 
@@ -397,7 +398,7 @@ void BoxFirstPersonControllerUpdate(
     Rotation *r = ecs_field(it, Rotation, 2);
     const FirstPersonActionMap *map = ecs_singleton_get(it->world, FirstPersonActionMap);
     box_first_person_input_t in = { 0 };
-    float dt = it->delta_time;
+    float dt = fminf(it->delta_time, BOX_CONTROLLER_DT_MAX);
     bool read = false;
     int32_t i;
     for (i = 0; dt > 0 && i < it->count; i ++) {

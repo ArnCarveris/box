@@ -54,6 +54,8 @@ static void box_endpoint_reply(
         reply->status = "Forbidden";
     } else if (code == 404) {
         reply->status = "Not Found";
+    } else if (code == 503) {
+        reply->status = "Service Unavailable";
     }
 
     if (body) {
@@ -343,7 +345,12 @@ static bool box_endpoint_request(
     ecs_world_t *world = host->world;
     const char *path = req->path ? req->path : "";
     ecs_entity_t session;
-    if (!strcmp(path, "terminal/new")) {
+    int32_t open = 0;
+    if (!strcmp(path, "terminal/new") && box_terminal_full(world, &open)) {
+        char *msg = flecs_asprintf(BOX_COMMAND_ERROR "too many sessions, %d are open", open);
+        box_endpoint_reply(reply, 400, msg);
+        ecs_os_free(msg);
+    } else if (!strcmp(path, "terminal/new")) {
         session = box_terminal_new(world);
         box_endpoint_reply(reply, session ? 200 : 400,
             session ? ecs_get_name(world, session) : BOX_COMMAND_ERROR "no session folder");
@@ -444,7 +451,11 @@ int box_command_request(
     ecs_http_reply_t *reply)
 {
     box_terminal_host_t *host = box_terminal_host(world);
-    ecs_http_server_request(host->server, method, path, body, reply);
+    if (host) {
+        ecs_http_server_request(host->server, method, path, body, reply);
+    } else {
+        box_endpoint_reply(reply, 503, BOX_COMMAND_ERROR BOX_COMMAND_NOT_IMPORTED);
+    }
 
     return reply->code;
 }

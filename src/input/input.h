@@ -27,13 +27,26 @@ typedef void (*box_input_route_t)(
     const box_input_emit_t *emit,
     void *ctx);
 
+/** Check whether an element that takes pointer events from the world is under a cursor.
+ *
+ * @param world The world
+ * @param cursor Cursor in window points
+ * @param ctx Context of the router
+ * @return Whether presses and the wheel at the cursor do not reach the actions
+ */
+typedef bool (*box_input_blocks_t)(
+    ecs_world_t *world,
+    const vec2 cursor,
+    void *ctx);
+
 /** Receives the events of a frame in order instead of flecs.script.event.
  *
  * box.picking installs one to aim the mouse events at the entities under the cursor.
  */
 typedef struct box_input_router_t {
-    box_input_route_t route; /**< Takes one event */
-    void *ctx;               /**< Passed to route */
+    box_input_route_t route;   /**< Takes one event */
+    box_input_blocks_t blocks; /**< Finds a blocking element under the cursor, NULL for none */
+    void *ctx;                 /**< Passed to route and blocks */
 } box_input_router_t;
 
 /** A synthetic hold of an action */
@@ -42,6 +55,15 @@ typedef struct box_input_hold_t {
     bool down;           /**< The hold is active */
     bool pressed;        /**< The hold started since the actions last resolved */
 } box_input_hold_t;
+
+/** Last window size and cursor position a surface reported */
+typedef struct box_input_surface_t {
+    ecs_entity_t surface; /**< The surface */
+    vec2 size;            /**< Its size in points */
+    vec2 position;        /**< Cursor position of its last move, in its points */
+    bool has_size;        /**< The surface reported a size */
+    bool has_position;    /**< The surface reported a cursor position */
+} box_input_surface_t;
 
 /** Queues and backend of the module, a private singleton */
 typedef struct InputDevice {
@@ -52,18 +74,25 @@ typedef struct InputDevice {
     box_input_platform_t backend;  /**< Backend that feeds real device input */
     box_input_router_t router;     /**< Takes the events of a frame, emitted directly when unset */
     ecs_entity_t screen;           /**< Target of the mouse events, focused for keyboard events */
-    bool has_position;             /**< A cursor position arrived since focus was gained */
+    ecs_vec_t text;                /**< char of the text typed this frame, without terminator */
+    ecs_vec_t surfaces;            /**< box_input_surface_t of the surfaces that sent events */
+    ecs_entity_t source;           /**< Surface stamped on pushed events that name none */
+    ecs_entity_t capture_surface;  /**< Surface the backend captured the cursor in */
+    bool capture_applied;          /**< The backend was asked to capture the cursor */
+    bool blocked[3];               /**< The last press of a mouse button hit a blocking element */
+    bool has_position;             /**< A cursor position arrived since focus or release */
 } InputDevice;
 
 extern ECS_COMPONENT_DECLARE(InputDevice);
 
 /** Private state of the action layer, a singleton */
 typedef struct InputActions {
-    ecs_vec_t waiters;      /**< box_input_waiter_t of the script tasks awaiting an action */
-    ecs_vec_t events;       /**< box_input_action_event_t the frame raises */
-    ecs_map_t bound;        /**< Action entity to the BOX_INPUT_BOUND_* bits of this frame */
-    ecs_query_t *bindings;  /**< Entities with a Binding */
-    ecs_query_t *actions;   /**< Entities with an Action and its ActionState */
+    ecs_vec_t waiters;                 /**< box_input_waiter_t of the tasks awaiting an action */
+    ecs_vec_t events;                  /**< box_input_action_event_t the frame raises */
+    ecs_map_t bound;                   /**< Action entity to the BOX_INPUT_BOUND_* bits */
+    ecs_query_t *bindings;             /**< Entities with a Binding */
+    ecs_query_t *actions;              /**< Entities with an Action and its ActionState */
+    uint8_t press_mods[BOX_KEY_COUNT]; /**< Modifier keys held when each key last went down */
 } InputActions;
 
 extern ECS_COMPONENT_DECLARE(InputActions);
@@ -82,6 +111,35 @@ void box_input_actions_import(
  */
 InputDevice* box_input_device(
     ecs_world_t *world);
+
+/** Set the surface that platform events pushed from now on come from, for events that do not
+ * name one. Window callbacks set it around their pushes.
+ *
+ * @param world The world
+ * @param surface The surface, 0 for none
+ */
+void box_input_platform_source(
+    ecs_world_t *world,
+    ecs_entity_t surface);
+
+/** Ask the backend to release a cursor it was asked to capture.
+ *
+ * @param world The world
+ * @param dev The device state
+ */
+void box_input_capture_release(
+    ecs_world_t *world,
+    InputDevice *dev);
+
+/** Check whether the last press of a mouse button hit an element that blocks it from actions.
+ *
+ * @param dev The device state
+ * @param key The key
+ * @return Whether the key is a mouse button whose press was blocked
+ */
+bool box_input_key_blocked(
+    const InputDevice *dev,
+    Key key);
 
 /** Install the router that takes the events of every frame, replacing the previous one.
  *

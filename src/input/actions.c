@@ -119,43 +119,214 @@ void box_input_hold_release_all(
     }
 }
 
-/** Check whether either key of a modifier is held.
+/** Number of modifier keys, KeyShiftLeft to KeySuperRight */
+#define BOX_INPUT_MOD_KEYS (KeySuperRight - KeyShiftLeft + 1)
+
+/** Bits of both keys of the shift modifier in a modifier key mask */
+#define BOX_INPUT_MOD_SHIFT (0x03u)
+
+/** Bits of both keys of the control modifier in a modifier key mask */
+#define BOX_INPUT_MOD_CTRL (0x0Cu)
+
+/** Bits of both keys of the alt modifier in a modifier key mask */
+#define BOX_INPUT_MOD_ALT (0x30u)
+
+/** Bits of both keys of the super modifier in a modifier key mask */
+#define BOX_INPUT_MOD_META (0xC0u)
+
+/** Modifier keys that are the key of a binding, the modifier keys held and the most specific
+ * chord of every key */
+typedef struct box_input_chords_t {
+    uint8_t bound;              /**< Mask of the modifier keys that are the key of a binding */
+    uint8_t live;               /**< Mask of the modifier keys held this frame */
+    const uint8_t *press;       /**< Mask of the modifier keys held when each key went down */
+    int8_t best[BOX_KEY_COUNT]; /**< Most modifiers a matching binding of the key needs */
+} box_input_chords_t;
+
+/** Get the modifier keys that are held.
  *
  * @param in The Input singleton
- * @param left The left key of the modifier
- * @param right The right key of the modifier
- * @return Whether one of the keys is held
+ * @return Mask with bit i set when KeyShiftLeft + i is held
  */
-static bool box_input_mod_held(
-    const Input *in,
-    Key left,
-    Key right)
+static uint8_t box_input_mod_mask(
+    const Input *in)
 {
-    return in->keys[left].down || in->keys[right].down;
+    uint8_t result = 0;
+    int32_t i;
+    for (i = 0; i < BOX_INPUT_MOD_KEYS; i ++) {
+        result |= (uint8_t)(in->keys[KeyShiftLeft + i].down ? 1u << i : 0);
+    }
+
+    return result;
+}
+
+/** Get the modifiers a binding requires as a modifier key mask.
+ *
+ * @param binding The binding
+ * @return Mask with both keys of every required modifier set
+ */
+static uint8_t box_input_binding_required(
+    const Binding *binding)
+{
+    return (uint8_t)((binding->shift ? BOX_INPUT_MOD_SHIFT : 0) |
+        (binding->ctrl ? BOX_INPUT_MOD_CTRL : 0) |
+        (binding->alt ? BOX_INPUT_MOD_ALT : 0) |
+        (binding->meta ? BOX_INPUT_MOD_META : 0));
+}
+
+/** Check whether one key of every required modifier is held.
+ *
+ * @param required Mask of the required modifiers
+ * @param held Mask of the held modifier keys
+ * @return Whether every required modifier is held
+ */
+static bool box_input_mods_held(
+    uint8_t required,
+    uint8_t held)
+{
+    bool result = true;
+    int32_t i;
+    for (i = 0; i < BOX_INPUT_MOD_KEYS; i += 2) {
+        uint8_t mod = (uint8_t)(3u << i);
+        result = result && (!(required & mod) || (held & mod));
+    }
+
+    return result;
+}
+
+/** Get both keys of the modifier a key is, so a binding of ShiftLeft ignores ShiftRight.
+ *
+ * @param key The key
+ * @return Mask of the keys of its modifier, 0 when the key is not a modifier
+ */
+static uint8_t box_input_own_mods(
+    Key key)
+{
+    uint8_t result = 0;
+    if (key >= KeyShiftLeft && key <= KeySuperRight) {
+        result = (uint8_t)(3u << ((key - KeyShiftLeft) / 2 * 2));
+    }
+
+    return result;
+}
+
+/** Count the modifiers a binding requires.
+ *
+ * @param binding The binding
+ * @return Number of required modifiers, 0 to 4
+ */
+static int8_t box_input_binding_mods(
+    const Binding *binding)
+{
+    return (int8_t)(binding->ctrl + binding->shift + binding->alt + binding->meta);
+}
+
+/** Check whether a binding matches its key and the modifier keys held when the key went down:
+ * every required modifier was held, and no other modifier key was held that is not the key of
+ * a binding, unless the binding ignores modifiers.
+ *
+ * @param in The Input singleton
+ * @param chords The bound modifier keys and the modifier keys held when each key went down
+ * @param binding The binding
+ * @return Whether the binding matches, ignoring more specific bindings of its key
+ */
+static bool box_input_binding_match(
+    const Input *in,
+    const box_input_chords_t *chords,
+    const Binding *binding)
+{
+    bool result = false;
+    const KeyState *key;
+    uint8_t required, held, extra;
+    if (binding->key <= KeyNone || binding->key >= BOX_KEY_COUNT) {
+        goto done;
+    }
+
+    key = &in->keys[binding->key];
+    required = box_input_binding_required(binding);
+    held = chords->press[binding->key];
+    extra = (uint8_t)(held & ~required & ~chords->bound & ~box_input_own_mods(binding->key));
+    result = (key->down || key->pressed) && box_input_mods_held(required, held) &&
+        (binding->ignore_modifiers || !extra);
+
+done:
+    return result;
 }
 
 /** Compute what a binding contributes to its action this frame.
  *
+ * A binding applies while it is the most specific match of its key and its required modifiers
+ * are still held, so releasing a modifier first ends the chord without handing the key to a
+ * less specific binding.
+ *
  * @param in The Input singleton
+ * @param chords The bound modifier keys, the held modifier keys and the most specific chords
  * @param binding The binding
  * @return BOX_INPUT_BOUND_* bits
  */
 static uint64_t box_input_binding_bits(
     const Input *in,
+    const box_input_chords_t *chords,
     const Binding *binding)
 {
     uint64_t result = 0;
-    bool mods = (!binding->ctrl || box_input_mod_held(in, KeyCtrlLeft, KeyCtrlRight)) &&
-        (!binding->shift || box_input_mod_held(in, KeyShiftLeft, KeyShiftRight)) &&
-        (!binding->alt || box_input_mod_held(in, KeyAltLeft, KeyAltRight)) &&
-        (!binding->meta || box_input_mod_held(in, KeySuperLeft, KeySuperRight));
-    if (mods && binding->key > KeyNone && binding->key < BOX_KEY_COUNT) {
+    if (box_input_binding_match(in, chords, binding) &&
+        box_input_binding_mods(binding) == chords->best[binding->key] &&
+        box_input_mods_held(box_input_binding_required(binding), chords->live))
+    {
         const KeyState *key = &in->keys[binding->key];
         result = (key->down ? BOX_INPUT_BOUND_DOWN : 0) |
             (key->pressed ? BOX_INPUT_BOUND_PRESSED : 0);
     }
 
     return result;
+}
+
+/** Record the modifier keys held by the keys that went down this frame, then find the modifier
+ * keys that are the key of a binding and, for every key, the most modifiers a matching binding
+ * of it requires.
+ *
+ * @param world The world
+ * @param st The action state
+ * @param in The Input singleton
+ * @param chords Receives the bound and held modifier keys and the most specific chords
+ */
+static void box_input_chords(
+    ecs_world_t *world,
+    InputActions *st,
+    const Input *in,
+    box_input_chords_t *chords)
+{
+    ecs_iter_t it = ecs_query_iter(world, st->bindings);
+    int32_t i;
+    ecs_os_zeromem(chords);
+    chords->live = box_input_mod_mask(in);
+    chords->press = st->press_mods;
+    for (i = 0; i < BOX_KEY_COUNT; i ++) {
+        if (in->keys[i].pressed) {
+            st->press_mods[i] = chords->live;
+        }
+    }
+
+    while (ecs_query_next(&it)) {
+        const Binding *b = ecs_field(&it, Binding, 0);
+        for (i = 0; i < it.count; i ++) {
+            if (b[i].key >= KeyShiftLeft && b[i].key <= KeySuperRight) {
+                chords->bound |= (uint8_t)(1u << (b[i].key - KeyShiftLeft));
+            }
+        }
+    }
+
+    it = ecs_query_iter(world, st->bindings);
+    while (ecs_query_next(&it)) {
+        const Binding *b = ecs_field(&it, Binding, 0);
+        for (i = 0; i < it.count; i ++) {
+            int8_t mods = box_input_binding_mods(&b[i]);
+            if (box_input_binding_match(in, chords, &b[i]) && mods > chords->best[b[i].key]) {
+                chords->best[b[i].key] = mods;
+            }
+        }
+    }
 }
 
 /** Get the action a binding drives.
@@ -214,12 +385,16 @@ static void box_input_bind(
 {
     box_input_hold_t *holds = ecs_vec_first_t(&dev->holds, box_input_hold_t);
     int32_t i, kept = 0, count = ecs_vec_count(&dev->holds);
-    ecs_iter_t it = ecs_query_iter(world, st->bindings);
+    box_input_chords_t chords;
+    ecs_iter_t it;
+    box_input_chords(world, st, in, &chords);
     box_input_bound_reset(&st->bound);
+    it = ecs_query_iter(world, st->bindings);
     while (ecs_query_next(&it)) {
         const Binding *b = ecs_field(&it, Binding, 0);
         for (i = 0; i < it.count; i ++) {
-            uint64_t bits = box_input_binding_bits(in, &b[i]);
+            uint64_t bits = box_input_key_blocked(dev, b[i].key) ?
+                0 : box_input_binding_bits(in, &chords, &b[i]);
             ecs_entity_t action = bits ? box_input_binding_action(world, it.entities[i], &b[i]) : 0;
             if (action) {
                 ecs_map_ensure(&st->bound, action)[0] |= bits;
