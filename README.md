@@ -84,5 +84,6 @@ Work is tracked with `project/pm.py`; `docs/PROCESS.md` describes the loop.
 ```sh
 python3 project/pm.py serve --host :: --port 8090        # status page on all interfaces
 python3 project/pm.py next 5                              # ready tasks
+python3 project/pm.py stage [<epic>[/<task>]]             # stage of open work, read across worktrees
 python3 project/pm.py check                               # validate the database
 ```
