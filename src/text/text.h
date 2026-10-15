@@ -35,6 +35,9 @@
 /** First backend texture handle of atlas pages, the handles below belong to box.texture */
 #define BOX_TEXT_PAGE_FIRST (0x40000000u)
 
+/** Atlas pages a constructed Font keeps */
+#define BOX_TEXT_ATLAS_PAGES_DEFAULT (4)
+
 /** Em size of a constructed Text, in logical pixels */
 #define BOX_TEXT_SIZE_DEFAULT (16.0f)
 
@@ -77,7 +80,10 @@ typedef struct box_text_page_t {
     int32_t pen_x;      /**< Column the next glyph of the shelf goes at */
     int32_t pen_y;      /**< Row of the shelf being filled */
     int32_t shelf;      /**< Height of the shelf being filled */
-    bool dirty;         /**< The backend does not have the current pixels */
+    int32_t sent;       /**< Size of the page the backend has, 0 before the first upload */
+    uint32_t generation; /**< Bumped when the page is cleared for reuse, older fields are dropped */
+    int64_t used;       /**< Frame a laid out glyph of the page was last looked up in */
+    int32_t dirty[4];   /**< Area the backend does not have: left, top, right, bottom */
 } box_text_page_t;
 
 /** Where the field of a glyph is in the atlas of its font */
@@ -112,6 +118,7 @@ typedef struct box_text_font_t {
     uint32_t generation;    /**< Bumped by every load request, older results are dropped */
     uint32_t epoch;         /**< Bumped when the atlas is dropped, older glyph fields are too */
     box_text_face_t *face;  /**< The loaded face, NULL before the first load succeeded */
+    char *path;             /**< Font.path of the last load request */
     ecs_map_t glyphs;       /**< Glyph index to box_text_atlas_glyph_t* */
     ecs_vec_t pages;        /**< box_text_page_t*, the atlas of the face */
     bool requested;         /**< A Text uses the font, so the font loads */
@@ -130,6 +137,8 @@ typedef struct box_text_state_t {
     uint32_t next_page;         /**< Next page handle */
     box_text_sync_t *sync;      /**< Jobs in flight */
     ecs_query_t *query;         /**< Entities with a Text */
+    ecs_query_t *shown;         /**< Entities with TextGlyphs, disabled ones included */
+    bool trim;                  /**< A layout or a budget changed, idle pages may be released */
     ecs_entity_t default_font;  /**< box.text.DefaultFont */
     bool relayout;              /**< A font was removed, every Text lays out again */
 } box_text_state_t;
@@ -195,6 +204,16 @@ void box_text_font_load(
 void box_text_font_clear(
     box_text_state_t *s,
     box_text_font_t *font);
+
+/** Release the atlas pages of every font beyond its Font.atlas_pages that no Text shows, least
+ * recently used first.
+ *
+ * @param world The world
+ * @param s The registry
+ */
+void box_text_atlas_trim(
+    ecs_world_t *world,
+    box_text_state_t *s);
 
 /** Free a font and its atlas.
  *

@@ -110,7 +110,8 @@
                 "id": "Text",
                 "benchcases": [
                     "layout_10k",
-                    "changed_1pct"
+                    "changed_1pct",
+                    "type_new_glyphs"
                 ]
             },
             {

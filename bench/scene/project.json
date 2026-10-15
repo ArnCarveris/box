@@ -28,6 +28,13 @@
                     "update_dynamic_100k_1pct",
                     "overlap_after_teleports_100k",
                     "overlap_sparse_movers_100k",
+                    "ray_after_static_moves_100k",
+                    "overlap_after_static_moves_100k",
+                    "ray_after_static_churn_100k",
+                    "overlap_after_static_churn_100k",
+                    "spawn_2k_at_one_spot",
+                    "spawn_2k_nested_at_one_spot",
+                    "update_dynamic_coincident_10k",
                     "idle_100k",
                     "idle_ray_100k"
                 ]

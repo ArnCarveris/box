@@ -1509,3 +1509,246 @@ void Text_font_tables_outside_file(void) {
     ecs_os_free(src);
     ecs_fini(world);
 }
+
+void Text_utf8_invalid_bytes_replaced(void) {
+    // ui_fixes/utf8
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    const char *values[] = { "a\xEF\xBF\xBD" "b", "a\xE9" "b", "a\x80" "b", "a\xBF" "b",
+        "a\xC0" "b", "a\xC1" "b", "a\xF5" "b", "a\xFF" "b", "a\xE2\x82" "b",
+        "a\xF0\x9F\x98" "b" };
+    ecs_entity_t texts[10];
+    int32_t i;
+    for (i = 0; i < 10; i ++) {
+        texts[i] = ecs_new(world);
+        ecs_set(world, texts[i], Text, {.value = (char*)values[i], .size = 20,
+            .font = ecs_lookup(world, "box.text.DefaultFont")});
+    }
+
+    ecs_entity_t ab = ecs_new(world);
+    ecs_set(world, ab, Text, {.value = "ab", .size = 20,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
+    ecs_progress(world, 0);
+
+    float w = ecs_get(world, texts[0], TextBounds)->width;
+    test_assert(w > ecs_get(world, ab, TextBounds)->width);
+    for (i = 1; i < 10; i ++) {
+        test_flt(ecs_get(world, texts[i], TextBounds)->width, w);
+    }
+
+    ecs_fini(world);
+}
+
+void Text_utf8_overlong_replaced(void) {
+    // ui_fixes/utf8
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    const char *values[] = { "\xC0\xAF", "\xEF\xBF\xBD\xEF\xBF\xBD",
+        "\xE0\x80\xAF", "\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD",
+        "\xF0\x80\x80\xAF", "\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD",
+        "\xC1\xBF", "\xEF\xBF\xBD\xEF\xBF\xBD",
+        "\xE0\x9F\xBF", "\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD",
+        "\xF0\x8F\xBF\xBF", "\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD" };
+    ecs_entity_t texts[12];
+    int32_t i;
+    for (i = 0; i < 12; i ++) {
+        texts[i] = ecs_new(world);
+        ecs_set(world, texts[i], Text, {.value = (char*)values[i], .size = 20,
+            .font = ecs_lookup(world, "box.text.DefaultFont")});
+    }
+
+    ecs_entity_t slash = ecs_new(world);
+    ecs_set(world, slash, Text, {.value = "/", .size = 20,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
+    ecs_progress(world, 0);
+
+    test_assert(ecs_get(world, texts[0], TextBounds)->width >
+        ecs_get(world, slash, TextBounds)->width);
+    for (i = 0; i < 12; i += 2) {
+        test_flt(ecs_get(world, texts[i], TextBounds)->width,
+            ecs_get(world, texts[i + 1], TextBounds)->width);
+    }
+
+    ecs_fini(world);
+}
+
+void Text_utf8_surrogates_replaced(void) {
+    // ui_fixes/utf8
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    const char *values[] = { "\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD", "\xED\xA0\x80",
+        "\xED\xAF\xBF", "\xED\xB0\x80", "\xED\xBF\xBF" };
+    ecs_entity_t texts[5];
+    int32_t i;
+    for (i = 0; i < 5; i ++) {
+        texts[i] = ecs_new(world);
+        ecs_set(world, texts[i], Text, {.value = (char*)values[i], .size = 20,
+            .font = ecs_lookup(world, "box.text.DefaultFont")});
+    }
+
+    ecs_entity_t pair = ecs_new(world);
+    ecs_set(world, pair, Text, {.value = "\xED\xA0\xBD\xED\xB8\x80", .size = 20,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
+    ecs_entity_t six = ecs_new(world);
+    ecs_set(world, six, Text, {.value = "\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD"
+        "\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD", .size = 20,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
+    ecs_progress(world, 0);
+
+    float w = ecs_get(world, texts[0], TextBounds)->width;
+    for (i = 1; i < 5; i ++) {
+        test_flt(ecs_get(world, texts[i], TextBounds)->width, w);
+    }
+
+    test_flt(ecs_get(world, pair, TextBounds)->width, ecs_get(world, six, TextBounds)->width);
+
+    ecs_fini(world);
+}
+
+void Text_utf8_above_max_replaced(void) {
+    // ui_fixes/utf8
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    const char *values[] = { "\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD",
+        "\xF4\x90\x80\x80", "\xF4\xBF\xBF\xBF", "\xF5\x80\x80\x80", "\xF7\xBF\xBF\xBF" };
+    ecs_entity_t texts[5];
+    int32_t i;
+    for (i = 0; i < 5; i ++) {
+        texts[i] = ecs_new(world);
+        ecs_set(world, texts[i], Text, {.value = (char*)values[i], .size = 20,
+            .font = ecs_lookup(world, "box.text.DefaultFont")});
+    }
+
+    ecs_progress(world, 0);
+
+    float w = ecs_get(world, texts[0], TextBounds)->width;
+    for (i = 1; i < 5; i ++) {
+        test_flt(ecs_get(world, texts[i], TextBounds)->width, w);
+    }
+
+    ecs_fini(world);
+}
+
+void Text_utf8_valid_boundaries(void) {
+    // ui_fixes/utf8
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    const char *values[] = { "a\xC2\x80" "b", "a\xDF\xBF" "b", "a\xE0\xA0\x80" "b",
+        "a\xED\x9F\xBF" "b", "a\xEF\xBF\xBF" "b", "a\xF0\x90\x80\x80" "b",
+        "a\xF4\x8F\xBF\xBF" "b" };
+    ecs_entity_t texts[7];
+    int32_t i;
+    for (i = 0; i < 7; i ++) {
+        texts[i] = ecs_new(world);
+        ecs_set(world, texts[i], Text, {.value = (char*)values[i], .size = 20,
+            .font = ecs_lookup(world, "box.text.DefaultFont")});
+    }
+
+    ecs_entity_t latin = ecs_new(world);
+    ecs_set(world, latin, Text, {.value = "\xC3\xA9", .size = 20,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
+    ecs_entity_t latin1 = ecs_new(world);
+    ecs_set(world, latin1, Text, {.value = "\xE9", .size = 20,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
+    ecs_entity_t replaced = ecs_new(world);
+    ecs_set(world, replaced, Text, {.value = "a\xEF\xBF\xBD\xEF\xBF\xBD" "b", .size = 20,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
+    ecs_progress(world, 0);
+
+    float w = ecs_get(world, texts[0], TextBounds)->width;
+    test_assert(fabsf(w - ecs_get(world, replaced, TextBounds)->width) > 1);
+    for (i = 1; i < 7; i ++) {
+        test_flt(ecs_get(world, texts[i], TextBounds)->width, w);
+    }
+
+    test_assert(ecs_get(world, latin, TextBounds)->width > 0);
+    test_assert(fabsf(ecs_get(world, latin, TextBounds)->width -
+        ecs_get(world, latin1, TextBounds)->width) > 0.01f);
+
+    ecs_fini(world);
+}
+
+void Text_utf8_three_byte_glyph(void) {
+    // ui_fixes/utf8
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    const char *values[] = { "\xE2\x80\x94", "\xE2\x80\xA6", "\xEF\xBF\xBD", "-" };
+    ecs_entity_t texts[4];
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        texts[i] = ecs_new(world);
+        ecs_set(world, texts[i], Text, {.value = ECS_CONST_CAST(char*, values[i]), .size = 20,
+            .font = ecs_lookup(world, "box.text.DefaultFont")});
+    }
+
+    ecs_progress(world, 0);
+
+    float dash = ecs_get(world, texts[0], TextBounds)->width;
+    float ellipsis = ecs_get(world, texts[1], TextBounds)->width;
+    float missing = ecs_get(world, texts[2], TextBounds)->width;
+    test_assert(dash > 0);
+    test_assert(ellipsis > 0);
+    test_assert(fabsf(dash - missing) > 0.5f);
+    test_assert(fabsf(ellipsis - missing) > 0.5f);
+    test_assert(dash > ecs_get(world, texts[3], TextBounds)->width);
+
+    ecs_fini(world);
+}
+
+void Text_utf8_truncated_at_end(void) {
+    // ui_fixes/utf8
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    const char *values[] = { "a\xEF\xBF\xBD", "a\xF0\x9F\x98", "a\xE2\x82", "a\xE2", "a\xC3",
+        "\xEF\xBF\xBD", "\xE2", "\xF4\x8F", "\xC3" };
+    ecs_entity_t texts[9];
+    int32_t i;
+    for (i = 0; i < 9; i ++) {
+        texts[i] = ecs_new(world);
+        ecs_set(world, texts[i], Text, {.value = ECS_CONST_CAST(char*, values[i]), .size = 20,
+            .font = ecs_lookup(world, "box.text.DefaultFont")});
+    }
+
+    ecs_progress(world, 0);
+
+    float tail = ecs_get(world, texts[0], TextBounds)->width;
+    float lone = ecs_get(world, texts[5], TextBounds)->width;
+    test_assert(lone > 0);
+    for (i = 1; i < 5; i ++) {
+        test_flt(ecs_get(world, texts[i], TextBounds)->width, tail);
+    }
+
+    for (i = 6; i < 9; i ++) {
+        test_flt(ecs_get(world, texts[i], TextBounds)->width, lone);
+    }
+
+    ecs_fini(world);
+}

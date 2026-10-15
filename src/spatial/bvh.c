@@ -1,29 +1,49 @@
 /**
  * @file spatial/bvh.c
  * @brief Bounding volume hierarchy: top down build, incremental insert and remove, walks.
+ *
+ * Every node holds the boxes of its two children, the box of the root child is in the tree.
+ * A slot is where a child lives: 2 * node + side, or BOX_BVH_ROOT.
  */
 
 #include "bvh.h"
 
-/** Bins of the surface area heuristic of a top down build */
+/** Most bins per axis of the surface area heuristic of a top down build, which uses one bin per
+ * leaf for fewer leaves */
 #define BOX_BVH_BINS (16)
 
-/** Ancestors a leaf without margin may grow before it is inserted again instead */
+/** Ancestors that may still contain a moved exact item before it is inserted again */
 #define BOX_BVH_GROW_LEVELS (4)
 
 /** Depth below which a build stops weighing splits and halves the leaves */
 #define BOX_BVH_MAX_SAH_DEPTH (48)
 
-/** Margins by which a fat leaf may outgrow its fat bounds before it shrinks */
+/** Margins by which a fat item may outgrow its fat bounds before it shrinks */
 #define BOX_BVH_SHRINK (4.0f)
 
 /** Entries a walk keeps on the stack before it allocates */
 #define BOX_BVH_STACK (64)
 
+/** No rotation while fitting ancestors */
+#define BOX_BVH_ROTATE_NONE (0)
+
+/** Rotations that balance the height of a node at no cost in area */
+#define BOX_BVH_ROTATE_HEIGHT (1)
+
+/** Rotations that lower the area of a node, else balance its height at no cost in area */
+#define BOX_BVH_ROTATE_AREA (2)
+
+/** Height difference of the children of a node above which it is balanced whatever the area,
+ * which bounds the height of nested boxes at one spot; well above what SAH trees produce */
+#define BOX_BVH_HEIGHT_SLACK (16)
+
+/** Child reference of an item */
+#define BOX_BVH_ITEM(item) (-2 - (item))
+
 /** Node a walk still has to visit */
 typedef struct box_bvh_entry_t {
-    int32_t node; /**< The node */
-    float t;      /**< Distance at which a ray enters the node, 0 for other walks */
+    int32_t ref; /**< The node or item */
+    float t;     /**< Distance at which a ray enters it, 0 for other walks */
 } box_bvh_entry_t;
 
 /** Stack of a walk, on the C stack until it outgrows it */
@@ -41,6 +61,16 @@ typedef struct box_bvh_bin_t {
     int32_t count; /**< Leaves in the bin */
 } box_bvh_bin_t;
 
+/** Split of a top down build */
+typedef struct box_bvh_split_t {
+    float cost;   /**< Area times leaves of both sides, FLT_MAX when nothing splits */
+    int32_t axis; /**< Axis of the bins */
+    int32_t bins; /**< Number of bins */
+    int32_t bin;  /**< Last bin of the left side */
+    float origin; /**< Lowest centroid on the axis */
+    float scale;  /**< Bins per unit of centroid */
+} box_bvh_split_t;
+
 /** Set up an empty stack.
  *
  * @param s The stack
@@ -53,15 +83,15 @@ static void box_bvh_stack_init(
     s->capacity = BOX_BVH_STACK;
 }
 
-/** Push a node on a stack.
+/** Push a node or item on a stack.
  *
  * @param s The stack
- * @param node The node
- * @param t Distance at which a ray enters the node
+ * @param ref The node or item
+ * @param t Distance at which a ray enters it
  */
 static void box_bvh_stack_push(
     box_bvh_stack_t *s,
-    int32_t node,
+    int32_t ref,
     float t)
 {
     if (s->count == s->capacity) {
@@ -76,7 +106,7 @@ static void box_bvh_stack_push(
         s->capacity = capacity;
     }
 
-    s->data[s->count ++] = (box_bvh_entry_t){ .node = node, .t = t };
+    s->data[s->count ++] = (box_bvh_entry_t){ .ref = ref, .t = t };
 }
 
 /** Free the storage of a stack.
@@ -168,7 +198,24 @@ static bool box_bvh_contains(
         o_max[0] >= i_max[0] && o_max[1] >= i_max[1] && o_max[2] >= i_max[2];
 }
 
-box_bvh_node_t* box_bvh_get(
+/** Test whether a child reference is an item.
+ *
+ * @param ref The reference
+ * @return true for an item, false for a node
+ */
+static bool box_bvh_is_item(
+    int32_t ref)
+{
+    return ref < BOX_BVH_NULL;
+}
+
+/** Get a node.
+ *
+ * @param tree The tree
+ * @param node The node index
+ * @return The node
+ */
+static box_bvh_node_t* box_bvh_get(
     const box_bvh_t *tree,
     int32_t node)
 {
@@ -177,10 +224,110 @@ box_bvh_node_t* box_bvh_get(
     return &((box_bvh_node_t*)tree->nodes.array)[node];
 }
 
+/** Get the height of a child.
+ *
+ * @param tree The tree
+ * @param ref The child
+ * @return 0 for an item, the height of a node
+ */
+static int32_t box_bvh_height(
+    const box_bvh_t *tree,
+    int32_t ref)
+{
+    return box_bvh_is_item(ref) ? 0 : box_bvh_get(tree, ref)->height;
+}
+
+/** Get the box of a slot.
+ *
+ * @param tree The tree
+ * @param slot The slot
+ * @param max Receives the maximum corner
+ * @return The minimum corner
+ */
+static float* box_bvh_slot_box(
+    const box_bvh_t *tree,
+    int32_t slot,
+    float **max)
+{
+    float *result;
+    if (slot == BOX_BVH_ROOT) {
+        result = ECS_CONST_CAST(float*, tree->min);
+        *max = ECS_CONST_CAST(float*, tree->max);
+    } else {
+        box_bvh_node_t *n = box_bvh_get(tree, slot >> 1);
+        result = n->min[slot & 1];
+        *max = n->max[slot & 1];
+    }
+
+    return result;
+}
+
+/** Get the child in a slot.
+ *
+ * @param tree The tree
+ * @param slot The slot
+ * @return The child
+ */
+static int32_t box_bvh_slot_ref(
+    const box_bvh_t *tree,
+    int32_t slot)
+{
+    return slot == BOX_BVH_ROOT ? tree->root : box_bvh_get(tree, slot >> 1)->child[slot & 1];
+}
+
+/** Put a child with its box in a slot and point the child back at the slot.
+ *
+ * @param tree The tree
+ * @param slot The slot
+ * @param ref The child
+ * @param min Minimum corner of the child
+ * @param max Maximum corner of the child
+ */
+static void box_bvh_put(
+    box_bvh_t *tree,
+    int32_t slot,
+    int32_t ref,
+    const vec3 min,
+    const vec3 max)
+{
+    float *s_max, *s_min = box_bvh_slot_box(tree, slot, &s_max);
+    vec3 b_min, b_max;
+    glm_vec3_copy(ECS_CONST_CAST(float*, min), b_min);
+    glm_vec3_copy(ECS_CONST_CAST(float*, max), b_max);
+    glm_vec3_copy(b_min, s_min);
+    glm_vec3_copy(b_max, s_max);
+    if (slot == BOX_BVH_ROOT) {
+        tree->root = ref;
+    } else {
+        box_bvh_get(tree, slot >> 1)->child[slot & 1] = ref;
+    }
+
+    if (box_bvh_is_item(ref)) {
+        *ecs_vec_get_t(&tree->slots, int32_t, BOX_BVH_ITEM(ref)) = slot;
+    } else {
+        box_bvh_get(tree, ref)->parent = slot;
+    }
+}
+
+/** Make room for the slot of an item.
+ *
+ * @param tree The tree
+ * @param item The item
+ */
+static void box_bvh_slots_ensure(
+    box_bvh_t *tree,
+    int32_t item)
+{
+    while (ecs_vec_count(&tree->slots) <= item) {
+        *ecs_vec_append_t(NULL, &tree->slots, int32_t) = BOX_BVH_NULL;
+    }
+}
+
 void box_bvh_init(
     box_bvh_t *tree)
 {
     ecs_vec_init_t(NULL, &tree->nodes, box_bvh_node_t, 0);
+    ecs_vec_init_t(NULL, &tree->slots, int32_t, 0);
     tree->root = BOX_BVH_NULL;
     tree->free = BOX_BVH_NULL;
     tree->leaves = 0;
@@ -190,9 +337,18 @@ void box_bvh_fini(
     box_bvh_t *tree)
 {
     ecs_vec_fini_t(NULL, &tree->nodes, box_bvh_node_t);
+    ecs_vec_fini_t(NULL, &tree->slots, int32_t);
     tree->root = BOX_BVH_NULL;
     tree->free = BOX_BVH_NULL;
     tree->leaves = 0;
+}
+
+bool box_bvh_has(
+    const box_bvh_t *tree,
+    int32_t item)
+{
+    return item < ecs_vec_count(&tree->slots) &&
+        *ecs_vec_get_t(&tree->slots, int32_t, item) != BOX_BVH_NULL;
 }
 
 /** Take a node from the free list or grow the node array.
@@ -213,9 +369,9 @@ static int32_t box_bvh_alloc(
 
     box_bvh_node_t *n = box_bvh_get(tree, result);
     n->parent = BOX_BVH_NULL;
-    n->left = BOX_BVH_NULL;
-    n->right = BOX_BVH_NULL;
-    n->height = 0;
+    n->child[0] = BOX_BVH_NULL;
+    n->child[1] = BOX_BVH_NULL;
+    n->height = 1;
 
     return result;
 }
@@ -235,278 +391,338 @@ static void box_bvh_release(
     tree->free = node;
 }
 
-/** Recompute the box and height of an inner node from its children.
+/** Compute the height of a node from its children.
  *
  * @param tree The tree
  * @param node The node
  */
-static void box_bvh_refit(
+static void box_bvh_refit_height(
     box_bvh_t *tree,
     int32_t node)
 {
     box_bvh_node_t *n = box_bvh_get(tree, node);
-    box_bvh_node_t *l = box_bvh_get(tree, n->left);
-    box_bvh_node_t *r = box_bvh_get(tree, n->right);
-    box_bvh_union(l->min, l->max, r->min, r->max, n->min, n->max);
-    n->height = 1 + (l->height > r->height ? l->height : r->height);
+    int32_t a = box_bvh_height(tree, n->child[0]), b = box_bvh_height(tree, n->child[1]);
+    n->height = 1 + (a > b ? a : b);
 }
 
-/** Point the parent of a node, or the root, at a node that takes its place.
+/** Swap a child of a node with a child of its other child, which is a node.
  *
  * @param tree The tree
- * @param parent Parent of the old node, BOX_BVH_NULL when it was the root
- * @param old The node that is replaced
- * @param node The node that takes its place
+ * @param a The node
+ * @param side Side of the child of a that moves down
+ * @param k Side of the grandchild that moves up
  */
-static void box_bvh_relink(
+static void box_bvh_swap(
     box_bvh_t *tree,
-    int32_t parent,
-    int32_t old,
-    int32_t node)
+    int32_t a,
+    int32_t side,
+    int32_t k)
 {
-    box_bvh_get(tree, node)->parent = parent;
-    if (parent == BOX_BVH_NULL) {
-        tree->root = node;
-    } else {
-        box_bvh_node_t *p = box_bvh_get(tree, parent);
-        if (p->left == old) {
-            p->left = node;
-        } else {
-            p->right = node;
+    box_bvh_node_t *n = box_bvh_get(tree, a);
+    int32_t p = n->child[1 - side];
+    box_bvh_node_t *pn = box_bvh_get(tree, p);
+    int32_t down = n->child[side], up = pn->child[k];
+    vec3 down_min, down_max, up_min, up_max, min, max;
+    glm_vec3_copy(n->min[side], down_min);
+    glm_vec3_copy(n->max[side], down_max);
+    glm_vec3_copy(pn->min[k], up_min);
+    glm_vec3_copy(pn->max[k], up_max);
+    box_bvh_put(tree, 2 * a + side, up, up_min, up_max);
+    box_bvh_put(tree, 2 * p + k, down, down_min, down_max);
+    box_bvh_refit_height(tree, p);
+    pn = box_bvh_get(tree, p);
+    box_bvh_union(pn->min[0], pn->max[0], pn->min[1], pn->max[1], min, max);
+    n = box_bvh_get(tree, a);
+    glm_vec3_copy(min, n->min[1 - side]);
+    glm_vec3_copy(max, n->max[1 - side]);
+    box_bvh_refit_height(tree, a);
+}
+
+/** Find the swap of a child of a node with a grandchild that lowers the area of the tree most.
+ *
+ * Moving child B down next to grandchild G of the other child C, and G up, changes only the
+ * box of C, so the rotation with the largest drop of that area wins (b2RotateNodes).
+ *
+ * @param tree The tree
+ * @param n The node, at least two high
+ * @param side Receives the side of the child that moves down, -1 when no swap lowers the area
+ * @param pick Receives the side of the grandchild that moves up
+ */
+static void box_bvh_rotate_area(
+    const box_bvh_t *tree,
+    const box_bvh_node_t *n,
+    int32_t *side,
+    int32_t *pick)
+{
+    float best = 0;
+    int32_t s, k;
+    *side = -1;
+    for (s = 0; s < 2; s ++) {
+        int32_t p = n->child[1 - s];
+        if (box_bvh_is_item(p)) {
+            continue;
+        }
+
+        const box_bvh_node_t *pn = box_bvh_get(tree, p);
+        float area = box_bvh_area(n->min[1 - s], n->max[1 - s]);
+        for (k = 0; k < 2; k ++) {
+            float drop = area - box_bvh_union_area(
+                n->min[s], n->max[s], pn->min[1 - k], pn->max[1 - k]);
+            if (drop > best) {
+                best = drop;
+                *side = s;
+                *pick = k;
+            }
         }
     }
 }
 
-/** Rotate the taller child of a node above it.
+/** Find the swap that balances a node whose children differ in height by more than one: the
+ * lower child moves down next to the lower grandchild of the higher one, which moves up.
+ *
+ * It is taken when the higher child keeps its box, as boxes at one spot cost the same area
+ * wherever they go, or when the heights differ by more than BOX_BVH_HEIGHT_SLACK, as with nested
+ * boxes at one spot; either would otherwise pile into a chain one level per box.
+ *
+ * @param tree The tree
+ * @param n The node
+ * @param side Receives the side of the child that moves down, -1 for no swap
+ * @param pick Receives the side of the grandchild that moves up
+ */
+static void box_bvh_rotate_height(
+    const box_bvh_t *tree,
+    const box_bvh_node_t *n,
+    int32_t *side,
+    int32_t *pick)
+{
+    int32_t h0 = box_bvh_height(tree, n->child[0]), h1 = box_bvh_height(tree, n->child[1]);
+    int32_t high = h0 > h1 ? 0 : 1;
+    *side = -1;
+    if (h0 > h1 + 1 || h1 > h0 + 1) {
+        const box_bvh_node_t *pn = box_bvh_get(tree, n->child[high]);
+        int32_t up = box_bvh_height(tree, pn->child[0]) >= box_bvh_height(tree, pn->child[1]) ?
+            0 : 1;
+        vec3 min, max;
+        box_bvh_union(n->min[1 - high], n->max[1 - high], pn->min[1 - up], pn->max[1 - up],
+            min, max);
+        bool same = glm_vec3_eqv(min, ECS_CONST_CAST(float*, n->min[high])) &&
+            glm_vec3_eqv(max, ECS_CONST_CAST(float*, n->max[high]));
+        if (same || h0 > h1 + BOX_BVH_HEIGHT_SLACK || h1 > h0 + BOX_BVH_HEIGHT_SLACK) {
+            *side = 1 - high;
+            *pick = up;
+        }
+    }
+}
+
+/** Rotate a node with the swap that lowers its area most, else with one that balances its
+ * height at no cost in area.
  *
  * @param tree The tree
  * @param a The node
- * @param up The taller child, which takes the place of the node
- * @param stay The other child of the node
- * @param up_is_right The taller child is the right child of the node
- * @return The child that took the place of the node
+ * @param mode BOX_BVH_ROTATE_AREA, or BOX_BVH_ROTATE_HEIGHT for the balancing swap only
  */
-static int32_t box_bvh_rotate(
+static void box_bvh_rotate(
     box_bvh_t *tree,
     int32_t a,
-    int32_t up,
-    int32_t stay,
-    bool up_is_right)
+    int32_t mode)
 {
-    box_bvh_node_t *u = box_bvh_get(tree, up);
-    int32_t f = u->left, g = u->right;
-    int32_t keep = box_bvh_get(tree, f)->height > box_bvh_get(tree, g)->height ? f : g;
-    int32_t give = keep == f ? g : f;
-    box_bvh_relink(tree, box_bvh_get(tree, a)->parent, a, up);
-    u = box_bvh_get(tree, up);
-    u->left = a;
-    u->right = keep;
-    box_bvh_node_t *n = box_bvh_get(tree, a);
-    n->parent = up;
-    if (up_is_right) {
-        n->left = stay;
-        n->right = give;
-    } else {
-        n->left = give;
-        n->right = stay;
+    const box_bvh_node_t *n = box_bvh_get(tree, a);
+    int32_t side = -1, pick = 0;
+    if (n->height >= 2 && mode == BOX_BVH_ROTATE_AREA) {
+        box_bvh_rotate_area(tree, n, &side, &pick);
     }
 
-    box_bvh_get(tree, give)->parent = a;
-    box_bvh_refit(tree, a);
-    box_bvh_refit(tree, up);
+    if (n->height >= 2 && side < 0) {
+        box_bvh_rotate_height(tree, n, &side, &pick);
+    }
 
-    return up;
+    if (side >= 0) {
+        box_bvh_swap(tree, a, side, pick);
+    }
 }
 
-/** Rotate a node whose children differ in height by more than one.
+/** Fit the ancestors of a node whose children changed from the node up: heights, rotations
+ * after an insert (as Box2D v3 does) and boxes.
  *
  * @param tree The tree
- * @param a The node
- * @return The node now in the place of a
+ * @param node The first node to fit
+ * @param rotate BOX_BVH_ROTATE_AREA, BOX_BVH_ROTATE_HEIGHT or BOX_BVH_ROTATE_NONE
+ * @param settle Stop at the first node whose box did not change or after BOX_BVH_GROW_LEVELS
+ * nodes, after a move that one of those nodes still contains, above which boxes only shrink
  */
-static int32_t box_bvh_balance(
+static void box_bvh_fix(
     box_bvh_t *tree,
-    int32_t a)
+    int32_t node,
+    int32_t rotate,
+    bool settle)
 {
-    int32_t result = a;
-    box_bvh_node_t *n = box_bvh_get(tree, a);
-    if (n->left == BOX_BVH_NULL || n->height < 2) {
-        goto done;
-    }
-
-    int32_t b = n->left, c = n->right;
-    int32_t balance = box_bvh_get(tree, c)->height - box_bvh_get(tree, b)->height;
-    if (balance > 1) {
-        result = box_bvh_rotate(tree, a, c, b, true);
-    } else if (balance < -1) {
-        result = box_bvh_rotate(tree, a, b, c, false);
-    }
-
-done:
-    return result;
-}
-
-/** Refit and balance the ancestors of a node up to the root.
- *
- * @param tree The tree
- * @param node The first ancestor to repair
- */
-static void box_bvh_repair(
-    box_bvh_t *tree,
-    int32_t node)
-{
+    int32_t level = 0;
     while (node != BOX_BVH_NULL) {
-        node = box_bvh_balance(tree, node);
-        box_bvh_refit(tree, node);
-        node = box_bvh_get(tree, node)->parent;
+        vec3 min, max;
+        if (!settle) {
+            box_bvh_refit_height(tree, node);
+        }
+
+        if (rotate != BOX_BVH_ROTATE_NONE) {
+            box_bvh_rotate(tree, node, rotate);
+        }
+
+        box_bvh_node_t *n = box_bvh_get(tree, node);
+        int32_t slot = n->parent;
+        box_bvh_union(n->min[0], n->max[0], n->min[1], n->max[1], min, max);
+        float *s_max, *s_min = box_bvh_slot_box(tree, slot, &s_max);
+        bool same = glm_vec3_eqv(s_min, min) && glm_vec3_eqv(s_max, max);
+        glm_vec3_copy(min, s_min);
+        glm_vec3_copy(max, s_max);
+        level ++;
+        bool settled = settle && (same || level == BOX_BVH_GROW_LEVELS);
+        node = slot == BOX_BVH_ROOT || settled ? BOX_BVH_NULL : slot >> 1;
     }
 }
 
-/** Find the node a new leaf grows the tree least next to.
+/** Find the slot whose child a new item grows the tree least next to.
  *
- * @param tree The tree
- * @param min Minimum corner of the leaf
- * @param max Maximum corner of the leaf
- * @return The sibling
+ * @param tree The tree, which is not empty
+ * @param min Minimum corner of the item
+ * @param max Maximum corner of the item
+ * @return The slot of the sibling
  */
 static int32_t box_bvh_sibling(
     const box_bvh_t *tree,
     const vec3 min,
     const vec3 max)
 {
-    int32_t node = tree->root;
-    box_bvh_node_t *n = box_bvh_get(tree, node);
-    while (n->left != BOX_BVH_NULL) {
-        float area = box_bvh_area(n->min, n->max);
-        float combined = box_bvh_union_area(n->min, n->max, min, max);
+    int32_t slot = BOX_BVH_ROOT, ref = tree->root, i;
+    const float *s_min = tree->min, *s_max = tree->max;
+    while (!box_bvh_is_item(ref)) {
+        const box_bvh_node_t *n = box_bvh_get(tree, ref);
+        float combined = box_bvh_union_area(s_min, s_max, min, max);
         float cost = 2.0f * combined;
-        float inherit = 2.0f * (combined - area);
-        box_bvh_node_t *l = box_bvh_get(tree, n->left);
-        box_bvh_node_t *r = box_bvh_get(tree, n->right);
-        float cost_l = box_bvh_union_area(l->min, l->max, min, max) + inherit;
-        float cost_r = box_bvh_union_area(r->min, r->max, min, max) + inherit;
-        if (l->left != BOX_BVH_NULL) {
-            cost_l -= box_bvh_area(l->min, l->max);
+        float inherit = 2.0f * (combined - box_bvh_area(s_min, s_max));
+        float child[2];
+        for (i = 0; i < 2; i ++) {
+            child[i] = box_bvh_union_area(n->min[i], n->max[i], min, max) + inherit;
+            if (!box_bvh_is_item(n->child[i])) {
+                child[i] -= box_bvh_area(n->min[i], n->max[i]);
+            }
         }
 
-        if (r->left != BOX_BVH_NULL) {
-            cost_r -= box_bvh_area(r->min, r->max);
-        }
-
-        if (cost < cost_l && cost < cost_r) {
+        if (cost < child[0] && cost < child[1]) {
             break;
         }
 
-        node = cost_l < cost_r ? n->left : n->right;
-        n = box_bvh_get(tree, node);
+        i = child[0] < child[1] ? 0 : 1;
+
+        slot = 2 * ref + i;
+        s_min = n->min[i];
+        s_max = n->max[i];
+        ref = n->child[i];
     }
 
-    return node;
+    return slot;
 }
 
-int32_t box_bvh_insert(
+/** Insert an item next to the sibling that grows the tree least, then fit its ancestors.
+ *
+ * @param tree The tree
+ * @param min Minimum corner of the item
+ * @param max Maximum corner of the item
+ * @param item The item, which is not in the tree
+ * @param rotate BOX_BVH_ROTATE_AREA or BOX_BVH_ROTATE_HEIGHT
+ */
+static void box_bvh_insert_rotate(
+    box_bvh_t *tree,
+    const vec3 min,
+    const vec3 max,
+    int32_t item,
+    int32_t rotate)
+{
+    box_bvh_slots_ensure(tree, item);
+    tree->leaves ++;
+    if (tree->root == BOX_BVH_NULL) {
+        box_bvh_put(tree, BOX_BVH_ROOT, BOX_BVH_ITEM(item), min, max);
+        goto done;
+    }
+
+    int32_t slot = box_bvh_sibling(tree, min, max);
+    int32_t node = box_bvh_alloc(tree);
+    int32_t sibling = box_bvh_slot_ref(tree, slot);
+    float *s_max, *s_min = box_bvh_slot_box(tree, slot, &s_max);
+    vec3 n_min, n_max;
+    box_bvh_union(s_min, s_max, min, max, n_min, n_max);
+    box_bvh_put(tree, 2 * node, sibling, s_min, s_max);
+    box_bvh_put(tree, 2 * node + 1, BOX_BVH_ITEM(item), min, max);
+    box_bvh_put(tree, slot, node, n_min, n_max);
+    box_bvh_fix(tree, node, rotate, false);
+done:
+    return;
+}
+
+void box_bvh_insert(
     box_bvh_t *tree,
     const vec3 min,
     const vec3 max,
     int32_t item)
 {
-    int32_t leaf = box_bvh_alloc(tree);
-    box_bvh_node_t *l = box_bvh_get(tree, leaf);
-    glm_vec3_copy(ECS_CONST_CAST(float*, min), l->min);
-    glm_vec3_copy(ECS_CONST_CAST(float*, max), l->max);
-    l->right = item;
-    tree->leaves ++;
-    if (tree->root == BOX_BVH_NULL) {
-        tree->root = leaf;
-        goto done;
-    }
-
-    int32_t sibling = box_bvh_sibling(tree, min, max);
-    int32_t parent = box_bvh_alloc(tree);
-    box_bvh_relink(tree, box_bvh_get(tree, sibling)->parent, sibling, parent);
-    box_bvh_node_t *p = box_bvh_get(tree, parent);
-    p->left = sibling;
-    p->right = leaf;
-    box_bvh_get(tree, sibling)->parent = parent;
-    box_bvh_get(tree, leaf)->parent = parent;
-    box_bvh_repair(tree, parent);
-done:
-    return leaf;
+    box_bvh_insert_rotate(tree, min, max, item, BOX_BVH_ROTATE_AREA);
 }
 
 void box_bvh_remove(
     box_bvh_t *tree,
-    int32_t leaf)
+    int32_t item)
 {
-    int32_t parent = box_bvh_get(tree, leaf)->parent;
+    int32_t *slots = ecs_vec_first(&tree->slots);
+    int32_t slot = slots[item];
+    slots[item] = BOX_BVH_NULL;
     tree->leaves --;
-    box_bvh_release(tree, leaf);
-    if (parent == BOX_BVH_NULL) {
+    if (slot == BOX_BVH_ROOT) {
         tree->root = BOX_BVH_NULL;
         goto done;
     }
 
+    int32_t parent = slot >> 1, side = slot & 1;
     box_bvh_node_t *p = box_bvh_get(tree, parent);
-    int32_t sibling = p->left == leaf ? p->right : p->left;
-    int32_t grand = p->parent;
-    box_bvh_relink(tree, grand, parent, sibling);
+    int32_t sibling = p->child[1 - side], up = p->parent;
+    vec3 min, max;
+    glm_vec3_copy(p->min[1 - side], min);
+    glm_vec3_copy(p->max[1 - side], max);
+    box_bvh_put(tree, up, sibling, min, max);
     box_bvh_release(tree, parent);
-    box_bvh_repair(tree, grand);
+    if (up != BOX_BVH_ROOT) {
+        box_bvh_fix(tree, up >> 1, BOX_BVH_ROTATE_NONE, false);
+    }
+
 done:
     return;
 }
 
-/** Grow the ancestors of a leaf without margin, or insert it again when that grows too many.
- *
- * @param tree The tree
- * @param leaf The leaf, which already has its new bounds
- * @return The leaf node
- */
-static int32_t box_bvh_grow(
+void box_bvh_move(
     box_bvh_t *tree,
-    int32_t leaf)
-{
-    int32_t result = leaf, level, top = BOX_BVH_NULL;
-    box_bvh_node_t *l = box_bvh_get(tree, leaf);
-    int32_t node = l->parent;
-    for (level = 0; level < BOX_BVH_GROW_LEVELS && node != BOX_BVH_NULL; level ++) {
-        box_bvh_node_t *n = box_bvh_get(tree, node);
-        if (box_bvh_contains(n->min, n->max, l->min, l->max)) {
-            top = node;
-            break;
-        }
-
-        node = n->parent;
-    }
-
-    if (top != BOX_BVH_NULL || l->parent == BOX_BVH_NULL) {
-        for (node = l->parent; node != top; node = box_bvh_get(tree, node)->parent) {
-            box_bvh_node_t *n = box_bvh_get(tree, node);
-            box_bvh_union(n->min, n->max, l->min, l->max, n->min, n->max);
-        }
-    } else {
-        vec3 min, max;
-        int32_t item = l->right;
-        glm_vec3_copy(l->min, min);
-        glm_vec3_copy(l->max, max);
-        box_bvh_remove(tree, leaf);
-        result = box_bvh_insert(tree, min, max, item);
-    }
-
-    return result;
-}
-
-int32_t box_bvh_move(
-    box_bvh_t *tree,
-    int32_t leaf,
+    int32_t item,
     const vec3 min,
     const vec3 max)
 {
-    box_bvh_node_t *l = box_bvh_get(tree, leaf);
-    glm_vec3_copy(ECS_CONST_CAST(float*, min), l->min);
-    glm_vec3_copy(ECS_CONST_CAST(float*, max), l->max);
+    int32_t slot = *ecs_vec_get_t(&tree->slots, int32_t, item), level;
+    bool near = slot == BOX_BVH_ROOT;
+    int32_t node = near ? BOX_BVH_NULL : slot >> 1;
+    for (level = 0; level < BOX_BVH_GROW_LEVELS && node != BOX_BVH_NULL && !near; level ++) {
+        int32_t up = box_bvh_get(tree, node)->parent;
+        float *a_max, *a_min = box_bvh_slot_box(tree, up, &a_max);
+        near = box_bvh_contains(a_min, a_max, min, max);
+        node = up == BOX_BVH_ROOT ? BOX_BVH_NULL : up >> 1;
+    }
 
-    return box_bvh_grow(tree, leaf);
+    if (near) {
+        float *s_max, *s_min = box_bvh_slot_box(tree, slot, &s_max);
+        glm_vec3_copy(ECS_CONST_CAST(float*, min), s_min);
+        glm_vec3_copy(ECS_CONST_CAST(float*, max), s_max);
+        if (slot != BOX_BVH_ROOT) {
+            box_bvh_fix(tree, slot >> 1, BOX_BVH_ROTATE_NONE, true);
+        }
+    } else {
+        box_bvh_remove(tree, item);
+        box_bvh_insert(tree, min, max, item);
+    }
 }
 
 /** Grow bounds by a margin on every side and by a displacement on the side it points to.
@@ -533,29 +749,30 @@ static void box_bvh_fatten(
     }
 }
 
-int32_t box_bvh_move_fat(
+bool box_bvh_move_fat(
     box_bvh_t *tree,
-    int32_t leaf,
+    int32_t item,
     const vec3 min,
     const vec3 max,
     float margin,
     const vec3 ahead)
 {
-    int32_t result = leaf;
-    box_bvh_node_t *l = box_bvh_get(tree, leaf);
+    int32_t slot = *ecs_vec_get_t(&tree->slots, int32_t, item);
+    float *l_max, *l_min = box_bvh_slot_box(tree, slot, &l_max);
     vec3 fat_min, fat_max, huge_min, huge_max;
     box_bvh_fatten(min, max, margin, ahead, fat_min, fat_max);
     glm_vec3_subs(fat_min, BOX_BVH_SHRINK * margin, huge_min);
     glm_vec3_adds(fat_max, BOX_BVH_SHRINK * margin, huge_max);
-    bool keep = box_bvh_contains(l->min, l->max, min, max) &&
-        box_bvh_contains(huge_min, huge_max, l->min, l->max);
+    bool keep = box_bvh_contains(l_min, l_max, min, max) &&
+        box_bvh_contains(huge_min, huge_max, l_min, l_max);
     if (!keep) {
-        int32_t item = l->right;
-        box_bvh_remove(tree, leaf);
-        result = box_bvh_insert(tree, fat_min, fat_max, item);
+        bool coherent = ahead[0] != 0 || ahead[1] != 0 || ahead[2] != 0;
+        box_bvh_remove(tree, item);
+        box_bvh_insert_rotate(tree, fat_min, fat_max, item,
+            coherent ? BOX_BVH_ROTATE_HEIGHT : BOX_BVH_ROTATE_AREA);
     }
 
-    return result;
+    return !keep;
 }
 
 /** Get the doubled center of a leaf on one axis.
@@ -574,20 +791,17 @@ static float box_bvh_centroid(
 /** Find the bin of a leaf.
  *
  * @param leaf The leaf
- * @param axis The axis of the bins
- * @param origin Lowest centroid on the axis
- * @param scale Bins per unit of centroid
+ * @param split The split whose axis and bins are used
  * @return The bin
  */
 static int32_t box_bvh_bin_of(
     const box_bvh_leaf_t *leaf,
-    int32_t axis,
-    float origin,
-    float scale)
+    const box_bvh_split_t *split)
 {
-    int32_t result = (int32_t)((box_bvh_centroid(leaf, axis) - origin) * scale);
-    if (result >= BOX_BVH_BINS) {
-        result = BOX_BVH_BINS - 1;
+    int32_t result = (int32_t)((box_bvh_centroid(leaf, split->axis) - split->origin) *
+        split->scale);
+    if (result >= split->bins) {
+        result = split->bins - 1;
     } else if (result < 0) {
         result = 0;
     }
@@ -595,42 +809,59 @@ static int32_t box_bvh_bin_of(
     return result;
 }
 
-/** Choose the bin after which to split a range of leaves, weighing area times count.
+/** Put a range of leaves in the bins of all three axes in one pass.
  *
  * @param leaves The leaves
  * @param count Number of leaves
- * @param axis The axis of the bins
- * @param origin Lowest centroid on the axis
- * @param scale Bins per unit of centroid
- * @return The last bin of the left side
+ * @param splits The splits of the three axes with their origin, scale and number of bins
+ * @param bins Receives the bins of the three axes
  */
-static int32_t box_bvh_split_bin(
+static void box_bvh_fill_bins(
     const box_bvh_leaf_t *leaves,
     int32_t count,
-    int32_t axis,
-    float origin,
-    float scale)
+    const box_bvh_split_t *splits,
+    box_bvh_bin_t bins[3][BOX_BVH_BINS])
 {
-    box_bvh_bin_t bins[BOX_BVH_BINS];
-    float right_cost[BOX_BVH_BINS];
-    int32_t i, result = 0, seen = 0;
-    float best = FLT_MAX;
-    vec3 min, max;
-    for (i = 0; i < BOX_BVH_BINS; i ++) {
-        glm_vec3_fill(bins[i].min, FLT_MAX);
-        glm_vec3_fill(bins[i].max, -FLT_MAX);
-        bins[i].count = 0;
+    int32_t i, a, n = splits[0].bins;
+    for (a = 0; a < 3; a ++) {
+        for (i = 0; i < n; i ++) {
+            glm_vec3_fill(bins[a][i].min, FLT_MAX);
+            glm_vec3_fill(bins[a][i].max, -FLT_MAX);
+            bins[a][i].count = 0;
+        }
     }
 
     for (i = 0; i < count; i ++) {
-        box_bvh_bin_t *bin = &bins[box_bvh_bin_of(&leaves[i], axis, origin, scale)];
-        box_bvh_union(bin->min, bin->max, leaves[i].min, leaves[i].max, bin->min, bin->max);
-        bin->count ++;
+        const box_bvh_leaf_t *l = &leaves[i];
+        for (a = 0; a < 3; a ++) {
+            box_bvh_bin_t *bin = &bins[a][box_bvh_bin_of(l, &splits[a])];
+            box_bvh_union(bin->min, bin->max, l->min, l->max, bin->min, bin->max);
+            bin->count ++;
+        }
     }
+}
 
+/** Choose the bin of one axis after which to split a range of leaves, weighing area times
+ * count, and keep it when it is cheaper than the split found so far.
+ *
+ * @param bins The bins of the axis
+ * @param count Number of leaves
+ * @param split The axis, origin, scale and number of bins, which receives the cost and bin
+ * @param best The cheapest split so far, replaced by a cheaper one
+ */
+static void box_bvh_split_axis(
+    const box_bvh_bin_t *bins,
+    int32_t count,
+    box_bvh_split_t *split,
+    box_bvh_split_t *best)
+{
+    float right_cost[BOX_BVH_BINS];
+    int32_t i, seen = 0, n = split->bins;
+    vec3 min, max;
+    split->cost = FLT_MAX;
     glm_vec3_fill(min, FLT_MAX);
     glm_vec3_fill(max, -FLT_MAX);
-    for (i = BOX_BVH_BINS - 1; i > 0; i --) {
+    for (i = n - 1; i > 0; i --) {
         box_bvh_union(min, max, bins[i].min, bins[i].max, min, max);
         seen += bins[i].count;
         right_cost[i - 1] = seen ? (float)seen * box_bvh_area(min, max) : 0;
@@ -639,17 +870,19 @@ static int32_t box_bvh_split_bin(
     glm_vec3_fill(min, FLT_MAX);
     glm_vec3_fill(max, -FLT_MAX);
     seen = 0;
-    for (i = 0; i < BOX_BVH_BINS - 1; i ++) {
+    for (i = 0; i < n - 1; i ++) {
         box_bvh_union(min, max, bins[i].min, bins[i].max, min, max);
         seen += bins[i].count;
         float cost = (seen ? (float)seen * box_bvh_area(min, max) : 0) + right_cost[i];
-        if (seen && seen < count && cost < best) {
-            best = cost;
-            result = i;
+        if (seen && seen < count && cost < split->cost) {
+            split->cost = cost;
+            split->bin = i;
         }
     }
 
-    return result;
+    if (split->cost < best->cost) {
+        *best = *split;
+    }
 }
 
 /** Order a range of leaves into two halves for the children of a node.
@@ -664,12 +897,17 @@ static int32_t box_bvh_partition(
     int32_t count,
     int32_t depth)
 {
-    int32_t result = count / 2, i, axis = 0;
+    int32_t result = count / 2, i, a;
+    box_bvh_split_t best = { .cost = FLT_MAX }, splits[3];
+    box_bvh_bin_t bins[3][BOX_BVH_BINS];
     vec3 cmin, cmax;
+    if (count == 2 || depth > BOX_BVH_MAX_SAH_DEPTH) {
+        goto done;
+    }
+
     glm_vec3_fill(cmin, FLT_MAX);
     glm_vec3_fill(cmax, -FLT_MAX);
     for (i = 0; i < count; i ++) {
-        int32_t a;
         for (a = 0; a < 3; a ++) {
             float c = box_bvh_centroid(&leaves[i], a);
             cmin[a] = c < cmin[a] ? c : cmin[a];
@@ -677,22 +915,27 @@ static int32_t box_bvh_partition(
         }
     }
 
-    for (i = 1; i < 3; i ++) {
-        if (cmax[i] - cmin[i] > cmax[axis] - cmin[axis]) {
-            axis = i;
+    for (a = 0; a < 3; a ++) {
+        splits[a] = (box_bvh_split_t){
+            .axis = a, .origin = cmin[a], .bins = count < BOX_BVH_BINS ? count : BOX_BVH_BINS
+        };
+        splits[a].scale = cmax[a] > cmin[a] ? (float)splits[a].bins / (cmax[a] - cmin[a]) : 0;
+    }
+
+    box_bvh_fill_bins(leaves, count, splits, bins);
+    for (a = 0; a < 3; a ++) {
+        if (splits[a].scale > 0) {
+            box_bvh_split_axis(bins[a], count, &splits[a], &best);
         }
     }
 
-    float extent = cmax[axis] - cmin[axis];
-    if (extent <= 0 || depth > BOX_BVH_MAX_SAH_DEPTH) {
+    if (best.cost == FLT_MAX) {
         goto done;
     }
 
-    float scale = (float)BOX_BVH_BINS / extent;
-    int32_t split = box_bvh_split_bin(leaves, count, axis, cmin[axis], scale);
     int32_t lo = 0, hi = count - 1;
     while (lo <= hi) {
-        if (box_bvh_bin_of(&leaves[lo], axis, cmin[axis], scale) <= split) {
+        if (box_bvh_bin_of(&leaves[lo], &best) <= best.bin) {
             lo ++;
         } else {
             box_bvh_leaf_t tmp = leaves[lo];
@@ -710,40 +953,40 @@ done:
     return result;
 }
 
-/** Build the subtree of a range of leaves.
+/** Build the subtree of a range of leaves, its nodes in depth first order.
  *
  * @param tree The tree, with room for every node of the build
  * @param leaves The leaves
  * @param count Number of leaves, at least one
  * @param depth Depth of the subtree root
- * @param nodes Receives the leaf node of every item
- * @return The subtree root
+ * @param min Receives the minimum corner of the subtree
+ * @param max Receives the maximum corner of the subtree
+ * @return The subtree root, a node or an item
  */
 static int32_t box_bvh_build_node(
     box_bvh_t *tree,
     box_bvh_leaf_t *leaves,
     int32_t count,
     int32_t depth,
-    int32_t *nodes)
+    vec3 min,
+    vec3 max)
 {
-    int32_t result = box_bvh_alloc(tree);
+    int32_t result;
     if (count == 1) {
-        box_bvh_node_t *n = box_bvh_get(tree, result);
-        glm_vec3_copy(leaves[0].min, n->min);
-        glm_vec3_copy(leaves[0].max, n->max);
-        n->right = leaves[0].item;
-        nodes[leaves[0].item] = result;
+        result = BOX_BVH_ITEM(leaves[0].item);
+        glm_vec3_copy(leaves[0].min, min);
+        glm_vec3_copy(leaves[0].max, max);
     } else {
+        vec3 l_min, l_max, r_min, r_max;
+        result = box_bvh_alloc(tree);
         int32_t half = box_bvh_partition(leaves, count, depth);
-        int32_t left = box_bvh_build_node(tree, leaves, half, depth + 1, nodes);
+        int32_t left = box_bvh_build_node(tree, leaves, half, depth + 1, l_min, l_max);
         int32_t right = box_bvh_build_node(
-            tree, leaves + half, count - half, depth + 1, nodes);
-        box_bvh_node_t *n = box_bvh_get(tree, result);
-        n->left = left;
-        n->right = right;
-        box_bvh_get(tree, left)->parent = result;
-        box_bvh_get(tree, right)->parent = result;
-        box_bvh_refit(tree, result);
+            tree, leaves + half, count - half, depth + 1, r_min, r_max);
+        box_bvh_put(tree, 2 * result, left, l_min, l_max);
+        box_bvh_put(tree, 2 * result + 1, right, r_min, r_max);
+        box_bvh_refit_height(tree, result);
+        box_bvh_union(l_min, l_max, r_min, r_max, min, max);
     }
 
     return result;
@@ -752,17 +995,42 @@ static int32_t box_bvh_build_node(
 void box_bvh_build(
     box_bvh_t *tree,
     box_bvh_leaf_t *leaves,
-    int32_t count,
-    int32_t *nodes)
+    int32_t count)
 {
+    int32_t i, *slots = ecs_vec_first(&tree->slots);
+    for (i = 0; i < ecs_vec_count(&tree->slots); i ++) {
+        slots[i] = BOX_BVH_NULL;
+    }
+
+    for (i = 0; i < count; i ++) {
+        box_bvh_slots_ensure(tree, leaves[i].item);
+    }
+
     ecs_vec_clear(&tree->nodes);
     tree->root = BOX_BVH_NULL;
     tree->free = BOX_BVH_NULL;
     tree->leaves = count;
     if (count) {
-        ecs_vec_set_min_size_t(NULL, &tree->nodes, box_bvh_node_t, count * 2);
-        tree->root = box_bvh_build_node(tree, leaves, count, 0, nodes);
+        vec3 min, max;
+        ecs_vec_set_min_size_t(NULL, &tree->nodes, box_bvh_node_t, count);
+        int32_t root = box_bvh_build_node(tree, leaves, count, 0, min, max);
+        box_bvh_put(tree, BOX_BVH_ROOT, root, min, max);
     }
+}
+
+float box_bvh_cost(
+    const box_bvh_t *tree)
+{
+    int32_t i, count = ecs_vec_count(&tree->nodes);
+    float result = 0, area = tree->root != BOX_BVH_NULL ? box_bvh_area(tree->min, tree->max) : 0;
+    for (i = 0; i < count && area > 0; i ++) {
+        const box_bvh_node_t *n = box_bvh_get(tree, i);
+        if (n->height > 0) {
+            result += box_bvh_union_area(n->min[0], n->max[0], n->min[1], n->max[1]) / area;
+        }
+    }
+
+    return result;
 }
 
 bool box_bvh_box_box(
@@ -843,6 +1111,7 @@ bool box_bvh_ray_box(
     return result;
 }
 
+
 bool box_bvh_overlap(
     const box_bvh_t *tree,
     const vec3 min,
@@ -852,22 +1121,24 @@ bool box_bvh_overlap(
 {
     box_bvh_stack_t s;
     bool result = true;
+    int32_t i;
     box_bvh_stack_init(&s);
-    if (tree->root != BOX_BVH_NULL) {
+    if (tree->root != BOX_BVH_NULL && box_bvh_box_box(tree->min, tree->max, min, max)) {
         box_bvh_stack_push(&s, tree->root, 0);
     }
 
     while (s.count && result) {
-        box_bvh_node_t *n = box_bvh_get(tree, s.data[-- s.count].node);
-        if (!box_bvh_box_box(n->min, n->max, min, max)) {
+        int32_t ref = s.data[-- s.count].ref;
+        if (box_bvh_is_item(ref)) {
+            result = visit(BOX_BVH_ITEM(ref), ctx);
             continue;
         }
 
-        if (n->left == BOX_BVH_NULL) {
-            result = visit(n->right, ctx);
-        } else {
-            box_bvh_stack_push(&s, n->left, 0);
-            box_bvh_stack_push(&s, n->right, 0);
+        const box_bvh_node_t *n = box_bvh_get(tree, ref);
+        for (i = 0; i < 2; i ++) {
+            if (box_bvh_box_box(n->min[i], n->max[i], min, max)) {
+                box_bvh_stack_push(&s, n->child[i], 0);
+            }
         }
     }
 
@@ -885,22 +1156,26 @@ bool box_bvh_sphere(
 {
     box_bvh_stack_t s;
     bool result = true;
+    int32_t i;
     box_bvh_stack_init(&s);
-    if (tree->root != BOX_BVH_NULL) {
+    if (tree->root != BOX_BVH_NULL &&
+        box_bvh_sphere_box(tree->min, tree->max, center, radius))
+    {
         box_bvh_stack_push(&s, tree->root, 0);
     }
 
     while (s.count && result) {
-        box_bvh_node_t *n = box_bvh_get(tree, s.data[-- s.count].node);
-        if (!box_bvh_sphere_box(n->min, n->max, center, radius)) {
+        int32_t ref = s.data[-- s.count].ref;
+        if (box_bvh_is_item(ref)) {
+            result = visit(BOX_BVH_ITEM(ref), ctx);
             continue;
         }
 
-        if (n->left == BOX_BVH_NULL) {
-            result = visit(n->right, ctx);
-        } else {
-            box_bvh_stack_push(&s, n->left, 0);
-            box_bvh_stack_push(&s, n->right, 0);
+        const box_bvh_node_t *n = box_bvh_get(tree, ref);
+        for (i = 0; i < 2; i ++) {
+            if (box_bvh_sphere_box(n->min[i], n->max[i], center, radius)) {
+                box_bvh_stack_push(&s, n->child[i], 0);
+            }
         }
     }
 
@@ -909,38 +1184,34 @@ bool box_bvh_sphere(
     return result;
 }
 
-/** Push the children of an inner node that a ray reaches, the nearer one last.
+/** Push the children of a node that a ray reaches, the nearer one last.
  *
- * @param tree The tree
  * @param n The node
  * @param ray The ray
  * @param reach Current reach of the ray
  * @param s The stack
  */
 static void box_bvh_ray_children(
-    const box_bvh_t *tree,
     const box_bvh_node_t *n,
     const box_bvh_ray_t *ray,
     float reach,
     box_bvh_stack_t *s)
 {
-    box_bvh_node_t *l = box_bvh_get(tree, n->left);
-    box_bvh_node_t *r = box_bvh_get(tree, n->right);
     float tl = 0, tr = 0;
-    bool hit_l = box_bvh_ray_box(ray, l->min, l->max, reach, &tl);
-    bool hit_r = box_bvh_ray_box(ray, r->min, r->max, reach, &tr);
+    bool hit_l = box_bvh_ray_box(ray, n->min[0], n->max[0], reach, &tl);
+    bool hit_r = box_bvh_ray_box(ray, n->min[1], n->max[1], reach, &tr);
     if (hit_l && hit_r) {
         if (tl < tr) {
-            box_bvh_stack_push(s, n->right, tr);
-            box_bvh_stack_push(s, n->left, tl);
+            box_bvh_stack_push(s, n->child[1], tr);
+            box_bvh_stack_push(s, n->child[0], tl);
         } else {
-            box_bvh_stack_push(s, n->left, tl);
-            box_bvh_stack_push(s, n->right, tr);
+            box_bvh_stack_push(s, n->child[0], tl);
+            box_bvh_stack_push(s, n->child[1], tr);
         }
     } else if (hit_l) {
-        box_bvh_stack_push(s, n->left, tl);
+        box_bvh_stack_push(s, n->child[0], tl);
     } else if (hit_r) {
-        box_bvh_stack_push(s, n->right, tr);
+        box_bvh_stack_push(s, n->child[1], tr);
     }
 }
 
@@ -955,11 +1226,10 @@ bool box_bvh_ray(
     bool result = true;
     float t = 0;
     box_bvh_stack_init(&s);
-    if (tree->root != BOX_BVH_NULL) {
-        box_bvh_node_t *root = box_bvh_get(tree, tree->root);
-        if (box_bvh_ray_box(ray, root->min, root->max, *reach, &t)) {
-            box_bvh_stack_push(&s, tree->root, t);
-        }
+    if (tree->root != BOX_BVH_NULL &&
+        box_bvh_ray_box(ray, tree->min, tree->max, *reach, &t))
+    {
+        box_bvh_stack_push(&s, tree->root, t);
     }
 
     while (s.count && result) {
@@ -968,11 +1238,10 @@ bool box_bvh_ray(
             continue;
         }
 
-        box_bvh_node_t *n = box_bvh_get(tree, entry.node);
-        if (n->left == BOX_BVH_NULL) {
-            result = visit(n->right, ctx);
+        if (box_bvh_is_item(entry.ref)) {
+            result = visit(BOX_BVH_ITEM(entry.ref), ctx);
         } else {
-            box_bvh_ray_children(tree, n, ray, *reach, &s);
+            box_bvh_ray_children(box_bvh_get(tree, entry.ref), ray, *reach, &s);
         }
     }
 
