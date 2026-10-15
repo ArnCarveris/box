@@ -285,6 +285,18 @@
                 ]
             },
             {
+                "id": "Invalidation",
+                "testcases": [
+                    "static_move_rebakes_nearby_probes",
+                    "dynamic_move_rebakes_nothing",
+                    "point_light_change_limited_to_range",
+                    "directional_light_change_rebakes_scene",
+                    "removed_and_recolored_shapes_rebake",
+                    "moved_emissive_leaves_no_light_behind",
+                    "requeued_probes_keep_values"
+                ]
+            },
+            {
                 "id": "Bounces",
                 "testcases": [
                     "pass_reaches_bounces",
