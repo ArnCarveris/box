@@ -110,8 +110,8 @@ static int32_t box_layout_read(
         n->shape[0] = t->width;
         n->shape[1] = t->height;
     } else if (r) {
-        n->shape[0] = r->width;
-        n->shape[1] = r->height;
+        n->shape[0] = n->item.width.mode == SizeModeGrow ? 0 : r->width;
+        n->shape[1] = n->item.height.mode == SizeModeGrow ? 0 : r->height;
     } else {
         const Circle *c = ecs_get(world, e, Circle);
         if (c) {
@@ -230,14 +230,16 @@ static void box_layout_measure(
         const Sizing *s = box_layout_sizing(n, axis);
         float size = s->mode == SizeModeFixed ? s->value : n->fit[axis];
         n->size[axis] = box_layout_clamp(size, s);
-        n->base[axis] = s->mode == SizeModeGrow ?
-            box_layout_clamp(0, s) : n->size[axis];
+        n->base[axis] = n->size[axis];
     }
 }
 
 /** Share the free space of a row or column among its growing children by weight.
  *
- * A child whose share passes its min or max keeps the bound, and the rest is shared again.
+ * A growing child never gets less than its basis, its fit size within its min and max, so
+ * small shares fill up first, as Clay grows its smallest elements first.
+ *
+ * A child whose share passes its basis or max keeps the bound, and the rest is shared again.
  *
  * @param nodes The nodes of the tree
  * @param n The parent
@@ -281,7 +283,7 @@ static void box_layout_grow(
             const Sizing *s = box_layout_sizing(c, main);
             float raw = free * fmaxf(s->value, 0.0f) / weights;
             if (!c->frozen) {
-                c->size[main] = box_layout_clamp(raw, s);
+                c->size[main] = fmaxf(box_layout_clamp(raw, s), c->base[main]);
                 over += c->size[main] - raw;
             }
         }

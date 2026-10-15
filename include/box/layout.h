@@ -60,7 +60,7 @@ ECS_STRUCT(Layout, {
 ECS_ENUM(SizeMode, {
     SizeModeFit = 0,   /**< Fit the content plus padding, or the shape */
     SizeModeFixed = 1, /**< Take the size in value */
-    SizeModeGrow = 2   /**< Take a share of the free space of the parent, weighted by value */
+    SizeModeGrow = 2   /**< Share the free space of the parent by weight, at least the fit size */
 });
 
 /** Size of an element on one axis */
