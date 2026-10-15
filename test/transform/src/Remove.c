@@ -4187,3 +4187,117 @@ void Remove_dynamic_parent_remove_position_root(void) {
 
     ecs_fini(world);
 }
+
+void Remove_static_childof_clear_parent(void) {
+    // core_fixes/delete_observers
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxTransform);
+
+    ecs_entity_t parent = ecs_new(world);
+    ecs_set(world, parent, Position, {10.0f, 0.0f, 0.0f});
+    ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, parent);
+    ecs_set(world, child, Position, {1.0f, 0.0f, 0.0f});
+    ecs_entity_t grandchild = ecs_new_w_pair(world, EcsChildOf, child);
+    ecs_set(world, grandchild, Position, {1.0f, 0.0f, 0.0f});
+
+    ecs_progress(world, 0);
+
+    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 11.0f);
+    test_flt(ecs_get(world, grandchild, WorldTransform)->m[3][0], 12.0f);
+
+    ecs_clear(world, parent);
+    ecs_progress(world, 0);
+
+    test_assert(ecs_is_alive(world, child));
+    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 1.0f);
+    test_flt(ecs_get(world, grandchild, WorldTransform)->m[3][0], 2.0f);
+
+    ecs_fini(world);
+}
+
+void Remove_static_parent_clear_parent(void) {
+    // core_fixes/delete_observers
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxTransform);
+
+    ecs_entity_t parent = ecs_new(world);
+    ecs_set(world, parent, Position, {10.0f, 0.0f, 0.0f});
+    ecs_entity_t child = ecs_new_w_parent(world, parent, NULL);
+    ecs_set(world, child, Position, {1.0f, 0.0f, 0.0f});
+    ecs_entity_t grandchild = ecs_new_w_parent(world, child, NULL);
+    ecs_set(world, grandchild, Position, {1.0f, 0.0f, 0.0f});
+
+    ecs_progress(world, 0);
+
+    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 11.0f);
+    test_flt(ecs_get(world, grandchild, WorldTransform)->m[3][0], 12.0f);
+
+    ecs_clear(world, parent);
+    ecs_progress(world, 0);
+
+    test_assert(ecs_is_alive(world, child));
+    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 1.0f);
+    test_flt(ecs_get(world, grandchild, WorldTransform)->m[3][0], 2.0f);
+
+    ecs_fini(world);
+}
+
+void Remove_dynamic_childof_clear_parent(void) {
+    // core_fixes/delete_observers
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxTransform);
+
+    ecs_entity_t parent = ecs_new(world);
+    ecs_add(world, parent, DynamicTransform);
+    ecs_set(world, parent, Position, {10.0f, 0.0f, 0.0f});
+    ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, parent);
+    ecs_set(world, child, Position, {1.0f, 0.0f, 0.0f});
+    ecs_entity_t grandchild = ecs_new_w_pair(world, EcsChildOf, child);
+    ecs_set(world, grandchild, Position, {1.0f, 0.0f, 0.0f});
+
+    ecs_progress(world, 0);
+
+    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 11.0f);
+    test_flt(ecs_get(world, grandchild, WorldTransform)->m[3][0], 12.0f);
+
+    ecs_clear(world, parent);
+    ecs_progress(world, 0);
+
+    test_assert(ecs_is_alive(world, child));
+    test_bool(ecs_has(world, child, DynamicTransform), false);
+    test_bool(ecs_has(world, grandchild, DynamicTransform), false);
+    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 1.0f);
+    test_flt(ecs_get(world, grandchild, WorldTransform)->m[3][0], 2.0f);
+
+    ecs_fini(world);
+}
+
+void Remove_dynamic_parent_clear_parent(void) {
+    // core_fixes/delete_observers
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxTransform);
+
+    ecs_entity_t parent = ecs_new(world);
+    ecs_add(world, parent, DynamicTransform);
+    ecs_set(world, parent, Position, {10.0f, 0.0f, 0.0f});
+    ecs_entity_t child = ecs_new_w_parent(world, parent, NULL);
+    ecs_set(world, child, Position, {1.0f, 0.0f, 0.0f});
+    ecs_entity_t grandchild = ecs_new_w_parent(world, child, NULL);
+    ecs_set(world, grandchild, Position, {1.0f, 0.0f, 0.0f});
+
+    ecs_progress(world, 0);
+
+    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 11.0f);
+    test_flt(ecs_get(world, grandchild, WorldTransform)->m[3][0], 12.0f);
+
+    ecs_clear(world, parent);
+    ecs_progress(world, 0);
+
+    test_assert(ecs_is_alive(world, child));
+    test_bool(ecs_has(world, child, DynamicTransform), false);
+    test_bool(ecs_has(world, grandchild, DynamicTransform), false);
+    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 1.0f);
+    test_flt(ecs_get(world, grandchild, WorldTransform)->m[3][0], 2.0f);
+
+    ecs_fini(world);
+}

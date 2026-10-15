@@ -5,7 +5,8 @@
  * A headless world renders 2500 static boxes into a 1280x720 offscreen surface on the main
  * thread and waits for the GPU after every frame; a headless bake converges in the first frame.
  *
- * A converged bake must capture nothing and cost what a never baked volume (budget_ms 0) does.
+ * A converged bake must capture nothing and cost what a never baked volume (budget_ms 0) does,
+ * whatever its bounces.
  */
 
 #include <box.h>
@@ -20,11 +21,13 @@
  * @param b The benchmark
  * @param baked Whether the scene has a LightBake
  * @param budget Milliseconds per frame the bake may spend, 0 never bakes
+ * @param bounces Bounces of the bake
  */
 static void bench_bake(
     bench_t *b,
     bool baked,
-    float budget)
+    float budget,
+    int32_t bounces)
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -35,7 +38,7 @@ static void bench_bake(
     ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
     if (baked) {
         ecs_singleton_set(world, LightBake, {.probe_spacing = 4, .bounds_padding = 1,
-            .capture_size = 16, .budget_ms = budget, .bounces = 1});
+            .capture_size = 16, .budget_ms = budget, .bounces = bounces});
     }
 
     ecs_entity_t camera = ecs_new(world);
@@ -96,19 +99,26 @@ void Bake_none(
     bench_t *b)
 {
     // baked_lighting/probe_capture
-    bench_bake(b, false, 0);
+    bench_bake(b, false, 0, 1);
 }
 
 void Bake_unbaked(
     bench_t *b)
 {
     // baked_lighting/probe_capture
-    bench_bake(b, true, 0);
+    bench_bake(b, true, 0, 1);
 }
 
 void Bake_converged(
     bench_t *b)
 {
     // baked_lighting/probe_capture
-    bench_bake(b, true, 2);
+    bench_bake(b, true, 2, 1);
+}
+
+void Bake_converged_bounces(
+    bench_t *b)
+{
+    // baked_lighting/bounces
+    bench_bake(b, true, 2, 3);
 }

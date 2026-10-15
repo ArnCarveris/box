@@ -2,12 +2,12 @@
  * @file render/gpu_bake.c
  * @brief Irradiance probe volumes of the webgpu backend and the captures that bake them.
  *
- * A volume is a uniform with its grid, a storage buffer with the SH of every probe and one
- * with the validity mask, bound as group 3 of the forward pass. Views without a volume bind a
- * 1x1x1 volume that keeps the hemisphere.
+ * A volume is a uniform with its grid, two storage buffers with the SH of every probe and one
+ * with the validity mask, bound as group 3 of the forward pass with the probe buffer the view
+ * shows. Views without a volume bind a 1x1x1 volume that keeps the hemisphere.
  *
- * A probe capture renders six faces with the forward pipeline into an rgba16float array, which
- * etc/shaders/bake_sh.wgsl projects onto the SH of the probe with texel solid angles (Sloan).
+ * A capture renders six faces into an rgba16float array, shaded with one probe buffer as DDGI
+ * shades with the previous irradiance; bake_sh.wgsl projects them onto SH in the other buffer.
  * Captures run in chunks of command buffers; timestamp queries around them time the GPU.
  */
 
@@ -155,14 +155,18 @@ static WGPUBuffer box_gpu_bake_buffer(
 static void box_gpu_volume_free(
     box_gpu_volume_t *v)
 {
-    wgpuBindGroupRelease(v->group);
+    int32_t i;
+    for (i = 0; i < 2; i ++) {
+        wgpuBindGroupRelease(v->group[i]);
+        wgpuBufferRelease(v->probes[i]);
+    }
+
     wgpuBufferRelease(v->grid);
-    wgpuBufferRelease(v->probes);
     wgpuBufferRelease(v->valid);
     ecs_os_free(v);
 }
 
-/** Create a volume with its buffers and bind group.
+/** Create a volume with its buffers and a bind group per probe buffer.
  *
  * @param gpu The backend
  * @param count Probes of the volume
@@ -175,28 +179,32 @@ static box_gpu_volume_t* box_gpu_volume_new(
     box_gpu_volume_t *v = ecs_os_calloc_t(box_gpu_volume_t);
     uint64_t probes = (uint64_t)count * BOX_GPU_PROBE_SIZE;
     uint64_t valid = (uint64_t)(count + 31) / 32 * sizeof(uint32_t);
+    int32_t i;
     v->count = count;
     v->grid = box_gpu_bake_buffer(gpu, sizeof(box_gpu_volume_uniforms_t),
         WGPUBufferUsage_Uniform);
-    v->probes = box_gpu_bake_buffer(gpu, probes,
-        WGPUBufferUsage_Storage | WGPUBufferUsage_CopySrc);
     v->valid = box_gpu_bake_buffer(gpu, valid, WGPUBufferUsage_Storage);
-    WGPUBindGroupEntry entries[3] = {
-        { .binding = 0, .buffer = v->grid, .size = sizeof(box_gpu_volume_uniforms_t) },
-        { .binding = 1, .buffer = v->probes, .size = probes },
-        { .binding = 2, .buffer = v->valid, .size = valid }
-    };
-    WGPUBindGroupDescriptor desc = {
-        .layout = gpu->volume_layout,
-        .entryCount = 3,
-        .entries = entries
-    };
-    v->group = wgpuDeviceCreateBindGroup(gpu->device, &desc);
+    for (i = 0; i < 2; i ++) {
+        v->probes[i] = box_gpu_bake_buffer(gpu, probes,
+            WGPUBufferUsage_Storage | WGPUBufferUsage_CopySrc);
+        WGPUBindGroupEntry entries[3] = {
+            { .binding = 0, .buffer = v->grid, .size = sizeof(box_gpu_volume_uniforms_t) },
+            { .binding = 1, .buffer = v->probes[i], .size = probes },
+            { .binding = 2, .buffer = v->valid, .size = valid }
+        };
+        WGPUBindGroupDescriptor desc = {
+            .layout = gpu->volume_layout,
+            .entryCount = 3,
+            .entries = entries
+        };
+        v->group[i] = wgpuDeviceCreateBindGroup(gpu->device, &desc);
+    }
 
     return v;
 }
 
-/** Write the grid of a volume, fill every probe with one SH and write its validity mask.
+/** Write the grid of a volume, fill every probe of both buffers with one SH and write its
+ * validity mask.
  *
  * @param gpu The backend
  * @param v The volume
@@ -219,7 +227,8 @@ static void box_gpu_volume_write(
     }
 
     wgpuQueueWriteBuffer(gpu->queue, v->grid, 0, &u, sizeof(u));
-    wgpuQueueWriteBuffer(gpu->queue, v->probes, 0, probes, size);
+    wgpuQueueWriteBuffer(gpu->queue, v->probes[0], 0, probes, size);
+    wgpuQueueWriteBuffer(gpu->queue, v->probes[1], 0, probes, size);
     wgpuQueueWriteBuffer(gpu->queue, v->valid, 0, desc + 1,
         (size_t)(v->count + 31) / 32 * sizeof(uint32_t));
     ecs_os_free(probes);
@@ -764,6 +773,7 @@ static void box_gpu_bake_face(
  * @param rv View with the lights of the batch
  * @param faces Faces of the chunk
  * @param shadow Array view of the shadow map the faces sample
+ * @param ambient Volume group the faces shade their ambient term with
  */
 static void box_gpu_bake_faces_render(
     box_gpu_t *gpu,
@@ -772,7 +782,8 @@ static void box_gpu_bake_faces_render(
     const box_render_packet_t *packet,
     const box_render_view_t *rv,
     int32_t faces,
-    WGPUTextureView shadow)
+    WGPUTextureView shadow,
+    WGPUBindGroup ambient)
 {
     WGPUBindGroup group = box_gpu_light_group_with(gpu, rv, b->uniforms, b->clusters, shadow);
     int32_t i;
@@ -799,7 +810,7 @@ static void box_gpu_bake_faces_render(
                 .depthStencilAttachment = &depth
             });
         wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
-        wgpuRenderPassEncoderSetBindGroup(pass, 3, gpu->no_volume->group, 0, NULL);
+        wgpuRenderPassEncoderSetBindGroup(pass, 3, ambient, 0, NULL);
         box_gpu_draw_capture(gpu, pass, packet, i);
         wgpuRenderPassEncoderEnd(pass);
         wgpuRenderPassEncoderRelease(pass);
@@ -847,7 +858,7 @@ static void box_gpu_bake_project(
         { .binding = 1, .textureView = b->color_view },
         {
             .binding = 2,
-            .buffer = volume->probes,
+            .buffer = volume->probes[batch->target],
             .size = (uint64_t)volume->count * BOX_GPU_PROBE_SIZE
         }
     };
@@ -871,6 +882,7 @@ static void box_gpu_bake_project(
             (box_render_bake_result_t){
                 .volume = batch->volume,
                 .generation = batch->generation,
+                .pass = batch->pass,
                 .probe = probes[i].index
             };
     }
@@ -986,7 +998,9 @@ static void box_gpu_bake_chunk_capture(
 
     timed = timed && timer->begun && last;
     box_gpu_bake_faces_render(gpu, b, encoder, packet, rv, faces,
-        *shadow ? *shadow : gpu->shadow_empty_view);
+        *shadow ? *shadow : gpu->shadow_empty_view,
+        batch->source == BOX_RENDER_BAKE_BLACK ? gpu->no_volume->group[0]
+            : volume->group[batch->source]);
     box_gpu_bake_project(gpu, b, encoder, pipeline, volume, batch, probes, count,
         timed ? &end : NULL);
     timer->ended |= timed;
@@ -1148,7 +1162,7 @@ WGPUBindGroup box_gpu_bake_group(
         ? ecs_map_get_deref(&gpu->volumes, box_gpu_volume_t, v->volume)
         : NULL;
 
-    return volume ? volume->group : gpu->no_volume->group;
+    return volume ? volume->group[v->volume_buffer & 1u] : gpu->no_volume->group[0];
 }
 
 /** Check whether the backend can capture a bake batch of a packet.
@@ -1161,7 +1175,11 @@ static bool box_gpu_bake_batch_valid(
     const box_render_packet_t *packet,
     const box_render_bake_batch_t *batch)
 {
-    return batch->count > 0 && batch->size > 0 && batch->first >= 0 &&
+    bool source = batch->source == BOX_RENDER_BAKE_BLACK ||
+        batch->source == 0 || batch->source == 1;
+    bool target = batch->target == 0 || batch->target == 1;
+
+    return batch->count > 0 && batch->size > 0 && batch->first >= 0 && source && target &&
         batch->first + batch->count <= ecs_vec_count(&packet->probes);
 }
 

@@ -212,6 +212,7 @@ typedef struct box_render_view_t {
     int32_t effect_first;       /**< Index of the first effect pass of the view in the packet */
     int32_t effect_count;       /**< Effect passes of the view, 0 renders without an HDR target */
     uint32_t volume;            /**< Probe volume the view samples, 0 for the hemisphere ambient */
+    uint32_t volume_buffer;     /**< Probe buffer of the volume the view samples, 0 or 1 */
 } box_render_view_t;
 
 /** Kind of an effect pass of a view */
@@ -276,8 +277,9 @@ typedef struct box_render_texture_desc_t {
  * probe is L2 SH irradiance E_lm = A_l * L_lm (Ramamoorthi and Hanrahan) in Sloan's real basis,
  * evaluated as E(n) / pi in place of the hemisphere ambient.
  *
- * The mask has one bit per probe, (probes + 31) / 32 words, set outside static geometry. A
- * create fills every probe with sh; an update of the same grid refills them and the mask.
+ * It has two probe buffers, so a pass reads the one the previous pass wrote. The mask has one
+ * bit per probe, (probes + 31) / 32 words, set outside static geometry. A create fills every
+ * probe of both buffers with sh; an update of the same grid refills them and the mask.
  */
 typedef struct box_render_volume_desc_t {
     float origin[3];        /**< World position of the first probe */
@@ -293,16 +295,24 @@ typedef struct box_render_probe_capture_t {
     uint32_t index;         /**< Index of the probe in its volume */
 } box_render_probe_capture_t;
 
-/** The probe captures of the volume of one scene in a packet.
+/** No probe buffer: the captures of the first pass shade with a black ambient term */
+#define BOX_RENDER_BAKE_BLACK (-1)
+
+/** The probe captures of one pass of the volume of one scene in a packet.
  *
  * Each probe renders six faces of the batches of the scene with bake set, lit by the lights
- * of the scene with a black ambient term, the sun shadowed by one cascade over the bounds.
+ * of the scene, the sun shadowed by one cascade over the bounds, the ambient term from the
+ * source buffer (black for the first pass), and is written into the target buffer.
  *
- * Texels no shape covers see the hemisphere ambient. Captures run before the targets.
+ * Texels no shape covers see the hemisphere ambient. Captures run before the targets, in the
+ * order of the packet, so a pass may read the buffer an earlier batch of the packet wrote.
  */
 typedef struct box_render_bake_batch_t {
     uint32_t volume;        /**< Handle of the volume the probes are written into */
-    uint32_t generation;    /**< Pass of the volume the probes belong to, reported back */
+    uint32_t generation;    /**< Bake of the volume the probes belong to, reported back */
+    int32_t pass;           /**< Pass of the bake, 0 bakes direct light and emission */
+    int32_t source;         /**< Probe buffer the faces shade with, or BOX_RENDER_BAKE_BLACK */
+    int32_t target;         /**< Probe buffer the probes are written into, 0 or 1 */
     ecs_entity_t scene;     /**< Scene root of the batches the faces draw */
     int32_t size;           /**< Edge of a face in texels */
     box_render_view_lights_t lights; /**< Lights of the scene, enabled */
@@ -493,6 +503,7 @@ typedef struct box_render_bake_timing_t {
 typedef struct box_render_bake_result_t {
     uint32_t volume;            /**< Handle of the volume */
     uint32_t generation;        /**< Generation of the bake batch of the probe */
+    int32_t pass;               /**< Pass of the bake batch of the probe */
     uint32_t probe;             /**< Index of the probe in the volume */
 } box_render_bake_result_t;
 
@@ -894,7 +905,8 @@ bool box_render_bake_probe(
  * progress counts nothing.
  *
  * @param world The world
- * @return Probes queued or in flight, 0 when every bake that can progress converged
+ * @return Probe captures of every pass not reported yet, 0 when every bake that can progress
+ *         converged
  */
 int32_t box_render_bake_pending(
     const ecs_world_t *world);

@@ -114,6 +114,7 @@ typedef struct box_text_font_t {
     bool requested;         /**< A Text uses the font, so the font loads */
     bool relayout;          /**< A page grew, the texts of the font lay out again */
     bool oversized;         /**< A glyph of the face did not fit a page, which was logged */
+    bool malformed;         /**< A composite glyph of the face nests too deep, which was logged */
 } box_text_font_t;
 
 /** Main thread state of the fonts of a world */
