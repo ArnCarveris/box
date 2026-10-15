@@ -142,7 +142,8 @@
                     "glyphs_added_mid_run",
                     "budget_more_glyphs_than_a_page",
                     "small_budget_reuses_pages",
-                    "cusp_glyph"
+                    "cusp_glyph",
+                    "rotated_small_text_same_ink"
                 ]
             },
             {

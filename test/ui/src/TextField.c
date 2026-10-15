@@ -785,3 +785,54 @@ void TextField_cusp_glyph(void) {
     ecs_os_free(png);
     ecs_fini(world);
 }
+
+void TextField_rotated_small_text_same_ink(void) {
+    // ui_fixes/msdf_correction
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {0, 0, 0});
+    ecs_set(world, e, Rgb, {255, 255, 255});
+    ecs_set(world, e, Text, {.value = "Rotate me", .size = 12,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 128, .height = 128, .write_to_file = "rotated.png",
+        .resolution_scale = 1});
+    char *png = flecs_asprintf("%s/rotated.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    double ink[2];
+    int32_t r;
+    for (r = 0; r < 2; r ++) {
+        ecs_set(world, e, Rotation, {0, 0, r ? (float)GLM_PI_4 : 0.0f});
+        ecs_progress(world, 0);
+        ecs_progress(world, 0);
+        ecs_progress(world, 0);
+        box_render_sync(world);
+
+        int w = 0, h = 0, n = 0, p;
+        unsigned char *px = stbi_load(png, &w, &h, &n, 4);
+        test_assert(px != NULL);
+        ink[r] = 0;
+        for (p = 0; p < w * h; p ++) {
+            double c = px[p * 4] / 255.0;
+            ink[r] += c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4);
+        }
+
+        stbi_image_free(px);
+    }
+
+    test_assert(ink[0] > 20);
+    test_assert(fabs(ink[1] - ink[0]) < 0.06 * ink[0]);
+
+    ecs_os_free(png);
+    ecs_fini(world);
+}
