@@ -46,7 +46,7 @@ typedef struct box_spatial_item_t {
     ecs_entity_t entity; /**< The entity, 0 when the item is free */
     vec3 min;            /**< Minimum corner of the world bounds */
     vec3 max;            /**< Maximum corner of the world bounds */
-    int32_t node;        /**< Leaf in its tree, -1 while it waits, next free item when free */
+    int32_t next;        /**< Next free item when the item is free */
     int32_t tree;        /**< BOX_SPATIAL_STATIC or BOX_SPATIAL_DYNAMIC */
     uint32_t frame;      /**< Update in which the bounds were last set */
     bool moved;          /**< The static leaf of the item waits for the bounds of the item */
@@ -73,7 +73,6 @@ typedef struct box_spatial_t {
     ecs_vec_t rescoped;        /**< ecs_entity_t, roots of subtrees that may change scene */
     ecs_vec_t walk;            /**< ecs_entity_t, stack of a subtree walk */
     ecs_vec_t leaves;          /**< box_bvh_leaf_t, scratch of a build */
-    ecs_vec_t nodes;           /**< int32_t, scratch of a build */
     ecs_vec_t empty;           /**< ecs_entity_t, scenes that lost their last entity */
     ecs_query_t *dynamic;      /**< Shapes with SpatialPose */
     box_spatial_stats_t stats; /**< Counters of the last update */

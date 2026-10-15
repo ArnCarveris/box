@@ -86,7 +86,6 @@ box_spatial_t* box_spatial_new(void)
     ecs_vec_init_t(NULL, &index->rescoped, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &index->walk, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &index->leaves, box_bvh_leaf_t, 0);
-    ecs_vec_init_t(NULL, &index->nodes, int32_t, 0);
     ecs_vec_init_t(NULL, &index->empty, ecs_entity_t, 0);
 
     return index;
@@ -106,7 +105,6 @@ void box_spatial_free(
     ecs_vec_fini_t(NULL, &index->rescoped, ecs_entity_t);
     ecs_vec_fini_t(NULL, &index->walk, ecs_entity_t);
     ecs_vec_fini_t(NULL, &index->leaves, box_bvh_leaf_t);
-    ecs_vec_fini_t(NULL, &index->nodes, int32_t);
     ecs_vec_fini_t(NULL, &index->empty, ecs_entity_t);
     ecs_os_free(index);
 }
@@ -157,9 +155,8 @@ static void box_spatial_item_place(
         float margin = box_spatial_margin(it->min, it->max);
         glm_vec3_subs(it->min, margin, min);
         glm_vec3_adds(it->max, margin, max);
-        it->node = box_bvh_insert(&s->trees[BOX_SPATIAL_DYNAMIC], min, max, item);
+        box_bvh_insert(&s->trees[BOX_SPATIAL_DYNAMIC], min, max, item);
     } else {
-        it->node = -1;
         *ecs_vec_append_t(NULL, &s->pending, int32_t) = item;
     }
 }
@@ -176,7 +173,7 @@ int32_t box_spatial_item_add(
     box_spatial_item_t *it;
     if (result >= 0) {
         it = box_spatial_item(s, result);
-        s->free_item = it->node;
+        s->free_item = it->next;
     } else {
         result = ecs_vec_count(&s->items);
         it = ecs_vec_append_t(NULL, &s->items, box_spatial_item_t);
@@ -239,7 +236,7 @@ bool box_spatial_item_set(
     uint32_t frame)
 {
     box_spatial_item_t *it = box_spatial_item(s, item);
-    int32_t node = it->node;
+    bool placed = box_bvh_has(&s->trees[it->tree], item), changed = false;
     float margin = box_spatial_margin(min, max);
     vec3 ahead;
     bool stretch = box_spatial_ahead(it, min, max, frame, margin, ahead);
@@ -247,29 +244,30 @@ bool box_spatial_item_set(
     glm_vec3_copy(ECS_CONST_CAST(float*, max), it->max);
     it->frame = frame;
     if (it->tree != tree) {
-        if (node >= 0) {
-            box_bvh_remove(&s->trees[it->tree], node);
+        if (placed) {
+            box_bvh_remove(&s->trees[it->tree], item);
         }
 
         it->tree = tree;
         it->moved = false;
         box_spatial_item_place(s, item);
-    } else if (node >= 0 && tree == BOX_SPATIAL_DYNAMIC) {
-        it->node = box_bvh_move_fat(&s->trees[tree], node, min, max, margin, ahead);
-    } else if (node >= 0 && !it->moved) {
+        changed = true;
+    } else if (placed && tree == BOX_SPATIAL_DYNAMIC) {
+        changed = box_bvh_move_fat(&s->trees[tree], item, min, max, margin, ahead);
+    } else if (placed && !it->moved) {
         it->moved = true;
         *ecs_vec_append_t(NULL, &s->moved, int32_t) = item;
     }
 
-    if (tree == BOX_SPATIAL_DYNAMIC && it->node != node && stretch && !it->stretched) {
+    if (tree == BOX_SPATIAL_DYNAMIC && changed && stretch && !it->stretched) {
         *ecs_vec_append_t(NULL, &s->stretched, int32_t) = item;
     }
 
-    if (tree == BOX_SPATIAL_DYNAMIC && it->node != node) {
+    if (tree == BOX_SPATIAL_DYNAMIC && changed) {
         it->stretched = stretch;
     }
 
-    return it->node != node;
+    return changed;
 }
 
 void box_spatial_item_remove(
@@ -278,14 +276,14 @@ void box_spatial_item_remove(
     int32_t item)
 {
     box_spatial_item_t *it = box_spatial_item(s, item);
-    if (it->node >= 0) {
-        box_bvh_remove(&s->trees[it->tree], it->node);
+    if (box_bvh_has(&s->trees[it->tree], item)) {
+        box_bvh_remove(&s->trees[it->tree], item);
     }
 
     it->entity = 0;
     it->moved = false;
     it->stretched = false;
-    it->node = s->free_item;
+    it->next = s->free_item;
     s->free_item = item;
     s->count --;
     if (!s->count && s->entity) {
@@ -305,7 +303,8 @@ static bool box_spatial_item_waits(
 {
     box_spatial_item_t *it = box_spatial_item(s, item);
 
-    return it->entity && it->tree == BOX_SPATIAL_STATIC && it->node < 0;
+    return it->entity && it->tree == BOX_SPATIAL_STATIC &&
+        !box_bvh_has(&s->trees[BOX_SPATIAL_STATIC], item);
 }
 
 void box_spatial_scene_rebuild(
@@ -314,9 +313,7 @@ void box_spatial_scene_rebuild(
 {
     int32_t i, count = ecs_vec_count(&s->items), leaves = 0;
     ecs_vec_set_count_t(NULL, &index->leaves, box_bvh_leaf_t, count);
-    ecs_vec_set_count_t(NULL, &index->nodes, int32_t, count);
     box_bvh_leaf_t *leaf = ecs_vec_first(&index->leaves);
-    int32_t *nodes = ecs_vec_first(&index->nodes);
     for (i = 0; i < count; i ++) {
         box_spatial_item_t *it = box_spatial_item(s, i);
         it->moved = false;
@@ -328,11 +325,7 @@ void box_spatial_scene_rebuild(
         }
     }
 
-    box_bvh_build(&s->trees[BOX_SPATIAL_STATIC], leaf, leaves, nodes);
-    for (i = 0; i < leaves; i ++) {
-        box_spatial_item(s, leaf[i].item)->node = nodes[leaf[i].item];
-    }
-
+    box_bvh_build(&s->trees[BOX_SPATIAL_STATIC], leaf, leaves);
     ecs_vec_clear(&s->pending);
     ecs_vec_clear(&s->moved);
 }
@@ -350,7 +343,7 @@ static void box_spatial_scene_move(
         box_spatial_item_t *it = box_spatial_item(s, moved[i]);
         if (it->moved) {
             it->moved = false;
-            it->node = box_bvh_move(&s->trees[BOX_SPATIAL_STATIC], it->node, it->min, it->max);
+            box_bvh_move(&s->trees[BOX_SPATIAL_STATIC], moved[i], it->min, it->max);
         }
     }
 
@@ -384,8 +377,7 @@ static void box_spatial_scene_commit(
     for (i = 0; i < count; i ++) {
         if (box_spatial_item_waits(s, pending[i])) {
             box_spatial_item_t *it = box_spatial_item(s, pending[i]);
-            it->node = box_bvh_insert(
-                &s->trees[BOX_SPATIAL_STATIC], it->min, it->max, pending[i]);
+            box_bvh_insert(&s->trees[BOX_SPATIAL_STATIC], it->min, it->max, pending[i]);
         }
     }
 
@@ -412,7 +404,7 @@ static int32_t box_spatial_scene_settle(
         if (it->stretched && it->frame == frame) {
             items[kept ++] = items[i];
         } else if (it->stretched) {
-            box_bvh_remove(&s->trees[BOX_SPATIAL_DYNAMIC], it->node);
+            box_bvh_remove(&s->trees[BOX_SPATIAL_DYNAMIC], items[i]);
             box_spatial_item_place(s, items[i]);
             result ++;
         }
