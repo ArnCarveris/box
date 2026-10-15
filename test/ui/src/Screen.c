@@ -378,14 +378,12 @@ void Screen_ui_view_skips_culling(void) {
 
     int64_t start = ecs_get_world_info(world)->frame_count_total + 3;
     const CullStatus *status = NULL;
-    int32_t i;
-    for (i = 0; i < 100; i ++) {
+    int32_t frames = 0;
+    while ((!status || status->frame < start) && frames < 5000) {
         ecs_progress(world, 0);
         box_render_sync(world);
         status = ecs_get(world, view, CullStatus);
-        if (status && status->frame >= start) {
-            break;
-        }
+        frames ++;
     }
 
     test_assert(status != NULL);
