@@ -240,6 +240,46 @@ static void BoxSpatialOnShapeRemove(
     }
 }
 
+/** Get the unit mesh of a shape.
+ *
+ * @param cache The mesh cache
+ * @param shape The shape
+ * @return The mesh, NULL when the shape has no mesh with vertices
+ */
+static const box_mesh_t* box_spatial_mesh(
+    const box_mesh_cache_t *cache,
+    const ShapeMesh *shape)
+{
+    const box_mesh_t *result = cache && shape->mesh ?
+        box_mesh_cache_get(cache, shape->mesh) : NULL;
+
+    return result && result->vertex_count ? result : NULL;
+}
+
+/** Get the local bounds of a shape: the unit mesh bounds times the instance scale.
+ *
+ * @param mesh The unit mesh, NULL when the shape has none
+ * @param shape The shape
+ * @param min Receives the minimum corner
+ * @param max Receives the maximum corner
+ * @return false when the shape has no mesh
+ */
+static bool box_spatial_shape_local(
+    const box_mesh_t *mesh,
+    const ShapeMesh *shape,
+    vec3 min,
+    vec3 max)
+{
+    int32_t i;
+    for (i = 0; mesh && i < 3; i ++) {
+        float a = mesh->min[i] * shape->scale[i], b = mesh->max[i] * shape->scale[i];
+        min[i] = a < b ? a : b;
+        max[i] = a < b ? b : a;
+    }
+
+    return mesh != NULL;
+}
+
 /** Get the local bounds of an entity: the unit mesh bounds of its shape times the instance
  * scale, else the area of a UI element without a shape (LayoutBounds, else TextBounds) in the
  * XY plane around its origin, which picks it only with a WorldTransform.
@@ -261,21 +301,12 @@ static bool box_spatial_local(
     bool *ui)
 {
     const ShapeMesh *shape = ecs_get(world, e, ShapeMesh);
-    const box_mesh_t *mesh = cache && shape && shape->mesh ?
-        box_mesh_cache_get(cache, shape->mesh) : NULL;
     const LayoutBounds *lb = shape ? NULL : ecs_get(world, e, LayoutBounds);
     const TextBounds *tb = shape || lb ? NULL : ecs_get(world, e, TextBounds);
     bool result = false;
-    int32_t i;
     *ui = false;
-    if (mesh && mesh->vertex_count) {
-        for (i = 0; i < 3; i ++) {
-            float a = mesh->min[i] * shape->scale[i], b = mesh->max[i] * shape->scale[i];
-            min[i] = a < b ? a : b;
-            max[i] = a < b ? b : a;
-        }
-
-        result = true;
+    if (shape) {
+        result = box_spatial_shape_local(box_spatial_mesh(cache, shape), shape, min, max);
     } else if ((lb || tb) && ecs_has(world, e, WorldTransform)) {
         float w = lb ? lb->width : tb->width, h = lb ? lb->height : tb->height;
         glm_vec3_copy((vec3){ -w * 0.5f, -h * 0.5f, 0 }, min);
@@ -448,11 +479,14 @@ static void box_spatial_dynamic(
 {
     ecs_iter_t it = ecs_query_iter(world, index->dynamic);
     box_spatial_scene_t *s = NULL;
+    const box_mesh_t *mesh = NULL;
     ecs_entity_t scene = 0;
+    uint32_t handle = 0;
     while (ecs_query_next(&it)) {
         const SpatialProxy *p = ecs_field(&it, SpatialProxy, 0);
         SpatialPose *pose = ecs_field(&it, SpatialPose, 1);
         const WorldTransform *t = ecs_field(&it, WorldTransform, 2);
+        const ShapeMesh *shape = ecs_field(&it, ShapeMesh, 3);
         int32_t i;
         for (i = 0; i < it.count; i ++) {
             vec3 l_min, l_max, min, max;
@@ -469,10 +503,15 @@ static void box_spatial_dynamic(
                 s = box_spatial_scene(index, scene);
             }
 
+            if (shape && (!mesh || handle != shape[i].mesh)) {
+                handle = shape[i].mesh;
+                mesh = box_spatial_mesh(cache, &shape[i]);
+            }
+
             const box_spatial_item_t *item = s ? box_spatial_item(s, p[i].item) : NULL;
-            if (!item || item->tree == BOX_SPATIAL_STATIC ||
-                !box_spatial_local(world, cache, it.entities[i], l_min, l_max, &ui))
-            {
+            bool local = shape ? box_spatial_shape_local(mesh, &shape[i], l_min, l_max) :
+                box_spatial_local(world, cache, it.entities[i], l_min, l_max, &ui);
+            if (!item || item->tree == BOX_SPATIAL_STATIC || !local) {
                 continue;
             }
 
@@ -714,7 +753,8 @@ void BoxSpatialImport(
         .terms = {
             { .id = ecs_id(SpatialProxy), .inout = EcsIn },
             { .id = ecs_id(SpatialPose), .inout = EcsInOut },
-            { .id = ecs_id(WorldTransform), .inout = EcsIn, .oper = EcsOptional }
+            { .id = ecs_id(WorldTransform), .inout = EcsIn, .oper = EcsOptional },
+            { .id = ecs_id(ShapeMesh), .inout = EcsIn, .oper = EcsOptional }
         },
         .cache_kind = EcsQueryCacheAuto
     });
