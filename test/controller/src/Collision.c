@@ -1045,3 +1045,188 @@ void Collision_steep_crease_walk_along(void) {
 
     ecs_fini(world);
 }
+
+void Collision_ball_through_axis(void) {
+    // controller_fixes/narrow_phase
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    float dt = 1.0f / 60.0f;
+    ecs_entity_t ball = ecs_new(world);
+    ecs_set(world, ball, Position, { 0, 50, 0 });
+    ecs_set(world, ball, Sphere, { .segments = 24, .radius = 0.4f });
+    ecs_entity_t fp = ecs_new(world);
+    ecs_add(world, fp, FirstPersonController);
+    ecs_progress(world, dt);
+
+    box_input_key(world, KeyW, true);
+    for (int32_t i = 0; i < 30; i ++) {
+        ecs_progress(world, dt);
+    }
+
+    float z = ecs_get(world, fp, Position)->z - 4 * dt - 4 * dt;
+    ecs_set(world, ball, Position, { 0, 1, z });
+    ecs_progress(world, dt);
+    for (int32_t i = 0; i < 30; i ++) {
+        ecs_progress(world, dt);
+        const Position *p = ecs_get(world, fp, Position);
+        test_assert(fabsf(p->y - 1.7f) < 0.001f);
+        test_assert(p->z > z + 0.69f);
+        test_assert(fabsf(p->x) < 0.001f);
+    }
+
+    test_bool(ecs_get(world, fp, FirstPersonController)->grounded, true);
+
+    ecs_fini(world);
+}
+
+void Collision_walk_into_balls(void) {
+    // controller_fixes/narrow_phase
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    float radius[] = { 0.4f, 0.6f, 1.0f, 0.4f };
+    float y[] = { 0.4f, 0.6f, 1.0f, 1.2f };
+    ecs_entity_t fp[4];
+    for (int32_t i = 0; i < 4; i ++) {
+        ecs_entity_t ball = ecs_new(world);
+        ecs_set(world, ball, Position, { 10.0f * (float)i, y[i], -3 });
+        ecs_set(world, ball, Sphere, { .segments = 24, .radius = radius[i] });
+        fp[i] = ecs_new(world);
+        ecs_set(world, fp[i], Position, { 10.0f * (float)i, 1.7f, 0 });
+        ecs_add(world, fp[i], FirstPersonController);
+    }
+
+    ecs_progress(world, 1.0f / 60.0f);
+    box_input_key(world, KeyW, true);
+    for (int32_t f = 0; f < 120; f ++) {
+        ecs_progress(world, 1.0f / 60.0f);
+        for (int32_t i = 0; i < 4; i ++) {
+            test_assert(fabsf(ecs_get(world, fp[i], Position)->y - 1.7f) < 0.001f);
+        }
+    }
+
+    for (int32_t i = 0; i < 4; i ++) {
+        const Position *p = ecs_get(world, fp[i], Position);
+        float dy = y[i] < 0.3f ? 0.3f - y[i] : (y[i] > 1.55f ? y[i] - 1.55f : 0);
+        float reach = radius[i] + 0.3f;
+        float dz = p->z + 3;
+        test_assert(fabsf(sqrtf(dz * dz + dy * dy) - reach) < 0.02f);
+        test_assert(fabsf(p->x - 10.0f * (float)i) < 0.001f);
+    }
+
+    ecs_fini(world);
+}
+
+void Collision_ground_beside_round_shapes(void) {
+    // controller_fixes/narrow_phase
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t pillar = ecs_new(world);
+    ecs_set(world, pillar, Position, { 0, 2, 0 });
+    ecs_set(world, pillar, Cylinder, { .segments = 24, .radius = 2, .length = 4 });
+    ecs_entity_t a = ecs_new(world);
+    ecs_set(world, a, Position, { 1.75f, 1.7f, 1.75f });
+    ecs_add(world, a, FirstPersonController);
+    ecs_entity_t log = ecs_new(world);
+    ecs_set(world, log, Position, { 20, 2, 0 });
+    ecs_set(world, log, Rotation, { 0, 0, (float)GLM_PI_2 });
+    ecs_set(world, log, Capsule, { .segments = 24, .radius = 2, .length = 2 });
+    ecs_entity_t b = ecs_new(world);
+    ecs_set(world, b, Position, { 22.75f, 1.7f, 1.75f });
+    ecs_add(world, b, FirstPersonController);
+
+    for (int32_t i = 0; i < 60; i ++) {
+        ecs_progress(world, 1.0f / 60.0f);
+        test_assert(fabsf(ecs_get(world, a, Position)->y - 1.7f) < 0.001f);
+        test_assert(fabsf(ecs_get(world, b, Position)->y - 1.7f) < 0.001f);
+    }
+
+    test_bool(ecs_get(world, a, FirstPersonController)->grounded, true);
+    test_bool(ecs_get(world, b, FirstPersonController)->grounded, true);
+
+    ecs_fini(world);
+}
+
+void Collision_step_over_log(void) {
+    // controller_fixes/narrow_phase
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t log = ecs_new(world);
+    ecs_set(world, log, Position, { 0, 0.14f, -2 });
+    ecs_set(world, log, Rotation, { 0, 0, (float)GLM_PI_2 });
+    ecs_set(world, log, Capsule, { .segments = 24, .radius = 0.14f, .length = 4 });
+    ecs_entity_t fp = ecs_new(world);
+    ecs_add(world, fp, FirstPersonController);
+    ecs_progress(world, 1.0f / 60.0f);
+
+    box_input_key(world, KeyW, true);
+    float top = 0;
+    for (int32_t i = 0; i < 90; i ++) {
+        ecs_progress(world, 1.0f / 60.0f);
+        const Position *p = ecs_get(world, fp, Position);
+        float dz = fabsf(p->z + 2);
+        test_assert(p->y > 1.7f - 0.001f);
+        if (dz < 0.1f) {
+            float surface = 0.14f + sqrtf(0.44f * 0.44f - dz * dz) - 0.3f;
+            test_assert(fabsf(p->y - 1.7f - surface) < 0.01f);
+        }
+
+        top = p->y > top ? p->y : top;
+    }
+
+    const Position *p = ecs_get(world, fp, Position);
+    test_assert(top > 1.7f + 0.27f);
+    test_assert(top < 1.7f + 0.29f);
+    test_assert(p->z < -4);
+    test_flt(p->y, 1.7f);
+    test_bool(ecs_get(world, fp, FirstPersonController)->grounded, true);
+
+    ecs_fini(world);
+}
+
+void Collision_sheared_box(void) {
+    // controller_fixes/narrow_phase
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t parent = ecs_new(world);
+    ecs_set(world, parent, Position, { 0, 0, -3 });
+    ecs_set(world, parent, Scale, { 2, 1, 1 });
+    ecs_entity_t rhombus = ecs_new_w_pair(world, EcsChildOf, parent);
+    ecs_set(world, rhombus, Position, { 0, 1, 0 });
+    ecs_set(world, rhombus, Rotation, { 0, (float)GLM_PI_4, 0 });
+    ecs_set(world, rhombus, Box, { 1, 2, 1 });
+    ecs_entity_t fp = ecs_new(world);
+    ecs_set(world, fp, Position, { 0.2f, 1.7f, 0 });
+    ecs_add(world, fp, FirstPersonController);
+    ecs_progress(world, 1.0f / 60.0f);
+
+    float hx = sqrtf(2), hz = sqrtf(0.5f);
+    float corner[4][2] = { { hx, 0 }, { 0, hz }, { -hx, 0 }, { 0, -hz } };
+    box_input_key(world, KeyW, true);
+    for (int32_t i = 0; i < 150; i ++) {
+        ecs_progress(world, 1.0f / 60.0f);
+        const Position *p = ecs_get(world, fp, Position);
+        float px = p->x, pz = p->z + 3, dist = 1e9f;
+        for (int32_t e = 0; e < 4; e ++) {
+            float ax = corner[e][0], az = corner[e][1];
+            float bx = corner[(e + 1) % 4][0], bz = corner[(e + 1) % 4][1];
+            float ex = bx - ax, ez = bz - az;
+            float t = ((px - ax) * ex + (pz - az) * ez) / (ex * ex + ez * ez);
+            t = t < 0 ? 0 : (t > 1 ? 1 : t);
+            float dx = px - ax - ex * t, dz = pz - az - ez * t;
+            float d = sqrtf(dx * dx + dz * dz);
+            dist = d < dist ? d : dist;
+        }
+
+        test_assert(dist > 0.29f);
+        test_assert(fabsf(p->y - 1.7f) < 0.001f);
+    }
+
+    test_assert(ecs_get(world, fp, Position)->z < -5);
+
+    ecs_fini(world);
+}

@@ -155,7 +155,7 @@ bool box_collider_resolve(
 /** Where a capsule touches a collider */
 typedef struct box_collider_contact_t {
     vec3 normal;  /**< Direction from the collider towards the capsule, that moves it out */
-    vec3 surface; /**< Normal of the face touched, the most upward one at an edge or corner */
+    vec3 surface; /**< Normal of the face touched or of the shape below, see box_collider_push */
     float depth;  /**< Overlap of the capsule and the collider along the normal, positive */
 } box_collider_contact_t;
 
@@ -165,6 +165,7 @@ typedef struct box_collider_contact_t {
  * @param a Center of the lower cap of the capsule
  * @param b Center of the upper cap of the capsule
  * @param radius Radius of the capsule
+ * @param hint Way out when the segment runs through the core of a ball or capsule, may be NULL
  * @param normal Receives the direction from the collider towards the capsule
  * @return The gap between their surfaces, negative by the depth when they overlap
  */
@@ -173,14 +174,20 @@ float box_collider_separation(
     const vec3 a,
     const vec3 b,
     float radius,
+    const vec3 hint,
     vec3 normal);
 
 /** Find how far a capsule reaches into a collider.
+ *
+ * The surface of the contact is the flat face it lies on, else (an edge, a corner or a round
+ * surface) the normal where a ray straight down from the lower cap enters the shape: up when
+ * the shape is not below the cap, the normal of the contact when the cap is inside it.
  *
  * @param c The collider
  * @param a Center of the lower cap of the capsule
  * @param b Center of the upper cap of the capsule
  * @param radius Radius of the capsule
+ * @param hint Way out when the segment runs through the core of a ball or capsule, may be NULL
  * @param out The contact, written when the capsule overlaps the collider
  * @return true when the capsule overlaps the collider
  */
@@ -189,15 +196,17 @@ bool box_collider_push(
     const vec3 a,
     const vec3 b,
     float radius,
+    const vec3 hint,
     box_collider_contact_t *out);
 
-/** Intersect a ray with the oriented box of a collider, or the ball of a sphere.
+/** Intersect a ray with the outside of a collider: its box, ball, cylinder or capsule.
  *
  * @param c The collider
  * @param origin Origin of the ray
  * @param dir Direction of the ray, need not be normalized
  * @param max Longest distance along dir that counts
- * @param t Receives the distance of the hit in lengths of dir
+ * @param t Receives the distance of the hit in lengths of dir, 0 when the origin is inside
+ * @param normal Receives the normal of the surface at the hit, zero inside, may be NULL
  * @return true when the ray hits
  */
 bool box_collider_ray(
@@ -205,7 +214,8 @@ bool box_collider_ray(
     const vec3 origin,
     const vec3 dir,
     float max,
-    float *t);
+    float *t,
+    vec3 normal);
 
 /** Move a body by its velocity over a frame, sliding along the shapes of its scene.
  *

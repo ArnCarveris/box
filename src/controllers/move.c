@@ -50,6 +50,7 @@ typedef struct box_move_t {
     bool ground;                       /**< A contact was walkable */
     bool wall;                         /**< A contact was too steep to stand on */
     bool support;                      /**< Rest on edges as well, the drop of a step */
+    vec3 back;                         /**< Unit way back along the motion, zero for none */
 } box_move_t;
 
 /** Context of a ray that searches the ground below a body */
@@ -235,7 +236,7 @@ static float box_move_deepest(
     box_move_segment(m->body, pos, a, b);
     for (i = 0; i < count; i ++) {
         box_collider_contact_t contact;
-        if (!box_collider_push(&c[i], a, b, m->body->radius, &contact)) {
+        if (!box_collider_push(&c[i], a, b, m->body->radius, m->back, &contact)) {
             continue;
         }
 
@@ -343,7 +344,7 @@ static float box_move_clearance(
     vec3 a, b, n;
     box_move_segment(m->body, pos, a, b);
     for (i = 0; i < count && result > 0; i ++) {
-        float gap = box_collider_separation(&c[i], a, b, m->body->radius, n);
+        float gap = box_collider_separation(&c[i], a, b, m->body->radius, m->back, n);
         float approach = -glm_vec3_dot(ECS_CONST_CAST(float*, dir), n);
         gap = gap > 0 ? gap : fmaxf(gap + limit, 0);
         if (approach > 0 && gap < result * approach) {
@@ -376,6 +377,10 @@ static void box_move_slide(
     float limit = m->body->radius * BOX_MOVE_FRACTION;
     int32_t i, steps = 0;
     vec3 rest = { 0, 0, 0 }, dir = { 0, 0, 0 };
+    if (isfinite(len) && len > 0) {
+        glm_vec3_scale(ECS_CONST_CAST(float*, motion), -1.0f / len, m->back);
+    }
+
     if (!isfinite(len)) {
         len = 0;
     } else if (len <= limit * BOX_MOVE_STEPS) {
@@ -394,6 +399,7 @@ static void box_move_slide(
     for (i = 0; i < BOX_MOVE_SWEEPS && len > BOX_MOVE_EPS; i ++) {
         float step;
         glm_vec3_scale(rest, 1.0f / len, dir);
+        glm_vec3_negate_to(dir, m->back);
         step = fminf(fmaxf(limit, box_move_clearance(m, pos, dir, limit)), len);
         glm_vec3_muladds(dir, step, pos);
         glm_vec3_scale(dir, len - step, rest);
@@ -608,7 +614,7 @@ static bool box_move_ground_filter(
     vec3 down = { 0, -1, 0 };
 
     return !box_move_own(r->world, r->body, e) && box_collider_resolve(r->world, e, &c) &&
-        box_collider_ray(&c, r->origin, down, FLT_MAX, distance);
+        box_collider_ray(&c, r->origin, down, FLT_MAX, distance, NULL);
 }
 
 bool box_controller_ground_below(

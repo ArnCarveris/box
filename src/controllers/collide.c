@@ -66,6 +66,75 @@ static box_collider_kind_t box_collide_kind(
     return result;
 }
 
+/** Remove from a vector its part along a unit axis and normalize what is left.
+ *
+ * @param v The vector, written in place
+ * @param axis The unit axis, NULL for none
+ * @return false when nothing is left
+ */
+static bool box_collide_orthogonal(
+    vec3 v,
+    const vec3 axis)
+{
+    float len;
+    if (axis) {
+        glm_vec3_muladds(ECS_CONST_CAST(float*, axis), -glm_vec3_dot(v, ECS_CONST_CAST(float*,
+            axis)), v);
+    }
+
+    len = glm_vec3_norm(v);
+    if (len > 1e-6f) {
+        glm_vec3_scale(v, 1.0f / len, v);
+    }
+
+    return len > 1e-6f;
+}
+
+/** Fit the orthonormal frame of a collider around its transformed extents.
+ *
+ * A transform with non-uniform scale above a rotation shears the shape. The frame keeps the
+ * direction of the second axis, the axis of round shapes, makes the first axis perpendicular
+ * to it, and the half extents bound the sheared box along the new axes.
+ *
+ * @param t The world transform, NULL for none
+ * @param e3 Half extents of the shape in its own frame
+ * @param out The collider, its axes and half extents are written
+ */
+static void box_collide_frame(
+    const WorldTransform *t,
+    const vec3 e3,
+    box_collider_t *out)
+{
+    vec3 h[3];
+    int32_t i, j;
+    for (j = 0; j < 3; j ++) {
+        for (i = 0; i < 3; i ++) {
+            out->axis[j][i] = t ? t->m[j][i] : (float)(i == j);
+            h[j][i] = out->axis[j][i] * e3[j];
+        }
+    }
+
+    if (!box_collide_orthogonal(out->axis[1], NULL)) {
+        glm_vec3_copy((vec3){ 0, 1, 0 }, out->axis[1]);
+    }
+
+    if (!box_collide_orthogonal(out->axis[0], out->axis[1])) {
+        glm_vec3_copy((vec3){ 1, 0, 0 }, out->axis[0]);
+        if (!box_collide_orthogonal(out->axis[0], out->axis[1])) {
+            glm_vec3_copy((vec3){ 0, 0, 1 }, out->axis[0]);
+            box_collide_orthogonal(out->axis[0], out->axis[1]);
+        }
+    }
+
+    glm_vec3_cross(out->axis[0], out->axis[1], out->axis[2]);
+    for (j = 0; j < 3; j ++) {
+        out->half[j] = 0;
+        for (i = 0; i < 3; i ++) {
+            out->half[j] += fabsf(glm_vec3_dot(h[i], out->axis[j]));
+        }
+    }
+}
+
 bool box_collider_resolve(
     const ecs_world_t *world,
     ecs_entity_t e,
@@ -90,21 +159,7 @@ bool box_collider_resolve(
         e3[i] = (mesh->max[i] - mesh->min[i]) * 0.5f * fabsf(shape->scale[i]);
     }
 
-    for (j = 0; j < 3; j ++) {
-        float len = 0;
-        for (i = 0; i < 3; i ++) {
-            out->axis[j][i] = t ? t->m[j][i] : (float)(i == j);
-            len += out->axis[j][i] * out->axis[j][i];
-        }
-
-        len = sqrtf(len);
-        for (i = 0; i < 3; i ++) {
-            out->axis[j][i] = len > 0 ? out->axis[j][i] / len : (float)(i == j);
-        }
-
-        out->half[j] = e3[j] * len;
-    }
-
+    box_collide_frame(t, e3, out);
     for (i = 0; i < 3; i ++) {
         out->center[i] = t ? t->m[3][i] : c[i];
         for (j = 0; t && j < 3; j ++) {
@@ -275,55 +330,82 @@ static void box_collide_world_dir(
     }
 }
 
-/** Find the normal of the face of a collider at a point of its surface.
+/** Pick the way out for a capsule segment that runs through the core of a ball or capsule.
  *
- * A point on an edge or corner of a box or a cylinder lies on several faces; it gets the most
- * upward one, so a body resting on the edge of a flat top stands on that top. Balls and capsules
- * are smooth and answer with the normal of the contact.
+ * The nearest points coincide, so their difference has no direction. The way out is
+ * perpendicular to both segments (to the capsule segment for a ball), on the side of a hint.
  *
  * @param c The collider
- * @param q The point of the surface in the frame of the collider
- * @param contact Normal of the contact in the frame of the collider
- * @param out The normal of the face in world space
+ * @param p0 First end of the capsule segment in the frame of the collider
+ * @param p1 Second end of the capsule segment in the frame of the collider
+ * @param hint Preferred direction in the frame of the collider, may be zero
+ * @param n Receives the way out in the frame of the collider
  */
-static void box_collide_surface(
+static void box_collide_coincident(
+    const box_collider_t *c,
+    const vec3 p0,
+    const vec3 p1,
+    const vec3 hint,
+    vec3 n)
+{
+    vec3 axis = { p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2] };
+    vec3 core = { 0, 1, 0 };
+    bool segment = box_collide_orthogonal(axis, NULL);
+    const float *along = segment ? axis : NULL;
+    glm_vec3_cross(axis, core, n);
+    if (c->kind == BoxColliderCapsule && segment && box_collide_orthogonal(n, NULL)) {
+        glm_vec3_scale(n, glm_vec3_dot(n, ECS_CONST_CAST(float*, hint)) < 0 ? -1.0f : 1.0f, n);
+        goto done;
+    }
+
+    glm_vec3_copy(ECS_CONST_CAST(float*, hint), n);
+    if (box_collide_orthogonal(n, along)) {
+        goto done;
+    }
+
+    glm_vec3_copy((vec3){ 1, 0, 0 }, n);
+    if (!box_collide_orthogonal(n, along)) {
+        glm_vec3_copy((vec3){ 0, 0, 1 }, n);
+        box_collide_orthogonal(n, along);
+    }
+
+done:
+    return;
+}
+
+/** Find the flat face of a box or the cap of a cylinder a point of its surface lies on.
+ *
+ * @param c The collider
+ * @param q The point in the frame of the collider
+ * @param n Receives the normal of the face in the frame of the collider
+ * @return false when the point lies on an edge, a corner, a round surface or inside
+ */
+static bool box_collide_face(
     const box_collider_t *c,
     const vec3 q,
-    const vec3 contact,
-    vec3 out)
+    vec3 n)
 {
     const float *h = c->half;
-    vec3 face[3];
     int32_t i, count = 0;
+    glm_vec3_zero(n);
     if (c->kind == BoxColliderBox) {
         for (i = 0; i < 3; i ++) {
             if (fabsf(q[i]) >= h[i] * (1.0f - BOX_COLLIDE_TOUCH)) {
-                glm_vec3_zero(face[count]);
-                face[count ++][i] = q[i] < 0 ? -1.0f : 1.0f;
+                n[i] = q[i] < 0 ? -1.0f : 1.0f;
+                count ++;
             }
         }
     } else if (c->kind == BoxColliderCylinder) {
         float r = sqrtf(q[0] * q[0] + q[2] * q[2]);
-        if (fabsf(q[1]) >= h[1] * (1.0f - BOX_COLLIDE_TOUCH)) {
-            glm_vec3_zero(face[count]);
-            face[count ++][1] = q[1] < 0 ? -1.0f : 1.0f;
-        }
-
-        if (r > 1e-6f && r >= h[0] * (1.0f - BOX_COLLIDE_TOUCH)) {
-            face[count][0] = q[0] / r;
-            face[count][1] = 0;
-            face[count ++][2] = q[2] / r;
+        if (fabsf(q[1]) >= h[1] * (1.0f - BOX_COLLIDE_TOUCH) &&
+            r < h[0] * (1.0f - BOX_COLLIDE_TOUCH))
+        {
+            n[1] = q[1] < 0 ? -1.0f : 1.0f;
+            count = 1;
         }
     }
 
-    box_collide_world_dir(c, contact, out);
-    for (i = 0; i < count; i ++) {
-        vec3 w;
-        box_collide_world_dir(c, face[i], w);
-        if (i == 0 || w[1] > out[1]) {
-            glm_vec3_copy(w, out);
-        }
-    }
+    return count == 1;
 }
 
 /** Find the nearest points of a capsule segment and a collider.
@@ -370,6 +452,9 @@ static float box_collide_nearest(
 /** Find the direction from a collider towards the nearest point of a capsule segment.
  *
  * @param c The collider
+ * @param a Center of the lower cap of the capsule
+ * @param b Center of the upper cap of the capsule
+ * @param hint Way out preferred when the segment runs through a core, may be NULL
  * @param p The nearest point of the segment, in the frame of the collider
  * @param q The nearest point of the collider or its core, in its frame
  * @param n Receives the direction in the frame of the collider
@@ -377,14 +462,26 @@ static float box_collide_nearest(
  */
 static float box_collide_normal(
     const box_collider_t *c,
+    const vec3 a,
+    const vec3 b,
+    const vec3 hint,
     const vec3 p,
     const vec3 q,
     vec3 n)
 {
     vec3 d = { p[0] - q[0], p[1] - q[1], p[2] - q[2] };
+    vec3 p0, p1, h = { 0, 0, 0 };
     float dist = glm_vec3_norm(d), result = 0;
     if (dist > BOX_COLLIDE_TOUCH) {
         glm_vec3_scale(d, 1.0f / dist, n);
+    } else if (c->kind == BoxColliderSphere || c->kind == BoxColliderCapsule) {
+        box_collide_local(c, a, p0);
+        box_collide_local(c, b, p1);
+        if (hint) {
+            box_collide_local_dir(c, hint, h);
+        }
+
+        box_collide_coincident(c, p0, p1, h, n);
     } else {
         result = box_collide_inside(c, p, n);
     }
@@ -397,11 +494,12 @@ float box_collider_separation(
     const vec3 a,
     const vec3 b,
     float radius,
+    const vec3 hint,
     vec3 normal)
 {
     vec3 p, q, n;
     float result = box_collide_nearest(c, a, b, radius, p, q);
-    result -= box_collide_normal(c, p, q, n);
+    result -= box_collide_normal(c, a, b, hint, p, q, n);
     box_collide_world_dir(c, n, normal);
 
     return result;
@@ -412,54 +510,191 @@ bool box_collider_push(
     const vec3 a,
     const vec3 b,
     float radius,
+    const vec3 hint,
     box_collider_contact_t *out)
 {
-    vec3 p, q, n;
-    float separation = box_collide_nearest(c, a, b, radius, p, q);
+    vec3 p, q, n, f;
+    vec3 down = { 0, -1, 0 };
+    float separation = box_collide_nearest(c, a, b, radius, p, q), t = 0;
     bool result = separation < 0;
-    if (result) {
-        separation -= box_collide_normal(c, p, q, n);
-        box_collide_world_dir(c, n, out->normal);
-        box_collide_surface(c, q, n, out->surface);
-        out->depth = -separation;
+    if (!result) {
+        goto done;
     }
 
+    separation -= box_collide_normal(c, a, b, hint, p, q, n);
+    box_collide_world_dir(c, n, out->normal);
+    out->depth = -separation;
+    glm_vec3_copy((vec3){ 0, 1, 0 }, out->surface);
+    if (box_collide_face(c, q, f)) {
+        box_collide_world_dir(c, f, out->surface);
+    } else if (box_collider_ray(c, a, down, FLT_MAX, &t, out->surface) && t <= 0) {
+        glm_vec3_copy(out->normal, out->surface);
+    }
+
+done:
     return result;
 }
 
-/** Intersect a ray with a ball around the origin.
+/** The nearest hit of a ray in the frame of a collider */
+typedef struct box_collide_hit_t {
+    float t;   /**< Distance of the hit in lengths of the direction */
+    float max; /**< Longest distance that counts */
+    vec3 n;    /**< Normal of the surface at the hit, in the frame of the collider */
+    bool hit;  /**< The ray hits */
+} box_collide_hit_t;
+
+/** Keep a hit of a ray when it is the nearest so far.
+ *
+ * @param h The nearest hit, written
+ * @param t Distance of the hit
+ * @param n Normal of the surface at the hit
+ */
+static void box_collide_hit(
+    box_collide_hit_t *h,
+    float t,
+    const vec3 n)
+{
+    if (t >= 0 && t <= h->max && (!h->hit || t < h->t)) {
+        h->hit = true;
+        h->t = t;
+        glm_vec3_copy(ECS_CONST_CAST(float*, n), h->n);
+    }
+}
+
+/** Intersect a ray with the outside of a ball.
  *
  * @param o Origin of the ray
  * @param d Direction of the ray
+ * @param y Height of the center of the ball on the axis
  * @param radius Radius of the ball
- * @param max Longest distance that counts
- * @param t Receives the distance of the hit
- * @return true when the ray hits the ball
+ * @param h The nearest hit, written
  */
-static bool box_collide_ray_ball(
+static void box_collide_ray_ball(
+    const vec3 o,
+    const vec3 d,
+    float y,
+    float radius,
+    box_collide_hit_t *h)
+{
+    vec3 oc = { o[0], o[1] - y, o[2] };
+    vec3 n;
+    float a = glm_vec3_dot(ECS_CONST_CAST(float*, d), ECS_CONST_CAST(float*, d));
+    float b = glm_vec3_dot(oc, ECS_CONST_CAST(float*, d));
+    float c = glm_vec3_dot(oc, oc) - radius * radius;
+    float disc = b * b - a * c, t = 0;
+    if (a > 1e-12f && disc >= 0 && radius > 0) {
+        t = (-b - sqrtf(disc)) / a;
+        glm_vec3_muladds(ECS_CONST_CAST(float*, d), t, oc);
+        glm_vec3_scale(oc, 1.0f / radius, n);
+        box_collide_hit(h, t, n);
+    }
+}
+
+/** Intersect a ray with the outside of the side of a cylinder along the axis.
+ *
+ * @param o Origin of the ray
+ * @param d Direction of the ray
+ * @param radius Radius of the cylinder
+ * @param height Half height of the side
+ * @param h The nearest hit, written
+ */
+static void box_collide_ray_side(
     const vec3 o,
     const vec3 d,
     float radius,
-    float max,
-    float *t)
+    float height,
+    box_collide_hit_t *h)
 {
-    float a = d[0] * d[0] + d[1] * d[1] + d[2] * d[2];
-    float b = o[0] * d[0] + o[1] * d[1] + o[2] * d[2];
-    float c = o[0] * o[0] + o[1] * o[1] + o[2] * o[2] - radius * radius;
-    float disc = b * b - a * c;
-    float hit = 0;
-    bool result = false;
-    if (a > 1e-12f && disc >= 0) {
-        hit = (-b - sqrtf(disc)) / a;
-        hit = hit < 0 && c <= 0 ? 0 : hit;
-        result = hit >= 0 && hit <= max;
+    float a = d[0] * d[0] + d[2] * d[2];
+    float b = o[0] * d[0] + o[2] * d[2];
+    float c = o[0] * o[0] + o[2] * o[2] - radius * radius;
+    float disc = b * b - a * c, t = 0;
+    vec3 n = { 0, 0, 0 };
+    if (a > 1e-12f && disc >= 0 && radius > 0) {
+        t = (-b - sqrtf(disc)) / a;
+        n[0] = (o[0] + d[0] * t) / radius;
+        n[2] = (o[2] + d[2] * t) / radius;
+        if (fabsf(o[1] + d[1] * t) <= height) {
+            box_collide_hit(h, t, n);
+        }
     }
+}
 
-    if (result) {
-        *t = hit;
+/** Intersect a ray with the outside of a collider in its own frame.
+ *
+ * @param c The collider
+ * @param o Origin of the ray
+ * @param d Direction of the ray
+ * @param h The nearest hit, written; a ray that starts inside hits at 0 with a zero normal
+ */
+static void box_collide_ray_local(
+    const box_collider_t *c,
+    const vec3 o,
+    const vec3 d,
+    box_collide_hit_t *h)
+{
+    const float *e = c->half;
+    float core = e[1] - e[0] > 0 ? e[1] - e[0] : 0;
+    float flat = o[0] * o[0] + o[2] * o[2];
+    vec3 zero = { 0, 0, 0 }, n = { 0, 0, 0 };
+    int32_t i;
+    if (c->kind == BoxColliderSphere) {
+        if (glm_vec3_norm2(ECS_CONST_CAST(float*, o)) <= e[0] * e[0]) {
+            box_collide_hit(h, 0, zero);
+        }
+
+        box_collide_ray_ball(o, d, 0, e[0], h);
+    } else if (c->kind == BoxColliderCapsule) {
+        float y = fminf(fmaxf(o[1], -core), core);
+        if (flat + (o[1] - y) * (o[1] - y) <= e[0] * e[0]) {
+            box_collide_hit(h, 0, zero);
+        }
+
+        box_collide_ray_side(o, d, e[0], core, h);
+        box_collide_ray_ball(o, d, core, e[0], h);
+        box_collide_ray_ball(o, d, -core, e[0], h);
+    } else if (c->kind == BoxColliderCylinder) {
+        if (flat <= e[0] * e[0] && fabsf(o[1]) <= e[1]) {
+            box_collide_hit(h, 0, zero);
+        }
+
+        box_collide_ray_side(o, d, e[0], e[1], h);
+        for (i = -1; i <= 1 && fabsf(d[1]) > 1e-12f; i += 2) {
+            float t = ((float)i * e[1] - o[1]) / d[1];
+            float x = o[0] + d[0] * t, z = o[2] + d[2] * t;
+            n[1] = (float)i;
+            if ((float)i * d[1] < 0 && x * x + z * z <= e[0] * e[0]) {
+                box_collide_hit(h, t, n);
+            }
+        }
+    } else {
+        float lo = 0, hi = h->max;
+        int32_t entry = -1;
+        bool result = true;
+        for (i = 0; i < 3 && result; i ++) {
+            if (fabsf(d[i]) < 1e-12f) {
+                result = o[i] >= -e[i] && o[i] <= e[i];
+            } else {
+                float t0 = (-e[i] - o[i]) / d[i];
+                float t1 = (e[i] - o[i]) / d[i];
+                if (fminf(t0, t1) > lo) {
+                    lo = fminf(t0, t1);
+                    entry = i;
+                }
+
+                hi = fminf(hi, fmaxf(t0, t1));
+                result = lo <= hi;
+            }
+        }
+
+        if (result && entry >= 0) {
+            n[entry] = d[entry] < 0 ? 1.0f : -1.0f;
+        }
+
+        if (result) {
+            box_collide_hit(h, lo, n);
+        }
     }
-
-    return result;
 }
 
 bool box_collider_ray(
@@ -467,35 +702,21 @@ bool box_collider_ray(
     const vec3 origin,
     const vec3 dir,
     float max,
-    float *t)
+    float *t,
+    vec3 normal)
 {
     vec3 o, d;
-    float lo = 0, hi = max;
-    bool result = true;
-    int32_t i;
+    box_collide_hit_t h = { .max = max };
     box_collide_local(c, origin, o);
     box_collide_local_dir(c, dir, d);
-    if (c->kind == BoxColliderSphere) {
-        result = box_collide_ray_ball(o, d, c->half[0], max, t);
-        goto done;
+    box_collide_ray_local(c, o, d, &h);
+    if (h.hit) {
+        *t = h.t;
     }
 
-    for (i = 0; i < 3 && result; i ++) {
-        if (fabsf(d[i]) < 1e-12f) {
-            result = o[i] >= -c->half[i] && o[i] <= c->half[i];
-        } else {
-            float t0 = (-c->half[i] - o[i]) / d[i];
-            float t1 = (c->half[i] - o[i]) / d[i];
-            lo = fmaxf(lo, fminf(t0, t1));
-            hi = fminf(hi, fmaxf(t0, t1));
-            result = lo <= hi;
-        }
+    if (h.hit && normal) {
+        box_collide_world_dir(c, h.n, normal);
     }
 
-    if (result) {
-        *t = lo;
-    }
-
-done:
-    return result;
+    return h.hit;
 }

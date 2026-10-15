@@ -157,7 +157,12 @@
                     "camera_infinite_velocity",
                     "steep_crease_holds",
                     "steep_slope_wall_crease_holds",
-                    "steep_crease_walk_along"
+                    "steep_crease_walk_along",
+                    "ball_through_axis",
+                    "walk_into_balls",
+                    "ground_beside_round_shapes",
+                    "step_over_log",
+                    "sheared_box"
                 ]
             }
         ]
