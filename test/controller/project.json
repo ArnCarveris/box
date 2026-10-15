@@ -163,7 +163,11 @@
                     "ground_beside_round_shapes",
                     "step_over_log",
                     "sheared_box",
-                    "fast_move_dense_posts"
+                    "fast_move_dense_posts",
+                    "round_obstacles_block",
+                    "capsule_core_crossing",
+                    "camera_on_capsule_core",
+                    "sheared_box_gap"
                 ]
             }
         ]

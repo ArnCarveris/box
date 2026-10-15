@@ -1274,3 +1274,154 @@ void Collision_fast_move_dense_posts(void) {
 
     ecs_fini(world);
 }
+
+void Collision_round_obstacles_block(void) {
+    // controller_fixes/narrow_phase
+    float radius[] = { 0.19f, 0.22f, 0.25f, 0.28f, 0.31f, 0.34f, 0.4f };
+    float fps[] = { 30, 60, 144 };
+    for (int32_t f = 0; f < 3; f ++) {
+        ecs_world_t *world = ecs_init();
+        ECS_IMPORT(world, Box);
+        ecs_entity_t fp[14];
+        for (int32_t i = 0; i < 14; i ++) {
+            float r = radius[i % 7], x = 10.0f * (float)i;
+            ecs_entity_t shape = ecs_new(world);
+            ecs_set(world, shape, Position, { x, r, -3 });
+            if (i < 7) {
+                ecs_set(world, shape, Sphere, { .segments = 24, .radius = r });
+            } else {
+                ecs_set(world, shape, Rotation, { 0, 0, (float)GLM_PI_2 });
+                ecs_set(world, shape, Capsule, { .segments = 24, .radius = r, .length = 4 });
+            }
+
+            fp[i] = ecs_new(world);
+            ecs_set(world, fp[i], Position, { x, 1.7f, 0 });
+            ecs_add(world, fp[i], FirstPersonController);
+        }
+
+        ecs_progress(world, 1.0f / fps[f]);
+        box_input_key(world, KeyW, true);
+        for (int32_t n = 0; n < (int32_t)(4 * fps[f]); n ++) {
+            ecs_progress(world, 1.0f / fps[f]);
+            for (int32_t i = 0; i < 14; i ++) {
+                const Position *p = ecs_get(world, fp[i], Position);
+                test_assert(p->y < 1.7f + 0.001f);
+                test_assert(p->z > -3);
+            }
+        }
+
+        ecs_fini(world);
+    }
+}
+
+void Collision_capsule_core_crossing(void) {
+    // controller_fixes/narrow_phase
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t fp = ecs_new(world);
+    ecs_add(world, fp, FirstPersonController);
+    ecs_progress(world, 1.0f / 60.0f);
+
+    ecs_entity_t log = ecs_new(world);
+    ecs_set(world, log, Position, { -sinf((float)GLM_PI_4), 1 + cosf((float)GLM_PI_4), 0 });
+    ecs_set(world, log, Rotation, { 0, 0, (float)GLM_PI_4 });
+    ecs_set(world, log, Capsule, { .segments = 24, .radius = 0.2f, .length = 4 });
+    ecs_progress(world, 1.0f / 60.0f);
+    for (int32_t i = 0; i < 3; i ++) {
+        ecs_progress(world, 1.0f / 60.0f);
+        const Position *p = ecs_get(world, fp, Position);
+        test_assert(fabsf(p->y - 1.7f) < 0.001f);
+    }
+
+    const Position *p = ecs_get(world, fp, Position);
+    test_assert(fabsf(p->z) > 0.49f);
+    test_assert(fabsf(p->x) < 0.001f);
+
+    ecs_fini(world);
+}
+
+void Collision_camera_on_capsule_core(void) {
+    // controller_fixes/narrow_phase
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t cam = ecs_new(world);
+    ecs_set(world, cam, Position, { 0, 1, 0 });
+    ecs_add(world, cam, CameraController);
+    CameraController *cc = ecs_get_mut(world, cam, CameraController);
+    cc->collide = true;
+    cc->speed = 2;
+    cc->acceleration = 1e9f;
+    ecs_progress(world, 1.0f / 60.0f);
+
+    box_input_key(world, KeyD, true);
+    ecs_progress(world, 1.0f / 60.0f);
+    ecs_entity_t log = ecs_new(world);
+    const Position *p = ecs_get(world, cam, Position);
+    ecs_set(world, log, Position, { p->x + 2.0f / 60.0f + 2.0f / 60.0f, 1, 0 });
+    ecs_set(world, log, Rotation, { 0, 0, (float)GLM_PI_2 });
+    ecs_set(world, log, Capsule, { .segments = 24, .radius = 0.3f, .length = 4 });
+    for (int32_t i = 0; i < 3; i ++) {
+        ecs_progress(world, 1.0f / 60.0f);
+    }
+
+    p = ecs_get(world, cam, Position);
+    test_assert(sqrtf((p->y - 1) * (p->y - 1) + p->z * p->z) > 0.54f);
+
+    ecs_fini(world);
+}
+
+void Collision_sheared_box_gap(void) {
+    // controller_fixes/narrow_phase
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t parent = ecs_new(world);
+    ecs_set(world, parent, Position, { 0, 0, -3 });
+    ecs_set(world, parent, Scale, { 2, 1, 1 });
+    ecs_entity_t rhombus = ecs_new_w_pair(world, EcsChildOf, parent);
+    ecs_set(world, rhombus, Position, { 0, 1, 0 });
+    ecs_set(world, rhombus, Rotation, { 0, (float)GLM_PI_4, 0 });
+    ecs_set(world, rhombus, Box, { 1, 2, 1 });
+    float hx = sqrtf(2), hz = sqrtf(0.5f);
+    float corner[4][2] = { { hx, 0 }, { 0, hz }, { -hx, 0 }, { 0, -hz } };
+    float nx = -hz / sqrtf(2.5f), nz = hx / sqrtf(2.5f);
+    ecs_entity_t fp = ecs_new(world);
+    ecs_set(world, fp, Position, { -hx * 0.5f + nx * 3, 1.7f, -3 + hz * 0.5f + nz * 3 });
+    ecs_set(world, fp, Rotation, { 0, atan2f(nx, nz), 0 });
+    ecs_add(world, fp, FirstPersonController);
+    ecs_progress(world, 1.0f / 60.0f);
+
+    box_input_key(world, KeyW, true);
+    float closest = 1e9f, stop = -1;
+    const Position *start = ecs_get(world, fp, Position);
+    float along = -(start->x * nx + (start->z + 3) * nz);
+    for (int32_t i = 0; i < 120; i ++) {
+        ecs_progress(world, 1.0f / 60.0f);
+        const Position *p = ecs_get(world, fp, Position);
+        float next = -(p->x * nx + (p->z + 3) * nz);
+        bool blocked = next - along < 2.0f / 60.0f;
+        along = next;
+        float px = p->x, pz = p->z + 3, dist = 1e9f;
+        for (int32_t e = 0; e < 4; e ++) {
+            float ax = corner[e][0], az = corner[e][1];
+            float bx = corner[(e + 1) % 4][0], bz = corner[(e + 1) % 4][1];
+            float ex = bx - ax, ez = bz - az;
+            float t = ((px - ax) * ex + (pz - az) * ez) / (ex * ex + ez * ez);
+            t = t < 0 ? 0 : (t > 1 ? 1 : t);
+            float dx = px - ax - ex * t, dz = pz - az - ez * t;
+            float d = sqrtf(dx * dx + dz * dz);
+            dist = d < dist ? d : dist;
+        }
+
+        closest = dist < closest ? dist : closest;
+        stop = blocked && stop < 0 ? dist : stop;
+    }
+
+    test_assert(closest > 0.29f);
+    test_assert(stop > 0.29f);
+    test_assert(stop < 0.3f + 0.76f);
+
+    ecs_fini(world);
+}

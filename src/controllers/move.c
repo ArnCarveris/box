@@ -64,6 +64,7 @@ typedef struct box_move_t {
     bool region;                       /**< The shapes were read */
     bool borrowed;                     /**< The shapes belong to the move this one forked from */
     float ahead;                       /**< Stretch of motion the next read starts from */
+    float floor;                       /**< Height of the feet where the step started */
     vec3 normals[BOX_MOVE_NORMALS];    /**< Normals of the contacts */
     int32_t normal_count;              /**< Normals kept */
     bool ground;                       /**< A contact was walkable */
@@ -347,20 +348,26 @@ static void box_move_take(
 
 /** Test whether the body can stand on a contact.
  *
- * The drop of a step also rests on an edge, but only of a surface the body can stand on.
+ * The drop of a step also rests on an edge of a surface the body can stand on, no higher than
+ * the step above where the step started, as Unreal's StepUp reverts a step whose impact point
+ * is above MaxStepHeight; it rests on the flank of a round shape only when the whole shape is.
  *
  * @param m The move
  * @param contact The contact
+ * @param point Height of the point of the shape the contact reaches deepest
  * @return true when the contact holds the body up
  */
 static bool box_move_ground(
     const box_move_t *m,
-    const box_collider_contact_t *contact)
+    const box_collider_contact_t *contact,
+    float point)
 {
+    const box_controller_body_t *body = m->body;
     bool result = contact->normal[1] >= BOX_MOVE_WALKABLE;
     if (m->support) {
         result = contact->normal[1] >= BOX_CONTROLLER_SUPPORT &&
-            contact->surface[1] >= BOX_MOVE_WALKABLE;
+            contact->surface[1] >= BOX_MOVE_WALKABLE &&
+            point <= m->floor + body->step + BOX_MOVE_FIT;
     }
 
     return result;
@@ -370,12 +377,14 @@ static bool box_move_ground(
  *
  * @param m The move
  * @param contact The contact
+ * @param point Height of the point of the shape the contact reaches deepest
  */
 static void box_move_touch(
     box_move_t *m,
-    const box_collider_contact_t *contact)
+    const box_collider_contact_t *contact,
+    float point)
 {
-    bool ground = box_move_ground(m, contact);
+    bool ground = box_move_ground(m, contact, point);
     m->ground |= ground;
     m->wall |= !ground;
     if (m->normal_count < BOX_MOVE_NORMALS) {
@@ -421,9 +430,14 @@ static float box_move_deepest(
     for (i = 0; i < count; i ++) {
         box_collider_contact_t contact;
         if (!box_move_overlap(min, max, s[i].min, s[i].max) ||
-            !box_collider_push(&s[i].collider, a, b, m->body->radius, m->back, &contact))
+            !box_collider_push(&s[i].collider, a, b, m->body->radius, m->back, m->support,
+                &contact))
         {
             continue;
+        }
+
+        if (contact.round && s[i].max[1] > m->floor + m->body->step + BOX_MOVE_FIT) {
+            glm_vec3_copy(contact.normal, contact.surface);
         }
 
         if (box_move_steep(m, contact.normal)) {
@@ -465,13 +479,14 @@ static void box_move_push(
         float *n = contact.normal;
         vec3 steep, away;
         float depth = box_move_deepest(m, pos, &contact, steep);
-        float flat = 0, d = 0;
+        float flat = 0, d = 0, point = 0;
         bool crease = false;
         again = depth > BOX_MOVE_EPS;
         if (!again) {
             continue;
         }
 
+        point = pos[1] + m->body->radius - n[1] * (m->body->radius - depth);
         flat = sqrtf(n[0] * n[0] + n[2] * n[2]);
         glm_vec3_copy(n, away);
         if (box_move_steep(m, n)) {
@@ -499,7 +514,7 @@ static void box_move_push(
             glm_vec3_muladds(away, -d, rest);
         }
 
-        box_move_touch(m, &contact);
+        box_move_touch(m, &contact, point);
     }
 }
 
@@ -654,6 +669,7 @@ static void box_move_step(
     down[1] = start[1] - at[1] - BOX_MOVE_MARGIN;
     attempt.ground = false;
     attempt.support = true;
+    attempt.floor = start[1];
     box_move_slide(&attempt, at, down);
     if (attempt.ground && box_move_flat(at, start) > box_move_flat(pos, start) + BOX_MOVE_EPS) {
         m->normal_count = attempt.normal_count;

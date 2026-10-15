@@ -160,6 +160,7 @@ typedef struct box_collider_contact_t {
     vec3 normal;  /**< Direction from the collider towards the capsule, that moves it out */
     vec3 surface; /**< Normal of the face touched or of the shape below, see box_collider_push */
     float depth;  /**< Overlap of the capsule and the collider along the normal, positive */
+    bool round;   /**< The surface is up because the body overhangs a round shape */
 } box_collider_contact_t;
 
 /** Find the signed distance between a capsule and a collider.
@@ -182,15 +183,18 @@ float box_collider_separation(
 
 /** Find how far a capsule reaches into a collider.
  *
- * The surface of a contact that faces up by BOX_CONTROLLER_SUPPORT or more is the flat face it
- * lies on, else (an edge, a corner, a round surface) where a ray down from the lower cap enters
- * the shape: up when the shape is not below the cap. Other contacts copy their normal.
+ * With surface set, a contact that faces up by BOX_CONTROLLER_SUPPORT or more gets the normal
+ * of the flat face it lies on, else where a ray down from the lower cap enters the shape.
+ *
+ * When that ray misses (the body overhangs an edge or a round shape) the surface is up, with
+ * round set for a ball, a capsule or the side of a cylinder. Other contacts take the normal.
  *
  * @param c The collider
  * @param a Center of the lower cap of the capsule
  * @param b Center of the upper cap of the capsule
  * @param radius Radius of the capsule
  * @param hint Way out when the segment runs through the core of a ball or capsule, may be NULL
+ * @param surface Find the surface of the contact
  * @param out The contact, written when the capsule overlaps the collider
  * @return true when the capsule overlaps the collider
  */
@@ -200,6 +204,7 @@ bool box_collider_push(
     const vec3 b,
     float radius,
     const vec3 hint,
+    bool surface,
     box_collider_contact_t *out);
 
 /** Intersect a ray with the outside of a collider: its box, ball, cylinder or capsule.

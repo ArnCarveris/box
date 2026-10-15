@@ -96,6 +96,9 @@ static bool box_collide_orthogonal(
  * direction of the second axis, the axis of round shapes, makes the first axis perpendicular
  * to it, and the half extents bound the sheared box along the new axes.
  *
+ * The frame contains the sheared shape but adds empty space near the faces it does not line up
+ * with: a body stops short of those faces, by up to 0.76 for Scale {2, 1, 1} over 45 degrees.
+ *
  * @param t The world transform, NULL for none
  * @param e3 Half extents of the shape in its own frame
  * @param out The collider, its axes and half extents are written
@@ -351,7 +354,7 @@ static void box_collide_coincident(
     vec3 axis = { p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2] };
     vec3 core = { 0, 1, 0 };
     bool segment = box_collide_orthogonal(axis, NULL);
-    const float *along = segment ? axis : NULL;
+    const float *along = segment ? axis : (c->kind == BoxColliderCapsule ? core : NULL);
     glm_vec3_cross(axis, core, n);
     if (c->kind == BoxColliderCapsule && segment && box_collide_orthogonal(n, NULL)) {
         glm_vec3_scale(n, glm_vec3_dot(n, ECS_CONST_CAST(float*, hint)) < 0 ? -1.0f : 1.0f, n);
@@ -408,6 +411,74 @@ static bool box_collide_face(
     return count == 1;
 }
 
+/** Test whether a point of the surface of a collider lies on an edge between flat faces.
+ *
+ * @param c The collider
+ * @param q The point in the frame of the collider
+ * @return true for an edge or corner of a box or the rim of a cylinder
+ */
+static bool box_collide_edge(
+    const box_collider_t *c,
+    const vec3 q)
+{
+    const float *h = c->half;
+    float r = sqrtf(q[0] * q[0] + q[2] * q[2]);
+    bool result = c->kind == BoxColliderBox;
+    if (c->kind == BoxColliderCylinder) {
+        result = fabsf(q[1]) >= h[1] * (1.0f - BOX_COLLIDE_TOUCH) &&
+            r >= h[0] * (1.0f - BOX_COLLIDE_TOUCH);
+    }
+
+    return result;
+}
+
+/** Find the nearest points of two segments in closed form (Ericson, Real-Time Collision
+ * Detection, 5.1.9).
+ *
+ * @param p1 First end of the first segment
+ * @param q1 Second end of the first segment
+ * @param p2 First end of the second segment
+ * @param q2 Second end of the second segment
+ * @param c1 Receives the nearest point of the first segment
+ * @param c2 Receives the nearest point of the second segment
+ */
+static void box_collide_segments(
+    const vec3 p1,
+    const vec3 q1,
+    const vec3 p2,
+    const vec3 q2,
+    vec3 c1,
+    vec3 c2)
+{
+    vec3 d1 = { q1[0] - p1[0], q1[1] - p1[1], q1[2] - p1[2] };
+    vec3 d2 = { q2[0] - p2[0], q2[1] - p2[1], q2[2] - p2[2] };
+    vec3 r = { p1[0] - p2[0], p1[1] - p2[1], p1[2] - p2[2] };
+    float a = glm_vec3_dot(d1, d1), e = glm_vec3_dot(d2, d2), f = glm_vec3_dot(d2, r);
+    float s = 0, t = 0;
+    if (a <= 1e-12f && e > 1e-12f) {
+        t = glm_clamp(f / e, 0, 1);
+    } else if (a > 1e-12f && e <= 1e-12f) {
+        s = glm_clamp(-glm_vec3_dot(d1, r) / a, 0, 1);
+    } else if (a > 1e-12f) {
+        float c = glm_vec3_dot(d1, r), b = glm_vec3_dot(d1, d2);
+        float denom = a * e - b * b;
+        s = denom > 1e-12f ? glm_clamp((b * f - c * e) / denom, 0, 1) : 0;
+        t = (b * s + f) / e;
+        if (t < 0) {
+            t = 0;
+            s = glm_clamp(-c / a, 0, 1);
+        } else if (t > 1) {
+            t = 1;
+            s = glm_clamp((b - c) / a, 0, 1);
+        }
+    }
+
+    glm_vec3_copy(ECS_CONST_CAST(float*, p1), c1);
+    glm_vec3_muladds(d1, s, c1);
+    glm_vec3_copy(ECS_CONST_CAST(float*, p2), c2);
+    glm_vec3_muladds(d2, t, c2);
+}
+
 /** Find the nearest points of a capsule segment and a collider.
  *
  * @param c The collider
@@ -434,7 +505,15 @@ static float box_collide_nearest(
     box_collide_local(c, b, p1);
     box_collide_on_segment(p0, p1, zero, p);
     box_collide_clamp(c, p, q);
-    for (i = 0; i < BOX_COLLIDE_STEPS && c->kind != BoxColliderSphere; i ++) {
+    if (c->kind == BoxColliderCapsule) {
+        vec3 top = { 0, c->half[1] - c->half[0] > 0 ? c->half[1] - c->half[0] : 0, 0 };
+        vec3 bottom = { 0, -top[1], 0 };
+        box_collide_segments(p0, p1, bottom, top, p, q);
+    }
+
+    for (i = 0; i < BOX_COLLIDE_STEPS && c->kind != BoxColliderSphere &&
+        c->kind != BoxColliderCapsule; i ++)
+    {
         box_collide_on_segment(p0, p1, q, p);
         box_collide_clamp(c, p, q);
     }
@@ -511,12 +590,13 @@ bool box_collider_push(
     const vec3 b,
     float radius,
     const vec3 hint,
+    bool surface,
     box_collider_contact_t *out)
 {
     vec3 p, q, n, f;
     vec3 down = { 0, -1, 0 };
     float separation = box_collide_nearest(c, a, b, radius, p, q), t = 0;
-    bool result = separation < 0;
+    bool result = separation < 0, hit = false;
     if (!result) {
         goto done;
     }
@@ -524,13 +604,23 @@ bool box_collider_push(
     separation -= box_collide_normal(c, a, b, hint, p, q, n);
     box_collide_world_dir(c, n, out->normal);
     out->depth = -separation;
-    glm_vec3_copy((vec3){ 0, 1, 0 }, out->surface);
-    if (out->normal[1] < BOX_CONTROLLER_SUPPORT) {
-        glm_vec3_copy(out->normal, out->surface);
-    } else if (box_collide_face(c, q, f)) {
+    out->round = false;
+    glm_vec3_copy(out->normal, out->surface);
+    if (!surface || out->normal[1] < BOX_CONTROLLER_SUPPORT) {
+        goto done;
+    }
+
+    if (box_collide_face(c, q, f)) {
         box_collide_world_dir(c, f, out->surface);
-    } else if (box_collider_ray(c, a, down, FLT_MAX, &t, out->surface) && t <= 0) {
-        glm_vec3_copy(out->normal, out->surface);
+        goto done;
+    }
+
+    hit = box_collider_ray(c, a, down, FLT_MAX, &t, f);
+    if (hit && t > 0) {
+        glm_vec3_copy(f, out->surface);
+    } else if (!hit) {
+        glm_vec3_copy((vec3){ 0, 1, 0 }, out->surface);
+        out->round = !box_collide_edge(c, q);
     }
 
 done:
