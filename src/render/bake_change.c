@@ -540,7 +540,7 @@ void box_bake_observers(
         ecs_id(BackFaceMode), ecs_id(TextureWrap), ecs_id(TextureTransform), ecs_id(ShapeMesh)
     };
     ecs_entity_t trees[2] = { ecs_id(Tint), ecs_id(Opacity) };
-    ecs_entity_t flags[3] = { DynamicTransform, ManualTransform, NoBake };
+    ecs_entity_t flags[2] = { ManualTransform, NoBake };
     int32_t i;
     for (i = 0; i < 8; i ++) {
         ecs_observer(world, {
@@ -560,7 +560,8 @@ void box_bake_observers(
         });
     }
 
-    for (i = 0; i < 3; i ++) {
+    box_transform_on_dynamic(world, BakeOnChange, b, NULL);
+    for (i = 0; i < 2; i ++) {
         ecs_observer(world, {
             .query.terms = {{ .id = flags[i] }},
             .events = { EcsOnAdd, EcsOnRemove },

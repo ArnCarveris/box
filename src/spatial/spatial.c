@@ -584,9 +584,8 @@ static void box_spatial_observers(
     box_spatial_observer(world, index, "SpatialOnProxyRemove", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(SpatialProxy) }},
         .events = { EcsOnRemove } }, BoxSpatialOnRemove);
-    box_spatial_observer(world, index, "SpatialOnDynamic", (ecs_observer_desc_t){
-        .query.terms = {{ .id = DynamicTransform }},
-        .events = { EcsOnAdd, EcsOnRemove } }, BoxSpatialOnChange);
+    index->refs ++;
+    box_transform_on_dynamic(world, BoxSpatialOnChange, index, box_spatial_release);
     box_spatial_observer(world, index, "SpatialOnScene", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(Scene) }},
         .events = { EcsOnAdd, EcsOnRemove } }, BoxSpatialOnRescope);

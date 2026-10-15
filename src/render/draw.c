@@ -707,9 +707,8 @@ static void box_draws_observers(
         .query.terms = {{ .id = ecs_id(Rgb) }},
         .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnChange);
     box_draws_material_observers(world, d);
-    box_draws_observer(world, d, "DrawsOnDynamic", (ecs_observer_desc_t){
-        .query.terms = {{ .id = DynamicTransform }},
-        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnChange);
+    d->refs ++;
+    box_transform_on_dynamic(world, BoxDrawsOnChange, d, box_draws_free);
     box_draws_observer(world, d, "DrawsOnWorldTransform", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(WorldTransform) }},
         .events = { EcsOnSet } }, BoxDrawsOnStaticWorld);
@@ -809,7 +808,12 @@ static void box_draws_queries(
                 .trav = EcsChildOf,
                 .inout = EcsInOutNone
             },
-            { .id = DynamicTransform, .inout = EcsInOutNone, .oper = EcsNot },
+            {
+                .id = DynamicTransform,
+                .src.id = EcsSelf,
+                .inout = EcsInOutNone,
+                .oper = EcsNot
+            },
             { .id = ecs_id(Shape2D), .src.id = EcsSelf, .inout = EcsIn, .oper = EcsOptional }
         },
         .cache_kind = EcsQueryCacheAuto

@@ -158,7 +158,11 @@ by `ecs_modified`, not by a write through a pointer alone. Hierarchies use `Chil
 computed roots and the descendants it wrote) to the functions registered with
 `box_transform_on_moved`. Draws and the spatial index follow static moves only through it and
 walk no subtree of their own, so a `Position` set fires no transform observer in render or
-spatial; only `DrawsOnPositionZ`, which keeps the 2D draw order, still fires.
+spatial; only `DrawsOnPositionZ`, which keeps the 2D draw order, still fires. Entities that gain or lose
+`DynamicTransform`, owned or inherited, reach draws, spatial and the bake through one transform
+observer and `box_transform_on_dynamic`: an inherited tag costs a forwarded event per entity and
+observer, so deleting a dynamic hierarchy pays for one observer instead of five, and entities
+deleted with their parent are not passed on.
 
 ## Surfaces and the GPU device
 
