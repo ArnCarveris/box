@@ -291,6 +291,9 @@ static void box_gpu_cull_on_map(
 
 /** Turn the counters of a mapped copy into the status of its views.
  *
+ * A view whose status is from a newer frame keeps it: copies finish mapping in any order, and
+ * CullStatus never steps back to an older frame.
+ *
  * @param gpu The backend
  * @param r The copy, mapped
  */
@@ -319,6 +322,8 @@ static void box_gpu_cull_publish(
         if (!st) {
             st = ecs_vec_append_t(NULL, &c->status, box_render_cull_status_t);
             st->view = rec->view;
+        } else if (st->status.frame > r->frame) {
+            continue;
         }
 
         int32_t visible = (int32_t)words[0], frustum = (int32_t)words[1];
@@ -337,13 +342,19 @@ static void box_gpu_cull_publish(
 
 /** Map the counter copies that were submitted and publish the ones that arrived.
  *
+ * Mapped copies publish in slot order, or as box_render_gpu_readback_delivery asks.
+ *
  * @param gpu The backend
  */
 static void box_gpu_cull_readback_poll(
     box_gpu_t *gpu)
 {
     box_gpu_cull_t *c = &gpu->cull;
-    int32_t i;
+    box_gpu_cull_readback_t *mapped[BOX_GPU_CULL_READBACKS];
+    int32_t i, j, count = 0;
+    ecs_os_mutex_lock(gpu->lock);
+    box_render_readback_delivery_t delivery = gpu->readbacks;
+    ecs_os_mutex_unlock(gpu->lock);
 #ifndef __EMSCRIPTEN__
     for (i = 0; i < BOX_GPU_CULL_READBACKS; i ++) {
         if (c->readbacks[i].state == BOX_GPU_READBACK_MAPPING) {
@@ -355,10 +366,15 @@ static void box_gpu_cull_readback_poll(
 
     for (i = 0; i < BOX_GPU_CULL_READBACKS; i ++) {
         box_gpu_cull_readback_t *r = &c->readbacks[i];
-        if (r->state == BOX_GPU_READBACK_MAPPED) {
-            box_gpu_cull_publish(gpu, r);
-            wgpuBufferUnmap(r->buffer);
-            r->state = BOX_GPU_READBACK_FREE;
+        if (r->state == BOX_GPU_READBACK_MAPPED && delivery != BOX_RENDER_READBACK_HOLD) {
+            for (j = count; j > 0 && delivery == BOX_RENDER_READBACK_NEWEST_FIRST &&
+                mapped[j - 1]->frame < r->frame; j --)
+            {
+                mapped[j] = mapped[j - 1];
+            }
+
+            mapped[j] = r;
+            count ++;
         } else if (r->state == BOX_GPU_READBACK_FAILED) {
             r->state = BOX_GPU_READBACK_FREE;
         } else if (r->state == BOX_GPU_READBACK_COPIED) {
@@ -370,6 +386,12 @@ static void box_gpu_cull_readback_poll(
                     .userdata1 = r
                 });
         }
+    }
+
+    for (i = 0; i < count; i ++) {
+        box_gpu_cull_publish(gpu, mapped[i]);
+        wgpuBufferUnmap(mapped[i]->buffer);
+        mapped[i]->state = BOX_GPU_READBACK_FREE;
     }
 }
 

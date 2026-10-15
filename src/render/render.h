@@ -689,6 +689,27 @@ bool box_render_gpu_compile_delivery(
     ecs_world_t *world,
     box_render_compile_delivery_t delivery);
 
+/** When the GPU backend publishes the cull counters it read back.
+ *
+ * Copies finish mapping in any order; tests hold them and publish them newest first to make
+ * an older frame arrive after a newer one.
+ */
+typedef enum box_render_readback_delivery_t {
+    BOX_RENDER_READBACK_AT_ONCE = 0,     /**< Every mapped copy, in slot order, the default */
+    BOX_RENDER_READBACK_HOLD = 1,        /**< Mapped copies wait until the delivery changes */
+    BOX_RENDER_READBACK_NEWEST_FIRST = 2 /**< Every mapped copy, newest frame first */
+} box_render_readback_delivery_t;
+
+/** Set when the GPU backend of a world publishes cull counters, for tests.
+ *
+ * @param world The world
+ * @param delivery When and in which order mapped copies are published
+ * @return Whether the world renders with the GPU backend
+ */
+bool box_render_gpu_readback_delivery(
+    ecs_world_t *world,
+    box_render_readback_delivery_t delivery);
+
 /** Take the oldest shader compile result the GPU backend of a world has not handed out yet.
  *
  * @param world The world

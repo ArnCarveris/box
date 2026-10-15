@@ -523,6 +523,12 @@
                     "instances_past_binding_limit_render",
                     "shapes_across_batches_stay_drawn"
                 ]
+            },
+            {
+                "id": "CullReadback",
+                "testcases": [
+                    "older_frame_never_replaces_newer"
+                ]
             }
         ]
     }

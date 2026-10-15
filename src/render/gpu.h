@@ -410,6 +410,7 @@ typedef struct box_gpu_t {
     ecs_vec_t results;              /**< box_render_shader_result_t not yet taken */
     ecs_os_mutex_t lock;            /**< Protects the counters and the results */
     box_render_compile_delivery_t delivery; /**< When compile outcomes apply, under the lock */
+    box_render_readback_delivery_t readbacks; /**< When cull counters publish, under the lock */
     box_render_gpu_stats_t stats;   /**< Counters read by the main thread */
     uint32_t canvas;                /**< Target presented on the page canvas, 0 for none */
     box_gpu_effects_t *effects;     /**< Effect passes of the views */
