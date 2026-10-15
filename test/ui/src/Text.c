@@ -1086,3 +1086,426 @@ void Text_font_without_units_fails(void) {
     ecs_os_free(src);
     ecs_fini(world);
 }
+
+void Text_recursive_composite_missing(void) {
+    // hardening/glyph_recursion
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    char *src = box_shader_locate("etc/fonts/B612-Regular.ttf");
+    test_assert(src != NULL);
+    FILE *f = fopen(src, "rb");
+    test_assert(f != NULL);
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    uint8_t *data = ecs_os_malloc((ecs_size_t)size);
+    test_int((long)fread(data, 1, (size_t)size, f), size);
+    fclose(f);
+
+    uint32_t head = 0, loca = 0, glyf = 0;
+    int32_t i, tables = (data[4] << 8) | data[5];
+    for (i = 0; i < tables; i ++) {
+        const uint8_t *rec = data + 12 + i * 16;
+        uint32_t off = ((uint32_t)rec[8] << 24) | (rec[9] << 16) | (rec[10] << 8) | rec[11];
+        if (!memcmp(rec, "head", 4)) {
+            head = off;
+        } else if (!memcmp(rec, "loca", 4)) {
+            loca = off;
+        } else if (!memcmp(rec, "glyf", 4)) {
+            glyf = off;
+        }
+    }
+
+    test_assert(head && loca && glyf);
+    test_int((data[head + 50] << 8) | data[head + 51], 0);
+    int32_t from[] = { 56, 34, 55, 57 };
+    int32_t to[] = { 56, 55, 34, 42 };
+    for (i = 0; i < 4; i ++) {
+        uint32_t at = glyf + 2 * (uint32_t)((data[loca + 2 * from[i]] << 8) |
+            data[loca + 2 * from[i] + 1]);
+        uint32_t end = glyf + 2 * (uint32_t)((data[loca + 2 * from[i] + 2] << 8) |
+            data[loca + 2 * from[i] + 3]);
+        test_assert(end - at >= 16);
+        data[at] = 0xff;
+        data[at + 1] = 0xff;
+        data[at + 10] = 0x00;
+        data[at + 11] = 0x02;
+        data[at + 12] = (uint8_t)(to[i] >> 8);
+        data[at + 13] = (uint8_t)to[i];
+        data[at + 14] = 0;
+        data[at + 15] = 0;
+    }
+
+    const char *tmp = ecs_singleton_get(world, AppStatus)->tmp_dir;
+    char *path = flecs_asprintf("%s/recursive.ttf", tmp);
+    f = fopen(path, "wb");
+    test_assert(f != NULL);
+    test_int((long)fwrite(data, 1, (size_t)size, f), size);
+    fclose(f);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t font = ecs_new(world);
+    ecs_set(world, font, Font, {.path = path});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {0, 0, 0});
+    ecs_set(world, e, Rgb, {255, 255, 255});
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 96, .height = 96, .write_to_file = "glyph.png",
+        .resolution_scale = 1});
+    ecs_log_set_level(-4);
+
+    const char *values[] = { "\xe4\xb8\x80", "W", "A", "B", "W", "X", "I" };
+    ecs_entity_t fonts[] = {
+        font, font, font, font, ecs_lookup(world, "box.text.DefaultFont"), font, font
+    };
+    int32_t ink[7] = {0}, w[7] = {0}, h[7] = {0};
+    char *png = flecs_asprintf("%s/glyph.png", tmp);
+    for (i = 0; i < 7; i ++) {
+        ecs_set(world, e, Text, {.value = ECS_CONST_CAST(char*, values[i]), .size = 48,
+            .font = fonts[i]});
+        ecs_progress(world, 0);
+        ecs_progress(world, 0);
+        ecs_progress(world, 0);
+        box_render_sync(world);
+        test_int(ecs_get(world, font, FontStatus)->state, FontReady);
+        test_assert(ecs_get(world, e, TextBounds)->width > 0);
+
+        int pw = 0, ph = 0, n = 0, x, y;
+        int32_t x0 = 96, y0 = 96, x1 = -1, y1 = -1;
+        unsigned char *px = stbi_load(png, &pw, &ph, &n, 4);
+        test_assert(px != NULL);
+        for (y = 0; y < ph; y ++) {
+            for (x = 0; x < pw; x ++) {
+                if (px[(y * pw + x) * 4] > 128) {
+                    ink[i] ++;
+                    x0 = x < x0 ? x : x0;
+                    y0 = y < y0 ? y : y0;
+                    x1 = x > x1 ? x : x1;
+                    y1 = y > y1 ? y : y1;
+                }
+            }
+        }
+
+        w[i] = x1 - x0;
+        h[i] = y1 - y0;
+        stbi_image_free(px);
+    }
+
+    test_assert(ink[0] > 0);
+    for (i = 1; i < 3; i ++) {
+        test_assert(ink[i] > 0);
+        test_assert(abs(w[i] - w[0]) <= 1);
+        test_assert(abs(h[i] - h[0]) <= 1);
+    }
+
+    test_assert(ink[3] > 0);
+    test_assert(ink[4] > 0);
+    test_assert(abs(w[4] - w[0]) > 4);
+    test_assert(ink[5] > 0);
+    test_assert(ink[6] > 0);
+    test_assert(abs(w[5] - w[6]) <= 1);
+    test_assert(abs(h[5] - h[6]) <= 1);
+    test_assert(abs(w[6] - w[0]) > 4);
+
+    ecs_os_free(png);
+    ecs_os_free(path);
+    ecs_os_free(data);
+    ecs_os_free(src);
+    ecs_fini(world);
+}
+
+void Text_composite_limits(void) {
+    // hardening/glyph_recursion
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    char *src = box_shader_locate("etc/fonts/B612-Regular.ttf");
+    test_assert(src != NULL);
+    FILE *f = fopen(src, "rb");
+    test_assert(f != NULL);
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    uint8_t *orig = ecs_os_malloc((ecs_size_t)size);
+    uint8_t *data = ecs_os_malloc((ecs_size_t)size);
+    test_int((long)fread(orig, 1, (size_t)size, f), size);
+    fclose(f);
+
+    uint32_t head = 0, loca = 0, glyf = 0, glyf_len = 0;
+    int32_t i, j, v, tables = (orig[4] << 8) | orig[5];
+    for (i = 0; i < tables; i ++) {
+        const uint8_t *rec = orig + 12 + i * 16;
+        uint32_t off = ((uint32_t)rec[8] << 24) | (rec[9] << 16) | (rec[10] << 8) | rec[11];
+        if (!memcmp(rec, "head", 4)) {
+            head = off;
+        } else if (!memcmp(rec, "loca", 4)) {
+            loca = off;
+        } else if (!memcmp(rec, "glyf", 4)) {
+            glyf = off;
+            glyf_len = ((uint32_t)rec[12] << 24) | (rec[13] << 16) | (rec[14] << 8) | rec[15];
+        }
+    }
+
+    test_assert(head && loca && glyf && glyf_len);
+    test_int((orig[head + 50] << 8) | orig[head + 51], 0);
+    uint32_t glyf_i = glyf + 2 * (uint32_t)((orig[loca + 2 * 42] << 8) | orig[loca + 2 * 42 + 1]);
+
+    int32_t patches[][5] = {
+        {66, 1, 67, 67, 2}, {67, 1, 68, 68, 2}, {68, 1, 69, 69, 2}, {69, 1, 70, 70, 2},
+        {70, 1, 71, 71, 2}, {71, 1, 72, 72, 2}, {72, 1, 73, 73, 2}, {73, 1, 74, 74, 2},
+        {74, 1, 75, 75, 2}, {75, 1, 76, 76, 2}, {76, 1, 77, 77, 2}, {77, 1, 78, 78, 2},
+        {78, 1, 79, 79, 2}, {79, 1, 80, 80, 2}, {80, 1, 81, 81, 2}, {81, 1, 42, 42, 2},
+        {43, 1, 44, 44, 2}, {44, 1, 45, 45, 2}, {45, 1, 47, 47, 2}, {47, 1, 48, 48, 2},
+        {48, 1, 49, 49, 2}, {49, 1, 50, 50, 2}, {50, 1, 51, 51, 2}, {51, 1, 52, 52, 2},
+        {52, 1, 54, 54, 2}, {54, 1, 55, 55, 2}, {55, 1, 56, 56, 2}, {56, 1, 57, 57, 2},
+        {57, 1, 58, 58, 2}, {58, 1, 59, 59, 2}, {59, 1, 19, 19, 2}, {19, 1, 20, 20, 2},
+        {20, 1, 42, 42, 2},
+        {82, 2, 83, 83, 2}, {83, 2, 84, 84, 2}, {84, 2, 85, 85, 2}, {85, 2, 86, 86, 2},
+        {86, 2, 87, 87, 2}, {87, 2, 88, 88, 2}, {88, 2, 42, 42, 2},
+        {34, 2, 35, 35, 2}, {35, 2, 36, 36, 2}, {36, 2, 37, 37, 2}, {37, 2, 38, 38, 2},
+        {38, 2, 39, 39, 2}, {39, 2, 40, 40, 2}, {40, 2, 41, 41, 2}, {41, 2, 42, 42, 2},
+        {18, 1, 42, 42, 0}
+    };
+    int32_t patch_count = (int32_t)(sizeof(patches) / sizeof(patches[0]));
+    const char *tmp = ecs_singleton_get(world, AppStatus)->tmp_dir;
+    char *paths[2];
+    for (v = 0; v < 2; v ++) {
+        ecs_os_memcpy(data, orig, (ecs_size_t)size);
+        for (i = 0; i <= patch_count; i ++) {
+            int32_t g = i < patch_count ? patches[i][0] : 46;
+            int32_t count = i < patch_count ? patches[i][1] : 256;
+            int32_t child = i < patch_count ? patches[i][2] : 42;
+            int32_t last = i < patch_count ? patches[i][3] : (v ? 53 : 42);
+            int32_t flags = i < patch_count ? patches[i][4] : 2;
+            uint32_t at = glyf + 2 * (uint32_t)((data[loca + 2 * g] << 8) | data[loca + 2 * g + 1]);
+            uint32_t end = glyf + 2 * (uint32_t)((data[loca + 2 * g + 2] << 8) |
+                data[loca + 2 * g + 3]);
+            test_assert(end - at >= (uint32_t)(10 + 6 * count));
+            data[at] = 0xff;
+            data[at + 1] = 0xff;
+            ecs_os_memcpy(data + at + 2, orig + glyf_i + 2, 8);
+            for (j = 0; j < count; j ++) {
+                uint8_t *rec = data + at + 10 + 6 * j;
+                int32_t fl = flags | (j < count - 1 ? 0x20 : 0);
+                int32_t target = j < count - 1 ? child : last;
+                rec[0] = (uint8_t)(fl >> 8);
+                rec[1] = (uint8_t)fl;
+                rec[2] = (uint8_t)(target >> 8);
+                rec[3] = (uint8_t)target;
+                rec[4] = 0;
+                rec[5] = 0;
+            }
+        }
+
+        if (v) {
+            uint32_t at = glyf + 2 * (uint32_t)((data[loca + 2 * 53] << 8) |
+                data[loca + 2 * 53 + 1]);
+            data[at] = 0xff;
+            data[at + 1] = 0xff;
+            ecs_os_memcpy(data + at + 2, orig + glyf_i + 2, 8);
+            data[at + 10] = 0;
+            data[at + 11] = 2;
+            data[at + 12] = 0;
+            data[at + 13] = 42;
+            data[at + 14] = 0;
+            data[at + 15] = 0;
+        }
+
+        uint32_t tail = (glyf_len - 12) / 2;
+        data[loca + 2 * 17] = (uint8_t)(tail >> 8);
+        data[loca + 2 * 17 + 1] = (uint8_t)tail;
+        uint32_t at = glyf + 2 * tail;
+        data[at] = 0xff;
+        data[at + 1] = 0xff;
+        data[at + 10] = 0x00;
+        data[at + 11] = 0x22;
+
+        paths[v] = flecs_asprintf("%s/limits_%d.ttf", tmp, v);
+        f = fopen(paths[v], "wb");
+        test_assert(f != NULL);
+        test_int((long)fwrite(data, 1, (size_t)size, f), size);
+        fclose(f);
+    }
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t font_a = ecs_new(world);
+    ecs_set(world, font_a, Font, {.path = paths[0]});
+    ecs_entity_t font_b = ecs_new(world);
+    ecs_set(world, font_b, Font, {.path = paths[1]});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {0, 0, 0});
+    ecs_set(world, e, Rgb, {255, 255, 255});
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 96, .height = 96, .write_to_file = "glyph.png",
+        .resolution_scale = 1});
+    ecs_log_set_level(-4);
+
+    const char *values[] = { "\xe4\xb8\x80", "I", "a", "q", "M", "J", "A", "0", "1", "M" };
+    ecs_entity_t fonts[] = {
+        font_a, font_a, font_a, font_a, font_a, font_a, font_a, font_a, font_a, font_b
+    };
+    int32_t ink[10] = {0}, w[10] = {0}, h[10] = {0};
+    char *png = flecs_asprintf("%s/glyph.png", tmp);
+    for (i = 0; i < 10; i ++) {
+        ecs_set(world, e, Text, {.value = ECS_CONST_CAST(char*, values[i]), .size = 48,
+            .font = fonts[i]});
+        ecs_progress(world, 0);
+        ecs_progress(world, 0);
+        ecs_progress(world, 0);
+        box_render_sync(world);
+        test_int(ecs_get(world, fonts[i], FontStatus)->state, FontReady);
+        test_assert(ecs_get(world, e, TextBounds)->width > 0);
+
+        int pw = 0, ph = 0, n = 0, x, y;
+        int32_t x0 = 96, y0 = 96, x1 = -1, y1 = -1;
+        unsigned char *px = stbi_load(png, &pw, &ph, &n, 4);
+        test_assert(px != NULL);
+        for (y = 0; y < ph; y ++) {
+            for (x = 0; x < pw; x ++) {
+                if (px[(y * pw + x) * 4] > 128) {
+                    ink[i] ++;
+                    x0 = x < x0 ? x : x0;
+                    y0 = y < y0 ? y : y0;
+                    x1 = x > x1 ? x : x1;
+                    y1 = y > y1 ? y : y1;
+                }
+            }
+        }
+
+        w[i] = x1 - x0;
+        h[i] = y1 - y0;
+        stbi_image_free(px);
+    }
+
+    test_assert(ink[0] > 0);
+    test_assert(ink[1] > 0);
+    test_assert(abs(w[1] - w[0]) > 4);
+    for (i = 2; i < 5; i ++) {
+        test_assert(ink[i] > 0);
+        test_assert(abs(w[i] - w[1]) <= 1);
+        test_assert(abs(h[i] - h[1]) <= 1);
+    }
+
+    for (i = 5; i < 10; i ++) {
+        test_assert(ink[i] > 0);
+        test_assert(abs(w[i] - w[0]) <= 1);
+        test_assert(abs(h[i] - h[0]) <= 1);
+    }
+
+    ecs_os_free(png);
+    ecs_os_free(paths[0]);
+    ecs_os_free(paths[1]);
+    ecs_os_free(data);
+    ecs_os_free(orig);
+    ecs_os_free(src);
+    ecs_fini(world);
+}
+
+void Text_font_tables_outside_file(void) {
+    // hardening/glyph_recursion
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    char *src = box_shader_locate("etc/fonts/B612-Regular.ttf");
+    test_assert(src != NULL);
+    FILE *f = fopen(src, "rb");
+    test_assert(f != NULL);
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    uint8_t *orig = ecs_os_malloc((ecs_size_t)size);
+    uint8_t *data = ecs_os_malloc((ecs_size_t)size);
+    test_int((long)fread(orig, 1, (size_t)size, f), size);
+    fclose(f);
+
+    uint32_t loca = 0, loca_rec = 0, last_rec = 0, last_off = 0;
+    int32_t i, v, tables = (orig[4] << 8) | orig[5];
+    for (i = 0; i < tables; i ++) {
+        const uint8_t *rec = orig + 12 + i * 16;
+        uint32_t off = ((uint32_t)rec[8] << 24) | (rec[9] << 16) | (rec[10] << 8) | rec[11];
+        if (!memcmp(rec, "loca", 4)) {
+            loca = off;
+            loca_rec = 12 + (uint32_t)i * 16;
+        }
+
+        if (off >= last_off) {
+            last_off = off;
+            last_rec = 12 + (uint32_t)i * 16;
+        }
+    }
+
+    test_assert(loca && loca_rec && last_rec);
+    const char *expect[] = { "loca", "loca", "outside the file", "outside the file" };
+    ecs_entity_t fonts[4], texts[4];
+    for (v = 0; v < 4; v ++) {
+        long len = size;
+        ecs_os_memcpy(data, orig, (ecs_size_t)size);
+        if (v == 0) {
+            data[loca_rec + 12] = 0;
+            data[loca_rec + 13] = 0;
+            data[loca_rec + 14] = 0;
+            data[loca_rec + 15] = 100;
+        } else if (v == 1) {
+            data[loca + 2 * 56] = 0xff;
+            data[loca + 2 * 56 + 1] = 0xff;
+        } else if (v == 2) {
+            data[last_rec + 14] = 0x10;
+        } else {
+            len = 10;
+        }
+
+        char *path = flecs_asprintf("%s/tables_%d.ttf",
+            ecs_singleton_get(world, AppStatus)->tmp_dir, v);
+        f = fopen(path, "wb");
+        test_assert(f != NULL);
+        test_int((long)fwrite(data, 1, (size_t)len, f), len);
+        fclose(f);
+        fonts[v] = ecs_new(world);
+        ecs_set(world, fonts[v], Font, {.path = path});
+        texts[v] = ecs_new(world);
+        ecs_set(world, texts[v], Text, {.value = "WA", .size = 20, .font = fonts[v]});
+        ecs_os_free(path);
+    }
+
+    ecs_entity_t other = ecs_new(world);
+    ecs_set(world, other, Text, {.value = "WA", .size = 20,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
+    ecs_log_set_level(-4);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+
+    for (v = 0; v < 4; v ++) {
+        const FontStatus *status = ecs_get(world, fonts[v], FontStatus);
+        test_int(status->state, FontFailed);
+        test_assert(status->error != NULL);
+        test_assert(v == 3 || strstr(status->error, expect[v]) != NULL);
+        test_flt(ecs_get(world, texts[v], TextBounds)->width, 0);
+    }
+
+    test_assert(ecs_get(world, other, TextBounds)->width > 0);
+
+    ecs_os_free(data);
+    ecs_os_free(orig);
+    ecs_os_free(src);
+    ecs_fini(world);
+}

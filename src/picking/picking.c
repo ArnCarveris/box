@@ -11,6 +11,7 @@
 
 ECS_COMPONENT_DECLARE(PickingState);
 ECS_TAG_DECLARE(Interactive);
+ECS_TAG_DECLARE(InputBlocker);
 ECS_TAG_DECLARE(Hovered);
 ECS_TAG_DECLARE(Pressed);
 
@@ -60,6 +61,33 @@ static void box_pick_route(
     box_pick_state_t *st = ctx;
     (void)world;
     ecs_vec_append_t(NULL, &st->emits, box_input_emit_t)[0] = *emit;
+}
+
+/** Check whether an InputBlocker element is on the path of what a cursor picks, so presses and
+ * the wheel there do not reach the actions, the blocks callback of the router.
+ *
+ * @param world The world
+ * @param cursor Cursor in window points
+ * @param ctx The module state
+ * @return Whether the pick at the cursor goes to or through an InputBlocker
+ */
+static bool box_pick_blocks(
+    ecs_world_t *world,
+    const vec2 cursor,
+    void *ctx)
+{
+    box_pick_state_t *st = ctx;
+    box_pick_t pick;
+    ecs_entity_t e;
+    int32_t depth = 0;
+    bool result = false;
+    box_pick_at(world, st, cursor, &pick);
+    for (e = pick.target; e && !result && depth < BOX_PICK_CHAIN_MAX; depth ++) {
+        result = ecs_has_id(world, e, InputBlocker);
+        e = ecs_get_parent(world, e);
+    }
+
+    return result;
 }
 
 /** Collect the entities an event goes to: the target up to its handler, else the screen.
@@ -435,6 +463,7 @@ void BoxPickingImport(
     ECS_IMPORT(world, BoxSpatial);
 
     ECS_TAG_DEFINE(world, Interactive);
+    ECS_TAG_DEFINE(world, InputBlocker);
     ECS_TAG_DEFINE(world, Hovered);
     ECS_TAG_DEFINE(world, Pressed);
     ECS_META_COMPONENT(world, PickStatus);
@@ -453,7 +482,8 @@ void BoxPickingImport(
     box_pick_queries_init(world, st);
     ecs_singleton_ensure(world, PickingState)->state = st;
     ecs_singleton_set(world, PickStatus, {0});
-    box_input_router_set(world, &(box_input_router_t){ .route = box_pick_route, .ctx = st });
+    box_input_router_set(world, &(box_input_router_t){
+        .route = box_pick_route, .blocks = box_pick_blocks, .ctx = st });
 
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "PickingUpdate" }),

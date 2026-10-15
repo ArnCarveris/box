@@ -67,6 +67,11 @@ part that does not fit in a command. Read `CLAUDE.md` for the house rules and
    zero when anything failed. Add a `deliverable/README.md` of under 20 lines and
    the screenshots of the task's own scene.
 
+   Write the README, the review artefacts and the report back to the coordinator
+   one line per paragraph or list item, never hard-wrapped at a column width: the
+   status page renders them as markdown, and a line break inside a paragraph only
+   breaks it up.
+
 9. **Review.** The implementation agent stops after `pm deliver` and never runs
    `pm done`. The coordinator puts every task through the review loop described in
    [Closing a task](#closing-a-task) and closes it once the verification passes.
@@ -104,6 +109,20 @@ After each task:
    rerun `pm deliver`, so `tests.json` and `bench*.json` postdate the review, and
    close with `pm done`. The review folder is part of the deliverable and shows in
    the task's deliverable listing on the status page.
+
+Like the README, review.md, response.md and the verification files are written one
+line per paragraph or list item (a finding's File, Problem and Expected are one line
+each), never hard-wrapped.
+
+The status page shows a task in three tabs: **Summary** (the deliverable README
+rendered as markdown, status, kind, test and bench counts and the deliverable files),
+**Review** (every finding as a card with its File, Problem and Expected and, per round,
+the response and the verification judgement with its evidence, plus the verdict) and
+**Process** (every step with its time: created, started, delivered, review, each
+response and verification round, redelivered, done). The tabs read
+`/api/report?path=<epic>/<task>`, which pm builds from `progress.json`, the `Date:`
+lines of the review artefacts and the report timestamps, never from git. An epic
+shows its deliverable README, a review overview of its tasks and a task timeline.
 
 Every date is UTC in ISO 8601 (`date -u +%Y-%m-%dT%H:%M:%SZ`) and is written when the
 artefact is written. These dates and the `timestamp` that `pm deliver` puts in every

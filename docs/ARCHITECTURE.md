@@ -359,7 +359,13 @@ a scene to the bake. Bounds are boxes; there is no mesh level narrow phase and n
 Glyph MSDFs are generated lazily per glyph on workers into RGBA8 atlas pages that grow and then
 page. Font data is untrusted: a face without units per em fails to load, and a glyph whose box
 is larger than a page (1024 minus spacing) is drawn as the missing glyph with one warning per
-font load; atlas placement makes at most `BOX_TEXT_PLACE_TRIES` passes. Layout handles UTF-8, kerning, newlines, word breaks and alignment; the block is centered
+font load; atlas placement makes at most `BOX_TEXT_PLACE_TRIES` passes. A font whose table
+directory, tables or `loca` entries (one per glyph plus the end, each inside `glyf`) lie
+outside the file fails to load. Before stb_truetype reads an outline, box walks the composite
+components of the glyph in the `glyf` table without recursion: more than 16 composite levels
+above a simple glyph (any cycle), more than 256 references in total, matching point offsets or
+records past the end of `glyf` draw the glyph as the missing glyph, again with one warning per
+font load. Layout handles UTF-8, kerning, newlines, word breaks and alignment; the block is centered
 on the origin and measured into `TextBounds`. Glyphs are slots of the 2D batches keyed by atlas
 page (`src/render/text_draw.c`), shaded by `shape2d.wgsl`. No shaping (ligatures, RTL).
 
@@ -398,7 +404,13 @@ with an `InputCapture` event.
 `Action` entities get an `ActionState` (down, pressed, released, start, delta, drag) written by
 `ActionUpdate`; `Binding` entities (key, modifiers) map keys to actions, and script events
 `on.pressed`, `on.held`, `on.dragged`, `on.released` fire for them. Real input is ignored while
-unfocused. Picking is not implemented.
+unfocused. `box.picking` routes pointer events to the entity under the cursor, front view
+first, bubbling to the first `Interactive` ancestor; a hit nothing handles passes to the views
+rendered before, unless an `InputBlocker` element on its path takes it, so a HUD panel with
+`InputBlocker` keeps clicks from the 3D scene. Through the router's `blocks` callback the input
+layer asks picking, when a mouse button goes down or the wheel turns, whether a blocker is under
+the cursor: such a press keeps the bindings of that button up until its next press (like
+Godot's unhandled input), and such a wheel is left out of `Mouse.scroll`.
 
 `CameraController` and `FirstPersonController` read only `ActionState`, never devices. Default
 actions live under `box.controllers.camera` and `box.controllers.first_person` and stay disabled

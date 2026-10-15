@@ -84,7 +84,10 @@
                     "module_child_fini",
                     "oversized_glyph_missing",
                     "oversized_warns_once_per_font",
-                    "font_without_units_fails"
+                    "font_without_units_fails",
+                    "recursive_composite_missing",
+                    "composite_limits",
+                    "font_tables_outside_file"
                 ]
             },
             {
@@ -169,6 +172,17 @@
                     "scrollback_follows_height",
                     "paste_long",
                     "null_text"
+                ]
+            },
+            {
+                "id": "Blocking",
+                "testcases": [
+                    "stops_pass_through",
+                    "press_stays_on_panel",
+                    "mouse_binding",
+                    "camera_look_and_zoom",
+                    "hover_and_wheel",
+                    "render_to_texture"
                 ]
             }
         ]
