@@ -139,11 +139,14 @@ fn median(v: vec3f) -> f32 {
 
 // Coverage of a glyph after msdfgen's screenPxRange shader: the median of the field at level 0
 // (a mip would average the channels and break the median) is the distance to the outline,
-// scaled from the range of the page to screen pixels. Below one pixel of range the edge stays
-// one pixel wide and the glyph fades with the range instead of aliasing.
+// scaled from the range of the page to screen pixels with the Euclidean footprint of a pixel, so
+// rotation changes nothing. Below one pixel of range the edge stays one pixel wide and the glyph
+// fades with the range instead of aliasing.
 fn glyph_coverage(uv: vec2f, range: vec2f) -> f32 {
     let field = textureSampleLevel(distance_map, material_sampler, uv, 0.0);
-    let texels = vec2f(1.0) / max(fwidth(uv), vec2f(1e-9));
+    let footprint = vec2f(length(vec2f(dpdx(uv.x), dpdy(uv.x))),
+        length(vec2f(dpdx(uv.y), dpdy(uv.y))));
+    let texels = vec2f(1.0) / max(footprint, vec2f(1e-9));
     let px_range = 0.5 * dot(range, texels);
     let cover = clamp((median(field.rgb) - 0.5) * max(px_range, 1.0) + 0.5, 0.0, 1.0);
     return cover * clamp(px_range, 0.0, 1.0);
