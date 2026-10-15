@@ -102,6 +102,8 @@ void TextLines_small_size_ink_in_bounds(void) {
         test_assert(fabsf((float)(x0 + x1 + 1) * 0.5f - (float)w * 0.5f) <= 2);
         test_assert((float)x0 >= ((float)w - b->width) * 0.5f - 2);
         test_assert((float)y0 >= ((float)h - b->height) * 0.5f - 2);
+        test_assert((float)(y1 + 1) <= ((float)h + b->height) * 0.5f + 2);
+        test_assert(fabsf((float)(y0 + y1 + 1) * 0.5f - (float)h * 0.5f) <= 3);
         stbi_image_free(px);
     }
 
@@ -139,6 +141,15 @@ void TextLines_kerning_pairs(void) {
             ecs_get(world, texts[i][2], TextBounds)->width;
         test_flt(pair, i < 5 ? apart - 5 : apart);
     }
+
+    ecs_entity_t line = ecs_new(world);
+    ecs_set(world, line, Text, {.value = "oooo", .size = 100,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
+    float oooo = ecs_get(world, line, TextBounds)->width;
+    ecs_entity_t split = ecs_new(world);
+    ecs_set(world, split, Text, {.value = "T\noooo", .size = 100,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
+    test_flt(ecs_get(world, split, TextBounds)->width, oooo);
 
     ecs_fini(world);
 }
@@ -184,8 +195,9 @@ void TextLines_line_break_edges(void) {
     test_flt(b[7]->height, 25);
 
     const TextBounds *nb = ecs_get(world, narrow, TextBounds);
+    float abc = b[8]->width;
     test_flt(nb->height, 75);
-    test_assert(nb->width < b[8]->width * 0.6f);
+    test_assert(nb->width < abc * 0.6f);
 
     ecs_entity_t exact = ecs_new(world);
     ecs_set(world, exact, Text, {.value = "abc abc", .size = 20, .line_height = 25,
@@ -195,12 +207,21 @@ void TextLines_line_break_edges(void) {
         .width = measured, .font = ecs_lookup(world, "box.text.DefaultFont")});
     test_flt(ecs_get(world, exact, TextBounds)->height, 25);
     test_flt(ecs_get(world, exact, TextBounds)->width, measured);
+    ecs_set(world, exact, Text, {.value = "abc abc", .size = 20, .line_height = 25,
+        .width = measured - 0.25f, .font = ecs_lookup(world, "box.text.DefaultFont")});
+    test_flt(ecs_get(world, exact, TextBounds)->height, 50);
 
     ecs_entity_t spaced = ecs_new(world);
     ecs_set(world, spaced, Text, {.value = "abc        abc", .size = 20, .line_height = 25,
-        .width = b[8]->width + 2, .font = ecs_lookup(world, "box.text.DefaultFont")});
+        .width = abc + 2, .font = ecs_lookup(world, "box.text.DefaultFont")});
     test_flt(ecs_get(world, spaced, TextBounds)->height, 50);
-    test_flt(ecs_get(world, spaced, TextBounds)->width, b[8]->width);
+    test_flt(ecs_get(world, spaced, TextBounds)->width, abc);
+
+    ecs_entity_t tabbed = ecs_new(world);
+    ecs_set(world, tabbed, Text, {.value = "abc\tabc", .size = 20, .line_height = 25,
+        .width = abc + 2, .font = ecs_lookup(world, "box.text.DefaultFont")});
+    test_flt(ecs_get(world, tabbed, TextBounds)->height, 50);
+    test_flt(ecs_get(world, tabbed, TextBounds)->width, abc);
 
     ecs_fini(world);
 }
