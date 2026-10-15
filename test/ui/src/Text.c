@@ -7,9 +7,9 @@
 #include <bake_test.h>
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "render.h"
-#include "draw.h"
 #include "preprocess.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -854,33 +854,170 @@ void Text_oversized_glyph_missing(void) {
     data[at + 8] = 0x7f;
     data[at + 9] = 0xff;
 
+    const char *tmp = ecs_singleton_get(world, AppStatus)->tmp_dir;
+    char *path = flecs_asprintf("%s/oversized.ttf", tmp);
+    f = fopen(path, "wb");
+    test_assert(f != NULL);
+    test_int((long)fwrite(data, 1, (size_t)size, f), size);
+    fclose(f);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t font = ecs_new(world);
+    ecs_set(world, font, Font, {.path = path});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {0, 0, 0});
+    ecs_set(world, e, Rgb, {255, 255, 255});
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 96, .height = 96, .write_to_file = "glyph.png",
+        .resolution_scale = 1});
+    ecs_log_set_level(-4);
+
+    const char *values[] = { "W", "\xe4\xb8\x80", "A", "W" };
+    ecs_entity_t fonts[] = { font, font, font, ecs_lookup(world, "box.text.DefaultFont") };
+    int32_t ink[4] = {0}, w[4] = {0}, h[4] = {0};
+    char *png = flecs_asprintf("%s/glyph.png", tmp);
+    for (i = 0; i < 4; i ++) {
+        ecs_set(world, e, Text, {.value = ECS_CONST_CAST(char*, values[i]), .size = 48,
+            .font = fonts[i]});
+        ecs_progress(world, 0);
+        ecs_progress(world, 0);
+        ecs_progress(world, 0);
+        box_render_sync(world);
+        test_int(ecs_get(world, font, FontStatus)->state, FontReady);
+        test_assert(ecs_get(world, e, TextBounds)->width > 0);
+
+        int pw = 0, ph = 0, n = 0, x, y;
+        int32_t x0 = 96, y0 = 96, x1 = -1, y1 = -1;
+        unsigned char *px = stbi_load(png, &pw, &ph, &n, 4);
+        test_assert(px != NULL);
+        for (y = 0; y < ph; y ++) {
+            for (x = 0; x < pw; x ++) {
+                if (px[(y * pw + x) * 4] > 128) {
+                    ink[i] ++;
+                    x0 = x < x0 ? x : x0;
+                    y0 = y < y0 ? y : y0;
+                    x1 = x > x1 ? x : x1;
+                    y1 = y > y1 ? y : y1;
+                }
+            }
+        }
+
+        w[i] = x1 - x0;
+        h[i] = y1 - y0;
+        stbi_image_free(px);
+    }
+
+    test_assert(ink[0] > 0);
+    test_assert(ink[1] > 0);
+    test_assert(abs(w[0] - w[1]) <= 1);
+    test_assert(abs(h[0] - h[1]) <= 1);
+    test_assert(ink[2] > 0);
+    test_assert(ink[3] > 0);
+    test_assert(abs(w[3] - w[1]) > 4);
+
+    ecs_os_free(png);
+    ecs_os_free(path);
+    ecs_os_free(data);
+    ecs_os_free(src);
+    ecs_fini(world);
+}
+
+void Text_oversized_warns_once_per_font(void) {
+    // hardening/font_glyph_limit
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    char *src = box_shader_locate("etc/fonts/B612-Regular.ttf");
+    test_assert(src != NULL);
+    FILE *f = fopen(src, "rb");
+    test_assert(f != NULL);
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    uint8_t *data = ecs_os_malloc((ecs_size_t)size);
+    test_int((long)fread(data, 1, (size_t)size, f), size);
+    fclose(f);
+
+    uint32_t head = 0, loca = 0, glyf = 0;
+    int32_t i, tables = (data[4] << 8) | data[5];
+    for (i = 0; i < tables; i ++) {
+        const uint8_t *rec = data + 12 + i * 16;
+        uint32_t off = ((uint32_t)rec[8] << 24) | (rec[9] << 16) | (rec[10] << 8) | rec[11];
+        if (!memcmp(rec, "head", 4)) {
+            head = off;
+        } else if (!memcmp(rec, "loca", 4)) {
+            loca = off;
+        } else if (!memcmp(rec, "glyf", 4)) {
+            glyf = off;
+        }
+    }
+
+    test_assert(head && loca && glyf);
+    test_int((data[head + 50] << 8) | data[head + 51], 0);
+    int32_t glyphs[] = { 56, 34 };
+    for (i = 0; i < 2; i ++) {
+        uint32_t at = glyf + 2 * (uint32_t)((data[loca + 2 * glyphs[i]] << 8) |
+            data[loca + 2 * glyphs[i] + 1]);
+        data[at + 4] = 0x80;
+        data[at + 5] = 0x00;
+        data[at + 8] = 0x7f;
+        data[at + 9] = 0xff;
+    }
+
     char *path = flecs_asprintf("%s/oversized.ttf", ecs_singleton_get(world, AppStatus)->tmp_dir);
     f = fopen(path, "wb");
     test_assert(f != NULL);
     test_int((long)fwrite(data, 1, (size_t)size, f), size);
     fclose(f);
 
+    ecs_entity_t t = box_terminal_new(world);
     ecs_entity_t font = ecs_new(world);
     ecs_set(world, font, Font, {.path = path});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Text, {.value = "WA\xe4\xb8\x80", .size = 20, .font = font});
-    ecs_log_set_level(-4);
+    ecs_set(world, e, Text, {.value = "W", .size = 20, .font = font});
     ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_set(world, e, Text, {.value = "WAW A", .size = 30, .font = font});
     ecs_progress(world, 0);
     ecs_progress(world, 0);
 
-    test_int(ecs_get(world, font, FontStatus)->state, FontReady);
-    const TextGlyphs *tg = ecs_get(world, e, TextGlyphs);
-    test_assert(tg != NULL);
-    test_int(ecs_vec_count(&tg->glyphs), 3);
-    const box_text_glyph_t *q = ecs_vec_first(&tg->glyphs);
-    test_flt(q[0].width, q[2].width);
-    test_flt(q[0].height, q[2].height);
-    test_flt(q[0].uv[2], q[2].uv[2]);
-    test_flt(q[0].uv[3], q[2].uv[3]);
-    test_assert(q[1].uv[2] != q[2].uv[2] || q[1].uv[3] != q[2].uv[3]);
-    test_assert(q[1].height < 40);
-    test_assert(q[1].width > 0);
+    int32_t warnings = 0;
+    char *out = box_terminal_run(world, t, "logs warning 100", NULL);
+    const char *p = out;
+    while ((p = strstr(p, "larger than an atlas page"))) {
+        warnings ++;
+        p ++;
+    }
+
+    test_int(warnings, 1);
+    test_assert(strstr(out, path) != NULL);
+    ecs_os_free(out);
+
+    ecs_entity_t font2 = ecs_new(world);
+    ecs_set(world, font2, Font, {.path = path});
+    ecs_entity_t e2 = ecs_new(world);
+    ecs_set(world, e2, Text, {.value = "AW", .size = 20, .font = font2});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+
+    warnings = 0;
+    out = box_terminal_run(world, t, "logs warning 100", NULL);
+    p = out;
+    while ((p = strstr(p, "larger than an atlas page"))) {
+        warnings ++;
+        p ++;
+    }
+
+    test_int(warnings, 2);
+    ecs_os_free(out);
 
     ecs_os_free(path);
     ecs_os_free(data);
