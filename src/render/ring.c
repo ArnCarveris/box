@@ -553,15 +553,16 @@ done:
 
 /** Apply changed settings while no packet is acquired.
  *
- * A new packet count drains the ring and keeps the backend; moving the rendering to or from
- * the main thread also restarts the backend on its new thread.
+ * A new packet count drains the ring and keeps the backend, and releases the storage of the
+ * slots a lower count no longer uses; moving the rendering to or from the main thread also
+ * restarts the backend on its new thread.
  *
  * @param ring The ring
  */
 static void box_render_ring_apply(
     box_render_ring_t *ring)
 {
-    int32_t count = ring->settings.in_flight;
+    int32_t i, count = ring->settings.in_flight;
     bool main_thread = ring->settings.main_thread || !ecs_os_has_threading();
     if (count < 1) {
         count = 1;
@@ -575,6 +576,11 @@ static void box_render_ring_apply(
         box_render_ring_stop(ring);
     } else {
         box_render_ring_drain(ring);
+    }
+
+    for (i = count; i < ring->count; i ++) {
+        box_render_packet_fini(&ring->packets[i]);
+        box_render_packet_init(&ring->packets[i]);
     }
 
     ecs_os_mutex_lock(ring->lock);
