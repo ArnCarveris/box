@@ -860,9 +860,9 @@ void TextField_budget_keeps_shown_pages(void) {
     }
 
     ecs_os_free(src);
-    unsigned char *images[3] = { NULL, NULL, NULL };
+    unsigned char *images[2] = { NULL, NULL };
     int w = 0, h = 0, n = 0, run, k, i;
-    for (run = 0; run < 3; run ++) {
+    for (run = 0; run < 2; run ++) {
         ecs_world_t *world = ecs_init();
         ECS_IMPORT(world, Box);
         App *app = ecs_singleton_get_mut(world, App);
@@ -874,14 +874,14 @@ void TextField_budget_keeps_shown_pages(void) {
         test_assert(f != NULL);
         test_int((long)fwrite(data, 1, (size_t)size, f), size);
         fclose(f);
-        char *sets[4];
-        for (k = 0; k < 4; k ++) {
+        char *sets[5];
+        for (k = 0; k < 5; k ++) {
             ecs_strbuf_t buf = ECS_STRBUF_INIT;
             int32_t c, count = 0;
-            for (c = 0x21 + k * 30; count < 30; c ++) {
+            for (c = 0x21 + k * 18; count < 18; c ++) {
                 ecs_strbuf_appendch(&buf, (char)c);
                 count ++;
-                if (!(count % 10)) {
+                if (!(count % 9)) {
                     ecs_strbuf_appendch(&buf, '\n');
                 }
             }
@@ -897,25 +897,25 @@ void TextField_budget_keeps_shown_pages(void) {
         ecs_set(world, view, View, {
             .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
         ecs_entity_t font = ecs_new(world);
-        ecs_set(world, font, Font, {.path = path, .atlas_pages = run == 2 ? 16 : 1});
-        ecs_entity_t a = ecs_new(world), b = ecs_new(world);
-        ecs_set(world, a, Position, {-160, 0, 0});
-        ecs_set(world, b, Position, {160, 0, 0});
+        ecs_set(world, font, Font, {.path = path, .atlas_pages = run ? 16 : 1});
+        ecs_entity_t a = ecs_new(world), d = ecs_new(world), b = ecs_new(world);
+        ecs_set(world, a, Position, {-213, 0, 0});
+        ecs_set(world, d, Position, {0, 0, 0});
+        ecs_set(world, b, Position, {213, 0, 0});
         ecs_set(world, a, Rgb, {255, 255, 255});
+        ecs_set(world, d, Rgb, {255, 255, 255});
         ecs_set(world, b, Rgb, {255, 255, 255});
         ecs_set(world, a, Text, {.value = sets[0], .size = 3, .line_height = 40, .font = font});
+        ecs_set(world, d, Text, {.value = sets[1], .size = 3, .line_height = 40, .font = font});
         ecs_entity_t s = ecs_new(world);
-        ecs_set(world, s, Surface, {.width = 640, .height = 160, .write_to_file = "shown.png",
+        ecs_set(world, s, Surface, {.width = 640, .height = 128, .write_to_file = "shown.png",
             .resolution_scale = 1});
         for (i = 0; i < 3; i ++) {
             ecs_progress(world, 0);
         }
 
-        if (run == 1) {
-            ecs_enable(world, a, false);
-        }
-
-        for (k = 1; k < 4; k ++) {
+        ecs_enable(world, d, false);
+        for (k = 2; k < 5; k ++) {
             ecs_set(world, b, Text, {.value = sets[k], .size = 3, .line_height = 40,
                 .font = font});
             for (i = 0; i < 3; i ++) {
@@ -923,7 +923,7 @@ void TextField_budget_keeps_shown_pages(void) {
             }
         }
 
-        ecs_enable(world, a, true);
+        ecs_enable(world, d, true);
         for (i = 0; i < 3; i ++) {
             ecs_progress(world, 0);
         }
@@ -933,7 +933,7 @@ void TextField_budget_keeps_shown_pages(void) {
         images[run] = stbi_load(png, &w, &h, &n, 4);
         test_assert(images[run] != NULL);
         ecs_os_free(png);
-        for (k = 0; k < 4; k ++) {
+        for (k = 0; k < 5; k ++) {
             ecs_os_free(sets[k]);
         }
 
@@ -941,21 +941,16 @@ void TextField_budget_keeps_shown_pages(void) {
         ecs_fini(world);
     }
 
-    for (k = 0; k < 2; k ++) {
-        int32_t p, ink = 0, off = 0;
-        for (p = 0; p < w * h; p ++) {
-            ink += images[2][p * 4] > 128;
-            off += abs(images[k][p * 4] - images[2][p * 4]) > 16;
-        }
-
-        test_assert(ink > 1000);
-        test_int(off, 0);
+    int32_t p, ink = 0, off = 0;
+    for (p = 0; p < w * h; p ++) {
+        ink += images[1][p * 4] > 128;
+        off += abs(images[0][p * 4] - images[1][p * 4]) > 16;
     }
 
-    for (k = 0; k < 3; k ++) {
-        stbi_image_free(images[k]);
-    }
-
+    test_assert(ink > 1000);
+    test_int(off, 0);
+    stbi_image_free(images[0]);
+    stbi_image_free(images[1]);
     free(data);
     ecs_os_fini();
 }
