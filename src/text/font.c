@@ -427,6 +427,8 @@ void box_text_font_load(
     job->font = font->entity;
     job->generation = ++ font->generation;
     job->path = f && f->path ? ecs_os_strdup(f->path) : NULL;
+    ecs_os_free(font->path);
+    font->path = f && f->path ? ecs_os_strdup(f->path) : NULL;
     s->sync->refs ++;
     box_text_working(s->sync, 1);
     if (f) {
@@ -502,6 +504,7 @@ void box_text_font_free(
     ecs_map_fini(&font->glyphs);
     ecs_vec_fini_t(NULL, &font->pages, box_text_page_t*);
     box_text_face_release(font->face);
+    ecs_os_free(font->path);
     ecs_os_free(font);
 }
 
@@ -638,8 +641,8 @@ static int32_t box_text_page_index(
     return result;
 }
 
-/** Find the least recently used page of a font that no laid out Text shows and that the
- * layout in progress does not use.
+/** Find the least recently used page of a font that no laid out Text shows (a disabled Text is
+ * still drawn, so it counts) and that the layout in progress does not use.
  *
  * @param world The world
  * @param s The registry
@@ -660,12 +663,13 @@ static int32_t box_text_page_idle(
         }
     }
 
-    ecs_iter_t it = ecs_query_iter(world, s->query);
+    ecs_iter_t it = ecs_query_iter(world, s->shown);
     while (ecs_query_next(&it)) {
+        const TextGlyphs *glyphs = ecs_field(&it, TextGlyphs, 0);
         for (i = 0; i < it.count; i ++) {
-            const TextGlyphs *tg = ecs_get(world, it.entities[i], TextGlyphs);
-            const box_text_glyph_t *g = tg ? ecs_vec_first(&tg->glyphs) : NULL;
-            for (j = 0; tg && j < ecs_vec_count(&tg->glyphs); j ++) {
+            const TextGlyphs *tg = &glyphs[i];
+            const box_text_glyph_t *g = ecs_vec_first(&tg->glyphs);
+            for (j = 0; j < ecs_vec_count(&tg->glyphs); j ++) {
                 int32_t index = box_text_page_index(font, g[j].page);
                 if (index >= 0) {
                     shown[index] = true;
@@ -689,19 +693,19 @@ static int32_t box_text_page_idle(
     return result;
 }
 
-/** Clear a page of a font for reuse: drop its glyphs, which are drawn again on their next use,
- * and move it last, where new glyphs go.
+/** Take a page out of the atlas of a font: drop its glyphs, which are drawn again on their next
+ * use, and move the pages after it down. Fields still in flight for it no longer find it.
  *
  * @param font The font
  * @param index Index of the page
+ * @return The page
  */
-static void box_text_page_reuse(
+static box_text_page_t* box_text_page_forget(
     box_text_font_t *font,
     int32_t index)
 {
-    int32_t i, count = ecs_vec_count(&font->pages);
-    box_text_page_t **pages = ecs_vec_first(&font->pages);
-    box_text_page_t *page = pages[index];
+    int32_t i;
+    box_text_page_t *result = *ecs_vec_get_t(&font->pages, box_text_page_t*, index);
     ecs_vec_t drop;
     ecs_vec_init_t(NULL, &drop, ecs_map_key_t, 0);
     ecs_map_iter_t it = ecs_map_iter(&font->glyphs);
@@ -721,16 +725,51 @@ static void box_text_page_reuse(
     }
 
     ecs_vec_fini_t(NULL, &drop, ecs_map_key_t);
-    for (i = index; i < count - 1; i ++) {
-        pages[i] = pages[i + 1];
-    }
+    ecs_vec_remove_ordered_t(&font->pages, box_text_page_t*, index);
 
-    pages[count - 1] = page;
+    return result;
+}
+
+/** Clear a page of a font for reuse and move it last, where new glyphs go.
+ *
+ * @param font The font
+ * @param index Index of the page
+ */
+static void box_text_page_reuse(
+    box_text_font_t *font,
+    int32_t index)
+{
+    box_text_page_t *page = box_text_page_forget(font, index);
+    *ecs_vec_append_t(NULL, &font->pages, box_text_page_t*) = page;
     ecs_os_memset(page->pixels, 0, page->size * page->size * 4);
     page->pen_x = page->pen_y = page->shelf = 0;
     page->generation ++;
     page->dirty[0] = page->dirty[1] = 0;
     page->dirty[2] = page->dirty[3] = page->size;
+}
+
+void box_text_atlas_trim(
+    ecs_world_t *world,
+    box_text_state_t *s)
+{
+    ecs_map_iter_t mit = ecs_map_iter(&s->fonts);
+    ecs_vec_clear(&s->placed);
+    while (ecs_map_next(&mit)) {
+        box_text_font_t *font = ecs_map_ptr(&mit);
+        const Font *f = ecs_is_alive(world, font->entity)
+            ? ecs_get(world, font->entity, Font)
+            : NULL;
+        int32_t budget = f ? f->atlas_pages : BOX_TEXT_ATLAS_PAGES_DEFAULT, idle = 0;
+        while (ecs_vec_count(&font->pages) > budget && idle >= 0) {
+            idle = box_text_page_idle(world, s, font);
+            if (idle >= 0) {
+                box_text_page_t *page = box_text_page_forget(font, idle);
+                *ecs_vec_append_t(NULL, &s->released, uint32_t) = page->handle;
+                ecs_os_free(page->pixels);
+                ecs_os_free(page);
+            }
+        }
+    }
 }
 
 /** Place an area in the atlas of a font: on the last page, which grows when it is full, then

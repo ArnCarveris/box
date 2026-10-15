@@ -114,7 +114,12 @@ done:
 static void BoxTextOnRemove(
     ecs_iter_t *it)
 {
+    box_text_state_t *s = box_text_state_get(it->world);
     int32_t i;
+    if (s) {
+        s->trim = true;
+    }
+
     if (!it->other_table || !ecs_table_get_type(it->other_table)->count) {
         goto done;
     }
@@ -132,7 +137,8 @@ done:
     return;
 }
 
-/** Load a font again when its Font changes and a Text uses it.
+/** Load a font again when the path of its Font changes and a Text uses it; a new atlas budget
+ * only releases idle pages.
  *
  * @param it The iterator of the observer
  */
@@ -147,12 +153,15 @@ static void BoxFontOnSet(
 
     for (i = 0; i < it->count; i ++) {
         box_text_font_t *font = ecs_map_get_deref(&s->fonts, box_text_font_t, it->entities[i]);
-        if (font && font->requested) {
+        const Font *f = ecs_get(it->world, it->entities[i], Font);
+        const char *path = f && f->path ? f->path : "";
+        if (font && font->requested && strcmp(font->path ? font->path : "", path)) {
             box_text_font_load(it->world, s, font);
+            s->relayout = true;
         }
     }
 
-    s->relayout = true;
+    s->trim = true;
 done:
     return;
 }
@@ -261,6 +270,11 @@ static void box_text_state_init(
         .terms = {{ .id = ecs_id(Text), .inout = EcsIn }},
         .cache_kind = EcsQueryCacheAuto
     });
+    s->shown = ecs_query(world, {
+        .terms = {{ .id = ecs_id(TextGlyphs), .inout = EcsIn }},
+        .cache_kind = EcsQueryCacheAuto,
+        .flags = EcsQueryMatchDisabled
+    });
     ecs_singleton_ensure(world, TextRegistry)->state = s;
     s->default_font = ecs_entity(world, { .name = "DefaultFont" });
     ecs_set(world, s->default_font, Font, {
@@ -317,6 +331,21 @@ static void box_text_ctor_free(
     ecs_os_free(ctx);
 }
 
+/** Release idle atlas pages beyond the budget of each font once a layout, a removed Text or a
+ * Font change may have left some.
+ *
+ * @param it The iterator of the system
+ */
+static void BoxTextTrim(
+    ecs_iter_t *it)
+{
+    box_text_state_t *s = box_text_state_get(it->world);
+    if (s && s->trim) {
+        s->trim = false;
+        box_text_atlas_trim(it->world, s);
+    }
+}
+
 /** Register the observers and systems of box.text.
  *
  * @param world The world
@@ -358,6 +387,11 @@ static void box_text_systems_init(
         .phase = EcsOnStore,
         .run = BoxTextRefresh,
         .immediate = true
+    });
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "TextTrim" }),
+        .phase = EcsOnStore,
+        .run = BoxTextTrim
     });
 }
 

@@ -374,6 +374,7 @@ static void box_text_typeset(
 
     box_text_emit(&run, font, text, metrics, box, glyphs, &bounds);
 write:
+    s->trim = true;
     ecs_modified(world, e, TextGlyphs);
     bool moved = was[0] != glyphs->natural[0] || was[1] != glyphs->natural[1] ||
         was[2] != glyphs->longest;

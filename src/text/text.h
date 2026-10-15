@@ -118,6 +118,7 @@ typedef struct box_text_font_t {
     uint32_t generation;    /**< Bumped by every load request, older results are dropped */
     uint32_t epoch;         /**< Bumped when the atlas is dropped, older glyph fields are too */
     box_text_face_t *face;  /**< The loaded face, NULL before the first load succeeded */
+    char *path;             /**< Font.path of the last load request */
     ecs_map_t glyphs;       /**< Glyph index to box_text_atlas_glyph_t* */
     ecs_vec_t pages;        /**< box_text_page_t*, the atlas of the face */
     bool requested;         /**< A Text uses the font, so the font loads */
@@ -136,6 +137,8 @@ typedef struct box_text_state_t {
     uint32_t next_page;         /**< Next page handle */
     box_text_sync_t *sync;      /**< Jobs in flight */
     ecs_query_t *query;         /**< Entities with a Text */
+    ecs_query_t *shown;         /**< Entities with TextGlyphs, disabled ones included */
+    bool trim;                  /**< A layout or a budget changed, idle pages may be released */
     ecs_entity_t default_font;  /**< box.text.DefaultFont */
     bool relayout;              /**< A font was removed, every Text lays out again */
 } box_text_state_t;
@@ -201,6 +204,16 @@ void box_text_font_load(
 void box_text_font_clear(
     box_text_state_t *s,
     box_text_font_t *font);
+
+/** Release the atlas pages of every font beyond its Font.atlas_pages that no Text shows, least
+ * recently used first.
+ *
+ * @param world The world
+ * @param s The registry
+ */
+void box_text_atlas_trim(
+    ecs_world_t *world,
+    box_text_state_t *s);
 
 /** Free a font and its atlas.
  *
