@@ -2,11 +2,11 @@
  * @file text/msdf_correct.c
  * @brief Error correction of multi channel distance fields, after msdfgen's MSDFErrorCorrection.
  *
- * Texels at corners and edges are protected and texels whose interpolation with a neighbor
- * leaves the range the distance allows are flagged.
+ * Texels at corners and edges are protected, texels whose interpolation with a neighbor leaves
+ * the range the distance allows are flagged and flattened to the median of their channels.
  *
- * Then protected texels whose flattening brings the field nearer to the true distance of the
- * shape are flagged too; flagged texels are flattened to the median of their channels.
+ * It runs after the scanline sign pass, so as msdfgen does with -scanline it never compares the
+ * field with the distance of the contours, whose sign the pass may have overruled.
  */
 
 #include "msdf.h"
@@ -27,9 +27,6 @@
 /** Ratio of the expected change of a value between texels from which it deviates (msdfgen) */
 #define BOX_MSDF_DEVIATION (1.11111111111111111)
 
-/** Ratio by which flattening must bring a texel nearer to the true distance (msdfgen) */
-#define BOX_MSDF_IMPROVE (1.11111111111111111)
-
 /** Tolerance of the distance between two texels an edge between them can have (msdfgen) */
 #define BOX_MSDF_PROTECT_TOLERANCE (1.001)
 
@@ -38,30 +35,12 @@
 
 /** Tests interpolation between a texel and a neighbor, after msdfgen's artifact classifiers */
 typedef struct box_msdf_class_t {
-    box_msdf_gen_t *gen;  /**< The generation to check distances with, NULL for the field only */
     double span;          /**< Largest change of a value expected per unit of interpolation */
     bool protect;         /**< The texel is protected: only inversions are artifacts */
     const float *texel;   /**< Channels of the texel */
     int32_t x;            /**< Column of the texel */
     int32_t y;            /**< Row of the texel */
-    double dx;            /**< Column offset of the neighbor */
-    double dy;            /**< Row offset of the neighbor */
 } box_msdf_class_t;
-
-/** Clamp an integer to a range.
- *
- * @param v The value
- * @param lo The smallest result
- * @param hi The largest result
- * @return The clamped value
- */
-static int32_t box_msdf_clamp_i(
-    int32_t v,
-    int32_t lo,
-    int32_t hi)
-{
-    return v < lo ? lo : (v > hi ? hi : v);
-}
 
 /** Mark the texel at a position protected when it is on the field.
  *
@@ -205,65 +184,6 @@ static void box_msdf_protect_edges(
     }
 }
 
-/** Bilinearly interpolate the channels of the field at a texel position.
- *
- * @param gen The generation
- * @param x Column position, texel centers at half
- * @param y Row position, texel centers at half
- * @param out Receives the three channels
- */
-static void box_msdf_interpolate(
-    const box_msdf_gen_t *gen,
-    double x,
-    double y,
-    float *out)
-{
-    int32_t w = gen->raster->width, h = gen->raster->height, c;
-    double fx = floor(x - 0.5), fy = floor(y - 0.5);
-    double tx = x - 0.5 - fx, ty = y - 0.5 - fy;
-    int32_t l = box_msdf_clamp_i((int32_t)fx, 0, w - 1);
-    int32_t r = box_msdf_clamp_i((int32_t)fx + 1, 0, w - 1);
-    int32_t b = box_msdf_clamp_i((int32_t)fy, 0, h - 1);
-    int32_t t = box_msdf_clamp_i((int32_t)fy + 1, 0, h - 1);
-    const float *lb = &gen->values[(b * w + l) * 4], *rb = &gen->values[(b * w + r) * 4];
-    const float *lt = &gen->values[(t * w + l) * 4], *rt = &gen->values[(t * w + r) * 4];
-    for (c = 0; c < 3; c ++) {
-        double bottom = lb[c] + (rb[c] - lb[c]) * tx, top = lt[c] + (rt[c] - lt[c]) * tx;
-        out[c] = (float)(bottom + (top - bottom) * ty);
-    }
-}
-
-/** Check whether flattening a texel brings the field nearer to the true distance of the shape
- * at a point between it and a neighbor.
- *
- * @param cls The classifier of the texel and neighbor
- * @param t Position between the texel and the neighbor
- * @return Whether the field improves by more than BOX_MSDF_IMPROVE
- */
-static bool box_msdf_improves(
-    const box_msdf_class_t *cls,
-    double t)
-{
-    box_msdf_gen_t *gen = cls->gen;
-    const box_msdf_raster_t *r = gen->raster;
-    double tx = t * cls->dx, ty = t * cls->dy;
-    double sx = cls->x + 0.5 + tx, sy = cls->y + 0.5 + ty;
-    double weight = (1.0 - fabs(tx)) * (1.0 - fabs(ty));
-    float before[3], after[3], m = box_msdf_median(cls->texel);
-    int32_t c;
-    box_msdf_interpolate(gen, sx, sy, before);
-    for (c = 0; c < 3; c ++) {
-        after[c] = (float)(before[c] + weight * (m - cls->texel[c]));
-    }
-
-    box_msdf_point_t p = { r->left + sx / r->scale, r->top - sy / r->scale };
-    box_msdf_value_t d = box_msdf_combine(gen, p, true);
-    float ref = (float)(d.v[0] * r->scale / r->range + 0.5);
-
-    return BOX_MSDF_IMPROVE * fabsf(box_msdf_median(after) - ref) <
-        fabsf(box_msdf_median(before) - ref);
-}
-
 /** Classify an interpolated median between two ends, after msdfgen's rangeTest.
  *
  * @param cls The classifier
@@ -298,10 +218,11 @@ static int32_t box_msdf_range_test(
     return result;
 }
 
-/** Decide whether the flags of an interpolated median make it an artifact.
+/** Decide whether the flags of an interpolated median make it an artifact. Without a check of
+ * the true distance, as after msdfgen's scanline sign pass, only the range decides.
  *
- * @param cls The classifier
- * @param t Position of the median between the texel and the neighbor
+ * @param cls Unused
+ * @param t Unused
  * @param flags Flags of the range tests
  * @return Whether the texel causes an artifact
  */
@@ -310,12 +231,10 @@ static bool box_msdf_evaluate(
     double t,
     int32_t flags)
 {
-    bool result = (flags & BOX_MSDF_ARTIFACT) != 0;
-    if (!result && cls->gen && (flags & BOX_MSDF_CANDIDATE)) {
-        result = box_msdf_improves(cls, t);
-    }
+    (void)cls;
+    (void)t;
 
-    return result;
+    return (flags & BOX_MSDF_ARTIFACT) != 0;
 }
 
 /** Check for an artifact where two channels are equal between two texels.
@@ -532,8 +451,6 @@ static bool box_msdf_texel_error(
         }
 
         const float *n = &gen->values[(ny * w + nx) * 4];
-        cls->dx = dirs[i][0];
-        cls->dy = dirs[i][1];
         if (i < 4) {
             cls->span = unit;
             result = box_msdf_linear(cls, am, cls->texel, n);
@@ -547,25 +464,18 @@ static bool box_msdf_texel_error(
     return result;
 }
 
-/** Flag the texels that cause artifacts, after msdfgen's findErrors.
+/** Flag the texels that cause artifacts, after msdfgen's findErrors without a distance check.
  *
  * @param gen The generation
- * @param check Compare candidates with the true distance of the shape
  */
 static void box_msdf_find_errors(
-    box_msdf_gen_t *gen,
-    bool check)
+    box_msdf_gen_t *gen)
 {
     int32_t x, y, w = gen->raster->width, h = gen->raster->height;
     for (y = 0; y < h; y ++) {
         for (x = 0; x < w; x ++) {
             uint8_t *flags = &gen->stencil[y * w + x];
-            if (check && (*flags & BOX_MSDF_ERROR)) {
-                continue;
-            }
-
             box_msdf_class_t cls = {
-                .gen = check ? gen : NULL,
                 .protect = (*flags & BOX_MSDF_PROTECTED) != 0,
                 .texel = &gen->values[(y * w + x) * 4],
                 .x = x,
@@ -584,12 +494,7 @@ void box_msdf_correct(
     int32_t i, texels = gen->raster->width * gen->raster->height;
     box_msdf_protect_corners(gen);
     box_msdf_protect_edges(gen);
-    box_msdf_find_errors(gen, false);
-    for (i = 0; i < texels; i ++) {
-        gen->stencil[i] |= BOX_MSDF_PROTECTED;
-    }
-
-    box_msdf_find_errors(gen, true);
+    box_msdf_find_errors(gen);
     for (i = 0; i < texels; i ++) {
         float *v = &gen->values[i * 4];
         if (gen->stencil[i] & BOX_MSDF_ERROR) {

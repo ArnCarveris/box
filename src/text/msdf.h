@@ -200,22 +200,9 @@ float box_msdf_median3(
 float box_msdf_median(
     const float *v);
 
-/** Distances of a point to a shape whose contours may overlap, after msdfgen's
- * OverlappingContourCombiner: an edge inside the fill of another contour does not count.
- *
- * @param gen The generation
- * @param p The point
- * @param white Every edge shapes every channel, for the single channel distance
- * @return The distances, positive inside a contour that winds positively
- */
-box_msdf_value_t box_msdf_combine(
-    box_msdf_gen_t *gen,
-    box_msdf_point_t p,
-    bool white);
-
-/** Correct the artifacts of the field after msdfgen's MSDFErrorCorrection: protect corners and
- * edges, flag texels whose interpolation leaves the expected range, then flag texels at edges
- * whose flattening brings the field nearer to the shape, and flatten every flagged texel.
+/** Correct the artifacts of the field after msdfgen's MSDFErrorCorrection without a distance
+ * check: protect corners and edges, then flatten the texels whose interpolation leaves the range
+ * their distance allows.
  *
  * @param gen The generation
  */

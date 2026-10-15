@@ -1252,12 +1252,10 @@ static void box_msdf_multi_init(
  *
  * @param gen The generation, its multi and contour scratch are filled
  * @param p The point
- * @param white Every edge shapes every channel, for the single channel distance
  */
 static void box_msdf_contours(
     box_msdf_gen_t *gen,
-    box_msdf_point_t p,
-    bool white)
+    box_msdf_point_t p)
 {
     const box_msdf_edge_t *edges = ecs_vec_first(&gen->shape->edges);
     const int32_t *counts = ecs_vec_first(&gen->shape->contours);
@@ -1268,7 +1266,7 @@ static void box_msdf_contours(
         for (i = 0; i < count; i ++) {
             int32_t edge = first + i;
             box_msdf_add_edge(&gen->multi[k], edges, first + (i + count - 1) % count, edge,
-                first + (i + 1) % count, white ? BOX_MSDF_WHITE : edges[edge].color, p);
+                first + (i + 1) % count, edges[edge].color, p);
         }
 
         gen->contour[k] = box_msdf_multi_value(&gen->multi[k], edges, p);
@@ -1276,10 +1274,16 @@ static void box_msdf_contours(
     }
 }
 
-box_msdf_value_t box_msdf_combine(
+/** Distances of a point to a shape whose contours may overlap, after msdfgen's
+ * OverlappingContourCombiner: an edge inside the fill of another contour does not count.
+ *
+ * @param gen The generation
+ * @param p The point
+ * @return The distances, positive inside a contour that winds positively
+ */
+static box_msdf_value_t box_msdf_combine(
     box_msdf_gen_t *gen,
-    box_msdf_point_t p,
-    bool white)
+    box_msdf_point_t p)
 {
     const box_msdf_edge_t *edges = ecs_vec_first(&gen->shape->edges);
     int32_t k, winding = 0, contours = ecs_vec_count(&gen->shape->contours);
@@ -1287,7 +1291,7 @@ box_msdf_value_t box_msdf_combine(
     box_msdf_multi_init(&all);
     box_msdf_multi_init(&inner);
     box_msdf_multi_init(&outer);
-    box_msdf_contours(gen, p, white);
+    box_msdf_contours(gen, p);
     for (k = 0; k < contours; k ++) {
         double d = box_msdf_median_d(gen->contour[k].v);
         box_msdf_multi_merge(&all, &gen->multi[k]);
@@ -1366,7 +1370,7 @@ static void box_msdf_row(
             winding += cross[c].x > p.x ? cross[c].dir : 0;
         }
 
-        box_msdf_value_t d = box_msdf_combine(gen, p, false);
+        box_msdf_value_t d = box_msdf_combine(gen, p);
         for (c = 0; c < 4; c ++) {
             v[c] = (float)fmax(-BOX_MSDF_VALUE_LIMIT,
                 fmin(BOX_MSDF_VALUE_LIMIT, d.v[c] * to_value + 0.5));
