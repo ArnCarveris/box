@@ -19,6 +19,8 @@ typedef struct {
     float pos[3];       /**< Position the element had */
     float fit[2];       /**< Size of the content plus padding, or of the shape */
     float base[2];      /**< Fit size within min and max, what the element adds to its parent */
+    float cmin[2];      /**< Narrowest the content of the element allows, within min and max */
+    float longest;      /**< Widest word of the text of the element, its narrowest width */
     float size[2];      /**< Computed size */
     float at[2];        /**< Computed position in the space of the parent */
     bool has_layout;    /**< The element has a Layout */
@@ -26,6 +28,7 @@ typedef struct {
     bool has_pos;       /**< The element has a Position */
     bool has_rect;      /**< The element has a Rect */
     bool rect_input;    /**< The Rect is the input of the element, not written */
+    bool has_text;      /**< The element has a Text the layout wraps */
     bool placed;        /**< The layout writes the position of the element */
     bool frozen;        /**< The grow share of the element hit a bound */
 } box_layout_node_t;

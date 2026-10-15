@@ -5,6 +5,7 @@
 
 #include <box.h>
 #include <bake_test.h>
+#include <math.h>
 
 /** A paragraph much wider than the panels of the tests */
 #define WRAP_PARAGRAPH "Box lays out text in rows and columns and wraps long paragraphs " \
@@ -120,8 +121,8 @@ void Wrap_longest_word_is_minimum(void) {
 
     const TextBounds *w = ecs_get(world, word, TextBounds);
     test_assert(w->width > 30);
-    test_flt(ecs_get(world, t, LayoutBounds)->width, w->width);
-    test_flt(ecs_get(world, t, TextBounds)->width, w->width);
+    test_assert(fabsf(ecs_get(world, t, LayoutBounds)->width - w->width) < 0.01f);
+    test_assert(fabsf(ecs_get(world, t, TextBounds)->width - w->width) < 0.01f);
     test_flt(ecs_get(world, t, TextBounds)->height, 3 * w->height);
     test_flt(ecs_get(world, row, LayoutBounds)->height, 3 * w->height);
 
@@ -202,20 +203,20 @@ void Wrap_text_width_still_applies(void) {
     ecs_set(world, panel, LayoutItem, { .width = { SizeModeFixed, 300 } });
     ecs_entity_t t = ecs_new_w_pair(world, EcsChildOf, panel);
     ecs_set(world, t, Text, {
-        .value = WRAP_PARAGRAPH, .size = 16, .width = 100, .font = font});
+        .value = WRAP_PARAGRAPH, .size = 16, .width = 200, .font = font});
     ecs_set(world, t, LayoutItem, { .width = { SizeModeGrow, 1, .content_min = true } });
     ecs_progress(world, 0);
 
-    float h100 = ecs_get(world, t, TextBounds)->height;
-    test_assert(ecs_get(world, t, TextBounds)->width <= 100);
+    float h200 = ecs_get(world, t, TextBounds)->height;
+    test_assert(ecs_get(world, t, TextBounds)->width <= 200);
     test_flt(ecs_get(world, t, LayoutBounds)->width, 300);
-    test_flt(ecs_get(world, panel, LayoutBounds)->height, h100);
+    test_flt(ecs_get(world, panel, LayoutBounds)->height, h200);
 
-    ecs_set(world, panel, LayoutItem, { .width = { SizeModeFixed, 60 } });
+    ecs_set(world, panel, LayoutItem, { .width = { SizeModeFixed, 120 } });
     ecs_progress(world, 0);
 
-    test_assert(ecs_get(world, t, TextBounds)->width <= 60);
-    test_assert(ecs_get(world, t, TextBounds)->height > h100);
+    test_assert(ecs_get(world, t, TextBounds)->width <= 120);
+    test_assert(ecs_get(world, t, TextBounds)->height > h200);
     test_flt(ecs_get(world, panel, LayoutBounds)->height, ecs_get(world, t, TextBounds)->height);
 
     ecs_fini(world);

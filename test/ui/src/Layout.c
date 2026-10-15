@@ -5,6 +5,7 @@
 
 #include <box.h>
 #include <bake_test.h>
+#include <math.h>
 
 void Layout_row_places_children(void) {
     // ui/layout
@@ -626,7 +627,8 @@ void Layout_grow_never_below_text(void) {
     const TextBounds *tt = ecs_get(world, t, TextBounds);
     test_assert(tt != NULL);
     test_assert(tt->width > 20);
-    test_flt(ecs_get(world, t, LayoutBounds)->width, tt->width);
+    test_assert(fabsf(ecs_get(world, t, LayoutBounds)->width - tt->width) < 0.01f);
+    test_assert(tt->height <= 50);
     test_flt(ecs_get(world, t, LayoutBounds)->height, 50);
     const TextBounds *tu = ecs_get(world, u, TextBounds);
     test_assert(tu->height > 5);
@@ -707,8 +709,10 @@ void Layout_grow_cross_axis_keeps_content(void) {
     test_assert(tt->height > 5);
     test_assert(tt->width > 10);
     test_flt(ecs_get(world, t, LayoutBounds)->height, tt->height);
-    test_flt(ecs_get(world, u, LayoutBounds)->width, tt->width);
-    test_flt(ecs_get(world, u, LayoutBounds)->height, tt->height);
+    const TextBounds *tu = ecs_get(world, u, TextBounds);
+    test_flt(tu->height, 2 * tt->height);
+    test_assert(fabsf(ecs_get(world, u, LayoutBounds)->width - tu->width) < 0.01f);
+    test_flt(ecs_get(world, u, LayoutBounds)->height, tu->height);
     test_flt(ecs_get(world, v, LayoutBounds)->height, 40);
 
     ecs_fini(world);

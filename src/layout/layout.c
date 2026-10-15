@@ -8,6 +8,7 @@
 
 #define BOX_LAYOUT_IMPL
 #include "layout_internal.h"
+#include "../text/text.h"
 
 static ECS_COMPONENT_DECLARE(LayoutRegistry);
 
@@ -244,10 +245,14 @@ static void LayoutUpdate(
     ecs_entity_t *marks = ecs_vec_first_t(&state->marks, ecs_entity_t);
     ecs_vec_clear(&state->roots);
     for (i = 0; i < count; i ++) {
-        ecs_entity_t root = ecs_is_alive(world, marks[i]) ?
-            box_layout_root(world, marks[i]) : 0;
+        bool alive = ecs_is_alive(world, marks[i]);
+        ecs_entity_t root = alive ? box_layout_root(world, marks[i]) : 0;
         if (root) {
             *ecs_vec_append_t(NULL, &state->roots, ecs_entity_t) = root;
+        } else if (alive && state->text_bounds && ecs_has(world, marks[i], Text)) {
+            state->writing = true;
+            box_text_wrap_to(world, marks[i], 0);
+            state->writing = false;
         }
     }
 
