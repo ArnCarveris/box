@@ -1088,3 +1088,48 @@ void Console_cursor_ill_formed(void) {
 
     ecs_fini(world);
 }
+
+void Console_caret_steps_match_glyphs(void) {
+    // ui_fixes/shared_utf8
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 640, .height = 360, .resolution_scale = 1});
+    ecs_progress(world, 0);
+
+    box_input_key_type(world, "`", 1);
+    while (box_input_pending(world)) {
+        ecs_progress(world, 0);
+    }
+
+    ecs_entity_t before = ecs_lookup(world, CONSOLE_INPUT ".before");
+    const Text *look = ecs_get(world, before, Text);
+    const char *glyphs[4] = { "", "\xEF\xBF\xBD", "\xEF\xBF\xBD\xEF\xBF\xBD",
+        "\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD" };
+    ecs_entity_t refs[4];
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        refs[i] = ecs_new(world);
+        ecs_set(world, refs[i], Text, {.value = (char*)glyphs[i], .size = look->size,
+            .font = look->font});
+    }
+
+    ecs_singleton_set(world, Input, { .text = "\xC0\xAF\xE2\x82", .focused = true });
+    ecs_progress(world, 0);
+    test_flt(ecs_get(world, before, TextBounds)->width,
+        ecs_get(world, refs[3], TextBounds)->width);
+    for (i = 2; i >= 0; i --) {
+        box_input_key_press(world, KeyLeft, 1);
+        while (box_input_pending(world)) {
+            ecs_progress(world, 0);
+        }
+
+        test_flt(ecs_get(world, before, TextBounds)->width,
+            ecs_get(world, refs[i], TextBounds)->width);
+    }
+
+    ecs_fini(world);
+}
