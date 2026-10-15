@@ -90,9 +90,7 @@ const SCAN_WORDS: u32 = 3u;
 
 var<workgroup> group_mask: array<atomic<u32>, 2>;
 var<workgroup> group_culled: atomic<u32>;
-var<workgroup> scan_sums: array<u32, 64>;
-var<workgroup> scan_carry: u32;
-var<workgroup> scan_groups: u32;
+var<workgroup> scan_sums: array<u32, 256>;
 
 // Whether the world space box around an instance reaches into the frustum and is large enough.
 // The size is the diameter of the sphere around the box in pixels, tested only when the box is
@@ -249,10 +247,11 @@ fn cull_instances(
     }
 }
 
-// Exclusive offsets of the workgroups of the parallel draws of a table, 64 at a time, and their
-// instance counts. A workgroup per draw; its table entry at scan.x holds the job, the first scan
-// word and the workgroups of the draw.
-@compute @workgroup_size(64)
+// Exclusive offsets of the workgroups of the parallel draws of a table and their instance
+// counts. A workgroup per draw; its table entry at scan.x holds the job, the first scan word and
+// the workgroups of the draw. Each invocation sums a contiguous run of the workgroup counts, the
+// workgroup scans the 256 sums, and each invocation writes the offsets of its run.
+@compute @workgroup_size(256)
 fn cull_scan(
     @builtin(local_invocation_index) local: u32,
     @builtin(workgroup_id) group: vec3u)
@@ -260,47 +259,37 @@ fn cull_scan(
     let entry = cull.scan.x + group.x * 4u;
     let job = jobs[scan_words[entry]];
     let base = scan_words[entry + 1u];
-    if (local == 0u) {
-        scan_carry = 0u;
-        scan_groups = scan_words[entry + 2u];
+    let groups = scan_words[entry + 2u];
+    let per = (groups + 255u) / 256u;
+    let first = min(local * per, groups);
+    let last = min(first + per, groups);
+    var own = 0u;
+    for (var g = first; g < last; g++) {
+        own += scan_words[base + g * SCAN_WORDS + 2u];
     }
 
-    let groups = workgroupUniformLoad(&scan_groups);
-    for (var start = 0u; start < groups; start += 64u) {
-        let g = start + local;
-        var own = 0u;
-        if (g < groups) {
-            own = scan_words[base + g * SCAN_WORDS + 2u];
-        }
-
-        scan_sums[local] = own;
-        workgroupBarrier();
-        for (var step = 1u; step < 64u; step *= 2u) {
-            var add = 0u;
-            if (local >= step) {
-                add = scan_sums[local - step];
-            }
-
-            workgroupBarrier();
-            scan_sums[local] += add;
-            workgroupBarrier();
-        }
-
-        let carry = scan_carry;
-        if (g < groups) {
-            scan_words[base + g * SCAN_WORDS + 2u] = carry + scan_sums[local] - own;
+    scan_sums[local] = own;
+    workgroupBarrier();
+    for (var step = 1u; step < 256u; step *= 2u) {
+        var add = 0u;
+        if (local >= step) {
+            add = scan_sums[local - step];
         }
 
         workgroupBarrier();
-        if (local == 63u) {
-            scan_carry = carry + scan_sums[63];
-        }
-
+        scan_sums[local] += add;
         workgroupBarrier();
     }
 
-    if (local == 0u) {
-        let total = scan_carry;
+    var offset = scan_sums[local] - own;
+    for (var g = first; g < last; g++) {
+        let count = scan_words[base + g * SCAN_WORDS + 2u];
+        scan_words[base + g * SCAN_WORDS + 2u] = offset;
+        offset += count;
+    }
+
+    if (local == 255u) {
+        let total = scan_sums[255];
         atomicStore(&args[args_of(job) * ARGS + 1u], total);
         atomicAdd(&counters[cull.jobs.w * COUNTERS], total);
     }
