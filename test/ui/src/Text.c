@@ -1086,3 +1086,139 @@ void Text_font_without_units_fails(void) {
     ecs_os_free(src);
     ecs_fini(world);
 }
+
+void Text_recursive_composite_missing(void) {
+    // hardening/glyph_recursion
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    char *src = box_shader_locate("etc/fonts/B612-Regular.ttf");
+    test_assert(src != NULL);
+    FILE *f = fopen(src, "rb");
+    test_assert(f != NULL);
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    uint8_t *data = ecs_os_malloc((ecs_size_t)size);
+    test_int((long)fread(data, 1, (size_t)size, f), size);
+    fclose(f);
+
+    uint32_t head = 0, loca = 0, glyf = 0;
+    int32_t i, tables = (data[4] << 8) | data[5];
+    for (i = 0; i < tables; i ++) {
+        const uint8_t *rec = data + 12 + i * 16;
+        uint32_t off = ((uint32_t)rec[8] << 24) | (rec[9] << 16) | (rec[10] << 8) | rec[11];
+        if (!memcmp(rec, "head", 4)) {
+            head = off;
+        } else if (!memcmp(rec, "loca", 4)) {
+            loca = off;
+        } else if (!memcmp(rec, "glyf", 4)) {
+            glyf = off;
+        }
+    }
+
+    test_assert(head && loca && glyf);
+    test_int((data[head + 50] << 8) | data[head + 51], 0);
+    int32_t from[] = { 56, 34, 55, 57 };
+    int32_t to[] = { 56, 55, 34, 42 };
+    for (i = 0; i < 4; i ++) {
+        uint32_t at = glyf + 2 * (uint32_t)((data[loca + 2 * from[i]] << 8) |
+            data[loca + 2 * from[i] + 1]);
+        uint32_t end = glyf + 2 * (uint32_t)((data[loca + 2 * from[i] + 2] << 8) |
+            data[loca + 2 * from[i] + 3]);
+        test_assert(end - at >= 16);
+        data[at] = 0xff;
+        data[at + 1] = 0xff;
+        data[at + 10] = 0x00;
+        data[at + 11] = 0x02;
+        data[at + 12] = (uint8_t)(to[i] >> 8);
+        data[at + 13] = (uint8_t)to[i];
+        data[at + 14] = 0;
+        data[at + 15] = 0;
+    }
+
+    const char *tmp = ecs_singleton_get(world, AppStatus)->tmp_dir;
+    char *path = flecs_asprintf("%s/recursive.ttf", tmp);
+    f = fopen(path, "wb");
+    test_assert(f != NULL);
+    test_int((long)fwrite(data, 1, (size_t)size, f), size);
+    fclose(f);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t font = ecs_new(world);
+    ecs_set(world, font, Font, {.path = path});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {0, 0, 0});
+    ecs_set(world, e, Rgb, {255, 255, 255});
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 96, .height = 96, .write_to_file = "glyph.png",
+        .resolution_scale = 1});
+    ecs_log_set_level(-4);
+
+    const char *values[] = { "\xe4\xb8\x80", "W", "A", "B", "W", "X", "I" };
+    ecs_entity_t fonts[] = {
+        font, font, font, font, ecs_lookup(world, "box.text.DefaultFont"), font, font
+    };
+    int32_t ink[7] = {0}, w[7] = {0}, h[7] = {0};
+    char *png = flecs_asprintf("%s/glyph.png", tmp);
+    for (i = 0; i < 7; i ++) {
+        ecs_set(world, e, Text, {.value = ECS_CONST_CAST(char*, values[i]), .size = 48,
+            .font = fonts[i]});
+        ecs_progress(world, 0);
+        ecs_progress(world, 0);
+        ecs_progress(world, 0);
+        box_render_sync(world);
+        test_int(ecs_get(world, font, FontStatus)->state, FontReady);
+        test_assert(ecs_get(world, e, TextBounds)->width > 0);
+
+        int pw = 0, ph = 0, n = 0, x, y;
+        int32_t x0 = 96, y0 = 96, x1 = -1, y1 = -1;
+        unsigned char *px = stbi_load(png, &pw, &ph, &n, 4);
+        test_assert(px != NULL);
+        for (y = 0; y < ph; y ++) {
+            for (x = 0; x < pw; x ++) {
+                if (px[(y * pw + x) * 4] > 128) {
+                    ink[i] ++;
+                    x0 = x < x0 ? x : x0;
+                    y0 = y < y0 ? y : y0;
+                    x1 = x > x1 ? x : x1;
+                    y1 = y > y1 ? y : y1;
+                }
+            }
+        }
+
+        w[i] = x1 - x0;
+        h[i] = y1 - y0;
+        stbi_image_free(px);
+    }
+
+    test_assert(ink[0] > 0);
+    for (i = 1; i < 3; i ++) {
+        test_assert(ink[i] > 0);
+        test_assert(abs(w[i] - w[0]) <= 1);
+        test_assert(abs(h[i] - h[0]) <= 1);
+    }
+
+    test_assert(ink[3] > 0);
+    test_assert(ink[4] > 0);
+    test_assert(abs(w[4] - w[0]) > 4);
+    test_assert(ink[5] > 0);
+    test_assert(ink[6] > 0);
+    test_assert(abs(w[5] - w[6]) <= 1);
+    test_assert(abs(h[5] - h[6]) <= 1);
+    test_assert(abs(w[6] - w[0]) > 4);
+
+    ecs_os_free(png);
+    ecs_os_free(path);
+    ecs_os_free(data);
+    ecs_os_free(src);
+    ecs_fini(world);
+}

@@ -22,9 +22,34 @@
 /** Largest font file that loads, in bytes */
 #define BOX_TEXT_MAX_FILE (64 * 1024 * 1024)
 
+/** Deepest nesting of composite glyphs that is drawn, a cycle exceeds it */
+#define BOX_TEXT_COMPOSITE_DEPTH (16)
+
+/** Most component references a glyph may make through all of its nested composites */
+#define BOX_TEXT_COMPOSITE_MAX (256)
+
+/** Composite flag: the component has 16 bit offsets instead of 8 bit ones */
+#define BOX_TEXT_COMP_WORDS (0x0001)
+
+/** Composite flag: the offsets are x, y values, not matching points (which stb asserts on) */
+#define BOX_TEXT_COMP_XY (0x0002)
+
+/** Composite flag: the component has one scale */
+#define BOX_TEXT_COMP_SCALE (0x0008)
+
+/** Composite flag: another component follows */
+#define BOX_TEXT_COMP_MORE (0x0020)
+
+/** Composite flag: the component has an x and a y scale */
+#define BOX_TEXT_COMP_XY_SCALE (0x0040)
+
+/** Composite flag: the component has a 2 by 2 transform */
+#define BOX_TEXT_COMP_2X2 (0x0080)
+
 /** A parsed font file, shared by the main thread and the jobs that read its outlines */
 struct box_text_face_t {
     uint8_t *data;          /**< The bytes of the file */
+    int32_t size;           /**< Bytes in data */
     stbtt_fontinfo info;    /**< The parsed font */
     float units;            /**< Font units per em */
     int32_t refs;           /**< The font and every job, changed on the main thread */
@@ -102,10 +127,12 @@ done:
 /** Read a file into memory.
  *
  * @param path The file
+ * @param size Receives the number of bytes
  * @return The bytes, NULL when the file cannot be read
  */
 static uint8_t* box_text_read(
-    const char *path)
+    const char *path,
+    int32_t *size)
 {
     uint8_t *result = NULL;
     long len = 0;
@@ -124,6 +151,8 @@ static uint8_t* box_text_read(
             ecs_os_free(result);
             result = NULL;
         }
+
+        size[0] = (int32_t)len;
     }
 
     fclose(f);
@@ -140,7 +169,8 @@ static void box_text_load_work(
 {
     box_text_load_job_t *job = ctx;
     char *resolved = box_shader_locate(job->path);
-    uint8_t *data = resolved ? box_text_read(resolved) : NULL;
+    int32_t size = 0;
+    uint8_t *data = resolved ? box_text_read(resolved, &size) : NULL;
     int offset = data ? stbtt_GetFontOffsetForIndex(data, 0) : -1;
     box_text_face_t *face = NULL;
     if (!data) {
@@ -151,6 +181,7 @@ static void box_text_load_work(
 
     face = ecs_os_calloc_t(box_text_face_t);
     face->data = data;
+    face->size = size;
     face->refs = 1;
     if (offset < 0 || !stbtt_InitFont(&face->info, data, offset)) {
         job->error = flecs_asprintf("box.text: cannot parse font '%s'", resolved);
@@ -239,6 +270,7 @@ static void box_text_load_complete(
     job->face = NULL;
     font->relayout = true;
     font->oversized = false;
+    font->malformed = false;
     box_text_status(world, job->font, FontReady, revision + 1, NULL);
     box_text_relayout(world, s, false);
 done:
@@ -498,23 +530,107 @@ static bool box_text_atlas_place(
     return result;
 }
 
-/** Log once per load of a font that a glyph does not fit an atlas page.
+/** Log once per load of a font and per reason that a glyph is drawn as the missing glyph.
  *
  * @param world The world
  * @param font The font
  * @param glyph The glyph index
+ * @param warned The flag of the reason, set once the warning is logged
+ * @param why Why the glyph is not drawn
  */
-static void box_text_oversized(
+static void box_text_skipped(
     ecs_world_t *world,
     box_text_font_t *font,
-    int32_t glyph)
+    int32_t glyph,
+    bool *warned,
+    const char *why)
 {
     const Font *f = ecs_is_alive(world, font->entity) ? ecs_get(world, font->entity, Font) : NULL;
-    if (!font->oversized) {
-        ecs_warn("box.text: glyph %d of font '%s' is larger than an atlas page, it is drawn "
-            "as the missing glyph", glyph, f && f->path ? f->path : "");
-        font->oversized = true;
+    if (!warned[0]) {
+        ecs_warn("box.text: glyph %d of font '%s' %s, it is drawn as the missing glyph",
+            glyph, f && f->path ? f->path : "", why);
+        warned[0] = true;
     }
+}
+
+/** Get the bytes of a composite glyph record after its flags and glyph index.
+ *
+ * @param flags The flags of the record
+ * @return Bytes of the offsets and the transform
+ */
+static int32_t box_text_component_args(
+    uint16_t flags)
+{
+    int32_t result = (flags & BOX_TEXT_COMP_WORDS) ? 4 : 2;
+    if (flags & BOX_TEXT_COMP_SCALE) {
+        result += 2;
+    } else if (flags & BOX_TEXT_COMP_XY_SCALE) {
+        result += 4;
+    } else if (flags & BOX_TEXT_COMP_2X2) {
+        result += 8;
+    }
+
+    return result;
+}
+
+/** Check that stb_truetype can read the outline of a glyph without unbounded recursion: its
+ * composite components nest at most BOX_TEXT_COMPOSITE_DEPTH deep (a cycle never ends), make
+ * at most BOX_TEXT_COMPOSITE_MAX references in total, use x, y offsets and stay in the file.
+ *
+ * @param face The face
+ * @param glyph The glyph index
+ * @return Whether the outline of the glyph may be read
+ */
+static bool box_text_composite_valid(
+    const box_text_face_t *face,
+    int32_t glyph)
+{
+    int32_t glyphs[BOX_TEXT_COMPOSITE_MAX], depths[BOX_TEXT_COMPOSITE_MAX];
+    int32_t count = 1, refs = 0;
+    bool result = true;
+    if (face->info.cff.size) {
+        goto done;
+    }
+
+    glyphs[0] = glyph;
+    depths[0] = 0;
+    while (count && result) {
+        count --;
+        int32_t depth = depths[count];
+        int32_t at = stbtt__GetGlyfOffset(&face->info, glyphs[count]);
+        uint16_t flags = BOX_TEXT_COMP_MORE;
+        if (at < 0) {
+            continue;
+        }
+
+        if (at + 10 > face->size) {
+            result = false;
+            break;
+        }
+
+        if (ttSHORT(face->data + at) >= 0) {
+            continue;
+        }
+
+        at += 10;
+        while (result && (flags & BOX_TEXT_COMP_MORE)) {
+            if (at + 4 > face->size) {
+                result = false;
+                break;
+            }
+
+            flags = ttUSHORT(face->data + at);
+            glyphs[count] = ttUSHORT(face->data + at + 2);
+            depths[count] = depth + 1;
+            at += 4 + box_text_component_args(flags);
+            result = (flags & BOX_TEXT_COMP_XY) && at <= face->size &&
+                depth + 1 < BOX_TEXT_COMPOSITE_DEPTH && ++ refs < BOX_TEXT_COMPOSITE_MAX;
+            count ++;
+        }
+    }
+
+done:
+    return result;
 }
 
 /** Generate the field of a glyph from its outline, on a worker thread.
@@ -662,6 +778,12 @@ const box_text_atlas_glyph_t* box_text_font_glyph(
     result = ecs_map_insert_alloc_t(&font->glyphs, box_text_atlas_glyph_t,
         (ecs_map_key_t)glyph);
     *result = (box_text_atlas_glyph_t){ .page = -1 };
+    if (!box_text_composite_valid(font->face, glyph)) {
+        box_text_skipped(world, font, glyph, &font->malformed,
+            "nests composite glyphs too deep or in a cycle");
+        goto missing;
+    }
+
     if (stbtt_IsGlyphEmpty(&font->face->info, glyph) ||
         !stbtt_GetGlyphBox(&font->face->info, glyph, &x0, &y0, &x1, &y1) ||
         x0 >= x1 || y0 >= y1)
@@ -690,7 +812,8 @@ const box_text_atlas_glyph_t* box_text_font_glyph(
     box_text_glyph_submit(world, s, font, glyph, result);
     goto done;
 oversized:
-    box_text_oversized(world, font, glyph);
+    box_text_skipped(world, font, glyph, &font->oversized, "is larger than an atlas page");
+missing:
     *result = (box_text_atlas_glyph_t){ .page = -1 };
     if (glyph) {
         *result = *box_text_font_glyph(world, s, font, 0);

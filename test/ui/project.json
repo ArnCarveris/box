@@ -84,7 +84,8 @@
                     "module_child_fini",
                     "oversized_glyph_missing",
                     "oversized_warns_once_per_font",
-                    "font_without_units_fails"
+                    "font_without_units_fails",
+                    "recursive_composite_missing"
                 ]
             },
             {
