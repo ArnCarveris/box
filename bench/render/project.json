@@ -34,7 +34,8 @@
                 "benchcases": [
                     "dynamic_material",
                     "blended_sort",
-                    "tint_subtree"
+                    "tint_subtree",
+                    "dynamic_material_dynamic_parents"
                 ]
             },
             {

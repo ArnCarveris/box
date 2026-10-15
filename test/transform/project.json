@@ -901,6 +901,16 @@
                 ]
             },
             {
+                "id": "OnDynamic",
+                "testcases": [
+                    "owned_and_spread",
+                    "parent_component_spread",
+                    "prefab_instance",
+                    "deleted_children_not_passed",
+                    "ctx_free_on_fini"
+                ]
+            },
+            {
                 "id": "DynamicParentRuns",
                 "testcases": [
                     "interleaved_parents",

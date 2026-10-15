@@ -275,42 +275,30 @@ Key box_input_dom_button(
 
 /** Decode a key value that is one printable character.
  *
+ * The bytes must be the well formed encoding of that character: an ill formed key types
+ * nothing, while a key that is U+FFFD itself types it.
+ *
  * @param key The UTF-8 KeyboardEvent.key value
- * @return The code point, 0 when the value names a key such as Enter or is not printable
+ * @return The code point, 0 when the value names a key such as Enter, is not printable or is
+ * ill formed
  */
 static int32_t box_input_dom_char(
     const char *key)
 {
-    const unsigned char *ptr = (const unsigned char*)key;
-    int32_t result = 0, size = 0, i;
+    const char *rest = key;
+    char encoded[4];
+    int32_t result = 0, size;
     if (!key || !key[0]) {
         goto done;
     }
 
-    if (ptr[0] < 0x80) {
-        result = ptr[0];
-        size = 1;
-    } else if ((ptr[0] & 0xe0) == 0xc0) {
-        result = ptr[0] & 0x1f;
-        size = 2;
-    } else if ((ptr[0] & 0xf0) == 0xe0) {
-        result = ptr[0] & 0x0f;
-        size = 3;
-    } else if ((ptr[0] & 0xf8) == 0xf0) {
-        result = ptr[0] & 0x07;
-        size = 4;
+    result = box_utf8_next(&rest);
+    size = box_utf8_encode(result, encoded);
+    if (rest[0] || (int32_t)(rest - key) != size || memcmp(key, encoded, (size_t)size)) {
+        result = 0;
     }
 
-    for (i = 1; i < size; i ++) {
-        if ((ptr[i] & 0xc0) != 0x80) {
-            size = 0;
-            break;
-        }
-
-        result = (result << 6) | (ptr[i] & 0x3f);
-    }
-
-    if (!size || ptr[size] || result < 0x20 || result == 0x7f) {
+    if (result < 0x20 || result == 0x7f) {
         result = 0;
     }
 

@@ -77,6 +77,35 @@ void box_types_owned_hooks(
     const box_owned_t *members,
     int32_t count);
 
+/** Code point that stands for an ill formed UTF-8 sequence or an invalid code point */
+#define BOX_UTF8_REPLACEMENT (0xFFFD)
+
+/** Read the code point of a UTF-8 sequence and move past it.
+ *
+ * Decodes per table 3-7 of the Unicode standard, as the WHATWG Encoding decoder does: overlong
+ * forms, surrogates and code points above U+10FFFF are ill formed.
+ *
+ * Each maximal subpart of an ill formed sequence reads as one U+FFFD and the next sequence
+ * starts at the byte that broke it, so a terminating zero is never passed.
+ *
+ * @param str The string, advanced past the sequence or the maximal subpart
+ * @return The code point, BOX_UTF8_REPLACEMENT for an ill formed sequence
+ */
+int32_t box_utf8_next(
+    const char **str);
+
+/** Encode a code point as UTF-8.
+ *
+ * Surrogates, negative values and values above U+10FFFF encode as U+FFFD.
+ *
+ * @param code The code point
+ * @param out Receives the bytes, at least 4
+ * @return Number of bytes written, 1 to 4
+ */
+int32_t box_utf8_encode(
+    int32_t code,
+    char *out);
+
 /** Register the box.types module.
  *
  * @param world The world

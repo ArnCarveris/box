@@ -459,7 +459,7 @@ static void box_draws_key(
         !ecs_get_target_for_id(world, e, EcsChildOf, NoShadow);
     key->bake = !shape2d && key->blend == Opaque && !ecs_has_id(world, e, DynamicTransform) &&
         !ecs_has_id(world, e, ManualTransform) && !ecs_has_id(world, e, NoBake) &&
-        box_draws_baked(world, key->scene);
+        !box_projection_anchored(world, e) && box_draws_baked(world, key->scene);
 }
 
 /** Bring the shape of a changed entity into the batch of its key and write its instance.
@@ -710,9 +710,8 @@ static void box_draws_observers(
         .query.terms = {{ .id = ecs_id(Rgb) }},
         .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnChange);
     box_draws_material_observers(world, d);
-    box_draws_observer(world, d, "DrawsOnDynamic", (ecs_observer_desc_t){
-        .query.terms = {{ .id = DynamicTransform }},
-        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnChange);
+    d->refs ++;
+    box_transform_on_dynamic(world, BoxDrawsOnChange, d, box_draws_free);
     box_draws_observer(world, d, "DrawsOnWorldTransform", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(WorldTransform) }},
         .events = { EcsOnSet } }, BoxDrawsOnStaticWorld);
@@ -812,7 +811,12 @@ static void box_draws_queries(
                 .trav = EcsChildOf,
                 .inout = EcsInOutNone
             },
-            { .id = DynamicTransform, .inout = EcsInOutNone, .oper = EcsNot },
+            {
+                .id = DynamicTransform,
+                .src.id = EcsSelf,
+                .inout = EcsInOutNone,
+                .oper = EcsNot
+            },
             { .id = ecs_id(Shape2D), .src.id = EcsSelf, .inout = EcsIn, .oper = EcsOptional }
         },
         .cache_kind = EcsQueryCacheAuto

@@ -162,7 +162,11 @@ by `ecs_modified`, not by a write through a pointer alone. Hierarchies use `Chil
 computed roots and the descendants it wrote) to the functions registered with
 `box_transform_on_moved`. Draws and the spatial index follow static moves only through it and
 walk no subtree of their own, so a `Position` set fires no transform observer in render or
-spatial; only `DrawsOnPositionZ`, which keeps the 2D draw order, still fires.
+spatial; only `DrawsOnPositionZ`, which keeps the 2D draw order, still fires. Entities that gain or lose
+`DynamicTransform`, owned or inherited, reach draws, spatial and the bake through one transform
+observer and `box_transform_on_dynamic`: an inherited tag costs a forwarded event per entity and
+observer, so deleting a dynamic hierarchy pays for one observer instead of five, and entities
+deleted with their parent are not passed on.
 
 ## Surfaces and the GPU device
 
@@ -202,7 +206,11 @@ light clusters and the spatial index are per scene, so entities of different sce
 interact even when they overlap. Adding or removing `Scene` or reparenting queues the subtree in
 the draw, light and spatial observers, which move it in the next frame. The only cross scene
 reference is `ProjectedAnchor`: it projects the world position of a target through a view's
-camera into pixel `Position` of a UI scene (origin at center, y up) in the same frame. Behind
+camera into pixel `Position` of a UI scene (origin at center, y up) in the same frame. It writes
+that `Position` without OnSet and the `WorldTransform` of the anchored subtree itself, so static
+transforms do not compute the anchor again in the next frame. An anchored subtree moves every
+frame by design, so the bake treats it like `DynamicTransform` or `NoBake` and never captures it
+(`box_projection_anchored`). Behind
 the camera, past the far plane or with a missing target the entity gets `ProjectedHidden` and
 collapses to a point.
 

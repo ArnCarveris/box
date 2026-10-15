@@ -55,7 +55,7 @@ that ran. The output folder ignores itself in git.
 Every run is also kept in `test/integration/out/history` (`--history` moves it), which a rerun
 never overwrites: `<run>/results.json` holds the commit at the start and end, the files that
 changed between them, the binary and its build time, and per scene the diff stats, exit code,
-attempts, guard refusals, load wait, load average before, at the render and after, render seconds and the error lines of its log; the render, baseline,
+attempts, guard refusals, load wait, load average before, at the render and after, render seconds, the error lines of its log and the warnings of headless readiness waits that timed out (`readiness`, also appended to a failing scene's detail); the render, baseline,
 diff, log and script of every failing scene are copied next to it. `runs.jsonl` has one summary
 line per run with the failing scenes. The last 30 runs are kept.
 

@@ -183,7 +183,8 @@
                     "manual_parent_move_updates_children",
                     "manual_parent_moved_in_on_store",
                     "mesh3_prefab_instances",
-                    "mesh3_prefab_removed"
+                    "mesh3_prefab_removed",
+                    "dynamic_hierarchy_deleted"
                 ]
             },
             {
@@ -295,7 +296,8 @@
                     "no_bake_tag",
                     "cache_is_owned",
                     "view_baked_defaults",
-                    "scene_renders_identically"
+                    "scene_renders_identically",
+                    "projected_anchor_not_baked"
                 ]
             },
             {

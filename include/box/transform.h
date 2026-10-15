@@ -56,11 +56,6 @@ ECS_STRUCT(WorldTransform, {
     mat4 m; /**< The matrix */
 });
 
-/** WorldTransform version, used to deduplicate static transforms. */
-ECS_STRUCT(WorldTransformVersion, {
-    uint64_t version; /**< Frame the static transform was last computed in */
-});
-
 /** Transform is recomputed every frame instead of on change, kept on every descendant */
 extern ECS_TAG_DECLARE(DynamicTransform);
 
@@ -116,6 +111,26 @@ typedef void (*box_transform_moved_t)(
 void box_transform_on_moved(
     ecs_world_t *world,
     box_transform_moved_t callback,
+    void *ctx,
+    ecs_ctx_free_t ctx_free);
+
+/** Call an observer callback for every entity that gains or loses DynamicTransform, owned or
+ * inherited (through `(IsA, DynamicTransformSpread)` or a prefab).
+ *
+ * One box.transform observer serves every function, which costs less than an observer per
+ * module: an inherited tag reaches an observer through a forwarded event per entity.
+ *
+ * The function gets the iterator of that observer with ctx replaced by its own context.
+ * Entities deleted with their parent are not passed: the components they lose report that.
+ *
+ * @param world The world
+ * @param callback The function
+ * @param ctx Context the function finds in it->ctx
+ * @param ctx_free Frees the context when the world is deleted, NULL for none
+ */
+void box_transform_on_dynamic(
+    ecs_world_t *world,
+    ecs_iter_action_t callback,
     void *ctx,
     ecs_ctx_free_t ctx_free);
 

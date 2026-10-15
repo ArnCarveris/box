@@ -6,46 +6,47 @@
 #include "console.h"
 #include <string.h>
 
-/** Find the start of the character before a byte of the input line.
- *
- * @param con The console state
- * @param at The byte
- * @return The first byte of the character before it, 0 at the start
- */
-static int32_t box_console_prev(
-    const box_console_t *con,
-    int32_t at)
-{
-    if (at > 0) {
-        at --;
-    }
-
-    while (at > 0 && (con->line[at] & 0xC0) == 0x80) {
-        at --;
-    }
-
-    return at;
-}
-
 /** Find the start of the character after a byte of the input line.
  *
+ * Characters are decoded with box_utf8_next, so each maximal subpart of an ill formed
+ * sequence is one character, as text draws it.
+ *
  * @param con The console state
- * @param at The byte
+ * @param at The byte, at the start of a character
  * @return The first byte of the next character, the length at the end
  */
 static int32_t box_console_next(
     const box_console_t *con,
     int32_t at)
 {
+    const char *ptr = &con->line[at];
     if (at < con->length) {
-        at ++;
+        box_utf8_next(&ptr);
+        at = (int32_t)(ptr - con->line);
     }
 
-    while (at < con->length && (con->line[at] & 0xC0) == 0x80) {
-        at ++;
+    return at < con->length ? at : con->length;
+}
+
+/** Find the start of the character before a byte of the input line.
+ *
+ * Decodes from the start of the line, since only a forward read finds the maximal subparts.
+ *
+ * @param con The console state
+ * @param at The byte, at the start of a character
+ * @return The first byte of the character before it, 0 at the start
+ */
+static int32_t box_console_prev(
+    const box_console_t *con,
+    int32_t at)
+{
+    int32_t result = 0, next = 0;
+    while (next < at) {
+        result = next;
+        next = box_console_next(con, next);
     }
 
-    return at;
+    return result;
 }
 
 /** Insert bytes at the cursor and move the cursor after them.

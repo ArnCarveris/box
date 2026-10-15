@@ -308,7 +308,8 @@ void box_draws_text_dynamic(
 
     it = ecs_query_iter(world, d->dynamic_text_materials);
     while (ecs_query_next(&it)) {
-        for (i = 0; i < it.count; i ++) {
+        int32_t count = box_transform_dynamic(world, it.table) ? 0 : it.count;
+        for (i = 0; i < count; i ++) {
             box_draws_mark(world, d, it.entities[i]);
         }
     }
@@ -437,7 +438,7 @@ void box_draws_text_init(
                 .trav = EcsChildOf,
                 .inout = EcsInOutNone
             },
-            { .id = DynamicTransform, .inout = EcsInOutNone, .oper = EcsNot }
+            { .id = DynamicTransform, .src.id = EcsSelf, .inout = EcsInOutNone, .oper = EcsNot }
         },
         .cache_kind = EcsQueryCacheAuto
     });

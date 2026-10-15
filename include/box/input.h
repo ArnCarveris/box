@@ -110,7 +110,8 @@ ECS_STRUCT(Mouse, {
 ECS_STRUCT(Input, {
     KeyState keys[104]; /**< State of every key and mouse button, indexed by Key */
     Mouse mouse;        /**< Cursor and wheel state */
-    char *text;         /**< Text typed this frame as UTF-8, owned, NULL for none */
+    char *text;         /**< Text typed this frame as UTF-8, owned, NULL for none; invalid
+                         *   code points are typed as U+FFFD */
     vec2 size;          /**< Window size in points, 0 until a resize event */
     bool focused;       /**< Platform input is applied, false ignores it */
     ecs_entity_t surface; /**< Surface with the input focus, 0 until one gains it */
@@ -286,8 +287,8 @@ Key box_input_dom_button(
 
 /** Push the platform events of a browser keydown or keyup: the key and the typed text.
  *
- * A keydown whose key value is one printable character types it, unless control or meta is
- * held.
+ * A keydown whose key value is one printable character (decoded with box_utf8_next) types
+ * it, unless control or meta is held.
  *
  * @param world The world
  * @param code The KeyboardEvent.code value
@@ -405,7 +406,8 @@ void box_input_key_press(
 
 /** Queue one key tap per character of a text, with the character as typed text.
  *
- * A character without a key, such as an accented letter, only adds text.
+ * A character without a key, such as an accented letter, only adds text. Characters are
+ * decoded with box_utf8_next: each maximal subpart of an ill formed sequence types U+FFFD.
  *
  * @param world The world
  * @param text UTF-8 text

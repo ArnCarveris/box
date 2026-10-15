@@ -1050,8 +1050,10 @@ static void box_draws_dynamic(
 
     it = ecs_query_iter(world, d->dynamic_material);
     while (ecs_query_next(&it)) {
-        box_draws_fill_transform(&it, d);
-        box_draws_fill_material(&it, d, !ecs_field_is_self(&it, 9));
+        if (!box_transform_dynamic(world, it.table)) {
+            box_draws_fill_transform(&it, d);
+            box_draws_fill_material(&it, d, !ecs_field_is_self(&it, 9));
+        }
     }
 }
 

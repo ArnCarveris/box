@@ -211,7 +211,8 @@ static bool box_bake_inside(
     const box_mesh_t *mesh = cache && shape && shape->mesh ?
         box_mesh_cache_get(cache, shape->mesh) : NULL;
     if (!mesh || ecs_has_id(world, e, DynamicTransform) ||
-        ecs_has_id(world, e, ManualTransform) || ecs_has_id(world, e, NoBake))
+        ecs_has_id(world, e, ManualTransform) || ecs_has_id(world, e, NoBake) ||
+        box_projection_anchored(world, e))
     {
         goto done;
     }

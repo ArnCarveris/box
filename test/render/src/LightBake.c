@@ -269,3 +269,60 @@ void LightBake_scene_renders_identically(void) {
     stbi_image_free(images[0]);
     stbi_image_free(images[1]);
 }
+
+void LightBake_projected_anchor_not_baked(void) {
+    // core_fixes/projection_position
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t scene = ecs_new(world);
+    ecs_add(world, scene, Scene);
+    ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
+        .capture_size = 8, .budget_ms = 0.001f, .bounces = 1});
+    ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, camera, Position, {0, 1, 5});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true,
+        .lighting.baked = true});
+    ecs_entity_t floor = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, floor, Position, {0, -0.1f, 0});
+    ecs_set(world, floor, Box, {2, 0.2f, 2});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 32, .height = 24, .resolution_scale = 1});
+
+    int32_t frame;
+    const LightBakeStatus *status = NULL;
+    for (frame = 0; frame < 5000; frame ++) {
+        ecs_progress(world, 0);
+        status = ecs_get(world, scene, LightBakeStatus);
+        if (status->converged) {
+            break;
+        }
+    }
+
+    test_assert(status->converged);
+
+    ecs_entity_t anchor = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, anchor, ProjectedAnchor, {
+        .target = floor, .view = view, .offset = {0, 1.1f, 0}});
+    ecs_set(world, anchor, Box, {0.5f, 0.5f, 0.5f});
+    ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, anchor);
+    ecs_set(world, child, Position, {0.5f, 0, 0});
+    ecs_set(world, child, Box, {0.3f, 0.3f, 0.3f});
+    for (frame = 0; frame < 5; frame ++) {
+        ecs_set(world, camera, Position, {0.01f * (float)frame, 1, 5});
+        ecs_progress(world, 0);
+        status = ecs_get(world, scene, LightBakeStatus);
+        test_assert(status->converged);
+        test_assert(fabsf(ecs_get(world, anchor, WorldTransform)->m[3][0]) < 1.0f);
+    }
+
+    ecs_entity_t plain = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, plain, Box, {0.5f, 0.5f, 0.5f});
+    ecs_progress(world, 0);
+    status = ecs_get(world, scene, LightBakeStatus);
+    test_bool(status->converged, false);
+
+    ecs_fini(world);
+}
