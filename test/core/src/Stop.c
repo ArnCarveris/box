@@ -223,3 +223,46 @@ void Stop_run_missing_scene(void) {
 
     ecs_fini(world);
 }
+
+void Stop_run_invalid_scene_headless(void) {
+    // core_fixes/scene_load_failure
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    char *path = flecs_asprintf("/tmp/box_core_invalid_%d.flecs", (int)getpid());
+    FILE *f = fopen(path, "w");
+    fputs("Foo {}\nusing flecs.meta\n", f);
+    fclose(f);
+    ecs_singleton_set(world, App, {
+        .headless = true, .frames = 2, .cpu_budget = 100, .fps = 0,
+        .unguarded = true, .unpaced = true, .scene = path });
+
+    ecs_log_set_level(-4);
+    test_assert(box_app_run(world) != 0);
+    test_int(ecs_singleton_get(world, AppStatus)->frame, 0);
+
+    unlink(path);
+    ecs_os_free(path);
+    ecs_fini(world);
+}
+
+void Stop_run_invalid_scene_windowed(void) {
+    // core_fixes/scene_load_failure
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    char *path = flecs_asprintf("/tmp/box_core_invalid_%d.flecs", (int)getpid());
+    FILE *f = fopen(path, "w");
+    fputs("Foo {\n", f);
+    fclose(f);
+    ecs_singleton_set(world, App, {
+        .frames = 2, .fps = 0, .unpaced = true, .scene = path });
+
+    ecs_log_set_level(-4);
+    test_assert(box_app_run(world) != 0);
+    test_int(ecs_singleton_get(world, AppStatus)->frame, 0);
+
+    unlink(path);
+    ecs_os_free(path);
+    ecs_fini(world);
+}
