@@ -37,10 +37,14 @@ ECS_STRUCT(Shader, {
     char *defines;  /**< Macros defined first, NAME or NAME=value separated by commas */
 });
 
-/** Outcome of the last preprocessing of a Shader, written by the engine */
+/** Outcome of the last preprocessing and GPU compile of a Shader, written by the engine.
+ *
+ * A GPU error stays until the compile outcome of newer code arrives, which in the browser
+ * can take longer than a frame.
+ */
 ECS_STRUCT(ShaderStatus, {
     int32_t revision;   /**< Times preprocessing produced new code */
-    bool ok;            /**< The last preprocessing succeeded */
+    bool ok;            /**< The last preprocessing succeeded and no GPU error is reported */
     char *error;        /**< First error as file:line: message, NULL when ok */
 });
 

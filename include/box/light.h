@@ -25,23 +25,40 @@
 extern "C" {
 #endif
 
+/** How a light takes part in the LightBake of its scene, as Unity's light modes.
+ *
+ * Mixed is the zero value and means what it says: the light lights directly in realtime and
+ * its bounced light is baked, so a light written as a C literal stays in both. In a scene
+ * without LightBake every mode lights directly in realtime.
+ */
+ECS_ENUM(LightBakeMode, {
+    LightBakeModeMixed = 0,    /**< Lights directly in realtime and contributes to the bake */
+    LightBakeModeRealtime = 1, /**< Lights directly in realtime and is left out of the bake */
+    LightBakeModeBaked = 2     /**< Exists only in the probes of the bake, its direct and
+                                *   bounced light alike: no realtime light, no per frame cost
+                                *   and no view shadows */
+});
+
 /** Directional light travelling along the entity's local +Z */
 ECS_STRUCT(DirectionalLight, {
-    float intensity; /**< Radiance scale, default 1, 0 lights nothing */
+    float intensity;    /**< Radiance scale, default 1, 0 lights nothing */
+    LightBakeMode bake; /**< Part of the light in the bake of its scene, default Mixed */
 });
 
 /** Omnidirectional light */
 ECS_STRUCT(PointLight, {
-    float intensity; /**< Radiance scale, default 1, 0 lights nothing */
-    float range;     /**< Distance at which the light reaches zero, default 10 */
+    float intensity;    /**< Radiance scale, default 1, 0 lights nothing */
+    float range;        /**< Distance at which the light reaches zero, default 10 */
+    LightBakeMode bake; /**< Part of the light in the bake of its scene, default Mixed */
 });
 
 /** Cone light along the entity's local +Z, angles are half angles in degrees */
 ECS_STRUCT(SpotLight, {
-    float intensity;   /**< Radiance scale, default 1, 0 lights nothing */
-    float range;       /**< Distance at which the light reaches zero, default 10 */
-    float inner_angle; /**< Full intensity cone half angle, default 20 */
-    float outer_angle; /**< Zero intensity cone half angle, default 30 */
+    float intensity;    /**< Radiance scale, default 1, 0 lights nothing */
+    float range;        /**< Distance at which the light reaches zero, default 10 */
+    float inner_angle;  /**< Full intensity cone half angle, default 20 */
+    float outer_angle;  /**< Zero intensity cone half angle, default 30 */
+    LightBakeMode bake; /**< Part of the light in the bake of its scene, default Mixed */
 });
 
 /** Hemisphere ambient light of the scene the entity is in, blended by the surface normal */
@@ -54,9 +71,9 @@ ECS_STRUCT(AmbientLight, {
 /** Baked indirect lighting of a scene, placed on a Scene root or as a singleton for the default
  * scene. Adding it adds LightBakeStatus.
  *
- * A bake is bounces + 1 passes over every probe: the first captures direct light and emission,
- * every later pass adds a bounce by shading its captures with the probes of the pass before it.
- * Views show the last complete pass while the next one bakes. Changing bounces bakes again.
+ * A bake is bounces + 1 passes: the first captures direct light and emission, each later one
+ * adds a bounce. A change rebakes the probes it can reach, which keep their values meanwhile
+ * (static shapes, lights; see docs/ARCHITECTURE.md, Invalidation). Dynamic shapes rebake none.
  *
  * Values apply as specified: bounces 0 bakes direct emission and light only, budget_ms 0 bakes
  * nothing, a capture_size outside 1 to 256 or bounces outside 0 to 16 bakes nothing and sets
@@ -74,10 +91,11 @@ ECS_STRUCT(LightBake, {
 /** Progress of the bake of a scene, written by the engine next to LightBake */
 ECS_STRUCT(LightBakeStatus, {
     int32_t probes;      /**< Probes of the volume */
-    int32_t baked;       /**< Probes baked in the pass being baked, or in the last when converged */
-    int32_t pass;        /**< Completed capture passes: the first bakes direct light and emission,
-                          *   each later one a bounce; bounces + 1 when converged */
-    bool converged;      /**< All bounces + 1 passes are baked, pass equals bounces + 1 */
+    int32_t baked;       /**< Valid probes not waiting to be (re)baked in the pass being baked */
+    int32_t pass;        /**< Completed capture passes of the bake in progress: the first bakes
+                          *   direct light and emission, each later one a bounce; bounces + 1
+                          *   when converged */
+    bool converged;      /**< All bounces + 1 passes are baked and no change is queued */
     bool cache_hit;      /**< The volume was loaded from the cache */
     char *error;         /**< Why nothing is baked, such as an invalid setting, NULL for none */
 });
@@ -89,6 +107,9 @@ extern ECS_TAG_DECLARE(NoBake);
  *
  * The first directional light of a scene casts the shadows of the views that enable them;
  * NoShadow shapes and blended shapes cast none.
+ *
+ * In a scene with LightBake the views are shadowed by the first directional light that is not
+ * Baked and the probe captures by the first one they shade surfaces with (see LightBakeMode).
  *
  * @param world The world
  */

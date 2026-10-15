@@ -1,12 +1,25 @@
 /**
  * @file app/cpu.c
- * @brief CPU time of the process, the oversubscription guard and the budget sleep.
+ * @brief CPU time of the process, the oversubscription guard, the budget sleep and the wait.
  */
 
 #include "app.h"
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/resource.h>
+
+/** Seconds left below which a wait sleeps the rest in one go */
+#define BOX_WAIT_STEP (0.0001)
+
+/** Fraction of the time left that one sleep of a longer wait asks for.
+ *
+ * A process without a window gets up to 50% timer leeway on macOS, so a sleep of the whole
+ * time left could overshoot by half of it; shorter sleeps converge on the deadline.
+ */
+#define BOX_WAIT_FRACTION (0.6)
+
+/** Seconds before a deadline at which a wait counts it as reached, below the sleep resolution */
+#define BOX_WAIT_EPSILON (1e-6)
 
 double box_app_cpu_time(void)
 {
@@ -30,14 +43,31 @@ double box_app_wall_time(void)
     return (double)t.sec + (double)t.nanosec * 1e-9;
 }
 
-bool box_app_oversubscribed(
-    double load,
-    int32_t cores)
+double box_wait_until(
+    double deadline)
 {
-    return load > (double)cores;
+    double now = box_app_wall_time();
+    while (deadline - now > BOX_WAIT_EPSILON) {
+        double left = deadline - now;
+        ecs_sleepf(left > BOX_WAIT_STEP ? left * BOX_WAIT_FRACTION : left);
+        now = box_app_wall_time();
+    }
+
+    return now;
 }
 
-int box_app_guard(void)
+bool box_app_oversubscribed(
+    double load,
+    int32_t cores,
+    float budget)
+{
+    double claim = budget > 0 ? (double)budget / 100.0 : 1.0;
+
+    return load + claim > (double)cores;
+}
+
+int box_app_guard(
+    float budget)
 {
     int result = 0;
 #ifndef __EMSCRIPTEN__
@@ -47,8 +77,9 @@ int box_app_guard(void)
         cores = 1;
     }
 
-    if (getloadavg(&load, 1) == 1 && box_app_oversubscribed(load, (int32_t)cores)) {
-        ecs_err("cpu oversubscribed: load %.1f on %d cores", load, (int)cores);
+    if (getloadavg(&load, 1) == 1 && box_app_oversubscribed(load, (int32_t)cores, budget)) {
+        ecs_err("cpu oversubscribed: load %.1f plus a claim of %.2f cores on %d cores", load,
+            budget > 0 ? (double)budget / 100.0 : 1.0, (int)cores);
         result = -1;
     }
 #endif

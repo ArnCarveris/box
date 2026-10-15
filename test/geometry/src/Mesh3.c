@@ -322,3 +322,262 @@ void Mesh3_ensure_modified_leak(void) {
 
     ecs_fini(world);
 }
+
+void Mesh3_prefab_instances_share(void) {
+    // core_fixes/mesh3_inherit
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+
+    Mesh3 m = {0};
+    ecs_vec_init_t(NULL, &m.vertices, vec3, 4);
+    ecs_vec_init_t(NULL, &m.indices, uint32_t, 6);
+    ecs_vec_set_count_t(NULL, &m.vertices, vec3, 4);
+    ecs_vec_set_count_t(NULL, &m.indices, uint32_t, 6);
+    vec3 *p = ecs_vec_first_t(&m.vertices, vec3);
+    glm_vec3_copy((vec3){ -1, -1, 0 }, p[0]);
+    glm_vec3_copy((vec3){ 1, -1, 0 }, p[1]);
+    glm_vec3_copy((vec3){ 1, 1, 0 }, p[2]);
+    glm_vec3_copy((vec3){ -1, 1, 0 }, p[3]);
+    const uint32_t tris[6] = { 0, 1, 2, 0, 2, 3 };
+    ecs_os_memcpy(ecs_vec_first(&m.indices), tris, sizeof(tris));
+
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_set_ptr(world, prefab, Mesh3, &m);
+    ecs_vec_fini_t(NULL, &m.vertices, vec3);
+    ecs_vec_fini_t(NULL, &m.indices, uint32_t);
+    const Mesh3 *shared = ecs_get(world, prefab, Mesh3);
+    uint32_t mesh = ecs_get(world, prefab, ShapeMesh)->mesh;
+    test_assert(mesh != 0);
+
+    ecs_entity_t *instances = ecs_os_malloc_n(ecs_entity_t, 1000);
+    for (int i = 0; i < 1000; i ++) {
+        instances[i] = ecs_new_w_pair(world, EcsIsA, prefab);
+    }
+
+    for (int i = 0; i < 1000; i ++) {
+        test_assert(!ecs_owns(world, instances[i], Mesh3));
+        test_assert(ecs_get(world, instances[i], Mesh3) == shared);
+        const ShapeMesh *sm = ecs_get(world, instances[i], ShapeMesh);
+        test_assert(sm != NULL);
+        test_uint(sm->mesh, mesh);
+        test_flt(sm->scale[0], 1.0f);
+    }
+
+    const box_mesh_t *resolved = box_mesh_cache_get(cache, mesh);
+    test_assert(resolved != NULL);
+    test_int(resolved->index_count, 6);
+    test_flt(resolved->min[0], -1.0f);
+    test_flt(resolved->max[1], 1.0f);
+
+    for (int i = 0; i < 1000; i ++) {
+        ecs_delete(world, instances[i]);
+    }
+
+    test_assert(box_mesh_cache_get(cache, mesh) != NULL);
+    ecs_delete(world, prefab);
+    test_int(box_mesh_cache_count(cache), 0);
+
+    ecs_os_free(instances);
+    ecs_fini(world);
+}
+
+void Mesh3_prefab_instance_override(void) {
+    // core_fixes/mesh3_inherit
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+
+    Mesh3 m = {0};
+    ecs_vec_init_t(NULL, &m.vertices, vec3, 3);
+    ecs_vec_set_count_t(NULL, &m.vertices, vec3, 3);
+    vec3 *p = ecs_vec_first_t(&m.vertices, vec3);
+    for (int i = 0; i < 3; i ++) {
+        glm_vec3_copy((vec3){ (float)(i == 1), (float)(i == 2), 0.0f }, p[i]);
+    }
+
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_set_ptr(world, prefab, Mesh3, &m);
+    ecs_entity_t a = ecs_new_w_pair(world, EcsIsA, prefab);
+    ecs_entity_t b = ecs_new_w_pair(world, EcsIsA, prefab);
+    uint32_t shared = ecs_get(world, prefab, ShapeMesh)->mesh;
+
+    p[2][2] = 3.0f;
+    ecs_set_ptr(world, a, Mesh3, &m);
+    ecs_vec_fini_t(NULL, &m.vertices, vec3);
+    test_assert(ecs_owns(world, a, Mesh3));
+    uint32_t own = ecs_get(world, a, ShapeMesh)->mesh;
+    test_assert(own != shared);
+    test_flt(box_mesh_cache_get(cache, own)->max[2], 3.0f);
+    test_uint(ecs_get(world, b, ShapeMesh)->mesh, shared);
+    test_uint(ecs_get(world, prefab, ShapeMesh)->mesh, shared);
+    test_flt(box_mesh_cache_get(cache, shared)->max[2], 0.0f);
+    test_int(ecs_vec_count(&ecs_get(world, prefab, Mesh3)->vertices), 3);
+
+    ecs_remove(world, a, Mesh3);
+    test_assert(!ecs_owns(world, a, Mesh3));
+    test_assert(ecs_has(world, a, Mesh3));
+    const ShapeMesh *sm = ecs_get(world, a, ShapeMesh);
+    test_assert(sm != NULL);
+    test_uint(sm->mesh, shared);
+    test_assert(box_mesh_cache_get(cache, own) == NULL);
+
+    ecs_delete(world, a);
+    ecs_delete(world, b);
+    ecs_delete(world, prefab);
+    test_int(box_mesh_cache_count(cache), 0);
+
+    ecs_fini(world);
+}
+
+void Mesh3_prefab_update(void) {
+    // core_fixes/mesh3_inherit
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+
+    Mesh3 m = {0};
+    ecs_vec_init_t(NULL, &m.vertices, vec3, 3);
+    ecs_vec_set_count_t(NULL, &m.vertices, vec3, 3);
+    vec3 *p = ecs_vec_first_t(&m.vertices, vec3);
+    for (int i = 0; i < 3; i ++) {
+        glm_vec3_copy((vec3){ (float)(i == 1), (float)(i == 2), 0.0f }, p[i]);
+    }
+
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_set_ptr(world, prefab, Mesh3, &m);
+    ecs_entity_t instances[10];
+    for (int i = 0; i < 10; i ++) {
+        instances[i] = ecs_new_w_pair(world, EcsIsA, prefab);
+    }
+
+    p[2][2] = 5.0f;
+    ecs_set_ptr(world, instances[0], Mesh3, &m);
+    uint32_t own = ecs_get(world, instances[0], ShapeMesh)->mesh;
+
+    p[2][2] = 2.0f;
+    ecs_set_ptr(world, prefab, Mesh3, &m);
+    ecs_vec_fini_t(NULL, &m.vertices, vec3);
+    uint32_t updated = ecs_get(world, prefab, ShapeMesh)->mesh;
+    test_flt(box_mesh_cache_get(cache, updated)->max[2], 2.0f);
+    test_uint(ecs_get(world, instances[0], ShapeMesh)->mesh, own);
+    test_flt(box_mesh_cache_get(cache, own)->max[2], 5.0f);
+    for (int i = 1; i < 10; i ++) {
+        test_uint(ecs_get(world, instances[i], ShapeMesh)->mesh, updated);
+    }
+
+    Mesh3 *edit = ecs_get_mut(world, prefab, Mesh3);
+    ecs_vec_get_t(&edit->vertices, vec3, 2)[0][2] = 4.0f;
+    ecs_modified(world, prefab, Mesh3);
+    uint32_t edited = ecs_get(world, prefab, ShapeMesh)->mesh;
+    test_flt(box_mesh_cache_get(cache, edited)->max[2], 4.0f);
+    for (int i = 1; i < 10; i ++) {
+        test_uint(ecs_get(world, instances[i], ShapeMesh)->mesh, edited);
+    }
+
+    test_int(box_mesh_cache_count(cache), 2);
+    for (int i = 0; i < 10; i ++) {
+        ecs_delete(world, instances[i]);
+    }
+
+    ecs_delete(world, prefab);
+    test_int(box_mesh_cache_count(cache), 0);
+
+    ecs_fini(world);
+}
+
+void Mesh3_prefab_delete(void) {
+    // core_fixes/mesh3_inherit
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    ECS_TAG(world, Marker);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+
+    Mesh3 m = {0};
+    ecs_vec_init_t(NULL, &m.vertices, vec3, 3);
+    ecs_vec_set_count_t(NULL, &m.vertices, vec3, 3);
+    vec3 *p = ecs_vec_first_t(&m.vertices, vec3);
+    for (int i = 0; i < 3; i ++) {
+        glm_vec3_copy((vec3){ (float)(i == 1), (float)(i == 2), 0.0f }, p[i]);
+    }
+
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_set_ptr(world, prefab, Mesh3, &m);
+    ecs_vec_fini_t(NULL, &m.vertices, vec3);
+    ecs_entity_t instances[10];
+    for (int i = 0; i < 10; i ++) {
+        instances[i] = ecs_new_w_pair(world, EcsIsA, prefab);
+        ecs_add(world, instances[i], Marker);
+    }
+
+    ecs_delete(world, prefab);
+    for (int i = 0; i < 10; i ++) {
+        test_assert(ecs_is_alive(world, instances[i]));
+        test_assert(!ecs_has(world, instances[i], Mesh3));
+        test_assert(!ecs_has(world, instances[i], ShapeMesh));
+        test_assert(ecs_has(world, instances[i], Marker));
+    }
+
+    test_int(box_mesh_cache_count(cache), 0);
+
+    ecs_fini(world);
+}
+
+void Mesh3_prefab_remove(void) {
+    // core_fixes/mesh3_inherit
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+
+    Mesh3 m = {0};
+    ecs_vec_init_t(NULL, &m.vertices, vec3, 3);
+    ecs_vec_set_count_t(NULL, &m.vertices, vec3, 3);
+    vec3 *p = ecs_vec_first_t(&m.vertices, vec3);
+    for (int i = 0; i < 3; i ++) {
+        glm_vec3_copy((vec3){ (float)(i == 1), (float)(i == 2), 0.0f }, p[i]);
+    }
+
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_set_ptr(world, prefab, Mesh3, &m);
+    ecs_entity_t instances[10];
+    for (int i = 0; i < 10; i ++) {
+        instances[i] = ecs_new_w_pair(world, EcsIsA, prefab);
+    }
+
+    uint32_t shared = ecs_get(world, instances[1], ShapeMesh)->mesh;
+    p[2][2] = 3.0f;
+    ecs_set_ptr(world, instances[0], Mesh3, &m);
+    uint32_t own = ecs_get(world, instances[0], ShapeMesh)->mesh;
+
+    ecs_remove(world, prefab, Mesh3);
+    test_assert(!ecs_has(world, prefab, Mesh3));
+    test_assert(ecs_has(world, instances[0], Mesh3));
+    test_uint(ecs_get(world, instances[0], ShapeMesh)->mesh, own);
+    for (int i = 1; i < 10; i ++) {
+        test_assert(!ecs_has(world, instances[i], Mesh3));
+        test_assert(!ecs_has(world, instances[i], ShapeMesh));
+    }
+
+    test_assert(box_mesh_cache_get(cache, shared) == NULL);
+
+    p[2][2] = 2.0f;
+    ecs_set_ptr(world, prefab, Mesh3, &m);
+    ecs_vec_fini_t(NULL, &m.vertices, vec3);
+    uint32_t again = ecs_get(world, prefab, ShapeMesh)->mesh;
+    test_flt(box_mesh_cache_get(cache, again)->max[2], 2.0f);
+    test_uint(ecs_get(world, instances[0], ShapeMesh)->mesh, own);
+    for (int i = 1; i < 10; i ++) {
+        const ShapeMesh *sm = ecs_get(world, instances[i], ShapeMesh);
+        test_assert(sm != NULL);
+        test_uint(sm->mesh, again);
+    }
+
+    for (int i = 0; i < 10; i ++) {
+        ecs_delete(world, instances[i]);
+    }
+
+    ecs_delete(world, prefab);
+    test_int(box_mesh_cache_count(cache), 0);
+
+    ecs_fini(world);
+}

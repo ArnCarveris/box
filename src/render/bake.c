@@ -6,12 +6,12 @@
  * says; probes inside a static shape are invalid. Probes start as the SH of the hemisphere
  * ambient of the scene, so a view that samples them looks as it did with the hemisphere.
  *
- * Captures of the nearest unbaked probes go into each packet as budget_ms allows, all of them
- * in a headless run, for bounces + 1 passes, each shading with the probes of the previous one.
- * Views keep the probe buffer of the last complete pass while the next writes the other one.
+ * Captures of the nearest unbaked probes go into each packet as budget_ms allows for bounces
+ * + 1 passes, each shading with the previous one; views keep the last complete pass. A change
+ * rebakes the probes it can reach (bake_change.c) in a copy of the shown buffer, then shows it.
  */
 
-#include "render.h"
+#include "bake.h"
 #include "../spatial/spatial.h"
 #include "../geometry/mesh_cache.h"
 #include <float.h>
@@ -37,96 +37,8 @@
 /** Error of a LightBake whose capture_size is out of range */
 #define BOX_BAKE_SIZE_ERROR "capture_size must be 1 to 256"
 
-/** Bounces a bake may have at most, as the range of Godot's LightmapGI */
-#define BOX_BAKE_BOUNCES_MAX (16)
-
 /** Error of a LightBake whose bounces is out of range */
 #define BOX_BAKE_BOUNCES_ERROR "bounces must be 0 to 16"
-
-/** Passes of a bake at most, the first one and one per bounce */
-#define BOX_BAKE_PASSES_MAX (BOX_BAKE_BOUNCES_MAX + 1)
-
-/** A probe in a packet whose capture the backend has not reported yet */
-typedef struct box_bake_flight_t {
-    uint32_t probe;         /**< Index of the probe */
-    int32_t pass;           /**< Pass of the capture */
-    int32_t packet;         /**< Number of the packet, as RenderStatus.submitted after it */
-} box_bake_flight_t;
-
-/** Weight of a new measurement in the GPU time per probe */
-#define BOX_BAKE_SMOOTHING (0.5f)
-
-/** A probe waiting for its capture and its squared distance to the nearest camera */
-typedef struct box_bake_pick_t {
-    float distance;         /**< Squared distance to the nearest camera of the scene */
-    uint32_t probe;         /**< Index of the probe */
-} box_bake_pick_t;
-
-/** Grid of probes of a volume */
-typedef struct box_bake_grid_t {
-    float origin[3];        /**< World position of the first probe */
-    float spacing;          /**< World units between neighbouring probes */
-    int32_t size[3];        /**< Probes per axis, 0 for a volume without probes */
-} box_bake_grid_t;
-
-/** The volume of one scene with LightBake */
-typedef struct box_bake_volume_t {
-    ecs_entity_t scene;     /**< Scene root, 0 for the default scene */
-    ecs_entity_t entity;    /**< Entity with the LightBake of the scene */
-    uint32_t handle;        /**< Volume handle, 0 while the grid has no probes */
-    int32_t probes;         /**< Probes of the grid */
-    box_bake_grid_t grid;   /**< The grid the backend has */
-    float probe_spacing;    /**< LightBake.probe_spacing the grid was placed with */
-    float bounds_padding;   /**< LightBake.bounds_padding the grid was placed with */
-    bool placed;            /**< The grid was placed at least once */
-    bool seen;              /**< A LightBake of the scene exists in this frame */
-    bool sent;              /**< The backend has the volume with this grid */
-    bool viewed;            /**< A view of the scene is in the packet of this frame */
-    bool converged;         /**< The backend reported every pass of every valid probe */
-    bool pending;           /**< The bake can progress this frame and has not converged */
-    bool resort;            /**< The queue is sorted again before the next probes are taken */
-    float sh[BOX_RENDER_SH_COEFFICIENTS][4]; /**< Irradiance the probes are filled with */
-    float ambient[BOX_RENDER_SH_COEFFICIENTS][4]; /**< Irradiance of the views of this frame */
-    ecs_vec_t valid;        /**< uint32_t, one bit per probe outside static geometry */
-    ecs_vec_t queue;        /**< uint32_t, probes waiting for capture, the nearest last */
-    ecs_vec_t flight;       /**< box_bake_flight_t, probes in packets not reported captured */
-    ecs_vec_t done;         /**< uint8_t, passes the backend reported for every probe */
-    ecs_vec_t cameras;      /**< vec3, cameras of the views of the scene in this frame */
-    ecs_vec_t sorted;       /**< vec3, cameras the queue was sorted for */
-    box_render_view_lights_t lights; /**< Lights of the first view of the scene in this frame */
-    vec3 min;               /**< Minimum corner of the static bounds of the grid */
-    vec3 max;               /**< Maximum corner of the static bounds of the grid */
-    int32_t capture_size;   /**< LightBake.capture_size of this frame */
-    float budget_ms;        /**< LightBake.budget_ms of this frame */
-    int32_t bounces;        /**< LightBake.bounces of this frame */
-    uint32_t generation;    /**< Number of the bake, so captures of an earlier one are ignored */
-    int32_t passes;         /**< Passes of the bake, one more than its bounces */
-    int32_t submitted;      /**< Passes whose every probe went into a packet */
-    int32_t completed;      /**< Passes the backend reported for every valid probe */
-    int32_t valid_count;    /**< Probes outside static geometry, captured by every pass */
-    int32_t reported[BOX_BAKE_PASSES_MAX]; /**< Probes the backend reported per pass */
-    int32_t first;          /**< Probe buffer the first pass writes, later passes alternate */
-    int32_t display;        /**< Probe buffer the views sample */
-    bool filled;            /**< The buffer the views sample holds the ambient, no pass */
-    const char *error;      /**< Why the volume bakes nothing, NULL for none */
-} box_bake_volume_t;
-
-/** Main thread state of the bake extract */
-typedef struct box_render_bake_t {
-    ecs_query_t *bakes;     /**< Entities with LightBake and their scene */
-    ecs_vec_t volumes;      /**< box_bake_volume_t */
-    ecs_vec_t free_handles; /**< uint32_t, volume handles to reuse */
-    uint32_t next_handle;   /**< Next volume handle */
-    ecs_vec_t hits;         /**< ecs_entity_t, scratch of the overlap queries */
-    int32_t indexed;        /**< Entities of the spatial index at the last extract */
-    ecs_vec_t picks;        /**< box_bake_pick_t, scratch of the choice of the next probes */
-    ecs_vec_t captured;     /**< box_render_bake_result_t, scratch of the reported captures */
-    float probe_ms;         /**< GPU milliseconds per probe capture */
-    bool measured;          /**< probe_ms comes from a measurement */
-    int32_t pending;        /**< Probes left in the volumes that can progress */
-    const void *backend;    /**< Context of the backend the volumes were sent to */
-    void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
-} box_render_bake_t;
 
 /** Find the volume of a scene.
  *
@@ -134,7 +46,7 @@ typedef struct box_render_bake_t {
  * @param scene The scene root
  * @return The volume, NULL when the scene has none
  */
-static box_bake_volume_t* box_bake_find(
+box_bake_volume_t* box_bake_find(
     const box_render_bake_t *b,
     ecs_entity_t scene)
 {
@@ -170,6 +82,13 @@ static box_bake_volume_t* box_bake_ensure(
         ecs_vec_init_t(NULL, &result->queue, uint32_t, 0);
         ecs_vec_init_t(NULL, &result->flight, box_bake_flight_t, 0);
         ecs_vec_init_t(NULL, &result->done, uint8_t, 0);
+        ecs_vec_init_t(NULL, &result->members, uint32_t, 0);
+        ecs_vec_init_t(NULL, &result->dirty, uint32_t, 0);
+        ecs_vec_init_t(NULL, &result->flags, uint8_t, 0);
+        ecs_vec_init_t(NULL, &result->shown, uint32_t, 0);
+        ecs_vec_init_t(NULL, &result->light_list, box_render_light_t, 0);
+        ecs_vec_init_t(NULL, &result->light_entities, ecs_entity_t, 0);
+        ecs_vec_init_t(NULL, &result->light_modes, uint8_t, 0);
         ecs_vec_init_t(NULL, &result->cameras, vec3, 0);
         ecs_vec_init_t(NULL, &result->sorted, vec3, 0);
     }
@@ -177,34 +96,35 @@ static box_bake_volume_t* box_bake_ensure(
     return result;
 }
 
-/** Count the probes along the axes of padded bounds at a spacing.
+/** Place the probes of one axis of padded bounds on the lattice (k + 1/2) * spacing.
  *
- * @param extent Size of the padded bounds per axis
+ * @param lo Low end of the padded bounds
+ * @param hi High end of the padded bounds
  * @param spacing World units between probes
- * @param size Receives the probes per axis
- * @return Probes of the grid
+ * @param first Receives the lattice index of the first probe
+ * @return Probes along the axis, at least 1
  */
-static double box_bake_count(
-    const double *extent,
+static double box_bake_axis(
+    double lo,
+    double hi,
     double spacing,
-    int32_t *size)
+    int32_t *first)
 {
-    double result = 1;
-    int32_t i;
-    for (i = 0; i < 3; i ++) {
-        double n = ceil(extent[i] / spacing - BOX_BAKE_EPSILON) + 1.0;
-        n = fmin(fmax(n, 1.0), (double)BOX_BAKE_PROBES_MAX + 1.0);
-        size[i] = (int32_t)n;
-        result *= n;
+    double a = ceil(lo / spacing - 0.5 - BOX_BAKE_EPSILON);
+    double b = floor(hi / spacing - 0.5 + BOX_BAKE_EPSILON);
+    if (b < a) {
+        a = b = floor(((lo + hi) * 0.5) / spacing);
     }
 
-    return result;
+    b = fmin(b, a + (double)BOX_BAKE_PROBES_MAX);
+    *first = (int32_t)a;
+
+    return b - a + 1.0;
 }
 
-/** Place a grid over bounds: probes spacing apart, centered on the padded bounds.
- *
- * Probes per axis are ceil(extent / spacing) + 1, so the grid covers the padded bounds; a
- * grid of more than BOX_BAKE_PROBES_MAX probes is spaced wider until it fits.
+/** Place a grid over bounds: probes at (k + 1/2) * spacing inside the padded bounds, so a
+ * change of the bounds only adds or removes probes at the edges (as Unity places adaptive
+ * probe volume bricks on a world grid). Above BOX_BAKE_PROBES_MAX probes it is spaced wider.
  *
  * @param min Minimum corner of the static bounds
  * @param max Maximum corner of the static bounds
@@ -220,32 +140,53 @@ static int32_t box_bake_place(
     float padding,
     box_bake_grid_t *out)
 {
-    double extent[3], center[3], step = spacing;
-    int32_t i, result = 0;
+    double step = spacing, probes = 0;
+    int32_t i, first[3], result = 0;
     ecs_os_memset_t(out, 0, box_bake_grid_t);
     if (!(spacing > 0) || !isfinite(spacing) || !isfinite(padding)) {
         goto done;
     }
 
-    for (i = 0; i < 3; i ++) {
-        center[i] = ((double)min[i] + (double)max[i]) * 0.5;
-        extent[i] = fmax((double)max[i] - (double)min[i] + 2.0 * (double)padding, 0.0);
-    }
+    do {
+        if (probes > BOX_BAKE_PROBES_MAX) {
+            step *= fmax(cbrt(probes / BOX_BAKE_PROBES_MAX), 1.01);
+        }
 
-    double probes = box_bake_count(extent, step, out->size);
-    while (probes > BOX_BAKE_PROBES_MAX) {
-        step *= fmax(cbrt(probes / BOX_BAKE_PROBES_MAX), 1.01);
-        probes = box_bake_count(extent, step, out->size);
-    }
+        probes = 1;
+        for (i = 0; i < 3; i ++) {
+            double n = box_bake_axis((double)min[i] - padding, (double)max[i] + padding, step,
+                &first[i]);
+            out->size[i] = (int32_t)n;
+            probes *= n;
+        }
+    } while (probes > BOX_BAKE_PROBES_MAX);
 
     out->spacing = (float)step;
     for (i = 0; i < 3; i ++) {
-        out->origin[i] = (float)(center[i] - (double)(out->size[i] - 1) * step * 0.5);
+        out->origin[i] = (float)(((double)first[i] + 0.5) * step);
     }
 
     result = (int32_t)probes;
 done:
     return result;
+}
+
+/** Get the world position of a probe of a volume.
+ *
+ * @param v The volume
+ * @param index Index of the probe
+ * @param out Receives the position
+ */
+void box_bake_probe_position(
+    const box_bake_volume_t *v,
+    uint32_t index,
+    vec3 out)
+{
+    const box_bake_grid_t *g = &v->grid;
+    uint32_t sx = (uint32_t)g->size[0], sy = (uint32_t)g->size[1];
+    out[0] = g->origin[0] + (float)(index % sx) * g->spacing;
+    out[1] = g->origin[1] + (float)((index / sx) % sy) * g->spacing;
+    out[2] = g->origin[2] + (float)(index / (sx * sy)) * g->spacing;
 }
 
 /** Check whether a position lies inside a static shape that the bake captures.
@@ -297,6 +238,33 @@ done:
     return result;
 }
 
+/** Check whether a position lies inside a static shape of a scene that the bake captures.
+ *
+ * @param world The world
+ * @param b The state, owns the scratch of the overlap queries
+ * @param cache The mesh cache
+ * @param scene The scene
+ * @param pos The position
+ * @return Whether the position is inside
+ */
+bool box_bake_occupied(
+    const ecs_world_t *world,
+    box_render_bake_t *b,
+    const box_mesh_cache_t *cache,
+    ecs_entity_t scene,
+    const vec3 pos)
+{
+    bool result = false;
+    int32_t h;
+    ecs_vec_clear(&b->hits);
+    box_spatial_overlap_box(world, scene, pos, pos, &b->hits);
+    for (h = 0; h < ecs_vec_count(&b->hits) && !result; h ++) {
+        result = box_bake_inside(world, cache, *ecs_vec_get_t(&b->hits, ecs_entity_t, h), pos);
+    }
+
+    return result;
+}
+
 /** Mark the probes of a volume that lie inside static geometry as invalid.
  *
  * @param world The world
@@ -309,35 +277,35 @@ static void box_bake_validate(
     box_bake_volume_t *v)
 {
     const box_mesh_cache_t *cache = box_mesh_cache_of(world);
-    const box_bake_grid_t *g = &v->grid;
     int32_t words = (v->probes + 31) / 32;
-    int32_t x, y, z, index = 0;
+    int32_t i;
     ecs_vec_set_count_t(NULL, &v->valid, uint32_t, words);
     uint32_t *valid = ecs_vec_first(&v->valid);
     ecs_os_memset(valid, 0, words * ECS_SIZEOF(uint32_t));
-    for (z = 0; z < g->size[2]; z ++) {
-        for (y = 0; y < g->size[1]; y ++) {
-            for (x = 0; x < g->size[0]; x ++, index ++) {
-                vec3 p = {
-                    g->origin[0] + (float)x * g->spacing,
-                    g->origin[1] + (float)y * g->spacing,
-                    g->origin[2] + (float)z * g->spacing
-                };
-                bool inside = false;
-                int32_t h;
-                ecs_vec_clear(&b->hits);
-                box_spatial_overlap_box(world, v->scene, p, p, &b->hits);
-                for (h = 0; h < ecs_vec_count(&b->hits) && !inside; h ++) {
-                    inside = box_bake_inside(world, cache,
-                        *ecs_vec_get_t(&b->hits, ecs_entity_t, h), p);
-                }
-
-                if (!inside) {
-                    valid[index >> 5] |= 1u << (index & 31);
-                }
-            }
+    v->valid_count = 0;
+    for (i = 0; i < v->probes; i ++) {
+        vec3 pos;
+        box_bake_probe_position(v, (uint32_t)i, pos);
+        if (!box_bake_occupied(world, b, cache, v->scene, pos)) {
+            valid[i >> 5] |= 1u << (i & 31);
+            v->valid_count ++;
         }
     }
+}
+
+/** Count the probes a volume still has to bake: those of the pass being baked that were not
+ * reported yet and those a change queued for the next bake.
+ *
+ * @param v The volume
+ * @return The probes
+ */
+static int32_t box_bake_left(
+    const box_bake_volume_t *v)
+{
+    int32_t current = v->completed < v->passes ? v->completed : v->passes - 1;
+    int32_t reported = current >= 0 ? v->reported[current] : 0;
+
+    return v->count - reported + ecs_vec_count(&v->dirty);
 }
 
 /** Write the progress of a volume into the LightBakeStatus of its entity when it changed.
@@ -353,8 +321,8 @@ static void box_bake_status(
         ? ecs_get(it->world, v->entity, LightBakeStatus)
         : NULL;
     int32_t pass = v->completed;
-    int32_t current = v->completed < v->passes ? v->completed : v->passes - 1;
-    int32_t baked = current >= 0 ? v->reported[current] : 0;
+    int32_t baked = v->valid_count - box_bake_left(v);
+    baked = baked > 0 ? baked : 0;
     if (!status) {
         goto done;
     }
@@ -376,6 +344,20 @@ static void box_bake_status(
 
 done:
     return;
+}
+
+/** Forget the queue of changes of a volume.
+ *
+ * @param v The volume
+ */
+static void box_bake_forget(
+    box_bake_volume_t *v)
+{
+    ecs_vec_clear(&v->dirty);
+    ecs_vec_set_count_t(NULL, &v->flags, uint8_t, v->probes);
+    if (v->probes) {
+        ecs_os_memset(ecs_vec_first(&v->flags), 0, v->probes);
+    }
 }
 
 /** Forget the bake of a volume: no probe is queued, in flight or baked.
@@ -400,41 +382,102 @@ static void box_bake_clear(
     v->passes = bounces ? v->bounces + 1 : 1;
     v->submitted = 0;
     v->completed = 0;
-    v->valid_count = 0;
+    v->count = 0;
     v->converged = false;
-    v->first = v->filled ? v->display : 1 - v->display;
+    v->first = v->display;
     v->generation ++;
 }
 
-/** Queue every valid probe of a volume for the captures of the next pass.
+/** Queue the probes of the bake of a volume for the captures of the next pass.
  *
  * @param v The volume
  */
 static void box_bake_queue(
     box_bake_volume_t *v)
 {
-    const uint32_t *valid = ecs_vec_first(&v->valid);
-    int32_t i;
-    ecs_vec_clear(&v->queue);
-    for (i = 0; valid && i < v->probes; i ++) {
-        if ((valid[i >> 5] >> (i & 31)) & 1u) {
-            *ecs_vec_append_t(NULL, &v->queue, uint32_t) = (uint32_t)i;
-        }
+    ecs_vec_set_count_t(NULL, &v->queue, uint32_t, v->count);
+    if (v->count) {
+        ecs_os_memcpy_n(ecs_vec_first(&v->queue), ecs_vec_first(&v->members), uint32_t,
+            v->count);
     }
 
-    v->valid_count = ecs_vec_count(&v->queue);
     v->resort = true;
 }
 
-/** Start the bake of a volume again from its first pass.
+/** Check whether a probe of a volume is outside static geometry.
+ *
+ * @param v The volume
+ * @param probe Index of the probe
+ * @return Whether the probe is valid
+ */
+bool box_bake_valid(
+    const box_bake_volume_t *v,
+    uint32_t probe)
+{
+    const uint32_t *valid = ecs_vec_first(&v->valid);
+
+    return valid && ((valid[probe >> 5] >> (probe & 31)) & 1u);
+}
+
+/** Start a bake of a volume from its first pass, of every valid probe or of its members again.
+ *
+ * Over probes that still hold the ambient the first pass writes the shown buffer, so a new
+ * volume lights up probe by probe. Otherwise every pass bakes in place (Gauss-Seidel, as DDGI)
+ * in a copy of the shown buffer, which the views switch to once the last pass is in a packet.
+ *
+ * @param v The volume
+ * @param all Whether every valid probe is baked, else the members of the last bake
+ */
+static void box_bake_begin(
+    box_bake_volume_t *v,
+    bool all)
+{
+    int32_t i;
+    if (all) {
+        ecs_vec_clear(&v->members);
+        for (i = 0; i < v->probes; i ++) {
+            if (box_bake_valid(v, (uint32_t)i)) {
+                *ecs_vec_append_t(NULL, &v->members, uint32_t) = (uint32_t)i;
+            }
+        }
+
+        box_bake_forget(v);
+    }
+
+    box_bake_clear(v);
+    v->count = ecs_vec_count(&v->members);
+    v->staged = !v->filled;
+    v->stage = 1 - v->display;
+    v->copy = v->staged;
+    v->baked_size = v->capture_size;
+    v->fresh |= all;
+    box_bake_queue(v);
+}
+
+/** Start a bake of the probes changes queued, when no bake is in progress.
  *
  * @param v The volume
  */
-static void box_bake_restart(
+static void box_bake_next(
     box_bake_volume_t *v)
 {
-    box_bake_clear(v);
-    box_bake_queue(v);
+    int32_t i, count = ecs_vec_count(&v->dirty);
+    const uint32_t *dirty = ecs_vec_first(&v->dirty);
+    if (!count || v->completed < v->passes) {
+        goto done;
+    }
+
+    ecs_vec_clear(&v->members);
+    for (i = 0; i < count; i ++) {
+        if (box_bake_valid(v, dirty[i])) {
+            *ecs_vec_append_t(NULL, &v->members, uint32_t) = dirty[i];
+        }
+    }
+
+    box_bake_forget(v);
+    box_bake_begin(v, false);
+done:
+    return;
 }
 
 /** Get a volume handle.
@@ -476,6 +519,284 @@ static void box_bake_handle_free(
     v->sent = false;
 }
 
+/** Write the SH irradiance of the hemisphere ambient of a view.
+ *
+ * The hemisphere mix(ground, sky, y / 2 + 1 / 2) is the irradiance over pi the forward pass
+ * shades with: a + b * y, a the mean and b half the difference of sky and ground.
+ *
+ * Its projection is exact in bands 0 and 1, E_00 = pi * a * 2 sqrt(pi) and E_1-1 = pi * b *
+ * 2 sqrt(pi / 3), so the probes evaluate to the hemisphere.
+ *
+ * @param l The lights of the view
+ * @param out Receives the coefficients
+ */
+static void box_bake_ambient(
+    const box_render_view_lights_t *l,
+    float out[BOX_RENDER_SH_COEFFICIENTS][4])
+{
+    double band0 = GLM_PI * 2.0 * sqrt(GLM_PI);
+    double band1 = GLM_PI * 2.0 * sqrt(GLM_PI / 3.0);
+    int32_t c;
+    ecs_os_memset(out, 0, ECS_SIZEOF(float) * BOX_RENDER_SH_COEFFICIENTS * 4);
+    for (c = 0; c < 3; c ++) {
+        double sky = l->ambient_sky[c], ground = l->ambient_ground[c];
+        out[0][c] = (float)((sky + ground) * 0.5 * band0);
+        out[1][c] = (float)((sky - ground) * 0.5 * band1);
+    }
+}
+
+/** Point the views of the packet at the volume of their scene, take the ambient light of the
+ * first view of every scene with the lights of its captures and collect the cameras of its
+ * views.
+ *
+ * @param world The world
+ * @param b The state
+ * @param p The packet
+ */
+static void box_bake_views(
+    ecs_world_t *world,
+    box_render_bake_t *b,
+    box_render_packet_t *p)
+{
+    int32_t i, count = ecs_vec_count(&p->views);
+    if (!b->lights_state) {
+        b->lights_state = box_render_lights_state(world);
+    }
+
+    for (i = 0; i < count; i ++) {
+        box_render_view_t *rv = ecs_vec_get_t(&p->views, box_render_view_t, i);
+        box_bake_volume_t *v = box_bake_find(b, rv->scene);
+        if (!v || !v->handle) {
+            continue;
+        }
+
+        const View *view = rv->view && ecs_is_alive(world, rv->view)
+            ? ecs_get(world, rv->view, View)
+            : NULL;
+        if (!v->viewed) {
+            box_bake_ambient(&rv->lights, v->ambient);
+            box_bake_scene_lights(b->lights_state, v->scene, &rv->lights, &v->lights);
+            v->viewed = true;
+        }
+
+        glm_vec3_copy(rv->camera_transform[3], *ecs_vec_append_t(NULL, &v->cameras, vec3));
+
+        if (rv->lights.enabled && (view ? view->lighting.baked : true)) {
+            rv->volume = v->handle;
+        }
+    }
+}
+
+/** Add a BOX_RENDER_VOLUME resource of a volume to a packet, followed by the shown mask.
+ *
+ * @param p The packet
+ * @param v The volume
+ * @param op What the backend does
+ * @param create Whether the backend creates the volume
+ * @return The description, which a resize completes with the old grid
+ */
+static box_render_volume_desc_t* box_bake_desc(
+    box_render_packet_t *p,
+    const box_bake_volume_t *v,
+    box_render_volume_op_t op,
+    bool create)
+{
+    int32_t i, words = ecs_vec_count(&v->shown);
+    uint32_t size = (uint32_t)sizeof(box_render_volume_desc_t) + (uint32_t)words * 4u;
+    box_render_volume_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_VOLUME,
+        create ? BOX_RENDER_CREATE : BOX_RENDER_UPDATE, v->handle, size);
+    for (i = 0; i < 3; i ++) {
+        desc->origin[i] = v->grid.origin[i];
+        desc->size[i] = (uint32_t)v->grid.size[i];
+    }
+
+    desc->spacing = v->grid.spacing;
+    desc->probes = (uint32_t)v->probes;
+    desc->op = (uint32_t)op;
+    desc->from = (uint32_t)(1 - v->stage);
+    ecs_os_memcpy(desc->sh, v->sh, ECS_SIZEOF(v->sh));
+    ecs_os_memcpy(desc + 1, ecs_vec_first(&v->shown), words * ECS_SIZEOF(uint32_t));
+
+    return desc;
+}
+
+/** Send a volume when the backend lacks its grid, or refill it when its ambient changed
+ * before anything was baked. An ambient change after a bake rebakes every probe instead, and
+ * the probes keep their values until then.
+ *
+ * @param p The packet
+ * @param v The volume
+ */
+static void box_bake_send(
+    box_render_packet_t *p,
+    box_bake_volume_t *v)
+{
+    float (*sh)[4] = v->viewed ? v->ambient : v->sh;
+    size_t sh_size = sizeof(v->sh);
+    bool refill = memcmp(sh, v->sh, sh_size) != 0;
+    if (!v->handle || (v->sent && !refill)) {
+        goto done;
+    }
+
+    if (sh != v->sh) {
+        ecs_os_memcpy(v->sh, sh, (ecs_size_t)sh_size);
+    }
+
+    if (v->sent && !v->filled) {
+        box_bake_mark_all(v);
+        goto done;
+    }
+
+    int32_t words = ecs_vec_count(&v->valid);
+    ecs_vec_set_count_t(NULL, &v->shown, uint32_t, words);
+    if (words) {
+        ecs_os_memcpy_n(ecs_vec_first(&v->shown), ecs_vec_first(&v->valid), uint32_t, words);
+    }
+
+    box_bake_desc(p, v, BOX_RENDER_VOLUME_FILL, !v->sent);
+    v->sent = true;
+    v->filled = true;
+    v->mask = false;
+    v->display = 0;
+    box_bake_begin(v, true);
+done:
+    return;
+}
+
+/** Send the copy into the stage buffer a staged bake starts with and the shown mask when it
+ * changed.
+ *
+ * @param p The packet
+ * @param v The volume
+ */
+static void box_bake_ops(
+    box_render_packet_t *p,
+    box_bake_volume_t *v)
+{
+    if (!v->sent || !v->handle) {
+        goto done;
+    }
+
+    if (v->copy) {
+        box_bake_desc(p, v, BOX_RENDER_VOLUME_COPY, false);
+        v->copy = false;
+        v->mask = false;
+    } else if (v->mask) {
+        box_bake_desc(p, v, BOX_RENDER_VOLUME_MASK, false);
+        v->mask = false;
+    }
+
+done:
+    return;
+}
+
+/** Get the index a probe of one grid has in another grid of the same lattice.
+ *
+ * @param from The grid of the probe
+ * @param to The other grid
+ * @param probe Index of the probe in from
+ * @return Index in to, -1 when to lacks the probe
+ */
+static int32_t box_bake_reindex(
+    const box_bake_grid_t *from,
+    const box_bake_grid_t *to,
+    uint32_t probe)
+{
+    int32_t cell[3], i, result = -1;
+    cell[0] = (int32_t)(probe % (uint32_t)from->size[0]);
+    cell[1] = (int32_t)((probe / (uint32_t)from->size[0]) % (uint32_t)from->size[1]);
+    cell[2] = (int32_t)(probe / ((uint32_t)from->size[0] * (uint32_t)from->size[1]));
+    for (i = 0; i < 3; i ++) {
+        cell[i] += (int32_t)roundf((from->origin[i] - to->origin[i]) / to->spacing);
+        if (cell[i] < 0 || cell[i] >= to->size[i]) {
+            goto done;
+        }
+    }
+
+    result = cell[0] + (cell[1] + cell[2] * to->size[1]) * to->size[0];
+done:
+    return result;
+}
+
+/** Grow or shrink the grid of a volume on its lattice; the backend keeps the probes of both
+ * buffers it shares with the old grid. New probes start as the ambient, hidden, and are queued
+ * with the probes of the bake that was in progress and those changes had queued.
+ *
+ * @param world The world
+ * @param b The state
+ * @param p The packet
+ * @param v The volume
+ * @param grid The new grid
+ * @param probes Probes of the new grid
+ */
+static void box_bake_resize(
+    const ecs_world_t *world,
+    box_render_bake_t *b,
+    box_render_packet_t *p,
+    box_bake_volume_t *v,
+    const box_bake_grid_t *grid,
+    int32_t probes)
+{
+    box_bake_grid_t old = v->grid;
+    int32_t i, words = (probes + 31) / 32;
+    ecs_vec_t requeue, shown;
+    ecs_vec_init_t(NULL, &requeue, uint32_t, 0);
+    ecs_vec_init_t(NULL, &shown, uint32_t, words);
+    for (i = 0; i < ecs_vec_count(&v->dirty); i ++) {
+        *ecs_vec_append_t(NULL, &requeue, uint32_t) = *ecs_vec_get_t(&v->dirty, uint32_t, i);
+    }
+
+    for (i = 0; v->completed < v->passes && i < ecs_vec_count(&v->members); i ++) {
+        *ecs_vec_append_t(NULL, &requeue, uint32_t) = *ecs_vec_get_t(&v->members, uint32_t, i);
+    }
+
+    ecs_vec_set_count_t(NULL, &shown, uint32_t, words);
+    uint32_t *bits = ecs_vec_first(&shown);
+    ecs_os_memset(bits, 0, words * ECS_SIZEOF(uint32_t));
+    for (i = 0; i < v->probes; i ++) {
+        int32_t to = box_bake_reindex(&old, grid, (uint32_t)i);
+        if (to != -1 && ((*ecs_vec_get_t(&v->shown, uint32_t, i >> 5) >> (i & 31)) & 1u)) {
+            bits[to >> 5] |= 1u << (to & 31);
+        }
+    }
+
+    v->grid = *grid;
+    v->probes = probes;
+    box_bake_validate(world, b, v);
+    box_bake_clear(v);
+    v->completed = v->submitted = v->passes;
+    ecs_vec_clear(&v->members);
+    box_bake_forget(v);
+    for (i = 0; i < words; i ++) {
+        bits[i] &= *ecs_vec_get_t(&v->valid, uint32_t, i);
+    }
+
+    ecs_vec_fini_t(NULL, &v->shown, uint32_t);
+    v->shown = shown;
+    for (i = 0; i < ecs_vec_count(&requeue); i ++) {
+        int32_t to = box_bake_reindex(&old, grid, *ecs_vec_get_t(&requeue, uint32_t, i));
+        if (to != -1) {
+            box_bake_mark(v, (uint32_t)to);
+        }
+    }
+
+    for (i = 0; i < probes; i ++) {
+        if (box_bake_reindex(grid, &old, (uint32_t)i) == -1) {
+            box_bake_mark(v, (uint32_t)i);
+        }
+    }
+
+    box_render_volume_desc_t *desc = box_bake_desc(p, v, BOX_RENDER_VOLUME_RESIZE, false);
+    for (i = 0; i < 3; i ++) {
+        desc->old_size[i] = (uint32_t)old.size[i];
+        desc->shift[i] = (int32_t)roundf((grid->origin[i] - old.origin[i]) / grid->spacing);
+    }
+
+    v->copy = false;
+    v->mask = false;
+    ecs_vec_fini_t(NULL, &requeue, uint32_t);
+}
+
 /** Place the grid of a volume again and keep it when it did not change.
  *
  * @param it The iterator of the system
@@ -507,6 +828,11 @@ static void box_bake_update(
         goto done;
     }
 
+    if (v->sent && v->probes && probes && grid.spacing == v->grid.spacing) {
+        box_bake_resize(it->world, b, p, v, &grid, probes);
+        goto done;
+    }
+
     v->grid = grid;
     v->probes = probes;
     v->sent = false;
@@ -525,111 +851,6 @@ done:
     return;
 }
 
-/** Write the SH irradiance of the hemisphere ambient of a view.
- *
- * The hemisphere mix(ground, sky, y / 2 + 1 / 2) is the irradiance over pi the forward pass
- * shades with: a + b * y, a the mean and b half the difference of sky and ground.
- *
- * Its projection is exact in bands 0 and 1, E_00 = pi * a * 2 sqrt(pi) and E_1-1 = pi * b *
- * 2 sqrt(pi / 3), so the probes evaluate to the hemisphere.
- *
- * @param l The lights of the view
- * @param out Receives the coefficients
- */
-static void box_bake_ambient(
-    const box_render_view_lights_t *l,
-    float out[BOX_RENDER_SH_COEFFICIENTS][4])
-{
-    double band0 = GLM_PI * 2.0 * sqrt(GLM_PI);
-    double band1 = GLM_PI * 2.0 * sqrt(GLM_PI / 3.0);
-    int32_t c;
-    ecs_os_memset(out, 0, ECS_SIZEOF(float) * BOX_RENDER_SH_COEFFICIENTS * 4);
-    for (c = 0; c < 3; c ++) {
-        double sky = l->ambient_sky[c], ground = l->ambient_ground[c];
-        out[0][c] = (float)((sky + ground) * 0.5 * band0);
-        out[1][c] = (float)((sky - ground) * 0.5 * band1);
-    }
-}
-
-/** Point the views of the packet at the volume of their scene, take the ambient light and the
- * lights of the first view of every scene and collect the cameras of its views.
- *
- * @param world The world
- * @param b The state
- * @param p The packet
- */
-static void box_bake_views(
-    ecs_world_t *world,
-    box_render_bake_t *b,
-    box_render_packet_t *p)
-{
-    int32_t i, count = ecs_vec_count(&p->views);
-    for (i = 0; i < count; i ++) {
-        box_render_view_t *rv = ecs_vec_get_t(&p->views, box_render_view_t, i);
-        box_bake_volume_t *v = box_bake_find(b, rv->scene);
-        if (!v || !v->handle) {
-            continue;
-        }
-
-        const View *view = rv->view && ecs_is_alive(world, rv->view)
-            ? ecs_get(world, rv->view, View)
-            : NULL;
-        if (!v->viewed) {
-            box_bake_ambient(&rv->lights, v->ambient);
-            v->lights = rv->lights;
-            v->viewed = true;
-        }
-
-        glm_vec3_copy(rv->camera_transform[3], *ecs_vec_append_t(NULL, &v->cameras, vec3));
-
-        if (rv->lights.enabled && (view ? view->lighting.baked : true)) {
-            rv->volume = v->handle;
-        }
-    }
-}
-
-/** Send a volume when the backend lacks its grid, or refill it when its ambient changed.
- *
- * @param p The packet
- * @param v The volume
- */
-static void box_bake_send(
-    box_render_packet_t *p,
-    box_bake_volume_t *v)
-{
-    float (*sh)[4] = v->viewed ? v->ambient : v->sh;
-    size_t sh_size = sizeof(v->sh);
-    bool refill = memcmp(sh, v->sh, sh_size) != 0;
-    if (!v->handle || (v->sent && !refill)) {
-        goto done;
-    }
-
-    int32_t words = ecs_vec_count(&v->valid);
-    uint32_t size = (uint32_t)sizeof(box_render_volume_desc_t) + (uint32_t)words * 4u;
-    box_render_volume_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_VOLUME,
-        v->sent ? BOX_RENDER_UPDATE : BOX_RENDER_CREATE, v->handle, size);
-    int32_t i;
-    for (i = 0; i < 3; i ++) {
-        desc->origin[i] = v->grid.origin[i];
-        desc->size[i] = (uint32_t)v->grid.size[i];
-    }
-
-    desc->spacing = v->grid.spacing;
-    desc->probes = (uint32_t)v->probes;
-    ecs_os_memcpy(desc->sh, sh, (ecs_size_t)sh_size);
-    ecs_os_memcpy(desc + 1, ecs_vec_first(&v->valid), words * ECS_SIZEOF(uint32_t));
-    if (sh != v->sh) {
-        ecs_os_memcpy(v->sh, sh, (ecs_size_t)sh_size);
-    }
-
-    v->sent = true;
-    v->filled = true;
-    v->display = 0;
-    box_bake_restart(v);
-done:
-    return;
-}
-
 /** Free the vectors of a volume.
  *
  * @param v The volume
@@ -641,6 +862,13 @@ static void box_bake_volume_fini(
     ecs_vec_fini_t(NULL, &v->queue, uint32_t);
     ecs_vec_fini_t(NULL, &v->flight, box_bake_flight_t);
     ecs_vec_fini_t(NULL, &v->done, uint8_t);
+    ecs_vec_fini_t(NULL, &v->members, uint32_t);
+    ecs_vec_fini_t(NULL, &v->dirty, uint32_t);
+    ecs_vec_fini_t(NULL, &v->flags, uint8_t);
+    ecs_vec_fini_t(NULL, &v->shown, uint32_t);
+    ecs_vec_fini_t(NULL, &v->light_list, box_render_light_t);
+    ecs_vec_fini_t(NULL, &v->light_entities, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &v->light_modes, uint8_t);
     ecs_vec_fini_t(NULL, &v->cameras, vec3);
     ecs_vec_fini_t(NULL, &v->sorted, vec3);
 }
@@ -702,24 +930,6 @@ static int box_bake_pick_cmp(
     int result = (da < db) - (da > db);
 
     return result ? result : (pa < pb) - (pa > pb);
-}
-
-/** Get the world position of a probe of a volume.
- *
- * @param v The volume
- * @param index Index of the probe
- * @param out Receives the position
- */
-static void box_bake_probe_position(
-    const box_bake_volume_t *v,
-    uint32_t index,
-    vec3 out)
-{
-    const box_bake_grid_t *g = &v->grid;
-    uint32_t sx = (uint32_t)g->size[0], sy = (uint32_t)g->size[1];
-    out[0] = g->origin[0] + (float)(index % sx) * g->spacing;
-    out[1] = g->origin[1] + (float)((index / sx) % sy) * g->spacing;
-    out[2] = g->origin[2] + (float)(index / (sx * sy)) * g->spacing;
 }
 
 /** Check whether the cameras moved more than a probe spacing since the queue was sorted.
@@ -865,17 +1075,66 @@ static void box_bake_batch(
     batch->volume = v->handle;
     batch->generation = v->generation;
     batch->pass = pass;
-    batch->source = pass ? v->first ^ ((pass - 1) & 1) : BOX_RENDER_BAKE_BLACK;
-    batch->target = v->first ^ (pass & 1);
+    if (v->staged) {
+        batch->source = pass ? v->stage : BOX_RENDER_BAKE_BLACK;
+        batch->target = v->stage;
+    } else {
+        batch->source = pass ? v->first ^ ((pass - 1) & 1) : BOX_RENDER_BAKE_BLACK;
+        batch->target = v->first ^ (pass & 1);
+    }
+
     batch->scene = v->scene;
     batch->size = v->capture_size;
-    batch->lights = v->lights;
+    batch->lights = batch->source == BOX_RENDER_BAKE_BLACK ? v->lights.first : v->lights.later;
     batch->lights.enabled = true;
+    batch->baked = v->lights.baked;
+    batch->baked_count = v->lights.baked_count;
+    batch->baked_directional = v->lights.baked_directional;
     glm_vec3_copy(v->min, batch->bounds_min);
     glm_vec3_copy(v->max, batch->bounds_max);
     batch->first = ecs_vec_count(&p->probes);
     batch->count = count;
     box_bake_pick(v, count, p, packet);
+}
+
+/** Show the pass of the bake of a volume whose every probe just went into a packet, when the
+ * views show its passes as they complete, or the stage buffer after the last pass of a staged
+ * bake. The views then see the probes it captured and those they saw before, still valid.
+ *
+ * @param v The volume
+ */
+static void box_bake_submitted(
+    box_bake_volume_t *v)
+{
+    int32_t i, words = ecs_vec_count(&v->shown);
+    uint32_t *shown = ecs_vec_first(&v->shown);
+    const uint32_t *valid = ecs_vec_first(&v->valid);
+    const uint32_t *members = ecs_vec_first(&v->members);
+    if (v->staged && v->submitted + 1 < v->passes) {
+        goto done;
+    }
+
+    if (!v->staged) {
+        v->display = v->first ^ (v->submitted & 1);
+        v->filled = false;
+    } else {
+        v->display = v->stage;
+    }
+
+    if (v->staged || !v->submitted) {
+        for (i = 0; i < v->count; i ++) {
+            shown[members[i] >> 5] |= 1u << (members[i] & 31);
+        }
+
+        for (i = 0; i < words; i ++) {
+            shown[i] &= valid[i];
+        }
+
+        v->mask = true;
+    }
+
+done:
+    return;
 }
 
 /** Add the next captures of a volume to the packet.
@@ -913,8 +1172,7 @@ static void box_bake_schedule(
 
         more = false;
         if (count == left) {
-            v->display = v->first ^ (v->submitted & 1);
-            v->filled = false;
+            box_bake_submitted(v);
             v->submitted ++;
             ecs_vec_clear(&v->queue);
             if (v->submitted < v->passes) {
@@ -994,7 +1252,7 @@ static void box_bake_requeue(
 
     ecs_vec_set_count_t(NULL, &v->flight, box_bake_flight_t, kept);
     if (restart) {
-        box_bake_restart(v);
+        box_bake_begin(v, false);
     }
 }
 
@@ -1007,15 +1265,15 @@ static int32_t box_bake_complete(
     box_bake_volume_t *v)
 {
     int32_t i, result = 0;
-    while (v->completed < v->submitted && v->reported[v->completed] >= v->valid_count) {
+    while (v->completed < v->submitted && v->reported[v->completed] >= v->count) {
         v->completed ++;
     }
 
     for (i = 0; i < v->passes; i ++) {
-        result += v->valid_count - v->reported[i];
+        result += v->count - v->reported[i];
     }
 
-    return result;
+    return result + ecs_vec_count(&v->dirty) * v->passes;
 }
 
 /** Take the GPU time of the captures the backend measured into the time per probe.
@@ -1067,7 +1325,12 @@ static void box_bake_progress(
         box_bake_requeue(v, rendered);
         box_bake_complete(v);
         v->error = box_bake_error(v);
-        v->converged = v->sent && v->probes && v->completed == v->passes;
+        if (v->sent && v->probes) {
+            box_bake_next(v);
+        }
+
+        v->converged = v->sent && v->probes && v->completed == v->passes &&
+            !ecs_vec_count(&v->dirty);
         v->pending = gpu && v->handle && v->sent && v->viewed && !v->error &&
             v->budget_ms > 0 && !v->converged;
         if (v->pending) {
@@ -1075,6 +1338,7 @@ static void box_bake_progress(
             b->pending += box_bake_complete(v);
         }
 
+        box_bake_ops(p, v);
         box_bake_status(it, v);
     }
 }
@@ -1122,6 +1386,7 @@ static void BoxRenderExtractBake(
         box_bake_volume_t *v = ecs_vec_get_t(&b->volumes, box_bake_volume_t, i);
         v->seen = false;
         v->viewed = false;
+        v->fresh = false;
         ecs_vec_clear(&v->cameras);
     }
 
@@ -1145,7 +1410,14 @@ static void BoxRenderExtractBake(
             v->budget_ms = bakes[row].budget_ms;
             if (v->bounces != bakes[row].bounces) {
                 v->bounces = bakes[row].bounces;
-                box_bake_restart(v);
+                if (v->sent && v->probes) {
+                    box_bake_begin(v, true);
+                }
+            }
+
+            if (v->sent && v->capture_size != v->baked_size) {
+                v->baked_size = v->capture_size;
+                box_bake_mark_all(v);
             }
 
             if (!v->placed || changed || v->probe_spacing != bakes[row].probe_spacing ||
@@ -1165,6 +1437,11 @@ static void BoxRenderExtractBake(
     box_bake_views(world, b, p);
     for (i = 0; i < ecs_vec_count(&b->volumes); i ++) {
         box_bake_send(p, ecs_vec_get_t(&b->volumes, box_bake_volume_t, i));
+    }
+
+    box_bake_changes(world, b);
+    for (i = 0; i < ecs_vec_count(&b->volumes); i ++) {
+        box_bake_lights(b, ecs_vec_get_t(&b->volumes, box_bake_volume_t, i));
     }
 
     box_bake_progress(it, b, p);
@@ -1187,6 +1464,8 @@ static void box_bake_free(
     ecs_vec_fini_t(NULL, &b->volumes, box_bake_volume_t);
     ecs_vec_fini_t(NULL, &b->picks, box_bake_pick_t);
     ecs_vec_fini_t(NULL, &b->captured, box_render_bake_result_t);
+    ecs_vec_fini_t(NULL, &b->changes, box_bake_change_t);
+    ecs_map_fini(&b->light_map);
     ecs_vec_fini_t(NULL, &b->free_handles, uint32_t);
     ecs_vec_fini_t(NULL, &b->hits, ecs_entity_t);
     ecs_os_free(b);
@@ -1202,6 +1481,8 @@ void box_render_bake_init(
     ecs_vec_init_t(NULL, &b->volumes, box_bake_volume_t, 0);
     ecs_vec_init_t(NULL, &b->free_handles, uint32_t, 0);
     ecs_vec_init_t(NULL, &b->hits, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &b->changes, box_bake_change_t, 0);
+    ecs_map_init(&b->light_map, NULL);
     b->next_handle = 1;
     b->bakes = ecs_query(world, {
         .terms = {
@@ -1224,6 +1505,7 @@ void box_render_bake_init(
         .ctx = b,
         .ctx_free = box_bake_free
     });
+    box_bake_observers(world, b);
 }
 
 bool box_render_bake_probe(

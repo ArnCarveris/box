@@ -90,7 +90,11 @@
                     "env_sets_unguarded",
                     "env_zero_keeps_guard",
                     "env_unset_keeps_guard",
-                    "run_unguarded"
+                    "run_unguarded",
+                    "budget_adds_to_load",
+                    "no_limit_claims_one_core",
+                    "run_refuses_budget_above_cores",
+                    "run_unguarded_ignores_budget"
                 ]
             },
             {
@@ -102,7 +106,10 @@
                     "sleeps_when_over_budget",
                     "unpaced_never_sleeps",
                     "not_headless_never_sleeps",
-                    "env_sets_unpaced"
+                    "env_sets_unpaced",
+                    "budget_share_at_half",
+                    "budget_share_at_quarter",
+                    "idle_earns_no_credit"
                 ]
             },
             {
@@ -176,6 +183,32 @@
                     "without_velocity",
                     "child_follows_parent",
                     "moving_child"
+                ]
+            },
+            {
+                "id": "FrameClock",
+                "testcases": [
+                    "timing_measures_delta_and_interval",
+                    "late_delta_counted",
+                    "dropped_frame_counted",
+                    "headless_steps_fixed_delta",
+                    "cap_sleeps_rest_of_frame",
+                    "vsync_paces_without_cap",
+                    "vsync_delta_smoothed",
+                    "swap_interval_follows_cap",
+                    "cadence_delta_matches_display",
+                    "cap_does_not_spin",
+                    "wait_does_not_spin",
+                    "fps_command",
+                    "long_run_59_94_hz_no_drift",
+                    "long_run_143_98_hz_no_drift",
+                    "late_gpu_repeats_frame",
+                    "fences_end_with_backend",
+                    "smoothing_follows_display_change",
+                    "cap_guard_never_binds_paced",
+                    "cap_guard_bounds_runaway",
+                    "cadence_repeats",
+                    "window_presents_follow_cadence"
                 ]
             }
         ]

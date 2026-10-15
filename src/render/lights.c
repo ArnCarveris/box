@@ -5,9 +5,13 @@
  * Every frame the lights are gathered per scene, directional lights first; a light buffer is
  * only uploaded when its contents changed. A scene without any light entity is lit by the
  * default sun of a shared buffer, a scene without AmbientLight by the default sky and ground.
+ *
+ * With LightBake views get the Mixed and Realtime lights, captures the Mixed and Baked ones over
+ * a black ambient and the Mixed ones over a pass, while every light is Mixed all share the view
+ * list (see box_lights_push); without it every light is realtime.
  */
 
-#include "render.h"
+#include "bake.h"
 #include <math.h>
 
 /** Lights the light buffer of a scene holds at least */
@@ -31,18 +35,37 @@ static const float box_lights_ground[3] = { 0.08f, 0.07f, 0.06f };
 /** Linear value of every display encoded channel value */
 static float box_lights_srgb[256];
 
-/** The lights of one scene and what its light buffer holds on the backend */
-typedef struct box_light_scene_t {
-    ecs_entity_t scene;     /**< Scene root, 0 for the default scene */
+/** The lists of lights of a scene, by the modes they hold */
+typedef enum box_light_list_kind_t {
+    BOX_LIGHTS_VIEW,        /**< Lights of the views: every light, or without the Baked ones */
+    BOX_LIGHTS_CAPTURE,     /**< Mixed and Baked lights, of captures over a black ambient */
+    BOX_LIGHTS_MIXED,       /**< Mixed lights, of captures over a previous pass */
+    BOX_LIGHTS_BAKED,       /**< Baked lights, whose direct light the projection adds */
+    BOX_LIGHTS_LISTS        /**< Number of lists */
+} box_light_list_kind_t;
+
+/** A list of lights of a scene and what its light buffer holds on the backend */
+typedef struct box_light_list_t {
     uint32_t buffer;        /**< Handle of the light buffer, 0 before it is created */
     uint32_t capacity;      /**< Lights the light buffer holds, 0 when the backend lacks it */
     uint32_t directional;   /**< Directional lights at the start of lights */
+    ecs_vec_t lights;       /**< box_render_light_t of this frame */
+    ecs_vec_t entities;     /**< ecs_entity_t, the entity of each light of this frame */
+    ecs_vec_t modes;        /**< uint8_t, the LightBakeMode of each light of this frame */
+    ecs_vec_t sent;         /**< box_render_light_t the light buffer holds */
+} box_light_list_t;
+
+/** The lights of one scene */
+typedef struct box_light_scene_t {
+    ecs_entity_t scene;     /**< Scene root, 0 for the default scene */
     bool has_lights;        /**< The scene has a light entity, even one that lights nothing */
     bool has_ambient;       /**< The scene has an AmbientLight */
+    bool baking;            /**< The scene has LightBake, so bake modes apply */
+    bool split;             /**< Baking with a light that is not Mixed: the capture, mixed and
+                             *   baked lists are kept, else the captures use the view list */
     float sky[3];           /**< Linear ambient light from above, summed */
     float ground[3];        /**< Linear ambient light from below, summed */
-    ecs_vec_t lights;       /**< box_render_light_t of this frame */
-    ecs_vec_t sent;         /**< box_render_light_t the light buffer holds */
+    box_light_list_t lists[BOX_LIGHTS_LISTS]; /**< The lists, by box_light_list_kind_t */
 } box_light_scene_t;
 
 /** Main thread state of the light extract */
@@ -51,6 +74,7 @@ typedef struct box_render_lights_t {
     ecs_query_t *point;         /**< Entities with PointLight */
     ecs_query_t *spot;          /**< Entities with SpotLight */
     ecs_query_t *ambient;       /**< Entities with AmbientLight */
+    ecs_query_t *bakes;         /**< Entities with LightBake */
     ecs_vec_t scenes;           /**< box_light_scene_t */
     ecs_map_t lookup;           /**< Scene root plus one to the index of its scene plus one */
     ecs_vec_t free_buffers;     /**< uint32_t, light buffer handles to reuse */
@@ -70,6 +94,70 @@ static void box_lights_table_init(void)
         float c = (float)i / 255.0f;
         box_lights_srgb[i] = c <= 0.04045f ? c / 12.92f : powf((c + 0.055f) / 1.055f, 2.4f);
     }
+}
+
+/** Prepare an empty list of lights.
+ *
+ * @param list The list
+ */
+static void box_lights_list_init(
+    box_light_list_t *list)
+{
+    ecs_os_memset_t(list, 0, box_light_list_t);
+    ecs_vec_init_t(NULL, &list->lights, box_render_light_t, 0);
+    ecs_vec_init_t(NULL, &list->entities, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &list->modes, uint8_t, 0);
+    ecs_vec_init_t(NULL, &list->sent, box_render_light_t, 0);
+}
+
+/** Free a list of lights; its light buffer is released by the caller.
+ *
+ * @param list The list
+ */
+static void box_lights_list_fini(
+    box_light_list_t *list)
+{
+    ecs_vec_fini_t(NULL, &list->lights, box_render_light_t);
+    ecs_vec_fini_t(NULL, &list->entities, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &list->modes, uint8_t);
+    ecs_vec_fini_t(NULL, &list->sent, box_render_light_t);
+}
+
+/** Empty a list of lights for a new frame, keeping its light buffer.
+ *
+ * @param list The list
+ */
+static void box_lights_list_clear(
+    box_light_list_t *list)
+{
+    ecs_vec_clear(&list->lights);
+    ecs_vec_clear(&list->entities);
+    ecs_vec_clear(&list->modes);
+    list->directional = 0;
+}
+
+/** Copy the lights of a list into an empty one.
+ *
+ * @param dst The empty list
+ * @param src The list copied
+ */
+static void box_lights_list_copy(
+    box_light_list_t *dst,
+    const box_light_list_t *src)
+{
+    int32_t count = ecs_vec_count(&src->lights);
+    ecs_vec_set_count_t(NULL, &dst->lights, box_render_light_t, count);
+    ecs_vec_set_count_t(NULL, &dst->entities, ecs_entity_t, count);
+    ecs_vec_set_count_t(NULL, &dst->modes, uint8_t, count);
+    if (count) {
+        ecs_os_memcpy_n(ecs_vec_first(&dst->lights), ecs_vec_first(&src->lights),
+            box_render_light_t, count);
+        ecs_os_memcpy_n(ecs_vec_first(&dst->entities), ecs_vec_first(&src->entities),
+            ecs_entity_t, count);
+        ecs_os_memcpy_n(ecs_vec_first(&dst->modes), ecs_vec_first(&src->modes), uint8_t, count);
+    }
+
+    dst->directional = src->directional;
 }
 
 /** Find the lights of a scene.
@@ -97,14 +185,16 @@ static box_light_scene_t* box_lights_ensure(
     box_render_lights_t *l,
     ecs_entity_t scene)
 {
-    int32_t index = box_lights_find(l, scene);
+    int32_t k, index = box_lights_find(l, scene);
     if (index == -1) {
         index = ecs_vec_count(&l->scenes);
         box_light_scene_t *s = ecs_vec_append_t(NULL, &l->scenes, box_light_scene_t);
         ecs_os_memset_t(s, 0, box_light_scene_t);
         s->scene = scene;
-        ecs_vec_init_t(NULL, &s->lights, box_render_light_t, 0);
-        ecs_vec_init_t(NULL, &s->sent, box_render_light_t, 0);
+        for (k = 0; k < BOX_LIGHTS_LISTS; k ++) {
+            box_lights_list_init(&s->lists[k]);
+        }
+
         ecs_map_insert(&l->lookup, scene + 1, (ecs_map_val_t)index + 1);
     }
 
@@ -118,12 +208,16 @@ static box_light_scene_t* box_lights_ensure(
 static void box_lights_reset(
     box_render_lights_t *l)
 {
-    int32_t i;
+    int32_t i, k;
     for (i = 0; i < ecs_vec_count(&l->scenes); i ++) {
         box_light_scene_t *s = ecs_vec_get_t(&l->scenes, box_light_scene_t, i);
-        ecs_vec_clear(&s->lights);
-        s->directional = 0;
+        for (k = 0; k < BOX_LIGHTS_LISTS; k ++) {
+            box_lights_list_clear(&s->lists[k]);
+        }
+
         s->has_lights = false;
+        s->baking = false;
+        s->split = false;
         s->has_ambient = false;
         glm_vec3_zero(s->sky);
         glm_vec3_zero(s->ground);
@@ -169,23 +263,21 @@ static void box_lights_axis(
     }
 }
 
-/** Append a light with a position, a range and no cone to a scene.
+/** Write a light with a position, a range and no cone.
  *
- * @param s The scene
  * @param transform World transform of the light, NULL for the origin
  * @param rgb Color of the light, NULL for white
  * @param intensity Radiance scale
  * @param range Distance at which the light reaches zero
- * @return The light
+ * @param out Receives the light
  */
-static box_render_light_t* box_lights_add_point(
-    box_light_scene_t *s,
+static void box_lights_point(
     const WorldTransform *transform,
     const Rgb *rgb,
     float intensity,
-    float range)
+    float range,
+    box_render_light_t *out)
 {
-    box_render_light_t *out = ecs_vec_append_t(NULL, &s->lights, box_render_light_t);
     if (transform) {
         glm_vec3_copy(ECS_CONST_CAST(float*, transform->m[3]), out->position);
     } else {
@@ -197,8 +289,61 @@ static box_render_light_t* box_lights_add_point(
     glm_vec3_copy((vec3){0, 0, 1}, out->direction);
     out->spot_scale = 0.0f;
     out->spot_offset = 1.0f;
+}
 
-    return out;
+/** Append a light to a list.
+ *
+ * @param list The list
+ * @param e The light entity
+ * @param mode The bake mode of the light
+ * @param light The light, directional when its range is 0
+ */
+static void box_lights_append(
+    box_light_list_t *list,
+    ecs_entity_t e,
+    LightBakeMode mode,
+    const box_render_light_t *light)
+{
+    *ecs_vec_append_t(NULL, &list->lights, box_render_light_t) = *light;
+    *ecs_vec_append_t(NULL, &list->entities, ecs_entity_t) = e;
+    *ecs_vec_append_t(NULL, &list->modes, uint8_t) = (uint8_t)mode;
+    list->directional += light->range > 0 ? 0u : 1u;
+}
+
+/** Append a light to the lists of its scene that its bake mode puts it in. Without LightBake
+ * that is the view list. With it the view list takes every light but the Baked ones.
+ *
+ * The first light that is not Mixed splits the capture lists off the view list, which until
+ * then held Mixed lights only. The capture list takes every light but the Realtime ones, the
+ * mixed list the Mixed ones and the baked list the Baked ones.
+ *
+ * @param s The scene
+ * @param e The light entity
+ * @param mode The bake mode of the light
+ * @param light The light, directional when its range is 0
+ */
+static void box_lights_push(
+    box_light_scene_t *s,
+    ecs_entity_t e,
+    LightBakeMode mode,
+    const box_render_light_t *light)
+{
+    box_light_list_t *lists = s->lists;
+    if (s->baking && mode != LightBakeModeMixed && !s->split) {
+        box_lights_list_copy(&lists[BOX_LIGHTS_CAPTURE], &lists[BOX_LIGHTS_VIEW]);
+        box_lights_list_copy(&lists[BOX_LIGHTS_MIXED], &lists[BOX_LIGHTS_VIEW]);
+        s->split = true;
+    }
+
+    if (!s->baking || mode != LightBakeModeBaked) {
+        box_lights_append(&lists[BOX_LIGHTS_VIEW], e, mode, light);
+    }
+
+    if (s->split && mode != LightBakeModeRealtime) {
+        box_lights_append(&lists[BOX_LIGHTS_CAPTURE], e, mode, light);
+        box_lights_append(&lists[mode == LightBakeModeMixed ? BOX_LIGHTS_MIXED : BOX_LIGHTS_BAKED],
+            e, mode, light);
+    }
 }
 
 /** Collect the lights one query matches into the scenes they belong to.
@@ -236,16 +381,18 @@ static void box_lights_collect(
             if (kind == 0) {
                 const DirectionalLight *d = &ecs_field(&it, DirectionalLight, 0)[i];
                 if (d->intensity > 0) {
-                    box_render_light_t *out = box_lights_add_point(s, NULL, rgb, d->intensity, 0);
-                    box_lights_axis(transform, out->position);
-                    glm_vec3_negate(out->position);
-                    out->range = 0.0f;
-                    s->directional ++;
+                    box_render_light_t out;
+                    box_lights_point(NULL, rgb, d->intensity, 0, &out);
+                    box_lights_axis(transform, out.position);
+                    glm_vec3_negate(out.position);
+                    box_lights_push(s, it.entities[i], d->bake, &out);
                 }
             } else if (kind == 1) {
                 const PointLight *p = &ecs_field(&it, PointLight, 0)[i];
                 if (p->intensity > 0 && p->range > 0) {
-                    box_lights_add_point(s, transform, rgb, p->intensity, p->range);
+                    box_render_light_t out;
+                    box_lights_point(transform, rgb, p->intensity, p->range, &out);
+                    box_lights_push(s, it.entities[i], p->bake, &out);
                 }
             } else {
                 const SpotLight *sp = &ecs_field(&it, SpotLight, 0)[i];
@@ -254,11 +401,12 @@ static void box_lights_collect(
                     float inner = glm_clamp(sp->inner_angle, 0.0f, outer);
                     float cos_outer = cosf(glm_rad(outer));
                     float cos_inner = cosf(glm_rad(inner));
-                    box_render_light_t *out = box_lights_add_point(
-                        s, transform, rgb, sp->intensity, sp->range);
-                    box_lights_axis(transform, out->direction);
-                    out->spot_scale = 1.0f / glm_max(cos_inner - cos_outer, 1e-4f);
-                    out->spot_offset = -cos_outer * out->spot_scale;
+                    box_render_light_t out;
+                    box_lights_point(transform, rgb, sp->intensity, sp->range, &out);
+                    box_lights_axis(transform, out.direction);
+                    out.spot_scale = 1.0f / glm_max(cos_inner - cos_outer, 1e-4f);
+                    out.spot_offset = -cos_outer * out.spot_scale;
+                    box_lights_push(s, it.entities[i], sp->bake, &out);
                 }
             }
         }
@@ -288,6 +436,24 @@ static void box_lights_collect_ambient(
                 s->sky[c] += box_lights_srgb[sky[c]] * intensity;
                 s->ground[c] += box_lights_srgb[ground[c]] * intensity;
             }
+        }
+    }
+}
+
+/** Mark the scenes that have LightBake in this frame, before their lights are collected.
+ *
+ * @param world The world
+ * @param l The state
+ */
+static void box_lights_collect_bakes(
+    ecs_world_t *world,
+    box_render_lights_t *l)
+{
+    ecs_iter_t it = ecs_query_iter(world, l->bakes);
+    while (ecs_query_next(&it)) {
+        int32_t i;
+        for (i = 0; i < it.count; i ++) {
+            box_lights_ensure(l, box_render_scene_field(&it, 1, i))->baking = true;
         }
     }
 }
@@ -354,15 +520,15 @@ done:
     return;
 }
 
-/** Send the light buffer of a scene when the backend lacks it or it changed.
+/** Send the light buffer of a list when the backend lacks it or it changed.
  *
  * @param l The state
- * @param s The scene
+ * @param s The list
  * @param p The packet
  */
-static void box_lights_send_scene(
+static void box_lights_send_list(
     box_render_lights_t *l,
-    box_light_scene_t *s,
+    box_light_list_t *s,
     box_render_packet_t *p)
 {
     int32_t count = ecs_vec_count(&s->lights);
@@ -400,10 +566,30 @@ done:
     return;
 }
 
+/** Destroy the light buffer of a list when it has one.
+ *
+ * @param l The state
+ * @param list The list
+ * @param p The packet, receives the destroy of the light buffer
+ */
+static void box_lights_release(
+    box_render_lights_t *l,
+    box_light_list_t *list,
+    box_render_packet_t *p)
+{
+    if (list->buffer) {
+        box_render_packet_resource(p, BOX_RENDER_BUFFER, BOX_RENDER_DESTROY, list->buffer, 0);
+        *ecs_vec_append_t(NULL, &l->free_buffers, uint32_t) = list->buffer;
+        list->buffer = 0;
+        list->capacity = 0;
+        ecs_vec_clear(&list->sent);
+    }
+}
+
 /** Remove the entry of a scene, moving the last entry into its place.
  *
  * @param l The state
- * @param p The packet, receives the destroy of the light buffer
+ * @param p The packet, receives the destroy of the light buffers
  * @param index Index of the scene
  */
 static void box_lights_remove(
@@ -412,15 +598,13 @@ static void box_lights_remove(
     int32_t index)
 {
     box_light_scene_t *s = ecs_vec_get_t(&l->scenes, box_light_scene_t, index);
-    int32_t last = ecs_vec_count(&l->scenes) - 1;
-    if (s->buffer) {
-        box_render_packet_resource(p, BOX_RENDER_BUFFER, BOX_RENDER_DESTROY, s->buffer, 0);
-        *ecs_vec_append_t(NULL, &l->free_buffers, uint32_t) = s->buffer;
+    int32_t k, last = ecs_vec_count(&l->scenes) - 1;
+    ecs_map_remove(&l->lookup, s->scene + 1);
+    for (k = 0; k < BOX_LIGHTS_LISTS; k ++) {
+        box_lights_release(l, &s->lists[k], p);
+        box_lights_list_fini(&s->lists[k]);
     }
 
-    ecs_map_remove(&l->lookup, s->scene + 1);
-    ecs_vec_fini_t(NULL, &s->lights, box_render_light_t);
-    ecs_vec_fini_t(NULL, &s->sent, box_render_light_t);
     if (index != last) {
         *s = *ecs_vec_get_t(&l->scenes, box_light_scene_t, last);
         ecs_map_val_t *moved = ecs_map_get(&l->lookup, s->scene + 1);
@@ -430,7 +614,9 @@ static void box_lights_remove(
     ecs_vec_remove_last(&l->scenes);
 }
 
-/** Send the light buffers of the scenes and drop the scenes that lost their lights.
+/** Send the light buffers of the scenes and drop the scenes that lost their lights, ambient
+ * and LightBake. The capture, mixed and baked lists have a buffer only while they are split
+ * off, the baked list only while it holds a light.
  *
  * @param l The state
  * @param p The packet
@@ -439,21 +625,28 @@ static void box_lights_send(
     box_render_lights_t *l,
     box_render_packet_t *p)
 {
-    int32_t i;
+    int32_t i, k;
     for (i = ecs_vec_count(&l->scenes) - 1; i >= 0; i --) {
         box_light_scene_t *s = ecs_vec_get_t(&l->scenes, box_light_scene_t, i);
-        if (s->has_lights) {
-            box_lights_send_scene(l, s, p);
-            l->stats.scenes ++;
-            l->stats.lights += ecs_vec_count(&s->lights);
-        } else if (!s->has_ambient) {
+        if (!s->has_lights && !s->has_ambient && !s->baking) {
             box_lights_remove(l, p, i);
-        } else if (s->buffer) {
-            box_render_packet_resource(p, BOX_RENDER_BUFFER, BOX_RENDER_DESTROY, s->buffer, 0);
-            *ecs_vec_append_t(NULL, &l->free_buffers, uint32_t) = s->buffer;
-            s->buffer = 0;
-            s->capacity = 0;
-            ecs_vec_clear(&s->sent);
+            continue;
+        }
+
+        for (k = 0; k < BOX_LIGHTS_LISTS; k ++) {
+            box_light_list_t *list = &s->lists[k];
+            bool used = s->has_lights && (k == BOX_LIGHTS_VIEW || (s->split &&
+                (k != BOX_LIGHTS_BAKED || ecs_vec_count(&list->lights))));
+            if (used) {
+                box_lights_send_list(l, list, p);
+            } else {
+                box_lights_release(l, list, p);
+            }
+        }
+
+        if (s->has_lights) {
+            l->stats.scenes ++;
+            l->stats.lights += ecs_vec_count(&s->lists[BOX_LIGHTS_VIEW].lights);
         }
     }
 }
@@ -481,12 +674,13 @@ static void box_lights_views(
             ? ecs_vec_get_t(&l->scenes, box_light_scene_t, index)
             : NULL;
         out->enabled = view ? view->lighting.enabled : true;
+        const box_light_list_t *list = s ? &s->lists[BOX_LIGHTS_VIEW] : NULL;
         if (s && s->has_lights) {
-            out->buffer = s->buffer;
-            out->directional = s->directional;
-            out->count = (uint32_t)ecs_vec_count(&s->lights);
-            if (s->directional) {
-                box_render_light_t *sun = ecs_vec_first_t(&s->lights, box_render_light_t);
+            out->buffer = list->buffer;
+            out->directional = list->directional;
+            out->count = (uint32_t)ecs_vec_count(&list->lights);
+            if (list->directional) {
+                box_render_light_t *sun = ecs_vec_first_t(&list->lights, box_render_light_t);
                 glm_vec3_copy(sun->position, out->sun);
                 glm_vec3_copy(sun->color, out->sun_color);
             }
@@ -520,11 +714,13 @@ static void box_lights_views(
 static void box_lights_reset_backend(
     box_render_lights_t *l)
 {
-    int32_t i;
+    int32_t i, k;
     for (i = 0; i < ecs_vec_count(&l->scenes); i ++) {
         box_light_scene_t *s = ecs_vec_get_t(&l->scenes, box_light_scene_t, i);
-        s->capacity = 0;
-        ecs_vec_clear(&s->sent);
+        for (k = 0; k < BOX_LIGHTS_LISTS; k ++) {
+            s->lists[k].capacity = 0;
+            ecs_vec_clear(&s->lists[k].sent);
+        }
     }
 
     l->default_sent = false;
@@ -549,6 +745,7 @@ static void BoxRenderExtractLights(
 
     ecs_os_memset_t(&l->stats, 0, box_render_lights_stats_t);
     box_lights_reset(l);
+    box_lights_collect_bakes(world, l);
     box_lights_collect(world, l, l->directional, 0);
     box_lights_collect(world, l, l->point, 1);
     box_lights_collect(world, l, l->spot, 2);
@@ -565,17 +762,43 @@ static void box_lights_free(
     void *ctx)
 {
     box_render_lights_t *l = ctx;
-    int32_t i;
+    int32_t i, k;
     for (i = 0; i < ecs_vec_count(&l->scenes); i ++) {
         box_light_scene_t *s = ecs_vec_get_t(&l->scenes, box_light_scene_t, i);
-        ecs_vec_fini_t(NULL, &s->lights, box_render_light_t);
-        ecs_vec_fini_t(NULL, &s->sent, box_render_light_t);
+        for (k = 0; k < BOX_LIGHTS_LISTS; k ++) {
+            box_lights_list_fini(&s->lists[k]);
+        }
     }
 
     ecs_vec_fini_t(NULL, &l->scenes, box_light_scene_t);
     ecs_vec_fini_t(NULL, &l->free_buffers, uint32_t);
     ecs_map_fini(&l->lookup);
     ecs_os_free(l);
+}
+
+/** Create a query of a component and the scene of its entity.
+ *
+ * @param world The world
+ * @param component The component
+ * @return The query, with the component and Scene(self|up)
+ */
+static ecs_query_t* box_lights_scene_query(
+    ecs_world_t *world,
+    ecs_entity_t component)
+{
+    return ecs_query(world, {
+        .terms = {
+            { .id = component, .inout = EcsIn },
+            {
+                .id = ecs_id(Scene),
+                .src.id = EcsSelf | EcsUp,
+                .trav = EcsChildOf,
+                .inout = EcsInOutNone,
+                .oper = EcsOptional
+            }
+        },
+        .cache_kind = EcsQueryCacheAuto
+    });
 }
 
 /** Create the query of one kind of light.
@@ -617,19 +840,8 @@ void box_render_lights_init(
     l->directional = box_lights_query(world, ecs_id(DirectionalLight));
     l->point = box_lights_query(world, ecs_id(PointLight));
     l->spot = box_lights_query(world, ecs_id(SpotLight));
-    l->ambient = ecs_query(world, {
-        .terms = {
-            { .id = ecs_id(AmbientLight), .inout = EcsIn },
-            {
-                .id = ecs_id(Scene),
-                .src.id = EcsSelf | EcsUp,
-                .trav = EcsChildOf,
-                .inout = EcsInOutNone,
-                .oper = EcsOptional
-            }
-        },
-        .cache_kind = EcsQueryCacheAuto
-    });
+    l->ambient = box_lights_scene_query(world, ecs_id(AmbientLight));
+    l->bakes = box_lights_scene_query(world, ecs_id(LightBake));
 
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "RenderExtractLights" }),
@@ -650,4 +862,71 @@ void box_render_lights_stats(
     if (s && s->ctx) {
         *stats = ((const box_render_lights_t*)s->ctx)->stats;
     }
+}
+
+const void* box_render_lights_state(
+    const ecs_world_t *world)
+{
+    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractLights");
+    const ecs_system_t *sys = system ? ecs_system_get(world, system) : NULL;
+
+    return sys ? sys->ctx : NULL;
+}
+
+/** Write the buffer, the counts and the first directional light of a list.
+ *
+ * @param list The list
+ * @param out Receives them, the ambient is kept
+ */
+static void box_lights_list_view(
+    const box_light_list_t *list,
+    box_render_view_lights_t *out)
+{
+    out->buffer = list->buffer;
+    out->directional = list->directional;
+    out->count = (uint32_t)ecs_vec_count(&list->lights);
+    glm_vec3_zero(out->sun);
+    glm_vec3_zero(out->sun_color);
+    if (list->directional) {
+        const box_render_light_t *sun = ecs_vec_first_t(&list->lights, box_render_light_t);
+        glm_vec3_copy(ECS_CONST_CAST(float*, sun->position), out->sun);
+        glm_vec3_copy(ECS_CONST_CAST(float*, sun->color), out->sun_color);
+    }
+}
+
+void box_bake_scene_lights(
+    const void *state,
+    ecs_entity_t scene,
+    const box_render_view_lights_t *view,
+    box_bake_lights_t *out)
+{
+    const box_render_lights_t *l = state;
+    int32_t index = l ? box_lights_find(ECS_CONST_CAST(box_render_lights_t*, l), scene) : -1;
+    const box_light_scene_t *s = index != -1
+        ? ecs_vec_get_t(&l->scenes, box_light_scene_t, index)
+        : NULL;
+    const box_light_list_t *capture = NULL;
+    ecs_os_memset_t(out, 0, box_bake_lights_t);
+    out->first = *view;
+    out->later = *view;
+    if (!s || !s->baking) {
+        goto done;
+    }
+
+    capture = &s->lists[s->split ? BOX_LIGHTS_CAPTURE : BOX_LIGHTS_VIEW];
+    out->count = ecs_vec_count(&capture->lights);
+    out->lights = ecs_vec_first(&capture->lights);
+    out->entities = ecs_vec_first(&capture->entities);
+    out->modes = ecs_vec_first(&capture->modes);
+    if (s->has_lights && s->split) {
+        const box_light_list_t *baked = &s->lists[BOX_LIGHTS_BAKED];
+        box_lights_list_view(capture, &out->first);
+        box_lights_list_view(&s->lists[BOX_LIGHTS_MIXED], &out->later);
+        out->baked = baked->buffer;
+        out->baked_count = (uint32_t)ecs_vec_count(&baked->lights);
+        out->baked_directional = baked->directional;
+    }
+
+done:
+    return;
 }

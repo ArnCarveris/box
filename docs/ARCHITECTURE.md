@@ -73,12 +73,16 @@ parser only writes the `App` singleton:
 | `<file>` | `scene` | Script loaded before the first frame |
 
 `box_app_run` refuses a headless run without `frames` or `timeout`, a headless run without its
-temporary folder, and a headless run on a machine whose load average exceeds its core count
-unless `App.unguarded` is set. It loads the
+temporary folder, and a headless run on a machine whose load average plus the cores its budget
+claims (`cpu_budget / 100`; 0, no limit, counts as a floor of one core even though such a run may use more) exceeds the core count unless
+`App.unguarded` is set. It loads the
 scene as a managed script, starts the `TerminalServer` on `port` and steps the world until it
 quits. `BOX_TEST=1` sets `unguarded` and `unpaced` in every new world. The `AppFrame` system
 (`EcsPostFrame`) counts frames into `AppStatus.frame`, stops on `frames` or `timeout` and in a
-paced headless run sleeps for as long as the process exceeded its CPU budget. Setting
+paced headless run sleeps for as long as the process exceeded its CPU budget. The sleep waits
+with `box_wait_until` to a deadline that advances from the previous one (GCRA, the virtual
+scheduling form of a leaky bucket), so a late wake up shortens the next sleep and the CPU share
+matches the budget; a frame under its budget earns no credit for later ones. Setting
 `App.headless` creates `/tmp/box/<pid>` (`AppStatus.tmp_dir`).
 
 The temporary folder is private: `/tmp/box/<pid>` is made with mode 0700 and must be owned by
@@ -177,7 +181,9 @@ unchanged.
 `Shader {path, defines}` is the shader abstraction. A C style preprocessor
 (`src/render/preprocess.c`: `#include`, `#define`, `#ifdef`, `#pragma once`) runs in
 `RenderExtract`, reloads on mtime or size change (`ShaderSettings.poll_interval`) and the backend
-compiles in an error scope, keeping the old module on failure. Compile errors come back into
+compiles in an error scope natively and through `getCompilationInfo` in the browser, where the
+outcome arrives after the frame. A new module replaces the old one only once its outcome arrived
+and compiled, so a failed module keeps the old one. Compile errors come back into
 `ShaderStatus` as `file:line: message`, mapped through a per line source table. Engine shaders
 live in `etc/shaders` (blit, mesh, shape2d, scatter, cull, cluster, shadow, bloom, ssao, fog,
 tonemap, exposure, bake_sh) with shared includes. `tools/wgsl_check.mjs` validates them with Tint.
@@ -204,10 +210,17 @@ collapses to a point.
 
 `RenderExtractDraws` (`src/render/draw.c`) resolves 3D shapes to a shared unit mesh (keyed by
 topology and quantized proportions) plus an instance scale in the private `ShapeMesh`; radius
-and size are never baked. A mesh is sent once per backend as a resource create. Shapes live in
-persistent batches keyed by scene, mesh, pipeline (shader, blend, back face, textures) and
-whether they are dynamic; removed slots are filled with the last one. An instance is 128 bytes
-(model matrix with scale, normal data, color, emissive, metallic/roughness, UV transform).
+and size are never baked. Prefabs resolve their shape too: `Mesh3` is `(OnInstantiate, Inherit)`,
+so instances share the prefab's vertex data and copy the prefab's `ShapeMesh` instead of hashing
+it again. A prefab edit reaches every instance that does not override it (`ecs_set`; `ecs_get_mut`
+on an inheriting instance returns NULL), and instances lose the mesh when the prefab loses it or
+is deleted. The other shapes are copied into instances. A mesh is sent once per backend as a
+resource create. Shapes live in persistent batches keyed by scene, mesh, pipeline (shader,
+blend, back face, textures) and whether they are dynamic; removed slots are filled with the last
+one. The backend creates a forward pipeline per shader, color format, blend and back face on
+first use in a map without a limit, emptied when the mesh or 2D shape shader recompiles. An
+instance is 128 bytes (model matrix with scale, normal data, color, emissive,
+metallic/roughness, UV transform).
 
 Observers on shape, material, hierarchy and scene components and `box_transform_on_moved` queue
 changed entities, so an unchanged frame visits and uploads nothing (`RenderStatus.upload_bytes`).
@@ -282,6 +295,28 @@ light has intensity 0 is dark. `View.lighting.enabled` false draws base color an
 `cluster.wgsl` splits the view frustum into 16x9x24 clusters and lists up to 128 point or spot
 lights per cluster; `mesh.wgsl` shades every directional light plus the cluster's lights.
 
+**Light modes.** `DirectionalLight`, `PointLight` and `SpotLight` have a `bake` member of type
+`LightBakeMode`, following Unity's light modes (Godot's Dynamic, Disabled and Static bake modes):
+`Mixed`, the zero value and what the constructors set, lights directly in realtime and is captured
+by the bake; `Realtime` lights directly and is left out of the bake; `Baked` exists only in the
+probes, its direct light as well as its bounce (as Unity's light probes hold the direct light of
+baked lights), and costs nothing per frame. In a scene with `LightBake` the views (light buffer,
+clusters, `mesh.wgsl`) get the `Mixed` and `Realtime` lights. The captures of a pass over a black
+ambient are lit by the `Mixed` and `Baked` lights; later passes, whose ambient term already holds
+the direct light of the `Baked` lights, by the `Mixed` ones only, so that light is not counted
+twice. `bake_sh.wgsl` adds the direct light of every `Baked` light at the probe to its SH (the
+light's irradiance times the basis in its direction, before the cosine convolution), occluded
+when the depth the capture faces kept toward the light (reversed, infinite far) shows a surface
+nearer than the light, for a directional light any surface. The light extract keeps these as
+separate lists with their own light buffers only once a light that is not `Mixed` appears; while
+every light is `Mixed` the captures use the view list and its buffer. A scene without `LightBake`
+has only the view list with every light, so every mode is realtime there. The first directional
+light of a list shadows what it lights: the views are shadowed by the first directional light that
+is not `Baked` (a baked sun never drives view shadows), the captures by the first one of their
+list, which is not `Realtime`. A scene with any light entity, whatever its mode, no longer gets the
+default sun. A mode change, `Mixed` to `Baked` included, is a change of the capture lights, so it
+queues the light's reach through the light rules of Invalidation below.
+
 **Bake settings.** `LightBake` on a `Scene` root (or a singleton for the default scene) holds
 the baked lighting settings: `probe_spacing` 2, `bounces` 2, `capture_size` 16, `budget_ms` 2,
 `bounds_padding` 1 and `cache` (`".box/bake"`, owned string, empty for none), all set by the
@@ -290,17 +325,17 @@ constructor and taken literally otherwise. Adding it makes the engine add `Light
 shape out of the captures; a static shape has neither `DynamicTransform` nor `ManualTransform`.
 
 **Probe volume.** `RenderExtractBake` (`src/render/bake.c`) places a grid per baked scene over the
-static bounds of its spatial index (`box_spatial_static_bounds`) plus `bounds_padding`,
-`probe_spacing` apart (ceil(extent / spacing) + 1 per axis, centered, spacing widened above 262144
-probes), again only when the index or the settings change. Probes inside the oriented bounds of a
-static captured shape are invalid. The volume is a `BOX_RENDER_VOLUME` resource (`gpu_bake.c`): a
-grid uniform, two probe buffers of 9 rgb L2 SH irradiance coefficients per probe
-(Ramamoorthi-Hanrahan, Sloan's basis) and a validity bit mask, both buffers filled with the exact
-SH of the hemisphere ambient when it is created or the ambient changes. A view with
-`lighting.baked` binds it as group 3 of `mesh.wgsl` with the probe buffer the packet selects for
-the view (one bind group per buffer, same layout), whose `ambient()` term blends the 8 surrounding
-valid probes with DDGI style wrap weights; other views bind a 1x1x1 volume that keeps the
-hemisphere, so a scene without `LightBake` renders exactly as before.
+static bounds of its spatial index (`box_spatial_static_bounds`) plus `bounds_padding`, on the
+world lattice (k + 1/2) * `probe_spacing` inside the padded bounds (as Unity places adaptive probe
+volume bricks on a world grid; spacing widened above 262144 probes), again only when the index or
+the settings change. Probes inside the oriented bounds of a static captured shape are invalid. The
+volume is a `BOX_RENDER_VOLUME` resource (`gpu_bake.c`): a grid uniform, two probe buffers of 9 rgb
+L2 SH irradiance coefficients per probe (Ramamoorthi-Hanrahan, Sloan's basis) and a validity bit
+mask, both buffers filled with the exact SH of the hemisphere ambient when it is created or the
+ambient changes. A view with `lighting.baked` binds it as group 3 of `mesh.wgsl` with the probe
+buffer the packet selects for the view (one bind group per buffer, same layout), whose `ambient()`
+term blends the 8 surrounding valid probes with DDGI style wrap weights; other views bind a 1x1x1
+volume that keeps the hemisphere, so a scene without `LightBake` renders exactly as before.
 
 **Probe captures.** Every frame the bake extract moves the unbaked valid probes nearest to the
 cameras of the views of the scene into the packet as a bake batch with the lights of the scene. The
@@ -345,6 +380,32 @@ the converged bake. `PerfRun` warms up again while a bake that can progress (val
 `budget_ms` above 0, a view of its scene, the GPU backend) has probes left (captures of every
 remaining pass), and gives up with an error after 300 frames without progress. `budget_ms` 0 never
 bakes.
+
+**Invalidation.** `bake_change.c` queues the probes a change can reach instead of rebaking the
+volume, as Lumen invalidates its surface cache by the bounds of changed primitives. Static shapes
+come from `box_transform_on_moved` (their old bounds are still in the spatial index then) and from
+observers of their look (`Rgb`, `Emissive`, `PbrMaterial`, `BlendMode`, `BackFaceMode`,
+`TextureWrap`, `TextureTransform`, `ShapeMesh`, `PbrTextures` also through `IsA`, `Tint` and
+`Opacity` for every shape below the entity) and of `DynamicTransform`, `ManualTransform` and
+`NoBake` when the other flags leave the shape static; dynamic, manual and `NoBake` shapes queue
+nothing, deleted ones included, and nothing is recorded while no scene has `LightBake`. At extract
+the old and new bounds of each are checked again for probes inside geometry (newly invalid probes
+are hidden at once, newly valid ones shown with the next bake) and padded by `probe_spacing * (1 +
+bounces)`; the valid probes inside are queued. The capture lights of each scene (light modes
+above) are matched to the last frame by entity: a point or spot light added, removed or changed
+queues the probes within its old and new range, any directional light or the default sun (gained
+or lost) every probe; an ambient
+change after a bake, `bounces` and `capture_size` queue every probe too, while `budget_ms` changes
+nothing. When no bake is in progress the queued probes start a staged bake: a
+`BOX_RENDER_VOLUME_COPY` copies the shown probe buffer into the other one, every pass bakes the
+queued probes there in place, and the views switch to it when the last pass is in a packet, seeing
+the probes it captured and those they saw before, so requeued probes keep their values until
+rebaked and probes that became valid stay hidden until a bake captured them. `converged` is false
+while probes are queued and `baked` counts the valid probes not waiting. Bounds that grow or shrink
+the grid resize it on its lattice: a `BOX_RENDER_VOLUME_RESIZE` fills the new grid and copies the
+rows of both probe buffers it shares with the old one, and only the new probes, hidden until baked,
+and the changed region are queued. A new `probe_spacing` places a new volume that bakes from the
+ambient.
 
 ## Spatial index
 

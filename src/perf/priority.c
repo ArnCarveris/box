@@ -3,7 +3,8 @@
  * @brief Real-time schedule of the thread that paces a performance run.
  *
  * On macOS the pacing thread gets a time-constraint policy for the duration of a run, so it wakes
- * on time from its sleeps on a loaded machine. Other platforms keep their schedule.
+ * on time from its sleeps on a loaded machine; on Linux SCHED_FIFO when the user may raise it.
+ * Other platforms keep their schedule and rely on the wake up latency the pacer learns.
  */
 
 #include "perf.h"
@@ -66,6 +67,47 @@ void box_perf_priority_reset(
     if (priority->active) {
         thread_policy_set((mach_port_t)priority->thread, THREAD_STANDARD_POLICY,
             (thread_policy_t)&policy, THREAD_STANDARD_POLICY_COUNT);
+        priority->active = false;
+        priority->thread = 0;
+    }
+}
+
+#elif defined(__linux__)
+
+#include <pthread.h>
+#include <sched.h>
+
+bool box_perf_priority_set(
+    box_perf_priority_t *priority,
+    double interval,
+    double computation)
+{
+    struct sched_param param = { .sched_priority = sched_get_priority_min(SCHED_FIFO) };
+    int err;
+    (void)interval;
+    (void)computation;
+    if (priority->active) {
+        goto done;
+    }
+
+    err = pthread_setschedparam(pthread_self(), SCHED_FIFO, &param);
+    if (!err) {
+        priority->active = true;
+        priority->thread = (uint64_t)pthread_self();
+    } else {
+        ecs_warn("perf: no SCHED_FIFO for the pacing thread (%d)", err);
+    }
+
+done:
+    return priority->active;
+}
+
+void box_perf_priority_reset(
+    box_perf_priority_t *priority)
+{
+    struct sched_param param = { .sched_priority = 0 };
+    if (priority->active) {
+        pthread_setschedparam((pthread_t)priority->thread, SCHED_OTHER, &param);
         priority->active = false;
         priority->thread = 0;
     }
