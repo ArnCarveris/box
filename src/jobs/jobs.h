@@ -90,6 +90,17 @@ int box_jobs_set_workers(
 int32_t box_jobs_pending(
     ecs_world_t *world);
 
+/** Count the jobs a worker took whose work is not marked finished yet.
+ *
+ * Work that signals its own module before it returns is not yet visible to JobsComplete, so a
+ * headless frame that waits for its module's work also waits for this to reach 0.
+ *
+ * @param world The world
+ * @return Number of jobs whose work runs or just returned
+ */
+int32_t box_jobs_running(
+    ecs_world_t *world);
+
 /** Compute the size of the pool.
  *
  * @param cores Number of online cores

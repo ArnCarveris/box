@@ -107,6 +107,20 @@ static void FreeEvent(
     events[event_count ++] = 'f';
 }
 
+static int32_t hold_started = 0;
+static int32_t hold_release = 0;
+
+static void WorkHold(
+    void *ctx)
+{
+    ecs_os_ainc(&hold_started);
+    while (!*(volatile int32_t*)&hold_release) {
+        ecs_sleepf(0.001);
+    }
+
+    ecs_os_ainc(&work_count);
+}
+
 static void RecordWork(
     ecs_iter_t *it)
 {
@@ -124,6 +138,8 @@ void Jobs_setup(void)
     sum = 0;
     order_count = 0;
     event_count = 0;
+    hold_started = 0;
+    hold_release = 0;
     ecs_os_memset(order, 0, sizeof(order));
     ecs_os_memset(events, 0, sizeof(events));
 }
@@ -421,6 +437,37 @@ void Jobs_pending_count(void)
     test_int(box_jobs_pending(world), 3);
 
     ecs_progress(world, 0);
+    test_int(box_jobs_pending(world), 0);
+
+    ecs_fini(world);
+}
+
+void Jobs_running_until_done(void)
+{
+    // ui_fixes/wrap_removed_flake
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_int(box_jobs_running(world), 0);
+    test_int(box_job_submit(world, &(box_job_desc_t){
+        .work = WorkHold, .complete = CompleteCount }), 0);
+
+    int32_t i;
+    for (i = 0; i < 5000 && !*(volatile int32_t*)&hold_started; i ++) {
+        ecs_sleepf(0.001);
+    }
+
+    test_int(box_jobs_running(world), 1);
+    test_int(work_count, 0);
+    ecs_os_ainc(&hold_release);
+    for (i = 0; i < 5000 && (!*(volatile int32_t*)&work_count || box_jobs_running(world)); i ++) {
+        ecs_sleepf(0.001);
+    }
+
+    test_int(work_count, 1);
+    test_int(box_jobs_running(world), 0);
+    ecs_progress(world, 0);
+    test_int(complete_count, 1);
     test_int(box_jobs_pending(world), 0);
 
     ecs_fini(world);
