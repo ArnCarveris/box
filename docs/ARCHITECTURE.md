@@ -433,7 +433,9 @@ level narrow phase and no picking.
 Glyph MSDFs are generated lazily per glyph on workers into RGBA8 atlas pages that grow and then
 page. A page reaches the backend as `BOX_RENDER_UPDATE` texture regions into a texture with one mip
 level: whole when it is new or grew, then once per frame the area that covers the glyphs completed
-since the last frame (`wgpuQueueWriteTexture`). Generation follows msdfgen 1.9+: perpendicular distance selection, the overlapping contour
+since the last frame (`wgpuQueueWriteTexture`). `Font.atlas_pages` (4 for a new Font) is the
+atlas budget: a glyph that needs a page beyond it clears the least recently used page that no laid
+out Text shows, and the glyphs of that page are generated again on their next use. Generation follows msdfgen 1.9+: perpendicular distance selection, the overlapping contour
 combiner (contours that overlap, such as composite glyphs, leave no seam) and its error correction
 (`src/text/msdf_correct.c`, edge priority with the distance checked at edges). Font data is untrusted: a face without units per em fails to load, and a glyph whose box
 is larger than a page (1024 minus spacing) is drawn as the missing glyph with one warning per

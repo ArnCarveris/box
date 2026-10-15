@@ -192,7 +192,7 @@ void Text_type_new_glyphs(
     int32_t i, typed = 0;
     for (i = 0; i < BENCH_TEXT_FONTS; i ++) {
         fonts[i] = ecs_new(world);
-        ecs_set(world, fonts[i], Font, {.path = path});
+        ecs_set(world, fonts[i], Font, {.path = path, .atlas_pages = 16});
         texts[i] = ecs_new(world);
         ecs_set(world, texts[i], Position, {(float)i * 40, 0, 0});
         ecs_set(world, texts[i], Text, {.value = "a", .size = 24, .font = fonts[i]});
@@ -213,7 +213,7 @@ void Text_type_new_glyphs(
             bench_pause(b);
             ecs_delete(world, fonts[f]);
             fonts[f] = ecs_new(world);
-            ecs_set(world, fonts[f], Font, {.path = path});
+            ecs_set(world, fonts[f], Font, {.path = path, .atlas_pages = 16});
             ecs_set(world, texts[f], Text, {.value = "a", .size = 24, .font = fonts[f]});
             ecs_progress(world, 0);
             box_render_sync(world);

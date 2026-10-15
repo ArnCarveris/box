@@ -263,7 +263,10 @@ static void box_text_state_init(
     });
     ecs_singleton_ensure(world, TextRegistry)->state = s;
     s->default_font = ecs_entity(world, { .name = "DefaultFont" });
-    ecs_set(world, s->default_font, Font, { .path = BOX_TEXT_DEFAULT_FONT });
+    ecs_set(world, s->default_font, Font, {
+        .path = BOX_TEXT_DEFAULT_FONT,
+        .atlas_pages = BOX_TEXT_ATLAS_PAGES_DEFAULT
+    });
 }
 
 /** Construct Text values with the documented size and box.text.DefaultFont.
@@ -282,6 +285,25 @@ static void box_text_ctor(
     int32_t i;
     for (i = 0; i < count; i ++) {
         values[i] = (Text){ .size = BOX_TEXT_SIZE_DEFAULT, .font = *font };
+    }
+}
+
+/** Construct Font values without a path and with the documented atlas budget.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Unused
+ */
+static void box_font_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    Font *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (Font){ .atlas_pages = BOX_TEXT_ATLAS_PAGES_DEFAULT };
     }
 }
 
@@ -354,6 +376,7 @@ void BoxTextImport(
     ECS_META_COMPONENT(world, Text);
     ECS_META_COMPONENT(world, TextBounds);
     box_owned_hooks(world, Font, BOX_OWNED_STR(Font, path));
+    ecs_set_hooks(world, Font, { .ctor = box_font_ctor });
     box_owned_hooks(world, FontStatus, BOX_OWNED_STR(FontStatus, error));
     box_owned_hooks(world, Text, BOX_OWNED_STR(Text, value));
 

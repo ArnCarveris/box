@@ -35,6 +35,9 @@
 /** First backend texture handle of atlas pages, the handles below belong to box.texture */
 #define BOX_TEXT_PAGE_FIRST (0x40000000u)
 
+/** Atlas pages a constructed Font keeps */
+#define BOX_TEXT_ATLAS_PAGES_DEFAULT (4)
+
 /** Em size of a constructed Text, in logical pixels */
 #define BOX_TEXT_SIZE_DEFAULT (16.0f)
 
@@ -78,6 +81,8 @@ typedef struct box_text_page_t {
     int32_t pen_y;      /**< Row of the shelf being filled */
     int32_t shelf;      /**< Height of the shelf being filled */
     int32_t sent;       /**< Size of the page the backend has, 0 before the first upload */
+    uint32_t generation; /**< Bumped when the page is cleared for reuse, older fields are dropped */
+    int64_t used;       /**< Frame a laid out glyph of the page was last looked up in */
     int32_t dirty[4];   /**< Area the backend does not have: left, top, right, bottom */
 } box_text_page_t;
 
