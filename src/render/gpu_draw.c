@@ -11,6 +11,7 @@
 
 #include "gpu.h"
 #include <math.h>
+#include <string.h>
 
 #ifdef BOX_RENDER_WGPU
 
@@ -98,6 +99,7 @@ void box_gpu_draw_init(
         });
     ecs_map_init(&gpu->meshes, NULL);
     ecs_map_init(&gpu->buffers, NULL);
+    ecs_map_init(&gpu->forward, NULL);
     ecs_vec_init_t(NULL, &gpu->view_data, uint8_t, 0);
     box_gpu_light_init(gpu);
     box_gpu_shadow_init(gpu);
@@ -140,16 +142,22 @@ static void box_gpu_buffer_free(
 void box_gpu_forward_reset(
     box_gpu_t *gpu)
 {
-    int32_t i;
-    for (i = 0; i < gpu->forward_count; i ++) {
-        if (gpu->forward[i].pipeline) {
-            wgpuRenderPipelineRelease(gpu->forward[i].pipeline);
-        }
-
-        gpu->forward[i].pipeline = NULL;
+    ecs_map_iter_t it;
+    if (!ecs_map_is_init(&gpu->forward)) {
+        goto done;
     }
 
-    gpu->forward_count = 0;
+    it = ecs_map_iter(&gpu->forward);
+    while (ecs_map_next(&it)) {
+        WGPURenderPipeline pipeline = ecs_map_ptr(&it);
+        if (pipeline) {
+            wgpuRenderPipelineRelease(pipeline);
+        }
+    }
+
+    ecs_map_clear(&gpu->forward);
+done:
+    return;
 }
 
 void box_gpu_draw_fini(
@@ -169,6 +177,7 @@ void box_gpu_draw_fini(
     ecs_map_fini(&gpu->buffers);
     ecs_vec_fini_t(NULL, &gpu->view_data, uint8_t);
     box_gpu_forward_reset(gpu);
+    ecs_map_fini(&gpu->forward);
     box_gpu_light_fini(gpu);
     box_gpu_shadow_fini(gpu);
     box_gpu_cull_fini(gpu);
@@ -454,12 +463,123 @@ static WGPURenderPipeline box_gpu_forward_create(
     return wgpuDeviceCreateRenderPipeline(gpu->device, &desc);
 }
 
+#ifndef __EMSCRIPTEN__
+/** Keep the error a scope around a pipeline creation caught, as one line: the causes wgpu
+ * lists below its "Caused by:" line joined by ": ".
+ *
+ * @param status Whether the scope was popped
+ * @param type Kind of error, NoError when there was none
+ * @param message Error text
+ * @param userdata1 The char* that receives the error
+ * @param userdata2 Unused
+ */
+static void box_gpu_forward_on_scope(
+    WGPUPopErrorScopeStatus status,
+    WGPUErrorType type,
+    WGPUStringView message,
+    void *userdata1,
+    void *userdata2)
+{
+    ecs_strbuf_t buf = ECS_STRBUF_INIT;
+    const char *text = message.data ? message.data : "";
+    const char *end = text + (message.length == WGPU_STRLEN
+        ? ecs_os_strlen(text) : (ecs_size_t)message.length);
+    const char *line = text;
+    int32_t lines = 0;
+    (void)userdata2;
+    if (status != WGPUPopErrorScopeStatus_Success || type == WGPUErrorType_NoError) {
+        goto done;
+    }
+
+    while (line < end) {
+        const char *next = memchr(line, '\n', (size_t)(end - line));
+        const char *stop = next ? next : end;
+        while (line < stop && (*line == ' ' || *line == '\t')) {
+            line ++;
+        }
+
+        bool skip = line == stop || !strncmp(line, "Validation Error", 16) ||
+            !strncmp(line, "Caused by:", 10) || !strncmp(line, "In wgpu", 7);
+        if (!skip) {
+            ecs_strbuf_append(&buf, "%s%.*s", lines ++ ? ": " : "", (int)(stop - line), line);
+        }
+
+        line = next ? next + 1 : end;
+    }
+
+    if (!lines) {
+        ecs_strbuf_appendstr(&buf, "the pipeline cannot be created");
+    }
+
+    *(char**)userdata1 = ecs_strbuf_get(&buf);
+done:
+    ecs_strbuf_reset(&buf);
+}
+#endif
+
+char* box_gpu_forward_check(
+    box_gpu_t *gpu,
+    uint32_t handle,
+    WGPUShaderModule shader)
+{
+    char *result = NULL;
+#ifndef __EMSCRIPTEN__
+    WGPURenderPipeline pipeline;
+    if (!gpu->device || !gpu->mesh_layout) {
+        goto done;
+    }
+
+    wgpuDevicePushErrorScope(gpu->device, WGPUErrorFilter_Validation);
+    pipeline = box_gpu_forward_create(
+        gpu, handle, shader, WGPUTextureFormat_RGBA8Unorm, Opaque, BackFaceCull);
+    wgpuDevicePopErrorScope(gpu->device, (WGPUPopErrorScopeCallbackInfo){
+        .mode = WGPUCallbackMode_AllowSpontaneous,
+        .callback = box_gpu_forward_on_scope,
+        .userdata1 = &result
+    });
+    if (pipeline) {
+        wgpuRenderPipelineRelease(pipeline);
+    }
+
+done:
+#else
+    (void)gpu;
+    (void)handle;
+    (void)shader;
+#endif
+
+    return result;
+}
+
+/** Pack the state a forward pipeline is created for into its cache key.
+ *
+ * @param shader Shader handle
+ * @param format Format of the color target, below 2^24
+ * @param blend BlendMode, below 16
+ * @param back_face BackFaceMode, of which the pipeline only tells BackFaceCull from the rest
+ * @return The key, distinct for every distinct pipeline
+ */
+static uint64_t box_gpu_forward_key(
+    uint32_t shader,
+    WGPUTextureFormat format,
+    uint32_t blend,
+    uint32_t back_face)
+{
+    ecs_assert((uint32_t)format < (1u << 24), ECS_INTERNAL_ERROR, NULL);
+
+    return ((uint64_t)shader << 32) | ((uint64_t)format << 8) | ((uint64_t)blend << 4) |
+        (back_face == BackFaceCull ? 0u : 1u);
+}
+
 /** Get the forward pipeline of a color format and the state of a batch, created on first use.
+ *
+ * The cache grows with the states in use; a recompiled or released mesh or 2D shape shader
+ * empties it, and a batch whose shader does not exist draws nothing.
  *
  * @param gpu The backend
  * @param format The format of the color target
  * @param b The batch
- * @return The pipeline, NULL without a mesh shader or when too many pipelines are in use
+ * @return The pipeline, NULL without a shader or for an unknown blend mode
  */
 static WGPURenderPipeline box_gpu_forward_pipeline(
     box_gpu_t *gpu,
@@ -467,30 +587,27 @@ static WGPURenderPipeline box_gpu_forward_pipeline(
     const box_render_batch_t *b)
 {
     WGPURenderPipeline result = NULL;
-    WGPUShaderModule shader = box_gpu_shader_get(gpu, b->pipeline);
-    box_gpu_forward_t *f;
-    int32_t i;
-    for (i = 0; i < gpu->forward_count; i ++) {
-        f = &gpu->forward[i];
-        if (f->shader == b->pipeline && f->format == format && f->blend == b->blend &&
-            f->back_face == b->back_face)
-        {
-            result = f->pipeline;
-            goto done;
-        }
+    WGPUShaderModule shader;
+    ecs_map_val_t *cached;
+    uint64_t key;
+    if (b->blend > Max) {
+        goto done;
     }
 
-    if (!shader || gpu->forward_count == BOX_GPU_FORWARD_PIPELINES || b->blend > Max) {
+    shader = box_gpu_shader_get(gpu, b->pipeline);
+    if (!shader) {
+        goto done;
+    }
+
+    key = box_gpu_forward_key(b->pipeline, format, b->blend, b->back_face);
+    cached = ecs_map_get(&gpu->forward, key);
+    if (cached) {
+        result = (WGPURenderPipeline)(uintptr_t)*cached;
         goto done;
     }
 
     result = box_gpu_forward_create(gpu, b->pipeline, shader, format, b->blend, b->back_face);
-    f = &gpu->forward[gpu->forward_count ++];
-    f->shader = b->pipeline;
-    f->format = format;
-    f->blend = b->blend;
-    f->back_face = b->back_face;
-    f->pipeline = result;
+    ecs_map_insert_ptr(&gpu->forward, key, result);
 done:
     return result;
 }

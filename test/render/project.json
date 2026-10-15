@@ -37,6 +37,19 @@
                 ]
             },
             {
+                "id": "DeviceLoss",
+                "testcases": [
+                    "pipeline_error_keeps_previous",
+                    "lost_device_recovers"
+                ]
+            },
+            {
+                "id": "Restart",
+                "testcases": [
+                    "main_thread_toggle_keeps_scene"
+                ]
+            },
+            {
                 "id": "Capture",
                 "testcases": [
                     "cleared_surface",
@@ -47,7 +60,9 @@
                     "view_root_selects_clear",
                     "every_frame",
                     "main_thread",
-                    "relative_path_written_before_exit"
+                    "relative_path_written_before_exit",
+                    "frame_completes_while_pending",
+                    "completes_while_frames_run"
                 ]
             },
             {
@@ -237,7 +252,13 @@
                     "gpu_reload_changes_image",
                     "gpu_deleted_texture_unbinds",
                     "gpu_inherited_from_prefab",
-                    "gpu_svg_colors"
+                    "gpu_svg_colors",
+                    "gpu_albedo_mip_linear_average",
+                    "gpu_roughness_mip_stored_average",
+                    "gpu_mip_data_then_color",
+                    "gpu_mip_shared_color_and_data",
+                    "gpu_mip_reload_keeps_color",
+                    "gpu_emissive_mip_linear_average"
                 ]
             },
             {
@@ -256,7 +277,12 @@
                     "moved_light_follows_transform",
                     "many_point_lights",
                     "unchanged_lights_upload_nothing",
-                    "component_defaults"
+                    "component_defaults",
+                    "cluster_lists_every_light",
+                    "spot_light_lights_its_whole_cone",
+                    "cluster_list_grows_to_every_light",
+                    "point_light_inverse_square",
+                    "point_light_fades_smoothly_to_range"
                 ]
             },
             {
@@ -304,6 +330,20 @@
                     "parent_tint_and_prefab_textures_rebake",
                     "newly_valid_probe_hidden_until_baked",
                     "full_rebakes_keep_values"
+                ]
+            },
+            {
+                "id": "LightModes",
+                "testcases": [
+                    "defaults_to_mixed",
+                    "realtime_light_left_out_of_bake",
+                    "baked_light_only_in_probes",
+                    "modes_identical_without_bake",
+                    "mode_change_rebakes_reach",
+                    "baked_sun_leaves_shadows_to_next",
+                    "first_realtime_light_drops_default_sun",
+                    "baked_light_lights_probes_like_mixed",
+                    "captures_follow_first_non_realtime_sun"
                 ]
             },
             {
@@ -445,6 +485,29 @@
                     "script_entry_enabled_by_default",
                     "bloom_temporal_keeps_last_frame",
                     "follow_surface_resize"
+                ]
+            },
+            {
+                "id": "ShaderCompile",
+                "testcases": [
+                    "failed_recompile_keeps_module",
+                    "recompile_in_flight_keeps_old_module",
+                    "broken_recompile_in_flight_reports_error",
+                    "error_stays_until_outcome",
+                    "two_recompiles_in_flight_end_with_newest",
+                    "late_older_outcome_is_ignored",
+                    "new_shader_before_first_outcome",
+                    "delete_shader_mid_compile",
+                    "fini_mid_compile"
+                ]
+            },
+            {
+                "id": "PipelineCache",
+                "testcases": [
+                    "every_state_combination_draws",
+                    "invalid_back_face_mode_keeps_states_apart",
+                    "shader_reload_redraws_every_state",
+                    "released_shader_draws_nothing"
                 ]
             }
         ]

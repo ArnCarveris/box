@@ -25,23 +25,43 @@
 extern "C" {
 #endif
 
-/** Directional light travelling along the entity's local +Z */
-ECS_STRUCT(DirectionalLight, {
-    float intensity; /**< Radiance scale, default 1, 0 lights nothing */
+/** How a light takes part in the LightBake of its scene, as Unity's light modes.
+ *
+ * Mixed is the zero value and means what it says: the light lights directly in realtime and
+ * its bounced light is baked, so a light written as a C literal stays in both. In a scene
+ * without LightBake every mode lights directly in realtime.
+ */
+ECS_ENUM(LightBakeMode, {
+    LightBakeModeMixed = 0,    /**< Lights directly in realtime and contributes to the bake */
+    LightBakeModeRealtime = 1, /**< Lights directly in realtime and is left out of the bake */
+    LightBakeModeBaked = 2     /**< Exists only in the probes of the bake, its direct and
+                                *   bounced light alike: no realtime light, no per frame cost
+                                *   and no view shadows */
 });
 
-/** Omnidirectional light */
+/** Directional light travelling along the entity's local +Z */
+ECS_STRUCT(DirectionalLight, {
+    float intensity;    /**< Light on a facing white surface, default 1, 0 lights nothing */
+    LightBakeMode bake; /**< Part of the light in the bake of its scene, default Mixed */
+});
+
+/** Omnidirectional light. Intensity is in linear display units: it lights a facing white diffuse
+ * surface at intensity / d^2 at distance d (from 0.01 up), windowed by (1 - (d / range)^4)^2 so
+ * the light reaches zero at range. A directional light lights that surface at its intensity.
+ */
 ECS_STRUCT(PointLight, {
-    float intensity; /**< Radiance scale, default 1, 0 lights nothing */
-    float range;     /**< Distance at which the light reaches zero, default 10 */
+    float intensity;    /**< Light on a facing white surface 1 unit away, default 1, 0 none */
+    float range;        /**< Distance at which the light reaches zero, default 10 */
+    LightBakeMode bake; /**< Part of the light in the bake of its scene, default Mixed */
 });
 
 /** Cone light along the entity's local +Z, angles are half angles in degrees */
 ECS_STRUCT(SpotLight, {
-    float intensity;   /**< Radiance scale, default 1, 0 lights nothing */
-    float range;       /**< Distance at which the light reaches zero, default 10 */
-    float inner_angle; /**< Full intensity cone half angle, default 20 */
-    float outer_angle; /**< Zero intensity cone half angle, default 30 */
+    float intensity;    /**< Light on a facing white surface 1 unit away, default 1, 0 none */
+    float range;        /**< Distance at which the light reaches zero, default 10 */
+    float inner_angle;  /**< Full intensity cone half angle, default 20 */
+    float outer_angle;  /**< Zero intensity cone half angle, default 30 */
+    LightBakeMode bake; /**< Part of the light in the bake of its scene, default Mixed */
 });
 
 /** Hemisphere ambient light of the scene the entity is in, blended by the surface normal */
@@ -90,6 +110,9 @@ extern ECS_TAG_DECLARE(NoBake);
  *
  * The first directional light of a scene casts the shadows of the views that enable them;
  * NoShadow shapes and blended shapes cast none.
+ *
+ * In a scene with LightBake the views are shadowed by the first directional light that is not
+ * Baked and the probe captures by the first one they shade surfaces with (see LightBakeMode).
  *
  * @param world The world
  */

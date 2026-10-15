@@ -440,41 +440,41 @@ static void box_bake_mark_light(
 }
 
 /** Queue the probes the lights that differ between two frames can reach, matched by their
- * entity: a light added, removed or changed counts in both its old and new place.
+ * entity: a light added, removed or changed, its bake mode included, counts in both its old and
+ * new place.
  *
  * @param b The state, owns the scratch map
  * @param v The volume
- * @param lights The lights of this frame
- * @param entities The entity of each light of this frame
- * @param count Number of lights of this frame
+ * @param l The lights of this frame
  */
 static void box_bake_lights_diff(
     box_render_bake_t *b,
     box_bake_volume_t *v,
-    const box_render_light_t *lights,
-    const ecs_entity_t *entities,
-    int32_t count)
+    const box_bake_lights_t *l)
 {
     const box_render_light_t *before = ecs_vec_first(&v->light_list);
     const ecs_entity_t *owners = ecs_vec_first(&v->light_entities);
+    const uint8_t *modes = ecs_vec_first(&v->light_modes);
     int32_t i, known = ecs_vec_count(&v->light_list);
     ecs_map_clear(&b->light_map);
     for (i = 0; i < known; i ++) {
         ecs_map_insert(&b->light_map, owners[i], (ecs_map_val_t)i);
     }
 
-    for (i = 0; i < count; i ++) {
-        ecs_map_val_t *old = ecs_map_get(&b->light_map, entities[i]);
+    for (i = 0; i < l->count; i ++) {
+        ecs_map_val_t *old = ecs_map_get(&b->light_map, l->entities[i]);
         if (!old) {
-            box_bake_mark_light(v, &lights[i]);
+            box_bake_mark_light(v, &l->lights[i]);
         } else {
             const box_render_light_t *was = &before[*old];
-            if (ecs_os_memcmp_t(was, &lights[i], box_render_light_t)) {
+            if (ecs_os_memcmp_t(was, &l->lights[i], box_render_light_t) ||
+                modes[*old] != l->modes[i])
+            {
                 box_bake_mark_light(v, was);
-                box_bake_mark_light(v, &lights[i]);
+                box_bake_mark_light(v, &l->lights[i]);
             }
 
-            ecs_map_remove(&b->light_map, entities[i]);
+            ecs_map_remove(&b->light_map, l->entities[i]);
         }
     }
 
@@ -485,42 +485,39 @@ static void box_bake_lights_diff(
 }
 
 void box_bake_lights(
-    const ecs_world_t *world,
     box_render_bake_t *b,
     box_bake_volume_t *v)
 {
-    int32_t count = 0, known = ecs_vec_count(&v->light_list);
-    const ecs_entity_t *entities = NULL;
-    if (!b->lights_state) {
-        b->lights_state = box_render_lights_state(world);
-    }
-
-    const box_render_light_t *lights = box_render_lights_scene(b->lights_state, v->scene,
-        &count, &entities);
+    const box_bake_lights_t *l = &v->lights;
+    int32_t count = l->count, known = ecs_vec_count(&v->light_list);
     if (!v->viewed || !v->sent || !v->probes) {
         goto done;
     }
 
-    bool sun = (v->baked_lights.buffer == 0) != (v->lights.buffer == 0);
+    bool sun = (v->baked_lights.buffer == BOX_RENDER_BUFFER_LIGHT_FIRST) !=
+        (l->first.buffer == BOX_RENDER_BUFFER_LIGHT_FIRST);
     bool same = count == known && (!count ||
-        (!ecs_os_memcmp(lights, ecs_vec_first(&v->light_list),
+        (!ecs_os_memcmp(l->lights, ecs_vec_first(&v->light_list),
             count * ECS_SIZEOF(box_render_light_t)) &&
-        !ecs_os_memcmp(entities, ecs_vec_first(&v->light_entities),
-            count * ECS_SIZEOF(ecs_entity_t))));
+        !ecs_os_memcmp(l->entities, ecs_vec_first(&v->light_entities),
+            count * ECS_SIZEOF(ecs_entity_t)) &&
+        !ecs_os_memcmp(l->modes, ecs_vec_first(&v->light_modes), count)));
     if (v->lights_known && sun) {
         box_bake_mark_all(v);
     } else if (v->lights_known && !same) {
-        box_bake_lights_diff(b, v, lights, entities, count);
+        box_bake_lights_diff(b, v, l);
     }
 
     ecs_vec_set_count_t(NULL, &v->light_list, box_render_light_t, count);
     ecs_vec_set_count_t(NULL, &v->light_entities, ecs_entity_t, count);
+    ecs_vec_set_count_t(NULL, &v->light_modes, uint8_t, count);
     if (count) {
-        ecs_os_memcpy_n(ecs_vec_first(&v->light_list), lights, box_render_light_t, count);
-        ecs_os_memcpy_n(ecs_vec_first(&v->light_entities), entities, ecs_entity_t, count);
+        ecs_os_memcpy_n(ecs_vec_first(&v->light_list), l->lights, box_render_light_t, count);
+        ecs_os_memcpy_n(ecs_vec_first(&v->light_entities), l->entities, ecs_entity_t, count);
+        ecs_os_memcpy_n(ecs_vec_first(&v->light_modes), l->modes, uint8_t, count);
     }
 
-    v->baked_lights = v->lights;
+    v->baked_lights = l->first;
     v->lights_known = true;
 done:
     return;

@@ -73,12 +73,16 @@ parser only writes the `App` singleton:
 | `<file>` | `scene` | Script loaded before the first frame |
 
 `box_app_run` refuses a headless run without `frames` or `timeout`, a headless run without its
-temporary folder, and a headless run on a machine whose load average exceeds its core count
-unless `App.unguarded` is set. It loads the
+temporary folder, and a headless run on a machine whose load average plus the cores its budget
+claims (`cpu_budget / 100`; 0, no limit, counts as a floor of one core even though such a run may use more) exceeds the core count unless
+`App.unguarded` is set. It loads the
 scene as a managed script, starts the `TerminalServer` on `port` and steps the world until it
 quits. `BOX_TEST=1` sets `unguarded` and `unpaced` in every new world. The `AppFrame` system
 (`EcsPostFrame`) counts frames into `AppStatus.frame`, stops on `frames` or `timeout` and in a
-paced headless run sleeps for as long as the process exceeded its CPU budget. Setting
+paced headless run sleeps for as long as the process exceeded its CPU budget. The sleep waits
+with `box_wait_until` to a deadline that advances from the previous one (GCRA, the virtual
+scheduling form of a leaky bucket), so a late wake up shortens the next sleep and the CPU share
+matches the budget; a frame under its budget earns no credit for later ones. Setting
 `App.headless` creates `/tmp/box/<pid>` (`AppStatus.tmp_dir`).
 
 The temporary folder is private: `/tmp/box/<pid>` is made with mode 0700 and must be owned by
@@ -181,7 +185,9 @@ unchanged.
 `Shader {path, defines}` is the shader abstraction. A C style preprocessor
 (`src/render/preprocess.c`: `#include`, `#define`, `#ifdef`, `#pragma once`) runs in
 `RenderExtract`, reloads on mtime or size change (`ShaderSettings.poll_interval`) and the backend
-compiles in an error scope, keeping the old module on failure. Compile errors come back into
+compiles in an error scope natively and through `getCompilationInfo` in the browser, where the
+outcome arrives after the frame. A new module replaces the old one only once its outcome arrived
+and compiled, so a failed module keeps the old one. Compile errors come back into
 `ShaderStatus` as `file:line: message`, mapped through a per line source table. Engine shaders
 live in `etc/shaders` (blit, mesh, shape2d, scatter, cull, cluster, shadow, bloom, ssao, fog,
 tonemap, exposure, bake_sh) with shared includes. `tools/wgsl_check.mjs` validates them with Tint.
@@ -219,7 +225,9 @@ on an inheriting instance returns NULL), and instances lose the mesh when the pr
 is deleted. The other shapes are copied into instances. A mesh is sent once per backend as a
 resource create. Shapes live in persistent batches keyed by scene, mesh, pipeline (shader,
 blend, back face, textures) and whether they are dynamic; removed slots are filled with the last
-one. An instance is 128 bytes (model matrix with scale, normal data, color, emissive,
+one. The backend creates a forward pipeline per shader, color format, blend and back face on
+first use in a map without a limit, emptied when the mesh or 2D shape shader recompiles. An
+instance is 128 bytes (model matrix with scale, normal data, color, emissive,
 metallic/roughness, UV transform).
 
 Observers on shape, material, hierarchy and scene components and `box_transform_on_moved` queue
@@ -251,7 +259,28 @@ order (creation order, only views whose camera has a `Camera`):
 7. The effects chain, the last effect writing the sRGB target.
 
 After the views the target is blitted if its render size differs, presented, and for a capture
-copied to a readback buffer and written as PNG on the render thread.
+copied to a readback buffer. The render thread maps the buffer without waiting (wgpu's
+`map_async`, as Bevy's screenshots do) and goes on with the next packet; the map callback, which
+fires during a later submit or poll, writes the PNG (through a `.part` file and a rename) and
+counts it in the GPU stats. `box_render_sync`, and the shutdown of the backend, call the
+backend's `flush`, which blocks on the device until every pending capture is written, so a
+capture is on disk after a sync. The browser writes no captures: the frame warns once, and the
+`capture` and `render` commands fail with "captures are not available in the browser".
+
+**Pipeline errors and device loss.** A mesh or 2D shape module that compiled is checked before
+it replaces the module that renders: a forward pipeline is created from it inside a validation
+error scope, and a module that does not fit the pipeline layout is reported in `ShaderStatus`
+like a compile error while the previous module and its pipelines keep rendering (native only;
+the browser reports its error scopes later). Before each packet the ring asks the backend's
+`lost` callback whether the device was lost (the wgpu device lost callback sets it, as does
+`box_render_gpu_lose_device`, which destroys the device to test this); it then stops and starts
+the backend on the thread that renders, which recreates the device, and the stop bumps the
+backend generation so the extract sends the whole scene again. The ring keeps the generation
+under its lock and publishes it in the acquire, which stamps the packet with it; a packet built
+for an older generation (in flight when the device was lost) is dropped, not rendered, so no
+delta reaches a device that lacks its resources, and errors of the lost device are not
+reported. `RenderStatus.device_losses` counts the recoveries whose new device was created. In
+the browser the page reports a lost device and does not recover.
 
 **Culling.** A compute pass tests each draw's instances (mesh bounds moved by the model matrix)
 against the clip planes and `min_dimension_px` and writes visible slots plus indirect draw args.
@@ -286,14 +315,44 @@ in batch order.
 
 `DirectionalLight`, `PointLight`, `SpotLight` and `AmbientLight` take color from `Rgb`, position
 from `WorldTransform` and direction from the local +Z axis. Constructors give intensity 1, range
-10 and a 20/30 degree cone. `RenderExtractLights` collects the lights of each scene into a
+10 and a 20/30 degree cone. Point and spot lights fall off with the inverse square of the
+distance (clamped below 0.01), windowed to zero at their range as in Frostbite's
+`smoothDistanceAtt`; `include/box/light.h` documents the units. `RenderExtractLights` collects the lights of each scene into a
 storage buffer per scene, directional first, uploaded only when its bytes change. Every view
 gets the buffer, counts and ambient of the scene of its camera. `AmbientLight` (sky, ground,
 intensity) on a scene root, any entity of the scene or as a singleton for the default scene is
 summed per scene. A scene without light entities gets a default sun and sky, so a scene whose
 light has intensity 0 is dark. `View.lighting.enabled` false draws base color and emission only.
-`cluster.wgsl` splits the view frustum into 16x9x24 clusters and lists up to 128 point or spot
-lights per cluster; `mesh.wgsl` shades every directional light plus the cluster's lights.
+`cluster.wgsl` splits the view frustum into 16x9x24 clusters and lists the point and spot lights
+that reach each one (spot lights tested against their cone) in one light index list the
+clusters share. The list of a view starts at 32 lights per cluster (fewer with fewer lights);
+the entries a pass allocated are read back a few frames later and the list grows to the next
+power of two when they did not fit (up to every light in every cluster and the 128 MiB storage
+binding limit) or shrinks when it is four times too large. Until it grew, clusters past its end
+miss lights, chosen by the order of the atomic allocation, and a warning names the shortfall.
+`mesh.wgsl` shades every directional light plus the cluster's lights.
+
+**Light modes.** `DirectionalLight`, `PointLight` and `SpotLight` have a `bake` member of type
+`LightBakeMode`, following Unity's light modes (Godot's Dynamic, Disabled and Static bake modes):
+`Mixed`, the zero value and what the constructors set, lights directly in realtime and is captured
+by the bake; `Realtime` lights directly and is left out of the bake; `Baked` exists only in the
+probes, its direct light as well as its bounce (as Unity's light probes hold the direct light of
+baked lights), and costs nothing per frame. In a scene with `LightBake` the views (light buffer,
+clusters, `mesh.wgsl`) get the `Mixed` and `Realtime` lights. The captures of a pass over a black
+ambient are lit by the `Mixed` and `Baked` lights; later passes, whose ambient term already holds
+the direct light of the `Baked` lights, by the `Mixed` ones only, so that light is not counted
+twice. `bake_sh.wgsl` adds the direct light of every `Baked` light at the probe to its SH (the
+light's irradiance times the basis in its direction, before the cosine convolution), occluded
+when the depth the capture faces kept toward the light (reversed, infinite far) shows a surface
+nearer than the light, for a directional light any surface. The light extract keeps these as
+separate lists with their own light buffers only once a light that is not `Mixed` appears; while
+every light is `Mixed` the captures use the view list and its buffer. A scene without `LightBake`
+has only the view list with every light, so every mode is realtime there. The first directional
+light of a list shadows what it lights: the views are shadowed by the first directional light that
+is not `Baked` (a baked sun never drives view shadows), the captures by the first one of their
+list, which is not `Realtime`. A scene with any light entity, whatever its mode, no longer gets the
+default sun. A mode change, `Mixed` to `Baked` included, is a change of the capture lights, so it
+queues the light's reach through the light rules of Invalidation below.
 
 **Bake settings.** `LightBake` on a `Scene` root (or a singleton for the default scene) holds
 the baked lighting settings: `probe_spacing` 2, `bounces` 2, `capture_size` 16, `budget_ms` 2,
@@ -369,9 +428,10 @@ observers of their look (`Rgb`, `Emissive`, `PbrMaterial`, `BlendMode`, `BackFac
 nothing, deleted ones included, and nothing is recorded while no scene has `LightBake`. At extract
 the old and new bounds of each are checked again for probes inside geometry (newly invalid probes
 are hidden at once, newly valid ones shown with the next bake) and padded by `probe_spacing * (1 +
-bounces)`; the valid probes inside are queued. The light extract's lights of each scene are matched
-to the last frame by entity: a point or spot light added, removed or changed queues the probes
-within its old and new range, any directional light or the default sun every probe; an ambient
+bounces)`; the valid probes inside are queued. The capture lights of each scene (light modes
+above) are matched to the last frame by entity: a point or spot light added, removed or changed
+queues the probes within its old and new range, any directional light or the default sun (gained
+or lost) every probe; an ambient
 change after a bake, `bounces` and `capture_size` queue every probe too, while `budget_ms` changes
 nothing. When no bake is in progress the queued probes start a staged bake: a
 `BOX_RENDER_VOLUME_COPY` copies the shown probe buffer into the other one, every pass bakes the
@@ -387,22 +447,49 @@ ambient.
 ## Spatial index
 
 `box.spatial` keeps, per scene, an index over world AABBs of shapes (unit mesh bounds times
-`ShapeMesh` scale, placed by `WorldTransform`): a static BVH (binned SAH build, SAH insert with
-AVL rotations) and a dynamic BVH with fat leaves for `DynamicTransform` shapes. Observers queue
-changed shapes and `box_transform_on_moved` the moved static entities; `SpatialUpdate`
-(`EcsOnStore`) places only those. Dynamic shapes are marked stale and placed by the first query
-after a frame, so an idle frame pays nothing. Queries (`src/spatial/spatial.h`) are scoped to
-one scene: nearest ray with a narrow phase filter, all hits sorted, box and sphere overlap,
-entity bounds. `box_controller_move` uses them for collision, `box_spatial_static_bounds` gives
-the box around the static shapes of a scene to the bake. Bounds are boxes; there is no mesh
-level narrow phase and no picking.
+`ShapeMesh` scale, placed by `WorldTransform`): a static BVH with exact leaves and a dynamic BVH
+with fat leaves for `DynamicTransform` shapes. Both are binary trees whose 64 byte nodes hold the
+boxes of both children (a child is a node or an item, so a node over two items is a two item
+leaf). The build bins all three axes for the surface area heuristic; inserts descend to the
+cheapest sibling and every ancestor takes the Box2D v3 rotation that lowers its area most (v3
+rotates on create only; here teleports and static moves rotate too), else a swap that balances
+its height at no cost in area or when its children are 16 levels apart, so boxes at one spot,
+equal or nested, do not pile into a chain; reinserts of
+coherent movers (a predicted displacement) only balance.
+A static move refits its ancestors exactly (shrinking too) when one of its four closest ancestors
+still contains it, and is inserted again otherwise. A fat leaf has a
+margin and reaches four times the displacement per frame ahead, at most four margins (a larger
+displacement is a teleport and predicts nothing); it is inserted again only when the bounds leave
+it or it outgrew them by four margins (Box2D's `b2DynamicTree::MoveProxy`), and a stretched leaf
+whose shape kept its bounds since the last query gets a leaf with only the margin.
+Observers queue changed shapes and `box_transform_on_moved` the moved static entities;
+`SpatialUpdate` (`EcsOnStore`) places only those. Dynamic shapes are placed by the first query
+after a frame, so an idle frame pays nothing. Each keeps the `WorldTransform` its bounds came from
+in `SpatialPose`, and the query computes bounds only for shapes whose transform differs from it;
+dynamic transforms publish no change signal, so finding them is one compare per dynamic shape.
+Queries (`src/spatial/spatial.h`) are scoped to one scene: nearest ray with a narrow phase
+filter, all hits sorted, box and sphere overlap, entity bounds. `box_controller_move` uses them
+for collision, `box_spatial_static_bounds` gives the box around the static shapes of a scene to
+the bake. Bounds are boxes; there is no mesh level narrow phase. A third tree per scene holds the
+UI elements without a shape (`LayoutBounds`, else `TextBounds`, flat in the XY plane of their
+`WorldTransform`); only ray casts that set `ui` see it, which picking does, so collision, overlap
+queries and the bake never meet UI.
 
 ## Text, layout and UI
 
-**Text.** `Text {value, size, line_height, width, align, wrap, font}` and `Font {path}`
+**Text.** `Text {value, size, line_height, width, align, wrap, font}` and `Font {path, atlas_pages}`
 (`box.text.DefaultFont` is B612 in `etc/fonts`). Fonts load with stb_truetype on the job system.
 Glyph MSDFs are generated lazily per glyph on workers into RGBA8 atlas pages that grow and then
-page. Font data is untrusted: a face without units per em fails to load, and a glyph whose box
+page. A page reaches the backend as `BOX_RENDER_UPDATE` texture regions into a texture with one mip
+level: whole when it is new or grew, then once per frame the area that covers the glyphs completed
+since the last frame (`wgpuQueueWriteTexture`). `Font.atlas_pages` (4 for a new Font, a C literal 0 keeps no idle page) is
+the atlas budget: once a layout or a removed Text leaves a font with more pages, the least recently
+used pages no Text shows (disabled Texts are still drawn, so they count) are released and their
+glyphs generated again on next use; a glyph that needs room beyond the budget reuses such a page.
+Only a new `Font.path` loads the font again. Generation follows msdfgen 1.9+: perpendicular distance selection, the overlapping contour
+combiner (contours that overlap, such as composite glyphs, leave no seam) and its error correction
+(`src/text/msdf_correct.c`, edge priority without a distance check, after the scanline sign pass as
+msdfgen runs it with `-scanline`); cusps are pushed apart first, as msdfgen normalizes shapes. Font data is untrusted: a face without units per em fails to load, and a glyph whose box
 is larger than a page (1024 minus spacing) is drawn as the missing glyph with one warning per
 font load; atlas placement makes at most `BOX_TEXT_PLACE_TRIES` passes. A font whose table
 directory, tables or `loca` entries (one per glyph plus the end, each inside `glyf`) lie
@@ -410,9 +497,15 @@ outside the file fails to load. Before stb_truetype reads an outline, box walks 
 components of the glyph in the `glyf` table without recursion: more than 16 composite levels
 above a simple glyph (any cycle), more than 256 references in total, matching point offsets or
 records past the end of `glyf` draw the glyph as the missing glyph, again with one warning per
-font load. Layout handles UTF-8, kerning, newlines, word breaks and alignment; the block is centered
+font load. Layout decodes UTF-8 per the Unicode standard: every maximal subpart of an ill formed
+sequence (stray or truncated bytes, overlong forms, surrogates, code points above U+10FFFF)
+reads as one U+FFFD, which B612 draws as its missing glyph. Layout handles kerning, newlines,
+word breaks and alignment; the block is centered
 on the origin and measured into `TextBounds`. Glyphs are slots of the 2D batches keyed by atlas
-page (`src/render/text_draw.c`), shaded by `shape2d.wgsl`. No shaping (ligatures, RTL).
+page (`src/render/text_draw.c`), shaded by `shape2d.wgsl`, which samples the field at level 0
+(a mip averages the channels and breaks the median), scales it to screen pixels as msdfgen's
+screenPxRange does, but from the Euclidean footprint of a pixel so rotation changes nothing, and
+fades a glyph whose range drops below one pixel. No shaping (ligatures, RTL).
 
 **Layout.** `Layout` on a parent arranges its children in `OrderedChildren` order in logical
 pixels: rows and columns, fit and grow sizing with weights, min/max, padding, spacing, alignment,
@@ -464,7 +557,13 @@ rendered before, unless an `InputBlocker` element on its path takes it, so a HUD
 `InputBlocker` keeps clicks from the 3D scene. Through the router's `blocks` callback the input
 layer asks picking, when a mouse button goes down or the wheel turns, whether a blocker is under
 the cursor: such a press keeps the bindings of that button up until its next press (like
-Godot's unhandled input), and such a wheel is left out of `Mouse.scroll`.
+Godot's unhandled input), and such a wheel is left out of `Mouse.scroll`. Picking casts through
+the spatial index (shapes and UI elements) and tests the triangles of a mesh with 64 or more
+through a hierarchy of its unit mesh, built by a box.jobs job queued on its first pick (picks
+scan the triangles until it is ready) and kept while the mesh is used and 600 frames after.
+Consecutive moves of a frame with the same buttons and modifiers are coalesced into the last
+one, which carries their summed delta (like the animation frame aligned moves of browsers);
+presses, releases, the wheel and keys are never skipped.
 
 `CameraController` and `FirstPersonController` read only `ActionState`, never devices. Default
 actions live under `box.controllers.camera` and `box.controllers.first_person` and stay disabled
@@ -511,8 +610,9 @@ frame); both are read live and do not apply to the `Terminal` entities of a scen
 (1 MiB, then `commands.log` moves to `commands.log.1`, logrotate style) and `images` (100) are
 read when a session opens and do not change open sessions. An image of `capture` or `render`
 counts against `images` from the moment it is named until it is deleted: naming one more
-deletes the oldest image the renderer is done with (written, or dropped once
-`RenderStatus.rendered` passed its packet), and when every kept image is still being written
+deletes the oldest image the renderer is done with (its packet rendered, as `RenderStatus.rendered`
+tells, and its readback no longer mapping, so the file is written or will never be), and when
+every kept image is still being written
 the command fails, so a burst of captures cannot leave files behind.
 
 **Captures.** `box_render_capture` queues a camera (or explicit settings); `RenderExtractCaptures`

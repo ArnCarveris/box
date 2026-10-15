@@ -1,6 +1,7 @@
 /**
  * @file render/bake.h
- * @brief State of the bake extract shared by bake.c and bake_change.c.
+ * @brief State of the bake extract shared by bake.c and bake_change.c, and the lights the light
+ * extract (lights.c) collects for the captures.
  */
 
 #ifndef BOX_RENDER_BAKE_H
@@ -40,6 +41,21 @@ typedef struct box_bake_pick_t {
     uint32_t probe;         /**< Index of the probe */
 } box_bake_pick_t;
 
+/** The lights the probe captures of a scene are lit with in a frame, from the light extract */
+typedef struct box_bake_lights_t {
+    box_render_view_lights_t first; /**< Lights of a pass over a black ambient: the Mixed and
+                                     *   Baked lights, with the ambient of the views */
+    box_render_view_lights_t later; /**< Lights of a pass over a previous one, which holds the
+                                     *   direct light of the Baked lights: the Mixed lights */
+    uint32_t baked;         /**< Light buffer of the Baked lights, 0 for none */
+    uint32_t baked_count;   /**< Baked lights */
+    uint32_t baked_directional; /**< Directional lights at the start of the Baked lights */
+    int32_t count;          /**< Mixed and Baked lights, 0 without LightBake */
+    const box_render_light_t *lights; /**< The Mixed and Baked lights, directional first */
+    const ecs_entity_t *entities; /**< The entity of each of them */
+    const uint8_t *modes;   /**< The LightBakeMode of each of them */
+} box_bake_lights_t;
+
 /** Grid of probes of a volume */
 typedef struct box_bake_grid_t {
     float origin[3];        /**< World position of the first probe */
@@ -71,7 +87,8 @@ typedef struct box_bake_volume_t {
     ecs_vec_t done;         /**< uint8_t, passes the backend reported for every probe */
     ecs_vec_t cameras;      /**< vec3, cameras of the views of the scene in this frame */
     ecs_vec_t sorted;       /**< vec3, cameras the queue was sorted for */
-    box_render_view_lights_t lights; /**< Lights of the first view of the scene in this frame */
+    box_bake_lights_t lights; /**< Lights of the captures in this frame, with the ambient of
+                               *   the first view of the scene */
     vec3 min;               /**< Minimum corner of the static bounds of the grid */
     vec3 max;               /**< Maximum corner of the static bounds of the grid */
     int32_t capture_size;   /**< LightBake.capture_size of this frame */
@@ -100,6 +117,7 @@ typedef struct box_bake_volume_t {
     ecs_vec_t shown;        /**< uint32_t, the validity mask views sample with */
     ecs_vec_t light_list;   /**< box_render_light_t of the scene in the last frame */
     ecs_vec_t light_entities; /**< ecs_entity_t, the entity of each light of light_list */
+    ecs_vec_t light_modes;  /**< uint8_t, the LightBakeMode of each light of light_list */
     box_render_view_lights_t baked_lights; /**< Lights of the views in the last frame */
     const char *error;      /**< Why the volume bakes nothing, NULL for none */
 } box_bake_volume_t;
@@ -122,6 +140,7 @@ typedef struct box_render_bake_t {
     ecs_map_t light_map;    /**< Light entity to its index in a light_list, scratch */
     const void *backend;    /**< Context of the backend the volumes were sent to */
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
+    int32_t generation;         /**< Generation of that backend, see box_render_backend_t */
 } box_render_bake_t;
 
 /** Find the volume of a scene.
@@ -198,17 +217,37 @@ void box_bake_changes(
     box_render_bake_t *b);
 
 /** Queue the probes a change of the lights of the scene of a volume can reach since the last
- * frame, light by light: a point or spot light the probes within its range, a directional
- * light or the default sun the whole scene.
+ * frame, light by light (a change of bake mode included): a point or spot light the probes
+ * within its range, a directional light or the default sun the whole scene.
  *
- * @param world The world
+ * Reads the lights box_bake_scene_lights gave the volume in this frame.
+ *
  * @param b The state
  * @param v The volume
  */
 void box_bake_lights(
-    const ecs_world_t *world,
     box_render_bake_t *b,
     box_bake_volume_t *v);
+
+/** Get the lights the probe captures of a scene are lit with in this frame.
+ *
+ * A pass over a black ambient is lit by the Mixed and Baked lights, a later pass by the Mixed
+ * ones, whose first directional light shadows it; the projection adds the direct light of the
+ * Baked lights to every probe.
+ *
+ * While every light is Mixed both are the lights of the views. A scene without light entities
+ * is lit by the default sun the views have.
+ *
+ * @param state The state of the light extract
+ * @param scene The scene, 0 for the default scene
+ * @param view The lights of the views of the scene, with their ambient
+ * @param out Receives the lights, valid until the next light extract
+ */
+void box_bake_scene_lights(
+    const void *state,
+    ecs_entity_t scene,
+    const box_render_view_lights_t *view,
+    box_bake_lights_t *out);
 
 /** Register the observers of the changes of static shapes that rebake the probes near them.
  *

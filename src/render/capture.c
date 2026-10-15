@@ -1,6 +1,6 @@
 /**
  * @file render/capture.c
- * @brief Captures of a target: a copy into a readback buffer that is written as a PNG file.
+ * @brief Captures of a target: a copy into a readback buffer that the map callback writes as PNG.
  */
 
 #include "gpu.h"
@@ -8,35 +8,23 @@
 #ifdef BOX_RENDER_WGPU
 
 #include <stdio.h>
+#include <string.h>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
 
-/** Outcome of mapping a readback buffer */
-typedef struct box_gpu_map_t {
-    bool done;                  /**< The map callback ran */
-    WGPUMapAsyncStatus status;  /**< Status the callback reported */
-} box_gpu_map_t;
-
-/** Record the outcome of a map request.
- *
- * @param status Outcome of the request
- * @param message Error text
- * @param userdata1 The box_gpu_map_t to fill
- * @param userdata2 Unused
- */
-static void box_gpu_on_map(
-    WGPUMapAsyncStatus status,
-    WGPUStringView message,
-    void *userdata1,
-    void *userdata2)
-{
-    box_gpu_map_t *map = userdata1;
-    (void)message;
-    (void)userdata2;
-    map->status = status;
-    map->done = true;
-}
+/** A capture on its way from the GPU to its PNG file */
+struct box_gpu_capture_t {
+    box_gpu_t *gpu;                 /**< The backend, NULL once the backend abandoned it */
+    uint32_t target;                /**< Handle of the target the buffer returns to */
+    WGPUBuffer buffer;              /**< Buffer the image is copied into */
+    uint64_t size;                  /**< Bytes of the buffer */
+    uint32_t width;                 /**< Width of the copied image */
+    uint32_t height;                /**< Height of the copied image */
+    uint32_t stride;                /**< Bytes per row of the copied image */
+    bool bgra;                      /**< The pixels are in BGRA order */
+    char *path;                     /**< File the PNG is written to */
+};
 
 /** Swap the red and blue channel of every pixel of an image.
  *
@@ -74,6 +62,121 @@ static bool box_gpu_is_bgra(
         format == WGPUTextureFormat_BGRA8UnormSrgb;
 }
 
+/** Encode the mapped image of a capture as a PNG file.
+ *
+ * @param capture The capture, whose buffer is mapped
+ * @return 0 when the file was written
+ */
+static int box_gpu_capture_png(
+    box_gpu_capture_t *capture)
+{
+    const void *data = wgpuBufferGetConstMappedRange(capture->buffer, 0, (size_t)capture->size);
+    uint8_t *pixels = ecs_os_malloc((ecs_size_t)capture->size);
+    char *part = flecs_asprintf("%s.part", capture->path);
+    int result = -1;
+    ecs_os_memcpy(pixels, data, (ecs_size_t)capture->size);
+    wgpuBufferUnmap(capture->buffer);
+    if (capture->bgra) {
+        box_gpu_swizzle(pixels, capture->width, capture->height, capture->stride);
+    }
+
+    if (!stbi_write_png(part, (int)capture->width, (int)capture->height, 4, pixels,
+        (int)capture->stride) || rename(part, capture->path))
+    {
+        ecs_err("cannot write capture '%s'", capture->path);
+        remove(part);
+        goto done;
+    }
+
+    result = 0;
+done:
+    ecs_os_free(part);
+    ecs_os_free(pixels);
+
+    return result;
+}
+
+/** Free a capture, returning its buffer to its target when the target has no idle buffer.
+ *
+ * @param capture The capture
+ */
+static void box_gpu_capture_free(
+    box_gpu_capture_t *capture)
+{
+    box_gpu_target_t *t = ecs_map_get_deref(
+        &capture->gpu->targets, box_gpu_target_t, capture->target);
+    if (t && !t->readback && !t->capture) {
+        t->readback = capture->buffer;
+        t->readback_size = capture->size;
+    } else {
+        wgpuBufferRelease(capture->buffer);
+    }
+
+    ecs_os_free(capture->path);
+    ecs_os_free(capture);
+}
+
+/** Remove a capture from the captures that are mapping.
+ *
+ * @param gpu The backend
+ * @param capture The capture
+ */
+static void box_gpu_capture_done(
+    box_gpu_t *gpu,
+    box_gpu_capture_t *capture)
+{
+    int32_t i, count;
+    ecs_os_mutex_lock(gpu->lock);
+    count = ecs_vec_count(&gpu->captures);
+    for (i = 0; i < count; i ++) {
+        if (ecs_vec_get_t(&gpu->captures, box_gpu_capture_t*, i)[0] == capture) {
+            ecs_vec_remove_t(&gpu->captures, box_gpu_capture_t*, i);
+            break;
+        }
+    }
+
+    ecs_os_mutex_unlock(gpu->lock);
+}
+
+/** Write the PNG of a capture once its buffer is mapped, then stop counting it as pending and
+ * free it. A capture the backend abandoned only frees itself.
+ *
+ * @param status Outcome of the map
+ * @param message Error text
+ * @param userdata1 The box_gpu_capture_t
+ * @param userdata2 Unused
+ */
+static void box_gpu_capture_on_map(
+    WGPUMapAsyncStatus status,
+    WGPUStringView message,
+    void *userdata1,
+    void *userdata2)
+{
+    box_gpu_capture_t *capture = userdata1;
+    box_gpu_t *gpu = capture->gpu;
+    (void)message;
+    (void)userdata2;
+    if (!gpu) {
+        ecs_os_free(capture->path);
+        ecs_os_free(capture);
+        goto done;
+    }
+
+    if (status != WGPUMapAsyncStatus_Success) {
+        ecs_err("cannot map the capture buffer of '%s'", capture->path);
+        box_gpu_count(gpu, BOX_GPU_STAT_ERRORS);
+    } else if (box_gpu_capture_png(capture)) {
+        box_gpu_count(gpu, BOX_GPU_STAT_ERRORS);
+    } else {
+        box_gpu_count(gpu, BOX_GPU_STAT_CAPTURES);
+    }
+
+    box_gpu_capture_done(gpu, capture);
+    box_gpu_capture_free(capture);
+done:
+    return;
+}
+
 void box_gpu_capture_encode(
     box_gpu_t *gpu,
     box_gpu_target_t *t,
@@ -84,6 +187,7 @@ void box_gpu_capture_encode(
     uint32_t height = wgpuTextureGetHeight(texture);
     uint32_t stride = (width * 4 + BOX_GPU_ROW_ALIGN - 1) & ~(uint32_t)(BOX_GPU_ROW_ALIGN - 1);
     uint64_t size = (uint64_t)stride * height;
+    box_gpu_capture_t *capture;
     if (!(t->usage & WGPUTextureUsage_CopySrc)) {
         ecs_err("the image of this target cannot be copied, capture skipped");
         box_gpu_count(gpu, BOX_GPU_STAT_ERRORS);
@@ -94,64 +198,35 @@ void box_gpu_capture_encode(
         box_gpu_capture_fini(t);
     }
 
-    if (!t->readback) {
+    capture = ecs_os_calloc_t(box_gpu_capture_t);
+    capture->gpu = gpu;
+    capture->target = t->handle;
+    capture->buffer = t->readback;
+    capture->size = size;
+    capture->width = width;
+    capture->height = height;
+    capture->stride = stride;
+    capture->bgra = box_gpu_is_bgra(t->format);
+    t->readback = NULL;
+    t->readback_size = 0;
+    if (!capture->buffer) {
         WGPUBufferDescriptor desc = {
             .usage = WGPUBufferUsage_MapRead | WGPUBufferUsage_CopyDst,
             .size = size
         };
-        t->readback = wgpuDeviceCreateBuffer(gpu->device, &desc);
-        t->readback_size = size;
-        t->pixels = ecs_os_malloc((ecs_size_t)size);
+        capture->buffer = wgpuDeviceCreateBuffer(gpu->device, &desc);
     }
 
     WGPUTexelCopyTextureInfo src = { .texture = texture, .aspect = WGPUTextureAspect_All };
     WGPUTexelCopyBufferInfo dst = {
         .layout = { .bytesPerRow = stride, .rowsPerImage = height },
-        .buffer = t->readback
+        .buffer = capture->buffer
     };
     WGPUExtent3D extent = { width, height, 1 };
     wgpuCommandEncoderCopyTextureToBuffer(encoder, &src, &dst, &extent);
-    t->capture_width = width;
-    t->capture_height = height;
-    t->capture_stride = stride;
-    t->capture_pending = true;
+    t->capture = capture;
 done:
     return;
-}
-
-/** Wait until the readback buffer of a target is mapped and copy it.
- *
- * @param gpu The backend
- * @param t The target
- * @return 0 when the pixels were copied, nonzero when the map failed
- */
-static int box_gpu_capture_read(
-    box_gpu_t *gpu,
-    box_gpu_target_t *t)
-{
-    box_gpu_map_t map = {0};
-    int result = -1;
-    wgpuBufferMapAsync(t->readback, WGPUMapMode_Read, 0, (size_t)t->readback_size,
-        (WGPUBufferMapCallbackInfo){
-            .mode = WGPUCallbackMode_AllowSpontaneous,
-            .callback = box_gpu_on_map,
-            .userdata1 = &map
-        });
-    while (!map.done) {
-        wgpuDevicePoll(gpu->device, true, NULL);
-    }
-
-    if (map.status != WGPUMapAsyncStatus_Success) {
-        ecs_err("cannot map the capture buffer");
-        goto done;
-    }
-
-    const void *data = wgpuBufferGetConstMappedRange(t->readback, 0, (size_t)t->readback_size);
-    ecs_os_memcpy(t->pixels, data, (ecs_size_t)t->readback_size);
-    wgpuBufferUnmap(t->readback);
-    result = 0;
-done:
-    return result;
 }
 
 void box_gpu_capture_write(
@@ -159,34 +234,24 @@ void box_gpu_capture_write(
     box_gpu_target_t *t,
     const char *path)
 {
-    char *part = NULL;
-    if (!t->capture_pending) {
+    box_gpu_capture_t *capture = t->capture;
+    if (!capture) {
         goto done;
     }
 
-    t->capture_pending = false;
-    if (box_gpu_capture_read(gpu, t)) {
-        box_gpu_count(gpu, BOX_GPU_STAT_ERRORS);
-        goto done;
-    }
-
-    if (box_gpu_is_bgra(t->format)) {
-        box_gpu_swizzle(t->pixels, t->capture_width, t->capture_height, t->capture_stride);
-    }
-
-    part = flecs_asprintf("%s.part", path);
-    if (!stbi_write_png(part, (int)t->capture_width, (int)t->capture_height, 4, t->pixels,
-        (int)t->capture_stride) || rename(part, path))
-    {
-        ecs_err("cannot write capture '%s'", path);
-        remove(part);
-        box_gpu_count(gpu, BOX_GPU_STAT_ERRORS);
-        goto done;
-    }
-
-    box_gpu_count(gpu, BOX_GPU_STAT_CAPTURES);
+    t->capture = NULL;
+    capture->path = ecs_os_strdup(path);
+    ecs_os_mutex_lock(gpu->lock);
+    ecs_vec_append_t(NULL, &gpu->captures, box_gpu_capture_t*)[0] = capture;
+    ecs_os_mutex_unlock(gpu->lock);
+    wgpuBufferMapAsync(capture->buffer, WGPUMapMode_Read, 0, (size_t)capture->size,
+        (WGPUBufferMapCallbackInfo){
+            .mode = WGPUCallbackMode_AllowSpontaneous,
+            .callback = box_gpu_capture_on_map,
+            .userdata1 = capture
+        });
 done:
-    ecs_os_free(part);
+    return;
 }
 
 void box_gpu_capture_fini(
@@ -196,10 +261,79 @@ void box_gpu_capture_fini(
         wgpuBufferRelease(t->readback);
     }
 
-    ecs_os_free(t->pixels);
+    if (t->capture) {
+        wgpuBufferRelease(t->capture->buffer);
+        ecs_os_free(t->capture);
+    }
+
     t->readback = NULL;
     t->readback_size = 0;
-    t->pixels = NULL;
+    t->capture = NULL;
+}
+
+/** Abandon the captures that are still mapping: release their buffers and empty the list. The
+ * map callback, which wgpu still fires for a released buffer, frees the capture and its path.
+ *
+ * @param gpu The backend
+ */
+static void box_gpu_capture_abandon(
+    box_gpu_t *gpu)
+{
+    int32_t i;
+    ecs_os_mutex_lock(gpu->lock);
+    for (i = 0; i < ecs_vec_count(&gpu->captures); i ++) {
+        box_gpu_capture_t *capture = ecs_vec_get_t(&gpu->captures, box_gpu_capture_t*, i)[0];
+        WGPUBuffer buffer = capture->buffer;
+        capture->buffer = NULL;
+        capture->gpu = NULL;
+        wgpuBufferRelease(buffer);
+    }
+
+    ecs_vec_clear(&gpu->captures);
+    ecs_os_mutex_unlock(gpu->lock);
+}
+
+void box_gpu_capture_flush(
+    void *ctx)
+{
+    box_gpu_t *gpu = ctx;
+    int32_t count = ecs_vec_count(&gpu->captures);
+#ifndef __EMSCRIPTEN__
+    while (count && gpu->device) {
+        wgpuDevicePoll(gpu->device, true, NULL);
+        if (ecs_vec_count(&gpu->captures) == count) {
+            ecs_err("%d captures did not complete", count);
+            box_gpu_capture_abandon(gpu);
+            break;
+        }
+
+        count = ecs_vec_count(&gpu->captures);
+    }
+#endif
+
+    ecs_os_mutex_lock(gpu->lock);
+    if (!ecs_vec_count(&gpu->captures)) {
+        ecs_vec_fini_t(NULL, &gpu->captures, box_gpu_capture_t*);
+    }
+
+    ecs_os_mutex_unlock(gpu->lock);
+}
+
+bool box_gpu_capture_pending(
+    box_gpu_t *gpu,
+    const char *path)
+{
+    bool result = false;
+    int32_t i;
+    ecs_os_mutex_lock(gpu->lock);
+    for (i = 0; i < ecs_vec_count(&gpu->captures) && !result; i ++) {
+        box_gpu_capture_t *capture = ecs_vec_get_t(&gpu->captures, box_gpu_capture_t*, i)[0];
+        result = !strcmp(capture->path, path);
+    }
+
+    ecs_os_mutex_unlock(gpu->lock);
+
+    return result;
 }
 
 #endif

@@ -96,7 +96,8 @@ static void box_gpu_on_device(
     }
 }
 
-/** Count and log an error no error scope caught.
+/** Count and log an error no error scope caught, unless the device is lost: releasing what
+ * belonged to a lost device reports errors, and the ring recovers from the loss itself.
  *
  * @param device The device
  * @param type Kind of error
@@ -114,11 +115,13 @@ static void box_gpu_on_error(
     (void)device;
     (void)type;
     (void)userdata2;
-    box_gpu_count(userdata1, BOX_GPU_STAT_ERRORS);
-    box_gpu_report("webgpu device error", message);
+    if (!((box_gpu_t*)userdata1)->lost) {
+        box_gpu_count(userdata1, BOX_GPU_STAT_ERRORS);
+        box_gpu_report("webgpu device error", message);
+    }
 }
 
-/** Count and log the loss of the device, unless the backend released it.
+/** Flag the loss of the device for the ring, and count and log it unless it was destroyed.
  *
  * @param device The device
  * @param reason Why it was lost
@@ -135,6 +138,10 @@ static void box_gpu_on_lost(
 {
     (void)device;
     (void)userdata2;
+    if (reason != WGPUDeviceLostReason_CallbackCancelled) {
+        ((box_gpu_t*)userdata1)->lost = true;
+    }
+
     if (reason != WGPUDeviceLostReason_Destroyed &&
         reason != WGPUDeviceLostReason_CallbackCancelled)
     {
@@ -326,6 +333,7 @@ static int box_gpu_init(
     box_gpu_t *gpu = ctx;
     int result = box_gpu_create(gpu);
     gpu->fence_done = 0;
+    gpu->lost = false;
     if (result) {
         goto done;
     }
@@ -381,6 +389,7 @@ static void box_gpu_render(
 {
     box_gpu_t *gpu = ctx;
     int32_t i, count = ecs_vec_count(&packet->resources);
+    box_gpu_shader_deliver(gpu);
     for (i = 0; i < count; i ++) {
         const box_render_resource_t *r = ecs_vec_get_t(
             &packet->resources, box_render_resource_t, i);
@@ -418,7 +427,7 @@ static void box_gpu_render(
         }
     }
 
-    box_gpu_texture_mips(gpu);
+    box_gpu_texture_mips(gpu, packet);
     box_gpu_upload(gpu, packet);
     box_gpu_scatter(gpu, packet);
     box_gpu_bake_capture(gpu, packet);
@@ -517,6 +526,33 @@ static bool box_gpu_done(
 #endif
 
     return fence <= gpu->fence_done || !gpu->device;
+}
+
+/** Destroy the device when box_render_gpu_lose_device asked for it, which loses it, and check
+ * whether the device was lost.
+ *
+ * @param ctx The backend
+ * @return Whether the device was lost, so the ring recreates it
+ */
+static bool box_gpu_lost(
+    void *ctx)
+{
+    box_gpu_t *gpu = ctx;
+    bool lose;
+    ecs_os_mutex_lock(gpu->lock);
+    lose = gpu->lose;
+    gpu->lose = false;
+    ecs_os_mutex_unlock(gpu->lock);
+#ifndef __EMSCRIPTEN__
+    if (lose && gpu->device) {
+        wgpuDeviceDestroy(gpu->device);
+        gpu->lost = true;
+    }
+#else
+    (void)lose;
+#endif
+
+    return gpu->lost;
 }
 
 /** Release a webgpu object when it exists.
@@ -656,7 +692,9 @@ box_render_backend_t box_render_gpu_backend(void)
         .free = box_gpu_free,
         .fence = box_gpu_fence,
         .wait = box_gpu_wait,
-        .done = box_gpu_done
+        .done = box_gpu_done,
+        .flush = box_gpu_capture_flush,
+        .lost = box_gpu_lost
     };
 
     return result;
@@ -677,6 +715,43 @@ bool box_render_gpu_stats(
     }
 
     return result;
+}
+
+bool box_render_gpu_compile_delivery(
+    ecs_world_t *world,
+    box_render_compile_delivery_t delivery)
+{
+    const box_render_backend_t *backend = box_render_get_backend(world);
+    bool result = backend->render == box_gpu_render;
+    if (result) {
+        box_gpu_t *gpu = backend->ctx;
+        ecs_os_mutex_lock(gpu->lock);
+        gpu->delivery = delivery;
+        ecs_os_mutex_unlock(gpu->lock);
+    }
+
+    return result;
+}
+
+bool box_render_gpu_capture_pending(
+    ecs_world_t *world,
+    const char *path)
+{
+    const box_render_backend_t *backend = box_render_get_backend(world);
+
+    return backend->render == box_gpu_render && box_gpu_capture_pending(backend->ctx, path);
+}
+
+void box_render_gpu_lose_device(
+    ecs_world_t *world)
+{
+    const box_render_backend_t *backend = box_render_get_backend(world);
+    if (backend->render == box_gpu_render) {
+        box_gpu_t *gpu = backend->ctx;
+        ecs_os_mutex_lock(gpu->lock);
+        gpu->lose = true;
+        ecs_os_mutex_unlock(gpu->lock);
+    }
 }
 
 bool box_render_gpu_shader_result(
@@ -718,6 +793,32 @@ bool box_render_gpu_stats(
     ecs_os_memset_t(stats, 0, box_render_gpu_stats_t);
 
     return false;
+}
+
+bool box_render_gpu_compile_delivery(
+    ecs_world_t *world,
+    box_render_compile_delivery_t delivery)
+{
+    (void)world;
+    (void)delivery;
+
+    return false;
+}
+
+bool box_render_gpu_capture_pending(
+    ecs_world_t *world,
+    const char *path)
+{
+    (void)world;
+    (void)path;
+
+    return false;
+}
+
+void box_render_gpu_lose_device(
+    ecs_world_t *world)
+{
+    (void)world;
 }
 
 bool box_render_gpu_shader_result(

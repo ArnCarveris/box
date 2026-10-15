@@ -3,7 +3,7 @@
  * @brief Sends the images box.texture decoded to the backend and picks the sampler anisotropy.
  *
  * A texture gets a backend handle with its first image; a removed texture releases it. The
- * pixels are freed once they are in a packet, so a new backend loads every texture again.
+ * pixels stay after they are in a packet, so a new backend gets every image in its first one.
  * A texture entity a surface renders into resolves to the image of the target of the surface.
  */
 
@@ -14,6 +14,7 @@
 typedef struct box_render_textures_t {
     const void *backend;    /**< Context of the backend the textures were sent to */
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
+    int32_t generation;         /**< Generation of that backend, see box_render_backend_t */
 } box_render_textures_t;
 
 /** Singleton with the texture entities surfaces render into */
@@ -171,21 +172,22 @@ static uint32_t box_render_texture_send(
     desc->width = (uint32_t)tex->width;
     desc->height = (uint32_t)tex->height;
     ecs_os_memcpy(desc + 1, tex->pixels, (ecs_size_t)size);
-    ecs_os_free(tex->pixels);
-    tex->pixels = NULL;
     tex->sent = true;
 
     return size;
 }
 
-/** Send the queued images, at most a budget of bytes per packet unless it is the first one.
+/** Send the queued images, at most a budget of bytes per packet unless it is the first one
+ * or every image goes to a restarted backend.
  *
  * @param p The packet
  * @param t The registry
+ * @param all Whether to send every queued image
  */
 static void box_render_textures_send(
     box_render_packet_t *p,
-    box_textures_t *t)
+    box_textures_t *t,
+    bool all)
 {
     int32_t i, kept = 0, count = ecs_vec_count(&t->queued);
     ecs_entity_t *queued = ecs_vec_first(&t->queued);
@@ -200,7 +202,7 @@ static void box_render_textures_send(
             continue;
         }
 
-        if (bytes && bytes + (uint64_t)tex->width * (uint64_t)tex->height * 4 >
+        if (!all && bytes && bytes + (uint64_t)tex->width * (uint64_t)tex->height * 4 >
             BOX_RENDER_TEXTURE_BUDGET)
         {
             queued[kept ++] = queued[i];
@@ -212,6 +214,26 @@ static void box_render_textures_send(
     }
 
     ecs_vec_set_count_t(NULL, &t->queued, ecs_entity_t, kept);
+}
+
+/** Queue every image the previous backend had, from the copy the registry keeps, so the
+ * first packet to a restarted backend has all of them.
+ *
+ * @param t The registry
+ */
+static void box_render_textures_requeue(
+    box_textures_t *t)
+{
+    ecs_map_iter_t it = ecs_map_iter(&t->textures);
+    while (ecs_map_next(&it)) {
+        box_texture_t *tex = ecs_map_ptr(&it);
+        if (tex->sent && tex->pixels && !tex->queued) {
+            tex->queued = true;
+            *ecs_vec_append_t(NULL, &t->queued, ecs_entity_t) = tex->entity;
+        }
+
+        tex->sent = false;
+    }
 }
 
 /** Release removed textures, send loaded images and set the sampler anisotropy.
@@ -226,13 +248,16 @@ static void BoxRenderExtractTextures(
     box_textures_t *t = box_textures_get(world);
     box_render_packet_t *p = box_render_packet(world);
     const box_render_backend_t *backend = box_render_get_backend(world);
+    bool restart = false;
     int32_t i;
     p->anisotropy = BOX_RENDER_ANISOTROPY_DEFAULT;
     if (!t) {
         goto done;
     }
 
-    if (backend->ctx != state->backend || backend->render != state->render) {
+    if (backend->ctx != state->backend || backend->render != state->render ||
+        backend->generation != state->generation)
+    {
         if (state->backend || state->render) {
             for (i = 0; i < ecs_vec_count(&t->released); i ++) {
                 *ecs_vec_append_t(NULL, &t->free_handles, uint32_t) =
@@ -240,11 +265,13 @@ static void BoxRenderExtractTextures(
             }
 
             ecs_vec_clear(&t->released);
-            box_textures_reload(world, t, true);
+            box_render_textures_requeue(t);
+            restart = true;
         }
 
         state->backend = backend->ctx;
         state->render = backend->render;
+        state->generation = backend->generation;
     }
 
     for (i = 0; i < ecs_vec_count(&t->released); i ++) {
@@ -254,7 +281,7 @@ static void BoxRenderExtractTextures(
     }
 
     ecs_vec_clear(&t->released);
-    box_render_textures_send(p, t);
+    box_render_textures_send(p, t, restart);
     p->anisotropy = box_render_anisotropy(world, t);
 done:
     return;

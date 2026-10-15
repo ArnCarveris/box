@@ -4,6 +4,9 @@
  *
  * Every query is scoped to one scene (0 for the default scene) and answers with the world
  * bounds of shapes: the unit mesh bounds scaled by the shape and placed by WorldTransform.
+ *
+ * UI elements without a shape (LayoutBounds, else TextBounds, flat in the XY plane of their
+ * WorldTransform) are indexed too, and only ray casts that ask for them see them.
  */
 
 #ifndef BOX_SPATIAL_PRIVATE_H
@@ -41,6 +44,7 @@ typedef struct box_spatial_ray_t {
     float max_distance;          /**< Longest distance that counts, 0 for no limit */
     box_spatial_filter_t filter; /**< Narrow phase, NULL to accept every hit of the bounds */
     void *ctx;                   /**< Context passed to filter */
+    bool ui;                     /**< Also hit UI elements without a shape, false for shapes only */
 } box_spatial_ray_t;
 
 /** Counters of the spatial index of a world */
@@ -48,6 +52,7 @@ typedef struct box_spatial_stats_t {
     int32_t scenes;   /**< Scenes with indexed entities */
     int32_t entities; /**< Indexed entities */
     int32_t updated;  /**< Entities the last update placed again */
+    int32_t rebound;  /**< Dynamic entities whose transform changed since the last update */
     int32_t moved;    /**< Dynamic entities the last update moved in their tree */
 } box_spatial_stats_t;
 

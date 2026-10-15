@@ -6,7 +6,7 @@
 #define BOX_LIGHT_IMPL
 #include <box.h>
 
-/** Construct DirectionalLight values at full intensity.
+/** Construct DirectionalLight values at full intensity, Mixed.
  *
  * @param ptr The components
  * @param count Number of components
@@ -21,11 +21,11 @@ static void box_directional_light_ctor(
     int32_t i;
     (void)ti;
     for (i = 0; i < count; i ++) {
-        values[i] = (DirectionalLight){ .intensity = 1.0f };
+        values[i] = (DirectionalLight){ .intensity = 1.0f, .bake = LightBakeModeMixed };
     }
 }
 
-/** Construct PointLight values at full intensity with the default range.
+/** Construct PointLight values at full intensity with the default range, Mixed.
  *
  * @param ptr The components
  * @param count Number of components
@@ -40,11 +40,13 @@ static void box_point_light_ctor(
     int32_t i;
     (void)ti;
     for (i = 0; i < count; i ++) {
-        values[i] = (PointLight){ .intensity = 1.0f, .range = 10.0f };
+        values[i] = (PointLight){
+            .intensity = 1.0f, .range = 10.0f, .bake = LightBakeModeMixed
+        };
     }
 }
 
-/** Construct SpotLight values at full intensity with the default range and cone.
+/** Construct SpotLight values at full intensity with the default range and cone, Mixed.
  *
  * @param ptr The components
  * @param count Number of components
@@ -60,7 +62,8 @@ static void box_spot_light_ctor(
     (void)ti;
     for (i = 0; i < count; i ++) {
         values[i] = (SpotLight){
-            .intensity = 1.0f, .range = 10.0f, .inner_angle = 20.0f, .outer_angle = 30.0f
+            .intensity = 1.0f, .range = 10.0f, .inner_angle = 20.0f, .outer_angle = 30.0f,
+            .bake = LightBakeModeMixed
         };
     }
 }
@@ -146,6 +149,7 @@ void BoxLightImport(
     ECS_MODULE(world, BoxLight);
     ECS_IMPORT(world, BoxTypes);
 
+    ECS_META_COMPONENT(world, LightBakeMode);
     ECS_META_COMPONENT(world, DirectionalLight);
     ECS_META_COMPONENT(world, PointLight);
     ECS_META_COMPONENT(world, SpotLight);

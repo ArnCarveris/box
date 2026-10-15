@@ -3,7 +3,8 @@
  * @brief Render commands: capture cameras and render entities, prefabs or templates on their own.
  *
  * Both commands write PNG files into the resources folder of the session and return their
- * names right away; the renderer writes the files once the frame that holds them rendered.
+ * names right away; the renderer writes a file once the GPU finished the frame that holds it,
+ * at the latest on box_render_sync.
  *
  * A capture shows a camera as its view renders it, effects included. A render shows its
  * subject alone in a private scene, plain lit without shadows or effects, so the image does
@@ -72,8 +73,9 @@ static void box_cmd_render_free(
  * @param prefix Start of the file name
  * @param counter Counter of the images with this prefix
  * @param name Receives the file name, which the caller frees
- * @return The path, NULL when the session has no folder, keeps no images or keeps as many
- * images as it may that are still being written; the caller frees it
+ * @return The path, NULL in the browser, which writes no captures, when the session has no
+ * folder, keeps no images or keeps as many images as it may that are still being written; the
+ * caller frees it
  */
 static char* box_cmd_render_file(
     const ecs_function_ctx_t *ctx,
@@ -87,6 +89,10 @@ static char* box_cmd_render_file(
     char *path = NULL;
     int kept;
     name[0] = NULL;
+#ifdef __EMSCRIPTEN__
+    box_command_error(ctx, result, "captures are not available in the browser");
+    goto done;
+#endif
     if (!s || !s->dir) {
         box_command_error(ctx, result, "the session has no folder");
         goto done;

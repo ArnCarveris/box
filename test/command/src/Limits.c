@@ -506,3 +506,60 @@ void Limits_command_resets_idle_timer(void) {
 
     ecs_fini(world);
 }
+
+void Limits_images_evicted_once_written(void) {
+    // render_fixes/capture_async
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_singleton_get_mut(world, TerminalLimits)->images = 1;
+    ecs_singleton_modified(world, TerminalLimits);
+
+    ecs_entity_t camera = ecs_entity(world, { .name = "cam" });
+    ecs_set(world, camera, Position, {0, 0, 5});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t surface = ecs_new(world);
+    ecs_set(world, surface, Surface, {.width = 8, .height = 8, .resolution_scale = 1});
+    ecs_entity_t s = box_terminal_new(world);
+    ecs_progress(world, 0);
+
+    char *resources = flecs_asprintf("%s/resources", ecs_get(world, s, TerminalStatus)->dir);
+    int32_t round, frame;
+    for (round = 0; round < 4; round ++) {
+        int32_t until = ecs_singleton_get(world, RenderStatus)->submitted + 2;
+        ecs_os_free(box_terminal_run(world, s, "capture cam", NULL));
+        for (frame = 0; frame < 8 &&
+            ecs_singleton_get(world, RenderStatus)->rendered < until; frame ++)
+        {
+            ecs_progress(world, 0);
+        }
+    }
+
+    for (frame = 0; frame < 4; frame ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_sync(world);
+
+    int32_t pngs = 0;
+    DIR *dir = opendir(resources);
+    test_assert(dir != NULL);
+    struct dirent *entry;
+    while ((entry = readdir(dir))) {
+        const char *ext = strrchr(entry->d_name, '.');
+        pngs += ext && !strcmp(ext, ".png");
+    }
+
+    closedir(dir);
+    test_int(pngs, 1);
+
+    ecs_os_free(resources);
+    ecs_fini(world);
+}

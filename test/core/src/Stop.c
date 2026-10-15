@@ -6,7 +6,37 @@
 #include <box.h>
 #include <bake_test.h>
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
+
+/** Error messages logged since the collector was installed */
+static ecs_strbuf_t stop_errors = ECS_STRBUF_INIT;
+
+/** Log function the collector passes messages on to */
+static ecs_os_api_log_t stop_log = NULL;
+
+/** Collect logged errors and pass every message on.
+ *
+ * @param level Level of the message
+ * @param file File that logged it
+ * @param line Line that logged it
+ * @param msg The message
+ */
+static void stop_collect_errors(
+    int32_t level,
+    const char *file,
+    int32_t line,
+    const char *msg)
+{
+    if (level == -3) {
+        ecs_strbuf_appendstr(&stop_errors, msg);
+        ecs_strbuf_appendch(&stop_errors, '\n');
+    }
+
+    if (stop_log) {
+        stop_log(level, file, line, msg);
+    }
+}
 
 static int32_t quit_after = 0;
 static float last_delta = 0;
@@ -221,5 +251,99 @@ void Stop_run_missing_scene(void) {
     test_assert(box_app_run(world) != 0);
     test_int(ecs_singleton_get(world, AppStatus)->frame, 0);
 
+    ecs_fini(world);
+}
+
+void Stop_run_invalid_scene_headless(void) {
+    // core_fixes/scene_load_failure
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    char *path = flecs_asprintf("/tmp/box_core_invalid_%d.flecs", (int)getpid());
+    FILE *f = fopen(path, "w");
+    test_assert(f != NULL);
+    fputs("Foo {}\nusing flecs.meta\n", f);
+    fclose(f);
+    ecs_singleton_set(world, App, {
+        .headless = true, .frames = 2, .cpu_budget = 100, .fps = 0,
+        .unguarded = true, .unpaced = true, .scene = path });
+
+    ecs_strbuf_reset(&stop_errors);
+    stop_log = ecs_os_api.log_;
+    ecs_os_api.log_ = stop_collect_errors;
+    int result = box_app_run(world);
+    ecs_os_api.log_ = stop_log;
+    char *errors = ecs_strbuf_get(&stop_errors);
+    test_assert(result != 0);
+    test_int(ecs_singleton_get(world, AppStatus)->frame, 0);
+    test_assert(errors != NULL);
+    test_assert(strstr(errors, "must be declared before other statements") != NULL);
+    test_assert(strstr(errors, "failed to load scene") != NULL);
+
+    ecs_os_free(errors);
+    unlink(path);
+    ecs_os_free(path);
+    ecs_fini(world);
+}
+
+void Stop_run_invalid_scene_windowed(void) {
+    // core_fixes/scene_load_failure
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    char *path = flecs_asprintf("/tmp/box_core_invalid_%d.flecs", (int)getpid());
+    FILE *f = fopen(path, "w");
+    test_assert(f != NULL);
+    fputs("Foo {\n", f);
+    fclose(f);
+    ecs_singleton_set(world, App, {
+        .frames = 2, .fps = 0, .unpaced = true, .scene = path });
+
+    ecs_strbuf_reset(&stop_errors);
+    stop_log = ecs_os_api.log_;
+    ecs_os_api.log_ = stop_collect_errors;
+    int result = box_app_run(world);
+    ecs_os_api.log_ = stop_log;
+    char *errors = ecs_strbuf_get(&stop_errors);
+    test_assert(result != 0);
+    test_int(ecs_singleton_get(world, AppStatus)->frame, 0);
+    test_assert(errors != NULL);
+    test_assert(strstr(errors, "unexpected end of script") != NULL);
+    test_assert(strstr(errors, "failed to load scene") != NULL);
+
+    ecs_os_free(errors);
+    unlink(path);
+    ecs_os_free(path);
+    ecs_fini(world);
+}
+
+void Stop_run_scene_evaluation_error(void) {
+    // core_fixes/scene_load_failure
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    char *path = flecs_asprintf("/tmp/box_core_invalid_%d.flecs", (int)getpid());
+    FILE *f = fopen(path, "w");
+    test_assert(f != NULL);
+    fputs("e { NoSuchComponent }\n", f);
+    fclose(f);
+    ecs_singleton_set(world, App, {
+        .frames = 2, .fps = 0, .unpaced = true, .scene = path });
+
+    ecs_strbuf_reset(&stop_errors);
+    stop_log = ecs_os_api.log_;
+    ecs_os_api.log_ = stop_collect_errors;
+    int result = box_app_run(world);
+    ecs_os_api.log_ = stop_log;
+    char *errors = ecs_strbuf_get(&stop_errors);
+    test_assert(result != 0);
+    test_int(ecs_singleton_get(world, AppStatus)->frame, 0);
+    test_assert(errors != NULL);
+    test_assert(strstr(errors, "NoSuchComponent") != NULL);
+    test_assert(strstr(errors, "failed to load scene") != NULL);
+
+    ecs_os_free(errors);
+    unlink(path);
+    ecs_os_free(path);
     ecs_fini(world);
 }

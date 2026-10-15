@@ -157,6 +157,7 @@ typedef struct box_render_draws_t {
     ecs_map_t order_z;          /**< Entity of a path to the z key it was ordered by */
     const void *backend;        /**< Context of the backend the GPU state was sent to */
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
+    int32_t generation;         /**< Generation of that backend, see box_render_backend_t */
     box_render_draws_stats_t stats; /**< Counters of the last extract */
     const ecs_table_t *scene_table; /**< Table whose entities share scene_of while processing */
     ecs_entity_t scene_of;      /**< Scene of the entities of scene_table */

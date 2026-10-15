@@ -6,8 +6,8 @@
  * with the validity mask, bound as group 3 of the forward pass with the probe buffer the view
  * shows. Views without a volume bind a 1x1x1 volume that keeps the hemisphere.
  *
- * A capture renders six faces into an rgba16float array, shaded with one probe buffer as DDGI
- * shades with the previous irradiance; bake_sh.wgsl projects them onto SH in the other buffer.
+ * A capture renders six faces (color and depth arrays) shaded with one probe buffer as DDGI does,
+ * bake_sh.wgsl projects them onto SH in the other buffer with the direct light of Baked lights.
  * Captures run in chunks of command buffers; timestamp queries around them time the GPU.
  */
 
@@ -92,6 +92,9 @@ typedef struct box_gpu_bake_params_t {
     float sky[4];                   /**< Linear ambient light from above */
     float ground[4];                /**< Linear ambient light from below */
     uint32_t probes[BOX_GPU_BAKE_CHUNK]; /**< Volume index of each probe of the chunk */
+    uint32_t lights[4];             /**< Baked lights, the directional ones among them first */
+    float near_[4];                 /**< Near plane of the faces */
+    float positions[BOX_GPU_BAKE_CHUNK][4]; /**< World position of each probe of the chunk */
 } box_gpu_bake_params_t;
 
 struct box_gpu_bake_t {
@@ -108,8 +111,9 @@ struct box_gpu_bake_t {
     WGPUTexture color;              /**< rgba16float array of the face layers */
     WGPUTextureView color_view;     /**< Array view the projection reads */
     ecs_vec_t layer_views;          /**< WGPUTextureView, the view each face renders into */
-    WGPUTexture depth;              /**< Depth of a face, shared by the faces in turn */
-    WGPUTextureView depth_view;     /**< View of the depth */
+    WGPUTexture depth;              /**< Depth32float array of the face layers */
+    WGPUTextureView depth_view;     /**< Array view the projection reads */
+    ecs_vec_t depth_views;          /**< WGPUTextureView, the depth each face renders into */
     WGPUQuerySet queries;           /**< Two timestamps per readback, NULL without the feature */
     WGPUBuffer resolve;             /**< Resolved timestamps */
     box_gpu_bake_readback_t readbacks[BOX_GPU_BAKE_READBACKS]; /**< Timestamp copies */
@@ -334,7 +338,12 @@ static void box_gpu_bake_layers_free(
         wgpuTextureViewRelease(*ecs_vec_get_t(&b->layer_views, WGPUTextureView, i));
     }
 
+    for (i = 0; i < ecs_vec_count(&b->depth_views); i ++) {
+        wgpuTextureViewRelease(*ecs_vec_get_t(&b->depth_views, WGPUTextureView, i));
+    }
+
     ecs_vec_clear(&b->layer_views);
+    ecs_vec_clear(&b->depth_views);
     box_gpu_bake_view_release(&b->color_view);
     box_gpu_bake_view_release(&b->depth_view);
     if (b->color) {
@@ -361,6 +370,7 @@ static void box_gpu_bake_state_free(
     int32_t i;
     box_gpu_bake_layers_free(b);
     ecs_vec_fini_t(NULL, &b->layer_views, WGPUTextureView);
+    ecs_vec_fini_t(NULL, &b->depth_views, WGPUTextureView);
     ecs_vec_fini_t(NULL, &b->captured, box_render_bake_result_t);
     ecs_vec_fini_t(NULL, &b->view_data, uint8_t);
     for (i = 0; i < BOX_GPU_BAKE_READBACKS; i ++) {
@@ -436,7 +446,7 @@ static box_gpu_bake_t* box_gpu_bake_state_new(
     box_gpu_t *gpu)
 {
     box_gpu_bake_t *b = ecs_os_calloc_t(box_gpu_bake_t);
-    WGPUBindGroupLayoutEntry entries[3] = {
+    WGPUBindGroupLayoutEntry entries[5] = {
         {
             .binding = 0,
             .visibility = WGPUShaderStage_Compute,
@@ -457,10 +467,23 @@ static box_gpu_bake_t* box_gpu_bake_state_new(
             .binding = 2,
             .visibility = WGPUShaderStage_Compute,
             .buffer = { .type = WGPUBufferBindingType_Storage }
+        },
+        {
+            .binding = 3,
+            .visibility = WGPUShaderStage_Compute,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Depth,
+                .viewDimension = WGPUTextureViewDimension_2DArray
+            }
+        },
+        {
+            .binding = 4,
+            .visibility = WGPUShaderStage_Compute,
+            .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
         }
     };
     b->layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
-        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 3, .entries = entries });
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 5, .entries = entries });
     b->pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
         &(WGPUPipelineLayoutDescriptor){
             .bindGroupLayoutCount = 1,
@@ -472,6 +495,7 @@ static box_gpu_bake_t* box_gpu_bake_state_new(
     b->clusters = box_gpu_light_clusters_new(gpu);
     ecs_vec_init_t(NULL, &b->view_data, uint8_t, 0);
     ecs_vec_init_t(NULL, &b->layer_views, WGPUTextureView, 0);
+    ecs_vec_init_t(NULL, &b->depth_views, WGPUTextureView, 0);
     ecs_vec_init_t(NULL, &b->captured, box_render_bake_result_t, 0);
     box_gpu_bake_queries_init(gpu, b);
 
@@ -557,14 +581,32 @@ static void box_gpu_bake_layers(
     }
 
     b->depth = wgpuDeviceCreateTexture(gpu->device, &(WGPUTextureDescriptor){
-        .usage = WGPUTextureUsage_RenderAttachment,
+        .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding,
         .dimension = WGPUTextureDimension_2D,
-        .size = { (uint32_t)size, (uint32_t)size, 1 },
+        .size = { (uint32_t)size, (uint32_t)size, (uint32_t)layers },
         .format = BOX_GPU_DEPTH_FORMAT,
         .mipLevelCount = 1,
         .sampleCount = 1
     });
-    b->depth_view = wgpuTextureCreateView(b->depth, NULL);
+    b->depth_view = wgpuTextureCreateView(b->depth, &(WGPUTextureViewDescriptor){
+        .format = BOX_GPU_DEPTH_FORMAT,
+        .dimension = WGPUTextureViewDimension_2DArray,
+        .mipLevelCount = 1,
+        .arrayLayerCount = (uint32_t)layers,
+        .aspect = WGPUTextureAspect_DepthOnly
+    });
+    for (i = 0; i < layers; i ++) {
+        *ecs_vec_append_t(NULL, &b->depth_views, WGPUTextureView) = wgpuTextureCreateView(
+            b->depth, &(WGPUTextureViewDescriptor){
+                .format = BOX_GPU_DEPTH_FORMAT,
+                .dimension = WGPUTextureViewDimension_2D,
+                .baseArrayLayer = (uint32_t)i,
+                .mipLevelCount = 1,
+                .arrayLayerCount = 1,
+                .aspect = WGPUTextureAspect_All
+            });
+    }
+
     b->size = size;
     b->layers = layers;
 done:
@@ -872,9 +914,9 @@ static void box_gpu_bake_faces_render(
             .clearValue = { 0, 0, 0, 0 }
         };
         WGPURenderPassDepthStencilAttachment depth = {
-            .view = b->depth_view,
+            .view = *ecs_vec_get_t(&b->depth_views, WGPUTextureView, i),
             .depthLoadOp = WGPULoadOp_Clear,
-            .depthStoreOp = WGPUStoreOp_Discard,
+            .depthStoreOp = WGPUStoreOp_Store,
             .depthClearValue = 0.0f
         };
         box_gpu_light_cluster_with(gpu, encoder, rv, b->uniforms, offset, b->clusters);
@@ -917,29 +959,43 @@ static void box_gpu_bake_project(
     int32_t count,
     const WGPUPassTimestampWrites *writes)
 {
+    box_gpu_buffer_t *baked = batch->baked
+        ? ecs_map_get_deref(&gpu->buffers, box_gpu_buffer_t, batch->baked)
+        : NULL;
+    uint32_t capacity = baked ? baked->size / (uint32_t)sizeof(box_render_light_t) : 0;
     box_gpu_bake_params_t params = {
-        .size = { (uint32_t)batch->size, (uint32_t)count, 0, 0 }
+        .size = { (uint32_t)batch->size, (uint32_t)count, 0, 0 },
+        .near_ = { BOX_GPU_BAKE_NEAR, 0, 0, 0 }
     };
     int32_t i;
+    params.lights[0] = glm_min(batch->baked_count, capacity);
+    params.lights[1] = glm_min(batch->baked_directional, params.lights[0]);
     glm_vec4_copy(ECS_CONST_CAST(float*, batch->lights.ambient_sky), params.sky);
     glm_vec4_copy(ECS_CONST_CAST(float*, batch->lights.ambient_ground), params.ground);
     for (i = 0; i < count; i ++) {
         params.probes[i] = probes[i].index;
+        glm_vec3_copy(ECS_CONST_CAST(float*, probes[i].position), params.positions[i]);
     }
 
     wgpuQueueWriteBuffer(gpu->queue, b->params, 0, &params, sizeof(params));
-    WGPUBindGroupEntry entries[3] = {
+    WGPUBindGroupEntry entries[5] = {
         { .binding = 0, .buffer = b->params, .size = sizeof(params) },
         { .binding = 1, .textureView = b->color_view },
         {
             .binding = 2,
             .buffer = volume->probes[batch->target],
             .size = (uint64_t)volume->count * BOX_GPU_PROBE_SIZE
+        },
+        { .binding = 3, .textureView = b->depth_view },
+        {
+            .binding = 4,
+            .buffer = baked ? baked->buffer : gpu->no_lights,
+            .size = baked ? baked->size : sizeof(box_render_light_t)
         }
     };
     WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
         .layout = b->layout,
-        .entryCount = 3,
+        .entryCount = 5,
         .entries = entries
     });
     WGPUComputePassEncoder pass = wgpuCommandEncoderBeginComputePass(encoder,
