@@ -2,8 +2,9 @@
  * @file spatial/index.h
  * @brief State of the spatial index of a world, private to box.spatial.
  *
- * Every scene has a static tree with exact leaves and a dynamic tree whose leaves have a
- * margin, so a mover only changes its place in the tree once it leaves its margin.
+ * A static tree with exact leaves and a dynamic tree with fat leaves per scene. A fat leaf
+ * reaches ahead along the last displacement, so a mover moves in its tree once it leaves it.
+ * A query computes bounds only for dynamic shapes whose transform differs from SpatialPose.
  *
  * Items hold the bounds of the last update; moved static leaves catch up on the next query.
  */
@@ -30,6 +31,15 @@ typedef struct SpatialProxy {
 
 /** Component id of SpatialProxy */
 extern ECS_COMPONENT_DECLARE(SpatialProxy);
+
+/** World transform the bounds of an indexed dynamic shape were computed from, all zero (which
+ * no world transform is) until the first update places the shape */
+typedef struct SpatialPose {
+    mat4 m; /**< The matrix */
+} SpatialPose;
+
+/** Component id of SpatialPose */
+extern ECS_COMPONENT_DECLARE(SpatialPose);
 
 /** An indexed entity with its exact world bounds */
 typedef struct box_spatial_item_t {
@@ -62,7 +72,7 @@ typedef struct box_spatial_t {
     ecs_vec_t leaves;          /**< box_bvh_leaf_t, scratch of a build */
     ecs_vec_t nodes;           /**< int32_t, scratch of a build */
     ecs_vec_t empty;           /**< ecs_entity_t, scenes that lost their last entity */
-    ecs_query_t *dynamic;      /**< Indexed entities with DynamicTransform */
+    ecs_query_t *dynamic;      /**< Shapes with SpatialPose */
     box_spatial_stats_t stats; /**< Counters of the last update */
     bool stale;                /**< Leaves may lag behind the entities since the last update */
     int32_t refs;              /**< Observers and systems that use the state */
@@ -79,8 +89,8 @@ extern ECS_COMPONENT_DECLARE(SpatialIndex);
 /** Get the index of a world to query it.
  *
  * Moves the leaves of the static items of the last update and places the dynamic entities
- * for their current transforms first when that did not happen yet, so a frame without queries
- * does not visit them.
+ * whose transform changed first when that did not happen yet, so a frame without queries does
+ * not visit them.
  *
  * @param world The world
  * @return The index, NULL when box.spatial was not imported
@@ -151,7 +161,8 @@ int32_t box_spatial_item_add(
 
 /** Give an item new bounds, moving it to another tree when it changed kind.
  *
- * A static item that has a leaf keeps it until box_spatial_move gives it the new bounds.
+ * A static item that has a leaf keeps it until box_spatial_move gives it the new bounds. A
+ * dynamic item that leaves its fat leaf gets one that reaches ahead along its displacement.
  *
  * @param s The scene
  * @param item The item

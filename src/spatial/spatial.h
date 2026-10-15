@@ -48,6 +48,7 @@ typedef struct box_spatial_stats_t {
     int32_t scenes;   /**< Scenes with indexed entities */
     int32_t entities; /**< Indexed entities */
     int32_t updated;  /**< Entities the last update placed again */
+    int32_t rebound;  /**< Dynamic entities whose transform changed since the last update */
     int32_t moved;    /**< Dynamic entities the last update moved in their tree */
 } box_spatial_stats_t;
 

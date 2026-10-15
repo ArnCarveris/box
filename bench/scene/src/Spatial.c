@@ -337,7 +337,7 @@ void Spatial_update_dynamic_100k_1pct(
     ECS_IMPORT(world, Box);
     ecs_entity_t *shapes = ecs_os_malloc_n(ecs_entity_t, 100000);
     box_spatial_stats_t stats = {0};
-    int32_t i, frame = 0, moved = 0;
+    int32_t i, frame = 0, moved = 0, rebound = 0;
     for (i = 0; i < 100000; i ++) {
         shapes[i] = ecs_new(world);
         ecs_add(world, shapes[i], DynamicTransform);
@@ -364,9 +364,11 @@ void Spatial_update_dynamic_100k_1pct(
         box_spatial_update(world);
         box_spatial_stats(world, &stats);
         moved += stats.moved;
+        rebound += stats.rebound;
     }
 
     bench_counter(b, "moved_in_tree_per_frame", frame ? (double)moved / frame : 0);
+    bench_counter(b, "rebound_per_frame", frame ? (double)rebound / frame : 0);
     ecs_os_free(shapes);
     ecs_fini(world);
 }

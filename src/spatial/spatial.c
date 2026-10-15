@@ -5,6 +5,9 @@
  * Observers collect changed shapes and the roots of changed subtrees, so an update only
  * computes the bounds of what changed. Moved static leaves and DynamicTransform shapes are
  * placed by the first query after a frame, so a frame without queries does not move leaves.
+ *
+ * A dynamic shape keeps the world transform of its bounds in SpatialPose, and only the shapes
+ * whose transform differs from it get new bounds.
  */
 
 #include "index.h"
@@ -12,7 +15,11 @@
 #include "../geometry/mesh_cache.h"
 
 ECS_COMPONENT_DECLARE(SpatialProxy);
+ECS_COMPONENT_DECLARE(SpatialPose);
 ECS_COMPONENT_DECLARE(SpatialIndex);
+
+/** World transform of a shape without one */
+static const WorldTransform box_spatial_identity = { .m = GLM_MAT4_IDENTITY_INIT };
 
 /** Construct SpatialProxy values that are not indexed.
  *
@@ -215,6 +222,26 @@ static void BoxSpatialOnRemove(
     }
 }
 
+/** Take entities that lose their shape out of the index, and mark the dynamic ones that stay
+ * so the next update drops their SpatialPose.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxSpatialOnShapeRemove(
+    ecs_iter_t *it)
+{
+    int32_t i;
+    BoxSpatialOnRemove(it);
+    bool stays = it->other_table && ecs_table_get_type(it->other_table)->count;
+    if (!ecs_is_fini(it->world) && stays &&
+        ecs_table_has_id(it->world, it->table, ecs_id(SpatialPose)))
+    {
+        for (i = 0; i < it->count; i ++) {
+            box_spatial_mark(it->world, it->ctx, it->entities[i], false);
+        }
+    }
+}
+
 /** Get the unit mesh of a shape.
  *
  * @param cache The mesh cache
@@ -246,8 +273,7 @@ static void box_spatial_world_bounds(
     vec3 min,
     vec3 max)
 {
-    static const WorldTransform identity = { .m = GLM_MAT4_IDENTITY_INIT };
-    const WorldTransform *m = t ? t : &identity;
+    const WorldTransform *m = t ? t : &box_spatial_identity;
     vec3 c, e;
     int32_t i;
     for (i = 0; i < 3; i ++) {
@@ -261,6 +287,29 @@ static void box_spatial_world_bounds(
             fabsf(m->m[2][i]) * e[2];
         min[i] = wc - we;
         max[i] = wc + we;
+    }
+}
+
+/** Keep the world transform of a dynamic shape with it, or drop it from a shape that is no
+ * longer an indexed dynamic shape.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param dynamic The entity is an indexed dynamic shape
+ * @param t World transform its bounds were computed from, NULL for the identity
+ */
+static void box_spatial_pose(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    bool dynamic,
+    const WorldTransform *t)
+{
+    if (dynamic) {
+        SpatialPose pose;
+        ecs_os_memcpy(pose.m, (t ? t : &box_spatial_identity)->m, sizeof(mat4));
+        ecs_set_ptr(world, e, SpatialPose, &pose);
+    } else if (ecs_has(world, e, SpatialPose)) {
+        ecs_remove(world, e, SpatialPose);
     }
 }
 
@@ -279,7 +328,7 @@ static void box_spatial_refresh(
 {
     vec3 min, max;
     ecs_entity_t scene = 0;
-    int32_t tree = BOX_SPATIAL_STATIC;
+    bool dynamic = false;
     SpatialProxy *p = ecs_is_alive(world, e) ? ecs_get_mut(world, e, SpatialProxy) : NULL;
     if (!p) {
         goto done;
@@ -289,31 +338,30 @@ static void box_spatial_refresh(
     p->dirty = false;
     p->rescope = false;
     const ShapeMesh *shape = ecs_get(world, e, ShapeMesh);
+    const WorldTransform *t = ecs_get(world, e, WorldTransform);
     const box_mesh_t *mesh = box_spatial_mesh(cache, shape);
     bool indexed = mesh && !ecs_has_id(world, e, EcsPrefab);
     if (indexed) {
-        box_spatial_world_bounds(mesh, shape, ecs_get(world, e, WorldTransform), min, max);
+        box_spatial_world_bounds(mesh, shape, t, min, max);
         scene = rescope ? box_render_scene_of(world, e) : p->scene;
-        tree = ecs_has_id(world, e, DynamicTransform) ? BOX_SPATIAL_DYNAMIC : BOX_SPATIAL_STATIC;
+        dynamic = ecs_has_id(world, e, DynamicTransform);
     }
 
     if (p->item >= 0 && (!indexed || scene != p->scene)) {
         box_spatial_unindex(index, p);
     }
 
-    if (!indexed) {
-        goto done;
-    }
-
-    index->stats.updated ++;
-    if (p->item < 0) {
+    int32_t tree = dynamic ? BOX_SPATIAL_DYNAMIC : BOX_SPATIAL_STATIC;
+    if (indexed && p->item < 0) {
         box_spatial_scene_t *s = box_spatial_scene_ensure(index, scene);
         p->scene = scene;
         p->item = box_spatial_item_add(s, e, tree, min, max);
-    } else {
+    } else if (indexed) {
         box_spatial_item_set(box_spatial_scene(index, scene), p->item, tree, min, max);
     }
 
+    index->stats.updated += indexed;
+    box_spatial_pose(world, e, dynamic, t);
 done:
     return;
 }
@@ -356,7 +404,7 @@ static void box_spatial_walk(
     ecs_vec_clear(roots);
 }
 
-/** Give the dynamic entities the bounds of this frame.
+/** Give the dynamic entities whose world transform changed the bounds of this frame.
  *
  * @param world The world
  * @param index The index
@@ -374,15 +422,19 @@ static void box_spatial_dynamic(
     uint32_t handle = 0;
     while (ecs_query_next(&it)) {
         const SpatialProxy *p = ecs_field(&it, SpatialProxy, 0);
-        const ShapeMesh *shape = ecs_field(&it, ShapeMesh, 1);
-        const WorldTransform *t = ecs_field(&it, WorldTransform, 2);
+        SpatialPose *pose = ecs_field(&it, SpatialPose, 1);
+        const ShapeMesh *shape = ecs_field(&it, ShapeMesh, 2);
+        const WorldTransform *t = ecs_field(&it, WorldTransform, 3);
         int32_t i;
         for (i = 0; i < it.count; i ++) {
             vec3 min, max;
-            if (p[i].item < 0 || p[i].dirty) {
+            const WorldTransform *m = t ? &t[i] : &box_spatial_identity;
+            if (p[i].item < 0 || p[i].dirty || !ecs_os_memcmp(pose[i].m, m->m, sizeof(mat4))) {
                 continue;
             }
 
+            ecs_os_memcpy(pose[i].m, m->m, sizeof(mat4));
+            index->stats.rebound ++;
             if (!s || scene != p[i].scene) {
                 scene = p[i].scene;
                 s = box_spatial_scene(index, scene);
@@ -398,7 +450,7 @@ static void box_spatial_dynamic(
                 continue;
             }
 
-            box_spatial_world_bounds(mesh, &shape[i], t ? &t[i] : NULL, min, max);
+            box_spatial_world_bounds(mesh, &shape[i], m, min, max);
             if (glm_vec3_eqv(min, ECS_CONST_CAST(float*, item->min)) &&
                 glm_vec3_eqv(max, ECS_CONST_CAST(float*, item->max)))
             {
@@ -451,6 +503,7 @@ static void box_spatial_process(
     const box_mesh_cache_t *cache = box_mesh_cache_of(world);
     int32_t i;
     index->stats.updated = 0;
+    index->stats.rebound = 0;
     index->stats.moved = 0;
     box_spatial_walk(world, index, &index->rescoped, true);
     for (i = 0; i < ecs_vec_count(&index->dirty); i ++) {
@@ -469,7 +522,7 @@ static void box_spatial_process(
 static void BoxSpatialUpdate(
     ecs_iter_t *it)
 {
-    box_spatial_process(it->world, it->ctx);
+    box_spatial_process(it->stage, it->ctx);
 }
 
 void box_spatial_update(
@@ -580,7 +633,7 @@ static void box_spatial_observers(
         .events = { EcsOnSet } }, BoxSpatialOnChange);
     box_spatial_observer(world, index, "SpatialOnShapeRemove", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(ShapeMesh) }},
-        .events = { EcsOnRemove } }, BoxSpatialOnRemove);
+        .events = { EcsOnRemove } }, BoxSpatialOnShapeRemove);
     box_spatial_observer(world, index, "SpatialOnProxyRemove", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(SpatialProxy) }},
         .events = { EcsOnRemove } }, BoxSpatialOnRemove);
@@ -613,6 +666,8 @@ void BoxSpatialImport(
         .move = box_spatial_proxy_move
     });
     ecs_add_pair(world, ecs_id(ShapeMesh), EcsWith, ecs_id(SpatialProxy));
+    ECS_COMPONENT_DEFINE(world, SpatialPose);
+    ecs_set_hooks(world, SpatialPose, { .ctor = flecs_default_ctor });
     ECS_COMPONENT_DEFINE(world, SpatialIndex);
     ecs_set_hooks(world, SpatialIndex, { .ctor = flecs_default_ctor });
     ecs_singleton_set(world, SpatialIndex, { .index = index });
@@ -621,9 +676,9 @@ void BoxSpatialImport(
     index->dynamic = ecs_query(world, {
         .terms = {
             { .id = ecs_id(SpatialProxy), .inout = EcsIn },
+            { .id = ecs_id(SpatialPose), .inout = EcsInOut },
             { .id = ecs_id(ShapeMesh), .inout = EcsIn },
-            { .id = ecs_id(WorldTransform), .inout = EcsIn, .oper = EcsOptional },
-            { .id = DynamicTransform, .inout = EcsInOutNone }
+            { .id = ecs_id(WorldTransform), .inout = EcsIn, .oper = EcsOptional }
         },
         .cache_kind = EcsQueryCacheAuto
     });

@@ -11,6 +11,9 @@
 /** Margin of a dynamic leaf relative to its largest extent */
 #define BOX_SPATIAL_MARGIN_SCALE (0.1f)
 
+/** Updates of its last displacement a dynamic leaf reaches ahead (b2_aabbMultiplier) */
+#define BOX_SPATIAL_PREDICT (4.0f)
+
 box_spatial_scene_t* box_spatial_scene(
     const box_spatial_t *index,
     ecs_entity_t scene)
@@ -191,7 +194,13 @@ bool box_spatial_item_set(
     const vec3 max)
 {
     box_spatial_item_t *it = box_spatial_item(s, item);
-    int32_t node = it->node;
+    int32_t node = it->node, i;
+    vec3 ahead;
+    for (i = 0; i < 3; i ++) {
+        ahead[i] = BOX_SPATIAL_PREDICT * 0.5f *
+            (min[i] + max[i] - it->min[i] - it->max[i]);
+    }
+
     glm_vec3_copy(ECS_CONST_CAST(float*, min), it->min);
     glm_vec3_copy(ECS_CONST_CAST(float*, max), it->max);
     if (it->tree != tree) {
@@ -203,7 +212,8 @@ bool box_spatial_item_set(
         it->moved = false;
         box_spatial_item_place(s, item);
     } else if (node >= 0 && tree == BOX_SPATIAL_DYNAMIC) {
-        it->node = box_bvh_move(&s->trees[tree], node, min, max, box_spatial_margin(min, max));
+        it->node = box_bvh_move_fat(
+            &s->trees[tree], node, min, max, box_spatial_margin(min, max), ahead);
     } else if (node >= 0 && !it->moved) {
         it->moved = true;
         *ecs_vec_append_t(NULL, &s->moved, int32_t) = item;
@@ -289,8 +299,7 @@ static void box_spatial_scene_move(
         box_spatial_item_t *it = box_spatial_item(s, moved[i]);
         if (it->moved) {
             it->moved = false;
-            it->node = box_bvh_move(
-                &s->trees[BOX_SPATIAL_STATIC], it->node, it->min, it->max, 0);
+            it->node = box_bvh_move(&s->trees[BOX_SPATIAL_STATIC], it->node, it->min, it->max);
         }
     }
 
