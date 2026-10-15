@@ -52,6 +52,20 @@ const WorldTransform* transformGetParentWorldTransform(
     const ecs_world_t *world,
     ecs_entity_t parent);
 
+/** Test whether the entities of an OnRemove observer are being deleted.
+ *
+ * Entities deleted with their parent come without a destination table (Parent hierarchies),
+ * from a table marked for deletion (ChildOf cascades), or move to an empty table while their
+ * parent's ChildOf record is marked for deletion (the parent is also a relationship target).
+ *
+ * Work for them is wasted. The root of a deleted tree is not detected, which costs one entry.
+ *
+ * @param it The observer iterator
+ * @return true for an OnRemove event that deletes the entities
+ */
+bool transformDeleting(
+    const ecs_iter_t *it);
+
 /** Register the systems and observers of dynamic transforms.
  *
  * @param world The world
