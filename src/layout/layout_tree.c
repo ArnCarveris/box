@@ -294,28 +294,26 @@ static void box_layout_measure(
  * @param n The parent
  * @param main The main axis of the parent
  * @param space The size of the content box on the main axis
+ * @return The size of the children and the spacing between them
  */
-static void box_layout_grow(
+static float box_layout_grow(
     box_layout_node_t *nodes,
     const box_layout_node_t *n,
     int32_t main,
     float space)
 {
-    float free = space;
-    int32_t i, pass;
-    if (n->count > 1) {
-        free -= n->layout.spacing * (float)(n->count - 1);
-    }
-
+    float gaps = n->count > 1 ? n->layout.spacing * (float)(n->count - 1) : 0;
+    float free = space - gaps, result = gaps;
+    int32_t i, pass, growing = 0;
     for (i = 0; i < n->count; i ++) {
         box_layout_node_t *c = &nodes[n->first + i];
         c->frozen = !box_layout_grows(c, main);
-        if (c->frozen) {
-            free -= c->size[main];
-        }
+        result += c->frozen ? c->size[main] : 0;
+        growing += !c->frozen;
     }
 
-    for (pass = 0; pass <= n->count; pass ++) {
+    free -= result - gaps;
+    for (pass = 0; growing && pass <= n->count; pass ++) {
         float weights = 0, over = 0;
         for (i = 0; i < n->count; i ++) {
             const box_layout_node_t *c = &nodes[n->first + i];
@@ -356,6 +354,13 @@ static void box_layout_grow(
 
         free = left;
     }
+
+    for (i = 0; growing && i < n->count; i ++) {
+        const box_layout_node_t *c = &nodes[n->first + i];
+        result += box_layout_grows(c, main) ? c->size[main] : 0;
+    }
+
+    return result;
 }
 
 /** Get the center of a child aligned in a box on one axis.
@@ -389,20 +394,18 @@ static float box_layout_align(
  * @param n The parent
  * @param main The main axis of the parent
  * @param space The size of the content box on the main axis
+ * @param total The size of the children and the spacing between them
  */
 static void box_layout_shrink(
     box_layout_node_t *nodes,
     const box_layout_node_t *n,
     int32_t main,
-    float space)
+    float space,
+    float total)
 {
     float gaps = n->count > 1 ? n->layout.spacing * (float)(n->count - 1) : 0;
-    float avail = space - gaps, total = gaps;
+    float avail = space - gaps;
     int32_t i, pass, open = 0;
-    for (i = 0; i < n->count; i ++) {
-        total += nodes[n->first + i].size[main];
-    }
-
     for (i = 0; total > space + 1e-4f && i < n->count; i ++) {
         box_layout_node_t *c = &nodes[n->first + i];
         c->frozen = !(c->size[main] > box_layout_least(c, main));
@@ -496,8 +499,8 @@ static void box_layout_resolve(
     }
 
     if (main >= first && main < last) {
-        box_layout_grow(nodes, n, main, hi[main] - lo[main]);
-        box_layout_shrink(nodes, n, main, hi[main] - lo[main]);
+        float total = box_layout_grow(nodes, n, main, hi[main] - lo[main]);
+        box_layout_shrink(nodes, n, main, hi[main] - lo[main], total);
     }
 }
 
@@ -602,6 +605,67 @@ static void box_layout_write(
     }
 }
 
+/** Size and place a tree without texts, both axes in one pass.
+ *
+ * @param nodes The nodes of the tree
+ * @param count Number of nodes
+ */
+static void box_layout_solve(
+    box_layout_node_t *nodes,
+    int32_t count)
+{
+    int32_t i;
+    for (i = count - 1; i >= 0; i --) {
+        box_layout_measure(nodes, &nodes[i], 0, 2);
+    }
+
+    for (i = 0; i < count; i ++) {
+        if (nodes[i].has_layout) {
+            box_layout_resolve(nodes, &nodes[i], 0, 2);
+            box_layout_place(nodes, &nodes[i]);
+        }
+    }
+}
+
+/** Size and place a tree with texts: widths, then the texts wrap, then heights.
+ *
+ * @param world The world
+ * @param state The state of the layout module
+ * @param nodes The nodes of the tree
+ * @param count Number of nodes
+ */
+static void box_layout_solve_text(
+    ecs_world_t *world,
+    box_layout_state_t *state,
+    box_layout_node_t *nodes,
+    int32_t count)
+{
+    int32_t i, axis;
+    for (axis = 0; axis < 2; axis ++) {
+        if (axis == 1) {
+            state->writing = true;
+            box_layout_wrap(world, state, nodes, count);
+            state->writing = false;
+        }
+
+        for (i = count - 1; i >= 0; i --) {
+            box_layout_measure(nodes, &nodes[i], axis, axis + 1);
+        }
+
+        for (i = 0; i < count; i ++) {
+            if (nodes[i].has_layout) {
+                box_layout_resolve(nodes, &nodes[i], axis, axis + 1);
+            }
+        }
+    }
+
+    for (i = 0; i < count; i ++) {
+        if (nodes[i].has_layout) {
+            box_layout_place(nodes, &nodes[i]);
+        }
+    }
+}
+
 void box_layout_tree(
     ecs_world_t *world,
     box_layout_state_t *state,
@@ -609,28 +673,11 @@ void box_layout_tree(
 {
     box_layout_collect(world, state, root);
     box_layout_node_t *nodes = ecs_vec_first_t(&state->nodes, box_layout_node_t);
-    int32_t i, first, count = ecs_vec_count(&state->nodes);
-    int32_t axes = state->has_text ? 1 : 2;
-    for (first = 0; first < 2; first += axes) {
-        if (first == 1) {
-            state->writing = true;
-            box_layout_wrap(world, state, nodes, count);
-            state->writing = false;
-        }
-
-        for (i = count - 1; i >= 0; i --) {
-            box_layout_measure(nodes, &nodes[i], first, first + axes);
-        }
-
-        for (i = 0; i < count; i ++) {
-            if (nodes[i].has_layout) {
-                box_layout_resolve(nodes, &nodes[i], first, first + axes);
-            }
-
-            if (nodes[i].has_layout && first + axes == 2) {
-                box_layout_place(nodes, &nodes[i]);
-            }
-        }
+    int32_t i, count = ecs_vec_count(&state->nodes);
+    if (state->has_text) {
+        box_layout_solve_text(world, state, nodes, count);
+    } else {
+        box_layout_solve(nodes, count);
     }
 
     state->writing = true;
