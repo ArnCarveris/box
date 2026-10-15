@@ -259,6 +259,17 @@ backend's `flush`, which blocks on the device until every pending capture is wri
 capture is on disk after a sync. The browser writes no captures: the frame warns once, and the
 `capture` and `render` commands fail with "captures are not available in the browser".
 
+**Pipeline errors and device loss.** A mesh or 2D shape module that compiled is checked before
+it replaces the module that renders: a forward pipeline is created from it inside a validation
+error scope, and a module that does not fit the pipeline layout is reported in `ShaderStatus`
+like a compile error while the previous module and its pipelines keep rendering (native only;
+the browser reports its error scopes later). Before each packet the ring asks the backend's
+`lost` callback whether the device was lost (the wgpu device lost callback sets it, as does
+`box_render_gpu_lose_device`, which destroys the device to test this); it then stops and starts
+the backend on the thread that renders, which recreates the device, and the stop bumps the
+backend generation so the extract sends the whole scene again. `RenderStatus.device_losses`
+counts the recoveries. In the browser the page reports a lost device and does not recover.
+
 **Culling.** A compute pass tests each draw's instances (mesh bounds moved by the model matrix)
 against the clip planes and `min_dimension_px` and writes visible slots plus indirect draw args.
 `CullSettings {enabled, occlusion, min_dimension_px}`: occlusion is two phase Hi-Z. The early

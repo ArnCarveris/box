@@ -71,6 +71,8 @@ ECS_STRUCT(RenderStatus, {
     int32_t delta_mismatches; /**< Frames on the simulated display whose delta differs over
                                *   BOX_FRAME_TOLERANCE_MS from the time it was shown after the
                                *   frame before it, so the motion does not match the display */
+    int32_t device_losses;  /**< Times the GPU device was lost and the renderer recreated it and
+                             *   sent the scene again, 0 when it never was */
 });
 
 /** How a view culled its instances in the last frame the GPU finished, set on the View entity.

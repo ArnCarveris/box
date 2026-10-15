@@ -402,6 +402,8 @@ typedef struct box_gpu_t {
     bool timestamps;                /**< The device has timestamp queries */
     box_gpu_bake_t *bake;           /**< Probe captures, created on the first capture */
     ecs_vec_t captures;             /**< box_gpu_capture_t* whose readback is mapping */
+    bool lost;                      /**< The device was lost, the ring recreates it */
+    bool lose;                      /**< box_render_gpu_lose_device asked to destroy it */
 } box_gpu_t;
 
 /** Fields of the counters of the backend */

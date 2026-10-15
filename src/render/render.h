@@ -474,6 +474,8 @@ typedef struct box_render_backend_t {
                                     *   when only the time a wait takes tells */
     void (*flush)(void*);       /**< Block until asynchronous work such as captures finished,
                                  *   on the render thread, NULL when there is none */
+    bool (*lost)(void*);        /**< Check before a packet whether the device was lost, so the
+                                 *   ring restarts the backend, NULL when it cannot tell */
     int32_t generation;         /**< Set by the ring, bumped at fini and on a new backend, as
                                  *   init runs after or during the next extract; a change makes
                                  *   the extract send everything again */
@@ -634,6 +636,14 @@ bool box_render_gpu_stats(
 bool box_render_gpu_capture_pending(
     ecs_world_t *world,
     const char *path);
+
+/** Destroy the device of the GPU backend of a world before its next packet, which loses it the
+ * way a driver reset or a removed GPU does, to test the recovery.
+ *
+ * @param world The world
+ */
+void box_render_gpu_lose_device(
+    ecs_world_t *world);
 
 /** When the GPU backend applies the outcome of a shader compile.
  *

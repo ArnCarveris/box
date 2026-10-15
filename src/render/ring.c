@@ -73,6 +73,7 @@ struct box_render_ring_t {
     int32_t presents_late;          /**< Present intervals over 1.1 frame intervals */
     int32_t presents_early;         /**< Present intervals under 0.9 frame intervals */
     int32_t delta_mismatches;       /**< Shown intervals that differ from the packet delta */
+    int32_t device_losses;          /**< Backend restarts after the device was lost */
     box_render_shown_t pending;     /**< Frame on the simulated display not yet shown */
 };
 
@@ -365,6 +366,28 @@ static void box_render_backend_stop(
     ring->backend_failed = false;
 }
 
+/** Restart a backend that lost its device on the thread that renders, before its next packet,
+ * as wgpu and Dawn applications do from the device lost callback: the stop bumps the
+ * generation, so the extract sends the whole scene to the new device.
+ *
+ * @param ring The ring
+ */
+static void box_render_backend_recover(
+    box_render_ring_t *ring)
+{
+    if (!ring->backend_ready || !ring->backend.lost || !ring->backend.lost(ring->backend.ctx)) {
+        goto done;
+    }
+
+    box_render_backend_stop(ring);
+    box_render_backend_start(ring);
+    ecs_os_mutex_lock(ring->lock);
+    ring->device_losses ++;
+    ecs_os_mutex_unlock(ring->lock);
+done:
+    return;
+}
+
 /** Check whether the render thread may take a packet, called with the lock held.
  *
  * @param ring The ring
@@ -420,6 +443,7 @@ static void* box_render_thread_main(
 
         box_render_packet_t *p = box_render_ring_slot(ring, ring->taken ++);
         ecs_os_mutex_unlock(ring->lock);
+        box_render_backend_recover(ring);
         box_render_consume(ring, p);
         ecs_os_mutex_lock(ring->lock);
         ring->released ++;
@@ -661,6 +685,7 @@ void box_render_ring_submit(
     ring->submitted ++;
     ring->taken ++;
     ecs_os_mutex_unlock(ring->lock);
+    box_render_backend_recover(ring);
     box_render_consume(ring, p);
     ecs_os_mutex_lock(ring->lock);
     ring->released ++;
@@ -734,5 +759,6 @@ void box_render_ring_status(
     status->presents_late = ring->presents_late;
     status->presents_early = ring->presents_early;
     status->delta_mismatches = ring->delta_mismatches;
+    status->device_losses = ring->device_losses;
     ecs_os_mutex_unlock(ring->lock);
 }
