@@ -514,13 +514,13 @@ static bool box_draws_mesh(
     desc->index_count = (uint32_t)mesh->index_count;
     ecs_os_memcpy(data, mesh->vertices, (ecs_size_t)vertex_size);
     ecs_os_memcpy(data + vertex_size, mesh->indices, (ecs_size_t)index_size);
-    box_mesh_cache_keep(cache, handle);
+    box_mesh_cache_hold(cache, handle);
     ecs_map_insert(&d->meshes, handle, 1);
 done:
     return result;
 }
 
-/** Destroy the meshes only the renderer still references.
+/** Destroy the meshes no shape uses any more and drop the hold of the renderer on them.
  *
  * @param p The packet
  * @param d The state
@@ -536,7 +536,7 @@ static void box_draws_release(
     ecs_map_iter_t it = ecs_map_iter(&d->meshes);
     while (ecs_map_next(&it)) {
         uint32_t handle = (uint32_t)ecs_map_key(&it);
-        if (box_mesh_cache_refs(cache, handle) <= 1) {
+        if (!box_mesh_cache_users(cache, handle)) {
             *ecs_vec_append_t(NULL, &d->released, uint32_t) = handle;
         }
     }
@@ -544,7 +544,7 @@ static void box_draws_release(
     for (i = 0; i < ecs_vec_count(&d->released); i ++) {
         uint32_t handle = *ecs_vec_get_t(&d->released, uint32_t, i);
         box_render_packet_resource(p, BOX_RENDER_MESH, BOX_RENDER_DESTROY, handle, 0);
-        box_mesh_cache_release(cache, handle);
+        box_mesh_cache_unhold(cache, handle);
         ecs_map_remove(&d->meshes, handle);
     }
 }
@@ -556,7 +556,7 @@ void box_draws_reset_backend(
     int32_t i;
     ecs_map_iter_t it = ecs_map_iter(&d->meshes);
     while (ecs_map_next(&it)) {
-        box_mesh_cache_release(cache, (uint32_t)ecs_map_key(&it));
+        box_mesh_cache_unhold(cache, (uint32_t)ecs_map_key(&it));
     }
 
     ecs_map_clear(&d->meshes);

@@ -65,7 +65,7 @@ typedef struct box_pick_candidate_t {
 typedef struct box_pick_mesh_t {
     box_bvh_t tree;  /**< Triangles of the unit mesh, the item of a leaf is a triangle index */
     uint32_t handle; /**< Mesh handle */
-    int32_t idle;    /**< Frames in a row picking held the only reference to the mesh */
+    int32_t idle;    /**< Frames in a row no shape used the mesh */
     bool building;   /**< A job builds the tree and reads the mesh */
     bool ready;      /**< The tree is built */
 } box_pick_mesh_t;
@@ -128,7 +128,7 @@ void box_pick_resolve(
     const vec2 cursor,
     box_pick_t *out);
 
-/** Drop the triangle hierarchies of meshes that only picking has referenced for a while.
+/** Drop the triangle hierarchies of meshes no shape has used for a while.
  *
  * @param world The world
  * @param st The module state
