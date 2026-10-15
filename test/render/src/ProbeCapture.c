@@ -342,7 +342,7 @@ void ProbeCapture_budget_spreads_over_frames(void) {
         ECS_IMPORT(world, Box);
 
         ecs_singleton_set(world, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
-            .capture_size = 8, .budget_ms = budgets[i], .bounces = 1});
+            .capture_size = 8, .budget_ms = budgets[i], .bounces = 0});
         ecs_entity_t camera = ecs_new(world);
         ecs_set(world, camera, Position, {0, 1, 5});
         ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});

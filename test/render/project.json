@@ -283,6 +283,17 @@
                 ]
             },
             {
+                "id": "Bounces",
+                "testcases": [
+                    "pass_reaches_bounces",
+                    "zero_bounces_bakes_one_pass",
+                    "out_of_range_bakes_nothing",
+                    "changing_bounces_restarts",
+                    "image_stable_once_converged",
+                    "view_keeps_last_complete_pass"
+                ]
+            },
+            {
                 "id": "ProbeVolume",
                 "testcases": [
                     "probe_count_of_layout",
