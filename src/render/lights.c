@@ -42,6 +42,7 @@ typedef struct box_light_scene_t {
     float sky[3];           /**< Linear ambient light from above, summed */
     float ground[3];        /**< Linear ambient light from below, summed */
     ecs_vec_t lights;       /**< box_render_light_t of this frame */
+    ecs_vec_t entities;     /**< ecs_entity_t, the entity of each light of this frame */
     ecs_vec_t sent;         /**< box_render_light_t the light buffer holds */
 } box_light_scene_t;
 
@@ -104,6 +105,7 @@ static box_light_scene_t* box_lights_ensure(
         ecs_os_memset_t(s, 0, box_light_scene_t);
         s->scene = scene;
         ecs_vec_init_t(NULL, &s->lights, box_render_light_t, 0);
+        ecs_vec_init_t(NULL, &s->entities, ecs_entity_t, 0);
         ecs_vec_init_t(NULL, &s->sent, box_render_light_t, 0);
         ecs_map_insert(&l->lookup, scene + 1, (ecs_map_val_t)index + 1);
     }
@@ -122,6 +124,7 @@ static void box_lights_reset(
     for (i = 0; i < ecs_vec_count(&l->scenes); i ++) {
         box_light_scene_t *s = ecs_vec_get_t(&l->scenes, box_light_scene_t, i);
         ecs_vec_clear(&s->lights);
+        ecs_vec_clear(&s->entities);
         s->directional = 0;
         s->has_lights = false;
         s->has_ambient = false;
@@ -172,6 +175,7 @@ static void box_lights_axis(
 /** Append a light with a position, a range and no cone to a scene.
  *
  * @param s The scene
+ * @param e The light entity
  * @param transform World transform of the light, NULL for the origin
  * @param rgb Color of the light, NULL for white
  * @param intensity Radiance scale
@@ -180,12 +184,14 @@ static void box_lights_axis(
  */
 static box_render_light_t* box_lights_add_point(
     box_light_scene_t *s,
+    ecs_entity_t e,
     const WorldTransform *transform,
     const Rgb *rgb,
     float intensity,
     float range)
 {
     box_render_light_t *out = ecs_vec_append_t(NULL, &s->lights, box_render_light_t);
+    *ecs_vec_append_t(NULL, &s->entities, ecs_entity_t) = e;
     if (transform) {
         glm_vec3_copy(ECS_CONST_CAST(float*, transform->m[3]), out->position);
     } else {
@@ -236,7 +242,8 @@ static void box_lights_collect(
             if (kind == 0) {
                 const DirectionalLight *d = &ecs_field(&it, DirectionalLight, 0)[i];
                 if (d->intensity > 0) {
-                    box_render_light_t *out = box_lights_add_point(s, NULL, rgb, d->intensity, 0);
+                    box_render_light_t *out = box_lights_add_point(s, it.entities[i], NULL, rgb,
+                        d->intensity, 0);
                     box_lights_axis(transform, out->position);
                     glm_vec3_negate(out->position);
                     out->range = 0.0f;
@@ -245,7 +252,8 @@ static void box_lights_collect(
             } else if (kind == 1) {
                 const PointLight *p = &ecs_field(&it, PointLight, 0)[i];
                 if (p->intensity > 0 && p->range > 0) {
-                    box_lights_add_point(s, transform, rgb, p->intensity, p->range);
+                    box_lights_add_point(s, it.entities[i], transform, rgb, p->intensity,
+                        p->range);
                 }
             } else {
                 const SpotLight *sp = &ecs_field(&it, SpotLight, 0)[i];
@@ -255,7 +263,7 @@ static void box_lights_collect(
                     float cos_outer = cosf(glm_rad(outer));
                     float cos_inner = cosf(glm_rad(inner));
                     box_render_light_t *out = box_lights_add_point(
-                        s, transform, rgb, sp->intensity, sp->range);
+                        s, it.entities[i], transform, rgb, sp->intensity, sp->range);
                     box_lights_axis(transform, out->direction);
                     out->spot_scale = 1.0f / glm_max(cos_inner - cos_outer, 1e-4f);
                     out->spot_offset = -cos_outer * out->spot_scale;
@@ -420,6 +428,7 @@ static void box_lights_remove(
 
     ecs_map_remove(&l->lookup, s->scene + 1);
     ecs_vec_fini_t(NULL, &s->lights, box_render_light_t);
+    ecs_vec_fini_t(NULL, &s->entities, ecs_entity_t);
     ecs_vec_fini_t(NULL, &s->sent, box_render_light_t);
     if (index != last) {
         *s = *ecs_vec_get_t(&l->scenes, box_light_scene_t, last);
@@ -569,6 +578,7 @@ static void box_lights_free(
     for (i = 0; i < ecs_vec_count(&l->scenes); i ++) {
         box_light_scene_t *s = ecs_vec_get_t(&l->scenes, box_light_scene_t, i);
         ecs_vec_fini_t(NULL, &s->lights, box_render_light_t);
+    ecs_vec_fini_t(NULL, &s->entities, ecs_entity_t);
         ecs_vec_fini_t(NULL, &s->sent, box_render_light_t);
     }
 
@@ -652,19 +662,28 @@ void box_render_lights_stats(
     }
 }
 
-const box_render_light_t* box_render_lights_of(
-    const ecs_world_t *world,
-    ecs_entity_t scene,
-    int32_t *count)
+const void* box_render_lights_state(
+    const ecs_world_t *world)
 {
     ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractLights");
     const ecs_system_t *sys = system ? ecs_system_get(world, system) : NULL;
-    const box_render_lights_t *l = sys ? sys->ctx : NULL;
+
+    return sys ? sys->ctx : NULL;
+}
+
+const box_render_light_t* box_render_lights_scene(
+    const void *state,
+    ecs_entity_t scene,
+    int32_t *count,
+    const ecs_entity_t **entities)
+{
+    const box_render_lights_t *l = state;
     int32_t index = l ? box_lights_find(ECS_CONST_CAST(box_render_lights_t*, l), scene) : -1;
     const box_light_scene_t *s = index != -1
         ? ecs_vec_get_t(&l->scenes, box_light_scene_t, index)
         : NULL;
     *count = s ? ecs_vec_count(&s->lights) : 0;
+    *entities = s ? ecs_vec_first(&s->entities) : NULL;
 
     return s ? ecs_vec_first(&s->lights) : NULL;
 }

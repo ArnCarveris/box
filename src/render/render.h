@@ -275,7 +275,9 @@ typedef struct box_render_texture_desc_t {
 typedef enum box_render_volume_op_t {
     BOX_RENDER_VOLUME_FILL = 0, /**< Fill every probe of both buffers with sh, write the mask */
     BOX_RENDER_VOLUME_MASK = 1, /**< Write the mask only, the probes keep their values */
-    BOX_RENDER_VOLUME_COPY = 2  /**< Copy probe buffer from into the other one, then the mask */
+    BOX_RENDER_VOLUME_COPY = 2, /**< Copy probe buffer from into the other one, then the mask */
+    BOX_RENDER_VOLUME_RESIZE = 3 /**< Take the new grid, fill it with sh, keep the probes of both
+                                  *   buffers it shares with the old grid, then the mask */
 } box_render_volume_op_t;
 
 /** Description of a BOX_RENDER_VOLUME create or update, followed by the validity mask.
@@ -296,6 +298,8 @@ typedef struct box_render_volume_desc_t {
     float sh[BOX_RENDER_SH_COEFFICIENTS][4]; /**< Linear rgb irradiance coefficients, w unused */
     uint32_t op;            /**< box_render_volume_op_t of an update */
     uint32_t from;          /**< Probe buffer a BOX_RENDER_VOLUME_COPY reads, 0 or 1 */
+    int32_t shift[3];       /**< Old grid index of probe 0 of a resize per axis, new + shift */
+    uint32_t old_size[3];   /**< Probes per axis of the grid before a resize */
 } box_render_volume_desc_t;
 
 /** A probe the backend captures: six faces around its position, projected onto its SH */
@@ -772,20 +776,30 @@ void box_render_lights_stats(
     const ecs_world_t *world,
     box_render_lights_stats_t *stats);
 
-/** Get the lights the light extract collected for a scene in this frame.
- *
- * The directional lights come first, then the point and spot lights; a scene without light
- * entities has none here and is lit by the default sun.
+/** Get the state of the light extract of a world, valid as long as the world.
  *
  * @param world The world
+ * @return The state, NULL without the light extract
+ */
+const void* box_render_lights_state(
+    const ecs_world_t *world);
+
+/** Get the lights the light extract collected for a scene in this frame.
+ *
+ * The directional lights come first, then the point and spot lights, in query order; a scene
+ * without light entities has none here and is lit by the default sun.
+ *
+ * @param state The state of the light extract
  * @param scene The scene, 0 for the default scene
  * @param count Receives the number of lights
+ * @param entities Receives the entity of each light
  * @return The lights, NULL when the scene has none
  */
-const box_render_light_t* box_render_lights_of(
-    const ecs_world_t *world,
+const box_render_light_t* box_render_lights_scene(
+    const void *state,
     ecs_entity_t scene,
-    int32_t *count);
+    int32_t *count,
+    const ecs_entity_t **entities);
 
 /** Register the cached query that knows the scene of every entity in a scene.
  *

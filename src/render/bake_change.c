@@ -18,7 +18,7 @@
  * @param v The volume
  * @param probe Index of the probe
  */
-static void box_bake_mark(
+void box_bake_mark(
     box_bake_volume_t *v,
     uint32_t probe)
 {
@@ -236,10 +236,32 @@ static void box_bake_record(
     }
 }
 
+/** Check whether a shape is captured apart from one of the flags that keep shapes out.
+ *
+ * @param world The world
+ * @param table The table of the shape
+ * @param e The shape
+ * @param skip The flag to ignore, 0 for none
+ * @return Whether the shape is static and baked as far as the other flags go
+ */
+static bool box_bake_captured_but(
+    const ecs_world_t *world,
+    const ecs_table_t *table,
+    ecs_entity_t e,
+    ecs_id_t skip)
+{
+    bool dynamic = skip != DynamicTransform && box_transform_dynamic(world, table);
+    bool manual = skip != ManualTransform && ecs_has_id(world, e, ManualTransform);
+    bool hidden = skip != NoBake && ecs_has_id(world, e, NoBake);
+
+    return !dynamic && !manual && !hidden;
+}
+
 /** Remember the static shapes whose captured look changed.
  *
- * A static shape that becomes dynamic, manual or NoBake leaves the captures and one that stops
- * being one enters them, so those changes count whatever the shape is now.
+ * A shape that gains or loses DynamicTransform, ManualTransform or NoBake counts when the
+ * other flags keep it static and baked, since it then enters or leaves the captures. A shape
+ * that is deleted counts only when it was captured.
  *
  * @param it The iterator of the observer
  */
@@ -249,28 +271,67 @@ static void BakeOnChange(
     box_render_bake_t *b = it->ctx;
     ecs_id_t id = it->event_id;
     bool flag = id == DynamicTransform || id == ManualTransform || id == NoBake;
+    bool deleted = it->event == EcsOnRemove && it->other_table &&
+        ecs_table_get_type(it->other_table)->count == 0;
     int32_t i;
-    if (ecs_is_fini(it->world)) {
+    if (ecs_is_fini(it->world) || !ecs_vec_count(&b->volumes) || (flag && deleted)) {
         goto done;
     }
 
     for (i = 0; i < it->count; i ++) {
         ecs_entity_t e = it->entities[i];
-        if (!ecs_has(it->world, e, ShapeMesh)) {
-            continue;
-        }
-
-        if (!flag && (box_transform_dynamic(it->world, it->table) ||
-            ecs_has_id(it->world, e, ManualTransform) || ecs_has_id(it->world, e, NoBake)))
+        if (ecs_has(it->world, e, ShapeMesh) &&
+            box_bake_captured_but(it->world, it->table, e, flag ? id : 0))
         {
-            continue;
+            box_bake_record(it->world, b, e, it->event == EcsOnRemove);
         }
-
-        box_bake_record(it->world, b, e, it->event == EcsOnRemove);
     }
 
 done:
     return;
+}
+
+/** Remember an entity and the static shapes below it, whose look a Tint or Opacity changed.
+ *
+ * @param world The world
+ * @param b The state
+ * @param e The entity
+ */
+static void box_bake_record_tree(
+    const ecs_world_t *world,
+    box_render_bake_t *b,
+    ecs_entity_t e)
+{
+    if (ecs_has(world, e, ShapeMesh) &&
+        box_bake_captured_but(world, ecs_get_table(world, e), e, 0))
+    {
+        box_bake_record(world, b, e, false);
+    }
+
+    ecs_iter_t it = ecs_children(world, e);
+    while (ecs_children_next(&it)) {
+        int32_t i;
+        for (i = 0; i < it.count; i ++) {
+            box_bake_record_tree(world, b, it.entities[i]);
+        }
+    }
+}
+
+/** Remember the static shapes below the entities whose Tint or Opacity changed, which apply
+ * to every shape below them.
+ *
+ * @param it The iterator of the observer
+ */
+static void BakeOnTree(
+    ecs_iter_t *it)
+{
+    box_render_bake_t *b = it->ctx;
+    int32_t i;
+    if (!ecs_is_fini(it->world) && ecs_vec_count(&b->volumes)) {
+        for (i = 0; i < it->count; i ++) {
+            box_bake_record_tree(it->world, b, it->entities[i]);
+        }
+    }
 }
 
 /** Remember the static shapes whose transform TransformStatic changed.
@@ -286,8 +347,9 @@ static void box_bake_on_moved(
     int32_t count,
     void *ctx)
 {
+    const box_render_bake_t *b = ctx;
     int32_t i;
-    for (i = 0; i < count; i ++) {
+    for (i = 0; ecs_vec_count(&b->volumes) && i < count; i ++) {
         if (ecs_has(world, entities[i], ShapeMesh) && !ecs_has_id(world, entities[i], NoBake)) {
             box_bake_record(world, ctx, entities[i], false);
         }
@@ -337,7 +399,7 @@ void box_bake_changes(
     box_render_bake_t *b)
 {
     int32_t i;
-    for (i = 0; i < ecs_vec_count(&b->changes); i ++) {
+    for (i = 0; ecs_vec_count(&b->volumes) && i < ecs_vec_count(&b->changes); i ++) {
         const box_bake_change_t *c = ecs_vec_get_t(&b->changes, box_bake_change_t, i);
         ecs_entity_t e = c->entity, scene = 0;
         vec3 min, max;
@@ -357,91 +419,105 @@ void box_bake_changes(
     ecs_vec_clear(&b->changes);
 }
 
-/** Check whether a light is in a list of lights.
- *
- * @param list The lights
- * @param count Number of lights
- * @param light The light
- * @return Whether an equal light is in the list
- */
-static bool box_bake_has_light(
-    const box_render_light_t *list,
-    int32_t count,
-    const box_render_light_t *light)
-{
-    bool result = false;
-    int32_t i;
-    for (i = 0; i < count && !result; i ++) {
-        result = !ecs_os_memcmp_t(&list[i], light, box_render_light_t);
-    }
-
-    return result;
-}
-
-/** Queue the probes within range of the point and spot lights of one list that the other
- * list lacks.
+/** Queue the probes a light can reach: within its range, or every probe for a directional
+ * light.
  *
  * @param v The volume
- * @param from The lights that may be missing from the other list
- * @param from_count Number of them
- * @param other The other list
- * @param other_count Number of lights in it
+ * @param l The light
  */
-static void box_bake_lights_missing(
+static void box_bake_mark_light(
     box_bake_volume_t *v,
-    const box_render_light_t *from,
-    int32_t from_count,
-    const box_render_light_t *other,
-    int32_t other_count)
+    const box_render_light_t *l)
 {
-    int32_t i;
-    for (i = 0; i < from_count; i ++) {
-        const box_render_light_t *l = &from[i];
-        if (l->range > 0 && !box_bake_has_light(other, other_count, l)) {
-            vec3 lo, hi;
-            glm_vec3_subs(ECS_CONST_CAST(float*, l->position), l->range, lo);
-            glm_vec3_adds(ECS_CONST_CAST(float*, l->position), l->range, hi);
-            box_bake_mark_box(v, lo, hi, true);
+    vec3 lo, hi;
+    if (!(l->range > 0)) {
+        box_bake_mark_all(v);
+    } else {
+        glm_vec3_subs(ECS_CONST_CAST(float*, l->position), l->range, lo);
+        glm_vec3_adds(ECS_CONST_CAST(float*, l->position), l->range, hi);
+        box_bake_mark_box(v, lo, hi, true);
+    }
+}
+
+/** Queue the probes the lights that differ between two frames can reach, matched by their
+ * entity: a light added, removed or changed counts in both its old and new place.
+ *
+ * @param b The state, owns the scratch map
+ * @param v The volume
+ * @param lights The lights of this frame
+ * @param entities The entity of each light of this frame
+ * @param count Number of lights of this frame
+ */
+static void box_bake_lights_diff(
+    box_render_bake_t *b,
+    box_bake_volume_t *v,
+    const box_render_light_t *lights,
+    const ecs_entity_t *entities,
+    int32_t count)
+{
+    const box_render_light_t *before = ecs_vec_first(&v->light_list);
+    const ecs_entity_t *owners = ecs_vec_first(&v->light_entities);
+    int32_t i, known = ecs_vec_count(&v->light_list);
+    ecs_map_clear(&b->light_map);
+    for (i = 0; i < known; i ++) {
+        ecs_map_insert(&b->light_map, owners[i], (ecs_map_val_t)i);
+    }
+
+    for (i = 0; i < count; i ++) {
+        ecs_map_val_t *old = ecs_map_get(&b->light_map, entities[i]);
+        if (!old) {
+            box_bake_mark_light(v, &lights[i]);
+        } else {
+            const box_render_light_t *was = &before[*old];
+            if (ecs_os_memcmp_t(was, &lights[i], box_render_light_t)) {
+                box_bake_mark_light(v, was);
+                box_bake_mark_light(v, &lights[i]);
+            }
+
+            ecs_map_remove(&b->light_map, entities[i]);
         }
     }
+
+    ecs_map_iter_t mit = ecs_map_iter(&b->light_map);
+    while (ecs_map_next(&mit)) {
+        box_bake_mark_light(v, &before[ecs_map_value(&mit)]);
+    }
 }
 
-/** Queue the probes a change of the lights of the scene of a volume can reach since the last
- * frame: a point or spot light the probes within its range, a directional light or the
- * default sun the whole scene.
- *
- * @param world The world
- * @param v The volume
- */
 void box_bake_lights(
     const ecs_world_t *world,
+    box_render_bake_t *b,
     box_bake_volume_t *v)
 {
     int32_t count = 0, known = ecs_vec_count(&v->light_list);
-    const box_render_light_t *lights = box_render_lights_of(world, v->scene, &count);
-    const box_render_light_t *before = ecs_vec_first(&v->light_list);
-    const box_render_view_lights_t *a = &v->baked_lights, *c = &v->lights;
+    const ecs_entity_t *entities = NULL;
+    if (!b->lights_state) {
+        b->lights_state = box_render_lights_state(world);
+    }
+
+    const box_render_light_t *lights = box_render_lights_scene(b->lights_state, v->scene,
+        &count, &entities);
     if (!v->viewed || !v->sent || !v->probes) {
         goto done;
     }
 
-    bool sun = a->directional != c->directional || (a->buffer == 0) != (c->buffer == 0) ||
-        memcmp(a->sun, c->sun, sizeof(a->sun)) || memcmp(a->sun_color, c->sun_color,
-        sizeof(a->sun_color));
+    bool sun = (v->baked_lights.buffer == 0) != (v->lights.buffer == 0);
     bool same = count == known && (!count ||
-        !ecs_os_memcmp(lights, before, count * ECS_SIZEOF(box_render_light_t)));
-    if (v->lights_known && (sun || !same)) {
-        if (sun) {
-            box_bake_mark_all(v);
-        } else {
-            box_bake_lights_missing(v, before, known, lights, count);
-            box_bake_lights_missing(v, lights, count, before, known);
-        }
+        (!ecs_os_memcmp(lights, ecs_vec_first(&v->light_list),
+            count * ECS_SIZEOF(box_render_light_t)) &&
+        !ecs_os_memcmp(entities, ecs_vec_first(&v->light_entities),
+            count * ECS_SIZEOF(ecs_entity_t))));
+    if (v->lights_known && sun) {
+        box_bake_mark_all(v);
+    } else if (v->lights_known && !same) {
+        box_bake_lights_diff(b, v, lights, entities, count);
     }
 
     ecs_vec_set_count_t(NULL, &v->light_list, box_render_light_t, count);
+    ecs_vec_set_count_t(NULL, &v->light_entities, ecs_entity_t, count);
     if (count) {
         ecs_os_memcpy_n(ecs_vec_first(&v->light_list), lights, box_render_light_t, count);
+        ecs_os_memcpy_n(ecs_vec_first(&v->light_entities), entities, ecs_entity_t, count);
     }
 
     v->baked_lights = v->lights;
@@ -459,18 +535,27 @@ void box_bake_observers(
     ecs_world_t *world,
     box_render_bake_t *b)
 {
-    ecs_entity_t looks[11] = {
+    ecs_entity_t looks[8] = {
         ecs_id(Rgb), ecs_id(Emissive), ecs_id(PbrMaterial), ecs_id(BlendMode),
-        ecs_id(BackFaceMode), ecs_id(TextureWrap), ecs_id(TextureTransform),
-        ecs_id(PbrTextures), ecs_id(Opacity), ecs_id(Tint), ecs_id(ShapeMesh)
+        ecs_id(BackFaceMode), ecs_id(TextureWrap), ecs_id(TextureTransform), ecs_id(ShapeMesh)
     };
+    ecs_entity_t trees[2] = { ecs_id(Tint), ecs_id(Opacity) };
     ecs_entity_t flags[3] = { DynamicTransform, ManualTransform, NoBake };
     int32_t i;
-    for (i = 0; i < 11; i ++) {
+    for (i = 0; i < 8; i ++) {
         ecs_observer(world, {
             .query.terms = {{ .id = looks[i] }},
             .events = { EcsOnSet, EcsOnRemove },
             .callback = BakeOnChange,
+            .ctx = b
+        });
+    }
+
+    for (i = 0; i < 2; i ++) {
+        ecs_observer(world, {
+            .query.terms = {{ .id = trees[i] }},
+            .events = { EcsOnSet, EcsOnRemove },
+            .callback = BakeOnTree,
             .ctx = b
         });
     }
@@ -484,5 +569,15 @@ void box_bake_observers(
         });
     }
 
+    ecs_observer(world, {
+        .query.terms = {{
+            .id = ecs_id(PbrTextures),
+            .src.id = EcsSelf | EcsUp,
+            .trav = EcsIsA
+        }},
+        .events = { EcsOnSet, EcsOnRemove },
+        .callback = BakeOnChange,
+        .ctx = b
+    });
     box_transform_on_moved(world, box_bake_on_moved, b, NULL);
 }

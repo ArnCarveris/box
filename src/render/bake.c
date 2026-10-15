@@ -87,6 +87,7 @@ static box_bake_volume_t* box_bake_ensure(
         ecs_vec_init_t(NULL, &result->flags, uint8_t, 0);
         ecs_vec_init_t(NULL, &result->shown, uint32_t, 0);
         ecs_vec_init_t(NULL, &result->light_list, box_render_light_t, 0);
+        ecs_vec_init_t(NULL, &result->light_entities, ecs_entity_t, 0);
         ecs_vec_init_t(NULL, &result->cameras, vec3, 0);
         ecs_vec_init_t(NULL, &result->sorted, vec3, 0);
     }
@@ -94,34 +95,35 @@ static box_bake_volume_t* box_bake_ensure(
     return result;
 }
 
-/** Count the probes along the axes of padded bounds at a spacing.
+/** Place the probes of one axis of padded bounds on the lattice (k + 1/2) * spacing.
  *
- * @param extent Size of the padded bounds per axis
+ * @param lo Low end of the padded bounds
+ * @param hi High end of the padded bounds
  * @param spacing World units between probes
- * @param size Receives the probes per axis
- * @return Probes of the grid
+ * @param first Receives the lattice index of the first probe
+ * @return Probes along the axis, at least 1
  */
-static double box_bake_count(
-    const double *extent,
+static double box_bake_axis(
+    double lo,
+    double hi,
     double spacing,
-    int32_t *size)
+    int32_t *first)
 {
-    double result = 1;
-    int32_t i;
-    for (i = 0; i < 3; i ++) {
-        double n = ceil(extent[i] / spacing - BOX_BAKE_EPSILON) + 1.0;
-        n = fmin(fmax(n, 1.0), (double)BOX_BAKE_PROBES_MAX + 1.0);
-        size[i] = (int32_t)n;
-        result *= n;
+    double a = ceil(lo / spacing - 0.5 - BOX_BAKE_EPSILON);
+    double b = floor(hi / spacing - 0.5 + BOX_BAKE_EPSILON);
+    if (b < a) {
+        a = b = floor(((lo + hi) * 0.5) / spacing);
     }
 
-    return result;
+    b = fmin(b, a + (double)BOX_BAKE_PROBES_MAX);
+    *first = (int32_t)a;
+
+    return b - a + 1.0;
 }
 
-/** Place a grid over bounds: probes spacing apart, centered on the padded bounds.
- *
- * Probes per axis are ceil(extent / spacing) + 1, so the grid covers the padded bounds; a
- * grid of more than BOX_BAKE_PROBES_MAX probes is spaced wider until it fits.
+/** Place a grid over bounds: probes at (k + 1/2) * spacing inside the padded bounds, so a
+ * change of the bounds only adds or removes probes at the edges (as Unity places adaptive
+ * probe volume bricks on a world grid). Above BOX_BAKE_PROBES_MAX probes it is spaced wider.
  *
  * @param min Minimum corner of the static bounds
  * @param max Maximum corner of the static bounds
@@ -137,27 +139,30 @@ static int32_t box_bake_place(
     float padding,
     box_bake_grid_t *out)
 {
-    double extent[3], center[3], step = spacing;
-    int32_t i, result = 0;
+    double step = spacing, probes = 0;
+    int32_t i, first[3], result = 0;
     ecs_os_memset_t(out, 0, box_bake_grid_t);
     if (!(spacing > 0) || !isfinite(spacing) || !isfinite(padding)) {
         goto done;
     }
 
-    for (i = 0; i < 3; i ++) {
-        center[i] = ((double)min[i] + (double)max[i]) * 0.5;
-        extent[i] = fmax((double)max[i] - (double)min[i] + 2.0 * (double)padding, 0.0);
-    }
+    do {
+        if (probes > BOX_BAKE_PROBES_MAX) {
+            step *= fmax(cbrt(probes / BOX_BAKE_PROBES_MAX), 1.01);
+        }
 
-    double probes = box_bake_count(extent, step, out->size);
-    while (probes > BOX_BAKE_PROBES_MAX) {
-        step *= fmax(cbrt(probes / BOX_BAKE_PROBES_MAX), 1.01);
-        probes = box_bake_count(extent, step, out->size);
-    }
+        probes = 1;
+        for (i = 0; i < 3; i ++) {
+            double n = box_bake_axis((double)min[i] - padding, (double)max[i] + padding, step,
+                &first[i]);
+            out->size[i] = (int32_t)n;
+            probes *= n;
+        }
+    } while (probes > BOX_BAKE_PROBES_MAX);
 
     out->spacing = (float)step;
     for (i = 0; i < 3; i ++) {
-        out->origin[i] = (float)(center[i] - (double)(out->size[i] - 1) * step * 0.5);
+        out->origin[i] = (float)(((double)first[i] + 0.5) * step);
     }
 
     result = (int32_t)probes;
@@ -513,55 +518,6 @@ static void box_bake_handle_free(
     v->sent = false;
 }
 
-/** Place the grid of a volume again and keep it when it did not change.
- *
- * @param it The iterator of the system
- * @param b The state
- * @param p The packet
- * @param v The volume
- * @param bake The LightBake of the scene
- */
-static void box_bake_update(
-    ecs_iter_t *it,
-    box_render_bake_t *b,
-    box_render_packet_t *p,
-    box_bake_volume_t *v,
-    const LightBake *bake)
-{
-    box_bake_grid_t grid = {0};
-    vec3 min, max;
-    int32_t probes = 0;
-    if (box_spatial_static_bounds(it->world, v->scene, min, max)) {
-        probes = box_bake_place(min, max, bake->probe_spacing, bake->bounds_padding, &grid);
-        glm_vec3_copy(min, v->min);
-        glm_vec3_copy(max, v->max);
-    }
-
-    v->placed = true;
-    v->probe_spacing = bake->probe_spacing;
-    v->bounds_padding = bake->bounds_padding;
-    if (probes == v->probes && !ecs_os_memcmp_t(&grid, &v->grid, box_bake_grid_t)) {
-        goto done;
-    }
-
-    v->grid = grid;
-    v->probes = probes;
-    v->sent = false;
-    if (probes) {
-        box_bake_validate(it->world, b, v);
-        if (!v->handle) {
-            v->handle = box_bake_handle_new(b);
-        }
-    } else {
-        box_bake_handle_free(b, p, v);
-        ecs_vec_clear(&v->valid);
-        box_bake_clear(v);
-    }
-
-done:
-    return;
-}
-
 /** Write the SH irradiance of the hemisphere ambient of a view.
  *
  * The hemisphere mix(ground, sky, y / 2 + 1 / 2) is the irradiance over pi the forward pass
@@ -625,18 +581,13 @@ static void box_bake_views(
     }
 }
 
-
-
-
-
-
 /** Add a BOX_RENDER_VOLUME resource of a volume to a packet, followed by the shown mask.
  *
  * @param p The packet
  * @param v The volume
  * @param op What the backend does
  * @param create Whether the backend creates the volume
- * @return The description, its sh still to be written
+ * @return The description, which a resize completes with the old grid
  */
 static box_render_volume_desc_t* box_bake_desc(
     box_render_packet_t *p,
@@ -733,6 +684,167 @@ done:
     return;
 }
 
+/** Get the index a probe of one grid has in another grid of the same lattice.
+ *
+ * @param from The grid of the probe
+ * @param to The other grid
+ * @param probe Index of the probe in from
+ * @return Index in to, -1 when to lacks the probe
+ */
+static int32_t box_bake_reindex(
+    const box_bake_grid_t *from,
+    const box_bake_grid_t *to,
+    uint32_t probe)
+{
+    int32_t cell[3], i, result = -1;
+    cell[0] = (int32_t)(probe % (uint32_t)from->size[0]);
+    cell[1] = (int32_t)((probe / (uint32_t)from->size[0]) % (uint32_t)from->size[1]);
+    cell[2] = (int32_t)(probe / ((uint32_t)from->size[0] * (uint32_t)from->size[1]));
+    for (i = 0; i < 3; i ++) {
+        cell[i] += (int32_t)roundf((from->origin[i] - to->origin[i]) / to->spacing);
+        if (cell[i] < 0 || cell[i] >= to->size[i]) {
+            goto done;
+        }
+    }
+
+    result = cell[0] + (cell[1] + cell[2] * to->size[1]) * to->size[0];
+done:
+    return result;
+}
+
+/** Grow or shrink the grid of a volume on its lattice; the backend keeps the probes of both
+ * buffers it shares with the old grid. New probes start as the ambient, hidden, and are queued
+ * with the probes of the bake that was in progress and those changes had queued.
+ *
+ * @param world The world
+ * @param b The state
+ * @param p The packet
+ * @param v The volume
+ * @param grid The new grid
+ * @param probes Probes of the new grid
+ */
+static void box_bake_resize(
+    const ecs_world_t *world,
+    box_render_bake_t *b,
+    box_render_packet_t *p,
+    box_bake_volume_t *v,
+    const box_bake_grid_t *grid,
+    int32_t probes)
+{
+    box_bake_grid_t old = v->grid;
+    int32_t i, words = (probes + 31) / 32;
+    ecs_vec_t requeue, shown;
+    ecs_vec_init_t(NULL, &requeue, uint32_t, 0);
+    ecs_vec_init_t(NULL, &shown, uint32_t, words);
+    for (i = 0; i < ecs_vec_count(&v->dirty); i ++) {
+        *ecs_vec_append_t(NULL, &requeue, uint32_t) = *ecs_vec_get_t(&v->dirty, uint32_t, i);
+    }
+
+    for (i = 0; v->completed < v->passes && i < ecs_vec_count(&v->members); i ++) {
+        *ecs_vec_append_t(NULL, &requeue, uint32_t) = *ecs_vec_get_t(&v->members, uint32_t, i);
+    }
+
+    ecs_vec_set_count_t(NULL, &shown, uint32_t, words);
+    uint32_t *bits = ecs_vec_first(&shown);
+    ecs_os_memset(bits, 0, words * ECS_SIZEOF(uint32_t));
+    for (i = 0; i < v->probes; i ++) {
+        int32_t to = box_bake_reindex(&old, grid, (uint32_t)i);
+        if (to != -1 && ((*ecs_vec_get_t(&v->shown, uint32_t, i >> 5) >> (i & 31)) & 1u)) {
+            bits[to >> 5] |= 1u << (to & 31);
+        }
+    }
+
+    v->grid = *grid;
+    v->probes = probes;
+    box_bake_validate(world, b, v);
+    box_bake_clear(v);
+    v->completed = v->submitted = v->passes;
+    ecs_vec_clear(&v->members);
+    box_bake_forget(v);
+    for (i = 0; i < words; i ++) {
+        bits[i] &= *ecs_vec_get_t(&v->valid, uint32_t, i);
+    }
+
+    ecs_vec_fini_t(NULL, &v->shown, uint32_t);
+    v->shown = shown;
+    for (i = 0; i < ecs_vec_count(&requeue); i ++) {
+        int32_t to = box_bake_reindex(&old, grid, *ecs_vec_get_t(&requeue, uint32_t, i));
+        if (to != -1) {
+            box_bake_mark(v, (uint32_t)to);
+        }
+    }
+
+    for (i = 0; i < probes; i ++) {
+        if (box_bake_reindex(grid, &old, (uint32_t)i) == -1) {
+            box_bake_mark(v, (uint32_t)i);
+        }
+    }
+
+    box_render_volume_desc_t *desc = box_bake_desc(p, v, BOX_RENDER_VOLUME_RESIZE, false);
+    for (i = 0; i < 3; i ++) {
+        desc->old_size[i] = (uint32_t)old.size[i];
+        desc->shift[i] = (int32_t)roundf((grid->origin[i] - old.origin[i]) / grid->spacing);
+    }
+
+    v->copy = false;
+    v->mask = false;
+    ecs_vec_fini_t(NULL, &requeue, uint32_t);
+}
+
+/** Place the grid of a volume again and keep it when it did not change.
+ *
+ * @param it The iterator of the system
+ * @param b The state
+ * @param p The packet
+ * @param v The volume
+ * @param bake The LightBake of the scene
+ */
+static void box_bake_update(
+    ecs_iter_t *it,
+    box_render_bake_t *b,
+    box_render_packet_t *p,
+    box_bake_volume_t *v,
+    const LightBake *bake)
+{
+    box_bake_grid_t grid = {0};
+    vec3 min, max;
+    int32_t probes = 0;
+    if (box_spatial_static_bounds(it->world, v->scene, min, max)) {
+        probes = box_bake_place(min, max, bake->probe_spacing, bake->bounds_padding, &grid);
+        glm_vec3_copy(min, v->min);
+        glm_vec3_copy(max, v->max);
+    }
+
+    v->placed = true;
+    v->probe_spacing = bake->probe_spacing;
+    v->bounds_padding = bake->bounds_padding;
+    if (probes == v->probes && !ecs_os_memcmp_t(&grid, &v->grid, box_bake_grid_t)) {
+        goto done;
+    }
+
+    if (v->sent && v->probes && probes && grid.spacing == v->grid.spacing) {
+        box_bake_resize(it->world, b, p, v, &grid, probes);
+        goto done;
+    }
+
+    v->grid = grid;
+    v->probes = probes;
+    v->sent = false;
+    if (probes) {
+        box_bake_validate(it->world, b, v);
+        if (!v->handle) {
+            v->handle = box_bake_handle_new(b);
+        }
+    } else {
+        box_bake_handle_free(b, p, v);
+        ecs_vec_clear(&v->valid);
+        box_bake_clear(v);
+    }
+
+done:
+    return;
+}
+
 /** Free the vectors of a volume.
  *
  * @param v The volume
@@ -749,6 +861,7 @@ static void box_bake_volume_fini(
     ecs_vec_fini_t(NULL, &v->flags, uint8_t);
     ecs_vec_fini_t(NULL, &v->shown, uint32_t);
     ecs_vec_fini_t(NULL, &v->light_list, box_render_light_t);
+    ecs_vec_fini_t(NULL, &v->light_entities, ecs_entity_t);
     ecs_vec_fini_t(NULL, &v->cameras, vec3);
     ecs_vec_fini_t(NULL, &v->sorted, vec3);
 }
@@ -976,27 +1089,42 @@ static void box_bake_batch(
 
 /** Show the pass of the bake of a volume whose every probe just went into a packet, when the
  * views show its passes as they complete, or the stage buffer after the last pass of a staged
- * bake, with the probes it made valid.
+ * bake. The views then see the probes it captured and those they saw before, still valid.
  *
  * @param v The volume
  */
 static void box_bake_submitted(
     box_bake_volume_t *v)
 {
-    int32_t words = ecs_vec_count(&v->valid);
+    int32_t i, words = ecs_vec_count(&v->shown);
+    uint32_t *shown = ecs_vec_first(&v->shown);
+    const uint32_t *valid = ecs_vec_first(&v->valid);
+    const uint32_t *members = ecs_vec_first(&v->members);
+    if (v->staged && v->submitted + 1 < v->passes) {
+        goto done;
+    }
+
     if (!v->staged) {
         v->display = v->first ^ (v->submitted & 1);
         v->filled = false;
-    } else if (v->submitted + 1 == v->passes) {
+    } else {
         v->display = v->stage;
-        ecs_vec_set_count_t(NULL, &v->shown, uint32_t, words);
-        if (words) {
-            ecs_os_memcpy_n(ecs_vec_first(&v->shown), ecs_vec_first(&v->valid), uint32_t,
-                words);
+    }
+
+    if (v->staged || !v->submitted) {
+        for (i = 0; i < v->count; i ++) {
+            shown[members[i] >> 5] |= 1u << (members[i] & 31);
+        }
+
+        for (i = 0; i < words; i ++) {
+            shown[i] &= valid[i];
         }
 
         v->mask = true;
     }
+
+done:
+    return;
 }
 
 /** Add the next captures of a volume to the packet.
@@ -1224,15 +1352,6 @@ static void box_bake_display(
     }
 }
 
-
-
-
-
-
-
-
-
-
 /** Keep a volume per scene with LightBake and point the views at the volume of their scene.
  *
  * @param it The iterator of the system
@@ -1312,7 +1431,7 @@ static void BoxRenderExtractBake(
 
     box_bake_changes(world, b);
     for (i = 0; i < ecs_vec_count(&b->volumes); i ++) {
-        box_bake_lights(world, ecs_vec_get_t(&b->volumes, box_bake_volume_t, i));
+        box_bake_lights(world, b, ecs_vec_get_t(&b->volumes, box_bake_volume_t, i));
     }
 
     box_bake_progress(it, b, p);
@@ -1336,11 +1455,11 @@ static void box_bake_free(
     ecs_vec_fini_t(NULL, &b->picks, box_bake_pick_t);
     ecs_vec_fini_t(NULL, &b->captured, box_render_bake_result_t);
     ecs_vec_fini_t(NULL, &b->changes, box_bake_change_t);
+    ecs_map_fini(&b->light_map);
     ecs_vec_fini_t(NULL, &b->free_handles, uint32_t);
     ecs_vec_fini_t(NULL, &b->hits, ecs_entity_t);
     ecs_os_free(b);
 }
-
 
 void box_render_bake_init(
     ecs_world_t *world)
@@ -1353,6 +1472,7 @@ void box_render_bake_init(
     ecs_vec_init_t(NULL, &b->free_handles, uint32_t, 0);
     ecs_vec_init_t(NULL, &b->hits, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &b->changes, box_bake_change_t, 0);
+    ecs_map_init(&b->light_map, NULL);
     b->next_handle = 1;
     b->bakes = ecs_query(world, {
         .terms = {

@@ -99,6 +99,7 @@ typedef struct box_bake_volume_t {
     ecs_vec_t flags;        /**< uint8_t per probe, 1 while it is in dirty */
     ecs_vec_t shown;        /**< uint32_t, the validity mask views sample with */
     ecs_vec_t light_list;   /**< box_render_light_t of the scene in the last frame */
+    ecs_vec_t light_entities; /**< ecs_entity_t, the entity of each light of light_list */
     box_render_view_lights_t baked_lights; /**< Lights of the views in the last frame */
     const char *error;      /**< Why the volume bakes nothing, NULL for none */
 } box_bake_volume_t;
@@ -117,6 +118,8 @@ typedef struct box_render_bake_t {
     bool measured;          /**< probe_ms comes from a measurement */
     int32_t pending;        /**< Probes left in the volumes that can progress */
     ecs_vec_t changes;      /**< box_bake_change_t, shapes changed since the last extract */
+    const void *lights_state; /**< State of the light extract, looked up once */
+    ecs_map_t light_map;    /**< Light entity to its index in a light_list, scratch */
     const void *backend;    /**< Context of the backend the volumes were sent to */
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
 } box_render_bake_t;
@@ -168,6 +171,15 @@ bool box_bake_occupied(
     ecs_entity_t scene,
     const vec3 pos);
 
+/** Queue a probe of a volume for the next bake when it is valid and not queued yet.
+ *
+ * @param v The volume
+ * @param probe Index of the probe
+ */
+void box_bake_mark(
+    box_bake_volume_t *v,
+    uint32_t probe);
+
 /** Queue every valid probe of a volume for the next bake.
  *
  * @param v The volume
@@ -186,14 +198,16 @@ void box_bake_changes(
     box_render_bake_t *b);
 
 /** Queue the probes a change of the lights of the scene of a volume can reach since the last
- * frame: a point or spot light the probes within its range, a directional light or the
- * default sun the whole scene.
+ * frame, light by light: a point or spot light the probes within its range, a directional
+ * light or the default sun the whole scene.
  *
  * @param world The world
+ * @param b The state
  * @param v The volume
  */
 void box_bake_lights(
     const ecs_world_t *world,
+    box_render_bake_t *b,
     box_bake_volume_t *v);
 
 /** Register the observers of the changes of static shapes that rebake the probes near them.
