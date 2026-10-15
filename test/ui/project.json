@@ -67,6 +67,8 @@
                     "parent_reparent_to_deleted_parent",
                     "parent_reparent_instance_child",
                     "prefab_layout",
+                    "prefab_child_of_tree",
+                    "prefab_childof_and_slot",
                     "add_remove_child",
                     "reparent",
                     "unchanged_tree_not_laid_out",
