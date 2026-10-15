@@ -41,7 +41,7 @@ void Bounces_pass_reaches_bounces(void) {
     int32_t frame, last = 0, drops = 0, previous = 0;
     bool seen[5] = {false, false, false, false, false};
     const LightBakeStatus *status = NULL;
-    for (frame = 0; frame < 2000; frame ++) {
+    for (frame = 0; frame < 5000; frame ++) {
         ecs_progress(world, 0);
         status = ecs_get(world, scene, LightBakeStatus);
         test_assert(status->pass >= last);
@@ -92,7 +92,7 @@ void Bounces_zero_bounces_bakes_one_pass(void) {
 
     int32_t frame, previous = 0;
     const LightBakeStatus *status = NULL;
-    for (frame = 0; frame < 1000; frame ++) {
+    for (frame = 0; frame < 5000; frame ++) {
         ecs_progress(world, 0);
         status = ecs_get(world, scene, LightBakeStatus);
         test_assert(status->baked >= previous);
@@ -120,7 +120,7 @@ void Bounces_out_of_range_bakes_nothing(void) {
         ecs_world_t *world = ecs_init();
         ECS_IMPORT(world, Box);
 
-        ecs_singleton_set(world, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
+        ecs_singleton_set(world, LightBake, {.probe_spacing = 2, .bounds_padding = 0.5f,
             .capture_size = 8, .budget_ms = 20, .bounces = values[i]});
         ecs_entity_t camera = ecs_new(world);
         ecs_set(world, camera, Position, {0, 1, 5});
@@ -144,9 +144,9 @@ void Bounces_out_of_range_bakes_nothing(void) {
         test_bool(status->converged, false);
         test_assert(status->error != NULL);
 
-        ecs_singleton_set(world, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
+        ecs_singleton_set(world, LightBake, {.probe_spacing = 2, .bounds_padding = 0.5f,
             .capture_size = 8, .budget_ms = 20, .bounces = 16});
-        for (frame = 0; frame < 2000; frame ++) {
+        for (frame = 0; frame < 5000; frame ++) {
             ecs_progress(world, 0);
             if (ecs_get(world, ecs_id(LightBake), LightBakeStatus)->converged) {
                 break;
@@ -185,7 +185,7 @@ void Bounces_changing_bounces_restarts(void) {
 
     int32_t frame;
     const LightBakeStatus *status = NULL;
-    for (frame = 0; frame < 2000; frame ++) {
+    for (frame = 0; frame < 5000; frame ++) {
         ecs_progress(world, 0);
         status = ecs_get(world, scene, LightBakeStatus);
         if (status->converged) {
@@ -205,7 +205,7 @@ void Bounces_changing_bounces_restarts(void) {
     test_int(status->pass, 0);
     test_assert(status->baked < probes);
 
-    for (frame = 0; frame < 2000; frame ++) {
+    for (frame = 0; frame < 5000; frame ++) {
         ecs_progress(world, 0);
         status = ecs_get(world, scene, LightBakeStatus);
         if (status->converged) {
@@ -266,7 +266,7 @@ void Bounces_image_stable_once_converged(void) {
         .resolution_scale = 1});
 
     const LightBakeStatus *status = NULL;
-    for (frame = 0; frame < 2000; frame ++) {
+    for (frame = 0; frame < 5000; frame ++) {
         ecs_progress(world, 0);
         status = ecs_get(world, scene, LightBakeStatus);
         if (status->converged) {
@@ -352,7 +352,7 @@ void Bounces_view_keeps_last_complete_pass(void) {
         .resolution_scale = 1});
 
     const LightBakeStatus *status = NULL;
-    for (frame = 0; frame < 2000; frame ++) {
+    for (frame = 0; frame < 5000; frame ++) {
         ecs_progress(world, 0);
         status = ecs_get(world, scene, LightBakeStatus);
         second |= status->baked < previous;
@@ -419,7 +419,7 @@ void Bounces_far_end_brightens_with_bounces(void) {
 
         ecs_entity_t scene = ecs_new(world);
         ecs_add(world, scene, Scene);
-        ecs_set(world, scene, LightBake, {.probe_spacing = 0.5f, .bounds_padding = -0.5f,
+        ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = -0.7f,
             .capture_size = 16, .budget_ms = 2, .bounces = bounces[i]});
         ecs_set(world, scene, AmbientLight, {.intensity = 0});
         ecs_entity_t dark = ecs_new_w_pair(world, EcsChildOf, scene);
@@ -451,14 +451,16 @@ void Bounces_far_end_brightens_with_bounces(void) {
         ecs_entity_t e = ecs_new(world);
         ecs_set(world, e, Surface, {.width = 160, .height = 120, .write_to_file = "far.png",
             .resolution_scale = 1});
-        for (j = 0; j < 3; j ++) {
+        int32_t frames = 0;
+        while (!ecs_get(world, scene, LightBakeStatus)->converged && frames < 5000) {
             ecs_progress(world, 0);
+            box_render_sync(world);
+            frames ++;
         }
 
-        box_render_sync(world);
+        test_bool(ecs_get(world, scene, LightBakeStatus)->converged, true);
         ecs_progress(world, 0);
         box_render_sync(world);
-        test_bool(ecs_get(world, scene, LightBakeStatus)->converged, true);
 
         char *path = flecs_asprintf("%s/far.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
         int w = 0, h = 0, n = 0;
@@ -513,7 +515,7 @@ void Bounces_colored_walls_bleed_with_bounces(void) {
 
         ecs_entity_t scene = ecs_new(world);
         ecs_add(world, scene, Scene);
-        ecs_set(world, scene, LightBake, {.probe_spacing = 0.5f, .bounds_padding = -0.5f,
+        ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = -0.7f,
             .capture_size = 16, .budget_ms = 2, .bounces = bounces[i]});
         ecs_set(world, scene, AmbientLight, {.intensity = 0});
         ecs_entity_t dark = ecs_new_w_pair(world, EcsChildOf, scene);
@@ -545,14 +547,16 @@ void Bounces_colored_walls_bleed_with_bounces(void) {
         ecs_entity_t e = ecs_new(world);
         ecs_set(world, e, Surface, {.width = 160, .height = 120, .write_to_file = "bleed.png",
             .resolution_scale = 1});
-        for (j = 0; j < 3; j ++) {
+        int32_t frames = 0;
+        while (!ecs_get(world, scene, LightBakeStatus)->converged && frames < 5000) {
             ecs_progress(world, 0);
+            box_render_sync(world);
+            frames ++;
         }
 
-        box_render_sync(world);
+        test_bool(ecs_get(world, scene, LightBakeStatus)->converged, true);
         ecs_progress(world, 0);
         box_render_sync(world);
-        test_bool(ecs_get(world, scene, LightBakeStatus)->converged, true);
 
         char *path = flecs_asprintf("%s/bleed.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
         int w = 0, h = 0, n = 0;

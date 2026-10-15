@@ -415,7 +415,7 @@ static void BoxTextureFrame(
     }
 
     ecs_time_measure(&start);
-    while (box_texture_working(t->sync)) {
+    while (box_texture_working(t->sync) || box_jobs_running(it->world)) {
         ecs_time_t now = start;
         if (ecs_time_measure(&now) > BOX_TEXTURE_HEADLESS_WAIT) {
             break;

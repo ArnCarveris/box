@@ -37,6 +37,9 @@ typedef struct {
     ecs_vec_t marks;              /**< Elements changed since the last layout */
     ecs_vec_t roots;              /**< Roots of the trees to lay out this frame */
     ecs_vec_t nodes;              /**< Elements of the tree being laid out */
+    ecs_map_t parents;            /**< Element laid out through Parent to its layout parent */
+    const ecs_table_t *parent_table; /**< Table of the last child collect checked for Parent */
+    bool parent_kept;             /**< That table has Parent, its children are kept */
     box_layout_text_t text;       /**< Hooks of the texts, zero without box.text */
     bool has_text;                /**< The tree being laid out has a text to wrap */
     bool writing;                 /**< The layout is writing its results */
