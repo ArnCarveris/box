@@ -37,6 +37,12 @@
                 ]
             },
             {
+                "id": "Restart",
+                "testcases": [
+                    "main_thread_toggle_keeps_scene"
+                ]
+            },
+            {
                 "id": "Capture",
                 "testcases": [
                     "cleared_surface",
