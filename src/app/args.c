@@ -40,7 +40,8 @@ done:
     return result;
 }
 
-/** Parse a size written as <width>x<height>, both whole numbers from 1 to 16384.
+/** Parse a size written as <width>x<height>, both whole numbers from 1 to 8192, the largest
+ * size box.surface renders.
  *
  * @param text The argument
  * @param width Receives the width
@@ -65,7 +66,7 @@ static int box_app_size(
     }
 
     h = strtol(end + 1, &end, 10);
-    if (end[0] || w < 1 || h < 1 || w > 16384 || h > 16384) {
+    if (end[0] || w < 1 || h < 1 || w > 8192 || h > 8192) {
         goto done;
     }
 

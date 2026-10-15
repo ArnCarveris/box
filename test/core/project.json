@@ -40,7 +40,9 @@
                     "surface",
                     "invalid_surface",
                     "surface_created_when_none",
-                    "surface_not_created_when_present"
+                    "surface_not_created_when_present",
+                    "surface_created_next_to_texture_surface",
+                    "surface_first_frame"
                 ]
             },
             {

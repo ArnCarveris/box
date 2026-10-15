@@ -290,7 +290,7 @@ void Args_surface(void) {
 void Args_invalid_surface(void) {
     // test_fixes/surface_option
     const char *values[] = {"800", "800x", "x600", "0x600", "800x0", "-800x600", "800x-600",
-        "800x600x2", "800X600", " 800x600", "20000x600", "abc", ""};
+        "800x600x2", "800X600", " 800x600", "8193x600", "600x8193", "abc", ""};
     int32_t i;
     ecs_log_set_level(-4);
     for (i = 0; i < (int32_t)(sizeof(values) / sizeof(values[0])); i ++) {
@@ -364,6 +364,82 @@ void Args_surface_not_created_when_present(void) {
     const Surface *s = ecs_get(world, own, Surface);
     test_int(s->width, 64);
     test_int(s->height, 48);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void Args_surface_created_next_to_texture_surface(void) {
+    // test_fixes/surface_option
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+
+    ecs_entity_t tex = ecs_entity(world, { .name = "screen_texture" });
+    ecs_entity_t screen = ecs_entity(world, { .name = "screen" });
+    Surface *screen_s = ecs_ensure(world, screen, Surface);
+    screen_s->width = 64;
+    screen_s->height = 48;
+    screen_s->texture = tex;
+    ecs_modified(world, screen, Surface);
+
+    char *argv[] = {"boxrun", "--headless", "--frames", "3", "--surface", "320x200"};
+    test_int(box_app_parse(world, 6, argv), 0);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->unguarded = true;
+    app->unpaced = true;
+    test_int(box_app_run(world), 0);
+
+    test_int(ecs_count(world, Surface), 2);
+    int32_t windows = 0, i;
+    ecs_iter_t it = ecs_each(world, Surface);
+    while (ecs_each_next(&it)) {
+        const Surface *s = ecs_field(&it, Surface, 0);
+        for (i = 0; i < it.count; i ++) {
+            if (!s[i].texture) {
+                windows ++;
+                test_int(s[i].width, 320);
+                test_int(s[i].height, 200);
+            }
+        }
+    }
+
+    test_int(windows, 1);
+    test_int(ecs_get(world, screen, Surface)->width, 64);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void Args_surface_first_frame(void) {
+    // test_fixes/surface_option
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+
+    char *argv[] = {"boxrun", "--headless", "--frames", "1", "--surface", "320x200"};
+    test_int(box_app_parse(world, 6, argv), 0);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->unguarded = true;
+    app->unpaced = true;
+    test_int(box_app_run(world), 0);
+
+    test_int(ecs_count(world, Surface), 1);
+    ecs_iter_t it = ecs_each(world, Surface);
+    test_bool(ecs_each_next(&it), true);
+    ecs_entity_t e = it.entities[0];
+    ecs_iter_fini(&it);
+
+    const SurfaceStatus *status = ecs_get(world, e, SurfaceStatus);
+    test_assert(status != NULL);
+    test_int(status->point_width, 320);
+    test_int(status->point_height, 200);
 
     ecs_fini(world);
     box_render_null_free(null);
