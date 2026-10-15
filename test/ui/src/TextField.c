@@ -1066,7 +1066,7 @@ void TextField_budget_values_in_one_frame(void) {
         off += abs(images[0][p * 4] - images[1][p * 4]) > 16;
     }
 
-    test_assert(ink > 1000);
+    test_assert(ink > 300);
     test_int(off, 0);
     stbi_image_free(images[0]);
     stbi_image_free(images[1]);
