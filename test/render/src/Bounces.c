@@ -120,7 +120,7 @@ void Bounces_out_of_range_bakes_nothing(void) {
         ecs_world_t *world = ecs_init();
         ECS_IMPORT(world, Box);
 
-        ecs_singleton_set(world, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
+        ecs_singleton_set(world, LightBake, {.probe_spacing = 2, .bounds_padding = 0.5f,
             .capture_size = 8, .budget_ms = 20, .bounces = values[i]});
         ecs_entity_t camera = ecs_new(world);
         ecs_set(world, camera, Position, {0, 1, 5});
@@ -144,7 +144,7 @@ void Bounces_out_of_range_bakes_nothing(void) {
         test_bool(status->converged, false);
         test_assert(status->error != NULL);
 
-        ecs_singleton_set(world, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
+        ecs_singleton_set(world, LightBake, {.probe_spacing = 2, .bounds_padding = 0.5f,
             .capture_size = 8, .budget_ms = 20, .bounces = 16});
         for (frame = 0; frame < 5000; frame ++) {
             ecs_progress(world, 0);
@@ -419,7 +419,7 @@ void Bounces_far_end_brightens_with_bounces(void) {
 
         ecs_entity_t scene = ecs_new(world);
         ecs_add(world, scene, Scene);
-        ecs_set(world, scene, LightBake, {.probe_spacing = 0.5f, .bounds_padding = -0.5f,
+        ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = -0.7f,
             .capture_size = 16, .budget_ms = 2, .bounces = bounces[i]});
         ecs_set(world, scene, AmbientLight, {.intensity = 0});
         ecs_entity_t dark = ecs_new_w_pair(world, EcsChildOf, scene);
@@ -515,7 +515,7 @@ void Bounces_colored_walls_bleed_with_bounces(void) {
 
         ecs_entity_t scene = ecs_new(world);
         ecs_add(world, scene, Scene);
-        ecs_set(world, scene, LightBake, {.probe_spacing = 0.5f, .bounds_padding = -0.5f,
+        ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = -0.7f,
             .capture_size = 16, .budget_ms = 2, .bounces = bounces[i]});
         ecs_set(world, scene, AmbientLight, {.intensity = 0});
         ecs_entity_t dark = ecs_new_w_pair(world, EcsChildOf, scene);

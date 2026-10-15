@@ -120,8 +120,8 @@ void ProbeCapture_dynamic_shape_lit_not_captured(void) {
 
         ecs_entity_t scene = ecs_new(world);
         ecs_add(world, scene, Scene);
-        ecs_set(world, scene, LightBake, {.probe_spacing = 0.75f, .bounds_padding = 0,
-            .capture_size = 16, .budget_ms = 2, .bounces = 1});
+        ecs_set(world, scene, LightBake, {.probe_spacing = 1.4f, .bounds_padding = -0.4f,
+            .capture_size = 16, .budget_ms = 2, .bounces = 0});
         ecs_set(world, scene, AmbientLight, {.intensity = 0});
         ecs_entity_t dark = ecs_new_w_pair(world, EcsChildOf, scene);
         ecs_set(world, dark, DirectionalLight, {.intensity = 0});
@@ -218,8 +218,8 @@ void ProbeCapture_no_bake_removes_contribution(void) {
 
         ecs_entity_t scene = ecs_new(world);
         ecs_add(world, scene, Scene);
-        ecs_set(world, scene, LightBake, {.probe_spacing = 0.75f, .bounds_padding = 0,
-            .capture_size = 16, .budget_ms = 2, .bounces = 1});
+        ecs_set(world, scene, LightBake, {.probe_spacing = 1.4f, .bounds_padding = -0.4f,
+            .capture_size = 16, .budget_ms = 2, .bounces = 0});
         ecs_set(world, scene, AmbientLight, {.intensity = 0});
         ecs_entity_t dark = ecs_new_w_pair(world, EcsChildOf, scene);
         ecs_set(world, dark, DirectionalLight, {.intensity = 0});
@@ -343,7 +343,7 @@ void ProbeCapture_perf_run_waits_for_convergence(void) {
 
 void ProbeCapture_budget_spreads_over_frames(void) {
     // baked_lighting/probe_capture
-    int32_t frames[2] = {0, 0};
+    int32_t frames[2] = {0, 0}, valid[2] = {0, 0}, probes[2] = {0, 0};
     float budgets[2] = {0.001f, 1000000};
     int32_t i;
 
@@ -392,9 +392,14 @@ void ProbeCapture_budget_spreads_over_frames(void) {
 
         test_assert(started != -1);
         frames[i] = frame - started;
+        valid[i] = status->baked;
+        probes[i] = status->probes;
         ecs_fini(world);
     }
 
+    test_assert(valid[0] > 40);
+    test_assert(frames[0] >= valid[0] - 1);
+    test_assert(frames[1] <= (probes[1] + 255) / 256 + 2);
     test_assert(frames[1] < frames[0]);
 }
 
