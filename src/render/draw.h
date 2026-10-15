@@ -3,8 +3,8 @@
  * @brief Instanced batches of the forward pass, shared by the change tracking and the extract.
  *
  * Shapes live in batches keyed by scene, mesh, pipeline, whether they are dynamic and whether
- * they cast shadows; a
- * batch keeps one slot per entity, swap-removed so its instances stay contiguous.
+ * they cast shadows; a batch keeps one slot per entity, swap-removed so its instances stay
+ * contiguous, and holds at most BOX_DRAWS_CHUNK of them, so a key may have several batches.
  */
 
 #ifndef BOX_RENDER_DRAW_H
@@ -14,6 +14,10 @@
 #include "../geometry/shape2d.h"
 #include "../texture/texture.h"
 #include "../text/text.h"
+
+/** Instances of one batch: one instance buffer stays within the 128 MiB storage binding that
+ * every WebGPU device supports, and a key with more shapes continues in another batch */
+#define BOX_DRAWS_CHUNK ((uint32_t)((128u << 20) / sizeof(box_render_instance_t)))
 
 /** Tints composed into one mix: a display encoded color becomes color * keep + add */
 typedef struct box_draw_tint_t {
@@ -140,6 +144,7 @@ typedef struct box_render_draws_t {
     ecs_vec_t sorted;           /**< box_draw_sorted_t, blended instances of one view */
     ecs_vec_t free_buffers;     /**< uint32_t, instance buffer handles to reuse */
     uint32_t next_buffer;       /**< Next instance buffer handle */
+    uint32_t chunk;             /**< Instances a batch holds before a key starts another */
     uint32_t changes_size;      /**< Bytes of the change buffer, 0 before it is created */
     const box_textures_t *textures; /**< Registry the texture handles resolve from in a send */
     const ecs_world_t *world;   /**< World of the send, whose surfaces render texture entities */
@@ -178,7 +183,7 @@ box_draw_batch_t* box_draws_batch(
     box_render_draws_t *d,
     int32_t index);
 
-/** Find the batch of a key, creating it when there is none.
+/** Find a batch of a key with room for another slot, creating one when there is none.
  *
  * @param d The state
  * @param key The key

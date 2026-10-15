@@ -513,6 +513,13 @@
                 "testcases": [
                     "interleaved_batches_blend_back_to_front"
                 ]
+            },
+            {
+                "id": "BatchChunks",
+                "testcases": [
+                    "instances_past_binding_limit_render",
+                    "shapes_across_batches_stay_drawn"
+                ]
             }
         ]
     }

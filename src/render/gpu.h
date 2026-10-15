@@ -123,7 +123,7 @@ typedef struct box_gpu_material_t {
 /** A buffer the main thread created by handle */
 typedef struct box_gpu_buffer_t {
     WGPUBuffer buffer;              /**< The buffer */
-    uint32_t size;                  /**< Bytes of the buffer */
+    uint64_t size;                  /**< Bytes of the buffer */
     uint32_t usage;                 /**< box_render_buffer_usage_t flags */
     WGPUBindGroup instances;        /**< Binds it as the instances of a batch, made on use */
 } box_gpu_buffer_t;

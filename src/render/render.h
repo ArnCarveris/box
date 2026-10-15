@@ -366,7 +366,7 @@ typedef enum box_render_buffer_usage_t {
 
 /** Description of a BOX_RENDER_BUFFER create; creating an existing handle replaces it */
 typedef struct box_render_buffer_desc_t {
-    uint32_t size;          /**< Bytes of the buffer */
+    uint64_t size;          /**< Bytes of the buffer */
     uint32_t usage;         /**< box_render_buffer_usage_t flags */
 } box_render_buffer_desc_t;
 
@@ -797,6 +797,18 @@ void box_render_draws_init(
 void box_render_draws_stats(
     const ecs_world_t *world,
     box_render_draws_stats_t *stats);
+
+/** Set the instances one batch holds before its shapes continue in another, for tests.
+ *
+ * A batch is one instance buffer, so the default keeps it within the 128 MiB storage binding
+ * every WebGPU device supports; shapes added after a change follow the new size.
+ *
+ * @param world The world
+ * @param instances Instances per batch, at least 1
+ */
+void box_render_draws_chunk(
+    ecs_world_t *world,
+    int32_t instances);
 
 /** Forget the texture entities surfaces render into, before the surfaces register them again.
  *

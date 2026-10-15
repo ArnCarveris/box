@@ -226,7 +226,9 @@ Observers on shape, material, hierarchy and scene components and `box_transform_
 changed entities, so an unchanged frame visits and uploads nothing (`RenderStatus.upload_bytes`).
 Static batches upload changes into a change buffer that `scatter.wgsl` scatters into their slots;
 entities with `DynamicTransform` or `DynamicMaterial` fill dynamic batches every frame from cached
-queries. A batch is one instanced indirect draw and is limited to 1M instances.
+queries. A batch is one instanced indirect draw of at most 2^20 instances, so its instance buffer
+fits the 128 MiB storage binding of every WebGPU device; a key with more shapes continues in
+further batches, without a limit on the instances of a key.
 
 Materials: `Rgb`, `PbrMaterial`, `Emissive`, `Opacity` and `Tint` resolve on the CPU, composed
 root down, into the instance. `BlendMode`, `BackFaceMode` and alpha below 1 key the batch.

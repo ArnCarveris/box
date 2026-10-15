@@ -173,7 +173,9 @@ int32_t box_draws_batch_ensure(
     box_draw_batch_t *b;
     while (result != -1) {
         b = box_draws_batch(d, result);
-        if (box_draws_key_eq(&b->key, key)) {
+        if (box_draws_key_eq(&b->key, key) &&
+            (uint32_t)ecs_vec_count(&b->entities) < d->chunk)
+        {
             goto done;
         }
 
@@ -597,6 +599,10 @@ static void box_draws_reserve(
         capacity *= 2;
     }
 
+    if (capacity > d->chunk && count <= d->chunk) {
+        capacity = d->chunk;
+    }
+
     if (!b->buffer && ecs_vec_count(&d->free_buffers)) {
         b->buffer = *ecs_vec_last_t(&d->free_buffers, uint32_t);
         ecs_vec_remove_last(&d->free_buffers);
@@ -606,7 +612,7 @@ static void box_draws_reserve(
 
     box_render_buffer_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_BUFFER,
         BOX_RENDER_CREATE, b->buffer, sizeof(box_render_buffer_desc_t));
-    desc->size = capacity * (uint32_t)sizeof(box_render_instance_t);
+    desc->size = (uint64_t)capacity * sizeof(box_render_instance_t);
     desc->usage = BOX_RENDER_BUFFER_INSTANCE | BOX_RENDER_BUFFER_STORAGE;
 
     b->capacity = capacity;
@@ -1149,4 +1155,15 @@ void box_draws_batches_fini(
     ecs_vec_fini_t(NULL, &d->free_batches, int32_t);
     ecs_vec_fini_t(NULL, &d->free_buffers, uint32_t);
     ecs_map_fini(&d->lookup);
+}
+
+void box_render_draws_chunk(
+    ecs_world_t *world,
+    int32_t instances)
+{
+    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractDraws");
+    const ecs_system_t *s = system ? ecs_system_get(world, system) : NULL;
+    if (s && s->ctx && instances > 0) {
+        ((box_render_draws_t*)s->ctx)->chunk = (uint32_t)instances;
+    }
 }

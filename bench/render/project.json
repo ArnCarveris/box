@@ -126,6 +126,13 @@
                 "benchcases": [
                     "gpu_10k"
                 ]
+            },
+            {
+                "id": "LargeBatch",
+                "benchcases": [
+                    "instances_1m",
+                    "instances_1m5"
+                ]
             }
         ]
     }

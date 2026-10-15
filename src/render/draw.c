@@ -845,6 +845,7 @@ void box_render_draws_init(
     ecs_map_init(&d->meshes, NULL);
     box_draws_order_init(d);
     d->next_buffer = BOX_RENDER_BUFFER_FIRST;
+    d->chunk = BOX_DRAWS_CHUNK;
     d->refs = 1;
     box_draws_queries(world, d);
     box_draws_text_init(world, d);
