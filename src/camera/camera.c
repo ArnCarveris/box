@@ -30,7 +30,20 @@ static void box_camera_ctor(
     }
 }
 
-/** Warn when an orthographic camera is set with a far plane that is not beyond its near plane.
+bool box_camera_has_depth(
+    const Camera *camera)
+{
+    bool result;
+    if (camera->ortho) {
+        result = camera->far_ > camera->near_;
+    } else {
+        result = camera->near_ > 0 && (camera->far_ == 0 || camera->far_ > camera->near_);
+    }
+
+    return result;
+}
+
+/** Warn when a camera is set with planes that leave no depth range.
  *
  * @param it The iterator of the hook
  */
@@ -40,10 +53,11 @@ static void box_camera_on_set(
     const Camera *cameras = ecs_field(it, Camera, 0);
     int32_t i;
     for (i = 0; i < it->count; i ++) {
-        if (cameras[i].ortho && cameras[i].far_ <= cameras[i].near_) {
-            ecs_warn("orthographic camera '%s' has far %g not beyond near %g, it draws nothing",
-                ecs_get_name(it->world, it->entities[i]), (double)cameras[i].far_,
-                (double)cameras[i].near_);
+        if (!box_camera_has_depth(&cameras[i])) {
+            char *path = ecs_get_path(it->world, it->entities[i]);
+            ecs_warn("camera '%s' has near %g and far %g, which leave no depth: it draws nothing",
+                path, (double)cameras[i].near_, (double)cameras[i].far_);
+            ecs_os_free(path);
         }
     }
 }
@@ -101,7 +115,9 @@ static void box_camera_perspective(
     out[0][0] = focal / aspect;
     out[1][1] = focal;
     out[2][3] = -1.0f;
-    if (camera->far_ > n) {
+    if (!box_camera_has_depth(camera)) {
+        out[3][2] = -1.0f;
+    } else if (camera->far_ > n) {
         out[2][2] = n / (camera->far_ - n);
         out[3][2] = n * camera->far_ / (camera->far_ - n);
     } else {

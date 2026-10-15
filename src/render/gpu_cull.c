@@ -800,6 +800,7 @@ static int32_t box_gpu_cull_phase(
  * @param base The uniforms of the cull view
  * @param history History of a view that culls by occlusion, NULL for none
  * @param hiz Pyramid of a view that culls by occlusion, NULL for none
+ * @param draws Whether it draws its batches, false for a camera without a depth range
  */
 static void box_gpu_cull_view_add(
     box_gpu_t *gpu,
@@ -809,7 +810,8 @@ static void box_gpu_cull_view_add(
     int32_t cascade,
     box_gpu_cull_uniforms_t *base,
     box_gpu_cull_history_t *history,
-    box_gpu_hiz_t *hiz)
+    box_gpu_hiz_t *hiz,
+    bool draws)
 {
     box_gpu_cull_t *c = &gpu->cull;
     const box_render_view_t *v = ecs_vec_get_t(&packet->views, box_render_view_t, index);
@@ -829,7 +831,7 @@ static void box_gpu_cull_view_add(
     for (i = 0; i < count * 3; i ++) {
         const box_render_batch_t *b = ecs_vec_get_t(
             &packet->batches, box_render_batch_t, i % count);
-        if (box_gpu_cull_phase(b) == i / count &&
+        if (draws && box_gpu_cull_phase(b) == i / count &&
             box_gpu_cull_draws(gpu, packet, b, index, cascade))
         {
             box_gpu_cull_draw_add(gpu, packet, i % count, base, history);
@@ -887,8 +889,9 @@ void box_gpu_cull_add(
         base.hiz[2] = hiz->levels;
     }
 
-    box_gpu_cull_view_add(gpu, packet, index, slot, -1, &base, history, hiz);
-    for (i = 0; i < (int32_t)u->shadow_config[0]; i ++) {
+    bool draws = box_camera_has_depth(&v->camera_data);
+    box_gpu_cull_view_add(gpu, packet, index, slot, -1, &base, history, hiz, draws);
+    for (i = 0; draws && i < (int32_t)u->shadow_config[0]; i ++) {
         box_gpu_cull_uniforms_t cascade;
         ecs_os_memset_t(&cascade, 0, box_gpu_cull_uniforms_t);
         for (j = 0; j < 6; j ++) {
@@ -899,7 +902,7 @@ void box_gpu_cull_add(
             box_gpu_cull_planes(ECS_CONST_CAST(vec4*, u->shadow_matrix[i]), cascade.planes);
         }
 
-        box_gpu_cull_view_add(gpu, packet, index, slot, i, &cascade, NULL, NULL);
+        box_gpu_cull_view_add(gpu, packet, index, slot, i, &cascade, NULL, NULL, true);
     }
 }
 
@@ -1081,7 +1084,7 @@ void box_gpu_cull_upload(
         sizeof(uint32_t), offset;
     bool grown = false;
     int32_t i;
-    if (!ecs_vec_count(&c->dispatches)) {
+    if (!ecs_vec_count(&c->views)) {
         goto done;
     }
 
@@ -1100,13 +1103,15 @@ void box_gpu_cull_upload(
     }
 
     c->bound = true;
+    if (ecs_vec_count(&c->dispatches)) {
+        wgpuQueueWriteBuffer(gpu->queue, c->uniforms, 0, ecs_vec_first(&c->uniform_data),
+            (size_t)ecs_vec_count(&c->uniform_data));
+        wgpuQueueWriteBuffer(gpu->queue, c->jobs, 0, ecs_vec_first(&c->job_data),
+            (size_t)ecs_vec_count(&c->job_data) * sizeof(box_gpu_cull_job_t));
+        wgpuQueueWriteBuffer(gpu->queue, c->args, 0, ecs_vec_first(&c->arg_data),
+            (size_t)ecs_vec_count(&c->arg_data) * sizeof(uint32_t));
+    }
 
-    wgpuQueueWriteBuffer(gpu->queue, c->uniforms, 0, ecs_vec_first(&c->uniform_data),
-        (size_t)ecs_vec_count(&c->uniform_data));
-    wgpuQueueWriteBuffer(gpu->queue, c->jobs, 0, ecs_vec_first(&c->job_data),
-        (size_t)ecs_vec_count(&c->job_data) * sizeof(box_gpu_cull_job_t));
-    wgpuQueueWriteBuffer(gpu->queue, c->args, 0, ecs_vec_first(&c->arg_data),
-        (size_t)ecs_vec_count(&c->arg_data) * sizeof(uint32_t));
     for (offset = 0; offset < counters; offset += sizeof(zeros)) {
         uint64_t size = counters - offset;
         wgpuQueueWriteBuffer(gpu->queue, c->counters, offset, zeros,

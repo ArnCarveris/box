@@ -36,9 +36,10 @@ extern "C" {
 /** Perspective or orthographic camera, values apply as specified, defaults are set by its ctor */
 ECS_STRUCT(Camera, {
     float fov;           /**< Vertical field of view in degrees, default 60 */
-    float near_;         /**< Near plane distance, default 0.1 */
+    float near_;         /**< Near plane distance, default 0.1, a perspective camera with
+                          *   near <= 0 draws nothing */
     float far_;          /**< Far plane distance, default 1000, 0 has none in perspective;
-                          *   an orthographic camera with far <= near draws nothing */
+                          *   far <= near (other than a perspective 0) draws nothing */
     float aspect_ratio;  /**< Width over height, 0 follows the surface */
     bool ortho;          /**< Use an orthographic projection */
     float ortho_height;  /**< Visible height in world units when orthographic, default 10 */
@@ -61,6 +62,17 @@ void box_camera_projection(
     float width,
     float height,
     mat4 out);
+
+/** Check whether the planes of a camera leave a depth range to draw in.
+ *
+ * Orthographic cameras need far > near; perspective cameras need near > 0 and a far plane of
+ * 0 (none) or beyond near. A camera without a depth range draws nothing and warns when set.
+ *
+ * @param camera The camera
+ * @return Whether the camera has a depth range
+ */
+bool box_camera_has_depth(
+    const Camera *camera);
 
 /** Register the box.camera module.
  *

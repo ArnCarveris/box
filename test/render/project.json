@@ -538,7 +538,9 @@
                 "testcases": [
                     "inverted_planes_draw_nothing",
                     "equal_planes_projection_is_finite",
-                    "valid_planes_after_invalid_draw"
+                    "valid_planes_after_invalid_draw",
+                    "perspective_bad_planes_draw_nothing",
+                    "empty_depth_view_draws_no_instances"
                 ]
             },
             {

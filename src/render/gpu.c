@@ -504,6 +504,7 @@ static void box_gpu_wait(
     WGPUSubmissionIndex index = (WGPUSubmissionIndex)(fence - 1);
     if (fence && gpu->device) {
         wgpuDevicePoll(gpu->device, true, &index);
+        box_gpu_stats_publish(gpu);
     }
 #else
     (void)gpu;
@@ -525,6 +526,7 @@ static bool box_gpu_done(
 #ifndef __EMSCRIPTEN__
     if (fence > gpu->fence_done && gpu->device) {
         wgpuDevicePoll(gpu->device, false, NULL);
+        box_gpu_stats_publish(gpu);
     }
 #endif
 
