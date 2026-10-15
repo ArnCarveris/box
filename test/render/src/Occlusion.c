@@ -50,10 +50,12 @@ void Occlusion_wall_hides_object(void) {
 
     int64_t start = ecs_get_world_info(world)->frame_count_total + 3;
     const CullStatus *status = NULL;
-    while (!status || status->frame < start) {
+    int32_t frames = 0;
+    while ((!status || status->frame < start) && frames < 5000) {
         ecs_progress(world, 0);
         box_render_sync(world);
         status = ecs_get(world, view, CullStatus);
+        frames ++;
     }
 
     test_assert(status != NULL);
@@ -95,13 +97,16 @@ void Occlusion_wall_moved_shows_object_same_frame(void) {
 
     int64_t start = ecs_get_world_info(world)->frame_count_total + 3;
     const CullStatus *status = NULL;
-    while (!status || status->frame < start) {
+    int32_t frames = 0;
+    while ((!status || status->frame < start) && frames < 5000) {
         ecs_progress(world, 0);
         box_render_sync(world);
         status = ecs_get(world, view, CullStatus);
+        frames ++;
     }
 
     test_assert(status != NULL);
+    test_assert(status->frame >= start);
     test_int(status->occlusion_culled, 1);
     char *path = flecs_asprintf("%s/moved.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
     int w = 0, h = 0, n = 0;
@@ -158,13 +163,16 @@ void Occlusion_camera_cut_shows_object_same_frame(void) {
 
     int64_t start = ecs_get_world_info(world)->frame_count_total + 3;
     const CullStatus *status = NULL;
-    while (!status || status->frame < start) {
+    int32_t frames = 0;
+    while ((!status || status->frame < start) && frames < 5000) {
         ecs_progress(world, 0);
         box_render_sync(world);
         status = ecs_get(world, view, CullStatus);
+        frames ++;
     }
 
     test_assert(status != NULL);
+    test_assert(status->frame >= start);
     test_int(status->occlusion_culled, 9);
 
     ecs_set(world, camera, Position, {0, 0, -40});
@@ -230,13 +238,16 @@ void Occlusion_slot_moves_keep_instances_drawn(void) {
 
     int64_t start = ecs_get_world_info(world)->frame_count_total + 3;
     const CullStatus *status = NULL;
-    while (!status || status->frame < start) {
+    int32_t frames = 0;
+    while ((!status || status->frame < start) && frames < 5000) {
         ecs_progress(world, 0);
         box_render_sync(world);
         status = ecs_get(world, view, CullStatus);
+        frames ++;
     }
 
     test_assert(status != NULL);
+    test_assert(status->frame >= start);
     test_int(status->visible, 5);
     test_int(status->occlusion_culled, 4);
 
@@ -302,13 +313,16 @@ void Occlusion_batch_replaced_draws_at_once(void) {
 
     int64_t start = ecs_get_world_info(world)->frame_count_total + 3;
     const CullStatus *status = NULL;
-    while (!status || status->frame < start) {
+    int32_t frames = 0;
+    while ((!status || status->frame < start) && frames < 5000) {
         ecs_progress(world, 0);
         box_render_sync(world);
         status = ecs_get(world, view, CullStatus);
+        frames ++;
     }
 
     test_assert(status != NULL);
+    test_assert(status->frame >= start);
     test_int(status->occlusion_culled, 4);
 
     for (i = 0; i < 4; i ++) {
@@ -366,13 +380,16 @@ void Occlusion_frustum_only_and_disabled(void) {
 
     int64_t start = ecs_get_world_info(world)->frame_count_total + 3;
     const CullStatus *status = NULL;
-    while (!status || status->frame < start) {
+    int32_t frames = 0;
+    while ((!status || status->frame < start) && frames < 5000) {
         ecs_progress(world, 0);
         box_render_sync(world);
         status = ecs_get(world, view, CullStatus);
+        frames ++;
     }
 
     test_assert(status != NULL);
+    test_assert(status->frame >= start);
     test_int(status->instances, 3);
     test_int(status->visible, 2);
     test_int(status->frustum_culled, 1);
@@ -380,13 +397,16 @@ void Occlusion_frustum_only_and_disabled(void) {
 
     ecs_set(world, view, View, {.camera = camera});
     start = ecs_get_world_info(world)->frame_count_total + 1;
-    while (!status || status->frame < start) {
+    frames = 0;
+    while ((!status || status->frame < start) && frames < 5000) {
         ecs_progress(world, 0);
         box_render_sync(world);
         status = ecs_get(world, view, CullStatus);
+        frames ++;
     }
 
     test_assert(status != NULL);
+    test_assert(status->frame >= start);
     test_int(status->instances, 3);
     test_int(status->visible, 3);
     test_int(status->frustum_culled, 0);
@@ -438,13 +458,16 @@ void Occlusion_hidden_caster_casts_shadow(void) {
 
     int64_t start = ecs_get_world_info(world)->frame_count_total + 3;
     const CullStatus *status = NULL;
-    while (!status || status->frame < start) {
+    int32_t frames = 0;
+    while ((!status || status->frame < start) && frames < 5000) {
         ecs_progress(world, 0);
         box_render_sync(world);
         status = ecs_get(world, view, CullStatus);
+        frames ++;
     }
 
     test_assert(status != NULL);
+    test_assert(status->frame >= start);
     test_int(status->instances, 3);
     test_int(status->occlusion_culled, 1);
 
