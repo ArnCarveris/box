@@ -9,6 +9,7 @@
 #define BOX_TEXT_IMPL
 #include "text.h"
 #include "../jobs/jobs.h"
+#include "../layout/layout_text.h"
 
 ECS_COMPONENT_DECLARE(TextGlyphs);
 ECS_COMPONENT_DECLARE(TextRegistry);
@@ -349,6 +350,7 @@ void BoxTextImport(
     ECS_META_COMPONENT(world, Font);
     ECS_META_COMPONENT(world, FontState);
     ECS_META_COMPONENT(world, FontStatus);
+    ECS_META_COMPONENT(world, TextWrap);
     ECS_META_COMPONENT(world, Text);
     ECS_META_COMPONENT(world, TextBounds);
     box_owned_hooks(world, Font, BOX_OWNED_STR(Font, path));
@@ -368,6 +370,12 @@ void BoxTextImport(
 
     box_text_systems_init(world);
     box_text_state_init(world);
+    box_layout_text_register(world, &(box_layout_text_t){
+        .component = ecs_id(Text),
+        .bounds = ecs_id(TextBounds),
+        .measure = box_text_measure,
+        .wrap = box_text_wrap_to
+    });
 
     ecs_entity_t *font = ecs_os_malloc_t(ecs_entity_t);
     *font = box_text_state_get(world)->default_font;

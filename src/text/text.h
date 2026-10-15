@@ -61,7 +61,7 @@ typedef struct box_text_glyph_t {
 /** Glyph quads of a Text, written by the layout and read by the renderer */
 typedef struct TextGlyphs {
     ecs_vec_t glyphs;   /**< box_text_glyph_t, in the order of the string */
-    float wrap;         /**< Width box.layout wraps the lines at, 0 when it does not */
+    float box;          /**< Width box.layout gives the Text, 0 outside a layout */
     float natural[2];   /**< Width and height of the block wrapped at Text.width only */
     float longest;      /**< Width of the widest word, the narrowest the block wraps to */
 } TextGlyphs;
@@ -264,24 +264,29 @@ void box_text_layout(
     ecs_entity_t e,
     const Text *text);
 
-/** Get the sizes box.layout fits a Text to, measured when the Text was laid out.
+/** Get the sizes box.layout fits a text element to, the measure hook of the layout.
+ *
+ * A Text gives the size of its lines at Text.width and its widest word, an element with only
+ * TextBounds gives that size.
  *
  * @param world The world
  * @param e The entity
- * @param size Receives the width and height of the block wrapped at Text.width only
- * @param longest Receives the width of the widest word
- * @return False when the entity has no laid out Text
+ * @param size Receives the width and height of the lines at Text.width
+ * @param least Receives the narrowest width the lines wrap to
+ * @param wraps Receives whether the element is a Text that takes the width of the layout
+ * @return False when the entity has no TextBounds
  */
 bool box_text_measure(
     const ecs_world_t *world,
     ecs_entity_t e,
     float *size,
-    float *longest);
+    float *least,
+    bool *wraps);
 
-/** Wrap the lines of a Text at a width box.layout resolved, laying it out again on a change.
+/** Give a Text the width box.layout resolved, laying it out again on a change.
  *
- * Text.width still bounds the lines when it is narrower. A width of 0 or one the block fits in
- * keeps the lines of Text.width.
+ * Lines break at the width when it is narrower than the lines at Text.width, and align within
+ * it. A width of 0 lays the Text out on its own again.
  *
  * @param world The world
  * @param e The entity, which has a Text

@@ -44,6 +44,7 @@
                     "grow_zero_weight_keeps_content",
                     "grow_script_keeps_content",
                     "grow_follows_shrinking_parent",
+                    "grow_opted_out_descendant_keeps_content",
                     "row_align",
                     "column_align",
                     "row_ignores_item_placement",
@@ -74,8 +75,13 @@
                     "panel_width_change_rewraps",
                     "longest_word_is_minimum",
                     "fixed_width_text",
-                    "fit_text_keeps_its_lines",
+                    "fit_text_wraps_unless_newlines",
                     "text_width_still_applies",
+                    "value_change_rewraps",
+                    "text_removed_drops_its_size",
+                    "leaving_the_tree_unwraps",
+                    "lines_align_in_the_box",
+                    "grow_paragraph_in_fit_card",
                     "script_paragraph"
                 ]
             },

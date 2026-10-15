@@ -6,7 +6,7 @@
 #ifndef BOX_LAYOUT_INTERNAL_H
 #define BOX_LAYOUT_INTERNAL_H
 
-#include <box.h>
+#include "layout_text.h"
 
 /** One element of a layout tree, stored in breadth first order */
 typedef struct {
@@ -27,7 +27,7 @@ typedef struct {
     bool has_pos;       /**< The element has a Position */
     bool has_rect;      /**< The element has a Rect */
     bool rect_input;    /**< The Rect is the input of the element, not written */
-    bool has_text;      /**< The element has a Text the layout wraps */
+    bool has_text;      /**< The element is a text that takes the width of the layout */
     bool placed;        /**< The layout writes the position of the element */
     bool frozen;        /**< The grow share of the element hit a bound */
 } box_layout_node_t;
@@ -37,7 +37,7 @@ typedef struct {
     ecs_vec_t marks;              /**< Elements changed since the last layout */
     ecs_vec_t roots;              /**< Roots of the trees to lay out this frame */
     ecs_vec_t nodes;              /**< Elements of the tree being laid out */
-    ecs_entity_t text_bounds;     /**< The TextBounds component, 0 until it exists */
+    box_layout_text_t text;       /**< Hooks of the texts, zero without box.text */
     bool has_text;                /**< The tree being laid out has a text to wrap */
     bool writing;                 /**< The layout is writing its results */
 } box_layout_state_t;
