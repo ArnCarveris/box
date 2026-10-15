@@ -128,7 +128,9 @@
                     "utf8_overlong_replaced",
                     "utf8_surrogates_replaced",
                     "utf8_above_max_replaced",
-                    "utf8_valid_boundaries"
+                    "utf8_valid_boundaries",
+                    "overlapping_contours_no_seam",
+                    "sharp_corners_large"
                 ]
             },
             {
