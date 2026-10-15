@@ -140,6 +140,7 @@ typedef struct box_render_bake_t {
     ecs_map_t light_map;    /**< Light entity to its index in a light_list, scratch */
     const void *backend;    /**< Context of the backend the volumes were sent to */
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
+    int32_t generation;         /**< Generation of that backend, see box_render_backend_t */
 } box_render_bake_t;
 
 /** Find the volume of a scene.

@@ -40,6 +40,42 @@ typedef struct box_msdf_raster_t {
     double range;   /**< Texels of distance the 0 to 1 of a channel spans */
 } box_msdf_raster_t;
 
+/** Distance from a point to an edge, ordered by magnitude, then by how head on the edge is */
+typedef struct box_msdf_dist_t {
+    double distance; /**< Signed distance in font units, positive inside */
+    double dot;      /**< Cosine between the edge end and the point, 0 along the edge */
+} box_msdf_dist_t;
+
+/** Nearest edge of one channel among a set of edges, after msdfgen's perpendicular selector */
+typedef struct box_msdf_sel_t {
+    box_msdf_dist_t near;  /**< True distance to the nearest edge */
+    double neg;            /**< Nearest perpendicular distance beyond an edge end that is <= 0 */
+    double pos;            /**< Nearest perpendicular distance beyond an edge end that is >= 0 */
+    int32_t edge;          /**< Index of the nearest edge, -1 before one is found */
+    double param;          /**< Parameter of the nearest point, outside 0..1 beyond an end */
+} box_msdf_sel_t;
+
+/** Nearest edges of red, green and blue among a set of edges */
+typedef struct box_msdf_multi_t {
+    box_msdf_sel_t c[3]; /**< Red, green and blue */
+} box_msdf_multi_t;
+
+/** Distances of a point: red, green, blue and the true distance, positive inside */
+typedef struct box_msdf_value_t {
+    double v[4]; /**< Red, green, blue and true distance in font units */
+} box_msdf_value_t;
+
+/** State of the generation of one field */
+typedef struct box_msdf_gen_t {
+    const box_msdf_shape_t *shape;   /**< The shape */
+    const box_msdf_raster_t *raster; /**< The texels */
+    int32_t *windings;               /**< Orientation of each contour: 1, -1 or 0 */
+    box_msdf_multi_t *multi;         /**< Scratch selectors, one per contour */
+    box_msdf_value_t *contour;       /**< Scratch distances, one per contour */
+    float *values;                   /**< Four floats per texel, 0.5 on the outline */
+    uint8_t *stencil;                /**< BOX_MSDF_ERROR and BOX_MSDF_PROTECTED per texel */
+} box_msdf_gen_t;
+
 /** Initialize an empty shape.
  *
  * @param shape The shape
@@ -129,5 +165,48 @@ void box_msdf_generate(
     const box_msdf_shape_t *shape,
     const box_msdf_raster_t *raster,
     uint8_t *pixels);
+
+/** Solve a x^2 + b x + c = 0.
+ *
+ * @param x Receives the roots
+ * @param a The quadratic coefficient
+ * @param b The linear coefficient
+ * @param c The constant
+ * @return The number of roots
+ */
+int32_t box_msdf_quadratic(
+    double x[2],
+    double a,
+    double b,
+    double c);
+
+/** Median of three floats.
+ *
+ * @param a The first value
+ * @param b The second value
+ * @param c The third value
+ * @return The median
+ */
+float box_msdf_median3(
+    float a,
+    float b,
+    float c);
+
+/** Median of the three channels of a texel.
+ *
+ * @param v The channels
+ * @return The median
+ */
+float box_msdf_median(
+    const float *v);
+
+/** Correct the artifacts of the field after msdfgen's MSDFErrorCorrection without a distance
+ * check: protect corners and edges, then flatten the texels whose interpolation leaves the range
+ * their distance allows.
+ *
+ * @param gen The generation
+ */
+void box_msdf_correct(
+    box_msdf_gen_t *gen);
 
 #endif

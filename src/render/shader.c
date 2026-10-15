@@ -36,6 +36,7 @@ typedef struct box_shader_state_t {
     uint32_t last_handle;       /**< Last handle given to an application shader */
     const void *backend;        /**< Context of the backend the shaders were sent to */
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
+    int32_t generation;         /**< Generation of that backend, see box_render_backend_t */
     ecs_time_t last_poll;       /**< Time the files were last checked */
     bool polled;                /**< The files were checked at least once */
     int32_t refs;               /**< Observers and systems that use the state */
@@ -390,7 +391,9 @@ static void box_shader_backend(
     box_shader_state_t *state,
     const box_render_backend_t *backend)
 {
-    if (backend->ctx == state->backend && backend->render == state->render) {
+    if (backend->ctx == state->backend && backend->render == state->render &&
+        backend->generation == state->generation)
+    {
         goto done;
     }
 
@@ -403,6 +406,7 @@ static void box_shader_backend(
     ecs_vec_clear(&state->destroyed);
     state->backend = backend->ctx;
     state->render = backend->render;
+    state->generation = backend->generation;
 done:
     return;
 }

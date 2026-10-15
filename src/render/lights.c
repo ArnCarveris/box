@@ -82,6 +82,7 @@ typedef struct box_render_lights_t {
     bool default_sent;          /**< The backend has the buffer of the default sun */
     const void *backend;        /**< Context of the backend the buffers were sent to */
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
+    int32_t generation;         /**< Generation of that backend, see box_render_backend_t */
     box_render_lights_stats_t stats; /**< Counters of the last extract */
 } box_render_lights_t;
 
@@ -737,10 +738,13 @@ static void BoxRenderExtractLights(
     ecs_world_t *world = it->world;
     box_render_packet_t *p = box_render_packet(world);
     const box_render_backend_t *backend = box_render_get_backend(world);
-    if (backend->ctx != l->backend || backend->render != l->render) {
+    if (backend->ctx != l->backend || backend->render != l->render ||
+        backend->generation != l->generation)
+    {
         box_lights_reset_backend(l);
         l->backend = backend->ctx;
         l->render = backend->render;
+        l->generation = backend->generation;
     }
 
     ecs_os_memset_t(&l->stats, 0, box_render_lights_stats_t);

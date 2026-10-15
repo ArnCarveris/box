@@ -113,7 +113,11 @@ to the response step. Each artefact (and each response round) carries a `Date: <
 line, and pm parses them strictly. Implementation agents run `pm deliver` but never `pm done`;
 the coordinator runs the loop, delivers again and closes the task. `pm done` refuses a task
 without a passing review or with reports older than it, even with `--force`; only
-`--skip-review "<reason>"` closes it unreviewed, recorded in `progress.json`. `pm check`
+`--skip-review "<reason>"` closes it unreviewed, recorded in `progress.json`. A requirement
+verified only manually or not at all is a review finding and goes in a `## Not verified` section
+of the deliverable README, one line per item (never under Left out); `pm done` refuses a task or
+epic with such items, `--force` included, until the user accepts them and the coordinator passes
+`--accept-gap "<reason>"`, recorded in `progress.json`. `pm check`
 reports a completed unreviewed task as a problem (a skipped one as a warning), and `pm review
 <epic>/<task>` prints the state and the next step. Tasks started and completed before the
 gate (`REVIEW_SINCE` in `pm.py`) are exempt; see docs/PROCESS.md.
