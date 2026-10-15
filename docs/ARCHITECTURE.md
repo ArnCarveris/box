@@ -457,10 +457,19 @@ level narrow phase and no picking.
 
 ## Text, layout and UI
 
-**Text.** `Text {value, size, line_height, width, align, wrap, font}` and `Font {path}`
+**Text.** `Text {value, size, line_height, width, align, wrap, font}` and `Font {path, atlas_pages}`
 (`box.text.DefaultFont` is B612 in `etc/fonts`). Fonts load with stb_truetype on the job system.
 Glyph MSDFs are generated lazily per glyph on workers into RGBA8 atlas pages that grow and then
-page. Font data is untrusted: a face without units per em fails to load, and a glyph whose box
+page. A page reaches the backend as `BOX_RENDER_UPDATE` texture regions into a texture with one mip
+level: whole when it is new or grew, then once per frame the area that covers the glyphs completed
+since the last frame (`wgpuQueueWriteTexture`). `Font.atlas_pages` (4 for a new Font, a C literal 0 keeps no idle page) is
+the atlas budget: once a layout or a removed Text leaves a font with more pages, the least recently
+used pages no Text shows (disabled Texts are still drawn, so they count) are released and their
+glyphs generated again on next use; a glyph that needs room beyond the budget reuses such a page.
+Only a new `Font.path` loads the font again. Generation follows msdfgen 1.9+: perpendicular distance selection, the overlapping contour
+combiner (contours that overlap, such as composite glyphs, leave no seam) and its error correction
+(`src/text/msdf_correct.c`, edge priority without a distance check, after the scanline sign pass as
+msdfgen runs it with `-scanline`); cusps are pushed apart first, as msdfgen normalizes shapes. Font data is untrusted: a face without units per em fails to load, and a glyph whose box
 is larger than a page (1024 minus spacing) is drawn as the missing glyph with one warning per
 font load; atlas placement makes at most `BOX_TEXT_PLACE_TRIES` passes. A font whose table
 directory, tables or `loca` entries (one per glyph plus the end, each inside `glyf`) lie
@@ -468,9 +477,15 @@ outside the file fails to load. Before stb_truetype reads an outline, box walks 
 components of the glyph in the `glyf` table without recursion: more than 16 composite levels
 above a simple glyph (any cycle), more than 256 references in total, matching point offsets or
 records past the end of `glyf` draw the glyph as the missing glyph, again with one warning per
-font load. Layout handles UTF-8, kerning, newlines, word breaks and alignment; the block is centered
+font load. Layout decodes UTF-8 per the Unicode standard: every maximal subpart of an ill formed
+sequence (stray or truncated bytes, overlong forms, surrogates, code points above U+10FFFF)
+reads as one U+FFFD, which B612 draws as its missing glyph. Layout handles kerning, newlines,
+word breaks and alignment; the block is centered
 on the origin and measured into `TextBounds`. Glyphs are slots of the 2D batches keyed by atlas
-page (`src/render/text_draw.c`), shaded by `shape2d.wgsl`. No shaping (ligatures, RTL).
+page (`src/render/text_draw.c`), shaded by `shape2d.wgsl`, which samples the field at level 0
+(a mip averages the channels and breaks the median), scales it to screen pixels as msdfgen's
+screenPxRange does, but from the Euclidean footprint of a pixel so rotation changes nothing, and
+fades a glyph whose range drops below one pixel. No shaping (ligatures, RTL).
 
 **Layout.** `Layout` on a parent arranges its children in `OrderedChildren` order in logical
 pixels: rows and columns, fit and grow sizing with weights, min/max, padding, spacing, alignment,

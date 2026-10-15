@@ -3,8 +3,10 @@
  * @brief Multi channel signed distance fields of outlines, after the method of msdfgen.
  *
  * Edges are colored so that two channels meet at every corner; a texel takes per channel the
- * pseudo distance of the nearest edge of that channel, its sign follows the nonzero fill and
- * texels whose channels clash with a neighbor are flattened to their median.
+ * perpendicular distance of the nearest edge of that channel.
+ *
+ * Contours combine as in msdfgen's OverlappingContourCombiner, so edges inside another contour
+ * leave no seam; the sign follows the nonzero fill and msdf_correct.c removes artifacts.
  */
 
 #include "msdf.h"
@@ -40,24 +42,18 @@
 /** Quadratic curves a cubic curve is approximated by */
 #define BOX_MSDF_CUBIC_SPLIT (4)
 
-/** Texels of difference between two neighbor texels from which their channels clash */
-#define BOX_MSDF_CLASH (1.001)
+/** Dot product of the directions at a vertex below which, minus one, the vertex is a cusp
+ * (msdfgen's MSDFGEN_CORNER_DOT_EPSILON) */
+#define BOX_MSDF_CUSP_DOT (0.000001)
+
+/** Overshoot of the turn that pushes the curves of a cusp apart (msdfgen) */
+#define BOX_MSDF_DECONVERGE (1.11111111111111111)
+
+/** Largest magnitude of a value before quantization, far beyond the 0 to 1 that is kept */
+#define BOX_MSDF_VALUE_LIMIT (1e6)
 
 /** A distance that is larger than any distance of a glyph */
 #define BOX_MSDF_FAR (1e240)
-
-/** Distance from a point to an edge, ordered by magnitude, then by how head on the edge is */
-typedef struct box_msdf_dist_t {
-    double distance; /**< Signed distance in font units, positive inside */
-    double dot;      /**< Cosine between the edge end and the point, 0 along the edge */
-} box_msdf_dist_t;
-
-/** Nearest edge of a channel and where on the edge the nearest point is */
-typedef struct box_msdf_near_t {
-    box_msdf_dist_t dist;  /**< Distance to the edge */
-    int32_t edge;          /**< Index of the edge, -1 before one is found */
-    double param;          /**< Parameter of the nearest point, outside 0..1 beyond an end */
-} box_msdf_near_t;
 
 /** Crossing of a fill test line with the outline */
 typedef struct box_msdf_cross_t {
@@ -214,15 +210,7 @@ static box_msdf_point_t box_msdf_direction(
     return result;
 }
 
-/** Solve a x^2 + b x + c = 0.
- *
- * @param x Receives the roots
- * @param a The quadratic coefficient
- * @param b The linear coefficient
- * @param c The constant
- * @return The number of roots
- */
-static int32_t box_msdf_quadratic(
+int32_t box_msdf_quadratic(
     double x[2],
     double a,
     double b,
@@ -754,6 +742,86 @@ static void box_msdf_color_contour(
     ecs_vec_fini_t(NULL, &corners, int32_t);
 }
 
+/** Order two edges that leave a corner in opposite directions, after msdfgen's
+ * convergentCurveOrdering: the sign of the cross product of the points of both edges at the
+ * same small distance from the corner.
+ *
+ * @param a The edge that ends at the corner
+ * @param b The edge that starts at the corner
+ * @return 1 when b lies counter clockwise of a near the corner, -1 when clockwise, 0 for a tie
+ */
+static int32_t box_msdf_convergent_order(
+    const box_msdf_edge_t *a,
+    const box_msdf_edge_t *b)
+{
+    box_msdf_point_t corner = b->p[0];
+    box_msdf_point_t a1 = box_msdf_sub(a->degree == 2 ? a->p[1] : a->p[0], corner);
+    box_msdf_point_t b1 = box_msdf_sub(b->degree == 2 ? b->p[1] : b->p[2], corner);
+    box_msdf_point_t a2 = { 0.0, 0.0 }, b2 = { 0.0, 0.0 };
+    int32_t result = 0;
+    if (a->degree == 2) {
+        a2 = box_msdf_sub(box_msdf_sub(a->p[0], a->p[1]), a1);
+    }
+
+    if (b->degree == 2) {
+        b2 = box_msdf_sub(box_msdf_sub(b->p[2], b->p[1]), b1);
+    }
+
+    a1 = (box_msdf_point_t){ a1.x * a->degree, a1.y * a->degree };
+    b1 = (box_msdf_point_t){ b1.x * b->degree, b1.y * b->degree };
+    double as = box_msdf_length(a1), bs = box_msdf_length(b1);
+    double third = as * box_msdf_cross(a1, b2) + bs * box_msdf_cross(a2, b1);
+    double fourth = as * bs * box_msdf_cross(a2, b2);
+    if (third != 0.0) {
+        result = third > 0.0 ? 1 : -1;
+    } else if (fourth != 0.0) {
+        result = fourth > 0.0 ? 1 : -1;
+    }
+
+    return result;
+}
+
+/** Push apart the curves of every cusp of the last contour, where the edges before and after a
+ * vertex leave it in opposite directions, after msdfgen's Shape::normalize.
+ *
+ * The control point of each curve turns its tangent away from the other by a tiny angle, so the
+ * distances of the two edges no longer tie beyond the tip. A line keeps its direction.
+ *
+ * @param shape The shape
+ */
+static void box_msdf_deconverge(
+    box_msdf_shape_t *shape)
+{
+    int32_t count = *ecs_vec_last_t(&shape->contours, int32_t);
+    int32_t i, first = ecs_vec_count(&shape->edges) - count;
+    box_msdf_edge_t *edges = ecs_vec_get_t(&shape->edges, box_msdf_edge_t, first);
+    double eps = BOX_MSDF_CUSP_DOT - 1.0;
+    double factor = BOX_MSDF_DECONVERGE * sqrt(1.0 - eps * eps) / eps;
+    for (i = 0; i < count && count > 1; i ++) {
+        box_msdf_edge_t *a = &edges[(i + count - 1) % count], *b = &edges[i];
+        box_msdf_point_t da = box_msdf_normalize(box_msdf_direction(a, 1.0));
+        box_msdf_point_t db = box_msdf_normalize(box_msdf_direction(b, 0.0));
+        if (box_msdf_dot(da, db) >= eps) {
+            continue;
+        }
+
+        box_msdf_point_t axis = box_msdf_normalize(box_msdf_sub(db, da));
+        double f = box_msdf_convergent_order(a, b) < 0 ? -factor : factor;
+        axis = (box_msdf_point_t){ axis.x * f, axis.y * f };
+        if (a->degree == 2) {
+            double len = box_msdf_length(box_msdf_sub(a->p[1], a->p[2]));
+            a->p[1].x -= axis.y * len;
+            a->p[1].y += axis.x * len;
+        }
+
+        if (b->degree == 2) {
+            double len = box_msdf_length(box_msdf_sub(b->p[1], b->p[0]));
+            b->p[1].x += axis.y * len;
+            b->p[1].y -= axis.x * len;
+        }
+    }
+}
+
 /** Close the contour being built and color its edges.
  *
  * @param shape The shape
@@ -773,6 +841,7 @@ static void box_msdf_close(
         goto done;
     }
 
+    box_msdf_deconverge(shape);
     box_msdf_color_contour(shape, &seed);
 done:
     return;
@@ -790,10 +859,108 @@ void box_msdf_move_to(
     shape->open = true;
 }
 
+/** Shoelace sum of each contour, after msdfgen's Contour::winding: positive for a contour
+ * that runs clockwise with y up.
+ *
+ * @param shape The shape
+ * @param windings Receives the sign of each contour, or NULL
+ * @param totals Receives the sum of each contour, or NULL
+ */
+static void box_msdf_windings(
+    const box_msdf_shape_t *shape,
+    int32_t *windings,
+    double *totals)
+{
+    const box_msdf_edge_t *edges = ecs_vec_first(&shape->edges);
+    const int32_t *counts = ecs_vec_first(&shape->contours);
+    int32_t i, k, first = 0, contours = ecs_vec_count(&shape->contours);
+    for (k = 0; k < contours; k ++) {
+        const box_msdf_edge_t *e = &edges[first];
+        box_msdf_point_t pts[4];
+        int32_t n = 0;
+        double total = 0.0;
+        if (counts[k] == 1) {
+            pts[n ++] = box_msdf_at(e, 0.0);
+            pts[n ++] = box_msdf_at(e, 1.0 / 3.0);
+            pts[n ++] = box_msdf_at(e, 2.0 / 3.0);
+        } else if (counts[k] == 2) {
+            pts[n ++] = box_msdf_at(e, 0.0);
+            pts[n ++] = box_msdf_at(e, 0.5);
+            pts[n ++] = box_msdf_at(e + 1, 0.0);
+            pts[n ++] = box_msdf_at(e + 1, 0.5);
+        }
+
+        for (i = 0; i < n; i ++) {
+            box_msdf_point_t a = pts[i], b = pts[(i + 1) % n];
+            total += (b.x - a.x) * (a.y + b.y);
+        }
+
+        for (i = 0; counts[k] > 2 && i < counts[k]; i ++) {
+            box_msdf_point_t a = e[(i + counts[k] - 1) % counts[k]].p[0], b = e[i].p[0];
+            total += (b.x - a.x) * (a.y + b.y);
+        }
+
+        if (windings) {
+            windings[k] = total > 0.0 ? 1 : (total < 0.0 ? -1 : 0);
+        }
+
+        if (totals) {
+            totals[k] = total;
+        }
+
+        first += counts[k];
+    }
+}
+
+/** Reverse every contour when the largest one runs counter clockwise, so that the distances of
+ * a well formed outline are positive inside.
+ *
+ * @param shape The shape
+ */
+static void box_msdf_orient(
+    box_msdf_shape_t *shape)
+{
+    int32_t i, contours = ecs_vec_count(&shape->contours), count = ecs_vec_count(&shape->edges);
+    int32_t first = 0, k, largest = 0;
+    int32_t *counts = ecs_vec_first(&shape->contours);
+    box_msdf_edge_t *edges = ecs_vec_first(&shape->edges);
+    double *totals = ecs_os_malloc_n(double, contours);
+    box_msdf_windings(shape, NULL, totals);
+    for (k = 1; k < contours; k ++) {
+        largest = fabs(totals[k]) > fabs(totals[largest]) ? k : largest;
+    }
+
+    if (totals[largest] >= 0.0) {
+        goto done;
+    }
+
+    for (i = 0; i < count; i ++) {
+        box_msdf_point_t p = edges[i].p[0];
+        edges[i].p[0] = edges[i].p[2];
+        edges[i].p[2] = p;
+    }
+
+    for (k = 0; k < contours; k ++) {
+        for (i = 0; i < counts[k] / 2; i ++) {
+            box_msdf_edge_t e = edges[first + i];
+            edges[first + i] = edges[first + counts[k] - 1 - i];
+            edges[first + counts[k] - 1 - i] = e;
+        }
+
+        first += counts[k];
+    }
+
+done:
+    ecs_os_free(totals);
+}
+
 void box_msdf_shape_finish(
     box_msdf_shape_t *shape)
 {
     box_msdf_close(shape);
+    if (ecs_vec_count(&shape->contours)) {
+        box_msdf_orient(shape);
+    }
 }
 
 /** Collect where a horizontal line crosses the outline, flattening curves.
@@ -828,190 +995,387 @@ static void box_msdf_crossings(
     }
 }
 
-/** Find the nearest edge of each channel and of all channels for a point.
+/** Scale a vector to unit length, keeping a zero vector zero.
  *
- * @param shape The shape
- * @param p The point
- * @param near Receives the nearest edge of red, green, blue and of any channel
+ * @param a The vector
+ * @return The unit vector, or zero
  */
-static void box_msdf_nearest(
-    const box_msdf_shape_t *shape,
-    box_msdf_point_t p,
-    box_msdf_near_t *near)
+static box_msdf_point_t box_msdf_normalize_zero(
+    box_msdf_point_t a)
 {
-    int32_t i, c, count = ecs_vec_count(&shape->edges);
-    const box_msdf_edge_t *edges = ecs_vec_first(&shape->edges);
-    for (c = 0; c < 4; c ++) {
-        near[c] = (box_msdf_near_t){ .dist = { BOX_MSDF_FAR, 1.0 }, .edge = -1 };
+    double len = box_msdf_length(a);
+    box_msdf_point_t result = { 0.0, 0.0 };
+    if (len > 0.0) {
+        result = (box_msdf_point_t){ a.x / len, a.y / len };
     }
 
-    for (i = 0; i < count; i ++) {
-        double param;
-        box_msdf_dist_t d = box_msdf_edge_distance(&edges[i], p, &param);
-        for (c = 0; c < 4; c ++) {
-            bool channel = c == 3 || (edges[i].color & (1 << c));
-            if (channel && box_msdf_less(d, near[c].dist)) {
-                near[c] = (box_msdf_near_t){ .dist = d, .edge = i, .param = param };
-            }
-        }
-    }
+    return result;
 }
 
-/** Compute the four channels of a texel, before the sign follows the fill.
- *
- * @param shape The shape
- * @param raster The texels
- * @param p Font position of the texel center
- * @param out Receives red, green, blue and the true distance, 0.5 on the outline
- */
-static void box_msdf_texel(
-    const box_msdf_shape_t *shape,
-    const box_msdf_raster_t *raster,
-    box_msdf_point_t p,
-    float *out)
-{
-    const box_msdf_edge_t *edges = ecs_vec_first(&shape->edges);
-    double to_value = raster->scale / raster->range;
-    box_msdf_near_t near[4];
-    int32_t c;
-    box_msdf_nearest(shape, p, near);
-    for (c = 0; c < 3; c ++) {
-        if (near[c].edge < 0) {
-            near[c] = near[3];
-        }
-
-        if (near[c].edge >= 0) {
-            box_msdf_pseudo(&edges[near[c].edge], p, near[c].param, &near[c].dist);
-        }
-
-        out[c] = (float)(near[c].dist.distance * to_value + 0.5);
-    }
-
-    out[3] = (float)(near[3].dist.distance * to_value + 0.5);
-}
-
-/** Median of three values.
+/** Median of three doubles.
  *
  * @param v The values
  * @return The median
  */
-static float box_msdf_median(
+static double box_msdf_median_d(
+    const double *v)
+{
+    return fmax(fmin(v[0], v[1]), fmin(fmax(v[0], v[1]), v[2]));
+}
+
+float box_msdf_median3(
+    float a,
+    float b,
+    float c)
+{
+    return glm_max(glm_min(a, b), glm_min(glm_max(a, b), c));
+}
+
+float box_msdf_median(
     const float *v)
 {
-    return glm_max(glm_min(v[0], v[1]), glm_min(glm_max(v[0], v[1]), v[2]));
+    return box_msdf_median3(v[0], v[1], v[2]);
 }
 
-/** Swap the values of a channel of two texels.
+/** Reset a selector to no edge.
  *
- * @param a The channels of the first texel
- * @param b The channels of the second texel
- * @param i The first channel
- * @param j The second channel
+ * @param sel The selector
  */
-static void box_msdf_swap(
-    float *a,
-    float *b,
-    int32_t i,
-    int32_t j)
+static void box_msdf_sel_init(
+    box_msdf_sel_t *sel)
 {
-    float ta = a[i], tb = b[i];
-    a[i] = a[j];
-    b[i] = b[j];
-    a[j] = ta;
-    b[j] = tb;
+    sel->near = (box_msdf_dist_t){ -BOX_MSDF_FAR, 0.0 };
+    sel->neg = -BOX_MSDF_FAR;
+    sel->pos = BOX_MSDF_FAR;
+    sel->edge = -1;
+    sel->param = 0.0;
 }
 
-/** Check whether two neighbor texels interpolate into a false edge.
+/** Take a perpendicular distance beyond a corner into a selector.
  *
- * @param pa The texel to test
- * @param pb Its neighbor
- * @param threshold Smallest channel difference that clashes
- * @return Whether a clashes with b and is the texel farther from the outline
+ * @param sel The selector
+ * @param distance The perpendicular distance
  */
-static bool box_msdf_clash(
-    const float *pa,
-    const float *pb,
-    float threshold)
+static void box_msdf_sel_perpendicular(
+    box_msdf_sel_t *sel,
+    double distance)
 {
-    float a[3] = { pa[0], pa[1], pa[2] }, b[3] = { pb[0], pb[1], pb[2] };
-    if (fabsf(b[0] - a[0]) < fabsf(b[1] - a[1])) {
-        box_msdf_swap(a, b, 0, 1);
+    if (distance <= 0.0 && distance > sel->neg) {
+        sel->neg = distance;
     }
 
-    if (fabsf(b[1] - a[1]) < fabsf(b[2] - a[2])) {
-        box_msdf_swap(a, b, 1, 2);
-        if (fabsf(b[0] - a[0]) < fabsf(b[1] - a[1])) {
-            box_msdf_swap(a, b, 0, 1);
+    if (distance >= 0.0 && distance < sel->pos) {
+        sel->pos = distance;
+    }
+}
+
+/** Merge the edges of one selector into another.
+ *
+ * @param sel The selector that takes the nearest of both
+ * @param other The other selector
+ */
+static void box_msdf_sel_merge(
+    box_msdf_sel_t *sel,
+    const box_msdf_sel_t *other)
+{
+    if (box_msdf_less(other->near, sel->near)) {
+        sel->near = other->near;
+        sel->edge = other->edge;
+        sel->param = other->param;
+    }
+
+    sel->neg = other->neg > sel->neg ? other->neg : sel->neg;
+    sel->pos = other->pos < sel->pos ? other->pos : sel->pos;
+}
+
+/** Pseudo distance a selector gives a point: its nearest edge extended past the ends, or a
+ * perpendicular distance beyond a corner when that is nearer.
+ *
+ * @param sel The selector
+ * @param edges The edges of the shape
+ * @param p The point
+ * @return The signed distance, positive inside
+ */
+static double box_msdf_sel_distance(
+    const box_msdf_sel_t *sel,
+    const box_msdf_edge_t *edges,
+    box_msdf_point_t p)
+{
+    double result = sel->near.distance < 0.0 ? sel->neg : sel->pos;
+    if (sel->edge >= 0) {
+        box_msdf_dist_t d = sel->near;
+        box_msdf_pseudo(&edges[sel->edge], p, sel->param, &d);
+        if (fabs(d.distance) < fabs(result)) {
+            result = d.distance;
         }
     }
 
-    return fabsf(b[1] - a[1]) >= threshold && !(b[0] == b[1] && b[0] == b[2]) &&
-        fabsf(a[2] - 0.5f) >= fabsf(b[2] - 0.5f);
+    return result;
 }
 
-/** Flatten the texels that clash with a neighbor to the median of their channels.
+/** Distance from a point to the line through an edge end, when the point lies ahead of it.
  *
- * @param raster The texels
- * @param values Four floats per texel
+ * @param distance The distance so far, replaced when the perpendicular distance is nearer
+ * @param ep The point relative to the end
+ * @param dir Unit direction from the end towards the side being tested
+ * @return Whether the distance was replaced
  */
-static void box_msdf_correct(
-    const box_msdf_raster_t *raster,
-    float *values)
+static bool box_msdf_perpendicular(
+    double *distance,
+    box_msdf_point_t ep,
+    box_msdf_point_t dir)
 {
-    int32_t x, y, w = raster->width, h = raster->height, i, count = 0;
-    float threshold = (float)(BOX_MSDF_CLASH / raster->range);
-    int32_t *clashes = ecs_os_malloc_n(int32_t, w * h);
-    for (y = 0; y < h; y ++) {
-        for (x = 0; x < w; x ++) {
-            const float *v = &values[(y * w + x) * 4];
-            if ((x > 0 && box_msdf_clash(v, v - 4, threshold)) ||
-                (x < w - 1 && box_msdf_clash(v, v + 4, threshold)) ||
-                (y > 0 && box_msdf_clash(v, v - w * 4, threshold)) ||
-                (y < h - 1 && box_msdf_clash(v, v + w * 4, threshold)))
-            {
-                clashes[count ++] = y * w + x;
-            }
+    double pd = box_msdf_cross(ep, dir);
+    bool result = false;
+    if (box_msdf_dot(ep, dir) > 0.0 && fabs(pd) < fabs(*distance)) {
+        *distance = pd;
+        result = true;
+    }
+
+    return result;
+}
+
+/** Add an edge to the selectors of the channels it shapes.
+ *
+ * @param multi The selectors of red, green and blue
+ * @param edges The edges of the shape
+ * @param prev Index of the edge before it in its contour
+ * @param edge Index of the edge
+ * @param next Index of the edge after it in its contour
+ * @param mask Channels the edge shapes
+ * @param p The point
+ */
+static void box_msdf_add_edge(
+    box_msdf_multi_t *multi,
+    const box_msdf_edge_t *edges,
+    int32_t prev,
+    int32_t edge,
+    int32_t next,
+    int32_t mask,
+    box_msdf_point_t p)
+{
+    const box_msdf_edge_t *e = &edges[edge];
+    double param;
+    int32_t c;
+    box_msdf_dist_t d = box_msdf_edge_distance(e, p, &param);
+    box_msdf_point_t ap = box_msdf_sub(p, e->p[0]), bp = box_msdf_sub(p, e->p[2]);
+    box_msdf_point_t a_dir = box_msdf_normalize_zero(box_msdf_direction(e, 0.0));
+    box_msdf_point_t b_dir = box_msdf_normalize_zero(box_msdf_direction(e, 1.0));
+    box_msdf_point_t prev_dir = box_msdf_normalize_zero(box_msdf_direction(&edges[prev], 1.0));
+    box_msdf_point_t next_dir = box_msdf_normalize_zero(box_msdf_direction(&edges[next], 0.0));
+    box_msdf_point_t a_bis = { prev_dir.x + a_dir.x, prev_dir.y + a_dir.y };
+    box_msdf_point_t b_bis = { b_dir.x + next_dir.x, b_dir.y + next_dir.y };
+    double add = box_msdf_dot(ap, box_msdf_normalize_zero(a_bis));
+    double bdd = -box_msdf_dot(bp, box_msdf_normalize_zero(b_bis));
+    double pa = d.distance, pb = d.distance;
+    bool has_a = add > 0.0 &&
+        box_msdf_perpendicular(&pa, ap, (box_msdf_point_t){ -a_dir.x, -a_dir.y });
+    bool has_b = bdd > 0.0 && box_msdf_perpendicular(&pb, bp, b_dir);
+    for (c = 0; c < 3; c ++) {
+        box_msdf_sel_t *sel = &multi->c[c];
+        if (!(mask & (1 << c))) {
+            continue;
+        }
+
+        if (box_msdf_less(d, sel->near)) {
+            sel->near = d;
+            sel->edge = edge;
+            sel->param = param;
+        }
+
+        if (has_a) {
+            box_msdf_sel_perpendicular(sel, -pa);
+        }
+
+        if (has_b) {
+            box_msdf_sel_perpendicular(sel, pb);
+        }
+    }
+}
+
+/** Distances of the selectors of a set of edges: the three channels and the true distance.
+ *
+ * @param multi The selectors
+ * @param edges The edges of the shape
+ * @param p The point
+ * @return The distances
+ */
+static box_msdf_value_t box_msdf_multi_value(
+    const box_msdf_multi_t *multi,
+    const box_msdf_edge_t *edges,
+    box_msdf_point_t p)
+{
+    box_msdf_value_t result;
+    box_msdf_dist_t near = multi->c[0].near;
+    int32_t c;
+    for (c = 0; c < 3; c ++) {
+        result.v[c] = box_msdf_sel_distance(&multi->c[c], edges, p);
+        if (box_msdf_less(multi->c[c].near, near)) {
+            near = multi->c[c].near;
         }
     }
 
-    for (i = 0; i < count; i ++) {
-        float *v = &values[clashes[i] * 4];
-        float m = box_msdf_median(v);
-        v[0] = v[1] = v[2] = m;
+    result.v[3] = near.distance;
+
+    return result;
+}
+
+/** Merge the selectors of a contour into a set.
+ *
+ * @param multi The set
+ * @param other The selectors of the contour
+ */
+static void box_msdf_multi_merge(
+    box_msdf_multi_t *multi,
+    const box_msdf_multi_t *other)
+{
+    int32_t c;
+    for (c = 0; c < 3; c ++) {
+        box_msdf_sel_merge(&multi->c[c], &other->c[c]);
+    }
+}
+
+/** Reset the selectors of a set.
+ *
+ * @param multi The set
+ */
+static void box_msdf_multi_init(
+    box_msdf_multi_t *multi)
+{
+    int32_t c;
+    for (c = 0; c < 3; c ++) {
+        box_msdf_sel_init(&multi->c[c]);
+    }
+}
+
+/** Run every edge of each contour through the selectors of the contour.
+ *
+ * @param gen The generation, its multi and contour scratch are filled
+ * @param p The point
+ */
+static void box_msdf_contours(
+    box_msdf_gen_t *gen,
+    box_msdf_point_t p)
+{
+    const box_msdf_edge_t *edges = ecs_vec_first(&gen->shape->edges);
+    const int32_t *counts = ecs_vec_first(&gen->shape->contours);
+    int32_t i, k, first = 0, contours = ecs_vec_count(&gen->shape->contours);
+    for (k = 0; k < contours; k ++) {
+        int32_t count = counts[k];
+        box_msdf_multi_init(&gen->multi[k]);
+        for (i = 0; i < count; i ++) {
+            int32_t edge = first + i;
+            box_msdf_add_edge(&gen->multi[k], edges, first + (i + count - 1) % count, edge,
+                first + (i + 1) % count, edges[edge].color, p);
+        }
+
+        gen->contour[k] = box_msdf_multi_value(&gen->multi[k], edges, p);
+        first += count;
+    }
+}
+
+/** Distances of a point to a shape whose contours may overlap, after msdfgen's
+ * OverlappingContourCombiner: an edge inside the fill of another contour does not count.
+ *
+ * @param gen The generation
+ * @param p The point
+ * @return The distances, positive inside a contour that winds positively
+ */
+static box_msdf_value_t box_msdf_combine(
+    box_msdf_gen_t *gen,
+    box_msdf_point_t p)
+{
+    const box_msdf_edge_t *edges = ecs_vec_first(&gen->shape->edges);
+    int32_t k, winding = 0, contours = ecs_vec_count(&gen->shape->contours);
+    box_msdf_multi_t all, inner, outer;
+    box_msdf_multi_init(&all);
+    box_msdf_multi_init(&inner);
+    box_msdf_multi_init(&outer);
+    box_msdf_contours(gen, p);
+    for (k = 0; k < contours; k ++) {
+        double d = box_msdf_median_d(gen->contour[k].v);
+        box_msdf_multi_merge(&all, &gen->multi[k]);
+        if (gen->windings[k] > 0 && d >= 0.0) {
+            box_msdf_multi_merge(&inner, &gen->multi[k]);
+        }
+
+        if (gen->windings[k] < 0 && d <= 0.0) {
+            box_msdf_multi_merge(&outer, &gen->multi[k]);
+        }
     }
 
-    ecs_os_free(clashes);
+    box_msdf_value_t shape = box_msdf_multi_value(&all, edges, p);
+    box_msdf_value_t in = box_msdf_multi_value(&inner, edges, p);
+    box_msdf_value_t out = box_msdf_multi_value(&outer, edges, p);
+    double di = box_msdf_median_d(in.v), dout = box_msdf_median_d(out.v);
+    box_msdf_value_t result = shape;
+    if (di >= 0.0 && fabs(di) <= fabs(dout)) {
+        result = in;
+        winding = 1;
+    } else if (dout <= 0.0 && fabs(dout) < fabs(di)) {
+        result = out;
+        winding = -1;
+    } else {
+        goto done;
+    }
+
+    for (k = 0; k < contours; k ++) {
+        double d = box_msdf_median_d(gen->contour[k].v), r = box_msdf_median_d(result.v);
+        double bound = winding > 0 ? dout : di;
+        if (gen->windings[k] == winding && fabs(d) < fabs(bound) &&
+            (winding > 0 ? d > r : d < r))
+        {
+            result = gen->contour[k];
+        }
+    }
+
+    for (k = 0; k < contours; k ++) {
+        double d = box_msdf_median_d(gen->contour[k].v), r = box_msdf_median_d(result.v);
+        if (gen->windings[k] != winding && d * r >= 0.0 && fabs(d) < fabs(r)) {
+            result = gen->contour[k];
+        }
+    }
+
+    if (box_msdf_median_d(result.v) == box_msdf_median_d(shape.v)) {
+        result = shape;
+    }
+
+done:
+    return result;
 }
 
 /** Fill one row of texels: the distances, with the sign the nonzero fill gives.
  *
- * @param shape The shape
- * @param raster The texels
+ * @param gen The generation
  * @param row The row
  * @param crossings Scratch vector of box_msdf_cross_t
- * @param values Four floats per texel of the row
  */
 static void box_msdf_row(
-    const box_msdf_shape_t *shape,
-    const box_msdf_raster_t *raster,
+    box_msdf_gen_t *gen,
     int32_t row,
-    ecs_vec_t *crossings,
-    float *values)
+    ecs_vec_t *crossings)
 {
+    const box_msdf_raster_t *raster = gen->raster;
     double y = raster->top - ((double)row + 0.5) / raster->scale;
+    double to_value = raster->scale / raster->range;
     int32_t x, c;
-    box_msdf_crossings(shape, y, crossings);
+    box_msdf_crossings(gen->shape, y, crossings);
     const box_msdf_cross_t *cross = ecs_vec_first(crossings);
     int32_t count = ecs_vec_count(crossings);
     for (x = 0; x < raster->width; x ++) {
         box_msdf_point_t p = { raster->left + ((double)x + 0.5) / raster->scale, y };
-        float *v = &values[x * 4];
+        float *v = &gen->values[(row * raster->width + x) * 4];
         int32_t winding = 0;
         for (c = 0; c < count; c ++) {
             winding += cross[c].x > p.x ? cross[c].dir : 0;
         }
 
-        box_msdf_texel(shape, raster, p, v);
+        box_msdf_value_t d = box_msdf_combine(gen, p);
+        for (c = 0; c < 4; c ++) {
+            v[c] = (float)fmax(-BOX_MSDF_VALUE_LIMIT,
+                fmin(BOX_MSDF_VALUE_LIMIT, d.v[c] * to_value + 0.5));
+        }
+
         bool inside = winding != 0;
         if ((box_msdf_median(v) > 0.5f) != inside && box_msdf_median(v) != 0.5f) {
             v[0] = 1.0f - v[0];
@@ -1031,26 +1395,36 @@ void box_msdf_generate(
     uint8_t *pixels)
 {
     int32_t i, y, texels = raster->width * raster->height;
-    float *values = NULL;
+    int32_t contours = ecs_vec_count(&shape->contours);
+    box_msdf_gen_t gen = { .shape = shape, .raster = raster };
     ecs_vec_t crossings;
     ecs_os_memset(pixels, 0, texels * 4);
     if (!ecs_vec_count(&shape->edges) || !texels) {
         goto done;
     }
 
-    values = ecs_os_malloc_n(float, texels * 4);
+    gen.values = ecs_os_malloc_n(float, texels * 4);
+    gen.stencil = ecs_os_calloc_n(uint8_t, texels);
+    gen.windings = ecs_os_malloc_n(int32_t, contours);
+    gen.multi = ecs_os_malloc_n(box_msdf_multi_t, contours);
+    gen.contour = ecs_os_malloc_n(box_msdf_value_t, contours);
+    box_msdf_windings(shape, gen.windings, NULL);
     ecs_vec_init_t(NULL, &crossings, box_msdf_cross_t, 0);
     for (y = 0; y < raster->height; y ++) {
-        box_msdf_row(shape, raster, y, &crossings, &values[y * raster->width * 4]);
+        box_msdf_row(&gen, y, &crossings);
     }
 
     ecs_vec_fini_t(NULL, &crossings, box_msdf_cross_t);
-    box_msdf_correct(raster, values);
+    box_msdf_correct(&gen);
     for (i = 0; i < texels * 4; i ++) {
-        pixels[i] = (uint8_t)(glm_clamp(values[i], 0.0f, 1.0f) * 255.0f + 0.5f);
+        pixels[i] = (uint8_t)(glm_clamp(gen.values[i], 0.0f, 1.0f) * 255.0f + 0.5f);
     }
 
-    ecs_os_free(values);
+    ecs_os_free(gen.contour);
+    ecs_os_free(gen.multi);
+    ecs_os_free(gen.windings);
+    ecs_os_free(gen.stencil);
+    ecs_os_free(gen.values);
 done:
     return;
 }
