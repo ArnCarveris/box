@@ -341,7 +341,8 @@ done:
 /** Show the pending frame of a simulated display and run the fini of the backend on the
  * calling thread when its init ran, so no fence outlives the device it belongs to.
  *
- * A fini bumps the generation of the backend: the next extract sends everything again.
+ * A stop after an init, whether it succeeded or failed, bumps the generation of the backend,
+ * so the next extract sends everything again.
  *
  * @param ring The ring
  */
@@ -358,7 +359,7 @@ static void box_render_backend_stop(
         ring->backend.fini(ring->backend.ctx);
     }
 
-    ring->backend.generation += ring->backend_ready;
+    ring->backend.generation += ring->backend_ready || ring->backend_failed;
 
     ring->backend_ready = false;
     ring->backend_failed = false;
