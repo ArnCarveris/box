@@ -281,36 +281,14 @@ Key box_input_dom_button(
 static int32_t box_input_dom_char(
     const char *key)
 {
-    const unsigned char *ptr = (const unsigned char*)key;
-    int32_t result = 0, size = 0, i;
+    const char *rest = key;
+    int32_t result = 0;
     if (!key || !key[0]) {
         goto done;
     }
 
-    if (ptr[0] < 0x80) {
-        result = ptr[0];
-        size = 1;
-    } else if ((ptr[0] & 0xe0) == 0xc0) {
-        result = ptr[0] & 0x1f;
-        size = 2;
-    } else if ((ptr[0] & 0xf0) == 0xe0) {
-        result = ptr[0] & 0x0f;
-        size = 3;
-    } else if ((ptr[0] & 0xf8) == 0xf0) {
-        result = ptr[0] & 0x07;
-        size = 4;
-    }
-
-    for (i = 1; i < size; i ++) {
-        if ((ptr[i] & 0xc0) != 0x80) {
-            size = 0;
-            break;
-        }
-
-        result = (result << 6) | (ptr[i] & 0x3f);
-    }
-
-    if (!size || ptr[size] || result < 0x20 || result == 0x7f) {
+    result = box_utf8_next(&rest);
+    if (rest[0] || result < 0x20 || result == 0x7f) {
         result = 0;
     }
 

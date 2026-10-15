@@ -5,45 +5,6 @@
 
 #include "input.h"
 
-/** Decode the next code point of a UTF-8 string and advance past it.
- *
- * @param text The string position, advanced past the code point
- * @return The code point, 0xfffd for an invalid sequence
- */
-static int32_t box_input_utf8_next(
-    const char **text)
-{
-    const unsigned char *ptr = (const unsigned char*)*text;
-    int32_t result = 0xfffd;
-    int32_t extra = 0, i;
-    if (ptr[0] < 0x80) {
-        result = ptr[0];
-    } else if ((ptr[0] & 0xe0) == 0xc0) {
-        result = ptr[0] & 0x1f;
-        extra = 1;
-    } else if ((ptr[0] & 0xf0) == 0xe0) {
-        result = ptr[0] & 0x0f;
-        extra = 2;
-    } else if ((ptr[0] & 0xf8) == 0xf0) {
-        result = ptr[0] & 0x07;
-        extra = 3;
-    }
-
-    for (i = 1; i <= extra; i ++) {
-        if ((ptr[i] & 0xc0) != 0x80) {
-            result = 0xfffd;
-            extra = i - 1;
-            break;
-        }
-
-        result = (result << 6) | (ptr[i] & 0x3f);
-    }
-
-    *text = (const char*)(ptr + 1 + extra);
-
-    return result;
-}
-
 /** Queue a key event.
  *
  * @param world The world
@@ -180,7 +141,7 @@ int32_t box_input_key_type(
     int32_t result = 0, delay = 0;
     frames = frames > 0 ? frames : 1;
     while (text && *text) {
-        int32_t code = box_input_utf8_next(&text);
+        int32_t code = box_utf8_next(&text);
         Key key = box_input_key_from_char(code);
         if (key) {
             box_input_queue_key(world, InputKeyDown, key, delay);
