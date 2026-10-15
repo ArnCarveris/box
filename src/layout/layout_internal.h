@@ -43,7 +43,7 @@ typedef struct {
     const ecs_table_t *child_table; /**< Table of the last child collect checked */
     bool child_kept;              /**< That table has Parent, its children are kept */
     bool child_tagged;            /**< That table has the child tag */
-    bool observing;               /**< The Position observer of tagged children exists */
+    ecs_entity_t observer;        /**< Position observer of tagged children, 0 until needed */
     ecs_entity_t module;          /**< The box.layout module, scope of the lazy observer */
     box_layout_text_t text;       /**< Hooks of the texts, zero without box.text */
     bool has_text;                /**< The tree being laid out has a text to wrap */

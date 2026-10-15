@@ -78,9 +78,8 @@ void box_layout_observe_children(
     ecs_world_t *world,
     box_layout_state_t *state)
 {
-    if (!state->observing) {
-        state->observing = true;
-        ecs_observer(world, {
+    if (!state->observer) {
+        state->observer = ecs_observer(world, {
             .entity = ecs_entity(world, { .name = "LayoutOnPosition", .parent = state->module }),
             .query.terms = {
                 { .id = ecs_id(Position), .inout = EcsInOutNone },

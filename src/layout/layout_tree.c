@@ -725,8 +725,16 @@ void box_layout_tree(
     }
 
     state->writing = true;
+    if (state->observer) {
+        ecs_enable(world, state->observer, false);
+    }
+
     for (i = 0; i < count; i ++) {
         box_layout_write(world, &nodes[i]);
+    }
+
+    if (state->observer) {
+        ecs_enable(world, state->observer, true);
     }
 
     state->writing = false;
