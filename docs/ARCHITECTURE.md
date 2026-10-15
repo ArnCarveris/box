@@ -446,7 +446,9 @@ sequence (stray or truncated bytes, overlong forms, surrogates, code points abov
 reads as one U+FFFD, which B612 draws as its missing glyph. Layout handles kerning, newlines,
 word breaks and alignment; the block is centered
 on the origin and measured into `TextBounds`. Glyphs are slots of the 2D batches keyed by atlas
-page (`src/render/text_draw.c`), shaded by `shape2d.wgsl`. No shaping (ligatures, RTL).
+page (`src/render/text_draw.c`), shaded by `shape2d.wgsl`, which samples the field at level 0
+(a mip averages the channels and breaks the median), scales it to screen pixels as msdfgen's
+screenPxRange does and fades a glyph whose range drops below one pixel. No shaping (ligatures, RTL).
 
 **Layout.** `Layout` on a parent arranges its children in `OrderedChildren` order in logical
 pixels: rows and columns, fit and grow sizing with weights, min/max, padding, spacing, alignment,
