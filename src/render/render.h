@@ -374,7 +374,7 @@ typedef enum box_render_buffer_usage_t {
 
 /** Description of a BOX_RENDER_BUFFER create; creating an existing handle replaces it */
 typedef struct box_render_buffer_desc_t {
-    uint32_t size;          /**< Bytes of the buffer */
+    uint64_t size;          /**< Bytes of the buffer */
     uint32_t usage;         /**< box_render_buffer_usage_t flags */
 } box_render_buffer_desc_t;
 
@@ -448,8 +448,10 @@ typedef struct box_render_batch_t {
     uint32_t textures[BOX_RENDER_TEXTURE_SLOTS]; /**< Texture handles of the layers, 0 for none */
     uint32_t wrap;              /**< TextureWrap of the samplers */
     uint32_t instances;         /**< Buffer handle holding the instance data */
-    uint32_t first_instance;    /**< First instance in the instance buffer */
+    uint32_t first_instance;    /**< First instance in the instance buffer, unused when listed */
     uint32_t instance_count;    /**< Instances to draw */
+    bool listed;                /**< The instances are the slots at slots, not a range */
+    uint32_t slots;             /**< Data offset of instance_count uint32_t slots in draw order */
 } box_render_batch_t;
 
 /** Everything the renderer needs of one frame, filled on the main thread.
@@ -555,6 +557,9 @@ typedef struct box_render_gpu_stats_t {
     int32_t scatters;           /**< Scatter dispatches recorded */
     int32_t scattered;          /**< Instances the scatter dispatches copied */
     int32_t probes;             /**< Probes captured */
+    int64_t cull_ns;            /**< GPU time of the cull passes of views read back, 0 without
+                                 *   timestamp queries */
+    int32_t cull_passes;        /**< Cull passes whose GPU time cull_ns holds */
 } box_render_gpu_stats_t;
 
 /** GPU time of the probe captures the GPU backend measured since the last time it was taken */
@@ -698,6 +703,42 @@ bool box_render_gpu_compile_delivery(
     ecs_world_t *world,
     box_render_compile_delivery_t delivery);
 
+/** When the GPU backend publishes the cull counters it read back.
+ *
+ * Copies finish mapping in any order; tests hold them and publish them newest first to make
+ * an older frame arrive after a newer one.
+ */
+typedef enum box_render_readback_delivery_t {
+    BOX_RENDER_READBACK_AT_ONCE = 0,     /**< Every mapped copy, in slot order, the default */
+    BOX_RENDER_READBACK_HOLD = 1,        /**< Mapped copies wait until the delivery changes */
+    BOX_RENDER_READBACK_NEWEST_FIRST = 2, /**< Every mapped copy, newest frame first */
+    BOX_RENDER_READBACK_ONE_NEWEST = 3   /**< Only the newest mapped copy per frame */
+} box_render_readback_delivery_t;
+
+/** Set the slots one page of the cull pass holds, for tests.
+ *
+ * The visible slots of the draws of a target and the occlusion history of a view are split
+ * over pages of at most this many 4 byte words, each bound whole as storage; the default is
+ * the 128 MiB storage binding every WebGPU device supports. Applies from the next cull pass.
+ *
+ * @param world The world
+ * @param slots Words per page, at least 1
+ * @return Whether the world renders with the GPU backend
+ */
+bool box_render_gpu_cull_window(
+    ecs_world_t *world,
+    uint32_t slots);
+
+/** Set when the GPU backend of a world publishes cull counters, for tests.
+ *
+ * @param world The world
+ * @param delivery When and in which order mapped copies are published
+ * @return Whether the world renders with the GPU backend
+ */
+bool box_render_gpu_readback_delivery(
+    ecs_world_t *world,
+    box_render_readback_delivery_t delivery);
+
 /** Take the oldest shader compile result the GPU backend of a world has not handed out yet.
  *
  * @param world The world
@@ -729,7 +770,8 @@ void box_render_use_gpu(
 /** Copy bytes of a buffer of the GPU backend of a world into memory, waiting for the copy.
  *
  * Only call this when the main thread renders (RenderSettings.main_thread), after
- * box_render_sync, so the device is used by one thread.
+ * box_render_sync, so the device is used by one thread; a call from another thread than the
+ * one that renders asserts, and returns false when asserts are compiled out.
  *
  * @param world The world
  * @param handle Handle of the buffer
@@ -748,7 +790,8 @@ bool box_render_gpu_read_buffer(
 /** Read back what the cull pass of a view kept in the last target the GPU backend rendered.
  *
  * Only call this when the main thread renders (RenderSettings.main_thread), after
- * box_render_sync, so the device is used by one thread.
+ * box_render_sync, so the device is used by one thread; a call from another thread than the
+ * one that renders asserts, and returns false when asserts are compiled out.
  *
  * @param world The world
  * @param view Entity with the View
@@ -806,6 +849,18 @@ void box_render_draws_init(
 void box_render_draws_stats(
     const ecs_world_t *world,
     box_render_draws_stats_t *stats);
+
+/** Set the instances one batch holds before its shapes continue in another, for tests.
+ *
+ * A batch is one instance buffer, so the default keeps it within the 128 MiB storage binding
+ * every WebGPU device supports; shapes added after a change follow the new size.
+ *
+ * @param world The world
+ * @param instances Instances per batch, at least 1
+ */
+void box_render_draws_chunk(
+    ecs_world_t *world,
+    int32_t instances);
 
 /** Forget the texture entities surfaces render into, before the surfaces register them again.
  *
@@ -1239,6 +1294,20 @@ void* box_render_packet_resource(
     box_render_resource_op_t op,
     uint32_t handle,
     uint32_t size);
+
+/** Reserve an aligned block of bytes in the data of a packet.
+ *
+ * The block moves when more data is reserved; keep the offset, not the pointer.
+ *
+ * @param p The packet
+ * @param size Bytes to reserve
+ * @param offset_out Receives the data offset of the block
+ * @return The block, NULL when size is 0
+ */
+void* box_render_packet_reserve(
+    box_render_packet_t *p,
+    uint32_t size,
+    uint32_t *offset_out);
 
 /** Get the bytes an upload or a resource change points to.
  *

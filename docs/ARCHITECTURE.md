@@ -234,7 +234,9 @@ Observers on shape, material, hierarchy and scene components and `box_transform_
 changed entities, so an unchanged frame visits and uploads nothing (`RenderStatus.upload_bytes`).
 Static batches upload changes into a change buffer that `scatter.wgsl` scatters into their slots;
 entities with `DynamicTransform` or `DynamicMaterial` fill dynamic batches every frame from cached
-queries. A batch is one instanced indirect draw and is limited to 1M instances.
+queries. A batch is one instanced indirect draw of at most 2^20 instances, so its instance buffer
+fits the 128 MiB storage binding of every WebGPU device; a key with more shapes continues in
+further batches, without a limit on the instances of a key.
 
 Materials: `Rgb`, `PbrMaterial`, `Emissive`, `Opacity` and `Tint` resolve on the CPU, composed
 root down, into the instance. `BlendMode`, `BackFaceMode` and alpha below 1 key the batch.
@@ -288,7 +290,10 @@ against the clip planes and `min_dimension_px` and writes visible slots plus ind
 phase draws what the view drew last frame (a history per instance slot, keyed by view and
 target), a depth pyramid keeps the farthest depth, the late phase tests every instance against
 at most 4x4 texels and draws the newly visible, so a fast camera never misses an instance.
-Blended draws keep a CPU back to front sort and are culled in slot order. `CullStatus` on each
+Blended draws keep a CPU back to front sort; each run of one batch in that order is one draw
+(at most 512 slots) whose job lists its sorted slots, culled in that order. The visible slots
+and slot lists of a target, and the history of a view, are split into pages of at most 128 MiB,
+each bound whole as storage, so the instances a target culls have no limit. `CullStatus` on each
 View reports instances, visible, frustum culled and occlusion culled, read back asynchronously.
 
 **Shadows.** Cascaded maps for the first directional light of the view's scene.

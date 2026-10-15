@@ -9,6 +9,27 @@
 #include <box.h>
 #include <bake_bench.h>
 #include "render.h"
+#ifdef __APPLE__
+#include <libproc.h>
+#include <unistd.h>
+#endif
+
+/** Get the instructions the process retired so far.
+ *
+ * @return The instructions, 0 where the platform does not count them
+ */
+static uint64_t bench_material_instructions(void)
+{
+    uint64_t result = 0;
+#ifdef __APPLE__
+    struct rusage_info_v4 info;
+    if (!proc_pid_rusage(getpid(), RUSAGE_INFO_V4, (rusage_info_t*)&info)) {
+        result = info.ri_instructions;
+    }
+#endif
+
+    return result;
+}
 
 /** Static opaque shapes of the scene */
 #define BENCH_MATERIAL_STATIC (100000)
@@ -78,6 +99,8 @@ static void bench_material(
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     box_render_draws_stats_t stats = {0};
+    double frames = 0;
+    uint64_t start = bench_material_instructions();
     bench_set_items(b, BENCH_MATERIAL_SHAPES);
     while (bench_iter(b)) {
         x += 0.01f;
@@ -85,10 +108,13 @@ static void bench_material(
         ecs_progress(world, 0);
         box_render_draws_stats(world, &stats);
         bench_keep(stats.upload_bytes);
+        frames ++;
     }
 
     bench_counter(b, "upload_bytes", (double)stats.upload_bytes);
     box_render_sync(world);
+    bench_counter(b, "instructions", (double)(bench_material_instructions() - start));
+    bench_counter(b, "frames", frames);
     ecs_fini(world);
 }
 
@@ -148,6 +174,8 @@ void Material_tint_subtree(
     ecs_progress(world, 0);
     box_render_draws_stats_t stats = {0};
     uint8_t strength = 0;
+    double frames = 0;
+    uint64_t start = bench_material_instructions();
     bench_set_items(b, BENCH_MATERIAL_SHAPES);
     while (bench_iter(b)) {
         strength ++;
@@ -155,9 +183,12 @@ void Material_tint_subtree(
         ecs_progress(world, 0);
         box_render_draws_stats(world, &stats);
         bench_keep(stats.processed);
+        frames ++;
     }
 
     bench_counter(b, "processed", (double)stats.processed);
+    bench_counter(b, "instructions", (double)(bench_material_instructions() - start));
+    bench_counter(b, "frames", frames);
     bench_counter(b, "upload_bytes", (double)stats.upload_bytes);
     box_render_sync(world);
     ecs_fini(world);

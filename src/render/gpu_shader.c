@@ -233,6 +233,7 @@ static void box_gpu_compile_arrive(
     if (compile->slot || !compile->gpu) {
         if (compile->gpu) {
             box_gpu_compile_finish(compile);
+            box_gpu_stats_publish(compile->gpu);
         }
 
         box_gpu_compile_free(compile);

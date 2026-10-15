@@ -176,9 +176,7 @@ void box_gpu_scatter(
     wgpuQueueSubmit(gpu->queue, 1, &commands);
     wgpuCommandBufferRelease(commands);
     wgpuCommandEncoderRelease(encoder);
-    ecs_os_mutex_lock(gpu->lock);
-    gpu->stats.scattered += (int32_t)copied;
-    ecs_os_mutex_unlock(gpu->lock);
+    gpu->pending.scattered += (int32_t)copied;
 done:
     return;
 }
@@ -255,6 +253,13 @@ bool box_render_gpu_read_buffer(
     }
 
     box_gpu_t *gpu = box_render_get_backend(world)->ctx;
+    bool renders = ecs_os_thread_self() == gpu->thread;
+    ecs_assert(renders, ECS_INVALID_OPERATION,
+        "box_render_gpu_read_buffer needs RenderSettings.main_thread and box_render_sync");
+    if (!renders) {
+        goto done;
+    }
+
     box_gpu_buffer_t *b = ecs_map_get_deref(&gpu->buffers, box_gpu_buffer_t, handle);
     if (!b || (uint64_t)offset + size > b->size) {
         goto done;

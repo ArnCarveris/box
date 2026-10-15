@@ -20,8 +20,15 @@ static const uint8_t box_draws_image_color[3] = { 255, 255, 255 };
 /** Distance in world units a 2D instance is lifted along its local z axis per layer */
 #define BOX_DRAWS_LAYER_STEP (0.0001f)
 
+/** Most slots of one blended draw, so the ordered cull pass spreads a long run over jobs */
+#define BOX_DRAWS_BLENDED_RUN (512)
+
 /** Bytes the smallest change buffer holds */
 #define BOX_DRAWS_MIN_CHANGES (64 * 1024)
+
+/** Bytes the change buffer holds at most, below the 256 MiB buffer size every WebGPU device
+ * supports; a batch whose segment does not fit any more uploads all its instances instead */
+#define BOX_DRAWS_MAX_CHANGES ((uint64_t)128 << 20)
 
 /** Words of one instance */
 #define BOX_DRAWS_WORDS ((uint32_t)(sizeof(box_render_instance_t) / sizeof(uint32_t)))
@@ -170,7 +177,9 @@ int32_t box_draws_batch_ensure(
     box_draw_batch_t *b;
     while (result != -1) {
         b = box_draws_batch(d, result);
-        if (box_draws_key_eq(&b->key, key)) {
+        if (box_draws_key_eq(&b->key, key) &&
+            (uint32_t)ecs_vec_count(&b->entities) < d->chunk)
+        {
             goto done;
         }
 
@@ -594,6 +603,10 @@ static void box_draws_reserve(
         capacity *= 2;
     }
 
+    if (capacity > d->chunk && count <= d->chunk) {
+        capacity = d->chunk;
+    }
+
     if (!b->buffer && ecs_vec_count(&d->free_buffers)) {
         b->buffer = *ecs_vec_last_t(&d->free_buffers, uint32_t);
         ecs_vec_remove_last(&d->free_buffers);
@@ -603,7 +616,7 @@ static void box_draws_reserve(
 
     box_render_buffer_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_BUFFER,
         BOX_RENDER_CREATE, b->buffer, sizeof(box_render_buffer_desc_t));
-    desc->size = capacity * (uint32_t)sizeof(box_render_instance_t);
+    desc->size = (uint64_t)capacity * sizeof(box_render_instance_t);
     desc->usage = BOX_RENDER_BUFFER_INSTANCE | BOX_RENDER_BUFFER_STORAGE;
 
     b->capacity = capacity;
@@ -672,21 +685,25 @@ void box_draws_batch_textures(
  * @param p The packet
  * @param d The state
  * @param b The batch
+ * @param changes Bytes the scatter segments of the frame already take
  * @return Bytes the scatter segment of the batch needs, 0 when it does not scatter
  */
-static uint32_t box_draws_send_batch(
+static uint64_t box_draws_send_batch(
     box_render_packet_t *p,
     box_render_draws_t *d,
-    box_draw_batch_t *b)
+    box_draw_batch_t *b,
+    uint64_t changes)
 {
-    uint32_t result = 0;
+    uint64_t result = 0;
     uint32_t count = (uint32_t)ecs_vec_count(&b->entities);
     box_draws_reserve(p, d, b);
     if (b->key.dynamic || b->full) {
         box_draws_upload_all(p, d, b);
     } else if (ecs_vec_count(&b->changed)) {
         result = box_draws_segment_size(b);
-        if ((uint64_t)result >= (uint64_t)count * sizeof(box_render_instance_t)) {
+        if (result >= (uint64_t)count * sizeof(box_render_instance_t) ||
+            changes + result > BOX_DRAWS_MAX_CHANGES)
+        {
             box_draws_upload_all(p, d, b);
             result = 0;
         }
@@ -769,8 +786,9 @@ static void box_draws_collect(
 
 /** Add the blended instances of every view, sorted back to front, after the opaque batches.
  *
- * Consecutive slots of one batch become one draw. The sort reuses the storage of earlier
- * frames, so a frame that sorts no more instances than before does not allocate.
+ * The sorted slots of a view go into the packet data; a run of one batch in that order is one
+ * draw listing its slots, split every BOX_DRAWS_BLENDED_RUN slots. Sort and packet storage
+ * is reused, so a frame that sorts no more instances than before does not allocate.
  *
  * @param p The packet
  * @param d The state
@@ -783,6 +801,7 @@ static void box_draws_send_blended(
     for (v = 0; v < ecs_vec_count(&p->views); v ++) {
         box_render_view_t *view = ecs_vec_get_t(&p->views, box_render_view_t, v);
         box_render_batch_t *out = NULL;
+        uint32_t offset = 0;
         box_draws_collect(d, view);
         int32_t count = ecs_vec_count(&d->sorted);
         box_draw_sorted_t *sorted = ecs_vec_first(&d->sorted);
@@ -790,10 +809,16 @@ static void box_draws_send_blended(
             qsort(sorted, (size_t)count, sizeof(box_draw_sorted_t), box_draws_sorted_cmp);
         }
 
+        uint32_t *slots = box_render_packet_reserve(p,
+            (uint32_t)count * (uint32_t)sizeof(uint32_t), &offset);
+        for (i = 0; i < count; i ++) {
+            slots[i] = (uint32_t)sorted[i].slot;
+        }
+
         for (i = 0; i < count; i ++) {
             box_draw_batch_t *b = box_draws_batch(d, sorted[i].batch);
             if (out && out->instances == b->buffer &&
-                out->first_instance + out->instance_count == (uint32_t)sorted[i].slot)
+                out->instance_count < BOX_DRAWS_BLENDED_RUN)
             {
                 out->instance_count ++;
                 continue;
@@ -809,7 +834,8 @@ static void box_draws_send_blended(
             out->mesh = b->key.mesh;
             box_draws_batch_textures(d, b, out);
             out->instances = b->buffer;
-            out->first_instance = (uint32_t)sorted[i].slot;
+            out->listed = true;
+            out->slots = offset + (uint32_t)i * (uint32_t)sizeof(uint32_t);
             out->instance_count = 1;
         }
     }
@@ -875,24 +901,28 @@ static uint32_t box_draws_scatter(
 static void box_draws_send_changes(
     box_render_packet_t *p,
     box_render_draws_t *d,
-    uint32_t total)
+    uint64_t total)
 {
     uint32_t offset = 0;
     int32_t i, count = ecs_vec_count(&d->batches);
     if (total > d->changes_size) {
-        uint32_t size = d->changes_size ? d->changes_size : BOX_DRAWS_MIN_CHANGES;
+        uint64_t size = d->changes_size ? d->changes_size : BOX_DRAWS_MIN_CHANGES;
         while (size < total) {
             size *= 2;
+        }
+
+        if (size > BOX_DRAWS_MAX_CHANGES) {
+            size = BOX_DRAWS_MAX_CHANGES;
         }
 
         box_render_buffer_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_BUFFER,
             BOX_RENDER_CREATE, BOX_RENDER_BUFFER_CHANGES, sizeof(box_render_buffer_desc_t));
         desc->size = size;
         desc->usage = BOX_RENDER_BUFFER_STORAGE;
-        d->changes_size = size;
+        d->changes_size = (uint32_t)size;
     }
 
-    uint8_t *data = box_render_packet_upload(p, BOX_RENDER_BUFFER_CHANGES, 0, total);
+    uint8_t *data = box_render_packet_upload(p, BOX_RENDER_BUFFER_CHANGES, 0, (uint32_t)total);
     d->stats.upload_bytes += total;
     for (i = 0; i < count; i ++) {
         box_draw_batch_t *b = box_draws_batch(d, i);
@@ -1064,7 +1094,7 @@ void box_draws_send(
 {
     box_mesh_cache_t *cache = box_mesh_cache_of(world);
     int32_t i, count = ecs_vec_count(&d->batches);
-    uint32_t changes = 0;
+    uint64_t changes = 0;
     bool views = ecs_vec_count(&p->views) != 0;
     d->textures = box_textures_get(world);
     d->world = world;
@@ -1100,7 +1130,7 @@ void box_draws_send(
         box_draw_batch_t *b = box_draws_batch(d, i);
         b->ready = false;
         if (b->alive && box_draws_mesh(p, d, cache, b->key.mesh)) {
-            changes += box_draws_send_batch(p, d, b);
+            changes += box_draws_send_batch(p, d, b, changes);
         }
 
         if (b->ready && b->key.blend != Opaque &&
@@ -1139,4 +1169,15 @@ void box_draws_batches_fini(
     ecs_vec_fini_t(NULL, &d->free_batches, int32_t);
     ecs_vec_fini_t(NULL, &d->free_buffers, uint32_t);
     ecs_map_fini(&d->lookup);
+}
+
+void box_render_draws_chunk(
+    ecs_world_t *world,
+    int32_t instances)
+{
+    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractDraws");
+    const ecs_system_t *s = system ? ecs_system_get(world, system) : NULL;
+    if (s && s->ctx && instances > 0) {
+        ((box_render_draws_t*)s->ctx)->chunk = (uint32_t)instances;
+    }
 }

@@ -80,7 +80,9 @@
                     "offscreen_100k_unculled",
                     "shadows_100k",
                     "occluded_city_100k",
-                    "occluded_city_100k_frustum_only"
+                    "occluded_city_100k_frustum_only",
+                    "many_batches_shadows",
+                    "town"
                 ]
             },
             {
@@ -126,6 +128,20 @@
                 "id": "Pipelines",
                 "benchcases": [
                     "state_combinations"
+                ]
+            },
+            {
+                "id": "Blended",
+                "benchcases": [
+                    "gpu_10k",
+                    "gpu_10k_lit_culled"
+                ]
+            },
+            {
+                "id": "LargeBatch",
+                "benchcases": [
+                    "instances_1m",
+                    "instances_1m5"
                 ]
             }
         ]
