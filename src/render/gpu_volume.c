@@ -2,9 +2,9 @@
  * @file render/gpu_volume.c
  * @brief Irradiance probe volumes of the webgpu backend.
  *
- * A volume is a uniform with its grid, two storage buffers with the SH of every probe and one
- * with the validity mask, bound as group 3 of the forward pass with the probe buffer the view
- * shows. Views without a volume bind a 1x1x1 volume that keeps the hemisphere.
+ * A volume is a uniform with its grid, two SH buffers, the validity mask and the visibility
+ * maps, bound as group 3 of the forward pass with the probe buffer the view shows. Views
+ * without a volume bind a 1x1x1 volume that keeps the hemisphere.
  */
 
 #include "gpu.h"
@@ -42,6 +42,7 @@ void box_gpu_volume_free(
 
     wgpuBufferRelease(v->grid);
     wgpuBufferRelease(v->valid);
+    wgpuBufferRelease(v->visibility);
     ecs_os_free(v);
 }
 
@@ -58,22 +59,26 @@ static box_gpu_volume_t* box_gpu_volume_new(
     box_gpu_volume_t *v = ecs_os_calloc_t(box_gpu_volume_t);
     uint64_t probes = (uint64_t)count * BOX_GPU_PROBE_SIZE;
     uint64_t valid = (uint64_t)(count + 31) / 32 * sizeof(uint32_t);
+    uint64_t visibility = (uint64_t)count * BOX_GPU_VISIBILITY_SIZE;
     int32_t i;
     v->count = count;
     v->grid = box_gpu_volume_buffer(gpu, sizeof(box_gpu_volume_uniforms_t),
         WGPUBufferUsage_Uniform);
     v->valid = box_gpu_volume_buffer(gpu, valid, WGPUBufferUsage_Storage);
+    v->visibility = box_gpu_volume_buffer(gpu, visibility,
+        WGPUBufferUsage_Storage | WGPUBufferUsage_CopySrc);
     for (i = 0; i < 2; i ++) {
         v->probes[i] = box_gpu_volume_buffer(gpu, probes,
             WGPUBufferUsage_Storage | WGPUBufferUsage_CopySrc);
-        WGPUBindGroupEntry entries[3] = {
+        WGPUBindGroupEntry entries[4] = {
             { .binding = 0, .buffer = v->grid, .size = sizeof(box_gpu_volume_uniforms_t) },
             { .binding = 1, .buffer = v->probes[i], .size = probes },
-            { .binding = 2, .buffer = v->valid, .size = valid }
+            { .binding = 2, .buffer = v->valid, .size = valid },
+            { .binding = 3, .buffer = v->visibility, .size = visibility }
         };
         WGPUBindGroupDescriptor desc = {
             .layout = gpu->volume_layout,
-            .entryCount = 3,
+            .entryCount = 4,
             .entries = entries
         };
         v->group[i] = wgpuDeviceCreateBindGroup(gpu->device, &desc);
@@ -82,8 +87,8 @@ static box_gpu_volume_t* box_gpu_volume_new(
     return v;
 }
 
-/** Write the grid of a volume, fill every probe of both buffers with one SH and write its
- * validity mask.
+/** Write the grid of a volume, fill every probe of both buffers with one SH, open its
+ * visibility maps and write its validity mask.
  *
  * @param gpu The backend
  * @param v The volume
@@ -99,17 +104,27 @@ static void box_gpu_volume_write(
         .size = { desc->size[0], desc->size[1], desc->size[2], 1 }
     };
     size_t size = (size_t)v->count * BOX_GPU_PROBE_SIZE;
+    size_t texels = (size_t)v->count * BOX_GPU_VISIBILITY_TEXELS;
     uint8_t *probes = ecs_os_malloc((ecs_size_t)size);
+    uint32_t *open = ecs_os_malloc_n(uint32_t, (ecs_size_t)texels);
     uint32_t i;
     for (i = 0; i < v->count; i ++) {
         ecs_os_memcpy(probes + i * BOX_GPU_PROBE_SIZE, desc->sh, BOX_GPU_PROBE_SIZE);
     }
 
+    for (i = 0; i < texels; i ++) {
+        open[i] = BOX_GPU_VISIBILITY_OPEN;
+    }
+
+    v->spacing = desc->spacing;
+
     wgpuQueueWriteBuffer(gpu->queue, v->grid, 0, &u, sizeof(u));
     wgpuQueueWriteBuffer(gpu->queue, v->probes[0], 0, probes, size);
     wgpuQueueWriteBuffer(gpu->queue, v->probes[1], 0, probes, size);
+    wgpuQueueWriteBuffer(gpu->queue, v->visibility, 0, open, texels * sizeof(uint32_t));
     wgpuQueueWriteBuffer(gpu->queue, v->valid, 0, desc + 1,
         (size_t)(v->count + 31) / 32 * sizeof(uint32_t));
+    ecs_os_free(open);
     ecs_os_free(probes);
 }
 
@@ -139,8 +154,8 @@ static void box_gpu_volume_keep(
         (size_t)(v->count + 31) / 32 * sizeof(uint32_t));
 }
 
-/** Copy the probes of both buffers of a volume that a resized grid keeps into the volume of
- * that grid, one run of x per row the two grids share.
+/** Copy the probes of both buffers and the visibility maps of a volume that a resized grid
+ * keeps into the volume of that grid, one run of x per row the two grids share.
  *
  * @param gpu The backend
  * @param from The volume of the old grid
@@ -177,6 +192,10 @@ static void box_gpu_volume_carry(
                     src * BOX_GPU_PROBE_SIZE, to->probes[i], dst * BOX_GPU_PROBE_SIZE,
                     (uint64_t)(x1 - x0) * BOX_GPU_PROBE_SIZE);
             }
+
+            wgpuCommandEncoderCopyBufferToBuffer(encoder, from->visibility,
+                src * BOX_GPU_VISIBILITY_SIZE, to->visibility, dst * BOX_GPU_VISIBILITY_SIZE,
+                (uint64_t)(x1 - x0) * BOX_GPU_VISIBILITY_SIZE);
         }
     }
 
@@ -191,7 +210,7 @@ done:
 void box_gpu_volume_init(
     box_gpu_t *gpu)
 {
-    WGPUBindGroupLayoutEntry entries[3] = {
+    WGPUBindGroupLayoutEntry entries[4] = {
         {
             .binding = 0,
             .visibility = WGPUShaderStage_Fragment,
@@ -209,9 +228,14 @@ void box_gpu_volume_init(
             .binding = 2,
             .visibility = WGPUShaderStage_Fragment,
             .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
+        },
+        {
+            .binding = 3,
+            .visibility = WGPUShaderStage_Fragment,
+            .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
         }
     };
-    WGPUBindGroupLayoutDescriptor layout = { .entryCount = 3, .entries = entries };
+    WGPUBindGroupLayoutDescriptor layout = { .entryCount = 4, .entries = entries };
     box_gpu_volume_uniforms_t none = { .size = { 1, 1, 1, 0 } };
     gpu->volume_layout = wgpuDeviceCreateBindGroupLayout(gpu->device, &layout);
     ecs_map_init(&gpu->volumes, NULL);

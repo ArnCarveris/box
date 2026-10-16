@@ -39,11 +39,28 @@ struct Volume {
 
 // Every probe is SH_COEFFICIENTS rgb irradiance coefficients E_lm (Ramamoorthi and Hanrahan),
 // in Sloan's real SH basis; probe_valid has one bit per probe, clear inside static geometry.
+// probe_visibility holds an octahedral map per probe of VISIBILITY_SIZE texels on each side,
+// each the mean and mean square distance to the surfaces its faces saw in probe spacings, packed
+// as two halves (bake_sh.wgsl).
 @group(3) @binding(0) var<uniform> volume: Volume;
 @group(3) @binding(1) var<storage, read> probes: array<vec4f>;
 @group(3) @binding(2) var<storage, read> probe_valid: array<u32>;
+@group(3) @binding(3) var<storage, read> probe_visibility: array<u32>;
 
 const SH_COEFFICIENTS: u32 = 9u;
+
+// Texels per edge of the octahedral distance map of a probe.
+const VISIBILITY_SIZE: i32 = 8;
+
+// Offset along the normal of the point whose visibility from a probe is tested, in spacings.
+const VISIBILITY_BIAS: f32 = 0.25;
+
+// Smallest variance of the distance in a direction, in square spacings.
+const VISIBILITY_VARIANCE: f32 = 0.001;
+
+// Share of the weight of the probes around a point that the hemisphere ambient makes up for
+// when the probes the point sees carry less.
+const VISIBILITY_FALLBACK: f32 = 0.1;
 
 struct VertexIn {
     @location(0) position: vec3f,
@@ -103,43 +120,107 @@ fn hemisphere_irradiance() -> Irradiance {
     return e;
 }
 
+// Point of the octahedral map of a direction, in [0, 1] on each axis.
+fn octahedral_uv(d: vec3f) -> vec2f {
+    var p = d.xy / (abs(d.x) + abs(d.y) + abs(d.z));
+    if (d.z < 0.0) {
+        p = (1.0 - abs(p.yx)) * select(vec2f(-1.0), vec2f(1.0), p >= vec2f(0.0));
+    }
+
+    return p * 0.5 + 0.5;
+}
+
+// Distance moments of a texel of the map of a probe. A texel past an edge of the map is the
+// texel mirrored across that edge, which the octahedral fold makes its neighbour.
+fn visibility_moments(index: u32, x: i32, y: i32) -> vec2f {
+    var tx = x;
+    var ty = y;
+    if (tx < 0 || tx >= VISIBILITY_SIZE) {
+        tx = clamp(tx, 0, VISIBILITY_SIZE - 1);
+        ty = VISIBILITY_SIZE - 1 - ty;
+    }
+
+    if (ty < 0 || ty >= VISIBILITY_SIZE) {
+        ty = clamp(ty, 0, VISIBILITY_SIZE - 1);
+        tx = VISIBILITY_SIZE - 1 - tx;
+    }
+
+    let texels = u32(VISIBILITY_SIZE * VISIBILITY_SIZE);
+    return unpack2x16float(probe_visibility[index * texels + u32(tx + ty * VISIBILITY_SIZE)]);
+}
+
+// Chance that a probe sees a point, from the offset of the point from the probe: one up to the
+// mean distance its faces saw in that direction, then Chebyshev's bound from the variance,
+// cubed, as DDGI weighs its probes.
+fn visibility_from(index: u32, offset: vec3f) -> f32 {
+    let len = length(offset);
+    let dist = len / volume.origin.w;
+    let t = octahedral_uv(offset / max(len, 1e-6)) * f32(VISIBILITY_SIZE) - 0.5;
+    let i = vec2i(floor(t));
+    let f = t - floor(t);
+    let low = mix(visibility_moments(index, i.x, i.y),
+        visibility_moments(index, i.x + 1, i.y), f.x);
+    let high = mix(visibility_moments(index, i.x, i.y + 1),
+        visibility_moments(index, i.x + 1, i.y + 1), f.x);
+    let m = mix(low, high, f.y);
+    if (len <= 1e-6 || dist <= m.x) {
+        return 1.0;
+    }
+
+    let variance = max(m.y - m.x * m.x, VISIBILITY_VARIANCE);
+    let delta = dist - m.x;
+    let p = variance / (variance + delta * delta);
+    return p * p * p;
+}
+
 // Irradiance at a position with a normal, blended from the 8 probes around it: trilinear
 // weights, times the wrap of the direction toward the probe around the normal as in DDGI, so
-// probes behind the surface count less. Invalid probes are skipped; outside the grid the
-// position clamps to the border probes. Without a valid probe it is the hemisphere ambient.
+// probes behind the surface count less, times the visibility of the position, moved off the
+// surface along the normal, from the probe. Invalid probes are skipped; outside the grid the
+// position clamps to the border probes. Without a valid probe it is the hemisphere ambient,
+// which also makes up the weight the visible probes lack below VISIBILITY_FALLBACK of the
+// weight of every valid probe, so a surface that sees none of its probes does not take the
+// light of the probes behind it.
 fn volume_irradiance(world: vec3f, n: vec3f) -> Irradiance {
     let size = volume.size.xyz;
     let g = clamp((world - volume.origin.xyz) / volume.origin.w, vec3f(0.0), vec3f(size - 1u));
     let base = min(vec3u(floor(g)), max(size, vec3u(2u)) - 2u);
     let t = clamp(g - vec3f(base), vec3f(0.0), vec3f(1.0));
+    let biased = world + n * (VISIBILITY_BIAS * volume.origin.w);
     var e: Irradiance;
     var total = 0.0;
+    var reach = 0.0;
     for (var i = 0u; i < 8u; i++) {
         let o = vec3u(i & 1u, (i >> 1u) & 1u, (i >> 2u) & 1u);
         let p = min(base + o, size - 1u);
         let index = p.x + (p.y + p.z * size.y) * size.x;
         let valid = (probe_valid[index >> 5u] >> (index & 31u)) & 1u;
         let trilinear = select(1.0 - t, t, o == vec3u(1u));
-        let to_probe = volume.origin.xyz + vec3f(p) * volume.origin.w - world;
+        let position = volume.origin.xyz + vec3f(p) * volume.origin.w;
+        let to_probe = position - world;
         let dist = length(to_probe);
         let dir = select(n, to_probe / max(dist, 1e-4), dist > 1e-4);
         let wrap = (dot(dir, n) + 1.0) * 0.5;
-        let w = trilinear.x * trilinear.y * trilinear.z * (wrap * wrap + 0.2) * f32(valid);
-        if (w > 0.0) {
+        let reached = trilinear.x * trilinear.y * trilinear.z * (wrap * wrap + 0.2) * f32(valid);
+        if (reached > 0.0) {
+            let w = reached * visibility_from(index, biased - position);
             for (var k = 0u; k < SH_COEFFICIENTS; k++) {
                 e.sh[k] += probes[index * SH_COEFFICIENTS + k].rgb * w;
             }
 
             total += w;
+            reach += reached;
         }
     }
 
-    if (total <= 0.0) {
+    if (reach <= 0.0) {
         return hemisphere_irradiance();
     }
 
+    let fallback = max(VISIBILITY_FALLBACK * reach - total, 0.0);
+    let hemisphere = hemisphere_irradiance();
     for (var k = 0u; k < SH_COEFFICIENTS; k++) {
-        e.sh[k] /= total;
+        e.sh[k] = (e.sh[k] + hemisphere.sh[k] * fallback) / (total + fallback);
     }
 
     return e;

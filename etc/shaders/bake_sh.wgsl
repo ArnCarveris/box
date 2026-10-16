@@ -11,6 +11,10 @@
 // occluded when the face texel toward the light saw a surface nearer than the light, for a
 // directional light any surface.
 //
+// The projection also writes the visibility of each probe: an octahedral map of the mean and
+// mean square distance to the surfaces its faces saw, which mesh.wgsl tests a point against
+// before it blends the probe in (DDGI's Chebyshev visibility).
+//
 // The cull entry point lists, before the faces render, the instances of one batch each face of
 // each probe of the chunk draws: those whose sphere spans the smallest size at their depth in
 // the face their center is in, and whose box reaches into the 90 degree frustum of the face.
@@ -33,7 +37,8 @@ struct Params {
     probes: array<vec4u, 32>,
     // x: Baked lights, y: directional lights among them, which come first
     lights: vec4u,
-    // x: near plane of the faces, y: pixels per unit at depth 1, z: smallest size in pixels
+    // x: near plane of the faces, y: pixels per unit at depth 1, z: smallest size in pixels,
+    // w: spacing of the probes of the volume
     near: vec4f,
     // World position of each probe of the chunk
     positions: array<vec4f, 128>,
@@ -80,11 +85,22 @@ struct CullJob {
 @group(0) @binding(6) var<storage, read_write> slots: array<u32>;
 @group(0) @binding(7) var<storage, read_write> args: array<u32>;
 @group(0) @binding(8) var<storage, read> lists: array<u32>;
+@group(0) @binding(9) var<storage, read_write> visibility: array<u32>;
 @group(1) @binding(0) var<storage, read> instances: array<Instance>;
 
 const GROUP: u32 = 64u;
 const SH_COEFFICIENTS: u32 = 9u;
 const PI: f32 = 3.141592653589793;
+
+// Texels per edge of the octahedral distance map of a probe, as in mesh.wgsl; one per lane.
+const VISIBILITY_SIZE: u32 = 8u;
+
+// Largest distance of the map in probe spacings: no point of the cells around a probe is
+// farther, so a direction that saw no surface or a farther one stores this.
+const VISIBILITY_MAX: f32 = 2.0;
+
+// Directions per edge of a texel of the map whose distances the texel averages.
+const VISIBILITY_SAMPLES: u32 = 4u;
 
 // Invocations of a workgroup of the cull.
 const CULL_GROUP: u32 = 256u;
@@ -170,6 +186,34 @@ fn surface_distance(probe: u32, d: vec3f) -> f32 {
     return select(-1.0, params.near.x / max(depth, 1e-20) / f, depth > 0.0);
 }
 
+// Direction of a point of the octahedral map, the inverse of octahedral_uv() of mesh.wgsl.
+fn octahedral_direction(uv: vec2f) -> vec3f {
+    let p = uv * 2.0 - 1.0;
+    var d = vec3f(p, 1.0 - abs(p.x) - abs(p.y));
+    if (d.z < 0.0) {
+        d = vec3f((1.0 - abs(p.yx)) * select(vec2f(-1.0), vec2f(1.0), p >= vec2f(0.0)), d.z);
+    }
+
+    return normalize(d);
+}
+
+// Mean and mean square distance in probe spacings to the surfaces the faces of a probe saw
+// over a texel of its octahedral map, averaged over VISIBILITY_SAMPLES squared directions.
+fn visibility_moments(probe: u32, texel: u32) -> vec2f {
+    let spacing = max(params.near.w, 1e-4);
+    let cell = vec2f(f32(texel % VISIBILITY_SIZE), f32(texel / VISIBILITY_SIZE));
+    var moments = vec2f(0.0);
+    for (var s = 0u; s < VISIBILITY_SAMPLES * VISIBILITY_SAMPLES; s++) {
+        let sub = vec2f(f32(s % VISIBILITY_SAMPLES), f32(s / VISIBILITY_SAMPLES)) + 0.5;
+        let uv = (cell + sub / f32(VISIBILITY_SAMPLES)) / f32(VISIBILITY_SIZE);
+        let hit = surface_distance(probe, octahedral_direction(uv));
+        let r = select(VISIBILITY_MAX, min(hit / spacing, VISIBILITY_MAX), hit >= 0.0);
+        moments += vec2f(r, r * r);
+    }
+
+    return moments / f32(VISIBILITY_SAMPLES * VISIBILITY_SAMPLES);
+}
+
 // Radiance of a point or spot light at a distance, as attenuation() of mesh.wgsl.
 fn attenuation(light: Light, l: vec3f, dist: f32) -> f32 {
     let ratio = dist / max(light.range, 1e-4);
@@ -247,10 +291,15 @@ fn project(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_index)
         workgroupBarrier();
     }
 
+    let index = params.probes[probe / 4u][probe % 4u];
     if (lane < SH_COEFFICIENTS) {
-        let index = params.probes[probe / 4u][probe % 4u];
         let e = (partial[0][lane] + direct(probe, lane)) * band(lane);
         volume[index * SH_COEFFICIENTS + lane] = vec4f(e, 0.0);
+    }
+
+    let texels = VISIBILITY_SIZE * VISIBILITY_SIZE;
+    if (lane < texels) {
+        visibility[index * texels + lane] = pack2x16float(visibility_moments(probe, lane));
     }
 }
 

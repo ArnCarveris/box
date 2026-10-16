@@ -386,13 +386,16 @@ typedef struct box_gpu_volume_uniforms_t {
 } box_gpu_volume_uniforms_t;
 
 /** An irradiance probe volume: grid uniforms, two buffers with the SH of every probe, which
- * the passes of a bake read and write in turn, and the validity mask */
+ * the passes of a bake read and write in turn, the validity mask and the visibility maps */
 typedef struct box_gpu_volume_t {
     WGPUBuffer grid;                /**< box_gpu_volume_uniforms_t */
     WGPUBuffer probes[2];           /**< BOX_RENDER_SH_COEFFICIENTS vec4 per probe */
     WGPUBuffer valid;               /**< One bit per probe, set when views sample it */
+    WGPUBuffer visibility;          /**< BOX_GPU_VISIBILITY_TEXELS packed halves per probe */
     uint32_t count;                 /**< Probes of the volume */
-    WGPUBindGroup group[2];         /**< Binds the grid, a probe buffer and the mask as group 3 */
+    float spacing;                  /**< World units between neighbouring probes */
+    WGPUBindGroup group[2];         /**< Binds the grid, a probe buffer, the mask and the
+                                     *   visibility as group 3 */
 } box_gpu_volume_t;
 
 /** The webgpu backend: device, shared objects and targets */
@@ -705,6 +708,16 @@ WGPUBindGroup box_gpu_material_group(
 
 /** Bytes of the SH of one probe */
 #define BOX_GPU_PROBE_SIZE (BOX_RENDER_SH_COEFFICIENTS * 4 * sizeof(float))
+
+/** Texels of the octahedral visibility map of a probe, VISIBILITY_SIZE squared in mesh.wgsl */
+#define BOX_GPU_VISIBILITY_TEXELS (64)
+
+/** Bytes of the visibility map of one probe, a word per texel */
+#define BOX_GPU_VISIBILITY_SIZE (BOX_GPU_VISIBILITY_TEXELS * sizeof(uint32_t))
+
+/** Texel of a visibility map that sees no surface: halves 2 and 4, the largest distance in
+ * spacings of bake_sh.wgsl and its square, so every point is visible before a capture */
+#define BOX_GPU_VISIBILITY_OPEN (0x44004000u)
 
 /** Create the layout of the probe volumes and the volume of views without one.
  *

@@ -98,7 +98,8 @@ typedef struct box_gpu_bake_params_t {
     float ground[4];                /**< Linear ambient light from below */
     uint32_t probes[BOX_GPU_BAKE_CHUNK]; /**< Volume index of each probe of the chunk */
     uint32_t lights[4];             /**< Baked lights, the directional ones among them first */
-    float near_[4];                 /**< Near plane of the faces */
+    float near_[4];                 /**< Near plane of the faces, pixels per unit at depth 1,
+                                     *   smallest size in pixels, spacing of the probes */
     float positions[BOX_GPU_BAKE_CHUNK][4]; /**< World position of each probe of the chunk */
 } box_gpu_bake_params_t;
 
@@ -445,7 +446,7 @@ static box_gpu_bake_t* box_gpu_bake_state_new(
     box_gpu_t *gpu)
 {
     box_gpu_bake_t *b = ecs_os_calloc_t(box_gpu_bake_t);
-    WGPUBindGroupLayoutEntry entries[5] = {
+    WGPUBindGroupLayoutEntry entries[6] = {
         {
             .binding = 0,
             .visibility = WGPUShaderStage_Compute,
@@ -479,10 +480,15 @@ static box_gpu_bake_t* box_gpu_bake_state_new(
             .binding = 4,
             .visibility = WGPUShaderStage_Compute,
             .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
+        },
+        {
+            .binding = 9,
+            .visibility = WGPUShaderStage_Compute,
+            .buffer = { .type = WGPUBufferBindingType_Storage }
         }
     };
     b->layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
-        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 5, .entries = entries });
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 6, .entries = entries });
     b->pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
         &(WGPUPipelineLayoutDescriptor){
             .bindGroupLayoutCount = 1,
@@ -1354,13 +1360,15 @@ static void box_gpu_bake_faces_render(
  * @param batch The bake batch
  * @param probes The probes of the chunk
  * @param count Probes of the chunk
+ * @param spacing Spacing of the probes of the volume
  */
 static void box_gpu_bake_params(
     box_gpu_t *gpu,
     box_gpu_bake_t *b,
     const box_render_bake_batch_t *batch,
     const box_render_probe_capture_t *probes,
-    int32_t count)
+    int32_t count,
+    float spacing)
 {
     box_gpu_buffer_t *baked = batch->baked
         ? ecs_map_get_deref(&gpu->buffers, box_gpu_buffer_t, batch->baked)
@@ -1369,7 +1377,7 @@ static void box_gpu_bake_params(
     box_gpu_bake_params_t params = {
         .size = { (uint32_t)batch->size, (uint32_t)count, 0, 0 },
         .near_ = {
-            BOX_GPU_BAKE_NEAR, (float)batch->size * 0.5f, BOX_RENDER_CULL_MIN_DIMENSION, 0
+            BOX_GPU_BAKE_NEAR, (float)batch->size * 0.5f, BOX_RENDER_CULL_MIN_DIMENSION, spacing
         }
     };
     int32_t i;
@@ -1412,7 +1420,7 @@ static void box_gpu_bake_project(
         ? ecs_map_get_deref(&gpu->buffers, box_gpu_buffer_t, batch->baked)
         : NULL;
     int32_t i;
-    WGPUBindGroupEntry entries[5] = {
+    WGPUBindGroupEntry entries[6] = {
         { .binding = 0, .buffer = b->params, .size = sizeof(box_gpu_bake_params_t) },
         { .binding = 1, .textureView = b->color_view },
         {
@@ -1425,11 +1433,16 @@ static void box_gpu_bake_project(
             .binding = 4,
             .buffer = baked ? baked->buffer : gpu->no_lights,
             .size = baked ? baked->size : sizeof(box_render_light_t)
+        },
+        {
+            .binding = 9,
+            .buffer = volume->visibility,
+            .size = (uint64_t)volume->count * BOX_GPU_VISIBILITY_SIZE
         }
     };
     WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
         .layout = b->layout,
-        .entryCount = 5,
+        .entryCount = 6,
         .entries = entries
     });
     WGPUComputePassEncoder pass = wgpuCommandEncoderBeginComputePass(encoder,
@@ -1532,7 +1545,7 @@ static void box_gpu_bake_chunk_capture(
     }
 
     box_gpu_bake_lights(gpu, b, ecs_vec_first(&b->view_data));
-    box_gpu_bake_params(gpu, b, batch, probes, count);
+    box_gpu_bake_params(gpu, b, batch, probes, count, volume->spacing);
     if (caster) {
         box_gpu_cull_reset(gpu);
         box_gpu_cull_capture_add(gpu, packet, batch->scene, 0, 0,
