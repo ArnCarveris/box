@@ -43,6 +43,8 @@
  * stale timestamps or a stalled queue and are dropped */
 #define BOX_GPU_BAKE_MEASURE_MAX (1000.0)
 
+#define BOX_GPU_BAKE_IN_FLIGHT (4)
+
 /** Byte alignment of the destination of a query resolve */
 #define BOX_GPU_BAKE_RESOLVE_ALIGN (256)
 
@@ -187,6 +189,7 @@ struct box_gpu_bake_t {
     box_gpu_bake_done_t done[BOX_GPU_BAKE_READBACKS]; /**< Measurements without timestamps */
     box_render_bake_timing_t timing; /**< Measured time not yet taken, under the gpu lock */
     ecs_vec_t captured;             /**< box_render_bake_result_t not taken, under the gpu lock */
+    int32_t in_flight;
 };
 
 /** Axis a face looks along and its up axis, the right axis is their cross product */
@@ -1588,6 +1591,12 @@ static void box_gpu_bake_chunk_capture(
         timed ? &end : NULL);
     timer->ended |= timed;
     box_gpu_bake_submit(gpu, encoder);
+#ifndef __EMSCRIPTEN__
+    if (++ b->in_flight >= BOX_GPU_BAKE_IN_FLIGHT) {
+        wgpuDevicePoll(gpu->device, true, NULL);
+        b->in_flight = 0;
+    }
+#endif
 done:
     return;
 }
