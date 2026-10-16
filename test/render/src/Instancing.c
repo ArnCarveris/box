@@ -582,6 +582,7 @@ void Instancing_no_alloc_steady_state(void) {
     // renderer/instancing
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    ecs_enable(world, ecs_lookup(world, "flecs.stats"), false);
 
     box_render_null_t *null = box_render_null_new();
     box_render_backend_t backend = box_render_null_backend(null);
