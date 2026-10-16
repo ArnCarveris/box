@@ -8,29 +8,19 @@ engine reacts to component changes. See `DESIGN.md` for the full brief and
 ## Prerequisites
 
 - [bake3](https://github.com/SanderMertens/bake3) on the path
-- The flecs repository checked out at `../../flecs` (built as a bundle)
+- The flecs repository checked out at `../../flecs`, built once with bake3 (`bake3 ../../flecs`)
 - A Rust toolchain (wgpu-native and resvg are built with cargo)
 - For wasm builds: emsdk, with `emsdk_env.sh` sourced, and the Rust target for resvg:
   `rustup target add wasm32-unknown-emscripten`
 
 ## Flecs version
 
-Box builds the exact HEAD of the branch checked out in `../../flecs`: the `flecs` bundle in
-`project.json` pins no tag or commit and takes no patches. Bake clones it once into
-`.bake/bundles/flecs/default/src` and warns when that checkout is behind `../../flecs`. To pick
-up a new flecs HEAD, fast-forward the checkout and rebuild:
-
-```sh
-bake3 bundle update flecs && bake3 --local-env
-```
-
-When the update refuses (flecs history was rewritten, or `../../flecs` switched branch), clone
-it again with `rm -rf .bake/bundles/flecs && bake3 --local-env`. Check that the commit box is
-built against matches `../../flecs`:
-
-```sh
-git -C .bake/bundles/flecs/default/src log -1 --format=%h; git -C ../../flecs log -1 --format=%h
-```
+Box uses the flecs project from the bake environment, which points at the checkout in
+`../../flecs` after it has been built once with bake3. The `use` entry for flecs in
+`project.json` lists the defines box needs (`FLECS_SCRIPT_MATH`, `FLECS_CREATE_MEMBER_ENTITIES`),
+so bake builds a static flecs library with those defines into box's own build directory. That
+library is rebuilt from the flecs sources like any other dependency, so box always builds against
+the current state of `../../flecs`.
 
 ## Build and run
 
