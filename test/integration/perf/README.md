@@ -36,11 +36,8 @@ $ {
 
 Every scene spells out every setting, so a changed default never changes what a scene measures.
 
-A scene may share content with another scene through `include <name>` (flecs script resolves it
-next to the script). The runner writes the script it runs into the output folder, so the scene
-lists the files it includes in `<scene>.sources`, one path relative to the scene per line, and
-the runner copies them next to it: `town.flecs` includes `town_content`, listed in `town.sources`
-as `../../../etc/scenes/town_content.flecs`, the content of `etc/scenes/town.flecs`.
+A scene contains all of its content and includes no other script, so changing an example scene in
+`etc/scenes` does not change what a perf scene measures.
 
 ## Rules every scene follows
 
@@ -215,7 +212,7 @@ whose work was under 2 ms: the pacer's sleep woke late on a busy machine, not th
 | `town_orbit_30` .. `town_orbit_120` | windowed town | 30, 60, 90, 120 | The town at the retina size of its window for a minute, orbiting, presenting to a simulated 120 Hz display (90 Hz for 90 FPS, which does not divide 120). | 2.5k..3.6k | 0.1k | 1.1k..2.2k |
 | `town_fly_30` .. `town_fly_120` | moving through the town | 30, 60, 90, 120 | The same, flown through the streets by the scene's `CameraController` with synthetic input for a minute. | 0..2.4k | 0.1k..4.8k | 0..2.4k |
 | `town_fly_90_120hz` | 90 FPS on a 120 Hz display | 90 | The fly run capped at 90 FPS on a simulated 120 Hz display: a cadence of 1, 1 and 2 refreshes, checked only on display deltas and missed refreshes. | 0..2.4k | 0.1k..4.8k | 0..2.4k |
-| `town` | a real scene | 120 | The town of `etc/scenes/town.flecs` (content shared through `town.sources`) with its view: cascaded shadows, occlusion culling with a 4 pixel smallest size, SSAO and tonemapping. | 2.3k..3k | 1k | 0.8k..1.4k |
+| `town` | a real scene | 120 | The town of `etc/scenes/town.flecs` with its view: cascaded shadows, occlusion culling with a 4 pixel smallest size, SSAO and tonemapping. | 2.3k..3k | 1k | 0.8k..1.4k |
 | `walk_1m_first_person` | 1M collision, two views | 120 | `walk_1m` with a second view through the walking controller's own camera, rendered after the orbit view. | 78k | 922k | 0 |
 
 Frustum culled includes the size cull: shapes below one pixel (the far street boxes of the city,

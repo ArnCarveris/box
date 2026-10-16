@@ -1,9 +1,3 @@
-// Sakura machi, the town of box_old: fly with WASD (QE for down/up), hold the right mouse button
-// to look around. The content lives in town_content.flecs, which the town perf and visual scenes
-// share.
-
-include town_content
-
 using flecs.script
 using box.transform
 using box.camera
