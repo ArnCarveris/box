@@ -28,6 +28,12 @@
             "cflags": [
                 "--use-port=emdawnwebgpu"
             ]
+        },
+        "${os Linux}": {
+            "defines": [
+                "BOX_RENDER_WGPU",
+                "_GNU_SOURCE"
+            ]
         }
     },
     "dependee": {
@@ -60,6 +66,13 @@
                     "--use-port=emdawnwebgpu",
                     "-sDEFAULT_TO_CXX=1",
                     "-sSTACK_SIZE=8388608"
+                ]
+            },
+            "${os Linux}": {
+                "lib": [
+                    "m",
+                    "dl",
+                    "pthread"
                 ]
             }
         }
@@ -132,6 +145,34 @@
     },
     "${os Emscripten}": {
         "bundle": {
+            "resvg": {
+                "repository": "https://github.com/linebender/resvg.git",
+                "tag": "v0.47.0",
+                "subdir": "crates/c-api",
+                "build-system": "cargo",
+                "library": "resvg",
+                "cargo-args": [
+                    "--no-default-features",
+                    "--features=text,system-fonts,memmap-fonts"
+                ],
+                "include": [
+                    "."
+                ]
+            }
+        }
+    },
+    "${os Linux}": {
+        "bundle": {
+            "wgpu_native": {
+                "repository": "https://github.com/gfx-rs/wgpu-native.git",
+                "tag": "v29.0.1.1",
+                "build-system": "cargo",
+                "library": "wgpu_native",
+                "include": [
+                    "ffi",
+                    "ffi/webgpu-headers"
+                ]
+            },
             "resvg": {
                 "repository": "https://github.com/linebender/resvg.git",
                 "tag": "v0.47.0",
