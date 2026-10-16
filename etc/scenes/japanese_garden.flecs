@@ -2187,12 +2187,13 @@ japanese_garden {
   orbit {
     Position: {0, 0, 0}
     Rotation: {0, 0, 0}
-    AngularVelocity: {0, 0.15, 0}
+    // AngularVelocity: {0, 0.15, 0}
 
     camera {
       Position: {-19.13, 11.83, 16.21}
       Rotation: {-0.4408, -0.8679, 0}
       Camera: {fov: 40, near_: 0.1, far_: 150}
+      CameraController: {}
     }
   }
 
