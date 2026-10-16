@@ -377,8 +377,10 @@ shape out of the captures; a static shape has neither `DynamicTransform` nor `Ma
 static bounds of its spatial index (`box_spatial_static_bounds`) plus `bounds_padding`, on the
 world lattice (k + 1/2) * `probe_spacing` inside the padded bounds (as Unity places adaptive probe
 volume bricks on a world grid; spacing widened above 262144 probes), again only when the index or
-the settings change. Probes inside the oriented bounds of a static captured shape are invalid. The
-volume is a `BOX_RENDER_VOLUME` resource (`gpu_volume.c`): a grid uniform, two probe buffers of 9 rgb
+the settings change. Probes a static captured shape encloses are invalid: inside its oriented
+bounds and inside its mesh by the generalized winding number, so a probe in a corner of the bounds
+of a sphere or the hole of a torus stays valid. The volume is a `BOX_RENDER_VOLUME` resource
+(`gpu_volume.c`): a grid uniform, two probe buffers of 9 rgb
 L2 SH irradiance coefficients per probe (Ramamoorthi-Hanrahan, Sloan's basis) and a validity bit
 mask, both buffers filled with the exact SH of the hemisphere ambient when it is created or the
 ambient changes. A view with `lighting.baked` binds it as group 3 of `mesh.wgsl` with the probe

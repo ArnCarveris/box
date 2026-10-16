@@ -155,6 +155,79 @@ void ProbeVolume_invalid_inside_rotated_box(void) {
     ecs_fini(world);
 }
 
+void ProbeVolume_valid_outside_sphere_inside_bounds(void) {
+    // baked_lighting/probe_volume
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_singleton_set(world, LightBake, {.probe_spacing = 1, .bounds_padding = 0});
+    ecs_entity_t ball = ecs_new(world);
+    ecs_set(world, ball, Position, {0, 0, 0});
+    ecs_set(world, ball, Sphere, {.segments = 24, .radius = 2});
+    ecs_progress(world, 0);
+
+    test_int(ecs_get(world, ecs_id(LightBake), LightBakeStatus)->probes, 4 * 4 * 4);
+
+    box_render_probe_t probe;
+    test_assert(box_render_bake_probe(world, 0, (vec3){0.5f, 0.5f, 0.5f}, &probe));
+    test_flt(probe.position[0], 0.5f);
+    test_flt(probe.position[1], 0.5f);
+    test_flt(probe.position[2], 0.5f);
+    test_bool(probe.valid, false);
+
+    test_assert(box_render_bake_probe(world, 0, (vec3){1.5f, -0.5f, 0.5f}, &probe));
+    test_flt(probe.position[0], 1.5f);
+    test_flt(probe.position[1], -0.5f);
+    test_bool(probe.valid, false);
+
+    test_assert(box_render_bake_probe(world, 0, (vec3){1.5f, 1.5f, -1.5f}, &probe));
+    test_flt(probe.position[0], 1.5f);
+    test_flt(probe.position[1], 1.5f);
+    test_flt(probe.position[2], -1.5f);
+    test_bool(probe.valid, true);
+
+    test_assert(box_render_bake_probe(world, 0, (vec3){-1.5f, 1.5f, 0.5f}, &probe));
+    test_flt(probe.position[0], -1.5f);
+    test_flt(probe.position[2], 0.5f);
+    test_bool(probe.valid, true);
+
+    ecs_fini(world);
+}
+
+void ProbeVolume_valid_inside_torus_hole(void) {
+    // baked_lighting/probe_volume
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_singleton_set(world, LightBake, {.probe_spacing = 0.5f, .bounds_padding = 0});
+    ecs_entity_t ring = ecs_new(world);
+    ecs_set(world, ring, Position, {0, 0, 0});
+    ecs_set(world, ring, Torus, {.segments = 24, .rings = 12, .radius = 2, .tube = 0.5f});
+    ecs_progress(world, 0);
+
+    test_int(ecs_get(world, ecs_id(LightBake), LightBakeStatus)->probes, 10 * 2 * 10);
+
+    box_render_probe_t probe;
+    test_assert(box_render_bake_probe(world, 0, (vec3){0.25f, 0.25f, -0.25f}, &probe));
+    test_flt(probe.position[0], 0.25f);
+    test_flt(probe.position[1], 0.25f);
+    test_flt(probe.position[2], -0.25f);
+    test_bool(probe.valid, true);
+
+    test_assert(box_render_bake_probe(world, 0, (vec3){2.25f, -0.25f, 0.25f}, &probe));
+    test_flt(probe.position[0], 2.25f);
+    test_flt(probe.position[1], -0.25f);
+    test_flt(probe.position[2], 0.25f);
+    test_bool(probe.valid, false);
+
+    test_assert(box_render_bake_probe(world, 0, (vec3){2.25f, 0.25f, 2.25f}, &probe));
+    test_flt(probe.position[0], 2.25f);
+    test_flt(probe.position[2], 2.25f);
+    test_bool(probe.valid, true);
+
+    ecs_fini(world);
+}
+
 void ProbeVolume_grid_follows_static_bounds(void) {
     // baked_lighting/probe_volume
     ecs_world_t *world = ecs_init();

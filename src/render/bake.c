@@ -189,10 +189,65 @@ void box_bake_probe_position(
     out[2] = g->origin[2] + (float)(index / (sx * sy)) * g->spacing;
 }
 
+/** Signed solid angle that a triangle subtends at the origin (Van Oosterom and Strackee),
+ * positive when its corners wind counter-clockwise seen from the origin.
+ *
+ * @param a The first corner, relative to the origin
+ * @param b The second corner, relative to the origin
+ * @param c The third corner, relative to the origin
+ * @return The solid angle in steradians
+ */
+static double box_bake_solid_angle(
+    const vec3 a,
+    const vec3 b,
+    const vec3 c)
+{
+    vec3 bc;
+    glm_vec3_cross(ECS_CONST_CAST(float*, b), ECS_CONST_CAST(float*, c), bc);
+    double la = glm_vec3_norm(ECS_CONST_CAST(float*, a));
+    double lb = glm_vec3_norm(ECS_CONST_CAST(float*, b));
+    double lc = glm_vec3_norm(ECS_CONST_CAST(float*, c));
+    double num = glm_vec3_dot(ECS_CONST_CAST(float*, a), bc);
+    double den = la * lb * lc +
+        glm_vec3_dot(ECS_CONST_CAST(float*, a), ECS_CONST_CAST(float*, b)) * lc +
+        glm_vec3_dot(ECS_CONST_CAST(float*, b), ECS_CONST_CAST(float*, c)) * la +
+        glm_vec3_dot(ECS_CONST_CAST(float*, c), ECS_CONST_CAST(float*, a)) * lb;
+
+    return 2.0 * atan2(num, den);
+}
+
+/** Check whether a point in the space of a unit mesh is enclosed by it: the generalized
+ * winding number of the mesh at the point, the solid angle of its triangles over 4 pi,
+ * exceeds one half. Holds for meshes with small gaps, and either winding.
+ *
+ * @param mesh The mesh
+ * @param p The point
+ * @return Whether the mesh encloses the point
+ */
+static bool box_bake_enclosed(
+    const box_mesh_t *mesh,
+    const vec3 p)
+{
+    double angle = 0;
+    int32_t t;
+    for (t = 0; t + 2 < mesh->index_count; t += 3) {
+        vec3 a, b, c;
+        glm_vec3_sub(mesh->vertices[mesh->indices[t]].position, ECS_CONST_CAST(float*, p), a);
+        glm_vec3_sub(mesh->vertices[mesh->indices[t + 1]].position,
+            ECS_CONST_CAST(float*, p), b);
+        glm_vec3_sub(mesh->vertices[mesh->indices[t + 2]].position,
+            ECS_CONST_CAST(float*, p), c);
+        angle += box_bake_solid_angle(a, b, c);
+    }
+
+    return fabs(angle) > 2.0 * GLM_PI;
+}
+
 /** Check whether a position lies inside a static shape that the bake captures.
  *
- * The test is against the oriented bounds of the unit mesh of the shape, scaled by its
- * instance scale and placed by its world transform; a position on the surface is outside.
+ * A position inside the oriented bounds of the scaled and placed unit mesh of the shape is
+ * tested against its triangles: one the surface does not enclose, such as a corner of the
+ * bounds of a sphere or the hole of a torus, is outside, as is a position on the surface.
  *
  * @param world The world
  * @param cache The mesh cache
@@ -226,13 +281,20 @@ static bool box_bake_inside(
     }
 
     int32_t i;
+    vec3 unit = {0};
     result = true;
     for (i = 0; i < 3; i ++) {
         float a = mesh->min[i] * shape->scale[i];
         float b = mesh->max[i] * shape->scale[i];
         if (!(local[i] > glm_min(a, b) && local[i] < glm_max(a, b))) {
             result = false;
+        } else {
+            unit[i] = local[i] / shape->scale[i];
         }
+    }
+
+    if (result) {
+        result = box_bake_enclosed(mesh, unit);
     }
 
 done:
