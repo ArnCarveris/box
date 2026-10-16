@@ -412,7 +412,7 @@ static void box_gpu_render(
             box_gpu_texture_apply(gpu, r->op, r->handle,
                 r->size >= sizeof(box_render_texture_desc_t) ? data : NULL);
         } else if (r->kind == BOX_RENDER_VOLUME) {
-            box_gpu_bake_apply(gpu, r->op, r->handle,
+            box_gpu_volume_apply(gpu, r->op, r->handle,
                 r->size >= sizeof(box_render_volume_desc_t) ? data : NULL, r->size);
         }
 

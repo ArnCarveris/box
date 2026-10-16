@@ -87,7 +87,7 @@ void box_gpu_draw_init(
     };
     WGPUBindGroupLayoutDescriptor layout = { .entryCount = 5, .entries = entries };
     box_gpu_cull_init(gpu);
-    box_gpu_bake_init(gpu);
+    box_gpu_volume_init(gpu);
     gpu->view_layout = wgpuDeviceCreateBindGroupLayout(gpu->device, &layout);
     WGPUBindGroupLayout groups[4] = {
         gpu->view_layout, gpu->material_layout, gpu->instance_layout, gpu->volume_layout
@@ -182,6 +182,7 @@ void box_gpu_draw_fini(
     box_gpu_shadow_fini(gpu);
     box_gpu_cull_fini(gpu);
     box_gpu_bake_fini(gpu);
+    box_gpu_volume_fini(gpu);
     box_gpu_effects_fini(gpu);
     if (gpu->view_buffer) {
         wgpuBufferRelease(gpu->view_buffer);
@@ -571,17 +572,7 @@ static uint64_t box_gpu_forward_key(
         (back_face == BackFaceCull ? 0u : 1u);
 }
 
-/** Get the forward pipeline of a color format and the state of a batch, created on first use.
- *
- * The cache grows with the states in use; a recompiled or released mesh or 2D shape shader
- * empties it, and a batch whose shader does not exist draws nothing.
- *
- * @param gpu The backend
- * @param format The format of the color target
- * @param b The batch
- * @return The pipeline, NULL without a shader or for an unknown blend mode
- */
-static WGPURenderPipeline box_gpu_forward_pipeline(
+WGPURenderPipeline box_gpu_forward_pipeline(
     box_gpu_t *gpu,
     WGPUTextureFormat format,
     const box_render_batch_t *b)
@@ -762,15 +753,6 @@ static void box_gpu_draw_batches(
     }
 }
 
-void box_gpu_draw_capture(
-    box_gpu_t *gpu,
-    WGPURenderPassEncoder pass,
-    const box_render_packet_t *packet,
-    int32_t slot)
-{
-    box_gpu_draw_batches(gpu, pass, BOX_GPU_HDR_FORMAT, packet, slot, 0);
-}
-
 /** Record a render pass of a view and its draws of one phase.
  *
  * @param gpu The backend
@@ -827,7 +809,7 @@ static void box_gpu_draw_pass(
     WGPUBindGroup group = box_gpu_light_group(gpu, v, slot);
     WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
     wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
-    wgpuRenderPassEncoderSetBindGroup(pass, 3, box_gpu_bake_group(gpu, v), 0, NULL);
+    wgpuRenderPassEncoderSetBindGroup(pass, 3, box_gpu_volume_group(gpu, v), 0, NULL);
     box_gpu_draw_batches(gpu, pass, hdr ? BOX_GPU_HDR_FORMAT : t->format, packet, slot, phase);
     wgpuRenderPassEncoderEnd(pass);
     wgpuRenderPassEncoderRelease(pass);

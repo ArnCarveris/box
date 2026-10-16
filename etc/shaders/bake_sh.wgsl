@@ -11,10 +11,18 @@
 // occluded when the face texel toward the light saw a surface nearer than the light, for a
 // directional light any surface.
 //
+// The cull entry point lists, before the faces render, the instances of one batch each face of
+// each probe of the chunk draws: those whose sphere spans the smallest size at their depth in
+// the face their center is in, and whose box reaches into the 90 degree frustum of the face.
+// The slots of a face keep slot order, compacted by a workgroup prefix sum, so depth ties
+// resolve the same way in every bake.
+//
 // Face f of probe p is the tile at column f and row p of the atlas, size texels on each side.
 // Its texel (x, y), y down, looks along
 // forward + u right + v up with u, v in [-1, 1] and right = cross(forward, up). The depth of
 // a face is reversed with an infinite far plane: near over the view depth, 0 where nothing is.
+
+#include "include/instance.wgsl"
 
 struct Params {
     // x: face edge in texels, y: probes of the chunk
@@ -22,13 +30,13 @@ struct Params {
     sky: vec4f,
     ground: vec4f,
     // Volume index of each probe of the chunk, four per vector
-    probes: array<vec4u, 8>,
+    probes: array<vec4u, 32>,
     // x: Baked lights, y: directional lights among them, which come first
     lights: vec4u,
-    // x: near plane of the faces
+    // x: near plane of the faces, y: pixels per unit at depth 1, z: smallest size in pixels
     near: vec4f,
     // World position of each probe of the chunk
-    positions: array<vec4f, 32>,
+    positions: array<vec4f, 128>,
 };
 
 // A light as in mesh.wgsl: position is the direction toward a directional light.
@@ -41,17 +49,53 @@ struct Light {
     spot_offset: f32,
 };
 
+// The instances of one batch the cull tests, at a dynamic offset per batch.
+struct CullJob {
+    // First slot, or first entry of lists when list is 1
+    first: u32,
+    count: u32,
+    list: u32,
+    // Index of the batch among the batches of the chunk
+    draw: u32,
+    // Box around the mesh of the batch
+    center: vec3f,
+    index_count: u32,
+    extent: vec3f,
+    // First entry of the batch in the slots of a face
+    region: u32,
+    // Batches of the chunk
+    draws: u32,
+    // Slots of a face, those of every batch
+    stride: u32,
+    pad0: u32,
+    pad1: u32,
+};
+
 @group(0) @binding(0) var<uniform> params: Params;
 @group(0) @binding(1) var captures: texture_2d<f32>;
 @group(0) @binding(2) var<storage, read_write> volume: array<vec4f>;
 @group(0) @binding(3) var depths: texture_depth_2d;
 @group(0) @binding(4) var<storage, read> lights: array<Light>;
+@group(0) @binding(5) var<uniform> job: CullJob;
+@group(0) @binding(6) var<storage, read_write> slots: array<u32>;
+@group(0) @binding(7) var<storage, read_write> args: array<u32>;
+@group(0) @binding(8) var<storage, read> lists: array<u32>;
+@group(1) @binding(0) var<storage, read> instances: array<Instance>;
 
 const GROUP: u32 = 64u;
 const SH_COEFFICIENTS: u32 = 9u;
 const PI: f32 = 3.141592653589793;
 
+// Invocations of a workgroup of the cull.
+const CULL_GROUP: u32 = 256u;
+
+// Words of the indexed indirect draw arguments of a draw.
+const ARGS: u32 = 5u;
+
 var<workgroup> partial: array<array<vec3f, 9>, 64>;
+
+// Per invocation of the cull, three faces per word in fields of ten bits.
+var<workgroup> face_scan: array<vec2u, 256>;
 
 // Texel of the atlas that holds texel (x, y) of a face of a probe.
 fn tile(probe: u32, face: u32, x: u32, y: u32) -> vec2u {
@@ -207,5 +251,101 @@ fn project(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_index)
         let index = params.probes[probe / 4u][probe % 4u];
         let e = (partial[0][lane] + direct(probe, lane)) * band(lane);
         volume[index * SH_COEFFICIENTS + lane] = vec4f(e, 0.0);
+    }
+}
+
+// Faces of a probe that draw an instance, one bit per face in the order of face_axes. Face f
+// sees along axis a = f / 2 where the depth along a is at least the distance along the other
+// two axes; the box reaches into it when it does so for each of them on its nearest corner.
+fn cull_faces(slot: u32, eye: vec3f) -> u32 {
+    let m = instances[slot].model;
+    let c0 = m[0].xyz;
+    let c1 = m[1].xyz;
+    let c2 = m[2].xyz;
+    let center = c0 * job.center.x + c1 * job.center.y + c2 * job.center.z + m[3].xyz;
+    let e = abs(c0) * job.extent.x + abs(c1) * job.extent.y + abs(c2) * job.extent.z;
+    let q = center - eye;
+    let a = abs(q);
+    let radius = length(e);
+    let w = max(a.x, max(a.y, a.z));
+    if (w > radius && 2.0 * radius * params.near.y < params.near.z * w) {
+        return 0u;
+    }
+
+    var mask = 0u;
+    for (var f = 0u; f < 6u; f++) {
+        let axis = f / 2u;
+        let b = (axis + 1u) % 3u;
+        let c = (axis + 2u) % 3u;
+        let depth = select(q[axis], -q[axis], (f & 1u) != 0u) + e[axis];
+        if (depth > 0.0 && depth + e[b] >= a[b] && depth + e[c] >= a[c]) {
+            mask |= 1u << f;
+        }
+    }
+
+    return mask;
+}
+
+// Count of a face in a packed scan entry.
+fn face_count(v: vec2u, f: u32) -> u32 {
+    return (select(v.y, v.x, f < 3u) >> ((f % 3u) * 10u)) & 1023u;
+}
+
+@compute @workgroup_size(256)
+fn cull(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_index) lane: u32) {
+    let probe = group.x;
+    let eye = params.positions[probe].xyz;
+    var running = array<u32, 6>(0u, 0u, 0u, 0u, 0u, 0u);
+    for (var start = 0u; start < job.count; start += CULL_GROUP) {
+        let i = start + lane;
+        var slot = 0u;
+        var mask = 0u;
+        if (i < job.count) {
+            slot = job.first + i;
+            if (job.list != 0u) {
+                slot = lists[job.first + i];
+            }
+
+            mask = cull_faces(slot, eye);
+        }
+
+        let own = vec2u(
+            (mask & 1u) | (((mask >> 1u) & 1u) << 10u) | (((mask >> 2u) & 1u) << 20u),
+            ((mask >> 3u) & 1u) | (((mask >> 4u) & 1u) << 10u) | (((mask >> 5u) & 1u) << 20u));
+        face_scan[lane] = own;
+        workgroupBarrier();
+        for (var step = 1u; step < CULL_GROUP; step *= 2u) {
+            var add = vec2u(0u);
+            if (lane >= step) {
+                add = face_scan[lane - step];
+            }
+
+            workgroupBarrier();
+            face_scan[lane] += add;
+            workgroupBarrier();
+        }
+
+        let before = face_scan[lane] - own;
+        let total = face_scan[CULL_GROUP - 1u];
+        for (var f = 0u; f < 6u; f++) {
+            if (((mask >> f) & 1u) != 0u) {
+                let at = (probe * 6u + f) * job.stride + job.region + running[f] +
+                    face_count(before, f);
+                slots[at] = slot;
+            }
+
+            running[f] += face_count(total, f);
+        }
+
+        workgroupBarrier();
+    }
+
+    if (lane < 6u) {
+        let at = ((probe * 6u + lane) * job.draws + job.draw) * ARGS;
+        args[at] = job.index_count;
+        args[at + 1u] = running[lane];
+        args[at + 2u] = 0u;
+        args[at + 3u] = 0u;
+        args[at + 4u] = 0u;
     }
 }

@@ -455,14 +455,7 @@ done:
     return s && s->module ? gpu->cluster : NULL;
 }
 
-/** Get the light buffer a view binds.
- *
- * @param gpu The backend
- * @param v The view
- * @param size Receives the bytes of the buffer
- * @return The light buffer of the view, or the empty buffer when the backend lacks it
- */
-static WGPUBuffer box_gpu_light_binding(
+WGPUBuffer box_gpu_light_binding(
     box_gpu_t *gpu,
     const box_render_view_t *v,
     uint64_t *size)

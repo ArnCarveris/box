@@ -703,19 +703,29 @@ WGPUBindGroup box_gpu_material_group(
     const box_render_batch_t *b,
     uint32_t anisotropy);
 
+/** Bytes of the SH of one probe */
+#define BOX_GPU_PROBE_SIZE (BOX_RENDER_SH_COEFFICIENTS * 4 * sizeof(float))
+
 /** Create the layout of the probe volumes and the volume of views without one.
  *
  * @param gpu The backend
  */
-void box_gpu_bake_init(
+void box_gpu_volume_init(
     box_gpu_t *gpu);
 
 /** Release the probe volumes and their layout.
  *
  * @param gpu The backend
  */
-void box_gpu_bake_fini(
+void box_gpu_volume_fini(
     box_gpu_t *gpu);
+
+/** Release a probe volume: its buffers, bind groups and the volume.
+ *
+ * @param v The volume
+ */
+void box_gpu_volume_free(
+    box_gpu_volume_t *v);
 
 /** Create, refill or release a probe volume from a BOX_RENDER_VOLUME resource.
  *
@@ -725,7 +735,7 @@ void box_gpu_bake_fini(
  * @param desc Grid, SH and validity mask, NULL for a release
  * @param size Bytes of the description with its mask
  */
-void box_gpu_bake_apply(
+void box_gpu_volume_apply(
     box_gpu_t *gpu,
     box_render_resource_op_t op,
     uint32_t handle,
@@ -738,9 +748,16 @@ void box_gpu_bake_apply(
  * @param v The view
  * @return The group of its volume, or of the 1x1x1 volume that leaves the hemisphere ambient
  */
-WGPUBindGroup box_gpu_bake_group(
+WGPUBindGroup box_gpu_volume_group(
     box_gpu_t *gpu,
     const box_render_view_t *v);
+
+/** Release the state of the probe captures.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_bake_fini(
+    box_gpu_t *gpu);
 
 /** Render the probe captures of a packet and project them onto the SH of their volumes.
  *
@@ -751,18 +768,20 @@ void box_gpu_bake_capture(
     box_gpu_t *gpu,
     const box_render_packet_t *packet);
 
-/** Record the draws of the cull view of a probe capture into the render pass of its faces.
+/** Get the forward pipeline of a color format and the state of a batch, created on first use.
+ *
+ * The cache grows with the states in use; a recompiled or released mesh or 2D shape shader
+ * empties it, and a batch whose shader does not exist draws nothing.
  *
  * @param gpu The backend
- * @param pass The render pass, with an rgba16float color target
- * @param packet The packet
- * @param slot Slot of the cull view of the probe
+ * @param format The format of the color target
+ * @param b The batch
+ * @return The pipeline, NULL without a shader or for an unknown blend mode
  */
-void box_gpu_draw_capture(
+WGPURenderPipeline box_gpu_forward_pipeline(
     box_gpu_t *gpu,
-    WGPURenderPassEncoder pass,
-    const box_render_packet_t *packet,
-    int32_t slot);
+    WGPUTextureFormat format,
+    const box_render_batch_t *b);
 
 /** Create the layouts the forward pass shares.
  *
@@ -909,6 +928,18 @@ void box_gpu_light_cluster_with(
     WGPUBuffer uniforms,
     uint32_t offset,
     WGPUBuffer clusters);
+
+/** Get the light buffer a view binds.
+ *
+ * @param gpu The backend
+ * @param v The view
+ * @param size Receives the bytes of the buffer
+ * @return The light buffer of the view, or the empty buffer when the backend lacks it
+ */
+WGPUBuffer box_gpu_light_binding(
+    box_gpu_t *gpu,
+    const box_render_view_t *v,
+    uint64_t *size);
 
 /** Create the bind group of the forward pass of a view with explicit buffers.
  *
@@ -1215,26 +1246,20 @@ void box_gpu_cull_capture_add(
     mat4 view_proj,
     float pixels);
 
-/** Add the cull view of a probe capture, which every face of the probe draws.
- *
- * It draws the batches of the scene with bake set that are large enough seen from the probe:
- * the sphere around an instance must span at least the smallest size at its depth in the face
- * its center is in, the largest axis distance to the probe. No frustum is tested.
+/** Check whether a probe capture draws a batch.
  *
  * @param gpu The backend
- * @param packet The packet
+ * @param b The batch
  * @param scene Scene of the captures
- * @param slot Slot that identifies the cull view
- * @param eye World position of the probe
- * @param pixels Pixels per unit at depth 1 of a face, 0 to draw every instance
+ * @param cascade Cascade of the cull view, -1 for a face
+ * @return Whether the batch has opaque static meshes of the scene the captures draw, and for
+ * the cascade casts shadows, and the backend has its mesh and storage instance buffer
  */
-void box_gpu_cull_probe_add(
+bool box_gpu_cull_capture_draws(
     box_gpu_t *gpu,
-    const box_render_packet_t *packet,
+    const box_render_batch_t *b,
     ecs_entity_t scene,
-    int32_t slot,
-    const float eye[3],
-    float pixels);
+    int32_t cascade);
 
 /** Record the dispatches of every cull view in one compute pass.
  *

@@ -983,16 +983,7 @@ void box_gpu_cull_reset(
     ecs_vec_clear(&c->tables);
 }
 
-/** Check whether a probe capture draws a batch.
- *
- * @param gpu The backend
- * @param b The batch
- * @param scene Scene of the captures
- * @param cascade Cascade of the cull view, -1 for a face
- * @return Whether the batch has opaque static meshes of the scene the captures draw, and for
- * the cascade casts shadows, and the backend has its mesh and storage instance buffer
- */
-static bool box_gpu_cull_capture_draws(
+bool box_gpu_cull_capture_draws(
     box_gpu_t *gpu,
     const box_render_batch_t *b,
     ecs_entity_t scene,
@@ -1072,29 +1063,6 @@ void box_gpu_cull_capture_add(
     base.size[1] = pixels > 0 ? BOX_RENDER_CULL_MIN_DIMENSION : 0.0f;
     base.size[2] = 1.0f;
     box_gpu_cull_capture_view(gpu, packet, scene, slot, cascade, &base);
-}
-
-void box_gpu_cull_probe_add(
-    box_gpu_t *gpu,
-    const box_render_packet_t *packet,
-    ecs_entity_t scene,
-    int32_t slot,
-    const float eye[3],
-    float pixels)
-{
-    box_gpu_cull_uniforms_t base;
-    int32_t i;
-    ecs_os_memset_t(&base, 0, box_gpu_cull_uniforms_t);
-    for (i = 0; i < 6; i ++) {
-        base.planes[i][3] = 1.0f;
-    }
-
-    glm_vec3_copy(ECS_CONST_CAST(float*, eye), base.clip_w);
-    base.size[0] = pixels;
-    base.size[1] = pixels > 0 ? BOX_RENDER_CULL_MIN_DIMENSION : 0.0f;
-    base.size[2] = 1.0f;
-    base.size[3] = 1.0f;
-    box_gpu_cull_capture_view(gpu, packet, scene, slot, -1, &base);
 }
 
 /** Make a cull buffer hold a number of bytes, growing it by doubling.

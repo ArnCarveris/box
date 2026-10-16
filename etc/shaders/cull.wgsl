@@ -94,9 +94,7 @@ var<workgroup> scan_sums: array<u32, 256>;
 
 // Whether the world space box around an instance reaches into the frustum and is large enough.
 // The size is the diameter of the sphere around the box in pixels, tested only when the box is
-// in front of the camera (w beyond the radius); size.z is 0 for orthographic projections. With
-// size.w 1 the cull view is a probe at clip_w.xyz that sees in every direction through the six
-// faces of a cube, the planes keep everything and w is the depth in the face the center is in.
+// in front of the camera (w beyond the radius); size.z is 0 for orthographic projections.
 fn visible(job: Job, slot: u32) -> bool {
     let m = instances[slot].model;
     let c0 = m[0].xyz;
@@ -113,11 +111,7 @@ fn visible(job: Job, slot: u32) -> bool {
     }
 
     let radius = length(extent);
-    var w = dot(cull.clip_w, vec4f(center, 1.0));
-    if (cull.size.w > 0.0) {
-        let d = abs(center - cull.clip_w.xyz);
-        w = max(d.x, max(d.y, d.z));
-    }
+    let w = dot(cull.clip_w, vec4f(center, 1.0));
 
     if (result && cull.size.y > 0.0 && w > radius * cull.size.z) {
         result = 2.0 * radius * cull.size.x >= cull.size.y * w;

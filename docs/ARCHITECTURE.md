@@ -371,7 +371,7 @@ static bounds of its spatial index (`box_spatial_static_bounds`) plus `bounds_pa
 world lattice (k + 1/2) * `probe_spacing` inside the padded bounds (as Unity places adaptive probe
 volume bricks on a world grid; spacing widened above 262144 probes), again only when the index or
 the settings change. Probes inside the oriented bounds of a static captured shape are invalid. The
-volume is a `BOX_RENDER_VOLUME` resource (`gpu_bake.c`): a grid uniform, two probe buffers of 9 rgb
+volume is a `BOX_RENDER_VOLUME` resource (`gpu_volume.c`): a grid uniform, two probe buffers of 9 rgb
 L2 SH irradiance coefficients per probe (Ramamoorthi-Hanrahan, Sloan's basis) and a validity bit
 mask, both buffers filled with the exact SH of the hemisphere ambient when it is created or the
 ambient changes. A view with `lighting.baked` binds it as group 3 of `mesh.wgsl` with the probe
@@ -388,10 +388,13 @@ of a packet (requested natively and by `apps/boxrun/shell.html` when the adapter
 `timestamp-query`, resolved a packet later because Metal writes pass timestamps when the pass
 completes, read back without waiting, measurements over a second dropped); without them it is the
 CPU time from recording until the queue reports the work done, which includes waits and errs on the
-expensive side. On the render thread the captures run before the targets, in chunks of at most 32
+expensive side. On the render thread the captures run before the targets, in chunks of at most 128
 probes per command buffer: six 90 degree faces of `capture_size` texels per probe render the opaque
-static batches of the scene with the forward pipeline into an rgba16float array, culled per face by
-frustum and 1 px size, without history, effects or 2D. Batches carry a `bake` key only in scenes
+static batches of the scene with the forward pipeline into an rgba16float array, without history,
+effects or 2D. The `cull` entry of `bake_sh.wgsl` (a dispatch per batch, a workgroup per probe)
+lists the instances of each face that reach into its frustum and span 1 px, in slot order; each
+face replays a render bundle of its indirect draws, recorded again only when the batches, lights,
+shadow map, ambient term or cull buffers change. Batches carry a `bake` key only in scenes
 with `LightBake` (opaque 3D shapes without `DynamicTransform`, `ManualTransform` or `NoBake`; the
 draw observers re-key on changes), so other scenes batch as before. The faces are lit by the lights
 of the scene and an ambient term from the batch's source buffer (below); the sun is shadowed by one
