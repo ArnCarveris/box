@@ -12,6 +12,10 @@ using box.effects
 using box.surface
 using box.controllers
 
+$ {
+  LightBake: {probe_spacing: 0.3, bounds_padding: -0.3, capture_size: 128, bounces: 3, budget_ms: 16}
+}
+
 window {
   Surface: {width: 1280, height: 720, vsync: true}
 }

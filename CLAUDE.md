@@ -77,6 +77,10 @@ Never open a window. Run `boxrun`, benches and scenes with `--headless` and `--f
 `--timeout`, drive them over the command port and look at captures; a windowed run takes over
 the keyboard and screen of the person working on this machine.
 
+Reproduce "retina resolution" at 3974x2514 pixels, always: the maximized window on the user's
+display (1987x1257 points at pixel ratio 2), set as `Surface: {width: 1987, height: 1257,
+pixel_ratio: 2}`. Never substitute a lower resolution such as 2880x1920 or 2560x1440.
+
 A headless `box_run` refuses to start when the load average exceeds the core count ("cpu
 oversubscribed") and paces itself to one core; that protects the machine from app, bench and
 scene runs, not from tests. Run test projects with `BOX_TEST=1` in front of the command

@@ -732,6 +732,31 @@ done:
     return;
 }
 
+/** Draw the views of a frame into the scene texture of a target and submit the work before the
+ * target acquires its image. Acquiring a window image blocks until the display frees one, so
+ * the GPU renders the frame while the render thread waits instead of after it.
+ *
+ * @param gpu The backend
+ * @param t The target, with a scene texture
+ * @param packet The packet
+ * @param frame The target of the packet
+ */
+static void box_gpu_target_scene_draw(
+    box_gpu_t *gpu,
+    box_gpu_target_t *t,
+    const box_render_packet_t *packet,
+    const box_render_target_t *frame)
+{
+    WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
+    WGPUCommandBuffer commands;
+    box_gpu_clear(encoder, t->scene_view, frame->clear);
+    box_gpu_draw_views(gpu, t, packet, frame, encoder, t->scene_view);
+    commands = wgpuCommandEncoderFinish(encoder, NULL);
+    wgpuQueueSubmit(gpu->queue, 1, &commands);
+    wgpuCommandBufferRelease(commands);
+    wgpuCommandEncoderRelease(encoder);
+}
+
 void box_gpu_target_render(
     box_gpu_t *gpu,
     const box_render_packet_t *packet,
@@ -742,8 +767,15 @@ void box_gpu_target_render(
         ? box_render_window_presents(t->surface != NULL, t->desc.vsync, packet->presents)
         : 1;
     int32_t i;
+    bool drawn = false;
     if (t) {
         box_gpu_target_scene_follow(gpu, t, packet->fps);
+    }
+
+    gpu->rendering = frame->handle;
+    if (t && t->scene_view) {
+        box_gpu_target_scene_draw(gpu, t, packet, frame);
+        drawn = true;
     }
 
     WGPUTexture texture = t ? box_gpu_target_acquire(gpu, t) : NULL;
@@ -751,14 +783,13 @@ void box_gpu_target_render(
         goto done;
     }
 
-    gpu->rendering = frame->handle;
-
     WGPUTextureView view = box_gpu_target_view(t, texture);
     WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
-    box_gpu_clear(encoder, t->scene_view ? t->scene_view : view, frame->clear);
-    box_gpu_draw_views(gpu, t, packet, frame, encoder, t->scene_view ? t->scene_view : view);
-    if (t->scene_view) {
+    if (drawn) {
         box_gpu_blit(gpu, t, encoder, view);
+    } else {
+        box_gpu_clear(encoder, view, frame->clear);
+        box_gpu_draw_views(gpu, t, packet, frame, encoder, view);
     }
 
     if (box_gpu_target_captures(frame)) {
