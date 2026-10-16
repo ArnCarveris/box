@@ -38,13 +38,15 @@ struct Volume {
 };
 
 // Every probe is SH_COEFFICIENTS rgb irradiance coefficients E_lm (Ramamoorthi and Hanrahan),
-// in Sloan's real SH basis; probe_valid has one bit per probe, clear inside static geometry.
+// in Sloan's real SH basis; cell_valid has a byte per cell of the grid, four to a word, whose
+// bit x + 2y + 4z is set when that corner probe of the cell is valid: clear inside static
+// geometry. A cell is a probe with a neighbour after it on every axis with more than one probe.
 // probe_visibility holds an octahedral map per probe of VISIBILITY_SIZE texels on each side,
 // each the mean and mean square distance to the surfaces its faces saw in probe spacings, packed
 // as two halves (bake_sh.wgsl).
 @group(3) @binding(0) var<uniform> volume: Volume;
 @group(3) @binding(1) var<storage, read> probes: array<vec4f>;
-@group(3) @binding(2) var<storage, read> probe_valid: array<u32>;
+@group(3) @binding(2) var<storage, read> cell_valid: array<u32>;
 @group(3) @binding(3) var<storage, read> probe_visibility: array<u32>;
 
 const SH_COEFFICIENTS: u32 = 9u;
@@ -155,17 +157,33 @@ fn visibility_moments(index: u32, x: i32, y: i32) -> vec2f {
 
 // Chance that a probe sees a point, from the offset of the point from the probe: one up to the
 // mean distance its faces saw in that direction, then Chebyshev's bound from the variance,
-// cubed, as DDGI weighs its probes.
+// cubed, as DDGI weighs its probes. The four texels around the point are read directly unless
+// one of them lies past an edge of the map.
 fn visibility_from(index: u32, offset: vec3f) -> f32 {
     let len = length(offset);
     let dist = len / volume.origin.w;
     let t = octahedral_uv(offset / max(len, 1e-6)) * f32(VISIBILITY_SIZE) - 0.5;
     let i = vec2i(floor(t));
     let f = t - floor(t);
-    let low = mix(visibility_moments(index, i.x, i.y),
-        visibility_moments(index, i.x + 1, i.y), f.x);
-    let high = mix(visibility_moments(index, i.x, i.y + 1),
-        visibility_moments(index, i.x + 1, i.y + 1), f.x);
+    var m00: vec2f;
+    var m10: vec2f;
+    var m01: vec2f;
+    var m11: vec2f;
+    if (all(i >= vec2i(0)) && all(i < vec2i(VISIBILITY_SIZE - 1))) {
+        let row = u32(VISIBILITY_SIZE);
+        let at = index * row * row + u32(i.x) + u32(i.y) * row;
+        m00 = unpack2x16float(probe_visibility[at]);
+        m10 = unpack2x16float(probe_visibility[at + 1u]);
+        m01 = unpack2x16float(probe_visibility[at + row]);
+        m11 = unpack2x16float(probe_visibility[at + row + 1u]);
+    } else {
+        m00 = visibility_moments(index, i.x, i.y);
+        m10 = visibility_moments(index, i.x + 1, i.y);
+        m01 = visibility_moments(index, i.x, i.y + 1);
+        m11 = visibility_moments(index, i.x + 1, i.y + 1);
+    }
+    let low = mix(m00, m10, f.x);
+    let high = mix(m01, m11, f.x);
     let m = mix(low, high, f.y);
     if (len <= 1e-6 || dist <= m.x) {
         return 1.0;
@@ -192,6 +210,9 @@ fn volume_irradiance(world: vec3f, n: vec3f, spec: vec3f) -> Indirect {
     let g = clamp((world - volume.origin.xyz) / volume.origin.w, vec3f(0.0), vec3f(size - 1u));
     let base = min(vec3u(floor(g)), max(size, vec3u(2u)) - 2u);
     let t = clamp(g - vec3f(base), vec3f(0.0), vec3f(1.0));
+    let cells = max(size, vec3u(2u)) - 1u;
+    let cell = base.x + (base.y + base.z * cells.y) * cells.x;
+    let corners = cell_valid[cell >> 2u] >> ((cell & 3u) * 8u);
     let biased = world + n * (VISIBILITY_BIAS * volume.origin.w);
     var diffuse = vec3f(0.0);
     var specular = vec3f(0.0);
@@ -201,7 +222,7 @@ fn volume_irradiance(world: vec3f, n: vec3f, spec: vec3f) -> Indirect {
         let o = vec3u(i & 1u, (i >> 1u) & 1u, (i >> 2u) & 1u);
         let p = min(base + o, size - 1u);
         let index = p.x + (p.y + p.z * size.y) * size.x;
-        let valid = (probe_valid[index >> 5u] >> (index & 31u)) & 1u;
+        let valid = (corners >> i) & 1u;
         let trilinear = select(1.0 - t, t, o == vec3u(1u));
         let position = volume.origin.xyz + vec3f(p) * volume.origin.w;
         let to_probe = position - world;

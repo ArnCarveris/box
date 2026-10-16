@@ -58,7 +58,7 @@ static box_gpu_volume_t* box_gpu_volume_new(
 {
     box_gpu_volume_t *v = ecs_os_calloc_t(box_gpu_volume_t);
     uint64_t probes = (uint64_t)count * BOX_GPU_PROBE_SIZE;
-    uint64_t valid = (uint64_t)(count + 31) / 32 * sizeof(uint32_t);
+    uint64_t valid = ((uint64_t)count + 3) & ~(uint64_t)3;
     uint64_t visibility = (uint64_t)count * BOX_GPU_VISIBILITY_SIZE;
     int32_t i;
     v->count = count;
@@ -85,6 +85,52 @@ static box_gpu_volume_t* box_gpu_volume_new(
     }
 
     return v;
+}
+
+/** Write the validity of the cells of a volume, so the forward pass reads that of the eight
+ * probes it blends with one load: a byte per cell, whose bit x + 2y + 4z is set when that corner
+ * of the cell is a valid probe.
+ *
+ * A cell is a probe with a neighbour after it on every axis with more than one probe. The mask
+ * of the probes follows the description, one bit per probe.
+ *
+ * @param gpu The backend
+ * @param v The volume
+ * @param desc The grid, followed by the mask of its probes
+ */
+static void box_gpu_volume_valid(
+    box_gpu_t *gpu,
+    box_gpu_volume_t *v,
+    const box_render_volume_desc_t *desc)
+{
+    const uint32_t *bits = (const uint32_t*)(desc + 1);
+    const uint32_t *n = desc->size;
+    uint32_t c[3], x, y, z, k;
+    size_t size = ((size_t)v->count + 3) & ~(size_t)3;
+    uint8_t *cells = ecs_os_calloc((ecs_size_t)size);
+    uint8_t *cell = cells;
+    for (k = 0; k < 3; k ++) {
+        c[k] = n[k] > 1 ? n[k] - 1 : 1;
+    }
+
+    for (z = 0; z < c[2]; z ++) {
+        for (y = 0; y < c[1]; y ++) {
+            for (x = 0; x < c[0]; x ++) {
+                for (k = 0; k < 8; k ++) {
+                    uint32_t px = n[0] > 1 ? x + (k & 1) : 0;
+                    uint32_t py = n[1] > 1 ? y + ((k >> 1) & 1) : 0;
+                    uint32_t pz = n[2] > 1 ? z + ((k >> 2) & 1) : 0;
+                    uint32_t index = px + (py + pz * n[1]) * n[0];
+                    *cell |= (uint8_t)(((bits[index >> 5] >> (index & 31)) & 1) << k);
+                }
+
+                cell ++;
+            }
+        }
+    }
+
+    wgpuQueueWriteBuffer(gpu->queue, v->valid, 0, cells, size);
+    ecs_os_free(cells);
 }
 
 /** Write the grid of a volume, fill every probe of both buffers with one SH, open its
@@ -122,8 +168,7 @@ static void box_gpu_volume_write(
     wgpuQueueWriteBuffer(gpu->queue, v->probes[0], 0, probes, size);
     wgpuQueueWriteBuffer(gpu->queue, v->probes[1], 0, probes, size);
     wgpuQueueWriteBuffer(gpu->queue, v->visibility, 0, open, texels * sizeof(uint32_t));
-    wgpuQueueWriteBuffer(gpu->queue, v->valid, 0, desc + 1,
-        (size_t)(v->count + 31) / 32 * sizeof(uint32_t));
+    box_gpu_volume_valid(gpu, v, desc);
     ecs_os_free(open);
     ecs_os_free(probes);
 }
@@ -150,8 +195,7 @@ static void box_gpu_volume_keep(
         wgpuCommandEncoderRelease(encoder);
     }
 
-    wgpuQueueWriteBuffer(gpu->queue, v->valid, 0, desc + 1,
-        (size_t)(v->count + 31) / 32 * sizeof(uint32_t));
+    box_gpu_volume_valid(gpu, v, desc);
 }
 
 /** Copy the probes of both buffers and the visibility maps of a volume that a resized grid

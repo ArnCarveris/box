@@ -4,7 +4,8 @@
 // a silhouette. 16 hemisphere samples around that normal, turned by a 4x4 pattern of angles,
 // count how many land behind the depth of the view. The occlusion image is half the size of the
 // view and holds the occlusion and view depth of every other pixel; `composite` averages the
-// occlusion over the 4x4 pattern among pixels of similar depth and darkens the image by it.
+// occlusion over the 4x4 pattern among pixels of similar depth, gathered as four 2x2 quads, and
+// darkens the image by it.
 #include "include/effect.wgsl"
 
 struct Ssao {
@@ -127,19 +128,21 @@ fn neighbor(center: vec3f, texel: vec2i, a: vec2i, b: vec2i) -> vec3f {
         return src;
     }
 
-    let size = vec2i(textureDimensions(ao_texture));
     let z = view_z(depth);
     let tolerance = max(abs(z) * 0.05, ssao.params.x * 0.5);
+    let inv = 1.0 / vec2f(textureDimensions(ao_texture));
     let center = texel / 2;
     var sum = 0.0;
     var weight = 0.0;
-    for (var y = -2; y < 2; y++) {
-        for (var x = -2; x < 2; x++) {
-            let at = clamp(center + vec2i(x, y), vec2i(0), size - 1);
-            let s = textureLoad(ao_texture, at, 0);
-            let w = select(0.0, 1.0, s.g < 0.0 && abs(s.g - z) < tolerance);
-            sum += s.r * w;
-            weight += w;
+    for (var y = -1; y < 2; y += 2) {
+        for (var x = -1; x < 2; x += 2) {
+            let uv = vec2f(center + vec2i(x, y)) * inv;
+            let r = textureGather(0, ao_texture, input_sampler, uv);
+            let g = textureGather(1, ao_texture, input_sampler, uv);
+            let similar = (g < vec4f(0.0)) & (abs(g - z) < vec4f(tolerance));
+            let w = select(vec4f(0.0), vec4f(1.0), similar);
+            sum += dot(r, w);
+            weight += dot(w, vec4f(1.0));
         }
     }
 

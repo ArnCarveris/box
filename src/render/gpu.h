@@ -422,7 +422,7 @@ typedef struct box_gpu_volume_uniforms_t {
 typedef struct box_gpu_volume_t {
     WGPUBuffer grid;                /**< box_gpu_volume_uniforms_t */
     WGPUBuffer probes[2];           /**< BOX_RENDER_SH_COEFFICIENTS vec4 per probe */
-    WGPUBuffer valid;               /**< One bit per probe, set when views sample it */
+    WGPUBuffer valid;               /**< A byte per cell, a bit per corner probe views sample */
     WGPUBuffer visibility;          /**< BOX_GPU_VISIBILITY_TEXELS packed halves per probe */
     uint32_t count;                 /**< Probes of the volume */
     float spacing;                  /**< World units between neighbouring probes */
