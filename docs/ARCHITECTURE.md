@@ -658,7 +658,6 @@ deletes the scene the next frame.
   median, confidence interval and percentiles; `--baseline` flags changes beyond 5%.
 - Epic pipeline: `tools/epic.py <epic> --env <name>` runs build, tests, visual, perf, bench,
   shaders and wasm into `project/db/<epic>/deliverable`.
-- Style: `tools/lint.py` enforces `design/coding_style.c`; `project/pm.py` is the task tool.
 
 ## From a component change to a reconfiguration
 
