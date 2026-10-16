@@ -8,6 +8,7 @@ using box.light
 using box.effects
 using box.surface
 using box.controllers
+using box.movement
 
 const cedar: Rgb = {109, 65, 53}
 const vermilion: Rgb = {191, 62, 48}
@@ -2183,11 +2184,16 @@ japanese_garden {
   LightBake: {probe_spacing: 1, bounds_padding: 0.3, bounces: 1, capture_size: 64, budget_ms: 8}
   AmbientLight: {sky: {130, 155, 207}, ground: {66, 73, 107}, intensity: 0.28}
 
-  camera {
-    Position: {27, 24, 39}
-    Rotation: {-0.55, 0.59, 0}
-    Camera: {fov: 40, near_: 0.1, far_: 150}
-    CameraController: {speed: 6, boost: 3, sensitivity: 0.003}
+  orbit {
+    Position: {0, 0, 0}
+    Rotation: {0, 0, 0}
+    AngularVelocity: {0, 0.15, 0}
+
+    camera {
+      Position: {-19.13, 11.83, 16.21}
+      Rotation: {-0.4408, -0.8679, 0}
+      Camera: {fov: 40, near_: 0.1, far_: 150}
+    }
   }
 
   predawn {
@@ -2549,7 +2555,7 @@ japanese_garden {
 
 main_view {
   View: {
-    camera: japanese_garden.camera,
+    camera: japanese_garden.orbit.camera,
     clear: {enabled: true, color: {51, 56, 81, 255}},
     lighting: {enabled: true, baked: true},
     shadows: {enabled: true, resolution: 2048, max_distance: 85},

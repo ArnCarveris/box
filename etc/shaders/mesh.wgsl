@@ -104,21 +104,25 @@ fn ambient(dir: vec3f) -> vec3f {
     return mix(view.ambient_ground.rgb, view.ambient_sky.rgb, dir.y * 0.5 + 0.5);
 }
 
-// L2 SH irradiance coefficients of a probe, or of a blend of probes.
-struct Irradiance {
-    sh: array<vec3f, 9>,
-};
-
-// Irradiance of the hemisphere ambient: mix(ground, sky, y / 2 + 1 / 2) is a + b * y, which
-// projects exactly onto the constant and the y coefficient.
-fn hemisphere_irradiance() -> Irradiance {
-    var e: Irradiance;
-    let a = (view.ambient_sky.rgb + view.ambient_ground.rgb) * 0.5;
-    let b = (view.ambient_sky.rgb - view.ambient_ground.rgb) * 0.5;
-    e.sh[0] = a * (PI * 3.5449077018);
-    e.sh[1] = b * (PI * 2.0466534158);
-    return e;
+// Irradiance in a direction from the L2 SH irradiance coefficients E_lm of a probe
+// (Ramamoorthi and Hanrahan, Sloan's real basis), before the division by pi and the clamp.
+fn sh_irradiance(e0: vec3f, e1: vec3f, e2: vec3f, e3: vec3f, e4: vec3f, e5: vec3f,
+    e6: vec3f, e7: vec3f, e8: vec3f, d: vec3f) -> vec3f
+{
+    let band0 = e0 * 0.2820947918;
+    let band1 = (e1 * d.y + e2 * d.z + e3 * d.x) * 0.4886025119;
+    let band2 = (e4 * (d.x * d.y) + e5 * (d.y * d.z) + e7 * (d.x * d.z)) * 1.0925484306
+        + e6 * (0.3153915653 * (3.0 * d.z * d.z - 1.0))
+        + e8 * (0.5462742153 * (d.x * d.x - d.y * d.y));
+    return band0 + band1 + band2;
 }
+
+// Indirect light of a fragment, irradiance over pi: in the direction of its normal for the
+// diffuse term and in the direction its specular term samples.
+struct Indirect {
+    diffuse: vec3f,
+    specular: vec3f,
+};
 
 // Point of the octahedral map of a direction, in [0, 1] on each axis.
 fn octahedral_uv(d: vec3f) -> vec2f {
@@ -180,14 +184,17 @@ fn visibility_from(index: u32, offset: vec3f) -> f32 {
 // position clamps to the border probes. Without a valid probe it is the hemisphere ambient,
 // which also makes up the weight the visible probes lack below VISIBILITY_FALLBACK of the
 // weight of every valid probe, so a surface that sees none of its probes does not take the
-// light of the probes behind it.
-fn volume_irradiance(world: vec3f, n: vec3f) -> Irradiance {
+// light of the probes behind it. The SH evaluation is linear in the coefficients, so every probe
+// is evaluated in the two directions and the results are blended; the hemisphere ambient is
+// the irradiance its SH projection evaluates to.
+fn volume_irradiance(world: vec3f, n: vec3f, spec: vec3f) -> Indirect {
     let size = volume.size.xyz;
     let g = clamp((world - volume.origin.xyz) / volume.origin.w, vec3f(0.0), vec3f(size - 1u));
     let base = min(vec3u(floor(g)), max(size, vec3u(2u)) - 2u);
     let t = clamp(g - vec3f(base), vec3f(0.0), vec3f(1.0));
     let biased = world + n * (VISIBILITY_BIAS * volume.origin.w);
-    var e: Irradiance;
+    var diffuse = vec3f(0.0);
+    var specular = vec3f(0.0);
     var total = 0.0;
     var reach = 0.0;
     for (var i = 0u; i < 8u; i++) {
@@ -204,37 +211,32 @@ fn volume_irradiance(world: vec3f, n: vec3f) -> Irradiance {
         let reached = trilinear.x * trilinear.y * trilinear.z * (wrap * wrap + 0.2) * f32(valid);
         if (reached > 0.0) {
             let w = reached * visibility_from(index, biased - position);
-            for (var k = 0u; k < SH_COEFFICIENTS; k++) {
-                e.sh[k] += probes[index * SH_COEFFICIENTS + k].rgb * w;
-            }
-
+            let at = index * SH_COEFFICIENTS;
+            let e0 = probes[at].rgb;
+            let e1 = probes[at + 1u].rgb;
+            let e2 = probes[at + 2u].rgb;
+            let e3 = probes[at + 3u].rgb;
+            let e4 = probes[at + 4u].rgb;
+            let e5 = probes[at + 5u].rgb;
+            let e6 = probes[at + 6u].rgb;
+            let e7 = probes[at + 7u].rgb;
+            let e8 = probes[at + 8u].rgb;
+            diffuse += sh_irradiance(e0, e1, e2, e3, e4, e5, e6, e7, e8, n) * w;
+            specular += sh_irradiance(e0, e1, e2, e3, e4, e5, e6, e7, e8, spec) * w;
             total += w;
             reach += reached;
         }
     }
 
     if (reach <= 0.0) {
-        return hemisphere_irradiance();
+        return Indirect(ambient(n), ambient(spec));
     }
 
     let fallback = max(VISIBILITY_FALLBACK * reach - total, 0.0);
-    let hemisphere = hemisphere_irradiance();
-    for (var k = 0u; k < SH_COEFFICIENTS; k++) {
-        e.sh[k] = (e.sh[k] + hemisphere.sh[k] * fallback) / (total + fallback);
-    }
-
-    return e;
-}
-
-// Irradiance over pi in a direction, the term the hemisphere ambient stands in for. The
-// direction is used as given, like the hemisphere, which reads its y without normalizing.
-fn irradiance(e: Irradiance, d: vec3f) -> vec3f {
-    let band0 = e.sh[0] * 0.2820947918;
-    let band1 = (e.sh[1] * d.y + e.sh[2] * d.z + e.sh[3] * d.x) * 0.4886025119;
-    let band2 = (e.sh[4] * (d.x * d.y) + e.sh[5] * (d.y * d.z) + e.sh[7] * (d.x * d.z))
-        * 1.0925484306 + e.sh[6] * (0.3153915653 * (3.0 * d.z * d.z - 1.0))
-        + e.sh[8] * (0.5462742153 * (d.x * d.x - d.y * d.y));
-    return max((band0 + band1 + band2) / PI, vec3f(0.0));
+    let scale = 1.0 / (PI * (total + fallback));
+    diffuse = (diffuse + ambient(n) * (PI * fallback)) * scale;
+    specular = (specular + ambient(spec) * (PI * fallback)) * scale;
+    return Indirect(max(diffuse, vec3f(0.0)), max(specular, vec3f(0.0)));
 }
 
 // Surface of a fragment from the material constants of its instance. Texture layers apply
@@ -395,9 +397,9 @@ fn shade(s: Surface, v: vec3f, world: vec3f) -> vec3f {
         specular_light = ambient(mix(r, n, a));
         diffuse_light = ambient(n);
     } else {
-        let e = volume_irradiance(world, n);
-        specular_light = irradiance(e, mix(r, n, a));
-        diffuse_light = irradiance(e, n);
+        let e = volume_irradiance(world, n, mix(r, n, a));
+        specular_light = e.specular;
+        diffuse_light = e.diffuse;
     }
 
     let indirect_specular = (f0 * ab.x + ab.y) * specular_light;

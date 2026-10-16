@@ -138,6 +138,7 @@ static uint32_t box_gpu_scatter_one(
     wgpuComputePassEncoderSetBindGroup(pass, 0, group, 0, NULL);
     wgpuComputePassEncoderDispatchWorkgroups(pass, groups, 1, 1);
     wgpuBindGroupRelease(group);
+    dst->version = ++ gpu->buffer_writes;
     box_gpu_count(gpu, BOX_GPU_STAT_SCATTER);
     result = sc->count;
 done:

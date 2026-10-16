@@ -3,9 +3,11 @@
 // geometry it drew first, and writes the slots of the instances to draw, compacted per draw,
 // with the instance count of its indexed indirect draw arguments.
 //
-// A job is the slot range of one draw in the instance buffer bound at group 1. Its bounds are
-// the box around the mesh, moved into world space by the model matrix (mesh bounds times the
-// instance scale and the world transform); the planes are the frustum in world space.
+// A job is the slot range of one draw in its instance buffer. Group 1 binds the instance pool,
+// which holds a copy of the instance buffers at the pool offset of each job, or for a draw the
+// pool does not hold its own buffer at offset 0. Its bounds are the box around the mesh, moved
+// into world space by the model matrix (mesh bounds times the instance scale and the world
+// transform); the planes are the frustum in world space.
 //
 // A view that culls by occlusion runs two phases. The early phase draws the instances in the
 // frustum that its history (group 2, one word per instance slot, 0 when the instance was
@@ -16,8 +18,10 @@
 // that comes into view is drawn the same frame. Cascades and views without occlusion run one
 // phase that draws everything in the frustum.
 //
-// cull_instances tests one instance per invocation of one job and records which instances of
-// its workgroup it draws as a 64 bit mask with their count in the scan words of the dispatch.
+// cull_instances tests one instance per invocation and records which instances of its
+// workgroup it draws as a 64 bit mask with their count in the scan words of the workgroup. A
+// dispatch covers a run of parallel draws of a table: its part of the workgroup list (scan.z,
+// scan.w workgroups) gives each workgroup its scan words and its table entry, so the job.
 // One cull_scan dispatch per cull view, phase and page turns the counts of the workgroups of each
 // of its parallel draws into exclusive offsets, in workgroup order, and writes their instance
 // counts (a workgroup per draw, from a table of job, first scan word and workgroups); one
@@ -53,6 +57,7 @@ struct Job {
     extent: vec3f,
     late: u32,
     list: u32,
+    pool: u32,
 };
 
 // Words of the indexed indirect draw arguments of a draw; the instance count is the second.
@@ -96,7 +101,7 @@ var<workgroup> scan_sums: array<u32, 256>;
 // The size is the diameter of the sphere around the box in pixels, tested only when the box is
 // in front of the camera (w beyond the radius); size.z is 0 for orthographic projections.
 fn visible(job: Job, slot: u32) -> bool {
-    let m = instances[slot].model;
+    let m = instances[job.pool + slot].model;
     let c0 = m[0].xyz;
     let c1 = m[1].xyz;
     let c2 = m[2].xyz;
@@ -126,7 +131,7 @@ fn visible(job: Job, slot: u32) -> bool {
 // and the instance is hidden when its nearest depth is farther than the farthest depth they
 // hold. A box that reaches behind the camera or in front of the near plane is never hidden.
 fn occluded(job: Job, slot: u32) -> bool {
-    let m = instances[slot].model;
+    let m = instances[job.pool + slot].model;
     let center = m[0].xyz * job.center.x + m[1].xyz * job.center.y + m[2].xyz * job.center.z +
         m[3].xyz;
     let origin = cull.view_proj * vec4f(center, 1.0);
@@ -210,11 +215,19 @@ fn base_of(job: Job) -> u32 {
 
 @compute @workgroup_size(64)
 fn cull_instances(
-    @builtin(global_invocation_id) id: vec3u,
     @builtin(local_invocation_index) local: u32,
-    @builtin(workgroup_id) group: vec3u)
+    @builtin(workgroup_id) group: vec3u,
+    @builtin(num_workgroups) groups: vec3u)
 {
-    let job = jobs[cull.jobs.x];
+    let g = group.y * groups.x + group.x;
+    if (g >= cull.scan.w) {
+        return;
+    }
+
+    let at = scan_words[cull.scan.z + g * 2u];
+    let entry = scan_words[cull.scan.z + g * 2u + 1u];
+    let job = jobs[scan_words[entry]];
+    let index = (at - scan_words[entry + 1u]) / SCAN_WORDS * 64u + local;
     if (local == 0u) {
         atomicStore(&group_mask[0], 0u);
         atomicStore(&group_mask[1], 0u);
@@ -222,8 +235,8 @@ fn cull_instances(
     }
 
     workgroupBarrier();
-    if (id.x < job.count) {
-        let d = decide(job, job.first + id.x);
+    if (index < job.count) {
+        let d = decide(job, job.first + index);
         if (d.x) {
             atomicOr(&group_mask[local / 32u], 1u << (local % 32u));
         }
@@ -237,7 +250,6 @@ fn cull_instances(
     if (local == 0u) {
         let low = atomicLoad(&group_mask[0]);
         let high = atomicLoad(&group_mask[1]);
-        let at = cull.scan.x + group.x * SCAN_WORDS;
         scan_words[at] = low;
         scan_words[at + 1u] = high;
         scan_words[at + 2u] = countOneBits(low) + countOneBits(high);

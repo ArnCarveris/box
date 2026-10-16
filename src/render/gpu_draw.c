@@ -285,6 +285,7 @@ void box_gpu_buffer_apply(
     b->buffer = box_gpu_buffer_new(gpu, desc->size, usage);
     b->size = desc->size;
     b->usage = desc->usage;
+    b->version = ++ gpu->buffer_writes;
     ecs_map_insert_ptr(&gpu->buffers, handle, b);
     box_gpu_count(gpu, BOX_GPU_STAT_BUFFER_CREATED);
 done:
@@ -309,6 +310,7 @@ void box_gpu_upload(
 
         wgpuQueueWriteBuffer(gpu->queue, b->buffer, u->offset,
             box_render_packet_data(packet, u->data), u->size);
+        b->version = ++ gpu->buffer_writes;
     }
 }
 

@@ -293,8 +293,15 @@ at most 4x4 texels and draws the newly visible, so a fast camera never misses an
 Blended draws keep a CPU back to front sort; each run of one batch in that order is one draw
 (at most 512 slots) whose job lists its sorted slots, culled in that order. The visible slots
 and slot lists of a target, and the history of a view, are split into pages of at most 128 MiB,
-each bound whole as storage, so the instances a target culls have no limit. `CullStatus` on each
-View reports instances, visible, frustum culled and occlusion culled, read back asynchronously.
+each bound whole as storage, so the instances a target culls have no limit. The cull reads the
+instances from a pool (`gpu_pool.c`) that holds a copy of every instance buffer at its own range,
+copied again only after the buffer was written (versions bumped by uploads, scatters and
+creation), so the draws of a cull view, phase and page cull in one `cull_instances` dispatch
+whose workgroups find their job in the workgroup list `cull_write` uses; a buffer that does not
+fit the pool window keeps a dispatch on its own buffer. A static scene copies its instances once
+and culls with a fixed number of dispatches per view and cascade, however many batches it has.
+`CullStatus` on each View reports instances, visible, frustum culled and occlusion culled, read
+back asynchronously.
 
 **Shadows.** Cascaded maps for the first directional light of the view's scene.
 `RenderExtractShadows` splits near..min(`max_distance`, far) by `split_lambda`; each cascade is
@@ -377,7 +384,9 @@ mask, both buffers filled with the exact SH of the hemisphere ambient when it is
 ambient changes. A view with `lighting.baked` binds it as group 3 of `mesh.wgsl` with the probe
 buffer the packet selects for the view (one bind group per buffer, same layout), whose `ambient()`
 term blends the 8 surrounding valid probes with DDGI style wrap weights; other views bind a 1x1x1
-volume that keeps the hemisphere, so a scene without `LightBake` renders exactly as before.
+volume that keeps the hemisphere, so a scene without `LightBake` renders exactly as before. The
+SH evaluation is linear, so each probe is evaluated in the diffuse and the specular direction and
+the two results are blended, which keeps two rgb sums live instead of a blend of 27 coefficients.
 
 **Probe captures.** Every frame the bake extract moves the unbaked valid probes nearest to the
 cameras of the views of the scene into the packet as a bake batch with the lights of the scene. The
