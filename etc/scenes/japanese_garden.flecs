@@ -1588,34 +1588,201 @@ template GardenPaths {
 template GardenWall {
   prop length: f32 = 5
 
+  const panels: i32 = math.ceil(length / 1.8)
+  const panel_width = length / panels
+  const stones: i32 = math.ceil((length + 0.12) / 0.55)
+  const stone_width = (length + 0.12) / stones
+  const tiles: i32 = math.ceil((length + 0.3) / 0.24)
+  const tile_width = (length + 0.3) / tiles
+
   plaster {
-    Position: {0, 0.73, 0}
-    Box: {length, 1.2, 0.22}
+    Position: {0, 0.83, 0}
+    Box: {length, 1, 0.22}
     Rgb: {216, 205, 180}
+    PbrMaterial: {roughness: 1}
   }
   footing {
-    Position: {0, 0.17, 0}
-    Box: {length + 0.12, 0.3, 0.36}
+    Position: {0, 0.2, 0}
+    Box: {length + 0.12, 0.4, 0.36}
+    Rgb: {119, 132, 130}
+  }
+  plinth_cap {
+    Position: {0, 0.415, 0}
+    Box: {length + 0.12, 0.055, 0.43}
     Rgb: stone
+  }
+  for face in 0..2 {
+    for row in 0..2 {
+      for block in 0..(stones + 1) {
+        const x0 = math.max(-(length + 0.12) / 2, -(length + 0.12) / 2 + (block - row * 0.5) * stone_width)
+        const x1 = math.min((length + 0.12) / 2, -(length + 0.12) / 2 + (block + 1 - row * 0.5) * stone_width)
+        if x1 > x0 {
+          {
+            Position: {(x0 + x1) / 2, 0.13 + row * 0.17, (face - 0.5) * 0.38}
+            RoundedBox: {x1 - x0 - 0.022, 0.145, 0.055, 0.012}
+            Rgb: {157 + (block + row) % 3 * 9, 167 + (block + row) % 3 * 8, 157 + (block + row) % 3 * 8}
+          }
+        }
+      }
+    }
+    for panel in 0..panels {
+      {
+        Position: {-length / 2 + (panel + 0.5) * panel_width, 0.89, (face - 0.5) * 0.24}
+        Rotation: {0, face * math.PI, 0}
+        {
+          Position: {}
+          Box: {panel_width - 0.14, 0.69, 0.024}
+          Rgb: {229 - panel % 2 * 5, 219 - panel % 2 * 4, 196 - panel % 2 * 4}
+          PbrMaterial: {roughness: 1}
+        }
+        if panel % 2 == 0 {
+          for side in 0..2 {
+            for half in 0..2 {
+              {
+                Position: {(side - 0.5) * 0.14, (half - 0.5) * 0.14, -0.026}
+                Rotation: {0, 0, (side - 0.5) * (half - 0.5) * math.PI}
+                Box: {0.018, 0.2, 0.018}
+                Rgb: {143, 112, 78}
+              }
+            }
+          }
+        }
+      }
+    }
+    for divider in 0..(panels + 1) {
+      {
+        Position: {-length / 2 + divider * panel_width, 0.86, (face - 0.5) * 0.27}
+        Box: {0.065, 0.91, 0.06}
+        Rgb: cedar
+      }
+    }
+    for rail in 0..2 {
+      {
+        Position: {0, 0.51 + rail * 0.78, (face - 0.5) * 0.27}
+        Box: {length, 0.065, 0.065}
+        Rgb: cedar
+      }
+    }
+  }
+  for end in 0..2 {
+    {
+      Position: {(end - 0.5) * length, 0.785, 0}
+      Box: {0.18, 1.23, 0.32}
+      Rgb: cedar
+    }
+    {
+      Position: {(end - 0.5) * length, 0.26, 0}
+      RoundedBox: {0.27, 0.5, 0.41, 0.02}
+      Rgb: {153, 162, 153}
+    }
+    {
+      Position: {(end - 0.5) * length, 1.29, 0}
+      Box: {0.25, 0.095, 0.39}
+      Rgb: {159, 108, 75}
+    }
   }
   for side in 0..2 {
     {
-      Position: {(side - 0.5) * length, 0.77, 0}
-      Box: {0.18, 1.52, 0.32}
-      Rgb: cedar
+      Position: {0, 1.45, (side - 0.5) * 0.32}
+      Rotation: {(side - 0.5) * 0.44, 0, 0}
+      {
+        Position: {}
+        Box: {length + 0.3, 0.085, 0.36}
+        Rgb: slate
+      }
+      for tile in 0..tiles {
+        {
+          Position: {-(length + 0.3) / 2 + (tile + 0.5) * tile_width, 0.06, 0}
+          Rotation: {math.PI / 2, 0, 0}
+          Cylinder: {radius: 0.029, length: 0.36, segments: 10}
+          Rgb: {85, 105, 122}
+        }
+        {
+          Position: {-(length + 0.3) / 2 + (tile + 0.5) * tile_width, 0.06, (side - 0.5) * 0.365}
+          Rotation: {math.PI / 2, 0, 0}
+          Cylinder: {radius: 0.039, length: 0.028, segments: 12}
+          Rgb: {99, 119, 131}
+        }
+      }
+    }
+    {
+      Position: {0, 1.335, (side - 0.5) * 0.48}
+      Box: {length + 0.3, 0.065, 0.075}
+      Rgb: {91, 69, 58}
     }
   }
-  coping {
-    Position: {0, 1.43, 0}
-    Box: {length + 0.3, 0.16, 0.57}
-    Rgb: slate
+  ridge {
+    Position: {0, 1.54, 0}
+    Rotation: {0, 0, math.PI / 2}
+    Cylinder: {radius: 0.065, length: length + 0.3, segments: 12}
+    Rgb: {85, 105, 122}
   }
-  for i in 0..20 {
+}
+
+@tree Parent
+template WalkLantern {
+  prop tint: Rgb = {255, 197, 133}
+
+  cord {
+    Position: {0, 0.565, 0}
+    Cylinder: {radius: 0.012, length: 0.23, segments: 8}
+    Rgb: {76, 55, 44}
+  }
+  hanger {
+    Position: {0, 0.415, 0}
+    Rotation: {math.PI / 2, 0, 0}
+    Torus: {radius: 0.055, tube: 0.013, segments: 16, rings: 6}
+    Rgb: {75, 66, 53}
+    PbrMaterial: {roughness: 0.45, metallic: 0.4}
+  }
+  shade {
+    Scale: {1, 1.18, 1}
+    Sphere: {radius: 0.29, segments: 24, smooth: true}
+    Rgb: tint
+    Emissive: {strength: 7, color: tint}
+  }
+  for rib in 0..9 {
+    const y = (rib - 4) * 0.073
     {
-      Position: {-length / 2 + (i + 0.5) * length / 20, 1.53, 0}
-      Rotation: {math.PI / 2, 0, 0}
-      Cylinder: {radius: 0.045, length: 0.59, segments: 6}
-      Rgb: {92, 110, 122}
+      Position: {0, y, 0}
+      Torus: {radius: 0.293 * math.sqrt(1 - y * y / (0.3422 * 0.3422)), tube: 0.011, segments: 24, rings: 6}
+      Rgb: {143, 84, 54}
+    }
+  }
+  for spine in 0..6 {
+    const angle = spine * math.PI / 3
+    for piece in 0..8 {
+      const a0 = -1.2 + piece * 0.3
+      const a1 = a0 + 0.3
+      TreeLimb(ax: math.cos(angle) * math.cos(a0) * 0.294, ay: math.sin(a0) * 0.346, az: math.sin(angle) * math.cos(a0) * 0.294,
+        bx: math.cos(angle) * math.cos(a1) * 0.294, by: math.sin(a1) * 0.346, bz: math.sin(angle) * math.cos(a1) * 0.294,
+        base: 0.009, tip: 0.009, tint: {161, 96, 64})
+    }
+  }
+  for end in 0..2 {
+    {
+      Position: {0, (end - 0.5) * 0.67, 0}
+      Cylinder: {radius: 0.115, length: 0.06, segments: 20}
+      Rgb: {86, 53, 43}
+    }
+    {
+      Position: {0, (end - 0.5) * 0.72, 0}
+      Torus: {radius: 0.104, tube: 0.013, segments: 20, rings: 6}
+      Rgb: {196, 150, 82}
+      PbrMaterial: {roughness: 0.4, metallic: 0.35}
+    }
+  }
+  knot {
+    Position: {0, -0.395, 0}
+    Scale: {1, 1.35, 1}
+    Sphere: {radius: 0.027, segments: 12, smooth: true}
+    Rgb: vermilion
+  }
+  for strand in 0..7 {
+    {
+      Position: {math.cos(strand * 0.898) * 0.018, -0.48, math.sin(strand * 0.898) * 0.018}
+      Cylinder: {radius: 0.006, length: 0.14 + strand % 2 * 0.02, segments: 6}
+      Rgb: {173 + strand % 2 * 18, 62, 48}
     }
   }
 }
@@ -1625,54 +1792,222 @@ template CoveredWalk {
   prop bays: i32 = 4
   prop bay_length: f32 = 2.27
 
+  const length = bays * bay_length
+  const center = (bays - 1) * bay_length / 2
+  const roof_length = length + 0.36
+  const tiles: i32 = math.ceil(roof_length / 0.22)
+  const tile_width = roof_length / tiles
+
+  for side in 0..2 {
+    {
+      Position: {(side - 0.5) * 1.4, 0.15, center}
+      Box: {0.15, 0.12, length}
+      Rgb: cedar
+    }
+    {
+      Position: {(side - 0.5) * 1.96, 0.23, center}
+      Box: {0.09, 0.17, length}
+      Rgb: {111, 64, 47}
+    }
+    {
+      Position: {(side - 0.5) * 1.64, 2.66, center}
+      Box: {0.15, 0.16, length + 0.22}
+      Rgb: vermilion
+    }
+  }
+  spine {
+    Position: {0, 2.82, center}
+    Box: {0.13, 0.14, length + 0.22}
+    Rgb: cedar
+  }
+  for station in 0..(bays + 1) {
+    {
+      Position: {0, 0, station * bay_length - bay_length / 2}
+      for side in 0..2 {
+        {
+          Position: {(side - 0.5) * 1.82, 0.11, 0}
+          RoundedBox: {0.35, 0.22, 0.35, 0.035}
+          Rgb: stone
+        }
+        {
+          Position: {(side - 0.5) * 1.82, 1.46, 0}
+          Box: {0.15, 2.48, 0.15}
+          Rgb: vermilion
+        }
+        {
+          Position: {(side - 0.5) * 1.82, 0.4, 0}
+          Box: {0.19, 0.18, 0.19}
+          Rgb: {65, 60, 55}
+          PbrMaterial: {roughness: 0.55, metallic: 0.25}
+        }
+        {
+          Position: {(side - 0.5) * 1.82, 2.46, 0}
+          Box: {0.27, 0.12, 0.27}
+          Rgb: {177, 108, 67}
+        }
+        {
+          Position: {(side - 0.5) * 1.82, 2.56, 0}
+          Box: {0.39, 0.1, 0.35}
+          Rgb: vermilion
+        }
+        {
+          Position: {(side - 0.5) * 1.46, 2.36, 0}
+          Rotation: {0, 0, (side - 0.5) * 1.44}
+          Box: {0.09, 0.55, 0.1}
+          Rgb: cedar
+        }
+        for face in 0..2 {
+          {
+            Position: {(side - 0.5) * 1.82, 2.36, (face - 0.5) * 0.17}
+            Rotation: {math.PI / 2, 0, 0}
+            Cylinder: {radius: 0.022, length: 0.02, segments: 12}
+            Rgb: {187, 145, 83}
+            PbrMaterial: {roughness: 0.45, metallic: 0.4}
+          }
+        }
+      }
+      {
+        Position: {0, 2.6, 0}
+        Box: {2.3, 0.13, 0.16}
+        Rgb: cedar
+      }
+      {
+        Position: {0, 2.79, 0}
+        Box: {0.095, 0.3, 0.12}
+        Rgb: cedar
+      }
+    }
+  }
   for bay in 0..bays {
     {
       Position: {0, 0, bay * bay_length}
-      for i in 0..10 {
+      for board in 0..10 {
         {
-          Position: {0, 0.26, (i - 4.5) * bay_length / 10}
+          Position: {0, 0.26, (board - 4.5) * bay_length / 10}
           Box: {2.05, 0.12, bay_length / 10 - 0.015}
-          Rgb: {155, 107, 77}
+          Rgb: {147 + board % 3 * 8, 99 + board % 3 * 6, 69 + board % 3 * 4}
         }
       }
       for side in 0..2 {
         {
-          Position: {(side - 0.5) * 1.82, 1.4, -bay_length / 2}
-          Box: {0.13, 2.8, 0.13}
+          Position: {(side - 0.5) * 1.82, 0.87, 0}
+          RoundedBox: {0.115, 0.095, bay_length - 0.15, 0.02}
           Rgb: vermilion
         }
         {
-          Position: {(side - 0.5) * 1.82, 0.65, 0}
-          Box: {0.08, 0.09, bay_length}
+          Position: {(side - 0.5) * 1.82, 0.43, 0}
+          Box: {0.075, 0.075, bay_length - 0.15}
           Rgb: vermilion
         }
         for slat in 0..6 {
           {
-            Position: {(side - 0.5) * 1.82, 0.47, (slat - 2.5) * bay_length / 6}
-            Box: {0.055, 0.35, 0.055}
+            Position: {(side - 0.5) * 1.82, 0.65, (slat - 2.5) * bay_length / 6}
+            Box: {0.045, 0.37, 0.045}
             Rgb: cedar
           }
         }
-        {
-          Position: {(side - 0.5) * 1.15, 2.85, 0}
-          Rotation: {0, 0, (side - 0.5) * -0.6}
-          Box: {1.4, 0.12, bay_length - 0.015}
-          Rgb: slate
+        for half in 0..2 {
+          for edge in 0..2 {
+            {
+              Position: {(side - 0.5) * 1.82, 0.65 + (half - 0.5) * 0.15, (edge - 0.5) * 0.15}
+              Rotation: {(half - 0.5) * (edge - 0.5) * math.PI, 0, 0}
+              Box: {0.045, 0.215, 0.03}
+              Rgb: {178, 122, 76}
+            }
+          }
+        }
+        for rafter in 0..6 {
+          {
+            Position: {(side - 0.5) * 1.28, 2.72, (rafter - 2.5) * bay_length / 6}
+            Rotation: {0, 0, -(side - 0.5) * 0.62}
+            Box: {1.37, 0.085, 0.075}
+            Rgb: {158, 100, 65}
+          }
         }
       }
-      crossbeam {
-        Position: {0, 2.65, -bay_length / 2}
-        Box: {2.3, 0.15, 0.15}
-        Rgb: cedar
+      WalkLantern(tint: {255, 193 + bay % 2 * 8, 125 + bay % 2 * 12}) {
+        Position: {0, 2.08, 0}
+        Rotation: {0, bay * 0.6, 0}
       }
-      PaperLantern() { Position: {0, 2.12, 0} }
     }
   }
   for side in 0..2 {
     {
-      Position: {(side - 0.5) * 1.82, 1.4, bays * bay_length - bay_length / 2}
-      Box: {0.13, 2.8, 0.13}
-      Rgb: vermilion
+      Position: {(side - 0.5) * 1.16, 2.86, center}
+      Rotation: {0, 0, -(side - 0.5) * 0.62}
+      {
+        Position: {}
+        Box: {1.36, 0.1, roof_length}
+        Rgb: {62, 80, 101}
+      }
+      for seam in 0..2 {
+        {
+          Position: {(seam - 0.5) * 0.44, 0.06, 0}
+          Box: {0.022, 0.014, roof_length}
+          Rgb: {72, 91, 110}
+        }
+      }
+      for tile in 0..tiles {
+        {
+          Position: {0, 0.065, -roof_length / 2 + (tile + 0.5) * tile_width}
+          Rotation: {0, 0, math.PI / 2}
+          Cylinder: {radius: 0.035, length: 1.36, segments: 10}
+          Rgb: {85, 105, 122}
+        }
+        {
+          Position: {(side - 0.5) * 1.37, 0.065, -roof_length / 2 + (tile + 0.5) * tile_width}
+          Rotation: {0, 0, math.PI / 2}
+          Cylinder: {radius: 0.046, length: 0.03, segments: 12}
+          Rgb: {99, 119, 131}
+        }
+      }
+      for end in 0..2 {
+        {
+          Position: {0, -0.035, (end - 0.5) * (roof_length + 0.025)}
+          Box: {1.43, 0.13, 0.075}
+          Rgb: {146, 105, 74}
+        }
+      }
+    }
+    {
+      Position: {(side - 0.5) * 2.45, 2.61, center}
+      Box: {0.11, 0.12, roof_length}
+      Rgb: {67, 84, 102}
+    }
+  }
+  ridge {
+    Position: {0, 3.1, center}
+    Rotation: {math.PI / 2, 0, 0}
+    Cylinder: {radius: 0.095, length: roof_length + 0.09, segments: 16}
+    Rgb: {99, 119, 131}
+  }
+  for end in 0..2 {
+    {
+      Position: {0, 2.82, center + (end - 0.5) * roof_length}
+      TrianglePrism: {2.16, 0.42, 0.065}
+      Rgb: {226, 211, 178}
+    }
+    {
+      Position: {0, 2.65, center + (end - 0.5) * (roof_length + 0.08)}
+      Box: {2.28, 0.095, 0.085}
+      Rgb: cedar
+    }
+    {
+      Position: {0, 2.83, center + (end - 0.5) * (roof_length + 0.08)}
+      Box: {0.08, 0.36, 0.085}
+      Rgb: cedar
+    }
+    {
+      Position: {0, 3.1, center + (end - 0.5) * (roof_length + 0.12)}
+      Rotation: {math.PI / 2, 0, 0}
+      Cylinder: {radius: 0.125, length: 0.08, segments: 16}
+      Rgb: {99, 119, 131}
+    }
+    {
+      Position: {0, 3.1, center + (end - 0.5) * (roof_length + 0.21)}
+      Rotation: {math.PI / 2, 0, 0}
+      Torus: {radius: 0.072, tube: 0.018, segments: 16, rings: 6}
+      Rgb: {63, 81, 102}
     }
   }
 }
