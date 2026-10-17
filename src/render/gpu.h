@@ -435,11 +435,23 @@ typedef struct box_gpu_volume_t {
  * as a storage texture on core WebGPU everywhere */
 #define BOX_GPU_REFLECT_FORMAT (WGPUTextureFormat_RGBA16Float)
 
-/** Cubemap array of the reflection probes of a scene: 6 layers per slot, a full mip chain */
+/** Face edge in texels of the last prefiltered mip level of a reflection cubemap at least */
+#define BOX_GPU_REFLECT_MIN_MIP (4)
+
+/** Cubemap array of the reflection probes of a scene: 6 layers per slot, mip 0 the mirror and
+ * each higher mip level down to BOX_GPU_REFLECT_MIN_MIP texels the GGX prefiltered radiance of
+ * a rougher surface, with the L2 SH irradiance of each slot.
+ *
+ * The source cubes the prefilter of a chunk samples are one too, with a full box filtered mip
+ * chain and no SH. */
 typedef struct box_gpu_reflect_t {
     WGPUTexture texture;            /**< The texture, BOX_GPU_REFLECT_FORMAT */
     WGPUTextureView cube;           /**< Cube array view of every mip level */
     WGPUTextureView *levels;        /**< 2D array view of every layer of each mip level */
+    WGPUBuffer sh;                  /**< BOX_RENDER_SH_COEFFICIENTS vec4 per slot, in the basis
+                                     *   and order of mesh.wgsl, NULL for source cubes */
+    WGPUBuffer visibility;          /**< Visibility maps the projection writes besides the SH,
+                                     *   unused, NULL for source cubes */
     uint32_t resolution;            /**< Face edge of mip 0 in texels */
     uint32_t cubes;                 /**< Cubemap slots */
     uint32_t mips;                  /**< Mip levels */
@@ -476,6 +488,12 @@ typedef struct box_gpu_t {
     WGPUBindGroupLayout reflect_mip_layout; /**< Binds two mip levels of a cube array */
     WGPUPipelineLayout reflect_mip_pipeline_layout; /**< Pipeline layout of the mip pass */
     WGPUComputePipeline reflect_mip; /**< Mip pipeline, NULL until the bake shader exists */
+    WGPUBindGroupLayout reflect_prefilter_layout; /**< Binds the source cubes and a mip level */
+    WGPUPipelineLayout reflect_prefilter_pipeline_layout; /**< Pipeline layout of the prefilter */
+    WGPUComputePipeline reflect_prefilter; /**< Prefilter pipeline, NULL until the bake shader
+                                            *   exists */
+    WGPUSampler reflect_sampler;    /**< Trilinear sampler of the source cubes */
+    box_gpu_reflect_t *reflect_source; /**< Source cubes of a chunk, NULL before the first */
     ecs_map_t forward;              /**< Forward pipeline by shader, format, blend, back face */
     WGPUBuffer view_buffer;         /**< Uniforms of the views of a target */
     int32_t view_capacity;          /**< Views the view buffer holds */
@@ -851,7 +869,7 @@ void box_gpu_reflect_apply(
     uint32_t handle,
     const box_render_reflection_desc_t *desc);
 
-/** Create the store and mip pipelines from the module of the bake shader.
+/** Create the store, mip and prefilter pipelines from the module of the bake shader.
  *
  * @param gpu The backend
  * @param module The module
@@ -861,7 +879,10 @@ void box_gpu_reflect_pipelines(
     WGPUShaderModule module);
 
 /** Record the pass that writes the faces of a chunk of reflection captures into mip 0 of their
- * slots and box filters every higher mip level of those slots.
+ * slots and fills every higher mip level of those slots with the GGX prefiltered radiance.
+ *
+ * The faces go to source cubes of the chunk as well, whose box filtered mips the prefilter
+ * samples by the solid angle of each sample. The SH of the slots is the projection's.
  *
  * @param gpu The backend
  * @param encoder The encoder of the chunk

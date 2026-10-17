@@ -545,6 +545,13 @@
                     "wall_shows_in_facing_face",
                     "perf_run_waits_for_captures"
                 ]
+            },
+            {
+                "id": "ReflectionPrefilter",
+                "testcases": [
+                    "uniform_emissive_matches_uniform_environment",
+                    "empty_scene_matches_hemisphere_ambient"
+                ]
             }
         ]
     }

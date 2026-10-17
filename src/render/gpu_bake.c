@@ -5,7 +5,9 @@
  *
  * Six faces per probe are shaded and projected onto SH by bake_sh.wgsl, or stored in a cubemap
  * slot. A chunk is one command buffer: a cull that lists the instances of each face, a render
- * pass that replays a render bundle per face into an atlas tile, and the projection or store.
+ * pass that replays a render bundle per face into an atlas tile, and the projection.
+ *
+ * Reflection captures store, prefilter and project their faces in that command buffer.
  */
 
 #include "gpu_bake.h"
@@ -1027,6 +1029,70 @@ static void box_gpu_bake_params(
     wgpuQueueWriteBuffer(gpu->queue, b->params, 0, &params, sizeof(params));
 }
 
+/** Where the projection of a chunk writes: the SH and visibility of probes indexed by
+ * params.probes, and the Baked lights it adds */
+typedef struct box_gpu_bake_target_t {
+    WGPUBuffer sh;                  /**< BOX_GPU_PROBE_SIZE per probe */
+    WGPUBuffer visibility;          /**< BOX_GPU_VISIBILITY_SIZE per probe */
+    uint32_t count;                 /**< Probes both buffers hold */
+    WGPUBuffer lights;              /**< Baked lights, gpu->no_lights for none */
+    uint64_t lights_size;           /**< Bytes of the light buffer */
+} box_gpu_bake_target_t;
+
+/** Record the projection of the faces of a chunk in the atlas of a kind of captures onto the
+ * SH of its probes.
+ *
+ * @param gpu The backend
+ * @param b The capture state
+ * @param encoder The encoder of the chunk
+ * @param pipeline The projection pipeline
+ * @param kind box_gpu_bake_kind_t of the atlas
+ * @param target Where the projection writes
+ * @param count Probes of the chunk
+ * @param writes Timestamp the pass writes, NULL for none
+ */
+static void box_gpu_bake_project_record(
+    box_gpu_t *gpu,
+    box_gpu_bake_t *b,
+    WGPUCommandEncoder encoder,
+    WGPUComputePipeline pipeline,
+    int32_t kind,
+    const box_gpu_bake_target_t *target,
+    int32_t count,
+    const WGPUPassTimestampWrites *writes)
+{
+    const box_gpu_bake_set_t *s = &b->sets[kind];
+    WGPUBindGroupEntry entries[6] = {
+        { .binding = 0, .buffer = b->params, .size = sizeof(box_gpu_bake_params_t) },
+        { .binding = 1, .textureView = s->color_view },
+        {
+            .binding = 2,
+            .buffer = target->sh,
+            .size = (uint64_t)target->count * BOX_GPU_PROBE_SIZE
+        },
+        { .binding = 3, .textureView = s->depth_read },
+        { .binding = 4, .buffer = target->lights, .size = target->lights_size },
+        {
+            .binding = 9,
+            .buffer = target->visibility,
+            .size = (uint64_t)target->count * BOX_GPU_VISIBILITY_SIZE
+        }
+    };
+    WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
+        .layout = b->layout,
+        .entryCount = 6,
+        .entries = entries
+    });
+    WGPUComputePassEncoder cpass = wgpuCommandEncoderBeginComputePass(encoder,
+        &(WGPUComputePassDescriptor){ .timestampWrites = writes });
+    wgpuComputePassEncoderSetPipeline(cpass, pipeline);
+    wgpuComputePassEncoderSetBindGroup(cpass, 0, group, 0, NULL);
+    wgpuComputePassEncoderDispatchWorkgroups(cpass, (uint32_t)count, 1, 1);
+    wgpuComputePassEncoderEnd(cpass);
+    wgpuComputePassEncoderRelease(cpass);
+    wgpuBindGroupRelease(group);
+}
+
 /** Record the projection of the faces of a chunk onto the SH of its probes.
  *
  * @param gpu The backend
@@ -1049,45 +1115,19 @@ static void box_gpu_bake_project(
     const WGPUPassTimestampWrites *writes)
 {
     const box_render_bake_batch_t *batch = pass->bake;
-    const box_gpu_bake_set_t *s = &b->sets[BOX_GPU_BAKE_PROBES];
     box_gpu_volume_t *volume = pass->volume;
     box_gpu_buffer_t *baked = batch->baked
         ? ecs_map_get_deref(&gpu->buffers, box_gpu_buffer_t, batch->baked)
         : NULL;
     int32_t i;
-    WGPUBindGroupEntry entries[6] = {
-        { .binding = 0, .buffer = b->params, .size = sizeof(box_gpu_bake_params_t) },
-        { .binding = 1, .textureView = s->color_view },
-        {
-            .binding = 2,
-            .buffer = volume->probes[batch->target],
-            .size = (uint64_t)volume->count * BOX_GPU_PROBE_SIZE
-        },
-        { .binding = 3, .textureView = s->depth_read },
-        {
-            .binding = 4,
-            .buffer = baked ? baked->buffer : gpu->no_lights,
-            .size = baked ? baked->size : sizeof(box_render_light_t)
-        },
-        {
-            .binding = 9,
-            .buffer = volume->visibility,
-            .size = (uint64_t)volume->count * BOX_GPU_VISIBILITY_SIZE
-        }
-    };
-    WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
-        .layout = b->layout,
-        .entryCount = 6,
-        .entries = entries
-    });
-    WGPUComputePassEncoder cpass = wgpuCommandEncoderBeginComputePass(encoder,
-        &(WGPUComputePassDescriptor){ .timestampWrites = writes });
-    wgpuComputePassEncoderSetPipeline(cpass, pipeline);
-    wgpuComputePassEncoderSetBindGroup(cpass, 0, group, 0, NULL);
-    wgpuComputePassEncoderDispatchWorkgroups(cpass, (uint32_t)count, 1, 1);
-    wgpuComputePassEncoderEnd(cpass);
-    wgpuComputePassEncoderRelease(cpass);
-    wgpuBindGroupRelease(group);
+    box_gpu_bake_project_record(gpu, b, encoder, pipeline, BOX_GPU_BAKE_PROBES,
+        &(box_gpu_bake_target_t){
+            .sh = volume->probes[batch->target],
+            .visibility = volume->visibility,
+            .count = volume->count,
+            .lights = baked ? baked->buffer : gpu->no_lights,
+            .lights_size = baked ? baked->size : sizeof(box_render_light_t)
+        }, count, writes);
     ecs_os_mutex_lock(gpu->lock);
     gpu->stats.probes += count;
     for (i = 0; i < count; i ++) {
@@ -1103,35 +1143,48 @@ static void box_gpu_bake_project(
     ecs_os_mutex_unlock(gpu->lock);
 }
 
-/** Record the store of the faces of a chunk of reflection captures into their cubemap slots
- * and report the probes it stored.
+/** Record the store of the faces of a chunk of reflection captures into their cubemap slots,
+ * the prefilter of their mips and the projection onto their SH, and report the probes it
+ * stored.
  *
  * @param gpu The backend
  * @param b The capture state
  * @param encoder The encoder of the chunk
+ * @param pipeline The projection pipeline
  * @param pass The captures of a reflection batch
  * @param probes The probes of the chunk
  * @param count Probes of the chunk
- * @param writes Timestamp the pass writes, NULL for none
+ * @param writes Timestamp the last pass writes, NULL for none
  * @return Whether the store was recorded
  */
 static bool box_gpu_bake_store(
     box_gpu_t *gpu,
     box_gpu_bake_t *b,
     WGPUCommandEncoder encoder,
+    WGPUComputePipeline pipeline,
     const box_gpu_bake_pass_t *pass,
     const box_render_probe_capture_t *probes,
     int32_t count,
     const WGPUPassTimestampWrites *writes)
 {
     const box_render_reflect_batch_t *batch = pass->reflect;
+    const box_gpu_reflect_t *cube = pass->cube;
     uint32_t ticket = batch->ticket + (uint32_t)(probes - pass->probes);
     int32_t i;
-    bool result = box_gpu_reflect_store(gpu, encoder, pass->cube, b->params,
-        sizeof(box_gpu_bake_params_t), b->sets[BOX_GPU_BAKE_REFLECT].color_view, count, writes);
+    bool result = box_gpu_reflect_store(gpu, encoder, cube, b->params,
+        sizeof(box_gpu_bake_params_t), b->sets[BOX_GPU_BAKE_REFLECT].color_view, count, NULL);
     if (!result) {
         goto done;
     }
+
+    box_gpu_bake_project_record(gpu, b, encoder, pipeline, BOX_GPU_BAKE_REFLECT,
+        &(box_gpu_bake_target_t){
+            .sh = cube->sh,
+            .visibility = cube->visibility,
+            .count = cube->cubes,
+            .lights = gpu->no_lights,
+            .lights_size = sizeof(box_render_light_t)
+        }, count, writes);
 
     ecs_os_mutex_lock(gpu->lock);
     for (i = 0; i < count; i ++) {
@@ -1282,7 +1335,7 @@ static void box_gpu_bake_chunk_capture(
         box_gpu_bake_project(gpu, b, encoder, pipeline, pass, probes, count,
             timed ? &end : NULL);
     } else {
-        timed = box_gpu_bake_store(gpu, b, encoder, pass, probes, count,
+        timed = box_gpu_bake_store(gpu, b, encoder, pipeline, pass, probes, count,
             timed ? &end : NULL) && timed;
     }
 
@@ -1414,6 +1467,13 @@ static void box_gpu_bake_batch(
 {
     WGPUTextureView shadow = NULL;
     int32_t first, chunk = box_gpu_bake_chunk(packet, pass->scene, pass->size);
+    if (pass->cube) {
+        int32_t layers = gpu->stats.texture_layers > 0
+            ? gpu->stats.texture_layers
+            : BOX_RENDER_REFLECT_LAYERS;
+        chunk = glm_imin(chunk, glm_imax(layers / 6, 1));
+    }
+
     box_gpu_bake_atlas(gpu, &b->sets[pass->kind], pass->size, chunk);
     box_gpu_bake_draws(gpu, b, packet, pass->scene, chunk);
     for (first = 0; first < pass->count; first += chunk) {

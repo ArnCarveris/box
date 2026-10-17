@@ -374,9 +374,9 @@ typedef struct box_render_bake_batch_t {
     int32_t count;          /**< Probes of the batch */
 } box_render_bake_batch_t;
 
-/** Description of a BOX_RENDER_REFLECTION create: a cubemap array of a scene with a full mip
- * chain, 6 layers per slot. Recreating a handle at the same resolution keeps the slots both
- * textures have; at another resolution nothing is kept.
+/** Description of a BOX_RENDER_REFLECTION create: a cubemap array of a scene, 6 layers per slot,
+ * with mips down to 4 texels and the SH irradiance of each slot. Recreating a handle at the same
+ * resolution keeps the slots both textures have; at another resolution nothing is kept.
  */
 typedef struct box_render_reflection_desc_t {
     uint32_t resolution;    /**< Face edge of a cubemap in texels */
@@ -389,8 +389,9 @@ typedef struct box_render_reflection_desc_t {
  * batches of the scene with bake set, lit by the lights of the views, the sun shadowed by one
  * cascade over the bounds, the ambient term of the volume buffer the views show or the hemisphere.
  *
- * Faces go to mip 0 of the slot of the probe, texels nothing covered get the sky radiance of
- * the bake, and the higher mips are box filtered.
+ * Faces go to mip 0 of the slot, texels nothing covered the sky radiance of the bake; mip k of
+ * N gets the GGX prefiltered radiance for the perceptual roughness k / (N - 1) and the SH of the
+ * slot the projection, in the same command buffer, before the probe is reported captured.
  */
 typedef struct box_render_reflect_batch_t {
     uint32_t texture;       /**< Handle of the BOX_RENDER_REFLECTION the probes are written into */
@@ -692,6 +693,25 @@ bool box_render_gpu_read_reflection(
     uint32_t face,
     float *out,
     int32_t count);
+
+/** Copy the L2 SH irradiance of a reflection probe cubemap slot into memory, waiting for the
+ * copy.
+ *
+ * The coefficients E_lm = A_l * L_lm of the capture are in the basis and order of mesh.wgsl, as
+ * the probes of a volume; a slot gets them with its prefiltered mips. Only call this when the
+ * main thread renders, after box_render_sync, as box_render_gpu_read_buffer.
+ *
+ * @param world The world
+ * @param texture Handle of the BOX_RENDER_REFLECTION
+ * @param slot Cubemap slot
+ * @param out Receives the linear rgb coefficients, w unused
+ * @return Whether the texture exists and the coefficients were copied
+ */
+bool box_render_gpu_read_reflection_sh(
+    ecs_world_t *world,
+    uint32_t texture,
+    uint32_t slot,
+    float out[BOX_RENDER_SH_COEFFICIENTS][4]);
 
 /** What the cull pass of a view tested and kept in the last target the GPU backend rendered */
 typedef struct box_render_cull_stats_t {

@@ -2,8 +2,12 @@
  * @file render/gpu_reflect.c
  * @brief Reflection probe cubemap arrays of the webgpu backend and the passes that fill them.
  *
- * Each scene with resident reflection probes has a cube array with a full mip chain, 6 layers
- * per slot. The captures of gpu_bake.c store their faces in mip 0 and box filter the others.
+ * Each scene with resident reflection probes has a cube array, 6 layers per slot, and the L2 SH
+ * irradiance of each slot. The captures of gpu_bake.c store their faces in mip 0 and in source
+ * cubes of the chunk with a box filtered full mip chain.
+ *
+ * The prefilter fills each higher mip level of the slots with the GGX prefiltered radiance from
+ * the source cubes, in the command buffer of the capture.
  */
 
 #include "gpu.h"
@@ -31,29 +35,50 @@ static void box_gpu_reflect_free(
         wgpuTextureViewRelease(c->levels[i]);
     }
 
+    if (c->sh) {
+        wgpuBufferRelease(c->sh);
+        wgpuBufferRelease(c->visibility);
+    }
+
     wgpuTextureViewRelease(c->cube);
     wgpuTextureRelease(c->texture);
     ecs_os_free(c->levels);
     ecs_os_free(c);
 }
 
-/** Create a cube array with a full mip chain and its views.
+/** Create a cube array and its views: the slots of a scene with mips down to
+ * BOX_GPU_REFLECT_MIN_MIP texels and their SH, or source cubes with a full mip chain.
  *
  * @param gpu The backend
  * @param resolution Face edge of mip 0 in texels
  * @param cubes Cubemap slots
+ * @param source Whether the cubes are source cubes
  * @return The cube array
  */
 static box_gpu_reflect_t* box_gpu_reflect_new(
     box_gpu_t *gpu,
     uint32_t resolution,
-    uint32_t cubes)
+    uint32_t cubes,
+    bool source)
 {
     box_gpu_reflect_t *c = ecs_os_calloc_t(box_gpu_reflect_t);
     uint32_t i, layers = cubes * BOX_GPU_REFLECT_FACES;
+    uint32_t smallest = source ? 1 : BOX_GPU_REFLECT_MIN_MIP;
     c->resolution = resolution;
     c->cubes = cubes;
-    for (c->mips = 1; (resolution >> c->mips) > 0; c->mips ++) { }
+    for (c->mips = 1; (resolution >> c->mips) >= smallest; c->mips ++) { }
+    if (!source) {
+        c->sh = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
+            .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_CopySrc |
+                WGPUBufferUsage_CopyDst,
+            .size = (uint64_t)cubes * BOX_GPU_PROBE_SIZE
+        });
+        c->visibility = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
+            .usage = WGPUBufferUsage_Storage,
+            .size = (uint64_t)cubes * BOX_GPU_VISIBILITY_SIZE
+        });
+    }
+
     c->texture = wgpuDeviceCreateTexture(gpu->device, &(WGPUTextureDescriptor){
         .usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_StorageBinding |
             WGPUTextureUsage_CopySrc | WGPUTextureUsage_CopyDst,
@@ -85,7 +110,7 @@ static box_gpu_reflect_t* box_gpu_reflect_new(
     return c;
 }
 
-/** Copy every mip level of the slots two cube arrays of the same resolution share.
+/** Copy every mip level and the SH of the slots two cube arrays of the same resolution share.
  *
  * @param gpu The backend
  * @param from The old cube array
@@ -110,6 +135,8 @@ static void box_gpu_reflect_carry(
             &(WGPUExtent3D){ size, size, cubes * BOX_GPU_REFLECT_FACES });
     }
 
+    wgpuCommandEncoderCopyBufferToBuffer(encoder, from->sh, 0, to->sh, 0,
+        (uint64_t)cubes * BOX_GPU_PROBE_SIZE);
     WGPUCommandBuffer commands = wgpuCommandEncoderFinish(encoder, NULL);
     wgpuQueueSubmit(gpu->queue, 1, &commands);
     wgpuCommandBufferRelease(commands);
@@ -129,7 +156,7 @@ void box_gpu_reflect_init(
         .format = BOX_GPU_REFLECT_FORMAT,
         .viewDimension = WGPUTextureViewDimension_2DArray
     };
-    WGPUBindGroupLayoutEntry store[3] = {
+    WGPUBindGroupLayoutEntry store[4] = {
         params,
         {
             .binding = 1,
@@ -139,7 +166,8 @@ void box_gpu_reflect_init(
                 .viewDimension = WGPUTextureViewDimension_2D
             }
         },
-        { .binding = 10, .visibility = WGPUShaderStage_Compute, .storageTexture = storage }
+        { .binding = 10, .visibility = WGPUShaderStage_Compute, .storageTexture = storage },
+        { .binding = 13, .visibility = WGPUShaderStage_Compute, .storageTexture = storage }
     };
     WGPUBindGroupLayoutEntry mip[3] = {
         params,
@@ -153,11 +181,30 @@ void box_gpu_reflect_init(
         },
         { .binding = 12, .visibility = WGPUShaderStage_Compute, .storageTexture = storage }
     };
+    WGPUBindGroupLayoutEntry prefilter[4] = {
+        params,
+        {
+            .binding = 14,
+            .visibility = WGPUShaderStage_Compute,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Float,
+                .viewDimension = WGPUTextureViewDimension_CubeArray
+            }
+        },
+        {
+            .binding = 15,
+            .visibility = WGPUShaderStage_Compute,
+            .sampler = { .type = WGPUSamplerBindingType_Filtering }
+        },
+        { .binding = 16, .visibility = WGPUShaderStage_Compute, .storageTexture = storage }
+    };
     ecs_map_init(&gpu->reflections, NULL);
     gpu->reflect_store_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
-        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 3, .entries = store });
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 4, .entries = store });
     gpu->reflect_mip_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
         &(WGPUBindGroupLayoutDescriptor){ .entryCount = 3, .entries = mip });
+    gpu->reflect_prefilter_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 4, .entries = prefilter });
     gpu->reflect_store_pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
         &(WGPUPipelineLayoutDescriptor){
             .bindGroupLayoutCount = 1,
@@ -168,6 +215,21 @@ void box_gpu_reflect_init(
             .bindGroupLayoutCount = 1,
             .bindGroupLayouts = &gpu->reflect_mip_layout
         });
+    gpu->reflect_prefilter_pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
+        &(WGPUPipelineLayoutDescriptor){
+            .bindGroupLayoutCount = 1,
+            .bindGroupLayouts = &gpu->reflect_prefilter_layout
+        });
+    gpu->reflect_sampler = wgpuDeviceCreateSampler(gpu->device, &(WGPUSamplerDescriptor){
+        .addressModeU = WGPUAddressMode_ClampToEdge,
+        .addressModeV = WGPUAddressMode_ClampToEdge,
+        .addressModeW = WGPUAddressMode_ClampToEdge,
+        .magFilter = WGPUFilterMode_Linear,
+        .minFilter = WGPUFilterMode_Linear,
+        .mipmapFilter = WGPUMipmapFilterMode_Linear,
+        .lodMaxClamp = 32.0f,
+        .maxAnisotropy = 1
+    });
 }
 
 void box_gpu_reflect_fini(
@@ -182,13 +244,26 @@ void box_gpu_reflect_fini(
         ecs_map_fini(&gpu->reflections);
     }
 
-    WGPUComputePipeline pipelines[2] = { gpu->reflect_store, gpu->reflect_mip };
-    WGPUPipelineLayout layouts[2] = {
-        gpu->reflect_store_pipeline_layout, gpu->reflect_mip_pipeline_layout
+    if (gpu->reflect_source) {
+        box_gpu_reflect_free(gpu->reflect_source);
+    }
+
+    if (gpu->reflect_sampler) {
+        wgpuSamplerRelease(gpu->reflect_sampler);
+    }
+
+    WGPUComputePipeline pipelines[3] = {
+        gpu->reflect_store, gpu->reflect_mip, gpu->reflect_prefilter
     };
-    WGPUBindGroupLayout groups[2] = { gpu->reflect_store_layout, gpu->reflect_mip_layout };
+    WGPUPipelineLayout layouts[3] = {
+        gpu->reflect_store_pipeline_layout, gpu->reflect_mip_pipeline_layout,
+        gpu->reflect_prefilter_pipeline_layout
+    };
+    WGPUBindGroupLayout groups[3] = {
+        gpu->reflect_store_layout, gpu->reflect_mip_layout, gpu->reflect_prefilter_layout
+    };
     int32_t i;
-    for (i = 0; i < 2; i ++) {
+    for (i = 0; i < 3; i ++) {
         if (pipelines[i]) {
             wgpuComputePipelineRelease(pipelines[i]);
         }
@@ -202,9 +277,12 @@ void box_gpu_reflect_fini(
         }
     }
 
-    gpu->reflect_store = gpu->reflect_mip = NULL;
+    gpu->reflect_source = NULL;
+    gpu->reflect_sampler = NULL;
+    gpu->reflect_store = gpu->reflect_mip = gpu->reflect_prefilter = NULL;
     gpu->reflect_store_pipeline_layout = gpu->reflect_mip_pipeline_layout = NULL;
-    gpu->reflect_store_layout = gpu->reflect_mip_layout = NULL;
+    gpu->reflect_prefilter_pipeline_layout = NULL;
+    gpu->reflect_store_layout = gpu->reflect_mip_layout = gpu->reflect_prefilter_layout = NULL;
 }
 
 void box_gpu_reflect_apply(
@@ -225,7 +303,7 @@ void box_gpu_reflect_apply(
     }
 
     if (op == BOX_RENDER_CREATE) {
-        box_gpu_reflect_t *c = box_gpu_reflect_new(gpu, desc->resolution, desc->cubes);
+        box_gpu_reflect_t *c = box_gpu_reflect_new(gpu, desc->resolution, desc->cubes, false);
         if (old && old->resolution == c->resolution) {
             box_gpu_reflect_carry(gpu, old, c);
         }
@@ -278,6 +356,8 @@ void box_gpu_reflect_pipelines(
         module, "reflect_store");
     box_gpu_reflect_compute(gpu, &gpu->reflect_mip, gpu->reflect_mip_pipeline_layout,
         module, "reflect_mip");
+    box_gpu_reflect_compute(gpu, &gpu->reflect_prefilter,
+        gpu->reflect_prefilter_pipeline_layout, module, "reflect_prefilter");
 }
 
 /** Get the workgroups along an edge of a face of the store and mip passes.
@@ -291,6 +371,63 @@ static uint32_t box_gpu_reflect_groups(
     return (size + BOX_GPU_REFLECT_GROUP - 1) / BOX_GPU_REFLECT_GROUP;
 }
 
+/** Get source cubes for the probes of a chunk at a resolution, created again when the ones
+ * there are smaller or of another resolution.
+ *
+ * @param gpu The backend
+ * @param resolution Face edge of mip 0 in texels
+ * @param count Probes of the chunk
+ * @return The source cubes
+ */
+static box_gpu_reflect_t* box_gpu_reflect_source(
+    box_gpu_t *gpu,
+    uint32_t resolution,
+    uint32_t count)
+{
+    box_gpu_reflect_t *c = gpu->reflect_source;
+    if (c && (c->resolution != resolution || c->cubes < count)) {
+        box_gpu_reflect_free(c);
+        c = NULL;
+    }
+
+    if (!c) {
+        c = box_gpu_reflect_new(gpu, resolution, count, true);
+        gpu->reflect_source = c;
+    }
+
+    return c;
+}
+
+/** Record a dispatch of a pass over the faces of the probes of a chunk at one mip level.
+ *
+ * @param gpu The backend
+ * @param pass The compute pass
+ * @param layout Bind group layout of the pipeline the pass has set
+ * @param entries Entries of the bind group
+ * @param count Entries
+ * @param size Face edge of the level in texels
+ * @param faces Faces of the chunk
+ */
+static void box_gpu_reflect_dispatch(
+    box_gpu_t *gpu,
+    WGPUComputePassEncoder pass,
+    WGPUBindGroupLayout layout,
+    const WGPUBindGroupEntry *entries,
+    uint32_t count,
+    uint32_t size,
+    uint32_t faces)
+{
+    WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
+        .layout = layout,
+        .entryCount = count,
+        .entries = entries
+    });
+    uint32_t groups = box_gpu_reflect_groups(size);
+    wgpuComputePassEncoderSetBindGroup(pass, 0, group, 0, NULL);
+    wgpuComputePassEncoderDispatchWorkgroups(pass, groups, groups, faces);
+    wgpuBindGroupRelease(group);
+}
+
 bool box_gpu_reflect_store(
     box_gpu_t *gpu,
     WGPUCommandEncoder encoder,
@@ -302,47 +439,46 @@ bool box_gpu_reflect_store(
     const WGPUPassTimestampWrites *writes)
 {
     uint32_t i, faces = (uint32_t)count * BOX_GPU_REFLECT_FACES;
-    bool result = gpu->reflect_store && gpu->reflect_mip && count > 0;
+    bool result = gpu->reflect_store && gpu->reflect_mip && gpu->reflect_prefilter &&
+        count > 0;
     if (!result) {
         goto done;
     }
 
-    WGPUBindGroupEntry entries[3] = {
-        { .binding = 0, .buffer = params, .size = params_size },
-        { .binding = 1, .textureView = atlas },
-        { .binding = 10, .textureView = cube->levels[0] }
-    };
-    WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
-        .layout = gpu->reflect_store_layout,
-        .entryCount = 3,
-        .entries = entries
-    });
+    box_gpu_reflect_t *source = box_gpu_reflect_source(gpu, cube->resolution, (uint32_t)count);
     WGPUComputePassEncoder pass = wgpuCommandEncoderBeginComputePass(encoder,
         &(WGPUComputePassDescriptor){ .timestampWrites = writes });
-    uint32_t groups = box_gpu_reflect_groups(cube->resolution);
     wgpuComputePassEncoderSetPipeline(pass, gpu->reflect_store);
-    wgpuComputePassEncoderSetBindGroup(pass, 0, group, 0, NULL);
-    wgpuComputePassEncoderDispatchWorkgroups(pass, groups, groups, faces);
-    wgpuBindGroupRelease(group);
-    if (cube->mips > 1) {
+    box_gpu_reflect_dispatch(gpu, pass, gpu->reflect_store_layout, (WGPUBindGroupEntry[4]){
+        { .binding = 0, .buffer = params, .size = params_size },
+        { .binding = 1, .textureView = atlas },
+        { .binding = 10, .textureView = cube->levels[0] },
+        { .binding = 13, .textureView = source->levels[0] }
+    }, 4, cube->resolution, faces);
+    if (source->mips > 1) {
         wgpuComputePassEncoderSetPipeline(pass, gpu->reflect_mip);
     }
 
-    for (i = 1; i < cube->mips; i ++) {
-        WGPUBindGroupEntry levels[3] = {
+    for (i = 1; i < source->mips; i ++) {
+        box_gpu_reflect_dispatch(gpu, pass, gpu->reflect_mip_layout, (WGPUBindGroupEntry[3]){
             { .binding = 0, .buffer = params, .size = params_size },
-            { .binding = 11, .textureView = cube->levels[i - 1] },
-            { .binding = 12, .textureView = cube->levels[i] }
-        };
-        group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
-            .layout = gpu->reflect_mip_layout,
-            .entryCount = 3,
-            .entries = levels
-        });
-        groups = box_gpu_reflect_groups(cube->resolution >> i);
-        wgpuComputePassEncoderSetBindGroup(pass, 0, group, 0, NULL);
-        wgpuComputePassEncoderDispatchWorkgroups(pass, groups, groups, faces);
-        wgpuBindGroupRelease(group);
+            { .binding = 11, .textureView = source->levels[i - 1] },
+            { .binding = 12, .textureView = source->levels[i] }
+        }, 3, cube->resolution >> i, faces);
+    }
+
+    if (cube->mips > 1) {
+        wgpuComputePassEncoderSetPipeline(pass, gpu->reflect_prefilter);
+    }
+
+    for (i = 1; i < cube->mips; i ++) {
+        box_gpu_reflect_dispatch(gpu, pass, gpu->reflect_prefilter_layout,
+            (WGPUBindGroupEntry[4]){
+                { .binding = 0, .buffer = params, .size = params_size },
+                { .binding = 14, .textureView = source->cube },
+                { .binding = 15, .sampler = gpu->reflect_sampler },
+                { .binding = 16, .textureView = cube->levels[i] }
+            }, 4, cube->resolution >> i, faces);
     }
 
     wgpuComputePassEncoderEnd(pass);
@@ -440,6 +576,35 @@ done:
     return result;
 }
 
+bool box_render_gpu_read_reflection_sh(
+    ecs_world_t *world,
+    uint32_t texture,
+    uint32_t slot,
+    float out[BOX_RENDER_SH_COEFFICIENTS][4])
+{
+    bool result = false;
+    box_render_gpu_stats_t stats;
+    if (!box_render_gpu_stats(world, &stats) || !stats.ready) {
+        goto done;
+    }
+
+    box_gpu_t *gpu = box_render_get_backend(world)->ctx;
+    bool renders = ecs_os_thread_self() == gpu->thread;
+    ecs_assert(renders, ECS_INVALID_OPERATION,
+        "box_render_gpu_read_reflection_sh needs RenderSettings.main_thread and box_render_sync");
+    const box_gpu_reflect_t *c = renders
+        ? ecs_map_get_deref(&gpu->reflections, box_gpu_reflect_t, texture)
+        : NULL;
+    if (!c || slot >= c->cubes) {
+        goto done;
+    }
+
+    result = box_gpu_read(gpu, c->sh, slot * (uint32_t)BOX_GPU_PROBE_SIZE,
+        (uint32_t)BOX_GPU_PROBE_SIZE, out);
+done:
+    return result;
+}
+
 #else
 
 bool box_render_gpu_read_reflection(
@@ -456,6 +621,20 @@ bool box_render_gpu_read_reflection(
     (void)face;
     (void)out;
     (void)count;
+
+    return false;
+}
+
+bool box_render_gpu_read_reflection_sh(
+    ecs_world_t *world,
+    uint32_t texture,
+    uint32_t slot,
+    float out[BOX_RENDER_SH_COEFFICIENTS][4])
+{
+    (void)world;
+    (void)texture;
+    (void)slot;
+    (void)out;
 
     return false;
 }

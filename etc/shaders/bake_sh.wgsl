@@ -23,8 +23,12 @@
 //
 // The reflect_store entry point writes the faces of the reflection probes of a chunk into mip 0
 // of their cubemap slot instead (params.probes holds the slots), mirrored to the WebGPU cubemap
-// convention, with the sky radiance of the projection where nothing covered a texel;
-// reflect_mip box filters one mip level of their slots into the next.
+// convention, with the sky radiance of the projection where nothing covered a texel. It writes
+// them into a source cube array of the chunk too, one cube per probe, whose full mip chain
+// reflect_mip box filters level by level. reflect_prefilter then fills each higher mip level of
+// the slots with the GGX prefiltered radiance of the source (split sum, Karis), sampling a
+// lower source mip by the solid angle of each sample (filtered importance sampling). The
+// projection runs on the reflection captures too, writing the SH of each slot.
 //
 // Face f of probe p is the tile at column f and row p of the atlas, size texels on each side.
 // Its texel (x, y), y down, looks along
@@ -94,6 +98,10 @@ struct CullJob {
 @group(0) @binding(10) var cube_store: texture_storage_2d_array<rgba16float, write>;
 @group(0) @binding(11) var cube_source: texture_2d_array<f32>;
 @group(0) @binding(12) var cube_mip: texture_storage_2d_array<rgba16float, write>;
+@group(0) @binding(13) var source_store: texture_storage_2d_array<rgba16float, write>;
+@group(0) @binding(14) var source: texture_cube_array<f32>;
+@group(0) @binding(15) var source_sampler: sampler;
+@group(0) @binding(16) var prefiltered: texture_storage_2d_array<rgba16float, write>;
 @group(1) @binding(0) var<storage, read> instances: array<Instance>;
 
 const GROUP: u32 = 64u;
@@ -109,6 +117,12 @@ const VISIBILITY_MAX: f32 = 2.0;
 
 // Directions per edge of a texel of the map whose distances the texel averages.
 const VISIBILITY_SAMPLES: u32 = 4u;
+
+// GGX samples of a texel of the prefiltered mip levels.
+const PREFILTER_SAMPLES: u32 = 64u;
+
+// Face edge in texels of the last prefiltered mip level at least.
+const PREFILTER_MIN_SIZE: u32 = 4u;
 
 // Invocations of a workgroup of the cull.
 const CULL_GROUP: u32 = 256u;
@@ -419,8 +433,20 @@ fn cube_layer(probe: u32, face: u32) -> u32 {
     return params.probes[probe / 4u][probe % 4u] * 6u + face;
 }
 
-// Texel (x, y) of face z % 6 of probe z / 6 of the chunk. A cubemap face texel at column x sees
-// along forward - u right with the right of the atlas, so it is texel size - 1 - x of the tile.
+// Direction texel (x, y) of a cubemap face looks along in the WebGPU cubemap convention: the
+// face axes of the atlas with u mirrored, as the store mirrors the faces.
+fn cube_direction(face: u32, texel: vec2u, size: u32) -> vec3f {
+    let step = 2.0 / f32(size);
+    let axes = face_axes(face);
+    let right = cross(axes[0], axes[1]);
+    let u = 1.0 - (f32(texel.x) + 0.5) * step;
+    let v = 1.0 - (f32(texel.y) + 0.5) * step;
+    return normalize(axes[0] + right * u + axes[1] * v);
+}
+
+// Texel (x, y) of face z % 6 of probe z / 6 of the chunk, into its slot and its source cube. A
+// cubemap face texel at column x sees along forward - u right with the right of the atlas, so it
+// is texel size - 1 - x of the tile.
 @compute @workgroup_size(8, 8)
 fn reflect_store(@builtin(global_invocation_id) id: vec3u) {
     let size = max(params.size.x, 1u);
@@ -430,36 +456,86 @@ fn reflect_store(@builtin(global_invocation_id) id: vec3u) {
         return;
     }
 
-    let x = size - 1u - id.x;
-    let step = 2.0 / f32(size);
-    let axes = face_axes(face);
-    let right = cross(axes[0], axes[1]);
-    let u = (f32(x) + 0.5) * step - 1.0;
-    let v = 1.0 - (f32(id.y) + 0.5) * step;
-    let d = normalize(axes[0] + right * u + axes[1] * v);
-    let texel = textureLoad(captures, tile(probe, face, x, id.y), 0);
-    let radiance = select(sky(d), texel.rgb, texel.a > 0.5);
-    textureStore(cube_store, id.xy, cube_layer(probe, face), vec4f(radiance, 1.0));
+    let d = cube_direction(face, id.xy, size);
+    let texel = textureLoad(captures, tile(probe, face, size - 1u - id.x, id.y), 0);
+    let radiance = vec4f(select(sky(d), texel.rgb, texel.a > 0.5), 1.0);
+    textureStore(cube_store, id.xy, cube_layer(probe, face), radiance);
+    textureStore(source_store, id.xy, id.z, radiance);
 }
 
-// Texel (x, y) of the next mip level of face z % 6 of probe z / 6 of the chunk: the mean of the
-// two by two texels of the level above.
+// Texel (x, y) of the next mip level of face z % 6 of probe z / 6 of the source cubes: the mean
+// of the two by two texels of the level above.
 @compute @workgroup_size(8, 8)
 fn reflect_mip(@builtin(global_invocation_id) id: vec3u) {
     let size = textureDimensions(cube_mip);
-    let probe = id.z / 6u;
-    if (id.x >= size.x || id.y >= size.y || probe >= params.size.y) {
+    if (id.x >= size.x || id.y >= size.y || id.z / 6u >= params.size.y) {
         return;
     }
 
-    let layer = cube_layer(probe, id.z % 6u);
     let last = textureDimensions(cube_source) - vec2u(1u);
     let p = id.xy * 2u;
     var sum = vec4f(0.0);
     for (var i = 0u; i < 4u; i++) {
         let q = min(p + vec2u(i & 1u, i >> 1u), last);
-        sum += textureLoad(cube_source, q, layer, 0);
+        sum += textureLoad(cube_source, q, id.z, 0);
     }
 
-    textureStore(cube_mip, id.xy, layer, sum * 0.25);
+    textureStore(cube_mip, id.xy, id.z, sum * 0.25);
+}
+
+// Point i of n of the Hammersley set.
+fn hammersley(i: u32, n: u32) -> vec2f {
+    return vec2f(f32(i) / f32(n), f32(reverseBits(i)) * 2.3283064365386963e-10);
+}
+
+// Half vector of a GGX sample around a normal for alpha = roughness squared, as mesh.wgsl.
+fn ggx_half(xi: vec2f, a: f32, n: vec3f) -> vec3f {
+    let phi = 2.0 * PI * xi.x;
+    let cos_theta = sqrt((1.0 - xi.y) / (1.0 + (a * a - 1.0) * xi.y));
+    let sin_theta = sqrt(max(1.0 - cos_theta * cos_theta, 0.0));
+    let up = select(vec3f(1.0, 0.0, 0.0), vec3f(0.0, 0.0, 1.0), abs(n.z) < 0.999);
+    let tx = normalize(cross(up, n));
+    let ty = cross(n, tx);
+    return normalize(tx * (sin_theta * cos(phi)) + ty * (sin_theta * sin(phi)) + n * cos_theta);
+}
+
+// Texel (x, y) of a prefiltered mip level of face z % 6 of the slot of probe z / 6 of the chunk.
+// Mip k of N levels, the last one at least PREFILTER_MIN_SIZE texels, holds the radiance
+// prefiltered for the perceptual roughness k / (N - 1) with n = v = r. Each sample reads the
+// source mip whose texels span the solid angle the sample stands for.
+@compute @workgroup_size(8, 8)
+fn reflect_prefilter(@builtin(global_invocation_id) id: vec3u) {
+    let size = textureDimensions(prefiltered).x;
+    let probe = id.z / 6u;
+    let face = id.z % 6u;
+    if (id.x >= size || id.y >= size || probe >= params.size.y) {
+        return;
+    }
+
+    let full = max(params.size.x, 1u);
+    let levels = max(firstLeadingBit(full / PREFILTER_MIN_SIZE) + 1u, 2u);
+    let mip = firstLeadingBit(full) - firstLeadingBit(max(size, 1u));
+    let roughness = min(f32(mip) / f32(levels - 1u), 1.0);
+    let a = roughness * roughness;
+    let n = cube_direction(face, id.xy, size);
+    let texel_angle = 4.0 * PI / (6.0 * f32(full) * f32(full));
+    var sum = vec3f(0.0);
+    var weight = 0.0;
+    for (var i = 0u; i < PREFILTER_SAMPLES; i++) {
+        let h = ggx_half(hammersley(i, PREFILTER_SAMPLES), a, n);
+        let ndh = max(dot(n, h), 0.0);
+        let l = 2.0 * ndh * h - n;
+        let ndl = dot(n, l);
+        if (ndl > 0.0) {
+            let k = ndh * ndh * (a * a - 1.0) + 1.0;
+            let pdf = a * a / (PI * k * k) * 0.25;
+            let sample_angle = 1.0 / (f32(PREFILTER_SAMPLES) * max(pdf, 1e-6));
+            let lod = max(0.5 * log2(sample_angle / texel_angle) + 1.0, 0.0);
+            sum += textureSampleLevel(source, source_sampler, l, probe, lod).rgb * ndl;
+            weight += ndl;
+        }
+    }
+
+    let radiance = sum / max(weight, 1e-6);
+    textureStore(prefiltered, id.xy, cube_layer(probe, face), vec4f(radiance, 1.0));
 }
