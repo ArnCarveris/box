@@ -30,6 +30,10 @@
 // lower source mip by the solid angle of each sample (filtered importance sampling). The
 // projection runs on the reflection captures too, writing the SH of each slot.
 //
+// A texel whose radiance is not finite (a NaN or infinity a draw shaded) counts as uncovered in
+// the projection and the store: the prefilter and the SH sum spread one such texel over the
+// whole probe, while the forward pass shows it as one pixel.
+//
 // Face f of probe p is the tile at column f and row p of the atlas, size texels on each side.
 // Its texel (x, y), y down, looks along
 // forward + u right + v up with u, v in [-1, 1] and right = cross(forward, up). The depth of
@@ -151,6 +155,13 @@ fn face_axes(face: u32) -> mat2x3f {
         case 4u: { return mat2x3f(vec3f(0.0, 0.0, 1.0), vec3f(0.0, 1.0, 0.0)); }
         default: { return mat2x3f(vec3f(0.0, 0.0, -1.0), vec3f(0.0, 1.0, 0.0)); }
     }
+}
+
+// A shape covered the capture texel and its radiance is finite. The exponent bits are tested
+// because a shader compiler may fold comparisons with NaN.
+fn covered(texel: vec4f) -> bool {
+    let exponent = bitcast<vec3u>(texel.rgb) & vec3u(0x7f800000u);
+    return texel.a > 0.5 && all(exponent != vec3u(0x7f800000u));
 }
 
 // Solid angle of the face area from the face center to (x, y), signed by the quadrant.
@@ -294,7 +305,7 @@ fn project(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_index)
         let right = cross(axes[0], axes[1]);
         let d = normalize(axes[0] + right * (u0 + u1) * 0.5 + axes[1] * (v0 + v1) * 0.5);
         let texel = textureLoad(captures, tile(probe, face, x, y), 0);
-        let radiance = select(a + b * d.y, texel.rgb, texel.a > 0.5) * weight;
+        let radiance = select(a + b * d.y, texel.rgb, covered(texel)) * weight;
         let y_lm = basis(d);
         for (var k = 0u; k < SH_COEFFICIENTS; k++) {
             sum[k] += radiance * y_lm[k];
@@ -458,7 +469,7 @@ fn reflect_store(@builtin(global_invocation_id) id: vec3u) {
 
     let d = cube_direction(face, id.xy, size);
     let texel = textureLoad(captures, tile(probe, face, size - 1u - id.x, id.y), 0);
-    let radiance = vec4f(select(sky(d), texel.rgb, texel.a > 0.5), 1.0);
+    let radiance = vec4f(select(sky(d), texel.rgb, covered(texel)), 1.0);
     textureStore(cube_store, id.xy, cube_layer(probe, face), radiance);
     textureStore(source_store, id.xy, id.z, radiance);
 }

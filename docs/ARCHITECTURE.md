@@ -463,6 +463,113 @@ rows of both probe buffers it shares with the old one, and only the new probes, 
 and the changed region are queued. A new `probe_spacing` places a new volume that bakes from the
 ambient.
 
+**Reflection probes.** Cubemap probes give glossy surfaces their indirect specular light, as
+Unity's reflection probes and Godot's ReflectionProbe do. `ReflectionBake` on a `Scene` root (or
+a singleton for the default scene) turns them on: `resolution` 128 (face edge, 8 to 512),
+`budget_ms` 1, `scene_probe` true and `scene_probe_height` 2, set by the constructor and taken
+literally otherwise; a resolution out of range captures nothing and sets
+`ReflectionBakeStatus.error` ("resolution must be 8 to 512"), `budget_ms` 0 captures nothing.
+Adding it adds `ReflectionBakeStatus` (`probes`, `resident`, `captured`, `converged`, `error`),
+removed with it. `ReflectionProbe` on any entity of the scene (constructor: `extent` {5, 5, 5},
+`blend` 1, `priority` 0, `projection` {5, 5, 5}, `offset` 0) is placed by the translation and
+rotation of its `WorldTransform`, scale ignored: its influence box (half size `extent`) and its
+projection box (half size `projection`, {0, 0, 0} for an infinitely distant environment) are
+both centered on the entity and oriented by its rotation, and it captures at `offset` in that
+frame. With `scene_probe` the engine adds a probe below all others: centered over the static
+bounds of the scene at `scene_probe_height` above their bottom, an influence box of 1e6, no
+projection box and no blend, placed again when the spatial index or the height changes. A probe
+of a scene without `ReflectionBake` is ignored. `View.lighting.reflections` (constructor true)
+lets a lit view sample them; other views, scenes without `ReflectionBake` and the captures bind a
+black 1x1 cube array and list no probes, so they shade exactly as before.
+
+**Reflection slots.** `reflect.c` keeps the probes of each scene, and each resident probe a slot
+of the cubemap array of its scene (`gpu_reflect.c`): rgba16float, six layers per slot, mips down
+to 4 texels (6 at 128), plus 9 rgb L2 SH coefficients per slot. A scene has
+`maxTextureArrayLayers / 6` slots (256 layers, 42 slots, until the device reports its limit).
+While the probes fit each keeps the slot it got; when they do not, they are ranked every frame,
+the scene probe first, then higher `priority`, then nearer to a camera of the scene's views, and
+the ones past the capacity lose their slot and capture (`resident` < `probes`), never sampled.
+The array grows in powers of two from 4 slots, copying the mips and SH of the slots it keeps, and
+is created again empty when `resolution` changes. The resident probes go to a storage buffer per
+scene (at least 4 entries, doubled as needed, uploaded only when its bytes change) in blend order:
+higher `priority` first, then the smaller influence box, then the entity, the scene probe last.
+
+**Reflection captures.** Each frame the extract puts the probes that wait for a capture into the
+packet as one reflection batch per scene, lit by the lights of the first view of the scene and
+the ambient of its light bake volume (the hemisphere without one). On the render thread they run
+after the light bake batches and before the targets, in the chunks and with the culling and
+render bundles of the probe captures above: six 90 degree faces of `resolution` texels per probe
+draw the opaque static batches (batches carry the `bake` key in a scene with `LightBake` or
+`ReflectionBake`), the sun shadowed by the cascade fitted to the static bounds, no effects, no
+blended or dynamic shapes and no reflections. `reflect_store` (`bake_sh.wgsl`) mirrors each face
+into mip 0 of the slot in the WebGPU cubemap convention; texels nothing covered, and texels whose
+radiance is not finite, get the hemisphere sky a + b y of the projection (one NaN would otherwise
+spread over the whole probe through the prefilter). `reflect_mip` box filters a source copy of
+the faces, and `reflect_prefilter` writes mip k of N with the GGX radiance of perceptual roughness
+k / (N - 1) for n = v = r (Karis' split sum), 64 Hammersley samples per texel read from the source
+mip of their solid angle (filtered importance sampling). The `project` entry turns the same faces
+into the SH irradiance of the slot, which the shading normalizes with. A capture reaches the
+views of the packet that rendered it.
+
+**Reflection clusters.** `cluster.wgsl` lists, after the lights of each cluster, the first 8
+resident `ReflectionProbe`s in blend order whose influence box reaches into the cluster
+(separating axis test of the oriented box against the cluster box clipped to it); the scene
+probe is never listed. The index list reserves room for them and grows like the lights; when it
+overflows, lights are kept and probes cut. The cluster pass also runs for a view without point or
+spot lights when it lists probes.
+
+**Reflection shading.** `mesh.wgsl` samples along `spec`, the reflection direction bent toward the
+normal by roughness squared, at mip roughness * (mips - 1). It takes the listed probes of the
+cluster in blend order: each adds its fade (1 inside the influence box, falling linearly to 0
+over `blend` toward its faces, a hard edge for `blend` 0) times the weight still left, until less
+than 0.001 is left; the scene probe takes the rest, else the fallback does (the irradiance grid
+for a view with `lighting.baked`, the hemisphere ambient otherwise). A probe with a projection box
+is sampled toward where the ray from the fragment leaves that box (parallax correction), from its
+capture point. For a view that samples a light bake volume, the radiance of each probe is
+normalized by the luminance of the grid irradiance at the fragment over that of the probe's SH,
+both in direction `spec`, clamped to 0 to 2, so a dark corner inside a bright probe does not
+reflect its light. The result replaces the ambient specular term, times the split sum
+environment BRDF.
+
+**Reflection invalidation.** A probe is queued for a new capture when what it shows changes, and
+shows its previous capture until the new one lands: a static shape change recorded by
+`bake_change.c` (recorded while any scene has `LightBake` or `ReflectionBake`) whose bounds reach
+its influence or projection box; a point or spot light of the views added, removed or changed
+whose range reaches them; a directional light, the default sun or the ambient changing (every
+probe); the light bake of the scene showing a new pass, converging, appearing or going (every
+probe); a change of its own boxes or capture point (`blend` and `priority` only reorder the
+buffer). A capture the backend did not report for a rendered packet is queued again. A new
+`resolution` or a new backend drops every capture.
+
+**Reflection budget.** A scene captures `budget_ms` over the GPU time per probe capture each frame,
+at least 1 and at most 64 probes, the scene probe first and then the ones nearest to a camera;
+a headless run captures every waiting probe. The time per probe starts at 1 ms and follows the
+timestamp queries around the reflection batches of a packet (the bake timer above, CPU time
+without them), each measurement weighted 0.5. A scene progresses only with a valid resolution,
+`budget_ms` above 0, a view of the scene in the packet and the GPU backend; `PerfRun` warms up
+while such a scene has probes left, as for the light bake. A converged scene captures nothing.
+
+**Reflection status.** `ReflectionBakeStatus` is written when it changes: `probes` counts every
+probe including the scene probe, `resident` those with a slot, `captured` the resident ones whose
+current content is captured with nothing queued or in flight, `converged` is `captured ==
+resident` without an error.
+
+**Placing reflection probes.** Scenes place their probes by hand, as
+`etc/scenes/japanese_garden.flecs` does for its pond, tea houses, covered walk and main paths:
+
+- One probe per space with its own lighting (a room, a covered walk, a path, a pond), not per
+  object; the scene probe covers what is left.
+- The projection box matches the walls around the space: floor, ceiling and walls of a room,
+  deck, roof and posts of a walk, the buildings, fences and beds along a path.
+- The capture point (`offset`) is at eye height in open space, away from furniture and lanterns,
+  so it sees the space as a viewer does; over a pond it is low above the water, which mirrors
+  what is around it.
+- An inner probe (a room off a path, a passage inside a larger space) gets a higher `priority`,
+  so it is blended first and the outer probe fills its fade.
+- The influence box extends `blend` past the space, overlapping its neighbours by 1 to 2 units,
+  so the seams fade into the next probe instead of the scene probe.
+- Few probes overlap: at most 3 cover any point of the garden, and a cluster lists 8 at most.
+
 ## Spatial index
 
 `box.spatial` keeps, per scene, an index over world AABBs of shapes (unit mesh bounds times

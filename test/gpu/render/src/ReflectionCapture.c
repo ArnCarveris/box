@@ -5,6 +5,7 @@
 
 #include <box.h>
 #include <bake_test.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include "render.h"
@@ -380,6 +381,45 @@ void ReflectionCapture_perf_run_waits_for_captures(void) {
 
     test_assert(converged);
     test_int(ecs_singleton_get(world, PerfStatus)->state, PerfDone);
+
+    ecs_fini(world);
+}
+
+void ReflectionCapture_non_finite_radiance_counts_as_sky(void) {
+    // reflection_probes/capture
+    ecs_world_t *world = world_new(true, true);
+    ecs_entity_t scene = scene_new(world, &(ReflectionBake){
+        .resolution = 16, .budget_ms = 1, .scene_probe = false});
+    ecs_entity_t probe = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, probe, Position, {0, 1, 0});
+    ecs_add(world, probe, ReflectionProbe);
+    ecs_entity_t wall = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, wall, Position, {3, 1, 0});
+    ecs_set(world, wall, Box, {0.2f, 2, 2});
+    ecs_set(world, wall, Emissive, {.strength = INFINITY, .color = {255, 255, 255}});
+
+    test_assert(converge(world, scene, 50) < 50);
+    uint32_t texture = box_render_reflect_texture(world, scene);
+    int32_t slot = slot_at(world, scene, 0);
+    test_assert(texture != 0);
+    test_assert(slot >= 0);
+
+    float texels[16 * 16 * 4];
+    uint32_t face;
+    int32_t i;
+    for (face = 0; face < 6; face ++) {
+        test_assert(box_render_gpu_read_reflection(world, texture, (uint32_t)slot, face,
+            texels, 16 * 16 * 4));
+        for (i = 0; i < 16 * 16 * 4; i ++) {
+            test_assert(isfinite(texels[i]));
+        }
+    }
+
+    float sh[BOX_RENDER_SH_COEFFICIENTS][4];
+    test_assert(box_render_gpu_read_reflection_sh(world, texture, (uint32_t)slot, sh));
+    for (i = 0; i < BOX_RENDER_SH_COEFFICIENTS; i ++) {
+        test_assert(isfinite(sh[i][0]) && isfinite(sh[i][1]) && isfinite(sh[i][2]));
+    }
 
     ecs_fini(world);
 }

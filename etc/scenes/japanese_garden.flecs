@@ -951,6 +951,7 @@ template HouseInterior {
 @tree Parent
 template TeaHouse {
   prop variant: i32 = 0
+  prop scale: f32 = 1
 
   const walls0: Rgb = {238, 222, 192}
   const walls1: Rgb = {213, 224, 201}
@@ -994,6 +995,22 @@ template TeaHouse {
   const timber: Rgb = timbers[variant]
   const panel_width = 0.8 + variant % 2 * 0.35
   const panes = 3 + variant % 3
+  Scale: {scale, scale, scale}
+  // The room and its veranda light themselves, so they get a probe above the garden probes. The
+  // projection box is the room between the floor, the ceiling, the back and side walls and the
+  // veranda edge; the influence box adds the blend distance on every side. The capture point is
+  // at standing eye height beside the furniture of every interior style. Probe boxes ignore the
+  // scale of the house, so they take it from the prop.
+  reflection {
+    Position: {0, 1.545, 0.33}
+    ReflectionProbe: {
+      extent: {2.98 * scale, 2.02 * scale, 2.62 * scale},
+      blend: scale,
+      priority: 2,
+      projection: {1.98 * scale, 1.02 * scale, 1.62 * scale},
+      offset: {0.75 * scale, 0.5 * scale, -0.1 * scale}
+    }
+  }
   foundation {
     Position: {0, 0.17, 0}
     RoundedBox: {4.6, 0.34, 3.3, 0.09}
@@ -1025,6 +1042,7 @@ template TeaHouse {
       Position: {-2.14 + i * 0.238, 0.505, 0.2}
       Box: {0.22, 0.035, 3.44}
       Rgb: {149 + i % 3 * 8, 99 + i % 3 * 6, 69 + i % 3 * 4}
+      PbrMaterial: {roughness: 0.2}
     }
   }
   step {
@@ -1036,6 +1054,7 @@ template TeaHouse {
     Position: {0, 0.54, 0.8}
     Box: {4.18, 0.055, 0.21}
     Rgb: {173, 126, 83}
+    PbrMaterial: {roughness: 0.25}
   }
   for track in 0..2 {
     {
@@ -1577,6 +1596,7 @@ template GardenPaths {
               Position: {x0 + (col + 0.5) * width, 0.17, z0 + (row + 0.5) * depth}
               Box: {width - 0.025, 0.09, depth - 0.025}
               Rgb: {161 + (xi + zi + col + row) % 3 * 9, 169 + (xi + zi + col + row) % 3 * 7, 161 + (xi + zi + col + row) % 3 * 6}
+              PbrMaterial: {roughness: 0.28}
             }
           }
         }
@@ -1799,6 +1819,18 @@ template CoveredWalk {
   const tiles: i32 = math.ceil(roof_length / 0.22)
   const tile_width = roof_length / tiles
 
+  // The walk under its roof, between the deck, the roof and the posts, with the capture point at
+  // eye height above the deck, between two lanterns
+  reflection {
+    Position: {0, 1.46, center}
+    ReflectionProbe: {
+      extent: {2.82, 2.14, length / 2 + 1},
+      blend: 1,
+      priority: 2,
+      projection: {1.82, 1.14, length / 2},
+      offset: {0, 0.46, bay_length / 2}
+    }
+  }
   for side in 0..2 {
     {
       Position: {(side - 0.5) * 1.4, 0.15, center}
@@ -1887,6 +1919,7 @@ template CoveredWalk {
           Position: {0, 0.26, (board - 4.5) * bay_length / 10}
           Box: {2.05, 0.12, bay_length / 10 - 0.015}
           Rgb: {147 + board % 3 * 8, 99 + board % 3 * 6, 69 + board % 3 * 4}
+          PbrMaterial: {roughness: 0.22}
         }
       }
       for side in 0..2 {
@@ -2095,7 +2128,7 @@ template WaterBasin {
     Position: {0, 0.61, 0}
     Cylinder: {radius: 0.35, length: 0.035, segments: 24}
     Rgb: {79, 143, 150}
-    PbrMaterial: {roughness: 0.2}
+    PbrMaterial: {roughness: 0.06}
   }
   for i in 0..2 {
     {
@@ -2182,6 +2215,7 @@ tonemap {
 japanese_garden {
   Scene: {}
   LightBake: {probe_spacing: 1, bounds_padding: 0.3, bounces: 1, capture_size: 64, budget_ms: 8}
+  ReflectionBake: {resolution: 128, budget_ms: 2, scene_probe: true, scene_probe_height: 2.6}
   AmbientLight: {sky: {130, 155, 207}, ground: {66, 73, 107}, intensity: 0.28}
 
   orbit {
@@ -2247,10 +2281,9 @@ japanese_garden {
       Position: {-14.25, 0.05, -2.8 + i * 6.7}
       Rotation: {0, math.PI / 2, 0}
     }
-    TeaHouse(variant: i + 6) {
+    TeaHouse(variant: i + 6, scale: 0.76) {
       Position: {3.4 + i * 6.65, 0.08, 10.2}
       Rotation: {0, math.PI, 0}
-      Scale: {0.76, 0.76, 0.76}
     }
     GardenBench() { Position: {0.6 + i * 6.65, 0.08, 11.4} }
     StoneLantern() { Position: {1.1 + i * 6.65, 0.08, 9.1} }
@@ -2418,7 +2451,21 @@ japanese_garden {
     Scale: {1.3, 1, 0.9}
     Cylinder: {radius: 2.53, length: 0.06, segments: 48}
     Rgb: {54, 124, 140}
-    PbrMaterial: {roughness: 0.21, metallic: 0.25}
+    PbrMaterial: {roughness: 0.06, metallic: 0.25}
+  }
+
+  // The pond, its bank and the bridge. The projection box reaches the trees, the bamboo, the
+  // tea house and the beds around the pond, from the water up; the capture point is low over
+  // the water, north of the bridge.
+  pond_reflection {
+    Position: {2.7, 2.2, 1.4}
+    ReflectionProbe: {
+      extent: {4.6, 3, 3.5},
+      blend: 1,
+      priority: 2,
+      projection: {5.3, 2, 5},
+      offset: {0, -1.7, -1.5}
+    }
   }
 
   for i in 0..24 {
@@ -2524,6 +2571,50 @@ japanese_garden {
 
   ToriiGate() { Position: {-3.1, 0.1, 4.75} }
 
+  // The main paths, open to the sky, each between the buildings, fences and beds along it. The
+  // capture points are at eye height above the paving, in the open between gates and trees. The
+  // torii path runs through the gates inside the south path, so it is the inner one there.
+  north_path_reflection {
+    Position: {0, 1.7, -6.8}
+    ReflectionProbe: {
+      extent: {15.3, 2.5, 2.5},
+      blend: 1,
+      priority: 1,
+      projection: {15.3, 1.5, 1.5},
+      offset: {0, 0.2, 0}
+    }
+  }
+  south_path_reflection {
+    Position: {1.7, 1.7, 6.5}
+    ReflectionProbe: {
+      extent: {13.5, 2.5, 2.6},
+      blend: 1,
+      priority: 1,
+      projection: {13.6, 1.5, 2.2},
+      offset: {0, 0.2, 0}
+    }
+  }
+  west_path_reflection {
+    Position: {-7.6, 1.7, -0.15}
+    ReflectionProbe: {
+      extent: {1.975, 2.5, 7.65},
+      blend: 1,
+      priority: 1,
+      projection: {1.75, 1.5, 6.65},
+      offset: {0, 0.2, 1.75}
+    }
+  }
+  torii_path_reflection {
+    Position: {-3.1, 1.7, 9.55}
+    ReflectionProbe: {
+      extent: {2.075, 2.5, 5.1},
+      blend: 1,
+      priority: 2,
+      projection: {1.8, 1.5, 4.1},
+      offset: {0, 0.2, 1.15}
+    }
+  }
+
   StoneLantern() { Position: {-4.9, 0.13, 3.85} }
   StoneLantern() { Position: {-1.3, 0.13, 3.85} }
   StoneLantern() { Position: {-0.65, 0.13, -0.1} }
@@ -2558,7 +2649,7 @@ main_view {
   View: {
     camera: japanese_garden.orbit.camera,
     clear: {enabled: true, color: {51, 56, 81, 255}},
-    lighting: {enabled: true, baked: true},
+    lighting: {enabled: true, baked: true, reflections: true},
     shadows: {enabled: true, resolution: 2048, max_distance: 85},
     effects: [{effect: contact_shadows}, {effect: lantern_bloom}, {effect: tonemap}]
   }

@@ -543,7 +543,8 @@
                     "probes_beyond_capacity_not_captured",
                     "removed_probe_frees_slot",
                     "wall_shows_in_facing_face",
-                    "perf_run_waits_for_captures"
+                    "perf_run_waits_for_captures",
+                    "non_finite_radiance_counts_as_sky"
                 ]
             },
             {
