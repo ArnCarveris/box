@@ -1218,9 +1218,9 @@ typedef struct box_render_reflection_probe_t {
 
 /** Register the system that keeps the reflection probes of every scene with ReflectionBake.
  *
- * Runs after the bake extract. Probes keep their cubemap slot while they stay resident; the
- * resident probes of a scene are uploaded to its reflection probe buffer when they change,
- * and the views of the scene point at it.
+ * Runs after the bake extract, whose change records queue the probes a change reaches for a new
+ * capture. Probes keep their cubemap slot while they stay resident; the resident probes of a
+ * scene are uploaded to its reflection probe buffer when they change.
  *
  * @param world The world
  */
@@ -1256,10 +1256,41 @@ uint32_t box_render_reflect_texture(
  * scene was in the packet of the last frame and the GPU backend renders.
  *
  * @param world The world
- * @return Resident probes not captured yet, 0 when every scene that can progress converged
+ * @return Resident probes without a capture of what they show now, 0 when every scene that
+ *         can progress converged
  */
 int32_t box_render_reflect_pending(
     const ecs_world_t *world);
+
+/** Get the resident reflection probes of a scene that wait for a capture, in the order they are
+ * captured: the scene probe first, then nearer to the cameras of the scene.
+ *
+ * A probe waits until its first capture is in a packet, and again from a change of what it
+ * shows until the capture after that change is in a packet; until then it shows its previous
+ * capture.
+ *
+ * @param world The world
+ * @param scene The scene, 0 for the default scene
+ * @param out Receives the entity of each probe, 0 for the scene probe, NULL for none
+ * @param max Entities out holds
+ * @return Probes that wait, which may be more than max
+ */
+int32_t box_render_reflect_queue(
+    const ecs_world_t *world,
+    ecs_entity_t scene,
+    ecs_entity_t *out,
+    int32_t max);
+
+/** Mark the resident reflection probes of a scene captured with nothing queued, as if the
+ * backend reported their captures, for tests that run without the GPU backend. The
+ * ReflectionBakeStatus follows in the next frame.
+ *
+ * @param world The world
+ * @param scene The scene, 0 for the default scene
+ */
+void box_render_reflect_settle(
+    ecs_world_t *world,
+    ecs_entity_t scene);
 
 /** Register the system that adds the effect passes of every view to the packet.
  *

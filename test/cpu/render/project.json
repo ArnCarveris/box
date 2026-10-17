@@ -62,6 +62,38 @@
                     "scene_without_probes_lists_none",
                     "scene_without_bake_lists_none"
                 ]
+            },
+            {
+                "id": "ReflectionInvalidation",
+                "testcases": [
+                    "settled_scene_queues_nothing",
+                    "static_move_queues_reached_probes",
+                    "static_look_change_queues_reached_probes",
+                    "static_add_and_delete_queue_reached_probes",
+                    "shape_reaches_rotated_probe_box",
+                    "shape_reaches_projection_box",
+                    "flag_change_queues_static_shape",
+                    "dynamic_shape_queues_nothing",
+                    "manual_shape_queues_nothing",
+                    "nobake_shape_queues_nothing",
+                    "point_light_change_queues_old_and_new_range",
+                    "light_added_and_removed_queue_range",
+                    "spot_light_change_queues_range",
+                    "directional_light_queues_all",
+                    "default_sun_queues_all",
+                    "ambient_change_queues_all",
+                    "light_bake_switch_queues_all_once",
+                    "light_bake_added_queues_all",
+                    "probe_move_queues_probe",
+                    "probe_settings_queue_probe",
+                    "priority_and_blend_only_upload",
+                    "resolution_change_recaptures_all",
+                    "queued_probe_keeps_slot",
+                    "queue_order_scene_probe_then_distance",
+                    "queued_again_not_duplicated",
+                    "unrelated_changes_queue_nothing",
+                    "scene_without_bake_records_nothing"
+                ]
             }
         ]
     }

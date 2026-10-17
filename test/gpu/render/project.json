@@ -552,6 +552,13 @@
                     "uniform_emissive_matches_uniform_environment",
                     "empty_scene_matches_hemisphere_ambient"
                 ]
+            },
+            {
+                "id": "ReflectionInvalidation",
+                "testcases": [
+                    "static_change_recaptures_reached_probe",
+                    "light_bake_pass_recaptures_every_probe"
+                ]
             }
         ]
     }

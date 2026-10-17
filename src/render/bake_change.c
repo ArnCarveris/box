@@ -5,6 +5,8 @@
  * Static shapes that move, change their look or leave the captures queue the probes around the
  * bounds they had and have, padded once per pass (as Lumen invalidates its surface cache by the
  * bounds of changed primitives). Lights are compared with the last frame per scene.
+ *
+ * The regions the shapes covered stay until the next extract, for reflect.c.
  */
 
 #include "bake.h"
@@ -211,6 +213,18 @@ done:
     return result;
 }
 
+/** Check whether the changes of static shapes are recorded: while a scene has LightBake or
+ * ReflectionBake.
+ *
+ * @param b The state
+ * @return Whether changes are recorded
+ */
+static bool box_bake_recording(
+    const box_render_bake_t *b)
+{
+    return ecs_vec_count(&b->volumes) || b->reflecting;
+}
+
 /** Remember a shape that changed with the bounds it had, which the spatial index still holds
  * until it is updated in OnStore, or which a removed shape still has.
  *
@@ -274,7 +288,7 @@ static void BakeOnChange(
     bool deleted = it->event == EcsOnRemove && it->other_table &&
         ecs_table_get_type(it->other_table)->count == 0;
     int32_t i;
-    if (ecs_is_fini(it->world) || !ecs_vec_count(&b->volumes) || (flag && deleted)) {
+    if (ecs_is_fini(it->world) || !box_bake_recording(b) || (flag && deleted)) {
         goto done;
     }
 
@@ -327,7 +341,7 @@ static void BakeOnTree(
 {
     box_render_bake_t *b = it->ctx;
     int32_t i;
-    if (!ecs_is_fini(it->world) && ecs_vec_count(&b->volumes)) {
+    if (!ecs_is_fini(it->world) && box_bake_recording(b)) {
         for (i = 0; i < it->count; i ++) {
             box_bake_record_tree(it->world, b, it->entities[i]);
         }
@@ -349,7 +363,7 @@ static void box_bake_on_moved(
 {
     const box_render_bake_t *b = ctx;
     int32_t i;
-    for (i = 0; ecs_vec_count(&b->volumes) && i < count; i ++) {
+    for (i = 0; box_bake_recording(b) && i < count; i ++) {
         if (ecs_has(world, entities[i], ShapeMesh) && !ecs_has_id(world, entities[i], NoBake)) {
             box_bake_record(world, ctx, entities[i], false);
         }
@@ -388,23 +402,37 @@ done:
     return;
 }
 
-/** Queue the probes the shapes that changed since the last extract can reach, around the
- * bounds they had and the bounds they have now.
+/** Add a region a changed shape covered to the regions of the state.
  *
- * @param world The world
  * @param b The state
+ * @param scene The scene of the region
+ * @param min Minimum corner of the region
+ * @param max Maximum corner of the region
  */
+static void box_bake_add_region(
+    box_render_bake_t *b,
+    ecs_entity_t scene,
+    const vec3 min,
+    const vec3 max)
+{
+    box_bake_region_t *r = ecs_vec_append_t(NULL, &b->regions, box_bake_region_t);
+    r->scene = scene;
+    glm_vec3_copy(ECS_CONST_CAST(float*, min), r->min);
+    glm_vec3_copy(ECS_CONST_CAST(float*, max), r->max);
+}
+
 void box_bake_changes(
     ecs_world_t *world,
     box_render_bake_t *b)
 {
     int32_t i;
-    for (i = 0; ecs_vec_count(&b->volumes) && i < ecs_vec_count(&b->changes); i ++) {
+    ecs_vec_clear(&b->regions);
+    for (i = 0; i < ecs_vec_count(&b->changes); i ++) {
         const box_bake_change_t *c = ecs_vec_get_t(&b->changes, box_bake_change_t, i);
         ecs_entity_t e = c->entity, scene = 0;
         vec3 min, max;
         if (c->old) {
-            box_bake_region(world, b, c->scene, c->min, c->max);
+            box_bake_add_region(b, c->scene, c->min, c->max);
         }
 
         if (ecs_is_alive(world, e) && !ecs_has_id(world, e, NoBake) &&
@@ -412,25 +440,30 @@ void box_bake_changes(
             !box_transform_dynamic(world, ecs_get_table(world, e)) &&
             box_spatial_bounds(world, e, &scene, min, max))
         {
-            box_bake_region(world, b, scene, min, max);
+            box_bake_add_region(b, scene, min, max);
         }
     }
 
     ecs_vec_clear(&b->changes);
+    for (i = 0; ecs_vec_count(&b->volumes) && i < ecs_vec_count(&b->regions); i ++) {
+        const box_bake_region_t *r = ecs_vec_get_t(&b->regions, box_bake_region_t, i);
+        box_bake_region(world, b, r->scene, r->min, r->max);
+    }
 }
 
 /** Queue the probes a light can reach: within its range, or every probe for a directional
- * light.
+ * light or a change of the whole scene.
  *
- * @param v The volume
- * @param l The light
+ * @param ctx The volume
+ * @param l The light, NULL for the whole scene
  */
 static void box_bake_mark_light(
-    box_bake_volume_t *v,
+    void *ctx,
     const box_render_light_t *l)
 {
+    box_bake_volume_t *v = ctx;
     vec3 lo, hi;
-    if (!(l->range > 0)) {
+    if (!l || !(l->range > 0)) {
         box_bake_mark_all(v);
     } else {
         glm_vec3_subs(ECS_CONST_CAST(float*, l->position), l->range, lo);
@@ -439,49 +472,110 @@ static void box_bake_mark_light(
     }
 }
 
-/** Queue the probes the lights that differ between two frames can reach, matched by their
- * entity: a light added, removed or changed, its bake mode included, counts in both its old and
- * new place.
+void box_bake_light_record_init(
+    box_bake_light_record_t *r)
+{
+    ecs_os_memset_t(r, 0, box_bake_light_record_t);
+    ecs_vec_init_t(NULL, &r->lights, box_render_light_t, 0);
+    ecs_vec_init_t(NULL, &r->entities, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &r->modes, uint8_t, 0);
+}
+
+void box_bake_light_record_fini(
+    box_bake_light_record_t *r)
+{
+    ecs_vec_fini_t(NULL, &r->lights, box_render_light_t);
+    ecs_vec_fini_t(NULL, &r->entities, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &r->modes, uint8_t);
+}
+
+/** Pass the lights that differ between a record and a frame to mark, matched by their entity:
+ * a light added, removed or changed, its bake mode included, counts in both its old and new
+ * place.
  *
- * @param b The state, owns the scratch map
- * @param v The volume
+ * @param map Scratch map of light entities
+ * @param r The record
  * @param l The lights of this frame
+ * @param mark Receives the lights
+ * @param ctx Context of mark
  */
 static void box_bake_lights_diff(
-    box_render_bake_t *b,
-    box_bake_volume_t *v,
-    const box_bake_lights_t *l)
+    ecs_map_t *map,
+    const box_bake_light_record_t *r,
+    const box_bake_light_set_t *l,
+    box_bake_light_mark_t mark,
+    void *ctx)
 {
-    const box_render_light_t *before = ecs_vec_first(&v->light_list);
-    const ecs_entity_t *owners = ecs_vec_first(&v->light_entities);
-    const uint8_t *modes = ecs_vec_first(&v->light_modes);
-    int32_t i, known = ecs_vec_count(&v->light_list);
-    ecs_map_clear(&b->light_map);
+    const box_render_light_t *before = ecs_vec_first(&r->lights);
+    const ecs_entity_t *owners = ecs_vec_first(&r->entities);
+    const uint8_t *modes = ecs_vec_first(&r->modes);
+    int32_t i, known = ecs_vec_count(&r->lights);
+    ecs_map_clear(map);
     for (i = 0; i < known; i ++) {
-        ecs_map_insert(&b->light_map, owners[i], (ecs_map_val_t)i);
+        ecs_map_insert(map, owners[i], (ecs_map_val_t)i);
     }
 
     for (i = 0; i < l->count; i ++) {
-        ecs_map_val_t *old = ecs_map_get(&b->light_map, l->entities[i]);
+        ecs_map_val_t *old = ecs_map_get(map, l->entities[i]);
         if (!old) {
-            box_bake_mark_light(v, &l->lights[i]);
+            mark(ctx, &l->lights[i]);
         } else {
             const box_render_light_t *was = &before[*old];
             if (ecs_os_memcmp_t(was, &l->lights[i], box_render_light_t) ||
                 modes[*old] != l->modes[i])
             {
-                box_bake_mark_light(v, was);
-                box_bake_mark_light(v, &l->lights[i]);
+                mark(ctx, was);
+                mark(ctx, &l->lights[i]);
             }
 
-            ecs_map_remove(&b->light_map, l->entities[i]);
+            ecs_map_remove(map, l->entities[i]);
         }
     }
 
-    ecs_map_iter_t mit = ecs_map_iter(&b->light_map);
+    ecs_map_iter_t mit = ecs_map_iter(map);
     while (ecs_map_next(&mit)) {
-        box_bake_mark_light(v, &before[ecs_map_value(&mit)]);
+        mark(ctx, &before[ecs_map_value(&mit)]);
     }
+}
+
+void box_bake_lights_compare(
+    ecs_map_t *map,
+    box_bake_light_record_t *r,
+    const box_render_view_lights_t *view,
+    const box_bake_light_set_t *now,
+    bool ambient,
+    box_bake_light_mark_t mark,
+    void *ctx)
+{
+    int32_t count = now->count, known = ecs_vec_count(&r->lights);
+    bool sun = (r->view.buffer == BOX_RENDER_BUFFER_LIGHT_FIRST) !=
+        (view->buffer == BOX_RENDER_BUFFER_LIGHT_FIRST);
+    bool sky = ambient &&
+        (ecs_os_memcmp(r->view.ambient_sky, view->ambient_sky, ECS_SIZEOF(float) * 3) ||
+        ecs_os_memcmp(r->view.ambient_ground, view->ambient_ground, ECS_SIZEOF(float) * 3));
+    bool same = count == known && (!count ||
+        (!ecs_os_memcmp(now->lights, ecs_vec_first(&r->lights),
+            count * ECS_SIZEOF(box_render_light_t)) &&
+        !ecs_os_memcmp(now->entities, ecs_vec_first(&r->entities),
+            count * ECS_SIZEOF(ecs_entity_t)) &&
+        !ecs_os_memcmp(now->modes, ecs_vec_first(&r->modes), count)));
+    if (r->known && (sun || sky)) {
+        mark(ctx, NULL);
+    } else if (r->known && !same) {
+        box_bake_lights_diff(map, r, now, mark, ctx);
+    }
+
+    ecs_vec_set_count_t(NULL, &r->lights, box_render_light_t, count);
+    ecs_vec_set_count_t(NULL, &r->entities, ecs_entity_t, count);
+    ecs_vec_set_count_t(NULL, &r->modes, uint8_t, count);
+    if (count) {
+        ecs_os_memcpy_n(ecs_vec_first(&r->lights), now->lights, box_render_light_t, count);
+        ecs_os_memcpy_n(ecs_vec_first(&r->entities), now->entities, ecs_entity_t, count);
+        ecs_os_memcpy_n(ecs_vec_first(&r->modes), now->modes, uint8_t, count);
+    }
+
+    r->view = *view;
+    r->known = true;
 }
 
 void box_bake_lights(
@@ -489,38 +583,11 @@ void box_bake_lights(
     box_bake_volume_t *v)
 {
     const box_bake_lights_t *l = &v->lights;
-    int32_t count = l->count, known = ecs_vec_count(&v->light_list);
-    if (!v->viewed || !v->sent || !v->probes) {
-        goto done;
+    box_bake_light_set_t now = { l->count, l->lights, l->entities, l->modes };
+    if (v->viewed && v->sent && v->probes) {
+        box_bake_lights_compare(&b->light_map, &v->known, &l->first, &now, false,
+            box_bake_mark_light, v);
     }
-
-    bool sun = (v->baked_lights.buffer == BOX_RENDER_BUFFER_LIGHT_FIRST) !=
-        (l->first.buffer == BOX_RENDER_BUFFER_LIGHT_FIRST);
-    bool same = count == known && (!count ||
-        (!ecs_os_memcmp(l->lights, ecs_vec_first(&v->light_list),
-            count * ECS_SIZEOF(box_render_light_t)) &&
-        !ecs_os_memcmp(l->entities, ecs_vec_first(&v->light_entities),
-            count * ECS_SIZEOF(ecs_entity_t)) &&
-        !ecs_os_memcmp(l->modes, ecs_vec_first(&v->light_modes), count)));
-    if (v->lights_known && sun) {
-        box_bake_mark_all(v);
-    } else if (v->lights_known && !same) {
-        box_bake_lights_diff(b, v, l);
-    }
-
-    ecs_vec_set_count_t(NULL, &v->light_list, box_render_light_t, count);
-    ecs_vec_set_count_t(NULL, &v->light_entities, ecs_entity_t, count);
-    ecs_vec_set_count_t(NULL, &v->light_modes, uint8_t, count);
-    if (count) {
-        ecs_os_memcpy_n(ecs_vec_first(&v->light_list), l->lights, box_render_light_t, count);
-        ecs_os_memcpy_n(ecs_vec_first(&v->light_entities), l->entities, ecs_entity_t, count);
-        ecs_os_memcpy_n(ecs_vec_first(&v->light_modes), l->modes, uint8_t, count);
-    }
-
-    v->baked_lights = l->first;
-    v->lights_known = true;
-done:
-    return;
 }
 
 /** Register the observers of the changes of static shapes that rebake the probes near them.

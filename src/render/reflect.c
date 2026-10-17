@@ -6,9 +6,13 @@
  * Each probe of a scene keeps its cubemap slot while it is resident; the resident probes are
  * uploaded to the reflection probe buffer of the scene in blend order when they change. Every
  * frame the uncaptured resident probes are captured as budget_ms allows, the scene probe first.
+ *
+ * A probe is queued for a new capture when what it shows changes: a static shape recorded by
+ * bake_change.c reaches one of its boxes, a light changes in its range, the light bake shows a
+ * new pass, or the probe moves. It shows its previous capture until the new one lands.
  */
 
-#include "render.h"
+#include "bake.h"
 #include "../spatial/spatial.h"
 #include <float.h>
 #include <math.h>
@@ -49,6 +53,8 @@ typedef struct box_reflect_probe_t {
     int32_t slot;           /**< Cubemap slot, -1 when the probe is not resident */
     bool seen;              /**< The probe exists in this frame */
     bool captured;          /**< The backend reported the capture of the probe into its slot */
+    bool queued;            /**< A change since that capture or the one in flight queued the
+                             *   probe for a new capture */
     uint32_t ticket;        /**< Ticket of the capture in flight */
     int32_t packet;         /**< Packet of the capture in flight, as RenderStatus.submitted after
                              *   it, 0 for none */
@@ -88,6 +94,10 @@ typedef struct box_reflect_scene_t {
     box_render_view_lights_t lights; /**< Lights of the first view of the scene in this frame */
     uint32_t volume;        /**< Probe volume a view of the scene samples, 0 for none */
     uint32_t volume_buffer; /**< Probe buffer of that volume the views show */
+    box_bake_light_record_t record; /**< Lights of the views when the scene was last viewed */
+    bool bake_known;        /**< bake_handle and bake_switches hold the light bake of a frame */
+    uint32_t bake_handle;   /**< Volume handle of the light bake of the scene, 0 for none */
+    int32_t bake_switches;  /**< box_bake_volume_t.switches of that light bake */
 } box_reflect_scene_t;
 
 /** A probe ranked for a slot or for the blend order */
@@ -116,6 +126,9 @@ typedef struct box_render_reflect_t {
     const void *backend;    /**< Context of the backend the buffers were sent to */
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
     int32_t generation;     /**< Generation of that backend, see box_render_backend_t */
+    box_render_bake_t *bake; /**< State of the bake extract, looked up once */
+    const void *lights_state; /**< State of the light extract, looked up once */
+    ecs_map_t light_map;    /**< Light entity to its index in a light record, scratch */
 } box_render_reflect_t;
 
 /** Find the probes of a scene.
@@ -163,6 +176,7 @@ static box_reflect_scene_t* box_reflect_ensure(
         ecs_vec_init_t(NULL, &result->list, box_render_reflection_probe_t, 0);
         ecs_vec_init_t(NULL, &result->sent_list, box_render_reflection_probe_t, 0);
         ecs_map_init(&result->lookup, NULL);
+        box_bake_light_record_init(&result->record);
     }
 
     return result;
@@ -181,6 +195,7 @@ static void box_reflect_scene_fini(
     ecs_vec_fini_t(NULL, &s->list, box_render_reflection_probe_t);
     ecs_vec_fini_t(NULL, &s->sent_list, box_render_reflection_probe_t);
     ecs_map_fini(&s->lookup);
+    box_bake_light_record_fini(&s->record);
 }
 
 /** Give a scene the handle its reflection probe buffer and its cubemap array share.
@@ -309,7 +324,125 @@ static void box_reflect_evict(
     }
 
     probe->captured = false;
+    probe->queued = false;
     probe->packet = 0;
+}
+
+/** Queue a probe for a new capture when it has a capture or one in flight; a probe without
+ * either waits for its first capture already.
+ *
+ * @param probe The probe
+ */
+static void box_reflect_queue(
+    box_reflect_probe_t *probe)
+{
+    probe->queued |= probe->captured || probe->packet;
+}
+
+/** Queue every probe of a scene for a new capture.
+ *
+ * @param s The scene
+ */
+static void box_reflect_queue_all(
+    box_reflect_scene_t *s)
+{
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&s->probes); i ++) {
+        box_reflect_queue(ecs_vec_get_t(&s->probes, box_reflect_probe_t, i));
+    }
+}
+
+/** Check whether a probe has a capture of what it shows now: reported, with no change since.
+ *
+ * @param probe The probe
+ * @return Whether the capture is current
+ */
+static bool box_reflect_current(
+    const box_reflect_probe_t *probe)
+{
+    return probe->captured && !probe->queued && !probe->packet;
+}
+
+/** Check whether a probe waits for a capture that is not in a packet yet.
+ *
+ * @param probe The probe
+ * @return Whether its next capture can be scheduled
+ */
+static bool box_reflect_waiting(
+    const box_reflect_probe_t *probe)
+{
+    return !probe->packet && (!probe->captured || probe->queued);
+}
+
+/** Check whether the data of a probe captures something else than before: its boxes or its
+ * capture point moved or resized. Blend and priority only change how it is blended.
+ *
+ * @param a The data before
+ * @param b The data now
+ * @return Whether the probe needs a new capture
+ */
+static bool box_reflect_moved(
+    const box_render_reflection_probe_t *a,
+    const box_render_reflection_probe_t *b)
+{
+    return ecs_os_memcmp(a->center, b->center, ECS_SIZEOF(a->center)) ||
+        ecs_os_memcmp(a->axes, b->axes, ECS_SIZEOF(a->axes)) ||
+        ecs_os_memcmp(a->extent, b->extent, ECS_SIZEOF(a->extent)) ||
+        ecs_os_memcmp(a->projection, b->projection, ECS_SIZEOF(a->projection)) ||
+        ecs_os_memcmp(a->capture, b->capture, ECS_SIZEOF(a->capture));
+}
+
+/** Check whether a box padded by the half size of another box, then by a radius, reaches the
+ * center of that box along the axes of a probe: the boxes of a probe padded by the bounds of a
+ * shape, or by the range of a light.
+ *
+ * @param d The data of the probe
+ * @param extent Half size of the box of the probe on its axes
+ * @param center World center of the other box
+ * @param half World half size of the other box
+ * @param radius Distance the padded box reaches beyond itself
+ * @return Whether the center is reached
+ */
+static bool box_reflect_box_reaches(
+    const box_render_reflection_probe_t *d,
+    const float *extent,
+    const vec3 center,
+    const vec3 half,
+    float radius)
+{
+    vec3 delta;
+    float outside = 0.0f;
+    int32_t i;
+    glm_vec3_sub(ECS_CONST_CAST(float*, center), ECS_CONST_CAST(float*, d->center), delta);
+    for (i = 0; i < 3; i ++) {
+        const float *axis = d->axes[i];
+        float along = fabsf(glm_vec3_dot(delta, ECS_CONST_CAST(float*, axis)));
+        float reach = fabsf(extent[i]) + fabsf(axis[0]) * half[0] + fabsf(axis[1]) * half[1] +
+            fabsf(axis[2]) * half[2];
+        float out = glm_max(along - reach, 0.0f);
+        outside += out * out;
+    }
+
+    return outside <= radius * radius;
+}
+
+/** Check whether the influence box or the projection box of a probe, padded by the half size
+ * of a box and a radius, reaches the center of that box.
+ *
+ * @param d The data of the probe
+ * @param center World center of the box
+ * @param half World half size of the box
+ * @param radius Distance beyond the box
+ * @return Whether either box of the probe is reached
+ */
+static bool box_reflect_reaches(
+    const box_render_reflection_probe_t *d,
+    const vec3 center,
+    const vec3 half,
+    float radius)
+{
+    return box_reflect_box_reaches(d, d->extent, center, half, radius) ||
+        box_reflect_box_reaches(d, d->projection, center, half, radius);
 }
 
 /** Give a probe the lowest free slot when it has none.
@@ -759,7 +892,12 @@ static void box_reflect_bakes(
             box_reflect_probe_t *probe = s->scene_index >= 0
                 ? ecs_vec_get_t(&s->probes, box_reflect_probe_t, s->scene_index)
                 : box_reflect_add_probe(s, 0);
+            box_render_reflection_probe_t was = probe->data;
             box_reflect_scene_data(s, &probe->data);
+            if (box_reflect_moved(&was, &probe->data)) {
+                box_reflect_queue(probe);
+            }
+
             probe->seen = true;
         }
     }
@@ -771,7 +909,8 @@ static void box_reflect_bakes(
     }
 }
 
-/** Take the ReflectionProbe of every entity in a scene with ReflectionBake.
+/** Take the ReflectionProbe of every entity in a scene with ReflectionBake, queueing the
+ * probes that moved or resized.
  *
  * @param world The world
  * @param r The state
@@ -792,7 +931,12 @@ static void box_reflect_probes(
             }
 
             box_reflect_probe_t *probe = box_reflect_ensure_probe(s, qit.entities[row]);
+            box_render_reflection_probe_t was = probe->data;
             box_reflect_place(&probe->data, &probes[row], transforms ? &transforms[row] : NULL);
+            if (box_reflect_moved(&was, &probe->data)) {
+                box_reflect_queue(probe);
+            }
+
             probe->seen = true;
         }
     }
@@ -867,6 +1011,7 @@ static void box_reflect_uncapture(
     for (i = 0; i < ecs_vec_count(&s->probes); i ++) {
         box_reflect_probe_t *probe = ecs_vec_get_t(&s->probes, box_reflect_probe_t, i);
         probe->captured = false;
+        probe->queued = false;
         probe->packet = 0;
     }
 }
@@ -980,7 +1125,7 @@ static void box_reflect_captured(
 }
 
 /** Queue the probes of a scene again whose packet the backend released without reporting
- * their capture, and count the probes it captured.
+ * their capture, and count the probes whose capture is current.
  *
  * @param s The scene
  * @param rendered Packets the backend released, as RenderStatus.rendered
@@ -995,10 +1140,83 @@ static void box_reflect_requeue(
         box_reflect_probe_t *probe = ecs_vec_get_t(&s->probes, box_reflect_probe_t, i);
         if (probe->packet && probe->packet <= rendered) {
             probe->packet = 0;
+            probe->queued |= probe->captured;
         }
 
-        s->captured += probe->slot >= 0 && probe->captured;
+        s->captured += probe->slot >= 0 && box_reflect_current(probe);
     }
+}
+
+/** Queue the probes of a scene that a light reaches: within its range, or every probe for a
+ * directional light or a change of the whole scene.
+ *
+ * @param ctx The scene
+ * @param l The light, NULL for the whole scene
+ */
+static void box_reflect_mark_light(
+    void *ctx,
+    const box_render_light_t *l)
+{
+    box_reflect_scene_t *s = ctx;
+    vec3 zero = {0, 0, 0};
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&s->probes); i ++) {
+        box_reflect_probe_t *probe = ecs_vec_get_t(&s->probes, box_reflect_probe_t, i);
+        if (!l || !(l->range > 0) ||
+            box_reflect_reaches(&probe->data, l->position, zero, l->range))
+        {
+            box_reflect_queue(probe);
+        }
+    }
+}
+
+/** Queue the probes of a scene that changed what they show since the last frame: those the
+ * regions of the static shapes that changed reach, those the lights that changed reach and
+ * every probe when the light bake of the scene showed a new pass, converged, started or ended.
+ *
+ * @param r The state
+ * @param s The scene
+ */
+static void box_reflect_invalidate(
+    box_render_reflect_t *r,
+    box_reflect_scene_t *s)
+{
+    const box_render_bake_t *b = r->bake;
+    const box_bake_volume_t *v = b ? box_bake_find(b, s->scene) : NULL;
+    uint32_t handle = v ? v->handle : 0;
+    int32_t i, j, switches = v ? v->switches : 0;
+    for (i = 0; b && i < ecs_vec_count(&b->regions); i ++) {
+        const box_bake_region_t *region = ecs_vec_get_t(&b->regions, box_bake_region_t, i);
+        vec3 center, half;
+        if (region->scene != s->scene) {
+            continue;
+        }
+
+        glm_vec3_center(ECS_CONST_CAST(float*, region->min), ECS_CONST_CAST(float*, region->max),
+            center);
+        glm_vec3_sub(ECS_CONST_CAST(float*, region->max), center, half);
+        for (j = 0; j < ecs_vec_count(&s->probes); j ++) {
+            box_reflect_probe_t *probe = ecs_vec_get_t(&s->probes, box_reflect_probe_t, j);
+            if (box_reflect_reaches(&probe->data, center, half, 0.0f)) {
+                box_reflect_queue(probe);
+            }
+        }
+    }
+
+    if (s->viewed) {
+        box_bake_light_set_t lights;
+        box_bake_view_lights(r->lights_state, s->scene, &lights);
+        box_bake_lights_compare(&r->light_map, &s->record, &s->lights, &lights, true,
+            box_reflect_mark_light, s);
+    }
+
+    if (s->bake_known && (handle != s->bake_handle || switches != s->bake_switches)) {
+        box_reflect_queue_all(s);
+    }
+
+    s->bake_known = true;
+    s->bake_handle = handle;
+    s->bake_switches = switches;
 }
 
 /** Order probes for their captures: the scene probe first, then nearer to the cameras of the
@@ -1040,8 +1258,8 @@ static int32_t box_reflect_budget(
     return result;
 }
 
-/** Add the captures of the next uncaptured resident probes of a scene to the packet, every one
- * of them in a headless run.
+/** Add the captures of the next resident probes of a scene that wait for one to the packet,
+ * every one of them in a headless run.
  *
  * @param r The state
  * @param p The packet
@@ -1060,8 +1278,7 @@ static void box_reflect_schedule(
     box_reflect_rank_t *ranks = box_reflect_rank(r, s, true);
     int32_t i, n = 0, count = ecs_vec_count(&r->ranks);
     for (i = 0; i < count; i ++) {
-        const box_reflect_probe_t *probe = &probes[ranks[i].index];
-        if (!probe->captured && !probe->packet) {
+        if (box_reflect_waiting(&probes[ranks[i].index])) {
             ranks[n ++] = ranks[i];
         }
     }
@@ -1095,6 +1312,7 @@ static void box_reflect_schedule(
         out->index = (uint32_t)probe->slot;
         probe->ticket = s->ticket ++;
         probe->packet = packet;
+        probe->queued = false;
     }
 
 done:
@@ -1193,7 +1411,19 @@ static void BoxRenderExtractReflect(
         }
     }
 
+    if (!r->bake) {
+        r->bake = box_bake_state(world);
+    }
+
+    if (!r->lights_state) {
+        r->lights_state = box_render_lights_state(world);
+    }
+
     box_reflect_bakes(world, r, p);
+    if (r->bake) {
+        r->bake->reflecting = ecs_vec_count(&r->scenes) != 0;
+    }
+
     box_reflect_probes(world, r);
     box_reflect_views(r, p, true);
     box_reflect_timing(world, r);
@@ -1203,6 +1433,7 @@ static void BoxRenderExtractReflect(
         box_reflect_scene_t *s = ecs_vec_get_t(&r->scenes, box_reflect_scene_t, i);
         box_reflect_prune(s);
         box_reflect_assign(r, s, capacity);
+        box_reflect_invalidate(r, s);
         box_reflect_list(r, s);
         box_reflect_send(r, p, s);
         box_reflect_progress(r, p, s, capacity, gpu, app && app->headless, status);
@@ -1229,6 +1460,7 @@ static void box_reflect_free(
     ecs_vec_fini_t(NULL, &r->free_buffers, uint32_t);
     ecs_vec_fini_t(NULL, &r->ranks, box_reflect_rank_t);
     ecs_vec_fini_t(NULL, &r->results, box_render_bake_result_t);
+    ecs_map_fini(&r->light_map);
     ecs_os_free(r);
 }
 
@@ -1275,6 +1507,7 @@ void box_render_reflect_init(
     ecs_vec_init_t(NULL, &r->free_buffers, uint32_t, 0);
     ecs_vec_init_t(NULL, &r->ranks, box_reflect_rank_t, 0);
     ecs_vec_init_t(NULL, &r->results, box_render_bake_result_t, 0);
+    ecs_map_init(&r->light_map, NULL);
     r->next_buffer = BOX_RENDER_BUFFER_REFLECT_FIRST;
     r->probe_ms = BOX_REFLECT_PROBE_MS;
     r->bakes = box_reflect_query(world, ecs_id(ReflectionBake), false);
@@ -1331,4 +1564,52 @@ int32_t box_render_reflect_pending(
     const box_render_reflect_t *r = box_reflect_state(world);
 
     return r ? r->pending : 0;
+}
+
+int32_t box_render_reflect_queue(
+    const ecs_world_t *world,
+    ecs_entity_t scene,
+    ecs_entity_t *out,
+    int32_t max)
+{
+    box_render_reflect_t *r = ECS_CONST_CAST(box_render_reflect_t*, box_reflect_state(world));
+    const box_reflect_scene_t *s = r ? box_reflect_find(r, scene) : NULL;
+    int32_t i, n = 0;
+    if (!s) {
+        goto done;
+    }
+
+    const box_reflect_probe_t *probes = ecs_vec_first(&s->probes);
+    box_reflect_rank_t *ranks = box_reflect_rank(r, s, true);
+    for (i = 0; i < ecs_vec_count(&r->ranks); i ++) {
+        const box_reflect_probe_t *probe = &probes[ranks[i].index];
+        if (probe->queued || (!probe->captured && !probe->packet)) {
+            ranks[n ++] = ranks[i];
+        }
+    }
+
+    qsort(ranks, (size_t)n, sizeof(box_reflect_rank_t), box_reflect_capture_cmp);
+    for (i = 0; out && i < n && i < max; i ++) {
+        out[i] = ranks[i].entity;
+    }
+
+done:
+    return n;
+}
+
+void box_render_reflect_settle(
+    ecs_world_t *world,
+    ecs_entity_t scene)
+{
+    box_render_reflect_t *r = ECS_CONST_CAST(box_render_reflect_t*, box_reflect_state(world));
+    box_reflect_scene_t *s = r ? box_reflect_find(r, scene) : NULL;
+    int32_t i;
+    for (i = 0; s && i < ecs_vec_count(&s->probes); i ++) {
+        box_reflect_probe_t *probe = ecs_vec_get_t(&s->probes, box_reflect_probe_t, i);
+        if (probe->slot >= 0) {
+            probe->captured = true;
+            probe->queued = false;
+            probe->packet = 0;
+        }
+    }
 }

@@ -86,9 +86,7 @@ static box_bake_volume_t* box_bake_ensure(
         ecs_vec_init_t(NULL, &result->dirty, uint32_t, 0);
         ecs_vec_init_t(NULL, &result->flags, uint8_t, 0);
         ecs_vec_init_t(NULL, &result->shown, uint32_t, 0);
-        ecs_vec_init_t(NULL, &result->light_list, box_render_light_t, 0);
-        ecs_vec_init_t(NULL, &result->light_entities, ecs_entity_t, 0);
-        ecs_vec_init_t(NULL, &result->light_modes, uint8_t, 0);
+        box_bake_light_record_init(&result->known);
         ecs_vec_init_t(NULL, &result->cameras, vec3, 0);
         ecs_vec_init_t(NULL, &result->sorted, vec3, 0);
     }
@@ -929,9 +927,7 @@ static void box_bake_volume_fini(
     ecs_vec_fini_t(NULL, &v->dirty, uint32_t);
     ecs_vec_fini_t(NULL, &v->flags, uint8_t);
     ecs_vec_fini_t(NULL, &v->shown, uint32_t);
-    ecs_vec_fini_t(NULL, &v->light_list, box_render_light_t);
-    ecs_vec_fini_t(NULL, &v->light_entities, ecs_entity_t);
-    ecs_vec_fini_t(NULL, &v->light_modes, uint8_t);
+    box_bake_light_record_fini(&v->known);
     ecs_vec_fini_t(NULL, &v->cameras, vec3);
     ecs_vec_fini_t(NULL, &v->sorted, vec3);
 }
@@ -1177,6 +1173,7 @@ static void box_bake_submitted(
         goto done;
     }
 
+    v->switches ++;
     if (!v->staged) {
         v->display = v->first ^ (v->submitted & 1);
         v->filled = false;
@@ -1392,8 +1389,10 @@ static void box_bake_progress(
             box_bake_next(v);
         }
 
+        bool converged = v->converged;
         v->converged = v->sent && v->probes && v->completed == v->passes &&
             !ecs_vec_count(&v->dirty);
+        v->switches += v->converged && !converged;
         v->pending = gpu && v->handle && v->sent && v->viewed && !v->error &&
             v->budget_ms > 0 && !v->converged;
         if (v->pending) {
@@ -1531,6 +1530,7 @@ static void box_bake_free(
     ecs_vec_fini_t(NULL, &b->picks, box_bake_pick_t);
     ecs_vec_fini_t(NULL, &b->captured, box_render_bake_result_t);
     ecs_vec_fini_t(NULL, &b->changes, box_bake_change_t);
+    ecs_vec_fini_t(NULL, &b->regions, box_bake_region_t);
     ecs_map_fini(&b->light_map);
     ecs_vec_fini_t(NULL, &b->free_handles, uint32_t);
     ecs_vec_fini_t(NULL, &b->hits, ecs_entity_t);
@@ -1548,6 +1548,7 @@ void box_render_bake_init(
     ecs_vec_init_t(NULL, &b->free_handles, uint32_t, 0);
     ecs_vec_init_t(NULL, &b->hits, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &b->changes, box_bake_change_t, 0);
+    ecs_vec_init_t(NULL, &b->regions, box_bake_region_t, 0);
     ecs_map_init(&b->light_map, NULL);
     b->next_handle = 1;
     b->bakes = ecs_query(world, {
@@ -1574,15 +1575,23 @@ void box_render_bake_init(
     box_bake_observers(world, b);
 }
 
+box_render_bake_t* box_bake_state(
+    const ecs_world_t *world)
+{
+    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractBake");
+    const ecs_system_t *s = system ? ecs_system_get(world, system) : NULL;
+
+    return s ? s->ctx : NULL;
+}
+
 bool box_render_bake_probe(
     const ecs_world_t *world,
     ecs_entity_t scene,
     const vec3 position,
     box_render_probe_t *out)
 {
-    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractBake");
-    const ecs_system_t *s = system ? ecs_system_get(world, system) : NULL;
-    const box_bake_volume_t *v = s && s->ctx ? box_bake_find(s->ctx, scene) : NULL;
+    const box_render_bake_t *b = box_bake_state(world);
+    const box_bake_volume_t *v = b ? box_bake_find(b, scene) : NULL;
     bool result = v && v->probes;
     int32_t i, cell[3];
     if (!result) {
@@ -1606,9 +1615,7 @@ done:
 int32_t box_render_bake_pending(
     const ecs_world_t *world)
 {
-    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractBake");
-    const ecs_system_t *s = system ? ecs_system_get(world, system) : NULL;
-    const box_render_bake_t *b = s ? s->ctx : NULL;
+    const box_render_bake_t *b = box_bake_state(world);
 
     return b ? b->pending : 0;
 }

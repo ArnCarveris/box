@@ -32,6 +32,39 @@ typedef struct box_bake_change_t {
     vec3 max;               /**< Maximum corner of the old bounds */
 } box_bake_change_t;
 
+/** A region of a scene a static shape covered before or after a change */
+typedef struct box_bake_region_t {
+    ecs_entity_t scene;     /**< Scene of the region */
+    vec3 min;               /**< Minimum corner of the region */
+    vec3 max;               /**< Maximum corner of the region */
+} box_bake_region_t;
+
+/** Lights of a scene in a frame, each with its entity and bake mode */
+typedef struct box_bake_light_set_t {
+    int32_t count;          /**< Lights */
+    const box_render_light_t *lights; /**< The lights, directional first */
+    const ecs_entity_t *entities; /**< The entity of each of them */
+    const uint8_t *modes;   /**< The LightBakeMode of each of them */
+} box_bake_light_set_t;
+
+/** The lights of a scene in the last frame they were compared with */
+typedef struct box_bake_light_record_t {
+    bool known;             /**< The record holds the lights of a frame */
+    box_render_view_lights_t view; /**< Lights of the views in that frame */
+    ecs_vec_t lights;       /**< box_render_light_t of that frame */
+    ecs_vec_t entities;     /**< ecs_entity_t, the entity of each light */
+    ecs_vec_t modes;        /**< uint8_t, the LightBakeMode of each light */
+} box_bake_light_record_t;
+
+/** Receives what a light that differs between two frames reaches.
+ *
+ * @param ctx Context of the comparison
+ * @param light The light as it was or is, NULL when the whole scene changed
+ */
+typedef void (*box_bake_light_mark_t)(
+    void *ctx,
+    const box_render_light_t *light);
+
 /** Weight of a new measurement in the GPU time per probe */
 #define BOX_BAKE_SMOOTHING (0.5f)
 
@@ -109,16 +142,14 @@ typedef struct box_bake_volume_t {
     bool staged;            /**< The bake writes the stage buffer, shown once every pass is in */
     bool copy;              /**< The shown buffer is copied into the stage buffer next packet */
     bool mask;              /**< The shown mask is sent next packet */
-    bool lights_known;      /**< baked_lights and light_list hold the lights of a frame */
     bool fresh;             /**< A bake of every probe started in this frame */
     ecs_vec_t members;      /**< uint32_t, probes the bake captures in every pass */
     ecs_vec_t dirty;        /**< uint32_t, probes a change queued for the next bake */
     ecs_vec_t flags;        /**< uint8_t per probe, 1 while it is in dirty */
     ecs_vec_t shown;        /**< uint32_t, the validity mask views sample with */
-    ecs_vec_t light_list;   /**< box_render_light_t of the scene in the last frame */
-    ecs_vec_t light_entities; /**< ecs_entity_t, the entity of each light of light_list */
-    ecs_vec_t light_modes;  /**< uint8_t, the LightBakeMode of each light of light_list */
-    box_render_view_lights_t baked_lights; /**< Lights of the views in the last frame */
+    box_bake_light_record_t known; /**< Lights of the captures in the last frame */
+    int32_t switches;       /**< Times the views switched to a pass of a bake or a bake
+                             *   converged, which changes the light reflections capture */
     const char *error;      /**< Why the volume bakes nothing, NULL for none */
 } box_bake_volume_t;
 
@@ -136,8 +167,12 @@ typedef struct box_render_bake_t {
     bool measured;          /**< probe_ms comes from a measurement */
     int32_t pending;        /**< Probes left in the volumes that can progress */
     ecs_vec_t changes;      /**< box_bake_change_t, shapes changed since the last extract */
+    ecs_vec_t regions;      /**< box_bake_region_t, what those shapes covered before and after
+                             *   their change, kept until the next extract */
+    bool reflecting;        /**< A scene has ReflectionBake, so changes are recorded without a
+                             *   LightBake too */
     const void *lights_state; /**< State of the light extract, looked up once */
-    ecs_map_t light_map;    /**< Light entity to its index in a light_list, scratch */
+    ecs_map_t light_map;    /**< Light entity to its index in a light record, scratch */
     const void *backend;    /**< Context of the backend the volumes were sent to */
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
     int32_t generation;         /**< Generation of that backend, see box_render_backend_t */
@@ -206,8 +241,16 @@ void box_bake_mark(
 void box_bake_mark_all(
     box_bake_volume_t *v);
 
-/** Queue the probes the shapes that changed since the last extract can reach, around the
- * bounds they had and the bounds they have now.
+/** Get the state of the bake extract of a world.
+ *
+ * @param world The world
+ * @return The state, NULL without the extract
+ */
+box_render_bake_t* box_bake_state(
+    const ecs_world_t *world);
+
+/** Collect the regions the shapes that changed since the last extract covered before and after
+ * their change into the regions of the state, and queue the probes they can reach.
  *
  * @param world The world
  * @param b The state
@@ -228,6 +271,58 @@ void box_bake_changes(
 void box_bake_lights(
     box_render_bake_t *b,
     box_bake_volume_t *v);
+
+/** Prepare an empty light record.
+ *
+ * @param r The record
+ */
+void box_bake_light_record_init(
+    box_bake_light_record_t *r);
+
+/** Free a light record.
+ *
+ * @param r The record
+ */
+void box_bake_light_record_fini(
+    box_bake_light_record_t *r);
+
+/** Compare the lights of a frame with a record and keep them in it.
+ *
+ * Once the record knows a frame, mark receives NULL when the default sun came or went, or with
+ * ambient when the ambient light changed.
+ *
+ * Otherwise it receives each light added, removed or changed, its bake mode included, matched
+ * by entity, as it was and as it is.
+ *
+ * @param map Scratch map of light entities
+ * @param r The record
+ * @param view The lights of the views in this frame
+ * @param now The lights in this frame
+ * @param ambient Whether a change of the ambient light changes the whole scene
+ * @param mark Receives what changed
+ * @param ctx Context of mark
+ */
+void box_bake_lights_compare(
+    ecs_map_t *map,
+    box_bake_light_record_t *r,
+    const box_render_view_lights_t *view,
+    const box_bake_light_set_t *now,
+    bool ambient,
+    box_bake_light_mark_t mark,
+    void *ctx);
+
+/** Get the lights the views of a scene and its reflection captures are lit with in this frame:
+ * every light, the Baked ones excepted when the scene has LightBake. Empty for a scene without
+ * light entities, which the default sun lights.
+ *
+ * @param state The state of the light extract
+ * @param scene The scene, 0 for the default scene
+ * @param out Receives the lights, valid until the next light extract
+ */
+void box_bake_view_lights(
+    const void *state,
+    ecs_entity_t scene,
+    box_bake_light_set_t *out);
 
 /** Get the lights the probe captures of a scene are lit with in this frame.
  *
