@@ -50,6 +50,18 @@
                     "slots_are_stable",
                     "probes_beyond_capacity"
                 ]
+            },
+            {
+                "id": "ReflectionClusters",
+                "testcases": [
+                    "blend_order_priority_then_size",
+                    "blend_order_size_tie_by_entity",
+                    "view_lists_probes_not_scene_probe",
+                    "view_lists_without_scene_probe",
+                    "removed_probe_leaves_lists",
+                    "scene_without_probes_lists_none",
+                    "scene_without_bake_lists_none"
+                ]
             }
         ]
     }

@@ -67,6 +67,7 @@ typedef struct box_reflect_rank_t {
     int32_t priority;       /**< ReflectionProbe.priority */
     bool scene;             /**< The probe is the scene probe */
     float distance;         /**< Squared distance to the nearest camera of the scene */
+    float volume;           /**< Volume of the influence box */
     ecs_entity_t entity;    /**< Entity of the probe, the last tie break */
 } box_reflect_rank_t;
 
@@ -418,7 +419,8 @@ static int box_reflect_slot_cmp(
     return result ? result : (ra->entity > rb->entity) - (ra->entity < rb->entity);
 }
 
-/** Order probes for blending: higher priority first, the scene probe last.
+/** Order probes for blending: higher priority first, then the smaller influence box, the
+ * scene probe last.
  *
  * @param a The first rank
  * @param b The second rank
@@ -432,6 +434,10 @@ static int box_reflect_blend_cmp(
     int result = (ra->scene > rb->scene) - (ra->scene < rb->scene);
     if (!result) {
         result = (rb->priority > ra->priority) - (rb->priority < ra->priority);
+    }
+
+    if (!result) {
+        result = (ra->volume > rb->volume) - (ra->volume < rb->volume);
     }
 
     return result ? result : (ra->entity > rb->entity) - (ra->entity < rb->entity);
@@ -462,6 +468,8 @@ static box_reflect_rank_t* box_reflect_rank(
         rank->priority = probes[i].data.priority;
         rank->scene = !probes[i].entity;
         rank->entity = probes[i].entity;
+        rank->volume = fabsf(probes[i].data.extent[0] * probes[i].data.extent[1] *
+            probes[i].data.extent[2]);
         rank->distance = FLT_MAX;
         for (c = 0; c < cams; c ++) {
             float d = glm_vec3_distance2(ECS_CONST_CAST(float*, probes[i].data.center),
@@ -750,8 +758,11 @@ static void box_reflect_views(
         if (cameras) {
             glm_vec3_copy(rv->camera_transform[3], *ecs_vec_append_t(NULL, &s->cameras, vec3));
         } else if (s->sent && ecs_vec_count(&s->list)) {
+            const box_render_reflection_probe_t *last = ecs_vec_last_t(
+                &s->list, box_render_reflection_probe_t);
             rv->reflections = s->buffer;
             rv->reflection_count = (uint32_t)ecs_vec_count(&s->list);
+            rv->reflection_listed = rv->reflection_count - last->scene;
         }
     }
 }

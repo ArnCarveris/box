@@ -290,11 +290,12 @@ typedef struct box_gpu_cull_readback_t {
 /** The cluster buffer of a view slot and the read back of the entries its pass allocated */
 typedef struct box_gpu_cluster_t {
     WGPUBuffer buffer;              /**< Allocated entries, offset and count per cluster, list */
-    uint64_t entries;               /**< Entries the light index list holds */
+    uint64_t entries;               /**< Entries the light and probe index list holds */
     WGPUBuffer readback;            /**< Mappable copy of the allocated entries */
     int32_t state;                  /**< Free, copied, mapping, mapped or failed */
     int64_t frame;                  /**< Frame of the packet the copy was recorded in */
-    bool cut;                       /**< The last read back pass listed fewer lights than reach */
+    bool cut;                       /**< The last read back pass listed fewer lights or probes
+                                     *   than reach */
 } box_gpu_cluster_t;
 
 /** Visible slots and slot lists of a group of draws, each bound whole as storage */
@@ -396,7 +397,7 @@ typedef struct box_gpu_view_uniforms_t {
     vec4 ambient_ground;            /**< Linear ambient light from below */
     vec4 cluster;                   /**< Inverse projection scale of x and y, slice near, far */
     uint32_t lights[4];             /**< Directional lights, lights, lit, orthographic */
-    uint32_t grid[4];               /**< Clusters per axis, unused */
+    uint32_t grid[4];               /**< Clusters per axis, reflection probes the clusters list */
     mat4 shadow_matrix[BOX_RENDER_SHADOW_CASCADES]; /**< World to shadow clip per cascade */
     vec4 shadow_split;              /**< View depth each cascade ends at */
     vec4 shadow_bias;               /**< Depth added to the compared depth per cascade */
@@ -463,6 +464,7 @@ typedef struct box_gpu_t {
     int32_t cluster_revision;       /**< Revision of the shader the pipeline was made with */
     ecs_vec_t clusters;             /**< box_gpu_cluster_t of each view slot */
     WGPUBuffer no_lights;           /**< Light buffer of a view whose light buffer is missing */
+    WGPUBuffer no_probes;           /**< Reflection probe buffer of a cluster pass without probes */
     ecs_vec_t view_data;            /**< Bytes of the view uniforms of a target */
     WGPUBindGroupLayout shadow_layout; /**< Bind group layout of the shadow pass */
     WGPUPipelineLayout shadow_pipeline_layout; /**< Pipeline layout of the shadow pass */
@@ -945,7 +947,7 @@ void box_gpu_light_uniforms(
     mat4 proj,
     box_gpu_view_uniforms_t *u);
 
-/** Record the cluster pass of a view when it has point or spot lights.
+/** Record the cluster pass of a view when it has point or spot lights or reflection probes.
  *
  * @param gpu The backend
  * @param encoder The encoder of the frame
@@ -958,7 +960,8 @@ void box_gpu_light_cluster(
     const box_render_view_t *v,
     int32_t slot);
 
-/** Record the cluster pass of a view with explicit buffers, when it has point or spot lights.
+/** Record the cluster pass of a view with explicit buffers, when it has point or spot lights or
+ * reflection probes.
  *
  * @param gpu The backend
  * @param encoder The encoder

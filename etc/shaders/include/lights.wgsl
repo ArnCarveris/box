@@ -2,9 +2,10 @@
 // pass. The light buffer holds the directional lights first, then the point and spot lights.
 // The view frustum is cut into clusters: grid.x by grid.y tiles of the image and grid.z depth
 // slices spaced logarithmically from cluster.z to cluster.w. The cluster buffer starts with the
-// number of list entries the cluster pass allocated, then holds the offset and count of every
-// cluster, then the light index list: the lights of a cluster are count entries from its
-// offset. The shadow members describe the cascaded shadow map of the first directional light,
+// number of list entries the cluster pass allocated, then holds the offset and count word of
+// every cluster, then the index list: a cluster lists cluster_lights(count) light indices from
+// its offset, followed by cluster_probes(count) indices into the reflection probe buffer of the
+// scene in blend order, at most CLUSTER_PROBES. The shadow members describe the cascaded shadow map of the first directional light,
 // see shadow.wgsl.
 #pragma once
 
@@ -20,7 +21,8 @@ struct View {
     cluster: vec4f,
     // x: directional lights, y: lights, z: 1 when lit, w: 1 for an orthographic camera
     lights: vec4u,
-    // x, y, z: clusters per axis, w: unused
+    // x, y, z: clusters per axis, w: reflection probes the clusters list, the first ones of the
+    // reflection probe buffer
     grid: vec4u,
     // World to shadow clip space of each cascade, reversed Z: 1 is nearest the light
     shadow_matrix: array<mat4x4f, 4>,
@@ -44,6 +46,36 @@ struct Light {
     direction: vec3f,
     spot_offset: f32,
 };
+
+// A resident reflection probe of the scene, see box_render_reflection_probe_t. The influence
+// and projection boxes are centered on center and oriented by axes.
+struct ReflectionProbe {
+    center: vec3f,
+    blend: f32,
+    axes: array<vec4f, 3>,
+    extent: vec3f,
+    priority: i32,
+    projection: vec3f,
+    slot: u32,
+    capture: vec3f,
+    scene: u32,
+};
+
+// Reflection probes a cluster lists at most.
+const CLUSTER_PROBES: u32 = 8u;
+
+// Bit of the count word of a cluster its probe count starts at; the lights are below it.
+const CLUSTER_PROBE_SHIFT: u32 = 28u;
+
+// Lights a cluster lists, from its count word.
+fn cluster_lights(count: u32) -> u32 {
+    return count & ((1u << CLUSTER_PROBE_SHIFT) - 1u);
+}
+
+// Reflection probes a cluster lists after its lights, from its count word.
+fn cluster_probes(count: u32) -> u32 {
+    return count >> CLUSTER_PROBE_SHIFT;
+}
 
 // View space position with the depth in front of the camera as a positive z.
 fn cluster_view_position(v: View, world: vec3f) -> vec3f {

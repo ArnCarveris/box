@@ -387,7 +387,7 @@ fn lights_direct(s: Surface, v: vec3f, world: vec3f) -> vec3f {
     if (view.lights.y > view.lights.x) {
         let cluster = cluster_index(view, cluster_view_position(view, world));
         let first = 1u + 2u * cluster_count(view) + clusters[1u + 2u * cluster];
-        let count = clusters[2u + 2u * cluster];
+        let count = cluster_lights(clusters[2u + 2u * cluster]);
         for (var i = 0u; i < count; i++) {
             let light = lights[clusters[first + i]];
             let delta = light.position - world;

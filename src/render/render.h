@@ -227,6 +227,8 @@ typedef struct box_render_view_t {
     uint32_t volume_buffer;     /**< Probe buffer of the volume the view samples, 0 or 1 */
     uint32_t reflections;       /**< Reflection probe buffer of the scene, 0 for none */
     uint32_t reflection_count;  /**< Resident reflection probes in that buffer */
+    uint32_t reflection_listed; /**< Probes of that buffer the clusters list: the resident
+                                 *   ReflectionProbes, which come before the scene probe */
 } box_render_view_t;
 
 /** Kind of an effect pass of a view */
@@ -1095,8 +1097,9 @@ int32_t box_render_bake_pending(
 
 /** A resident reflection probe as the reflection probe buffer of its scene holds it.
  *
- * The buffer lists the resident probes of a scene in blend order: higher priority first, the
- * scene probe last. The boxes are centered on center and oriented by axes.
+ * The buffer lists the resident probes of a scene in blend order: higher priority first, then
+ * the smaller influence box, the scene probe last. The boxes are centered on center and
+ * oriented by axes.
  */
 typedef struct box_render_reflection_probe_t {
     float center[3];        /**< World center of the influence and projection boxes */
