@@ -6,7 +6,9 @@
  * Every pass is a compute dispatch of etc/shaders/atmosphere.wgsl, the 2D LUTs included, so they
  * share one sampler and bind their outputs as storage textures. Scene LUTs build before the
  * targets of a packet, the passes of a view right before its forward pass, which draws the sky
- * from the sky view LUT and binds the aerial perspective volume for mesh.wgsl.
+ * from the sky view LUT and binds the aerial perspective volume for mesh.wgsl. A view with a
+ * HeightFog that takes its color from the atmosphere also gets the 2x1 in scatter color of its
+ * fog, after the sky view, which its fog pass reads.
  */
 
 #include "gpu.h"
@@ -20,7 +22,7 @@
 #define BOX_GPU_ATMOS_TEXEL (8)
 
 /** Bytes of the uniform buffer of an atmosphere pass */
-#define BOX_GPU_ATMOS_UNIFORMS (256)
+#define BOX_GPU_ATMOS_UNIFORMS (512)
 
 /** Invocations per axis of a workgroup, along x and y */
 #define BOX_GPU_ATMOS_GROUP (8)
@@ -65,6 +67,8 @@ typedef struct box_gpu_atmos_uniforms_t {
     float view[4];                  /**< Altitude, Mie anisotropy, aerial distance and intensity */
     float sun_disk[4];              /**< Cosine and sine of the sun radius, disk intensity */
     mat4 inv_view_proj;             /**< Clip to world space of the view */
+    float fog_light[4];             /**< Direction toward the main light, its horizon fade */
+    float fog_moon[4];              /**< Radiance toward the moon as the main light, 1 if it is */
 } box_gpu_atmos_uniforms_t;
 
 /** The transmittance and multi scattering LUTs of the atmosphere of a scene */
@@ -89,6 +93,9 @@ typedef struct box_gpu_atmos_view_t {
     WGPUTextureView sky_view;       /**< View sampled and written */
     WGPUTexture aerial;             /**< Aerial perspective volume */
     WGPUTextureView aerial_view;    /**< View sampled and written */
+    WGPUTexture fog;                /**< Fog in scatter color, created on first use */
+    WGPUTextureView fog_view;       /**< View sampled and written */
+    int64_t fog_frame;              /**< Frame of the last packet that wrote the fog color */
 } box_gpu_atmos_view_t;
 
 /** The atmosphere state of the backend */
@@ -114,7 +121,7 @@ struct box_gpu_atmos_t {
 
 /** Entry points of the passes, by box_render_atmos_pass_t */
 static const char *box_gpu_atmos_entries[BOX_RENDER_ATMOS_PASSES] = {
-    "transmittance", "multi_scattering", "sky_view", "aerial"
+    "transmittance", "multi_scattering", "sky_view", "aerial", "fog"
 };
 
 /** Create a texture the passes write and sample.
@@ -185,8 +192,9 @@ static void box_gpu_atmos_release(
 /** Create the bind group layout and pipeline layout of a pass.
  *
  * Every pass binds the uniforms at 0; the passes after the transmittance sample it at 1 with the
- * sampler at 2; the per view passes sample the multi scattering at 3, the aerial perspective the
- * sky view at 4. The 2D LUTs are written at 5, the aerial perspective volume at 6.
+ * sampler at 2; the sky view and aerial perspective sample the multi scattering at 3, the aerial
+ * perspective and the fog the sky view at 4. The 2D LUTs and the fog color are written at 5,
+ * the aerial perspective volume at 6.
  *
  * @param gpu The backend
  * @param a The atmosphere state
@@ -219,9 +227,12 @@ static void box_gpu_atmos_layout(
             .texture = sampled };
     }
 
-    if (pass == BOX_RENDER_ATMOS_AERIAL) {
+    if (pass == BOX_RENDER_ATMOS_AERIAL || pass == BOX_RENDER_ATMOS_FOG) {
         entries[count ++] = (WGPUBindGroupLayoutEntry){ .binding = 4, .visibility = comp,
             .texture = sampled };
+    }
+
+    if (pass == BOX_RENDER_ATMOS_AERIAL) {
         entries[count ++] = (WGPUBindGroupLayoutEntry){ .binding = 6, .visibility = comp,
             .storageTexture = {
                 .access = WGPUStorageTextureAccess_WriteOnly,
@@ -392,6 +403,7 @@ static void box_gpu_atmos_view_free(
 {
     box_gpu_atmos_release(&v->sky, &v->sky_view);
     box_gpu_atmos_release(&v->aerial, &v->aerial_view);
+    box_gpu_atmos_release(&v->fog, &v->fog_view);
     wgpuBufferRelease(v->uniforms);
     ecs_os_free(v);
     gpu->pending.atmosphere_views --;
@@ -914,6 +926,64 @@ static box_gpu_atmos_view_t* box_gpu_atmos_view(
     return result;
 }
 
+/** Check whether a view runs a HeightFog that takes its color from the atmosphere.
+ *
+ * @param packet The packet
+ * @param v The view
+ * @return Whether one of its effect passes is such a fog
+ */
+static bool box_gpu_atmos_has_fog(
+    const box_render_packet_t *packet,
+    const box_render_view_t *v)
+{
+    bool result = false;
+    int32_t i;
+    if (!v->atmos.sky || v->effect_first + v->effect_count > ecs_vec_count(&packet->effects)) {
+        goto done;
+    }
+
+    for (i = 0; i < v->effect_count && !result; i ++) {
+        const box_render_effect_t *e = ecs_vec_get_t(
+            &packet->effects, box_render_effect_t, v->effect_first + i);
+        result = e->kind == BOX_RENDER_EFFECT_FOG && e->fog.atmosphere;
+    }
+
+done:
+    return result;
+}
+
+/** Record the pass that writes the fog in scatter color of a view from its sky view.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder
+ * @param packet The packet
+ * @param l The LUTs of the scene of the view
+ * @param s The view state, its sky view written
+ */
+static void box_gpu_atmos_fog(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    const box_render_packet_t *packet,
+    const box_gpu_atmos_luts_t *l,
+    box_gpu_atmos_view_t *s)
+{
+    box_gpu_atmos_t *a = gpu->atmosphere;
+    if (!s->fog) {
+        s->fog = box_gpu_atmos_texture(gpu, BOX_RENDER_ATMOS_FOG_WIDTH, 1, 1, &s->fog_view);
+    }
+
+    WGPUBindGroupEntry entries[5] = {
+        { .binding = 0, .buffer = s->uniforms, .size = sizeof(box_gpu_atmos_uniforms_t) },
+        { .binding = 1, .textureView = l->transmittance_view },
+        { .binding = 2, .sampler = a->sampler },
+        { .binding = 4, .textureView = s->sky_view },
+        { .binding = 5, .textureView = s->fog_view }
+    };
+    box_gpu_atmos_dispatch(gpu, encoder, BOX_RENDER_ATMOS_FOG, entries, 5,
+        BOX_RENDER_ATMOS_FOG_WIDTH, 1, 1);
+    s->fog_frame = packet->frame;
+}
+
 void box_gpu_atmosphere_view(
     box_gpu_t *gpu,
     const box_gpu_target_t *t,
@@ -937,6 +1007,8 @@ void box_gpu_atmosphere_view(
     ecs_os_memcpy_n(u.sun_color, in->sun_color, float, 4);
     ecs_os_memcpy_n(u.night, in->night, float, 4);
     ecs_os_memcpy_n(u.sun_disk, in->sun_disk, float, 4);
+    ecs_os_memcpy_n(u.fog_light, in->fog_light, float, 4);
+    ecs_os_memcpy_n(u.fog_moon, in->fog_moon, float, 4);
     u.view[0] = in->altitude;
     u.view[1] = in->mie_anisotropy;
     u.view[2] = in->aerial_distance;
@@ -968,6 +1040,10 @@ void box_gpu_atmosphere_view(
     box_gpu_atmos_dispatch(gpu, encoder, BOX_RENDER_ATMOS_AERIAL, aerial, 6,
         BOX_RENDER_ATMOS_AERIAL_SIZE, BOX_RENDER_ATMOS_AERIAL_SIZE,
         BOX_RENDER_ATMOS_AERIAL_SIZE);
+    if (box_gpu_atmos_has_fog(packet, v)) {
+        box_gpu_atmos_fog(gpu, encoder, packet, l, s);
+    }
+
 done:
     return;
 }
@@ -977,6 +1053,20 @@ bool box_gpu_atmosphere_sky(
     const box_render_view_t *v)
 {
     return v->atmos.sky && box_gpu_atmos_luts_ready(gpu->atmosphere, v) != NULL;
+}
+
+WGPUTextureView box_gpu_atmosphere_fog(
+    box_gpu_t *gpu,
+    const box_gpu_target_t *t,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v)
+{
+    box_gpu_atmos_t *a = gpu->atmosphere;
+    box_gpu_atmos_view_t *s = a && box_gpu_atmosphere_sky(gpu, v)
+        ? box_gpu_atmos_view_find(a, t, v)
+        : NULL;
+
+    return s && s->fog && s->fog_frame == packet->frame ? s->fog_view : NULL;
 }
 
 void box_gpu_atmosphere_uniforms(

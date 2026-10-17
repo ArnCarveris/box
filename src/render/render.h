@@ -226,6 +226,12 @@ typedef struct box_render_view_atmos_t {
     float aerial_distance;  /**< Far end of the aerial perspective volume in km */
     float aerial_intensity; /**< Scale of the scattering and extinction of the volume */
     float km_per_unit;      /**< Kilometers in a world unit, the inverse of units_per_km */
+    float fog_light[4];     /**< Direction toward the main light of the atmosphere, the sun or
+                             *   the moon, and in w the fade of its disk at the horizon; w 0
+                             *   without one */
+    float fog_moon[4];      /**< Radiance the fog scatters toward the moon when it is the main
+                             *   light, its attenuated color over pi, which the sky view does
+                             *   not hold; w 1 when the moon is the main light */
     bool sky;               /**< LightSettings.atmosphere: the view draws the sky and applies
                              *   the aerial perspective to its 3D meshes */
 } box_render_view_atmos_t;
@@ -476,12 +482,16 @@ typedef struct box_render_reflect_batch_t {
 /** Edge of the aerial perspective volume of a view in texels, its slices included */
 #define BOX_RENDER_ATMOS_AERIAL_SIZE (32)
 
+/** Width of the fog in scatter color of a view in texels: the ambient and the glow */
+#define BOX_RENDER_ATMOS_FOG_WIDTH (2)
+
 /** Passes of the atmosphere, the order of their GPU times in box_render_gpu_stats_t */
 typedef enum box_render_atmos_pass_t {
     BOX_RENDER_ATMOS_TRANSMITTANCE, /**< Transmittance LUT of a scene */
     BOX_RENDER_ATMOS_MULTI,         /**< Multi scattering LUT of a scene */
     BOX_RENDER_ATMOS_SKY,           /**< Sky view LUT of a view */
     BOX_RENDER_ATMOS_AERIAL,        /**< Aerial perspective volume of a view */
+    BOX_RENDER_ATMOS_FOG,           /**< In scatter color of the HeightFog of a view */
     BOX_RENDER_ATMOS_PASSES         /**< Number of passes */
 } box_render_atmos_pass_t;
 
@@ -1210,6 +1220,27 @@ bool box_render_lights_atmos_sun(
     ecs_entity_t scene,
     float *direction,
     float *color);
+
+/** Get the main light of the valid atmosphere of a scene as the light extract of this frame
+ * attenuated it: the sun or the moon, whichever is brighter after the transmittance and the
+ * horizon fade, the sun by day and the moon by night.
+ *
+ * @param state The state of the light extract, see box_render_lights_state
+ * @param scene The scene, 0 for the default scene
+ * @param direction Receives the normalized direction toward the light
+ * @param color Receives its linear color times intensity times pi, times the transmittance and
+ * the horizon fade
+ * @param fade Receives the fade of its disk at the horizon
+ * @param moon Receives whether the light is the moon
+ * @return Whether the scene has a valid atmosphere with a sun or a moon
+ */
+bool box_render_lights_atmos_main(
+    const void *state,
+    ecs_entity_t scene,
+    float *direction,
+    float *color,
+    float *fade,
+    bool *moon);
 
 /** Register the system that keeps the transmittance and multi scattering LUTs of every scene
  * with a valid Atmosphere, a BOX_RENDER_ATMOSPHERE per scene.

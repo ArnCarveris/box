@@ -171,6 +171,8 @@ typedef struct box_gpu_fog_uniforms_t {
     float sun[4];                   /**< Direction toward the sun, 1 when there is one */
     float sun_color[4];             /**< Sun radiance times its inscatter */
     float ambient[4];               /**< Ambient light times its inscatter */
+    float atmos[4];                 /**< 1 for the color of the atmosphere, phase g, sun and
+                                     *   ambient inscatter */
 } box_gpu_fog_uniforms_t;
 
 /** Convert a display encoded channel to linear light.
@@ -1155,7 +1157,12 @@ done:
     return result;
 }
 
-/** Record the height fog pass, lit by the sun and ambient light of the scene of the view.
+/** Highest phase asymmetry of the glow of a fog colored by the atmosphere */
+#define BOX_GPU_FOG_ANISOTROPY_MAX (0.92f)
+
+/** Record the height fog pass, lit by the sun and ambient light of the scene of the view, or
+ * colored by the sky of a view that renders its atmosphere when the fog has atmosphere set:
+ * the in scatter color the atmosphere wrote for the view, toward its main light.
  *
  * @param gpu The backend
  * @param ctx The chain
@@ -1195,12 +1202,30 @@ static bool box_gpu_fx_fog(
         u.ambient[c] = (l->ambient_sky[c] + l->ambient_ground[c]) * 0.5f * f->ambient_inscatter;
     }
 
+    WGPUTextureView sky = f->atmosphere
+        ? box_gpu_atmosphere_fog(gpu, ctx->t, ctx->packet, ctx->v)
+        : NULL;
+    if (sky) {
+        const box_render_view_atmos_t *a = &ctx->v->atmos;
+        glm_vec4_zero(u.sun);
+        if (glm_vec3_norm(ECS_CONST_CAST(float*, a->fog_light)) > 1e-6f) {
+            glm_vec3_normalize_to(ECS_CONST_CAST(float*, a->fog_light), u.sun);
+            u.sun[3] = 1.0f;
+        }
+
+        u.atmos[0] = 1.0f;
+        u.atmos[1] = glm_clamp(a->mie_anisotropy, 0.0f, BOX_GPU_FOG_ANISOTROPY_MAX);
+        u.atmos[2] = f->sun_inscatter;
+        u.atmos[3] = f->ambient_inscatter;
+    }
+
     box_gpu_fx_uniforms(gpu, s, &u, sizeof(u));
 
     return box_gpu_fx_draw(gpu, ctx, &(box_gpu_fx_pass_t){
         .shader = BOX_RENDER_SHADER_FOG,
         .entry = "fs",
         .input = ctx->input,
+        .aux = sky,
         .uniforms = s->uniforms,
         .output = ctx->output,
         .format = ctx->format,

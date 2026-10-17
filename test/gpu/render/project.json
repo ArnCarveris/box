@@ -600,7 +600,10 @@
                     "sun_brighter_than_sky_beside_disk",
                     "sun_disk_intensity_zero_removes_disk",
                     "sun_below_horizon_draws_no_disk",
-                    "disk_center_brighter_than_limb"
+                    "disk_center_brighter_than_limb",
+                    "fog_at_noon_tints_toward_horizon",
+                    "fog_at_sunset_warmer_toward_sun",
+                    "fog_without_atmosphere_uses_color"
                 ]
             },
             {

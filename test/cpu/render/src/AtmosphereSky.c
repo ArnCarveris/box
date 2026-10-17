@@ -50,6 +50,61 @@ static const box_render_view_t* frame_view(
     return ecs_vec_first(&null->last.views);
 }
 
+/** Create a white directional light in a scene that shines down from an elevation.
+ *
+ * @param world The world
+ * @param scene The scene
+ * @param elevation Elevation of the direction toward the light in degrees
+ * @param yaw Yaw of the light in degrees
+ * @param intensity Intensity of the light
+ * @return The light
+ */
+static ecs_entity_t light_new(
+    ecs_world_t *world,
+    ecs_entity_t scene,
+    float elevation,
+    float yaw,
+    float intensity)
+{
+    ecs_entity_t light = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, light, DirectionalLight, {.intensity = intensity});
+    ecs_set(world, light, Rgb, {255, 255, 255});
+    ecs_set(world, light, Rotation, {glm_rad(elevation), glm_rad(yaw), 0});
+
+    return light;
+}
+
+/** Create a world that renders with the null backend, with a scene that has a sun and a moon
+ * at elevations.
+ *
+ * @param null Receives the backend
+ * @param sun_elevation Elevation of the sun in degrees
+ * @param moon_elevation Elevation of the moon in degrees, opposite the sun
+ * @param view Receives the view
+ * @return The world
+ */
+static ecs_world_t* world_sun_moon(
+    box_render_null_t **null,
+    float sun_elevation,
+    float moon_elevation,
+    ecs_entity_t *view)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(*null);
+    box_render_set_backend(world, &backend);
+    ecs_entity_t scene = scene_new(world, view);
+    ecs_entity_t sun = light_new(world, scene, sun_elevation, 0, 1);
+    ecs_entity_t moon = light_new(world, scene, moon_elevation, 180, 0.5f);
+    Atmosphere *a = ecs_get_mut(world, scene, Atmosphere);
+    a->sun = sun;
+    a->moon = moon;
+    ecs_modified(world, scene, Atmosphere);
+
+    return world;
+}
+
 void AtmosphereSky_view_atmosphere_defaults(void) {
     // atmosphere/sky
     ecs_world_t *world = ecs_init();
@@ -140,4 +195,94 @@ void AtmosphereSky_packet_view_sun_disk(void) {
     test_flt(v->atmos.sun_disk[2], 0.0f);
 
     ecs_fini(world);
+}
+
+void AtmosphereSky_fog_atmosphere_defaults(void) {
+    // atmosphere/fog
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_assert(ecs_script_run(world, "fog",
+        "using box.effects\n"
+        "fog { HeightFog: {} }\n"
+        "off { HeightFog: {atmosphere: false} }\n", NULL) == 0);
+
+    const HeightFog *fog = ecs_get(world, ecs_lookup(world, "fog"), HeightFog);
+    test_assert(fog != NULL);
+    test_bool(fog->atmosphere, true);
+    test_flt(fog->density, 0.1f);
+    fog = ecs_get(world, ecs_lookup(world, "off"), HeightFog);
+    test_bool(fog->atmosphere, false);
+
+    ecs_entity_t added = ecs_new(world);
+    ecs_add(world, added, HeightFog);
+    test_bool(ecs_get(world, added, HeightFog)->atmosphere, true);
+
+    HeightFog resolved;
+    box_render_fog_settings(ecs_get(world, added, HeightFog), &resolved);
+    test_bool(resolved.atmosphere, true);
+
+    ecs_fini(world);
+}
+
+void AtmosphereSky_packet_view_fog_light_is_sun_by_day(void) {
+    // atmosphere/fog
+    box_render_null_t *null;
+    ecs_entity_t view;
+    ecs_world_t *world = world_sun_moon(&null, 30, 20, &view);
+
+    const box_render_view_t *v = frame_view(world, null);
+    test_assert(v->atmosphere != 0);
+    test_assert(fabsf(v->atmos.fog_light[0]) < 1e-4f);
+    test_assert(fabsf(v->atmos.fog_light[1] - sinf(glm_rad(30))) < 1e-4f);
+    test_assert(fabsf(v->atmos.fog_light[1] - v->atmos.sun[1]) < 1e-5f);
+    test_assert(fabsf(v->atmos.fog_light[2] - v->atmos.sun[2]) < 1e-5f);
+    test_flt(v->atmos.fog_light[3], 1.0f);
+    test_flt(v->atmos.fog_moon[3], 0.0f);
+    test_flt(v->atmos.fog_moon[0], 0.0f);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void AtmosphereSky_packet_view_fog_light_is_moon_by_night(void) {
+    // atmosphere/fog
+    box_render_null_t *null;
+    ecs_entity_t view;
+    ecs_world_t *world = world_sun_moon(&null, -20, 30, &view);
+
+    const box_render_view_t *v = frame_view(world, null);
+    test_assert(v->atmosphere != 0);
+    test_assert(fabsf(v->atmos.fog_light[1] - sinf(glm_rad(30))) < 1e-4f);
+    test_assert(v->atmos.fog_light[2] * v->atmos.sun[2] < 0);
+    test_flt(v->atmos.fog_light[3], 1.0f);
+    test_flt(v->atmos.fog_moon[3], 1.0f);
+    test_assert(v->atmos.fog_moon[0] > 0);
+    test_assert(v->atmos.fog_moon[0] < 0.5f);
+    test_assert(v->atmos.fog_moon[0] > v->atmos.fog_moon[2]);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void AtmosphereSky_packet_view_fog_light_without_lights(void) {
+    // atmosphere/fog
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+
+    ecs_entity_t view;
+    scene_new(world, &view);
+    const box_render_view_t *v = frame_view(world, null);
+    test_assert(v->atmosphere != 0);
+    test_assert(fabsf(v->atmos.fog_light[0] - v->atmos.sun[0]) < 1e-5f);
+    test_assert(fabsf(v->atmos.fog_light[1] - v->atmos.sun[1]) < 1e-5f);
+    test_assert(v->atmos.fog_light[1] > 0);
+    test_assert(v->atmos.fog_light[3] > 0.99f);
+    test_flt(v->atmos.fog_moon[3], 0.0f);
+
+    ecs_fini(world);
+    box_render_null_free(null);
 }

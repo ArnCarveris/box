@@ -62,6 +62,8 @@ typedef struct box_light_atmos_light_t {
     float direction[3];     /**< Normalized direction toward the light */
     float color[3];         /**< Color of the light before the transmittance */
     float transmittance[3]; /**< Transmittance from the ground altitude toward the light */
+    float fade;             /**< Fade of its disk at the horizon */
+    float attenuated[3];    /**< Color times the transmittance and the fade */
 } box_light_atmos_light_t;
 
 /** The Atmosphere of a scene in this frame */
@@ -420,8 +422,10 @@ static void box_lights_atmos_light(
     box_atmos_transmittance(&a->medium, a->value.ground_altitude, target->direction[1],
         target->transmittance);
     fade = box_atmos_horizon_fade(target->direction[1], radius);
+    target->fade = fade;
     for (c = 0; c < 3; c ++) {
         light->color[c] *= target->transmittance[c] * fade;
+        target->attenuated[c] = light->color[c];
     }
 }
 
@@ -1183,6 +1187,42 @@ bool box_render_lights_atmos_sun(
     }
 
     return result;
+}
+
+bool box_render_lights_atmos_main(
+    const void *state,
+    ecs_entity_t scene,
+    float *direction,
+    float *color,
+    float *fade,
+    bool *moon)
+{
+    const box_render_lights_t *l = state;
+    int32_t index = l ? box_lights_find(ECS_CONST_CAST(box_render_lights_t*, l), scene) : -1;
+    const box_light_scene_t *s = index != -1
+        ? ecs_vec_get_t(&l->scenes, box_light_scene_t, index)
+        : NULL;
+    const box_light_atmos_t *a = s && s->atmos.entity && !s->atmos.error ? &s->atmos : NULL;
+    const box_light_atmos_light_t *light = NULL;
+    if (a && a->sun.found) {
+        light = &a->sun;
+    }
+
+    if (a && a->moon.found && (!light ||
+        glm_luminance(ECS_CONST_CAST(float*, a->moon.attenuated)) >
+        glm_luminance(ECS_CONST_CAST(float*, a->sun.attenuated))))
+    {
+        light = &a->moon;
+    }
+
+    if (light) {
+        glm_vec3_copy(ECS_CONST_CAST(float*, light->direction), direction);
+        glm_vec3_copy(ECS_CONST_CAST(float*, light->attenuated), color);
+        *fade = light->fade;
+        *moon = light == &a->moon;
+    }
+
+    return light != NULL;
 }
 
 void box_render_lights_time_of_day(

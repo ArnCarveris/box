@@ -273,6 +273,29 @@ done:
     return;
 }
 
+/** Write the main light of the atmosphere of a scene, which the in scatter color of a fog
+ * with HeightFog.atmosphere follows.
+ *
+ * @param lights The state of the light extract
+ * @param scene The scene
+ * @param out The atmosphere inputs of a view, zeroed
+ */
+static void box_atmos_view_fog(
+    const void *lights,
+    ecs_entity_t scene,
+    box_render_view_atmos_t *out)
+{
+    float color[3], fade = 0;
+    bool moon = false;
+    if (box_render_lights_atmos_main(lights, scene, out->fog_light, color, &fade, &moon)) {
+        out->fog_light[3] = fade;
+        if (moon) {
+            glm_vec3_scale(color, 1.0f / GLM_PIf, out->fog_moon);
+            out->fog_moon[3] = 1.0f;
+        }
+    }
+}
+
 /** Write the inputs of the sky view and aerial perspective of a view of a scene with LUTs.
  *
  * @param world The world
@@ -313,6 +336,7 @@ static void box_atmos_view(
     out->aerial_distance = value->aerial_distance;
     out->aerial_intensity = value->aerial_intensity;
     out->km_per_unit = 1.0f / value->units_per_km;
+    box_atmos_view_fog(lights, v->scene, out);
     out->sky = view ? view->lighting.atmosphere : true;
 }
 

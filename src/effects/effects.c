@@ -73,7 +73,8 @@ static void box_fog_ctor(
             .max_opacity = 1.0f,
             .color = {191, 158, 140},
             .sun_inscatter = 1.0f,
-            .ambient_inscatter = 1.0f
+            .ambient_inscatter = 1.0f,
+            .atmosphere = true
         };
     }
 }

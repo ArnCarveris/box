@@ -42,15 +42,25 @@ ECS_STRUCT(Ssao, {
     float intensity; /**< Strength of the occlusion, default 1 */
 });
 
-/** Exponential fog that thins out with height, lit by the sun and ambient light of the scene */
+/** Exponential fog that thins out with height, lit by the sun and ambient light of the scene.
+ *
+ * With atmosphere set, a view that renders the Atmosphere of its scene takes the in scatter
+ * color of the fog from its sky instead: the ambient is the horizon of the sky mixed a little
+ * toward its zenith, the glow the horizon toward the main light (the sun by day, the moon by
+ * night) with the Mie phase of the atmosphere. color is then ignored. The fog applies on top of
+ * the aerial perspective.
+ */
 ECS_STRUCT(HeightFog, {
     float density;           /**< Fog density at the base height, default 0.1 */
     float falloff;           /**< Rate at which density drops with height, default 0.3 */
     float base_height;       /**< Height of full density, default 0 */
     float max_opacity;       /**< Upper bound of the fog opacity, default 1 */
-    rgb color;               /**< Fog color, default 191 158 140 */
+    rgb color;               /**< Fog color, default 191 158 140, ignored when the color comes
+                              *   from the atmosphere */
     float sun_inscatter;     /**< Scattered directional light, default 1 */
     float ambient_inscatter; /**< Scattered ambient light, default 1 */
+    bool atmosphere;         /**< Take the in scatter color from the sky of the Atmosphere of
+                              *   the scene when the view renders it, default true */
 });
 
 /** Exposure that adapts to the brightness of the image.

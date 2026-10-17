@@ -16,6 +16,12 @@
 // Slice 0 is the identity (0, 0, 0, 1), so a distance d samples the volume at
 // w = (d / aerial_distance * (N - 1) + 0.5) / N and a distance of 0 gives the identity.
 //
+// fog (2x1): the in scatter color of a HeightFog with atmosphere, once per view. Texel 0 is the
+// ambient, the mean of 6 horizon samples of the sky view mixed 15% toward its zenith; texel 1
+// the glow toward the main light, the horizon sample at its azimuth minus the ambient times
+// its horizon fade, or the radiance of the moon when it is the main light, which the sky view
+// does not scatter. fog.wgsl adds the phase and the inscatter scales per pixel.
+//
 // The planet center is under the camera: a world direction is a direction of the planet frame,
 // the camera at (0, bottom + altitude, 0). The earth shadow is analytic, a smoothstep around
 // the cosine of the horizon, instead of a ray test against the planet.
@@ -53,6 +59,10 @@ struct Atmosphere {
     sun_disk: vec4f,
     // clip to world space of the view
     inv_view_proj: mat4x4f,
+    // xyz: direction toward the main light, w: the fade of its disk at the horizon, per view
+    fog_light: vec4f,
+    // rgb: radiance toward the moon when it is the main light, w: 1 when it is, per view
+    fog_moon: vec4f,
 };
 
 struct Medium {
@@ -365,6 +375,51 @@ fn sky_view(@builtin(global_invocation_id) gid: vec3u) {
     let s = in_scatter(vec3f(0.0, r, 0.0), rd, 1e9, SKY_STEPS, 1.0, true);
     let night = 1.0 - smoothstep(-0.05, 0.02, u.sun.y);
     textureStore(out_2d, vec2i(gid.xy), vec4f(s.light + u.night.rgb * night, 1.0));
+}
+
+// Number of horizon samples of the fog ambient
+const FOG_HORIZON_SAMPLES: i32 = 6;
+// Mix of the fog ambient from the horizon toward the zenith
+const FOG_ZENITH_MIX: f32 = 0.15;
+
+// The sky view in a direction, from the camera
+fn sky_sample(rd: vec3f) -> vec3f {
+    return textureSampleLevel(sky_lut, lut_sampler, direction_to_sky_uv(rd, camera_radius()),
+        0.0).rgb;
+}
+
+// The sky view at the horizon toward the azimuth of a direction
+fn sky_horizon(rd: vec3f) -> vec3f {
+    let xz = max(length(rd.xz), 1e-6);
+    return sky_sample(vec3f(rd.x / xz, 0.0, rd.z / xz));
+}
+
+@compute @workgroup_size(8, 8, 1)
+fn fog(@builtin(global_invocation_id) gid: vec3u) {
+    let dims = textureDimensions(out_2d);
+    if (gid.x >= dims.x || gid.y >= dims.y) {
+        return;
+    }
+
+    var horizon = vec3f(0.0);
+    for (var i = 0; i < FOG_HORIZON_SAMPLES; i = i + 1) {
+        let a = (f32(i) + 0.5) * (2.0 * PI / f32(FOG_HORIZON_SAMPLES));
+        horizon = horizon + sky_horizon(vec3f(sin(a), 0.0, cos(a)));
+    }
+
+    let ambient = mix(horizon / f32(FOG_HORIZON_SAMPLES), sky_sample(vec3f(0.0, 1.0, 0.0)),
+        FOG_ZENITH_MIX);
+    var result = ambient;
+    if (gid.x == 1u) {
+        result = vec3f(0.0);
+        if (u.fog_moon.w > 0.5) {
+            result = u.fog_moon.rgb;
+        } else if (length(u.fog_light.xyz) > 1e-4) {
+            result = max(sky_horizon(u.fog_light.xyz) - ambient, vec3f(0.0)) * u.fog_light.w;
+        }
+    }
+
+    textureStore(out_2d, vec2i(gid.xy), vec4f(result, 1.0));
 }
 
 fn unproject(ndc: vec2f, z: f32) -> vec3f {

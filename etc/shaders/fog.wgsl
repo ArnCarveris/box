@@ -2,6 +2,12 @@
 // optical depth along the ray from the near plane to the pixel is integrated analytically; a
 // pixel without geometry integrates to infinity. The fog color is lit by the sun of the scene
 // with a Henyey-Greenstein phase that peaks toward the sun, and by its ambient light.
+//
+// In a view that renders the Atmosphere of its scene a fog with atmosphere takes its in scatter
+// color from the sky instead: the ambient and the glow toward the main light, which the fog
+// pass of atmosphere.wgsl wrote once for the view into the 2x1 image at binding 4, the glow
+// with the phase of the reference, Henyey-Greenstein with g the Mie anisotropy clamped to 0.92
+// or a broad lobe, whichever is larger.
 #include "include/effect.wgsl"
 
 struct Fog {
@@ -16,10 +22,14 @@ struct Fog {
     sun_color: vec4f,
     // rgb: ambient light times its inscatter
     ambient: vec4f,
+    // 1 when the color comes from the atmosphere, phase g, sun and ambient inscatter
+    atmos: vec4f,
 };
 
 @group(0) @binding(2) var<uniform> fog: Fog;
 @group(0) @binding(3) var depth_texture: texture_depth_2d;
+// Texel 0: the ambient of the sky, texel 1: the glow toward the main light
+@group(0) @binding(4) var sky_texture: texture_2d<f32>;
 
 const ANISOTROPY: f32 = 0.3;
 
@@ -32,6 +42,14 @@ fn phase(cos_theta: f32) -> f32 {
     let g = ANISOTROPY;
     let d = max(1.0 + g * g - 2.0 * g * cos_theta, 1e-4);
     return (1.0 - g * g) / (d * sqrt(d));
+}
+
+// Phase of the glow of the sky toward the main light, at most 1 toward it.
+fn sky_phase(cos_theta: f32, g: f32) -> f32 {
+    let d = max(1.0 + g * g - 2.0 * g * cos_theta, 1e-4);
+    let hg = pow((1.0 - g) * (1.0 - g) / d, 1.5);
+    let broad = pow(clamp(0.5 + 0.5 * cos_theta, 0.0, 1.0), 3.0);
+    return clamp(max(hg, broad), 0.0, 1.0);
 }
 
 fn optical_depth(origin: vec3f, dir: vec3f, dist: f32, sky: bool) -> f32 {
@@ -71,7 +89,16 @@ fn optical_depth(origin: vec3f, dir: vec3f, dist: f32, sky: bool) -> f32 {
         }
     }
 
-    let inscatter = fog.color.rgb * light;
+    var inscatter = fog.color.rgb * light;
+    if (fog.atmos.x > 0.5) {
+        let ambient = textureLoad(sky_texture, vec2i(0, 0), 0).rgb;
+        let glow = textureLoad(sky_texture, vec2i(1, 0), 0).rgb;
+        inscatter = ambient * fog.atmos.w;
+        if (fog.sun.w > 0.5) {
+            inscatter += glow * sky_phase(dot(dir, fog.sun.xyz), fog.atmos.y) * fog.atmos.z;
+        }
+    }
+
     let a = src.a * (1.0 - factor) + factor;
     return vec4f(src.rgb * (1.0 - factor) + inscatter * factor, a);
 }

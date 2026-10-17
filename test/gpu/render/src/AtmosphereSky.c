@@ -426,3 +426,101 @@ void AtmosphereSky_disk_center_brighter_than_limb(void) {
     test_assert(brightness(center) > brightness(limb) + 15);
     stbi_image_free(pixels);
 }
+
+/** Color of the fogs, which a fog colored by the atmosphere ignores */
+#define FOG_COLOR ((rgb){255, 0, 255})
+
+/** Render an unlit view at 1 m above the ground of a scene with 1 world unit per meter that
+ * looks along -z at the horizon, toward a wall 2 km away in a dense ground fog.
+ *
+ * @param elevation Elevation of the sun in degrees
+ * @param yaw Yaw of the sun in degrees, 0 in front of the camera and 180 behind it
+ * @param fog Whether the view has the fog, else the wall is left out too
+ * @param atmosphere HeightFog.atmosphere of the fog
+ * @return The pixels, the wall at (WIDTH / 2, HEIGHT / 2), or the sky just above the horizon
+ * at (WIDTH / 2, HEIGHT / 2 - 1) without fog
+ */
+static unsigned char* render_fog(
+    float elevation,
+    float yaw,
+    bool fog,
+    bool atmosphere)
+{
+    ecs_world_t *world = world_new();
+    ecs_entity_t scene = scene_new(world, 1000, elevation);
+    ecs_get_mut(world, scene, Atmosphere)->sun_disk_intensity = 0;
+    ecs_modified(world, scene, Atmosphere);
+    ecs_iter_t it = ecs_children(world, scene);
+    while (ecs_children_next(&it)) {
+        int32_t i;
+        for (i = 0; i < it.count; i ++) {
+            if (ecs_has(world, it.entities[i], DirectionalLight)) {
+                ecs_set(world, it.entities[i], Rotation, {glm_rad(elevation), glm_rad(yaw), 0});
+            }
+        }
+    }
+
+    ecs_entity_t camera = camera_new(world, scene, 1, 60, 0);
+    ecs_entity_t view = view_new(world, camera, false, true);
+    if (fog) {
+        ecs_entity_t e = ecs_new(world);
+        ecs_set(world, e, HeightFog, {.density = 0.005f, .falloff = 0.001f, .max_opacity = 1,
+            .color = FOG_COLOR, .sun_inscatter = 1, .ambient_inscatter = 1,
+            .atmosphere = atmosphere});
+        View *v = ecs_get_mut(world, view, View);
+        *ecs_vec_append_t(NULL, &v->effects, ViewEffect) = (ViewEffect){
+            .enabled = true, .effect = e };
+        ecs_modified(world, view, View);
+        box_new(world, scene, (float[3]){0, 0, -2000}, 1600, (Rgb){200, 40, 40});
+    }
+
+    return render(world);
+}
+
+void AtmosphereSky_fog_at_noon_tints_toward_horizon(void) {
+    // atmosphere/fog
+    unsigned char *sky = render_fog(90, 0, false, false);
+    unsigned char *colored = render_fog(90, 0, true, true);
+    unsigned char *plain = render_fog(90, 0, true, false);
+    int32_t horizon[3], wall_colored[3], wall_plain[3];
+    int32_t fog[3] = {FOG_COLOR.r, FOG_COLOR.g, FOG_COLOR.b};
+    pixel(sky, WIDTH / 2, HEIGHT / 2 - 1, horizon);
+    pixel(colored, WIDTH / 2, HEIGHT / 2, wall_colored);
+    pixel(plain, WIDTH / 2, HEIGHT / 2, wall_plain);
+    test_assert(difference(wall_plain, fog) <= 3);
+    test_assert(difference(wall_colored, (int32_t[3]){200, 40, 40}) > 40);
+    test_assert(distance2(wall_colored, horizon) * 8 < distance2(wall_colored, fog));
+    test_assert(difference(wall_colored, horizon) <= 40);
+    test_assert(wall_colored[2] > wall_colored[0]);
+    stbi_image_free(sky);
+    stbi_image_free(colored);
+    stbi_image_free(plain);
+}
+
+void AtmosphereSky_fog_at_sunset_warmer_toward_sun(void) {
+    // atmosphere/fog
+    unsigned char *toward = render_fog(3, 0, true, true);
+    unsigned char *away = render_fog(3, 180, true, true);
+    int32_t sun_side[3], other_side[3];
+    pixel(toward, WIDTH / 2, HEIGHT / 2, sun_side);
+    pixel(away, WIDTH / 2, HEIGHT / 2, other_side);
+    test_assert(brightness(sun_side) > brightness(other_side) + 20);
+    test_assert(sun_side[0] - sun_side[2] > other_side[0] - other_side[2] + 20);
+    test_assert(sun_side[0] > sun_side[2]);
+    stbi_image_free(toward);
+    stbi_image_free(away);
+}
+
+void AtmosphereSky_fog_without_atmosphere_uses_color(void) {
+    // atmosphere/fog
+    unsigned char *plain = render_fog(3, 0, true, false);
+    unsigned char *colored = render_fog(3, 0, true, true);
+    int32_t wall_plain[3], wall_colored[3];
+    int32_t fog[3] = {FOG_COLOR.r, FOG_COLOR.g, FOG_COLOR.b};
+    pixel(plain, WIDTH / 2, HEIGHT / 2, wall_plain);
+    pixel(colored, WIDTH / 2, HEIGHT / 2, wall_colored);
+    test_assert(difference(wall_plain, fog) <= 3);
+    test_assert(difference(wall_colored, fog) > 60);
+    stbi_image_free(plain);
+    stbi_image_free(colored);
+}
