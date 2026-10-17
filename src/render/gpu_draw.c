@@ -6,7 +6,8 @@
  * cleared to 0 and compared with greater, and draws the batches of its scene indirectly.
  *
  * A view that culls by occlusion draws twice: what its early cull phase kept, then what the
- * late phase found visible behind the depth of the first draw, with the blended draws.
+ * late phase found visible behind the depth of the first draw, with the blended draws. A view
+ * that renders the atmosphere of its scene draws the sky after its last opaque 3D mesh.
  */
 
 #include "gpu.h"
@@ -51,7 +52,7 @@ static WGPUBuffer box_gpu_buffer_new(
 void box_gpu_draw_init(
     box_gpu_t *gpu)
 {
-    WGPUBindGroupLayoutEntry entries[9] = {
+    WGPUBindGroupLayoutEntry entries[11] = {
         {
             .binding = 0,
             .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
@@ -106,9 +107,22 @@ void box_gpu_draw_init(
             .binding = 8,
             .visibility = WGPUShaderStage_Fragment,
             .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
+        },
+        {
+            .binding = 9,
+            .visibility = WGPUShaderStage_Fragment,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Float,
+                .viewDimension = WGPUTextureViewDimension_3D
+            }
+        },
+        {
+            .binding = 10,
+            .visibility = WGPUShaderStage_Fragment,
+            .sampler = { .type = WGPUSamplerBindingType_Filtering }
         }
     };
-    WGPUBindGroupLayoutDescriptor layout = { .entryCount = 9, .entries = entries };
+    WGPUBindGroupLayoutDescriptor layout = { .entryCount = 11, .entries = entries };
     box_gpu_cull_init(gpu);
     box_gpu_volume_init(gpu);
     box_gpu_reflect_init(gpu);
@@ -717,6 +731,7 @@ static int32_t box_gpu_view_write(
         u->viewport[3] = 1.0f / (float)(t->desc.render_height > 0 ? t->desc.render_height : 1);
         box_gpu_light_uniforms(gpu, v, proj, u);
         box_gpu_shadow_uniforms(gpu, v, proj, result, u);
+        box_gpu_atmosphere_uniforms(gpu, v, u);
         box_gpu_cull_add(gpu, t, packet, i, result, proj, u);
         result ++;
     }
@@ -732,27 +747,68 @@ static int32_t box_gpu_view_write(
     return result;
 }
 
-/** Record the indirect draws of the batches a view renders in a pass, in packet order.
+/** Record the sky of a view in a pass of a phase that draws the background, then bind the
+ * groups of the forward pass again, which the sky pipeline does not share.
  *
  * @param gpu The backend
+ * @param t The target
+ * @param pass The render pass of the view
+ * @param format The format of the color target
+ * @param v The view
+ * @param group The bind group of the view
+ * @param offset Offset of the uniforms of the view in the view buffer
+ * @return Whether the sky was drawn, so the pipeline and material bound before are not
+ */
+static bool box_gpu_draw_sky(
+    box_gpu_t *gpu,
+    const box_gpu_target_t *t,
+    WGPURenderPassEncoder pass,
+    WGPUTextureFormat format,
+    const box_render_view_t *v,
+    WGPUBindGroup group,
+    uint32_t offset)
+{
+    bool result = box_gpu_atmosphere_draw_sky(gpu, t, pass, format, v);
+    if (result) {
+        wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
+        wgpuRenderPassEncoderSetBindGroup(pass, 3, box_gpu_volume_group(gpu, v), 0, NULL);
+    }
+
+    return result;
+}
+
+/** Record the indirect draws of the batches a view renders in a pass, in packet order.
+ *
+ * The sky of a view that renders its atmosphere draws after the opaque 3D meshes and before
+ * the 2D shapes and the blended draws, in the phases that draw those.
+ *
+ * @param gpu The backend
+ * @param t The target
  * @param pass The render pass of the view
  * @param format The format of the color target
  * @param packet The packet
+ * @param v The view
+ * @param group The bind group of the view
  * @param slot Slot of the view in the view buffer
  * @param phase 0 for every draw of a view without occlusion, 1 for the opaque meshes of the
  * early phase, 2 for what the late phase kept, the 2D shapes and the blended draws
  */
 static void box_gpu_draw_batches(
     box_gpu_t *gpu,
+    const box_gpu_target_t *t,
     WGPURenderPassEncoder pass,
     WGPUTextureFormat format,
     const box_render_packet_t *packet,
+    const box_render_view_t *v,
+    WGPUBindGroup group,
     int32_t slot,
     int32_t phase)
 {
     const box_gpu_cull_view_t *cv = box_gpu_cull_view(gpu, slot, -1);
     WGPURenderPipeline bound = NULL;
     WGPUBindGroup material = NULL;
+    uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
+    bool sky = phase == 1 || !box_gpu_atmosphere_sky(gpu, v);
     int32_t i;
     for (i = 0; cv && i < cv->draw_count; i ++) {
         const box_gpu_cull_draw_t *d = ecs_vec_get_t(
@@ -761,6 +817,14 @@ static void box_gpu_draw_batches(
             &packet->batches, box_render_batch_t, d->batch);
         WGPURenderPipeline pipeline = box_gpu_forward_pipeline(gpu, format, b);
         bool mesh = b->view == -1 && b->pipeline == BOX_RENDER_SHADER_MESH;
+        if (!sky && !mesh) {
+            sky = true;
+            if (box_gpu_draw_sky(gpu, t, pass, format, v, group, offset)) {
+                bound = NULL;
+                material = NULL;
+            }
+        }
+
         if (!pipeline || (phase == 1 && !mesh)) {
             continue;
         }
@@ -779,6 +843,10 @@ static void box_gpu_draw_batches(
         if (box_gpu_cull_draw(gpu, pass, packet, d, 2, phase == 2 && mesh)) {
             box_gpu_count(gpu, BOX_GPU_STAT_DRAW);
         }
+    }
+
+    if (!sky) {
+        box_gpu_draw_sky(gpu, t, pass, format, v, group, offset);
     }
 }
 
@@ -835,11 +903,12 @@ static void box_gpu_draw_pass(
         .depthStencilAttachment = &depth
     };
     uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
-    WGPUBindGroup group = box_gpu_light_group(gpu, v, slot);
+    WGPUBindGroup group = box_gpu_light_group(gpu, t, v, slot);
     WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
     wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
     wgpuRenderPassEncoderSetBindGroup(pass, 3, box_gpu_volume_group(gpu, v), 0, NULL);
-    box_gpu_draw_batches(gpu, pass, hdr ? BOX_GPU_HDR_FORMAT : t->format, packet, slot, phase);
+    box_gpu_draw_batches(gpu, t, pass, hdr ? BOX_GPU_HDR_FORMAT : t->format, packet, v, group,
+        slot, phase);
     wgpuRenderPassEncoderEnd(pass);
     wgpuRenderPassEncoderRelease(pass);
     wgpuBindGroupRelease(group);

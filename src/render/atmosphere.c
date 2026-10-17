@@ -275,16 +275,21 @@ done:
 
 /** Write the inputs of the sky view and aerial perspective of a view of a scene with LUTs.
  *
+ * @param world The world
  * @param lights The state of the light extract
  * @param s The LUTs of the scene of the view
  * @param v The view
  */
 static void box_atmos_view(
+    const ecs_world_t *world,
     const void *lights,
     const box_atmos_scene_t *s,
     box_render_view_t *v)
 {
     const Atmosphere *value = &s->value;
+    const View *view = v->view && ecs_is_alive(world, v->view)
+        ? ecs_get(world, v->view, View)
+        : NULL;
     box_render_view_atmos_t *out = &v->atmos;
     float camera_y = v->camera_transform[3][1];
     float scale = value->night_intensity;
@@ -303,6 +308,8 @@ static void box_atmos_view(
     out->mie_anisotropy = value->mie.anisotropy;
     out->aerial_distance = value->aerial_distance;
     out->aerial_intensity = value->aerial_intensity;
+    out->km_per_unit = 1.0f / value->units_per_km;
+    out->sky = view ? view->lighting.atmosphere : true;
 }
 
 /** Give every view of a scene with LUTs its atmosphere, after the light extract found the sun.
@@ -326,7 +333,7 @@ static void BoxRenderExtractAtmosphereViews(
         box_render_view_t *v = ecs_vec_get_t(&p->views, box_render_view_t, i);
         const box_atmos_scene_t *s = box_atmos_find(a, v->scene);
         if (s && s->seen) {
-            box_atmos_view(lights, s, v);
+            box_atmos_view(it->world, lights, s, v);
         }
     }
 

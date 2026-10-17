@@ -39,6 +39,9 @@ struct View {
     // x: reflection probes of the reflection probe buffer the view samples, 0 for none; the
     // scene probe is the last of them when there are more than the clusters list (grid.w)
     reflection: vec4u,
+    // Aerial perspective: x km per world unit, y the inverse of the distance in km the volume
+    // reaches, z its slices, w 1 when the view applies it
+    aerial: vec4f,
 };
 
 struct Light {

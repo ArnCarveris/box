@@ -162,6 +162,13 @@
                     "fallback_dark_night",
                     "fallback_leaves_authored_light"
                 ]
+            },
+            {
+                "id": "AtmosphereSky",
+                "testcases": [
+                    "view_atmosphere_defaults",
+                    "packet_view_follows_atmosphere"
+                ]
             }
         ]
     }

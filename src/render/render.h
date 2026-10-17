@@ -210,6 +210,9 @@ typedef struct box_render_view_atmos_t {
     float mie_anisotropy;   /**< Mie phase asymmetry g */
     float aerial_distance;  /**< Far end of the aerial perspective volume in km */
     float aerial_intensity; /**< Scale of the scattering and extinction of the volume */
+    float km_per_unit;      /**< Kilometers in a world unit, the inverse of units_per_km */
+    bool sky;               /**< LightSettings.atmosphere: the view draws the sky and applies
+                             *   the aerial perspective to its 3D meshes */
 } box_render_view_atmos_t;
 
 /** The culling of a view, resolved from its CullSettings */

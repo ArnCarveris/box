@@ -5,7 +5,8 @@
  *
  * Every pass is a compute dispatch of etc/shaders/atmosphere.wgsl, the 2D LUTs included, so they
  * share one sampler and bind their outputs as storage textures. Scene LUTs build before the
- * targets of a packet, the passes of a view right before its forward pass.
+ * targets of a packet, the passes of a view right before its forward pass, which draws the sky
+ * from the sky view LUT and binds the aerial perspective volume for mesh.wgsl.
  */
 
 #include "gpu.h"
@@ -102,6 +103,12 @@ struct box_gpu_atmos_t {
     WGPUBuffer resolve;             /**< Resolved timestamps */
     box_gpu_atmos_readback_t readbacks[BOX_GPU_ATMOS_READBACKS]; /**< Timestamp copies */
     int32_t current;                /**< Readback of the packet being rendered, -1 for none */
+    WGPUBindGroupLayout sky_layout; /**< Bindings of the sky draw */
+    WGPUPipelineLayout sky_pipeline_layout; /**< Layout of the sky draw */
+    ecs_vec_t sky_pipelines;        /**< box_gpu_blit_t, the sky draw per color format */
+    int32_t sky_revision;           /**< Revision of the shader of the sky pipelines */
+    WGPUTexture placeholder;        /**< 1x1x1 volume bound by views without aerial perspective */
+    WGPUTextureView placeholder_view; /**< View of the placeholder volume */
 };
 
 /** Entry points of the passes, by box_render_atmos_pass_t */
@@ -236,6 +243,52 @@ static void box_gpu_atmos_layout(
             .bindGroupLayouts = &a->layouts[pass] });
 }
 
+/** Create the bind group layout and pipeline layout of the sky draw: the uniforms of the view
+ * at 0, the sampler at 2 and the sky view LUT at 4, as the aerial perspective pass binds them.
+ *
+ * @param gpu The backend
+ * @param a The atmosphere state
+ */
+static void box_gpu_atmos_sky_layout(
+    box_gpu_t *gpu,
+    box_gpu_atmos_t *a)
+{
+    WGPUShaderStage frag = WGPUShaderStage_Fragment;
+    WGPUBindGroupLayoutEntry entries[3] = {
+        { .binding = 0, .visibility = frag, .buffer = { .type = WGPUBufferBindingType_Uniform,
+            .minBindingSize = sizeof(box_gpu_atmos_uniforms_t) } },
+        { .binding = 2, .visibility = frag,
+            .sampler = { .type = WGPUSamplerBindingType_Filtering } },
+        { .binding = 4, .visibility = frag, .texture = {
+            .sampleType = WGPUTextureSampleType_Float,
+            .viewDimension = WGPUTextureViewDimension_2D
+        } }
+    };
+    a->sky_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 3, .entries = entries });
+    a->sky_pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
+        &(WGPUPipelineLayoutDescriptor){ .bindGroupLayoutCount = 1,
+            .bindGroupLayouts = &a->sky_layout });
+}
+
+/** Release the sky pipelines of every color format.
+ *
+ * @param a The atmosphere state
+ */
+static void box_gpu_atmos_sky_reset(
+    box_gpu_atmos_t *a)
+{
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&a->sky_pipelines); i ++) {
+        box_gpu_blit_t *b = ecs_vec_get_t(&a->sky_pipelines, box_gpu_blit_t, i);
+        if (b->pipeline) {
+            wgpuRenderPipelineRelease(b->pipeline);
+        }
+    }
+
+    ecs_vec_clear(&a->sky_pipelines);
+}
+
 /** Create the timestamp queries and their readbacks when the device has the feature.
  *
  * @param gpu The backend
@@ -291,6 +344,17 @@ void box_gpu_atmosphere_init(
     });
     ecs_map_init(&a->luts, NULL);
     ecs_vec_init_t(NULL, &a->views, box_gpu_atmos_view_t*, 0);
+    ecs_vec_init_t(NULL, &a->sky_pipelines, box_gpu_blit_t, 0);
+    box_gpu_atmos_sky_layout(gpu, a);
+    a->placeholder = wgpuDeviceCreateTexture(gpu->device, &(WGPUTextureDescriptor){
+        .usage = WGPUTextureUsage_TextureBinding,
+        .dimension = WGPUTextureDimension_3D,
+        .size = { 1, 1, 1 },
+        .format = BOX_GPU_ATMOS_FORMAT,
+        .mipLevelCount = 1,
+        .sampleCount = 1
+    });
+    a->placeholder_view = wgpuTextureCreateView(a->placeholder, NULL);
     box_gpu_atmos_queries_init(gpu, a);
     gpu->atmosphere = a;
 }
@@ -373,6 +437,11 @@ void box_gpu_atmosphere_fini(
         wgpuBufferRelease(a->resolve);
     }
 
+    box_gpu_atmos_sky_reset(a);
+    ecs_vec_fini_t(NULL, &a->sky_pipelines, box_gpu_blit_t);
+    wgpuPipelineLayoutRelease(a->sky_pipeline_layout);
+    wgpuBindGroupLayoutRelease(a->sky_layout);
+    box_gpu_atmos_release(&a->placeholder, &a->placeholder_view);
     wgpuSamplerRelease(a->sampler);
     ecs_map_fini(&a->luts);
     ecs_vec_fini_t(NULL, &a->views, box_gpu_atmos_view_t*);
@@ -760,6 +829,51 @@ done:
     return;
 }
 
+/** Find the sky view and aerial perspective of a view in a target.
+ *
+ * @param a The atmosphere state
+ * @param t The target
+ * @param v The view
+ * @return The state, NULL when the view has none in the target
+ */
+static box_gpu_atmos_view_t* box_gpu_atmos_view_find(
+    const box_gpu_atmos_t *a,
+    const box_gpu_target_t *t,
+    const box_render_view_t *v)
+{
+    box_gpu_atmos_view_t *result = NULL;
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&a->views); i ++) {
+        box_gpu_atmos_view_t *s = *ecs_vec_get_t(&a->views, box_gpu_atmos_view_t*, i);
+        if (s->target == t->handle && s->view == v->view) {
+            result = s;
+            break;
+        }
+    }
+
+    return result;
+}
+
+/** Get the LUTs of the scene of a view when they are built with the current pipelines.
+ *
+ * @param a The atmosphere state, NULL without one
+ * @param v The view
+ * @return The LUTs, NULL when the view runs no atmosphere pass
+ */
+static box_gpu_atmos_luts_t* box_gpu_atmos_luts_ready(
+    const box_gpu_atmos_t *a,
+    const box_render_view_t *v)
+{
+    box_gpu_atmos_luts_t *result = a && v->atmosphere
+        ? ecs_map_get_deref(&a->luts, box_gpu_atmos_luts_t, v->atmosphere)
+        : NULL;
+    if (result && (result->dirty || result->revision != a->revision || !a->revision)) {
+        result = NULL;
+    }
+
+    return result;
+}
+
 /** Get the sky view and aerial perspective of a view in a target, created on first use.
  *
  * @param gpu The backend
@@ -775,16 +889,7 @@ static box_gpu_atmos_view_t* box_gpu_atmos_view(
     const box_render_view_t *v)
 {
     box_gpu_atmos_t *a = gpu->atmosphere;
-    box_gpu_atmos_view_t *result = NULL;
-    int32_t i;
-    for (i = 0; i < ecs_vec_count(&a->views); i ++) {
-        box_gpu_atmos_view_t *s = *ecs_vec_get_t(&a->views, box_gpu_atmos_view_t*, i);
-        if (s->target == t->handle && s->view == v->view) {
-            result = s;
-            break;
-        }
-    }
-
+    box_gpu_atmos_view_t *result = box_gpu_atmos_view_find(a, t, v);
     if (!result) {
         result = ecs_os_calloc_t(box_gpu_atmos_view_t);
         result->target = t->handle;
@@ -811,12 +916,10 @@ void box_gpu_atmosphere_view(
     const box_render_view_t *v)
 {
     box_gpu_atmos_t *a = gpu->atmosphere;
-    box_gpu_atmos_luts_t *l = a && v->atmosphere
-        ? ecs_map_get_deref(&a->luts, box_gpu_atmos_luts_t, v->atmosphere)
-        : NULL;
+    box_gpu_atmos_luts_t *l = box_gpu_atmos_luts_ready(a, v);
     box_gpu_atmos_uniforms_t u;
     mat4 proj, view_proj;
-    if (!l || l->dirty || l->revision != a->revision || !a->revision) {
+    if (!l) {
         goto done;
     }
 
@@ -860,6 +963,147 @@ void box_gpu_atmosphere_view(
         BOX_RENDER_ATMOS_AERIAL_SIZE);
 done:
     return;
+}
+
+bool box_gpu_atmosphere_sky(
+    box_gpu_t *gpu,
+    const box_render_view_t *v)
+{
+    return v->atmos.sky && box_gpu_atmos_luts_ready(gpu->atmosphere, v) != NULL;
+}
+
+void box_gpu_atmosphere_uniforms(
+    box_gpu_t *gpu,
+    const box_render_view_t *v,
+    box_gpu_view_uniforms_t *u)
+{
+    const box_render_view_atmos_t *in = &v->atmos;
+    glm_vec4_zero(u->aerial);
+    if (box_gpu_atmosphere_sky(gpu, v)) {
+        u->aerial[0] = in->km_per_unit;
+        u->aerial[1] = in->aerial_distance > 0 ? 1.0f / in->aerial_distance : 0.0f;
+        u->aerial[2] = (float)BOX_RENDER_ATMOS_AERIAL_SIZE;
+        u->aerial[3] = 1.0f;
+    }
+}
+
+void box_gpu_atmosphere_bindings(
+    box_gpu_t *gpu,
+    const box_gpu_target_t *t,
+    const box_render_view_t *v,
+    WGPUBindGroupEntry *out)
+{
+    box_gpu_atmos_t *a = gpu->atmosphere;
+    box_gpu_atmos_view_t *s = t && box_gpu_atmosphere_sky(gpu, v)
+        ? box_gpu_atmos_view_find(a, t, v)
+        : NULL;
+    out[0] = (WGPUBindGroupEntry){
+        .binding = 9,
+        .textureView = s ? s->aerial_view : a->placeholder_view
+    };
+    out[1] = (WGPUBindGroupEntry){ .binding = 10, .sampler = a->sampler };
+}
+
+/** Get the sky pipeline of a color format, created on first use and again after the atmosphere
+ * shader recompiled.
+ *
+ * @param gpu The backend
+ * @param a The atmosphere state
+ * @param format The format of the color target
+ * @return The pipeline, NULL while the shader has no module
+ */
+static WGPURenderPipeline box_gpu_atmos_sky_pipeline(
+    box_gpu_t *gpu,
+    box_gpu_atmos_t *a,
+    WGPUTextureFormat format)
+{
+    box_gpu_shader_t *shader = ecs_map_get_deref(
+        &gpu->shaders, box_gpu_shader_t, BOX_RENDER_SHADER_ATMOSPHERE);
+    WGPURenderPipeline result = NULL;
+    int32_t i;
+    if (!shader || !shader->module) {
+        goto done;
+    }
+
+    if (a->sky_revision != shader->revision) {
+        box_gpu_atmos_sky_reset(a);
+        a->sky_revision = shader->revision;
+    }
+
+    for (i = 0; i < ecs_vec_count(&a->sky_pipelines); i ++) {
+        box_gpu_blit_t *b = ecs_vec_get_t(&a->sky_pipelines, box_gpu_blit_t, i);
+        if (b->format == format) {
+            result = b->pipeline;
+            goto done;
+        }
+    }
+
+    WGPUColorTargetState target = { .format = format, .writeMask = WGPUColorWriteMask_All };
+    WGPUFragmentState fragment = {
+        .module = shader->module,
+        .entryPoint = { .data = "sky_fs", .length = WGPU_STRLEN },
+        .targetCount = 1,
+        .targets = &target
+    };
+    WGPUDepthStencilState depth = {
+        .format = BOX_GPU_DEPTH_FORMAT,
+        .depthWriteEnabled = WGPUOptionalBool_False,
+        .depthCompare = WGPUCompareFunction_Equal,
+        .stencilFront = { .compare = WGPUCompareFunction_Always },
+        .stencilBack = { .compare = WGPUCompareFunction_Always }
+    };
+    result = wgpuDeviceCreateRenderPipeline(gpu->device, &(WGPURenderPipelineDescriptor){
+        .layout = a->sky_pipeline_layout,
+        .vertex = {
+            .module = shader->module,
+            .entryPoint = { .data = "sky_vs", .length = WGPU_STRLEN }
+        },
+        .primitive = { .topology = WGPUPrimitiveTopology_TriangleList },
+        .depthStencil = &depth,
+        .multisample = { .count = 1, .mask = 0xFFFFFFFF },
+        .fragment = &fragment
+    });
+    *ecs_vec_append_t(NULL, &a->sky_pipelines, box_gpu_blit_t) = (box_gpu_blit_t){
+        .format = format,
+        .pipeline = result
+    };
+done:
+    return result;
+}
+
+bool box_gpu_atmosphere_draw_sky(
+    box_gpu_t *gpu,
+    const box_gpu_target_t *t,
+    WGPURenderPassEncoder pass,
+    WGPUTextureFormat format,
+    const box_render_view_t *v)
+{
+    box_gpu_atmos_t *a = gpu->atmosphere;
+    box_gpu_atmos_view_t *s = box_gpu_atmosphere_sky(gpu, v)
+        ? box_gpu_atmos_view_find(a, t, v)
+        : NULL;
+    WGPURenderPipeline pipeline = s ? box_gpu_atmos_sky_pipeline(gpu, a, format) : NULL;
+    bool result = pipeline != NULL;
+    if (!result) {
+        goto done;
+    }
+
+    WGPUBindGroupEntry entries[3] = {
+        { .binding = 0, .buffer = s->uniforms, .size = sizeof(box_gpu_atmos_uniforms_t) },
+        { .binding = 2, .sampler = a->sampler },
+        { .binding = 4, .textureView = s->sky_view }
+    };
+    WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
+        .layout = a->sky_layout,
+        .entryCount = 3,
+        .entries = entries
+    });
+    wgpuRenderPassEncoderSetPipeline(pass, pipeline);
+    wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 0, NULL);
+    wgpuRenderPassEncoderDraw(pass, 3, 1, 0, 0);
+    wgpuBindGroupRelease(group);
+done:
+    return result;
 }
 
 void box_gpu_atmosphere_sweep(

@@ -409,6 +409,9 @@ typedef struct box_gpu_view_uniforms_t {
     uint32_t shadow_config[4];      /**< Cascades, 0 without shadows, PCF taps, two unused */
     uint32_t reflection[4];         /**< Probes of the reflection probe buffer the view samples,
                                      *   0 for none, three unused */
+    vec4 aerial;                    /**< Aerial perspective: km per world unit, inverse of the
+                                     *   volume distance in km, its slices, 1 when the view
+                                     *   applies it and 0 when not */
 } box_gpu_view_uniforms_t;
 
 /** Pipeline of the blit or the forward pass for one color format */
@@ -1116,6 +1119,8 @@ WGPUBuffer box_gpu_light_binding(
 /** Create the bind group of the forward pass of a view with explicit buffers.
  *
  * @param gpu The backend
+ * @param t The target whose aerial perspective volume of the view it binds, NULL for the
+ * placeholder volume of views and captures without aerial perspective
  * @param v The view
  * @param uniforms Buffer with the uniforms, bound with a dynamic offset
  * @param clusters Cluster buffer of the view
@@ -1124,21 +1129,24 @@ WGPUBuffer box_gpu_light_binding(
  */
 WGPUBindGroup box_gpu_light_group_with(
     box_gpu_t *gpu,
+    const box_gpu_target_t *t,
     const box_render_view_t *v,
     WGPUBuffer uniforms,
     WGPUBuffer clusters,
     WGPUTextureView shadow);
 
-/** Create the bind group of the forward pass of a view: its uniforms, lights, clusters and
- * shadow map.
+/** Create the bind group of the forward pass of a view: its uniforms, lights, clusters, shadow
+ * map and aerial perspective volume.
  *
  * @param gpu The backend
+ * @param t The target
  * @param v The view
  * @param slot Slot of the view in the view buffer
  * @return The bind group, released by the caller
  */
 WGPUBindGroup box_gpu_light_group(
     box_gpu_t *gpu,
+    const box_gpu_target_t *t,
     const box_render_view_t *v,
     int32_t slot);
 
@@ -1288,6 +1296,62 @@ void box_gpu_atmosphere_view(
     const box_gpu_target_t *t,
     WGPUCommandEncoder encoder,
     const box_render_packet_t *packet,
+    const box_render_view_t *v);
+
+/** Check whether a view draws the sky and applies the aerial perspective in this packet: it
+ * has LightSettings.atmosphere and its scene has built atmosphere LUTs, so
+ * box_gpu_atmosphere_view records its passes.
+ *
+ * @param gpu The backend
+ * @param v The view
+ * @return Whether the view renders its atmosphere
+ */
+bool box_gpu_atmosphere_sky(
+    box_gpu_t *gpu,
+    const box_render_view_t *v);
+
+/** Write the aerial perspective uniforms of a view, zero when it does not render its
+ * atmosphere.
+ *
+ * @param gpu The backend
+ * @param v The view
+ * @param u The uniforms of the view
+ */
+void box_gpu_atmosphere_uniforms(
+    box_gpu_t *gpu,
+    const box_render_view_t *v,
+    box_gpu_view_uniforms_t *u);
+
+/** Write the aerial perspective volume and its sampler as bindings 9 and 10 of the forward
+ * pass: the volume of the view in a target after box_gpu_atmosphere_view, else a placeholder.
+ *
+ * @param gpu The backend
+ * @param t The target, NULL for the placeholder
+ * @param v The view
+ * @param out Receives the two entries
+ */
+void box_gpu_atmosphere_bindings(
+    box_gpu_t *gpu,
+    const box_gpu_target_t *t,
+    const box_render_view_t *v,
+    WGPUBindGroupEntry *out);
+
+/** Record the sky of a view that renders its atmosphere into its forward pass: a fullscreen
+ * triangle at the far plane, depth 0 compared with equal and not written, so only the pixels
+ * no geometry covered sample the sky view LUT. Replaces the bind group at 0.
+ *
+ * @param gpu The backend
+ * @param t The target
+ * @param pass The render pass of the view
+ * @param format The format of the color target
+ * @param v The view
+ * @return Whether the sky was drawn
+ */
+bool box_gpu_atmosphere_draw_sky(
+    box_gpu_t *gpu,
+    const box_gpu_target_t *t,
+    WGPURenderPassEncoder pass,
+    WGPUTextureFormat format,
     const box_render_view_t *v);
 
 /** Release the sky view and aerial perspective of the views the targets of a packet did not

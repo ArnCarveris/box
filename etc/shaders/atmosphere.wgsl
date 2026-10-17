@@ -19,6 +19,10 @@
 // The planet center is under the camera: a world direction is a direction of the planet frame,
 // the camera at (0, bottom + altitude, 0). The earth shadow is analytic, a smoothstep around
 // the cosine of the horizon, instead of a ray test against the planet.
+//
+// sky_vs and sky_fs draw the sky of a view in its forward pass: a fullscreen triangle at the far
+// plane (reversed Z depth 0) that samples the sky view LUT in the direction of its pixel, the
+// horizon row for a direction below the horizon.
 #include "include/atmosphere_medium.h"
 
 struct Atmosphere {
@@ -383,4 +387,41 @@ fn aerial(@builtin(global_invocation_id) gid: vec3u) {
     }
 
     textureStore(out_3d, vec3i(gid), result);
+}
+
+// The depth is compared with equal, so the position is invariant
+struct SkyOut {
+    @invariant @builtin(position) pos: vec4f,
+    @location(0) ndc: vec2f,
+};
+
+@vertex fn sky_vs(@builtin(vertex_index) i: u32) -> SkyOut {
+    let p = vec2f(f32((i << 1u) & 2u), f32(i & 2u)) * 2.0 - 1.0;
+    var o: SkyOut;
+    o.pos = vec4f(p, 0.0, 1.0);
+    o.ndc = p;
+    return o;
+}
+
+// Point of the sky view LUT of a world direction seen from a radius, the inverse of
+// sky_uv_to_direction.
+fn direction_to_sky_uv(rd: vec3f, r: f32) -> vec2f {
+    let horizon = horizon_angle(r);
+    let zenith = acos(clamp(rd.y, -1.0, 1.0));
+    var v = 0.5;
+    if (zenith < horizon) {
+        v = 0.5 * sqrt(zenith / max(horizon, 1e-6));
+    } else {
+        v = 0.5 + 0.5 * sqrt(max(zenith - horizon, 0.0) / max(PI - horizon, 1e-6));
+    }
+
+    let u_azimuth = atan2(rd.x, rd.z) / (2.0 * PI) + 0.5;
+    return vec2f(clamp(u_azimuth, 0.0, 1.0), clamp(v, 0.0, 1.0));
+}
+
+@fragment fn sky_fs(f: SkyOut) -> @location(0) vec4f {
+    let rd = normalize(unproject(f.ndc, 0.5) - unproject(f.ndc, 1.0));
+    var uv = direction_to_sky_uv(rd, camera_radius());
+    uv.y = min(uv.y, 0.5);
+    return vec4f(textureSampleLevel(sky_lut, lut_sampler, uv, 0.0).rgb, 1.0);
 }

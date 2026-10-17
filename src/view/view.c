@@ -7,8 +7,8 @@
 #include <box.h>
 
 /** Construct View values that are lit, sample the baked lighting and the reflection probes of
- * their scene, have the documented shadow defaults and cull with occlusion and a smallest size
- * of one pixel.
+ * their scene, render its atmosphere, have the documented shadow defaults and cull with
+ * occlusion and a smallest size of one pixel.
  *
  * @param ptr The components
  * @param count Number of components
@@ -26,6 +26,7 @@ static void box_view_ctor(
         values[i].lighting.enabled = true;
         values[i].lighting.baked = true;
         values[i].lighting.reflections = true;
+        values[i].lighting.atmosphere = true;
         values[i].shadows = (ShadowSettings){
             .cascades = 4,
             .resolution = 2048,

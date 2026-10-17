@@ -7,7 +7,9 @@
 // instance data is read from the instance buffer of the batch (group 2). Indirect light comes
 // from the hemisphere ambient, or for a view that samples baked lighting from the irradiance
 // probe volume of its scene (group 3). The indirect specular light of a view that samples
-// reflection probes comes from the prefiltered cubemaps of the probes its clusters list.
+// reflection probes comes from the prefiltered cubemaps of the probes its clusters list. A view
+// that renders the atmosphere of its scene attenuates the shaded color and adds the in scattered
+// light from one trilinear tap of its aerial perspective volume.
 #include "include/instance.wgsl"
 #include "include/lights.wgsl"
 #include "include/shadow.wgsl"
@@ -35,6 +37,11 @@ const MIN_ROUGHNESS: f32 = 0.045;
 @group(0) @binding(6) var reflection_cubes: texture_cube_array<f32>;
 @group(0) @binding(7) var reflection_sampler: sampler;
 @group(0) @binding(8) var<storage, read> reflection_sh: array<vec4f>;
+
+// Aerial perspective volume of the view (atmosphere.wgsl): x and y the uv of the screen, z the
+// distance from the camera, rgb the in scattered light and a the transmittance up to it.
+@group(0) @binding(9) var aerial_volume: texture_3d<f32>;
+@group(0) @binding(10) var aerial_sampler: sampler;
 
 @group(2) @binding(0) var<storage, read> instances: array<Instance>;
 
@@ -562,6 +569,32 @@ fn shade(s: Surface, v: vec3f, world: vec3f) -> vec3f {
         s.emissive;
 }
 
+// Color of a fragment seen through the atmosphere between it and the camera, shaped for the
+// blend equation: a fragment that covers the target is attenuated and adds the in scattered
+// light weighted by its coverage, light added to or taken from the target is only attenuated,
+// and a filter of the target is left as it is.
+fn aerial_perspective(color: vec3f, alpha: f32, pos: vec4f, world: vec3f) -> vec3f {
+    let uv = pos.xy * view.viewport.zw;
+    let km = length(world - view.camera.xyz) * view.aerial.x;
+    let slices = view.aerial.z;
+    let w = (km * view.aerial.y * (slices - 1.0) + 0.5) / slices;
+    let ap = textureSampleLevel(aerial_volume, aerial_sampler, vec3f(uv, w), 0.0);
+    switch blend_mode {
+        case 0u, 1u: {
+            return color * ap.a + ap.rgb;
+        }
+        case 2u: {
+            return color * ap.a + ap.rgb * alpha;
+        }
+        case 4u, 7u: {
+            return color;
+        }
+        default: {
+            return color * ap.a;
+        }
+    }
+}
+
 fn output(color: vec3f, alpha: f32) -> vec4f {
     switch blend_mode {
         case 0u: {
@@ -582,5 +615,10 @@ fn output(color: vec3f, alpha: f32) -> vec4f {
 @fragment fn fs(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
     let s = surface(f, front);
     let v = normalize(view.camera.xyz - f.world);
-    return output(shade(s, v, f.world), s.alpha);
+    var color = shade(s, v, f.world);
+    if (view.aerial.w > 0.0) {
+        color = aerial_perspective(color, s.alpha, f.pos, f.world);
+    }
+
+    return output(color, s.alpha);
 }

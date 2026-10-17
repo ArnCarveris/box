@@ -588,6 +588,15 @@
                     "transmittance_matches_cpu_at_zenith",
                     "transmittance_matches_cpu_near_horizon"
                 ]
+            },
+            {
+                "id": "AtmosphereSky",
+                "testcases": [
+                    "zenith_bluer_and_darker_than_horizon",
+                    "view_without_atmosphere_shows_clear_color",
+                    "far_box_approaches_horizon_color",
+                    "sky_does_not_draw_over_geometry"
+                ]
             }
         ]
     }
