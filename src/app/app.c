@@ -432,6 +432,8 @@ static void box_app_serve(
     (void)world;
     (void)port;
 #else
+    ECS_IMPORT(world, FlecsStats);
+    ecs_enable(world, ecs_id(FlecsStats), true);
     ecs_entity_t server = ecs_lookup(world, "box.command.TerminalServer");
     if (server) {
         TerminalServer value = { .port = port };

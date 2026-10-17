@@ -11,6 +11,7 @@ void BoxImport(
 {
     ECS_IMPORT(world, FlecsScriptMath);
     ECS_IMPORT(world, FlecsStats);
+    ecs_enable(world, ecs_id(FlecsStats), false);
     ECS_IMPORT(world, BoxTransform);
     ECS_IMPORT(world, BoxGeometry);
     ECS_IMPORT(world, BoxCamera);
