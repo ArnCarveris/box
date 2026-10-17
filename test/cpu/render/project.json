@@ -170,6 +170,22 @@
                     "packet_view_follows_atmosphere",
                     "packet_view_sun_disk"
                 ]
+            },
+            {
+                "id": "Environment",
+                "testcases": [
+                    "script_defaults",
+                    "c_defaults",
+                    "invalid_resolution_sets_error",
+                    "view_settings_defaults",
+                    "view_without_source_uses_none",
+                    "unlit_view_uses_none",
+                    "shared_source_creates_one_cubemap",
+                    "resolution_change_recreates_cubemap",
+                    "removing_source_destroys_cubemap",
+                    "image_sent_once_per_version",
+                    "missing_file_sets_error"
+                ]
             }
         ]
     }
