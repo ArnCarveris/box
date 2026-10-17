@@ -67,6 +67,7 @@ typedef struct CommandInfo {
     int32_t required;   /**< Arguments that may not be omitted */
     bool rest;          /**< The last parameter takes the remainder of the line */
     bool quiet;         /**< The result is not logged */
+    int32_t paths;      /**< Bit i is set when function parameter i is a path parameter */
 } CommandInfo;
 
 /** Process wide state of the module: the HTTP server and the session folders */
@@ -177,6 +178,50 @@ ecs_entity_t box_terminal_cwd(
     ecs_world_t *world,
     ecs_entity_t session);
 
+/** Byte range of a token of a command line, as the dispatcher splits the line */
+typedef struct box_command_token_t {
+    int32_t start;  /**< First byte, the opening quote of a quoted token */
+    int32_t end;    /**< Byte after the token, after the closing quote when there is one */
+    bool quoted;    /**< The token starts with a double quote */
+} box_command_token_t;
+
+/** Find the tokens of a command line as the dispatcher splits it.
+ *
+ * Tokens are separated by whitespace. A double quote groups a token up to the next unescaped
+ * quote or the end of the line, brackets keep their contents together. Only the first
+ * FLECS_SCRIPT_FUNCTION_ARGS_MAX tokens are arguments, the rest only go to a rest parameter.
+ *
+ * @param line The command line
+ * @param tokens Receives the ranges of up to max tokens
+ * @param max Size of the tokens array
+ * @return Number of tokens of the line, which may be more than max
+ */
+int32_t box_command_tokens(
+    const char *line,
+    box_command_token_t *tokens,
+    int32_t max);
+
+/** Get the text of a token as the dispatcher passes it: without quotes and escapes.
+ *
+ * @param line The command line
+ * @param t The token, from box_command_tokens
+ * @return The text, which the caller frees
+ */
+char* box_command_token_text(
+    const char *line,
+    const box_command_token_t *t);
+
+/** Get the end of the remainder of a line a rest parameter takes, before trailing whitespace.
+ *
+ * A rest parameter with more tokens after its first one takes the line from the start of its
+ * first token to this byte, quotes and all.
+ *
+ * @param line The command line
+ * @return The byte after the last character that is not whitespace
+ */
+int32_t box_command_rest_end(
+    const char *line);
+
 /** Register the session observers.
  *
  * @param world The world
@@ -249,6 +294,20 @@ int box_shell_resolve(
     ecs_entity_t session,
     const char *path,
     box_shell_access_t access,
+    ecs_entity_t *out);
+
+/** Look up the entity of a path as box_shell_resolve does, without failing a command.
+ *
+ * @param world The world
+ * @param cwd The scope the path is relative to, 0 for the root
+ * @param path The path
+ * @param out Receives the entity, 0 for the root
+ * @return 0 when the path names an entity or the root, -1 otherwise
+ */
+int box_shell_lookup(
+    const ecs_world_t *world,
+    ecs_entity_t cwd,
+    const char *path,
     ecs_entity_t *out);
 
 /** Register the shell commands cd, ls, touch, rm, mv, man and the component commands.

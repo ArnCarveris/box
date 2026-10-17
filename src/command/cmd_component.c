@@ -644,7 +644,7 @@ void box_component_init(
         .name = "add",
         .brief = "Add a component or pair to an entity",
         .params = {
-            { .name = "entity", .type = ecs_id(ecs_string_t) },
+            { .name = "entity", .type = ecs_id(ecs_string_t), .path = true },
             { .name = "component", .type = ecs_id(ecs_string_t) }
         },
         .callback = box_component_add
@@ -654,7 +654,7 @@ void box_component_init(
         .name = "remove",
         .brief = "Remove a component or pair from an entity",
         .params = {
-            { .name = "entity", .type = ecs_id(ecs_string_t) },
+            { .name = "entity", .type = ecs_id(ecs_string_t), .path = true },
             { .name = "component", .type = ecs_id(ecs_string_t) }
         },
         .callback = box_component_remove
@@ -664,7 +664,7 @@ void box_component_init(
         .name = "set",
         .brief = "Assign a flecs script value to a component or member like Position.x",
         .params = {
-            { .name = "entity", .type = ecs_id(ecs_string_t) },
+            { .name = "entity", .type = ecs_id(ecs_string_t), .path = true },
             { .name = "component", .type = ecs_id(ecs_string_t) },
             { .name = "value", .type = ecs_id(ecs_string_t), .rest = true }
         },
@@ -675,7 +675,7 @@ void box_component_init(
         .name = "get",
         .brief = "Print a component or member value, every component when omitted",
         .params = {
-            { .name = "entity", .type = ecs_id(ecs_string_t) },
+            { .name = "entity", .type = ecs_id(ecs_string_t), .path = true },
             { .name = "component", .type = ecs_id(ecs_string_t), .optional = true }
         },
         .callback = box_component_get
@@ -684,7 +684,7 @@ void box_component_init(
     box_command_register(world, &(box_command_desc_t){
         .name = "clear",
         .brief = "Remove every component of an entity but its name and parent",
-        .params = {{ .name = "entity", .type = ecs_id(ecs_string_t) }},
+        .params = {{ .name = "entity", .type = ecs_id(ecs_string_t), .path = true }},
         .callback = box_component_clear
     });
 }

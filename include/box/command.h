@@ -86,6 +86,7 @@ typedef struct box_command_param_t {
     ecs_entity_t type;  /**< ecs_string_t, ecs_i32_t, ecs_f64_t, ecs_bool_t or ecs_entity_t */
     bool optional;      /**< The argument may be omitted and is then zero */
     bool rest;          /**< Last string parameter that takes the remainder of the line */
+    bool path;          /**< String parameter that names an existing entity as a shell path */
 } box_command_param_t;
 
 /** Describes a command for box_command_register */

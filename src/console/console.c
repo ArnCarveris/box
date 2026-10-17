@@ -19,7 +19,8 @@ ECS_COMPONENT_DECLARE(ConsoleHost);
 /** Most times the view is recreated in one frame to render after every other view */
 #define BOX_CONSOLE_VIEW_TRIES (256)
 
-/** Construct Console values: closed, the left half of the surface, light text on a dark panel.
+/** Construct Console values: closed, the left half of the surface, light text on a dark panel,
+ * command lines colored in light tones, unknown names and extra arguments in the error color.
  *
  * @param ptr The components
  * @param count Number of components
@@ -46,7 +47,18 @@ static void box_console_ctor(
             .text = {215, 220, 230},
             .command = {120, 200, 255},
             .error = {255, 110, 100},
-            .input = {255, 255, 255}
+            .input = {255, 255, 255},
+            .syntax = {
+                .name = {110, 190, 255},
+                .unknown = {255, 110, 100},
+                .entity = {130, 220, 150},
+                .missing = {255, 190, 80},
+                .number = {200, 160, 255},
+                .string = {235, 210, 140},
+                .boolean = {255, 150, 200},
+                .value = {140, 225, 225},
+                .extra = {255, 110, 100}
+            }
         };
     }
 }
@@ -481,6 +493,7 @@ void BoxConsoleImport(
     ECS_IMPORT(world, BoxInput);
     ECS_IMPORT(world, BoxCommand);
 
+    ECS_META_COMPONENT(world, ConsoleSyntax);
     ECS_META_COMPONENT(world, Console);
     ecs_set_hooks(world, Console, { .ctor = box_console_ctor });
     ECS_COMPONENT_DEFINE(world, ConsoleHost);
@@ -493,6 +506,7 @@ void BoxConsoleImport(
     ecs_vec_init_t(NULL, &con->history, char*, 0);
     ecs_vec_init_t(NULL, &con->ui.lines, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &con->typed, char, 0);
+    ecs_vec_init_t(NULL, &con->spans, box_console_span_t, 0);
     ecs_singleton_set(world, ConsoleHost, { con });
     ecs_atfini(world, box_console_free, con);
     box_console_action(world, con);

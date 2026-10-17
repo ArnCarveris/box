@@ -146,6 +146,7 @@ ecs_entity_t box_command_register(
         fdesc.params[i + 1].name = p->name;
         fdesc.params[i + 1].type = p->type;
         info.required += !p->optional;
+        info.paths |= p->path ? (1 << (i + 1)) : 0;
         info.rest = p->rest;
     }
 

@@ -131,6 +131,132 @@ static void box_console_text(
     box_console_color(world, e, color);
 }
 
+/** Get the color of a part of a command line.
+ *
+ * @param console The Console singleton
+ * @param kind What the part is
+ * @return The color
+ */
+static rgb box_console_syntax_color(
+    const Console *console,
+    box_console_syntax_t kind)
+{
+    const ConsoleSyntax *c = &console->syntax;
+    rgb result = c->extra;
+    switch (kind) {
+    case BoxSyntaxName: result = c->name; break;
+    case BoxSyntaxUnknown: result = c->unknown; break;
+    case BoxSyntaxEntity: result = c->entity; break;
+    case BoxSyntaxMissing: result = c->missing; break;
+    case BoxSyntaxNumber: result = c->number; break;
+    case BoxSyntaxString: result = c->string; break;
+    case BoxSyntaxBoolean: result = c->boolean; break;
+    case BoxSyntaxValue: result = c->value; break;
+    case BoxSyntaxExtra: result = c->extra; break;
+    }
+
+    return result;
+}
+
+/** Move a byte offset of a shown part of a line to the string box_console_hold_spaces makes of
+ * it, where every trailing space is a two byte no-break space.
+ *
+ * @param offset Byte of the part
+ * @param kept Bytes of the part before its trailing spaces
+ * @return Byte of the string
+ */
+static int32_t box_console_held(
+    int32_t offset,
+    int32_t kept)
+{
+    return offset > kept ? kept + 2 * (offset - kept) : offset;
+}
+
+/** Test whether the TextSpans of an element are the given spans.
+ *
+ * @param cur The TextSpans, NULL when the element has none
+ * @param spans The spans
+ * @param count Number of spans
+ * @return Whether they are the same
+ */
+static bool box_console_spans_same(
+    const TextSpans *cur,
+    const TextSpan *spans,
+    int32_t count)
+{
+    int32_t i, have = cur ? ecs_vec_count(&cur->spans) : 0;
+    bool result = have == count;
+    for (i = 0; result && i < count; i ++) {
+        const TextSpan *a = ecs_vec_get_t(&cur->spans, TextSpan, i);
+        const TextSpan *b = &spans[i];
+        result = a->start == b->start && a->end == b->end && a->color.r == b->color.r &&
+            a->color.g == b->color.g && a->color.b == b->color.b && a->color.a == b->color.a;
+    }
+
+    return result;
+}
+
+/** Set the TextSpans of a text element to the spans of the part of a line it shows, when they
+ * differ. Only the colors of the glyphs change, so the text is not laid out again.
+ *
+ * @param world The world
+ * @param e The element
+ * @param spans The box_console_span_t of the line, NULL for none
+ * @param value The part of the line the element shows
+ * @param from Byte of the line the part starts at
+ * @param size Bytes of the part
+ * @param console The Console singleton
+ */
+static void box_console_spans(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    const ecs_vec_t *spans,
+    const char *value,
+    int32_t from,
+    int32_t size,
+    const Console *console)
+{
+    int32_t i, kept = size, count = 0, total = spans ? ecs_vec_count(spans) : 0;
+    TextSpan *out = total ? ecs_os_malloc_n(TextSpan, total) : NULL;
+    const TextSpans *cur = ecs_get(world, e, TextSpans);
+    while (kept > 0 && value[kept - 1] == ' ') {
+        kept --;
+    }
+
+    for (i = 0; i < total; i ++) {
+        const box_console_span_t *s = ecs_vec_get_t(spans, box_console_span_t, i);
+        int32_t start = (s->start > from ? s->start : from) - from;
+        int32_t end = (s->end < from + size ? s->end : from + size) - from;
+        if (end > start) {
+            rgb c = box_console_syntax_color(console, s->kind);
+            out[count ++] = (TextSpan){
+                .start = box_console_held(start, kept),
+                .end = box_console_held(end, kept),
+                .color = { c.r, c.g, c.b, 255 }
+            };
+        }
+    }
+
+    if (box_console_spans_same(cur, out, count)) {
+        goto done;
+    }
+
+    if (!count) {
+        ecs_remove(world, e, TextSpans);
+        goto done;
+    }
+
+    TextSpans *ts = ecs_ensure(world, e, TextSpans);
+    ecs_vec_clear(&ts->spans);
+    for (i = 0; i < count; i ++) {
+        *ecs_vec_append_t(NULL, &ts->spans, TextSpan) = out[i];
+    }
+
+    ecs_modified(world, e, TextSpans);
+done:
+    ecs_os_free(out);
+}
+
 void box_console_ui_build(
     ecs_world_t *world,
     box_console_t *con)
@@ -345,6 +471,7 @@ static void box_console_ui_scrollback(
         const box_console_line_t *l = at >= 0 ?
             ecs_vec_get_t(&con->lines, box_console_line_t, at) : NULL;
         const char *text = l ? l->text : "";
+        int32_t size = (int32_t)strlen(text);
         rgb color = console->text;
         if (l && l->kind == BoxConsoleCommand) {
             color = console->command;
@@ -352,7 +479,8 @@ static void box_console_ui_scrollback(
             color = console->error;
         }
 
-        box_console_text(world, e, text, (int32_t)strlen(text), console, color);
+        box_console_text(world, e, text, size, console, color);
+        box_console_spans(world, e, l ? &l->spans : NULL, text, 0, size, console);
     }
 }
 
@@ -369,13 +497,22 @@ void box_console_ui_sync(
         con->refresh = true;
     }
 
+    if (con->refresh && (!con->colored || strcmp(con->colored, con->line))) {
+        box_console_syntax(world, con, con->line, &con->spans);
+        ecs_os_free(con->colored);
+        con->colored = ecs_os_strdup(con->line);
+    }
+
     if (con->refresh) {
         box_console_ui_scrollback(world, con, console);
         box_console_text(world, ui->prompt, prompt, (int32_t)strlen(prompt), console,
             console->input);
         box_console_text(world, ui->before, con->line, con->cursor, console, console->input);
+        box_console_spans(world, ui->before, &con->spans, con->line, 0, con->cursor, console);
         box_console_text(world, ui->after, &con->line[con->cursor],
             con->length - con->cursor, console, console->input);
+        box_console_spans(world, ui->after, &con->spans, &con->line[con->cursor],
+            con->cursor, con->length - con->cursor, console);
         con->refresh = false;
     }
 }

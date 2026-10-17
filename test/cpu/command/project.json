@@ -89,6 +89,25 @@
                 ]
             },
             {
+                "id": "Tokens",
+                "testcases": [
+                    "words",
+                    "whitespace",
+                    "empty_line",
+                    "quoted",
+                    "quoted_escape",
+                    "unterminated_quote",
+                    "unterminated_escape",
+                    "nested_brackets",
+                    "quote_inside_word",
+                    "rest_end",
+                    "more_than_max",
+                    "text_matches_dispatcher",
+                    "rest_matches_dispatcher",
+                    "path_params"
+                ]
+            },
+            {
                 "id": "Logs",
                 "testcases": [
                     "captures_error",

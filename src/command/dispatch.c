@@ -54,39 +54,113 @@ static int32_t box_dispatch_bracket(
     return result;
 }
 
-/** Read a double quoted token, removing the quotes and the backslash escapes.
+/** Test whether a character separates tokens.
  *
- * @param p The opening quote
- * @param out Receives the unquoted text, written in place
- * @return The character after the closing quote
+ * @param c The character
+ * @return Whether it is a space, tab or line break
  */
-static char* box_dispatch_quoted(
-    char *p,
-    char *out)
+static bool box_dispatch_space(
+    char c)
 {
-    p ++;
-    while (p[0] && p[0] != '"') {
-        if (p[0] == '\\' && p[1]) {
-            p ++;
-        }
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+}
 
-        out[0] = p[0];
-        out ++;
-        p ++;
+/** Find the next token of a line.
+ *
+ * Double quotes group a token, a backslash escapes the next character in it and a quote that
+ * is not closed runs to the end of the line. Brackets keep their contents together.
+ *
+ * @param line The command line
+ * @param at Byte to search from
+ * @param out Receives the range of the token
+ * @return Whether there is a token
+ */
+static bool box_dispatch_scan(
+    const char *line,
+    int32_t at,
+    box_command_token_t *out)
+{
+    int32_t depth = 0;
+    while (box_dispatch_space(line[at])) {
+        at ++;
     }
 
-    if (p[0]) {
-        p ++;
+    out->start = at;
+    out->quoted = line[at] == '"';
+    if (out->quoted) {
+        at ++;
+        while (line[at] && line[at] != '"') {
+            at += line[at] == '\\' && line[at + 1] ? 2 : 1;
+        }
+
+        at += line[at] != '\0';
+    } else {
+        while (line[at] && (depth > 0 || !box_dispatch_space(line[at]))) {
+            depth += box_dispatch_bracket(line[at]);
+            at ++;
+        }
+    }
+
+    out->end = at;
+
+    return out->end > out->start;
+}
+
+int32_t box_command_tokens(
+    const char *line,
+    box_command_token_t *tokens,
+    int32_t max)
+{
+    box_command_token_t t;
+    int32_t result = 0, at = 0;
+    while (box_dispatch_scan(line, at, &t)) {
+        if (result < max) {
+            tokens[result] = t;
+        }
+
+        result ++;
+        at = t.end;
+    }
+
+    return result;
+}
+
+/** Write the unquoted text of a token, removing the quotes and the backslash escapes.
+ *
+ * @param line The command line
+ * @param t The token
+ * @param out Receives the text and a terminator, at least t->end - t->start + 1 bytes
+ */
+static void box_dispatch_unquote(
+    const char *line,
+    const box_command_token_t *t,
+    char *out)
+{
+    int32_t at = t->start + t->quoted;
+    while (at < t->end && !(t->quoted && line[at] == '"')) {
+        if (t->quoted && line[at] == '\\' && at + 1 < t->end) {
+            at ++;
+        }
+
+        out[0] = line[at];
+        out ++;
+        at ++;
     }
 
     out[0] = '\0';
-
-    return p;
 }
 
-/** Split a line into whitespace separated tokens.
- *
- * Double quotes group a token, brackets keep their contents together.
+char* box_command_token_text(
+    const char *line,
+    const box_command_token_t *t)
+{
+    char *result = ecs_os_malloc(t->end - t->start + 1);
+    box_dispatch_unquote(line, t, result);
+
+    return result;
+}
+
+/** Split a line into its tokens, unquoted, as box_command_tokens finds them.
  *
  * @param line The command line
  * @param out Receives the tokens
@@ -95,37 +169,29 @@ static void box_dispatch_split(
     const char *line,
     box_command_line_t *out)
 {
-    char *p = out->buffer = ecs_os_strdup(line);
+    box_command_token_t t;
+    int32_t at = 0;
+    out->buffer = ecs_os_strdup(line);
     out->count = 0;
-    while (out->count < BOX_DISPATCH_TOKENS) {
-        while (p[0] == ' ' || p[0] == '\t' || p[0] == '\n' || p[0] == '\r') {
-            p ++;
-        }
-
-        if (!p[0]) {
-            break;
-        }
-
-        char *token = p;
-        out->offsets[out->count] = (int32_t)(p - out->buffer);
+    while (out->count < BOX_DISPATCH_TOKENS && box_dispatch_scan(line, at, &t)) {
+        char *token = &out->buffer[t.start];
+        box_dispatch_unquote(line, &t, token);
+        out->offsets[out->count] = t.start;
         out->tokens[out->count] = token;
         out->count ++;
-        if (p[0] == '"') {
-            p = box_dispatch_quoted(p, token);
-            continue;
-        }
-
-        int32_t depth = 0;
-        while (p[0] && (depth > 0 || !strchr(" \t\n\r", p[0]))) {
-            depth += box_dispatch_bracket(p[0]);
-            p ++;
-        }
-
-        if (p[0]) {
-            p[0] = '\0';
-            p ++;
-        }
+        at = t.end;
     }
+}
+
+int32_t box_command_rest_end(
+    const char *line)
+{
+    int32_t result = ecs_os_strlen(line);
+    while (result && box_dispatch_space(line[result - 1])) {
+        result --;
+    }
+
+    return result;
 }
 
 /** Copy the remainder of a line from a token on, without trailing whitespace.
@@ -138,14 +204,10 @@ static char* box_dispatch_rest(
     const char *line,
     int32_t offset)
 {
-    const char *start = line + offset;
-    int32_t len = ecs_os_strlen(start);
-    while (len && strchr(" \t\n\r", start[len - 1])) {
-        len --;
-    }
-
+    int32_t len = box_command_rest_end(line) - offset;
+    len = len > 0 ? len : 0;
     char *result = ecs_os_malloc(len + 1);
-    ecs_os_memcpy(result, start, len);
+    ecs_os_memcpy(result, line + offset, len);
     result[len] = '\0';
 
     return result;

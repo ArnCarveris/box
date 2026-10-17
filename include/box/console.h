@@ -7,6 +7,7 @@
  *
  * The console runs cls itself, so it never reaches the session: cls empties the scrollback and
  * Ctrl+L does the same without touching the input line. help in the console lists cls too.
+ * Command lines are colored in the console only (ConsoleSyntax), never in sessions or logs.
  */
 
 #ifndef BOX_CONSOLE_H
@@ -39,6 +40,26 @@ extern "C" {
 /** Path of the view of the console content while it is open */
 #define BOX_CONSOLE_VIEW "console.view"
 
+/** Colors of the parts of a command line in the console, as Console.syntax.
+ *
+ * Lines are split as the dispatcher splits them: the first token is the command name, the
+ * others take the color of the type of their parameter. Entities resolve from the session cwd.
+ *
+ * The input line is colored as it is typed; a line that ran keeps the colors it had then.
+ * Output keeps Console.text and Console.error, other parts Console.input or Console.command.
+ */
+ECS_STRUCT(ConsoleSyntax, {
+    rgb name;       /**< Name of a known command or console command */
+    rgb unknown;    /**< Name of no command */
+    rgb entity;     /**< Entity argument that resolves from the cwd of the session */
+    rgb missing;    /**< Entity argument that does not resolve */
+    rgb number;     /**< Argument of an i32 or f64 parameter, a number in a value expression */
+    rgb string;     /**< Quoted argument, a string in a value expression, a rest parameter */
+    rgb boolean;    /**< Argument of a bool parameter, true or false in a value expression */
+    rgb value;      /**< Value expression in brackets, {...} or [...], of a string parameter */
+    rgb extra;      /**< Argument beyond the parameters of the command */
+});
+
 /** The console singleton: whether it is open and how it looks.
  *
  * The panel is a layout: a root that fills the surface in points holds the panel, which takes
@@ -63,6 +84,7 @@ ECS_STRUCT(Console, {
     rgb command;         /**< Color of a line that ran, echoed after the prompt */
     rgb error;           /**< Color of the output of a failed command */
     rgb input;           /**< Color of the input line and its cursor */
+    ConsoleSyntax syntax;/**< Colors of the parts of command lines, see ConsoleSyntax */
 });
 
 /** Register the box.console module.

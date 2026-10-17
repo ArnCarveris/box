@@ -164,6 +164,18 @@ static bool box_shell_valid_name(
     return result;
 }
 
+int box_shell_lookup(
+    const ecs_world_t *world,
+    ecs_entity_t cwd,
+    const char *path,
+    ecs_entity_t *out)
+{
+    ecs_entity_t scope = 0;
+    const char *rest = box_shell_prefix(world, cwd, path, &scope);
+
+    return box_shell_find(world, scope, rest, out);
+}
+
 int box_shell_resolve(
     const ecs_function_ctx_t *ctx,
     ecs_value_t *result,
@@ -174,10 +186,8 @@ int box_shell_resolve(
 {
     ecs_world_t *world = ctx->world;
     const char *p = path ? path : ".";
-    ecs_entity_t scope = 0;
-    const char *rest = box_shell_prefix(world, box_terminal_cwd(world, session), p, &scope);
     int ret = -1;
-    if (box_shell_find(world, scope, rest, out)) {
+    if (box_shell_lookup(world, box_terminal_cwd(world, session), p, out)) {
         box_command_error(ctx, result, "no entity '%s'", p);
     } else if (access != BoxShellScope && !out[0]) {
         box_command_error(ctx, result, "'%s' is the root", p);
@@ -619,14 +629,18 @@ void box_shell_init(
     box_command_register(world, &(box_command_desc_t){
         .name = "cd",
         .brief = "Change the current entity, the root when omitted",
-        .params = {{ .name = "path", .type = ecs_id(ecs_string_t), .optional = true }},
+        .params = {{
+            .name = "path", .type = ecs_id(ecs_string_t), .optional = true, .path = true
+        }},
         .callback = box_shell_cd
     });
 
     box_command_register(world, &(box_command_desc_t){
         .name = "ls",
         .brief = "List the children of the current entity or a path",
-        .params = {{ .name = "path", .type = ecs_id(ecs_string_t), .optional = true }},
+        .params = {{
+            .name = "path", .type = ecs_id(ecs_string_t), .optional = true, .path = true
+        }},
         .callback = box_shell_ls
     });
 
@@ -640,7 +654,7 @@ void box_shell_init(
     box_command_register(world, &(box_command_desc_t){
         .name = "rm",
         .brief = "Delete an entity and its children",
-        .params = {{ .name = "path", .type = ecs_id(ecs_string_t) }},
+        .params = {{ .name = "path", .type = ecs_id(ecs_string_t), .path = true }},
         .callback = box_shell_rm
     });
 
@@ -648,7 +662,7 @@ void box_shell_init(
         .name = "mv",
         .brief = "Rename an entity, or move it into an existing entity",
         .params = {
-            { .name = "from", .type = ecs_id(ecs_string_t) },
+            { .name = "from", .type = ecs_id(ecs_string_t), .path = true },
             { .name = "to", .type = ecs_id(ecs_string_t) }
         },
         .callback = box_shell_mv

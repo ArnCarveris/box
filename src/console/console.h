@@ -24,10 +24,31 @@ typedef enum box_console_kind_t {
     BoxConsoleError     /**< Output of a failed command */
 } box_console_kind_t;
 
+/** What a part of a command line is, which picks its color from Console.syntax */
+typedef enum box_console_syntax_t {
+    BoxSyntaxName,      /**< Name of a known command or console command */
+    BoxSyntaxUnknown,   /**< Name of no command */
+    BoxSyntaxEntity,    /**< Entity argument that resolves */
+    BoxSyntaxMissing,   /**< Entity argument that does not resolve */
+    BoxSyntaxNumber,    /**< Number argument or number in a value expression */
+    BoxSyntaxString,    /**< Quoted argument, string in a value expression, rest parameter */
+    BoxSyntaxBoolean,   /**< Bool argument or true or false in a value expression */
+    BoxSyntaxValue,     /**< Value expression in brackets */
+    BoxSyntaxExtra      /**< Argument beyond the parameters of the command */
+} box_console_syntax_t;
+
+/** A colored byte range of a command line */
+typedef struct box_console_span_t {
+    int32_t start;              /**< First byte */
+    int32_t end;                /**< Byte after the range */
+    box_console_syntax_t kind;  /**< What the range is */
+} box_console_span_t;
+
 /** One line of the scrollback */
 typedef struct box_console_line_t {
     char *text;                 /**< The line without its newline */
     box_console_kind_t kind;    /**< What the line shows */
+    ecs_vec_t spans;            /**< box_console_span_t of a line that ran, in bytes of text */
 } box_console_line_t;
 
 /** Entities of the console content, created the first time it opens */
@@ -65,6 +86,8 @@ typedef struct box_console_t {
     char *line;                 /**< The input line, UTF-8 */
     int32_t length;             /**< Bytes of the input line */
     int32_t cursor;             /**< Byte of the input line the cursor sits before */
+    ecs_vec_t spans;            /**< box_console_span_t of the input line */
+    char *colored;              /**< The input line the spans were found for, NULL for none */
     ecs_vec_t typed;            /**< char of the text typed since the last update */
     bool pressed[BOX_KEY_COUNT];/**< Keys pressed since the last update */
     float wheel;                /**< Wheel movement since the last update */
@@ -120,6 +143,30 @@ char* box_console_exec(
     box_console_t *con,
     const char *line,
     bool *error);
+
+/** Test whether a word is the name of a console command.
+ *
+ * @param word The word
+ * @param len Length of the word
+ * @return Whether the console runs the command itself
+ */
+bool box_console_is_command(
+    const char *word,
+    int32_t len);
+
+/** Find the colored parts of a command line, from the tokens the dispatcher splits it into and
+ * the parameters of its command. Entity arguments resolve from the cwd of the console session.
+ *
+ * @param world The world
+ * @param con The console state
+ * @param line The command line
+ * @param spans Receives the box_console_span_t of the line, later ones over earlier ones
+ */
+void box_console_syntax(
+    ecs_world_t *world,
+    box_console_t *con,
+    const char *line,
+    ecs_vec_t *spans);
 
 /** Empty the scrollback and reset the scroll position, keeping the input line and history.
  *

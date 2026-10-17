@@ -179,6 +179,29 @@
                 ]
             },
             {
+                "id": "ConsoleSyntax",
+                "testcases": [
+                    "command_name_known",
+                    "command_name_unknown",
+                    "console_command",
+                    "entity_found_and_missing",
+                    "entity_param_type",
+                    "type_from_parameters",
+                    "numbers_and_booleans",
+                    "strings",
+                    "value_expression",
+                    "extra_arguments",
+                    "rest_parameter",
+                    "updates_while_typing",
+                    "cursor_split_and_history",
+                    "echoed_keeps_colors",
+                    "output_lines_plain",
+                    "color_change_no_relayout",
+                    "session_plain_text",
+                    "capture"
+                ]
+            },
+            {
                 "id": "PickingCost",
                 "testcases": [
                     "moves_in_one_frame_hover_last",

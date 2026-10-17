@@ -724,7 +724,7 @@ void box_cmd_render_init(
     box_command_register(world, &(box_command_desc_t){
         .name = "render",
         .brief = "Write a PNG of an entity, prefab or template on its own to resources next frame",
-        .params = {{ .name = "subject", .type = ecs_id(ecs_string_t) }},
+        .params = {{ .name = "subject", .type = ecs_id(ecs_string_t), .path = true }},
         .callback = box_cmd_render,
         .ctx = state
     });

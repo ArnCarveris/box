@@ -202,26 +202,70 @@ static void box_console_history_add(
     con->draft = NULL;
 }
 
+/** Free the text and spans of a scrollback line.
+ *
+ * @param l The line
+ */
+static void box_console_line_fini(
+    box_console_line_t *l)
+{
+    ecs_os_free(l->text);
+    ecs_vec_fini_t(NULL, &l->spans, box_console_span_t);
+}
+
+/** Give a scrollback line the part of the spans of a text that falls on it.
+ *
+ * @param l The line
+ * @param spans The box_console_span_t of the text, NULL for none
+ * @param from Byte of the text the line starts at
+ * @param size Bytes of the text on the line
+ * @param shift Bytes in front of that part on the line, the prompt
+ */
+static void box_console_line_spans(
+    box_console_line_t *l,
+    const ecs_vec_t *spans,
+    int32_t from,
+    int32_t size,
+    int32_t shift)
+{
+    int32_t i, count = spans ? ecs_vec_count(spans) : 0;
+    for (i = 0; i < count; i ++) {
+        box_console_span_t s = *ecs_vec_get_t(spans, box_console_span_t, i);
+        s.start = s.start > from ? s.start : from;
+        s.end = s.end < from + size ? s.end : from + size;
+        if (s.end > s.start) {
+            s.start += shift - from;
+            s.end += shift - from;
+            *ecs_vec_append_t(NULL, &l->spans, box_console_span_t) = s;
+        }
+    }
+}
+
 /** Append text to the scrollback, one line per newline, without a trailing empty line.
  *
  * @param con The console state
  * @param prefix Text in front of the first line, NULL for none
  * @param text The text
  * @param kind What the lines show
+ * @param spans The box_console_span_t of the text the lines keep, NULL for none
  */
 static void box_console_append(
     box_console_t *con,
     const char *prefix,
     const char *text,
-    box_console_kind_t kind)
+    box_console_kind_t kind,
+    const ecs_vec_t *spans)
 {
     const char *p = text;
     bool first = true;
     while (p[0] || first) {
         const char *nl = strchr(p, '\n');
         int32_t size = nl ? (int32_t)(nl - p) : (int32_t)strlen(p);
+        int32_t shift = first && prefix ? (int32_t)strlen(prefix) : 0;
         box_console_line_t *l = ecs_vec_append_t(NULL, &con->lines, box_console_line_t);
         l->kind = kind;
+        ecs_vec_init_t(NULL, &l->spans, box_console_span_t, 0);
+        box_console_line_spans(l, spans, (int32_t)(p - text), size, shift);
         if (first && prefix) {
             l->text = flecs_asprintf("%s%.*s", prefix, size, p);
         } else {
@@ -254,7 +298,7 @@ static void box_console_trim(
     }
 
     for (i = 0; i < drop; i ++) {
-        ecs_os_free(lines[i].text);
+        box_console_line_fini(&lines[i]);
     }
 
     memmove(lines, &lines[drop], (size_t)keep * sizeof(box_console_line_t));
@@ -384,6 +428,13 @@ static const box_console_command_t* box_console_command(
     return result;
 }
 
+bool box_console_is_command(
+    const char *word,
+    int32_t len)
+{
+    return box_console_command(word, len) != NULL;
+}
+
 /** Append the console group of help: a header and the console commands with their briefs.
  *
  * @param buf The buffer
@@ -420,6 +471,9 @@ char* box_console_exec(
     const box_console_command_t *cmd, *help_cmd = NULL;
     bool failed = false, help, help_group;
     char *result = NULL;
+    ecs_vec_t spans;
+    ecs_vec_init_t(NULL, &spans, box_console_span_t, 0);
+    box_console_syntax(world, con, line, &spans);
     word = box_console_word(&p, &len);
     topic = box_console_word(&p, &topic_len);
     for (args = topic != NULL; box_console_word(&p, &skip); args ++) { }
@@ -446,13 +500,15 @@ char* box_console_exec(
     }
 
     box_console_history_add(con, line);
-    box_console_append(con, BOX_CONSOLE_PROMPT, line, BoxConsoleCommand);
+    box_console_append(con, BOX_CONSOLE_PROMPT, line, BoxConsoleCommand, &spans);
+    ecs_vec_fini_t(NULL, &spans, box_console_span_t);
     if (cmd) {
         result = cmd->run(world, con, args, &failed);
     }
 
     if (result[0]) {
-        box_console_append(con, NULL, result, failed ? BoxConsoleError : BoxConsoleOutput);
+        box_console_append(con, NULL, result, failed ? BoxConsoleError : BoxConsoleOutput,
+            NULL);
     }
 
     box_console_trim(world, con);
@@ -470,7 +526,7 @@ void box_console_clear(
 {
     int32_t i;
     for (i = 0; i < ecs_vec_count(&con->lines); i ++) {
-        ecs_os_free(ecs_vec_get_t(&con->lines, box_console_line_t, i)->text);
+        box_console_line_fini(ecs_vec_get_t(&con->lines, box_console_line_t, i));
     }
 
     ecs_vec_clear(&con->lines);
@@ -575,7 +631,7 @@ void box_console_edit_fini(
 {
     int32_t i;
     for (i = 0; i < ecs_vec_count(&con->lines); i ++) {
-        ecs_os_free(ecs_vec_get_t(&con->lines, box_console_line_t, i)->text);
+        box_console_line_fini(ecs_vec_get_t(&con->lines, box_console_line_t, i));
     }
 
     for (i = 0; i < ecs_vec_count(&con->history); i ++) {
@@ -586,6 +642,8 @@ void box_console_edit_fini(
     ecs_vec_fini_t(NULL, &con->history, char*);
     ecs_vec_fini_t(NULL, &con->ui.lines, ecs_entity_t);
     ecs_vec_fini_t(NULL, &con->typed, char);
+    ecs_vec_fini_t(NULL, &con->spans, box_console_span_t);
+    ecs_os_free(con->colored);
     ecs_os_free(con->draft);
     ecs_os_free(con->line);
 }
