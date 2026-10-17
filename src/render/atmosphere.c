@@ -303,6 +303,10 @@ static void box_atmos_view(
     out->night[0] = box_atmos_extract_linear(value->night_tint.r) * scale;
     out->night[1] = box_atmos_extract_linear(value->night_tint.g) * scale;
     out->night[2] = box_atmos_extract_linear(value->night_tint.b) * scale;
+    float radius = glm_rad(glm_min(value->sun_radius, 90.0f));
+    out->sun_disk[0] = cosf(radius);
+    out->sun_disk[1] = sinf(radius);
+    out->sun_disk[2] = glm_max(value->sun_disk_intensity, 0.0f);
     out->altitude = glm_max(value->ground_altitude +
         (camera_y - value->sea_level) / value->units_per_km, (float)BOX_ATMOS_PLANET_OFFSET);
     out->mie_anisotropy = value->mie.anisotropy;

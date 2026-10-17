@@ -595,7 +595,11 @@
                     "zenith_bluer_and_darker_than_horizon",
                     "view_without_atmosphere_shows_clear_color",
                     "far_box_approaches_horizon_color",
-                    "sky_does_not_draw_over_geometry"
+                    "sky_does_not_draw_over_geometry",
+                    "sun_brighter_than_sky_beside_disk",
+                    "sun_disk_intensity_zero_removes_disk",
+                    "sun_below_horizon_draws_no_disk",
+                    "disk_center_brighter_than_limb"
                 ]
             }
         ]

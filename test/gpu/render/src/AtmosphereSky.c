@@ -254,6 +254,8 @@ void AtmosphereSky_zenith_bluer_and_darker_than_horizon(void) {
     // atmosphere/sky
     ecs_world_t *world = world_new();
     ecs_entity_t scene = scene_new(world, 1000, 90);
+    ecs_get_mut(world, scene, Atmosphere)->sun_disk_intensity = 0;
+    ecs_modified(world, scene, Atmosphere);
     ecs_entity_t camera = camera_new(world, scene, 0, 90, 45);
     view_new(world, camera, true, true);
     unsigned char *pixels = render(world);
@@ -330,4 +332,97 @@ void AtmosphereSky_sky_does_not_draw_over_geometry(void) {
     test_assert(difference(corner_sky, corner_plain) > 8);
     stbi_image_free(images[0]);
     stbi_image_free(images[1]);
+}
+
+/** Render a lit view that looks at the white sun of a scene, the sun at the center of the
+ * image.
+ *
+ * @param elevation Elevation of the sun and pitch of the camera in degrees
+ * @param fov Vertical field of view in degrees
+ * @param radius Angular radius of the sun disk in degrees
+ * @param intensity Atmosphere.sun_disk_intensity
+ * @return The pixels, the sun at (WIDTH / 2, HEIGHT / 2)
+ */
+static unsigned char* render_sun(
+    float elevation,
+    float fov,
+    float radius,
+    float intensity)
+{
+    ecs_world_t *world = world_new();
+    ecs_entity_t scene = scene_new(world, 1000, elevation);
+    Atmosphere *a = ecs_get_mut(world, scene, Atmosphere);
+    a->sun_radius = radius;
+    a->sun_disk_intensity = intensity;
+    ecs_modified(world, scene, Atmosphere);
+    ecs_entity_t camera = camera_new(world, scene, 0, fov, elevation);
+    view_new(world, camera, true, true);
+
+    return render(world);
+}
+
+/** Get the sum of the channels of a color.
+ *
+ * @param c The color
+ * @return The sum
+ */
+static int32_t brightness(
+    const int32_t c[3])
+{
+    return c[0] + c[1] + c[2];
+}
+
+void AtmosphereSky_sun_brighter_than_sky_beside_disk(void) {
+    // atmosphere/sun_disk
+    unsigned char *pixels = render_sun(20, 4, 0.266f, 1);
+    int32_t sun[3], beside[3];
+    pixel(pixels, WIDTH / 2, HEIGHT / 2, sun);
+    pixel(pixels, WIDTH / 2 + 12, HEIGHT / 2, beside);
+    test_assert(brightness(sun) > brightness(beside) + 60);
+    test_assert(sun[0] > beside[0] && sun[1] > beside[1] && sun[2] >= beside[2]);
+    stbi_image_free(pixels);
+}
+
+void AtmosphereSky_sun_disk_intensity_zero_removes_disk(void) {
+    // atmosphere/sun_disk
+    unsigned char *with = render_sun(20, 4, 0.266f, 1);
+    unsigned char *without = render_sun(20, 4, 0.266f, 0);
+    int32_t sun_with[3], sun_without[3], beside_with[3], beside_without[3];
+    pixel(with, WIDTH / 2, HEIGHT / 2, sun_with);
+    pixel(without, WIDTH / 2, HEIGHT / 2, sun_without);
+    pixel(with, WIDTH / 2 + 12, HEIGHT / 2, beside_with);
+    pixel(without, WIDTH / 2 + 12, HEIGHT / 2, beside_without);
+    test_assert(difference(sun_with, sun_without) > 20);
+    test_assert(difference(sun_without, beside_without) <= 6);
+    test_assert(difference(beside_with, beside_without) <= 1);
+    stbi_image_free(with);
+    stbi_image_free(without);
+}
+
+void AtmosphereSky_sun_below_horizon_draws_no_disk(void) {
+    // atmosphere/sun_disk
+    unsigned char *with = render_sun(-5, 10, 2, 1);
+    unsigned char *without = render_sun(-5, 10, 2, 0);
+    int32_t i, c;
+    for (i = 0; i < WIDTH * HEIGHT; i ++) {
+        for (c = 0; c < 3; c ++) {
+            test_assert(abs(with[i * 4 + c] - without[i * 4 + c]) <= 1);
+        }
+    }
+
+    stbi_image_free(with);
+    stbi_image_free(without);
+}
+
+void AtmosphereSky_disk_center_brighter_than_limb(void) {
+    // atmosphere/sun_disk
+    unsigned char *pixels = render_sun(20, 10, 2, 0.3f);
+    int32_t center[3], limb[3], beside[3];
+    pixel(pixels, WIDTH / 2, HEIGHT / 2, center);
+    pixel(pixels, WIDTH / 2 + 8, HEIGHT / 2, limb);
+    pixel(pixels, WIDTH / 2 + 14, HEIGHT / 2, beside);
+    test_assert(center[0] < 255 && center[1] < 255 && center[2] < 255);
+    test_assert(brightness(limb) > brightness(beside) + 20);
+    test_assert(brightness(center) > brightness(limb) + 15);
+    stbi_image_free(pixels);
 }

@@ -1,0 +1,36 @@
+using box.transform
+using box.camera
+using box.view
+using box.material
+using box.light
+using box.effects
+using box.atmosphere
+
+$ {
+  Atmosphere: {units_per_km: 100}
+}
+
+bloom {
+  Bloom: {intensity: 0.35, threshold: 1, threshold_softness: 0.5}
+}
+
+tonemap {
+  Tonemap: {}
+}
+
+// Looks at the sun 20 degrees up; the disk is 0.53 degrees across, 7 pixels of a 360 high frame
+camera {
+  Position: {0, 2, 0}
+  Rotation: {0.34907, 0, 0}
+  Camera: {fov: 28}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {0, 0, 0, 255}}, effects: [{effect: bloom}, {effect: tonemap}]}
+}
+
+sun {
+  Rotation: {0.34907, 0, 0}
+  DirectionalLight: {intensity: 6}
+  Rgb: {255, 255, 255}
+}

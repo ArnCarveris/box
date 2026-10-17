@@ -206,6 +206,8 @@ typedef struct box_render_view_atmos_t {
     float sun_color[4];     /**< Top of atmosphere irradiance of the sun: its light color times
                              *   intensity times pi before the transmittance, 0 without one */
     float night[4];         /**< Linear night_tint times night_intensity */
+    float sun_disk[4];      /**< Cosine and sine of the angular radius of the sun disk and its
+                             *   sun_disk_intensity, w unused */
     float altitude;         /**< Altitude of the camera above the ground in km, at least 1 m */
     float mie_anisotropy;   /**< Mie phase asymmetry g */
     float aerial_distance;  /**< Far end of the aerial perspective volume in km */

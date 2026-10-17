@@ -22,7 +22,10 @@
 //
 // sky_vs and sky_fs draw the sky of a view in its forward pass: a fullscreen triangle at the far
 // plane (reversed Z depth 0) that samples the sky view LUT in the direction of its pixel, the
-// horizon row for a direction below the horizon.
+// horizon row for a direction below the horizon. Pixels near the sun that do not look at the
+// ground add the sun disk: the transmittance from the camera toward the sun times the sun's top
+// of atmosphere radiance and the disk intensity, limb darkened with the linear law and with an
+// edge one pixel wide. The target clips it in a view without effects.
 #include "include/atmosphere_medium.h"
 
 struct Atmosphere {
@@ -46,6 +49,8 @@ struct Atmosphere {
     night: vec4f,
     // camera altitude, Mie anisotropy, aerial distance, aerial intensity, per view
     view: vec4f,
+    // cosine and sine of the angular radius of the sun disk, disk intensity, per view
+    sun_disk: vec4f,
     // clip to world space of the view
     inv_view_proj: mat4x4f,
 };
@@ -77,6 +82,8 @@ const MULTI_DIRECTIONS: i32 = 8;
 const MULTI_STEPS: i32 = 20;
 const SKY_STEPS: i32 = 30;
 const AERIAL_STEPS: i32 = 6;
+// Coefficient u of the linear limb darkening law 1 - u (1 - mu)
+const LIMB_DARKENING: f32 = 0.6;
 
 fn bottom_radius() -> f32 {
     return u.radii.x;
@@ -419,9 +426,40 @@ fn direction_to_sky_uv(rd: vec3f, r: f32) -> vec2f {
     return vec2f(clamp(u_azimuth, 0.0, 1.0), clamp(v, 0.0, 1.0));
 }
 
+// Radiance of the sun disk in a direction seen from a radius, sun_cos and sin_sun the cosine and
+// sine of the angle between the direction and the sun, aa_w the width of the anti-aliased edge
+// in that cosine.
+fn sun_disk(rd: vec3f, r: f32, sun_cos: f32, sin_sun: f32, aa_w: f32) -> vec3f {
+    let sun = u.sun.xyz;
+    let disk_cos = u.sun_disk.x;
+    let sin_r = u.sun_disk.y;
+    var result = vec3f(0.0);
+    if (u.sun_disk.z > 0.0 && sun_cos > disk_cos - aa_w) {
+        let ground = ray_sphere(vec3f(0.0, r, 0.0), rd, bottom_radius());
+        if (ground.y < 0.0) {
+            let t_sun = sample_transmittance(r, clamp(sun.y, -1.0, 1.0));
+            // The sine of the angle from the center, exact near it where the cosine is not
+            let s = min(sin_sun / max(sin_r, 1e-6), 1.0);
+            let mu = sqrt(max(0.0, 1.0 - s * s));
+            let limb = 1.0 - LIMB_DARKENING * (1.0 - mu);
+            let aa = smoothstep(disk_cos - aa_w, disk_cos + aa_w, sun_cos);
+            result = t_sun * u.sun_color.rgb / PI * u.sun_disk.z * limb * aa;
+        }
+    }
+
+    return result;
+}
+
 @fragment fn sky_fs(f: SkyOut) -> @location(0) vec4f {
     let rd = normalize(unproject(f.ndc, 0.5) - unproject(f.ndc, 1.0));
-    var uv = direction_to_sky_uv(rd, camera_radius());
+    let r = camera_radius();
+    let sun_cos = dot(rd, u.sun.xyz);
+    // Derivatives in uniform control flow, before any branch. The cosine changes with the sine
+    // of the angle from the sun, so outside the disk the width is scaled to the one at its edge.
+    let sin_sun = length(cross(rd, u.sun.xyz));
+    let aa_w = max(fwidth(sun_cos) * min(1.0, u.sun_disk.y / max(sin_sun, 1e-6)), 1e-6);
+    var uv = direction_to_sky_uv(rd, r);
     uv.y = min(uv.y, 0.5);
-    return vec4f(textureSampleLevel(sky_lut, lut_sampler, uv, 0.0).rgb, 1.0);
+    let sky = textureSampleLevel(sky_lut, lut_sampler, uv, 0.0).rgb;
+    return vec4f(sky + sun_disk(rd, r, sun_cos, sin_sun, aa_w), 1.0);
 }

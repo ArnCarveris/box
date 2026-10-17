@@ -167,7 +167,8 @@
                 "id": "AtmosphereSky",
                 "testcases": [
                     "view_atmosphere_defaults",
-                    "packet_view_follows_atmosphere"
+                    "packet_view_follows_atmosphere",
+                    "packet_view_sun_disk"
                 ]
             }
         ]

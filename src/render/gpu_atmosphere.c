@@ -63,6 +63,7 @@ typedef struct box_gpu_atmos_uniforms_t {
     float sun_color[4];             /**< Top of atmosphere irradiance of the sun */
     float night[4];                 /**< Night floor of the sky view */
     float view[4];                  /**< Altitude, Mie anisotropy, aerial distance and intensity */
+    float sun_disk[4];              /**< Cosine and sine of the sun radius, disk intensity */
     mat4 inv_view_proj;             /**< Clip to world space of the view */
 } box_gpu_atmos_uniforms_t;
 
@@ -244,7 +245,8 @@ static void box_gpu_atmos_layout(
 }
 
 /** Create the bind group layout and pipeline layout of the sky draw: the uniforms of the view
- * at 0, the sampler at 2 and the sky view LUT at 4, as the aerial perspective pass binds them.
+ * at 0, the transmittance LUT of the sun disk at 1, the sampler at 2 and the sky view LUT at 4,
+ * as the aerial perspective pass binds them.
  *
  * @param gpu The backend
  * @param a The atmosphere state
@@ -254,9 +256,13 @@ static void box_gpu_atmos_sky_layout(
     box_gpu_atmos_t *a)
 {
     WGPUShaderStage frag = WGPUShaderStage_Fragment;
-    WGPUBindGroupLayoutEntry entries[3] = {
+    WGPUBindGroupLayoutEntry entries[4] = {
         { .binding = 0, .visibility = frag, .buffer = { .type = WGPUBufferBindingType_Uniform,
             .minBindingSize = sizeof(box_gpu_atmos_uniforms_t) } },
+        { .binding = 1, .visibility = frag, .texture = {
+            .sampleType = WGPUTextureSampleType_Float,
+            .viewDimension = WGPUTextureViewDimension_2D
+        } },
         { .binding = 2, .visibility = frag,
             .sampler = { .type = WGPUSamplerBindingType_Filtering } },
         { .binding = 4, .visibility = frag, .texture = {
@@ -265,7 +271,7 @@ static void box_gpu_atmos_sky_layout(
         } }
     };
     a->sky_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
-        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 3, .entries = entries });
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 4, .entries = entries });
     a->sky_pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
         &(WGPUPipelineLayoutDescriptor){ .bindGroupLayoutCount = 1,
             .bindGroupLayouts = &a->sky_layout });
@@ -930,6 +936,7 @@ void box_gpu_atmosphere_view(
     ecs_os_memcpy_n(u.sun, in->sun, float, 4);
     ecs_os_memcpy_n(u.sun_color, in->sun_color, float, 4);
     ecs_os_memcpy_n(u.night, in->night, float, 4);
+    ecs_os_memcpy_n(u.sun_disk, in->sun_disk, float, 4);
     u.view[0] = in->altitude;
     u.view[1] = in->mie_anisotropy;
     u.view[2] = in->aerial_distance;
@@ -1079,23 +1086,23 @@ bool box_gpu_atmosphere_draw_sky(
     const box_render_view_t *v)
 {
     box_gpu_atmos_t *a = gpu->atmosphere;
-    box_gpu_atmos_view_t *s = box_gpu_atmosphere_sky(gpu, v)
-        ? box_gpu_atmos_view_find(a, t, v)
-        : NULL;
+    box_gpu_atmos_luts_t *l = v->atmos.sky ? box_gpu_atmos_luts_ready(a, v) : NULL;
+    box_gpu_atmos_view_t *s = l ? box_gpu_atmos_view_find(a, t, v) : NULL;
     WGPURenderPipeline pipeline = s ? box_gpu_atmos_sky_pipeline(gpu, a, format) : NULL;
     bool result = pipeline != NULL;
     if (!result) {
         goto done;
     }
 
-    WGPUBindGroupEntry entries[3] = {
+    WGPUBindGroupEntry entries[4] = {
         { .binding = 0, .buffer = s->uniforms, .size = sizeof(box_gpu_atmos_uniforms_t) },
+        { .binding = 1, .textureView = l->transmittance_view },
         { .binding = 2, .sampler = a->sampler },
         { .binding = 4, .textureView = s->sky_view }
     };
     WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
         .layout = a->sky_layout,
-        .entryCount = 3,
+        .entryCount = 4,
         .entries = entries
     });
     wgpuRenderPassEncoderSetPipeline(pass, pipeline);

@@ -6,6 +6,7 @@
 
 #include <box.h>
 #include <bake_test.h>
+#include <math.h>
 #include "render.h"
 
 /** Create a scene root with the default Atmosphere and a view whose camera is in it.
@@ -109,6 +110,34 @@ void AtmosphereSky_packet_view_follows_atmosphere(void) {
     v = frame_view(world, null);
     test_uint(v->atmosphere, 0);
     test_bool(v->atmos.sky, false);
+
+    ecs_fini(world);
+}
+
+void AtmosphereSky_packet_view_sun_disk(void) {
+    // atmosphere/sun_disk
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+
+    ecs_entity_t view;
+    ecs_entity_t scene = scene_new(world, &view);
+    const box_render_view_t *v = frame_view(world, null);
+    test_assert(v->atmosphere != 0);
+    test_flt(v->atmos.sun_disk[0], cosf(glm_rad(0.266f)));
+    test_flt(v->atmos.sun_disk[1], sinf(glm_rad(0.266f)));
+    test_flt(v->atmos.sun_disk[2], 1.0f);
+
+    Atmosphere *a = ecs_get_mut(world, scene, Atmosphere);
+    a->sun_radius = 2;
+    a->sun_disk_intensity = 0;
+    ecs_modified(world, scene, Atmosphere);
+    v = frame_view(world, null);
+    test_flt(v->atmos.sun_disk[0], cosf(glm_rad(2.0f)));
+    test_flt(v->atmos.sun_disk[1], sinf(glm_rad(2.0f)));
+    test_flt(v->atmos.sun_disk[2], 0.0f);
 
     ecs_fini(world);
 }
