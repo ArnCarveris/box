@@ -31,6 +31,7 @@ typedef struct DrawSlot {
     int32_t slot;   /**< Slot of the entity in the batch */
     float fade;     /**< Product of the Opacity of the ancestors, 1 without any */
     float layer;    /**< Layer of a 2D shape, its depth in the hierarchy */
+    int32_t clip;   /**< Clip index of the nearest ClipChildren ancestor of a 2D shape, 0 none */
     bool dirty;     /**< The entity is in the list of changed entities */
     bool tinted;    /**< An ancestor has a Tint of a strength above 0 */
     box_draw_tint_t tint; /**< Tints of the ancestors, composed from the root down */
@@ -126,6 +127,23 @@ typedef struct box_draw_batch_t {
     ecs_vec_t changed;      /**< int32_t, slots of a static batch the GPU does not have */
 } box_draw_batch_t;
 
+/** The ClipChildren elements the 2D draws clip to, by clip index.
+ *
+ * An element gets an index when a 2D draw below it first asks for it and keeps it until it loses
+ * ClipChildren, so the instances that hold the index stay valid; freed indices are reused. Index
+ * 0 is no clip. The areas are computed every frame and uploaded when one changed.
+ */
+typedef struct box_draw_clips_t {
+    ecs_map_t index;        /**< Element to its clip index */
+    ecs_vec_t entities;     /**< ecs_entity_t per clip index, 0 for a free index */
+    ecs_vec_t records;      /**< box_render_clip_t per clip index, as the backend has them */
+    ecs_vec_t free;         /**< int32_t, clip indices to reuse */
+    uint32_t capacity;      /**< Clips the clip buffer holds, 0 before it is created */
+    int32_t tagged;         /**< Entities with ClipChildren, so a world without any skips the
+                             *   walk up the hierarchy */
+    bool dirty;             /**< A record changed since the last upload */
+} box_draw_clips_t;
+
 /** Main thread state of the instanced batches */
 typedef struct box_render_draws_t {
     ecs_query_t *dynamic_transform; /**< Shapes with DynamicTransform */
@@ -165,6 +183,7 @@ typedef struct box_render_draws_t {
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
     int32_t generation;         /**< Generation of that backend, see box_render_backend_t */
     box_render_draws_stats_t stats; /**< Counters of the last extract */
+    box_draw_clips_t clips;     /**< The clip areas of the 2D draws */
     const ecs_table_t *scene_table; /**< Table whose entities share scene_of while processing */
     ecs_entity_t scene_of;      /**< Scene of the entities of scene_table */
     int32_t refs;               /**< Observers and systems that use the state */
@@ -483,6 +502,68 @@ void box_draws_text_remove(
  */
 void box_draws_text_dynamic(
     ecs_world_t *world,
+    box_render_draws_t *d);
+
+/** Initialize the clip areas of the 2D draws.
+ *
+ * @param d The state
+ */
+void box_draws_clips_init(
+    box_render_draws_t *d);
+
+/** Release the clip areas of the 2D draws.
+ *
+ * @param d The state
+ */
+void box_draws_clips_fini(
+    box_render_draws_t *d);
+
+/** Get the clip index of the nearest ClipChildren ancestor of an entity, giving the ancestor
+ * an index when it has none.
+ *
+ * @param world The world
+ * @param d The state
+ * @param e The entity, whose own ClipChildren does not clip it
+ * @return The clip index, 0 when no ancestor clips
+ */
+int32_t box_draws_clip_of(
+    const ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e);
+
+/** Count an element that got ClipChildren.
+ *
+ * @param d The state
+ */
+void box_draws_clip_added(
+    box_render_draws_t *d);
+
+/** Free the clip index of an element that lost ClipChildren.
+ *
+ * @param d The state
+ * @param e The element
+ */
+void box_draws_clip_removed(
+    box_render_draws_t *d,
+    ecs_entity_t e);
+
+/** Write the areas of the clips into the clip buffer when one changed: added, removed, moved,
+ * resized or reparented.
+ *
+ * @param world The world
+ * @param d The state
+ * @param p The packet
+ */
+void box_draws_clips_send(
+    const ecs_world_t *world,
+    box_render_draws_t *d,
+    box_render_packet_t *p);
+
+/** Forget the clip buffer the backend had, so it is created and uploaded again.
+ *
+ * @param d The state
+ */
+void box_draws_clips_reset(
     box_render_draws_t *d);
 
 /** Release every batch and the GPU state of the batches.

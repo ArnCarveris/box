@@ -226,6 +226,21 @@
                     "render_to_texture",
                     "no_extra_batches"
                 ]
+            },
+            {
+                "id": "Clip",
+                "testcases": [
+                    "child_outside_parent_hidden",
+                    "rounded_corners_empty",
+                    "nested_clips_intersect",
+                    "text_cut_mid_glyph",
+                    "world_space_rotated_panel",
+                    "render_to_texture",
+                    "remove_shows_full_child",
+                    "moving_parent_moves_clip",
+                    "picking_follows_clip",
+                    "dynamic_child_moves_out"
+                ]
             }
         ]
     }

@@ -9,6 +9,8 @@
 #define BOX_LAYOUT_IMPL
 #include "layout_internal.h"
 
+ECS_TAG_DECLARE(ClipChildren);
+
 static ECS_COMPONENT_DECLARE(LayoutRegistry);
 
 /** Mark an element whose layout input changed.
@@ -460,6 +462,7 @@ void BoxLayoutImport(
     ECS_META_COMPONENT(world, LayoutItem);
     ECS_META_COMPONENT(world, LayoutBounds);
     ECS_META_COMPONENT(world, LayoutFill);
+    ECS_TAG_DEFINE(world, ClipChildren);
     ecs_set_hooks(world, LayoutItem, { .ctor = box_layout_item_ctor });
 
     ecs_add_pair(world, ecs_id(Layout), EcsWith, ecs_id(LayoutBounds));

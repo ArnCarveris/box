@@ -52,7 +52,7 @@ static WGPUBuffer box_gpu_buffer_new(
 void box_gpu_draw_init(
     box_gpu_t *gpu)
 {
-    WGPUBindGroupLayoutEntry entries[11] = {
+    WGPUBindGroupLayoutEntry entries[12] = {
         {
             .binding = 0,
             .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
@@ -120,9 +120,14 @@ void box_gpu_draw_init(
             .binding = 10,
             .visibility = WGPUShaderStage_Fragment,
             .sampler = { .type = WGPUSamplerBindingType_Filtering }
+        },
+        {
+            .binding = 11,
+            .visibility = WGPUShaderStage_Fragment,
+            .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
         }
     };
-    WGPUBindGroupLayoutDescriptor layout = { .entryCount = 11, .entries = entries };
+    WGPUBindGroupLayoutDescriptor layout = { .entryCount = 12, .entries = entries };
     box_gpu_cull_init(gpu);
     box_gpu_volume_init(gpu);
     box_gpu_reflect_init(gpu);

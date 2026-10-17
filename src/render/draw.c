@@ -85,6 +85,7 @@ static void box_draws_free(
     ecs_vec_fini_t(NULL, &d->moved, ecs_entity_t);
     ecs_vec_fini_t(NULL, &d->walk, ecs_entity_t);
     box_draws_order_fini(d);
+    box_draws_clips_fini(d);
     ecs_os_free(d);
 done:
     return;
@@ -190,6 +191,33 @@ static void BoxDrawsOnHierarchy(
     box_render_draws_t *d = it->ctx;
     d->order_dirty = true;
     BoxDrawsOnMove(it);
+}
+
+/** Follow an element that got or lost ClipChildren: its descendants take the clip index of
+ * their nearest clip again.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxDrawsOnClip(
+    ecs_iter_t *it)
+{
+    box_render_draws_t *d = it->ctx;
+    int32_t i;
+    if (ecs_is_fini(it->world)) {
+        goto done;
+    }
+
+    for (i = 0; i < it->count; i ++) {
+        if (it->event == EcsOnAdd) {
+            box_draws_clip_added(d);
+        } else {
+            box_draws_clip_removed(d, it->entities[i]);
+        }
+    }
+
+    BoxDrawsOnMove(it);
+done:
+    return;
 }
 
 /** Make the 2D draw order again when the z it was made from changed.
@@ -527,7 +555,9 @@ write:
     box_draws_instance(inst, transform, shape, &material);
     if (material.shape2d) {
         s->layer = box_draws_layer(world, e, false);
+        s->clip = box_draws_clip_of(world, d, e);
         box_draws_lift(inst, transform, s->layer);
+        inst->model[0][3] = (float)s->clip;
     }
 
     box_draws_slot_changed(b, s->slot);
@@ -610,6 +640,7 @@ static void BoxRenderExtractDraws(
     d->stats.scattered = 0;
     d->stats.upload_bytes = 0;
     box_draws_process(world, d);
+    box_draws_clips_send(world, d, p);
     box_draws_order_update(world, d);
     box_draws_send(world, d, p);
     RenderStatus *status = ecs_singleton_get_mut(world, RenderStatus);
@@ -747,6 +778,9 @@ static void box_draws_observers(
     box_draws_observer(world, d, "DrawsOnParent", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(EcsParent) }},
         .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnHierarchy);
+    box_draws_observer(world, d, "DrawsOnClipChildren", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ClipChildren }},
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnClip);
     box_draws_observer(world, d, "DrawsOnOrderedChildren", (ecs_observer_desc_t){
         .query.terms = {{ .id = EcsOrderedChildren }},
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnOrdered);
@@ -856,6 +890,7 @@ void box_render_draws_init(
     ecs_map_init(&d->lookup, NULL);
     ecs_map_init(&d->meshes, NULL);
     box_draws_order_init(d);
+    box_draws_clips_init(d);
     d->next_buffer = BOX_RENDER_BUFFER_FIRST;
     d->chunk = BOX_DRAWS_CHUNK;
     d->refs = 1;

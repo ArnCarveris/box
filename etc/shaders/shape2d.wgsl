@@ -15,12 +15,30 @@
 // distance range of the page; its coverage comes from the multi channel signed distance field
 // of the page (distance_map, a linear layer), so the edge stays sharp at any scale. Instances
 // are read by the slot the cull pass wrote, from the instance buffer of the batch (group 2).
+//
+// The w of the first model column is the clip index of the instance, 0 when no ClipChildren
+// ancestor clips it. A clip maps the world position of a fragment into the local plane of its
+// element, where the coverage of its rounded area multiplies the alpha, anti-aliased over the
+// footprint of the fragment there; the clips it is nested in follow through its parent index.
 #include "include/lights.wgsl"
 
 // BlendMode of the pipeline: the output is shaped for the blend equation it is drawn with.
 override blend_mode: u32 = 0u;
 
 @group(0) @binding(0) var<uniform> view: View;
+
+// The area of a ClipChildren element (box_render_clip_t): x and y are the first two rows of its
+// inverse world transform, area its half extents, corner radius and the index of its parent clip.
+struct Clip {
+    x: vec4f,
+    y: vec4f,
+    area: vec4f,
+};
+
+// Most nested clips a fragment intersects, BOX_RENDER_CLIP_DEPTH
+const clip_depth: u32 = 16u;
+
+@group(0) @binding(11) var<storage, read> clips: array<Clip>;
 
 @group(1) @binding(0) var albedo_map: texture_2d<f32>;
 @group(1) @binding(2) var distance_map: texture_2d<f32>;
@@ -58,6 +76,10 @@ struct VertexOut {
     @location(7) @interpolate(flat) uv_transform: vec4f,
     // 1 for a glyph, 0 for a shape
     @location(8) @interpolate(flat) glyph: f32,
+    // World position, which the clips map into the plane of their element
+    @location(9) world: vec3f,
+    // Clip index, 0 for none
+    @location(10) @interpolate(flat) clip: u32,
 };
 
 // Pixels the image moves per model unit along a direction, at a projected point.
@@ -110,7 +132,10 @@ fn pixels_per_unit(mvp: mat4x4f, clip: vec4f, dir: vec2f) -> f32 {
     let grow = min(1.0 / max(ppu, vec2f(1e-9)), vec2f(limit));
     let pad = select(vec2f(0.0), grow, (ppu > vec2f(0.0)) & vec2<bool>(!glyph));
     let q = edge + corner * pad;
-    o.pos = mvp * vec4f(origin + dir_x * q.x + dir_y * q.y, 0.0, 1.0);
+    let point = vec4f(origin + dir_x * q.x + dir_y * q.y, 0.0, 1.0);
+    o.pos = mvp * point;
+    o.world = (model * point).xyz;
+    o.clip = u32(max(inst.model[0].w, 0.0) + 0.5);
     o.local = q;
     o.uv = vec2f(q.x / (2.0 * extent.x) + 0.5, 0.5 - q.y / (2.0 * extent.y));
     o.extent = extent;
@@ -152,6 +177,34 @@ fn glyph_coverage(uv: vec2f, range: vec2f) -> f32 {
     return cover * clamp(px_range, 0.0, 1.0);
 }
 
+// Coverage of a fragment by the clips of its instance, the product over the chain of nested
+// clips. The distance to each rounded area is scaled to pixels by the footprint of the fragment
+// in the plane of the clip along the gradient of the distance, so the clip edge is anti-aliased
+// like the edge of a shape. The derivatives come in from uniform control flow.
+fn clip_coverage(first: u32, world: vec3f, world_dx: vec3f, world_dy: vec3f) -> f32 {
+    var cover = 1.0;
+    var index = first;
+    let count = arrayLength(&clips);
+    for (var i = 0u; i < clip_depth && index != 0u && index < count; i++) {
+        let c = clips[index];
+        let p = vec2f(dot(c.x, vec4f(world, 1.0)), dot(c.y, vec4f(world, 1.0)));
+        let dx = vec2f(dot(c.x.xyz, world_dx), dot(c.y.xyz, world_dx));
+        let dy = vec2f(dot(c.x.xyz, world_dy), dot(c.y.xyz, world_dy));
+        let r = clamp(c.area.z, 0.0, min(c.area.x, c.area.y));
+        let q = abs(p) - c.area.xy + vec2f(r);
+        let d = length(max(q, vec2f(0.0))) + min(max(q.x, q.y), 0.0) - r;
+        let corner = (q.x > 0.0) & (q.y > 0.0);
+        let side = select(vec2f(0.0, 1.0), vec2f(1.0, 0.0), q.x > q.y);
+        let toward = select(side, normalize(max(q, vec2f(1e-20))), corner);
+        let g = toward * select(vec2f(1.0), vec2f(-1.0), p < vec2f(0.0));
+        let px = length(vec2f(dot(g, dx), dot(g, dy)));
+        cover *= coverage(d, px);
+        index = u32(max(c.area.w, 0.0) + 0.5);
+    }
+
+    return cover;
+}
+
 fn output(color: vec3f, alpha: f32, cover: f32) -> vec4f {
     switch blend_mode {
         case 2u: {
@@ -170,6 +223,8 @@ fn output(color: vec3f, alpha: f32, cover: f32) -> vec4f {
 }
 
 @fragment fn fs(f: VertexOut) -> @location(0) vec4f {
+    let world_dx = dpdx(f.world);
+    let world_dy = dpdy(f.world);
     let footprint = vec2f(
         length(vec2f(dpdx(f.local.x), dpdy(f.local.x))),
         length(vec2f(dpdx(f.local.y), dpdy(f.local.y))));
@@ -189,8 +244,14 @@ fn output(color: vec3f, alpha: f32, cover: f32) -> vec4f {
     let shape_color = mix(f.border.rgb, f.color.rgb * texel.rgb, fill);
     let color = select(shape_color, f.color.rgb, glyph) + f.emissive;
     let shape_alpha = shape_cover * thin * f.color.a * mix(f.border.a, texel.a, fill);
-    let alpha = select(shape_alpha, glyph_cover * f.color.a, glyph);
-    let cover = select(shape_cover, glyph_cover, glyph);
+    var alpha = select(shape_alpha, glyph_cover * f.color.a, glyph);
+    var cover = select(shape_cover, glyph_cover, glyph);
+    if (f.clip != 0u) {
+        let clipped = clip_coverage(f.clip, f.world, world_dx, world_dy);
+        alpha *= clipped;
+        cover *= clipped;
+    }
+
     if (alpha <= 0.001) {
         discard;
     }

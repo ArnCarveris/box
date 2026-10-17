@@ -544,6 +544,9 @@ static void box_pick_candidate(
 
 /** Narrow phase of the spatial ray: the area of a UI element or the triangles of a shape.
  *
+ * A hit on a UI element or a 2D shape outside the area of a ClipChildren ancestor is no hit, as
+ * it is not drawn there.
+ *
  * The distance it reports is moved out by the tie margin, so the walk still reaches every hit
  * that ties with the nearest one, which the selection weighs.
  *
@@ -575,6 +578,13 @@ static bool box_pick_filter(
     }
 
     result = result && (ray->max_distance <= 0 || t <= ray->max_distance);
+    if (result && (ui || ecs_has(cast->world, e, Line))) {
+        vec3 point;
+        glm_vec3_scale(ECS_CONST_CAST(float*, ray->dir), t, point);
+        glm_vec3_add(point, ECS_CONST_CAST(float*, ray->origin), point);
+        result = box_render_clip_contains(cast->world, e, point);
+    }
+
     if (result) {
         box_pick_candidate(cast, e, t, ui);
         *distance = t + BOX_PICK_TIE * (t > 1.0f ? t : 1.0f);

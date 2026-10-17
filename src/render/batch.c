@@ -580,6 +580,7 @@ void box_draws_reset_backend(
     ecs_vec_clear(&d->free_buffers);
     d->next_buffer = BOX_RENDER_BUFFER_FIRST;
     d->changes_size = 0;
+    box_draws_clips_reset(d);
 }
 
 /** Give a batch an instance buffer that holds all its instances.
@@ -1057,6 +1058,7 @@ static void box_draws_fill_transform(
         box_draws_transform(inst, transforms ? &transforms[i] : NULL, &shapes[i]);
         if (b->key.pipeline == BOX_RENDER_SHADER_SHAPE2D) {
             box_draws_lift(inst, transforms ? &transforms[i] : NULL, slots[i].layer);
+            inst->model[0][3] = (float)slots[i].clip;
         }
     }
 }

@@ -107,6 +107,15 @@ ECS_STRUCT(LayoutFill, {
     ecs_entity_t surface; /**< Surface whose size in points the element takes */
 });
 
+/** Clips the Rect, Circle, Line, Border, Image and Text of the descendants of an element to its
+ * area, like CSS overflow: hidden; the element itself is not clipped.
+ *
+ * The area is its LayoutBounds, else its Rect, centered in its local XY plane and rounded by its
+ * Border.radius. Nested clips intersect, anti-aliased per pixel in screen, world and texture UI,
+ * and picking misses outside the area. 3D shapes below the element are not clipped.
+ */
+extern ECS_TAG_DECLARE(ClipChildren);
+
 /** Register the box.layout module.
  *
  * @param world The world

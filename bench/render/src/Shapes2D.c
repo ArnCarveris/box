@@ -25,6 +25,12 @@
 /** Rows of a panel of the UI tree, each a background with an icon */
 #define BENCH_SHAPES2D_ROWS (50)
 
+/** Clip panels of the clipped scene */
+#define BENCH_SHAPES2D_CLIPS (4)
+
+/** 2D shapes under the clip panels of the clipped scene */
+#define BENCH_SHAPES2D_CLIPPED (1000)
+
 /** Accept a packet without rendering it.
  *
  * @param ctx Unused
@@ -277,4 +283,67 @@ void Shapes2D_ui_tree_add_remove(
     box_render_sync(world);
     ecs_fini(world);
     ecs_os_free(panels);
+}
+
+void Shapes2D_clipped_1000_moving_clips(
+    bench_t *b)
+{
+    // ui/clip
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    app->unpaced = true;
+    ecs_singleton_modified(world, App);
+    box_render_backend_t backend = { .render = bench_shapes2d_drop };
+    box_render_set_backend(world, &backend);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    ecs_entity_t clips[BENCH_SHAPES2D_CLIPS];
+    int32_t c, i;
+    for (c = 0; c < BENCH_SHAPES2D_CLIPS; c ++) {
+        ecs_entity_t clip = clips[c] = ecs_new(world);
+        ecs_add_id(world, clip, ClipChildren);
+        ecs_set(world, clip, Position, {(float)c * 220, 0, 0});
+        ecs_set(world, clip, Rect, {200, 200});
+        ecs_set(world, clip, Border, {.radius = 16});
+        ecs_set(world, clip, Rgb, {40, 44, 56});
+        for (i = 0; i < BENCH_SHAPES2D_CLIPPED / BENCH_SHAPES2D_CLIPS; i ++) {
+            ecs_entity_t e = ecs_new_w_pair(world, EcsChildOf, clip);
+            ecs_set(world, e, Position,
+                {(float)(i % 16) * 16 - 120, (float)(i / 16) * 16 - 120, 0});
+            if (i % 2) {
+                ecs_set(world, e, Rect, {14, 14});
+            } else {
+                ecs_set(world, e, Circle, {7});
+            }
+
+            ecs_set(world, e, Rgb, {250, 190, 60});
+        }
+    }
+
+    for (i = 0; i < 4; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_draws_stats_t stats = {0};
+    int32_t frame = 0;
+    bench_set_items(b, BENCH_SHAPES2D_CLIPPED);
+    while (bench_iter(b)) {
+        c = frame % BENCH_SHAPES2D_CLIPS;
+        ecs_set(world, clips[c], Position, {(float)c * 220, (float)(frame % 8), 0});
+        ecs_progress(world, 0);
+        box_render_draws_stats(world, &stats);
+        bench_keep(stats.upload_bytes + stats.clip_bytes);
+        frame ++;
+    }
+
+    bench_counter(b, "batches", (double)stats.batches);
+    bench_counter(b, "clips", (double)stats.clips);
+    bench_counter(b, "clip_bytes", (double)stats.clip_bytes);
+    box_render_sync(world);
+    ecs_fini(world);
 }

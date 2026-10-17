@@ -68,6 +68,13 @@
 /** Buffer handle of the change buffer the scatter pass reads changed instances from */
 #define BOX_RENDER_BUFFER_CHANGES (1)
 
+/** Buffer handle of the clip buffer: the areas of the ClipChildren elements the 2D draws read,
+ * box_render_clip_t by clip index */
+#define BOX_RENDER_BUFFER_CLIPS (2)
+
+/** Most nested clips a 2D draw intersects; clips further up the hierarchy are not applied */
+#define BOX_RENDER_CLIP_DEPTH (16)
+
 /** First buffer handle of the instance buffers of batches */
 #define BOX_RENDER_BUFFER_FIRST (16)
 
@@ -485,6 +492,18 @@ typedef enum box_render_buffer_usage_t {
     BOX_RENDER_BUFFER_STORAGE = 1 << 1   /**< Read and written by compute shaders */
 } box_render_buffer_usage_t;
 
+/** The area of a ClipChildren element as shape2d.wgsl reads it from the clip buffer.
+ *
+ * The rows map a world position into the local XY plane of the element, where the area is a
+ * rounded rectangle on the origin. A 2D instance holds its clip index in model[0][3] (0 for
+ * none, index 0 of the buffer is unused) and a clip the index of the clip it is nested in.
+ */
+typedef struct box_render_clip_t {
+    float x[4];             /**< First row of the inverse world transform of the element */
+    float y[4];             /**< Second row of the inverse world transform of the element */
+    float area[4];          /**< Half width, half height, corner radius, index of the parent clip */
+} box_render_clip_t;
+
 /** Description of a BOX_RENDER_BUFFER create; creating an existing handle replaces it */
 typedef struct box_render_buffer_desc_t {
     uint64_t size;          /**< Bytes of the buffer */
@@ -497,7 +516,8 @@ typedef struct box_render_buffer_desc_t {
  * transform and the material constants only.
  */
 typedef struct box_render_instance_t {
-    mat4 model;             /**< World transform with the instance scale, affine */
+    mat4 model;             /**< World transform with the instance scale, affine; a 2D instance
+                             *   holds its clip index in model[0][3] */
     vec4 color;             /**< Linear base color, alpha is the opacity with its ancestors */
     vec4 emissive;          /**< Linear emitted color times its strength, w unused */
     vec4 material;          /**< Metallic, roughness, z and w unused */
@@ -1018,6 +1038,8 @@ typedef struct box_render_draws_stats_t {
     int32_t processed;          /**< Changed entities processed by the last extract */
     int32_t scattered;          /**< Instances the last extract sent through the scatter pass */
     int64_t upload_bytes;       /**< Bytes the last extract uploaded into instance buffers */
+    int32_t clips;              /**< ClipChildren elements in the clip buffer */
+    int64_t clip_bytes;         /**< Bytes the last extract uploaded into the clip buffer */
 } box_render_draws_stats_t;
 
 /** Register the observers and the system that keep the shapes of the world in batches.
@@ -1039,6 +1061,32 @@ void box_render_draws_init(
 void box_render_draws_stats(
     const ecs_world_t *world,
     box_render_draws_stats_t *stats);
+
+/** Get the clip area of a ClipChildren element: its LayoutBounds, else its Rect, with the
+ * corners rounded by its Border.radius.
+ *
+ * @param world The world
+ * @param e The element
+ * @param half Receives half its width and half its height, 0 when it has neither
+ * @return The corner radius, clamped to half the smaller side
+ */
+float box_render_clip_area(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    float half[2]);
+
+/** Check whether a world position is inside the clip areas of the ClipChildren ancestors of an
+ * entity, in the local XY plane of each, as the 2D shader clips it.
+ *
+ * @param world The world
+ * @param e The entity, whose own ClipChildren does not clip it
+ * @param point The world position
+ * @return Whether no ancestor clips the position away
+ */
+bool box_render_clip_contains(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    const float point[3]);
 
 /** Set the instances one batch holds before its shapes continue in another, for tests.
  *

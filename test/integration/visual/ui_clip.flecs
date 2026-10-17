@@ -1,0 +1,170 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+using box.layout
+using box.text
+
+// A 3D scene with a rotated world space panel that clips its content in its own plane, under a
+// screen space UI of rounded panels whose text, images and shapes overflow and are clipped,
+// one of them with a clip nested in it.
+
+camera {
+  Position: {0, 1.4, 3.4}
+  Rotation: {-0.12, 0, 0}
+  Camera: {fov: 55}
+}
+
+main_view {
+  View: {
+    camera: camera,
+    clear: {enabled: true, color: {120, 150, 190, 255}}
+  }
+}
+
+sun {
+  Rotation: {0.5574, 2.221, 0}
+  DirectionalLight: {intensity: 2}
+  Rgb: {255, 244, 225}
+}
+
+ground {
+  Position: {0, -0.05, 0}
+  Box: {24, 0.1, 24}
+  Rgb: {140, 150, 125}
+  PbrMaterial: {roughness: 0.9}
+}
+
+checker {
+  TexturePath: {path: "test/integration/visual/assets/checker.png"}
+}
+
+letter {
+  TexturePath: {path: "test/integration/visual/assets/letter.png"}
+}
+
+board {
+  Position: {0.75, 0.55, 0.2}
+  Rotation: {0.2, -0.55, 0.12}
+  Scale: {0.008, 0.008, 0.008}
+  Rect: {220, 150}
+  Rgb: {30, 34, 46}
+  Border: {width: 3, radius: 24, color: {120, 140, 200, 255}}
+  ClipChildren
+
+  title {
+    Position: {-30, 40, 0}
+    Text: {value: "World panel clips", size: 30}
+    Rgb: {255, 255, 255}
+  }
+
+  stripe {
+    Position: {0, -10, 0}
+    Rotation: {0, 0, 0.35}
+    Rect: {360, 26}
+    Rgb: {250, 190, 60}
+  }
+
+  disc {
+    Position: {100, -70, 0}
+    Circle: {60}
+    Rgb: {90, 210, 110}
+  }
+}
+
+hud {
+  Scene: {}
+
+  camera {
+    Position: {0, 0, 100}
+    Camera: {ortho: true, ortho_scale: 1}
+  }
+
+  card {
+    Position: {-180, 70, 0}
+    Rect: {220, 150}
+    Rgb: {40, 44, 56}
+    Border: {width: 3, radius: 28, color: {230, 230, 240, 255}}
+    ClipChildren
+
+    heading {
+      Position: {40, 45, 0}
+      Text: {value: "Overflowing heading text", size: 26}
+      Rgb: {255, 220, 90}
+    }
+
+    picture {
+      Position: {-80, -30, 0}
+      Rect: {120, 120}
+      Image: {texture: checker, u1: 1, v1: 1}
+    }
+
+    bar {
+      Position: {60, -40, 0}
+      Rotation: {0, 0, -0.6}
+      Rect: {30, 220}
+      Rgb: {90, 160, 250}
+      Border: {radius: 15}
+    }
+  }
+
+  frame {
+    Position: {170, 80, 0}
+    Rect: {240, 170}
+    Rgb: {52, 58, 76}
+    Border: {radius: 40}
+    ClipChildren
+
+    window {
+      Position: {50, -40, 0}
+      Rect: {170, 120}
+      Rgb: {30, 34, 46}
+      Border: {width: 2, radius: 16, color: {120, 220, 140, 255}}
+      ClipChildren
+
+      sun {
+        Position: {70, 50, 0}
+        Circle: {90}
+        Rgb: {230, 80, 70}
+      }
+
+      line {
+        Line: {x1: -150, y1: -80, x2: 150, y2: 90, width: 8}
+        Rgb: {255, 255, 255}
+      }
+
+      label {
+        Position: {-20, -30, 0}
+        Text: {value: "Nested clip", size: 34}
+        Rgb: {255, 255, 255}
+      }
+    }
+
+    stamp {
+      Position: {-110, 70, 0}
+      Rect: {90, 90}
+      Image: {texture: letter, u1: 1, v1: 1}
+    }
+  }
+
+  strip {
+    Position: {-170, -120, 0}
+    Rect: {260, 40}
+    Rgb: {250, 240, 220}
+    Border: {width: 2, radius: 20, color: {110, 80, 60, 255}}
+    ClipChildren
+
+    ticker {
+      Position: {60, 0, 0}
+      Text: {value: "A single line of text that does not fit", size: 22}
+      Rgb: {60, 40, 30}
+    }
+  }
+}
+
+hud_view {
+  View: {camera: hud.camera}
+}

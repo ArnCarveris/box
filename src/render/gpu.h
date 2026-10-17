@@ -513,6 +513,7 @@ typedef struct box_gpu_t {
     ecs_vec_t clusters;             /**< box_gpu_cluster_t of each view slot */
     WGPUBuffer no_lights;           /**< Light buffer of a view whose light buffer is missing */
     WGPUBuffer no_probes;           /**< Reflection probe buffer of a cluster pass without probes */
+    WGPUBuffer no_clips;            /**< Clip buffer of the views while no element clips */
     ecs_vec_t view_data;            /**< Bytes of the view uniforms of a target */
     WGPUBindGroupLayout shadow_layout; /**< Bind group layout of the shadow pass */
     WGPUPipelineLayout shadow_pipeline_layout; /**< Pipeline layout of the shadow pass */
