@@ -21,6 +21,26 @@
                     "crate_click_selects",
                     "panel_blocks_crate"
                 ]
+            },
+            {
+                "id": "World",
+                "testcases": [
+                    "hover_lamp_button",
+                    "lamp_button_toggles_light",
+                    "lamp_key_toggles_light",
+                    "color_button_cycles_crate",
+                    "occluded_panel_ignores_click"
+                ]
+            },
+            {
+                "id": "Texture",
+                "testcases": [
+                    "hover_start_button",
+                    "start_through_uv",
+                    "stop_on_other_slice",
+                    "screen_frame_does_nothing",
+                    "reactor_key_toggles"
+                ]
             }
         ]
     }

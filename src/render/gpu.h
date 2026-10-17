@@ -290,13 +290,14 @@ typedef struct box_gpu_cull_readback_t {
     uint32_t stamps;                /**< Timestamp pairs of its cull passes, 0 for none */
 } box_gpu_cull_readback_t;
 
-/** The cluster buffer of a view slot and the read back of the entries its pass allocated */
+/** The cluster buffer of a view in a target and the read back of the entries its pass allocated */
 typedef struct box_gpu_cluster_t {
     WGPUBuffer buffer;              /**< Allocated entries, offset and count per cluster, list */
     uint64_t entries;               /**< Entries the light and probe index list holds */
     WGPUBuffer readback;            /**< Mappable copy of the allocated entries */
     int32_t state;                  /**< Free, copied, mapping, mapped or failed */
     int64_t frame;                  /**< Frame of the packet the copy was recorded in */
+    int64_t stamp;                  /**< Cull pass the view last bound the buffer in */
     bool cut;                       /**< The last read back pass listed fewer lights or probes
                                      *   than reach */
 } box_gpu_cluster_t;
@@ -510,7 +511,7 @@ typedef struct box_gpu_t {
     WGPUPipelineLayout cluster_pipeline_layout; /**< Pipeline layout of the cluster pass */
     WGPUComputePipeline cluster;    /**< Cluster pipeline, NULL until the shader exists */
     int32_t cluster_revision;       /**< Revision of the shader the pipeline was made with */
-    ecs_vec_t clusters;             /**< box_gpu_cluster_t of each view slot */
+    ecs_map_t clusters;             /**< View and target key to box_gpu_cluster_t */
     WGPUBuffer no_lights;           /**< Light buffer of a view whose light buffer is missing */
     WGPUBuffer no_probes;           /**< Reflection probe buffer of a cluster pass without probes */
     WGPUBuffer no_clips;            /**< Clip buffer of the views while no element clips */
@@ -1077,15 +1078,24 @@ void box_gpu_light_uniforms(
 /** Record the cluster pass of a view when it has point or spot lights or reflection probes.
  *
  * @param gpu The backend
+ * @param t The target that renders the view
  * @param encoder The encoder of the frame
  * @param v The view
  * @param slot Slot of the view in the view buffer
  */
 void box_gpu_light_cluster(
     box_gpu_t *gpu,
+    const box_gpu_target_t *t,
     WGPUCommandEncoder encoder,
     const box_render_view_t *v,
     int32_t slot);
+
+/** Release the cluster buffers of the views no target rendered for a while.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_light_purge(
+    box_gpu_t *gpu);
 
 /** Record the cluster pass of a view with explicit buffers, when it has point or spot lights or
  * reflection probes.

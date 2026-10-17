@@ -264,7 +264,8 @@
                     "spot_light_lights_its_whole_cone",
                     "cluster_list_grows_to_every_light",
                     "point_light_inverse_square",
-                    "point_light_fades_smoothly_to_range"
+                    "point_light_fades_smoothly_to_range",
+                    "cluster_list_kept_per_target"
                 ]
             },
             {

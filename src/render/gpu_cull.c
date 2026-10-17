@@ -509,6 +509,7 @@ void box_gpu_cull_begin(
     box_gpu_cull_readback_poll(gpu);
     if (!(c->stamp % BOX_GPU_CULL_PURGE)) {
         box_gpu_hiz_purge(gpu);
+        box_gpu_light_purge(gpu);
     }
 
     ecs_vec_clear(&c->views);

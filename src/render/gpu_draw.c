@@ -941,7 +941,7 @@ void box_gpu_draw_views(
         WGPUTextureView hdr = box_gpu_effects_begin(gpu, t, packet, v);
         bool occludes = box_gpu_cull_occludes(gpu, slot);
         box_gpu_atmosphere_view(gpu, t, encoder, packet, v);
-        box_gpu_light_cluster(gpu, encoder, v, slot);
+        box_gpu_light_cluster(gpu, t, encoder, v, slot);
         box_gpu_cull_record(gpu, encoder, slot);
         box_gpu_shadow_render(gpu, encoder, packet, i, slot);
         box_gpu_draw_pass(gpu, t, encoder, color, hdr, packet, v, slot, occludes ? 1 : 0);
