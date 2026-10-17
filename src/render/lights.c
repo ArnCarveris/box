@@ -2,9 +2,9 @@
  * @file render/lights.c
  * @brief Collects the lights of every scene into light buffers and gives every view its lights.
  *
- * Every frame the lights are gathered per scene, directional lights first; a light buffer is
- * only uploaded when its contents changed. A scene without any light entity is lit by the
- * default sun of a shared buffer, a scene without AmbientLight by the default sky and ground.
+ * Lights are gathered per scene each frame, directional first, a buffer uploaded on change. A
+ * scene without light entities gets the default sun, without AmbientLight the default sky and
+ * ground; an Atmosphere attenuates its sun and moon, the default sun included.
  *
  * With LightBake views get the Mixed and Realtime lights, captures the Mixed and Baked ones over
  * a black ambient and the Mixed ones over a pass, while every light is Mixed all share the view
@@ -12,6 +12,7 @@
  */
 
 #include "bake.h"
+#include "../atmosphere/atmosphere.h"
 #include <math.h>
 
 /** Lights the light buffer of a scene holds at least */
@@ -55,6 +56,23 @@ typedef struct box_light_list_t {
     ecs_vec_t sent;         /**< box_render_light_t the light buffer holds */
 } box_light_list_t;
 
+/** A light of an atmosphere: its sun or its moon */
+typedef struct box_light_atmos_light_t {
+    bool found;             /**< The light was collected in this frame */
+    float direction[3];     /**< Normalized direction toward the light */
+    float transmittance[3]; /**< Transmittance from the ground altitude toward the light */
+} box_light_atmos_light_t;
+
+/** The Atmosphere of a scene in this frame */
+typedef struct box_light_atmos_t {
+    ecs_entity_t entity;    /**< Entity with the Atmosphere, 0 when the scene has none */
+    const char *error;      /**< Why its values are invalid, NULL when they are valid */
+    Atmosphere value;       /**< Its values */
+    box_atmos_medium_t medium; /**< Its medium, set when it is valid */
+    box_light_atmos_light_t sun; /**< The sun */
+    box_light_atmos_light_t moon; /**< The moon */
+} box_light_atmos_t;
+
 /** The lights of one scene */
 typedef struct box_light_scene_t {
     ecs_entity_t scene;     /**< Scene root, 0 for the default scene */
@@ -63,6 +81,9 @@ typedef struct box_light_scene_t {
     bool baking;            /**< The scene has LightBake, so bake modes apply */
     bool split;             /**< Baking with a light that is not Mixed: the capture, mixed and
                              *   baked lists are kept, else the captures use the view list */
+    bool default_sun;       /**< The view list holds the default sun attenuated by the
+                             *   atmosphere of a scene without light entities */
+    box_light_atmos_t atmos; /**< The atmosphere of the scene */
     float sky[3];           /**< Linear ambient light from above, summed */
     float ground[3];        /**< Linear ambient light from below, summed */
     box_light_list_t lists[BOX_LIGHTS_LISTS]; /**< The lists, by box_light_list_kind_t */
@@ -75,6 +96,7 @@ typedef struct box_render_lights_t {
     ecs_query_t *spot;          /**< Entities with SpotLight */
     ecs_query_t *ambient;       /**< Entities with AmbientLight */
     ecs_query_t *bakes;         /**< Entities with LightBake */
+    ecs_query_t *atmospheres;   /**< Entities with Atmosphere, NULL without box.atmosphere */
     ecs_vec_t scenes;           /**< box_light_scene_t */
     ecs_map_t lookup;           /**< Scene root plus one to the index of its scene plus one */
     ecs_vec_t free_buffers;     /**< uint32_t, light buffer handles to reuse */
@@ -219,6 +241,8 @@ static void box_lights_reset(
         s->has_lights = false;
         s->baking = false;
         s->split = false;
+        s->default_sun = false;
+        ecs_os_memset_t(&s->atmos, 0, box_light_atmos_t);
         s->has_ambient = false;
         glm_vec3_zero(s->sky);
         glm_vec3_zero(s->ground);
@@ -347,6 +371,76 @@ static void box_lights_push(
     }
 }
 
+/** Write the default sun.
+ *
+ * @param out Receives the light
+ */
+static void box_lights_default_sun(
+    box_render_light_t *out)
+{
+    ecs_os_memset_t(out, 0, box_render_light_t);
+    glm_vec3_normalize_to(ECS_CONST_CAST(float*, box_lights_sun), out->position);
+    glm_vec3_scale(ECS_CONST_CAST(float*, box_lights_sun_color), GLM_PIf, out->color);
+    glm_vec3_copy((vec3){0, 0, 1}, out->direction);
+    out->spot_offset = 1.0f;
+}
+
+/** Attenuate the sun or moon of an atmosphere by the transmittance toward it and its fade at
+ * the horizon, and remember its direction and transmittance for the AtmosphereStatus.
+ *
+ * @param a The atmosphere, valid
+ * @param target The sun or moon of the atmosphere
+ * @param radius Angular radius of the disk of the light in degrees
+ * @param light The directional light, its color is attenuated
+ */
+static void box_lights_atmos_light(
+    box_light_atmos_t *a,
+    box_light_atmos_light_t *target,
+    float radius,
+    box_render_light_t *light)
+{
+    float fade;
+    int32_t c;
+    target->found = true;
+    glm_vec3_copy(light->position, target->direction);
+    box_atmos_transmittance(&a->medium, a->value.ground_altitude, target->direction[1],
+        target->transmittance);
+    fade = box_atmos_horizon_fade(target->direction[1], radius);
+    for (c = 0; c < 3; c ++) {
+        light->color[c] *= target->transmittance[c] * fade;
+    }
+}
+
+/** Attenuate a directional light that is the sun or the moon of the atmosphere of its scene.
+ *
+ * Without Atmosphere.sun the sun is the first directional light of the scene that is not the
+ * moon.
+ *
+ * @param s The scene of the light
+ * @param e The light entity
+ * @param light The light, its color is attenuated
+ */
+static void box_lights_atmos_directional(
+    box_light_scene_t *s,
+    ecs_entity_t e,
+    box_render_light_t *light)
+{
+    box_light_atmos_t *a = &s->atmos;
+    const Atmosphere *v = &a->value;
+    if (!a->entity || a->error) {
+        goto done;
+    }
+
+    if (!a->sun.found && (v->sun ? e == v->sun : e != v->moon)) {
+        box_lights_atmos_light(a, &a->sun, v->sun_radius, light);
+    } else if (!a->moon.found && v->moon && e == v->moon) {
+        box_lights_atmos_light(a, &a->moon, v->moon_radius, light);
+    }
+
+done:
+    return;
+}
+
 /** Collect the lights one query matches into the scenes they belong to.
  *
  * The scene of a light comes from the Scene(self|up) field of the query.
@@ -381,11 +475,12 @@ static void box_lights_collect(
             s->has_lights = true;
             if (kind == 0) {
                 const DirectionalLight *d = &ecs_field(&it, DirectionalLight, 0)[i];
+                box_render_light_t out;
+                box_lights_point(NULL, rgb, d->intensity, 0, &out);
+                box_lights_axis(transform, out.position);
+                glm_vec3_negate(out.position);
+                box_lights_atmos_directional(s, it.entities[i], &out);
                 if (d->intensity > 0) {
-                    box_render_light_t out;
-                    box_lights_point(NULL, rgb, d->intensity, 0, &out);
-                    box_lights_axis(transform, out.position);
-                    glm_vec3_negate(out.position);
                     box_lights_push(s, it.entities[i], d->bake, &out);
                 }
             } else if (kind == 1) {
@@ -410,6 +505,110 @@ static void box_lights_collect(
                     box_lights_push(s, it.entities[i], sp->bake, &out);
                 }
             }
+        }
+    }
+}
+
+/** Give the atmosphere of every scene in this frame to its scene, the first one of a scene
+ * that has several.
+ *
+ * @param world The world
+ * @param l The state
+ */
+static void box_lights_collect_atmospheres(
+    ecs_world_t *world,
+    box_render_lights_t *l)
+{
+    if (l->atmospheres) {
+        ecs_iter_t it = ecs_query_iter(world, l->atmospheres);
+        while (ecs_query_next(&it)) {
+            const Atmosphere *values = ecs_field(&it, Atmosphere, 0);
+            int32_t i;
+            for (i = 0; i < it.count; i ++) {
+                box_light_scene_t *s = box_lights_ensure(l, box_render_scene_field(&it, 1, i));
+                box_light_atmos_t *a = &s->atmos;
+                if (!a->entity) {
+                    a->entity = it.entities[i];
+                    a->value = values[i];
+                    a->error = box_atmos_error(&values[i]);
+                    if (!a->error) {
+                        box_atmos_medium(&values[i], &a->medium);
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Light the scenes with a valid atmosphere, no light entities and no Atmosphere.sun by the
+ * default sun of their atmosphere, kept in their view list.
+ *
+ * @param l The state
+ */
+static void box_lights_atmos_defaults(
+    box_render_lights_t *l)
+{
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&l->scenes); i ++) {
+        box_light_scene_t *s = ecs_vec_get_t(&l->scenes, box_light_scene_t, i);
+        box_light_atmos_t *a = &s->atmos;
+        if (a->entity && !a->error && !s->has_lights && !a->value.sun) {
+            box_render_light_t sun;
+            box_lights_default_sun(&sun);
+            box_lights_atmos_light(a, &a->sun, a->value.sun_radius, &sun);
+            box_lights_push(s, a->entity, LightBakeModeMixed, &sun);
+            s->default_sun = true;
+        }
+    }
+}
+
+/** Write the transmittances and the error of the atmosphere of every scene into its
+ * AtmosphereStatus when they changed.
+ *
+ * @param it The iterator of the system
+ * @param l The state
+ */
+static void box_lights_atmos_status(
+    ecs_iter_t *it,
+    box_render_lights_t *l)
+{
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&l->scenes); i ++) {
+        const box_light_atmos_t *a = &ecs_vec_get_t(&l->scenes, box_light_scene_t, i)->atmos;
+        const AtmosphereStatus *status = a->entity
+            ? ecs_get(it->world, a->entity, AtmosphereStatus)
+            : NULL;
+        if (!status) {
+            continue;
+        }
+
+        AtmosphereStatus value = *status;
+        glm_vec3_zero(value.sun_transmittance);
+        glm_vec3_zero(value.moon_transmittance);
+        value.moon_illumination = 0.0f;
+        if (!a->error && a->sun.found) {
+            glm_vec3_copy(ECS_CONST_CAST(float*, a->sun.transmittance), value.sun_transmittance);
+        }
+
+        if (!a->error && a->moon.found) {
+            glm_vec3_copy(ECS_CONST_CAST(float*, a->moon.transmittance),
+                value.moon_transmittance);
+        }
+
+        if (!a->error && a->sun.found && a->moon.found) {
+            value.moon_illumination = box_atmos_moon_illumination(a->sun.direction,
+                a->moon.direction);
+        }
+
+        bool same_error = a->error
+            ? status->error && !strcmp(status->error, a->error)
+            : !status->error;
+        if (!same_error || value.moon_illumination != status->moon_illumination ||
+            ecs_os_memcmp(value.sun_transmittance, status->sun_transmittance, sizeof(vec3)) ||
+            ecs_os_memcmp(value.moon_transmittance, status->moon_transmittance, sizeof(vec3)))
+        {
+            value.error = ECS_CONST_CAST(char*, a->error);
+            ecs_set_ptr(it->stage, a->entity, AtmosphereStatus, &value);
         }
     }
 }
@@ -504,15 +703,12 @@ static void box_lights_send_default(
     box_render_lights_t *l,
     box_render_packet_t *p)
 {
-    box_render_light_t sun = {0};
+    box_render_light_t sun;
     if (l->default_sent) {
         goto done;
     }
 
-    glm_vec3_normalize_to(ECS_CONST_CAST(float*, box_lights_sun), sun.position);
-    glm_vec3_scale(ECS_CONST_CAST(float*, box_lights_sun_color), GLM_PIf, sun.color);
-    glm_vec3_copy((vec3){0, 0, 1}, sun.direction);
-    sun.spot_offset = 1.0f;
+    box_lights_default_sun(&sun);
     box_lights_buffer_create(p, BOX_LIGHTS_DEFAULT_BUFFER, 1);
     ecs_os_memcpy_t(box_render_packet_upload(p, BOX_LIGHTS_DEFAULT_BUFFER, 0,
         sizeof(box_render_light_t)), &sun, box_render_light_t);
@@ -629,15 +825,15 @@ static void box_lights_send(
     int32_t i, k;
     for (i = ecs_vec_count(&l->scenes) - 1; i >= 0; i --) {
         box_light_scene_t *s = ecs_vec_get_t(&l->scenes, box_light_scene_t, i);
-        if (!s->has_lights && !s->has_ambient && !s->baking) {
+        if (!s->has_lights && !s->has_ambient && !s->baking && !s->atmos.entity) {
             box_lights_remove(l, p, i);
             continue;
         }
 
         for (k = 0; k < BOX_LIGHTS_LISTS; k ++) {
             box_light_list_t *list = &s->lists[k];
-            bool used = s->has_lights && (k == BOX_LIGHTS_VIEW || (s->split &&
-                (k != BOX_LIGHTS_BAKED || ecs_vec_count(&list->lights))));
+            bool used = (s->has_lights || s->default_sun) && (k == BOX_LIGHTS_VIEW ||
+                (s->split && (k != BOX_LIGHTS_BAKED || ecs_vec_count(&list->lights))));
             if (used) {
                 box_lights_send_list(l, list, p);
             } else {
@@ -676,7 +872,7 @@ static void box_lights_views(
             : NULL;
         out->enabled = view ? view->lighting.enabled : true;
         const box_light_list_t *list = s ? &s->lists[BOX_LIGHTS_VIEW] : NULL;
-        if (s && s->has_lights) {
+        if (s && (s->has_lights || s->default_sun)) {
             out->buffer = list->buffer;
             out->directional = list->directional;
             out->count = (uint32_t)ecs_vec_count(&list->lights);
@@ -750,12 +946,15 @@ static void BoxRenderExtractLights(
     ecs_os_memset_t(&l->stats, 0, box_render_lights_stats_t);
     box_lights_reset(l);
     box_lights_collect_bakes(world, l);
+    box_lights_collect_atmospheres(world, l);
     box_lights_collect(world, l, l->directional, 0);
     box_lights_collect(world, l, l->point, 1);
     box_lights_collect(world, l, l->spot, 2);
+    box_lights_atmos_defaults(l);
     box_lights_collect_ambient(world, l);
     box_lights_send(l, p);
     box_lights_views(world, l, p);
+    box_lights_atmos_status(it, l);
 }
 
 /** Free the state of the light extract.
@@ -875,6 +1074,16 @@ const void* box_render_lights_state(
     const ecs_system_t *sys = system ? ecs_system_get(world, system) : NULL;
 
     return sys ? sys->ctx : NULL;
+}
+
+void box_render_lights_atmosphere(
+    ecs_world_t *world)
+{
+    box_render_lights_t *l = ECS_CONST_CAST(box_render_lights_t*,
+        box_render_lights_state(world));
+    if (l && !l->atmospheres) {
+        l->atmospheres = box_lights_scene_query(world, ecs_id(Atmosphere));
+    }
 }
 
 /** Write the buffer, the counts and the first directional light of a list.

@@ -115,6 +115,28 @@
                     "garden_few_overlapping_probes",
                     "garden_probes_have_glossy_surfaces"
                 ]
+            },
+            {
+                "id": "Atmosphere",
+                "testcases": [
+                    "status_follows_atmosphere",
+                    "singleton_has_status",
+                    "script_defaults",
+                    "add_defaults",
+                    "zero_is_literal",
+                    "invalid_values_set_error",
+                    "error_clears_when_valid",
+                    "zenith_transmittance_near_white",
+                    "low_sun_transmittance_reddish",
+                    "no_rayleigh_transmittance",
+                    "no_ozone_transmittance",
+                    "sun_light_attenuated",
+                    "sun_below_horizon_is_zero",
+                    "explicit_sun_and_moon_attenuated",
+                    "default_sun_attenuated",
+                    "invalid_atmosphere_leaves_lights",
+                    "scene_without_atmosphere_unchanged"
+                ]
             }
         ]
     }

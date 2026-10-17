@@ -1046,6 +1046,14 @@ void box_render_lights_stats(
 const void* box_render_lights_state(
     const ecs_world_t *world);
 
+/** Make the light extract attenuate the sun and moon of the scenes with an Atmosphere and
+ * write their AtmosphereStatus, called by the import of box.atmosphere.
+ *
+ * @param world The world
+ */
+void box_render_lights_atmosphere(
+    ecs_world_t *world);
+
 /** Register the cached query that knows the scene of every entity in a scene.
  *
  * @param world The world

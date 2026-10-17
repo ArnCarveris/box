@@ -32,6 +32,7 @@
 #include "box/spatial.h"
 #include "box/picking.h"
 #include "box/console.h"
+#include "box/atmosphere.h"
 
 #ifdef __cplusplus
 extern "C" {

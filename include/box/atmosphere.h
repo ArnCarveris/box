@@ -1,0 +1,109 @@
+/**
+ * @file box/atmosphere.h
+ * @brief Physically based atmosphere of a scene, after Hillaire 2020; distances are in km.
+ *
+ * In a scene with an Atmosphere the sun and moon DirectionalLight intensity and Rgb are top of
+ * atmosphere values: the light extract attenuates them by the transmittance toward the light.
+ */
+
+#ifndef BOX_ATMOSPHERE_H
+#define BOX_ATMOSPHERE_H
+
+#include "types.h"
+
+#ifdef BOX_ATMOSPHERE_IMPL
+#define ECS_META_IMPL IMPL
+#else
+#define ECS_META_IMPL EXTERN
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/** Rayleigh scattering of the air molecules, density falling off exponentially with altitude */
+ECS_STRUCT(AtmosphereRayleigh, {
+    float scale_height;     /**< Altitude in km over which the density falls by 1/e, default 8 */
+    float scattering_scale; /**< Scale of the Earth scattering coefficients, default 1, 0 for
+                             *   no Rayleigh scattering */
+});
+
+/** Mie scattering and absorption of the aerosols, density falling off exponentially */
+ECS_STRUCT(AtmosphereMie, {
+    float scale_height;     /**< Altitude in km over which the density falls by 1/e, default 1.2 */
+    float anisotropy;       /**< Cornette-Shanks phase asymmetry g, -1 < g < 1, default 0.8 */
+    float scattering_scale; /**< Scale of the Earth scattering and extinction coefficients,
+                             *   default 1, 0 for no aerosols */
+    rgb tint;               /**< Display encoded tint of the coefficients, default
+                             *   {255, 255, 255} */
+});
+
+/** Atmosphere of a scene, placed on a Scene root or as a singleton for the default scene.
+ * Adding it adds AtmosphereStatus, removing it removes it.
+ *
+ * Values apply as specified; a planet_radius, thickness, units_per_km or scale height that is
+ * not positive or another negative distance sets AtmosphereStatus.error and renders nothing.
+ */
+ECS_STRUCT(Atmosphere, {
+    ecs_entity_t sun;       /**< DirectionalLight that is the sun, default 0 for the light the
+                             *   light extract picks: the first DirectionalLight of the scene or
+                             *   the default sun */
+    ecs_entity_t moon;      /**< DirectionalLight that is the moon, default 0 for no moon */
+    float planet_radius;    /**< Radius of the planet in km, default 6360 */
+    float thickness;        /**< Height of the atmosphere above the ground in km, default 100 */
+    float ground_altitude;  /**< Altitude in km at sea_level, 0 to thickness, default 0.5 */
+    float sea_level;        /**< World Y of the ground_altitude, default 0 */
+    float units_per_km;     /**< World units in a km, default 1000 */
+    AtmosphereRayleigh rayleigh; /**< Air molecules, default {8, 1} */
+    AtmosphereMie mie;      /**< Aerosols, default {1.2, 0.8, 1, {255, 255, 255}} */
+    float ozone_scale;      /**< Scale of the absorption of the ozone layer, a tent around 25
+                             *   km, default 1, 0 for no ozone */
+    rgb ground_albedo;      /**< Display encoded albedo of the planet, default {77, 77, 77} */
+    rgb night_tint;         /**< Display encoded color of the night sky, default
+                             *   {70, 110, 230} */
+    float night_intensity;  /**< Scale of the night sky color, default 0.003 */
+    float sun_disk_intensity; /**< Scale of the drawn sun disk, default 1, 0 draws none */
+    float sun_radius;       /**< Angular radius of the sun disk in degrees, default 0.266 */
+    float moon_disk_intensity; /**< Scale of the drawn moon disk, default 1, 0 draws none */
+    float moon_radius;      /**< Angular radius of the moon disk in degrees, default 0.259 */
+    float moon_albedo;      /**< Fraction of sunlight the moon reflects, default 0.12 */
+    float earthshine;       /**< Light of the unlit part of the moon, default 0 */
+    float aerial_distance;  /**< Far end of the aerial perspective volume in km, default 32 */
+    float aerial_intensity; /**< Scale of the aerial perspective, default 1, 0 for none */
+    float ibl_update_angle; /**< Degrees the sun or moon moves before the environment is
+                             *   rendered again, default 0.5 */
+});
+
+/** State of the atmosphere of a scene, written by the engine next to Atmosphere.
+ *
+ * The transmittances are zero for a missing light and for a light below the planet's horizon,
+ * every value but lut_version is zero while error is set.
+ */
+ECS_STRUCT(AtmosphereStatus, {
+    vec3 sun_transmittance;  /**< Linear rgb transmittance from the ground altitude toward the
+                              *   sun */
+    vec3 moon_transmittance; /**< Linear rgb transmittance from the ground altitude toward the
+                              *   moon */
+    float moon_illumination; /**< Lit fraction of the moon disk seen from the ground, 0 to 1 */
+    int32_t lut_version;     /**< Incremented each time the transmittance and multi scattering
+                              *   lookup tables are built again */
+    char *error;             /**< Why nothing renders, such as an invalid value, NULL for none */
+});
+
+/** Register the box.atmosphere module.
+ *
+ * Makes the light extract attenuate the sun and moon of every scene with a valid Atmosphere by
+ * the transmittance toward them and a fade over the disk's angular diameter at the horizon.
+ *
+ * @param world The world
+ */
+void BoxAtmosphereImport(
+    ecs_world_t *world);
+
+#ifdef __cplusplus
+}
+#endif
+
+#undef ECS_META_IMPL
+
+#endif
