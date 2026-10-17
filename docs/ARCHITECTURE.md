@@ -42,7 +42,7 @@ in the `project/db/<epic>/<task>/deliverable/README.md` files.
 | `box.effects` | `src/effects` | `Bloom`, `Ssao`, `HeightFog`, `AutoExposure`, `Tonemap` settings |
 | `box.material` | `src/material` | `Rgb`, `Opacity`, `Tint`, `PbrMaterial`, `Emissive`, `BlendMode`, `BackFaceMode`, `PbrTextures`, `TextureWrap`, `TextureTransform`, `DynamicMaterial`, `NoShadow` |
 | `box.texture` | `src/texture` | `TexturePath`, `Texture`, `TextureStatus`; decoding on the job system |
-| `box.light` | `src/light` | `DirectionalLight`, `PointLight`, `SpotLight`, `AmbientLight` |
+| `box.light` | `src/light` | `DirectionalLight`, `PointLight`, `SpotLight`, `AmbientLight`, `Environment`, `EnvironmentStatus`, `EnvironmentImage` |
 | `box.movement` | `src/movement` | `Velocity`, `AngularVelocity` (data only, controllers write `Velocity`) |
 | `box.layout` | `src/layout` | `Layout`, `LayoutItem`, `LayoutBounds`, `Sizing`, `Padding` |
 | `box.text` | `src/text` | `Font`, `FontStatus`, `Text`, `TextBounds`; MSDF atlas |
@@ -190,7 +190,7 @@ outcome arrives after the frame. A new module replaces the old one only once its
 and compiled, so a failed module keeps the old one. Compile errors come back into
 `ShaderStatus` as `file:line: message`, mapped through a per line source table. Engine shaders
 live in `etc/shaders` (blit, mesh, shape2d, scatter, cull, cluster, shadow, bloom, ssao, fog,
-tonemap, exposure, bake_sh) with shared includes. `tools/wgsl_check.mjs` validates them with Tint.
+tonemap, exposure, bake_sh, environment) with shared includes. `tools/wgsl_check.mjs` validates them with Tint.
 
 ## Scenes
 
@@ -569,6 +569,45 @@ resident` without an error.
 - The influence box extends `blend` past the space, overlapping its neighbours by 1 to 2 units,
   so the seams fade into the next probe instead of the scene probe.
 - Few probes overlap: at most 3 cover any point of the garden, and a cluster lists 8 at most.
+
+## Image based lighting
+
+An environment source is an entity with `Environment {resolution, filter}` (constructor: 256,
+`Ggx`). Adding it adds `EnvironmentStatus {version, error}`, removed with it. A resolution that is
+not a power of two from 8 to 1024 creates no cubemap and sets `error`. `version` 0 means no
+content yet; the source increments it each time it sends new content. A view is lit with one
+through `LightSettings.environment {source, intensity, yaw, background}` (the View constructor
+sets `intensity` 1): an unlit view, or one without a source with a valid `Environment`, gets
+handle 0 in its packet view. `src/render/environment.c` keeps one `BOX_RENDER_ENVIRONMENT` per
+source, however many views share it, and destroys it when the entity loses `Environment`, is
+deleted or gets an invalid resolution. The image based lighting code never knows what produced
+a source.
+
+**Source contract** (`src/render/environment.h`, `gpu_environment.h`):
+
+1. `box_render_environment_handle(world, e)` (main thread, during `RenderExtract`) assigns a
+   backend handle on demand. The cubemap is created in that frame's packet.
+2. `box_gpu_environment_target(gpu, handle, &res)` (render thread) returns a write only
+   `texture_storage_2d_array<rgba16float>` view of mip 0: 6 layers in WebGPU cube order, `res`
+   texels per edge. Texel directions are those of `cube_direction` (`include/cube.wgsl`, which
+   `bake_sh.wgsl` includes).
+3. The source records its pass before `box_gpu_environment_process` runs (in `box_gpu_render`
+   after uploads and scatters, before captures and targets), then calls
+   `box_gpu_environment_written(gpu, handle, version)`.
+4. The source bumps `EnvironmentStatus.version` in the frame the new content is sent
+   (`box_render_environment_sent`).
+5. A new resolution or a device loss recreates the cubemap empty
+   (`box_render_environment_content` returns 0), and the source must write it again.
+
+**EnvironmentImage** is the reference source (`src/render/environment_image.c`,
+`gpu_environment_image.c`); adding it adds `Environment` (`EcsWith`). It loads a Radiance `.hdr`
+(any stb_image format) with `stbi_loadf` on the job system through `src/texture/load.c`, scaled
+down to at most 4096 texels wide, keeps the rgba16float texels on the main thread and sends them
+once per version as a `BOX_RENDER_ENVIRONMENT_IMAGE`. `environment.wgsl` converts the
+equirectangular image into the target, four samples per texel: the center column looks along
+-Z, +X is to its right, the edges look along +Z and the top row is +Y. A file that cannot be read
+or decoded sets `error`. `etc/environments` holds `axes.hdr` (a color per axis direction) and
+`sky.hdr` (a gradient sky), written by `tools/environment_images.py`.
 
 ## Spatial index
 
