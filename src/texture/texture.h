@@ -84,6 +84,25 @@ void box_texture_decode_init(void);
 void box_texture_decode(
     box_texture_job_t *job);
 
+/** Decode an image file into linear float RGBA texels, on a worker thread.
+ *
+ * Radiance .hdr files keep their values; other formats are decoded from display encoding by
+ * stb_image. An image wider than max_width is scaled down to it, keeping the aspect ratio.
+ *
+ * @param path The file, located as box_shader_locate does
+ * @param max_width Largest width of the result, 0 for no limit
+ * @param width Receives the width
+ * @param height Receives the height
+ * @param error Receives why the decode failed, freed by the caller
+ * @return Four floats per texel row by row from the top, freed by the caller, NULL on failure
+ */
+float* box_texture_decode_float(
+    const char *path,
+    int32_t max_width,
+    int32_t *width,
+    int32_t *height,
+    char **error);
+
 /** Get the registry of a world.
  *
  * @param world The world

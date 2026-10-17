@@ -275,3 +275,45 @@ void box_texture_decode(
 done:
     return;
 }
+
+float* box_texture_decode_float(
+    const char *path,
+    int32_t max_width,
+    int32_t *width,
+    int32_t *height,
+    char **error)
+{
+    int w = 0, h = 0, n = 0;
+    int32_t size = 0;
+    float *result = NULL;
+    char *file = path ? box_shader_locate(path) : NULL;
+    uint8_t *data = file ? box_texture_read(file, &size) : NULL;
+    ecs_os_free(file);
+    if (!data) {
+        *error = flecs_asprintf("cannot read image '%s'", path ? path : "");
+        goto done;
+    }
+
+    result = stbi_loadf_from_memory(data, size, &w, &h, &n, 4);
+    ecs_os_free(data);
+    if (!result) {
+        *error = flecs_asprintf("cannot decode image '%s': %s", path, stbi_failure_reason());
+        goto done;
+    }
+
+    *width = w;
+    *height = h;
+    if (max_width > 0 && w > max_width) {
+        int32_t nh = (int32_t)floor((double)h * max_width / w + 0.5);
+        nh = nh < 1 ? 1 : nh;
+        float *scaled = ecs_os_malloc((ecs_size_t)((size_t)max_width * nh * 4 * sizeof(float)));
+        stbir_resize_float_linear(result, w, h, 0, scaled, max_width, nh, 0, STBIR_4CHANNEL);
+        stbi_image_free(result);
+        result = scaled;
+        *width = max_width;
+        *height = nh;
+    }
+
+done:
+    return result;
+}
