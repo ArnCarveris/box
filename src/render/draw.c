@@ -708,6 +708,9 @@ static void box_draws_observers(
     box_draws_observer(world, d, "DrawsOnTextRemove", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(Text) }},
         .events = { EcsOnRemove } }, BoxDrawsOnTextRemove);
+    box_draws_observer(world, d, "DrawsOnTextSpans", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ecs_id(TextSpans) }},
+        .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnChange);
     box_draws_observer(world, d, "DrawsOnColor", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(Rgb) }},
         .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnChange);

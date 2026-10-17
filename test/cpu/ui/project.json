@@ -164,6 +164,23 @@
                     "platform_called_on_changes",
                     "captured_keeps_shape"
                 ]
+            },
+            {
+                "id": "TextSpans",
+                "testcases": [
+                    "glyph_to_color",
+                    "outside_spans_keep_entity_color",
+                    "later_span_wins",
+                    "ranges_clipped",
+                    "empty_and_inverted_ranges",
+                    "multi_byte",
+                    "span_starts_inside_character",
+                    "wrapped_offsets",
+                    "span_change_no_relayout",
+                    "remove_spans_no_relayout",
+                    "script_sets_spans",
+                    "copy_owns_spans"
+                ]
             }
         ]
     }

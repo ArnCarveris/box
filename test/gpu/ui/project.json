@@ -203,6 +203,20 @@
                 "testcases": [
                     "render_to_texture"
                 ]
+            },
+            {
+                "id": "TextSpans",
+                "testcases": [
+                    "two_words_two_colors",
+                    "entity_color_outside_spans",
+                    "span_alpha",
+                    "span_change_recolors_next_frame",
+                    "remove_spans_restores_entity_color",
+                    "wrapped_paragraph_keeps_colors",
+                    "world_space",
+                    "render_to_texture",
+                    "no_extra_batches"
+                ]
             }
         ]
     }

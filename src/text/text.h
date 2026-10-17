@@ -59,6 +59,7 @@ typedef struct box_text_glyph_t {
     float uv[4];    /**< Area of the page: u scale, v scale, u offset, v offset */
     float range;    /**< Distance range of the field in texture coordinates of the page */
     uint32_t page;  /**< Backend texture handle of the atlas page */
+    int32_t offset; /**< Byte offset of the first byte of the character of the glyph */
 } box_text_glyph_t;
 
 /** Caret before a character of a laid out Text, or after its last one */
@@ -121,6 +122,7 @@ typedef struct box_text_atlas_glyph_t {
 typedef struct box_text_placed_t {
     float x;                                /**< Pen x of the glyph on its line */
     int32_t line;                           /**< Line of the glyph */
+    int32_t offset;                         /**< Byte offset of the character of the glyph */
     const box_text_atlas_glyph_t *glyph;    /**< Atlas area of the glyph */
 } box_text_placed_t;
 
@@ -298,6 +300,20 @@ float box_text_face_kern(
  */
 uint64_t box_text_key(
     const Text *text);
+
+/** Get the color of the span a byte offset of a Text falls in.
+ *
+ * The last span whose range, clipped to the string, holds the offset wins.
+ *
+ * @param spans The spans of the Text, NULL for none
+ * @param length Byte length of Text.value
+ * @param offset Byte offset of the first byte of a glyph
+ * @return The display encoded color, NULL when no span holds the offset
+ */
+const rgba* box_text_span_color(
+    const TextSpans *spans,
+    int32_t length,
+    int32_t offset);
 
 /** Lay out a Text into its TextGlyphs and TextBounds.
  *

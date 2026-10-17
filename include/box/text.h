@@ -71,6 +71,26 @@ ECS_STRUCT(Text, {
     TextWrap wrap;      /**< How the lines follow the width of a layout, TextWrapWords */
 });
 
+/** A byte range of Text.value drawn in a color of its own */
+ECS_STRUCT(TextSpan, {
+    int32_t start; /**< Byte offset of the first byte of the range */
+    int32_t end;   /**< Byte offset after the range */
+    rgba color;    /**< Display encoded color, its alpha multiplies the opacity of the text */
+});
+
+/** Colored byte ranges of the Text of the entity.
+ *
+ * A glyph whose first byte falls in a span takes its color instead of the Rgb of the entity;
+ * a later span wins where spans overlap, ranges are clipped to the string and a glyph outside
+ * every span keeps the entity color. Tint, Opacity, Emissive and BlendMode apply as before.
+ *
+ * Spans only color glyphs: layout, kerning, wrapping, TextBounds and the glyph atlas do not
+ * depend on them, so a change of TextSpans alone recolors the glyphs without a new layout.
+ */
+ECS_STRUCT(TextSpans, {
+    ecs_vec(TextSpan) spans; /**< The spans, TextSpan, later ones over earlier ones */
+});
+
 /** Size of the block of lines of a Text, in logical pixels, written by the engine.
  *
  * The width is the widest line without trailing spaces, or the width a layout wraps the lines

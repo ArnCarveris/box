@@ -176,6 +176,7 @@ static void box_text_char(
     box_text_placed_t *p = ecs_vec_append_t(NULL, &run->s->placed, box_text_placed_t);
     p->x = x;
     p->line = run->line;
+    p->offset = offset;
     p->glyph = area;
     run->pen = x + advance;
     run->line_end = run->pen;
@@ -278,6 +279,7 @@ static void box_text_emit(
         q->uv[3] = (float)g->y / p;
         q->range = BOX_TEXT_RANGE / p;
         q->page = page->handle;
+        q->offset = placed[i].offset;
     }
 
     box_text_emit_carets(run, text, width, height, out);

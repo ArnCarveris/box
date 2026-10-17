@@ -4,6 +4,7 @@
  *
  * Every glyph of a Text is a slot of a glyph batch keyed like a 2D shape plus its atlas page,
  * drawn with etc/shaders/shape2d.wgsl, which reads the page as a multi channel distance field.
+ * TextSpans color glyphs through the color of their instances, in the same batches.
  *
  * Pages reach the backend as texture updates: whole when new or grown, then per frame the area
  * of the glyphs completed since the last one.
@@ -247,6 +248,66 @@ static bool box_draws_text_fits(
     return result;
 }
 
+/** Get the lowest span alpha the glyphs of a Text take, which decides how its batch blends.
+ *
+ * @param spans The spans of the Text
+ * @param length Byte length of Text.value
+ * @param glyphs The glyphs
+ * @param count Number of glyphs
+ * @return The alpha from 0 to 1, 1 when no glyph is in a span
+ */
+static float box_draws_text_spans_alpha(
+    const TextSpans *spans,
+    int32_t length,
+    const box_text_glyph_t *glyphs,
+    int32_t count)
+{
+    uint8_t lowest = 255;
+    int32_t i;
+    for (i = 0; i < count && lowest; i ++) {
+        const rgba *color = box_text_span_color(spans, length, glyphs[i].offset);
+        if (color && color->a < lowest) {
+            lowest = color->a;
+        }
+    }
+
+    return (float)lowest / 255.0f;
+}
+
+/** Write the instance of a glyph in the color of the span it falls in.
+ *
+ * @param out The instance
+ * @param transform World transform of the text, NULL for the identity
+ * @param g The glyph
+ * @param material Material components of the text
+ * @param color Display encoded color of the span, NULL for the color of the entity
+ */
+static void box_draws_glyph_span(
+    box_render_instance_t *out,
+    const WorldTransform *transform,
+    const box_text_glyph_t *g,
+    const box_draw_material_t *material,
+    const rgba *color)
+{
+    box_draw_material_t m;
+    Rgb rgb;
+    Opacity opacity;
+    if (!color) {
+        box_draws_glyph(out, transform, g, material);
+        goto done;
+    }
+
+    m = *material;
+    rgb = (Rgb){ color->r, color->g, color->b };
+    opacity.value = material->opacity ? glm_clamp(material->opacity->value, 0.0f, 1.0f) : 1.0f;
+    opacity.value *= (float)color->a / 255.0f;
+    m.color = &rgb;
+    m.opacity = &opacity;
+    box_draws_glyph(out, transform, g, &m);
+done:
+    return;
+}
+
 void box_draws_text_update(
     ecs_world_t *world,
     box_render_draws_t *d,
@@ -267,7 +328,17 @@ void box_draws_text_update(
         .inherited = count && tint.keep < 1.0f ? &tint : NULL,
         .fade = fade
     };
-    box_draws_text_key(world, d, e, box_draws_alpha(&material), &key);
+    const TextSpans *spans = count ? ecs_get(world, e, TextSpans) : NULL;
+    const Text *text = spans && ecs_vec_count(&spans->spans) ? ecs_get(world, e, Text) : NULL;
+    int32_t length = text && text->value ? (int32_t)strlen(text->value) : 0;
+    float alpha = box_draws_alpha(&material);
+    if (length) {
+        alpha *= box_draws_text_spans_alpha(spans, length, glyphs, count);
+    } else {
+        spans = NULL;
+    }
+
+    box_draws_text_key(world, d, e, alpha, &key);
     TextSlots *ts = ecs_get_mut(world, e, TextSlots);
     if (!box_draws_text_fits(d, ts, glyphs, count, &key)) {
         box_draws_text_remove(world, d, e);
@@ -288,7 +359,13 @@ void box_draws_text_update(
         box_draw_batch_t *b = box_draws_batch(d, at->batch);
         box_render_instance_t *inst = ecs_vec_get_t(
             &b->instances, box_render_instance_t, at->slot);
-        box_draws_glyph(inst, transform, &glyphs[i], &material);
+        if (spans) {
+            box_draws_glyph_span(inst, transform, &glyphs[i], &material,
+                box_text_span_color(spans, length, glyphs[i].offset));
+        } else {
+            box_draws_glyph(inst, transform, &glyphs[i], &material);
+        }
+
         box_draws_lift(inst, transform, layer);
         box_draws_slot_changed(b, at->slot);
     }

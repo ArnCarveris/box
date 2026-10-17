@@ -22,6 +22,31 @@ box_text_state_t* box_text_state_get(
     return r ? r->state : NULL;
 }
 
+const rgba* box_text_span_color(
+    const TextSpans *spans,
+    int32_t length,
+    int32_t offset)
+{
+    const TextSpan *first = spans ? ecs_vec_first(&spans->spans) : NULL;
+    int32_t i = first ? ecs_vec_count(&spans->spans) : 0;
+    const rgba *result = NULL;
+    if (offset < 0 || offset >= length) {
+        goto done;
+    }
+
+    while (i -- > 0) {
+        int32_t start = first[i].start > 0 ? first[i].start : 0;
+        int32_t end = first[i].end < length ? first[i].end : length;
+        if (offset >= start && offset < end) {
+            result = &first[i].color;
+            break;
+        }
+    }
+
+done:
+    return result;
+}
+
 /** Free the registry of a world.
  *
  * @param s The registry
@@ -466,10 +491,13 @@ void BoxTextImport(
     ECS_META_COMPONENT(world, Text);
     ECS_META_COMPONENT(world, TextBounds);
     ECS_META_COMPONENT(world, TextCaret);
+    ECS_META_COMPONENT(world, TextSpan);
+    ECS_META_COMPONENT(world, TextSpans);
     box_owned_hooks(world, Font, BOX_OWNED_STR(Font, path));
     ecs_set_hooks(world, Font, { .ctor = box_font_ctor });
     box_owned_hooks(world, FontStatus, BOX_OWNED_STR(FontStatus, error));
     box_owned_hooks(world, Text, BOX_OWNED_STR(Text, value));
+    box_owned_hooks(world, TextSpans, BOX_OWNED_VEC(TextSpans, spans, TextSpan));
 
     ECS_COMPONENT_DEFINE(world, TextGlyphs);
     box_owned_hooks(world, TextGlyphs,
