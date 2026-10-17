@@ -135,6 +135,8 @@ static void box_console_capture(
     }
 
     box_console_toggle_keys(it->world, con, keep);
+    con->clear = con->clear || (in->keys[KeyL].pressed &&
+        (in->keys[KeyCtrlLeft].down || in->keys[KeyCtrlRight].down));
     for (i = KeyNone + 1; i < BOX_KEY_COUNT; i ++) {
         con->pressed[i] = con->pressed[i] || in->keys[i].pressed;
         if (!keep[i]) {
@@ -182,6 +184,7 @@ static void box_console_reset_input(
     ecs_os_zeromem(&con->pressed);
     ecs_vec_clear(&con->typed);
     con->wheel = 0;
+    con->clear = false;
 }
 
 /** Enable the toggle action while the world has a Surface to show the console on.

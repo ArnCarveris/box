@@ -68,6 +68,7 @@ typedef struct box_console_t {
     ecs_vec_t typed;            /**< char of the text typed since the last update */
     bool pressed[BOX_KEY_COUNT];/**< Keys pressed since the last update */
     float wheel;                /**< Wheel movement since the last update */
+    bool clear;                 /**< Ctrl+L was pressed since the last update */
     int32_t scroll;             /**< Scrollback lines scrolled up from the newest */
     bool shown;                 /**< The content is shown and the console takes the keyboard */
     bool enabled;               /**< The toggle action is enabled */
@@ -105,6 +106,9 @@ bool box_console_edit(
 
 /** Run a line in the session of the console and add it and its output to the scrollback.
  *
+ * A console command (cls) runs in the console and never reaches the session, help also lists
+ * the console commands.
+ *
  * @param world The world
  * @param con The console state
  * @param line The command line
@@ -116,6 +120,13 @@ char* box_console_exec(
     box_console_t *con,
     const char *line,
     bool *error);
+
+/** Empty the scrollback and reset the scroll position, keeping the input line and history.
+ *
+ * @param con The console state
+ */
+void box_console_clear(
+    box_console_t *con);
 
 /** Private singleton that points to the console state of a world */
 typedef struct ConsoleHost {

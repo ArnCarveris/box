@@ -4,6 +4,9 @@
  *
  * The toggle action (the grave key) opens and closes it. The console is UI content in its own
  * scene, drawn by its own view after every other view, and takes the keyboard while open.
+ *
+ * The console runs cls itself, so it never reaches the session: cls empties the scrollback and
+ * Ctrl+L does the same without touching the input line. help in the console lists cls too.
  */
 
 #ifndef BOX_CONSOLE_H
@@ -74,8 +77,8 @@ void BoxConsoleImport(
 
 /** Run a line in the console as if it was typed and entered.
  *
- * The line and its output are added to the scrollback and the input history. The script
- * function box.console.run(line) does the same and returns the output.
+ * The line and its output are added to the scrollback and the input history, cls empties the
+ * scrollback and returns an empty output. box.console.run(line) does the same in a script.
  *
  * @param world The world
  * @param line The command line

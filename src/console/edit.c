@@ -282,17 +282,175 @@ static ecs_entity_t box_console_session(
     return con->session;
 }
 
+/** A command the console runs itself, without passing the line to its session.
+ *
+ * @param world The world
+ * @param con The console state
+ * @param args Number of arguments after the command name
+ * @param error Set to whether the command failed
+ * @return The output, which the caller frees
+ */
+typedef char* (*box_console_command_cb)(
+    ecs_world_t *world,
+    box_console_t *con,
+    int32_t args,
+    bool *error);
+
+/** A console command, listed by help in the console group */
+typedef struct box_console_command_t {
+    const char *name;               /**< Command name */
+    const char *brief;              /**< One line description */
+    box_console_command_cb run;     /**< Runs after the line is in the scrollback */
+} box_console_command_t;
+
+/** Spaces between the name column and the brief, as help lists the session commands */
+#define BOX_CONSOLE_HELP_GAP (2)
+
+/** Name of the help group of the console commands */
+#define BOX_CONSOLE_HELP_GROUP "console"
+
+/** The cls command: empty the scrollback, including the line of cls itself.
+ *
+ * @param world The world
+ * @param con The console state
+ * @param args Number of arguments, cls takes none
+ * @param error Set to whether the command failed
+ * @return Nothing, or the error for arguments
+ */
+static char* box_console_cls(
+    ecs_world_t *world,
+    box_console_t *con,
+    int32_t args,
+    bool *error)
+{
+    char *result = NULL;
+    (void)world;
+    if (args) {
+        result = flecs_asprintf(BOX_COMMAND_ERROR "cls takes no arguments, got %d", args);
+        error[0] = true;
+    } else {
+        box_console_clear(con);
+        result = ecs_os_strdup("");
+    }
+
+    return result;
+}
+
+/** The commands only the console runs */
+static const box_console_command_t box_console_commands[] = {
+    { "cls", "Clear the scrollback of the console, Ctrl+L does the same", box_console_cls }
+};
+
+/** Number of console commands */
+#define BOX_CONSOLE_COMMAND_COUNT \
+    ((int32_t)(sizeof(box_console_commands) / sizeof(box_console_commands[0])))
+
+/** Find the next whitespace separated word of a line.
+ *
+ * @param p The text after the previous word, moved after the word
+ * @param len Receives the length of the word
+ * @return The start of the word, NULL at the end of the line
+ */
+static const char* box_console_word(
+    const char **p,
+    int32_t *len)
+{
+    const char *result = *p + strspn(*p, " \t\n\r");
+    *len = (int32_t)strcspn(result, " \t\n\r");
+    *p = result + *len;
+
+    return *len ? result : NULL;
+}
+
+/** Find the console command of a word.
+ *
+ * @param word The word
+ * @param len Length of the word
+ * @return The command, NULL when the word is not a console command
+ */
+static const box_console_command_t* box_console_command(
+    const char *word,
+    int32_t len)
+{
+    const box_console_command_t *result = NULL;
+    int32_t i;
+    for (i = 0; word && i < BOX_CONSOLE_COMMAND_COUNT && !result; i ++) {
+        const char *name = box_console_commands[i].name;
+        if ((int32_t)strlen(name) == len && !strncmp(word, name, (size_t)len)) {
+            result = &box_console_commands[i];
+        }
+    }
+
+    return result;
+}
+
+/** Append the console group of help: a header and the console commands with their briefs.
+ *
+ * @param buf The buffer
+ * @param only The command to list, NULL for all of them
+ */
+static void box_console_help(
+    ecs_strbuf_t *buf,
+    const box_console_command_t *only)
+{
+    int32_t i, width = 0;
+    ecs_strbuf_appendstr(buf, BOX_CONSOLE_HELP_GROUP " (console only)");
+    for (i = 0; i < BOX_CONSOLE_COMMAND_COUNT; i ++) {
+        int32_t len = (int32_t)strlen(box_console_commands[i].name);
+        width = len > width ? len : width;
+    }
+
+    for (i = 0; i < BOX_CONSOLE_COMMAND_COUNT; i ++) {
+        const box_console_command_t *cmd = &box_console_commands[i];
+        if (!only || only == cmd) {
+            ecs_strbuf_append(buf, "\n%-*s%s", width + BOX_CONSOLE_HELP_GAP, cmd->name,
+                cmd->brief);
+        }
+    }
+}
+
 char* box_console_exec(
     ecs_world_t *world,
     box_console_t *con,
     const char *line,
     bool *error)
 {
-    ecs_entity_t session = box_console_session(world, con);
-    bool failed = false;
-    char *result = box_terminal_run(world, session, line, &failed);
+    const char *p = line, *word, *topic;
+    int32_t len, topic_len, skip, args;
+    const box_console_command_t *cmd, *help_cmd = NULL;
+    bool failed = false, help, help_group;
+    char *result = NULL;
+    word = box_console_word(&p, &len);
+    topic = box_console_word(&p, &topic_len);
+    for (args = topic != NULL; box_console_word(&p, &skip); args ++) { }
+    cmd = box_console_command(word, len);
+    help = word && len == 4 && !strncmp(word, "help", 4) && args <= 1;
+    help_cmd = help ? box_console_command(topic, topic_len) : NULL;
+    help_group = help && topic && topic_len == (int32_t)strlen(BOX_CONSOLE_HELP_GROUP) &&
+        !strncmp(topic, BOX_CONSOLE_HELP_GROUP, (size_t)topic_len);
+    if (help_cmd || help_group) {
+        ecs_strbuf_t buf = ECS_STRBUF_INIT;
+        box_console_help(&buf, help_cmd);
+        result = ecs_strbuf_get(&buf);
+    } else if (!cmd) {
+        result = box_terminal_run(world, box_console_session(world, con), line, &failed);
+    }
+
+    if (help && !topic && !failed) {
+        ecs_strbuf_t buf = ECS_STRBUF_INIT;
+        ecs_strbuf_appendstr(&buf, result);
+        ecs_strbuf_appendstr(&buf, result[0] ? "\n\n" : "");
+        box_console_help(&buf, NULL);
+        ecs_os_free(result);
+        result = ecs_strbuf_get(&buf);
+    }
+
     box_console_history_add(con, line);
     box_console_append(con, BOX_CONSOLE_PROMPT, line, BoxConsoleCommand);
+    if (cmd) {
+        result = cmd->run(world, con, args, &failed);
+    }
+
     if (result[0]) {
         box_console_append(con, NULL, result, failed ? BoxConsoleError : BoxConsoleOutput);
     }
@@ -305,6 +463,19 @@ char* box_console_exec(
     }
 
     return result;
+}
+
+void box_console_clear(
+    box_console_t *con)
+{
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&con->lines); i ++) {
+        ecs_os_free(ecs_vec_get_t(&con->lines, box_console_line_t, i)->text);
+    }
+
+    ecs_vec_clear(&con->lines);
+    con->scroll = 0;
+    con->refresh = true;
 }
 
 /** Run the input line and clear it, or only clear it when it is blank.
@@ -386,6 +557,10 @@ bool box_console_edit(
     if (key[KeyPageUp] || key[KeyPageDown] || con->wheel != 0) {
         box_console_scroll(con, (key[KeyPageUp] ? page : 0) - (key[KeyPageDown] ? page : 0) +
             (int32_t)(con->wheel * BOX_CONSOLE_WHEEL_LINES));
+    }
+
+    if (con->clear) {
+        box_console_clear(con);
     }
 
     if (key[KeyEnter] || key[KeyKpEnter]) {

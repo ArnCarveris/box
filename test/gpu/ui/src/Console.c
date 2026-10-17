@@ -1243,3 +1243,342 @@ void Console_paste_closed_not_taken(void) {
 
     ecs_fini(world);
 }
+
+/** Type a line into the open console and press Enter.
+ *
+ * @param world The world
+ * @param line The line
+ */
+static void console_cls_enter(
+    ecs_world_t *world,
+    const char *line)
+{
+    box_input_key_type(world, line, 1);
+    box_input_key_press(world, KeyEnter, 1);
+    while (box_input_pending(world)) {
+        ecs_progress(world, 0);
+    }
+
+    ecs_progress(world, 0);
+}
+
+/** Count the line elements of the console log and how many of them show text.
+ *
+ * @param world The world
+ * @param shown Receives the number of lines that are not empty
+ * @return The number of line elements
+ */
+static int32_t console_cls_lines(
+    ecs_world_t *world,
+    int32_t *shown)
+{
+    int32_t result = 0;
+    shown[0] = 0;
+    while (true) {
+        char name[64];
+        ecs_os_snprintf(name, sizeof(name), CONSOLE_LOG ".line_%d", result);
+        ecs_entity_t e = ecs_lookup(world, name);
+        if (!e) {
+            break;
+        }
+
+        shown[0] += ecs_get(world, e, Text)->value[0] != '\0';
+        result ++;
+    }
+
+    return result;
+}
+
+/** Get the text of a line element of the console log counted from the bottom.
+ *
+ * @param world The world
+ * @param from_bottom 0 for the newest line
+ * @return The text
+ */
+static const char* console_cls_line(
+    ecs_world_t *world,
+    int32_t from_bottom)
+{
+    int32_t shown, count = console_cls_lines(world, &shown);
+    char name[64];
+    ecs_os_snprintf(name, sizeof(name), CONSOLE_LOG ".line_%d", count - 1 - from_bottom);
+
+    return ecs_get(world, ecs_lookup(world, name), Text)->value;
+}
+
+void Console_cls_clears_scrollback(void) {
+    // ui/console
+    ecs_world_t *world = console_paste_world(true);
+    int32_t i, shown;
+    for (i = 0; i < 40; i ++) {
+        char name[32];
+        ecs_os_snprintf(name, sizeof(name), "many.c%02d", i);
+        ecs_entity(world, { .name = name });
+    }
+
+    ecs_entity(world, { .name = "things.alpha" });
+    console_cls_enter(world, "ls many");
+    box_input_key_press(world, KeyPageUp, 1);
+    while (box_input_pending(world)) {
+        ecs_progress(world, 0);
+    }
+
+    int32_t lines = console_cls_lines(world, &shown);
+    test_assert(lines > 2);
+    test_int(shown, lines);
+
+    console_cls_enter(world, "cls");
+    test_int(console_cls_lines(world, &shown), lines);
+    test_int(shown, 0);
+    test_str(console_paste_line(world), "");
+
+    console_cls_enter(world, "ls things");
+    test_int(console_cls_lines(world, &shown), lines);
+    test_int(shown, 2);
+    test_str(console_cls_line(world, 1), "> ls things");
+    test_str(console_cls_line(world, 0), "alpha");
+
+    ecs_fini(world);
+}
+
+void Console_ctrl_l_clears_keeps_input(void) {
+    // ui/console
+    ecs_world_t *world = console_paste_world(true);
+    int32_t shown;
+    ecs_entity(world, { .name = "things.alpha" });
+    console_cls_enter(world, "ls things");
+    console_cls_lines(world, &shown);
+    test_int(shown, 2);
+
+    box_input_key_type(world, "abc", 1);
+    box_input_key_press(world, KeyLeft, 1);
+    box_input_key(world, KeyCtrlLeft, true);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_input_key_press(world, KeyL, 1);
+    box_input_key(world, KeyCtrlLeft, false);
+    while (box_input_pending(world)) {
+        ecs_progress(world, 0);
+    }
+
+    ecs_progress(world, 0);
+    test_assert(console_cls_lines(world, &shown) > 0);
+    test_int(shown, 0);
+    test_str(console_paste_line(world), "ab");
+    test_str(ecs_get(world, ecs_lookup(world, CONSOLE_INPUT ".after"), Text)->value, "c");
+    test_bool(ecs_singleton_get(world, Console)->open, true);
+
+    ecs_os_free(box_console_run(world, "ls things", NULL));
+    box_input_key_type(world, "l", 1);
+    while (box_input_pending(world)) {
+        ecs_progress(world, 0);
+    }
+
+    ecs_progress(world, 0);
+    test_str(console_paste_line(world), "abl");
+    console_cls_lines(world, &shown);
+    test_int(shown, 2);
+
+    ecs_fini(world);
+}
+
+void Console_cls_kept_in_history(void) {
+    // ui/console
+    ecs_world_t *world = console_paste_world(true);
+    console_cls_enter(world, "ls");
+    console_cls_enter(world, "cls");
+    box_input_key_press(world, KeyUp, 1);
+    while (box_input_pending(world)) {
+        ecs_progress(world, 0);
+    }
+
+    test_str(console_paste_line(world), "cls");
+    box_input_key_press(world, KeyUp, 1);
+    while (box_input_pending(world)) {
+        ecs_progress(world, 0);
+    }
+
+    test_str(console_paste_line(world), "ls");
+
+    ecs_fini(world);
+}
+
+void Console_cls_with_args_error(void) {
+    // ui/console
+    ecs_world_t *world = console_paste_world(true);
+    int32_t shown;
+    ecs_entity(world, { .name = "things.alpha" });
+    console_cls_enter(world, "ls things");
+    console_cls_enter(world, "cls x");
+    console_cls_lines(world, &shown);
+    test_int(shown, 4);
+    test_str(console_cls_line(world, 3), "> ls things");
+    test_str(console_cls_line(world, 1), "> cls x");
+    test_str(console_cls_line(world, 0), BOX_COMMAND_ERROR "cls takes no arguments, got 1");
+    const Console *c = ecs_singleton_get(world, Console);
+    char name[64];
+    int32_t count = console_cls_lines(world, &shown);
+    ecs_os_snprintf(name, sizeof(name), CONSOLE_LOG ".line_%d", count - 1);
+    const Rgb *color = ecs_get(world, ecs_lookup(world, name), Rgb);
+    test_int(color->r, c->error.r);
+    test_int(color->g, c->error.g);
+    test_int(color->b, c->error.b);
+
+    bool error = false;
+    char *out = box_console_run(world, "cls a b", &error);
+    test_bool(error, true);
+    test_str(out, BOX_COMMAND_ERROR "cls takes no arguments, got 2");
+    ecs_os_free(out);
+
+    ecs_entity_t session = ecs_lookup(world, BOX_CONSOLE_SESSION);
+    test_int(ecs_get(world, session, TerminalStatus)->commands, 1);
+
+    ecs_fini(world);
+}
+
+void Console_cls_not_in_session(void) {
+    // ui/console
+    ecs_world_t *world = console_paste_world(true);
+    ecs_entity(world, { .name = "things.alpha" });
+    console_cls_enter(world, "ls things");
+    console_cls_enter(world, "cls");
+    console_cls_enter(world, "  cls  ");
+
+    ecs_entity_t session = ecs_lookup(world, BOX_CONSOLE_SESSION);
+    test_assert(session != 0);
+    const TerminalStatus *st = ecs_get(world, session, TerminalStatus);
+    test_int(st->commands, 1);
+    char *path = flecs_asprintf("%s/commands.log", st->dir);
+    char log[256] = {0};
+    FILE *f = fopen(path, "r");
+    test_assert(f != NULL);
+    fread(log, 1, sizeof(log) - 1, f);
+    fclose(f);
+    test_str(log, "$ ls things\nalpha\n");
+    ecs_os_free(path);
+
+    char *out = box_terminal_run(world, session, "commands", NULL);
+    test_str(out, "$ ls things\nalpha");
+    ecs_os_free(out);
+
+    ecs_fini(world);
+}
+
+void Console_cls_from_run(void) {
+    // ui/console
+    ecs_world_t *world = console_paste_world(true);
+    int32_t shown;
+    ecs_entity(world, { .name = "things.alpha" });
+    ecs_os_free(box_console_run(world, "ls things", NULL));
+    ecs_progress(world, 0);
+    console_cls_lines(world, &shown);
+    test_int(shown, 2);
+
+    bool error = true;
+    char *out = box_console_run(world, "cls", &error);
+    test_bool(error, false);
+    test_str(out, "");
+    ecs_os_free(out);
+    ecs_progress(world, 0);
+    console_cls_lines(world, &shown);
+    test_int(shown, 0);
+
+    ecs_os_free(box_console_run(world, "ls things", NULL));
+    test_assert(ecs_script_run(world, "run",
+        "using box.text\n"
+        "const out: string = box.console.run(\"cls\")\n"
+        "result {\n"
+        "  Text: {value: $out}\n"
+        "}\n", NULL) == 0);
+    test_str(ecs_get(world, ecs_lookup(world, "result"), Text)->value, "");
+    ecs_progress(world, 0);
+    console_cls_lines(world, &shown);
+    test_int(shown, 0);
+
+    ecs_fini(world);
+}
+
+void Console_cls_unknown_over_session(void) {
+    // ui/console
+    ecs_world_t *world = console_paste_world(true);
+    int32_t shown;
+    ecs_entity(world, { .name = "things.alpha" });
+    console_cls_enter(world, "ls things");
+
+    ecs_entity_t t = box_terminal_new(world);
+    bool error = false;
+    char *out = box_terminal_run(world, t, "cls", &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "unknown command 'cls'") != NULL);
+    ecs_os_free(out);
+    test_assert(ecs_lookup(world, "box.command.commands.cls") == 0);
+
+    ecs_progress(world, 0);
+    console_cls_lines(world, &shown);
+    test_int(shown, 2);
+
+    ecs_fini(world);
+}
+
+void Console_help_lists_console_commands(void) {
+    // ui/console
+    ecs_world_t *world = console_paste_world(true);
+    console_cls_enter(world, "help");
+    test_str(console_cls_line(world, 0),
+        "cls  Clear the scrollback of the console, Ctrl+L does the same");
+    test_str(console_cls_line(world, 1), "console (console only)");
+    test_str(console_cls_line(world, 2), "");
+
+    char *out = box_console_run(world, "help", NULL);
+    test_assert(!strncmp(out, "help", 4) || strstr(out, "\nhelp") != NULL);
+    test_assert(strstr(out, "\n\nconsole (console only)\ncls  ") != NULL);
+    ecs_os_free(out);
+
+    bool error = true;
+    out = box_console_run(world, "help cls", &error);
+    test_bool(error, false);
+    test_str(out, "console (console only)\n"
+        "cls  Clear the scrollback of the console, Ctrl+L does the same");
+    ecs_os_free(out);
+
+    out = box_console_run(world, "help console", &error);
+    test_bool(error, false);
+    test_str(out, "console (console only)\n"
+        "cls  Clear the scrollback of the console, Ctrl+L does the same");
+    ecs_os_free(out);
+
+    out = box_console_run(world, "help ls", &error);
+    test_bool(error, false);
+    test_assert(!strncmp(out, "usage: ls", 9));
+    test_assert(strstr(out, "console only") == NULL);
+    ecs_os_free(out);
+
+    ecs_fini(world);
+}
+
+void Console_help_over_session_no_console(void) {
+    // ui/console
+    ecs_world_t *world = console_paste_world(true);
+    ecs_entity_t t = box_terminal_new(world);
+    char *out = box_terminal_run(world, t, "help", NULL);
+    test_assert(strstr(out, "\nhelp") != NULL || !strncmp(out, "help", 4));
+    test_assert(strstr(out, "console only") == NULL);
+    test_assert(strstr(out, "\ncls") == NULL);
+    test_assert(strncmp(out, "cls", 3));
+    ecs_os_free(out);
+
+    bool error = false;
+    out = box_terminal_run(world, t, "help cls", &error);
+    test_bool(error, true);
+    ecs_os_free(out);
+
+    out = box_console_run(world, "help", NULL);
+    test_assert(strstr(out, "console only") != NULL);
+    ecs_os_free(out);
+
+    out = box_terminal_run(world, ecs_lookup(world, BOX_CONSOLE_SESSION), "help", NULL);
+    test_assert(strstr(out, "console only") == NULL);
+    ecs_os_free(out);
+
+    ecs_fini(world);
+}

@@ -166,7 +166,16 @@
                     "paste_shortcut",
                     "paste_platform_event",
                     "paste_drops_line_breaks",
-                    "paste_closed_not_taken"
+                    "paste_closed_not_taken",
+                    "cls_clears_scrollback",
+                    "ctrl_l_clears_keeps_input",
+                    "cls_kept_in_history",
+                    "cls_with_args_error",
+                    "cls_not_in_session",
+                    "cls_from_run",
+                    "cls_unknown_over_session",
+                    "help_lists_console_commands",
+                    "help_over_session_no_console"
                 ]
             },
             {
