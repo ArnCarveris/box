@@ -31,6 +31,25 @@
                     "ortho_default_height",
                     "ortho_scale"
                 ]
+            },
+            {
+                "id": "ReflectionBake",
+                "testcases": [
+                    "script_defaults",
+                    "c_defaults",
+                    "zero_is_literal",
+                    "status_follows_bake",
+                    "singleton_bake_has_status",
+                    "error_is_owned",
+                    "invalid_resolution_sets_error",
+                    "scene_probe_counts",
+                    "scene_probe_disabled",
+                    "singleton_scene_probe",
+                    "probe_count_follows_adds_and_removes",
+                    "probe_outside_bake_scene_ignored",
+                    "slots_are_stable",
+                    "probes_beyond_capacity"
+                ]
             }
         ]
     }

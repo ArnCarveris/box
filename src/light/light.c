@@ -143,6 +143,79 @@ static void box_light_bake_remove(
     }
 }
 
+/** Construct ReflectionBake values with the default resolution, budget and scene probe.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_reflection_bake_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    ReflectionBake *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (ReflectionBake){
+            .resolution = 128,
+            .budget_ms = 1.0f,
+            .scene_probe = true,
+            .scene_probe_height = 2.0f
+        };
+    }
+}
+
+/** Construct ReflectionProbe values with the default boxes and blend.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_reflection_probe_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    ReflectionProbe *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (ReflectionProbe){
+            .extent = {5.0f, 5.0f, 5.0f},
+            .blend = 1.0f,
+            .projection = {5.0f, 5.0f, 5.0f}
+        };
+    }
+}
+
+/** Add ReflectionBakeStatus to an entity that got ReflectionBake.
+ *
+ * @param it The observer iterator
+ */
+static void box_reflection_bake_add(
+    ecs_iter_t *it)
+{
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        ecs_set(it->stage, it->entities[i], ReflectionBakeStatus, {0});
+    }
+}
+
+/** Remove ReflectionBakeStatus from an entity that lost ReflectionBake.
+ *
+ * @param it The observer iterator
+ */
+static void box_reflection_bake_remove(
+    ecs_iter_t *it)
+{
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        ecs_remove(it->stage, it->entities[i], ReflectionBakeStatus);
+    }
+}
+
 void BoxLightImport(
     ecs_world_t *world)
 {
@@ -164,6 +237,12 @@ void BoxLightImport(
     ECS_META_COMPONENT(world, LightBakeStatus);
     box_owned_hooks(world, LightBakeStatus, BOX_OWNED_STR(LightBakeStatus, error));
     ECS_TAG_DEFINE(world, NoBake);
+    ECS_META_COMPONENT(world, ReflectionBake);
+    ecs_set_hooks(world, ReflectionBake, { .ctor = box_reflection_bake_ctor });
+    ECS_META_COMPONENT(world, ReflectionBakeStatus);
+    box_owned_hooks(world, ReflectionBakeStatus, BOX_OWNED_STR(ReflectionBakeStatus, error));
+    ECS_META_COMPONENT(world, ReflectionProbe);
+    ecs_set_hooks(world, ReflectionProbe, { .ctor = box_reflection_probe_ctor });
 
     ecs_observer(world, {
         .query.terms = {{ .id = ecs_id(LightBake) }},
@@ -174,5 +253,15 @@ void BoxLightImport(
         .query.terms = {{ .id = ecs_id(LightBake) }},
         .events = { EcsOnRemove },
         .callback = box_light_bake_remove
+    });
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(ReflectionBake) }},
+        .events = { EcsOnAdd },
+        .callback = box_reflection_bake_add
+    });
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(ReflectionBake) }},
+        .events = { EcsOnRemove },
+        .callback = box_reflection_bake_remove
     });
 }

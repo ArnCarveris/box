@@ -332,6 +332,7 @@ void BoxRenderImport(
     box_render_draws_init(world);
     box_render_lights_init(world);
     box_render_bake_init(world);
+    box_render_reflect_init(world);
     box_render_shadows_init(world);
     box_render_cull_status_init(world);
     box_render_effects_init(world);

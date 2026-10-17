@@ -106,6 +106,49 @@ ECS_STRUCT(LightBakeStatus, {
 /** Keeps a static shape out of the bake captures */
 extern ECS_TAG_DECLARE(NoBake);
 
+/** Cubemap reflection probes of a scene, placed on a Scene root or as a singleton for the
+ * default scene. Adding it adds ReflectionBakeStatus, removing it removes it.
+ *
+ * Values apply as specified: budget_ms 0 captures nothing, a resolution outside 8 to 512
+ * captures nothing and sets ReflectionBakeStatus.error.
+ */
+ECS_STRUCT(ReflectionBake, {
+    int32_t resolution;   /**< Face edge of a probe cubemap in texels, 8 to 512, default 128 */
+    float budget_ms;      /**< GPU time per frame spent capturing and prefiltering in
+                           *   milliseconds, default 1 */
+    bool scene_probe;     /**< The engine adds a probe covering the whole scene, default true */
+    float scene_probe_height; /**< Height of the scene probe above the bottom of the static
+                               *   bounds of the scene, default 2 */
+});
+
+/** Progress of the reflection probes of a scene, written by the engine next to ReflectionBake */
+ECS_STRUCT(ReflectionBakeStatus, {
+    int32_t probes;       /**< Probes of the scene, the scene probe included */
+    int32_t resident;     /**< Probes that have a cubemap slot; the others did not fit */
+    int32_t captured;     /**< Resident probes whose current content is captured and
+                           *   prefiltered */
+    bool converged;       /**< Every resident probe is captured and nothing is queued */
+    char *error;          /**< Why nothing is captured, such as an invalid setting, NULL for
+                           *   none */
+});
+
+/** Reflection probe of the scene with ReflectionBake the entity is in, placed by the world
+ * transform of the entity (position and rotation, scale is ignored).
+ *
+ * Its boxes are centered on the entity and oriented by its rotation. Where probes overlap,
+ * higher priority probes are blended first and cover lower ones; the scene probe is below all.
+ */
+ECS_STRUCT(ReflectionProbe, {
+    vec3 extent;          /**< Half size of the influence box, default {5, 5, 5} */
+    float blend;          /**< Distance inside the influence box over which the probe fades
+                           *   out, default 1, 0 is a hard edge */
+    int32_t priority;     /**< Blend order, higher first, default 0 */
+    vec3 projection;      /**< Half size of the box reflections are parallax corrected with,
+                           *   default {5, 5, 5}, {0, 0, 0} for an infinitely distant
+                           *   environment */
+    vec3 offset;          /**< Capture point relative to the entity, default {0, 0, 0} */
+});
+
 /** Register the box.light module.
  *
  * The first directional light of a scene casts the shadows of the views that enable them;

@@ -77,6 +77,9 @@
 /** First buffer handle of the light buffers of scenes */
 #define BOX_RENDER_BUFFER_LIGHT_FIRST (0x20000000u)
 
+/** First buffer handle of the reflection probe buffers of scenes */
+#define BOX_RENDER_BUFFER_REFLECT_FIRST (0x30000000u)
+
 /** First target handle of captures, the handles below belong to surfaces */
 #define BOX_RENDER_CAPTURE_TARGET_FIRST (0x40000000u)
 
@@ -222,6 +225,8 @@ typedef struct box_render_view_t {
     int32_t effect_count;       /**< Effect passes of the view, 0 renders without an HDR target */
     uint32_t volume;            /**< Probe volume the view samples, 0 for the hemisphere ambient */
     uint32_t volume_buffer;     /**< Probe buffer of the volume the view samples, 0 or 1 */
+    uint32_t reflections;       /**< Reflection probe buffer of the scene, 0 for none */
+    uint32_t reflection_count;  /**< Resident reflection probes in that buffer */
 } box_render_view_t;
 
 /** Kind of an effect pass of a view */
@@ -560,6 +565,7 @@ typedef struct box_render_gpu_stats_t {
     int64_t cull_ns;            /**< GPU time of the cull passes of views read back, 0 without
                                  *   timestamp queries */
     int32_t cull_passes;        /**< Cull passes whose GPU time cull_ns holds */
+    int32_t texture_layers;     /**< maxTextureArrayLayers of the device, 0 before it exists */
 } box_render_gpu_stats_t;
 
 /** GPU time of the probe captures the GPU backend measured since the last time it was taken */
@@ -1082,6 +1088,52 @@ bool box_render_bake_probe(
  */
 int32_t box_render_bake_pending(
     const ecs_world_t *world);
+
+/** Texture array layers the reflection probe slots assume while no device reports its limit,
+ * the WebGPU default of maxTextureArrayLayers */
+#define BOX_RENDER_REFLECT_LAYERS (256)
+
+/** A resident reflection probe as the reflection probe buffer of its scene holds it.
+ *
+ * The buffer lists the resident probes of a scene in blend order: higher priority first, the
+ * scene probe last. The boxes are centered on center and oriented by axes.
+ */
+typedef struct box_render_reflection_probe_t {
+    float center[3];        /**< World center of the influence and projection boxes */
+    float blend;            /**< Distance inside the influence box over which it fades out */
+    float axes[3][4];       /**< World directions of the local x, y and z axes, unit length, w
+                             *   unused */
+    float extent[3];        /**< Half size of the influence box */
+    int32_t priority;       /**< ReflectionProbe.priority, INT32_MIN for the scene probe */
+    float projection[3];    /**< Half size of the projection box, zero for no box projection */
+    uint32_t slot;          /**< Cubemap slot of the probe */
+    float capture[3];       /**< World capture point */
+    uint32_t scene;         /**< 1 for the scene probe, 0 for a ReflectionProbe */
+} box_render_reflection_probe_t;
+
+/** Register the system that keeps the reflection probes of every scene with ReflectionBake.
+ *
+ * Runs after the bake extract. Probes keep their cubemap slot while they stay resident; the
+ * resident probes of a scene are uploaded to its reflection probe buffer when they change,
+ * and the views of the scene point at it.
+ *
+ * @param world The world
+ */
+void box_render_reflect_init(
+    ecs_world_t *world);
+
+/** Get the resident reflection probes of a scene.
+ *
+ * @param world The world
+ * @param scene The scene, 0 for the default scene
+ * @param count Receives the number of probes
+ * @return The probes in blend order, valid until the next extract, NULL when the scene has
+ *         no ReflectionBake
+ */
+const box_render_reflection_probe_t* box_render_reflect_probes(
+    const ecs_world_t *world,
+    ecs_entity_t scene,
+    int32_t *count);
 
 /** Register the system that adds the effect passes of every view to the packet.
  *

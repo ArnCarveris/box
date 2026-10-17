@@ -261,9 +261,17 @@ static void box_gpu_device_init(
 {
     WGPUDeviceDescriptor desc = WGPU_DEVICE_DESCRIPTOR_INIT;
     WGPUFeatureName timestamps = WGPUFeatureName_TimestampQuery;
+    WGPULimits adapter = WGPU_LIMITS_INIT, limits = WGPU_LIMITS_INIT;
     if (wgpuAdapterHasFeature(gpu->adapter, timestamps)) {
         desc.requiredFeatureCount = 1;
         desc.requiredFeatures = &timestamps;
+    }
+
+    if (wgpuAdapterGetLimits(gpu->adapter, &adapter) == WGPUStatus_Success &&
+        adapter.maxTextureArrayLayers != WGPU_LIMIT_U32_UNDEFINED)
+    {
+        limits.maxTextureArrayLayers = adapter.maxTextureArrayLayers;
+        desc.requiredLimits = &limits;
     }
 
     desc.uncapturedErrorCallbackInfo.callback = box_gpu_on_error;
@@ -322,6 +330,26 @@ done:
 
 #endif
 
+/** Get the texture array layers the device supports.
+ *
+ * @param gpu The backend
+ * @return maxTextureArrayLayers of the device, the WebGPU default when it does not tell
+ */
+static int32_t box_gpu_texture_layers(
+    box_gpu_t *gpu)
+{
+    WGPULimits limits = WGPU_LIMITS_INIT;
+    int32_t result = BOX_RENDER_REFLECT_LAYERS;
+    if (wgpuDeviceGetLimits(gpu->device, &limits) == WGPUStatus_Success &&
+        limits.maxTextureArrayLayers != WGPU_LIMIT_U32_UNDEFINED &&
+        limits.maxTextureArrayLayers <= (uint32_t)INT32_MAX)
+    {
+        result = (int32_t)limits.maxTextureArrayLayers;
+    }
+
+    return result;
+}
+
 /** Create the device and the objects the targets share on the thread that renders.
  *
  * @param ctx The backend
@@ -350,6 +378,7 @@ done:
     ecs_os_mutex_lock(gpu->lock);
     gpu->stats.ready = result == 0;
     gpu->stats.failed = result != 0;
+    gpu->stats.texture_layers = result == 0 ? box_gpu_texture_layers(gpu) : 0;
     ecs_os_mutex_unlock(gpu->lock);
 
     return result;
@@ -600,6 +629,7 @@ static void box_gpu_fini(
     box_gpu_stats_publish(gpu);
     ecs_os_mutex_lock(gpu->lock);
     gpu->stats.ready = false;
+    gpu->stats.texture_layers = 0;
     ecs_os_mutex_unlock(gpu->lock);
 }
 
