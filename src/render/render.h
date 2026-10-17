@@ -53,6 +53,9 @@
 /** Shader handle of the engine compute shader of the atmosphere lookup tables */
 #define BOX_RENDER_SHADER_ATMOSPHERE (45)
 
+/** Shader handle of the engine compute shader that turns environment images into cubemaps */
+#define BOX_RENDER_SHADER_ENVIRONMENT (46)
+
 /** Cascades of the shadow map of a view at most */
 #define BOX_RENDER_SHADOW_CASCADES (4)
 
@@ -134,7 +137,10 @@ typedef enum box_render_resource_kind_t {
     BOX_RENDER_SHADER,   /**< Shader module or pipeline */
     BOX_RENDER_VOLUME,   /**< Irradiance probe volume of a scene with LightBake */
     BOX_RENDER_REFLECTION, /**< Cubemap array of the reflection probes of a scene */
-    BOX_RENDER_ATMOSPHERE /**< Transmittance and multi scattering LUTs of a scene */
+    BOX_RENDER_ATMOSPHERE, /**< Transmittance and multi scattering LUTs of a scene */
+    BOX_RENDER_ENVIRONMENT, /**< Cubemap of an environment source */
+    BOX_RENDER_ENVIRONMENT_IMAGE /**< Equirectangular image an EnvironmentImage writes into the
+                                  *   cubemap of its handle */
 } box_render_resource_kind_t;
 
 /** What a resource change does to its object */
@@ -224,6 +230,15 @@ typedef struct box_render_view_atmos_t {
                              *   the aerial perspective to its 3D meshes */
 } box_render_view_atmos_t;
 
+/** The environment a view is lit with, resolved from LightSettings.environment */
+typedef struct box_render_view_env_t {
+    uint32_t handle;        /**< Handle of the BOX_RENDER_ENVIRONMENT, 0 for none: the view is
+                             *   unlit, has no source or the source has no valid Environment */
+    float intensity;        /**< Scale of the environment light */
+    float yaw;              /**< Rotation of the environment about +Y in radians */
+    bool background;        /**< Draw the environment in place of the clear color */
+} box_render_view_env_t;
+
 /** The culling of a view, resolved from its CullSettings */
 typedef struct box_render_view_cull_t {
     bool enabled;           /**< Instances outside the frustum or too small are not drawn */
@@ -264,6 +279,7 @@ typedef struct box_render_view_t {
                                  *   scene has no valid Atmosphere and the view runs no
                                  *   atmosphere pass */
     box_render_view_atmos_t atmos; /**< Inputs of its sky view and aerial perspective */
+    box_render_view_env_t environment; /**< Environment the view is lit with */
 } box_render_view_t;
 
 /** Kind of an effect pass of a view */
@@ -334,6 +350,32 @@ typedef struct box_render_texture_region_t {
     uint32_t width;         /**< Columns of the region */
     uint32_t height;        /**< Rows of the region */
 } box_render_texture_region_t;
+
+/** Description of a BOX_RENDER_ENVIRONMENT create or update.
+ *
+ * A create makes the cubemap empty, also over an existing handle, and its source writes it
+ * again; an update only changes the filter of the mip levels.
+ */
+typedef struct box_render_environment_desc_t {
+    uint32_t resolution;    /**< Face edge of mip 0 in texels, a power of two from 8 to 1024 */
+    uint32_t filter;        /**< EnvironmentFilter of the mip levels */
+} box_render_environment_desc_t;
+
+/** Description of a BOX_RENDER_ENVIRONMENT_IMAGE update, followed by its rgba16float texels
+ * row by row, the first row at the top of the image (+Y).
+ *
+ * The backend converts the image into mip 0 of the cubemap of the handle before the
+ * environments are processed and reports it written with version.
+ */
+typedef struct box_render_environment_image_t {
+    uint32_t width;         /**< Width of the image in texels */
+    uint32_t height;        /**< Height of the image in texels */
+    int32_t version;        /**< EnvironmentStatus.version of the content */
+    uint32_t pad;           /**< Unused, keeps the texels 8 byte aligned */
+} box_render_environment_image_t;
+
+/** Largest width of an environment image; a wider image is scaled down to it */
+#define BOX_RENDER_ENVIRONMENT_IMAGE_MAX (4096)
 
 /** Coefficients of an L2 spherical harmonic: one for band 0, three for 1 and five for 2 */
 #define BOX_RENDER_SH_COEFFICIENTS (9)
@@ -1173,6 +1215,111 @@ void box_render_lights_stats(
  */
 const void* box_render_lights_state(
     const ecs_world_t *world);
+
+/** Register the system that keeps the cubemaps of the environment sources, writes their
+ * EnvironmentStatus.error and gives every lit view the environment of its LightSettings.
+ *
+ * Runs after the view extract. A cubemap is destroyed when its entity loses Environment, is
+ * deleted or gets an invalid resolution.
+ *
+ * @param world The world
+ */
+void box_render_environment_init(
+    ecs_world_t *world);
+
+/** Get the backend handle of the cubemap of an environment source, assigning it on demand.
+ *
+ * Main thread, during RenderExtract. When the backend lacks the cubemap, or it has another
+ * resolution, it is created empty in the packet of this frame, and the source writes it again.
+ *
+ * @param world The world
+ * @param e Entity with Environment
+ * @return The handle, 0 when the entity has no Environment or its resolution is invalid
+ */
+uint32_t box_render_environment_handle(
+    ecs_world_t *world,
+    ecs_entity_t e);
+
+/** Get the handle of the cubemap of an environment source without creating it.
+ *
+ * @param world The world
+ * @param e Entity with Environment
+ * @return The handle, 0 when the backend has no cubemap of the entity
+ */
+uint32_t box_render_environment_find(
+    const ecs_world_t *world,
+    ecs_entity_t e);
+
+/** Get the content the cubemap of an environment source holds.
+ *
+ * @param world The world
+ * @param e Entity with Environment
+ * @return The EnvironmentStatus.version last sent into the current cubemap, 0 when it is empty
+ *         or does not exist, so the source must write it
+ */
+int32_t box_render_environment_content(
+    const ecs_world_t *world,
+    ecs_entity_t e);
+
+/** Record that a source sends new content into its cubemap in the packet of this frame.
+ *
+ * Increments EnvironmentStatus.version, which is what the source passes to
+ * box_gpu_environment_written.
+ *
+ * @param world The world
+ * @param e Entity with Environment, whose handle the source got this frame
+ * @return The new version
+ */
+int32_t box_render_environment_sent(
+    ecs_world_t *world,
+    ecs_entity_t e);
+
+/** Report why a source has no content; EnvironmentStatus.error shows it unless the resolution
+ * is invalid.
+ *
+ * @param world The world
+ * @param e Entity with Environment
+ * @param error The reason, copied, NULL when the source has content again
+ */
+void box_render_environment_error(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    const char *error);
+
+/** Check whether a packet runs the environment shader.
+ *
+ * @param p The packet
+ * @return Whether it carries an environment image
+ */
+bool box_render_environment_use(
+    const box_render_packet_t *p);
+
+/** Register the EnvironmentImage source: its loads on the job system and the system that sends
+ * a loaded image into its cubemap once per version.
+ *
+ * @param world The world
+ */
+void box_render_environment_image_init(
+    ecs_world_t *world);
+
+/** Copy a face of mip 0 of the cubemap of an environment into memory, waiting for the copy.
+ *
+ * Only call this when the main thread renders, after box_render_sync, as
+ * box_render_gpu_read_buffer.
+ *
+ * @param world The world
+ * @param handle Handle of the BOX_RENDER_ENVIRONMENT
+ * @param face Face in WebGPU cube order: +X, -X, +Y, -Y, +Z, -Z
+ * @param out Receives the linear RGBA texels row by row, four floats each
+ * @param count Floats out holds
+ * @return Whether the cubemap exists, was written and the texels were copied
+ */
+bool box_render_gpu_read_environment(
+    ecs_world_t *world,
+    uint32_t handle,
+    uint32_t face,
+    float *out,
+    int32_t count);
 
 /** Make the light extract attenuate the sun and moon of the scenes with an Atmosphere and
  * write their AtmosphereStatus, called by the import of box.atmosphere.
