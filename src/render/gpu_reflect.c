@@ -3,8 +3,8 @@
  * @brief Reflection probe cubemap arrays of the webgpu backend and the passes that fill them.
  *
  * Each scene with resident reflection probes has a cube array, 6 layers per slot, and the L2 SH
- * irradiance of each slot. The captures of gpu_bake.c store their faces in mip 0 and in source
- * cubes of the chunk with a box filtered full mip chain.
+ * irradiance of each slot, which its views sample; views without probes bind one black slot.
+ * Captures store their faces in mip 0 and in source cubes with a box filtered full mip chain.
  *
  * The prefilter fills each higher mip level of the slots with the GGX prefiltered radiance from
  * the source cubes, in the command buffer of the capture.
@@ -230,6 +230,7 @@ void box_gpu_reflect_init(
         .lodMaxClamp = 32.0f,
         .maxAnisotropy = 1
     });
+    gpu->no_reflection = box_gpu_reflect_new(gpu, 1, 1, false);
 }
 
 void box_gpu_reflect_fini(
@@ -246,6 +247,10 @@ void box_gpu_reflect_fini(
 
     if (gpu->reflect_source) {
         box_gpu_reflect_free(gpu->reflect_source);
+    }
+
+    if (gpu->no_reflection) {
+        box_gpu_reflect_free(gpu->no_reflection);
     }
 
     if (gpu->reflect_sampler) {
@@ -278,6 +283,7 @@ void box_gpu_reflect_fini(
     }
 
     gpu->reflect_source = NULL;
+    gpu->no_reflection = NULL;
     gpu->reflect_sampler = NULL;
     gpu->reflect_store = gpu->reflect_mip = gpu->reflect_prefilter = NULL;
     gpu->reflect_store_pipeline_layout = gpu->reflect_mip_pipeline_layout = NULL;
@@ -317,6 +323,18 @@ void box_gpu_reflect_apply(
 
 done:
     return;
+}
+
+const box_gpu_reflect_t* box_gpu_reflect_of(
+    box_gpu_t *gpu,
+    const box_render_view_t *v)
+{
+    bool listed = v->reflections && v->lights.enabled &&
+        ecs_map_get(&gpu->buffers, v->reflections);
+
+    return listed
+        ? ecs_map_get_deref(&gpu->reflections, box_gpu_reflect_t, v->reflections)
+        : NULL;
 }
 
 /** Create a compute pipeline of an entry point of the bake shader, releasing the one it

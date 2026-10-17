@@ -28,6 +28,8 @@ ECS_STRUCT(ClearSettings, {
 ECS_STRUCT(LightSettings, {
     bool enabled;           /**< Enable lighting for the view */
     bool baked;             /**< Sample the baked lighting of the scene, View ctor sets true */
+    bool reflections;       /**< Sample the reflection probes of the scene, View ctor sets
+                             *   true */
 });
 
 /** Shadow settings of a view */

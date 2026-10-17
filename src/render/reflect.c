@@ -722,7 +722,9 @@ done:
     return;
 }
 
-/** Collect the resident probes of a scene in blend order.
+/** Collect the resident probes of a scene in blend order, after their captures of this frame
+ * are scheduled: a probe is ready once its capture was reported or is in flight, since the
+ * captures of a packet run before its targets and a packet renders after the earlier ones.
  *
  * @param r The state
  * @param s The scene, receives the list
@@ -739,8 +741,10 @@ static void box_reflect_list(
     for (i = 0; i < count; i ++) {
         box_render_reflection_probe_t *out = ecs_vec_get_t(
             &s->list, box_render_reflection_probe_t, i);
-        *out = probes[ranks[i].index].data;
-        out->slot = (uint32_t)probes[ranks[i].index].slot;
+        const box_reflect_probe_t *probe = &probes[ranks[i].index];
+        *out = probe->data;
+        out->slot = (uint32_t)probe->slot;
+        out->ready = probe->captured || probe->packet;
     }
 }
 
@@ -943,13 +947,16 @@ static void box_reflect_probes(
 }
 
 /** Collect the cameras of the views of every scene, the lights of the first one and the probe
- * volume buffer they show, or point the views at the reflection probe buffer of their scene.
+ * volume buffer they show, or point the lit views that sample reflections at the reflection
+ * probe buffer of their scene.
  *
+ * @param world The world
  * @param r The state
  * @param p The packet
  * @param cameras Collect the cameras, else point the views at the buffers
  */
 static void box_reflect_views(
+    const ecs_world_t *world,
     const box_render_reflect_t *r,
     box_render_packet_t *p,
     bool cameras)
@@ -973,7 +980,16 @@ static void box_reflect_views(
                 s->volume = rv->volume;
                 s->volume_buffer = rv->volume_buffer;
             }
-        } else if (s->sent && ecs_vec_count(&s->list)) {
+
+            continue;
+        }
+
+        const View *view = rv->view && ecs_is_alive(world, rv->view)
+            ? ecs_get(world, rv->view, View)
+            : NULL;
+        if (s->sent && ecs_vec_count(&s->list) && rv->lights.enabled &&
+            (view ? view->lighting.reflections : true))
+        {
             const box_render_reflection_probe_t *last = ecs_vec_last_t(
                 &s->list, box_render_reflection_probe_t);
             rv->reflections = s->buffer;
@@ -1425,7 +1441,7 @@ static void BoxRenderExtractReflect(
     }
 
     box_reflect_probes(world, r);
-    box_reflect_views(r, p, true);
+    box_reflect_views(world, r, p, true);
     box_reflect_timing(world, r);
     box_reflect_captured(world, r);
     r->pending = 0;
@@ -1434,13 +1450,13 @@ static void BoxRenderExtractReflect(
         box_reflect_prune(s);
         box_reflect_assign(r, s, capacity);
         box_reflect_invalidate(r, s);
+        box_reflect_progress(r, p, s, capacity, gpu, app && app->headless, status);
         box_reflect_list(r, s);
         box_reflect_send(r, p, s);
-        box_reflect_progress(r, p, s, capacity, gpu, app && app->headless, status);
         box_reflect_status(it, s);
     }
 
-    box_reflect_views(r, p, false);
+    box_reflect_views(world, r, p, false);
 }
 
 /** Free the state of the reflection probe extract.

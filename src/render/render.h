@@ -226,7 +226,8 @@ typedef struct box_render_view_t {
     int32_t effect_count;       /**< Effect passes of the view, 0 renders without an HDR target */
     uint32_t volume;            /**< Probe volume the view samples, 0 for the hemisphere ambient */
     uint32_t volume_buffer;     /**< Probe buffer of the volume the view samples, 0 or 1 */
-    uint32_t reflections;       /**< Reflection probe buffer of the scene, 0 for none */
+    uint32_t reflections;       /**< Reflection probe buffer of the scene, 0 for none or when
+                                 *   the view does not sample reflection probes */
     uint32_t reflection_count;  /**< Resident reflection probes in that buffer */
     uint32_t reflection_listed; /**< Probes of that buffer the clusters list: the resident
                                  *   ReflectionProbes, which come before the scene probe */
@@ -1214,6 +1215,9 @@ typedef struct box_render_reflection_probe_t {
     uint32_t slot;          /**< Cubemap slot of the probe */
     float capture[3];       /**< World capture point */
     uint32_t scene;         /**< 1 for the scene probe, 0 for a ReflectionProbe */
+    uint32_t ready;         /**< 1 when views can sample the slot: its capture was reported or
+                             *   runs before the targets of this packet */
+    uint32_t pad[3];        /**< Unused */
 } box_render_reflection_probe_t;
 
 /** Register the system that keeps the reflection probes of every scene with ReflectionBake.

@@ -404,6 +404,8 @@ typedef struct box_gpu_view_uniforms_t {
     vec4 shadow_offset;             /**< World offset along the normal per cascade */
     vec4 shadow_params;             /**< Fade start, shadow end, texel in uv, unused */
     uint32_t shadow_config[4];      /**< Cascades, 0 without shadows, PCF taps, two unused */
+    uint32_t reflection[4];         /**< Probes of the reflection probe buffer the view samples,
+                                     *   0 for none, three unused */
 } box_gpu_view_uniforms_t;
 
 /** Pipeline of the blit or the forward pass for one color format */
@@ -494,6 +496,7 @@ typedef struct box_gpu_t {
                                             *   exists */
     WGPUSampler reflect_sampler;    /**< Trilinear sampler of the source cubes */
     box_gpu_reflect_t *reflect_source; /**< Source cubes of a chunk, NULL before the first */
+    box_gpu_reflect_t *no_reflection; /**< One black slot, bound by views without probes */
     ecs_map_t forward;              /**< Forward pipeline by shader, format, blend, back face */
     WGPUBuffer view_buffer;         /**< Uniforms of the views of a target */
     int32_t view_capacity;          /**< Views the view buffer holds */
@@ -868,6 +871,17 @@ void box_gpu_reflect_apply(
     box_render_resource_op_t op,
     uint32_t handle,
     const box_render_reflection_desc_t *desc);
+
+/** Get the cubemap array a view samples its reflection probes from.
+ *
+ * @param gpu The backend
+ * @param v The view
+ * @return The cubemap array of the scene of the view, NULL when the view samples no reflection
+ *         probes or the backend lacks their buffer or array
+ */
+const box_gpu_reflect_t* box_gpu_reflect_of(
+    box_gpu_t *gpu,
+    const box_render_view_t *v);
 
 /** Create the store, mip and prefilter pipelines from the module of the bake shader.
  *

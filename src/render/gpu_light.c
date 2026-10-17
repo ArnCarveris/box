@@ -1,6 +1,7 @@
 /**
  * @file render/gpu_light.c
- * @brief Light uniforms, the cluster pass and the light bindings of the forward pass.
+ * @brief Light uniforms, the cluster pass and the light and reflection probe bindings of the
+ * forward pass.
  *
  * Every view with point or spot lights or reflection probes runs etc/shaders/cluster.wgsl before
  * it draws: it lists, per cluster of the view frustum, the lights that reach it and the probes
@@ -307,6 +308,11 @@ void box_gpu_light_uniforms(
     u->grid[1] = BOX_GPU_CLUSTER_Y;
     u->grid[2] = BOX_GPU_CLUSTER_Z;
     u->grid[3] = box_gpu_cluster_probe_count(gpu, v);
+    if (box_gpu_reflect_of(gpu, v)) {
+        box_gpu_buffer_t *p = box_gpu_probe_buffer(gpu, v);
+        uint32_t probes = p->size / (uint32_t)sizeof(box_render_reflection_probe_t);
+        u->reflection[0] = glm_min(v->reflection_count, probes);
+    }
 }
 
 /** Count the point and spot lights a view shades with.
@@ -658,16 +664,27 @@ WGPUBindGroup box_gpu_light_group_with(
 {
     uint64_t size = 0;
     WGPUBuffer lights = box_gpu_light_binding(gpu, v, &size);
-    WGPUBindGroupEntry entries[5] = {
+    const box_gpu_reflect_t *cube = box_gpu_reflect_of(gpu, v);
+    box_gpu_buffer_t *p = cube ? box_gpu_probe_buffer(gpu, v) : NULL;
+    cube = cube ? cube : gpu->no_reflection;
+    WGPUBindGroupEntry entries[9] = {
         { .binding = 0, .buffer = uniforms, .size = sizeof(box_gpu_view_uniforms_t) },
         { .binding = 1, .buffer = lights, .size = size },
         { .binding = 2, .buffer = clusters, .size = wgpuBufferGetSize(clusters) },
         { .binding = 3, .textureView = shadow },
-        { .binding = 4, .sampler = gpu->shadow_sampler }
+        { .binding = 4, .sampler = gpu->shadow_sampler },
+        {
+            .binding = 5,
+            .buffer = p ? p->buffer : gpu->no_probes,
+            .size = p ? p->size : sizeof(box_render_reflection_probe_t)
+        },
+        { .binding = 6, .textureView = cube->cube },
+        { .binding = 7, .sampler = gpu->reflect_sampler },
+        { .binding = 8, .buffer = cube->sh, .size = wgpuBufferGetSize(cube->sh) }
     };
     WGPUBindGroupDescriptor desc = {
         .layout = gpu->view_layout,
-        .entryCount = 5,
+        .entryCount = 9,
         .entries = entries
     };
 

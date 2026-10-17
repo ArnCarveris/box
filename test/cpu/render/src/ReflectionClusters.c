@@ -63,7 +63,7 @@ static ecs_entity_t probe_new(
     return probe;
 }
 
-/** Create a lit view whose camera is in a scene.
+/** Create a lit view that samples reflection probes, whose camera is in a scene.
  *
  * @param world The world
  * @param scene The scene of the camera
@@ -77,7 +77,8 @@ static ecs_entity_t view_new(
     ecs_set(world, camera, Position, {0, 2, 10});
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
-    ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true});
+    ecs_set(world, view, View, {
+        .camera = camera, .lighting = {.enabled = true, .reflections = true}});
 
     return view;
 }

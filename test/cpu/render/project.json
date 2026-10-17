@@ -94,6 +94,16 @@
                     "unrelated_changes_queue_nothing",
                     "scene_without_bake_records_nothing"
                 ]
+            },
+            {
+                "id": "ReflectionShading",
+                "testcases": [
+                    "view_reflections_defaults",
+                    "view_without_reflections_lists_none",
+                    "view_with_reflections_lists_probes",
+                    "unlit_view_lists_none",
+                    "probes_wait_for_capture"
+                ]
             }
         ]
     }

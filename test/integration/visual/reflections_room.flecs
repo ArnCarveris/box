@@ -1,0 +1,105 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+
+// A closed room with colored walls, lit by a lamp under the ceiling, holds a mirror ball and a
+// glossy floor. One room probe, box projected onto the room, gives both their reflections.
+room {
+  Scene: {}
+  ReflectionBake: {resolution: 128}
+  AmbientLight: {intensity: 0.1}
+
+  camera {
+    Position: {0, 1.7, 2.6}
+    Rotation: {-0.28, 0, 0}
+    Camera: {fov: 70}
+  }
+
+  lamp {
+    Position: {0, 2.6, 0}
+    PointLight: {intensity: 5, range: 12}
+  }
+
+  bulb {
+    Position: {0, 2.75, 0}
+    Sphere: {segments: 16, smooth: true, radius: 0.12}
+    Rgb: {0, 0, 0}
+    Emissive: {strength: 4, color: {255, 236, 200}}
+  }
+
+  floor {
+    Position: {0, -0.1, 0}
+    Box: {6.4, 0.2, 6.4}
+    Rgb: {60, 60, 66}
+    PbrMaterial: {metallic: 0, roughness: 0.12}
+  }
+
+  ceiling {
+    Position: {0, 3.1, 0}
+    Box: {6.4, 0.2, 6.4}
+    Rgb: {230, 230, 230}
+  }
+
+  back_wall {
+    Position: {0, 1.5, -3.1}
+    Box: {6.4, 3, 0.2}
+    Rgb: {200, 60, 50}
+  }
+
+  front_wall {
+    Position: {0, 1.5, 3.1}
+    Box: {6.4, 3, 0.2}
+    Rgb: {230, 230, 230}
+  }
+
+  left_wall {
+    Position: {-3.1, 1.5, 0}
+    Box: {0.2, 3, 6}
+    Rgb: {50, 90, 200}
+  }
+
+  right_wall {
+    Position: {3.1, 1.5, 0}
+    Box: {0.2, 3, 6}
+    Rgb: {60, 170, 80}
+  }
+
+  window {
+    Position: {0, 1.6, -2.95}
+    Box: {2, 1, 0.1}
+    Rgb: {0, 0, 0}
+    Emissive: {strength: 1.5, color: {200, 225, 255}}
+  }
+
+  crate {
+    Position: {-1.6, 0.4, -1.4}
+    Rotation: {0, 0.5, 0}
+    Box: {0.8, 0.8, 0.8}
+    Rgb: {230, 190, 60}
+  }
+
+  pillar {
+    Position: {1.7, 0.9, -1.6}
+    Cylinder: {segments: 24, smooth: true, radius: 0.3, length: 1.8}
+    Rgb: {240, 240, 240}
+  }
+
+  mirror {
+    Position: {0, 0.75, -0.6}
+    Sphere: {segments: 48, smooth: true, radius: 0.75}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {metallic: 1, roughness: 0}
+  }
+
+  probe {
+    Position: {0, 1.5, 0}
+    ReflectionProbe: {extent: {3.2, 1.7, 3.2}, blend: 0.2, projection: {3, 1.5, 3}}
+  }
+}
+
+room_view {
+  View: {camera: room.camera, clear: {enabled: true, color: {0, 0, 0, 255}}}
+}

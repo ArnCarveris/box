@@ -36,6 +36,9 @@ struct View {
     shadow_params: vec4f,
     // x: cascades, 0 without shadows, y: PCF taps per axis
     shadow_config: vec4u,
+    // x: reflection probes of the reflection probe buffer the view samples, 0 for none; the
+    // scene probe is the last of them when there are more than the clusters list (grid.w)
+    reflection: vec4u,
 };
 
 struct Light {
@@ -59,6 +62,10 @@ struct ReflectionProbe {
     slot: u32,
     capture: vec3f,
     scene: u32,
+    ready: u32,
+    pad0: u32,
+    pad1: u32,
+    pad2: u32,
 };
 
 // Reflection probes a cluster lists at most.

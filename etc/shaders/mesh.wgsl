@@ -6,7 +6,8 @@
 // The cull pass writes the slots of the visible instances, which step per instance; the
 // instance data is read from the instance buffer of the batch (group 2). Indirect light comes
 // from the hemisphere ambient, or for a view that samples baked lighting from the irradiance
-// probe volume of its scene (group 3).
+// probe volume of its scene (group 3). The indirect specular light of a view that samples
+// reflection probes comes from the prefiltered cubemaps of the probes its clusters list.
 #include "include/instance.wgsl"
 #include "include/lights.wgsl"
 #include "include/shadow.wgsl"
@@ -26,6 +27,14 @@ const MIN_ROUGHNESS: f32 = 0.045;
 @group(1) @binding(2) var roughness_map: texture_2d<f32>;
 @group(1) @binding(3) var normal_map: texture_2d<f32>;
 @group(1) @binding(4) var material_sampler: sampler;
+
+// Reflection probes of the scene in blend order (box_render_reflection_probe_t), the cubemap
+// array with a slot per probe, mip k of N prefiltered for the perceptual roughness k / (N - 1)
+// (bake_sh.wgsl), and the L2 SH irradiance of each slot, as a probe of the volume holds it.
+@group(0) @binding(5) var<storage, read> reflection_probes: array<ReflectionProbe>;
+@group(0) @binding(6) var reflection_cubes: texture_cube_array<f32>;
+@group(0) @binding(7) var reflection_sampler: sampler;
+@group(0) @binding(8) var<storage, read> reflection_sh: array<vec4f>;
 
 @group(2) @binding(0) var<storage, read> instances: array<Instance>;
 
@@ -63,6 +72,16 @@ const VISIBILITY_VARIANCE: f32 = 0.001;
 // Share of the weight of the probes around a point that the hemisphere ambient makes up for
 // when the probes the point sees carry less.
 const VISIBILITY_FALLBACK: f32 = 0.1;
+
+// Weight left over by the reflection probes of a fragment below which the next ones are
+// skipped.
+const REFLECTION_EPSILON: f32 = 1e-3;
+
+// Range of the scale the irradiance grid normalizes the radiance of a reflection probe by: down
+// to black for a fragment the grid sees no light at, up to twice as bright for one that is lit
+// more than the capture point of the probe.
+const REFLECTION_NORMALIZE_MIN: f32 = 0.0;
+const REFLECTION_NORMALIZE_MAX: f32 = 2.0;
 
 struct VertexIn {
     @location(0) position: vec3f,
@@ -260,6 +279,111 @@ fn volume_irradiance(world: vec3f, n: vec3f, spec: vec3f) -> Indirect {
     return Indirect(max(diffuse, vec3f(0.0)), max(specular, vec3f(0.0)));
 }
 
+// A world direction or offset in the frame of the boxes of a reflection probe.
+fn probe_local(p: ReflectionProbe, v: vec3f) -> vec3f {
+    return vec3f(dot(v, p.axes[0].xyz), dot(v, p.axes[1].xyz), dot(v, p.axes[2].xyz));
+}
+
+// Weight of a reflection probe at a position: 1 inside its influence box, falling linearly to 0
+// over blend toward its faces and 0 outside; a blend of 0 is a hard edge.
+fn probe_fade(p: ReflectionProbe, world: vec3f) -> f32 {
+    let inside = p.extent - abs(probe_local(p, world - p.center));
+    let d = min(min(inside.x, inside.y), inside.z);
+    if (p.blend > 0.0) {
+        return clamp(d / p.blend, 0.0, 1.0);
+    }
+
+    return select(0.0, 1.0, d >= 0.0);
+}
+
+// Direction a reflection probe is sampled in for a ray from a position along dir: from the
+// capture point toward where the ray leaves the projection box (parallax correction), or dir
+// itself when the box has no volume. A position outside the box that looks away from it uses
+// the direction from the capture point to the position.
+fn probe_direction(p: ReflectionProbe, world: vec3f, dir: vec3f) -> vec3f {
+    if (any(p.projection <= vec3f(0.0))) {
+        return dir;
+    }
+
+    let o = probe_local(p, world - p.center);
+    let d = probe_local(p, dir);
+    let safe = select(d, vec3f(1e-6), abs(d) < vec3f(1e-6));
+    let exit = max((p.projection - o) / safe, (-p.projection - o) / safe);
+    let t = max(min(min(exit.x, exit.y), exit.z), 0.0);
+    let result = world + dir * t - p.capture;
+    return select(dir, result, dot(result, result) > 1e-8);
+}
+
+// Irradiance over pi in a direction from the SH of the cubemap slot of a reflection probe.
+fn probe_irradiance(slot: u32, d: vec3f) -> vec3f {
+    let at = slot * SH_COEFFICIENTS;
+    let e = sh_irradiance(reflection_sh[at].rgb, reflection_sh[at + 1u].rgb,
+        reflection_sh[at + 2u].rgb, reflection_sh[at + 3u].rgb, reflection_sh[at + 4u].rgb,
+        reflection_sh[at + 5u].rgb, reflection_sh[at + 6u].rgb, reflection_sh[at + 7u].rgb,
+        reflection_sh[at + 8u].rgb, d);
+    return max(e / PI, vec3f(0.0));
+}
+
+fn luminance(c: vec3f) -> f32 {
+    return dot(c, vec3f(0.2126, 0.7152, 0.0722));
+}
+
+// Prefiltered radiance a reflection probe reflects toward a position along the specular
+// direction spec at a mip level. For a view that samples baked lighting it is scaled by the
+// luminance of the irradiance grid at the position over that of the SH of the probe, both in
+// direction spec, within REFLECTION_NORMALIZE_MIN and REFLECTION_NORMALIZE_MAX, so a dim
+// alcove inside a bright probe does not reflect its bright light.
+fn probe_radiance(p: ReflectionProbe, world: vec3f, spec: vec3f, mip: f32, grid: vec3f) -> vec3f {
+    let d = probe_direction(p, world, normalize(spec));
+    let radiance = textureSampleLevel(reflection_cubes, reflection_sampler, d, p.slot, mip).rgb;
+    if (volume.size.w == 0u) {
+        return radiance;
+    }
+
+    let own = luminance(probe_irradiance(p.slot, spec));
+    let scale = luminance(grid) / max(own, 1e-4);
+    return radiance * clamp(scale, REFLECTION_NORMALIZE_MIN, REFLECTION_NORMALIZE_MAX);
+}
+
+// Indirect specular light of a fragment from the reflection probes of its cluster, along the
+// specular direction spec. The cluster lists its probes in blend order: each one takes its fade
+// weight of the weight still left, until none is; the scene probe, last in the probe buffer,
+// takes what is left, else the fallback does: the hemisphere ambient or, for a view that
+// samples baked lighting, the irradiance grid, both in direction spec. A probe whose slot holds
+// no capture yet is skipped. The mip level follows the perceptual roughness as the prefilter
+// wrote them.
+fn reflections(world: vec3f, spec: vec3f, roughness: f32, cluster: u32, fallback: vec3f) -> vec3f {
+    let mip = roughness * f32(textureNumLevels(reflection_cubes) - 1u);
+    var sum = vec3f(0.0);
+    var left = 1.0;
+    if (view.grid.w > 0u) {
+        let count = clusters[2u + 2u * cluster];
+        let listed = cluster_probes(count);
+        let first = 1u + 2u * cluster_count(view) + clusters[1u + 2u * cluster] +
+            cluster_lights(count);
+        for (var i = 0u; i < listed && left > REFLECTION_EPSILON; i++) {
+            let p = reflection_probes[clusters[first + i]];
+            let w = probe_fade(p, world) * left * f32(p.ready);
+            if (w > 0.0) {
+                sum += probe_radiance(p, world, spec, mip, fallback) * w;
+                left -= w;
+            }
+        }
+    }
+
+    if (left > REFLECTION_EPSILON) {
+        let last = view.reflection.x - 1u;
+        var rest = fallback;
+        if (view.reflection.x > view.grid.w && reflection_probes[last].ready != 0u) {
+            rest = probe_radiance(reflection_probes[last], world, spec, mip, fallback);
+        }
+
+        sum += rest * left;
+    }
+
+    return sum;
+}
+
 // Surface of a fragment from the material constants of its instance. Texture layers apply
 // here on front faces; a plain back face keeps the constants and faces the camera.
 struct Surface {
@@ -375,7 +499,7 @@ fn attenuation(light: Light, l: vec3f, dist: f32) -> f32 {
 // Light inputs. Every direct light the forward pass uses comes from here: the directional
 // lights of the scene, the first one through its shadow map, then the point and spot lights
 // of the cluster of the fragment.
-fn lights_direct(s: Surface, v: vec3f, world: vec3f) -> vec3f {
+fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32) -> vec3f {
     var sum = vec3f(0.0);
     let shadow = shadow_factor(world, s.normal);
     for (var i = 0u; i < view.lights.x; i++) {
@@ -385,7 +509,6 @@ fn lights_direct(s: Surface, v: vec3f, world: vec3f) -> vec3f {
     }
 
     if (view.lights.y > view.lights.x) {
-        let cluster = cluster_index(view, cluster_view_position(view, world));
         let first = 1u + 2u * cluster_count(view) + clusters[1u + 2u * cluster];
         let count = cluster_lights(clusters[2u + 2u * cluster]);
         for (var i = 0u; i < count; i++) {
@@ -412,20 +535,31 @@ fn shade(s: Surface, v: vec3f, world: vec3f) -> vec3f {
     let ndv = max(dot(n, v), 1e-4);
     let ab = env_brdf(s.roughness, ndv);
     let r = reflect(-v, n);
+    let spec = mix(r, n, a);
     var specular_light: vec3f;
     var diffuse_light: vec3f;
     if (volume.size.w == 0u) {
-        specular_light = ambient(mix(r, n, a));
+        specular_light = ambient(spec);
         diffuse_light = ambient(n);
     } else {
-        let e = volume_irradiance(world, n, mix(r, n, a));
+        let e = volume_irradiance(world, n, spec);
         specular_light = e.specular;
         diffuse_light = e.diffuse;
     }
 
+    var cluster = 0u;
+    if (view.lights.y > view.lights.x || view.grid.w > 0u) {
+        cluster = cluster_index(view, cluster_view_position(view, world));
+    }
+
+    if (view.reflection.x > 0u) {
+        specular_light = reflections(world, spec, s.roughness, cluster, specular_light);
+    }
+
     let indirect_specular = (f0 * ab.x + ab.y) * specular_light;
     let indirect_diffuse = diffuse_color * diffuse_light;
-    return lights_direct(s, v, world) + indirect_diffuse + indirect_specular + s.emissive;
+    return lights_direct(s, v, world, cluster) + indirect_diffuse + indirect_specular +
+        s.emissive;
 }
 
 fn output(color: vec3f, alpha: f32) -> vec4f {

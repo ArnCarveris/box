@@ -559,6 +559,20 @@
                     "static_change_recaptures_reached_probe",
                     "light_bake_pass_recaptures_every_probe"
                 ]
+            },
+            {
+                "id": "ReflectionShading",
+                "testcases": [
+                    "scene_without_probes_renders_as_before",
+                    "view_without_reflections_renders_as_before",
+                    "probes_ready_after_capture",
+                    "mirror_reflects_probe",
+                    "higher_priority_probe_covers_lower",
+                    "blend_mixes_overlapping_probes",
+                    "scene_probe_fills_outside_probes",
+                    "box_projection_corrects_parallax",
+                    "grid_darkens_dim_fragment"
+                ]
             }
         ]
     }
