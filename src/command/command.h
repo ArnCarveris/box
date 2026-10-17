@@ -306,4 +306,11 @@ void box_cmd_render_init(
 void box_cmd_frames_init(
     ecs_world_t *world);
 
+/** Register the quit command that ends the run after the current frame.
+ *
+ * @param world The world
+ */
+void box_cmd_quit_init(
+    ecs_world_t *world);
+
 #endif

@@ -313,6 +313,17 @@
                     "http_exec",
                     "commands_are_script_functions"
                 ]
+            },
+            {
+                "id": "Quit",
+                "testcases": [
+                    "empty_output_ends_progress",
+                    "logged",
+                    "http_exec",
+                    "headless_run_ends_early",
+                    "script_call",
+                    "listed_and_script_function"
+                ]
             }
         ]
     }
