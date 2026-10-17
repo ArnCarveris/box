@@ -9,7 +9,8 @@
     },
     "lang.c": {
         "include": [
-            "../../../src/render"
+            "../../../src/render",
+            "../../../src/text"
         ]
     },
     "test": {
@@ -117,6 +118,33 @@
                     "trigger_on_ancestor_does_nothing",
                     "disabled_element",
                     "deleted_action"
+                ]
+            },
+            {
+                "id": "TextCaret",
+                "testcases": [
+                    "carets_grow_to_width",
+                    "alignment_shifts_carets",
+                    "kerning",
+                    "wrapped_lines",
+                    "wrap_point_on_next_line",
+                    "line_ranges",
+                    "layout_width_wraps",
+                    "newlines",
+                    "trailing_newline",
+                    "crlf_line_range",
+                    "empty_string",
+                    "multi_byte",
+                    "ill_formed_utf8",
+                    "offset_inside_character",
+                    "offset_clamped",
+                    "hit_outside_block",
+                    "hit_halfway",
+                    "hit_round_trip",
+                    "hit_long_line",
+                    "edited_this_frame",
+                    "without_text",
+                    "font_not_loaded"
                 ]
             }
         ]

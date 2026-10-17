@@ -82,6 +82,71 @@ ECS_STRUCT(TextBounds, {
     float height; /**< Height of the lines */
 });
 
+/** The caret line at a byte offset of a Text, in the local space of the entity.
+ *
+ * Logical pixels, y up, in the block of lines TextBounds measures, centered on the origin.
+ */
+ECS_STRUCT(TextCaret, {
+    float x;      /**< Between the glyphs around the offset: the kerned advance, not the ink */
+    float y;      /**< Bottom of the line of the caret */
+    float height; /**< Line height of the line */
+    int32_t line; /**< Line of the caret, 0 for the first */
+});
+
+/** Get the caret line at a byte offset of a Text, from the layout that draws it.
+ *
+ * An offset inside a character moves to its start; offsets clamp to 0 and the string length.
+ * At a wrap point the caret starts the next line, after a trailing newline an empty line.
+ *
+ * A Text whose value or parameters changed since its last layout is laid out again first.
+ *
+ * @param world The world
+ * @param text The entity with the Text
+ * @param offset Byte offset in Text.value
+ * @param caret Receives the caret line
+ * @return False while the font is not loaded or when the entity has no Text
+ */
+bool box_text_caret(
+    ecs_world_t *world,
+    ecs_entity_t text,
+    int32_t offset,
+    TextCaret *caret);
+
+/** Get the caret offset of a Text closest to a point in the local space of the entity.
+ *
+ * The line comes from y, clamped to the first and last line, then the nearest caret of that
+ * line from x: a point left of the halfway point of a glyph is before it, else after it.
+ *
+ * @param world The world
+ * @param text The entity with the Text
+ * @param x X in logical pixels
+ * @param y Y in logical pixels, up
+ * @return The byte offset of the caret, 0 while the font is not loaded or without a Text
+ */
+int32_t box_text_hit(
+    ecs_world_t *world,
+    ecs_entity_t text,
+    float x,
+    float y);
+
+/** Get the byte range of a line of a Text, without the newline that ends it.
+ *
+ * A wrapped line ends where the next one starts. The line clamps to the lines of the Text.
+ *
+ * @param world The world
+ * @param text The entity with the Text
+ * @param line The line, 0 for the first
+ * @param start Receives the offset of the first character of the line, may be NULL
+ * @param end Receives the offset after its last character, may be NULL
+ * @return The line count, 0 while the font is not loaded or without a Text
+ */
+int32_t box_text_line(
+    ecs_world_t *world,
+    ecs_entity_t text,
+    int32_t line,
+    int32_t *start,
+    int32_t *end);
+
 /** Register the box.text module.
  *
  * @param world The world

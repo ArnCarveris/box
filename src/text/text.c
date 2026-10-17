@@ -38,6 +38,8 @@ static void box_text_state_free(
     ecs_vec_fini_t(NULL, &s->released, uint32_t);
     ecs_vec_fini_t(NULL, &s->placed, box_text_placed_t);
     ecs_vec_fini_t(NULL, &s->lines, float);
+    ecs_vec_fini_t(NULL, &s->carets, box_text_caret_t);
+    ecs_vec_fini_t(NULL, &s->rows, box_text_row_t);
     ecs_vec_fini_t(NULL, &s->texts, ecs_entity_t);
     if (-- s->sync->refs == 0) {
         ecs_os_mutex_free(s->sync->lock);
@@ -128,6 +130,9 @@ static void BoxTextOnRemove(
         TextGlyphs *glyphs = ecs_get_mut(it->world, it->entities[i], TextGlyphs);
         if (glyphs) {
             ecs_vec_clear(&glyphs->glyphs);
+            ecs_vec_clear(&glyphs->carets);
+            ecs_vec_clear(&glyphs->rows);
+            glyphs->ready = false;
         }
 
         ecs_set(it->stage, it->entities[i], TextBounds, {0});
@@ -310,6 +315,8 @@ static void box_text_state_init(
     ecs_vec_init_t(NULL, &s->released, uint32_t, 0);
     ecs_vec_init_t(NULL, &s->placed, box_text_placed_t, 0);
     ecs_vec_init_t(NULL, &s->lines, float, 0);
+    ecs_vec_init_t(NULL, &s->carets, box_text_caret_t, 0);
+    ecs_vec_init_t(NULL, &s->rows, box_text_row_t, 0);
     ecs_vec_init_t(NULL, &s->texts, ecs_entity_t, 0);
     s->next_page = BOX_TEXT_PAGE_FIRST;
     s->sync = ecs_os_calloc_t(box_text_sync_t);
@@ -458,13 +465,17 @@ void BoxTextImport(
     ECS_META_COMPONENT(world, TextWrap);
     ECS_META_COMPONENT(world, Text);
     ECS_META_COMPONENT(world, TextBounds);
+    ECS_META_COMPONENT(world, TextCaret);
     box_owned_hooks(world, Font, BOX_OWNED_STR(Font, path));
     ecs_set_hooks(world, Font, { .ctor = box_font_ctor });
     box_owned_hooks(world, FontStatus, BOX_OWNED_STR(FontStatus, error));
     box_owned_hooks(world, Text, BOX_OWNED_STR(Text, value));
 
     ECS_COMPONENT_DEFINE(world, TextGlyphs);
-    box_owned_hooks(world, TextGlyphs, BOX_OWNED_VEC(TextGlyphs, glyphs, box_text_glyph_t));
+    box_owned_hooks(world, TextGlyphs,
+        BOX_OWNED_VEC(TextGlyphs, glyphs, box_text_glyph_t),
+        BOX_OWNED_VEC(TextGlyphs, carets, box_text_caret_t),
+        BOX_OWNED_VEC(TextGlyphs, rows, box_text_row_t));
     ECS_COMPONENT_DEFINE(world, TextRegistry);
     ecs_set_hooks(world, TextRegistry, {
         .ctor = flecs_default_ctor,

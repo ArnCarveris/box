@@ -61,12 +61,31 @@ typedef struct box_text_glyph_t {
     uint32_t page;  /**< Backend texture handle of the atlas page */
 } box_text_glyph_t;
 
-/** Glyph quads of a Text, written by the layout and read by the renderer */
+/** Caret before a character of a laid out Text, or after its last one */
+typedef struct box_text_caret_t {
+    int32_t offset;     /**< Byte offset of the character, the length for the last caret */
+    int32_t line;       /**< Line of the caret */
+    float x;            /**< X of the caret, on its line in a run, local in TextGlyphs */
+} box_text_caret_t;
+
+/** A line of a laid out Text */
+typedef struct box_text_row_t {
+    int32_t caret;      /**< Index of the first caret of the line */
+    int32_t end;        /**< Byte offset after the line, without its newline */
+} box_text_row_t;
+
+/** Glyph quads and carets of a Text, written by the layout and read by the renderer */
 typedef struct TextGlyphs {
     ecs_vec_t glyphs;   /**< box_text_glyph_t, in the order of the string */
+    ecs_vec_t carets;   /**< box_text_caret_t, one per character and one after the last */
+    ecs_vec_t rows;     /**< box_text_row_t, one per line */
     float box;          /**< Width box.layout gives the Text, 0 outside a layout */
     float natural[2];   /**< Width and height of the block wrapped at Text.width only */
     float longest;      /**< Width of the widest word, the narrowest the block wraps to */
+    float top;          /**< Y of the top of the first line, local */
+    float line_height;  /**< Logical pixels between two baselines */
+    uint64_t key;       /**< box_text_key of the Text laid out last */
+    bool ready;         /**< The carets and rows hold the last layout, its font loaded */
 } TextGlyphs;
 
 /** Component id of TextGlyphs */
@@ -133,6 +152,8 @@ typedef struct box_text_state_t {
     ecs_vec_t released;         /**< uint32_t, page handles the backend should destroy */
     ecs_vec_t placed;           /**< Scratch of the layout: box_text_placed_t of a string */
     ecs_vec_t lines;            /**< Scratch of the layout: float width per line */
+    ecs_vec_t carets;           /**< Scratch of the layout: box_text_caret_t of a string */
+    ecs_vec_t rows;             /**< Scratch of the layout: box_text_row_t per line */
     ecs_vec_t texts;            /**< Scratch: entities to lay out again */
     uint32_t next_page;         /**< Next page handle */
     box_text_sync_t *sync;      /**< Jobs in flight */
@@ -269,6 +290,14 @@ float box_text_face_kern(
     const box_text_face_t *face,
     int32_t left,
     int32_t right);
+
+/** Get the key of what a Text lays out from: its string and the parameters of its layout.
+ *
+ * @param text The Text
+ * @return The key, which changes when the string or a parameter does
+ */
+uint64_t box_text_key(
+    const Text *text);
 
 /** Lay out a Text into its TextGlyphs and TextBounds.
  *

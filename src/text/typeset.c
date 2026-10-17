@@ -5,6 +5,8 @@
  * Glyphs advance along a pen in logical pixels; a word that passes the width moves to the next
  * line, a word wider than the width breaks inside. The block is centered on the origin, y up.
  * A Text is measured at Text.width for box.layout, which can wrap it narrower afterwards.
+ *
+ * The caret before every character and the byte range of every line are kept for editing.
  */
 
 #include "text.h"
@@ -24,6 +26,9 @@ typedef struct box_text_run_t {
     int32_t line_start;     /**< First placed glyph of the line */
     int32_t word_start;     /**< First placed glyph of the current word */
     int32_t prev;           /**< Glyph index before the pen, -1 at the start of a line */
+    int32_t word_caret;     /**< Caret of the first character of the current word */
+    int32_t row_caret;      /**< First caret of the line being filled */
+    int32_t cr;             /**< Offset of a carriage return just before, -1 for none */
     float longest;          /**< Width of the widest word so far */
     bool in_word;           /**< The last character was not a space */
 } box_text_run_t;
@@ -33,15 +38,22 @@ typedef struct box_text_run_t {
  * @param run The run
  * @param width Width of the line
  * @param start First placed glyph of the next line
+ * @param end Byte offset after the line, without its newline
+ * @param caret First caret of the next line
  */
 static void box_text_break(
     box_text_run_t *run,
     float width,
-    int32_t start)
+    int32_t start,
+    int32_t end,
+    int32_t caret)
 {
     *ecs_vec_append_t(NULL, &run->s->lines, float) = width;
+    *ecs_vec_append_t(NULL, &run->s->rows, box_text_row_t) = (box_text_row_t){
+        .caret = run->row_caret, .end = end };
     run->line ++;
     run->line_start = start;
+    run->row_caret = caret;
 }
 
 /** Make room for a glyph that passes the width: move its word to the next line, then break
@@ -50,19 +62,28 @@ static void box_text_break(
  * @param run The run
  * @param x Pen x of the glyph, moved with it
  * @param advance Advance of the glyph
+ * @param caret Caret of the glyph
  */
 static void box_text_wrap(
     box_text_run_t *run,
     float *x,
-    float advance)
+    float advance,
+    int32_t caret)
 {
     int32_t i, count = ecs_vec_count(&run->s->placed);
     box_text_placed_t *placed = ecs_vec_first(&run->s->placed);
+    box_text_caret_t *carets = ecs_vec_first(&run->s->carets);
     if (run->word_start > run->line_start) {
-        box_text_break(run, run->word_base, run->word_start);
+        box_text_break(run, run->word_base, run->word_start,
+            carets[run->word_caret].offset, run->word_caret);
         for (i = run->word_start; i < count; i ++) {
             placed[i].x -= run->word_x;
             placed[i].line = run->line;
+        }
+
+        for (i = run->word_caret; i <= caret; i ++) {
+            carets[i].x -= run->word_x;
+            carets[i].line = run->line;
         }
 
         *x -= run->word_x;
@@ -72,8 +93,9 @@ static void box_text_wrap(
     }
 
     if (*x + advance > run->wrap + BOX_TEXT_WRAP_SLACK && count > run->line_start) {
-        box_text_break(run, run->line_end, count);
+        box_text_break(run, run->line_end, count, carets[caret].offset, caret);
         run->word_start = count;
+        run->word_caret = caret;
         run->word_x = 0.0f;
         run->word_base = 0.0f;
         run->line_end = 0.0f;
@@ -81,12 +103,13 @@ static void box_text_wrap(
     }
 }
 
-/** Advance the run over one code point.
+/** Advance the run over one code point and place the caret before it.
  *
  * @param world The world
  * @param run The run
  * @param font The font, its face loaded
  * @param codepoint The code point
+ * @param offset Byte offset of the code point in the string
  * @param px Logical pixels per font unit
  */
 static void box_text_char(
@@ -94,11 +117,16 @@ static void box_text_char(
     box_text_run_t *run,
     box_text_font_t *font,
     int32_t codepoint,
+    int32_t offset,
     float px)
 {
     int32_t count = ecs_vec_count(&run->s->placed);
+    int32_t caret = ecs_vec_count(&run->s->carets), cr = run->cr;
+    box_text_caret_t *c = ecs_vec_append_t(NULL, &run->s->carets, box_text_caret_t);
+    *c = (box_text_caret_t){ .offset = offset, .line = run->line, .x = run->pen };
+    run->cr = -1;
     if (codepoint == '\n') {
-        box_text_break(run, run->line_end, count);
+        box_text_break(run, run->line_end, count, cr >= 0 ? cr : offset, caret + 1);
         run->pen = 0.0f;
         run->line_end = 0.0f;
         run->word_start = count;
@@ -108,6 +136,7 @@ static void box_text_char(
     }
 
     if (codepoint == '\r') {
+        run->cr = offset;
         goto done;
     }
 
@@ -119,6 +148,7 @@ static void box_text_char(
     }
 
     run->prev = glyph;
+    c->x = x;
     if (codepoint == ' ' || codepoint == '\t') {
         run->pen = x + advance;
         run->in_word = false;
@@ -127,6 +157,7 @@ static void box_text_char(
 
     if (!run->in_word) {
         run->word_start = count;
+        run->word_caret = caret;
         run->word_x = x;
         run->word_base = run->line_end;
         run->in_word = true;
@@ -135,8 +166,11 @@ static void box_text_char(
     if (run->wrap > 0.0f && x + advance > run->wrap + BOX_TEXT_WRAP_SLACK &&
         count > run->line_start)
     {
-        box_text_wrap(run, &x, advance);
+        box_text_wrap(run, &x, advance, caret);
     }
+
+    c->x = x;
+    c->line = run->line;
 
     const box_text_atlas_glyph_t *area = box_text_font_glyph(world, run->s, font, glyph);
     box_text_placed_t *p = ecs_vec_append_t(NULL, &run->s->placed, box_text_placed_t);
@@ -151,6 +185,40 @@ static void box_text_char(
 
 done:
     return;
+}
+
+/** Copy the carets and lines of a run into TextGlyphs, aligned and in the local space.
+ *
+ * @param run The finished run
+ * @param text The Text
+ * @param width Width of the block
+ * @param height Height of the block
+ * @param out Receives the carets and lines
+ */
+static void box_text_emit_carets(
+    const box_text_run_t *run,
+    const Text *text,
+    float width,
+    float height,
+    TextGlyphs *out)
+{
+    const box_text_caret_t *carets = ecs_vec_first(&run->s->carets);
+    const float *widths = ecs_vec_first(&run->s->lines);
+    int32_t i, count = ecs_vec_count(&run->s->carets);
+    box_text_caret_t *dst = ecs_vec_grow_t(NULL, &out->carets, box_text_caret_t, count);
+    for (i = 0; i < count; i ++) {
+        float free = width - widths[carets[i].line];
+        float indent = text->align == AlignCenter ? free * 0.5f
+            : (text->align == AlignRight ? free : 0.0f);
+        dst[i] = carets[i];
+        dst[i].x = -width * 0.5f + indent + carets[i].x;
+    }
+
+    count = ecs_vec_count(&run->s->rows);
+    ecs_os_memcpy_n(ecs_vec_grow_t(NULL, &out->rows, box_text_row_t, count),
+        ecs_vec_first(&run->s->rows), box_text_row_t, count);
+    out->top = height * 0.5f;
+    out->ready = true;
 }
 
 /** Turn the placed glyphs into quads: align the lines and center the block on the origin.
@@ -211,6 +279,8 @@ static void box_text_emit(
         q->range = BOX_TEXT_RANGE / p;
         q->page = page->handle;
     }
+
+    box_text_emit_carets(run, text, width, height, out);
 }
 
 /** Break a string into lines at a width, filling the placed and lines scratch of the registry.
@@ -231,14 +301,22 @@ static box_text_run_t box_text_run(
     float px,
     float wrap)
 {
-    box_text_run_t result = { .s = s, .wrap = wrap, .prev = -1 };
+    box_text_run_t result = { .s = s, .wrap = wrap, .prev = -1, .cr = -1 };
+    const char *p = str;
     ecs_vec_clear(&s->placed);
     ecs_vec_clear(&s->lines);
-    while (*str) {
-        box_text_char(world, &result, font, box_utf8_next(&str), px);
+    ecs_vec_clear(&s->carets);
+    ecs_vec_clear(&s->rows);
+    while (*p) {
+        int32_t offset = (int32_t)(p - str);
+        box_text_char(world, &result, font, box_utf8_next(&p), offset, px);
     }
 
-    box_text_break(&result, result.line_end, ecs_vec_count(&s->placed));
+    int32_t length = (int32_t)(p - str);
+    *ecs_vec_append_t(NULL, &s->carets, box_text_caret_t) = (box_text_caret_t){
+        .offset = length, .line = result.line, .x = result.pen };
+    box_text_break(&result, result.line_end, ecs_vec_count(&s->placed),
+        length, ecs_vec_count(&s->carets));
 
     return result;
 }
@@ -259,6 +337,52 @@ static float box_text_widest(
     }
 
     return result;
+}
+
+/** Give an empty string its one caret, at the origin of one line centered on the origin.
+ *
+ * @param out Receives the caret and the line, its line height set
+ */
+static void box_text_empty(
+    TextGlyphs *out)
+{
+    *ecs_vec_append_t(NULL, &out->carets, box_text_caret_t) = (box_text_caret_t){0};
+    *ecs_vec_append_t(NULL, &out->rows, box_text_row_t) = (box_text_row_t){0};
+    out->top = out->line_height * 0.5f;
+    out->ready = true;
+}
+
+/** Mix bytes into a 64 bit FNV-1a hash.
+ *
+ * @param hash The hash so far
+ * @param data The bytes
+ * @param size Number of bytes
+ * @return The hash with the bytes mixed in
+ */
+static uint64_t box_text_hash(
+    uint64_t hash,
+    const void *data,
+    size_t size)
+{
+    const uint8_t *bytes = data;
+    size_t i;
+    for (i = 0; i < size; i ++) {
+        hash = (hash ^ bytes[i]) * 1099511628211ull;
+    }
+
+    return hash;
+}
+
+uint64_t box_text_key(
+    const Text *text)
+{
+    const char *str = text->value ? text->value : "";
+    float sizes[3] = { text->size, text->line_height, text->width };
+    uint64_t ids[3] = { (uint64_t)text->align, (uint64_t)text->wrap, text->font };
+    uint64_t result = box_text_hash(14695981039346656037ull, str, strlen(str) + 1);
+    result = box_text_hash(result, sizes, sizeof(sizes));
+
+    return box_text_hash(result, ids, sizeof(ids));
 }
 
 /** Lay out a Text into its TextGlyphs and TextBounds.
@@ -289,13 +413,17 @@ static void box_text_typeset(
 
     float was[3] = { glyphs->natural[0], glyphs->natural[1], glyphs->longest };
     ecs_vec_clear(&glyphs->glyphs);
+    ecs_vec_clear(&glyphs->carets);
+    ecs_vec_clear(&glyphs->rows);
+    glyphs->ready = false;
+    glyphs->key = box_text_key(text);
     if (measure) {
         glyphs->natural[0] = glyphs->natural[1] = glyphs->longest = 0.0f;
     }
 
     box_text_font_t *font = text->font ? box_text_font_of(world, s, text->font) : NULL;
     const char *str = text->value;
-    if (!font || !font->face || !str || !str[0]) {
+    if (!font || !font->face) {
         goto write;
     }
 
@@ -306,6 +434,12 @@ static void box_text_typeset(
     metrics[2] = text->line_height > 0.0f
         ? text->line_height
         : (ascent - descent + gap) * px;
+    glyphs->line_height = metrics[2];
+    if (!str || !str[0]) {
+        box_text_empty(glyphs);
+        goto write;
+    }
+
     float wrap = text->width > 0.0f ? text->width : 0.0f;
     float box = text->wrap == TextWrapWords ? glyphs->box : 0.0f;
     bool narrow = !measure && box > 0.0f && box < glyphs->natural[0];
