@@ -721,6 +721,7 @@ are script functions registered with `box_command_register` (`src/command`):
 - Input: `key.*`, `mouse.*`, `input.*`, `action.*` feed the synthetic queue.
 - Render: `capture [cameras]` and `render <entity|prefab|template>`.
 - `commands` and `logs` list history and are quiet.
+- `help [command]` lists every command of `box.command.commands` (sorted, grouped by the part before the first dot) or shows the usage line, brief and parameter types of one; it is quiet, and unknown names get up to three suggestions. The unknown command error mentions `help`.
 
 The HTTP server has no deferred reply, so commands that wait (`input.wait`, `capture`, `render`)
 answer at once with a pending state and the caller polls.
