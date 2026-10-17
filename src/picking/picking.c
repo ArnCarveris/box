@@ -4,6 +4,7 @@
  *
  * box.input hands every event of a frame to the router of this module, which sends them in
  * order in PreUpdate, picking what the last frame placed, so handlers act before the layout.
+ * The ActionTriggers of the delivered events reach the actions in the next ActionUpdate.
  */
 
 #define BOX_PICKING_IMPL
@@ -264,6 +265,7 @@ static void box_pick_send(
     int32_t i, count = box_pick_chain(world, st, pick, chain);
     EcsScriptMouseEvent evt = *src;
     uint32_t pressed = src->buttons & ~st->buttons;
+    uint32_t released = st->buttons & ~src->buttons;
     bool press = pressed != 0;
     if (st->has_cursor && !press) {
         evt.delta_x = src->screen_x - st->cursor[0];
@@ -278,6 +280,7 @@ static void box_pick_send(
         ecs_script_mouse_event(world, &evt);
     }
 
+    box_pick_triggers(world, st, src, pick, pressed, released);
     st->cursor[0] = src->screen_x;
     st->cursor[1] = src->screen_y;
     st->buttons = src->buttons;
@@ -407,6 +410,7 @@ void BoxPickingUpdate(
     bool pointer = false;
     int32_t i;
     box_pick_meshes_prune(world, st);
+    box_pick_triggers_check(world, st);
     for (i = 0; i < ecs_vec_count(&st->emits); i ++) {
         box_input_emit_t emit = *ecs_vec_get_t(&st->emits, box_input_emit_t, i);
         box_pick_t pick;
@@ -502,6 +506,8 @@ void BoxPickingImport(
     ECS_TAG_DEFINE(world, InputBlocker);
     ECS_TAG_DEFINE(world, Hovered);
     ECS_TAG_DEFINE(world, Pressed);
+    ECS_META_COMPONENT(world, ActionTriggerMode);
+    ECS_META_COMPONENT(world, ActionTrigger);
     ECS_META_COMPONENT(world, PickStatus);
     ECS_COMPONENT_DEFINE(world, PickingState);
     ecs_set_hooks(world, PickingState, {
@@ -517,6 +523,7 @@ void BoxPickingImport(
     ecs_vec_init_t(NULL, &st->waiters, box_pick_waiter_t, 0);
     ecs_map_init(&st->meshes, NULL);
     box_pick_queries_init(world, st);
+    box_pick_triggers_import(world, st);
     ecs_singleton_ensure(world, PickingState)->state = st;
     ecs_singleton_set(world, PickStatus, {0});
     box_input_router_set(world, &(box_input_router_t){

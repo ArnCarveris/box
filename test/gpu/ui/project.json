@@ -193,6 +193,12 @@
                     "hover_and_wheel",
                     "render_to_texture"
                 ]
+            },
+            {
+                "id": "ActionTrigger",
+                "testcases": [
+                    "render_to_texture"
+                ]
             }
         ]
     }

@@ -1,6 +1,6 @@
 /**
  * @file input/actions.c
- * @brief Resolves bindings and synthetic holds into ActionState and raises the action events.
+ * @brief Resolves bindings, synthetic holds and triggers into ActionState and raises the events.
  */
 
 #include "input.h"
@@ -79,8 +79,42 @@ static void box_input_actions_dtor(
 
         ecs_vec_fini_t(NULL, &st[i].waiters, box_input_waiter_t);
         ecs_vec_fini_t(NULL, &st[i].events, box_input_action_event_t);
+        ecs_vec_fini_t(NULL, &st[i].cursors, box_input_cursor_t);
         ecs_map_fini(&st[i].bound);
     }
+}
+
+/** Find the hold of an action by a source, adding it when asked to.
+ *
+ * @param dev The device state
+ * @param source The element of a trigger, 0 for a synthetic hold
+ * @param action The action entity
+ * @param add Whether a missing hold is added
+ * @return The hold, NULL when there is none
+ */
+static box_input_hold_t* box_input_hold_find(
+    InputDevice *dev,
+    ecs_entity_t source,
+    ecs_entity_t action,
+    bool add)
+{
+    box_input_hold_t *holds = ecs_vec_first_t(&dev->holds, box_input_hold_t);
+    box_input_hold_t *result = NULL;
+    int32_t i, count = ecs_vec_count(&dev->holds);
+    for (i = 0; i < count && !result; i ++) {
+        if (holds[i].action == action && holds[i].source == source) {
+            result = &holds[i];
+        }
+    }
+
+    if (!result && add && action) {
+        result = ecs_vec_append_t(NULL, &dev->holds, box_input_hold_t);
+        ecs_os_zeromem(result);
+        result->action = action;
+        result->source = source;
+    }
+
+    return result;
 }
 
 void box_input_hold(
@@ -88,21 +122,7 @@ void box_input_hold(
     ecs_entity_t action,
     bool down)
 {
-    box_input_hold_t *holds = ecs_vec_first_t(&dev->holds, box_input_hold_t);
-    box_input_hold_t *hold = NULL;
-    int32_t i, count = ecs_vec_count(&dev->holds);
-    for (i = 0; i < count && !hold; i ++) {
-        if (holds[i].action == action) {
-            hold = &holds[i];
-        }
-    }
-
-    if (!hold && down && action) {
-        hold = ecs_vec_append_t(NULL, &dev->holds, box_input_hold_t);
-        ecs_os_zeromem(hold);
-        hold->action = action;
-    }
-
+    box_input_hold_t *hold = box_input_hold_find(dev, 0, action, down);
     if (hold) {
         hold->pressed = hold->pressed || (down && !hold->down);
         hold->down = down;
@@ -116,6 +136,53 @@ void box_input_hold_release_all(
     int32_t i;
     for (i = 0; i < ecs_vec_count(&dev->holds); i ++) {
         holds[i].down = false;
+        holds[i].tapped = false;
+        holds[i].taps = 0;
+    }
+}
+
+void box_input_trigger_tap(
+    InputDevice *dev,
+    ecs_entity_t source,
+    ecs_entity_t action,
+    const vec2 cursor)
+{
+    box_input_hold_t *hold = box_input_hold_find(dev, source, action, true);
+    if (hold) {
+        hold->taps ++;
+        hold->cursor[0] = cursor[0];
+        hold->cursor[1] = cursor[1];
+    }
+}
+
+void box_input_trigger_hold(
+    InputDevice *dev,
+    ecs_entity_t source,
+    ecs_entity_t action,
+    bool down,
+    const vec2 cursor)
+{
+    box_input_hold_t *hold = box_input_hold_find(dev, source, action, down);
+    if (hold) {
+        hold->pressed = hold->pressed || (down && !hold->down);
+        hold->down = down;
+        hold->cursor[0] = cursor[0];
+        hold->cursor[1] = cursor[1];
+    }
+}
+
+void box_input_trigger_cursor(
+    InputDevice *dev,
+    ecs_entity_t source,
+    const vec2 cursor)
+{
+    box_input_hold_t *holds = ecs_vec_first_t(&dev->holds, box_input_hold_t);
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&dev->holds); i ++) {
+        if (source && holds[i].source == source && holds[i].down) {
+            holds[i].cursor[0] = cursor[0];
+            holds[i].cursor[1] = cursor[1];
+        }
     }
 }
 
@@ -370,7 +437,8 @@ static void box_input_bound_reset(
     }
 }
 
-/** Collect the bits of every binding and synthetic hold per action.
+/** Collect the bits of every binding, synthetic hold and trigger per action, and the cursors
+ * of the triggers.
  *
  * @param world The world
  * @param st The action state
@@ -402,15 +470,31 @@ static void box_input_bind(
         }
     }
 
+    ecs_vec_clear(&st->cursors);
     for (i = 0; i < count; i ++) {
-        uint64_t bits = (holds[i].down ? BOX_INPUT_BOUND_DOWN : 0) |
+        uint64_t bits;
+        if (holds[i].tapped) {
+            holds[i].tapped = false;
+            holds[i].taps --;
+        } else if (holds[i].taps > 0) {
+            holds[i].tapped = true;
+        }
+
+        bits = (holds[i].down || holds[i].tapped ? BOX_INPUT_BOUND_DOWN : 0) |
             (holds[i].pressed ? BOX_INPUT_BOUND_PRESSED : 0);
         if (bits) {
             ecs_map_ensure(&st->bound, holds[i].action)[0] |= bits;
         }
 
+        if (holds[i].source) {
+            box_input_cursor_t *c = ecs_vec_append_t(NULL, &st->cursors, box_input_cursor_t);
+            c->action = holds[i].action;
+            c->cursor[0] = holds[i].cursor[0];
+            c->cursor[1] = holds[i].cursor[1];
+        }
+
         holds[i].pressed = false;
-        if (holds[i].down) {
+        if (holds[i].down || holds[i].taps > 0) {
             holds[kept ++] = holds[i];
         }
     }
@@ -424,22 +508,22 @@ static void box_input_bind(
  * @param phase What the event reports
  * @param action The action entity
  * @param state The state of the action this frame
- * @param mouse The cursor state of the frame
+ * @param cursor The cursor the event reports
  */
 static void box_input_action_raise(
     InputActions *st,
     box_input_phase_t phase,
     ecs_entity_t action,
     const ActionState *state,
-    const Mouse *mouse)
+    const float *cursor)
 {
     box_input_action_event_t *ev = ecs_vec_append_t(
         NULL, &st->events, box_input_action_event_t);
     ev->phase = phase;
     ev->event = (ActionEvent){
         .action = action,
-        .screen_x = mouse->position[0],
-        .screen_y = mouse->position[1],
+        .screen_x = cursor[0],
+        .screen_y = cursor[1],
         .delta_x = state->delta[0],
         .delta_y = state->delta[1],
         .drag_x = state->drag[0],
@@ -447,7 +531,31 @@ static void box_input_action_raise(
     };
 }
 
+/** Find the cursor of the pointer event that triggered an action this frame.
+ *
+ * @param st The action state
+ * @param action The action entity
+ * @return The cursor of the last trigger of the action, NULL when no trigger fed it
+ */
+static const float* box_input_action_cursor(
+    const InputActions *st,
+    ecs_entity_t action)
+{
+    const box_input_cursor_t *cursors = ecs_vec_first_t(&st->cursors, box_input_cursor_t);
+    const float *result = NULL;
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&st->cursors); i ++) {
+        if (cursors[i].action == action) {
+            result = cursors[i].cursor;
+        }
+    }
+
+    return result;
+}
+
 /** Advance the state of one action and append the events it raises.
+ *
+ * An action a trigger fed starts at and reports the cursor of the pointer event of the trigger.
  *
  * @param st The action state
  * @param action The action entity
@@ -465,13 +573,15 @@ static void box_input_action_resolve(
     bool down = (bits & BOX_INPUT_BOUND_DOWN) != 0;
     bool tap = (bits & BOX_INPUT_BOUND_PRESSED) != 0;
     bool was = state->down;
+    const float *cursor = box_input_action_cursor(st, action);
     int32_t i;
+    cursor = cursor ? cursor : mouse->position;
     state->pressed = !was && (down || tap);
     state->released = was ? !down : (tap && !down);
     state->down = down;
     for (i = 0; i < 2; i ++) {
         if (state->pressed) {
-            state->start[i] = mouse->position[i];
+            state->start[i] = cursor[i];
             state->delta[i] = state->drag[i] = 0;
         } else if (down || state->released) {
             state->delta[i] = mouse->delta[i];
@@ -482,19 +592,19 @@ static void box_input_action_resolve(
     }
 
     if (state->pressed) {
-        box_input_action_raise(st, BoxInputPressed, action, state, mouse);
+        box_input_action_raise(st, BoxInputPressed, action, state, cursor);
     }
 
     if (down) {
-        box_input_action_raise(st, BoxInputHeld, action, state, mouse);
+        box_input_action_raise(st, BoxInputHeld, action, state, cursor);
     }
 
     if (down && !state->pressed && (state->delta[0] != 0 || state->delta[1] != 0)) {
-        box_input_action_raise(st, BoxInputDragged, action, state, mouse);
+        box_input_action_raise(st, BoxInputDragged, action, state, cursor);
     }
 
     if (state->released) {
-        box_input_action_raise(st, BoxInputReleased, action, state, mouse);
+        box_input_action_raise(st, BoxInputReleased, action, state, cursor);
     }
 }
 
@@ -666,6 +776,7 @@ void box_input_actions_import(
     InputActions *st = ecs_singleton_ensure(world, InputActions);
     ecs_vec_init_t(NULL, &st->waiters, box_input_waiter_t, 0);
     ecs_vec_init_t(NULL, &st->events, box_input_action_event_t, 0);
+    ecs_vec_init_t(NULL, &st->cursors, box_input_cursor_t, 0);
     ecs_map_init(&st->bound, NULL);
     st->bindings = ecs_query(world, {
         .entity = ecs_entity(world, { .name = "ActionBindings" }),

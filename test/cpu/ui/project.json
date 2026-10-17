@@ -94,6 +94,30 @@
                     "grow_paragraph_in_fit_card",
                     "script_paragraph"
                 ]
+            },
+            {
+                "id": "ActionTrigger",
+                "testcases": [
+                    "script_defaults",
+                    "zero_values_trigger_nothing",
+                    "click_taps_once",
+                    "three_clicks",
+                    "release_outside",
+                    "press_mode",
+                    "hold_released_outside",
+                    "hold_released_by_delete",
+                    "hold_released_by_remove",
+                    "hold_released_by_reset",
+                    "hold_released_by_focus_loss",
+                    "right_button_ignores_left",
+                    "blocker_keeps_binding_up",
+                    "world_space_element",
+                    "shape",
+                    "binding_keeps_action_down",
+                    "trigger_on_ancestor_does_nothing",
+                    "disabled_element",
+                    "deleted_action"
+                ]
             }
         ]
     }

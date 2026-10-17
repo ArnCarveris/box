@@ -3,13 +3,15 @@
  * @brief Picking: the pointer events of a frame go to the entities under the cursor.
  *
  * Every view casts a ray from its camera into its scene, the front view first, so screen UI,
- * world UI and 3D shapes are picked the same way. Events go out through flecs.script.event.
+ * world UI and 3D shapes are picked the same way. Events go out through flecs.script.event,
+ * and an element with an ActionTrigger drives an input Action.
  */
 
 #ifndef BOX_PICKING_H
 #define BOX_PICKING_H
 
 #include "types.h"
+#include "input.h"
 
 #ifdef BOX_PICKING_IMPL
 #define ECS_META_IMPL IMPL
@@ -52,6 +54,35 @@ extern ECS_TAG_DECLARE(Hovered);
 
 /** Added to the entity a press went to while a mouse button is held */
 extern ECS_TAG_DECLARE(Pressed);
+
+/** How the button of an ActionTrigger drives its action.
+ *
+ * A tap makes the action pressed in one frame and released in a later one. Taps queue, so N
+ * clicks give N taps, also when they arrive in one frame.
+ *
+ * Scripts use the full constant names, such as ActionTrigger: {action: a, mode: ActionTriggerHold}.
+ */
+ECS_ENUM(ActionTriggerMode, {
+    ActionTriggerClick, /**< Tap when the button comes up over the element it went down on */
+    ActionTriggerPress, /**< Tap when the button goes down on the element */
+    ActionTriggerHold   /**< Down from the press on the element until the button comes up */
+});
+
+/** Makes a mouse button on an element drive an input Action; adding it makes it Interactive.
+ *
+ * It acts on the events its entity handles as the first Interactive (or InputBlocker) entity on
+ * the path of the target, in every view and for the mouse.* commands; disabled entities and
+ * prefabs never trigger. Deleting the element or trigger, input.reset and focus loss end a Hold.
+ *
+ * The action is down while any trigger, Binding or action.down holds it, changes in the frame
+ * after the pointer event (picking runs after ActionUpdate) and reports its cursor. A mouse
+ * Binding of the button still sees the press unless an InputBlocker is on the path.
+ */
+ECS_STRUCT(ActionTrigger, {
+    ecs_entity_t action;    /**< Action it drives; 0, deleted or not an Action does nothing */
+    ActionTriggerMode mode; /**< How the button drives the action, Click by default */
+    Key button;             /**< Mouse button, KeyMouseLeft by default; KeyNone does nothing */
+});
 
 /** What the cursor picked, a singleton written by the engine and read only for applications */
 ECS_STRUCT(PickStatus, {

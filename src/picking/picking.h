@@ -1,6 +1,7 @@
 /**
  * @file picking/picking.h
- * @brief Private state of box.picking: the queued events, the queries and the pick of a cursor.
+ * @brief Private state of box.picking: the queued events, the queries, the pick of a cursor and
+ * the active action triggers.
  */
 
 #ifndef BOX_PICKING_INTERNAL_H
@@ -76,6 +77,15 @@ typedef struct box_pick_waiter_t {
     ecs_script_future_t *future; /**< Future the event resolves */
 } box_pick_waiter_t;
 
+/** Mouse buttons a trigger can use, KeyMouseLeft to KeyMouseRight */
+#define BOX_PICK_BUTTONS (3)
+
+/** The action a Hold trigger holds while its button is down */
+typedef struct box_pick_hold_t {
+    ecs_entity_t source; /**< Element of the trigger, 0 when the button holds nothing */
+    ecs_entity_t action; /**< The action it holds */
+} box_pick_hold_t;
+
 /** Private state of the module, kept on the heap behind the PickingState singleton */
 typedef struct box_pick_state_t {
     ecs_query_t *views;     /**< Entities with a View */
@@ -92,6 +102,8 @@ typedef struct box_pick_state_t {
     vec2 cursor;            /**< Cursor of the last pointer event */
     uint32_t buttons;       /**< Buttons held at the last pointer event */
     bool has_cursor;        /**< A pointer event arrived, so the cursor is known */
+    ecs_entity_t clicks[BOX_PICK_BUTTONS]; /**< Click trigger a press of a button went to */
+    box_pick_hold_t holds[BOX_PICK_BUTTONS]; /**< Hold trigger of each button */
 } box_pick_state_t;
 
 /** Singleton that owns the state of the module */
@@ -150,6 +162,43 @@ void box_pick_meshes_fini(
  * @param st The module state
  */
 void box_pick_queries_init(
+    ecs_world_t *world,
+    box_pick_state_t *st);
+
+/** Feed the ActionTriggers of a pointer event to box.input after it was delivered: a press
+ * starts the trigger of the handler of its pick, a release ends a hold anywhere and ends a click
+ * while the cursor is still over the element of the press.
+ *
+ * @param world The world
+ * @param st The module state
+ * @param src The event
+ * @param pick The pick the event was delivered by
+ * @param pressed The buttons that went down with the event
+ * @param released The buttons that came up with the event
+ */
+void box_pick_triggers(
+    ecs_world_t *world,
+    box_pick_state_t *st,
+    const EcsScriptMouseEvent *src,
+    const box_pick_t *pick,
+    uint32_t pressed,
+    uint32_t released);
+
+/** Release the holds of triggers that were disabled, changed or lost their action.
+ *
+ * @param world The world
+ * @param st The module state
+ */
+void box_pick_triggers_check(
+    ecs_world_t *world,
+    box_pick_state_t *st);
+
+/** Register ActionTrigger with its hooks.
+ *
+ * @param world The world
+ * @param st The module state
+ */
+void box_pick_triggers_import(
     ecs_world_t *world,
     box_pick_state_t *st);
 

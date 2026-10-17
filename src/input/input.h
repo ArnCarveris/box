@@ -49,9 +49,13 @@ typedef struct box_input_router_t {
     void *ctx;                 /**< Passed to route and blocks */
 } box_input_router_t;
 
-/** A synthetic hold of an action */
+/** A synthetic hold of an action, or what an element with an ActionTrigger feeds it */
 typedef struct box_input_hold_t {
     ecs_entity_t action; /**< The action entity */
+    ecs_entity_t source; /**< Element of the trigger, 0 for a synthetic hold */
+    vec2 cursor;         /**< Cursor of the last pointer event of the trigger */
+    int32_t taps;        /**< Taps of the trigger still to resolve, the current one included */
+    bool tapped;         /**< The current tap holds the action down this frame */
     bool down;           /**< The hold is active */
     bool pressed;        /**< The hold started since the actions last resolved */
 } box_input_hold_t;
@@ -85,11 +89,18 @@ typedef struct InputDevice {
 
 extern ECS_COMPONENT_DECLARE(InputDevice);
 
+/** Cursor of the pointer event that triggered an action, which its events report */
+typedef struct box_input_cursor_t {
+    ecs_entity_t action; /**< The action entity */
+    vec2 cursor;         /**< Cursor in window points */
+} box_input_cursor_t;
+
 /** Private state of the action layer, a singleton */
 typedef struct InputActions {
     ecs_vec_t waiters;                 /**< box_input_waiter_t of the tasks awaiting an action */
     ecs_vec_t events;                  /**< box_input_action_event_t the frame raises */
     ecs_map_t bound;                   /**< Action entity to the BOX_INPUT_BOUND_* bits */
+    ecs_vec_t cursors;                 /**< box_input_cursor_t of the triggers this frame */
     ecs_query_t *bindings;             /**< Entities with a Binding */
     ecs_query_t *actions;              /**< Entities with an Action and its ActionState */
     uint8_t press_mods[BOX_KEY_COUNT]; /**< Modifier keys held when each key last went down */
@@ -195,12 +206,56 @@ void box_input_hold(
     ecs_entity_t action,
     bool down);
 
-/** End every synthetic hold of an action.
+/** End every synthetic hold and trigger hold, and drop the taps of the triggers.
  *
  * @param dev The device state
  */
 void box_input_hold_release_all(
     InputDevice *dev);
+
+/** Tap an action for an element: the action goes down in the next resolve and comes up in the
+ * one after. Taps queue, so each one goes down and up in its own frames.
+ *
+ * box.picking calls it for an ActionTrigger. Its action events report the cursor.
+ *
+ * @param dev The device state
+ * @param source The element of the trigger
+ * @param action The action entity
+ * @param cursor Cursor of the pointer event in window points
+ */
+void box_input_trigger_tap(
+    InputDevice *dev,
+    ecs_entity_t source,
+    ecs_entity_t action,
+    const vec2 cursor);
+
+/** Start or end the hold of an action by an element. It combines with the bindings and the
+ * other holds of the action, which stays down while any of them holds it.
+ *
+ * @param dev The device state
+ * @param source The element of the trigger
+ * @param action The action entity
+ * @param down Whether the hold starts
+ * @param cursor Cursor of the pointer event in window points
+ */
+void box_input_trigger_hold(
+    InputDevice *dev,
+    ecs_entity_t source,
+    ecs_entity_t action,
+    bool down,
+    const vec2 cursor);
+
+/** Move the cursor of the triggers of an element that are still active, without starting or
+ * ending one, so a hold that input.reset ended stays up.
+ *
+ * @param dev The device state
+ * @param source The element of the trigger
+ * @param cursor Cursor of the pointer event in window points
+ */
+void box_input_trigger_cursor(
+    InputDevice *dev,
+    ecs_entity_t source,
+    const vec2 cursor);
 
 /** Clear the per frame state, apply the platform and synthetic events and emit them.
  *
