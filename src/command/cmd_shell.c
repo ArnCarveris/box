@@ -559,32 +559,6 @@ done:
     ecs_os_free(name);
 }
 
-/** Append the usage line of a command.
- *
- * @param world The world
- * @param cmd The command function
- * @param buf The buffer
- */
-static void box_shell_usage(
-    const ecs_world_t *world,
-    ecs_entity_t cmd,
-    ecs_strbuf_t *buf)
-{
-    const EcsScriptFunction *f = ecs_get(world, cmd, EcsScriptFunction);
-    const CommandInfo *info = ecs_get(world, cmd, CommandInfo);
-    const ecs_script_parameter_t *params = ecs_vec_first(&f->params);
-    int32_t i, count = ecs_vec_count(&f->params);
-    ecs_strbuf_append(buf, "usage: %s", ecs_get_name(world, cmd));
-    for (i = 1; i < count; i ++) {
-        const char *suffix = info->rest && i == count - 1 ? "..." : "";
-        if (i > info->required) {
-            ecs_strbuf_append(buf, " [%s%s]", params[i].name, suffix);
-        } else {
-            ecs_strbuf_append(buf, " <%s%s>", params[i].name, suffix);
-        }
-    }
-}
-
 /** The man command: print the flecs.doc descriptions of an entity or a command.
  *
  * @param ctx The call context
@@ -620,7 +594,7 @@ static void box_shell_man(
     }
 
     if (ecs_has(world, e, CommandInfo) && ecs_has(world, e, EcsScriptFunction)) {
-        box_shell_usage(world, e, &buf);
+        box_command_usage(world, e, &buf);
     }
 
     for (i = 0; i < (int32_t)(sizeof(kinds) / sizeof(kinds[0])); i ++) {

@@ -206,8 +206,8 @@ void Terminal_sessions_isolated(void) {
 
     out = box_terminal_run(world, s1, "commands", NULL);
     test_str(out,
-        "$ nope\nerror: unknown command 'nope'\n"
-        "$ nope2\nerror: unknown command 'nope2'");
+        "$ nope\nerror: unknown command 'nope', see help\n"
+        "$ nope2\nerror: unknown command 'nope2', see help");
     ecs_os_free(out);
 
     test_int(ecs_get(world, s1, TerminalStatus)->commands, 3);
@@ -248,7 +248,7 @@ void Terminal_log_file(void) {
     size_t n = fread(buf, 1, sizeof(buf) - 1, f);
     buf[n] = '\0';
     fclose(f);
-    test_str(buf, "$ nope a\nerror: unknown command 'nope'\n$ commands\n");
+    test_str(buf, "$ nope a\nerror: unknown command 'nope', see help\n$ commands\n");
 
     ecs_os_free(path);
     ecs_fini(world);
@@ -303,9 +303,9 @@ void Terminal_commands_all(void) {
     char *out = box_terminal_run(world, s, "commands", &error);
     test_bool(error, false);
     test_str(out,
-        "$ a\nerror: unknown command 'a'\n"
-        "$ b\nerror: unknown command 'b'\n"
-        "$ c\nerror: unknown command 'c'");
+        "$ a\nerror: unknown command 'a', see help\n"
+        "$ b\nerror: unknown command 'b', see help\n"
+        "$ c\nerror: unknown command 'c', see help");
 
     ecs_os_free(out);
     ecs_fini(world);
@@ -322,7 +322,8 @@ void Terminal_commands_count(void) {
     ecs_os_free(box_terminal_run(world, s, "c", NULL));
 
     char *out = box_terminal_run(world, s, "commands 2", NULL);
-    test_str(out, "$ b\nerror: unknown command 'b'\n$ c\nerror: unknown command 'c'");
+    test_str(out, "$ b\nerror: unknown command 'b', see help\n"
+        "$ c\nerror: unknown command 'c', see help");
 
     ecs_os_free(out);
     ecs_fini(world);
@@ -337,7 +338,7 @@ void Terminal_commands_count_above_total(void) {
     ecs_os_free(box_terminal_run(world, s, "a", NULL));
 
     char *out = box_terminal_run(world, s, "commands 10", NULL);
-    test_str(out, "$ a\nerror: unknown command 'a'");
+    test_str(out, "$ a\nerror: unknown command 'a', see help");
 
     ecs_os_free(out);
     ecs_fini(world);
@@ -353,7 +354,7 @@ void Terminal_commands_not_nested(void) {
     ecs_os_free(box_terminal_run(world, s, "commands", NULL));
 
     char *out = box_terminal_run(world, s, "commands", NULL);
-    test_str(out, "$ a\nerror: unknown command 'a'\n$ commands");
+    test_str(out, "$ a\nerror: unknown command 'a', see help\n$ commands");
 
     ecs_os_free(out);
     ecs_fini(world);
@@ -394,7 +395,7 @@ void Terminal_commands_is_script_function(void) {
     char *out = NULL;
     ecs_value_t result = { .type = ecs_id(ecs_string_t), .ptr = &out };
     test_int(ecs_function_call(world, f, 2, argv, &result), 0);
-    test_str(out, "$ a\nerror: unknown command 'a'");
+    test_str(out, "$ a\nerror: unknown command 'a', see help");
 
     ecs_os_free(out);
     ecs_fini(world);
@@ -436,7 +437,7 @@ void Terminal_http_exec_get(void) {
     test_int(box_command_request(world, "GET",
         "/terminal/exec?session=s1&cmd=commands%201", NULL, &reply), 200);
     char *body = ecs_strbuf_get(&reply.body);
-    test_str(body, "$ b\nerror: unknown command 'b'");
+    test_str(body, "$ b\nerror: unknown command 'b', see help");
     ecs_os_free(body);
 
     test_int(ecs_get(world, s, TerminalStatus)->commands, 3);
@@ -456,7 +457,7 @@ void Terminal_http_exec_post(void) {
     test_int(box_command_request(world, "POST",
         "/terminal/exec?session=s1", "commands 1", &reply), 200);
     char *body = ecs_strbuf_get(&reply.body);
-    test_str(body, "$ a\nerror: unknown command 'a'");
+    test_str(body, "$ a\nerror: unknown command 'a', see help");
     ecs_os_free(body);
 
     ecs_fini(world);
@@ -473,7 +474,7 @@ void Terminal_http_exec_error(void) {
     test_int(box_command_request(world, "GET",
         "/terminal/exec?session=s1&cmd=nope", NULL, &reply), 400);
     char *body = ecs_strbuf_get(&reply.body);
-    test_str(body, "error: unknown command 'nope'");
+    test_str(body, "error: unknown command 'nope', see help");
     ecs_os_free(body);
 
     ecs_fini(world);

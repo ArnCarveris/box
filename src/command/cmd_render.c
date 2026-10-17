@@ -713,7 +713,7 @@ void box_cmd_render_init(
 
     box_command_register(world, &(box_command_desc_t){
         .name = "capture",
-        .brief = "PNG of the active camera or of cameras a, b in resources, written next frame",
+        .brief = "Write a PNG of the active camera or of cameras a, b to resources next frame",
         .params = {{
             .name = "cameras", .type = ecs_id(ecs_string_t), .optional = true, .rest = true
         }},
@@ -723,7 +723,7 @@ void box_cmd_render_init(
 
     box_command_register(world, &(box_command_desc_t){
         .name = "render",
-        .brief = "PNG of an entity, prefab or template on its own in resources, written next frame",
+        .brief = "Write a PNG of an entity, prefab or template on its own to resources next frame",
         .params = {{ .name = "subject", .type = ecs_id(ecs_string_t) }},
         .callback = box_cmd_render,
         .ctx = state

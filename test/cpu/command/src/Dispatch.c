@@ -74,7 +74,7 @@ void Dispatch_unknown_command(void) {
     bool error = false;
     char *out = box_terminal_run(world, s, "foo bar", &error);
     test_bool(error, true);
-    test_str(out, "error: unknown command 'foo'");
+    test_str(out, "error: unknown command 'foo', see help");
 
     ecs_os_free(out);
     ecs_fini(world);
@@ -443,7 +443,7 @@ void Dispatch_dotted_command(void) {
     ecs_os_free(out);
 
     out = box_terminal_run(world, s, "key", NULL);
-    test_str(out, "error: unknown command 'key'");
+    test_str(out, "error: unknown command 'key', see help");
     ecs_os_free(out);
 
     ecs_fini(world);

@@ -198,6 +198,7 @@ void BoxCommandImport(
     box_terminal_init(world, host);
     box_endpoint_init(world, host);
     box_history_init(world);
+    box_cmd_help_init(world);
     box_logs_init(world);
     box_shell_init(world);
     box_search_init(world);

@@ -787,7 +787,7 @@ void box_search_init(
 
     box_command_register(world, &(box_command_desc_t){
         .name = "query",
-        .brief = "Create a named query; lists queries without arguments",
+        .brief = "Create a named query, list the queries without arguments",
         .params = {
             { .name = "name", .type = ecs_id(ecs_string_t), .optional = true },
             { .name = "expr", .type = ecs_id(ecs_string_t), .optional = true, .rest = true }

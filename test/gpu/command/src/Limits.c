@@ -289,11 +289,11 @@ void Limits_history_bounded(void) {
     test_int(ecs_get(world, s, TerminalStatus)->commands, 20);
     char *out = box_terminal_run(world, s, "commands", NULL);
     test_str(out,
-        "$ nope 15\nerror: unknown command 'nope'\n"
-        "$ nope 16\nerror: unknown command 'nope'\n"
-        "$ nope 17\nerror: unknown command 'nope'\n"
-        "$ nope 18\nerror: unknown command 'nope'\n"
-        "$ nope 19\nerror: unknown command 'nope'");
+        "$ nope 15\nerror: unknown command 'nope', see help\n"
+        "$ nope 16\nerror: unknown command 'nope', see help\n"
+        "$ nope 17\nerror: unknown command 'nope', see help\n"
+        "$ nope 18\nerror: unknown command 'nope', see help\n"
+        "$ nope 19\nerror: unknown command 'nope', see help");
     ecs_os_free(out);
 
     ecs_fini(world);

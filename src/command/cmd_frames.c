@@ -113,13 +113,13 @@ void box_cmd_frames_init(
 {
     box_command_register(world, &(box_command_desc_t){
         .name = "fps",
-        .brief = "Frame rate and timing: delta against wall time, presents, late and dropped",
+        .brief = "Show the frame rate and timing: delta against wall time, presents, late, dropped",
         .callback = box_cmd_frames
     });
 
     box_command_register(world, &(box_command_desc_t){
         .name = "frames",
-        .brief = "Same as fps: the timing of the recent frames",
+        .brief = "Show the timing of the recent frames, same as fps",
         .callback = box_cmd_frames
     });
 }

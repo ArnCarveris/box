@@ -300,7 +300,8 @@ static char* box_dispatch_call(
     bool failed = host->failed;
     st->failed = true;
     if (!f || !info) {
-        result = flecs_asprintf(BOX_COMMAND_ERROR "unknown command '%s'", cl->tokens[0]);
+        result = flecs_asprintf(
+            BOX_COMMAND_ERROR "unknown command '%s', see help", cl->tokens[0]);
         goto done;
     }
 

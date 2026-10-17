@@ -306,6 +306,25 @@ void box_cmd_render_init(
 void box_cmd_frames_init(
     ecs_world_t *world);
 
+/** Register the help command that lists the commands or shows how to use one.
+ *
+ * @param world The world
+ */
+void box_cmd_help_init(
+    ecs_world_t *world);
+
+/** Append the usage line of a command: its name and each parameter as <name>, [name] when
+ * optional and <name...> when it takes the rest of the line.
+ *
+ * @param world The world
+ * @param cmd The command function
+ * @param buf The buffer
+ */
+void box_command_usage(
+    const ecs_world_t *world,
+    ecs_entity_t cmd,
+    ecs_strbuf_t *buf);
+
 /** Register the quit command that ends the run after the current frame.
  *
  * @param world The world

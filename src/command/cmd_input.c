@@ -1073,7 +1073,7 @@ void box_cmd_input_init(
 
     box_command_register(world, &(box_command_desc_t){
         .name = "input.wait",
-        .brief = "Frames until the input queue is drained, 0 when it is; repeat until 0",
+        .brief = "Print the frames until the input queue is drained, 0 when it is; repeat until 0",
         .callback = box_cmd_input_wait
     });
 

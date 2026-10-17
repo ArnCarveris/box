@@ -335,6 +335,25 @@
                     "paste_shortcut",
                     "utf8"
                 ]
+            },
+            {
+                "id": "Help",
+                "testcases": [
+                    "list_all_commands",
+                    "list_registered_after_import",
+                    "list_sorted_grouped",
+                    "usage_get",
+                    "usage_optional_rest",
+                    "unknown_suggestions",
+                    "unknown_no_suggestions",
+                    "group_mouse",
+                    "no_brief_listed",
+                    "every_command_has_brief",
+                    "dispatch_error_mentions_help",
+                    "quiet",
+                    "http_exec",
+                    "no_color_codes"
+                ]
             }
         ]
     }
