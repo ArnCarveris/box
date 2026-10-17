@@ -330,12 +330,14 @@ void BoxRenderImport(
     box_render_captures_init(world);
     box_render_textures_init(world);
     box_render_draws_init(world);
+    box_render_atmosphere_init(world);
     box_render_lights_init(world);
     box_render_bake_init(world);
     box_render_reflect_init(world);
     box_render_shadows_init(world);
     box_render_cull_status_init(world);
     box_render_effects_init(world);
+    box_render_atmosphere_views_init(world);
 
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "RenderSubmitPacket" }),

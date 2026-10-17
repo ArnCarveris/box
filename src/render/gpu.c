@@ -409,7 +409,8 @@ static void box_gpu_targets_render(
     }
 }
 
-/** Apply the resources of a packet, capture its probes and render its targets.
+/** Apply the resources of a packet, capture its probes, build its atmosphere LUTs and render its
+ * targets.
  *
  * @param ctx The backend
  * @param packet The packet
@@ -446,6 +447,9 @@ static void box_gpu_render(
         } else if (r->kind == BOX_RENDER_REFLECTION) {
             box_gpu_reflect_apply(gpu, r->op, r->handle,
                 r->size >= sizeof(box_render_reflection_desc_t) ? data : NULL);
+        } else if (r->kind == BOX_RENDER_ATMOSPHERE) {
+            box_gpu_atmosphere_apply(gpu, r->op, r->handle,
+                r->size >= sizeof(box_render_atmosphere_desc_t) ? data : NULL);
         }
 
         if (r->kind != BOX_RENDER_TARGET) {
@@ -465,9 +469,11 @@ static void box_gpu_render(
     box_gpu_upload(gpu, packet);
     box_gpu_scatter(gpu, packet);
     box_gpu_bake_capture(gpu, packet);
+    box_gpu_atmosphere_build(gpu, packet);
     box_gpu_targets_render(gpu, packet);
 
     box_gpu_effects_sweep(gpu, packet);
+    box_gpu_atmosphere_sweep(gpu, packet);
     box_gpu_stats_publish(gpu);
 }
 
@@ -720,6 +726,7 @@ void box_gpu_stats_publish(
 {
     box_render_gpu_stats_t *p = &gpu->pending;
     box_render_gpu_stats_t *s = &gpu->stats;
+    int32_t i;
     ecs_os_mutex_lock(gpu->lock);
     s->targets += p->targets;
     s->created += p->created;
@@ -739,6 +746,14 @@ void box_gpu_stats_publish(
     s->scattered += p->scattered;
     s->cull_ns += p->cull_ns;
     s->cull_passes += p->cull_passes;
+    s->atmosphere_luts += p->atmosphere_luts;
+    s->atmosphere_views += p->atmosphere_views;
+    s->atmosphere_builds += p->atmosphere_builds;
+    for (i = 0; i < BOX_RENDER_ATMOS_PASSES; i ++) {
+        s->atmosphere_ns[i] += p->atmosphere_ns[i];
+        s->atmosphere_passes[i] += p->atmosphere_passes[i];
+    }
+
     ecs_os_mutex_unlock(gpu->lock);
     ecs_os_memset_t(p, 0, box_render_gpu_stats_t);
 }

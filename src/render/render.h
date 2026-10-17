@@ -50,6 +50,9 @@
 /** Shader handle of the engine shader of the height fog pass */
 #define BOX_RENDER_SHADER_FOG (44)
 
+/** Shader handle of the engine compute shader of the atmosphere lookup tables */
+#define BOX_RENDER_SHADER_ATMOSPHERE (45)
+
 /** Cascades of the shadow map of a view at most */
 #define BOX_RENDER_SHADOW_CASCADES (4)
 
@@ -123,7 +126,8 @@ typedef enum box_render_resource_kind_t {
     BOX_RENDER_TARGET,   /**< Surface or offscreen target that views render into */
     BOX_RENDER_SHADER,   /**< Shader module or pipeline */
     BOX_RENDER_VOLUME,   /**< Irradiance probe volume of a scene with LightBake */
-    BOX_RENDER_REFLECTION /**< Cubemap array of the reflection probes of a scene */
+    BOX_RENDER_REFLECTION, /**< Cubemap array of the reflection probes of a scene */
+    BOX_RENDER_ATMOSPHERE /**< Transmittance and multi scattering LUTs of a scene */
 } box_render_resource_kind_t;
 
 /** What a resource change does to its object */
@@ -195,6 +199,19 @@ typedef struct box_render_view_shadows_t {
     float direction[3];     /**< Direction toward the light that casts the shadows */
 } box_render_view_shadows_t;
 
+/** What the sky view and aerial perspective passes of a view read besides the medium of the
+ * atmosphere of its scene */
+typedef struct box_render_view_atmos_t {
+    float sun[4];           /**< Direction toward the sun, w unused; (0, -1, 0) without one */
+    float sun_color[4];     /**< Top of atmosphere irradiance of the sun: its light color times
+                             *   intensity times pi before the transmittance, 0 without one */
+    float night[4];         /**< Linear night_tint times night_intensity */
+    float altitude;         /**< Altitude of the camera above the ground in km, at least 1 m */
+    float mie_anisotropy;   /**< Mie phase asymmetry g */
+    float aerial_distance;  /**< Far end of the aerial perspective volume in km */
+    float aerial_intensity; /**< Scale of the scattering and extinction of the volume */
+} box_render_view_atmos_t;
+
 /** The culling of a view, resolved from its CullSettings */
 typedef struct box_render_view_cull_t {
     bool enabled;           /**< Instances outside the frustum or too small are not drawn */
@@ -231,6 +248,10 @@ typedef struct box_render_view_t {
     uint32_t reflection_count;  /**< Resident reflection probes in that buffer */
     uint32_t reflection_listed; /**< Probes of that buffer the clusters list: the resident
                                  *   ReflectionProbes, which come before the scene probe */
+    uint32_t atmosphere;        /**< Handle of the BOX_RENDER_ATMOSPHERE of its scene, 0 when the
+                                 *   scene has no valid Atmosphere and the view runs no
+                                 *   atmosphere pass */
+    box_render_view_atmos_t atmos; /**< Inputs of its sky view and aerial perspective */
 } box_render_view_t;
 
 /** Kind of an effect pass of a view */
@@ -409,6 +430,49 @@ typedef struct box_render_reflect_batch_t {
                              *   index is the slot */
     int32_t count;          /**< Probes of the batch */
 } box_render_reflect_batch_t;
+
+/** Width of the transmittance LUT of an atmosphere in texels */
+#define BOX_RENDER_ATMOS_TRANSMITTANCE_WIDTH (256)
+
+/** Height of the transmittance LUT of an atmosphere in texels */
+#define BOX_RENDER_ATMOS_TRANSMITTANCE_HEIGHT (64)
+
+/** Edge of the multi scattering LUT of an atmosphere in texels */
+#define BOX_RENDER_ATMOS_MULTI_SIZE (32)
+
+/** Width of the sky view LUT of a view in texels */
+#define BOX_RENDER_ATMOS_SKY_WIDTH (192)
+
+/** Height of the sky view LUT of a view in texels */
+#define BOX_RENDER_ATMOS_SKY_HEIGHT (108)
+
+/** Edge of the aerial perspective volume of a view in texels, its slices included */
+#define BOX_RENDER_ATMOS_AERIAL_SIZE (32)
+
+/** Passes of the atmosphere, the order of their GPU times in box_render_gpu_stats_t */
+typedef enum box_render_atmos_pass_t {
+    BOX_RENDER_ATMOS_TRANSMITTANCE, /**< Transmittance LUT of a scene */
+    BOX_RENDER_ATMOS_MULTI,         /**< Multi scattering LUT of a scene */
+    BOX_RENDER_ATMOS_SKY,           /**< Sky view LUT of a view */
+    BOX_RENDER_ATMOS_AERIAL,        /**< Aerial perspective volume of a view */
+    BOX_RENDER_ATMOS_PASSES         /**< Number of passes */
+} box_render_atmos_pass_t;
+
+/** Description of a BOX_RENDER_ATMOSPHERE create or update: the medium of the atmosphere of a
+ * scene, which its transmittance and multi scattering LUTs are built from, as the first members
+ * of Atmosphere in etc/shaders/atmosphere.wgsl.
+ *
+ * A create makes the LUTs, an update builds them again; either builds before the targets of the
+ * first packet whose atmosphere shader exists. The bytes are the key the LUTs were built with.
+ */
+typedef struct box_render_atmosphere_desc_t {
+    float radii[4];         /**< Bottom and top radius, Rayleigh and Mie scale height in km */
+    float rayleigh[4];      /**< Rayleigh scattering in km^-1 at density 1, w unused */
+    float mie_scattering[4]; /**< Tinted Mie scattering in km^-1 at density 1, w unused */
+    float mie_extinction[4]; /**< Tinted Mie extinction in km^-1 at density 1, w unused */
+    float ozone[4];         /**< Ozone absorption in km^-1 at the peak of its tent, w unused */
+    float ground_albedo[4]; /**< Linear albedo of the ground, w unused */
+} box_render_atmosphere_desc_t;
 
 /** How a buffer is used, flags of box_render_buffer_desc_t */
 typedef enum box_render_buffer_usage_t {
@@ -607,6 +671,16 @@ typedef struct box_render_gpu_stats_t {
                                  *   timestamp queries */
     int32_t cull_passes;        /**< Cull passes whose GPU time cull_ns holds */
     int32_t texture_layers;     /**< maxTextureArrayLayers of the device, 0 before it exists */
+    int32_t atmosphere_luts;    /**< Atmospheres whose transmittance and multi scattering LUTs
+                                 *   exist */
+    int32_t atmosphere_views;   /**< Views and targets whose sky view and aerial perspective
+                                 *   exist */
+    int32_t atmosphere_builds;  /**< Times the LUTs of an atmosphere were built */
+    int64_t atmosphere_ns[BOX_RENDER_ATMOS_PASSES]; /**< GPU time of each atmosphere pass read
+                                 *   back, by box_render_atmos_pass_t, 0 without timestamp
+                                 *   queries */
+    int32_t atmosphere_passes[BOX_RENDER_ATMOS_PASSES]; /**< Passes whose GPU time
+                                 *   atmosphere_ns holds */
 } box_render_gpu_stats_t;
 
 /** GPU time of the probe captures the GPU backend measured since the last time it was taken */
@@ -1053,6 +1127,116 @@ const void* box_render_lights_state(
  */
 void box_render_lights_atmosphere(
     ecs_world_t *world);
+
+/** Get the sun of the valid atmosphere of a scene as the light extract of this frame found it.
+ *
+ * @param state The state of the light extract, see box_render_lights_state
+ * @param scene The scene, 0 for the default scene
+ * @param direction Receives the normalized direction toward the sun
+ * @param color Receives its linear color times intensity times pi, before the transmittance
+ * @return Whether the scene has a valid atmosphere and a sun
+ */
+bool box_render_lights_atmos_sun(
+    const void *state,
+    ecs_entity_t scene,
+    float *direction,
+    float *color);
+
+/** Register the system that keeps the transmittance and multi scattering LUTs of every scene
+ * with a valid Atmosphere, a BOX_RENDER_ATMOSPHERE per scene.
+ *
+ * Runs before the light extract, which writes the lut_version of each build into the
+ * AtmosphereStatus. The LUTs are built again only when the medium changes: radii, scale
+ * heights, coefficients, tint and ground albedo, not the sun, the colors or the cameras.
+ *
+ * @param world The world
+ */
+void box_render_atmosphere_init(
+    ecs_world_t *world);
+
+/** Register the system that gives every view of a scene with atmosphere LUTs its sky view and
+ * aerial perspective inputs, after the light extract found the sun of the scene.
+ *
+ * @param world The world
+ */
+void box_render_atmosphere_views_init(
+    ecs_world_t *world);
+
+/** Make the atmosphere extract follow the Atmosphere components, called by the import of
+ * box.atmosphere.
+ *
+ * @param world The world
+ */
+void box_render_atmosphere_import(
+    ecs_world_t *world);
+
+/** Get the lut_version an atmosphere has after the extract of this frame.
+ *
+ * @param world The world
+ * @param scene The scene of the atmosphere
+ * @param entity The entity with the Atmosphere
+ * @param current Its lut_version so far
+ * @return The version of the last build of the LUTs of the scene when they were built from the
+ *         entity, else current
+ */
+int32_t box_render_atmosphere_version(
+    const ecs_world_t *world,
+    ecs_entity_t scene,
+    ecs_entity_t entity,
+    int32_t current);
+
+/** Get the handle of the atmosphere LUTs of a scene.
+ *
+ * @param world The world
+ * @param scene The scene, 0 for the default scene
+ * @return Handle of its BOX_RENDER_ATMOSPHERE, 0 when the scene has no valid Atmosphere
+ */
+uint32_t box_render_atmosphere_handle(
+    const ecs_world_t *world,
+    ecs_entity_t scene);
+
+/** Check whether a packet runs the atmosphere shader.
+ *
+ * @param p The packet
+ * @return Whether it builds atmosphere LUTs or a view has an atmosphere
+ */
+bool box_render_atmosphere_use(
+    const box_render_packet_t *p);
+
+/** Get where the transmittance LUT holds a radius and a direction, as atmosphere.wgsl maps them.
+ *
+ * @param bottom Radius of the ground in km
+ * @param top Radius of the top of the atmosphere in km
+ * @param r Radius of the start of the ray in km
+ * @param mu Cosine of the angle between the ray and the up direction
+ * @param uv Receives the texture coordinates, 0 to 1, v 0 at the first row
+ */
+void box_render_atmos_transmittance_uv(
+    float bottom,
+    float top,
+    float r,
+    float mu,
+    float *uv);
+
+/** Copy the transmittance or the multi scattering LUT of an atmosphere into memory, waiting for
+ * the copy.
+ *
+ * Only call this when the main thread renders, after box_render_sync, as
+ * box_render_gpu_read_buffer.
+ *
+ * @param world The world
+ * @param handle Handle of the BOX_RENDER_ATMOSPHERE
+ * @param lut BOX_RENDER_ATMOS_TRANSMITTANCE or BOX_RENDER_ATMOS_MULTI
+ * @param out Receives the linear RGBA texels row by row, four floats each
+ * @param count Floats out holds
+ * @return Whether the LUTs exist, were built and the texels were copied
+ */
+bool box_render_gpu_read_atmosphere(
+    ecs_world_t *world,
+    uint32_t handle,
+    box_render_atmos_pass_t lut,
+    float *out,
+    int32_t count);
 
 /** Register the cached query that knows the scene of every entity in a scene.
  *

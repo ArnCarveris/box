@@ -304,4 +304,5 @@ void BoxAtmosphereImport(
     });
 
     box_render_lights_atmosphere(world);
+    box_render_atmosphere_import(world);
 }

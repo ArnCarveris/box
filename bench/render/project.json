@@ -2,7 +2,7 @@
     "id": "bench_render",
     "type": "application",
     "value": {
-        "description": "Benchmarks for the packet data, the extract of the instanced batches and lights, the shadow pass, the frustum and occlusion cull passes, the effect passes, the baked lighting and prefab instantiation of box.render",
+        "description": "Benchmarks for the packet data, the extract of the instanced batches and lights, the shadow pass, the frustum and occlusion cull passes, the effect passes, the baked lighting, prefab instantiation and the atmosphere extract of box.render",
         "public": false,
         "use": [
             "box"
@@ -142,6 +142,14 @@
                 "benchcases": [
                     "instances_1m",
                     "instances_1m5"
+                ]
+            },
+            {
+                "id": "Atmosphere",
+                "benchcases": [
+                    "one_view",
+                    "four_views",
+                    "four_views_no_atmosphere"
                 ]
             }
         ]

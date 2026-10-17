@@ -574,6 +574,20 @@
                     "box_projection_corrects_parallax",
                     "grid_darkens_dim_fragment"
                 ]
+            },
+            {
+                "id": "AtmosphereLuts",
+                "testcases": [
+                    "version_steady_without_changes",
+                    "version_changes_with_medium",
+                    "version_kept_when_sun_moves",
+                    "version_kept_when_camera_moves",
+                    "scene_without_atmosphere_has_no_resources",
+                    "removed_atmosphere_releases_resources",
+                    "views_of_a_scene_get_own_volumes",
+                    "transmittance_matches_cpu_at_zenith",
+                    "transmittance_matches_cpu_near_horizon"
+                ]
             }
         ]
     }

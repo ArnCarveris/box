@@ -128,6 +128,7 @@ void box_gpu_draw_init(
     box_gpu_light_init(gpu);
     box_gpu_shadow_init(gpu);
     box_gpu_effects_init(gpu);
+    box_gpu_atmosphere_init(gpu);
 }
 
 /** Release the buffers of a mesh and the mesh.
@@ -209,6 +210,7 @@ void box_gpu_draw_fini(
     box_gpu_volume_fini(gpu);
     box_gpu_reflect_fini(gpu);
     box_gpu_effects_fini(gpu);
+    box_gpu_atmosphere_fini(gpu);
     if (gpu->view_buffer) {
         wgpuBufferRelease(gpu->view_buffer);
         gpu->view_buffer = NULL;
@@ -864,6 +866,7 @@ void box_gpu_draw_views(
 
         WGPUTextureView hdr = box_gpu_effects_begin(gpu, t, packet, v);
         bool occludes = box_gpu_cull_occludes(gpu, slot);
+        box_gpu_atmosphere_view(gpu, t, encoder, packet, v);
         box_gpu_light_cluster(gpu, encoder, v, slot);
         box_gpu_cull_record(gpu, encoder, slot);
         box_gpu_shadow_render(gpu, encoder, packet, i, slot);

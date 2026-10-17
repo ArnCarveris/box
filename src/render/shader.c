@@ -453,7 +453,8 @@ done:
  * @return Whether a batch uses the shader as its pipeline, it scatters and runs a scatter, or
  * it assigns lights to clusters or draws shadow casters and a batch draws with the mesh shader,
  * or it culls and a batch draws with the mesh or the 2D shape shader, or an effect pass of a
- * view runs it, or it projects probe captures and the packet captures probes or reflections
+ * view runs it, or it projects probe captures and the packet captures probes or reflections, or
+ * it builds atmosphere LUTs and the packet has an atmosphere
  */
 static bool box_shader_used(
     const box_render_packet_t *p,
@@ -467,6 +468,10 @@ static bool box_shader_used(
     uint32_t also = handle == BOX_RENDER_SHADER_CULL ? BOX_RENDER_SHADER_SHAPE2D : pipeline;
     int32_t i;
     if (box_render_effects_use(p, handle)) {
+        result = true;
+    }
+
+    if (handle == BOX_RENDER_SHADER_ATMOSPHERE && box_render_atmosphere_use(p)) {
         result = true;
     }
 
@@ -749,4 +754,6 @@ void BoxShaderImport(
         BOX_RENDER_SHADER_FOG, true);
     box_shader_builtin(world, state, builtin, "bake_sh", "etc/shaders/bake_sh.wgsl",
         BOX_RENDER_SHADER_BAKE, true);
+    box_shader_builtin(world, state, builtin, "atmosphere", "etc/shaders/atmosphere.wgsl",
+        BOX_RENDER_SHADER_ATMOSPHERE, true);
 }

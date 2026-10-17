@@ -64,6 +64,9 @@ typedef struct box_gpu_effects_t box_gpu_effects_t;
 /** Textures, pipelines and timing of the probe captures */
 typedef struct box_gpu_bake_t box_gpu_bake_t;
 
+/** LUTs, pipelines and timing of the atmosphere passes */
+typedef struct box_gpu_atmos_t box_gpu_atmos_t;
+
 /** A capture on its way from the GPU to its PNG file */
 typedef struct box_gpu_capture_t box_gpu_capture_t;
 
@@ -552,6 +555,7 @@ typedef struct box_gpu_t {
     uint32_t rendering;             /**< Target that is rendering, materials cannot sample it */
     bool timestamps;                /**< The device has timestamp queries */
     box_gpu_bake_t *bake;           /**< Probe captures, created on the first capture */
+    box_gpu_atmos_t *atmosphere;    /**< Atmosphere passes */
     ecs_vec_t captures;             /**< box_gpu_capture_t* whose readback is mapping */
     bool lost;                      /**< The device was lost, the ring recreates it */
     bool lose;                      /**< box_render_gpu_lose_device asked to destroy it */
@@ -1229,6 +1233,72 @@ WGPUTextureView box_gpu_shadow_capture(
 WGPUTextureView box_gpu_shadow_binding(
     box_gpu_t *gpu,
     const box_render_view_t *v);
+
+/** Create the layouts, sampler and timestamp queries of the atmosphere passes.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_atmosphere_init(
+    box_gpu_t *gpu);
+
+/** Release the LUTs, view states, pipelines, layouts and queries of the atmosphere passes.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_atmosphere_fini(
+    box_gpu_t *gpu);
+
+/** Create, update or release the LUTs of an atmosphere from a BOX_RENDER_ATMOSPHERE resource;
+ * a create or an update builds them before the next targets.
+ *
+ * @param gpu The backend
+ * @param op What happens to the LUTs
+ * @param handle Handle of the LUTs
+ * @param desc The medium, NULL for a release
+ */
+void box_gpu_atmosphere_apply(
+    box_gpu_t *gpu,
+    box_render_resource_op_t op,
+    uint32_t handle,
+    const box_render_atmosphere_desc_t *desc);
+
+/** Advance the timestamps of the atmosphere passes and build the LUTs that wait for a build,
+ * after the resources of a packet applied and before its targets.
+ *
+ * LUTs wait while the atmosphere shader has no module, and build again after it recompiled.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+void box_gpu_atmosphere_build(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
+
+/** Record the sky view and then the aerial perspective pass of a view whose scene has built
+ * atmosphere LUTs, before its forward pass; other views record nothing.
+ *
+ * @param gpu The backend
+ * @param t The target
+ * @param encoder The encoder of the frame
+ * @param packet The packet
+ * @param v The view
+ */
+void box_gpu_atmosphere_view(
+    box_gpu_t *gpu,
+    const box_gpu_target_t *t,
+    WGPUCommandEncoder encoder,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v);
+
+/** Release the sky view and aerial perspective of the views the targets of a packet did not
+ * render with an atmosphere.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+void box_gpu_atmosphere_sweep(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
 
 /** Create the layouts, sampler and placeholders of the effect passes.
  *

@@ -60,6 +60,7 @@ typedef struct box_light_list_t {
 typedef struct box_light_atmos_light_t {
     bool found;             /**< The light was collected in this frame */
     float direction[3];     /**< Normalized direction toward the light */
+    float color[3];         /**< Color of the light before the transmittance */
     float transmittance[3]; /**< Transmittance from the ground altitude toward the light */
 } box_light_atmos_light_t;
 
@@ -403,6 +404,7 @@ static void box_lights_atmos_light(
     int32_t c;
     target->found = true;
     glm_vec3_copy(light->position, target->direction);
+    glm_vec3_copy(light->color, target->color);
     box_atmos_transmittance(&a->medium, a->value.ground_altitude, target->direction[1],
         target->transmittance);
     fade = box_atmos_horizon_fade(target->direction[1], radius);
@@ -562,8 +564,8 @@ static void box_lights_atmos_defaults(
     }
 }
 
-/** Write the transmittances and the error of the atmosphere of every scene into its
- * AtmosphereStatus when they changed.
+/** Write the transmittances, the error and the lut_version of the atmosphere of every scene
+ * into its AtmosphereStatus when they changed.
  *
  * @param it The iterator of the system
  * @param l The state
@@ -574,7 +576,8 @@ static void box_lights_atmos_status(
 {
     int32_t i;
     for (i = 0; i < ecs_vec_count(&l->scenes); i ++) {
-        const box_light_atmos_t *a = &ecs_vec_get_t(&l->scenes, box_light_scene_t, i)->atmos;
+        const box_light_scene_t *s = ecs_vec_get_t(&l->scenes, box_light_scene_t, i);
+        const box_light_atmos_t *a = &s->atmos;
         const AtmosphereStatus *status = a->entity
             ? ecs_get(it->world, a->entity, AtmosphereStatus)
             : NULL;
@@ -583,6 +586,8 @@ static void box_lights_atmos_status(
         }
 
         AtmosphereStatus value = *status;
+        value.lut_version = box_render_atmosphere_version(it->world, s->scene, a->entity,
+            status->lut_version);
         glm_vec3_zero(value.sun_transmittance);
         glm_vec3_zero(value.moon_transmittance);
         value.moon_illumination = 0.0f;
@@ -604,6 +609,7 @@ static void box_lights_atmos_status(
             ? status->error && !strcmp(status->error, a->error)
             : !status->error;
         if (!same_error || value.moon_illumination != status->moon_illumination ||
+            value.lut_version != status->lut_version ||
             ecs_os_memcmp(value.sun_transmittance, status->sun_transmittance, sizeof(vec3)) ||
             ecs_os_memcmp(value.moon_transmittance, status->moon_transmittance, sizeof(vec3)))
         {
@@ -1084,6 +1090,26 @@ void box_render_lights_atmosphere(
     if (l && !l->atmospheres) {
         l->atmospheres = box_lights_scene_query(world, ecs_id(Atmosphere));
     }
+}
+
+bool box_render_lights_atmos_sun(
+    const void *state,
+    ecs_entity_t scene,
+    float *direction,
+    float *color)
+{
+    const box_render_lights_t *l = state;
+    int32_t index = l ? box_lights_find(ECS_CONST_CAST(box_render_lights_t*, l), scene) : -1;
+    const box_light_scene_t *s = index != -1
+        ? ecs_vec_get_t(&l->scenes, box_light_scene_t, index)
+        : NULL;
+    bool result = s && s->atmos.entity && !s->atmos.error && s->atmos.sun.found;
+    if (result) {
+        glm_vec3_copy(ECS_CONST_CAST(float*, s->atmos.sun.direction), direction);
+        glm_vec3_copy(ECS_CONST_CAST(float*, s->atmos.sun.color), color);
+    }
+
+    return result;
 }
 
 /** Write the buffer, the counts and the first directional light of a list.
