@@ -37,6 +37,7 @@ typedef struct box_render_env_t {
     ecs_query_t *environments;  /**< Environment and EnvironmentStatus */
     ecs_map_t sources;          /**< Entity to box_env_t* */
     ecs_vec_t free_handles;     /**< uint32_t, handles to reuse */
+    ecs_vec_t gone;             /**< ecs_entity_t, records of this frame without Environment */
     uint32_t next_handle;       /**< Next handle */
     const void *backend;        /**< Context of the backend the cubemaps were created on */
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
@@ -263,15 +264,21 @@ static void BoxRenderExtractEnvironment(
     }
 
     box_env_collect(world, state);
+    ecs_vec_clear(&state->gone);
     mit = ecs_map_iter(&state->sources);
     while (ecs_map_next(&mit)) {
-        box_env_t *env = ecs_map_ptr(&mit);
-        if (!env->seen) {
-            box_env_release(world, state, env);
-            ecs_os_free(env->error);
-            ecs_os_free(env);
-            ecs_map_remove(&state->sources, ecs_map_key(&mit));
+        if (!((box_env_t*)ecs_map_ptr(&mit))->seen) {
+            *ecs_vec_append_t(NULL, &state->gone, ecs_entity_t) = ecs_map_key(&mit);
         }
+    }
+
+    for (i = 0; i < ecs_vec_count(&state->gone); i ++) {
+        ecs_entity_t e = *ecs_vec_get_t(&state->gone, ecs_entity_t, i);
+        box_env_t *env = box_env_find(state, e);
+        box_env_release(world, state, env);
+        ecs_map_remove(&state->sources, e);
+        ecs_os_free(env->error);
+        ecs_os_free(env);
     }
 
     for (i = 0; i < ecs_vec_count(&p->views); i ++) {
@@ -296,6 +303,7 @@ static void box_env_free(
 
     ecs_map_fini(&state->sources);
     ecs_vec_fini_t(NULL, &state->free_handles, uint32_t);
+    ecs_vec_fini_t(NULL, &state->gone, ecs_entity_t);
     ecs_os_free(state);
 }
 
@@ -305,6 +313,7 @@ void box_render_environment_init(
     box_render_env_t *state = ecs_os_calloc_t(box_render_env_t);
     ecs_map_init(&state->sources, NULL);
     ecs_vec_init_t(NULL, &state->free_handles, uint32_t, 0);
+    ecs_vec_init_t(NULL, &state->gone, ecs_entity_t, 0);
     state->next_handle = BOX_ENV_HANDLE_FIRST;
     state->environments = ecs_query(world, {
         .terms = {

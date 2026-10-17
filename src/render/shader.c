@@ -454,7 +454,8 @@ done:
  * it assigns lights to clusters or draws shadow casters and a batch draws with the mesh shader,
  * or it culls and a batch draws with the mesh or the 2D shape shader, or an effect pass of a
  * view runs it, or it projects probe captures and the packet captures probes or reflections, or
- * it builds atmosphere LUTs and the packet has an atmosphere
+ * it builds atmosphere LUTs and the packet has an atmosphere, or it converts environment
+ * images and the packet carries one
  */
 static bool box_shader_used(
     const box_render_packet_t *p,
@@ -472,6 +473,10 @@ static bool box_shader_used(
     }
 
     if (handle == BOX_RENDER_SHADER_ATMOSPHERE && box_render_atmosphere_use(p)) {
+        result = true;
+    }
+
+    if (handle == BOX_RENDER_SHADER_ENVIRONMENT && box_render_environment_use(p)) {
         result = true;
     }
 
@@ -756,4 +761,6 @@ void BoxShaderImport(
         BOX_RENDER_SHADER_BAKE, true);
     box_shader_builtin(world, state, builtin, "atmosphere", "etc/shaders/atmosphere.wgsl",
         BOX_RENDER_SHADER_ATMOSPHERE, true);
+    box_shader_builtin(world, state, builtin, "environment", "etc/shaders/environment.wgsl",
+        BOX_RENDER_SHADER_ENVIRONMENT, true);
 }
