@@ -119,6 +119,7 @@ void BoxInputImport(
     ECS_COMPONENT_DEFINE(world, InputDevice);
 
     box_owned_hooks(world, Input, BOX_OWNED_STR(Input, text), BOX_OWNED_STR(Input, paste));
+    box_owned_hooks(world, InputEvent, BOX_OWNED_STR(InputEvent, text));
     ecs_set_hooks(world, InputDevice, {
         .ctor = flecs_default_ctor,
         .dtor = box_input_device_dtor,
