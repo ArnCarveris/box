@@ -83,6 +83,19 @@ static bool box_layout_grows(
     return box_layout_sizing(n, axis)->mode == SizeModeGrow;
 }
 
+/** Test whether an element scrolls on an axis, so its children keep their fit size there.
+ *
+ * @param n The element
+ * @param axis 0 for x, 1 for y
+ * @return True when the element scrolls on the axis
+ */
+static bool box_layout_scrolls(
+    const box_layout_node_t *n,
+    int32_t axis)
+{
+    return n->has_scroll && (axis ? n->scroll.vertical : n->scroll.horizontal);
+}
+
 /** Read the components of an element into a new node of the tree.
  *
  * @param world The world
@@ -109,6 +122,18 @@ static int32_t box_layout_read(
     if (item) {
         n->item = *item;
         n->has_item = true;
+    }
+
+    const LayoutScroll *scroll = l ? ecs_get(world, e, LayoutScroll) : NULL;
+    if (scroll) {
+        n->scroll = *scroll;
+        n->has_scroll = true;
+    }
+
+    const LayoutFloat *fl = ecs_get(world, e, LayoutFloat);
+    if (fl) {
+        n->fl = *fl;
+        n->is_float = true;
     }
 
     const Position *p = ecs_get(world, e, Position);
@@ -177,9 +202,48 @@ static bool box_layout_track(
     return !state->child_prefab;
 }
 
+/** Move the floating children of an element after the others, keeping their order, and link
+ * every child to its parent.
+ *
+ * @param state The state of the layout module
+ * @param parent Index of the element
+ * @param first Index of its first child
+ * @return Number of its floating children
+ */
+static int32_t box_layout_partition(
+    box_layout_state_t *state,
+    int32_t parent,
+    int32_t first)
+{
+    box_layout_node_t *nodes = ecs_vec_first_t(&state->nodes, box_layout_node_t);
+    int32_t i, kept = first, end = ecs_vec_count(&state->nodes);
+    int32_t root = nodes[parent].float_root;
+    ecs_vec_clear(&state->floating);
+    for (i = first; i < end; i ++) {
+        if (nodes[i].is_float) {
+            *ecs_vec_append_t(NULL, &state->floating, box_layout_node_t) = nodes[i];
+        } else {
+            nodes[kept ++] = nodes[i];
+        }
+    }
+
+    if (ecs_vec_count(&state->floating)) {
+        ecs_os_memcpy_n(&nodes[kept], ecs_vec_first(&state->floating), box_layout_node_t,
+            end - kept);
+    }
+
+    for (i = first; i < end; i ++) {
+        nodes[i].parent = parent;
+        nodes[i].float_root = nodes[i].is_float ? i : root;
+    }
+
+    return end - kept;
+}
+
 /** Collect a tree breadth first, so the children of an element are next to each other.
  *
- * Every child is tracked (box_layout_track), and prefab children are left out.
+ * Every child is tracked (box_layout_track), and prefab children are left out. The floating
+ * children of an element follow its other children.
  *
  * @param world The world
  * @param state The state of the layout module
@@ -195,6 +259,9 @@ static void box_layout_collect(
     state->child_table = NULL;
     ecs_vec_clear(&state->untagged);
     box_layout_read(world, state, root);
+    box_layout_node_t *r = ecs_vec_first_t(&state->nodes, box_layout_node_t);
+    r->is_float = false;
+    r->parent = r->float_root = -1;
     int32_t i;
     for (i = 0; i < ecs_vec_count(&state->nodes); i ++) {
         box_layout_node_t *n = ecs_vec_get_t(&state->nodes, box_layout_node_t, i);
@@ -214,9 +281,11 @@ static void box_layout_collect(
             }
         }
 
+        int32_t floats = box_layout_partition(state, i, first);
         n = ecs_vec_get_t(&state->nodes, box_layout_node_t, i);
         n->first = first;
-        n->count = ecs_vec_count(&state->nodes) - first;
+        n->floats = floats;
+        n->count = ecs_vec_count(&state->nodes) - first - floats;
     }
 }
 
@@ -271,6 +340,9 @@ static float box_layout_least(
 
 /** Measure the fit size and content minimum of an element on a range of axes.
  *
+ * Floating children are left out. Along an axis the element scrolls, its content minimum is
+ * its padding.
+ *
  * @param nodes The nodes of the tree
  * @param n The element, its children already measured on the axes
  * @param first First axis, 0 for x, 1 for y
@@ -311,6 +383,9 @@ static void box_layout_measure(
                 n->layout.spacing * (float)(n->count - 1) : 0;
             fit[axis] += gaps + edges[axis];
             least[axis] += gaps + edges[axis];
+            if (box_layout_scrolls(n, axis)) {
+                least[axis] = edges[axis];
+            }
         }
     }
 
@@ -505,6 +580,9 @@ static void box_layout_content(
 
 /** Size the children of an element whose size is final on a range of axes.
  *
+ * Along an axis the element scrolls the children keep their fit size. Floating children are
+ * sized by box_layout_resolve_floats.
+ *
  * @param nodes The nodes of the tree
  * @param n The element
  * @param first First axis, 0 for x, 1 for y
@@ -527,7 +605,7 @@ static void box_layout_resolve(
         box_layout_node_t *c = &nodes[n->first + i];
         for (axis = first; axis < last; axis ++) {
             float space = hi[axis] - lo[axis];
-            if (axis == main) {
+            if (axis == main || box_layout_scrolls(n, axis)) {
                 continue;
             }
 
@@ -539,20 +617,90 @@ static void box_layout_resolve(
         }
     }
 
-    if (main >= first && main < last) {
+    if (main >= first && main < last && !box_layout_scrolls(n, main)) {
         float total = box_layout_grow(nodes, n, main, hi[main] - lo[main]);
         box_layout_shrink(nodes, n, main, hi[main] - lo[main], total);
     }
 }
 
+/** Get the content box of a scrolling element on one axis, extended past its high edge on x and
+ * its low edge on y when the children overflow it, so overflowing content starts at the left
+ * or top edge.
+ *
+ * @param n The element
+ * @param axis 0 for x, 1 for y
+ * @param size Size of the children on the axis
+ * @param lo The low edge, extended on y
+ * @param hi The high edge, extended on x
+ */
+static void box_layout_overflow(
+    const box_layout_node_t *n,
+    int32_t axis,
+    float size,
+    float *lo,
+    float *hi)
+{
+    if (box_layout_scrolls(n, axis) && size > *hi - *lo) {
+        if (axis) {
+            *lo = *hi - size;
+        } else {
+            *hi = *lo + size;
+        }
+    }
+}
+
+/** Measure the content of a scrolling element from the sizes its children got, clamp its offset
+ * to the content and shift its children by it.
+ *
+ * @param nodes The nodes of the tree
+ * @param n The element, its children placed
+ */
+static void box_layout_scroll(
+    box_layout_node_t *nodes,
+    box_layout_node_t *n)
+{
+    int32_t main = n->layout.direction == DirectionRow ? 0 :
+        n->layout.direction == DirectionColumn ? 1 : -1;
+    const Padding *pad = &n->layout.padding;
+    float edges[2] = { pad->left + pad->right, pad->top + pad->bottom };
+    float want[2] = { n->scroll.x, n->scroll.y };
+    int32_t i, axis;
+    for (axis = 0; axis < 2; axis ++) {
+        float fit = 0;
+        for (i = 0; i < n->count; i ++) {
+            const box_layout_node_t *c = &nodes[n->first + i];
+            float v = main == -1 ? box_layout_extent(c, axis, c->size[axis]) : c->size[axis];
+            fit = axis == main ? fit + v : fmaxf(fit, v);
+        }
+
+        if (axis == main && n->count > 1) {
+            fit += n->layout.spacing * (float)(n->count - 1);
+        }
+
+        float max = fmaxf(fit + edges[axis] - n->size[axis], 0);
+        n->content[axis] = fit + edges[axis];
+        n->offset[axis] = isfinite(want[axis]) ? fminf(fmaxf(want[axis], 0), max) : 0;
+    }
+
+    for (i = 0; i < n->count; i ++) {
+        box_layout_node_t *c = &nodes[n->first + i];
+        if (c->placed) {
+            c->at[0] -= n->offset[0];
+            c->at[1] += n->offset[1];
+        }
+    }
+}
+
 /** Place the children of an element whose children are sized.
+ *
+ * Floating children are placed by box_layout_floats once the tree is written.
  *
  * @param nodes The nodes of the tree
  * @param n The element
  */
 static void box_layout_place(
     box_layout_node_t *nodes,
-    const box_layout_node_t *n)
+    box_layout_node_t *n)
 {
     float lo[2], hi[2];
     int32_t main = n->layout.direction == DirectionRow ? 0 :
@@ -582,20 +730,24 @@ static void box_layout_place(
         total += n->layout.spacing * (float)(n->count - 1);
     }
 
+    box_layout_overflow(n, main, total, &lo[main], &hi[main]);
     float space = hi[main] - lo[main];
     float cursor = box_layout_align(0, space, total, align[main], 0) - total / 2;
     for (i = 0; i < n->count; i ++) {
         box_layout_node_t *c = &nodes[n->first + i];
         float center = cursor + c->size[main] / 2;
+        float clo = lo[cross], chi = hi[cross];
+        box_layout_overflow(n, cross, c->size[cross], &clo, &chi);
         c->placed = true;
         c->at[main] = main ? hi[1] - center : lo[0] + center;
-        c->at[cross] = box_layout_align(
-            lo[cross], hi[cross], c->size[cross], align[cross], cross);
+        c->at[cross] = box_layout_align(clo, chi, c->size[cross], align[cross], cross);
         cursor += c->size[main] + n->layout.spacing;
     }
 
 done:
-    return;
+    if (n->has_scroll) {
+        box_layout_scroll(nodes, n);
+    }
 }
 
 /** Give the texts of a tree their resolved widths and take the heights they get.
@@ -620,13 +772,101 @@ static void box_layout_wrap(
     }
 }
 
-/** Write the computed size and position of an element where they changed.
+/** Get the size of the anchor of a floating element on one axis.
+ *
+ * The anchor is its parent when it names none or a deleted one, the node of the anchor when it
+ * is in the tree, else the LayoutBounds or Rect of the anchor.
  *
  * @param world The world
+ * @param nodes The nodes of the tree
+ * @param count Number of nodes
+ * @param f The floating element
+ * @param axis 0 for x, 1 for y
+ * @return The size
+ */
+static float box_layout_anchor_size(
+    const ecs_world_t *world,
+    const box_layout_node_t *nodes,
+    int32_t count,
+    const box_layout_node_t *f,
+    int32_t axis)
+{
+    ecs_entity_t anchor = f->fl.anchor;
+    float result = nodes[f->parent].size[axis];
+    int32_t i;
+    if (!anchor || anchor == f->e || !ecs_is_alive(world, anchor)) {
+        goto done;
+    }
+
+    for (i = 0; i < count; i ++) {
+        if (nodes[i].e == anchor) {
+            result = nodes[i].size[axis];
+            goto done;
+        }
+    }
+
+    const LayoutBounds *lb = ecs_get(world, anchor, LayoutBounds);
+    const Rect *r = lb ? NULL : ecs_get(world, anchor, Rect);
+    result = lb ? (axis ? lb->height : lb->width) : r ? (axis ? r->height : r->width) : 0;
+done:
+    return result;
+}
+
+/** Size the children of the elements of a tree on a range of axes: first the elements outside
+ * floating elements, then every floating element in tree order, whose grow axes take the size of
+ * its anchor, and the elements below it.
+ *
+ * @param world The world
+ * @param nodes The nodes of the tree, measured on the axes
+ * @param count Number of nodes
+ * @param first First axis, 0 for x, 1 for y
+ * @param last Axis after the last one
+ */
+static void box_layout_resolve_all(
+    const ecs_world_t *world,
+    box_layout_node_t *nodes,
+    int32_t count,
+    int32_t first,
+    int32_t last)
+{
+    int32_t i, f, axis;
+    for (i = 0; i < count; i ++) {
+        if (nodes[i].has_layout && nodes[i].float_root == -1) {
+            box_layout_resolve(nodes, &nodes[i], first, last);
+        }
+    }
+
+    for (f = 0; f < count; f ++) {
+        box_layout_node_t *n = &nodes[f];
+        if (!n->is_float) {
+            continue;
+        }
+
+        for (axis = first; axis < last; axis ++) {
+            n->anchor[axis] = box_layout_anchor_size(world, nodes, count, n, axis);
+            if (box_layout_grows(n, axis)) {
+                n->size[axis] = box_layout_grow_clamp(n, axis, n->anchor[axis]);
+            }
+        }
+
+        for (i = f; i < count; i ++) {
+            if (nodes[i].has_layout && nodes[i].float_root == f) {
+                box_layout_resolve(nodes, &nodes[i], first, last);
+            }
+        }
+    }
+}
+
+/** Write the computed size and position of an element where they changed, the content of a
+ * scrolling element and the anchor size of a floating one.
+ *
+ * @param world The world
+ * @param state The state of the layout module
  * @param n The element
  */
 static void box_layout_write(
     ecs_world_t *world,
+    box_layout_state_t *state,
     const box_layout_node_t *n)
 {
     const LayoutBounds *b = ecs_get(world, n->e, LayoutBounds);
@@ -644,14 +884,40 @@ static void box_layout_write(
             ecs_set(world, n->e, Rect, { n->size[0], n->size[1] });
         }
     }
+
+    if (n->has_scroll) {
+        const LayoutContent *c = ecs_get(world, n->e, LayoutContent);
+        LayoutContent v = {
+            .width = n->content[0], .height = n->content[1],
+            .max_x = fmaxf(n->content[0] - n->size[0], 0),
+            .max_y = fmaxf(n->content[1] - n->size[1], 0),
+            .x = n->offset[0], .y = n->offset[1]
+        };
+        if (!c || ecs_os_memcmp_t(c, &v, LayoutContent)) {
+            ecs_set_ptr(world, n->e, LayoutContent, &v);
+        }
+
+        *ecs_map_ensure(&state->scrolled, (ecs_map_key_t)n->e) = (ecs_map_val_t)(4u |
+            (n->scroll.horizontal ? 1u : 0u) | (n->scroll.vertical ? 2u : 0u));
+    }
+
+    if (n->is_float) {
+        uint32_t w, h;
+        ecs_os_memcpy(&w, &n->anchor[0], ECS_SIZEOF(uint32_t));
+        ecs_os_memcpy(&h, &n->anchor[1], ECS_SIZEOF(uint32_t));
+        *ecs_map_ensure(&state->anchor_sizes, (ecs_map_key_t)n->e) =
+            ((ecs_map_val_t)w << 32) | h;
+    }
 }
 
 /** Size and place a tree without texts, both axes in one pass.
  *
+ * @param world The world
  * @param nodes The nodes of the tree
  * @param count Number of nodes
  */
 static void box_layout_solve(
+    const ecs_world_t *world,
     box_layout_node_t *nodes,
     int32_t count)
 {
@@ -660,9 +926,9 @@ static void box_layout_solve(
         box_layout_measure(nodes, &nodes[i], 0, 2);
     }
 
+    box_layout_resolve_all(world, nodes, count, 0, 2);
     for (i = 0; i < count; i ++) {
         if (nodes[i].has_layout) {
-            box_layout_resolve(nodes, &nodes[i], 0, 2);
             box_layout_place(nodes, &nodes[i]);
         }
     }
@@ -693,11 +959,7 @@ static void box_layout_solve_text(
             box_layout_measure(nodes, &nodes[i], axis, axis + 1);
         }
 
-        for (i = 0; i < count; i ++) {
-            if (nodes[i].has_layout) {
-                box_layout_resolve(nodes, &nodes[i], axis, axis + 1);
-            }
-        }
+        box_layout_resolve_all(world, nodes, count, axis, axis + 1);
     }
 
     for (i = 0; i < count; i ++) {
@@ -726,12 +988,12 @@ void box_layout_tree(
     if (state->has_text) {
         box_layout_solve_text(world, state, nodes, count);
     } else {
-        box_layout_solve(nodes, count);
+        box_layout_solve(world, nodes, count);
     }
 
     state->writing = true;
     for (i = 0; i < count; i ++) {
-        box_layout_write(world, &nodes[i]);
+        box_layout_write(world, state, &nodes[i]);
     }
 
     state->writing = false;

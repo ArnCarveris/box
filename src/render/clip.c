@@ -15,6 +15,25 @@
 /** Most ancestors a walk up the hierarchy visits looking for clips */
 #define BOX_DRAWS_CLIP_WALK (256)
 
+/** Get the next ancestor whose ClipChildren can clip an entity: its parent, none above a
+ * floating element (LayoutFloat), which its ancestors do not clip.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return The parent, 0 for a floating entity or a root
+ */
+static ecs_entity_t box_draws_clip_up(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    ecs_entity_t result = 0;
+    if (e && !ecs_has(world, e, LayoutFloat)) {
+        result = ecs_get_parent(world, e);
+    }
+
+    return result;
+}
+
 float box_render_clip_area(
     const ecs_world_t *world,
     ecs_entity_t e,
@@ -113,11 +132,11 @@ bool box_render_clip_contains(
     const float point[3])
 {
     box_render_clip_t clip;
-    ecs_entity_t cur = e ? ecs_get_parent(world, e) : 0;
+    ecs_entity_t cur = box_draws_clip_up(world, e);
     int32_t depth = 0, clips = 0;
     bool result = true;
     for (; cur && result && depth < BOX_DRAWS_CLIP_WALK && clips < BOX_RENDER_CLIP_DEPTH;
-        cur = ecs_get_parent(world, cur))
+        cur = box_draws_clip_up(world, cur))
     {
         if (ecs_has_id(world, cur, ClipChildren)) {
             box_draws_clip_record(world, cur, 0, &clip);
@@ -192,9 +211,9 @@ int32_t box_draws_clip_of(
     box_render_draws_t *d,
     ecs_entity_t e)
 {
-    ecs_entity_t cur = d->clips.tagged > 0 ? ecs_get_parent(world, e) : 0;
+    ecs_entity_t cur = d->clips.tagged > 0 ? box_draws_clip_up(world, e) : 0;
     int32_t depth = 0, result = 0;
-    for (; cur && depth < BOX_DRAWS_CLIP_WALK; cur = ecs_get_parent(world, cur)) {
+    for (; cur && depth < BOX_DRAWS_CLIP_WALK; cur = box_draws_clip_up(world, cur)) {
         if (ecs_has_id(world, cur, ClipChildren)) {
             result = box_draws_clip_index(&d->clips, cur);
             break;

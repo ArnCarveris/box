@@ -264,6 +264,15 @@
                     "picking_follows_clip",
                     "dynamic_child_moves_out"
                 ]
+            },
+            {
+                "id": "ScrollFloat",
+                "testcases": [
+                    "scrolled_list_shows_rows_in_view",
+                    "scrolled_list_picks_row_under_cursor",
+                    "float_draws_above_and_outside_clip",
+                    "float_takes_click_over_sibling"
+                ]
             }
         ]
     }

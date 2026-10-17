@@ -332,13 +332,15 @@ float box_draws_layer(
     bool glyph)
 {
     float result = glyph ? 1.0f : 0.0f;
+    bool floating = ecs_has(world, e, LayoutFloat);
     ecs_entity_t cur = ecs_get_parent(world, e);
     while (cur) {
         result += 2.0f;
+        floating |= ecs_has(world, cur, LayoutFloat);
         cur = ecs_get_parent(world, cur);
     }
 
-    return result;
+    return floating ? result + BOX_DRAWS_FLOAT_LAYERS : result;
 }
 
 float box_draws_fade(
@@ -781,6 +783,9 @@ static void box_draws_observers(
     box_draws_observer(world, d, "DrawsOnClipChildren", (ecs_observer_desc_t){
         .query.terms = {{ .id = ClipChildren }},
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnClip);
+    box_draws_observer(world, d, "DrawsOnLayoutFloat", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ecs_id(LayoutFloat) }},
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnHierarchy);
     box_draws_observer(world, d, "DrawsOnOrderedChildren", (ecs_observer_desc_t){
         .query.terms = {{ .id = EcsOrderedChildren }},
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnOrdered);

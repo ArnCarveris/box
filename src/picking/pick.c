@@ -664,9 +664,31 @@ static bool box_pick_ordered_after(
     return result;
 }
 
+/** Check whether an element or one of its ancestors floats (LayoutFloat).
+ *
+ * @param world The world
+ * @param path The element and its ancestors, root first
+ * @param count Length of the path
+ * @return Whether it floats
+ */
+static bool box_pick_floating(
+    const ecs_world_t *world,
+    const ecs_entity_t *path,
+    int32_t count)
+{
+    bool result = false;
+    int32_t i;
+    for (i = 0; i < count && !result; i ++) {
+        result = ecs_has(world, path[i], LayoutFloat);
+    }
+
+    return result;
+}
+
 /** Check whether one element is drawn after another in the hierarchy order of 2D drawing.
  *
- * Parents draw before their children, siblings by Position z, then OrderedChildren order or id.
+ * Floating elements and their descendants draw after the others. Parents draw before their
+ * children, siblings by Position z, then OrderedChildren order or id.
  *
  * @param world The world
  * @param a The first element
@@ -682,11 +704,14 @@ static bool box_pick_drawn_after(
     int32_t na = box_pick_path(world, a, pa), nb = box_pick_path(world, b, pb);
     int32_t i = 0;
     bool result;
+    bool fa = box_pick_floating(world, pa, na), fb = box_pick_floating(world, pb, nb);
     while (i < na && i < nb && pa[i] == pb[i]) {
         i ++;
     }
 
-    if (i == na || i == nb) {
+    if (fa != fb) {
+        result = fa;
+    } else if (i == na || i == nb) {
         result = na > nb;
     } else {
         float za = box_pick_z(world, pa[i]), zb = box_pick_z(world, pb[i]);

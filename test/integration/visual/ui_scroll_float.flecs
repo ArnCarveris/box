@@ -1,0 +1,186 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.layout
+using box.text
+
+// Scroll views and floating elements: a list scrolled by 70 shows its rows cut at the top and
+// bottom of its clip; a picker in it opens a floating list that leaves the clip of the list and
+// covers the card drawn after it; a strip scrolled sideways cuts its tiles; a menu button near
+// the bottom flips its menu upward, and a tooltip near the right edge shifts left to stay in.
+
+camera {
+  Position: {0, 0, 100}
+  Camera: {ortho: true, ortho_scale: 1}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {236, 238, 242, 255}}}
+}
+
+template Row {
+  prop r: u8 = 90
+  prop g: u8 = 160
+  prop b: u8 = 250
+  LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 36}}
+  Rect: {1, 1}
+  Rgb: {r, g, b}
+  Border: {radius: 6}
+}
+
+template Option {
+  prop r: u8 = 200
+  prop g: u8 = 235
+  prop b: u8 = 205
+  LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 24}}
+  Rect: {1, 1}
+  Rgb: {r, g, b}
+  Border: {radius: 4}
+}
+
+template Tile {
+  prop r: u8 = 250
+  prop g: u8 = 190
+  prop b: u8 = 60
+  LayoutItem: {width: {mode: Fixed, value: 60}, height: {mode: Fixed, value: 46}}
+  Rect: {1, 1}
+  Rgb: {r, g, b}
+  Border: {radius: 6}
+}
+
+screen {
+  Position: {0, 0, 0}
+  Layout: {direction: None}
+  LayoutItem: {width: {mode: Fixed, value: 640}, height: {mode: Fixed, value: 360}}
+  Rect: {1, 1}
+  Rgb: {24, 26, 34}
+
+  list {
+    Layout: {direction: Column, spacing: 4, padding: {6, 6, 6, 6}}
+    LayoutItem: {
+      width: {mode: Fixed, value: 200}, height: {mode: Fixed, value: 230},
+      h: Left, v: Top, x: 30, y: -30
+    }
+    LayoutScroll: {y: 70, vertical: true}
+    Rect: {1, 1}
+    Rgb: {44, 48, 62}
+    Border: {radius: 10}
+    ClipChildren
+
+    row_1 { Row: {r: 90, g: 160, b: 250} }
+    row_2 { Row: {r: 120, g: 220, b: 140} }
+
+    picker {
+      Layout: {direction: Row, padding: {4, 4, 10, 10}, v: Middle}
+      LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 30}}
+      Rect: {1, 1}
+      Rgb: {250, 190, 60}
+      Border: {radius: 6}
+
+      label {
+        Text: {value: "Choose one", size: 16}
+        Rgb: {40, 30, 20}
+      }
+
+      options {
+        LayoutFloat: {h: Left, v: Top, anchor_h: Left, anchor_v: Bottom, y: -4, flip: true}
+        Layout: {direction: Column, spacing: 3, padding: {4, 4, 4, 4}}
+        LayoutItem: {width: {mode: Fixed, value: 260}}
+        Rect: {1, 1}
+        Rgb: {30, 90, 50}
+        Border: {width: 2, radius: 6, color: {200, 235, 205, 255}}
+
+        option_1 { Option: {r: 200, g: 235, b: 205} }
+        option_2 { Option: {r: 170, g: 220, b: 180} }
+        option_3 { Option: {r: 140, g: 205, b: 155} }
+      }
+    }
+
+    row_3 { Row: {r: 230, g: 80, b: 70} }
+    row_4 { Row: {r: 180, g: 120, b: 230} }
+    row_5 { Row: {r: 90, g: 160, b: 250} }
+    row_6 { Row: {r: 120, g: 220, b: 140} }
+    row_7 { Row: {r: 250, g: 190, b: 60} }
+  }
+
+  card {
+    LayoutItem: {
+      width: {mode: Fixed, value: 170}, height: {mode: Fixed, value: 200},
+      h: Left, v: Top, x: 250, y: -30
+    }
+    Rect: {1, 1}
+    Rgb: {70, 80, 110}
+    Border: {radius: 10}
+  }
+
+  strip {
+    Layout: {direction: Row, spacing: 6, padding: {6, 6, 6, 6}}
+    LayoutItem: {
+      width: {mode: Fixed, value: 300}, height: {mode: Fixed, value: 58},
+      h: Left, v: Bottom, x: 30, y: 30
+    }
+    LayoutScroll: {x: 40, horizontal: true}
+    Rect: {1, 1}
+    Rgb: {44, 48, 62}
+    Border: {radius: 10}
+    ClipChildren
+
+    tile_1 { Tile: {r: 250, g: 190, b: 60} }
+    tile_2 { Tile: {r: 230, g: 80, b: 70} }
+    tile_3 { Tile: {r: 180, g: 120, b: 230} }
+    tile_4 { Tile: {r: 90, g: 160, b: 250} }
+    tile_5 { Tile: {r: 120, g: 220, b: 140} }
+    tile_6 { Tile: {r: 250, g: 190, b: 60} }
+    tile_7 { Tile: {r: 230, g: 80, b: 70} }
+  }
+
+  menu_button {
+    Layout: {direction: Row, padding: {4, 4, 10, 10}, v: Middle}
+    LayoutItem: {
+      width: {mode: Fixed, value: 150}, height: {mode: Fixed, value: 34},
+      h: Right, v: Bottom, x: -30, y: 30
+    }
+    Rect: {1, 1}
+    Rgb: {90, 160, 250}
+    Border: {radius: 6}
+
+    label {
+      Text: {value: "Menu", size: 16}
+      Rgb: {255, 255, 255}
+    }
+
+    menu {
+      LayoutFloat: {h: Right, v: Top, anchor_h: Right, anchor_v: Bottom, y: -4, flip: true}
+      LayoutItem: {width: {mode: Grow, min: 180}, height: {mode: Fixed, value: 120}}
+      Rect: {1, 1}
+      Rgb: {250, 240, 220}
+      Border: {width: 2, radius: 8, color: {110, 80, 60, 255}}
+    }
+  }
+
+  hint {
+    LayoutItem: {
+      width: {mode: Fixed, value: 40}, height: {mode: Fixed, value: 40},
+      h: Right, v: Top, x: -10, y: -90
+    }
+    Layout: {direction: None}
+    Rect: {1, 1}
+    Rgb: {250, 190, 60}
+    Border: {radius: 20}
+
+    tooltip {
+      LayoutFloat: {h: Center, v: Bottom, anchor_h: Center, anchor_v: Top, y: 6, flip: true}
+      Layout: {direction: Row, padding: {6, 6, 10, 10}}
+      Rect: {1, 1}
+      Rgb: {20, 20, 24}
+      Border: {radius: 6}
+
+      label {
+        Text: {value: "A tooltip that stays in", size: 14}
+        Rgb: {255, 255, 255}
+      }
+    }
+  }
+}

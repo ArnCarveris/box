@@ -3,7 +3,8 @@
  * @brief Draw order of the 2D shapes and glyphs: the order of the hierarchy, not view depth.
  *
  * The entities with 2D slots are sorted by the sibling keys (Position z, then rank) of their
- * ancestors and themselves; their slots are drawn per view as runs of consecutive slots.
+ * ancestors and themselves, floating elements (LayoutFloat) and their descendants after the
+ * rest; their slots are drawn per view as runs of consecutive slots.
  */
 
 #include "draw.h"
@@ -231,7 +232,26 @@ void box_draws_order_position(
     }
 }
 
-/** Order two entities by path, a parent before its children, then by id.
+/** Check whether an entity or one of its ancestors floats (LayoutFloat).
+ *
+ * @param world The world
+ * @param e The entity
+ * @return Whether it floats
+ */
+static bool box_draws_floating(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    bool result = false;
+    for (; e && !result; e = ecs_get_parent(world, e)) {
+        result = ecs_has(world, e, LayoutFloat);
+    }
+
+    return result;
+}
+
+/** Order two entities: those that do not float first, then by path, a parent before its
+ * children, then by id.
  *
  * @param a The first entity
  * @param b The second entity
@@ -243,7 +263,7 @@ static int box_draws_order_cmp(
 {
     const box_draw_order_t *x = a, *y = b;
     int32_t i, depth = x->depth < y->depth ? x->depth : y->depth;
-    int result = 0;
+    int result = (x->floating > y->floating) - (x->floating < y->floating);
     for (i = 0; !result && i < depth; i ++) {
         result = (x->path[i] > y->path[i]) - (x->path[i] < y->path[i]);
     }
@@ -290,6 +310,7 @@ static void box_draws_order_collect(
             o->entity = e;
             o->path = (const uint64_t*)(uintptr_t)(uint32_t)path;
             o->depth = (int32_t)(path >> 32);
+            o->floating = box_draws_floating(world, e);
         }
     }
 

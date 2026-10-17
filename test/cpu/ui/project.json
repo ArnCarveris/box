@@ -181,6 +181,59 @@
                     "script_sets_spans",
                     "copy_owns_spans"
                 ]
+            },
+            {
+                "id": "LayoutScroll",
+                "testcases": [
+                    "offset_shifts_column",
+                    "offset_shifts_row",
+                    "content_column",
+                    "content_row",
+                    "content_padding",
+                    "content_wrapping_text",
+                    "content_fits",
+                    "clamp_offset",
+                    "clamp_not_written_back",
+                    "not_narrowed_along_scroll_axis",
+                    "grow_across_scroll_axis",
+                    "scroll_change_moves_children",
+                    "scroll_change_does_not_remeasure",
+                    "axes_change_lays_out_again",
+                    "remove_scroll_lays_out_again",
+                    "direction_none_keeps_free_children",
+                    "script"
+                ]
+            },
+            {
+                "id": "LayoutFloat",
+                "testcases": [
+                    "not_in_parent_fit",
+                    "not_in_flow",
+                    "dropdown",
+                    "anchor_points",
+                    "offset",
+                    "anchor_sibling",
+                    "deleted_anchor_is_parent",
+                    "fixed_size",
+                    "fit_size",
+                    "grow_width_of_anchor",
+                    "grow_clamped",
+                    "flip_bottom",
+                    "flip_kept_when_it_fits",
+                    "no_flip_without_flag",
+                    "flip_right_edge",
+                    "flip_left_edge",
+                    "flip_against_root",
+                    "follows_moving_anchor",
+                    "follows_scrolling_anchor",
+                    "follows_resizing_anchor",
+                    "anchor_in_other_tree",
+                    "float_child_of_scroll_not_scrolled",
+                    "nested_float",
+                    "remove_float_rejoins_flow",
+                    "keeps_z",
+                    "script"
+                ]
             }
         ]
     }

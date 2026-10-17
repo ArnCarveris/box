@@ -218,7 +218,7 @@ static void box_layout_on_parent(
  * @param e The element
  * @return The root, 0 when the element is not laid out
  */
-static ecs_entity_t box_layout_root(
+ecs_entity_t box_layout_root(
     const ecs_world_t *world,
     ecs_entity_t e)
 {
@@ -254,6 +254,95 @@ static int box_layout_compare(
     ecs_entity_t eb = *(const ecs_entity_t*)b;
 
     return (ea > eb) - (ea < eb);
+}
+
+/** LayoutScroll observer: a new or removed offset lays the tree out again, a set one only
+ * moves the children unless the axes that scroll changed (LayoutUpdate decides).
+ *
+ * @param it Iterator over the elements
+ */
+static void box_layout_on_scroll(
+    ecs_iter_t *it)
+{
+    box_layout_state_t *state = it->ctx;
+    int32_t i;
+    if (state->writing) {
+        goto done;
+    }
+
+    for (i = 0; i < it->count; i ++) {
+        if (it->event == EcsOnSet) {
+            *ecs_vec_append_t(NULL, &state->scrolls, ecs_entity_t) = it->entities[i];
+        } else {
+            ecs_map_remove(&state->scrolled, (ecs_map_key_t)it->entities[i]);
+            box_layout_mark(state, it->entities[i]);
+        }
+    }
+
+done:
+    return;
+}
+
+/** LayoutFloat observer: keep the floating elements and lay out the tree of a changed one.
+ *
+ * @param it Iterator over the elements
+ */
+static void box_layout_on_float(
+    ecs_iter_t *it)
+{
+    box_layout_state_t *state = it->ctx;
+    int32_t i, f;
+    for (i = 0; i < it->count; i ++) {
+        ecs_entity_t e = it->entities[i];
+        if (it->event == EcsOnAdd) {
+            *ecs_vec_append_t(NULL, &state->floats, ecs_entity_t) = e;
+        } else if (it->event == EcsOnRemove) {
+            ecs_entity_t *floats = ecs_vec_first_t(&state->floats, ecs_entity_t);
+            for (f = 0; f < ecs_vec_count(&state->floats); f ++) {
+                if (floats[f] == e) {
+                    ecs_vec_remove_t(&state->floats, ecs_entity_t, f);
+                    break;
+                }
+            }
+
+            ecs_map_remove(&state->anchor_sizes, (ecs_map_key_t)e);
+        }
+
+        if (!state->writing) {
+            box_layout_mark(state, e);
+        }
+    }
+}
+
+/** Sort the elements whose LayoutScroll was set: those whose scrolling axes changed or that
+ * were not laid out as scrolling are marked, the others only move their children.
+ *
+ * @param world The world
+ * @param state The state of the layout module
+ */
+static void box_layout_scrolls(
+    ecs_world_t *world,
+    box_layout_state_t *state)
+{
+    int32_t i, count = ecs_vec_count(&state->scrolls);
+    ecs_vec_clear(&state->shifts);
+    for (i = 0; i < count; i ++) {
+        ecs_entity_t e = *ecs_vec_get_t(&state->scrolls, ecs_entity_t, i);
+        const LayoutScroll *s = ecs_is_alive(world, e) ? ecs_get(world, e, LayoutScroll) : NULL;
+        if (!s) {
+            continue;
+        }
+
+        const ecs_map_val_t *axes = ecs_map_get(&state->scrolled, (ecs_map_key_t)e);
+        ecs_map_val_t want = 4u | (s->horizontal ? 1u : 0u) | (s->vertical ? 2u : 0u);
+        if (!axes || *axes != want) {
+            box_layout_mark(state, e);
+        } else {
+            *ecs_vec_append_t(NULL, &state->shifts, ecs_entity_t) = e;
+        }
+    }
+
+    ecs_vec_clear(&state->scrolls);
 }
 
 /** Layout observer: an element lost its Layout, so its children left the tree.
@@ -331,7 +420,8 @@ static void LayoutFillUpdate(
     }
 }
 
-/** Lay out the trees of the elements marked since the last frame.
+/** Lay out the trees of the elements marked since the last frame, move the children of the
+ * elements that only scrolled and place the floating elements.
  *
  * @param it The system iterator
  */
@@ -342,9 +432,10 @@ static void LayoutUpdate(
     box_layout_state_t *state = it->ctx;
     int32_t i, count;
     box_layout_moved(world, state, true);
+    box_layout_scrolls(world, state);
     count = ecs_vec_count(&state->marks);
     if (!count) {
-        goto done;
+        goto moved;
     }
 
     ecs_entity_t *marks = ecs_vec_first_t(&state->marks, ecs_entity_t);
@@ -373,9 +464,17 @@ static void LayoutUpdate(
         }
     }
 
+moved:
+    for (i = 0; i < ecs_vec_count(&state->shifts); i ++) {
+        ecs_entity_t e = *ecs_vec_get_t(&state->shifts, ecs_entity_t, i);
+        if (ecs_is_alive(world, e)) {
+            box_layout_scroll_shift(world, state, e);
+        }
+    }
+
+    ecs_vec_clear(&state->shifts);
+    box_layout_floats(world, state);
     box_layout_moved(world, state, false);
-done:
-    return;
 }
 
 /** Free the states of LayoutRegistry values.
@@ -402,7 +501,14 @@ static void box_layout_registry_dtor(
             ecs_vec_fini_t(NULL, &state->roots, ecs_entity_t);
             ecs_vec_fini_t(NULL, &state->nodes, box_layout_node_t);
             ecs_vec_fini_t(NULL, &state->untagged, ecs_entity_t);
+            ecs_vec_fini_t(NULL, &state->floating, box_layout_node_t);
+            ecs_vec_fini_t(NULL, &state->scrolls, ecs_entity_t);
+            ecs_vec_fini_t(NULL, &state->shifts, ecs_entity_t);
+            ecs_vec_fini_t(NULL, &state->floats, ecs_entity_t);
+            ecs_vec_fini_t(NULL, &state->placing, box_layout_placing_t);
             ecs_map_fini(&state->parents);
+            ecs_map_fini(&state->scrolled);
+            ecs_map_fini(&state->anchor_sizes);
             ecs_os_free(state);
         }
     }
@@ -462,6 +568,9 @@ void BoxLayoutImport(
     ECS_META_COMPONENT(world, LayoutItem);
     ECS_META_COMPONENT(world, LayoutBounds);
     ECS_META_COMPONENT(world, LayoutFill);
+    ECS_META_COMPONENT(world, LayoutScroll);
+    ECS_META_COMPONENT(world, LayoutContent);
+    ECS_META_COMPONENT(world, LayoutFloat);
     ECS_TAG_DEFINE(world, ClipChildren);
     ecs_set_hooks(world, LayoutItem, { .ctor = box_layout_item_ctor });
 
@@ -469,6 +578,7 @@ void BoxLayoutImport(
     ecs_add_pair(world, ecs_id(Layout), EcsWith, EcsOrderedChildren);
     ecs_add_pair(world, ecs_id(LayoutItem), EcsWith, ecs_id(LayoutBounds));
     ecs_add_pair(world, ecs_id(LayoutFill), EcsWith, ecs_id(LayoutItem));
+    ecs_add_pair(world, ecs_id(LayoutScroll), EcsWith, ecs_id(LayoutContent));
 
     ECS_COMPONENT_DEFINE(world, LayoutRegistry);
     ecs_set_hooks(world, LayoutRegistry, {
@@ -482,6 +592,13 @@ void BoxLayoutImport(
     ecs_vec_init_t(NULL, &state->roots, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &state->nodes, box_layout_node_t, 0);
     ecs_vec_init_t(NULL, &state->untagged, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &state->floating, box_layout_node_t, 0);
+    ecs_vec_init_t(NULL, &state->scrolls, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &state->shifts, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &state->floats, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &state->placing, box_layout_placing_t, 0);
+    ecs_map_init(&state->scrolled, NULL);
+    ecs_map_init(&state->anchor_sizes, NULL);
     state->child_tag = ecs_entity(world, { .name = "LayoutChild" });
     ecs_map_init(&state->parents, NULL);
     ecs_singleton_ensure(world, LayoutRegistry)->state = state;
@@ -499,6 +616,22 @@ void BoxLayoutImport(
             .ctx = state
         });
     }
+
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "LayoutOnScroll" }),
+        .query.terms = {{ .id = ecs_id(LayoutScroll), .inout = EcsInOutNone }},
+        .events = { EcsOnAdd, EcsOnSet, EcsOnRemove },
+        .callback = box_layout_on_scroll,
+        .ctx = state
+    });
+
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "LayoutOnFloat" }),
+        .query.terms = {{ .id = ecs_id(LayoutFloat), .inout = EcsInOutNone }},
+        .events = { EcsOnAdd, EcsOnSet, EcsOnRemove },
+        .callback = box_layout_on_float,
+        .ctx = state
+    });
 
     ecs_observer(world, {
         .entity = ecs_entity(world, { .name = "LayoutOnLayoutRemove" }),

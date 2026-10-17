@@ -19,6 +19,10 @@
  * every WebGPU device supports, and a key with more shapes continues in another batch */
 #define BOX_DRAWS_CHUNK ((uint32_t)((128u << 20) / sizeof(box_render_instance_t)))
 
+/** Layers a floating element and its descendants are lifted over the elements that do not float,
+ * more than twice the depth of any UI hierarchy */
+#define BOX_DRAWS_FLOAT_LAYERS (512.0f)
+
 /** Tints composed into one mix: a display encoded color becomes color * keep + add */
 typedef struct box_draw_tint_t {
     float add[3];   /**< Sum of the tint colors weighted by what the later tints keep, 0..1 */
@@ -95,6 +99,7 @@ typedef struct box_draw_order_t {
     ecs_entity_t entity;    /**< The entity, its shape slot first and then its glyph slots */
     const uint64_t *path;   /**< Sibling keys of the entity and its ancestors, root first */
     int32_t depth;          /**< Keys in path */
+    bool floating;          /**< The entity or an ancestor floats, so it draws after the rest */
 } box_draw_order_t;
 
 /** Consecutive slots of one batch that draw one after another in the draw order of a scene */
@@ -354,7 +359,9 @@ float box_draws_fade(
     box_draw_tint_t *tint);
 
 /** Get the layer of a 2D shape or glyph: twice the number of its ancestors, plus one for a
- * glyph, so it can be lifted over coplanar ancestors and the shape of its own entity.
+ * glyph, so it can be lifted over coplanar ancestors and the shape of its own entity. A floating
+ * element (LayoutFloat) and its descendants are lifted BOX_DRAWS_FLOAT_LAYERS further, over the
+ * elements that do not float.
  *
  * @param world The world
  * @param e The entity
@@ -519,7 +526,7 @@ void box_draws_clips_fini(
     box_render_draws_t *d);
 
 /** Get the clip index of the nearest ClipChildren ancestor of an entity, giving the ancestor
- * an index when it has none.
+ * an index when it has none. The walk stops at a floating element (LayoutFloat).
  *
  * @param world The world
  * @param d The state

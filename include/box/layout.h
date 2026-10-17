@@ -97,6 +97,75 @@ ECS_STRUCT(LayoutBounds, {
     float height; /**< Computed height */
 });
 
+/** Shifts the children of an element with a Layout to show another part of its content, like
+ * CSS overflow: auto. A scroll view is a ClipChildren element with a LayoutScroll.
+ *
+ * The children are placed shifted by -x and -y logical pixels: a positive y shows content
+ * further down, a positive x content further right. The layout applies the offset clamped to
+ * 0..LayoutContent.max_x and 0..max_y and never writes the clamped value back, so a script owns
+ * the offset. A change of the offset alone moves the children without measuring the tree again.
+ *
+ * Along an axis whose flag is set the children are not narrowed to the element: they keep their
+ * fit size, grow children included, which only grow across that axis, and the element no
+ * longer needs its content as its minimum. An axis whose flag is clear lays out as without a
+ * LayoutScroll, so its offset only applies when the content minimum overflows the element.
+ * Children of a DirectionNone element without a LayoutItem keep their position and do not
+ * scroll; floating children (LayoutFloat) follow their anchor instead.
+ */
+ECS_STRUCT(LayoutScroll, {
+    float x;         /**< Offset of the content to the left, in logical pixels */
+    float y;         /**< Offset of the content upward, in logical pixels */
+    bool horizontal; /**< The children keep their fit width */
+    bool vertical;   /**< The children keep their fit height */
+});
+
+/** Size of the content of an element with a LayoutScroll, written by the layout.
+ *
+ * The content is the box the children take, measured as the fit size of the element from the
+ * sizes the children got, including padding. The largest offsets keep the end of the content
+ * in view and are 0 when the content fits.
+ */
+ECS_STRUCT(LayoutContent, {
+    float width;  /**< Width of the content including padding */
+    float height; /**< Height of the content including padding */
+    float max_x;  /**< Largest LayoutScroll.x that keeps content in view */
+    float max_y;  /**< Largest LayoutScroll.y that keeps content in view */
+    float x;      /**< LayoutScroll.x the layout applied, clamped to 0..max_x */
+    float y;      /**< LayoutScroll.y the layout applied, clamped to 0..max_y */
+});
+
+/** Places an element next to an anchor outside the flow of its parent, for dropdowns, popup
+ * menus and tooltips.
+ *
+ * The element is left out of the fit size and the flow of its parent, which must have a Layout.
+ * Its own h/v point sits on the anchor_h/anchor_v point of the anchor plus the x/y offset (y up,
+ * as LayoutItem.y). A dropdown list has h: Left, v: Top, anchor_h: Left, anchor_v: Bottom.
+ * The anchor is found through the Position of it and its ancestors, rotation and scale left out.
+ *
+ * It sizes itself as any element from its LayoutItem: fit, fixed, and a grow axis takes the size
+ * of the anchor within min and max, so a list can be as wide as its button.
+ *
+ * With flip, an element that does not fit inside the root of its layout tree (the surface for a
+ * LayoutFill root) along y is placed on the other side of the anchor when that fits better, its
+ * y offset mirrored; along x it is shifted to stay inside.
+ *
+ * It draws above every non floating element of its scene, and picking agrees; floating elements
+ * draw among each other in hierarchy order. ClipChildren ancestors of its parent do not clip it
+ * or its descendants, a ClipChildren on the element itself clips its children. It follows its
+ * anchor when the anchor moves, scrolls or resizes, in the same frame. A LayoutFloat on the root
+ * of a layout tree does nothing.
+ */
+ECS_STRUCT(LayoutFloat, {
+    ecs_entity_t anchor; /**< Element the float is placed against, 0 for its parent */
+    Align h;             /**< Point of the float on the x axis that sits on the anchor point */
+    VAlign v;            /**< Point of the float on the y axis that sits on the anchor point */
+    Align anchor_h;      /**< Point of the anchor on the x axis */
+    VAlign anchor_v;     /**< Point of the anchor on the y axis */
+    float x;             /**< Offset from the anchor point on the x axis */
+    float y;             /**< Offset from the anchor point on the y axis, up */
+    bool flip;           /**< Keep the float inside the root of its layout tree */
+});
+
 /** Makes an element take the size of a surface in points, the root of a layout that fills the
  * screen.
  *
