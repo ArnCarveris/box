@@ -137,6 +137,31 @@
                     "invalid_atmosphere_leaves_lights",
                     "scene_without_atmosphere_unchanged"
                 ]
+            },
+            {
+                "id": "TimeOfDay",
+                "testcases": [
+                    "script_defaults",
+                    "add_defaults",
+                    "status_follows_time_of_day",
+                    "singleton_has_status",
+                    "equator_equinox_noon_zenith",
+                    "equator_equinox_sunrise_east_sunset_west",
+                    "latitude_52_noon_altitudes",
+                    "time_scale_advances_hour",
+                    "time_scale_wraps_day_and_year",
+                    "set_restarts_status",
+                    "full_moon_illumination",
+                    "new_moon_illumination",
+                    "paused_sets_no_rotation",
+                    "sun_rotation_follows_status",
+                    "moon_rotation_follows_status",
+                    "atmosphere_sun_and_moon",
+                    "prefab_instance_gets_owned_rotation",
+                    "fallback_red_sunset",
+                    "fallback_dark_night",
+                    "fallback_leaves_authored_light"
+                ]
             }
         ]
     }

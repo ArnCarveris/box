@@ -291,6 +291,8 @@ void BoxAtmosphereImport(
     ecs_set_hooks(world, Atmosphere, { .ctor = box_atmosphere_ctor });
     ECS_META_COMPONENT(world, AtmosphereStatus);
     box_owned_hooks(world, AtmosphereStatus, BOX_OWNED_STR(AtmosphereStatus, error));
+    ECS_META_COMPONENT(world, TimeOfDay);
+    ECS_META_COMPONENT(world, TimeOfDayStatus);
 
     ecs_observer(world, {
         .query.terms = {{ .id = ecs_id(Atmosphere) }},
@@ -305,4 +307,6 @@ void BoxAtmosphereImport(
 
     box_render_lights_atmosphere(world);
     box_render_atmosphere_import(world);
+    box_render_lights_time_of_day(world);
+    box_tod_init(world);
 }

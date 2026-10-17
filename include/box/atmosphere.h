@@ -90,10 +90,61 @@ ECS_STRUCT(AtmosphereStatus, {
     char *error;             /**< Why nothing renders, such as an invalid value, NULL for none */
 });
 
+/** Time of day of a scene, placed on a Scene root or as a singleton for the default scene.
+ * Adding it adds TimeOfDayStatus, removing it removes it.
+ *
+ * The sun and moon positions are computed from Paul Schlyter's orbital elements for the year
+ * 2000 at Greenwich longitude, and the engine writes the Rotation of the sun and moon lights so
+ * that they travel along their local +Z from the sky toward the ground. A light that inherits
+ * its Rotation from a prefab gets an owned one; a light should have no rotated parent.
+ *
+ * Box is right handed with +Y up. With north 0, north is +Z and so east is -X: seen from
+ * above with north up, east is on the right. The north yaw turns this compass about +Y, as the
+ * Rotation yaw turns +Z: north 90 makes +X north and +Z east.
+ *
+ * Without an Atmosphere in the scene the light extract attenuates the sun and moon by the air
+ * mass, warms their color toward the horizon and fades them out below it; the authored
+ * DirectionalLight and Rgb are left as they are.
+ */
+ECS_STRUCT(TimeOfDay, {
+    float hour;             /**< Local apparent solar time, 0 to 24, 12 has the sun on the
+                             *   meridian, default 12 */
+    int32_t day_of_year;    /**< Day of the year, 1 to 365, default 80 (about the March
+                             *   equinox) */
+    float latitude;         /**< Latitude in degrees, -90 to 90, default 45 */
+    float north;            /**< World yaw of north in degrees, default 0 for north along +Z */
+    float time_scale;       /**< Simulated hours per real second, default 0 for paused */
+    float moon_offset;      /**< Hours added to the time of the moon's position, default 0 */
+    ecs_entity_t sun;       /**< DirectionalLight that is the sun, default 0 for the sun of the
+                             *   scene's Atmosphere, or the first DirectionalLight of the scene
+                             *   without one */
+    ecs_entity_t moon;      /**< DirectionalLight that is the moon, default 0 for the moon of
+                             *   the scene's Atmosphere, none without one */
+});
+
+/** State of the time of day of a scene, written by the engine next to TimeOfDay.
+ *
+ * Setting TimeOfDay restarts the status at its hour and day; with a time_scale the hour then
+ * advances by time_scale times the frame delta, wrapping into the next day and year.
+ */
+ECS_STRUCT(TimeOfDayStatus, {
+    float hour;             /**< Current local apparent solar time, 0 to 24 */
+    int32_t day_of_year;    /**< Current day of the year, 1 to 365 */
+    float sun_altitude;     /**< Degrees of the sun above the horizon, -90 to 90 */
+    float sun_azimuth;      /**< Degrees of the sun from north toward east, 0 to 360 */
+    float moon_altitude;    /**< Degrees of the moon above the horizon, -90 to 90 */
+    float moon_azimuth;     /**< Degrees of the moon from north toward east, 0 to 360 */
+    float moon_illumination; /**< Lit fraction of the moon disk, 0 for a new moon to 1 for a
+                              *   full moon */
+    float daylight;         /**< Brightness of the sky, 0 at night to 1 in full daylight, with
+                             *   a little moonlight */
+});
+
 /** Register the box.atmosphere module.
  *
  * Makes the light extract attenuate the sun and moon of every scene with a valid Atmosphere by
- * the transmittance toward them and a fade over the disk's angular diameter at the horizon.
+ * the transmittance toward them and a fade over the disk's angular diameter at the horizon,
+ * and the sun and moon of a TimeOfDay without an Atmosphere by its fallback.
  *
  * @param world The world
  */

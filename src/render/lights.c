@@ -3,8 +3,8 @@
  * @brief Collects the lights of every scene into light buffers and gives every view its lights.
  *
  * Lights are gathered per scene each frame, directional first, a buffer uploaded on change. A
- * scene without light entities gets the default sun, without AmbientLight the default sky and
- * ground; an Atmosphere attenuates its sun and moon, the default sun included.
+ * scene without lights gets the default sun, without AmbientLight the default ambient; an
+ * Atmosphere attenuates its sun and moon, else a TimeOfDay its own by the fallback.
  *
  * With LightBake views get the Mixed and Realtime lights, captures the Mixed and Baked ones over
  * a black ambient and the Mixed ones over a pass, while every light is Mixed all share the view
@@ -74,6 +74,15 @@ typedef struct box_light_atmos_t {
     box_light_atmos_light_t moon; /**< The moon */
 } box_light_atmos_t;
 
+/** The TimeOfDay of a scene in this frame */
+typedef struct box_light_tod_t {
+    ecs_entity_t entity;    /**< Entity with the TimeOfDay, 0 when the scene has none */
+    ecs_entity_t sun;       /**< TimeOfDay.sun, 0 for the first directional light */
+    ecs_entity_t moon;      /**< TimeOfDay.moon, 0 for none */
+    bool sun_found;         /**< The sun was collected in this frame */
+    bool moon_found;        /**< The moon was collected in this frame */
+} box_light_tod_t;
+
 /** The lights of one scene */
 typedef struct box_light_scene_t {
     ecs_entity_t scene;     /**< Scene root, 0 for the default scene */
@@ -85,6 +94,7 @@ typedef struct box_light_scene_t {
     bool default_sun;       /**< The view list holds the default sun attenuated by the
                              *   atmosphere of a scene without light entities */
     box_light_atmos_t atmos; /**< The atmosphere of the scene */
+    box_light_tod_t tod;    /**< The time of day of the scene */
     float sky[3];           /**< Linear ambient light from above, summed */
     float ground[3];        /**< Linear ambient light from below, summed */
     box_light_list_t lists[BOX_LIGHTS_LISTS]; /**< The lists, by box_light_list_kind_t */
@@ -98,6 +108,7 @@ typedef struct box_render_lights_t {
     ecs_query_t *ambient;       /**< Entities with AmbientLight */
     ecs_query_t *bakes;         /**< Entities with LightBake */
     ecs_query_t *atmospheres;   /**< Entities with Atmosphere, NULL without box.atmosphere */
+    ecs_query_t *times;         /**< Entities with TimeOfDay, NULL without box.atmosphere */
     ecs_vec_t scenes;           /**< box_light_scene_t */
     ecs_map_t lookup;           /**< Scene root plus one to the index of its scene plus one */
     ecs_vec_t free_buffers;     /**< uint32_t, light buffer handles to reuse */
@@ -244,6 +255,7 @@ static void box_lights_reset(
         s->split = false;
         s->default_sun = false;
         ecs_os_memset_t(&s->atmos, 0, box_light_atmos_t);
+        ecs_os_memset_t(&s->tod, 0, box_light_tod_t);
         s->has_ambient = false;
         glm_vec3_zero(s->sky);
         glm_vec3_zero(s->ground);
@@ -443,6 +455,38 @@ done:
     return;
 }
 
+/** Attenuate a directional light that is the sun or the moon of the TimeOfDay of a scene
+ * without an Atmosphere by the fallback of the time of day.
+ *
+ * Without TimeOfDay.sun the sun is the first directional light of the scene that is not the
+ * moon.
+ *
+ * @param s The scene of the light
+ * @param e The light entity
+ * @param light The light, its color is attenuated
+ */
+static void box_lights_tod_directional(
+    box_light_scene_t *s,
+    ecs_entity_t e,
+    box_render_light_t *light)
+{
+    box_light_tod_t *t = &s->tod;
+    if (!t->entity || s->atmos.entity) {
+        goto done;
+    }
+
+    if (!t->sun_found && (t->sun ? e == t->sun : e != t->moon)) {
+        t->sun_found = true;
+        box_tod_fallback(light->position[1], light->color);
+    } else if (!t->moon_found && t->moon && e == t->moon) {
+        t->moon_found = true;
+        box_tod_fallback(light->position[1], light->color);
+    }
+
+done:
+    return;
+}
+
 /** Collect the lights one query matches into the scenes they belong to.
  *
  * The scene of a light comes from the Scene(self|up) field of the query.
@@ -482,6 +526,7 @@ static void box_lights_collect(
                 box_lights_axis(transform, out.position);
                 glm_vec3_negate(out.position);
                 box_lights_atmos_directional(s, it.entities[i], &out);
+                box_lights_tod_directional(s, it.entities[i], &out);
                 if (d->intensity > 0) {
                     box_lights_push(s, it.entities[i], d->bake, &out);
                 }
@@ -536,6 +581,33 @@ static void box_lights_collect_atmospheres(
                     if (!a->error) {
                         box_atmos_medium(&values[i], &a->medium);
                     }
+                }
+            }
+        }
+    }
+}
+
+/** Give the time of day of every scene in this frame to its scene, the first one of a scene
+ * that has several.
+ *
+ * @param world The world
+ * @param l The state
+ */
+static void box_lights_collect_times(
+    ecs_world_t *world,
+    box_render_lights_t *l)
+{
+    if (l->times) {
+        ecs_iter_t it = ecs_query_iter(world, l->times);
+        while (ecs_query_next(&it)) {
+            const TimeOfDay *values = ecs_field(&it, TimeOfDay, 0);
+            int32_t i;
+            for (i = 0; i < it.count; i ++) {
+                box_light_scene_t *s = box_lights_ensure(l, box_render_scene_field(&it, 1, i));
+                if (!s->tod.entity) {
+                    s->tod.entity = it.entities[i];
+                    s->tod.sun = values[i].sun;
+                    s->tod.moon = values[i].moon;
                 }
             }
         }
@@ -953,6 +1025,7 @@ static void BoxRenderExtractLights(
     box_lights_reset(l);
     box_lights_collect_bakes(world, l);
     box_lights_collect_atmospheres(world, l);
+    box_lights_collect_times(world, l);
     box_lights_collect(world, l, l->directional, 0);
     box_lights_collect(world, l, l->point, 1);
     box_lights_collect(world, l, l->spot, 2);
@@ -1110,6 +1183,16 @@ bool box_render_lights_atmos_sun(
     }
 
     return result;
+}
+
+void box_render_lights_time_of_day(
+    ecs_world_t *world)
+{
+    box_render_lights_t *l = ECS_CONST_CAST(box_render_lights_t*,
+        box_render_lights_state(world));
+    if (l && !l->times) {
+        l->times = box_lights_scene_query(world, ecs_id(TimeOfDay));
+    }
 }
 
 /** Write the buffer, the counts and the first directional light of a list.

@@ -1238,6 +1238,14 @@ bool box_render_gpu_read_atmosphere(
     float *out,
     int32_t count);
 
+/** Make the light extract attenuate the sun and moon of the scenes with a TimeOfDay and no
+ * Atmosphere by the fallback of the time of day, called by the import of box.atmosphere.
+ *
+ * @param world The world
+ */
+void box_render_lights_time_of_day(
+    ecs_world_t *world);
+
 /** Register the cached query that knows the scene of every entity in a scene.
  *
  * @param world The world

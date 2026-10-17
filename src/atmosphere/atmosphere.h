@@ -1,6 +1,7 @@
 /**
  * @file atmosphere/atmosphere.h
- * @brief Private declarations of box.atmosphere: the medium and the CPU transmittance.
+ * @brief Private declarations of box.atmosphere: the medium, the CPU transmittance and the time
+ * of day.
  *
  * The coefficients come from etc/shaders/include/atmosphere_medium.h, which the shaders read.
  */
@@ -86,5 +87,24 @@ float box_atmos_horizon_fade(
 float box_atmos_moon_illumination(
     const float *sun,
     const float *moon);
+
+/** Attenuate the color of a time of day sun or moon in a scene without an Atmosphere: the
+ * transmittance of the Kasten-Young air mass, a lerp toward a warm color at the horizon and a
+ * fade over the sun's angular diameter below it.
+ *
+ * @param sin_altitude Sine of the altitude of the light, the y of the direction toward it
+ * @param color The linear color of the light, attenuated in place
+ */
+void box_tod_fallback(
+    float sin_altitude,
+    float *color);
+
+/** Register TimeOfDay, TimeOfDayStatus, their observers and the system that advances the time
+ * of day and rotates the sun and moon lights, called by the import of box.atmosphere.
+ *
+ * @param world The world
+ */
+void box_tod_init(
+    ecs_world_t *world);
 
 #endif
