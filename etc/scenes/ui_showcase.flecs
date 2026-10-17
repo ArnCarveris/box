@@ -1,0 +1,392 @@
+// UI showcase: screen space widgets that drive input actions over a 3D scene. A button, a
+// toggle and a slider in a HUD panel, keys bound to the same actions, and a crate picked in 3D.
+// C counts, H toggles the shadows, a click on the crate selects it. Fly with WASD (QE for
+// down/up), hold the right mouse button to look around.
+
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.surface
+using box.controllers
+using box.layout
+using box.text
+using box.input
+using box.picking
+
+window {
+  Surface: {width: 1280, height: 720, vsync: true}
+}
+
+// Actions: a widget and a key drive the same action, the scene only awaits the action
+
+actions {
+  count {
+    Action: {description: "Count a click"}
+    Binding: {key: C}
+  }
+
+  shadows {
+    Action: {description: "Toggle the shadows of the 3D view"}
+    Binding: {key: H}
+  }
+
+  select {
+    Action: {description: "Select the crate"}
+  }
+}
+
+// The 3D scene: the default scene. Its view, the sun and the crate follow the state of the
+// showcase, so they are part of the Showcase template below: a read of showcase[Showcase.mut]
+// outside the template does not update when an async block assigns a mut variable
+
+camera {
+  Position: {0, 2.2, 7}
+  Rotation: {-0.2, 0, 0}
+  Camera: {fov: 60}
+  CameraController: {}
+}
+
+$ {
+  AmbientLight: {sky: {90, 110, 140}, ground: {40, 36, 30}, intensity: 0.6}
+}
+
+ground {
+  Position: {0, -0.05, 0}
+  Box: {80, 0.1, 80}
+  Rgb: {140, 150, 125}
+  PbrMaterial: {roughness: 0.9}
+}
+
+hero {
+  Position: {0.4, 0.9, -0.5}
+  Capsule: {segments: 24, smooth: true, length: 0.8, radius: 0.45}
+  Rgb: {220, 90, 60}
+}
+
+pillar {
+  Position: {4.6, 1.2, -3.5}
+  Cylinder: {segments: 24, smooth: true, radius: 0.4, length: 2.4}
+  Rgb: {170, 175, 190}
+}
+
+ball {
+  Position: {2.2, 0.5, 1.5}
+  Sphere: {segments: 32, smooth: true, radius: 0.5}
+  Rgb: {80, 140, 210}
+  PbrMaterial: {roughness: 0.3}
+}
+
+// Widgets: templates that show the props they are given and drive an action or a pointer drag
+
+// A button that taps its action when clicked, lighter while hovered and darker while pressed
+template Button {
+  prop label: string = "Button"
+  prop action: entity = 0
+  mut hover = false
+  mut down = false
+
+  ActionTrigger: {action: action}
+  Layout: {direction: Row, padding: {8, 8, 12, 12}, h: Center, v: Middle}
+  LayoutItem: {width: {mode: Grow}}
+  Rect: {1, 1}
+
+  if down {
+    Rgb: {40, 90, 170}
+    Border: {radius: 6, width: 2, color: {255, 220, 90, 255}}
+  } else if hover {
+    Rgb: {90, 140, 220}
+    Border: {radius: 6, width: 2, color: {170, 200, 255, 255}}
+  } else {
+    Rgb: {60, 100, 170}
+    Border: {radius: 6, width: 2, color: {60, 100, 170, 255}}
+  }
+
+  text {
+    Text: {value: label, size: 16}
+    Rgb: {255, 255, 255}
+  }
+
+  async {
+    while true {
+      await on.enter(this)
+      hover = true
+      await on.leave(this)
+      hover = false
+    }
+  }
+
+  async {
+    while true {
+      await on.press(this)
+      down = true
+      await on.release(this)
+      down = false
+    }
+  }
+}
+
+// A check box that taps its action when clicked; it shows the state it is given, the action
+// changes that state where it is owned
+template Toggle {
+  prop label: string = "Toggle"
+  prop action: entity = 0
+  prop checked = false
+  mut hover = false
+
+  ActionTrigger: {action: action}
+  Layout: {direction: Row, spacing: 10, padding: {4, 4, 4, 4}, v: Middle}
+  LayoutItem: {width: {mode: Grow}}
+
+  check {
+    Layout: {}
+    LayoutItem: {width: {mode: Fixed, value: 22}, height: {mode: Fixed, value: 22}}
+    Rect: {1, 1}
+    Rgb: {30, 34, 46}
+
+    if hover {
+      Border: {radius: 5, width: 2, color: {170, 200, 255, 255}}
+    } else {
+      Border: {radius: 5, width: 2, color: {120, 130, 150, 255}}
+    }
+
+    if checked {
+      mark {
+        LayoutItem: {h: Center, v: Middle, width: {mode: Fixed, value: 12}, height: {mode: Fixed, value: 12}}
+        Rect: {1, 1}
+        Rgb: {90, 210, 110}
+        Border: {radius: 3}
+      }
+    }
+  }
+
+  text {
+    Text: {value: label, size: 16}
+    Rgb: {225, 230, 240}
+  }
+
+  async {
+    while true {
+      await on.enter(this)
+      hover = true
+      await on.leave(this)
+      hover = false
+    }
+  }
+}
+
+// A slider that shows value between min and max on a track of width points with a knob. It is
+// Interactive but drives no action: an async block can only assign the mut variables of its own
+// template, so the scope that owns the value awaits on.press and on.drag on the slider and maps
+// local_x, the pointer relative to the slider's center, to a value the knob is centered on
+const SliderKnob: f32 = 16
+
+template Slider {
+  prop label: string = "Slider"
+  prop min: f32 = 0
+  prop max: f32 = 1
+  prop value: f32 = 0
+  prop width: f32 = 200
+
+  const t = clamp((value - min) / (max - min), 0, 1)
+
+  Interactive
+  Layout: {direction: Column, spacing: 6}
+  LayoutItem: {width: {mode: Fixed, value: width}}
+
+  head {
+    Layout: {direction: Row, v: Middle}
+    LayoutItem: {width: {mode: Grow}}
+
+    name {
+      Text: {value: label, size: 16}
+      Rgb: {225, 230, 240}
+    }
+
+    gap {
+      LayoutItem: {width: {mode: Grow}}
+    }
+
+    amount {
+      Text: {value: "{value:.2}", size: 16}
+      Rgb: {255, 220, 90}
+    }
+  }
+
+  track {
+    Layout: {}
+    LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: SliderKnob}}
+
+    rail {
+      LayoutItem: {v: Middle, width: {mode: Grow}, height: {mode: Fixed, value: 6}}
+      Rect: {1, 1}
+      Rgb: {40, 44, 56}
+      Border: {radius: 3}
+    }
+
+    fill {
+      LayoutItem: {h: Left, v: Middle, width: {mode: Fixed, value: SliderKnob / 2 + t * (width - SliderKnob)}, height: {mode: Fixed, value: 6}}
+      Rect: {1, 1}
+      Rgb: {250, 200, 90}
+      Border: {radius: 3}
+    }
+
+    knob {
+      LayoutItem: {h: Left, v: Middle, x: t * (width - SliderKnob), width: {mode: Fixed, value: SliderKnob}, height: {mode: Fixed, value: SliderKnob}}
+      Rect: {1, 1}
+      Rgb: {255, 255, 255}
+      Border: {radius: 8}
+    }
+  }
+}
+
+// The showcase: the state of the app in mut variables, one async block per action, and the
+// screen space UI. The 3D scene and the widgets follow the state reactively.
+
+template Showcase {
+  mut clicks: i32 = 0
+  mut shadows = true
+  mut sun: f32 = 2
+  mut selected = false
+  mut last: string = "none"
+
+  async {
+    while true {
+      await on.pressed(actions.count)
+      clicks = clicks + 1
+      last = "count"
+    }
+  }
+
+  async {
+    while true {
+      await on.pressed(actions.shadows)
+      shadows = !shadows
+      last = "shadows"
+    }
+  }
+
+  async {
+    while true {
+      await on.pressed(actions.select)
+      selected = !selected
+      last = "select"
+    }
+  }
+
+  // The parts of the 3D scene that follow the state. The 3D view is created before the HUD
+  // view, and views draw in the order they were created, so the UI draws over the 3D scene
+  world_view {
+    View: {
+      camera: camera,
+      clear: {enabled: true, color: {120, 150, 190, 255}},
+      shadows: {enabled: shadows}
+    }
+  }
+
+  sun {
+    Rotation: {0.7359, 2.3726, 0}
+    DirectionalLight: {intensity: sun}
+    Rgb: {255, 244, 225}
+  }
+
+  // A click on the crate taps actions.select; the panel covers its left part, where the
+  // InputBlocker keeps the click from it
+  crate {
+    Position: {-4.4, 0.6, -1.5}
+    Rotation: {0, 0.4, 0}
+    Box: {1.2, 1.2, 1.2}
+    Rgb: {200, 150, 80}
+    ActionTrigger: {action: actions.select}
+
+    if selected {
+      Tint: {255, 220, 90, 150}
+    }
+  }
+
+  // Screen space UI: a scene with an orthographic camera at ortho_scale 1, so one logical
+  // pixel is one point. Its root fills the window, so the panel anchors to the left edge
+  // and stays there when the window is resized.
+  hud {
+    Scene: {}
+
+    camera {
+      Position: {0, 0, 100}
+      Camera: {ortho: true, ortho_scale: 1}
+    }
+
+    screen {
+      LayoutFill: {surface: window}
+      Layout: {}
+
+      // InputBlocker: clicks on the panel never reach the 3D scene behind it
+      panel {
+        InputBlocker
+        Layout: {direction: Column, spacing: 10, padding: {14, 14, 16, 16}}
+        LayoutItem: {h: Left, v: Middle, x: 16, width: {mode: Fixed, value: 300}}
+        Rect: {1, 1}
+        Rgb: {16, 20, 28}
+        Opacity: {0.9}
+        Border: {width: 1, radius: 10, color: {90, 110, 150, 255}}
+
+        title {
+          Text: {value: "UI Showcase", size: 22}
+          Rgb: {255, 255, 255}
+        }
+
+        counter {
+          Button: {label: "Clicks: {clicks}", action: actions.count}
+        }
+
+        shadow_toggle {
+          Toggle: {label: "Shadows (H)", action: actions.shadows, checked: shadows}
+        }
+
+        // The pointer drags the sun intensity directly, without an action
+        sun_slider {
+          Slider: {label: "Sun", min: 0, max: 4, value: sun, width: 268}
+
+          async {
+            while true {
+              const e = await on.press(this)
+              const s = this[Slider]
+              sun = clamp(s.min + (e.local_x / (s.width - SliderKnob) + 0.5) * (s.max - s.min), s.min, s.max)
+            }
+          }
+
+          async {
+            while true {
+              const e = await on.drag(this)
+              const s = this[Slider]
+              sun = clamp(s.min + (e.local_x / (s.width - SliderKnob) + 0.5) * (s.max - s.min), s.min, s.max)
+            }
+          }
+        }
+
+        status {
+          Text: {value: "Last action: {last}", size: 15}
+          Rgb: {200, 210, 230}
+        }
+
+        hint {
+          Text: {value: "C counts, H toggles shadows, click the crate to select it", size: 13, width: 268}
+          Rgb: {140, 150, 170}
+        }
+      }
+    }
+  }
+
+  // The HUD view is created after the 3D view, so the UI draws over it, without clear,
+  // lighting or culling
+  hud_view {
+    View: {camera: hud.camera, lighting: {enabled: false}, culling: {enabled: false}}
+  }
+}
+
+showcase {
+  Showcase: {}
+}

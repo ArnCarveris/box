@@ -1,0 +1,27 @@
+{
+    "id": "uishowcase_gpu",
+    "type": "application",
+    "value": {
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "test": {
+        "testsuites": [
+            {
+                "id": "Screen",
+                "testcases": [
+                    "scene_loads",
+                    "hover_counter",
+                    "click_counts",
+                    "key_counts",
+                    "toggle_shadows",
+                    "slider_drag",
+                    "crate_click_selects",
+                    "panel_blocks_crate"
+                ]
+            }
+        ]
+    }
+}
