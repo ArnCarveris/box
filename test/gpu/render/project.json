@@ -602,6 +602,12 @@
                     "sun_below_horizon_draws_no_disk",
                     "disk_center_brighter_than_limb"
                 ]
+            },
+            {
+                "id": "Environment",
+                "testcases": [
+                    "axes_faces_show_axis_colors"
+                ]
             }
         ]
     }
