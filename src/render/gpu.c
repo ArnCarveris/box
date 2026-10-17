@@ -409,8 +409,8 @@ static void box_gpu_targets_render(
     }
 }
 
-/** Apply the resources of a packet, capture its probes, build its atmosphere LUTs and render its
- * targets.
+/** Apply the resources of a packet, write and process its environments, capture its probes,
+ * build its atmosphere LUTs and render its targets.
  *
  * @param ctx The backend
  * @param packet The packet
@@ -450,6 +450,11 @@ static void box_gpu_render(
         } else if (r->kind == BOX_RENDER_ATMOSPHERE) {
             box_gpu_atmosphere_apply(gpu, r->op, r->handle,
                 r->size >= sizeof(box_render_atmosphere_desc_t) ? data : NULL);
+        } else if (r->kind == BOX_RENDER_ENVIRONMENT) {
+            box_gpu_environment_apply(gpu, r->op, r->handle,
+                r->size >= sizeof(box_render_environment_desc_t) ? data : NULL);
+        } else if (r->kind == BOX_RENDER_ENVIRONMENT_IMAGE) {
+            box_gpu_environment_image_apply(gpu, r->handle, data, data ? r->size : 0);
         }
 
         if (r->kind != BOX_RENDER_TARGET) {
@@ -468,6 +473,8 @@ static void box_gpu_render(
     box_gpu_texture_mips(gpu, packet);
     box_gpu_upload(gpu, packet);
     box_gpu_scatter(gpu, packet);
+    box_gpu_environment_image_render(gpu, packet);
+    box_gpu_environment_process(gpu, packet);
     box_gpu_bake_capture(gpu, packet);
     box_gpu_atmosphere_build(gpu, packet);
     box_gpu_targets_render(gpu, packet);
