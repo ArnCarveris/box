@@ -722,6 +722,7 @@ are script functions registered with `box_command_register` (`src/command`):
 - Render: `capture [cameras]` and `render <entity|prefab|template>`.
 - `commands` and `logs` list history and are quiet.
 - `help [command]` lists every command of `box.command.commands` (sorted, grouped by the part before the first dot) or shows the usage line, brief and parameter types of one; it is quiet, and unknown names get up to three suggestions. The unknown command error mentions `help`.
+- `cls` (console only, not a `box.command.commands` function): `box_console_exec` checks a small table of console commands (name, brief, callback) before passing the line to the session. `cls` empties the scrollback (the `cls` line itself is not shown) and resets the scroll position. The line stays in the input history (Up brings it back) but never reaches the session, so it is not in the session history or `commands.log`. `cls` with arguments is an error. Over HTTP or `box_terminal_run` it is an unknown command. `box.console.run("cls")` and `box_console_run` clear too and return an empty output. In the console, `help` also lists a "console" group (marked console only) with these commands. Ctrl+L does the same as `cls` without touching the input line.
 
 The HTTP server has no deferred reply, so commands that wait (`input.wait`, `capture`, `render`)
 answer at once with a pending state and the caller polls.
