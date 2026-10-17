@@ -122,7 +122,8 @@ typedef enum box_render_resource_kind_t {
     BOX_RENDER_TEXTURE,  /**< Sampled texture */
     BOX_RENDER_TARGET,   /**< Surface or offscreen target that views render into */
     BOX_RENDER_SHADER,   /**< Shader module or pipeline */
-    BOX_RENDER_VOLUME    /**< Irradiance probe volume of a scene with LightBake */
+    BOX_RENDER_VOLUME,   /**< Irradiance probe volume of a scene with LightBake */
+    BOX_RENDER_REFLECTION /**< Cubemap array of the reflection probes of a scene */
 } box_render_resource_kind_t;
 
 /** What a resource change does to its object */
@@ -373,6 +374,40 @@ typedef struct box_render_bake_batch_t {
     int32_t count;          /**< Probes of the batch */
 } box_render_bake_batch_t;
 
+/** Description of a BOX_RENDER_REFLECTION create: a cubemap array of a scene with a full mip
+ * chain, 6 layers per slot. Recreating a handle at the same resolution keeps the slots both
+ * textures have; at another resolution nothing is kept.
+ */
+typedef struct box_render_reflection_desc_t {
+    uint32_t resolution;    /**< Face edge of a cubemap in texels */
+    uint32_t cubes;         /**< Cubemap slots of the array */
+} box_render_reflection_desc_t;
+
+/** The reflection probe captures of one scene in a packet, which run after its bake batches.
+ *
+ * Each probe renders six 90 degree faces from its capture point as the bake captures do: the
+ * batches of the scene with bake set, lit by the lights of the views, the sun shadowed by one
+ * cascade over the bounds, the ambient term of the volume buffer the views show or the hemisphere.
+ *
+ * Faces go to mip 0 of the slot of the probe, texels nothing covered get the sky radiance of
+ * the bake, and the higher mips are box filtered.
+ */
+typedef struct box_render_reflect_batch_t {
+    uint32_t texture;       /**< Handle of the BOX_RENDER_REFLECTION the probes are written into */
+    uint32_t ticket;        /**< Ticket of the first probe, the next probes count up from it */
+    ecs_entity_t scene;     /**< Scene root of the batches the faces draw */
+    int32_t size;           /**< Edge of a face in texels, the resolution of the texture */
+    box_render_view_lights_t lights; /**< Lights and ambient light of the views of the scene */
+    uint32_t volume;        /**< Probe volume the faces shade their ambient term with, 0 for the
+                             *   hemisphere ambient */
+    uint32_t volume_buffer; /**< Probe buffer of that volume, 0 or 1 */
+    float bounds_min[3];    /**< Minimum corner of the static bounds of the scene */
+    float bounds_max[3];    /**< Maximum corner of the static bounds of the scene */
+    int32_t first;          /**< First probe of the batch in the probes of the packet, whose
+                             *   index is the slot */
+    int32_t count;          /**< Probes of the batch */
+} box_render_reflect_batch_t;
+
 /** How a buffer is used, flags of box_render_buffer_desc_t */
 typedef enum box_render_buffer_usage_t {
     BOX_RENDER_BUFFER_INSTANCE = 1 << 0, /**< Per instance vertex data of batches */
@@ -450,7 +485,8 @@ typedef struct box_render_batch_t {
     uint32_t blend;             /**< BlendMode of the pipeline, Opaque writes depth */
     uint32_t back_face;         /**< BackFaceMode of the pipeline, BackFaceCull culls */
     bool shadow;                /**< The instances cast shadows, false for NoShadow */
-    bool bake;                  /**< Static 3D instances without NoBake, drawn by probe captures */
+    bool bake;                  /**< Static 3D instances without NoBake of a scene with LightBake or
+                                 *   ReflectionBake, drawn by the captures */
     uint32_t mesh;              /**< Mesh handle */
     uint32_t textures[BOX_RENDER_TEXTURE_SLOTS]; /**< Texture handles of the layers, 0 for none */
     uint32_t wrap;              /**< TextureWrap of the samplers */
@@ -485,7 +521,8 @@ typedef struct box_render_packet_t {
     ecs_vec_t targets;      /**< box_render_target_t in the order they render */
     ecs_vec_t effects;      /**< box_render_effect_t, the effect passes of the views */
     ecs_vec_t bakes;        /**< box_render_bake_batch_t, the probe captures of the frame */
-    ecs_vec_t probes;       /**< box_render_probe_capture_t of the bake batches */
+    ecs_vec_t probes;       /**< box_render_probe_capture_t of the bake and reflection batches */
+    ecs_vec_t reflections;  /**< box_render_reflect_batch_t, the reflection captures of the frame */
     ecs_vec_t data;         /**< Bytes the resources and uploads point into */
     int32_t generation;     /**< Backend generation the extract built it for, the ring drops a
                              *   packet of an older generation instead of rendering it */
@@ -610,6 +647,51 @@ bool box_render_gpu_bake_captured(
 bool box_render_gpu_bake_timing(
     ecs_world_t *world,
     box_render_bake_timing_t *out);
+
+/** Take the reflection probes the GPU backend of a world captured since the last call.
+ *
+ * Each result has the texture handle as volume, the ticket of the probe as generation and its
+ * slot as probe. A probe of a packet that was rendered and is not among them was not captured.
+ *
+ * @param world The world
+ * @param out Receives box_render_bake_result_t
+ * @return Whether the world renders with the GPU backend
+ */
+bool box_render_gpu_reflect_captured(
+    ecs_world_t *world,
+    ecs_vec_t *out);
+
+/** Take the GPU time of the reflection captures the GPU backend of a world measured, as
+ * box_render_gpu_bake_timing does for the probe captures.
+ *
+ * @param world The world
+ * @param out Receives the time, zero when nothing arrived
+ * @return Whether the world renders with the GPU backend
+ */
+bool box_render_gpu_reflect_timing(
+    ecs_world_t *world,
+    box_render_bake_timing_t *out);
+
+/** Copy mip 0 of one face of a reflection probe cubemap into memory, waiting for the copy.
+ *
+ * Texel (x, y) of the face, y down, follows the WebGPU cubemap convention. Only call this when
+ * the main thread renders, after box_render_sync, as box_render_gpu_read_buffer.
+ *
+ * @param world The world
+ * @param texture Handle of the BOX_RENDER_REFLECTION
+ * @param slot Cubemap slot
+ * @param face Face, 0 to 5 for +x, -x, +y, -y, +z, -z
+ * @param out Receives resolution squared linear RGBA texels, four floats each
+ * @param count Floats out holds
+ * @return Whether the texture exists and the texels were copied
+ */
+bool box_render_gpu_read_reflection(
+    ecs_world_t *world,
+    uint32_t texture,
+    uint32_t slot,
+    uint32_t face,
+    float *out,
+    int32_t count);
 
 /** What the cull pass of a view tested and kept in the last target the GPU backend rendered */
 typedef struct box_render_cull_stats_t {
@@ -1137,6 +1219,27 @@ const box_render_reflection_probe_t* box_render_reflect_probes(
     const ecs_world_t *world,
     ecs_entity_t scene,
     int32_t *count);
+
+/** Get the reflection probe cubemap array of a scene.
+ *
+ * @param world The world
+ * @param scene The scene, 0 for the default scene
+ * @return Handle of its BOX_RENDER_REFLECTION, 0 when the scene has none
+ */
+uint32_t box_render_reflect_texture(
+    const ecs_world_t *world,
+    ecs_entity_t scene);
+
+/** Get the reflection probes left to capture in the scenes whose captures can progress.
+ *
+ * Captures can progress when the resolution is valid, budget_ms is positive, a view of the
+ * scene was in the packet of the last frame and the GPU backend renders.
+ *
+ * @param world The world
+ * @return Resident probes not captured yet, 0 when every scene that can progress converged
+ */
+int32_t box_render_reflect_pending(
+    const ecs_world_t *world);
 
 /** Register the system that adds the effect passes of every view to the packet.
  *

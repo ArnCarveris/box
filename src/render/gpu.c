@@ -443,6 +443,9 @@ static void box_gpu_render(
         } else if (r->kind == BOX_RENDER_VOLUME) {
             box_gpu_volume_apply(gpu, r->op, r->handle,
                 r->size >= sizeof(box_render_volume_desc_t) ? data : NULL, r->size);
+        } else if (r->kind == BOX_RENDER_REFLECTION) {
+            box_gpu_reflect_apply(gpu, r->op, r->handle,
+                r->size >= sizeof(box_render_reflection_desc_t) ? data : NULL);
         }
 
         if (r->kind != BOX_RENDER_TARGET) {

@@ -533,6 +533,18 @@
                 "testcases": [
                     "equal_depth_ties_render_identically"
                 ]
+            },
+            {
+                "id": "ReflectionCapture",
+                "testcases": [
+                    "converges_headless",
+                    "converges_with_light_bake",
+                    "zero_budget_captures_nothing",
+                    "probes_beyond_capacity_not_captured",
+                    "removed_probe_frees_slot",
+                    "wall_shows_in_facing_face",
+                    "perf_run_waits_for_captures"
+                ]
             }
         ]
     }

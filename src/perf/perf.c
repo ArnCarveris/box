@@ -869,7 +869,8 @@ static void box_perf_measure(
     box_perf_travel(world, perf, status, camera);
 }
 
-/** Check whether a light bake that can progress is still baking, which a run waits for.
+/** Check whether a light or reflection bake that can progress is still baking, which a run
+ * waits for.
  *
  * A bake that leaves the same probes for BOX_PERF_BAKE_STALL frames is given up on, with an
  * error, and the run measures without it.
@@ -882,7 +883,7 @@ static bool box_perf_baking(
     ecs_world_t *world,
     box_perf_t *perf)
 {
-    int32_t left = box_render_bake_pending(world);
+    int32_t left = box_render_bake_pending(world) + box_render_reflect_pending(world);
     bool result = false;
     if (!left || perf->bake_stalled >= BOX_PERF_BAKE_STALL) {
         goto done;
@@ -892,7 +893,7 @@ static bool box_perf_baking(
         perf->bake_left = left;
         perf->bake_stalled = 0;
     } else if (++ perf->bake_stalled == BOX_PERF_BAKE_STALL) {
-        ecs_err("PerfRun: the light bake left %d probes for %d frames, measuring without it",
+        ecs_err("PerfRun: the bakes left %d probes for %d frames, measuring without them",
             left, BOX_PERF_BAKE_STALL);
         goto done;
     }

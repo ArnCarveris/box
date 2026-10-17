@@ -21,6 +21,11 @@
 // The slots of a face keep slot order, compacted by a workgroup prefix sum, so depth ties
 // resolve the same way in every bake.
 //
+// The reflect_store entry point writes the faces of the reflection probes of a chunk into mip 0
+// of their cubemap slot instead (params.probes holds the slots), mirrored to the WebGPU cubemap
+// convention, with the sky radiance of the projection where nothing covered a texel;
+// reflect_mip box filters one mip level of their slots into the next.
+//
 // Face f of probe p is the tile at column f and row p of the atlas, size texels on each side.
 // Its texel (x, y), y down, looks along
 // forward + u right + v up with u, v in [-1, 1] and right = cross(forward, up). The depth of
@@ -86,6 +91,9 @@ struct CullJob {
 @group(0) @binding(7) var<storage, read_write> args: array<u32>;
 @group(0) @binding(8) var<storage, read> lists: array<u32>;
 @group(0) @binding(9) var<storage, read_write> visibility: array<u32>;
+@group(0) @binding(10) var cube_store: texture_storage_2d_array<rgba16float, write>;
+@group(0) @binding(11) var cube_source: texture_2d_array<f32>;
+@group(0) @binding(12) var cube_mip: texture_storage_2d_array<rgba16float, write>;
 @group(1) @binding(0) var<storage, read> instances: array<Instance>;
 
 const GROUP: u32 = 64u;
@@ -397,4 +405,61 @@ fn cull(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_index) la
         args[at + 3u] = 0u;
         args[at + 4u] = 0u;
     }
+}
+
+// Radiance a texel no shape covered sees in a direction, as in project.
+fn sky(d: vec3f) -> vec3f {
+    let a = (params.sky.rgb + params.ground.rgb) * 0.5;
+    let b = (params.sky.rgb - params.ground.rgb) * 0.75;
+    return a + b * d.y;
+}
+
+// Layer of a face of a probe of the chunk in the cubemap array, six per slot.
+fn cube_layer(probe: u32, face: u32) -> u32 {
+    return params.probes[probe / 4u][probe % 4u] * 6u + face;
+}
+
+// Texel (x, y) of face z % 6 of probe z / 6 of the chunk. A cubemap face texel at column x sees
+// along forward - u right with the right of the atlas, so it is texel size - 1 - x of the tile.
+@compute @workgroup_size(8, 8)
+fn reflect_store(@builtin(global_invocation_id) id: vec3u) {
+    let size = max(params.size.x, 1u);
+    let probe = id.z / 6u;
+    let face = id.z % 6u;
+    if (id.x >= size || id.y >= size || probe >= params.size.y) {
+        return;
+    }
+
+    let x = size - 1u - id.x;
+    let step = 2.0 / f32(size);
+    let axes = face_axes(face);
+    let right = cross(axes[0], axes[1]);
+    let u = (f32(x) + 0.5) * step - 1.0;
+    let v = 1.0 - (f32(id.y) + 0.5) * step;
+    let d = normalize(axes[0] + right * u + axes[1] * v);
+    let texel = textureLoad(captures, tile(probe, face, x, id.y), 0);
+    let radiance = select(sky(d), texel.rgb, texel.a > 0.5);
+    textureStore(cube_store, id.xy, cube_layer(probe, face), vec4f(radiance, 1.0));
+}
+
+// Texel (x, y) of the next mip level of face z % 6 of probe z / 6 of the chunk: the mean of the
+// two by two texels of the level above.
+@compute @workgroup_size(8, 8)
+fn reflect_mip(@builtin(global_invocation_id) id: vec3u) {
+    let size = textureDimensions(cube_mip);
+    let probe = id.z / 6u;
+    if (id.x >= size.x || id.y >= size.y || probe >= params.size.y) {
+        return;
+    }
+
+    let layer = cube_layer(probe, id.z % 6u);
+    let last = textureDimensions(cube_source) - vec2u(1u);
+    let p = id.xy * 2u;
+    var sum = vec4f(0.0);
+    for (var i = 0u; i < 4u; i++) {
+        let q = min(p + vec2u(i & 1u, i >> 1u), last);
+        sum += textureLoad(cube_source, q, layer, 0);
+    }
+
+    textureStore(cube_mip, id.xy, layer, sum * 0.25);
 }

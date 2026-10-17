@@ -19,6 +19,7 @@ void box_render_packet_init(
     ecs_vec_init_t(NULL, &p->effects, box_render_effect_t, 0);
     ecs_vec_init_t(NULL, &p->bakes, box_render_bake_batch_t, 0);
     ecs_vec_init_t(NULL, &p->probes, box_render_probe_capture_t, 0);
+    ecs_vec_init_t(NULL, &p->reflections, box_render_reflect_batch_t, 0);
     ecs_vec_init_t(NULL, &p->data, uint8_t, 0);
 }
 
@@ -34,6 +35,7 @@ void box_render_packet_fini(
     ecs_vec_fini_t(NULL, &p->effects, box_render_effect_t);
     ecs_vec_fini_t(NULL, &p->bakes, box_render_bake_batch_t);
     ecs_vec_fini_t(NULL, &p->probes, box_render_probe_capture_t);
+    ecs_vec_fini_t(NULL, &p->reflections, box_render_reflect_batch_t);
     ecs_vec_fini_t(NULL, &p->data, uint8_t);
 }
 
@@ -59,6 +61,7 @@ void box_render_packet_reset(
     ecs_vec_clear(&p->effects);
     ecs_vec_clear(&p->bakes);
     ecs_vec_clear(&p->probes);
+    ecs_vec_clear(&p->reflections);
     ecs_vec_clear(&p->data);
     if (capacity > BOX_RENDER_DATA_KEEP && (used <= BOX_RENDER_DATA_KEEP ||
         used < capacity / BOX_RENDER_DATA_TRIM_FILL))
@@ -115,6 +118,8 @@ void box_render_packet_copy(
     box_render_vec_copy(&dst->effects, &src->effects, ECS_SIZEOF(box_render_effect_t));
     box_render_vec_copy(&dst->bakes, &src->bakes, ECS_SIZEOF(box_render_bake_batch_t));
     box_render_vec_copy(&dst->probes, &src->probes, ECS_SIZEOF(box_render_probe_capture_t));
+    box_render_vec_copy(&dst->reflections, &src->reflections,
+        ECS_SIZEOF(box_render_reflect_batch_t));
     box_render_vec_copy(&dst->data, &src->data, ECS_SIZEOF(uint8_t));
 }
 

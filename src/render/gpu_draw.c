@@ -88,6 +88,7 @@ void box_gpu_draw_init(
     WGPUBindGroupLayoutDescriptor layout = { .entryCount = 5, .entries = entries };
     box_gpu_cull_init(gpu);
     box_gpu_volume_init(gpu);
+    box_gpu_reflect_init(gpu);
     gpu->view_layout = wgpuDeviceCreateBindGroupLayout(gpu->device, &layout);
     WGPUBindGroupLayout groups[4] = {
         gpu->view_layout, gpu->material_layout, gpu->instance_layout, gpu->volume_layout
@@ -183,6 +184,7 @@ void box_gpu_draw_fini(
     box_gpu_cull_fini(gpu);
     box_gpu_bake_fini(gpu);
     box_gpu_volume_fini(gpu);
+    box_gpu_reflect_fini(gpu);
     box_gpu_effects_fini(gpu);
     if (gpu->view_buffer) {
         wgpuBufferRelease(gpu->view_buffer);

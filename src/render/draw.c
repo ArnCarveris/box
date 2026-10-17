@@ -371,23 +371,25 @@ static ecs_entity_t box_draws_scene(
     return result;
 }
 
-/** Check whether a scene bakes its lighting, so captures tell its static shapes apart.
+/** Check whether a scene bakes its lighting or reflections, so captures tell its static shapes
+ * apart.
  *
  * @param world The world
  * @param scene The scene, 0 for the default scene
- * @return Whether the scene root, or for the default scene the singleton, has LightBake
+ * @return Whether the scene root, or for the default scene the singleton, has LightBake or
+ *         ReflectionBake
  */
 static bool box_draws_baked(
     const ecs_world_t *world,
     ecs_entity_t scene)
 {
-    ecs_entity_t e = scene ? scene : ecs_id(LightBake);
+    bool light = ecs_has(world, scene ? scene : ecs_id(LightBake), LightBake);
 
-    return ecs_has(world, e, LightBake);
+    return light || ecs_has(world, scene ? scene : ecs_id(ReflectionBake), ReflectionBake);
 }
 
 /** Mark every shape in the batches of the scene of the entities of an observer event, after
- * the scene got or lost LightBake, which changes the bake flag of their keys.
+ * the scene got or lost LightBake or ReflectionBake, which changes the bake flag of their keys.
  *
  * @param it The iterator of the observer
  */
@@ -726,6 +728,9 @@ static void box_draws_observers(
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnChange);
     box_draws_observer(world, d, "DrawsOnLightBake", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(LightBake) }},
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnLightBake);
+    box_draws_observer(world, d, "DrawsOnReflectionBake", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ecs_id(ReflectionBake) }},
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnLightBake);
     box_draws_observer(world, d, "DrawsOnNoShadow", (ecs_observer_desc_t){
         .query.terms = {{ .id = NoShadow }},

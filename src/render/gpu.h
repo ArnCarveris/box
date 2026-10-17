@@ -431,6 +431,20 @@ typedef struct box_gpu_volume_t {
                                      *   visibility as group 3 */
 } box_gpu_volume_t;
 
+/** Format of the reflection probe cubemaps, the smallest one that is filterable and writable
+ * as a storage texture on core WebGPU everywhere */
+#define BOX_GPU_REFLECT_FORMAT (WGPUTextureFormat_RGBA16Float)
+
+/** Cubemap array of the reflection probes of a scene: 6 layers per slot, a full mip chain */
+typedef struct box_gpu_reflect_t {
+    WGPUTexture texture;            /**< The texture, BOX_GPU_REFLECT_FORMAT */
+    WGPUTextureView cube;           /**< Cube array view of every mip level */
+    WGPUTextureView *levels;        /**< 2D array view of every layer of each mip level */
+    uint32_t resolution;            /**< Face edge of mip 0 in texels */
+    uint32_t cubes;                 /**< Cubemap slots */
+    uint32_t mips;                  /**< Mip levels */
+} box_gpu_reflect_t;
+
 /** The webgpu backend: device, shared objects and targets */
 typedef struct box_gpu_t {
     WGPUInstance instance;          /**< The instance */
@@ -455,6 +469,13 @@ typedef struct box_gpu_t {
     WGPUBindGroupLayout volume_layout; /**< Binds the probe volume a view samples */
     ecs_map_t volumes;              /**< Handle to box_gpu_volume_t */
     box_gpu_volume_t *no_volume;    /**< 1x1x1 volume of the views that use the hemisphere */
+    ecs_map_t reflections;          /**< Handle to box_gpu_reflect_t */
+    WGPUBindGroupLayout reflect_store_layout; /**< Binds a face atlas and mip 0 of a cube array */
+    WGPUPipelineLayout reflect_store_pipeline_layout; /**< Pipeline layout of the store */
+    WGPUComputePipeline reflect_store; /**< Store pipeline, NULL until the bake shader exists */
+    WGPUBindGroupLayout reflect_mip_layout; /**< Binds two mip levels of a cube array */
+    WGPUPipelineLayout reflect_mip_pipeline_layout; /**< Pipeline layout of the mip pass */
+    WGPUComputePipeline reflect_mip; /**< Mip pipeline, NULL until the bake shader exists */
     ecs_map_t forward;              /**< Forward pipeline by shader, format, blend, back face */
     WGPUBuffer view_buffer;         /**< Uniforms of the views of a target */
     int32_t view_capacity;          /**< Views the view buffer holds */
@@ -800,6 +821,68 @@ WGPUBindGroup box_gpu_volume_group(
     box_gpu_t *gpu,
     const box_render_view_t *v);
 
+/** Create the layouts of the reflection cubemap passes.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_reflect_init(
+    box_gpu_t *gpu);
+
+/** Release the reflection cubemaps, their pipelines and layouts.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_reflect_fini(
+    box_gpu_t *gpu);
+
+/** Create or release the cubemap array of a scene from a BOX_RENDER_REFLECTION resource.
+ *
+ * A create of an existing handle at the same resolution copies every mip level of the slots
+ * both arrays have into the new one.
+ *
+ * @param gpu The backend
+ * @param op What happens to the array
+ * @param handle Handle of the array
+ * @param desc Resolution and slots, NULL for a release
+ */
+void box_gpu_reflect_apply(
+    box_gpu_t *gpu,
+    box_render_resource_op_t op,
+    uint32_t handle,
+    const box_render_reflection_desc_t *desc);
+
+/** Create the store and mip pipelines from the module of the bake shader.
+ *
+ * @param gpu The backend
+ * @param module The module
+ */
+void box_gpu_reflect_pipelines(
+    box_gpu_t *gpu,
+    WGPUShaderModule module);
+
+/** Record the pass that writes the faces of a chunk of reflection captures into mip 0 of their
+ * slots and box filters every higher mip level of those slots.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder of the chunk
+ * @param cube The cubemap array
+ * @param params Uniforms of the chunk, Params of bake_sh.wgsl with the slots as its probes
+ * @param params_size Bytes of the uniforms
+ * @param atlas View of the face atlas of the chunk
+ * @param count Probes of the chunk
+ * @param writes Timestamps the pass writes, NULL for none
+ * @return Whether the pass was recorded, false while the pipelines do not exist
+ */
+bool box_gpu_reflect_store(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    const box_gpu_reflect_t *cube,
+    WGPUBuffer params,
+    uint64_t params_size,
+    WGPUTextureView atlas,
+    int32_t count,
+    const WGPUPassTimestampWrites *writes);
+
 /** Release the state of the probe captures.
  *
  * @param gpu The backend
@@ -807,7 +890,8 @@ WGPUBindGroup box_gpu_volume_group(
 void box_gpu_bake_fini(
     box_gpu_t *gpu);
 
-/** Render the probe captures of a packet and project them onto the SH of their volumes.
+/** Render the probe captures of a packet and project them onto the SH of their volumes, then
+ * render its reflection captures into their cubemaps.
  *
  * @param gpu The backend
  * @param packet The packet, after its resources, uploads and scatters applied
