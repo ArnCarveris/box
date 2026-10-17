@@ -1133,3 +1133,113 @@ void Console_caret_steps_match_glyphs(void) {
 
     ecs_fini(world);
 }
+
+/** Create a headless world with a surface, and open the console unless told not to.
+ *
+ * @param open Whether to open the console
+ * @return The world
+ */
+static ecs_world_t* console_paste_world(
+    bool open)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 640, .height = 360, .resolution_scale = 1});
+    ecs_progress(world, 0);
+    if (open) {
+        box_input_key_type(world, "`", 1);
+        while (box_input_pending(world)) {
+            ecs_progress(world, 0);
+        }
+
+        test_bool(ecs_singleton_get(world, Console)->open, true);
+    }
+
+    return world;
+}
+
+/** Get the input line of the console before its cursor.
+ *
+ * @param world The world
+ * @return The text
+ */
+static const char* console_paste_line(
+    ecs_world_t *world)
+{
+    return ecs_get(world, ecs_lookup(world, CONSOLE_INPUT ".before"), Text)->value;
+}
+
+void Console_paste_shortcut(void) {
+    // widgets/clipboard_cursor
+    ecs_world_t *world = console_paste_world(true);
+    ecs_entity_t t = box_terminal_new(world);
+    ecs_os_free(box_terminal_run(world, t, "clipboard.set echo pasted", NULL));
+    box_input_key(world, KeyCtrlLeft, true);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_input_key_press(world, KeyV, 1);
+    box_input_key(world, KeyCtrlLeft, false);
+    ecs_progress(world, 0);
+    test_assert(ecs_singleton_get(world, Input)->paste == NULL);
+    while (box_input_pending(world)) {
+        ecs_progress(world, 0);
+    }
+
+    ecs_progress(world, 0);
+    test_str(console_paste_line(world), "echo pasted");
+    test_bool(ecs_singleton_get(world, Console)->open, true);
+
+    box_input_key_press(world, KeyEnter, 1);
+    while (box_input_pending(world)) {
+        ecs_progress(world, 0);
+    }
+
+    ecs_progress(world, 0);
+    test_str(console_paste_line(world), "");
+
+    ecs_fini(world);
+}
+
+void Console_paste_platform_event(void) {
+    // widgets/clipboard_cursor
+    ecs_world_t *world = console_paste_world(true);
+    box_input_key_type(world, "ab", 1);
+    while (box_input_pending(world)) {
+        ecs_progress(world, 0);
+    }
+
+    box_input_platform_push(world, &(InputEvent){
+        .kind = InputPaste, .text = " gr\xc3\xbc\xc3\x9f" });
+    ecs_progress(world, 0);
+    test_assert(ecs_singleton_get(world, Input)->paste == NULL);
+    ecs_progress(world, 0);
+    test_str(console_paste_line(world), "ab gr\xc3\xbc\xc3\x9f");
+
+    ecs_fini(world);
+}
+
+void Console_paste_drops_line_breaks(void) {
+    // widgets/clipboard_cursor
+    ecs_world_t *world = console_paste_world(true);
+    box_input_paste(world, "one\ntwo\r\n\tthree");
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_str(console_paste_line(world), "onetwothree");
+
+    ecs_fini(world);
+}
+
+void Console_paste_closed_not_taken(void) {
+    // widgets/clipboard_cursor
+    ecs_world_t *world = console_paste_world(false);
+    box_input_paste(world, "for the game");
+    ecs_progress(world, 0);
+    test_bool(ecs_singleton_get(world, Console)->open, false);
+    test_str(ecs_singleton_get(world, Input)->paste, "for the game");
+
+    ecs_fini(world);
+}

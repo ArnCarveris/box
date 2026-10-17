@@ -85,6 +85,12 @@ typedef struct InputDevice {
     bool capture_applied;          /**< The backend was asked to capture the cursor */
     bool blocked[3];               /**< The last press of a mouse button hit a blocking element */
     bool has_position;             /**< A cursor position arrived since focus or release */
+    bool held[BOX_KEY_COUNT];      /**< Keys held by the applied events, which writes to
+                                    *   Input.keys from outside (the console) do not change */
+    char *clipboard;               /**< In memory clipboard, the last text set or pasted by the
+                                    *   platform, NULL for none */
+    PointerCursor cursor;          /**< Shape of the pointer cursor shown */
+    PointerCursor cursor_applied;  /**< Shape the backend was last told */
 } InputDevice;
 
 extern ECS_COMPONENT_DECLARE(InputDevice);
@@ -132,6 +138,33 @@ InputDevice* box_input_device(
 void box_input_platform_source(
     ecs_world_t *world,
     ecs_entity_t surface);
+
+/** Free the text of the events of a queue and empty it.
+ *
+ * @param events The InputEvent queue
+ */
+void box_input_events_clear(
+    ecs_vec_t *events);
+
+/** Set the shape of the pointer cursor, telling the backend when it changed.
+ *
+ * box.picking sets it once per frame from the Cursor of the element under the cursor.
+ *
+ * @param world The world
+ * @param shape The shape, an invalid shape is the default
+ */
+void box_input_cursor_shape(
+    ecs_world_t *world,
+    PointerCursor shape);
+
+/** Tell the backend the shape of the pointer cursor when it is not the one it was last told.
+ *
+ * @param world The world
+ * @param dev The device state
+ */
+void box_input_cursor_sync(
+    ecs_world_t *world,
+    InputDevice *dev);
 
 /** Ask the backend to release a cursor it was asked to capture.
  *

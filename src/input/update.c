@@ -46,6 +46,9 @@ static void box_input_frame_begin(
         in->text[0] = '\0';
     }
 
+    ecs_os_free(in->paste);
+    in->paste = NULL;
+
     in->mouse.delta[0] = in->mouse.delta[1] = 0;
     in->mouse.scroll[0] = in->mouse.scroll[1] = 0;
 }
@@ -191,6 +194,7 @@ static void box_input_key_down(
     held = state->down;
     state->pressed = state->pressed || !held;
     state->down = true;
+    dev->held[key] = true;
     if (!held || (repeat && box_input_key_value(key))) {
         box_input_emit_key(dev, in, key, true, held);
     }
@@ -210,6 +214,10 @@ static void box_input_key_up(
     Input *in,
     Key key)
 {
+    if (key > KeyNone && key < BOX_KEY_COUNT) {
+        dev->held[key] = false;
+    }
+
     if (key > KeyNone && key < BOX_KEY_COUNT && in->keys[key].down) {
         in->keys[key].down = false;
         in->keys[key].released = true;
@@ -246,6 +254,60 @@ static void box_input_text(
     if (code > 0) {
         memcpy(ecs_vec_grow_t(NULL, &dev->text, char, size), utf8, (size_t)size);
     }
+}
+
+/** Append pasted text to Input.paste, each maximal subpart of an ill formed sequence as U+FFFD.
+ *
+ * @param in The Input singleton
+ * @param text UTF-8 text, nothing is pasted for NULL or empty text
+ */
+static void box_input_paste_text(
+    Input *in,
+    const char *text)
+{
+    const char *cur = text;
+    ecs_strbuf_t buf = ECS_STRBUF_INIT;
+    char utf8[4];
+    if (!text || !text[0]) {
+        goto done;
+    }
+
+    if (in->paste) {
+        ecs_strbuf_appendstr(&buf, in->paste);
+    }
+
+    while (cur[0]) {
+        int32_t size = box_utf8_encode(box_utf8_next(&cur), utf8);
+        ecs_strbuf_appendstrn(&buf, utf8, size);
+    }
+
+    ecs_os_free(in->paste);
+    in->paste = ecs_strbuf_get(&buf);
+done:
+    return;
+}
+
+/** Check whether a key event is the paste shortcut: V going down or repeating while control,
+ * or command on macOS, is held without alt, which AltGr layouts press with control.
+ *
+ * The keys held are those of the applied events, so a console that clears Input.keys while it
+ * is open still pastes.
+ *
+ * @param dev The device state, before the key goes down
+ * @param ev The key down event
+ * @return Whether the event pastes
+ */
+static bool box_input_paste_shortcut(
+    const InputDevice *dev,
+    const InputEvent *ev)
+{
+    bool ctrl = dev->held[KeyCtrlLeft] || dev->held[KeyCtrlRight];
+#ifdef __APPLE__
+    ctrl = ctrl || dev->held[KeySuperLeft] || dev->held[KeySuperRight];
+#endif
+
+    return ev->key == KeyV && (!dev->held[KeyV] || ev->repeat) && ctrl &&
+        !dev->held[KeyAltLeft] && !dev->held[KeyAltRight];
 }
 
 /** Move the cursor, adding the movement to the delta of the frame.
@@ -453,10 +515,16 @@ static void box_input_apply(
     const InputEvent *ev,
     bool synthetic)
 {
+    bool paste;
     switch (ev->kind) {
     case InputKeyDown:
+        paste = box_input_paste_shortcut(dev, ev) && (synthetic || !dev->backend.clipboard_set);
         box_input_press_block(world, dev, in, ev->key);
         box_input_key_down(dev, in, ev->key, ev->repeat);
+        if (paste) {
+            box_input_paste_text(in, box_input_clipboard_get(world));
+        }
+
         break;
     case InputKeyUp:
         box_input_key_up(dev, in, ev->key);
@@ -506,6 +574,14 @@ static void box_input_apply(
         }
 
         in->mouse.captured = ev->code != 0 && dev->capture_applied;
+        break;
+    case InputPaste:
+        if (!synthetic && ev->text && ev->text[0]) {
+            ecs_os_free(dev->clipboard);
+            dev->clipboard = ecs_os_strdup(ev->text);
+        }
+
+        box_input_paste_text(in, ev->text);
         break;
     }
 }
@@ -567,7 +643,7 @@ static void box_input_apply_platform(
         }
     }
 
-    ecs_vec_clear(&dev->platform);
+    box_input_events_clear(&dev->platform);
 }
 
 /** Apply the synthetic events that are due, in order, up to the first one that waits.
@@ -590,6 +666,7 @@ static void box_input_apply_queue(
         }
 
         box_input_apply(world, dev, in, &events[i], true);
+        ecs_os_free(events[i].text);
     }
 
     if (i > 0) {

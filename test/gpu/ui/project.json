@@ -162,7 +162,11 @@
                     "panel_keeps_fraction_with_long_text",
                     "null_text",
                     "cursor_ill_formed",
-                    "caret_steps_match_glyphs"
+                    "caret_steps_match_glyphs",
+                    "paste_shortcut",
+                    "paste_platform_event",
+                    "paste_drops_line_breaks",
+                    "paste_closed_not_taken"
                 ]
             },
             {

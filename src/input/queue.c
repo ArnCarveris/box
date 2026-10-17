@@ -97,6 +97,7 @@ void box_input_platform_push(
     *ev = *event;
     ev->delay = 0;
     ev->surface = ev->surface ? ev->surface : dev->source;
+    ev->text = event->text ? ecs_os_strdup(event->text) : NULL;
 }
 
 void box_input_platform_source(
@@ -114,6 +115,7 @@ void box_input_queue(
     InputEvent *ev = ecs_vec_append_t(NULL, &dev->queue, InputEvent);
     *ev = *event;
     ev->delay = ev->delay > 0 ? ev->delay : 0;
+    ev->text = event->text ? ecs_os_strdup(event->text) : NULL;
 }
 
 void box_input_key(
@@ -252,8 +254,8 @@ void box_input_reset(
     ecs_world_t *world)
 {
     InputDevice *dev = box_input_device(world);
-    ecs_vec_clear(&dev->platform);
-    ecs_vec_clear(&dev->queue);
+    box_input_events_clear(&dev->platform);
+    box_input_events_clear(&dev->queue);
     box_input_queue(world, &(InputEvent){ .kind = InputReset });
 }
 

@@ -1,6 +1,7 @@
 /**
  * @file command/cmd_input.c
- * @brief Input commands: key, mouse, input and action commands that feed the synthetic queue.
+ * @brief Input commands: key, mouse, input and action commands that feed the synthetic queue,
+ * and the clipboard commands.
  */
 
 #include "command.h"
@@ -675,6 +676,45 @@ static void box_cmd_input_wait(
     }
 }
 
+/** The clipboard.set command: put the rest of the line on the clipboard.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The session and the text
+ * @param result Receives the output
+ */
+static void box_cmd_clipboard_set(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_value_t *result)
+{
+    (void)argc;
+    if (!box_cmd_input_ready(ctx, result)) {
+        box_input_clipboard_set(ctx->world, box_cmd_input_str(argv, 1));
+    }
+}
+
+/** The clipboard.get command: print the text on the clipboard.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The session
+ * @param result Receives the output
+ */
+static void box_cmd_clipboard_get(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_value_t *result)
+{
+    (void)argc;
+    (void)argv;
+    if (!box_cmd_input_ready(ctx, result)) {
+        *(char**)result->ptr = ecs_os_strdup(box_input_clipboard_get(ctx->world));
+    }
+}
+
 /** The action.press command: hold an action for dur frames, one when omitted.
  *
  * @param ctx The call context
@@ -1035,6 +1075,19 @@ void box_cmd_input_init(
         .name = "input.wait",
         .brief = "Frames until the input queue is drained, 0 when it is; repeat until 0",
         .callback = box_cmd_input_wait
+    });
+
+    box_command_register(world, &(box_command_desc_t){
+        .name = "clipboard.set",
+        .brief = "Put the rest of the line on the clipboard, which the paste shortcut pastes",
+        .params = {{ .name = "text", .type = ecs_id(ecs_string_t), .rest = true }},
+        .callback = box_cmd_clipboard_set
+    });
+
+    box_command_register(world, &(box_command_desc_t){
+        .name = "clipboard.get",
+        .brief = "Print the text on the clipboard, of the platform or in memory",
+        .callback = box_cmd_clipboard_get
     });
 
     box_cmd_input_action_cmds(world);

@@ -5,6 +5,8 @@
  * box.input hands every event of a frame to the router of this module, which sends them in
  * order in PreUpdate, picking what the last frame placed, so handlers act before the layout.
  * The ActionTriggers of the delivered events reach the actions in the next ActionUpdate.
+ *
+ * The Cursor on the path of the target sets the pointer cursor shape once per frame.
  */
 
 #define BOX_PICKING_IMPL
@@ -168,6 +170,33 @@ static void box_pick_tag(
     }
 }
 
+/** Find the shape of the pointer cursor over a pick: the Cursor of the first entity on the path
+ * from its target to its handler.
+ *
+ * @param world The world
+ * @param st The module state
+ * @param pick The pick
+ * @return The shape, CursorDefault when no entity on the path has a Cursor
+ */
+static PointerCursor box_pick_shape(
+    const ecs_world_t *world,
+    const box_pick_state_t *st,
+    const box_pick_t *pick)
+{
+    ecs_entity_t chain[BOX_PICK_CHAIN_MAX];
+    int32_t i, count = pick->target ? box_pick_chain(world, st, pick, chain) : 0;
+    PointerCursor result = CursorDefault;
+    for (i = 0; i < count && ecs_is_alive(world, chain[i]); i ++) {
+        const Cursor *c = ecs_get(world, chain[i], Cursor);
+        if (c) {
+            result = c->shape;
+            break;
+        }
+    }
+
+    return result;
+}
+
 /** Publish a pick in PickStatus, Hovered and Pressed.
  *
  * @param world The world
@@ -203,6 +232,7 @@ static void box_pick_publish(
     status.distance = pick->hit_distance;
     status.cursor[0] = cursor[0];
     status.cursor[1] = cursor[1];
+    status.shape = box_pick_shape(world, st, pick);
     glm_vec3_copy(ECS_CONST_CAST(float*, pick->hit_point), status.point);
     box_pick_tag(world, Hovered, st->hovered, pick->target);
     box_pick_tag(world, Pressed, st->pressed, pressed);
@@ -438,6 +468,8 @@ void BoxPickingUpdate(
     if (!pointer && st->has_cursor) {
         box_pick_refresh(world, st);
     }
+
+    box_input_cursor_shape(world, ecs_singleton_get(world, PickStatus)->shape);
 }
 
 /** Suspend a task until the wheel moves over the entity of the argument.
@@ -508,6 +540,7 @@ void BoxPickingImport(
     ECS_TAG_DEFINE(world, Pressed);
     ECS_META_COMPONENT(world, ActionTriggerMode);
     ECS_META_COMPONENT(world, ActionTrigger);
+    ECS_META_COMPONENT(world, Cursor);
     ECS_META_COMPONENT(world, PickStatus);
     ECS_COMPONENT_DEFINE(world, PickingState);
     ecs_set_hooks(world, PickingState, {

@@ -146,6 +146,24 @@
                     "without_text",
                     "font_not_loaded"
                 ]
+            },
+            {
+                "id": "Cursor",
+                "testcases": [
+                    "script_component",
+                    "follows_element",
+                    "bubbles_from_child",
+                    "nearest_cursor_wins",
+                    "not_above_handler",
+                    "default_over_nothing",
+                    "default_without_cursor",
+                    "stays_on_capture",
+                    "returns_after_capture",
+                    "component_changed",
+                    "component_removed",
+                    "platform_called_on_changes",
+                    "captured_keeps_shape"
+                ]
             }
         ]
     }

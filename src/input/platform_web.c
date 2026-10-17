@@ -4,6 +4,10 @@
  *
  * Keys, buttons, the wheel and focus come from the canvas, cursor moves and button releases
  * from the page so a drag continues outside it. The cursor is reported in surface points.
+ *
+ * The page pastes with its own shortcuts; the paste events of the canvas are collected in the
+ * page and pushed by the poll. The clipboard is written with navigator.clipboard.writeText and
+ * the cursor shape is the CSS cursor of the canvas.
  */
 
 #include "input.h"
@@ -51,6 +55,84 @@ EM_JS(void, box_web_canvas_point, (double x, double y, float *out), {
     var h = Math.max(c.height, 1) * s;
     HEAPF32[out >> 2] = w > 0 ? (x - r.left - (r.width - w) / 2) / w : 0;
     HEAPF32[(out >> 2) + 1] = h > 0 ? (y - r.top - (r.height - h) / 2) / h : 0;
+});
+
+/** Start or stop collecting the text of the paste events of the canvas, and the writes the
+ * browser refuses, in the page.
+ *
+ * @param on Whether to collect them
+ */
+EM_JS(void, box_web_paste_listen, (bool on), {
+    var c = document.querySelector('#canvas');
+    if (Module.boxPasteListener) {
+        c.removeEventListener('paste', Module.boxPasteListener);
+        Module.boxPasteListener = null;
+    }
+
+    Module.boxPastes = [];
+    Module.boxClipboardRefused = 0;
+    if (on) {
+        Module.boxPasteListener = function(e) {
+            var text = e.clipboardData ? e.clipboardData.getData('text/plain') : "";
+            e.preventDefault();
+            if (text) {
+                Module.boxPastes.push(new TextEncoder().encode(text));
+            }
+        };
+        c.addEventListener('paste', Module.boxPasteListener);
+    }
+});
+
+/** Get the size of the oldest paste the page collected.
+ *
+ * @return Bytes of its UTF-8 text, -1 when there is none
+ */
+EM_JS(int, box_web_paste_size, (void), {
+    return Module.boxPastes && Module.boxPastes.length ? Module.boxPastes[0].length : -1;
+});
+
+/** Take the oldest paste the page collected.
+ *
+ * @param out Receives its UTF-8 text, box_web_paste_size bytes
+ */
+EM_JS(void, box_web_paste_take, (char *out), {
+    HEAPU8.set(Module.boxPastes.shift(), out);
+});
+
+/** Write text to the clipboard with navigator.clipboard.writeText. The browser refuses it
+ * without a user activation or outside a secure context, which the page counts.
+ *
+ * @param text UTF-8 text
+ * @param size Bytes of the text
+ */
+EM_JS(void, box_web_clipboard_write, (const char *text, int size), {
+    var refused = function() { Module.boxClipboardRefused = (Module.boxClipboardRefused | 0) + 1; };
+    var str = new TextDecoder().decode(HEAPU8.slice(text, text + size));
+    if (!navigator.clipboard || !navigator.clipboard.writeText) {
+        refused();
+    } else {
+        navigator.clipboard.writeText(str).catch(refused);
+    }
+});
+
+/** Take the number of clipboard writes the browser refused since the last call.
+ *
+ * @return The count
+ */
+EM_JS(int, box_web_clipboard_refused, (void), {
+    var n = Module.boxClipboardRefused | 0;
+    Module.boxClipboardRefused = 0;
+    return n;
+});
+
+/** Set the CSS cursor of the canvas.
+ *
+ * @param shape The PointerCursor
+ */
+EM_JS(void, box_web_cursor_css, (int shape), {
+    var names = ['default', 'pointer', 'text', 'crosshair', 'ew-resize', 'ns-resize', 'move',
+        'not-allowed'];
+    document.querySelector('#canvas').style.cursor = names[shape] || 'default';
 });
 
 /** Start pushing the events of the canvas: its surface is stamped on them.
@@ -302,6 +384,63 @@ static bool box_web_capture(
     return captured && web->pointer.locked;
 }
 
+/** Put text on the clipboard, the clipboard_set callback of the backend.
+ *
+ * @param world The world
+ * @param text UTF-8 text
+ * @param ctx The backend state
+ */
+static void box_web_clipboard_set(
+    ecs_world_t *world,
+    const char *text,
+    void *ctx)
+{
+    (void)world;
+    (void)ctx;
+    box_web_clipboard_write(text, (int)strlen(text));
+}
+
+/** Show a cursor shape over the canvas, the cursor callback of the backend. The pointer lock
+ * hides it while the cursor is captured.
+ *
+ * @param world The world
+ * @param shape The shape
+ * @param ctx The backend state
+ */
+static void box_web_cursor(
+    ecs_world_t *world,
+    PointerCursor shape,
+    void *ctx)
+{
+    (void)world;
+    (void)ctx;
+    box_web_cursor_css((int)shape);
+}
+
+/** Push the pastes the page collected since the last poll, and log the clipboard writes the
+ * browser refused.
+ *
+ * @param web The backend state
+ */
+static void box_web_pastes(
+    box_web_t *web)
+{
+    int size;
+    char *text;
+    if (box_web_clipboard_refused()) {
+        ecs_dbg("box.input: the browser refused to write the clipboard");
+    }
+
+    while ((size = box_web_paste_size()) >= 0) {
+        text = ecs_os_malloc(size + 1);
+        box_web_paste_take(text);
+        text[size] = '\0';
+        box_input_platform_push(web->world, &(InputEvent){
+            .kind = InputPaste, .text = text, .surface = web->surface });
+        ecs_os_free(text);
+    }
+}
+
 /** Register or, with NULL state, remove the callbacks of the backend.
  *
  * @param web The backend state, NULL to remove the callbacks
@@ -322,6 +461,7 @@ static void box_web_callbacks(
         web ? box_web_lock : NULL);
     emscripten_set_pointerlockerror_callback(EMSCRIPTEN_EVENT_TARGET_DOCUMENT, web, false,
         web ? box_web_lock_error : NULL);
+    box_web_paste_listen(web != NULL);
 }
 
 /** Follow the canvas to another surface once its surface is gone: the first surface without a
@@ -377,6 +517,7 @@ static void box_web_poll(
     }
 
     box_web_follow(world, web);
+    box_web_pastes(web);
     s = web->status && web->surface && ecs_is_alive(world, web->surface) ?
         ecs_get_id(world, web->surface, web->status) : NULL;
     if (!s) {
@@ -396,7 +537,8 @@ done:
     return;
 }
 
-/** Remove the callbacks, exit or cancel the pointer lock and release the backend state.
+/** Remove the callbacks, exit or cancel the pointer lock, show the default cursor and release
+ * the backend state.
  *
  * @param ctx The backend state
  */
@@ -406,6 +548,7 @@ static void box_web_free(
     box_web_t *web = ctx;
     box_web_callbacks(NULL);
     emscripten_exit_pointerlock();
+    box_web_cursor_css((int)CursorDefault);
 
     ecs_os_free(ctx);
 }
@@ -437,7 +580,12 @@ void box_input_web_attach(
     web->surface = surface;
     box_web_callbacks(web);
     box_input_platform_set(world, &(box_input_platform_t){
-        .poll = box_web_poll, .free = box_web_free, .capture = box_web_capture, .ctx = web });
+        .poll = box_web_poll,
+        .free = box_web_free,
+        .capture = box_web_capture,
+        .clipboard_set = box_web_clipboard_set,
+        .cursor = box_web_cursor,
+        .ctx = web });
 
 done:
     return;

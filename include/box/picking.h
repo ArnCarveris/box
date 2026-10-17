@@ -84,6 +84,20 @@ ECS_STRUCT(ActionTrigger, {
     Key button;             /**< Mouse button, KeyMouseLeft by default; KeyNone does nothing */
 });
 
+/** The shape of the pointer cursor over an element, such as Cursor: {shape: CursorPointer}.
+ *
+ * The shape is that of the first entity with a Cursor on the bubbling path of PickStatus.target,
+ * from it up to its handler; that is the captured entity wherever the cursor is, until the frame
+ * after the release that ends the capture, like Hovered. PickStatus.shape reports it.
+ *
+ * Without a Cursor on the path, and over nothing that handles pointer events, the default shows.
+ * box.input tells the platform when the shape changes: a glfw standard cursor natively, the CSS
+ * cursor of the canvas in the browser. A captured cursor stays hidden until the capture ends.
+ */
+ECS_STRUCT(Cursor, {
+    PointerCursor shape; /**< Shape over the element, CursorDefault by default */
+});
+
 /** What the cursor picked, a singleton written by the engine and read only for applications */
 ECS_STRUCT(PickStatus, {
     ecs_entity_t target;  /**< Entity the pointer events go to, 0 for box.input.screen */
@@ -97,6 +111,7 @@ ECS_STRUCT(PickStatus, {
     vec2 cursor;          /**< Cursor in window points the pick was made at */
     ecs_entity_t captured; /**< Entity that captured the pointer with a press, 0 for none */
     vec2 drag;            /**< Cursor movement since the press while captured, else 0 */
+    PointerCursor shape;  /**< Shape of the pointer cursor, from the Cursor on the path of target */
 });
 
 /** Register the box.picking module.

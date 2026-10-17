@@ -324,6 +324,17 @@
                     "script_call",
                     "listed_and_script_function"
                 ]
+            },
+            {
+                "id": "Clipboard",
+                "testcases": [
+                    "set_get",
+                    "set_spaces",
+                    "get_empty",
+                    "set_missing_text",
+                    "paste_shortcut",
+                    "utf8"
+                ]
             }
         ]
     }

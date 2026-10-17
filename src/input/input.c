@@ -27,8 +27,11 @@ static void box_input_device_dtor(
             dev[i].backend.free(dev[i].backend.ctx);
         }
 
+        box_input_events_clear(&dev[i].platform);
+        box_input_events_clear(&dev[i].queue);
         ecs_vec_fini_t(NULL, &dev[i].platform, InputEvent);
         ecs_vec_fini_t(NULL, &dev[i].queue, InputEvent);
+        ecs_os_free(dev[i].clipboard);
         ecs_vec_fini_t(NULL, &dev[i].emits, box_input_emit_t);
         ecs_vec_fini_t(NULL, &dev[i].holds, box_input_hold_t);
         ecs_vec_fini_t(NULL, &dev[i].text, char);
@@ -57,8 +60,10 @@ void box_input_platform_set(
     }
 
     ecs_os_zeromem(&dev->backend);
+    dev->cursor_applied = CursorDefault;
     if (platform) {
         dev->backend = *platform;
+        box_input_cursor_sync(world, dev);
     }
 }
 
@@ -102,6 +107,7 @@ void BoxInputImport(
     ECS_META_COMPONENT(world, Key);
     ECS_META_COMPONENT(world, KeyState);
     ECS_META_COMPONENT(world, InputEventKind);
+    ECS_META_COMPONENT(world, PointerCursor);
     ECS_META_COMPONENT(world, InputEvent);
     ECS_META_COMPONENT(world, Mouse);
     ECS_META_COMPONENT(world, Input);
@@ -112,7 +118,7 @@ void BoxInputImport(
     ECS_META_COMPONENT(world, ActionEvent);
     ECS_COMPONENT_DEFINE(world, InputDevice);
 
-    box_owned_hooks(world, Input, BOX_OWNED_STR(Input, text));
+    box_owned_hooks(world, Input, BOX_OWNED_STR(Input, text), BOX_OWNED_STR(Input, paste));
     ecs_set_hooks(world, InputDevice, {
         .ctor = flecs_default_ctor,
         .dtor = box_input_device_dtor,

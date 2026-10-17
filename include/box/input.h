@@ -75,7 +75,20 @@ ECS_ENUM(InputEventKind, {
     InputActionDown, /**< A synthetic hold of an action starts */
     InputActionUp,   /**< A synthetic hold of an action ends */
     InputCapture,    /**< Sets Input.capture to code, a platform sends 0 when it ends a capture */
-    InputCaptured    /**< The platform took (code 1) or let go (code 0) of the cursor */
+    InputCaptured,   /**< The platform took (code 1) or let go (code 0) of the cursor */
+    InputPaste       /**< Text was pasted, the UTF-8 text of the event goes to Input.paste */
+});
+
+/** Shape of the pointer cursor, which the platform shows over the window */
+ECS_ENUM(PointerCursor, {
+    CursorDefault,   /**< The arrow of the platform */
+    CursorPointer,   /**< A hand, over something that can be clicked */
+    CursorText,      /**< An I-beam, over text that can be selected or edited */
+    CursorCrosshair, /**< A crosshair, for picking a point */
+    CursorResizeH,   /**< A horizontal double arrow, for resizing left and right */
+    CursorResizeV,   /**< A vertical double arrow, for resizing up and down */
+    CursorMove,      /**< Arrows in four directions, for moving something */
+    CursorNotAllowed /**< A crossed circle, for an action that is not possible */
 });
 
 /** One device event, pushed by the platform or queued as synthetic input */
@@ -89,6 +102,8 @@ ECS_STRUCT(InputEvent, {
     int32_t delay;       /**< Frames a synthetic event waits after the one before it */
     ecs_entity_t action; /**< Action of an action event */
     ecs_entity_t surface; /**< Surface whose window sent a platform event, 0 for any surface */
+    char *text;          /**< UTF-8 text of a paste event, copied when the event is pushed or
+                          *   queued */
 });
 
 /** Cursor and wheel state of the current frame */
@@ -106,12 +121,18 @@ ECS_STRUCT(Mouse, {
  * The application sets capture to capture the cursor while input is focused, through glfw's
  * disabled cursor with raw motion natively and Pointer Lock in the browser, which grants it at
  * the next click or key; mouse.captured says when the platform holds it.
+ *
+ * Input.paste holds the text of the InputPaste events of the frame, which the paste shortcut
+ * produces (see box_input_clipboard_set for which pastes where). Copy and cut are left to the
+ * widgets, such as the text field.
  */
 ECS_STRUCT(Input, {
     KeyState keys[104]; /**< State of every key and mouse button, indexed by Key */
     Mouse mouse;        /**< Cursor and wheel state */
     char *text;         /**< Text typed this frame as UTF-8, owned, NULL for none; invalid
                          *   code points are typed as U+FFFD */
+    char *paste;        /**< Text pasted this frame as UTF-8, owned, NULL for none; ill formed
+                         *   sequences are pasted as U+FFFD, pastes of one frame are joined */
     vec2 size;          /**< Window size in points, 0 until a resize event */
     bool focused;       /**< Platform input is applied, false ignores it */
     ecs_entity_t surface; /**< Surface with the input focus, 0 until one gains it */
@@ -180,11 +201,55 @@ typedef bool (*box_input_capture_t)(
     bool captured,
     void *ctx);
 
-/** Backend that feeds real device input, such as glfw or the browser */
+/** Put text on the clipboard of the platform.
+ *
+ * The platform may refuse it, such as a browser without a user activation.
+ *
+ * @param world The world
+ * @param text UTF-8 text
+ * @param ctx The ctx of the backend
+ */
+typedef void (*box_input_clipboard_set_t)(
+    ecs_world_t *world,
+    const char *text,
+    void *ctx);
+
+/** Read the clipboard of the platform.
+ *
+ * @param world The world
+ * @param ctx The ctx of the backend
+ * @return UTF-8 text valid until the next call of the backend, NULL when it cannot be read
+ */
+typedef const char* (*box_input_clipboard_get_t)(
+    ecs_world_t *world,
+    void *ctx);
+
+/** Show a shape of the pointer cursor in the windows of a world.
+ *
+ * @param world The world
+ * @param shape The shape
+ * @param ctx The ctx of the backend
+ */
+typedef void (*box_input_cursor_shape_t)(
+    ecs_world_t *world,
+    PointerCursor shape,
+    void *ctx);
+
+/** Backend that feeds real device input, such as glfw or the browser.
+ *
+ * A backend with clipboard_set owns the clipboard: it pushes the InputPaste events of its paste
+ * shortcut itself. Without it the world keeps an in memory clipboard that the shortcut pastes.
+ */
 typedef struct box_input_platform_t {
     void (*poll)(ecs_world_t *world, void *ctx); /**< Pushes the OS events at frame start */
     void (*free)(void *ctx);                     /**< Releases ctx, NULL when not needed */
     box_input_capture_t capture;                 /**< Captures the cursor, NULL when it cannot */
+    box_input_clipboard_set_t clipboard_set;     /**< Writes the clipboard, NULL keeps it in
+                                                  *   memory */
+    box_input_clipboard_get_t clipboard_get;     /**< Reads the clipboard, NULL when it cannot be
+                                                  *   read outside a paste event */
+    box_input_cursor_shape_t cursor;             /**< Shows a cursor shape, NULL when it cannot;
+                                                  *   called when the shape changes */
     void *ctx;                                   /**< Backend state passed to the callbacks */
 } box_input_platform_t;
 
@@ -206,6 +271,8 @@ void BoxInputImport(
     ecs_world_t *world);
 
 /** Install the backend that feeds real device input, replacing and freeing the previous one.
+ *
+ * A new backend with a cursor callback is told the current shape unless it is the default.
  *
  * @param world The world
  * @param platform The backend, NULL to remove it
@@ -542,6 +609,51 @@ void box_input_action_drag(
     ecs_world_t *world,
     ecs_entity_t action,
     const box_input_sweep_t *drag);
+
+/** Put UTF-8 text on the clipboard of the platform, and the in memory clipboard of the world.
+ *
+ * Natively glfw writes it, and reads the clipboard when Ctrl+V, Ctrl+Shift+V or, on macOS, Cmd+V
+ * goes down in a window (never with Alt). The browser writes it with navigator.clipboard.writeText,
+ * which it may refuse without a user activation (logged at debug level).
+ *
+ * The browser pastes with its own shortcuts (Ctrl+V, Cmd+V on macOS, Shift+Insert, its menu) in
+ * the paste event of the canvas. Without a platform clipboard, as in headless runs and tests, the
+ * shortcut of glfw pastes the in memory text. A synthetic shortcut pastes box_input_clipboard_get.
+ *
+ * @param world The world
+ * @param text UTF-8 text, NULL clears the clipboard
+ */
+void box_input_clipboard_set(
+    ecs_world_t *world,
+    const char *text);
+
+/** Get the text on the clipboard: what the platform reads when it can, else the in memory
+ * clipboard, the last text set or pasted by the platform. The browser cannot read it outside
+ * a paste event.
+ *
+ * @param world The world
+ * @return UTF-8 text, empty when there is none, valid until the next clipboard call
+ */
+const char* box_input_clipboard_get(
+    ecs_world_t *world);
+
+/** Queue a paste of text, as if the platform pasted it.
+ *
+ * @param world The world
+ * @param text UTF-8 text, nothing is queued for NULL or empty text
+ */
+void box_input_paste(
+    ecs_world_t *world,
+    const char *text);
+
+/** Get the shape of the pointer cursor shown, which box.picking sets from the Cursor of the
+ * element under the cursor. It is tracked without a platform too.
+ *
+ * @param world The world
+ * @return The shape
+ */
+PointerCursor box_input_cursor_get(
+    ecs_world_t *world);
 
 /** Look up a key by its name, case insensitive.
  *

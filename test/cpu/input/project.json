@@ -7,6 +7,11 @@
             "box"
         ]
     },
+    "lang.c": {
+        "include": [
+            "../../../src/input"
+        ]
+    },
     "test": {
         "testsuites": [
             {
@@ -145,6 +150,48 @@
                     "dom_release_no_jump",
                     "dom_blur_keeps_request",
                     "dom_unwanted_lock"
+                ]
+            },
+            {
+                "id": "Clipboard",
+                "testcases": [
+                    "set_get",
+                    "set_null_clears",
+                    "get_empty",
+                    "paste_shortcut",
+                    "paste_lasts_one_frame",
+                    "paste_needs_ctrl",
+                    "paste_with_shift",
+                    "paste_not_with_alt",
+                    "paste_held_once",
+                    "paste_ctrl_earlier_frame",
+                    "paste_platform_keys",
+                    "paste_platform_repeat",
+                    "paste_platform_unfocused",
+                    "paste_event",
+                    "paste_event_updates_clipboard",
+                    "paste_queued",
+                    "paste_joined",
+                    "paste_empty_clipboard",
+                    "utf8_round_trip",
+                    "paste_ill_formed",
+                    "backend_set",
+                    "backend_get",
+                    "backend_shortcut_not_doubled",
+                    "backend_synthetic_shortcut",
+                    "backend_replaced_keeps_memory",
+                    "worlds_separate"
+                ]
+            },
+            {
+                "id": "PointerShape",
+                "testcases": [
+                    "default_shape",
+                    "headless_tracks",
+                    "platform_on_change",
+                    "invalid_shape",
+                    "new_backend_told",
+                    "new_backend_default_not_told"
                 ]
             }
         ]

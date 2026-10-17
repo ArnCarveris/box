@@ -285,7 +285,7 @@ ecs_id_t box_command_component(
 void box_cmd_script_init(
     ecs_world_t *world);
 
-/** Register the key, mouse, input and action commands.
+/** Register the key, mouse, input, clipboard and action commands.
  *
  * @param world The world
  */

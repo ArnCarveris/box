@@ -117,8 +117,9 @@ static void box_console_toggle_keys(
     }
 }
 
-/** Input was written: while the console is open, take the typed text, the key presses and the
- * wheel, and release every key and button but those of the toggle so no other action fires.
+/** Input was written: while the console is open, take the typed and pasted text, the key presses
+ * and the wheel, and release every key and button but those of the toggle so no other action
+ * fires.
  *
  * @param it Iterator over the Input singleton
  */
@@ -147,6 +148,13 @@ static void box_console_capture(
         in->text[0] = '\0';
     }
 
+    size = in->paste ? (int32_t)strlen(in->paste) : 0;
+    if (size) {
+        memcpy(ecs_vec_grow_t(NULL, &con->typed, char, size), in->paste, (size_t)size);
+    }
+
+    ecs_os_free(in->paste);
+    in->paste = NULL;
     con->wheel += in->mouse.scroll[1];
     in->mouse.scroll[0] = in->mouse.scroll[1] = 0;
 done:

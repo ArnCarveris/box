@@ -42,9 +42,9 @@ extern "C" {
  * the width and height fractions of the surface from the top left. It follows the surface when
  * it is resized. A fraction of zero or less is a panel of zero size, one or more fills the axis.
  *
- * While open, typed text and key presses go to the input line and no action other than the
- * toggle sees the keyboard or the mouse buttons. Enter runs the line, Up and Down walk the
- * lines that ran, Page Up, Page Down and the wheel scroll, Escape or the toggle close it.
+ * While open, typed and pasted text (Input.paste) and key presses go to the input line and no
+ * action but the toggle sees the keyboard or mouse buttons. Enter runs the line, Up and Down walk
+ * the lines that ran, Page Up, Page Down and the wheel scroll, Escape or the toggle close it.
  */
 ECS_STRUCT(Console, {
     bool open;           /**< Shown and taking the keyboard, the toggle action flips it */
