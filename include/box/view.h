@@ -102,7 +102,9 @@ ECS_STRUCT(Scene, {
  *
  * View gets a constructor that enables lighting, baked lighting, reflections and the
  * atmosphere, sets the environment intensity to 1 and the ShadowSettings defaults with shadows
- * disabled and enables culling with occlusion and a smallest size of one pixel. A C literal View starts from zero instead: unlit, drawing every instance.
+ * disabled and enables culling with occlusion and a smallest size of one pixel.
+ *
+ * A C literal View starts from zero instead: unlit, drawing every instance.
  *
  * @param world The world
  */

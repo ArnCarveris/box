@@ -6,7 +6,7 @@
  * demand by box_render_environment_handle, which views and sources call during RenderExtract.
  */
 
-#include "render.h"
+#include "environment.h"
 
 /** First handle of the cubemaps of environments */
 #define BOX_ENV_HANDLE_FIRST (1)

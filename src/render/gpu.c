@@ -6,7 +6,7 @@
  * resources of a packet and renders its targets, fini releases everything init created.
  */
 
-#include "gpu.h"
+#include "gpu_environment.h"
 
 #ifdef BOX_RENDER_WGPU
 

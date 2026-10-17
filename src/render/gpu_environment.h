@@ -1,0 +1,146 @@
+/**
+ * @file render/gpu_environment.h
+ * @brief Environment cubemaps of the webgpu backend and the passes of the EnvironmentImage
+ * source, only used on the thread that renders the packets.
+ */
+
+#ifndef BOX_RENDER_GPU_ENVIRONMENT_H
+#define BOX_RENDER_GPU_ENVIRONMENT_H
+
+#include "gpu.h"
+#include "environment.h"
+
+#ifdef BOX_RENDER_WGPU
+
+/** Format of the environment cubemaps, filterable and writable as a storage texture */
+#define BOX_GPU_ENVIRONMENT_FORMAT (WGPUTextureFormat_RGBA16Float)
+
+/** Face edge in texels of the last mip level of an environment cubemap at least */
+#define BOX_GPU_ENVIRONMENT_MIN_MIP (4)
+
+/** The cubemap of an environment source: 6 layers in WebGPU cube order, mip 0 written by the
+ * source and the levels above it down to BOX_GPU_ENVIRONMENT_MIN_MIP texels left to the
+ * processing of the environments */
+typedef struct box_gpu_environment_t {
+    WGPUTexture texture;            /**< The texture, BOX_GPU_ENVIRONMENT_FORMAT */
+    WGPUTextureView cube;           /**< Cube view of every mip level */
+    WGPUTextureView target;         /**< 2D array view of the 6 layers of mip 0 */
+    uint32_t resolution;            /**< Face edge of mip 0 in texels */
+    uint32_t filter;                /**< EnvironmentFilter of the mip levels */
+    uint32_t mips;                  /**< Mip levels */
+    int32_t written;                /**< Version the source last wrote, 0 while empty */
+    int32_t processed;              /**< Version the processing last ran for, 0 for none */
+} box_gpu_environment_t;
+
+/** Pipeline and images in flight of the EnvironmentImage conversion */
+typedef struct box_gpu_env_image_t box_gpu_env_image_t;
+
+/** Create the map of the environment cubemaps.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_environment_init(
+    box_gpu_t *gpu);
+
+/** Release the environment cubemaps and the conversion of environment images.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_environment_fini(
+    box_gpu_t *gpu);
+
+/** Create, update or release the cubemap of an environment from a BOX_RENDER_ENVIRONMENT
+ * resource; a create makes it empty, also over an existing handle.
+ *
+ * @param gpu The backend
+ * @param op What happens to the cubemap
+ * @param handle Handle of the cubemap
+ * @param desc The resolution and filter, NULL for a release
+ */
+void box_gpu_environment_apply(
+    box_gpu_t *gpu,
+    box_render_resource_op_t op,
+    uint32_t handle,
+    const box_render_environment_desc_t *desc);
+
+/** Get the cubemap of an environment.
+ *
+ * @param gpu The backend
+ * @param handle Handle of the cubemap
+ * @return The cubemap, NULL when the handle has none
+ */
+const box_gpu_environment_t* box_gpu_environment_get(
+    box_gpu_t *gpu,
+    uint32_t handle);
+
+/** Get the view a source writes the content of an environment into: a write only
+ * texture_storage_2d_array<rgba16float> of mip 0, 6 layers in WebGPU cube order, the texel
+ * directions of cube_direction in bake_sh.wgsl.
+ *
+ * @param gpu The backend
+ * @param handle Handle of the cubemap
+ * @param res Receives the texels per edge of a face, 0 without a cubemap
+ * @return The view, NULL when the handle has no cubemap
+ */
+WGPUTextureView box_gpu_environment_target(
+    box_gpu_t *gpu,
+    uint32_t handle,
+    uint32_t *res);
+
+/** Report that a source recorded the pass that writes new content into an environment, before
+ * box_gpu_environment_process runs.
+ *
+ * @param gpu The backend
+ * @param handle Handle of the cubemap
+ * @param version EnvironmentStatus.version of the content
+ */
+void box_gpu_environment_written(
+    box_gpu_t *gpu,
+    uint32_t handle,
+    int32_t version);
+
+/** Process the environments whose sources wrote new content, after the sources of a packet
+ * recorded their passes and before the captures and the targets.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+void box_gpu_environment_process(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
+
+/** Release the conversion of environment images.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_environment_image_fini(
+    box_gpu_t *gpu);
+
+/** Take the image of a BOX_RENDER_ENVIRONMENT_IMAGE resource into a texture that waits for its
+ * conversion, replacing an image of the handle that still waits.
+ *
+ * @param gpu The backend
+ * @param handle Handle of the cubemap the image is written into
+ * @param data The description followed by the texels
+ * @param size Bytes of data
+ */
+void box_gpu_environment_image_apply(
+    box_gpu_t *gpu,
+    uint32_t handle,
+    const void *data,
+    uint32_t size);
+
+/** Convert the images that wait into their cubemaps, as the reference environment source:
+ * each writes the target of its handle and reports it written. Images wait while the
+ * environment shader has no module; an image whose cubemap is gone is dropped.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+void box_gpu_environment_image_render(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
+
+#endif
+
+#endif

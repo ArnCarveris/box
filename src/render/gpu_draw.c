@@ -10,7 +10,7 @@
  * that renders the atmosphere of its scene draws the sky after its last opaque 3D mesh.
  */
 
-#include "gpu.h"
+#include "gpu_environment.h"
 #include <math.h>
 #include <string.h>
 

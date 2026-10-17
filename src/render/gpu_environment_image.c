@@ -5,7 +5,7 @@
  * cubemap, which is then reported written.
  */
 
-#include "gpu.h"
+#include "gpu_environment.h"
 
 #ifdef BOX_RENDER_WGPU
 

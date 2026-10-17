@@ -4,7 +4,7 @@
  * into the cubemap of their entity once per version, following the environment source contract.
  */
 
-#include "render.h"
+#include "environment.h"
 #include "../texture/texture.h"
 #include "../jobs/jobs.h"
 #include <math.h>

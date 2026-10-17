@@ -4,7 +4,7 @@
  */
 
 #define BOX_RENDER_IMPL
-#include "render.h"
+#include "environment.h"
 #include <stdlib.h>
 
 /** Whether the main thread renders by default: in the browser there is no render thread */

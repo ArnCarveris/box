@@ -8,7 +8,7 @@
 
 #define BOX_SHADER_IMPL
 #include "preprocess.h"
-#include "render.h"
+#include "environment.h"
 
 /** Engine side of a Shader: its handle, files and the code the backend last received */
 typedef struct box_shader_t {

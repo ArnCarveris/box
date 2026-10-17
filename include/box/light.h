@@ -179,9 +179,9 @@ ECS_STRUCT(EnvironmentStatus, {
  * Environment.
  *
  * Column u of the image is the longitude, row v the latitude: the center column looks along
- * -Z, the camera forward, the image goes toward +X to its right, its left and right edges look
- * along +Z, and the top row is +Y. Direction d is at u = 0.5 + atan2(d.x, -d.z) / 2 pi and
- * v = acos(d.y) / pi.
+ * -Z, the camera forward, the image goes toward +X to its right and its edges look along +Z.
+ *
+ * The top row is +Y: direction d is at u = 0.5 + atan2(d.x, -d.z) / 2 pi, v = acos(d.y) / pi.
  */
 ECS_STRUCT(EnvironmentImage, {
     char *path;           /**< Image file, relative to the working directory or an ancestor

@@ -4,7 +4,7 @@
  * processing that runs after the sources of a packet wrote new content.
  */
 
-#include "gpu.h"
+#include "gpu_environment.h"
 
 #ifdef BOX_RENDER_WGPU
 
