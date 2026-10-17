@@ -1,0 +1,100 @@
+{
+    "id": "ui",
+    "type": "application",
+    "value": {
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "lang.c": {
+        "include": [
+            "../../../src/render"
+        ]
+    },
+    "test": {
+        "testsuites": [
+            {
+                "id": "Layout",
+                "testcases": [
+                    "row_places_children",
+                    "column_places_children",
+                    "ordered_children",
+                    "row_spacing",
+                    "column_spacing",
+                    "padding",
+                    "fit_content",
+                    "fit_rect",
+                    "fit_circle",
+                    "fit_text",
+                    "fit_without_item",
+                    "fixed_size",
+                    "min_max",
+                    "grow_weighted",
+                    "grow_zero_weight",
+                    "grow_min_max",
+                    "grow_column",
+                    "grow_cross_axis",
+                    "grow_direction_none",
+                    "grow_fit_column_widest",
+                    "grow_content_is_minimum",
+                    "grow_never_below_text",
+                    "grow_without_content_min",
+                    "grow_cross_axis_keeps_content",
+                    "grow_zero_weight_keeps_content",
+                    "grow_script_keeps_content",
+                    "grow_follows_shrinking_parent",
+                    "grow_opted_out_descendant_keeps_content",
+                    "row_align",
+                    "column_align",
+                    "row_ignores_item_placement",
+                    "none_anchors",
+                    "none_keeps_position",
+                    "none_fit_content",
+                    "none_refits_moved_child",
+                    "none_refits_query_write",
+                    "child_leaving_tree_drops_layout_tag",
+                    "position_keeps_z",
+                    "position_owned",
+                    "rect_written",
+                    "rect_input_change",
+                    "nested",
+                    "transform_same_frame",
+                    "same_in_every_scene",
+                    "parent_component",
+                    "parent_reparent",
+                    "parent_reparent_to_plain_parent",
+                    "parent_reparent_to_deleted_parent",
+                    "parent_reparent_instance_child",
+                    "prefab_layout",
+                    "prefab_child_of_tree",
+                    "prefab_childof_and_slot",
+                    "add_remove_child",
+                    "reparent",
+                    "unchanged_tree_not_laid_out",
+                    "root_item",
+                    "script",
+                    "module_child_fini",
+                    "module_child_text_fini"
+                ]
+            },
+            {
+                "id": "Wrap",
+                "testcases": [
+                    "fixed_panel_grows_in_height",
+                    "panel_width_change_rewraps",
+                    "longest_word_is_minimum",
+                    "fixed_width_text",
+                    "fit_text_wraps_unless_newlines",
+                    "text_width_still_applies",
+                    "value_change_rewraps",
+                    "text_removed_drops_its_size",
+                    "leaving_the_tree_unwraps",
+                    "lines_align_in_the_box",
+                    "grow_paragraph_in_fit_card",
+                    "script_paragraph"
+                ]
+            }
+        ]
+    }
+}

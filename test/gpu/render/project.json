@@ -1,5 +1,5 @@
 {
-    "id": "render",
+    "id": "render_gpu",
     "type": "application",
     "value": {
         "public": false,
@@ -9,9 +9,9 @@
     },
     "lang.c": {
         "include": [
-            "../../src/render",
-            "../../src/geometry",
-            "../../src/spatial"
+            "../../../src/render",
+            "../../../src/geometry",
+            "../../../src/spatial"
         ]
     },
     "test": {
@@ -117,22 +117,6 @@
                     "gpu_error_in_status",
                     "gpu_error_in_include",
                     "gpu_error_after_directives"
-                ]
-            },
-            {
-                "id": "Camera",
-                "testcases": [
-                    "perspective_near_is_one",
-                    "perspective_infinite_far",
-                    "perspective_finite_far",
-                    "perspective_defaults",
-                    "perspective_aspect_follows_surface",
-                    "aspect_ratio_overrides_surface",
-                    "ortho_near_far",
-                    "ortho_default_far",
-                    "ortho_height",
-                    "ortho_default_height",
-                    "ortho_scale"
                 ]
             },
             {

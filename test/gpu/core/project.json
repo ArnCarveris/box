@@ -1,0 +1,36 @@
+{
+    "id": "core_gpu",
+    "type": "application",
+    "value": {
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "lang.c": {
+        "include": [
+            "../../../src/app",
+            "../../../src/jobs",
+            "../../../src/render"
+        ]
+    },
+    "test": {
+        "testsuites": [
+            {
+                "id": "Hooks",
+                "testcases": [
+                    "app",
+                    "app_status",
+                    "action",
+                    "mesh3",
+                    "terminal",
+                    "terminal_status",
+                    "texture_path",
+                    "surface",
+                    "view",
+                    "owning_components_have_hooks"
+                ]
+            }
+        ]
+    }
+}

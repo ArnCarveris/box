@@ -7,8 +7,8 @@
 #include <box.h>
 #include <bake_test.h>
 #include <math.h>
-#include "../../../src/geometry/mesh_cache.h"
-#include "../../../src/jobs/jobs.h"
+#include "../../../../src/geometry/mesh_cache.h"
+#include "../../../../src/jobs/jobs.h"
 #include "render.h"
 
 #define STB_IMAGE_IMPLEMENTATION

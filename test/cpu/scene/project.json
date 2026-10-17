@@ -9,35 +9,12 @@
     },
     "lang.c": {
         "include": [
-            "../../src/render",
-            "../../src/spatial"
+            "../../../src/render",
+            "../../../src/spatial"
         ]
     },
     "test": {
         "testsuites": [
-            {
-                "id": "Projection",
-                "testcases": [
-                    "perspective",
-                    "offset",
-                    "orthographic",
-                    "surface_size",
-                    "surface_points",
-                    "anchor_in_ui_scene",
-                    "follows_target_same_frame",
-                    "follows_camera",
-                    "subtree_same_frame",
-                    "dynamic_anchor",
-                    "behind_camera_hidden",
-                    "off_screen_hidden",
-                    "shown_again",
-                    "missing_view_hidden",
-                    "deleted_target_hidden",
-                    "from_script",
-                    "drawn_at_projection",
-                    "transformed_once_per_frame"
-                ]
-            },
             {
                 "id": "Spatial",
                 "testcases": [

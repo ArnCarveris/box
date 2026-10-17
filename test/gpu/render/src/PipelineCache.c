@@ -205,7 +205,7 @@ void PipelineCache_shader_reload_redraws_every_state(void) {
 
     stbi_image_free(px);
 
-    int32_t root = (int32_t)(strstr(__FILE__, "test/render/src/") - __FILE__);
+    int32_t root = (int32_t)(strstr(__FILE__, "test/gpu/render/src/") - __FILE__);
     char *mesh = flecs_asprintf("%s/magenta_mesh.wgsl", tmp);
     char *shape = flecs_asprintf("%s/magenta_shape2d.wgsl", tmp);
     FILE *f = fopen(mesh, "w");

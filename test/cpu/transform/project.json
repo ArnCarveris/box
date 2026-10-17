@@ -9,7 +9,7 @@
     },
     "lang.c": {
         "include": [
-            "../../src/transform"
+            "../../../src/transform"
         ]
     },
     "test": {

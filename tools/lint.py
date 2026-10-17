@@ -10,7 +10,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_PATHS = ["include", "src", "apps", "test", "bench"]
-LEGACY = ["test/transform"]
+LEGACY = ["test/cpu/transform"]
 EXTENSIONS = (".c", ".h", ".m")
 BAKE_ACTIONS = ("log", "error", "autofix")
 MAX_LINE = 100

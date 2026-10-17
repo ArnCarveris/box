@@ -26,8 +26,8 @@ in the `project/db/<epic>/<task>/deliverable/README.md` files.
   never in the component a user writes.
 - Tests assert observable behaviour (pixels, status components, command output), not internals.
 - Public headers are `include/box/*.h`; a module keeps private declarations in a header next to
-  its sources (`src/render/render.h`, `src/spatial/spatial.h`). Every directory under `test/`
-  is a test project.
+  its sources (`src/render/render.h`, `src/spatial/spatial.h`). Every directory under
+  `test/cpu` and `test/gpu` is a test project.
 
 ## Modules
 
@@ -644,9 +644,10 @@ deletes the scene the next frame.
 
 ## Testing and performance tooling
 
-- Tests: `bake3 run test/<project> --local-env -- -j 12`, projects `command`, `controller`,
-  `core`, `geometry`, `input`, `perf`, `render`, `scene`, `transform`, `ui`. `BOX_TEST=1`
-  disables the CPU budget and load guard. `test/transform` was written by the user.
+- Tests: `bake3 run test/cpu/<project> --local-env -- -j 12`, projects `command`, `controller`,
+  `core`, `geometry`, `input`, `perf`, `render`, `scene`, `transform`, `ui`; suites that render
+  with the GPU are in `test/gpu/<project>`, projects `command`, `core`, `render`, `scene`, `ui`.
+  `BOX_TEST=1` disables the CPU budget and load guard. `test/cpu/transform` was written by the user.
 - Visual regression: `tools/integration.py visual` renders every `test/integration/visual/*.flecs`
   headless at 640x360 for 3 frames and compares it with `baseline/<scene>.png` (largest channel
   delta and number of differing pixels), writing an HTML report; `--update-baseline` refreshes.

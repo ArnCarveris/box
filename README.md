@@ -57,9 +57,11 @@ node tools/wgsl_check.mjs                                 # etc/shaders, or pass
 ## Tests
 
 ```sh
-BOX_TEST=1 bake3 run test/transform --local-env -- -j 8          # all suites of a test project
-BOX_TEST=1 bake3 run test/transform --local-env -- Update -j 8   # one suite
-BOX_TEST=1 bake3 run test/transform --local-env -- Update.root   # one case
+BOX_TEST=1 bake3 run test/cpu/transform --local-env -- -j 8          # all suites of a test project
+BOX_TEST=1 bake3 run test/cpu/transform --local-env -- Update -j 8   # one suite
+BOX_TEST=1 bake3 run test/cpu/transform --local-env -- Update.root   # one case
 ```
 
-Every directory under `test/` is a test project.
+Every directory under `test/cpu` and `test/gpu` is a test project. Suites in `test/cpu` never
+render with the GPU; a suite with any test case that does (a `Surface`, a capture, the `capture` or
+`render` command, or the GPU backend's API) is in `test/gpu`. GPU projects have a `_gpu` id suffix.
