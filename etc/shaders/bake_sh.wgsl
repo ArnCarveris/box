@@ -40,6 +40,7 @@
 // a face is reversed with an infinite far plane: near over the view depth, 0 where nothing is.
 
 #include "include/instance.wgsl"
+#include "include/cube.wgsl"
 
 struct Params {
     // x: face edge in texels, y: probes of the chunk
@@ -143,18 +144,6 @@ var<workgroup> face_scan: array<vec2u, 256>;
 fn tile(probe: u32, face: u32, x: u32, y: u32) -> vec2u {
     let size = max(params.size.x, 1u);
     return vec2u(face * size + x, probe * size + y);
-}
-
-// Axis a face looks along and its up axis.
-fn face_axes(face: u32) -> mat2x3f {
-    switch face {
-        case 0u: { return mat2x3f(vec3f(1.0, 0.0, 0.0), vec3f(0.0, 1.0, 0.0)); }
-        case 1u: { return mat2x3f(vec3f(-1.0, 0.0, 0.0), vec3f(0.0, 1.0, 0.0)); }
-        case 2u: { return mat2x3f(vec3f(0.0, 1.0, 0.0), vec3f(0.0, 0.0, -1.0)); }
-        case 3u: { return mat2x3f(vec3f(0.0, -1.0, 0.0), vec3f(0.0, 0.0, 1.0)); }
-        case 4u: { return mat2x3f(vec3f(0.0, 0.0, 1.0), vec3f(0.0, 1.0, 0.0)); }
-        default: { return mat2x3f(vec3f(0.0, 0.0, -1.0), vec3f(0.0, 1.0, 0.0)); }
-    }
 }
 
 // A shape covered the capture texel and its radiance is finite. The exponent bits are tested
@@ -442,17 +431,6 @@ fn sky(d: vec3f) -> vec3f {
 // Layer of a face of a probe of the chunk in the cubemap array, six per slot.
 fn cube_layer(probe: u32, face: u32) -> u32 {
     return params.probes[probe / 4u][probe % 4u] * 6u + face;
-}
-
-// Direction texel (x, y) of a cubemap face looks along in the WebGPU cubemap convention: the
-// face axes of the atlas with u mirrored, as the store mirrors the faces.
-fn cube_direction(face: u32, texel: vec2u, size: u32) -> vec3f {
-    let step = 2.0 / f32(size);
-    let axes = face_axes(face);
-    let right = cross(axes[0], axes[1]);
-    let u = 1.0 - (f32(texel.x) + 0.5) * step;
-    let v = 1.0 - (f32(texel.y) + 0.5) * step;
-    return normalize(axes[0] + right * u + axes[1] * v);
 }
 
 // Texel (x, y) of face z % 6 of probe z / 6 of the chunk, into its slot and its source cube. A
