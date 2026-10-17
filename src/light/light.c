@@ -216,6 +216,51 @@ static void box_reflection_bake_remove(
     }
 }
 
+/** Construct Environment values with the default resolution and the GGX filter.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_environment_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    Environment *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (Environment){ .resolution = 256, .filter = EnvironmentFilterGgx };
+    }
+}
+
+/** Add EnvironmentStatus to an entity that got Environment.
+ *
+ * @param it The observer iterator
+ */
+static void box_environment_add(
+    ecs_iter_t *it)
+{
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        ecs_set(it->stage, it->entities[i], EnvironmentStatus, {0});
+    }
+}
+
+/** Remove EnvironmentStatus from an entity that lost Environment.
+ *
+ * @param it The observer iterator
+ */
+static void box_environment_remove(
+    ecs_iter_t *it)
+{
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        ecs_remove(it->stage, it->entities[i], EnvironmentStatus);
+    }
+}
+
 void BoxLightImport(
     ecs_world_t *world)
 {
@@ -243,6 +288,14 @@ void BoxLightImport(
     box_owned_hooks(world, ReflectionBakeStatus, BOX_OWNED_STR(ReflectionBakeStatus, error));
     ECS_META_COMPONENT(world, ReflectionProbe);
     ecs_set_hooks(world, ReflectionProbe, { .ctor = box_reflection_probe_ctor });
+    ECS_META_COMPONENT(world, EnvironmentFilter);
+    ECS_META_COMPONENT(world, Environment);
+    ecs_set_hooks(world, Environment, { .ctor = box_environment_ctor });
+    ECS_META_COMPONENT(world, EnvironmentStatus);
+    box_owned_hooks(world, EnvironmentStatus, BOX_OWNED_STR(EnvironmentStatus, error));
+    ECS_META_COMPONENT(world, EnvironmentImage);
+    box_owned_hooks(world, EnvironmentImage, BOX_OWNED_STR(EnvironmentImage, path));
+    ecs_add_pair(world, ecs_id(EnvironmentImage), EcsWith, ecs_id(Environment));
 
     ecs_observer(world, {
         .query.terms = {{ .id = ecs_id(LightBake) }},
@@ -263,5 +316,15 @@ void BoxLightImport(
         .query.terms = {{ .id = ecs_id(ReflectionBake) }},
         .events = { EcsOnRemove },
         .callback = box_reflection_bake_remove
+    });
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(Environment) }},
+        .events = { EcsOnAdd },
+        .callback = box_environment_add
+    });
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(Environment) }},
+        .events = { EcsOnRemove },
+        .callback = box_environment_remove
     });
 }

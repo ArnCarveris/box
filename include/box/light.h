@@ -149,6 +149,45 @@ ECS_STRUCT(ReflectionProbe, {
     vec3 offset;          /**< Capture point relative to the entity, default {0, 0, 0} */
 });
 
+/** How the mip levels of an environment cubemap are prefiltered from its first level */
+ECS_ENUM(EnvironmentFilter, {
+    EnvironmentFilterGgx = 0, /**< GGX radiance of a rougher surface at each higher level */
+    EnvironmentFilterBox = 1  /**< Mean of the two by two texels of the level below */
+});
+
+/** An environment source: an entity whose content (an image, a sky) the engine keeps in a
+ * cubemap that views light their scene with through LightSettings.environment.
+ *
+ * Adding it adds EnvironmentStatus, removing it removes it. A resolution that is not a power
+ * of two from 8 to 1024 creates no cubemap and sets EnvironmentStatus.error.
+ */
+ECS_STRUCT(Environment, {
+    int32_t resolution;       /**< Face edge of the cubemap in texels, a power of two from 8
+                               *   to 1024, default 256 */
+    EnvironmentFilter filter; /**< How the mip levels are prefiltered, default Ggx */
+});
+
+/** Progress of an environment source, written by the engine next to Environment */
+ECS_STRUCT(EnvironmentStatus, {
+    int32_t version;      /**< Content sent to the cubemap so far, 0 for none yet; the source
+                           *   increments it each time it sends new content */
+    char *error;          /**< Why the source has no content, such as an invalid resolution or
+                           *   a missing file, NULL for none */
+});
+
+/** An environment source that loads a Radiance .hdr equirectangular image; adding it adds
+ * Environment.
+ *
+ * Column u of the image is the longitude, row v the latitude: the center column looks along
+ * -Z, the camera forward, the image goes toward +X to its right, its left and right edges look
+ * along +Z, and the top row is +Y. Direction d is at u = 0.5 + atan2(d.x, -d.z) / 2 pi and
+ * v = acos(d.y) / pi.
+ */
+ECS_STRUCT(EnvironmentImage, {
+    char *path;           /**< Image file, relative to the working directory or an ancestor
+                           *   of it; a file that cannot be read sets EnvironmentStatus.error */
+});
+
 /** Register the box.light module.
  *
  * The first directional light of a scene casts the shadows of the views that enable them;

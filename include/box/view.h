@@ -24,6 +24,17 @@ ECS_STRUCT(ClearSettings, {
     rgba color;             /**< Clear color */
 });
 
+/** The environment a view lights its scene with: an entity with Environment, such as an
+ * EnvironmentImage */
+ECS_STRUCT(EnvironmentSettings, {
+    ecs_entity_t source;    /**< Entity with Environment, 0 for no environment */
+    float intensity;        /**< Scale of the environment light, View ctor sets 1 */
+    float yaw;              /**< Rotation of the environment about +Y in radians, as
+                             *   Rotation.y */
+    bool background;        /**< Draw the environment behind the geometry in place of the
+                             *   clear color */
+});
+
 /** Light settings for a view */
 ECS_STRUCT(LightSettings, {
     bool enabled;           /**< Enable lighting for the view */
@@ -33,6 +44,8 @@ ECS_STRUCT(LightSettings, {
     bool atmosphere;        /**< Render the Atmosphere of the scene: the sky behind the
                              *   geometry and the aerial perspective of the 3D meshes, View
                              *   ctor sets true */
+    EnvironmentSettings environment; /**< Environment the view is lit with, used only when
+                                      *   the view is lit */
 });
 
 /** Shadow settings of a view */
@@ -88,8 +101,8 @@ ECS_STRUCT(Scene, {
 /** Register the box.view module.
  *
  * View gets a constructor that enables lighting, baked lighting, reflections and the
- * atmosphere, sets the ShadowSettings defaults with shadows disabled and enables culling with
- * occlusion and a smallest size of one pixel. A C literal View starts from zero instead: unlit, drawing every instance.
+ * atmosphere, sets the environment intensity to 1 and the ShadowSettings defaults with shadows
+ * disabled and enables culling with occlusion and a smallest size of one pixel. A C literal View starts from zero instead: unlit, drawing every instance.
  *
  * @param world The world
  */
