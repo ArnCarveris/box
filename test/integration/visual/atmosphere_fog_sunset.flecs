@@ -19,7 +19,7 @@ camera {
 
 // The fog takes its color from the sky, so color is ignored: the pink would show without it
 fog {
-  HeightFog: {density: 0.004, falloff: 0.02, base_height: 0, color: {255, 0, 255}}
+  HeightFog: {density: 0.0015, falloff: 0.05, base_height: 0, color: {255, 0, 255}}
 }
 
 bloom {
