@@ -20,20 +20,30 @@
 
 /** The cubemap of an environment source: 6 layers in WebGPU cube order, mip 0 written by the
  * source and the levels above it down to BOX_GPU_ENVIRONMENT_MIN_MIP texels left to the
- * processing of the environments */
+ * processing of the environments, which also writes the SH irradiance */
 typedef struct box_gpu_environment_t {
     WGPUTexture texture;            /**< The texture, BOX_GPU_ENVIRONMENT_FORMAT */
     WGPUTextureView cube;           /**< Cube view of every mip level */
-    WGPUTextureView target;         /**< 2D array view of the 6 layers of mip 0 */
+    WGPUTextureView target;         /**< 2D array view of the 6 layers of mip 0, levels[0] */
+    WGPUTextureView *levels;        /**< 2D array view of the 6 layers of each mip level */
+    WGPUBuffer params;              /**< Params of bake_sh.wgsl of the processing: the
+                                     *   resolution and one cube at layer 0 */
+    WGPUBuffer sh;                  /**< BOX_RENDER_SH_COEFFICIENTS vec4 of L2 SH irradiance,
+                                     *   in the basis and order of mesh.wgsl */
     uint32_t resolution;            /**< Face edge of mip 0 in texels */
     uint32_t filter;                /**< EnvironmentFilter of the mip levels */
     uint32_t mips;                  /**< Mip levels */
     int32_t written;                /**< Version the source last wrote, 0 while empty */
     int32_t processed;              /**< Version the processing last ran for, 0 for none */
+    uint32_t processed_filter;      /**< Filter the processing last ran with */
+    int32_t runs;                   /**< Times the processing ran since the cubemap was created */
 } box_gpu_environment_t;
 
 /** Pipeline and images in flight of the EnvironmentImage conversion */
 typedef struct box_gpu_env_image_t box_gpu_env_image_t;
+
+/** Pipeline of the SH projection and the source cubes of the Ggx processing */
+typedef struct box_gpu_env_process_t box_gpu_env_process_t;
 
 /** Create the map of the environment cubemaps.
  *
@@ -99,8 +109,25 @@ void box_gpu_environment_written(
     uint32_t handle,
     int32_t version);
 
-/** Process the environments whose sources wrote new content, after the sources of a packet
- * recorded their passes and before the captures and the targets.
+/** Check whether the environments can be processed, creating the pipelines of the bake shader
+ * and the SH projection when it was (re)compiled. A source writes no content before, so a
+ * cubemap never holds a version the processing could not follow in the same packet.
+ *
+ * @param gpu The backend
+ * @return Whether the bake shader has a module and the pipelines exist
+ */
+bool box_gpu_environment_ready(
+    box_gpu_t *gpu);
+
+/** Process the environments whose sources wrote a version that was not processed yet, or whose
+ * filter changed, after the sources of a packet recorded their passes and before the captures
+ * and the targets.
+ *
+ * Each such cubemap is processed once, however many views use it, all of them in one command
+ * buffer: Box box filters mip 0 into the levels above it, Ggx box filters it into a source cube
+ * and prefilters the levels from that. Both project a box filtered mip onto the SH.
+ *
+ * The GPU time is measured with the timestamp queries of the captures.
  *
  * @param gpu The backend
  * @param packet The packet
@@ -131,8 +158,10 @@ void box_gpu_environment_image_apply(
     uint32_t size);
 
 /** Convert the images that wait into their cubemaps, as the reference environment source:
- * each writes the target of its handle and reports it written. Images wait while the
- * environment shader has no module; an image whose cubemap is gone is dropped.
+ * each writes the target of its handle and reports it written.
+ *
+ * Images wait while the environment shader has no module or box_gpu_environment_ready fails;
+ * an image whose cubemap is gone is dropped.
  *
  * @param gpu The backend
  * @param packet The packet

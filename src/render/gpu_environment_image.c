@@ -297,7 +297,7 @@ void box_gpu_environment_image_render(
         goto done;
     }
 
-    pipeline = box_gpu_env_image_pipeline(gpu, s);
+    pipeline = box_gpu_environment_ready(gpu) ? box_gpu_env_image_pipeline(gpu, s) : NULL;
     for (i = ecs_vec_count(&s->pending) - 1; i >= 0; i --) {
         box_gpu_env_pending_t *p = ecs_vec_get_t(&s->pending, box_gpu_env_pending_t, i);
         uint32_t res = 0;

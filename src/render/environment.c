@@ -454,3 +454,18 @@ bool box_render_environment_use(
 
     return result;
 }
+
+bool box_render_environment_processes(
+    const box_render_packet_t *p)
+{
+    bool result = false;
+    int32_t i;
+    for (i = 0; !result && i < ecs_vec_count(&p->resources); i ++) {
+        const box_render_resource_t *r = ecs_vec_get_t(
+            &p->resources, box_render_resource_t, i);
+        result = r->kind == BOX_RENDER_ENVIRONMENT_IMAGE ||
+            (r->kind == BOX_RENDER_ENVIRONMENT && r->op != BOX_RENDER_DESTROY);
+    }
+
+    return result;
+}

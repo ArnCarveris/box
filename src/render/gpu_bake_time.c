@@ -1,13 +1,14 @@
 /**
  * @file render/gpu_bake_time.c
- * @brief GPU time of the probe and reflection captures of the webgpu backend and the results
- * the main thread takes.
+ * @brief GPU time of the probe and reflection captures and the environment processing of the
+ * webgpu backend and the results the main thread takes.
  *
  * Timestamps around the captures of each kind in a packet are read back without waiting, or
  * the CPU measures until the queue reports their work done when the device has no timestamps.
  */
 
 #include "gpu_bake.h"
+#include "environment.h"
 
 #ifdef BOX_RENDER_WGPU
 
@@ -226,7 +227,8 @@ int32_t box_gpu_bake_readback(
 }
 
 /** Resolve the timestamps of the readbacks whose captures were submitted before the last
- * packet and copy them into their readbacks.
+ * packet and copy them into their readbacks; the ones recorded earlier in this packet are
+ * resolved by the next one.
  *
  * Metal writes the timestamps of a pass when the pass completed, which a resolve in the same
  * or the next command buffer does not wait for, so the resolve waits for one more packet.
@@ -261,6 +263,12 @@ void box_gpu_bake_resolve(
         }
 
         rb->state = BOX_GPU_BAKE_COPIED;
+    }
+
+    for (r = 0; r < BOX_GPU_BAKE_READBACKS; r ++) {
+        if (b->readbacks[r].state == BOX_GPU_BAKE_RECORDED) {
+            b->readbacks[r].state = BOX_GPU_BAKE_WRITTEN;
+        }
     }
 
     if (encoder) {
@@ -400,6 +408,13 @@ bool box_render_gpu_reflect_timing(
 {
     return box_gpu_bake_time(world, BOX_GPU_BAKE_REFLECT, out);
 }
+
+bool box_render_gpu_environment_timing(
+    ecs_world_t *world,
+    box_render_bake_timing_t *out)
+{
+    return box_gpu_bake_time(world, BOX_GPU_BAKE_ENVIRONMENT, out);
+}
 #else
 
 
@@ -435,6 +450,16 @@ bool box_render_gpu_reflect_captured(
 }
 
 bool box_render_gpu_reflect_timing(
+    ecs_world_t *world,
+    box_render_bake_timing_t *out)
+{
+    (void)world;
+    ecs_os_memset_t(out, 0, box_render_bake_timing_t);
+
+    return false;
+}
+
+bool box_render_gpu_environment_timing(
     ecs_world_t *world,
     box_render_bake_timing_t *out)
 {

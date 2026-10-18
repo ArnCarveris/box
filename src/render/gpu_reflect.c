@@ -23,11 +23,7 @@
 /** Bytes of a texel of BOX_GPU_REFLECT_FORMAT */
 #define BOX_GPU_REFLECT_TEXEL (8)
 
-/** Release a cube array and its views.
- *
- * @param c The cube array
- */
-static void box_gpu_reflect_free(
+void box_gpu_reflect_free(
     box_gpu_reflect_t *c)
 {
     uint32_t i;
@@ -46,16 +42,7 @@ static void box_gpu_reflect_free(
     ecs_os_free(c);
 }
 
-/** Create a cube array and its views: the slots of a scene with mips down to
- * BOX_GPU_REFLECT_MIN_MIP texels and their SH, or source cubes with a full mip chain.
- *
- * @param gpu The backend
- * @param resolution Face edge of mip 0 in texels
- * @param cubes Cubemap slots
- * @param source Whether the cubes are source cubes
- * @return The cube array
- */
-static box_gpu_reflect_t* box_gpu_reflect_new(
+box_gpu_reflect_t* box_gpu_reflect_new(
     box_gpu_t *gpu,
     uint32_t resolution,
     uint32_t cubes,
@@ -446,6 +433,63 @@ static void box_gpu_reflect_dispatch(
     wgpuBindGroupRelease(group);
 }
 
+bool box_gpu_reflect_ready(
+    const box_gpu_t *gpu)
+{
+    return gpu->reflect_store && gpu->reflect_mip && gpu->reflect_prefilter;
+}
+
+void box_gpu_reflect_mip_chain(
+    box_gpu_t *gpu,
+    WGPUComputePassEncoder pass,
+    WGPUBuffer params,
+    uint64_t params_size,
+    const WGPUTextureView *levels,
+    uint32_t resolution,
+    uint32_t mips,
+    uint32_t faces)
+{
+    uint32_t i;
+    if (mips > 1) {
+        wgpuComputePassEncoderSetPipeline(pass, gpu->reflect_mip);
+    }
+
+    for (i = 1; i < mips; i ++) {
+        box_gpu_reflect_dispatch(gpu, pass, gpu->reflect_mip_layout, (WGPUBindGroupEntry[3]){
+            { .binding = 0, .buffer = params, .size = params_size },
+            { .binding = 11, .textureView = levels[i - 1] },
+            { .binding = 12, .textureView = levels[i] }
+        }, 3, resolution >> i, faces);
+    }
+}
+
+void box_gpu_reflect_prefilter_chain(
+    box_gpu_t *gpu,
+    WGPUComputePassEncoder pass,
+    WGPUBuffer params,
+    uint64_t params_size,
+    WGPUTextureView source,
+    const WGPUTextureView *levels,
+    uint32_t resolution,
+    uint32_t mips,
+    uint32_t faces)
+{
+    uint32_t i;
+    if (mips > 1) {
+        wgpuComputePassEncoderSetPipeline(pass, gpu->reflect_prefilter);
+    }
+
+    for (i = 1; i < mips; i ++) {
+        box_gpu_reflect_dispatch(gpu, pass, gpu->reflect_prefilter_layout,
+            (WGPUBindGroupEntry[4]){
+                { .binding = 0, .buffer = params, .size = params_size },
+                { .binding = 14, .textureView = source },
+                { .binding = 15, .sampler = gpu->reflect_sampler },
+                { .binding = 16, .textureView = levels[i] }
+            }, 4, resolution >> i, faces);
+    }
+}
+
 bool box_gpu_reflect_store(
     box_gpu_t *gpu,
     WGPUCommandEncoder encoder,
@@ -456,9 +500,8 @@ bool box_gpu_reflect_store(
     int32_t count,
     const WGPUPassTimestampWrites *writes)
 {
-    uint32_t i, faces = (uint32_t)count * BOX_GPU_REFLECT_FACES;
-    bool result = gpu->reflect_store && gpu->reflect_mip && gpu->reflect_prefilter &&
-        count > 0;
+    uint32_t faces = (uint32_t)count * BOX_GPU_REFLECT_FACES;
+    bool result = box_gpu_reflect_ready(gpu) && count > 0;
     if (!result) {
         goto done;
     }
@@ -473,32 +516,10 @@ bool box_gpu_reflect_store(
         { .binding = 10, .textureView = cube->levels[0] },
         { .binding = 13, .textureView = source->levels[0] }
     }, 4, cube->resolution, faces);
-    if (source->mips > 1) {
-        wgpuComputePassEncoderSetPipeline(pass, gpu->reflect_mip);
-    }
-
-    for (i = 1; i < source->mips; i ++) {
-        box_gpu_reflect_dispatch(gpu, pass, gpu->reflect_mip_layout, (WGPUBindGroupEntry[3]){
-            { .binding = 0, .buffer = params, .size = params_size },
-            { .binding = 11, .textureView = source->levels[i - 1] },
-            { .binding = 12, .textureView = source->levels[i] }
-        }, 3, cube->resolution >> i, faces);
-    }
-
-    if (cube->mips > 1) {
-        wgpuComputePassEncoderSetPipeline(pass, gpu->reflect_prefilter);
-    }
-
-    for (i = 1; i < cube->mips; i ++) {
-        box_gpu_reflect_dispatch(gpu, pass, gpu->reflect_prefilter_layout,
-            (WGPUBindGroupEntry[4]){
-                { .binding = 0, .buffer = params, .size = params_size },
-                { .binding = 14, .textureView = source->cube },
-                { .binding = 15, .sampler = gpu->reflect_sampler },
-                { .binding = 16, .textureView = cube->levels[i] }
-            }, 4, cube->resolution >> i, faces);
-    }
-
+    box_gpu_reflect_mip_chain(gpu, pass, params, params_size, source->levels,
+        cube->resolution, source->mips, faces);
+    box_gpu_reflect_prefilter_chain(gpu, pass, params, params_size, source->cube,
+        cube->levels, cube->resolution, cube->mips, faces);
     wgpuComputePassEncoderEnd(pass);
     wgpuComputePassEncoderRelease(pass);
 done:

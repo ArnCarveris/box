@@ -113,6 +113,14 @@ void box_render_environment_error(
 bool box_render_environment_use(
     const box_render_packet_t *p);
 
+/** Check whether a packet may process environments, so it needs the bake shader.
+ *
+ * @param p The packet
+ * @return Whether it creates or updates a cubemap or carries an environment image
+ */
+bool box_render_environment_processes(
+    const box_render_packet_t *p);
+
 /** Register the EnvironmentImage source: its loads on the job system and the system that sends
  * a loaded image into its cubemap once per version.
  *
@@ -139,5 +147,60 @@ bool box_render_gpu_read_environment(
     uint32_t face,
     float *out,
     int32_t count);
+
+/** What the GPU backend did with the cubemap of an environment source */
+typedef struct box_render_environment_state_t {
+    int32_t written;        /**< Version the source last wrote, 0 while empty */
+    int32_t processed;      /**< Version the mips and the SH were last processed for, 0 for
+                             *   none */
+    uint32_t filter;        /**< EnvironmentFilter the mips were last processed with */
+    int32_t runs;           /**< Times the cubemap was processed since it was created */
+} box_render_environment_state_t;
+
+/** Get what the GPU backend did with the cubemap of an environment.
+ *
+ * Only call this when the main thread renders, after box_render_sync, as
+ * box_render_gpu_read_environment.
+ *
+ * @param world The world
+ * @param handle Handle of the BOX_RENDER_ENVIRONMENT
+ * @param out Receives the state
+ * @return Whether the cubemap exists
+ */
+bool box_render_gpu_environment_state(
+    ecs_world_t *world,
+    uint32_t handle,
+    box_render_environment_state_t *out);
+
+/** Copy the L2 SH irradiance of an environment into memory, waiting for the copy.
+ *
+ * The coefficients are in the basis and order of mesh.wgsl, convolved with the clamped cosine
+ * as the probe SH: irradiance, which the forward pass divides by pi. Only call this when the
+ * main thread renders, after box_render_sync, as box_render_gpu_read_environment.
+ *
+ * @param world The world
+ * @param handle Handle of the BOX_RENDER_ENVIRONMENT
+ * @param out Receives the linear rgb coefficients, w unused
+ * @return Whether the cubemap exists, was processed and the SH was copied
+ */
+bool box_render_gpu_read_environment_sh(
+    ecs_world_t *world,
+    uint32_t handle,
+    float out[BOX_RENDER_SH_COEFFICIENTS][4]);
+
+/** Take the GPU time of the environment processing the GPU backend of a world measured since
+ * the last call.
+ *
+ * The time of the processing of each packet is measured with the timestamp queries of the
+ * probe captures, or from the CPU until the queue reports it done without them.
+ *
+ * @param world The world
+ * @param out Receives the time, its probes the environments processed, zero when nothing
+ *            arrived
+ * @return Whether the world renders with the GPU backend
+ */
+bool box_render_gpu_environment_timing(
+    ecs_world_t *world,
+    box_render_bake_timing_t *out);
 
 #endif

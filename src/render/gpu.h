@@ -568,6 +568,8 @@ typedef struct box_gpu_t {
     struct box_gpu_env_image_t *environment_image; /**< Conversion of environment images,
                                                     *   created by the first image */
     box_gpu_particles_t *particles; /**< Particle passes */
+    struct box_gpu_env_process_t *environment_process; /**< Processing of the environments,
+                                                        *   created on first use */
     ecs_vec_t captures;             /**< box_gpu_capture_t* whose readback is mapping */
     bool lost;                      /**< The device was lost, the ring recreates it */
     bool lose;                      /**< box_render_gpu_lose_device asked to destroy it */
@@ -907,6 +909,83 @@ const box_gpu_reflect_t* box_gpu_reflect_of(
 void box_gpu_reflect_pipelines(
     box_gpu_t *gpu,
     WGPUShaderModule module);
+
+/** Create a cube array and its views: the slots of a scene with mips down to
+ * BOX_GPU_REFLECT_MIN_MIP texels and their SH, or source cubes with a full mip chain.
+ *
+ * @param gpu The backend
+ * @param resolution Face edge of mip 0 in texels
+ * @param cubes Cubemap slots
+ * @param source Whether the cubes are source cubes
+ * @return The cube array
+ */
+box_gpu_reflect_t* box_gpu_reflect_new(
+    box_gpu_t *gpu,
+    uint32_t resolution,
+    uint32_t cubes,
+    bool source);
+
+/** Release a cube array and its views.
+ *
+ * @param c The cube array
+ */
+void box_gpu_reflect_free(
+    box_gpu_reflect_t *c);
+
+/** Check whether the store, mip and prefilter pipelines exist.
+ *
+ * @param gpu The backend
+ * @return Whether the bake shader made them
+ */
+bool box_gpu_reflect_ready(
+    const box_gpu_t *gpu);
+
+/** Record into a compute pass the reflect_mip dispatches that box filter each mip level of a
+ * cube array from the level above, level 1 to the last.
+ *
+ * @param gpu The backend
+ * @param pass The compute pass
+ * @param params Uniforms, Params of bake_sh.wgsl whose size.y is the cubes the faces cover
+ * @param params_size Bytes of the uniforms
+ * @param levels 2D array view of each mip level
+ * @param resolution Face edge of mip 0 in texels
+ * @param mips Mip levels
+ * @param faces Layers the dispatches cover, six per cube
+ */
+void box_gpu_reflect_mip_chain(
+    box_gpu_t *gpu,
+    WGPUComputePassEncoder pass,
+    WGPUBuffer params,
+    uint64_t params_size,
+    const WGPUTextureView *levels,
+    uint32_t resolution,
+    uint32_t mips,
+    uint32_t faces);
+
+/** Record into a compute pass the reflect_prefilter dispatches that fill mip levels 1 to the
+ * last of a cube array with the GGX prefiltered radiance of box filtered source cubes.
+ *
+ * @param gpu The backend
+ * @param pass The compute pass
+ * @param params Uniforms, Params of bake_sh.wgsl with the resolution as size.x, the cubes as
+ *               size.y and the layer of each cube in probes
+ * @param params_size Bytes of the uniforms
+ * @param source Cube array view of the source cubes with their full mip chain
+ * @param levels 2D array view of each mip level written
+ * @param resolution Face edge of mip 0 in texels
+ * @param mips Mip levels, the last one at least BOX_GPU_REFLECT_MIN_MIP texels
+ * @param faces Layers the dispatches cover, six per cube
+ */
+void box_gpu_reflect_prefilter_chain(
+    box_gpu_t *gpu,
+    WGPUComputePassEncoder pass,
+    WGPUBuffer params,
+    uint64_t params_size,
+    WGPUTextureView source,
+    const WGPUTextureView *levels,
+    uint32_t resolution,
+    uint32_t mips,
+    uint32_t faces);
 
 /** Record the pass that writes the faces of a chunk of reflection captures into mip 0 of their
  * slots and fills every higher mip level of those slots with the GGX prefiltered radiance.

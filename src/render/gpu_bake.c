@@ -1495,6 +1495,26 @@ void box_gpu_bake_fini(
     }
 }
 
+box_gpu_bake_t* box_gpu_bake_state(
+    box_gpu_t *gpu)
+{
+    if (!gpu->bake) {
+        box_gpu_bake_t *created = box_gpu_bake_state_new(gpu);
+        ecs_os_mutex_lock(gpu->lock);
+        gpu->bake = created;
+        ecs_os_mutex_unlock(gpu->lock);
+    }
+
+    return gpu->bake;
+}
+
+bool box_gpu_bake_ready(
+    box_gpu_t *gpu,
+    box_gpu_bake_t *b)
+{
+    return box_gpu_bake_pipeline(gpu, b) && box_gpu_reflect_ready(gpu);
+}
+
 /** Check whether the backend can capture a batch of a packet.
  *
  * @param packet The packet
@@ -1555,14 +1575,7 @@ static void box_gpu_bake_run(
         goto done;
     }
 
-    if (!gpu->bake) {
-        box_gpu_bake_t *created = box_gpu_bake_state_new(gpu);
-        ecs_os_mutex_lock(gpu->lock);
-        gpu->bake = created;
-        ecs_os_mutex_unlock(gpu->lock);
-    }
-
-    box_gpu_bake_t *b = gpu->bake;
+    box_gpu_bake_t *b = box_gpu_bake_state(gpu);
     timer.readback = box_gpu_bake_readback(b);
     for (i = 0; i <= last; i ++) {
         if (!box_gpu_bake_batch_valid(packet, kind, i)) {

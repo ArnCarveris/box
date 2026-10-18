@@ -14,8 +14,8 @@
 /** Probes captured by one command buffer at most */
 #define BOX_GPU_BAKE_CHUNK (128)
 
-/** Timestamp measurements in flight at most, two per packet */
-#define BOX_GPU_BAKE_READBACKS (8)
+/** Timestamp measurements in flight at most, three per packet */
+#define BOX_GPU_BAKE_READBACKS (12)
 
 /** Milliseconds a measurement of the captures of one packet may take at most, longer ones are
  * stale timestamps or a stalled queue and are dropped */
@@ -28,12 +28,15 @@
 typedef enum box_gpu_bake_kind_t {
     BOX_GPU_BAKE_PROBES,            /**< Probe captures of the bake batches */
     BOX_GPU_BAKE_REFLECT,           /**< Reflection captures */
+    BOX_GPU_BAKE_ENVIRONMENT,       /**< Processing of the environments, timed only */
     BOX_GPU_BAKE_KINDS              /**< Kinds of captures */
 } box_gpu_bake_kind_t;
 
 /** State of a timestamp readback */
 typedef enum box_gpu_bake_readback_state_t {
     BOX_GPU_BAKE_FREE,              /**< Unused */
+    BOX_GPU_BAKE_RECORDED,          /**< The timestamps are recorded before the captures of the
+                                     *   packet, which turn them written */
     BOX_GPU_BAKE_WRITTEN,           /**< The timestamps are submitted, resolved a packet later */
     BOX_GPU_BAKE_COPIED,            /**< The copy is submitted, mapped at the next capture */
     BOX_GPU_BAKE_MAPPING,           /**< Waiting for the map */
@@ -45,7 +48,8 @@ typedef enum box_gpu_bake_readback_state_t {
 typedef struct box_gpu_bake_readback_t {
     WGPUBuffer buffer;              /**< Mappable copy of the resolved timestamps */
     int32_t state;                  /**< box_gpu_bake_readback_state_t */
-    int32_t probes;                 /**< Probes the measured captures held */
+    int32_t probes;                 /**< Probes the measured captures held, or environments
+                                     *   processed */
     int32_t kind;                   /**< box_gpu_bake_kind_t of the captures */
 } box_gpu_bake_readback_t;
 
@@ -250,6 +254,25 @@ void box_gpu_bake_done_measure(
     int32_t kind,
     uint64_t start,
     int32_t probes);
+
+/** Get the capture state, created on first use.
+ *
+ * @param gpu The backend
+ * @return The state
+ */
+box_gpu_bake_t* box_gpu_bake_state(
+    box_gpu_t *gpu);
+
+/** Create the pipelines of the bake shader, the reflection ones among them, again when the
+ * shader was recompiled.
+ *
+ * @param gpu The backend
+ * @param b The capture state
+ * @return Whether the shader has a module and the pipelines exist
+ */
+bool box_gpu_bake_ready(
+    box_gpu_t *gpu,
+    box_gpu_bake_t *b);
 
 /** Finish an encoder, submit it and release it.
  *

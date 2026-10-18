@@ -30,6 +30,11 @@
 // lower source mip by the solid angle of each sample (filtered importance sampling). The
 // projection runs on the reflection captures too, writing the SH of each slot.
 //
+// The environment processing reuses reflect_mip and reflect_prefilter on one cube (params.probes
+// all 0, params.size.y 1): a Box environment box filters its own mips, a Ggx one box filters a
+// source cube and prefilters its mips from it. environment_sh projects a mip of at most 16
+// texels per edge of the box filtered chain onto the same SH as project.
+//
 // A texel whose radiance is not finite (a NaN or infinity a draw shaded) counts as uncovered in
 // the projection and the store: the prefilter and the SH sum spread one such texel over the
 // whole probe, while the forward pass shows it as one pixel.
@@ -158,6 +163,17 @@ fn corner(x: f32, y: f32) -> f32 {
     return atan2(x * y, sqrt(x * x + y * y + 1.0));
 }
 
+// Solid angle of texel (x, y) of a cube face of size texels per edge. It is symmetric in u and
+// v, so it holds for the atlas tiles and the mirrored WebGPU cubemap faces alike.
+fn texel_solid_angle(x: u32, y: u32, size: u32) -> f32 {
+    let step = 2.0 / f32(size);
+    let u0 = f32(x) * step - 1.0;
+    let v0 = 1.0 - f32(y + 1u) * step;
+    let u1 = u0 + step;
+    let v1 = v0 + step;
+    return corner(u0, v0) - corner(u0, v1) - corner(u1, v0) + corner(u1, v1);
+}
+
 // Sloan's real SH basis up to band 2, in the order of mesh.wgsl.
 fn basis(d: vec3f) -> array<f32, 9> {
     return array<f32, 9>(
@@ -183,6 +199,22 @@ fn band(k: u32) -> f32 {
     }
 
     return PI / 4.0;
+}
+
+// Sum the SH coefficients of the lanes of a workgroup of GROUP invocations into partial[0].
+// Every lane calls it from uniform control flow.
+fn reduce_sh(lane: u32, sum: array<vec3f, 9>) {
+    partial[lane] = sum;
+    workgroupBarrier();
+    for (var stride = GROUP / 2u; stride > 0u; stride = stride / 2u) {
+        if (lane < stride) {
+            for (var k = 0u; k < SH_COEFFICIENTS; k++) {
+                partial[lane][k] += partial[lane + stride][k];
+            }
+        }
+
+        workgroupBarrier();
+    }
 }
 
 // Distance from a probe to the surface its faces saw in a direction, negative where they saw
@@ -285,14 +317,12 @@ fn project(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_index)
         let face = t / per_face;
         let x = (t % per_face) % size;
         let y = (t % per_face) / size;
-        let u0 = f32(x) * step - 1.0;
-        let v0 = 1.0 - f32(y + 1u) * step;
-        let u1 = u0 + step;
-        let v1 = v0 + step;
-        let weight = corner(u0, v0) - corner(u0, v1) - corner(u1, v0) + corner(u1, v1);
+        let weight = texel_solid_angle(x, y, size);
         let axes = face_axes(face);
         let right = cross(axes[0], axes[1]);
-        let d = normalize(axes[0] + right * (u0 + u1) * 0.5 + axes[1] * (v0 + v1) * 0.5);
+        let u = (f32(x) + 0.5) * step - 1.0;
+        let v = 1.0 - (f32(y) + 0.5) * step;
+        let d = normalize(axes[0] + right * u + axes[1] * v);
         let texel = textureLoad(captures, tile(probe, face, x, y), 0);
         let radiance = select(a + b * d.y, texel.rgb, covered(texel)) * weight;
         let y_lm = basis(d);
@@ -301,18 +331,7 @@ fn project(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_index)
         }
     }
 
-    partial[lane] = sum;
-    workgroupBarrier();
-    for (var stride = GROUP / 2u; stride > 0u; stride = stride / 2u) {
-        if (lane < stride) {
-            for (var k = 0u; k < SH_COEFFICIENTS; k++) {
-                partial[lane][k] += partial[lane + stride][k];
-            }
-        }
-
-        workgroupBarrier();
-    }
-
+    reduce_sh(lane, sum);
     let index = params.probes[probe / 4u][probe % 4u];
     if (lane < SH_COEFFICIENTS) {
         let e = (partial[0][lane] + direct(probe, lane)) * band(lane);
@@ -527,4 +546,32 @@ fn reflect_prefilter(@builtin(global_invocation_id) id: vec3u) {
 
     let radiance = sum / max(weight, 1e-6);
     textureStore(prefiltered, id.xy, cube_layer(probe, face), vec4f(radiance, 1.0));
+}
+
+// L2 SH irradiance of an environment cubemap, in the basis, order and convolution of project,
+// into the first SH_COEFFICIENTS entries of volume. cube_source holds the six faces of a box
+// filtered mip level of the cubemap, at most 16 texels per edge, in the WebGPU cubemap
+// convention. A texel whose radiance is not finite adds nothing.
+@compute @workgroup_size(64)
+fn environment_sh(@builtin(local_invocation_index) lane: u32) {
+    let size = max(textureDimensions(cube_source).x, 1u);
+    let per_face = size * size;
+    var sum: array<vec3f, 9>;
+    for (var t = lane; t < per_face * 6u; t += GROUP) {
+        let face = t / per_face;
+        let texel = vec2u((t % per_face) % size, (t % per_face) / size);
+        let d = cube_direction(face, texel, size);
+        let c = textureLoad(cube_source, texel, face, 0);
+        let radiance = select(vec3f(0.0), c.rgb, covered(vec4f(c.rgb, 1.0))) *
+            texel_solid_angle(texel.x, texel.y, size);
+        let y_lm = basis(d);
+        for (var k = 0u; k < SH_COEFFICIENTS; k++) {
+            sum[k] += radiance * y_lm[k];
+        }
+    }
+
+    reduce_sh(lane, sum);
+    if (lane < SH_COEFFICIENTS) {
+        volume[lane] = vec4f(partial[0][lane] * band(lane), 0.0);
+    }
 }

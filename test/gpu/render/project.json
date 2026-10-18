@@ -609,7 +609,13 @@
             {
                 "id": "Environment",
                 "testcases": [
-                    "axes_faces_show_axis_colors"
+                    "axes_faces_show_axis_colors",
+                    "unchanged_source_processed_once",
+                    "changed_path_reprocesses",
+                    "changed_filter_reprocesses",
+                    "shared_source_processed_once",
+                    "axes_sh_signs",
+                    "processing_time_measured"
                 ]
             },
             {
