@@ -1,8 +1,9 @@
 // Particle draw: one indirect draw per pool of the scene of a view, six vertices per used
 // slot. A live particle is a quad facing the camera, its size wide and turned by its rotation
 // plus its spin times its age, shaded as a soft circle, smoothstep(1, 0, d^2) over the quad,
-// in the color of the emitter times its opacity; a free slot collapses outside the clip
-// volume. Size, rotation, spin and opacity are drawn from the seed and the spawn index.
+// in its color times its opacity; a free slot collapses outside the clip volume. Size,
+// rotation, spin, opacity and color are drawn from the seed and the spawn index, each from its
+// own stream.
 #include "include/lights.wgsl"
 #include "include/particle.wgsl"
 
@@ -15,6 +16,7 @@ struct VertexOut {
     @builtin(position) clip: vec4f,
     @location(0) uv: vec2f,
     @location(1) opacity: f32,
+    @location(2) color: vec3f,
 };
 
 // Corners of the two triangles of the quad.
@@ -29,6 +31,7 @@ fn vs(@builtin(vertex_index) vertex: u32, @builtin(instance_index) slot: u32) ->
     let corner = CORNERS[vertex];
     out.uv = corner;
     out.opacity = 0.0;
+    out.color = vec3f(0.0);
     out.clip = vec4f(2.0, 2.0, 2.0, 1.0);
     if (p.remaining == 0u) {
         return out;
@@ -49,6 +52,7 @@ fn vs(@builtin(vertex_index) vertex: u32, @builtin(instance_index) slot: u32) ->
     let world = p.position + (right * turned.x + up * turned.y) * (0.5 * size);
     out.clip = view.view_proj * vec4f(world, 1.0);
     out.opacity = particle_draw(seed, p.index, STREAM_OPACITY, emitter.opacity.xy);
+    out.color = particle_color(seed, p.index, emitter.color.rgb, emitter.variance.rgb);
     return out;
 }
 
@@ -61,5 +65,5 @@ fn fs(in: VertexOut) -> @location(0) vec4f {
         discard;
     }
 
-    return vec4f(emitter.color.rgb, alpha);
+    return vec4f(in.color, alpha);
 }

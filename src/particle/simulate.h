@@ -47,6 +47,21 @@
 /** First of the two hash streams of the barycentric coordinates of a mesh table point */
 #define BOX_PARTICLE_STREAM_BARY (13u)
 
+/** First of the three hash streams of the color of a particle, one per channel */
+#define BOX_PARTICLE_STREAM_COLOR (15u)
+
+/** Hash stream of the phase of the wander field of an emitter, drawn for indices 0 to 2 */
+#define BOX_PARTICLE_STREAM_WANDER (18u)
+
+/** Ground collision mode of an emitter without a ground plane */
+#define BOX_PARTICLE_GROUND_NONE (0u)
+
+/** Ground collision mode of particles that bounce off the ground plane */
+#define BOX_PARTICLE_GROUND_BOUNCE (1u)
+
+/** Ground collision mode of particles that die on the ground plane */
+#define BOX_PARTICLE_GROUND_DIE (2u)
+
 /** Longest lifetime in microseconds, so a lifetime and a frame delta fit in 32 bits */
 #define BOX_PARTICLE_LIFE_MAX_US (4000000000u)
 
@@ -70,6 +85,38 @@ typedef struct box_particle_t {
     float velocity[3];      /**< World velocity */
     uint32_t index;         /**< Spawn index of the particle in its emitter */
 } box_particle_t;
+
+/** The forces of a frame of the step, as the wind, turbulence and wander members of Emitter in
+ * particle.wgsl */
+typedef struct box_particle_forces_t {
+    float acceleration[3];  /**< Emitter acceleration plus gravity, world units per second
+                             *   squared */
+    float wind[3];          /**< Velocity the drag pulls toward */
+    float drag;             /**< Rate of exponential decay of the difference with the wind */
+    float turbulence;       /**< Acceleration of the wander field */
+    float scale;            /**< Frequency multiplier of the wander field */
+    float phase[3];         /**< Offset of the wander field, from the seed */
+} box_particle_forces_t;
+
+/** The ground plane of an emitter, as the ground and collide members of Emitter */
+typedef struct box_particle_ground_t {
+    uint32_t mode;          /**< BOX_PARTICLE_GROUND_NONE, _BOUNCE or _DIE */
+    float height;           /**< World height of the plane */
+    float bounce;           /**< Share of the speed into the plane a hit keeps, 0 to 1 */
+    float friction;         /**< Share of the speed along the plane a hit loses, 0 to 1 */
+} box_particle_ground_t;
+
+/** What a particle draws from its streams, as the spawn and the draw shaders draw it */
+typedef struct box_particle_sample_t {
+    float direction[3];     /**< Unit direction in emitter space, zero for none */
+    float speed;            /**< Initial speed */
+    uint32_t life;          /**< Lifetime in microseconds */
+    float size;             /**< Diameter */
+    float rotation;         /**< Initial rotation in degrees */
+    float spin;             /**< Spin in degrees per second */
+    float opacity;          /**< Opacity */
+    float color[3];         /**< Linear color */
+} box_particle_sample_t;
 
 /** Hash a word, the PCG hash of Jarzynski and Olano, "Hash Functions for GPU Rendering".
  *
@@ -124,6 +171,61 @@ static inline float box_particle_range(
     float u)
 {
     return max > min ? min + (max - min) * u : min;
+}
+
+/** Draw one stream of a particle from a range.
+ *
+ * @param seed The seed of the emitter
+ * @param index The spawn index of the particle
+ * @param stream The stream of the value
+ * @param min Smallest value
+ * @param max Largest value, a max not above min hands out min
+ * @return The value
+ */
+static inline float box_particle_draw(
+    uint32_t seed,
+    uint32_t index,
+    uint32_t stream,
+    float min,
+    float max)
+{
+    return box_particle_range(min, max,
+        box_particle_unit(box_particle_hash(seed, index, stream)));
+}
+
+/** Decode a display encoded channel to linear.
+ *
+ * @param c The channel, 0 to 1
+ * @return The linear value
+ */
+static inline float box_particle_decode(
+    float c)
+{
+    return c <= 0.04045f ? c / 12.92f : powf((c + 0.055f) / 1.055f, 2.4f);
+}
+
+/** Draw the color of a particle, each channel from its own stream around the color.
+ *
+ * @param seed The seed of the emitter
+ * @param index The spawn index of the particle
+ * @param color Display encoded color, 0 to 1 per channel
+ * @param variance Display encoded amount per channel the color is drawn around color
+ * @param out Receives the linear color, of the display encoded draw clamped to 0 to 1
+ */
+static inline void box_particle_color(
+    uint32_t seed,
+    uint32_t index,
+    const float *color,
+    const float *variance,
+    float *out)
+{
+    int32_t c;
+    for (c = 0; c < 3; c ++) {
+        float u = box_particle_unit(
+            box_particle_hash(seed, index, BOX_PARTICLE_STREAM_COLOR + (uint32_t)c));
+        float v = color[c] + (2.0f * u - 1.0f) * variance[c];
+        out[c] = box_particle_decode(fminf(fmaxf(v, 0.0f), 1.0f));
+    }
 }
 
 /** Convert seconds to whole microseconds, clamped to 0 to BOX_PARTICLE_LIFE_MAX_US.
@@ -246,25 +348,121 @@ static inline void box_particle_cone(
     }
 }
 
-/** Advance a particle by a frame with semi implicit Euler.
+/** Draw the phase of the wander field of an emitter from its seed, which the extract sends in
+ * the block, so it has no WGSL twin.
+ *
+ * @param seed The seed of the emitter
+ * @param out Receives the phase, 0 to 64 per axis
+ */
+static inline void box_particle_phase(
+    uint32_t seed,
+    float *out)
+{
+    uint32_t c;
+    for (c = 0; c < 3; c ++) {
+        out[c] = 64.0f * box_particle_unit(
+            box_particle_hash(seed, c, BOX_PARTICLE_STREAM_WANDER));
+    }
+}
+
+/** Evaluate the wander field: a sum of sines of the position times the scale, offset by the
+ * phase, times the turbulence. No component depends on its own axis, so the field has no
+ * divergence, and each lies in -turbulence to turbulence.
+ *
+ * @param position World position
+ * @param phase Offset of the field
+ * @param scale Frequency multiplier
+ * @param turbulence Acceleration of the field
+ * @param out Receives the acceleration
+ */
+static inline void box_particle_wander(
+    const float *position,
+    const float *phase,
+    float scale,
+    float turbulence,
+    float *out)
+{
+    float q[3];
+    int32_t c;
+    for (c = 0; c < 3; c ++) {
+        q[c] = position[c] * scale + phase[c];
+    }
+
+    out[0] = 0.5f * turbulence * (sinf(q[1]) + sinf(1.618f * q[2]));
+    out[1] = 0.5f * turbulence * (sinf(q[2]) + sinf(1.618f * q[0]));
+    out[2] = 0.5f * turbulence * (sinf(q[0]) + sinf(1.618f * q[1]));
+}
+
+/** Advance a particle by a frame: v += (acceleration + wander(p)) * delta, then the exact drag
+ * v = wind + (v - wind) * exp(-drag * delta), then p += v * delta.
  *
  * @param position World position, advanced in place
  * @param velocity World velocity, advanced in place
- * @param acceleration Acceleration in world units per second squared
+ * @param forces The forces of the frame
  * @param delta Seconds of the frame
  */
 static inline void box_particle_integrate(
     float *position,
     float *velocity,
-    const float *acceleration,
+    const box_particle_forces_t *forces,
     float delta)
 {
+    float wander[3], keep = expf(-forces->drag * delta);
     int32_t i;
+    box_particle_wander(position, forces->phase, forces->scale, forces->turbulence, wander);
     for (i = 0; i < 3; i ++) {
-        velocity[i] += acceleration[i] * delta;
+        velocity[i] += (forces->acceleration[i] + wander[i]) * delta;
+        velocity[i] = forces->wind[i] + (velocity[i] - forces->wind[i]) * keep;
         position[i] += velocity[i] * delta;
     }
 }
+
+/** Collide a particle with the ground plane after its step: a particle below the plane is
+ * lifted onto it, keeps bounce of its speed into the plane, reversed, and loses friction of
+ * its speed along it, or dies.
+ *
+ * @param position World position, lifted in place
+ * @param velocity World velocity, changed in place
+ * @param ground The ground plane
+ * @return Whether the particle lives on
+ */
+static inline bool box_particle_collide(
+    float *position,
+    float *velocity,
+    const box_particle_ground_t *ground)
+{
+    bool result = true;
+    if (ground->mode == BOX_PARTICLE_GROUND_NONE || position[1] >= ground->height) {
+        goto done;
+    }
+
+    if (ground->mode == BOX_PARTICLE_GROUND_DIE) {
+        result = false;
+        goto done;
+    }
+
+    position[1] = ground->height;
+    if (velocity[1] < 0.0f) {
+        velocity[1] = -velocity[1] * ground->bounce;
+    }
+
+    velocity[0] *= 1.0f - ground->friction;
+    velocity[2] *= 1.0f - ground->friction;
+done:
+    return result;
+}
+
+/** Draw the properties of a particle of an emitter as the spawn and the draw shaders do, each
+ * from its own stream.
+ *
+ * @param emitter The emitter
+ * @param index The spawn index of the particle
+ * @param out Receives the draws
+ */
+void box_particle_sample(
+    const ParticleEmitter *emitter,
+    uint32_t index,
+    box_particle_sample_t *out);
 
 /** Sample points over the surface of a mesh, area weighted, as the table of an EmitterMesh.
  *

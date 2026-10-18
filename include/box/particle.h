@@ -42,14 +42,54 @@ ECS_STRUCT(ParticleRange, {
     float max;          /**< Largest value; a max not above min hands out min */
 });
 
+/** Forces on the particles of emitters, as a world singleton, on an entity that
+ * ParticleEmitter.forces names or on the emitter entity itself.
+ *
+ * An emitter adds up the forces of the three, multiplying their turbulence scales. A frame
+ * adds (acceleration + gravity + wander) * delta to the velocity, pulls it toward the wind
+ * with v = wind + (v - wind) * exp(-drag * delta), then adds the velocity times the delta.
+ */
+ECS_STRUCT(ParticleForces, {
+    vec3 gravity;           /**< Acceleration in world units per second squared added to the
+                             *   emitter acceleration, default {0, -9.81, 0} */
+    vec3 wind;              /**< Velocity in world units per second the drag pulls particles
+                             *   toward; wind acts through drag only, default {0, 0, 0} */
+    float drag;             /**< Fraction of the difference between the velocity and the wind
+                             *   lost per second, as a rate of exponential decay, default 0 */
+    float turbulence;       /**< Acceleration of a smooth wander field in world units per
+                             *   second squared, default 0 */
+    float turbulence_scale; /**< Frequency multiplier of the wander field, above 1 for smaller
+                             *   swirls, default 1 */
+});
+
+/** Collision of the particles of the emitter entity with the horizontal plane at height.
+ *
+ * A particle that ends a frame below the plane is lifted onto it, then keeps bounce of its
+ * speed into the plane, reversed, and loses friction of its speed along it, or dies with die.
+ * A particle that dies early keeps its slot and its count in ParticleStats until its lifetime.
+ */
+ECS_STRUCT(ParticleCollision, {
+    bool ground;            /**< Collide with the ground plane, default true */
+    float height;           /**< World height of the ground plane, default 0 */
+    float bounce;           /**< Share of the speed into the plane a hit keeps, reversed, 0 to
+                             *   1, default 0.5 */
+    float friction;         /**< Share of the speed along the plane a hit loses, 0 to 1,
+                             *   default 0.2 */
+    bool die;               /**< Kill a particle that hits the plane instead, default false */
+});
+
 /** An emitter that spawns rate times the frame delta particles a frame, carrying the fraction.
  * Its WorldTransform places the spawn volume and direction; live particles stay in world space.
  * A full pool spawns nothing, and a change of max empties it.
  *
  * ParticlePlayback pauses, stops and resets it; ParticleBurst spawns on top of the rate.
  *
- * Particles move with semi implicit Euler and die once their age reaches their lifetime; each
- * is a camera facing soft circle of its size, color times opacity, over the opaque image.
+ * Particles move under the acceleration and the ParticleForces, collide with the ground plane
+ * of a ParticleCollision of the emitter entity and die once their age reaches their lifetime;
+ * each is a camera facing soft circle of its size, color times opacity, over the opaque image.
+ *
+ * Every property a particle draws has its own random stream, so changing one range does not
+ * change the other draws.
  */
 ECS_STRUCT(ParticleEmitter, {
     int32_t max;            /**< Particles alive at once, clamped to BOX_PARTICLE_MAX, default
@@ -74,7 +114,15 @@ ECS_STRUCT(ParticleEmitter, {
     ParticleRange opacity;  /**< Opacity the color is drawn with, default {1, 1} */
     vec3 acceleration;      /**< Acceleration in world units per second squared, default
                              *   {0, 0, 0} */
+    float inherit_velocity; /**< Share of the world velocity of the emitter a particle gets at
+                             *   spawn, the velocity measured from the WorldTransform between
+                             *   frames, default 0 */
     rgb color;              /**< Display encoded color, default {255, 255, 255} */
+    rgb color_variance;     /**< Display encoded amount per channel the color of a particle
+                             *   is drawn around color, clamped to 0 to 255, default
+                             *   {0, 0, 0} */
+    ecs_entity_t forces;    /**< Entity whose ParticleForces apply besides those of the world
+                             *   and of the emitter entity, default 0 for none */
     uint32_t seed;          /**< Seed of the random draws, default 0 */
 });
 

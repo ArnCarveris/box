@@ -157,6 +157,7 @@
                 "id": "Particle",
                 "benchcases": [
                     "simulate_1m",
+                    "simulate_1m_forces",
                     "draw_1m"
                 ]
             }

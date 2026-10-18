@@ -32,8 +32,8 @@ typedef struct box_render_particle_block_t {
     float direction[4];     /**< Unit direction in emitter space or zero, w the cosine of the
                              *   spread */
     float extents[4];       /**< Half size of a box, w the radius of a sphere or disc */
-    float acceleration[4];  /**< World acceleration, w the seconds of the frame */
-    float color[4];         /**< Linear color, w unused */
+    float acceleration[4];  /**< World acceleration plus gravity, w the seconds of the frame */
+    float color[4];         /**< Display encoded color, 0 to 1, w unused */
     float speed[2];         /**< Range of the initial speed */
     float size[2];          /**< Range of the diameter */
     float rotation[2];      /**< Range of the initial rotation in degrees */
@@ -53,7 +53,18 @@ typedef struct box_render_particle_block_t {
     uint32_t delta_us;      /**< Microseconds of the frame */
     uint32_t life_min;      /**< Shortest lifetime in microseconds */
     uint32_t life_span;     /**< Microseconds the longest lifetime is above life_min */
-    uint32_t pad1[9];       /**< Pads the block to the uniform offset alignment */
+    uint32_t pad1;          /**< Unused */
+    float wind[4];          /**< World velocity the drag pulls toward, w the drag rate */
+    float turbulence[4];    /**< Acceleration of the wander field, y its frequency scale, zw
+                             *   unused */
+    float wander[4];        /**< Phase of the wander field drawn from the seed, w unused */
+    float variance[4];      /**< Display encoded color variance, 0 to 1, w unused */
+    float inherit[4];       /**< World velocity every spawn of the frame gets, w unused */
+    float ground[4];        /**< Height of the ground plane, y the bounce, z the friction, w
+                             *   unused */
+    uint32_t collide;       /**< BOX_PARTICLE_GROUND_NONE, _BOUNCE or _DIE */
+    uint32_t pad2[47];      /**< Pads the block to a multiple of the uniform offset
+                             *   alignment */
 } box_render_particle_block_t;
 
 /** A particle pool of the frame: a range of a particle page, simulated after the scatters and

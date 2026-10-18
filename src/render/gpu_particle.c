@@ -15,8 +15,9 @@
 /** Invocations of a workgroup of the particle compute shader */
 #define BOX_GPU_PARTICLE_GROUP (256u)
 
-/** Bytes between the blocks of two pools, the dynamic offset alignment of webgpu */
-#define BOX_GPU_PARTICLE_STRIDE (256u)
+/** Bytes between the blocks of two pools, a multiple of the dynamic offset alignment of
+ * webgpu */
+#define BOX_GPU_PARTICLE_STRIDE (512u)
 
 /** Bytes of the indirect draw arguments of a pool */
 #define BOX_GPU_PARTICLE_ARGS (16u)

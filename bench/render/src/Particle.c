@@ -1,7 +1,7 @@
 /**
  * @file Particle.c
  * @brief Benchmarks for a pool of one million live particles: the frame with the integrate and
- * spawn passes alone, and with the draw of the pool in a view.
+ * spawn passes alone, with three active forces, and with the draw of the pool in a view.
  *
  * The main thread renders and each frame waits for the GPU by reading a word of the particle
  * page back, so a frame measures the extract, the compute passes and the draw of the pool.
@@ -21,10 +21,12 @@
  *
  * @param b The benchmark
  * @param draw Whether a view draws the pool
+ * @param forces Whether gravity, drag toward a wind and turbulence act on the particles
  */
 static void bench_particles(
     bench_t *b,
-    bool draw)
+    bool draw,
+    bool forces)
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -56,6 +58,13 @@ static void bench_particles(
     p->size = (ParticleRange){0.02f, 0.05f};
     p->acceleration[1] = -2;
     ecs_modified(world, e, ParticleEmitter);
+    if (forces) {
+        ecs_set(world, e, ParticleForces, {
+            .gravity = {0, -9.81f, 0}, .wind = {3, 0, 1}, .drag = 0.8f, .turbulence = 4,
+            .turbulence_scale = 1.5f
+        });
+    }
+
     ecs_entity_t surface = ecs_new(world);
     ecs_set(world, surface, Surface, {.width = 1280, .height = 720, .resolution_scale = 1});
 
@@ -89,12 +98,19 @@ void Particle_simulate_1m(
     bench_t *b)
 {
     // particle/bench
-    bench_particles(b, false);
+    bench_particles(b, false, false);
+}
+
+void Particle_simulate_1m_forces(
+    bench_t *b)
+{
+    // particle/bench
+    bench_particles(b, false, true);
 }
 
 void Particle_draw_1m(
     bench_t *b)
 {
     // particle/bench
-    bench_particles(b, true);
+    bench_particles(b, true, false);
 }

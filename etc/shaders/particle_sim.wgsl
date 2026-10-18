@@ -1,9 +1,11 @@
 // Particle simulation: one dispatch of each entry point per pool of the packet. integrate ages
 // the used slots of the pool by the frame, frees the particles whose age reached their
-// lifetime and moves the others with semi implicit Euler, and writes the indirect draw
-// arguments of the pool. spawn then writes the spawned particles into the slots the extract
-// picked. Each spawn draws its lifetime, position, direction and speed from the seed and its
-// spawn index; the C twin is box_particle_* in src/particle/simulate.h.
+// lifetime, moves the others under the acceleration, gravity, wander field and drag toward the
+// wind and collides them with the ground plane, and writes the indirect draw arguments of the
+// pool. spawn then writes the spawned particles into the slots the extract picked. Each spawn
+// draws its lifetime, position, direction and speed from the seed and its spawn index, each
+// from its own stream, and adds the velocity it inherits from the emitter; the C twin is
+// box_particle_* in src/particle/simulate.h.
 #include "include/particle.wgsl"
 
 @group(0) @binding(0) var<uniform> emitter: Emitter;
@@ -34,9 +36,11 @@ fn integrate(@builtin(global_invocation_id) id: vec3u) {
 
     p.remaining = particle_age(p.remaining, emitter.life.x);
     if (p.remaining != 0u) {
-        let delta = emitter.acceleration.w;
-        p.velocity += emitter.acceleration.xyz * delta;
-        p.position += p.velocity * delta;
+        particle_integrate(&p, emitter.acceleration.xyz, emitter.wind, emitter.turbulence.xy,
+            emitter.wander.xyz, emitter.acceleration.w);
+        if (!particle_collide(&p, emitter.ground.xyz, emitter.collide.x)) {
+            p.remaining = 0u;
+        }
     }
 
     particles[i] = p;
@@ -78,7 +82,7 @@ fn spawn(@builtin(global_invocation_id) id: vec3u) {
     var p: Particle;
     p.position = (emitter.model * vec4f(local, 1.0)).xyz;
     p.remaining = particle_life(seed, index, emitter.life.y, emitter.life.z);
-    p.velocity = direction * speed;
+    p.velocity = direction * speed + emitter.inherit.xyz;
     p.index = index;
     particles[slot] = p;
 }

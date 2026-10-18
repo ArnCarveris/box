@@ -1,0 +1,59 @@
+// Forces on particles. Left: grey smoke rising from a chimney that a strong wind (the forces
+// entity breeze, through drag) bends to the right, with turbulence and a color variance.
+// Right: orange sparks with a wide speed variance thrown up and pulled down by a strong
+// gravity onto the ground plane at height 0, where they bounce and slide outward. The forces
+// are exaggerated so the three frames of a visual run show them.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.particle
+
+camera {
+  Position: {0, 3, 10}
+  Rotation: {-0.25, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {16, 18, 28, 255}}}
+}
+
+floor {
+  Position: {0, -0.05, 0}
+  Box: {16, 0.1, 8}
+  Rgb: {70, 72, 80}
+}
+
+chimney {
+  Position: {-4, 0.5, 0}
+  Box: {0.6, 1, 0.6}
+  Rgb: {140, 60, 50}
+}
+
+// Wind of 120 units per second to the right that the smoke follows with drag 40
+breeze {
+  ParticleForces: {gravity: {0, 0, 0}, wind: {120, 0, 0}, drag: 40}
+}
+
+smoke {
+  Position: {-4, 1.1, 0}
+  ParticleEmitter: {
+    max: 4000, rate: 30000, shape: EmitterSphere, radius: 0.45, spread: 10,
+    speed: {20, 60}, lifetime: {2, 2}, size: {0.35, 0.7}, opacity: {0.08, 0.25},
+    color: {170, 170, 175}, color_variance: {30, 30, 30}, forces: breeze, seed: 3
+  }
+  ParticleForces: {gravity: {0, 0, 0}, turbulence: 400, turbulence_scale: 2}
+}
+
+sparks {
+  Position: {2, 0.6, 0}
+  ParticleEmitter: {
+    max: 4000, rate: 30000, shape: EmitterSphere, radius: 0.1, spread: 70,
+    speed: {20, 140}, lifetime: {2, 2}, size: {0.05, 0.1}, opacity: {0.7, 1},
+    color: {255, 170, 60}, color_variance: {0, 60, 50}, seed: 4
+  }
+  ParticleForces: {gravity: {0, -3000, 0}}
+  ParticleCollision: {height: 0, bounce: 0.3, friction: 0.3}
+}

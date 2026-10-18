@@ -35,6 +35,52 @@ static void box_particle_emitter_ctor(
     }
 }
 
+/** Construct ParticleForces values: earth gravity, no wind, drag or turbulence.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_particle_forces_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    ParticleForces *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (ParticleForces){
+            .gravity = {0, -9.81f, 0},
+            .turbulence_scale = 1.0f
+        };
+    }
+}
+
+/** Construct ParticleCollision values: a ground plane at height 0 that keeps half the speed
+ * into it and a fifth of the speed along it.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_particle_collision_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    ParticleCollision *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (ParticleCollision){
+            .ground = true,
+            .bounce = 0.5f,
+            .friction = 0.2f
+        };
+    }
+}
+
 void BoxParticleImport(
     ecs_world_t *world)
 {
@@ -47,6 +93,10 @@ void BoxParticleImport(
 
     ECS_META_COMPONENT(world, EmitterShape);
     ECS_META_COMPONENT(world, ParticleRange);
+    ECS_META_COMPONENT(world, ParticleForces);
+    ecs_set_hooks(world, ParticleForces, { .ctor = box_particle_forces_ctor });
+    ECS_META_COMPONENT(world, ParticleCollision);
+    ecs_set_hooks(world, ParticleCollision, { .ctor = box_particle_collision_ctor });
     ECS_META_COMPONENT(world, ParticleEmitter);
     ecs_set_hooks(world, ParticleEmitter, { .ctor = box_particle_emitter_ctor });
     ECS_META_COMPONENT(world, PlaybackState);

@@ -1,6 +1,7 @@
 /**
  * @file particle/simulate.c
- * @brief Samples the point table of an EmitterMesh over the surface of a mesh.
+ * @brief Samples the point table of an EmitterMesh over the surface of a mesh and draws the
+ * properties of a particle as the shaders do.
  */
 
 #include "simulate.h"
@@ -113,4 +114,50 @@ done:
     ecs_os_free(cdf);
 
     return result;
+}
+
+void box_particle_sample(
+    const ParticleEmitter *emitter,
+    uint32_t index,
+    box_particle_sample_t *out)
+{
+    uint32_t seed = emitter->seed;
+    uint32_t life_min = box_particle_us(emitter->lifetime.min);
+    uint32_t life_max = box_particle_us(emitter->lifetime.max);
+    float spread = glm_clamp(emitter->spread, 0.0f, 180.0f);
+    float n[3] = { emitter->direction[0], emitter->direction[1], emitter->direction[2] };
+    float u[2] = {
+        box_particle_unit(box_particle_hash(seed, index, BOX_PARTICLE_STREAM_DIRECTION)),
+        box_particle_unit(box_particle_hash(seed, index, BOX_PARTICLE_STREAM_DIRECTION + 1u))
+    };
+    float color[3] = {
+        (float)emitter->color.r / 255.0f,
+        (float)emitter->color.g / 255.0f,
+        (float)emitter->color.b / 255.0f
+    };
+    float variance[3] = {
+        (float)emitter->color_variance.r / 255.0f,
+        (float)emitter->color_variance.g / 255.0f,
+        (float)emitter->color_variance.b / 255.0f
+    };
+    if (glm_vec3_norm2(n) > 0) {
+        glm_vec3_normalize(n);
+    } else {
+        glm_vec3_zero(n);
+    }
+
+    box_particle_cone(n, cosf(glm_rad(spread)), u, out->direction);
+    out->speed = box_particle_draw(seed, index, BOX_PARTICLE_STREAM_SPEED,
+        emitter->speed.min, emitter->speed.max);
+    out->life = box_particle_life(seed, index, life_min,
+        life_max > life_min ? life_max - life_min : 0);
+    out->size = box_particle_draw(seed, index, BOX_PARTICLE_STREAM_SIZE,
+        emitter->size.min, emitter->size.max);
+    out->rotation = box_particle_draw(seed, index, BOX_PARTICLE_STREAM_ROTATION,
+        emitter->rotation.min, emitter->rotation.max);
+    out->spin = box_particle_draw(seed, index, BOX_PARTICLE_STREAM_SPIN,
+        emitter->spin.min, emitter->spin.max);
+    out->opacity = box_particle_draw(seed, index, BOX_PARTICLE_STREAM_OPACITY,
+        emitter->opacity.min, emitter->opacity.max);
+    box_particle_color(seed, index, color, variance, out->color);
 }

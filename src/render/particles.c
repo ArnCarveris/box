@@ -64,6 +64,8 @@ typedef struct box_particle_pool_t {
     uint32_t table_mesh;    /**< Mesh handle the table was sampled from */
     vec3 table_scale;       /**< Shape scale the table was sampled with */
     uint32_t table_seed;    /**< Seed the table was sampled with */
+    vec3 last_position;     /**< World position of the emitter in the last frame */
+    bool has_last;          /**< last_position holds a position */
 } box_particle_pool_t;
 
 /** A burst of the frame and the emitter whose pool it spawns into */
@@ -91,19 +93,6 @@ typedef struct box_render_particles_t {
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
     int32_t generation;     /**< Generation of that backend, see box_render_backend_t */
 } box_render_particles_t;
-
-/** Decode a display encoded channel to linear.
- *
- * @param c The channel
- * @return The linear value, 0 to 1
- */
-static float box_particles_linear(
-    uint8_t c)
-{
-    float v = (float)c / 255.0f;
-
-    return v <= 0.04045f ? v / 12.92f : powf((v + 0.055f) / 1.055f, 2.4f);
-}
 
 /** Check whether a death comes before another, by clock and then by slot.
  *
@@ -682,16 +671,69 @@ static void box_particles_spawn(
     }
 }
 
+/** Add the forces of a source to the sum of the forces of an emitter, multiplying the
+ * turbulence scale.
+ *
+ * @param f The forces of the source, NULL for none
+ * @param sum The sum
+ */
+static void box_particles_forces_add(
+    const ParticleForces *f,
+    ParticleForces *sum)
+{
+    if (f) {
+        glm_vec3_add(ECS_CONST_CAST(float*, f->gravity), sum->gravity, sum->gravity);
+        glm_vec3_add(ECS_CONST_CAST(float*, f->wind), sum->wind, sum->wind);
+        sum->drag += f->drag;
+        sum->turbulence += f->turbulence;
+        sum->turbulence_scale *= f->turbulence_scale;
+    }
+}
+
+/** Sum the forces on the particles of an emitter: those of the world singleton, of the entity
+ * the emitter names and of the emitter entity, each source counted once.
+ *
+ * @param world The world
+ * @param e The emitter
+ * @param emitter The emitter values
+ * @param out Receives the sum
+ */
+static void box_particles_forces(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    const ParticleEmitter *emitter,
+    ParticleForces *out)
+{
+    ecs_entity_t singleton = ecs_id(ParticleForces);
+    ecs_entity_t named = emitter->forces;
+    ecs_os_memset_t(out, 0, ParticleForces);
+    out->turbulence_scale = 1.0f;
+    box_particles_forces_add(ecs_get(world, singleton, ParticleForces), out);
+    if (named && named != singleton && named != e && ecs_is_alive(world, named)) {
+        box_particles_forces_add(ecs_get(world, named, ParticleForces), out);
+    }
+
+    if (e != singleton) {
+        box_particles_forces_add(ecs_get(world, e, ParticleForces), out);
+    }
+}
+
 /** Write the parameters of an emitter for this frame.
  *
  * @param emitter The emitter values
  * @param transform World transform of the emitter, NULL for the identity
+ * @param forces The sum of the forces on its particles
+ * @param collision Its ground collision, NULL for none
+ * @param inherit World velocity its spawns get
  * @param delta Seconds of the frame
  * @param out Receives the block, every padding member zero
  */
 static void box_particles_block(
     const ParticleEmitter *emitter,
     const WorldTransform *transform,
+    const ParticleForces *forces,
+    const ParticleCollision *collision,
+    const vec3 inherit,
     float delta,
     box_render_particle_block_t *out)
 {
@@ -713,11 +755,12 @@ static void box_particles_block(
     out->direction[3] = cosf(glm_rad(spread));
     glm_vec3_copy(ECS_CONST_CAST(float*, emitter->extents), out->extents);
     out->extents[3] = emitter->radius;
-    glm_vec3_copy(ECS_CONST_CAST(float*, emitter->acceleration), out->acceleration);
+    glm_vec3_add(ECS_CONST_CAST(float*, emitter->acceleration),
+        ECS_CONST_CAST(float*, forces->gravity), out->acceleration);
     out->acceleration[3] = delta;
-    out->color[0] = box_particles_linear(emitter->color.r);
-    out->color[1] = box_particles_linear(emitter->color.g);
-    out->color[2] = box_particles_linear(emitter->color.b);
+    out->color[0] = (float)emitter->color.r / 255.0f;
+    out->color[1] = (float)emitter->color.g / 255.0f;
+    out->color[2] = (float)emitter->color.b / 255.0f;
     out->color[3] = 1.0f;
     out->speed[0] = emitter->speed.min;
     out->speed[1] = emitter->speed.max;
@@ -731,6 +774,49 @@ static void box_particles_block(
     out->opacity[1] = emitter->opacity.max;
     out->shape = (uint32_t)emitter->shape;
     out->seed = emitter->seed;
+    glm_vec3_copy(ECS_CONST_CAST(float*, forces->wind), out->wind);
+    out->wind[3] = forces->drag > 0 ? forces->drag : 0.0f;
+    out->turbulence[0] = forces->turbulence;
+    out->turbulence[1] = forces->turbulence_scale;
+    box_particle_phase(emitter->seed, out->wander);
+    out->variance[0] = (float)emitter->color_variance.r / 255.0f;
+    out->variance[1] = (float)emitter->color_variance.g / 255.0f;
+    out->variance[2] = (float)emitter->color_variance.b / 255.0f;
+    glm_vec3_copy(ECS_CONST_CAST(float*, inherit), out->inherit);
+    if (collision && collision->ground) {
+        out->ground[0] = collision->height;
+        out->ground[1] = glm_clamp(collision->bounce, 0.0f, 1.0f);
+        out->ground[2] = glm_clamp(collision->friction, 0.0f, 1.0f);
+        out->collide = collision->die ? BOX_PARTICLE_GROUND_DIE : BOX_PARTICLE_GROUND_BOUNCE;
+    }
+}
+
+/** Measure the world velocity of an emitter from its position in the last frame.
+ *
+ * @param pool The pool of the emitter, keeps the position
+ * @param transform World transform of the emitter, NULL for the identity
+ * @param delta Seconds of the frame
+ * @param out Receives the velocity, zero in the first frame and for a frame without time
+ */
+static void box_particles_velocity(
+    box_particle_pool_t *pool,
+    const WorldTransform *transform,
+    float delta,
+    vec3 out)
+{
+    vec3 position = {0, 0, 0};
+    if (transform) {
+        glm_vec3_copy(ECS_CONST_CAST(float*, transform->m[3]), position);
+    }
+
+    glm_vec3_zero(out);
+    if (pool->has_last && delta > 0) {
+        glm_vec3_sub(position, pool->last_position, out);
+        glm_vec3_scale(out, 1.0f / delta, out);
+    }
+
+    glm_vec3_copy(position, pool->last_position);
+    pool->has_last = true;
 }
 
 /** Account the frame of one emitter and add its pool to the packet when it has particles.
@@ -768,6 +854,7 @@ static void box_particles_emitter(
     PlaybackState state = playback ? playback->state : ParticlePlaying;
     bool reset = playback && playback->reset;
     uint64_t time = 0;
+    vec3 velocity;
     if (max <= 0) {
         goto done;
     }
@@ -806,6 +893,7 @@ static void box_particles_emitter(
         pool->stopped = false;
     }
 
+    box_particles_velocity(pool, transform, p->delta, velocity);
     age_us = reset || state == ParticlePaused ? 0 : delta_us;
     pool->clock += age_us;
     box_particles_retire(pool);
@@ -840,7 +928,11 @@ static void box_particles_emitter(
     entry->clear = pool->fresh;
     entry->table = pool->table;
     entry->slots = slots;
-    box_particles_block(emitter, transform, age_us ? p->delta : 0.0f, &entry->block);
+    ParticleForces forces;
+    box_particles_forces(world, e, emitter, &forces);
+    glm_vec3_scale(velocity, emitter->inherit_velocity, velocity);
+    box_particles_block(emitter, transform, &forces,
+        ecs_get(world, e, ParticleCollision), velocity, age_us ? p->delta : 0.0f, &entry->block);
     entry->block.count = count;
     entry->block.first = first;
     entry->block.used = pool->used;

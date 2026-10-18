@@ -63,6 +63,40 @@ static const box_render_particle_pool_t* pool_of(
     return result;
 }
 
+/** Create an emitter with the constructor values that spawns a particle every frame.
+ *
+ * @param world The world
+ * @return The emitter
+ */
+static ecs_entity_t emitter_new(
+    ecs_world_t *world)
+{
+    ecs_entity_t e = ecs_new(world);
+    ecs_add(world, e, ParticleEmitter);
+    ecs_get_mut(world, e, ParticleEmitter)->rate = 60;
+    ecs_modified(world, e, ParticleEmitter);
+
+    return e;
+}
+
+/** Check three floats of a block against values.
+ *
+ * @param v The floats
+ * @param x The first value
+ * @param y The second value
+ * @param z The third value
+ */
+static void check_vec3(
+    const float *v,
+    float x,
+    float y,
+    float z)
+{
+    test_assert(fabsf(v[0] - x) < 1e-4f);
+    test_assert(fabsf(v[1] - y) < 1e-4f);
+    test_assert(fabsf(v[2] - z) < 1e-4f);
+}
+
 /** Check the constructor values of an emitter.
  *
  * @param p The emitter
@@ -100,6 +134,11 @@ static void check_defaults(
     test_int(p->color.r, 255);
     test_int(p->color.g, 255);
     test_int(p->color.b, 255);
+    test_flt(p->inherit_velocity, 0);
+    test_int(p->color_variance.r, 0);
+    test_int(p->color_variance.g, 0);
+    test_int(p->color_variance.b, 0);
+    test_uint(p->forces, 0);
     test_uint(p->seed, 0);
 }
 
@@ -280,7 +319,7 @@ void Emitter_extracted_block(void) {
     test_uint(b->delta_us, 16667);
     test_uint(b->life_min, 500000);
     test_uint(b->life_span, 1000000);
-    test_int(sizeof(box_render_particle_block_t), 256);
+    test_int(sizeof(box_render_particle_block_t), 512);
 
     frame(world);
     pool = pool_of(null, e);
@@ -407,6 +446,313 @@ void Emitter_mesh_table_sent(void) {
     }
 
     test_int(uploads, 1);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void Emitter_forces_defaults(void) {
+    // particle/forces
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t e = ecs_new(world);
+    ecs_add(world, e, ParticleForces);
+    ecs_add(world, e, ParticleCollision);
+    const ParticleForces *f = ecs_get(world, e, ParticleForces);
+    test_assert(f != NULL);
+    check_vec3(f->gravity, 0, -9.81f, 0);
+    check_vec3(f->wind, 0, 0, 0);
+    test_flt(f->drag, 0);
+    test_flt(f->turbulence, 0);
+    test_flt(f->turbulence_scale, 1);
+    const ParticleCollision *c = ecs_get(world, e, ParticleCollision);
+    test_assert(c != NULL);
+    test_bool(c->ground, true);
+    test_flt(c->height, 0);
+    test_flt(c->bounce, 0.5f);
+    test_flt(c->friction, 0.2f);
+    test_bool(c->die, false);
+    test_assert(ecs_singleton_get(world, ParticleForces) == NULL);
+
+    ecs_fini(world);
+}
+
+void Emitter_forces_script(void) {
+    // particle/forces
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+
+    test_assert(ecs_script_run(world, "forces",
+        "using box.particle\n"
+        "zone { ParticleForces: {wind: {5, 0, 0}, drag: 1, turbulence: 2, "
+        "turbulence_scale: 3} }\n"
+        "plain { ParticleForces: {} }\n"
+        "e { ParticleEmitter: {rate: 60, forces: zone, inherit_velocity: 0.5, "
+        "color_variance: {10, 20, 30}}\n"
+        "    ParticleCollision: {height: 1, die: true} }\n", NULL) == 0);
+
+    ecs_entity_t zone = ecs_lookup(world, "zone"), e = ecs_lookup(world, "e");
+    const ParticleForces *f = ecs_get(world, zone, ParticleForces);
+    test_assert(f != NULL);
+    check_vec3(f->gravity, 0, -9.81f, 0);
+    check_vec3(f->wind, 5, 0, 0);
+    test_flt(f->turbulence_scale, 3);
+    f = ecs_get(world, ecs_lookup(world, "plain"), ParticleForces);
+    test_assert(f != NULL);
+    check_vec3(f->gravity, 0, -9.81f, 0);
+    test_flt(f->turbulence_scale, 1);
+    const ParticleEmitter *p = ecs_get(world, e, ParticleEmitter);
+    test_uint(p->forces, zone);
+    test_flt(p->inherit_velocity, 0.5f);
+    test_int(p->color_variance.b, 30);
+    const ParticleCollision *c = ecs_get(world, e, ParticleCollision);
+    test_bool(c->ground, true);
+    test_flt(c->height, 1);
+    test_bool(c->die, true);
+
+    frame(world);
+    const box_render_particle_pool_t *pool = pool_of(null, e);
+    test_assert(pool != NULL);
+    check_vec3(pool->block.acceleration, 0, -9.81f, 0);
+    check_vec3(pool->block.wind, 5, 0, 0);
+    test_flt(pool->block.wind[3], 1);
+    test_flt(pool->block.turbulence[0], 2);
+    test_flt(pool->block.turbulence[1], 3);
+    test_uint(pool->block.collide, BOX_PARTICLE_GROUND_DIE);
+    test_flt(pool->block.ground[0], 1);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void Emitter_forces_add_up(void) {
+    // particle/forces
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+
+    ecs_singleton_set(world, ParticleForces, {
+        .gravity = {0, -10, 0}, .wind = {1, 0, 0}, .drag = 0.5f, .turbulence = 1,
+        .turbulence_scale = 2
+    });
+    ecs_entity_t zone = ecs_new(world);
+    ecs_set(world, zone, ParticleForces, {
+        .gravity = {0, 0, 1}, .wind = {0, 2, 0}, .drag = 0.25f, .turbulence = 2,
+        .turbulence_scale = 3
+    });
+    ecs_entity_t e = emitter_new(world);
+    ecs_set(world, e, ParticleForces, {
+        .gravity = {1, 0, 0}, .wind = {0, 0, 4}, .drag = 1, .turbulence = 0.5f,
+        .turbulence_scale = 0.5f
+    });
+    ParticleEmitter *p = ecs_get_mut(world, e, ParticleEmitter);
+    p->forces = zone;
+    p->acceleration[1] = 1;
+    p->seed = 5;
+    ecs_modified(world, e, ParticleEmitter);
+    frame(world);
+
+    const box_render_particle_pool_t *pool = pool_of(null, e);
+    test_assert(pool != NULL);
+    const box_render_particle_block_t *b = &pool->block;
+    check_vec3(b->acceleration, 1, -9, 1);
+    test_flt(b->acceleration[3], DELTA);
+    check_vec3(b->wind, 1, 2, 4);
+    test_flt(b->wind[3], 1.75f);
+    test_flt(b->turbulence[0], 3.5f);
+    test_flt(b->turbulence[1], 3);
+    float phase[3];
+    box_particle_phase(5, phase);
+    check_vec3(b->wander, phase[0], phase[1], phase[2]);
+
+    ecs_remove(world, e, ParticleForces);
+    frame(world);
+    b = &pool_of(null, e)->block;
+    check_vec3(b->acceleration, 0, -9, 1);
+    check_vec3(b->wind, 1, 2, 0);
+    test_flt(b->wind[3], 0.75f);
+    test_flt(b->turbulence[0], 3);
+    test_flt(b->turbulence[1], 6);
+
+    ecs_singleton_remove(world, ParticleForces);
+    frame(world);
+    b = &pool_of(null, e)->block;
+    check_vec3(b->acceleration, 0, 1, 1);
+    test_flt(b->turbulence[1], 3);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void Emitter_forces_counted_once(void) {
+    // particle/forces
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+
+    ecs_singleton_set(world, ParticleForces, { .gravity = {0, -1, 0}, .turbulence_scale = 2 });
+    ecs_entity_t e = emitter_new(world);
+    ecs_set(world, e, ParticleForces, { .gravity = {0, -2, 0}, .turbulence_scale = 3 });
+    ecs_get_mut(world, e, ParticleEmitter)->forces = e;
+    ecs_modified(world, e, ParticleEmitter);
+    frame(world);
+    const box_render_particle_block_t *b = &pool_of(null, e)->block;
+    check_vec3(b->acceleration, 0, -3, 0);
+    test_flt(b->turbulence[1], 6);
+
+    ecs_get_mut(world, e, ParticleEmitter)->forces = ecs_id(ParticleForces);
+    ecs_modified(world, e, ParticleEmitter);
+    frame(world);
+    b = &pool_of(null, e)->block;
+    check_vec3(b->acceleration, 0, -3, 0);
+    test_flt(b->turbulence[1], 6);
+
+    ecs_entity_t bare = ecs_new(world);
+    ecs_get_mut(world, e, ParticleEmitter)->forces = bare;
+    ecs_modified(world, e, ParticleEmitter);
+    frame(world);
+    b = &pool_of(null, e)->block;
+    check_vec3(b->acceleration, 0, -3, 0);
+
+    ecs_entity_t gone = ecs_new(world);
+    ecs_set(world, gone, ParticleForces, { .gravity = {0, -4, 0}, .turbulence_scale = 1 });
+    ecs_get_mut(world, e, ParticleEmitter)->forces = gone;
+    ecs_modified(world, e, ParticleEmitter);
+    frame(world);
+    check_vec3(pool_of(null, e)->block.acceleration, 0, -7, 0);
+    ecs_delete(world, gone);
+    frame(world);
+    check_vec3(pool_of(null, e)->block.acceleration, 0, -3, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void Emitter_no_forces_no_gravity(void) {
+    // particle/forces
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+
+    ecs_entity_t e = emitter_new(world);
+    ecs_get_mut(world, e, ParticleEmitter)->acceleration[2] = 3;
+    ecs_modified(world, e, ParticleEmitter);
+    frame(world);
+
+    const box_render_particle_block_t *b = &pool_of(null, e)->block;
+    check_vec3(b->acceleration, 0, 0, 3);
+    check_vec3(b->wind, 0, 0, 0);
+    test_flt(b->wind[3], 0);
+    test_flt(b->turbulence[0], 0);
+    test_flt(b->turbulence[1], 1);
+    check_vec3(b->variance, 0, 0, 0);
+    check_vec3(b->inherit, 0, 0, 0);
+    test_uint(b->collide, BOX_PARTICLE_GROUND_NONE);
+
+    ecs_set(world, e, ParticleForces, { .drag = -2, .turbulence_scale = 1 });
+    frame(world);
+    test_flt(pool_of(null, e)->block.wind[3], 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void Emitter_inherit_velocity(void) {
+    // particle/emitter
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+
+    ecs_entity_t e = emitter_new(world);
+    ecs_set(world, e, Position, {0, 0, 0});
+    ecs_get_mut(world, e, ParticleEmitter)->inherit_velocity = 0.5f;
+    ecs_modified(world, e, ParticleEmitter);
+    frame(world);
+    check_vec3(pool_of(null, e)->block.inherit, 0, 0, 0);
+
+    ecs_set(world, e, Position, {1, 0, 0});
+    frame(world);
+    const box_render_particle_block_t *b = &pool_of(null, e)->block;
+    test_assert(fabsf(b->inherit[0] - 0.5f / DELTA) < 1e-2f);
+    test_assert(fabsf(b->inherit[1]) < 1e-4f);
+    test_assert(fabsf(b->inherit[2]) < 1e-4f);
+
+    ecs_set(world, e, Position, {1, 2, 0});
+    frame(world);
+    b = &pool_of(null, e)->block;
+    test_assert(fabsf(b->inherit[0]) < 1e-4f);
+    test_assert(fabsf(b->inherit[1] - 1.0f / DELTA) < 1e-2f);
+
+    frame(world);
+    check_vec3(pool_of(null, e)->block.inherit, 0, 0, 0);
+
+    ecs_get_mut(world, e, ParticleEmitter)->inherit_velocity = 0;
+    ecs_modified(world, e, ParticleEmitter);
+    ecs_set(world, e, Position, {5, 5, 5});
+    frame(world);
+    check_vec3(pool_of(null, e)->block.inherit, 0, 0, 0);
+
+    ecs_get_mut(world, e, ParticleEmitter)->inherit_velocity = 2;
+    ecs_modified(world, e, ParticleEmitter);
+    ecs_set(world, e, Position, {5, 5, 4});
+    frame(world);
+    b = &pool_of(null, e)->block;
+    test_assert(fabsf(b->inherit[2] + 2.0f / DELTA) < 1e-2f);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void Emitter_color_variance_in_block(void) {
+    // particle/emitter
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+
+    ecs_entity_t e = emitter_new(world);
+    ParticleEmitter *p = ecs_get_mut(world, e, ParticleEmitter);
+    p->color = (rgb){255, 128, 0};
+    p->color_variance = (rgb){10, 20, 255};
+    ecs_modified(world, e, ParticleEmitter);
+    frame(world);
+
+    const box_render_particle_block_t *b = &pool_of(null, e)->block;
+    check_vec3(b->color, 1, 128.0f / 255.0f, 0);
+    check_vec3(b->variance, 10.0f / 255.0f, 20.0f / 255.0f, 1);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void Emitter_collision_in_block(void) {
+    // particle/collision
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+
+    ecs_entity_t e = emitter_new(world);
+    ecs_add(world, e, ParticleCollision);
+    frame(world);
+    const box_render_particle_block_t *b = &pool_of(null, e)->block;
+    test_uint(b->collide, BOX_PARTICLE_GROUND_BOUNCE);
+    check_vec3(b->ground, 0, 0.5f, 0.2f);
+
+    ecs_set(world, e, ParticleCollision, {
+        .ground = true, .height = 2, .bounce = 1.5f, .friction = -1
+    });
+    frame(world);
+    b = &pool_of(null, e)->block;
+    test_uint(b->collide, BOX_PARTICLE_GROUND_BOUNCE);
+    check_vec3(b->ground, 2, 1, 0);
+
+    ecs_set(world, e, ParticleCollision, { .ground = true, .height = -1, .die = true });
+    frame(world);
+    b = &pool_of(null, e)->block;
+    test_uint(b->collide, BOX_PARTICLE_GROUND_DIE);
+    test_flt(b->ground[0], -1);
+
+    ecs_set(world, e, ParticleCollision, { .ground = false, .height = 3, .die = true });
+    frame(world);
+    test_uint(pool_of(null, e)->block.collide, BOX_PARTICLE_GROUND_NONE);
+
+    ecs_remove(world, e, ParticleCollision);
+    frame(world);
+    test_uint(pool_of(null, e)->block.collide, BOX_PARTICLE_GROUND_NONE);
 
     ecs_fini(world);
     box_render_null_free(null);

@@ -26,7 +26,15 @@
                     "extracted_block",
                     "block_follows_transform",
                     "spawn_slots_in_packet",
-                    "mesh_table_sent"
+                    "mesh_table_sent",
+                    "forces_defaults",
+                    "forces_script",
+                    "forces_add_up",
+                    "forces_counted_once",
+                    "no_forces_no_gravity",
+                    "inherit_velocity",
+                    "color_variance_in_block",
+                    "collision_in_block"
                 ]
             },
             {
@@ -63,7 +71,21 @@
                     "cone_zero_direction",
                     "integrate_constant_acceleration",
                     "same_seed_same_draws",
-                    "other_seed_other_draws"
+                    "other_seed_other_draws",
+                    "integrate_drag_toward_wind",
+                    "integrate_gravity_and_drag",
+                    "integrate_wind_needs_drag",
+                    "wander_bounded",
+                    "wander_scale_and_phase",
+                    "integrate_turbulence",
+                    "color_within_variance",
+                    "sample_in_range",
+                    "sample_streams_independent",
+                    "sample_fixed_seed",
+                    "ground_bounce",
+                    "ground_friction",
+                    "ground_die",
+                    "ground_above_plane"
                 ]
             },
             {
