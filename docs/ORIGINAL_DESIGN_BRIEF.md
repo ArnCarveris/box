@@ -1,5 +1,5 @@
 # Box
-A framework for building 2D/3D games written with flecs.
+A framework for building 2D/3D games written with flecs. This is the original design brief for the project, and the information in this document may be incomplete and out of date.
 
 - You will build a 2D/3D framework for building games
 - The framework will be Flecs-native
