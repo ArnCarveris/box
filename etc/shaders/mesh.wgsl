@@ -252,7 +252,8 @@ fn visibility_from(index: u32, offset: vec3f) -> f32 {
 // position clamps to the border probes. Without a valid probe it is the ambient (the SH of the
 // environment of the view, else the hemisphere), which also makes up the weight the visible
 // probes lack below VISIBILITY_FALLBACK of the weight of every valid probe, so a surface that
-// sees none of its probes does not take the light of the probes behind it. The SH evaluation is linear in the coefficients, so every probe
+// sees none of its probes does not take the light of the probes behind it. The SH evaluation is
+// linear in the coefficients, so every probe
 // is evaluated in the two directions and the results are blended; the hemisphere ambient is
 // the irradiance its SH projection evaluates to.
 fn volume_irradiance(world: vec3f, n: vec3f, spec: vec3f) -> Indirect {

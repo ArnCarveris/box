@@ -190,7 +190,8 @@ outcome arrives after the frame. A new module replaces the old one only once its
 and compiled, so a failed module keeps the old one. Compile errors come back into
 `ShaderStatus` as `file:line: message`, mapped through a per line source table. Engine shaders
 live in `etc/shaders` (blit, mesh, shape2d, scatter, cull, cluster, shadow, bloom, ssao, fog,
-tonemap, exposure, bake_sh, environment) with shared includes. `tools/wgsl_check.mjs` validates them with Tint.
+tonemap, exposure, bake_sh, environment; `environment.wgsl` converts source images and also draws
+the environment background) with shared includes. `tools/wgsl_check.mjs` validates them with Tint.
 
 ## Scenes
 
@@ -608,6 +609,32 @@ equirectangular image into the target, four samples per texel: the center column
 -Z, +X is to its right, the edges look along +Z and the top row is +Y. A file that cannot be read
 or decoded sets `error`. `etc/environments` holds `axes.hdr` (a color per axis direction) and
 `sky.hdr` (a gradient sky), written by `tools/environment_images.py`.
+
+**Shading** (`gpu_environment.c`, `mesh.wgsl`, `environment.wgsl`). Besides processing sources,
+`gpu_environment.c` supplies the forward pass: the environment cube (mip chain, filtered) at
+group 0 binding 12 and its 9 SH coefficients as a uniform at binding 13 (bindings 9 to 11 were
+already taken by the aerial perspective volume, its sampler and the clips; no storage buffer or
+bind group is added). A view without an environment binds the black reflection slot and zero SH.
+Per view values (`intensity`, cos and sin of `yaw`, an enabled flag) live in the free space of
+the view uniform; the flag is written only for a processed environment. With `background`,
+`gpu_environment.c` also owns the background pipeline: `environment.wgsl` draws one full view
+triangle as the first draw of the pass (phases 0 and 1, no depth test or write) in place of the
+clear color, following the camera and `yaw`.
+
+| Light | Order (first that applies wins or blends first) |
+| --- | --- |
+| Diffuse | irradiance grid (`LightBake` volume, valid probes), then the environment SH times `intensity` rotated by `yaw`, then the hemisphere |
+| Specular | cluster listed reflection probes (blend order), then the ready scene probe, then the environment (mip `roughness * (levels - 1)`), then the fallback |
+
+The environment SH replaces the hemisphere wherever `ambient()` was used: no volume, invalid
+probes, and the visibility fallback. In a baked view the environment specular is normalized like
+a probe, by grid luminance over the SH luminance, clamped 0 to 2. The env BRDF term is kept. A
+view without an environment takes the old code paths and renders as before.
+
+**Captures keep the hemisphere.** Light bake and reflection captures bind no environment (zero
+uniforms, black slot, zero SH), so texels no probe or geometry covers get the hemisphere.
+Views of one scene can use different environments, so a capture cannot pick one; the Atmosphere
+epic adds a scene level setting for captures later.
 
 ## Spatial index
 

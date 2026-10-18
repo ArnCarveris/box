@@ -428,7 +428,7 @@ void Environment_processing_time_measured(void) {
 /** Render the background of a view that looks along -Z at nothing, lit by axes.hdr, and get the
  * pixel at the center of the image.
  *
- * @param yaw EnvironmentSettings.yaw
+ * @param yaw LightSettings.environment.yaw
  * @param background EnvironmentSettings.background
  * @param out Receives red, green and blue
  */
