@@ -2,8 +2,7 @@
 
 A data-driven 2D/3D game framework built on [Flecs](https://github.com/SanderMertens/flecs)
 and WebGPU. Scenes, assets and configuration are entities and components; the
-engine reacts to component changes. See `DESIGN.md` for the full brief and
-`docs/ARCHITECTURE.md` for the module layout.
+engine reacts to component changes. See `DESIGN.md` for the full brief.
 
 ## Prerequisites
 

@@ -78,7 +78,7 @@ ECS_STRUCT(AmbientLight, {
  *
  * A bake is bounces + 1 passes: the first captures direct light and emission, each later one
  * adds a bounce. A change rebakes the probes it can reach, which keep their values meanwhile
- * (static shapes, lights; see docs/ARCHITECTURE.md, Invalidation). Dynamic shapes rebake none.
+ * (static shapes, lights). Dynamic shapes rebake none.
  *
  * Values apply as specified: bounces 0 bakes direct emission and light only, budget_ms 0 bakes
  * nothing, a capture_size outside 1 to 256 or bounces outside 0 to 16 bakes nothing and sets
