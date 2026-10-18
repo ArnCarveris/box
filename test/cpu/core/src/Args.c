@@ -22,6 +22,7 @@ void Args_defaults(void) {
     test_flt(app->timeout, 0);
     test_flt(app->cpu_budget, 100);
     test_flt(app->fps, 0);
+    test_flt(app->delta_time, 0);
     test_int(app->port, 27750);
     test_assert(app->scene == NULL);
 
@@ -161,8 +162,9 @@ void Args_all_options(void) {
     ECS_IMPORT(world, Box);
 
     char *argv[] = {"boxrun", "--headless", "--frames", "5", "--timeout", "30",
-        "--cpu-budget", "50", "--fps", "30", "--port", "8000", "scene.flecs"};
-    test_int(box_app_parse(world, 13, argv), 0);
+        "--cpu-budget", "50", "--fps", "30", "--delta-time", "0.025", "--port", "8000",
+        "scene.flecs"};
+    test_int(box_app_parse(world, 15, argv), 0);
 
     const App *app = ecs_singleton_get(world, App);
     test_bool(app->headless, true);
@@ -170,6 +172,7 @@ void Args_all_options(void) {
     test_flt(app->timeout, 30);
     test_flt(app->cpu_budget, 50);
     test_flt(app->fps, 30);
+    test_flt(app->delta_time, 0.025f);
     test_int(app->port, 8000);
     test_str(app->scene, "scene.flecs");
 

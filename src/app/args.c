@@ -4,6 +4,7 @@
  */
 
 #include "app.h"
+#include <float.h>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -114,6 +115,11 @@ static int box_app_option(
             app->fps = (float)v;
             result = 0;
         }
+    } else if (!strcmp(flag, "delta-time")) {
+        if (!box_app_number(value, 0, &v) && v >= 0 && v <= FLT_MAX) {
+            app->delta_time = (float)v;
+            result = 0;
+        }
     } else if (!strcmp(flag, "surface")) {
         result = box_app_size(value, &app->surface_width, &app->surface_height);
     } else if (!strcmp(flag, "port")) {
@@ -139,8 +145,8 @@ static bool box_app_has_value(
     const char *flag)
 {
     return !strcmp(flag, "frames") || !strcmp(flag, "timeout") ||
-        !strcmp(flag, "cpu-budget") || !strcmp(flag, "fps") || !strcmp(flag, "port") ||
-        !strcmp(flag, "surface");
+        !strcmp(flag, "cpu-budget") || !strcmp(flag, "fps") || !strcmp(flag, "delta-time") ||
+        !strcmp(flag, "port") || !strcmp(flag, "surface");
 }
 
 int box_app_parse(

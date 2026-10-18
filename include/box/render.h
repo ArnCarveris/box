@@ -30,23 +30,10 @@ extern "C" {
 /** Fraction of the frame interval a present interval may deviate before it counts as uneven */
 #define BOX_RENDER_PRESENT_TOLERANCE (0.1)
 
-/** Hz a refresh rate may be off and still count as a whole multiple of the frame rate cap:
- * displays report whole Hz, so a 59.94 Hz panel reads as 59 or 60 */
-#define BOX_RENDER_REFRESH_SLACK (1.0)
-
-/** How frames travel from the main thread to the renderer, applied before the next frame.
- *
- * display_rate simulates a vsync display for offscreen targets, like a FIFO swap chain of three
- * images: a frame shows for swap_interval refreshes from the first free refresh after its submit
- * and its GPU work, and the renderer blocks while a present is still queued.
- */
+/** How frames travel from the main thread to the renderer, applied before the next frame */
 ECS_STRUCT(RenderSettings, {
     int32_t in_flight;  /**< Packets in flight, default 2, from 1 to 8 */
     bool main_thread;   /**< The main thread renders the packet, default on in the browser */
-    float display_rate; /**< Refresh rate in Hz of the simulated vsync display, 0 for none */
-    float display_actual; /**< Rate the simulated display really runs at when it differs from the
-                               reported display_rate, to test pacing against a drifting display;
-                               0 for display_rate */
 });
 
 /** Packet counters the engine writes after every frame, read only for applications */
@@ -54,29 +41,16 @@ ECS_STRUCT(RenderStatus, {
     int32_t submitted;  /**< Packets the main thread handed to the renderer */
     int32_t rendered;   /**< Packets the backend finished and the ring got back */
     int32_t in_flight;  /**< Packets submitted or being filled that are not yet rendered */
-    int32_t stalls;     /**< Frames whose first packet waited for a free one, in the middle of
-                         *   the frame; box_app_run waits at the start instead (waits) */
-    int32_t waits;      /**< Frames box_app_run started only once a packet was free: the
-                         *   display paces the frame loop through the packets in flight */
+    int32_t stalls;     /**< Frames whose first packet waited for a free one: every packet was
+                         *   in flight, the backpressure of the renderer */
     bool threaded;      /**< A render thread consumes the packets */
     int64_t upload_bytes; /**< Bytes of instance data the last frame uploaded, 0 when unchanged */
-    bool vsync;         /**< Frames present with vsync: a window with vsync or display_rate */
-    float refresh_rate; /**< Refresh rate in Hz of the vsync display, 0 when unknown or none */
-    int32_t swap_interval; /**< Refreshes the last frame is shown for: refresh_rate / App.fps,
-                            *   1 without a cap, alternating in a cadence, 0 when the refresh
-                            *   rate is unknown and the cap sleeps */
-    int32_t cadence;    /**< Frames after which the swap intervals repeat: 1 when every frame
-                         *   is shown equally long, 3 for 90 FPS on 120 Hz (1, 1, 2 refreshes),
-                         *   0 when they do not repeat within 240 frames or nothing paces */
-    int32_t presented;  /**< Frames presented: shown on the simulated display or handed over */
+    bool vsync;         /**< Frames present to a window with vsync, FIFO */
+    float refresh_rate; /**< Refresh rate in Hz the surface reports, 0 when unknown or none */
+    int32_t presented;  /**< Frames the backend presented */
     double present_ms;  /**< Interval between the last two presents */
-    int32_t presents_late;  /**< Present intervals over 1.1 frame intervals: the swap interval of
-                             *   the frame before on the simulated display, so a repeated
-                             *   refresh (a late CPU or GPU) counts, else 1 / App.fps */
-    int32_t presents_early; /**< Present intervals under 0.9 frame intervals */
-    int32_t delta_mismatches; /**< Frames on the simulated display whose delta differs over
-                               *   BOX_FRAME_TOLERANCE_MS from the time it was shown after the
-                               *   frame before it, so the motion does not match the display */
+    int32_t presents_late;  /**< Present intervals over 1.1 / App.fps, counted while capped */
+    int32_t presents_early; /**< Present intervals under 0.9 / App.fps, counted while capped */
     int32_t device_losses;  /**< Lost GPU devices the renderer recreated, 0 for none; a failed
                              *   recreation is not counted and drops later frames, and the
                              *   browser neither reports nor recovers a loss (its page does) */

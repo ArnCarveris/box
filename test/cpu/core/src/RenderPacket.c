@@ -581,7 +581,7 @@ void RenderPacket_headless_fixed_delta(void) {
     ecs_singleton_set(world, App, {
         .headless = true,
         .frames = 5,
-        .fps = 50,
+        .delta_time = 0.02f,
         .cpu_budget = 100,
         .unguarded = true,
         .unpaced = true

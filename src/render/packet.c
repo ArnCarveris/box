@@ -52,7 +52,6 @@ void box_render_packet_reset(
     p->fps = 0;
     p->vsync = false;
     p->refresh = 0;
-    p->presents = 0;
     p->anisotropy = 0;
     ecs_vec_clear(&p->resources);
     ecs_vec_clear(&p->uploads);
@@ -110,7 +109,6 @@ void box_render_packet_copy(
     dst->fps = src->fps;
     dst->vsync = src->vsync;
     dst->refresh = src->refresh;
-    dst->presents = src->presents;
     dst->anisotropy = src->anisotropy;
     box_render_vec_copy(&dst->resources, &src->resources, ECS_SIZEOF(box_render_resource_t));
     box_render_vec_copy(&dst->uploads, &src->uploads, ECS_SIZEOF(box_render_upload_t));

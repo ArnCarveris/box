@@ -30,17 +30,13 @@ extern "C" {
 /** Port of the command endpoints when --port is not given */
 #define BOX_APP_PORT (27750)
 
-/** Fixed step of a headless run whose App.fps is 0: 1 / BOX_APP_FPS seconds per frame. A window
- * has no cap by default, so vsync shows a frame at every refresh. */
-#define BOX_APP_FPS (60)
-
 /** Frames the ranges of FrameTiming cover, the most recent ones */
 #define BOX_FRAME_WINDOW (240)
 
 /** Milliseconds the delta_time of a frame may differ from the wall time since the previous one.
  *
- * The delta is either measured or snapped to whole vsyncs, so it only differs from the measured
- * interval by the wake up jitter of the frame loop, which stays well under a millisecond.
+ * flecs measures the delta at the start of the frame, so with App.delta_time 0 it only differs
+ * from the interval the frame timing measures by the time between the two clock reads.
  */
 #define BOX_FRAME_TOLERANCE_MS (1.0)
 
@@ -51,20 +47,23 @@ extern "C" {
  *
  * A headless run needs a frame limit or a timeout, is refused on an oversubscribed machine
  * unless unguarded, and sleeps when it uses more than its CPU budget unless unpaced.
+ *
+ * flecs paces the frames: fps is its target fps (ecs_set_target_fps), applied at the start and
+ * whenever App is set, and every frame is ecs_progress(world, delta_time), read from App each
+ * frame. In the browser the animation frames pace the loop and fps has no effect.
  */
 ECS_STRUCT(App, {
-    bool headless;      /**< Run without a window, with a fixed delta time */
+    bool headless;      /**< Run without a window */
     int32_t frames;     /**< Stop after this many frames, 0 for no limit */
     double timeout;     /**< Stop after this many seconds, 0 for none, negative for infinite */
     float cpu_budget;   /**< Percent of one core a headless run may use, default 100, 0 no limit */
-    float fps;          /**< Frame rate cap of a window, default 0: uncapped, vsync paces; headless
-                         *   the fixed step, 0 for BOX_APP_FPS */
+    float fps;          /**< Target fps flecs caps the frames at, default 0: no cap */
+    float delta_time;   /**< Seconds every frame advances, default 0: flecs measures the delta */
     int32_t port;       /**< Port of the command endpoints, 0 disables them */
     int32_t surface_width;  /**< Width of the Surface created when there is no window, 0 none */
     int32_t surface_height; /**< Height of the Surface a run creates when it has none */
     bool unguarded;     /**< A headless run starts on an oversubscribed machine */
     bool unpaced;       /**< A headless run ignores its CPU budget */
-    bool realtime;      /**< Headless, delta_time is measured like a window's, set by PerfRun */
     char *scene;        /**< Script file loaded before the first frame, NULL for none */
 });
 
@@ -88,23 +87,11 @@ ECS_STRUCT(FrameRange, {
  *
  * delta is the unscaled delta_time the world advanced with, interval the wall time between the
  * starts of two frames and error their difference.
- *
- * With vsync the delta is the refreshes the frame before is shown for, timed by the measured
- * refresh rate (the reported one until the estimate completes), so it matches the display.
  */
 ECS_STRUCT(FrameTiming, {
     int32_t frames;         /**< Frames the ranges cover, at most BOX_FRAME_WINDOW */
-    double target_ms;       /**< Interval of the App.fps cap, 0 when uncapped; headless the
-                             *   fixed step */
-    double frame_ms;        /**< Interval the last frame is expected to take: the refreshes it
-                             *   is shown for while vsync paces, else target_ms */
-    bool vsync;             /**< Frames present with vsync, which paces them */
-    bool fixed;             /**< Headless fixed step: delta is 1 / App.fps, not measured */
-    float refresh_rate;     /**< Refresh rate the last delta was snapped with: the one measured
-                             *   from the frame times once the estimate is complete, before
-                             *   that the one the display reports; 0 when it was not snapped */
-    bool refresh_measured;  /**< refresh_rate is the measured estimate */
-    bool smoothing;         /**< The last delta was snapped to whole refresh periods */
+    double target_ms;       /**< Interval of the App.fps cap, 0 when uncapped */
+    bool vsync;             /**< Frames present with vsync */
     double delta_ms;        /**< Delta of the last frame */
     double interval_ms;     /**< Interval before the last frame */
     FrameRange delta;       /**< Deltas of the recent frames */
@@ -112,7 +99,7 @@ ECS_STRUCT(FrameTiming, {
     FrameRange error;       /**< Absolute difference of delta and interval of the recent frames */
     FrameRange present;     /**< Intervals between the presents of the recent frames */
     int32_t late;           /**< Recent frames whose error exceeds BOX_FRAME_TOLERANCE_MS */
-    int32_t dropped;        /**< Recent frames longer than BOX_FRAME_DROPPED times frame_ms */
+    int32_t dropped;        /**< Recent frames longer than BOX_FRAME_DROPPED times target_ms */
     int64_t total;          /**< Frames since the world started */
     int64_t total_late;     /**< Frames since the world started with an error over tolerance */
     int64_t total_dropped;  /**< Dropped frames since the world started */
@@ -126,11 +113,11 @@ void BoxAppImport(
     ecs_world_t *world);
 
 /** Write command line arguments into the App singleton: --headless, --frames <n>,
- * --timeout <s|infinite>, --cpu-budget <pct>, --fps <n>, --port <n>, --surface <w>x<h>, a scene.
+ * --timeout <s|infinite>, --cpu-budget <pct>, --fps <n>, --delta-time <s>, --port <n>,
+ * --surface <w>x<h>, a scene.
  *
- * --fps <n> caps a window, which without it (or with 0) shows a frame at every refresh with
- * vsync; a cap below the refresh rate shows each frame for whole refreshes. Headless, --fps <n>
- * sets the fixed step of 1 / n seconds per frame, 1 / BOX_APP_FPS without it.
+ * --fps <n> sets the target fps of flecs in every mode, 0 or none for no cap. --delta-time <s>
+ * makes every frame advance s seconds, 0 or none to measure the delta, headless too.
  *
  * @param world The world
  * @param argc Argument count, including the executable
@@ -141,15 +128,6 @@ int box_app_parse(
     ecs_world_t *world,
     int argc,
     char *argv[]);
-
-/** Get the frame rate the frame loop runs at: App.fps, or for a headless run that is not
- * realtime the fixed step BOX_APP_FPS when App.fps is 0.
- *
- * @param app The App singleton, NULL for none
- * @return Frames per second, 0 when uncapped
- */
-float box_app_fps(
-    const App *app);
 
 /** Block the calling thread with an OS sleep until a time on the ecs_os_get_time clock.
  *
@@ -162,7 +140,8 @@ float box_app_fps(
 double box_wait_until(
     double deadline);
 
-/** Run the world with the settings of the App singleton until a stop condition is met.
+/** Run the world with the settings of the App singleton until a stop condition is met: every
+ * frame is ecs_progress(world, App.delta_time), and nothing else runs in the loop.
  *
  * @param world The world
  * @return 0 when the run completed, nonzero when it was refused or failed to start

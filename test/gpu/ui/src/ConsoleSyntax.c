@@ -452,8 +452,8 @@ void ConsoleSyntax_extra_arguments(void) {
     syntax_span(world, e, 4, 19, 25, c->extra);
 
     syntax_clear(world);
-    syntax_type(world, "fps now");
-    syntax_span(world, syntax_before(world), 1, 4, 7, c->extra);
+    syntax_type(world, "frames now");
+    syntax_span(world, syntax_before(world), 1, 7, 10, c->extra);
 
     ecs_fini(world);
 }

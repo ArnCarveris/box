@@ -16,18 +16,6 @@ double fake_now(void)
     return fake_time;
 }
 
-void fake_sleep(
-    double seconds)
-{
-    fake_time += seconds;
-}
-
-void fake_sleep_late(
-    double seconds)
-{
-    fake_time += seconds * 1.5 + 0.001;
-}
-
 uint64_t fake_os_now(void)
 {
     return (uint64_t)(fake_time * 1e9);
@@ -38,6 +26,23 @@ void fake_os_sleep(
     int32_t nanosec)
 {
     fake_time += (double)sec + (double)nanosec * 1e-9;
+}
+
+static ecs_os_api_now_t fake_saved_now = NULL;
+static ecs_os_api_sleep_t fake_saved_sleep = NULL;
+
+void fake_os_begin(void)
+{
+    fake_saved_now = ecs_os_api.now_;
+    fake_saved_sleep = ecs_os_api.sleep_;
+    ecs_os_api.now_ = fake_os_now;
+    ecs_os_api.sleep_ = fake_os_sleep;
+}
+
+void fake_os_end(void)
+{
+    ecs_os_api.now_ = fake_saved_now;
+    ecs_os_api.sleep_ = fake_saved_sleep;
 }
 
 void fake_work(

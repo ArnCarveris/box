@@ -671,8 +671,6 @@ typedef struct box_render_packet_t {
     float fps;              /**< Frame rate cap of the frame, App.fps, 0 when uncapped */
     bool vsync;             /**< A window target of the frame presents with vsync */
     float refresh;          /**< Refresh rate in Hz of the display of that window, 0 unknown */
-    int32_t presents;       /**< Refreshes the frame is shown for, set by the submit, 0 when
-                             *   presentation does not pace it */
     uint32_t anisotropy;    /**< Anisotropic samples of the texture samplers, 1 to 16 */
     ecs_vec_t resources;    /**< box_render_resource_t in the order they were made */
     ecs_vec_t uploads;      /**< box_render_upload_t in the order they were made */
@@ -704,10 +702,6 @@ typedef struct box_render_backend_t {
     void (*render)(void*, const box_render_packet_t*); /**< Render a packet, valid until return */
     void (*fini)(void*);        /**< Release what init created */
     void (*free)(void*);        /**< Free ctx on the main thread, NULL when the caller owns it */
-    uint64_t (*fence)(void*);   /**< Mark the work render submitted so far, 0 when unsupported */
-    void (*wait)(void*, uint64_t); /**< Block until the GPU finished the work of a fence */
-    bool (*done)(void*, uint64_t); /**< Check without blocking whether a fence is done, NULL
-                                    *   when only the time a wait takes tells */
     void (*flush)(void*);       /**< Block until asynchronous work such as captures finished,
                                  *   on the render thread, NULL when there is none */
     bool (*lost)(void*);        /**< Check before a packet whether the device was lost, so the
@@ -1974,15 +1968,6 @@ void box_render_pause(
     ecs_world_t *world,
     bool paused);
 
-/** Wait until a packet is free for the next frame, before the frame measures its delta, so the
- * backpressure of the display paces the start of the frame instead of stalling the first
- * box_render_packet call in its middle (RenderStatus.waits, not stalls). No-op without box.render.
- *
- * @param world The world
- */
-void box_render_wait(
-    ecs_world_t *world);
-
 /** Wait until the backend rendered every submitted packet, also while the ring is held, and
  * flushed it, so every capture of those packets is written, and bring RenderStatus up to date.
  *
@@ -2070,63 +2055,12 @@ void box_render_ring_pause(
     box_render_ring_t *ring,
     bool paused);
 
-/** Wait until a ring has a packet free for the next acquire, counting RenderStatus.waits. Does
- * nothing with new settings to apply, on the main thread, which renders inside the submit, or
- * with a packet acquired and not submitted, which the next frame fills.
- *
- * @param ring The ring
- */
-void box_render_ring_wait(
-    box_render_ring_t *ring);
-
 /** Wait until every submitted packet of a ring was rendered.
  *
  * @param ring The ring
  */
 void box_render_ring_sync(
     box_render_ring_t *ring);
-
-/** Compute how many refreshes a frame is shown for so that vsync paces a frame rate cap, the
- * swap interval of Vulkan, EGL and D3D (Unity's vSyncCount) that webgpu does not expose.
- *
- * The refresh rate may be off by BOX_RENDER_REFRESH_SLACK, as reported rates are whole Hz.
- *
- * @param refresh Refresh rate of the display in Hz, 0 when unknown
- * @param fps Frame rate cap, 0 for none
- * @return The interval, 1 without a cap or with a cap at or above the refresh rate, 0 when
- *         the refresh rate is unknown or not a whole multiple of the cap
- */
-int32_t box_render_swap_interval(
-    float refresh,
-    float fps);
-
-/** Compute the refreshes the next frame is shown for: the swap interval, or for a cap between
- * two whole multiples a cadence that alternates between them, like a 3:2 pulldown, so the
- * frames average the cap and each is shown for whole refreshes the delta can match.
- *
- * @param phase Refreshes owed to the frames so far, 0 at the start of a cadence
- * @param refresh Refresh rate of the display in Hz, 0 when unknown
- * @param fps Frame rate cap, 0 for none
- * @return The refreshes, 0 when the refresh rate is unknown
- */
-int32_t box_render_cadence_next(
-    double *phase,
-    float refresh,
-    float fps);
-
-/** Count the frames after which the refreshes of box_render_cadence_next repeat.
- *
- * @param refresh Refresh rate of the display in Hz, 0 when unknown
- * @param fps Frame rate cap, 0 for none
- * @return 1 for a swap interval, the frames of one cycle of a cadence, 0 when the refresh
- *         rate is unknown or the cadence does not repeat within BOX_RENDER_CADENCE_MAX frames
- */
-int32_t box_render_cadence_cycle(
-    float refresh,
-    float fps);
-
-/** Frames a cadence repeats within at most for box_render_cadence_cycle */
-#define BOX_RENDER_CADENCE_MAX (240)
 
 /** Read the counters of a ring.
  *

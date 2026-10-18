@@ -2,7 +2,7 @@
 """Drives a box app through its command port, with the Python standard library only.
 
   app = App(binary, ["etc/scenes/x.flecs"], log="out/x.log")
-  app.start()                      # --headless --timeout <s> --port <free port> <args>
+  app.start()                      # --headless --delta-time 1/60 --timeout <s> --port <port> <args>
   app.exec("mouse.move [166, 298]")
   app.wait_input()                 # input.wait until 0
   app.wait_for("get showcase Showcase.mut.clicks", "3")
@@ -32,6 +32,7 @@ from integration import ANSI, ROOT, read_png
 
 ERROR = "error: "
 START_TIMEOUT = 60
+DELTA_TIME = "0.016666667"
 REQUEST_TIMEOUT = 30
 QUIT_TIMEOUT = 10
 INPUT_FRAMES = 600
@@ -210,8 +211,8 @@ class App:
 
     def start(self):
         self.port = free_port()
-        cmd = [self.binary, "--headless", "--timeout", str(self.timeout), "--port",
-               str(self.port)] + self.args
+        cmd = [self.binary, "--headless", "--delta-time", DELTA_TIME, "--timeout",
+               str(self.timeout), "--port", str(self.port)] + self.args
         log = open(self.log, "ab") if self.log else subprocess.DEVNULL
         try:
             if self.log:

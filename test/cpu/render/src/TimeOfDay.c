@@ -192,7 +192,7 @@ static void run_frames(
 {
     char count[16];
     ecs_os_snprintf(count, sizeof(count), "%d", frames);
-    char *argv[] = {"boxrun", "--headless", "--frames", count, "--fps", "60"};
+    char *argv[] = {"boxrun", "--headless", "--frames", count, "--delta-time", "0.016666667"};
     test_int(box_app_parse(world, 6, argv), 0);
     App *app = ecs_singleton_get_mut(world, App);
     app->unguarded = true;

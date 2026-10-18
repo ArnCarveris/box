@@ -2,9 +2,10 @@
  * @file box/perf.h
  * @brief Performance runs: an orbiting camera fitted to the scene and frame time checks.
  *
- * Setting the PerfRun singleton starts a run that paces frames to a target rate, orbits a camera
- * around the bounds of every shape (or flies it with its controller) and counts each frame
- * interval outside 10% of the target and each delta_time that differs from the wall time.
+ * Setting the PerfRun singleton starts a run that caps the frames at a target rate with
+ * App.fps, orbits a camera around the bounds of every shape (or flies it with its controller)
+ * and counts each frame interval outside 10% of the target and each delta_time that differs
+ * from the wall time.
  */
 
 #ifndef BOX_PERF_H
@@ -40,7 +41,7 @@ extern "C" {
 /** Progress of a performance run */
 ECS_ENUM(PerfState, {
     PerfIdle = 0,    /**< No run was started */
-    PerfWarmup = 1,  /**< Frames are paced and the camera orbits, nothing is measured */
+    PerfWarmup = 1,  /**< Frames are capped and the camera orbits, nothing is measured */
     PerfMeasure = 2, /**< Every frame interval is measured */
     PerfDone = 3,    /**< The run completed, PerfStatus holds the result */
     PerfInvalid = 4  /**< The settings are invalid, the run did not start */
@@ -51,11 +52,8 @@ ECS_ENUM(PerfState, {
 
 /** Settings of a performance run, setting the singleton (re)starts the run.
  *
- * The run sets App.fps to its target and App.realtime, so delta_time is measured like in a
- * window, and without a refresh sleeps until a target interval passed since the last frame.
- *
- * With a refresh the frames present to a simulated vsync display (RenderSettings.display_rate)
- * and are paced like a window: by the presentation, or by the App.fps cap.
+ * The run sets App.fps to its target, so flecs caps the frames, and measures the intervals
+ * between the starts of the frames.
  */
 ECS_STRUCT(PerfRun, {
     float fps;            /**< Target frame rate: 30, 60, 90 or 120, default 60 */
@@ -65,7 +63,6 @@ ECS_STRUCT(PerfRun, {
     float period;         /**< Seconds per revolution of the camera, default 10, 0 stands still */
     float elevation;      /**< Degrees the camera looks down on the center, default 30 */
     float stall;          /**< Milliseconds of busy work added to every frame, to test checks */
-    float refresh;        /**< Refresh rate in Hz of the simulated vsync display, 0 for none */
     bool fly;             /**< The camera controller flies the camera, forward and turning left */
     bool quit;            /**< Quit the world when the run completes */
     char *report;         /**< JSON file the result is written to, NULL for none */
@@ -81,16 +78,8 @@ ECS_STRUCT(PerfRange, {
 /** Checks of a run beyond the frame intervals: delta time, presentation, CPU use and flight */
 ECS_STRUCT(PerfChecks, {
     int32_t delta_errors; /**< Frames whose delta_time differs over tolerance from wall time */
-    int32_t display_delta_errors; /**< Frames whose delta differs over tolerance from the time
-                                   *   the simulated display showed them after the previous */
     double delta_tolerance_ms; /**< Tolerance of the delta, BOX_FRAME_TOLERANCE_MS */
     double delta_max_ms;  /**< Largest difference of delta_time and the wall time */
-    int32_t present_errors; /**< Present intervals of the simulated display outside 10% of the
-                             *   refreshes planned for the frame before: a missed refresh */
-    float refresh;        /**< Refresh rate of the simulated display, 0 for none */
-    bool cadence;         /**< The target does not divide the refresh rate: frames alternate
-                           *   between refresh counts, so only the display delta and the
-                           *   missed refreshes count as errors */
     double present_mean_ms; /**< Mean interval between presents during the measurement */
     double cpu_percent;   /**< Process CPU time over wall time during the measurement */
     double cpu_ms;        /**< Process CPU milliseconds per measured frame */
@@ -103,22 +92,18 @@ ECS_STRUCT(PerfStatus, {
     PerfState state;      /**< Progress of the run */
     bool passed;          /**< The run completed every frame without an error */
     int32_t frame;        /**< Frames measured so far */
-    int32_t errors;       /**< Sum of slow, fast, both delta errors and present_errors; in a
-                           *   cadence only the display delta and present errors */
+    int32_t errors;       /**< Sum of slow, fast and delta errors */
     int32_t slow;         /**< Frames longer than 1.1 target intervals */
     int32_t fast;         /**< Frames shorter than 0.9 target intervals */
     PerfChecks checks;    /**< Delta, presentation, CPU and flight checks of the measurement */
     double target_ms;     /**< Target frame interval in milliseconds */
-    int32_t warmup;       /**< Paced frames before the measurement, the settle period */
+    int32_t warmup;       /**< Capped frames before the measurement, the settle period */
     float period;         /**< Seconds per revolution of the orbit */
     double min_ms;        /**< Shortest frame interval */
     double mean_ms;       /**< Mean frame interval */
     double p50_ms;        /**< Median frame interval */
     double p99_ms;        /**< 99th percentile frame interval */
     double max_ms;        /**< Longest frame interval */
-    double work_mean_ms;  /**< Mean time a frame worked before the pacer waited */
-    double work_p99_ms;   /**< 99th percentile time a frame worked before the pacer waited */
-    double work_max_ms;   /**< Longest time a frame worked before the pacer waited */
     double slept_ms;      /**< Milliseconds the CPU budget of App slept during the measurement */
     int32_t stalls;       /**< Frames that waited for a free render packet during the measurement */
     int32_t shapes;       /**< Shapes the bounds were measured from */

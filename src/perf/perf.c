@@ -1,6 +1,6 @@
 /**
  * @file perf/perf.c
- * @brief Registers the box.perf module: frame pacing, the orbit camera and the frame checks.
+ * @brief Registers the box.perf module: the frame rate cap, the orbit camera and the frame checks.
  */
 
 #define BOX_PERF_IMPL
@@ -11,38 +11,10 @@
 #include <stdlib.h>
 #include <sys/resource.h>
 
-/** Seconds of a coarse sleep below which the pacer sleeps the rest in one go */
-#define BOX_PERF_STEP (0.0001)
-
-/** Seconds before a deadline at which the pacer counts it as reached, below the sleep resolution */
-#define BOX_PERF_EPSILON (1e-6)
-
-/** Seconds of CPU time the real-time schedule adds to the work for the wake ups of the wait */
-#define BOX_PERF_WAKE (0.001)
-
-/** Factor a sleep may take at most: a process without a window gets up to 50% timer leeway on
- * macOS, so a coarse sleep asks for the time left divided by it and cannot overshoot */
-#define BOX_PERF_LEEWAY (1.5)
-
-/** Seconds of wake up latency the pacer learns at most */
-#define BOX_PERF_WAKE_MAX (0.002)
-
-/** Seconds of wake up latency the pacer leaves to the deadline: waking this much early would
- * end a wait before its deadline, so the learned latency stops short of it */
-#define BOX_PERF_WAKE_FLOOR (0.00001)
-
-/** Weight of a new latency sample in the learned latency once a few samples were taken */
-#define BOX_PERF_WAKE_GAIN (0.25)
-
 /** Warmup frames a light bake may go without progress before a run measures without it */
 #define BOX_PERF_BAKE_STALL (300)
 
-/** Factor on the median work of the warmup frames that the real-time schedule asks for */
-#define BOX_PERF_WORK_MARGIN (1.5)
-
 double (*box_perf_clock)(void) = NULL;
-
-void (*box_perf_sleep)(double seconds) = NULL;
 
 /** Read the wall clock, or the clock a test installed.
  *
@@ -60,90 +32,6 @@ static double box_perf_now(void)
     }
 
     return result;
-}
-
-/** Sleep on the wall clock, or with the sleep a test installed.
- *
- * @param seconds Seconds to sleep
- */
-static void box_perf_sleep_for(
-    double seconds)
-{
-    if (box_perf_sleep) {
-        box_perf_sleep(seconds);
-    } else {
-        ecs_sleepf(seconds);
-    }
-}
-
-/** Learn the wake up latency of the pacing thread from a sleep that woke later than planned.
- *
- * @param perf The state of the module
- * @param late Seconds the sleep woke after the time it asked for
- * @param jitter Whether the sample also updates the spread of the latency
- */
-static void box_perf_learn(
-    box_perf_t *perf,
-    double late,
-    bool jitter)
-{
-    double gain = 1.0 / (double)(perf->wake_samples + 1);
-    gain = gain > BOX_PERF_WAKE_GAIN ? gain : BOX_PERF_WAKE_GAIN;
-    late = late > BOX_PERF_WAKE_FLOOR ? late - BOX_PERF_WAKE_FLOOR : 0;
-    if (jitter) {
-        perf->wake_jitter += gain * (fabs(late - perf->wake) - perf->wake_jitter);
-        perf->wake += gain * (late - perf->wake);
-    } else {
-        perf->wake += gain * late;
-    }
-
-    perf->wake = perf->wake < 0 ? 0 : perf->wake;
-    perf->wake = perf->wake > BOX_PERF_WAKE_MAX ? BOX_PERF_WAKE_MAX : perf->wake;
-    perf->wake_samples ++;
-}
-
-/** Seconds a wait may end before its deadline: the spread of the wake up latency times this,
- * since a sleep to make up for less would overshoot by a whole latency */
-#define BOX_PERF_EARLY (3.0)
-
-/** Wait until a deadline with OS sleeps, never busy waiting, waking early by the latency the
- * thread is learned to wake up with, so a late scheduler on any platform still lands on time.
- *
- * Coarse sleeps ask for the time left before the latency and its spread, divided by the timer
- * leeway, so none overshoots; a final sleep then ends a latency before the deadline. A wait
- * that still ends early by more than the spread of the latency sleeps again.
- *
- * @param perf The state of the module
- * @param deadline Wall seconds to wait for
- * @return The wall clock after the wait
- */
-static double box_perf_wait(
-    box_perf_t *perf,
-    double deadline)
-{
-    double now = box_perf_now();
-    double left, coarse, sleep, before, early;
-    bool final;
-    early = perf->wake_jitter * BOX_PERF_EARLY;
-    while (deadline - now > (early > BOX_PERF_EPSILON ? early : BOX_PERF_EPSILON)) {
-        left = deadline - now;
-        coarse = (left - 2.0 * perf->wake - 2.0 * perf->wake_jitter) / BOX_PERF_LEEWAY;
-        final = coarse <= BOX_PERF_STEP;
-        sleep = left - perf->wake;
-        sleep = final ? (sleep > BOX_PERF_EPSILON ? sleep : BOX_PERF_EPSILON) : coarse;
-        before = now;
-        box_perf_sleep_for(sleep);
-        now = box_perf_now();
-        if (final) {
-            box_perf_learn(perf, now - before - sleep, true);
-        } else if (now > deadline - perf->wake) {
-            box_perf_learn(perf, now - (deadline - perf->wake), false);
-        }
-
-        early = perf->wake_jitter * BOX_PERF_EARLY;
-    }
-
-    return now;
 }
 
 /** Read the OS clock that flecs and the frame loop measure delta_time with.
@@ -184,7 +72,6 @@ static box_perf_t* box_perf_new(void)
 {
     box_perf_t *result = ecs_os_calloc_t(box_perf_t);
     ecs_vec_init_t(NULL, &result->intervals, double, 0);
-    ecs_vec_init_t(NULL, &result->work, double, 0);
 
     return result;
 }
@@ -197,9 +84,7 @@ static void box_perf_free(
     void *ctx)
 {
     box_perf_t *perf = ctx;
-    box_perf_priority_reset(&perf->priority);
     ecs_vec_fini_t(NULL, &perf->intervals, double);
-    ecs_vec_fini_t(NULL, &perf->work, double);
     ecs_os_free(perf);
 }
 
@@ -214,37 +99,19 @@ static bool box_perf_valid_fps(
     return fps == 30 || fps == 60 || fps == 90 || fps == 120;
 }
 
-/** Make the frame rate of the App singleton the target of the run and measure delta_time.
+/** Make the target of the run the frame rate of the App singleton, so flecs caps the frames.
  *
  * @param world The world
- * @param fps The target frame rate, 0 when a run ends
+ * @param fps The target frame rate
  */
 static void box_perf_app_fps(
     ecs_world_t *world,
     float fps)
 {
     App *app = ecs_singleton_get_mut(world, App);
-    bool realtime = fps > 0;
-    if (app && ((fps > 0 && app->fps != fps) || app->realtime != realtime)) {
-        app->fps = fps > 0 ? fps : app->fps;
-        app->realtime = realtime;
+    if (app && app->fps != fps) {
+        app->fps = fps;
         ecs_singleton_modified(world, App);
-    }
-}
-
-/** Present to a simulated vsync display for the run, or stop simulating one.
- *
- * @param world The world
- * @param refresh Refresh rate in Hz, 0 for none
- */
-static void box_perf_display(
-    ecs_world_t *world,
-    float refresh)
-{
-    RenderSettings *settings = ecs_singleton_get_mut(world, RenderSettings);
-    if (settings && settings->display_rate != refresh) {
-        settings->display_rate = refresh;
-        ecs_singleton_modified(world, RenderSettings);
     }
 }
 
@@ -268,41 +135,15 @@ static void box_perf_fly_keys(
     }
 }
 
-/** Decide whether a simulated display shows the frames of a run in a cadence: the target does
- * not divide the refresh rate, so frames alternate between refresh counts.
- *
- * @param refresh Refresh rate of the simulated display, 0 for none
- * @param fps Target frame rate
- * @return Whether the frames alternate
- */
-static bool box_perf_cadence(
-    float refresh,
-    float fps)
-{
-    bool result = false;
-    double whole;
-    if (refresh > 0 && fps > 0 && (double)fps < (double)refresh - BOX_RENDER_REFRESH_SLACK) {
-        whole = floor((double)refresh / (double)fps + 0.5);
-        result = fabs(whole * (double)fps - (double)refresh) > BOX_RENDER_REFRESH_SLACK;
-    }
-
-    return result;
-}
-
-/** Sum the errors of a run. In a cadence the frame intervals and the deltas against them are
- * uneven by design and only reported: what counts is that every delta matches the time the
- * display showed the frame before it, and that no frame missed its refresh.
+/** Sum the errors of a run: the slow and fast frame intervals and the deltas that differ from
+ * the wall time.
  *
  * @param status The status to update
  */
 static void box_perf_errors(
     PerfStatus *status)
 {
-    const PerfChecks *checks = &status->checks;
-    status->errors = checks->display_delta_errors + checks->present_errors;
-    if (!checks->cadence) {
-        status->errors += status->slow + status->fast + checks->delta_errors;
-    }
+    status->errors = status->slow + status->fast + status->checks.delta_errors;
 }
 
 /** Start a run from new settings, or mark it invalid.
@@ -333,33 +174,22 @@ static void BoxPerfOnSet(
     perf->begin = 0;
     perf->os_begin = 0;
     perf->has_last = false;
-    perf->wake = 0;
-    perf->wake_jitter = 0;
-    perf->wake_samples = 0;
     status.checks.fly = run->fly;
-    status.checks.refresh = run->refresh;
-    status.checks.cadence = box_perf_cadence(run->refresh, fps);
     status.checks.delta_tolerance_ms = BOX_FRAME_TOLERANCE_MS;
     perf->bake_left = 0;
     perf->bake_stalled = 0;
-    perf->priority.refused = false;
-    box_perf_priority_reset(&perf->priority);
     perf->bounds = false;
     perf->cull_frame = -1;
     ecs_os_memset(perf->cull_last, 0, ECS_SIZEOF(perf->cull_last));
     ecs_os_memset(perf->cull_sum, 0, ECS_SIZEOF(perf->cull_sum));
     ecs_vec_clear(&perf->intervals);
-    ecs_vec_clear(&perf->work);
     if (!valid) {
         ecs_err("PerfRun.fps is %g, expected 30, 60, 90 or 120", (double)run->fps);
-        box_perf_app_fps(world, 0);
-        box_perf_display(world, 0);
         if (run->quit) {
             ecs_quit(world);
         }
     } else {
         box_perf_app_fps(world, fps);
-        box_perf_display(world, run->refresh);
         if (run->fly) {
             box_perf_fly_keys(world, perf, true);
         }
@@ -506,24 +336,7 @@ done:
     return;
 }
 
-/** Give the pacing thread a real-time schedule of one frame per target interval, unless the
- * platform refused it before in this run.
- *
- * @param perf The state of the module
- * @param computation Seconds of CPU time a frame needs
- */
-static void box_perf_schedule(
-    box_perf_t *perf,
-    double computation)
-{
-    if (!perf->priority.refused) {
-        perf->priority.refused = !box_perf_priority_set(
-            &perf->priority, 1.0 / perf->fps, computation);
-    }
-}
-
-/** Start the measurement: fit the schedule to the work of the warmup frames and remember the
- * budget sleep and the stalls before it.
+/** Start the measurement: remember the budget sleep, the stalls and the presents before it.
  *
  * @param world The world
  * @param perf The state of the module
@@ -534,18 +347,9 @@ static void box_perf_begin(
 {
     const AppStatus *app = ecs_singleton_get(world, AppStatus);
     const RenderStatus *render = ecs_singleton_get(world, RenderStatus);
-    box_perf_stats_t warmup;
-    box_perf_stats(&perf->work, &warmup);
-    ecs_vec_clear(&perf->work);
-    if (warmup.p50 > 0) {
-        box_perf_schedule(perf, warmup.p50 * 0.001 * BOX_PERF_WORK_MARGIN + BOX_PERF_WAKE);
-    }
-
     perf->slept = app ? app->slept : 0;
     perf->stalls = render ? render->stalls : 0;
     perf->presented = render ? render->presented : 0;
-    perf->presents_bad = render ? render->presents_late + render->presents_early : 0;
-    perf->mismatches = render ? render->delta_mismatches : 0;
     perf->cpu = box_perf_cpu();
     perf->wall = box_perf_os_now();
     perf->measure = perf->mark;
@@ -556,19 +360,16 @@ static void box_perf_begin(
  *
  * @param perf The state of the module
  * @param status The status to update
- * @param interval Seconds since the previous frame
- * @param work Seconds the frame worked before the pacer waited
+ * @param interval Seconds since the previous frame started
  */
 static void box_perf_count(
     box_perf_t *perf,
     PerfStatus *status,
-    double interval,
-    double work)
+    double interval)
 {
     double ms = interval * 1000.0;
     double target = status->target_ms;
     ecs_vec_append_t(NULL, &perf->intervals, double)[0] = ms;
-    ecs_vec_append_t(NULL, &perf->work, double)[0] = work * 1000.0;
     status->frame ++;
     if (ms > target * (1.0 + BOX_PERF_TOLERANCE)) {
         status->slow ++;
@@ -609,25 +410,6 @@ static void box_perf_travel(
     perf->has_last = true;
 done:
     return;
-}
-
-/** Count the uneven presents of the simulated display since the measurement started.
- *
- * @param world The world
- * @param perf The state of the module
- * @param status The status to update
- */
-static void box_perf_presents(
-    ecs_world_t *world,
-    const box_perf_t *perf,
-    PerfStatus *status)
-{
-    const RenderStatus *render = ecs_singleton_get(world, RenderStatus);
-    if (render && status->checks.refresh > 0) {
-        status->checks.present_errors = render->presents_late + render->presents_early -
-            perf->presents_bad;
-        status->checks.display_delta_errors = render->delta_mismatches - perf->mismatches;
-    }
 }
 
 /** Check whether a camera is the orbiting camera or one of its descendants.
@@ -757,7 +539,6 @@ static void box_perf_end_usage(
     status->checks.cpu_percent = wall > 0 ? cpu / wall * 100.0 : 0;
     status->checks.cpu_ms = status->frame > 0 ? cpu * 1000.0 / (double)status->frame : 0;
     status->checks.present_mean_ms = presents > 0 ? wall * 1000.0 / (double)presents : 0;
-    box_perf_presents(world, perf, status);
     box_perf_errors(status);
 }
 
@@ -776,17 +557,13 @@ static void box_perf_end(
 {
     const AppStatus *app = ecs_singleton_get(world, AppStatus);
     const RenderStatus *render = ecs_singleton_get(world, RenderStatus);
-    box_perf_stats_t frames, work;
+    box_perf_stats_t frames;
     box_perf_stats(&perf->intervals, &frames);
-    box_perf_stats(&perf->work, &work);
     status->min_ms = frames.min;
     status->mean_ms = frames.mean;
     status->p50_ms = frames.p50;
     status->p99_ms = frames.p99;
     status->max_ms = frames.max;
-    status->work_mean_ms = work.mean;
-    status->work_p99_ms = work.p99;
-    status->work_max_ms = work.max;
     status->slept_ms = app ? (app->slept - perf->slept) * 1000.0 : 0;
     status->stalls = render ? render->stalls - perf->stalls : 0;
     status->revolutions = run->period > 0 && !run->fly
@@ -796,9 +573,6 @@ static void box_perf_end(
     status->passed = status->errors == 0 && status->frame == perf->frames;
     status->state = PerfDone;
     perf->state = PerfDone;
-    box_perf_priority_reset(&perf->priority);
-    box_perf_app_fps(world, 0);
-    box_perf_display(world, 0);
     if (run->fly) {
         box_perf_fly_keys(world, perf, false);
     }
@@ -845,26 +619,23 @@ done:
     return;
 }
 
-/** Measure a frame of the run: count its interval and its culling and the presents.
+/** Measure a frame of the run: count its interval and its culling.
  *
  * @param world The world
  * @param perf The state of the module
  * @param run The run settings
  * @param status The status to update
- * @param now The clock at the end of the frame
- * @param work Seconds the frame worked
+ * @param now The clock at the start of the frame
  */
 static void box_perf_measure(
     ecs_world_t *world,
     box_perf_t *perf,
     const PerfRun *run,
     PerfStatus *status,
-    double now,
-    double work)
+    double now)
 {
     ecs_entity_t camera = box_perf_camera(world, run);
-    box_perf_presents(world, perf, status);
-    box_perf_count(perf, status, now - perf->mark, work);
+    box_perf_count(perf, status, now - perf->mark);
     box_perf_sample_cull(world, perf, status, camera);
     box_perf_travel(world, perf, status, camera);
 }
@@ -903,8 +674,8 @@ done:
     return result;
 }
 
-/** Pace the frame to the target interval, unless a simulated display paces it like a window,
- * measure it and advance the run.
+/** Measure the frame, the interval between its start and the start of the previous frame, which
+ * flecs caps at App.fps, and advance the run.
  *
  * @param it The iterator of the system
  */
@@ -914,35 +685,19 @@ static void BoxPerfFrame(
     box_perf_t *perf = it->ctx;
     const PerfRun *run = ecs_singleton_get(it->world, PerfRun);
     PerfStatus *status = ecs_singleton_get_mut(it->world, PerfStatus);
-    double now, work;
+    double now = perf->begin;
     if (!run || !status || (perf->state != PerfWarmup && perf->state != PerfMeasure)) {
-        box_perf_priority_reset(&perf->priority);
         goto done;
     }
 
-    now = box_perf_now();
-    if (perf->mark > 0) {
-        work = now - (perf->begin > perf->mark ? perf->begin : perf->mark);
-        if (!perf->priority.active) {
-            box_perf_schedule(perf, 0.5 / perf->fps);
-        }
-
-        if (run->refresh <= 0) {
-            now = box_perf_wait(perf, perf->mark + 1.0 / perf->fps);
-        }
-
-        if (perf->state == PerfMeasure) {
-            box_perf_measure(it->world, perf, run, status, now, work);
-        } else {
-            ecs_vec_append_t(NULL, &perf->work, double)[0] = work * 1000.0;
-        }
+    if (perf->mark > 0 && now > 0 && perf->state == PerfMeasure) {
+        box_perf_measure(it->world, perf, run, status, now);
     }
 
     perf->mark = now;
     perf->run ++;
     if (perf->state == PerfWarmup && box_perf_baking(it->world, perf)) {
         perf->run = 0;
-        ecs_vec_clear(&perf->work);
     }
 
     if (perf->state == PerfWarmup && perf->run >= perf->warmup) {

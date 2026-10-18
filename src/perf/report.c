@@ -131,19 +131,12 @@ static void box_perf_report_stats(
         status->p50_ms, status->p99_ms, status->max_ms, fps, status->slept_ms, status->stalls,
         status->shapes);
     ecs_strbuf_append(buf,
-        "  \"work_mean_ms\": %.4f,\n  \"work_p99_ms\": %.4f,\n  \"work_max_ms\": %.4f,\n",
-        status->work_mean_ms, status->work_p99_ms, status->work_max_ms);
-    ecs_strbuf_append(buf,
         "  \"delta_errors\": %d,\n  \"delta_tolerance_ms\": %.3f,\n  \"delta_max_ms\": %.4f,\n"
-        "  \"display_delta_errors\": %d,\n"
-        "  \"present_errors\": %d,\n  \"refresh\": %.2f,\n  \"cadence\": %s,\n"
         "  \"present_mean_ms\": %.4f,\n"
         "  \"cpu_percent\": %.2f,\n  \"cpu_ms\": %.4f,\n  \"fly\": %s,\n"
         "  \"travelled\": %.3f,\n",
         checks->delta_errors, checks->delta_tolerance_ms, checks->delta_max_ms,
-        checks->display_delta_errors, checks->present_errors, (double)checks->refresh,
-        checks->cadence ? "true" : "false", checks->present_mean_ms, checks->cpu_percent,
-        checks->cpu_ms,
+        checks->present_mean_ms, checks->cpu_percent, checks->cpu_ms,
         checks->fly ? "true" : "false", (double)checks->travelled);
     ecs_strbuf_append(buf,
         "  \"center\": [%.4f, %.4f, %.4f],\n  \"radius\": %.4f,\n  \"distance\": %.4f,\n",

@@ -7,7 +7,7 @@ Usage:
                         [scene ...]
 
 visual renders every <dir>/<scene>.flecs (test/integration/visual by default) headless with
-boxrun, a static camera and a fixed delta, and compares the last frame with
+boxrun, a static camera and a fixed delta (--delta-time 1/60), and compares the last frame with
 <dir>/baseline/<scene>.png. A scene fails when the difference is strong and widespread: the
 largest channel delta is above 24 and more than 200 pixels have a channel off by more than 16,
 so GPU speckle and faint drift pass. A missing baseline fails too.
@@ -42,14 +42,10 @@ run in runs.jsonl. The last 30 runs are kept.
 perf runs every <dir>/<scene>.flecs (test/integration/perf by default) headless with boxrun on an
 offscreen surface of --size, unless the scene declares its own Surface. The scene sets the
 box.perf.PerfRun singleton (30, 60, 90 or 120 FPS) and runs in a release build (--cfg overrides
-it); the engine paces every frame to the target (or presents to a simulated vsync display of
-PerfRun.refresh Hz that paces it), orbits the camera
+it); the run sets App.fps to the target, so flecs caps every frame at it, orbits the camera
 around the bounds of the shapes (or lets its controller fly it) and counts as errors every frame
-interval outside [0.9, 1.1] target intervals, every delta_time that differs more than 1 ms from the
-wall time since the previous frame or from the time the display showed the frame before, and every
-present that missed its refresh. A target that does not divide the refresh rate (90 FPS on a
-120 Hz display) shows frames in a cadence of 1 and 2 refreshes: only the display delta and
-the missed presents count then. A scene passes only with zero errors, when a view renders the
+interval outside [0.9, 1.1] target intervals and every delta_time that differs more than 1 ms from
+the wall time since the previous frame. A scene passes only with zero errors, when a view renders the
 orbiting (or flying) camera, when an orbit covers at least one revolution (frames >= fps *
 period) or a flying camera moved, and when the warmup, the only frames not measured, is at most one second. A run is retried
 only when the load guard refused to start it; a run that started is never retried. Each result
@@ -67,7 +63,7 @@ out load guard refusals, up to --guard-wait seconds for the whole run.
 
 e2e runs every test_* function of every <dir>/<scenario>.py (test/integration/e2e by default)
 against a fresh headless process of the app the scenario names in APP (with the arguments in
-ARGS), driven over its command port with tools/box_client.py. A case passes when its function
+ARGS and a fixed delta of 1/60 s), driven over its command port with tools/box_client.py. A case passes when its function
 returns, the app logged no error and it quits cleanly (exit 0, its /tmp/box/<pid> removed). Each
 app is built once and runs as a copy in .bake/integration like visual, and a start the load guard
 refuses is retried the same way. A failure prints the failing command, its output and the tail
@@ -101,6 +97,7 @@ MAX_DELTA = 24
 PIXEL_DELTA = 16
 MAX_PIXELS = 200
 RENDER_TIMEOUT = 120
+DELTA_TIME = "0.016666667"
 GUARD_WAIT = 10
 GUARD_PAUSE = 2
 GUARD_REPORT = 60
@@ -110,10 +107,9 @@ TREE_LIST = 10
 LOAD_WAIT = 1800
 PERF_TIMEOUT = 240
 PERF_FIELDS = ("target_fps", "frames", "errors", "slow", "fast", "min_ms", "mean_ms", "p50_ms",
-               "p99_ms", "max_ms", "fps", "work_mean_ms", "work_p99_ms", "work_max_ms",
+               "p99_ms", "max_ms", "fps",
                "slept_ms", "stalls", "stall_ms", "warmup", "period", "revolutions", "views",
-               "delta_errors", "delta_tolerance_ms", "delta_max_ms", "display_delta_errors",
-               "present_errors", "refresh", "cadence",
+               "delta_errors", "delta_tolerance_ms", "delta_max_ms",
                "present_mean_ms", "cpu_percent", "cpu_ms", "fly", "travelled")
 CULL_FIELDS = ("visible", "frustum_culled", "occlusion_culled")
 PERF_KEYS = PERF_FIELDS + ("drawn", "culled", "deg_per_frame", "cull_samples", "cull_changes",
@@ -442,8 +438,8 @@ def render_scene(scene, png, args):
     with open(harness, "w") as f:
         f.write("%s\n\nvisual_capture {\n  box.surface.Surface: {width: %d, height: %d, "
                 "write_to_file: \"%s\"}\n}\n" % (source.rstrip(), width, height, png))
-    cmd = [args.binary, "--headless", "--frames", str(args.frames), "--timeout",
-           str(RENDER_TIMEOUT), "--port", "0", harness]
+    cmd = [args.binary, "--headless", "--frames", str(args.frames), "--delta-time", DELTA_TIME,
+           "--timeout", str(RENDER_TIMEOUT), "--port", "0", harness]
     code, log, run = run_guarded(cmd, args, png, RENDER_TIMEOUT * 2,
                                  lambda log: "cpu oversubscribed" in log)
     with open(os.path.join(os.path.dirname(png), scene_name(scene) + ".log"), "w") as f:
@@ -803,24 +799,14 @@ def perf_problems(data):
 
 
 def perf_detail(data):
-    refresh = data.get("refresh") or 0
-    display = (", %g Hz display, present mean %.2f ms" % (refresh, data.get("present_mean_ms", 0))
-               if refresh else "")
-    if data.get("cadence"):
-        display += (", cadence: only display delta and missed presents count, slow, fast and "
-                    "delta reported")
-    return ("%d errors (%d slow, %d fast, %d delta, %d display delta, %d present) in %d frames at "
-            "%d fps%s, frame "
-            "mean %.2f ms, p99 %.2f ms, max %.2f ms, delta max %.3f ms, work mean %.2f ms, p99 "
-            "%.2f ms, cpu %.1f%% (%.2f ms/frame), budget slept %.1f ms" % (
+    return ("%d errors (%d slow, %d fast, %d delta) in %d frames at %d fps, frame "
+            "mean %.2f ms, p99 %.2f ms, max %.2f ms, delta max %.3f ms, present mean %.2f ms, "
+            "cpu %.1f%% (%.2f ms/frame), budget slept %.1f ms" % (
                 data.get("errors", 0), data.get("slow", 0), data.get("fast", 0),
-                data.get("delta_errors", 0), data.get("display_delta_errors", 0),
-                data.get("present_errors", 0),
-                data.get("frames", 0), data.get("target_fps", 0), display,
+                data.get("delta_errors", 0), data.get("frames", 0), data.get("target_fps", 0),
                 data.get("mean_ms", 0), data.get("p99_ms", 0), data.get("max_ms", 0),
-                data.get("delta_max_ms", 0), data.get("work_mean_ms", 0),
-                data.get("work_p99_ms", 0), data.get("cpu_percent", 0), data.get("cpu_ms", 0),
-                data.get("slept_ms", 0)))
+                data.get("delta_max_ms", 0), data.get("present_mean_ms", 0),
+                data.get("cpu_percent", 0), data.get("cpu_ms", 0), data.get("slept_ms", 0)))
 
 
 def cull_detail(result):

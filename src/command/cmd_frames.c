@@ -1,12 +1,15 @@
 /**
  * @file command/cmd_frames.c
- * @brief The fps and frames commands: the frame timing of the recent frames.
+ * @brief The fps and frames commands: the frame rate cap and the timing of the recent frames.
  *
- * Both print FrameTiming and RenderStatus in a few lines: the rate, how the frames are paced,
- * the delta against the wall time, the presents and the late and dropped frames.
+ * Both print FrameTiming and RenderStatus in a few lines: the rate, the cap, vsync, the delta
+ * against the wall time, the presents and the late and dropped frames. fps <rate> sets App.fps.
  */
 
 #include "command.h"
+#include <float.h>
+#include <math.h>
+#include <stdlib.h>
 
 /** Append the line of a range of frame times.
  *
@@ -25,25 +28,19 @@ static void box_cmd_frames_range(
         name, last, range->min, range->mean, range->max);
 }
 
-/** Append how the frames are paced: the cap, vsync, the swap interval and the smoothing.
- *
- * With vsync the display paces the frames when there is no cap or the cap is at or above the
- * refresh rate; a cap below it is paced by the clock of the frame loop in whole refreshes.
+/** Append the rate of the frames, the cap and whether they present with vsync.
  *
  * @param buf The output
  * @param timing The frame timing
  * @param render The render status, NULL when box.render is not imported
  */
-static void box_cmd_frames_pacing(
+static void box_cmd_frames_rate(
     ecs_strbuf_t *buf,
     const FrameTiming *timing,
     const RenderStatus *render)
 {
     double fps = timing->interval.mean > 0 ? 1000.0 / timing->interval.mean : 0;
     double cap = timing->target_ms > 0 ? 1000.0 / timing->target_ms : 0;
-    bool vsync = render && render->vsync && render->swap_interval > 0;
-    const char *pacer = vsync && cap > 0 &&
-        cap < (double)render->refresh_rate - BOX_RENDER_REFRESH_SLACK ? "the cap" : "vsync";
     ecs_strbuf_append(buf, "%.1f fps", fps);
     if (cap > 0) {
         ecs_strbuf_append(buf, ", cap %.0f", cap);
@@ -51,29 +48,59 @@ static void box_cmd_frames_pacing(
         ecs_strbuf_appendstr(buf, ", no cap");
     }
 
-    if (timing->fixed) {
-        ecs_strbuf_appendstr(buf, ", fixed delta");
-    } else if (vsync && render->cadence != 1) {
-        ecs_strbuf_append(buf, ", %s paces: a cadence of %.0f Hz refreshes, %d for this frame",
-            pacer, (double)render->refresh_rate, render->swap_interval);
-    } else if (vsync) {
-        ecs_strbuf_append(buf, ", %s paces: %d refresh(es) of %.0f Hz per frame",
-            pacer, render->swap_interval, (double)render->refresh_rate);
+    if (render && render->vsync && render->refresh_rate > 0) {
+        ecs_strbuf_append(buf, ", vsync %.0f Hz", (double)render->refresh_rate);
     } else if (render && render->vsync) {
-        ecs_strbuf_appendstr(buf, ", vsync, the cap sleeps");
+        ecs_strbuf_appendstr(buf, ", vsync");
     } else {
         ecs_strbuf_appendstr(buf, ", no vsync");
-    }
-
-    if (timing->smoothing) {
-        ecs_strbuf_append(buf, ", delta snapped to refreshes of %.2f Hz (%s)",
-            (double)timing->refresh_rate, timing->refresh_measured ? "measured" : "reported");
     }
 
     ecs_strbuf_appendch(buf, '\n');
 }
 
-/** The fps and frames commands: print the timing of the recent frames.
+/** Print the timing of the recent frames.
+ *
+ * @param ctx The call context
+ * @param result Receives the output
+ */
+static void box_cmd_frames_print(
+    const ecs_function_ctx_t *ctx,
+    ecs_value_t *result)
+{
+    const FrameTiming *timing = ecs_singleton_get(ctx->world, FrameTiming);
+    const RenderStatus *render = ecs_singleton_get(ctx->world, RenderStatus);
+    ecs_strbuf_t buf = ECS_STRBUF_INIT;
+    if (!timing || !timing->frames) {
+        box_command_error(ctx, result, "no frame timing yet, run a frame first");
+        goto done;
+    }
+
+    box_cmd_frames_rate(&buf, timing, render);
+    box_cmd_frames_range(&buf, "delta", timing->delta_ms, &timing->delta);
+    box_cmd_frames_range(&buf, "interval", timing->interval_ms, &timing->interval);
+    box_cmd_frames_range(&buf, "error", timing->error.mean, &timing->error);
+    if (timing->present.max > 0) {
+        box_cmd_frames_range(&buf, "present", render ? render->present_ms : 0, &timing->present);
+    }
+
+    ecs_strbuf_append(&buf,
+        "last %d frames: %d late (|delta - interval| > %.1f ms), %d dropped (> %.1f ms); "
+        "since start %lld frames, %lld late, %lld dropped\n",
+        timing->frames, timing->late, BOX_FRAME_TOLERANCE_MS, timing->dropped,
+        timing->target_ms * BOX_FRAME_DROPPED, (long long)timing->total,
+        (long long)timing->total_late, (long long)timing->total_dropped);
+    if (render && render->threaded) {
+        ecs_strbuf_append(&buf, "packets: %d in flight, %d frames waited for a free one\n",
+            render->in_flight, render->stalls);
+    }
+
+    *(char**)result->ptr = ecs_strbuf_get(&buf);
+done:
+    return;
+}
+
+/** The frames command: print the timing of the recent frames.
  *
  * @param ctx The call context
  * @param argc Number of arguments
@@ -86,36 +113,54 @@ static void box_cmd_frames(
     const ecs_value_t *argv,
     ecs_value_t *result)
 {
-    const FrameTiming *timing = ecs_singleton_get(ctx->world, FrameTiming);
-    const RenderStatus *render = ecs_singleton_get(ctx->world, RenderStatus);
-    ecs_strbuf_t buf = ECS_STRBUF_INIT;
     (void)argc;
     (void)argv;
-    if (!timing || !timing->frames) {
-        box_command_error(ctx, result, "no frame timing yet, run a frame first");
+    box_cmd_frames_print(ctx, result);
+}
+
+/** The fps command: set App.fps, the target fps of flecs, when given a rate, else print the
+ * timing of the recent frames like frames.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The session and the rate
+ * @param result Receives the output
+ */
+static void box_cmd_fps(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_value_t *result)
+{
+    const char *arg = argc > 1 ? *(char**)argv[1].ptr : NULL;
+    char *end = NULL;
+    double fps;
+    App *app;
+    if (!arg || !arg[0]) {
+        box_cmd_frames_print(ctx, result);
         goto done;
     }
 
-    box_cmd_frames_pacing(&buf, timing, render);
-    box_cmd_frames_range(&buf, "delta", timing->delta_ms, &timing->delta);
-    box_cmd_frames_range(&buf, "interval", timing->interval_ms, &timing->interval);
-    box_cmd_frames_range(&buf, "error", timing->error.mean, &timing->error);
-    if (timing->present.max > 0) {
-        box_cmd_frames_range(&buf, "present", render ? render->present_ms : 0, &timing->present);
+    fps = strtod(arg, &end);
+    if (end[0] || !isfinite(fps) || fps < 0 || fps > FLT_MAX) {
+        box_command_error(ctx, result, "invalid rate '%s', expected a number >= 0", arg);
+        goto done;
     }
 
-    ecs_strbuf_append(&buf,
-        "last %d frames: %d late (|delta - interval| > %.1f ms), %d dropped (> %.1f ms); "
-        "since start %lld frames, %lld late, %lld dropped\n",
-        timing->frames, timing->late, BOX_FRAME_TOLERANCE_MS, timing->dropped,
-        timing->frame_ms * BOX_FRAME_DROPPED, (long long)timing->total,
-        (long long)timing->total_late, (long long)timing->total_dropped);
-    if (render && render->threaded) {
-        ecs_strbuf_append(&buf, "packets: %d in flight, %d frames waited at their start, "
-            "%d in the middle\n", render->in_flight, render->waits, render->stalls);
+    app = ecs_singleton_get_mut(ctx->world, App);
+    if (!app) {
+        box_command_error(ctx, result, "box.app is not imported");
+        goto done;
     }
 
-    *(char**)result->ptr = ecs_strbuf_get(&buf);
+    app->fps = (float)fps;
+    ecs_singleton_modified(ctx->world, App);
+    if (fps > 0) {
+        *(char**)result->ptr = flecs_asprintf("cap %g fps\n", fps);
+    } else {
+        *(char**)result->ptr = ecs_os_strdup("no cap\n");
+    }
+
 done:
     return;
 }
@@ -125,13 +170,14 @@ void box_cmd_frames_init(
 {
     box_command_register(world, &(box_command_desc_t){
         .name = "fps",
-        .brief = "Show the frame rate and timing: delta against wall time, presents, late, dropped",
-        .callback = box_cmd_frames
+        .brief = "Set the frame rate cap, 0 for none, or show the frame timing like frames",
+        .params = {{ .name = "rate", .type = ecs_id(ecs_string_t), .optional = true }},
+        .callback = box_cmd_fps
     });
 
     box_command_register(world, &(box_command_desc_t){
         .name = "frames",
-        .brief = "Show the timing of the recent frames, same as fps",
+        .brief = "Show the frame rate and timing: delta against wall time, presents, late, dropped",
         .callback = box_cmd_frames
     });
 }

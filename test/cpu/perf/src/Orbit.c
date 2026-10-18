@@ -16,7 +16,7 @@ void Orbit_fits_bounds(void) {
     fake_work_ms = 0;
     fake_slept_ms = 0;
     box_perf_clock = fake_now;
-    box_perf_sleep = fake_sleep;
+    fake_os_begin();
 
     ecs_entity_t a = ecs_new(world);
     ecs_set(world, a, Position, {-5, 0, 0});
@@ -49,7 +49,7 @@ void Orbit_fits_bounds(void) {
 
     ecs_fini(world);
     box_perf_clock = NULL;
-    box_perf_sleep = NULL;
+    fake_os_end();
 }
 
 void Orbit_looks_at_center(void) {
@@ -60,7 +60,7 @@ void Orbit_looks_at_center(void) {
     fake_work_ms = 0;
     fake_slept_ms = 0;
     box_perf_clock = fake_now;
-    box_perf_sleep = fake_sleep;
+    fake_os_begin();
 
     ecs_entity_t a = ecs_new(world);
     ecs_set(world, a, Position, {10, 3, -4});
@@ -94,7 +94,7 @@ void Orbit_looks_at_center(void) {
 
     ecs_fini(world);
     box_perf_clock = NULL;
-    box_perf_sleep = NULL;
+    fake_os_end();
 }
 
 void Orbit_moves_every_frame(void) {
@@ -105,7 +105,7 @@ void Orbit_moves_every_frame(void) {
     fake_work_ms = 0;
     fake_slept_ms = 0;
     box_perf_clock = fake_now;
-    box_perf_sleep = fake_sleep;
+    fake_os_begin();
 
     ecs_entity_t a = ecs_new(world);
     ecs_set(world, a, Position, {0, 0, 0});
@@ -134,7 +134,7 @@ void Orbit_moves_every_frame(void) {
 
     ecs_fini(world);
     box_perf_clock = NULL;
-    box_perf_sleep = NULL;
+    fake_os_end();
 }
 
 void Orbit_first_camera_when_unset(void) {
@@ -145,7 +145,7 @@ void Orbit_first_camera_when_unset(void) {
     fake_work_ms = 0;
     fake_slept_ms = 0;
     box_perf_clock = fake_now;
-    box_perf_sleep = fake_sleep;
+    fake_os_begin();
 
     ecs_entity_t a = ecs_new(world);
     ecs_set(world, a, Position, {0, 0, 0});
@@ -167,7 +167,7 @@ void Orbit_first_camera_when_unset(void) {
 
     ecs_fini(world);
     box_perf_clock = NULL;
-    box_perf_sleep = NULL;
+    fake_os_end();
 }
 
 void Orbit_elevation(void) {
@@ -178,7 +178,7 @@ void Orbit_elevation(void) {
     fake_work_ms = 0;
     fake_slept_ms = 0;
     box_perf_clock = fake_now;
-    box_perf_sleep = fake_sleep;
+    fake_os_begin();
 
     ecs_entity_t a = ecs_new(world);
     ecs_set(world, a, Position, {0, 0, 0});
@@ -200,7 +200,7 @@ void Orbit_elevation(void) {
 
     ecs_fini(world);
     box_perf_clock = NULL;
-    box_perf_sleep = NULL;
+    fake_os_end();
 }
 
 void Orbit_no_shapes(void) {
@@ -211,7 +211,7 @@ void Orbit_no_shapes(void) {
     fake_work_ms = 0;
     fake_slept_ms = 0;
     box_perf_clock = fake_now;
-    box_perf_sleep = fake_sleep;
+    fake_os_begin();
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
@@ -228,7 +228,7 @@ void Orbit_no_shapes(void) {
 
     ecs_fini(world);
     box_perf_clock = NULL;
-    box_perf_sleep = NULL;
+    fake_os_end();
 }
 
 void Orbit_period(void) {
@@ -237,7 +237,7 @@ void Orbit_period(void) {
     ECS_IMPORT(world, Box);
     fake_time = 100;
     box_perf_clock = fake_now;
-    box_perf_sleep = fake_sleep;
+    fake_os_begin();
 
     ecs_entity_t a = ecs_new(world);
     ecs_set(world, a, Position, {4, 0, 0});
@@ -274,7 +274,7 @@ void Orbit_period(void) {
 
     ecs_fini(world);
     box_perf_clock = NULL;
-    box_perf_sleep = NULL;
+    fake_os_end();
 }
 
 void Orbit_cull_ranges(void) {
@@ -285,7 +285,7 @@ void Orbit_cull_ranges(void) {
     fake_work_ms = 0;
     fake_slept_ms = 0;
     box_perf_clock = fake_now;
-    box_perf_sleep = fake_sleep;
+    fake_os_begin();
 
     ecs_entity_t a = ecs_new(world);
     ecs_set(world, a, Position, {0, 0, 0});
@@ -327,7 +327,7 @@ void Orbit_cull_ranges(void) {
 
     ecs_fini(world);
     box_perf_clock = NULL;
-    box_perf_sleep = NULL;
+    fake_os_end();
 }
 
 void Orbit_views_of_orbit(void) {
@@ -338,7 +338,7 @@ void Orbit_views_of_orbit(void) {
     fake_work_ms = 0;
     fake_slept_ms = 0;
     box_perf_clock = fake_now;
-    box_perf_sleep = fake_sleep;
+    fake_os_begin();
 
     ecs_entity_t a = ecs_new(world);
     ecs_set(world, a, Position, {0, 0, 0});
@@ -395,7 +395,7 @@ void Orbit_views_of_orbit(void) {
 
     ecs_fini(world);
     box_perf_clock = NULL;
-    box_perf_sleep = NULL;
+    fake_os_end();
 }
 
 void Orbit_revolutions(void) {
@@ -406,7 +406,7 @@ void Orbit_revolutions(void) {
     fake_work_ms = 0;
     fake_slept_ms = 0;
     box_perf_clock = fake_now;
-    box_perf_sleep = fake_sleep;
+    fake_os_begin();
 
     ecs_entity_t a = ecs_new(world);
     ecs_set(world, a, Position, {0, 0, 0});
@@ -428,5 +428,5 @@ void Orbit_revolutions(void) {
 
     ecs_fini(world);
     box_perf_clock = NULL;
-    box_perf_sleep = NULL;
+    fake_os_end();
 }

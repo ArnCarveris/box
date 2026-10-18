@@ -206,7 +206,7 @@ void Stop_run_headless_fixed_delta(void) {
     });
 
     ecs_singleton_set(world, App, {
-        .headless = true, .frames = 3, .cpu_budget = 100, .fps = 50,
+        .headless = true, .frames = 3, .cpu_budget = 100, .delta_time = 0.02f,
         .unguarded = true, .unpaced = true });
 
     test_int(box_app_run(world), 0);

@@ -18,7 +18,7 @@ void Report_writes_json(void) {
     fake_work_ms = 0;
     fake_slept_ms = 0;
     box_perf_clock = fake_now;
-    box_perf_sleep = fake_sleep;
+    fake_os_begin();
 
     char path[256];
     snprintf(path, sizeof(path), "/tmp/box_perf_report_%d.json", (int)getpid());
@@ -58,7 +58,7 @@ void Report_writes_json(void) {
 
     ecs_fini(world);
     box_perf_clock = NULL;
-    box_perf_sleep = NULL;
+    fake_os_end();
 }
 
 void Report_failed_run(void) {
@@ -69,7 +69,7 @@ void Report_failed_run(void) {
     fake_work_ms = 0;
     fake_slept_ms = 0;
     box_perf_clock = fake_now;
-    box_perf_sleep = fake_sleep;
+    fake_os_begin();
 
     char path[256];
     snprintf(path, sizeof(path), "/tmp/box_perf_failed_%d.json", (int)getpid());
@@ -94,7 +94,7 @@ void Report_failed_run(void) {
 
     ecs_fini(world);
     box_perf_clock = NULL;
-    box_perf_sleep = NULL;
+    fake_os_end();
 }
 
 void Report_status_reflected(void) {
@@ -105,7 +105,7 @@ void Report_status_reflected(void) {
     fake_work_ms = 0;
     fake_slept_ms = 0;
     box_perf_clock = fake_now;
-    box_perf_sleep = fake_sleep;
+    fake_os_begin();
 
     ecs_singleton_set(world, PerfRun, { .fps = 120, .warmup = 2, .frames = 2 });
     for (int i = 0; i < 4; i ++) {
@@ -122,7 +122,7 @@ void Report_status_reflected(void) {
 
     ecs_fini(world);
     box_perf_clock = NULL;
-    box_perf_sleep = NULL;
+    fake_os_end();
 }
 
 void Report_script_run(void) {
@@ -133,7 +133,7 @@ void Report_script_run(void) {
     fake_work_ms = 0;
     fake_slept_ms = 0;
     box_perf_clock = fake_now;
-    box_perf_sleep = fake_sleep;
+    fake_os_begin();
 
     test_assert(ecs_script_run(world, "perf",
         "using box.camera\n"
@@ -161,7 +161,7 @@ void Report_script_run(void) {
 
     ecs_fini(world);
     box_perf_clock = NULL;
-    box_perf_sleep = NULL;
+    fake_os_end();
 }
 
 void Report_orbit_json(void) {
@@ -172,7 +172,7 @@ void Report_orbit_json(void) {
     fake_work_ms = 0;
     fake_slept_ms = 0;
     box_perf_clock = fake_now;
-    box_perf_sleep = fake_sleep;
+    fake_os_begin();
 
     char path[256];
     snprintf(path, sizeof(path), "/tmp/box_perf_orbit_%d.json", (int)getpid());
@@ -212,5 +212,5 @@ void Report_orbit_json(void) {
 
     ecs_fini(world);
     box_perf_clock = NULL;
-    box_perf_sleep = NULL;
+    fake_os_end();
 }

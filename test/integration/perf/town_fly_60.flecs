@@ -1,7 +1,6 @@
 // The town of etc/scenes/town.flecs at 60 FPS for a minute, flown by its CameraController with
 // synthetic input (forward and turning left held, boost toggled every 2 s), in the retina window
-// of that scene (1280x720 points, 2560x1440 pixels) presenting to a simulated 120 Hz vsync
-// display, each frame shown for 2 refreshes.
+// of that scene (1280x720 points, 2560x1440 pixels).
 
 using flecs.script
 using box.transform
@@ -1074,5 +1073,5 @@ view {
 }
 
 $ {
-  PerfRun: {fps: 60, frames: 3600, warmup: 60, period: 0, elevation: 30, camera: camera, refresh: 120, fly: true}
+  PerfRun: {fps: 60, frames: 3600, warmup: 60, period: 0, elevation: 30, camera: camera, fly: true}
 }

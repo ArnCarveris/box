@@ -478,7 +478,6 @@ typedef struct box_gpu_t {
     WGPUAdapter adapter;            /**< The adapter */
     WGPUDevice device;              /**< The device */
     WGPUQueue queue;                /**< Queue of the device */
-    uint64_t fence_done;            /**< Last fence whose work the queue reported done */
     WGPUBindGroupLayout blit_layout; /**< Bind group layout of the blit */
     WGPUPipelineLayout blit_pipeline_layout; /**< Pipeline layout of the blit */
     WGPUSampler sampler;            /**< Linear sampler of the blit */
@@ -675,7 +674,7 @@ void box_gpu_target_apply(
 
 /** Clear a target, scale its scene to the presented image, capture it and present it.
  *
- * A window presents each frame once, FIFO with vsync; the frame loop paces a cap with its clock.
+ * A window presents each frame once, FIFO with vsync; flecs paces a cap with its target fps.
  * Presenting a frame again holds two of the 3 drawables wgpu gives a CAMetalLayer (latency 2 + 1,
  * clamped to 1..2), and nextDrawable then waits on the compositor without a timeout.
  *

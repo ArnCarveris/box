@@ -9,7 +9,6 @@
 #include <box.h>
 
 extern double (*box_perf_clock)(void);
-extern void (*box_perf_sleep)(double seconds);
 
 /** Seconds on the fake clock */
 extern double fake_time;
@@ -26,21 +25,6 @@ extern double fake_slept_ms;
  */
 double fake_now(void);
 
-/** Sleep on the fake clock.
- *
- * @param seconds Seconds to advance the fake clock by
- */
-void fake_sleep(
-    double seconds);
-
-/** Sleep on the fake clock like a busy machine: with 50% timer leeway and a millisecond of
- * wake up latency.
- *
- * @param seconds Seconds asked for
- */
-void fake_sleep_late(
-    double seconds);
-
 /** OS clock callback that reads the fake clock without advancing it, for ecs_os_api.now_.
  *
  * @return The fake time in nanoseconds
@@ -55,6 +39,14 @@ uint64_t fake_os_now(void);
 void fake_os_sleep(
     int32_t sec,
     int32_t nanosec);
+
+/** Make flecs read and sleep on the fake clock, so its target fps paces the frames in fake time.
+ * fake_os_end restores the OS clock and sleep.
+ */
+void fake_os_begin(void);
+
+/** Restore the OS clock and sleep that fake_os_begin replaced. */
+void fake_os_end(void);
 
 /** System that spends fake_work_ms of fake time and reports fake_slept_ms of budget sleep.
  *
