@@ -64,11 +64,11 @@ parser only writes the `App` singleton:
 
 | Option | `App` member | Notes |
 |---|---|---|
-| `--headless` | `headless` | No window, fixed delta of `1/fps` |
+| `--headless` | `headless` | No window, fixed delta of `1/fps` (60 when `fps` is 0) |
 | `--frames <n>` | `frames` | Stop after n frames |
 | `--timeout <s\|infinite>` | `timeout` | Wall seconds, the clock starts at the first frame |
 | `--cpu-budget <pct>` | `cpu_budget` | Percentage of one core, default 100 |
-| `--fps <n>` | `fps` | Target rate, default 60, 0 uncapped |
+| `--fps <n>` | `fps` | Cap in a window, default 0: no cap, the display's vsync paces the frames. A headless run uses it as its fixed step, 60 when 0 (`BOX_APP_FPS`) |
 | `--port <n>` | `port` | Command and REST port, default 27750, 0 disables |
 | `<file>` | `scene` | Script loaded before the first frame |
 
@@ -125,15 +125,48 @@ A ring of `RenderSettings.in_flight` packets (default 2, at most 8) carries a fr
 world to the renderer; their vectors keep their storage, so a steady frame does not allocate.
 A packet holds, in apply order: resource changes (create, update, destroy of a buffer, mesh,
 texture, target or shader by handle), uploads into buffers, the targets to render and the
-views with their batches. Bytes live in one 16 byte aligned data block. The first
-`box_render_packet` call of a frame acquires a free packet and waits when all are in flight
-(`RenderStatus.stalls`). `box_render_sync` waits until every submitted packet rendered; deleting
+views with their batches. Bytes live in one 16 byte aligned data block. The main loop
+waits for a free packet at the start of the frame, before the delta is measured
+(`box_app_frame_wait`, `box_render_ring_wait`, `RenderStatus.waits`), so a slow present does not
+become the game's delta; `box_render_packet` only waits (`RenderStatus.stalls`) if no packet is
+free when it is called. The wait is a no-op with `main_thread` (browser). `box_render_sync` waits until every submitted packet rendered; deleting
 the world does the same before `AppStatus.tmp_dir` is removed.
 
 A backend (`box_render_backend_t`) is `init`, `render`, `fini` on the consuming thread and
 `free` on the main thread. A new ring has a null backend that records what it received. The
 first `Surface` replaces it with the webgpu backend, so a world without surfaces never creates
 a device. The backend keeps targets, meshes, textures and shaders by handle.
+
+## Frame loop and pacing
+
+A window presents once per frame. Earlier versions emulated a swap interval by presenting a
+frame again (acquire, blit, FIFO present); that uses up the surface's few drawables
+(CAMetalLayer), so acquire blocked for tens of milliseconds and the next delta spiked. Pacing
+is done by the frame loop instead.
+
+- No cap (the default, `App.fps` 0): vsync blocks the present, so the display paces the frames
+  and a 120 Hz display gets about 120 frames per second. `--fps <n>` at or above the refresh
+  rate behaves the same; the frame loop only keeps a guard (`BOX_APP_PACED_GUARD` of a refresh)
+  that bounds the rate when presents return immediately.
+- A cap below the refresh rate: `box_app_frame_delay` advances a deadline by whole refreshes at
+  the reported refresh rate (`swap_interval / refresh_rate`) and sleeps to it. This loop is open
+  loop against the display: it is not locked to the measured present times, so a display a
+  little off its reported rate, or clock drift, slowly moves the phase relative to vsync and
+  can show an occasional uneven frame when the phase crosses a refresh boundary.
+- Headless runs ignore all of this and step a fixed `1/fps` (60 by default); `--realtime`
+  measures instead.
+
+The delta passed to `ecs_progress` is the measured frame time snapped to whole refreshes by the
+smoother (`src/app/smooth.c`), so it matches the time the frame is on screen. Until its
+estimate of the refresh period completes it uses the reported rate. The estimator drops
+readings that do not round to their number of refreshes (missed refreshes), and rejects an
+estimate more than `BOX_RENDER_REFRESH_SLACK` away from the reported rate. The snapped delta
+stays within the `BOX_SMOOTH_AHEAD` band of the measured time, so one late present does not
+become a spike. `FrameTiming.refresh_rate` reports the period actually used for snapping.
+
+On a variable refresh display (ProMotion) the compositor may lower the rate. Once the reported
+rate is wrong the smoother keeps snapping to the reported period until `box_smooth_allowed`
+gives up and the raw measured delta is used.
 
 ## Frame phases
 
