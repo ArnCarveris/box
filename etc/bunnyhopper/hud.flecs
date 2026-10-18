@@ -1,0 +1,134 @@
+// The HUD: a screen space UI scene drawn over the world. It reads the BunnyGame singleton, the
+// lives of the player and the state of the run, so flecs evaluates the parts that depend on them
+// again when they change; nothing in it is set from C. Its root fills the window, so the
+// elements stay at their edges when the window is resized.
+
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.layout
+using box.text
+using box.texture
+using bunnyhopper
+
+// Opacity of the icon of a lost life
+const lostAlpha: f32 = 70.0 / 255.0
+
+// The icon of a life, rendered from the SVG at 128x128
+life_icon {
+  TexturePath: {path: "etc/bunnyhopper/icons/bunny_life.svg", width: 128, height: 128}
+}
+
+// One life in the row of lives, index from the left: the icon fitted in a size by size square
+template LifeIcon {
+  prop index: i32 = 0
+  prop size: f32 = 46
+  prop alpha: f32 = 1
+
+  LayoutItem: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
+  Rect: {size, size}
+  Image: {texture: life_icon, u1: 1, v1: 1}
+  Opacity: {alpha}
+}
+
+// The HUD of the game. The scene instantiates it after its world view, so the HUD view draws
+// after it, with the window the HUD fills.
+template BunnyHud {
+  prop surface: entity = 0
+
+  const game = BunnyGame[BunnyGame]
+  const carrotCount = game.carrots
+  const maxLives = game.max_lives
+
+  // The player by name: an entity in a variable (game.player) is watched from the instance on,
+  // and would miss lives the scene sets right after it includes the game
+  const lives = player[BunnyLives].lives_left
+
+  // A script sees a pair added to the state singleton, but not removed: it evaluates again
+  // before the pair is gone. A run ends with no lives left and restart() gives the lives back
+  // before it changes the state, so with the lives the HUD sees both changes.
+  const over = BunnyGameState?[(BunnyGameState, Over)] && lives == 0
+
+  // Screen space UI: an orthographic camera at ortho_scale 1, so one logical pixel is one point
+  ui {
+    Scene: {}
+
+    camera {
+      Position: {0, 0, 100}
+      Camera: {ortho: true, ortho_scale: 1}
+    }
+
+    screen {
+      LayoutFill: {surface: surface}
+      Layout: {}
+
+      score {
+        LayoutItem: {h: Left, v: Top, x: 24, y: -24}
+        Text: {value: "Carrots: {carrotCount}", size: 30}
+        Rgb: {255, 255, 255}
+      }
+
+      lives {
+        Layout: {direction: Row, spacing: 12, padding: {12, 12, 12, 12}}
+        LayoutItem: {h: Right, v: Top, x: -14, y: -14}
+
+        for i in 0..maxLives {
+          "life_{i}" {
+            if i < lives {
+              LifeIcon: {index: i, size: 46, alpha: 1}
+            } else {
+              LifeIcon: {index: i, size: 46, alpha: lostAlpha}
+            }
+          }
+        }
+      }
+
+      if !over && carrotCount < 3 {
+        hint {
+          LayoutItem: {h: Center, v: Bottom, y: 60}
+          Text: {value: "SPACE to hop - hop again in the air for big carrots!", size: 24}
+          Rgb: {255, 255, 255}
+        }
+      }
+
+      // The background is a child of its own, so its opacity leaves the text opaque
+      if over {
+        game_over {
+          Layout: {}
+          LayoutItem: {
+            h: Center, v: Top, y: -256,
+            width: {mode: Fixed, value: 560}, height: {mode: Fixed, value: 170}
+          }
+
+          background {
+            LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+            Rect: {1, 1}
+            Rgb: {20, 30, 20}
+            Opacity: {170.0 / 255.0}
+            Border: {radius: 8}
+          }
+
+          title {
+            LayoutItem: {h: Center, v: Top, y: -28}
+            Text: {value: "GAME OVER", size: 64}
+            Rgb: {255, 255, 255}
+          }
+
+          prompt {
+            LayoutItem: {h: Center, v: Top, y: -110}
+            Text: {value: "Press R to try again", size: 26}
+            Rgb: {255, 255, 255}
+          }
+        }
+      }
+    }
+  }
+
+  // The view of the HUD, after the world view: no clear, no lighting and no culling
+  view {
+    View: {camera: ui.camera, lighting: {enabled: false}, culling: {enabled: false}}
+  }
+}

@@ -10,6 +10,7 @@ include scenery
 include world
 include player
 include input
+include hud
 
 using flecs.script.math
 using box.transform
@@ -68,4 +69,9 @@ main_view {
     shadows: {enabled: true, max_distance: 200},
     effects: [{effect: ssao}, {effect: bloom}, {effect: tonemap}]
   }
+}
+
+// The HUD (hud.flecs), created after the world view so it draws over it
+hud {
+  BunnyHud: {surface: window}
 }

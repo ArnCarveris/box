@@ -1,0 +1,31 @@
+{
+    "id": "bunnyhopper_gpu",
+    "type": "application",
+    "value": {
+        "public": false,
+        "use": [
+            "box",
+            "bunnyhopper_game"
+        ]
+    },
+    "lang.c": {
+        "include": [
+            "../../../src/render"
+        ]
+    },
+    "test": {
+        "testsuites": [
+            {
+                "id": "Hud",
+                "testcases": [
+                    "score_follows_carrots",
+                    "lost_lives_dimmed",
+                    "hint_until_three_carrots",
+                    "game_over_panel",
+                    "follows_resize",
+                    "capture_shows_icons"
+                ]
+            }
+        ]
+    }
+}
