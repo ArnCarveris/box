@@ -456,7 +456,7 @@ void Game_scene_loads(void) {
         }
     }
 
-    test_int(scripts, 9);
+    test_int(scripts, 10);
     test_assert(ecs_lookup(world, "BunnyModel") != 0);
     test_assert(ecs_has_id(world, prefab(world, "SmallCarrot"), EcsPrefab));
     test_assert(ecs_has_id(world, prefab(world, "LargeCarrot"), EcsPrefab));

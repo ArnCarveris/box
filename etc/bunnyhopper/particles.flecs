@@ -1,0 +1,158 @@
+// Particle effects: one shot templates the bunnyhopper systems play with box_particle_burst_at,
+// dust where the bunny lands, a red burst where a carrot hits it and sparkles where a carrot
+// passes it. Each is a layer below the root that bursts once and fades in and out over the life
+// of its particles.
+//
+// The layers describe the effects in the frame of the track, as if the world stood still. The
+// systems shift the velocities of every play by the world speed and keep the wind of
+// effect_wind at it, so dust stays where it landed on the scrolling track.
+
+using box.particle
+using box.transform
+
+// The wind of the scrolling world, (-BunnyGame.speed, 0, 0) while playing and 0 once the game is
+// over. Every layer names it, and pulls its particles toward it with its own drag.
+effect_wind {
+  ParticleForces: {gravity: {0, 0, 0}, wind: {-cfg.initialSpeed, 0, 0}}
+}
+
+// Budgets of the effects: a few plays of a template at once are plenty, as the bunny lands at
+// most once per jump. A full budget recycles the oldest play, so a landing never drops its dust.
+$ {
+  ParticleSettings: {effect_max: 8, effect_total: 32, effect_overflow: EffectRecycle}
+}
+
+// Dust of a landing after a jump, played at the bunny's feet
+prefab LandingDust {
+  particles {
+    Position: {0, 0.08, 0}
+    ParticleEmitter: {
+      max: 16,
+      rate: 0,
+      shape: EmitterBox,
+      extents: {0.25, 0.025, 0.15},
+      direction: {0, 1, 0},
+      spread: 58,
+      speed: {0.5, 2.2},
+      lifetime: {0.35, 0.75},
+      size: {0.08, 0.2},
+      color: {225, 210, 185},
+      forces: effect_wind,
+      seed: 101
+    }
+    ParticleBurst: {count: 11}
+    ParticleForces: {gravity: {0, -5, 0}, drag: 2.5}
+    ParticleCurves: {
+      size: {1, 1.33, 1.65, 1.98},
+      opacity: {0.7, 1.12, 0.7, 0}
+    }
+  }
+}
+
+// Dust of a hard landing, when the bunny comes down faster than cfg.hardLandingVelocity
+prefab HardLandingDust {
+  particles {
+    Position: {0, 0.08, 0}
+    ParticleEmitter: {
+      max: 32,
+      rate: 0,
+      shape: EmitterBox,
+      extents: {0.25, 0.025, 0.15},
+      direction: {0, 1, 0},
+      spread: 60,
+      speed: {1.2, 4.6},
+      lifetime: {0.35, 0.75},
+      size: {0.08, 0.2},
+      color: {225, 210, 185},
+      forces: effect_wind,
+      seed: 102
+    }
+    ParticleBurst: {count: 23}
+    ParticleForces: {gravity: {0, -5, 0}, drag: 2.5}
+    ParticleCurves: {
+      size: {1, 1.72, 2.44, 3.16},
+      opacity: {0.7, 1.12, 0.7, 0}
+    }
+  }
+}
+
+// A red burst around the bunny when a carrot costs it a life
+prefab HitBurst {
+  particles {
+    Position: {0, 0.7, 0}
+    ParticleEmitter: {
+      max: 32,
+      rate: 0,
+      shape: EmitterBox,
+      extents: {0.125, 0.15, 0.125},
+      direction: {0, 1, 0},
+      spread: 66,
+      speed: {1.5, 5.5},
+      lifetime: {0.3, 0.7},
+      size: {0.09, 0.23},
+      color: {255, 0, 0},
+      forces: effect_wind,
+      seed: 103
+    }
+    ParticleBurst: {count: 28}
+    ParticleForces: {gravity: {0, -9, 0}, drag: 2}
+    ParticleCurves: {
+      size: {1, 1.1, 1.21, 1.31},
+      opacity: {0.7, 1.1, 0.56, 0}
+    }
+  }
+}
+
+// Golden sparkles that rise from a carrot the bunny cleared. They add their light to the image,
+// and a wider glow layer drawn with the same seed adds a halo to each of them, so together they
+// are brighter than the sky and bloom, as the emissive strength 2 of the original did.
+prefab CarrotSparkle {
+  particles {
+    ParticleEmitter: {
+      max: 32,
+      rate: 0,
+      shape: EmitterBox,
+      extents: {0.25, 0, 0.25},
+      direction: {0, 1, 0},
+      spread: 0,
+      speed: {2, 8},
+      lifetime: {0.5, 0.5},
+      size: {0.06, 0.16},
+      color: {255, 220, 80},
+      forces: effect_wind,
+      seed: 104
+    }
+    ParticleBurst: {count: 18}
+    ParticleForces: {gravity: {0, 0, 0}}
+    ParticleAppearance: {blend: ParticleAdditive}
+    ParticleCurves: {
+      opacity: {0.7, 1.09, 0.87, 0}
+    }
+  }
+
+  // The same particles twice as large and fainter: the same seed and draws place them on the
+  // sparkles of the layer above
+  glow {
+    ParticleEmitter: {
+      max: 32,
+      rate: 0,
+      shape: EmitterBox,
+      extents: {0.25, 0, 0.25},
+      direction: {0, 1, 0},
+      spread: 0,
+      speed: {2, 8},
+      lifetime: {0.5, 0.5},
+      size: {0.12, 0.32},
+      opacity: {0.6, 0.6},
+      color: {255, 220, 80},
+      forces: effect_wind,
+      seed: 104
+    }
+    ParticleBurst: {count: 18}
+    ParticleForces: {gravity: {0, 0, 0}}
+    ParticleAppearance: {blend: ParticleAdditive}
+    ParticleCurves: {
+      opacity: {0.7, 1.09, 0.87, 0}
+    }
+  }
+}

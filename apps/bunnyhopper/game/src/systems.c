@@ -74,7 +74,28 @@ static void BunnyConfig(
     bunny_cfg_read(it->world, &rt->cfg);
 }
 
-/** Move the bunny with gravity, land it on the ground and tilt it with its velocity.
+/** Play the dust of a landing at the feet of the bunny.
+ *
+ * @param world The world
+ * @param x X of the bunny
+ * @param hard Whether the landing was hard
+ * @param cfg The constants of the scene
+ */
+static void bunny_landed(
+    ecs_world_t *world,
+    float x,
+    bool hard,
+    const bunny_cfg_t *cfg)
+{
+    const BunnyGame *g = ecs_singleton_get(world, BunnyGame);
+    if (g) {
+        ecs_entity_t dust = hard && g->dust_high ? g->dust_high : g->dust;
+        bunny_effect_queue(world, dust, x, cfg->ground_y);
+    }
+}
+
+/** Move the bunny with gravity, land it on the ground and tilt it with its velocity. A landing
+ * after a jump while playing plays the dust at its feet, the high dust when it was hard.
  *
  * @param it Iterator over the players
  */
@@ -96,6 +117,10 @@ static void BunnyPhysics(
         j[i].v += cfg->gravity * dt;
         p[i].y += j[i].v * dt;
         if (p[i].y <= ground) {
+            if (playing && j[i].jumps > 0) {
+                bunny_landed(it->world, p[i].x, -j[i].v > cfg->hard_landing_velocity, cfg);
+            }
+
             p[i].y = ground;
             j[i].v = 0.0f;
             j[i].jumps = 0;
@@ -183,7 +208,8 @@ done:
     return;
 }
 
-/** Scroll the carrots toward the bunny, delete and count those that passed it.
+/** Scroll the carrots toward the bunny, delete and count those that passed it, playing the
+ * sparkle where each one passed.
  *
  * @param it Iterator over the carrots
  */
@@ -202,6 +228,7 @@ static void BunnyCarrotScroll(
     for (int32_t i = 0; i < it->count; i ++) {
         p[i].x -= step;
         if (p[i].x < cfg->despawn_x) {
+            bunny_effect_queue(it->world, g->sparkle, p[i].x, p[i].y);
             ecs_delete(it->stage, it->entities[i]);
             bunny_carrot_passed(it->stage, g);
             passed = true;
@@ -294,7 +321,8 @@ done:
     return;
 }
 
-/** Hit the bunny: take a life, then end the run or bounce and protect the bunny.
+/** Hit the bunny: play the hit effect at it, take a life, then end the run or bounce and
+ * protect the bunny.
  *
  * @param world The stage the changes go through
  * @param player The bunny
@@ -305,6 +333,12 @@ static void bunny_hit(
     ecs_entity_t player,
     const bunny_cfg_t *cfg)
 {
+    const BunnyGame *g = ecs_singleton_get(world, BunnyGame);
+    const Position *p = ecs_get(world, player, Position);
+    if (g && p) {
+        bunny_effect_queue(world, g->hit, p->x, p->y);
+    }
+
     BunnyLives *lives = ecs_get_mut(world, player, BunnyLives);
     lives->lives_left --;
     ecs_modified(world, player, BunnyLives);
@@ -458,4 +492,6 @@ void bunny_systems_import(
         },
         .run = BunnyCollision
     });
+
+    bunny_effects_import(world);
 }

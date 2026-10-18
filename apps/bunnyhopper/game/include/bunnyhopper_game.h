@@ -5,6 +5,9 @@
  * The scene (etc/bunnyhopper) holds the constants cfg.*, the assets and the BunnyGame singleton;
  * the systems of EcsOnUpdate move the bunny, the carrots and the scenery while the state is
  * (BunnyGameState, Playing) and stop the world when the last life is lost.
+ *
+ * Landings, hits and passing carrots play the effect templates of BunnyGame, which scroll with
+ * the world.
  */
 
 #ifndef BUNNYHOPPER_GAME_H
@@ -57,8 +60,11 @@ ECS_STRUCT(BunnyGame, {
     ecs_entity_t small_carrot;  /**< Prefab of a small carrot, with BunnyCarrot */
     ecs_entity_t large_carrot;  /**< Prefab of a large carrot that needs a double jump */
     ecs_entity_t dust;          /**< Effect template of a landing after a jump, 0 for none */
+    ecs_entity_t dust_high;     /**< Effect template of a hard landing, 0 plays dust */
     ecs_entity_t sparkle;       /**< Effect template of a carrot that passed, 0 for none */
     ecs_entity_t hit;           /**< Effect template of a carrot that hit the bunny, 0 for none */
+    ecs_entity_t effect_wind;   /**< Entity with the ParticleForces the effect layers name, whose
+                                 *   wind the systems keep at (-speed, 0, 0), 0 for none */
 });
 
 /** Look of the bunny: the scene's bunny template follows it */

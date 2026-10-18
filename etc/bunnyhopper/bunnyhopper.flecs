@@ -6,6 +6,7 @@
 include config
 include bunny
 include carrots
+include particles
 include scenery
 include world
 include player

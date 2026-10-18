@@ -25,6 +25,13 @@
                     "follows_resize",
                     "capture_shows_icons"
                 ]
+            },
+            {
+                "id": "Effects",
+                "testcases": [
+                    "dust_near_feet",
+                    "sparkle_brighter_than_sky"
+                ]
             }
         ]
     }

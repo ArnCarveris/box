@@ -1,5 +1,5 @@
 // The world: the static ground and track, the scenery, the bunny, the parent of the carrots and
-// the BunnyGame singleton that ties them together.
+// the BunnyGame singleton that ties them together with the carrot prefabs and the effects.
 
 using flecs.script.math
 using box.transform
@@ -77,6 +77,11 @@ $ {
     player: player,
     carrot_parent: carrots,
     small_carrot: SmallCarrot,
-    large_carrot: LargeCarrot
+    large_carrot: LargeCarrot,
+    dust: LandingDust,
+    dust_high: HardLandingDust,
+    sparkle: CarrotSparkle,
+    hit: HitBurst,
+    effect_wind: effect_wind
   }
 }
