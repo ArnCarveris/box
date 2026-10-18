@@ -6,6 +6,7 @@
 #define BOX_PARTICLE_IMPL
 #include <box.h>
 #include "../render/render.h"
+#include "effect.h"
 
 /** Construct ParticleEmitter values: a white stream of 1000 particles that rise at 1 unit per
  * second for 1 to 2 seconds.
@@ -138,6 +139,11 @@ void BoxParticleImport(
     ECS_META_COMPONENT(world, ParticleAppearance);
     ECS_META_COMPONENT(world, ParticleStats);
     ecs_singleton_set(world, ParticleStats, {0});
+    ECS_META_COMPONENT(world, EffectOverflow);
+    ECS_META_COMPONENT(world, ParticleSettings);
+    ecs_singleton_set(world, ParticleSettings, {0});
+    ECS_META_COMPONENT(world, ParticleEffect);
 
     box_render_particles_import(world);
+    box_particle_effects_import(world);
 }

@@ -116,6 +116,9 @@ typedef struct box_render_particle_pool_t {
     box_render_particle_block_t block; /**< Parameters of the frame */
 } box_render_particle_pool_t;
 
+/** State of the particle extract, private to particles.c */
+typedef struct box_render_particles_t box_render_particles_t;
+
 /** Register the system that keeps a particle pool for every enabled ParticleEmitter, spawns
  * into it and writes ParticleStats.
  *
@@ -135,6 +138,24 @@ void box_render_particles_init(
  */
 void box_render_particles_import(
     ecs_world_t *world);
+
+/** Get the state of the particle extract of a world.
+ *
+ * @param world The world
+ * @return The state, NULL without the extract or before box.particle handed it the emitters
+ */
+box_render_particles_t* box_render_particles_get(
+    const ecs_world_t *world);
+
+/** Get the particles alive in the pool of an emitter after the last extract.
+ *
+ * @param s The state of the extract, NULL for none
+ * @param emitter The emitter
+ * @return The particles, 0 for an emitter without a pool or with a kept one
+ */
+int32_t box_render_particles_live(
+    const box_render_particles_t *s,
+    ecs_entity_t emitter);
 
 /** Check whether a packet runs a particle shader.
  *

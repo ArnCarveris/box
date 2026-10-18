@@ -1,8 +1,8 @@
 /**
  * @file Particle.c
- * @brief Tests for the particle passes: streams render where their particles are, scenes and
- * full pools are respected, a fixed seed renders the same image twice, additive pools brighten,
- * soft particles fade near geometry and sprites show the frame of their age.
+ * @brief Tests for the particle passes: streams and effect bursts render where their particles
+ * are, scenes and full pools are respected, a fixed seed renders the same image twice, additive
+ * pools brighten, soft particles fade near geometry and sprites show the frame of their age.
  *
  * Frames advance a fixed 1/60 s.
  * An unlit orthographic camera 10 units in front of the origin looks into a 32x32 capture of
@@ -362,5 +362,64 @@ void Particle_sprite_frame_texel(void) {
     stbi_image_free(px);
 
     ecs_os_free(file);
+    ecs_fini(world);
+}
+
+/** Create a prefab template of one white particle of size 1 that stays where it spawns.
+ *
+ * @param world The world
+ * @return The template
+ */
+static ecs_entity_t dot_template_new(
+    ecs_world_t *world)
+{
+    test_assert(ecs_script_run(world, "dot",
+        "using box.particle\n"
+        "prefab Dot {\n"
+        "  ParticleEmitter: {max: 1, direction: {0, 0, 0}, lifetime: {100, 100}, "
+        "size: {1, 1}}\n"
+        "  ParticleBurst: {count: 1}\n"
+        "}\n", NULL) == 0);
+    ecs_entity_t result = ecs_lookup(world, "Dot");
+    test_assert(result != 0);
+
+    return result;
+}
+
+void Particle_burst_renders_at_point(void) {
+    // particle/effect
+    ecs_world_t *world = world_new("burst.png");
+    ecs_entity_t dot = dot_template_new(world);
+    vec3 at = {2, 1, 0};
+    test_assert(box_particle_burst_at(world, dot, at, 1) != 0);
+    unsigned char *px = run(world, "burst.png", 3);
+
+    test_assert(green_at(px, 2, 1) > 128);
+    test_assert(green_at(px, 0, 0) < 8);
+    test_assert(green_at(px, -2, 1) < 8);
+    test_int(ecs_singleton_get(world, ParticleStats)->effects, 1);
+
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+void Particle_two_plays_one_frame(void) {
+    // particle/effect
+    ecs_world_t *world = world_new("plays.png");
+    ecs_entity_t dot = dot_template_new(world);
+    vec3 left = {-2, -1, 0}, right = {2, 1, 0};
+    ecs_entity_t a = box_particle_burst_at(world, dot, left, 1);
+    ecs_entity_t b = box_particle_burst_at(world, dot, right, 1);
+    test_assert(a != 0);
+    test_assert(b != 0);
+    test_assert(a != b);
+    unsigned char *px = run(world, "plays.png", 3);
+
+    test_assert(green_at(px, -2, -1) > 128);
+    test_assert(green_at(px, 2, 1) > 128);
+    test_assert(green_at(px, 0, 0) < 8);
+    test_int(ecs_singleton_get(world, ParticleStats)->effects, 2);
+
+    stbi_image_free(px);
     ecs_fini(world);
 }

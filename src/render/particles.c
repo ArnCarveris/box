@@ -48,6 +48,8 @@ typedef struct box_particle_pool_t {
     uint32_t capacity;      /**< Slots of the pool */
     bool fresh;             /**< The range was not cleared on the backend yet */
     bool seen;              /**< The emitter is enabled in this frame */
+    bool kept;              /**< The emitter of an effect instance was disabled, so the pool
+                             *   was kept, emptied when the emitter is enabled again */
     uint64_t clock;         /**< Microseconds the pool has run */
     double carry;           /**< Fraction of a particle owed to the next frame */
     uint64_t time;          /**< Microseconds the emitter has played, ParticlePlayback.time */
@@ -84,8 +86,8 @@ typedef struct box_particle_burst_t {
 /** Main thread state of the particle extract */
 typedef struct box_render_particles_t {
     ecs_query_t *emitters;  /**< ParticleEmitter, WorldTransform, Scene(self|up),
-                             *   ParticlePlayback,
-                             *   ParticleCurves and ParticleAppearance, NULL without box.particle */
+                             *   ParticlePlayback, ParticleCurves, ParticleAppearance and
+                             *   ParticleEffect(self|up), NULL without box.particle */
     ecs_query_t *burst_query; /**< ParticleBurst and ParticleEmitter(self|up), NULL without
                              *   box.particle */
     ecs_vec_t bursts;       /**< box_particle_burst_t of the frame, sorted by emitter */
@@ -860,6 +862,7 @@ static void box_particles_forces(
  * @param collision Its ground collision, NULL for none
  * @param inherit World velocity its spawns get
  * @param delta Seconds of the frame
+ * @param scale Multiplier of the speeds and sizes, the scale of the effect it plays in
  * @param out Receives the block, every padding member zero
  */
 static void box_particles_block(
@@ -869,6 +872,7 @@ static void box_particles_block(
     const ParticleCollision *collision,
     const vec3 inherit,
     float delta,
+    float scale,
     box_render_particle_block_t *out)
 {
     float spread = glm_clamp(emitter->spread, 0.0f, 180.0f);
@@ -896,10 +900,10 @@ static void box_particles_block(
     out->color[1] = (float)emitter->color.g / 255.0f;
     out->color[2] = (float)emitter->color.b / 255.0f;
     out->color[3] = 1.0f;
-    out->speed[0] = emitter->speed.min;
-    out->speed[1] = emitter->speed.max;
-    out->size[0] = emitter->size.min;
-    out->size[1] = emitter->size.max;
+    out->speed[0] = emitter->speed.min * scale;
+    out->speed[1] = emitter->speed.max * scale;
+    out->size[0] = emitter->size.min * scale;
+    out->size[1] = emitter->size.max * scale;
     out->rotation[0] = emitter->rotation.min;
     out->rotation[1] = emitter->rotation.max;
     out->spin[0] = emitter->spin.min;
@@ -1063,6 +1067,7 @@ static uint32_t box_particles_texture(
  * @param playback Its playback control, NULL to play; receives the clock and a cleared reset
  * @param curves Its ParticleCurves, NULL for none
  * @param look Its ParticleAppearance, NULL for none
+ * @param effect The ParticleEffect of the instance it plays in, NULL for none
  * @param stats Receives its counts
  */
 static void box_particles_emitter(
@@ -1076,6 +1081,7 @@ static void box_particles_emitter(
     ParticlePlayback *playback,
     const ParticleCurves *curves,
     const ParticleAppearance *look,
+    const ParticleEffect *effect,
     ParticleStats *stats)
 {
     int32_t max = emitter->max > BOX_PARTICLE_MAX ? BOX_PARTICLE_MAX : emitter->max;
@@ -1101,6 +1107,16 @@ static void box_particles_emitter(
         box_particles_range_alloc(s, p, pool);
     }
 
+    if (pool->kept) {
+        box_particles_empty(pool);
+        pool->time = 0;
+        pool->started = false;
+        pool->stopped = false;
+        pool->has_last = false;
+        pool->fresh = true;
+        pool->kept = false;
+    }
+
     pool->seen = true;
     pool->scene = scene;
     if (emitter->shape == EmitterMesh) {
@@ -1123,6 +1139,7 @@ static void box_particles_emitter(
         pool->started = false;
         pool->carry = 0;
         pool->stopped = false;
+        pool->has_last = false;
     }
 
     if (look && look->shape == ParticleBillboard) {
@@ -1173,7 +1190,8 @@ static void box_particles_emitter(
     box_particles_forces(world, e, emitter, &forces);
     glm_vec3_scale(velocity, emitter->inherit_velocity, velocity);
     box_particles_block(emitter, transform, &forces,
-        ecs_get(world, e, ParticleCollision), velocity, age_us ? p->delta : 0.0f, &entry->block);
+        ecs_get(world, e, ParticleCollision), velocity, age_us ? p->delta : 0.0f,
+        effect && effect->scale > 0 ? effect->scale : 1.0f, &entry->block);
     box_particles_block_look(curves, look, pool, &entry->block);
     entry->block.count = count;
     entry->block.first = first;
@@ -1191,8 +1209,30 @@ done:
     }
 }
 
+/** Check whether the pool of an emitter that is not enabled in this frame is kept: the emitter
+ * is a disabled layer of an effect instance, which plays again from the pool of its template.
+ *
+ * @param world The world
+ * @param e The emitter
+ * @return Whether the pool is kept
+ */
+static bool box_particles_keeps(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    bool result = false;
+    if (ecs_is_alive(world, e) && ecs_has_id(world, e, EcsDisabled) &&
+        ecs_has(world, e, ParticleEmitter))
+    {
+        result = ecs_search_relation(world, ecs_get_table(world, e), 0,
+            ecs_id(ParticleEffect), EcsChildOf, EcsSelf | EcsUp, NULL, NULL, NULL) != -1;
+    }
+
+    return result;
+}
+
 /** Account the particles of every enabled emitter, free the pools of the emitters that are
- * gone and write ParticleStats.
+ * gone, keep those of disabled effect layers and write ParticleStats.
  *
  * @param it The iterator of the system
  */
@@ -1231,21 +1271,31 @@ static void BoxRenderExtractParticles(
         ParticlePlayback *playbacks = ecs_field(&qit, ParticlePlayback, 3);
         const ParticleCurves *curves = ecs_field(&qit, ParticleCurves, 4);
         const ParticleAppearance *looks = ecs_field(&qit, ParticleAppearance, 5);
+        const ParticleEffect *effects = ecs_field(&qit, ParticleEffect, 6);
         bool shared = ecs_field_is_set(&qit, 1) && !ecs_field_is_self(&qit, 1);
         bool curves_shared = curves && !ecs_field_is_self(&qit, 4);
         bool looks_shared = looks && !ecs_field_is_self(&qit, 5);
+        bool effects_shared = effects && !ecs_field_is_self(&qit, 6);
         for (i = 0; i < qit.count; i ++) {
             const WorldTransform *t = transforms ? &transforms[shared ? 0 : i] : NULL;
             stats.emitters ++;
             box_particles_emitter(world, s, p, qit.entities[i], &emitters[i], t,
                 box_render_scene_field(&qit, 2, i), playbacks ? &playbacks[i] : NULL,
                 curves ? &curves[curves_shared ? 0 : i] : NULL,
-                looks ? &looks[looks_shared ? 0 : i] : NULL, &stats);
+                looks ? &looks[looks_shared ? 0 : i] : NULL,
+                effects ? &effects[effects_shared ? 0 : i] : NULL, &stats);
         }
     }
 
     for (i = ecs_vec_count(&s->pools) - 1; i >= 0; i --) {
-        if (!(*ecs_vec_get_t(&s->pools, box_particle_pool_t*, i))->seen) {
+        box_particle_pool_t *pool = *ecs_vec_get_t(&s->pools, box_particle_pool_t*, i);
+        if (pool->seen) {
+            continue;
+        }
+
+        if (box_particles_keeps(world, pool->entity)) {
+            pool->kept = true;
+        } else {
             box_particles_pool_free(s, p, i);
         }
     }
@@ -1253,6 +1303,14 @@ static void BoxRenderExtractParticles(
     for (i = 0; i < ecs_vec_count(&s->pages); i ++) {
         const box_particle_page_t *page = ecs_vec_get_t(&s->pages, box_particle_page_t, i);
         stats.bytes += (int64_t)page->pools * page->capacity * BOX_RENDER_PARTICLE_SIZE;
+    }
+
+    const ParticleStats *prev = ecs_singleton_get(world, ParticleStats);
+    if (prev) {
+        stats.effects = prev->effects;
+        stats.recycled = prev->recycled;
+        stats.merged = prev->merged;
+        stats.dropped = prev->dropped;
     }
 
     ecs_singleton_set_ptr(world, ParticleStats, &stats);
@@ -1344,7 +1402,14 @@ void box_render_particles_import(
                     .oper = EcsOptional
                 },
                 { .id = ecs_id(ParticleCurves), .inout = EcsIn, .oper = EcsOptional },
-                { .id = ecs_id(ParticleAppearance), .inout = EcsIn, .oper = EcsOptional }
+                { .id = ecs_id(ParticleAppearance), .inout = EcsIn, .oper = EcsOptional },
+                {
+                    .id = ecs_id(ParticleEffect),
+                    .src.id = EcsSelf | EcsUp,
+                    .trav = EcsChildOf,
+                    .inout = EcsIn,
+                    .oper = EcsOptional
+                }
             },
             .cache_kind = EcsQueryCacheAuto
         });
@@ -1361,6 +1426,25 @@ void box_render_particles_import(
             .cache_kind = EcsQueryCacheAuto
         });
     }
+}
+
+box_render_particles_t* box_render_particles_get(
+    const ecs_world_t *world)
+{
+    box_render_particles_t *result = box_particles_state(world);
+
+    return result && result->emitters ? result : NULL;
+}
+
+int32_t box_render_particles_live(
+    const box_render_particles_t *s,
+    ecs_entity_t emitter)
+{
+    const box_particle_pool_t *pool = s
+        ? ecs_map_get_deref(&s->by_entity, box_particle_pool_t, emitter)
+        : NULL;
+
+    return pool && !pool->kept ? pool->live : 0;
 }
 
 bool box_render_particles_use(

@@ -627,7 +627,9 @@
                     "fixed_seed_same_image",
                     "additive_never_darkens",
                     "soft_fades_near_wall",
-                    "sprite_frame_texel"
+                    "sprite_frame_texel",
+                    "burst_renders_at_point",
+                    "two_plays_one_frame"
                 ]
             }
         ]

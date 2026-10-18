@@ -1,11 +1,11 @@
 /**
  * @file Particle.c
  * @brief Benchmarks for a pool of one million live particles: the frame with the integrate and
- * spawn passes alone, with three active forces, and with the draw of the pool in a view; and
- * the fill rate of a smoke effect that covers the screen many times over.
+ * spawn passes alone, with three active forces, and with the draw of the pool in a view; the
+ * fill rate of a screen covering smoke; and a thousand plays a second of a layered effect.
  *
- * The main thread renders and each frame waits for the GPU by reading a word of the particle
- * page back, so a frame measures the extract, the compute passes and the draw of the pool.
+ * The GPU cases render on the main thread and read a word of the particle page back each frame.
+ * The effect case extracts into a null backend and counts the allocations of a frame.
  */
 
 #include <box.h>
@@ -189,4 +189,82 @@ void Particle_smoke_fill(
     bench_counter(b, "frames", frames);
     bench_counter(b, "particles", (double)ecs_singleton_get(world, ParticleStats)->particles);
     ecs_fini(world);
+}
+
+/** Plays per second of the effect benchmark */
+#define BENCH_EFFECT_PLAYS (1000)
+
+void Particle_effect_plays_1k(
+    bench_t *b)
+{
+    // particle/effect
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+    if (ecs_script_run(world, "hit",
+        "using box.particle\n"
+        "using box.transform\n"
+        "prefab Hit {\n"
+        "  flash {\n"
+        "    ParticleEmitter: {max: 16, lifetime: {0.1, 0.2}, size: {0.5, 1}}\n"
+        "    ParticleBurst: {count: 8}\n"
+        "  }\n"
+        "  smoke {\n"
+        "    Position: {0, 0.5, 0}\n"
+        "    ParticleEmitter: {max: 64, rate: 60, lifetime: {0.4, 0.6}, shape: EmitterSphere, "
+        "radius: 0.5}\n"
+        "    ParticleBurst: {count: 12, at: 0.1}\n"
+        "  }\n"
+        "  debris {\n"
+        "    ParticleEmitter: {max: 32, spread: 60, speed: {2, 4}, lifetime: {0.3, 0.5}}\n"
+        "    ParticleBurst: {count: 6, at: 0.05, repeat: 2}\n"
+        "  }\n"
+        "}\n", NULL))
+    {
+        goto done;
+    }
+
+    ecs_entity_t hit = ecs_lookup(world, "Hit");
+    double owed = 0, plays = 0, frames = 0;
+    int64_t mallocs = 0;
+    uint32_t n = 0;
+    int32_t i;
+    for (i = 0; i < 240; i ++) {
+        owed += BENCH_EFFECT_PLAYS * BENCH_PARTICLE_DELTA;
+        for (; owed >= 1; owed -= 1, n ++) {
+            vec3 at = { (float)(n % 32), 0, (float)((n / 32) % 32) };
+            box_particle_burst_at(world, hit, at, 1.0f + (float)(n % 3) * 0.5f);
+        }
+
+        ecs_progress(world, BENCH_PARTICLE_DELTA);
+        box_render_sync(world);
+    }
+
+    bench_set_items(b, (int64_t)(BENCH_EFFECT_PLAYS * BENCH_PARTICLE_DELTA + 0.5f));
+    mallocs = ecs_os_api_malloc_count;
+    while (bench_iter(b)) {
+        owed += BENCH_EFFECT_PLAYS * BENCH_PARTICLE_DELTA;
+        for (; owed >= 1; owed -= 1, n ++) {
+            vec3 at = { (float)(n % 32), 0, (float)((n / 32) % 32) };
+            bench_keep(box_particle_burst_at(world, hit, at, 1.0f + (float)(n % 3) * 0.5f));
+            plays ++;
+        }
+
+        ecs_progress(world, BENCH_PARTICLE_DELTA);
+        box_render_sync(world);
+        frames ++;
+    }
+
+    mallocs = ecs_os_api_malloc_count - mallocs;
+    const ParticleStats *stats = ecs_singleton_get(world, ParticleStats);
+    bench_counter(b, "frames", frames);
+    bench_counter(b, "plays", plays);
+    bench_counter(b, "effects", (double)stats->effects);
+    bench_counter(b, "particles", (double)stats->particles);
+    bench_counter(b, "allocations_per_frame", frames > 0 ? (double)mallocs / frames : 0);
+done:
+    ecs_fini(world);
+    box_render_null_free(null);
 }

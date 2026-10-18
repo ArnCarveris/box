@@ -159,7 +159,8 @@
                     "simulate_1m",
                     "simulate_1m_forces",
                     "draw_1m",
-                    "smoke_fill"
+                    "smoke_fill",
+                    "effect_plays_1k"
                 ]
             }
         ]

@@ -247,12 +247,85 @@ ECS_STRUCT(ParticleStats, {
     int32_t particles;      /**< Particles alive after this frame's spawns */
     int32_t spawned;        /**< Particles spawned this frame */
     int64_t bytes;          /**< Bytes of device memory the pools are kept in */
+    int32_t effects;        /**< Effect instances playing after this frame */
+    int32_t recycled;       /**< Bursts since the previous frame that a full budget had replay
+                             *   an instance that was playing */
+    int32_t merged;         /**< Bursts since the previous frame that joined a play nearby */
+    int32_t dropped;        /**< Bursts since the previous frame that a full budget dropped */
 });
+
+/** What box_particle_burst_at does with a burst while a budget of ParticleSettings is full */
+ECS_ENUM(EffectOverflow, {
+    EffectRecycle = 0,      /**< The instance that has played longest plays the burst instead */
+    EffectSkip = 1,         /**< A burst no view sees, or beyond effect_distance from the camera
+                             *   of every view, is dropped; one a view sees recycles */
+    EffectMerge = 2         /**< A burst within effect_merge of a play of its template joins
+                             *   it; with no play nearby it recycles */
+});
+
+/** The budgets of the effects box_particle_burst_at plays, a world singleton.
+ *
+ * A recycle never takes an instance that started in the same frame, and a burst that finds none
+ * to take is dropped. A recycled instance empties its layers in the frame of the burst and
+ * plays from the next.
+ */
+ECS_STRUCT(ParticleSettings, {
+    int32_t effect_max;     /**< Instances of one template playing at once, default 0 for any */
+    int32_t effect_total;   /**< Instances of every template playing at once, default 0 for
+                             *   any */
+    EffectOverflow effect_overflow; /**< What a burst does while a budget is full, default
+                             *   EffectRecycle */
+    float effect_distance;  /**< World distance from the camera of every view beyond which
+                             *   EffectSkip drops a burst, default 0 for none */
+    float effect_merge;     /**< World distance from a play of its template within which
+                             *   EffectMerge joins a burst to it, default 0 */
+});
+
+/** A play of an effect template, on the root of an instance that box_particle_burst_at plays.
+ *
+ * It stays on the root of an instance that went back to the pool, disabled.
+ */
+ECS_STRUCT(ParticleEffect, {
+    ecs_entity_t effect;    /**< The template, a prefab or a script template */
+    float scale;            /**< Multiplier of the sizes, speeds, spawn volumes and layer
+                             *   offsets, above 0 */
+    float time;             /**< Seconds into the play, written by the engine every frame */
+    float emit;             /**< Seconds into the play at which the last burst of its layers
+                             *   goes off and their emission ends */
+    float retire;           /**< Seconds into the play at which its last particle dies and the
+                             *   instance goes back to the pool: emit plus the longest
+                             *   lifetime of its layers */
+});
+
+/** Play an effect template once at a world point.
+ *
+ * The template is a prefab or a script template whose root and descendants with an emitter are
+ * layers that play together. A free instance from its pool, or a new one, is placed, scaled and
+ * played, and goes back to the pool disabled once the last particle of every layer died.
+ *
+ * A layer stops emitting after its last burst; a burst that repeats forever goes off once. The
+ * budgets of ParticleSettings rule a burst while they are full, and deleting the template deletes
+ * its instances. Scripts call it as box.particle.burst_at(effect, position, scale).
+ *
+ * @param world The world
+ * @param effect The template
+ * @param position World position of the play
+ * @param scale Multiplier of the sizes, speeds, spawn volumes and layer offsets of the
+ *              template, 0 or less for the size of the template
+ * @return The root of the instance that plays the burst, 0 when the template holds no emitter
+ *         or a full budget dropped the burst
+ */
+ecs_entity_t box_particle_burst_at(
+    ecs_world_t *world,
+    ecs_entity_t effect,
+    const vec3 position,
+    float scale);
 
 /** Register the box.particle module.
  *
  * Makes the render extract keep a pool for every enabled ParticleEmitter, simulate it in the
  * compute passes of the packet and draw it in the views of its scene, and writes ParticleStats.
+ * Plays the effects of box_particle_burst_at within the budgets of ParticleSettings.
  *
  * @param world The world
  */

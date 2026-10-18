@@ -177,6 +177,32 @@
                     "billboard_corners_sent",
                     "billboard_without_mesh_is_circle"
                 ]
+            },
+            {
+                "id": "Effect",
+                "testcases": [
+                    "reused_after_retire",
+                    "not_reused_before_retire",
+                    "layers_play_together",
+                    "layers_retire_together",
+                    "scale_sizes_and_speeds",
+                    "scale_volumes_and_offsets",
+                    "scale_zero_is_template_size",
+                    "prefab_template",
+                    "script_template",
+                    "without_emitter_returns_zero",
+                    "recycle_oldest",
+                    "recycle_total",
+                    "recycle_not_same_frame",
+                    "skip_unseen",
+                    "skip_distance",
+                    "skip_without_view",
+                    "merge_nearby",
+                    "merge_far_recycles",
+                    "stats",
+                    "delete_template",
+                    "script_function"
+                ]
             }
         ]
     }

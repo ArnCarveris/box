@@ -1,0 +1,52 @@
+// A layered blast template played three times by box.particle.burst_at, three frames in: a
+// white flash, a grey smoke puff above it and orange debris in every play. The left play is at
+// half the size of the template, the middle one at its size and the right one at one and a half.
+using box.transform
+using box.geometry
+using box.camera
+using box.view
+using box.particle
+
+camera {
+  Position: {0, 1, 7}
+  Camera: {fov: 60}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {10, 12, 20, 255}}}
+}
+
+prefab Blast {
+  flash {
+    ParticleEmitter: {
+      max: 200, rate: 0, shape: EmitterSphere, radius: 0.1, spread: 180,
+      speed: {1, 3}, lifetime: {1, 1}, size: {0.1, 0.2}, opacity: {0.6, 0.9},
+      color: {255, 250, 230}, seed: 1
+    }
+    ParticleAppearance: {blend: ParticleAdditive}
+    ParticleBurst: {count: 150}
+  }
+
+  smoke {
+    Position: {0, 0.4, 0}
+    ParticleEmitter: {
+      max: 200, rate: 0, shape: EmitterSphere, radius: 0.3, spread: 180,
+      speed: {0.5, 1.5}, lifetime: {2, 2}, size: {0.3, 0.5}, opacity: {0.3, 0.5},
+      acceleration: {0, 1, 0}, color: {110, 105, 100}, seed: 2
+    }
+    ParticleBurst: {count: 120}
+  }
+
+  debris {
+    ParticleEmitter: {
+      max: 300, rate: 0, shape: EmitterPoint, spread: 70,
+      speed: {15, 25}, lifetime: {2, 2}, size: {0.08, 0.12}, opacity: {1, 1},
+      acceleration: {0, -9.8, 0}, color: {255, 140, 40}, seed: 3
+    }
+    ParticleBurst: {count: 240}
+  }
+}
+
+const left: entity = box.particle.burst_at(Blast, {-2.5, 0.5, 0}, 0.5)
+const middle: entity = box.particle.burst_at(Blast, {0, 0.5, 0}, 1)
+const right: entity = box.particle.burst_at(Blast, {2.5, 0.5, 0}, 1.5)
