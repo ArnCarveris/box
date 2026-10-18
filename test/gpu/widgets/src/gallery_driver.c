@@ -14,6 +14,9 @@
 /** Path of the gallery scene in the repository */
 #define GALLERY_SCENE "etc/scenes/widgets.flecs"
 
+/** Divides the render pixels of the surfaces of the gallery in the tests */
+#define GALLERY_RESOLUTION_SCALE (4.0f)
+
 /** Thickness of the scroll bars of the page, which cover its right and bottom edge */
 #define GALLERY_PAGE_BAR (10.0f)
 
@@ -370,6 +373,17 @@ ecs_world_t* gallery_load(
     test_assert(loaded != NULL);
     test_assert(loaded->script != NULL);
     test_assert(loaded->error == NULL);
+
+    /* The tests read state, not pixels: render the window and the preview at a quarter of
+     * their size, so tests that share a GPU do not wait on each other */
+    const char *surfaces[] = { "window", "gallery.preview_surface" };
+    for (i = 0; i < 2; i ++) {
+        ecs_entity_t e = ecs_lookup(world, surfaces[i]);
+        test_assert(e != 0);
+        Surface *surface = ecs_get_mut(world, e, Surface);
+        surface->resolution_scale = GALLERY_RESOLUTION_SCALE;
+        ecs_modified(world, e, Surface);
+    }
 
     for (i = 0; i < 3; i ++) {
         ecs_progress(world, 0);
