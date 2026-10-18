@@ -200,31 +200,57 @@ static int32_t containers_presses(
     return result;
 }
 
-/** Check whether Tab, from the entity that has the focus, reaches an entity before it wraps
- * around to the first one again.
+/** Give an entity the keyboard focus as Tab would, without tabbing through the whole gallery.
+ *
+ * Presses Tab once while the focus is not visible, so the focus that follows is visible.
  *
  * @param world The world
  * @param s The terminal session
  * @param path Path of the entity
+ */
+static void containers_focus(
+    ecs_world_t *world,
+    ecs_entity_t s,
+    const char *path)
+{
+    if (!ecs_singleton_get(world, FocusStatus)->visible) {
+        gallery_key(world, s, "Tab");
+    }
+
+    ecs_entity_t e = ecs_lookup(world, path);
+    test_assert(e != 0);
+    test_bool(box_ui_focus(world, e), true);
+    gallery_settle(world, s);
+    gallery_expect_focus(world, s, path);
+}
+
+/** Check whether Tab, from the entity that has the focus, reaches an entity before the focus
+ * leaves a part of the tree.
+ *
+ * @param world The world
+ * @param s The terminal session
+ * @param path Path of the entity
+ * @param scope Path of the part of the tree, which holds the focused entity
  * @return Whether Tab focused it
  */
 static bool containers_tab_reaches(
     ecs_world_t *world,
     ecs_entity_t s,
-    const char *path)
+    const char *path,
+    const char *scope)
 {
-    char *first = gallery_focused(world, s);
-    bool result = false, wrapped = false;
+    size_t len = strlen(scope);
+    bool result = false, inside = true;
     int32_t i;
-    for (i = 0; i < 60 && !result && !wrapped; i ++) {
+    for (i = 0; i < 20 && !result && inside; i ++) {
         gallery_key(world, s, "Tab");
         char *focused = gallery_focused(world, s);
         result = !strcmp(focused, path);
-        wrapped = !strcmp(focused, first);
+        inside = !strncmp(focused, scope, len) && (!focused[len] || focused[len] == '.');
         ecs_os_free(focused);
     }
 
-    ecs_os_free(first);
+    test_assert(result || !inside);
 
     return result;
 }
@@ -310,7 +336,7 @@ void Containers_dropdown_keys_open(void) {
     const char *keys[] = { "Enter", "Space", "Down", "Up" };
     int32_t i;
 
-    gallery_tab_to(world, s, QUALITY);
+    containers_focus(world, s, QUALITY);
     for (i = 0; i < 4; i ++) {
         gallery_key(world, s, keys[i]);
         containers_expect(world, s, QUALITY, "Dropdown", "open", "true");
@@ -377,7 +403,7 @@ void Containers_dropdown_keys_select(void) {
     ecs_entity_t s = 0;
     ecs_world_t *world = gallery_load(&s);
 
-    gallery_tab_to(world, s, QUALITY);
+    containers_focus(world, s, QUALITY);
     gallery_key(world, s, "Down");
     containers_expect(world, s, QUALITY, "Dropdown", "open", "true");
     gallery_key(world, s, "Down");
@@ -600,7 +626,7 @@ void Containers_tabs_arrows(void) {
     ecs_entity_t s = 0;
     ecs_world_t *world = gallery_load(&s);
 
-    gallery_tab_to(world, s, TABS ".bar.tab_0");
+    containers_focus(world, s, TABS ".bar.tab_0");
     gallery_expect(world, s, "get " TABS ".bar.tab_0 Border.width", "2");
     gallery_key(world, s, "Right");
     containers_expect(world, s, TABS, "TabView", "current", "1");
@@ -631,7 +657,7 @@ void Containers_tabs_arrows(void) {
     test_int(gallery_changes(world, s), 6);
 
     /* The arrow keys of a widget on a page stay with the widget */
-    gallery_tab_to(world, s, TABS ".display.mode.window");
+    containers_focus(world, s, TABS ".display.mode.window");
     gallery_key(world, s, "Right");
     containers_expect(world, s, TABS, "TabView", "current", "2");
     gallery_expect_focus(world, s, TABS ".display.mode.full");
@@ -648,7 +674,7 @@ void Containers_tabs_one_tab_stop(void) {
     test_bool(ecs_has_id(world, ecs_lookup(world, TABS ".bar.tab_1"), Focusable), false);
     test_bool(ecs_has_id(world, ecs_lookup(world, TABS ".bar.tab_2"), Focusable), false);
 
-    gallery_tab_to(world, s, TABS ".bar.tab_0");
+    containers_focus(world, s, TABS ".bar.tab_0");
     gallery_key(world, s, "Tab");
     gallery_expect_focus(world, s, TABS ".general.toggles.notify");
     ecs_os_free(gallery_run(world, s, "key.down ShiftLeft"));
@@ -686,16 +712,16 @@ void Containers_tabs_hidden_page(void) {
     containers_expect(world, s, TABS ".audio.level", "Slider", "current", "60");
 
     /* Tab passes over the widgets of the hidden pages */
-    gallery_tab_to(world, s, TABS ".bar.tab_0");
-    test_bool(containers_tab_reaches(world, s, TABS ".audio.level"), false);
-    gallery_tab_to(world, s, TABS ".bar.tab_0");
-    test_bool(containers_tab_reaches(world, s, TABS ".display.mode.window"), false);
+    containers_focus(world, s, TABS ".bar.tab_0");
+    test_bool(containers_tab_reaches(world, s, TABS ".audio.level", TABS), false);
+    containers_focus(world, s, TABS ".bar.tab_0");
+    test_bool(containers_tab_reaches(world, s, TABS ".display.mode.window", TABS), false);
 
     /* Shown, the page takes the pointer and the focus, the other page no longer does */
     gallery_click(world, s, TABS ".bar.tab_1", 0, 0, TABS ".bar.tab_1");
     gallery_hover(world, s, TABS ".audio.level", 0, 0.8f, TABS ".audio.level");
-    test_bool(containers_tab_reaches(world, s, TABS ".audio.level"), true);
-    test_bool(containers_tab_reaches(world, s, TABS ".general.apply"), false);
+    test_bool(containers_tab_reaches(world, s, TABS ".audio.level", TABS), true);
+    test_bool(containers_tab_reaches(world, s, TABS ".general.apply", TABS), false);
 
     ecs_fini(world);
 }
@@ -835,7 +861,7 @@ void Containers_scroll_keys(void) {
     gallery_key(world, s, "Down");
     test_flt(containers_content(world, NOTES)->y, 0);
 
-    gallery_tab_to(world, s, NOTES);
+    containers_focus(world, s, NOTES);
     gallery_key(world, s, "Down");
     test_flt(containers_content(world, NOTES)->y, CONTAINERS_STEP);
     gallery_key(world, s, "Down");
@@ -976,7 +1002,7 @@ void Containers_list_keys(void) {
     ecs_entity_t s = 0;
     ecs_world_t *world = gallery_load(&s);
 
-    gallery_tab_to(world, s, FILES);
+    containers_focus(world, s, FILES);
     gallery_key(world, s, "Down");
     containers_expect(world, s, FILES, "ListView", "current", "1");
     gallery_key(world, s, "Down");
@@ -1009,7 +1035,7 @@ void Containers_list_keeps_selection_in_view(void) {
     float list[4], row[4];
     int32_t i;
 
-    gallery_tab_to(world, s, FILES);
+    containers_focus(world, s, FILES);
     for (i = 0; i < 6; i ++) {
         gallery_key(world, s, "Down");
     }
@@ -1138,7 +1164,7 @@ void Containers_collapsible_keys(void) {
     ecs_entity_t s = 0;
     ecs_world_t *world = gallery_load(&s);
 
-    gallery_tab_to(world, s, DETAILS);
+    containers_focus(world, s, DETAILS);
     gallery_expect(world, s, "get " DETAILS ".head Border.width", "2");
     gallery_key(world, s, "Enter");
     containers_expect(world, s, DETAILS, "Collapsible", "current", "true");
@@ -1173,14 +1199,14 @@ void Containers_collapsible_hides_content(void) {
     ecs_os_free(handler);
 
     /* Tab goes from the section to the next one */
-    gallery_tab_to(world, s, DETAILS);
+    containers_focus(world, s, DETAILS);
     gallery_key(world, s, "Tab");
     gallery_expect_focus(world, s, ADVANCED);
-    gallery_tab_to(world, s, DETAILS);
-    test_bool(containers_tab_reaches(world, s, DETAILS ".verbose"), false);
+    containers_focus(world, s, DETAILS);
+    test_bool(containers_tab_reaches(world, s, DETAILS ".verbose", DETAILS), false);
 
     /* Open, it takes the pointer and the focus */
-    gallery_tab_to(world, s, DETAILS);
+    containers_focus(world, s, DETAILS);
     gallery_key(world, s, "Enter");
     gallery_key(world, s, "Tab");
     gallery_expect_focus(world, s, DETAILS ".verbose");
@@ -1208,7 +1234,7 @@ void Containers_collapsible_content_activation(void) {
     gallery_expect(world, s, "get gallery Gallery.mut.last", "\"experimental: true\"");
 
     /* Keys of the widget stay with it */
-    gallery_tab_to(world, s, ADVANCED ".experimental");
+    containers_focus(world, s, ADVANCED ".experimental");
     gallery_key(world, s, "Space");
     containers_expect(world, s, ADVANCED ".experimental", "Switch", "current", "false");
     containers_expect(world, s, ADVANCED, "Collapsible", "current", "true");
