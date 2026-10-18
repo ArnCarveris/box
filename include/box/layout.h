@@ -182,7 +182,8 @@ ECS_STRUCT(LayoutFill, {
  * The area is its LayoutBounds, else its Rect, centered in its local XY plane and rounded by its
  * Border.radius. Nested clips intersect, anti-aliased per pixel in screen, world and texture UI,
  * and picking misses outside the area. An empty area (zero width or height) hides everything
- * below it, and Tab skips the Focusable entities it clips away entirely. 3D shapes below the
+ * below it, and Tab skips the Focusable entities it clips away entirely, unless the element has a
+ * LayoutScroll. 3D shapes below the
  * element are not clipped.
  */
 extern ECS_TAG_DECLARE(ClipChildren);

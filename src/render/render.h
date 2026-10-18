@@ -1122,7 +1122,7 @@ bool box_render_clip_contains(
 
 /** Check whether the ClipChildren ancestors of an entity clip all of it away: its bounds (its
  * LayoutBounds, else its Rect, else its origin) have no part of positive size inside the area of
- * one of them. A clip with an empty area hides everything below it. The ancestors of a floating
+ * one of them, except a clip that scrolls (with a LayoutScroll). A clip with an empty area hides everything below it. The ancestors of a floating
  * element (LayoutFloat) do not clip it.
  *
  * @param world The world

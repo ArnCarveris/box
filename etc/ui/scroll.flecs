@@ -82,6 +82,37 @@ template HeadlessScrollView {
     }
   }
 
+  // A descendant that gets the focus, such as by Tab, is scrolled into view. The world matrices
+  // give its offset from the center of the view, y up, in the units of the bounds.
+  async {
+    while true {
+      const e = await on.focus(this)
+      if e.target != this {
+        const b = this[LayoutBounds]
+        const content = this[LayoutContent]
+        const tb = e.target[LayoutBounds]
+        const vm = this[WorldTransform].m.v
+        const tm = e.target[WorldTransform].m.v
+        const dx = tm[12] - vm[12]
+        const dy = vm[13] - tm[13]
+        if vertical {
+          if dy - tb.height / 2 < -b.height / 2 {
+            y = clamp(content.y + dy - tb.height / 2 + b.height / 2, 0, content.max_y)
+          } else if dy + tb.height / 2 > b.height / 2 {
+            y = clamp(content.y + dy + tb.height / 2 - b.height / 2, 0, content.max_y)
+          }
+        }
+        if horizontal {
+          if dx - tb.width / 2 < -b.width / 2 {
+            x = clamp(content.x + dx - tb.width / 2 + b.width / 2, 0, content.max_x)
+          } else if dx + tb.width / 2 > b.width / 2 {
+            x = clamp(content.x + dx + tb.width / 2 - b.width / 2, 0, content.max_x)
+          }
+        }
+      }
+    }
+  }
+
   async {
     while true {
       const e = await on.scroll(this)

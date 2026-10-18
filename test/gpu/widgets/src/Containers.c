@@ -213,14 +213,7 @@ static void containers_focus(
     ecs_entity_t s,
     const char *path)
 {
-    if (!ecs_singleton_get(world, FocusStatus)->visible) {
-        gallery_key(world, s, "Tab");
-    }
-
-    ecs_entity_t e = ecs_lookup(world, path);
-    test_assert(e != 0);
-    test_bool(box_ui_focus(world, e), true);
-    gallery_settle(world, s);
+    gallery_tab_to(world, s, path);
     gallery_expect_focus(world, s, path);
 }
 
@@ -894,6 +887,27 @@ void Containers_scroll_keys(void) {
     gallery_key(world, s, "Down");
     containers_expect(world, s, FORMAT, "Dropdown", "open", "true");
     test_flt(containers_content(world, NOTES)->y, 0);
+
+    ecs_fini(world);
+}
+
+void Containers_scroll_tab_reaches(void) {
+    // widgets/containers
+    ecs_entity_t s = 0;
+    ecs_world_t *world = gallery_load(&s);
+    float r[4], v[4];
+    containers_rect(world, NOTES, v);
+    containers_rect(world, NOTES ".share", r);
+    test_assert(r[1] > v[3]);
+    test_flt(containers_content(world, NOTES)->y, 0);
+
+    /* Tab does not skip the button below the fold, and scrolls it into view */
+    gallery_tab_to(world, s, NOTES ".share");
+    containers_rect(world, NOTES, v);
+    containers_rect(world, NOTES ".share", r);
+    test_assert(containers_content(world, NOTES)->y > 0);
+    test_assert(r[1] >= v[1] - 0.5f);
+    test_assert(r[3] <= v[3] + 0.5f);
 
     ecs_fini(world);
 }
