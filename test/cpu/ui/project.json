@@ -22,6 +22,7 @@
                     "column_places_children",
                     "ordered_children",
                     "ordered_children_added_late",
+                    "ordered_children_recycled_ids",
                     "row_spacing",
                     "column_spacing",
                     "padding",

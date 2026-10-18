@@ -402,12 +402,14 @@ static int box_layout_compare_created(
     return (ia > ib) - (ia < ib);
 }
 
-/** Put the children of the parents that got OrderedChildren since the last layout in the order
- * they were created.
+/** Put the children a parent had when it got OrderedChildren in the order they were created.
  *
  * flecs lists the children a parent had before it got the trait table by table, so the children
  * of a template instance whose body adds the Layout, created by the scene before the body ran,
- * would otherwise be placed in an order that depends on their components.
+ * would otherwise be placed in an order that depends on their components. Children added after
+ * the trait are already listed in the order they were added and keep it, after the earlier ones.
+ *
+ * The queue holds, per parent, the parent, the number of children and the children.
  *
  * @param world The world
  * @param state The layout state
@@ -417,27 +419,55 @@ static void box_layout_order(
     box_layout_state_t *state)
 {
     ecs_vec_t sorted;
-    int32_t i;
+    int32_t i = 0, c, count = ecs_vec_count(&state->ordered);
+    ecs_entity_t *queue = ecs_vec_first_t(&state->ordered, ecs_entity_t);
     ecs_vec_init_t(NULL, &sorted, ecs_entity_t, 0);
-    for (i = 0; i < ecs_vec_count(&state->ordered); i ++) {
-        ecs_entity_t parent = *ecs_vec_get_t(&state->ordered, ecs_entity_t, i);
+    while (i < count) {
+        ecs_entity_t parent = queue[i];
+        int32_t n = (int32_t)queue[i + 1];
+        ecs_entity_t *early = &queue[i + 2];
+        i += 2 + n;
+
         ecs_entities_t children = { 0 };
         if (ecs_is_alive(world, parent) && ecs_has_id(world, parent, EcsOrderedChildren)) {
             children = ecs_get_ordered_children(world, parent);
         }
-
-        if (children.count < 2) {
+        if (children.count < 2 || n < 2) {
             continue;
         }
 
+        /* Early children still in the list, by creation, then the others in listed order */
+        qsort(early, (size_t)n, sizeof(ecs_entity_t), box_layout_compare_created);
         ecs_vec_set_count_t(NULL, &sorted, ecs_entity_t, children.count);
-        ecs_os_memcpy_n(ecs_vec_first(&sorted), children.ids, ecs_entity_t, children.count);
-        qsort(ecs_vec_first(&sorted), (size_t)children.count, sizeof(ecs_entity_t),
-            box_layout_compare_created);
-        if (ecs_os_memcmp(ecs_vec_first(&sorted), children.ids,
+        ecs_entity_t *out = ecs_vec_first_t(&sorted, ecs_entity_t);
+        int32_t o = 0;
+        for (c = 0; c < n; c ++) {
+            int32_t j;
+            for (j = 0; j < children.count; j ++) {
+                if (children.ids[j] == early[c]) {
+                    out[o ++] = early[c];
+                    break;
+                }
+            }
+        }
+        for (c = 0; c < children.count; c ++) {
+            int32_t j;
+            bool is_early = false;
+            for (j = 0; j < n; j ++) {
+                if (early[j] == children.ids[c]) {
+                    is_early = true;
+                    break;
+                }
+            }
+            if (!is_early) {
+                out[o ++] = children.ids[c];
+            }
+        }
+
+        if (o == children.count && ecs_os_memcmp(out, children.ids,
             ECS_SIZEOF(ecs_entity_t) * children.count))
         {
-            ecs_set_child_order(world, parent, ecs_vec_first(&sorted), children.count);
+            ecs_set_child_order(world, parent, out, children.count);
             box_layout_mark(state, parent);
         }
     }
@@ -446,7 +476,7 @@ static void box_layout_order(
     ecs_vec_fini_t(NULL, &sorted, ecs_entity_t);
 }
 
-/** Queue the parents that got OrderedChildren for box_layout_order.
+/** Queue the parents that got OrderedChildren, with their children, for box_layout_order.
  *
  * @param it Iterator of the observer
  */
@@ -456,7 +486,21 @@ static void box_layout_on_ordered(
     box_layout_state_t *state = it->ctx;
     int32_t i;
     for (i = 0; i < it->count; i ++) {
-        *ecs_vec_append_t(NULL, &state->ordered, ecs_entity_t) = it->entities[i];
+        ecs_entity_t parent = it->entities[i];
+        int32_t at = ecs_vec_count(&state->ordered);
+        *ecs_vec_append_t(NULL, &state->ordered, ecs_entity_t) = parent;
+        *ecs_vec_append_t(NULL, &state->ordered, ecs_entity_t) = 0;
+
+        ecs_iter_t cit = ecs_children(it->world, parent);
+        while (ecs_children_next(&cit)) {
+            int32_t c;
+            for (c = 0; c < cit.count; c ++) {
+                *ecs_vec_append_t(NULL, &state->ordered, ecs_entity_t) = cit.entities[c];
+            }
+        }
+
+        ecs_vec_get_t(&state->ordered, ecs_entity_t, at + 1)[0] =
+            (ecs_entity_t)(ecs_vec_count(&state->ordered) - at - 2);
     }
 }
 

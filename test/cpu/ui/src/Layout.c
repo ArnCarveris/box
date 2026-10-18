@@ -130,6 +130,35 @@ void Layout_ordered_children_added_late(void) {
     ecs_fini(world);
 }
 
+void Layout_ordered_children_recycled_ids(void) {
+    // ui/layout
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t x = ecs_new(world);
+    ecs_entity_t y = ecs_new(world);
+    ecs_entity_t z = ecs_new(world);
+    ecs_delete(world, x);
+    ecs_delete(world, y);
+    ecs_delete(world, z);
+
+    ecs_entity_t p = ecs_new(world);
+    ecs_set(world, p, Layout, { .direction = DirectionRow });
+    ecs_entity_t a = ecs_new_w_pair(world, EcsChildOf, p);
+    ecs_set(world, a, Rect, {10, 10});
+    ecs_entity_t b = ecs_new_w_pair(world, EcsChildOf, p);
+    ecs_set(world, b, Rect, {10, 10});
+    ecs_entity_t c = ecs_new_w_pair(world, EcsChildOf, p);
+    ecs_set(world, c, Rect, {10, 10});
+    ecs_progress(world, 0);
+
+    test_flt(ecs_get(world, a, Position)->x, -10);
+    test_flt(ecs_get(world, b, Position)->x, 0);
+    test_flt(ecs_get(world, c, Position)->x, 10);
+
+    ecs_fini(world);
+}
+
 void Layout_row_spacing(void) {
     // ui/layout
     ecs_world_t *world = ecs_init();
