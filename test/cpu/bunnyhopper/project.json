@@ -1,0 +1,40 @@
+{
+    "id": "bunnyhopper_test",
+    "type": "application",
+    "value": {
+        "public": false,
+        "use": [
+            "box",
+            "bunnyhopper_game"
+        ]
+    },
+    "test": {
+        "testsuites": [
+            {
+                "id": "Game",
+                "testcases": [
+                    "scene_loads",
+                    "actions_and_bindings",
+                    "starts_playing",
+                    "jump_lands",
+                    "double_jump",
+                    "third_jump_ignored",
+                    "carrot_spawns_at_spawn_x",
+                    "carrot_scrolls_at_speed",
+                    "carrot_despawns_counted",
+                    "speed_up_every_fifth",
+                    "large_after_five",
+                    "collision_costs_life",
+                    "invulnerable_no_second_hit",
+                    "last_life_game_over",
+                    "game_over_world_stops",
+                    "game_over_jump_false",
+                    "restart_while_playing",
+                    "restart_after_game_over",
+                    "scenery_wraps",
+                    "same_seed_same_carrots"
+                ]
+            }
+        ]
+    }
+}

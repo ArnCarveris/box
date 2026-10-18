@@ -1,0 +1,148 @@
+// The bunny, built from boxes. It faces +x, its origin is between its feet on the ground. The
+// player's Bunny component drives the props: speed tilts the ears back, dead crosses out the
+// eyes. The legs are pivots with BunnyLeg that the bunnyhopper systems swing.
+
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using bunnyhopper
+
+template BunnyModel {
+  prop speed: f32 = 12
+  prop dead: bool = false
+
+  const fur: Rgb = {240, 240, 240}
+  const eye: Rgb = {40, 40, 40}
+  const earTilt = clamp((speed - 12) * 0.05, -0.45, 0.75)
+
+  body {
+    Position: {-0.05, 0.55, 0}
+    Box: {1, 0.75, 0.6}
+    Rgb: fur
+  }
+
+  head {
+    Position: {0.5, 1.05, 0}
+    Box: {0.55, 0.55, 0.5}
+    Rgb: fur
+  }
+
+  ear_left {
+    Position: {0.38, 1.54, -0.14}
+    Rotation: {0, 0, earTilt}
+    Box: {0.14, 0.7, 0.14}
+    Rgb: fur
+  }
+
+  ear_right {
+    Position: {0.38, 1.54, 0.14}
+    Rotation: {0, 0, earTilt}
+    Box: {0.14, 0.7, 0.14}
+    Rgb: fur
+  }
+
+  tail {
+    Position: {-0.62, 0.6, 0}
+    Sphere: {segments: 12, smooth: true, radius: 0.18}
+    Rgb: fur
+  }
+
+  nose {
+    Position: {0.79, 1.0, 0}
+    Box: {0.1, 0.12, 0.14}
+    Rgb: {245, 150, 170}
+  }
+
+  // Open eyes, or two crossed bars per eye once the bunny is dead
+  if dead {
+    eye_left_bar_a {
+      Position: {0.68, 1.18, -0.26}
+      Rotation: {0, 0, PI / 4}
+      Box: {0.16, 0.05, 0.06}
+      Rgb: eye
+    }
+
+    eye_left_bar_b {
+      Position: {0.68, 1.18, -0.26}
+      Rotation: {0, 0, -PI / 4}
+      Box: {0.16, 0.05, 0.06}
+      Rgb: eye
+    }
+
+    eye_right_bar_a {
+      Position: {0.68, 1.18, 0.26}
+      Rotation: {0, 0, PI / 4}
+      Box: {0.16, 0.05, 0.06}
+      Rgb: eye
+    }
+
+    eye_right_bar_b {
+      Position: {0.68, 1.18, 0.26}
+      Rotation: {0, 0, -PI / 4}
+      Box: {0.16, 0.05, 0.06}
+      Rgb: eye
+    }
+  } else {
+    eye_left {
+      Position: {0.68, 1.18, -0.26}
+      Box: {0.08, 0.1, 0.06}
+      Rgb: eye
+    }
+
+    eye_right {
+      Position: {0.68, 1.18, 0.26}
+      Box: {0.08, 0.1, 0.06}
+      Rgb: eye
+    }
+  }
+
+  // Legs: a pivot at the hip holding the leg below it. Left and right run half a cycle apart
+  leg_front_left {
+    Position: {0.32, 0.5, -0.24}
+    Rotation: {0, 0, 0}
+    BunnyLeg: {phase: 0, air_target: 0.9}
+
+    leg {
+      Position: {0, -0.25, 0}
+      Box: {0.16, 0.5, 0.16}
+      Rgb: fur
+    }
+  }
+
+  leg_front_right {
+    Position: {0.32, 0.5, 0.24}
+    Rotation: {0, 0, 0}
+    BunnyLeg: {phase: PI, air_target: 0.9}
+
+    leg {
+      Position: {0, -0.25, 0}
+      Box: {0.16, 0.5, 0.16}
+      Rgb: fur
+    }
+  }
+
+  leg_back_left {
+    Position: {-0.38, 0.5, -0.24}
+    Rotation: {0, 0, 0}
+    BunnyLeg: {phase: PI, air_target: -0.95}
+
+    leg {
+      Position: {0, -0.275, 0}
+      Box: {0.22, 0.55, 0.22}
+      Rgb: fur
+    }
+  }
+
+  leg_back_right {
+    Position: {-0.38, 0.5, 0.24}
+    Rotation: {0, 0, 0}
+    BunnyLeg: {phase: 2 * PI, air_target: -0.95}
+
+    leg {
+      Position: {0, -0.275, 0}
+      Box: {0.22, 0.55, 0.22}
+      Rgb: fur
+    }
+  }
+}

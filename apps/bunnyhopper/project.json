@@ -1,0 +1,14 @@
+{
+    "id": "bunnyhopper",
+    "type": "application",
+    "value": {
+        "use": ["box", "bunnyhopper_game"]
+    },
+    "lang.c": {
+        "${os Emscripten}": {
+            "shell": "../boxrun/shell.html",
+            "embed": ["../../etc"],
+            "ldflags": ["-sEXPORTED_RUNTIME_METHODS=cwrap,FS"]
+        }
+    }
+}

@@ -1,0 +1,71 @@
+// Bunny hopper: an endless runner. The bunny runs on a dirt track while the world scrolls past;
+// SPACE hops over the carrots that grow out of the ground, a second press in the air double
+// jumps over the large ones. A carrot costs a life, every 5 carrots the run gets faster, and
+// with no lives left R starts a new run.
+
+include config
+include bunny
+include carrots
+include scenery
+include world
+include player
+include input
+
+using flecs.script.math
+using box.transform
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.surface
+using box.atmosphere
+
+window {
+  Surface: {width: 1280, height: 1024, vsync: true}
+}
+
+// The camera looks from (0, 5, 16) at (0, 2.8, 0)
+camera {
+  Position: {0, 5, 16}
+  Rotation: {-atan2(5 - 2.8, 16), 0, 0}
+  Camera: {fov: 60, near_: 0.5, far_: 1000}
+}
+
+// The sun shines from (0.6, 2.2, 1.4) toward the origin, its +Z along -(0.6, 2.2, 1.4)
+sun {
+  Rotation: {asin(2.2 / sqrt(0.36 + 4.84 + 1.96)), atan2(-0.6, -1.4), 0}
+  DirectionalLight: {intensity: 2}
+  Rgb: {255, 255, 255}
+}
+
+// A daytime sky lit by the sun, and a soft fill light
+$ {
+  Atmosphere: {sun: sun}
+  AmbientLight: {intensity: 0.5}
+}
+
+exposure {
+  AutoExposure: {}
+}
+
+ssao {
+  Ssao: {radius: 0.5}
+}
+
+bloom {
+  Bloom: {}
+}
+
+tonemap {
+  Tonemap: {auto_exposure: exposure}
+}
+
+main_view {
+  View: {
+    camera: camera,
+    clear: {enabled: true, color: {150, 195, 235, 255}},
+    shadows: {enabled: true, max_distance: 200},
+    effects: [{effect: ssao}, {effect: bloom}, {effect: tonemap}]
+  }
+}

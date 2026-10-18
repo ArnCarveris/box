@@ -1,0 +1,38 @@
+// Scenery prefabs. BunnyScenery scrolls them at a fraction of the world speed (parallax) and
+// moves them forward by wrap_span once they pass wrap_min, so a few of them fill the view.
+
+using box.transform
+using box.geometry
+using box.material
+using bunnyhopper
+
+// A tuft of grass beside the track
+prefab GrassTuft {
+  BunnyScenery: {parallax: 1, wrap_min: -32, wrap_span: 64}
+  Box: {1, 1, 0.4}
+  Rgb: {70, 140, 60}
+}
+
+// A tree behind the track
+prefab Tree {
+  BunnyScenery: {parallax: 0.75, wrap_min: -36, wrap_span: 72}
+
+  trunk {
+    Position: {0, 0.9, 0}
+    Box: {0.45, 1.8, 0.45}
+    Rgb: {110, 80, 50}
+  }
+
+  canopy {
+    Position: {0, 2.7, 0}
+    Sphere: {segments: 16, smooth: true, radius: 1.6}
+    Rgb: {60, 145, 65}
+  }
+}
+
+// A hill on the horizon
+prefab Hill {
+  BunnyScenery: {parallax: 0.35, wrap_min: -44, wrap_span: 88}
+  HemiSphere: {segments: 24, smooth: true, radius: 1}
+  Rgb: {105, 165, 90}
+}

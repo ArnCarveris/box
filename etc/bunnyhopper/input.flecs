@@ -1,0 +1,31 @@
+// Input: SPACE hops (a second press in the air double jumps), R restarts once the game is over.
+// Each action is awaited by a loop that calls the bunnyhopper function behind it.
+
+using flecs.script
+using box.input
+
+actions {
+  Jump {
+    Action: {description: "Make the bunny jump; a second press in the air double jumps"}
+    Binding: {key: Space}
+  }
+
+  Restart {
+    Action: {description: "Restart after the game is over"}
+    Binding: {key: R}
+  }
+}
+
+async {
+  while true {
+    await on.pressed(actions.Jump)
+    await bunnyhopper.jump()
+  }
+}
+
+async {
+  while true {
+    await on.pressed(actions.Restart)
+    await bunnyhopper.restart()
+  }
+}

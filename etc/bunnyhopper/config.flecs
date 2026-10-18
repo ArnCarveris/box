@@ -1,0 +1,36 @@
+// Constants of the game. The bunnyhopper systems read them every frame as cfg.<name>.
+
+using flecs.script.math
+
+cfg {
+  // Height of the ground the bunny runs on and carrots grow from
+  export const groundY: f32 = 0
+
+  // Carrots spawn at spawnX and are deleted and counted below despawnX
+  export const spawnX: f32 = 24
+  export const despawnX: f32 = -8
+
+  // Jumps: gravity, the velocity of a jump or bounce, the downward speed of a hard landing and
+  // the jumps before the bunny has to land (2 is a double jump)
+  export const gravity: f32 = -32
+  export const jumpVelocity: f32 = 13
+  export const hardLandingVelocity: f32 = 16
+  export const maxJumps: i32 = 2
+
+  // Seconds a hit bunny cannot be hit again
+  export const invulnTime: f32 = 0.5
+
+  // The dead bunny lies on its back, its origin deadHeight above the ground
+  export const deadAngle: f32 = PI
+  export const deadHeight: f32 = 1.5
+
+  // Chance that a carrot is large once 5 carrots passed
+  export const largeCarrotChance: f32 = 0.18
+
+  // Lives and speed of a new run
+  export const maxLives: i32 = 3
+  export const initialSpeed: f32 = 12
+
+  // Seed of the scenery layout and of the carrot generator
+  export const seed: u64 = 1337
+}

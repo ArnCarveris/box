@@ -1,0 +1,86 @@
+// Carrot prefabs the bunnyhopper spawn system instantiates on the ground at cfg.spawnX. A carrot
+// is a cone of its width that reaches sink below the ground, tip down, with three leaves on top.
+// Box's Cone is centered with a base radius, so a radius of 0.5 scaled by the width matches the
+// unit cone of the original.
+
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using bunnyhopper
+
+// Depth the carrot reaches into the ground
+const sink: f32 = 0.45
+
+prefab SmallCarrot {
+  const height: f32 = 1.1
+  const width: f32 = 0.65
+
+  BunnyCarrot: {half_width: width / 2, height: height}
+
+  body {
+    Position: {0, height - (height + sink) / 2, 0}
+    Rotation: {PI, 0, 0}
+    Scale: {width, 1, width}
+    Cone: {segments: 16, smooth: true, length: height + sink, radius: 0.5}
+    Rgb: {255, 100, 20}
+    Emissive: {strength: 0.9, color: {255, 100, 50}}
+  }
+
+  leaf_mid {
+    Position: {0, height + 0.15, 0}
+    Box: {0.12, 0.55, 0.12}
+    Rgb: {70, 160, 60}
+  }
+
+  leaf_left {
+    Position: {0.14, height + 0.15, 0}
+    Rotation: {0, 0, 0.5}
+    Box: {0.12, 0.55, 0.12}
+    Rgb: {70, 160, 60}
+  }
+
+  leaf_right {
+    Position: {-0.14, height + 0.15, 0}
+    Rotation: {0, 0, -0.5}
+    Box: {0.12, 0.55, 0.12}
+    Rgb: {70, 160, 60}
+  }
+}
+
+// A carrot too tall for a single jump
+prefab LargeCarrot {
+  const height: f32 = 3.2
+  const width: f32 = 1.0
+
+  BunnyCarrot: {half_width: width / 2, height: height}
+
+  body {
+    Position: {0, height - (height + sink) / 2, 0}
+    Rotation: {PI, 0, 0}
+    Scale: {width, 1, width}
+    Cone: {segments: 16, smooth: true, length: height + sink, radius: 0.5}
+    Rgb: {255, 100, 20}
+    Emissive: {strength: 0.9, color: {255, 100, 50}}
+  }
+
+  leaf_mid {
+    Position: {0, height + 0.15, 0}
+    Box: {0.12, 0.55, 0.12}
+    Rgb: {70, 160, 60}
+  }
+
+  leaf_left {
+    Position: {0.14, height + 0.15, 0}
+    Rotation: {0, 0, 0.5}
+    Box: {0.12, 0.55, 0.12}
+    Rgb: {70, 160, 60}
+  }
+
+  leaf_right {
+    Position: {-0.14, height + 0.15, 0}
+    Rotation: {0, 0, -0.5}
+    Box: {0.12, 0.55, 0.12}
+    Rgb: {70, 160, 60}
+  }
+}

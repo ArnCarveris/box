@@ -1,0 +1,10 @@
+{
+    "id": "bunnyhopper_game",
+    "type": "package",
+    "value": {
+        "use": ["box"]
+    },
+    "lang.c": {
+        "c-standard": "c11"
+    }
+}
