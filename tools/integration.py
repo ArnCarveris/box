@@ -61,10 +61,23 @@ scene. --seconds measures that many seconds at every scene's target instead of i
 --max-load waits, up to --load-wait seconds, until the load average is at most n before every
 scene. Like visual, perf runs every scene with one copy of the app built at the start and waits
 out load guard refusals, up to --guard-wait seconds for the whole run.
+
+  integration.py e2e [--dir dir] [--env name] [--cfg mode] [--out dir] [--json file]
+                     [scenario ...]
+
+e2e runs every test_* function of every <dir>/<scenario>.py (test/integration/e2e by default)
+against a fresh headless process of the app the scenario names in APP (with the arguments in
+ARGS), driven over its command port with tools/box_client.py. A case passes when its function
+returns, the app logged no error and it quits cleanly (exit 0, its /tmp/box/<pid> removed). Each
+app is built once and runs as a copy in .bake/integration like visual, and a start the load guard
+refuses is retried the same way. A failure prints the failing command, its output and the tail
+of the log. The logs and captures go to <out>/e2e (test/integration/out by default), --json
+writes the results in the bake3 test report format, one suite per scenario.
 """
 import argparse
 import glob
 import html
+import importlib.util
 import json
 import os
 import re
@@ -73,11 +86,15 @@ import struct
 import subprocess
 import sys
 import time
+import traceback
 import zlib
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VISUAL_DIR = os.path.join(ROOT, "test", "integration", "visual")
 PERF_DIR = os.path.join(ROOT, "test", "integration", "perf")
+E2E_DIR = os.path.join(ROOT, "test", "integration", "e2e")
+E2E_TIMEOUT = 90
+E2E_KEYS = ("attempts", "refusals", "load_wait", "command", "output")
 OUT_DIR = os.path.join(ROOT, "test", "integration", "out")
 DEFAULT_APP = "apps/boxrun"
 MAX_DELTA = 24
@@ -375,8 +392,13 @@ def app_binary(args):
     project = app_project(args.app)
     with open(os.path.join(ROOT, project, "project.json")) as f:
         name = json.load(f)["id"].split(".")[-1]
-    env = os.path.join(ROOT, ".bake", "local_env", *([args.env] if args.env else []))
-    found = glob.glob(os.path.join(env, "build", name, "*-%s" % (args.cfg or "debug"), name))
+    with open(os.path.join(ROOT, "project.json")) as f:
+        root = json.load(f)["id"]
+    env = [args.env] if args.env else []
+    found = []
+    for base in (os.path.join(ROOT, ".bake"), os.path.join(os.path.expanduser("~"), ".bake", root)):
+        found += glob.glob(os.path.join(base, "local_env", *env, "build", name,
+                                        "*-%s" % (args.cfg or "debug"), name))
     return max(found, key=os.path.getmtime) if found else None
 
 
@@ -535,7 +557,7 @@ this.checked)"> Only failures</label></p>
 def write_json(path, results, project, elapsed, suite="Visual", keys=("max", "mean", "px")):
     tests = []
     for r in results:
-        row = {"suite": suite, "case": r["scene"], "status": r["status"],
+        row = {"suite": r.get("suite", suite), "case": r["scene"], "status": r["status"],
                "elapsed": r["elapsed"], "detail": r.get("detail", "")}
         for key in keys:
             if key in r:
@@ -886,6 +908,147 @@ def cmd_perf(args):
     return 1 if failed else 0
 
 
+def e2e_scenarios(directory, names):
+    if not names:
+        return sorted(glob.glob(os.path.join(directory, "*.py")))
+    result = []
+    for name in names:
+        path = name if os.path.isfile(name) else os.path.join(directory, scene_name(name) + ".py")
+        if not os.path.isfile(path):
+            sys.exit("no scenario %s" % path)
+        result.append(os.path.abspath(path))
+    return result
+
+
+def e2e_load(path):
+    spec = importlib.util.spec_from_file_location("e2e_" + scene_name(path), path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    cases = [(name, fn) for name, fn in vars(module).items()
+             if name.startswith("test_") and callable(fn)]
+    cases.sort(key=lambda case: case[1].__code__.co_firstlineno)
+    return module, cases
+
+
+def e2e_start(binary, module, log, out, prefix, args, run):
+    import box_client
+    while True:
+        run["load_wait"] += wait_for_cores(args)
+        run["attempts"] += 1
+        app = box_client.App(binary, getattr(module, "ARGS", []), log=log, timeout=E2E_TIMEOUT,
+                             out=out, prefix=prefix)
+        try:
+            return app.start()
+        except box_client.Refused:
+            run["refusals"] += 1
+            if args.load_budget <= 0:
+                raise
+        pause = min(GUARD_PAUSE, args.load_budget)
+        time.sleep(pause)
+        args.load_budget -= pause
+        run["load_wait"] += pause
+
+
+def e2e_where(error, path):
+    frames = [f for f in traceback.extract_tb(error.__traceback__) if f.filename == path]
+    return " at %s:%d" % (os.path.basename(path), frames[-1].lineno) if frames else ""
+
+
+def run_case(path, module, name, fn, binary, out, args):
+    import box_client
+    scenario = scene_name(path)
+    prefix = "%s.%s" % (scenario, name)
+    log = os.path.join(out, prefix + ".log")
+    for stale in [log] + glob.glob(os.path.join(out, glob.escape(prefix) + ".*.png")):
+        if os.path.exists(stale):
+            os.unlink(stale)
+    run = {"attempts": 0, "refusals": 0, "load_wait": 0}
+    result = {"suite": scenario, "scene": name, "status": "fail"}
+    start = time.time()
+    app = None
+    try:
+        app = e2e_start(binary, module, log, out, prefix, args, run)
+        fn(app)
+        if app.exit_code is None and not app.running():
+            app.fail("the app exited with %s during the case" % app.proc.poll())
+        if app.exit_code is None:
+            app.expect("logs error", "")
+            app.quit()
+        result["status"] = "pass"
+    except box_client.Refused as e:
+        result["detail"] = refusal_detail(run, args)
+        result["log"] = e.log
+    except Exception as e:
+        failure = isinstance(e, box_client.Failure)
+        result["detail"] = (str(e) if failure else "%s: %s" % (type(e).__name__, e)) + \
+            e2e_where(e, path)
+        result["command"] = e.command if failure else app and app.last_command
+        result["output"] = e.output if failure else app and app.last_output
+        result["log"] = e.log if failure and e.log is not None else app and app.log_tail()
+    finally:
+        if app:
+            app.kill()
+    result.update(run)
+    result["elapsed"] = round(time.time() - start, 6)
+    return result
+
+
+def print_case(r):
+    line = "%s %s.%s (%.1f s)" % ("PASS" if r["status"] == "pass" else "FAIL", r["suite"],
+                                  r["scene"], r["elapsed"])
+    if r["status"] == "pass":
+        print(line, flush=True)
+        return
+    print("%s: %s" % (line, r.get("detail", "")))
+    if r.get("command") is not None:
+        print("    command: %s" % r["command"])
+    if r.get("output") is not None:
+        lines = r["output"].splitlines() or [""]
+        print("    output:  %s" % ("\n             ".join(lines)))
+    if r.get("log"):
+        print("    log tail:")
+        print("\n".join("      " + line for line in r["log"].splitlines()))
+    sys.stdout.flush()
+
+
+def cmd_e2e(args):
+    directory = os.path.abspath(args.dir) if args.dir else E2E_DIR
+    base = os.path.abspath(args.out) if args.out else OUT_DIR
+    ignore_out(base)
+    out = os.path.join(base, "e2e")
+    os.makedirs(out, exist_ok=True)
+    scenarios = e2e_scenarios(directory, args.scenarios)
+    if not scenarios:
+        sys.exit("no scenarios in %s" % directory)
+    sys.path.insert(0, directory)
+    loaded = [(path,) + e2e_load(path) for path in scenarios]
+    start = time.time()
+    binaries = {}
+    results = []
+    try:
+        for path, module, cases in loaded:
+            args.app = getattr(module, "APP", DEFAULT_APP)
+            if args.app not in binaries:
+                binaries[args.app] = prepare_app(args)[0]
+        args.load_budget = args.guard_wait
+        for path, module, cases in loaded:
+            for name, fn in cases:
+                r = run_case(path, module, name, fn, binaries[getattr(module, "APP", DEFAULT_APP)],
+                             out, args)
+                results.append(r)
+                print_case(r)
+    finally:
+        for binary in binaries.values():
+            os.unlink(binary)
+    failed = sum(1 for r in results if r["status"] != "pass")
+    print("%d passed, %d failed in %.1f s, logs and captures in %s" % (
+        len(results) - failed, failed, time.time() - start, display(out)))
+    if args.json:
+        write_json(args.json, results, display(directory), time.time() - start, keys=E2E_KEYS)
+
+    return 1 if failed else 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -932,6 +1095,17 @@ def main():
                       "to the core count when the load guard refuses a run")
     perf.add_argument("--json", help="write the results in the bake3 test report format")
     perf.set_defaults(fn=cmd_perf)
+    e2e = sub.add_parser("e2e", help="drive apps through their command port and check them")
+    e2e.add_argument("scenarios", nargs="*", help="scenario names or paths, all when empty")
+    e2e.add_argument("--dir", help="folder of the scenarios, test/integration/e2e by default")
+    e2e.add_argument("--env", help="bake3 local environment, the default one when absent")
+    e2e.add_argument("--cfg", help="bake3 build mode, the bake3 default when absent")
+    e2e.add_argument("--out", help="folder whose e2e/ folder gets the logs and captures")
+    e2e.add_argument("--json", help="write the results in the bake3 test report format")
+    e2e.add_argument("--load-wait", dest="guard_wait", type=float, default=LOAD_WAIT,
+                     help="seconds the whole run waits at most for the load average to drop "
+                     "to the core count when the load guard refuses a start")
+    e2e.set_defaults(fn=cmd_e2e)
     args = parser.parse_args()
 
     return args.fn(args)
