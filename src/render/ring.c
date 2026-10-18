@@ -58,6 +58,7 @@ struct box_render_ring_t {
     int64_t flushes;                /**< Drains that asked the backend to flush */
     int64_t flushed;                /**< Flushes the render thread completed */
     float display_rate;             /**< Refresh rate of the simulated display, applied */
+    float display_actual;           /**< Rate the simulated display runs at, applied */
     bool vsync;                     /**< The last submitted packet presents with vsync */
     float refresh;                  /**< Refresh rate of the display of the last packet */
     int32_t swap_interval;          /**< Refreshes the last submitted packet is shown for */
@@ -170,6 +171,19 @@ done:
     return result;
 }
 
+/** Seconds between the refreshes of the simulated display: the actual rate when set, else the
+ * reported one.
+ *
+ * @param ring The ring
+ * @return The period
+ */
+static double box_render_display_period(
+    box_render_ring_t *ring)
+{
+    float rate = ring->display_actual > 0 ? ring->display_actual : ring->display_rate;
+    return 1.0 / (double)rate;
+}
+
 /** Find the refresh of the simulated display that first shows a frame that is ready at a time:
  * the first refresh after it, and not before the refresh after the last present.
  *
@@ -185,7 +199,7 @@ static double box_render_display_time(
     box_render_ring_t *ring,
     double ready)
 {
-    double period = 1.0 / (double)ring->display_rate;
+    double period = box_render_display_period(ring);
     double result;
     if (ring->origin == 0) {
         ring->origin = ready - period * 0.5;
@@ -255,7 +269,7 @@ static void box_render_show_pending(
         goto done;
     }
 
-    period = 1.0 / (double)ring->display_rate;
+    period = box_render_display_period(ring);
     shown = box_render_display_time(ring, frame->ready);
     box_wait_until(shown);
     if (frame->fence && ring->backend_ready && ring->backend.wait) {
@@ -574,8 +588,11 @@ static void box_render_ring_apply(
     ecs_os_mutex_lock(ring->lock);
     ring->base = ring->released;
     ring->count = count;
-    if (ring->display_rate != ring->settings.display_rate) {
+    if (ring->display_rate != ring->settings.display_rate ||
+        ring->display_actual != ring->settings.display_actual)
+    {
         ring->display_rate = ring->settings.display_rate;
+        ring->display_actual = ring->settings.display_actual;
         ring->origin = 0;
         ring->shown = 0;
         ring->frame_shown = 0;

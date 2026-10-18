@@ -153,6 +153,9 @@ is done by the frame loop instead.
   loop against the display: it is not locked to the measured present times, so a display a
   little off its reported rate, or clock drift, slowly moves the phase relative to vsync and
   can show an occasional uneven frame when the phase crosses a refresh boundary.
+  `FramePacing_window_cap_display_off_rate` runs a simulated display at 119.88 Hz reporting 120
+  (`RenderSettings.display_actual`) under a 60 fps cap and checks that the deltas stay within
+  one refresh of the time on screen and sum to it, with no drops.
 - Headless runs ignore all of this and step a fixed `1/fps` (60 by default); `--realtime`
   measures instead.
 

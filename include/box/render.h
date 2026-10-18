@@ -44,6 +44,9 @@ ECS_STRUCT(RenderSettings, {
     int32_t in_flight;  /**< Packets in flight, default 2, from 1 to 8 */
     bool main_thread;   /**< The main thread renders the packet, default on in the browser */
     float display_rate; /**< Refresh rate in Hz of the simulated vsync display, 0 for none */
+    float display_actual; /**< Rate the simulated display really runs at when it differs from the
+                               reported display_rate, to test pacing against a drifting display;
+                               0 for display_rate */
 });
 
 /** Packet counters the engine writes after every frame, read only for applications */

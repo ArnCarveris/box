@@ -238,6 +238,7 @@
                     "window_uncapped_144_hz",
                     "window_cap_60_on_120_hz",
                     "window_cap_72_on_144_hz",
+                    "window_cap_display_off_rate",
                     "window_cap_paced_by_clock",
                     "frames_report_snap_rate",
                     "frames_report_cap_paces",

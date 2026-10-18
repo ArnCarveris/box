@@ -194,13 +194,15 @@ static ecs_os_api_sleep_t pacing_sleep = NULL;
 /** Run a world on the simulated display of the null backend with the fake clock, which stays
  * installed until pacing_window_fini.
  *
- * @param display Refresh rate of the simulated display
+ * @param display Refresh rate the simulated display reports
+ * @param actual Rate it really runs at, 0 for the reported one
  * @param fps App.fps, 0 for the default of a window
  * @param frames Frames to run
  * @return The world, deleted with pacing_window_fini
  */
 static ecs_world_t* pacing_window(
     float display,
+    float actual,
     float fps,
     int32_t frames)
 {
@@ -216,7 +218,7 @@ static ecs_world_t* pacing_window(
     fake_seed = 1;
     ecs_system(world, { .phase = EcsOnUpdate, .run = FakeWork });
     ecs_singleton_set(world, RenderSettings, {
-        .in_flight = 2, .main_thread = true, .display_rate = display });
+        .in_flight = 2, .main_thread = true, .display_rate = display, .display_actual = actual });
     ecs_singleton_set(world, App, { .frames = frames, .fps = fps });
     test_int(box_app_run(world), 0);
 
@@ -248,7 +250,7 @@ static void pacing_window_check(
     float fps,
     int32_t presents)
 {
-    ecs_world_t *world = pacing_window(display, fps, 1800);
+    ecs_world_t *world = pacing_window(display, 0, fps, 1800);
     const RenderStatus *r = ecs_singleton_get(world, RenderStatus);
     const FrameTiming *t = ecs_singleton_get(world, FrameTiming);
     double shown = 1000.0 * (double)presents / (double)display;
@@ -591,6 +593,25 @@ void FramePacing_window_cap_72_on_144_hz(void) {
     pacing_window_check(144, 72, 2);
 }
 
+void FramePacing_window_cap_display_off_rate(void) {
+    // testing/town_stutter
+    // A cap paces the loop open loop against the reported rate, so a display 0.1% off (119.88
+    // against 120) slides the phase across a refresh boundary every few seconds. This shows
+    // what that does: the frames the display shows keep to 2 refreshes except for a bounded
+    // number of 1 and 3 refresh frames, and the deltas still add up to the time on screen.
+    ecs_world_t *world = pacing_window(120, 119.88f, 60, 3600);
+    const RenderStatus *r = ecs_singleton_get(world, RenderStatus);
+    const FrameTiming *t = ecs_singleton_get(world, FrameTiming);
+    double shown = 2000.0 / 119.88;
+    test_int(r->swap_interval, 2);
+    test_assert(t->interval.mean > shown * 0.99 && t->interval.mean < shown * 1.01);
+    test_assert(t->delta.min > shown * 0.45 && t->delta.max < shown * 1.55);
+    test_assert(fabs(t->delta.mean - t->interval.mean) < 0.5);
+    test_assert(t->dropped < 10);
+
+    pacing_window_fini(world);
+}
+
 void FramePacing_window_cap_paced_by_clock(void) {
     // testing/town_stutter
     float fps[] = { 60, 0 };
@@ -631,7 +652,7 @@ void FramePacing_frames_report_snap_rate(void) {
     int32_t frames[] = { 120, 900 };
     const char *source[] = { "(reported)", "(measured)" };
     for (int k = 0; k < 2; k ++) {
-        ecs_world_t *world = pacing_window(120, 0, frames[k]);
+        ecs_world_t *world = pacing_window(120, 0, 0, frames[k]);
         ecs_entity_t s = box_terminal_new(world);
         bool error = false;
         char *out = box_terminal_run(world, s, "frames", &error);
@@ -652,7 +673,7 @@ void FramePacing_frames_report_cap_paces(void) {
         "cap 60, the cap paces: 2 refresh(es) of 120 Hz per frame",
         "no cap, vsync paces: 1 refresh(es) of 120 Hz per frame" };
     for (int k = 0; k < 2; k ++) {
-        ecs_world_t *world = pacing_window(120, fps[k], 300);
+        ecs_world_t *world = pacing_window(120, 0, fps[k], 300);
         ecs_entity_t s = box_terminal_new(world);
         bool error = false;
         char *out = box_terminal_run(world, s, "frames", &error);
