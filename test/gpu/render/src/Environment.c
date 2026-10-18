@@ -1,7 +1,7 @@
 /**
  * @file Environment.c
  * @brief Tests for the cubemap the GPU converts an EnvironmentImage into and its processing:
- * the mips, the SH irradiance and their GPU time.
+ * the mips, the SH irradiance and their GPU time, and the background a view draws from it.
  */
 
 #include <box.h>
@@ -9,6 +9,10 @@
 #include <math.h>
 #include <stdio.h>
 #include "environment.h"
+
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_STATIC
+#include <stb_image.h>
 
 /** Resolution of the cubemap of the tests */
 #define RES (16)
@@ -416,4 +420,112 @@ void Environment_processing_time_measured(void) {
 
     env_no_errors(world);
     ecs_fini(world);
+}
+
+/** Edge of the image of the background tests */
+#define BACKGROUND_SIZE (32)
+
+/** Render the background of a view that looks along -Z at nothing, lit by axes.hdr, and get the
+ * pixel at the center of the image.
+ *
+ * @param yaw EnvironmentSettings.yaw
+ * @param background EnvironmentSettings.background
+ * @param out Receives red, green and blue
+ */
+static void background_center(
+    float yaw,
+    bool background,
+    int out[3])
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
+    ecs_entity_t surface = ecs_new(world);
+    ecs_set(world, surface, Surface, {.width = BACKGROUND_SIZE, .height = BACKGROUND_SIZE,
+        .write_to_file = "background.png", .resolution_scale = 1});
+    ecs_entity_t source = env_source(world, "etc/environments/axes.hdr", RES,
+        EnvironmentFilterGgx);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 0});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera,
+        .clear = {.enabled = true, .color = {0, 0, 0, 255}},
+        .lighting = {.enabled = true, .environment = {
+            .source = source, .intensity = 1, .yaw = yaw, .background = background
+        }}
+    });
+
+    box_render_environment_state_t state;
+    test_assert(env_wait(world, source, &state));
+    env_frames(world, 3);
+    env_no_errors(world);
+
+    int w = 0, h = 0, n = 0;
+    char *path = flecs_asprintf("%s/background.png",
+        ecs_singleton_get(world, AppStatus)->tmp_dir);
+    unsigned char *pixels = stbi_load(path, &w, &h, &n, 4);
+    test_assert(pixels != NULL);
+    test_int(w, BACKGROUND_SIZE);
+    test_int(h, BACKGROUND_SIZE);
+    const unsigned char *p = pixels +
+        ((BACKGROUND_SIZE / 2) * BACKGROUND_SIZE + BACKGROUND_SIZE / 2) * 4;
+    out[0] = p[0];
+    out[1] = p[1];
+    out[2] = p[2];
+    stbi_image_free(pixels);
+    ecs_os_free(path);
+    ecs_fini(world);
+}
+
+/** Check that a pixel shows a color of axes.hdr.
+ *
+ * @param pixel Red, green and blue of the pixel
+ * @param color The linear color, each channel 0 or 1
+ */
+static void expect_axis_color(
+    const int pixel[3],
+    const float color[3])
+{
+    int32_t c;
+    for (c = 0; c < 3; c ++) {
+        if (color[c] > 0.5f) {
+            test_assert(pixel[c] > 230);
+        } else {
+            test_assert(pixel[c] < 25);
+        }
+    }
+}
+
+void Environment_background_shows_environment(void) {
+    // environment/background
+    int pixel[3];
+    background_center(0, true, pixel);
+    expect_axis_color(pixel, face_colors[5]);
+}
+
+/* Turned a quarter about +Y, as Rotation.y turns an entity, +X of the environment looks along
+ * -Z, toward the center of the image; turned the other way -X does, and turned half +Z does. */
+void Environment_background_follows_yaw(void) {
+    // environment/background
+    int pixel[3];
+    background_center((float)M_PI * 0.5f, true, pixel);
+    expect_axis_color(pixel, face_colors[0]);
+    background_center((float)M_PI * -0.5f, true, pixel);
+    expect_axis_color(pixel, face_colors[1]);
+    background_center((float)M_PI, true, pixel);
+    expect_axis_color(pixel, face_colors[4]);
+}
+
+void Environment_background_off_keeps_clear_color(void) {
+    // environment/background
+    int pixel[3];
+    background_center(0, false, pixel);
+    test_int(pixel[0], 0);
+    test_int(pixel[1], 0);
+    test_int(pixel[2], 0);
 }

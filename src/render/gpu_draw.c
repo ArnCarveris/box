@@ -3,7 +3,8 @@
  * @brief Meshes, buffers and the forward pass of the webgpu backend.
  *
  * Every view of a target renders in order into its color texture with a depth buffer that is
- * cleared to 0 and compared with greater, and draws the batches of its scene indirectly.
+ * cleared to 0 and compared with greater, and draws the batches of its scene indirectly, after
+ * its environment background when it has one.
  *
  * A view that culls by occlusion draws twice: what its early cull phase kept, then what the
  * late phase found visible behind the depth of the first draw, with the blended draws. A view
@@ -52,7 +53,7 @@ static WGPUBuffer box_gpu_buffer_new(
 void box_gpu_draw_init(
     box_gpu_t *gpu)
 {
-    WGPUBindGroupLayoutEntry entries[12] = {
+    WGPUBindGroupLayoutEntry entries[14] = {
         {
             .binding = 0,
             .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
@@ -125,9 +126,25 @@ void box_gpu_draw_init(
             .binding = 11,
             .visibility = WGPUShaderStage_Fragment,
             .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
+        },
+        {
+            .binding = 12,
+            .visibility = WGPUShaderStage_Fragment,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Float,
+                .viewDimension = WGPUTextureViewDimension_Cube
+            }
+        },
+        {
+            .binding = 13,
+            .visibility = WGPUShaderStage_Fragment,
+            .buffer = {
+                .type = WGPUBufferBindingType_Uniform,
+                .minBindingSize = BOX_GPU_PROBE_SIZE
+            }
         }
     };
-    WGPUBindGroupLayoutDescriptor layout = { .entryCount = 12, .entries = entries };
+    WGPUBindGroupLayoutDescriptor layout = { .entryCount = 14, .entries = entries };
     box_gpu_cull_init(gpu);
     box_gpu_volume_init(gpu);
     box_gpu_reflect_init(gpu);
@@ -741,6 +758,7 @@ static int32_t box_gpu_view_write(
         box_gpu_light_uniforms(gpu, v, proj, u);
         box_gpu_shadow_uniforms(gpu, v, proj, result, u);
         box_gpu_atmosphere_uniforms(gpu, v, u);
+        box_gpu_environment_uniforms(gpu, v, u);
         box_gpu_cull_add(gpu, t, packet, i, result, proj, u);
         result ++;
     }
@@ -1030,12 +1048,16 @@ static void box_gpu_draw_pass(
         .depthStencilAttachment = &depth
     };
     uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
+    WGPUTextureFormat format = hdr ? BOX_GPU_HDR_FORMAT : t->format;
     WGPUBindGroup group = box_gpu_light_group(gpu, t, v, slot);
     vp.pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+    if (phase < 2) {
+        box_gpu_environment_draw_background(gpu, vp.pass, format, v, offset);
+    }
+
     wgpuRenderPassEncoderSetBindGroup(vp.pass, 0, group, 1, &offset);
     wgpuRenderPassEncoderSetBindGroup(vp.pass, 3, box_gpu_volume_group(gpu, v), 0, NULL);
-    box_gpu_draw_batches(gpu, t, &vp, hdr ? BOX_GPU_HDR_FORMAT : t->format, packet, v, group,
-        slot, phase);
+    box_gpu_draw_batches(gpu, t, &vp, format, packet, v, group, slot, phase);
     wgpuRenderPassEncoderEnd(vp.pass);
     wgpuRenderPassEncoderRelease(vp.pass);
     wgpuBindGroupRelease(group);

@@ -12,6 +12,7 @@
  */
 
 #include "gpu.h"
+#include "gpu_environment.h"
 
 #ifdef BOX_RENDER_WGPU
 
@@ -700,7 +701,7 @@ WGPUBindGroup box_gpu_light_group_with(
     cube = cube ? cube : gpu->no_reflection;
     box_gpu_buffer_t *clips = ecs_map_get_deref(
         &gpu->buffers, box_gpu_buffer_t, BOX_RENDER_BUFFER_CLIPS);
-    WGPUBindGroupEntry entries[12] = {
+    WGPUBindGroupEntry entries[14] = {
         { .binding = 0, .buffer = uniforms, .size = sizeof(box_gpu_view_uniforms_t) },
         { .binding = 1, .buffer = lights, .size = size },
         { .binding = 2, .buffer = clusters, .size = wgpuBufferGetSize(clusters) },
@@ -721,9 +722,10 @@ WGPUBindGroup box_gpu_light_group_with(
         }
     };
     box_gpu_atmosphere_bindings(gpu, t, v, &entries[9]);
+    box_gpu_environment_bindings(gpu, t ? v : NULL, &entries[12]);
     WGPUBindGroupDescriptor desc = {
         .layout = gpu->view_layout,
-        .entryCount = 12,
+        .entryCount = 14,
         .entries = entries
     };
 

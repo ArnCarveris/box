@@ -416,6 +416,9 @@ typedef struct box_gpu_view_uniforms_t {
     vec4 aerial;                    /**< Aerial perspective: km per world unit, inverse of the
                                      *   volume distance in km, its slices, 1 when the view
                                      *   applies it and 0 when not */
+    vec4 environment;               /**< Environment: intensity, cosine and sine of the yaw, 1
+                                     *   when the view is lit by a processed environment and 0
+                                     *   when not */
 } box_gpu_view_uniforms_t;
 
 /** Pipeline of the blit or the forward pass for one color format */
@@ -570,6 +573,11 @@ typedef struct box_gpu_t {
     box_gpu_particles_t *particles; /**< Particle passes */
     struct box_gpu_env_process_t *environment_process; /**< Processing of the environments,
                                                         *   created on first use */
+    struct box_gpu_env_background_t *environment_background; /**< Background draw of the
+                                                              *   views, created on first use */
+    WGPUTextureView no_environment; /**< Cube view of the black reflection slot, bound by views
+                                     *   without an environment */
+    WGPUBuffer no_environment_sh;   /**< Zero SH uniform of views without an environment */
     ecs_vec_t captures;             /**< box_gpu_capture_t* whose readback is mapping */
     bool lost;                      /**< The device was lost, the ring recreates it */
     bool lose;                      /**< box_render_gpu_lose_device asked to destroy it */
@@ -1240,7 +1248,8 @@ WGPUBuffer box_gpu_light_binding(
  *
  * @param gpu The backend
  * @param t The target whose aerial perspective volume of the view it binds, NULL for the
- * placeholder volume of views and captures without aerial perspective
+ * placeholder volume, the black environment and the zero environment SH of the probe and
+ * reflection captures
  * @param v The view
  * @param uniforms Buffer with the uniforms, bound with a dynamic offset
  * @param clusters Cluster buffer of the view
@@ -1256,7 +1265,7 @@ WGPUBindGroup box_gpu_light_group_with(
     WGPUTextureView shadow);
 
 /** Create the bind group of the forward pass of a view: its uniforms, lights, clusters, shadow
- * map and aerial perspective volume.
+ * map, aerial perspective volume and environment.
  *
  * @param gpu The backend
  * @param t The target

@@ -108,7 +108,7 @@ void box_render_environment_error(
 /** Check whether a packet runs the environment shader.
  *
  * @param p The packet
- * @return Whether it carries an environment image
+ * @return Whether it carries an environment image or a view draws its environment background
  */
 bool box_render_environment_use(
     const box_render_packet_t *p);

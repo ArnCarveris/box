@@ -6,10 +6,14 @@
  * The processing reuses the reflection probe passes of bake_sh.wgsl: reflect_mip box filters
  * the mip chain, reflect_prefilter writes the GGX prefiltered mips of a Ggx cubemap, and
  * environment_sh projects a box filtered mip onto the SH irradiance.
+ *
+ * The forward pass of a lit view binds the cubemap and SH of its environment, and
+ * environment.wgsl draws the background of a view that asks for it.
  */
 
 #include "gpu_environment.h"
 #include "gpu_bake.h"
+#include <math.h>
 
 #ifdef BOX_RENDER_WGPU
 
@@ -30,6 +34,13 @@ struct box_gpu_env_process_t {
     ecs_map_t sources;              /**< Resolution to the box_gpu_reflect_t* source cube a Ggx
                                      *   cubemap of that resolution is box filtered into */
     ecs_vec_t due;                  /**< box_gpu_environment_t* processed by a packet */
+};
+
+struct box_gpu_env_background_t {
+    WGPUBindGroupLayout layout;     /**< Binds the view uniforms, the cube and the sampler */
+    WGPUPipelineLayout pipeline_layout; /**< Pipeline layout of the background */
+    ecs_vec_t pipelines;            /**< box_gpu_blit_t, the background per color format */
+    int32_t revision;               /**< Revision of the shader of the pipelines */
 };
 
 /** Release a cubemap, its views and buffers.
@@ -101,7 +112,7 @@ static box_gpu_environment_t* box_gpu_environment_new(
         .size = sizeof(box_gpu_bake_params_t)
     });
     e->sh = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
-        .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_CopySrc,
+        .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_Uniform | WGPUBufferUsage_CopySrc,
         .size = BOX_GPU_PROBE_SIZE
     });
     box_gpu_bake_params_t *params = ecs_os_calloc_t(box_gpu_bake_params_t);
@@ -116,7 +127,59 @@ static box_gpu_environment_t* box_gpu_environment_new(
 void box_gpu_environment_init(
     box_gpu_t *gpu)
 {
+    const box_gpu_reflect_t *black = gpu->no_reflection;
     ecs_map_init(&gpu->environments, NULL);
+    gpu->no_environment = wgpuTextureCreateView(black->texture, &(WGPUTextureViewDescriptor){
+        .format = BOX_GPU_REFLECT_FORMAT,
+        .dimension = WGPUTextureViewDimension_Cube,
+        .mipLevelCount = black->mips,
+        .arrayLayerCount = BOX_GPU_ENVIRONMENT_FACES,
+        .aspect = WGPUTextureAspect_All
+    });
+    gpu->no_environment_sh = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
+        .usage = WGPUBufferUsage_Uniform,
+        .size = BOX_GPU_PROBE_SIZE
+    });
+}
+
+/** Release the background pipelines of every color format.
+ *
+ * @param s The background state
+ */
+static void box_gpu_env_background_reset(
+    box_gpu_env_background_t *s)
+{
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&s->pipelines); i ++) {
+        box_gpu_blit_t *b = ecs_vec_get_t(&s->pipelines, box_gpu_blit_t, i);
+        if (b->pipeline) {
+            wgpuRenderPipelineRelease(b->pipeline);
+        }
+    }
+
+    ecs_vec_clear(&s->pipelines);
+}
+
+/** Release the background pipelines and layouts.
+ *
+ * @param gpu The backend
+ */
+static void box_gpu_env_background_fini(
+    box_gpu_t *gpu)
+{
+    box_gpu_env_background_t *s = gpu->environment_background;
+    if (!s) {
+        goto done;
+    }
+
+    box_gpu_env_background_reset(s);
+    ecs_vec_fini_t(NULL, &s->pipelines, box_gpu_blit_t);
+    wgpuPipelineLayoutRelease(s->pipeline_layout);
+    wgpuBindGroupLayoutRelease(s->layout);
+    ecs_os_free(s);
+    gpu->environment_background = NULL;
+done:
+    return;
 }
 
 /** Release the SH pipeline and the source cubes of the processing.
@@ -155,6 +218,17 @@ void box_gpu_environment_fini(
 {
     box_gpu_environment_image_fini(gpu);
     box_gpu_env_process_fini(gpu);
+    box_gpu_env_background_fini(gpu);
+    if (gpu->no_environment) {
+        wgpuTextureViewRelease(gpu->no_environment);
+        gpu->no_environment = NULL;
+    }
+
+    if (gpu->no_environment_sh) {
+        wgpuBufferRelease(gpu->no_environment_sh);
+        gpu->no_environment_sh = NULL;
+    }
+
     if (ecs_map_is_init(&gpu->environments)) {
         ecs_map_iter_t it = ecs_map_iter(&gpu->environments);
         while (ecs_map_next(&it)) {
@@ -457,6 +531,191 @@ void box_gpu_environment_process(
 
 done:
     return;
+}
+
+const box_gpu_environment_t* box_gpu_environment_of(
+    box_gpu_t *gpu,
+    const box_render_view_t *v)
+{
+    const box_gpu_environment_t *e = v->environment.handle
+        ? box_gpu_environment_get(gpu, v->environment.handle)
+        : NULL;
+
+    return e && e->processed ? e : NULL;
+}
+
+void box_gpu_environment_uniforms(
+    box_gpu_t *gpu,
+    const box_render_view_t *v,
+    box_gpu_view_uniforms_t *u)
+{
+    glm_vec4_zero(u->environment);
+    if (box_gpu_environment_of(gpu, v)) {
+        u->environment[0] = v->environment.intensity;
+        u->environment[1] = cosf(v->environment.yaw);
+        u->environment[2] = sinf(v->environment.yaw);
+        u->environment[3] = 1.0f;
+    }
+}
+
+void box_gpu_environment_bindings(
+    box_gpu_t *gpu,
+    const box_render_view_t *v,
+    WGPUBindGroupEntry *out)
+{
+    const box_gpu_environment_t *e = v ? box_gpu_environment_of(gpu, v) : NULL;
+    out[0] = (WGPUBindGroupEntry){
+        .binding = 12,
+        .textureView = e ? e->cube : gpu->no_environment
+    };
+    out[1] = (WGPUBindGroupEntry){
+        .binding = 13,
+        .buffer = e ? e->sh : gpu->no_environment_sh,
+        .size = BOX_GPU_PROBE_SIZE
+    };
+}
+
+/** Get the state of the background draw, creating its layouts on first use: the view uniforms
+ * at 4, with a dynamic offset into the view buffer, the cube at 5 and its sampler at 6, which
+ * the conversion of environment.wgsl does not use.
+ *
+ * @param gpu The backend
+ * @return The state
+ */
+static box_gpu_env_background_t* box_gpu_env_background_get(
+    box_gpu_t *gpu)
+{
+    box_gpu_env_background_t *s = gpu->environment_background;
+    if (s) {
+        goto done;
+    }
+
+    WGPUShaderStage both = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment;
+    WGPUBindGroupLayoutEntry entries[3] = {
+        { .binding = 4, .visibility = both, .buffer = {
+            .type = WGPUBufferBindingType_Uniform,
+            .hasDynamicOffset = true,
+            .minBindingSize = sizeof(box_gpu_view_uniforms_t)
+        } },
+        { .binding = 5, .visibility = WGPUShaderStage_Fragment, .texture = {
+            .sampleType = WGPUTextureSampleType_Float,
+            .viewDimension = WGPUTextureViewDimension_Cube
+        } },
+        { .binding = 6, .visibility = WGPUShaderStage_Fragment,
+            .sampler = { .type = WGPUSamplerBindingType_Filtering } }
+    };
+    s = ecs_os_calloc_t(box_gpu_env_background_t);
+    s->layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 3, .entries = entries });
+    s->pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
+        &(WGPUPipelineLayoutDescriptor){ .bindGroupLayoutCount = 1,
+            .bindGroupLayouts = &s->layout });
+    ecs_vec_init_t(NULL, &s->pipelines, box_gpu_blit_t, 0);
+    gpu->environment_background = s;
+done:
+    return s;
+}
+
+/** Get the background pipeline of a color format, created on first use and again after the
+ * environment shader recompiled.
+ *
+ * @param gpu The backend
+ * @param s The background state
+ * @param format The format of the color target
+ * @return The pipeline, NULL while the shader has no module
+ */
+static WGPURenderPipeline box_gpu_env_background_pipeline(
+    box_gpu_t *gpu,
+    box_gpu_env_background_t *s,
+    WGPUTextureFormat format)
+{
+    box_gpu_shader_t *shader = ecs_map_get_deref(
+        &gpu->shaders, box_gpu_shader_t, BOX_RENDER_SHADER_ENVIRONMENT);
+    WGPURenderPipeline result = NULL;
+    int32_t i;
+    if (!shader || !shader->module) {
+        goto done;
+    }
+
+    if (s->revision != shader->revision) {
+        box_gpu_env_background_reset(s);
+        s->revision = shader->revision;
+    }
+
+    for (i = 0; i < ecs_vec_count(&s->pipelines); i ++) {
+        box_gpu_blit_t *b = ecs_vec_get_t(&s->pipelines, box_gpu_blit_t, i);
+        if (b->format == format) {
+            result = b->pipeline;
+            goto done;
+        }
+    }
+
+    WGPUColorTargetState target = { .format = format, .writeMask = WGPUColorWriteMask_All };
+    WGPUFragmentState fragment = {
+        .module = shader->module,
+        .entryPoint = { .data = "background_fs", .length = WGPU_STRLEN },
+        .targetCount = 1,
+        .targets = &target
+    };
+    WGPUDepthStencilState depth = {
+        .format = BOX_GPU_DEPTH_FORMAT,
+        .depthWriteEnabled = WGPUOptionalBool_False,
+        .depthCompare = WGPUCompareFunction_Always,
+        .stencilFront = { .compare = WGPUCompareFunction_Always },
+        .stencilBack = { .compare = WGPUCompareFunction_Always }
+    };
+    result = wgpuDeviceCreateRenderPipeline(gpu->device, &(WGPURenderPipelineDescriptor){
+        .layout = s->pipeline_layout,
+        .vertex = {
+            .module = shader->module,
+            .entryPoint = { .data = "background_vs", .length = WGPU_STRLEN }
+        },
+        .primitive = { .topology = WGPUPrimitiveTopology_TriangleList },
+        .depthStencil = &depth,
+        .multisample = { .count = 1, .mask = 0xFFFFFFFF },
+        .fragment = &fragment
+    });
+    *ecs_vec_append_t(NULL, &s->pipelines, box_gpu_blit_t) = (box_gpu_blit_t){
+        .format = format,
+        .pipeline = result
+    };
+done:
+    return result;
+}
+
+bool box_gpu_environment_draw_background(
+    box_gpu_t *gpu,
+    WGPURenderPassEncoder pass,
+    WGPUTextureFormat format,
+    const box_render_view_t *v,
+    uint32_t offset)
+{
+    const box_gpu_environment_t *e = v->environment.background
+        ? box_gpu_environment_of(gpu, v)
+        : NULL;
+    box_gpu_env_background_t *s = e ? box_gpu_env_background_get(gpu) : NULL;
+    WGPURenderPipeline pipeline = s ? box_gpu_env_background_pipeline(gpu, s, format) : NULL;
+    bool result = pipeline != NULL;
+    if (!result) {
+        goto done;
+    }
+
+    WGPUBindGroupEntry entries[3] = {
+        { .binding = 4, .buffer = gpu->view_buffer, .size = sizeof(box_gpu_view_uniforms_t) },
+        { .binding = 5, .textureView = e->cube },
+        { .binding = 6, .sampler = gpu->reflect_sampler }
+    };
+    WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
+        .layout = s->layout,
+        .entryCount = 3,
+        .entries = entries
+    });
+    wgpuRenderPassEncoderSetPipeline(pass, pipeline);
+    wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
+    wgpuRenderPassEncoderDraw(pass, 3, 1, 0, 0);
+    wgpuBindGroupRelease(group);
+done:
+    return result;
 }
 
 /** Convert a half float to a float.

@@ -615,7 +615,10 @@
                     "changed_filter_reprocesses",
                     "shared_source_processed_once",
                     "axes_sh_signs",
-                    "processing_time_measured"
+                    "processing_time_measured",
+                    "background_shows_environment",
+                    "background_follows_yaw",
+                    "background_off_keeps_clear_color"
                 ]
             },
             {

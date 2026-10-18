@@ -1,0 +1,82 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+
+// Six balls lit only by the environment sky.hdr, which the view also draws as its background:
+// metal in the back row, a white dielectric in front, roughness 0.05, 0.4 and 0.8 from left to
+// right. The smooth metal ball mirrors the blue sky above the brown ground with a bright horizon
+// band, the rough ones blur it into a soft blue to brown gradient; the dielectric balls are
+// lit blue from above and dim brown from below, with a faint sky reflection at their rim.
+spheres {
+  Scene: {}
+  AmbientLight: {sky: {0, 0, 0}, ground: {0, 0, 0}, intensity: 0}
+
+  sky {
+    Environment: {resolution: 128}
+    EnvironmentImage: {path: "etc/environments/sky.hdr"}
+  }
+
+  darkness {
+    DirectionalLight: {intensity: 0}
+  }
+
+  camera {
+    Position: {0, 1.4, 5.5}
+    Rotation: {-0.12, 0, 0}
+    Camera: {fov: 55}
+  }
+
+  metal_smooth {
+    Position: {-2.2, 1.6, -0.8}
+    Sphere: {segments: 48, smooth: true, radius: 0.8}
+    Rgb: {240, 240, 245}
+    PbrMaterial: {metallic: 1, roughness: 0.05}
+  }
+
+  metal_mid {
+    Position: {0, 1.6, -0.8}
+    Sphere: {segments: 48, smooth: true, radius: 0.8}
+    Rgb: {240, 240, 245}
+    PbrMaterial: {metallic: 1, roughness: 0.4}
+  }
+
+  metal_rough {
+    Position: {2.2, 1.6, -0.8}
+    Sphere: {segments: 48, smooth: true, radius: 0.8}
+    Rgb: {240, 240, 245}
+    PbrMaterial: {metallic: 1, roughness: 0.8}
+  }
+
+  dielectric_smooth {
+    Position: {-2.2, 0.2, 0.8}
+    Sphere: {segments: 48, smooth: true, radius: 0.6}
+    Rgb: {230, 230, 230}
+    PbrMaterial: {metallic: 0, roughness: 0.05}
+  }
+
+  dielectric_mid {
+    Position: {0, 0.2, 0.8}
+    Sphere: {segments: 48, smooth: true, radius: 0.6}
+    Rgb: {230, 230, 230}
+    PbrMaterial: {metallic: 0, roughness: 0.4}
+  }
+
+  dielectric_rough {
+    Position: {2.2, 0.2, 0.8}
+    Sphere: {segments: 48, smooth: true, radius: 0.6}
+    Rgb: {230, 230, 230}
+    PbrMaterial: {metallic: 0, roughness: 0.8}
+  }
+}
+
+spheres_view {
+  View: {
+    camera: spheres.camera,
+    clear: {enabled: true, color: {0, 0, 0, 255}},
+    lighting: {enabled: true, baked: true, reflections: true, atmosphere: true,
+      environment: {source: spheres.sky, intensity: 1, yaw: 0, background: true}}
+  }
+}

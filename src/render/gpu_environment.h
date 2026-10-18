@@ -45,6 +45,9 @@ typedef struct box_gpu_env_image_t box_gpu_env_image_t;
 /** Pipeline of the SH projection and the source cubes of the Ggx processing */
 typedef struct box_gpu_env_process_t box_gpu_env_process_t;
 
+/** Pipelines of the environment background draw */
+typedef struct box_gpu_env_background_t box_gpu_env_background_t;
+
 /** Create the map of the environment cubemaps.
  *
  * @param gpu The backend
@@ -135,6 +138,62 @@ bool box_gpu_environment_ready(
 void box_gpu_environment_process(
     box_gpu_t *gpu,
     const box_render_packet_t *packet);
+
+/** Get the environment a view is lit with: the cubemap of its LightSettings.environment, once
+ * the processing wrote its mips and SH.
+ *
+ * @param gpu The backend
+ * @param v The view
+ * @return The cubemap, NULL when the view has no environment or it was not processed yet
+ */
+const box_gpu_environment_t* box_gpu_environment_of(
+    box_gpu_t *gpu,
+    const box_render_view_t *v);
+
+/** Write the environment uniforms of a view: its intensity and yaw, zero when
+ * box_gpu_environment_of has no cubemap for it.
+ *
+ * @param gpu The backend
+ * @param v The view
+ * @param u The uniforms of the view
+ */
+void box_gpu_environment_uniforms(
+    box_gpu_t *gpu,
+    const box_render_view_t *v,
+    box_gpu_view_uniforms_t *u);
+
+/** Write the environment cube and its SH uniform as bindings 12 and 13 of the forward pass: the
+ * cubemap of the view, else the black reflection slot and a zero SH.
+ *
+ * @param gpu The backend
+ * @param v The view, NULL for the black slot of the probe and reflection captures
+ * @param out Receives the two entries
+ */
+void box_gpu_environment_bindings(
+    box_gpu_t *gpu,
+    const box_render_view_t *v,
+    WGPUBindGroupEntry *out);
+
+/** Record the environment background of a view as the first draw of its forward pass, in place
+ * of the clear color: one triangle over the view that samples mip 0 of its environment in the
+ * direction of each pixel, turned by its yaw and times its intensity.
+ *
+ * Depth is neither tested nor written. Replaces the bind group at 0.
+ *
+ * @param gpu The backend
+ * @param pass The render pass of the view
+ * @param format The format of the color target
+ * @param v The view
+ * @param offset Offset of the uniforms of the view in the view buffer
+ * @return Whether the background was drawn: the view has LightSettings.environment.background,
+ *         a processed environment and the environment shader a module
+ */
+bool box_gpu_environment_draw_background(
+    box_gpu_t *gpu,
+    WGPURenderPassEncoder pass,
+    WGPUTextureFormat format,
+    const box_render_view_t *v,
+    uint32_t offset);
 
 /** Release the conversion of environment images.
  *

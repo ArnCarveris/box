@@ -42,6 +42,9 @@ struct View {
     // Aerial perspective: x km per world unit, y the inverse of the distance in km the volume
     // reaches, z its slices, w 1 when the view applies it
     aerial: vec4f,
+    // Environment: x its intensity, y and z the cosine and sine of its yaw, w 1 when the view is
+    // lit by an environment
+    environment: vec4f,
 };
 
 struct Light {
@@ -119,4 +122,12 @@ fn cluster_index(v: View, p: vec3f) -> u32 {
     let y = min(u32(max(fy, 0.0)), v.grid.y - 1u);
     let z = min(u32(max(fz, 0.0)), v.grid.z - 1u);
     return x + y * v.grid.x + z * v.grid.x * v.grid.y;
+}
+
+// A world direction in the frame of the environment of a view, which the view turns about +Y by
+// its yaw as Rotation.y turns an entity.
+fn environment_direction(v: View, d: vec3f) -> vec3f {
+    let c = v.environment.y;
+    let s = v.environment.z;
+    return vec3f(c * d.x - s * d.z, d.y, s * d.x + c * d.z);
 }

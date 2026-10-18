@@ -452,6 +452,11 @@ bool box_render_environment_use(
         result = r->kind == BOX_RENDER_ENVIRONMENT_IMAGE;
     }
 
+    for (i = 0; !result && i < ecs_vec_count(&p->views); i ++) {
+        const box_render_view_t *v = ecs_vec_get_t(&p->views, box_render_view_t, i);
+        result = v->environment.handle && v->environment.background;
+    }
+
     return result;
 }
 

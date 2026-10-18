@@ -5,8 +5,14 @@
 // u = 0.5 + atan2(d.x, -d.z) / 2 pi and v = acos(d.y) / pi, so the center column looks along -Z,
 // the image goes toward +X to its right, its edges look along +Z and its top row is +Y. Each
 // texel averages four samples at the centers of its quarters, so a large image does not alias.
+//
+// background_vs and background_fs draw the environment of a view behind its geometry: one
+// triangle over the view as the first draw of its forward pass, in place of the clear color,
+// that samples mip 0 of the cubemap in the direction of each pixel, turned by the yaw of the view
+// and times its intensity. The bindings of the background follow those of the conversion.
 
 #include "include/cube.wgsl"
+#include "include/lights.wgsl"
 
 const PI: f32 = 3.141592653589793;
 
@@ -51,4 +57,44 @@ fn equirect_to_cube(@builtin(global_invocation_id) id: vec3u) {
     }
 
     textureStore(cube, id.xy, id.z, vec4f(sum * 0.25, 1.0));
+}
+
+@group(0) @binding(4) var<uniform> view: View;
+@group(0) @binding(5) var environment_cube: texture_cube<f32>;
+@group(0) @binding(6) var environment_sampler: sampler;
+
+struct BackgroundOut {
+    @builtin(position) pos: vec4f,
+    @location(0) ndc: vec2f,
+};
+
+@vertex fn background_vs(@builtin(vertex_index) i: u32) -> BackgroundOut {
+    let p = vec2f(f32((i << 1u) & 2u), f32(i & 2u)) * 2.0 - 1.0;
+    var o: BackgroundOut;
+    o.pos = vec4f(p, 0.0, 1.0);
+    o.ndc = p;
+    return o;
+}
+
+// World direction a pixel of the view looks along: through the pixel for a perspective camera,
+// along the camera for an orthographic one. The view matrix is inverted through its cofactors,
+// so a scaled camera keeps its directions.
+fn background_direction(ndc: vec2f) -> vec3f {
+    var dir = vec3f(0.0, 0.0, -1.0);
+    if (view.lights.w == 0u) {
+        dir = vec3f(ndc * view.cluster.xy, -1.0);
+    }
+
+    let c0 = view.view[0].xyz;
+    let c1 = view.view[1].xyz;
+    let c2 = view.view[2].xyz;
+    let cofactor = mat3x3f(cross(c1, c2), cross(c2, c0), cross(c0, c1));
+    let det = dot(c0, cofactor[0]);
+    return normalize(transpose(cofactor) * dir * select(1.0, -1.0, det < 0.0));
+}
+
+@fragment fn background_fs(f: BackgroundOut) -> @location(0) vec4f {
+    let d = environment_direction(view, background_direction(f.ndc));
+    let radiance = textureSampleLevel(environment_cube, environment_sampler, d, 0.0).rgb;
+    return vec4f(radiance * view.environment.x, 1.0);
 }

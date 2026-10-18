@@ -455,7 +455,8 @@ done:
  * or it culls and a batch draws with the mesh or the 2D shape shader, or an effect pass of a
  * view runs it, or it projects probe captures and the packet captures probes or reflections or
  * may process environments, or it builds atmosphere LUTs and the packet has an atmosphere, or
- * it converts environment images and the packet carries one, or it simulates or draws particles
+ * it converts environment images or draws environment backgrounds and the packet carries an
+ * image or a view with a background, or it simulates or draws particles
  * and the packet has a particle pool
  */
 static bool box_shader_used(

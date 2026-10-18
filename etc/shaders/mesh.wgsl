@@ -8,6 +8,8 @@
 // from the hemisphere ambient, or for a view that samples baked lighting from the irradiance
 // probe volume of its scene (group 3). The indirect specular light of a view that samples
 // reflection probes comes from the prefiltered cubemaps of the probes its clusters list. A view
+// lit by an environment takes its SH in place of the hemisphere ambient and its prefiltered
+// cubemap as an infinitely distant probe below the scene probe. A view
 // that renders the atmosphere of its scene attenuates the shaded color and adds the in scattered
 // light from one trilinear tap of its aerial perspective volume.
 #include "include/instance.wgsl"
@@ -43,6 +45,13 @@ const MIN_ROUGHNESS: f32 = 0.045;
 @group(0) @binding(9) var aerial_volume: texture_3d<f32>;
 @group(0) @binding(10) var aerial_sampler: sampler;
 
+// Environment of the view (LightSettings.environment): a cubemap whose mip k of N is
+// prefiltered for the perceptual roughness k / (N - 1), as a reflection probe slot, and its L2
+// SH irradiance. Views without one bind the black reflection slot and a zero SH, and their
+// view.environment.w is 0.
+@group(0) @binding(12) var environment_cube: texture_cube<f32>;
+@group(0) @binding(13) var<uniform> environment_sh: array<vec4f, 9>;
+
 @group(2) @binding(0) var<storage, read> instances: array<Instance>;
 
 // Grid of the probe volume: probe (x, y, z) sits at origin.xyz + (x, y, z) * origin.w, x
@@ -76,8 +85,8 @@ const VISIBILITY_BIAS: f32 = 0.25;
 // Smallest variance of the distance in a direction, in square spacings.
 const VISIBILITY_VARIANCE: f32 = 0.001;
 
-// Share of the weight of the probes around a point that the hemisphere ambient makes up for
-// when the probes the point sees carry less.
+// Share of the weight of the probes around a point that the ambient makes up for when the
+// probes the point sees carry less.
 const VISIBILITY_FALLBACK: f32 = 0.1;
 
 // Weight left over by the reflection probes of a fragment below which the next ones are
@@ -127,11 +136,6 @@ struct VertexOut {
     return o;
 }
 
-// Hemisphere ambient light of the scene in a direction.
-fn ambient(dir: vec3f) -> vec3f {
-    return mix(view.ambient_ground.rgb, view.ambient_sky.rgb, dir.y * 0.5 + 0.5);
-}
-
 // Irradiance in a direction from the L2 SH irradiance coefficients E_lm of a probe
 // (Ramamoorthi and Hanrahan, Sloan's real basis), before the division by pi and the clamp.
 fn sh_irradiance(e0: vec3f, e1: vec3f, e2: vec3f, e3: vec3f, e4: vec3f, e5: vec3f,
@@ -143,6 +147,26 @@ fn sh_irradiance(e0: vec3f, e1: vec3f, e2: vec3f, e3: vec3f, e4: vec3f, e5: vec3
         + e6 * (0.3153915653 * (3.0 * d.z * d.z - 1.0))
         + e8 * (0.5462742153 * (d.x * d.x - d.y * d.y));
     return band0 + band1 + band2;
+}
+
+// Irradiance over pi in a world direction from the SH of the environment of the view, turned by
+// its yaw, times its intensity.
+fn environment_irradiance(dir: vec3f) -> vec3f {
+    let d = environment_direction(view, dir);
+    let e = sh_irradiance(environment_sh[0].rgb, environment_sh[1].rgb, environment_sh[2].rgb,
+        environment_sh[3].rgb, environment_sh[4].rgb, environment_sh[5].rgb,
+        environment_sh[6].rgb, environment_sh[7].rgb, environment_sh[8].rgb, d);
+    return max(e / PI, vec3f(0.0)) * view.environment.x;
+}
+
+// Ambient light of the scene in a direction: the SH of the environment of a view lit by one,
+// else the hemisphere ambient.
+fn ambient(dir: vec3f) -> vec3f {
+    if (view.environment.w > 0.0) {
+        return environment_irradiance(dir);
+    }
+
+    return mix(view.ambient_ground.rgb, view.ambient_sky.rgb, dir.y * 0.5 + 0.5);
 }
 
 // Indirect light of a fragment, irradiance over pi: in the direction of its normal for the
@@ -225,10 +249,10 @@ fn visibility_from(index: u32, offset: vec3f) -> f32 {
 // weights, times the wrap of the direction toward the probe around the normal as in DDGI, so
 // probes behind the surface count less, times the visibility of the position, moved off the
 // surface along the normal, from the probe. Invalid probes are skipped; outside the grid the
-// position clamps to the border probes. Without a valid probe it is the hemisphere ambient,
-// which also makes up the weight the visible probes lack below VISIBILITY_FALLBACK of the
-// weight of every valid probe, so a surface that sees none of its probes does not take the
-// light of the probes behind it. The SH evaluation is linear in the coefficients, so every probe
+// position clamps to the border probes. Without a valid probe it is the ambient (the SH of the
+// environment of the view, else the hemisphere), which also makes up the weight the visible
+// probes lack below VISIBILITY_FALLBACK of the weight of every valid probe, so a surface that
+// sees none of its probes does not take the light of the probes behind it. The SH evaluation is linear in the coefficients, so every probe
 // is evaluated in the two directions and the results are blended; the hemisphere ambient is
 // the irradiance its SH projection evaluates to.
 fn volume_irradiance(world: vec3f, n: vec3f, spec: vec3f) -> Indirect {
@@ -352,13 +376,32 @@ fn probe_radiance(p: ReflectionProbe, world: vec3f, spec: vec3f, mip: f32, grid:
     return radiance * clamp(scale, REFLECTION_NORMALIZE_MIN, REFLECTION_NORMALIZE_MAX);
 }
 
+// Prefiltered radiance the environment of the view reflects along the specular direction spec,
+// an infinitely distant probe turned by the yaw of the view, at the mip level of a perceptual
+// roughness, times its intensity. For a view that samples baked lighting it is normalized as
+// probe_radiance normalizes a probe, by the luminance of the irradiance grid over that of the
+// SH of the environment, both in direction spec.
+fn environment_radiance(spec: vec3f, roughness: f32, grid: vec3f) -> vec3f {
+    let mip = roughness * f32(textureNumLevels(environment_cube) - 1u);
+    let d = environment_direction(view, normalize(spec));
+    let radiance = textureSampleLevel(environment_cube, reflection_sampler, d, mip).rgb *
+        view.environment.x;
+    if (volume.size.w == 0u) {
+        return radiance;
+    }
+
+    let own = luminance(environment_irradiance(spec));
+    let scale = luminance(grid) / max(own, 1e-4);
+    return radiance * clamp(scale, REFLECTION_NORMALIZE_MIN, REFLECTION_NORMALIZE_MAX);
+}
+
 // Indirect specular light of a fragment from the reflection probes of its cluster, along the
 // specular direction spec. The cluster lists its probes in blend order: each one takes its fade
 // weight of the weight still left, until none is; the scene probe, last in the probe buffer,
-// takes what is left, else the fallback does: the hemisphere ambient or, for a view that
-// samples baked lighting, the irradiance grid, both in direction spec. A probe whose slot holds
-// no capture yet is skipped. The mip level follows the perceptual roughness as the prefilter
-// wrote them.
+// takes what is left, else the environment of the view does, else the fallback: the ambient or,
+// for a view that samples baked lighting, the irradiance grid, both in direction spec. A probe
+// whose slot holds no capture yet is skipped. The mip level follows the perceptual roughness as
+// the prefilter wrote them.
 fn reflections(world: vec3f, spec: vec3f, roughness: f32, cluster: u32, fallback: vec3f) -> vec3f {
     let mip = roughness * f32(textureNumLevels(reflection_cubes) - 1u);
     var sum = vec3f(0.0);
@@ -383,6 +426,8 @@ fn reflections(world: vec3f, spec: vec3f, roughness: f32, cluster: u32, fallback
         var rest = fallback;
         if (view.reflection.x > view.grid.w && reflection_probes[last].ready != 0u) {
             rest = probe_radiance(reflection_probes[last], world, spec, mip, fallback);
+        } else if (view.environment.w > 0.0) {
+            rest = environment_radiance(spec, roughness, fallback);
         }
 
         sum += rest * left;
@@ -561,6 +606,8 @@ fn shade(s: Surface, v: vec3f, world: vec3f) -> vec3f {
 
     if (view.reflection.x > 0u) {
         specular_light = reflections(world, spec, s.roughness, cluster, specular_light);
+    } else if (view.environment.w > 0.0) {
+        specular_light = environment_radiance(spec, s.roughness, specular_light);
     }
 
     let indirect_specular = (f0 * ab.x + ab.y) * specular_light;
