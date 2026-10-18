@@ -11,6 +11,7 @@
 /** One script event the frame emits after the Input singleton is written */
 typedef struct box_input_emit_t {
     bool is_mouse;                    /**< The event is a mouse event, else a keyboard event */
+    Key key;                          /**< Key of a keyboard event */
     bool is_scroll;                   /**< The mouse event is a wheel movement in its delta */
     EcsScriptMouseEvent mouse;        /**< Mouse event to emit, aimed at the screen */
     EcsScriptKeyboardEvent keyboard;  /**< Keyboard event to emit */
@@ -49,6 +50,20 @@ typedef struct box_input_router_t {
     void *ctx;                 /**< Passed to route and blocks */
 } box_input_router_t;
 
+/** Take keys and text of a frame from Input before the bindings and other consumers see them.
+ *
+ * It runs after the events of the frame were applied, before Input is marked modified, so the
+ * console capture runs after it. box.ui installs one for the keyboard focus.
+ *
+ * @param world The world
+ * @param in The Input singleton, which it may change
+ * @param ctx Context of the claim
+ */
+typedef void (*box_input_claim_t)(
+    ecs_world_t *world,
+    Input *in,
+    void *ctx);
+
 /** A synthetic hold of an action, or what an element with an ActionTrigger feeds it */
 typedef struct box_input_hold_t {
     ecs_entity_t action; /**< The action entity */
@@ -77,6 +92,8 @@ typedef struct InputDevice {
     ecs_vec_t holds;               /**< box_input_hold_t of the synthetic action holds */
     box_input_platform_t backend;  /**< Backend that feeds real device input */
     box_input_router_t router;     /**< Takes the events of a frame, emitted directly when unset */
+    box_input_claim_t claim;       /**< Takes keys of a frame from Input, NULL for none */
+    void *claim_ctx;               /**< Passed to claim */
     ecs_entity_t screen;           /**< Target of the mouse events, focused for keyboard events */
     ecs_vec_t text;                /**< char of the text typed this frame, without terminator */
     ecs_vec_t surfaces;            /**< box_input_surface_t of the surfaces that sent events */
@@ -195,6 +212,30 @@ bool box_input_key_blocked(
 void box_input_router_set(
     ecs_world_t *world,
     const box_input_router_t *router);
+
+/** Install the claim that takes keys and text of every frame, replacing the previous one.
+ *
+ * @param world The world
+ * @param claim The claim, NULL to remove it
+ * @param ctx Passed to the claim
+ */
+void box_input_claim_set(
+    ecs_world_t *world,
+    box_input_claim_t claim,
+    void *ctx);
+
+/** Mark the keys and the required modifier keys of the bindings of an action.
+ *
+ * The console keeps its toggle with it, box.ui keeps the toggle of the console from KeyCapture.
+ *
+ * @param world The world
+ * @param action The action, 0 marks nothing
+ * @param keys Set to true for every key a binding of the action uses, BOX_KEY_COUNT entries
+ */
+void box_input_action_keys(
+    ecs_world_t *world,
+    ecs_entity_t action,
+    bool *keys);
 
 /** Get the screen entity, the target of mouse events that no entity takes.
  *

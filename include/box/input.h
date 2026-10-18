@@ -59,6 +59,7 @@ ECS_STRUCT(KeyState, {
     bool down;     /**< The key is held */
     bool pressed;  /**< The key went down this frame */
     bool released; /**< The key came up this frame */
+    bool repeated; /**< The platform (or key.repeat) repeated the held key this frame */
 });
 
 /** What an input event does */
@@ -459,6 +460,18 @@ void box_input_key(
     ecs_world_t *world,
     Key key,
     bool down);
+
+/** Queue a repeat of a held key, as the platform sends while a key is held down.
+ *
+ * The repeat sets KeyState.repeated and emits a key event with repeat set. A key that is not
+ * held goes down instead.
+ *
+ * @param world The world
+ * @param key The key
+ */
+void box_input_key_repeat(
+    ecs_world_t *world,
+    Key key);
 
 /** Queue a key tap that holds the key for a number of frames.
  *

@@ -416,6 +416,40 @@ static ecs_entity_t box_input_binding_action(
     return result;
 }
 
+void box_input_action_keys(
+    ecs_world_t *world,
+    ecs_entity_t action,
+    bool *keys)
+{
+    InputActions *st = action ? box_input_actions(world) : NULL;
+    ecs_iter_t it;
+    int32_t i;
+    if (!st) {
+        goto done;
+    }
+
+    it = ecs_query_iter(world, st->bindings);
+    while (ecs_query_next(&it)) {
+        const Binding *b = ecs_field(&it, Binding, 0);
+        for (i = 0; i < it.count; i ++) {
+            if (box_input_binding_action(world, it.entities[i], &b[i]) != action ||
+                b[i].key <= KeyNone || b[i].key >= BOX_KEY_COUNT)
+            {
+                continue;
+            }
+
+            keys[b[i].key] = true;
+            keys[KeyCtrlLeft] = keys[KeyCtrlRight] = keys[KeyCtrlLeft] || b[i].ctrl;
+            keys[KeyShiftLeft] = keys[KeyShiftRight] = keys[KeyShiftLeft] || b[i].shift;
+            keys[KeyAltLeft] = keys[KeyAltRight] = keys[KeyAltLeft] || b[i].alt;
+            keys[KeySuperLeft] = keys[KeySuperRight] = keys[KeySuperLeft] || b[i].meta;
+        }
+    }
+
+done:
+    return;
+}
+
 /** Zero the bits of the last frame, emptying the map once an action in it was not bound.
  *
  * Keeping the entries of a steady set of bound actions avoids allocating every frame.

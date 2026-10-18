@@ -273,6 +273,14 @@
                     "float_draws_above_and_outside_clip",
                     "float_takes_click_over_sibling"
                 ]
+            },
+            {
+                "id": "Focus",
+                "testcases": [
+                    "console_over_key_capture",
+                    "render_to_texture",
+                    "tab_views_of_focused_surface"
+                ]
             }
         ]
     }

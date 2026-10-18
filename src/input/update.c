@@ -39,6 +39,7 @@ static void box_input_frame_begin(
     for (i = 0; i < BOX_KEY_COUNT; i ++) {
         in->keys[i].pressed = false;
         in->keys[i].released = false;
+        in->keys[i].repeated = false;
     }
 
     ecs_vec_clear(&dev->text);
@@ -53,19 +54,20 @@ static void box_input_frame_begin(
     in->mouse.scroll[0] = in->mouse.scroll[1] = 0;
 }
 
-/** Check whether either key of a modifier is held.
+/** Check whether either key of a modifier is held by the applied events, which a consumer that
+ * clears Input.keys (the console, box.ui) does not change.
  *
- * @param in The Input singleton
+ * @param dev The device state
  * @param left The left key of the modifier
  * @param right The right key of the modifier
  * @return Whether one of the keys is held
  */
-static bool box_input_modifier(
-    const Input *in,
+static bool box_input_held_modifier(
+    const InputDevice *dev,
     Key left,
     Key right)
 {
-    return in->keys[left].down || in->keys[right].down;
+    return dev->held[left] || dev->held[right];
 }
 
 /** Collect the held mouse buttons as the bitmask of a script mouse event.
@@ -109,10 +111,10 @@ static void box_input_emit_mouse(
         .local_y = in->mouse.position[1],
         .button = button,
         .buttons = box_input_buttons(in),
-        .ctrl = box_input_modifier(in, KeyCtrlLeft, KeyCtrlRight),
-        .shift = box_input_modifier(in, KeyShiftLeft, KeyShiftRight),
-        .alt = box_input_modifier(in, KeyAltLeft, KeyAltRight),
-        .meta = box_input_modifier(in, KeySuperLeft, KeySuperRight)
+        .ctrl = box_input_held_modifier(dev, KeyCtrlLeft, KeyCtrlRight),
+        .shift = box_input_held_modifier(dev, KeyShiftLeft, KeyShiftRight),
+        .alt = box_input_held_modifier(dev, KeyAltLeft, KeyAltRight),
+        .meta = box_input_held_modifier(dev, KeySuperLeft, KeySuperRight)
     };
 }
 
@@ -158,20 +160,24 @@ static void box_input_emit_key(
 
     emit = ecs_vec_append_t(NULL, &dev->emits, box_input_emit_t);
     ecs_os_zeromem(emit);
+    emit->key = key;
     emit->keyboard = (EcsScriptKeyboardEvent){
         .key = ECS_CONST_CAST(char*, value),
         .down = down,
         .repeat = repeat,
-        .ctrl = box_input_modifier(in, KeyCtrlLeft, KeyCtrlRight),
-        .shift = box_input_modifier(in, KeyShiftLeft, KeyShiftRight),
-        .alt = box_input_modifier(in, KeyAltLeft, KeyAltRight),
-        .meta = box_input_modifier(in, KeySuperLeft, KeySuperRight)
+        .ctrl = box_input_held_modifier(dev, KeyCtrlLeft, KeyCtrlRight),
+        .shift = box_input_held_modifier(dev, KeyShiftLeft, KeyShiftRight),
+        .alt = box_input_held_modifier(dev, KeyAltLeft, KeyAltRight),
+        .meta = box_input_held_modifier(dev, KeySuperLeft, KeySuperRight)
     };
 done:
     return;
 }
 
 /** Put a key or button down, emitting a repeat for a held key that the platform repeats.
+ *
+ * Whether the key is held for the events and repeats comes from the applied events, so a key
+ * that a consumer cleared from Input.keys (the console, box.ui) still repeats and comes up.
  *
  * @param dev The device state
  * @param in The Input singleton
@@ -191,8 +197,9 @@ static void box_input_key_down(
     }
 
     state = &in->keys[key];
-    held = state->down;
-    state->pressed = state->pressed || !held;
+    held = dev->held[key];
+    state->pressed = state->pressed || !state->down;
+    state->repeated = state->repeated || (repeat && held && box_input_key_value(key));
     state->down = true;
     dev->held[key] = true;
     if (!held || (repeat && box_input_key_value(key))) {
@@ -214,13 +221,14 @@ static void box_input_key_up(
     Input *in,
     Key key)
 {
-    if (key > KeyNone && key < BOX_KEY_COUNT) {
-        dev->held[key] = false;
-    }
-
+    bool held = key > KeyNone && key < BOX_KEY_COUNT && dev->held[key];
     if (key > KeyNone && key < BOX_KEY_COUNT && in->keys[key].down) {
         in->keys[key].down = false;
         in->keys[key].released = true;
+    }
+
+    if (held) {
+        dev->held[key] = false;
         box_input_emit_key(dev, in, key, false, false);
     }
 }
@@ -778,6 +786,10 @@ void BoxInputUpdate(
     box_input_capture_sync(world, dev, in);
     box_input_text_publish(dev, in);
     box_input_derive(in);
+    if (dev->claim) {
+        dev->claim(world, in, dev->claim_ctx);
+    }
+
     ecs_singleton_modified(world, Input);
     box_input_emit(world, dev);
 }

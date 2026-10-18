@@ -78,6 +78,16 @@ void box_input_router_set(
     }
 }
 
+void box_input_claim_set(
+    ecs_world_t *world,
+    box_input_claim_t claim,
+    void *ctx)
+{
+    InputDevice *dev = box_input_device(world);
+    dev->claim = claim;
+    dev->claim_ctx = claim ? ctx : NULL;
+}
+
 ecs_entity_t box_input_screen(
     ecs_world_t *world)
 {

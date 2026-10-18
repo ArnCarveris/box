@@ -418,6 +418,45 @@ done:
     return;
 }
 
+/** The key.repeat command: count repeats of a held key, one when omitted, dur frames apart.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The session, the key, the count and the spacing
+ * @param result Receives the output
+ */
+static void box_cmd_key_repeat(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_value_t *result)
+{
+    (void)argc;
+    int32_t count = box_cmd_input_i32(argv, 2);
+    int32_t frames = box_cmd_input_i32(argv, 3);
+    int32_t i;
+    Key key;
+    if (box_cmd_input_ready(ctx, result) ||
+        box_cmd_input_count(ctx, result, "count", count, BOX_COMMAND_STEPS_MAX) ||
+        box_cmd_input_frames(ctx, result, "dur", frames))
+    {
+        goto done;
+    }
+
+    key = box_cmd_input_key(ctx, result, box_cmd_input_str(argv, 1));
+    for (i = 0; key && i < (count > 0 ? count : 1); i ++) {
+        box_input_queue(ctx->world, &(InputEvent){
+            .kind = InputKeyDown,
+            .key = key,
+            .repeat = true,
+            .delay = frames > 0 ? frames : 1
+        });
+    }
+
+done:
+    return;
+}
+
 /** The key.type command: one key press per character, each held for dur frames.
  *
  * @param ctx The call context
@@ -907,6 +946,17 @@ static void box_cmd_input_keys(
         .brief = "Release a key",
         .params = {{ .name = "key", .type = ecs_id(ecs_string_t) }},
         .callback = box_cmd_key_down_up
+    });
+
+    box_command_register(world, &(box_command_desc_t){
+        .name = "key.repeat",
+        .brief = "Repeat a held key count times (default 1), dur frames apart (default 1)",
+        .params = {
+            { .name = "key", .type = ecs_id(ecs_string_t) },
+            { .name = "count", .type = ecs_id(ecs_i32_t), .optional = true },
+            { .name = "dur", .type = ecs_id(ecs_i32_t), .optional = true }
+        },
+        .callback = box_cmd_key_repeat
     });
 
     box_command_register(world, &(box_command_desc_t){

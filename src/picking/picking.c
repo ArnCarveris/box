@@ -311,6 +311,10 @@ static void box_pick_send(
     }
 
     box_pick_triggers(world, st, src, pick, pressed, released);
+    if (st->hook.pointer) {
+        st->hook.pointer(world, st, src, pick, pressed, released, st->hook.ctx);
+    }
+
     st->cursor[0] = src->screen_x;
     st->cursor[1] = src->screen_y;
     st->buttons = src->buttons;
@@ -441,11 +445,19 @@ void BoxPickingUpdate(
     int32_t i;
     box_pick_meshes_prune(world, st);
     box_pick_triggers_check(world, st);
+    if (st->hook.begin) {
+        st->hook.begin(world, st, st->hook.ctx);
+    }
+
     for (i = 0; i < ecs_vec_count(&st->emits); i ++) {
         box_input_emit_t emit = *ecs_vec_get_t(&st->emits, box_input_emit_t, i);
         box_pick_t pick;
         if (!emit.is_mouse) {
             ecs_script_keyboard_event(world, &emit.keyboard);
+            if (st->hook.key) {
+                st->hook.key(world, st, &emit, st->hook.ctx);
+            }
+
             continue;
         }
 
@@ -470,6 +482,19 @@ void BoxPickingUpdate(
     }
 
     box_input_cursor_shape(world, ecs_singleton_get(world, PickStatus)->shape);
+}
+
+void box_pick_hook_set(
+    ecs_world_t *world,
+    const box_pick_hook_t *hook)
+{
+    const PickingState *ps = ecs_singleton_get(world, PickingState);
+    if (ps && ps->state) {
+        ecs_os_zeromem(&ps->state->hook);
+        if (hook) {
+            ps->state->hook = *hook;
+        }
+    }
 }
 
 /** Suspend a task until the wheel moves over the entity of the argument.

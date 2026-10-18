@@ -126,6 +126,13 @@ void box_input_key(
     box_input_queue_key(world, down ? InputKeyDown : InputKeyUp, key, 0);
 }
 
+void box_input_key_repeat(
+    ecs_world_t *world,
+    Key key)
+{
+    box_input_queue(world, &(InputEvent){ .kind = InputKeyDown, .key = key, .repeat = true });
+}
+
 void box_input_key_press(
     ecs_world_t *world,
     Key key,

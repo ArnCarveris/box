@@ -35,6 +35,7 @@ void BoxImport(
     ECS_IMPORT(world, BoxProjection);
     ECS_IMPORT(world, BoxSpatial);
     ECS_IMPORT(world, BoxPicking);
+    ECS_IMPORT(world, BoxUi);
     ECS_IMPORT(world, BoxConsole);
     ECS_IMPORT(world, BoxAtmosphere);
     ECS_IMPORT(world, BoxParticle);

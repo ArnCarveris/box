@@ -86,8 +86,61 @@ typedef struct box_pick_hold_t {
     ecs_entity_t action; /**< The action it holds */
 } box_pick_hold_t;
 
+typedef struct box_pick_state_t box_pick_state_t;
+
+/** Follow the start of the events of a frame, before any of them is delivered.
+ *
+ * @param world The world
+ * @param st The module state
+ * @param ctx Context of the hook
+ */
+typedef void (*box_pick_begin_t)(
+    ecs_world_t *world,
+    box_pick_state_t *st,
+    void *ctx);
+
+/** Follow a keyboard event after it went out through flecs.script.event.
+ *
+ * @param world The world
+ * @param st The module state
+ * @param emit The keyboard event
+ * @param ctx Context of the hook
+ */
+typedef void (*box_pick_key_t)(
+    ecs_world_t *world,
+    box_pick_state_t *st,
+    const box_input_emit_t *emit,
+    void *ctx);
+
+/** Follow a pointer event after it was delivered along the path of its pick.
+ *
+ * @param world The world
+ * @param st The module state
+ * @param src The event
+ * @param pick The pick the event was delivered by
+ * @param pressed The buttons that went down with the event
+ * @param released The buttons that came up with the event
+ * @param ctx Context of the hook
+ */
+typedef void (*box_pick_pointer_t)(
+    ecs_world_t *world,
+    box_pick_state_t *st,
+    const EcsScriptMouseEvent *src,
+    const box_pick_t *pick,
+    uint32_t pressed,
+    uint32_t released,
+    void *ctx);
+
+/** Follows the events the router delivers, which box.ui installs for the keyboard focus */
+typedef struct box_pick_hook_t {
+    box_pick_begin_t begin;     /**< Called before the events of a frame, NULL for none */
+    box_pick_key_t key;         /**< Called after each keyboard event, NULL for none */
+    box_pick_pointer_t pointer; /**< Called after each pointer event, NULL for none */
+    void *ctx;                  /**< Passed to the callbacks */
+} box_pick_hook_t;
+
 /** Private state of the module, kept on the heap behind the PickingState singleton */
-typedef struct box_pick_state_t {
+struct box_pick_state_t {
     ecs_query_t *views;     /**< Entities with a View */
     ecs_query_t *surfaces;  /**< Entities with a Surface */
     ecs_vec_t emits;        /**< box_input_emit_t the router queued this frame */
@@ -104,7 +157,8 @@ typedef struct box_pick_state_t {
     bool has_cursor;        /**< A pointer event arrived, so the cursor is known */
     ecs_entity_t clicks[BOX_PICK_BUTTONS]; /**< Click trigger a press of a button went to */
     box_pick_hold_t holds[BOX_PICK_BUTTONS]; /**< Hold trigger of each button */
-} box_pick_state_t;
+    box_pick_hook_t hook;   /**< Follows the delivered events */
+};
 
 /** Singleton that owns the state of the module */
 typedef struct PickingState {
@@ -139,6 +193,43 @@ void box_pick_resolve(
     box_pick_state_t *st,
     const vec2 cursor,
     box_pick_t *out);
+
+/** Collect the views of the surface the window cursor is on (see box_pick_at), the last
+ * rendered first.
+ *
+ * @param world The world
+ * @param st The module state
+ * @param out Receives the views, BOX_PICK_VIEW_MAX entries
+ * @return Number of views
+ */
+int32_t box_pick_input_views(
+    ecs_world_t *world,
+    box_pick_state_t *st,
+    ecs_entity_t *out);
+
+/** Check whether one element is drawn after another in the hierarchy order of 2D drawing.
+ *
+ * Floating elements and their descendants draw after the others. Parents draw before their
+ * children, siblings by Position z, then OrderedChildren order or id.
+ *
+ * @param world The world
+ * @param a The first element
+ * @param b The second element
+ * @return Whether a is drawn after b
+ */
+bool box_pick_drawn_after(
+    const ecs_world_t *world,
+    ecs_entity_t a,
+    ecs_entity_t b);
+
+/** Install the hook that follows the delivered events, replacing the previous one.
+ *
+ * @param world The world
+ * @param hook The hook, NULL to remove it
+ */
+void box_pick_hook_set(
+    ecs_world_t *world,
+    const box_pick_hook_t *hook);
 
 /** Drop the triangle hierarchies of meshes no shape has used for a while.
  *

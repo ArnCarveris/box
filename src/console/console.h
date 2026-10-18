@@ -100,7 +100,6 @@ typedef struct box_console_t {
     ecs_entity_t surface;       /**< Surface the content fills, 0 while the world has none */
     float width;                /**< Surface width in points the content was laid out for */
     float height;               /**< Surface height in points the content was laid out for */
-    ecs_query_t *bindings;      /**< Entities with a Binding */
     ecs_query_t *surfaces;      /**< Entities with a Surface */
     ecs_query_t *views;         /**< Entities with a View */
 } box_console_t;

@@ -6,6 +6,7 @@
 
 #define BOX_CONSOLE_IMPL
 #include "console.h"
+#include "../input/input.h"
 #include <string.h>
 
 ECS_COMPONENT_DECLARE(ConsoleHost);
@@ -77,58 +78,6 @@ static box_console_t* box_console_get(
     return host ? host->con : NULL;
 }
 
-/** Get the action a binding drives.
- *
- * @param world The world
- * @param e The binding entity
- * @param binding The binding
- * @return The action, 0 when there is none
- */
-static ecs_entity_t box_console_binding_action(
-    ecs_world_t *world,
-    ecs_entity_t e,
-    const Binding *binding)
-{
-    ecs_entity_t result = binding->action;
-    if (!result) {
-        result = ecs_has(world, e, Action) ? e : ecs_get_parent(world, e);
-    }
-
-    return result;
-}
-
-/** Mark the keys and modifiers of the bindings of the toggle action, which an open console
- * leaves to the actions.
- *
- * @param world The world
- * @param con The console state
- * @param keep Set to true for every key the toggle uses
- */
-static void box_console_toggle_keys(
-    ecs_world_t *world,
-    box_console_t *con,
-    bool *keep)
-{
-    ecs_iter_t it = ecs_query_iter(world, con->bindings);
-    int32_t i;
-    while (ecs_query_next(&it)) {
-        const Binding *b = ecs_field(&it, Binding, 0);
-        for (i = 0; i < it.count; i ++) {
-            if (box_console_binding_action(world, it.entities[i], &b[i]) != con->action ||
-                b[i].key <= KeyNone || b[i].key >= BOX_KEY_COUNT)
-            {
-                continue;
-            }
-
-            keep[b[i].key] = true;
-            keep[KeyCtrlLeft] = keep[KeyCtrlRight] = keep[KeyCtrlLeft] || b[i].ctrl;
-            keep[KeyShiftLeft] = keep[KeyShiftRight] = keep[KeyShiftLeft] || b[i].shift;
-            keep[KeyAltLeft] = keep[KeyAltRight] = keep[KeyAltLeft] || b[i].alt;
-            keep[KeySuperLeft] = keep[KeySuperRight] = keep[KeySuperLeft] || b[i].meta;
-        }
-    }
-}
-
 /** Input was written: while the console is open, take the typed and pasted text, the key presses
  * and the wheel, and release every key and button but those of the toggle so no other action
  * fires.
@@ -146,7 +95,7 @@ static void box_console_capture(
         goto done;
     }
 
-    box_console_toggle_keys(it->world, con, keep);
+    box_input_action_keys(it->world, con->action, keep);
     con->clear = con->clear || (in->keys[KeyL].pressed &&
         (in->keys[KeyCtrlLeft].down || in->keys[KeyCtrlRight].down));
     for (i = KeyNone + 1; i < BOX_KEY_COUNT; i ++) {
@@ -512,10 +461,6 @@ void BoxConsoleImport(
     box_console_action(world, con);
     ecs_singleton_add(world, Console);
 
-    con->bindings = ecs_query(world, {
-        .terms = {{ .id = ecs_id(Binding), .inout = EcsIn }},
-        .cache_kind = EcsQueryCacheAuto
-    });
     con->surfaces = ecs_query(world, {
         .terms = {{ .id = ecs_id(Surface), .inout = EcsIn }},
         .cache_kind = EcsQueryCacheAuto

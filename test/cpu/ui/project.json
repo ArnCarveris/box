@@ -234,6 +234,55 @@
                     "keeps_z",
                     "script"
                 ]
+            },
+            {
+                "id": "Focus",
+                "testcases": [
+                    "tags_and_status",
+                    "click_focuses",
+                    "any_button_focuses",
+                    "click_empty_clears",
+                    "click_non_focusable_clears",
+                    "disable_clears",
+                    "delete_clears",
+                    "remove_focusable_clears",
+                    "tab_walks_draw_order",
+                    "shift_tab_walks_back",
+                    "tab_ordered_children",
+                    "tab_skips_disabled",
+                    "tab_stays_in_nearest_scope",
+                    "tab_without_scope_reaches_binding",
+                    "tab_with_scope_kept_from_binding",
+                    "keyboard_focus_keeps_nav_keys",
+                    "pointer_focus_lets_keys_through",
+                    "key_capture_keeps_keys",
+                    "key_capture_on_ancestor",
+                    "key_capture_added_reactively",
+                    "api_from_c",
+                    "api_from_script",
+                    "prefab_never_focused",
+                    "key_repeat_state",
+                    "tab_first_scope_of_front_view"
+                ]
+            },
+            {
+                "id": "UiEvents",
+                "testcases": [
+                    "focus_blur_bubble",
+                    "key_reports_key_and_modifiers",
+                    "key_nothing_when_not_focused",
+                    "key_repeats",
+                    "activate_click",
+                    "activate_not_released_elsewhere",
+                    "activate_enter",
+                    "activate_space_on_release",
+                    "key_capture_no_activate",
+                    "enter_taps_trigger",
+                    "space_holds_trigger",
+                    "change_on_widget_and_ancestor",
+                    "submit_on_widget_and_ancestor",
+                    "change_once_per_report"
+                ]
             }
         ]
     }

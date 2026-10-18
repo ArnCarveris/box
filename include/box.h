@@ -31,6 +31,7 @@
 #include "box/projection.h"
 #include "box/spatial.h"
 #include "box/picking.h"
+#include "box/ui.h"
 #include "box/console.h"
 #include "box/atmosphere.h"
 #include "box/particle.h"

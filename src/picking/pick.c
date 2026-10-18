@@ -685,17 +685,7 @@ static bool box_pick_floating(
     return result;
 }
 
-/** Check whether one element is drawn after another in the hierarchy order of 2D drawing.
- *
- * Floating elements and their descendants draw after the others. Parents draw before their
- * children, siblings by Position z, then OrderedChildren order or id.
- *
- * @param world The world
- * @param a The first element
- * @param b The second element
- * @return Whether a is drawn after b
- */
-static bool box_pick_drawn_after(
+bool box_pick_drawn_after(
     const ecs_world_t *world,
     ecs_entity_t a,
     ecs_entity_t b)
@@ -1262,6 +1252,17 @@ void box_pick_at(
     ecs_os_zeromem(out);
     box_pick_input_surface(world, st, &s);
     box_pick_surface(world, st, &s, cursor, 0, out);
+}
+
+int32_t box_pick_input_views(
+    ecs_world_t *world,
+    box_pick_state_t *st,
+    ecs_entity_t *out)
+{
+    box_pick_surface_t s;
+    box_pick_input_surface(world, st, &s);
+
+    return box_pick_views(world, st, &s, out);
 }
 
 /** Find where the ray of a cursor meets the plane of an entity.
