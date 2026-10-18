@@ -95,7 +95,8 @@ static bool box_pick_blocks(
     return result;
 }
 
-/** Collect the entities an event goes to: the target up to its handler, else the screen.
+/** Collect the entities an event goes to: the target up to its handler, else the screen. The
+ * walk ends at an entity that is no longer alive, which a script of the event may have deleted.
  *
  * @param world The world
  * @param st The module state
@@ -115,7 +116,7 @@ static int32_t box_pick_chain(
         chain[count ++] = st->screen;
     }
 
-    while (e && count < BOX_PICK_CHAIN_MAX) {
+    while (e && ecs_is_alive(world, e) && count < BOX_PICK_CHAIN_MAX) {
         chain[count ++] = e;
         e = e == pick->handler ? 0 : ecs_get_parent(world, e);
     }

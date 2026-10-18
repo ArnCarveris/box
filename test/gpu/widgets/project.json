@@ -59,6 +59,42 @@
                     "light_theme",
                     "capture_selection"
                 ]
+            },
+            {
+                "id": "Containers",
+                "testcases": [
+                    "scene_loads",
+                    "dropdown_click_opens",
+                    "dropdown_keys_open",
+                    "dropdown_click_selects",
+                    "dropdown_hover_highlights",
+                    "dropdown_keys_select",
+                    "dropdown_escape_keeps",
+                    "dropdown_press_outside_closes",
+                    "dropdown_list_covers_below",
+                    "dropdown_opens_upward",
+                    "dropdown_space_binding",
+                    "tabs_click",
+                    "tabs_arrows",
+                    "tabs_one_tab_stop",
+                    "tabs_hidden_page",
+                    "scroll_wheel",
+                    "scroll_wheel_clamps",
+                    "scroll_thumb_drag",
+                    "scroll_track_pages",
+                    "scroll_keys",
+                    "scroll_clips_picking",
+                    "scroll_nested",
+                    "list_click_selects",
+                    "list_keys",
+                    "list_keeps_selection_in_view",
+                    "list_change_once",
+                    "list_200_items",
+                    "collapsible_click",
+                    "collapsible_keys",
+                    "collapsible_hides_content",
+                    "collapsible_content_activation"
+                ]
             }
         ]
     }

@@ -14,20 +14,24 @@
 static const char *widgets_templates[] = {
     "Label", "Panel", "Separator", "HeadlessButton", "Button", "HeadlessToggle", "Checkbox",
     "Switch", "RadioGroup", "HeadlessRadioButton", "RadioButton", "HeadlessSlider", "Slider",
-    "ProgressBar", "HeadlessStepper", "Stepper", "HeadlessTextInput", "TextInput"
+    "ProgressBar", "HeadlessStepper", "Stepper", "HeadlessTextInput", "TextInput", "Chevron", "HeadlessDropdown", "Dropdown",
+    "HeadlessScrollView", "ScrollBar", "ScrollView", "HeadlessListView", "ListView",
+    "HeadlessTabHeader", "TabHeader", "TabView", "HeadlessTab", "Tab", "HeadlessCollapsible",
+    "Collapsible"
 };
 
 /** Number of templates of the widget library */
-#define WIDGETS_TEMPLATES (18)
+#define WIDGETS_TEMPLATES (33)
 
 /** Templates of the library with a mut */
 static const char *widgets_muts[] = {
     "Button.mut", "Checkbox.mut", "Switch.mut", "RadioGroup.mut", "RadioButton.mut",
-    "Slider.mut", "ProgressBar.mut", "Stepper.mut", "TextInput.mut"
+    "Slider.mut", "ProgressBar.mut", "Stepper.mut", "TextInput.mut", "Dropdown.mut", "ScrollView.mut",
+    "ListView.mut", "TabView.mut", "Tab.mut", "Collapsible.mut"
 };
 
 /** Number of templates of the library with a mut */
-#define WIDGETS_MUTS (9)
+#define WIDGETS_MUTS (15)
 
 /** Get the warnings and errors the log capture of a world kept.
  *
@@ -98,7 +102,7 @@ void Widgets_library_loads(void) {
         }
     }
 
-    test_int(scripts, 10);
+    test_int(scripts, 14);
 
     char *logs = widgets_warnings(world);
     test_str(logs, "");
@@ -146,6 +150,14 @@ void Widgets_templates_exist(void) {
     test_bool(widgets_has_member(world, "box.widgets.Stepper.mut", "current"), true);
     test_bool(widgets_has_member(world, "box.widgets.TextInput", "value"), true);
     test_bool(widgets_has_member(world, "box.widgets.TextInput.mut", "current"), true);
+    test_bool(widgets_has_member(world, "box.widgets.Dropdown", "value"), true);
+    test_bool(widgets_has_member(world, "box.widgets.ListView", "value"), true);
+    test_bool(widgets_has_member(world, "box.widgets.TabView", "value"), true);
+    test_bool(widgets_has_member(world, "box.widgets.Collapsible", "value"), true);
+    test_bool(widgets_has_member(world, "box.widgets.Dropdown.mut", "current"), true);
+    test_bool(widgets_has_member(world, "box.widgets.ListView.mut", "current"), true);
+    test_bool(widgets_has_member(world, "box.widgets.TabView.mut", "current"), true);
+    test_bool(widgets_has_member(world, "box.widgets.Collapsible.mut", "current"), true);
 
     ecs_entity_t dark = ecs_lookup(world, "box.widgets.DarkTheme");
     ecs_entity_t light = ecs_lookup(world, "box.widgets.LightTheme");

@@ -71,7 +71,7 @@ static void basics_tab_to(
 {
     int32_t i;
     bool found = false;
-    for (i = 0; i < 20 && !found; i ++) {
+    for (i = 0; i < 60 && !found; i ++) {
         gallery_key(world, s, "Tab");
         char *focused = gallery_focused(world, s);
         found = !strcmp(focused, path);
@@ -710,7 +710,7 @@ void Basics_tab_order(void) {
         BASICS ".toggles.music", BASICS ".toggles.wifi", BASICS ".radios.size.medium",
         BASICS ".sliders.volume", BASICS ".sliders.gain", BASICS ".steppers.count",
         TEXT ".name.field", TEXT ".secret.field", TEXT ".fixed.field",
-        TEXT ".submit.message.field", BASICS ".buttons.save"
+        TEXT ".submit.message.field", CONTAINERS ".tabs.bar.tab_0"
     };
     int32_t i;
 

@@ -402,12 +402,52 @@ static int box_layout_compare_created(
     return (ia > ib) - (ia < ib);
 }
 
-/** Put the children a parent had when it got OrderedChildren in the order they were created.
+/** Check whether a list of entities holds an entity.
  *
- * flecs lists the children a parent had before it got the trait table by table, so the children
- * of a template instance whose body adds the Layout, created by the scene before the body ran,
- * would otherwise be placed in an order that depends on their components. Children added after
- * the trait are already listed in the order they were added and keep it, after the earlier ones.
+ * @param list The entities
+ * @param count Number of entities
+ * @param e The entity
+ * @return Whether the list holds it
+ */
+static bool box_layout_has_entity(
+    const ecs_entity_t *list,
+    int32_t count,
+    ecs_entity_t e)
+{
+    int32_t i;
+    bool result = false;
+    for (i = 0; i < count && !result; i ++) {
+        result = list[i] == e;
+    }
+
+    return result;
+}
+
+/** Check whether a child of a template instance was created by the body of a template of the
+ * instance, rather than declared in the scope of the instance.
+ *
+ * @param world The world
+ * @param parent The parent
+ * @param child The child
+ * @return Whether a template the parent instantiates created the child
+ */
+static bool box_layout_template_child(
+    const ecs_world_t *world,
+    ecs_entity_t parent,
+    ecs_entity_t child)
+{
+    ecs_entity_t tmpl = ecs_is_alive(world, child) ?
+        ecs_get_target(world, child, EcsScriptTemplate, 0) : 0;
+
+    return tmpl && ecs_has_id(world, parent, tmpl);
+}
+
+/** Put the children of a parent that got OrderedChildren in the order they were declared: those
+ * a template body of the parent created, which runs after the scope of the instance, first; each
+ * group the children it had when it got the trait by creation, then those added since.
+ *
+ * flecs lists the children a parent had before the trait table by table, in an order that
+ * depends on their components.
  *
  * The queue holds, per parent, the parent, the number of children and the children.
  *
@@ -432,35 +472,32 @@ static void box_layout_order(
         if (ecs_is_alive(world, parent) && ecs_has_id(world, parent, EcsOrderedChildren)) {
             children = ecs_get_ordered_children(world, parent);
         }
-        if (children.count < 2 || n < 2) {
+
+        if (children.count < 2) {
             continue;
         }
 
-        /* Early children still in the list, by creation, then the others in listed order */
         qsort(early, (size_t)n, sizeof(ecs_entity_t), box_layout_compare_created);
         ecs_vec_set_count_t(NULL, &sorted, ecs_entity_t, children.count);
         ecs_entity_t *out = ecs_vec_first_t(&sorted, ecs_entity_t);
-        int32_t o = 0;
-        for (c = 0; c < n; c ++) {
-            int32_t j;
-            for (j = 0; j < children.count; j ++) {
-                if (children.ids[j] == early[c]) {
+        int32_t o = 0, pass;
+        for (pass = 0; pass < 2; pass ++) {
+            bool own = pass == 0;
+            for (c = 0; c < n; c ++) {
+                if (box_layout_has_entity(children.ids, children.count, early[c]) &&
+                    box_layout_template_child(world, parent, early[c]) == own)
+                {
                     out[o ++] = early[c];
-                    break;
                 }
             }
-        }
-        for (c = 0; c < children.count; c ++) {
-            int32_t j;
-            bool is_early = false;
-            for (j = 0; j < n; j ++) {
-                if (early[j] == children.ids[c]) {
-                    is_early = true;
-                    break;
+
+            for (c = 0; c < children.count; c ++) {
+                ecs_entity_t child = children.ids[c];
+                if (!box_layout_has_entity(early, n, child) &&
+                    box_layout_template_child(world, parent, child) == own)
+                {
+                    out[o ++] = child;
                 }
-            }
-            if (!is_early) {
-                out[o ++] = children.ids[c];
             }
         }
 

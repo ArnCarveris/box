@@ -1107,8 +1107,8 @@ float box_render_clip_area(
     float half[2]);
 
 /** Check whether a world position is inside the clip areas of the ClipChildren ancestors of an
- * entity, in the local XY plane of each, as the 2D shader clips it. The ancestors of a floating
- * element (LayoutFloat) do not clip it.
+ * entity, in the local XY plane of each, as the 2D shader clips it. A clip with an empty area
+ * contains no position. The ancestors of a floating element (LayoutFloat) do not clip it.
  *
  * @param world The world
  * @param e The entity, whose own ClipChildren does not clip it
@@ -1119,6 +1119,19 @@ bool box_render_clip_contains(
     const ecs_world_t *world,
     ecs_entity_t e,
     const float point[3]);
+
+/** Check whether the ClipChildren ancestors of an entity clip all of it away: its bounds (its
+ * LayoutBounds, else its Rect, else its origin) have no part of positive size inside the area of
+ * one of them. A clip with an empty area hides everything below it. The ancestors of a floating
+ * element (LayoutFloat) do not clip it.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return Whether no part of it is drawn
+ */
+bool box_render_clip_hides(
+    const ecs_world_t *world,
+    ecs_entity_t e);
 
 /** Set the instances one batch holds before its shapes continue in another, for tests.
  *

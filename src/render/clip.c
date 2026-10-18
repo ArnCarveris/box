@@ -140,7 +140,71 @@ bool box_render_clip_contains(
     {
         if (ecs_has_id(world, cur, ClipChildren)) {
             box_draws_clip_record(world, cur, 0, &clip);
-            result = box_draws_clip_distance(&clip, point) <= 0;
+            result = clip.area[0] > 0 && clip.area[1] > 0 &&
+                box_draws_clip_distance(&clip, point) <= 0;
+            clips ++;
+        }
+
+        depth ++;
+    }
+
+    return result;
+}
+
+/** Check whether the bounds of an entity, as corners in world space, miss the area of a clip:
+ * their box in the local plane of the clip has no overlap of positive size with the area.
+ *
+ * @param c The record of the clip
+ * @param corners The four corners of the bounds in world space
+ * @return Whether the clip hides all of the bounds
+ */
+static bool box_draws_clip_misses(
+    const box_render_clip_t *c,
+    const vec3 corners[4])
+{
+    float lo[2] = { INFINITY, INFINITY }, hi[2] = { -INFINITY, -INFINITY };
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        const float *p = corners[i];
+        float x = c->x[0] * p[0] + c->x[1] * p[1] + c->x[2] * p[2] + c->x[3];
+        float y = c->y[0] * p[0] + c->y[1] * p[1] + c->y[2] * p[2] + c->y[3];
+        lo[0] = glm_min(lo[0], x);
+        lo[1] = glm_min(lo[1], y);
+        hi[0] = glm_max(hi[0], x);
+        hi[1] = glm_max(hi[1], y);
+    }
+
+    return c->area[0] <= 0 || c->area[1] <= 0 || lo[0] >= c->area[0] ||
+        hi[0] <= -c->area[0] || lo[1] >= c->area[1] || hi[1] <= -c->area[1];
+}
+
+bool box_render_clip_hides(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    const WorldTransform *t = ecs_get(world, e, WorldTransform);
+    box_render_clip_t clip;
+    vec3 corners[4];
+    float half[2];
+    ecs_entity_t cur = box_draws_clip_up(world, e);
+    int32_t i, depth = 0, clips = 0;
+    bool result = false;
+    box_render_clip_area(world, e, half);
+    for (i = 0; i < 4; i ++) {
+        vec3 local = { (i & 1) ? half[0] : -half[0], (i & 2) ? half[1] : -half[1], 0 };
+        if (t) {
+            glm_mat4_mulv3(ECS_CONST_CAST(vec4*, t->m), local, 1.0f, corners[i]);
+        } else {
+            glm_vec3_copy(local, corners[i]);
+        }
+    }
+
+    for (; cur && !result && depth < BOX_DRAWS_CLIP_WALK && clips < BOX_RENDER_CLIP_DEPTH;
+        cur = box_draws_clip_up(world, cur))
+    {
+        if (ecs_has_id(world, cur, ClipChildren)) {
+            box_draws_clip_record(world, cur, 0, &clip);
+            result = box_draws_clip_misses(&clip, ECS_CONST_CAST(const vec3*, corners));
             clips ++;
         }
 

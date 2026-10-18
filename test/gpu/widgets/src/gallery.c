@@ -191,6 +191,55 @@ double gallery_number(
     return result;
 }
 
+void gallery_tab_to(
+    ecs_world_t *world,
+    ecs_entity_t session,
+    const char *path)
+{
+    int32_t i;
+    bool found = false;
+    for (i = 0; i < 40 && !found; i ++) {
+        gallery_key(world, session, "Tab");
+        char *focused = gallery_focused(world, session);
+        found = !strcmp(focused, path);
+        ecs_os_free(focused);
+    }
+
+    if (!found) {
+        printf("Tab never reached '%s'\n", path);
+    }
+
+    test_assert(found);
+}
+
+void gallery_expect_focus(
+    ecs_world_t *world,
+    ecs_entity_t session,
+    const char *path)
+{
+    char *focused = gallery_focused(world, session);
+    test_str(focused, path);
+    ecs_os_free(focused);
+}
+
+double gallery_value(
+    ecs_world_t *world,
+    ecs_entity_t session,
+    const char *fmt,
+    ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    char *line = flecs_vasprintf(fmt, args);
+    va_end(args);
+    char *out = gallery_run(world, session, "%s", line);
+    double result = strtod(out, NULL);
+    ecs_os_free(out);
+    ecs_os_free(line);
+
+    return result;
+}
+
 int32_t gallery_changes(
     ecs_world_t *world,
     ecs_entity_t session)

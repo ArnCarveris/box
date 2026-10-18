@@ -180,7 +180,8 @@ fn glyph_coverage(uv: vec2f, range: vec2f) -> f32 {
 // Coverage of a fragment by the clips of its instance, the product over the chain of nested
 // clips. The distance to each rounded area is scaled to pixels by the footprint of the fragment
 // in the plane of the clip along the gradient of the distance, so the clip edge is anti-aliased
-// like the edge of a shape. The derivatives come in from uniform control flow.
+// like the edge of a shape; an empty area covers nothing. The derivatives come in from uniform
+// control flow.
 fn clip_coverage(first: u32, world: vec3f, world_dx: vec3f, world_dy: vec3f) -> f32 {
     var cover = 1.0;
     var index = first;
@@ -198,7 +199,7 @@ fn clip_coverage(first: u32, world: vec3f, world_dx: vec3f, world_dy: vec3f) -> 
         let toward = select(side, normalize(max(q, vec2f(1e-20))), corner);
         let g = toward * select(vec2f(1.0), vec2f(-1.0), p < vec2f(0.0));
         let px = length(vec2f(dot(g, dx), dot(g, dy)));
-        cover *= coverage(d, px);
+        cover *= select(coverage(d, px), 0.0, min(c.area.x, c.area.y) <= 0.0);
         index = u32(max(c.area.w, 0.0) + 0.5);
     }
 

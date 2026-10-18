@@ -14,6 +14,9 @@
 /** Path of the Text panel of the gallery */
 #define TEXT "gallery.hud.root.sections.text"
 
+/** Path of the Containers panel of the gallery */
+#define CONTAINERS "gallery.hud.root.sections.containers"
+
 /** Load the gallery scene into a new headless world and open a terminal session.
  *
  * @param session Receives the session
@@ -162,6 +165,42 @@ double gallery_number(
     const char *path,
     const char *tmpl,
     const char *member);
+
+/** Tab until an entity has the focus, at most 40 times.
+ *
+ * @param world The world
+ * @param session The terminal session
+ * @param path Path of the entity
+ */
+void gallery_tab_to(
+    ecs_world_t *world,
+    ecs_entity_t session,
+    const char *path);
+
+/** Check the entity with the keyboard focus.
+ *
+ * @param world The world
+ * @param session The terminal session
+ * @param path Its path, "#0" for none
+ */
+void gallery_expect_focus(
+    ecs_world_t *world,
+    ecs_entity_t session,
+    const char *path);
+
+/** Run a command line that must succeed and read its output as a number.
+ *
+ * @param world The world
+ * @param session The terminal session
+ * @param fmt Format of the command line
+ * @param ... Arguments of the format
+ * @return The number the command printed
+ */
+double gallery_value(
+    ecs_world_t *world,
+    ecs_entity_t session,
+    const char *fmt,
+    ...);
 
 /** Get the number of changes the status line of the gallery counted.
  *

@@ -166,6 +166,9 @@ static void box_ui_order_insert(
  * @param query The query
  * @param scope The scope, 0 for every entity of the query
  * @param scene Keep only entities of this scene, when scope is 0
+ * @param shown Leave out the entities a ClipChildren ancestor clips away entirely, such as the
+ * content of a collapsed section or of a hidden tab page, but keep the focused one
+ * @param focused The entity with the focus, 0 for none
  * @param list Receives the entities
  * @return Number of entities
  */
@@ -174,6 +177,8 @@ static int32_t box_ui_collect(
     ecs_query_t *query,
     ecs_entity_t scope,
     ecs_entity_t scene,
+    bool shown,
+    ecs_entity_t focused,
     ecs_vec_t *list)
 {
     ecs_iter_t it = ecs_query_iter(world, query);
@@ -184,6 +189,10 @@ static int32_t box_ui_collect(
             ecs_entity_t e = it.entities[i];
             bool keep = scope ? box_ui_below(world, e, scope) :
                 box_render_scene_of(world, e) == scene;
+            if (keep && shown && e != focused) {
+                keep = !box_render_clip_hides(world, e);
+            }
+
             if (keep) {
                 box_ui_order_insert(world, list, e);
             }
@@ -207,7 +216,8 @@ static ecs_entity_t box_ui_step_in(
     ecs_entity_t scope,
     bool back)
 {
-    int32_t i, at = -1, count = box_ui_collect(world, st->focusables, scope, 0, &st->order);
+    int32_t i, at = -1, count = box_ui_collect(
+        world, st->focusables, scope, 0, true, st->focused, &st->order);
     const ecs_entity_t *items = ecs_vec_first_t(&st->order, ecs_entity_t);
     ecs_entity_t result = 0;
     for (i = 0; i < count && at < 0; i ++) {
@@ -251,7 +261,7 @@ static ecs_entity_t box_ui_step_first(
         }
 
         int32_t n = box_ui_collect(
-            world, st->scopes, 0, box_render_scene_of(world, camera), &scopes);
+            world, st->scopes, 0, box_render_scene_of(world, camera), false, 0, &scopes);
         for (s = 0; s < n && !result; s ++) {
             result = box_ui_step_in(world, st, ecs_vec_get_t(&scopes, ecs_entity_t, s)[0], back);
         }

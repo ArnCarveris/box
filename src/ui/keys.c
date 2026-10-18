@@ -284,6 +284,7 @@ done:
 }
 
 /** Find the first Focusable entity on the bubbling path of a pick, from its target to its handler.
+ * The path ends at an entity that the scripts of the press deleted.
  *
  * @param world The world
  * @param pick The pick
@@ -295,7 +296,7 @@ static ecs_entity_t box_ui_press_focus(
 {
     ecs_entity_t e = pick->target, result = 0;
     int32_t depth = 0;
-    while (e && !result && depth < BOX_UI_DEPTH_MAX) {
+    while (e && ecs_is_alive(world, e) && !result && depth < BOX_UI_DEPTH_MAX) {
         result = box_ui_can_focus(world, e) ? e : 0;
         e = e == pick->handler ? 0 : ecs_get_parent(world, e);
         depth ++;
@@ -318,7 +319,7 @@ static bool box_ui_is_up(
 {
     int32_t depth = 0;
     bool result = false;
-    while (e && !result && depth < BOX_UI_DEPTH_MAX) {
+    while (e && ecs_is_alive(world, e) && !result && depth < BOX_UI_DEPTH_MAX) {
         result = e == ancestor;
         e = ecs_get_parent(world, e);
         depth ++;

@@ -1,6 +1,7 @@
 // Widget gallery: the widgets of box.widgets in a screen space UI, each in its normal and
 // disabled state. Tab moves the focus through them, the status line shows the last change.
-// The Basics and Text sections are filled; the room right of them is for the containers.
+// The Basics and Text sections hold the simple widgets and the text fields, the Containers
+// section right of them the dropdowns, tabs, scroll views, the list view and the collapsibles.
 
 using flecs.script
 using box.transform
@@ -25,6 +26,50 @@ actions {
     Action: {description: "Ping from the gallery"}
   }
 }
+
+// The 200 entries of the list view of the Containers section
+const files = [
+  "scene_001.flecs", "texture_002.png", "mesh_003.glb", "shader_004.wgsl", "sound_005.ogg",
+  "font_006.ttf", "script_007.flecs", "prefab_008.flecs", "scene_009.flecs", "texture_010.png",
+  "mesh_011.glb", "shader_012.wgsl", "sound_013.ogg", "font_014.ttf", "script_015.flecs",
+  "prefab_016.flecs", "scene_017.flecs", "texture_018.png", "mesh_019.glb", "shader_020.wgsl",
+  "sound_021.ogg", "font_022.ttf", "script_023.flecs", "prefab_024.flecs", "scene_025.flecs",
+  "texture_026.png", "mesh_027.glb", "shader_028.wgsl", "sound_029.ogg", "font_030.ttf",
+  "script_031.flecs", "prefab_032.flecs", "scene_033.flecs", "texture_034.png", "mesh_035.glb",
+  "shader_036.wgsl", "sound_037.ogg", "font_038.ttf", "script_039.flecs", "prefab_040.flecs",
+  "scene_041.flecs", "texture_042.png", "mesh_043.glb", "shader_044.wgsl", "sound_045.ogg",
+  "font_046.ttf", "script_047.flecs", "prefab_048.flecs", "scene_049.flecs", "texture_050.png",
+  "mesh_051.glb", "shader_052.wgsl", "sound_053.ogg", "font_054.ttf", "script_055.flecs",
+  "prefab_056.flecs", "scene_057.flecs", "texture_058.png", "mesh_059.glb", "shader_060.wgsl",
+  "sound_061.ogg", "font_062.ttf", "script_063.flecs", "prefab_064.flecs", "scene_065.flecs",
+  "texture_066.png", "mesh_067.glb", "shader_068.wgsl", "sound_069.ogg", "font_070.ttf",
+  "script_071.flecs", "prefab_072.flecs", "scene_073.flecs", "texture_074.png", "mesh_075.glb",
+  "shader_076.wgsl", "sound_077.ogg", "font_078.ttf", "script_079.flecs", "prefab_080.flecs",
+  "scene_081.flecs", "texture_082.png", "mesh_083.glb", "shader_084.wgsl", "sound_085.ogg",
+  "font_086.ttf", "script_087.flecs", "prefab_088.flecs", "scene_089.flecs", "texture_090.png",
+  "mesh_091.glb", "shader_092.wgsl", "sound_093.ogg", "font_094.ttf", "script_095.flecs",
+  "prefab_096.flecs", "scene_097.flecs", "texture_098.png", "mesh_099.glb", "shader_100.wgsl",
+  "sound_101.ogg", "font_102.ttf", "script_103.flecs", "prefab_104.flecs", "scene_105.flecs",
+  "texture_106.png", "mesh_107.glb", "shader_108.wgsl", "sound_109.ogg", "font_110.ttf",
+  "script_111.flecs", "prefab_112.flecs", "scene_113.flecs", "texture_114.png", "mesh_115.glb",
+  "shader_116.wgsl", "sound_117.ogg", "font_118.ttf", "script_119.flecs", "prefab_120.flecs",
+  "scene_121.flecs", "texture_122.png", "mesh_123.glb", "shader_124.wgsl", "sound_125.ogg",
+  "font_126.ttf", "script_127.flecs", "prefab_128.flecs", "scene_129.flecs", "texture_130.png",
+  "mesh_131.glb", "shader_132.wgsl", "sound_133.ogg", "font_134.ttf", "script_135.flecs",
+  "prefab_136.flecs", "scene_137.flecs", "texture_138.png", "mesh_139.glb", "shader_140.wgsl",
+  "sound_141.ogg", "font_142.ttf", "script_143.flecs", "prefab_144.flecs", "scene_145.flecs",
+  "texture_146.png", "mesh_147.glb", "shader_148.wgsl", "sound_149.ogg", "font_150.ttf",
+  "script_151.flecs", "prefab_152.flecs", "scene_153.flecs", "texture_154.png", "mesh_155.glb",
+  "shader_156.wgsl", "sound_157.ogg", "font_158.ttf", "script_159.flecs", "prefab_160.flecs",
+  "scene_161.flecs", "texture_162.png", "mesh_163.glb", "shader_164.wgsl", "sound_165.ogg",
+  "font_166.ttf", "script_167.flecs", "prefab_168.flecs", "scene_169.flecs", "texture_170.png",
+  "mesh_171.glb", "shader_172.wgsl", "sound_173.ogg", "font_174.ttf", "script_175.flecs",
+  "prefab_176.flecs", "scene_177.flecs", "texture_178.png", "mesh_179.glb", "shader_180.wgsl",
+  "sound_181.ogg", "font_182.ttf", "script_183.flecs", "prefab_184.flecs", "scene_185.flecs",
+  "texture_186.png", "mesh_187.glb", "shader_188.wgsl", "sound_189.ogg", "font_190.ttf",
+  "script_191.flecs", "prefab_192.flecs", "scene_193.flecs", "texture_194.png", "mesh_195.glb",
+  "shader_196.wgsl", "sound_197.ogg", "font_198.ttf", "script_199.flecs", "prefab_200.flecs"
+]
 
 // An empty scene whose view paints the background of the theme behind the UI
 backdrop {
@@ -95,6 +140,14 @@ template Gallery {
               last = "{w.name()}: {w[RadioGroup.mut].current}"
             } else if w.has(TextInput) && !w[TextInput].password {
               last = "{w.name()}: {w[TextInput.mut].current}"
+            } else if w.has(Dropdown) {
+              last = "{w.name()}: {w[Dropdown.mut].current}"
+            } else if w.has(TabView) {
+              last = "{w.name()}: {w[TabView.mut].current}"
+            } else if w.has(ListView) {
+              last = "{w.name()}: {w[ListView.mut].current}"
+            } else if w.has(Collapsible) {
+              last = "{w.name()}: {w[Collapsible.mut].current}"
             } else {
               last = "{w.name()}"
             }
@@ -206,6 +259,64 @@ template Gallery {
 
             TextInput message(label: "Message", placeholder: "Type and press Enter", width: 248)
             Label echo(text: "Submitted: {submitted}", variant: "muted")
+          }
+        }
+
+        Panel containers(title: "Containers", width: 600) {
+          TabView tabs(width: 576, height: 100) {
+            Tab general(label: "General") {
+              toggles {
+                Layout: {direction: Row, spacing: 16, v: Middle}
+                Checkbox notify(label: "Notifications", value: true)
+                Switch sync(label: "Sync")
+              }
+              Button apply(label: "Apply")
+            }
+
+            Tab audio(label: "Audio") {
+              Slider level(label: "Level", width: 200, value: 60, unit: "%")
+              Stepper channels(min: 1, max: 8, value: 2)
+            }
+
+            Tab display(label: "Display") {
+              RadioGroup mode(value: "Window") {
+                RadioButton window(label: "Window")
+                RadioButton full(label: "Fullscreen")
+              }
+            }
+          }
+
+          ScrollView notes(height: 280) {
+            Label intro(width: 540, text: "A scroll view clips its content and moves it with the wheel, its scroll bar and, while it has the focus, the arrow keys, PageUp, PageDown, Home and End. This paragraph is long enough to show the wrapping of a label inside the view. The list view below is a scroll view of its own: the wheel over it scrolls the list, elsewhere it scrolls this view. The dropdown under the list opens a list that floats over the edge of the view.")
+
+            ListView files(items: files, value: 0, height: 120)
+
+            picker {
+              Layout: {direction: Row, spacing: 8, v: Middle}
+              Label picker_label(text: "Format")
+              Dropdown format(options: ["PNG", "JPEG", "WebP", "AVIF", "TIFF"], value: 0)
+            }
+
+            Label usage(width: 540, text: "Tab moves the focus into the view and through the widgets in it. A widget scrolled out of the view is clipped: it is not drawn and the pointer passes through it to whatever lies under it.")
+
+            Button share(label: "Share", variant: "secondary")
+
+            Label outro(width: 540, variant: "muted", text: "The end of the scroll view.")
+          }
+
+          Collapsible details(title: "Details", width: 576) {
+            Label details_text(text: "Hidden until the section opens", variant: "muted")
+            Checkbox verbose(label: "Verbose output")
+          }
+
+          Collapsible advanced(title: "Advanced", value: true, width: 576) {
+            Switch experimental(label: "Experimental features")
+          }
+
+          quality_row {
+            Layout: {direction: Row, spacing: 8, v: Middle}
+            Label quality_label(text: "Quality")
+            Dropdown quality(options: ["Low", "Medium", "High", "Ultra", "Custom"], value: 1)
           }
         }
       }
