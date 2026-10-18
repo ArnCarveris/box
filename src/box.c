@@ -6,9 +6,24 @@
 #include <box.h>
 #include "jobs/jobs.h"
 
+/** Make flecs allocate zeroed memory.
+ *
+ * flecs_script_for_slot_init leaves the entry cache of a for loop slot uninitialized, so a slot
+ * in reused memory can match an entity of an earlier instance and write its freed entry.
+ *
+ * Zeroed slots start with an empty cache; drop this once flecs initializes it.
+ */
+static void box_os_zeroed_alloc(void)
+{
+    if (ecs_os_api.calloc_ && ecs_os_api.malloc_ != ecs_os_api.calloc_) {
+        ecs_os_api.malloc_ = ecs_os_api.calloc_;
+    }
+}
+
 void BoxImport(
     ecs_world_t *world)
 {
+    box_os_zeroed_alloc();
     ECS_IMPORT(world, FlecsScriptMath);
     ECS_IMPORT(world, FlecsStats);
     ecs_enable(world, ecs_id(FlecsStats), false);
