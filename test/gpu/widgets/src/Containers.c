@@ -578,7 +578,7 @@ void Containers_dropdown_space_binding(void) {
     ecs_set(world, jump, Binding, { .key = KeySpace });
 
     /* A click focuses without a visible focus, which leaves Space to the bindings */
-    gallery_click(world, s, CONTAINERS ".quality_row.quality_label", 0, 0, "#0");
+    gallery_click(world, s, CONTAINERS ".quality_row.quality_label", 0, 0, PAGE);
     test_int(containers_presses(world, s, "key.press Space", jump), 1);
 
     /* While the list is open the dropdown captures every key */
@@ -956,9 +956,11 @@ void Containers_scroll_clips_picking(void) {
     gallery_click(world, s, NOTES ".share", 0, 0, NOTES ".share");
     gallery_expect(world, s, "get gallery Gallery.mut.last", "\"share\"");
 
-    /* The top of the list view, now above the top of the view, does not take the pointer */
+    /* The top of the list view, now above the top of the view, does not take the pointer; the
+     * page scrolled the view to show the button */
     float files[4];
     containers_rect(world, FILES, files);
+    containers_rect(world, NOTES, notes);
     test_assert(files[1] < notes[1]);
     ecs_os_snprintf(point, ECS_SIZEOF(point), "[%.1f, %.1f]", (double)(files[0] + 40),
         (double)((files[1] + notes[1]) * 0.5f));

@@ -72,6 +72,84 @@ static void gallery_expect_mut(
     ecs_os_free(line);
 }
 
+/** Frames to step after the input queue is drained: the widgets react in the frames that
+ * handle the input, picking reports a pointer move a frame later. */
+#define GALLERY_STEP (0)
+
+/** Run the input commands queued so far and the frames the widgets react in.
+ *
+ * @param world The world
+ * @param s The terminal session
+ */
+static void gallery_step(
+    ecs_world_t *world,
+    ecs_entity_t s)
+{
+    gallery_settle_frames(world, s, GALLERY_STEP);
+}
+
+/** Press a key and run the input.
+ *
+ * @param world The world
+ * @param s The terminal session
+ * @param key The key
+ */
+static void gallery_press(
+    ecs_world_t *world,
+    ecs_entity_t s,
+    const char *key)
+{
+    ecs_os_free(gallery_run(world, s, "key.press %s", key));
+    gallery_step(world, s);
+}
+
+/** Scroll a widget into view and click a place in it.
+ *
+ * @param world The world
+ * @param s The terminal session
+ * @param path Path of the widget
+ * @param fx Place across the width, as gallery_point
+ * @param fy Place across the height, as gallery_point
+ */
+static void gallery_tap(
+    ecs_world_t *world,
+    ecs_entity_t s,
+    const char *path,
+    float fx,
+    float fy)
+{
+    char point[64];
+    gallery_reveal(world, s, path);
+    gallery_point(world, path, fx, fy, point, sizeof(point));
+    ecs_os_free(gallery_run(world, s, "mouse.click left %s", point));
+    gallery_step(world, s);
+}
+
+/** Scroll a widget into view, move the pointer to a place in it and check the handler under it.
+ *
+ * @param world The world
+ * @param s The terminal session
+ * @param path Path of the widget
+ * @param fx Place across the width, as gallery_point
+ * @param fy Place across the height, as gallery_point
+ * @param handler Path of the handler PickStatus must report there, "#0" for none
+ */
+static void gallery_over(
+    ecs_world_t *world,
+    ecs_entity_t s,
+    const char *path,
+    float fx,
+    float fy,
+    const char *handler)
+{
+    char point[64];
+    gallery_reveal(world, s, path);
+    gallery_point(world, path, fx, fy, point, sizeof(point));
+    ecs_os_free(gallery_run(world, s, "mouse.move %s", point));
+    gallery_settle_frames(world, s, 1);
+    gallery_expect(world, s, "get box.picking.PickStatus PickStatus.handler", handler);
+}
+
 /** Type text and run the input.
  *
  * @param world The world
@@ -84,7 +162,7 @@ static void gallery_type(
     const char *text)
 {
     ecs_os_free(gallery_run(world, s, "key.type %s", text));
-    gallery_settle(world, s);
+    gallery_step(world, s);
 }
 
 /** Press a key while the control key (command on macOS) is held.
@@ -104,9 +182,9 @@ static void gallery_shortcut(
     const char *mod = "CtrlLeft";
 #endif
     ecs_os_free(gallery_run(world, s, "key.down %s", mod));
-    gallery_key(world, s, key);
+    gallery_press(world, s, key);
     ecs_os_free(gallery_run(world, s, "key.up %s", mod));
-    gallery_settle(world, s);
+    gallery_step(world, s);
 }
 
 /** Press Tab and check the entity that gets the focus.
@@ -120,7 +198,7 @@ static void gallery_tab_expect(
     ecs_entity_t s,
     const char *path)
 {
-    gallery_key(world, s, "Tab");
+    gallery_press(world, s, "Tab");
     gallery_expect_focus(world, s, path);
 }
 
@@ -143,7 +221,7 @@ static void gallery_slider_click(
     float fy = 1.0f - GALLERY_THUMB / b->height;
     float fx = (-b->width * 0.5f + GALLERY_THUMB * 0.5f + ratio * (b->width - GALLERY_THUMB)) /
         (b->width * 0.5f);
-    gallery_click(world, s, path, fx, fy, path);
+    gallery_tap(world, s, path, fx, fy);
 }
 
 /** Check the shape the pointer cursor shows over a place of an element: the one PickStatus
@@ -166,7 +244,7 @@ static void gallery_expect_cursor(
     const char *handler,
     PointerCursor shape)
 {
-    gallery_hover(world, s, path, fx, fy, handler);
+    gallery_over(world, s, path, fx, fy, handler);
     test_int(ecs_singleton_get(world, PickStatus)->shape, shape);
     test_int(box_input_cursor_get(world), shape);
 }
@@ -184,7 +262,7 @@ static void gallery_expect_cursor_here(
     const char *handler,
     PointerCursor shape)
 {
-    gallery_settle(world, s);
+    gallery_settle_frames(world, s, 1);
     gallery_expect(world, s, "get box.picking.PickStatus PickStatus.handler", handler);
     test_int(ecs_singleton_get(world, PickStatus)->shape, shape);
     test_int(box_input_cursor_get(world), shape);
@@ -290,9 +368,9 @@ void Gallery_theme_switch(void) {
     gallery_expect(world, s, "get " FORM " Rgb", "{r: 46, g: 50, b: 58}");
 
     /* A click opens the theme dropdown, a click on Light picks it */
-    gallery_click(world, s, HEADER ".theme", 0, 0, HEADER ".theme");
+    gallery_tap(world, s, HEADER ".theme", 0, 0);
     gallery_expect_mut(world, s, HEADER ".theme", "Dropdown", "open", "true");
-    gallery_click(world, s, HEADER ".theme.list.option_1", 0, 0, HEADER ".theme");
+    gallery_tap(world, s, HEADER ".theme.list.option_1", 0, 0);
     gallery_expect_mut(world, s, HEADER ".theme", "Dropdown", "current", "1");
     gallery_expect(world, s, "get " HEADER ".theme.caption Text.value", "\"Light\"");
     gallery_expect(world, s, "get box.ui.theme UiTheme.background", "{r: 232, g: 235, b: 240}");
@@ -306,10 +384,10 @@ void Gallery_theme_switch(void) {
     gallery_expect(world, s, "get gallery Gallery.mut.last", "\"theme: 1\"");
 
     /* The keys pick Dark again: Down opens the list at Light, Up highlights Dark, Enter */
-    gallery_key(world, s, "Down");
+    gallery_press(world, s, "Down");
     gallery_expect_mut(world, s, HEADER ".theme", "Dropdown", "open", "true");
-    gallery_key(world, s, "Up");
-    gallery_key(world, s, "Enter");
+    gallery_press(world, s, "Up");
+    gallery_press(world, s, "Enter");
     gallery_expect_mut(world, s, HEADER ".theme", "Dropdown", "current", "0");
     gallery_expect_mut(world, s, HEADER ".theme", "Dropdown", "open", "false");
     gallery_expect(world, s, "get " BASICS ".buttons.save Rgb", "{r: 98, g: 168, b: 122}");
@@ -334,14 +412,14 @@ void Gallery_form_apply(void) {
     test_assert(shape != 0);
 
     /* Typing a name */
-    gallery_click(world, s, NAME ".field", 0, 0, NAME ".field");
+    gallery_tap(world, s, NAME ".field", 0, 0);
     gallery_shortcut(world, s, "A");
     gallery_type(world, s, "Ada");
     gallery_expect_mut(world, s, NAME, "TextInput", "current", "\"Ada\"");
 
     /* Picking a shape */
-    gallery_click(world, s, SHAPE, 0, 0, SHAPE);
-    gallery_click(world, s, SHAPE ".list.option_2", 0, 0, SHAPE);
+    gallery_tap(world, s, SHAPE, 0, 0);
+    gallery_tap(world, s, SHAPE ".list.option_2", 0, 0);
     gallery_expect_mut(world, s, SHAPE, "Dropdown", "current", "2");
 
     /* Moving the sliders: a click at either end of a track, a drag of the knob */
@@ -356,16 +434,16 @@ void Gallery_form_apply(void) {
     gallery_point(world, BLUE ".track.knob", 0, 0, from, sizeof(from));
     gallery_point(world, BLUE, 0.98f, fy, to, sizeof(to));
     ecs_os_free(gallery_run(world, s, "mouse.drag left %s %s", from, to));
-    gallery_settle(world, s);
+    gallery_step(world, s);
     double blue = gallery_value(world, s, "get " BLUE " box.widgets.Slider.mut.current");
     test_assert(blue > 240 && blue < 255.5);
 
     /* Stepping the size, unchecking the shadow, picking the night light */
-    gallery_click(world, s, SIZE, GALLERY_PLUS, 0, SIZE);
+    gallery_tap(world, s, SIZE, GALLERY_PLUS, 0);
     gallery_expect_mut(world, s, SIZE, "Stepper", "current", "1.25");
-    gallery_click(world, s, SHADOW, -0.8f, 0, SHADOW);
+    gallery_tap(world, s, SHADOW, -0.8f, 0);
     gallery_expect_mut(world, s, SHADOW, "Checkbox", "current", "false");
-    gallery_click(world, s, LIGHT ".night", 0, 0, LIGHT ".night");
+    gallery_tap(world, s, LIGHT ".night", 0, 0);
     gallery_expect_mut(world, s, LIGHT, "RadioGroup", "current", "\"Night\"");
 
     /* Nothing applies before Apply */
@@ -374,7 +452,7 @@ void Gallery_form_apply(void) {
     gallery_expect(world, s, "get gallery Gallery.mut.draft.shape", "2");
     gallery_expect(world, s, "get gallery Gallery.mut.draft.size", "1.25");
 
-    gallery_click(world, s, APPLY, 0, 0, APPLY);
+    gallery_tap(world, s, APPLY, 0, 0);
     gallery_expect(world, s, "get " PREVIEW ".label Text.value", "\"Ada\"");
     test_bool(ecs_has(world, shape, Torus), true);
     test_bool(ecs_has(world, shape, Box), false);
@@ -396,7 +474,7 @@ void Gallery_form_apply(void) {
     /* The form keeps its values after Apply, a second Apply changes nothing */
     gallery_expect_mut(world, s, NAME, "TextInput", "current", "\"Ada\"");
     gallery_expect_mut(world, s, SHAPE, "Dropdown", "current", "2");
-    gallery_click(world, s, APPLY, 0, 0, APPLY);
+    gallery_tap(world, s, APPLY, 0, 0);
     test_bool(ecs_has(world, shape, Torus), true);
     gallery_expect(world, s, "logs warning 100", "");
 
@@ -409,23 +487,23 @@ void Gallery_form_reset(void) {
     ecs_world_t *world = gallery_load(&s);
     ecs_entity_t shape = ecs_lookup(world, PREVIEW ".shape");
 
-    gallery_click(world, s, NAME ".field", 0, 0, NAME ".field");
+    gallery_tap(world, s, NAME ".field", 0, 0);
     gallery_shortcut(world, s, "A");
     gallery_type(world, s, "Grace");
-    gallery_click(world, s, SHAPE, 0, 0, SHAPE);
-    gallery_click(world, s, SHAPE ".list.option_1", 0, 0, SHAPE);
+    gallery_tap(world, s, SHAPE, 0, 0);
+    gallery_tap(world, s, SHAPE ".list.option_1", 0, 0);
     gallery_slider_click(world, s, RED, 0);
     gallery_slider_click(world, s, BLUE, 1);
-    gallery_click(world, s, SIZE, GALLERY_PLUS, 0, SIZE);
-    gallery_click(world, s, SHADOW, -0.8f, 0, SHADOW);
-    gallery_click(world, s, LIGHT ".dusk", 0, 0, LIGHT ".dusk");
-    gallery_click(world, s, APPLY, 0, 0, APPLY);
+    gallery_tap(world, s, SIZE, GALLERY_PLUS, 0);
+    gallery_tap(world, s, SHADOW, -0.8f, 0);
+    gallery_tap(world, s, LIGHT ".dusk", 0, 0);
+    gallery_tap(world, s, APPLY, 0, 0);
     test_bool(ecs_has(world, shape, Sphere), true);
     gallery_expect(world, s, "get " PREVIEW ".label Text.value", "\"Grace\"");
 
     /* Reset puts the defaults back in the widgets, without a change of their own */
     int32_t changes = gallery_changes(world, s);
-    gallery_click(world, s, RESET, 0, 0, RESET);
+    gallery_tap(world, s, RESET, 0, 0);
     test_int(gallery_changes(world, s), changes + 1);
     gallery_expect(world, s, "get gallery Gallery.mut.last", "\"reset\"");
     gallery_expect_form_defaults(world, s);
@@ -436,14 +514,14 @@ void Gallery_form_reset(void) {
     /* The preview keeps the applied values until Apply */
     test_bool(ecs_has(world, shape, Sphere), true);
     gallery_expect(world, s, "get " PREVIEW ".label Text.value", "\"Grace\"");
-    gallery_click(world, s, APPLY, 0, 0, APPLY);
+    gallery_tap(world, s, APPLY, 0, 0);
     gallery_expect_preview_defaults(world, s);
 
     /* The reset widgets work as before: a change after Reset is read */
     gallery_slider_click(world, s, GREEN, 1);
     gallery_expect_mut(world, s, GREEN, "Slider", "current", "255");
     gallery_expect(world, s, "get gallery Gallery.mut.draft.color.g", "255");
-    gallery_click(world, s, RESET, 0, 0, RESET);
+    gallery_tap(world, s, RESET, 0, 0);
     gallery_expect_mut(world, s, GREEN, "Slider", "current", "140");
     gallery_expect(world, s, "logs warning 100", "");
 
@@ -456,26 +534,68 @@ void Gallery_form_enter_applies(void) {
     ecs_world_t *world = gallery_load(&s);
     ecs_entity_t shape = ecs_lookup(world, PREVIEW ".shape");
 
-    gallery_click(world, s, SHAPE, 0, 0, SHAPE);
-    gallery_click(world, s, SHAPE ".list.option_1", 0, 0, SHAPE);
-    gallery_click(world, s, NAME ".field", 0.9f, 0, NAME ".field");
+    gallery_tap(world, s, SHAPE, 0, 0);
+    gallery_tap(world, s, SHAPE ".list.option_1", 0, 0);
+    gallery_tap(world, s, NAME ".field", 0.9f, 0);
     gallery_type(world, s, "s");
     gallery_expect(world, s, "get " PREVIEW ".label Text.value", "\"Widget\"");
     test_bool(ecs_has(world, shape, Box), true);
 
-    gallery_key(world, s, "Enter");
+    gallery_press(world, s, "Enter");
     gallery_expect(world, s, "get " PREVIEW ".label Text.value", "\"Widgets\"");
     test_bool(ecs_has(world, shape, Sphere), true);
     gallery_expect_focus(world, s, NAME ".field");
 
     /* Enter in a field of another section applies nothing */
-    gallery_click(world, s, SHAPE, 0, 0, SHAPE);
-    gallery_click(world, s, SHAPE ".list.option_2", 0, 0, SHAPE);
-    gallery_click(world, s, TEXT ".submit.message.field", 0, 0, TEXT ".submit.message.field");
+    gallery_tap(world, s, SHAPE, 0, 0);
+    gallery_tap(world, s, SHAPE ".list.option_2", 0, 0);
+    gallery_tap(world, s, TEXT ".submit.message.field", 0, 0);
     gallery_type(world, s, "hi");
-    gallery_key(world, s, "Enter");
+    gallery_press(world, s, "Enter");
     gallery_expect(world, s, "get gallery Gallery.mut.submitted", "\"hi\"");
     test_bool(ecs_has(world, shape, Sphere), true);
+
+    ecs_fini(world);
+}
+
+void Gallery_tab_order(void) {
+    // widgets/gallery
+    ecs_entity_t s = 0;
+    ecs_world_t *world = gallery_load(&s);
+    const char *sections[] = { BASICS, TEXT, CONTAINERS, FORM };
+    int32_t i, section = 0;
+    bool found = false;
+
+    /* From nothing focused Tab starts at the theme switch of the header and follows the
+     * reading order of the sections to the form */
+    gallery_expect_focus(world, s, "#0");
+    gallery_tab_expect(world, s, HEADER ".theme");
+    gallery_tab_expect(world, s, BASICS ".buttons.save");
+    for (i = 0; i < 80 && !found; i ++) {
+        gallery_press(world, s, "Tab");
+        char *focused = gallery_focused(world, s);
+        while (section < 3 && strncmp(focused, sections[section], strlen(sections[section]))) {
+            section ++;
+        }
+
+        if (strncmp(focused, sections[section], strlen(sections[section]))) {
+            printf("Tab left the reading order at '%s'\n", focused);
+        }
+
+        test_assert(strncmp(focused, sections[section], strlen(sections[section])) == 0);
+        found = !strcmp(focused, NAME ".field");
+        ecs_os_free(focused);
+    }
+
+    test_assert(found);
+    gallery_expect(world, s, "get box.ui.FocusStatus FocusStatus.visible", "true");
+
+    /* The focused field is scrolled into the page view */
+    float page[4], r[4];
+    gallery_rect(world, PAGE, page);
+    gallery_rect(world, NAME ".field", r);
+    test_assert(r[1] >= page[1] && r[3] <= page[3]);
+    gallery_expect(world, s, "logs warning 100", "");
 
     ecs_fini(world);
 }
@@ -488,19 +608,22 @@ void Gallery_keyboard_only(void) {
     int32_t i;
     bool found = false;
 
-    /* From nothing focused Tab starts at the theme switch of the header and follows the
-     * reading order of the sections to the form */
+    /* From nothing focused Shift+Tab wraps to the last widget in reading order, Reset, and walks
+     * back through the form to its name field */
     gallery_expect_focus(world, s, "#0");
-    gallery_tab_expect(world, s, HEADER ".theme");
-    gallery_tab_expect(world, s, BASICS ".buttons.save");
-    for (i = 0; i < 80 && !found; i ++) {
-        gallery_key(world, s, "Tab");
+    ecs_os_free(gallery_run(world, s, "key.down ShiftLeft"));
+    gallery_press(world, s, "Tab");
+    gallery_expect_focus(world, s, RESET);
+    for (i = 0; i < 12 && !found; i ++) {
+        gallery_press(world, s, "Tab");
         char *focused = gallery_focused(world, s);
-        test_assert(strncmp(focused, PAGE, strlen(PAGE)) == 0);
+        test_assert(strncmp(focused, FORM, strlen(FORM)) == 0);
         found = !strcmp(focused, NAME ".field");
         ecs_os_free(focused);
     }
 
+    ecs_os_free(gallery_run(world, s, "key.up ShiftLeft"));
+    gallery_step(world, s);
     test_assert(found);
     gallery_expect(world, s, "get box.ui.FocusStatus FocusStatus.visible", "true");
 
@@ -514,32 +637,32 @@ void Gallery_keyboard_only(void) {
     gallery_shortcut(world, s, "A");
     gallery_type(world, s, "Kim");
     gallery_tab_expect(world, s, SHAPE);
-    gallery_key(world, s, "Down");
+    gallery_press(world, s, "Down");
     gallery_expect_mut(world, s, SHAPE, "Dropdown", "open", "true");
-    gallery_key(world, s, "Down");
-    gallery_key(world, s, "Enter");
+    gallery_press(world, s, "Down");
+    gallery_press(world, s, "Enter");
     gallery_expect_mut(world, s, SHAPE, "Dropdown", "current", "1");
     gallery_tab_expect(world, s, RED);
-    gallery_key(world, s, "Home");
+    gallery_press(world, s, "Home");
     gallery_tab_expect(world, s, GREEN);
-    gallery_key(world, s, "End");
+    gallery_press(world, s, "End");
     gallery_tab_expect(world, s, BLUE);
-    gallery_key(world, s, "Right");
-    gallery_key(world, s, "Right");
+    gallery_press(world, s, "Right");
+    gallery_press(world, s, "Right");
     gallery_tab_expect(world, s, SIZE);
-    gallery_key(world, s, "Up");
-    gallery_key(world, s, "Up");
+    gallery_press(world, s, "Up");
+    gallery_press(world, s, "Up");
     gallery_tab_expect(world, s, SHADOW);
-    gallery_key(world, s, "Space");
+    gallery_press(world, s, "Space");
     gallery_tab_expect(world, s, LIGHT ".day");
-    gallery_key(world, s, "Right");
+    gallery_press(world, s, "Right");
     gallery_expect_focus(world, s, LIGHT ".dusk");
     gallery_tab_expect(world, s, APPLY);
     gallery_tab_expect(world, s, RESET);
     ecs_os_free(gallery_run(world, s, "key.down ShiftLeft"));
-    gallery_key(world, s, "Tab");
+    gallery_press(world, s, "Tab");
     ecs_os_free(gallery_run(world, s, "key.up ShiftLeft"));
-    gallery_settle(world, s);
+    gallery_step(world, s);
     gallery_expect_focus(world, s, APPLY);
 
     gallery_expect_mut(world, s, NAME, "TextInput", "current", "\"Kim\"");
@@ -552,7 +675,7 @@ void Gallery_keyboard_only(void) {
     gallery_expect_preview_defaults(world, s);
 
     /* Apply with Enter */
-    gallery_key(world, s, "Enter");
+    gallery_press(world, s, "Enter");
     gallery_expect(world, s, "get " PREVIEW ".label Text.value", "\"Kim\"");
     test_bool(ecs_has(world, shape, Sphere), true);
     gallery_expect(world, s, "get " PREVIEW ".shape Rgb", "{r: 0, g: 255, b: 62}");
@@ -563,8 +686,8 @@ void Gallery_keyboard_only(void) {
         "{r: 196, g: 128, b: 110, a: 255}");
 
     /* Reset with Space restores the widgets, the focus stays on it */
-    gallery_key(world, s, "Tab");
-    gallery_key(world, s, "Space");
+    gallery_press(world, s, "Tab");
+    gallery_press(world, s, "Space");
     gallery_expect_focus(world, s, RESET);
     gallery_expect_form_defaults(world, s);
     gallery_expect(world, s, "logs warning 100", "");
@@ -673,10 +796,10 @@ void Gallery_resize(void) {
     gallery_rect(world, BASICS, basics);
     ecs_os_free(gallery_run(world, s, "mouse.move [%.1f, %.1f]",
         (double)(basics[0] + 40), (double)(basics[1] + 10)));
-    gallery_settle(world, s);
+    gallery_step(world, s);
     gallery_expect(world, s, "get box.picking.PickStatus PickStatus.handler", PAGE);
     ecs_os_free(gallery_run(world, s, "mouse.scroll 0 -3"));
-    gallery_settle(world, s);
+    gallery_step(world, s);
     gallery_rect(world, BASICS, after);
     gallery_expect_at(after[1], basics[1] - 120);
     gallery_rect(world, HEADER, moved);
@@ -686,7 +809,7 @@ void Gallery_resize(void) {
     gallery_reveal(world, s, FORM);
     gallery_rect(world, FORM, after);
     test_assert(after[2] <= 784 - 10 + 0.5f);
-    gallery_click(world, s, APPLY, 0, 0, APPLY);
+    gallery_tap(world, s, APPLY, 0, 0);
     gallery_expect_focus(world, s, APPLY);
     gallery_rect(world, HEADER, moved);
     gallery_expect_at(moved[1], 16);

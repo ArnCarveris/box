@@ -71,6 +71,17 @@ void gallery_settle(
     ecs_world_t *world,
     ecs_entity_t session);
 
+/** Run the input commands queued so far with a number of frames after the queue is drained.
+ *
+ * @param world The world
+ * @param session The terminal session
+ * @param frames Frames to step after the queue is drained
+ */
+void gallery_settle_frames(
+    ecs_world_t *world,
+    ecs_entity_t session,
+    int32_t frames);
+
 /** Get the window point at a place in the bounds of a widget.
  *
  * @param world The world

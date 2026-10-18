@@ -104,6 +104,7 @@
                     "form_apply",
                     "form_reset",
                     "form_enter_applies",
+                    "tab_order",
                     "keyboard_only",
                     "cursors",
                     "resize"

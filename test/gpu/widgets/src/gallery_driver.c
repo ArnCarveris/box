@@ -83,6 +83,14 @@ void gallery_settle(
     ecs_world_t *world,
     ecs_entity_t session)
 {
+    gallery_settle_frames(world, session, 1);
+}
+
+void gallery_settle_frames(
+    ecs_world_t *world,
+    ecs_entity_t session,
+    int32_t frames)
+{
     int32_t i;
     for (i = 0; i < 1000; i ++) {
         char *out = gallery_run(world, session, "input.wait");
@@ -96,7 +104,7 @@ void gallery_settle(
     }
 
     test_assert(i < 1000);
-    for (i = 0; i < 3; i ++) {
+    for (i = 0; i < frames; i ++) {
         ecs_progress(world, 0);
     }
 }
