@@ -18,10 +18,11 @@ The runner appends a `visual_capture` entity with a `Surface` of 640x360 (`--siz
 `write_to_file` is the absolute path `test/integration/out/<scene>.png`, and runs
 
 ```sh
-bake3 run apps/boxrun --local-env=<name> -- --headless --frames 3 --timeout 120 --port 0 <scene>
+bake3 run apps/boxrun --local-env=<name> -- --headless --frames 3 --timeout 120 --port 0 --delta-time 0.016666667 <scene>
 ```
 
-A headless run steps with a fixed delta, so the frame it writes is the same run after run. The
+The runner passes `--delta-time` (1/60), a fixed step for `ecs_progress`; a headless run without it
+measures its delta. With the fixed step the frame it writes is the same run after run. The
 runner builds the app once with `bake3 build` and runs every scene with a copy of that binary in
 `.bake/integration`, removed when the run ends, so a build in the same environment during the
 suite cannot swap the binary halfway. A render the load guard refuses (`cpu oversubscribed`)
