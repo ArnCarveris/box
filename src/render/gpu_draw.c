@@ -786,29 +786,98 @@ static bool box_gpu_draw_sky(
     return result;
 }
 
-/** Record the particles of the scene of a view in a pass, then bind the groups of the forward
- * pass again, which the particle pipeline does not share.
+/** The render pass of a view the batches record into, which a soft particle pool splits */
+typedef struct box_gpu_view_pass_t {
+    WGPURenderPassEncoder pass;     /**< The pass being recorded */
+    WGPUCommandEncoder encoder;     /**< Encoder of the frame */
+    WGPUTextureView color;          /**< Color attachment of the pass */
+    WGPUTextureView depth;          /**< Depth attachment, which soft particles read */
+    WGPUStoreOp depth_store;        /**< Store op of the depth of the passes after the split */
+    bool soft;                      /**< The particles draw in a pass of their own that reads
+                                     *   the depth instead of writing it */
+} box_gpu_view_pass_t;
+
+/** Begin a pass of a view that continues the image and depth of the pass before it.
+ *
+ * @param vp The pass of the view
+ * @param read_only Whether the depth is read only, so the pass can sample it
+ * @return The pass
+ */
+static WGPURenderPassEncoder box_gpu_view_pass_continue(
+    const box_gpu_view_pass_t *vp,
+    bool read_only)
+{
+    WGPURenderPassColorAttachment attachment = {
+        .view = vp->color,
+        .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
+        .loadOp = WGPULoadOp_Load,
+        .storeOp = WGPUStoreOp_Store
+    };
+    WGPURenderPassDepthStencilAttachment depth = {
+        .view = vp->depth,
+        .depthLoadOp = WGPULoadOp_Load,
+        .depthStoreOp = vp->depth_store
+    };
+    if (read_only) {
+        depth.depthLoadOp = WGPULoadOp_Undefined;
+        depth.depthStoreOp = WGPUStoreOp_Undefined;
+        depth.depthReadOnly = true;
+    }
+
+    WGPURenderPassDescriptor desc = {
+        .colorAttachmentCount = 1,
+        .colorAttachments = &attachment,
+        .depthStencilAttachment = &depth
+    };
+
+    return wgpuCommandEncoderBeginRenderPass(vp->encoder, &desc);
+}
+
+/** Record the particles of the scene of a view, then bind the groups of the forward pass again,
+ * which the particle pipeline does not share.
+ *
+ * A view with a soft pool ends its pass, draws the particles in a pass that samples the depth it
+ * reads and, unless they are the last draws of the view, continues in a new pass.
  *
  * @param gpu The backend
- * @param pass The render pass of the view
+ * @param vp The pass of the view, its pass replaced by a split
  * @param format The format of the color target
  * @param v The view
  * @param group The bind group of the view
  * @param offset Offset of the uniforms of the view in the view buffer
- * @return Whether particles were drawn, so the pipeline and material bound before are not
+ * @param last Whether nothing draws after the particles
+ * @return Whether the pipeline and material bound before are lost
  */
 static bool box_gpu_draw_particles(
     box_gpu_t *gpu,
-    WGPURenderPassEncoder pass,
+    box_gpu_view_pass_t *vp,
     WGPUTextureFormat format,
     const box_render_view_t *v,
     WGPUBindGroup group,
-    uint32_t offset)
+    uint32_t offset,
+    bool last)
 {
-    bool result = box_gpu_particles_draw(gpu, pass, format, v);
-    if (result) {
-        wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
-        wgpuRenderPassEncoderSetBindGroup(pass, 3, box_gpu_volume_group(gpu, v), 0, NULL);
+    bool result = true, rebind = true;
+    if (!vp->soft) {
+        result = box_gpu_particles_draw(gpu, vp->pass, format, v, NULL);
+        rebind = result;
+    } else {
+        wgpuRenderPassEncoderEnd(vp->pass);
+        wgpuRenderPassEncoderRelease(vp->pass);
+        vp->pass = box_gpu_view_pass_continue(vp, true);
+        wgpuRenderPassEncoderSetBindGroup(vp->pass, 0, group, 1, &offset);
+        box_gpu_particles_draw(gpu, vp->pass, format, v, vp->depth);
+        rebind = !last;
+        if (!last) {
+            wgpuRenderPassEncoderEnd(vp->pass);
+            wgpuRenderPassEncoderRelease(vp->pass);
+            vp->pass = box_gpu_view_pass_continue(vp, false);
+        }
+    }
+
+    if (rebind) {
+        wgpuRenderPassEncoderSetBindGroup(vp->pass, 0, group, 1, &offset);
+        wgpuRenderPassEncoderSetBindGroup(vp->pass, 3, box_gpu_volume_group(gpu, v), 0, NULL);
     }
 
     return result;
@@ -822,7 +891,7 @@ static bool box_gpu_draw_particles(
  *
  * @param gpu The backend
  * @param t The target
- * @param pass The render pass of the view
+ * @param vp The render pass of the view, which the particles may split
  * @param format The format of the color target
  * @param packet The packet
  * @param v The view
@@ -834,7 +903,7 @@ static bool box_gpu_draw_particles(
 static void box_gpu_draw_batches(
     box_gpu_t *gpu,
     const box_gpu_target_t *t,
-    WGPURenderPassEncoder pass,
+    box_gpu_view_pass_t *vp,
     WGPUTextureFormat format,
     const box_render_packet_t *packet,
     const box_render_view_t *v,
@@ -858,7 +927,7 @@ static void box_gpu_draw_batches(
         bool mesh = b->view == -1 && b->pipeline == BOX_RENDER_SHADER_MESH;
         if (!sky && !mesh) {
             sky = true;
-            if (box_gpu_draw_sky(gpu, t, pass, format, v, group, offset)) {
+            if (box_gpu_draw_sky(gpu, t, vp->pass, format, v, group, offset)) {
                 bound = NULL;
                 material = NULL;
             }
@@ -866,7 +935,7 @@ static void box_gpu_draw_batches(
 
         if (!particles && !mesh) {
             particles = true;
-            if (box_gpu_draw_particles(gpu, pass, format, v, group, offset)) {
+            if (box_gpu_draw_particles(gpu, vp, format, v, group, offset, false)) {
                 bound = NULL;
                 material = NULL;
             }
@@ -877,27 +946,27 @@ static void box_gpu_draw_batches(
         }
 
         if (pipeline != bound) {
-            wgpuRenderPassEncoderSetPipeline(pass, pipeline);
+            wgpuRenderPassEncoderSetPipeline(vp->pass, pipeline);
             bound = pipeline;
         }
 
         WGPUBindGroup group = box_gpu_material_group(gpu, b, packet->anisotropy);
         if (group != material) {
-            wgpuRenderPassEncoderSetBindGroup(pass, 1, group, 0, NULL);
+            wgpuRenderPassEncoderSetBindGroup(vp->pass, 1, group, 0, NULL);
             material = group;
         }
 
-        if (box_gpu_cull_draw(gpu, pass, packet, d, 2, phase == 2 && mesh)) {
+        if (box_gpu_cull_draw(gpu, vp->pass, packet, d, 2, phase == 2 && mesh)) {
             box_gpu_count(gpu, BOX_GPU_STAT_DRAW);
         }
     }
 
     if (!sky) {
-        box_gpu_draw_sky(gpu, t, pass, format, v, group, offset);
+        box_gpu_draw_sky(gpu, t, vp->pass, format, v, group, offset);
     }
 
     if (!particles) {
-        box_gpu_draw_particles(gpu, pass, format, v, group, offset);
+        box_gpu_draw_particles(gpu, vp, format, v, group, offset, true);
     }
 }
 
@@ -942,10 +1011,17 @@ static void box_gpu_draw_pass(
         attachment.clearValue = (WGPUColor){0};
     }
 
+    box_gpu_view_pass_t vp = {
+        .encoder = encoder,
+        .color = hdr ? hdr : color,
+        .depth = t->depth_view,
+        .depth_store = phase == 1 || hdr ? WGPUStoreOp_Store : WGPUStoreOp_Discard,
+        .soft = phase != 1 && box_gpu_particles_soft(gpu, v)
+    };
     WGPURenderPassDepthStencilAttachment depth = {
         .view = t->depth_view,
         .depthLoadOp = phase < 2 ? WGPULoadOp_Clear : WGPULoadOp_Load,
-        .depthStoreOp = phase == 1 || hdr ? WGPUStoreOp_Store : WGPUStoreOp_Discard,
+        .depthStoreOp = vp.soft ? WGPUStoreOp_Store : vp.depth_store,
         .depthClearValue = 0.0f
     };
     WGPURenderPassDescriptor desc = {
@@ -955,13 +1031,13 @@ static void box_gpu_draw_pass(
     };
     uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
     WGPUBindGroup group = box_gpu_light_group(gpu, t, v, slot);
-    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
-    wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
-    wgpuRenderPassEncoderSetBindGroup(pass, 3, box_gpu_volume_group(gpu, v), 0, NULL);
-    box_gpu_draw_batches(gpu, t, pass, hdr ? BOX_GPU_HDR_FORMAT : t->format, packet, v, group,
+    vp.pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+    wgpuRenderPassEncoderSetBindGroup(vp.pass, 0, group, 1, &offset);
+    wgpuRenderPassEncoderSetBindGroup(vp.pass, 3, box_gpu_volume_group(gpu, v), 0, NULL);
+    box_gpu_draw_batches(gpu, t, &vp, hdr ? BOX_GPU_HDR_FORMAT : t->format, packet, v, group,
         slot, phase);
-    wgpuRenderPassEncoderEnd(pass);
-    wgpuRenderPassEncoderRelease(pass);
+    wgpuRenderPassEncoderEnd(vp.pass);
+    wgpuRenderPassEncoderRelease(vp.pass);
     wgpuBindGroupRelease(group);
 }
 
@@ -990,6 +1066,7 @@ void box_gpu_draw_views(
         box_gpu_light_cluster(gpu, t, encoder, v, slot);
         box_gpu_cull_record(gpu, encoder, slot);
         box_gpu_shadow_render(gpu, encoder, packet, i, slot);
+        box_gpu_particles_sort(gpu, encoder, v, slot);
         box_gpu_draw_pass(gpu, t, encoder, color, hdr, packet, v, slot, occludes ? 1 : 0);
         if (occludes) {
             box_gpu_cull_record_late(gpu, encoder, t->depth_view, slot);

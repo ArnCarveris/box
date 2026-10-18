@@ -624,7 +624,10 @@
                     "stream_renders_where_expected",
                     "other_scene_does_not_show",
                     "full_pool_stops_spawning",
-                    "fixed_seed_same_image"
+                    "fixed_seed_same_image",
+                    "additive_never_darkens",
+                    "soft_fades_near_wall",
+                    "sprite_frame_texel"
                 ]
             }
         ]

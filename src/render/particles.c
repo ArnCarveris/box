@@ -10,6 +10,7 @@
 #include "render.h"
 #include "../particle/simulate.h"
 #include "../geometry/mesh_cache.h"
+#include "../texture/texture.h"
 #include <math.h>
 #include <stdlib.h>
 
@@ -66,6 +67,12 @@ typedef struct box_particle_pool_t {
     uint32_t table_seed;    /**< Seed the table was sampled with */
     vec3 last_position;     /**< World position of the emitter in the last frame */
     bool has_last;          /**< last_position holds a position */
+    uint32_t mesh;          /**< Buffer handle of the corners of a billboard, 0 for none */
+    uint32_t corners;       /**< Corners in the billboard buffer */
+    bool mesh_built;        /**< The corners match the key below */
+    ecs_entity_t mesh_entity; /**< Entity the corners were built from */
+    uint32_t mesh_handle;   /**< Mesh handle the corners were built from */
+    vec3 mesh_scale;        /**< Shape scale the corners were built with */
 } box_particle_pool_t;
 
 /** A burst of the frame and the emitter whose pool it spawns into */
@@ -76,8 +83,9 @@ typedef struct box_particle_burst_t {
 
 /** Main thread state of the particle extract */
 typedef struct box_render_particles_t {
-    ecs_query_t *emitters;  /**< ParticleEmitter, WorldTransform, Scene(self|up) and
-                             *   ParticlePlayback, NULL without box.particle */
+    ecs_query_t *emitters;  /**< ParticleEmitter, WorldTransform, Scene(self|up),
+                             *   ParticlePlayback,
+                             *   ParticleCurves and ParticleAppearance, NULL without box.particle */
     ecs_query_t *burst_query; /**< ParticleBurst and ParticleEmitter(self|up), NULL without
                              *   box.particle */
     ecs_vec_t bursts;       /**< box_particle_burst_t of the frame, sorted by emitter */
@@ -89,6 +97,9 @@ typedef struct box_render_particles_t {
     ecs_vec_t table_handles; /**< uint32_t, table handles to reuse */
     uint32_t next_table;    /**< Next table handle */
     ecs_vec_t points;       /**< box_particle_point_t, the table being sampled */
+    ecs_vec_t mesh_handles; /**< uint32_t, billboard corner buffer handles to reuse */
+    uint32_t next_mesh;     /**< Next billboard corner buffer handle */
+    ecs_vec_t corners;      /**< box_render_particle_corner_t, the corners being built */
     const void *backend;    /**< Context of the backend the pages were sent to */
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
     int32_t generation;     /**< Generation of that backend, see box_render_backend_t */
@@ -333,6 +344,27 @@ static void box_particles_table_free(
     pool->table_built = false;
 }
 
+/** Destroy the billboard corners of a pool on the backend.
+ *
+ * @param s The state
+ * @param p The packet
+ * @param pool The pool
+ */
+static void box_particles_mesh_free(
+    box_render_particles_t *s,
+    box_render_packet_t *p,
+    box_particle_pool_t *pool)
+{
+    if (pool->mesh) {
+        box_render_packet_resource(p, BOX_RENDER_BUFFER, BOX_RENDER_DESTROY, pool->mesh, 0);
+        *ecs_vec_append_t(NULL, &s->mesh_handles, uint32_t) = pool->mesh;
+    }
+
+    pool->mesh = 0;
+    pool->corners = 0;
+    pool->mesh_built = false;
+}
+
 /** Make the pool of an emitter.
  *
  * @param s The state
@@ -375,6 +407,7 @@ static void box_particles_pool_free(
     if (p) {
         box_particles_range_free(s, p, pool);
         box_particles_table_free(s, p, pool);
+        box_particles_mesh_free(s, p, pool);
     }
 
     ecs_map_remove(&s->by_entity, pool->entity);
@@ -398,8 +431,10 @@ static void box_particles_reset_backend(
     ecs_vec_clear(&s->pages);
     ecs_vec_clear(&s->page_handles);
     ecs_vec_clear(&s->table_handles);
+    ecs_vec_clear(&s->mesh_handles);
     s->next_page = BOX_RENDER_BUFFER_PARTICLE_FIRST;
     s->next_table = BOX_RENDER_BUFFER_PARTICLE_TABLE_FIRST;
+    s->next_mesh = BOX_RENDER_BUFFER_PARTICLE_MESH_FIRST;
 }
 
 /** Sample the mesh table of an EmitterMesh again when its source, its shape or its seed
@@ -465,6 +500,105 @@ static void box_particles_table_update(
     pool->table_mesh = mesh;
     pool->table_seed = emitter->seed;
     glm_vec3_copy(scale, pool->table_scale);
+done:
+    return;
+}
+
+/** Write the corners of the triangles of a mesh, scaled by the shape, as a billboard draws them.
+ *
+ * @param m The mesh
+ * @param scale Scale of the shape
+ * @param out Receives a corner per index
+ */
+static void box_particles_corners(
+    const box_mesh_t *m,
+    const float *scale,
+    box_render_particle_corner_t *out)
+{
+    int32_t i, c;
+    for (i = 0; i < m->index_count; i ++) {
+        uint32_t v = m->indices[i];
+        const box_vertex_t *vertex = (int32_t)v < m->vertex_count ? &m->vertices[v] : NULL;
+        vec3 n = {0, 0, 1};
+        ecs_os_memset_t(&out[i], 0, box_render_particle_corner_t);
+        if (!vertex) {
+            continue;
+        }
+
+        for (c = 0; c < 3; c ++) {
+            out[i].position[c] = vertex->position[c] * scale[c];
+            n[c] = scale[c] != 0 ? vertex->normal[c] / scale[c] : 0.0f;
+        }
+
+        if (glm_vec3_norm2(n) > 0) {
+            glm_vec3_normalize(n);
+        }
+
+        glm_vec3_copy(n, out[i].normal);
+        out[i].position[3] = vertex->uv[0];
+        out[i].normal[3] = vertex->uv[1];
+    }
+}
+
+/** Build the corners of the mesh a billboard draws again when its entity, its shape or its
+ * scale changed, and send them.
+ *
+ * @param world The world
+ * @param s The state
+ * @param p The packet
+ * @param pool The pool
+ * @param source Entity of the mesh, 0 for none
+ */
+static void box_particles_mesh_update(
+    ecs_world_t *world,
+    box_render_particles_t *s,
+    box_render_packet_t *p,
+    box_particle_pool_t *pool,
+    ecs_entity_t source)
+{
+    const ShapeMesh *shape = source && ecs_is_alive(world, source)
+        ? ecs_get(world, source, ShapeMesh)
+        : NULL;
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    uint32_t mesh = shape ? shape->mesh : 0;
+    vec3 scale = {0, 0, 0};
+    if (shape) {
+        glm_vec3_copy(ECS_CONST_CAST(float*, shape->scale), scale);
+    }
+
+    if (pool->mesh_built && pool->mesh_entity == source && pool->mesh_handle == mesh &&
+        glm_vec3_eqv(scale, pool->mesh_scale))
+    {
+        goto done;
+    }
+
+    const box_mesh_t *m = mesh && cache ? box_mesh_cache_get(cache, mesh) : NULL;
+    box_particles_mesh_free(s, p, pool);
+    if (m && m->index_count >= 3 && m->vertex_count) {
+        int32_t count = m->index_count - m->index_count % 3;
+        uint32_t size = (uint32_t)count * (uint32_t)sizeof(box_render_particle_corner_t);
+        ecs_vec_set_count_t(NULL, &s->corners, box_render_particle_corner_t, m->index_count);
+        box_particles_corners(m, scale, ecs_vec_first(&s->corners));
+        if (ecs_vec_count(&s->mesh_handles)) {
+            pool->mesh = *ecs_vec_last_t(&s->mesh_handles, uint32_t);
+            ecs_vec_remove_last(&s->mesh_handles);
+        } else {
+            pool->mesh = s->next_mesh ++;
+        }
+
+        box_render_buffer_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_BUFFER,
+            BOX_RENDER_CREATE, pool->mesh, sizeof(box_render_buffer_desc_t));
+        desc->size = size;
+        desc->usage = BOX_RENDER_BUFFER_STORAGE;
+        ecs_os_memcpy(box_render_packet_upload(p, pool->mesh, 0, size),
+            ecs_vec_first(&s->corners), (ecs_size_t)size);
+        pool->corners = (uint32_t)count;
+    }
+
+    pool->mesh_built = m != NULL || !mesh;
+    pool->mesh_entity = source;
+    pool->mesh_handle = mesh;
+    glm_vec3_copy(scale, pool->mesh_scale);
 done:
     return;
 }
@@ -819,6 +953,100 @@ static void box_particles_velocity(
     pool->has_last = true;
 }
 
+/** Get the keys the sort of a pool sorts: the used slots rounded up to a power of two, at least
+ * the keys of a workgroup.
+ *
+ * @param used Slots that may hold a particle
+ * @param capacity Slots of the pool, a power of two
+ * @return The keys
+ */
+static uint32_t box_particles_sort_count(
+    uint32_t used,
+    uint32_t capacity)
+{
+    uint32_t result = BOX_RENDER_PARTICLE_SORT_MIN;
+    while (result < used) {
+        result *= 2;
+    }
+
+    return result < capacity ? result : capacity;
+}
+
+/** Write the changes over the life and the appearance of an emitter into its block.
+ *
+ * Without ParticleCurves the curves change nothing; without ParticleAppearance the particles
+ * are soft alpha blended circles, unsorted because their one color blends the same in any
+ * order.
+ *
+ * @param curves The ParticleCurves of the emitter, NULL for none
+ * @param look The ParticleAppearance of the emitter, NULL for none
+ * @param pool The pool, with its billboard corners
+ * @param out The block, its other members written
+ */
+static void box_particles_block_look(
+    const ParticleCurves *curves,
+    const ParticleAppearance *look,
+    const box_particle_pool_t *pool,
+    box_render_particle_block_t *out)
+{
+    const rgb *colors = NULL;
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        out->curve_size[i] = curves ? (&curves->size.start)[i] : 1.0f;
+        out->curve_opacity[i] = curves ? (&curves->opacity.start)[i] : 1.0f;
+        out->curve_rotation[i] = curves ? (&curves->rotation.start)[i] : 0.0f;
+        out->curve_spin[i] = curves ? (&curves->spin.start)[i] : 1.0f;
+        colors = curves ? &(&curves->color.start)[i] : NULL;
+        out->gradient[i][0] = colors ? box_particle_linear(colors->r) : 1.0f;
+        out->gradient[i][1] = colors ? box_particle_linear(colors->g) : 1.0f;
+        out->gradient[i][2] = colors ? box_particle_linear(colors->b) : 1.0f;
+        out->gradient[i][3] = 1.0f;
+    }
+
+    out->look = ParticleCircle;
+    out->blend = ParticleAlpha;
+    out->columns = 1;
+    out->rows = 1;
+    out->corners = 6;
+    if (look) {
+        out->look = (uint32_t)look->shape;
+        out->blend = look->blend == ParticleAdditive ? ParticleAdditive : ParticleAlpha;
+        out->columns = look->columns > 1 ? (uint32_t)look->columns : 1;
+        out->rows = look->rows > 1 ? (uint32_t)look->rows : 1;
+        out->fps = look->fps > 0 ? look->fps : 0.0f;
+        out->softness = look->softness > 0 ? look->softness : 0.0f;
+        out->stretch = look->stretch > 0 ? look->stretch : 0.0f;
+        out->lit = glm_clamp(look->lit, 0.0f, 1.0f);
+        if (look->shape == ParticleBillboard && pool->corners) {
+            out->corners = pool->corners;
+        } else if (look->shape != ParticleSprite) {
+            out->look = ParticleCircle;
+        }
+    }
+
+    out->styled = look ? 1u : 0u;
+    out->sorted = out->blend == ParticleAlpha && (curves || look) ? 1u : 0u;
+    out->sort_count = out->sorted ? box_particles_sort_count(pool->used, pool->capacity) : 0;
+}
+
+/** Get the texture handle of the sprite of an appearance.
+ *
+ * @param world The world
+ * @param look The ParticleAppearance, NULL for none
+ * @return The handle, 0 for white
+ */
+static uint32_t box_particles_texture(
+    ecs_world_t *world,
+    const ParticleAppearance *look)
+{
+    uint32_t result = 0;
+    if (look && look->shape == ParticleSprite && look->texture) {
+        result = box_textures_handle(box_textures_get(world), look->texture);
+    }
+
+    return result;
+}
+
 /** Account the frame of one emitter and add its pool to the packet when it has particles.
  *
  * A paused emitter ages and moves nothing and spawns nothing, a stopped one ages its particles
@@ -833,6 +1061,8 @@ static void box_particles_velocity(
  * @param transform Its world transform, NULL for the identity
  * @param scene Its scene
  * @param playback Its playback control, NULL to play; receives the clock and a cleared reset
+ * @param curves Its ParticleCurves, NULL for none
+ * @param look Its ParticleAppearance, NULL for none
  * @param stats Receives its counts
  */
 static void box_particles_emitter(
@@ -844,6 +1074,8 @@ static void box_particles_emitter(
     const WorldTransform *transform,
     ecs_entity_t scene,
     ParticlePlayback *playback,
+    const ParticleCurves *curves,
+    const ParticleAppearance *look,
     ParticleStats *stats)
 {
     int32_t max = emitter->max > BOX_PARTICLE_MAX ? BOX_PARTICLE_MAX : emitter->max;
@@ -893,6 +1125,13 @@ static void box_particles_emitter(
         pool->stopped = false;
     }
 
+    if (look && look->shape == ParticleBillboard) {
+        box_particles_mesh_update(world, s, p, pool, look->mesh);
+    } else if (pool->mesh_built) {
+        box_particles_mesh_free(s, p, pool);
+    }
+
+
     box_particles_velocity(pool, transform, p->delta, velocity);
     age_us = reset || state == ParticlePaused ? 0 : delta_us;
     pool->clock += age_us;
@@ -928,11 +1167,14 @@ static void box_particles_emitter(
     entry->clear = pool->fresh;
     entry->table = pool->table;
     entry->slots = slots;
+    entry->texture = box_particles_texture(world, look);
+    entry->mesh = pool->mesh;
     ParticleForces forces;
     box_particles_forces(world, e, emitter, &forces);
     glm_vec3_scale(velocity, emitter->inherit_velocity, velocity);
     box_particles_block(emitter, transform, &forces,
         ecs_get(world, e, ParticleCollision), velocity, age_us ? p->delta : 0.0f, &entry->block);
+    box_particles_block_look(curves, look, pool, &entry->block);
     entry->block.count = count;
     entry->block.first = first;
     entry->block.used = pool->used;
@@ -987,12 +1229,18 @@ static void BoxRenderExtractParticles(
         const ParticleEmitter *emitters = ecs_field(&qit, ParticleEmitter, 0);
         const WorldTransform *transforms = ecs_field(&qit, WorldTransform, 1);
         ParticlePlayback *playbacks = ecs_field(&qit, ParticlePlayback, 3);
+        const ParticleCurves *curves = ecs_field(&qit, ParticleCurves, 4);
+        const ParticleAppearance *looks = ecs_field(&qit, ParticleAppearance, 5);
         bool shared = ecs_field_is_set(&qit, 1) && !ecs_field_is_self(&qit, 1);
+        bool curves_shared = curves && !ecs_field_is_self(&qit, 4);
+        bool looks_shared = looks && !ecs_field_is_self(&qit, 5);
         for (i = 0; i < qit.count; i ++) {
             const WorldTransform *t = transforms ? &transforms[shared ? 0 : i] : NULL;
             stats.emitters ++;
             box_particles_emitter(world, s, p, qit.entities[i], &emitters[i], t,
-                box_render_scene_field(&qit, 2, i), playbacks ? &playbacks[i] : NULL, &stats);
+                box_render_scene_field(&qit, 2, i), playbacks ? &playbacks[i] : NULL,
+                curves ? &curves[curves_shared ? 0 : i] : NULL,
+                looks ? &looks[looks_shared ? 0 : i] : NULL, &stats);
         }
     }
 
@@ -1028,6 +1276,8 @@ static void box_particles_free(
     ecs_vec_fini_t(NULL, &s->table_handles, uint32_t);
     ecs_vec_fini_t(NULL, &s->points, box_particle_point_t);
     ecs_vec_fini_t(NULL, &s->bursts, box_particle_burst_t);
+    ecs_vec_fini_t(NULL, &s->mesh_handles, uint32_t);
+    ecs_vec_fini_t(NULL, &s->corners, box_render_particle_corner_t);
     ecs_os_free(s);
 }
 
@@ -1056,6 +1306,9 @@ void box_render_particles_init(
     ecs_vec_init_t(NULL, &s->table_handles, uint32_t, 0);
     ecs_vec_init_t(NULL, &s->points, box_particle_point_t, 0);
     ecs_vec_init_t(NULL, &s->bursts, box_particle_burst_t, 0);
+    ecs_vec_init_t(NULL, &s->mesh_handles, uint32_t, 0);
+    ecs_vec_init_t(NULL, &s->corners, box_render_particle_corner_t, 0);
+    s->next_mesh = BOX_RENDER_BUFFER_PARTICLE_MESH_FIRST;
     s->next_page = BOX_RENDER_BUFFER_PARTICLE_FIRST;
     s->next_table = BOX_RENDER_BUFFER_PARTICLE_TABLE_FIRST;
 
@@ -1089,7 +1342,9 @@ void box_render_particles_import(
                     .src.id = EcsSelf,
                     .inout = EcsInOut,
                     .oper = EcsOptional
-                }
+                },
+                { .id = ecs_id(ParticleCurves), .inout = EcsIn, .oper = EcsOptional },
+                { .id = ecs_id(ParticleAppearance), .inout = EcsIn, .oper = EcsOptional }
             },
             .cache_kind = EcsQueryCacheAuto
         });

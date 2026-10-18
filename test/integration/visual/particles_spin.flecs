@@ -1,0 +1,67 @@
+// Spin over life: lit box billboards whose spin speeds up along their spin curve, so the angle
+// they turned is the area under it, next to alpha sprites of the letter texture that add turns
+// from their rotation curve, both drawn back to front.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.texture
+using box.particle
+
+camera {
+  Position: {0, 2, 9}
+  Rotation: {-0.12, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {30, 34, 44, 255}}}
+}
+
+$ {
+  AmbientLight: {sky: {60, 64, 76}, ground: {30, 28, 26}}
+}
+
+sun {
+  Rotation: {0.7, 2.4, 0}
+  DirectionalLight: {intensity: 2.5}
+  Rgb: {255, 240, 220}
+}
+
+letter_tex {
+  TexturePath: {path: "test/integration/visual/assets/letter.png"}
+}
+
+// Mesh of the debris, out of view: billboards draw its shape scaled by their size
+rock {
+  Position: {0, -1000, 0}
+  Box: {1, 0.6, 0.4}
+}
+
+debris {
+  Position: {-2, 1, 0}
+  ParticleEmitter: {
+    max: 400, rate: 6000, shape: EmitterSphere, radius: 0.3, spread: 180,
+    speed: {20, 50}, lifetime: {0.045, 0.05}, size: {0.3, 0.5}, rotation: {0, 360},
+    spin: {2000, 4000}, opacity: {1, 1}, color: {200, 150, 110}, seed: 13
+  }
+  ParticleCurves: {
+    spin: {0, 1, 2, 4}
+  }
+  ParticleAppearance: {shape: ParticleBillboard, mesh: rock, lit: 1}
+}
+
+letters {
+  Position: {2, 1, 0}
+  ParticleEmitter: {
+    max: 400, rate: 6000, shape: EmitterSphere, radius: 0.3, spread: 180,
+    speed: {20, 40}, lifetime: {0.045, 0.05}, size: {0.6, 0.6}, opacity: {0.9, 1},
+    color: {255, 255, 255}, seed: 17
+  }
+  ParticleCurves: {
+    rotation: {0, 0.25, 0.5, 1}
+  }
+  ParticleAppearance: {shape: ParticleSprite, texture: letter_tex}
+}

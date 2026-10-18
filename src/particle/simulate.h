@@ -1,7 +1,8 @@
 /**
  * @file particle/simulate.h
  * @brief C twin of the particle simulation of etc/shaders/particle_sim.wgsl and
- * etc/shaders/include/particle.wgsl: the hash, the range draws, the spawn shapes and the step.
+ * etc/shaders/include/particle.wgsl: the hash, the range draws, the spawn shapes, the step and
+ * the changes of a particle over its life.
  *
  * Every function here has a WGSL twin with the same name minus the box_ prefix; a change to
  * one is a change to both. Lifetimes are whole microseconds, so the spawn accounting of the
@@ -13,6 +14,7 @@
 
 #include <box.h>
 #include <math.h>
+#include <string.h>
 
 /** Hash stream of the lifetime of a particle */
 #define BOX_PARTICLE_STREAM_LIFE (0u)
@@ -64,6 +66,9 @@
 
 /** Longest lifetime in microseconds, so a lifetime and a frame delta fit in 32 bits */
 #define BOX_PARTICLE_LIFE_MAX_US (4000000000u)
+
+/** Sort key of a free slot, after every live particle */
+#define BOX_PARTICLE_SORT_DEAD (0xFFFFFFFFu)
 
 /** Points of the table an EmitterMesh spawns from */
 #define BOX_PARTICLE_MESH_POINTS (4096)
@@ -463,6 +468,252 @@ void box_particle_sample(
     const ParticleEmitter *emitter,
     uint32_t index,
     box_particle_sample_t *out);
+
+/** Decode an 8 bit display encoded channel to linear.
+ *
+ * @param c The channel
+ * @return The linear value, 0 to 1
+ */
+static inline float box_particle_linear(
+    uint8_t c)
+{
+    return box_particle_decode((float)c / 255.0f);
+}
+
+/** Get the normalized age of a particle.
+ *
+ * @param age Seconds the particle lived
+ * @param life Seconds it lives
+ * @return The age over the life, 0 to 1, 0 for a life of 0
+ */
+static inline float box_particle_norm_age(
+    float age,
+    float life)
+{
+    float t = life > 0.0f ? age / life : 0.0f;
+
+    return fminf(fmaxf(t, 0.0f), 1.0f);
+}
+
+/** Evaluate a ParticleCurve at a normalized age, linear between its four keys.
+ *
+ * @param keys Values at the ages 0, 1/3, 2/3 and 1
+ * @param t The normalized age, clamped to 0 to 1
+ * @return The value
+ */
+static inline float box_particle_curve(
+    const float *keys,
+    float t)
+{
+    float s = fminf(fmaxf(t, 0.0f), 1.0f) * 3.0f;
+    float i = fminf(floorf(s), 2.0f);
+    int32_t k = (int32_t)i;
+
+    return keys[k] + (keys[k + 1] - keys[k]) * (s - i);
+}
+
+/** Get the area under a ParticleCurve from age 0 up to a normalized age.
+ *
+ * @param keys Values at the ages 0, 1/3, 2/3 and 1
+ * @param t The normalized age, clamped to 0 to 1
+ * @return The area, in normalized age times value
+ */
+static inline float box_particle_curve_area(
+    const float *keys,
+    float t)
+{
+    float s = fminf(fmaxf(t, 0.0f), 1.0f) * 3.0f, sum = 0.0f;
+    int32_t k;
+    for (k = 0; k < 3; k ++) {
+        float f = fminf(fmaxf(s - (float)k, 0.0f), 1.0f);
+        sum += f * keys[k] + 0.5f * f * f * (keys[k + 1] - keys[k]);
+    }
+
+    return sum / 3.0f;
+}
+
+/** Get the degrees a particle has turned by its spin, the area under its spin curve up to its
+ * age; a constant curve turns it by its spin times the key times its age.
+ *
+ * @param spin Spin the particle spawned with, degrees per second
+ * @param keys Keys of the spin curve
+ * @param age Seconds the particle lived
+ * @param life Seconds it lives
+ * @return The degrees
+ */
+static inline float box_particle_turned(
+    float spin,
+    const float *keys,
+    float age,
+    float life)
+{
+    float result;
+    if (keys[0] == keys[1] && keys[1] == keys[2] && keys[2] == keys[3]) {
+        result = spin * keys[0] * age;
+    } else {
+        result = spin * life * box_particle_curve_area(keys, box_particle_norm_age(age, life));
+    }
+
+    return result;
+}
+
+/** Get the rotation of a particle in degrees: the rotation it spawned with, the turns of the
+ * rotation curve and what its spin turned it by.
+ *
+ * @param rotation Rotation it spawned with in degrees
+ * @param spin Spin it spawned with in degrees per second
+ * @param rotation_keys Keys of the rotation curve, in turns
+ * @param spin_keys Keys of the spin curve
+ * @param age Seconds the particle lived
+ * @param life Seconds it lives
+ * @return The degrees
+ */
+static inline float box_particle_rotation(
+    float rotation,
+    float spin,
+    const float *rotation_keys,
+    const float *spin_keys,
+    float age,
+    float life)
+{
+    float t = box_particle_norm_age(age, life);
+
+    return rotation + 360.0f * box_particle_curve(rotation_keys, t) +
+        box_particle_turned(spin, spin_keys, age, life);
+}
+
+/** Evaluate a ParticleGradient at a normalized age, linear between its four linear colors.
+ *
+ * @param keys Linear colors at the ages 0, 1/3, 2/3 and 1, four floats each, w unused
+ * @param t The normalized age, clamped to 0 to 1
+ * @param out Receives the linear color
+ */
+static inline void box_particle_gradient(
+    const float *keys,
+    float t,
+    float *out)
+{
+    float s = fminf(fmaxf(t, 0.0f), 1.0f) * 3.0f;
+    float i = fminf(floorf(s), 2.0f);
+    int32_t k = (int32_t)i * 4, c;
+    for (c = 0; c < 3; c ++) {
+        out[c] = keys[k + c] + (keys[k + 4 + c] - keys[k + c]) * (s - i);
+    }
+}
+
+/** Get the frame of a sprite sheet a particle shows.
+ *
+ * @param columns Frames across the sheet, 0 and 1 for one
+ * @param rows Frames down the sheet, 0 and 1 for one
+ * @param fps Frames a second, looping, 0 to play the sheet once over the life
+ * @param age Seconds the particle lived
+ * @param life Seconds it lives
+ * @return The frame, row by row from the top left, 0 to columns times rows minus 1
+ */
+static inline uint32_t box_particle_frame(
+    uint32_t columns,
+    uint32_t rows,
+    float fps,
+    float age,
+    float life)
+{
+    uint32_t frames = (columns > 1 ? columns : 1) * (rows > 1 ? rows : 1);
+    float f = fps > 0.0f
+        ? floorf(fmaxf(age, 0.0f) * fps)
+        : floorf(box_particle_norm_age(age, life) * (float)frames);
+    uint32_t result = (uint32_t)f;
+
+    return fps > 0.0f ? result % frames : (result < frames ? result : frames - 1);
+}
+
+/** Get the rectangle of a frame of a sprite sheet in texture coordinates.
+ *
+ * @param frame The frame, row by row from the top left
+ * @param columns Frames across the sheet, 0 and 1 for one
+ * @param rows Frames down the sheet, 0 and 1 for one
+ * @param out Receives u and v of the top left corner, then the width and height
+ */
+static inline void box_particle_frame_rect(
+    uint32_t frame,
+    uint32_t columns,
+    uint32_t rows,
+    float *out)
+{
+    uint32_t c = columns > 1 ? columns : 1, r = rows > 1 ? rows : 1;
+    out[2] = 1.0f / (float)c;
+    out[3] = 1.0f / (float)r;
+    out[0] = (float)(frame % c) * out[2];
+    out[1] = (float)((frame / c) % r) * out[3];
+}
+
+/** Get the fade of a soft particle in front of the geometry behind it.
+ *
+ * @param scene View depth of the geometry behind the fragment
+ * @param depth View depth of the fragment of the particle
+ * @param softness World units the particle fades over, 0 or less for no fade
+ * @return The opacity factor, 0 at the geometry to 1 a softness or more in front of it
+ */
+static inline float box_particle_soft(
+    float scene,
+    float depth,
+    float softness)
+{
+    float result = 1.0f;
+    if (softness > 0.0f) {
+        result = fminf(fmaxf((scene - depth) / softness, 0.0f), 1.0f);
+    }
+
+    return result;
+}
+
+/** Get the view depth of a depth buffer value from the depth rows of a projection.
+ *
+ * @param p The projection, z and w rows of its z and w columns: P[2][2], P[3][2], P[2][3] and
+ *          P[3][3] in column major order
+ * @param d The depth buffer value, reversed: 1 at the near plane
+ * @return The distance in front of the camera, infinite for a value with no point
+ */
+static inline float box_particle_view_depth(
+    const float *p,
+    float d)
+{
+    float den = d * p[2] - p[0];
+    float result = INFINITY;
+    if (den != 0.0f) {
+        result = -(p[1] - d * p[3]) / den;
+    }
+
+    return result;
+}
+
+/** Get the length factor of a stretched sprite.
+ *
+ * @param stretch Length added per unit of speed, 0 or less for none
+ * @param speed Speed across the screen in world units per second
+ * @return The factor its length along the velocity is scaled by, at least 1
+ */
+static inline float box_particle_stretch(
+    float stretch,
+    float speed)
+{
+    return 1.0f + fmaxf(stretch, 0.0f) * fmaxf(speed, 0.0f);
+}
+
+/** Get the sort key of a live particle: ascending keys draw back to front.
+ *
+ * @param depth View depth of the particle
+ * @return The key, below BOX_PARTICLE_SORT_DEAD
+ */
+static inline uint32_t box_particle_sort_key(
+    float depth)
+{
+    uint32_t bits;
+    memcpy(&bits, &depth, sizeof(bits));
+    bits ^= (bits >> 31) ? 0xFFFFFFFFu : 0x80000000u;
+    bits = ~bits;
+
+    return bits == BOX_PARTICLE_SORT_DEAD ? BOX_PARTICLE_SORT_DEAD - 1u : bits;
+}
 
 /** Sample points over the surface of a mesh, area weighted, as the table of an EmitterMesh.
  *

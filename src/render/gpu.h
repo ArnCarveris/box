@@ -786,6 +786,29 @@ void box_gpu_texture_mips(
 void box_gpu_materials_clear(
     box_gpu_t *gpu);
 
+/** Get the view a particle sprite samples a texture through, decoded from sRGB, and queue its
+ * levels for generation in linear light.
+ *
+ * @param gpu The backend
+ * @param handle Texture handle, 0 or one the backend lacks for white
+ * @return The view
+ */
+WGPUTextureView box_gpu_texture_color(
+    box_gpu_t *gpu,
+    uint32_t handle);
+
+/** Get the sampler of a wrap mode and an anisotropy, created on first use.
+ *
+ * @param gpu The backend
+ * @param wrap The TextureWrap
+ * @param anisotropy Anisotropic samples, rounded down to a power of two up to 16
+ * @return The sampler
+ */
+WGPUSampler box_gpu_texture_sampler(
+    box_gpu_t *gpu,
+    uint32_t wrap,
+    uint32_t anisotropy);
+
 /** Get the bind group of the texture layers and sampler of a batch, created on first use.
  *
  * A layer whose handle has BOX_RENDER_TEXTURE_TARGET samples the image of that target, or the
@@ -1502,20 +1525,47 @@ void box_gpu_particles_simulate(
     box_gpu_t *gpu,
     const box_render_packet_t *packet);
 
+/** Record the sort passes of the alpha blended particle pools of the scene of a view that draw
+ * back to front, before the passes of the view.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder of the frame
+ * @param v The view
+ * @param slot Slot of the view in the view buffer, which holds its uniforms
+ */
+void box_gpu_particles_sort(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    const box_render_view_t *v,
+    int32_t slot);
+
+/** Check whether a pool of the scene of a view fades in front of the depth of the view, so the
+ * view draws its particles in a pass that reads the depth instead of writing it.
+ *
+ * @param gpu The backend
+ * @param v The view
+ * @return Whether a soft pool has particles in the scene of the view
+ */
+bool box_gpu_particles_soft(
+    const box_gpu_t *gpu,
+    const box_render_view_t *v);
+
 /** Record the indirect draws of the particle pools of the scene of a view into its forward
- * pass. Replaces the pipeline and the bind group at 1.
+ * pass, emitters back to front. Replaces the pipeline and the bind groups at 1 and 2.
  *
  * @param gpu The backend
  * @param pass The render pass of the view, with the bind group of the view at 0
  * @param format The format of the color target
  * @param v The view
+ * @param depth The depth of the view, read only in the pass, NULL when it is written
  * @return Whether a pool was drawn
  */
 bool box_gpu_particles_draw(
     box_gpu_t *gpu,
     WGPURenderPassEncoder pass,
     WGPUTextureFormat format,
-    const box_render_view_t *v);
+    const box_render_view_t *v,
+    WGPUTextureView depth);
 
 /** Create the layouts, sampler and placeholders of the effect passes.
  *

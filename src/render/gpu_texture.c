@@ -469,14 +469,7 @@ done:
     return;
 }
 
-/** Get the sampler of a wrap mode and an anisotropy, created on first use.
- *
- * @param gpu The backend
- * @param wrap The TextureWrap
- * @param anisotropy Anisotropic samples, rounded down to a power of two up to 16
- * @return The sampler
- */
-static WGPUSampler box_gpu_texture_sampler(
+WGPUSampler box_gpu_texture_sampler(
     box_gpu_t *gpu,
     uint32_t wrap,
     uint32_t anisotropy)
@@ -593,6 +586,17 @@ static WGPUTextureView box_gpu_material_view(
     result = color ? tex->srgb : tex->linear;
 done:
     return result;
+}
+
+WGPUTextureView box_gpu_texture_color(
+    box_gpu_t *gpu,
+    uint32_t handle)
+{
+    uint32_t textures[BOX_RENDER_TEXTURE_SLOTS] = {0};
+    textures[0] = handle & BOX_RENDER_TEXTURE_TARGET ? 0 : handle;
+    box_gpu_material_mips(gpu, textures);
+
+    return box_gpu_material_view(gpu, textures[0], 0);
 }
 
 WGPUBindGroup box_gpu_material_group(

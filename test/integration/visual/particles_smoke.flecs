@@ -1,0 +1,59 @@
+// Lit soft smoke over a floor: alpha blended circles drawn back to front that grow, fade out
+// and turn from pale to dark gray over their life, half shaded by the sun and its shadow and
+// faded where they meet the floor. Short lives and fast particles, so the three frames of a
+// visual run show whole lives.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.particle
+
+camera {
+  Position: {0, 2.5, 9}
+  Rotation: {-0.2, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {70, 90, 120, 255}}}
+}
+
+$ {
+  AmbientLight: {sky: {90, 100, 120}, ground: {40, 36, 32}}
+}
+
+sun {
+  Rotation: {0.8, 2.2, 0}
+  DirectionalLight: {intensity: 2.5}
+  Rgb: {255, 236, 210}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {14, 0.2, 8}
+  Rgb: {120, 110, 100}
+}
+
+pillar {
+  Position: {2.5, 1, -1.5}
+  Box: {0.8, 2, 0.8}
+  Rgb: {150, 150, 155}
+}
+
+smoke {
+  Position: {-0.5, 0.1, 0}
+  ParticleEmitter: {
+    max: 6000, rate: 90000, shape: EmitterDisc, radius: 0.6, spread: 25,
+    speed: {30, 90}, lifetime: {0.04, 0.05}, size: {0.4, 0.7}, rotation: {0, 360},
+    opacity: {0.4, 0.7}, acceleration: {600, 0, 0}, color: {255, 255, 255}, seed: 3
+  }
+  ParticleCurves: {
+    size: {0.5, 1.5, 2.5, 3.5},
+    opacity: {0, 1, 0.6, 0},
+    color: {start: {240, 240, 235}, early: {200, 200, 200}, late: {140, 140, 145},
+      end: {90, 90, 95}}
+  }
+  ParticleAppearance: {softness: 0.6, lit: 0.6}
+}

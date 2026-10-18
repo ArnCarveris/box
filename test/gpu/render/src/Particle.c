@@ -1,7 +1,8 @@
 /**
  * @file Particle.c
  * @brief Tests for the particle passes: streams render where their particles are, scenes and
- * full pools are respected and a fixed seed renders the same image twice.
+ * full pools are respected, a fixed seed renders the same image twice, additive pools brighten,
+ * soft particles fade near geometry and sprites show the frame of their age.
  *
  * Frames advance a fixed 1/60 s.
  * An unlit orthographic camera 10 units in front of the origin looks into a 32x32 capture of
@@ -17,16 +18,22 @@
 #define STB_IMAGE_STATIC
 #include <stb_image.h>
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_STATIC
+#include <stb_image_write.h>
+
 /** Edge of the capture in pixels */
 #define SIZE (32)
 
-/** Create a headless world with a camera, a view that clears to black and a surface.
+/** Create a headless world with a camera, a view that clears to a gray and a surface.
  *
  * @param file Name of the PNG the surface writes every frame
+ * @param gray Channels of the clear color
  * @return The world
  */
-static ecs_world_t* world_new(
-    const char *file)
+static ecs_world_t* world_new_clear(
+    const char *file,
+    uint8_t gray)
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -40,12 +47,24 @@ static ecs_world_t* world_new(
         .far_ = 100});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera,
-        .clear = {.enabled = true, .color = {0, 0, 0, 255}}, .lighting.enabled = false});
+        .clear = {.enabled = true, .color = {gray, gray, gray, 255}},
+        .lighting.enabled = false});
     ecs_entity_t surface = ecs_new(world);
     ecs_set(world, surface, Surface, {.width = SIZE, .height = SIZE, .resolution_scale = 1,
         .write_to_file = ECS_CONST_CAST(char*, file)});
 
     return world;
+}
+
+/** Create a headless world with a camera, a view that clears to black and a surface.
+ *
+ * @param file Name of the PNG the surface writes every frame
+ * @return The world
+ */
+static ecs_world_t* world_new(
+    const char *file)
+{
+    return world_new_clear(file, 0);
 }
 
 /** Create a white emitter at the origin that rises at 1 unit per second.
@@ -73,6 +92,45 @@ static ecs_entity_t emitter_new(
     ecs_modified(world, e, ParticleEmitter);
 
     return e;
+}
+
+/** Create an emitter of one white particle that stays where it spawns.
+ *
+ * @param world The world
+ * @param x World x of the emitter
+ * @param size Diameter of the particle
+ * @return The emitter
+ */
+static ecs_entity_t single_new(
+    ecs_world_t *world,
+    float x,
+    float size)
+{
+    ecs_entity_t e = emitter_new(world, 0, 60, 1);
+    ecs_set(world, e, Position, {x, 0, 0});
+    ParticleEmitter *p = ecs_get_mut(world, e, ParticleEmitter);
+    p->direction[1] = 0;
+    p->size = (ParticleRange){size, size};
+    ecs_modified(world, e, ParticleEmitter);
+
+    return e;
+}
+
+/** Get a pixel at a world position on the plane of the emitters.
+ *
+ * @param px The pixels
+ * @param x World x
+ * @param y World y
+ * @return The RGBA channels of the pixel
+ */
+static const unsigned char* pixel_at(
+    const unsigned char *px,
+    float x,
+    float y)
+{
+    int32_t col = (int32_t)(16.0f + x * 4.0f), row = (int32_t)(16.0f - y * 4.0f);
+
+    return &px[(row * SIZE + col) * 4];
 }
 
 /** Run frames and load the image the last one wrote.
@@ -209,4 +267,100 @@ void Particle_fixed_seed_same_image(void) {
     test_assert(memcmp(px[0], px[1], SIZE * SIZE * 4) == 0);
     stbi_image_free(px[0]);
     stbi_image_free(px[1]);
+}
+
+void Particle_additive_never_darkens(void) {
+    // particle/blend
+    unsigned char *px[2];
+    int32_t w, i;
+    for (w = 0; w < 2; w ++) {
+        ecs_world_t *world = world_new_clear("blend.png", 128);
+        ecs_entity_t e = emitter_new(world, 0, 400, 1000);
+        ecs_get_mut(world, e, ParticleEmitter)->color = (rgb){64, 64, 64};
+        ecs_modified(world, e, ParticleEmitter);
+        ecs_set(world, e, ParticleAppearance, {
+            .blend = w ? ParticleAdditive : ParticleAlpha});
+        px[w] = run(world, "blend.png", 60);
+        ecs_fini(world);
+    }
+
+    const unsigned char *alpha = pixel_at(px[0], 0, 0.5f);
+    const unsigned char *additive = pixel_at(px[1], 0, 0.5f);
+    test_assert(alpha[1] < 110);
+    test_assert(additive[1] > 150);
+    for (i = 0; i < SIZE * SIZE * 4; i ++) {
+        if ((i % 4) != 3) {
+            test_assert(px[1][i] >= 126);
+        }
+    }
+
+    test_assert(pixel_at(px[1], 3, 3)[1] <= 130);
+    stbi_image_free(px[0]);
+    stbi_image_free(px[1]);
+}
+
+void Particle_soft_fades_near_wall(void) {
+    // particle/soft
+    ecs_world_t *world = world_new("soft.png");
+    ecs_entity_t wall = ecs_new(world);
+    ecs_set(world, wall, Position, {-1, 0, -0.3f});
+    ecs_set(world, wall, Box, {6, 8, 0.1f});
+    ecs_set(world, wall, Rgb, {0, 0, 0});
+    ecs_entity_t near_soft = single_new(world, -2.5f, 1.5f);
+    ecs_entity_t near_hard = single_new(world, 0, 1.5f);
+    ecs_entity_t open_soft = single_new(world, 3, 1.5f);
+    ecs_set(world, near_soft, ParticleAppearance, {.softness = 2});
+    ecs_set(world, near_hard, ParticleAppearance, {.softness = 0});
+    ecs_set(world, open_soft, ParticleAppearance, {.softness = 2});
+    unsigned char *px = run(world, "soft.png", 10);
+
+    int32_t faded = pixel_at(px, -2.5f, 0)[1];
+    int32_t hard = pixel_at(px, 0, 0)[1];
+    int32_t open = pixel_at(px, 3, 0)[1];
+    test_assert(hard > 200);
+    test_assert(open > 200);
+    test_assert(faded < 160);
+    test_assert(faded > 4);
+    test_assert(pixel_at(px, -2.5f, 2.5f)[1] < 8);
+    test_int(ecs_singleton_get(world, ParticleStats)->particles, 3);
+
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+void Particle_sprite_frame_texel(void) {
+    // particle/sprite
+    ecs_world_t *world = world_new("sprite.png");
+    const char *tmp = ecs_singleton_get(world, AppStatus)->tmp_dir;
+    char *file = flecs_asprintf("%s/sheet.png", tmp);
+    uint8_t texels[8 * 2 * 4];
+    int32_t i;
+    for (i = 0; i < 16; i ++) {
+        bool right = (i % 8) >= 4;
+        texels[i * 4 + 0] = (uint8_t)(right ? 0 : 255);
+        texels[i * 4 + 1] = (uint8_t)(right ? 255 : 0);
+        texels[i * 4 + 2] = 0;
+        texels[i * 4 + 3] = 255;
+    }
+
+    test_assert(stbi_write_png(file, 8, 2, 4, texels, 8 * 4) != 0);
+    ecs_entity_t tex = ecs_new(world);
+    ecs_set(world, tex, TexturePath, {.path = file});
+    ecs_entity_t e = single_new(world, 0, 4);
+    ecs_set(world, e, ParticleAppearance, {
+        .shape = ParticleSprite, .texture = tex, .columns = 2, .rows = 1, .fps = 1});
+
+    unsigned char *px = run(world, "sprite.png", 20);
+    const unsigned char *c = pixel_at(px, 0, 0);
+    test_assert(c[0] > 200 && c[1] < 50 && c[2] < 50);
+    stbi_image_free(px);
+
+    px = run(world, "sprite.png", 70);
+    c = pixel_at(px, 0, 0);
+    test_assert(c[0] < 50 && c[1] > 200 && c[2] < 50);
+    test_assert(pixel_at(px, 3, 3)[1] < 8);
+    stbi_image_free(px);
+
+    ecs_os_free(file);
+    ecs_fini(world);
 }

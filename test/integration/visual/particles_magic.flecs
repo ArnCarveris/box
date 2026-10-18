@@ -1,0 +1,71 @@
+// Magic: additive ring sprites rising from a disc, turning a quarter turn and fading from violet
+// to cyan over their life, next to a sprite sheet of the checker texture that steps through its
+// sixteen frames once over each life.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.effects
+using box.texture
+using box.particle
+
+bloom {
+  Bloom: {intensity: 0.4, threshold: 1, threshold_softness: 0.5}
+}
+
+tonemap {
+  Tonemap: {}
+}
+
+camera {
+  Position: {0, 2, 9}
+  Rotation: {-0.12, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {12, 8, 24, 255}},
+    effects: [{effect: bloom}, {effect: tonemap}]}
+}
+
+ring_tex {
+  TexturePath: {path: "test/integration/visual/assets/ring.png"}
+}
+
+checker_tex {
+  TexturePath: {path: "test/integration/visual/assets/checker.png"}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {14, 0.2, 8}
+  Rgb: {30, 26, 40}
+}
+
+rings {
+  Position: {-2, 0.1, 0}
+  ParticleEmitter: {
+    max: 600, rate: 5000, shape: EmitterDisc, radius: 1, spread: 5,
+    speed: {10, 80}, lifetime: {0.04, 0.05}, size: {0.3, 0.6}, opacity: {0.4, 0.8},
+    color: {255, 255, 255}, seed: 7
+  }
+  ParticleCurves: {
+    size: {0.5, 1, 1.2, 1.4},
+    opacity: {0, 1, 1, 0},
+    rotation: {0, 0.1, 0.2, 0.25},
+    color: {start: {200, 80, 255}, early: {160, 110, 255}, late: {90, 200, 255},
+      end: {60, 255, 230}}
+  }
+  ParticleAppearance: {shape: ParticleSprite, blend: ParticleAdditive, texture: ring_tex}
+}
+
+sheet {
+  Position: {2.2, 0.1, 0}
+  ParticleEmitter: {
+    max: 600, rate: 8000, shape: EmitterDisc, radius: 0.8, spread: 10,
+    speed: {30, 60}, lifetime: {0.04, 0.05}, size: {0.5, 0.5}, opacity: {1, 1},
+    color: {255, 255, 255}, seed: 9
+  }
+  ParticleAppearance: {shape: ParticleSprite, texture: checker_tex, columns: 4, rows: 4}
+}

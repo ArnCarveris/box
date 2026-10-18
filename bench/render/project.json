@@ -158,7 +158,8 @@
                 "benchcases": [
                     "simulate_1m",
                     "simulate_1m_forces",
-                    "draw_1m"
+                    "draw_1m",
+                    "smoke_fill"
                 ]
             }
         ]

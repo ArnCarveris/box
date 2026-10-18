@@ -140,6 +140,43 @@
                     "reset_restarts_schedule",
                     "negative_count"
                 ]
+            },
+            {
+                "id": "Curves",
+                "testcases": [
+                    "constant_curve",
+                    "curve_at_sampled_ages",
+                    "curve_clamps_age",
+                    "gradient_at_sampled_ages",
+                    "spin_area_constant",
+                    "spin_area_ramp",
+                    "spin_area_not_spin_times_age",
+                    "rotation_adds_turns",
+                    "c_defaults",
+                    "script_defaults"
+                ]
+            },
+            {
+                "id": "Appearance",
+                "testcases": [
+                    "c_defaults",
+                    "script_values",
+                    "frame_over_life",
+                    "frame_at_fps_loops",
+                    "frame_whole_texture",
+                    "frame_rect",
+                    "soft_fade_term",
+                    "soft_view_depth",
+                    "stretch_factor",
+                    "sort_key_back_to_front",
+                    "block_without_appearance",
+                    "block_curves",
+                    "block_sprite",
+                    "block_additive_unsorted",
+                    "sort_count_power_of_two",
+                    "billboard_corners_sent",
+                    "billboard_without_mesh_is_circle"
+                ]
             }
         ]
     }

@@ -81,6 +81,33 @@ static void box_particle_collision_ctor(
     }
 }
 
+/** Construct ParticleCurves values that change nothing: multipliers of 1, no added turns and a
+ * white gradient.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_particle_curves_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    ParticleCurves *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (ParticleCurves){
+            .size = { 1.0f, 1.0f, 1.0f, 1.0f },
+            .opacity = { 1.0f, 1.0f, 1.0f, 1.0f },
+            .color = {
+                {255, 255, 255}, {255, 255, 255}, {255, 255, 255}, {255, 255, 255}
+            },
+            .spin = { 1.0f, 1.0f, 1.0f, 1.0f }
+        };
+    }
+}
+
 void BoxParticleImport(
     ecs_world_t *world)
 {
@@ -102,6 +129,13 @@ void BoxParticleImport(
     ECS_META_COMPONENT(world, PlaybackState);
     ECS_META_COMPONENT(world, ParticlePlayback);
     ECS_META_COMPONENT(world, ParticleBurst);
+    ECS_META_COMPONENT(world, ParticleCurve);
+    ECS_META_COMPONENT(world, ParticleGradient);
+    ECS_META_COMPONENT(world, ParticleCurves);
+    ecs_set_hooks(world, ParticleCurves, { .ctor = box_particle_curves_ctor });
+    ECS_META_COMPONENT(world, ParticleShape);
+    ECS_META_COMPONENT(world, ParticleBlend);
+    ECS_META_COMPONENT(world, ParticleAppearance);
     ECS_META_COMPONENT(world, ParticleStats);
     ecs_singleton_set(world, ParticleStats, {0});
 

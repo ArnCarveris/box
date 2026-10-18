@@ -1,0 +1,65 @@
+// Additive fire in the HDR image before bloom: a dense column of circles that shrink and cool
+// from white yellow through orange to a dim red over their life. Overlapping particles add up
+// above 1 and bloom; the additive pool never darkens the logs behind it.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.effects
+using box.particle
+
+bloom {
+  Bloom: {intensity: 0.4, threshold: 1, threshold_softness: 0.5}
+}
+
+tonemap {
+  Tonemap: {}
+}
+
+camera {
+  Position: {0, 2, 8}
+  Rotation: {-0.15, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {8, 6, 6, 255}},
+    effects: [{effect: bloom}, {effect: tonemap}]}
+}
+
+ground {
+  Position: {0, -0.1, 0}
+  Box: {14, 0.2, 8}
+  Rgb: {40, 34, 30}
+}
+
+log_a {
+  Position: {0, 0.15, 0.3}
+  Rotation: {0, 0.5, 0}
+  Box: {2.2, 0.3, 0.3}
+  Rgb: {60, 36, 20}
+}
+
+log_b {
+  Position: {0, 0.15, -0.3}
+  Rotation: {0, -0.5, 0}
+  Box: {2.2, 0.3, 0.3}
+  Rgb: {60, 36, 20}
+}
+
+fire {
+  Position: {0, 0.3, 0}
+  ParticleEmitter: {
+    max: 8000, rate: 120000, shape: EmitterDisc, radius: 0.5, spread: 12,
+    speed: {5, 100}, lifetime: {0.02, 0.05}, size: {0.3, 0.6}, opacity: {0.2, 0.5},
+    acceleration: {0, 400, 0}, color: {255, 200, 140}, seed: 11
+  }
+  ParticleCurves: {
+    size: {1, 1.2, 0.8, 0.2},
+    opacity: {1, 1, 0.7, 0},
+    color: {start: {255, 255, 220}, early: {255, 190, 80}, late: {240, 90, 30},
+      end: {90, 20, 10}}
+  }
+  ParticleAppearance: {blend: ParticleAdditive, softness: 0.3}
+}

@@ -18,6 +18,19 @@
 /** Bytes of a particle in a pool, box_particle_t of src/particle/simulate.h */
 #define BOX_RENDER_PARTICLE_SIZE (32)
 
+/** First buffer handle of the corner buffers of the ParticleBillboard meshes */
+#define BOX_RENDER_BUFFER_PARTICLE_MESH_FIRST (0x5C000000u)
+
+/** Fewest keys a sort of a pool sorts, the keys one workgroup sorts in shared memory */
+#define BOX_RENDER_PARTICLE_SORT_MIN (512u)
+
+/** A corner of a triangle of a billboard mesh, as Corner in etc/shaders/include/particle.wgsl */
+typedef struct box_render_particle_corner_t {
+    float position[4];      /**< Position in the space of the mesh times its shape scale, w the
+                             *   u texture coordinate */
+    float normal[4];        /**< Unit normal, w the v texture coordinate */
+} box_render_particle_corner_t;
+
 /** Spawn slot of a particle that spawns with a lifetime of 0, which takes no slot */
 #define BOX_RENDER_PARTICLE_NO_SLOT (0xFFFFFFFFu)
 
@@ -53,7 +66,8 @@ typedef struct box_render_particle_block_t {
     uint32_t delta_us;      /**< Microseconds of the frame */
     uint32_t life_min;      /**< Shortest lifetime in microseconds */
     uint32_t life_span;     /**< Microseconds the longest lifetime is above life_min */
-    uint32_t pad1;          /**< Unused */
+    uint32_t sort_first;    /**< First sort key of the pool in the key buffer, set by the
+                             *   backend */
     float wind[4];          /**< World velocity the drag pulls toward, w the drag rate */
     float turbulence[4];    /**< Acceleration of the wander field, y its frequency scale, zw
                              *   unused */
@@ -63,8 +77,27 @@ typedef struct box_render_particle_block_t {
     float ground[4];        /**< Height of the ground plane, y the bounce, z the friction, w
                              *   unused */
     uint32_t collide;       /**< BOX_PARTICLE_GROUND_NONE, _BOUNCE or _DIE */
-    uint32_t pad2[47];      /**< Pads the block to a multiple of the uniform offset
-                             *   alignment */
+    uint32_t pad1[3];       /**< Unused */
+    uint32_t look;          /**< ParticleShape drawn, ParticleCircle while a billboard has no
+                             *   mesh */
+    uint32_t blend;         /**< ParticleBlend */
+    uint32_t columns;       /**< Frames across the sprite sheet, at least 1 */
+    uint32_t rows;          /**< Frames down the sprite sheet, at least 1 */
+    float fps;              /**< Frames a second, 0 to play the sheet once over the life */
+    float softness;         /**< World units a particle fades over in front of the geometry */
+    float stretch;          /**< Length added along the screen velocity per unit of speed */
+    float lit;              /**< Fraction of the color the lights shade */
+    float curve_size[4];    /**< Keys of the size multiplier */
+    float curve_opacity[4]; /**< Keys of the opacity multiplier */
+    float curve_rotation[4]; /**< Keys of the turns added to the rotation */
+    float curve_spin[4];    /**< Keys of the spin multiplier */
+    float gradient[4][4];   /**< Linear colors of the color multiplier, w unused */
+    uint32_t corners;       /**< Vertices drawn per particle: 6 for a quad, else the corners of
+                             *   the billboard mesh */
+    uint32_t sorted;        /**< 1 when the pool is drawn back to front through its sort keys */
+    uint32_t sort_count;    /**< Keys sorted, a power of two of at least
+                             *   BOX_RENDER_PARTICLE_SORT_MIN, 0 when not sorted */
+    uint32_t styled;        /**< 1 when the emitter has a ParticleAppearance */
 } box_render_particle_block_t;
 
 /** A particle pool of the frame: a range of a particle page, simulated after the scatters and
@@ -78,6 +111,8 @@ typedef struct box_render_particle_pool_t {
     bool clear;             /**< The range is zeroed before the passes, for a new pool */
     uint32_t table;         /**< Buffer handle of the mesh table, 0 for none */
     uint32_t slots;         /**< Data offset of the block.count uint32_t spawn slots */
+    uint32_t texture;       /**< Texture handle of a sprite, 0 for white */
+    uint32_t mesh;          /**< Buffer handle of the corners of a billboard, 0 for none */
     box_render_particle_block_t block; /**< Parameters of the frame */
 } box_render_particle_pool_t;
 

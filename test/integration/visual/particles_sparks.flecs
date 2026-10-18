@@ -1,0 +1,50 @@
+// Additive sparks: small bright particles thrown out of a point in a wide cone, pulled down by
+// gravity and stretched along their velocity across the screen, cooling from white to orange.
+// The HDR image blooms where they cross.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.effects
+using box.particle
+
+bloom {
+  Bloom: {intensity: 0.5, threshold: 1, threshold_softness: 0.5}
+}
+
+tonemap {
+  Tonemap: {}
+}
+
+camera {
+  Position: {0, 2, 9}
+  Rotation: {-0.12, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {10, 10, 14, 255}},
+    effects: [{effect: bloom}, {effect: tonemap}]}
+}
+
+anvil {
+  Position: {0, 0.5, 0}
+  Box: {1.6, 1, 0.8}
+  Rgb: {50, 50, 56}
+}
+
+sparks {
+  Position: {0, 1.05, 0}
+  ParticleEmitter: {
+    max: 3000, rate: 40000, shape: EmitterPoint, spread: 70,
+    speed: {60, 160}, lifetime: {0.03, 0.05}, size: {0.03, 0.06}, opacity: {0.8, 1},
+    acceleration: {0, -2500, 0}, color: {255, 230, 180}, seed: 5
+  }
+  ParticleCurves: {
+    opacity: {1, 1, 0.8, 0},
+    color: {start: {255, 255, 255}, early: {255, 220, 140}, late: {255, 140, 50},
+      end: {200, 60, 20}}
+  }
+  ParticleAppearance: {blend: ParticleAdditive, stretch: 0.04}
+}

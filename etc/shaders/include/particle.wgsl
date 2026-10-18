@@ -28,7 +28,8 @@ struct Emitter {
     // x: used slots, y: first spawn slot in the slot buffer, z: mesh table points,
     // w: index of the draw arguments
     pool: vec4u,
-    // x: microseconds of the frame, y: shortest lifetime, z: microseconds the longest is above
+    // x: microseconds of the frame, y: shortest lifetime, z: microseconds the longest is above,
+    // w: first sort key of the pool in the key buffer
     life: vec4u,
     // xyz: world velocity the drag pulls toward, w: drag rate
     wind: vec4f,
@@ -44,6 +45,27 @@ struct Emitter {
     ground: vec4f,
     // x: ground collision mode, GROUND_*
     collide: vec4u,
+    // x: ParticleShape drawn, y: ParticleBlend, z: frames across the sheet, w: frames down
+    look: vec4u,
+    // x: frames a second, y: softness, z: stretch, w: fraction lit
+    params: vec4f,
+    // Keys of the size, opacity, rotation (turns) and spin curves at the ages 0, 1/3, 2/3, 1
+    curve_size: vec4f,
+    curve_opacity: vec4f,
+    curve_rotation: vec4f,
+    curve_spin: vec4f,
+    // Linear colors of the gradient at the same ages
+    gradient: array<vec4f, 4>,
+    // x: vertices per particle, y: 1 when drawn through the sort keys, z: keys sorted, w: 1 when
+    // the emitter has a ParticleAppearance
+    draw: vec4u,
+};
+
+// A corner of a triangle of a billboard mesh, box_render_particle_corner_t: xyz the position
+// times the shape scale and the normal, w the texture coordinates.
+struct Corner {
+    position: vec4f,
+    normal: vec4f,
 };
 
 // A pool slot, box_particle_t: remaining is 0 for a free slot.
@@ -65,6 +87,18 @@ const EMITTER_SPHERE: u32 = 1u;
 const EMITTER_BOX: u32 = 2u;
 const EMITTER_DISC: u32 = 3u;
 const EMITTER_MESH: u32 = 4u;
+
+// ParticleShape
+const PARTICLE_CIRCLE: u32 = 0u;
+const PARTICLE_SPRITE: u32 = 1u;
+const PARTICLE_BILLBOARD: u32 = 2u;
+
+// ParticleBlend
+const PARTICLE_ALPHA: u32 = 0u;
+const PARTICLE_ADDITIVE: u32 = 1u;
+
+// Sort key of a free slot, after every live particle
+const SORT_DEAD: u32 = 0xFFFFFFFFu;
 
 // Hash streams, BOX_PARTICLE_STREAM_*
 const STREAM_LIFE: u32 = 0u;
@@ -218,4 +252,111 @@ fn particle_collide(p: ptr<function, Particle>, ground: vec3f, mode: u32) -> boo
     (*p).velocity.x *= 1.0 - ground.z;
     (*p).velocity.z *= 1.0 - ground.z;
     return true;
+}
+
+// The age of a particle over its life, 0 to 1.
+fn particle_norm_age(age: f32, life: f32) -> f32 {
+    return clamp(select(0.0, age / life, life > 0.0), 0.0, 1.0);
+}
+
+// A curve of four keys at the ages 0, 1/3, 2/3 and 1, linear between two keys.
+fn particle_curve(keys: vec4f, t: f32) -> f32 {
+    let s = clamp(t, 0.0, 1.0) * 3.0;
+    let i = min(floor(s), 2.0);
+    let f = s - i;
+    var a = keys.x;
+    var b = keys.y;
+    if (i >= 2.0) {
+        a = keys.z;
+        b = keys.w;
+    } else if (i >= 1.0) {
+        a = keys.y;
+        b = keys.z;
+    }
+    return a + (b - a) * f;
+}
+
+// Area under a curve from age 0 up to a normalized age.
+fn particle_curve_area(keys: vec4f, t: f32) -> f32 {
+    let s = clamp(t, 0.0, 1.0) * 3.0;
+    let f = clamp(vec3f(s) - vec3f(0.0, 1.0, 2.0), vec3f(0.0), vec3f(1.0));
+    let a = keys.xyz;
+    let b = keys.yzw;
+    return dot(f * a + 0.5 * f * f * (b - a), vec3f(1.0)) / 3.0;
+}
+
+// Degrees a particle has turned by its spin: the area under the spin curve up to its age.
+fn particle_turned(spin: f32, keys: vec4f, age: f32, life: f32) -> f32 {
+    if (all(keys == keys.xxxx)) {
+        return spin * keys.x * age;
+    }
+
+    return spin * life * particle_curve_area(keys, particle_norm_age(age, life));
+}
+
+// Rotation of a particle in degrees: spawned, plus the turns of the rotation curve, plus spin.
+fn particle_rotation(rotation: f32, spin: f32, rotation_keys: vec4f, spin_keys: vec4f,
+    age: f32, life: f32) -> f32
+{
+    let t = particle_norm_age(age, life);
+    return rotation + 360.0 * particle_curve(rotation_keys, t) +
+        particle_turned(spin, spin_keys, age, life);
+}
+
+// A gradient of four linear colors at the keys of a curve.
+fn particle_gradient(keys: array<vec4f, 4>, t: f32) -> vec3f {
+    let s = clamp(t, 0.0, 1.0) * 3.0;
+    let i = min(floor(s), 2.0);
+    let k = u32(i);
+    var g = keys;
+    return mix(g[k].rgb, g[k + 1u].rgb, s - i);
+}
+
+// Frame of a sprite sheet a particle shows, row by row from the top left.
+fn particle_frame(columns: u32, rows: u32, fps: f32, age: f32, life: f32) -> u32 {
+    let frames = max(columns, 1u) * max(rows, 1u);
+    if (fps > 0.0) {
+        return u32(floor(max(age, 0.0) * fps)) % frames;
+    }
+
+    return min(u32(floor(particle_norm_age(age, life) * f32(frames))), frames - 1u);
+}
+
+// Rectangle of a frame in texture coordinates: xy the top left corner, zw the size.
+fn particle_frame_rect(frame: u32, columns: u32, rows: u32) -> vec4f {
+    let c = max(columns, 1u);
+    let r = max(rows, 1u);
+    let size = vec2f(1.0 / f32(c), 1.0 / f32(r));
+    return vec4f(f32(frame % c) * size.x, f32((frame / c) % r) * size.y, size);
+}
+
+// Fade of a soft particle a view depth in front of the geometry behind it.
+fn particle_soft(scene: f32, depth: f32, softness: f32) -> f32 {
+    if (softness <= 0.0) {
+        return 1.0;
+    }
+
+    return clamp((scene - depth) / softness, 0.0, 1.0);
+}
+
+// View depth of a reversed depth buffer value from P[2][2], P[3][2], P[2][3] and P[3][3].
+fn particle_view_depth(p: vec4f, d: f32) -> f32 {
+    let den = d * p.z - p.x;
+    if (den == 0.0) {
+        return 3.4e38;
+    }
+
+    return -(p.y - d * p.w) / den;
+}
+
+// Length factor of a sprite stretched along its velocity across the screen.
+fn particle_stretch(stretch: f32, speed: f32) -> f32 {
+    return 1.0 + max(stretch, 0.0) * max(speed, 0.0);
+}
+
+// Sort key of a live particle; ascending keys draw back to front.
+fn particle_sort_key(depth: f32) -> u32 {
+    let bits = bitcast<u32>(depth);
+    let ordered = bits ^ select(0x80000000u, 0xFFFFFFFFu, (bits >> 31u) != 0u);
+    return min(~ordered, SORT_DEAD - 1u);
 }

@@ -6,6 +6,13 @@
 // draws its lifetime, position, direction and speed from the seed and its spawn index, each
 // from its own stream, and adds the velocity it inherits from the emitter; the C twin is
 // box_particle_* in src/particle/simulate.h.
+//
+// An alpha blended pool that is drawn back to front is sorted for each view that draws it:
+// sort_keys writes the key of every slot from its view depth, then a bitonic sort orders the
+// keys ascending. sort_local sorts every run of SORT_GROUP keys in workgroup memory, and for
+// every larger run length k sort_global does the steps of k down to SORT_GROUP and sort_merge
+// the rest in workgroup memory. Keys tie break on the slot, so a sort is the same every run.
+#include "include/lights.wgsl"
 #include "include/particle.wgsl"
 
 @group(0) @binding(0) var<uniform> emitter: Emitter;
@@ -13,13 +20,29 @@
 @group(0) @binding(2) var<storage, read> slots: array<u32>;
 @group(0) @binding(3) var<storage, read> table: array<TablePoint>;
 @group(0) @binding(4) var<storage, read_write> args: array<u32>;
+@group(0) @binding(5) var<storage, read_write> keys: array<vec2u>;
+@group(0) @binding(6) var<uniform> view: View;
+@group(0) @binding(7) var<uniform> step: SortStep;
+
+// Run length k and compare distance j of a step of the bitonic sort.
+struct SortStep {
+    k: u32,
+    j: u32,
+    pad0: u32,
+    pad1: u32,
+};
+
+// Keys a workgroup sorts in workgroup memory, two per invocation
+const SORT_GROUP: u32 = 512u;
+
+var<workgroup> sorting: array<vec2u, 512>;
 
 @compute @workgroup_size(256)
 fn integrate(@builtin(global_invocation_id) id: vec3u) {
     let i = id.x;
     if (i == 0u) {
         let at = emitter.pool.w * 4u;
-        args[at] = 6u;
+        args[at] = emitter.draw.x;
         args[at + 1u] = emitter.pool.x;
         args[at + 2u] = 0u;
         args[at + 3u] = 0u;
@@ -85,4 +108,101 @@ fn spawn(@builtin(global_invocation_id) id: vec3u) {
     p.velocity = direction * speed + emitter.inherit.xyz;
     p.index = index;
     particles[slot] = p;
+}
+
+// Write the sort key and slot of every key of a pool, free slots and slots past the used ones
+// last.
+@compute @workgroup_size(256)
+fn sort_keys(@builtin(global_invocation_id) id: vec3u) {
+    let i = id.x;
+    if (i >= emitter.draw.z) {
+        return;
+    }
+
+    var key = SORT_DEAD;
+    if (i < emitter.pool.x) {
+        let p = particles[i];
+        if (p.remaining != 0u) {
+            key = particle_sort_key(-(view.view * vec4f(p.position, 1.0)).z);
+        }
+    }
+
+    keys[emitter.life.w + i] = vec2u(key, i);
+}
+
+// Whether a key goes before another, by key and then by slot.
+fn sort_before(a: vec2u, b: vec2u) -> bool {
+    return a.x < b.x || (a.x == b.x && a.y < b.y);
+}
+
+// Compare and swap two keys of workgroup memory by the direction of the run they are in.
+fn sort_shared_step(base: u32, t: u32, k: u32, j: u32) {
+    let i = 2u * j * (t / j) + (t % j);
+    let l = i + j;
+    let a = sorting[i];
+    let b = sorting[l];
+    let ascending = ((base + i) & k) == 0u;
+    if (sort_before(b, a) == ascending) {
+        sorting[i] = b;
+        sorting[l] = a;
+    }
+}
+
+// Sort every run of SORT_GROUP keys, ascending and descending in turn.
+@compute @workgroup_size(256)
+fn sort_local(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_id) local: vec3u) {
+    let base = group.x * SORT_GROUP;
+    let first = emitter.life.w + base;
+    let t = local.x;
+    sorting[t] = keys[first + t];
+    sorting[t + 256u] = keys[first + t + 256u];
+    workgroupBarrier();
+    for (var k = 2u; k <= SORT_GROUP; k = k * 2u) {
+        for (var j = k / 2u; j > 0u; j = j / 2u) {
+            sort_shared_step(base, t, k, j);
+            workgroupBarrier();
+        }
+    }
+
+    keys[first + t] = sorting[t];
+    keys[first + t + 256u] = sorting[t + 256u];
+}
+
+// The steps of a run length below SORT_GROUP, in workgroup memory.
+@compute @workgroup_size(256)
+fn sort_merge(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_id) local: vec3u) {
+    let base = group.x * SORT_GROUP;
+    let first = emitter.life.w + base;
+    let t = local.x;
+    sorting[t] = keys[first + t];
+    sorting[t + 256u] = keys[first + t + 256u];
+    workgroupBarrier();
+    for (var j = SORT_GROUP / 2u; j > 0u; j = j / 2u) {
+        sort_shared_step(base, t, step.k, j);
+        workgroupBarrier();
+    }
+
+    keys[first + t] = sorting[t];
+    keys[first + t + 256u] = sorting[t + 256u];
+}
+
+// One step of compare distance SORT_GROUP or more, over the keys of the pool.
+@compute @workgroup_size(256)
+fn sort_global(@builtin(global_invocation_id) id: vec3u) {
+    let t = id.x;
+    let j = step.j;
+    let i = 2u * j * (t / j) + (t % j);
+    let l = i + j;
+    if (l >= emitter.draw.z) {
+        return;
+    }
+
+    let first = emitter.life.w;
+    let a = keys[first + i];
+    let b = keys[first + l];
+    let ascending = (i & step.k) == 0u;
+    if (sort_before(b, a) == ascending) {
+        keys[first + i] = b;
+        keys[first + l] = a;
+    }
 }

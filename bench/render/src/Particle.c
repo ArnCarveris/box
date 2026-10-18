@@ -1,7 +1,8 @@
 /**
  * @file Particle.c
  * @brief Benchmarks for a pool of one million live particles: the frame with the integrate and
- * spawn passes alone, with three active forces, and with the draw of the pool in a view.
+ * spawn passes alone, with three active forces, and with the draw of the pool in a view; and
+ * the fill rate of a smoke effect that covers the screen many times over.
  *
  * The main thread renders and each frame waits for the GPU by reading a word of the particle
  * page back, so a frame measures the extract, the compute passes and the draw of the pool.
@@ -113,4 +114,79 @@ void Particle_draw_1m(
 {
     // particle/bench
     bench_particles(b, true, false);
+}
+
+/** Particles of the screen filling smoke */
+#define BENCH_SMOKE (4000)
+
+void Particle_smoke_fill(
+    bench_t *b)
+{
+    // particle/bench
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    app->unpaced = true;
+    ecs_singleton_modified(world, App);
+    ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 6});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
+        .color = {40, 50, 70, 255}}});
+    ecs_entity_t wall = ecs_new(world);
+    ecs_set(world, wall, Position, {0, 0, -2});
+    ecs_set(world, wall, Box, {40, 40, 0.2f});
+
+    ecs_entity_t e = ecs_new(world);
+    ecs_add(world, e, ParticleEmitter);
+    ParticleEmitter *p = ecs_get_mut(world, e, ParticleEmitter);
+    p->max = BENCH_SMOKE;
+    p->rate = BENCH_SMOKE;
+    p->shape = EmitterBox;
+    p->extents[0] = 3;
+    p->extents[1] = 2;
+    p->extents[2] = 1;
+    p->spread = 180;
+    p->speed = (ParticleRange){0.1f, 0.3f};
+    p->lifetime = (ParticleRange){0.9f, 1};
+    p->size = (ParticleRange){3, 5};
+    p->rotation = (ParticleRange){0, 360};
+    p->opacity = (ParticleRange){0.05f, 0.15f};
+    ecs_modified(world, e, ParticleEmitter);
+    ecs_set(world, e, ParticleCurves, {
+        .size = {0.5f, 1, 1.3f, 1.5f},
+        .opacity = {0, 1, 1, 0},
+        .rotation = {0, 0, 0, 0},
+        .color = {{230, 230, 230}, {200, 200, 200}, {160, 160, 160}, {120, 120, 120}},
+        .spin = {1, 1, 1, 1}
+    });
+    ecs_set(world, e, ParticleAppearance, {.softness = 0.5f, .lit = 0.5f});
+    ecs_entity_t surface = ecs_new(world);
+    ecs_set(world, surface, Surface, {.width = 1280, .height = 720, .resolution_scale = 1});
+
+    int32_t i;
+    for (i = 0; i < 90; i ++) {
+        ecs_progress(world, BENCH_PARTICLE_DELTA);
+    }
+
+    box_render_sync(world);
+    uint32_t word = 0;
+    double frames = 0;
+    bench_set_items(b, BENCH_SMOKE);
+    while (bench_iter(b)) {
+        ecs_progress(world, BENCH_PARTICLE_DELTA);
+        box_render_sync(world);
+        box_render_gpu_read_buffer(world, BOX_RENDER_BUFFER_PARTICLE_FIRST, 0,
+            sizeof(word), &word);
+        bench_keep(word);
+        frames ++;
+    }
+
+    bench_counter(b, "frames", frames);
+    bench_counter(b, "particles", (double)ecs_singleton_get(world, ParticleStats)->particles);
+    ecs_fini(world);
 }

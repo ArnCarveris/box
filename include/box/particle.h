@@ -86,7 +86,8 @@ ECS_STRUCT(ParticleCollision, {
  *
  * Particles move under the acceleration and the ParticleForces, collide with the ground plane
  * of a ParticleCollision of the emitter entity and die once their age reaches their lifetime;
- * each is a camera facing soft circle of its size, color times opacity, over the opaque image.
+ * each is a camera facing soft circle of its size, color times opacity, over the opaque image,
+ * unless ParticleCurves and ParticleAppearance on the emitter change that.
  *
  * Every property a particle draws has its own random stream, so changing one range does not
  * change the other draws.
@@ -163,6 +164,76 @@ ECS_STRUCT(ParticleBurst, {
                              *   default 0 for once on the first frame */
     int32_t repeat;         /**< Times it goes off again after the first, below zero for as
                              *   long as the emitter plays, default 0 */
+});
+
+/** Four keys of a value over the life of a particle, at normalized age 0, 1/3, 2/3 and 1,
+ * linear between two keys; a curve naming one value four times is a constant */
+ECS_STRUCT(ParticleCurve, {
+    float start;            /**< Value at birth */
+    float early;            /**< Value at a third of the life */
+    float late;             /**< Value at two thirds of the life */
+    float end;              /**< Value at death */
+});
+
+/** Four display encoded colors over the life of a particle, at the keys of ParticleCurve,
+ * blended in linear light between two keys */
+ECS_STRUCT(ParticleGradient, {
+    rgb start;              /**< Color at birth */
+    rgb early;              /**< Color at a third of the life */
+    rgb late;               /**< Color at two thirds of the life */
+    rgb end;                /**< Color at death */
+});
+
+/** How the particles of an emitter change over their life, evaluated on the GPU.
+ *
+ * Every curve multiplies the value a particle spawned with except rotation, which adds turns.
+ * The ctor sets the multipliers to 1, rotation to 0 and the gradient to white, so
+ * `ParticleCurves: {}` changes nothing.
+ */
+ECS_STRUCT(ParticleCurves, {
+    ParticleCurve size;     /**< Multiplier of the size, default 1 */
+    ParticleCurve opacity;  /**< Multiplier of the opacity, default 1 */
+    ParticleCurve rotation; /**< Turns added to the rotation, default 0 */
+    ParticleGradient color; /**< Multiplier of the color, default white */
+    ParticleCurve spin;     /**< Multiplier of the angular velocity, default 1: the rotation a
+                             *   particle has turned is the area under it up to its age */
+});
+
+/** What a particle is drawn as */
+ECS_ENUM(ParticleShape, {
+    ParticleCircle = 0,     /**< A soft round sprite, the look without an appearance */
+    ParticleSprite = 1,     /**< The texture of the appearance over a sheet of frames */
+    ParticleBillboard = 2   /**< The mesh of the appearance kept facing the camera */
+});
+
+/** How the particles of an emitter blend with the image */
+ECS_ENUM(ParticleBlend, {
+    ParticleAlpha = 0,      /**< Blended by opacity and drawn back to front, for smoke and
+                             *   debris */
+    ParticleAdditive = 1    /**< Color times opacity added in any order, never darkening, for
+                             *   fire, sparks and magic */
+});
+
+/** How the particles of an emitter look. Without it they are soft alpha blended circles.
+ *
+ * Particles draw in the HDR image of the view before bloom, so colors above 1 bloom, with the
+ * aerial perspective of the atmosphere as meshes have it.
+ */
+ECS_STRUCT(ParticleAppearance, {
+    ParticleShape shape;    /**< What a particle is drawn as, default ParticleCircle */
+    ParticleBlend blend;    /**< How it blends, default ParticleAlpha */
+    ecs_entity_t texture;   /**< TexturePath or Texture entity a sprite reads, white without */
+    ecs_entity_t mesh;      /**< Entity whose Mesh3 or shape a billboard draws, scaled by the
+                             *   size; a circle is drawn while it has none */
+    int32_t columns;        /**< Frames across the texture, 0 and 1 for one */
+    int32_t rows;           /**< Frames down the texture, 0 and 1 for one, read row by row */
+    float fps;              /**< Frames a second, 0 to play the sheet once over the life */
+    float softness;         /**< World units over which a particle fades as it nears the
+                             *   geometry behind it, 0 for hard edges */
+    float stretch;          /**< Length added to a sprite or circle along its screen space
+                             *   velocity per unit of speed, 0 for none */
+    float lit;              /**< Fraction of the color the lights of the scene shade, 0 unlit
+                             *   to 1 */
 });
 
 /** Counters of the particle simulation, a singleton the render extract writes every frame.
