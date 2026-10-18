@@ -1,0 +1,83 @@
+{
+    "id": "particle",
+    "type": "application",
+    "value": {
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "lang.c": {
+        "include": [
+            "../../../src/render",
+            "../../../src/particle",
+            "../../../src/geometry"
+        ]
+    },
+    "test": {
+        "testsuites": [
+            {
+                "id": "Emitter",
+                "testcases": [
+                    "c_defaults",
+                    "script_defaults",
+                    "zero_is_literal",
+                    "c_literal_spawns_nothing",
+                    "extracted_block",
+                    "block_follows_transform",
+                    "spawn_slots_in_packet",
+                    "mesh_table_sent"
+                ]
+            },
+            {
+                "id": "Spawn",
+                "testcases": [
+                    "count_on_fixed_clock",
+                    "carries_fraction",
+                    "zero_delta_spawns_nothing",
+                    "max_is_clamped",
+                    "full_pool_spawns_nothing",
+                    "full_pool_resumes_after_deaths",
+                    "max_change_resets_pool",
+                    "particles_die_at_lifetime",
+                    "zero_lifetime_takes_no_slot",
+                    "same_seed_same_accounting"
+                ]
+            },
+            {
+                "id": "Simulate",
+                "testcases": [
+                    "hash_reference_values",
+                    "unit_in_range",
+                    "range_draw",
+                    "range_max_not_above_min",
+                    "life_in_range",
+                    "age_frees_at_lifetime",
+                    "point_shape",
+                    "sphere_points_inside",
+                    "box_points_inside",
+                    "disc_points_inside",
+                    "mesh_points_on_surface",
+                    "mesh_without_area",
+                    "cone_within_spread",
+                    "cone_zero_direction",
+                    "integrate_constant_acceleration",
+                    "same_seed_same_draws",
+                    "other_seed_other_draws"
+                ]
+            },
+            {
+                "id": "Lifecycle",
+                "testcases": [
+                    "stats",
+                    "stats_count_pages",
+                    "scene_membership",
+                    "delete_emitter",
+                    "remove_emitter",
+                    "disable_emitter",
+                    "new_backend_empties_pools"
+                ]
+            }
+        ]
+    }
+}

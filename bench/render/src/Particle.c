@@ -1,0 +1,100 @@
+/**
+ * @file Particle.c
+ * @brief Benchmarks for a pool of one million live particles: the frame with the integrate and
+ * spawn passes alone, and with the draw of the pool in a view.
+ *
+ * The main thread renders and each frame waits for the GPU by reading a word of the particle
+ * page back, so a frame measures the extract, the compute passes and the draw of the pool.
+ */
+
+#include <box.h>
+#include <bake_bench.h>
+#include "render.h"
+
+/** Particles the pool keeps alive */
+#define BENCH_PARTICLES (1000000)
+
+/** Frame delta, a fixed clock */
+#define BENCH_PARTICLE_DELTA (1.0f / 60.0f)
+
+/** Run frames of an emitter that keeps one million particles alive.
+ *
+ * @param b The benchmark
+ * @param draw Whether a view draws the pool
+ */
+static void bench_particles(
+    bench_t *b,
+    bool draw)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    app->unpaced = true;
+    ecs_singleton_modified(world, App);
+    ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
+
+    if (draw) {
+        ecs_entity_t camera = ecs_new(world);
+        ecs_set(world, camera, Position, {0, 5, 30});
+        ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+        ecs_entity_t view = ecs_new(world);
+        ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
+            .color = {0, 0, 0, 255}}});
+    }
+
+    ecs_entity_t e = ecs_new(world);
+    ecs_add(world, e, ParticleEmitter);
+    ParticleEmitter *p = ecs_get_mut(world, e, ParticleEmitter);
+    p->max = BENCH_PARTICLES;
+    p->rate = 1200000;
+    p->shape = EmitterSphere;
+    p->radius = 2;
+    p->spread = 30;
+    p->speed = (ParticleRange){2, 6};
+    p->lifetime = (ParticleRange){1, 1.2f};
+    p->size = (ParticleRange){0.02f, 0.05f};
+    p->acceleration[1] = -2;
+    ecs_modified(world, e, ParticleEmitter);
+    ecs_entity_t surface = ecs_new(world);
+    ecs_set(world, surface, Surface, {.width = 1280, .height = 720, .resolution_scale = 1});
+
+    int32_t i;
+    for (i = 0; i < 90; i ++) {
+        ecs_progress(world, BENCH_PARTICLE_DELTA);
+    }
+
+    box_render_sync(world);
+    uint32_t word = 0;
+    double frames = 0;
+    bench_set_items(b, BENCH_PARTICLES);
+    while (bench_iter(b)) {
+        ecs_progress(world, BENCH_PARTICLE_DELTA);
+        box_render_sync(world);
+        box_render_gpu_read_buffer(world, BOX_RENDER_BUFFER_PARTICLE_FIRST, 0,
+            sizeof(word), &word);
+        bench_keep(word);
+        frames ++;
+    }
+
+    const ParticleStats *stats = ecs_singleton_get(world, ParticleStats);
+    bench_counter(b, "frames", frames);
+    bench_counter(b, "particles", (double)stats->particles);
+    bench_counter(b, "spawned", (double)stats->spawned);
+    bench_counter(b, "bytes", (double)stats->bytes);
+    ecs_fini(world);
+}
+
+void Particle_simulate_1m(
+    bench_t *b)
+{
+    // particle/bench
+    bench_particles(b, false);
+}
+
+void Particle_draw_1m(
+    bench_t *b)
+{
+    // particle/bench
+    bench_particles(b, true);
+}

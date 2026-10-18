@@ -611,6 +611,15 @@
                 "testcases": [
                     "axes_faces_show_axis_colors"
                 ]
+            },
+            {
+                "id": "Particle",
+                "testcases": [
+                    "stream_renders_where_expected",
+                    "other_scene_does_not_show",
+                    "full_pool_stops_spawning",
+                    "fixed_seed_same_image"
+                ]
             }
         ]
     }

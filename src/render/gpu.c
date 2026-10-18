@@ -475,6 +475,7 @@ static void box_gpu_render(
     box_gpu_scatter(gpu, packet);
     box_gpu_environment_image_render(gpu, packet);
     box_gpu_environment_process(gpu, packet);
+    box_gpu_particles_simulate(gpu, packet);
     box_gpu_bake_capture(gpu, packet);
     box_gpu_atmosphere_build(gpu, packet);
     box_gpu_targets_render(gpu, packet);

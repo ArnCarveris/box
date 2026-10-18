@@ -67,6 +67,9 @@ typedef struct box_gpu_bake_t box_gpu_bake_t;
 /** LUTs, pipelines and timing of the atmosphere passes */
 typedef struct box_gpu_atmos_t box_gpu_atmos_t;
 
+/** Pipelines and frame buffers of the particle passes */
+typedef struct box_gpu_particles_t box_gpu_particles_t;
+
 /** A capture on its way from the GPU to its PNG file */
 typedef struct box_gpu_capture_t box_gpu_capture_t;
 
@@ -564,6 +567,7 @@ typedef struct box_gpu_t {
     ecs_map_t environments;         /**< Handle to box_gpu_environment_t* */
     struct box_gpu_env_image_t *environment_image; /**< Conversion of environment images,
                                                     *   created by the first image */
+    box_gpu_particles_t *particles; /**< Particle passes */
     ecs_vec_t captures;             /**< box_gpu_capture_t* whose readback is mapping */
     bool lost;                      /**< The device was lost, the ring recreates it */
     bool lose;                      /**< box_render_gpu_lose_device asked to destroy it */
@@ -1394,6 +1398,45 @@ bool box_gpu_atmosphere_draw_sky(
 void box_gpu_atmosphere_sweep(
     box_gpu_t *gpu,
     const box_render_packet_t *packet);
+
+/** Create the layouts and placeholders of the particle passes, after the view layout.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_particles_init(
+    box_gpu_t *gpu);
+
+/** Release the pipelines, layouts and buffers of the particle passes.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_particles_fini(
+    box_gpu_t *gpu);
+
+/** Record the integrate and spawn passes of every particle pool of a packet, after its
+ * scatters and before its targets, and keep the draws of the pools for its views.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+void box_gpu_particles_simulate(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
+
+/** Record the indirect draws of the particle pools of the scene of a view into its forward
+ * pass. Replaces the pipeline and the bind group at 1.
+ *
+ * @param gpu The backend
+ * @param pass The render pass of the view, with the bind group of the view at 0
+ * @param format The format of the color target
+ * @param v The view
+ * @return Whether a pool was drawn
+ */
+bool box_gpu_particles_draw(
+    box_gpu_t *gpu,
+    WGPURenderPassEncoder pass,
+    WGPUTextureFormat format,
+    const box_render_view_t *v);
 
 /** Create the layouts, sampler and placeholders of the effect passes.
  *

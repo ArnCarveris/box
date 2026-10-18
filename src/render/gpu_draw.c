@@ -149,6 +149,7 @@ void box_gpu_draw_init(
     box_gpu_shadow_init(gpu);
     box_gpu_effects_init(gpu);
     box_gpu_atmosphere_init(gpu);
+    box_gpu_particles_init(gpu);
 }
 
 /** Release the buffers of a mesh and the mesh.
@@ -232,6 +233,7 @@ void box_gpu_draw_fini(
     box_gpu_environment_fini(gpu);
     box_gpu_effects_fini(gpu);
     box_gpu_atmosphere_fini(gpu);
+    box_gpu_particles_fini(gpu);
     if (gpu->view_buffer) {
         wgpuBufferRelease(gpu->view_buffer);
         gpu->view_buffer = NULL;
@@ -784,10 +786,39 @@ static bool box_gpu_draw_sky(
     return result;
 }
 
+/** Record the particles of the scene of a view in a pass, then bind the groups of the forward
+ * pass again, which the particle pipeline does not share.
+ *
+ * @param gpu The backend
+ * @param pass The render pass of the view
+ * @param format The format of the color target
+ * @param v The view
+ * @param group The bind group of the view
+ * @param offset Offset of the uniforms of the view in the view buffer
+ * @return Whether particles were drawn, so the pipeline and material bound before are not
+ */
+static bool box_gpu_draw_particles(
+    box_gpu_t *gpu,
+    WGPURenderPassEncoder pass,
+    WGPUTextureFormat format,
+    const box_render_view_t *v,
+    WGPUBindGroup group,
+    uint32_t offset)
+{
+    bool result = box_gpu_particles_draw(gpu, pass, format, v);
+    if (result) {
+        wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
+        wgpuRenderPassEncoderSetBindGroup(pass, 3, box_gpu_volume_group(gpu, v), 0, NULL);
+    }
+
+    return result;
+}
+
 /** Record the indirect draws of the batches a view renders in a pass, in packet order.
  *
- * The sky of a view that renders its atmosphere draws after the opaque 3D meshes and before
- * the 2D shapes and the blended draws, in the phases that draw those.
+ * The sky of a view that renders its atmosphere, then the particles of its scene, draw after
+ * the opaque 3D meshes and before the 2D shapes and the blended draws, in the phases that draw
+ * those.
  *
  * @param gpu The backend
  * @param t The target
@@ -816,6 +847,7 @@ static void box_gpu_draw_batches(
     WGPUBindGroup material = NULL;
     uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
     bool sky = phase == 1 || !box_gpu_atmosphere_sky(gpu, v);
+    bool particles = phase == 1;
     int32_t i;
     for (i = 0; cv && i < cv->draw_count; i ++) {
         const box_gpu_cull_draw_t *d = ecs_vec_get_t(
@@ -827,6 +859,14 @@ static void box_gpu_draw_batches(
         if (!sky && !mesh) {
             sky = true;
             if (box_gpu_draw_sky(gpu, t, pass, format, v, group, offset)) {
+                bound = NULL;
+                material = NULL;
+            }
+        }
+
+        if (!particles && !mesh) {
+            particles = true;
+            if (box_gpu_draw_particles(gpu, pass, format, v, group, offset)) {
                 bound = NULL;
                 material = NULL;
             }
@@ -854,6 +894,10 @@ static void box_gpu_draw_batches(
 
     if (!sky) {
         box_gpu_draw_sky(gpu, t, pass, format, v, group, offset);
+    }
+
+    if (!particles) {
+        box_gpu_draw_particles(gpu, pass, format, v, group, offset);
     }
 }
 

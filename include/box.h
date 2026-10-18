@@ -33,6 +33,7 @@
 #include "box/picking.h"
 #include "box/console.h"
 #include "box/atmosphere.h"
+#include "box/particle.h"
 
 #ifdef __cplusplus
 extern "C" {

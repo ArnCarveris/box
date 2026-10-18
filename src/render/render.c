@@ -340,6 +340,7 @@ void BoxRenderImport(
     box_render_atmosphere_views_init(world);
     box_render_environment_init(world);
     box_render_environment_image_init(world);
+    box_render_particles_init(world);
 
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "RenderSubmitPacket" }),

@@ -1,0 +1,835 @@
+/**
+ * @file render/particles.c
+ * @brief Keeps a particle pool for every enabled ParticleEmitter and counts its particles.
+ *
+ * A pool is a range of a particle page, a storage buffer of pools of one size. Lifetimes are
+ * whole microseconds drawn from the seed, so the extract knows when each particle dies: it
+ * frees and picks slots and counts the live particles without reading the GPU back.
+ */
+
+#include "render.h"
+#include "../particle/simulate.h"
+#include "../geometry/mesh_cache.h"
+#include <math.h>
+
+/** Slots of the smallest pool */
+#define BOX_PARTICLE_CLASS_MIN (1024u)
+
+/** Slots of a particle page at least, unless one pool is larger */
+#define BOX_PARTICLE_PAGE_SLOTS (16384u)
+
+/** Pools of a particle page at most, a bit each in its mask */
+#define BOX_PARTICLE_PAGE_POOLS (64u)
+
+/** When a particle dies and the slot it frees */
+typedef struct box_particle_death_t {
+    uint64_t clock;         /**< Clock of the pool at which its age reaches its lifetime */
+    uint32_t slot;          /**< Slot of the particle */
+    uint32_t pad;           /**< Unused */
+} box_particle_death_t;
+
+/** A storage buffer that holds pools of one size */
+typedef struct box_particle_page_t {
+    uint32_t handle;        /**< Buffer handle */
+    uint32_t capacity;      /**< Slots of each of its pools */
+    uint32_t pools;         /**< Pools it holds */
+    uint64_t occupied;      /**< Bit per pool in use */
+} box_particle_page_t;
+
+/** The pool of an emitter and the accounting of its particles */
+typedef struct box_particle_pool_t {
+    ecs_entity_t entity;    /**< Entity with the ParticleEmitter */
+    ecs_entity_t scene;     /**< Scene of the emitter in this frame */
+    int32_t max;            /**< Clamped ParticleEmitter.max the pool was made for */
+    uint32_t page;          /**< Handle of its page */
+    uint32_t base;          /**< First slot of the pool in its page */
+    uint32_t capacity;      /**< Slots of the pool */
+    bool fresh;             /**< The range was not cleared on the backend yet */
+    bool seen;              /**< The emitter is enabled in this frame */
+    uint64_t clock;         /**< Microseconds the pool has run */
+    double carry;           /**< Fraction of a particle owed to the next frame */
+    uint32_t next;          /**< Spawn index of the next particle */
+    int32_t live;           /**< Particles alive */
+    uint32_t used;          /**< Slots from the start that were handed out */
+    ecs_vec_t deaths;       /**< box_particle_death_t, a heap by clock and slot */
+    ecs_vec_t free_slots;   /**< uint32_t, slots below used whose particle died */
+    uint32_t table;         /**< Buffer handle of the mesh table, 0 for none */
+    int32_t points;         /**< Points of the mesh table */
+    bool table_built;       /**< The table matches the key below */
+    ecs_entity_t table_source; /**< Entity the table was sampled from */
+    uint32_t table_mesh;    /**< Mesh handle the table was sampled from */
+    vec3 table_scale;       /**< Shape scale the table was sampled with */
+    uint32_t table_seed;    /**< Seed the table was sampled with */
+} box_particle_pool_t;
+
+/** Main thread state of the particle extract */
+typedef struct box_render_particles_t {
+    ecs_query_t *emitters;  /**< ParticleEmitter, WorldTransform and Scene(self|up), NULL
+                             *   without box.particle */
+    ecs_vec_t pools;        /**< box_particle_pool_t* */
+    ecs_map_t by_entity;    /**< Entity to box_particle_pool_t* */
+    ecs_vec_t pages;        /**< box_particle_page_t */
+    ecs_vec_t page_handles; /**< uint32_t, page handles to reuse */
+    uint32_t next_page;     /**< Next page handle */
+    ecs_vec_t table_handles; /**< uint32_t, table handles to reuse */
+    uint32_t next_table;    /**< Next table handle */
+    ecs_vec_t points;       /**< box_particle_point_t, the table being sampled */
+    const void *backend;    /**< Context of the backend the pages were sent to */
+    void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
+    int32_t generation;     /**< Generation of that backend, see box_render_backend_t */
+} box_render_particles_t;
+
+/** Decode a display encoded channel to linear.
+ *
+ * @param c The channel
+ * @return The linear value, 0 to 1
+ */
+static float box_particles_linear(
+    uint8_t c)
+{
+    float v = (float)c / 255.0f;
+
+    return v <= 0.04045f ? v / 12.92f : powf((v + 0.055f) / 1.055f, 2.4f);
+}
+
+/** Check whether a death comes before another, by clock and then by slot.
+ *
+ * @param a The first death
+ * @param b The second death
+ * @return Whether a comes first
+ */
+static bool box_particles_before(
+    const box_particle_death_t *a,
+    const box_particle_death_t *b)
+{
+    return a->clock < b->clock || (a->clock == b->clock && a->slot < b->slot);
+}
+
+/** Add a death to the heap of a pool.
+ *
+ * @param pool The pool
+ * @param clock Clock at which the particle dies
+ * @param slot Slot of the particle
+ */
+static void box_particles_heap_push(
+    box_particle_pool_t *pool,
+    uint64_t clock,
+    uint32_t slot)
+{
+    int32_t i = ecs_vec_count(&pool->deaths);
+    box_particle_death_t *heap;
+    ecs_vec_append_t(NULL, &pool->deaths, box_particle_death_t);
+    heap = ecs_vec_first_t(&pool->deaths, box_particle_death_t);
+    box_particle_death_t d = { .clock = clock, .slot = slot };
+    while (i > 0) {
+        int32_t parent = (i - 1) / 2;
+        if (!box_particles_before(&d, &heap[parent])) {
+            break;
+        }
+
+        heap[i] = heap[parent];
+        i = parent;
+    }
+
+    heap[i] = d;
+}
+
+/** Remove the first death from the heap of a pool.
+ *
+ * @param pool The pool, with at least one death
+ * @return The death
+ */
+static box_particle_death_t box_particles_heap_pop(
+    box_particle_pool_t *pool)
+{
+    box_particle_death_t *heap = ecs_vec_first_t(&pool->deaths, box_particle_death_t);
+    int32_t count = ecs_vec_count(&pool->deaths) - 1, i = 0;
+    box_particle_death_t result = heap[0], last = heap[count];
+    ecs_vec_remove_last(&pool->deaths);
+    while (count) {
+        int32_t child = 2 * i + 1;
+        if (child >= count) {
+            break;
+        }
+
+        if (child + 1 < count && box_particles_before(&heap[child + 1], &heap[child])) {
+            child ++;
+        }
+
+        if (!box_particles_before(&heap[child], &last)) {
+            break;
+        }
+
+        heap[i] = heap[child];
+        i = child;
+    }
+
+    if (count) {
+        heap[i] = last;
+    }
+
+    return result;
+}
+
+/** Get the slots of the pool of a number of particles: a power of two, at least
+ * BOX_PARTICLE_CLASS_MIN.
+ *
+ * @param max Particles alive at once, 1 to BOX_PARTICLE_MAX
+ * @return The slots
+ */
+static uint32_t box_particles_class(
+    int32_t max)
+{
+    uint32_t result = BOX_PARTICLE_CLASS_MIN;
+    while (result < (uint32_t)max) {
+        result *= 2;
+    }
+
+    return result;
+}
+
+/** Find the page of a handle.
+ *
+ * @param s The state
+ * @param handle The handle
+ * @return Index of the page, -1 when there is none
+ */
+static int32_t box_particles_page_find(
+    const box_render_particles_t *s,
+    uint32_t handle)
+{
+    int32_t i, result = -1;
+    for (i = 0; i < ecs_vec_count(&s->pages); i ++) {
+        if (ecs_vec_get_t(&s->pages, box_particle_page_t, i)->handle == handle) {
+            result = i;
+            break;
+        }
+    }
+
+    return result;
+}
+
+/** Give a pool a range of slots in a page of its size, creating a page when every page of that
+ * size is full.
+ *
+ * @param s The state
+ * @param p The packet, receives a new page
+ * @param pool The pool, its capacity set
+ */
+static void box_particles_range_alloc(
+    box_render_particles_t *s,
+    box_render_packet_t *p,
+    box_particle_pool_t *pool)
+{
+    box_particle_page_t *page = NULL;
+    uint32_t bit;
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&s->pages); i ++) {
+        box_particle_page_t *candidate = ecs_vec_get_t(&s->pages, box_particle_page_t, i);
+        uint64_t full = candidate->pools >= 64 ? UINT64_MAX
+            : (((uint64_t)1 << candidate->pools) - 1);
+        if (candidate->capacity == pool->capacity && candidate->occupied != full) {
+            page = candidate;
+            break;
+        }
+    }
+
+    if (!page) {
+        uint32_t pools = BOX_PARTICLE_PAGE_SLOTS / pool->capacity;
+        pools = pools < 1 ? 1 : pools > BOX_PARTICLE_PAGE_POOLS ? BOX_PARTICLE_PAGE_POOLS : pools;
+        page = ecs_vec_append_t(NULL, &s->pages, box_particle_page_t);
+        ecs_os_memset_t(page, 0, box_particle_page_t);
+        page->capacity = pool->capacity;
+        page->pools = pools;
+        if (ecs_vec_count(&s->page_handles)) {
+            page->handle = *ecs_vec_last_t(&s->page_handles, uint32_t);
+            ecs_vec_remove_last(&s->page_handles);
+        } else {
+            page->handle = s->next_page ++;
+        }
+
+        box_render_buffer_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_BUFFER,
+            BOX_RENDER_CREATE, page->handle, sizeof(box_render_buffer_desc_t));
+        desc->size = (uint64_t)pools * pool->capacity * BOX_RENDER_PARTICLE_SIZE;
+        desc->usage = BOX_RENDER_BUFFER_STORAGE;
+    }
+
+    for (bit = 0; bit < page->pools; bit ++) {
+        if (!(page->occupied & ((uint64_t)1 << bit))) {
+            break;
+        }
+    }
+
+    page->occupied |= (uint64_t)1 << bit;
+    pool->page = page->handle;
+    pool->base = bit * page->capacity;
+    pool->fresh = true;
+}
+
+/** Return the range of a pool to its page, destroying the page when it is empty.
+ *
+ * @param s The state
+ * @param p The packet, receives the destroy of an empty page
+ * @param pool The pool
+ */
+static void box_particles_range_free(
+    box_render_particles_t *s,
+    box_render_packet_t *p,
+    box_particle_pool_t *pool)
+{
+    int32_t index = box_particles_page_find(s, pool->page);
+    if (index < 0) {
+        goto done;
+    }
+
+    box_particle_page_t *page = ecs_vec_get_t(&s->pages, box_particle_page_t, index);
+    page->occupied &= ~((uint64_t)1 << (pool->base / page->capacity));
+    if (!page->occupied) {
+        box_render_packet_resource(p, BOX_RENDER_BUFFER, BOX_RENDER_DESTROY, page->handle, 0);
+        *ecs_vec_append_t(NULL, &s->page_handles, uint32_t) = page->handle;
+        ecs_vec_remove_t(&s->pages, box_particle_page_t, index);
+    }
+
+done:
+    pool->page = 0;
+}
+
+/** Forget every particle of a pool, as if it was just made.
+ *
+ * @param pool The pool
+ */
+static void box_particles_empty(
+    box_particle_pool_t *pool)
+{
+    pool->clock = 0;
+    pool->carry = 0;
+    pool->next = 0;
+    pool->live = 0;
+    pool->used = 0;
+    ecs_vec_clear(&pool->deaths);
+    ecs_vec_clear(&pool->free_slots);
+}
+
+/** Destroy the mesh table of a pool on the backend.
+ *
+ * @param s The state
+ * @param p The packet
+ * @param pool The pool
+ */
+static void box_particles_table_free(
+    box_render_particles_t *s,
+    box_render_packet_t *p,
+    box_particle_pool_t *pool)
+{
+    if (pool->table) {
+        box_render_packet_resource(p, BOX_RENDER_BUFFER, BOX_RENDER_DESTROY, pool->table, 0);
+        *ecs_vec_append_t(NULL, &s->table_handles, uint32_t) = pool->table;
+    }
+
+    pool->table = 0;
+    pool->points = 0;
+    pool->table_built = false;
+}
+
+/** Make the pool of an emitter.
+ *
+ * @param s The state
+ * @param p The packet
+ * @param e The emitter
+ * @param max Clamped ParticleEmitter.max, at least 1
+ * @return The pool
+ */
+static box_particle_pool_t* box_particles_pool_new(
+    box_render_particles_t *s,
+    box_render_packet_t *p,
+    ecs_entity_t e,
+    int32_t max)
+{
+    box_particle_pool_t *result = ecs_os_calloc_t(box_particle_pool_t);
+    result->entity = e;
+    result->max = max;
+    result->capacity = box_particles_class(max);
+    ecs_vec_init_t(NULL, &result->deaths, box_particle_death_t, 0);
+    ecs_vec_init_t(NULL, &result->free_slots, uint32_t, 0);
+    box_particles_range_alloc(s, p, result);
+    *ecs_vec_append_t(NULL, &s->pools, box_particle_pool_t*) = result;
+    ecs_map_insert_ptr(&s->by_entity, e, result);
+
+    return result;
+}
+
+/** Free a pool, its range and its table.
+ *
+ * @param s The state
+ * @param p The packet, NULL when the backend lost them anyway
+ * @param index Index of the pool
+ */
+static void box_particles_pool_free(
+    box_render_particles_t *s,
+    box_render_packet_t *p,
+    int32_t index)
+{
+    box_particle_pool_t *pool = *ecs_vec_get_t(&s->pools, box_particle_pool_t*, index);
+    if (p) {
+        box_particles_range_free(s, p, pool);
+        box_particles_table_free(s, p, pool);
+    }
+
+    ecs_map_remove(&s->by_entity, pool->entity);
+    ecs_vec_remove_t(&s->pools, box_particle_pool_t*, index);
+    ecs_vec_fini_t(NULL, &pool->deaths, box_particle_death_t);
+    ecs_vec_fini_t(NULL, &pool->free_slots, uint32_t);
+    ecs_os_free(pool);
+}
+
+/** Forget every pool, page and table, for a backend that does not have them.
+ *
+ * @param s The state
+ */
+static void box_particles_reset_backend(
+    box_render_particles_t *s)
+{
+    while (ecs_vec_count(&s->pools)) {
+        box_particles_pool_free(s, NULL, ecs_vec_count(&s->pools) - 1);
+    }
+
+    ecs_vec_clear(&s->pages);
+    ecs_vec_clear(&s->page_handles);
+    ecs_vec_clear(&s->table_handles);
+    s->next_page = BOX_RENDER_BUFFER_PARTICLE_FIRST;
+    s->next_table = BOX_RENDER_BUFFER_PARTICLE_TABLE_FIRST;
+}
+
+/** Sample the mesh table of an EmitterMesh again when its source, its shape or its seed
+ * changed, and send it.
+ *
+ * @param world The world
+ * @param s The state
+ * @param p The packet
+ * @param pool The pool
+ * @param e The emitter
+ * @param emitter The emitter values
+ */
+static void box_particles_table_update(
+    ecs_world_t *world,
+    box_render_particles_t *s,
+    box_render_packet_t *p,
+    box_particle_pool_t *pool,
+    ecs_entity_t e,
+    const ParticleEmitter *emitter)
+{
+    ecs_entity_t source = emitter->source ? emitter->source : e;
+    const ShapeMesh *shape = source && ecs_is_alive(world, source)
+        ? ecs_get(world, source, ShapeMesh)
+        : NULL;
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    uint32_t mesh = shape ? shape->mesh : 0;
+    vec3 scale = {0, 0, 0};
+    if (shape) {
+        glm_vec3_copy(ECS_CONST_CAST(float*, shape->scale), scale);
+    }
+
+    if (pool->table_built && pool->table_source == source && pool->table_mesh == mesh &&
+        pool->table_seed == emitter->seed && glm_vec3_eqv(scale, pool->table_scale))
+    {
+        goto done;
+    }
+
+    const box_mesh_t *m = mesh && cache ? box_mesh_cache_get(cache, mesh) : NULL;
+    ecs_vec_set_count_t(NULL, &s->points, box_particle_point_t, BOX_PARTICLE_MESH_POINTS);
+    int32_t points = box_particle_mesh_table(m, scale, emitter->seed,
+        ecs_vec_first(&s->points), BOX_PARTICLE_MESH_POINTS);
+    box_particles_table_free(s, p, pool);
+    if (points) {
+        uint32_t size = (uint32_t)points * (uint32_t)sizeof(box_particle_point_t);
+        if (ecs_vec_count(&s->table_handles)) {
+            pool->table = *ecs_vec_last_t(&s->table_handles, uint32_t);
+            ecs_vec_remove_last(&s->table_handles);
+        } else {
+            pool->table = s->next_table ++;
+        }
+
+        box_render_buffer_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_BUFFER,
+            BOX_RENDER_CREATE, pool->table, sizeof(box_render_buffer_desc_t));
+        desc->size = size;
+        desc->usage = BOX_RENDER_BUFFER_STORAGE;
+        ecs_os_memcpy(box_render_packet_upload(p, pool->table, 0, size),
+            ecs_vec_first(&s->points), (ecs_size_t)size);
+        pool->points = points;
+    }
+
+    pool->table_built = true;
+    pool->table_source = source;
+    pool->table_mesh = mesh;
+    pool->table_seed = emitter->seed;
+    glm_vec3_copy(scale, pool->table_scale);
+done:
+    return;
+}
+
+/** Free the slots of the particles of a pool whose age reached their lifetime by the clock.
+ *
+ * @param pool The pool
+ */
+static void box_particles_retire(
+    box_particle_pool_t *pool)
+{
+    while (ecs_vec_count(&pool->deaths) &&
+        ecs_vec_first_t(&pool->deaths, box_particle_death_t)->clock <= pool->clock)
+    {
+        box_particle_death_t d = box_particles_heap_pop(pool);
+        *ecs_vec_append_t(NULL, &pool->free_slots, uint32_t) = d.slot;
+        pool->live --;
+    }
+
+    if (!pool->live) {
+        pool->used = 0;
+        ecs_vec_clear(&pool->free_slots);
+    }
+}
+
+/** Add what an emitter owes for a frame to its pool and take the whole particles, carrying the
+ * fraction; what a full pool has no slots for is dropped, not owed.
+ *
+ * @param pool The pool
+ * @param emitter The emitter values
+ * @param delta Seconds of the frame
+ * @return Particles to spawn, at most the free slots of the pool
+ */
+static uint32_t box_particles_owed(
+    box_particle_pool_t *pool,
+    const ParticleEmitter *emitter,
+    double delta)
+{
+    uint32_t free = (uint32_t)(pool->max - pool->live);
+    double whole;
+    pool->carry += (emitter->rate > 0 ? (double)emitter->rate : 0.0) * delta;
+    whole = floor(pool->carry);
+    pool->carry -= whole;
+
+    return whole < (double)free ? (uint32_t)whole : free;
+}
+
+/** Spawn particles into free slots of a pool, the slots of particles that died first.
+ *
+ * @param pool The pool
+ * @param emitter The emitter values
+ * @param count Particles to spawn, at most the free slots of the pool
+ * @param life_min Shortest lifetime in microseconds
+ * @param life_span Microseconds the longest lifetime is above life_min
+ * @param out Receives the slot of each spawn
+ */
+static void box_particles_spawn(
+    box_particle_pool_t *pool,
+    const ParticleEmitter *emitter,
+    uint32_t count,
+    uint32_t life_min,
+    uint32_t life_span,
+    uint32_t *out)
+{
+    uint32_t k;
+    for (k = 0; k < count; k ++) {
+        uint32_t life = box_particle_life(emitter->seed, pool->next + k, life_min, life_span);
+        uint32_t slot = BOX_RENDER_PARTICLE_NO_SLOT;
+        if (life) {
+            if (ecs_vec_count(&pool->free_slots)) {
+                slot = *ecs_vec_last_t(&pool->free_slots, uint32_t);
+                ecs_vec_remove_last(&pool->free_slots);
+            } else {
+                slot = pool->used ++;
+            }
+
+            box_particles_heap_push(pool, pool->clock + life, slot);
+            pool->live ++;
+        }
+
+        out[k] = slot;
+    }
+}
+
+/** Write the parameters of an emitter for this frame.
+ *
+ * @param emitter The emitter values
+ * @param transform World transform of the emitter, NULL for the identity
+ * @param delta Seconds of the frame
+ * @param out Receives the block, every padding member zero
+ */
+static void box_particles_block(
+    const ParticleEmitter *emitter,
+    const WorldTransform *transform,
+    float delta,
+    box_render_particle_block_t *out)
+{
+    float spread = glm_clamp(emitter->spread, 0.0f, 180.0f);
+    ecs_os_memset_t(out, 0, box_render_particle_block_t);
+    if (transform) {
+        ecs_os_memcpy_t(out->model, transform->m, mat4);
+    } else {
+        glm_mat4_identity(out->model);
+    }
+
+    glm_vec3_copy(ECS_CONST_CAST(float*, emitter->direction), out->direction);
+    if (glm_vec3_norm2(out->direction) > 0) {
+        glm_vec3_normalize(out->direction);
+    } else {
+        glm_vec3_zero(out->direction);
+    }
+
+    out->direction[3] = cosf(glm_rad(spread));
+    glm_vec3_copy(ECS_CONST_CAST(float*, emitter->extents), out->extents);
+    out->extents[3] = emitter->radius;
+    glm_vec3_copy(ECS_CONST_CAST(float*, emitter->acceleration), out->acceleration);
+    out->acceleration[3] = delta;
+    out->color[0] = box_particles_linear(emitter->color.r);
+    out->color[1] = box_particles_linear(emitter->color.g);
+    out->color[2] = box_particles_linear(emitter->color.b);
+    out->color[3] = 1.0f;
+    out->speed[0] = emitter->speed.min;
+    out->speed[1] = emitter->speed.max;
+    out->size[0] = emitter->size.min;
+    out->size[1] = emitter->size.max;
+    out->rotation[0] = emitter->rotation.min;
+    out->rotation[1] = emitter->rotation.max;
+    out->spin[0] = emitter->spin.min;
+    out->spin[1] = emitter->spin.max;
+    out->opacity[0] = emitter->opacity.min;
+    out->opacity[1] = emitter->opacity.max;
+    out->shape = (uint32_t)emitter->shape;
+    out->seed = emitter->seed;
+}
+
+/** Account the frame of one emitter and add its pool to the packet when it has particles.
+ *
+ * @param world The world
+ * @param s The state
+ * @param p The packet
+ * @param e The emitter
+ * @param emitter The emitter values
+ * @param transform Its world transform, NULL for the identity
+ * @param scene Its scene
+ * @param stats Receives its counts
+ */
+static void box_particles_emitter(
+    ecs_world_t *world,
+    box_render_particles_t *s,
+    box_render_packet_t *p,
+    ecs_entity_t e,
+    const ParticleEmitter *emitter,
+    const WorldTransform *transform,
+    ecs_entity_t scene,
+    ParticleStats *stats)
+{
+    int32_t max = emitter->max > BOX_PARTICLE_MAX ? BOX_PARTICLE_MAX : emitter->max;
+    box_particle_pool_t *pool = ecs_map_get_deref(&s->by_entity, box_particle_pool_t, e);
+    uint32_t life_min = box_particle_us(emitter->lifetime.min);
+    uint32_t life_max = box_particle_us(emitter->lifetime.max);
+    uint32_t first, count, slots = 0;
+    if (max <= 0) {
+        goto done;
+    }
+
+    if (!pool) {
+        pool = box_particles_pool_new(s, p, e, max);
+    } else if (pool->max != max) {
+        box_particles_range_free(s, p, pool);
+        box_particles_empty(pool);
+        pool->max = max;
+        pool->capacity = box_particles_class(max);
+        box_particles_range_alloc(s, p, pool);
+    }
+
+    pool->seen = true;
+    pool->scene = scene;
+    if (emitter->shape == EmitterMesh) {
+        box_particles_table_update(world, s, p, pool, e, emitter);
+    } else if (pool->table_built) {
+        box_particles_table_free(s, p, pool);
+    }
+
+    pool->clock += box_particle_us(p->delta);
+    box_particles_retire(pool);
+    first = pool->next;
+    count = box_particles_owed(pool, emitter, p->delta);
+    box_particles_spawn(pool, emitter, count, life_min,
+        life_max > life_min ? life_max - life_min : 0,
+        box_render_packet_reserve(p, count * (uint32_t)sizeof(uint32_t), &slots));
+    pool->next += count;
+    stats->spawned += (int32_t)count;
+    stats->particles += pool->live;
+    if (!pool->used) {
+        goto done;
+    }
+
+    box_render_particle_pool_t *entry = ecs_vec_append_t(
+        NULL, &p->particles, box_render_particle_pool_t);
+    ecs_os_memset_t(entry, 0, box_render_particle_pool_t);
+    entry->entity = e;
+    entry->scene = scene;
+    entry->buffer = pool->page;
+    entry->offset = pool->base * BOX_RENDER_PARTICLE_SIZE;
+    entry->capacity = pool->capacity;
+    entry->clear = pool->fresh;
+    entry->table = pool->table;
+    entry->slots = slots;
+    box_particles_block(emitter, transform, p->delta, &entry->block);
+    entry->block.count = count;
+    entry->block.first = first;
+    entry->block.used = pool->used;
+    entry->block.points = (uint32_t)pool->points;
+    entry->block.delta_us = box_particle_us(p->delta);
+    entry->block.life_min = life_min;
+    entry->block.life_span = life_max > life_min ? life_max - life_min : 0;
+    pool->fresh = false;
+    stats->simulated ++;
+done:
+    return;
+}
+
+/** Account the particles of every enabled emitter, free the pools of the emitters that are
+ * gone and write ParticleStats.
+ *
+ * @param it The iterator of the system
+ */
+static void BoxRenderExtractParticles(
+    ecs_iter_t *it)
+{
+    box_render_particles_t *s = it->ctx;
+    ecs_world_t *world = it->world;
+    const box_render_backend_t *backend = box_render_get_backend(world);
+    box_render_packet_t *p = NULL;
+    ParticleStats stats = {0};
+    int32_t i;
+    if (!s->emitters) {
+        goto done;
+    }
+
+    p = box_render_packet(world);
+    if (backend->ctx != s->backend || backend->render != s->render ||
+        backend->generation != s->generation)
+    {
+        box_particles_reset_backend(s);
+        s->backend = backend->ctx;
+        s->render = backend->render;
+        s->generation = backend->generation;
+    }
+
+    for (i = 0; i < ecs_vec_count(&s->pools); i ++) {
+        (*ecs_vec_get_t(&s->pools, box_particle_pool_t*, i))->seen = false;
+    }
+
+    ecs_iter_t qit = ecs_query_iter(world, s->emitters);
+    while (ecs_query_next(&qit)) {
+        const ParticleEmitter *emitters = ecs_field(&qit, ParticleEmitter, 0);
+        const WorldTransform *transforms = ecs_field(&qit, WorldTransform, 1);
+        bool shared = ecs_field_is_set(&qit, 1) && !ecs_field_is_self(&qit, 1);
+        for (i = 0; i < qit.count; i ++) {
+            const WorldTransform *t = transforms ? &transforms[shared ? 0 : i] : NULL;
+            stats.emitters ++;
+            box_particles_emitter(world, s, p, qit.entities[i], &emitters[i], t,
+                box_render_scene_field(&qit, 2, i), &stats);
+        }
+    }
+
+    for (i = ecs_vec_count(&s->pools) - 1; i >= 0; i --) {
+        if (!(*ecs_vec_get_t(&s->pools, box_particle_pool_t*, i))->seen) {
+            box_particles_pool_free(s, p, i);
+        }
+    }
+
+    for (i = 0; i < ecs_vec_count(&s->pages); i ++) {
+        const box_particle_page_t *page = ecs_vec_get_t(&s->pages, box_particle_page_t, i);
+        stats.bytes += (int64_t)page->pools * page->capacity * BOX_RENDER_PARTICLE_SIZE;
+    }
+
+    ecs_singleton_set_ptr(world, ParticleStats, &stats);
+done:
+    return;
+}
+
+/** Free the state of the particle extract.
+ *
+ * @param ctx The state
+ */
+static void box_particles_free(
+    void *ctx)
+{
+    box_render_particles_t *s = ctx;
+    box_particles_reset_backend(s);
+    ecs_vec_fini_t(NULL, &s->pools, box_particle_pool_t*);
+    ecs_map_fini(&s->by_entity);
+    ecs_vec_fini_t(NULL, &s->pages, box_particle_page_t);
+    ecs_vec_fini_t(NULL, &s->page_handles, uint32_t);
+    ecs_vec_fini_t(NULL, &s->table_handles, uint32_t);
+    ecs_vec_fini_t(NULL, &s->points, box_particle_point_t);
+    ecs_os_free(s);
+}
+
+/** Get the state of the particle extract of a world.
+ *
+ * @param world The world
+ * @return The state, NULL without the extract
+ */
+static box_render_particles_t* box_particles_state(
+    const ecs_world_t *world)
+{
+    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractParticles");
+    const ecs_system_t *sys = system ? ecs_system_get(world, system) : NULL;
+
+    return sys ? sys->ctx : NULL;
+}
+
+void box_render_particles_init(
+    ecs_world_t *world)
+{
+    box_render_particles_t *s = ecs_os_calloc_t(box_render_particles_t);
+    ecs_vec_init_t(NULL, &s->pools, box_particle_pool_t*, 0);
+    ecs_map_init(&s->by_entity, NULL);
+    ecs_vec_init_t(NULL, &s->pages, box_particle_page_t, 0);
+    ecs_vec_init_t(NULL, &s->page_handles, uint32_t, 0);
+    ecs_vec_init_t(NULL, &s->table_handles, uint32_t, 0);
+    ecs_vec_init_t(NULL, &s->points, box_particle_point_t, 0);
+    s->next_page = BOX_RENDER_BUFFER_PARTICLE_FIRST;
+    s->next_table = BOX_RENDER_BUFFER_PARTICLE_TABLE_FIRST;
+
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "RenderExtractParticles" }),
+        .phase = RenderExtract,
+        .run = BoxRenderExtractParticles,
+        .ctx = s,
+        .ctx_free = box_particles_free
+    });
+}
+
+void box_render_particles_import(
+    ecs_world_t *world)
+{
+    box_render_particles_t *s = box_particles_state(world);
+    if (s && !s->emitters) {
+        s->emitters = ecs_query(world, {
+            .terms = {
+                { .id = ecs_id(ParticleEmitter), .inout = EcsIn },
+                { .id = ecs_id(WorldTransform), .inout = EcsIn, .oper = EcsOptional },
+                {
+                    .id = ecs_id(Scene),
+                    .src.id = EcsSelf | EcsUp,
+                    .trav = EcsChildOf,
+                    .inout = EcsInOutNone,
+                    .oper = EcsOptional
+                }
+            },
+            .cache_kind = EcsQueryCacheAuto
+        });
+    }
+}
+
+bool box_render_particles_use(
+    const box_render_packet_t *p,
+    uint32_t handle)
+{
+    bool result = false;
+    if (handle == BOX_RENDER_SHADER_PARTICLE_SIM || handle == BOX_RENDER_SHADER_PARTICLE_DRAW) {
+        result = ecs_vec_count(&p->particles) != 0;
+    }
+
+    return result;
+}

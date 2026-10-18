@@ -55,6 +55,11 @@
 
 /** Shader handle of the engine compute shader that turns environment images into cubemaps */
 #define BOX_RENDER_SHADER_ENVIRONMENT (46)
+/** Shader handle of the engine compute shader that ages, moves and spawns particles */
+#define BOX_RENDER_SHADER_PARTICLE_SIM (47)
+
+/** Shader handle of the engine shader that draws particles */
+#define BOX_RENDER_SHADER_PARTICLE_DRAW (48)
 
 /** Cascades of the shadow map of a view at most */
 #define BOX_RENDER_SHADOW_CASCADES (4)
@@ -639,6 +644,7 @@ typedef struct box_render_packet_t {
     ecs_vec_t bakes;        /**< box_render_bake_batch_t, the probe captures of the frame */
     ecs_vec_t probes;       /**< box_render_probe_capture_t of the bake and reflection batches */
     ecs_vec_t reflections;  /**< box_render_reflect_batch_t, the reflection captures of the frame */
+    ecs_vec_t particles;    /**< box_render_particle_pool_t, simulated after the scatters */
     ecs_vec_t data;         /**< Bytes the resources and uploads point into */
     int32_t generation;     /**< Backend generation the extract built it for, the ring drops a
                              *   packet of an older generation instead of rendering it */
@@ -2027,5 +2033,7 @@ bool box_render_target_scene(
 void box_render_ring_status(
     box_render_ring_t *ring,
     RenderStatus *status);
+
+#include "particles.h"
 
 #endif

@@ -1,0 +1,67 @@
+// A steady stream from each emitter shape, left to right: point, sphere, box, disc and the
+// surface of a torus. Fast particles so the three frames of a visual run show a stream.
+using box.transform
+using box.geometry
+using box.camera
+using box.view
+using box.particle
+
+camera {
+  Position: {0, 2, 14}
+  Camera: {fov: 60}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {10, 12, 20, 255}}}
+}
+
+// Source of the mesh emitter, out of view: the table is in the space of its shape
+torus {
+  Position: {0, -1000, 0}
+  Torus: {radius: 0.8, tube: 0.3}
+}
+
+point {
+  Position: {-6, 0, 0}
+  ParticleEmitter: {
+    max: 4000, rate: 20000, shape: EmitterPoint, spread: 12,
+    speed: {20, 40}, lifetime: {2, 2}, size: {0.12, 0.2}, opacity: {0.5, 1},
+    color: {255, 90, 60}, seed: 1
+  }
+}
+
+sphere {
+  Position: {-3, 0, 0}
+  ParticleEmitter: {
+    max: 4000, rate: 20000, shape: EmitterSphere, radius: 0.8, spread: 12,
+    speed: {20, 40}, lifetime: {2, 2}, size: {0.12, 0.2}, opacity: {0.5, 1},
+    color: {255, 200, 60}, seed: 1
+  }
+}
+
+box {
+  Position: {0, 0, 0}
+  ParticleEmitter: {
+    max: 4000, rate: 20000, shape: EmitterBox, extents: {0.8, 0.4, 0.8}, spread: 12,
+    speed: {20, 40}, lifetime: {2, 2}, size: {0.12, 0.2}, opacity: {0.5, 1},
+    color: {90, 230, 90}, seed: 1
+  }
+}
+
+disc {
+  Position: {3, 0, 0}
+  ParticleEmitter: {
+    max: 4000, rate: 20000, shape: EmitterDisc, radius: 0.8, spread: 12,
+    speed: {20, 40}, lifetime: {2, 2}, size: {0.12, 0.2}, opacity: {0.5, 1},
+    color: {80, 170, 255}, seed: 1
+  }
+}
+
+mesh {
+  Position: {6, 0, 0}
+  ParticleEmitter: {
+    max: 4000, rate: 20000, shape: EmitterMesh, source: torus, spread: 12,
+    speed: {20, 40}, lifetime: {2, 2}, size: {0.12, 0.2}, opacity: {0.5, 1},
+    color: {220, 110, 255}, seed: 1
+  }
+}
