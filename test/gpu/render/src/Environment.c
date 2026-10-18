@@ -22,8 +22,28 @@ static const float face_colors[6][3] = {
  * + and the other two channels toward -, so only that channel is positive along the axis. */
 static const int32_t axis_coefficient[3] = { 3, 1, 2 };
 
-/** Frames a test renders at most while it waits for the GPU */
+/** Frames a test renders at least while it waits for the GPU */
 #define FRAMES (100)
+
+/** Seconds a test waits for the GPU at least: on a loaded machine the image loads and the
+ * readbacks of the GPU take longer than FRAMES frames of a tiny surface */
+#define WAIT_SECONDS (20.0)
+
+/** Check whether a wait goes on: for FRAMES frames and WAIT_SECONDS seconds, whichever is longer.
+ *
+ * @param frame Frames waited
+ * @param start Time the wait started
+ * @return Whether to render another frame
+ */
+static bool env_waiting(
+    int32_t frame,
+    const ecs_time_t *start)
+{
+    ecs_time_t now;
+    ecs_os_get_time(&now);
+
+    return frame < FRAMES || ecs_time_to_double(ecs_time_sub(now, *start)) < WAIT_SECONDS;
+}
 
 /** Create a headless world that renders on the main thread into a surface.
  *
@@ -86,7 +106,7 @@ static bool env_state(
  * @param world The world
  * @param source The source
  * @param out Receives the state
- * @return Whether it was processed within FRAMES frames
+ * @return Whether it was processed while env_waiting
  */
 static bool env_wait(
     ecs_world_t *world,
@@ -95,13 +115,41 @@ static bool env_wait(
 {
     bool result = false;
     int32_t frame;
-    for (frame = 0; frame < FRAMES && !result; frame ++) {
+    ecs_time_t start;
+    ecs_os_get_time(&start);
+    for (frame = 0; env_waiting(frame, &start) && !result; frame ++) {
         ecs_progress(world, 0);
         box_render_sync(world);
         int32_t version = ecs_get(world, source, EnvironmentStatus)->version;
         uint32_t filter = (uint32_t)ecs_get(world, source, Environment)->filter;
         result = env_state(world, source, out) && version && out->processed == version &&
             out->filter == filter;
+    }
+
+    return result;
+}
+
+/** Render frames until the EnvironmentStatus of a source reaches a version, which it does once
+ * the image of a changed EnvironmentImage loaded.
+ *
+ * @param world The world
+ * @param source The source
+ * @param version The version
+ * @return Whether it reached it while env_waiting
+ */
+static bool env_wait_version(
+    ecs_world_t *world,
+    ecs_entity_t source,
+    int32_t version)
+{
+    bool result = false;
+    int32_t frame;
+    ecs_time_t start;
+    ecs_os_get_time(&start);
+    for (frame = 0; env_waiting(frame, &start) && !result; frame ++) {
+        ecs_progress(world, 0);
+        box_render_sync(world);
+        result = ecs_get(world, source, EnvironmentStatus)->version >= version;
     }
 
     return result;
@@ -219,7 +267,7 @@ void Environment_changed_path_reprocesses(void) {
     test_int(state.runs, 1);
 
     ecs_set(world, source, EnvironmentImage, {.path = "etc/environments/sky.hdr"});
-    env_frames(world, 1);
+    test_assert(env_wait_version(world, source, 2));
     test_assert(env_wait(world, source, &state));
     test_int(ecs_get(world, source, EnvironmentStatus)->version, 2);
     test_int(state.written, 2);
@@ -348,7 +396,9 @@ void Environment_processing_time_measured(void) {
 
             int32_t processed = 0;
             double ms = 0;
-            for (frame = 0; frame < FRAMES && !processed; frame ++) {
+            ecs_time_t start;
+            ecs_os_get_time(&start);
+            for (frame = 0; env_waiting(frame, &start) && !processed; frame ++) {
                 test_assert(box_render_gpu_environment_timing(world, &timing));
                 processed += timing.probes;
                 ms += timing.ms;
