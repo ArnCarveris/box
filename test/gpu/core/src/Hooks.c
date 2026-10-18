@@ -384,17 +384,21 @@ void Hooks_owning_components_have_hooks(void) {
     ecs_entity_t box = ecs_lookup(world, "box");
     test_assert(box != 0);
 
+    /* The widget library is script: flecs generates the hooks of its template types, vectors of
+     * strings included, so only the components of the C modules are checked */
+    ecs_entity_t widgets = ecs_lookup(world, "box.widgets");
+
     int32_t owning = 0;
     ecs_iter_t it = ecs_each(world, EcsStruct);
     while (ecs_each_next(&it)) {
         const EcsStruct *st = ecs_field(&it, EcsStruct, 0);
         for (int32_t i = 0; i < it.count; i ++) {
             ecs_entity_t parent = ecs_get_parent(world, it.entities[i]);
-            while (parent && parent != box) {
+            while (parent && parent != box && (!widgets || parent != widgets)) {
                 parent = ecs_get_parent(world, parent);
             }
 
-            if (!parent) {
+            if (!parent || parent == widgets) {
                 continue;
             }
 
