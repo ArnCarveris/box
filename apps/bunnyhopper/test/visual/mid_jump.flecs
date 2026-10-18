@@ -1,0 +1,23 @@
+// The bunny at the top of a jump, legs in the air
+include etc/bunnyhopper/bunnyhopper
+
+using box.transform
+using bunnyhopper
+
+player {
+  Position: {-7, 2.5, 0}
+  BunnyJump: {v: 0, jumps: 1}
+}
+
+// Carrots on their way to the bunny
+carrots {
+  small {
+    (IsA, SmallCarrot)
+    Position: {-1, 0, 0}
+  }
+
+  large {
+    (IsA, LargeCarrot)
+    Position: {3.5, 0, 0}
+  }
+}

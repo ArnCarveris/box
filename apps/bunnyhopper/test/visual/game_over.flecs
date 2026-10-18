@@ -1,0 +1,13 @@
+// The dead bunny lying on its back, the world stopped
+include etc/bunnyhopper/bunnyhopper
+
+using bunnyhopper
+
+player {
+  Bunny: {speed: 0, dead: true}
+  BunnyLives: {lives_left: 0}
+}
+
+$ {
+  (BunnyGameState, Over)
+}

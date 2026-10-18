@@ -1,0 +1,18 @@
+// The bunny running on the dirt track in the first frames of a run
+include etc/bunnyhopper/bunnyhopper
+
+using box.transform
+using bunnyhopper
+
+// Carrots on their way to the bunny
+carrots {
+  small {
+    (IsA, SmallCarrot)
+    Position: {-1, 0, 0}
+  }
+
+  large {
+    (IsA, LargeCarrot)
+    Position: {3.5, 0, 0}
+  }
+}

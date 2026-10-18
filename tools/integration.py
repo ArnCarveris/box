@@ -428,6 +428,11 @@ def render_scene(scene, png, args):
     with open(scene) as f:
         source = f.read()
     harness = os.path.join(os.path.dirname(png), scene_name(scene) + ".run.flecs")
+    # Include paths cannot leave the folder of the script: link etc so a scene of a game can
+    # include etc/<game>/<game>
+    etc_link = os.path.join(os.path.dirname(png), "etc")
+    if not os.path.lexists(etc_link):
+        os.symlink(os.path.join(ROOT, "etc"), etc_link)
     with open(harness, "w") as f:
         f.write("%s\n\nvisual_capture {\n  box.surface.Surface: {width: %d, height: %d, "
                 "write_to_file: \"%s\"}\n}\n" % (source.rstrip(), width, height, png))
