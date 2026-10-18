@@ -631,10 +631,45 @@ probes, and the visibility fallback. In a baked view the environment specular is
 a probe, by grid luminance over the SH luminance, clamped 0 to 2. The env BRDF term is kept. A
 view without an environment takes the old code paths and renders as before.
 
-**Captures keep the hemisphere.** Light bake and reflection captures bind no environment (zero
-uniforms, black slot, zero SH), so texels no probe or geometry covers get the hemisphere.
-Views of one scene can use different environments, so a capture cannot pick one; the Atmosphere
-epic adds a scene level setting for captures later.
+**Captures use the hemisphere unless told otherwise.** By default light bake and reflection
+captures bind no environment (zero uniforms, black slot, zero SH), so texels no probe or geometry
+covers get the hemisphere. Views of one scene can use different environments, so the choice is a
+scene level, source agnostic setting: `LightBake.environment` and `ReflectionBake.environment`
+name an environment source entity (default 0 = the hemisphere). When set, `sky()` and
+`sky_texel()` in `bake_sh.wgsl` sample that source's SH (and its mip 0 cube for stored reflection
+faces) in place of the hemisphere, and the initial volume fill in `bake.c` uses the same SH. A
+version change of the source requeues probes through the existing invalidation path
+(`box_bake_mark_all` for the light bake, `box_reflect_queue_all` for reflections). The bake code
+knows nothing about the atmosphere.
+
+## Atmosphere as an environment source
+
+Adding `Atmosphere` to a scene root (or the singleton) makes that entity an environment source:
+`box_atmosphere_add` sets `Environment {resolution 128, filter Box}` unless the entity already has
+an `Environment`, in which case the author's settings win (before or after adding `Atmosphere`).
+A view uses it like any source: `LightSettings.environment.source` = the entity with the
+`Atmosphere`. The image based lighting code does not know about the atmosphere.
+
+The source contract as the atmosphere uses it: a scene level sky view LUT at the scene's ground
+altitude (view independent, one per scene, shared by all its views) is sampled by a compute pass
+that writes mip 0 of the cube through `box_gpu_environment_target`, before
+`box_gpu_environment_process` runs, then calls `box_gpu_environment_written` with the version the
+main thread bumped in the frame it sent the content. Texel directions come from `cube_direction`
+in `bake_sh.wgsl`. The cube holds the sky with the sun's and moon's scattering, without the sun
+and moon disks (direct lights cover those). Below the horizon it holds a ground term,
+`ground_albedo * (sun irradiance at the ground * max(0, sun.y) + moon irradiance + mean sky
+irradiance) / pi`. A new resolution or a device loss recreates the cubemap empty and it is
+written again. A request waits while pipelines, LUTs or environment processing are not ready.
+
+Throttle: the cube is rendered, and `EnvironmentStatus.version` bumped, only when the sun or moon
+direction moved more than `Atmosphere.ibl_update_angle` since the last render (small moves
+accumulate), when their color or intensity changed by more than 2% of the brightest channel, when
+a medium parameter changed (descriptor, altitude, Mie g, night), or when the cubemap was
+recreated. Never on a frame where none of that holds, and once per scene, not per view.
+
+`Box` is the default filter because the sky has no sharp detail: a 128² source costs about
+0.23 ms with Box and 0.67 ms with GGX. The `AtmosphereIbl` GPU suite prints the cube pass plus
+processing time for both filters.
 
 ## Spatial index
 
