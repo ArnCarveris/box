@@ -2,7 +2,7 @@
     "id": "bunnyhopper",
     "type": "application",
     "value": {
-        "use": ["box", "bunnyhopper_game"]
+        "use": ["box"]
     },
     "lang.c": {
         "${os Emscripten}": {

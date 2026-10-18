@@ -19,7 +19,6 @@
 
 /* Headers of public dependencies */
 #include <box.h>
-#include <bunnyhopper_game.h>
 
 #endif
 

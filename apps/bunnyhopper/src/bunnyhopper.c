@@ -3,7 +3,7 @@
  * @brief Registers the bunnyhopper module: components, state, scene constants and generator.
  */
 
-#define BUNNYHOPPER_GAME_IMPL
+#define BUNNYHOPPER_IMPL
 #include "game.h"
 #include <stddef.h>
 

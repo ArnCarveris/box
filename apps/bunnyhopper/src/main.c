@@ -3,7 +3,7 @@
  * @brief Runs the bunny hopper game with the settings of the command line.
  */
 
-#include <bunnyhopper.h>
+#include "game.h"
 
 /** Set the game scene as the default, parse the command line into the App singleton, where a
  * scene argument replaces the default, and run the world.
