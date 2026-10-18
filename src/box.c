@@ -6,9 +6,25 @@
 #include <box.h>
 #include "jobs/jobs.h"
 
+/** Allocate zeroed memory for ecs_os_malloc.
+ *
+ * flecs script leaves the cache of the for loop slots of a template state uninitialized when it
+ * allocates them, so a template that runs again can find the entity of the previous run in a
+ * reused block and write through its freed entry. Zeroed memory makes the cache start empty.
+ *
+ * @param size Bytes to allocate
+ * @return The memory, NULL when out of memory
+ */
+static void* box_os_malloc(
+    ecs_size_t size)
+{
+    return ecs_os_api.calloc_(size);
+}
+
 void BoxImport(
     ecs_world_t *world)
 {
+    ecs_os_api.malloc_ = box_os_malloc;
     ECS_IMPORT(world, FlecsScriptMath);
     ECS_IMPORT(world, FlecsStats);
     ecs_enable(world, ecs_id(FlecsStats), false);
