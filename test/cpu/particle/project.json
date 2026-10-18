@@ -77,6 +77,47 @@
                     "disable_emitter",
                     "new_backend_empties_pools"
                 ]
+            },
+            {
+                "id": "Playback",
+                "testcases": [
+                    "without_playback_plays",
+                    "defaults",
+                    "play_to_pause",
+                    "pause_to_play",
+                    "play_to_stop",
+                    "stop_to_play",
+                    "pause_to_stop",
+                    "stop_to_pause",
+                    "pause_freezes_pool",
+                    "stop_lets_particles_finish",
+                    "reset_clears_pool_and_clock",
+                    "reset_while_paused",
+                    "time_advances_only_while_playing",
+                    "restart_after_stop",
+                    "script_control"
+                ]
+            },
+            {
+                "id": "Burst",
+                "testcases": [
+                    "defaults",
+                    "at_zero_once",
+                    "at_zero_repeat_ignored",
+                    "period_once",
+                    "repeat_count",
+                    "endless_repeat",
+                    "alongside_rate",
+                    "larger_than_free",
+                    "on_descendant",
+                    "nearest_emitter",
+                    "without_emitter_ignored",
+                    "pause_holds_schedule",
+                    "stop_spawns_nothing",
+                    "restart_after_stop",
+                    "reset_restarts_schedule",
+                    "negative_count"
+                ]
             }
         ]
     }

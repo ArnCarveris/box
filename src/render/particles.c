@@ -11,6 +11,7 @@
 #include "../particle/simulate.h"
 #include "../geometry/mesh_cache.h"
 #include <math.h>
+#include <stdlib.h>
 
 /** Slots of the smallest pool */
 #define BOX_PARTICLE_CLASS_MIN (1024u)
@@ -48,6 +49,9 @@ typedef struct box_particle_pool_t {
     bool seen;              /**< The emitter is enabled in this frame */
     uint64_t clock;         /**< Microseconds the pool has run */
     double carry;           /**< Fraction of a particle owed to the next frame */
+    uint64_t time;          /**< Microseconds the emitter has played, ParticlePlayback.time */
+    bool started;           /**< A frame played since the playback clock was zeroed */
+    bool stopped;           /**< ParticleStopped since the last frame it played */
     uint32_t next;          /**< Spawn index of the next particle */
     int32_t live;           /**< Particles alive */
     uint32_t used;          /**< Slots from the start that were handed out */
@@ -62,10 +66,19 @@ typedef struct box_particle_pool_t {
     uint32_t table_seed;    /**< Seed the table was sampled with */
 } box_particle_pool_t;
 
+/** A burst of the frame and the emitter whose pool it spawns into */
+typedef struct box_particle_burst_t {
+    ecs_entity_t emitter;   /**< Nearest ParticleEmitter at or above the burst */
+    ParticleBurst burst;    /**< The burst values */
+} box_particle_burst_t;
+
 /** Main thread state of the particle extract */
 typedef struct box_render_particles_t {
-    ecs_query_t *emitters;  /**< ParticleEmitter, WorldTransform and Scene(self|up), NULL
-                             *   without box.particle */
+    ecs_query_t *emitters;  /**< ParticleEmitter, WorldTransform, Scene(self|up) and
+                             *   ParticlePlayback, NULL without box.particle */
+    ecs_query_t *burst_query; /**< ParticleBurst and ParticleEmitter(self|up), NULL without
+                             *   box.particle */
+    ecs_vec_t bursts;       /**< box_particle_burst_t of the frame, sorted by emitter */
     ecs_vec_t pools;        /**< box_particle_pool_t* */
     ecs_map_t by_entity;    /**< Entity to box_particle_pool_t* */
     ecs_vec_t pages;        /**< box_particle_page_t */
@@ -494,20 +507,142 @@ static void box_particles_retire(
  * @param pool The pool
  * @param emitter The emitter values
  * @param delta Seconds of the frame
+ * @param burst Particles the bursts of the frame add
  * @return Particles to spawn, at most the free slots of the pool
  */
 static uint32_t box_particles_owed(
     box_particle_pool_t *pool,
     const ParticleEmitter *emitter,
-    double delta)
+    double delta,
+    double burst)
 {
     uint32_t free = (uint32_t)(pool->max - pool->live);
     double whole;
     pool->carry += (emitter->rate > 0 ? (double)emitter->rate : 0.0) * delta;
     whole = floor(pool->carry);
     pool->carry -= whole;
+    whole += burst;
 
     return whole < (double)free ? (uint32_t)whole : free;
+}
+
+/** Count the times a burst goes off in a frame that moves the playback clock from t0 to t1.
+ *
+ * Firing k, from 1, is at k times its period, so the firings up to a time are the time over the
+ * period, capped at repeat + 1 for a burst that does not repeat forever.
+ *
+ * @param burst The burst
+ * @param t0 Playback microseconds before the frame
+ * @param t1 Playback microseconds after the frame
+ * @param first Whether this is the first frame since the clock was zeroed
+ * @return The times it goes off
+ */
+static uint64_t box_particles_burst_fires(
+    const ParticleBurst *burst,
+    uint64_t t0,
+    uint64_t t1,
+    bool first)
+{
+    uint64_t period = box_particle_us(burst->at), n0, n1, result = 0;
+    if (!period) {
+        result = first ? 1 : 0;
+        goto done;
+    }
+
+    n0 = t0 / period;
+    n1 = t1 / period;
+    if (burst->repeat >= 0) {
+        uint64_t total = (uint64_t)burst->repeat + 1;
+        n0 = n0 < total ? n0 : total;
+        n1 = n1 < total ? n1 : total;
+    }
+
+    result = n1 - n0;
+done:
+    return result;
+}
+
+/** Order bursts by their emitter.
+ *
+ * @param a The first burst
+ * @param b The second burst
+ * @return Below, at or above zero as a sorts before, with or after b
+ */
+static int box_particles_burst_compare(
+    const void *a,
+    const void *b)
+{
+    ecs_entity_t ea = ((const box_particle_burst_t*)a)->emitter;
+    ecs_entity_t eb = ((const box_particle_burst_t*)b)->emitter;
+
+    return (ea > eb) - (ea < eb);
+}
+
+/** Collect the bursts of the frame with the emitter of each, sorted by emitter.
+ *
+ * @param world The world
+ * @param s The state
+ */
+static void box_particles_bursts_collect(
+    ecs_world_t *world,
+    box_render_particles_t *s)
+{
+    int32_t i;
+    ecs_vec_clear(&s->bursts);
+    ecs_iter_t it = ecs_query_iter(world, s->burst_query);
+    while (ecs_query_next(&it)) {
+        const ParticleBurst *bursts = ecs_field(&it, ParticleBurst, 0);
+        ecs_entity_t src = ecs_field_src(&it, 1);
+        for (i = 0; i < it.count; i ++) {
+            box_particle_burst_t *b = ecs_vec_append_t(NULL, &s->bursts, box_particle_burst_t);
+            b->emitter = src ? src : it.entities[i];
+            b->burst = bursts[i];
+        }
+    }
+
+    if (ecs_vec_count(&s->bursts) > 1) {
+        qsort(ecs_vec_first(&s->bursts), (size_t)ecs_vec_count(&s->bursts),
+            sizeof(box_particle_burst_t), box_particles_burst_compare);
+    }
+}
+
+/** Count the particles the bursts of an emitter spawn in a frame that moves its playback clock
+ * from t0 to t1.
+ *
+ * @param s The state, with the bursts of the frame
+ * @param e The emitter
+ * @param t0 Playback microseconds before the frame
+ * @param t1 Playback microseconds after the frame
+ * @param first Whether this is the first frame since the clock was zeroed
+ * @return The particles, not capped by the free slots
+ */
+static double box_particles_bursts_owed(
+    const box_render_particles_t *s,
+    ecs_entity_t e,
+    uint64_t t0,
+    uint64_t t1,
+    bool first)
+{
+    const box_particle_burst_t *bursts = ecs_vec_first_t(&s->bursts, box_particle_burst_t);
+    int32_t lo = 0, hi = ecs_vec_count(&s->bursts);
+    double result = 0;
+    while (lo < hi) {
+        int32_t mid = (lo + hi) / 2;
+        if (bursts[mid].emitter < e) {
+            lo = mid + 1;
+        } else {
+            hi = mid;
+        }
+    }
+
+    for (; lo < ecs_vec_count(&s->bursts) && bursts[lo].emitter == e; lo ++) {
+        const ParticleBurst *b = &bursts[lo].burst;
+        if (b->count > 0) {
+            result += (double)b->count * (double)box_particles_burst_fires(b, t0, t1, first);
+        }
+    }
+
+    return result;
 }
 
 /** Spawn particles into free slots of a pool, the slots of particles that died first.
@@ -600,6 +735,10 @@ static void box_particles_block(
 
 /** Account the frame of one emitter and add its pool to the packet when it has particles.
  *
+ * A paused emitter ages and moves nothing and spawns nothing, a stopped one ages its particles
+ * and spawns nothing, and a reset empties the pool and zeroes the playback clock in a frame that
+ * does nothing else. Only a playing emitter advances the playback clock its bursts go off by.
+ *
  * @param world The world
  * @param s The state
  * @param p The packet
@@ -607,6 +746,7 @@ static void box_particles_block(
  * @param emitter The emitter values
  * @param transform Its world transform, NULL for the identity
  * @param scene Its scene
+ * @param playback Its playback control, NULL to play; receives the clock and a cleared reset
  * @param stats Receives its counts
  */
 static void box_particles_emitter(
@@ -617,13 +757,17 @@ static void box_particles_emitter(
     const ParticleEmitter *emitter,
     const WorldTransform *transform,
     ecs_entity_t scene,
+    ParticlePlayback *playback,
     ParticleStats *stats)
 {
     int32_t max = emitter->max > BOX_PARTICLE_MAX ? BOX_PARTICLE_MAX : emitter->max;
     box_particle_pool_t *pool = ecs_map_get_deref(&s->by_entity, box_particle_pool_t, e);
     uint32_t life_min = box_particle_us(emitter->lifetime.min);
     uint32_t life_max = box_particle_us(emitter->lifetime.max);
-    uint32_t first, count, slots = 0;
+    uint32_t first, count = 0, slots = 0, delta_us = box_particle_us(p->delta), age_us;
+    PlaybackState state = playback ? playback->state : ParticlePlaying;
+    bool reset = playback && playback->reset;
+    uint64_t time = 0;
     if (max <= 0) {
         goto done;
     }
@@ -646,10 +790,35 @@ static void box_particles_emitter(
         box_particles_table_free(s, p, pool);
     }
 
-    pool->clock += box_particle_us(p->delta);
+    if (reset) {
+        box_particles_empty(pool);
+        pool->time = 0;
+        pool->started = false;
+        pool->fresh = true;
+    }
+
+    if (state == ParticleStopped) {
+        pool->stopped = true;
+    } else if (state != ParticlePaused && pool->stopped) {
+        pool->time = 0;
+        pool->started = false;
+        pool->carry = 0;
+        pool->stopped = false;
+    }
+
+    age_us = reset || state == ParticlePaused ? 0 : delta_us;
+    pool->clock += age_us;
     box_particles_retire(pool);
     first = pool->next;
-    count = box_particles_owed(pool, emitter, p->delta);
+    if (!reset && state != ParticlePaused && state != ParticleStopped) {
+        uint64_t t0 = pool->time;
+        pool->time += delta_us;
+        count = box_particles_owed(pool, emitter, p->delta,
+            box_particles_bursts_owed(s, e, t0, pool->time, !pool->started));
+        pool->started = true;
+    }
+
+    time = pool->time;
     box_particles_spawn(pool, emitter, count, life_min,
         life_max > life_min ? life_max - life_min : 0,
         box_render_packet_reserve(p, count * (uint32_t)sizeof(uint32_t), &slots));
@@ -671,18 +840,21 @@ static void box_particles_emitter(
     entry->clear = pool->fresh;
     entry->table = pool->table;
     entry->slots = slots;
-    box_particles_block(emitter, transform, p->delta, &entry->block);
+    box_particles_block(emitter, transform, age_us ? p->delta : 0.0f, &entry->block);
     entry->block.count = count;
     entry->block.first = first;
     entry->block.used = pool->used;
     entry->block.points = (uint32_t)pool->points;
-    entry->block.delta_us = box_particle_us(p->delta);
+    entry->block.delta_us = age_us;
     entry->block.life_min = life_min;
     entry->block.life_span = life_max > life_min ? life_max - life_min : 0;
     pool->fresh = false;
     stats->simulated ++;
 done:
-    return;
+    if (playback) {
+        playback->time = (float)((double)time * 1e-6);
+        playback->reset = false;
+    }
 }
 
 /** Account the particles of every enabled emitter, free the pools of the emitters that are
@@ -717,16 +889,18 @@ static void BoxRenderExtractParticles(
         (*ecs_vec_get_t(&s->pools, box_particle_pool_t*, i))->seen = false;
     }
 
+    box_particles_bursts_collect(world, s);
     ecs_iter_t qit = ecs_query_iter(world, s->emitters);
     while (ecs_query_next(&qit)) {
         const ParticleEmitter *emitters = ecs_field(&qit, ParticleEmitter, 0);
         const WorldTransform *transforms = ecs_field(&qit, WorldTransform, 1);
+        ParticlePlayback *playbacks = ecs_field(&qit, ParticlePlayback, 3);
         bool shared = ecs_field_is_set(&qit, 1) && !ecs_field_is_self(&qit, 1);
         for (i = 0; i < qit.count; i ++) {
             const WorldTransform *t = transforms ? &transforms[shared ? 0 : i] : NULL;
             stats.emitters ++;
             box_particles_emitter(world, s, p, qit.entities[i], &emitters[i], t,
-                box_render_scene_field(&qit, 2, i), &stats);
+                box_render_scene_field(&qit, 2, i), playbacks ? &playbacks[i] : NULL, &stats);
         }
     }
 
@@ -761,6 +935,7 @@ static void box_particles_free(
     ecs_vec_fini_t(NULL, &s->page_handles, uint32_t);
     ecs_vec_fini_t(NULL, &s->table_handles, uint32_t);
     ecs_vec_fini_t(NULL, &s->points, box_particle_point_t);
+    ecs_vec_fini_t(NULL, &s->bursts, box_particle_burst_t);
     ecs_os_free(s);
 }
 
@@ -788,6 +963,7 @@ void box_render_particles_init(
     ecs_vec_init_t(NULL, &s->page_handles, uint32_t, 0);
     ecs_vec_init_t(NULL, &s->table_handles, uint32_t, 0);
     ecs_vec_init_t(NULL, &s->points, box_particle_point_t, 0);
+    ecs_vec_init_t(NULL, &s->bursts, box_particle_burst_t, 0);
     s->next_page = BOX_RENDER_BUFFER_PARTICLE_FIRST;
     s->next_table = BOX_RENDER_BUFFER_PARTICLE_TABLE_FIRST;
 
@@ -815,6 +991,24 @@ void box_render_particles_import(
                     .trav = EcsChildOf,
                     .inout = EcsInOutNone,
                     .oper = EcsOptional
+                },
+                {
+                    .id = ecs_id(ParticlePlayback),
+                    .src.id = EcsSelf,
+                    .inout = EcsInOut,
+                    .oper = EcsOptional
+                }
+            },
+            .cache_kind = EcsQueryCacheAuto
+        });
+        s->burst_query = ecs_query(world, {
+            .terms = {
+                { .id = ecs_id(ParticleBurst), .inout = EcsIn },
+                {
+                    .id = ecs_id(ParticleEmitter),
+                    .src.id = EcsSelf | EcsUp,
+                    .trav = EcsChildOf,
+                    .inout = EcsInOutNone
                 }
             },
             .cache_kind = EcsQueryCacheAuto

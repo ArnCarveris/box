@@ -373,6 +373,12 @@
                     "http_exec",
                     "no_color_codes"
                 ]
+            },
+            {
+                "id": "Particle",
+                "testcases": [
+                    "playback_states"
+                ]
             }
         ]
     }

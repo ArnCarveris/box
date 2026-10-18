@@ -46,6 +46,8 @@ ECS_STRUCT(ParticleRange, {
  * Its WorldTransform places the spawn volume and direction; live particles stay in world space.
  * A full pool spawns nothing, and a change of max empties it.
  *
+ * ParticlePlayback pauses, stops and resets it; ParticleBurst spawns on top of the rate.
+ *
  * Particles move with semi implicit Euler and die once their age reaches their lifetime; each
  * is a camera facing soft circle of its size, color times opacity, over the opaque image.
  */
@@ -74,6 +76,45 @@ ECS_STRUCT(ParticleEmitter, {
                              *   {0, 0, 0} */
     rgb color;              /**< Display encoded color, default {255, 255, 255} */
     uint32_t seed;          /**< Seed of the random draws, default 0 */
+});
+
+/** What an emitter with ParticlePlayback does this frame */
+ECS_ENUM(PlaybackState, {
+    ParticlePlaying = 0,    /**< Emits and moves its particles */
+    ParticlePaused = 1,     /**< The pool is frozen: nothing is emitted and nothing moves, and
+                             *   the particles stay drawn */
+    ParticleStopped = 2     /**< Emission ended, live particles finish their lives; playing
+                             *   again restarts the clock and the burst schedule */
+});
+
+/** Playback control of a ParticleEmitter; an emitter without it plays.
+ *
+ * Every control is a component write, so a script, the REST API or the set command drives
+ * it. The render extract keeps the clock and writes it back every frame.
+ */
+ECS_STRUCT(ParticlePlayback, {
+    PlaybackState state;    /**< Playing, paused or stopped, default ParticlePlaying */
+    float time;             /**< Seconds the emitter has played since it started, written by
+                             *   the engine every frame; advances only while playing */
+    bool reset;             /**< Empties the pool and zeroes the clock this frame, cleared again
+                             *   by the frame */
+});
+
+/** Particles spawned in one frame on a schedule of the playback clock, on a ParticleEmitter
+ * or on any descendant of one, sharing the pool of the nearest emitter at or above it.
+ *
+ * It goes off at seconds into the playback and repeat more times every at seconds; a burst at
+ * 0 goes off once on the first frame.
+ *
+ * Bursts run alongside the continuous rate, so an emitter with rate 0 and a burst is a one
+ * shot effect; a burst larger than the free slots of the pool spawns what fits.
+ */
+ECS_STRUCT(ParticleBurst, {
+    int32_t count;          /**< Particles spawned each time it goes off, default 0 */
+    float at;               /**< Seconds into the playback it first goes off, and its period,
+                             *   default 0 for once on the first frame */
+    int32_t repeat;         /**< Times it goes off again after the first, below zero for as
+                             *   long as the emitter plays, default 0 */
 });
 
 /** Counters of the particle simulation, a singleton the render extract writes every frame.

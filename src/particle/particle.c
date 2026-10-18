@@ -49,6 +49,9 @@ void BoxParticleImport(
     ECS_META_COMPONENT(world, ParticleRange);
     ECS_META_COMPONENT(world, ParticleEmitter);
     ecs_set_hooks(world, ParticleEmitter, { .ctor = box_particle_emitter_ctor });
+    ECS_META_COMPONENT(world, PlaybackState);
+    ECS_META_COMPONENT(world, ParticlePlayback);
+    ECS_META_COMPONENT(world, ParticleBurst);
     ECS_META_COMPONENT(world, ParticleStats);
     ecs_singleton_set(world, ParticleStats, {0});
 

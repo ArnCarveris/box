@@ -1,0 +1,73 @@
+// A layered explosion of bursts on emitters with rate 0, three frames in: a hot orange core,
+// a grey smoke shell around it, and fast yellow sparks whose pool takes a burst from each of two
+// child entities, the second going off on the second frame. A stopped emitter on the right
+// and a paused one on the left draw nothing.
+using box.transform
+using box.geometry
+using box.camera
+using box.view
+using box.particle
+
+camera {
+  Position: {0, 1, 6}
+  Camera: {fov: 60}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {10, 12, 20, 255}}}
+}
+
+explosion {
+  Position: {0, 1, 0}
+
+  smoke {
+    Position: {0, 0, 0}
+    ParticleEmitter: {
+      max: 600, rate: 0, shape: EmitterSphere, radius: 0.3, spread: 180,
+      speed: {20, 30}, lifetime: {3, 3}, size: {0.4, 0.7}, opacity: {0.3, 0.5},
+      acceleration: {0, 2, 0}, color: {90, 80, 80}, seed: 3
+    }
+    ParticleBurst: {count: 500}
+  }
+
+  core {
+    Position: {0, 0, 0}
+    ParticleEmitter: {
+      max: 800, rate: 0, shape: EmitterSphere, radius: 0.2, spread: 180,
+      speed: {4, 12}, lifetime: {2, 2}, size: {0.12, 0.25}, opacity: {0.6, 1},
+      color: {255, 120, 30}, seed: 1
+    }
+    ParticleBurst: {count: 700}
+  }
+
+  sparks {
+    Position: {0, 0, 0}
+    ParticleEmitter: {
+      max: 1200, rate: 0, shape: EmitterPoint, spread: 180,
+      speed: {30, 60}, lifetime: {2, 2}, size: {0.05, 0.08}, opacity: {1, 1},
+      acceleration: {0, -9.8, 0}, color: {255, 230, 120}, seed: 2
+    }
+
+    first_wave {
+      ParticleBurst: {count: 400}
+    }
+
+    second_wave {
+      ParticleBurst: {count: 400, at: 0.03}
+    }
+  }
+}
+
+paused {
+  Position: {-3, 1, 0}
+  ParticleEmitter: {max: 100, rate: 0, spread: 180, speed: {2, 2}, size: {0.3, 0.3}}
+  ParticleBurst: {count: 100}
+  ParticlePlayback: {state: ParticlePaused}
+}
+
+stopped {
+  Position: {3, 1, 0}
+  ParticleEmitter: {max: 100, rate: 0, spread: 180, speed: {2, 2}, size: {0.3, 0.3}}
+  ParticleBurst: {count: 100}
+  ParticlePlayback: {state: ParticleStopped}
+}
