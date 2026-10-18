@@ -1,0 +1,119 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.atmosphere
+
+// Spheres lit by the sun and by the environment of the atmosphere of their scene, which is the
+// scene root: noon in the top row, sunset in the bottom row, drawn over it by a second view.
+// From left to right a smooth and a rough metal, a smooth and a rough white dielectric. At noon
+// the smooth metal mirrors a blue sky over a grey ground and the white balls are lit blue from
+// above; at sunset the metal mirrors an orange horizon toward the sun on the left and the white
+// balls are warm on their left and dim blue on their right.
+noon {
+  Scene: {}
+  Atmosphere: {}
+
+  sun {
+    Rotation: {1.047, 0.524, 0}
+    DirectionalLight: {intensity: 3}
+    Rgb: {255, 255, 255}
+  }
+
+  camera {
+    Position: {0, 0, 8}
+    Camera: {fov: 40}
+  }
+
+  metal_smooth {
+    Position: {-2.7, 0.95, 0}
+    Sphere: {segments: 48, smooth: true, radius: 0.8}
+    Rgb: {240, 240, 245}
+    PbrMaterial: {metallic: 1, roughness: 0.05}
+  }
+
+  metal_rough {
+    Position: {-0.9, 0.95, 0}
+    Sphere: {segments: 48, smooth: true, radius: 0.8}
+    Rgb: {240, 240, 245}
+    PbrMaterial: {metallic: 1, roughness: 0.6}
+  }
+
+  white_smooth {
+    Position: {0.9, 0.95, 0}
+    Sphere: {segments: 48, smooth: true, radius: 0.8}
+    Rgb: {230, 230, 230}
+    PbrMaterial: {metallic: 0, roughness: 0.05}
+  }
+
+  white_rough {
+    Position: {2.7, 0.95, 0}
+    Sphere: {segments: 48, smooth: true, radius: 0.8}
+    Rgb: {230, 230, 230}
+    PbrMaterial: {metallic: 0, roughness: 0.8}
+  }
+}
+
+sunset {
+  Scene: {}
+  Atmosphere: {}
+
+  sun {
+    Rotation: {0.052, 1.571, 0}
+    DirectionalLight: {intensity: 3}
+    Rgb: {255, 255, 255}
+  }
+
+  camera {
+    Position: {0, 0, 8}
+    Camera: {fov: 40}
+  }
+
+  metal_smooth {
+    Position: {-2.7, -0.95, 0}
+    Sphere: {segments: 48, smooth: true, radius: 0.8}
+    Rgb: {240, 240, 245}
+    PbrMaterial: {metallic: 1, roughness: 0.05}
+  }
+
+  metal_rough {
+    Position: {-0.9, -0.95, 0}
+    Sphere: {segments: 48, smooth: true, radius: 0.8}
+    Rgb: {240, 240, 245}
+    PbrMaterial: {metallic: 1, roughness: 0.6}
+  }
+
+  white_smooth {
+    Position: {0.9, -0.95, 0}
+    Sphere: {segments: 48, smooth: true, radius: 0.8}
+    Rgb: {230, 230, 230}
+    PbrMaterial: {metallic: 0, roughness: 0.05}
+  }
+
+  white_rough {
+    Position: {2.7, -0.95, 0}
+    Sphere: {segments: 48, smooth: true, radius: 0.8}
+    Rgb: {230, 230, 230}
+    PbrMaterial: {metallic: 0, roughness: 0.8}
+  }
+}
+
+noon_view {
+  View: {
+    camera: noon.camera,
+    clear: {enabled: true, color: {20, 20, 24, 255}},
+    lighting: {enabled: true, baked: true, reflections: true, atmosphere: false,
+      environment: {source: noon, intensity: 1, yaw: 0, background: false}}
+  }
+}
+
+sunset_view {
+  View: {
+    camera: sunset.camera,
+    clear: {enabled: false},
+    lighting: {enabled: true, baked: true, reflections: true, atmosphere: false,
+      environment: {source: sunset, intensity: 1, yaw: 0, background: false}}
+  }
+}

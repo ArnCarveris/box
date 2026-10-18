@@ -7,7 +7,7 @@
 #ifndef BOX_RENDER_GPU_BAKE_H
 #define BOX_RENDER_GPU_BAKE_H
 
-#include "gpu.h"
+#include "gpu_environment.h"
 
 #ifdef BOX_RENDER_WGPU
 
@@ -72,7 +72,8 @@ typedef struct box_gpu_bake_timer_t {
 
 /** Uniforms of the SH projection, as in Params of etc/shaders/bake_sh.wgsl */
 typedef struct box_gpu_bake_params_t {
-    uint32_t size[4];               /**< Face edge in texels, probes of the chunk */
+    uint32_t size[4];               /**< Face edge in texels, probes of the chunk, 1 when the
+                                     *   texels nothing covered see the environment */
     float sky[4];                   /**< Linear ambient light from above */
     float ground[4];                /**< Linear ambient light from below */
     uint32_t probes[BOX_GPU_BAKE_CHUNK]; /**< Volume index or cubemap slot of each probe */
@@ -80,6 +81,8 @@ typedef struct box_gpu_bake_params_t {
     float near_[4];                 /**< Near plane of the faces, pixels per unit at depth 1,
                                      *   smallest size in pixels, spacing of the probes */
     float positions[BOX_GPU_BAKE_CHUNK][4]; /**< World position of each probe of the chunk */
+    float environment[BOX_RENDER_SH_COEFFICIENTS][4]; /**< SH irradiance of the environment,
+                                     *   copied from its buffer on the GPU when size[2] is 1 */
 } box_gpu_bake_params_t;
 
 /** Uniforms of the cull of one batch of a chunk, as CullJob of etc/shaders/bake_sh.wgsl */
@@ -148,6 +151,8 @@ typedef struct box_gpu_bake_pass_t {
     box_render_view_t rv;           /**< View with the lights the faces are shaded with */
     float sky[4];                   /**< Linear ambient light from above of the sky radiance */
     float ground[4];                /**< Linear ambient light from below of the sky radiance */
+    const box_gpu_environment_t *environment; /**< Processed environment of the sky radiance
+                                     *   in place of the hemisphere, NULL for none */
     WGPUBindGroup ambient;          /**< Volume group the faces shade their ambient term with */
     box_gpu_volume_t *volume;       /**< Volume a bake writes, NULL for reflections */
     const box_gpu_reflect_t *cube;  /**< Cubemap array reflections write, NULL for a bake */

@@ -13,6 +13,7 @@
  */
 
 #include "bake.h"
+#include "environment.h"
 #include "../spatial/spatial.h"
 #include <float.h>
 #include <math.h>
@@ -95,6 +96,13 @@ typedef struct box_reflect_scene_t {
     uint32_t volume;        /**< Probe volume a view of the scene samples, 0 for none */
     uint32_t volume_buffer; /**< Probe buffer of that volume the views show */
     box_bake_light_record_t record; /**< Lights of the views when the scene was last viewed */
+    uint32_t env_handle;    /**< Cubemap of ReflectionBake.environment the captures see where
+                             *   nothing covers them, 0 for the hemisphere while it has no
+                             *   content */
+    int32_t env_content;    /**< EnvironmentStatus.version that cubemap holds, 0 without one */
+    bool env_known;         /**< env_was_handle and env_was_content hold those of a frame */
+    uint32_t env_was_handle; /**< env_handle when the probes were last invalidated */
+    int32_t env_was_content; /**< env_content when the probes were last invalidated */
     bool bake_known;        /**< bake_handle and bake_switches hold the light bake of a frame */
     uint32_t bake_handle;   /**< Volume handle of the light bake of the scene, 0 for none */
     int32_t bake_switches;  /**< box_bake_volume_t.switches of that light bake */
@@ -878,6 +886,13 @@ static void box_reflect_bakes(
                 : NULL;
             s->resolution = bake->resolution;
             s->budget_ms = bake->budget_ms;
+            s->env_handle = bake->environment
+                ? box_render_environment_handle(world, bake->environment)
+                : 0;
+            s->env_content = s->env_handle
+                ? box_render_environment_content(world, bake->environment)
+                : 0;
+            s->env_handle = s->env_content ? s->env_handle : 0;
             if (changed || !s->bounded) {
                 glm_vec3_zero(s->min);
                 glm_vec3_zero(s->max);
@@ -1190,6 +1205,8 @@ static void box_reflect_mark_light(
  * regions of the static shapes that changed reach, those the lights that changed reach and
  * every probe when the light bake of the scene showed a new pass, converged, started or ended.
  *
+ * A new version or another source of the environment the captures see queues every probe.
+ *
  * @param r The state
  * @param s The scene
  */
@@ -1229,6 +1246,16 @@ static void box_reflect_invalidate(
     if (s->bake_known && (handle != s->bake_handle || switches != s->bake_switches)) {
         box_reflect_queue_all(s);
     }
+
+    if (s->env_known && (s->env_handle != s->env_was_handle ||
+        s->env_content != s->env_was_content))
+    {
+        box_reflect_queue_all(s);
+    }
+
+    s->env_known = true;
+    s->env_was_handle = s->env_handle;
+    s->env_was_content = s->env_content;
 
     s->bake_known = true;
     s->bake_handle = handle;
@@ -1316,6 +1343,7 @@ static void box_reflect_schedule(
     batch->lights.enabled = true;
     batch->volume = s->volume;
     batch->volume_buffer = s->volume_buffer;
+    batch->environment = s->env_handle;
     glm_vec3_copy(s->min, batch->bounds_min);
     glm_vec3_copy(s->max, batch->bounds_max);
     batch->first = ecs_vec_count(&p->probes);

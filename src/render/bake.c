@@ -3,8 +3,8 @@
  * @brief Irradiance probe volume of every scene with LightBake and the captures that bake it.
  *
  * The grid covers the static bounds the spatial index holds, padded and spaced as LightBake
- * says; probes inside a static shape are invalid. Probes start as the SH of the hemisphere
- * ambient of the scene, so a view that samples them looks as it did with the hemisphere.
+ * says; probes inside a static shape are invalid. Probes start as the SH of the sky: the
+ * hemisphere ambient, or LightBake.environment, whose new versions are ambient changes.
  *
  * Captures of the nearest unbaked probes go into each packet as budget_ms allows for bounces
  * + 1 passes, each shading with the previous one; views keep the last complete pass. A change
@@ -12,6 +12,7 @@
  */
 
 #include "bake.h"
+#include "environment.h"
 #include "../spatial/spatial.h"
 #include "../geometry/mesh_cache.h"
 #include <float.h>
@@ -675,15 +676,34 @@ static box_render_volume_desc_t* box_bake_desc(
     desc->probes = (uint32_t)v->probes;
     desc->op = (uint32_t)op;
     desc->from = (uint32_t)(1 - v->stage);
+    desc->environment = v->filled_env;
     ecs_os_memcpy(desc->sh, v->sh, ECS_SIZEOF(v->sh));
     ecs_os_memcpy(desc + 1, ecs_vec_first(&v->shown), words * ECS_SIZEOF(uint32_t));
 
     return desc;
 }
 
-/** Send a volume when the backend lacks its grid, or refill it when its ambient changed
- * before anything was baked. An ambient change after a bake rebakes every probe instead, and
- * the probes keep their values until then.
+/** Take the environment the captures of a volume see where nothing covers them in this frame:
+ * the cubemap of LightBake.environment once its source sent content, else the hemisphere.
+ *
+ * @param world The world
+ * @param v The volume
+ */
+static void box_bake_environment(
+    ecs_world_t *world,
+    box_bake_volume_t *v)
+{
+    uint32_t handle = v->environment
+        ? box_render_environment_handle(world, v->environment)
+        : 0;
+    int32_t content = handle ? box_render_environment_content(world, v->environment) : 0;
+    v->env_handle = content ? handle : 0;
+    v->env_content = content;
+}
+
+/** Send a volume when the backend lacks its grid, or refill it when its ambient or its
+ * environment changed before anything was baked. An ambient or environment change after a bake
+ * rebakes every probe instead, and the probes keep their values until then.
  *
  * @param p The packet
  * @param v The volume
@@ -694,7 +714,8 @@ static void box_bake_send(
 {
     float (*sh)[4] = v->viewed ? v->ambient : v->sh;
     size_t sh_size = sizeof(v->sh);
-    bool refill = memcmp(sh, v->sh, sh_size) != 0;
+    bool refill = memcmp(sh, v->sh, sh_size) != 0 || v->env_handle != v->filled_env ||
+        v->env_content != v->filled_content;
     if (!v->handle || (v->sent && !refill)) {
         goto done;
     }
@@ -703,6 +724,8 @@ static void box_bake_send(
         ecs_os_memcpy(v->sh, sh, (ecs_size_t)sh_size);
     }
 
+    v->filled_env = v->env_handle;
+    v->filled_content = v->env_content;
     if (v->sent && !v->filled) {
         box_bake_mark_all(v);
         goto done;
@@ -1149,6 +1172,7 @@ static void box_bake_batch(
     batch->baked = v->lights.baked;
     batch->baked_count = v->lights.baked_count;
     batch->baked_directional = v->lights.baked_directional;
+    batch->environment = v->env_handle;
     glm_vec3_copy(v->min, batch->bounds_min);
     glm_vec3_copy(v->max, batch->bounds_max);
     batch->first = ecs_vec_count(&p->probes);
@@ -1471,6 +1495,7 @@ static void BoxRenderExtractBake(
 
             v->seen = true;
             v->entity = qit.entities[row];
+            v->environment = bakes[row].environment;
             v->capture_size = bakes[row].capture_size;
             v->budget_ms = bakes[row].budget_ms;
             if (v->bounces != bakes[row].bounces) {
@@ -1501,7 +1526,9 @@ static void BoxRenderExtractBake(
 
     box_bake_views(world, b, p);
     for (i = 0; i < ecs_vec_count(&b->volumes); i ++) {
-        box_bake_send(p, ecs_vec_get_t(&b->volumes, box_bake_volume_t, i));
+        box_bake_volume_t *v = ecs_vec_get_t(&b->volumes, box_bake_volume_t, i);
+        box_bake_environment(world, v);
+        box_bake_send(p, v);
     }
 
     box_bake_changes(world, b);

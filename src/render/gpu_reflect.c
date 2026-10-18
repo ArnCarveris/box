@@ -143,7 +143,7 @@ void box_gpu_reflect_init(
         .format = BOX_GPU_REFLECT_FORMAT,
         .viewDimension = WGPUTextureViewDimension_2DArray
     };
-    WGPUBindGroupLayoutEntry store[4] = {
+    WGPUBindGroupLayoutEntry store[6] = {
         params,
         {
             .binding = 1,
@@ -154,7 +154,20 @@ void box_gpu_reflect_init(
             }
         },
         { .binding = 10, .visibility = WGPUShaderStage_Compute, .storageTexture = storage },
-        { .binding = 13, .visibility = WGPUShaderStage_Compute, .storageTexture = storage }
+        { .binding = 13, .visibility = WGPUShaderStage_Compute, .storageTexture = storage },
+        {
+            .binding = 15,
+            .visibility = WGPUShaderStage_Compute,
+            .sampler = { .type = WGPUSamplerBindingType_Filtering }
+        },
+        {
+            .binding = 17,
+            .visibility = WGPUShaderStage_Compute,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Float,
+                .viewDimension = WGPUTextureViewDimension_Cube
+            }
+        }
     };
     WGPUBindGroupLayoutEntry mip[3] = {
         params,
@@ -187,7 +200,7 @@ void box_gpu_reflect_init(
     };
     ecs_map_init(&gpu->reflections, NULL);
     gpu->reflect_store_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
-        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 4, .entries = store });
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 6, .entries = store });
     gpu->reflect_mip_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
         &(WGPUBindGroupLayoutDescriptor){ .entryCount = 3, .entries = mip });
     gpu->reflect_prefilter_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
@@ -497,6 +510,7 @@ bool box_gpu_reflect_store(
     WGPUBuffer params,
     uint64_t params_size,
     WGPUTextureView atlas,
+    WGPUTextureView environment,
     int32_t count,
     const WGPUPassTimestampWrites *writes)
 {
@@ -510,12 +524,14 @@ bool box_gpu_reflect_store(
     WGPUComputePassEncoder pass = wgpuCommandEncoderBeginComputePass(encoder,
         &(WGPUComputePassDescriptor){ .timestampWrites = writes });
     wgpuComputePassEncoderSetPipeline(pass, gpu->reflect_store);
-    box_gpu_reflect_dispatch(gpu, pass, gpu->reflect_store_layout, (WGPUBindGroupEntry[4]){
+    box_gpu_reflect_dispatch(gpu, pass, gpu->reflect_store_layout, (WGPUBindGroupEntry[6]){
         { .binding = 0, .buffer = params, .size = params_size },
         { .binding = 1, .textureView = atlas },
         { .binding = 10, .textureView = cube->levels[0] },
-        { .binding = 13, .textureView = source->levels[0] }
-    }, 4, cube->resolution, faces);
+        { .binding = 13, .textureView = source->levels[0] },
+        { .binding = 15, .sampler = gpu->reflect_sampler },
+        { .binding = 17, .textureView = environment ? environment : gpu->no_environment }
+    }, 6, cube->resolution, faces);
     box_gpu_reflect_mip_chain(gpu, pass, params, params_size, source->levels,
         cube->resolution, source->mips, faces);
     box_gpu_reflect_prefilter_chain(gpu, pass, params, params_size, source->cube,

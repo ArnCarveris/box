@@ -624,6 +624,18 @@
                 ]
             },
             {
+                "id": "AtmosphereIbl",
+                "testcases": [
+                    "noon_sphere_bluish_brighter_on_top",
+                    "sunset_side_toward_sun_warmer",
+                    "version_follows_throttle",
+                    "bake_open_probe_matches_environment",
+                    "cube_and_processing_time_measured",
+                    "background_matches_sky",
+                    "reflection_capture_sees_environment"
+                ]
+            },
+            {
                 "id": "Particle",
                 "testcases": [
                     "stream_renders_where_expected",

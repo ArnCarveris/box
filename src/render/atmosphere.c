@@ -5,9 +5,12 @@
  *
  * The LUTs are a BOX_RENDER_ATMOSPHERE resource per scene, built again only when the medium they
  * were built from changes; the sun, the colors and the cameras only reach the per view passes.
+ *
+ * The entity of the LUTs is also an environment source: its sky goes into the cubemap of its
+ * Environment as a BOX_RENDER_ATMOSPHERE_ENVIRONMENT, throttled to the changes that show.
  */
 
-#include "render.h"
+#include "environment.h"
 #include "../atmosphere/atmosphere.h"
 #include <math.h>
 
@@ -24,6 +27,11 @@ typedef struct box_atmos_scene_t {
     int32_t version;        /**< lut_version of the last build */
     box_render_atmosphere_desc_t key; /**< Medium of the last build */
     Atmosphere value;       /**< Values of the Atmosphere in this frame */
+    bool env_sent;          /**< The sky was rendered into the environment of env_entity */
+    ecs_entity_t env_entity; /**< Entity whose environment the sky was last rendered into */
+    uint32_t env_handle;    /**< Handle of the cubemap it was rendered into */
+    box_render_atmosphere_desc_t env_key; /**< Medium of that render */
+    box_render_atmosphere_env_t env; /**< Inputs of that render */
 } box_atmos_scene_t;
 
 /** Main thread state of the atmosphere extract */
@@ -382,6 +390,174 @@ done:
     return;
 }
 
+/** Write the inputs of the environment of a scene with LUTs: its sky seen from the ground.
+ *
+ * @param lights The state of the light extract
+ * @param s The LUTs of the scene
+ * @param out Receives the inputs, version 0
+ */
+static void box_atmos_env_inputs(
+    const void *lights,
+    const box_atmos_scene_t *s,
+    box_render_atmosphere_env_t *out)
+{
+    const Atmosphere *value = &s->value;
+    float scale = value->night_intensity;
+    ecs_os_memset_t(out, 0, box_render_atmosphere_env_t);
+    out->atmosphere = s->handle;
+    out->altitude = glm_max(value->ground_altitude, (float)BOX_ATMOS_PLANET_OFFSET);
+    out->mie_anisotropy = value->mie.anisotropy;
+    if (!box_render_lights_atmos_sun(lights, s->scene, out->sun, out->sun_color)) {
+        glm_vec3_copy((vec3){0, -1, 0}, out->sun);
+    }
+
+    if (!box_render_lights_atmos_moon(lights, s->scene, out->moon, out->moon_color,
+        &out->moon[3]))
+    {
+        glm_vec3_copy((vec3){0, -1, 0}, out->moon);
+    }
+
+    out->night[0] = box_atmos_extract_linear(value->night_tint.r) * scale;
+    out->night[1] = box_atmos_extract_linear(value->night_tint.g) * scale;
+    out->night[2] = box_atmos_extract_linear(value->night_tint.b) * scale;
+}
+
+/** Check whether a light of an environment changed enough since its last render to show: its
+ * direction turned by more than an angle, or a channel of its color changed by more than
+ * BOX_RENDER_ATMOS_ENV_COLOR of the brightest channel it had.
+ *
+ * @param was_dir Direction at the last render
+ * @param was_color Color at the last render
+ * @param dir Direction now
+ * @param color Color now
+ * @param cos_angle Cosine of the angle
+ * @return Whether the environment is rendered again
+ */
+static bool box_atmos_env_light_changed(
+    const float *was_dir,
+    const float *was_color,
+    const float *dir,
+    const float *color,
+    float cos_angle)
+{
+    float ref = glm_max(glm_max(was_color[0], was_color[1]), was_color[2]);
+    bool result = glm_vec3_dot(ECS_CONST_CAST(float*, was_dir), ECS_CONST_CAST(float*, dir)) <
+        cos_angle;
+    int32_t c;
+    for (c = 0; c < 3 && !result; c ++) {
+        result = fabsf(color[c] - was_color[c]) > BOX_RENDER_ATMOS_ENV_COLOR * ref;
+    }
+
+    return result;
+}
+
+/** Check whether the environment of a scene is rendered again with new inputs: it never was,
+ * its cubemap is new or empty, the medium changed, or the sun or moon changed enough to show.
+ *
+ * @param world The world
+ * @param s The LUTs of the scene
+ * @param handle Handle of the cubemap
+ * @param in The inputs of this frame
+ * @return Whether the environment is rendered
+ */
+static bool box_atmos_env_changed(
+    const ecs_world_t *world,
+    const box_atmos_scene_t *s,
+    uint32_t handle,
+    const box_render_atmosphere_env_t *in)
+{
+    const box_render_atmosphere_env_t *was = &s->env;
+    float angle = glm_clamp(s->value.ibl_update_angle, 0.0f, 180.0f);
+    float cos_angle = cosf(glm_rad(angle));
+    bool result = !s->env_sent || s->env_entity != s->entity || s->env_handle != handle ||
+        !box_render_environment_content(world, s->entity);
+    if (!result) {
+        result = ecs_os_memcmp_t(&s->env_key, &s->key, box_render_atmosphere_desc_t) ||
+            was->atmosphere != in->atmosphere || was->altitude != in->altitude ||
+            was->mie_anisotropy != in->mie_anisotropy ||
+            ecs_os_memcmp(was->night, in->night, ECS_SIZEOF(float) * 4);
+    }
+
+    if (!result) {
+        result = box_atmos_env_light_changed(was->sun, was->sun_color, in->sun, in->sun_color,
+            cos_angle) ||
+            box_atmos_env_light_changed(was->moon, was->moon_color, in->moon, in->moon_color,
+                cos_angle);
+    }
+
+    return result;
+}
+
+/** Render the sky of a scene with LUTs into the environment of the entity of its Atmosphere
+ * when that changed enough since the last render.
+ *
+ * @param world The world
+ * @param lights The state of the light extract
+ * @param p The packet
+ * @param s The LUTs of the scene
+ */
+static void box_atmos_environment(
+    ecs_world_t *world,
+    const void *lights,
+    box_render_packet_t *p,
+    box_atmos_scene_t *s)
+{
+    uint32_t handle = box_render_environment_handle(world, s->entity);
+    box_render_atmosphere_env_t in;
+    if (!handle) {
+        s->env_sent = false;
+        goto done;
+    }
+
+    box_atmos_env_inputs(lights, s, &in);
+    if (!box_atmos_env_changed(world, s, handle, &in)) {
+        goto done;
+    }
+
+    in.version = box_render_environment_sent(world, s->entity);
+    box_render_atmosphere_env_t *desc = box_render_packet_resource(p,
+        BOX_RENDER_ATMOSPHERE_ENVIRONMENT, BOX_RENDER_UPDATE, handle,
+        sizeof(box_render_atmosphere_env_t));
+    if (desc) {
+        *desc = in;
+    }
+
+    s->env = in;
+    s->env_key = s->key;
+    s->env_entity = s->entity;
+    s->env_handle = handle;
+    s->env_sent = true;
+done:
+    return;
+}
+
+/** Render the environment of every scene with LUTs whose sky changed enough to show.
+ *
+ * @param it The iterator of the system
+ */
+static void BoxRenderExtractAtmosphereEnvironment(
+    ecs_iter_t *it)
+{
+    box_render_atmos_t *a = box_atmos_state(it->world);
+    const void *lights = box_render_lights_state(it->world);
+    box_render_packet_t *p = NULL;
+    int32_t i;
+    if (!a || !ecs_vec_count(&a->scenes)) {
+        goto done;
+    }
+
+    p = box_render_packet(it->world);
+    for (i = 0; i < ecs_vec_count(&a->scenes); i ++) {
+        box_atmos_scene_t *s = ecs_vec_get_t(&a->scenes, box_atmos_scene_t, i);
+        if (s->seen) {
+            box_atmos_environment(it->world, lights, p, s);
+        }
+    }
+
+done:
+    return;
+}
+
 /** Free the state of the atmosphere extract.
  *
  * @param ctx The state
@@ -419,6 +595,16 @@ void box_render_atmosphere_views_init(
         .entity = ecs_entity(world, { .name = "RenderExtractAtmosphereViews" }),
         .phase = RenderExtract,
         .run = BoxRenderExtractAtmosphereViews
+    });
+}
+
+void box_render_atmosphere_environment_init(
+    ecs_world_t *world)
+{
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "RenderExtractAtmosphereEnvironment" }),
+        .phase = RenderExtract,
+        .run = BoxRenderExtractAtmosphereEnvironment
     });
 }
 
@@ -477,7 +663,8 @@ bool box_render_atmosphere_use(
     for (i = 0; !result && i < ecs_vec_count(&p->resources); i ++) {
         const box_render_resource_t *r = ecs_vec_get_t(
             &p->resources, box_render_resource_t, i);
-        result = r->kind == BOX_RENDER_ATMOSPHERE && r->op != BOX_RENDER_DESTROY;
+        result = (r->kind == BOX_RENDER_ATMOSPHERE && r->op != BOX_RENDER_DESTROY) ||
+            r->kind == BOX_RENDER_ATMOSPHERE_ENVIRONMENT;
     }
 
     return result;

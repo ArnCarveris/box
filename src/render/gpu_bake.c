@@ -12,6 +12,7 @@
 
 #include "gpu_bake.h"
 #include <float.h>
+#include <stddef.h>
 
 #ifdef BOX_RENDER_WGPU
 
@@ -1007,7 +1008,7 @@ static void box_gpu_bake_params(
         : NULL;
     uint32_t capacity = baked ? baked->size / (uint32_t)sizeof(box_render_light_t) : 0;
     box_gpu_bake_params_t params = {
-        .size = { (uint32_t)pass->size, (uint32_t)count, 0, 0 },
+        .size = { (uint32_t)pass->size, (uint32_t)count, pass->environment ? 1u : 0u, 0 },
         .near_ = {
             BOX_GPU_BAKE_NEAR, (float)pass->size * 0.5f, BOX_RENDER_CULL_MIN_DIMENSION,
             pass->spacing
@@ -1172,7 +1173,8 @@ static bool box_gpu_bake_store(
     uint32_t ticket = batch->ticket + (uint32_t)(probes - pass->probes);
     int32_t i;
     bool result = box_gpu_reflect_store(gpu, encoder, cube, b->params,
-        sizeof(box_gpu_bake_params_t), b->sets[BOX_GPU_BAKE_REFLECT].color_view, count, NULL);
+        sizeof(box_gpu_bake_params_t), b->sets[BOX_GPU_BAKE_REFLECT].color_view,
+        pass->environment ? pass->environment->cube : NULL, count, NULL);
     if (!result) {
         goto done;
     }
@@ -1317,6 +1319,11 @@ static void box_gpu_bake_chunk_capture(
     };
     bool timed = timer->readback != -1;
     WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
+    if (pass->environment) {
+        wgpuCommandEncoderCopyBufferToBuffer(encoder, pass->environment->sh, 0, b->params,
+            offsetof(box_gpu_bake_params_t, environment), BOX_GPU_PROBE_SIZE);
+    }
+
     if (box_gpu_bake_cull(gpu, b, encoder, count,
         timed && !timer->begun ? &begin : NULL))
     {
@@ -1349,6 +1356,21 @@ static void box_gpu_bake_chunk_capture(
 #endif
 done:
     return;
+}
+
+/** Get the environment the texels of a batch nothing covers see.
+ *
+ * @param gpu The backend
+ * @param handle Handle of the environment of the batch, 0 for none
+ * @return The environment once it was processed, NULL for the hemisphere
+ */
+static const box_gpu_environment_t* box_gpu_bake_environment(
+    box_gpu_t *gpu,
+    uint32_t handle)
+{
+    const box_gpu_environment_t *result = handle ? box_gpu_environment_get(gpu, handle) : NULL;
+
+    return result && result->processed ? result : NULL;
 }
 
 /** Fit the capture cascade of the sun of the faces of a batch to static bounds.
@@ -1401,6 +1423,7 @@ static void box_gpu_bake_pass_probes(
 
     glm_vec4_copy(ECS_CONST_CAST(float*, batch->lights.ambient_sky), out->sky);
     glm_vec4_copy(ECS_CONST_CAST(float*, batch->lights.ambient_ground), out->ground);
+    out->environment = box_gpu_bake_environment(gpu, batch->environment);
     out->rv.scene = batch->scene;
     out->rv.lights = batch->lights;
     out->rv.lights.enabled = true;
@@ -1441,6 +1464,7 @@ static void box_gpu_bake_pass_reflect(
         : gpu->no_volume->group[0];
     glm_vec4_copy(ECS_CONST_CAST(float*, batch->lights.ambient_sky), out->sky);
     glm_vec4_copy(ECS_CONST_CAST(float*, batch->lights.ambient_ground), out->ground);
+    out->environment = box_gpu_bake_environment(gpu, batch->environment);
     out->rv.scene = batch->scene;
     out->rv.lights = batch->lights;
     out->rv.lights.enabled = true;

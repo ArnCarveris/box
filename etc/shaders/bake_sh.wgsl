@@ -2,8 +2,10 @@
 // irradiance of the probe (Ramamoorthi and Hanrahan), in the basis and coefficient order of
 // mesh.wgsl. One workgroup per probe sums radiance times basis times the solid angle of every
 // texel (Sloan, "Stupid Spherical Harmonics Tricks"), then scales each band by the clamped
-// cosine convolution A_l. Texels no shape covered (alpha 0) see the hemisphere ambient as
-// radiance a + 1.5 b y, whose irradiance over pi is exactly the a + b y the forward pass uses.
+// cosine convolution A_l. Texels no shape covered (alpha 0) see the sky: the hemisphere ambient
+// as radiance a + 1.5 b y, whose irradiance over pi is exactly the a + b y the forward pass
+// uses, or with params.size.z the radiance E_lm / A_l of the SH of an environment source, so
+// an open probe gets the SH of the environment.
 //
 // Baked lights exist only in the probes, so their direct light at the probe is added too, as
 // Unity's light probes hold the direct light of baked lights: a point, spot or directional
@@ -23,7 +25,8 @@
 //
 // The reflect_store entry point writes the faces of the reflection probes of a chunk into mip 0
 // of their cubemap slot instead (params.probes holds the slots), mirrored to the WebGPU cubemap
-// convention, with the sky radiance of the projection where nothing covered a texel. It writes
+// convention, with the sky radiance where nothing covered a texel (mip 0 of the environment cube
+// with params.size.z, the hemisphere of the projection otherwise). It writes
 // them into a source cube array of the chunk too, one cube per probe, whose full mip chain
 // reflect_mip box filters level by level. reflect_prefilter then fills each higher mip level of
 // the slots with the GGX prefiltered radiance of the source (split sum, Karis), sampling a
@@ -48,7 +51,8 @@
 #include "include/cube.wgsl"
 
 struct Params {
-    // x: face edge in texels, y: probes of the chunk
+    // x: face edge in texels, y: probes of the chunk, z: 1 when uncovered texels see the
+    // environment instead of the hemisphere
     size: vec4u,
     sky: vec4f,
     ground: vec4f,
@@ -61,6 +65,8 @@ struct Params {
     near: vec4f,
     // World position of each probe of the chunk
     positions: array<vec4f, 128>,
+    // L2 SH irradiance of the environment, in the basis and order of basis()
+    environment: array<vec4f, 9>,
 };
 
 // A light as in mesh.wgsl: position is the direction toward a directional light.
@@ -112,6 +118,7 @@ struct CullJob {
 @group(0) @binding(14) var source: texture_cube_array<f32>;
 @group(0) @binding(15) var source_sampler: sampler;
 @group(0) @binding(16) var prefiltered: texture_storage_2d_array<rgba16float, write>;
+@group(0) @binding(17) var environment_cube: texture_cube<f32>;
 @group(1) @binding(0) var<storage, read> instances: array<Instance>;
 
 const GROUP: u32 = 64u;
@@ -310,8 +317,6 @@ fn project(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_index)
     let size = max(params.size.x, 1u);
     let per_face = size * size;
     let step = 2.0 / f32(size);
-    let a = (params.sky.rgb + params.ground.rgb) * 0.5;
-    let b = (params.sky.rgb - params.ground.rgb) * 0.75;
     var sum: array<vec3f, 9>;
     for (var t = lane; t < per_face * 6u; t += GROUP) {
         let face = t / per_face;
@@ -324,7 +329,7 @@ fn project(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_index)
         let v = 1.0 - (f32(y) + 0.5) * step;
         let d = normalize(axes[0] + right * u + axes[1] * v);
         let texel = textureLoad(captures, tile(probe, face, x, y), 0);
-        let radiance = select(a + b * d.y, texel.rgb, covered(texel)) * weight;
+        let radiance = select(sky(d), texel.rgb, covered(texel)) * weight;
         let y_lm = basis(d);
         for (var k = 0u; k < SH_COEFFICIENTS; k++) {
             sum[k] += radiance * y_lm[k];
@@ -440,11 +445,32 @@ fn cull(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_index) la
     }
 }
 
-// Radiance a texel no shape covered sees in a direction, as in project.
+// Radiance a texel no shape covered sees in a direction: the radiance of the SH of the
+// environment with params.size.z, else the hemisphere ambient.
 fn sky(d: vec3f) -> vec3f {
+    if (params.size.z != 0u) {
+        let y_lm = basis(d);
+        var radiance = vec3f(0.0);
+        for (var k = 0u; k < SH_COEFFICIENTS; k++) {
+            radiance += params.environment[k].rgb / band(k) * y_lm[k];
+        }
+
+        return radiance;
+    }
+
     let a = (params.sky.rgb + params.ground.rgb) * 0.5;
     let b = (params.sky.rgb - params.ground.rgb) * 0.75;
     return a + b * d.y;
+}
+
+// Radiance a stored cubemap texel no shape covered sees: mip 0 of the environment with
+// params.size.z, whose texel directions are those of cube_direction, else sky().
+fn sky_texel(d: vec3f) -> vec3f {
+    if (params.size.z != 0u) {
+        return textureSampleLevel(environment_cube, source_sampler, d, 0.0).rgb;
+    }
+
+    return sky(d);
 }
 
 // Layer of a face of a probe of the chunk in the cubemap array, six per slot.
@@ -466,7 +492,7 @@ fn reflect_store(@builtin(global_invocation_id) id: vec3u) {
 
     let d = cube_direction(face, id.xy, size);
     let texel = textureLoad(captures, tile(probe, face, size - 1u - id.x, id.y), 0);
-    let radiance = vec4f(select(sky(d), texel.rgb, covered(texel)), 1.0);
+    let radiance = vec4f(select(sky_texel(d), texel.rgb, covered(texel)), 1.0);
     textureStore(cube_store, id.xy, cube_layer(probe, face), radiance);
     textureStore(source_store, id.xy, id.z, radiance);
 }

@@ -7,7 +7,7 @@
  * without a volume bind a 1x1x1 volume that keeps the hemisphere.
  */
 
-#include "gpu.h"
+#include "gpu_environment.h"
 
 #ifdef BOX_RENDER_WGPU
 
@@ -133,6 +133,52 @@ static void box_gpu_volume_valid(
     ecs_os_free(cells);
 }
 
+/** Fill every probe of both buffers of a volume with the SH of a processed environment, which
+ * replaces the SH the probes were written with.
+ *
+ * The SH is copied into the first probe of each buffer, then each buffer copies the probes the
+ * other one has filled after them, doubling the filled probes with every pair of copies.
+ *
+ * @param gpu The backend
+ * @param v The volume, its buffers written
+ * @param handle Handle of the environment, 0 for none
+ */
+static void box_gpu_volume_environment(
+    box_gpu_t *gpu,
+    box_gpu_volume_t *v,
+    uint32_t handle)
+{
+    const box_gpu_environment_t *env = handle ? box_gpu_environment_get(gpu, handle) : NULL;
+    uint64_t filled = 1;
+    int32_t i;
+    if (!env || !env->processed || !v->count) {
+        goto done;
+    }
+
+    WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
+    for (i = 0; i < 2; i ++) {
+        wgpuCommandEncoderCopyBufferToBuffer(encoder, env->sh, 0, v->probes[i], 0,
+            BOX_GPU_PROBE_SIZE);
+    }
+
+    while (filled < v->count) {
+        uint64_t n = filled < v->count - filled ? filled : v->count - filled;
+        for (i = 0; i < 2; i ++) {
+            wgpuCommandEncoderCopyBufferToBuffer(encoder, v->probes[i], 0, v->probes[1 - i],
+                filled * BOX_GPU_PROBE_SIZE, n * BOX_GPU_PROBE_SIZE);
+        }
+
+        filled += n;
+    }
+
+    WGPUCommandBuffer commands = wgpuCommandEncoderFinish(encoder, NULL);
+    wgpuQueueSubmit(gpu->queue, 1, &commands);
+    wgpuCommandBufferRelease(commands);
+    wgpuCommandEncoderRelease(encoder);
+done:
+    return;
+}
+
 /** Write the grid of a volume, fill every probe of both buffers with one SH, open its
  * visibility maps and write its validity mask.
  *
@@ -168,6 +214,7 @@ static void box_gpu_volume_write(
     wgpuQueueWriteBuffer(gpu->queue, v->probes[0], 0, probes, size);
     wgpuQueueWriteBuffer(gpu->queue, v->probes[1], 0, probes, size);
     wgpuQueueWriteBuffer(gpu->queue, v->visibility, 0, open, texels * sizeof(uint32_t));
+    box_gpu_volume_environment(gpu, v, desc->environment);
     box_gpu_volume_valid(gpu, v, desc);
     ecs_os_free(open);
     ecs_os_free(probes);
@@ -371,6 +418,54 @@ WGPUBindGroup box_gpu_volume_group(
         : NULL;
 
     return volume ? volume->group[v->volume_buffer & 1u] : gpu->no_volume->group[0];
+}
+
+bool box_render_gpu_read_volume_sh(
+    ecs_world_t *world,
+    uint32_t volume,
+    uint32_t buffer,
+    uint32_t probe,
+    float out[BOX_RENDER_SH_COEFFICIENTS][4])
+{
+    bool result = false;
+    box_render_gpu_stats_t stats;
+    if (!box_render_gpu_stats(world, &stats) || !stats.ready || buffer > 1) {
+        goto done;
+    }
+
+    box_gpu_t *gpu = box_render_get_backend(world)->ctx;
+    bool renders = ecs_os_thread_self() == gpu->thread;
+    ecs_assert(renders, ECS_INVALID_OPERATION,
+        "box_render_gpu_read_volume_sh needs RenderSettings.main_thread and box_render_sync");
+    const box_gpu_volume_t *v = renders
+        ? ecs_map_get_deref(&gpu->volumes, box_gpu_volume_t, volume)
+        : NULL;
+    if (!v || probe >= v->count) {
+        goto done;
+    }
+
+    result = box_gpu_read(gpu, v->probes[buffer], probe * (uint32_t)BOX_GPU_PROBE_SIZE,
+        (uint32_t)BOX_GPU_PROBE_SIZE, out);
+done:
+    return result;
+}
+
+#else
+
+bool box_render_gpu_read_volume_sh(
+    ecs_world_t *world,
+    uint32_t volume,
+    uint32_t buffer,
+    uint32_t probe,
+    float out[BOX_RENDER_SH_COEFFICIENTS][4])
+{
+    (void)world;
+    (void)volume;
+    (void)buffer;
+    (void)probe;
+    (void)out;
+
+    return false;
 }
 
 #endif

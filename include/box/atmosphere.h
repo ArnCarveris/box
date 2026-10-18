@@ -41,6 +41,10 @@ ECS_STRUCT(AtmosphereMie, {
 /** Atmosphere of a scene, placed on a Scene root or as a singleton for the default scene.
  * Adding it adds AtmosphereStatus, removing it removes it.
  *
+ * The entity is the environment source of the sky of its scene (LightSettings.environment):
+ * Atmosphere adds Environment {128, Box} unless the entity has one. The sky has no sun or moon
+ * disk; the sun or moon moving ibl_update_angle or changing color by 2% renders it again.
+ *
  * Values apply as specified; a planet_radius, thickness, units_per_km or scale height that is
  * not positive or another negative distance sets AtmosphereStatus.error and renders nothing.
  */

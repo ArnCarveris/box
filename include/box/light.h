@@ -89,6 +89,9 @@ ECS_STRUCT(LightBake, {
     float budget_ms;     /**< Render time per frame spent baking in milliseconds, default 2 */
     float bounds_padding; /**< World units added around the static bounds, default 1 */
     char *cache;         /**< Cache folder path, default ".box/bake", empty for none */
+    ecs_entity_t environment; /**< Environment source the captures see where no shape covers
+                          *   them and the probes start as, default 0 for the hemisphere of
+                          *   the AmbientLight */
 });
 
 /** Progress of the bake of a scene, written by the engine next to LightBake */
@@ -119,6 +122,8 @@ ECS_STRUCT(ReflectionBake, {
     bool scene_probe;     /**< The engine adds a probe covering the whole scene, default true */
     float scene_probe_height; /**< Height of the scene probe above the bottom of the static
                                *   bounds of the scene, default 2 */
+    ecs_entity_t environment; /**< Environment source the captures see where no shape covers
+                               *   them, default 0 for the hemisphere of the AmbientLight */
 });
 
 /** Progress of the reflection probes of a scene, written by the engine next to ReflectionBake */

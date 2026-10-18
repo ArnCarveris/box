@@ -17,6 +17,13 @@
 // Slice 0 is the identity (0, 0, 0, 1), so a distance d samples the volume at
 // w = (d / aerial_distance * (N - 1) + 0.5) / N and a distance of 0 gives the identity.
 //
+// environment (6 layers of the cubemap of an environment source): the sky view of the scene
+// at its ground altitude in the direction of each texel, cube_direction of include/cube.wgsl,
+// without the sun and moon disks. A direction that hits the planet sees the ground instead:
+// ground_albedo times the irradiance of the sun and moon at the ground and the mean irradiance
+// of the sky, over pi. Each 8x8 workgroup integrates that sky irradiance from 64 cosine
+// weighted directions of the sky view, one per invocation, summed by a tree reduction.
+//
 // fog (2x1): the in scatter color of a HeightFog with atmosphere, once per view. Texel 0 is the
 // ambient, the mean of 6 horizon samples of the sky view mixed 15% toward its zenith; texel 1
 // the glow toward the main light, the horizon sample at its azimuth minus the ambient times
@@ -38,6 +45,7 @@
 // directions, the dark side lit by the earthshine fraction. The target clips them in a view
 // without effects.
 #include "include/atmosphere_medium.h"
+#include "include/cube.wgsl"
 
 struct Atmosphere {
     // bottom radius, top radius, Rayleigh scale height, Mie scale height
@@ -97,6 +105,7 @@ struct Scatter {
 @group(0) @binding(4) var sky_lut: texture_2d<f32>;
 @group(0) @binding(5) var out_2d: texture_storage_2d<rgba16float, write>;
 @group(0) @binding(6) var out_3d: texture_storage_3d<rgba16float, write>;
+@group(0) @binding(7) var out_cube: texture_storage_2d_array<rgba16float, write>;
 
 const PI: f32 = 3.14159265358979323846;
 const TRANSMITTANCE_STEPS: i32 = BOX_ATMOS_TRANSMITTANCE_STEPS;
@@ -249,10 +258,10 @@ fn camera_radius() -> f32 {
     return bottom_radius() + max(u.view.x, BOX_ATMOS_PLANET_OFFSET);
 }
 
-// Single scattering of the sun plus multi scattering and the single scattering of the moon
-// times its illumination along a ray inside the atmosphere, with sigma scaled by k, integrated
-// as (S - S T) / sigma_t per step.
-fn in_scatter(ro: vec3f, rd: vec3f, max_t: f32, steps: i32, k: f32, ground: bool) -> Scatter {
+// Single scattering of a light (the sun or the moon) plus multi scattering along a ray inside
+// the atmosphere, with sigma scaled by k, integrated as (S - S T) / sigma_t per step.
+fn in_scatter(ro: vec3f, rd: vec3f, max_t: f32, steps: i32, k: f32, ground: bool, sun: vec3f,
+    sun_color: vec3f) -> Scatter {
     var s: Scatter;
     s.light = vec3f(0.0);
     s.throughput = vec3f(1.0);
@@ -262,16 +271,9 @@ fn in_scatter(ro: vec3f, rd: vec3f, max_t: f32, steps: i32, k: f32, ground: bool
     }
 
     let dt = (seg.y - seg.x) / f32(steps);
-    let sun = u.sun.xyz;
     let cos_view = clamp(dot(rd, sun), -1.0, 1.0);
     let rayleigh = rayleigh_phase(cos_view);
     let mie = mie_phase(cos_view, u.view.y);
-    let moon = u.moon.xyz;
-    let moon_light = u.moon_color.rgb * u.moon.w;
-    let has_moon = max(moon_light.r, max(moon_light.g, moon_light.b)) > 0.0;
-    let cos_moon = clamp(dot(rd, moon), -1.0, 1.0);
-    let rayleigh_moon = rayleigh_phase(cos_moon);
-    let mie_moon = mie_phase(cos_moon, u.view.y);
     for (var i = 0; i < steps; i = i + 1) {
         let pos = ro + rd * (seg.x + (f32(i) + 0.5) * dt);
         let r = length(pos);
@@ -281,13 +283,7 @@ fn in_scatter(ro: vec3f, rd: vec3f, max_t: f32, steps: i32, k: f32, ground: bool
         let sun_t = sample_transmittance(r, mu_sun) * earth_shadow(r, mu_sun);
         let single = (m.scattering_rayleigh * rayleigh + m.scattering_mie * mie) * sun_t;
         let psi = textureSampleLevel(multi_lut, lut_sampler, multi_to_uv(mu_sun, r), 0.0).rgb;
-        var scattered = (single + psi * m.scattering) * u.sun_color.rgb;
-        if (has_moon) {
-            let mu_moon = clamp(dot(pos / max(r, 1e-4), moon), -1.0, 1.0);
-            let moon_t = sample_transmittance(r, mu_moon) * earth_shadow(r, mu_moon);
-            scattered = scattered + (m.scattering_rayleigh * rayleigh_moon +
-                m.scattering_mie * mie_moon) * moon_t * moon_light;
-        }
+        let scattered = (single + psi * m.scattering) * sun_color;
         let integral = (scattered - scattered * step_t) / max(m.extinction, vec3f(1e-6));
         s.light = s.light + s.throughput * integral;
         s.throughput = s.throughput * step_t;
@@ -396,10 +392,16 @@ fn sky_view(@builtin(global_invocation_id) gid: vec3u) {
     }
 
     let r = camera_radius();
+    let ro = vec3f(0.0, r, 0.0);
     let rd = sky_uv_to_direction((vec2f(gid.xy) + 0.5) / vec2f(dims), r);
-    let s = in_scatter(vec3f(0.0, r, 0.0), rd, 1e9, SKY_STEPS, 1.0, true);
+    var light = in_scatter(ro, rd, 1e9, SKY_STEPS, 1.0, true, u.sun.xyz, u.sun_color.rgb).light;
+    let moon_light = u.moon_color.rgb * u.moon.w;
+    if (any(moon_light > vec3f(0.0))) {
+        light += in_scatter(ro, rd, 1e9, SKY_STEPS, 1.0, true, u.moon.xyz, moon_light).light;
+    }
+
     let night = 1.0 - smoothstep(-0.05, 0.02, u.sun.y);
-    textureStore(out_2d, vec2i(gid.xy), vec4f(s.light + u.night.rgb * night, 1.0));
+    textureStore(out_2d, vec2i(gid.xy), vec4f(light + u.night.rgb * night, 1.0));
 }
 
 // Number of horizon samples of the fog ambient
@@ -447,6 +449,61 @@ fn fog(@builtin(global_invocation_id) gid: vec3u) {
     textureStore(out_2d, vec2i(gid.xy), vec4f(result, 1.0));
 }
 
+// Sky irradiance samples of a workgroup of the environment, one per invocation
+const ENV_SAMPLES: u32 = 64u;
+// Sample directions per axis of the stratified sky irradiance
+const ENV_SAMPLES_AXIS: u32 = 8u;
+
+var<workgroup> env_samples: array<vec3f, 64>;
+
+// Radiance of the sky view in sample i of a cosine weighted stratified set over the upper
+// hemisphere, so pi times the mean of the samples is the irradiance of the ground.
+fn env_sky_sample(i: u32) -> vec3f {
+    let u1 = (f32(i % ENV_SAMPLES_AXIS) + 0.5) / f32(ENV_SAMPLES_AXIS);
+    let u2 = (f32(i / ENV_SAMPLES_AXIS) + 0.5) / f32(ENV_SAMPLES_AXIS);
+    let r = sqrt(u1);
+    let phi = 2.0 * PI * u2;
+    return sky_sample(vec3f(r * cos(phi), sqrt(max(0.0, 1.0 - u1)), r * sin(phi)));
+}
+
+// Irradiance of a light at the ground from top of atmosphere irradiance in a direction.
+fn env_ground_light(dir: vec3f, color: vec3f) -> vec3f {
+    let mu = clamp(dir.y, -1.0, 1.0);
+    return color * sample_transmittance(bottom_radius(), mu) * max(mu, 0.0);
+}
+
+@compute @workgroup_size(8, 8, 1)
+fn environment(@builtin(global_invocation_id) gid: vec3u,
+    @builtin(local_invocation_index) lane: u32)
+{
+    env_samples[lane] = env_sky_sample(lane);
+    workgroupBarrier();
+    for (var stride = ENV_SAMPLES / 2u; stride > 0u; stride = stride / 2u) {
+        if (lane < stride) {
+            env_samples[lane] = env_samples[lane] + env_samples[lane + stride];
+        }
+
+        workgroupBarrier();
+    }
+
+    let sky = env_samples[0];
+    let dims = textureDimensions(out_cube);
+    if (gid.x >= dims.x || gid.y >= dims.y || gid.z >= 6u) {
+        return;
+    }
+
+    let rd = cube_direction(gid.z, gid.xy, dims.x);
+    let ground = ray_sphere(vec3f(0.0, camera_radius(), 0.0), rd, bottom_radius());
+    var radiance = sky_sample(rd);
+    if (ground.x > 0.0) {
+        let irradiance = env_ground_light(u.sun.xyz, u.sun_color.rgb) +
+            env_ground_light(u.moon.xyz, u.moon_color.rgb) + sky * (PI / f32(ENV_SAMPLES));
+        radiance = u.ground_albedo.rgb * irradiance / PI;
+    }
+
+    textureStore(out_cube, vec2i(gid.xy), i32(gid.z), vec4f(radiance, 1.0));
+}
+
 fn unproject(ndc: vec2f, z: f32) -> vec3f {
     let h = u.inv_view_proj * vec4f(ndc, z, 1.0);
     return h.xyz / h.w;
@@ -465,8 +522,14 @@ fn aerial(@builtin(global_invocation_id) gid: vec3u) {
     let distance = f32(gid.z) / f32(max(dims.z, 2u) - 1u) * u.view.z;
     var result = vec4f(0.0, 0.0, 0.0, 1.0);
     if (distance > 0.0) {
-        let s = in_scatter(vec3f(0.0, camera_radius(), 0.0), rd, distance, AERIAL_STEPS,
-            u.view.w, false);
+        var s = in_scatter(vec3f(0.0, camera_radius(), 0.0), rd, distance, AERIAL_STEPS,
+            u.view.w, false, u.sun.xyz, u.sun_color.rgb);
+        let moon_light = u.moon_color.rgb * u.moon.w;
+        if (any(moon_light > vec3f(0.0))) {
+            let m = in_scatter(vec3f(0.0, camera_radius(), 0.0), rd, distance, AERIAL_STEPS,
+                u.view.w, false, u.moon.xyz, moon_light);
+            s.light = s.light + m.light * s.throughput;
+        }
         let t = (s.throughput.x + s.throughput.y + s.throughput.z) / 3.0;
         let horizon_u = clamp(atan2(rd.x, rd.z) / (2.0 * PI) + 0.5, 0.0, 1.0);
         let horizon = textureSampleLevel(sky_lut, lut_sampler, vec2f(horizon_u, 0.5), 0.0).rgb;

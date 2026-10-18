@@ -199,6 +199,29 @@
                     "image_sent_once_per_version",
                     "missing_file_sets_error"
                 ]
+            },
+            {
+                "id": "AtmosphereEnvironment",
+                "testcases": [
+                    "adds_environment",
+                    "singleton_adds_environment",
+                    "keeps_authored_environment",
+                    "authored_after_atmosphere_wins",
+                    "script_authored_environment_wins",
+                    "light_bake_environment_default",
+                    "reflection_bake_environment_default",
+                    "renders_once_without_changes",
+                    "sun_move_past_angle_renders",
+                    "small_sun_moves_accumulate",
+                    "update_angle_follows_setting",
+                    "color_change_threshold",
+                    "medium_change_renders",
+                    "moon_scatters_into_environment",
+                    "invalid_resolution_renders_nothing",
+                    "resolution_change_renders_again",
+                    "bake_fills_with_environment",
+                    "bake_without_environment_uses_hemisphere"
+                ]
             }
         ]
     }

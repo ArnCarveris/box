@@ -113,6 +113,12 @@ typedef struct box_bake_volume_t {
     bool pending;           /**< The bake can progress this frame and has not converged */
     bool resort;            /**< The queue is sorted again before the next probes are taken */
     float sh[BOX_RENDER_SH_COEFFICIENTS][4]; /**< Irradiance the probes are filled with */
+    ecs_entity_t environment; /**< LightBake.environment of this frame */
+    uint32_t env_handle;    /**< Cubemap of that source the captures see where nothing covers
+                             *   them, 0 for the hemisphere while it has no content */
+    int32_t env_content;    /**< EnvironmentStatus.version that cubemap holds, 0 without one */
+    uint32_t filled_env;    /**< env_handle the probes were filled with, or rebaked for */
+    int32_t filled_content; /**< env_content the probes were filled with, or rebaked for */
     float ambient[BOX_RENDER_SH_COEFFICIENTS][4]; /**< Irradiance of the views of this frame */
     ecs_vec_t valid;        /**< uint32_t, one bit per probe outside static geometry */
     ecs_vec_t queue;        /**< uint32_t, probes waiting for capture, the nearest last */

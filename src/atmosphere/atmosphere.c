@@ -11,6 +11,9 @@
 #include "../render/render.h"
 #include <math.h>
 
+/** Environment.resolution an Atmosphere adds */
+#define BOX_ATMOS_ENVIRONMENT_RESOLUTION (128)
+
 /** Error of a planet radius that is not positive */
 #define BOX_ATMOS_RADIUS_ERROR "planet_radius must be positive"
 
@@ -79,7 +82,8 @@ static void box_atmosphere_ctor(
     }
 }
 
-/** Add AtmosphereStatus to an entity that got Atmosphere.
+/** Add AtmosphereStatus to an entity that got Atmosphere, and Environment with the defaults of
+ * an atmosphere unless it has one.
  *
  * @param it The observer iterator
  */
@@ -89,6 +93,12 @@ static void box_atmosphere_add(
     int32_t i;
     for (i = 0; i < it->count; i ++) {
         ecs_set(it->stage, it->entities[i], AtmosphereStatus, {0});
+        if (!ecs_has(it->world, it->entities[i], Environment)) {
+            ecs_set(it->stage, it->entities[i], Environment, {
+                .resolution = BOX_ATMOS_ENVIRONMENT_RESOLUTION,
+                .filter = EnvironmentFilterBox
+            });
+        }
     }
 }
 

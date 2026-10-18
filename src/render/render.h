@@ -144,8 +144,10 @@ typedef enum box_render_resource_kind_t {
     BOX_RENDER_REFLECTION, /**< Cubemap array of the reflection probes of a scene */
     BOX_RENDER_ATMOSPHERE, /**< Transmittance and multi scattering LUTs of a scene */
     BOX_RENDER_ENVIRONMENT, /**< Cubemap of an environment source */
-    BOX_RENDER_ENVIRONMENT_IMAGE /**< Equirectangular image an EnvironmentImage writes into the
+    BOX_RENDER_ENVIRONMENT_IMAGE, /**< Equirectangular image an EnvironmentImage writes into the
                                   *   cubemap of its handle */
+    BOX_RENDER_ATMOSPHERE_ENVIRONMENT /**< Sky an Atmosphere renders into the cubemap of its
+                                       *   handle */
 } box_render_resource_kind_t;
 
 /** What a resource change does to its object */
@@ -399,6 +401,9 @@ typedef struct box_render_volume_desc_t {
     uint32_t from;          /**< Probe buffer a BOX_RENDER_VOLUME_COPY reads, 0 or 1 */
     int32_t shift[3];       /**< Old grid index of probe 0 of a resize per axis, new + shift */
     uint32_t old_size[3];   /**< Probes per axis of the grid before a resize */
+    uint32_t environment;   /**< BOX_RENDER_ENVIRONMENT whose SH a create, fill or resize fills
+                             *   the probes with in place of sh once it was processed, 0 for
+                             *   sh */
 } box_render_volume_desc_t;
 
 /** A probe the backend captures: six faces around its position, projected onto its SH */
@@ -434,6 +439,8 @@ typedef struct box_render_bake_batch_t {
     uint32_t baked;         /**< Light buffer of the Baked lights of the scene, 0 for none */
     uint32_t baked_count;   /**< Baked lights in that buffer */
     uint32_t baked_directional; /**< Directional lights at the start of that buffer */
+    uint32_t environment;   /**< BOX_RENDER_ENVIRONMENT whose SH texels nothing covers see, 0
+                             *   or one not processed yet for the hemisphere ambient */
     float bounds_min[3];    /**< Minimum corner of the static bounds of the scene */
     float bounds_max[3];    /**< Maximum corner of the static bounds of the scene */
     int32_t first;          /**< First probe of the batch in the probes of the packet */
@@ -468,6 +475,9 @@ typedef struct box_render_reflect_batch_t {
     uint32_t volume;        /**< Probe volume the faces shade their ambient term with, 0 for the
                              *   hemisphere ambient */
     uint32_t volume_buffer; /**< Probe buffer of that volume, 0 or 1 */
+    uint32_t environment;   /**< BOX_RENDER_ENVIRONMENT texels nothing covers see, its cube in
+                             *   the stored faces and its SH in the projection, 0 or one not
+                             *   processed yet for the hemisphere ambient */
     float bounds_min[3];    /**< Minimum corner of the static bounds of the scene */
     float bounds_max[3];    /**< Maximum corner of the static bounds of the scene */
     int32_t first;          /**< First probe of the batch in the probes of the packet, whose
@@ -503,6 +513,9 @@ typedef enum box_render_atmos_pass_t {
     BOX_RENDER_ATMOS_SKY,           /**< Sky view LUT of a view */
     BOX_RENDER_ATMOS_AERIAL,        /**< Aerial perspective volume of a view */
     BOX_RENDER_ATMOS_FOG,           /**< In scatter color of the HeightFog of a view */
+    BOX_RENDER_ATMOS_SCENE_SKY,     /**< Sky view LUT of a scene at its ground altitude, which
+                                     *   its environment is rendered from */
+    BOX_RENDER_ATMOS_ENVIRONMENT,   /**< Mip 0 of the environment cubemap of a scene */
     BOX_RENDER_ATMOS_PASSES         /**< Number of passes */
 } box_render_atmos_pass_t;
 
@@ -521,6 +534,27 @@ typedef struct box_render_atmosphere_desc_t {
     float ozone[4];         /**< Ozone absorption in km^-1 at the peak of its tent, w unused */
     float ground_albedo[4]; /**< Linear albedo of the ground, w unused */
 } box_render_atmosphere_desc_t;
+
+/** Description of a BOX_RENDER_ATMOSPHERE_ENVIRONMENT update: the sky of the atmosphere of a
+ * scene, rendered into mip 0 of the cubemap of the BOX_RENDER_ENVIRONMENT of the handle.
+ *
+ * The backend renders a sky view LUT of the scene at its ground altitude, then the cubemap
+ * from it before the environments are processed, and reports the cubemap written with version.
+ *
+ * The request waits while the LUTs, the atmosphere shader or the processing are not ready; a
+ * newer one for the handle replaces it, one whose cubemap is gone is dropped.
+ */
+typedef struct box_render_atmosphere_env_t {
+    uint32_t atmosphere;    /**< Handle of the BOX_RENDER_ATMOSPHERE of the scene */
+    int32_t version;        /**< EnvironmentStatus.version of the content */
+    float altitude;         /**< Altitude of the ground in km, at least 1 m */
+    float mie_anisotropy;   /**< Mie phase asymmetry g */
+    float sun[4];           /**< Direction toward the sun, w unused; (0, -1, 0) without one */
+    float sun_color[4];     /**< Top of atmosphere irradiance of the sun, 0 without one */
+    float moon[4];          /**< Direction toward the moon, in w its illumination; (0, -1, 0) without one */
+    float moon_color[4];    /**< Top of atmosphere irradiance of the moon, 0 without one */
+    float night[4];         /**< Linear night_tint times night_intensity */
+} box_render_atmosphere_env_t;
 
 /** How a buffer is used, flags of box_render_buffer_desc_t */
 typedef enum box_render_buffer_usage_t {
@@ -848,6 +882,24 @@ bool box_render_gpu_read_reflection_sh(
     ecs_world_t *world,
     uint32_t texture,
     uint32_t slot,
+    float out[BOX_RENDER_SH_COEFFICIENTS][4]);
+
+/** Copy the L2 SH irradiance of a probe of a probe buffer of a volume into memory, waiting for
+ * the copy. Only call this when the main thread renders, after box_render_sync, as
+ * box_render_gpu_read_buffer.
+ *
+ * @param world The world
+ * @param volume Handle of the BOX_RENDER_VOLUME
+ * @param buffer Probe buffer, 0 or 1
+ * @param probe Index of the probe
+ * @param out Receives the linear rgb coefficients, w unused
+ * @return Whether the volume has the probe and the coefficients were copied
+ */
+bool box_render_gpu_read_volume_sh(
+    ecs_world_t *world,
+    uint32_t volume,
+    uint32_t buffer,
+    uint32_t probe,
     float out[BOX_RENDER_SH_COEFFICIENTS][4]);
 
 /** What the cull pass of a view tested and kept in the last target the GPU backend rendered */
@@ -1302,6 +1354,23 @@ void box_render_atmosphere_init(
  */
 void box_render_atmosphere_views_init(
     ecs_world_t *world);
+
+/** Register the system that makes the entity with the Atmosphere of every scene with LUTs an
+ * environment source, which renders its sky into the cubemap of its valid Environment as a
+ * BOX_RENDER_ATMOSPHERE_ENVIRONMENT.
+ *
+ * It renders when the cubemap is empty, the medium changed, the sun or moon moved more than
+ * Atmosphere.ibl_update_angle or a channel of their color changed by more than
+ * BOX_RENDER_ATMOS_ENV_COLOR, and never otherwise. Runs after the light extract.
+ *
+ * @param world The world
+ */
+void box_render_atmosphere_environment_init(
+    ecs_world_t *world);
+
+/** Relative change of the color of the sun or moon, against its brightest channel, above
+ * which the environment of an atmosphere is rendered again */
+#define BOX_RENDER_ATMOS_ENV_COLOR (0.02f)
 
 /** Make the atmosphere extract follow the Atmosphere components, called by the import of
  * box.atmosphere.

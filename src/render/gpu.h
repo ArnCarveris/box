@@ -1030,6 +1030,8 @@ void box_gpu_reflect_prefilter_chain(
  * @param params Uniforms of the chunk, Params of bake_sh.wgsl with the slots as its probes
  * @param params_size Bytes of the uniforms
  * @param atlas View of the face atlas of the chunk
+ * @param environment Cube view of the environment texels nothing covered see when
+ *        params.size.z is set, NULL for the black cube
  * @param count Probes of the chunk
  * @param writes Timestamps the pass writes, NULL for none
  * @return Whether the pass was recorded, false while the pipelines do not exist
@@ -1041,6 +1043,7 @@ bool box_gpu_reflect_store(
     WGPUBuffer params,
     uint64_t params_size,
     WGPUTextureView atlas,
+    WGPUTextureView environment,
     int32_t count,
     const WGPUPassTimestampWrites *writes);
 
@@ -1408,6 +1411,32 @@ void box_gpu_atmosphere_apply(
  * @param packet The packet
  */
 void box_gpu_atmosphere_build(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
+
+/** Take the request of a BOX_RENDER_ATMOSPHERE_ENVIRONMENT resource to render the sky of an
+ * atmosphere into the cubemap of an environment, replacing one of the handle that still waits.
+ *
+ * @param gpu The backend
+ * @param handle Handle of the cubemap
+ * @param desc The request, NULL to drop the one of the handle
+ */
+void box_gpu_atmosphere_environment_apply(
+    box_gpu_t *gpu,
+    uint32_t handle,
+    const box_render_atmosphere_env_t *desc);
+
+/** Render the environments of atmospheres that wait for it, after box_gpu_atmosphere_build
+ * and before box_gpu_environment_process: the sky view LUT of the scene at its ground
+ * altitude, then mip 0 of the cubemap from it, reported written with the request's version.
+ *
+ * A request waits while its LUTs are not built with the current pipelines or
+ * box_gpu_environment_ready fails, and is dropped when its cubemap or its LUTs are gone.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+void box_gpu_atmosphere_environment(
     box_gpu_t *gpu,
     const box_render_packet_t *packet);
 

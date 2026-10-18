@@ -469,6 +469,7 @@ bool box_render_environment_processes(
         const box_render_resource_t *r = ecs_vec_get_t(
             &p->resources, box_render_resource_t, i);
         result = r->kind == BOX_RENDER_ENVIRONMENT_IMAGE ||
+            r->kind == BOX_RENDER_ATMOSPHERE_ENVIRONMENT ||
             (r->kind == BOX_RENDER_ENVIRONMENT && r->op != BOX_RENDER_DESTROY);
     }
 
