@@ -468,6 +468,7 @@ static void box_bake_mark_light(
     vec3 lo, hi;
     if (!l || !(l->range > 0)) {
         box_bake_mark_all(v);
+        v->relit = true;
     } else {
         glm_vec3_subs(ECS_CONST_CAST(float*, l->position), l->range, lo);
         glm_vec3_adds(ECS_CONST_CAST(float*, l->position), l->range, hi);
@@ -482,6 +483,7 @@ void box_bake_light_record_init(
     ecs_vec_init_t(NULL, &r->lights, box_render_light_t, 0);
     ecs_vec_init_t(NULL, &r->entities, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &r->modes, uint8_t, 0);
+    ecs_vec_init_t(NULL, &r->scratch, box_render_light_t, 0);
 }
 
 void box_bake_light_record_fini(
@@ -490,6 +492,7 @@ void box_bake_light_record_fini(
     ecs_vec_fini_t(NULL, &r->lights, box_render_light_t);
     ecs_vec_fini_t(NULL, &r->entities, ecs_entity_t);
     ecs_vec_fini_t(NULL, &r->modes, uint8_t);
+    ecs_vec_fini_t(NULL, &r->scratch, box_render_light_t);
 }
 
 /** Pass the lights that differ between a record and a frame to mark, matched by their entity:
@@ -541,15 +544,128 @@ static void box_bake_lights_diff(
     }
 }
 
+/** Check whether a directional light is within the thresholds of how it was: its direction
+ * within threshold->light degrees and its linear color within threshold->color of the
+ * brightest channel of either, a threshold of 0 asking for the same value.
+ *
+ * The direction of a light that is black in both states does not count unless
+ * threshold->light is 0. Anything else of the light must be the same.
+ *
+ * @param was The light as it was
+ * @param now The light as it is
+ * @param threshold The thresholds
+ * @return Whether the light counts as unchanged
+ */
+static bool box_bake_light_near(
+    const box_render_light_t *was,
+    const box_render_light_t *now,
+    const box_bake_threshold_t *threshold)
+{
+    vec3 a, b;
+    float brightest = 0.0f, largest = 0.0f;
+    int32_t i;
+    bool result = was->range == now->range && was->spot_scale == now->spot_scale &&
+        was->spot_offset == now->spot_offset &&
+        !ecs_os_memcmp(was->direction, now->direction, ECS_SIZEOF(float) * 3);
+    if (!result) {
+        goto done;
+    }
+
+    if (threshold->light > 0 && glm_vec3_max(ECS_CONST_CAST(float*, was->color)) <= 0 &&
+        glm_vec3_max(ECS_CONST_CAST(float*, now->color)) <= 0)
+    {
+        result = true;
+    } else if (threshold->light > 0) {
+        glm_vec3_normalize_to(ECS_CONST_CAST(float*, was->position), a);
+        glm_vec3_normalize_to(ECS_CONST_CAST(float*, now->position), b);
+        float cosine = glm_clamp(glm_vec3_dot(a, b), -1.0f, 1.0f);
+        result = glm_deg(acosf(cosine)) <= threshold->light;
+    } else {
+        result = !ecs_os_memcmp(was->position, now->position, ECS_SIZEOF(float) * 3);
+    }
+
+    if (!result) {
+        goto done;
+    }
+
+    if (threshold->color > 0) {
+        for (i = 0; i < 3; i ++) {
+            brightest = glm_max(brightest, glm_max(was->color[i], now->color[i]));
+            largest = glm_max(largest, fabsf(was->color[i] - now->color[i]));
+        }
+
+        result = largest <= threshold->color * brightest;
+    } else {
+        result = !ecs_os_memcmp(was->color, now->color, ECS_SIZEOF(float) * 3);
+    }
+
+done:
+    return result;
+}
+
+/** Take the lights of a frame into the scratch of a record, each directional light within the
+ * thresholds of the one of its entity and mode in the record as the record has it.
+ *
+ * @param map Scratch map of light entities
+ * @param r The record, which knows a frame
+ * @param now The lights in this frame
+ * @param threshold The thresholds
+ * @return The lights to compare and keep
+ */
+static const box_render_light_t* box_bake_lights_hold(
+    ecs_map_t *map,
+    box_bake_light_record_t *r,
+    const box_bake_light_set_t *now,
+    const box_bake_threshold_t *threshold)
+{
+    const box_render_light_t *before = ecs_vec_first(&r->lights);
+    const ecs_entity_t *owners = ecs_vec_first(&r->entities);
+    const uint8_t *modes = ecs_vec_first(&r->modes);
+    int32_t i, known = ecs_vec_count(&r->lights);
+    ecs_vec_set_count_t(NULL, &r->scratch, box_render_light_t, now->count);
+    box_render_light_t *out = ecs_vec_first(&r->scratch);
+    ecs_os_memcpy_n(out, now->lights, box_render_light_t, now->count);
+    ecs_map_clear(map);
+    for (i = 0; i < known; i ++) {
+        if (!(before[i].range > 0)) {
+            ecs_map_insert(map, owners[i], (ecs_map_val_t)i);
+        }
+    }
+
+    for (i = 0; i < now->count; i ++) {
+        ecs_map_val_t *old = ecs_map_get(map, now->entities[i]);
+        if (!old || (now->lights[i].range > 0) || modes[*old] != now->modes[i] ||
+            !ecs_os_memcmp_t(&before[*old], &now->lights[i], box_render_light_t))
+        {
+            continue;
+        }
+
+        if (box_bake_light_near(&before[*old], &now->lights[i], threshold)) {
+            out[i] = before[*old];
+            r->held = true;
+        }
+    }
+
+    return out;
+}
+
 void box_bake_lights_compare(
     ecs_map_t *map,
     box_bake_light_record_t *r,
     const box_render_view_lights_t *view,
-    const box_bake_light_set_t *now,
+    const box_bake_light_set_t *frame,
     bool ambient,
+    const box_bake_threshold_t *threshold,
     box_bake_light_mark_t mark,
     void *ctx)
 {
+    box_bake_light_set_t held = *frame;
+    const box_bake_light_set_t *now = &held;
+    r->held = false;
+    if (r->known && held.count && (threshold->light > 0 || threshold->color > 0)) {
+        held.lights = box_bake_lights_hold(map, r, frame, threshold);
+    }
+
     int32_t count = now->count, known = ecs_vec_count(&r->lights);
     bool sun = (r->view.buffer == BOX_RENDER_BUFFER_LIGHT_FIRST) !=
         (view->buffer == BOX_RENDER_BUFFER_LIGHT_FIRST);
@@ -589,7 +705,7 @@ void box_bake_lights(
     box_bake_light_set_t now = { l->count, l->lights, l->entities, l->modes };
     if (v->viewed && v->sent && v->probes) {
         box_bake_lights_compare(&b->light_map, &v->known, &l->first, &now, false,
-            box_bake_mark_light, v);
+            &v->threshold, box_bake_mark_light, v);
     }
 }
 

@@ -106,6 +106,14 @@ typedef struct box_reflect_scene_t {
     bool bake_known;        /**< bake_handle and bake_switches hold the light bake of a frame */
     uint32_t bake_handle;   /**< Volume handle of the light bake of the scene, 0 for none */
     int32_t bake_switches;  /**< box_bake_volume_t.switches of that light bake */
+    bool bake_settled;      /**< That light bake settled, or the scene has none */
+    box_bake_threshold_t threshold; /**< Thresholds of the ReflectionBake of this frame */
+    int32_t landed;         /**< Resident probes with a capture, current or not */
+    bool relit;             /**< A directional light, the ambient, the environment or a settled
+                             *   light bake queued every probe since the captures were dropped */
+    bool settled;           /**< The captures converged once since they were dropped, or every
+                             *   resident probe has one with only a relight queued; PerfRun
+                             *   waits no more */
 } box_reflect_scene_t;
 
 /** A probe ranked for a slot or for the blend order */
@@ -886,6 +894,8 @@ static void box_reflect_bakes(
                 : NULL;
             s->resolution = bake->resolution;
             s->budget_ms = bake->budget_ms;
+            s->threshold.light = bake->light_threshold;
+            s->threshold.color = bake->color_threshold;
             s->env_handle = bake->environment
                 ? box_render_environment_handle(world, bake->environment)
                 : 0;
@@ -1045,6 +1055,9 @@ static void box_reflect_uncapture(
         probe->queued = false;
         probe->packet = 0;
     }
+
+    s->relit = false;
+    s->settled = false;
 }
 
 /** Make the cubemap array of a scene hold the slots in use at its resolution: a power of two
@@ -1167,6 +1180,7 @@ static void box_reflect_requeue(
 {
     int32_t i;
     s->captured = 0;
+    s->landed = 0;
     for (i = 0; i < ecs_vec_count(&s->probes); i ++) {
         box_reflect_probe_t *probe = ecs_vec_get_t(&s->probes, box_reflect_probe_t, i);
         if (probe->packet && probe->packet <= rendered) {
@@ -1175,6 +1189,7 @@ static void box_reflect_requeue(
         }
 
         s->captured += probe->slot >= 0 && box_reflect_current(probe);
+        s->landed += probe->slot >= 0 && probe->captured;
     }
 }
 
@@ -1199,13 +1214,19 @@ static void box_reflect_mark_light(
             box_reflect_queue(probe);
         }
     }
+
+    if (!l || !(l->range > 0)) {
+        s->relit = true;
+    }
 }
 
 /** Queue the probes of a scene that changed what they show since the last frame: those the
  * regions of the static shapes that changed reach, those the lights that changed reach and
  * every probe when the light bake of the scene showed a new pass, converged, started or ended.
  *
- * A new version or another source of the environment the captures see queues every probe.
+ * Another source of the environment the captures see queues every probe, and so does a new
+ * version of it unless a directional light is held within the thresholds of its captured
+ * state, which the source then follows.
  *
  * @param r The state
  * @param s The scene
@@ -1240,17 +1261,19 @@ static void box_reflect_invalidate(
         box_bake_light_set_t lights;
         box_bake_view_lights(r->lights_state, s->scene, &lights);
         box_bake_lights_compare(&r->light_map, &s->record, &s->lights, &lights, true,
-            box_reflect_mark_light, s);
+            &s->threshold, box_reflect_mark_light, s);
     }
 
     if (s->bake_known && (handle != s->bake_handle || switches != s->bake_switches)) {
         box_reflect_queue_all(s);
+        s->relit |= s->bake_settled;
     }
 
     if (s->env_known && (s->env_handle != s->env_was_handle ||
-        s->env_content != s->env_was_content))
+        (s->env_content != s->env_was_content && !s->record.held)))
     {
         box_reflect_queue_all(s);
+        s->relit = true;
     }
 
     s->env_known = true;
@@ -1260,6 +1283,7 @@ static void box_reflect_invalidate(
     s->bake_known = true;
     s->bake_handle = handle;
     s->bake_switches = switches;
+    s->bake_settled = !v || v->settled;
 }
 
 /** Order probes for their captures: the scene probe first, then nearer to the cameras of the
@@ -1408,11 +1432,15 @@ static void box_reflect_progress(
 {
     box_reflect_texture(r, p, s, capacity);
     box_reflect_requeue(s, status ? status->rendered : 0);
-    s->pending = gpu && s->cubes && !s->error && s->budget_ms > 0 && s->viewed &&
-        s->captured < s->resident;
+    bool progress = gpu && s->cubes && !s->error && s->budget_ms > 0 && s->viewed;
+    if (progress && s->bake_settled) {
+        s->settled |= s->captured == s->resident || (s->relit && s->landed == s->resident);
+    }
+
+    s->pending = progress && s->captured < s->resident;
     if (s->pending) {
         box_reflect_schedule(r, p, s, headless, (status ? status->submitted : 0) + 1);
-        r->pending += s->resident - s->captured;
+        r->pending += s->settled ? 0 : s->resident - s->captured;
     }
 }
 

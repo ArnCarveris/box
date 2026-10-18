@@ -42,7 +42,9 @@ ECS_ENUM(LightBakeMode, {
 /** Directional light travelling along the entity's local +Z */
 ECS_STRUCT(DirectionalLight, {
     float intensity;    /**< Light on a facing white surface, default 1, 0 lights nothing */
-    LightBakeMode bake; /**< Part of the light in the bake of its scene, default Mixed */
+    LightBakeMode bake; /**< Part of the light in the bake of its scene, default Mixed; a sun
+                         *   moved by a time of day should be Mixed or Realtime, as a Baked
+                         *   one keeps the light of its baked state within the thresholds */
 });
 
 /** Omnidirectional light. Intensity is in linear display units: it lights a facing white diffuse
@@ -92,6 +94,12 @@ ECS_STRUCT(LightBake, {
     ecs_entity_t environment; /**< Environment source the captures see where no shape covers
                           *   them and the probes start as, default 0 for the hemisphere of
                           *   the AmbientLight */
+    float light_threshold; /**< Degrees a directional light turns from the direction it was
+                          *   baked with before it or an environment change rebakes, so a
+                          *   time of day converges between rebakes, default 2, 0 for any */
+    float color_threshold; /**< Change of the linear color of a directional light from the
+                          *   baked one, over its brightest channel, before it or an
+                          *   environment change rebakes, default 0.05, 0 for any */
 });
 
 /** Progress of the bake of a scene, written by the engine next to LightBake */
@@ -124,6 +132,12 @@ ECS_STRUCT(ReflectionBake, {
                                *   bounds of the scene, default 2 */
     ecs_entity_t environment; /**< Environment source the captures see where no shape covers
                                *   them, default 0 for the hemisphere of the AmbientLight */
+    float light_threshold; /**< Degrees a directional light turns from the direction it was
+                            *   captured with before it or an environment change recaptures,
+                            *   default 2, 0 for any; probes show the old capture meanwhile */
+    float color_threshold; /**< Change of the linear color of a directional light from the
+                            *   captured one, over its brightest channel, before it or an
+                            *   environment change recaptures, default 0.05, 0 for any */
 });
 
 /** Progress of the reflection probes of a scene, written by the engine next to ReflectionBake */

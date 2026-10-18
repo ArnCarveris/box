@@ -705,6 +705,10 @@ static void box_bake_environment(
  * environment changed before anything was baked. An ambient or environment change after a bake
  * rebakes every probe instead, and the probes keep their values until then.
  *
+ * New content of the same environment rebakes nothing while a directional light of the last
+ * frame was held within the thresholds of its baked state: the source follows that light, as
+ * an atmosphere follows its sun, and the light rebakes once it passes them.
+ *
  * @param p The packet
  * @param v The volume
  */
@@ -714,9 +718,10 @@ static void box_bake_send(
 {
     float (*sh)[4] = v->viewed ? v->ambient : v->sh;
     size_t sh_size = sizeof(v->sh);
-    bool refill = memcmp(sh, v->sh, sh_size) != 0 || v->env_handle != v->filled_env ||
-        v->env_content != v->filled_content;
-    if (!v->handle || (v->sent && !refill)) {
+    bool ambient = memcmp(sh, v->sh, sh_size) != 0;
+    bool source = v->env_handle != v->filled_env;
+    bool content = v->env_content != v->filled_content;
+    if (!v->handle || (v->sent && !ambient && !source && !content)) {
         goto done;
     }
 
@@ -727,7 +732,11 @@ static void box_bake_send(
     v->filled_env = v->env_handle;
     v->filled_content = v->env_content;
     if (v->sent && !v->filled) {
-        box_bake_mark_all(v);
+        if (ambient || source || !v->known.held) {
+            box_bake_mark_all(v);
+            v->relit = true;
+        }
+
         goto done;
     }
 
@@ -742,6 +751,8 @@ static void box_bake_send(
     v->filled = true;
     v->mask = false;
     v->display = 0;
+    v->relit = false;
+    v->settled = false;
     box_bake_begin(v, true);
 done:
     return;
@@ -1409,6 +1420,7 @@ static void box_bake_progress(
         box_bake_requeue(v, rendered);
         box_bake_complete(v);
         v->error = box_bake_error(v);
+        v->settled |= v->sent && v->probes && v->relit && v->completed == v->passes;
         if (v->sent && v->probes) {
             box_bake_next(v);
         }
@@ -1417,11 +1429,13 @@ static void box_bake_progress(
         v->converged = v->sent && v->probes && v->completed == v->passes &&
             !ecs_vec_count(&v->dirty);
         v->switches += v->converged && !converged;
+        v->settled |= v->converged;
         v->pending = gpu && v->handle && v->sent && v->viewed && !v->error &&
             v->budget_ms > 0 && !v->converged;
         if (v->pending) {
             box_bake_schedule(b, p, v, app && app->headless, packet);
-            b->pending += box_bake_complete(v);
+            int32_t left = box_bake_complete(v);
+            b->pending += v->settled ? 0 : left;
         }
 
         box_bake_ops(p, v);
@@ -1498,6 +1512,8 @@ static void BoxRenderExtractBake(
             v->environment = bakes[row].environment;
             v->capture_size = bakes[row].capture_size;
             v->budget_ms = bakes[row].budget_ms;
+            v->threshold.light = bakes[row].light_threshold;
+            v->threshold.color = bakes[row].color_threshold;
             if (v->bounces != bakes[row].bounces) {
                 v->bounces = bakes[row].bounces;
                 if (v->sent && v->probes) {

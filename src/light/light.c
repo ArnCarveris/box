@@ -112,7 +112,9 @@ static void box_light_bake_ctor(
             .capture_size = 16,
             .budget_ms = 2.0f,
             .bounds_padding = 1.0f,
-            .cache = ecs_os_strdup(".box/bake")
+            .cache = ecs_os_strdup(".box/bake"),
+            .light_threshold = 2.0f,
+            .color_threshold = 0.05f
         };
     }
 }
@@ -162,7 +164,9 @@ static void box_reflection_bake_ctor(
             .resolution = 128,
             .budget_ms = 1.0f,
             .scene_probe = true,
-            .scene_probe_height = 2.0f
+            .scene_probe_height = 2.0f,
+            .light_threshold = 2.0f,
+            .color_threshold = 0.05f
         };
     }
 }

@@ -1591,15 +1591,18 @@ bool box_render_bake_probe(
     const vec3 position,
     box_render_probe_t *out);
 
-/** Get the probes left to bake in the volumes whose bake can progress.
+/** Get the probes left to bake in the volumes whose bake can progress and has not settled.
  *
  * A volume can progress when its settings are valid, its budget_ms is positive, a view of its
  * scene was in the packet of the last frame and the GPU backend renders; a volume that cannot
  * progress counts nothing.
  *
+ * A volume settles when it first converges after it was filled, or when a bake completes
+ * after a light, ambient or environment change queued every probe, as a time of day does.
+ *
  * @param world The world
  * @return Probe captures of every pass not reported yet, those of the probes a change queued
- *         included, 0 when every bake that can progress converged
+ *         included, 0 when every bake that can progress settled
  */
 int32_t box_render_bake_pending(
     const ecs_world_t *world);
@@ -1664,14 +1667,19 @@ uint32_t box_render_reflect_texture(
     const ecs_world_t *world,
     ecs_entity_t scene);
 
-/** Get the reflection probes left to capture in the scenes whose captures can progress.
+/** Get the reflection probes left to capture in the scenes whose captures can progress and
+ * have not settled.
  *
  * Captures can progress when the resolution is valid, budget_ms is positive, a view of the
  * scene was in the packet of the last frame and the GPU backend renders.
  *
+ * Once the light bake of the scene settled, a scene settles when it first converges, or when
+ * every resident probe has a capture after a light, ambient, environment or bake change
+ * queued every probe.
+ *
  * @param world The world
  * @return Resident probes without a capture of what they show now, 0 when every scene that
- *         can progress converged
+ *         can progress settled
  */
 int32_t box_render_reflect_pending(
     const ecs_world_t *world);

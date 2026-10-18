@@ -365,7 +365,9 @@ light of a list shadows what it lights: the views are shadowed by the first dire
 is not `Baked` (a baked sun never drives view shadows), the captures by the first one of their
 list, which is not `Realtime`. A scene with any light entity, whatever its mode, no longer gets the
 default sun. A mode change, `Mixed` to `Baked` included, is a change of the capture lights, so it
-queues the light's reach through the light rules of Invalidation below.
+queues the light's reach through the light rules of Invalidation below. A `Baked` sun that a
+time of day moves keeps the direct light of the state it was baked with until it passes the
+thresholds below, so time of day scenes should use a `Mixed` or `Realtime` sun.
 
 **Bake settings.** `LightBake` on a `Scene` root (or a singleton for the default scene) holds
 the baked lighting settings: `probe_spacing` 2, `bounces` 2, `capture_size` 16, `budget_ms` 2,
@@ -435,8 +437,10 @@ nothing; a new grid, ambient or `bounces` starts the bake again. A headless run 
 left into each packet, each batch reading the buffer the one before it wrote, so its frames show
 the converged bake. `PerfRun` warms up again while a bake that can progress (valid settings,
 `budget_ms` above 0, a view of its scene, the GPU backend) has probes left (captures of every
-remaining pass), and gives up with an error after 300 frames without progress. `budget_ms` 0 never
-bakes.
+remaining pass) and has not settled, and gives up with an error after 300 frames without
+progress. A bake settles when it first converges after its volume was filled, or when a bake
+completes after a directional light, ambient or environment change queued every probe, so the
+rebakes of an animated time of day do not keep a run warming up. `budget_ms` 0 never bakes.
 
 **Invalidation.** `bake_change.c` queues the probes a change can reach instead of rebaking the
 volume, as Lumen invalidates its surface cache by the bounds of changed primitives. Static shapes
@@ -451,7 +455,15 @@ are hidden at once, newly valid ones shown with the next bake) and padded by `pr
 bounces)`; the valid probes inside are queued. The capture lights of each scene (light modes
 above) are matched to the last frame by entity: a point or spot light added, removed or changed
 queues the probes within its old and new range, any directional light or the default sun (gained
-or lost) every probe; an ambient
+or lost) every probe. A directional light counts only once its direction differs by more than
+`LightBake.light_threshold` (degrees, constructor 2) or its linear color by more than
+`color_threshold` (largest channel difference over the brightest channel, constructor 0.05) from
+the state the probes were baked with: the record keeps that state, so small changes add up and
+slow motion rebakes once their sum crosses a threshold. A threshold of 0 counts every change of
+what it measures (the behavior before thresholds, and what a C literal gets); the direction of a
+light black in both states counts only then. A new environment version counts only while no
+directional light is held within the thresholds, since a source such as an atmosphere follows
+its sun. An ambient
 change after a bake, `bounces` and `capture_size` queue every probe too, while `budget_ms` changes
 nothing. When no bake is in progress the queued probes start a staged bake: a
 `BOX_RENDER_VOLUME_COPY` copies the shown probe buffer into the other one, every pass bakes the
@@ -537,8 +549,9 @@ shows its previous capture until the new one lands: a static shape change record
 `bake_change.c` (recorded while any scene has `LightBake` or `ReflectionBake`) whose bounds reach
 its influence or projection box; a point or spot light of the views added, removed or changed
 whose range reaches them; a directional light, the default sun or the ambient changing (every
-probe); the light bake of the scene showing a new pass, converging, appearing or going (every
-probe); a change of its own boxes or capture point (`blend` and `priority` only reorder the
+probe), with the thresholds of `ReflectionBake` (`light_threshold`, `color_threshold`, as for
+the light bake); the light bake of the scene showing a new pass, converging, appearing or going
+(every probe); a change of its own boxes or capture point (`blend` and `priority` only reorder the
 buffer). A capture the backend did not report for a rendered packet is queued again. A new
 `resolution` or a new backend drops every capture.
 
@@ -548,7 +561,9 @@ a headless run captures every waiting probe. The time per probe starts at 1 ms a
 timestamp queries around the reflection batches of a packet (the bake timer above, CPU time
 without them), each measurement weighted 0.5. A scene progresses only with a valid resolution,
 `budget_ms` above 0, a view of the scene in the packet and the GPU backend; `PerfRun` warms up
-while such a scene has probes left, as for the light bake. A converged scene captures nothing.
+while such a scene has probes left and has not settled, as for the light bake: once the light
+bake settled, when it first converges or every resident probe has a capture after a whole scene
+change queued them again. A converged scene captures nothing.
 
 **Reflection status.** `ReflectionBakeStatus` is written when it changes: `probes` counts every
 probe including the scene probe, `resident` those with a slot, `captured` the resident ones whose
@@ -639,7 +654,8 @@ name an environment source entity (default 0 = the hemisphere). When set, `sky()
 `sky_texel()` in `bake_sh.wgsl` sample that source's SH (and its mip 0 cube for stored reflection
 faces) in place of the hemisphere, and the initial volume fill in `bake.c` uses the same SH. A
 version change of the source requeues probes through the existing invalidation path
-(`box_bake_mark_all` for the light bake, `box_reflect_queue_all` for reflections). The bake code
+(`box_bake_mark_all` for the light bake, `box_reflect_queue_all` for reflections), except while
+a directional light is held within the light and color thresholds (Invalidation). The bake code
 knows nothing about the atmosphere.
 
 ## Atmosphere as an environment source

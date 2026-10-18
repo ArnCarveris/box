@@ -563,6 +563,17 @@
                 ]
             },
             {
+                "id": "TimeOfDayInvalidation",
+                "testcases": [
+                    "small_rotation_keeps_bakes_converged",
+                    "large_rotation_requeues_bakes",
+                    "small_rotations_add_up_requeue_once",
+                    "zero_threshold_requeues_every_change",
+                    "held_sun_ignores_environment_versions",
+                    "perf_run_finishes_warmup_with_time_scale"
+                ]
+            },
+            {
                 "id": "ReflectionShading",
                 "testcases": [
                     "scene_without_probes_renders_as_before",

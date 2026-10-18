@@ -47,13 +47,25 @@ typedef struct box_bake_light_set_t {
     const uint8_t *modes;   /**< The LightBakeMode of each of them */
 } box_bake_light_set_t;
 
-/** The lights of a scene in the last frame they were compared with */
+/** How far a directional light may drift from the state the probes were baked with before
+ * it counts as a change, from LightBake or ReflectionBake */
+typedef struct box_bake_threshold_t {
+    float light;            /**< Degrees between the directions, 0 for any difference */
+    float color;            /**< Largest channel difference of the linear colors over the
+                             *   brightest channel of either, 0 for any difference */
+} box_bake_threshold_t;
+
+/** The lights of a scene in the last frame they were compared with, directional lights within
+ * the thresholds as they were when they last counted as a change */
 typedef struct box_bake_light_record_t {
     bool known;             /**< The record holds the lights of a frame */
+    bool held;              /**< A directional light of that frame differs from the record
+                             *   within the thresholds, which keeps its earlier state */
     box_render_view_lights_t view; /**< Lights of the views in that frame */
     ecs_vec_t lights;       /**< box_render_light_t of that frame */
     ecs_vec_t entities;     /**< ecs_entity_t, the entity of each light */
     ecs_vec_t modes;        /**< uint8_t, the LightBakeMode of each light */
+    ecs_vec_t scratch;      /**< box_render_light_t, the lights of a frame being compared */
 } box_bake_light_record_t;
 
 /** Receives what a light that differs between two frames reaches.
@@ -154,6 +166,11 @@ typedef struct box_bake_volume_t {
     ecs_vec_t flags;        /**< uint8_t per probe, 1 while it is in dirty */
     ecs_vec_t shown;        /**< uint32_t, the validity mask views sample with */
     box_bake_light_record_t known; /**< Lights of the captures in the last frame */
+    box_bake_threshold_t threshold; /**< Thresholds of the LightBake of this frame */
+    bool relit;             /**< A directional light, the ambient or the environment queued
+                             *   every probe since the volume was filled */
+    bool settled;           /**< The bake converged once since the volume was filled, or
+                             *   completed with only a relight queued; PerfRun waits no more */
     int32_t switches;       /**< Times the views switched to a pass of a bake or a bake
                              *   converged, which changes the light reflections capture */
     const char *error;      /**< Why the volume bakes nothing, NULL for none */
@@ -269,6 +286,8 @@ void box_bake_changes(
  * frame, light by light (a change of bake mode included): a point or spot light the probes
  * within its range, a directional light or the default sun the whole scene.
  *
+ * A directional light counts only past the thresholds of the volume.
+ *
  * Reads the lights box_bake_scene_lights gave the volume in this frame.
  *
  * @param b The state
@@ -298,13 +317,15 @@ void box_bake_light_record_fini(
  * ambient when the ambient light changed.
  *
  * Otherwise it receives each light added, removed or changed, its bake mode included, matched
- * by entity, as it was and as it is.
+ * by entity, as it was and as it is. A directional light within the thresholds is no change:
+ * the record keeps its state, so small changes add up, and held of the record is set.
  *
  * @param map Scratch map of light entities
  * @param r The record
  * @param view The lights of the views in this frame
- * @param now The lights in this frame
+ * @param frame The lights in this frame
  * @param ambient Whether a change of the ambient light changes the whole scene
+ * @param threshold How far a directional light may drift without counting
  * @param mark Receives what changed
  * @param ctx Context of mark
  */
@@ -312,8 +333,9 @@ void box_bake_lights_compare(
     ecs_map_t *map,
     box_bake_light_record_t *r,
     const box_render_view_lights_t *view,
-    const box_bake_light_set_t *now,
+    const box_bake_light_set_t *frame,
     bool ambient,
+    const box_bake_threshold_t *threshold,
     box_bake_light_mark_t mark,
     void *ctx);
 
