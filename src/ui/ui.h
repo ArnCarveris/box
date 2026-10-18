@@ -43,6 +43,27 @@ typedef struct box_ui_waiter_t {
     ecs_script_future_t *future; /**< Future the event resolves */
 } box_ui_waiter_t;
 
+/** Private state of a TextEdit: the parts the engine built and what the last sync saw */
+typedef struct TextEditState {
+    ecs_entity_t content;   /**< The ClipChildren element the text scrolls in */
+    ecs_entity_t text;      /**< The Text */
+    ecs_entity_t selection; /**< The selection Rect */
+    ecs_entity_t caret;     /**< The caret Rect */
+    char *value;            /**< TextEdit.value the engine last wrote or took in */
+    double blink;           /**< Frame clock seconds the caret blink last restarted */
+    bool focused;           /**< The entity had the focus at the last sync */
+    bool added_layout;      /**< The engine added the Layout of the entity */
+    bool added_cursor;      /**< The engine added the Cursor of the entity */
+} TextEditState;
+
+extern ECS_COMPONENT_DECLARE(TextEditState);
+
+/** One character of the value of a TextEdit, decoded for the word moves */
+typedef struct box_ui_char_t {
+    int32_t offset; /**< Byte offset of its first byte */
+    int32_t kind;   /**< Its word class: 0 space, 1 word character, 2 other */
+} box_ui_char_t;
+
 /** Private state of the module, kept on the heap behind the UiState singleton */
 struct box_ui_state_t {
     ecs_query_t *focusables;     /**< Entities with Focusable */
@@ -63,6 +84,17 @@ struct box_ui_state_t {
     ecs_entity_t hold_action;    /**< The action it holds */
     bool console;                /**< The console was open when the keys of the frame arrived */
     bool progress;               /**< Futures were resolved since the tasks last resumed */
+    ecs_entity_t theme;          /**< The box.ui.theme entity */
+    ecs_query_t *edits;          /**< Entities with a TextEdit */
+    ecs_vec_t edit_list;         /**< ecs_entity_t scratch of the TextEdit update */
+    ecs_vec_t edit_chars;        /**< box_ui_char_t scratch of a word move */
+    ecs_entity_t edit_press;     /**< TextEdit a held left press selects in, 0 for none */
+    int32_t edit_clicks;         /**< Clicks of that press: 1, 2 for words, 3 for everything */
+    int32_t edit_word[2];        /**< Byte range of the word a double click selected */
+    float edit_pointer;          /**< X of the pointer of the press in its content element */
+    ecs_entity_t edit_click;     /**< TextEdit the last left press went to */
+    double edit_click_time;      /**< Frame clock seconds of that press */
+    vec2 edit_click_at;          /**< Window point of that press */
 };
 
 /** Singleton that owns the state of the module */
@@ -275,6 +307,54 @@ void box_ui_shim_activate(
     ecs_world_t *world,
     box_ui_state_t *st,
     const UiActivateEvent *evt);
+
+/** Register TextEdit, TextEditStatus, their hooks, observer and update system.
+ *
+ * @param world The world
+ * @param st The module state
+ */
+void box_ui_text_edit_import(
+    ecs_world_t *world,
+    box_ui_state_t *st);
+
+/** Insert the text and the paste KeyCapture took this frame into the focused TextEdit.
+ *
+ * @param world The world
+ * @param st The module state
+ */
+void box_ui_text_edit_input(
+    ecs_world_t *world,
+    box_ui_state_t *st);
+
+/** Edit the focused TextEdit for a key event.
+ *
+ * @param world The world
+ * @param st The module state
+ * @param e The focused entity
+ * @param evt The key event
+ */
+void box_ui_text_edit_key(
+    ecs_world_t *world,
+    box_ui_state_t *st,
+    ecs_entity_t e,
+    const UiKeyEvent *evt);
+
+/** Place the caret or select in a TextEdit for a pointer event after the press focused it.
+ *
+ * @param world The world
+ * @param st The module state
+ * @param src The event
+ * @param pick The pick it was delivered by
+ * @param pressed The buttons that went down
+ * @param released The buttons that came up
+ */
+void box_ui_text_edit_pointer(
+    ecs_world_t *world,
+    box_ui_state_t *st,
+    const EcsScriptMouseEvent *src,
+    const box_pick_t *pick,
+    uint32_t pressed,
+    uint32_t released);
 
 /** Register UiTheme, the box.ui.theme entity and ui.sibling, and load the widget library.
  *

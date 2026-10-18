@@ -20,6 +20,12 @@
 /** Most entities an event bubbles through */
 #define BOX_PICK_CHAIN_MAX (256)
 
+/** Private: an element rays pass through, so its parent is hit in its place by its own area.
+ *
+ * box.ui puts it on the parts it builds inside a TextEdit, which are not picked separately.
+ */
+extern ECS_TAG_DECLARE(PickThrough);
+
 /** A surface a pick goes through */
 typedef struct box_pick_surface_t {
     ecs_entity_t view_root; /**< Parent of its views, 0 for the views no surface claims */

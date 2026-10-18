@@ -1,6 +1,6 @@
 // Widget gallery: the widgets of box.widgets in a screen space UI, each in its normal and
 // disabled state. Tab moves the focus through them, the status line shows the last change.
-// The Basics section is filled; the room right of it is for the containers and text sections.
+// The Basics and Text sections are filled; the room right of them is for the containers.
 
 using flecs.script
 using box.transform
@@ -40,6 +40,7 @@ template Gallery {
   mut last: string = "none"
   mut changes: i32 = 0
   mut pings: i32 = 0
+  mut submitted: string = ""
 
   const t = box.ui.theme[UiTheme]
 
@@ -74,24 +75,29 @@ template Gallery {
       Layout: {direction: Column, spacing: 16, padding: {24, 24, 24, 24}}
       FocusScope
 
-      // The status line follows every change reported below the root
+      // The status line follows every change reported below the root. A text field reports
+      // its edits itself and its TextInput again, only the TextInput counts.
       async {
         while true {
           const e = await on.change(this)
           const w = e.widget
-          changes = changes + 1
-          if w.has(Slider) {
-            last = "{w.name()}: {w[Slider.mut].current:.2}"
-          } else if w.has(Stepper) {
-            last = "{w.name()}: {w[Stepper.mut].current:.0}"
-          } else if w.has(Checkbox) {
-            last = "{w.name()}: {w[Checkbox.mut].current}"
-          } else if w.has(Switch) {
-            last = "{w.name()}: {w[Switch.mut].current}"
-          } else if w.has(RadioGroup) {
-            last = "{w.name()}: {w[RadioGroup.mut].current}"
-          } else {
-            last = "{w.name()}"
+          if !w.has(TextEdit) {
+            changes = changes + 1
+            if w.has(Slider) {
+              last = "{w.name()}: {w[Slider.mut].current:.2}"
+            } else if w.has(Stepper) {
+              last = "{w.name()}: {w[Stepper.mut].current:.0}"
+            } else if w.has(Checkbox) {
+              last = "{w.name()}: {w[Checkbox.mut].current}"
+            } else if w.has(Switch) {
+              last = "{w.name()}: {w[Switch.mut].current}"
+            } else if w.has(RadioGroup) {
+              last = "{w.name()}: {w[RadioGroup.mut].current}"
+            } else if w.has(TextInput) && !w[TextInput].password {
+              last = "{w.name()}: {w[TextInput.mut].current}"
+            } else {
+              last = "{w.name()}"
+            }
           }
         }
       }
@@ -174,6 +180,32 @@ template Gallery {
             Layout: {direction: Row, spacing: 16, v: Middle}
             Stepper count(min: 0, max: 5, value: 2)
             Stepper fixed(min: 0, max: 5, value: 3, disabled: true)
+          }
+        }
+
+        Panel text(title: "Text", width: 280) {
+          TextInput name(label: "Name", placeholder: "Your name", width: 248)
+          TextInput secret(label: "Password", placeholder: "Password", password: true, width: 248)
+          TextInput off(label: "Disabled", value: "Not editable", disabled: true, width: 248)
+          TextInput fixed(label: "Read only", value: "Copy me", read_only: true, width: 248)
+
+          Separator fields_end()
+
+          // Enter in the message field shows its text in the label below it
+          submit {
+            Layout: {direction: Column, spacing: 8}
+
+            async {
+              while true {
+                const e = await on.submit(this)
+                if e.widget.has(TextInput) {
+                  submitted = e.widget[TextInput.mut].current
+                }
+              }
+            }
+
+            TextInput message(label: "Message", placeholder: "Type and press Enter", width: 248)
+            Label echo(text: "Submitted: {submitted}", variant: "muted")
           }
         }
       }

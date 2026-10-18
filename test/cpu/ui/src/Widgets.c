@@ -14,20 +14,20 @@
 static const char *widgets_templates[] = {
     "Label", "Panel", "Separator", "HeadlessButton", "Button", "HeadlessToggle", "Checkbox",
     "Switch", "RadioGroup", "HeadlessRadioButton", "RadioButton", "HeadlessSlider", "Slider",
-    "ProgressBar", "HeadlessStepper", "Stepper"
+    "ProgressBar", "HeadlessStepper", "Stepper", "HeadlessTextInput", "TextInput"
 };
 
 /** Number of templates of the widget library */
-#define WIDGETS_TEMPLATES (16)
+#define WIDGETS_TEMPLATES (18)
 
 /** Templates of the library with a mut */
 static const char *widgets_muts[] = {
     "Button.mut", "Checkbox.mut", "Switch.mut", "RadioGroup.mut", "RadioButton.mut",
-    "Slider.mut", "ProgressBar.mut", "Stepper.mut"
+    "Slider.mut", "ProgressBar.mut", "Stepper.mut", "TextInput.mut"
 };
 
 /** Number of templates of the library with a mut */
-#define WIDGETS_MUTS (8)
+#define WIDGETS_MUTS (9)
 
 /** Get the warnings and errors the log capture of a world kept.
  *
@@ -98,7 +98,7 @@ void Widgets_library_loads(void) {
         }
     }
 
-    test_int(scripts, 9);
+    test_int(scripts, 10);
 
     char *logs = widgets_warnings(world);
     test_str(logs, "");
@@ -144,6 +144,8 @@ void Widgets_templates_exist(void) {
     test_bool(widgets_has_member(world, "box.widgets.Switch.mut", "current"), true);
     test_bool(widgets_has_member(world, "box.widgets.RadioGroup.mut", "current"), true);
     test_bool(widgets_has_member(world, "box.widgets.Stepper.mut", "current"), true);
+    test_bool(widgets_has_member(world, "box.widgets.TextInput", "value"), true);
+    test_bool(widgets_has_member(world, "box.widgets.TextInput.mut", "current"), true);
 
     ecs_entity_t dark = ecs_lookup(world, "box.widgets.DarkTheme");
     ecs_entity_t light = ecs_lookup(world, "box.widgets.LightTheme");

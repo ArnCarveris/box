@@ -43,3 +43,4 @@ include radio
 include slider
 include progress
 include stepper
+include text_input

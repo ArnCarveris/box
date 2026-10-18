@@ -11,6 +11,9 @@
 /** Path of the Basics panel of the gallery */
 #define BASICS "gallery.hud.root.sections.basics"
 
+/** Path of the Text panel of the gallery */
+#define TEXT "gallery.hud.root.sections.text"
+
 /** Load the gallery scene into a new headless world and open a terminal session.
  *
  * @param session Receives the session

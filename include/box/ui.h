@@ -1,9 +1,11 @@
 /**
  * @file box/ui.h
- * @brief UI: the keyboard focus, Tab navigation, keys kept from the bindings and widget events.
+ * @brief UI: the keyboard focus, Tab navigation, keys kept from the bindings, widget events and
+ * the text field.
  *
  * One Focusable entity holds the keyboard focus. A press or Tab moves it, KeyCapture keeps the
  * keys from the game's bindings, and widgets report changes to the scope that uses them.
+ * TextEdit is a single line text field whose editing is done by the engine.
  */
 
 #ifndef BOX_UI_H
@@ -125,6 +127,43 @@ ECS_STRUCT(UiTheme, {
     float caret_blink;      /**< Seconds of one on or off phase of the caret, 0 for steady */
 });
 
+/** A single line text field whose caret, selection, clipboard and scrolling the engine edits.
+ *
+ * value is the source of truth. An edit writes it with ecs_modified and reports on.change on the
+ * entity; typed text and pastes replace the selection, control characters are dropped and
+ * newlines and tabs become spaces. A value set from script or C keeps the caret, unreported.
+ *
+ * Adding it adds Focusable, KeyCapture, TextEditStatus, Cursor {CursorText} and a Layout unless
+ * it has them, removing it removes them. Private children colored from UiTheme draw it and pass
+ * picks to it; it is one line high and as wide as its LayoutItem makes it.
+ */
+ECS_STRUCT(TextEdit, {
+    char *value;         /**< The text, UTF-8 */
+    char *placeholder;   /**< Shown in UiTheme.text_muted while value is empty, also focused */
+    int32_t max_length;  /**< Most characters, an insertion is cut at a character; 0 no limit */
+    float size;          /**< Em size in logical pixels, default 16 */
+    ecs_entity_t font;   /**< Entity with a Font, default box.text.DefaultFont */
+    bool password;       /**< Every character is drawn as U+2022, copy and cut do nothing */
+    bool read_only;      /**< The text can be selected and copied only */
+});
+
+/** Where the caret of a TextEdit is, written by the engine and read only for applications.
+ *
+ * Keys repeat: Left and Right move by character, by word with Ctrl (Alt on macOS); Home, End, Up
+ * and Down to the ends (also Cmd+Left/Right on macOS); Shift extends. Backspace and Delete erase
+ * (a word with Ctrl), Ctrl+A/C/X (Cmd on macOS) select all, copy, cut; Escape blurs, Enter submits.
+ *
+ * A press places the caret, a drag selects and scrolls past an edge, a double click selects a
+ * word, a triple click all (within 0.5 s of the frame clock and 4 points), shift extends. The
+ * caret blinks with UiTheme.caret_blink and restarts on edits; unfocused, caret and selection hide.
+ */
+ECS_STRUCT(TextEditStatus, {
+    int32_t caret;  /**< Byte offset of the caret in value */
+    int32_t anchor; /**< Byte offset of the other end of the selection, caret when none */
+    float scroll;   /**< Logical pixels the text is shifted left to keep the caret in view */
+    bool focused;   /**< The entity has the focus, so the caret and the selection show */
+});
+
 /** Register the box.ui module.
  *
  * Registers the async script functions flecs.script.on.focus, blur, key, activate, change and
@@ -159,6 +198,25 @@ bool box_ui_focus(
  */
 const char* box_ui_text(
     const ecs_world_t *world);
+
+/** Find where a word move of a TextEdit goes from a byte offset, as Ctrl+Left and Ctrl+Right do.
+ *
+ * Words are runs of letters and digits (ASCII and every code point above U+007F, characters as
+ * box_utf8_next decodes them) and runs of other characters that are not spaces. A move skips the
+ * spaces next to the offset, then one run: forward to its end, back to its start.
+ *
+ * Ctrl+Backspace and Ctrl+Delete erase what the move passes over. A double click selects the run
+ * under the pointer, spaces included. In a password a word move goes to the start or the end.
+ *
+ * @param text UTF-8 text
+ * @param offset Byte offset, moved to the start of the character it is in
+ * @param forward Whether the move goes right
+ * @return The byte offset the move ends at
+ */
+int32_t box_ui_word_move(
+    const char *text,
+    int32_t offset,
+    bool forward);
 
 /** Get the text that KeyCapture took from Input.paste this frame.
  *

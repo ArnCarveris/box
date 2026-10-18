@@ -295,6 +295,47 @@
                     "theme_dark",
                     "sibling"
                 ]
+            },
+            {
+                "id": "TextEdit",
+                "testcases": [
+                    "adds_focus_and_parts",
+                    "type_text",
+                    "insert_middle",
+                    "replace_selection",
+                    "max_length",
+                    "control_characters",
+                    "multi_byte",
+                    "ill_formed",
+                    "caret_moves",
+                    "word_moves",
+                    "home_end",
+                    "shift_selection",
+                    "select_all",
+                    "backspace_repeat",
+                    "click_placement",
+                    "drag_select",
+                    "drag_scrolls",
+                    "double_click_word",
+                    "triple_click_all",
+                    "slow_clicks",
+                    "shift_click",
+                    "copy_paste",
+                    "cut",
+                    "password",
+                    "read_only",
+                    "enter_submits",
+                    "change_per_edit",
+                    "set_value_no_change",
+                    "scroll_keeps_caret",
+                    "key_capture_binding",
+                    "escape_blurs",
+                    "click_elsewhere_blurs",
+                    "tab_between_fields",
+                    "placeholder",
+                    "caret_blink",
+                    "word_move_function"
+                ]
             }
         ]
     }

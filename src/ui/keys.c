@@ -1,7 +1,8 @@
 /**
  * @file ui/keys.c
  * @brief Keys and presses of the UI: the claim that keeps keys from the bindings, Tab, Enter and
- * Space on the focused entity, the focus of a press and the activation of a click.
+ * Space on the focused entity, the focus of a press and the activation of a click, and the
+ * hand off of keys, text and presses to a focused TextEdit.
  *
  * The claim runs in InputUpdate with the focus the last frame left; the keys and presses then
  * reach the hook in box.picking in order, which moves the focus and activates.
@@ -232,8 +233,9 @@ done:
     return;
 }
 
-/** Follow a keyboard event: on.key to the focused entity, Tab moves the focus, Enter and Space
- * activate it unless KeyCapture keeps them for the widget. An open console takes every key.
+/** Follow a keyboard event: on.key to the focused entity, Tab moves the focus, a focused
+ * TextEdit edits, Enter and Space activate unless KeyCapture keeps them for the widget. An open
+ * console takes every key.
  *
  * @param world The world
  * @param pst The picking state
@@ -270,6 +272,8 @@ static void box_ui_key(
 
     if (evt.key == KeyTab && evt.down && !evt.ctrl && !evt.alt && !evt.meta) {
         st->keyboard = box_ui_focus_step(world, st, pst, evt.shift) || st->keyboard;
+    } else if (e && st->focused == e && ecs_has(world, e, TextEdit)) {
+        box_ui_text_edit_key(world, st, e, &evt);
     } else if (e && st->focused == e && !box_ui_up(world, e, KeyCapture)) {
         box_ui_activate_key(world, st, e, &evt);
     }
@@ -362,7 +366,7 @@ static void box_ui_activate_click(
 }
 
 /** Follow a pointer event: a press of any button focuses the first Focusable entity on its path
- * or clears the focus, and a left click activates.
+ * or clears the focus, a left click activates and a left press and drag select in a TextEdit.
  *
  * @param world The world
  * @param pst The picking state
@@ -397,10 +401,12 @@ static void box_ui_pointer(
         st->press_handler = pick->handler;
     }
 
+    box_ui_text_edit_pointer(world, st, src, pick, pressed, released);
     box_ui_progress(world, st);
 }
 
-/** Check the focus and the Space hold before the events of a frame.
+/** Check the focus and the Space hold before the events of a frame, and insert the text and the
+ * paste of the frame into a focused TextEdit.
  *
  * @param world The world
  * @param pst The picking state
@@ -421,6 +427,7 @@ static void box_ui_begin(
         box_ui_hold_release(world, st);
     }
 
+    box_ui_text_edit_input(world, st);
     box_ui_progress(world, st);
 }
 

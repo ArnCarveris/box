@@ -17,6 +17,7 @@ ECS_TAG_DECLARE(Interactive);
 ECS_TAG_DECLARE(InputBlocker);
 ECS_TAG_DECLARE(Hovered);
 ECS_TAG_DECLARE(Pressed);
+ECS_TAG_DECLARE(PickThrough);
 
 /** Release the state of the module with the futures still waiting for a wheel movement.
  *
@@ -563,6 +564,7 @@ void BoxPickingImport(
     ECS_TAG_DEFINE(world, InputBlocker);
     ECS_TAG_DEFINE(world, Hovered);
     ECS_TAG_DEFINE(world, Pressed);
+    ECS_TAG_DEFINE(world, PickThrough);
     ECS_META_COMPONENT(world, ActionTriggerMode);
     ECS_META_COMPONENT(world, ActionTrigger);
     ECS_META_COMPONENT(world, Cursor);

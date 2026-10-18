@@ -126,7 +126,7 @@ void Basics_scene_loads(void) {
 
     gallery_expect(world, s, "logs warning 100", "");
     gallery_expect(world, s, "get gallery Gallery.mut",
-        "{last: \"none\", changes: 0, pings: 0}");
+        "{last: \"none\", changes: 0, pings: 0, submitted: \"\"}");
     gallery_expect(world, s, "get gallery.hud.root.header.status Text.value",
         "\"Last change: none\"");
     gallery_expect(world, s, "get " BASICS ".heading Text.value", "\"Basics\"");
@@ -709,11 +709,12 @@ void Basics_tab_order(void) {
         BASICS ".buttons.remove", BASICS ".buttons.ping", BASICS ".toggles.sound",
         BASICS ".toggles.music", BASICS ".toggles.wifi", BASICS ".radios.size.medium",
         BASICS ".sliders.volume", BASICS ".sliders.gain", BASICS ".steppers.count",
-        BASICS ".buttons.save"
+        TEXT ".name.field", TEXT ".secret.field", TEXT ".fixed.field",
+        TEXT ".submit.message.field", BASICS ".buttons.save"
     };
     int32_t i;
 
-    for (i = 0; i < 13; i ++) {
+    for (i = 0; i < 17; i ++) {
         gallery_key(world, s, "Tab");
         basics_expect_focus(world, s, order[i]);
     }

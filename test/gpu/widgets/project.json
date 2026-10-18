@@ -7,6 +7,11 @@
             "box"
         ]
     },
+    "lang.c": {
+        "include": [
+            "../../../src/render"
+        ]
+    },
     "test": {
         "testsuites": [
             {
@@ -38,6 +43,21 @@
                     "focus_ring_after_tab",
                     "light_theme",
                     "set_mut_no_change"
+                ]
+            },
+            {
+                "id": "Text",
+                "testcases": [
+                    "scene_loads",
+                    "type_name",
+                    "password",
+                    "disabled",
+                    "read_only",
+                    "tab_between",
+                    "submit_label",
+                    "set_mut_no_change",
+                    "light_theme",
+                    "capture_selection"
                 ]
             }
         ]

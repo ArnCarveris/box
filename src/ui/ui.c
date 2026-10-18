@@ -1,7 +1,7 @@
 /**
  * @file ui/ui.c
  * @brief Registers box.ui: the focus tags, the event types, the module state, its hooks in
- * box.input and box.picking, the theme and the widget library.
+ * box.input and box.picking, the text field, the theme and the widget library.
  */
 
 #define BOX_UI_IMPL
@@ -41,6 +41,8 @@ static void box_ui_state_dtor(
         ecs_vec_fini_t(NULL, &st->order, ecs_entity_t);
         ecs_vec_fini_t(NULL, &st->text, char);
         ecs_vec_fini_t(NULL, &st->paste, char);
+        ecs_vec_fini_t(NULL, &st->edit_list, ecs_entity_t);
+        ecs_vec_fini_t(NULL, &st->edit_chars, box_ui_char_t);
         ecs_os_free(st);
     }
 }
@@ -103,6 +105,8 @@ void BoxUiImport(
     ECS_META_COMPONENT(world, UiActivateEvent);
     ECS_META_COMPONENT(world, UiChangeEvent);
     ECS_META_COMPONENT(world, UiTheme);
+    ECS_META_COMPONENT(world, TextEdit);
+    ECS_META_COMPONENT(world, TextEditStatus);
     ecs_set_hooks(world, FocusStatus, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, UiFocusEvent, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, UiKeyEvent, { .ctor = flecs_default_ctor });
@@ -142,5 +146,7 @@ void BoxUiImport(
     box_ui_keys_import(world, st);
     box_ui_events_import(world, st, on, ui);
     box_ui_shim_import(world, st, on, ui);
+    box_ui_text_edit_import(world, st);
     box_ui_widgets_import(world, ui);
+    st->theme = ecs_lookup(world, "box.ui.theme");
 }
