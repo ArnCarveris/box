@@ -36,6 +36,9 @@ typedef struct box_app_smoother_t {
     bool allowed;               /**< The measured rate is within 5% of the estimate */
     bool measured;              /**< The first measurement window passed */
     bool smoothed;              /**< The last delta was snapped to whole refresh periods */
+    double snap_period;         /**< Nanoseconds of the refresh the last delta was snapped to,
+                                 *   0 when it was not */
+    bool snap_measured;         /**< snap_period is the estimate, not the reported rate */
 } box_app_smoother_t;
 
 /** Reset a delta smoother to its state before the first frame.
@@ -49,7 +52,9 @@ void box_app_smoother_reset(
  * MainTimerSync::DeltaSmoother::smooth_delta: once the refresh rate is stable, the delta is the
  * refreshes the previous frame is shown for in exact periods, plus repeated refreshes.
  *
- * A small share of the time left over is handed back each frame, so the deltas never drift.
+ * The time left over returns a little per frame, so the deltas never drift, and the deltas stay
+ * within a refresh of the measured time; until the estimate completes the refreshes are timed
+ * by the reported rate. See smooth.c.
  *
  * @param s The smoother
  * @param delta Measured nanoseconds since the previous frame
@@ -57,7 +62,7 @@ void box_app_smoother_reset(
  * @param cycle Frames after which the present counts repeat: 1 when every frame is shown for
  *        the same refreshes, 0 when they do not repeat within a few seconds
  * @param refresh Refresh rate the display reports, which times the refreshes until the
- *        estimate completes, 0 when unknown
+ *        estimate completes and bounds the estimate, 0 when unknown
  * @return Nanoseconds the frame advances
  */
 int64_t box_app_smooth_delta(
@@ -67,18 +72,19 @@ int64_t box_app_smooth_delta(
     int32_t cycle,
     float refresh);
 
-/** Fraction of the shortest frame interval of presentation pacing that the frame rate cap
- * still enforces: a guard that never binds while the presents pace the frames, and stops a
- * runaway frame rate when they return at once, like a minimized or occluded window. */
+/** Fraction of a refresh period that the frame loop still waits for while the display paces the
+ * frames: a guard that never binds while the presents block, and stops a runaway frame rate when
+ * they return at once, like those of a minimized or occluded window. */
 #define BOX_APP_PACED_GUARD (0.75)
 
-/** Compute the interval the frame rate cap sleeps to, as an absolute deadline per frame.
+/** Compute the interval the frame loop sleeps to, as an absolute deadline per frame: 1 / fps
+ * without vsync, BOX_APP_PACED_GUARD of a refresh while the display paces (no cap or one at or
+ * above the refresh rate), else the refreshes the frame is shown for at the reported rate.
  *
  * @param fps Frame rate cap, 0 for none
- * @param refresh Refresh rate of the display in Hz, 0 when unknown
+ * @param refresh Refresh rate the display reports in Hz, 0 when unknown
  * @param presents Refreshes the last frame is shown for, 0 when presentation does not pace
- * @return Seconds per frame, 1 / fps when the cap paces, BOX_APP_PACED_GUARD times the
- *         shortest interval presentation paces otherwise, 0 without a cap
+ * @return Seconds per frame, 0 when nothing paces the loop
  */
 double box_app_cap_interval(
     float fps,

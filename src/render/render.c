@@ -98,7 +98,7 @@ box_render_packet_t* box_render_packet(
         result->frame = info->frame_count_total;
         result->time = info->world_time_total;
         result->delta = info->delta_time;
-        result->fps = app && app->fps > 0 ? app->fps : 0;
+        result->fps = box_app_fps(app);
     }
 
     return result;
@@ -136,6 +136,15 @@ void box_render_pause(
     bool paused)
 {
     box_render_ring_pause(box_render_get_ring(world), paused);
+}
+
+void box_render_wait(
+    ecs_world_t *world)
+{
+    const RenderRing *ring = ecs_id(RenderRing) ? ecs_singleton_get(world, RenderRing) : NULL;
+    if (ring && ring->ring) {
+        box_render_ring_wait(ring->ring);
+    }
 }
 
 void box_render_sync(

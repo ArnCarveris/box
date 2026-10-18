@@ -30,7 +30,8 @@ extern "C" {
 /** Port of the command endpoints when --port is not given */
 #define BOX_APP_PORT (27750)
 
-/** Frame rate the module sets in App before the command line is parsed */
+/** Fixed step of a headless run whose App.fps is 0: 1 / BOX_APP_FPS seconds per frame. A window
+ * has no cap by default, so vsync shows a frame at every refresh. */
 #define BOX_APP_FPS (60)
 
 /** Frames the ranges of FrameTiming cover, the most recent ones */
@@ -56,7 +57,8 @@ ECS_STRUCT(App, {
     int32_t frames;     /**< Stop after this many frames, 0 for no limit */
     double timeout;     /**< Stop after this many seconds, 0 for none, negative for infinite */
     float cpu_budget;   /**< Percent of one core a headless run may use, default 100, 0 no limit */
-    float fps;          /**< Frame rate cap, default 60, 0 uncapped; headless the fixed step */
+    float fps;          /**< Frame rate cap of a window, default 0: uncapped, vsync paces; headless
+                         *   the fixed step, 0 for BOX_APP_FPS */
     int32_t port;       /**< Port of the command endpoints, 0 disables them */
     int32_t surface_width;  /**< Width of the Surface created when there is no window, 0 none */
     int32_t surface_height; /**< Height of the Surface a run creates when it has none */
@@ -85,16 +87,23 @@ ECS_STRUCT(FrameRange, {
 /** Timing of the recent frames, written by the engine at the start of every frame.
  *
  * delta is the unscaled delta_time the world advanced with, interval the wall time between the
- * starts of two frames and error their difference. With vsync the delta is the refreshes the
- * frame before is shown for, timed by the measured refresh rate, so it matches the display.
+ * starts of two frames and error their difference.
+ *
+ * With vsync the delta is the refreshes the frame before is shown for, timed by the measured
+ * refresh rate (the reported one until the estimate completes), so it matches the display.
  */
 ECS_STRUCT(FrameTiming, {
     int32_t frames;         /**< Frames the ranges cover, at most BOX_FRAME_WINDOW */
-    double target_ms;       /**< Interval of the App.fps cap, 0 when uncapped */
+    double target_ms;       /**< Interval of the App.fps cap, 0 when uncapped; headless the
+                             *   fixed step */
+    double frame_ms;        /**< Interval the last frame is expected to take: the refreshes it
+                             *   is shown for while vsync paces, else target_ms */
     bool vsync;             /**< Frames present with vsync, which paces them */
     bool fixed;             /**< Headless fixed step: delta is 1 / App.fps, not measured */
-    float refresh_rate;     /**< Display refresh rate measured from the frame times, 0 while
-                             *   the estimate is not complete */
+    float refresh_rate;     /**< Refresh rate the last delta was snapped with: the one measured
+                             *   from the frame times once the estimate is complete, before
+                             *   that the one the display reports; 0 when it was not snapped */
+    bool refresh_measured;  /**< refresh_rate is the measured estimate */
     bool smoothing;         /**< The last delta was snapped to whole refresh periods */
     double delta_ms;        /**< Delta of the last frame */
     double interval_ms;     /**< Interval before the last frame */
@@ -103,7 +112,7 @@ ECS_STRUCT(FrameTiming, {
     FrameRange error;       /**< Absolute difference of delta and interval of the recent frames */
     FrameRange present;     /**< Intervals between the presents of the recent frames */
     int32_t late;           /**< Recent frames whose error exceeds BOX_FRAME_TOLERANCE_MS */
-    int32_t dropped;        /**< Recent frames longer than BOX_FRAME_DROPPED target intervals */
+    int32_t dropped;        /**< Recent frames longer than BOX_FRAME_DROPPED times frame_ms */
     int64_t total;          /**< Frames since the world started */
     int64_t total_late;     /**< Frames since the world started with an error over tolerance */
     int64_t total_dropped;  /**< Dropped frames since the world started */
@@ -116,10 +125,12 @@ ECS_STRUCT(FrameTiming, {
 void BoxAppImport(
     ecs_world_t *world);
 
-/** Write command line arguments into the App singleton.
+/** Write command line arguments into the App singleton: --headless, --frames <n>,
+ * --timeout <s|infinite>, --cpu-budget <pct>, --fps <n>, --port <n>, --surface <w>x<h>, a scene.
  *
- * Accepts --headless, --frames <n>, --timeout <s|infinite>, --cpu-budget <pct>,
- * --fps <n>, --port <n>, --surface <width>x<height> and one scene file.
+ * --fps <n> caps a window, which without it (or with 0) shows a frame at every refresh with
+ * vsync; a cap below the refresh rate shows each frame for whole refreshes. Headless, --fps <n>
+ * sets the fixed step of 1 / n seconds per frame, 1 / BOX_APP_FPS without it.
  *
  * @param world The world
  * @param argc Argument count, including the executable
@@ -130,6 +141,15 @@ int box_app_parse(
     ecs_world_t *world,
     int argc,
     char *argv[]);
+
+/** Get the frame rate the frame loop runs at: App.fps, or for a headless run that is not
+ * realtime the fixed step BOX_APP_FPS when App.fps is 0.
+ *
+ * @param app The App singleton, NULL for none
+ * @return Frames per second, 0 when uncapped
+ */
+float box_app_fps(
+    const App *app);
 
 /** Block the calling thread with an OS sleep until a time on the ecs_os_get_time clock.
  *

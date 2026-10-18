@@ -51,6 +51,7 @@ struct box_render_ring_t {
     int64_t taken;                  /**< Packets the consumer started on */
     int64_t released;               /**< Packets the consumer finished */
     int32_t stalls;                 /**< Acquires that waited for a free packet */
+    int32_t waits;                  /**< Frame starts that waited for a free packet */
     bool stop;                      /**< The render thread exits once it took every packet */
     bool paused;                    /**< The render thread takes no packets */
     bool flushing;                  /**< A drain ignores the pause */
@@ -169,28 +170,12 @@ done:
     return result;
 }
 
-int32_t box_render_window_presents(
-    bool window,
-    bool vsync,
-    int32_t presents)
-{
-    return window && vsync && presents > 1 ? presents : 1;
-}
-
-bool box_render_target_scene(
-    const box_render_target_desc_t *desc,
-    bool window,
-    float fps)
-{
-    bool resized = desc->render_width != desc->width || desc->render_height != desc->height;
-    bool repeats = window && desc->vsync && desc->refresh > 0 && fps > 0 &&
-        (double)fps < (double)desc->refresh - BOX_RENDER_REFRESH_SLACK;
-
-    return resized || repeats;
-}
-
 /** Find the refresh of the simulated display that first shows a frame that is ready at a time:
  * the first refresh after it, and not before the refresh after the last present.
+ *
+ * The refreshes start half a period before the first frame is ready, as a real display has a
+ * phase of its own: a loop that paces a cap by its clock submits whole refreshes after the first
+ * frame, so each frame would be ready right at a refresh and jitter would pick either side.
  *
  * @param ring The ring
  * @param ready Seconds when the frame is ready
@@ -203,7 +188,7 @@ static double box_render_display_time(
     double period = 1.0 / (double)ring->display_rate;
     double result;
     if (ring->origin == 0) {
-        ring->origin = ready;
+        ring->origin = ready - period * 0.5;
     }
 
     result = ring->origin + ceil((ready - ring->origin) / period - 1e-6) * period;
@@ -251,7 +236,10 @@ static void box_render_count_present(
 
 /** Show the pending frame of the simulated display at the first free refresh after its submit,
  * once the display reaches it. A GPU that finishes the frame later repeats the frame before
- * until the refresh after it finished. The frame then stays for its refreshes.
+ * until the refresh after it finished.
+ *
+ * The frame then stays for its refreshes: in a window the clock of the frame loop keeps the next
+ * frame that far away, here the display holds it, so a loop without box_app_run is paced alike.
  *
  * The wait frees an image of the three image swap chain for the next frame.
  *
@@ -674,6 +662,27 @@ box_render_packet_t* box_render_ring_acquire(
     return result;
 }
 
+void box_render_ring_wait(
+    box_render_ring_t *ring)
+{
+    if (ring->dirty || ring->main_thread) {
+        goto done;
+    }
+
+    ecs_os_mutex_lock(ring->lock);
+    if (ring->acquired == ring->submitted && ring->acquired - ring->released >= ring->count) {
+        ring->waits ++;
+    }
+
+    while (ring->acquired == ring->submitted && ring->acquired - ring->released >= ring->count) {
+        ecs_os_cond_wait(ring->can_write, ring->lock);
+    }
+
+    ecs_os_mutex_unlock(ring->lock);
+done:
+    return;
+}
+
 box_render_packet_t* box_render_ring_current(
     box_render_ring_t *ring)
 {
@@ -786,6 +795,7 @@ void box_render_ring_status(
     status->rendered = (int32_t)ring->released;
     status->in_flight = (int32_t)(ring->acquired - ring->released);
     status->stalls = ring->stalls;
+    status->waits = ring->waits;
     status->threaded = !ring->main_thread;
     status->vsync = ring->vsync;
     status->refresh_rate = ring->refresh;

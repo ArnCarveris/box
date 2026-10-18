@@ -5,6 +5,7 @@
 
 #define BOX_APP_IMPL
 #include "app.h"
+#include "../render/render.h"
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -248,7 +249,7 @@ static void box_app_smoother_follow(
 
 /** Compute the delta time of the next frame, as Godot's Main::iteration does with
  * MainTimerSync: the wall time since the previous iteration, smoothed while the frames
- * present with vsync. A headless run that is not realtime steps one frame interval.
+ * present with vsync. A headless run that is not realtime steps 1 / box_app_fps.
  *
  * @param world The world
  * @param clock The clock of the frame loop
@@ -262,16 +263,17 @@ static float box_app_delta(
     const RenderStatus *render = ecs_id(RenderStatus)
         ? ecs_singleton_get(world, RenderStatus)
         : NULL;
-    float fps = app && app->fps > 0 ? app->fps : (float)BOX_APP_FPS;
+    float fps = box_app_fps(app);
     double now = box_app_wall_time();
     double raw = clock->ticks > 0 ? now - clock->ticks : 0;
-    double result = 1.0 / (double)fps;
+    double result = fps > 0 ? 1.0 / (double)fps : 1.0 / (double)BOX_APP_FPS;
     int32_t presents, cycle;
     int64_t ns;
     clock->ticks = now;
-    clock->fixed = app && app->headless && !app->realtime && app->fps > 0;
+    clock->fixed = app && app->headless && !app->realtime;
     clock->smoother.smoothed = false;
-    box_app_smoother_follow(clock, app ? app->fps : 0, render);
+    clock->smoother.snap_period = 0;
+    box_app_smoother_follow(clock, fps, render);
     if (clock->fixed || raw <= 0) {
         goto done;
     }
@@ -289,35 +291,50 @@ done:
     return (float)result;
 }
 
-double box_app_cap_interval(
-    float fps,
-    float refresh,
-    int32_t presents)
+float box_app_fps(
+    const App *app)
 {
-    double result = 0;
-    double shortest;
-    if (fps <= 0) {
+    float result = 0;
+    if (!app) {
         goto done;
     }
 
-    result = 1.0 / (double)fps;
-    if (presents > 0 && refresh > 0) {
-        shortest = floor(((double)refresh + BOX_RENDER_REFRESH_SLACK) / (double)fps);
-        shortest = shortest > 1 ? shortest : 1;
-        result = BOX_APP_PACED_GUARD * shortest / (double)refresh;
+    result = app->fps > 0 ? app->fps : 0;
+    if (!result && app->headless && !app->realtime) {
+        result = (float)BOX_APP_FPS;
     }
 
 done:
     return result;
 }
 
-/** Sleep for the rest of the frame interval of the frame rate cap, as Godot's
- * OS::add_frame_delay does: the deadline advances one interval per frame and stays within one
- * interval of the clock, so a late frame does not make the next ones early.
+double box_app_cap_interval(
+    float fps,
+    float refresh,
+    int32_t presents)
+{
+    double result = 0;
+    if (presents > 0 && refresh > 0) {
+        bool paced = fps <= 0 || (double)fps >= (double)refresh - BOX_RENDER_REFRESH_SLACK;
+        result = (paced ? BOX_APP_PACED_GUARD : (double)presents) / (double)refresh;
+    } else if (fps > 0) {
+        result = 1.0 / (double)fps;
+    }
+
+    return result;
+}
+
+/** Sleep for the rest of the frame interval, as Godot's OS::add_frame_delay does: the deadline
+ * advances one interval per frame and stays within one interval of the clock, so a late frame
+ * does not make the next ones early.
  *
- * When the presents pace the frames a second clock would beat against the refreshes, so the
- * deadline advances by a fraction of the shortest paced interval: it never binds while the
- * presents block and bounds the frame rate when they return at once.
+ * A cap below the refresh rate advances the deadline by the refreshes the frame just submitted
+ * is shown for at the reported rate, so the frames, presented once each, reach the display
+ * those refreshes apart; the frames no longer wait for the display, so it cannot be measured.
+ *
+ * When the display paces the frames a second clock would beat against the refreshes, so the
+ * deadline only advances by BOX_APP_PACED_GUARD of a refresh: it never binds while the presents
+ * block and bounds the frame rate when they return at once.
  *
  * @param world The world
  * @param clock The clock of the frame loop
@@ -330,8 +347,9 @@ static void box_app_frame_delay(
     const RenderStatus *render = ecs_id(RenderStatus)
         ? ecs_singleton_get(world, RenderStatus)
         : NULL;
-    double delay = box_app_cap_interval(app ? app->fps : 0,
-        render ? render->refresh_rate : 0, render ? render->swap_interval : 0);
+    double delay = box_app_cap_interval(box_app_fps(app),
+        render && render->vsync ? render->refresh_rate : 0,
+        render && render->vsync ? render->swap_interval : 0);
     double now;
     if (delay <= 0) {
         clock->target = 0;
@@ -355,6 +373,25 @@ done:
     return;
 }
 
+/** Compute the interval a frame is expected to take, which a dropped frame exceeds.
+ *
+ * @param target Interval of the frame rate cap in milliseconds, 0 without a cap
+ * @param render The render status, NULL without box.render
+ * @return The refreshes the last frame is shown for while vsync paces the frames, else the
+ *         interval of the cap, 0 when neither is known
+ */
+static double box_app_frame_ms(
+    double target,
+    const RenderStatus *render)
+{
+    double result = target;
+    if (render && render->vsync && render->refresh_rate > 0 && render->swap_interval > 0) {
+        result = 1000.0 * (double)render->swap_interval / (double)render->refresh_rate;
+    }
+
+    return result;
+}
+
 /** Record the timing of the frame that starts: its delta, the wall time since the previous one
  * and the presents, and publish the ranges of the recent frames in FrameTiming.
  *
@@ -373,7 +410,8 @@ static void BoxAppTiming(
     double now = box_app_wall_time();
     double delta = (double)ecs_get_world_info(it->world)->delta_time_raw * 1000.0;
     double interval = clock->begin > 0 ? (now - clock->begin) * 1000.0 : 0;
-    double target = app && app->fps > 0 ? 1000.0 / (double)app->fps : 0;
+    double target = box_app_fps(app) > 0 ? 1000.0 / (double)box_app_fps(app) : 0;
+    double frame = box_app_frame_ms(target, render);
     bool late, dropped;
     clock->begin = now;
     if (!timing || interval <= 0) {
@@ -381,7 +419,7 @@ static void BoxAppTiming(
     }
 
     late = fabs(delta - interval) > BOX_FRAME_TOLERANCE_MS;
-    dropped = target > 0 && interval > target * BOX_FRAME_DROPPED;
+    dropped = frame > 0 && interval > frame * BOX_FRAME_DROPPED;
     box_app_series_add(&clock->delta, delta);
     box_app_series_add(&clock->interval, interval);
     box_app_series_add(&clock->error, fabs(delta - interval));
@@ -394,11 +432,13 @@ static void BoxAppTiming(
     clock->presented = render ? render->presented : 0;
     timing->frames = clock->delta.count;
     timing->target_ms = target;
+    timing->frame_ms = frame;
     timing->vsync = render && render->vsync;
     timing->fixed = clock->fixed;
-    timing->refresh_rate = clock->smoother.complete
-        ? (float)(1e9 / clock->smoother.period)
+    timing->refresh_rate = clock->smoother.snap_period > 0
+        ? (float)(1e9 / clock->smoother.snap_period)
         : 0;
+    timing->refresh_measured = timing->refresh_rate > 0 && clock->smoother.snap_measured;
     timing->smoothing = clock->smoother.smoothed;
     timing->delta_ms = delta;
     timing->interval_ms = interval;
@@ -532,6 +572,25 @@ done:
     return result;
 }
 
+/** Wait before the frame measures its delta until the renderer has a packet free for it.
+ *
+ * With a render thread the ring of packets is the backpressure of the display: once every packet
+ * is in flight the main thread waits for the render thread to present one.
+ *
+ * Waiting here instead of at the first packet of the frame keeps the wait out of the frame: the
+ * delta is measured and the simulation runs after it, at the time the display freed the packet,
+ * so a present hiccup is not baked into a frame that then shows up to a frame later.
+ *
+ * @param world The world
+ */
+static void box_app_frame_wait(
+    ecs_world_t *world)
+{
+    if (ecs_id(RenderStatus)) {
+        box_render_wait(world);
+    }
+}
+
 #ifdef __EMSCRIPTEN__
 /** Run a frame from the animation frame callback of the browser and end the loop when the
  * world quits. The browser paces the frames, so flecs must not sleep to reach a frame rate.
@@ -570,7 +629,12 @@ int box_app_run(
 #ifdef __EMSCRIPTEN__
     emscripten_set_main_loop_arg(box_app_web_frame, clock, 0, true);
 #else
-    while (ecs_progress(world, box_app_delta(world, clock))) {
+    while (true) {
+        box_app_frame_wait(world);
+        if (!ecs_progress(world, box_app_delta(world, clock))) {
+            break;
+        }
+
         box_app_frame_delay(world, clock);
     }
 #endif
@@ -622,7 +686,6 @@ void BoxAppImport(
     bool test = box_app_test_env();
     ecs_singleton_set(world, App, {
         .cpu_budget = 100,
-        .fps = BOX_APP_FPS,
         .port = BOX_APP_PORT,
         .unguarded = test,
         .unpaced = test

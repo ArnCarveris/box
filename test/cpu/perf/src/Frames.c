@@ -164,7 +164,7 @@ void Frames_invalid_fps(void) {
     test_int(status->state, PerfInvalid);
     test_int(status->frame, 0);
     test_bool(status->passed, false);
-    test_int(ecs_singleton_get(world, App)->fps, 60);
+    test_int(ecs_singleton_get(world, App)->fps, 0);
 
     ecs_fini(world);
     box_perf_clock = NULL;

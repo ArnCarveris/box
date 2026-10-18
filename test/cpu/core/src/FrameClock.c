@@ -724,13 +724,12 @@ void FrameClock_cap_guard_never_binds_paced(void) {
     // testing/town_stutter
     test_flt(box_app_cap_interval(60, 120, 0), 1.0 / 60.0);
     test_flt(box_app_cap_interval(60, 0, 2), 1.0 / 60.0);
-    test_flt(box_app_cap_interval(0, 120, 1), 0);
-    test_flt(box_app_cap_interval(60, 120, 2), BOX_APP_PACED_GUARD * 2.0 / 120.0);
-    test_flt(box_app_cap_interval(30, 59, 2), BOX_APP_PACED_GUARD * 2.0 / 59.0);
-    test_flt(box_app_cap_interval(90, 120, 2), BOX_APP_PACED_GUARD / 120.0);
-    test_flt(box_app_cap_interval(90, 120, 1), BOX_APP_PACED_GUARD / 120.0);
-    test_assert(box_app_cap_interval(60, 120, 2) < 2.0 / 120.0);
-    test_assert(box_app_cap_interval(90, 120, 1) < 1.0 / 120.0);
+    test_flt(box_app_cap_interval(0, 120, 1), BOX_APP_PACED_GUARD / 120.0);
+    test_flt(box_app_cap_interval(120, 120, 1), BOX_APP_PACED_GUARD / 120.0);
+    test_flt(box_app_cap_interval(144, 120, 1), BOX_APP_PACED_GUARD / 120.0);
+    test_flt(box_app_cap_interval(0, 0, 0), 0);
+    test_assert(box_app_cap_interval(0, 120, 1) < 1.0 / 120.0);
+    test_assert(box_app_cap_interval(120, 120, 1) < 1.0 / 120.0);
 }
 
 void FrameClock_cap_guard_bounds_runaway(void) {
@@ -747,9 +746,9 @@ void FrameClock_cap_guard_bounds_runaway(void) {
     fake_slow_frame = -1;
     fake_jitter = 0;
     ecs_system(world, { .phase = EcsOnUpdate, .run = FakeWork });
-    ecs_singleton_set(world, App, { .frames = 200, .fps = 60 });
+    ecs_singleton_set(world, App, { .frames = 200 });
     ecs_singleton_set(world, RenderStatus, {
-        .vsync = true, .refresh_rate = 120, .swap_interval = 2, .cadence = 1 });
+        .vsync = true, .refresh_rate = 120, .swap_interval = 1, .cadence = 1 });
     ecs_entity_t render = ecs_lookup(world, "box.render.RenderSubmitPacket");
     test_assert(render != 0);
     ecs_enable(world, render, false);
@@ -757,8 +756,8 @@ void FrameClock_cap_guard_bounds_runaway(void) {
     test_int(box_app_run(world), 0);
 
     const FrameTiming *t = ecs_singleton_get(world, FrameTiming);
-    test_assert(t->interval.min > 12.49);
-    test_assert(t->interval.mean > 12.49 && t->interval.mean < 12.6);
+    test_assert(t->interval.min > 6.24);
+    test_assert(t->interval.mean > 6.24 && t->interval.mean < 6.3);
 
     ecs_fini(world);
     ecs_os_api.now_ = now;
@@ -794,30 +793,4 @@ void FrameClock_cadence_repeats(void) {
     test_int(box_render_swap_interval(143.98f, 72), 2);
     test_int(box_render_swap_interval(59, 60), 1);
     test_int(box_render_swap_interval(120, 90), 0);
-}
-
-void FrameClock_window_presents_follow_cadence(void) {
-    // testing/town_stutter
-    test_int(box_render_window_presents(true, true, 2), 2);
-    test_int(box_render_window_presents(true, true, 1), 1);
-    test_int(box_render_window_presents(true, true, 0), 1);
-    test_int(box_render_window_presents(false, true, 2), 1);
-    test_int(box_render_window_presents(true, false, 2), 1);
-
-    box_render_target_desc_t desc = {
-        .width = 2560, .height = 1440, .render_width = 2560, .render_height = 1440,
-        .vsync = true, .refresh = 120 };
-    test_bool(box_render_target_scene(&desc, true, 60), true);
-    test_bool(box_render_target_scene(&desc, true, 90), true);
-    test_bool(box_render_target_scene(&desc, true, 120), false);
-    test_bool(box_render_target_scene(&desc, true, 0), false);
-    test_bool(box_render_target_scene(&desc, false, 60), false);
-    desc.vsync = false;
-    test_bool(box_render_target_scene(&desc, true, 60), false);
-    desc.refresh = 0;
-    desc.vsync = true;
-    test_bool(box_render_target_scene(&desc, true, 60), false);
-    desc.render_width = 1280;
-    desc.render_height = 720;
-    test_bool(box_render_target_scene(&desc, false, 120), true);
 }

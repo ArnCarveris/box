@@ -573,7 +573,7 @@ void Terminal_http_rest_forward(void) {
         "/component/box/app/App?component=box.app.App", NULL, &reply), 200);
     char *body = ecs_strbuf_get(&reply.body);
     test_assert(body != NULL);
-    test_assert(strstr(body, "\"fps\":60") != NULL);
+    test_assert(strstr(body, "\"fps\":0") != NULL);
     ecs_os_free(body);
 
     reply = ECS_HTTP_REPLY_INIT;

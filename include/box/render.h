@@ -51,7 +51,10 @@ ECS_STRUCT(RenderStatus, {
     int32_t submitted;  /**< Packets the main thread handed to the renderer */
     int32_t rendered;   /**< Packets the backend finished and the ring got back */
     int32_t in_flight;  /**< Packets submitted or being filled that are not yet rendered */
-    int32_t stalls;     /**< Frames the main thread waited for a free packet */
+    int32_t stalls;     /**< Frames whose first packet waited for a free one, in the middle of
+                         *   the frame; box_app_run waits at the start instead (waits) */
+    int32_t waits;      /**< Frames box_app_run started only once a packet was free: the
+                         *   display paces the frame loop through the packets in flight */
     bool threaded;      /**< A render thread consumes the packets */
     int64_t upload_bytes; /**< Bytes of instance data the last frame uploaded, 0 when unchanged */
     bool vsync;         /**< Frames present with vsync: a window with vsync or display_rate */

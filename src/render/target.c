@@ -331,51 +331,6 @@ static void box_gpu_target_scene(
     t->blit_group = wgpuDeviceCreateBindGroup(gpu->device, &desc);
 }
 
-/** Release the scene texture of a target and its blit bind group.
- *
- * @param t The target
- */
-static void box_gpu_target_scene_release(
-    box_gpu_target_t *t)
-{
-    if (t->blit_group) {
-        wgpuBindGroupRelease(t->blit_group);
-    }
-
-    if (t->scene_view) {
-        wgpuTextureViewRelease(t->scene_view);
-    }
-
-    if (t->scene) {
-        wgpuTextureRelease(t->scene);
-    }
-
-    t->blit_group = NULL;
-    t->scene_view = NULL;
-    t->scene = NULL;
-}
-
-/** Keep the scene texture of a target only while it needs one: a window that may present a
- * frame again has one, and loses it, with the blit of every frame, when the cap no longer asks
- * for more than one refresh per frame.
- *
- * @param gpu The backend
- * @param t The target
- * @param fps Frame rate cap of the frame, 0 for none
- */
-static void box_gpu_target_scene_follow(
-    box_gpu_t *gpu,
-    box_gpu_target_t *t,
-    float fps)
-{
-    bool needed = box_render_target_scene(&t->desc, t->surface != NULL, fps);
-    if (needed && !t->scene) {
-        box_gpu_target_scene(gpu, t);
-    } else if (!needed && t->scene) {
-        box_gpu_target_scene_release(t);
-    }
-}
-
 /** Make the textures of a target match its description.
  *
  * @param gpu The backend
@@ -697,41 +652,6 @@ done:
     return result;
 }
 
-/** Present the scene texture of a window again, so the frame stays on screen for another
- * refresh: the swap interval of the window, which webgpu does not expose, emulated with FIFO
- * presents that each block until the display takes an image.
- *
- * @param gpu The backend
- * @param t The target
- */
-static void box_gpu_target_repeat(
-    box_gpu_t *gpu,
-    box_gpu_target_t *t)
-{
-    WGPUTexture texture = box_gpu_target_acquire(gpu, t);
-    WGPUTextureView view;
-    WGPUCommandEncoder encoder;
-    WGPUCommandBuffer commands;
-    if (!texture || !t->surface) {
-        goto done;
-    }
-
-    view = box_gpu_target_view(t, texture);
-    encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
-    box_gpu_blit(gpu, t, encoder, view);
-    commands = wgpuCommandEncoderFinish(encoder, NULL);
-    wgpuQueueSubmit(gpu->queue, 1, &commands);
-    wgpuCommandBufferRelease(commands);
-    wgpuCommandEncoderRelease(encoder);
-    wgpuTextureViewRelease(view);
-#ifndef __EMSCRIPTEN__
-    wgpuSurfacePresent(t->surface);
-#endif
-    wgpuTextureRelease(texture);
-done:
-    return;
-}
-
 /** Draw the views of a frame into the scene texture of a target and submit the work before the
  * target acquires its image. Acquiring a window image blocks until the display frees one, so
  * the GPU renders the frame while the render thread waits instead of after it.
@@ -763,15 +683,7 @@ void box_gpu_target_render(
     const box_render_target_t *frame)
 {
     box_gpu_target_t *t = ecs_map_get_deref(&gpu->targets, box_gpu_target_t, frame->handle);
-    int32_t presents = t
-        ? box_render_window_presents(t->surface != NULL, t->desc.vsync, packet->presents)
-        : 1;
-    int32_t i;
     bool drawn = false;
-    if (t) {
-        box_gpu_target_scene_follow(gpu, t, packet->fps);
-    }
-
     gpu->rendering = frame->handle;
     if (t && t->scene_view) {
         box_gpu_target_scene_draw(gpu, t, packet, frame);
@@ -810,10 +722,6 @@ void box_gpu_target_render(
 
     if (box_gpu_target_captures(frame)) {
         box_gpu_capture_write(gpu, t, box_render_packet_data(packet, frame->capture));
-    }
-
-    for (i = 1; i < presents && t->scene; i ++) {
-        box_gpu_target_repeat(gpu, t);
     }
 
     box_gpu_count(gpu, BOX_GPU_STAT_FRAMES);

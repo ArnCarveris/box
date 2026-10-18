@@ -21,7 +21,7 @@ void Args_defaults(void) {
     test_int(app->frames, 0);
     test_flt(app->timeout, 0);
     test_flt(app->cpu_budget, 100);
-    test_flt(app->fps, 60);
+    test_flt(app->fps, 0);
     test_int(app->port, 27750);
     test_assert(app->scene == NULL);
 

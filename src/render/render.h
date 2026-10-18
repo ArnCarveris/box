@@ -1974,6 +1974,15 @@ void box_render_pause(
     ecs_world_t *world,
     bool paused);
 
+/** Wait until a packet is free for the next frame, before the frame measures its delta, so the
+ * backpressure of the display paces the start of the frame instead of stalling the first
+ * box_render_packet call in its middle (RenderStatus.waits, not stalls). No-op without box.render.
+ *
+ * @param world The world
+ */
+void box_render_wait(
+    ecs_world_t *world);
+
 /** Wait until the backend rendered every submitted packet, also while the ring is held, and
  * flushed it, so every capture of those packets is written, and bring RenderStatus up to date.
  *
@@ -2061,6 +2070,15 @@ void box_render_ring_pause(
     box_render_ring_t *ring,
     bool paused);
 
+/** Wait until a ring has a packet free for the next acquire, counting RenderStatus.waits. Does
+ * nothing with new settings to apply, on the main thread, which renders inside the submit, or
+ * with a packet acquired and not submitted, which the next frame fills.
+ *
+ * @param ring The ring
+ */
+void box_render_ring_wait(
+    box_render_ring_t *ring);
+
 /** Wait until every submitted packet of a ring was rendered.
  *
  * @param ring The ring
@@ -2109,33 +2127,6 @@ int32_t box_render_cadence_cycle(
 
 /** Frames a cadence repeats within at most for box_render_cadence_cycle */
 #define BOX_RENDER_CADENCE_MAX (240)
-
-/** Count the presents of a frame to a window: the frame is presented again until it was shown
- * for its refreshes, since webgpu has no swap interval.
- *
- * @param window The target presents to a window surface
- * @param vsync The window presents with vertical sync
- * @param presents Refreshes the packet is shown for
- * @return Presents of the frame, at least 1
- */
-int32_t box_render_window_presents(
-    bool window,
-    bool vsync,
-    int32_t presents);
-
-/** Decide whether a target renders into a scene texture that a blit copies to its image: when
- * the render size differs from the image, or when a vsync window may present a frame again,
- * which needs the frame kept in a texture of its own.
- *
- * @param desc The description of the target
- * @param window The target presents to a window surface
- * @param fps Frame rate cap of the frame, 0 for none
- * @return Whether the target needs the scene texture
- */
-bool box_render_target_scene(
-    const box_render_target_desc_t *desc,
-    bool window,
-    float fps);
 
 /** Read the counters of a ring.
  *

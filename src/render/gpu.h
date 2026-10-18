@@ -675,6 +675,10 @@ void box_gpu_target_apply(
 
 /** Clear a target, scale its scene to the presented image, capture it and present it.
  *
+ * A window presents each frame once, FIFO with vsync; the frame loop paces a cap with its clock.
+ * Presenting a frame again holds two of the 3 drawables wgpu gives a CAMetalLayer (latency 2 + 1,
+ * clamped to 1..2), and nextDrawable then waits on the compositor without a timeout.
+ *
  * @param gpu The backend
  * @param packet The packet the target belongs to
  * @param frame The target of the packet
