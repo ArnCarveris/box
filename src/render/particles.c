@@ -1299,7 +1299,7 @@ static void BoxRenderExtractParticles(
         ParticlePlayback *playbacks = ecs_field(&qit, ParticlePlayback, 3);
         const ParticleCurves *curves = ecs_field(&qit, ParticleCurves, 4);
         const ParticleAppearance *looks = ecs_field(&qit, ParticleAppearance, 5);
-                bool shared = ecs_field_is_set(&qit, 1) && !ecs_field_is_self(&qit, 1);
+        bool shared = ecs_field_is_set(&qit, 1) && !ecs_field_is_self(&qit, 1);
         bool curves_shared = curves && !ecs_field_is_self(&qit, 4);
         bool looks_shared = looks && !ecs_field_is_self(&qit, 5);
         ecs_entity_t effect_src = 0;

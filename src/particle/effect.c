@@ -322,6 +322,7 @@ static box_particle_instance_t* box_particle_instance_new(
     {
         box_particle_collect(world, s, result);
         result->collected = ecs_vec_count(&result->layers) != 0;
+        effect->empty = !result->collected;
     }
 
     return result;
@@ -757,6 +758,11 @@ ecs_entity_t box_particle_burst_at(
 
     if (!inst) {
         inst = box_particle_instance_new(world, s, pool);
+        if (pool->empty) {
+            ecs_vec_remove_last(&pool->instances);
+            box_particle_instance_free(world, s, inst, true);
+            goto done;
+        }
     }
 
     box_particle_play(world, s, inst, position, scale);

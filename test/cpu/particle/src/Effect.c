@@ -523,6 +523,16 @@ void Effect_without_emitter_returns_zero(void) {
     test_assert(box_particle_burst_at(world, plain, origin, 1) == 0);
     test_int(instances_of(world, "Empty"), 0);
 
+    test_assert(ecs_script_run(world, "bare",
+        "using box.transform\n"
+        "template Bare {\n"
+        "  child { Position: {1, 0, 0} }\n"
+        "}\n", NULL) == 0);
+    ecs_entity_t bare = ecs_lookup(world, "Bare");
+    test_assert(bare != 0);
+    test_assert(box_particle_burst_at(world, bare, origin, 1) == 0);
+    test_assert(box_particle_burst_at(world, bare, origin, 1) == 0);
+
     ParticleStats stats = frame(world);
     test_int(stats.effects, 0);
     test_int(stats.dropped, 0);

@@ -258,7 +258,9 @@ ECS_STRUCT(ParticleStats, {
 ECS_ENUM(EffectOverflow, {
     EffectRecycle = 0,      /**< The instance that has played longest plays the burst instead */
     EffectSkip = 1,         /**< A burst no view sees, or beyond effect_distance from the camera
-                             *   of every view, is dropped; one a view sees recycles */
+                             *   of every view, is dropped; one a view sees recycles. With
+                             *   several views a burst is kept when one view both sees it and is
+                             *   within effect_distance of it */
     EffectMerge = 2         /**< A burst within effect_merge of a play of its template joins
                              *   it; with no play nearby it recycles */
 });
