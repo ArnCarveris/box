@@ -95,6 +95,19 @@
                     "collapsible_hides_content",
                     "collapsible_content_activation"
                 ]
+            },
+            {
+                "id": "Gallery",
+                "testcases": [
+                    "scene_loads",
+                    "theme_switch",
+                    "form_apply",
+                    "form_reset",
+                    "form_enter_applies",
+                    "keyboard_only",
+                    "cursors",
+                    "resize"
+                ]
             }
         ]
     }

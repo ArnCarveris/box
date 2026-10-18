@@ -13,6 +13,7 @@ using box.text
 
 // Behavior of a two-state control with a label. A click on the control or its label, Enter or
 // Space toggles current and reports the change; Space shows the pressed look while it is down.
+// The pointer shows a hand over it, a crossed circle while it is disabled.
 template HeadlessToggle {
   prop label: string = ""
   prop value: bool = false
@@ -20,12 +21,23 @@ template HeadlessToggle {
   prop width: f32 = 0
 
   mut current = value
+  mut last_value = value
   mut hover = false
   mut down = false
   mut focused = false
 
   if !disabled {
     Focusable
+    Cursor: {CursorPointer}
+  } else {
+    Cursor: {CursorNotAllowed}
+  }
+
+  async {
+    if value != last_value {
+      last_value = value
+      current = value
+    }
   }
 
   async {

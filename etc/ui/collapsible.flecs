@@ -16,7 +16,8 @@ using box.transform
 // for its header, the child head, which comes before the content, the children of the instance:
 // a click on the header, or Enter and Space while the section has the focus, toggle current and
 // report the change. While closed the section is only as tall as its header, header points, and
-// clips its content away entirely, so the content is not drawn, picked or reached with Tab.
+// clips its content away entirely, so the content is not drawn, picked or reached with Tab. The
+// pointer shows a hand over the header, a crossed circle while the section is disabled.
 template HeadlessCollapsible {
   prop title: string = ""
   prop value: bool = false
@@ -25,6 +26,7 @@ template HeadlessCollapsible {
   prop header: f32 = 0
 
   mut current = value
+  mut last_value = value
   mut hover = false
   mut down = false
   mut focused = false
@@ -32,6 +34,8 @@ template HeadlessCollapsible {
   ClipChildren
   if !disabled {
     Focusable
+  } else {
+    Cursor: {CursorNotAllowed}
   }
   if current {
     LayoutItem: {width: {min: width, max: width}, height: {mode: Fit, value: 1}}
@@ -40,6 +44,16 @@ template HeadlessCollapsible {
   }
 
   head {
+    if !disabled {
+      Cursor: {CursorPointer}
+    }
+  }
+
+  async {
+    if value != last_value {
+      last_value = value
+      current = value
+    }
   }
 
   async {

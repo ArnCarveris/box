@@ -24,7 +24,8 @@ fn slider_snap(v: f64, min: f64, max: f64, step: f64) -> f64 {
 // from there follows it: the track is the bottom thumb points of the slider across its width, the
 // thumb center moves between thumb / 2 from either edge. The arrow keys step (a hundredth of the range for a continuous slider),
 // PageUp and PageDown step by a tenth of the range, Home and End go to min and max. current
-// snaps to step and stays within min..max.
+// snaps to step and stays within min..max. The pointer shows a hand over the slider, a crossed
+// circle while it is disabled.
 template HeadlessSlider {
   prop min: f32 = 0
   prop max: f32 = 100
@@ -35,6 +36,7 @@ template HeadlessSlider {
   prop thumb: f32 = 0
 
   mut current: f32 = slider_snap(value, min, max, step)
+  mut last_value: f32 = value
   mut hover = false
   mut down = false
   mut focused = false
@@ -47,6 +49,16 @@ template HeadlessSlider {
 
   if !disabled {
     Focusable
+    Cursor: {CursorPointer}
+  } else {
+    Cursor: {CursorNotAllowed}
+  }
+
+  async {
+    if value != last_value {
+      last_value = value
+      current = slider_snap(value, min, max, step)
+    }
   }
 
   async {

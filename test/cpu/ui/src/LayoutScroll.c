@@ -508,3 +508,52 @@ void LayoutScroll_script(void) {
 
     ecs_fini(world);
 }
+
+/** Delete the entity of the observer context when the LayoutContent of a view is set, as a
+ * scroll view template removes its scroll bar when its content fits.
+ *
+ * @param it The iterator, whose ctx points to the entity
+ */
+static void scroll_delete_on_content(
+    ecs_iter_t *it)
+{
+    ecs_entity_t *bar = it->ctx;
+    if (*bar && ecs_is_alive(it->world, *bar)) {
+        ecs_delete(it->world, *bar);
+    }
+}
+
+void LayoutScroll_content_observer_deletes_child(void) {
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t view = scroll_view(world, DirectionColumn, 100, 100,
+        (LayoutScroll){ .vertical = true });
+    ecs_entity_t a = scroll_rect(world, view, 50, 80);
+    ecs_entity_t bar = scroll_rect(world, view, 10, 10);
+    ecs_set(world, bar, LayoutItem, { .width = { SizeModeFixed, 10 } });
+    ecs_progress(world, 0);
+    test_assert(ecs_is_alive(world, bar));
+
+    /* The layout writes the content of the view before the children after it, so the bar
+     * is deleted while the layout still has to write it */
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(LayoutContent), .src.id = view }},
+        .events = { EcsOnSet },
+        .callback = scroll_delete_on_content,
+        .ctx = &bar
+    });
+    ecs_set(world, a, Rect, { 50, 200 });
+    ecs_progress(world, 0);
+    test_assert(!ecs_is_alive(world, bar));
+    test_flt(ecs_get(world, a, LayoutBounds)->height, 200);
+
+    /* The next layout measures the content without the bar */
+    ecs_progress(world, 0);
+    const LayoutContent *content = ecs_get(world, view, LayoutContent);
+    test_assert(content != NULL);
+    test_flt(content->height, 200);
+    test_flt(content->max_y, 100);
+
+    ecs_fini(world);
+}

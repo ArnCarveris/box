@@ -8,14 +8,23 @@
 
 #include <box.h>
 
+/** Path of the header of the gallery, above the page */
+#define HEADER "gallery.hud.root.header"
+
+/** Path of the page of the gallery, the scroll view of the sections */
+#define PAGE "gallery.hud.root.page"
+
 /** Path of the Basics panel of the gallery */
-#define BASICS "gallery.hud.root.sections.basics"
+#define BASICS PAGE ".top.basics"
 
 /** Path of the Text panel of the gallery */
-#define TEXT "gallery.hud.root.sections.text"
+#define TEXT PAGE ".top.text"
 
 /** Path of the Containers panel of the gallery */
-#define CONTAINERS "gallery.hud.root.sections.containers"
+#define CONTAINERS PAGE ".bottom.containers"
+
+/** Path of the Form panel of the gallery */
+#define FORM PAGE ".bottom.form"
 
 /** Load the gallery scene into a new headless world and open a terminal session.
  *
@@ -79,7 +88,44 @@ void gallery_point(
     char *out,
     size_t size);
 
+/** Get the window rectangle of an element.
+ *
+ * @param world The world
+ * @param path Path of the element
+ * @param r Receives left, top, right and bottom in window points
+ */
+void gallery_rect(
+    ecs_world_t *world,
+    const char *path,
+    float r[4]);
+
+/** Scroll the page of the gallery as little as it takes to show all of an element, as far as
+ * the page view is large enough, and run the frames that move it.
+ *
+ * @param world The world
+ * @param session The terminal session
+ * @param path Path of the element
+ */
+void gallery_reveal(
+    ecs_world_t *world,
+    ecs_entity_t session,
+    const char *path);
+
+/** Scroll the page of the gallery so that the top left of an element is at the top left of the
+ * page view, as far as the page scrolls, and run the frames that move it.
+ *
+ * @param world The world
+ * @param session The terminal session
+ * @param path Path of the element
+ */
+void gallery_show(
+    ecs_world_t *world,
+    ecs_entity_t session,
+    const char *path);
+
 /** Move the cursor to a place on a widget and check that PickStatus reports a handler there.
+ *
+ * Scrolls the page first when the widget is not all in view.
  *
  * @param world The world
  * @param session The terminal session

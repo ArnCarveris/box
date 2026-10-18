@@ -21,6 +21,7 @@ template RadioGroup {
   prop width: f32 = 0
 
   mut current: string = value
+  mut last_value: string = value
   mut first: entity = 0   // First enabled button, the Tab stop while none is checked
   mut pending: entity = 0 // Button the arrow keys move the focus to, checked when focused
 
@@ -32,12 +33,20 @@ template RadioGroup {
   if disabled {
     Opacity: {t.disabled_opacity}
   }
+
+  async {
+    if value != last_value {
+      last_value = value
+      current = value
+    }
+  }
 }
 
 // Behavior of a radio button, a child of a radio group. The group is one Tab stop: only the
 // checked button (or the first one while none is) is Focusable. A click, Enter or Space checks
 // the button; the arrow keys check and focus the next or previous enabled button of the group,
-// wrapping around. The group reports the change.
+// wrapping around. The group reports the change. The pointer shows a hand over the button, a
+// crossed circle while it or its group is disabled.
 template HeadlessRadioButton : parent RadioGroup {
   prop label: string = ""
   prop disabled: bool = false
@@ -52,9 +61,12 @@ template HeadlessRadioButton : parent RadioGroup {
 
   if !off {
     Interactive
+    Cursor: {CursorPointer}
     if checked || focused || pending == this || (current == "" && first == this) {
       Focusable
     }
+  } else {
+    Cursor: {CursorNotAllowed}
   }
 
   async {

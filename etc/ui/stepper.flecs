@@ -15,7 +15,8 @@ using box.text
 // Behavior of a stepper, a spin button. A click on the left button part (button points wide)
 // steps down, on the right one up; the arrow keys step (Up and Right up), PageUp and PageDown by
 // ten steps, Home and End go to min and max. current stays within min..max. part is the button
-// under the pointer and pressed the one held: -1 minus, 1 plus, 0 none.
+// under the pointer and pressed the one held: -1 minus, 1 plus, 0 none. The pointer shows a hand
+// over the stepper, a crossed circle while it is disabled.
 template HeadlessStepper {
   prop min: f32 = 0
   prop max: f32 = 10
@@ -26,12 +27,23 @@ template HeadlessStepper {
   prop button: f32 = 0
 
   mut current: f32 = clamp(value, min, max)
+  mut last_value: f32 = value
   mut part: i32 = 0
   mut pressed: i32 = 0
   mut focused = false
 
   if !disabled {
     Focusable
+    Cursor: {CursorPointer}
+  } else {
+    Cursor: {CursorNotAllowed}
+  }
+
+  async {
+    if value != last_value {
+      last_value = value
+      current = clamp(value, min, max)
+    }
   }
 
   async {

@@ -237,7 +237,7 @@ void Text_disabled(void) {
     ecs_world_t *world = gallery_load(&s);
 
     gallery_click(world, s, TEXT ".name.field", 0, 0, TEXT ".name.field");
-    gallery_click(world, s, TEXT ".off.field", 0, 0, "#0");
+    gallery_click(world, s, TEXT ".off.field", 0, 0, PAGE);
     text_expect_focus(world, s, "#0");
     text_type(world, s, "x");
     text_expect_mut(world, s, "off", "current", "\"Not editable\"");

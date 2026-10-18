@@ -860,6 +860,10 @@ static void box_layout_resolve_all(
 /** Write the computed size and position of an element where they changed, the content of a
  * scrolling element and the anchor size of a floating one.
  *
+ * The layout runs immediately, so the observers of an earlier write run before this one: an
+ * element they deleted, such as the scroll bar a scroll view removes when its content fits, is
+ * skipped.
+ *
  * @param world The world
  * @param state The state of the layout module
  * @param n The element
@@ -869,6 +873,10 @@ static void box_layout_write(
     box_layout_state_t *state,
     const box_layout_node_t *n)
 {
+    if (!ecs_is_alive(world, n->e)) {
+        goto done;
+    }
+
     const LayoutBounds *b = ecs_get(world, n->e, LayoutBounds);
     if (!b || b->width != n->size[0] || b->height != n->size[1]) {
         ecs_set(world, n->e, LayoutBounds, { n->size[0], n->size[1] });
@@ -908,6 +916,9 @@ static void box_layout_write(
         *ecs_map_ensure(&state->anchor_sizes, (ecs_map_key_t)n->e) =
             ((ecs_map_val_t)w << 32) | h;
     }
+
+done:
+    return;
 }
 
 /** Size and place a tree without texts, both axes in one pass.

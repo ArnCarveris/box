@@ -1,0 +1,75 @@
+// The widget gallery of etc/scenes/widgets.flecs in the light theme with every section in view,
+// as widgets_dark shows it in the dark theme: the theme dropdown of the header picked Light. The
+// form has its Name field focused with "idg" selected and the caret on, and its Shape dropdown
+// open with Sphere highlighted over the sliders.
+include etc/scenes/widgets
+
+using flecs.script
+using box.camera
+using box.surface
+using box.ui
+using box.widgets
+
+window {
+  Surface: {width: 2048, height: 1152}
+}
+
+backdrop {
+  camera {
+    Camera: {ortho: true, ortho_scale: 0, ortho_height: 1152}
+  }
+}
+
+gallery {
+  hud {
+    camera {
+      Camera: {ortho: true, ortho_scale: 0, ortho_height: 1152}
+    }
+
+    root {
+      header {
+        theme {
+          Dropdown.mut: {current: 1}
+        }
+      }
+
+      page {
+        bottom {
+          form {
+            body {
+              controls {
+                name {
+                  field {
+                    TextEditStatus: {caret: 4, anchor: 1}
+                  }
+                }
+
+                shape_row {
+                  shape {
+                    Dropdown.mut: {open: true, highlight: 1}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// The theme switch on the theme entity holds the index of the theme the dropdown picked
+box {
+  ui {
+    theme {
+      ThemeSwitch.mut: {index: 1}
+    }
+  }
+}
+
+// Focus the field once the gallery runs; a focus by script shows the caret like a click
+async {
+  const controls = gallery.lookup("hud").lookup("root").lookup("page").lookup("bottom")
+    .lookup("form").lookup("body").lookup("controls")
+  await ui.focus(controls.lookup("name").lookup("field"))
+}

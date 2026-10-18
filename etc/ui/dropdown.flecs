@@ -83,7 +83,8 @@ template Chevron {
 // The list is the child list, a LayoutFloat below the button that flips above it when it does not
 // fit below; its options are row points tall with inset points above and below them. over is
 // whether the pointer is over the list. The template reads no component, so its async blocks only
-// restart when a prop changes.
+// restart when a prop changes. The pointer shows a hand over the button and the list, a crossed
+// circle while the dropdown is disabled.
 template HeadlessDropdown {
   prop options = ["Option"]
   prop value: i32 = 0
@@ -93,6 +94,7 @@ template HeadlessDropdown {
   prop inset: f32 = 0
 
   mut current: i32 = clamp(value, 0, options.count() - 1)
+  mut last_value: i32 = value
   mut open = false
   mut highlight: i32 = 0
   mut over = false
@@ -105,10 +107,20 @@ template HeadlessDropdown {
 
   if !disabled {
     Focusable
+    Cursor: {CursorPointer}
+  } else {
+    Cursor: {CursorNotAllowed}
   }
 
   if open {
     KeyCapture
+  }
+
+  async {
+    if value != last_value {
+      last_value = value
+      current = clamp(value, 0, count - 1)
+    }
   }
 
   list {

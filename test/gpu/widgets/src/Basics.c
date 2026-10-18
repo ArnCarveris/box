@@ -125,8 +125,10 @@ void Basics_scene_loads(void) {
     ecs_world_t *world = gallery_load(&s);
 
     gallery_expect(world, s, "logs warning 100", "");
-    gallery_expect(world, s, "get gallery Gallery.mut",
-        "{last: \"none\", changes: 0, pings: 0, submitted: \"\"}");
+    gallery_expect(world, s, "get gallery Gallery.mut.last", "\"none\"");
+    gallery_expect(world, s, "get gallery Gallery.mut.changes", "0");
+    gallery_expect(world, s, "get gallery Gallery.mut.pings", "0");
+    gallery_expect(world, s, "get gallery Gallery.mut.submitted", "\"\"");
     gallery_expect(world, s, "get gallery.hud.root.header.status Text.value",
         "\"Last change: none\"");
     gallery_expect(world, s, "get " BASICS ".heading Text.value", "\"Basics\"");
@@ -646,13 +648,13 @@ void Basics_disabled_ignore_clicks(void) {
     ecs_world_t *world = gallery_load(&s);
     float fy, fx = basics_slider_at(world, BASICS ".sliders.muted", 0.1f, &fy);
 
-    gallery_click(world, s, BASICS ".buttons.off", 0, 0, "#0");
-    gallery_click(world, s, BASICS ".toggles.locked", -0.8f, 0, "#0");
-    gallery_click(world, s, BASICS ".toggles.airplane", -0.6f, 0, "#0");
-    gallery_click(world, s, BASICS ".radios.size.huge", 0, 0, "#0");
-    gallery_click(world, s, BASICS ".radios.quality.low", 0, 0, "#0");
-    gallery_click(world, s, BASICS ".sliders.muted", fx, fy, "#0");
-    gallery_click(world, s, BASICS ".steppers.fixed", BASICS_PLUS, 0, "#0");
+    gallery_click(world, s, BASICS ".buttons.off", 0, 0, PAGE);
+    gallery_click(world, s, BASICS ".toggles.locked", -0.8f, 0, PAGE);
+    gallery_click(world, s, BASICS ".toggles.airplane", -0.6f, 0, PAGE);
+    gallery_click(world, s, BASICS ".radios.size.huge", 0, 0, PAGE);
+    gallery_click(world, s, BASICS ".radios.quality.low", 0, 0, PAGE);
+    gallery_click(world, s, BASICS ".sliders.muted", fx, fy, PAGE);
+    gallery_click(world, s, BASICS ".steppers.fixed", BASICS_PLUS, 0, PAGE);
 
     test_int(gallery_changes(world, s), 0);
     basics_expect_focus(world, s, "#0");
@@ -705,7 +707,7 @@ void Basics_tab_order(void) {
     ecs_entity_t s = 0;
     ecs_world_t *world = gallery_load(&s);
     const char *order[] = {
-        BASICS ".buttons.save", BASICS ".buttons.cancel", BASICS ".buttons.more",
+        HEADER ".theme", BASICS ".buttons.save", BASICS ".buttons.cancel", BASICS ".buttons.more",
         BASICS ".buttons.remove", BASICS ".buttons.ping", BASICS ".toggles.sound",
         BASICS ".toggles.music", BASICS ".toggles.wifi", BASICS ".radios.size.medium",
         BASICS ".sliders.volume", BASICS ".sliders.gain", BASICS ".steppers.count",
@@ -714,7 +716,7 @@ void Basics_tab_order(void) {
     };
     int32_t i;
 
-    for (i = 0; i < 17; i ++) {
+    for (i = 0; i < 18; i ++) {
         gallery_key(world, s, "Tab");
         basics_expect_focus(world, s, order[i]);
     }

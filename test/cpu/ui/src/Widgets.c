@@ -1,7 +1,7 @@
 /**
  * @file Widgets.c
  * @brief The widget library box.ui loads: the box.widgets module and its templates, a world
- * without the library, the UiTheme of box.ui.theme and ui.sibling.
+ * without the library, the UiTheme of box.ui.theme, a script that assigns it and ui.sibling.
  */
 
 #include <box.h>
@@ -226,6 +226,43 @@ void Widgets_theme_dark(void) {
     ecs_value_t dark = ecs_const_var_get(world, ecs_lookup(world, "box.widgets.DarkTheme"));
     test_assert(dark.ptr != NULL);
     test_assert(!ecs_os_memcmp_t(dark.ptr, t, UiTheme));
+
+    ecs_fini(world);
+}
+
+void Widgets_theme_from_script(void) {
+    // ui/widgets
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t theme = ecs_lookup(world, "box.ui.theme");
+    test_assert(theme != 0);
+
+    /* A scene with a theme switch declares the theme entity; it never takes it over, so an
+     * update or the delete of the scene keeps it and its value */
+    ecs_entity_t script = ecs_script(world, { .code =
+        "using box.widgets\n"
+        "box {\n"
+        "  ui {\n"
+        "    theme {\n"
+        "      box.ui.UiTheme: LightTheme\n"
+        "    }\n"
+        "  }\n"
+        "}\n"
+    });
+    test_assert(script != 0);
+    test_assert(ecs_lookup(world, "box.ui.theme") == theme);
+    test_int(ecs_get(world, theme, UiTheme)->background.r, 232);
+    test_bool(ecs_has_pair(world, theme, ecs_id(EcsScript), script), false);
+
+    test_int(ecs_script_update(world, script, 0, "using box.widgets\n"), 0);
+    test_assert(ecs_is_alive(world, theme));
+    test_assert(ecs_lookup(world, "box.ui.theme") == theme);
+    test_int(ecs_get(world, theme, UiTheme)->background.r, 232);
+
+    ecs_delete(world, script);
+    test_assert(ecs_is_alive(world, theme));
+    test_assert(ecs_get(world, theme, UiTheme) != NULL);
+    ecs_progress(world, 0);
 
     ecs_fini(world);
 }

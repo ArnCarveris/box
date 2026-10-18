@@ -13,7 +13,8 @@ using box.text
 
 // Behavior of a push button. A click, Enter or Space activates it: with an action the
 // ActionTrigger taps it, without one the button reports a change (ui.changed). Space shows the
-// pressed look while it is down.
+// pressed look while it is down. The pointer shows a hand over it, a crossed circle while it is
+// disabled.
 template HeadlessButton {
   prop label: string = "Button"
   prop action: entity = 0
@@ -27,6 +28,9 @@ template HeadlessButton {
   if !disabled {
     Focusable
     ActionTrigger: {action: action}
+    Cursor: {CursorPointer}
+  } else {
+    Cursor: {CursorNotAllowed}
   }
 
   async {

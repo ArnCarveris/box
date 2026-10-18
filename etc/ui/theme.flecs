@@ -1,7 +1,9 @@
 // The themes of the widget library. Widgets read box.ui.theme[UiTheme] reactively, so assigning
 // one of these to it restyles every widget in the next frame:
 //
-//   box.ui.theme { UiTheme: LightTheme }
+//   box { ui { theme { UiTheme: LightTheme } } }
+//
+// The theme entity belongs to box.ui, so a script that assigns it never owns or deletes it.
 
 module box.widgets
 

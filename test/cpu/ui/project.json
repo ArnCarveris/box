@@ -203,7 +203,8 @@
                     "axes_change_lays_out_again",
                     "remove_scroll_lays_out_again",
                     "direction_none_keeps_free_children",
-                    "script"
+                    "script",
+                    "content_observer_deletes_child"
                 ]
             },
             {
@@ -293,6 +294,7 @@
                     "templates_exist",
                     "missing_file",
                     "theme_dark",
+                    "theme_from_script",
                     "sibling"
                 ]
             },

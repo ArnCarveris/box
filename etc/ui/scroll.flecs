@@ -42,6 +42,8 @@ fn scroll_thumb_at(track: f64, thumb: f64, at: f64, most: f64) -> f64 {
 // scroll a step, PageUp and PageDown a page, Home and End to the start and the end. The wheel goes
 // to the innermost scroll view under the cursor, the first Interactive element on its path.
 // vbar and hbar are the visible bars, drag the thumb held: 1 vertical, 2 horizontal, 0 none.
+// Without focusable the view is only Interactive: it is no Tab stop and a press on it clears the
+// focus, as for a page that scrolls the widgets in it into view while Tab moves through them.
 template HeadlessScrollView {
   prop width: f32 = 0
   prop height: f32 = 0
@@ -50,6 +52,7 @@ template HeadlessScrollView {
   prop bar: f32 = 0
   prop step: f32 = 40
   prop keys: bool = true
+  prop focusable: bool = true
 
   mut x: f32 = 0
   mut y: f32 = 0
@@ -60,7 +63,11 @@ template HeadlessScrollView {
   // The body reads no component: flecs script restarts the async blocks of a template when a
   // component it reads changes, in the body or in an async block. The blocks read LayoutBounds
   // and LayoutContent, which only change when the layout runs, after the events of a frame.
-  Focusable
+  if focusable {
+    Focusable
+  } else {
+    Interactive
+  }
   ClipChildren
   LayoutScroll: {x: x, y: y, horizontal: horizontal, vertical: vertical}
 
@@ -83,11 +90,14 @@ template HeadlessScrollView {
   }
 
   // A descendant that gets the focus, such as by Tab, is scrolled into view. The world matrices
-  // give its offset from the center of the view, y up, in the units of the bounds.
+  // give its offset from the center of the view, y up, in the units of the bounds. A focus
+  // before the first layout, which has placed nothing yet, scrolls nothing.
   async {
     while true {
       const e = await on.focus(this)
-      if e.target != this {
+      const placed = this.has(LayoutContent) && this.has(WorldTransform) &&
+        e.target.has(LayoutBounds) && e.target.has(WorldTransform)
+      if e.target != this && placed {
         const b = this[LayoutBounds]
         const content = this[LayoutContent]
         const tb = e.target[LayoutBounds]
@@ -238,7 +248,7 @@ template HeadlessScrollView {
 // The look of a scroll bar: a track of length track with a thumb of length thumb at offset at
 // from its start, size points thick. A floating bar sits on the right (vertical) or bottom edge
 // of its parent; a pinned one is placed by its Position, for a parent without a direction whose
-// children without a LayoutItem do not scroll.
+// children without a LayoutItem do not scroll. The pointer shows a hand over it.
 template ScrollBar {
   prop vertical: bool = true
   prop track: f32 = 0
@@ -272,6 +282,7 @@ template ScrollBar {
   }
   Rgb: t.surface_alt
   Opacity: {0.9}
+  Cursor: {CursorPointer}
 
   knob {
     if vertical {
@@ -359,7 +370,8 @@ template ScrollView : HeadlessScrollView {
 // on a row selects it; Up and Down select the next and the previous row, PageUp and PageDown move
 // a page, Home and End select the first and the last row, and the scroll offset follows so the
 // selected row stays in view. Each change of the selection reports a change. hover is the row
-// under the pointer, -1 for none. The rows start inset points below the top of the content.
+// under the pointer, -1 for none. The rows start inset points below the top of the content. The
+// pointer shows a hand over the list, a crossed circle while it is disabled.
 template HeadlessListView : HeadlessScrollView {
   prop items = ["Item"]
   prop value: i32 = -1
@@ -369,9 +381,23 @@ template HeadlessListView : HeadlessScrollView {
   prop disabled: bool = false
 
   mut current: i32 = clamp(value, -1, items.count() - 1)
+  mut last_value: i32 = value
   mut hover: i32 = -1
 
   const count = items.count()
+
+  if disabled {
+    Cursor: {CursorNotAllowed}
+  } else {
+    Cursor: {CursorPointer}
+  }
+
+  async {
+    if value != last_value {
+      last_value = value
+      current = clamp(value, -1, count - 1)
+    }
+  }
 
   async {
     while true {

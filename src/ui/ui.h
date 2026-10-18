@@ -358,6 +358,10 @@ void box_ui_text_edit_pointer(
 
 /** Register UiTheme, the box.ui.theme entity and ui.sibling, and load the widget library.
  *
+ * A script owns the entities it declares that no other script owns and deletes them when it is
+ * updated or deleted. The theme entity is owned by the module, so it survives the scenes that
+ * assign it.
+ *
  * @param world The world
  * @param ui The flecs.script.ui scope
  */

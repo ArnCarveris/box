@@ -1,6 +1,7 @@
 /**
- * @file gallery.c
- * @brief Loads the widget gallery scene and drives it through the command API.
+ * @file gallery_driver.c
+ * @brief Loads the widget gallery scene and drives it through the command API, the functions of
+ * gallery.h.
  */
 
 #include "gallery.h"
@@ -12,6 +13,9 @@
 
 /** Path of the gallery scene in the repository */
 #define GALLERY_SCENE "etc/scenes/widgets.flecs"
+
+/** Thickness of the scroll bars of the page, which cover its right and bottom edge */
+#define GALLERY_PAGE_BAR (10.0f)
 
 /** Find the scene in the working directory or one of its ancestors.
  *
@@ -120,6 +124,93 @@ void gallery_point(
     ecs_os_snprintf(out, (ecs_size_t)size, "[%.1f, %.1f]", (double)x, (double)y);
 }
 
+void gallery_rect(
+    ecs_world_t *world,
+    const char *path,
+    float r[4])
+{
+    ecs_entity_t e = ecs_lookup(world, path);
+    ecs_entity_t window = ecs_lookup(world, "window");
+    test_assert(e != 0);
+    const WorldTransform *t = ecs_get(world, e, WorldTransform);
+    const LayoutBounds *b = ecs_get(world, e, LayoutBounds);
+    const SurfaceStatus *ss = ecs_get(world, window, SurfaceStatus);
+    test_assert(t != NULL && b != NULL && ss != NULL);
+    float x = (float)ss->point_width * 0.5f + t->m[3][0];
+    float y = (float)ss->point_height * 0.5f - t->m[3][1];
+    r[0] = x - b->width * 0.5f;
+    r[1] = y - b->height * 0.5f;
+    r[2] = x + b->width * 0.5f;
+    r[3] = y + b->height * 0.5f;
+}
+
+/** Scroll the page of the gallery to offsets, each clamped to what the page scrolls.
+ *
+ * @param world The world
+ * @param session The terminal session
+ * @param x Offset of the content to the left
+ * @param y Offset of the content upward
+ */
+static void gallery_scroll_page(
+    ecs_world_t *world,
+    ecs_entity_t session,
+    float x,
+    float y)
+{
+    const LayoutContent *c = ecs_get(world, ecs_lookup(world, PAGE), LayoutContent);
+    test_assert(c != NULL);
+    x = x < 0 ? 0 : x > c->max_x ? c->max_x : x;
+    y = y < 0 ? 0 : y > c->max_y ? c->max_y : y;
+    if (x != c->x || y != c->y) {
+        ecs_os_free(gallery_run(world, session, "set " PAGE " box.widgets.ScrollView.mut.x %.1f",
+            (double)x));
+        ecs_os_free(gallery_run(world, session, "set " PAGE " box.widgets.ScrollView.mut.y %.1f",
+            (double)y));
+        gallery_settle(world, session);
+    }
+}
+
+void gallery_reveal(
+    ecs_world_t *world,
+    ecs_entity_t session,
+    const char *path)
+{
+    float page[4], r[4];
+    gallery_rect(world, PAGE, page);
+    gallery_rect(world, path, r);
+    const LayoutContent *c = ecs_get(world, ecs_lookup(world, PAGE), LayoutContent);
+    test_assert(c != NULL);
+    float x = c->x, y = c->y;
+    page[2] -= GALLERY_PAGE_BAR;
+    page[3] -= GALLERY_PAGE_BAR;
+    if (r[0] < page[0]) {
+        x -= page[0] - r[0];
+    } else if (r[2] > page[2]) {
+        x += r[2] - page[2];
+    }
+
+    if (r[1] < page[1]) {
+        y -= page[1] - r[1];
+    } else if (r[3] > page[3]) {
+        y += r[3] - page[3];
+    }
+
+    gallery_scroll_page(world, session, x, y);
+}
+
+void gallery_show(
+    ecs_world_t *world,
+    ecs_entity_t session,
+    const char *path)
+{
+    float page[4], r[4];
+    gallery_rect(world, PAGE, page);
+    gallery_rect(world, path, r);
+    const LayoutContent *c = ecs_get(world, ecs_lookup(world, PAGE), LayoutContent);
+    test_assert(c != NULL);
+    gallery_scroll_page(world, session, c->x + r[0] - page[0], c->y + r[1] - page[1]);
+}
+
 void gallery_hover(
     ecs_world_t *world,
     ecs_entity_t session,
@@ -129,6 +220,7 @@ void gallery_hover(
     const char *handler)
 {
     char point[64];
+    gallery_reveal(world, session, path);
     gallery_point(world, path, fx, fy, point, sizeof(point));
     ecs_os_free(gallery_run(world, session, "mouse.move %s", point));
     gallery_settle(world, session);

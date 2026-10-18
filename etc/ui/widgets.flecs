@@ -24,7 +24,9 @@
 //   }
 //
 // Setting the mut from C or the terminal (set settings.volume Slider.mut {current: 20}) changes
-// the widget without a change event.
+// the widget without a change event. So does a later change of the value prop: current takes the
+// new value, so a form that passes its own muts as the values of its widgets resets them by
+// assigning those muts.
 //
 // Interactive widgets show hover, pressed and focused looks, with a focus ring only while the
 // focus came from the keyboard (FocusStatus.visible). They are Focusable, so a FocusScope above
@@ -32,6 +34,11 @@
 // on.activate (Enter, Space, a click) and on.key. `prop disabled` dims a widget with the
 // disabled_opacity of the theme and makes it ignore input and Tab. Widgets fit their content;
 // a `width` prop fixes their width, 0 fits.
+//
+// The pointer shows a hand (CursorPointer) over what can be clicked or dragged: buttons, check
+// boxes, switches, radio buttons, sliders, steppers, dropdowns, tabs, list rows, the headers of
+// collapsibles and scroll bars; an I-beam (CursorText) over text fields; a crossed circle
+// (CursorNotAllowed) over disabled widgets.
 //
 // Containers hold other widgets: a ScrollView scrolls its children, a TabView shows the page of
 // one of its Tab children, a Collapsible shows or hides its children. Content they hide is

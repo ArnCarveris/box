@@ -30,6 +30,21 @@
 /** The smaller of two numbers */
 #define CONTAINERS_MIN(a, b) ((a) < (b) ? (a) : (b))
 
+/** Load the gallery with the Containers panel at the top of the page, where all of it is in
+ * view, so the tests can point at its widgets.
+ *
+ * @param session Receives the terminal session
+ * @return The world
+ */
+static ecs_world_t* containers_load(
+    ecs_entity_t *session)
+{
+    ecs_world_t *world = gallery_load(session);
+    gallery_show(world, *session, CONTAINERS);
+
+    return world;
+}
+
 /** Get a member of the mut of a widget of the Containers section, as the get command prints it.
  *
  * @param world The world
@@ -251,7 +266,7 @@ static bool containers_tab_reaches(
 void Containers_scene_loads(void) {
     // widgets/containers
     ecs_entity_t s = 0;
-    ecs_world_t *world = gallery_load(&s);
+    ecs_world_t *world = containers_load(&s);
 
     gallery_expect(world, s, "logs warning 100", "");
     gallery_expect(world, s, "get " CONTAINERS ".heading Text.value", "\"Containers\"");
@@ -293,7 +308,7 @@ void Containers_scene_loads(void) {
 void Containers_dropdown_click_opens(void) {
     // widgets/containers
     ecs_entity_t s = 0;
-    ecs_world_t *world = gallery_load(&s);
+    ecs_world_t *world = containers_load(&s);
     ecs_entity_t quality = ecs_lookup(world, QUALITY);
 
     gallery_click(world, s, QUALITY, 0, 0, QUALITY);
@@ -325,7 +340,7 @@ void Containers_dropdown_click_opens(void) {
 void Containers_dropdown_keys_open(void) {
     // widgets/containers
     ecs_entity_t s = 0;
-    ecs_world_t *world = gallery_load(&s);
+    ecs_world_t *world = containers_load(&s);
     const char *keys[] = { "Enter", "Space", "Down", "Up" };
     int32_t i;
 
@@ -349,7 +364,7 @@ void Containers_dropdown_keys_open(void) {
 void Containers_dropdown_click_selects(void) {
     // widgets/containers
     ecs_entity_t s = 0;
-    ecs_world_t *world = gallery_load(&s);
+    ecs_world_t *world = containers_load(&s);
 
     gallery_click(world, s, QUALITY, 0, 0, QUALITY);
     gallery_click(world, s, QUALITY ".list.option_3", 0, 0, QUALITY);
@@ -372,7 +387,7 @@ void Containers_dropdown_click_selects(void) {
 void Containers_dropdown_hover_highlights(void) {
     // widgets/containers
     ecs_entity_t s = 0;
-    ecs_world_t *world = gallery_load(&s);
+    ecs_world_t *world = containers_load(&s);
 
     gallery_click(world, s, QUALITY, 0, 0, QUALITY);
     gallery_hover(world, s, QUALITY ".list.option_0", 0, 0, QUALITY);
@@ -394,7 +409,7 @@ void Containers_dropdown_hover_highlights(void) {
 void Containers_dropdown_keys_select(void) {
     // widgets/containers
     ecs_entity_t s = 0;
-    ecs_world_t *world = gallery_load(&s);
+    ecs_world_t *world = containers_load(&s);
 
     containers_focus(world, s, QUALITY);
     gallery_key(world, s, "Down");
@@ -437,7 +452,7 @@ void Containers_dropdown_keys_select(void) {
 void Containers_dropdown_escape_keeps(void) {
     // widgets/containers
     ecs_entity_t s = 0;
-    ecs_world_t *world = gallery_load(&s);
+    ecs_world_t *world = containers_load(&s);
 
     gallery_click(world, s, QUALITY, 0, 0, QUALITY);
     gallery_key(world, s, "Down");
@@ -460,7 +475,7 @@ void Containers_dropdown_escape_keeps(void) {
 void Containers_dropdown_press_outside_closes(void) {
     // widgets/containers
     ecs_entity_t s = 0;
-    ecs_world_t *world = gallery_load(&s);
+    ecs_world_t *world = containers_load(&s);
     char point[64];
 
     gallery_click(world, s, QUALITY, 0, 0, QUALITY);
@@ -491,7 +506,7 @@ void Containers_dropdown_press_outside_closes(void) {
 void Containers_dropdown_list_covers_below(void) {
     // widgets/containers
     ecs_entity_t s = 0;
-    ecs_world_t *world = gallery_load(&s);
+    ecs_world_t *world = containers_load(&s);
     float list[4], option[4], details[4], notes[4];
 
     gallery_click(world, s, FORMAT, 0, 0, FORMAT);
@@ -530,7 +545,7 @@ void Containers_dropdown_list_covers_below(void) {
 void Containers_dropdown_opens_upward(void) {
     // widgets/containers
     ecs_entity_t s = 0;
-    ecs_world_t *world = gallery_load(&s);
+    ecs_world_t *world = containers_load(&s);
     float button[4], list[4];
 
     /* Near the bottom of the window the list flips above the button */
@@ -557,7 +572,7 @@ void Containers_dropdown_opens_upward(void) {
 void Containers_dropdown_space_binding(void) {
     // widgets/containers
     ecs_entity_t s = 0;
-    ecs_world_t *world = gallery_load(&s);
+    ecs_world_t *world = containers_load(&s);
     ecs_entity_t jump = ecs_entity(world, { .name = "jump" });
     ecs_set(world, jump, Action, { NULL });
     ecs_set(world, jump, Binding, { .key = KeySpace });
@@ -582,7 +597,7 @@ void Containers_dropdown_space_binding(void) {
 void Containers_tabs_click(void) {
     // widgets/containers
     ecs_entity_t s = 0;
-    ecs_world_t *world = gallery_load(&s);
+    ecs_world_t *world = containers_load(&s);
     const LayoutBounds *b = NULL;
 
     gallery_click(world, s, TABS ".bar.tab_1", 0, 0, TABS ".bar.tab_1");
@@ -617,7 +632,7 @@ void Containers_tabs_click(void) {
 void Containers_tabs_arrows(void) {
     // widgets/containers
     ecs_entity_t s = 0;
-    ecs_world_t *world = gallery_load(&s);
+    ecs_world_t *world = containers_load(&s);
 
     containers_focus(world, s, TABS ".bar.tab_0");
     gallery_expect(world, s, "get " TABS ".bar.tab_0 Border.width", "2");
@@ -661,7 +676,7 @@ void Containers_tabs_arrows(void) {
 void Containers_tabs_one_tab_stop(void) {
     // widgets/containers
     ecs_entity_t s = 0;
-    ecs_world_t *world = gallery_load(&s);
+    ecs_world_t *world = containers_load(&s);
 
     test_bool(ecs_has_id(world, ecs_lookup(world, TABS ".bar.tab_0"), Focusable), true);
     test_bool(ecs_has_id(world, ecs_lookup(world, TABS ".bar.tab_1"), Focusable), false);
@@ -690,7 +705,7 @@ void Containers_tabs_one_tab_stop(void) {
 void Containers_tabs_hidden_page(void) {
     // widgets/containers
     ecs_entity_t s = 0;
-    ecs_world_t *world = gallery_load(&s);
+    ecs_world_t *world = containers_load(&s);
     char point[64];
 
     /* The slider of the hidden Audio page is not picked where it lies */
@@ -722,7 +737,7 @@ void Containers_tabs_hidden_page(void) {
 void Containers_scroll_wheel(void) {
     // widgets/containers
     ecs_entity_t s = 0;
-    ecs_world_t *world = gallery_load(&s);
+    ecs_world_t *world = containers_load(&s);
     float before[4], after[4];
 
     containers_rect(world, NOTES ".intro", before);
@@ -755,7 +770,7 @@ void Containers_scroll_wheel(void) {
 void Containers_scroll_wheel_clamps(void) {
     // widgets/containers
     ecs_entity_t s = 0;
-    ecs_world_t *world = gallery_load(&s);
+    ecs_world_t *world = containers_load(&s);
     float max_y = containers_content(world, NOTES)->max_y;
 
     gallery_hover(world, s, NOTES, -0.99f, 0, NOTES);
@@ -777,7 +792,7 @@ void Containers_scroll_wheel_clamps(void) {
 void Containers_scroll_thumb_drag(void) {
     // widgets/containers
     ecs_entity_t s = 0;
-    ecs_world_t *world = gallery_load(&s);
+    ecs_world_t *world = containers_load(&s);
     const LayoutContent *c = containers_content(world, NOTES);
     float max_y = c->max_y, r[4];
     char from[64], to[64];
@@ -823,7 +838,7 @@ void Containers_scroll_thumb_drag(void) {
 void Containers_scroll_track_pages(void) {
     // widgets/containers
     ecs_entity_t s = 0;
-    ecs_world_t *world = gallery_load(&s);
+    ecs_world_t *world = containers_load(&s);
     float max_y = containers_content(world, NOTES)->max_y, r[4];
     containers_rect(world, NOTES, r);
     float fx = 1.0f - CONTAINERS_BAR / (r[2] - r[0]);
@@ -845,7 +860,7 @@ void Containers_scroll_track_pages(void) {
 void Containers_scroll_keys(void) {
     // widgets/containers
     ecs_entity_t s = 0;
-    ecs_world_t *world = gallery_load(&s);
+    ecs_world_t *world = containers_load(&s);
     float max_y = containers_content(world, NOTES)->max_y, r[4];
     containers_rect(world, NOTES, r);
 
@@ -894,7 +909,7 @@ void Containers_scroll_keys(void) {
 void Containers_scroll_tab_reaches(void) {
     // widgets/containers
     ecs_entity_t s = 0;
-    ecs_world_t *world = gallery_load(&s);
+    ecs_world_t *world = containers_load(&s);
     float r[4], v[4];
     containers_rect(world, NOTES, v);
     containers_rect(world, NOTES ".share", r);
@@ -915,7 +930,7 @@ void Containers_scroll_tab_reaches(void) {
 void Containers_scroll_clips_picking(void) {
     // widgets/containers
     ecs_entity_t s = 0;
-    ecs_world_t *world = gallery_load(&s);
+    ecs_world_t *world = containers_load(&s);
     float notes[4], share[4];
     char point[64];
 
@@ -959,7 +974,7 @@ void Containers_scroll_clips_picking(void) {
 void Containers_scroll_nested(void) {
     // widgets/containers
     ecs_entity_t s = 0;
-    ecs_world_t *world = gallery_load(&s);
+    ecs_world_t *world = containers_load(&s);
 
     /* The wheel over the list view scrolls the list view only */
     gallery_hover(world, s, FILES ".rows.row_1", 0, 0, FILES);
@@ -985,7 +1000,7 @@ void Containers_scroll_nested(void) {
 void Containers_list_click_selects(void) {
     // widgets/containers
     ecs_entity_t s = 0;
-    ecs_world_t *world = gallery_load(&s);
+    ecs_world_t *world = containers_load(&s);
 
     gallery_click(world, s, FILES ".rows.row_2", 0, 0, FILES);
     containers_expect(world, s, FILES, "ListView", "current", "2");
@@ -1014,7 +1029,7 @@ void Containers_list_click_selects(void) {
 void Containers_list_keys(void) {
     // widgets/containers
     ecs_entity_t s = 0;
-    ecs_world_t *world = gallery_load(&s);
+    ecs_world_t *world = containers_load(&s);
 
     containers_focus(world, s, FILES);
     gallery_key(world, s, "Down");
@@ -1045,7 +1060,7 @@ void Containers_list_keys(void) {
 void Containers_list_keeps_selection_in_view(void) {
     // widgets/containers
     ecs_entity_t s = 0;
-    ecs_world_t *world = gallery_load(&s);
+    ecs_world_t *world = containers_load(&s);
     float list[4], row[4];
     int32_t i;
 
@@ -1088,7 +1103,7 @@ void Containers_list_keeps_selection_in_view(void) {
 void Containers_list_change_once(void) {
     // widgets/containers
     ecs_entity_t s = 0;
-    ecs_world_t *world = gallery_load(&s);
+    ecs_world_t *world = containers_load(&s);
 
     gallery_click(world, s, FILES ".rows.row_0", 0, 0, FILES);
     test_int(gallery_changes(world, s), 0);
@@ -1114,7 +1129,7 @@ void Containers_list_change_once(void) {
 void Containers_list_200_items(void) {
     // widgets/containers
     ecs_entity_t s = 0;
-    ecs_world_t *world = gallery_load(&s);
+    ecs_world_t *world = containers_load(&s);
     const LayoutContent *c = containers_content(world, FILES);
     float list[4];
 
@@ -1142,7 +1157,7 @@ void Containers_list_200_items(void) {
 void Containers_collapsible_click(void) {
     // widgets/containers
     ecs_entity_t s = 0;
-    ecs_world_t *world = gallery_load(&s);
+    ecs_world_t *world = containers_load(&s);
     float closed[4], open[4], below[4];
 
     containers_rect(world, DETAILS, closed);
@@ -1176,7 +1191,7 @@ void Containers_collapsible_click(void) {
 void Containers_collapsible_keys(void) {
     // widgets/containers
     ecs_entity_t s = 0;
-    ecs_world_t *world = gallery_load(&s);
+    ecs_world_t *world = containers_load(&s);
 
     containers_focus(world, s, DETAILS);
     gallery_expect(world, s, "get " DETAILS ".head Border.width", "2");
@@ -1201,7 +1216,7 @@ void Containers_collapsible_keys(void) {
 void Containers_collapsible_hides_content(void) {
     // widgets/containers
     ecs_entity_t s = 0;
-    ecs_world_t *world = gallery_load(&s);
+    ecs_world_t *world = containers_load(&s);
     char point[64];
 
     /* Closed, the check box under the header is not picked where it lies */
@@ -1238,7 +1253,7 @@ void Containers_collapsible_hides_content(void) {
 void Containers_collapsible_content_activation(void) {
     // widgets/containers
     ecs_entity_t s = 0;
-    ecs_world_t *world = gallery_load(&s);
+    ecs_world_t *world = containers_load(&s);
 
     /* A widget in the content takes its click, the section stays open */
     gallery_click(world, s, ADVANCED ".experimental", -0.8f, 0, ADVANCED ".experimental");

@@ -141,7 +141,9 @@ void box_ui_widgets_import(
     ecs_entity_t ui)
 {
     ecs_set_hooks(world, UiTheme, { .ctor = box_ui_theme_ctor });
-    ecs_add(world, ecs_entity(world, { .name = "theme" }), UiTheme);
+    ecs_entity_t theme = ecs_entity(world, { .name = "theme" });
+    ecs_add(world, theme, UiTheme);
+    ecs_add_pair(world, theme, ecs_id(EcsScript), ecs_get_parent(world, theme));
     ecs_function(world, {
         .name = "sibling",
         .parent = ui,

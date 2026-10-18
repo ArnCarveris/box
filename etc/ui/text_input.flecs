@@ -16,7 +16,8 @@ using box.text
 // the widget, Enter a submit (on.submit), so a scene reads w[TextInput.mut].current. The changes
 // and submits of the field itself (e.widget is the field) reach the ancestors too. read_only
 // allows selecting and copying only, password draws bullets and disables copy and cut. A
-// disabled field shows its value without a TextEdit and is skipped by Tab.
+// disabled field shows its value without a TextEdit and is skipped by Tab. The pointer shows the
+// I-beam of the TextEdit over the field, a crossed circle over a disabled field.
 template HeadlessTextInput {
   prop label: string = ""
   prop placeholder: string = ""
@@ -27,8 +28,20 @@ template HeadlessTextInput {
   prop read_only: bool = false
 
   mut current: string = value
+  mut last_value: string = value
   mut hover = false
   mut focused = false
+
+  if disabled {
+    Cursor: {CursorNotAllowed}
+  }
+
+  async {
+    if value != last_value {
+      last_value = value
+      current = value
+    }
+  }
 
   async {
     while true {

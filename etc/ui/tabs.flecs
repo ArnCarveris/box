@@ -19,7 +19,7 @@ struct TabLabel(value: string)
 // Behavior of the header of a tab in the bar of a tab view: index is the place of its tab, the
 // header of the selected tab is Focusable, the others only Interactive. The tab view acts on its
 // clicks and keys. A change of tab changes selected, which restarts the async blocks, so they
-// keep no state across events.
+// keep no state across events. The pointer shows a hand over it.
 template HeadlessTabHeader {
   prop index: i32 = 0
   prop label: string = ""
@@ -29,6 +29,7 @@ template HeadlessTabHeader {
   mut down = false
 
   Interactive
+  Cursor: {CursorPointer}
   if selected {
     Focusable
   }
@@ -152,6 +153,7 @@ template TabView {
   prop height: f32 = 0
 
   mut current: i32 = value
+  mut last_value: i32 = value
   mut count: i32 = 0
   mut first: entity = 0
   mut header: entity = 0
@@ -183,6 +185,13 @@ template TabView {
           index: i, selected: i == current,
           label: ui.sibling(first, i, TabLabel)[TabLabel].value)
       }
+    }
+  }
+
+  async {
+    if value != last_value {
+      last_value = value
+      current = value
     }
   }
 
