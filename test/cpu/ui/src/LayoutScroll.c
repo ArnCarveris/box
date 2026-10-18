@@ -557,3 +557,50 @@ void LayoutScroll_content_observer_deletes_child(void) {
 
     ecs_fini(world);
 }
+
+/** Set the Rect of the view of the observer context back to a point when its LayoutContent is
+ * set, as a scroll view template that reads its content sets its components again.
+ *
+ * @param it The iterator, whose ctx points to the view
+ */
+static void scroll_reset_rect_on_content(
+    ecs_iter_t *it)
+{
+    ecs_entity_t *view = it->ctx;
+    ecs_set(it->world, *view, Rect, { 1, 1 });
+}
+
+void LayoutScroll_content_observer_sets_rect(void) {
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t view = scroll_view(world, DirectionColumn, 100, 100,
+        (LayoutScroll){ .vertical = true });
+    ecs_set(world, view, Rect, { 1, 1 });
+    ecs_entity_t a = scroll_rect(world, view, 50, 80);
+    ecs_progress(world, 0);
+    test_flt(ecs_get(world, view, Rect)->width, 100);
+
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(LayoutContent), .src.id = view }},
+        .events = { EcsOnSet },
+        .callback = scroll_reset_rect_on_content,
+        .ctx = &view
+    });
+
+    /* The content the layout writes resets the Rect, which the layout sizes again */
+    ecs_set(world, a, Rect, { 50, 200 });
+    ecs_progress(world, 0);
+    test_flt(ecs_get(world, view, LayoutContent)->height, 200);
+    test_flt(ecs_get(world, view, Rect)->width, 100);
+    test_flt(ecs_get(world, view, Rect)->height, 100);
+
+    /* So does the content a scroll writes, which only moves the children */
+    ecs_set(world, view, LayoutScroll, { .y = 40, .vertical = true });
+    ecs_progress(world, 0);
+    test_flt(ecs_get(world, view, LayoutContent)->y, 40);
+    test_flt(ecs_get(world, view, Rect)->width, 100);
+    test_flt(ecs_get(world, view, Rect)->height, 100);
+
+    ecs_fini(world);
+}

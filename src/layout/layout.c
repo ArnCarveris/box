@@ -28,6 +28,10 @@ static void box_layout_mark(
 
 /** Element observer: a Layout, LayoutItem, shape or text size changed.
  *
+ * The Rect the layout writes marks nothing. What reacts to a result while the layout writes,
+ * such as a template that reads the LayoutContent of its scroll view and sets its Layout,
+ * LayoutItem and Rect again, marks the elements it changes.
+ *
  * @param it Iterator over the elements
  */
 static void box_layout_on_element(
@@ -35,8 +39,8 @@ static void box_layout_on_element(
 {
     box_layout_state_t *state = it->ctx;
     int32_t i;
-    if (!state->writing) {
-        for (i = 0; i < it->count; i ++) {
+    for (i = 0; i < it->count; i ++) {
+        if (it->event_id != ecs_id(Rect) || it->entities[i] != state->writing_rect) {
             box_layout_mark(state, it->entities[i]);
         }
     }
@@ -576,23 +580,18 @@ static void LayoutFillUpdate(
     }
 }
 
-/** Lay out the trees of the elements marked since the last frame, move the children of the
- * elements that only scrolled and place the floating elements.
+/** Lay out the trees of the elements marked so far.
  *
- * @param it The system iterator
+ * @param world The world
+ * @param state The state of the layout module
  */
-static void LayoutUpdate(
-    ecs_iter_t *it)
+static void box_layout_marked(
+    ecs_world_t *world,
+    box_layout_state_t *state)
 {
-    ecs_world_t *world = it->world;
-    box_layout_state_t *state = it->ctx;
-    int32_t i, count;
-    box_layout_order(world, state);
-    box_layout_moved(world, state, true);
-    box_layout_scrolls(world, state);
-    count = ecs_vec_count(&state->marks);
+    int32_t i, count = ecs_vec_count(&state->marks);
     if (!count) {
-        goto moved;
+        goto done;
     }
 
     ecs_entity_t *marks = ecs_vec_first_t(&state->marks, ecs_entity_t);
@@ -621,7 +620,29 @@ static void LayoutUpdate(
         }
     }
 
-moved:
+done:
+    return;
+}
+
+/** Lay out the trees of the elements marked since the last frame, move the children of the
+ * elements that only scrolled and place the floating elements.
+ *
+ * What reacts to a scroll, such as a template that reads the LayoutContent of its scroll view
+ * and sets its Rect again, marks elements while the children move; their trees are laid out
+ * again in the same frame, so nothing is drawn or picked at the size the reaction set.
+ *
+ * @param it The system iterator
+ */
+static void LayoutUpdate(
+    ecs_iter_t *it)
+{
+    ecs_world_t *world = it->world;
+    box_layout_state_t *state = it->ctx;
+    int32_t i;
+    box_layout_order(world, state);
+    box_layout_moved(world, state, true);
+    box_layout_scrolls(world, state);
+    box_layout_marked(world, state);
     for (i = 0; i < ecs_vec_count(&state->shifts); i ++) {
         ecs_entity_t e = *ecs_vec_get_t(&state->shifts, ecs_entity_t, i);
         if (ecs_is_alive(world, e)) {
@@ -630,6 +651,7 @@ moved:
     }
 
     ecs_vec_clear(&state->shifts);
+    box_layout_marked(world, state);
     box_layout_floats(world, state);
     box_layout_moved(world, state, false);
 }

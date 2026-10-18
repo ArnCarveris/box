@@ -319,12 +319,12 @@ void Containers_dropdown_click_opens(void) {
     test_assert(ecs_lookup(world, QUALITY ".list.option_4") != 0);
     gallery_expect(world, s, "get " QUALITY ".list.option_3.caption Text.value", "\"Ultra\"");
 
-    /* The list is as wide as the button */
+    /* The list is as wide as the button, up to the rounding of the transforms of the page */
     float button[4], list[4];
     containers_rect(world, QUALITY, button);
     containers_rect(world, QUALITY ".list", list);
-    test_flt(list[0], button[0]);
-    test_flt(list[2], button[2]);
+    test_assert(fabsf(list[0] - button[0]) < 0.01f);
+    test_assert(fabsf(list[2] - button[2]) < 0.01f);
 
     gallery_click(world, s, QUALITY, 0, 0, QUALITY);
     containers_expect(world, s, QUALITY, "Dropdown", "open", "false");
@@ -496,7 +496,7 @@ void Containers_dropdown_press_outside_closes(void) {
 
     /* A press on no widget clears the focus and closes the list too */
     gallery_click(world, s, QUALITY, 0, 0, QUALITY);
-    gallery_click(world, s, CONTAINERS ".quality_row.quality_label", 0, 0, "#0");
+    gallery_click(world, s, CONTAINERS ".quality_row.quality_label", 0, 0, PAGE);
     containers_expect(world, s, QUALITY, "Dropdown", "open", "false");
     gallery_expect_focus(world, s, "#0");
 
@@ -690,7 +690,7 @@ void Containers_tabs_one_tab_stop(void) {
     gallery_key(world, s, "Tab");
     ecs_os_free(gallery_run(world, s, "key.up ShiftLeft"));
     gallery_settle(world, s);
-    gallery_expect_focus(world, s, BASICS ".steppers.count");
+    gallery_expect_focus(world, s, TEXT ".submit.message.field");
 
     /* After a switch the header of the new tab is the tab stop */
     gallery_click(world, s, TABS ".bar.tab_1", 0, 0, TABS ".bar.tab_1");

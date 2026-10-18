@@ -398,8 +398,11 @@ void Text_capture_selection(void) {
     gallery_expect(world, s, "get " TEXT ".name.field TextEditStatus",
         "{caret: 6, anchor: 12, scroll: 0, focused: true}");
 
+    /* The capture reads pixels: render the window at its full size, which the gallery of the
+     * tests divides */
     Surface *surface = ecs_get_mut(world, window, Surface);
     surface->write_to_file = ecs_os_strdup(TEXT_CAPTURE);
+    surface->resolution_scale = 1.0f;
     ecs_modified(world, window, Surface);
     for (i = 0; i < 3; i ++) {
         ecs_progress(world, 0);

@@ -85,10 +85,11 @@ template HeadlessTextInput {
       }
     }
 
+    // A disabled field ignores the pointer, so it never shows as hovered
     async {
       while true {
         await on.enter(this)
-        hover = true
+        hover = !disabled
         await on.leave(this)
         hover = false
       }

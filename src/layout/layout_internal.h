@@ -72,6 +72,7 @@ typedef struct {
     box_layout_text_t text;       /**< Hooks of the texts, zero without box.text */
     bool has_text;                /**< The tree being laid out has a text to wrap */
     bool writing;                 /**< The layout is writing its results */
+    ecs_entity_t writing_rect;    /**< Element whose Rect the layout is writing, 0 for none */
 } box_layout_state_t;
 
 /** Singleton that owns the state of the layout module, freed after every observer ran */

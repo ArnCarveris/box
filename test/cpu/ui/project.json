@@ -204,7 +204,8 @@
                     "remove_scroll_lays_out_again",
                     "direction_none_keeps_free_children",
                     "script",
-                    "content_observer_deletes_child"
+                    "content_observer_deletes_child",
+                    "content_observer_sets_rect"
                 ]
             },
             {

@@ -889,7 +889,9 @@ static void box_layout_write(
     if (n->has_rect && !n->rect_input) {
         const Rect *r = ecs_get(world, n->e, Rect);
         if (r->width != n->size[0] || r->height != n->size[1]) {
+            state->writing_rect = n->e;
             ecs_set(world, n->e, Rect, { n->size[0], n->size[1] });
+            state->writing_rect = 0;
         }
     }
 
