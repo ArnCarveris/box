@@ -85,6 +85,12 @@ scheduling form of a leaky bucket), so a late wake up shortens the next sleep an
 matches the budget; a frame under its budget earns no credit for later ones. Setting
 `App.headless` creates `/tmp/box/<pid>` (`AppStatus.tmp_dir`).
 
+A relative scene path, shader or texture that the working directory lacks is looked up in its
+ancestors, so `bake3 run`, which runs an app from its own folder, finds the files the repository
+root names. An application keeps its assets in its own `etc` (`apps/bunnyhopper/etc`, its default
+scene `apps/bunnyhopper/etc/bunnyhopper.flecs`) and names them from the repository root; its
+browser build embeds that folder next to the root `etc`, under the same path.
+
 The temporary folder is private: `/tmp/box/<pid>` is made with mode 0700 and must be owned by
 the user. `/tmp/box` is accepted only when it is a real folder (not a link) owned by the user
 or by root and, when others can write it, sticky, so no other user can rename or replace the

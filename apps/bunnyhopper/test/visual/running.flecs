@@ -1,5 +1,5 @@
 // The bunny running on the dirt track in the first frames of a run
-include etc/bunnyhopper/bunnyhopper
+include apps/bunnyhopper/etc/bunnyhopper
 
 using box.transform
 using bunnyhopper

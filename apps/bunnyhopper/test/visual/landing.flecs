@@ -1,7 +1,7 @@
 // A hard landing two frames in, seen from close behind the bunny: the bunny, back on the
 // ground after a double jump, kicks up the high dust around its feet, which the scrolling track
 // starts to carry away behind it
-include etc/bunnyhopper/bunnyhopper
+include apps/bunnyhopper/etc/bunnyhopper
 
 using flecs.script.math
 using box.transform

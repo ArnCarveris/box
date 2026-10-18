@@ -10,7 +10,7 @@
 #include "bunnyhopper/bake_config.h"
 
 /** Scene the application loads when the command line gives none */
-#define BUNNYHOPPER_SCENE "etc/bunnyhopper/bunnyhopper.flecs"
+#define BUNNYHOPPER_SCENE "apps/bunnyhopper/etc/bunnyhopper.flecs"
 
 #ifdef __cplusplus
 extern "C" {

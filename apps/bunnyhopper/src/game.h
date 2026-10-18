@@ -2,9 +2,9 @@
  * @file game.h
  * @brief The bunnyhopper module: components, systems and script functions of the endless runner.
  *
- * The scene (etc/bunnyhopper) holds the constants cfg.*, the assets and the BunnyGame singleton;
- * the systems of EcsOnUpdate move the bunny, the carrots and the scenery while the state is
- * (BunnyGameState, Playing) and stop the world when the last life is lost.
+ * The scene (apps/bunnyhopper/etc) holds the constants cfg.*, the assets and the BunnyGame
+ * singleton; the systems of EcsOnUpdate move the bunny, the carrots and the scenery while the
+ * state is (BunnyGameState, Playing) and stop the world when the last life is lost.
  *
  * Landings, hits and passing carrots play the effect templates of BunnyGame, which scroll with
  * the world.

@@ -1,8 +1,10 @@
 """The bunny hopper driven through its command port: SPACE hops and double jumps, carrots that
 pass the bunny count in BunnyGame and the HUD, a run without jumps ends in the game over panel,
-R starts a new run, and landings play particles that fade.
+R starts a new run, landings play particles that fade, and the HUD's life icon loads from the
+app's own assets.
 
-Every case runs in a fresh apps/bunnyhopper process with its default scene and gets the App of
+Every case runs in a fresh apps/bunnyhopper process with its default scene
+(apps/bunnyhopper/etc/bunnyhopper.flecs, named from the repository root) and gets the App of
 tools/box_client.py; the runner checks after every case that the app logged no error and quits
 cleanly. Headless, the app steps a fixed 1 / --fps seconds per frame, and the software renderer
 of the test machines draws the default 1280x1024 window with its effects at about 1 frame per
@@ -27,6 +29,7 @@ SCREEN = "hud.ui.screen"
 SCORE = "get %s.score Text.value" % SCREEN
 TITLE = "get %s.game_over.title Text.value" % SCREEN
 HUD_CAMERA = "hud.ui.camera"
+LIFE_ICON = "life_icon"
 
 # A jump starts at 13 units per second against a gravity of 32: it peaks at 169 / 64 = 2.64
 # above the ground and lands after 0.81 s. Only a double jump gets above JUMP_PEAK
@@ -139,6 +142,15 @@ def test_particles(app):
     app.expect("get player BunnyJump.jumps", "0")
     app.wait_for(PARTICLES, "0", frames=DUST_FRAMES)
     app.expect("get player BunnyLives.lives_left", "3")
+
+
+def test_life_icon(app):
+    setup(app)
+    app.expect("get %s TexturePath.path" % LIFE_ICON, '"apps/bunnyhopper/etc/icons/bunny_life.svg"')
+    app.wait_for("get %s TextureStatus.state" % LIFE_ICON, lambda out: out.endswith("Ready"),
+                 what="the life icon loaded from apps/bunnyhopper/etc/icons")
+    app.expect("get %s Texture.width" % LIFE_ICON, "128")
+    app.expect("get %s Texture.height" % LIFE_ICON, "128")
 
 
 def test_quit(app):

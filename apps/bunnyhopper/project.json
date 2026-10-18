@@ -7,7 +7,7 @@
     "lang.c": {
         "${os Emscripten}": {
             "shell": "../boxrun/shell.html",
-            "embed": ["../../etc"],
+            "embed": ["../../etc", "../../apps/bunnyhopper/etc"],
             "ldflags": ["-sEXPORTED_RUNTIME_METHODS=cwrap,FS"]
         }
     }

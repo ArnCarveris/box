@@ -1,5 +1,5 @@
 // The bunny at the top of a jump, legs in the air
-include etc/bunnyhopper/bunnyhopper
+include apps/bunnyhopper/etc/bunnyhopper
 
 using box.transform
 using bunnyhopper

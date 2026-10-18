@@ -30,7 +30,13 @@ bake3 run apps/boxrun --local-env -- --headless --frames 10  # headless run, exi
 bake3 run apps/boxrun --local-env -- etc/scenes/default.flecs  # open the default scene in a window
 bake3 run apps/boxrun --local-env -- --surface 1280x720 test/integration/visual/bake_bounces.flecs
                                                           # a window for a scene without a Surface
+bake3 run apps/bunnyhopper --local-env                    # play the bunny hopper
 ```
+
+Box opens files relative to the working directory or, failing that, one of its ancestors, so a
+run from the repository root or from an app's folder finds the engine's assets as `etc/...`. An
+app keeps its own assets in `apps/<app>/etc` and names them from the repository root, e.g.
+`apps/bunnyhopper/etc/bunnyhopper.flecs`.
 
 ## Browser build
 
@@ -41,7 +47,8 @@ bake3 run apps/boxrun --target em --local-env             # serve the page on lo
 ```
 
 The files land in `.bake/local_env/wasm32-Emscripten/<cfg>/bin/`. The build uses emsdk's
-`emdawnwebgpu` port, so it renders with the browser's own WebGPU, and embeds `etc/` at `/etc`.
+`emdawnwebgpu` port, so it renders with the browser's own WebGPU, and embeds `etc/` at `/etc`
+(an app also embeds its `apps/<app>/etc` at `/apps/<app>/etc`).
 Command line arguments go after `#` in the page URL, e.g. `boxrun.html#etc/scenes/x.flecs`.
 In the browser the main thread renders each packet at the end of its frame, jobs run inline,
 no command port is served and `Surface.write_to_file` captures are skipped.

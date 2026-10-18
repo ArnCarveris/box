@@ -1,7 +1,7 @@
 // The dead bunny lying on its back, the world stopped, under the game over panel of the HUD.
 // The capture is 640x360: the HUD lays out for a 1280x720 window and its camera shows it at
 // half size, so the capture holds the whole HUD as a 1280x720 window shows it.
-include etc/bunnyhopper/bunnyhopper
+include apps/bunnyhopper/etc/bunnyhopper
 
 using box.camera
 using box.surface
