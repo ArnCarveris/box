@@ -55,6 +55,7 @@ typedef struct box_particle_effects_t {
     int64_t frame;          /**< Frames the effects ran */
     ecs_query_t *views;     /**< View, for EffectSkip */
     ecs_query_t *surfaces;  /**< Surface and an optional SurfaceStatus, for EffectSkip */
+    const box_render_particles_t *extract; /**< State of the particle extract, NULL for none */
     ecs_vec_t stack;        /**< ecs_entity_t, scratch of the walks */
 } box_particle_effects_t;
 
@@ -832,7 +833,7 @@ static void BoxParticleEffects(
 {
     box_particle_effects_t *s = it->ctx;
     ecs_world_t *world = it->world;
-    const box_render_particles_t *extract = box_render_particles_get(world);
+    const box_render_particles_t *extract = s->extract;
     uint64_t delta = box_particle_us(it->delta_time);
     int32_t e, i;
     for (e = ecs_vec_count(&s->effects) - 1; e >= 0; e --) {
@@ -922,6 +923,8 @@ void box_particle_effects_import(
         },
         .cache_kind = EcsQueryCacheAuto
     });
+
+    s->extract = box_render_particles_get(world);
 
     ECS_COMPONENT_DEFINE(world, ParticleEffectState);
     ecs_singleton_set(world, ParticleEffectState, { .state = s });

@@ -86,8 +86,8 @@ typedef struct box_particle_burst_t {
 /** Main thread state of the particle extract */
 typedef struct box_render_particles_t {
     ecs_query_t *emitters;  /**< ParticleEmitter, WorldTransform, Scene(self|up),
-                             *   ParticlePlayback, ParticleCurves, ParticleAppearance and
-                             *   ParticleEffect(self|up), NULL without box.particle */
+                             *   ParticlePlayback, ParticleCurves and ParticleAppearance, NULL
+                             *   without box.particle */
     ecs_query_t *burst_query; /**< ParticleBurst and ParticleEmitter(self|up), NULL without
                              *   box.particle */
     ecs_vec_t bursts;       /**< box_particle_burst_t of the frame, sorted by emitter */
@@ -1209,6 +1209,34 @@ done:
     }
 }
 
+/** Find the ParticleEffect of the instance the emitters of a table play in, on the emitters
+ * themselves or on the nearest ChildOf ancestor that has one.
+ *
+ * Searched per table instead of matched by the query, whose up traversal allocates.
+ *
+ * @param world The world
+ * @param table The table of the emitters
+ * @param src Receives the ancestor that has it, 0 when the emitters have it or none does
+ * @return Whether the emitters have it themselves
+ */
+static bool box_particles_effect_of(
+    const ecs_world_t *world,
+    ecs_table_t *table,
+    ecs_entity_t *src)
+{
+    bool result = false;
+    *src = 0;
+    if (ecs_table_has_id(world, table, ecs_id(ParticleEffect))) {
+        result = true;
+    } else if (ecs_search_relation(world, table, 0, ecs_id(ParticleEffect), EcsChildOf,
+        EcsUp, src, NULL, NULL) == -1)
+    {
+        *src = 0;
+    }
+
+    return result;
+}
+
 /** Check whether the pool of an emitter that is not enabled in this frame is kept: the emitter
  * is a disabled layer of an effect instance, which plays again from the pool of its template.
  *
@@ -1271,11 +1299,14 @@ static void BoxRenderExtractParticles(
         ParticlePlayback *playbacks = ecs_field(&qit, ParticlePlayback, 3);
         const ParticleCurves *curves = ecs_field(&qit, ParticleCurves, 4);
         const ParticleAppearance *looks = ecs_field(&qit, ParticleAppearance, 5);
-        const ParticleEffect *effects = ecs_field(&qit, ParticleEffect, 6);
-        bool shared = ecs_field_is_set(&qit, 1) && !ecs_field_is_self(&qit, 1);
+                bool shared = ecs_field_is_set(&qit, 1) && !ecs_field_is_self(&qit, 1);
         bool curves_shared = curves && !ecs_field_is_self(&qit, 4);
         bool looks_shared = looks && !ecs_field_is_self(&qit, 5);
-        bool effects_shared = effects && !ecs_field_is_self(&qit, 6);
+        ecs_entity_t effect_src = 0;
+        bool effect_self = box_particles_effect_of(world, qit.table, &effect_src);
+        const ParticleEffect *shared_effect = effect_src
+            ? ecs_get(world, effect_src, ParticleEffect)
+            : NULL;
         for (i = 0; i < qit.count; i ++) {
             const WorldTransform *t = transforms ? &transforms[shared ? 0 : i] : NULL;
             stats.emitters ++;
@@ -1283,7 +1314,8 @@ static void BoxRenderExtractParticles(
                 box_render_scene_field(&qit, 2, i), playbacks ? &playbacks[i] : NULL,
                 curves ? &curves[curves_shared ? 0 : i] : NULL,
                 looks ? &looks[looks_shared ? 0 : i] : NULL,
-                effects ? &effects[effects_shared ? 0 : i] : NULL, &stats);
+                effect_self ? ecs_get(world, qit.entities[i], ParticleEffect) : shared_effect,
+                &stats);
         }
     }
 
@@ -1402,14 +1434,7 @@ void box_render_particles_import(
                     .oper = EcsOptional
                 },
                 { .id = ecs_id(ParticleCurves), .inout = EcsIn, .oper = EcsOptional },
-                { .id = ecs_id(ParticleAppearance), .inout = EcsIn, .oper = EcsOptional },
-                {
-                    .id = ecs_id(ParticleEffect),
-                    .src.id = EcsSelf | EcsUp,
-                    .trav = EcsChildOf,
-                    .inout = EcsIn,
-                    .oper = EcsOptional
-                }
+                { .id = ecs_id(ParticleAppearance), .inout = EcsIn, .oper = EcsOptional }
             },
             .cache_kind = EcsQueryCacheAuto
         });
