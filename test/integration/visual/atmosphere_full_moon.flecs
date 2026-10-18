@@ -29,7 +29,7 @@ sun {
 
 moon {
   Rotation: {0.4363, 0.5, 0}
-  DirectionalLight: {intensity: 1.5}
+  DirectionalLight: {intensity: 0.3}
   Rgb: {255, 255, 255}
 }
 
@@ -37,7 +37,7 @@ moon {
 // degrees up ahead of it and 29 degrees off to the side, opposite the sun. The moon radius is
 // enlarged so the disk is 18 pixels across a 360 high frame.
 $ {
-  Atmosphere: {units_per_km: 100, sun: sun, moon: moon, moon_radius: 1.5, moon_disk_intensity: 6}
+  Atmosphere: {units_per_km: 100, sun: sun, moon: moon, moon_radius: 1.5, moon_disk_intensity: 30}
 }
 
 ground {

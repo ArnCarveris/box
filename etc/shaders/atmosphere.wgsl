@@ -540,7 +540,7 @@ fn moon_disk(rd: vec3f, r: f32, moon_cos: f32, sin_moon: f32, aa_w: f32) -> vec3
     let disk_cos = u.moon_disk.x;
     let sin_r = u.moon_disk.y;
     var result = vec3f(0.0);
-    if (u.moon_disk.z > 0.0 && moon_cos > disk_cos - aa_w) {
+    if (u.moon_disk.z > 0.0 && u.moon.w > 0.0 && moon_cos > disk_cos - aa_w) {
         let ground = ray_sphere(vec3f(0.0, r, 0.0), rd, bottom_radius());
         if (ground.y < 0.0) {
             let t_moon = sample_transmittance(r, clamp(moon.y, -1.0, 1.0));
@@ -549,7 +549,8 @@ fn moon_disk(rd: vec3f, r: f32, moon_cos: f32, sin_moon: f32, aa_w: f32) -> vec3
             let s = min(sin_moon / max(sin_r, 1e-6), 1.0);
             w = w * (s / max(length(w), 1e-6));
             let n = w - sqrt(max(0.0, 1.0 - s * s)) * rd;
-            let lit = max(0.0, dot(n, u.sun.xyz));
+            // The illumination in moon.w is zero without a sun, where u.sun is only a fallback
+            let lit = select(0.0, max(0.0, dot(n, u.sun.xyz)), u.moon.w > 0.0);
             let shade = lit + u.moon_disk.w * (1.0 - lit);
             let aa = smoothstep(disk_cos - aa_w, disk_cos + aa_w, moon_cos);
             result = t_moon * u.moon_color.rgb / PI * u.moon_disk.z * shade * aa;
