@@ -126,6 +126,9 @@ typedef struct box_render_particles_t box_render_particles_t;
  * the free slots of each pool without reading the GPU back; it does nothing until box.particle
  * hands it the emitters.
  *
+ * It runs before the light extract, so the intensities it writes for ParticleLight light the
+ * same frame.
+ *
  * @param world The world
  */
 void box_render_particles_init(

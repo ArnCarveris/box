@@ -2,6 +2,9 @@
  * @file particle/effect.c
  * @brief Plays effect templates once at a point from a pool of instances per template, within
  * the budgets of ParticleSettings, and returns an instance to its pool once it played out.
+ *
+ * The flashes of an instance are written at its play and after every step of its clock, so the
+ * light extract of the next frame lights them at the time of the play the frame shows.
  */
 
 #include "effect.h"
@@ -16,6 +19,12 @@ typedef struct box_particle_layer_t {
     bool stopped;           /**< Its emission ended in this play */
 } box_particle_layer_t;
 
+/** A light an EffectFlash of an instance flashes */
+typedef struct box_particle_flash_t {
+    ecs_entity_t entity;    /**< Entity with the EffectFlash and the PointLight */
+    float own;              /**< Intensity of its light before the first flash */
+} box_particle_flash_t;
+
 typedef struct box_particle_effect_t box_particle_effect_t;
 
 /** An instance of a template and its play */
@@ -28,11 +37,14 @@ typedef struct box_particle_instance_t {
     int64_t frame;          /**< Frame of the effects the play started in */
     uint64_t time;          /**< Microseconds into the play */
     uint64_t emit;          /**< Microseconds into the play the last layer stops emitting */
-    uint64_t retire;        /**< emit plus the longest lifetime of the layers */
+    uint64_t retire;        /**< emit plus the longest lifetime of the layers, or the longest
+                             *   flash when that is later */
+    uint64_t flash;         /**< Microseconds of the longest flash */
     vec3 position;          /**< World position of the play */
     float scale;            /**< Scale of the play */
     ecs_vec_t layers;       /**< box_particle_layer_t */
     ecs_vec_t entities;     /**< ecs_entity_t, the root and its descendants */
+    ecs_vec_t flashes;      /**< box_particle_flash_t */
 } box_particle_instance_t;
 
 /** The pool of instances of one template */
@@ -169,8 +181,55 @@ static box_particle_layer_t* box_particle_layer_of(
     return result;
 }
 
-/** Collect the entities and the layers of an instance, when its template made them, give
- * every layer a playback control and every entity a Position, so the layers follow the root.
+/** Get the microseconds an EffectFlash fades over.
+ *
+ * @param flash The EffectFlash
+ * @return The microseconds, a fifth of a second for seconds of 0
+ */
+static uint64_t box_particle_flash_us(
+    const EffectFlash *flash)
+{
+    return box_particle_us(flash->seconds > 0 ? flash->seconds : 0.2f);
+}
+
+/** Write the intensity of the flashes of an instance at the time of its play.
+ *
+ * @param world The world
+ * @param inst The instance
+ */
+static void box_particle_flash_write(
+    ecs_world_t *world,
+    const box_particle_instance_t *inst)
+{
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&inst->flashes); i ++) {
+        const box_particle_flash_t *f = ecs_vec_get_t(&inst->flashes, box_particle_flash_t, i);
+        const EffectFlash *flash = ecs_is_alive(world, f->entity)
+            ? ecs_get(world, f->entity, EffectFlash)
+            : NULL;
+        const PointLight *light = flash ? ecs_get(world, f->entity, PointLight) : NULL;
+        uint64_t span;
+        float from, value;
+        if (!light) {
+            continue;
+        }
+
+        span = box_particle_flash_us(flash);
+        from = flash->intensity > 0 ? flash->intensity : f->own;
+        value = inst->time < span
+            ? from * (float)(1.0 - (double)inst->time / (double)span)
+            : 0.0f;
+        if (light->intensity != value) {
+            PointLight copy = *light;
+            copy.intensity = value;
+            ecs_set_ptr(world, f->entity, PointLight, &copy);
+        }
+    }
+}
+
+/** Collect the entities, the layers and the flashes of an instance, when its template made
+ * them, give every layer a playback control and every entity a Position, so the layers follow
+ * the root.
  *
  * @param world The world
  * @param s The state
@@ -184,6 +243,7 @@ static void box_particle_collect(
     int32_t i;
     ecs_vec_clear(&inst->entities);
     ecs_vec_clear(&inst->layers);
+    ecs_vec_clear(&inst->flashes);
     ecs_vec_clear(&s->stack);
     *ecs_vec_append_t(NULL, &s->stack, ecs_entity_t) = inst->root;
     while (ecs_vec_count(&s->stack)) {
@@ -205,10 +265,20 @@ static void box_particle_collect(
 
     inst->emit = 0;
     inst->retire = 0;
+    inst->flash = 0;
     for (i = 0; i < ecs_vec_count(&inst->entities); i ++) {
         ecs_entity_t e = *ecs_vec_get_t(&inst->entities, ecs_entity_t, i);
         if (!ecs_has(world, e, Position)) {
             ecs_set(world, e, Position, {0, 0, 0});
+        }
+
+        const EffectFlash *flash = ecs_get(world, e, EffectFlash);
+        const PointLight *light = flash ? ecs_get(world, e, PointLight) : NULL;
+        if (light) {
+            uint64_t span = box_particle_flash_us(flash);
+            *ecs_vec_append_t(NULL, &inst->flashes, box_particle_flash_t) =
+                (box_particle_flash_t){ .entity = e, .own = light->intensity };
+            inst->flash = span > inst->flash ? span : inst->flash;
         }
 
         const ParticleBurst *burst = ecs_get(world, e, ParticleBurst);
@@ -233,6 +303,7 @@ static void box_particle_collect(
         }
     }
 
+    inst->retire = inst->flash > inst->retire ? inst->flash : inst->retire;
     inst->collected = true;
 }
 
@@ -315,6 +386,7 @@ static box_particle_instance_t* box_particle_instance_new(
 
     ecs_vec_init_t(NULL, &result->layers, box_particle_layer_t, 0);
     ecs_vec_init_t(NULL, &result->entities, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &result->flashes, box_particle_flash_t, 0);
     *ecs_vec_append_t(NULL, &effect->instances, box_particle_instance_t*) = result;
     if (ecs_has_id(world, result->root, effect->prefab
         ? ecs_pair(EcsIsA, effect->template_)
@@ -352,6 +424,7 @@ static void box_particle_instance_free(
 
     ecs_vec_fini_t(NULL, &inst->layers, box_particle_layer_t);
     ecs_vec_fini_t(NULL, &inst->entities, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &inst->flashes, box_particle_flash_t);
     ecs_os_free(inst);
 }
 
@@ -636,7 +709,8 @@ static box_particle_instance_t* box_particle_free_instance(
 /** Place, scale and play an instance from the start.
  *
  * A free instance is enabled and its layers play again from the start; a recycled one resets
- * its layers, which empties their pools in this frame and plays them from the next.
+ * its layers, which empties their pools in this frame and plays them from the next. Its
+ * flashes light up at once.
  *
  * @param world The world
  * @param s The state
@@ -683,6 +757,7 @@ static void box_particle_play(
         }
     }
 
+    box_particle_flash_write(world, inst);
     box_particle_effect_write(world, inst);
 }
 
@@ -772,8 +847,8 @@ done:
 }
 
 /** Advance the play of an instance after the particle extract ran: stop the emission of each
- * layer after its last burst and return the instance to its pool once its layers stopped and
- * their last particle died.
+ * layer after its last burst, fade its flashes and return the instance to its pool once its
+ * layers stopped, their last particle died and its flashes faded.
  *
  * @param world The world
  * @param s The state
@@ -800,6 +875,11 @@ static void box_particle_advance(
     inst->held = false;
     if (!held) {
         inst->time += delta;
+    }
+
+    box_particle_flash_write(world, inst);
+    if (inst->time < inst->flash) {
+        done = false;
     }
 
     for (i = 0; i < ecs_vec_count(&inst->layers); i ++) {

@@ -3,6 +3,7 @@
  * @brief Tests for the particle passes: streams and effect bursts render where their particles
  * are, scenes and full pools are respected, a fixed seed renders the same image twice, additive
  * pools brighten, soft particles fade near geometry and sprites show the frame of their age.
+ * An effect flash lights a wall while it plays, and a deleted lingering emitter still draws.
  *
  * Frames advance a fixed 1/60 s.
  * An unlit orthographic camera 10 units in front of the origin looks into a 32x32 capture of
@@ -419,6 +420,95 @@ void Particle_two_plays_one_frame(void) {
     test_assert(green_at(px, 2, 1) > 128);
     test_assert(green_at(px, 0, 0) < 8);
     test_int(ecs_singleton_get(world, ParticleStats)->effects, 2);
+
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+/** Light the views of a world, which the worlds of the tests draw unlit.
+ *
+ * @param world The world
+ */
+static void lighting_enable(
+    ecs_world_t *world)
+{
+    ecs_entity_t views[4];
+    int32_t i, count = 0;
+    ecs_iter_t it = ecs_each(world, View);
+    while (ecs_each_next(&it)) {
+        for (i = 0; i < it.count && count < 4; i ++) {
+            views[count ++] = it.entities[i];
+        }
+    }
+
+    for (i = 0; i < count; i ++) {
+        ecs_get_mut(world, views[i], View)->lighting.enabled = true;
+        ecs_modified(world, views[i], View);
+    }
+}
+
+void Particle_flash_lights_wall(void) {
+    // particle/flash
+    ecs_world_t *world = world_new("flash.png");
+    lighting_enable(world);
+    ecs_singleton_set(world, AmbientLight, {.intensity = 0});
+    ecs_entity_t wall = ecs_new(world);
+    ecs_set(world, wall, Position, {0, 0, -1});
+    ecs_set(world, wall, Box, {20, 20, 0.1f});
+    ecs_set(world, wall, Rgb, {255, 255, 255});
+    ecs_set(world, wall, PbrMaterial, {.roughness = 1});
+    test_assert(ecs_script_run(world, "flash",
+        "using box.particle\n"
+        "using box.light\n"
+        "prefab Flash {\n"
+        "  ParticleEmitter: {max: 1, direction: {0, 0, 0}, lifetime: {1, 1}, "
+        "size: {1, 1}}\n"
+        "  ParticleBurst: {count: 1}\n"
+        "  light {\n"
+        "    PointLight: {intensity: 1, range: 4}\n"
+        "    EffectFlash: {intensity: 4, seconds: 0.05}\n"
+        "  }\n"
+        "}\n", NULL) == 0);
+    ecs_entity_t flash = ecs_lookup(world, "Flash");
+    vec3 at = {0, 0, 0};
+    test_assert(box_particle_burst_at(world, flash, at, 1) != 0);
+
+    unsigned char *px = run(world, "flash.png", 1);
+    test_assert(green_at(px, 1.5f, 0) > 64);
+    test_assert(green_at(px, -1.5f, 0) > 64);
+    test_assert(green_at(px, 0, 1.5f) > 64);
+    stbi_image_free(px);
+
+    px = run(world, "flash.png", 4);
+    test_int(ecs_singleton_get(world, ParticleStats)->effects, 1);
+    test_assert(green_at(px, 1.5f, 0) < 8);
+    test_assert(green_at(px, -1.5f, 0) < 8);
+    test_assert(green_at(px, 0, 1.5f) < 8);
+    test_assert(green_at(px, 0, 0) > 128);
+
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+void Particle_lingering_renders_after_delete(void) {
+    // particle/linger
+    ecs_world_t *world = world_new("linger.png");
+    ecs_entity_t lingering = single_new(world, -2, 1);
+    ecs_entity_t plain = single_new(world, 2, 1);
+    ecs_get_mut(world, lingering, ParticleEmitter)->linger = true;
+    ecs_modified(world, lingering, ParticleEmitter);
+    unsigned char *px = run(world, "linger.png", 3);
+    test_assert(green_at(px, -2, 0) > 128);
+    test_assert(green_at(px, 2, 0) > 128);
+    stbi_image_free(px);
+
+    ecs_delete(world, lingering);
+    ecs_delete(world, plain);
+    px = run(world, "linger.png", 1);
+    test_assert(green_at(px, -2, 0) > 128);
+    test_assert(green_at(px, 2, 0) < 8);
+    test_int(ecs_singleton_get(world, ParticleStats)->lingering, 1);
+    test_int(ecs_singleton_get(world, ParticleStats)->emitters, 0);
 
     stbi_image_free(px);
     ecs_fini(world);

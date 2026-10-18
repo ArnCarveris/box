@@ -109,6 +109,29 @@ static void box_particle_curves_ctor(
     }
 }
 
+/** Construct ParticleLight values: a light at intensity 1 while the emitter plays, without a
+ * curve, that goes dark at once when it stops.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_particle_light_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    ParticleLight *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (ParticleLight){
+            .intensity = 1.0f,
+            .curve = { 1.0f, 1.0f, 1.0f, 1.0f }
+        };
+    }
+}
+
 void BoxParticleImport(
     ecs_world_t *world)
 {
@@ -117,6 +140,7 @@ void BoxParticleImport(
     ECS_IMPORT(world, BoxTransform);
     ECS_IMPORT(world, BoxGeometry);
     ECS_IMPORT(world, BoxView);
+    ECS_IMPORT(world, BoxLight);
     ECS_IMPORT(world, BoxRender);
 
     ECS_META_COMPONENT(world, EmitterShape);
@@ -131,6 +155,9 @@ void BoxParticleImport(
     ECS_META_COMPONENT(world, ParticlePlayback);
     ECS_META_COMPONENT(world, ParticleBurst);
     ECS_META_COMPONENT(world, ParticleCurve);
+    ECS_META_COMPONENT(world, ParticleLight);
+    ecs_set_hooks(world, ParticleLight, { .ctor = box_particle_light_ctor });
+    ECS_META_COMPONENT(world, EffectFlash);
     ECS_META_COMPONENT(world, ParticleGradient);
     ECS_META_COMPONENT(world, ParticleCurves);
     ecs_set_hooks(world, ParticleCurves, { .ctor = box_particle_curves_ctor });

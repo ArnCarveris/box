@@ -5,6 +5,10 @@
  * A pool is a range of a particle page, a storage buffer of pools of one size. Lifetimes are
  * whole microseconds drawn from the seed, so the extract knows when each particle dies: it
  * frees and picks slots and counts the live particles without reading the GPU back.
+ *
+ * The pool of a deleted linger emitter keeps its range and runs the last block of its emitter
+ * without spawns until its last particle died, which the GPU ages by the same whole
+ * microseconds, so no rounding margin is needed. ParticleLight lights the frame it is written.
  */
 
 #include "render.h"
@@ -75,6 +79,13 @@ typedef struct box_particle_pool_t {
     ecs_entity_t mesh_entity; /**< Entity the corners were built from */
     uint32_t mesh_handle;   /**< Mesh handle the corners were built from */
     vec3 mesh_scale;        /**< Shape scale the corners were built with */
+    bool linger;            /**< ParticleEmitter.linger of the last frame the emitter was seen */
+    bool lingering;         /**< The emitter was deleted and the pool runs out its particles,
+                             *   no longer in by_entity */
+    uint64_t faded;         /**< Microseconds of stopped frames since the emitter stopped, the
+                             *   fade of its ParticleLight */
+    box_render_particle_pool_t entry; /**< The pool of the last frame of a lingering emitter
+                             *   in the packet, which a lingering pool runs again */
 } box_particle_pool_t;
 
 /** A burst of the frame and the emitter whose pool it spawns into */
@@ -85,9 +96,9 @@ typedef struct box_particle_burst_t {
 
 /** Main thread state of the particle extract */
 typedef struct box_render_particles_t {
-    ecs_query_t *emitters;  /**< ParticleEmitter, WorldTransform, Scene(self|up),
-                             *   ParticlePlayback, ParticleCurves and ParticleAppearance, NULL
-                             *   without box.particle */
+    ecs_query_t *emitters;  /**< ParticleEmitter, WorldTransform, Scene(self|up), Playback,
+                             *   Curves, Appearance, ParticleLight, PointLight(self) and
+                             *   SpotLight(self), NULL without box.particle */
     ecs_query_t *burst_query; /**< ParticleBurst and ParticleEmitter(self|up), NULL without
                              *   box.particle */
     ecs_vec_t bursts;       /**< box_particle_burst_t of the frame, sorted by emitter */
@@ -412,7 +423,10 @@ static void box_particles_pool_free(
         box_particles_mesh_free(s, p, pool);
     }
 
-    ecs_map_remove(&s->by_entity, pool->entity);
+    if (!pool->lingering) {
+        ecs_map_remove(&s->by_entity, pool->entity);
+    }
+
     ecs_vec_remove_t(&s->pools, box_particle_pool_t*, index);
     ecs_vec_fini_t(NULL, &pool->deaths, box_particle_death_t);
     ecs_vec_fini_t(NULL, &pool->free_slots, uint32_t);
@@ -1051,11 +1065,74 @@ static uint32_t box_particles_texture(
     return result;
 }
 
+/** Get the intensity a ParticleLight gives its light.
+ *
+ * @param light The ParticleLight
+ * @param time Microseconds of the playback clock
+ * @param stopped Whether the emitter stopped since it last played
+ * @param faded Microseconds of stopped frames since it stopped
+ * @return The intensity
+ */
+static float box_particles_light_value(
+    const ParticleLight *light,
+    uint64_t time,
+    bool stopped,
+    uint64_t faded)
+{
+    uint64_t period = box_particle_us(light->period);
+    uint64_t fade = box_particle_us(light->fade);
+    float result = light->intensity, t;
+    if (period) {
+        if (light->loop) {
+            t = (float)((double)(time % period) / (double)period);
+        } else {
+            t = time >= period ? 1.0f : (float)((double)time / (double)period);
+        }
+
+        result *= box_particle_curve(&light->curve.start, t);
+    }
+
+    if (stopped) {
+        result = faded < fade
+            ? result * (float)(1.0 - (double)faded / (double)fade)
+            : 0.0f;
+    }
+
+    return result;
+}
+
+/** The lights a ParticleLight of an emitter drives in a frame */
+typedef struct box_particles_light_t {
+    const ParticleLight *light; /**< The ParticleLight, NULL for none */
+    PointLight *point;      /**< The PointLight of the emitter itself, NULL for none */
+    SpotLight *spot;        /**< The SpotLight of the emitter itself, NULL for none */
+} box_particles_light_t;
+
+/** Write the intensity of the lights a ParticleLight drives.
+ *
+ * @param lights The lights
+ * @param intensity The intensity
+ */
+static void box_particles_light_write(
+    const box_particles_light_t *lights,
+    float intensity)
+{
+    if (lights->point) {
+        lights->point->intensity = intensity;
+    }
+
+    if (lights->spot) {
+        lights->spot->intensity = intensity;
+    }
+}
+
 /** Account the frame of one emitter and add its pool to the packet when it has particles.
  *
  * A paused emitter ages and moves nothing and spawns nothing, a stopped one ages its particles
  * and spawns nothing, and a reset empties the pool and zeroes the playback clock in a frame that
  * does nothing else. Only a playing emitter advances the playback clock its bursts go off by.
+ *
+ * The lights of a ParticleLight follow the clock after the frame.
  *
  * @param world The world
  * @param s The state
@@ -1068,6 +1145,7 @@ static uint32_t box_particles_texture(
  * @param curves Its ParticleCurves, NULL for none
  * @param look Its ParticleAppearance, NULL for none
  * @param effect The ParticleEffect of the instance it plays in, NULL for none
+ * @param lights The lights its ParticleLight drives
  * @param stats Receives its counts
  */
 static void box_particles_emitter(
@@ -1082,6 +1160,7 @@ static void box_particles_emitter(
     const ParticleCurves *curves,
     const ParticleAppearance *look,
     const ParticleEffect *effect,
+    const box_particles_light_t *lights,
     ParticleStats *stats)
 {
     int32_t max = emitter->max > BOX_PARTICLE_MAX ? BOX_PARTICLE_MAX : emitter->max;
@@ -1092,6 +1171,8 @@ static void box_particles_emitter(
     PlaybackState state = playback ? playback->state : ParticlePlaying;
     bool reset = playback && playback->reset;
     uint64_t time = 0;
+    bool stopped = state == ParticleStopped;
+    uint64_t faded = UINT64_MAX;
     vec3 velocity;
     if (max <= 0) {
         goto done;
@@ -1115,10 +1196,12 @@ static void box_particles_emitter(
         pool->has_last = false;
         pool->fresh = true;
         pool->kept = false;
+        pool->faded = 0;
     }
 
     pool->seen = true;
     pool->scene = scene;
+    pool->linger = emitter->linger;
     if (emitter->shape == EmitterMesh) {
         box_particles_table_update(world, s, p, pool, e, emitter);
     } else if (pool->table_built) {
@@ -1134,12 +1217,14 @@ static void box_particles_emitter(
 
     if (state == ParticleStopped) {
         pool->stopped = true;
+        pool->faded += delta_us;
     } else if (state != ParticlePaused && pool->stopped) {
         pool->time = 0;
         pool->started = false;
         pool->carry = 0;
         pool->stopped = false;
         pool->has_last = false;
+        pool->faded = 0;
     }
 
     if (look && look->shape == ParticleBillboard) {
@@ -1163,6 +1248,8 @@ static void box_particles_emitter(
     }
 
     time = pool->time;
+    stopped = pool->stopped;
+    faded = pool->faded;
     box_particles_spawn(pool, emitter, count, life_min,
         life_max > life_min ? life_max - life_min : 0,
         box_render_packet_reserve(p, count * (uint32_t)sizeof(uint32_t), &slots));
@@ -1201,12 +1288,64 @@ static void box_particles_emitter(
     entry->block.life_min = life_min;
     entry->block.life_span = life_max > life_min ? life_max - life_min : 0;
     pool->fresh = false;
+    if (emitter->linger) {
+        pool->entry = *entry;
+    }
+
     stats->simulated ++;
 done:
     if (playback) {
         playback->time = (float)((double)time * 1e-6);
         playback->reset = false;
     }
+
+    if (lights->light) {
+        box_particles_light_write(lights,
+            box_particles_light_value(lights->light, time, stopped, faded));
+    }
+}
+
+/** Run a frame of a lingering pool: age and move its particles with the block of the last frame
+ * of its emitter, spawning nothing.
+ *
+ * @param p The packet
+ * @param pool The lingering pool
+ * @param stats Receives its counts
+ * @return Whether particles live on, else the pool is to be freed
+ */
+static bool box_particles_linger(
+    box_render_packet_t *p,
+    box_particle_pool_t *pool,
+    ParticleStats *stats)
+{
+    uint32_t delta_us = box_particle_us(p->delta), slots = 0;
+    bool result = false;
+    pool->clock += delta_us;
+    box_particles_retire(pool);
+    if (!pool->used) {
+        goto done;
+    }
+
+    box_render_packet_reserve(p, 0, &slots);
+    box_render_particle_pool_t *entry = ecs_vec_append_t(
+        NULL, &p->particles, box_render_particle_pool_t);
+    *entry = pool->entry;
+    entry->clear = false;
+    entry->slots = slots;
+    entry->block.acceleration[3] = delta_us ? p->delta : 0.0f;
+    entry->block.count = 0;
+    entry->block.first = pool->next;
+    entry->block.used = pool->used;
+    entry->block.delta_us = delta_us;
+    entry->block.sort_count = entry->block.sorted
+        ? box_particles_sort_count(pool->used, pool->capacity)
+        : 0;
+    stats->particles += pool->live;
+    stats->simulated ++;
+    stats->lingering ++;
+    result = true;
+done:
+    return result;
 }
 
 /** Find the ParticleEffect of the instance the emitters of a table play in, on the emitters
@@ -1260,7 +1399,8 @@ static bool box_particles_keeps(
 }
 
 /** Account the particles of every enabled emitter, free the pools of the emitters that are
- * gone, keep those of disabled effect layers and write ParticleStats.
+ * gone, keep those of disabled effect layers, run out those of deleted lingering emitters and
+ * write ParticleStats.
  *
  * @param it The iterator of the system
  */
@@ -1299,6 +1439,10 @@ static void BoxRenderExtractParticles(
         ParticlePlayback *playbacks = ecs_field(&qit, ParticlePlayback, 3);
         const ParticleCurves *curves = ecs_field(&qit, ParticleCurves, 4);
         const ParticleAppearance *looks = ecs_field(&qit, ParticleAppearance, 5);
+        const ParticleLight *lights = ecs_field(&qit, ParticleLight, 6);
+        PointLight *points = ecs_field(&qit, PointLight, 7);
+        SpotLight *spots = ecs_field(&qit, SpotLight, 8);
+        bool lights_shared = lights && !ecs_field_is_self(&qit, 6);
         bool shared = ecs_field_is_set(&qit, 1) && !ecs_field_is_self(&qit, 1);
         bool curves_shared = curves && !ecs_field_is_self(&qit, 4);
         bool looks_shared = looks && !ecs_field_is_self(&qit, 5);
@@ -1309,13 +1453,18 @@ static void BoxRenderExtractParticles(
             : NULL;
         for (i = 0; i < qit.count; i ++) {
             const WorldTransform *t = transforms ? &transforms[shared ? 0 : i] : NULL;
+            box_particles_light_t light = {
+                .light = lights ? &lights[lights_shared ? 0 : i] : NULL,
+                .point = points ? &points[i] : NULL,
+                .spot = spots ? &spots[i] : NULL
+            };
             stats.emitters ++;
             box_particles_emitter(world, s, p, qit.entities[i], &emitters[i], t,
                 box_render_scene_field(&qit, 2, i), playbacks ? &playbacks[i] : NULL,
                 curves ? &curves[curves_shared ? 0 : i] : NULL,
                 looks ? &looks[looks_shared ? 0 : i] : NULL,
                 effect_self ? ecs_get(world, qit.entities[i], ParticleEffect) : shared_effect,
-                &stats);
+                &light, &stats);
         }
     }
 
@@ -1325,9 +1474,24 @@ static void BoxRenderExtractParticles(
             continue;
         }
 
-        if (box_particles_keeps(world, pool->entity)) {
-            pool->kept = true;
-        } else {
+        if (!pool->lingering) {
+            if (box_particles_keeps(world, pool->entity)) {
+                pool->kept = true;
+                continue;
+            }
+
+            if (!pool->linger || pool->kept || !pool->live ||
+                ecs_is_alive(world, pool->entity))
+            {
+                box_particles_pool_free(s, p, i);
+                continue;
+            }
+
+            ecs_map_remove(&s->by_entity, pool->entity);
+            pool->lingering = true;
+        }
+
+        if (!box_particles_linger(p, pool, &stats)) {
             box_particles_pool_free(s, p, i);
         }
     }
@@ -1434,7 +1598,20 @@ void box_render_particles_import(
                     .oper = EcsOptional
                 },
                 { .id = ecs_id(ParticleCurves), .inout = EcsIn, .oper = EcsOptional },
-                { .id = ecs_id(ParticleAppearance), .inout = EcsIn, .oper = EcsOptional }
+                { .id = ecs_id(ParticleAppearance), .inout = EcsIn, .oper = EcsOptional },
+                { .id = ecs_id(ParticleLight), .inout = EcsIn, .oper = EcsOptional },
+                {
+                    .id = ecs_id(PointLight),
+                    .src.id = EcsSelf,
+                    .inout = EcsInOut,
+                    .oper = EcsOptional
+                },
+                {
+                    .id = ecs_id(SpotLight),
+                    .src.id = EcsSelf,
+                    .inout = EcsInOut,
+                    .oper = EcsOptional
+                }
             },
             .cache_kind = EcsQueryCacheAuto
         });

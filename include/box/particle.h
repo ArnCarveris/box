@@ -125,6 +125,9 @@ ECS_STRUCT(ParticleEmitter, {
     ecs_entity_t forces;    /**< Entity whose ParticleForces apply besides those of the world
                              *   and of the emitter entity, default 0 for none */
     uint32_t seed;          /**< Seed of the random draws, default 0 */
+    bool linger;            /**< Deleting the emitter leaves its live particles to finish
+                             *   their lives in a pool that spawns nothing, default false
+                             *   to free the pool at once */
 });
 
 /** What an emitter with ParticlePlayback does this frame */
@@ -173,6 +176,41 @@ ECS_STRUCT(ParticleCurve, {
     float early;            /**< Value at a third of the life */
     float late;             /**< Value at two thirds of the life */
     float end;              /**< Value at death */
+});
+
+/** Drives the intensity of the PointLight or SpotLight of a ParticleEmitter entity from its
+ * playback, written by the render extract every frame before the lights are collected.
+ *
+ * While it plays the light has intensity, times the curve over period seconds of the playback
+ * clock when period is above 0, once and then its end key, or with loop. Paused holds the light,
+ * stopped fades it linearly to zero over fade seconds of stopped frames, playing restarts it.
+ *
+ * Every emitter of an effect instance, root and layers, drives the light it owns, the copy of
+ * its template's. The light goes out with the entity, also a lingering one.
+ */
+ECS_STRUCT(ParticleLight, {
+    float intensity;        /**< Intensity of the light while the emitter plays, default 1 */
+    ParticleCurve curve;    /**< Multiplier of the intensity over period, its keys at 0, 1/3,
+                             *   2/3 and 1 of it, default 1 */
+    float period;           /**< Seconds of the playback clock the curve spans, default 0 for
+                             *   no curve */
+    bool loop;              /**< Repeat the curve every period, default false for once */
+    float fade;             /**< Seconds the light fades out over once the emitter stopped,
+                             *   default 0 to go dark at once */
+});
+
+/** A flash of the PointLight next to it in an effect template each time box_particle_burst_at
+ * plays the effect: it starts at intensity and fades linearly to zero over seconds of the play,
+ * then stays dark until the next play.
+ *
+ * After a frame the light holds the value at ParticleEffect.time, and an instance does not
+ * retire before its flashes faded.
+ */
+ECS_STRUCT(EffectFlash, {
+    float intensity;        /**< Intensity of the light when the effect starts, default 0 for
+                             *   the intensity of the light itself */
+    float seconds;          /**< Seconds the flash fades to zero over, default 0 for a fifth of
+                             *   a second */
 });
 
 /** Four display encoded colors over the life of a particle, at the keys of ParticleCurve,
@@ -247,6 +285,9 @@ ECS_STRUCT(ParticleStats, {
     int32_t particles;      /**< Particles alive after this frame's spawns */
     int32_t spawned;        /**< Particles spawned this frame */
     int64_t bytes;          /**< Bytes of device memory the pools are kept in */
+    int32_t lingering;      /**< Pools of deleted ParticleEmitter.linger emitters whose
+                             *   particles still live, simulated without spawns and counted in
+                             *   particles and bytes, not in emitters */
     int32_t effects;        /**< Effect instances playing after this frame */
     int32_t recycled;       /**< Bursts since the previous frame that a full budget had replay
                              *   an instance that was playing */
@@ -294,16 +335,16 @@ ECS_STRUCT(ParticleEffect, {
     float time;             /**< Seconds into the play, written by the engine every frame */
     float emit;             /**< Seconds into the play at which the last burst of its layers
                              *   goes off and their emission ends */
-    float retire;           /**< Seconds into the play at which its last particle dies and the
-                             *   instance goes back to the pool: emit plus the longest
-                             *   lifetime of its layers */
+    float retire;           /**< Seconds into the play at which the instance goes back to the
+                             *   pool: emit plus the longest lifetime of its layers, or its
+                             *   longest EffectFlash when that ends later */
 });
 
 /** Play an effect template once at a world point.
  *
  * The template is a prefab or a script template whose root and descendants with an emitter are
  * layers that play together. A free instance from its pool, or a new one, is placed, scaled and
- * played, and goes back to the pool disabled once the last particle of every layer died.
+ * played, and goes back to the pool disabled once its layers and its flashes played out.
  *
  * A layer stops emitting after its last burst; a burst that repeats forever goes off once. The
  * budgets of ParticleSettings rule a burst while they are full, and deleting the template deletes
@@ -326,7 +367,9 @@ ecs_entity_t box_particle_burst_at(
 /** Register the box.particle module.
  *
  * Makes the render extract keep a pool for every enabled ParticleEmitter, simulate it in the
- * compute passes of the packet and draw it in the views of its scene, and writes ParticleStats.
+ * compute passes of the packet, draw it in the views of its scene and drive its ParticleLight,
+ * and writes ParticleStats.
+ *
  * Plays the effects of box_particle_burst_at within the budgets of ParticleSettings.
  *
  * @param world The world

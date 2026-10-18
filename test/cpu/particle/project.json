@@ -203,6 +203,54 @@
                     "delete_template",
                     "script_function"
                 ]
+            },
+            {
+                "id": "Light",
+                "testcases": [
+                    "c_defaults",
+                    "script_values",
+                    "follows_play",
+                    "holds_while_paused",
+                    "stop_goes_dark_at_once",
+                    "stop_fades_over_seconds",
+                    "paused_fade_holds",
+                    "play_after_stop_relights",
+                    "curve_once",
+                    "curve_loop",
+                    "spot_light",
+                    "lights_same_frame",
+                    "prefab_instance_own_light",
+                    "effect_layers_own_lights",
+                    "goes_out_with_entity"
+                ]
+            },
+            {
+                "id": "Flash",
+                "testcases": [
+                    "c_defaults",
+                    "fades_over_seconds",
+                    "default_seconds",
+                    "own_intensity",
+                    "each_play",
+                    "root_of_prefab",
+                    "holds_instance",
+                    "dark_lights_cost_nothing"
+                ]
+            },
+            {
+                "id": "Linger",
+                "testcases": [
+                    "c_default",
+                    "keeps_particles_after_delete",
+                    "spawns_nothing",
+                    "keeps_buffers",
+                    "frees_after_longest_lifetime",
+                    "stats",
+                    "without_linger_frees_at_once",
+                    "remove_frees_at_once",
+                    "page_reused_after_free",
+                    "light_goes_out"
+                ]
             }
         ]
     }
