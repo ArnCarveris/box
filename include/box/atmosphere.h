@@ -48,7 +48,8 @@ ECS_STRUCT(Atmosphere, {
     ecs_entity_t sun;       /**< DirectionalLight that is the sun, default 0 for the light the
                              *   light extract picks: the first DirectionalLight of the scene or
                              *   the default sun */
-    ecs_entity_t moon;      /**< DirectionalLight that is the moon, default 0 for no moon */
+    ecs_entity_t moon;      /**< DirectionalLight that is the moon, default 0 for no moon; its
+                             *   light is scaled by AtmosphereStatus.moon_illumination */
     float planet_radius;    /**< Radius of the planet in km, default 6360 */
     float thickness;        /**< Height of the atmosphere above the ground in km, default 100 */
     float ground_altitude;  /**< Altitude in km at sea_level, 0 to thickness, default 0.5 */
@@ -67,7 +68,8 @@ ECS_STRUCT(Atmosphere, {
     float moon_disk_intensity; /**< Scale of the drawn moon disk, default 1, 0 draws none */
     float moon_radius;      /**< Angular radius of the moon disk in degrees, default 0.259 */
     float moon_albedo;      /**< Fraction of sunlight the moon reflects, default 0.12 */
-    float earthshine;       /**< Light of the unlit part of the moon, default 0 */
+    float earthshine;       /**< Fraction of the radiance of the fully lit moon disk that its
+                             *   unlit part shows, default 0 */
     float aerial_distance;  /**< Far end of the aerial perspective volume in km, default 32 */
     float aerial_intensity; /**< Scale of the aerial perspective, default 1, 0 for none */
     float ibl_update_angle; /**< Degrees the sun or moon moves before the environment is

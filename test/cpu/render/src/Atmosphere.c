@@ -609,8 +609,8 @@ void Atmosphere_explicit_sun_and_moon_attenuated(void) {
     test_near(l->color[0], GLM_PIf * ts[0], 1e-4f);
     test_near(l->color[2], GLM_PIf * ts[2], 1e-4f);
     l = view_light(world, scene, moon);
-    test_near(l->color[0], 0.5f * GLM_PIf * tm[0], 1e-4f);
-    test_near(l->color[2], 0.5f * GLM_PIf * tm[2], 1e-4f);
+    test_near(l->color[0], 0.75f * 0.5f * GLM_PIf * tm[0], 1e-4f);
+    test_near(l->color[2], 0.75f * 0.5f * GLM_PIf * tm[2], 1e-4f);
 
     ecs_get_mut(world, scene, Atmosphere)->moon = 0;
     ecs_modified(world, scene, Atmosphere);
@@ -687,6 +687,195 @@ void Atmosphere_scene_without_atmosphere_unchanged(void) {
     test_near(v->lights.sun_color[2], GLM_PIf, 1e-5f);
     v = frame_view(world, null, sky);
     test_assert(v->lights.sun_color[2] < 0.9f * GLM_PIf);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** Create a scene with the default Atmosphere whose sun and moon are set, the sun created first.
+ *
+ * @param world The world
+ * @param sun_elevation Elevation of the sun in degrees
+ * @param moon_elevation Elevation of the moon in degrees
+ * @param moon_yaw Yaw of the moon in degrees
+ * @param sun Receives the sun
+ * @param moon Receives the moon, of intensity 0.5
+ * @return The scene
+ */
+static ecs_entity_t sun_moon_new(
+    ecs_world_t *world,
+    float sun_elevation,
+    float moon_elevation,
+    float moon_yaw,
+    ecs_entity_t *sun,
+    ecs_entity_t *moon)
+{
+    ecs_entity_t scene = scene_new(world);
+    *sun = light_new(world, scene, sun_elevation, 0, 1);
+    *moon = light_new(world, scene, moon_elevation, moon_yaw, 0.5f);
+    Atmosphere *a = ecs_get_mut(world, scene, Atmosphere);
+    a->sun = *sun;
+    a->moon = *moon;
+    ecs_modified(world, scene, Atmosphere);
+
+    return scene;
+}
+
+/** Get the entity of a light of the view list of a scene by its index.
+ *
+ * @param world The world
+ * @param scene The scene
+ * @param index Index of the light
+ * @return The light entity
+ */
+static ecs_entity_t view_light_entity(
+    ecs_world_t *world,
+    ecs_entity_t scene,
+    int32_t index)
+{
+    box_bake_light_set_t set;
+    box_bake_view_lights(box_render_lights_state(world), scene, &set);
+    test_assert(index < set.count);
+
+    return set.entities[index];
+}
+
+void Atmosphere_moon_illumination_follows_elongation(void) {
+    // atmosphere/moon
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+
+    ecs_entity_t sun, moon;
+    ecs_entity_t scene = sun_moon_new(world, 210, 30, 0, &sun, &moon);
+    const AtmosphereStatus *status = frame_status(world, scene);
+    test_assert(status->error == NULL);
+    test_near(status->moon_illumination, 1.0f, 1e-4f);
+
+    ecs_set(world, sun, Rotation, {glm_rad(-60.0f), 0, 0});
+    status = frame_status(world, scene);
+    test_near(status->moon_illumination, 0.5f, 1e-4f);
+
+    ecs_set(world, sun, Rotation, {glm_rad(35.0f), 0, 0});
+    status = frame_status(world, scene);
+    test_near(status->moon_illumination, 0.0f, 3e-3f);
+    test_assert(status->moon_illumination > 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void Atmosphere_moon_below_horizon_light_is_zero(void) {
+    // atmosphere/moon
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+
+    ecs_entity_t sun, moon;
+    ecs_entity_t scene = sun_moon_new(world, 170, -10, 0, &sun, &moon);
+    const AtmosphereStatus *status = frame_status(world, scene);
+    test_near(status->moon_illumination, 1.0f, 1e-4f);
+    test_flt(status->moon_transmittance[0], 0);
+    test_flt(status->moon_transmittance[2], 0);
+    const box_render_light_t *l = view_light(world, scene, moon);
+    test_flt(l->color[0], 0);
+    test_flt(l->color[1], 0);
+    test_flt(l->color[2], 0);
+    test_assert(view_light_entity(world, scene, 0) == sun);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void Atmosphere_moon_light_scaled_by_illumination(void) {
+    // atmosphere/moon
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+
+    ecs_entity_t sun, moon;
+    ecs_entity_t scene = sun_moon_new(world, -60, 30, 0, &sun, &moon);
+    const AtmosphereStatus *status = frame_status(world, scene);
+    const float *tm = status->moon_transmittance;
+    test_near(status->moon_illumination, 0.5f, 1e-4f);
+    test_assert(tm[2] > 0 && tm[2] < tm[0] && tm[0] < 1);
+    const box_render_light_t *l = view_light(world, scene, moon);
+    test_near(l->color[0], 0.5f * 0.5f * GLM_PIf * tm[0], 1e-4f);
+    test_near(l->color[1], 0.5f * 0.5f * GLM_PIf * tm[1], 1e-4f);
+    test_near(l->color[2], 0.5f * 0.5f * GLM_PIf * tm[2], 1e-4f);
+
+    ecs_set(world, sun, Rotation, {glm_rad(210.0f), 0, 0});
+    status = frame_status(world, scene);
+    l = view_light(world, scene, moon);
+    test_near(l->color[0], 0.5f * GLM_PIf * status->moon_transmittance[0], 1e-4f);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void Atmosphere_moon_is_light_zero_after_sunset(void) {
+    // atmosphere/moon
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+
+    ecs_entity_t sun, moon;
+    ecs_entity_t scene = sun_moon_new(world, -10, 30, 180, &sun, &moon);
+    view_new(world, scene);
+    const box_render_view_t *v = frame_view(world, null, scene);
+    const AtmosphereStatus *status = ecs_get(world, scene, AtmosphereStatus);
+    test_assert(status->moon_illumination > 0.8f);
+    test_assert(view_light_entity(world, scene, 0) == moon);
+    test_assert(view_light_entity(world, scene, 1) == sun);
+    test_int(v->lights.directional, 2);
+    test_int(v->lights.count, 2);
+    test_near(v->lights.sun[1], sinf(glm_rad(30.0f)), 1e-4f);
+    const box_render_light_t *l = view_light(world, scene, moon);
+    test_assert(l->color[0] > 0);
+    test_near(v->lights.sun_color[0], l->color[0], 1e-6f);
+    test_near(v->lights.sun_color[2], l->color[2], 1e-6f);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void Atmosphere_sun_is_light_zero_by_day(void) {
+    // atmosphere/moon
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+
+    ecs_entity_t scene = scene_new(world);
+    ecs_entity_t moon = light_new(world, scene, 30, 180, 0.5f);
+    ecs_entity_t sun = light_new(world, scene, 20, 0, 1);
+    Atmosphere *a = ecs_get_mut(world, scene, Atmosphere);
+    a->sun = sun;
+    a->moon = moon;
+    ecs_modified(world, scene, Atmosphere);
+    view_new(world, scene);
+    const box_render_view_t *v = frame_view(world, null, scene);
+    test_assert(view_light_entity(world, scene, 0) == sun);
+    test_assert(view_light_entity(world, scene, 1) == moon);
+    test_near(v->lights.sun[1], sinf(glm_rad(20.0f)), 1e-4f);
+
+    ecs_set(world, sun, Rotation, {glm_rad(-20.0f), 0, 0});
+    v = frame_view(world, null, scene);
+    test_assert(view_light_entity(world, scene, 0) == moon);
+    test_near(v->lights.sun[1], sinf(glm_rad(30.0f)), 1e-4f);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void Atmosphere_scene_without_atmosphere_keeps_light_order(void) {
+    // atmosphere/moon
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+
+    ecs_entity_t plain = ecs_new(world);
+    ecs_add(world, plain, Scene);
+    ecs_entity_t dim = light_new(world, plain, 30, 0, 0.2f);
+    ecs_entity_t bright = light_new(world, plain, 60, 0, 2);
+    view_new(world, plain);
+    const box_render_view_t *v = frame_view(world, null, plain);
+    test_assert(view_light_entity(world, plain, 0) == dim);
+    test_assert(view_light_entity(world, plain, 1) == bright);
+    test_near(v->lights.sun_color[0], 0.2f * GLM_PIf, 1e-5f);
 
     ecs_fini(world);
     box_render_null_free(null);

@@ -286,3 +286,64 @@ void AtmosphereSky_packet_view_fog_light_without_lights(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+void AtmosphereSky_packet_view_moon_disk(void) {
+    // atmosphere/moon
+    box_render_null_t *null;
+    ecs_entity_t view;
+    ecs_world_t *world = world_sun_moon(&null, -20, 30, &view);
+
+    const box_render_view_t *v = frame_view(world, null);
+    ecs_entity_t scene = ecs_get_parent(world, ecs_get(world, view, View)->camera);
+    const AtmosphereStatus *status = ecs_get(world, scene, AtmosphereStatus);
+    test_assert(v->atmosphere != 0);
+    test_assert(fabsf(v->atmos.moon[1] - sinf(glm_rad(30))) < 1e-4f);
+    test_assert(v->atmos.moon[2] * v->atmos.sun[2] < 0);
+    test_assert(status->moon_illumination > 0.9f);
+    test_flt(v->atmos.moon[3], status->moon_illumination);
+    test_assert(fabsf(v->atmos.moon_color[0] - 0.5f * GLM_PIf) < 1e-5f);
+    test_assert(fabsf(v->atmos.moon_color[2] - 0.5f * GLM_PIf) < 1e-5f);
+    test_flt(v->atmos.moon_disk[0], cosf(glm_rad(0.259f)));
+    test_flt(v->atmos.moon_disk[1], sinf(glm_rad(0.259f)));
+    test_flt(v->atmos.moon_disk[2], 0.12f);
+    test_flt(v->atmos.moon_disk[3], 0.0f);
+
+    Atmosphere *a = ecs_get_mut(world, scene, Atmosphere);
+    a->moon_radius = 2;
+    a->moon_disk_intensity = 3;
+    a->moon_albedo = 0.2f;
+    a->earthshine = 0.1f;
+    ecs_modified(world, scene, Atmosphere);
+    v = frame_view(world, null);
+    test_flt(v->atmos.moon_disk[0], cosf(glm_rad(2.0f)));
+    test_flt(v->atmos.moon_disk[1], sinf(glm_rad(2.0f)));
+    test_assert(fabsf(v->atmos.moon_disk[2] - 0.6f) < 1e-6f);
+    test_flt(v->atmos.moon_disk[3], 0.1f);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void AtmosphereSky_packet_view_without_moon(void) {
+    // atmosphere/moon
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+
+    ecs_entity_t view;
+    ecs_entity_t scene = scene_new(world, &view);
+    light_new(world, scene, 30, 0, 1);
+    const box_render_view_t *v = frame_view(world, null);
+    test_assert(v->atmosphere != 0);
+    test_flt(v->atmos.moon[0], 0.0f);
+    test_flt(v->atmos.moon[1], -1.0f);
+    test_flt(v->atmos.moon[2], 0.0f);
+    test_flt(v->atmos.moon[3], 0.0f);
+    test_flt(v->atmos.moon_color[0], 0.0f);
+    test_flt(v->atmos.moon_color[2], 0.0f);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}

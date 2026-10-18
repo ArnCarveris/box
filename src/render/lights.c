@@ -63,7 +63,8 @@ typedef struct box_light_atmos_light_t {
     float color[3];         /**< Color of the light before the transmittance */
     float transmittance[3]; /**< Transmittance from the ground altitude toward the light */
     float fade;             /**< Fade of its disk at the horizon */
-    float attenuated[3];    /**< Color times the transmittance and the fade */
+    float attenuated[3];    /**< Color times the transmittance and the fade, for the moon also
+                             *   its illumination */
 } box_light_atmos_light_t;
 
 /** The Atmosphere of a scene in this frame */
@@ -74,6 +75,7 @@ typedef struct box_light_atmos_t {
     box_atmos_medium_t medium; /**< Its medium, set when it is valid */
     box_light_atmos_light_t sun; /**< The sun */
     box_light_atmos_light_t moon; /**< The moon */
+    float moon_illumination; /**< Lit fraction of the moon, 0 without a sun or a moon */
 } box_light_atmos_t;
 
 /** The TimeOfDay of a scene in this frame */
@@ -640,6 +642,92 @@ static void box_lights_atmos_defaults(
     }
 }
 
+/** Scale the moon light of a list by its illumination.
+ *
+ * @param list The list
+ * @param moon The moon entity
+ * @param illumination The lit fraction of the moon
+ */
+static void box_lights_list_moon(
+    box_light_list_t *list,
+    ecs_entity_t moon,
+    float illumination)
+{
+    const ecs_entity_t *entities = ecs_vec_first_t(&list->entities, ecs_entity_t);
+    int32_t i;
+    for (i = 0; i < (int32_t)list->directional; i ++) {
+        if (entities[i] == moon) {
+            box_render_light_t *light = ecs_vec_get_t(&list->lights, box_render_light_t, i);
+            glm_vec3_scale(light->color, illumination, light->color);
+        }
+    }
+}
+
+/** Move the brightest directional light of a list to its start, keeping the order of the
+ * others. Of lights equally bright the first stays first.
+ *
+ * @param list The list
+ */
+static void box_lights_list_brightest(
+    box_light_list_t *list)
+{
+    box_render_light_t *lights = ecs_vec_first_t(&list->lights, box_render_light_t);
+    ecs_entity_t *entities = ecs_vec_first_t(&list->entities, ecs_entity_t);
+    uint8_t *modes = ecs_vec_first_t(&list->modes, uint8_t);
+    int32_t i, brightest = 0;
+    for (i = 1; i < (int32_t)list->directional; i ++) {
+        if (glm_luminance(lights[i].color) > glm_luminance(lights[brightest].color)) {
+            brightest = i;
+        }
+    }
+
+    if (brightest > 0) {
+        box_render_light_t light = lights[brightest];
+        ecs_entity_t e = entities[brightest];
+        uint8_t mode = modes[brightest];
+        ecs_os_memmove_n(&lights[1], &lights[0], box_render_light_t, brightest);
+        ecs_os_memmove_n(&entities[1], &entities[0], ecs_entity_t, brightest);
+        ecs_os_memmove_n(&modes[1], &modes[0], uint8_t, brightest);
+        lights[0] = light;
+        entities[0] = e;
+        modes[0] = mode;
+    }
+}
+
+/** Scale the moon of every scene with a valid atmosphere by its illumination, which needs the
+ * sun, and put the brightest directional light of the scene first in its lists so that it
+ * casts the shadows: the sun by day, the moon after sunset.
+ *
+ * @param l The state
+ */
+static void box_lights_atmos_moonlight(
+    box_render_lights_t *l)
+{
+    int32_t i, k;
+    for (i = 0; i < ecs_vec_count(&l->scenes); i ++) {
+        box_light_scene_t *s = ecs_vec_get_t(&l->scenes, box_light_scene_t, i);
+        box_light_atmos_t *a = &s->atmos;
+        if (!a->entity || a->error) {
+            continue;
+        }
+
+        if (a->moon.found) {
+            a->moon_illumination = a->sun.found
+                ? box_atmos_moon_illumination(a->sun.direction, a->moon.direction)
+                : 0.0f;
+            glm_vec3_scale(a->moon.attenuated, a->moon_illumination, a->moon.attenuated);
+        }
+
+        for (k = 0; k < BOX_LIGHTS_LISTS; k ++) {
+            if (a->moon.found) {
+                box_lights_list_moon(&s->lists[k], a->value.moon, a->moon_illumination);
+            }
+
+            box_lights_list_brightest(&s->lists[k]);
+        }
+    }
+}
+
 /** Write the transmittances, the error and the lut_version of the atmosphere of every scene
  * into its AtmosphereStatus when they changed.
  *
@@ -676,9 +764,8 @@ static void box_lights_atmos_status(
                 value.moon_transmittance);
         }
 
-        if (!a->error && a->sun.found && a->moon.found) {
-            value.moon_illumination = box_atmos_moon_illumination(a->sun.direction,
-                a->moon.direction);
+        if (!a->error) {
+            value.moon_illumination = a->moon_illumination;
         }
 
         bool same_error = a->error
@@ -1034,6 +1121,7 @@ static void BoxRenderExtractLights(
     box_lights_collect(world, l, l->point, 1);
     box_lights_collect(world, l, l->spot, 2);
     box_lights_atmos_defaults(l);
+    box_lights_atmos_moonlight(l);
     box_lights_collect_ambient(world, l);
     box_lights_send(l, p);
     box_lights_views(world, l, p);
@@ -1184,6 +1272,28 @@ bool box_render_lights_atmos_sun(
     if (result) {
         glm_vec3_copy(ECS_CONST_CAST(float*, s->atmos.sun.direction), direction);
         glm_vec3_copy(ECS_CONST_CAST(float*, s->atmos.sun.color), color);
+    }
+
+    return result;
+}
+
+bool box_render_lights_atmos_moon(
+    const void *state,
+    ecs_entity_t scene,
+    float *direction,
+    float *color,
+    float *illumination)
+{
+    const box_render_lights_t *l = state;
+    int32_t index = l ? box_lights_find(ECS_CONST_CAST(box_render_lights_t*, l), scene) : -1;
+    const box_light_scene_t *s = index != -1
+        ? ecs_vec_get_t(&l->scenes, box_light_scene_t, index)
+        : NULL;
+    bool result = s && s->atmos.entity && !s->atmos.error && s->atmos.moon.found;
+    if (result) {
+        glm_vec3_copy(ECS_CONST_CAST(float*, s->atmos.moon.direction), direction);
+        glm_vec3_copy(ECS_CONST_CAST(float*, s->atmos.moon.color), color);
+        *illumination = s->atmos.moon_illumination;
     }
 
     return result;

@@ -8,8 +8,9 @@
 // multi_scattering (32x32): x the cosine of the sun zenith from -1 to 1, y the altitude;
 // psi_ms = L2 / (1 - F) over 64 directions of 20 steps, the ground bouncing ground_albedo.
 // sky_view (192x108): x the absolute world azimuth atan2(x, z), y the zenith angle, squared on
-// both sides of the horizon at y = 0.5; single scattering of the sun plus multi scattering,
-// integrated as (S - S T) / sigma_t, plus the night floor that fades in as the sun sets.
+// both sides of the horizon at y = 0.5; single scattering of the sun plus multi scattering and
+// the single scattering of the moon times its illumination, integrated as (S - S T) / sigma_t,
+// plus the night floor that fades in as the sun sets.
 // aerial (32x32x32, a 3D texture): x and y the uv of the screen, slice z the in scatter (blended
 // toward the horizon color of the sky view by 1 - T) and the mean transmittance T from the
 // camera to the distance z / (N - 1) * aerial_distance along the ray of its texel, 6 steps.
@@ -19,8 +20,8 @@
 // fog (2x1): the in scatter color of a HeightFog with atmosphere, once per view. Texel 0 is the
 // ambient, the mean of 6 horizon samples of the sky view mixed 15% toward its zenith; texel 1
 // the glow toward the main light, the horizon sample at its azimuth minus the ambient times
-// its horizon fade, or the radiance of the moon when it is the main light, which the sky view
-// does not scatter. fog.wgsl adds the phase and the inscatter scales per pixel.
+// its horizon fade, or the radiance of the moon when it is the main light, whose faint glow the
+// horizon of the sky view hardly holds. fog.wgsl adds the phase and the inscatter scales per pixel.
 //
 // The planet center is under the camera: a world direction is a direction of the planet frame,
 // the camera at (0, bottom + altitude, 0). The earth shadow is analytic, a smoothstep around
@@ -31,7 +32,11 @@
 // horizon row for a direction below the horizon. Pixels near the sun that do not look at the
 // ground add the sun disk: the transmittance from the camera toward the sun times the sun's top
 // of atmosphere radiance and the disk intensity, limb darkened with the linear law and with an
-// edge one pixel wide. The target clips it in a view without effects.
+// edge one pixel wide. Pixels near the moon add the moon disk the same way: a ray cast at a unit
+// sphere seen at the moon radius, its top of atmosphere radiance times the disk intensity and
+// albedo times the cosine of the sun at the hit, so the phase follows from the sun and moon
+// directions, the dark side lit by the earthshine fraction. The target clips them in a view
+// without effects.
 #include "include/atmosphere_medium.h"
 
 struct Atmosphere {
@@ -57,6 +62,13 @@ struct Atmosphere {
     view: vec4f,
     // cosine and sine of the angular radius of the sun disk, disk intensity, per view
     sun_disk: vec4f,
+    // xyz: direction toward the moon, w: its illumination, per view
+    moon: vec4f,
+    // rgb: top of atmosphere irradiance of the moon, per view
+    moon_color: vec4f,
+    // cosine and sine of the angular radius of the moon disk, disk intensity times albedo,
+    // earthshine, per view
+    moon_disk: vec4f,
     // clip to world space of the view
     inv_view_proj: mat4x4f,
     // xyz: direction toward the main light, w: the fade of its disk at the horizon, per view
@@ -237,8 +249,9 @@ fn camera_radius() -> f32 {
     return bottom_radius() + max(u.view.x, BOX_ATMOS_PLANET_OFFSET);
 }
 
-// Single scattering of the sun plus multi scattering along a ray inside the atmosphere, with
-// sigma scaled by k, integrated as (S - S T) / sigma_t per step.
+// Single scattering of the sun plus multi scattering and the single scattering of the moon
+// times its illumination along a ray inside the atmosphere, with sigma scaled by k, integrated
+// as (S - S T) / sigma_t per step.
 fn in_scatter(ro: vec3f, rd: vec3f, max_t: f32, steps: i32, k: f32, ground: bool) -> Scatter {
     var s: Scatter;
     s.light = vec3f(0.0);
@@ -253,6 +266,12 @@ fn in_scatter(ro: vec3f, rd: vec3f, max_t: f32, steps: i32, k: f32, ground: bool
     let cos_view = clamp(dot(rd, sun), -1.0, 1.0);
     let rayleigh = rayleigh_phase(cos_view);
     let mie = mie_phase(cos_view, u.view.y);
+    let moon = u.moon.xyz;
+    let moon_light = u.moon_color.rgb * u.moon.w;
+    let has_moon = max(moon_light.r, max(moon_light.g, moon_light.b)) > 0.0;
+    let cos_moon = clamp(dot(rd, moon), -1.0, 1.0);
+    let rayleigh_moon = rayleigh_phase(cos_moon);
+    let mie_moon = mie_phase(cos_moon, u.view.y);
     for (var i = 0; i < steps; i = i + 1) {
         let pos = ro + rd * (seg.x + (f32(i) + 0.5) * dt);
         let r = length(pos);
@@ -262,7 +281,13 @@ fn in_scatter(ro: vec3f, rd: vec3f, max_t: f32, steps: i32, k: f32, ground: bool
         let sun_t = sample_transmittance(r, mu_sun) * earth_shadow(r, mu_sun);
         let single = (m.scattering_rayleigh * rayleigh + m.scattering_mie * mie) * sun_t;
         let psi = textureSampleLevel(multi_lut, lut_sampler, multi_to_uv(mu_sun, r), 0.0).rgb;
-        let scattered = (single + psi * m.scattering) * u.sun_color.rgb;
+        var scattered = (single + psi * m.scattering) * u.sun_color.rgb;
+        if (has_moon) {
+            let mu_moon = clamp(dot(pos / max(r, 1e-4), moon), -1.0, 1.0);
+            let moon_t = sample_transmittance(r, mu_moon) * earth_shadow(r, mu_moon);
+            scattered = scattered + (m.scattering_rayleigh * rayleigh_moon +
+                m.scattering_mie * mie_moon) * moon_t * moon_light;
+        }
         let integral = (scattered - scattered * step_t) / max(m.extinction, vec3f(1e-6));
         s.light = s.light + s.throughput * integral;
         s.throughput = s.throughput * step_t;
@@ -505,6 +530,35 @@ fn sun_disk(rd: vec3f, r: f32, sun_cos: f32, sin_sun: f32, aa_w: f32) -> vec3f {
     return result;
 }
 
+// Radiance of the moon disk in a direction seen from a radius, moon_cos and sin_moon the
+// cosine and sine of the angle between the direction and the moon, aa_w the width of the
+// anti-aliased edge in that cosine. The direction hits a unit sphere at the distance that makes
+// it subtend the moon radius; the normal at the hit, from the offset of the ray from the
+// center, is exact near it where the cosine is not.
+fn moon_disk(rd: vec3f, r: f32, moon_cos: f32, sin_moon: f32, aa_w: f32) -> vec3f {
+    let moon = u.moon.xyz;
+    let disk_cos = u.moon_disk.x;
+    let sin_r = u.moon_disk.y;
+    var result = vec3f(0.0);
+    if (u.moon_disk.z > 0.0 && moon_cos > disk_cos - aa_w) {
+        let ground = ray_sphere(vec3f(0.0, r, 0.0), rd, bottom_radius());
+        if (ground.y < 0.0) {
+            let t_moon = sample_transmittance(r, clamp(moon.y, -1.0, 1.0));
+            // Offset of the center from the ray, perpendicular to it, in moon radii
+            var w = (moon_cos * rd - moon) / max(sin_r, 1e-6);
+            let s = min(sin_moon / max(sin_r, 1e-6), 1.0);
+            w = w * (s / max(length(w), 1e-6));
+            let n = w - sqrt(max(0.0, 1.0 - s * s)) * rd;
+            let lit = max(0.0, dot(n, u.sun.xyz));
+            let shade = lit + u.moon_disk.w * (1.0 - lit);
+            let aa = smoothstep(disk_cos - aa_w, disk_cos + aa_w, moon_cos);
+            result = t_moon * u.moon_color.rgb / PI * u.moon_disk.z * shade * aa;
+        }
+    }
+
+    return result;
+}
+
 @fragment fn sky_fs(f: SkyOut) -> @location(0) vec4f {
     let rd = normalize(unproject(f.ndc, 0.5) - unproject(f.ndc, 1.0));
     let r = camera_radius();
@@ -513,8 +567,12 @@ fn sun_disk(rd: vec3f, r: f32, sun_cos: f32, sin_sun: f32, aa_w: f32) -> vec3f {
     // of the angle from the sun, so outside the disk the width is scaled to the one at its edge.
     let sin_sun = length(cross(rd, u.sun.xyz));
     let aa_w = max(fwidth(sun_cos) * min(1.0, u.sun_disk.y / max(sin_sun, 1e-6)), 1e-6);
+    let moon_cos = dot(rd, u.moon.xyz);
+    let sin_moon = length(cross(rd, u.moon.xyz));
+    let moon_aa_w = max(fwidth(moon_cos) * min(1.0, u.moon_disk.y / max(sin_moon, 1e-6)), 1e-6);
     var uv = direction_to_sky_uv(rd, r);
     uv.y = min(uv.y, 0.5);
     let sky = textureSampleLevel(sky_lut, lut_sampler, uv, 0.0).rgb;
-    return vec4f(sky + sun_disk(rd, r, sun_cos, sin_sun, aa_w), 1.0);
+    return vec4f(sky + sun_disk(rd, r, sun_cos, sin_sun, aa_w) +
+        moon_disk(rd, r, moon_cos, sin_moon, moon_aa_w), 1.0);
 }

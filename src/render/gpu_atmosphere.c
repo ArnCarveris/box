@@ -66,6 +66,10 @@ typedef struct box_gpu_atmos_uniforms_t {
     float night[4];                 /**< Night floor of the sky view */
     float view[4];                  /**< Altitude, Mie anisotropy, aerial distance and intensity */
     float sun_disk[4];              /**< Cosine and sine of the sun radius, disk intensity */
+    float moon[4];                  /**< Direction toward the moon, its illumination */
+    float moon_color[4];            /**< Top of atmosphere irradiance of the moon */
+    float moon_disk[4];             /**< Cosine and sine of the moon radius, disk intensity
+                                     *   times albedo, earthshine */
     mat4 inv_view_proj;             /**< Clip to world space of the view */
     float fog_light[4];             /**< Direction toward the main light, its horizon fade */
     float fog_moon[4];              /**< Radiance toward the moon as the main light, 1 if it is */
@@ -1007,6 +1011,9 @@ void box_gpu_atmosphere_view(
     ecs_os_memcpy_n(u.sun_color, in->sun_color, float, 4);
     ecs_os_memcpy_n(u.night, in->night, float, 4);
     ecs_os_memcpy_n(u.sun_disk, in->sun_disk, float, 4);
+    ecs_os_memcpy_n(u.moon, in->moon, float, 4);
+    ecs_os_memcpy_n(u.moon_color, in->moon_color, float, 4);
+    ecs_os_memcpy_n(u.moon_disk, in->moon_disk, float, 4);
     ecs_os_memcpy_n(u.fog_light, in->fog_light, float, 4);
     ecs_os_memcpy_n(u.fog_moon, in->fog_moon, float, 4);
     u.view[0] = in->altitude;

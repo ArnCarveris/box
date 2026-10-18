@@ -226,6 +226,12 @@ typedef struct box_render_view_atmos_t {
     float night[4];         /**< Linear night_tint times night_intensity */
     float sun_disk[4];      /**< Cosine and sine of the angular radius of the sun disk and its
                              *   sun_disk_intensity, w unused */
+    float moon[4];          /**< Direction toward the moon and in w its moon_illumination;
+                             *   (0, -1, 0, 0) without one */
+    float moon_color[4];    /**< Top of atmosphere irradiance of the moon: its light color times
+                             *   intensity times pi before the transmittance, 0 without one */
+    float moon_disk[4];     /**< Cosine and sine of the angular radius of the moon disk, its
+                             *   moon_disk_intensity times moon_albedo and its earthshine */
     float altitude;         /**< Altitude of the camera above the ground in km, at least 1 m */
     float mie_anisotropy;   /**< Mie phase asymmetry g */
     float aerial_distance;  /**< Far end of the aerial perspective volume in km */
@@ -234,9 +240,9 @@ typedef struct box_render_view_atmos_t {
     float fog_light[4];     /**< Direction toward the main light of the atmosphere, the sun or
                              *   the moon, and in w the fade of its disk at the horizon; w 0
                              *   without one */
-    float fog_moon[4];      /**< Radiance the fog scatters toward the moon when it is the main
-                             *   light, its attenuated color over pi, which the sky view does
-                             *   not hold; w 1 when the moon is the main light */
+    float fog_moon[4];      /**< Radiance the fog scatters toward the moon as the main light,
+                             *   its attenuated color over pi, a glow the sky view hardly
+                             *   holds; w 1 when the moon is the main light */
     bool sky;               /**< LightSettings.atmosphere: the view draws the sky and applies
                              *   the aerial perspective to its 3D meshes */
 } box_render_view_atmos_t;
@@ -1240,6 +1246,22 @@ bool box_render_lights_atmos_sun(
     float *direction,
     float *color);
 
+/** Get the moon of the valid atmosphere of a scene as the light extract of this frame found it.
+ *
+ * @param state The state of the light extract, see box_render_lights_state
+ * @param scene The scene, 0 for the default scene
+ * @param direction Receives the normalized direction toward the moon
+ * @param color Receives its linear color times intensity times pi, before the transmittance
+ * @param illumination Receives its lit fraction, 0 without a sun
+ * @return Whether the scene has a valid atmosphere and a moon
+ */
+bool box_render_lights_atmos_moon(
+    const void *state,
+    ecs_entity_t scene,
+    float *direction,
+    float *color,
+    float *illumination);
+
 /** Get the main light of the valid atmosphere of a scene as the light extract of this frame
  * attenuated it: the sun or the moon, whichever is brighter after the transmittance and the
  * horizon fade, the sun by day and the moon by night.
@@ -1248,7 +1270,7 @@ bool box_render_lights_atmos_sun(
  * @param scene The scene, 0 for the default scene
  * @param direction Receives the normalized direction toward the light
  * @param color Receives its linear color times intensity times pi, times the transmittance and
- * the horizon fade
+ * the horizon fade, and for the moon its illumination
  * @param fade Receives the fade of its disk at the horizon
  * @param moon Receives whether the light is the moon
  * @return Whether the scene has a valid atmosphere with a sun or a moon

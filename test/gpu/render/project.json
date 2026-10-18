@@ -603,7 +603,9 @@
                     "disk_center_brighter_than_limb",
                     "fog_at_noon_tints_toward_horizon",
                     "fog_at_sunset_warmer_toward_sun",
-                    "fog_without_atmosphere_uses_color"
+                    "fog_without_atmosphere_uses_color",
+                    "full_moon_lights_more_pixels_than_quarter",
+                    "new_moon_draws_no_disk"
                 ]
             },
             {

@@ -524,3 +524,76 @@ void AtmosphereSky_fog_without_atmosphere_uses_color(void) {
     stbi_image_free(plain);
     stbi_image_free(colored);
 }
+
+/** Elevation of the moon and pitch of the camera of render_moon in degrees */
+#define MOON_ELEVATION (20.0f)
+
+/** Render a moon of 2 degrees radius in the middle of a 10 degree view, lit by a sun at an
+ * elevation along the same azimuth. The sun disk is off.
+ *
+ * @param sun_elevation Elevation of the sun in degrees, MOON_ELEVATION + 180 for a full moon
+ * @param intensity Atmosphere.moon_disk_intensity
+ * @return The pixels, the moon at (WIDTH / 2, HEIGHT / 2)
+ */
+static unsigned char* render_moon(
+    float sun_elevation,
+    float intensity)
+{
+    ecs_world_t *world = world_new();
+    ecs_entity_t scene = scene_new(world, 1000, sun_elevation);
+    ecs_entity_t moon = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, moon, DirectionalLight, {.intensity = 1});
+    ecs_set(world, moon, Rgb, {255, 255, 255});
+    ecs_set(world, moon, Rotation, {glm_rad(MOON_ELEVATION), 0, 0});
+    Atmosphere *a = ecs_get_mut(world, scene, Atmosphere);
+    a->moon = moon;
+    a->moon_radius = 2;
+    a->moon_disk_intensity = intensity;
+    a->sun_disk_intensity = 0;
+    ecs_modified(world, scene, Atmosphere);
+    ecs_entity_t camera = camera_new(world, scene, 0, 10, MOON_ELEVATION);
+    view_new(world, camera, true, true);
+
+    return render(world);
+}
+
+/** Count the pixels the moon disk lights: brighter with the disk than without it.
+ *
+ * @param sun_elevation Elevation of the sun in degrees
+ * @param threshold Brightness a pixel gains at least to count
+ * @return The pixels
+ */
+static int32_t moon_pixels(
+    float sun_elevation,
+    int32_t threshold)
+{
+    unsigned char *with = render_moon(sun_elevation, 4);
+    unsigned char *without = render_moon(sun_elevation, 0);
+    int32_t x, y, result = 0;
+    for (y = 0; y < HEIGHT; y ++) {
+        for (x = 0; x < WIDTH; x ++) {
+            int32_t a[3], b[3];
+            pixel(with, x, y, a);
+            pixel(without, x, y, b);
+            result += brightness(a) > brightness(b) + threshold;
+        }
+    }
+
+    stbi_image_free(with);
+    stbi_image_free(without);
+
+    return result;
+}
+
+void AtmosphereSky_full_moon_lights_more_pixels_than_quarter(void) {
+    // atmosphere/moon
+    int32_t full = moon_pixels(MOON_ELEVATION + 180, 60);
+    int32_t quarter = moon_pixels(MOON_ELEVATION - 90, 60);
+    test_assert(quarter > 60);
+    test_assert(full > quarter * 3 / 2);
+}
+
+void AtmosphereSky_new_moon_draws_no_disk(void) {
+    // atmosphere/moon
+    test_int(moon_pixels(MOON_ELEVATION, 3), 0);
+}

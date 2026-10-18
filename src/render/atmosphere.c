@@ -330,6 +330,19 @@ static void box_atmos_view(
     out->sun_disk[0] = cosf(radius);
     out->sun_disk[1] = sinf(radius);
     out->sun_disk[2] = glm_max(value->sun_disk_intensity, 0.0f);
+    if (!box_render_lights_atmos_moon(lights, v->scene, out->moon, out->moon_color,
+        &out->moon[3]))
+    {
+        glm_vec4_copy((vec4){0, -1, 0, 0}, out->moon);
+        glm_vec3_zero(out->moon_color);
+    }
+
+    radius = glm_rad(glm_min(value->moon_radius, 90.0f));
+    out->moon_disk[0] = cosf(radius);
+    out->moon_disk[1] = sinf(radius);
+    out->moon_disk[2] = glm_max(value->moon_disk_intensity, 0.0f) *
+        glm_max(value->moon_albedo, 0.0f);
+    out->moon_disk[3] = glm_max(value->earthshine, 0.0f);
     out->altitude = glm_max(value->ground_altitude +
         (camera_y - value->sea_level) / value->units_per_km, (float)BOX_ATMOS_PLANET_OFFSET);
     out->mie_anisotropy = value->mie.anisotropy;
