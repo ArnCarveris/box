@@ -277,6 +277,9 @@ static bool box_bake_captured_but(
  * other flags keep it static and baked, since it then enters or leaves the captures. A shape
  * that is deleted counts only when it was captured.
  *
+ * Nothing counts once the world quits: it deletes its roots before ecs_is_fini holds, while
+ * the spatial index cannot be queried.
+ *
  * @param it The iterator of the observer
  */
 static void BakeOnChange(
@@ -288,7 +291,7 @@ static void BakeOnChange(
     bool deleted = it->event == EcsOnRemove && it->other_table &&
         ecs_table_get_type(it->other_table)->count == 0;
     int32_t i;
-    if (ecs_is_fini(it->world) || !box_bake_recording(b) || (flag && deleted)) {
+    if (ecs_should_quit(it->world) || !box_bake_recording(b) || (flag && deleted)) {
         goto done;
     }
 
@@ -332,7 +335,7 @@ static void box_bake_record_tree(
 }
 
 /** Remember the static shapes below the entities whose Tint or Opacity changed, which apply
- * to every shape below them.
+ * to every shape below them. Nothing counts once the world quits, as for BakeOnChange.
  *
  * @param it The iterator of the observer
  */
@@ -341,7 +344,7 @@ static void BakeOnTree(
 {
     box_render_bake_t *b = it->ctx;
     int32_t i;
-    if (!ecs_is_fini(it->world) && box_bake_recording(b)) {
+    if (!ecs_should_quit(it->world) && box_bake_recording(b)) {
         for (i = 0; i < it->count; i ++) {
             box_bake_record_tree(it->world, b, it->entities[i]);
         }

@@ -1007,3 +1007,35 @@ void ReflectionInvalidation_scene_without_bake_records_nothing(void) {
 
     ecs_fini(world);
 }
+
+void ReflectionInvalidation_quit_records_nothing(void) {
+    // reflection_probes/invalidation
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t scene = scene_new(world, true);
+    probe_new(world, scene, -10, 2);
+    ecs_entity_t a = shape_new(world, scene, -10, 2);
+    ecs_entity_t b = shape_new(world, scene, -10, 0);
+    ecs_entity_t mover = shape_new(world, scene, -8, 0);
+    ecs_add_id(world, mover, DynamicTransform);
+    ecs_progress(world, 0);
+    settle(world, scene);
+
+    box_render_bake_t *state = box_bake_state(world);
+    test_assert(state != NULL);
+    ecs_set(world, a, Rgb, {255, 0, 0});
+    test_int(ecs_vec_count(&state->changes), 1);
+    ecs_progress(world, 0);
+    test_int(ecs_vec_count(&state->changes), 0);
+
+    /* The world deletes its roots once it quits, before it is fini, while the spatial index
+     * cannot be queried: the changes of its shapes are not recorded */
+    ecs_quit(world);
+    ecs_set(world, a, Rgb, {0, 255, 0});
+    ecs_delete(world, b);
+    ecs_set(world, scene, Tint, {0, 0, 255});
+    test_int(ecs_vec_count(&state->changes), 0);
+
+    ecs_fini(world);
+}
