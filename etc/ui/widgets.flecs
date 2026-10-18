@@ -1,0 +1,45 @@
+// The widget library of box, the script module box.widgets. box.ui loads it when a world imports
+// it; a scene writes `using box.widgets` and instantiates the templates:
+//
+//   Panel settings(title: "Audio") {
+//     Slider volume(min: 0, max: 100, step: 1, value: 80)
+//     Checkbox mute(label: "Mute")
+//   }
+//
+// Behavior and looks are separate templates. A headless template (HeadlessButton) owns the state
+// in mut variables and the async blocks that follow the input; the styled template (Button :
+// HeadlessButton) inherits it and only draws, from the theme in box.ui.theme[UiTheme]. An
+// application restyles a widget by inheriting the headless template in a template of its own.
+//
+// Values: a widget with a value has `prop value`, the initial value, and `mut current`, the value
+// now, in every widget. On a change by the user the widget assigns current and calls
+// ui.changed(this), so a scene awaits the change on the widget or any ancestor of it and reads the
+// mut of the template it instantiated:
+//
+//   async {
+//     while true {
+//       const e = await on.change(settings)
+//       volume_level = settings.volume[Slider.mut].current
+//     }
+//   }
+//
+// Setting the mut from C or the terminal (set settings.volume Slider.mut {current: 20}) changes
+// the widget without a change event.
+//
+// Interactive widgets show hover, pressed and focused looks, with a focus ring only while the
+// focus came from the keyboard (FocusStatus.visible). They are Focusable, so a FocusScope above
+// them makes Tab move between them, and follow the keyboard of their WAI-ARIA role through
+// on.activate (Enter, Space, a click) and on.key. `prop disabled` dims a widget with the
+// disabled_opacity of the theme and makes it ignore input and Tab. Widgets fit their content;
+// a `width` prop fixes their width, 0 fits.
+
+module box.widgets
+
+include theme
+include label
+include button
+include toggle
+include radio
+include slider
+include progress
+include stepper

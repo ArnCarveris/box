@@ -95,6 +95,41 @@ void Layout_ordered_children(void) {
     ecs_fini(world);
 }
 
+void Layout_ordered_children_added_late(void) {
+    // ui/layout
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t p = ecs_new(world);
+    ecs_entity_t a = ecs_new_w_pair(world, EcsChildOf, p);
+    ecs_set(world, a, Rect, {10, 10});
+    ecs_set(world, a, Rgb, {255, 0, 0});
+    ecs_entity_t b = ecs_new_w_pair(world, EcsChildOf, p);
+    ecs_set(world, b, Rect, {10, 10});
+    ecs_entity_t c = ecs_new_w_pair(world, EcsChildOf, p);
+    ecs_set(world, c, Rect, {10, 10});
+    ecs_set(world, c, Rgb, {0, 255, 0});
+    ecs_set(world, p, Layout, { .direction = DirectionRow });
+    ecs_entity_t d = ecs_new_w_pair(world, EcsChildOf, p);
+    ecs_set(world, d, Rect, {10, 10});
+    ecs_progress(world, 0);
+
+    test_flt(ecs_get(world, a, Position)->x, -15);
+    test_flt(ecs_get(world, b, Position)->x, -5);
+    test_flt(ecs_get(world, c, Position)->x, 5);
+    test_flt(ecs_get(world, d, Position)->x, 15);
+
+    ecs_entity_t order[] = { d, c, b, a };
+    ecs_set_child_order(world, p, order, 4);
+    ecs_modified(world, p, Layout);
+    ecs_progress(world, 0);
+
+    test_flt(ecs_get(world, d, Position)->x, -15);
+    test_flt(ecs_get(world, a, Position)->x, 15);
+
+    ecs_fini(world);
+}
+
 void Layout_row_spacing(void) {
     // ui/layout
     ecs_world_t *world = ecs_init();

@@ -276,4 +276,13 @@ void box_ui_shim_activate(
     box_ui_state_t *st,
     const UiActivateEvent *evt);
 
+/** Register UiTheme, the box.ui.theme entity and ui.sibling, and load the widget library.
+ *
+ * @param world The world
+ * @param ui The flecs.script.ui scope
+ */
+void box_ui_widgets_import(
+    ecs_world_t *world,
+    ecs_entity_t ui);
+
 #endif

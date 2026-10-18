@@ -452,7 +452,7 @@ void Game_scene_loads(void) {
         for (int32_t i = 0; i < it.count; i ++) {
             test_assert(s[i].script != NULL);
             test_assert(s[i].error == NULL);
-            scripts += s[i].filename != NULL;
+            scripts += s[i].filename != NULL && !strstr(s[i].filename, "etc/ui/");
         }
     }
 

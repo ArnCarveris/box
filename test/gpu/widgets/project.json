@@ -1,0 +1,45 @@
+{
+    "id": "widgets_gpu",
+    "type": "application",
+    "value": {
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "test": {
+        "testsuites": [
+            {
+                "id": "Basics",
+                "testcases": [
+                    "scene_loads",
+                    "button_click",
+                    "button_enter",
+                    "button_space",
+                    "button_action",
+                    "checkbox_click",
+                    "checkbox_space",
+                    "switch_click",
+                    "switch_space",
+                    "radio_click",
+                    "radio_arrows",
+                    "radio_one_tab_stop",
+                    "slider_drag",
+                    "slider_track_click",
+                    "slider_arrows",
+                    "slider_home_end",
+                    "slider_step_snapping",
+                    "slider_clamping",
+                    "stepper_buttons",
+                    "stepper_keys",
+                    "disabled_ignore_clicks",
+                    "disabled_skip_tab",
+                    "tab_order",
+                    "focus_ring_after_tab",
+                    "light_theme",
+                    "set_mut_no_change"
+                ]
+            }
+        ]
+    }
+}

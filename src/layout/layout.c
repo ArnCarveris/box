@@ -8,6 +8,7 @@
 
 #define BOX_LAYOUT_IMPL
 #include "layout_internal.h"
+#include <stdlib.h>
 
 ECS_TAG_DECLARE(ClipChildren);
 
@@ -385,6 +386,80 @@ void box_layout_text_register(
     });
 }
 
+/** Compare two entities by creation, the index part of their ids.
+ *
+ * @param a The first entity
+ * @param b The second entity
+ * @return Negative, zero or positive as a was created before, with or after b
+ */
+static int box_layout_compare_created(
+    const void *a,
+    const void *b)
+{
+    uint32_t ia = (uint32_t)*(const ecs_entity_t*)a;
+    uint32_t ib = (uint32_t)*(const ecs_entity_t*)b;
+
+    return (ia > ib) - (ia < ib);
+}
+
+/** Put the children of the parents that got OrderedChildren since the last layout in the order
+ * they were created.
+ *
+ * flecs lists the children a parent had before it got the trait table by table, so the children
+ * of a template instance whose body adds the Layout, created by the scene before the body ran,
+ * would otherwise be placed in an order that depends on their components.
+ *
+ * @param world The world
+ * @param state The layout state
+ */
+static void box_layout_order(
+    ecs_world_t *world,
+    box_layout_state_t *state)
+{
+    ecs_vec_t sorted;
+    int32_t i;
+    ecs_vec_init_t(NULL, &sorted, ecs_entity_t, 0);
+    for (i = 0; i < ecs_vec_count(&state->ordered); i ++) {
+        ecs_entity_t parent = *ecs_vec_get_t(&state->ordered, ecs_entity_t, i);
+        ecs_entities_t children = { 0 };
+        if (ecs_is_alive(world, parent) && ecs_has_id(world, parent, EcsOrderedChildren)) {
+            children = ecs_get_ordered_children(world, parent);
+        }
+
+        if (children.count < 2) {
+            continue;
+        }
+
+        ecs_vec_set_count_t(NULL, &sorted, ecs_entity_t, children.count);
+        ecs_os_memcpy_n(ecs_vec_first(&sorted), children.ids, ecs_entity_t, children.count);
+        qsort(ecs_vec_first(&sorted), (size_t)children.count, sizeof(ecs_entity_t),
+            box_layout_compare_created);
+        if (ecs_os_memcmp(ecs_vec_first(&sorted), children.ids,
+            ECS_SIZEOF(ecs_entity_t) * children.count))
+        {
+            ecs_set_child_order(world, parent, ecs_vec_first(&sorted), children.count);
+            box_layout_mark(state, parent);
+        }
+    }
+
+    ecs_vec_clear(&state->ordered);
+    ecs_vec_fini_t(NULL, &sorted, ecs_entity_t);
+}
+
+/** Queue the parents that got OrderedChildren for box_layout_order.
+ *
+ * @param it Iterator of the observer
+ */
+static void box_layout_on_ordered(
+    ecs_iter_t *it)
+{
+    box_layout_state_t *state = it->ctx;
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        *ecs_vec_append_t(NULL, &state->ordered, ecs_entity_t) = it->entities[i];
+    }
+}
+
 /** Size the elements that fill a surface to the size of the surface in points.
  *
  * @param it The system iterator
@@ -431,6 +506,7 @@ static void LayoutUpdate(
     ecs_world_t *world = it->world;
     box_layout_state_t *state = it->ctx;
     int32_t i, count;
+    box_layout_order(world, state);
     box_layout_moved(world, state, true);
     box_layout_scrolls(world, state);
     count = ecs_vec_count(&state->marks);
@@ -505,6 +581,7 @@ static void box_layout_registry_dtor(
             ecs_vec_fini_t(NULL, &state->scrolls, ecs_entity_t);
             ecs_vec_fini_t(NULL, &state->shifts, ecs_entity_t);
             ecs_vec_fini_t(NULL, &state->floats, ecs_entity_t);
+            ecs_vec_fini_t(NULL, &state->ordered, ecs_entity_t);
             ecs_vec_fini_t(NULL, &state->placing, box_layout_placing_t);
             ecs_map_fini(&state->parents);
             ecs_map_fini(&state->scrolled);
@@ -596,6 +673,7 @@ void BoxLayoutImport(
     ecs_vec_init_t(NULL, &state->scrolls, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &state->shifts, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &state->floats, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &state->ordered, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &state->placing, box_layout_placing_t, 0);
     ecs_map_init(&state->scrolled, NULL);
     ecs_map_init(&state->anchor_sizes, NULL);
@@ -638,6 +716,14 @@ void BoxLayoutImport(
         .query.terms = {{ .id = ecs_id(Layout), .inout = EcsInOutNone }},
         .events = { EcsOnRemove },
         .callback = box_layout_on_layout_remove,
+        .ctx = state
+    });
+
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "LayoutOnOrdered" }),
+        .query.terms = {{ .id = EcsOrderedChildren }},
+        .events = { EcsOnAdd },
+        .callback = box_layout_on_ordered,
         .ctx = state
     });
 

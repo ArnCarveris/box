@@ -1,0 +1,191 @@
+// Widget gallery: the widgets of box.widgets in a screen space UI, each in its normal and
+// disabled state. Tab moves the focus through them, the status line shows the last change.
+// The Basics section is filled; the room right of it is for the containers and text sections.
+
+using flecs.script
+using box.transform
+using box.camera
+using box.view
+using box.surface
+using box.layout
+using box.geometry
+using box.material
+using box.text
+using box.input
+using box.picking
+using box.ui
+using box.widgets
+
+window {
+  Surface: {width: 1280, height: 800}
+}
+
+actions {
+  ping {
+    Action: {description: "Ping from the gallery"}
+  }
+}
+
+// An empty scene whose view paints the background of the theme behind the UI
+backdrop {
+  Scene: {}
+
+  camera {
+    Position: {0, 0, 100}
+    Camera: {ortho: true, ortho_scale: 1}
+  }
+}
+
+template Gallery {
+  mut last: string = "none"
+  mut changes: i32 = 0
+  mut pings: i32 = 0
+
+  const t = box.ui.theme[UiTheme]
+
+  async {
+    while true {
+      await on.pressed(actions.ping)
+      pings = pings + 1
+    }
+  }
+
+  // The background view is created before the UI view, so the UI draws over it
+  backdrop_view {
+    View: {
+      camera: backdrop.camera,
+      clear: {enabled: true, color: {t.background.r, t.background.g, t.background.b, 255}},
+      lighting: {enabled: false},
+      culling: {enabled: false}
+    }
+  }
+
+  // Screen space UI: one logical pixel is one point, the root fills the window
+  hud {
+    Scene: {}
+
+    camera {
+      Position: {0, 0, 100}
+      Camera: {ortho: true, ortho_scale: 1}
+    }
+
+    root {
+      LayoutFill: {surface: window}
+      Layout: {direction: Column, spacing: 16, padding: {24, 24, 24, 24}}
+      FocusScope
+
+      // The status line follows every change reported below the root
+      async {
+        while true {
+          const e = await on.change(this)
+          const w = e.widget
+          changes = changes + 1
+          if w.has(Slider) {
+            last = "{w.name()}: {w[Slider.mut].current:.2}"
+          } else if w.has(Stepper) {
+            last = "{w.name()}: {w[Stepper.mut].current:.0}"
+          } else if w.has(Checkbox) {
+            last = "{w.name()}: {w[Checkbox.mut].current}"
+          } else if w.has(Switch) {
+            last = "{w.name()}: {w[Switch.mut].current}"
+          } else if w.has(RadioGroup) {
+            last = "{w.name()}: {w[RadioGroup.mut].current}"
+          } else {
+            last = "{w.name()}"
+          }
+        }
+      }
+
+      header {
+        Layout: {direction: Row, spacing: 16, v: Bottom}
+        LayoutItem: {width: {mode: Grow}}
+
+        Label title(text: "Widgets", variant: "heading")
+        Label status(text: "Last change: {last}", variant: "muted")
+        Label pings(text: "Pings: {pings}", variant: "caption")
+      }
+
+      sections {
+        Layout: {direction: Row, spacing: 16}
+        LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+
+        Panel basics(title: "Basics", width: 600) {
+          labels {
+            Layout: {direction: Row, spacing: 16, v: Bottom}
+            Label heading(text: "Heading", variant: "heading")
+            Label body(text: "Body text")
+            Label muted(text: "Muted text", variant: "muted")
+            Label caption(text: "Caption", variant: "caption")
+          }
+
+          Separator labels_end()
+
+          buttons {
+            Layout: {direction: Row, spacing: 8, v: Middle}
+            Button save(label: "Save")
+            Button cancel(label: "Cancel", variant: "secondary")
+            Button more(label: "More", variant: "ghost")
+            Button remove(label: "Delete", variant: "danger")
+            Button ping(label: "Ping", variant: "secondary", action: actions.ping)
+            Button off(label: "Disabled", disabled: true)
+          }
+
+          toggles {
+            Layout: {direction: Row, spacing: 16, v: Middle}
+            Checkbox sound(label: "Sound")
+            Checkbox music(label: "Music", value: true)
+            Checkbox locked(label: "Locked", disabled: true)
+            Switch wifi(label: "Wi-Fi")
+            Switch airplane(label: "Airplane", value: true, disabled: true)
+          }
+
+          radios {
+            Layout: {direction: Row, spacing: 48}
+
+            RadioGroup size(value: "Medium") {
+              RadioButton small(label: "Small")
+              RadioButton medium(label: "Medium")
+              RadioButton large(label: "Large")
+              RadioButton huge(label: "Huge", disabled: true)
+            }
+
+            RadioGroup quality(value: "High", disabled: true) {
+              RadioButton low(label: "Low")
+              RadioButton high(label: "High")
+            }
+          }
+
+          Separator radios_end()
+
+          sliders {
+            Layout: {direction: Row, spacing: 24}
+            Slider volume(label: "Volume", width: 168, min: 0, max: 100, step: 10, value: 40, unit: "%")
+            Slider gain(label: "Gain", width: 168, min: 0, max: 1, step: 0, value: 0.5, decimals: 2)
+            Slider muted(label: "Disabled", width: 168, value: 70, disabled: true)
+          }
+
+          progress {
+            Layout: {direction: Row, spacing: 24}
+            ProgressBar download(label: "Download", value: 0.65, width: 168)
+            ProgressBar done(label: "Done", value: 1, width: 168)
+          }
+
+          steppers {
+            Layout: {direction: Row, spacing: 16, v: Middle}
+            Stepper count(min: 0, max: 5, value: 2)
+            Stepper fixed(min: 0, max: 5, value: 3, disabled: true)
+          }
+        }
+      }
+    }
+  }
+
+  // The UI view draws over the background without clearing it
+  hud_view {
+    View: {camera: hud.camera, lighting: {enabled: false}, culling: {enabled: false}}
+  }
+}
+
+gallery {
+  Gallery: {}
+}

@@ -11,6 +11,7 @@
 
 #include "types.h"
 #include "input.h"
+#include "material.h"
 #include "picking.h"
 
 #ifdef BOX_UI_IMPL
@@ -91,11 +92,47 @@ ECS_STRUCT(UiChangeEvent, {
     ecs_entity_t widget; /**< Widget that reported the change or the submit */
 });
 
+/** Colors and metrics of the widgets, on the box.ui.theme entity.
+ *
+ * The widgets of box.widgets read box.ui.theme[UiTheme] reactively, so setting another value
+ * restyles every widget in the next frame. A new UiTheme holds box.widgets.DarkTheme, the other
+ * preset is box.widgets.LightTheme. Lengths are logical pixels.
+ */
+ECS_STRUCT(UiTheme, {
+    Rgb background;         /**< Behind the panels, the window */
+    Rgb surface;            /**< Panels and the face of controls */
+    Rgb surface_alt;        /**< Insets: tracks, boxes and fields */
+    Rgb border;             /**< Edges of panels and controls */
+    Rgb text;               /**< Body text */
+    Rgb text_muted;         /**< Secondary text: captions, hints */
+    Rgb accent;             /**< Primary buttons, checked and filled parts */
+    Rgb accent_text;        /**< Text and marks on the accent */
+    Rgb hover;              /**< Face of a hovered control */
+    Rgb pressed;            /**< Face of a pressed control */
+    Rgb focus;              /**< The focus ring */
+    Rgb danger;             /**< Destructive buttons and errors */
+    Rgb selection;          /**< Behind selected text */
+    Rgb caret;              /**< The text caret */
+    float disabled_opacity; /**< Opacity of a disabled widget */
+    float font_size;        /**< Body text */
+    float small_font_size;  /**< Captions */
+    float heading_font_size; /**< Headings and panel titles */
+    float radius;           /**< Corner radius of controls */
+    float padding;          /**< Space inside panels and controls */
+    float spacing;          /**< Space between the children of a panel or a row */
+    float control_height;   /**< Height of buttons, fields and rows of controls */
+    float focus_width;      /**< Width of the focus ring */
+    float caret_blink;      /**< Seconds of one on or off phase of the caret, 0 for steady */
+});
+
 /** Register the box.ui module.
  *
  * Registers the async script functions flecs.script.on.focus, blur, key, activate, change and
  * submit, each taking a target and resolving on the target and its ancestors, and ui.focus,
  * ui.changed and ui.submit, which resolve at once (await ui.changed(this)).
+ *
+ * Creates box.ui.theme with a UiTheme and loads the widget library box.widgets as a managed
+ * script from etc/ui/widgets.flecs, found as a Font.path is; without it there are no widgets.
  *
  * @param world The world
  */

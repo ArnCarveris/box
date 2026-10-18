@@ -21,6 +21,7 @@
                     "row_places_children",
                     "column_places_children",
                     "ordered_children",
+                    "ordered_children_added_late",
                     "row_spacing",
                     "column_spacing",
                     "padding",
@@ -282,6 +283,16 @@
                     "change_on_widget_and_ancestor",
                     "submit_on_widget_and_ancestor",
                     "change_once_per_report"
+                ]
+            },
+            {
+                "id": "Widgets",
+                "testcases": [
+                    "library_loads",
+                    "templates_exist",
+                    "missing_file",
+                    "theme_dark",
+                    "sibling"
                 ]
             }
         ]

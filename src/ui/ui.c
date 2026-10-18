@@ -1,7 +1,7 @@
 /**
  * @file ui/ui.c
- * @brief Registers box.ui: the focus tags, the event types, the module state and its hooks in
- * box.input and box.picking.
+ * @brief Registers box.ui: the focus tags, the event types, the module state, its hooks in
+ * box.input and box.picking, the theme and the widget library.
  */
 
 #define BOX_UI_IMPL
@@ -102,6 +102,7 @@ void BoxUiImport(
     ECS_META_COMPONENT(world, UiKeyEvent);
     ECS_META_COMPONENT(world, UiActivateEvent);
     ECS_META_COMPONENT(world, UiChangeEvent);
+    ECS_META_COMPONENT(world, UiTheme);
     ecs_set_hooks(world, FocusStatus, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, UiFocusEvent, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, UiKeyEvent, { .ctor = flecs_default_ctor });
@@ -141,4 +142,5 @@ void BoxUiImport(
     box_ui_keys_import(world, st);
     box_ui_events_import(world, st, on, ui);
     box_ui_shim_import(world, st, on, ui);
+    box_ui_widgets_import(world, ui);
 }
