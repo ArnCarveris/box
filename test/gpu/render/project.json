@@ -661,6 +661,19 @@
                     "flash_lights_wall",
                     "lingering_renders_after_delete"
                 ]
+            },
+            {
+                "id": "Parametric",
+                "testcases": [
+                    "profile_hole",
+                    "profile_concave",
+                    "sweep",
+                    "lathe_cavity",
+                    "profile_multiple_holes",
+                    "bake_hollow",
+                    "profile_many_holes",
+                    "loft_transform"
+                ]
             }
         ]
     }

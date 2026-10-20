@@ -1,0 +1,175 @@
+#include "mesh_cache.h"
+#include <math.h>
+
+static ECS_TAG_DECLARE(SurfaceOwnsManual);
+
+static bool box_attachment_update(ecs_world_t *world, ecs_entity_t e, int depth, mat4 output);
+
+static bool box_attachment_transform(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    mat4 m,
+    int depth)
+{
+    if (depth > 64 || !ecs_is_alive(world, e)) {
+        return false;
+    }
+
+    if (ecs_has(world, e, SurfaceAttachment)) {
+        return box_attachment_update(world, e, depth + 1, m);
+    }
+
+    if (ecs_has_id(world, e, ManualTransform)) {
+        const WorldTransform *t = ecs_get(world, e, WorldTransform);
+        if (!t) {
+            return false;
+        }
+
+        glm_mat4_copy(ECS_CONST_CAST(vec4*, t->m), m);
+
+        return true;
+    }
+
+    ecs_entity_t parent = ecs_get_parent(world, e);
+    mat4 base, local;
+    glm_mat4_identity(base);
+    if (parent && !box_attachment_transform(world, parent, base, depth + 1)) {
+        return false;
+    }
+
+    const Position *position = ecs_get(world, e, Position);
+    const Rotation *rotation = ecs_get(world, e, Rotation);
+    const Scale *scale = ecs_get(world, e, Scale);
+    glm_mat4_identity(local);
+    if (rotation) {
+        glm_euler_yxz((vec3){rotation->x, rotation->y, rotation->z}, local);
+    }
+
+    if (scale) {
+        glm_scale(local, (vec3){scale->x, scale->y, scale->z});
+    }
+
+    if (position) {
+        glm_vec3_copy((vec3){position->x, position->y, position->z}, local[3]);
+    }
+
+    glm_mat4_mul(base, local, m);
+
+    return true;
+}
+
+static bool box_attachment_update(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    int depth,
+    mat4 output)
+{
+    const SurfaceAttachment *value = ecs_get(world, e, SurfaceAttachment);
+    if (!value || !value->target || value->target == e || depth > 64 ||
+        !ecs_is_alive(world, value->target))
+    {
+        return false;
+    }
+
+    SurfaceAttachment attachment = *value;
+    box_surface_sample_t sample;
+    if (!box_surface_evaluate(world, attachment.target, attachment.region,
+        attachment.u, attachment.v, &sample))
+    {
+        return false;
+    }
+
+    mat4 target, inverse, frame, rotation;
+    if (!box_attachment_transform(world, attachment.target, target, depth + 1) ||
+        fabsf(glm_mat4_det(target)) < 0.00000001f)
+    {
+        return false;
+    }
+
+    glm_mat4_inv(target, inverse);
+    glm_mat4_transpose(inverse);
+    glm_mat4_identity(frame);
+    vec3 point;
+    glm_vec3_muladds(sample.normal, attachment.offset, sample.position);
+    glm_mat4_mulv3(target, sample.position, 1, point);
+    glm_mat4_mulv3(inverse, sample.normal, 0, frame[2]);
+    glm_vec3_normalize(frame[2]);
+    glm_mat4_mulv3(target, sample.tangent, 0, frame[0]);
+    glm_vec3_muladds(frame[2], -glm_vec3_dot(frame[0], frame[2]), frame[0]);
+    glm_vec3_normalize(frame[0]);
+    glm_vec3_cross(frame[2], frame[0], frame[1]);
+    glm_vec3_copy(point, frame[3]);
+    glm_euler_yxz(attachment.rotation, rotation);
+    WorldTransform result;
+    glm_mat4_mul(frame, rotation, result.m);
+    const Scale *scale = ecs_get(world, e, Scale);
+    if (scale) {
+        glm_scale(result.m, (vec3){scale->x, scale->y, scale->z});
+    }
+
+    const WorldTransform *old = ecs_get(world, e, WorldTransform);
+    bool changed = !old;
+    for (int i = 0; old && i < 4; i ++) {
+        for (int j = 0; j < 4; j ++) {
+            changed |= fabsf(old->m[i][j] - result.m[i][j]) > 0.000001f;
+        }
+    }
+
+    if (output) {
+        glm_mat4_copy(result.m, output);
+    }
+
+    if (changed) {
+        ecs_set_ptr(world, e, WorldTransform, &result);
+    }
+
+    return true;
+}
+
+static void box_attachment_set(
+    ecs_iter_t *it)
+{
+    for (int i = 0; i < it->count; i ++) {
+        ecs_entity_t e = it->entities[i];
+        if (!ecs_has_id(it->world, e, ManualTransform)) {
+            ecs_add_id(it->world, e, SurfaceOwnsManual);
+            ecs_add_id(it->world, e, ManualTransform);
+        }
+
+        box_attachment_update(it->world, e, 0, NULL);
+    }
+}
+
+static void box_attachment_remove(
+    ecs_iter_t *it)
+{
+    for (int i = 0; i < it->count; i ++) {
+        ecs_entity_t e = it->entities[i];
+        if (it->other_table && ecs_has_id(it->world, e, SurfaceOwnsManual)) {
+            ecs_remove_id(it->stage, e, SurfaceOwnsManual);
+            ecs_remove_id(it->stage, e, ManualTransform);
+        }
+    }
+}
+
+static void box_attachments_update(
+    ecs_iter_t *it)
+{
+    for (int i = 0; i < it->count; i ++) {
+        box_attachment_update(it->world, it->entities[i], 0, NULL);
+    }
+}
+
+void box_geometry_attachments_init(
+    ecs_world_t *world)
+{
+    ECS_IMPORT(world, BoxTransform);
+    ECS_TAG_DEFINE(world, SurfaceOwnsManual);
+    ecs_observer(world, {.query.terms = {{.id = ecs_id(SurfaceAttachment)}},
+        .events = {EcsOnSet}, .callback = box_attachment_set});
+    ecs_observer(world, {.query.terms = {{.id = ecs_id(SurfaceAttachment)}},
+        .events = {EcsOnRemove}, .callback = box_attachment_remove});
+    ecs_system(world, {.entity = ecs_entity(world, {.name = "SurfacePlacement"}),
+        .phase = EcsPostUpdate, .query.terms = {{.id = ecs_id(SurfaceAttachment)}},
+        .callback = box_attachments_update});
+}

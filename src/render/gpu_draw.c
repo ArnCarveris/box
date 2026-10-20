@@ -178,6 +178,7 @@ static void box_gpu_mesh_free(
     box_gpu_t *gpu,
     box_gpu_mesh_t *m)
 {
+    wgpuBufferRelease(m->surface_assets);
     wgpuBufferRelease(m->vertices);
     wgpuBufferRelease(m->indices);
     ecs_os_free(m);
@@ -197,6 +198,9 @@ static void box_gpu_buffer_free(
         wgpuBindGroupRelease(b->instances);
     }
 
+    if (b->surface_assets) {
+        wgpuBufferRelease(b->surface_assets);
+    }
     wgpuBufferRelease(b->buffer);
     ecs_os_free(b);
     box_gpu_count(gpu, BOX_GPU_STAT_BUFFER_DESTROYED);
@@ -309,10 +313,27 @@ void box_gpu_mesh_apply(
 
     uint64_t vertex_size = (uint64_t)desc->vertex_count * sizeof(box_vertex_t);
     uint64_t index_size = (uint64_t)desc->index_count * sizeof(uint32_t);
+    uint64_t asset_size = desc->surface_asset_count ? (uint64_t)desc->surface_asset_count * sizeof(vec4) : sizeof(vec4);
+    WGPULimits limits = WGPU_LIMITS_INIT;
+    if (wgpuDeviceGetLimits(gpu->device, &limits) != WGPUStatus_Success ||
+        vertex_size > limits.maxBufferSize || index_size > limits.maxBufferSize ||
+        index_size > limits.maxStorageBufferBindingSize ||
+        asset_size > limits.maxBufferSize || asset_size > limits.maxStorageBufferBindingSize)
+    {
+        ecs_err("surface mesh exceeds device buffer capacity");
+        goto done;
+    }
     const uint8_t *vertices = (const uint8_t*)(desc + 1);
     m = ecs_os_calloc_t(box_gpu_mesh_t);
     m->vertices = box_gpu_buffer_new(gpu, vertex_size, WGPUBufferUsage_Vertex);
-    m->indices = box_gpu_buffer_new(gpu, index_size, WGPUBufferUsage_Index);
+    m->indices = box_gpu_buffer_new(gpu, index_size,
+        WGPUBufferUsage_Index | WGPUBufferUsage_Storage);
+    m->surface_asset_size = desc->surface_asset_count ? (uint64_t)desc->surface_asset_count * sizeof(vec4) : sizeof(vec4);
+    m->surface_assets = box_gpu_buffer_new(gpu, m->surface_asset_size, WGPUBufferUsage_Storage);
+    if (desc->surface_asset_count) {
+        wgpuQueueWriteBuffer(gpu->queue, m->surface_assets, 0,
+            vertices + vertex_size + index_size, m->surface_asset_size);
+    }
     m->index_count = desc->index_count;
     box_gpu_mesh_bounds(m, (const box_vertex_t*)vertices, desc->vertex_count);
     wgpuQueueWriteBuffer(gpu->queue, m->vertices, 0, vertices, (size_t)vertex_size);
@@ -350,6 +371,12 @@ void box_gpu_buffer_apply(
 
     b = ecs_os_calloc_t(box_gpu_buffer_t);
     b->buffer = box_gpu_buffer_new(gpu, desc->size, usage);
+    box_gpu_mesh_t *mesh = ecs_map_get_deref(&gpu->meshes, box_gpu_mesh_t, (desc->usage & BOX_RENDER_BUFFER_INSTANCE) ? desc->surface_mesh : 0);
+    if (mesh) {
+        b->surface_assets = mesh->surface_assets;
+        b->surface_asset_size = mesh->surface_asset_size;
+        wgpuBufferAddRef(b->surface_assets);
+    }
     b->size = desc->size;
     b->usage = desc->usage;
     b->version = ++ gpu->buffer_writes;

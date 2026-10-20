@@ -464,6 +464,7 @@ static bool box_shader_used(
     uint32_t handle)
 {
     bool result = handle == BOX_RENDER_SHADER_SCATTER && ecs_vec_count(&p->scatters);
+
     uint32_t pipeline = handle == BOX_RENDER_SHADER_CLUSTER ||
         handle == BOX_RENDER_SHADER_SHADOW || handle == BOX_RENDER_SHADER_CULL
         ? BOX_RENDER_SHADER_MESH

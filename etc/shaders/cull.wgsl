@@ -82,6 +82,7 @@ const PHASE_LATE: u32 = 2u;
 @group(0) @binding(5) var<storage, read> slot_lists: array<u32>;
 @group(0) @binding(6) var<storage, read_write> scan_words: array<u32>;
 @group(1) @binding(0) var<storage, read> instances: array<Instance>;
+@group(1) @binding(1) var<storage, read> surface_assets: array<vec4f>;
 @group(2) @binding(0) var<storage, read_write> history: array<u32>;
 @group(2) @binding(1) var pyramid: texture_2d<f32>;
 
@@ -101,12 +102,19 @@ var<workgroup> scan_sums: array<u32, 256>;
 // The size is the diameter of the sphere around the box in pixels, tested only when the box is
 // in front of the camera (w beyond the radius); size.z is 0 for orthographic projections.
 fn visible(job: Job, slot: u32) -> bool {
-    let m = instances[job.pool + slot].model;
+    let inst = instances[job.pool + slot];
+    let m = inst.model;
+    var local_center = job.center;
+    var local_extent = job.extent;
+    if (inst.surface.p[0].x != 0.0) {
+        local_center = inst.surface.p[22].xyz;
+        local_extent = inst.surface.p[23].xyz;
+    }
     let c0 = m[0].xyz;
     let c1 = m[1].xyz;
     let c2 = m[2].xyz;
-    let center = c0 * job.center.x + c1 * job.center.y + c2 * job.center.z + m[3].xyz;
-    let extent = abs(c0) * job.extent.x + abs(c1) * job.extent.y + abs(c2) * job.extent.z;
+    let center = c0 * local_center.x + c1 * local_center.y + c2 * local_center.z + m[3].xyz;
+    let extent = abs(c0) * local_extent.x + abs(c1) * local_extent.y + abs(c2) * local_extent.z;
     var result = true;
     for (var i = 0u; i < 6u; i++) {
         let p = cull.planes[i];
@@ -131,13 +139,20 @@ fn visible(job: Job, slot: u32) -> bool {
 // and the instance is hidden when its nearest depth is farther than the farthest depth they
 // hold. A box that reaches behind the camera or in front of the near plane is never hidden.
 fn occluded(job: Job, slot: u32) -> bool {
-    let m = instances[job.pool + slot].model;
-    let center = m[0].xyz * job.center.x + m[1].xyz * job.center.y + m[2].xyz * job.center.z +
+    let inst = instances[job.pool + slot];
+    let m = inst.model;
+    var local_center = job.center;
+    var local_extent = job.extent;
+    if (inst.surface.p[0].x != 0.0) {
+        local_center = inst.surface.p[22].xyz;
+        local_extent = inst.surface.p[23].xyz;
+    }
+    let center = m[0].xyz * local_center.x + m[1].xyz * local_center.y + m[2].xyz * local_center.z +
         m[3].xyz;
     let origin = cull.view_proj * vec4f(center, 1.0);
-    let dx = cull.view_proj * vec4f(m[0].xyz * job.extent.x, 0.0);
-    let dy = cull.view_proj * vec4f(m[1].xyz * job.extent.y, 0.0);
-    let dz = cull.view_proj * vec4f(m[2].xyz * job.extent.z, 0.0);
+    let dx = cull.view_proj * vec4f(m[0].xyz * local_extent.x, 0.0);
+    let dy = cull.view_proj * vec4f(m[1].xyz * local_extent.y, 0.0);
+    let dz = cull.view_proj * vec4f(m[2].xyz * local_extent.z, 0.0);
     var lo = vec2f(1.0);
     var hi = vec2f(0.0);
     var depth = 0.0;

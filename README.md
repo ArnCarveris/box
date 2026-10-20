@@ -37,6 +37,9 @@ run from the repository root or from an app's folder finds the engine's assets a
 app keeps its own assets in `apps/<app>/etc` and names them from the repository root, e.g.
 `apps/bunnyhopper/etc/bunnyhopper.flecs`.
 
+Parameterized surfaces and surface-relative placement are described in
+[Geometry surfaces](docs/geometry-surfaces.md).
+
 ## Browser build
 
 ```sh

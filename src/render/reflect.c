@@ -792,6 +792,7 @@ static void box_reflect_send(
         box_render_buffer_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_BUFFER,
             BOX_RENDER_CREATE, s->buffer, sizeof(box_render_buffer_desc_t));
         desc->size = s->capacity * (uint64_t)sizeof(box_render_reflection_probe_t);
+        desc->surface_mesh = 0;
         desc->usage = BOX_RENDER_BUFFER_STORAGE;
         s->sent = false;
     }

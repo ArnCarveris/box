@@ -67,6 +67,7 @@
 /** PCF taps per axis of a shadow lookup at most */
 #define BOX_RENDER_SHADOW_FILTER_MAX (7)
 
+
 /** Shader handle of the engine shader of the forward pass that draws the 2D shapes */
 #define BOX_RENDER_SHADER_SHAPE2D (7)
 
@@ -340,6 +341,7 @@ typedef struct box_render_target_desc_t {
  * triangle. A mesh does not change under its handle; it is destroyed and created again.
  */
 typedef struct box_render_mesh_desc_t {
+    uint32_t surface_asset_count;
     uint32_t vertex_count;  /**< Vertices after the description */
     uint32_t index_count;   /**< Indices after the vertices */
 } box_render_mesh_desc_t;
@@ -576,6 +578,7 @@ typedef struct box_render_clip_t {
 
 /** Description of a BOX_RENDER_BUFFER create; creating an existing handle replaces it */
 typedef struct box_render_buffer_desc_t {
+    uint32_t surface_mesh;
     uint64_t size;          /**< Bytes of the buffer */
     uint32_t usage;         /**< box_render_buffer_usage_t flags */
 } box_render_buffer_desc_t;
@@ -592,6 +595,7 @@ typedef struct box_render_instance_t {
     vec4 emissive;          /**< Linear emitted color times its strength, w unused */
     vec4 material;          /**< Metallic, roughness, z and w unused */
     vec4 uv;                /**< TextureTransform: u scale, v scale, u offset, v offset */
+    struct { vec4 p[BOX_SURFACE_VECTORS]; } surface;
 } box_render_instance_t;
 
 /** Compute pass that copies changed instances from the change buffer into their slots.

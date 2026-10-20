@@ -188,8 +188,9 @@ static void box_shape2d_resolve(
 
     if (mesh && (!mesh->mesh != !drawn || ecs_os_memcmp(mesh->scale, scale, ECS_SIZEOF(vec3)))) {
         uint32_t handle = drawn ? box_mesh_cache_acquire(shape->cache, shape, NULL) : 0;
-        box_mesh_cache_release(shape->cache, mesh->mesh);
+        box_shape_mesh_release(shape->cache, mesh);
         mesh->mesh = handle;
+        mesh->render_mesh = 0;
         glm_vec3_copy(scale, mesh->scale);
         ecs_modified(it->stage, e, ShapeMesh);
     }

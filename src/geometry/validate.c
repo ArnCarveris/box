@@ -1,0 +1,309 @@
+#include "paths.h"
+#include <math.h>
+
+static const char* box_validate_path(
+    const ecs_world_t *world,
+    ecs_entity_t entity,
+    bool three,
+    int32_t closed)
+{
+    if (!entity || !ecs_is_alive(world, entity) ||
+        !(three ? ecs_has(world, entity, Path3D) : ecs_has(world, entity, Path2D)))
+    {
+        return three ? "missing Path3D with at least one segment" :
+            "missing Path2D with at least one segment";
+    }
+
+    ecs_vec_t points = {0};
+    bool ok = three ? box_path3_sample(world, entity, &points) :
+        box_path2_sample(world, entity, &points);
+    const char *reason = NULL;
+    if (!ok) {
+        reason = "path has no usable segments or contains invalid coordinates";
+        goto done;
+    }
+
+    bool path_closed = three ? ecs_get(world, entity, Path3D)->closed :
+        ecs_get(world, entity, Path2D)->closed;
+    if (closed >= 0 && path_closed != (bool)closed) {
+        reason = closed ? "profile path must be closed" : "contour path must be open";
+        goto done;
+    }
+
+    int32_t count = ecs_vec_count(&points);
+    const float *data = ecs_vec_first(&points);
+    int32_t dimensions = three ? 3 : 2;
+    bool span = false;
+    for (int32_t i = 1; i < count && !span; i ++) {
+        for (int32_t j = 0; j < dimensions; j ++) {
+            span |= data[i * dimensions + j] != data[j];
+        }
+    }
+    if (!span) {
+        reason = "path is degenerate; move a point away from the start";
+        goto done;
+    }
+
+    if (closed == 1 && !three) {
+        if (count < 3) {
+            reason = "closed path needs at least three distinct points";
+            goto done;
+        }
+        double area = 0;
+        for (int32_t i = 0; i < count; i ++) {
+            int32_t next = (i + 1) % count;
+            area += (double)data[2 * i] * data[2 * next + 1] -
+                (double)data[2 * next] * data[2 * i + 1];
+        }
+        if (fabs(area) < 1e-8) {
+            reason = "closed path has zero area; correct its footprint";
+        }
+    }
+done:
+    if (three) {
+        ecs_vec_fini_t(NULL, &points, vec3);
+    } else {
+        ecs_vec_fini_t(NULL, &points, vec2);
+    }
+    return reason;
+}
+
+static const char* box_validate_profile(
+    const ecs_world_t *world,
+    ecs_entity_t entity)
+{
+    const Profile2D *profile = entity && ecs_is_alive(world, entity) ?
+        ecs_get(world, entity, Profile2D) : NULL;
+    if (!profile) {
+        return "missing Profile2D with a closed outer Path2D";
+    }
+    const char *reason = box_validate_path(world, profile->outer, false, true);
+    if (reason) {
+        return reason;
+    }
+    const ecs_entity_t *holes = ecs_vec_first(&profile->holes);
+    for (int32_t i = 0; i < ecs_vec_count(&profile->holes); i ++) {
+        reason = box_validate_path(world, holes[i], false, true);
+        if (reason) {
+            return reason;
+        }
+    }
+    return NULL;
+}
+
+static void box_validate_report_status(
+    const ecs_world_t *world,
+    ecs_entity_t entity,
+    const char *status,
+    const char *component,
+    const char *reason)
+{
+    if (!reason) {
+        return;
+    }
+    char *path = ecs_get_path(world, entity);
+    ecs_err("%s %s on %s: %s", status, component, path, reason);
+    ecs_os_free(path);
+}
+
+static void box_validate_report(
+    const ecs_world_t *world,
+    ecs_entity_t entity,
+    const char *component,
+    const char *reason)
+{
+    box_validate_report_status(world, entity, "invalid", component, reason);
+}
+
+static bool box_validate_path2_hook(ecs_world_t *world, ecs_entity_t entity, void *ptr)
+{
+    const Path2D *path = ptr;
+    box_validate_report(world, entity, "Path2D",
+        box_validate_path(world, entity, false, path->closed));
+    return true;
+}
+
+static bool box_validate_path3_hook(ecs_world_t *world, ecs_entity_t entity, void *ptr)
+{
+    const Path3D *path = ptr;
+    box_validate_report(world, entity, "Path3D",
+        box_validate_path(world, entity, true, path->closed));
+    return true;
+}
+
+static bool box_validate_profile_hook(ecs_world_t *world, ecs_entity_t entity, void *ptr)
+{
+    (void)ptr;
+    box_validate_report(world, entity, "Profile2D", box_validate_profile(world, entity));
+    return true;
+}
+
+static bool box_validate_sweep_hook(ecs_world_t *world, ecs_entity_t entity, void *ptr)
+{
+    const Sweep *sweep = ptr;
+    const char *reason = NULL;
+    if (!!sweep->profile == !!sweep->contour) {
+        reason = "set exactly one of profile or contour";
+    } else {
+        reason = box_validate_path(world, sweep->path, true, -1);
+        if (!reason) {
+            reason = sweep->profile ? box_validate_profile(world, sweep->profile) :
+                box_validate_path(world, sweep->contour, false, false);
+        }
+    }
+    if (!reason && (!isfinite(sweep->scale[0]) || !isfinite(sweep->scale[1]) ||
+        !isfinite(sweep->taper) || !isfinite(sweep->roll)))
+    {
+        reason = "scale, taper, and roll must be finite";
+    }
+    box_validate_report(world, entity, "Sweep", reason);
+    return true;
+}
+
+static bool box_validate_loft_hook(ecs_world_t *world, ecs_entity_t entity, void *ptr)
+{
+    const Loft *loft = ptr;
+    int32_t count = ecs_vec_count(&loft->sections);
+    const char *reason = count < 2 ? "at least two sections are required" : NULL;
+    const LoftSection *sections = ecs_vec_first(&loft->sections);
+    for (int32_t i = 0; !reason && i < count; i ++) {
+        reason = box_validate_profile(world, sections[i].profile);
+        if (!reason) {
+            for (int32_t j = 0; j < 3; j ++) {
+                if (!isfinite(sections[i].offset[j]) || !isfinite(sections[i].rotation[j])) {
+                    reason = "section offsets and rotations must be finite";
+                }
+            }
+            if (!isfinite(sections[i].scale[0]) || !isfinite(sections[i].scale[1])) {
+                reason = "section scale must be finite";
+            }
+        }
+    }
+    box_validate_report(world, entity, "Loft", reason);
+    return true;
+}
+
+static bool box_validate_lathe_hook(ecs_world_t *world, ecs_entity_t entity, void *ptr)
+{
+    const Lathe *lathe = ptr;
+    const char *reason = box_validate_path(world, lathe->profile, false, -1);
+    if (!reason && lathe->inner) {
+        reason = box_validate_path(world, lathe->inner, false, -1);
+    }
+    box_validate_report(world, entity, "Lathe", reason);
+    return true;
+}
+
+static bool box_validate_extrusion_hook(ecs_world_t *world, ecs_entity_t entity, void *ptr)
+{
+    const ProfileExtrusion *extrusion = ptr;
+    const char *reason = box_validate_profile(world, extrusion->profile);
+    if (!reason && !isfinite(extrusion->depth)) {
+        reason = "depth must be finite";
+    }
+    box_validate_report(world, entity, "ProfileExtrusion", reason);
+    return true;
+}
+
+static bool box_validate_prism_hook(ecs_world_t *world, ecs_entity_t entity, void *ptr)
+{
+    const BeveledPrism *prism = ptr;
+    int32_t count = ecs_vec_count(&prism->footprint);
+    const char *reason = NULL;
+    if (count != 3 && count != 4) {
+        reason = "footprint needs 3 or 4 vertices";
+    } else {
+        const vec2 *points = ecs_vec_first(&prism->footprint);
+        float sign = 0;
+        for (int32_t i = 0; i < count; i ++) {
+            const float *a = points[i], *b = points[(i + 1) % count];
+            const float *c = points[(i + 2) % count];
+            float cross = (b[0] - a[0]) * (c[1] - b[1]) -
+                (b[1] - a[1]) * (c[0] - b[0]);
+            if (!isfinite(cross) || fabsf(cross) < 0.000001f || (i && sign * cross < 0)) {
+                reason = "footprint must be finite, convex, and nondegenerate";
+                break;
+            }
+            sign = cross;
+        }
+    }
+    if (!reason && (!isfinite(prism->depth) || !isfinite(prism->inset) ||
+        !isfinite(prism->bevel) || !isfinite(prism->offset[0]) ||
+        !isfinite(prism->offset[1])))
+    {
+        reason = "depth, inset, bevel, and offset must be finite";
+    }
+    box_validate_report(world, entity, "BeveledPrism", reason);
+    return true;
+}
+
+static bool box_validate_mesh_hook(ecs_world_t *world, ecs_entity_t entity, void *ptr)
+{
+    const ShapeMesh *shape = ptr;
+    const box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    const box_mesh_t *mesh = shape->mesh ? box_mesh_cache_get(cache, shape->mesh) : NULL;
+    if (!mesh) {
+        return true;
+    }
+    if (!mesh->vertex_count || mesh->index_count < 3) {
+        box_validate_report_status(world, entity, "empty", "ShapeMesh",
+            "mesh has no triangles");
+        return true;
+    }
+    const box_mesh_t *render = shape->render_mesh ?
+        box_mesh_cache_get(cache, shape->render_mesh) : mesh;
+    if (!render || render->index_count < 3) {
+        box_validate_report_status(world, entity, "empty", "ShapeMesh",
+            "resolved mesh has no triangles");
+        return true;
+    }
+    for (int32_t j = 0; j < 3; j ++) {
+        if (!isfinite(shape->scale[j])) {
+            box_validate_report(world, entity, "ShapeMesh", "scale must be finite");
+            return true;
+        }
+    }
+    int32_t visible = 0;
+    for (int32_t i = 0; i + 2 < render->index_count; i += 3) {
+        uint32_t a = render->indices[i], b = render->indices[i + 1];
+        uint32_t c = render->indices[i + 2];
+        if (a >= (uint32_t)render->vertex_count || b >= (uint32_t)render->vertex_count ||
+            c >= (uint32_t)render->vertex_count)
+        {
+            box_validate_report(world, entity, "ShapeMesh", "mesh index is out of range");
+            return true;
+        }
+        vec3 ab, ac, normal;
+        for (int32_t j = 0; j < 3; j ++) {
+            ab[j] = (render->vertices[b].position[j] -
+                render->vertices[a].position[j]) * shape->scale[j];
+            ac[j] = (render->vertices[c].position[j] -
+                render->vertices[a].position[j]) * shape->scale[j];
+        }
+        glm_vec3_cross(ab, ac, normal);
+        float area = glm_vec3_norm2(normal);
+        if (!isfinite(area)) {
+            box_validate_report(world, entity, "ShapeMesh", "mesh vertices must be finite");
+            return true;
+        }
+        visible += area > 1e-20f;
+    }
+    if (!visible) {
+        box_validate_report_status(world, entity, "empty", "ShapeMesh",
+            "all triangles collapse after shape scale; check dimensions and paths");
+    }
+    return true;
+}
+
+void box_geometry_validation_init(ecs_world_t *world)
+{
+    ecs_set_hooks(world, Path2D, {.on_validate = box_validate_path2_hook});
+    ecs_set_hooks(world, Path3D, {.on_validate = box_validate_path3_hook});
+    ecs_set_hooks(world, Profile2D, {.on_validate = box_validate_profile_hook});
+    ecs_set_hooks(world, Sweep, {.on_validate = box_validate_sweep_hook});
+    ecs_set_hooks(world, Loft, {.on_validate = box_validate_loft_hook});
+    ecs_set_hooks(world, Lathe, {.on_validate = box_validate_lathe_hook});
+    ecs_set_hooks(world, ProfileExtrusion, {.on_validate = box_validate_extrusion_hook});
+    ecs_set_hooks(world, BeveledPrism, {.on_validate = box_validate_prism_hook});
+    ecs_set_hooks(world, ShapeMesh, {.on_validate = box_validate_mesh_hook});
+}

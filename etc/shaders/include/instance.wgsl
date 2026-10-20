@@ -2,6 +2,7 @@
 // model matrix is affine with the instance scale; the w of its first three columns is unused,
 // except that a 2D instance keeps its clip index in the w of the first (shape2d.wgsl).
 #pragma once
+#include "surface.wgsl"
 
 struct Instance {
     model: mat4x4f,
@@ -9,6 +10,7 @@ struct Instance {
     emissive: vec4f,
     material: vec4f,
     uv: vec4f,
+    surface: SurfaceData,
 };
 
 // Model matrix with the unused w of the first three columns cleared.

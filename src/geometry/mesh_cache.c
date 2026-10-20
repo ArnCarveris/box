@@ -153,12 +153,20 @@ uint32_t box_mesh_cache_acquire(
 {
     box_shape_key_t key;
     ecs_os_memset_t(&key, 0, box_shape_key_t);
-    shape->desc.key(value, &key);
+    if (shape->desc.key_world) {
+        shape->desc.key_world(shape->world, value, &key);
+    } else {
+        shape->desc.key(value, &key);
+    }
     uint64_t hash = box_mesh_cache_hash(shape, &key);
     uint32_t handle = box_mesh_cache_find(cache, shape, &key, hash);
     if (!handle) {
         box_mesh_t mesh = {0};
-        shape->desc.generate(value, &key, &mesh);
+        if (shape->desc.generate_world) {
+            shape->desc.generate_world(shape->world, value, &key, &mesh);
+        } else {
+            shape->desc.generate(value, &key, &mesh);
+        }
         box_mesh_bounds(&mesh);
         if (ecs_vec_count(&cache->free_list)) {
             handle = *ecs_vec_last_t(&cache->free_list, uint32_t);
@@ -317,4 +325,96 @@ box_shape_t* box_mesh_cache_add_shape(
     *ecs_vec_append_t(NULL, &cache->shapes, box_shape_t*) = result;
 done:
     return result;
+}
+
+typedef struct box_resolved_mesh_t {
+    const ShapeMesh *shape;
+    const box_mesh_t *mesh;
+    uint64_t source_hash;
+} box_resolved_mesh_t;
+
+static void box_resolved_mesh_key(
+    const void *value,
+    box_shape_key_t *key)
+{
+    const box_resolved_mesh_t *resolved = value;
+    uint64_t hash = 14695981039346656037ull;
+    const uint8_t *bytes = (const uint8_t*)resolved->shape->surface.p;
+    for (size_t i = 0; i < 20 * sizeof(vec4); i ++) {
+        hash = (hash ^ bytes[i]) * 1099511628211ull;
+    }
+    ecs_os_memcpy(key->i, &resolved->source_hash, sizeof(uint64_t));
+    ecs_os_memcpy(key->f, &hash, sizeof(hash));
+}
+
+static void box_resolved_mesh_generate(
+    const void *value,
+    const box_shape_key_t *key,
+    box_mesh_t *mesh)
+{
+    (void)key;
+    const box_resolved_mesh_t *resolved = value;
+    const box_mesh_t *source = resolved->mesh;
+    int32_t count = source->vertex_count;
+    int32_t regions = (count + 3) / 4;
+    mesh->vertices = ecs_os_malloc_n(box_vertex_t, count);
+    mesh->indices = ecs_os_memdup_n(source->indices, uint32_t, source->index_count);
+    mesh->surface_assets = ecs_os_calloc_n(vec4, regions);
+    if (!mesh->vertices || !mesh->indices || !mesh->surface_assets) {
+        box_mesh_fini(mesh);
+        return;
+    }
+    mesh->vertex_count = mesh->vertex_capacity = count;
+    mesh->index_count = mesh->index_capacity = source->index_count;
+    mesh->surface_asset_count = regions;
+    for (int32_t i = 0; i < count; i ++) {
+        const box_vertex_t *input = &source->vertices[i];
+        box_vertex_t *output = &mesh->vertices[i];
+        int region = (int)input->position[2];
+        box_surface_sample_t sample;
+        box_surface_sample(&resolved->shape->surface, region,
+            input->position[0], input->position[1], &sample);
+        glm_vec3_copy(sample.position, output->position);
+        glm_vec3_copy(sample.normal, output->normal);
+        glm_vec2_copy(ECS_CONST_CAST(float*, input->uv), output->uv);
+        int material = 2;
+        if (region == 0 || region == 1) {
+            material = region;
+        } else if (region == 2 || region == 3 || region == 8 || region == 9) {
+            material = 3;
+        }
+        mesh->surface_assets[i / 4][i % 4] = (float)material;
+    }
+}
+
+uint32_t box_mesh_cache_resolve(
+    box_mesh_cache_t *cache,
+    const ShapeMesh *shape)
+{
+    static const box_shape_t resolved_shape = {
+        .desc = {.key = box_resolved_mesh_key, .generate = box_resolved_mesh_generate}
+    };
+    int kind = (int)shape->surface.p[0][0];
+    box_mesh_entry_t *source = box_mesh_cache_entry(cache, shape->mesh);
+    if (kind < 1 || kind > 6 || !source || !source->shape ||
+        !source->mesh.vertex_count || !source->mesh.index_count)
+    {
+        return 0;
+    }
+    box_resolved_mesh_t value = {shape, &source->mesh, source->hash};
+    uint32_t handle = box_mesh_cache_acquire(cache, &resolved_shape, &value);
+    const box_mesh_t *mesh = box_mesh_cache_get(cache, handle);
+    if (!mesh || !mesh->vertex_count || !mesh->index_count) {
+        box_mesh_cache_release(cache, handle);
+        return 0;
+    }
+    return handle;
+}
+
+void box_shape_mesh_release(
+    box_mesh_cache_t *cache,
+    const ShapeMesh *shape)
+{
+    box_mesh_cache_release(cache, shape->mesh);
+    box_mesh_cache_release(cache, shape->render_mesh);
 }

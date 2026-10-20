@@ -120,6 +120,7 @@ struct CullJob {
 @group(0) @binding(16) var prefiltered: texture_storage_2d_array<rgba16float, write>;
 @group(0) @binding(17) var environment_cube: texture_cube<f32>;
 @group(1) @binding(0) var<storage, read> instances: array<Instance>;
+@group(1) @binding(1) var<storage, read> surface_assets: array<vec4f>;
 
 const GROUP: u32 = 64u;
 const SH_COEFFICIENTS: u32 = 9u;

@@ -1,0 +1,753 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.surface
+using box.controllers
+
+window {
+    Surface: {width: 960, height: 600, write_to_file: "geometry-primitives.png"}
+}
+
+camera {
+    Position: {9, 8, 15}
+    Rotation: {-0.38, 0.54, 0}
+    Camera: {fov: 48}
+    CameraController: {}
+}
+
+main_view {
+    View: {
+        camera: camera,
+        clear: {enabled: true, color: {28, 34, 45, 255}},
+        shadows: {enabled: true}
+    }
+}
+
+sun {
+    Rotation: {0.7, 2.4, 0}
+    DirectionalLight: {intensity: 2}
+}
+
+$ {
+    AmbientLight: {sky: {150, 175, 210}, ground: {65, 60, 55}, intensity: 0.7}
+}
+
+floor {
+    Position: {0, -0.25, 0}
+    Box: {13, 0.2, 9}
+    Rgb: {70, 77, 90}
+}
+
+cable_profile_outer {
+    Path2D: {
+        start: {0.2, 0},
+        segments: [
+            {kind: Line, end: {0.19903695, 0.019603428}},
+            {kind: Line, end: {0.19615706, 0.039018064}},
+            {kind: Line, end: {0.19138807, 0.058056935}},
+            {kind: Line, end: {0.18477591, 0.076536686}},
+            {kind: Line, end: {0.17638425, 0.094279347}},
+            {kind: Line, end: {0.16629392, 0.11111405}},
+            {kind: Line, end: {0.15460209, 0.12687866}},
+            {kind: Line, end: {0.14142136, 0.14142136}},
+            {kind: Line, end: {0.12687866, 0.15460209}},
+            {kind: Line, end: {0.11111405, 0.16629392}},
+            {kind: Line, end: {0.094279347, 0.17638425}},
+            {kind: Line, end: {0.076536686, 0.18477591}},
+            {kind: Line, end: {0.058056935, 0.19138807}},
+            {kind: Line, end: {0.039018064, 0.19615706}},
+            {kind: Line, end: {0.019603428, 0.19903695}},
+            {kind: Line, end: {1.2246468e-17, 0.2}},
+            {kind: Line, end: {-0.019603428, 0.19903695}},
+            {kind: Line, end: {-0.039018064, 0.19615706}},
+            {kind: Line, end: {-0.058056935, 0.19138807}},
+            {kind: Line, end: {-0.076536686, 0.18477591}},
+            {kind: Line, end: {-0.094279347, 0.17638425}},
+            {kind: Line, end: {-0.11111405, 0.16629392}},
+            {kind: Line, end: {-0.12687866, 0.15460209}},
+            {kind: Line, end: {-0.14142136, 0.14142136}},
+            {kind: Line, end: {-0.15460209, 0.12687866}},
+            {kind: Line, end: {-0.16629392, 0.11111405}},
+            {kind: Line, end: {-0.17638425, 0.094279347}},
+            {kind: Line, end: {-0.18477591, 0.076536686}},
+            {kind: Line, end: {-0.19138807, 0.058056935}},
+            {kind: Line, end: {-0.19615706, 0.039018064}},
+            {kind: Line, end: {-0.19903695, 0.019603428}},
+            {kind: Line, end: {-0.2, 2.4492936e-17}},
+            {kind: Line, end: {-0.19903695, -0.019603428}},
+            {kind: Line, end: {-0.19615706, -0.039018064}},
+            {kind: Line, end: {-0.19138807, -0.058056935}},
+            {kind: Line, end: {-0.18477591, -0.076536686}},
+            {kind: Line, end: {-0.17638425, -0.094279347}},
+            {kind: Line, end: {-0.16629392, -0.11111405}},
+            {kind: Line, end: {-0.15460209, -0.12687866}},
+            {kind: Line, end: {-0.14142136, -0.14142136}},
+            {kind: Line, end: {-0.12687866, -0.15460209}},
+            {kind: Line, end: {-0.11111405, -0.16629392}},
+            {kind: Line, end: {-0.094279347, -0.17638425}},
+            {kind: Line, end: {-0.076536686, -0.18477591}},
+            {kind: Line, end: {-0.058056935, -0.19138807}},
+            {kind: Line, end: {-0.039018064, -0.19615706}},
+            {kind: Line, end: {-0.019603428, -0.19903695}},
+            {kind: Line, end: {-3.6739404e-17, -0.2}},
+            {kind: Line, end: {0.019603428, -0.19903695}},
+            {kind: Line, end: {0.039018064, -0.19615706}},
+            {kind: Line, end: {0.058056935, -0.19138807}},
+            {kind: Line, end: {0.076536686, -0.18477591}},
+            {kind: Line, end: {0.094279347, -0.17638425}},
+            {kind: Line, end: {0.11111405, -0.16629392}},
+            {kind: Line, end: {0.12687866, -0.15460209}},
+            {kind: Line, end: {0.14142136, -0.14142136}},
+            {kind: Line, end: {0.15460209, -0.12687866}},
+            {kind: Line, end: {0.16629392, -0.11111405}},
+            {kind: Line, end: {0.17638425, -0.094279347}},
+            {kind: Line, end: {0.18477591, -0.076536686}},
+            {kind: Line, end: {0.19138807, -0.058056935}},
+            {kind: Line, end: {0.19615706, -0.039018064}},
+            {kind: Line, end: {0.19903695, -0.019603428}}
+        ],
+        closed: true
+    }
+}
+
+cable_profile_inner {
+    Path2D: {
+        start: {0.12, 0},
+        segments: [
+            {kind: Line, end: {0.11942217, 0.011762057}},
+            {kind: Line, end: {0.11769423, 0.023410839}},
+            {kind: Line, end: {0.11483284, 0.034834161}},
+            {kind: Line, end: {0.11086554, 0.045922012}},
+            {kind: Line, end: {0.10583055, 0.056567608}},
+            {kind: Line, end: {0.099776353, 0.066668428}},
+            {kind: Line, end: {0.092761254, 0.076127194}},
+            {kind: Line, end: {0.084852814, 0.084852814}},
+            {kind: Line, end: {0.076127194, 0.092761254}},
+            {kind: Line, end: {0.066668428, 0.099776353}},
+            {kind: Line, end: {0.056567608, 0.10583055}},
+            {kind: Line, end: {0.045922012, 0.11086554}},
+            {kind: Line, end: {0.034834161, 0.11483284}},
+            {kind: Line, end: {0.023410839, 0.11769423}},
+            {kind: Line, end: {0.011762057, 0.11942217}},
+            {kind: Line, end: {7.3478808e-18, 0.12}},
+            {kind: Line, end: {-0.011762057, 0.11942217}},
+            {kind: Line, end: {-0.023410839, 0.11769423}},
+            {kind: Line, end: {-0.034834161, 0.11483284}},
+            {kind: Line, end: {-0.045922012, 0.11086554}},
+            {kind: Line, end: {-0.056567608, 0.10583055}},
+            {kind: Line, end: {-0.066668428, 0.099776353}},
+            {kind: Line, end: {-0.076127194, 0.092761254}},
+            {kind: Line, end: {-0.084852814, 0.084852814}},
+            {kind: Line, end: {-0.092761254, 0.076127194}},
+            {kind: Line, end: {-0.099776353, 0.066668428}},
+            {kind: Line, end: {-0.10583055, 0.056567608}},
+            {kind: Line, end: {-0.11086554, 0.045922012}},
+            {kind: Line, end: {-0.11483284, 0.034834161}},
+            {kind: Line, end: {-0.11769423, 0.023410839}},
+            {kind: Line, end: {-0.11942217, 0.011762057}},
+            {kind: Line, end: {-0.12, 1.4695762e-17}},
+            {kind: Line, end: {-0.11942217, -0.011762057}},
+            {kind: Line, end: {-0.11769423, -0.023410839}},
+            {kind: Line, end: {-0.11483284, -0.034834161}},
+            {kind: Line, end: {-0.11086554, -0.045922012}},
+            {kind: Line, end: {-0.10583055, -0.056567608}},
+            {kind: Line, end: {-0.099776353, -0.066668428}},
+            {kind: Line, end: {-0.092761254, -0.076127194}},
+            {kind: Line, end: {-0.084852814, -0.084852814}},
+            {kind: Line, end: {-0.076127194, -0.092761254}},
+            {kind: Line, end: {-0.066668428, -0.099776353}},
+            {kind: Line, end: {-0.056567608, -0.10583055}},
+            {kind: Line, end: {-0.045922012, -0.11086554}},
+            {kind: Line, end: {-0.034834161, -0.11483284}},
+            {kind: Line, end: {-0.023410839, -0.11769423}},
+            {kind: Line, end: {-0.011762057, -0.11942217}},
+            {kind: Line, end: {-2.2043642e-17, -0.12}},
+            {kind: Line, end: {0.011762057, -0.11942217}},
+            {kind: Line, end: {0.023410839, -0.11769423}},
+            {kind: Line, end: {0.034834161, -0.11483284}},
+            {kind: Line, end: {0.045922012, -0.11086554}},
+            {kind: Line, end: {0.056567608, -0.10583055}},
+            {kind: Line, end: {0.066668428, -0.099776353}},
+            {kind: Line, end: {0.076127194, -0.092761254}},
+            {kind: Line, end: {0.084852814, -0.084852814}},
+            {kind: Line, end: {0.092761254, -0.076127194}},
+            {kind: Line, end: {0.099776353, -0.066668428}},
+            {kind: Line, end: {0.10583055, -0.056567608}},
+            {kind: Line, end: {0.11086554, -0.045922012}},
+            {kind: Line, end: {0.11483284, -0.034834161}},
+            {kind: Line, end: {0.11769423, -0.023410839}},
+            {kind: Line, end: {0.11942217, -0.011762057}}
+        ],
+        closed: true
+    }
+}
+
+cable_profile { Profile2D: {outer: cable_profile_outer, holes: [cable_profile_inner]} }
+
+cable_route { Path3D: {start: {-0.8, 0, 0}, segments: [{kind: CubicBezier, control1: {-0.8, 2.5, 0}, control2: {0.8, 2.5, 0}, end: {0.8, 0, 0}}]} }
+
+hull_profile_0_outer {
+    Path2D: {
+        start: {0.8, 0},
+        segments: [
+            {kind: Line, end: {0.8, 0.078793123}},
+            {kind: Line, end: {0.8, 0.15912989}},
+            {kind: Line, end: {0.8, 0.24267735}},
+            {kind: Line, end: {0.8, 0.33137085}},
+            {kind: Line, end: {0.79746035, 0.42625144}},
+            {kind: Line, end: {0.76871959, 0.51364201}},
+            {kind: Line, end: {0.71238345, 0.58463799}},
+            {kind: Line, end: {0.6328541, 0.6328541}},
+            {kind: Line, end: {0.53344121, 0.65}},
+            {kind: Line, end: {0.43431611, 0.65}},
+            {kind: Line, end: {0.34743224, 0.65}},
+            {kind: Line, end: {0.26923882, 0.65}},
+            {kind: Line, end: {0.19717534, 0.65}},
+            {kind: Line, end: {0.12929304, 0.65}},
+            {kind: Line, end: {0.064019412, 0.65}},
+            {kind: Line, end: {3.9801021e-17, 0.65}},
+            {kind: Line, end: {-0.064019412, 0.65}},
+            {kind: Line, end: {-0.12929304, 0.65}},
+            {kind: Line, end: {-0.19717534, 0.65}},
+            {kind: Line, end: {-0.26923882, 0.65}},
+            {kind: Line, end: {-0.34743224, 0.65}},
+            {kind: Line, end: {-0.43431611, 0.65}},
+            {kind: Line, end: {-0.53344121, 0.65}},
+            {kind: Line, end: {-0.6328541, 0.6328541}},
+            {kind: Line, end: {-0.71238345, 0.58463799}},
+            {kind: Line, end: {-0.76871959, 0.51364201}},
+            {kind: Line, end: {-0.79746035, 0.42625144}},
+            {kind: Line, end: {-0.8, 0.33137085}},
+            {kind: Line, end: {-0.8, 0.24267735}},
+            {kind: Line, end: {-0.8, 0.15912989}},
+            {kind: Line, end: {-0.8, 0.078793123}},
+            {kind: Line, end: {-0.8, 9.7971744e-17}},
+            {kind: Line, end: {-0.8, -0.078793123}},
+            {kind: Line, end: {-0.8, -0.15912989}},
+            {kind: Line, end: {-0.8, -0.24267735}},
+            {kind: Line, end: {-0.8, -0.33137085}},
+            {kind: Line, end: {-0.79746035, -0.42625144}},
+            {kind: Line, end: {-0.76871959, -0.51364201}},
+            {kind: Line, end: {-0.71238345, -0.58463799}},
+            {kind: Line, end: {-0.6328541, -0.6328541}},
+            {kind: Line, end: {-0.53344121, -0.65}},
+            {kind: Line, end: {-0.43431611, -0.65}},
+            {kind: Line, end: {-0.34743224, -0.65}},
+            {kind: Line, end: {-0.26923882, -0.65}},
+            {kind: Line, end: {-0.19717534, -0.65}},
+            {kind: Line, end: {-0.12929304, -0.65}},
+            {kind: Line, end: {-0.064019412, -0.65}},
+            {kind: Line, end: {-1.1940306e-16, -0.65}},
+            {kind: Line, end: {0.064019412, -0.65}},
+            {kind: Line, end: {0.12929304, -0.65}},
+            {kind: Line, end: {0.19717534, -0.65}},
+            {kind: Line, end: {0.26923882, -0.65}},
+            {kind: Line, end: {0.34743224, -0.65}},
+            {kind: Line, end: {0.43431611, -0.65}},
+            {kind: Line, end: {0.53344121, -0.65}},
+            {kind: Line, end: {0.6328541, -0.6328541}},
+            {kind: Line, end: {0.71238345, -0.58463799}},
+            {kind: Line, end: {0.76871959, -0.51364201}},
+            {kind: Line, end: {0.79746035, -0.42625144}},
+            {kind: Line, end: {0.8, -0.33137085}},
+            {kind: Line, end: {0.8, -0.24267735}},
+            {kind: Line, end: {0.8, -0.15912989}},
+            {kind: Line, end: {0.8, -0.078793123}}
+        ],
+        closed: true
+    }
+}
+
+hull_profile_0_inner {
+    Path2D: {
+        start: {0.7, 0},
+        segments: [
+            {kind: Line, end: {0.7, 0.068943982}},
+            {kind: Line, end: {0.7, 0.13923866}},
+            {kind: Line, end: {0.7, 0.21234268}},
+            {kind: Line, end: {0.7, 0.28994949}},
+            {kind: Line, end: {0.69595458, 0.37199547}},
+            {kind: Line, end: {0.66709506, 0.44573867}},
+            {kind: Line, end: {0.61436804, 0.50419882}},
+            {kind: Line, end: {0.54129013, 0.54129013}},
+            {kind: Line, end: {0.45137333, 0.55}},
+            {kind: Line, end: {0.36749825, 0.55}},
+            {kind: Line, end: {0.29398112, 0.55}},
+            {kind: Line, end: {0.22781746, 0.55}},
+            {kind: Line, end: {0.16684068, 0.55}},
+            {kind: Line, end: {0.1094018, 0.55}},
+            {kind: Line, end: {0.054170272, 0.55}},
+            {kind: Line, end: {3.3677787e-17, 0.55}},
+            {kind: Line, end: {-0.054170272, 0.55}},
+            {kind: Line, end: {-0.1094018, 0.55}},
+            {kind: Line, end: {-0.16684068, 0.55}},
+            {kind: Line, end: {-0.22781746, 0.55}},
+            {kind: Line, end: {-0.29398112, 0.55}},
+            {kind: Line, end: {-0.36749825, 0.55}},
+            {kind: Line, end: {-0.45137333, 0.55}},
+            {kind: Line, end: {-0.54129013, 0.54129013}},
+            {kind: Line, end: {-0.61436804, 0.50419882}},
+            {kind: Line, end: {-0.66709506, 0.44573867}},
+            {kind: Line, end: {-0.69595458, 0.37199547}},
+            {kind: Line, end: {-0.7, 0.28994949}},
+            {kind: Line, end: {-0.7, 0.21234268}},
+            {kind: Line, end: {-0.7, 0.13923866}},
+            {kind: Line, end: {-0.7, 0.068943982}},
+            {kind: Line, end: {-0.7, 8.5725276e-17}},
+            {kind: Line, end: {-0.7, -0.068943982}},
+            {kind: Line, end: {-0.7, -0.13923866}},
+            {kind: Line, end: {-0.7, -0.21234268}},
+            {kind: Line, end: {-0.7, -0.28994949}},
+            {kind: Line, end: {-0.69595458, -0.37199547}},
+            {kind: Line, end: {-0.66709506, -0.44573867}},
+            {kind: Line, end: {-0.61436804, -0.50419882}},
+            {kind: Line, end: {-0.54129013, -0.54129013}},
+            {kind: Line, end: {-0.45137333, -0.55}},
+            {kind: Line, end: {-0.36749825, -0.55}},
+            {kind: Line, end: {-0.29398112, -0.55}},
+            {kind: Line, end: {-0.22781746, -0.55}},
+            {kind: Line, end: {-0.16684068, -0.55}},
+            {kind: Line, end: {-0.1094018, -0.55}},
+            {kind: Line, end: {-0.054170272, -0.55}},
+            {kind: Line, end: {-1.0103336e-16, -0.55}},
+            {kind: Line, end: {0.054170272, -0.55}},
+            {kind: Line, end: {0.1094018, -0.55}},
+            {kind: Line, end: {0.16684068, -0.55}},
+            {kind: Line, end: {0.22781746, -0.55}},
+            {kind: Line, end: {0.29398112, -0.55}},
+            {kind: Line, end: {0.36749825, -0.55}},
+            {kind: Line, end: {0.45137333, -0.55}},
+            {kind: Line, end: {0.54129013, -0.54129013}},
+            {kind: Line, end: {0.61436804, -0.50419882}},
+            {kind: Line, end: {0.66709506, -0.44573867}},
+            {kind: Line, end: {0.69595458, -0.37199547}},
+            {kind: Line, end: {0.7, -0.28994949}},
+            {kind: Line, end: {0.7, -0.21234268}},
+            {kind: Line, end: {0.7, -0.13923866}},
+            {kind: Line, end: {0.7, -0.068943982}}
+        ],
+        closed: true
+    }
+}
+
+hull_profile_0 { Profile2D: {outer: hull_profile_0_outer, holes: [hull_profile_0_inner]} }
+
+hull_profile_1_outer {
+    Path2D: {
+        start: {0.9, 0},
+        segments: [
+            {kind: Line, end: {0.9, 0.088642263}},
+            {kind: Line, end: {0.9, 0.17902113}},
+            {kind: Line, end: {0.9, 0.27301202}},
+            {kind: Line, end: {0.89049346, 0.36885447}},
+            {kind: Line, end: {0.8597008, 0.45951965}},
+            {kind: Line, end: {0.80926754, 0.54073528}},
+            {kind: Line, end: {0.7415787, 0.60859791}},
+            {kind: Line, end: {0.65964263, 0.65964263}},
+            {kind: Line, end: {0.5669993, 0.69089064}},
+            {kind: Line, end: {0.46772505, 0.7}},
+            {kind: Line, end: {0.3741578, 0.7}},
+            {kind: Line, end: {0.28994949, 0.7}},
+            {kind: Line, end: {0.21234268, 0.7}},
+            {kind: Line, end: {0.13923866, 0.7}},
+            {kind: Line, end: {0.068943982, 0.7}},
+            {kind: Line, end: {4.2862638e-17, 0.7}},
+            {kind: Line, end: {-0.068943982, 0.7}},
+            {kind: Line, end: {-0.13923866, 0.7}},
+            {kind: Line, end: {-0.21234268, 0.7}},
+            {kind: Line, end: {-0.28994949, 0.7}},
+            {kind: Line, end: {-0.3741578, 0.7}},
+            {kind: Line, end: {-0.46772505, 0.7}},
+            {kind: Line, end: {-0.5669993, 0.69089064}},
+            {kind: Line, end: {-0.65964263, 0.65964263}},
+            {kind: Line, end: {-0.7415787, 0.60859791}},
+            {kind: Line, end: {-0.80926754, 0.54073528}},
+            {kind: Line, end: {-0.8597008, 0.45951965}},
+            {kind: Line, end: {-0.89049346, 0.36885447}},
+            {kind: Line, end: {-0.9, 0.27301202}},
+            {kind: Line, end: {-0.9, 0.17902113}},
+            {kind: Line, end: {-0.9, 0.088642263}},
+            {kind: Line, end: {-0.9, 1.1021821e-16}},
+            {kind: Line, end: {-0.9, -0.088642263}},
+            {kind: Line, end: {-0.9, -0.17902113}},
+            {kind: Line, end: {-0.9, -0.27301202}},
+            {kind: Line, end: {-0.89049346, -0.36885447}},
+            {kind: Line, end: {-0.8597008, -0.45951965}},
+            {kind: Line, end: {-0.80926754, -0.54073528}},
+            {kind: Line, end: {-0.7415787, -0.60859791}},
+            {kind: Line, end: {-0.65964263, -0.65964263}},
+            {kind: Line, end: {-0.5669993, -0.69089064}},
+            {kind: Line, end: {-0.46772505, -0.7}},
+            {kind: Line, end: {-0.3741578, -0.7}},
+            {kind: Line, end: {-0.28994949, -0.7}},
+            {kind: Line, end: {-0.21234268, -0.7}},
+            {kind: Line, end: {-0.13923866, -0.7}},
+            {kind: Line, end: {-0.068943982, -0.7}},
+            {kind: Line, end: {-1.2858791e-16, -0.7}},
+            {kind: Line, end: {0.068943982, -0.7}},
+            {kind: Line, end: {0.13923866, -0.7}},
+            {kind: Line, end: {0.21234268, -0.7}},
+            {kind: Line, end: {0.28994949, -0.7}},
+            {kind: Line, end: {0.3741578, -0.7}},
+            {kind: Line, end: {0.46772505, -0.7}},
+            {kind: Line, end: {0.5669993, -0.69089064}},
+            {kind: Line, end: {0.65964263, -0.65964263}},
+            {kind: Line, end: {0.7415787, -0.60859791}},
+            {kind: Line, end: {0.80926754, -0.54073528}},
+            {kind: Line, end: {0.8597008, -0.45951965}},
+            {kind: Line, end: {0.89049346, -0.36885447}},
+            {kind: Line, end: {0.9, -0.27301202}},
+            {kind: Line, end: {0.9, -0.17902113}},
+            {kind: Line, end: {0.9, -0.088642263}}
+        ],
+        closed: true
+    }
+}
+
+hull_profile_1_inner {
+    Path2D: {
+        start: {0.8, 0},
+        segments: [
+            {kind: Line, end: {0.8, 0.078793123}},
+            {kind: Line, end: {0.8, 0.15912989}},
+            {kind: Line, end: {0.79999007, 0.24267433}},
+            {kind: Line, end: {0.78934043, 0.32695551}},
+            {kind: Line, end: {0.75947137, 0.40594591}},
+            {kind: Line, end: {0.7120479, 0.47577519}},
+            {kind: Line, end: {0.64932511, 0.53288735}},
+            {kind: Line, end: {0.574094, 0.574094}},
+            {kind: Line, end: {0.48959073, 0.59656803}},
+            {kind: Line, end: {0.40090718, 0.6}},
+            {kind: Line, end: {0.32070668, 0.6}},
+            {kind: Line, end: {0.24852814, 0.6}},
+            {kind: Line, end: {0.18200801, 0.6}},
+            {kind: Line, end: {0.11934742, 0.6}},
+            {kind: Line, end: {0.059094842, 0.6}},
+            {kind: Line, end: {3.6739404e-17, 0.6}},
+            {kind: Line, end: {-0.059094842, 0.6}},
+            {kind: Line, end: {-0.11934742, 0.6}},
+            {kind: Line, end: {-0.18200801, 0.6}},
+            {kind: Line, end: {-0.24852814, 0.6}},
+            {kind: Line, end: {-0.32070668, 0.6}},
+            {kind: Line, end: {-0.40090718, 0.6}},
+            {kind: Line, end: {-0.48959073, 0.59656803}},
+            {kind: Line, end: {-0.574094, 0.574094}},
+            {kind: Line, end: {-0.64932511, 0.53288735}},
+            {kind: Line, end: {-0.7120479, 0.47577519}},
+            {kind: Line, end: {-0.75947137, 0.40594591}},
+            {kind: Line, end: {-0.78934043, 0.32695551}},
+            {kind: Line, end: {-0.79999007, 0.24267433}},
+            {kind: Line, end: {-0.8, 0.15912989}},
+            {kind: Line, end: {-0.8, 0.078793123}},
+            {kind: Line, end: {-0.8, 9.7971744e-17}},
+            {kind: Line, end: {-0.8, -0.078793123}},
+            {kind: Line, end: {-0.8, -0.15912989}},
+            {kind: Line, end: {-0.79999007, -0.24267433}},
+            {kind: Line, end: {-0.78934043, -0.32695551}},
+            {kind: Line, end: {-0.75947137, -0.40594591}},
+            {kind: Line, end: {-0.7120479, -0.47577519}},
+            {kind: Line, end: {-0.64932511, -0.53288735}},
+            {kind: Line, end: {-0.574094, -0.574094}},
+            {kind: Line, end: {-0.48959073, -0.59656803}},
+            {kind: Line, end: {-0.40090718, -0.6}},
+            {kind: Line, end: {-0.32070668, -0.6}},
+            {kind: Line, end: {-0.24852814, -0.6}},
+            {kind: Line, end: {-0.18200801, -0.6}},
+            {kind: Line, end: {-0.11934742, -0.6}},
+            {kind: Line, end: {-0.059094842, -0.6}},
+            {kind: Line, end: {-1.1021821e-16, -0.6}},
+            {kind: Line, end: {0.059094842, -0.6}},
+            {kind: Line, end: {0.11934742, -0.6}},
+            {kind: Line, end: {0.18200801, -0.6}},
+            {kind: Line, end: {0.24852814, -0.6}},
+            {kind: Line, end: {0.32070668, -0.6}},
+            {kind: Line, end: {0.40090718, -0.6}},
+            {kind: Line, end: {0.48959073, -0.59656803}},
+            {kind: Line, end: {0.574094, -0.574094}},
+            {kind: Line, end: {0.64932511, -0.53288735}},
+            {kind: Line, end: {0.7120479, -0.47577519}},
+            {kind: Line, end: {0.75947137, -0.40594591}},
+            {kind: Line, end: {0.78934043, -0.32695551}},
+            {kind: Line, end: {0.79999007, -0.24267433}},
+            {kind: Line, end: {0.8, -0.15912989}},
+            {kind: Line, end: {0.8, -0.078793123}}
+        ],
+        closed: true
+    }
+}
+
+hull_profile_1 { Profile2D: {outer: hull_profile_1_outer, holes: [hull_profile_1_inner]} }
+
+hull_profile_2_outer {
+    Path2D: {
+        start: {0.35, 0},
+        segments: [
+            {kind: Line, end: {0.34996302, 0.034468349}},
+            {kind: Line, end: {0.34716052, 0.069054521}},
+            {kind: Line, end: {0.3399129, 0.10311145}},
+            {kind: Line, end: {0.32832397, 0.13599624}},
+            {kind: Line, end: {0.31260665, 0.16709174}},
+            {kind: Line, end: {0.29307597, 0.19582711}},
+            {kind: Line, end: {0.27013797, 0.22169651}},
+            {kind: Line, end: {0.24427493, 0.24427493}},
+            {kind: Line, end: {0.21602769, 0.2632305}},
+            {kind: Line, end: {0.18597593, 0.27833265}},
+            {kind: Line, end: {0.15471735, 0.28945581}},
+            {kind: Line, end: {0.12284687, 0.29657859}},
+            {kind: Line, end: {0.090936784, 0.2997784}},
+            {kind: Line, end: {0.05967371, 0.3}},
+            {kind: Line, end: {0.029547421, 0.3}},
+            {kind: Line, end: {1.8369702e-17, 0.3}},
+            {kind: Line, end: {-0.029547421, 0.3}},
+            {kind: Line, end: {-0.05967371, 0.3}},
+            {kind: Line, end: {-0.090936784, 0.2997784}},
+            {kind: Line, end: {-0.12284687, 0.29657859}},
+            {kind: Line, end: {-0.15471735, 0.28945581}},
+            {kind: Line, end: {-0.18597593, 0.27833265}},
+            {kind: Line, end: {-0.21602769, 0.2632305}},
+            {kind: Line, end: {-0.24427493, 0.24427493}},
+            {kind: Line, end: {-0.27013797, 0.22169651}},
+            {kind: Line, end: {-0.29307597, 0.19582711}},
+            {kind: Line, end: {-0.31260665, 0.16709174}},
+            {kind: Line, end: {-0.32832397, 0.13599624}},
+            {kind: Line, end: {-0.3399129, 0.10311145}},
+            {kind: Line, end: {-0.34716052, 0.069054521}},
+            {kind: Line, end: {-0.34996302, 0.034468349}},
+            {kind: Line, end: {-0.35, 4.2862638e-17}},
+            {kind: Line, end: {-0.34996302, -0.034468349}},
+            {kind: Line, end: {-0.34716052, -0.069054521}},
+            {kind: Line, end: {-0.3399129, -0.10311145}},
+            {kind: Line, end: {-0.32832397, -0.13599624}},
+            {kind: Line, end: {-0.31260665, -0.16709174}},
+            {kind: Line, end: {-0.29307597, -0.19582711}},
+            {kind: Line, end: {-0.27013797, -0.22169651}},
+            {kind: Line, end: {-0.24427493, -0.24427493}},
+            {kind: Line, end: {-0.21602769, -0.2632305}},
+            {kind: Line, end: {-0.18597593, -0.27833265}},
+            {kind: Line, end: {-0.15471735, -0.28945581}},
+            {kind: Line, end: {-0.12284687, -0.29657859}},
+            {kind: Line, end: {-0.090936784, -0.2997784}},
+            {kind: Line, end: {-0.05967371, -0.3}},
+            {kind: Line, end: {-0.029547421, -0.3}},
+            {kind: Line, end: {-5.5109106e-17, -0.3}},
+            {kind: Line, end: {0.029547421, -0.3}},
+            {kind: Line, end: {0.05967371, -0.3}},
+            {kind: Line, end: {0.090936784, -0.2997784}},
+            {kind: Line, end: {0.12284687, -0.29657859}},
+            {kind: Line, end: {0.15471735, -0.28945581}},
+            {kind: Line, end: {0.18597593, -0.27833265}},
+            {kind: Line, end: {0.21602769, -0.2632305}},
+            {kind: Line, end: {0.24427493, -0.24427493}},
+            {kind: Line, end: {0.27013797, -0.22169651}},
+            {kind: Line, end: {0.29307597, -0.19582711}},
+            {kind: Line, end: {0.31260665, -0.16709174}},
+            {kind: Line, end: {0.32832397, -0.13599624}},
+            {kind: Line, end: {0.3399129, -0.10311145}},
+            {kind: Line, end: {0.34716052, -0.069054521}},
+            {kind: Line, end: {0.34996302, -0.034468349}}
+        ],
+        closed: true
+    }
+}
+
+hull_profile_2_inner {
+    Path2D: {
+        start: {0.25, 0},
+        segments: [
+            {kind: Line, end: {0.24994078, 0.024617018}},
+            {kind: Line, end: {0.24760719, 0.049252132}},
+            {kind: Line, end: {0.24190269, 0.073380379}},
+            {kind: Line, end: {0.23294079, 0.096487236}},
+            {kind: Line, end: {0.2209265, 0.11808767}},
+            {kind: Line, end: {0.20614834, 0.13774392}},
+            {kind: Line, end: {0.18896683, 0.15508107}},
+            {kind: Line, end: {0.16979984, 0.16979984}},
+            {kind: Line, end: {0.14910567, 0.18168578}},
+            {kind: Line, end: {0.12736454, 0.19061451}},
+            {kind: Line, end: {0.10505956, 0.19655262}},
+            {kind: Line, end: {0.082658127, 0.19955437}},
+            {kind: Line, end: {0.060669337, 0.2}},
+            {kind: Line, end: {0.039782473, 0.2}},
+            {kind: Line, end: {0.019698281, 0.2}},
+            {kind: Line, end: {1.2246468e-17, 0.2}},
+            {kind: Line, end: {-0.019698281, 0.2}},
+            {kind: Line, end: {-0.039782473, 0.2}},
+            {kind: Line, end: {-0.060669337, 0.2}},
+            {kind: Line, end: {-0.082658127, 0.19955437}},
+            {kind: Line, end: {-0.10505956, 0.19655262}},
+            {kind: Line, end: {-0.12736454, 0.19061451}},
+            {kind: Line, end: {-0.14910567, 0.18168578}},
+            {kind: Line, end: {-0.16979984, 0.16979984}},
+            {kind: Line, end: {-0.18896683, 0.15508107}},
+            {kind: Line, end: {-0.20614834, 0.13774392}},
+            {kind: Line, end: {-0.2209265, 0.11808767}},
+            {kind: Line, end: {-0.23294079, 0.096487236}},
+            {kind: Line, end: {-0.24190269, 0.073380379}},
+            {kind: Line, end: {-0.24760719, 0.049252132}},
+            {kind: Line, end: {-0.24994078, 0.024617018}},
+            {kind: Line, end: {-0.25, 3.061617e-17}},
+            {kind: Line, end: {-0.24994078, -0.024617018}},
+            {kind: Line, end: {-0.24760719, -0.049252132}},
+            {kind: Line, end: {-0.24190269, -0.073380379}},
+            {kind: Line, end: {-0.23294079, -0.096487236}},
+            {kind: Line, end: {-0.2209265, -0.11808767}},
+            {kind: Line, end: {-0.20614834, -0.13774392}},
+            {kind: Line, end: {-0.18896683, -0.15508107}},
+            {kind: Line, end: {-0.16979984, -0.16979984}},
+            {kind: Line, end: {-0.14910567, -0.18168578}},
+            {kind: Line, end: {-0.12736454, -0.19061451}},
+            {kind: Line, end: {-0.10505956, -0.19655262}},
+            {kind: Line, end: {-0.082658127, -0.19955437}},
+            {kind: Line, end: {-0.060669337, -0.2}},
+            {kind: Line, end: {-0.039782473, -0.2}},
+            {kind: Line, end: {-0.019698281, -0.2}},
+            {kind: Line, end: {-3.6739404e-17, -0.2}},
+            {kind: Line, end: {0.019698281, -0.2}},
+            {kind: Line, end: {0.039782473, -0.2}},
+            {kind: Line, end: {0.060669337, -0.2}},
+            {kind: Line, end: {0.082658127, -0.19955437}},
+            {kind: Line, end: {0.10505956, -0.19655262}},
+            {kind: Line, end: {0.12736454, -0.19061451}},
+            {kind: Line, end: {0.14910567, -0.18168578}},
+            {kind: Line, end: {0.16979984, -0.16979984}},
+            {kind: Line, end: {0.18896683, -0.15508107}},
+            {kind: Line, end: {0.20614834, -0.13774392}},
+            {kind: Line, end: {0.2209265, -0.11808767}},
+            {kind: Line, end: {0.23294079, -0.096487236}},
+            {kind: Line, end: {0.24190269, -0.073380379}},
+            {kind: Line, end: {0.24760719, -0.049252132}},
+            {kind: Line, end: {0.24994078, -0.024617018}}
+        ],
+        closed: true
+    }
+}
+
+hull_profile_2 { Profile2D: {outer: hull_profile_2_outer, holes: [hull_profile_2_inner]} }
+
+cup_outer {
+    Path2D: {
+        start: {0, 0},
+        segments: [
+            {kind: Line, end: {0.7, 0}},
+            {kind: Line, end: {0.9, 1.8}}
+        ],
+        closed: false
+    }
+}
+
+cup_inner {
+    Path2D: {
+        start: {0, 0.15},
+        segments: [
+            {kind: Line, end: {0.58, 0.15}},
+            {kind: Line, end: {0.78, 1.8}}
+        ],
+        closed: false
+    }
+}
+
+cable {
+    Position: {-4.5, 0, -2}
+    Sweep: {
+        path: cable_route, profile: cable_profile, scale: {1, 1},
+        taper: 1, cap_start: true, cap_end: true
+    }
+    Rgb: {230, 155, 65}
+}
+
+rivet {
+    Sphere: {radius: 0.1, smooth: true}
+    Rgb: {240, 240, 255}
+    SurfaceAttachment: {target: cable, u: 0.25, v: 0.5, offset: 0.08}
+}
+
+hull {
+    Position: {-1.5, 0, -2}
+    Loft: {
+        sections: [
+            {profile: hull_profile_0, offset: {0, 0, 0}, scale: {1, 1}},
+            {profile: hull_profile_1, offset: {0.2, 1, 0}, scale: {1, 1}},
+            {profile: hull_profile_2, offset: {0, 2, 0}, scale: {1, 1}}
+        ],
+        cap_start: true, cap_end: true
+    }
+    Rgb: {70, 165, 205}
+}
+
+cup {
+    Position: {1.5, 0, -2}
+    Lathe: {
+        profile: cup_outer,
+        inner: cup_inner,
+        cap_start: true, cap_end: true
+    }
+    Rgb: {200, 90, 85}
+}
+
+panel {
+    Position: {4.5, 0.5, -2}
+    Rotation: {0.2, 0, -0.15}
+    BeveledPrism: {
+        footprint: [{-1, -0.7}, {1, -0.7}, {0.6, 0.7}, {-0.8, 0.7}],
+        depth: 0.6, inset: 0.1, offset: {0.3, 0}, bevel: 0.08
+    }
+    Rgb: {170, 125, 210}
+}
+
+frame_outline {
+    Path2D: {
+        start: {-0.9, -1},
+        segments: [
+            {kind: Line, end: {0.9, -1}},
+            {kind: Line, end: {0.9, 1}},
+            {kind: Line, end: {-0.9, 1}}
+        ],
+        closed: true
+    }
+}
+
+frame_hole {
+    Path2D: {
+        start: {-0.6, -0.7},
+        segments: [
+            {kind: Line, end: {-0.6, 0.7}},
+            {kind: Line, end: {0.6, 0.7}},
+            {kind: Line, end: {0.6, -0.7}}
+        ],
+        closed: true
+    }
+}
+
+frame_profile { Profile2D: {outer: frame_outline, holes: [frame_hole]} }
+
+frame {
+    Position: {-3, 1, 2}
+    Rotation: {1.5707963, 0, 0}
+    ProfileExtrusion: {
+        profile: frame_profile, depth: 0.2, cap_start: true, cap_end: true
+    }
+    Rgb: {110, 195, 125}
+}
+
+dome {
+    Position: {0, 0, 2}
+    EllipsoidShell: {
+        radius: {1, 0.9, 1}, longitude_end: 6.2831853,
+        latitude_start: 0, latitude_end: 1.5707963,
+        thickness: 0.1, rims: true
+    }
+    Rgb: {225, 210, 135}
+}
+
+elbow {
+    Position: {3, 0.7, 2}
+    Rotation: {0.8, 0, 0}
+    TorusShell: {
+        radius: 0.9, tube: 0.28, ring_end: 4.712389,
+        tube_end: 6.2831853, thickness: 0.07, rims: true
+    }
+    Rgb: {105, 175, 200}
+}

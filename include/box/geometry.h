@@ -168,6 +168,180 @@ ECS_STRUCT(Star, {
     float radius;   /**< Outer radius */
 });
 
+ECS_ENUM(SurfaceRegion, {
+    SurfaceOuter,
+    SurfaceInner,
+    SurfaceStart,
+    SurfaceEnd,
+    SurfaceUMin,
+    SurfaceUMax,
+    SurfaceVMin,
+    SurfaceVMax
+});
+
+ECS_ENUM(PathSegmentKind, {
+    PathLine,
+    PathCubicBezier
+});
+
+ECS_STRUCT(PathSegment2D, {
+    PathSegmentKind kind;
+    vec2 end;
+    vec2 control1;
+    vec2 control2;
+});
+
+ECS_STRUCT(PathSegment3D, {
+    PathSegmentKind kind;
+    vec3 end;
+    vec3 control1;
+    vec3 control2;
+});
+
+ECS_STRUCT(Path2D, {
+    vec2 start;
+    ecs_vec(PathSegment2D) segments;
+    bool closed;
+});
+
+ECS_STRUCT(Path3D, {
+    vec3 start;
+    ecs_vec(PathSegment3D) segments;
+    bool closed;
+});
+
+ECS_STRUCT(Sweep, {
+    ecs_entity_t path;
+    ecs_entity_t profile;
+    ecs_entity_t contour;
+    vec2 scale;
+    float taper;
+    float roll;
+    bool cap_start;
+    bool cap_end;
+    int32_t segments;
+    int32_t rings;
+});
+
+ECS_STRUCT(LoftSection, {
+    ecs_entity_t profile;
+    vec3 offset;
+    vec3 rotation;
+    vec2 scale;
+});
+
+ECS_STRUCT(Loft, {
+    ecs_vec(LoftSection) sections;
+    bool cap_start;
+    bool cap_end;
+    int32_t segments;
+    int32_t rings;
+});
+
+ECS_STRUCT(Lathe, {
+    ecs_entity_t profile;
+    ecs_entity_t inner;
+    bool cap_start;
+    bool cap_end;
+    int32_t segments;
+    int32_t rings;
+});
+
+ECS_STRUCT(EllipsoidShell, {
+    vec3 radius;
+    float longitude_start;
+    float longitude_end;
+    float latitude_start;
+    float latitude_end;
+    float thickness;
+    bool rims;
+    int32_t segments;
+    int32_t rings;
+});
+
+ECS_STRUCT(TorusShell, {
+    float radius;
+    float tube;
+    float ring_start;
+    float ring_end;
+    float tube_start;
+    float tube_end;
+    float thickness;
+    bool rims;
+    int32_t segments;
+    int32_t rings;
+});
+
+ECS_STRUCT(BeveledPrism, {
+    ecs_vec(vec2) footprint;
+    float depth;
+    float inset;
+    vec2 offset;
+    float bevel;
+});
+
+ECS_STRUCT(Profile2D, {
+    ecs_entity_t outer;
+    ecs_vec(ecs_entity_t) holes;
+});
+
+ECS_STRUCT(ProfileExtrusion, {
+    ecs_entity_t profile;
+    float depth;
+    bool cap_start;
+    bool cap_end;
+});
+
+ECS_STRUCT(SurfaceMaterial, {
+    rgba color;
+    float metallic;
+    float roughness;
+});
+
+ECS_STRUCT(SurfaceMaterials, {
+    SurfaceMaterial outer;
+    SurfaceMaterial inner;
+    SurfaceMaterial rim;
+    SurfaceMaterial cap;
+});
+
+ECS_STRUCT(SurfaceAttachment, {
+    ecs_entity_t target;
+    SurfaceRegion region;
+    float u;
+    float v;
+    float offset;
+    vec3 rotation;
+});
+
+#define BOX_SURFACE_VECTORS 24
+
+typedef struct box_surface_data_t {
+    vec4 p[BOX_SURFACE_VECTORS];
+    vec4 *assets;
+    int32_t asset_count;
+} box_surface_data_t;
+
+typedef struct box_surface_sample_t {
+    vec3 position;
+    vec3 normal;
+    vec3 tangent;
+} box_surface_sample_t;
+
+bool box_surface_evaluate(
+    const ecs_world_t *world,
+    ecs_entity_t entity,
+    SurfaceRegion region,
+    float u,
+    float v,
+    box_surface_sample_t *sample);
+
+typedef void (*box_shape_surface_fn)(
+    const void *value,
+    box_surface_data_t *data,
+    vec3 min,
+    vec3 max);
+
 /** Filled rectangle in the XY plane, centered on the origin and facing +Z.
  *
  * The 2D shapes (Rect, Circle, Line) are quads shaded with an analytic signed distance, so
@@ -232,6 +406,8 @@ typedef struct box_mesh_t {
     box_vertex_t *vertices;  /**< Vertex array */
     uint32_t *indices;       /**< Three indices per triangle */
     rgba *colors;            /**< One color per vertex, NULL when the mesh has none */
+    vec4 *surface_assets;
+    int32_t surface_asset_count;
     int32_t vertex_count;    /**< Number of vertices */
     int32_t index_count;     /**< Number of indices */
     int32_t vertex_capacity; /**< Allocated vertices */
@@ -281,6 +457,10 @@ typedef struct box_shape_desc_t {
     box_shape_key_fn key;           /**< Key function */
     box_shape_generate_fn generate; /**< Mesh generator */
     box_shape_scale_fn scale;       /**< Scale function, NULL for a scale of one */
+    void (*key_world)(const ecs_world_t*, const void*, box_shape_key_t*);
+    void (*generate_world)(const ecs_world_t*, const void*, const box_shape_key_t*, box_mesh_t*);
+    void (*surface_world)(const ecs_world_t*, const void*, box_surface_data_t*, vec3, vec3);
+    box_shape_surface_fn surface;
 } box_shape_desc_t;
 
 /** Register a shape so that setting its component selects a cached mesh.

@@ -860,6 +860,7 @@ static void box_lights_buffer_create(
     box_render_buffer_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_BUFFER,
         BOX_RENDER_CREATE, handle, sizeof(box_render_buffer_desc_t));
     desc->size = capacity * (uint32_t)sizeof(box_render_light_t);
+    desc->surface_mesh = 0;
     desc->usage = BOX_RENDER_BUFFER_STORAGE;
 }
 

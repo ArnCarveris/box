@@ -100,6 +100,7 @@ void box_mesh_fini(
     ecs_os_free(mesh->vertices);
     ecs_os_free(mesh->indices);
     ecs_os_free(mesh->colors);
+    ecs_os_free(mesh->surface_assets);
     ecs_os_memset_t(mesh, 0, box_mesh_t);
 }
 

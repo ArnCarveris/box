@@ -265,7 +265,8 @@ static bool box_bake_inside(
     const box_mesh_t *mesh = cache && shape && shape->mesh ?
         box_mesh_cache_get(cache, shape->mesh) : NULL;
     if (!mesh || ecs_has_id(world, e, DynamicTransform) ||
-        ecs_has_id(world, e, ManualTransform) || ecs_has_id(world, e, NoBake) ||
+        (ecs_has_id(world, e, ManualTransform) && !ecs_has(world, e, SurfaceAttachment)) ||
+        ecs_has_id(world, e, NoBake) ||
         box_projection_anchored(world, e))
     {
         goto done;
@@ -277,6 +278,18 @@ static bool box_bake_inside(
     if (t) {
         glm_mat4_inv(ECS_CONST_CAST(vec4*, t->m), inv);
         glm_mat4_mulv(inv, local, local);
+    }
+
+    if (shape->surface.p[0][0]) {
+        vec3 point;
+        for (int j = 0; j < 3; j ++) {
+            if (!shape->scale[j]) {
+                goto done;
+            }
+            point[j] = local[j] / shape->scale[j];
+        }
+        result = box_surface_enclosed(shape, mesh, point);
+        goto done;
     }
 
     int32_t i;

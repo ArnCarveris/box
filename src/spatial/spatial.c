@@ -272,7 +272,9 @@ static bool box_spatial_shape_local(
 {
     int32_t i;
     for (i = 0; mesh && i < 3; i ++) {
-        float a = mesh->min[i] * shape->scale[i], b = mesh->max[i] * shape->scale[i];
+        float lo = shape->surface.p[0][0] ? shape->min[i] : mesh->min[i];
+        float hi = shape->surface.p[0][0] ? shape->max[i] : mesh->max[i];
+        float a = lo * shape->scale[i], b = hi * shape->scale[i];
         min[i] = a < b ? a : b;
         max[i] = a < b ? b : a;
     }

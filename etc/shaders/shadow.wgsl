@@ -9,6 +9,7 @@ struct Cascade {
 
 @group(0) @binding(0) var<uniform> cascade: Cascade;
 @group(1) @binding(0) var<storage, read> instances: array<Instance>;
+@group(1) @binding(1) var<storage, read> surface_assets: array<vec4f>;
 
 struct VertexIn {
     @location(0) position: vec3f,
@@ -16,6 +17,15 @@ struct VertexIn {
 };
 
 @vertex fn vs(v: VertexIn) -> @builtin(position) vec4f {
-    let model = instance_model(instances[v.slot]);
-    return cascade.matrix * (model * vec4f(v.position, 1.0));
+    let inst = instances[v.slot];
+    let model = instance_model(inst);
+    var position = v.position;
+    if (inst.surface.p[19].x != 0.0) {
+        position = v.position;
+    } else if (inst.surface.p[0].x == 7.0) {
+        position.y *= inst.surface.p[1].y;
+    } else if (inst.surface.p[0].x != 0.0) {
+        position = surface_position(inst.surface, i32(position.z), position.x, position.y);
+    }
+    return cascade.matrix * (model * vec4f(position, 1.0));
 }

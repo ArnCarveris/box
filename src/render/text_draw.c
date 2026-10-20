@@ -197,6 +197,7 @@ static void box_draws_glyph(
     const box_text_glyph_t *g,
     const box_draw_material_t *material)
 {
+    ecs_os_memset(&out->surface, 0, sizeof(out->surface));
     mat4 m;
     int32_t i;
     if (transform) {

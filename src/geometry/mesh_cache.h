@@ -17,6 +17,7 @@ typedef struct box_mesh_cache_t box_mesh_cache_t;
 
 /** Registered shape */
 typedef struct box_shape_t {
+    const ecs_world_t *world;
     box_shape_desc_t desc;   /**< Registration */
     ecs_size_t size;         /**< Size of the shape component */
     box_mesh_cache_t *cache; /**< Cache the shape resolves through */
@@ -25,11 +26,17 @@ typedef struct box_shape_t {
 /** Mesh and instance scale an entity's shape resolved to; holds a reference to the mesh */
 typedef struct ShapeMesh {
     uint32_t mesh; /**< Mesh handle, 0 for none */
+    uint32_t render_mesh;
     vec3 scale;    /**< Instance scale applied to the unit mesh */
+    box_surface_data_t surface;
+    vec3 min;
+    vec3 max;
 } ShapeMesh;
 
 /** Component id of ShapeMesh */
 extern ECS_COMPONENT_DECLARE(ShapeMesh);
+
+void box_geometry_validation_init(ecs_world_t *world);
 
 /** Create an empty mesh cache.
  *
@@ -176,6 +183,20 @@ void box_geometry_shapes_init(
  */
 void box_geometry_star_init(
     ecs_world_t *world);
+
+uint32_t box_mesh_cache_resolve(box_mesh_cache_t *cache, const ShapeMesh *shape);
+void box_shape_mesh_release(box_mesh_cache_t *cache, const ShapeMesh *shape);
+void box_geometry_surfaces_init(ecs_world_t *world);
+void box_surface_build_frames(const box_surface_data_t *data, vec4 *frames, int steps);
+void box_surface_sample(const box_surface_data_t *data, int region,
+    float u, float v, box_surface_sample_t *sample);
+void box_surface_vertex(const ShapeMesh *shape, const box_vertex_t *vertex, vec3 position);
+void box_surface_materials_apply(const ecs_world_t *world, ecs_entity_t e, ShapeMesh *shape);
+void box_surface_materials_init(ecs_world_t *world);
+void box_geometry_profiles_init(ecs_world_t *world);
+void box_geometry_attachments_init(ecs_world_t *world);
+bool box_profile_contains(const box_surface_data_t *d, float x, float z);
+bool box_surface_enclosed(const ShapeMesh *shape, const box_mesh_t *mesh, const vec3 point);
 
 #ifdef __cplusplus
 }

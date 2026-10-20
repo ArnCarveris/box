@@ -15,6 +15,18 @@
     "test": {
         "testsuites": [
             {
+                "id": "Validation",
+                "testcases": [
+                    "valid_mesh",
+                    "empty_mesh",
+                    "valid_to_empty",
+                    "invalid_footprint",
+                    "missing_profile",
+                    "degenerate_path",
+                    "unsupported_sweep_inputs"
+                ]
+            },
+            {
                 "id": "Box",
                 "testcases": [
                     "size",
@@ -278,6 +290,47 @@
                     "tube",
                     "frustum",
                     "rounded_box"
+                ]
+            },
+            {
+                "id": "Parametric",
+                "testcases": [
+                    "sweep_shared_topology",
+                    "sweep_evaluation",
+                    "sweep_hollow",
+                    "sweep_frame",
+                    "sweep_strip",
+                    "rounded_contour",
+                    "loft",
+                    "lathe_cavity",
+                    "shells",
+                    "pole_frame",
+                    "profile_holes",
+                    "profile_shared_depth",
+                    "attachments",
+                    "lod_independent",
+                    "regions",
+                    "prism",
+                    "inherited_edit",
+                    "script_authoring",
+                    "attachment_chain"
+                ]
+            },
+            {
+                "id": "Assets",
+                "testcases": [
+                    "mixed_paths",
+                    "multisegment_sweep",
+                    "large_counts",
+                    "many_holes",
+                    "loft_transform",
+                    "lifecycle",
+                    "invalid",
+                    "documentation",
+                    "shared_edits",
+                    "inherited_paths",
+                    "open_contour",
+                    "triangulation_failure"
                 ]
             }
         ]

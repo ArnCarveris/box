@@ -79,6 +79,13 @@
                     "static_vs_brute_force",
                     "coincident_vs_brute_force"
                 ]
+            },
+            {
+                "id": "Parametric",
+                "testcases": [
+                    "geometry_edits_update_bounds",
+                    "attachments_update_bounds"
+                ]
             }
         ]
     }

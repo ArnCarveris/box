@@ -64,11 +64,15 @@ void box_gpu_cull_init(
     box_gpu_t *gpu)
 {
     box_gpu_cull_t *c = &gpu->cull;
-    WGPUBindGroupLayoutEntry instance = {
+    WGPUBindGroupLayoutEntry instance[2] = {{
         .binding = 0,
         .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Compute,
         .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
-    };
+    }, {
+        .binding = 1,
+        .visibility = WGPUShaderStage_Vertex,
+        .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
+    }};
     WGPUBindGroupLayoutEntry entries[7] = {
         {
             .binding = 0,
@@ -112,7 +116,7 @@ void box_gpu_cull_init(
     };
     int32_t i;
     gpu->instance_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
-        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 1, .entries = &instance });
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 2, .entries = instance });
     c->layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
         &(WGPUBindGroupLayoutDescriptor){ .entryCount = 7, .entries = entries });
     box_gpu_hiz_init(gpu);
@@ -294,11 +298,15 @@ WGPUBindGroup box_gpu_instance_group(
         goto done;
     }
 
-    WGPUBindGroupEntry entry = { .binding = 0, .buffer = b->buffer, .size = b->size };
+    WGPUBindGroupEntry entry[2] = {
+        {.binding = 0, .buffer = b->buffer, .size = b->size},
+        {.binding = 1, .buffer = b->surface_assets ? b->surface_assets : b->buffer,
+            .size = b->surface_assets ? b->surface_asset_size : sizeof(vec4)}
+    };
     b->instances = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
         .layout = gpu->instance_layout,
-        .entryCount = 1,
-        .entries = &entry
+        .entryCount = 2,
+        .entries = entry
     });
 done:
     return b->instances;

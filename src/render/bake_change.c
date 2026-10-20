@@ -190,13 +190,15 @@ static bool box_bake_shape_bounds(
         goto done;
     }
 
+    const float *local_min = shape->surface.p[0][0] ? shape->min : mesh->min;
+    const float *local_max = shape->surface.p[0][0] ? shape->max : mesh->max;
     glm_vec3_fill(min, FLT_MAX);
     glm_vec3_fill(max, -FLT_MAX);
     for (c = 0; c < 8; c ++) {
         vec4 corner = {
-            ((c & 1) ? mesh->max[0] : mesh->min[0]) * shape->scale[0],
-            ((c & 2) ? mesh->max[1] : mesh->min[1]) * shape->scale[1],
-            ((c & 4) ? mesh->max[2] : mesh->min[2]) * shape->scale[2],
+            ((c & 1) ? local_max[0] : local_min[0]) * shape->scale[0],
+            ((c & 2) ? local_max[1] : local_min[1]) * shape->scale[1],
+            ((c & 4) ? local_max[2] : local_min[2]) * shape->scale[2],
             1.0f
         };
         if (t) {
@@ -265,7 +267,8 @@ static bool box_bake_captured_but(
     ecs_id_t skip)
 {
     bool dynamic = skip != DynamicTransform && box_transform_dynamic(world, table);
-    bool manual = skip != ManualTransform && ecs_has_id(world, e, ManualTransform);
+    bool manual = skip != ManualTransform && ecs_has_id(world, e, ManualTransform) &&
+        !ecs_has(world, e, SurfaceAttachment);
     bool hidden = skip != NoBake && ecs_has_id(world, e, NoBake);
 
     return !dynamic && !manual && !hidden && !box_projection_anchored(world, e);
@@ -439,7 +442,8 @@ void box_bake_changes(
         }
 
         if (ecs_is_alive(world, e) && !ecs_has_id(world, e, NoBake) &&
-            !ecs_has_id(world, e, ManualTransform) && !box_projection_anchored(world, e) &&
+            (!ecs_has_id(world, e, ManualTransform) || ecs_has(world, e, SurfaceAttachment)) &&
+            !box_projection_anchored(world, e) &&
             !box_transform_dynamic(world, ecs_get_table(world, e)) &&
             box_spatial_bounds(world, e, &scene, min, max))
         {

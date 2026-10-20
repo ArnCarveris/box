@@ -101,6 +101,8 @@ typedef struct box_gpu_shader_t {
 
 /** Vertex and index buffers of a mesh */
 typedef struct box_gpu_mesh_t {
+    WGPUBuffer surface_assets;
+    uint64_t surface_asset_size;
     WGPUBuffer vertices;            /**< box_vertex_t */
     WGPUBuffer indices;             /**< uint32_t, three per triangle */
     uint32_t index_count;           /**< Indices to draw */
@@ -128,6 +130,8 @@ typedef struct box_gpu_material_t {
 
 /** A buffer the main thread created by handle */
 typedef struct box_gpu_buffer_t {
+    WGPUBuffer surface_assets;
+    uint64_t surface_asset_size;
     WGPUBuffer buffer;              /**< The buffer */
     uint64_t size;                  /**< Bytes of the buffer */
     uint32_t usage;                 /**< box_render_buffer_usage_t flags */
@@ -1126,6 +1130,7 @@ char* box_gpu_forward_check(
  * @param handle Handle of the mesh
  * @param desc Description followed by the vertices and indices, NULL for a release
  */
+
 void box_gpu_mesh_apply(
     box_gpu_t *gpu,
     box_render_resource_op_t op,

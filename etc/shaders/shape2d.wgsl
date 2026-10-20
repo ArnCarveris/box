@@ -21,6 +21,7 @@
 // element, where the coverage of its rounded area multiplies the alpha, anti-aliased over the
 // footprint of the fragment there; the clips it is nested in follow through its parent index.
 #include "include/lights.wgsl"
+#include "include/surface.wgsl"
 
 // BlendMode of the pipeline: the output is shaped for the blend equation it is drawn with.
 override blend_mode: u32 = 0u;
@@ -51,9 +52,11 @@ struct Shape2DInstance {
     emissive: vec4f,
     shape: vec4u,
     uv: vec4f,
+    surface: SurfaceData,
 };
 
 @group(2) @binding(0) var<storage, read> instances: array<Shape2DInstance>;
+@group(2) @binding(1) var<storage, read> surface_assets: array<vec4f>;
 
 struct VertexIn {
     @location(0) position: vec3f,

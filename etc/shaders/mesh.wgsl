@@ -53,6 +53,7 @@ const MIN_ROUGHNESS: f32 = 0.045;
 @group(0) @binding(13) var<uniform> environment_sh: array<vec4f, 9>;
 
 @group(2) @binding(0) var<storage, read> instances: array<Instance>;
+@group(2) @binding(1) var<storage, read> surface_assets: array<vec4f>;
 
 // Grid of the probe volume: probe (x, y, z) sits at origin.xyz + (x, y, z) * origin.w, x
 // fastest in the probe buffer. size.w is 0 for the 1x1x1 volume of views that keep the
@@ -100,6 +101,7 @@ const REFLECTION_NORMALIZE_MIN: f32 = 0.0;
 const REFLECTION_NORMALIZE_MAX: f32 = 2.0;
 
 struct VertexIn {
+    @builtin(vertex_index) vertex: u32,
     @location(0) position: vec3f,
     @location(1) normal: vec3f,
     @location(2) uv: vec2f,
@@ -124,15 +126,62 @@ struct VertexOut {
     let c2 = model[2].xyz;
     let cofactor = mat3x3f(cross(c1, c2), cross(c2, c0), cross(c0, c1));
     let flip = select(1.0, -1.0, dot(c0, cross(c1, c2)) < 0.0);
-    let world = model * vec4f(v.position, 1.0);
+    var position = v.position;
+    var normal = v.normal;
+    if (inst.surface.p[19].x != 0.0) {
+        position = v.position;
+        normal = v.normal;
+    } else if (inst.surface.p[0].x == 7.0) {
+        position.y *= inst.surface.p[1].y;
+    } else if (inst.surface.p[0].x == 1.0 && v.position.z < 2.0) {
+        let sample = surface_sweep_sample(inst.surface, i32(v.position.z), v.position.x, v.position.y);
+        position = sample.position;
+        normal = sv_unit(sample.normal);
+        if (sv_dot(sample.normal, sample.normal) < 0.000000000001) {
+            normal = surface_normal(inst.surface, i32(v.position.z), v.position.x, v.position.y);
+        }
+    } else if (inst.surface.p[0].x != 0.0) {
+        position = surface_position(inst.surface, i32(v.position.z), v.position.x, v.position.y);
+        normal = surface_normal(inst.surface, i32(v.position.z), v.position.x, v.position.y);
+    }
+    let world = model * vec4f(position, 1.0);
     var o: VertexOut;
     o.pos = view.view_proj * world;
     o.world = world.xyz;
-    o.normal = cofactor * v.normal * flip;
+    o.normal = cofactor * normal * flip;
     o.color = inst.color;
     o.emissive = inst.emissive.rgb;
     o.material = inst.material.xy;
     o.uv = v.uv * inst.uv.xy + inst.uv.zw;
+    if (inst.surface.p[0].x != 0.0) {
+        var region = i32(v.position.z);
+        if (inst.surface.p[0].x == 7.0) {
+            region = select(0, 1, v.uv.x >= 2.0);
+            if (abs(v.normal.y) > 0.5) {
+                region = 2;
+            } else if (region == 1) {
+                o.uv.x -= 2.0 * inst.uv.x;
+            }
+        }
+        var material_region = 2;
+        if (region == 0 || region == 1) {
+            material_region = region;
+        } else if (region == 2 || region == 3 || region == 8 || region == 9) {
+            material_region = 3;
+        }
+        if (inst.surface.p[19].x != 0.0) {
+            material_region = i32(surface_assets[v.vertex / 4u][v.vertex % 4u]);
+        }
+        let packed = bitcast<u32>(inst.surface.p[21][material_region]);
+        if ((packed & 0x80000000u) != 0u) {
+            let tint = unpack4x8unorm(bitcast<u32>(inst.surface.p[20][material_region]));
+            let linear = select(pow((tint.rgb + vec3f(0.055)) / 1.055, vec3f(2.4)),
+                tint.rgb / 12.92, tint.rgb <= vec3f(0.04045));
+            o.color *= vec4f(linear, tint.a);
+            o.material = vec2f(f32((packed >> 16u) & 32767u) / 32767.0,
+                f32(packed & 65535u) / 65535.0);
+        }
+    }
     return o;
 }
 

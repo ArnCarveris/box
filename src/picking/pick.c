@@ -447,7 +447,8 @@ static bool box_pick_mesh(
     glm_mat4_inv(m, inv);
     glm_mat4_mulv3(inv, ECS_CONST_CAST(float*, origin), 1.0f, o);
     glm_mat4_mulv3(inv, ECS_CONST_CAST(float*, dir), 0.0f, d);
-    if (shape->scale[0] != 0 && shape->scale[1] != 0 && shape->scale[2] != 0) {
+    if (!shape->surface.p[0][0] && shape->scale[0] != 0 &&
+        shape->scale[1] != 0 && shape->scale[2] != 0) {
         tree = box_pick_mesh_tree(world, cache, st, shape->mesh, mesh);
     }
 
@@ -460,6 +461,14 @@ static bool box_pick_mesh(
     for (i = 0; i + 2 < count; i += 3) {
         vec3 v[3], w;
         box_pick_corners(mesh, i, shape->scale, v);
+        if (shape->surface.p[0][0]) {
+            for (int j = 0; j < 3; j ++) {
+                uint32_t index = mesh->indices ? mesh->indices[i + j] : (uint32_t)(i + j);
+                box_surface_vertex(shape, &mesh->vertices[index], v[j]);
+                glm_vec3_mul(v[j], ECS_CONST_CAST(float*, shape->scale), v[j]);
+            }
+        }
+
         if (box_pick_triangle(o, d, v[0], v[1], v[2], w) && w[0] < best[0]) {
             glm_vec3_copy(w, best);
             hit = i;
@@ -481,6 +490,24 @@ found:
     }
 
 done:
+    if (mesh && mesh->vertex_count && shape &&
+        shape->surface.p[0][0] == 7 && fabsf(d[1]) > 0.000001f) {
+        int regions = (int)shape->surface.p[3][3];
+        for (int side = 0; side < 2; side ++) {
+            float y = ((float)side - 0.5f) * shape->surface.p[1][1];
+            float distance = (y - o[1]) / d[1];
+            float x = o[0] + distance * d[0], z = o[2] + distance * d[2];
+            if ((regions & (1 << (side + 2))) && distance >= 0 && distance < best[0] &&
+                box_profile_contains(&shape->surface, x, z))
+            {
+                *t = best[0] = distance;
+                uv[0] = x;
+                uv[1] = z;
+                hit = 0;
+            }
+        }
+    }
+
     return hit >= 0;
 }
 

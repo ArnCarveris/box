@@ -5,6 +5,7 @@
 
 #define BOX_GEOMETRY_IMPL
 #include "shape2d.h"
+#include "paths.h"
 
 ECS_COMPONENT_DECLARE(ShapeMesh);
 
@@ -22,7 +23,7 @@ static void box_shape_mesh_ctor(
     (void)ti;
     ShapeMesh *values = ptr;
     for (int32_t i = 0; i < count; i ++) {
-        values[i].mesh = 0;
+        values[i] = (ShapeMesh){0};
         glm_vec3_one(values[i].scale);
     }
 }
@@ -40,7 +41,7 @@ static void box_shape_mesh_dtor(
 {
     ShapeMesh *values = ptr;
     for (int32_t i = 0; i < count; i ++) {
-        box_mesh_cache_release(ti->hooks.ctx, values[i].mesh);
+        box_shape_mesh_release(ti->hooks.ctx, &values[i]);
     }
 }
 
@@ -61,7 +62,8 @@ static void box_shape_mesh_copy(
     const ShapeMesh *src = src_ptr;
     for (int32_t i = 0; i < count; i ++) {
         box_mesh_cache_keep(ti->hooks.ctx, src[i].mesh);
-        box_mesh_cache_release(ti->hooks.ctx, dst[i].mesh);
+        box_mesh_cache_keep(ti->hooks.ctx, src[i].render_mesh);
+        box_shape_mesh_release(ti->hooks.ctx, &dst[i]);
         dst[i] = src[i];
     }
 }
@@ -83,9 +85,10 @@ static void box_shape_mesh_move(
     ShapeMesh *src = src_ptr;
     for (int32_t i = 0; i < count; i ++) {
         if (&dst[i] != &src[i]) {
-            box_mesh_cache_release(ti->hooks.ctx, dst[i].mesh);
+            box_shape_mesh_release(ti->hooks.ctx, &dst[i]);
             dst[i] = src[i];
             src[i].mesh = 0;
+            src[i].render_mesh = 0;
         }
     }
 }
@@ -115,14 +118,46 @@ static void box_shape_resolve(
     for (int32_t i = 0; i < it->count; i ++) {
         if (shared && shared->mesh) {
             box_mesh_cache_keep(shape->cache, shared->mesh);
+            box_mesh_cache_keep(shape->cache, shared->render_mesh);
             resolved[i] = *shared;
         } else {
             const void *value = ECS_ELEM(values, shape->size, self ? i : 0);
+            resolved[i] = (ShapeMesh){0};
             resolved[i].mesh = box_mesh_cache_acquire(shape->cache, shape, value);
             glm_vec3_one(resolved[i].scale);
+            if (shape->desc.surface_world) {
+                shape->desc.surface_world(it->world, value, &resolved[i].surface,
+                    resolved[i].min, resolved[i].max);
+            }
+            if (shape->desc.surface) {
+                shape->desc.surface(value, &resolved[i].surface,
+                    resolved[i].min, resolved[i].max);
+                box_shape_key_t key = {0};
+                if (shape->desc.key_world) {
+                    shape->desc.key_world(it->world, value, &key);
+                } else {
+                    shape->desc.key(value, &key);
+                }
+                resolved[i].surface.p[3][3] = (float)key.i[2];
+            }
+            if (resolved[i].surface.assets) {
+                ecs_os_free(resolved[i].surface.assets);
+                const box_mesh_t *mesh = box_mesh_cache_get(shape->cache, resolved[i].mesh);
+                resolved[i].surface.assets = mesh->surface_assets;
+                resolved[i].surface.asset_count = mesh->surface_asset_count;
+            }
+            if (shape->desc.surface_world) {
+                const box_mesh_t *mesh = box_mesh_cache_get(shape->cache, resolved[i].mesh);
+                if (!mesh || !mesh->vertex_count || !mesh->index_count) {
+                    box_shape_mesh_release(shape->cache, &resolved[i]);
+                    resolved[i] = (ShapeMesh){0};
+                    glm_vec3_one(resolved[i].scale);
+                }
+            }
             if (shape->desc.scale) {
                 shape->desc.scale(value, resolved[i].scale);
             }
+            resolved[i].render_mesh = box_mesh_cache_resolve(shape->cache, &resolved[i]);
         }
     }
 }
@@ -145,18 +180,20 @@ static void box_shape_on_set(
     ecs_entity_t *entities = ecs_os_memdup_n(it->entities, ecs_entity_t, count);
     box_shape_resolve(it, shape, resolved);
     for (int32_t i = 0; i < count; i ++) {
+        box_surface_materials_apply(it->world, entities[i], &resolved[i]);
         ShapeMesh *dst = ecs_get_mut(it->world, entities[i], ShapeMesh);
         bool same = dst && !self && dst->mesh == resolved[i].mesh &&
-            glm_vec3_eqv(dst->scale, resolved[i].scale);
+            glm_vec3_eqv(dst->scale, resolved[i].scale) &&
+            !ecs_os_memcmp_t(&dst->surface, &resolved[i].surface, box_surface_data_t);
         if (same) {
-            box_mesh_cache_release(shape->cache, resolved[i].mesh);
+            box_shape_mesh_release(shape->cache, &resolved[i]);
         } else if (dst) {
-            box_mesh_cache_release(shape->cache, dst->mesh);
+            box_shape_mesh_release(shape->cache, dst);
             *dst = resolved[i];
             ecs_modified(it->stage, entities[i], ShapeMesh);
         } else {
             ecs_set_ptr(it->stage, entities[i], ShapeMesh, &resolved[i]);
-            box_mesh_cache_release(shape->cache, resolved[i].mesh);
+            box_shape_mesh_release(shape->cache, &resolved[i]);
         }
     }
 
@@ -190,8 +227,9 @@ static void box_shape_drop(
     }
 
     if (dst) {
-        box_mesh_cache_release(shape->cache, dst->mesh);
+        box_shape_mesh_release(shape->cache, dst);
         dst->mesh = 0;
+        dst->render_mesh = 0;
         glm_vec3_one(dst->scale);
     }
 }
@@ -257,7 +295,9 @@ int box_shape_register(
     box_mesh_cache_t *cache = box_mesh_cache_of(world);
     const ecs_type_info_t *ti = NULL;
     box_shape_t *shape = NULL;
-    if (!cache || !desc->component || !desc->key || !desc->generate) {
+    if (!cache || !desc || !desc->component || (!desc->key && !desc->key_world) ||
+        (!desc->generate && !desc->generate_world))
+    {
         ecs_err("box_shape_register: invalid shape registration");
         goto done;
     }
@@ -280,6 +320,7 @@ int box_shape_register(
     }
 
     shape->size = ti->size;
+    shape->world = world;
     ecs_add_pair(world, desc->component, EcsWith, ecs_id(ShapeMesh));
     ecs_observer(world, {
         .query.terms = {{ .id = desc->component }},
@@ -332,6 +373,32 @@ void BoxGeometryImport(
     ECS_META_COMPONENT(world, Frustum);
     ECS_META_COMPONENT(world, RoundedBox);
     ECS_META_COMPONENT(world, Star);
+    ECS_META_COMPONENT(world, SurfaceRegion);
+    ECS_COMPONENT_DEFINE(world, PathSegmentKind);
+    ecs_enum(world, {.entity = ecs_id(PathSegmentKind), .constants = {
+        {.name = "Line", .value = PathLine}, {.name = "CubicBezier", .value = PathCubicBezier}}});
+    ECS_META_COMPONENT(world, PathSegment2D);
+    ECS_META_COMPONENT(world, PathSegment3D);
+    ECS_META_COMPONENT(world, Path2D);
+    ECS_META_COMPONENT(world, Path3D);
+    ECS_META_COMPONENT(world, Sweep);
+    ECS_META_COMPONENT(world, LoftSection);
+    ECS_META_COMPONENT(world, Loft);
+    ECS_META_COMPONENT(world, Lathe);
+    ECS_META_COMPONENT(world, EllipsoidShell);
+    ECS_META_COMPONENT(world, TorusShell);
+    ECS_META_COMPONENT(world, BeveledPrism);
+    ECS_META_COMPONENT(world, Profile2D);
+    ECS_META_COMPONENT(world, ProfileExtrusion);
+    ecs_entity_t surfaces[] = {ecs_id(Sweep), ecs_id(Loft), ecs_id(Lathe),
+        ecs_id(EllipsoidShell), ecs_id(TorusShell), ecs_id(BeveledPrism), ecs_id(ProfileExtrusion)};
+    for (size_t i = 0; i < sizeof(surfaces) / sizeof(surfaces[0]); i ++) {
+        ecs_add_pair(world, surfaces[i], EcsOnInstantiate, EcsInherit);
+    }
+
+    ECS_META_COMPONENT(world, SurfaceAttachment);
+    ECS_META_COMPONENT(world, SurfaceMaterial);
+    ECS_META_COMPONENT(world, SurfaceMaterials);
     ECS_META_COMPONENT(world, Rect);
     ECS_META_COMPONENT(world, Circle);
     ECS_META_COMPONENT(world, Line);
@@ -349,6 +416,12 @@ void BoxGeometryImport(
     });
 
     box_geometry_shapes_init(world);
+    box_surface_materials_init(world);
+    box_geometry_paths_init(world);
+    box_geometry_surfaces_init(world);
+    box_geometry_profiles_init(world);
+    box_geometry_attachments_init(world);
     box_geometry_star_init(world);
     box_geometry_shapes2d_init(world);
+    box_geometry_validation_init(world);
 }

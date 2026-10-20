@@ -457,6 +457,14 @@ void box_draws_transform(
         glm_mat4_identity(out->model);
     }
 
+    ecs_os_memcpy(out->surface.p, shape->surface.p, sizeof(out->surface.p));
+    out->surface.p[19][0] = shape->render_mesh != 0;
+    if (shape->surface.p[0][0]) {
+        for (int j = 0; j < 3; j ++) {
+            out->surface.p[22][j] = (shape->min[j] + shape->max[j]) * 0.5f;
+            out->surface.p[23][j] = (shape->max[j] - shape->min[j]) * 0.5f;
+        }
+    }
     glm_vec4_scale(out->model[0], shape->scale[0], out->model[0]);
     glm_vec4_scale(out->model[1], shape->scale[1], out->model[1]);
     glm_vec4_scale(out->model[2], shape->scale[2], out->model[2]);
@@ -513,16 +521,30 @@ static bool box_draws_mesh(
         goto done;
     }
 
+    uint64_t total_size = sizeof(box_render_mesh_desc_t) +
+        (uint64_t)mesh->vertex_count * sizeof(box_vertex_t) +
+        (uint64_t)mesh->index_count * sizeof(uint32_t) +
+        (uint64_t)mesh->surface_asset_count * sizeof(vec4);
+    if (total_size + (uint64_t)ecs_vec_count(&p->data) + BOX_RENDER_DATA_ALIGN > INT32_MAX) {
+        ecs_err("surface render packet capacity exceeded");
+        return false;
+    }
     uint32_t vertex_size = (uint32_t)mesh->vertex_count * (uint32_t)sizeof(box_vertex_t);
     uint32_t index_size = (uint32_t)mesh->index_count * (uint32_t)sizeof(uint32_t);
     box_render_mesh_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_MESH,
         BOX_RENDER_CREATE, handle,
-        (uint32_t)sizeof(box_render_mesh_desc_t) + vertex_size + index_size);
+        (uint32_t)sizeof(box_render_mesh_desc_t) + vertex_size + index_size +
+        (uint32_t)mesh->surface_asset_count * sizeof(vec4));
     uint8_t *data = (uint8_t*)(desc + 1);
+    desc->surface_asset_count = (uint32_t)mesh->surface_asset_count;
     desc->vertex_count = (uint32_t)mesh->vertex_count;
     desc->index_count = (uint32_t)mesh->index_count;
     ecs_os_memcpy(data, mesh->vertices, (ecs_size_t)vertex_size);
     ecs_os_memcpy(data + vertex_size, mesh->indices, (ecs_size_t)index_size);
+    if (mesh->surface_asset_count) {
+        ecs_os_memcpy(data + vertex_size + index_size, mesh->surface_assets,
+            mesh->surface_asset_count * sizeof(vec4));
+    }
     box_mesh_cache_hold(cache, handle);
     ecs_map_insert(&d->meshes, handle, 1);
 done:
@@ -617,6 +639,7 @@ static void box_draws_reserve(
 
     box_render_buffer_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_BUFFER,
         BOX_RENDER_CREATE, b->buffer, sizeof(box_render_buffer_desc_t));
+    desc->surface_mesh = b->key.mesh;
     desc->size = (uint64_t)capacity * sizeof(box_render_instance_t);
     desc->usage = BOX_RENDER_BUFFER_INSTANCE | BOX_RENDER_BUFFER_STORAGE;
 
@@ -919,6 +942,7 @@ static void box_draws_send_changes(
         box_render_buffer_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_BUFFER,
             BOX_RENDER_CREATE, BOX_RENDER_BUFFER_CHANGES, sizeof(box_render_buffer_desc_t));
         desc->size = size;
+        desc->surface_mesh = 0;
         desc->usage = BOX_RENDER_BUFFER_STORAGE;
         d->changes_size = (uint32_t)size;
     }

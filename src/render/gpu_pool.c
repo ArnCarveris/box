@@ -172,15 +172,14 @@ void box_gpu_cull_pool_upload(
     }
 
     if (!c->pool_group) {
-        WGPUBindGroupEntry entry = {
-            .binding = 0,
-            .buffer = c->pool,
-            .size = c->pool_size < limit ? c->pool_size : limit
+        WGPUBindGroupEntry entry[2] = {
+            {.binding = 0, .buffer = c->pool, .size = c->pool_size < limit ? c->pool_size : limit},
+            {.binding = 1, .buffer = c->pool, .size = sizeof(vec4)}
         };
         c->pool_group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
             .layout = gpu->instance_layout,
-            .entryCount = 1,
-            .entries = &entry
+            .entryCount = 2,
+            .entries = entry
         });
     }
 

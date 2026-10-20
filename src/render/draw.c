@@ -478,7 +478,7 @@ static void box_draws_key(
     }
 
     key->scene = box_draws_scene(world, d, e);
-    key->mesh = shape->mesh;
+    key->mesh = shape->render_mesh ? shape->render_mesh : shape->mesh;
     key->pipeline = shape2d ? BOX_RENDER_SHADER_SHAPE2D : BOX_RENDER_SHADER_MESH;
     if (shape2d && shape2d->texture) {
         key->textures[0] = shape2d->texture;
