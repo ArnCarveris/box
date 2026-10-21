@@ -46,6 +46,7 @@ ECS_STRUCT(LightSettings, {
                              *   ctor sets true */
     EnvironmentSettings environment; /**< Environment the view is lit with, used only when
                                       *   the view is lit */
+    ecs_entity_t scene;
 });
 
 /** Shadow settings of a view */

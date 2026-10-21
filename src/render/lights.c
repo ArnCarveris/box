@@ -1036,7 +1036,8 @@ static void box_lights_views(
         const View *view = v->view && ecs_is_alive(world, v->view)
             ? ecs_get(world, v->view, View)
             : NULL;
-        int32_t index = box_lights_find(l, v->scene);
+        ecs_entity_t scene = view && view->lighting.scene ? view->lighting.scene : v->scene;
+        int32_t index = box_lights_find(l, scene);
         box_light_scene_t *s = index != -1
             ? ecs_vec_get_t(&l->scenes, box_light_scene_t, index)
             : NULL;

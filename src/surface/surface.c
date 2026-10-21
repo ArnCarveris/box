@@ -31,6 +31,7 @@ typedef struct box_surface_state_t {
 
 /** Engine side of a surface: its target, its window and what the backend was told */
 typedef struct SurfaceImpl {
+    bool opened;
     uint32_t handle;                /**< Handle of the target, 0 before it was created */
     box_window_t *window;           /**< The window, NULL for an offscreen target */
     int32_t window_width;           /**< Width in points the window was given */
@@ -243,7 +244,11 @@ static void box_surface_open(
     SurfaceImpl *impl,
     box_surface_state_t *state)
 {
-    impl->handle = ++ state->last_handle;
+    impl->opened = true;
+    if (!impl->handle) {
+        impl->handle = ++ state->last_handle;
+    }
+
     if (box_surface_offscreen(world, s)) {
         goto done;
     }
@@ -409,7 +414,7 @@ static void box_surface_frame(
     box_render_target_desc_t desc;
     float clear[4];
     int32_t generation = box_render_get_backend(world)->generation;
-    if (!impl->handle) {
+    if (!impl->opened) {
         box_surface_open(world, e, s, impl, state);
         op = BOX_RENDER_CREATE;
     } else if (impl->generation != generation) {
@@ -553,9 +558,19 @@ static void BoxSurfacePoll(
 static void BoxSurfaceOnSet(
     ecs_iter_t *it)
 {
+    box_surface_state_t *state = it->ctx;
+    const Surface *s = ecs_field(it, Surface, 0);
     int32_t i;
     for (i = 0; i < it->count; i ++) {
-        ecs_add(it->world, it->entities[i], SurfaceImpl);
+        ecs_entity_t texture = s[i].texture;
+        SurfaceImpl *impl = ecs_ensure(it->world, it->entities[i], SurfaceImpl);
+        if (texture) {
+            if (!impl->handle) {
+                impl->handle = ++ state->last_handle;
+            }
+
+            box_render_texture_target(it->world, texture, impl->handle);
+        }
     }
 
     box_render_use_gpu(ECS_CONST_CAST(ecs_world_t*, ecs_get_world(it->world)));
@@ -653,7 +668,8 @@ void BoxSurfaceImport(
         .entity = ecs_entity(world, { .name = "SurfaceOnSet" }),
         .query.terms = {{ .id = ecs_id(Surface) }},
         .events = { EcsOnSet },
-        .callback = BoxSurfaceOnSet
+        .callback = BoxSurfaceOnSet,
+        .ctx = state
     });
 
     ecs_observer(world, {

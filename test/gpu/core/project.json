@@ -30,6 +30,12 @@
                     "view",
                     "owning_components_have_hooks"
                 ]
+            },
+            {
+                "id": "Design",
+                "testcases": [
+                    "capture"
+                ]
             }
         ]
     }

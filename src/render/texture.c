@@ -103,7 +103,7 @@ void box_render_texture_target(
 {
     ecs_map_t *map = box_render_target_textures(world);
     if (map && texture && target) {
-        ecs_map_insert(map, texture, target);
+        *ecs_map_ensure(map, texture) = target;
     }
 }
 

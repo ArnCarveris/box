@@ -9,6 +9,8 @@
 #include <box.h>
 #include <sys/types.h>
 
+int box_app_views(ecs_world_t *world);
+
 /** Read the CPU time the process has used on all of its threads.
  *
  * @return User plus system seconds, 0 in the browser, which has no process CPU time

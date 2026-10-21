@@ -40,6 +40,36 @@ app keeps its own assets in `apps/<app>/etc` and names them from the repository 
 Parameterized surfaces and surface-relative placement are described in
 [Geometry surfaces](docs/geometry-surfaces.md).
 
+Use `--design` to inspect a scene with top, bottom, left and right orthographic cameras
+and a perspective camera:
+
+```sh
+bake3 run apps/boxrun --local-env -- --design etc/scenes/default.flecs
+bake3 run apps/boxrun --local-env -- --camera camera etc/scenes/default.flecs
+```
+
+Design mode uses the scene of the first view on the main surface, or the first shape's
+scene when no view exists. It fits the cameras and shadow distances to that scene's
+static and dynamic shape bounds each frame, with a small margin. Top and bottom occupy
+the upper left tiles, left and right the lower left tiles, and perspective the right
+half of the window. Every panel has a black border and a tiny label in its upper-left
+corner. Each view has a white directional light angled from its camera and a dim neutral
+ambient fill. Post effects, environment lighting, atmosphere, baked
+lighting and reflections are disabled for the design views.
+
+When the main `Surface.write_to_file` is `model.png`, the overview is saved there and
+the individual views are saved as `model-top.png`, `model-bottom.png`, `model-left.png`,
+`model-right.png` and `model-perspective.png`. Each individual image has half the main
+surface's width; its height matches the tile's aspect ratio after reserving the label
+header. Relative capture paths use the usual headless temporary directory.
+
+`--camera <entity.path>` renders an existing camera, retaining its view settings when
+available, or the main view's settings otherwise. The options are mutually exclusive;
+the equivalent App fields are `design: true` and `camera: "entity.path"`, applied by
+`box_app_run` after loading the scene. Both options create a surface if needed, using
+`--surface` dimensions when supplied. `View.lighting.scene` can select a separate scene
+for direct and ambient lighting; design mode uses it to light each camera independently.
+
 ## Browser build
 
 ```sh

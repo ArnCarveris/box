@@ -92,7 +92,13 @@ static int box_app_option(
 {
     double v = 0;
     int result = -1;
-    if (!strcmp(flag, "frames")) {
+    if (!strcmp(flag, "camera")) {
+        if (value && value[0] && value[0] != '-') {
+            ecs_os_free(app->camera);
+            app->camera = ecs_os_strdup(value);
+            result = 0;
+        }
+    } else if (!strcmp(flag, "frames")) {
         if (!box_app_number(value, 0, &v) && v >= 1 && v <= INT32_MAX && v == floor(v)) {
             app->frames = (int32_t)v;
             result = 0;
@@ -146,7 +152,7 @@ static bool box_app_has_value(
 {
     return !strcmp(flag, "frames") || !strcmp(flag, "timeout") ||
         !strcmp(flag, "cpu-budget") || !strcmp(flag, "fps") || !strcmp(flag, "delta-time") ||
-        !strcmp(flag, "port") || !strcmp(flag, "surface");
+        !strcmp(flag, "port") || !strcmp(flag, "surface") || !strcmp(flag, "camera");
 }
 
 int box_app_parse(
@@ -176,6 +182,8 @@ int box_app_parse(
             }
         } else if (!strcmp(arg, "--headless")) {
             app->headless = true;
+        } else if (!strcmp(arg, "--design")) {
+            app->design = true;
         } else if (arg[1] == '-' && box_app_has_value(&arg[2])) {
             result = box_app_option(app, &arg[2], i + 1 < argc ? argv[i + 1] : NULL);
             i ++;
@@ -183,6 +191,11 @@ int box_app_parse(
             ecs_err("unknown option '%s'", arg);
             result = -1;
         }
+    }
+
+    if (!result && app->design && app->camera) {
+        ecs_err("--design and --camera cannot be combined");
+        result = -1;
     }
 
     ecs_singleton_modified(world, App);

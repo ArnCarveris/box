@@ -217,6 +217,19 @@
                     "parse_delta_time_not_a_number",
                     "parse_delta_time_not_finite"
                 ]
+            },
+            {
+                "id": "Design",
+                "testcases": [
+                    "parse",
+                    "camera_parse",
+                    "invalid_options",
+                    "fitted_views",
+                    "empty_scene",
+                    "capture_names",
+                    "select_camera",
+                    "invalid_camera"
+                ]
             }
         ]
     }
