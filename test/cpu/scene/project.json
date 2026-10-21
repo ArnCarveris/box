@@ -86,6 +86,41 @@
                     "geometry_edits_update_bounds",
                     "attachments_update_bounds"
                 ]
+            },
+            {
+                "id": "SpatialLayout",
+                "testcases": [
+                    "fit_stretch",
+                    "fit_modes",
+                    "fit_chained_resize",
+                    "align_bounds_keep",
+                    "align_rotated_nested",
+                    "align_named_frames",
+                    "align_remove",
+                    "array_stable",
+                    "array_progression",
+                    "distribute_modes",
+                    "distribute_rotated_resize",
+                    "cycles",
+                    "invalid_layouts",
+                    "script",
+                    "fit_nested_scale",
+                    "align_array_group",
+                    "group_target",
+                    "distribute_fit_chain",
+                    "distribute_remove",
+                    "feedback_cycle",
+                    "mesh_bounds",
+                    "dynamic_target",
+                    "named_frame_script",
+                    "array_nested_prototype",
+                    "nested_implicit_position",
+                    "array_after_indexed",
+                    "diagnostic_cleanup",
+                    "fit_in_aligned_group",
+                    "nested_arrays",
+                    "empty_distribution"
+                ]
             }
         ]
     }

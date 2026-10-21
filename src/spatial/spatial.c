@@ -11,6 +11,7 @@
  */
 
 #include "index.h"
+#include "layout.h"
 #include "../render/render.h"
 #include "../geometry/mesh_cache.h"
 
@@ -698,6 +699,10 @@ static void box_spatial_observers(
     ecs_world_t *world,
     box_spatial_t *index)
 {
+    box_spatial_observer(world, index, "SpatialOnPrefab", (ecs_observer_desc_t){
+        .query.terms = {{ .id = EcsPrefab }},
+        .query.flags = EcsQueryMatchPrefab | EcsQueryMatchDisabled,
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxSpatialOnChange);
     box_spatial_observer(world, index, "SpatialOnShape", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(ShapeMesh) }},
         .events = { EcsOnSet } }, BoxSpatialOnChange);
@@ -732,6 +737,8 @@ void BoxSpatialImport(
 {
     ECS_MODULE(world, BoxSpatial);
     ECS_IMPORT(world, BoxRender);
+
+    box_spatial_layout_init(world);
 
     box_spatial_t *index = box_spatial_new();
     ECS_COMPONENT_DEFINE(world, SpatialProxy);

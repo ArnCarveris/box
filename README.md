@@ -40,6 +40,9 @@ app keeps its own assets in `apps/<app>/etc` and names them from the repository 
 Parameterized surfaces and surface-relative placement are described in
 [Geometry surfaces](docs/geometry-surfaces.md).
 
+Relational 3D modeling with Fit, Align, Array, and Distribute is described in
+[Spatial layout](docs/spatial-layout.md).
+
 Use `--design` to inspect a scene with top, bottom, left and right orthographic cameras
 and a perspective camera:
 
