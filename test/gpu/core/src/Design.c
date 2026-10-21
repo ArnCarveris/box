@@ -33,19 +33,23 @@ void Design_capture(void)
     test_int(width, 256);
     test_int(height, 256);
     ecs_os_free(path);
-    const char *names[] = {"top", "bottom", "left", "right", "perspective"};
-    for (int i = 0; i < 5; i ++) {
+    const char *names[] = {
+        "top", "bottom", "left", "right", "front", "back",
+        "perspective", "perspective-back"
+    };
+    for (int i = 0; i < 8; i ++) {
         path = flecs_asprintf("%s/design-%s.png", dir, names[i]);
         unsigned char *pixels = stbi_load(path, &width, &height, &channels, 4);
         test_assert(pixels != NULL);
         test_int(width, 128);
-        test_int(height, i < 4 ? 224 : 240);
+        test_int(height, i < 6 ? 138 : 112);
         unsigned char *center = &pixels[((height / 2) * width + 64) * 4];
         test_assert(center[0] > 100);
         test_assert(abs(center[0] - center[1]) < 3);
         test_assert(abs(center[1] - center[2]) < 3);
-        int x = i < 4 ? (i % 2) * 64 + 32 : 192;
-        int y = i < 4 ? (i / 2) * 128 + 72 : 136;
+        int x = i < 6 ? (i % 2) * 64 + 32 : 192;
+        int y = i < 6 ? (int)((i / 2 + 0.5f) * (256.0f / 3) + 8)
+            : (i - 6) * 128 + 72;
         unsigned char *tile = &overview[(y * 256 + x) * 4];
         test_assert(abs(tile[0] - center[0]) < 5);
         test_assert(abs(tile[1] - center[1]) < 5);
@@ -60,9 +64,9 @@ void Design_capture(void)
     path = flecs_asprintf("%s/design.png", dir);
     overview = stbi_load(path, &width, &height, &channels, 4);
     test_assert(overview != NULL);
-    for (int i = 0; i < 5; i ++) {
-        int left = i < 4 ? (i % 2) * 64 : 128;
-        int top = i < 4 ? (i / 2) * 128 : 0;
+    for (int i = 0; i < 8; i ++) {
+        int left = i < 6 ? (i % 2) * 64 : 128;
+        int top = i < 6 ? (int)((i / 2) * (256.0f / 3)) : (i - 6) * 128;
         int ink = 0;
         for (int y = top + 2; y < top + 14; y ++) {
             for (int x = left + 4; x < left + 30; x ++) {

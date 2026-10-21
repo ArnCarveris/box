@@ -6,20 +6,26 @@
 #include <math.h>
 #include <string.h>
 
+enum {
+    BOX_DESIGN_ORTHO_COUNT = 6,
+    BOX_DESIGN_VIEW_COUNT = 8
+};
+
 static const char *box_design_names[] = {
-    "top", "bottom", "left", "right", "perspective"
+    "top", "bottom", "left", "right", "front", "back",
+    "perspective", "perspective-back"
 };
 
 typedef struct box_design_t {
     ecs_entity_t scene;
     ecs_entity_t surface;
-    ecs_entity_t camera[5];
-    ecs_entity_t view[5];
-    ecs_entity_t target[5];
-    ecs_entity_t tile[5];
-    ecs_entity_t light[5];
-    ecs_entity_t label[5];
-    ecs_entity_t caption[5];
+    ecs_entity_t camera[BOX_DESIGN_VIEW_COUNT];
+    ecs_entity_t view[BOX_DESIGN_VIEW_COUNT];
+    ecs_entity_t target[BOX_DESIGN_VIEW_COUNT];
+    ecs_entity_t tile[BOX_DESIGN_VIEW_COUNT];
+    ecs_entity_t light[BOX_DESIGN_VIEW_COUNT];
+    ecs_entity_t label[BOX_DESIGN_VIEW_COUNT];
+    ecs_entity_t caption[BOX_DESIGN_VIEW_COUNT];
     ecs_entity_t overview;
     char *capture;
 } box_design_t;
@@ -138,7 +144,8 @@ static void box_design_fit(
     float aspect)
 {
     vec3 directions[] = {
-        {0, 1, 0}, {0, -1, 0}, {-1, 0, 0}, {1, 0, 0}, {1, 0.75f, 1}
+        {0, 1, 0}, {0, -1, 0}, {-1, 0, 0}, {1, 0, 0},
+        {0, 0, 1}, {0, 0, -1}, {1, 0.75f, 1}, {-1, 0.75f, -1}
     };
     vec3 up = {0, 1, 0}, center, extent, back, right;
     if (index < 2) {
@@ -172,7 +179,7 @@ static void box_design_fit(
             (x + padding) / (tangent * aspect), (y + padding) / tangent));
     }
 
-    if (index < 4) {
+    if (index < BOX_DESIGN_ORTHO_COUNT) {
         distance = half_depth + padding * 2;
     }
 
@@ -275,12 +282,14 @@ static void BoxDesignUpdate(
     overview->ortho_height = (float)height;
     ecs_modified(world, design->overview, Camera);
 
-    for (int32_t i = 0; i < 5; i ++) {
-        float w = i < 4 ? width * 0.25f : width * 0.5f;
-        float h = i < 4 ? height * 0.5f : (float)height;
+    for (int32_t i = 0; i < BOX_DESIGN_VIEW_COUNT; i ++) {
+        bool ortho = i < BOX_DESIGN_ORTHO_COUNT;
+        float w = ortho ? width * 0.25f : width * 0.5f;
+        float h = ortho ? height / 3.0f : height * 0.5f;
+        int32_t row = ortho ? i / 2 : i - BOX_DESIGN_ORTHO_COUNT;
         float caption_height = fminf(16, h * 0.2f);
         float content_height = h - caption_height;
-        int32_t target_height = (int32_t)(content_height * (i < 4 ? 2 : 1));
+        int32_t target_height = (int32_t)(content_height * (ortho ? 2 : 1));
         target_height = target_height > 0 ? target_height : 1;
         float aspect = (float)target_width / target_height;
         Surface *target = ecs_get_mut(world, design->target[i], Surface);
@@ -302,8 +311,8 @@ static void BoxDesignUpdate(
         }
 
         mat4 matrix = GLM_MAT4_IDENTITY_INIT;
-        matrix[3][0] = i < 4 ? -width * 0.5f + w * ((i % 2) + 0.5f) : width * 0.25f;
-        matrix[3][1] = i < 4 ? height * 0.25f * (i < 2 ? 1 : -1) : 0;
+        matrix[3][0] = ortho ? -width * 0.5f + w * ((i % 2) + 0.5f) : width * 0.25f;
+        matrix[3][1] = height * 0.5f - h * (row + 0.5f);
         matrix[3][1] -= caption_height * 0.5f;
         box_design_pose(world, design->tile[i], matrix);
         ecs_set(world, design->caption[i], Rect, {w, caption_height});
@@ -415,18 +424,18 @@ int box_app_views(
     ecs_entity_t view = box_app_child(world, root, "view");
     ecs_set(world, view, View, {
         .camera = design->overview,
-        .clear = {.enabled = true, .color = {32, 32, 32, 255}}
+        .clear = {.enabled = true, .color = {16, 16, 16, 255}}
     });
 
     Surface settings = *ecs_get(world, surface, Surface);
     design->capture = ecs_os_strdup(settings.write_to_file);
-    for (int32_t i = 0; i < 5; i ++) {
+    for (int32_t i = 0; i < BOX_DESIGN_VIEW_COUNT; i ++) {
         ecs_entity_t camera = box_app_child(world, cameras, box_design_names[i]);
         design->camera[i] = camera;
         ecs_add(world, camera, ManualTransform);
         ecs_set(world, camera, Camera, {
             .fov = BOX_CAMERA_FOV, .near_ = 0.1f, .far_ = 1000,
-            .ortho = i < 4, .ortho_height = 10
+            .ortho = i < BOX_DESIGN_ORTHO_COUNT, .ortho_height = 10
         });
         ecs_entity_t target = ecs_new(world);
         ecs_entity_t texture = ecs_new(world);
@@ -448,7 +457,7 @@ int box_app_views(
         View *v = ecs_ensure(world, target_view, View);
         v->camera = camera;
         v->lighting = (LightSettings){.enabled = true, .scene = light};
-        v->clear = (ClearSettings){.enabled = true, .color = {48, 48, 48, 255}};
+        v->clear = (ClearSettings){.enabled = true, .color = {24, 24, 24, 255}};
         v->shadows.enabled = true;
         v->shadows.fade = 0;
         v->culling.min_dimension_px = 0;
@@ -476,7 +485,8 @@ int box_app_views(
         design->label[i] = label;
         ecs_add(world, label, ManualTransform);
         Text *text = ecs_ensure(world, label, Text);
-        text->value = ecs_os_strdup(box_design_names[i]);
+        text->value = ecs_os_strdup(i == BOX_DESIGN_VIEW_COUNT - 1
+            ? "perspective (back)" : box_design_names[i]);
         text->value[0] -= 'a' - 'A';
         text->size = 9;
         text->align = AlignLeft;

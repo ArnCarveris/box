@@ -62,16 +62,25 @@ void Design_invalid_options(void)
 
 static void design_check_fit(ecs_world_t *world, vec3 min, vec3 max)
 {
-    const char *names[] = {"top", "bottom", "left", "right", "perspective"};
+    const char *names[] = {
+        "top", "bottom", "left", "right", "front", "back",
+        "perspective", "perspective-back"
+    };
+    vec3 directions[] = {
+        {0, 1, 0}, {0, -1, 0}, {-1, 0, 0}, {1, 0, 0},
+        {0, 0, 1}, {0, 0, -1}, {1, 0.75f, 1}, {-1, 0.75f, -1}
+    };
     ecs_entity_t root = ecs_lookup(world, "scene.DesignCameras");
     test_assert(root != 0);
-    for (int i = 0; i < 5; i ++) {
+    for (int i = 0; i < 8; i ++) {
         ecs_entity_t entity = ecs_lookup_child(world, root, names[i]);
         const Camera *camera = ecs_get(world, entity, Camera);
         const WorldTransform *transform = ecs_get(world, entity, WorldTransform);
         test_assert(camera != NULL);
         test_assert(transform != NULL);
-        test_bool(camera->ortho, i < 4);
+        test_bool(camera->ortho, i < 6);
+        glm_vec3_normalize(directions[i]);
+        test_assert(glm_vec3_dot((float*)transform->m[2], directions[i]) > 0.999f);
         test_assert(camera->near_ > 0);
         test_assert(camera->far_ > camera->near_);
         mat4 projection, view, vp;
@@ -132,8 +141,8 @@ void Design_fitted_views(void)
 
     test_int(box_app_run(world), 0);
     design_check_fit(world, (vec3){8, 17, 26}, (vec3){18, 23, 34});
-    test_int(ecs_count(world, Surface), 6);
-    test_int(ecs_count(world, DirectionalLight), 5);
+    test_int(ecs_count(world, Surface), 9);
+    test_int(ecs_count(world, DirectionalLight), 8);
     test_int(ecs_count(world, PointLight), 0);
     test_assert(!ecs_has(world, scene, LightBake));
     test_flt(ecs_get(world, scene, AmbientLight)->intensity, 0.08f);
@@ -159,7 +168,7 @@ void Design_fitted_views(void)
             }
         }
     }
-    test_int(count, 5);
+    test_int(count, 8);
     ecs_set(world, moving, Position, {5, 0, 0});
     ecs_progress(world, 0.016f);
     design_check_fit(world, (vec3){8, 17, 26}, (vec3){22, 23, 34});
@@ -172,7 +181,7 @@ void Design_empty_scene(void)
     box_render_null_t *backend;
     ecs_world_t *world = design_world(&backend);
     test_int(box_app_run(world), 0);
-    test_int(ecs_count(world, Surface), 6);
+    test_int(ecs_count(world, Surface), 9);
     ecs_entity_t camera = ecs_lookup(world, "DesignCameras.perspective");
     test_assert(camera != 0);
     test_assert(box_camera_has_depth(ecs_get(world, camera, Camera)));
@@ -207,7 +216,7 @@ void Design_capture_names(void)
             }
         }
     }
-    test_int(count, 5);
+    test_int(count, 8);
     ecs_fini(world);
     box_render_null_free(backend);
 }

@@ -43,8 +43,8 @@ Parameterized surfaces and surface-relative placement are described in
 Relational 3D modeling with Fit, Align, Array, and Distribute is described in
 [Spatial layout](docs/spatial-layout.md).
 
-Use `--design` to inspect a scene with top, bottom, left and right orthographic cameras
-and a perspective camera:
+Use `--design` to inspect a scene with top, bottom, left, right, front and back orthographic
+cameras and two perspective cameras:
 
 ```sh
 bake3 run apps/boxrun --local-env -- --design etc/scenes/default.flecs
@@ -54,15 +54,17 @@ bake3 run apps/boxrun --local-env -- --camera camera etc/scenes/default.flecs
 Design mode uses the scene of the first view on the main surface, or the first shape's
 scene when no view exists. It fits the cameras and shadow distances to that scene's
 static and dynamic shape bounds each frame, with a small margin. Top and bottom occupy
-the upper left tiles, left and right the lower left tiles, and perspective the right
-half of the window. Every panel has a black border and a tiny label in its upper-left
-corner. Each view has a white directional light angled from its camera and a dim neutral
+the first row on the left, left and right the second row, and front and back the third
+row. The right half stacks perspective above perspective (back), which orbits the camera
+180 degrees around the scene at the same elevation. Every panel has a black border and
+a tiny label in its upper-left corner. Each view has a white directional light angled from its camera and a dim neutral
 ambient fill. Post effects, environment lighting, atmosphere, baked
 lighting and reflections are disabled for the design views.
 
 When the main `Surface.write_to_file` is `model.png`, the overview is saved there and
 the individual views are saved as `model-top.png`, `model-bottom.png`, `model-left.png`,
-`model-right.png` and `model-perspective.png`. Each individual image has half the main
+`model-right.png`, `model-front.png`, `model-back.png`, `model-perspective.png` and
+`model-perspective-back.png`. Each individual image has half the main
 surface's width; its height matches the tile's aspect ratio after reserving the label
 header. Relative capture paths use the usual headless temporary directory.
 
