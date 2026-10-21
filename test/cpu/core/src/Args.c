@@ -447,3 +447,72 @@ void Args_surface_first_frame(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+void Args_out(void) {
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    char *argv[] = {"boxrun", "--out", "model.png"};
+    test_int(box_app_parse(world, 3, argv), 0);
+    test_str(ecs_singleton_get(world, App)->out, "model.png");
+    ecs_entity_t copy = ecs_new(world);
+    ecs_set_ptr(world, copy, App, ecs_singleton_get(world, App));
+    test_assert(ecs_get(world, copy, App)->out != ecs_singleton_get(world, App)->out);
+    test_str(ecs_get(world, copy, App)->out, "model.png");
+    char *repeat[] = {"boxrun", "--out", "other"};
+    test_int(box_app_parse(world, 3, repeat), 0);
+    test_str(ecs_singleton_get(world, App)->out, "other");
+    test_str(ecs_get(world, copy, App)->out, "model.png");
+    ecs_fini(world);
+}
+
+void Args_invalid_out(void) {
+    char *args[][3] = {
+        {"boxrun", "--out"},
+        {"boxrun", "--out", ""},
+        {"boxrun", "--out", "--design"}
+    };
+    ecs_log_set_level(-4);
+    for (int i = 0; i < 3; i ++) {
+        ecs_world_t *world = ecs_init();
+        ECS_IMPORT(world, Box);
+        test_assert(box_app_parse(world, i ? 3 : 2, args[i]) != 0);
+        ecs_fini(world);
+    }
+}
+
+void Args_out_capture(void) {
+    for (int i = 0; i < 3; i ++) {
+        ecs_world_t *world = ecs_init();
+        ECS_IMPORT(world, Box);
+        box_render_null_t *null = box_render_null_new();
+        box_render_backend_t backend = box_render_null_backend(null);
+        box_render_set_backend(world, &backend);
+        if (i) {
+            ecs_entity_t surface = ecs_new(world);
+            ecs_set(world, surface, Surface, {
+                .width = 64, .height = 48, .write_to_file = "old.png"
+            });
+        }
+        char *argv[] = {"boxrun", "--headless", "--frames", "1", "--port", "0",
+            "--out", i == 2 ? "/tmp/box-out-test.png" : "model"};
+        test_int(box_app_parse(world, 8, argv), 0);
+        App *app = ecs_singleton_get_mut(world, App);
+        app->unguarded = true;
+        app->unpaced = true;
+        test_int(box_app_run(world), 0);
+        test_int(ecs_count(world, Surface), 1);
+        ecs_iter_t it = ecs_each(world, Surface);
+        test_assert(ecs_each_next(&it));
+        const Surface *surface = ecs_field(&it, Surface, 0);
+        test_assert(surface->write_to_file[0] == '/');
+        if (i == 2) {
+            test_str(surface->write_to_file, "/tmp/box-out-test.png");
+        } else {
+            size_t length = strlen(surface->write_to_file);
+            test_str(surface->write_to_file + length - 10, "/model.png");
+        }
+        ecs_iter_fini(&it);
+        ecs_fini(world);
+        box_render_null_free(null);
+    }
+}

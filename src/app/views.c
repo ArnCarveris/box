@@ -5,6 +5,7 @@
 #include <float.h>
 #include <math.h>
 #include <string.h>
+#include <unistd.h>
 
 enum {
     BOX_DESIGN_ORTHO_COUNT = 6,
@@ -365,7 +366,7 @@ int box_app_views(
 {
     int result = 0;
     const App *app = ecs_singleton_get(world, App);
-    if (!app->design && !app->camera) {
+    if (!app->design && !app->camera && !app->out) {
         goto done;
     }
 
@@ -384,6 +385,34 @@ int box_app_views(
 
     bool design_mode = app->design;
     ecs_entity_t surface = box_app_surface(world);
+    if (app->out) {
+        char cwd[4096];
+        if (app->out[0] != '/' && !getcwd(cwd, sizeof(cwd))) {
+            ecs_err("cannot resolve output path '%s'", app->out);
+            result = -1;
+            goto done;
+        }
+
+        char *path = app->out[0] == '/' ? ecs_os_strdup(app->out)
+            : flecs_asprintf("%s/%s", cwd, app->out);
+        const char *dot = strrchr(path, '.');
+        const char *slash = strrchr(path, '/');
+        if (!dot || (slash && dot < slash)) {
+            char *png = flecs_asprintf("%s.png", path);
+            ecs_os_free(path);
+            path = png;
+        }
+
+        Surface *settings = ecs_get_mut(world, surface, Surface);
+        ecs_os_free(settings->write_to_file);
+        settings->write_to_file = path;
+        ecs_modified(world, surface, Surface);
+    }
+
+    if (!design_mode && !selected) {
+        goto done;
+    }
+
     ecs_entity_t source = box_app_view(world, surface, selected);
     ecs_entity_t root = ecs_new(world);
     if (!design_mode) {

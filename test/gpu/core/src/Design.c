@@ -80,3 +80,38 @@ void Design_capture(void)
     ecs_os_free(path);
     ecs_fini(world);
 }
+
+void Design_out_capture(void)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    const AppStatus *status;
+    ecs_singleton_set(world, App, {
+        .headless = true, .unguarded = true, .unpaced = true,
+        .surface_width = 256, .surface_height = 256
+    });
+    status = ecs_singleton_get(world, AppStatus);
+    char *prefix = flecs_asprintf("%s/out-design", status->tmp_dir);
+    char *argv[] = {"boxrun", "--design", "--out", prefix, "--frames", "1", "--port", "0"};
+    test_int(box_app_parse(world, 8, argv), 0);
+    ecs_entity_t shape = ecs_new(world);
+    ecs_set(world, shape, Box, {2, 2, 2});
+    test_int(box_app_run(world), 0);
+    box_render_sync(world);
+    const char *suffixes[] = {
+        "", "-top", "-bottom", "-left", "-right", "-front", "-back",
+        "-perspective", "-perspective-back"
+    };
+    for (int i = 0; i < 9; i ++) {
+        char *path = flecs_asprintf("%s%s.png", prefix, suffixes[i]);
+        int width, height, channels;
+        unsigned char *pixels = stbi_load(path, &width, &height, &channels, 4);
+        test_assert(pixels != NULL);
+        test_int(width, i ? 128 : 256);
+        test_assert(height > 0);
+        stbi_image_free(pixels);
+        ecs_os_free(path);
+    }
+    ecs_os_free(prefix);
+    ecs_fini(world);
+}

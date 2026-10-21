@@ -48,6 +48,7 @@ cameras and two perspective cameras:
 
 ```sh
 bake3 run apps/boxrun --local-env -- --design etc/scenes/default.flecs
+bake3 run apps/boxrun --local-env -- --headless --frames 3 --design --out model etc/scenes/default.flecs
 bake3 run apps/boxrun --local-env -- --camera camera etc/scenes/default.flecs
 ```
 
@@ -61,12 +62,18 @@ a tiny label in its upper-left corner. Each view has a white directional light a
 ambient fill. Post effects, environment lighting, atmosphere, baked
 lighting and reflections are disabled for the design views.
 
-When the main `Surface.write_to_file` is `model.png`, the overview is saved there and
+`--out <path>` saves the main surface to a PNG, adding `.png` when no extension is
+given. Relative paths are resolved from the working directory, including headless runs.
+It overrides the scene's main `Surface.write_to_file` and works with `--camera` too.
+
+With `--design --out model` (or when the main `Surface.write_to_file` is `model.png`),
+the overview is saved as `model.png` and
 the individual views are saved as `model-top.png`, `model-bottom.png`, `model-left.png`,
 `model-right.png`, `model-front.png`, `model-back.png`, `model-perspective.png` and
 `model-perspective-back.png`. Each individual image has half the main
 surface's width; its height matches the tile's aspect ratio after reserving the label
-header. Relative capture paths use the usual headless temporary directory.
+header. Relative paths set directly through `Surface.write_to_file` use the usual
+headless temporary directory.
 
 `--camera <entity.path>` renders an existing camera, retaining its view settings when
 available, or the main view's settings otherwise. The options are mutually exclusive;

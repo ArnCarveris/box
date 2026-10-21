@@ -92,10 +92,11 @@ static int box_app_option(
 {
     double v = 0;
     int result = -1;
-    if (!strcmp(flag, "camera")) {
+    if (!strcmp(flag, "camera") || !strcmp(flag, "out")) {
         if (value && value[0] && value[0] != '-') {
-            ecs_os_free(app->camera);
-            app->camera = ecs_os_strdup(value);
+            char **target = !strcmp(flag, "out") ? &app->out : &app->camera;
+            ecs_os_free(*target);
+            *target = ecs_os_strdup(value);
             result = 0;
         }
     } else if (!strcmp(flag, "frames")) {
@@ -152,7 +153,8 @@ static bool box_app_has_value(
 {
     return !strcmp(flag, "frames") || !strcmp(flag, "timeout") ||
         !strcmp(flag, "cpu-budget") || !strcmp(flag, "fps") || !strcmp(flag, "delta-time") ||
-        !strcmp(flag, "port") || !strcmp(flag, "surface") || !strcmp(flag, "camera");
+        !strcmp(flag, "port") || !strcmp(flag, "surface") || !strcmp(flag, "camera") ||
+        !strcmp(flag, "out");
 }
 
 int box_app_parse(

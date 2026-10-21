@@ -471,7 +471,8 @@ void BoxAppImport(
     ECS_META_COMPONENT(world, AppStatus);
     ECS_META_COMPONENT(world, FrameRange);
     ECS_META_COMPONENT(world, FrameTiming);
-    box_owned_hooks(world, App, BOX_OWNED_STR(App, scene), BOX_OWNED_STR(App, camera));
+    box_owned_hooks(world, App, BOX_OWNED_STR(App, scene), BOX_OWNED_STR(App, camera),
+        BOX_OWNED_STR(App, out));
     box_owned_hooks(world, AppStatus, BOX_OWNED_STR(AppStatus, tmp_dir));
 
     ecs_singleton_set(world, AppStatus, {0});

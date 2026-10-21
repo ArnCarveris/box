@@ -67,6 +67,7 @@ ECS_STRUCT(App, {
     char *scene;        /**< Script file loaded before the first frame, NULL for none */
     bool design;
     char *camera;
+    char *out;
 });
 
 /** State of the process the engine writes, read only for applications */

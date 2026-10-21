@@ -34,7 +34,8 @@
             {
                 "id": "Design",
                 "testcases": [
-                    "capture"
+                    "capture",
+                    "out_capture"
                 ]
             }
         ]
