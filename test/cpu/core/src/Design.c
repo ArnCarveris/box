@@ -270,3 +270,67 @@ void Design_invalid_camera(void)
         box_render_null_free(backend);
     }
 }
+
+void Design_tight_perspective(void)
+{
+    box_render_null_t *backend;
+    ecs_world_t *world = design_world(&backend);
+    ecs_entity_t surface = ecs_new(world);
+    ecs_set(world, surface, Surface, {.width = 1600, .height = 1000});
+    vec3 positions[] = {{0, -0.25f, 0}, {-7, 5, -8}, {7, 3, -8}};
+    Box boxes[] = {{28, 0.5f, 24}, {6, 10, 6}, {6, 6, 6}};
+    for (int i = 0; i < 3; i ++) {
+        ecs_entity_t shape = ecs_new(world);
+        ecs_set(world, shape, Position, {
+            positions[i][0], positions[i][1], positions[i][2]
+        });
+        ecs_set_ptr(world, shape, Box, &boxes[i]);
+    }
+
+    test_int(box_app_run(world), 0);
+    const char *names[] = {"DesignCameras.perspective", "DesignCameras.perspective-back"};
+    for (int resize = 0; resize < 2; resize ++) {
+        if (resize) {
+            ecs_get_mut(world, surface, Surface)->width = 800;
+            ecs_modified(world, surface, Surface);
+            ecs_progress(world, 0.016f);
+        }
+
+        for (int i = 0; i < 2; i ++) {
+            ecs_entity_t entity = ecs_lookup(world, names[i]);
+            const Camera *camera = ecs_get(world, entity, Camera);
+            const WorldTransform *transform = ecs_get(world, entity, WorldTransform);
+            mat4 projection, view, vp;
+            box_camera_projection(camera, 1, 1, projection);
+            glm_mat4_inv((vec4*)transform->m, view);
+            glm_mat4_mul(projection, view, vp);
+            float min[2] = {1, 1}, max[2] = {-1, -1};
+            for (int shape = 0; shape < 3; shape ++) {
+                for (int c = 0; c < 8; c ++) {
+                    vec4 point = {
+                        positions[shape][0] + (c & 1 ? 0.5f : -0.5f) * boxes[shape].x,
+                        positions[shape][1] + (c & 2 ? 0.5f : -0.5f) * boxes[shape].y,
+                        positions[shape][2] + (c & 4 ? 0.5f : -0.5f) * boxes[shape].z, 1
+                    }, clip;
+                    glm_mat4_mulv(vp, point, clip);
+                    test_assert(clip[3] > 0);
+                    test_assert(clip[2] / clip[3] >= 0);
+                    test_assert(clip[2] / clip[3] <= 1);
+                    for (int axis = 0; axis < 2; axis ++) {
+                        float value = clip[axis] / clip[3];
+                        test_assert(fabsf(value) < 1);
+                        min[axis] = fminf(min[axis], value);
+                        max[axis] = fmaxf(max[axis], value);
+                    }
+                }
+            }
+
+            int axis = max[0] - min[0] > max[1] - min[1] ? 0 : 1;
+            test_assert(max[axis] - min[axis] > 1.7f);
+            test_assert(fabsf(max[axis] + min[axis]) < 0.1f);
+        }
+    }
+
+    ecs_fini(world);
+    box_render_null_free(backend);
+}

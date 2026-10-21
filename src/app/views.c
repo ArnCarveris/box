@@ -30,6 +30,7 @@ typedef struct box_design_t {
     ecs_entity_t caption[BOX_DESIGN_VIEW_COUNT];
     ecs_entity_t overview;
     char *capture;
+    ecs_vec_t points;
 } box_design_t;
 
 static void box_design_free(
@@ -37,6 +38,7 @@ static void box_design_free(
 {
     box_design_t *design = ptr;
     ecs_os_free(design->capture);
+    ecs_vec_fini_t(NULL, &design->points, vec3);
     ecs_os_free(design);
 }
 
@@ -143,7 +145,8 @@ static void box_design_fit(
     int32_t index,
     vec3 min,
     vec3 max,
-    float aspect)
+    float aspect,
+    const ecs_vec_t *points)
 {
     vec3 directions[] = {
         {0, 1, 0}, {0, -1, 0}, {-1, 0, 0}, {1, 0, 0},
@@ -165,24 +168,45 @@ static void box_design_fit(
     float half_width = 0, half_height = 0, half_depth = 0;
     float distance = padding;
     float tangent = tanf(glm_rad(BOX_CAMERA_FOV) * 0.5f);
-    for (int32_t i = 0; i < 8; i ++) {
-        vec3 point = {
-            ((i & 1) ? max[0] : min[0]) - center[0],
-            ((i & 2) ? max[1] : min[1]) - center[1],
-            ((i & 4) ? max[2] : min[2]) - center[2]
+    float lower[2] = {-FLT_MAX, -FLT_MAX};
+    float upper[2] = {FLT_MAX, FLT_MAX};
+    float tangents[2] = {tangent * aspect, tangent};
+    bool perspective = index >= BOX_DESIGN_ORTHO_COUNT;
+    vec3 *vertices = ecs_vec_first(points);
+    int32_t count = perspective ? ecs_vec_count(points) : 0;
+    for (int32_t i = 0; i < (count ? count : 8); i ++) {
+        vec3 point;
+        if (count) {
+            glm_vec3_sub(vertices[i], center, point);
+        } else {
+            for (int32_t axis = 0; axis < 3; axis ++) {
+                point[axis] = ((i & (1 << axis)) ? max[axis] : min[axis]) - center[axis];
+            }
+        }
+
+        float projected[2] = {
+            glm_vec3_dot(point, right), glm_vec3_dot(point, up)
         };
-        float x = fabsf(glm_vec3_dot(point, right));
-        float y = fabsf(glm_vec3_dot(point, up));
+        float x = fabsf(projected[0]);
+        float y = fabsf(projected[1]);
         float z = glm_vec3_dot(point, back);
         half_width = fmaxf(half_width, x);
         half_height = fmaxf(half_height, y);
         half_depth = fmaxf(half_depth, fabsf(z));
-        distance = fmaxf(distance, z + fmaxf(
-            (x + padding) / (tangent * aspect), (y + padding) / tangent));
+        for (int32_t axis = 0; axis < 2; axis ++) {
+            lower[axis] = fmaxf(lower[axis], projected[axis] + z * tangents[axis]);
+            upper[axis] = fminf(upper[axis], projected[axis] - z * tangents[axis]);
+        }
     }
 
-    if (index < BOX_DESIGN_ORTHO_COUNT) {
-        distance = half_depth + padding * 2;
+    if (perspective) {
+        for (int32_t axis = 0; axis < 2; axis ++) {
+            distance = fmaxf(distance,
+                (lower[axis] - upper[axis] + 2 * padding) / (2 * tangents[axis]));
+        }
+
+        glm_vec3_muladds(right, (lower[0] + upper[0]) * 0.5f, center);
+        glm_vec3_muladds(up, (lower[1] + upper[1]) * 0.5f, center);
     }
 
     distance = fmaxf(distance, half_depth + padding * 2);
@@ -246,6 +270,7 @@ static void BoxDesignUpdate(
     vec3 min = {FLT_MAX, FLT_MAX, FLT_MAX};
     vec3 max = {-FLT_MAX, -FLT_MAX, -FLT_MAX};
     bool found = false;
+    ecs_vec_clear(&design->points);
     ecs_iter_t shapes = ecs_each(world, ShapeMesh);
     while (ecs_each_next(&shapes)) {
         for (int32_t i = 0; i < shapes.count; i ++) {
@@ -257,6 +282,12 @@ static void BoxDesignUpdate(
                 glm_vec3_minv(min, lo, min);
                 glm_vec3_maxv(max, hi, max);
                 found = true;
+                for (int32_t c = 0; c < 8; c ++) {
+                    float *point = *ecs_vec_append_t(NULL, &design->points, vec3);
+                    point[0] = c & 1 ? hi[0] : lo[0];
+                    point[1] = c & 2 ? hi[1] : lo[1];
+                    point[2] = c & 4 ? hi[2] : lo[2];
+                }
             }
         }
     }
@@ -306,7 +337,7 @@ static void BoxDesignUpdate(
             ecs_modified(world, design->target[i], Surface);
         }
 
-        box_design_fit(world, design, i, min, max, aspect);
+        box_design_fit(world, design, i, min, max, aspect, &design->points);
         const Rect *rect = ecs_get(world, design->tile[i], Rect);
         if (rect->width != w || rect->height != content_height) {
             ecs_set(world, design->tile[i], Rect, {w, content_height});

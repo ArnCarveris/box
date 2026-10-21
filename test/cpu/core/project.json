@@ -228,6 +228,7 @@
                     "camera_parse",
                     "invalid_options",
                     "fitted_views",
+                    "tight_perspective",
                     "empty_scene",
                     "capture_names",
                     "select_camera",
