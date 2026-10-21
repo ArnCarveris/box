@@ -4,6 +4,7 @@
 #include "../geometry/mesh_cache.h"
 #include <float.h>
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -321,6 +322,29 @@ static void BoxDesignUpdate(
         matrix[3][2] = 0.1f;
         box_design_pose(world, design->caption[i], matrix);
         matrix[3][2] = 0.2f;
+        if (ortho) {
+            int32_t horizontal = i < 2 ? 0 : (i < 4 ? 2 : 0);
+            int32_t vertical = i < 2 ? 2 : 1;
+            const char *axes = "XYZ";
+            char caption[128];
+            if (found) {
+                snprintf(caption, sizeof(caption), "%s (%c: %.4g, %c: %.4g)",
+                    box_design_names[i], axes[horizontal],
+                    max[horizontal] - min[horizontal], axes[vertical],
+                    max[vertical] - min[vertical]);
+            } else {
+                snprintf(caption, sizeof(caption), "%s", box_design_names[i]);
+            }
+
+            caption[0] -= 'a' - 'A';
+            Text *text = ecs_get_mut(world, design->label[i], Text);
+            if (strcmp(text->value, caption)) {
+                ecs_os_free(text->value);
+                text->value = ecs_os_strdup(caption);
+                ecs_modified(world, design->label[i], Text);
+            }
+        }
+
         const TextBounds *bounds = ecs_get(world, design->label[i], TextBounds);
         matrix[3][0] += -w * 0.5f + 5 + (bounds ? bounds->width * 0.5f : 0);
         box_design_pose(world, design->label[i], matrix);

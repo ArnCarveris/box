@@ -58,7 +58,9 @@ static and dynamic shape bounds each frame, with a small margin. Top and bottom 
 the first row on the left, left and right the second row, and front and back the third
 row. The right half stacks perspective above perspective (back), which orbits the camera
 180 degrees around the scene at the same elevation. Every panel has a black border and
-a tiny label in its upper-left corner. Each view has a white directional light angled from its camera and a dim neutral
+a tiny label in its upper-left corner. Orthographic labels include the model's dimensions
+in world units along the two visible axes, updated each frame from the scene bounds.
+Each view has a white directional light angled from its camera and a dim neutral
 ambient fill. Post effects, environment lighting, atmosphere, baked
 lighting and reflections are disabled for the design views.
 
