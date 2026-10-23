@@ -190,7 +190,10 @@
                     "dynamic_opacity_blends",
                     "blended_no_alloc_steady_state",
                     "gpu_alpha_blend",
-                    "gpu_back_face_plain"
+                    "gpu_back_face_plain",
+                    "default_roughness_without_material",
+                    "default_roughness_metallic_only",
+                    "default_material_sphere_matte"
                 ]
             },
             {
