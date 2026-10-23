@@ -473,7 +473,7 @@ static void box_draws_key(
     if (textures) {
         key->textures[0] = textures->albedo;
         key->textures[1] = textures->emissive;
-        key->textures[2] = textures->roughness;
+        key->textures[2] = textures->orm;
         key->textures[3] = textures->normal;
     }
 

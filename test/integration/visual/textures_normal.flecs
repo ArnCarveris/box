@@ -68,7 +68,7 @@ striped_metal {
   Quad: {2.2, 2.2}
   Rgb: {230, 200, 150}
   PbrMaterial: {metallic: 1, roughness: 1}
-  PbrTextures: {roughness: stripes}
+  PbrTextures: {orm: stripes}
 }
 
 glowing_box {

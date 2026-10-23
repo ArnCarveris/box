@@ -1,0 +1,72 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+
+// A gold panel and a gold ball with the ORM map orm.png on a grey floor, lit by the environment
+// sky.hdr, which the view draws as the background, and a sun from the upper left. The map tiles
+// the material four by four: dark grooves between the tiles (occlusion, only the sky light is
+// taken away, the sun still lights them), a smooth top and a rough bottom half per tile, and
+// metal columns (sharp sky reflections, no diffuse) next to dielectric ones (gold diffuse with
+// a faint white sheen).
+orm_scene {
+  Scene: {}
+
+  sky {
+    Environment: {resolution: 64}
+    EnvironmentImage: {path: "etc/environments/sky.hdr"}
+  }
+
+  orm {
+    TexturePath: {path: "test/integration/visual/assets/orm.png"}
+  }
+
+  sun {
+    Rotation: {0.75, 2.2, 0}
+    DirectionalLight: {intensity: 1.5}
+    Rgb: {255, 240, 220}
+  }
+
+  camera {
+    Position: {0, 1.6, 6}
+    Rotation: {-0.12, 0, 0}
+    Camera: {fov: 50}
+  }
+
+  floor {
+    Position: {0, -0.1, 0}
+    Box: {12, 0.2, 8}
+    Rgb: {120, 120, 125}
+    PbrMaterial: {roughness: 0.8}
+  }
+
+  panel {
+    Position: {-1.5, 1.4, -0.5}
+    Rotation: {0, 0.3, 0}
+    Quad: {2.6, 2.6}
+    Rgb: {230, 180, 100}
+    PbrMaterial: {metallic: 1, roughness: 0.9}
+    PbrTextures: {orm: orm}
+  }
+
+  ball {
+    Position: {1.6, 1.1, 0}
+    Sphere: {segments: 64, smooth: true, radius: 1.1}
+    Rgb: {230, 180, 100}
+    PbrMaterial: {metallic: 1, roughness: 0.9}
+    PbrTextures: {orm: orm}
+    TextureTransform: {scale_x: 2, scale_y: 1}
+  }
+}
+
+orm_view {
+  View: {
+    camera: orm_scene.camera,
+    clear: {enabled: true, color: {0, 0, 0, 255}},
+    lighting: {enabled: true, baked: false, reflections: false, atmosphere: false,
+      environment: {source: orm_scene.sky, intensity: 1, yaw: 0, background: true}}
+  }
+}

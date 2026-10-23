@@ -105,7 +105,7 @@
 /** First shader handle of application shaders, the handles below are engine shaders */
 #define BOX_RENDER_SHADER_FIRST (64)
 
-/** Texture layers of a batch: albedo, emissive, roughness and normal, as in PbrTextures */
+/** Texture layers of a batch: albedo, emissive, ORM and normal, as in PbrTextures */
 #define BOX_RENDER_TEXTURE_SLOTS (4)
 
 /** Anisotropic samples of the texture samplers when no surface sets them */

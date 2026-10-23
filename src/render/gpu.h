@@ -490,7 +490,7 @@ typedef struct box_gpu_t {
     WGPUBindGroupLayout view_layout; /**< Bind group layout of the view uniforms */
     WGPUBindGroupLayout material_layout; /**< Bind group layout of the texture layers */
     WGPUSampler samplers[BOX_GPU_WRAPS][BOX_GPU_ANISOTROPY_LEVELS]; /**< Created on use */
-    box_gpu_texture_t *white;       /**< Default of the albedo, emissive and roughness layers */
+    box_gpu_texture_t *white;       /**< Default of the albedo, emissive and ORM layers */
     box_gpu_texture_t *flat;        /**< Default of the normal layer, an unperturbed normal */
     ecs_map_t textures;             /**< Handle to box_gpu_texture_t */
     ecs_map_t materials;            /**< Key hash to the first box_gpu_material_t */

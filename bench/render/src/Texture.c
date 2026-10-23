@@ -86,7 +86,7 @@ void Texture_textured_batches(
         ecs_set(world, e, PbrTextures, {
             .albedo = textures[set % BENCH_TEXTURE_COUNT],
             .emissive = textures[(set / BENCH_TEXTURE_COUNT) % BENCH_TEXTURE_COUNT],
-            .roughness = textures[(set + 3) % BENCH_TEXTURE_COUNT],
+            .orm = textures[(set + 3) % BENCH_TEXTURE_COUNT],
             .normal = textures[(set + 7) % BENCH_TEXTURE_COUNT]
         });
         ecs_set(world, e, TextureTransform, {.scale_x = 2, .scale_y = 2});
