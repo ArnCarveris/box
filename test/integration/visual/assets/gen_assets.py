@@ -85,9 +85,22 @@ def bumps(x, y):
 
 
 def stripes(x, y):
-    """Roughness in the green channel: smooth and rough horizontal bands."""
+    """ORM of smooth and rough horizontal bands: roughness in green, no occlusion in red and the
+    metallic of the material in blue."""
     g = 30 if (y // (SIZE // 8)) % 2 == 0 else 255
-    return (g, g, g, 255)
+    return (255, g, 255, 255)
+
+
+def orm(x, y):
+    """ORM of four by four tiles with occluded grooves (red) between them, a smooth top and a
+    rough bottom half per tile (green) and metal and dielectric columns (blue)."""
+    cell = SIZE // 4
+    u, v = x % cell, y % cell
+    edge = min(u, v, cell - 1 - u, cell - 1 - v)
+    r = 255 if edge >= 4 else 20 + edge * 55
+    g = 40 if v < cell // 2 else 255
+    b = 255 if (x // cell) % 2 == 0 else 0
+    return (r, g, b, 255)
 
 
 def ring(x, y):
@@ -99,7 +112,8 @@ def ring(x, y):
 
 def main():
     for name, fn in (("checker.png", checker), ("letter.png", letter),
-                     ("bumps.png", bumps), ("stripes.png", stripes), ("ring.png", ring)):
+                     ("bumps.png", bumps), ("stripes.png", stripes), ("ring.png", ring),
+                     ("orm.png", orm)):
         write_png(name, SIZE, image(SIZE, fn))
         print("%s %d bytes" % (name, os.path.getsize(os.path.join(HERE, name))))
 

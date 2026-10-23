@@ -1290,7 +1290,7 @@ void Texture_gpu_albedo_mip_linear_average(void) {
     ecs_fini(world);
 }
 
-void Texture_gpu_roughness_mip_stored_average(void) {
+void Texture_gpu_orm_mip_stored_average(void) {
     // lighting_fixes/albedo_mips
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -1304,12 +1304,13 @@ void Texture_gpu_roughness_mip_stored_average(void) {
     int32_t i, c;
     for (i = 0; i < 256; i ++) {
         uint8_t v = ((i % 16) + (i / 16)) % 2 ? 255 : 0;
-        for (c = 0; c < 3; c ++) {
-            checker[i * 4 + c] = v;
-            half[i * 4 + c] = 128;
-        }
-
+        checker[i * 4 + 0] = 255;
+        checker[i * 4 + 1] = v;
+        checker[i * 4 + 2] = 255;
         checker[i * 4 + 3] = 255;
+        half[i * 4 + 0] = 255;
+        half[i * 4 + 1] = 128;
+        half[i * 4 + 2] = 255;
         half[i * 4 + 3] = 255;
     }
 
@@ -1335,14 +1336,14 @@ void Texture_gpu_roughness_mip_stored_average(void) {
     ecs_set(world, far, Quad, {2.5f, 2.5f});
     ecs_set(world, far, Rgb, {255, 255, 255});
     ecs_set(world, far, PbrMaterial, {.metallic = 1, .roughness = 1});
-    ecs_set(world, far, PbrTextures, {.roughness = checker_tex});
+    ecs_set(world, far, PbrTextures, {.orm = checker_tex});
     ecs_set(world, far, TextureTransform, {.scale_x = 64, .scale_y = 64});
     ecs_entity_t flat = ecs_new(world);
     ecs_set(world, flat, Position, {1.5f, 0, 0});
     ecs_set(world, flat, Quad, {2.5f, 2.5f});
     ecs_set(world, flat, Rgb, {255, 255, 255});
     ecs_set(world, flat, PbrMaterial, {.metallic = 1, .roughness = 1});
-    ecs_set(world, flat, PbrTextures, {.roughness = half_tex});
+    ecs_set(world, flat, PbrTextures, {.orm = half_tex});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "rough.png",
         .resolution_scale = 1});
@@ -1409,7 +1410,7 @@ void Texture_gpu_mip_data_then_color(void) {
     ecs_set(world, far, Quad, {5, 5});
     ecs_set(world, far, Rgb, {255, 255, 255});
     ecs_set(world, far, PbrMaterial, {.roughness = 1});
-    ecs_set(world, far, PbrTextures, {.roughness = checker_tex});
+    ecs_set(world, far, PbrTextures, {.orm = checker_tex});
     ecs_set(world, far, TextureTransform, {.scale_x = 64, .scale_y = 64});
     ecs_entity_t flat = ecs_new(world);
     ecs_set(world, flat, Position, {3, 0, 0});
@@ -1489,7 +1490,7 @@ void Texture_gpu_mip_shared_color_and_data(void) {
     ecs_set(world, far, Quad, {5, 5});
     ecs_set(world, far, Rgb, {255, 255, 255});
     ecs_set(world, far, PbrMaterial, {.roughness = 1});
-    ecs_set(world, far, PbrTextures, {.albedo = checker_tex, .roughness = checker_tex});
+    ecs_set(world, far, PbrTextures, {.albedo = checker_tex, .orm = checker_tex});
     ecs_set(world, far, TextureTransform, {.scale_x = 64, .scale_y = 64});
     ecs_entity_t flat = ecs_new(world);
     ecs_set(world, flat, Position, {3, 0, 0});
@@ -1693,5 +1694,443 @@ void Texture_gpu_emissive_mip_linear_average(void) {
     ecs_os_free(path);
     ecs_os_free(grey_file);
     ecs_os_free(checker_file);
+    ecs_fini(world);
+}
+
+void Texture_gpu_orm_roughness_green(void) {
+    // materials/textures
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    const char *tmp = ecs_singleton_get(world, AppStatus)->tmp_dir;
+    char *file = flecs_asprintf("%s/orm_smooth.png", tmp);
+    uint8_t px[4 * 4 * 4];
+    int32_t i;
+    for (i = 0; i < 16; i ++) {
+        px[i * 4 + 0] = 255;
+        px[i * 4 + 1] = 25;
+        px[i * 4 + 2] = 255;
+        px[i * 4 + 3] = 255;
+    }
+
+    test_assert(stbi_write_png(file, 4, 4, 4, px, 4 * 4) != 0);
+
+    ecs_entity_t tex = ecs_new(world);
+    ecs_set(world, tex, TexturePath, {.path = file});
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 6});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}},
+        .lighting.enabled = true});
+    ecs_singleton_set(world, AmbientLight, {.intensity = 0});
+    ecs_entity_t left_light = ecs_new(world);
+    ecs_set(world, left_light, Position, {-1.5f, 0, 2});
+    ecs_set(world, left_light, PointLight, {.intensity = 4, .range = 10});
+    ecs_entity_t right_light = ecs_new(world);
+    ecs_set(world, right_light, Position, {1.5f, 0, 2});
+    ecs_set(world, right_light, PointLight, {.intensity = 4, .range = 10});
+    ecs_entity_t rough = ecs_new(world);
+    ecs_set(world, rough, Position, {-1.5f, 0, 0});
+    ecs_set(world, rough, Quad, {2.5f, 2.5f});
+    ecs_set(world, rough, Rgb, {255, 255, 255});
+    ecs_set(world, rough, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_entity_t smooth = ecs_new(world);
+    ecs_set(world, smooth, Position, {1.5f, 0, 0});
+    ecs_set(world, smooth, Quad, {2.5f, 2.5f});
+    ecs_set(world, smooth, Rgb, {255, 255, 255});
+    ecs_set(world, smooth, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, smooth, PbrTextures, {.orm = tex});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 128, .height = 64, .write_to_file = "orm_green.png",
+        .resolution_scale = 1});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    char *path = flecs_asprintf("%s/orm_green.png", tmp);
+    int w = 0, h = 0, n = 0;
+    unsigned char *img = stbi_load(path, &w, &h, &n, 4);
+    test_assert(img != NULL);
+    int32_t x, y, rough_peak = 0, smooth_peak = 0, rough_bright = 0, smooth_bright = 0;
+    for (y = 24; y < 40; y ++) {
+        for (x = 42; x < 58; x ++) {
+            rough_peak = glm_max(rough_peak, img[(y * 128 + x) * 4 + 1]);
+            smooth_peak = glm_max(smooth_peak, img[(y * 128 + x + 28) * 4 + 1]);
+        }
+    }
+
+    for (y = 24; y < 40; y ++) {
+        for (x = 42; x < 58; x ++) {
+            rough_bright += img[(y * 128 + x) * 4 + 1] * 2 > rough_peak;
+            smooth_bright += img[(y * 128 + x + 28) * 4 + 1] * 2 > smooth_peak;
+        }
+    }
+
+    test_assert(rough_peak > 20);
+    test_assert(smooth_peak > rough_peak + 40);
+    test_assert(smooth_bright * 4 < rough_bright);
+
+    stbi_image_free(img);
+    ecs_os_free(path);
+    ecs_os_free(file);
+    ecs_fini(world);
+}
+
+void Texture_gpu_orm_metallic_blue(void) {
+    // materials/textures
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    const char *tmp = ecs_singleton_get(world, AppStatus)->tmp_dir;
+    char *dielectric_file = flecs_asprintf("%s/orm_dielectric.png", tmp);
+    char *metal_file = flecs_asprintf("%s/orm_metal.png", tmp);
+    uint8_t px[4 * 4 * 4];
+    int32_t i, c;
+    for (i = 0; i < 16; i ++) {
+        px[i * 4 + 0] = 255;
+        px[i * 4 + 1] = 255;
+        px[i * 4 + 2] = 0;
+        px[i * 4 + 3] = 255;
+    }
+
+    test_assert(stbi_write_png(dielectric_file, 4, 4, 4, px, 4 * 4) != 0);
+    for (i = 0; i < 16; i ++) {
+        px[i * 4 + 2] = 255;
+    }
+
+    test_assert(stbi_write_png(metal_file, 4, 4, 4, px, 4 * 4) != 0);
+
+    ecs_entity_t dielectric_tex = ecs_new(world);
+    ecs_set(world, dielectric_tex, TexturePath, {.path = dielectric_file});
+    ecs_entity_t metal_tex = ecs_new(world);
+    ecs_set(world, metal_tex, TexturePath, {.path = metal_file});
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 6});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}},
+        .lighting.enabled = true});
+    ecs_singleton_set(world, AmbientLight, {
+        .sky = {255, 255, 255}, .ground = {255, 255, 255}, .intensity = 1});
+    ecs_entity_t sun = ecs_new(world);
+    ecs_set(world, sun, DirectionalLight, {.intensity = 0});
+    ecs_entity_t plain = ecs_new(world);
+    ecs_set(world, plain, Position, {-4, 0, 0});
+    ecs_set(world, plain, Quad, {3, 3});
+    ecs_set(world, plain, Rgb, {60, 200, 60});
+    ecs_set(world, plain, PbrMaterial, {.metallic = 0, .roughness = 1});
+    ecs_entity_t dielectric = ecs_new(world);
+    ecs_set(world, dielectric, Position, {0, 0, 0});
+    ecs_set(world, dielectric, Quad, {3, 3});
+    ecs_set(world, dielectric, Rgb, {60, 200, 60});
+    ecs_set(world, dielectric, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, dielectric, PbrTextures, {.orm = dielectric_tex});
+    ecs_entity_t metal = ecs_new(world);
+    ecs_set(world, metal, Position, {4, 0, 0});
+    ecs_set(world, metal, Quad, {3, 3});
+    ecs_set(world, metal, Rgb, {60, 200, 60});
+    ecs_set(world, metal, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, metal, PbrTextures, {.orm = metal_tex});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 128, .height = 64, .write_to_file = "orm_blue.png",
+        .resolution_scale = 1});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    char *path = flecs_asprintf("%s/orm_blue.png", tmp);
+    int w = 0, h = 0, n = 0;
+    unsigned char *img = stbi_load(path, &w, &h, &n, 4);
+    test_assert(img != NULL);
+    unsigned char *reference = &img[(32 * 128 + 27) * 4];
+    unsigned char *diffuse = &img[(32 * 128 + 64) * 4];
+    unsigned char *metallic = &img[(32 * 128 + 101) * 4];
+    test_assert(reference[1] > 150);
+    test_assert(reference[1] > reference[0] + 60);
+    for (c = 0; c < 3; c ++) {
+        test_assert(abs(diffuse[c] - reference[c]) < 4);
+    }
+
+    test_assert(diffuse[1] > metallic[1] + 30);
+
+    stbi_image_free(img);
+    ecs_os_free(path);
+    ecs_os_free(metal_file);
+    ecs_os_free(dielectric_file);
+    ecs_fini(world);
+}
+
+void Texture_gpu_orm_occlusion_indirect_only(void) {
+    // materials/textures
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    const char *tmp = ecs_singleton_get(world, AppStatus)->tmp_dir;
+    char *file = flecs_asprintf("%s/orm_occluded.png", tmp);
+    uint8_t px[4 * 4 * 4];
+    int32_t i, c;
+    for (i = 0; i < 16; i ++) {
+        px[i * 4 + 0] = 0;
+        px[i * 4 + 1] = 255;
+        px[i * 4 + 2] = 255;
+        px[i * 4 + 3] = 255;
+    }
+
+    test_assert(stbi_write_png(file, 4, 4, 4, px, 4 * 4) != 0);
+
+    ecs_entity_t tex = ecs_new(world);
+    ecs_set(world, tex, TexturePath, {.path = file});
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 6});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}},
+        .lighting.enabled = true});
+    ecs_singleton_set(world, AmbientLight, {
+        .sky = {255, 255, 255}, .ground = {255, 255, 255}, .intensity = 1});
+    ecs_entity_t sun = ecs_new(world);
+    ecs_set(world, sun, Rotation, {0, (float)GLM_PI, 0});
+    ecs_set(world, sun, DirectionalLight, {.intensity = 0});
+    ecs_entity_t occluded = ecs_new(world);
+    ecs_set(world, occluded, Position, {-2, 0, 0});
+    ecs_set(world, occluded, Quad, {3, 3});
+    ecs_set(world, occluded, Rgb, {200, 200, 200});
+    ecs_set(world, occluded, PbrMaterial, {.metallic = 0, .roughness = 1});
+    ecs_set(world, occluded, PbrTextures, {.orm = tex});
+    ecs_entity_t open = ecs_new(world);
+    ecs_set(world, open, Position, {2, 0, 0});
+    ecs_set(world, open, Quad, {3, 3});
+    ecs_set(world, open, Rgb, {200, 200, 200});
+    ecs_set(world, open, PbrMaterial, {.metallic = 0, .roughness = 1});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "orm_red.png",
+        .resolution_scale = 1});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    char *path = flecs_asprintf("%s/orm_red.png", tmp);
+    int w = 0, h = 0, n = 0;
+    unsigned char *img = stbi_load(path, &w, &h, &n, 4);
+    test_assert(img != NULL);
+    unsigned char *left = &img[(16 * 64 + 22) * 4];
+    unsigned char *right = &img[(16 * 64 + 41) * 4];
+    test_assert(right[1] > 100);
+    for (c = 0; c < 3; c ++) {
+        test_assert(left[c] < 4);
+    }
+
+    stbi_image_free(img);
+
+    ecs_singleton_set(world, AmbientLight, {.intensity = 0});
+    ecs_set(world, sun, DirectionalLight, {.intensity = 1});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    img = stbi_load(path, &w, &h, &n, 4);
+    test_assert(img != NULL);
+    left = &img[(16 * 64 + 22) * 4];
+    right = &img[(16 * 64 + 41) * 4];
+    test_assert(right[1] > 100);
+    for (c = 0; c < 3; c ++) {
+        test_assert(abs(left[c] - right[c]) < 4);
+    }
+
+    stbi_image_free(img);
+
+    ecs_set(world, sun, DirectionalLight, {.intensity = 0});
+    ecs_set(world, occluded, Emissive, {.strength = 1, .color = {255, 120, 40}});
+    ecs_set(world, open, Emissive, {.strength = 1, .color = {255, 120, 40}});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    img = stbi_load(path, &w, &h, &n, 4);
+    test_assert(img != NULL);
+    left = &img[(16 * 64 + 22) * 4];
+    right = &img[(16 * 64 + 41) * 4];
+    test_assert(right[0] > 200);
+    for (c = 0; c < 3; c ++) {
+        test_assert(abs(left[c] - right[c]) < 4);
+    }
+
+    stbi_image_free(img);
+    ecs_os_free(path);
+    ecs_os_free(file);
+    ecs_fini(world);
+}
+
+void Texture_gpu_orm_missing_layer_unchanged(void) {
+    // materials/textures
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    const char *tmp = ecs_singleton_get(world, AppStatus)->tmp_dir;
+    char *white_file = flecs_asprintf("%s/orm_white.png", tmp);
+    char *occluded_file = flecs_asprintf("%s/orm_black_red.png", tmp);
+    uint8_t px[4 * 4 * 4];
+    int32_t i;
+    memset(px, 255, sizeof(px));
+    test_assert(stbi_write_png(white_file, 4, 4, 4, px, 4 * 4) != 0);
+    for (i = 0; i < 16; i ++) {
+        px[i * 4 + 0] = 0;
+    }
+
+    test_assert(stbi_write_png(occluded_file, 4, 4, 4, px, 4 * 4) != 0);
+
+    ecs_entity_t white_tex = ecs_new(world);
+    ecs_set(world, white_tex, TexturePath, {.path = white_file});
+    ecs_entity_t occluded_tex = ecs_new(world);
+    ecs_set(world, occluded_tex, TexturePath, {.path = occluded_file});
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 6});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}},
+        .lighting.enabled = true});
+    ecs_entity_t light = ecs_new(world);
+    ecs_set(world, light, Position, {-1, 0.5f, 2});
+    ecs_set(world, light, PointLight, {.intensity = 3, .range = 10});
+    ecs_entity_t quad = ecs_new(world);
+    ecs_set(world, quad, Position, {-1.5f, 0, 0});
+    ecs_set(world, quad, Quad, {2.5f, 2.5f});
+    ecs_set(world, quad, Rgb, {200, 140, 90});
+    ecs_set(world, quad, PbrMaterial, {.metallic = 0.5f, .roughness = 0.4f});
+    ecs_set(world, quad, Emissive, {.strength = 0.2f, .color = {40, 80, 255}});
+    ecs_entity_t probe = ecs_new(world);
+    ecs_set(world, probe, Position, {1.5f, 0, 0});
+    ecs_set(world, probe, Quad, {2.5f, 2.5f});
+    ecs_set(world, probe, Rgb, {200, 200, 200});
+    ecs_set(world, probe, PbrMaterial, {.metallic = 0, .roughness = 1});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "orm_missing.png",
+        .resolution_scale = 1});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    char *path = flecs_asprintf("%s/orm_missing.png", tmp);
+    int w = 0, h = 0, n = 0;
+    unsigned char *img = stbi_load(path, &w, &h, &n, 4);
+    test_assert(img != NULL);
+    unsigned char *before = ecs_os_malloc(64 * 32 * 4);
+    ecs_os_memcpy(before, img, 64 * 32 * 4);
+    stbi_image_free(img);
+
+    ecs_set(world, quad, PbrTextures, {.orm = white_tex});
+    ecs_set(world, probe, PbrTextures, {.orm = occluded_tex});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    img = stbi_load(path, &w, &h, &n, 4);
+    test_assert(img != NULL);
+    unsigned char *probe_before = &before[(16 * 64 + 39) * 4];
+    unsigned char *probe_after = &img[(16 * 64 + 39) * 4];
+    test_assert(probe_before[1] > probe_after[1] + 10);
+    int32_t x, y, c;
+    for (y = 0; y < 32; y ++) {
+        for (x = 0; x < 32; x ++) {
+            for (c = 0; c < 3; c ++) {
+                test_int(img[(y * 64 + x) * 4 + c], before[(y * 64 + x) * 4 + c]);
+            }
+        }
+    }
+
+    stbi_image_free(img);
+    ecs_os_free(before);
+    ecs_os_free(path);
+    ecs_os_free(occluded_file);
+    ecs_os_free(white_file);
+    ecs_fini(world);
+}
+
+void Texture_gpu_orm_back_face_plain(void) {
+    // materials/textures
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    const char *tmp = ecs_singleton_get(world, AppStatus)->tmp_dir;
+    char *file = flecs_asprintf("%s/orm_back.png", tmp);
+    uint8_t px[4 * 4 * 4];
+    int32_t i, c;
+    for (i = 0; i < 16; i ++) {
+        px[i * 4 + 0] = 0;
+        px[i * 4 + 1] = 25;
+        px[i * 4 + 2] = 0;
+        px[i * 4 + 3] = 255;
+    }
+
+    test_assert(stbi_write_png(file, 4, 4, 4, px, 4 * 4) != 0);
+
+    ecs_entity_t tex = ecs_new(world);
+    ecs_set(world, tex, TexturePath, {.path = file});
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 6});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}},
+        .lighting.enabled = true});
+    ecs_singleton_set(world, AmbientLight, {
+        .sky = {255, 255, 255}, .ground = {255, 255, 255}, .intensity = 1});
+    ecs_entity_t sun = ecs_new(world);
+    ecs_set(world, sun, DirectionalLight, {.intensity = 0});
+    ecs_entity_t front = ecs_new(world);
+    ecs_set(world, front, Position, {-4, 0, 0});
+    ecs_set(world, front, Quad, {3, 3});
+    ecs_set(world, front, Rgb, {200, 200, 200});
+    ecs_set(world, front, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, front, PbrTextures, {.orm = tex});
+    ecs_entity_t back = ecs_new(world);
+    ecs_set(world, back, Position, {0, 0, 0});
+    ecs_set(world, back, Rotation, {0, (float)GLM_PI, 0});
+    ecs_set(world, back, Quad, {3, 3});
+    ecs_set(world, back, Rgb, {200, 200, 200});
+    ecs_set(world, back, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, back, PbrTextures, {.orm = tex});
+    ecs_set(world, back, BackFaceMode, {BackFacePlain});
+    ecs_entity_t plain = ecs_new(world);
+    ecs_set(world, plain, Position, {4, 0, 0});
+    ecs_set(world, plain, Rotation, {0, (float)GLM_PI, 0});
+    ecs_set(world, plain, Quad, {3, 3});
+    ecs_set(world, plain, Rgb, {200, 200, 200});
+    ecs_set(world, plain, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, plain, BackFaceMode, {BackFacePlain});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 128, .height = 64, .write_to_file = "orm_back.png",
+        .resolution_scale = 1});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    char *path = flecs_asprintf("%s/orm_back.png", tmp);
+    int w = 0, h = 0, n = 0;
+    unsigned char *img = stbi_load(path, &w, &h, &n, 4);
+    test_assert(img != NULL);
+    unsigned char *textured = &img[(32 * 128 + 27) * 4];
+    unsigned char *backside = &img[(32 * 128 + 64) * 4];
+    unsigned char *reference = &img[(32 * 128 + 101) * 4];
+    test_assert(reference[1] > 60);
+    test_assert(textured[1] < 4);
+    for (c = 0; c < 3; c ++) {
+        test_assert(abs(backside[c] - reference[c]) < 4);
+    }
+
+    stbi_image_free(img);
+    ecs_os_free(path);
+    ecs_os_free(file);
     ecs_fini(world);
 }

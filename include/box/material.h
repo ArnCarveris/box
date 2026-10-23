@@ -110,13 +110,19 @@ ECS_STRUCT(TextureTransform, {
  * image of the same frame it then samples; until it loaded, or when it is missing, the layer
  * has no effect. Back faces drawn with BackFacePlain do not sample the textures.
  *
- * Minified albedo and emissive textures average linear light, the other layers the stored
- * values; a texture shared by a color and a data layer is filtered as color in both.
+ * The ORM layer holds occlusion (red), roughness (green) and metallic (blue) in one image, as
+ * glTF's occlusion and metallic roughness textures share one: green multiplies
+ * PbrMaterial.roughness, blue multiplies PbrMaterial.metallic and red is the ambient occlusion
+ * of the indirect light, 1 for unoccluded. Its values are stored as they are, not display
+ * encoded; a missing layer is white, which leaves the material as it is.
+ *
+ * Minified albedo and emissive textures average linear light, the data layers (ORM and normal)
+ * the stored values; a texture shared by a color and a data layer is filtered as color in both.
  */
 ECS_STRUCT(PbrTextures, {
     ecs_entity_t albedo;    /**< Multiplied with the base color and opacity, display encoded */
     ecs_entity_t emissive;  /**< Multiplied with the Emissive color times its strength */
-    ecs_entity_t roughness; /**< Multiplied with the roughness, green channel */
+    ecs_entity_t orm;       /**< Occlusion (red), roughness (green) and metallic (blue), stored */
     ecs_entity_t normal;    /**< Tangent space normal map, green points up the image */
 });
 

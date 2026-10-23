@@ -14,7 +14,8 @@
 /** Layers below this one sample color: albedo and emissive, decoded from sRGB */
 #define BOX_GPU_COLOR_LAYERS (2)
 
-/** Pixel of the default albedo, emissive and roughness layers */
+/** Pixel of the default albedo, emissive and ORM layers: no occlusion, the material roughness
+ * and metallic */
 static const uint8_t box_gpu_white[4] = { 255, 255, 255, 255 };
 
 /** Pixel of the default normal layer, a normal along the surface normal */
@@ -23,7 +24,7 @@ static const uint8_t box_gpu_flat[4] = { 128, 128, 255, 255 };
 /** Color space the mip levels of a texture are averaged in */
 typedef enum box_gpu_mip_space_t {
     BOX_GPU_MIP_UNKNOWN,    /**< No layer bound the texture yet */
-    BOX_GPU_MIP_LINEAR,     /**< As stored, for the roughness, normal and distance layers */
+    BOX_GPU_MIP_LINEAR,     /**< As stored, for the ORM, normal and distance layers */
     BOX_GPU_MIP_SRGB        /**< In linear light through the sRGB view, for the color layers */
 } box_gpu_mip_space_t;
 

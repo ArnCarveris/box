@@ -3,6 +3,8 @@
 // Instance normals use the cofactor matrix of the model rotation, the inverse transpose up to
 // a scale, so non-uniform scale keeps them perpendicular. Texture layers (group 1) are sampled
 // with the instance UV transform; the normal map uses a tangent frame from screen derivatives.
+// The ORM layer holds the glTF occlusion (red, of the indirect light only), roughness (green)
+// and metallic (blue) multipliers.
 // The cull pass writes the slots of the visible instances, which step per instance; the
 // instance data is read from the instance buffer of the batch (group 2). Indirect light comes
 // from the hemisphere ambient, or for a view that samples baked lighting from the irradiance
@@ -28,7 +30,7 @@ const MIN_ROUGHNESS: f32 = 0.045;
 
 @group(1) @binding(0) var albedo_map: texture_2d<f32>;
 @group(1) @binding(1) var emissive_map: texture_2d<f32>;
-@group(1) @binding(2) var roughness_map: texture_2d<f32>;
+@group(1) @binding(2) var orm_map: texture_2d<f32>;
 @group(1) @binding(3) var normal_map: texture_2d<f32>;
 @group(1) @binding(4) var material_sampler: sampler;
 
@@ -487,12 +489,14 @@ fn reflections(world: vec3f, spec: vec3f, roughness: f32, cluster: u32, fallback
 }
 
 // Surface of a fragment from the material constants of its instance. Texture layers apply
-// here on front faces; a plain back face keeps the constants and faces the camera.
+// here on front faces; a plain back face keeps the constants, is unoccluded and faces the
+// camera. The occlusion scales the indirect light only.
 struct Surface {
     albedo: vec3f,
     alpha: f32,
     metallic: f32,
     roughness: f32,
+    occlusion: f32,
     emissive: vec3f,
     normal: vec3f,
 };
@@ -518,7 +522,7 @@ fn perturb(n: vec3f, p: vec3f, uv: vec2f, m: vec3f) -> vec3f {
 fn surface(f: VertexOut, front: bool) -> Surface {
     let albedo = textureSample(albedo_map, material_sampler, f.uv);
     let emissive = textureSample(emissive_map, material_sampler, f.uv).rgb;
-    let roughness = textureSample(roughness_map, material_sampler, f.uv).g;
+    let orm = textureSample(orm_map, material_sampler, f.uv).rgb;
     let tangent_normal = textureSample(normal_map, material_sampler, f.uv).xyz * 2.0 - 1.0;
     let geometric = normalize(f.normal);
     let mapped = perturb(geometric, f.world, f.uv, tangent_normal);
@@ -527,12 +531,15 @@ fn surface(f: VertexOut, front: bool) -> Surface {
     s.alpha = f.color.a;
     s.metallic = clamp(f.material.x, 0.0, 1.0);
     s.roughness = clamp(f.material.y, MIN_ROUGHNESS, 1.0);
+    s.occlusion = 1.0;
     s.emissive = f.emissive;
     s.normal = -geometric;
     if (front) {
         s.albedo *= albedo.rgb;
         s.alpha *= albedo.a;
-        s.roughness = clamp(f.material.y * roughness, MIN_ROUGHNESS, 1.0);
+        s.metallic = clamp(f.material.x * orm.b, 0.0, 1.0);
+        s.roughness = clamp(f.material.y * orm.g, MIN_ROUGHNESS, 1.0);
+        s.occlusion = orm.r;
         s.emissive *= emissive;
         s.normal = mapped;
     }
@@ -660,8 +667,8 @@ fn shade(s: Surface, v: vec3f, world: vec3f) -> vec3f {
         specular_light = environment_radiance(spec, s.roughness, specular_light);
     }
 
-    let indirect_specular = (f0 * ab.x + ab.y) * specular_light;
-    let indirect_diffuse = diffuse_color * diffuse_light;
+    let indirect_specular = (f0 * ab.x + ab.y) * specular_light * s.occlusion;
+    let indirect_diffuse = diffuse_color * diffuse_light * s.occlusion;
     return lights_direct(s, v, world, cluster) + indirect_diffuse + indirect_specular +
         s.emissive;
 }
