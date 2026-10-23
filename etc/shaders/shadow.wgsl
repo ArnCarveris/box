@@ -18,6 +18,7 @@ struct VertexIn {
 
 @vertex fn vs(v: VertexIn) -> @builtin(position) vec4f {
     let inst = instances[v.slot];
+    surface_data = inst.surface;
     let model = instance_model(inst);
     var position = v.position;
     if (inst.surface.p[19].x != 0.0) {
@@ -25,7 +26,7 @@ struct VertexIn {
     } else if (inst.surface.p[0].x == 7.0) {
         position.y *= inst.surface.p[1].y;
     } else if (inst.surface.p[0].x != 0.0) {
-        position = surface_position(inst.surface, i32(position.z), position.x, position.y);
+        position = surface_position(i32(position.z), position.x, position.y);
     }
     return cascade.matrix * (model * vec4f(position, 1.0));
 }

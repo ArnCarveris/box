@@ -122,6 +122,7 @@ struct VertexOut {
 
 @vertex fn vs(v: VertexIn) -> VertexOut {
     let inst = instances[v.slot];
+    surface_data = inst.surface;
     let model = inst.model;
     let c0 = model[0].xyz;
     let c1 = model[1].xyz;
@@ -136,15 +137,15 @@ struct VertexOut {
     } else if (inst.surface.p[0].x == 7.0) {
         position.y *= inst.surface.p[1].y;
     } else if (inst.surface.p[0].x == 1.0 && v.position.z < 2.0) {
-        let sample = surface_sweep_sample(inst.surface, i32(v.position.z), v.position.x, v.position.y);
+        let sample = surface_sweep_sample(i32(v.position.z), v.position.x, v.position.y);
         position = sample.position;
         normal = sv_unit(sample.normal);
         if (sv_dot(sample.normal, sample.normal) < 0.000000000001) {
-            normal = surface_normal(inst.surface, i32(v.position.z), v.position.x, v.position.y);
+            normal = surface_normal(i32(v.position.z), v.position.x, v.position.y);
         }
     } else if (inst.surface.p[0].x != 0.0) {
-        position = surface_position(inst.surface, i32(v.position.z), v.position.x, v.position.y);
-        normal = surface_normal(inst.surface, i32(v.position.z), v.position.x, v.position.y);
+        position = surface_position(i32(v.position.z), v.position.x, v.position.y);
+        normal = surface_normal(i32(v.position.z), v.position.x, v.position.y);
     }
     let world = model * vec4f(position, 1.0);
     var o: VertexOut;
