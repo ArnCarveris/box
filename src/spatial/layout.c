@@ -1306,7 +1306,9 @@ static void clear_nodes(
         ecs_os_free(ecs_map_ptr(&it));
     }
 
-    ecs_map_clear(&ctx->nodes);
+    if (ecs_map_count(&ctx->nodes)) {
+        ecs_map_clear(&ctx->nodes);
+    }
 }
 
 bool box_spatial_layout_update(
