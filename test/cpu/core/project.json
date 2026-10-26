@@ -162,6 +162,7 @@
                     "large_data_shrinks_when_load_settles",
                     "lowered_in_flight_releases_slots",
                     "null_backend_copy_shrinks",
+                    "layout_update_no_alloc",
                     "raised_in_flight_after_release",
                     "shutdown_with_packets_in_flight",
                     "shutdown_without_frames",

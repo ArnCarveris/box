@@ -411,6 +411,29 @@ void RenderPacket_no_alloc_after_warmup_main_thread(void) {
     ecs_fini(world);
 }
 
+void RenderPacket_layout_update_no_alloc(void) {
+    // engine_core/render_thread
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    int32_t i;
+    for (i = 0; i < 10; i ++) {
+        test_bool(box_spatial_layout_update(world), true);
+    }
+
+    int64_t before = ecs_os_api_malloc_count + ecs_os_api_calloc_count +
+        ecs_os_api_realloc_count;
+    for (i = 0; i < 100; i ++) {
+        test_bool(box_spatial_layout_update(world), true);
+    }
+
+    int64_t after = ecs_os_api_malloc_count + ecs_os_api_calloc_count +
+        ecs_os_api_realloc_count;
+    test_int(after - before, 0);
+
+    ecs_fini(world);
+}
+
 void RenderPacket_shutdown_with_packets_in_flight(void) {
     // engine_core/render_thread
     ecs_world_t *world = ecs_init();
