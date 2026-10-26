@@ -1306,7 +1306,11 @@ static void clear_nodes(
         ecs_os_free(ecs_map_ptr(&it));
     }
 
-    ecs_map_clear(&ctx->nodes);
+    // ecs_map_clear reallocates the buckets, so a scene without layout nodes skips it and the
+    // frame stays free of allocations.
+    if (ecs_map_count(&ctx->nodes)) {
+        ecs_map_clear(&ctx->nodes);
+    }
 }
 
 bool box_spatial_layout_update(
