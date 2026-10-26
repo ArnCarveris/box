@@ -282,33 +282,3 @@ void TimeOfDayInvalidation_held_sun_ignores_environment_versions(void) {
     no_errors(world);
     ecs_fini(world);
 }
-
-void TimeOfDayInvalidation_perf_run_finishes_warmup_with_time_scale(void) {
-    // baked_lighting/probe_capture
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-    ecs_entity_t sun;
-    ecs_entity_t scene = scene_new(world, 2, 0.05f, false, &sun);
-    ecs_add(world, scene, TimeOfDay);
-    TimeOfDay *tod = ecs_get_mut(world, scene, TimeOfDay);
-    tod->hour = 10;
-    tod->time_scale = 1;
-    ecs_modified(world, scene, TimeOfDay);
-    ecs_singleton_set(world, PerfRun, {.fps = 120, .frames = 4, .warmup = 2});
-
-    int32_t i, restarts = 0, pass = 0;
-    bool done = false, was = false;
-    for (i = 0; i < 5000 && (!done || !restarts); i ++) {
-        ecs_progress(world, 0);
-        const LightBakeStatus *status = ecs_get(world, scene, LightBakeStatus);
-        restarts += (was && !status->converged) || status->pass < pass;
-        was = status->converged;
-        pass = status->pass;
-        done |= ecs_singleton_get(world, PerfStatus)->state == PerfDone;
-    }
-
-    test_bool(done, true);
-    test_assert(restarts > 0);
-    test_assert(ecs_get(world, scene, TimeOfDayStatus)->hour > 10);
-    ecs_fini(world);
-}

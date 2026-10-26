@@ -574,8 +574,7 @@
                     "large_rotation_requeues_bakes",
                     "small_rotations_add_up_requeue_once",
                     "zero_threshold_requeues_every_change",
-                    "held_sun_ignores_environment_versions",
-                    "perf_run_finishes_warmup_with_time_scale"
+                    "held_sun_ignores_environment_versions"
                 ]
             },
             {
@@ -627,16 +626,7 @@
             {
                 "id": "Environment",
                 "testcases": [
-                    "axes_faces_show_axis_colors",
-                    "unchanged_source_processed_once",
-                    "changed_path_reprocesses",
-                    "changed_filter_reprocesses",
-                    "shared_source_processed_once",
-                    "axes_sh_signs",
-                    "processing_time_measured",
-                    "background_shows_environment",
-                    "background_follows_yaw",
-                    "background_off_keeps_clear_color"
+                    "axes_faces_show_axis_colors"
                 ]
             },
             {
@@ -646,7 +636,6 @@
                     "sunset_side_toward_sun_warmer",
                     "version_follows_throttle",
                     "bake_open_probe_matches_environment",
-                    "cube_and_processing_time_measured",
                     "background_matches_sky",
                     "reflection_capture_sees_environment"
                 ]

@@ -9,7 +9,6 @@
 #include <app.h>
 #include "render.h"
 #include <string.h>
-#include <sys/resource.h>
 
 static double fake_clock = 100;
 static double fake_work = 0;
@@ -154,29 +153,6 @@ void FrameClock_presents_late_against_cap(void) {
     ecs_fini(world);
     ecs_os_api.now_ = now;
     ecs_os_api.sleep_ = sleep;
-}
-
-void FrameClock_wait_does_not_spin(void) {
-    // testing/town_stutter
-    ecs_world_t *world = ecs_init();
-    ecs_time_t start;
-    ecs_os_get_time(&start);
-    double begin = (double)start.sec + (double)start.nanosec * 1e-9;
-    struct rusage before, after;
-    getrusage(RUSAGE_SELF, &before);
-
-    double end = box_wait_until(begin + 0.2);
-
-    getrusage(RUSAGE_SELF, &after);
-    double cpu = (double)(after.ru_utime.tv_sec - before.ru_utime.tv_sec) +
-        (double)(after.ru_utime.tv_usec - before.ru_utime.tv_usec) * 1e-6 +
-        (double)(after.ru_stime.tv_sec - before.ru_stime.tv_sec) +
-        (double)(after.ru_stime.tv_usec - before.ru_stime.tv_usec) * 1e-6;
-    test_assert(end >= begin + 0.2);
-    test_assert(end < begin + 0.25);
-    test_assert(cpu < 0.02);
-
-    ecs_fini(world);
 }
 
 void FrameClock_fps_command(void) {

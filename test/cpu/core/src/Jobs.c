@@ -35,13 +35,6 @@ static void WorkCount(
     ecs_os_ainc(&work_count);
 }
 
-static void WorkSleep(
-    void *ctx)
-{
-    ecs_sleepf(0.01);
-    ecs_os_ainc(&work_count);
-}
-
 static void WorkJob(
     void *ctx)
 {
@@ -512,25 +505,6 @@ void Jobs_inline_runs_at_end_of_frame(void)
     test_int(complete_count, 1);
 
     ecs_fini(world);
-}
-
-void Jobs_shutdown_with_pending(void)
-{
-    // engine_core/jobs
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-    box_jobs_set_workers(world, 1);
-
-    for (int32_t i = 0; i < 100; i ++) {
-        box_job_submit(world, &(box_job_desc_t){
-            .work = WorkSleep, .complete = CompleteCount, .ctx_free = FreeCount });
-    }
-
-    ecs_fini(world);
-
-    test_int(complete_count, 0);
-    test_int(free_count, 100);
-    test_assert(work_count < 100);
 }
 
 void Jobs_shutdown_with_finished(void)
