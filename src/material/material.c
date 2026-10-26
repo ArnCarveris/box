@@ -28,7 +28,7 @@ static void box_opacity_ctor(
     }
 }
 
-/** Construct PbrMaterial values: a dielectric of medium roughness.
+/** Construct PbrMaterial values: the material of a shape without PbrMaterial, a matte dielectric.
  *
  * @param ptr The components
  * @param count Number of components
@@ -43,7 +43,8 @@ static void box_pbr_material_ctor(
     int32_t i;
     (void)ti;
     for (i = 0; i < count; i ++) {
-        values[i] = (PbrMaterial){ .metallic = 0.0f, .roughness = 0.5f };
+        values[i] = (PbrMaterial){
+            .metallic = BOX_MATERIAL_METALLIC, .roughness = BOX_MATERIAL_ROUGHNESS };
     }
 }
 

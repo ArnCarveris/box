@@ -301,6 +301,9 @@ void Parametric_regions(void) {
     uint32_t color;
     memcpy(&color, &ecs_get(world, e, ShapeMesh)->surface.p[20][0], sizeof(color));
     test_uint(color, 0xff0000ffu);
+    uint32_t parameters;
+    memcpy(&parameters, &ecs_get(world, e, ShapeMesh)->surface.p[21][1], sizeof(parameters));
+    test_uint(parameters, 0x8000ffffu);
     ecs_remove(world, e, SurfaceMaterials);
     test_flt(ecs_get(world, e, ShapeMesh)->surface.p[20][0], 0);
     ecs_fini(world);

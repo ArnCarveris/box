@@ -33,6 +33,13 @@
                 ]
             },
             {
+                "id": "Material",
+                "testcases": [
+                    "default_roughness_without_material",
+                    "default_roughness_metallic_only"
+                ]
+            },
+            {
                 "id": "ReflectionBake",
                 "testcases": [
                     "script_defaults",

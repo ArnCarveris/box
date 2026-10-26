@@ -6,6 +6,7 @@
 #include <box.h>
 #include <bake_test.h>
 #include <stdlib.h>
+#include <math.h>
 #include "render.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -150,7 +151,7 @@ void Material_pbr_material_defaults(void) {
     ecs_add(world, e, Opacity);
     const PbrMaterial *pbr = ecs_get(world, e, PbrMaterial);
     test_flt(pbr->metallic, 0);
-    test_flt(pbr->roughness, 0.5f);
+    test_flt(pbr->roughness, 1);
     test_flt(ecs_get(world, e, Opacity)->value, 1);
 
     ecs_fini(world);
@@ -962,6 +963,90 @@ void Material_gpu_back_face_plain(void) {
     test_assert(right[0] > 240);
     test_assert(right[1] > 240);
     test_assert(right[2] > 240);
+
+    stbi_image_free(px);
+    ecs_os_free(path);
+    ecs_fini(world);
+}
+
+void Material_default_material_sphere_matte(void) {
+    // materials/pbr
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 6});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
+        .color = {0, 0, 0, 255}}, .lighting.enabled = true});
+    ecs_singleton_set(world, AmbientLight, {.intensity = 0});
+    ecs_entity_t plain = ecs_new(world);
+    ecs_set(world, plain, Position, {-1.5f, 0, 0});
+    ecs_set(world, plain, Sphere, {.segments = 64, .smooth = true, .radius = 1.2f});
+    ecs_set(world, plain, Rgb, {64, 128, 32});
+    ecs_entity_t glossy = ecs_new(world);
+    ecs_set(world, glossy, Position, {1.5f, 0, 0});
+    ecs_set(world, glossy, Sphere, {.segments = 64, .smooth = true, .radius = 1.2f});
+    ecs_set(world, glossy, Rgb, {64, 128, 32});
+    ecs_set(world, glossy, PbrMaterial, {.roughness = 0.3f});
+    ecs_entity_t sun = ecs_new(world);
+    ecs_set(world, sun, Rotation, {0, (float)GLM_PI, 0});
+    ecs_set(world, sun, DirectionalLight, {.intensity = 1});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 128, .height = 64, .write_to_file = "matte.png",
+        .resolution_scale = 1});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    char *path = flecs_asprintf("%s/matte.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0, x, y;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_int(w, 128);
+    test_int(h, 64);
+
+    float albedo_rg = powf((64.0f / 255.0f + 0.055f) / 1.055f, 2.4f) /
+        powf((128.0f / 255.0f + 0.055f) / 1.055f, 2.4f);
+    float albedo_bg = powf((32.0f / 255.0f + 0.055f) / 1.055f, 2.4f) /
+        powf((128.0f / 255.0f + 0.055f) / 1.055f, 2.4f);
+    int half;
+    for (half = 0; half < 2; half ++) {
+        unsigned char *peak = NULL;
+        int best = -1;
+        for (y = 0; y < h; y ++) {
+            for (x = half * 64; x < half * 64 + 64; x ++) {
+                unsigned char *c = &px[(y * w + x) * 4];
+                int sum = c[0] + c[1] + c[2];
+                if (sum > best) {
+                    best = sum;
+                    peak = c;
+                }
+            }
+        }
+
+        test_assert(peak != NULL);
+        test_assert(peak[1] > 40);
+        float lin[3];
+        int i;
+        for (i = 0; i < 3; i ++) {
+            float v = (float)peak[i] / 255.0f;
+            lin[i] = v <= 0.04045f ? v / 12.92f : powf((v + 0.055f) / 1.055f, 2.4f);
+        }
+
+        float rg = lin[0] / lin[1];
+        float bg = lin[2] / lin[1];
+        if (half == 0) {
+            test_assert(rg < albedo_rg * 1.5f);
+            test_assert(bg < albedo_bg * 3.0f);
+        } else {
+            test_assert(rg > albedo_rg * 2.0f);
+            test_assert(bg > albedo_bg * 4.0f);
+        }
+    }
 
     stbi_image_free(px);
     ecs_os_free(path);

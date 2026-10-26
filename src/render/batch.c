@@ -433,8 +433,8 @@ void box_draws_material(
     out->emissive[1] = emissive ? box_draws_linear(emissive->color.g) * strength : 0.0f;
     out->emissive[2] = emissive ? box_draws_linear(emissive->color.b) * strength : 0.0f;
     out->emissive[3] = 0.0f;
-    out->material[0] = pbr ? glm_clamp(pbr->metallic, 0.0f, 1.0f) : 0.0f;
-    out->material[1] = pbr ? glm_clamp(pbr->roughness, 0.0f, 1.0f) : 0.5f;
+    out->material[0] = pbr ? glm_clamp(pbr->metallic, 0.0f, 1.0f) : BOX_MATERIAL_METALLIC;
+    out->material[1] = pbr ? glm_clamp(pbr->roughness, 0.0f, 1.0f) : BOX_MATERIAL_ROUGHNESS;
     out->material[2] = 0.0f;
     out->material[3] = 0.0f;
     out->uv[0] = uv ? uv->scale_x : 1.0f;
