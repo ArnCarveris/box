@@ -660,8 +660,12 @@ fn shade(s: Surface, v: vec3f, world: vec3f) -> vec3f {
         specular_light = environment_radiance(spec, s.roughness, specular_light);
     }
 
-    let indirect_specular = (f0 * ab.x + ab.y) * specular_light;
-    let indirect_diffuse = diffuse_color * diffuse_light;
+    // The split sum scale and bias already integrate the Fresnel over the GGX lobe of the
+    // roughness, so the grazing reflection of a rough surface fades without a roughness aware
+    // f90. What the lobe reflects is not available to the diffuse term, as 1 - F in brdf().
+    let specular_albedo = f0 * ab.x + ab.y;
+    let indirect_specular = specular_albedo * specular_light;
+    let indirect_diffuse = (vec3f(1.0) - specular_albedo) * diffuse_color * diffuse_light;
     return lights_direct(s, v, world, cluster) + indirect_diffuse + indirect_specular +
         s.emissive;
 }

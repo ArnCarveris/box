@@ -54,7 +54,18 @@ ECS_STRUCT(Tint, {
     uint8_t a;  /**< Tint strength, 0 leaves the color and 255 replaces it */
 });
 
-/** Physically based surface parameters, default roughness 0.5 */
+/** Metallic of a surface without PbrMaterial and of a constructed PbrMaterial: a dielectric */
+#define BOX_MATERIAL_METALLIC (0.0f)
+
+/** Roughness of a surface without PbrMaterial and of a constructed PbrMaterial: matte, as in
+ * glTF. A smooth or glossy surface sets it explicitly. */
+#define BOX_MATERIAL_ROUGHNESS (1.0f)
+
+/** Physically based surface parameters, default metallic 0 and roughness 1 (matte).
+ *
+ * A field a scene does not set keeps its default, so a PbrMaterial that only sets metallic is as
+ * rough as a shape without PbrMaterial.
+ */
 ECS_STRUCT(PbrMaterial, {
     float metallic;  /**< 0 dielectric to 1 metal */
     float roughness; /**< 0 mirror to 1 fully diffuse */

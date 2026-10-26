@@ -55,7 +55,8 @@ static void box_surface_materials_ctor(
 {
     (void)ti;
     SurfaceMaterials *values = ptr;
-    SurfaceMaterial material = {.color = {255, 255, 255, 255}, .roughness = 0.5f};
+    SurfaceMaterial material = {.color = {255, 255, 255, 255},
+        .metallic = BOX_MATERIAL_METALLIC, .roughness = BOX_MATERIAL_ROUGHNESS};
     for (int i = 0; i < count; i ++) {
         values[i] = (SurfaceMaterials){material, material, material, material};
     }
