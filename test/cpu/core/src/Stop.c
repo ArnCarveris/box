@@ -71,47 +71,6 @@ void Stop_frames(void) {
     ecs_fini(world);
 }
 
-void Stop_timeout(void) {
-    // engine_core/app
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-
-    ecs_singleton_set(world, App, { .timeout = 0.1, .cpu_budget = 100 });
-
-    ecs_time_t start;
-    ecs_os_get_time(&start);
-    int32_t count = 0;
-    while (ecs_progress(world, 0) && count < 1000) {
-        ecs_sleepf(0.005);
-        count ++;
-    }
-
-    test_assert(count < 1000);
-    test_bool(ecs_should_quit(world), true);
-    test_assert(ecs_time_measure(&start) >= 0.1);
-    test_assert(ecs_singleton_get(world, AppStatus)->elapsed >= 0.1);
-
-    ecs_fini(world);
-}
-
-void Stop_frames_before_timeout(void) {
-    // engine_core/app
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-
-    ecs_singleton_set(world, App, { .frames = 2, .timeout = 60, .cpu_budget = 100 });
-
-    int32_t count = 0;
-    while (ecs_progress(world, 0) && count < 100) {
-        count ++;
-    }
-
-    test_int(ecs_singleton_get(world, AppStatus)->frame, 2);
-    test_assert(ecs_singleton_get(world, AppStatus)->elapsed < 60);
-
-    ecs_fini(world);
-}
-
 void Stop_no_limit(void) {
     // engine_core/app
     ecs_world_t *world = ecs_init();

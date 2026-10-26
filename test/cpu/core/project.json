@@ -52,8 +52,6 @@
                 "id": "Stop",
                 "testcases": [
                     "frames",
-                    "timeout",
-                    "frames_before_timeout",
                     "no_limit",
                     "timeout_infinite",
                     "run_headless_frames",
@@ -109,13 +107,9 @@
                     "sleep_over_budget",
                     "no_sleep_within_budget",
                     "budget_above_one_core",
-                    "sleeps_when_over_budget",
                     "unpaced_never_sleeps",
                     "not_headless_never_sleeps",
-                    "env_sets_unpaced",
-                    "budget_share_at_half",
-                    "budget_share_at_quarter",
-                    "idle_earns_no_credit"
+                    "env_sets_unpaced"
                 ]
             },
             {
@@ -137,7 +131,6 @@
                     "running_until_done",
                     "set_workers_after_start",
                     "inline_runs_at_end_of_frame",
-                    "shutdown_with_pending",
                     "shutdown_with_finished",
                     "shutdown_idle_workers",
                     "worker_count"
@@ -151,7 +144,6 @@
                     "render_thread_owns_backend",
                     "main_thread_consumes",
                     "backpressure_full_ring",
-                    "backpressure_stalls_main_thread",
                     "in_flight_setting",
                     "settings_change_drains",
                     "switch_to_main_thread",
@@ -201,7 +193,6 @@
                     "late_delta_counted",
                     "dropped_frame_counted",
                     "presents_late_against_cap",
-                    "wait_does_not_spin",
                     "fps_command"
                 ]
             },

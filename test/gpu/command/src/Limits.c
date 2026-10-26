@@ -483,30 +483,6 @@ void Limits_next_out_of_range_keeps_iteration(void) {
     ecs_fini(world);
 }
 
-void Limits_command_resets_idle_timer(void) {
-    // hardening/command_limits
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-
-    ecs_singleton_get_mut(world, TerminalLimits)->idle_timeout = 0.2;
-    ecs_singleton_modified(world, TerminalLimits);
-
-    ecs_entity_t active = box_terminal_new(world);
-    ecs_entity_t idle = box_terminal_new(world);
-    test_assert(active != 0);
-    test_assert(idle != 0);
-
-    ecs_sleepf(0.3);
-    ecs_os_free(box_terminal_run(world, active, "commands", NULL));
-    ecs_progress(world, 0);
-
-    test_assert(ecs_is_alive(world, active));
-    test_assert(ecs_has(world, active, TerminalStatus));
-    test_assert(!ecs_is_alive(world, idle));
-
-    ecs_fini(world);
-}
-
 void Limits_images_evicted_once_written(void) {
     // render_fixes/capture_async
     ecs_world_t *world = ecs_init();

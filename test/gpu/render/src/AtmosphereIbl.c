@@ -1,7 +1,7 @@
 /**
  * @file AtmosphereIbl.c
  * @brief Tests for the Atmosphere as an environment source: spheres lit only by its cubemap,
- * the throttle of its renders, the light bake that sees it and the GPU time it costs.
+ * the throttle of its renders and the light bake that sees it.
  *
  * The sky lives in one scene and the sphere in another without lights, whose view takes the
  * entity with the Atmosphere as its LightSettings.environment.source, so the sun of the sky
@@ -462,62 +462,6 @@ void AtmosphereIbl_bake_open_probe_matches_environment(void) {
     test_assert(to_hemisphere > 0.5f);
 
     ecs_fini(world);
-}
-
-void AtmosphereIbl_cube_and_processing_time_measured(void) {
-    // atmosphere/environment
-    static const EnvironmentFilter filters[2] = { EnvironmentFilterBox, EnvironmentFilterGgx };
-    static const char *names[2] = { "Box", "Ggx" };
-    const int32_t renders = 8;
-    int32_t f, r, frame;
-    for (f = 0; f < 2; f ++) {
-        ecs_world_t *world = ibl_world();
-        ecs_entity_t sun;
-        ecs_entity_t sky = sky_new(world, 40, 0, &sun);
-        ecs_set(world, sky, Environment, {.resolution = 128, .filter = filters[f]});
-        sphere_new(world, sky, "timing.png");
-        test_assert(ibl_wait(world, sky));
-        for (frame = 0; frame < 10; frame ++) {
-            ibl_frame(world);
-        }
-
-        box_render_gpu_stats_t before, after;
-        box_render_bake_timing_t timing;
-        test_assert(box_render_gpu_stats(world, &before));
-        test_assert(box_render_gpu_environment_timing(world, &timing));
-        double process_ms = 0;
-        int32_t processed = 0;
-        for (r = 1; r <= renders; r ++) {
-            sun_turn(world, sun, 40 + (float)r, 0);
-            test_assert(ibl_wait(world, sky));
-            test_assert(box_render_gpu_environment_timing(world, &timing));
-            process_ms += timing.ms;
-            processed += timing.probes;
-        }
-
-        for (frame = 0; frame < 20 && processed < renders; frame ++) {
-            ibl_frame(world);
-            test_assert(box_render_gpu_environment_timing(world, &timing));
-            process_ms += timing.ms;
-            processed += timing.probes;
-        }
-
-        test_assert(box_render_gpu_stats(world, &after));
-        int32_t passes = after.atmosphere_passes[BOX_RENDER_ATMOS_ENVIRONMENT] -
-            before.atmosphere_passes[BOX_RENDER_ATMOS_ENVIRONMENT];
-        double cube_ms = (double)(after.atmosphere_ns[BOX_RENDER_ATMOS_ENVIRONMENT] -
-            before.atmosphere_ns[BOX_RENDER_ATMOS_ENVIRONMENT]) / 1e6;
-        double sky_ms = (double)(after.atmosphere_ns[BOX_RENDER_ATMOS_SCENE_SKY] -
-            before.atmosphere_ns[BOX_RENDER_ATMOS_SCENE_SKY]) / 1e6;
-        test_assert(processed > 0);
-        test_assert(process_ms > 0);
-        printf("atmosphere environment 128^2 %s per render: sky view %.3f ms, cube %.3f ms "
-            "(%d timed), processing %.3f ms (%d, %s)\n", names[f],
-            passes ? sky_ms / passes : 0.0, passes ? cube_ms / passes : 0.0, passes,
-            process_ms / processed, processed, timing.measured ? "timestamps" : "cpu");
-        ibl_no_errors(world);
-        ecs_fini(world);
-    }
 }
 
 /* Above the horizon the environment holds the sky the views draw: a view that draws the

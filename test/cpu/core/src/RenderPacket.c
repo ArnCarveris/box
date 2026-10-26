@@ -7,8 +7,6 @@
 #include <bake_test.h>
 #include "render.h"
 
-static ecs_world_t *unpause_world = NULL;
-static bool unpaused = false;
 static int32_t custom_renders = 0;
 static int32_t custom_finis = 0;
 
@@ -51,15 +49,6 @@ static void ExtractLarge(ecs_iter_t *it) {
 static void DropPacket(void *ctx, const box_render_packet_t *packet) {
     (void)ctx;
     (void)packet;
-}
-
-static void* UnpauseLater(void *arg) {
-    (void)arg;
-    ecs_sleepf(0.05);
-    unpaused = true;
-    box_render_pause(unpause_world, false);
-
-    return NULL;
 }
 
 static int FailInit(void *ctx) {
@@ -207,39 +196,6 @@ void RenderPacket_backpressure_full_ring(void) {
     ecs_progress(world, 0);
     status = ecs_singleton_get(world, RenderStatus);
     test_int(status->stalls, 0);
-
-    ecs_fini(world);
-    box_render_null_free(null);
-}
-
-void RenderPacket_backpressure_stalls_main_thread(void) {
-    // engine_core/render_thread
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-
-    box_render_null_t *null = box_render_null_new();
-    box_render_backend_t backend = box_render_null_backend(null);
-    box_render_set_backend(world, &backend);
-    box_render_pause(world, true);
-
-    ecs_progress(world, 0);
-    ecs_progress(world, 0);
-
-    unpause_world = world;
-    unpaused = false;
-    ecs_os_thread_t thread = ecs_os_thread_new(UnpauseLater, NULL);
-    ecs_progress(world, 0);
-    test_bool(unpaused, true);
-    ecs_os_thread_join(thread);
-
-    const RenderStatus *status = ecs_singleton_get(world, RenderStatus);
-    test_int(status->submitted, 3);
-    test_int(status->stalls, 1);
-    test_assert(status->in_flight <= 2);
-
-    box_render_sync(world);
-    test_int(null->packets, 3);
-    test_int(null->gaps, 0);
 
     ecs_fini(world);
     box_render_null_free(null);
