@@ -86,8 +86,8 @@ ECS_STRUCT(ParticleCollision, {
 });
 
 /** An emitter that spawns rate times the frame delta particles a frame, carrying the fraction.
- * Its WorldTransform places the spawn volume and direction; live particles stay in world space.
- * A full pool spawns nothing, and a change of max empties it.
+ * Its WorldTransform places the spawn volume and direction; live particles stay in world space
+ * but for the drift of their ParticleForces. A full pool spawns nothing; a new max empties it.
  *
  * ParticlePlayback pauses, stops and resets it; ParticleBurst spawns on top of the rate.
  *
