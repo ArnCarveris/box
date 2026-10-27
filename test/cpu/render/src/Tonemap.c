@@ -42,6 +42,11 @@ static float saturation(
     return hi > 0 ? (hi - lo) / hi : 0.0f;
 }
 
+/* The cases call no flecs function that would set up the OS API the loader allocates with. */
+void Tonemap_setup(void) {
+    ecs_os_set_api_defaults();
+}
+
 void Tonemap_lut_size(void) {
     // lighting/effects
     test_int(BOX_RENDER_TONY_SIZE, 48);

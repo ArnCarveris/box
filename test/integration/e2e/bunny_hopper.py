@@ -6,22 +6,23 @@ app's own assets.
 Every case runs in a fresh apps/bunnyhopper process with its default scene
 (apps/bunnyhopper/etc/bunnyhopper.flecs, named from the repository root) and gets the App of
 tools/box_client.py; the runner checks after every case that the app logged no error and quits
-cleanly. Headless, the app steps a fixed 1 / --fps seconds per frame, and the software renderer
-of the test machines draws the default 1280x1024 window with its effects at about 1 frame per
-second. So every case starts with setup: the window shrinks to 640x480, still tall enough for
-the game over panel, and the world view drops its effects and shadows, which takes it to about
-10 frames per second, and --fps 20 makes each frame 50 ms of game time. Waits count frames, so
-they hold under load: a frame budget of 20 is one second of the game.
+cleanly. The runner steps the app by a fixed delta of 1/60 s per frame (--delta-time), and the
+software renderer of the test machines draws the default 1280x1024 window with its effects at
+about 1 frame per second. So every case starts with setup: the window shrinks to 640x480, still
+tall enough for the game over panel, and the world view drops its effects and shadows, which
+takes it to about 10 frames per second; --fps 20 caps it on faster machines. Waits count
+frames, so they hold under load: a frame budget of FPS is one second of the game.
 
 Without jumps the first carrot reaches the bunny about 3 s into a run, the next ones every 1
 to 2 s, and the third hit ends it.
 """
-from box_client import mean_luma
+from box_client import DELTA_TIME, mean_luma
 
 APP = "apps/bunnyhopper"
 ARGS = ["--fps", "20"]
 
-FPS = 20
+# Frames per second of game time
+FPS = round(1 / float(DELTA_TIME))
 GAME = "get bunnyhopper.BunnyGame BunnyGame."
 STATE = "has bunnyhopper.BunnyGameState (bunnyhopper.BunnyGameState, bunnyhopper.BunnyGameState.%s)"
 PARTICLES = "get box.particle.ParticleStats ParticleStats.particles"

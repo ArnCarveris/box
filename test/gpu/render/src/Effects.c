@@ -622,7 +622,8 @@ void Effects_exposure_first_frame_at_target(void) {
         .min_log_luma = -8, .max_log_luma = 4, .speed_up = 0.5f, .speed_down = 0.5f,
         .high_percentile = 1});
     effects_view(world, camera, exposure);
-    effects_cube(world, 0, 20, 3, (Rgb){255, 255, 255});
+    ecs_entity_t wall = effects_cube(world, 0, 1, 3, (Rgb){255, 255, 255});
+    ecs_set(world, wall, Box, {20, 20, 1});
     ecs_entity_t s = ecs_new(world);
     ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "first.png",
         .resolution_scale = 1});
@@ -659,7 +660,11 @@ void Effects_exposure_ignores_pixels_below_min_log_luma(void) {
             .low_percentile = 0, .high_percentile = 1});
         effects_view(world, camera, exposure);
 
-        effects_cube(world, 0, run ? 1.5f : 20, 0.5f, (Rgb){255, 255, 255});
+        ecs_entity_t shape = effects_cube(world, 0, 1.5f, 0.5f, (Rgb){255, 255, 255});
+        if (!run) {
+            ecs_set(world, shape, Box, {20, 20, 1});
+        }
+
         ecs_entity_t s = ecs_new(world);
         ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "bin0.png",
             .resolution_scale = 1});
