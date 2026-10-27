@@ -3,11 +3,10 @@
 // geometry it drew first, and writes the slots of the instances to draw, compacted per draw,
 // with the instance count of its indexed indirect draw arguments.
 //
-// A job is the slot range of one draw in its instance buffer. Group 1 binds the instance pool,
-// which holds a copy of the instance buffers at the pool offset of each job, or for a draw the
-// pool does not hold its own buffer at offset 0. Its bounds are the box around the mesh, moved
-// into world space by the model matrix (mesh bounds times the instance scale and the world
-// transform); the planes are the frustum in world space.
+// A job is the slot range of one draw in its instance page, which group 1 binds: every batch
+// owns a run of slots of a page shared by many batches, so a job's first is its page slot. Its
+// bounds are the box around the mesh, moved into world space by the model matrix (mesh bounds
+// times the instance scale and the world transform); the planes are the frustum in world space.
 //
 // A view that culls by occlusion runs two phases. The early phase draws the instances in the
 // frustum that its history (group 2, one word per instance slot, 0 when the instance was
@@ -20,8 +19,9 @@
 //
 // cull_instances tests one instance per invocation and records which instances of its
 // workgroup it draws as a 64 bit mask with their count in the scan words of the workgroup. A
-// dispatch covers a run of parallel draws of a table: its part of the workgroup list (scan.z,
-// scan.w workgroups) gives each workgroup its scan words and its table entry, so the job.
+// dispatch covers a run of parallel draws of a table that share an instance page and a
+// history: its part of the workgroup list (scan.z, scan.w workgroups) gives each workgroup its
+// scan words and its table entry, so the job.
 // One cull_scan dispatch per cull view, phase and page turns the counts of the workgroups of each
 // of its parallel draws into exclusive offsets, in workgroup order, and writes their instance
 // counts (a workgroup per draw, from a table of job, first scan word and workgroups); one
@@ -57,7 +57,6 @@ struct Job {
     extent: vec3f,
     late: u32,
     list: u32,
-    pool: u32,
 };
 
 // Words of the indexed indirect draw arguments of a draw; the instance count is the second.
@@ -102,7 +101,7 @@ var<workgroup> scan_sums: array<u32, 256>;
 // The size is the diameter of the sphere around the box in pixels, tested only when the box is
 // in front of the camera (w beyond the radius); size.z is 0 for orthographic projections.
 fn visible(job: Job, slot: u32) -> bool {
-    let inst = instances[job.pool + slot];
+    let inst = instances[slot];
     let m = inst.model;
     var local_center = job.center;
     var local_extent = job.extent;
@@ -139,7 +138,7 @@ fn visible(job: Job, slot: u32) -> bool {
 // and the instance is hidden when its nearest depth is farther than the farthest depth they
 // hold. A box that reaches behind the camera or in front of the near plane is never hidden.
 fn occluded(job: Job, slot: u32) -> bool {
-    let inst = instances[job.pool + slot];
+    let inst = instances[slot];
     let m = inst.model;
     var local_center = job.center;
     var local_extent = job.extent;

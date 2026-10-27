@@ -101,8 +101,9 @@ typedef struct box_gpu_shader_t {
 
 /** Vertex and index buffers of a mesh */
 typedef struct box_gpu_mesh_t {
-    WGPUBuffer surface_assets;
-    uint64_t surface_asset_size;
+    WGPUBuffer surface_assets;      /**< Surface assets the shaders read, one vec4 without any */
+    uint64_t surface_asset_size;    /**< Bytes of the surface assets */
+    bool assets;                    /**< The mesh has surface assets, so its draws bind them */
     WGPUBuffer vertices;            /**< box_vertex_t */
     WGPUBuffer indices;             /**< uint32_t, three per triangle */
     uint32_t index_count;           /**< Indices to draw */
@@ -128,14 +129,23 @@ typedef struct box_gpu_material_t {
     struct box_gpu_material_t *next; /**< Next material with the same hash */
 } box_gpu_material_t;
 
+/** Bind group of an instance page with the surface assets of a mesh that has them */
+typedef struct box_gpu_instance_group_t {
+    uint32_t mesh;                  /**< Handle of the mesh */
+    WGPUBuffer assets;              /**< Surface assets of the mesh it binds, held */
+    WGPUBindGroup group;            /**< The bind group */
+} box_gpu_instance_group_t;
+
 /** A buffer the main thread created by handle */
 typedef struct box_gpu_buffer_t {
-    WGPUBuffer surface_assets;
-    uint64_t surface_asset_size;
     WGPUBuffer buffer;              /**< The buffer */
     uint64_t size;                  /**< Bytes of the buffer */
     uint32_t usage;                 /**< box_render_buffer_usage_t flags */
-    WGPUBindGroup instances;        /**< Binds it as the instances of a batch, made on use */
+    WGPUBindGroup instances;        /**< Binds it as the instance page of the draws of meshes
+                                     *   without surface assets, made on use */
+    ecs_vec_t mesh_groups;          /**< box_gpu_instance_group_t, binds it with the surface
+                                     *   assets of a mesh that has them, made on use */
+    int64_t counted;                /**< History ranges pass that last counted its words */
     uint64_t version;               /**< Write that last changed it, unique across buffers */
 } box_gpu_buffer_t;
 
@@ -170,13 +180,16 @@ typedef struct box_gpu_hiz_page_t {
 
 /** Which instances a view drew in its previous frame, one word per instance slot.
  *
- * Each instance buffer the view draws from has a range of words, 0 for an instance that was
- * drawn. A range is only a guess for the early phase: after a slot moved or a buffer was
- * replaced the late phase still tests and draws every instance the early phase missed.
+ * Each instance page the view draws from has a range of words indexed by page slot, 0 for an
+ * instance that was drawn, which grows with the page.
+ *
+ * A range is only a guess for the early phase: after a slot moved, a run of a batch moved to
+ * other slots (it reads the words those slots had) or a page was replaced, the late phase still
+ * tests and draws every instance the early phase missed.
  */
 typedef struct box_gpu_cull_history_t {
     ecs_vec_t pages;                /**< box_gpu_hiz_page_t, each bound whole as storage */
-    ecs_map_t ranges;               /**< Instance buffer handle to page, offset and words */
+    ecs_map_t ranges;               /**< Instance page handle to page, offset and words */
     int64_t stamp;                  /**< Cull pass the view was last culled in */
 } box_gpu_cull_history_t;
 
@@ -205,15 +218,14 @@ typedef struct box_gpu_cull_draw_t {
     uint32_t count;                 /**< Instances it tests */
 } box_gpu_cull_draw_t;
 
-/** A dispatch of the cull pass over the jobs of one instance buffer */
+/** A dispatch of the cull pass over the jobs of one instance page */
 typedef struct box_gpu_cull_dispatch_t {
-    uint32_t buffer;                /**< Handle of the instance buffer */
+    uint32_t buffer;                /**< Handle of the instance page */
     uint32_t groups;                /**< Workgroups to dispatch */
     bool ordered;                   /**< One invocation per job keeps the order of its slots */
     bool late;                      /**< Runs after the early draw, against the pyramid */
     uint32_t page;                  /**< Page that holds the visible slots of its jobs */
     WGPUBindGroup history;          /**< History page and pyramid, NULL for those of the view */
-    bool pooled;                    /**< Its jobs read the instance pool, not their buffer */
     uint32_t first;                 /**< Its job */
     uint32_t scan;                  /**< First scan word of its workgroups, parallel only */
     uint32_t scan_groups;           /**< Its workgroups, 0 for an ordered dispatch */
@@ -226,43 +238,35 @@ typedef struct box_gpu_cull_table_t {
     bool late;                      /**< Phase of its dispatches */
     uint32_t page;                  /**< Page of its dispatches */
     uint32_t uniform;               /**< Index of its uniforms in the uniform buffer */
-    uint32_t buffer;                /**< An instance buffer of its dispatches, for group 1 */
+    uint32_t buffer;                /**< An instance page of its dispatches, for group 1 */
     uint32_t entries;               /**< Draws, the workgroups of cull_scan */
     uint32_t groups;                /**< Workgroups of all its draws, those of cull_write */
 } box_gpu_cull_table_t;
 
-/** One cull_instances dispatch over consecutive parallel draws of a table that read the same
- * instances and history: the pool, or the buffer of the one draw that is not in it */
+/** One cull_instances dispatch over consecutive parallel draws of a table that share an
+ * instance page and a history */
 typedef struct box_gpu_cull_run_t {
     int32_t view;                   /**< Index of the cull view */
     bool late;                      /**< Phase of its draws */
     uint32_t page;                  /**< Page of its draws */
     uint32_t uniform;               /**< Index of its uniforms, its part of the workgroup list */
-    uint32_t buffer;                /**< Instance buffer of its draw, 0 for the pool */
+    uint32_t buffer;                /**< Instance page of its draws, bound as group 1 */
     WGPUBindGroup history;          /**< History page and pyramid, NULL for those of the view */
     uint32_t groups;                /**< Workgroups of its draws */
 } box_gpu_cull_run_t;
 
-/** Range of the instance pool that holds a copy of an instance buffer */
-typedef struct box_gpu_cull_pool_range_t {
-    uint64_t offset;                /**< First byte in the pool */
-    uint64_t size;                  /**< Bytes it holds */
-    uint64_t version;               /**< Version of the buffer it holds, 0 for none yet */
-} box_gpu_cull_pool_range_t;
-
 /** Range of instances of one draw the cull shader tests, as in Job of cull.wgsl */
 typedef struct box_gpu_cull_job_t {
-    uint32_t first;                 /**< First slot in the instance buffer */
+    uint32_t first;                 /**< First slot in the instance page */
     uint32_t count;                 /**< Slots to test */
     uint32_t args;                  /**< Index of the draw arguments it counts into */
     uint32_t base;                  /**< First entry it writes in the visible slots of its page */
     float center[3];                /**< Center of the mesh bounds */
-    uint32_t history;               /**< First history word of its buffer, UINT32_MAX for none */
+    uint32_t history;               /**< First history word of its page, UINT32_MAX for none */
     float extent[3];                /**< Half size of the mesh bounds */
     uint32_t late;                  /**< Draw arguments of its late phase, UINT32_MAX for none */
     uint32_t list;                  /**< 1 when first indexes the slot lists, 0 for a range */
-    uint32_t pool;                  /**< Instance of the pool its slot 0 is at, 0 for none */
-    uint32_t pad[2];                /**< Pads the job to the size of Job in cull.wgsl */
+    uint32_t pad[3];                /**< Pads the job to the size of Job in cull.wgsl */
 } box_gpu_cull_job_t;
 
 /** Uniforms of one cull dispatch, as in Cull of cull.wgsl */
@@ -329,9 +333,6 @@ typedef struct box_gpu_cull_page_t {
  * WebGPU device supports, in 4 byte words */
 #define BOX_GPU_CULL_WINDOW ((uint32_t)((128u << 20) / sizeof(uint32_t)))
 
-/** Smallest size of the instance pool of the cull pass in bytes */
-#define BOX_GPU_POOL_MIN_SIZE (65536)
-
 /** Copies of the cull counters in flight at most */
 #define BOX_GPU_CULL_READBACKS (4)
 
@@ -380,15 +381,10 @@ typedef struct box_gpu_cull_t {
     ecs_vec_t uniform_data;         /**< Bytes of the uniforms of the dispatches */
     ecs_vec_t job_data;             /**< box_gpu_cull_job_t of the target */
     ecs_vec_t arg_data;             /**< uint32_t, the draw arguments before culling */
-    ecs_vec_t order;                /**< uint64_t, instance buffer and draw of blended draws */
+    ecs_vec_t order;                /**< uint64_t, instance page and draw of blended draws */
     ecs_vec_t tables;               /**< box_gpu_cull_table_t of the target */
     ecs_vec_t runs;                 /**< box_gpu_cull_run_t of the target */
-    WGPUBuffer pool;                /**< Copies of the instance buffers the cull reads */
-    uint64_t pool_size;             /**< Bytes of the pool buffer */
-    uint64_t pool_used;             /**< Bytes of the pool its ranges use */
-    uint64_t pool_waste;            /**< Bytes of ranges that no longer hold a buffer */
-    WGPUBindGroup pool_group;       /**< Binds the pool as the instances, made on use */
-    ecs_map_t pool_ranges;          /**< Instance buffer handle to box_gpu_cull_pool_range_t */
+    int64_t counting;               /**< History ranges passes, marks the pages counted */
     WGPUQuerySet stamps;            /**< Begin and end of the cull passes of a target, NULL
                                      *   without timestamp queries */
     WGPUBuffer stamp_resolve;       /**< Resolved timestamps, copied into the readback */
@@ -545,7 +541,9 @@ typedef struct box_gpu_t {
     WGPUTextureView capture_shadow_layer; /**< View the casters render into */
     WGPUBuffer capture_shadow_buffer; /**< Matrix of the cascade of the captures */
     WGPUBindGroup capture_shadow_group; /**< Binds the matrix to the shadow pipeline */
-    WGPUBindGroupLayout instance_layout; /**< Binds the instance buffer of a batch */
+    WGPUBindGroupLayout instance_layout; /**< Binds an instance page and surface assets */
+    WGPUBuffer no_assets;           /**< One zero vec4, the surface assets of the draws of
+                                     *   meshes without any */
     box_gpu_cull_t cull;            /**< Cull pass state */
     WGPUBindGroupLayout scatter_layout; /**< Bind group layout of the scatter pass */
     WGPUPipelineLayout scatter_pipeline_layout; /**< Pipeline layout of the scatter pass */
@@ -604,7 +602,8 @@ typedef enum box_gpu_stat_t {
     BOX_GPU_STAT_BUFFER_DESTROYED,  /**< A buffer was released */
     BOX_GPU_STAT_PASS,              /**< A view pass was rendered */
     BOX_GPU_STAT_DRAW,              /**< A draw call was recorded */
-    BOX_GPU_STAT_SCATTER            /**< A scatter dispatch was recorded */
+    BOX_GPU_STAT_SCATTER,           /**< A scatter dispatch was recorded */
+    BOX_GPU_STAT_INSTANCE_BIND      /**< An instance bind group was set in a pass or bundle */
 } box_gpu_stat_t;
 
 #ifdef __EMSCRIPTEN__
@@ -1736,14 +1735,28 @@ void box_gpu_cull_init(
 void box_gpu_cull_fini(
     box_gpu_t *gpu);
 
-/** Get the bind group of an instance buffer, made on first use.
+/** Get the bind group of an instance page for the draws of a mesh, made on first use.
+ *
+ * The draws of every mesh without surface assets share one group per page, so a pass sets it
+ * once per page; a mesh with surface assets has a group of its own per page.
  *
  * @param gpu The backend
- * @param b The buffer
+ * @param b The page
+ * @param handle Handle of the mesh
+ * @param m The mesh, NULL for a pass that reads no surface assets, such as the cull
  * @return The bind group, NULL when the buffer is not a storage buffer
  */
 WGPUBindGroup box_gpu_instance_group(
     box_gpu_t *gpu,
+    box_gpu_buffer_t *b,
+    uint32_t handle,
+    const box_gpu_mesh_t *m);
+
+/** Release the instance bind groups of a buffer.
+ *
+ * @param b The buffer
+ */
+void box_gpu_instance_groups_release(
     box_gpu_buffer_t *b);
 
 /** Forget the cull views of the previous target, before the views of a target are written.
@@ -1931,7 +1944,7 @@ box_gpu_cull_history_t* box_gpu_hiz_history(
     ecs_entity_t view,
     uint32_t target);
 
-/** Give every instance buffer a view draws opaque batches from a range of its history.
+/** Give every instance page a view draws opaque batches from a range of its history.
  *
  * When the ranges do not fit, the history starts over in a larger buffer, as if the view drew
  * every instance the previous frame.
@@ -1947,21 +1960,21 @@ void box_gpu_hiz_ranges(
     const box_render_packet_t *packet,
     int32_t index);
 
-/** Get the first history word of an instance buffer in its page.
+/** Get the first history word of an instance page in its history page.
  *
  * @param h The history
- * @param buffer Handle of the instance buffer
+ * @param buffer Handle of the instance page
  * @return The offset, UINT32_MAX when the buffer has no range
  */
 uint32_t box_gpu_hiz_offset(
     const box_gpu_cull_history_t *h,
     uint32_t buffer);
 
-/** Get the page of the history words of an instance buffer.
+/** Get the history page of the history words of an instance page.
  *
  * @param h The history
- * @param buffer Handle of the instance buffer
- * @return The page, 0 when the buffer has no range
+ * @param buffer Handle of the instance page
+ * @return The page, 0 when the instance page has no range
  */
 uint32_t box_gpu_hiz_page(
     const box_gpu_cull_history_t *h,
@@ -1994,52 +2007,6 @@ void box_gpu_hiz_build(
     box_gpu_hiz_t *hiz,
     WGPUTextureView depth);
 
-/** Forget every range of the instance pool, so the next draws copy their buffers again from
- * the start of the pool.
- *
- * @param c The cull state
- */
-void box_gpu_cull_pool_reset(
-    box_gpu_cull_t *c);
-
-/** Drop the ranges of the instance pool whose buffer no longer exists, counting them as waste.
- *
- * @param gpu The backend
- */
-void box_gpu_cull_pool_purge(
-    box_gpu_t *gpu);
-
-/** Find the range of the instance pool that holds a copy of an instance buffer, adding one at
- * the end of the pool for a buffer it does not hold yet or that outgrew its range. The copy
- * itself is made by box_gpu_cull_pool_upload.
- *
- * @param gpu The backend
- * @param handle Handle of the instance buffer
- * @return The instance its slot 0 is at in the pool, UINT32_MAX when it does not fit
- */
-uint32_t box_gpu_cull_pool_add(
-    box_gpu_t *gpu,
-    uint32_t handle);
-
-/** Test whether the instance pool holds an instance buffer whole.
- *
- * @param gpu The backend
- * @param handle Handle of the instance buffer
- * @return Whether the jobs of the buffer read the pool
- */
-bool box_gpu_cull_pooled(
-    box_gpu_t *gpu,
-    uint32_t handle);
-
-/** Make the instance pool hold every range and copy the buffers written since their range was
- * copied, then bind it. The copies are submitted before the frame, after its uploads and
- * scatters, so the cull of the frame reads its instances.
- *
- * @param gpu The backend
- */
-void box_gpu_cull_pool_upload(
-    box_gpu_t *gpu);
-
 /** Release the histories and pyramids that no cull pass used for a while.
  *
  * @param gpu The backend
@@ -2061,15 +2028,16 @@ const box_gpu_cull_view_t* box_gpu_cull_view(
 
 /** Record the indirect draw of a batch of a cull view.
  *
- * Binds the mesh, the instance buffer at group, the visible slots of the draw and draws with
- * the arguments the cull pass wrote.
+ * Binds the mesh, the instance page at group unless it is bound there already, the visible
+ * slots of the draw and draws with the arguments the cull pass wrote.
  *
  * @param gpu The backend
  * @param pass The render pass
  * @param packet The packet
  * @param draw The draw
- * @param group Bind group index the instance buffer is bound at
+ * @param group Bind group index the instance page is bound at
  * @param late Draw what the late phase kept instead of the early or only phase
+ * @param bound Instance bind group bound last in the pass, NULL for none, updated
  * @return Whether the draw was recorded
  */
 bool box_gpu_cull_draw(
@@ -2078,7 +2046,8 @@ bool box_gpu_cull_draw(
     const box_render_packet_t *packet,
     const box_gpu_cull_draw_t *draw,
     uint32_t group,
-    bool late);
+    bool late,
+    WGPUBindGroup *bound);
 
 /** Record a copy of a presented image into the readback buffer of its target.
  *

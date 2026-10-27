@@ -185,6 +185,101 @@ static void box_gpu_mesh_free(
     box_gpu_count(gpu, BOX_GPU_STAT_MESH_DESTROYED);
 }
 
+/** Create a bind group of an instance page and surface assets.
+ *
+ * @param gpu The backend
+ * @param b The page
+ * @param assets The surface assets
+ * @param size Bytes of the surface assets
+ * @return The bind group
+ */
+static WGPUBindGroup box_gpu_instance_group_new(
+    box_gpu_t *gpu,
+    const box_gpu_buffer_t *b,
+    WGPUBuffer assets,
+    uint64_t size)
+{
+    WGPUBindGroupEntry entry[2] = {
+        {.binding = 0, .buffer = b->buffer, .size = b->size},
+        {.binding = 1, .buffer = assets, .size = size}
+    };
+
+    return wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
+        .layout = gpu->instance_layout,
+        .entryCount = 2,
+        .entries = entry
+    });
+}
+
+WGPUBindGroup box_gpu_instance_group(
+    box_gpu_t *gpu,
+    box_gpu_buffer_t *b,
+    uint32_t handle,
+    const box_gpu_mesh_t *m)
+{
+    WGPUBindGroup result = NULL;
+    int32_t i;
+    if (!(b->usage & BOX_RENDER_BUFFER_STORAGE)) {
+        goto done;
+    }
+
+    if (!m || !m->assets) {
+        if (!b->instances) {
+            b->instances = box_gpu_instance_group_new(gpu, b, gpu->no_assets, sizeof(vec4));
+        }
+
+        result = b->instances;
+        goto done;
+    }
+
+    box_gpu_instance_group_t *g = NULL;
+    for (i = 0; i < ecs_vec_count(&b->mesh_groups); i ++) {
+        g = ecs_vec_get_t(&b->mesh_groups, box_gpu_instance_group_t, i);
+        if (g->mesh == handle) {
+            break;
+        }
+
+        g = NULL;
+    }
+
+    if (g && g->assets != m->surface_assets) {
+        wgpuBindGroupRelease(g->group);
+        wgpuBufferRelease(g->assets);
+    } else if (g) {
+        result = g->group;
+        goto done;
+    } else {
+        g = ecs_vec_append_t(NULL, &b->mesh_groups, box_gpu_instance_group_t);
+        g->mesh = handle;
+    }
+
+    g->assets = m->surface_assets;
+    wgpuBufferAddRef(g->assets);
+    g->group = box_gpu_instance_group_new(gpu, b, m->surface_assets, m->surface_asset_size);
+    result = g->group;
+done:
+    return result;
+}
+
+void box_gpu_instance_groups_release(
+    box_gpu_buffer_t *b)
+{
+    int32_t i;
+    if (b->instances) {
+        wgpuBindGroupRelease(b->instances);
+        b->instances = NULL;
+    }
+
+    for (i = 0; i < ecs_vec_count(&b->mesh_groups); i ++) {
+        box_gpu_instance_group_t *g = ecs_vec_get_t(
+            &b->mesh_groups, box_gpu_instance_group_t, i);
+        wgpuBindGroupRelease(g->group);
+        wgpuBufferRelease(g->assets);
+    }
+
+    ecs_vec_clear(&b->mesh_groups);
+}
+
 /** Release a buffer and its handle.
  *
  * @param gpu The backend
@@ -194,13 +289,8 @@ static void box_gpu_buffer_free(
     box_gpu_t *gpu,
     box_gpu_buffer_t *b)
 {
-    if (b->instances) {
-        wgpuBindGroupRelease(b->instances);
-    }
-
-    if (b->surface_assets) {
-        wgpuBufferRelease(b->surface_assets);
-    }
+    box_gpu_instance_groups_release(b);
+    ecs_vec_fini_t(NULL, &b->mesh_groups, box_gpu_instance_group_t);
     wgpuBufferRelease(b->buffer);
     ecs_os_free(b);
     box_gpu_count(gpu, BOX_GPU_STAT_BUFFER_DESTROYED);
@@ -329,6 +419,7 @@ void box_gpu_mesh_apply(
     m->indices = box_gpu_buffer_new(gpu, index_size,
         WGPUBufferUsage_Index | WGPUBufferUsage_Storage);
     m->surface_asset_size = desc->surface_asset_count ? (uint64_t)desc->surface_asset_count * sizeof(vec4) : sizeof(vec4);
+    m->assets = desc->surface_asset_count != 0;
     m->surface_assets = box_gpu_buffer_new(gpu, m->surface_asset_size, WGPUBufferUsage_Storage);
     if (desc->surface_asset_count) {
         wgpuQueueWriteBuffer(gpu->queue, m->surface_assets, 0,
@@ -371,12 +462,7 @@ void box_gpu_buffer_apply(
 
     b = ecs_os_calloc_t(box_gpu_buffer_t);
     b->buffer = box_gpu_buffer_new(gpu, desc->size, usage);
-    box_gpu_mesh_t *mesh = ecs_map_get_deref(&gpu->meshes, box_gpu_mesh_t, (desc->usage & BOX_RENDER_BUFFER_INSTANCE) ? desc->surface_mesh : 0);
-    if (mesh) {
-        b->surface_assets = mesh->surface_assets;
-        b->surface_asset_size = mesh->surface_asset_size;
-        wgpuBufferAddRef(b->surface_assets);
-    }
+    ecs_vec_init_t(NULL, &b->mesh_groups, box_gpu_instance_group_t, 0);
     b->size = desc->size;
     b->usage = desc->usage;
     b->version = ++ gpu->buffer_writes;
@@ -958,7 +1044,7 @@ static void box_gpu_draw_batches(
 {
     const box_gpu_cull_view_t *cv = box_gpu_cull_view(gpu, slot, -1);
     WGPURenderPipeline bound = NULL;
-    WGPUBindGroup material = NULL;
+    WGPUBindGroup material = NULL, instances = NULL;
     uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
     bool sky = phase == 1 || !box_gpu_atmosphere_sky(gpu, v);
     bool particles = phase == 1;
@@ -975,6 +1061,7 @@ static void box_gpu_draw_batches(
             if (box_gpu_draw_sky(gpu, t, vp->pass, format, v, group, offset)) {
                 bound = NULL;
                 material = NULL;
+                instances = NULL;
             }
         }
 
@@ -983,6 +1070,7 @@ static void box_gpu_draw_batches(
             if (box_gpu_draw_particles(gpu, vp, format, v, group, offset, false)) {
                 bound = NULL;
                 material = NULL;
+                instances = NULL;
             }
         }
 
@@ -1001,7 +1089,7 @@ static void box_gpu_draw_batches(
             material = group;
         }
 
-        if (box_gpu_cull_draw(gpu, vp->pass, packet, d, 2, phase == 2 && mesh)) {
+        if (box_gpu_cull_draw(gpu, vp->pass, packet, d, 2, phase == 2 && mesh, &instances)) {
             box_gpu_count(gpu, BOX_GPU_STAT_DRAW);
         }
     }

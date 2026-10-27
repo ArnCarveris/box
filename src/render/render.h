@@ -87,7 +87,15 @@
 /** Most nested clips a 2D draw intersects; clips further up the hierarchy are not applied */
 #define BOX_RENDER_CLIP_DEPTH (16)
 
-/** First buffer handle of the instance buffers of batches */
+/** Buffer handle of the first instance page, the first handle of the instance pages.
+ *
+ * Every batch draws a run of slots of one instance page, a storage buffer of at most
+ * BOX_DRAWS_CHUNK instances shared by the batches (box_render_batch_t.instances is the page and
+ * first_instance the first slot of the run).
+ *
+ * Page p of the store has the handle BOX_RENDER_BUFFER_FIRST + p * buffers + b for buffer b of
+ * its layout (one buffer today), so the first page is BOX_RENDER_BUFFER_FIRST once a batch
+ * exists. A released page index is reused by the next page the store needs. */
 #define BOX_RENDER_BUFFER_FIRST (16)
 
 /** Byte alignment of a scatter segment in the change buffer, the storage offset alignment */
@@ -610,7 +618,8 @@ typedef struct box_render_instance_t {
  * followed by count entries of a slot index and the words of the instance.
  */
 typedef struct box_render_scatter_t {
-    uint32_t buffer;        /**< Handle of the instance buffer the slots are in */
+    uint32_t buffer;        /**< Handle of the instance page the slots are in, one scatter per
+                             *   page and frame */
     uint32_t changes;       /**< Handle of the buffer holding the segment */
     uint32_t offset;        /**< Byte offset of the segment, a BOX_RENDER_SCATTER_ALIGN multiple */
     uint32_t size;          /**< Bytes of the segment */
@@ -661,11 +670,12 @@ typedef struct box_render_batch_t {
     uint32_t mesh;              /**< Mesh handle */
     uint32_t textures[BOX_RENDER_TEXTURE_SLOTS]; /**< Texture handles of the layers, 0 for none */
     uint32_t wrap;              /**< TextureWrap of the samplers */
-    uint32_t instances;         /**< Buffer handle holding the instance data */
-    uint32_t first_instance;    /**< First instance in the instance buffer, unused when listed */
+    uint32_t instances;         /**< Handle of the instance page holding the instance data */
+    uint32_t first_instance;    /**< First slot in the instance page, unused when listed */
     uint32_t instance_count;    /**< Instances to draw */
     bool listed;                /**< The instances are the slots at slots, not a range */
-    uint32_t slots;             /**< Data offset of instance_count uint32_t slots in draw order */
+    uint32_t slots;             /**< Data offset of instance_count uint32_t page slots in draw
+                                 *   order */
 } box_render_batch_t;
 
 /** Everything the renderer needs of one frame, filled on the main thread.
@@ -764,6 +774,9 @@ typedef struct box_render_gpu_stats_t {
     int32_t buffers;            /**< Buffers alive */
     int32_t passes;             /**< View passes rendered */
     int32_t draws;              /**< Draw calls recorded */
+    int32_t instance_binds;     /**< Instance bind groups set in the cull, forward, shadow and
+                                 *   capture passes, only when the page (or surface assets of
+                                 *   the mesh) differs from the one bound last in the pass */
     int32_t scatters;           /**< Scatter dispatches recorded */
     int32_t scattered;          /**< Instances the scatter dispatches copied */
     int32_t probes;             /**< Probes captured */
@@ -1130,6 +1143,9 @@ typedef struct box_render_draws_stats_t {
     int32_t dynamic;            /**< Dynamic instances in batches */
     int32_t processed;          /**< Changed entities processed by the last extract */
     int32_t scattered;          /**< Instances the last extract sent through the scatter pass */
+    int32_t scatters;           /**< Scatters the last extract sent, one per instance page with
+                                 *   static changes */
+    int32_t pages;              /**< Instance pages alive */
     int64_t upload_bytes;       /**< Bytes the last extract uploaded into instance buffers */
     int32_t clips;              /**< ClipChildren elements in the clip buffer */
     int64_t clip_bytes;         /**< Bytes the last extract uploaded into the clip buffer */
@@ -1197,8 +1213,8 @@ bool box_render_clip_hides(
 
 /** Set the instances one batch holds before its shapes continue in another, for tests.
  *
- * A batch is one instance buffer, so the default keeps it within the 128 MiB storage binding
- * every WebGPU device supports; shapes added after a change follow the new size.
+ * A batch is one run of slots of an instance page, so the default keeps it within the 128 MiB
+ * storage binding every WebGPU device supports; shapes added after a change follow the new size.
  *
  * @param world The world
  * @param instances Instances per batch, at least 1
@@ -1206,6 +1222,19 @@ bool box_render_clip_hides(
 void box_render_draws_chunk(
     ecs_world_t *world,
     int32_t instances);
+
+/** Set the slots of an instance page, for tests.
+ *
+ * The default is BOX_DRAWS_CHUNK, the 128 MiB storage binding every WebGPU device supports. A
+ * batch never spans pages, so a key also continues in another batch once a batch holds this
+ * many shapes. Pages created after the change hold at most this many slots.
+ *
+ * @param world The world
+ * @param slots Slots per page, at least 1
+ */
+void box_render_draws_page(
+    ecs_world_t *world,
+    int32_t slots);
 
 /** Forget the texture entities surfaces render into, before the surfaces register them again.
  *

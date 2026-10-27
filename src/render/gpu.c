@@ -635,6 +635,9 @@ void box_gpu_count(
     case BOX_GPU_STAT_SCATTER:
         gpu->pending.scatters ++;
         break;
+    case BOX_GPU_STAT_INSTANCE_BIND:
+        gpu->pending.instance_binds ++;
+        break;
     }
 }
 
@@ -659,6 +662,7 @@ void box_gpu_stats_publish(
     s->buffers += p->buffers;
     s->passes += p->passes;
     s->draws += p->draws;
+    s->instance_binds += p->instance_binds;
     s->scatters += p->scatters;
     s->scattered += p->scattered;
     s->cull_ns += p->cull_ns;

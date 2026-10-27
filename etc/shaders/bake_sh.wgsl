@@ -81,7 +81,8 @@ struct Light {
 
 // The instances of one batch the cull tests, at a dynamic offset per batch.
 struct CullJob {
-    // First slot, or first entry of lists when list is 1
+    // First slot of the run of the batch in its instance page, or first entry of lists when
+    // list is 1
     first: u32,
     count: u32,
     list: u32,

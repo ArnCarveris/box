@@ -640,6 +640,7 @@ static void BoxRenderExtractDraws(
 
     d->stats.processed = 0;
     d->stats.scattered = 0;
+    d->stats.scatters = 0;
     d->stats.upload_bytes = 0;
     box_draws_process(world, d);
     box_draws_clips_send(world, d, p);
@@ -885,7 +886,6 @@ void box_render_draws_init(
 
     ecs_vec_init_t(NULL, &d->batches, box_draw_batch_t, 0);
     ecs_vec_init_t(NULL, &d->free_batches, int32_t, 0);
-    ecs_vec_init_t(NULL, &d->free_buffers, uint32_t, 0);
     ecs_vec_init_t(NULL, &d->dirty, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &d->moved, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &d->walk, ecs_entity_t, 0);
@@ -896,7 +896,10 @@ void box_render_draws_init(
     ecs_map_init(&d->meshes, NULL);
     box_draws_order_init(d);
     box_draws_clips_init(d);
-    d->next_buffer = BOX_RENDER_BUFFER_FIRST;
+    box_draws_store_init(&d->store, &(box_draw_layout_t){
+        .streams = 1,
+        .stride = { (uint32_t)sizeof(box_render_instance_t) }
+    }, BOX_RENDER_BUFFER_FIRST, BOX_DRAWS_CHUNK);
     d->chunk = BOX_DRAWS_CHUNK;
     d->refs = 1;
     box_draws_queries(world, d);
