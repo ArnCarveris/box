@@ -1,6 +1,6 @@
 /**
  * @file Effects.c
- * @brief Tests for the effect chain of a view: bloom, tonemap, exposure, fog and SSAO.
+ * @brief Tests for the effect chain of a view: bloom, tonemap, exposure, fog, SSAO and SMAA.
  *
  * Most cases render an unlit view (a C literal View) from 5 units in front of the origin into
  * a 64x64 capture; a unit cube at the origin covers columns 26 to 38 of the middle row.
@@ -1311,6 +1311,410 @@ void Effects_follow_surface_resize(void) {
     test_assert(px[(32 * 128 + 64) * 4] > 250);
     test_assert(px[(32 * 128 + 80) * 4] > 8);
     test_assert(px[(2 * 128 + 2) * 4] < 8);
+
+    stbi_image_free(px);
+    ecs_os_free(path);
+    ecs_fini(world);
+}
+
+/** Set the camera, clear and effects of a view, which renders unlit.
+ *
+ * @param world The world
+ * @param view The view
+ * @param camera The camera
+ * @param clear Whether the view clears to black
+ * @param effects The effect entities, in order
+ * @param count Number of effects
+ */
+static void smaa_view_set(
+    ecs_world_t *world,
+    ecs_entity_t view,
+    ecs_entity_t camera,
+    bool clear,
+    const ecs_entity_t *effects,
+    int32_t count)
+{
+    View value = {.camera = camera, .clear = {.enabled = clear, .color = {0, 0, 0, 255}}};
+    int32_t i;
+    ecs_vec_init_t(NULL, &value.effects, ViewEffect, count);
+    for (i = 0; i < count; i ++) {
+        *ecs_vec_append_t(NULL, &value.effects, ViewEffect) = (ViewEffect){
+            .enabled = true, .effect = effects[i] };
+    }
+
+    ecs_set_ptr(world, view, View, &value);
+    ecs_vec_fini_t(NULL, &value.effects, ViewEffect);
+}
+
+/** Create a white quad at the origin turned 30 degrees about the view axis.
+ *
+ * @param world The world
+ * @param size Edge of the quad
+ * @return The quad
+ */
+static ecs_entity_t smaa_quad(
+    ecs_world_t *world,
+    float size)
+{
+    ecs_entity_t result = ecs_new(world);
+    ecs_set(world, result, Quad, {size, size});
+    ecs_set(world, result, Rotation, {0, 0, glm_rad(30)});
+    ecs_set(world, result, Rgb, {0, 0, 0});
+    ecs_set(world, result, Emissive, {.strength = 8, .color = {255, 255, 255}});
+
+    return result;
+}
+
+/** Render a frame and keep a copy of the 64x64 capture it wrote.
+ *
+ * @param world The world
+ * @param file File name of the capture in the temporary folder
+ * @return The RGBA pixels, freed with ecs_os_free
+ */
+static unsigned char* smaa_frame(
+    ecs_world_t *world,
+    const char *file)
+{
+    ecs_progress(world, 1.0f / 60);
+    ecs_progress(world, 1.0f / 60);
+    box_render_sync(world);
+    unsigned char *px = effects_load(world, file);
+    unsigned char *result = ecs_os_malloc(64 * 64 * 4);
+    ecs_os_memcpy(result, px, 64 * 64 * 4);
+    stbi_image_free(px);
+
+    return result;
+}
+
+/** Count the pixels whose channels all lie strictly between 8 and 247.
+ *
+ * @param px The RGBA pixels of a 64x64 capture
+ * @return The count
+ */
+static int32_t smaa_partial(
+    const unsigned char *px)
+{
+    int32_t i, c, result = 0;
+    for (i = 0; i < 64 * 64; i ++) {
+        bool partial = true;
+        for (c = 0; c < 3; c ++) {
+            partial = partial && px[i * 4 + c] > 8 && px[i * 4 + c] < 247;
+        }
+
+        result += partial;
+    }
+
+    return result;
+}
+
+/** Check whether the pixels within 3 pixels of a pixel all equal it.
+ *
+ * @param px The RGBA pixels of a 64x64 capture
+ * @param x Column of the pixel
+ * @param y Row of the pixel
+ * @return Whether the area around the pixel is flat
+ */
+static bool smaa_flat(
+    const unsigned char *px,
+    int32_t x,
+    int32_t y)
+{
+    int32_t dx, dy, c;
+    bool result = true;
+    for (dy = -3; dy <= 3 && result; dy ++) {
+        for (dx = -3; dx <= 3 && result; dx ++) {
+            int32_t nx = glm_clamp(x + dx, 0, 63), ny = glm_clamp(y + dy, 0, 63);
+            for (c = 0; c < 4; c ++) {
+                result = result && px[(ny * 64 + nx) * 4 + c] == px[(y * 64 + x) * 4 + c];
+            }
+        }
+    }
+
+    return result;
+}
+
+void Effects_smaa_softens_diagonal_edge(void) {
+    // lighting/effects
+    ecs_entity_t camera;
+    ecs_world_t *world = effects_world(&camera);
+    ecs_entity_t tonemap = ecs_new(world);
+    ecs_add(world, tonemap, Tonemap);
+    ecs_entity_t smaa = ecs_new(world);
+    ecs_add(world, smaa, Smaa);
+    ecs_entity_t chain[2] = {tonemap, smaa};
+    ecs_entity_t view = ecs_new(world);
+    smaa_view_set(world, view, camera, true, chain, 1);
+    smaa_quad(world, 3);
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "smaa_edge.png",
+        .resolution_scale = 1});
+    unsigned char *plain = smaa_frame(world, "smaa_edge.png");
+
+    smaa_view_set(world, view, camera, true, chain, 2);
+    unsigned char *smooth = smaa_frame(world, "smaa_edge.png");
+    test_assert(plain[(32 * 64 + 32) * 4] > 250);
+    test_assert(smooth[(32 * 64 + 32) * 4] > 250);
+    test_assert(plain[(2 * 64 + 2) * 4] < 4);
+    test_assert(smooth[(2 * 64 + 2) * 4] < 4);
+    test_assert(smaa_partial(plain) <= 4);
+    test_assert(smaa_partial(smooth) >= 40);
+
+    ecs_os_free(smooth);
+    ecs_os_free(plain);
+    ecs_fini(world);
+}
+
+void Effects_smaa_keeps_flat_areas(void) {
+    // lighting/effects
+    ecs_entity_t camera;
+    ecs_world_t *world = effects_world(&camera);
+    ecs_entity_t tonemap = ecs_new(world);
+    ecs_add(world, tonemap, Tonemap);
+    ecs_entity_t smaa = ecs_new(world);
+    ecs_add(world, smaa, Smaa);
+    ecs_entity_t chain[2] = {tonemap, smaa};
+    ecs_entity_t view = ecs_new(world);
+    smaa_view_set(world, view, camera, true, chain, 1);
+    smaa_quad(world, 3);
+    ecs_entity_t floor = ecs_new(world);
+    ecs_set(world, floor, Position, {0, -2.2f, -1});
+    ecs_set(world, floor, Quad, {8, 1.5f});
+    ecs_set(world, floor, Rgb, {120, 60, 30});
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "smaa_flat.png",
+        .resolution_scale = 1});
+    unsigned char *plain = smaa_frame(world, "smaa_flat.png");
+
+    smaa_view_set(world, view, camera, true, chain, 2);
+    unsigned char *smooth = smaa_frame(world, "smaa_flat.png");
+    int32_t x, y, c, flat = 0, lit = 0, changed = 0;
+    for (y = 0; y < 64; y ++) {
+        for (x = 0; x < 64; x ++) {
+            if (!smaa_flat(plain, x, y)) {
+                continue;
+            }
+
+            flat ++;
+            lit += plain[(y * 64 + x) * 4] > 100;
+            for (c = 0; c < 4; c ++) {
+                int32_t i = (y * 64 + x) * 4 + c;
+                changed += abs((int)plain[i] - (int)smooth[i]) > 1;
+            }
+        }
+    }
+
+    test_assert(flat > 1000);
+    test_assert(lit > 200);
+    test_int(changed, 0);
+
+    ecs_os_free(smooth);
+    ecs_os_free(plain);
+    ecs_fini(world);
+}
+
+void Effects_smaa_leaves_later_view(void) {
+    // lighting/effects
+    ecs_entity_t camera;
+    ecs_world_t *world = effects_world(&camera);
+    ecs_entity_t tonemap = ecs_new(world);
+    ecs_add(world, tonemap, Tonemap);
+    ecs_entity_t smaa = ecs_new(world);
+    ecs_add(world, smaa, Smaa);
+    ecs_entity_t chain[2] = {tonemap, smaa};
+    ecs_entity_t view = ecs_new(world);
+    smaa_view_set(world, view, camera, true, chain, 1);
+    smaa_quad(world, 2);
+    ecs_entity_t scene = ecs_new(world);
+    ecs_add(world, scene, Scene);
+    ecs_entity_t ui_camera = ecs_new(world);
+    ecs_add_pair(world, ui_camera, EcsChildOf, scene);
+    ecs_set(world, ui_camera, Position, {0, 0, 100});
+    ecs_set(world, ui_camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f,
+        .far_ = 1000});
+    ecs_entity_t ui_view = ecs_new(world);
+    ecs_set(world, ui_view, View, {.camera = ui_camera});
+    ecs_entity_t rect = ecs_new(world);
+    ecs_add_pair(world, rect, EcsChildOf, scene);
+    ecs_set(world, rect, Position, {0, 26, 0});
+    ecs_set(world, rect, Rotation, {0, 0, glm_rad(8)});
+    ecs_set(world, rect, Rect, {40, 6});
+    ecs_set(world, rect, Rgb, {40, 200, 255});
+    ecs_entity_t label = ecs_new(world);
+    ecs_add_pair(world, label, EcsChildOf, scene);
+    ecs_set(world, label, Position, {0, -25, 0});
+    ecs_set(world, label, Text, {.value = "AVW", .size = 12,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
+    ecs_set(world, label, Rgb, {255, 255, 255});
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "smaa_ui.png",
+        .resolution_scale = 1});
+    unsigned char *plain = smaa_frame(world, "smaa_ui.png");
+
+    smaa_view_set(world, view, camera, true, chain, 2);
+    unsigned char *smooth = smaa_frame(world, "smaa_ui.png");
+    int32_t x, y, i, ui = 0, wrong = 0;
+    for (y = 0; y < 64; y ++) {
+        if (y > 12 && y < 50) {
+            continue;
+        }
+
+        for (x = 0; x < 64; x ++) {
+            i = (y * 64 + x) * 4;
+            ui += plain[i] > 8 || plain[i + 1] > 8 || plain[i + 2] > 8;
+            wrong += memcmp(&plain[i], &smooth[i], 4) != 0;
+        }
+    }
+
+    test_assert(ui > 40);
+    test_int(wrong, 0);
+    test_assert(memcmp(plain, smooth, 64 * 64 * 4) != 0);
+
+    ecs_os_free(smooth);
+    ecs_os_free(plain);
+    ecs_fini(world);
+}
+
+void Effects_smaa_last_composites_over(void) {
+    // lighting/effects
+    ecs_entity_t camera;
+    ecs_world_t *world = effects_world(&camera);
+    ecs_entity_t back = ecs_new(world);
+    ecs_set(world, back, View, {.camera = camera, .clear = {.enabled = true,
+        .color = {200, 30, 30, 255}}});
+    ecs_entity_t scene = ecs_new(world);
+    ecs_add(world, scene, Scene);
+    ecs_entity_t overlay_camera = ecs_new(world);
+    ecs_add_pair(world, overlay_camera, EcsChildOf, scene);
+    ecs_set(world, overlay_camera, Position, {0, 0, 5});
+    ecs_set(world, overlay_camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t tonemap = ecs_new(world);
+    ecs_add(world, tonemap, Tonemap);
+    ecs_entity_t smaa = ecs_new(world);
+    ecs_add(world, smaa, Smaa);
+    ecs_entity_t chain[2] = {tonemap, smaa};
+    ecs_entity_t overlay = ecs_new(world);
+    smaa_view_set(world, overlay, overlay_camera, false, chain, 2);
+    ecs_entity_t quad = smaa_quad(world, 3);
+    ecs_add_pair(world, quad, EcsChildOf, scene);
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "smaa_over.png",
+        .resolution_scale = 1});
+    unsigned char *px = smaa_frame(world, "smaa_over.png");
+
+    unsigned char *corner = &px[(4 * 64 + 4) * 4];
+    unsigned char *center = &px[(32 * 64 + 32) * 4];
+    test_int(corner[0], 200);
+    test_int(corner[1], 30);
+    test_int(corner[2], 30);
+    test_int(corner[3], 255);
+    test_assert(center[0] > 250);
+    test_assert(center[1] > 250);
+    test_assert(center[2] > 250);
+    int32_t i, mixed = 0;
+    for (i = 0; i < 64 * 64; i ++) {
+        mixed += px[i * 4 + 1] > 40 && px[i * 4 + 1] < 240 && px[i * 4] > px[i * 4 + 1];
+    }
+
+    test_assert(mixed >= 20);
+
+    ecs_os_free(px);
+    ecs_fini(world);
+}
+
+void Effects_smaa_default_settings(void) {
+    // lighting/effects
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t e = ecs_new(world);
+    ecs_add(world, e, Smaa);
+    const Smaa *a = ecs_get(world, e, Smaa);
+    test_flt(a->threshold, 0.1f);
+    test_int(a->max_search_steps, 16);
+    test_int(a->max_search_steps_diag, 8);
+    test_int(a->corner_rounding, 25);
+
+    Smaa resolved;
+    box_render_smaa_settings(a, &resolved);
+    test_flt(resolved.threshold, 0.1f);
+    test_int(resolved.max_search_steps, 16);
+    test_int(resolved.max_search_steps_diag, 8);
+    test_int(resolved.corner_rounding, 25);
+
+    test_assert(ecs_script_run(world, "smaa", "using box.effects\n"
+        "aa { Smaa: {} }\n", NULL) == 0);
+    const Smaa *scripted = ecs_get(world, ecs_lookup(world, "aa"), Smaa);
+    test_assert(scripted != NULL);
+    test_flt(scripted->threshold, 0.1f);
+    test_int(scripted->max_search_steps, 16);
+
+    ecs_fini(world);
+}
+
+void Effects_smaa_settings_clamped(void) {
+    // lighting/effects
+    Smaa out;
+    box_render_smaa_settings(&(Smaa){.threshold = 0, .max_search_steps = 0,
+        .max_search_steps_diag = -3, .corner_rounding = -5}, &out);
+    test_flt(out.threshold, 0.01f);
+    test_int(out.max_search_steps, 1);
+    test_int(out.max_search_steps_diag, 0);
+    test_int(out.corner_rounding, 0);
+
+    box_render_smaa_settings(&(Smaa){.threshold = 2, .max_search_steps = 500,
+        .max_search_steps_diag = 50, .corner_rounding = 200}, &out);
+    test_flt(out.threshold, 0.5f);
+    test_int(out.max_search_steps, 112);
+    test_int(out.max_search_steps_diag, 20);
+    test_int(out.corner_rounding, 100);
+
+    box_render_smaa_settings(&(Smaa){.threshold = 0.2f, .max_search_steps = 32,
+        .max_search_steps_diag = 0, .corner_rounding = 50}, &out);
+    test_flt(out.threshold, 0.2f);
+    test_int(out.max_search_steps, 32);
+    test_int(out.max_search_steps_diag, 0);
+    test_int(out.corner_rounding, 50);
+}
+
+void Effects_smaa_follows_surface_resize(void) {
+    // lighting/effects
+    ecs_entity_t camera;
+    ecs_world_t *world = effects_world(&camera);
+    ecs_entity_t tonemap = ecs_new(world);
+    ecs_add(world, tonemap, Tonemap);
+    ecs_entity_t smaa = ecs_new(world);
+    ecs_add(world, smaa, Smaa);
+    ecs_entity_t chain[2] = {tonemap, smaa};
+    ecs_entity_t view = ecs_new(world);
+    smaa_view_set(world, view, camera, true, chain, 2);
+    smaa_quad(world, 3);
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 64, .height = 64,
+        .write_to_file = "smaa_resize.png", .resolution_scale = 1});
+    ecs_progress(world, 1.0f / 60);
+    box_render_sync(world);
+    ecs_set(world, s, Surface, {.width = 128, .height = 64, .resolution_scale = 2,
+        .write_to_file = "smaa_resize.png"});
+    ecs_progress(world, 1.0f / 60);
+    box_render_sync(world);
+    ecs_set(world, s, Surface, {.width = 96, .height = 48, .resolution_scale = 0.5f,
+        .write_to_file = "smaa_resize.png"});
+    ecs_progress(world, 1.0f / 60);
+    ecs_progress(world, 1.0f / 60);
+    box_render_sync(world);
+
+    box_render_gpu_stats_t stats;
+    test_assert(box_render_gpu_stats(world, &stats));
+    test_int(stats.errors, 0);
+    char *path = flecs_asprintf("%s/smaa_resize.png",
+        ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_int(w, 96);
+    test_int(h, 48);
+    test_assert(px[(24 * 96 + 48) * 4] > 250);
+    test_assert(px[(2 * 96 + 2) * 4] < 8);
 
     stbi_image_free(px);
     ecs_os_free(path);

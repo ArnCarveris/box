@@ -138,10 +138,21 @@ void DeviceLoss_lost_device_recovers(void) {
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t tonemap = ecs_new(world);
+    ecs_add(world, tonemap, Tonemap);
+    ecs_entity_t smaa = ecs_new(world);
+    ecs_add(world, smaa, Smaa);
     ecs_entity_t view = ecs_new(world);
-    ecs_set(world, view, View, {
+    View value = {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}},
-        .lighting.enabled = true});
+        .lighting.enabled = true};
+    ecs_vec_init_t(NULL, &value.effects, ViewEffect, 2);
+    *ecs_vec_append_t(NULL, &value.effects, ViewEffect) = (ViewEffect){
+        .enabled = true, .effect = tonemap };
+    *ecs_vec_append_t(NULL, &value.effects, ViewEffect) = (ViewEffect){
+        .enabled = true, .effect = smaa };
+    ecs_set_ptr(world, view, View, &value);
+    ecs_vec_fini_t(NULL, &value.effects, ViewEffect);
     ecs_entity_t quad = ecs_new(world);
     ecs_set(world, quad, Position, {-2, 0, 0});
     ecs_set(world, quad, Quad, {3, 3});

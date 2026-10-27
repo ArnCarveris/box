@@ -2212,6 +2212,10 @@ tonemap {
   Tonemap: {}
 }
 
+smaa {
+  Smaa: {}
+}
+
 japanese_garden {
   Scene: {}
   LightBake: {probe_spacing: 1, bounds_padding: 0.3, bounces: 1, capture_size: 64, budget_ms: 8}
@@ -2651,6 +2655,6 @@ main_view {
     clear: {enabled: true, color: {51, 56, 81, 255}},
     lighting: {enabled: true, baked: true, reflections: true},
     shadows: {enabled: true, resolution: 2048, max_distance: 85},
-    effects: [{effect: contact_shadows}, {effect: lantern_bloom}, {effect: tonemap}]
+    effects: [{effect: contact_shadows}, {effect: lantern_bloom}, {effect: tonemap}, {effect: smaa}]
   }
 }

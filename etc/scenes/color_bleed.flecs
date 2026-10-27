@@ -24,6 +24,10 @@ tonemap {
   Tonemap: {}
 }
 
+smaa {
+  Smaa: {}
+}
+
 room {
   Scene: {}
   LightBake: {probe_spacing: 0.5, bounds_padding: -0.3, bounces: 3}
@@ -113,6 +117,6 @@ main_view {
   View: {
     camera: room.camera,
     clear: {enabled: true, color: {0, 0, 0, 255}},
-    effects: [{effect: tonemap}]
+    effects: [{effect: tonemap}, {effect: smaa}]
   }
 }

@@ -6,10 +6,15 @@ struct FullscreenOut {
     @location(0) uv: vec2f,
 };
 
-@vertex fn vs(@builtin(vertex_index) i: u32) -> FullscreenOut {
+// Corner i of the triangle, for vertex stages that pass more than the uv.
+fn fullscreen(i: u32) -> FullscreenOut {
     let p = vec2f(f32((i << 1u) & 2u), f32(i & 2u));
     var o: FullscreenOut;
     o.pos = vec4f(p * 2.0 - 1.0, 0.0, 1.0);
     o.uv = vec2f(p.x, 1.0 - p.y);
     return o;
+}
+
+@vertex fn vs(@builtin(vertex_index) i: u32) -> FullscreenOut {
+    return fullscreen(i);
 }

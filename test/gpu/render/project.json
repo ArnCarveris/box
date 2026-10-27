@@ -479,7 +479,14 @@
                     "default_settings",
                     "script_entry_enabled_by_default",
                     "bloom_temporal_keeps_last_frame",
-                    "follow_surface_resize"
+                    "follow_surface_resize",
+                    "smaa_softens_diagonal_edge",
+                    "smaa_keeps_flat_areas",
+                    "smaa_leaves_later_view",
+                    "smaa_last_composites_over",
+                    "smaa_default_settings",
+                    "smaa_settings_clamped",
+                    "smaa_follows_surface_resize"
                 ]
             },
             {

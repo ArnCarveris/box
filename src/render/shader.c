@@ -760,6 +760,8 @@ void BoxShaderImport(
         BOX_RENDER_SHADER_EXPOSURE, true);
     box_shader_builtin(world, state, builtin, "bloom", "etc/shaders/bloom.wgsl",
         BOX_RENDER_SHADER_BLOOM, true);
+    box_shader_builtin(world, state, builtin, "smaa", "etc/shaders/smaa.wgsl",
+        BOX_RENDER_SHADER_SMAA, true);
     box_shader_builtin(world, state, builtin, "ssao", "etc/shaders/ssao.wgsl",
         BOX_RENDER_SHADER_SSAO, true);
     box_shader_builtin(world, state, builtin, "fog", "etc/shaders/fog.wgsl",

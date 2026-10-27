@@ -107,6 +107,30 @@ static void box_exposure_ctor(
     }
 }
 
+/** Construct Smaa values with the documented defaults.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_smaa_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    Smaa *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (Smaa){
+            .threshold = 0.1f,
+            .max_search_steps = 16,
+            .max_search_steps_diag = 8,
+            .corner_rounding = 25
+        };
+    }
+}
+
 void BoxEffectsImport(
     ecs_world_t *world)
 {
@@ -119,10 +143,12 @@ void BoxEffectsImport(
     ECS_META_COMPONENT(world, AutoExposure);
     ECS_META_COMPONENT(world, TonemapOperator);
     ECS_META_COMPONENT(world, Tonemap);
+    ECS_META_COMPONENT(world, Smaa);
 
     ecs_set_hooks(world, Bloom, { .ctor = box_bloom_ctor });
     ecs_set_hooks(world, Ssao, { .ctor = box_ssao_ctor });
     ecs_set_hooks(world, HeightFog, { .ctor = box_fog_ctor });
     ecs_set_hooks(world, AutoExposure, { .ctor = box_exposure_ctor });
     ecs_set_hooks(world, Tonemap, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, Smaa, { .ctor = box_smaa_ctor });
 }

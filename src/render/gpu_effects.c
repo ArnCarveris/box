@@ -15,6 +15,15 @@
 /** Color format of the ambient occlusion and view depth of a view */
 #define BOX_GPU_AO_FORMAT (WGPUTextureFormat_RG16Float)
 
+/** Color format of the edges SMAA finds */
+#define BOX_GPU_SMAA_EDGES_FORMAT (WGPUTextureFormat_RG8Unorm)
+
+/** Color format of the blending weights of SMAA */
+#define BOX_GPU_SMAA_WEIGHTS_FORMAT (WGPUTextureFormat_RGBA8Unorm)
+
+/** Bindings of the SMAA passes */
+#define BOX_GPU_SMAA_BINDINGS (7)
+
 /** Bytes of the uniforms of an effect pass */
 #define BOX_GPU_FX_UNIFORMS (256)
 
@@ -90,11 +99,17 @@ typedef struct box_gpu_fx_target_t {
     WGPUTextureView hdr_views[2];   /**< Views of the images */
     WGPUTexture ao;                 /**< Ambient occlusion, created on first use */
     WGPUTextureView ao_view;        /**< View of the ambient occlusion */
+    WGPUTexture smaa_edges;         /**< Edges of SMAA, created on first use */
+    WGPUTextureView smaa_edges_view; /**< View of the edges */
+    WGPUTexture smaa_weights;       /**< Blending weights of SMAA, created on first use */
+    WGPUTextureView smaa_weights_view; /**< View of the blending weights */
 } box_gpu_fx_target_t;
 
 struct box_gpu_effects_t {
     WGPUBindGroupLayout layout;     /**< Bindings of the fullscreen effect passes */
     WGPUPipelineLayout pipeline_layout; /**< Pipeline layout of the fullscreen passes */
+    WGPUBindGroupLayout smaa_layout; /**< Bindings of the SMAA passes */
+    WGPUPipelineLayout smaa_pipeline_layout; /**< Pipeline layout of the SMAA passes */
     WGPUBindGroupLayout measure_layout; /**< Bindings of the exposure compute passes */
     WGPUPipelineLayout measure_pipeline_layout; /**< Pipeline layout of the compute passes */
     WGPUComputePipeline histogram;  /**< Pipeline that fills the luminance histogram */
@@ -105,6 +120,10 @@ struct box_gpu_effects_t {
     WGPUTextureView placeholder_view; /**< View of the placeholder image */
     WGPUTexture placeholder_3d;     /**< 1x1x1 volume bound where a pass reads no LUT */
     WGPUTextureView placeholder_3d_view; /**< View of the placeholder volume */
+    WGPUTexture smaa_area;          /**< Area texture of SMAA, uploaded on first use */
+    WGPUTextureView smaa_area_view; /**< View of the area texture */
+    WGPUTexture smaa_search;        /**< Search texture of SMAA, uploaded with the area */
+    WGPUTextureView smaa_search_view; /**< View of the search texture */
     WGPUTexture tony;               /**< The Tony McMapface LUT, loaded on first use */
     WGPUTextureView tony_view;      /**< View of the LUT */
     bool tony_failed;               /**< The LUT could not be loaded, which was logged once */
@@ -119,6 +138,7 @@ struct box_gpu_effects_t {
 /** One fullscreen effect pass: its pipeline, inputs and output */
 typedef struct box_gpu_fx_pass_t {
     uint32_t shader;                /**< Shader handle */
+    const char *vertex;             /**< Vertex entry point, NULL for vs */
     const char *entry;              /**< Fragment entry point */
     WGPUTextureView input;          /**< Image at binding 0 */
     WGPUTextureView aux;            /**< Image at binding 4, NULL for the placeholder */
@@ -172,6 +192,13 @@ typedef struct box_gpu_ssao_uniforms_t {
     mat4 inv_proj;                  /**< Its inverse */
     float params[4];                /**< Radius, bias, intensity, unused */
 } box_gpu_ssao_uniforms_t;
+
+/** Uniforms of the SMAA passes, matching Smaa in etc/shaders/smaa.wgsl */
+typedef struct box_gpu_smaa_uniforms_t {
+    float metrics[4];               /**< 1 / width, 1 / height, width, height */
+    float params[4];                /**< Threshold, search steps, diagonal search steps,
+                                     *   corner rounding 0..1 */
+} box_gpu_smaa_uniforms_t;
 
 /** Uniforms of the fog pass, matching Fog in etc/shaders/fog.wgsl */
 typedef struct box_gpu_fog_uniforms_t {
@@ -382,6 +409,27 @@ void box_gpu_effects_init(
             .sampleType = WGPUTextureSampleType_Float,
             .viewDimension = WGPUTextureViewDimension_3D } }
     };
+    WGPUBindGroupLayoutEntry smaa[BOX_GPU_SMAA_BINDINGS] = {
+        { .binding = 0, .visibility = frag, .texture = {
+            .sampleType = WGPUTextureSampleType_Float,
+            .viewDimension = WGPUTextureViewDimension_2D } },
+        { .binding = 1, .visibility = frag, .sampler = {
+            .type = WGPUSamplerBindingType_Filtering } },
+        { .binding = 2, .visibility = frag | WGPUShaderStage_Vertex, .buffer = {
+            .type = WGPUBufferBindingType_Uniform } },
+        { .binding = 3, .visibility = frag, .texture = {
+            .sampleType = WGPUTextureSampleType_Float,
+            .viewDimension = WGPUTextureViewDimension_2D } },
+        { .binding = 4, .visibility = frag, .texture = {
+            .sampleType = WGPUTextureSampleType_Float,
+            .viewDimension = WGPUTextureViewDimension_2D } },
+        { .binding = 5, .visibility = frag, .texture = {
+            .sampleType = WGPUTextureSampleType_Float,
+            .viewDimension = WGPUTextureViewDimension_2D } },
+        { .binding = 6, .visibility = frag, .texture = {
+            .sampleType = WGPUTextureSampleType_Float,
+            .viewDimension = WGPUTextureViewDimension_2D } }
+    };
     WGPUShaderStage comp = WGPUShaderStage_Compute;
     WGPUBindGroupLayoutEntry measure[4] = {
         { .binding = 0, .visibility = comp, .texture = {
@@ -411,6 +459,12 @@ void box_gpu_effects_init(
     fx->pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
         &(WGPUPipelineLayoutDescriptor){ .bindGroupLayoutCount = 1,
             .bindGroupLayouts = &fx->layout });
+    fx->smaa_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = BOX_GPU_SMAA_BINDINGS,
+            .entries = smaa });
+    fx->smaa_pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
+        &(WGPUPipelineLayoutDescriptor){ .bindGroupLayoutCount = 1,
+            .bindGroupLayouts = &fx->smaa_layout });
     fx->measure_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
         &(WGPUBindGroupLayoutDescriptor){ .entryCount = 4, .entries = measure });
     fx->measure_pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
@@ -500,6 +554,8 @@ static void box_gpu_fx_target_free(
     box_gpu_fx_release(&ft->hdr[0], &ft->hdr_views[0]);
     box_gpu_fx_release(&ft->hdr[1], &ft->hdr_views[1]);
     box_gpu_fx_release(&ft->ao, &ft->ao_view);
+    box_gpu_fx_release(&ft->smaa_edges, &ft->smaa_edges_view);
+    box_gpu_fx_release(&ft->smaa_weights, &ft->smaa_weights_view);
     ecs_os_free(ft);
 }
 
@@ -554,9 +610,13 @@ void box_gpu_effects_fini(
     box_gpu_fx_release(&fx->placeholder, &fx->placeholder_view);
     box_gpu_fx_release(&fx->placeholder_3d, &fx->placeholder_3d_view);
     box_gpu_fx_release(&fx->tony, &fx->tony_view);
+    box_gpu_fx_release(&fx->smaa_area, &fx->smaa_area_view);
+    box_gpu_fx_release(&fx->smaa_search, &fx->smaa_search_view);
     wgpuBufferRelease(fx->unit_exposure);
     wgpuBufferRelease(fx->no_uniforms);
     wgpuSamplerRelease(fx->sampler);
+    wgpuPipelineLayoutRelease(fx->smaa_pipeline_layout);
+    wgpuBindGroupLayoutRelease(fx->smaa_layout);
     wgpuPipelineLayoutRelease(fx->measure_pipeline_layout);
     wgpuBindGroupLayoutRelease(fx->measure_layout);
     wgpuPipelineLayoutRelease(fx->pipeline_layout);
@@ -625,7 +685,8 @@ static WGPUBlendState* box_gpu_fx_blend(
 }
 
 /** Get the pipeline of an effect entry point, created on first use and again when its shader
- * was recompiled.
+ * was recompiled. The SMAA shader has a layout of its own; the vertex entry point of a pass
+ * follows from its fragment entry point.
  *
  * @param gpu The backend
  * @param pass The pass
@@ -682,10 +743,12 @@ static WGPURenderPipeline box_gpu_fx_pipeline(
         .targets = &target
     };
     WGPURenderPipelineDescriptor desc = {
-        .layout = fx->pipeline_layout,
+        .layout = pass->shader == BOX_RENDER_SHADER_SMAA
+            ? fx->smaa_pipeline_layout
+            : fx->pipeline_layout,
         .vertex = {
             .module = module,
-            .entryPoint = { .data = "vs", .length = WGPU_STRLEN }
+            .entryPoint = { .data = pass->vertex ? pass->vertex : "vs", .length = WGPU_STRLEN }
         },
         .primitive = { .topology = WGPUPrimitiveTopology_TriangleList },
         .multisample = { .count = 1, .mask = 0xFFFFFFFF },
@@ -695,6 +758,43 @@ static WGPURenderPipeline box_gpu_fx_pipeline(
     found->revision = revision;
 done:
     return module && found ? found->pipeline : NULL;
+}
+
+/** Record a fullscreen pass with its pipeline and bind group, and release the bind group.
+ *
+ * @param ctx The chain
+ * @param pass The pass
+ * @param pipeline The pipeline of the pass
+ * @param group The bind group of the pass
+ */
+static void box_gpu_fx_record(
+    const box_gpu_fx_ctx_t *ctx,
+    const box_gpu_fx_pass_t *pass,
+    WGPURenderPipeline pipeline,
+    WGPUBindGroup group)
+{
+    WGPURenderPassColorAttachment attachment = {
+        .view = pass->output,
+        .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
+        .loadOp = pass->blend == BOX_GPU_FX_REPLACE ? WGPULoadOp_Clear : WGPULoadOp_Load,
+        .storeOp = WGPUStoreOp_Store
+    };
+    WGPURenderPassDescriptor desc = {
+        .colorAttachmentCount = 1,
+        .colorAttachments = &attachment
+    };
+    WGPURenderPassEncoder rp = wgpuCommandEncoderBeginRenderPass(ctx->encoder, &desc);
+    wgpuRenderPassEncoderSetPipeline(rp, pipeline);
+    wgpuRenderPassEncoderSetBindGroup(rp, 0, group, 0, NULL);
+    if (pass->blend == BOX_GPU_FX_ADD) {
+        WGPUColor constant = { pass->constant, pass->constant, pass->constant, pass->constant };
+        wgpuRenderPassEncoderSetBlendConstant(rp, &constant);
+    }
+
+    wgpuRenderPassEncoderDraw(rp, 3, 1, 0, 0);
+    wgpuRenderPassEncoderEnd(rp);
+    wgpuRenderPassEncoderRelease(rp);
+    wgpuBindGroupRelease(group);
 }
 
 /** Record a fullscreen effect pass.
@@ -731,28 +831,7 @@ static bool box_gpu_fx_draw(
         .entryCount = 7,
         .entries = entries
     });
-    WGPURenderPassColorAttachment attachment = {
-        .view = pass->output,
-        .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
-        .loadOp = pass->blend == BOX_GPU_FX_REPLACE ? WGPULoadOp_Clear : WGPULoadOp_Load,
-        .storeOp = WGPUStoreOp_Store
-    };
-    WGPURenderPassDescriptor desc = {
-        .colorAttachmentCount = 1,
-        .colorAttachments = &attachment
-    };
-    WGPURenderPassEncoder rp = wgpuCommandEncoderBeginRenderPass(ctx->encoder, &desc);
-    wgpuRenderPassEncoderSetPipeline(rp, pipeline);
-    wgpuRenderPassEncoderSetBindGroup(rp, 0, group, 0, NULL);
-    if (pass->blend == BOX_GPU_FX_ADD) {
-        WGPUColor constant = { pass->constant, pass->constant, pass->constant, pass->constant };
-        wgpuRenderPassEncoderSetBlendConstant(rp, &constant);
-    }
-
-    wgpuRenderPassEncoderDraw(rp, 3, 1, 0, 0);
-    wgpuRenderPassEncoderEnd(rp);
-    wgpuRenderPassEncoderRelease(rp);
-    wgpuBindGroupRelease(group);
+    box_gpu_fx_record(ctx, pass, pipeline, group);
 done:
     return pipeline != NULL;
 }
@@ -1333,6 +1412,135 @@ static bool box_gpu_fx_fog(
     });
 }
 
+/** Record an SMAA pass, with the bindings of the SMAA layout.
+ *
+ * @param gpu The backend
+ * @param ctx The chain
+ * @param pass The pass
+ * @param edges The edge image the pass reads, NULL when it writes it
+ * @param weights The weight image the pass reads, NULL when it does not read it
+ * @return Whether the pass was recorded, false while the shader has no module
+ */
+static bool box_gpu_fx_smaa_draw(
+    box_gpu_t *gpu,
+    const box_gpu_fx_ctx_t *ctx,
+    const box_gpu_fx_pass_t *pass,
+    WGPUTextureView edges,
+    WGPUTextureView weights)
+{
+    box_gpu_effects_t *fx = gpu->effects;
+    WGPURenderPipeline pipeline = box_gpu_fx_pipeline(gpu, pass);
+    if (!pipeline) {
+        goto done;
+    }
+
+    WGPUBindGroupEntry entries[BOX_GPU_SMAA_BINDINGS] = {
+        { .binding = 0, .textureView = pass->input },
+        { .binding = 1, .sampler = fx->sampler },
+        { .binding = 2, .buffer = pass->uniforms, .size = BOX_GPU_FX_UNIFORMS },
+        { .binding = 3, .textureView = edges ? edges : fx->placeholder_view },
+        { .binding = 4, .textureView = fx->smaa_area_view },
+        { .binding = 5, .textureView = fx->smaa_search_view },
+        { .binding = 6, .textureView = weights ? weights : fx->placeholder_view }
+    };
+    WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
+        .layout = fx->smaa_layout,
+        .entryCount = BOX_GPU_SMAA_BINDINGS,
+        .entries = entries
+    });
+    box_gpu_fx_record(ctx, pass, pipeline, group);
+done:
+    return pipeline != NULL;
+}
+
+/** Create the area and search textures of the device and the edge and weight images of the
+ * target when they do not exist yet.
+ *
+ * @param gpu The backend
+ * @param ft The images of the target, at its render size
+ */
+static void box_gpu_fx_smaa_images(
+    box_gpu_t *gpu,
+    box_gpu_fx_target_t *ft)
+{
+    box_gpu_effects_t *fx = gpu->effects;
+    if (!fx->smaa_area) {
+        fx->smaa_area = box_gpu_smaa_area(gpu);
+        fx->smaa_area_view = wgpuTextureCreateView(fx->smaa_area, NULL);
+        fx->smaa_search = box_gpu_smaa_search(gpu);
+        fx->smaa_search_view = wgpuTextureCreateView(fx->smaa_search, NULL);
+    }
+
+    if (!ft->smaa_edges) {
+        ft->smaa_edges = box_gpu_fx_texture(gpu, (uint32_t)ft->width, (uint32_t)ft->height,
+            BOX_GPU_SMAA_EDGES_FORMAT, 1);
+        ft->smaa_edges_view = wgpuTextureCreateView(ft->smaa_edges, NULL);
+        ft->smaa_weights = box_gpu_fx_texture(gpu, (uint32_t)ft->width, (uint32_t)ft->height,
+            BOX_GPU_SMAA_WEIGHTS_FORMAT, 1);
+        ft->smaa_weights_view = wgpuTextureCreateView(ft->smaa_weights, NULL);
+    }
+}
+
+/** Record the passes of SMAA 1x: the color edges of the image into the edge image, the
+ * blending weights of the edges into the weight image, then the image blended with its
+ * neighbors by the weights into the output.
+ *
+ * @param gpu The backend
+ * @param ctx The chain
+ * @param e The pass
+ * @return Whether the image was written to the output
+ */
+static bool box_gpu_fx_smaa(
+    box_gpu_t *gpu,
+    const box_gpu_fx_ctx_t *ctx,
+    const box_render_effect_t *e)
+{
+    box_gpu_fx_target_t *ft = ctx->ft;
+    const Smaa *a = &e->smaa;
+    box_gpu_fx_state_t *s = box_gpu_fx_state(gpu, ctx, e->entity, (int32_t)e->kind);
+    float w = (float)(ft->width > 0 ? ft->width : 1);
+    float h = (float)(ft->height > 0 ? ft->height : 1);
+    box_gpu_smaa_uniforms_t u = {
+        .metrics = { 1.0f / w, 1.0f / h, w, h },
+        .params = { a->threshold, (float)a->max_search_steps,
+            (float)a->max_search_steps_diag, (float)a->corner_rounding / 100.0f }
+    };
+    bool result = false;
+    box_gpu_fx_uniforms(gpu, s, &u, sizeof(u));
+    box_gpu_fx_smaa_images(gpu, ft);
+    box_gpu_fx_pass_t pass = {
+        .shader = BOX_RENDER_SHADER_SMAA,
+        .vertex = "edges_vs",
+        .entry = "edges",
+        .input = ctx->input,
+        .uniforms = s->uniforms,
+        .output = ft->smaa_edges_view,
+        .format = BOX_GPU_SMAA_EDGES_FORMAT,
+        .blend = BOX_GPU_FX_REPLACE
+    };
+    if (!box_gpu_fx_smaa_draw(gpu, ctx, &pass, NULL, NULL)) {
+        goto done;
+    }
+
+    pass.vertex = "weights_vs";
+    pass.entry = "weights";
+    pass.output = ft->smaa_weights_view;
+    pass.format = BOX_GPU_SMAA_WEIGHTS_FORMAT;
+    if (!box_gpu_fx_smaa_draw(gpu, ctx, &pass, ft->smaa_edges_view, NULL)) {
+        goto done;
+    }
+
+    pass.vertex = "blend_vs";
+    pass.entry = "blend";
+    pass.output = ctx->output;
+    pass.format = ctx->format;
+    pass.blend = ctx->blend;
+    result = box_gpu_fx_smaa_draw(gpu, ctx, &pass, ft->smaa_edges_view,
+        ft->smaa_weights_view);
+done:
+    return result;
+}
+
 /** Get the HDR images of a target, created or resized to its render size.
  *
  * @param gpu The backend
@@ -1369,6 +1577,8 @@ static box_gpu_fx_target_t* box_gpu_fx_target(
     box_gpu_fx_release(&result->hdr[0], &result->hdr_views[0]);
     box_gpu_fx_release(&result->hdr[1], &result->hdr_views[1]);
     box_gpu_fx_release(&result->ao, &result->ao_view);
+    box_gpu_fx_release(&result->smaa_edges, &result->smaa_edges_view);
+    box_gpu_fx_release(&result->smaa_weights, &result->smaa_weights_view);
     result->width = t->desc.render_width;
     result->height = t->desc.render_height;
     for (i = 0; i < 2; i ++) {
@@ -1428,6 +1638,9 @@ static bool box_gpu_fx_effect(
         break;
     case BOX_RENDER_EFFECT_FOG:
         result = box_gpu_fx_fog(gpu, ctx, e);
+        break;
+    case BOX_RENDER_EFFECT_SMAA:
+        result = box_gpu_fx_smaa(gpu, ctx, e);
         break;
     default:
         break;

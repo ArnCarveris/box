@@ -20,6 +20,7 @@ typedef enum bench_effect_t {
     BENCH_EFFECT_BLOOM,     /**< Bloom */
     BENCH_EFFECT_SSAO,      /**< Ssao */
     BENCH_EFFECT_FOG,       /**< HeightFog */
+    BENCH_EFFECT_SMAA,      /**< Tonemap then Smaa, its cost is the difference with tonemap */
     BENCH_EFFECT_ALL        /**< Ssao, fog, bloom and tonemap with exposure */
 } bench_effect_t;
 
@@ -58,14 +59,16 @@ static void bench_effects(
     ecs_entity_t exposure = ecs_new(world);
     ecs_add(world, exposure, AutoExposure);
     ecs_entity_t tonemap = ecs_new(world);
-    ecs_set(world, tonemap, Tonemap, {.auto_exposure = kind == BENCH_EFFECT_TONEMAP
-        ? 0 : exposure});
+    ecs_set(world, tonemap, Tonemap, {.auto_exposure =
+        kind == BENCH_EFFECT_TONEMAP || kind == BENCH_EFFECT_SMAA ? 0 : exposure});
     ecs_entity_t bloom = ecs_new(world);
     ecs_add(world, bloom, Bloom);
     ecs_entity_t ssao = ecs_new(world);
     ecs_add(world, ssao, Ssao);
     ecs_entity_t fog = ecs_new(world);
     ecs_add(world, fog, HeightFog);
+    ecs_entity_t smaa = ecs_new(world);
+    ecs_add(world, smaa, Smaa);
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 8, 30});
     ecs_set(world, camera, Rotation, {-0.3f, 0, 0});
@@ -87,9 +90,13 @@ static void bench_effects(
     }
 
     if (kind == BENCH_EFFECT_TONEMAP || kind == BENCH_EFFECT_EXPOSURE ||
-        kind == BENCH_EFFECT_ALL || disabled)
+        kind == BENCH_EFFECT_SMAA || kind == BENCH_EFFECT_ALL || disabled)
     {
         bench_effects_add(&value, tonemap, !disabled);
+    }
+
+    if (kind == BENCH_EFFECT_SMAA) {
+        bench_effects_add(&value, smaa, true);
     }
 
     ecs_entity_t view = ecs_new(world);
@@ -165,6 +172,13 @@ void Effects_bloom(
 {
     // lighting/effects
     bench_effects(b, BENCH_EFFECT_BLOOM);
+}
+
+void Effects_smaa(
+    bench_t *b)
+{
+    // lighting/effects
+    bench_effects(b, BENCH_EFFECT_SMAA);
 }
 
 void Effects_ssao(
