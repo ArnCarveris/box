@@ -489,7 +489,8 @@ static void box_gpu_bake_draws(
                 .count = rb->instance_count,
                 .pipeline = box_gpu_forward_pipeline(gpu, BOX_GPU_HDR_FORMAT, rb),
                 .material = box_gpu_material_group(gpu, rb, packet->anisotropy),
-                .instances = box_gpu_instance_group(gpu, inst),
+                .instances = box_gpu_instance_group(gpu, inst, rb->mesh, m),
+                .page = box_gpu_instance_group(gpu, inst, 0, NULL),
                 .vertices = m->vertices,
                 .indices = m->indices
             };
@@ -590,12 +591,18 @@ static bool box_gpu_bake_cull(
 
     WGPUComputePassEncoder pass = wgpuCommandEncoderBeginComputePass(encoder,
         &(WGPUComputePassDescriptor){ .timestampWrites = writes });
+    WGPUBindGroup page = NULL;
     wgpuComputePassEncoderSetPipeline(pass, b->cull);
     for (d = 0; d < draws; d ++) {
         const box_gpu_bake_draw_t *draw = ecs_vec_get_t(&b->draws, box_gpu_bake_draw_t, d);
         uint32_t offset = (uint32_t)(d * BOX_GPU_BAKE_JOB_STRIDE);
         wgpuComputePassEncoderSetBindGroup(pass, 0, b->cull_group, 1, &offset);
-        wgpuComputePassEncoderSetBindGroup(pass, 1, draw->instances, 0, NULL);
+        if (draw->page != page) {
+            wgpuComputePassEncoderSetBindGroup(pass, 1, draw->page, 0, NULL);
+            box_gpu_count(gpu, BOX_GPU_STAT_INSTANCE_BIND);
+            page = draw->page;
+        }
+
         wgpuComputePassEncoderDispatchWorkgroups(pass, (uint32_t)count, 1, 1);
     }
 
@@ -823,7 +830,7 @@ static WGPURenderBundle box_gpu_bake_bundle(
             .sampleCount = 1
         });
     WGPURenderPipeline pipeline = NULL;
-    WGPUBindGroup material = NULL;
+    WGPUBindGroup material = NULL, instances = NULL;
     uint32_t offset = (uint32_t)(face * BOX_GPU_VIEW_STRIDE);
     int32_t d, draws = ecs_vec_count(&b->draws);
     wgpuRenderBundleEncoderSetBindGroup(e, 0, s->faces_group, 1, &offset);
@@ -846,7 +853,12 @@ static WGPURenderBundle box_gpu_bake_bundle(
             material = draw->material;
         }
 
-        wgpuRenderBundleEncoderSetBindGroup(e, 2, draw->instances, 0, NULL);
+        if (draw->instances != instances) {
+            wgpuRenderBundleEncoderSetBindGroup(e, 2, draw->instances, 0, NULL);
+            box_gpu_count(gpu, BOX_GPU_STAT_INSTANCE_BIND);
+            instances = draw->instances;
+        }
+
         wgpuRenderBundleEncoderSetVertexBuffer(e, 0, draw->vertices, 0, WGPU_WHOLE_SIZE);
         wgpuRenderBundleEncoderSetVertexBuffer(e, 1, b->slots, first * sizeof(uint32_t),
             (uint64_t)draw->count * sizeof(uint32_t));

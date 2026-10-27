@@ -351,19 +351,25 @@ box_gpu_cull_history_t* box_gpu_hiz_history(
     return result;
 }
 
-/** Get the history words an instance buffer of a batch needs, one per instance it holds.
+/** Get the history words the instance page of a batch needs, one per slot it holds.
+ *
+ * Many batches share a page, so a page counts once per mark: the first batch of the page in
+ * a pass with that mark gets its words, the others none.
  *
  * @param gpu The backend
  * @param packet The packet
  * @param index Index of the view in the packet
  * @param b The batch
- * @return The words, 0 when the view does not draw the batch with a history
+ * @param mark Pass that counts the pages
+ * @return The words, 0 when the view does not draw the batch with a history or the page was
+ * counted in this pass
  */
 static uint32_t box_gpu_hiz_words(
     box_gpu_t *gpu,
     const box_render_packet_t *packet,
     int32_t index,
-    const box_render_batch_t *b)
+    const box_render_batch_t *b,
+    int64_t mark)
 {
     const box_render_view_t *v = ecs_vec_get_t(&packet->views, box_render_view_t, index);
     uint32_t result = 0;
@@ -372,8 +378,9 @@ static uint32_t box_gpu_hiz_words(
     }
 
     box_gpu_buffer_t *inst = ecs_map_get_deref(&gpu->buffers, box_gpu_buffer_t, b->instances);
-    if (inst && (inst->usage & BOX_RENDER_BUFFER_STORAGE)) {
-        result = inst->size / (uint32_t)sizeof(box_render_instance_t);
+    if (inst && (inst->usage & BOX_RENDER_BUFFER_STORAGE) && inst->counted != mark) {
+        inst->counted = mark;
+        result = (uint32_t)(inst->size / sizeof(box_render_instance_t));
     }
 
 done:
@@ -398,10 +405,10 @@ static uint64_t box_gpu_hiz_range(
     return ((uint64_t)page << 48) | ((uint64_t)offset << 22) | words;
 }
 
-/** Check whether a history range holds the words of an instance buffer.
+/** Check whether a history range holds the words of an instance page.
  *
  * @param h The history
- * @param buffer Handle of the instance buffer
+ * @param buffer Handle of the instance page
  * @param words Words it needs
  * @return Whether the buffer has a range that large
  */
@@ -462,11 +469,12 @@ void box_gpu_hiz_ranges(
 {
     int32_t i, count = ecs_vec_count(&packet->batches);
     uint64_t missing = 0, total = 0;
+    int64_t mark = ++ gpu->cull.counting;
     box_gpu_hiz_page_t *page = ecs_vec_count(&h->pages) ? ecs_vec_last_t(
         &h->pages, box_gpu_hiz_page_t) : NULL;
     for (i = 0; i < count; i ++) {
         const box_render_batch_t *b = ecs_vec_get_t(&packet->batches, box_render_batch_t, i);
-        uint32_t words = box_gpu_hiz_words(gpu, packet, index, b);
+        uint32_t words = box_gpu_hiz_words(gpu, packet, index, b, mark);
         total += words;
         if (words && !box_gpu_hiz_fits(h, b->instances, words)) {
             missing += words;
@@ -479,9 +487,10 @@ void box_gpu_hiz_ranges(
         missing = total;
     }
 
+    mark = ++ gpu->cull.counting;
     for (i = 0; i < count; i ++) {
         const box_render_batch_t *b = ecs_vec_get_t(&packet->batches, box_render_batch_t, i);
-        uint32_t words = box_gpu_hiz_words(gpu, packet, index, b);
+        uint32_t words = box_gpu_hiz_words(gpu, packet, index, b, mark);
         if (!words || box_gpu_hiz_fits(h, b->instances, words)) {
             continue;
         }

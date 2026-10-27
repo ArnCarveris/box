@@ -3,8 +3,11 @@
  * @brief Scatter pass of the webgpu backend and buffer readback.
  *
  * A scatter copies the changed instances of a segment of the change buffer into their slots
- * of an instance buffer with the engine compute shader etc/shaders/scatter.wgsl, so a frame
+ * of an instance page with the engine compute shader etc/shaders/scatter.wgsl, so a frame
  * only uploads the instances that changed.
+ *
+ * The extract sends one scatter per page with static changes, so a frame records one bind
+ * group and one dispatch per such page.
  */
 
 #include "gpu.h"

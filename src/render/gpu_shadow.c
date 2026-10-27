@@ -383,10 +383,11 @@ static void box_gpu_shadow_draw(
     const box_render_packet_t *packet,
     const box_gpu_cull_view_t *cv)
 {
+    WGPUBindGroup instances = NULL;
     int32_t i;
     for (i = 0; i < cv->draw_count; i ++) {
         box_gpu_cull_draw(gpu, pass, packet, ecs_vec_get_t(
-            &gpu->cull.draws, box_gpu_cull_draw_t, cv->first_draw + i), 1, false);
+            &gpu->cull.draws, box_gpu_cull_draw_t, cv->first_draw + i), 1, false, &instances);
     }
 }
 

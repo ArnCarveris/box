@@ -5,6 +5,9 @@
  * Shapes live in batches keyed by scene, mesh, pipeline, whether they are dynamic and whether
  * they cast shadows; a batch keeps one slot per entity, swap-removed so its instances stay
  * contiguous, and holds at most BOX_DRAWS_CHUNK of them, so a key may have several batches.
+ *
+ * The instances of every batch live in one store of instance pages: a batch owns one run of
+ * contiguous slots of one page, handed out by the slot allocator of the store (store.c).
  */
 
 #ifndef BOX_RENDER_DRAW_H
@@ -15,9 +18,57 @@
 #include "../texture/texture.h"
 #include "../text/text.h"
 
-/** Instances of one batch: one instance buffer stays within the 128 MiB storage binding that
- * every WebGPU device supports, and a key with more shapes continues in another batch */
+/** Instances of one batch and slots of one instance page: one page stays within the 128 MiB
+ * storage binding that every WebGPU device supports, and a key with more shapes continues in
+ * another batch */
 #define BOX_DRAWS_CHUNK ((uint32_t)((128u << 20) / sizeof(box_render_instance_t)))
+
+/** Slots the smallest run of a batch holds, and the smallest page buffer */
+#define BOX_DRAWS_MIN_CAPACITY (64)
+
+/** Buffers of an instance page at most, one per stream of its layout */
+#define BOX_DRAWS_STREAMS (2)
+
+/** Layout of the instance pages of a store: one buffer per stream, each with its bytes per slot */
+typedef struct box_draw_layout_t {
+    int32_t streams;                    /**< Buffers of a page, 1 to BOX_DRAWS_STREAMS */
+    uint32_t stride[BOX_DRAWS_STREAMS]; /**< Bytes of one slot in each buffer */
+} box_draw_layout_t;
+
+/** Free slots of an instance page below the end of its highest run */
+typedef struct box_draw_hole_t {
+    uint32_t first;         /**< First free slot */
+    uint32_t count;         /**< Free slots */
+} box_draw_hole_t;
+
+/** An instance page: GPU buffers whose slots are handed out to batches as runs */
+typedef struct box_draw_page_t {
+    bool alive;             /**< The page is in use, else its index is free */
+    uint32_t slots;         /**< Slots the page holds at most */
+    uint32_t capacity;      /**< Slots its buffers hold, 0 before they are created */
+    uint32_t top;           /**< End of its highest run, the slots its buffers must hold */
+    int32_t runs;           /**< Runs handed out */
+    ecs_vec_t holes;        /**< box_draw_hole_t below top by first slot, never adjacent */
+    uint32_t entries;       /**< Scatter entries of the frame */
+    uint32_t offset;        /**< Byte offset of its scatter segment in the change buffer */
+    uint32_t written;       /**< Entries written into its segment */
+} box_draw_page_t;
+
+/** The instance pages every batch shares and the slot allocator that hands out their runs.
+ *
+ * Runs are handed out first fit at the lowest offset of the lowest page and merge with free
+ * neighbors when freed; a run that fits no page starts a new page at the lowest free index.
+ *
+ * The allocator only depends on the order of its calls, so the same adds, removes and key
+ * changes give the same pages and slots.
+ */
+typedef struct box_draw_store_t {
+    box_draw_layout_t layout;   /**< Buffers of a page and their strides */
+    uint32_t base;              /**< Handle of the first buffer of the first page */
+    uint32_t slots;             /**< Slots a new page holds at most */
+    ecs_vec_t pages;            /**< box_draw_page_t by page index */
+    int32_t alive;              /**< Pages alive */
+} box_draw_store_t;
 
 /** Layers a floating element and its descendants are lifted over the elements that do not float,
  * more than twice the depth of any UI hierarchy */
@@ -122,8 +173,9 @@ typedef struct box_draw_batch_t {
     box_draw_key_t key;     /**< Key of the batch */
     bool alive;             /**< The batch is in use, else it is on the free list */
     int32_t next;           /**< Next batch with the same hash, -1 for none */
-    uint32_t buffer;        /**< Handle of the instance buffer, 0 before it is created */
-    uint32_t capacity;      /**< Instances the instance buffer holds */
+    int32_t page;           /**< Instance page of its run, -1 before it has one */
+    uint32_t first;         /**< First slot of its run in the page */
+    uint32_t capacity;      /**< Slots of its run */
     bool full;              /**< Upload every instance instead of the changed slots */
     bool ready;             /**< The backend has the mesh and the instances this frame */
     ecs_vec_t entities;     /**< ecs_entity_t per slot */
@@ -166,8 +218,7 @@ typedef struct box_render_draws_t {
     ecs_vec_t released;         /**< uint32_t, meshes to release this frame */
     ecs_vec_t blended;          /**< int32_t, blended batches the frame draws */
     ecs_vec_t sorted;           /**< box_draw_sorted_t, blended instances of one view */
-    ecs_vec_t free_buffers;     /**< uint32_t, instance buffer handles to reuse */
-    uint32_t next_buffer;       /**< Next instance buffer handle */
+    box_draw_store_t store;     /**< Instance pages of the batches */
     uint32_t chunk;             /**< Instances a batch holds before a key starts another */
     uint32_t changes_size;      /**< Bytes of the change buffer, 0 before it is created */
     const box_textures_t *textures; /**< Registry the texture handles resolve from in a send */
@@ -386,7 +437,7 @@ void box_draws_lift(
     const WorldTransform *transform,
     float layer);
 
-/** Send the batches of the frame: meshes, instance buffers, uploads and scatters.
+/** Send the batches of the frame: meshes, instance pages, uploads and scatters.
  *
  * The texture entities of a batch resolve to the handles of the images the backend has.
  *
@@ -398,6 +449,98 @@ void box_draws_send(
     ecs_world_t *world,
     box_render_draws_t *d,
     box_render_packet_t *p);
+
+/** Initialize a store of instance pages, without pages.
+ *
+ * @param s The store
+ * @param layout Buffers of a page and their strides
+ * @param base Handle of the first buffer of the first page
+ * @param slots Slots a page holds at most
+ */
+void box_draws_store_init(
+    box_draw_store_t *s,
+    const box_draw_layout_t *layout,
+    uint32_t base,
+    uint32_t slots);
+
+/** Release the memory of a store. The buffers of its pages are not released.
+ *
+ * @param s The store
+ */
+void box_draws_store_fini(
+    box_draw_store_t *s);
+
+/** Forget every page and run, after a new backend that has none of their buffers.
+ *
+ * @param s The store
+ */
+void box_draws_store_reset(
+    box_draw_store_t *s);
+
+/** Get the handle of a buffer of a page.
+ *
+ * @param s The store
+ * @param page Index of the page
+ * @param stream Buffer of the page
+ * @return The handle
+ */
+uint32_t box_draws_store_handle(
+    const box_draw_store_t *s,
+    int32_t page,
+    int32_t stream);
+
+/** Hand out a run of slots, first fit at the lowest offset of the lowest page, starting a
+ * page when none has room.
+ *
+ * @param s The store
+ * @param count Slots of the run
+ * @param page Receives the index of the page
+ * @param first Receives the first slot of the run
+ */
+void box_draws_store_alloc(
+    box_draw_store_t *s,
+    uint32_t count,
+    int32_t *page,
+    uint32_t *first);
+
+/** Free a run, merging it with the free slots next to it. A page without runs is released in
+ * the packet, except the first page.
+ *
+ * @param s The store
+ * @param p The packet
+ * @param page Index of the page
+ * @param first First slot of the run
+ * @param count Slots of the run
+ */
+void box_draws_store_free(
+    box_draw_store_t *s,
+    box_render_packet_t *p,
+    int32_t page,
+    uint32_t first,
+    uint32_t count);
+
+/** Make the buffers of a page hold its runs, creating them again by doubling up to the slots of
+ * the page. A created buffer has none of the instances of the runs in it.
+ *
+ * @param s The store
+ * @param p The packet
+ * @param page Index of the page
+ * @return Whether the buffers were created, so every run of the page must upload
+ */
+bool box_draws_store_reserve(
+    box_draw_store_t *s,
+    box_render_packet_t *p,
+    int32_t page);
+
+/** Get a page of a store.
+ *
+ * @param s The store
+ * @param page Index of the page
+ * @return The page
+ */
+box_draw_page_t* box_draws_store_page(
+    box_draw_store_t *s,
+    int32_t page);
 
 /** Initialize the draw order of the 2D slots.
  *

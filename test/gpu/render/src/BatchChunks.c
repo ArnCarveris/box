@@ -3,7 +3,8 @@
  * @brief Tests for batches with more instances than one instance buffer binding holds.
  *
  * The first case renders 2^20 + 16 unlit boxes of one key (most behind the camera) into a
- * 32x32 capture; the others lower the instances per batch and the cull page size.
+ * 32x32 capture; the others lower the instances per batch, the cull page size and the slots of
+ * an instance page.
  */
 
 #include <box.h>
@@ -233,6 +234,101 @@ void BatchChunks_lowered_limits_render_like_defaults(void) {
     int32_t off = 0;
     for (i = 0; i < 64 * 64 * 4; i ++) {
         if (abs((int32_t)images[0][i] - (int32_t)images[1][i]) > 8) {
+            off ++;
+        }
+    }
+
+    test_int(off, 0);
+    stbi_image_free(images[0]);
+    stbi_image_free(images[1]);
+}
+
+void BatchChunks_lowered_pages_render_like_defaults(void) {
+    // gpu_instance_data/instance_store
+    unsigned char *images[2] = {NULL, NULL};
+    int32_t run, i;
+    for (run = 0; run < 2; run ++) {
+        ecs_world_t *world = ecs_init();
+        ECS_IMPORT(world, Box);
+        App *app = ecs_singleton_get_mut(world, App);
+        app->headless = true;
+        ecs_singleton_modified(world, App);
+        if (run) {
+            box_render_draws_page(world, 4);
+        }
+
+        ecs_entity_t camera = ecs_new(world);
+        ecs_set(world, camera, Position, {0, 4, 14});
+        ecs_set(world, camera, Rotation, {-0.25f, 0, 0});
+        ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+        ecs_entity_t view = ecs_new(world);
+        ecs_add(world, view, View);
+        View *v = ecs_get_mut(world, view, View);
+        v->camera = camera;
+        v->clear = (ClearSettings){.enabled = true, .color = {20, 20, 30, 255}};
+        v->shadows.enabled = true;
+        v->culling = (CullSettings){.enabled = true, .occlusion = true};
+        ecs_modified(world, view, View);
+        ecs_entity_t sun = ecs_new(world);
+        ecs_set(world, sun, Rotation, {0.5423041f, 2.3679806f, -0.4669112f});
+        ecs_set(world, sun, DirectionalLight, {.intensity = 1.5f * GLM_PIf});
+        ecs_entity_t floor = ecs_new(world);
+        ecs_set(world, floor, Position, {0, -0.1f, 0});
+        ecs_set(world, floor, Box, {30, 0.2f, 30});
+        ecs_set(world, floor, Rgb, {120, 120, 120});
+        ecs_entity_t wall = ecs_new(world);
+        ecs_set(world, wall, Position, {-3, 1.5f, 4});
+        ecs_set(world, wall, Box, {6, 3, 0.2f});
+        ecs_set(world, wall, Rgb, {200, 40, 40});
+        for (i = 0; i < 12; i ++) {
+            ecs_entity_t e = ecs_new(world);
+            if (i % 3 == 0) {
+                ecs_add(world, e, DynamicTransform);
+            }
+
+            ecs_set(world, e, Position, {(float)(i % 4) * 2.5f - 4, 0.5f, -(float)(i / 4) * 2.5f});
+            ecs_set(world, e, Box, {1, 1, 1});
+            ecs_set(world, e, Rgb, {40, (uint8_t)(100 + i * 10), 200});
+        }
+
+        for (i = 0; i < 5; i ++) {
+            int32_t layer = (i * 3) % 5;
+            ecs_entity_t e = ecs_new(world);
+            ecs_set(world, e, Position, {3, 1.5f, 6 - (float)layer * 0.5f});
+            ecs_set(world, e, Box, {2, 2, 0.05f});
+            ecs_set(world, e, Rgb, {(uint8_t)(i % 2 ? 255 : 0), 200, (uint8_t)(i % 2 ? 0 : 255)});
+            ecs_set(world, e, Opacity, {0.5f});
+        }
+
+        ecs_entity_t s = ecs_new(world);
+        ecs_set(world, s, Surface, {.width = 64, .height = 64, .resolution_scale = 1,
+            .write_to_file = run ? "paged.png" : "unpaged.png"});
+        ecs_progress(world, 1.0f / 60);
+        box_render_sync(world);
+        box_render_draws_stats_t draws;
+        box_render_draws_stats(world, &draws);
+        test_assert(run ? draws.pages > 4 : draws.pages == 1);
+
+        for (i = 0; i < 4; i ++) {
+            ecs_progress(world, 1.0f / 60);
+            box_render_sync(world);
+        }
+
+        box_render_gpu_stats_t stats;
+        test_bool(box_render_gpu_stats(world, &stats), true);
+        test_int(stats.errors, 0);
+        char *path = flecs_asprintf("%s/%s", ecs_singleton_get(world, AppStatus)->tmp_dir,
+            run ? "paged.png" : "unpaged.png");
+        int w = 0, h = 0, n = 0;
+        images[run] = stbi_load(path, &w, &h, &n, 4);
+        test_assert(images[run] != NULL);
+        ecs_os_free(path);
+        ecs_fini(world);
+    }
+
+    int32_t off = 0;
+    for (i = 0; i < 64 * 64 * 4; i ++) {
+        if (images[0][i] != images[1][i]) {
             off ++;
         }
     }

@@ -231,6 +231,17 @@
                 ]
             },
             {
+                "id": "InstanceStore",
+                "testcases": [
+                    "static_changes_one_scatter_per_page",
+                    "freed_run_reused_lowest",
+                    "outgrown_run_moves",
+                    "lowered_pages_spread",
+                    "dynamic_uploads_one_range_per_batch",
+                    "new_backend_sends_pages_again"
+                ]
+            },
+            {
                 "id": "Tonemap",
                 "setup": true,
                 "testcases": [

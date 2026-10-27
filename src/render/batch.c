@@ -2,8 +2,11 @@
  * @file render/batch.c
  * @brief Persistent instanced batches and what a frame sends of them to the renderer.
  *
- * Static batches upload all instances when their buffer is created and afterwards only the
- * changed slots, through a segment of the change buffer that the scatter pass copies.
+ * Every batch owns a run of slots of an instance page (store.c). Static batches upload all
+ * instances when their run is handed out and afterwards only the changed slots, through one
+ * segment of the change buffer per page that the scatter pass copies.
+ *
+ * Dynamic batches upload their run every frame.
  */
 
 #include "draw.h"
@@ -13,9 +16,6 @@ static const uint8_t box_draws_default_color[3] = { 204, 204, 204 };
 
 /** Color of a 2D shape with an Image and without Rgb, which shows the texture as is */
 static const uint8_t box_draws_image_color[3] = { 255, 255, 255 };
-
-/** Instances the smallest instance buffer holds */
-#define BOX_DRAWS_MIN_CAPACITY (64)
 
 /** Distance in world units a 2D instance is lifted along its local z axis per layer */
 #define BOX_DRAWS_LAYER_STEP (0.0001f)
@@ -167,6 +167,18 @@ box_draw_batch_t* box_draws_batch(
     return ecs_vec_get_t(&d->batches, box_draw_batch_t, index);
 }
 
+/** Get the instances a batch holds before its key continues in another batch: a batch never
+ * spans pages, so at most the slots of a page.
+ *
+ * @param d The state
+ * @return The instances
+ */
+static uint32_t box_draws_limit(
+    const box_render_draws_t *d)
+{
+    return d->chunk < d->store.slots ? d->chunk : d->store.slots;
+}
+
 int32_t box_draws_batch_ensure(
     box_render_draws_t *d,
     const box_draw_key_t *key)
@@ -178,7 +190,7 @@ int32_t box_draws_batch_ensure(
     while (result != -1) {
         b = box_draws_batch(d, result);
         if (box_draws_key_eq(&b->key, key) &&
-            (uint32_t)ecs_vec_count(&b->entities) < d->chunk)
+            (uint32_t)ecs_vec_count(&b->entities) < box_draws_limit(d))
         {
             goto done;
         }
@@ -202,7 +214,8 @@ int32_t box_draws_batch_ensure(
 
     b->key = *key;
     b->alive = true;
-    b->buffer = 0;
+    b->page = -1;
+    b->first = 0;
     b->capacity = 0;
     b->full = true;
     head = ecs_map_ensure(&d->lookup, hash);
@@ -213,7 +226,7 @@ done:
     return result;
 }
 
-/** Take a batch out of use, releasing its instance buffer in the packet.
+/** Take a batch out of use, freeing its run of slots.
  *
  * @param d The state
  * @param p The packet
@@ -241,9 +254,8 @@ static void box_draws_batch_free(
         ecs_map_remove(&d->lookup, hash);
     }
 
-    if (b->buffer) {
-        box_render_packet_resource(p, BOX_RENDER_BUFFER, BOX_RENDER_DESTROY, b->buffer, 0);
-        *ecs_vec_append_t(NULL, &d->free_buffers, uint32_t) = b->buffer;
+    if (b->page >= 0) {
+        box_draws_store_free(&d->store, p, b->page, b->first, b->capacity);
     }
 
     ecs_vec_clear(&b->entities);
@@ -251,7 +263,8 @@ static void box_draws_batch_free(
     ecs_vec_clear(&b->instances);
     ecs_vec_clear(&b->changed);
     b->alive = false;
-    b->buffer = 0;
+    b->page = -1;
+    b->first = 0;
     b->capacity = 0;
     *ecs_vec_append_t(NULL, &d->free_batches, int32_t) = index;
 }
@@ -593,19 +606,20 @@ void box_draws_reset_backend(
     ecs_map_clear(&d->meshes);
     for (i = 0; i < ecs_vec_count(&d->batches); i ++) {
         box_draw_batch_t *b = box_draws_batch(d, i);
-        b->buffer = 0;
+        b->page = -1;
+        b->first = 0;
         b->capacity = 0;
         b->full = true;
         ecs_vec_clear(&b->changed);
     }
 
-    ecs_vec_clear(&d->free_buffers);
-    d->next_buffer = BOX_RENDER_BUFFER_FIRST;
+    box_draws_store_reset(&d->store);
     d->changes_size = 0;
     box_draws_clips_reset(d);
 }
 
-/** Give a batch an instance buffer that holds all its instances.
+/** Give a batch a run of slots that holds all its instances, moving it to a new run when it
+ * outgrew its run; a moved batch uploads every instance and its old run is freed.
  *
  * @param p The packet
  * @param d The state
@@ -617,8 +631,10 @@ static void box_draws_reserve(
     box_draw_batch_t *b)
 {
     uint32_t count = (uint32_t)ecs_vec_count(&b->entities);
-    uint32_t capacity = b->capacity ? b->capacity : BOX_DRAWS_MIN_CAPACITY;
-    if (b->buffer && count <= b->capacity) {
+    uint32_t limit = box_draws_limit(d);
+    uint32_t capacity = BOX_DRAWS_MIN_CAPACITY, first;
+    int32_t page;
+    if (b->page >= 0 && count <= b->capacity) {
         goto done;
     }
 
@@ -626,23 +642,17 @@ static void box_draws_reserve(
         capacity *= 2;
     }
 
-    if (capacity > d->chunk && count <= d->chunk) {
-        capacity = d->chunk;
+    if (capacity > limit && count <= limit) {
+        capacity = limit;
     }
 
-    if (!b->buffer && ecs_vec_count(&d->free_buffers)) {
-        b->buffer = *ecs_vec_last_t(&d->free_buffers, uint32_t);
-        ecs_vec_remove_last(&d->free_buffers);
-    } else if (!b->buffer) {
-        b->buffer = d->next_buffer ++;
+    box_draws_store_alloc(&d->store, capacity, &page, &first);
+    if (b->page >= 0) {
+        box_draws_store_free(&d->store, p, b->page, b->first, b->capacity);
     }
 
-    box_render_buffer_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_BUFFER,
-        BOX_RENDER_CREATE, b->buffer, sizeof(box_render_buffer_desc_t));
-    desc->surface_mesh = b->key.mesh;
-    desc->size = (uint64_t)capacity * sizeof(box_render_instance_t);
-    desc->usage = BOX_RENDER_BUFFER_INSTANCE | BOX_RENDER_BUFFER_STORAGE;
-
+    b->page = page;
+    b->first = first;
     b->capacity = capacity;
     b->full = true;
     ecs_vec_clear(&b->changed);
@@ -650,7 +660,33 @@ done:
     return;
 }
 
-/** Upload every instance of a batch.
+/** Make the buffers of every page hold their runs; the batches of a page whose buffers were
+ * created again upload every instance into them.
+ *
+ * @param p The packet
+ * @param d The state
+ */
+static void box_draws_pages(
+    box_render_packet_t *p,
+    box_render_draws_t *d)
+{
+    int32_t i, pg, count = ecs_vec_count(&d->batches);
+    for (pg = 0; pg < ecs_vec_count(&d->store.pages); pg ++) {
+        if (!box_draws_store_reserve(&d->store, p, pg)) {
+            continue;
+        }
+
+        for (i = 0; i < count; i ++) {
+            box_draw_batch_t *b = box_draws_batch(d, i);
+            if (b->alive && b->page == pg) {
+                b->full = true;
+                ecs_vec_clear(&b->changed);
+            }
+        }
+    }
+}
+
+/** Upload every instance of a batch into its run.
  *
  * @param p The packet
  * @param d The state
@@ -663,24 +699,28 @@ static void box_draws_upload_all(
 {
     uint32_t size = (uint32_t)ecs_vec_count(&b->instances) *
         (uint32_t)sizeof(box_render_instance_t);
-    void *dst = box_render_packet_upload(p, b->buffer, 0, size);
+    uint32_t offset = b->first * (uint32_t)sizeof(box_render_instance_t);
+    void *dst = box_render_packet_upload(p,
+        box_draws_store_handle(&d->store, b->page, 0), offset, size);
     ecs_os_memcpy(dst, ecs_vec_first(&b->instances), (ecs_size_t)size);
     d->stats.upload_bytes += size;
     b->full = false;
     ecs_vec_clear(&b->changed);
 }
 
-/** Get the bytes of the scatter segment of a static batch.
+/** Get the bytes of a scatter segment, aligned for the next segment.
  *
- * @param b The batch
- * @return The bytes, aligned for the next segment
+ * @param entries Entries of the segment
+ * @return The bytes, 0 for a segment without entries
  */
-static uint32_t box_draws_segment_size(
-    const box_draw_batch_t *b)
+static uint64_t box_draws_segment_size(
+    uint32_t entries)
 {
-    uint32_t size = BOX_DRAWS_HEADER + (uint32_t)ecs_vec_count(&b->changed) * BOX_DRAWS_ENTRY;
+    uint64_t size = BOX_DRAWS_HEADER + (uint64_t)entries * BOX_DRAWS_ENTRY;
 
-    return (size + BOX_RENDER_SCATTER_ALIGN - 1) & ~(uint32_t)(BOX_RENDER_SCATTER_ALIGN - 1);
+    return entries
+        ? (size + BOX_RENDER_SCATTER_ALIGN - 1) & ~(uint64_t)(BOX_RENDER_SCATTER_ALIGN - 1)
+        : 0;
 }
 
 void box_draws_batch_textures(
@@ -706,30 +746,36 @@ void box_draws_batch_textures(
 
 /** Upload the instances of a batch it needs this frame and add its draw.
  *
+ * The changed slots of a static batch go into the scatter segment of its page, unless they
+ * are not smaller than its instances or the segments of the frame would outgrow the change
+ * buffer; it uploads every instance then.
+ *
  * @param p The packet
  * @param d The state
  * @param b The batch
- * @param changes Bytes the scatter segments of the frame already take
- * @return Bytes the scatter segment of the batch needs, 0 when it does not scatter
+ * @param changes Bytes the scatter segments of the frame take, updated
  */
-static uint64_t box_draws_send_batch(
+static void box_draws_send_batch(
     box_render_packet_t *p,
     box_render_draws_t *d,
     box_draw_batch_t *b,
-    uint64_t changes)
+    uint64_t *changes)
 {
-    uint64_t result = 0;
     uint32_t count = (uint32_t)ecs_vec_count(&b->entities);
-    box_draws_reserve(p, d, b);
+    uint32_t entries = (uint32_t)ecs_vec_count(&b->changed);
     if (b->key.dynamic || b->full) {
         box_draws_upload_all(p, d, b);
-    } else if (ecs_vec_count(&b->changed)) {
-        result = box_draws_segment_size(b);
-        if (result >= (uint64_t)count * sizeof(box_render_instance_t) ||
-            changes + result > BOX_DRAWS_MAX_CHANGES)
+    } else if (entries) {
+        box_draw_page_t *pg = box_draws_store_page(&d->store, b->page);
+        uint64_t grow = box_draws_segment_size(pg->entries + entries) -
+            box_draws_segment_size(pg->entries);
+        uint64_t run = (uint64_t)count * sizeof(box_render_instance_t);
+        if ((uint64_t)entries * BOX_DRAWS_ENTRY >= run || *changes + grow > BOX_DRAWS_MAX_CHANGES)
         {
             box_draws_upload_all(p, d, b);
-            result = 0;
+        } else {
+            pg->entries += entries;
+            *changes += grow;
         }
     }
 
@@ -747,11 +793,11 @@ static uint64_t box_draws_send_batch(
     out->bake = b->key.bake;
     out->mesh = b->key.mesh;
     box_draws_batch_textures(d, b, out);
-    out->instances = b->buffer;
-    out->first_instance = 0;
+    out->instances = box_draws_store_handle(&d->store, b->page, 0);
+    out->first_instance = b->first;
     out->instance_count = count;
 done:
-    return result;
+    return;
 }
 
 /** Order blended instances back to front, then by batch and slot for equal depths.
@@ -810,8 +856,8 @@ static void box_draws_collect(
 
 /** Add the blended instances of every view, sorted back to front, after the opaque batches.
  *
- * The sorted slots of a view go into the packet data; a run of one batch in that order is one
- * draw listing its slots, split every BOX_DRAWS_BLENDED_RUN slots. Sort and packet storage
+ * The sorted page slots of a view go into the packet data; a run of one batch in that order is
+ * one draw listing its slots, split every BOX_DRAWS_BLENDED_RUN slots. Sort and packet storage
  * is reused, so a frame that sorts no more instances than before does not allocate.
  *
  * @param p The packet
@@ -836,12 +882,12 @@ static void box_draws_send_blended(
         uint32_t *slots = box_render_packet_reserve(p,
             (uint32_t)count * (uint32_t)sizeof(uint32_t), &offset);
         for (i = 0; i < count; i ++) {
-            slots[i] = (uint32_t)sorted[i].slot;
+            slots[i] = box_draws_batch(d, sorted[i].batch)->first + (uint32_t)sorted[i].slot;
         }
 
         for (i = 0; i < count; i ++) {
             box_draw_batch_t *b = box_draws_batch(d, sorted[i].batch);
-            if (out && out->instances == b->buffer &&
+            if (out && sorted[i].batch == sorted[i - 1].batch &&
                 out->instance_count < BOX_DRAWS_BLENDED_RUN)
             {
                 out->instance_count ++;
@@ -857,7 +903,7 @@ static void box_draws_send_blended(
             out->shadow = b->key.shadow;
             out->mesh = b->key.mesh;
             box_draws_batch_textures(d, b, out);
-            out->instances = b->buffer;
+            out->instances = box_draws_store_handle(&d->store, b->page, 0);
             out->listed = true;
             out->slots = offset + (uint32_t)i * (uint32_t)sizeof(uint32_t);
             out->instance_count = 1;
@@ -865,25 +911,20 @@ static void box_draws_send_blended(
     }
 }
 
-/** Write the scatter segment of a batch and add its scatter.
+/** Write the changed slots of a static batch into the scatter segment of its page.
  *
- * @param p The packet
  * @param d The state
  * @param b The batch
- * @param dst Start of the segment
- * @param offset Byte offset of the segment in the change buffer
- * @return Bytes of the segment
+ * @param data Start of the change buffer upload
  */
-static uint32_t box_draws_scatter(
-    box_render_packet_t *p,
+static void box_draws_scatter(
     box_render_draws_t *d,
     box_draw_batch_t *b,
-    uint8_t *dst,
-    uint32_t offset)
+    uint8_t *data)
 {
-    uint32_t *header = (uint32_t*)dst;
-    uint32_t *entry = header + BOX_RENDER_SCATTER_HEADER;
-    uint32_t written = 0, size = box_draws_segment_size(b);
+    box_draw_page_t *pg = box_draws_store_page(&d->store, b->page);
+    uint32_t *entry = (uint32_t*)(data + pg->offset + BOX_DRAWS_HEADER +
+        pg->written * BOX_DRAWS_ENTRY);
     int32_t i, count = ecs_vec_count(&b->changed), slots = ecs_vec_count(&b->entities);
     for (i = 0; i < count; i ++) {
         int32_t slot = *ecs_vec_get_t(&b->changed, int32_t, i);
@@ -891,32 +932,18 @@ static uint32_t box_draws_scatter(
             continue;
         }
 
-        entry[0] = (uint32_t)slot;
+        entry[0] = b->first + (uint32_t)slot;
         ecs_os_memcpy(&entry[1], ecs_vec_get_t(&b->instances, box_render_instance_t, slot),
             ECS_SIZEOF(box_render_instance_t));
         entry += 1 + BOX_DRAWS_WORDS;
-        written ++;
+        pg->written ++;
     }
 
-    header[0] = written;
-    header[1] = BOX_DRAWS_WORDS;
-    header[2] = 0;
-    header[3] = 0;
     ecs_vec_clear(&b->changed);
-    if (written) {
-        box_render_scatter_t *sc = box_render_packet_scatter(p);
-        sc->buffer = b->buffer;
-        sc->changes = BOX_RENDER_BUFFER_CHANGES;
-        sc->offset = offset;
-        sc->size = BOX_DRAWS_HEADER + written * BOX_DRAWS_ENTRY;
-        sc->count = written;
-        d->stats.scattered += (int32_t)written;
-    }
-
-    return size;
 }
 
-/** Upload the change buffer with the segments of the scattering batches.
+/** Upload the change buffer with the segment of every page with static changes and add one
+ * scatter per page, holding the changed slots of every static batch in the page.
  *
  * @param p The packet
  * @param d The state
@@ -928,7 +955,7 @@ static void box_draws_send_changes(
     uint64_t total)
 {
     uint32_t offset = 0;
-    int32_t i, count = ecs_vec_count(&d->batches);
+    int32_t i, count = ecs_vec_count(&d->batches), pages = ecs_vec_count(&d->store.pages);
     if (total > d->changes_size) {
         uint64_t size = d->changes_size ? d->changes_size : BOX_DRAWS_MIN_CHANGES;
         while (size < total) {
@@ -942,17 +969,47 @@ static void box_draws_send_changes(
         box_render_buffer_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_BUFFER,
             BOX_RENDER_CREATE, BOX_RENDER_BUFFER_CHANGES, sizeof(box_render_buffer_desc_t));
         desc->size = size;
-        desc->surface_mesh = 0;
         desc->usage = BOX_RENDER_BUFFER_STORAGE;
         d->changes_size = (uint32_t)size;
     }
 
     uint8_t *data = box_render_packet_upload(p, BOX_RENDER_BUFFER_CHANGES, 0, (uint32_t)total);
     d->stats.upload_bytes += total;
+    for (i = 0; i < pages; i ++) {
+        box_draw_page_t *pg = box_draws_store_page(&d->store, i);
+        pg->offset = offset;
+        pg->written = 0;
+        offset += (uint32_t)box_draws_segment_size(pg->entries);
+    }
+
     for (i = 0; i < count; i ++) {
         box_draw_batch_t *b = box_draws_batch(d, i);
-        if (b->alive && !b->key.dynamic && ecs_vec_count(&b->changed)) {
-            offset += box_draws_scatter(p, d, b, data + offset, offset);
+        if (b->alive && b->ready && !b->key.dynamic && ecs_vec_count(&b->changed)) {
+            box_draws_scatter(d, b, data);
+        }
+    }
+
+    for (i = 0; i < pages; i ++) {
+        box_draw_page_t *pg = box_draws_store_page(&d->store, i);
+        uint32_t *header = (uint32_t*)(data + pg->offset);
+        if (!pg->entries) {
+            continue;
+        }
+
+        header[0] = pg->written;
+        header[1] = BOX_DRAWS_WORDS;
+        header[2] = 0;
+        header[3] = 0;
+        pg->entries = 0;
+        if (pg->written) {
+            box_render_scatter_t *sc = box_render_packet_scatter(p);
+            sc->buffer = box_draws_store_handle(&d->store, i, 0);
+            sc->changes = BOX_RENDER_BUFFER_CHANGES;
+            sc->offset = pg->offset;
+            sc->size = BOX_DRAWS_HEADER + pg->written * BOX_DRAWS_ENTRY;
+            sc->count = pg->written;
+            d->stats.scattered += (int32_t)pg->written;
+            d->stats.scatters ++;
         }
     }
 }
@@ -1127,6 +1184,7 @@ void box_draws_send(
     d->stats.batches = 0;
     d->stats.instances = 0;
     d->stats.dynamic = 0;
+    d->stats.scatters = 0;
     for (i = 0; i < count; i ++) {
         box_draw_batch_t *b = box_draws_batch(d, i);
         if (b->alive && !ecs_vec_count(&b->entities)) {
@@ -1154,9 +1212,17 @@ void box_draws_send(
     ecs_vec_clear(&d->blended);
     for (i = 0; i < count; i ++) {
         box_draw_batch_t *b = box_draws_batch(d, i);
-        b->ready = false;
-        if (b->alive && box_draws_mesh(p, d, cache, b->key.mesh)) {
-            changes += box_draws_send_batch(p, d, b, changes);
+        b->ready = b->alive && box_draws_mesh(p, d, cache, b->key.mesh);
+        if (b->ready) {
+            box_draws_reserve(p, d, b);
+        }
+    }
+
+    box_draws_pages(p, d);
+    for (i = 0; i < count; i ++) {
+        box_draw_batch_t *b = box_draws_batch(d, i);
+        if (b->ready) {
+            box_draws_send_batch(p, d, b, &changes);
         }
 
         if (b->ready && b->key.blend != Opaque &&
@@ -1176,6 +1242,8 @@ void box_draws_send(
     }
 
 done:
+    d->stats.pages = d->store.alive;
+
     return;
 }
 
@@ -1193,8 +1261,20 @@ void box_draws_batches_fini(
 
     ecs_vec_fini_t(NULL, &d->batches, box_draw_batch_t);
     ecs_vec_fini_t(NULL, &d->free_batches, int32_t);
-    ecs_vec_fini_t(NULL, &d->free_buffers, uint32_t);
+    box_draws_store_fini(&d->store);
     ecs_map_fini(&d->lookup);
+}
+
+void box_render_draws_page(
+    ecs_world_t *world,
+    int32_t slots)
+{
+    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractDraws");
+    const ecs_system_t *s = system ? ecs_system_get(world, system) : NULL;
+    if (s && s->ctx && slots > 0) {
+        box_render_draws_t *d = s->ctx;
+        d->store.slots = (uint32_t)slots < BOX_DRAWS_CHUNK ? (uint32_t)slots : BOX_DRAWS_CHUNK;
+    }
 }
 
 void box_render_draws_chunk(
