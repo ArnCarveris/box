@@ -48,8 +48,9 @@ template BunnyHud {
   const lives = player[BunnyLives].lives_left
 
   // A script sees a pair added to the state singleton, but not removed: it evaluates again
-  // before the pair is gone. A run ends with no lives left and restart() gives the lives back
-  // before it changes the state, so with the lives the HUD sees both changes.
+  // before the pair is gone. A run ends with no lives left and run.flecs, which restart()
+  // reloads, gives the lives back before it changes the state, so with the lives the HUD sees
+  // both changes.
   const over = BunnyGameState?[(BunnyGameState, Over)] && lives == 0
 
   // Screen space UI: an orthographic camera at ortho_scale 1, so one logical pixel is one point

@@ -3,17 +3,17 @@
 // passes it. Each is a layer below the root that bursts once and fades in and out over the life
 // of its particles.
 //
-// The layers describe the effects in the frame of the track, as if the world stood still. The
-// systems shift the velocities of every play by the world speed and keep the wind of
-// effect_wind at it, so dust stays where it landed on the scrolling track.
+// The layers describe the effects in the frame of the track, as if the world stood still: every
+// layer names effect_drift, whose drift moves its particles with the scrolling track, so dust
+// stays where it landed.
 
 using box.particle
 using box.transform
 
-// The wind of the scrolling world, (-BunnyGame.speed, 0, 0) while playing and 0 once the game is
-// over. Every layer names it, and pulls its particles toward it with its own drag.
-effect_wind {
-  ParticleForces: {gravity: {0, 0, 0}, wind: {-cfg.initialSpeed, 0, 0}}
+// The frame of the track: the systems keep its drift at (-BunnyGame.speed, 0, 0) while playing
+// and at 0 once the game is over. It adds no forces of its own.
+effect_drift {
+  ParticleForces: {gravity: {0, 0, 0}}
 }
 
 // Budgets of the effects: a few plays of a template at once are plenty, as the bunny lands at
@@ -37,7 +37,7 @@ prefab LandingDust {
       lifetime: {0.35, 0.75},
       size: {0.08, 0.2},
       color: {225, 210, 185},
-      forces: effect_wind,
+      forces: effect_drift,
       seed: 101
     }
     ParticleBurst: {count: 11}
@@ -64,7 +64,7 @@ prefab HardLandingDust {
       lifetime: {0.35, 0.75},
       size: {0.08, 0.2},
       color: {225, 210, 185},
-      forces: effect_wind,
+      forces: effect_drift,
       seed: 102
     }
     ParticleBurst: {count: 23}
@@ -91,7 +91,7 @@ prefab HitBurst {
       lifetime: {0.3, 0.7},
       size: {0.09, 0.23},
       color: {255, 0, 0},
-      forces: effect_wind,
+      forces: effect_drift,
       seed: 103
     }
     ParticleBurst: {count: 28}
@@ -119,7 +119,7 @@ prefab CarrotSparkle {
       lifetime: {0.5, 0.5},
       size: {0.06, 0.16},
       color: {255, 220, 80},
-      forces: effect_wind,
+      forces: effect_drift,
       seed: 104
     }
     ParticleBurst: {count: 18}
@@ -145,7 +145,7 @@ prefab CarrotSparkle {
       size: {0.12, 0.32},
       opacity: {0.6, 0.6},
       color: {255, 220, 80},
-      forces: effect_wind,
+      forces: effect_drift,
       seed: 104
     }
     ParticleBurst: {count: 18}
