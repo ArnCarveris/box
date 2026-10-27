@@ -1,0 +1,43 @@
+// A new run: the bunny on the ground with all its lives, an empty parent for the carrots, the
+// BunnyGame singleton that ties them together with the carrot prefabs and the effects, and the
+// Playing state. bunnyhopper.restart() reloads this script: the reload deletes the carrots with
+// their parent and sets the rest again. The player, created by world.flecs, and the scenery stay.
+
+using box.transform
+using bunnyhopper
+
+// A component with named members keeps the members it does not name, so every member is named.
+// The lives are set before the state, so the HUD never sees a new run with no lives
+player {
+  Position: {-7, cfg.groundY, 0}
+  Rotation: {0, 0, 0}
+  Bunny: {speed: cfg.initialSpeed, dead: false}
+  BunnyPlayer: {run_phase: 0}
+  BunnyJump: {v: 0, jumps: 0}
+  BunnyLives: {lives_left: cfg.maxLives}
+}
+
+// Parent of the spawned carrots
+carrots {}
+
+$ {
+  BunnyGame: {
+    carrots: 0,
+    max_lives: cfg.maxLives,
+    speed: cfg.initialSpeed,
+    distance_since_spawn: 0,
+    next_spawn_distance: 6,
+    seed: cfg.seed,
+    player: player,
+    carrot_parent: carrots,
+    small_carrot: SmallCarrot,
+    large_carrot: LargeCarrot,
+    dust: LandingDust,
+    dust_high: HardLandingDust,
+    sparkle: CarrotSparkle,
+    hit: HitBurst,
+    effect_drift: effect_drift
+  }
+
+  (BunnyGameState, Playing)
+}

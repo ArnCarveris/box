@@ -1,5 +1,4 @@
-// The world: the static ground and track, the scenery, the bunny, the parent of the carrots and
-// the BunnyGame singleton that ties them together with the carrot prefabs and the effects.
+// The world: the static ground and track, the scenery and the bunny. run.flecs sets up a run.
 
 using flecs.script.math
 using box.transform
@@ -54,34 +53,8 @@ scenery {
   }
 }
 
-// The bunny runs in place; the world scrolls past it. Its look is in player.flecs
+// The bunny runs in place; the world scrolls past it. It is created here, so a reload of
+// run.flecs, which puts it at the start of a run, keeps it. Its look is in player.flecs
 player {
-  Position: {-7, cfg.groundY, 0}
-  Rotation: {0, 0, 0}
   DynamicTransform
-  Bunny: {speed: cfg.initialSpeed}
-  BunnyPlayer: {}
-  BunnyJump: {}
-  BunnyLives: {lives_left: cfg.maxLives}
-}
-
-// Parent of the spawned carrots
-carrots {}
-
-$ {
-  BunnyGame: {
-    max_lives: cfg.maxLives,
-    speed: cfg.initialSpeed,
-    next_spawn_distance: 6,
-    seed: cfg.seed,
-    player: player,
-    carrot_parent: carrots,
-    small_carrot: SmallCarrot,
-    large_carrot: LargeCarrot,
-    dust: LandingDust,
-    dust_high: HardLandingDust,
-    sparkle: CarrotSparkle,
-    hit: HitBurst,
-    effect_wind: effect_wind
-  }
 }

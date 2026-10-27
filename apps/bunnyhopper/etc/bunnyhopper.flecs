@@ -9,6 +9,7 @@ include carrots
 include particles
 include scenery
 include world
+include run
 include player
 include input
 include hud
