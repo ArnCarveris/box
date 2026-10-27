@@ -113,8 +113,9 @@ ECS_STRUCT(Tonemap, {
 /** SMAA 1x anti aliasing: color edge detection with diagonal and corner detection.
  *
  * Belongs after the Tonemap: edges are found on the input clamped to 0..1 and sRGB encoded,
- * none between values above 1 (which a view gets before its Tonemap). The blend keeps them, in
- * linear light and all four channels, so a view without clear composites anti aliased coverage.
+ * while the blend reads the input as it is, in linear light and all four channels, so values
+ * above 1 are kept but no edges are found between them. Placed before the Tonemap it runs
+ * there, on the clamped HDR values. A view without clear composites anti aliased coverage.
  *
  * It only touches the image of its own view: text and UI of a later view stay crisp, while 2D
  * shapes and text drawn inside the same 3D view (world space UI) are anti aliased with it.
