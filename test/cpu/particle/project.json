@@ -238,6 +238,22 @@
                 ]
             },
             {
+                "id": "Drift",
+                "testcases": [
+                    "c_default",
+                    "moves_without_changing_velocity",
+                    "with_gravity_and_drag",
+                    "turbulence_moves_with_frame",
+                    "frame_phase_wraps",
+                    "sources_add_up",
+                    "change_moves_from_next_frame",
+                    "effect_layers_drift",
+                    "lingering_follows_change",
+                    "slides_on_ground",
+                    "burst_from_system"
+                ]
+            },
+            {
                 "id": "Linger",
                 "testcases": [
                     "c_default",
