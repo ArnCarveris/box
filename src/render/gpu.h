@@ -1752,13 +1752,6 @@ WGPUBindGroup box_gpu_instance_group(
     uint32_t handle,
     const box_gpu_mesh_t *m);
 
-/** Release the instance bind groups of a buffer.
- *
- * @param b The buffer
- */
-void box_gpu_instance_groups_release(
-    box_gpu_buffer_t *b);
-
 /** Forget the cull views of the previous target, before the views of a target are written.
  *
  * Also maps the counter copies of earlier targets, which have been submitted by now, publishes

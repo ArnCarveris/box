@@ -592,7 +592,6 @@ typedef struct box_render_clip_t {
 
 /** Description of a BOX_RENDER_BUFFER create; creating an existing handle replaces it */
 typedef struct box_render_buffer_desc_t {
-    uint32_t surface_mesh;
     uint64_t size;          /**< Bytes of the buffer */
     uint32_t usage;         /**< box_render_buffer_usage_t flags */
 } box_render_buffer_desc_t;

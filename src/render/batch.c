@@ -969,7 +969,6 @@ static void box_draws_send_changes(
         box_render_buffer_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_BUFFER,
             BOX_RENDER_CREATE, BOX_RENDER_BUFFER_CHANGES, sizeof(box_render_buffer_desc_t));
         desc->size = size;
-        desc->surface_mesh = 0;
         desc->usage = BOX_RENDER_BUFFER_STORAGE;
         d->changes_size = (uint32_t)size;
     }

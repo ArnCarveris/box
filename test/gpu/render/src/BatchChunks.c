@@ -328,7 +328,7 @@ void BatchChunks_lowered_pages_render_like_defaults(void) {
 
     int32_t off = 0;
     for (i = 0; i < 64 * 64 * 4; i ++) {
-        if (abs((int32_t)images[0][i] - (int32_t)images[1][i]) > 8) {
+        if (images[0][i] != images[1][i]) {
             off ++;
         }
     }

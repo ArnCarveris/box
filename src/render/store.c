@@ -261,7 +261,6 @@ bool box_draws_store_reserve(
         box_render_buffer_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_BUFFER,
             BOX_RENDER_CREATE, box_draws_store_handle(s, page, i),
             sizeof(box_render_buffer_desc_t));
-        desc->surface_mesh = 0;
         desc->size = (uint64_t)capacity * s->layout.stride[i];
         desc->usage = BOX_RENDER_BUFFER_INSTANCE | BOX_RENDER_BUFFER_STORAGE;
     }

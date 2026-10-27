@@ -1366,13 +1366,15 @@ done:
 
 /** Bind the groups of a cull dispatch and dispatch it.
  *
- * The instance page is set only when it differs from the one bound last in the pass.
+ * The instance page is set only when it differs from the one bound last in the pass. A dispatch
+ * that reads no instances keeps the page bound last, if any.
  *
  * @param gpu The backend
  * @param pass The compute pass
  * @param page Page whose bind group is group 0
  * @param uniform Index of the uniforms of the dispatch
  * @param buffer Instance page bound as group 1
+ * @param any Whether any page will do, for a dispatch that reads no instances
  * @param history Group 2
  * @param groups Workgroups along x and y
  * @param bound Instance bind group bound last in the pass, NULL for none, updated
@@ -1384,14 +1386,19 @@ static bool box_gpu_cull_run(
     uint32_t page,
     uint32_t uniform,
     uint32_t buffer,
+    bool any,
     WGPUBindGroup history,
     const uint32_t *groups,
     WGPUBindGroup *bound)
 {
     box_gpu_cull_t *c = &gpu->cull;
-    box_gpu_buffer_t *b = ecs_map_get_deref(&gpu->buffers, box_gpu_buffer_t, buffer);
-    WGPUBindGroup instances = b ? box_gpu_instance_group(gpu, b, 0, NULL) : NULL;
+    WGPUBindGroup instances = any ? *bound : NULL;
     uint32_t offset = uniform * BOX_GPU_CULL_STRIDE;
+    if (!instances) {
+        box_gpu_buffer_t *b = ecs_map_get_deref(&gpu->buffers, box_gpu_buffer_t, buffer);
+        instances = b ? box_gpu_instance_group(gpu, b, 0, NULL) : NULL;
+    }
+
     if (!instances) {
         goto done;
     }
@@ -1477,7 +1484,7 @@ static void box_gpu_cull_dispatches(
                 bound = c->ordered;
             }
 
-            box_gpu_cull_run(gpu, pass, dp->page, (uint32_t)d, dp->buffer,
+            box_gpu_cull_run(gpu, pass, dp->page, (uint32_t)d, dp->buffer, false,
                 dp->history ? dp->history : cv->group, groups, &instances);
         }
     }
@@ -1499,8 +1506,8 @@ static void box_gpu_cull_dispatches(
             bound = c->parallel;
         }
 
-        box_gpu_cull_run(gpu, pass, r->page, r->uniform, r->buffer, r->history, groups,
-            &instances);
+        box_gpu_cull_run(gpu, pass, r->page, r->uniform, r->buffer, false, r->history,
+            groups, &instances);
     }
 
     for (stage = 0; stage < 2; stage ++) {
@@ -1527,8 +1534,8 @@ static void box_gpu_cull_dispatches(
                 bound = pipeline;
             }
 
-            box_gpu_cull_run(gpu, pass, t->page, t->uniform, t->buffer, cv->group, groups,
-                &instances);
+            box_gpu_cull_run(gpu, pass, t->page, t->uniform, t->buffer, true, cv->group,
+                groups, &instances);
         }
     }
 

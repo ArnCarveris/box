@@ -285,7 +285,6 @@ static void box_particles_range_alloc(
         box_render_buffer_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_BUFFER,
             BOX_RENDER_CREATE, page->handle, sizeof(box_render_buffer_desc_t));
         desc->size = (uint64_t)pools * pool->capacity * BOX_RENDER_PARTICLE_SIZE;
-        desc->surface_mesh = 0;
         desc->usage = BOX_RENDER_BUFFER_STORAGE;
     }
 
@@ -515,7 +514,6 @@ static void box_particles_table_update(
         box_render_buffer_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_BUFFER,
             BOX_RENDER_CREATE, pool->table, sizeof(box_render_buffer_desc_t));
         desc->size = size;
-        desc->surface_mesh = 0;
         desc->usage = BOX_RENDER_BUFFER_STORAGE;
         ecs_os_memcpy(box_render_packet_upload(p, pool->table, 0, size),
             ecs_vec_first(&s->points), (ecs_size_t)size);
@@ -616,7 +614,6 @@ static void box_particles_mesh_update(
         box_render_buffer_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_BUFFER,
             BOX_RENDER_CREATE, pool->mesh, sizeof(box_render_buffer_desc_t));
         desc->size = size;
-        desc->surface_mesh = 0;
         desc->usage = BOX_RENDER_BUFFER_STORAGE;
         ecs_os_memcpy(box_render_packet_upload(p, pool->mesh, 0, size),
             ecs_vec_first(&s->corners), (ecs_size_t)size);

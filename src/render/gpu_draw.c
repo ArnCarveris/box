@@ -261,7 +261,11 @@ done:
     return result;
 }
 
-void box_gpu_instance_groups_release(
+/** Release the instance bind groups of a buffer.
+ *
+ * @param b The buffer
+ */
+static void box_gpu_instance_groups_release(
     box_gpu_buffer_t *b)
 {
     int32_t i;
@@ -278,6 +282,33 @@ void box_gpu_instance_groups_release(
     }
 
     ecs_vec_clear(&b->mesh_groups);
+}
+
+/** Release the bind groups of the instance pages with the surface assets of a mesh, once the
+ * mesh is released.
+ *
+ * @param gpu The backend
+ * @param handle Handle of the mesh
+ */
+static void box_gpu_instance_groups_drop(
+    box_gpu_t *gpu,
+    uint32_t handle)
+{
+    ecs_map_iter_t it = ecs_map_iter(&gpu->buffers);
+    int32_t i;
+    while (ecs_map_next(&it)) {
+        box_gpu_buffer_t *b = ecs_map_ptr(&it);
+        for (i = 0; i < ecs_vec_count(&b->mesh_groups); i ++) {
+            box_gpu_instance_group_t *g = ecs_vec_get_t(
+                &b->mesh_groups, box_gpu_instance_group_t, i);
+            if (g->mesh == handle) {
+                wgpuBindGroupRelease(g->group);
+                wgpuBufferRelease(g->assets);
+                ecs_vec_remove_t(&b->mesh_groups, box_gpu_instance_group_t, i);
+                break;
+            }
+        }
+    }
 }
 
 /** Release a buffer and its handle.
@@ -393,6 +424,10 @@ void box_gpu_mesh_apply(
 {
     box_gpu_mesh_t *m = ecs_map_get_deref(&gpu->meshes, box_gpu_mesh_t, handle);
     if (m) {
+        if (m->assets) {
+            box_gpu_instance_groups_drop(gpu, handle);
+        }
+
         ecs_map_remove(&gpu->meshes, handle);
         box_gpu_mesh_free(gpu, m);
     }
