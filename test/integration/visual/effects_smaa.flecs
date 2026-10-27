@@ -1,0 +1,107 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.text
+
+tonemap {
+  Tonemap: {}
+}
+
+smaa {
+  Smaa: {}
+}
+
+camera {
+  Position: {0, 2.4, 8}
+  Rotation: {0, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {205, 222, 245, 255}}, effects: [{effect: tonemap}, {effect: smaa}]}
+}
+
+sun {
+  Rotation: {0.6, 2.3, 0}
+  DirectionalLight: {intensity: 3 * flecs.script.math.PI}
+  Rgb: {255, 246, 232}
+}
+
+ground {
+  Position: {0, -0.1, -4}
+  Box: {40, 0.2, 30}
+  Rgb: {96, 110, 84}
+}
+
+// Thin poles leaning a little, so their sides are long shallow staircases without anti aliasing
+for i in 0..5 {
+  {
+    Position: {i * 1.6 - 3.2, 1.6, -2.5}
+    Rotation: {0, 0, (i - 2) * 0.06}
+    Cylinder: {segments: 12, smooth: true, radius: 0.05, length: 3.2}
+    Rgb: {40, 40, 46}
+  }
+}
+
+// A wire across the poles, a few pixels wide and nearly horizontal
+wire_left {
+  Position: {-1.6, 2.95, -2.5}
+  Rotation: {0, 0, 0.05}
+  Box: {6.6, 0.045, 0.045}
+  Rgb: {20, 20, 24}
+}
+
+wire_right {
+  Position: {1.6, 2.95, -2.5}
+  Rotation: {0, 0, -0.05}
+  Box: {6.6, 0.045, 0.045}
+  Rgb: {20, 20, 24}
+}
+
+// Boxes against the sky, turned about the view axis and about Y at several angles
+for i in 0..4 {
+  {
+    Position: {i * 1.7 - 2.55, 1.9, 0.6}
+    Rotation: {0, i * 0.35, i * 0.2 + 0.1}
+    Box: {0.7, 0.7, 0.7}
+    Rgb: {200 - i * 30, 90 + i * 30, 70 + i * 40}
+  }
+}
+
+// Spheres above the poles
+for i in 0..3 {
+  {
+    Position: {i * 2.4 - 2.4, 4.0, -2.5}
+    Sphere: {segments: 32, smooth: true, radius: 0.4}
+    Rgb: {230, 220 - i * 60, 80 + i * 70}
+  }
+}
+
+hud {
+  Scene: {}
+
+  camera {
+    Position: {0, 0, 100}
+    Camera: {ortho: true, ortho_scale: 1}
+  }
+
+  title {
+    Position: {-180, 150, 0}
+    Text: {value: "SMAA after Tonemap", size: 20}
+    Rgb: {20, 24, 32}
+  }
+
+  note {
+    Position: {-180, 124, 0}
+    Text: {value: "UI text stays crisp", size: 14}
+    Rgb: {60, 30, 30}
+  }
+}
+
+hud_view {
+  View: {camera: hud.camera, lighting: {enabled: false}, culling: {enabled: false}}
+}

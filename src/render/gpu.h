@@ -1667,6 +1667,22 @@ void box_gpu_effects_sweep(
     box_gpu_t *gpu,
     const box_render_packet_t *packet);
 
+/** Create the area texture of SMAA from the data of the reference: 160 x 560 RG8Unorm.
+ *
+ * @param gpu The backend
+ * @return The texture, released by the caller
+ */
+WGPUTexture box_gpu_smaa_area(
+    box_gpu_t *gpu);
+
+/** Create the search texture of SMAA from the data of the reference: 64 x 16 R8Unorm.
+ *
+ * @param gpu The backend
+ * @return The texture, released by the caller
+ */
+WGPUTexture box_gpu_smaa_search(
+    box_gpu_t *gpu);
+
 /** Create the layouts of the scatter pass.
  *
  * @param gpu The backend

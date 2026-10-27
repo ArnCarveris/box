@@ -21,6 +21,10 @@ tonemap {
   Tonemap: {}
 }
 
+smaa {
+  Smaa: {}
+}
+
 // The viewpoint of the town scene of ../flecs-engine, which looked from {-12.8, 9.455, 25.806} at
 // {-12.366, 9.044, 25}. box_old's own camera sat 225 units away, where the town is a speck.
 camera {
@@ -31,7 +35,7 @@ camera {
 }
 
 view {
-  View: {camera: camera, clear: {enabled: true, color: {150, 178, 210, 255}}, lighting: {enabled: true}, shadows: {enabled: true, cascades: 4, resolution: 2048, max_distance: 200, split_lambda: 0.7, depth_bias: 2, normal_offset: 1.5, filter_size: 3, fade: 0.2}, culling: {enabled: true, occlusion: true, min_dimension_px: 4}, effects: [{enabled: true, effect: ssao}, {enabled: true, effect: tonemap}]}
+  View: {camera: camera, clear: {enabled: true, color: {150, 178, 210, 255}}, lighting: {enabled: true}, shadows: {enabled: true, cascades: 4, resolution: 2048, max_distance: 200, split_lambda: 0.7, depth_bias: 2, normal_offset: 1.5, filter_size: 3, fade: 0.2}, culling: {enabled: true, occlusion: true, min_dimension_px: 4}, effects: [{enabled: true, effect: ssao}, {enabled: true, effect: tonemap}, {enabled: true, effect: smaa}]}
 }
 
 $ {

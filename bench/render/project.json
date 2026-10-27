@@ -94,6 +94,7 @@
                     "tonemap",
                     "auto_exposure",
                     "bloom",
+                    "smaa",
                     "ssao",
                     "fog",
                     "all"

@@ -17,6 +17,14 @@
 /** Smallest brightness and log2 luminance range the exposure measures */
 #define BOX_EFFECTS_EXPOSURE_EPSILON (1e-4f)
 
+/** Range of the edge detection threshold of SMAA */
+#define BOX_EFFECTS_SMAA_THRESHOLD_MIN (0.01f)
+#define BOX_EFFECTS_SMAA_THRESHOLD_MAX (0.5f)
+
+/** Most search steps of SMAA, orthogonal and diagonal */
+#define BOX_EFFECTS_SMAA_STEPS_MAX (112)
+#define BOX_EFFECTS_SMAA_DIAG_STEPS_MAX (20)
+
 void box_render_bloom_settings(
     const Bloom *in,
     Bloom *out)
@@ -73,6 +81,19 @@ void box_render_exposure_settings(
     out->max_exposure = glm_max(in->max_exposure, 0.0f);
 }
 
+void box_render_smaa_settings(
+    const Smaa *in,
+    Smaa *out)
+{
+    out->threshold = glm_clamp(in->threshold, BOX_EFFECTS_SMAA_THRESHOLD_MIN,
+        BOX_EFFECTS_SMAA_THRESHOLD_MAX);
+    out->max_search_steps = glm_imax(glm_imin(in->max_search_steps,
+        BOX_EFFECTS_SMAA_STEPS_MAX), 1);
+    out->max_search_steps_diag = glm_imax(glm_imin(in->max_search_steps_diag,
+        BOX_EFFECTS_SMAA_DIAG_STEPS_MAX), 0);
+    out->corner_rounding = glm_imax(glm_imin(in->corner_rounding, 100), 0);
+}
+
 /** Append an effect pass to the packet and count it for its view.
  *
  * @param p The packet
@@ -115,6 +136,7 @@ static void box_effects_entity(
     const Bloom *bloom = ecs_get(world, e, Bloom);
     const AutoExposure *exposure = ecs_get(world, e, AutoExposure);
     const Tonemap *tonemap = ecs_get(world, e, Tonemap);
+    const Smaa *smaa = ecs_get(world, e, Smaa);
     if (ssao) {
         box_render_ssao_settings(ssao, &box_effects_append(
             p, v, BOX_RENDER_EFFECT_SSAO, e)->ssao);
@@ -148,6 +170,11 @@ static void box_effects_entity(
             pass->exposure = settings == exposure ? e : source;
             box_render_exposure_settings(settings, &pass->auto_exposure);
         }
+    }
+
+    if (smaa) {
+        box_render_smaa_settings(smaa, &box_effects_append(
+            p, v, BOX_RENDER_EFFECT_SMAA, e)->smaa);
     }
 }
 
@@ -218,6 +245,9 @@ bool box_render_effects_use(
             break;
         case BOX_RENDER_SHADER_FOG:
             result = e->kind == BOX_RENDER_EFFECT_FOG;
+            break;
+        case BOX_RENDER_SHADER_SMAA:
+            result = e->kind == BOX_RENDER_EFFECT_SMAA;
             break;
         default:
             break;

@@ -5,6 +5,10 @@
  * An effect entity is added to the effects of a View, which renders into an HDR target and
  * runs its effects in order. Constructors set the defaults; values apply as specified, so a
  * C literal that leaves a field out sets it to zero.
+ *
+ * Effects only touch the image of their own view: a later view of the target, such as a screen
+ * space UI view, draws on top of the finished image, so anti aliasing (Smaa) leaves its text
+ * and shapes crisp.
  */
 
 #ifndef BOX_EFFECTS_H
@@ -104,6 +108,27 @@ ECS_ENUM(TonemapOperator, {
 ECS_STRUCT(Tonemap, {
     ecs_entity_t auto_exposure; /**< Entity with AutoExposure that scales the input, 0 is none */
     TonemapOperator operator_;  /**< The mapping, default PbrNeutral */
+});
+
+/** SMAA 1x anti aliasing: color edge detection with diagonal and corner detection.
+ *
+ * Belongs after the Tonemap: edges are found on the input clamped to 0..1 and sRGB encoded,
+ * while the blend reads the input as it is, in linear light and all four channels, so values
+ * above 1 are kept but no edges are found between them. Placed before the Tonemap it runs
+ * there, on the clamped HDR values. A view without clear composites anti aliased coverage.
+ *
+ * It only touches the image of its own view: text and UI of a later view stay crisp, while 2D
+ * shapes and text drawn inside the same 3D view (world space UI) are anti aliased with it.
+ */
+ECS_STRUCT(Smaa, {
+    float threshold;               /**< Color edge detection threshold on display encoded
+                                    *   values, default 0.1, clamped to 0.01..0.5 */
+    int32_t max_search_steps;      /**< Horizontal and vertical search steps, default 16,
+                                    *   clamped to 1..112 */
+    int32_t max_search_steps_diag; /**< Diagonal search steps, default 8, clamped to 0..20,
+                                    *   0 turns the diagonal detection off */
+    int32_t corner_rounding;       /**< Percentage of the corners that is rounded, default 25,
+                                    *   clamped to 0..100 */
 });
 
 /** Register the box.effects module.

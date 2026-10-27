@@ -37,6 +37,11 @@ tonemap {
   Tonemap: {auto_exposure: exposure}
 }
 
+// Anti aliasing on the tone mapped image
+smaa {
+  Smaa: {}
+}
+
 camera {
   Position: {0, 2.5, 6}
   Rotation: {-0.35, 0, 0}
@@ -49,7 +54,7 @@ main_view {
     camera: camera,
     clear: {enabled: true, color: {120, 150, 190, 255}},
     shadows: {enabled: true},
-    effects: [{effect: ssao}, {effect: bloom}, {effect: tonemap}]
+    effects: [{effect: ssao}, {effect: bloom}, {effect: tonemap}, {effect: smaa}]
   }
 }
 

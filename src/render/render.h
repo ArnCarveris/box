@@ -61,6 +61,9 @@
 /** Shader handle of the engine shader that draws particles */
 #define BOX_RENDER_SHADER_PARTICLE_DRAW (48)
 
+/** Shader handle of the engine shader of the SMAA passes */
+#define BOX_RENDER_SHADER_SMAA (49)
+
 /** Cascades of the shadow map of a view at most */
 #define BOX_RENDER_SHADOW_CASCADES (4)
 
@@ -307,7 +310,8 @@ typedef enum box_render_effect_kind_t {
     BOX_RENDER_EFFECT_EXPOSURE, /**< AutoExposure on its own: scales by the adapted exposure */
     BOX_RENDER_EFFECT_BLOOM,    /**< Bloom */
     BOX_RENDER_EFFECT_SSAO,     /**< Ssao */
-    BOX_RENDER_EFFECT_FOG       /**< HeightFog */
+    BOX_RENDER_EFFECT_FOG,      /**< HeightFog */
+    BOX_RENDER_EFFECT_SMAA      /**< Smaa */
 } box_render_effect_kind_t;
 
 /** An effect pass of a view with its settings resolved, in the order of View.effects */
@@ -320,6 +324,7 @@ typedef struct box_render_effect_t {
     Bloom bloom;                /**< Resolved settings of a bloom pass */
     Ssao ssao;                  /**< Resolved settings of an ambient occlusion pass */
     HeightFog fog;              /**< Resolved settings of a fog pass */
+    Smaa smaa;                  /**< Resolved settings of an anti aliasing pass */
 } box_render_effect_t;
 
 /** Description of a BOX_RENDER_TARGET create or update: the size and kind of a surface */
@@ -1757,6 +1762,15 @@ void box_render_fog_settings(
 void box_render_exposure_settings(
     const AutoExposure *in,
     AutoExposure *out);
+
+/** Resolve the settings of an anti aliasing pass.
+ *
+ * @param in The settings of an effect entity
+ * @param out Receives the resolved settings
+ */
+void box_render_smaa_settings(
+    const Smaa *in,
+    Smaa *out);
 
 /** Texels along each edge of the Tony McMapface LUT */
 #define BOX_RENDER_TONY_SIZE (48)
