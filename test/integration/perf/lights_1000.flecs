@@ -33,7 +33,7 @@ for x in 0..40 {
     }
     {
       Position: {x * 2 - 39, 1.2, z * 2 - 24}
-      PointLight: {intensity: 2, range: 3}
+      PointLight: {intensity: 2 * flecs.script.math.PI, range: 3}
       Rgb: {80 + (x % 4) * 55, 240 - (z % 4) * 50, 120 + ((x + z) % 3) * 60}
     }
   }

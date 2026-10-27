@@ -38,7 +38,7 @@ void LightModes_defaults_to_mixed(void) {
         LightBakeModeMixed);
 
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, PointLight, {.intensity = 2, .range = 5});
+    ecs_set(world, e, PointLight, {.intensity = 2 * GLM_PIf, .range = 5});
     test_int(ecs_get(world, e, PointLight)->bake, LightBakeModeMixed);
     ecs_add(world, e, SpotLight);
     test_int(ecs_get(world, e, SpotLight)->bake, LightBakeModeMixed);
@@ -88,7 +88,7 @@ void LightModes_realtime_light_left_out_of_bake(void) {
 
         ecs_entity_t lamp = ecs_new_w_pair(world, EcsChildOf, scene);
         ecs_set(world, lamp, Position, {1.5f, 2.5f, -1.5f});
-        ecs_set(world, lamp, PointLight, {.intensity = 3, .range = 6,
+        ecs_set(world, lamp, PointLight, {.intensity = 3 * GLM_PIf, .range = 6,
             .bake = i == 2 ? LightBakeModeMixed : LightBakeModeRealtime});
 
         ecs_entity_t e = ecs_new(world);
@@ -115,7 +115,7 @@ void LightModes_realtime_light_left_out_of_bake(void) {
         if (i == 1) {
             const LightBakeStatus *status = ecs_get(world, scene, LightBakeStatus);
             int32_t baked = status->baked;
-            ecs_set(world, lamp, PointLight, {.intensity = 6, .range = 4,
+            ecs_set(world, lamp, PointLight, {.intensity = 6 * GLM_PIf, .range = 4,
                 .bake = LightBakeModeRealtime});
             ecs_set(world, lamp, Position, {-1.5f, 2.5f, -1.5f});
             ecs_progress(world, 0);
@@ -189,11 +189,11 @@ void LightModes_baked_light_only_in_probes(void) {
 
         ecs_entity_t dim = ecs_new_w_pair(world, EcsChildOf, scene);
         ecs_set(world, dim, Position, {-2, 1.5f, 0});
-        ecs_set(world, dim, PointLight, {.intensity = 1, .range = 3});
+        ecs_set(world, dim, PointLight, {.intensity = GLM_PIf, .range = 3});
         if (!(i % 2)) {
             ecs_entity_t lamp = ecs_new_w_pair(world, EcsChildOf, scene);
             ecs_set(world, lamp, Position, {1.5f, 2.5f, -1.5f});
-            ecs_set(world, lamp, PointLight, {.intensity = 4, .range = 6,
+            ecs_set(world, lamp, PointLight, {.intensity = 4 * GLM_PIf, .range = 6,
                 .bake = LightBakeModeBaked});
         }
 
@@ -277,14 +277,14 @@ void LightModes_modes_identical_without_bake(void) {
         ecs_set(world, caster, Box, {1.5f, 0.2f, 1.5f});
         ecs_entity_t sun = ecs_new(world);
         ecs_set(world, sun, Rotation, {(float)GLM_PI_2, 0, 0});
-        ecs_set(world, sun, DirectionalLight, {.intensity = 0.5f, .bake = mode});
+        ecs_set(world, sun, DirectionalLight, {.intensity = 0.5f * GLM_PIf, .bake = mode});
         ecs_entity_t lamp = ecs_new(world);
         ecs_set(world, lamp, Position, {3, 1, 2});
-        ecs_set(world, lamp, PointLight, {.intensity = 2, .range = 5, .bake = mode});
+        ecs_set(world, lamp, PointLight, {.intensity = 2 * GLM_PIf, .range = 5, .bake = mode});
         ecs_entity_t spot = ecs_new(world);
         ecs_set(world, spot, Position, {3, 3, -3});
         ecs_set(world, spot, Rotation, {(float)GLM_PI_2, 0, 0});
-        ecs_set(world, spot, SpotLight, {.intensity = 3, .range = 6, .inner_angle = 20,
+        ecs_set(world, spot, SpotLight, {.intensity = 3 * GLM_PIf, .range = 6, .inner_angle = 20,
             .outer_angle = 30, .bake = mode});
         ecs_entity_t e = ecs_new(world);
         ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "modes.png",
@@ -346,7 +346,7 @@ void LightModes_mode_change_rebakes_reach(void) {
     ecs_set(world, floor, Box, {48, 0.2f, 4});
     ecs_entity_t lamp = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, lamp, Position, {16, 1, 0});
-    ecs_set(world, lamp, PointLight, {.intensity = 2, .range = 3});
+    ecs_set(world, lamp, PointLight, {.intensity = 2 * GLM_PIf, .range = 3});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 32, .height = 24, .resolution_scale = 1});
 
@@ -365,7 +365,7 @@ void LightModes_mode_change_rebakes_reach(void) {
         test_bool(status->converged, true);
         int32_t probes = status->probes, baked = status->baked;
 
-        ecs_set(world, lamp, PointLight, {.intensity = 2, .range = 3, .bake = modes[m]});
+        ecs_set(world, lamp, PointLight, {.intensity = 2 * GLM_PIf, .range = 3, .bake = modes[m]});
         ecs_progress(world, 0);
         box_render_sync(world);
         status = ecs_get(world, scene, LightBakeStatus);
@@ -413,13 +413,13 @@ void LightModes_baked_sun_leaves_shadows_to_next(void) {
         if (!i) {
             ecs_entity_t baked = ecs_new(world);
             ecs_set(world, baked, Rotation, {(float)GLM_PI_2, 0, 0.7f});
-            ecs_set(world, baked, DirectionalLight, {.intensity = 2,
+            ecs_set(world, baked, DirectionalLight, {.intensity = 2 * GLM_PIf,
                 .bake = LightBakeModeBaked});
         }
 
         ecs_entity_t sun = ecs_new(world);
         ecs_set(world, sun, Rotation, {(float)GLM_PI_2, 0, 0});
-        ecs_set(world, sun, DirectionalLight, {.intensity = 1});
+        ecs_set(world, sun, DirectionalLight, {.intensity = GLM_PIf});
         ecs_entity_t e = ecs_new(world);
         ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "suns.png",
             .resolution_scale = 1});
@@ -487,7 +487,7 @@ void LightModes_first_realtime_light_drops_default_sun(void) {
 
     ecs_entity_t lamp = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, lamp, Position, {6, 1, 0});
-    ecs_set(world, lamp, PointLight, {.intensity = 2, .range = 2,
+    ecs_set(world, lamp, PointLight, {.intensity = 2 * GLM_PIf, .range = 2,
         .bake = LightBakeModeRealtime});
     ecs_progress(world, 0);
     box_render_sync(world);
@@ -539,7 +539,7 @@ void LightModes_baked_light_lights_probes_like_mixed(void) {
 
         ecs_entity_t lamp = ecs_new_w_pair(world, EcsChildOf, scene);
         ecs_set(world, lamp, Position, {1.5f, 1.5f, -2});
-        ecs_set(world, lamp, PointLight, {.intensity = 3, .range = 5, .bake = modes[i]});
+        ecs_set(world, lamp, PointLight, {.intensity = 3 * GLM_PIf, .range = 5, .bake = modes[i]});
 
         ecs_entity_t e = ecs_new(world);
         ecs_set(world, e, Surface, {.width = 64, .height = 48, .write_to_file = "rooms.png",
@@ -622,12 +622,12 @@ void LightModes_captures_follow_first_non_realtime_sun(void) {
         ecs_set(world, caster, Box, {3, 0.2f, 3});
         ecs_entity_t realtime = ecs_new(world);
         ecs_set(world, realtime, Rotation, {(float)GLM_PI_2, 0, 0.6f});
-        ecs_set(world, realtime, DirectionalLight, {.intensity = 0.3f,
+        ecs_set(world, realtime, DirectionalLight, {.intensity = 0.3f * GLM_PIf,
             .bake = LightBakeModeRealtime});
         if (!i) {
             ecs_entity_t sun = ecs_new(world);
             ecs_set(world, sun, Rotation, {(float)GLM_PI_2, 0, 0});
-            ecs_set(world, sun, DirectionalLight, {.intensity = 1,
+            ecs_set(world, sun, DirectionalLight, {.intensity = GLM_PIf,
                 .bake = LightBakeModeBaked});
         }
 

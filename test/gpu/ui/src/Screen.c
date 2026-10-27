@@ -316,7 +316,7 @@ void Screen_unlit_ui_view_draws_base_color(void) {
     ecs_set(world, ui, Scene, {0});
     ecs_entity_t light = ecs_new_w_pair(world, EcsChildOf, ui);
     ecs_set(world, light, Position, {0, 0, 30});
-    ecs_set(world, light, PointLight, {.intensity = 50, .range = 100});
+    ecs_set(world, light, PointLight, {.intensity = 50 * GLM_PIf, .range = 100});
     ecs_set(world, light, Rgb, {255, 0, 0});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, ui);
     ecs_set(world, camera, Position, {0, 0, 100});

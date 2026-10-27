@@ -52,7 +52,7 @@ column_right {
 
 red {
   Position: {-2, 1.5, 1}
-  PointLight: {intensity: 4, range: 6}
+  PointLight: {intensity: 4 * flecs.script.math.PI, range: 6}
   Rgb: {255, 60, 40}
   Sphere: {segments: 12, smooth: true, radius: 0.1}
   Emissive: {strength: 1, color: {255, 60, 40}}
@@ -60,7 +60,7 @@ red {
 
 green {
   Position: {0, 2.5, -1.5}
-  PointLight: {intensity: 4, range: 6}
+  PointLight: {intensity: 4 * flecs.script.math.PI, range: 6}
   Rgb: {60, 255, 80}
   Sphere: {segments: 12, smooth: true, radius: 0.1}
   Emissive: {strength: 1, color: {60, 255, 80}}
@@ -68,7 +68,7 @@ green {
 
 blue {
   Position: {2, 1.5, 1}
-  PointLight: {intensity: 4, range: 6}
+  PointLight: {intensity: 4 * flecs.script.math.PI, range: 6}
   Rgb: {60, 120, 255}
   Sphere: {segments: 12, smooth: true, radius: 0.1}
   Emissive: {strength: 1, color: {60, 120, 255}}

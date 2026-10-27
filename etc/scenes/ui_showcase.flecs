@@ -408,7 +408,7 @@ template Showcase {
 
   sun {
     Rotation: {0.7359, 2.3726, 0}
-    DirectionalLight: {intensity: sun}
+    DirectionalLight: {intensity: sun * PI}
     Rgb: {255, 244, 225}
   }
 
@@ -439,7 +439,7 @@ template Showcase {
     Rgb: {255, 214, 150}
 
     if lamp {
-      PointLight: {intensity: 12, range: 8}
+      PointLight: {intensity: 12 * PI, range: 8}
     } else {
       PointLight: {intensity: 0, range: 8}
     }

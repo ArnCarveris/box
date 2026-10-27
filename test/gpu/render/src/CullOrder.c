@@ -37,7 +37,7 @@ void CullOrder_equal_depth_ties_render_identically(void) {
     ecs_modified(world, view, View);
     ecs_entity_t sun = ecs_new(world);
     ecs_set(world, sun, Rotation, {0.5423041f, 2.3679806f, -0.4669112f});
-    ecs_set(world, sun, DirectionalLight, {.intensity = 1.5f});
+    ecs_set(world, sun, DirectionalLight, {.intensity = 1.5f * GLM_PIf});
     int32_t i, k;
     for (k = 0; k < 2; k ++) {
         for (i = 0; i < 2048; i ++) {

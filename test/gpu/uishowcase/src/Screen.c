@@ -5,6 +5,7 @@
 
 #include "showcase.h"
 #include <bake_test.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -60,7 +61,8 @@ void Screen_scene_loads(void) {
         "{clicks: 0, shadows: true, sun: 2, selected: false, last: \"none\", lamp: false, "
         "paint: 0, reactor: false}");
     showcase_expect(world, s, "get showcase.world_view View.shadows.enabled", "true");
-    showcase_expect(world, s, "get showcase.sun DirectionalLight.intensity", "2");
+    test_assert(fabs(showcase_value(world, s, "get showcase.sun DirectionalLight.intensity") -
+        2 * GLM_PI) < 1e-5);
     showcase_expect(world, s, "get " SHOWCASE_COUNTER_PATH ".text Text.value", "\"Clicks: 0\"");
     test_assert(ecs_lookup(world, "showcase.hud_view") > ecs_lookup(world, "showcase.world_view"));
 
@@ -171,7 +173,7 @@ void Screen_slider_drag(void) {
     test_assert(raised > 2.5);
     test_assert(raised < 3);
     char *out = showcase_run(world, s, "get showcase.sun DirectionalLight.intensity");
-    test_flt(strtod(out, NULL), raised);
+    test_assert(fabs(strtod(out, NULL) - raised * GLM_PI) < 1e-4);
     ecs_os_free(out);
 
     showcase_hover(world, s, SHOWCASE_KNOB_RIGHT, slider);
@@ -179,7 +181,8 @@ void Screen_slider_drag(void) {
         "mouse.drag left " SHOWCASE_KNOB_RIGHT " " SHOWCASE_SLIDER_PAST_RIGHT));
     showcase_settle(world, s);
     showcase_expect(world, s, "get showcase Showcase.mut.sun", "4");
-    showcase_expect(world, s, "get showcase.sun DirectionalLight.intensity", "4");
+    test_assert(fabs(showcase_value(world, s, "get showcase.sun DirectionalLight.intensity") -
+        4 * GLM_PI) < 1e-5);
 
     showcase_hover(world, s, SHOWCASE_KNOB_RIGHT, slider);
     ecs_os_free(showcase_run(world, s,

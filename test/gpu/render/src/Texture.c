@@ -1330,7 +1330,7 @@ void Texture_gpu_orm_mip_stored_average(void) {
         .lighting.enabled = true});
     ecs_entity_t light = ecs_new(world);
     ecs_set(world, light, Position, {0, 0, 3});
-    ecs_set(world, light, PointLight, {.intensity = 2, .range = 20});
+    ecs_set(world, light, PointLight, {.intensity = 2 * GLM_PIf, .range = 20});
     ecs_entity_t far = ecs_new(world);
     ecs_set(world, far, Position, {-1.5f, 0, 0});
     ecs_set(world, far, Quad, {2.5f, 2.5f});
@@ -1729,10 +1729,10 @@ void Texture_gpu_orm_roughness_green(void) {
     ecs_singleton_set(world, AmbientLight, {.intensity = 0});
     ecs_entity_t left_light = ecs_new(world);
     ecs_set(world, left_light, Position, {-1.5f, 0, 2});
-    ecs_set(world, left_light, PointLight, {.intensity = 4, .range = 10});
+    ecs_set(world, left_light, PointLight, {.intensity = 4 * GLM_PIf, .range = 10});
     ecs_entity_t right_light = ecs_new(world);
     ecs_set(world, right_light, Position, {1.5f, 0, 2});
-    ecs_set(world, right_light, PointLight, {.intensity = 4, .range = 10});
+    ecs_set(world, right_light, PointLight, {.intensity = 4 * GLM_PIf, .range = 10});
     ecs_entity_t rough = ecs_new(world);
     ecs_set(world, rough, Position, {-1.5f, 0, 0});
     ecs_set(world, rough, Quad, {2.5f, 2.5f});
@@ -1933,7 +1933,7 @@ void Texture_gpu_orm_occlusion_indirect_only(void) {
     stbi_image_free(img);
 
     ecs_singleton_set(world, AmbientLight, {.intensity = 0});
-    ecs_set(world, sun, DirectionalLight, {.intensity = 1});
+    ecs_set(world, sun, DirectionalLight, {.intensity = GLM_PIf});
     ecs_progress(world, 0);
     box_render_sync(world);
     img = stbi_load(path, &w, &h, &n, 4);
@@ -2000,7 +2000,7 @@ void Texture_gpu_orm_missing_layer_unchanged(void) {
         .lighting.enabled = true});
     ecs_entity_t light = ecs_new(world);
     ecs_set(world, light, Position, {-1, 0.5f, 2});
-    ecs_set(world, light, PointLight, {.intensity = 3, .range = 10});
+    ecs_set(world, light, PointLight, {.intensity = 3 * GLM_PIf, .range = 10});
     ecs_entity_t quad = ecs_new(world);
     ecs_set(world, quad, Position, {-1.5f, 0, 0});
     ecs_set(world, quad, Quad, {2.5f, 2.5f});

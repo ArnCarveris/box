@@ -20,7 +20,7 @@ room {
 
   lamp {
     Position: {0, 2.6, 0}
-    PointLight: {intensity: 5, range: 12}
+    PointLight: {intensity: 5 * flecs.script.math.PI, range: 12}
   }
 
   bulb {

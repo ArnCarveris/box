@@ -22,7 +22,7 @@ main_view {
 
 sun {
   Rotation: {0.8, 0.9, 0}
-  DirectionalLight: {intensity: 3}
+  DirectionalLight: {intensity: 3 * flecs.script.math.PI}
   Rgb: {255, 255, 255}
 }
 

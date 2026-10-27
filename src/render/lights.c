@@ -24,7 +24,8 @@
 /** Direction toward the default sun, in world space */
 static const float box_lights_sun[3] = { 0.35f, 0.8f, 0.5f };
 
-/** Linear color of the default sun */
+/** Linear color of the default sun, which has intensity pi so it lights a facing white surface
+ * at about its base color */
 static const float box_lights_sun_color[3] = { 1.0f, 0.96f, 0.9f };
 
 /** Linear default ambient light from above */
@@ -266,10 +267,11 @@ static void box_lights_reset(
     }
 }
 
-/** Write the linear color of a light, scaled by its intensity and pi.
+/** Write the linear color of a light, scaled by its intensity: the irradiance it gives a
+ * surface facing it, which a Lambert surface reflects as albedo / pi times that.
  *
  * @param rgb Color of the light, NULL for white
- * @param intensity Radiance scale
+ * @param intensity Irradiance scale
  * @param out Receives the color
  */
 static void box_lights_color(
@@ -277,10 +279,9 @@ static void box_lights_color(
     float intensity,
     float *out)
 {
-    float scale = intensity * GLM_PIf;
-    out[0] = (rgb ? box_lights_srgb[rgb->r] : 1.0f) * scale;
-    out[1] = (rgb ? box_lights_srgb[rgb->g] : 1.0f) * scale;
-    out[2] = (rgb ? box_lights_srgb[rgb->b] : 1.0f) * scale;
+    out[0] = (rgb ? box_lights_srgb[rgb->r] : 1.0f) * intensity;
+    out[1] = (rgb ? box_lights_srgb[rgb->g] : 1.0f) * intensity;
+    out[2] = (rgb ? box_lights_srgb[rgb->b] : 1.0f) * intensity;
 }
 
 /** Write the normalized local +Z axis of a transform.
@@ -309,7 +310,7 @@ static void box_lights_axis(
  *
  * @param transform World transform of the light, NULL for the origin
  * @param rgb Color of the light, NULL for white
- * @param intensity Radiance scale
+ * @param intensity Irradiance scale
  * @param range Distance at which the light reaches zero
  * @param out Receives the light
  */
@@ -388,7 +389,7 @@ static void box_lights_push(
     }
 }
 
-/** Write the default sun.
+/** Write the default sun, of intensity pi.
  *
  * @param out Receives the light
  */

@@ -662,7 +662,7 @@ void TimeOfDay_fallback_red_sunset(void) {
     float noon[3], sunset[3];
     fallback_color(12, noon);
     fallback_color(17.75f, sunset);
-    test_assert(noon[0] > 0.95f * GLM_PIf);
+    test_assert(noon[0] > 0.95f);
     test_assert(noon[2] > 0.9f * noon[0]);
     test_assert(sunset[0] > 0);
     test_assert(sunset[0] < noon[0]);
@@ -699,8 +699,8 @@ void TimeOfDay_fallback_leaves_authored_light(void) {
 
     ecs_remove(world, plain, TimeOfDay);
     v = frame_view(world, null, plain);
-    test_near(v->lights.sun_color[0], GLM_PIf, 1e-5f);
-    test_near(v->lights.sun_color[2], GLM_PIf, 1e-5f);
+    test_near(v->lights.sun_color[0], 1, 1e-5f);
+    test_near(v->lights.sun_color[2], 1, 1e-5f);
 
     ecs_fini(world);
     box_render_null_free(null);

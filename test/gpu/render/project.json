@@ -270,6 +270,7 @@
                     "spot_light_lights_its_whole_cone",
                     "cluster_list_grows_to_every_light",
                     "point_light_inverse_square",
+                    "directional_light_irradiance_unit",
                     "point_light_fades_smoothly_to_range",
                     "cluster_list_kept_per_target"
                 ]
@@ -462,8 +463,12 @@
                     "bloom_intensity_change_applies",
                     "tonemap_compresses_hdr",
                     "tonemap_keeps_hue_of_bright_colors",
+                    "tonemap_tony_mc_mapface_matches_lut",
+                    "tonemap_tony_desaturates_bright_colors",
                     "exposure_adapts_over_frames",
                     "exposure_deterministic_with_fixed_delta",
+                    "exposure_first_frame_at_target",
+                    "exposure_ignores_pixels_below_min_log_luma",
                     "fog_darkens_with_distance",
                     "fog_lit_by_scene_sun",
                     "ssao_darkens_crease",

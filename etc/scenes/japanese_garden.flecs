@@ -2233,7 +2233,7 @@ japanese_garden {
 
   predawn {
     Rotation: {0.18, -2.3, 0}
-    DirectionalLight: {intensity: 0.28}
+    DirectionalLight: {intensity: 0.28 * math.PI}
     Rgb: {155, 179, 236}
   }
 

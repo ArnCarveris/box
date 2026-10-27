@@ -995,7 +995,7 @@ void Material_default_material_sphere_matte(void) {
     ecs_set(world, glossy, PbrMaterial, {.roughness = 0.3f});
     ecs_entity_t sun = ecs_new(world);
     ecs_set(world, sun, Rotation, {0, (float)GLM_PI, 0});
-    ecs_set(world, sun, DirectionalLight, {.intensity = 1});
+    ecs_set(world, sun, DirectionalLight, {.intensity = GLM_PIf});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 128, .height = 64, .write_to_file = "matte.png",
         .resolution_scale = 1});

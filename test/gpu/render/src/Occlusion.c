@@ -451,7 +451,7 @@ void Occlusion_hidden_caster_casts_shadow(void) {
     ecs_set(world, caster, Box, {3, 0.2f, 3});
     ecs_entity_t sun = ecs_new(world);
     ecs_set(world, sun, Rotation, {(float)GLM_PI_4, 0, 0});
-    ecs_set(world, sun, DirectionalLight, {.intensity = 1});
+    ecs_set(world, sun, DirectionalLight, {.intensity = GLM_PIf});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "caster.png",
         .resolution_scale = 1});

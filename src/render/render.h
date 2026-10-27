@@ -183,7 +183,7 @@ typedef struct box_render_upload_t {
 typedef struct box_render_light_t {
     float position[3];  /**< World position, the direction toward a directional light */
     float range;        /**< Distance at which the light reaches zero, 0 for directional */
-    float color[3];     /**< Linear color times intensity times pi */
+    float color[3];     /**< Linear color times intensity, the irradiance of the light */
     float spot_scale;   /**< Cone falloff scale, 1 / (cos inner - cos outer) */
     float direction[3]; /**< Direction a spot light shines in */
     float spot_offset;  /**< Cone falloff offset, -cos outer times spot_scale */
@@ -199,7 +199,7 @@ typedef struct box_render_view_lights_t {
     float ambient_sky[4];    /**< Linear ambient light from above */
     float ambient_ground[4]; /**< Linear ambient light from below */
     float sun[3];            /**< Direction toward the first directional light, if any */
-    float sun_color[3];      /**< Linear color times intensity times pi of that light */
+    float sun_color[3];      /**< Linear color times intensity of that light */
 } box_render_view_lights_t;
 
 /** The shadow settings of a view, resolved, with the view depths its cascades end at.
@@ -225,14 +225,14 @@ typedef struct box_render_view_shadows_t {
 typedef struct box_render_view_atmos_t {
     float sun[4];           /**< Direction toward the sun, w unused; (0, -1, 0) without one */
     float sun_color[4];     /**< Top of atmosphere irradiance of the sun: its light color times
-                             *   intensity times pi before the transmittance, 0 without one */
+                             *   intensity before the transmittance, 0 without one */
     float night[4];         /**< Linear night_tint times night_intensity */
     float sun_disk[4];      /**< Cosine and sine of the angular radius of the sun disk and its
                              *   sun_disk_intensity, w unused */
     float moon[4];          /**< Direction toward the moon and in w its moon_illumination;
                              *   (0, -1, 0, 0) without one */
     float moon_color[4];    /**< Top of atmosphere irradiance of the moon: its light color times
-                             *   intensity times pi before the transmittance, 0 without one */
+                             *   intensity before the transmittance, 0 without one */
     float moon_disk[4];     /**< Cosine and sine of the angular radius of the moon disk, its
                              *   moon_disk_intensity times moon_albedo and its earthshine */
     float altitude;         /**< Altitude of the camera above the ground in km, at least 1 m */
@@ -316,6 +316,7 @@ typedef struct box_render_effect_t {
     ecs_entity_t entity;        /**< Effect entity, keys the state the pass keeps across frames */
     ecs_entity_t exposure;      /**< AutoExposure entity whose adapted exposure scales, 0 none */
     AutoExposure auto_exposure; /**< Resolved exposure settings when exposure is set */
+    TonemapOperator tonemap;    /**< Operator of a tone map pass */
     Bloom bloom;                /**< Resolved settings of a bloom pass */
     Ssao ssao;                  /**< Resolved settings of an ambient occlusion pass */
     HeightFog fog;              /**< Resolved settings of a fog pass */
@@ -1287,7 +1288,7 @@ void box_render_lights_atmosphere(
  * @param state The state of the light extract, see box_render_lights_state
  * @param scene The scene, 0 for the default scene
  * @param direction Receives the normalized direction toward the sun
- * @param color Receives its linear color times intensity times pi, before the transmittance
+ * @param color Receives its linear color times intensity, before the transmittance
  * @return Whether the scene has a valid atmosphere and a sun
  */
 bool box_render_lights_atmos_sun(
@@ -1301,7 +1302,7 @@ bool box_render_lights_atmos_sun(
  * @param state The state of the light extract, see box_render_lights_state
  * @param scene The scene, 0 for the default scene
  * @param direction Receives the normalized direction toward the moon
- * @param color Receives its linear color times intensity times pi, before the transmittance
+ * @param color Receives its linear color times intensity, before the transmittance
  * @param illumination Receives its lit fraction, 0 without a sun
  * @return Whether the scene has a valid atmosphere and a moon
  */
@@ -1319,7 +1320,7 @@ bool box_render_lights_atmos_moon(
  * @param state The state of the light extract, see box_render_lights_state
  * @param scene The scene, 0 for the default scene
  * @param direction Receives the normalized direction toward the light
- * @param color Receives its linear color times intensity times pi, times the transmittance and
+ * @param color Receives its linear color times intensity, times the transmittance and
  * the horizon fade, and for the moon its illumination
  * @param fade Receives the fade of its disk at the horizon
  * @param moon Receives whether the light is the moon
@@ -1756,6 +1757,55 @@ void box_render_fog_settings(
 void box_render_exposure_settings(
     const AutoExposure *in,
     AutoExposure *out);
+
+/** Texels along each edge of the Tony McMapface LUT */
+#define BOX_RENDER_TONY_SIZE (48)
+
+/** Texels of the Tony McMapface LUT */
+#define BOX_RENDER_TONY_TEXELS (BOX_RENDER_TONY_SIZE * BOX_RENDER_TONY_SIZE * BOX_RENDER_TONY_SIZE)
+
+/** File of the Tony McMapface LUT, found like a shader file */
+#define BOX_RENDER_TONY_PATH "etc/luts/tony_mc_mapface.dds"
+
+/** Load the Tony McMapface LUT from its DDS file: 48^3 RGB9E5 texels, x fastest, then y, then z.
+ *
+ * @param path The file, relative paths are found like shader files
+ * @param error Receives why the file cannot be used, NULL when it loads
+ * @return The texels, freed with ecs_os_free, NULL when the file cannot be used
+ */
+uint32_t* box_render_tony_load(
+    const char *path,
+    char **error);
+
+/** Decode a texel of the shared exponent format RGB9E5.
+ *
+ * @param texel The texel: 9 bit mantissas of r, g and b from the low bits, 5 bit exponent on top
+ * @param out Receives the linear color
+ */
+void box_render_rgb9e5_decode(
+    uint32_t texel,
+    float *out);
+
+/** Map a linear color with the Khronos PBR Neutral curve, as etc/shaders/tonemap.wgsl does.
+ *
+ * @param in The color, after the exposure
+ * @param out Receives the mapped color
+ */
+void box_render_tonemap_pbr_neutral(
+    const float *in,
+    float *out);
+
+/** Map a linear color with Tony McMapface, as etc/shaders/tonemap.wgsl does without its dither:
+ * the LUT sampled with trilinear filtering at c / (c + 1), with half texel insets.
+ *
+ * @param lut The texels of the LUT, as box_render_tony_load returns them
+ * @param in The color, after the exposure
+ * @param out Receives the mapped color
+ */
+void box_render_tonemap_tony(
+    const uint32_t *lut,
+    const float *in,
+    float *out);
 
 /** Check whether the effect passes of a packet run an engine shader.
  *

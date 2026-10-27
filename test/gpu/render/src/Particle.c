@@ -465,8 +465,8 @@ void Particle_flash_lights_wall(void) {
         "size: {1, 1}}\n"
         "  ParticleBurst: {count: 1}\n"
         "  light {\n"
-        "    PointLight: {intensity: 1, range: 4}\n"
-        "    EffectFlash: {intensity: 4, seconds: 0.05}\n"
+        "    PointLight: {intensity: flecs.script.math.PI, range: 4}\n"
+        "    EffectFlash: {intensity: 4 * flecs.script.math.PI, seconds: 0.05}\n"
         "  }\n"
         "}\n", NULL) == 0);
     ecs_entity_t flash = ecs_lookup(world, "Flash");

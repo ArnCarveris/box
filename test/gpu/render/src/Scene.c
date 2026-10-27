@@ -527,11 +527,11 @@ void Scene_lights_isolated_in_overlapping_scenes(void) {
     ecs_entity_t light_a = ecs_new_w_pair(world, EcsChildOf, a);
     ecs_set(world, light_a, Position, {0, 0, 0});
     ecs_set(world, light_a, Rgb, {255, 0, 0});
-    ecs_set(world, light_a, PointLight, {.intensity = 4, .range = 3});
+    ecs_set(world, light_a, PointLight, {.intensity = 4 * GLM_PIf, .range = 3});
     ecs_entity_t light_b = ecs_new_w_pair(world, EcsChildOf, b);
     ecs_set(world, light_b, Position, {0, 0, 0});
     ecs_set(world, light_b, Rgb, {0, 0, 255});
-    ecs_set(world, light_b, PointLight, {.intensity = 4, .range = 3});
+    ecs_set(world, light_b, PointLight, {.intensity = 4 * GLM_PIf, .range = 3});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = cam_a,
         .clear = {.enabled = true, .color = {0, 0, 0, 255}}, .lighting.enabled = true});
@@ -603,7 +603,7 @@ void Scene_light_follows_reparent(void) {
     ecs_set(world, group, Position, {0, 0, 0});
     ecs_entity_t light = ecs_new_w_pair(world, EcsChildOf, group);
     ecs_set(world, light, Position, {0, 0, 0});
-    ecs_set(world, light, PointLight, {.intensity = 4, .range = 3});
+    ecs_set(world, light, PointLight, {.intensity = 4 * GLM_PIf, .range = 3});
     ecs_entity_t view_a = ecs_new(world);
     ecs_set(world, view_a, View, {.camera = cam_a,
         .clear = {.enabled = true, .color = {0, 0, 0, 255}}, .lighting.enabled = true});
@@ -664,7 +664,7 @@ void Scene_light_moves_with_scene_added(void) {
     ecs_entity_t mid = ecs_new_w_parent(world, group, NULL);
     ecs_entity_t light = ecs_new_w_parent(world, mid, NULL);
     ecs_set(world, light, Position, {0, 0, 0});
-    ecs_set(world, light, PointLight, {.intensity = 4, .range = 3});
+    ecs_set(world, light, PointLight, {.intensity = 4 * GLM_PIf, .range = 3});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera,
         .clear = {.enabled = true, .color = {0, 0, 0, 255}}, .lighting.enabled = true});

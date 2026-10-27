@@ -1,6 +1,7 @@
 // Bindings every effect pass shares: the image so far (binding 0) and a linear clamp sampler
 // (binding 1). A pass declares its uniforms at binding 2 and, when it uses them, the depth of
-// the view at binding 3, a second image at binding 4 and the adapted exposure at binding 5.
+// the view at binding 3, a second image at binding 4, the adapted exposure at binding 5 and a
+// 3D lookup table at binding 6.
 #pragma once
 #include "fullscreen.wgsl"
 

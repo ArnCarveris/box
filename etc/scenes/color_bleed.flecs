@@ -104,7 +104,7 @@ room {
   spot {
     Position: {0, 3.9, 0}
     Rotation: {1.5708, 0, 0}
-    SpotLight: {intensity: 35, range: 10, inner_angle: 15, outer_angle: 25}
+    SpotLight: {intensity: 35 * flecs.script.math.PI, range: 10, inner_angle: 15, outer_angle: 25}
     Rgb: {255, 255, 255}
   }
 }

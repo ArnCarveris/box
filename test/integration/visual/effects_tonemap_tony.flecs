@@ -1,0 +1,64 @@
+// The scene of effects_tonemap.flecs mapped with Tony McMapface instead of PBR Neutral: the
+// bright orange to yellow spheres and the lamp lose chroma as they brighten, the white box and
+// the floor stay neutral.
+
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+
+exposure {
+  AutoExposure: {speed_up: 1000, speed_down: 1000}
+}
+
+tonemap {
+  Tonemap: {auto_exposure: exposure, operator_: TonyMcMapface}
+}
+
+camera {
+  Position: {0, 3, 9}
+  Rotation: {-0.25, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {120, 160, 220, 255}}, effects: [{effect: tonemap}]}
+}
+
+sun {
+  Rotation: {0.5848, 2.4751, 0}
+  DirectionalLight: {intensity: 6 * flecs.script.math.PI}
+  Rgb: {255, 245, 230}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {16, 0.2, 10}
+  Rgb: {180, 180, 170}
+}
+
+for i in 0..6 {
+  {
+    Position: {i * 1.6 - 4, 0.6, 0}
+    Sphere: {segments: 32, smooth: true, radius: 0.6}
+    Rgb: {255, 60 + i * 35, 40}
+    PbrMaterial: {roughness: 0.3}
+  }
+}
+
+white_box {
+  Position: {-2, 0.75, 2}
+  Rotation: {0, 0.5, 0}
+  Box: {1.5, 1.5, 1.5}
+  Rgb: {255, 255, 255}
+}
+
+lamp {
+  Position: {2.5, 0.6, 2.2}
+  Sphere: {segments: 32, smooth: true, radius: 0.5}
+  Rgb: {0, 0, 0}
+  Emissive: {strength: 12, color: {255, 220, 160}}
+}

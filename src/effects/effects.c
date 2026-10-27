@@ -117,6 +117,7 @@ void BoxEffectsImport(
     ECS_META_COMPONENT(world, Ssao);
     ECS_META_COMPONENT(world, HeightFog);
     ECS_META_COMPONENT(world, AutoExposure);
+    ECS_META_COMPONENT(world, TonemapOperator);
     ECS_META_COMPONENT(world, Tonemap);
 
     ecs_set_hooks(world, Bloom, { .ctor = box_bloom_ctor });

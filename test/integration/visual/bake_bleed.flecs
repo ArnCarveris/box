@@ -18,7 +18,7 @@ yard {
 
   sun {
     Rotation: {0.35, -1.4, 0}
-    DirectionalLight: {intensity: 1.2}
+    DirectionalLight: {intensity: 1.2 * flecs.script.math.PI}
   }
 
   floor {

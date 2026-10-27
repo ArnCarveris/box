@@ -633,7 +633,7 @@ santorini {
     Camera: {fov: 46, near_: 0.1, far_: 180}
     CameraController: {speed: 12}
   }
-  aegean_sun { Rotation: {0.83, -2.3, 0}; DirectionalLight: {intensity: 2.1}; Rgb: {255, 237, 208} }
+  aegean_sun { Rotation: {0.83, -2.3, 0}; DirectionalLight: {intensity: 2.1 * math.PI}; Rgb: {255, 237, 208} }
 
   sea_base { Position: {0, -0.8, 1}; RoundedBox: {37, 1.4, 33, 0.65, segments: 6}; Rgb: {19, 89, 133} }
   water {

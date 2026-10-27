@@ -54,7 +54,7 @@ static void bench_bake(
         .culling = {.enabled = true, .occlusion = true, .min_dimension_px = 1}});
     ecs_entity_t sun = ecs_new(world);
     ecs_set(world, sun, Rotation, {0.9f, 2.4f, 0});
-    ecs_set(world, sun, DirectionalLight, {.intensity = 1.5f});
+    ecs_set(world, sun, DirectionalLight, {.intensity = 1.5f * GLM_PIf});
     ecs_entity_t floor = ecs_new(world);
     ecs_set(world, floor, Position, {0, -0.1f, 0});
     ecs_set(world, floor, Box, {102, 0.2f, 102});
@@ -155,7 +155,7 @@ static void bench_bake_change(
         .culling = {.enabled = true, .occlusion = true, .min_dimension_px = 1}});
     ecs_entity_t sun = ecs_new(world);
     ecs_set(world, sun, Rotation, {0.9f, 2.4f, 0});
-    ecs_set(world, sun, DirectionalLight, {.intensity = 1.5f});
+    ecs_set(world, sun, DirectionalLight, {.intensity = 1.5f * GLM_PIf});
     ecs_entity_t floor = ecs_new(world);
     ecs_set(world, floor, Position, {0, -0.1f, 0});
     ecs_set(world, floor, Box, {640, 0.2f, 640});

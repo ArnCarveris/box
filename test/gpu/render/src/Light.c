@@ -38,7 +38,7 @@ void Light_point_light_reaches_its_range(void) {
     ecs_set(world, wall, PbrMaterial, {.roughness = 1});
     ecs_entity_t light = ecs_new(world);
     ecs_set(world, light, Position, {-3, 0, 0});
-    ecs_set(world, light, PointLight, {.intensity = 4, .range = 3});
+    ecs_set(world, light, PointLight, {.intensity = 4 * GLM_PIf, .range = 3});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "point.png",
         .resolution_scale = 1});
@@ -85,11 +85,11 @@ void Light_point_light_color(void) {
     ecs_set(world, wall, PbrMaterial, {.roughness = 1});
     ecs_entity_t red = ecs_new(world);
     ecs_set(world, red, Position, {-3, 0, 0});
-    ecs_set(world, red, PointLight, {.intensity = 2, .range = 3});
+    ecs_set(world, red, PointLight, {.intensity = 2 * GLM_PIf, .range = 3});
     ecs_set(world, red, Rgb, {255, 0, 0});
     ecs_entity_t blue = ecs_new(world);
     ecs_set(world, blue, Position, {3, 0, 0});
-    ecs_set(world, blue, PointLight, {.intensity = 2, .range = 3});
+    ecs_set(world, blue, PointLight, {.intensity = 2 * GLM_PIf, .range = 3});
     ecs_set(world, blue, Rgb, {0, 0, 255});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "color.png",
@@ -139,7 +139,7 @@ void Light_spot_light_cone(void) {
     ecs_set(world, spot, Position, {0, 0, 2});
     ecs_set(world, spot, Rotation, {0, (float)GLM_PI, 0});
     ecs_set(world, spot, SpotLight, {
-        .intensity = 20, .range = 10, .inner_angle = 10, .outer_angle = 15});
+        .intensity = 20 * GLM_PIf, .range = 10, .inner_angle = 10, .outer_angle = 15});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "spot.png",
         .resolution_scale = 1});
@@ -184,7 +184,7 @@ void Light_directional_light_direction(void) {
     ecs_set(world, wall, PbrMaterial, {.roughness = 1});
     ecs_entity_t sun = ecs_new(world);
     ecs_set(world, sun, Rotation, {0, (float)GLM_PI, 0});
-    ecs_set(world, sun, DirectionalLight, {.intensity = 1});
+    ecs_set(world, sun, DirectionalLight, {.intensity = GLM_PIf});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "sun.png",
         .resolution_scale = 1});
@@ -251,7 +251,7 @@ void Light_lights_replace_default_sun(void) {
     stbi_image_free(px);
 
     ecs_entity_t away = ecs_new(world);
-    ecs_set(world, away, DirectionalLight, {.intensity = 1});
+    ecs_set(world, away, DirectionalLight, {.intensity = GLM_PIf});
     ecs_progress(world, 0);
     box_render_sync(world);
     px = stbi_load(path, &w, &h, &n, 4);
@@ -299,10 +299,10 @@ void Light_light_scoped_to_scene(void) {
     ecs_set(world, wall, PbrMaterial, {.roughness = 1});
     ecs_entity_t own = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, own, Position, {-3, 0, 0});
-    ecs_set(world, own, PointLight, {.intensity = 4, .range = 3});
+    ecs_set(world, own, PointLight, {.intensity = 4 * GLM_PIf, .range = 3});
     ecs_entity_t other = ecs_new(world);
     ecs_set(world, other, Position, {3, 0, 0});
-    ecs_set(world, other, PointLight, {.intensity = 4, .range = 3});
+    ecs_set(world, other, PointLight, {.intensity = 4 * GLM_PIf, .range = 3});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "scene.png",
         .resolution_scale = 1});
@@ -351,10 +351,10 @@ void Light_nested_scene_keeps_its_lights(void) {
     ecs_set(world, wall, PbrMaterial, {.roughness = 1});
     ecs_entity_t own = ecs_new_w_pair(world, EcsChildOf, outer);
     ecs_set(world, own, Position, {-3, 0, 0});
-    ecs_set(world, own, PointLight, {.intensity = 4, .range = 3});
+    ecs_set(world, own, PointLight, {.intensity = 4 * GLM_PIf, .range = 3});
     ecs_entity_t nested = ecs_new_w_pair(world, EcsChildOf, inner);
     ecs_set(world, nested, Position, {3, 0, 0});
-    ecs_set(world, nested, PointLight, {.intensity = 4, .range = 3});
+    ecs_set(world, nested, PointLight, {.intensity = 4 * GLM_PIf, .range = 3});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "nested.png",
         .resolution_scale = 1});
@@ -400,7 +400,7 @@ void Light_lighting_disabled_is_unlit(void) {
     ecs_set(world, glow, Emissive, {.strength = 1, .color = {0, 255, 0}});
     ecs_entity_t light = ecs_new(world);
     ecs_set(world, light, Position, {-3, 0, 0});
-    ecs_set(world, light, PointLight, {.intensity = 4, .range = 3});
+    ecs_set(world, light, PointLight, {.intensity = 4 * GLM_PIf, .range = 3});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "unlit.png",
         .resolution_scale = 1});
@@ -453,7 +453,7 @@ void Light_ambient_light_of_scene(void) {
     ecs_set(world, wall, Rgb, {128, 128, 128});
     ecs_set(world, wall, PbrMaterial, {.roughness = 1});
     ecs_entity_t away = ecs_new_w_pair(world, EcsChildOf, scene);
-    ecs_set(world, away, DirectionalLight, {.intensity = 1});
+    ecs_set(world, away, DirectionalLight, {.intensity = GLM_PIf});
     ecs_singleton_set(world, AmbientLight, {.intensity = 0});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "ambient.png",
@@ -561,7 +561,7 @@ void Light_moved_light_follows_transform(void) {
     ecs_set(world, parent, Position, {-3, 0, 0});
     ecs_entity_t light = ecs_new_w_pair(world, EcsChildOf, parent);
     ecs_set(world, light, Position, {0, 0, 0});
-    ecs_set(world, light, PointLight, {.intensity = 4, .range = 3});
+    ecs_set(world, light, PointLight, {.intensity = 4 * GLM_PIf, .range = 3});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "moved.png",
         .resolution_scale = 1});
@@ -614,7 +614,7 @@ void Light_many_point_lights(void) {
         for (y = 0; y < 25; y ++) {
             ecs_entity_t light = ecs_new(world);
             ecs_set(world, light, Position, {-8 + x * 0.41f, -4.2f + y * 0.35f, 0});
-            ecs_set(world, light, PointLight, {.intensity = 2, .range = 1.2f});
+            ecs_set(world, light, PointLight, {.intensity = 2 * GLM_PIf, .range = 1.2f});
         }
     }
 
@@ -655,9 +655,9 @@ void Light_unchanged_lights_upload_nothing(void) {
     ecs_set(world, scene, Scene, {0});
     ecs_entity_t light = ecs_new(world);
     ecs_set(world, light, Position, {1, 2, 3});
-    ecs_set(world, light, PointLight, {.intensity = 1, .range = 5});
+    ecs_set(world, light, PointLight, {.intensity = GLM_PIf, .range = 5});
     ecs_entity_t other = ecs_new_w_pair(world, EcsChildOf, scene);
-    ecs_set(world, other, SpotLight, {.intensity = 1, .range = 5, .outer_angle = 30});
+    ecs_set(world, other, SpotLight, {.intensity = GLM_PIf, .range = 5, .outer_angle = 30});
 
     box_render_lights_stats_t stats;
     ecs_progress(world, 0);
@@ -751,12 +751,12 @@ void Light_cluster_lists_every_light(void) {
     for (i = 0; i < 200; i ++) {
         ecs_entity_t light = ecs_new(world);
         ecs_set(world, light, Position, {-3, 0, 0});
-        ecs_set(world, light, PointLight, {.intensity = 0.005f, .range = 2});
+        ecs_set(world, light, PointLight, {.intensity = 0.005f * GLM_PIf, .range = 2});
     }
 
     ecs_entity_t single = ecs_new(world);
     ecs_set(world, single, Position, {3, 0, 0});
-    ecs_set(world, single, PointLight, {.intensity = 1, .range = 2});
+    ecs_set(world, single, PointLight, {.intensity = GLM_PIf, .range = 2});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "crowd.png",
         .resolution_scale = 1});
@@ -802,7 +802,7 @@ void Light_spot_light_lights_its_whole_cone(void) {
     ecs_set(world, spot, Position, {-1, 0, 2});
     ecs_set(world, spot, Rotation, {0, (float)GLM_PI - 0.5f, 0});
     ecs_set(world, spot, SpotLight, {
-        .intensity = 40, .range = 12, .inner_angle = 40, .outer_angle = 45});
+        .intensity = 40 * GLM_PIf, .range = 12, .inner_angle = 40, .outer_angle = 45});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "cone.png",
         .resolution_scale = 1});
@@ -848,7 +848,7 @@ void Light_point_light_inverse_square(void) {
     ecs_set(world, wall, Rgb, {255, 255, 255});
     ecs_set(world, wall, PbrMaterial, {.roughness = 1});
     ecs_entity_t light = ecs_new(world);
-    ecs_set(world, light, PointLight, {.intensity = 0.15f, .range = 40});
+    ecs_set(world, light, PointLight, {.intensity = 0.15f * GLM_PIf, .range = 40});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "falloff.png",
         .resolution_scale = 1});
@@ -878,6 +878,91 @@ void Light_point_light_inverse_square(void) {
     ecs_fini(world);
 }
 
+/** Light a surface reflects toward the eye from one light, as brdf() of etc/shaders/mesh.wgsl:
+ * Lambert diffuse albedo / pi times 1 - F, GGX specular, times the light color and NdotL.
+ *
+ * @param albedo Linear base color, dielectric
+ * @param roughness Perceptual roughness
+ * @param ndl Cosine between the normal and the direction toward the light, the eye along the
+ *        normal
+ * @param color Light color times intensity
+ * @return The linear reflected light
+ */
+static float light_brdf(
+    float albedo,
+    float roughness,
+    float ndl,
+    float color)
+{
+    float a = roughness * roughness, a2 = a * a;
+    float sin_l = sqrtf(1.0f - ndl * ndl);
+    float len = sqrtf(sin_l * sin_l + (ndl + 1.0f) * (ndl + 1.0f));
+    float ndh = (ndl + 1.0f) / len, ldh = ndh;
+    float x = 1.0f - ldh;
+    float f = 0.04f + 0.96f * x * x * x * x * x;
+    float d = ndh * ndh * (a2 - 1.0f) + 1.0f;
+    float dist = a2 / (GLM_PIf * d * d);
+    float gv = ndl;
+    float gl = sqrtf((ndl - a2 * ndl) * ndl + a2);
+    float vis = 0.5f / (gv + gl);
+    float diffuse = (1.0f - f) * albedo / GLM_PIf;
+
+    return (diffuse + dist * vis * f) * color * ndl;
+}
+
+/* A sun of intensity 2 travels 60 degrees off the normal of a wall of albedo 128 (0.2158
+ * linear): the wall reflects about 0.2158 / pi * 2 * 0.5 = 0.069 plus a little GGX specular,
+ * where the old radiance of intensity times pi made it 0.22. */
+void Light_directional_light_irradiance_unit(void) {
+    // lighting/lights
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 6});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
+        .color = {0, 0, 0, 255}}, .lighting.enabled = true});
+    ecs_singleton_set(world, AmbientLight, {.intensity = 0});
+    ecs_entity_t wall = ecs_new(world);
+    ecs_set(world, wall, Position, {0, 0, -1});
+    ecs_set(world, wall, Box, {20, 20, 0.1f});
+    ecs_set(world, wall, Rgb, {128, 128, 128});
+    ecs_set(world, wall, PbrMaterial, {.roughness = 1});
+
+    ecs_entity_t sun = ecs_new(world);
+    ecs_set(world, sun, Rotation, {0, 2.0f * (float)GLM_PI / 3.0f, 0});
+    ecs_set(world, sun, DirectionalLight, {.intensity = 2});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "unit.png",
+        .resolution_scale = 1});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    char *path = flecs_asprintf("%s/unit.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    unsigned char *c = &px[(16 * 64 + 32) * 4];
+
+    float albedo = powf((128.0f / 255.0f + 0.055f) / 1.055f, 2.4f);
+    float linear = light_brdf(albedo, 1, 0.5f, 2);
+    float encoded = 1.055f * powf(linear, 1.0f / 2.4f) - 0.055f;
+    int expect = (int)(encoded * 255.0f + 0.5f);
+    test_assert(linear > 0.068f && linear < 0.072f);
+    test_assert(abs((int)c[0] - expect) <= 2);
+    test_assert(abs((int)c[1] - expect) <= 2);
+    test_assert(abs((int)c[2] - expect) <= 2);
+
+    stbi_image_free(px);
+    ecs_os_free(path);
+    ecs_fini(world);
+}
+
 void Light_point_light_fades_smoothly_to_range(void) {
     // lighting_fixes/point_falloff
     ecs_world_t *world = ecs_init();
@@ -900,7 +985,7 @@ void Light_point_light_fades_smoothly_to_range(void) {
     ecs_set(world, wall, PbrMaterial, {.roughness = 1});
     ecs_entity_t light = ecs_new(world);
     ecs_set(world, light, Position, {0, 0, 1});
-    ecs_set(world, light, PointLight, {.intensity = 2, .range = 3});
+    ecs_set(world, light, PointLight, {.intensity = 2 * GLM_PIf, .range = 3});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "fade.png",
         .resolution_scale = 1});
@@ -954,12 +1039,12 @@ void Light_cluster_list_grows_to_every_light(void) {
     for (i = 0; i < 100; i ++) {
         ecs_entity_t light = ecs_new(world);
         ecs_set(world, light, Position, {-3, 0, 0});
-        ecs_set(world, light, PointLight, {.intensity = 0.004f, .range = 1000});
+        ecs_set(world, light, PointLight, {.intensity = 0.004f * GLM_PIf, .range = 1000});
     }
 
     ecs_entity_t single = ecs_new(world);
     ecs_set(world, single, Position, {3, 0, 0});
-    ecs_set(world, single, PointLight, {.intensity = 0.4f, .range = 1000});
+    ecs_set(world, single, PointLight, {.intensity = 0.4f * GLM_PIf, .range = 1000});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "everywhere.png",
         .resolution_scale = 1});
@@ -1008,12 +1093,12 @@ void Light_cluster_list_kept_per_target(void) {
     for (i = 0; i < 100; i ++) {
         ecs_entity_t light = ecs_new(world);
         ecs_set(world, light, Position, {-3, 0, 0});
-        ecs_set(world, light, PointLight, {.intensity = 0.004f, .range = 1000});
+        ecs_set(world, light, PointLight, {.intensity = 0.004f * GLM_PIf, .range = 1000});
     }
 
     ecs_entity_t single = ecs_new(world);
     ecs_set(world, single, Position, {3, 0, 0});
-    ecs_set(world, single, PointLight, {.intensity = 0.4f, .range = 1000});
+    ecs_set(world, single, PointLight, {.intensity = 0.4f * GLM_PIf, .range = 1000});
 
     ecs_entity_t scene = ecs_new(world);
     ecs_set(world, scene, Scene, {0});

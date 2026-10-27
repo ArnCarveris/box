@@ -247,7 +247,7 @@ void LightBake_scene_renders_identically(void) {
         ecs_set(world, ball, Sphere, {.segments = 24, .smooth = true, .radius = 1});
         ecs_entity_t light = ecs_new_w_pair(world, EcsChildOf, scene);
         ecs_set(world, light, Position, {2, 3, 2});
-        ecs_set(world, light, PointLight, {.intensity = 4, .range = 12});
+        ecs_set(world, light, PointLight, {.intensity = 4 * GLM_PIf, .range = 12});
         ecs_entity_t e = ecs_new(world);
         ecs_set(world, e, Surface, {.width = 64, .height = 48, .write_to_file = "bake.png",
             .resolution_scale = 1});

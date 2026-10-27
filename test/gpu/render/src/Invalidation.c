@@ -179,7 +179,7 @@ void Invalidation_point_light_change_limited_to_range(void) {
     ecs_set(world, floor, Box, {48, 0.2f, 4});
     ecs_entity_t lamp = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, lamp, Position, {16, 1, 0});
-    ecs_set(world, lamp, PointLight, {.intensity = 2, .range = 3});
+    ecs_set(world, lamp, PointLight, {.intensity = 2 * GLM_PIf, .range = 3});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 32, .height = 24, .resolution_scale = 1});
 
@@ -194,7 +194,7 @@ void Invalidation_point_light_change_limited_to_range(void) {
     test_bool(status->converged, true);
     int32_t probes = status->probes, baked = status->baked;
 
-    ecs_set(world, lamp, PointLight, {.intensity = 4, .range = 3});
+    ecs_set(world, lamp, PointLight, {.intensity = 4 * GLM_PIf, .range = 3});
     ecs_progress(world, 0);
     box_render_sync(world);
     status = ecs_get(world, scene, LightBakeStatus);
@@ -245,7 +245,7 @@ void Invalidation_directional_light_change_rebakes_scene(void) {
     ecs_set(world, floor, Box, {16, 0.2f, 4});
     ecs_entity_t sun = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, sun, Rotation, {1, 0.5f, 0});
-    ecs_set(world, sun, DirectionalLight, {.intensity = 1});
+    ecs_set(world, sun, DirectionalLight, {.intensity = GLM_PIf});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 32, .height = 24, .resolution_scale = 1});
 
@@ -261,7 +261,7 @@ void Invalidation_directional_light_change_rebakes_scene(void) {
     int32_t baked = status->baked;
     test_assert(baked > 0);
 
-    ecs_set(world, sun, DirectionalLight, {.intensity = 2});
+    ecs_set(world, sun, DirectionalLight, {.intensity = 2 * GLM_PIf});
     ecs_progress(world, 0);
     box_render_sync(world);
     status = ecs_get(world, scene, LightBakeStatus);

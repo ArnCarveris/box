@@ -536,9 +536,9 @@ void Atmosphere_sun_light_attenuated(void) {
     const float *t = status->sun_transmittance;
     test_assert(t[0] > t[1] && t[1] > t[2] && t[2] > 0.5f && t[0] < 1.0f);
     test_near(v->lights.sun[1], 0.5f, 1e-4f);
-    test_near(v->lights.sun_color[0], 2 * GLM_PIf * t[0], 1e-4f);
-    test_near(v->lights.sun_color[1], 2 * GLM_PIf * t[1], 1e-4f);
-    test_near(v->lights.sun_color[2], 2 * GLM_PIf * t[2], 1e-4f);
+    test_near(v->lights.sun_color[0], 2 * t[0], 1e-4f);
+    test_near(v->lights.sun_color[1], 2 * t[1], 1e-4f);
+    test_near(v->lights.sun_color[2], 2 * t[2], 1e-4f);
 
     test_flt(ecs_get(world, sun, DirectionalLight)->intensity, 2);
     test_int(ecs_get(world, sun, Rgb)->r, 255);
@@ -575,7 +575,7 @@ void Atmosphere_sun_below_horizon_is_zero(void) {
     ecs_set(world, sun, Rotation, {0, 0, 0});
     v = frame_view(world, null, scene);
     status = ecs_get(world, scene, AtmosphereStatus);
-    test_near(v->lights.sun_color[0], GLM_PIf * 0.5f * status->sun_transmittance[0], 1e-4f);
+    test_near(v->lights.sun_color[0], 0.5f * status->sun_transmittance[0], 1e-4f);
 
     ecs_fini(world);
     box_render_null_free(null);
@@ -603,14 +603,14 @@ void Atmosphere_explicit_sun_and_moon_attenuated(void) {
     test_near(tm[2], ts[2], 1e-5f);
 
     const box_render_light_t *l = view_light(world, scene, other);
-    test_near(l->color[0], GLM_PIf, 1e-5f);
-    test_near(l->color[2], GLM_PIf, 1e-5f);
+    test_near(l->color[0], 1, 1e-5f);
+    test_near(l->color[2], 1, 1e-5f);
     l = view_light(world, scene, sun);
-    test_near(l->color[0], GLM_PIf * ts[0], 1e-4f);
-    test_near(l->color[2], GLM_PIf * ts[2], 1e-4f);
+    test_near(l->color[0], ts[0], 1e-4f);
+    test_near(l->color[2], ts[2], 1e-4f);
     l = view_light(world, scene, moon);
-    test_near(l->color[0], 0.75f * 0.5f * GLM_PIf * tm[0], 1e-4f);
-    test_near(l->color[2], 0.75f * 0.5f * GLM_PIf * tm[2], 1e-4f);
+    test_near(l->color[0], 0.75f * 0.5f * tm[0], 1e-4f);
+    test_near(l->color[2], 0.75f * 0.5f * tm[2], 1e-4f);
 
     ecs_get_mut(world, scene, Atmosphere)->moon = 0;
     ecs_modified(world, scene, Atmosphere);
@@ -618,7 +618,7 @@ void Atmosphere_explicit_sun_and_moon_attenuated(void) {
     test_flt(status->moon_illumination, 0);
     test_flt(status->moon_transmittance[0], 0);
     l = view_light(world, scene, moon);
-    test_near(l->color[0], 0.5f * GLM_PIf, 1e-5f);
+    test_near(l->color[0], 0.5f, 1e-5f);
 
     ecs_fini(world);
     box_render_null_free(null);
@@ -662,8 +662,8 @@ void Atmosphere_invalid_atmosphere_leaves_lights(void) {
     view_new(world, scene);
     const box_render_view_t *v = frame_view(world, null, scene);
     test_assert(ecs_get(world, scene, AtmosphereStatus)->error != NULL);
-    test_near(v->lights.sun_color[0], 2 * GLM_PIf, 1e-5f);
-    test_near(v->lights.sun_color[2], 2 * GLM_PIf, 1e-5f);
+    test_near(v->lights.sun_color[0], 2, 1e-5f);
+    test_near(v->lights.sun_color[2], 2, 1e-5f);
 
     ecs_fini(world);
     box_render_null_free(null);
@@ -682,11 +682,11 @@ void Atmosphere_scene_without_atmosphere_unchanged(void) {
     view_new(world, sky);
     view_new(world, plain);
     const box_render_view_t *v = frame_view(world, null, plain);
-    test_near(v->lights.sun_color[0], GLM_PIf, 1e-5f);
-    test_near(v->lights.sun_color[1], GLM_PIf, 1e-5f);
-    test_near(v->lights.sun_color[2], GLM_PIf, 1e-5f);
+    test_near(v->lights.sun_color[0], 1, 1e-5f);
+    test_near(v->lights.sun_color[1], 1, 1e-5f);
+    test_near(v->lights.sun_color[2], 1, 1e-5f);
     v = frame_view(world, null, sky);
-    test_assert(v->lights.sun_color[2] < 0.9f * GLM_PIf);
+    test_assert(v->lights.sun_color[2] < 0.9f);
 
     ecs_fini(world);
     box_render_null_free(null);
@@ -797,14 +797,14 @@ void Atmosphere_moon_light_scaled_by_illumination(void) {
     test_near(status->moon_illumination, 0.5f, 1e-4f);
     test_assert(tm[2] > 0 && tm[2] < tm[0] && tm[0] < 1);
     const box_render_light_t *l = view_light(world, scene, moon);
-    test_near(l->color[0], 0.5f * 0.5f * GLM_PIf * tm[0], 1e-4f);
-    test_near(l->color[1], 0.5f * 0.5f * GLM_PIf * tm[1], 1e-4f);
-    test_near(l->color[2], 0.5f * 0.5f * GLM_PIf * tm[2], 1e-4f);
+    test_near(l->color[0], 0.5f * 0.5f * tm[0], 1e-4f);
+    test_near(l->color[1], 0.5f * 0.5f * tm[1], 1e-4f);
+    test_near(l->color[2], 0.5f * 0.5f * tm[2], 1e-4f);
 
     ecs_set(world, sun, Rotation, {glm_rad(210.0f), 0, 0});
     status = frame_status(world, scene);
     l = view_light(world, scene, moon);
-    test_near(l->color[0], 0.5f * GLM_PIf * status->moon_transmittance[0], 1e-4f);
+    test_near(l->color[0], 0.5f * status->moon_transmittance[0], 1e-4f);
 
     ecs_fini(world);
     box_render_null_free(null);
@@ -875,7 +875,7 @@ void Atmosphere_scene_without_atmosphere_keeps_light_order(void) {
     const box_render_view_t *v = frame_view(world, null, plain);
     test_assert(view_light_entity(world, plain, 0) == dim);
     test_assert(view_light_entity(world, plain, 1) == bright);
-    test_near(v->lights.sun_color[0], 0.2f * GLM_PIf, 1e-5f);
+    test_near(v->lights.sun_color[0], 0.2f, 1e-5f);
 
     ecs_fini(world);
     box_render_null_free(null);

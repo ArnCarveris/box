@@ -62,7 +62,7 @@ static ecs_entity_t scene_new(
     ecs_get_mut(world, scene, Atmosphere)->units_per_km = units_per_km;
     ecs_modified(world, scene, Atmosphere);
     ecs_entity_t sun = ecs_new_w_pair(world, EcsChildOf, scene);
-    ecs_set(world, sun, DirectionalLight, {.intensity = 1});
+    ecs_set(world, sun, DirectionalLight, {.intensity = GLM_PIf});
     ecs_set(world, sun, Rgb, {255, 255, 255});
     ecs_set(world, sun, Rotation, {glm_rad(elevation), 0, 0});
 
@@ -542,7 +542,7 @@ static unsigned char* render_moon(
     ecs_world_t *world = world_new();
     ecs_entity_t scene = scene_new(world, 1000, sun_elevation);
     ecs_entity_t moon = ecs_new_w_pair(world, EcsChildOf, scene);
-    ecs_set(world, moon, DirectionalLight, {.intensity = 1});
+    ecs_set(world, moon, DirectionalLight, {.intensity = GLM_PIf});
     ecs_set(world, moon, Rgb, {255, 255, 255});
     ecs_set(world, moon, Rotation, {glm_rad(MOON_ELEVATION), 0, 0});
     Atmosphere *a = ecs_get_mut(world, scene, Atmosphere);

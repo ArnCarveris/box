@@ -535,7 +535,7 @@ int box_app_views(
             .sky = {255, 255, 255}, .ground = {255, 255, 255}, .intensity = 0.08f
         });
         ecs_set(world, light, DirectionalLight, {
-            .intensity = 1, .bake = LightBakeModeRealtime
+            .intensity = GLM_PIf, .bake = LightBakeModeRealtime
         });
         ecs_set(world, light, Rgb, {255, 255, 255});
         View *v = ecs_ensure(world, target_view, View);

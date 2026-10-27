@@ -465,7 +465,9 @@ void Gallery_form_apply(void) {
     gallery_expect(world, s, "get " PREVIEW ".shape Scale", "{x: 1.25, y: 1.25, z: 1.25}");
     test_bool(ecs_has_id(world, shape, NoShadow), true);
     gallery_expect(world, s, "get " PREVIEW ".sun Rgb", "{r: 150, g: 170, b: 255}");
-    gallery_expect(world, s, "get " PREVIEW ".sun DirectionalLight.intensity", "0.6000000238");
+    char *intensity = gallery_run(world, s, "get " PREVIEW ".sun DirectionalLight.intensity");
+    test_assert(fabs(strtod(intensity, NULL) - 0.6 * GLM_PI) < 1e-5);
+    ecs_os_free(intensity);
     gallery_expect(world, s, "get " PREVIEW_VIEW " View.clear.color",
         "{r: 16, g: 20, b: 38, a: 255}");
     gallery_expect(world, s, "get " FORM ".body.preview.applied_text Text.value",

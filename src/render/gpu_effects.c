@@ -33,6 +33,9 @@
 /** Stops the exposure is clamped to when no bound is set */
 #define BOX_GPU_EXPOSURE_LIMIT (60.0f)
 
+/** Format of the Tony McMapface LUT, a core sampleable and filterable format of WebGPU */
+#define BOX_GPU_TONY_FORMAT (WGPUTextureFormat_RGB9E5Ufloat)
+
 /** Kind of state that holds the measured exposure, next to box_render_effect_kind_t */
 #define BOX_GPU_FX_MEASURE (100)
 
@@ -100,6 +103,11 @@ struct box_gpu_effects_t {
     WGPUSampler sampler;            /**< Linear clamp sampler */
     WGPUTexture placeholder;        /**< 1x1 image bound where a pass reads no second image */
     WGPUTextureView placeholder_view; /**< View of the placeholder image */
+    WGPUTexture placeholder_3d;     /**< 1x1x1 volume bound where a pass reads no LUT */
+    WGPUTextureView placeholder_3d_view; /**< View of the placeholder volume */
+    WGPUTexture tony;               /**< The Tony McMapface LUT, loaded on first use */
+    WGPUTextureView tony_view;      /**< View of the LUT */
+    bool tony_failed;               /**< The LUT could not be loaded, which was logged once */
     WGPUBuffer unit_exposure;       /**< Exposure of 0 stops, bound where a pass scales nothing */
     WGPUBuffer no_uniforms;         /**< Uniforms bound where a pass has none */
     ecs_vec_t pipelines;            /**< box_gpu_fx_pipeline_t */
@@ -116,6 +124,7 @@ typedef struct box_gpu_fx_pass_t {
     WGPUTextureView aux;            /**< Image at binding 4, NULL for the placeholder */
     WGPUBuffer uniforms;            /**< Uniforms at binding 2, NULL for none */
     WGPUBuffer exposure;            /**< Exposure at binding 5, NULL for 0 stops */
+    WGPUTextureView lut;            /**< Volume at binding 6, NULL for the placeholder */
     WGPUTextureView depth;          /**< Depth at binding 3 */
     WGPUTextureView output;         /**< Image the pass writes */
     WGPUTextureFormat format;       /**< Format of the output */
@@ -138,7 +147,8 @@ typedef struct box_gpu_fx_ctx_t {
 
 /** Uniforms of the tone map pass, matching Tonemap in etc/shaders/tonemap.wgsl */
 typedef struct box_gpu_tonemap_uniforms_t {
-    uint32_t flags[4];              /**< Scale by the exposure, apply the curve, two unused */
+    uint32_t flags[4];              /**< Scale by the exposure, operator (0 none, 1 PBR Neutral,
+                                     *   2 Tony McMapface), two unused */
 } box_gpu_tonemap_uniforms_t;
 
 /** Uniforms of the exposure passes, matching Settings in etc/shaders/exposure.wgsl */
@@ -255,6 +265,78 @@ static WGPUTextureView box_gpu_fx_level(
     return wgpuTextureCreateView(texture, &desc);
 }
 
+/** Create a 3D texture that passes sample, filled with texels of 4 bytes.
+ *
+ * @param gpu The backend
+ * @param size Texels along each edge
+ * @param format Color format, of 4 bytes per texel
+ * @param texels The texels, x fastest, then y, then z
+ * @param view Receives the view of the texture
+ * @return The texture
+ */
+static WGPUTexture box_gpu_fx_volume(
+    box_gpu_t *gpu,
+    uint32_t size,
+    WGPUTextureFormat format,
+    const uint32_t *texels,
+    WGPUTextureView *view)
+{
+    WGPUTextureDescriptor desc = {
+        .usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst,
+        .dimension = WGPUTextureDimension_3D,
+        .size = { size, size, size },
+        .format = format,
+        .mipLevelCount = 1,
+        .sampleCount = 1
+    };
+    WGPUTexture result = wgpuDeviceCreateTexture(gpu->device, &desc);
+    WGPUTexelCopyTextureInfo dst = { .texture = result, .aspect = WGPUTextureAspect_All };
+    WGPUTexelCopyBufferLayout layout = { .bytesPerRow = size * 4, .rowsPerImage = size };
+    WGPUExtent3D extent = { size, size, size };
+    WGPUTextureViewDescriptor view_desc = {
+        .format = format,
+        .dimension = WGPUTextureViewDimension_3D,
+        .mipLevelCount = 1,
+        .arrayLayerCount = 1,
+        .aspect = WGPUTextureAspect_All
+    };
+    wgpuQueueWriteTexture(gpu->queue, &dst, texels, (size_t)size * size * size * 4, &layout,
+        &extent);
+    *view = wgpuTextureCreateView(result, &view_desc);
+
+    return result;
+}
+
+/** Get the view of the Tony McMapface LUT, loaded from its file on first use.
+ *
+ * @param gpu The backend
+ * @return The view, NULL when the file cannot be loaded
+ */
+static WGPUTextureView box_gpu_fx_tony(
+    box_gpu_t *gpu)
+{
+    box_gpu_effects_t *fx = gpu->effects;
+    char *error = NULL;
+    uint32_t *texels = NULL;
+    if (fx->tony_view || fx->tony_failed) {
+        goto done;
+    }
+
+    texels = box_render_tony_load(BOX_RENDER_TONY_PATH, &error);
+    if (!texels) {
+        ecs_err("tonemap: %s", error);
+        ecs_os_free(error);
+        fx->tony_failed = true;
+        goto done;
+    }
+
+    fx->tony = box_gpu_fx_volume(gpu, BOX_RENDER_TONY_SIZE, BOX_GPU_TONY_FORMAT, texels,
+        &fx->tony_view);
+    ecs_os_free(texels);
+done:
+    return fx->tony_view;
+}
+
 /** Release a texture and its view when they exist.
  *
  * @param texture The texture
@@ -280,7 +362,7 @@ void box_gpu_effects_init(
 {
     box_gpu_effects_t *fx = ecs_os_calloc_t(box_gpu_effects_t);
     WGPUShaderStage frag = WGPUShaderStage_Fragment;
-    WGPUBindGroupLayoutEntry entries[6] = {
+    WGPUBindGroupLayoutEntry entries[7] = {
         { .binding = 0, .visibility = frag, .texture = {
             .sampleType = WGPUTextureSampleType_Float,
             .viewDimension = WGPUTextureViewDimension_2D } },
@@ -295,7 +377,10 @@ void box_gpu_effects_init(
             .sampleType = WGPUTextureSampleType_Float,
             .viewDimension = WGPUTextureViewDimension_2D } },
         { .binding = 5, .visibility = frag, .buffer = {
-            .type = WGPUBufferBindingType_ReadOnlyStorage } }
+            .type = WGPUBufferBindingType_ReadOnlyStorage } },
+        { .binding = 6, .visibility = frag, .texture = {
+            .sampleType = WGPUTextureSampleType_Float,
+            .viewDimension = WGPUTextureViewDimension_3D } }
     };
     WGPUShaderStage comp = WGPUShaderStage_Compute;
     WGPUBindGroupLayoutEntry measure[4] = {
@@ -320,8 +405,9 @@ void box_gpu_effects_init(
         .maxAnisotropy = 1
     };
     float unit[4] = { 0.0f, 1.0f, 0.0f, 0.0f };
+    uint32_t black = 0;
     fx->layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
-        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 6, .entries = entries });
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 7, .entries = entries });
     fx->pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
         &(WGPUPipelineLayoutDescriptor){ .bindGroupLayoutCount = 1,
             .bindGroupLayouts = &fx->layout });
@@ -333,6 +419,8 @@ void box_gpu_effects_init(
     fx->sampler = wgpuDeviceCreateSampler(gpu->device, &sampler);
     fx->placeholder = box_gpu_fx_texture(gpu, 1, 1, BOX_GPU_HDR_FORMAT, 1);
     fx->placeholder_view = wgpuTextureCreateView(fx->placeholder, NULL);
+    fx->placeholder_3d = box_gpu_fx_volume(gpu, 1, BOX_GPU_TONY_FORMAT, &black,
+        &fx->placeholder_3d_view);
     fx->unit_exposure = box_gpu_fx_buffer(gpu, sizeof(unit), WGPUBufferUsage_Storage);
     fx->no_uniforms = box_gpu_fx_buffer(gpu, BOX_GPU_FX_UNIFORMS, WGPUBufferUsage_Uniform);
     wgpuQueueWriteBuffer(gpu->queue, fx->unit_exposure, 0, unit, sizeof(unit));
@@ -464,6 +552,8 @@ void box_gpu_effects_fini(
     ecs_vec_fini_t(NULL, &fx->states, box_gpu_fx_state_t*);
     ecs_vec_fini_t(NULL, &fx->targets, box_gpu_fx_target_t*);
     box_gpu_fx_release(&fx->placeholder, &fx->placeholder_view);
+    box_gpu_fx_release(&fx->placeholder_3d, &fx->placeholder_3d_view);
+    box_gpu_fx_release(&fx->tony, &fx->tony_view);
     wgpuBufferRelease(fx->unit_exposure);
     wgpuBufferRelease(fx->no_uniforms);
     wgpuSamplerRelease(fx->sampler);
@@ -627,17 +717,18 @@ static bool box_gpu_fx_draw(
 
     WGPUBuffer uniforms = pass->uniforms ? pass->uniforms : fx->no_uniforms;
     WGPUBuffer exposure = pass->exposure ? pass->exposure : fx->unit_exposure;
-    WGPUBindGroupEntry entries[6] = {
+    WGPUBindGroupEntry entries[7] = {
         { .binding = 0, .textureView = pass->input },
         { .binding = 1, .sampler = fx->sampler },
         { .binding = 2, .buffer = uniforms, .size = BOX_GPU_FX_UNIFORMS },
         { .binding = 3, .textureView = ctx->t->depth_view },
         { .binding = 4, .textureView = pass->aux ? pass->aux : fx->placeholder_view },
-        { .binding = 5, .buffer = exposure, .size = 4 * sizeof(float) }
+        { .binding = 5, .buffer = exposure, .size = 4 * sizeof(float) },
+        { .binding = 6, .textureView = pass->lut ? pass->lut : fx->placeholder_3d_view }
     };
     WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
         .layout = fx->layout,
-        .entryCount = 6,
+        .entryCount = 7,
         .entries = entries
     });
     WGPURenderPassColorAttachment attachment = {
@@ -861,10 +952,18 @@ static bool box_gpu_fx_tonemap(
 {
     box_gpu_tonemap_uniforms_t u = {{0}};
     WGPUBuffer exposure = e && e->exposure ? box_gpu_fx_measure(gpu, ctx, e) : NULL;
+    WGPUTextureView lut = NULL;
     box_gpu_fx_state_t *s = box_gpu_fx_state(gpu, ctx, e ? e->entity : 0,
         e ? (int32_t)e->kind : BOX_GPU_FX_COPY);
     u.flags[0] = exposure ? 1u : 0u;
-    u.flags[1] = e && e->kind == BOX_RENDER_EFFECT_TONEMAP ? 1u : 0u;
+    if (e && e->kind == BOX_RENDER_EFFECT_TONEMAP) {
+        u.flags[1] = 1u;
+        if (e->tonemap == TonemapOperatorTonyMcMapface) {
+            lut = box_gpu_fx_tony(gpu);
+            u.flags[1] = lut ? 2u : 1u;
+        }
+    }
+
     box_gpu_fx_uniforms(gpu, s, &u, sizeof(u));
 
     return box_gpu_fx_draw(gpu, ctx, &(box_gpu_fx_pass_t){
@@ -873,6 +972,7 @@ static bool box_gpu_fx_tonemap(
         .input = ctx->input,
         .uniforms = s->uniforms,
         .exposure = exposure,
+        .lut = lut,
         .output = ctx->output,
         .format = ctx->format,
         .blend = ctx->blend

@@ -155,7 +155,7 @@ void DeviceLoss_lost_device_recovers(void) {
     ecs_set(world, box, PbrMaterial, {.roughness = 1});
     ecs_entity_t light = ecs_new(world);
     ecs_set(world, light, Position, {2, 0, 2});
-    ecs_set(world, light, PointLight, {.intensity = 4, .range = 4});
+    ecs_set(world, light, PointLight, {.intensity = 4 * GLM_PIf, .range = 4});
     ecs_entity_t label = ecs_new(world);
     ecs_set(world, label, Position, {0, 2, 0});
     ecs_set(world, label, Text, {.value = "Box", .size = 1,

@@ -363,7 +363,7 @@ void Culling_offscreen_caster_shadows_view(void) {
     ecs_set(world, far, Box, {1.5f, 0.2f, 1.5f});
     ecs_entity_t sun = ecs_new(world);
     ecs_set(world, sun, Rotation, {(float)GLM_PI_4, 0, 0});
-    ecs_set(world, sun, DirectionalLight, {.intensity = 1});
+    ecs_set(world, sun, DirectionalLight, {.intensity = GLM_PIf});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "caster.png",
         .resolution_scale = 1});

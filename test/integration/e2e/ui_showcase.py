@@ -7,6 +7,8 @@ the App of tools/box_client.py. The runner checks after every case that the app 
 error and quits cleanly. The coordinates are window points for 1280x720, each checked with
 PickStatus before it is clicked.
 """
+import math
+
 from box_client import mean_luma
 
 APP = "apps/uishowcase"
@@ -87,15 +89,18 @@ def test_screen_toggle_and_slider(app):
     app.wait_for("get showcase.world_view View.shadows.enabled", "false")
     app.expect(state("last"), '"shadows"')
 
-    app.expect("get showcase.sun DirectionalLight.intensity", "2")
+    # The light has the intensity of the slider times pi, the unit of DirectionalLight
+    app.wait_for("get showcase.sun DirectionalLight.intensity",
+                 lambda out: abs(number(out) - 2 * math.pi) < 1e-4, what="an intensity of 2 pi")
     hover(app, KNOB, SLIDER_PATH)
     app.exec("mouse.drag left %s %s" % (KNOB, KNOB_RIGHT))
     app.wait_input()
     out = app.wait_for("get showcase.sun DirectionalLight.intensity",
-                       lambda out: 2.5 < number(out) < 3, what="an intensity in (2.5, 3)")
+                       lambda out: 2.5 * math.pi < number(out) < 3 * math.pi,
+                       what="an intensity in (2.5 pi, 3 pi)")
     sun = app.get("showcase", "Showcase.mut.sun")
-    app.check(abs(sun - number(out)) < 1e-4,
-              "Showcase.mut.sun %g differs from the intensity %s" % (sun, out))
+    app.check(abs(sun * math.pi - number(out)) < 1e-4,
+              "Showcase.mut.sun %g times pi differs from the intensity %s" % (sun, out))
 
 
 def test_hud_blocks_scene(app):

@@ -18,7 +18,7 @@ room {
 
   sun {
     Rotation: {0.9, 2.4, 0}
-    DirectionalLight: {intensity: 0.3}
+    DirectionalLight: {intensity: 0.3 * flecs.script.math.PI}
   }
 
   floor {

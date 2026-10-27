@@ -24,7 +24,7 @@ main_view {
 // The sun 40 degrees up behind the camera, off to one side
 sun {
   Rotation: {0.6981, 2.4, 0}
-  DirectionalLight: {intensity: 3}
+  DirectionalLight: {intensity: 3 * flecs.script.math.PI}
   Rgb: {255, 255, 255}
 }
 
@@ -32,7 +32,7 @@ sun {
 // about two thirds lit
 moon {
   Rotation: {0.3491, 0, 0}
-  DirectionalLight: {intensity: 1}
+  DirectionalLight: {intensity: flecs.script.math.PI}
   Rgb: {255, 255, 255}
 }
 
