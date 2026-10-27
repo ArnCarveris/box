@@ -36,7 +36,7 @@ static void box_particle_emitter_ctor(
     }
 }
 
-/** Construct ParticleForces values: earth gravity, no wind, drag or turbulence.
+/** Construct ParticleForces values: earth gravity, no wind, drag, turbulence or drift.
  *
  * @param ptr The components
  * @param count Number of components

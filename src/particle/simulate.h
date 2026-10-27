@@ -70,6 +70,10 @@
 /** Sort key of a free slot, after every live particle */
 #define BOX_PARTICLE_SORT_DEAD (0xFFFFFFFFu)
 
+/** Period of each axis of the argument of the wander field: sin(q) and sin(1.618 q) both repeat
+ * after 1000 pi, up to 1e-4 radians for the float 1.618 */
+#define BOX_PARTICLE_WANDER_PERIOD (3141.592653589793)
+
 /** Points of the table an EmitterMesh spawns from */
 #define BOX_PARTICLE_MESH_POINTS (4096)
 
@@ -91,8 +95,8 @@ typedef struct box_particle_t {
     uint32_t index;         /**< Spawn index of the particle in its emitter */
 } box_particle_t;
 
-/** The forces of a frame of the step, as the wind, turbulence and wander members of Emitter in
- * particle.wgsl */
+/** The forces of a frame of the step, as the wind, turbulence, wander and drift members of
+ * Emitter in particle.wgsl */
 typedef struct box_particle_forces_t {
     float acceleration[3];  /**< Emitter acceleration plus gravity, world units per second
                              *   squared */
@@ -100,7 +104,9 @@ typedef struct box_particle_forces_t {
     float drag;             /**< Rate of exponential decay of the difference with the wind */
     float turbulence;       /**< Acceleration of the wander field */
     float scale;            /**< Frequency multiplier of the wander field */
-    float phase[3];         /**< Offset of the wander field, from the seed */
+    float phase[3];         /**< Offset of the wander field, from the seed and the frame */
+    float drift[3];         /**< Velocity of the frame of reference, added to the position
+                             *   only */
 } box_particle_forces_t;
 
 /** The ground plane of an emitter, as the ground and collide members of Emitter */
@@ -370,6 +376,30 @@ static inline void box_particle_phase(
     }
 }
 
+/** Offset the phase of the wander field of an emitter by the displacement of its frame of
+ * reference, so the field at a world position is the one at the position minus the offset.
+ *
+ * The shift wraps at BOX_PARTICLE_WANDER_PERIOD, so the phase stays small however far the frame
+ * moved. The extract sends the phase in the block, so it has no WGSL twin.
+ *
+ * @param phase The phase from the seed
+ * @param offset World displacement of the frame of reference
+ * @param scale Frequency multiplier of the field
+ * @param out Receives the phase
+ */
+static inline void box_particle_frame_phase(
+    const float *phase,
+    const double *offset,
+    float scale,
+    float *out)
+{
+    int32_t c;
+    for (c = 0; c < 3; c ++) {
+        out[c] = (float)((double)phase[c] -
+            fmod(offset[c] * (double)scale, BOX_PARTICLE_WANDER_PERIOD));
+    }
+}
+
 /** Evaluate the wander field: a sum of sines of the position times the scale, offset by the
  * phase, times the turbulence. No component depends on its own axis, so the field has no
  * divergence, and each lies in -turbulence to turbulence.
@@ -399,7 +429,8 @@ static inline void box_particle_wander(
 }
 
 /** Advance a particle by a frame: v += (acceleration + wander(p)) * delta, then the exact drag
- * v = wind + (v - wind) * exp(-drag * delta), then p += v * delta.
+ * v = wind + (v - wind) * exp(-drag * delta), then p += (v + drift) * delta. The drift moves
+ * the particle without entering its velocity.
  *
  * @param position World position, advanced in place
  * @param velocity World velocity, advanced in place
@@ -418,7 +449,7 @@ static inline void box_particle_integrate(
     for (i = 0; i < 3; i ++) {
         velocity[i] += (forces->acceleration[i] + wander[i]) * delta;
         velocity[i] = forces->wind[i] + (velocity[i] - forces->wind[i]) * keep;
-        position[i] += velocity[i] * delta;
+        position[i] += (velocity[i] + forces->drift[i]) * delta;
     }
 }
 

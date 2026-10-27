@@ -3,7 +3,8 @@
  * @brief Tests for the particle passes: streams and effect bursts render where their particles
  * are, scenes and full pools are respected, a fixed seed renders the same image twice, additive
  * pools brighten, soft particles fade near geometry and sprites show the frame of their age.
- * An effect flash lights a wall while it plays, and a deleted lingering emitter still draws.
+ * An effect flash lights a wall while it plays, a deleted lingering emitter still draws and the
+ * drift of the forces carries particles at rest across the image.
  *
  * Frames advance a fixed 1/60 s.
  * An unlit orthographic camera 10 units in front of the origin looks into a 32x32 capture of
@@ -509,6 +510,28 @@ void Particle_lingering_renders_after_delete(void) {
     test_assert(green_at(px, 2, 0) < 8);
     test_int(ecs_singleton_get(world, ParticleStats)->lingering, 1);
     test_int(ecs_singleton_get(world, ParticleStats)->emitters, 0);
+
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+void Particle_drift_moves_particles(void) {
+    // particle/drift
+    ecs_world_t *world = world_new("drift.png");
+    ecs_entity_t e = single_new(world, -2, 1);
+    ecs_set(world, e, ParticleForces, {.drift = {2, 0, 0}});
+    unsigned char *px = run(world, "drift.png", 61);
+
+    test_assert(green_at(px, 0, 0) > 128);
+    test_assert(green_at(px, -2, 0) < 8);
+    test_assert(green_at(px, 2, 0) < 8);
+    test_int(ecs_singleton_get(world, ParticleStats)->particles, 1);
+    stbi_image_free(px);
+
+    ecs_set(world, e, ParticleForces, {.drift = {0, 2, 0}});
+    px = run(world, "drift.png", 60);
+    test_assert(green_at(px, 0, 2) > 128);
+    test_assert(green_at(px, 0, 0) < 8);
 
     stbi_image_free(px);
     ecs_fini(world);

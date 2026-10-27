@@ -46,8 +46,12 @@ ECS_STRUCT(ParticleRange, {
  * ParticleEmitter.forces names or on the emitter entity itself.
  *
  * An emitter adds up the forces of the three, multiplying their turbulence scales. A frame
- * adds (acceleration + gravity + wander) * delta to the velocity, pulls it toward the wind
- * with v = wind + (v - wind) * exp(-drag * delta), then adds the velocity times the delta.
+ * adds (acceleration + gravity + wander) * delta to the velocity v, pulls it toward the wind
+ * with v = wind + (v - wind) * exp(-drag * delta), then moves by (v + drift) * delta.
+ *
+ * The drift is the velocity of a frame of reference the particles move with, as a world that
+ * scrolls past a fixed camera: velocities, forces, curves and the wander field are relative to
+ * it, so a layer looks as without drift. The ground plane of ParticleCollision stays put.
  */
 ECS_STRUCT(ParticleForces, {
     vec3 gravity;           /**< Acceleration in world units per second squared added to the
@@ -60,6 +64,9 @@ ECS_STRUCT(ParticleForces, {
                              *   second squared, default 0 */
     float turbulence_scale; /**< Frequency multiplier of the wander field, above 1 for smaller
                              *   swirls, default 1 */
+    vec3 drift;             /**< Velocity in world units per second of the frame of reference
+                             *   that moves the live particles from the next frame without
+                             *   entering their velocity, default {0, 0, 0} */
 });
 
 /** Collision of the particles of the emitter entity with the horizontal plane at height.
@@ -79,8 +86,8 @@ ECS_STRUCT(ParticleCollision, {
 });
 
 /** An emitter that spawns rate times the frame delta particles a frame, carrying the fraction.
- * Its WorldTransform places the spawn volume and direction; live particles stay in world space.
- * A full pool spawns nothing, and a change of max empties it.
+ * Its WorldTransform places the spawn volume and direction; live particles stay in world space
+ * but for the drift of their ParticleForces. A full pool spawns nothing; a new max empties it.
  *
  * ParticlePlayback pauses, stops and resets it; ParticleBurst spawns on top of the rate.
  *
@@ -350,7 +357,9 @@ ECS_STRUCT(ParticleEffect, {
  * budgets of ParticleSettings rule a burst while they are full, and deleting the template deletes
  * its instances. Scripts call it as box.particle.burst_at(effect, position, scale).
  *
- * @param world The world
+ * @param world The world, or in a system on the main thread before EcsPreStore its stage or
+ *              its world: the instance is made when the commands of the stage merge and
+ *              plays as a burst outside a system does, from that frame
  * @param effect The template
  * @param position World position of the play
  * @param scale Multiplier of the sizes, speeds, spawn volumes and layer offsets of the

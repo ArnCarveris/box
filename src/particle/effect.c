@@ -5,6 +5,10 @@
  *
  * The flashes of an instance are written at its play and after every step of its clock, so the
  * light extract of the next frame lights them at the time of the play the frame shows.
+ *
+ * A burst from a system that runs deferred makes its instance when the commands merge; a
+ * system before the transforms collects its layers then, so it plays in that frame as a burst
+ * outside a system does.
  */
 
 #include "effect.h"
@@ -64,6 +68,8 @@ typedef struct box_particle_effects_t {
     int32_t recycled;       /**< Bursts recycled since the last frame */
     int32_t merged;         /**< Bursts merged since the last frame */
     int32_t dropped;        /**< Bursts dropped since the last frame */
+    int32_t pending;        /**< Instances made while the world was deferred, whose layers
+                             *   were not collected yet */
     int64_t frame;          /**< Frames the effects ran */
     ecs_query_t *views;     /**< View, for EffectSkip */
     ecs_query_t *surfaces;  /**< Surface and an optional SurfaceStatus, for EffectSkip */
@@ -395,6 +401,8 @@ static box_particle_instance_t* box_particle_instance_new(
         box_particle_collect(world, s, result);
         result->collected = ecs_vec_count(&result->layers) != 0;
         effect->empty = !result->collected;
+    } else {
+        s->pending ++;
     }
 
     return result;
@@ -767,6 +775,10 @@ ecs_entity_t box_particle_burst_at(
     const vec3 position,
     float scale)
 {
+    if (ecs_stage_is_readonly(world)) {
+        world = ecs_get_stage(world, 0);
+    }
+
     const ParticleEffectState *state = ecs_singleton_get(world, ParticleEffectState);
     box_particle_effects_t *s = state ? state->state : NULL;
     const ParticleSettings *settings = ecs_singleton_get(world, ParticleSettings);
@@ -907,6 +919,47 @@ static void box_particle_advance(
     box_particle_effect_write(world, inst);
 }
 
+/** Collect the layers of the instances that bursts made while the world was deferred, once their
+ * commands merged, and write their flashes and their play as a burst outside a system does.
+ *
+ * Runs before the transforms, so the layers have their Position in the frame of the burst.
+ *
+ * @param it The iterator of the system
+ */
+static void BoxParticleEffectsCollect(
+    ecs_iter_t *it)
+{
+    box_particle_effects_t *s = it->ctx;
+    ecs_world_t *world = it->world;
+    int32_t e, i;
+    if (!s->pending) {
+        goto done;
+    }
+
+    for (e = 0; e < ecs_vec_count(&s->effects); e ++) {
+        box_particle_effect_t *effect = *ecs_vec_get_t(&s->effects, box_particle_effect_t*, e);
+        for (i = 0; i < ecs_vec_count(&effect->instances); i ++) {
+            box_particle_instance_t *inst = *ecs_vec_get_t(
+                &effect->instances, box_particle_instance_t*, i);
+            if (inst->collected || !inst->playing || !ecs_is_alive(world, inst->root)) {
+                continue;
+            }
+
+            box_particle_collect(world, s, inst);
+            if (!ecs_vec_count(&inst->layers)) {
+                effect->empty = true;
+            }
+
+            box_particle_flash_write(world, inst);
+            box_particle_effect_write(world, inst);
+        }
+    }
+
+    s->pending = 0;
+done:
+    return;
+}
+
 /** Advance every playing instance, release the pools of deleted templates and write the
  * effect counters of ParticleStats.
  *
@@ -1014,6 +1067,14 @@ void box_particle_effects_import(
 
     ECS_COMPONENT_DEFINE(world, ParticleEffectState);
     ecs_singleton_set(world, ParticleEffectState, { .state = s });
+
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "ParticleEffectsCollect" }),
+        .phase = EcsPostUpdate,
+        .run = BoxParticleEffectsCollect,
+        .ctx = s,
+        .immediate = true
+    });
 
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "ParticleEffects" }),

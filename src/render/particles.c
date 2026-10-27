@@ -6,9 +6,9 @@
  * whole microseconds drawn from the seed, so the extract knows when each particle dies: it
  * frees and picks slots and counts the live particles without reading the GPU back.
  *
- * The pool of a deleted linger emitter keeps its range and runs the last block of its emitter
- * without spawns until its last particle died, which the GPU ages by the same whole
- * microseconds, so no rounding margin is needed. ParticleLight lights the frame it is written.
+ * A deleted linger emitter leaves its pool running its last block without spawns, under the
+ * forces of every frame, until the GPU aged its last particle by the same whole microseconds.
+ * ParticleLight lights the frame it is written.
  */
 
 #include "render.h"
@@ -84,6 +84,14 @@ typedef struct box_particle_pool_t {
                              *   no longer in by_entity */
     uint64_t faded;         /**< Microseconds of stopped frames since the emitter stopped, the
                              *   fade of its ParticleLight */
+    double frame[3];        /**< World displacement of the frame of reference since the last
+                             *   frame without particles to move: the drift times the seconds
+                             *   of every frame they moved */
+    vec3 acceleration;      /**< ParticleEmitter.acceleration of the last frame of a linger
+                             *   emitter */
+    ecs_entity_t forces;    /**< ParticleEmitter.forces of that frame */
+    ParticleForces own;     /**< ParticleForces of the emitter entity in that frame */
+    bool has_own;           /**< The emitter entity had ParticleForces in that frame */
     box_render_particle_pool_t entry; /**< The pool of the last frame of a lingering emitter
                              *   in the packet, which a lingering pool runs again */
 } box_particle_pool_t;
@@ -333,6 +341,7 @@ static void box_particles_empty(
     pool->next = 0;
     pool->live = 0;
     pool->used = 0;
+    pool->frame[0] = pool->frame[1] = pool->frame[2] = 0;
     ecs_vec_clear(&pool->deaths);
     ecs_vec_clear(&pool->free_slots);
 }
@@ -837,6 +846,7 @@ static void box_particles_forces_add(
     if (f) {
         glm_vec3_add(ECS_CONST_CAST(float*, f->gravity), sum->gravity, sum->gravity);
         glm_vec3_add(ECS_CONST_CAST(float*, f->wind), sum->wind, sum->wind);
+        glm_vec3_add(ECS_CONST_CAST(float*, f->drift), sum->drift, sum->drift);
         sum->drag += f->drag;
         sum->turbulence += f->turbulence;
         sum->turbulence_scale *= f->turbulence_scale;
@@ -848,17 +858,19 @@ static void box_particles_forces_add(
  *
  * @param world The world
  * @param e The emitter
- * @param emitter The emitter values
+ * @param named The entity ParticleEmitter.forces names, 0 for none
+ * @param own The ParticleForces of the emitter entity, NULL for none or when the emitter is
+ *            the singleton
  * @param out Receives the sum
  */
 static void box_particles_forces(
     const ecs_world_t *world,
     ecs_entity_t e,
-    const ParticleEmitter *emitter,
+    ecs_entity_t named,
+    const ParticleForces *own,
     ParticleForces *out)
 {
     ecs_entity_t singleton = ecs_id(ParticleForces);
-    ecs_entity_t named = emitter->forces;
     ecs_os_memset_t(out, 0, ParticleForces);
     out->turbulence_scale = 1.0f;
     box_particles_forces_add(ecs_get(world, singleton, ParticleForces), out);
@@ -866,16 +878,53 @@ static void box_particles_forces(
         box_particles_forces_add(ecs_get(world, named, ParticleForces), out);
     }
 
-    if (e != singleton) {
-        box_particles_forces_add(ecs_get(world, e, ParticleForces), out);
+    box_particles_forces_add(own, out);
+}
+
+/** Write the forces of a frame into the block of a pool and move the frame of reference of the
+ * pool by the drift of the frame, so the wander field moves with the particles.
+ *
+ * The field is offset by the displacement before this frame's drift, where the integrate pass
+ * samples it. A frame with no particles to move puts the frame back at the world origin, so a
+ * burst starts in the field it has without drift.
+ *
+ * @param pool The pool, its frame of reference advanced
+ * @param acceleration ParticleEmitter.acceleration
+ * @param forces The sum of the forces on its particles
+ * @param moves Whether the integrate pass moves particles in this frame
+ * @param out The block, its seed and its seconds of the frame written
+ */
+static void box_particles_block_forces(
+    box_particle_pool_t *pool,
+    const vec3 acceleration,
+    const ParticleForces *forces,
+    bool moves,
+    box_render_particle_block_t *out)
+{
+    float phase[3];
+    int32_t c;
+    if (!moves) {
+        pool->frame[0] = pool->frame[1] = pool->frame[2] = 0;
+    }
+
+    glm_vec3_add(ECS_CONST_CAST(float*, acceleration),
+        ECS_CONST_CAST(float*, forces->gravity), out->acceleration);
+    glm_vec3_copy(ECS_CONST_CAST(float*, forces->wind), out->wind);
+    out->wind[3] = forces->drag > 0 ? forces->drag : 0.0f;
+    out->turbulence[0] = forces->turbulence;
+    out->turbulence[1] = forces->turbulence_scale;
+    box_particle_phase(out->seed, phase);
+    box_particle_frame_phase(phase, pool->frame, forces->turbulence_scale, out->wander);
+    glm_vec3_copy(ECS_CONST_CAST(float*, forces->drift), out->drift);
+    for (c = 0; c < 3; c ++) {
+        pool->frame[c] += moves ? (double)out->drift[c] * (double)out->acceleration[3] : 0.0;
     }
 }
 
-/** Write the parameters of an emitter for this frame.
+/** Write the parameters of an emitter for this frame but its forces.
  *
  * @param emitter The emitter values
  * @param transform World transform of the emitter, NULL for the identity
- * @param forces The sum of the forces on its particles
  * @param collision Its ground collision, NULL for none
  * @param inherit World velocity its spawns get
  * @param delta Seconds of the frame
@@ -885,7 +934,6 @@ static void box_particles_forces(
 static void box_particles_block(
     const ParticleEmitter *emitter,
     const WorldTransform *transform,
-    const ParticleForces *forces,
     const ParticleCollision *collision,
     const vec3 inherit,
     float delta,
@@ -910,8 +958,6 @@ static void box_particles_block(
     out->direction[3] = cosf(glm_rad(spread));
     glm_vec3_copy(ECS_CONST_CAST(float*, emitter->extents), out->extents);
     out->extents[3] = emitter->radius;
-    glm_vec3_add(ECS_CONST_CAST(float*, emitter->acceleration),
-        ECS_CONST_CAST(float*, forces->gravity), out->acceleration);
     out->acceleration[3] = delta;
     out->color[0] = (float)emitter->color.r / 255.0f;
     out->color[1] = (float)emitter->color.g / 255.0f;
@@ -929,11 +975,6 @@ static void box_particles_block(
     out->opacity[1] = emitter->opacity.max;
     out->shape = (uint32_t)emitter->shape;
     out->seed = emitter->seed;
-    glm_vec3_copy(ECS_CONST_CAST(float*, forces->wind), out->wind);
-    out->wind[3] = forces->drag > 0 ? forces->drag : 0.0f;
-    out->turbulence[0] = forces->turbulence;
-    out->turbulence[1] = forces->turbulence_scale;
-    box_particle_phase(emitter->seed, out->wander);
     out->variance[0] = (float)emitter->color_variance.r / 255.0f;
     out->variance[1] = (float)emitter->color_variance.g / 255.0f;
     out->variance[2] = (float)emitter->color_variance.b / 255.0f;
@@ -1176,6 +1217,7 @@ static void box_particles_emitter(
     uint64_t time = 0;
     bool stopped = state == ParticleStopped;
     uint64_t faded = UINT64_MAX;
+    bool moves;
     vec3 velocity;
     if (max <= 0) {
         goto done;
@@ -1241,6 +1283,7 @@ static void box_particles_emitter(
     age_us = reset || state == ParticlePaused ? 0 : delta_us;
     pool->clock += age_us;
     box_particles_retire(pool);
+    moves = pool->live != 0;
     first = pool->next;
     if (!reset && state != ParticlePaused && state != ParticleStopped) {
         uint64_t t0 = pool->time;
@@ -1276,12 +1319,16 @@ static void box_particles_emitter(
     entry->slots = slots;
     entry->texture = box_particles_texture(world, look);
     entry->mesh = pool->mesh;
+    const ParticleForces *own = e != ecs_id(ParticleForces)
+        ? ecs_get(world, e, ParticleForces)
+        : NULL;
     ParticleForces forces;
-    box_particles_forces(world, e, emitter, &forces);
+    box_particles_forces(world, e, emitter->forces, own, &forces);
     glm_vec3_scale(velocity, emitter->inherit_velocity, velocity);
-    box_particles_block(emitter, transform, &forces,
-        ecs_get(world, e, ParticleCollision), velocity, age_us ? p->delta : 0.0f,
-        effect && effect->scale > 0 ? effect->scale : 1.0f, &entry->block);
+    box_particles_block(emitter, transform, ecs_get(world, e, ParticleCollision), velocity,
+        age_us ? p->delta : 0.0f, effect && effect->scale > 0 ? effect->scale : 1.0f,
+        &entry->block);
+    box_particles_block_forces(pool, emitter->acceleration, &forces, moves, &entry->block);
     box_particles_block_look(curves, look, pool, &entry->block);
     entry->block.count = count;
     entry->block.first = first;
@@ -1293,6 +1340,12 @@ static void box_particles_emitter(
     pool->fresh = false;
     if (emitter->linger) {
         pool->entry = *entry;
+        glm_vec3_copy(ECS_CONST_CAST(float*, emitter->acceleration), pool->acceleration);
+        pool->forces = emitter->forces;
+        pool->has_own = own != NULL;
+        if (own) {
+            pool->own = *own;
+        }
     }
 
     stats->simulated ++;
@@ -1309,18 +1362,22 @@ done:
 }
 
 /** Run a frame of a lingering pool: age and move its particles with the block of the last frame
- * of its emitter, spawning nothing.
+ * of its emitter, spawning nothing, under the forces of this frame: those of the world and of
+ * the entity the emitter named, and the last ones of the emitter itself.
  *
+ * @param world The world
  * @param p The packet
  * @param pool The lingering pool
  * @param stats Receives its counts
  * @return Whether particles live on, else the pool is to be freed
  */
 static bool box_particles_linger(
+    const ecs_world_t *world,
     box_render_packet_t *p,
     box_particle_pool_t *pool,
     ParticleStats *stats)
 {
+    ParticleForces forces;
     uint32_t delta_us = box_particle_us(p->delta), slots = 0;
     bool result = false;
     pool->clock += delta_us;
@@ -1336,6 +1393,10 @@ static bool box_particles_linger(
     entry->clear = false;
     entry->slots = slots;
     entry->block.acceleration[3] = delta_us ? p->delta : 0.0f;
+    box_particles_forces(world, pool->entity, pool->forces, pool->has_own ? &pool->own : NULL,
+        &forces);
+    box_particles_block_forces(pool, pool->acceleration, &forces, pool->live != 0,
+        &entry->block);
     entry->block.count = 0;
     entry->block.first = pool->next;
     entry->block.used = pool->used;
@@ -1494,7 +1555,7 @@ static void BoxRenderExtractParticles(
             pool->lingering = true;
         }
 
-        if (!box_particles_linger(p, pool, &stats)) {
+        if (!box_particles_linger(world, p, pool, &stats)) {
             box_particles_pool_free(s, p, i);
         }
     }

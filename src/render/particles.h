@@ -71,13 +71,15 @@ typedef struct box_render_particle_block_t {
     float wind[4];          /**< World velocity the drag pulls toward, w the drag rate */
     float turbulence[4];    /**< Acceleration of the wander field, y its frequency scale, zw
                              *   unused */
-    float wander[4];        /**< Phase of the wander field drawn from the seed, w unused */
+    float wander[4];        /**< Phase of the wander field drawn from the seed, offset by the
+                             *   displacement of the frame of reference, w unused */
     float variance[4];      /**< Display encoded color variance, 0 to 1, w unused */
     float inherit[4];       /**< World velocity every spawn of the frame gets, w unused */
     float ground[4];        /**< Height of the ground plane, y the bounce, z the friction, w
                              *   unused */
+    float drift[3];         /**< World velocity of the frame of reference, added to the
+                             *   position only */
     uint32_t collide;       /**< BOX_PARTICLE_GROUND_NONE, _BOUNCE or _DIE */
-    uint32_t pad1[3];       /**< Unused */
     uint32_t look;          /**< ParticleShape drawn, ParticleCircle while a billboard has no
                              *   mesh */
     uint32_t blend;         /**< ParticleBlend */

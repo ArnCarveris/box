@@ -35,7 +35,8 @@ struct Emitter {
     wind: vec4f,
     // x: acceleration of the wander field, y: its frequency scale
     turbulence: vec4f,
-    // xyz: phase of the wander field drawn from the seed
+    // xyz: phase of the wander field drawn from the seed, offset by the displacement of the
+    // frame of reference
     wander: vec4f,
     // rgb: display encoded color variance
     variance: vec4f,
@@ -43,8 +44,10 @@ struct Emitter {
     inherit: vec4f,
     // x: height of the ground plane, y: bounce, z: friction
     ground: vec4f,
-    // x: ground collision mode, GROUND_*
-    collide: vec4u,
+    // World velocity of the frame of reference, added to the position only
+    drift: vec3f,
+    // Ground collision mode, GROUND_*
+    collide: u32,
     // x: ParticleShape drawn, y: ParticleBlend, z: frames across the sheet, w: frames down
     look: vec4u,
     // x: frames a second, y: softness, z: stretch, w: fraction lit
@@ -221,15 +224,16 @@ fn particle_wander(position: vec3f, phase: vec3f, scale: f32, turbulence: f32) -
 }
 
 // Advance a particle by a frame: v += (acceleration + wander(p)) * delta, then the exact drag
-// v = wind + (v - wind) * exp(-drag * delta), then p += v * delta. wind.w is the drag,
-// turbulence.x the acceleration of the wander field and turbulence.y its scale.
+// v = wind + (v - wind) * exp(-drag * delta), then p += (v + drift) * delta. wind.w is the drag,
+// turbulence.x the acceleration of the wander field and turbulence.y its scale. The drift
+// moves the particle without entering its velocity.
 fn particle_integrate(p: ptr<function, Particle>, acceleration: vec3f, wind: vec4f,
-    turbulence: vec2f, phase: vec3f, delta: f32)
+    turbulence: vec2f, phase: vec3f, drift: vec3f, delta: f32)
 {
     let wander = particle_wander((*p).position, phase, turbulence.y, turbulence.x);
     let v = (*p).velocity + (acceleration + wander) * delta;
     (*p).velocity = wind.xyz + (v - wind.xyz) * exp(-wind.w * delta);
-    (*p).position += (*p).velocity * delta;
+    (*p).position += ((*p).velocity + drift) * delta;
 }
 
 // Collide a particle with the ground plane of height ground.x after its step: a particle
