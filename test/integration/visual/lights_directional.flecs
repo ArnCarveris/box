@@ -21,13 +21,13 @@ $ {
 
 key {
   Rotation: {0.7359, 2.3726, 0}
-  DirectionalLight: {intensity: 1.2}
+  DirectionalLight: {intensity: 1.2 * flecs.script.math.PI}
   Rgb: {255, 226, 190}
 }
 
 fill {
   Rotation: {0.2625, -2.2594, 0}
-  DirectionalLight: {intensity: 0.4}
+  DirectionalLight: {intensity: 0.4 * flecs.script.math.PI}
   Rgb: {110, 150, 255}
 }
 

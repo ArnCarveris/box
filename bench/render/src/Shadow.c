@@ -47,7 +47,7 @@ static void bench_shadow(
             .normal_offset = 1.5f, .filter_size = 3, .fade = 0.2f}});
     ecs_entity_t sun = ecs_new(world);
     ecs_set(world, sun, Rotation, {0.5423041f, 2.3679806f, -0.4669112f});
-    ecs_set(world, sun, DirectionalLight, {.intensity = 1.5f});
+    ecs_set(world, sun, DirectionalLight, {.intensity = 1.5f * GLM_PIf});
     ecs_entity_t floor = ecs_new(world);
     ecs_set(world, floor, Position, {0, -0.1f, 0});
     ecs_set(world, floor, Box, {204, 0.2f, 129});

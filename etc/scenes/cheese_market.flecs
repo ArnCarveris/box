@@ -1124,7 +1124,7 @@ cheese_market {
 
   afternoon {
     Rotation: {0.85, -2.4, 0}
-    DirectionalLight: {intensity: 1.8}
+    DirectionalLight: {intensity: 1.8 * math.PI}
     Rgb: {255, 226, 180}
   }
 

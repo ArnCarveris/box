@@ -50,15 +50,15 @@ prefab Blast {
 
   light {
     Position: {0, 0, 0.3}
-    PointLight: {intensity: 1, range: 5}
+    PointLight: {intensity: flecs.script.math.PI, range: 5}
     Rgb: {255, 160, 70}
-    EffectFlash: {intensity: 6, seconds: 0.5}
+    EffectFlash: {intensity: 6 * flecs.script.math.PI, seconds: 0.5}
   }
 }
 
 prefab Faded : Blast {
   light {
-    EffectFlash: {intensity: 6, seconds: 0.01}
+    EffectFlash: {intensity: 6 * flecs.script.math.PI, seconds: 0.01}
   }
 }
 

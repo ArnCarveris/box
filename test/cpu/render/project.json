@@ -229,6 +229,20 @@
                     "bake_fills_with_environment",
                     "bake_without_environment_uses_hemisphere"
                 ]
+            },
+            {
+                "id": "Tonemap",
+                "setup": true,
+                "testcases": [
+                    "lut_size",
+                    "lut_first_texels",
+                    "lut_missing_file_fails",
+                    "rgb9e5_decode",
+                    "black_stays_black",
+                    "mid_gray",
+                    "brightness_rolls_off_to_white",
+                    "saturated_color_loses_chroma"
+                ]
             }
         ]
     }

@@ -221,7 +221,7 @@ void Shadow_box_casts_shadow(void) {
     ecs_set(world, caster, Box, {1.5f, 0.2f, 1.5f});
     ecs_entity_t sun = ecs_new(world);
     ecs_set(world, sun, Rotation, {(float)GLM_PI_2, 0, 0});
-    ecs_set(world, sun, DirectionalLight, {.intensity = 1});
+    ecs_set(world, sun, DirectionalLight, {.intensity = GLM_PIf});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "cast.png",
         .resolution_scale = 1});
@@ -271,7 +271,7 @@ void Shadow_disabled_casts_no_shadow(void) {
     ecs_set(world, caster, Box, {1.5f, 0.2f, 1.5f});
     ecs_entity_t sun = ecs_new(world);
     ecs_set(world, sun, Rotation, {(float)GLM_PI_2, 0, 0});
-    ecs_set(world, sun, DirectionalLight, {.intensity = 1});
+    ecs_set(world, sun, DirectionalLight, {.intensity = GLM_PIf});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "disabled.png",
         .resolution_scale = 1});
@@ -320,7 +320,7 @@ void Shadow_no_shadow_casts_none(void) {
     ecs_set(world, caster, Box, {1.5f, 0.2f, 1.5f});
     ecs_entity_t sun = ecs_new(world);
     ecs_set(world, sun, Rotation, {(float)GLM_PI_2, 0, 0});
-    ecs_set(world, sun, DirectionalLight, {.intensity = 1});
+    ecs_set(world, sun, DirectionalLight, {.intensity = GLM_PIf});
     ecs_add(world, caster, NoShadow);
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "ghost.png",
@@ -370,7 +370,7 @@ void Shadow_no_shadow_parent_casts_none(void) {
     ecs_set(world, caster, Box, {1.5f, 0.2f, 1.5f});
     ecs_entity_t sun = ecs_new(world);
     ecs_set(world, sun, Rotation, {(float)GLM_PI_2, 0, 0});
-    ecs_set(world, sun, DirectionalLight, {.intensity = 1});
+    ecs_set(world, sun, DirectionalLight, {.intensity = GLM_PIf});
     ecs_entity_t group = ecs_new(world);
     ecs_add(world, group, NoShadow);
     ecs_add_pair(world, caster, EcsChildOf, group);
@@ -422,7 +422,7 @@ void Shadow_no_shadow_removed_casts_again(void) {
     ecs_set(world, caster, Box, {1.5f, 0.2f, 1.5f});
     ecs_entity_t sun = ecs_new(world);
     ecs_set(world, sun, Rotation, {(float)GLM_PI_2, 0, 0});
-    ecs_set(world, sun, DirectionalLight, {.intensity = 1});
+    ecs_set(world, sun, DirectionalLight, {.intensity = GLM_PIf});
     ecs_add(world, caster, NoShadow);
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "removed.png",
@@ -485,7 +485,7 @@ void Shadow_beyond_max_distance_unshadowed(void) {
     ecs_set(world, caster, Box, {1.5f, 0.2f, 1.5f});
     ecs_entity_t sun = ecs_new(world);
     ecs_set(world, sun, Rotation, {(float)GLM_PI_2, 0, 0});
-    ecs_set(world, sun, DirectionalLight, {.intensity = 1});
+    ecs_set(world, sun, DirectionalLight, {.intensity = GLM_PIf});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "beyond.png",
         .resolution_scale = 1});
@@ -534,7 +534,7 @@ void Shadow_fade_softens_last_cascade(void) {
     ecs_set(world, caster, Box, {1.5f, 0.2f, 1.5f});
     ecs_entity_t sun = ecs_new(world);
     ecs_set(world, sun, Rotation, {(float)GLM_PI_2, 0, 0});
-    ecs_set(world, sun, DirectionalLight, {.intensity = 1});
+    ecs_set(world, sun, DirectionalLight, {.intensity = GLM_PIf});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "fade.png",
         .resolution_scale = 1});

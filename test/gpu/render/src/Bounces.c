@@ -542,7 +542,7 @@ void Bounces_colored_walls_bleed_with_bounces(void) {
         ecs_entity_t lamp = ecs_new_w_pair(world, EcsChildOf, scene);
         ecs_set(world, lamp, Position, {0, 3.9f, 0});
         ecs_set(world, lamp, Rotation, {1.5708f, 0, 0});
-        ecs_set(world, lamp, SpotLight, {.intensity = 12, .range = 10, .inner_angle = 15,
+        ecs_set(world, lamp, SpotLight, {.intensity = 12 * GLM_PIf, .range = 10, .inner_angle = 15,
             .outer_angle = 25});
         ecs_entity_t e = ecs_new(world);
         ecs_set(world, e, Surface, {.width = 160, .height = 120, .write_to_file = "bleed.png",

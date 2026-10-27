@@ -66,7 +66,7 @@ static void bench_blended(
     if (lit) {
         ecs_entity_t sun = ecs_new(world);
         ecs_set(world, sun, Rotation, {0.5423041f, 2.3679806f, -0.4669112f});
-        ecs_set(world, sun, DirectionalLight, {.intensity = 1.5f});
+        ecs_set(world, sun, DirectionalLight, {.intensity = 1.5f * GLM_PIf});
     }
 
     int32_t i;

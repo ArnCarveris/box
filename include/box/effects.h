@@ -66,14 +66,17 @@ ECS_STRUCT(HeightFog, {
 /** Exposure that adapts to the brightness of the image.
  *
  * A Tonemap refers to it to scale its input, or it is an effect of its own that scales the
- * image. The exposure starts at 0 stops and adapts every frame by the frame delta, so a
- * headless run with a fixed delta adapts the same way every time.
+ * image. The histogram leaves out pixels with alpha 0 and pixels darker than min_log_luma.
+ *
+ * The first frame of a view starts at the target exposure; later frames adapt toward it by
+ * the frame delta, so a headless run with a fixed delta adapts the same way every time.
  */
 ECS_STRUCT(AutoExposure, {
     float target_brightness;     /**< Brightness the exposure converges to, 0 uses the range */
     float min_brightness;        /**< Low end of the accepted brightness, default 0.1 */
     float max_brightness;        /**< High end of the accepted brightness, default 0.3 */
-    float min_log_luma;          /**< Lowest log2 luminance of the histogram, default -8 */
+    float min_log_luma;          /**< Lowest log2 luminance of the histogram, darker pixels
+                                  *   are left out, default -8 */
     float max_log_luma;          /**< Highest log2 luminance of the histogram, default 4 */
     float speed_up;              /**< Adaptation rate toward brighter, default 3 */
     float speed_down;            /**< Adaptation rate toward darker, default 1 */
@@ -84,9 +87,23 @@ ECS_STRUCT(AutoExposure, {
     float max_exposure;          /**< Upper clamp of the exposure, 0 is unbounded */
 });
 
-/** Maps HDR color to the display range with the Khronos PBR Neutral curve */
+/** How a Tonemap maps HDR color to the display range */
+ECS_ENUM(TonemapOperator, {
+    TonemapOperatorPbrNeutral = 0,   /**< Khronos PBR Neutral: colors below a peak of about 0.76
+                                      *   keep their value and saturation, brighter ones roll off
+                                      *   to white */
+    TonemapOperatorTonyMcMapface = 1 /**< Tony McMapface, a 48^3 LUT (etc/luts) that desaturates
+                                      *   colors smoothly as they brighten */
+});
+
+/** Maps HDR color to the display range, after scaling it by an adapted exposure.
+ *
+ * The output is linear, the target encodes it. Tony McMapface adds a dither of up to half an
+ * 8 bit step against banding.
+ */
 ECS_STRUCT(Tonemap, {
     ecs_entity_t auto_exposure; /**< Entity with AutoExposure that scales the input, 0 is none */
+    TonemapOperator operator_;  /**< The mapping, default PbrNeutral */
 });
 
 /** Register the box.effects module.

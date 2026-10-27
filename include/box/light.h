@@ -3,8 +3,8 @@
  * @brief Light components; color comes from the entity's Rgb and direction from its transform.
  *
  * A light lights only its scene (nearest Scene ancestor, else the default scene); a scene
- * without light entities gets a default sun. Intensity 1 and a white Rgb light a facing surface
- * at its base color, View.lighting.enabled false draws base color plus emission unlit.
+ * without light entities gets a default sun of intensity pi, View.lighting.enabled false draws
+ * base color plus emission unlit. Intensity is irradiance, see DirectionalLight.
  *
  * The ambient of a scene sums its AmbientLight components, set on the Scene root (a singleton
  * for the default scene); a scene without one gets the default sky and ground.
@@ -39,34 +39,45 @@ ECS_ENUM(LightBakeMode, {
                                 *   and no view shadows */
 });
 
-/** Directional light travelling along the entity's local +Z */
+/** Directional light travelling along the entity's local +Z.
+ *
+ * Intensity is the linear irradiance on a surface facing the light, Rgb times intensity, as in
+ * flecs-engine: a Lambert surface reflects albedo / pi * intensity * NdotL.
+ *
+ * Intensity pi and a white Rgb light a facing surface at its base color. An Atmosphere computes
+ * its sky from the irradiance of its sun and moon.
+ */
 ECS_STRUCT(DirectionalLight, {
-    float intensity;    /**< Light on a facing white surface, default 1, 0 lights nothing */
+    float intensity;    /**< Irradiance on a facing surface, default 1, 0 lights nothing */
     LightBakeMode bake; /**< Part of the light in the bake of its scene, default Mixed; a sun
                          *   moved by a time of day should be Mixed or Realtime, as a Baked
                          *   one keeps the light of its baked state within the thresholds */
 });
 
-/** Omnidirectional light. Intensity is in linear display units: it lights a facing white diffuse
- * surface at intensity / d^2 at distance d (from 0.01 up), windowed by (1 - (d / range)^4)^2 so
- * the light reaches zero at range. A directional light lights that surface at its intensity.
+/** Omnidirectional light. Intensity is the irradiance on a facing surface 1 unit away: at
+ * distance d (from 0.01 up) it is intensity / d^2, windowed by (1 - (d / range)^4)^2 so the light
+ * reaches zero at range, and a white diffuse surface reflects that over pi.
  */
 ECS_STRUCT(PointLight, {
-    float intensity;    /**< Light on a facing white surface 1 unit away, default 1, 0 none */
+    float intensity;    /**< Irradiance on a facing surface 1 unit away, default 1, 0 none */
     float range;        /**< Distance at which the light reaches zero, default 10 */
     LightBakeMode bake; /**< Part of the light in the bake of its scene, default Mixed */
 });
 
 /** Cone light along the entity's local +Z, angles are half angles in degrees */
 ECS_STRUCT(SpotLight, {
-    float intensity;    /**< Light on a facing white surface 1 unit away, default 1, 0 none */
+    float intensity;    /**< Irradiance on a facing surface 1 unit away, default 1, 0 none */
     float range;        /**< Distance at which the light reaches zero, default 10 */
     float inner_angle;  /**< Full intensity cone half angle, default 20 */
     float outer_angle;  /**< Zero intensity cone half angle, default 30 */
     LightBakeMode bake; /**< Part of the light in the bake of its scene, default Mixed */
 });
 
-/** Hemisphere ambient light of the scene the entity is in, blended by the surface normal */
+/** Hemisphere ambient light of the scene the entity is in, blended by the surface normal.
+ *
+ * The colors are irradiance over pi, so a white surface reflects them at its base color: sky
+ * times intensity is the ambient a surface facing up gets, as from a uniform sky of that color.
+ */
 ECS_STRUCT(AmbientLight, {
     rgb sky;         /**< Display encoded light from above, default {118, 130, 149} */
     rgb ground;      /**< Display encoded light from below, default {79, 74, 68} */

@@ -18,7 +18,7 @@ noon {
 
   sun {
     Rotation: {1.047, 0.524, 0}
-    DirectionalLight: {intensity: 3}
+    DirectionalLight: {intensity: 3 * flecs.script.math.PI}
     Rgb: {255, 255, 255}
   }
 
@@ -62,7 +62,7 @@ sunset {
 
   sun {
     Rotation: {0.052, 1.571, 0}
-    DirectionalLight: {intensity: 3}
+    DirectionalLight: {intensity: 3 * flecs.script.math.PI}
     Rgb: {255, 255, 255}
   }
 

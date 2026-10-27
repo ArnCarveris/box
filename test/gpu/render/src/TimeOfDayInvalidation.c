@@ -80,7 +80,7 @@ static ecs_entity_t scene_new(
     ecs_set(world, block, Position, {0, 0.5f, 0});
     ecs_set(world, block, Box, {1, 1, 1});
     *sun = ecs_new_w_pair(world, EcsChildOf, scene);
-    ecs_set(world, *sun, DirectionalLight, {.intensity = 1});
+    ecs_set(world, *sun, DirectionalLight, {.intensity = GLM_PIf});
     ecs_set(world, *sun, Rgb, {255, 255, 255});
     sun_turn(world, *sun, ELEVATION);
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
@@ -240,7 +240,7 @@ void TimeOfDayInvalidation_zero_threshold_requeues_every_change(void) {
         test_bool(converge(world, scene), true);
     }
 
-    ecs_set(world, sun, DirectionalLight, {.intensity = 1.01f});
+    ecs_set(world, sun, DirectionalLight, {.intensity = 1.01f * GLM_PIf});
     frame(world);
     test_bool(ecs_get(world, scene, LightBakeStatus)->converged, false);
     test_bool(ecs_get(world, scene, ReflectionBakeStatus)->converged, false);

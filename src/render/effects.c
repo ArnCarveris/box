@@ -138,6 +138,9 @@ static void box_effects_entity(
     if (tonemap) {
         box_render_effect_t *pass = box_effects_append(p, v, BOX_RENDER_EFFECT_TONEMAP, e);
         ecs_entity_t source = tonemap->auto_exposure;
+        pass->tonemap = tonemap->operator_ == TonemapOperatorTonyMcMapface
+            ? TonemapOperatorTonyMcMapface
+            : TonemapOperatorPbrNeutral;
         const AutoExposure *settings = source && ecs_is_alive(world, source)
             ? ecs_get(world, source, AutoExposure)
             : exposure;

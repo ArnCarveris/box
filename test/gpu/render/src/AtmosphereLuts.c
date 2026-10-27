@@ -40,7 +40,7 @@ static ecs_entity_t sun_new(
     float elevation)
 {
     ecs_entity_t sun = ecs_new_w_pair(world, EcsChildOf, scene);
-    ecs_set(world, sun, DirectionalLight, {.intensity = 1});
+    ecs_set(world, sun, DirectionalLight, {.intensity = GLM_PIf});
     ecs_set(world, sun, Rgb, {255, 255, 255});
     ecs_set(world, sun, Rotation, {glm_rad(elevation), 0, 0});
 

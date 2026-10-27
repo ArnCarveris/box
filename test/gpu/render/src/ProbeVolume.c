@@ -304,7 +304,7 @@ void ProbeVolume_unbaked_view_renders_identically(void) {
         ecs_set(world, ball, Sphere, {.segments = 24, .smooth = true, .radius = 1});
         ecs_entity_t sun = ecs_new_w_pair(world, EcsChildOf, scene);
         ecs_set(world, sun, Rotation, {glm_rad(60), 0, 0});
-        ecs_set(world, sun, DirectionalLight, {.intensity = 0.2f});
+        ecs_set(world, sun, DirectionalLight, {.intensity = 0.2f * GLM_PIf});
         ecs_entity_t e = ecs_new(world);
         ecs_set(world, e, Surface, {.width = 64, .height = 48, .write_to_file = "unbaked.png",
             .resolution_scale = 1});

@@ -49,7 +49,7 @@ static void bench_atmosphere(
     }
 
     ecs_entity_t sun = ecs_new_w_pair(world, EcsChildOf, scene);
-    ecs_set(world, sun, DirectionalLight, {.intensity = 1});
+    ecs_set(world, sun, DirectionalLight, {.intensity = GLM_PIf});
     ecs_set(world, sun, Rotation, {0.5f, 0, 0});
     int32_t i;
     for (i = 0; i < views; i ++) {

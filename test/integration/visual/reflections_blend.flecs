@@ -24,12 +24,12 @@ hall {
 
   left_lamp {
     Position: {-3, 2.9, 3}
-    PointLight: {intensity: 5, range: 12}
+    PointLight: {intensity: 5 * flecs.script.math.PI, range: 12}
   }
 
   right_lamp {
     Position: {3, 2.9, 3}
-    PointLight: {intensity: 5, range: 12}
+    PointLight: {intensity: 5 * flecs.script.math.PI, range: 12}
   }
 
   floor {

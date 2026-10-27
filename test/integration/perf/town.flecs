@@ -18,7 +18,7 @@ $ {
 
 sun {
   Rotation: {0.703, -0.8332, 0}
-  DirectionalLight: {intensity: 1.1}
+  DirectionalLight: {intensity: 1.1 * math.PI}
   Rgb: {255, 255, 255}
 }
 

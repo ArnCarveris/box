@@ -157,15 +157,15 @@ template Gallery {
     sun {
       if applied.light == "Night" {
         Rotation: {1.1, 2.8, 0}
-        DirectionalLight: {intensity: 0.6}
+        DirectionalLight: {intensity: 0.6 * math.PI}
         Rgb: {150, 170, 255}
       } else if applied.light == "Dusk" {
         Rotation: {0.3, 2.0, 0}
-        DirectionalLight: {intensity: 1.8}
+        DirectionalLight: {intensity: 1.8 * math.PI}
         Rgb: {255, 150, 90}
       } else {
         Rotation: {0.85, 2.4, 0}
-        DirectionalLight: {intensity: 2.2}
+        DirectionalLight: {intensity: 2.2 * math.PI}
         Rgb: {255, 246, 230}
       }
     }

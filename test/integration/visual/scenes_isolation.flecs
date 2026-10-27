@@ -17,7 +17,7 @@ warm {
 
   lamp {
     Position: {0, 2.2, 1.5}
-    PointLight: {intensity: 8, range: 9}
+    PointLight: {intensity: 8 * flecs.script.math.PI, range: 9}
     Rgb: {255, 150, 60}
   }
 
@@ -77,7 +77,7 @@ cool {
 
   sun {
     Rotation: {0.662, 2.4293, 0}
-    DirectionalLight: {intensity: 1.5}
+    DirectionalLight: {intensity: 1.5 * flecs.script.math.PI}
     Rgb: {90, 150, 255}
   }
 
@@ -104,7 +104,7 @@ cool {
 
     glow {
       Position: {5, 3.4, 0.5}
-      PointLight: {intensity: 6, range: 4}
+      PointLight: {intensity: 6 * flecs.script.math.PI, range: 4}
       Rgb: {80, 255, 120}
     }
 

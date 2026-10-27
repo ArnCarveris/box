@@ -33,7 +33,7 @@ room {
   lamp {
     Position: {-2.6, 2.1, -0.6}
     Rgb: {255, 210, 160}
-    PointLight: {intensity: 3, range: 6}
+    PointLight: {intensity: 3 * flecs.script.math.PI, range: 6}
   }
 
   floor {

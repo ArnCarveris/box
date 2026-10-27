@@ -110,7 +110,7 @@ static void bench_cull(
             .normal_offset = 1.5f, .filter_size = 3, .fade = 0.2f}});
     ecs_entity_t sun = ecs_new(world);
     ecs_set(world, sun, Rotation, {0.5423041f, 2.3679806f, -0.4669112f});
-    ecs_set(world, sun, DirectionalLight, {.intensity = 1.5f});
+    ecs_set(world, sun, DirectionalLight, {.intensity = 1.5f * GLM_PIf});
     ecs_entity_t floor = ecs_new(world);
     ecs_set(world, floor, Position, {0, -0.1f, 0});
     ecs_set(world, floor, Box, {204, 0.2f, 129});
@@ -168,7 +168,7 @@ static void bench_city(
         .culling = {.enabled = true, .occlusion = !frustum_only, .min_dimension_px = 1}});
     ecs_entity_t sun = ecs_new(world);
     ecs_set(world, sun, Rotation, {0.5423041f, 2.3679806f, -0.4669112f});
-    ecs_set(world, sun, DirectionalLight, {.intensity = 1.5f});
+    ecs_set(world, sun, DirectionalLight, {.intensity = 1.5f * GLM_PIf});
     ecs_entity_t ground = ecs_new(world);
     ecs_set(world, ground, Position, {0, -0.1f, 0});
     ecs_set(world, ground, Box, {250, 0.2f, 250});
@@ -268,7 +268,7 @@ void Cull_many_batches_shadows(
     ecs_modified(world, view, View);
     ecs_entity_t sun = ecs_new(world);
     ecs_set(world, sun, Rotation, {0.5423041f, 2.3679806f, -0.4669112f});
-    ecs_set(world, sun, DirectionalLight, {.intensity = 1.5f});
+    ecs_set(world, sun, DirectionalLight, {.intensity = 1.5f * GLM_PIf});
     int32_t i;
     for (i = 0; i < BENCH_CULL_BATCHES * 50; i ++) {
         int32_t mesh = i % BENCH_CULL_BATCHES;

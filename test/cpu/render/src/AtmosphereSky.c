@@ -301,8 +301,8 @@ void AtmosphereSky_packet_view_moon_disk(void) {
     test_assert(v->atmos.moon[2] * v->atmos.sun[2] < 0);
     test_assert(status->moon_illumination > 0.9f);
     test_flt(v->atmos.moon[3], status->moon_illumination);
-    test_assert(fabsf(v->atmos.moon_color[0] - 0.5f * GLM_PIf) < 1e-5f);
-    test_assert(fabsf(v->atmos.moon_color[2] - 0.5f * GLM_PIf) < 1e-5f);
+    test_assert(fabsf(v->atmos.moon_color[0] - 0.5f) < 1e-5f);
+    test_assert(fabsf(v->atmos.moon_color[2] - 0.5f) < 1e-5f);
     test_flt(v->atmos.moon_disk[0], cosf(glm_rad(0.259f)));
     test_flt(v->atmos.moon_disk[1], sinf(glm_rad(0.259f)));
     test_flt(v->atmos.moon_disk[2], 0.12f);

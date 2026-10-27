@@ -16,6 +16,135 @@
 #define STB_IMAGE_STATIC
 #include <stb_image.h>
 
+/** Create a world that renders headless, with a camera 5 units in front of the origin.
+ *
+ * @param camera Receives the camera
+ * @return The world
+ */
+static ecs_world_t* effects_world(
+    ecs_entity_t *camera)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    *camera = ecs_new(world);
+    ecs_set(world, *camera, Position, {0, 0, 5});
+    ecs_set(world, *camera, Camera, {.fov = 60, .near_ = 0.1f});
+
+    return world;
+}
+
+/** Create an unlit view with a black clear that runs one effect.
+ *
+ * @param world The world
+ * @param camera The camera
+ * @param effect The effect entity
+ * @return The view
+ */
+static ecs_entity_t effects_view(
+    ecs_world_t *world,
+    ecs_entity_t camera,
+    ecs_entity_t effect)
+{
+    ecs_entity_t result = ecs_new(world);
+    View value = {.camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}};
+    ecs_vec_init_t(NULL, &value.effects, ViewEffect, 1);
+    *ecs_vec_append_t(NULL, &value.effects, ViewEffect) = (ViewEffect){
+        .enabled = true, .effect = effect };
+    ecs_set_ptr(world, result, View, &value);
+    ecs_vec_fini_t(NULL, &value.effects, ViewEffect);
+
+    return result;
+}
+
+/** Create a cube that emits a color and reflects nothing.
+ *
+ * @param world The world
+ * @param x Position of its center along X
+ * @param size Edge of the cube
+ * @param strength Emissive strength
+ * @param color Emissive color
+ * @return The cube
+ */
+static ecs_entity_t effects_cube(
+    ecs_world_t *world,
+    float x,
+    float size,
+    float strength,
+    Rgb color)
+{
+    ecs_entity_t result = ecs_new(world);
+    ecs_set(world, result, Position, {x, 0, 0});
+    ecs_set(world, result, Box, {size, size, size});
+    ecs_set(world, result, Rgb, {0, 0, 0});
+    ecs_set_ptr(world, result, Emissive, (&(Emissive){.strength = strength, .color = color}));
+
+    return result;
+}
+
+/** Load the last capture of a 64x64 surface.
+ *
+ * @param world The world
+ * @param file File name of the capture in the temporary folder
+ * @return The RGBA pixels, freed with stbi_image_free
+ */
+static unsigned char* effects_load(
+    ecs_world_t *world,
+    const char *file)
+{
+    char *path = flecs_asprintf("%s/%s", ecs_singleton_get(world, AppStatus)->tmp_dir, file);
+    int w = 0, h = 0, n = 0;
+    unsigned char *result = stbi_load(path, &w, &h, &n, 4);
+    test_assert(result != NULL);
+    test_int(w, 64);
+    ecs_os_free(path);
+
+    return result;
+}
+
+/** Encode a linear channel as an 8 bit sRGB target stores it.
+ *
+ * @param c The channel
+ * @return The stored value
+ */
+static int effects_srgb8(
+    float c)
+{
+    c = glm_clamp(c, 0.0f, 1.0f);
+    c = c <= 0.0031308f ? c * 12.92f : 1.055f * powf(c, 1.0f / 2.4f) - 0.055f;
+
+    return (int)(c * 255.0f + 0.5f);
+}
+
+/** Decode a stored 8 bit sRGB channel to linear.
+ *
+ * @param c The stored value
+ * @return The linear channel
+ */
+static float effects_linear(
+    unsigned char c)
+{
+    float v = (float)c / 255.0f;
+
+    return v <= 0.04045f ? v / 12.92f : powf((v + 0.055f) / 1.055f, 2.4f);
+}
+
+/** Get the saturation of a stored pixel in linear light: (max - min) / max.
+ *
+ * @param px The pixel
+ * @return The saturation
+ */
+static float effects_saturation(
+    const unsigned char *px)
+{
+    float r = effects_linear(px[0]), g = effects_linear(px[1]), b = effects_linear(px[2]);
+    float hi = glm_max(r, glm_max(g, b)), lo = glm_min(r, glm_min(g, b));
+
+    return hi > 0 ? (hi - lo) / hi : 0.0f;
+}
+
 void Effects_bloom_spreads_past_emissive_edge(void) {
     // lighting/effects
     ecs_world_t *world = ecs_init();
@@ -281,6 +410,90 @@ void Effects_tonemap_keeps_hue_of_bright_colors(void) {
     ecs_fini(world);
 }
 
+/* Mid gray, white and yellow cubes against black match the C twin of the shader; mid gray stays
+ * a neutral gray a little darker than its input and white is not clipped. */
+void Effects_tonemap_tony_mc_mapface_matches_lut(void) {
+    // lighting/effects
+    ecs_entity_t camera;
+    ecs_world_t *world = effects_world(&camera);
+    ecs_entity_t tonemap = ecs_new(world);
+    ecs_set(world, tonemap, Tonemap, {.operator_ = TonemapOperatorTonyMcMapface});
+    effects_view(world, camera, tonemap);
+    float hdr[3][3] = {{0.18f, 0.18f, 0.18f}, {1, 1, 1}, {1, 1, 0}};
+    effects_cube(world, -1.5f, 1, 0.18f, (Rgb){255, 255, 255});
+    effects_cube(world, 0, 1, 1, (Rgb){255, 255, 255});
+    effects_cube(world, 1.5f, 1, 1, (Rgb){255, 255, 0});
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "tony.png",
+        .resolution_scale = 1});
+    ecs_progress(world, 1.0f / 60);
+    box_render_sync(world);
+
+    char *error = NULL;
+    uint32_t *lut = box_render_tony_load(BOX_RENDER_TONY_PATH, &error);
+    test_assert(lut != NULL);
+    unsigned char *px = effects_load(world, "tony.png");
+    const int32_t columns[3] = {14, 32, 50};
+    int32_t i, c;
+    for (i = 0; i < 3; i ++) {
+        float expect[3];
+        const unsigned char *p = &px[(32 * 64 + columns[i]) * 4];
+        box_render_tonemap_tony(lut, hdr[i], expect);
+        for (c = 0; c < 3; c ++) {
+            test_assert(abs((int)p[c] - effects_srgb8(expect[c])) <= 3);
+        }
+    }
+
+    const unsigned char *gray = &px[(32 * 64 + 14) * 4];
+    test_assert(abs((int)gray[0] - (int)gray[1]) <= 2);
+    test_assert(abs((int)gray[0] - (int)gray[2]) <= 2);
+    test_assert(gray[0] < effects_srgb8(0.18f));
+    test_assert(px[(32 * 64 + 32) * 4] < 250);
+
+    stbi_image_free(px);
+    ecs_os_free(lut);
+    ecs_fini(world);
+}
+
+/* A bright yellow keeps less of its chroma with Tony McMapface than with PBR Neutral, and the
+ * black clear stays black up to the dither. */
+void Effects_tonemap_tony_desaturates_bright_colors(void) {
+    // lighting/effects
+    ecs_entity_t camera;
+    ecs_world_t *world = effects_world(&camera);
+    ecs_entity_t tonemap = ecs_new(world);
+    ecs_add(world, tonemap, Tonemap);
+    effects_view(world, camera, tonemap);
+    effects_cube(world, 0, 1, 1, (Rgb){255, 255, 0});
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "chroma.png",
+        .resolution_scale = 1});
+    ecs_progress(world, 1.0f / 60);
+    box_render_sync(world);
+    unsigned char *px = effects_load(world, "chroma.png");
+    float neutral = effects_saturation(&px[(32 * 64 + 32) * 4]);
+    stbi_image_free(px);
+
+    ecs_set(world, tonemap, Tonemap, {.operator_ = TonemapOperatorTonyMcMapface});
+    ecs_progress(world, 1.0f / 60);
+    box_render_sync(world);
+    px = effects_load(world, "chroma.png");
+    float tony = effects_saturation(&px[(32 * 64 + 32) * 4]);
+    const unsigned char *c = &px[(32 * 64 + 32) * 4];
+    test_assert(neutral > 0.95f);
+    test_assert(tony < neutral - 0.05f);
+    test_assert(c[0] > c[2] + 60);
+    test_assert(c[1] > c[2] + 60);
+
+    const unsigned char *k = &px[(32 * 64 + 50) * 4];
+    test_assert(k[0] < 12 && k[1] < 12 && k[2] < 12);
+
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+/* The first frame already has the exposure of the dim wall, 2.3 stops up. From frame 11 the
+ * wall is 10 times brighter and the exposure comes down toward 0 stops at the speed down. */
 void Effects_exposure_adapts_over_frames(void) {
     // lighting/effects
     ecs_world_t *world = ecs_init();
@@ -311,12 +524,16 @@ void Effects_exposure_adapts_over_frames(void) {
     ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "adapt.png",
         .resolution_scale = 1});
     char *path = NULL;
-    unsigned char seen[4] = {0};
+    unsigned char seen[5] = {0};
     int32_t frame, sample = 0;
     for (frame = 1; frame <= 180; frame ++) {
+        if (frame == 11) {
+            ecs_set(world, wall, Emissive, {.strength = 0.2f, .color = {255, 255, 255}});
+        }
+
         ecs_progress(world, 1.0f / 60);
         box_render_sync(world);
-        if (frame != 1 && frame != 30 && frame != 170 && frame != 180) {
+        if (frame != 1 && frame != 10 && frame != 11 && frame != 60 && frame != 180) {
             continue;
         }
 
@@ -331,10 +548,11 @@ void Effects_exposure_adapts_over_frames(void) {
         stbi_image_free(px);
     }
 
-    test_assert(seen[1] > seen[0] + 10);
-    test_assert(seen[2] > seen[1] + 10);
-    test_assert(seen[3] >= seen[2]);
-    test_assert(seen[3] - seen[2] < 3);
+    test_assert(abs((int)seen[0] - (int)seen[1]) < 3);
+    test_assert(seen[0] > 40);
+    test_assert(seen[2] > seen[1] + 60);
+    test_assert(seen[2] > seen[3] + 10);
+    test_assert(seen[3] > seen[4] + 10);
 
     ecs_os_free(path);
     ecs_fini(world);
@@ -391,6 +609,79 @@ void Effects_exposure_deterministic_with_fixed_delta(void) {
 
     test_assert(result[0] < 255);
     test_int(result[0], result[1]);
+}
+
+/* The exposure scales a wall of 3 to the target brightness of 0.2 in the first frame, where
+ * adapting from 0 stops at this speed would take seconds. */
+void Effects_exposure_first_frame_at_target(void) {
+    // lighting/effects
+    ecs_entity_t camera;
+    ecs_world_t *world = effects_world(&camera);
+    ecs_entity_t exposure = ecs_new(world);
+    ecs_set(world, exposure, AutoExposure, {.min_brightness = 0.2f, .max_brightness = 0.2f,
+        .min_log_luma = -8, .max_log_luma = 4, .speed_up = 0.5f, .speed_down = 0.5f,
+        .high_percentile = 1});
+    effects_view(world, camera, exposure);
+    ecs_entity_t wall = effects_cube(world, 0, 1, 3, (Rgb){255, 255, 255});
+    ecs_set(world, wall, Box, {20, 20, 1});
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "first.png",
+        .resolution_scale = 1});
+    unsigned char seen[2] = {0};
+    int32_t frame;
+    for (frame = 1; frame <= 30; frame ++) {
+        ecs_progress(world, 1.0f / 60);
+        box_render_sync(world);
+        if (frame == 1 || frame == 30) {
+            unsigned char *px = effects_load(world, "first.png");
+            seen[frame == 1 ? 0 : 1] = px[(32 * 64 + 32) * 4];
+            stbi_image_free(px);
+        }
+    }
+
+    test_assert(abs((int)seen[0] - effects_srgb8(0.2f)) <= 3);
+    test_assert(abs((int)seen[0] - (int)seen[1]) <= 1);
+
+    ecs_fini(world);
+}
+
+/* A wall that fills the view and a cube in front of black that covers less than a fifth of it
+ * get the same exposure: the black pixels, in bin 0, are left out of the histogram. */
+void Effects_exposure_ignores_pixels_below_min_log_luma(void) {
+    // lighting/effects
+    unsigned char result[2] = {0};
+    int32_t run;
+    for (run = 0; run < 2; run ++) {
+        ecs_entity_t camera;
+        ecs_world_t *world = effects_world(&camera);
+        ecs_entity_t exposure = ecs_new(world);
+        ecs_set(world, exposure, AutoExposure, {.min_brightness = 0.1f, .max_brightness = 0.1f,
+            .min_log_luma = -8, .max_log_luma = 4, .speed_up = 3, .speed_down = 1,
+            .low_percentile = 0, .high_percentile = 1});
+        effects_view(world, camera, exposure);
+
+        ecs_entity_t shape = effects_cube(world, 0, 1.5f, 0.5f, (Rgb){255, 255, 255});
+        if (!run) {
+            ecs_set(world, shape, Box, {20, 20, 1});
+        }
+
+        ecs_entity_t s = ecs_new(world);
+        ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "bin0.png",
+            .resolution_scale = 1});
+        ecs_progress(world, 1.0f / 60);
+        box_render_sync(world);
+        unsigned char *px = effects_load(world, "bin0.png");
+        result[run] = px[(32 * 64 + 32) * 4];
+        if (run) {
+            test_int(px[(4 * 64 + 4) * 4], 0);
+        }
+
+        stbi_image_free(px);
+        ecs_fini(world);
+    }
+
+    test_assert(abs((int)result[0] - effects_srgb8(0.1f)) <= 3);
+    test_assert(abs((int)result[0] - (int)result[1]) <= 1);
 }
 
 void Effects_fog_darkens_with_distance(void) {
@@ -479,7 +770,7 @@ void Effects_fog_lit_by_scene_sun(void) {
     ecs_singleton_set(world, AmbientLight, {.intensity = 0});
     ecs_entity_t sun = ecs_new(world);
     ecs_set(world, sun, Rotation, {(float)GLM_PI_2, 0, 0});
-    ecs_set(world, sun, DirectionalLight, {.intensity = 0.2f});
+    ecs_set(world, sun, DirectionalLight, {.intensity = 0.2f * GLM_PIf});
     ecs_entity_t s = ecs_new(world);
     ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "sun.png",
         .resolution_scale = 1});
@@ -493,7 +784,7 @@ void Effects_fog_lit_by_scene_sun(void) {
     unsigned char dim = px[(32 * 64 + 32) * 4];
     stbi_image_free(px);
 
-    ecs_set(world, sun, DirectionalLight, {.intensity = 0.8f});
+    ecs_set(world, sun, DirectionalLight, {.intensity = 0.8f * GLM_PIf});
     ecs_progress(world, 1.0f / 60);
     box_render_sync(world);
     px = stbi_load(path, &w, &h, &n, 4);
@@ -893,6 +1184,7 @@ void Effects_default_settings(void) {
     test_flt(a->min_exposure, 0);
     test_flt(a->max_exposure, 0);
     test_uint(ecs_get(world, e, Tonemap)->auto_exposure, 0);
+    test_int(ecs_get(world, e, Tonemap)->operator_, TonemapOperatorPbrNeutral);
 
     ecs_fini(world);
 }

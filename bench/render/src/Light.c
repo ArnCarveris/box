@@ -73,7 +73,7 @@ static void bench_light(
         ecs_entity_t e = ecs_new_w_pair(world, EcsChildOf, parent);
         ecs_set(world, e, Position,
             {(float)(i % BENCH_LIGHTS_ROW) * 2, 1, (float)(i / BENCH_LIGHTS_ROW) * 2});
-        ecs_set(world, e, PointLight, {.intensity = 2, .range = 3,
+        ecs_set(world, e, PointLight, {.intensity = 2 * GLM_PIf, .range = 3,
             .bake = modes ? (LightBakeMode)(i % modes) : LightBakeModeMixed});
         ecs_set(world, e, Rgb, {255, 200, 100});
     }
@@ -126,7 +126,7 @@ static void bench_light_scenes(
                 : ecs_new_w_pair(world, EcsChildOf, group);
             ecs_set(world, e, Position,
                 {(float)(i % BENCH_LIGHTS_ROW) * 2, 1, (float)(i / BENCH_LIGHTS_ROW) * 2});
-            ecs_set(world, e, PointLight, {.intensity = 2, .range = 3});
+            ecs_set(world, e, PointLight, {.intensity = 2 * GLM_PIf, .range = 3});
             ecs_set(world, e, Rgb, {255, 200, 100});
         }
     }
@@ -178,10 +178,10 @@ static void bench_light_clustered(
         ecs_set(world, e, Position,
             {(float)(i % BENCH_LIGHTS_ROW) * 2, 1, (float)(i / BENCH_LIGHTS_ROW) * 2});
         if (i % 10) {
-            ecs_set(world, e, PointLight, {.intensity = 2, .range = 3});
+            ecs_set(world, e, PointLight, {.intensity = 2 * GLM_PIf, .range = 3});
         } else {
             ecs_set(world, e, Rotation, {-1.2f, 0, 0});
-            ecs_set(world, e, SpotLight, {.intensity = 4, .range = 8, .inner_angle = 20,
+            ecs_set(world, e, SpotLight, {.intensity = 4 * GLM_PIf, .range = 8, .inner_angle = 20,
                 .outer_angle = 30});
         }
 
@@ -244,10 +244,10 @@ static void bench_light_crowded(
         ecs_set(world, e, Position,
             {(float)x * 2.0f - 7.0f, (float)y - 3.5f, -4.0f - (float)z * 4.0f});
         if (spots) {
-            ecs_set(world, e, SpotLight, {.intensity = 1, .range = 8, .inner_angle = 15,
+            ecs_set(world, e, SpotLight, {.intensity = GLM_PIf, .range = 8, .inner_angle = 15,
                 .outer_angle = 20});
         } else {
-            ecs_set(world, e, PointLight, {.intensity = 1, .range = 8});
+            ecs_set(world, e, PointLight, {.intensity = GLM_PIf, .range = 8});
         }
     }
 

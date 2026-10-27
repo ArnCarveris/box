@@ -46,20 +46,20 @@ cone {
 narrow {
   Position: {-4, 5, 0}
   Rotation: {1.5708, 0, 0}
-  SpotLight: {intensity: 30, range: 9, inner_angle: 10, outer_angle: 16}
+  SpotLight: {intensity: 30 * flecs.script.math.PI, range: 9, inner_angle: 10, outer_angle: 16}
   Rgb: {255, 255, 255}
 }
 
 wide {
   Position: {0, 5, 0}
   Rotation: {1.5708, 0, 0}
-  SpotLight: {intensity: 30, range: 9, inner_angle: 15, outer_angle: 30}
+  SpotLight: {intensity: 30 * flecs.script.math.PI, range: 9, inner_angle: 15, outer_angle: 30}
   Rgb: {255, 170, 80}
 }
 
 slanted {
   Position: {6, 4, 2}
   Rotation: {0.8658, -2.3287, 0}
-  SpotLight: {intensity: 30, range: 10, inner_angle: 5, outer_angle: 25}
+  SpotLight: {intensity: 30 * flecs.script.math.PI, range: 10, inner_angle: 5, outer_angle: 25}
   Rgb: {80, 220, 255}
 }

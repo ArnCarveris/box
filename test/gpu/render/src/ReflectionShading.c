@@ -296,7 +296,7 @@ static unsigned char* render_lit(
     ecs_set(world, rough, PbrMaterial, {.metallic = 1, .roughness = 0.7f});
     ecs_entity_t light = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, light, Position, {2, 3, 2});
-    ecs_set(world, light, PointLight, {.intensity = 4, .range = 12});
+    ecs_set(world, light, PointLight, {.intensity = 4 * GLM_PIf, .range = 12});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, camera, Position, {0, 1, 6});
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
