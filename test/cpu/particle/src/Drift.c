@@ -702,24 +702,30 @@ void Drift_slides_on_ground(void) {
     box_render_null_free(null);
 }
 
+/** Frame in which the burst system of a test plays again */
+#define BURST_AGAIN (70)
+
 /** What the burst system of a test plays */
 typedef struct burst_ctx_t {
     ecs_entity_t effect;    /**< The template */
     ecs_entity_t root;      /**< Root of the instance the burst returned */
     int32_t frames;         /**< Frames the system ran */
+    bool stage;             /**< Burst on the stage of the system, else on its world */
 } burst_ctx_t;
 
-/** Play the template once at (2, 0, 1), in the first frame the system runs.
+/** Play the template at (2, 0, 1) in the first frame the system runs and again in the frame
+ * BURST_AGAIN, after the first play went back to the pool.
  *
  * @param it The iterator of the system
  */
-static void BurstOnce(
+static void BurstTwice(
     ecs_iter_t *it)
 {
     burst_ctx_t *ctx = it->ctx;
     vec3 at = {2, 0, 1};
-    if (!ctx->frames) {
-        ctx->root = box_particle_burst_at(it->world, ctx->effect, at, 1);
+    if (!ctx->frames || ctx->frames == BURST_AGAIN) {
+        ctx->root = box_particle_burst_at(
+            ctx->stage ? it->stage : it->world, ctx->effect, at, 1);
     }
 
     ctx->frames ++;
@@ -752,31 +758,45 @@ static void check_same_pool(
     }
 }
 
-void Drift_burst_from_system(void) {
-    // particle/effect
+/** Check that bursts from an EcsOnUpdate system play as those outside a system, a new
+ * instance and one that went back to the pool.
+ *
+ * @param stage Burst on the stage of the system, else on its world
+ */
+static void burst_from_system(
+    bool stage)
+{
     box_render_null_t *a_null, *b_null;
     ecs_world_t *a = world_new(&a_null);
     ecs_world_t *b = world_new(&b_null);
     test_assert(ecs_script_run(a, "templates", TEMPLATES, NULL) == 0);
     test_assert(ecs_script_run(b, "templates", TEMPLATES, NULL) == 0);
 
-    burst_ctx_t ctx = { .effect = ecs_lookup(b, "Puff") };
+    burst_ctx_t ctx = { .effect = ecs_lookup(b, "Puff"), .stage = stage };
     test_assert(ctx.effect != 0);
     ecs_system(b, {
-        .entity = ecs_entity(b, { .name = "BurstOnce" }),
+        .entity = ecs_entity(b, { .name = "BurstTwice" }),
         .phase = EcsOnUpdate,
-        .run = BurstOnce,
+        .run = BurstTwice,
         .ctx = &ctx
     });
 
     vec3 at = {2, 0, 1};
     ecs_entity_t a_root = box_particle_burst_at(a, ecs_lookup(a, "Puff"), at, 1);
     test_assert(a_root != 0);
+    ecs_entity_t b_first = 0;
     int32_t i;
-    for (i = 0; i < 70; i ++) {
+    for (i = 0; i < 2 * BURST_AGAIN; i ++) {
+        if (i == BURST_AGAIN) {
+            test_int(ecs_singleton_get(a, ParticleStats)->effects, 0);
+            test_int(ecs_singleton_get(b, ParticleStats)->effects, 0);
+            test_assert(box_particle_burst_at(a, ecs_lookup(a, "Puff"), at, 1) == a_root);
+        }
+
         frame(a);
         frame(b);
         if (!i) {
+            b_first = ctx.root;
             test_assert(ctx.root != 0);
             test_assert(ecs_is_alive(b, ctx.root));
             test_assert(ecs_has_pair(b, ctx.root, EcsIsA, ctx.effect));
@@ -793,7 +813,7 @@ void Drift_burst_from_system(void) {
         test_int(sb->particles, sa->particles);
         test_int(sb->spawned, sa->spawned);
         test_int(sb->simulated, sa->simulated);
-        if (i < 50) {
+        if (i % BURST_AGAIN < 50) {
             test_int(sb->effects, 1);
         }
 
@@ -810,11 +830,22 @@ void Drift_burst_from_system(void) {
             ecs_get(a, a_root, ParticleEffect)->time);
     }
 
-    test_int(ctx.frames, 70);
+    test_int(ctx.frames, 2 * BURST_AGAIN);
+    test_assert(ctx.root == b_first);
     test_int(ecs_singleton_get(b, ParticleStats)->effects, 0);
 
     ecs_fini(a);
     box_render_null_free(a_null);
     ecs_fini(b);
     box_render_null_free(b_null);
+}
+
+void Drift_burst_from_system(void) {
+    // particle/effect
+    burst_from_system(true);
+}
+
+void Drift_burst_from_system_world(void) {
+    // particle/effect
+    burst_from_system(false);
 }

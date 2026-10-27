@@ -250,7 +250,8 @@
                     "effect_layers_drift",
                     "lingering_follows_change",
                     "slides_on_ground",
-                    "burst_from_system"
+                    "burst_from_system",
+                    "burst_from_system_world"
                 ]
             },
             {

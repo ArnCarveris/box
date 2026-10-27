@@ -775,6 +775,10 @@ ecs_entity_t box_particle_burst_at(
     const vec3 position,
     float scale)
 {
+    if (ecs_stage_is_readonly(world)) {
+        world = ecs_get_stage(world, 0);
+    }
+
     const ParticleEffectState *state = ecs_singleton_get(world, ParticleEffectState);
     box_particle_effects_t *s = state ? state->state : NULL;
     const ParticleSettings *settings = ecs_singleton_get(world, ParticleSettings);

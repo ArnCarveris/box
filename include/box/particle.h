@@ -64,10 +64,9 @@ ECS_STRUCT(ParticleForces, {
                              *   second squared, default 0 */
     float turbulence_scale; /**< Frequency multiplier of the wander field, above 1 for smaller
                              *   swirls, default 1 */
-    vec3 drift;             /**< Velocity in world units per second of the frame of reference,
-                             *   moving the live particles of every pool these forces apply to
-                             *   from the next frame, never kept in their velocity, default
-                             *   {0, 0, 0} */
+    vec3 drift;             /**< Velocity in world units per second of the frame of reference
+                             *   that moves the live particles from the next frame without
+                             *   entering their velocity, default {0, 0, 0} */
 });
 
 /** Collision of the particles of the emitter entity with the horizontal plane at height.
@@ -358,9 +357,9 @@ ECS_STRUCT(ParticleEffect, {
  * budgets of ParticleSettings rule a burst while they are full, and deleting the template deletes
  * its instances. Scripts call it as box.particle.burst_at(effect, position, scale).
  *
- * @param world The world, or the stage of a system on the main thread before EcsPreStore: the
- *              instance is made when its commands merge and plays as a burst outside a
- *              system does, from that frame
+ * @param world The world, or in a system on the main thread before EcsPreStore its stage or
+ *              its world: the instance is made when the commands of the stage merge and
+ *              plays as a burst outside a system does, from that frame
  * @param effect The template
  * @param position World position of the play
  * @param scale Multiplier of the sizes, speeds, spawn volumes and layer offsets of the
