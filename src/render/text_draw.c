@@ -37,6 +37,7 @@ static void box_text_slots_ctor(
     (void)ti;
     for (i = 0; i < count; i ++) {
         ecs_vec_init_t(NULL, &values[i].slots, box_draw_glyph_slot_t, 0);
+        values[i].rank = 0;
     }
 }
 
@@ -96,6 +97,7 @@ static void box_text_slots_copy(
     (void)ti;
     for (i = 0; i < count; i ++) {
         ecs_vec_clear(&values[i].slots);
+        values[i].rank = 0;
     }
 }
 
@@ -362,8 +364,8 @@ void box_draws_text_update(
     }
 
     const WorldTransform *transform = ecs_get(world, e, WorldTransform);
-    float layer = count ? box_draws_layer(world, e, true) : 0.0f;
     material.clip = count ? box_draws_clip_of(world, d, e) : 0;
+    material.rank = ts ? ts->rank : 0;
     for (i = 0; i < count; i ++) {
         const box_draw_glyph_slot_t *at = ecs_vec_get_t(&ts->slots, box_draw_glyph_slot_t, i);
         box_draw_batch_t *b = box_draws_batch(d, at->batch);
@@ -377,10 +379,6 @@ void box_draws_text_update(
                 box_text_span_color(spans, length, glyphs[i].offset));
         } else {
             box_draws_glyph(t, sh, transform, &glyphs[i], &material);
-        }
-
-        if (t) {
-            box_draws_lift(t, transform, layer);
         }
 
         box_draws_slot_changed(b, at->slot, kinds & BOX_DRAW_BOTH);

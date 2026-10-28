@@ -19,9 +19,6 @@ static const uint8_t box_draws_default_color[3] = { 204, 204, 204 };
 /** Color of a 2D shape with an Image and without Rgb, which shows the texture as is */
 static const uint8_t box_draws_image_color[3] = { 255, 255, 255 };
 
-/** Distance in world units a 2D instance is lifted along its local z axis per layer */
-#define BOX_DRAWS_LAYER_STEP (0.0001f)
-
 /** Most slots of one blended draw, so the ordered cull pass spreads a long run over jobs */
 #define BOX_DRAWS_BLENDED_RUN (512)
 
@@ -753,7 +750,7 @@ void box_draws_material(
     out->uv[2] = uv ? uv->offset_x : 0.0f;
     out->uv[3] = uv ? uv->offset_y : 0.0f;
     out->ids[0] = material->clip > 0 ? (uint32_t)material->clip : 0u;
-    out->ids[1] = 0;
+    out->ids[1] = material->rank;
     out->ids[2] = 0;
     out->ids[3] = 0;
     if (material->inherited || material->tint || material->shape2d) {
@@ -864,24 +861,6 @@ void box_draws_surface(
             out->p[22][j] = (shape->min[j] + shape->max[j]) * 0.5f;
             out->p[23][j] = (shape->max[j] - shape->min[j]) * 0.5f;
         }
-    }
-}
-
-void box_draws_lift(
-    box_render_transform_t *out,
-    const WorldTransform *transform,
-    float layer)
-{
-    float step = layer * BOX_DRAWS_LAYER_STEP;
-    vec3 axis = {0, 0, 1};
-    int32_t r;
-    if (transform) {
-        glm_vec3_copy(ECS_CONST_CAST(float*, transform->m[2]), axis);
-        glm_vec3_normalize(axis);
-    }
-
-    for (r = 0; r < 3; r ++) {
-        out->rows[r][3] += axis[r] * step;
     }
 }
 
@@ -1616,7 +1595,8 @@ static void box_draws_fill_material(
             .tint = tints ? &tints[i] : NULL,
             .inherited = slots[i].tinted ? &slots[i].tint : NULL,
             .fade = slots[i].fade,
-            .clip = shapes2d ? slots[i].clip : 0
+            .clip = shapes2d ? slots[i].clip : 0,
+            .rank = shapes2d ? slots[i].rank : 0
         };
         if (walk) {
             material.fade = box_draws_fade(it->world, it->entities[i], &inherited);
@@ -1676,9 +1656,9 @@ static void box_draws_fill_transform(
         box_render_transform_t *out = box_draws_slot_transform(b, slots[i].slot);
         box_render_transform_t was = *out;
         box_draws_transform(out, transforms ? &transforms[i] : NULL, &shapes[i]);
-        if (box_draws_is_2d(b)) {
-            box_draws_lift(out, transforms ? &transforms[i] : NULL, slots[i].layer);
-        } else if (d->shadow_record && ecs_os_memcmp_t(&was, out, box_render_transform_t)) {
+        if (!box_draws_is_2d(b) && d->shadow_record &&
+            ecs_os_memcmp_t(&was, out, box_render_transform_t))
+        {
             const box_render_surface_t *surface = box_draws_slot_surface(b, slots[i].slot);
             box_draws_shadow_region(it->world, d, b, &was, surface);
             box_draws_shadow_region(it->world, d, b, out, surface);

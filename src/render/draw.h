@@ -90,10 +90,6 @@ typedef struct box_draw_store_t {
     int32_t alive;              /**< Pages alive */
 } box_draw_store_t;
 
-/** Layers a floating element and its descendants are lifted over the elements that do not float,
- * more than twice the depth of any UI hierarchy */
-#define BOX_DRAWS_FLOAT_LAYERS (512.0f)
-
 /** Tints composed into one mix: a display encoded color becomes color * keep + add */
 typedef struct box_draw_tint_t {
     float add[3];   /**< Sum of the tint colors weighted by what the later tints keep, 0..1 */
@@ -105,7 +101,8 @@ typedef struct DrawSlot {
     int32_t batch;  /**< Index of the batch, -1 when the entity is not drawn */
     int32_t slot;   /**< Slot of the entity in the batch */
     float fade;     /**< Product of the Opacity of the ancestors, 1 without any */
-    float layer;    /**< Layer of a 2D shape, its depth in the hierarchy */
+    uint32_t rank;  /**< Rank of a 2D shape in the draw order of its tree (box_draw_order_t),
+                     *   which lifts its depth over the elements drawn before it */
     int32_t clip;   /**< Clip index of the nearest ClipChildren ancestor of a 2D shape, 0 none */
     bool dirty;     /**< The entity is in the list of changed entities */
     uint8_t changed; /**< box_draw_kind_t, the streams its changes since the last extract write */
@@ -145,6 +142,8 @@ typedef struct box_draw_glyph_slot_t {
 /** Slots of the glyphs of a Text, one per glyph of its TextGlyphs, added with every Text */
 typedef struct TextSlots {
     ecs_vec_t slots; /**< box_draw_glyph_slot_t */
+    uint32_t rank;   /**< Rank of the glyphs in the draw order of the tree of the Text, above
+                      *   the shape of its entity */
 } TextSlots;
 
 /** Component id of TextSlots */
@@ -163,6 +162,7 @@ typedef struct box_draw_material_t {
     const Shape2D *shape2d;     /**< Resolved 2D shape, NULL for a 3D shape */
     float fade;                 /**< Product of the Opacity of the ancestors */
     int32_t clip;               /**< Clip index of a 2D shape or glyph, 0 for none */
+    uint32_t rank;              /**< Rank of a 2D shape or glyph in the draw order of its tree */
 } box_draw_material_t;
 
 /** A blended instance of a view, ordered back to front by its view depth */
@@ -178,6 +178,8 @@ typedef struct box_draw_order_t {
     const uint64_t *path;   /**< Sibling keys of the entity and its ancestors, root first */
     int32_t depth;          /**< Keys in path */
     bool floating;          /**< The entity or an ancestor floats, so it draws after the rest */
+    ecs_entity_t tree;      /**< Topmost ancestor that is not a scene root, the entity itself
+                             *   without one: the entities of a tree count their ranks together */
 } box_draw_order_t;
 
 /** Consecutive slots of one batch that draw one after another in the draw order of a scene */
@@ -301,6 +303,8 @@ typedef struct box_render_draws_t {
     ecs_map_t ranks;            /**< Child to its rank, while the order is made */
     ecs_map_t parents;          /**< Parents whose children have a rank, while the order is made */
     ecs_map_t order_z;          /**< Entity of a path to the z key it was ordered by */
+    ecs_map_t tree_ranks;       /**< Tree of the order to its next rank and its count of ranks,
+                                 *   while the runs are made */
     const void *backend;        /**< Context of the backend the GPU state was sent to */
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
     int32_t generation;         /**< Generation of that backend, see box_render_backend_t */
@@ -607,34 +611,6 @@ float box_draws_fade(
     ecs_entity_t e,
     box_draw_tint_t *tint);
 
-/** Get the layer of a 2D shape or glyph: twice the number of its ancestors, plus one for a
- * glyph, so it can be lifted over coplanar ancestors and the shape of its own entity. A floating
- * element (LayoutFloat) and its descendants are lifted BOX_DRAWS_FLOAT_LAYERS further, over the
- * elements that do not float.
- *
- * @param world The world
- * @param e The entity
- * @param glyph Whether the layer is for the glyphs of the Text of the entity
- * @return The layer
- */
-float box_draws_layer(
-    const ecs_world_t *world,
-    ecs_entity_t e,
-    bool glyph);
-
-/** Lift a 2D instance by its layer along the local z axis of its entity, toward the side it
- * faces, so it wins the depth test over coplanar ancestors whose depth rounds differently when
- * the plane is rotated in perspective. A step is a tenth of a millimeter in world units.
- *
- * @param out The transform
- * @param transform World transform of the entity, NULL for the identity
- * @param layer The layer
- */
-void box_draws_lift(
-    box_render_transform_t *out,
-    const WorldTransform *transform,
-    float layer);
-
 /** Send the batches of the frame: meshes, instance pages, uploads and scatters.
  *
  * The texture entities of a batch resolve to the handles of the images the backend has.
@@ -870,11 +846,12 @@ void box_draws_order_slot(
 /** Bring the draw order of the 2D slots up to date.
  *
  * 2D shapes and glyphs draw in hierarchy order, not by view depth: parents before children,
- * siblings by Position z, then OrderedChildren order or entity id, a shape before its glyphs.
+ * siblings by Position z, then OrderedChildren order or entity id, a shape before its glyphs. New
+ * entities, hierarchy, z or child order changes make the order again, moved slots only the runs.
  *
- * The order is made again when an entity got 2D slots, the hierarchy or the z of an entity in
- * it changed, or an OrderedChildren parent reordered its children; moved slots only make the
- * runs again.
+ * Making the runs ranks the shapes and glyphs of every tree (box_draw_order_t) along the order
+ * into their shading (ids[1]) with box_draws_rank_next. The 2D shader lifts the depth of each by
+ * its rank over the coplanar elements of its tree drawn before it, at any angle in perspective.
  *
  * @param world The world
  * @param d The state

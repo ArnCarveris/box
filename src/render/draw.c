@@ -247,8 +247,8 @@ static void box_draws_on_moved(
 }
 
 /** Remember the entities whose parent changed as roots of changed subtrees, and make the 2D
- * draw order again. A reparented entity writes its transform and its shading: its layer,
- * clip, opacity and tints follow the new ancestors.
+ * draw order again. A reparented entity writes its transform and its shading: its clip,
+ * opacity and tints follow the new ancestors, its rank the new order.
  *
  * @param it The iterator of the observer
  */
@@ -394,23 +394,6 @@ static void box_draws_walk(
     }
 
     ecs_vec_clear(&d->moved);
-}
-
-float box_draws_layer(
-    const ecs_world_t *world,
-    ecs_entity_t e,
-    bool glyph)
-{
-    float result = glyph ? 1.0f : 0.0f;
-    bool floating = ecs_has(world, e, LayoutFloat);
-    ecs_entity_t cur = ecs_get_parent(world, e);
-    while (cur) {
-        result += 2.0f;
-        floating |= ecs_has(world, cur, LayoutFloat);
-        cur = ecs_get_parent(world, cur);
-    }
-
-    return floating ? result + BOX_DRAWS_FLOAT_LAYERS : result;
 }
 
 float box_draws_fade(
@@ -696,18 +679,15 @@ write:
             kinds |= BOX_DRAW_SHADING;
         }
 
-        s->layer = box_draws_layer(world, e, false);
         s->clip = clip;
         material.clip = clip;
+        material.rank = s->rank;
     }
 
     if (kinds & BOX_DRAW_TRANSFORM) {
         box_render_transform_t *out = box_draws_slot_transform(b, s->slot);
         transform = ecs_get(world, e, WorldTransform);
         box_draws_transform(out, transform, shape);
-        if (material.shape2d) {
-            box_draws_lift(out, transform, s->layer);
-        }
     }
 
     if ((kinds & BOX_DRAW_SHADING) && material.shape2d) {

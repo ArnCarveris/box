@@ -550,6 +550,245 @@ void Shapes2D_coplanar_draw_in_order(void) {
     ecs_fini(world);
 }
 
+/** What a turned panel holds in front of it, in the order its children are created */
+typedef enum Shapes2D_siblings_t {
+    Shapes2DFill,       /**< The green fill alone, the mask of its pixels */
+    Shapes2DGroove,     /**< A red groove, then the smaller green fill over it */
+    Shapes2DNested,     /**< A red groove with a yellow child, then the green fill over both */
+    Shapes2DTextAlone,  /**< A white text alone, the mask of its pixels */
+    Shapes2DText,       /**< A red rect, then a white text over it */
+    Shapes2DFloatAlone, /**< The green fill floating (LayoutFloat) alone, the mask of its pixels */
+    Shapes2DFloat       /**< The floating green fill, then a red groove that it stays over */
+} Shapes2D_siblings_t;
+
+/** Add a rect in the plane of its parent.
+ *
+ * @param world The world
+ * @param parent The parent
+ * @param x Its x position
+ * @param w Its width
+ * @param h Its height
+ * @param rgb Its color as 0xRRGGBB
+ * @return The rect
+ */
+static ecs_entity_t Shapes2D_child(
+    ecs_world_t *world,
+    ecs_entity_t parent,
+    float x,
+    float w,
+    float h,
+    uint32_t rgb)
+{
+    ecs_entity_t e = ecs_new_w_pair(world, EcsChildOf, parent);
+    ecs_set(world, e, Position, {x, 0, 0});
+    ecs_set(world, e, Rect, {w, h});
+    ecs_set(world, e, Rgb, {(uint8_t)(rgb >> 16), (uint8_t)(rgb >> 8), (uint8_t)rgb});
+
+    return e;
+}
+
+/** Make a world with a perspective camera at the origin and a blue 300x120 panel turned toward
+ * it like the panel of ui_world_widgets, scaled with its distance to cover the same part of the
+ * image, holding coplanar overlapping children of different sizes like a Slider's groove and fill.
+ *
+ * @param dist The distance of the panel from the camera
+ * @param mode The children of the panel
+ * @return The world
+ */
+static ecs_world_t* Shapes2D_siblings_world(
+    float dist,
+    Shapes2D_siblings_t mode)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 0});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f, .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t panel = ecs_new(world);
+    ecs_set(world, panel, Position, {0, 0, -dist});
+    ecs_set(world, panel, Rotation, {-0.35f, 0.95f, 0});
+    ecs_set(world, panel, Scale, {0.003f * dist, 0.003f * dist, 0.003f * dist});
+    ecs_set(world, panel, Rect, {300, 120});
+    ecs_set(world, panel, Rgb, {0, 0, 255});
+    bool floats = mode == Shapes2DFloatAlone || mode == Shapes2DFloat;
+    if (floats) {
+        ecs_entity_t fill = Shapes2D_child(world, panel, -40, 180, 40, 0x00FF00);
+        ecs_set(world, fill, LayoutFloat, {0});
+    }
+
+    if (mode == Shapes2DGroove || mode == Shapes2DNested || mode == Shapes2DFloat) {
+        ecs_entity_t g = Shapes2D_child(world, panel, 0, 260, 40, 0xFF0000);
+        if (mode == Shapes2DNested) {
+            Shapes2D_child(world, g, -20, 200, 30, 0xFFFF00);
+        }
+    }
+
+    if (mode == Shapes2DText) {
+        Shapes2D_child(world, panel, 0, 280, 110, 0xFF0000);
+    }
+
+    if (mode == Shapes2DText || mode == Shapes2DTextAlone) {
+        ecs_entity_t label = ecs_new_w_pair(world, EcsChildOf, panel);
+        ecs_set(world, label, Position, {0, 0, 0});
+        ecs_set(world, label, Text, {.value = "HHH", .size = 60,
+            .font = ecs_lookup(world, "box.text.DefaultFont")});
+        ecs_set(world, label, Rgb, {255, 255, 255});
+    } else if (!floats) {
+        Shapes2D_child(world, panel, -40, 180, 40, 0x00FF00);
+    }
+
+    return world;
+}
+
+/** Render a world into a 160x160 capture and free the world.
+ *
+ * @param world The world
+ * @param file The name of the capture
+ * @return The pixels of the capture, freed with stbi_image_free
+ */
+static unsigned char* Shapes2D_siblings_capture(
+    ecs_world_t *world,
+    const char *file)
+{
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 160, .height = 160,
+        .write_to_file = ECS_CONST_CAST(char*, file), .resolution_scale = 1});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    char *path = flecs_asprintf("%s/%s", ecs_singleton_get(world, AppStatus)->tmp_dir, file);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_int(w, 160);
+    test_int(h, 160);
+    ecs_os_free(path);
+    ecs_fini(world);
+
+    return px;
+}
+
+/** Render a turned panel.
+ *
+ * @param dist The distance of the panel from the camera
+ * @param mode The children of the panel
+ * @param file The name of the capture
+ * @return The pixels of the 160x160 capture, freed with stbi_image_free
+ */
+static unsigned char* Shapes2D_siblings_render(
+    float dist,
+    Shapes2D_siblings_t mode,
+    const char *file)
+{
+    return Shapes2D_siblings_capture(Shapes2D_siblings_world(dist, mode), file);
+}
+
+/** Check that the pixels a later element fully covers when drawn alone keep its color when it is
+ * drawn over coplanar elements, at a near, a middle and a far distance.
+ *
+ * @param mask_mode The children of the panel without the elements below
+ * @param mode The children of the panel with them
+ * @param color The color of the element drawn last
+ * @param least The pixels it must cover at least
+ */
+static void Shapes2D_siblings_check(
+    Shapes2D_siblings_t mask_mode,
+    Shapes2D_siblings_t mode,
+    const unsigned char *color,
+    int32_t least)
+{
+    float distances[3] = { 2, 10, 40 };
+    int32_t d, j;
+    for (d = 0; d < 3; d ++) {
+        unsigned char *mask = Shapes2D_siblings_render(distances[d], mask_mode, "mask.png");
+        unsigned char *px = Shapes2D_siblings_render(distances[d], mode, "siblings.png");
+        int32_t i, covered = 0, hidden = 0;
+        for (i = 0; i < 160 * 160; i ++) {
+            bool in = true, shown = true;
+            for (j = 0; j < 3; j ++) {
+                in &= abs((int)mask[i * 4 + j] - (int)color[j]) <= 10;
+                shown &= abs((int)px[i * 4 + j] - (int)color[j]) <= 10;
+            }
+
+            covered += in;
+            hidden += in && !shown;
+        }
+
+        test_assert(covered > least);
+        test_int(hidden, 0);
+        stbi_image_free(mask);
+        stbi_image_free(px);
+    }
+}
+
+void Shapes2D_coplanar_siblings_in_perspective(void) {
+    // ui/shapes_2d
+    const unsigned char green[3] = { 0, 255, 0 };
+    Shapes2D_siblings_check(Shapes2DFill, Shapes2DGroove, green, 100);
+}
+
+void Shapes2D_coplanar_sibling_over_descendants(void) {
+    // ui/shapes_2d
+    const unsigned char green[3] = { 0, 255, 0 };
+    Shapes2D_siblings_check(Shapes2DFill, Shapes2DNested, green, 100);
+}
+
+void Shapes2D_coplanar_glyphs_in_perspective(void) {
+    // ui/shapes_2d
+    const unsigned char white[3] = { 255, 255, 255 };
+    Shapes2D_siblings_check(Shapes2DTextAlone, Shapes2DText, white, 10);
+}
+
+void Shapes2D_coplanar_float_in_perspective(void) {
+    // ui/shapes_2d
+    const unsigned char green[3] = { 0, 255, 0 };
+    Shapes2D_siblings_check(Shapes2DFloatAlone, Shapes2DFloat, green, 100);
+}
+
+/** Render a turned panel at a distance of 2 with an emissive red box on the ray through the
+ * center of the image, the center of the green fill.
+ *
+ * @param z The z of the box, the panel being at -2
+ * @return The pixel at the center of the image
+ */
+static uint32_t Shapes2D_siblings_box(
+    float z)
+{
+    ecs_world_t *world = Shapes2D_siblings_world(2, Shapes2DNested);
+    ecs_entity_t box = ecs_new(world);
+    ecs_set(world, box, Position, {0, 0, z});
+    ecs_set(world, box, Box, {0.2f, 0.2f, 0.2f});
+    ecs_set(world, box, Rgb, {0, 0, 0});
+    ecs_set(world, box, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, box, Emissive, {.strength = 1, .color = {255, 0, 0}});
+    unsigned char *px = Shapes2D_siblings_capture(world, "box.png");
+    const unsigned char *c = &px[(80 * 160 + 80) * 4];
+    uint32_t result = (uint32_t)c[0] | ((uint32_t)c[1] << 8) | ((uint32_t)c[2] << 16);
+    stbi_image_free(px);
+
+    return result;
+}
+
+void Shapes2D_coplanar_siblings_depth_with_3d_shapes(void) {
+    // ui/shapes_2d
+    uint32_t front = Shapes2D_siblings_box(-1.6f);
+    test_assert((front & 0xFF) > 200);
+    test_assert(((front >> 8) & 0xFF) < 30);
+
+    uint32_t behind = Shapes2D_siblings_box(-2.6f);
+    test_assert((behind & 0xFF) < 10);
+    test_assert(((behind >> 8) & 0xFF) > 245);
+    test_assert(((behind >> 16) & 0xFF) < 10);
+}
+
 void Shapes2D_edges_crisp_at_any_scale(void) {
     // ui/shapes_2d
     ecs_world_t *world = ecs_init();

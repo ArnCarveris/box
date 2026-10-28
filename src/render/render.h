@@ -770,7 +770,8 @@ typedef struct box_render_shading_t {
     vec4 emissive;          /**< Linear emitted color times its strength, w unused */
     vec4 material;          /**< Metallic, roughness, zw unused (the words of a 2D shape) */
     vec4 uv;                /**< TextureTransform: u scale, v scale, u offset, v offset */
-    uint32_t ids[4];        /**< Clip index of a 2D instance (0 for none), three reserved 0 */
+    uint32_t ids[4];        /**< Clip index of a 2D instance (0 for none), its rank in the draw
+                             *   order of its tree, two reserved 0 */
 } box_render_shading_t;
 
 /** A record of the material table (BOX_RENDER_BUFFER_MATERIALS), Material of material.wgsl: the
