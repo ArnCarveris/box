@@ -25,7 +25,7 @@ struct Gtao {
     effect: vec4f,
     // slices, steps per slice, sample distribution power, thin occluder compensation
     quality: vec4f,
-    // depth mip sampling offset, 1 at half resolution, render width, render height
+    // depth mip sampling offset, 1 at half resolution, two unused
     extent: vec4f,
 };
 
@@ -257,6 +257,11 @@ fn spatio_temporal_noise(p: vec2u) -> vec2f {
     return fract(0.5 + f32(index) * vec2f(0.75487766624669276005, 0.5698402909980532659114));
 }
 
+// Depth of a neighbor outside the image from the depth of the pixel and of its opposite neighbor.
+fn border_depth(center: f32, opposite: f32) -> f32 {
+    return max(2.0 * center - opposite, 0.5 * center);
+}
+
 fn output_term(p: vec2i, visibility: f32) {
     let v = clamp(visibility / OCCLUSION_TERM_SCALE, 0.0, 1.0);
     textureStore(out_term, p, vec4f(v, 0.0, 0.0, 0.0));
@@ -271,11 +276,26 @@ fn output_term(p: vec2i, visibility: f32) {
 
     let pixel_size = gtao.viewport.zw;
     let screen = (vec2f(pix) + 0.5) * pixel_size;
+    let size = vec2i(gtao.viewport.xy);
     var z = depth_at(pix, 0);
-    let left_z = depth_at(pix + vec2i(-1, 0), 0);
-    let top_z = depth_at(pix + vec2i(0, -1), 0);
-    let right_z = depth_at(pix + vec2i(1, 0), 0);
-    let bottom_z = depth_at(pix + vec2i(0, 1), 0);
+    var left_z = depth_at(pix + vec2i(-1, 0), 0);
+    var top_z = depth_at(pix + vec2i(0, -1), 0);
+    var right_z = depth_at(pix + vec2i(1, 0), 0);
+    var bottom_z = depth_at(pix + vec2i(0, 1), 0);
+    // A neighbor outside the image continues the slope of the opposite one, so the normal of a
+    // pixel on the border is not bent toward the camera by a repeated depth.
+    if (pix.x == 0) {
+        left_z = border_depth(z, right_z);
+    }
+    if (pix.x == size.x - 1) {
+        right_z = border_depth(z, left_z);
+    }
+    if (pix.y == 0) {
+        top_z = border_depth(z, bottom_z);
+    }
+    if (pix.y == size.y - 1) {
+        bottom_z = border_depth(z, top_z);
+    }
     let edges = calculate_edges(z, left_z, right_z, top_z, bottom_z);
     textureStore(out_edges, pix, vec4f(pack_edges(edges), 0.0, 0.0, 0.0));
 
@@ -496,8 +516,8 @@ fn term_bilinear(coord: vec2f) -> f32 {
     }
 
     let full_depth = view_depth(raw);
-    let low_size = gtao.viewport.xy;
-    let coord = f.pos.xy / gtao.extent.zw * low_size;
+    // Working texel k holds the depth of render pixel 2k.
+    let coord = f.pos.xy * 0.5;
     let base = vec2i(floor(coord - 0.5));
     // GatherRed order: (0, 1), (1, 1), (1, 0), (0, 0)
     let low = vec4f(depth_at(base + vec2i(0, 1), 0), depth_at(base + vec2i(1, 1), 0),

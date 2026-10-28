@@ -195,6 +195,7 @@ void box_gpu_draw_init(
     box_gpu_light_init(gpu);
     box_gpu_shadow_init(gpu);
     box_gpu_effects_init(gpu);
+    box_gpu_gtao_init(gpu);
     box_gpu_atmosphere_init(gpu);
     box_gpu_particles_init(gpu);
 }
@@ -490,6 +491,7 @@ void box_gpu_draw_fini(
     box_gpu_reflect_fini(gpu);
     box_gpu_environment_fini(gpu);
     box_gpu_effects_fini(gpu);
+    box_gpu_gtao_fini(gpu);
     box_gpu_atmosphere_fini(gpu);
     box_gpu_particles_fini(gpu);
     if (gpu->view_buffer) {
@@ -1685,7 +1687,7 @@ void box_gpu_draw_views(
             }
 
             if (ao) {
-                box_gpu_gtao_record(gpu, t, encoder, packet, v);
+                box_gpu_gtao_record(gpu, t, encoder, v);
             }
 
             box_gpu_draw_pass(gpu, t, encoder, color, hdr, packet, v, group, slot, 3);

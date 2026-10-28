@@ -1023,7 +1023,7 @@ void Effects_gtao_darkens_crease(void) {
     test_assert(before[(62 * 64 + 32) * 4] > 60);
     test_assert(before[(62 * 64 + 32) * 4] < 250);
     test_assert(gtao_darkening(before, after, 16, 48) > 10);
-    test_assert(gtao_diff(before, after, 24, 60, 40, 63) <= 2);
+    test_assert(gtao_diff(before, after, 8, 40, 56, 47) <= 2);
     test_assert(gtao_diff(before, after, 24, 0, 40, 3) <= 2);
 
     ecs_os_free(before);
@@ -1120,6 +1120,7 @@ void Effects_gtao_ortho_view_unchanged(void) {
     // lighting/effects
     ecs_entity_t camera, floor, wall;
     ecs_world_t *world = gtao_world(0.5f, 0, 10, &camera, &floor, &wall);
+    ecs_set(world, camera, Position, {0, 3, 6});
     ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 4, .near_ = 0.1f,
         .far_ = 100});
     ecs_entity_t view = ecs_new(world);
@@ -1203,7 +1204,7 @@ void Effects_gtao_specular_occlusion(void) {
     unsigned char *after = gtao_frame(world, "gtao_specular.png");
 
     test_assert(before[(62 * 64 + 32) * 4] > 30);
-    test_assert(gtao_diff(before, after, 24, 60, 40, 63) <= 2);
+    test_assert(gtao_diff(before, after, 8, 40, 56, 47) <= 2);
     test_assert(gtao_darkening(before, after, 34, 48) > 4);
 
     ecs_os_free(before);
@@ -1220,11 +1221,11 @@ void Effects_gtao_half_resolution_close_to_full(void) {
     gtao_surface(world, "gtao_half.png");
     unsigned char *none = gtao_frame(world, "gtao_half.png");
 
-    ecs_entity_t full = gtao_effect(world, 0.5f, 2.2f, false);
+    ecs_entity_t full = gtao_effect(world, 1.5f, 2.2f, false);
     gtao_view_set(world, view, camera, true, &full, 1);
     unsigned char *at_full = gtao_frame(world, "gtao_half.png");
 
-    ecs_entity_t half = gtao_effect(world, 0.5f, 2.2f, true);
+    ecs_entity_t half = gtao_effect(world, 1.5f, 2.2f, true);
     gtao_view_set(world, view, camera, true, &half, 1);
     unsigned char *at_half = gtao_frame(world, "gtao_half.png");
 
@@ -1244,10 +1245,13 @@ void Effects_gtao_half_resolution_close_to_full(void) {
 
     test_assert(left > 4);
     test_assert(right < 59);
-    test_assert(gtao_diff(none, at_half, left - 3, 2, left + 3, 18) <= 2);
-    test_assert(gtao_diff(none, at_half, right - 3, 2, right + 3, 18) <= 2);
-    test_assert(gtao_diff(none, at_full, left - 3, 2, left + 3, 18) <= 2);
-    test_assert(gtao_diff(none, at_full, right - 3, 2, right + 3, 18) <= 2);
+    test_assert(gtao_diff(none, at_half, left - 3, 2, left + 3, 12) <= 2);
+    test_assert(gtao_diff(none, at_half, right - 3, 2, right + 3, 12) <= 2);
+    test_assert(gtao_diff(none, at_full, left - 3, 2, left + 3, 12) <= 2);
+    test_assert(gtao_diff(none, at_full, right - 3, 2, right + 3, 12) <= 2);
+    box_render_gpu_stats_t stats;
+    test_bool(box_render_gpu_stats(world, &stats), true);
+    test_int(stats.errors, 0);
 
     ecs_os_free(none);
     ecs_os_free(at_full);

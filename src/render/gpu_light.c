@@ -721,7 +721,7 @@ WGPUBindGroup box_gpu_light_group_with(
             .buffer = clips ? clips->buffer : gpu->no_clips,
             .size = clips ? clips->size : sizeof(box_render_clip_t)
         },
-        [14] = { .binding = 14, .textureView = ao ? ao : box_gpu_effects_white(gpu) }
+        [14] = { .binding = 14, .textureView = ao ? ao : box_gpu_gtao_white(gpu) }
     };
     box_gpu_atmosphere_bindings(gpu, t, v, &entries[9]);
     box_gpu_environment_bindings(gpu, t ? v : NULL, &entries[12]);

@@ -5,40 +5,12 @@
  * A view with effects renders into an HDR image; its effects run in order as fullscreen passes
  * between two HDR images and the last pass writes the target. State kept across frames, such
  * as an adapted exposure or bloom history, is keyed by target, view and effect entity.
- *
- * Gtao is not a pass of the chain: its compute passes run between the depth prepass and the
- * forward pass of a view and write the ambient occlusion image the forward pass binds.
  */
 
 #include "gpu.h"
 #include <math.h>
 
 #ifdef BOX_RENDER_WGPU
-
-/** Format of the depth mips, AO terms, edges and AO image of Gtao, a core storage format */
-#define BOX_GPU_GTAO_FORMAT (WGPUTextureFormat_R32Float)
-
-/** Mips of the view depth of Gtao (XE_GTAO_DEPTH_MIP_LEVELS) */
-#define BOX_GPU_GTAO_MIPS (5)
-
-/** Smallest edge of the depth mips of Gtao, so that the last mip has a texel */
-#define BOX_GPU_GTAO_MIN_EDGE (16)
-
-/** Invocations along each axis of a workgroup of the Gtao passes */
-#define BOX_GPU_GTAO_GROUP (8)
-
-/** Most denoise passes of Gtao */
-#define BOX_GPU_GTAO_DENOISE_MAX (3)
-
-/** Private settings of XeGTAO with its defaults: the radius multiplier, the sample distribution
- * power, the thin occluder compensation, the depth mip sampling offset and the blur beta of the
- * denoise, which is 1e4 (no blur) without denoise passes */
-#define BOX_GPU_GTAO_RADIUS_MULTIPLIER (1.457f)
-#define BOX_GPU_GTAO_SAMPLE_POWER (2.0f)
-#define BOX_GPU_GTAO_THIN_OCCLUDER (0.0f)
-#define BOX_GPU_GTAO_MIP_OFFSET (3.3f)
-#define BOX_GPU_GTAO_BLUR_BETA (1.2f)
-#define BOX_GPU_GTAO_NO_BLUR_BETA (1e4f)
 
 /** Color format of the edges SMAA finds */
 #define BOX_GPU_SMAA_EDGES_FORMAT (WGPUTextureFormat_RG8Unorm)
@@ -76,9 +48,6 @@
 /** Kind of state of the pass that copies an HDR image into its target */
 #define BOX_GPU_FX_COPY (101)
 
-/** Kind of state of the ambient occlusion (Gtao) of a view */
-#define BOX_GPU_FX_GTAO (102)
-
 /** How a pass writes its output */
 typedef enum box_gpu_fx_blend_t {
     BOX_GPU_FX_REPLACE,     /**< Replace the output */
@@ -95,24 +64,6 @@ typedef struct box_gpu_fx_pipeline_t {
     box_gpu_fx_blend_t blend;       /**< How the output is written */
     WGPURenderPipeline pipeline;    /**< The pipeline */
 } box_gpu_fx_pipeline_t;
-
-/** Images of the ambient occlusion of a view: R32Float at the working resolution, the render
- * size or half of it rounded up, except the AO image the forward pass reads at the render size */
-typedef struct box_gpu_gtao_images_t {
-    uint32_t width;                 /**< Render width */
-    uint32_t height;                /**< Render height */
-    uint32_t work_width;            /**< Working width */
-    uint32_t work_height;           /**< Working height */
-    WGPUTexture depth;              /**< View depth and its mips, at least BOX_GPU_GTAO_MIN_EDGE */
-    WGPUTextureView depth_view;     /**< View of every mip */
-    WGPUTextureView depth_mips[BOX_GPU_GTAO_MIPS]; /**< View of each mip */
-    WGPUTexture terms[2];           /**< AO terms the main pass and denoise alternate between */
-    WGPUTextureView term_views[2];  /**< Views of the terms */
-    WGPUTexture edges;              /**< Packed edges of the main pass */
-    WGPUTextureView edges_view;     /**< View of the edges */
-    WGPUTexture ao;                 /**< AO image at the render size */
-    WGPUTextureView ao_view;        /**< View of the AO image */
-} box_gpu_gtao_images_t;
 
 /** State of an effect of a view in a target, kept while the effect runs every frame */
 typedef struct box_gpu_fx_state_t {
@@ -133,7 +84,6 @@ typedef struct box_gpu_fx_state_t {
     WGPUTextureView history_views[2]; /**< Views of the history images */
     int32_t history_index;          /**< History image that holds the last frame */
     bool history_valid;             /**< The history holds a frame */
-    box_gpu_gtao_images_t gtao;     /**< Images of an ambient occlusion */
 } box_gpu_fx_state_t;
 
 /** HDR images of a target, the size it renders at */
@@ -160,24 +110,6 @@ struct box_gpu_effects_t {
     WGPUComputePipeline histogram;  /**< Pipeline that fills the luminance histogram */
     WGPUComputePipeline adapt;      /**< Pipeline that adapts the exposure */
     int32_t measure_revision;       /**< Revision of the exposure shader of those pipelines */
-    WGPUBindGroupLayout gtao_prefilter_layout; /**< Bindings of the Gtao prefilter to mip 3 */
-    WGPUBindGroupLayout gtao_last_layout; /**< Bindings of the Gtao prefilter of mip 4 */
-    WGPUBindGroupLayout gtao_main_layout; /**< Bindings of the Gtao main pass */
-    WGPUBindGroupLayout gtao_denoise_layout; /**< Bindings of the Gtao denoise passes */
-    WGPUBindGroupLayout gtao_upsample_layout; /**< Bindings of the Gtao bilateral upsample */
-    WGPUPipelineLayout gtao_prefilter_pipeline_layout; /**< Pipeline layouts of those */
-    WGPUPipelineLayout gtao_last_pipeline_layout;
-    WGPUPipelineLayout gtao_main_pipeline_layout;
-    WGPUPipelineLayout gtao_denoise_pipeline_layout;
-    WGPUPipelineLayout gtao_upsample_pipeline_layout;
-    WGPUComputePipeline gtao_prefilter; /**< Gtao prefilter of the depth into mips 0 to 3 */
-    WGPUComputePipeline gtao_last;  /**< Gtao prefilter of mip 4 */
-    WGPUComputePipeline gtao_main;  /**< Gtao main pass */
-    WGPUComputePipeline gtao_denoise; /**< Gtao denoise pass */
-    WGPUComputePipeline gtao_denoise_final; /**< Last Gtao denoise pass, which scales the term */
-    int32_t gtao_revision;          /**< Revision of the Gtao shader of those pipelines */
-    WGPUTexture white;              /**< 1x1 R32Float of 1, the AO of a view without Gtao */
-    WGPUTextureView white_view;     /**< View of the white image */
     WGPUSampler sampler;            /**< Linear clamp sampler */
     WGPUTexture placeholder;        /**< 1x1 image bound where a pass reads no second image */
     WGPUTextureView placeholder_view; /**< View of the placeholder image */
@@ -248,21 +180,6 @@ typedef struct box_gpu_bloom_uniforms_t {
     float params[4];                /**< Firefly clamp, blend of the first mip, history blend */
     float first[4];                 /**< Tap offset of the first downsample in uv */
 } box_gpu_bloom_uniforms_t;
-
-/** Uniforms of the Gtao passes, matching Gtao in etc/shaders/gtao.wgsl */
-typedef struct box_gpu_gtao_uniforms_t {
-    float viewport[4];              /**< Working width, height and their inverse */
-    float ndc_to_view[4];           /**< NDC to view multiplier xy and addend xy, for a working
-                                     *   pixel position in 0..1 */
-    float unpack[4];                /**< NDC to view multiplier times the working pixel size xy,
-                                     *   the numerator and addend of the depth unpack */
-    float effect[4];                /**< Radius times the multiplier, falloff range, final value
-                                     *   power, denoise blur beta */
-    float quality[4];               /**< Slices, steps per slice, sample distribution power,
-                                     *   thin occluder compensation */
-    float extent[4];                /**< Depth mip sampling offset, 1 at half resolution, render
-                                     *   width and height */
-} box_gpu_gtao_uniforms_t;
 
 /** Uniforms of the SMAA passes, matching Smaa in etc/shaders/smaa.wgsl */
 typedef struct box_gpu_smaa_uniforms_t {
@@ -455,145 +372,6 @@ static void box_gpu_fx_release(
     }
 }
 
-/** What a binding of a Gtao pass holds */
-typedef enum box_gpu_gtao_binding_t {
-    BOX_GPU_GTAO_UNIFORMS,          /**< The uniforms */
-    BOX_GPU_GTAO_DEPTH,             /**< The depth of the target */
-    BOX_GPU_GTAO_READ,              /**< An R32Float image read with textureLoad */
-    BOX_GPU_GTAO_WRITE              /**< An R32Float storage image */
-} box_gpu_gtao_binding_t;
-
-/** Describe a binding of a Gtao pass.
- *
- * @param binding Binding number in etc/shaders/gtao.wgsl
- * @param stage Stage that reads it
- * @param kind What it holds
- * @return The layout entry
- */
-static WGPUBindGroupLayoutEntry box_gpu_gtao_entry(
-    uint32_t binding,
-    WGPUShaderStage stage,
-    box_gpu_gtao_binding_t kind)
-{
-    WGPUBindGroupLayoutEntry result = { .binding = binding, .visibility = stage };
-    switch (kind) {
-    case BOX_GPU_GTAO_UNIFORMS:
-        result.buffer.type = WGPUBufferBindingType_Uniform;
-        break;
-    case BOX_GPU_GTAO_DEPTH:
-        result.texture.sampleType = WGPUTextureSampleType_Depth;
-        result.texture.viewDimension = WGPUTextureViewDimension_2D;
-        break;
-    case BOX_GPU_GTAO_READ:
-        result.texture.sampleType = WGPUTextureSampleType_UnfilterableFloat;
-        result.texture.viewDimension = WGPUTextureViewDimension_2D;
-        break;
-    case BOX_GPU_GTAO_WRITE:
-        result.storageTexture.access = WGPUStorageTextureAccess_WriteOnly;
-        result.storageTexture.format = BOX_GPU_GTAO_FORMAT;
-        result.storageTexture.viewDimension = WGPUTextureViewDimension_2D;
-        break;
-    }
-
-    return result;
-}
-
-/** Create a bind group layout of a Gtao pass and its pipeline layout.
- *
- * @param gpu The backend
- * @param entries The bindings
- * @param count Number of bindings
- * @param pipeline_layout Receives the pipeline layout
- * @return The bind group layout
- */
-static WGPUBindGroupLayout box_gpu_gtao_layout(
-    box_gpu_t *gpu,
-    const WGPUBindGroupLayoutEntry *entries,
-    size_t count,
-    WGPUPipelineLayout *pipeline_layout)
-{
-    WGPUBindGroupLayout result = wgpuDeviceCreateBindGroupLayout(gpu->device,
-        &(WGPUBindGroupLayoutDescriptor){ .entryCount = count, .entries = entries });
-    *pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
-        &(WGPUPipelineLayoutDescriptor){ .bindGroupLayoutCount = 1,
-            .bindGroupLayouts = &result });
-
-    return result;
-}
-
-/** Create the layouts of the Gtao passes and the white image of views without Gtao.
- *
- * @param gpu The backend
- * @param fx The effects
- */
-static void box_gpu_gtao_init(
-    box_gpu_t *gpu,
-    box_gpu_effects_t *fx)
-{
-    WGPUShaderStage comp = WGPUShaderStage_Compute;
-    WGPUShaderStage frag = WGPUShaderStage_Fragment;
-    WGPUBindGroupLayoutEntry prefilter[6] = {
-        box_gpu_gtao_entry(0, comp, BOX_GPU_GTAO_UNIFORMS),
-        box_gpu_gtao_entry(1, comp, BOX_GPU_GTAO_DEPTH),
-        box_gpu_gtao_entry(2, comp, BOX_GPU_GTAO_WRITE),
-        box_gpu_gtao_entry(3, comp, BOX_GPU_GTAO_WRITE),
-        box_gpu_gtao_entry(4, comp, BOX_GPU_GTAO_WRITE),
-        box_gpu_gtao_entry(5, comp, BOX_GPU_GTAO_WRITE)
-    };
-    WGPUBindGroupLayoutEntry last[3] = {
-        box_gpu_gtao_entry(0, comp, BOX_GPU_GTAO_UNIFORMS),
-        box_gpu_gtao_entry(6, comp, BOX_GPU_GTAO_READ),
-        box_gpu_gtao_entry(7, comp, BOX_GPU_GTAO_WRITE)
-    };
-    WGPUBindGroupLayoutEntry main_pass[4] = {
-        box_gpu_gtao_entry(0, comp, BOX_GPU_GTAO_UNIFORMS),
-        box_gpu_gtao_entry(8, comp, BOX_GPU_GTAO_READ),
-        box_gpu_gtao_entry(9, comp, BOX_GPU_GTAO_WRITE),
-        box_gpu_gtao_entry(10, comp, BOX_GPU_GTAO_WRITE)
-    };
-    WGPUBindGroupLayoutEntry denoise[4] = {
-        box_gpu_gtao_entry(0, comp, BOX_GPU_GTAO_UNIFORMS),
-        box_gpu_gtao_entry(11, comp, BOX_GPU_GTAO_READ),
-        box_gpu_gtao_entry(12, comp, BOX_GPU_GTAO_READ),
-        box_gpu_gtao_entry(13, comp, BOX_GPU_GTAO_WRITE)
-    };
-    WGPUBindGroupLayoutEntry upsample[4] = {
-        box_gpu_gtao_entry(0, frag, BOX_GPU_GTAO_UNIFORMS),
-        box_gpu_gtao_entry(1, frag, BOX_GPU_GTAO_DEPTH),
-        box_gpu_gtao_entry(8, frag, BOX_GPU_GTAO_READ),
-        box_gpu_gtao_entry(11, frag, BOX_GPU_GTAO_READ)
-    };
-    float one = 1.0f;
-    fx->gtao_prefilter_layout = box_gpu_gtao_layout(gpu, prefilter, 6,
-        &fx->gtao_prefilter_pipeline_layout);
-    fx->gtao_last_layout = box_gpu_gtao_layout(gpu, last, 3, &fx->gtao_last_pipeline_layout);
-    fx->gtao_main_layout = box_gpu_gtao_layout(gpu, main_pass, 4,
-        &fx->gtao_main_pipeline_layout);
-    fx->gtao_denoise_layout = box_gpu_gtao_layout(gpu, denoise, 4,
-        &fx->gtao_denoise_pipeline_layout);
-    fx->gtao_upsample_layout = box_gpu_gtao_layout(gpu, upsample, 4,
-        &fx->gtao_upsample_pipeline_layout);
-    fx->white = wgpuDeviceCreateTexture(gpu->device, &(WGPUTextureDescriptor){
-        .usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst,
-        .dimension = WGPUTextureDimension_2D,
-        .size = { 1, 1, 1 },
-        .format = BOX_GPU_GTAO_FORMAT,
-        .mipLevelCount = 1,
-        .sampleCount = 1
-    });
-    fx->white_view = wgpuTextureCreateView(fx->white, NULL);
-    WGPUTexelCopyTextureInfo dst = { .texture = fx->white, .aspect = WGPUTextureAspect_All };
-    WGPUTexelCopyBufferLayout layout = { .bytesPerRow = sizeof(float), .rowsPerImage = 1 };
-    WGPUExtent3D extent = { 1, 1, 1 };
-    wgpuQueueWriteTexture(gpu->queue, &dst, &one, sizeof(one), &layout, &extent);
-}
-
-WGPUTextureView box_gpu_effects_white(
-    box_gpu_t *gpu)
-{
-    return gpu->effects->white_view;
-}
-
 void box_gpu_effects_init(
     box_gpu_t *gpu)
 {
@@ -691,7 +469,6 @@ void box_gpu_effects_init(
     ecs_vec_init_t(NULL, &fx->pipelines, box_gpu_fx_pipeline_t, 0);
     ecs_vec_init_t(NULL, &fx->states, box_gpu_fx_state_t*, 0);
     ecs_vec_init_t(NULL, &fx->targets, box_gpu_fx_target_t*, 0);
-    box_gpu_gtao_init(gpu, fx);
     gpu->effects = fx;
 }
 
@@ -731,32 +508,6 @@ static void box_gpu_fx_mips_free(
     s->height = 0;
 }
 
-/** Release the images of an ambient occlusion.
- *
- * @param g The images
- */
-static void box_gpu_gtao_images_free(
-    box_gpu_gtao_images_t *g)
-{
-    int32_t i;
-    for (i = 0; i < BOX_GPU_GTAO_MIPS; i ++) {
-        if (g->depth_mips[i]) {
-            wgpuTextureViewRelease(g->depth_mips[i]);
-            g->depth_mips[i] = NULL;
-        }
-    }
-
-    box_gpu_fx_release(&g->depth, &g->depth_view);
-    box_gpu_fx_release(&g->terms[0], &g->term_views[0]);
-    box_gpu_fx_release(&g->terms[1], &g->term_views[1]);
-    box_gpu_fx_release(&g->edges, &g->edges_view);
-    box_gpu_fx_release(&g->ao, &g->ao_view);
-    g->width = 0;
-    g->height = 0;
-    g->work_width = 0;
-    g->work_height = 0;
-}
-
 /** Release the state of an effect and everything it owns.
  *
  * @param s The state
@@ -766,7 +517,6 @@ static void box_gpu_fx_state_free(
 {
     box_gpu_fx_mips_free(s);
     box_gpu_fx_history_free(s);
-    box_gpu_gtao_images_free(&s->gtao);
     if (s->uniforms) {
         wgpuBufferRelease(s->uniforms);
     }
@@ -809,20 +559,6 @@ static void box_gpu_fx_compute_release(
     }
 }
 
-/** Release the compute pipelines of Gtao.
- *
- * @param fx The effects
- */
-static void box_gpu_gtao_pipelines_free(
-    box_gpu_effects_t *fx)
-{
-    box_gpu_fx_compute_release(&fx->gtao_prefilter);
-    box_gpu_fx_compute_release(&fx->gtao_last);
-    box_gpu_fx_compute_release(&fx->gtao_main);
-    box_gpu_fx_compute_release(&fx->gtao_denoise);
-    box_gpu_fx_compute_release(&fx->gtao_denoise_final);
-}
-
 /** Release the effect pipelines.
  *
  * @param fx The effects
@@ -849,7 +585,6 @@ static void box_gpu_fx_pipelines_free(
         fx->adapt = NULL;
     }
 
-    box_gpu_gtao_pipelines_free(fx);
 }
 
 void box_gpu_effects_fini(
@@ -887,17 +622,6 @@ void box_gpu_effects_fini(
     wgpuBindGroupLayoutRelease(fx->measure_layout);
     wgpuPipelineLayoutRelease(fx->pipeline_layout);
     wgpuBindGroupLayoutRelease(fx->layout);
-    wgpuPipelineLayoutRelease(fx->gtao_prefilter_pipeline_layout);
-    wgpuPipelineLayoutRelease(fx->gtao_last_pipeline_layout);
-    wgpuPipelineLayoutRelease(fx->gtao_main_pipeline_layout);
-    wgpuPipelineLayoutRelease(fx->gtao_denoise_pipeline_layout);
-    wgpuPipelineLayoutRelease(fx->gtao_upsample_pipeline_layout);
-    wgpuBindGroupLayoutRelease(fx->gtao_prefilter_layout);
-    wgpuBindGroupLayoutRelease(fx->gtao_last_layout);
-    wgpuBindGroupLayoutRelease(fx->gtao_main_layout);
-    wgpuBindGroupLayoutRelease(fx->gtao_denoise_layout);
-    wgpuBindGroupLayoutRelease(fx->gtao_upsample_layout);
-    box_gpu_fx_release(&fx->white, &fx->white_view);
     ecs_os_free(fx);
     gpu->effects = NULL;
 done:
@@ -962,7 +686,7 @@ static WGPUBlendState* box_gpu_fx_blend(
 }
 
 /** Get the pipeline of an effect entry point, created on first use and again when its shader
- * was recompiled. The SMAA shader and the Gtao upsample have layouts of their own; the vertex
+ * was recompiled. The SMAA shader has a layout of its own; the vertex
  * entry point of a pass follows from its fragment entry point.
  *
  * @param gpu The backend
@@ -1022,8 +746,6 @@ static WGPURenderPipeline box_gpu_fx_pipeline(
     WGPURenderPipelineDescriptor desc = {
         .layout = pass->shader == BOX_RENDER_SHADER_SMAA
             ? fx->smaa_pipeline_layout
-            : pass->shader == BOX_RENDER_SHADER_GTAO
-            ? fx->gtao_upsample_pipeline_layout
             : fx->pipeline_layout,
         .vertex = {
             .module = module,
@@ -1813,350 +1535,6 @@ done:
     return result;
 }
 
-/** Get the compute pipelines of Gtao, created again when the Gtao shader was recompiled.
- *
- * @param gpu The backend
- * @return Whether every pipeline exists
- */
-static bool box_gpu_gtao_pipelines(
-    box_gpu_t *gpu)
-{
-    box_gpu_effects_t *fx = gpu->effects;
-    WGPUShaderModule module = NULL;
-    int32_t revision = box_gpu_fx_module(gpu, BOX_RENDER_SHADER_GTAO, &module);
-    struct {
-        WGPUComputePipeline *pipeline;
-        WGPUPipelineLayout layout;
-        const char *entry;
-    } passes[5] = {
-        { &fx->gtao_prefilter, fx->gtao_prefilter_pipeline_layout, "prefilter" },
-        { &fx->gtao_last, fx->gtao_last_pipeline_layout, "prefilter_last" },
-        { &fx->gtao_main, fx->gtao_main_pipeline_layout, "main_pass" },
-        { &fx->gtao_denoise, fx->gtao_denoise_pipeline_layout, "denoise" },
-        { &fx->gtao_denoise_final, fx->gtao_denoise_pipeline_layout, "denoise_final" }
-    };
-    int32_t i;
-    if (!module || (fx->gtao_prefilter && fx->gtao_revision == revision)) {
-        goto done;
-    }
-
-    box_gpu_gtao_pipelines_free(fx);
-    for (i = 0; i < 5; i ++) {
-        *passes[i].pipeline = wgpuDeviceCreateComputePipeline(gpu->device,
-            &(WGPUComputePipelineDescriptor){
-                .layout = passes[i].layout,
-                .compute = { .module = module,
-                    .entryPoint = { .data = passes[i].entry, .length = WGPU_STRLEN } }
-            });
-    }
-
-    fx->gtao_revision = revision;
-done:
-    return module && fx->gtao_prefilter && fx->gtao_last && fx->gtao_main &&
-        fx->gtao_denoise && fx->gtao_denoise_final;
-}
-
-/** Create an R32Float image the Gtao passes write as storage and read.
- *
- * @param gpu The backend
- * @param width Width in pixels
- * @param height Height in pixels
- * @param mips Mip levels
- * @param usage Usage besides storage and texture binding
- * @return The texture
- */
-static WGPUTexture box_gpu_gtao_texture(
-    box_gpu_t *gpu,
-    uint32_t width,
-    uint32_t height,
-    uint32_t mips,
-    WGPUTextureUsage usage)
-{
-    WGPUTextureDescriptor desc = {
-        .usage = WGPUTextureUsage_StorageBinding | WGPUTextureUsage_TextureBinding | usage,
-        .dimension = WGPUTextureDimension_2D,
-        .size = { width ? width : 1, height ? height : 1, 1 },
-        .format = BOX_GPU_GTAO_FORMAT,
-        .mipLevelCount = mips,
-        .sampleCount = 1
-    };
-
-    return wgpuDeviceCreateTexture(gpu->device, &desc);
-}
-
-/** Get the edge of the depth mips of Gtao for an edge of the working resolution.
- *
- * @param edge The working edge
- * @return The edge, at least BOX_GPU_GTAO_MIN_EDGE
- */
-static uint32_t box_gpu_gtao_edge(
-    uint32_t edge)
-{
-    return edge > BOX_GPU_GTAO_MIN_EDGE ? edge : BOX_GPU_GTAO_MIN_EDGE;
-}
-
-/** Make the images of an ambient occlusion match the render size and resolution, created on
- * first use and again on a resize.
- *
- * @param gpu The backend
- * @param t The target
- * @param g The images
- * @param half Whether it computes at half the render size
- */
-static void box_gpu_gtao_images(
-    box_gpu_t *gpu,
-    const box_gpu_target_t *t,
-    box_gpu_gtao_images_t *g,
-    bool half)
-{
-    uint32_t w = (uint32_t)(t->desc.render_width > 0 ? t->desc.render_width : 1);
-    uint32_t h = (uint32_t)(t->desc.render_height > 0 ? t->desc.render_height : 1);
-    uint32_t ww = half ? (w + 1) / 2 : w, wh = half ? (h + 1) / 2 : h;
-    int32_t i;
-    if (g->ao && g->width == w && g->height == h && g->work_width == ww &&
-        g->work_height == wh)
-    {
-        goto done;
-    }
-
-    box_gpu_gtao_images_free(g);
-    g->width = w;
-    g->height = h;
-    g->work_width = ww;
-    g->work_height = wh;
-    g->depth = box_gpu_gtao_texture(gpu, box_gpu_gtao_edge(ww),
-        box_gpu_gtao_edge(wh), BOX_GPU_GTAO_MIPS, WGPUTextureUsage_None);
-    g->depth_view = wgpuTextureCreateView(g->depth, NULL);
-    for (i = 0; i < BOX_GPU_GTAO_MIPS; i ++) {
-        g->depth_mips[i] = box_gpu_fx_level(g->depth, (uint32_t)i);
-    }
-
-    for (i = 0; i < 2; i ++) {
-        g->terms[i] = box_gpu_gtao_texture(gpu, ww, wh, 1, WGPUTextureUsage_None);
-        g->term_views[i] = wgpuTextureCreateView(g->terms[i], NULL);
-    }
-
-    g->edges = box_gpu_gtao_texture(gpu, ww, wh, 1, WGPUTextureUsage_None);
-    g->edges_view = wgpuTextureCreateView(g->edges, NULL);
-    g->ao = box_gpu_gtao_texture(gpu, w, h, 1, WGPUTextureUsage_RenderAttachment);
-    g->ao_view = wgpuTextureCreateView(g->ao, NULL);
-done:
-    return;
-}
-
-/** Fill the uniforms of the Gtao passes from the projection of the view: tan(fov / 2) per axis,
- * the view position of a working pixel and the view depth of a reversed Z depth, for a finite
- * far plane (n f / (f - n) / (depth + n / (f - n))) and for none (n / depth).
- *
- * A working pixel at half resolution holds the depth of the top left pixel of its block: its
- * position u in 0..1 is (2 ww / w) u - 0.5 / w of the render size.
- *
- * @param ctx The view and target
- * @param g The images, at the working resolution
- * @param a The settings
- * @param out Receives the uniforms
- */
-static void box_gpu_gtao_settings(
-    const box_gpu_fx_ctx_t *ctx,
-    const box_gpu_gtao_images_t *g,
-    const Gtao *a,
-    box_gpu_gtao_uniforms_t *out)
-{
-    static const float slices[4] = { 1, 2, 3, 9 };
-    static const float steps[4] = { 2, 2, 3, 3 };
-    int32_t quality = a->quality >= GtaoLow && a->quality <= GtaoUltra ? a->quality : GtaoHigh;
-    bool half = g->work_width != g->width || g->work_height != g->height;
-    float w = (float)g->width, h = (float)g->height;
-    float ww = (float)g->work_width, wh = (float)g->work_height;
-    float scale = half ? 2.0f : 1.0f;
-    mat4 proj;
-    ecs_os_memset_t(out, 0, box_gpu_gtao_uniforms_t);
-    box_gpu_fx_projection(ctx, proj);
-    float tan_x = 1.0f / proj[0][0], tan_y = 1.0f / proj[1][1];
-    float mul_x = tan_x * 2.0f, mul_y = tan_y * -2.0f;
-    float add_x = -tan_x, add_y = tan_y;
-    out->viewport[0] = ww;
-    out->viewport[1] = wh;
-    out->viewport[2] = 1.0f / ww;
-    out->viewport[3] = 1.0f / wh;
-    out->ndc_to_view[0] = mul_x * (scale * ww / w);
-    out->ndc_to_view[1] = mul_y * (scale * wh / h);
-    out->ndc_to_view[2] = add_x + (half ? mul_x * -0.5f / w : 0.0f);
-    out->ndc_to_view[3] = add_y + (half ? mul_y * -0.5f / h : 0.0f);
-    out->unpack[0] = mul_x * scale / w;
-    out->unpack[1] = mul_y * scale / h;
-    out->unpack[2] = proj[3][2];
-    out->unpack[3] = proj[2][2];
-    out->effect[0] = a->radius * BOX_GPU_GTAO_RADIUS_MULTIPLIER;
-    out->effect[1] = a->falloff_range;
-    out->effect[2] = a->final_value_power;
-    out->effect[3] = a->denoise_passes > 0 ? BOX_GPU_GTAO_BLUR_BETA : BOX_GPU_GTAO_NO_BLUR_BETA;
-    out->quality[0] = slices[quality];
-    out->quality[1] = steps[quality];
-    out->quality[2] = BOX_GPU_GTAO_SAMPLE_POWER;
-    out->quality[3] = BOX_GPU_GTAO_THIN_OCCLUDER;
-    out->extent[0] = BOX_GPU_GTAO_MIP_OFFSET;
-    out->extent[1] = half ? 1.0f : 0.0f;
-    out->extent[2] = w;
-    out->extent[3] = h;
-}
-
-/** Bind a group of a Gtao pass, dispatch it and release the group.
- *
- * @param gpu The backend
- * @param cp The compute pass
- * @param pipeline The pipeline
- * @param layout The bind group layout of the pass
- * @param entries The bindings
- * @param count Number of bindings
- * @param x Workgroups along x
- * @param y Workgroups along y
- */
-static void box_gpu_gtao_dispatch(
-    box_gpu_t *gpu,
-    WGPUComputePassEncoder cp,
-    WGPUComputePipeline pipeline,
-    WGPUBindGroupLayout layout,
-    const WGPUBindGroupEntry *entries,
-    size_t count,
-    uint32_t x,
-    uint32_t y)
-{
-    WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
-        .layout = layout,
-        .entryCount = count,
-        .entries = entries
-    });
-    wgpuComputePassEncoderSetPipeline(cp, pipeline);
-    wgpuComputePassEncoderSetBindGroup(cp, 0, group, 0, NULL);
-    wgpuComputePassEncoderDispatchWorkgroups(cp, x ? x : 1, y ? y : 1, 1);
-    wgpuBindGroupRelease(group);
-}
-
-WGPUTextureView box_gpu_gtao_begin(
-    box_gpu_t *gpu,
-    box_gpu_target_t *t,
-    const box_render_packet_t *packet,
-    const box_render_view_t *v)
-{
-    WGPUTextureView result = NULL;
-    if (!gpu->effects || !v->gtao.enabled || !box_gpu_gtao_pipelines(gpu)) {
-        goto done;
-    }
-
-    box_gpu_fx_ctx_t ctx = { .t = t, .packet = packet, .v = v };
-    box_gpu_fx_state_t *s = box_gpu_fx_state(gpu, &ctx, v->gtao.effect, BOX_GPU_FX_GTAO);
-    box_gpu_gtao_images(gpu, t, &s->gtao, v->gtao.settings.half_resolution);
-    result = s->gtao.ao_view;
-done:
-    return result;
-}
-
-void box_gpu_gtao_record(
-    box_gpu_t *gpu,
-    box_gpu_target_t *t,
-    WGPUCommandEncoder encoder,
-    const box_render_packet_t *packet,
-    const box_render_view_t *v)
-{
-    box_gpu_effects_t *fx = gpu->effects;
-    box_gpu_fx_ctx_t ctx = { .t = t, .encoder = encoder, .packet = packet, .v = v };
-    box_gpu_fx_state_t *s = box_gpu_fx_state(gpu, &ctx, v->gtao.effect, BOX_GPU_FX_GTAO);
-    box_gpu_gtao_images_t *g = &s->gtao;
-    const Gtao *a = &v->gtao.settings;
-    bool half = g->work_width != g->width || g->work_height != g->height;
-    uint32_t ww = g->work_width, wh = g->work_height, group = BOX_GPU_GTAO_GROUP;
-    uint32_t last_w = box_gpu_gtao_edge(ww) >> (BOX_GPU_GTAO_MIPS - 1);
-    uint32_t last_h = box_gpu_gtao_edge(wh) >> (BOX_GPU_GTAO_MIPS - 1);
-    int32_t i, passes = glm_imax(glm_imin(a->denoise_passes, BOX_GPU_GTAO_DENOISE_MAX), 1);
-    int32_t current = 0;
-    box_gpu_gtao_uniforms_t u;
-    if (!g->ao || !box_gpu_gtao_pipelines(gpu)) {
-        goto done;
-    }
-
-    box_gpu_gtao_settings(&ctx, g, a, &u);
-    box_gpu_fx_uniforms(gpu, s, &u, sizeof(u));
-    WGPUBindGroupEntry uniforms = {
-        .binding = 0, .buffer = s->uniforms, .size = BOX_GPU_FX_UNIFORMS
-    };
-    WGPUComputePassEncoder cp = wgpuCommandEncoderBeginComputePass(encoder, NULL);
-    WGPUBindGroupEntry prefilter[6] = {
-        uniforms,
-        { .binding = 1, .textureView = t->depth_view },
-        { .binding = 2, .textureView = g->depth_mips[0] },
-        { .binding = 3, .textureView = g->depth_mips[1] },
-        { .binding = 4, .textureView = g->depth_mips[2] },
-        { .binding = 5, .textureView = g->depth_mips[3] }
-    };
-    box_gpu_gtao_dispatch(gpu, cp, fx->gtao_prefilter, fx->gtao_prefilter_layout, prefilter, 6,
-        (ww + group * 2 - 1) / (group * 2), (wh + group * 2 - 1) / (group * 2));
-    WGPUBindGroupEntry last[3] = {
-        uniforms,
-        { .binding = 6, .textureView = g->depth_mips[BOX_GPU_GTAO_MIPS - 2] },
-        { .binding = 7, .textureView = g->depth_mips[BOX_GPU_GTAO_MIPS - 1] }
-    };
-    box_gpu_gtao_dispatch(gpu, cp, fx->gtao_last, fx->gtao_last_layout, last, 3,
-        (last_w + group - 1) / group, (last_h + group - 1) / group);
-    WGPUBindGroupEntry main_pass[4] = {
-        uniforms,
-        { .binding = 8, .textureView = g->depth_view },
-        { .binding = 9, .textureView = g->term_views[0] },
-        { .binding = 10, .textureView = g->edges_view }
-    };
-    box_gpu_gtao_dispatch(gpu, cp, fx->gtao_main, fx->gtao_main_layout, main_pass, 4,
-        (ww + group - 1) / group, (wh + group - 1) / group);
-    for (i = 0; i < passes; i ++) {
-        bool final = i == passes - 1;
-        bool direct = final && !half;
-        WGPUBindGroupEntry denoise[4] = {
-            uniforms,
-            { .binding = 11, .textureView = g->term_views[current] },
-            { .binding = 12, .textureView = g->edges_view },
-            { .binding = 13, .textureView = direct ? g->ao_view : g->term_views[current ^ 1] }
-        };
-        box_gpu_gtao_dispatch(gpu, cp, final ? fx->gtao_denoise_final : fx->gtao_denoise,
-            fx->gtao_denoise_layout, denoise, 4, (ww + group * 2 - 1) / (group * 2),
-            (wh + group - 1) / group);
-        if (!direct) {
-            current ^= 1;
-        }
-    }
-
-    wgpuComputePassEncoderEnd(cp);
-    wgpuComputePassEncoderRelease(cp);
-    if (!half) {
-        goto done;
-    }
-
-    box_gpu_fx_pass_t pass = {
-        .shader = BOX_RENDER_SHADER_GTAO,
-        .entry = "upsample",
-        .output = g->ao_view,
-        .format = BOX_GPU_GTAO_FORMAT,
-        .blend = BOX_GPU_FX_REPLACE
-    };
-    WGPURenderPipeline pipeline = box_gpu_fx_pipeline(gpu, &pass);
-    if (!pipeline) {
-        goto done;
-    }
-
-    WGPUBindGroupEntry upsample[4] = {
-        uniforms,
-        { .binding = 1, .textureView = t->depth_view },
-        { .binding = 8, .textureView = g->depth_view },
-        { .binding = 11, .textureView = g->term_views[current] }
-    };
-    WGPUBindGroup bind = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
-        .layout = fx->gtao_upsample_layout,
-        .entryCount = 4,
-        .entries = upsample
-    });
-    box_gpu_fx_record(&ctx, &pass, pipeline, bind);
-done:
-    return;
-}
-
 WGPUTextureView box_gpu_effects_begin(
     box_gpu_t *gpu,
     box_gpu_target_t *t,
@@ -2289,7 +1667,7 @@ void box_gpu_effects_sweep(
     }
 
 done:
-    return;
+    box_gpu_gtao_sweep(gpu, packet);
 }
 
 #endif

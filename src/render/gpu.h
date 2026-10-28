@@ -58,6 +58,9 @@
 /** Effect passes, HDR targets and the state effects keep across frames */
 typedef struct box_gpu_effects_t box_gpu_effects_t;
 
+/** Pipelines of the ambient occlusion (Gtao) and its images per target and view */
+typedef struct box_gpu_gtao_t box_gpu_gtao_t;
+
 /** Edge in texels of the shadow map of the probe captures */
 #define BOX_GPU_CAPTURE_SHADOW_RESOLUTION (2048)
 
@@ -593,6 +596,7 @@ typedef struct box_gpu_t {
     ecs_os_thread_id_t thread;      /**< Thread that ran init, the only one using the device */
     uint32_t canvas;                /**< Target presented on the page canvas, 0 for none */
     box_gpu_effects_t *effects;     /**< Effect passes of the views */
+    box_gpu_gtao_t *gtao;           /**< Ambient occlusion of the views */
     uint32_t rendering;             /**< Target that is rendering, materials cannot sample it */
     bool timestamps;                /**< The device has timestamp queries */
     box_gpu_bake_t *bake;           /**< Probe captures, created on the first capture */
@@ -1746,12 +1750,36 @@ void box_gpu_effects_run(
     const box_render_view_t *v,
     WGPUTextureView color);
 
+/** Release the HDR targets and effect state that the targets of a packet did not use, and the
+ * Gtao state (box_gpu_gtao_sweep).
+ *
+ * @param gpu The backend
+ * @param packet The packet that rendered
+ */
+void box_gpu_effects_sweep(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
+
+/** Create the layouts of the Gtao passes and the white image of views without Gtao.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_gtao_init(
+    box_gpu_t *gpu);
+
+/** Release the pipelines, layouts and images of Gtao.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_gtao_fini(
+    box_gpu_t *gpu);
+
 /** Get the 1x1 white R32Float image bound as the ambient occlusion of a view without Gtao.
  *
  * @param gpu The backend
  * @return The view of the image
  */
-WGPUTextureView box_gpu_effects_white(
+WGPUTextureView box_gpu_gtao_white(
     box_gpu_t *gpu);
 
 /** Get the ambient occlusion image a view binds for its forward pass, created or resized to the
@@ -1779,22 +1807,20 @@ WGPUTextureView box_gpu_gtao_begin(
  * @param gpu The backend
  * @param t The target
  * @param encoder The encoder of the frame
- * @param packet The packet
  * @param v The view, for which box_gpu_gtao_begin returned an image this frame
  */
 void box_gpu_gtao_record(
     box_gpu_t *gpu,
     box_gpu_target_t *t,
     WGPUCommandEncoder encoder,
-    const box_render_packet_t *packet,
     const box_render_view_t *v);
 
-/** Release the HDR targets and effect state that the targets of a packet did not use.
+/** Release the Gtao images of the views the targets of a packet did not render with Gtao.
  *
  * @param gpu The backend
  * @param packet The packet that rendered
  */
-void box_gpu_effects_sweep(
+void box_gpu_gtao_sweep(
     box_gpu_t *gpu,
     const box_render_packet_t *packet);
 
