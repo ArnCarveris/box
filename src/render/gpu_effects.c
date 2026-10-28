@@ -12,9 +12,6 @@
 
 #ifdef BOX_RENDER_WGPU
 
-/** Color format of the ambient occlusion and view depth of a view */
-#define BOX_GPU_AO_FORMAT (WGPUTextureFormat_RG16Float)
-
 /** Color format of the edges SMAA finds */
 #define BOX_GPU_SMAA_EDGES_FORMAT (WGPUTextureFormat_RG8Unorm)
 
@@ -97,8 +94,6 @@ typedef struct box_gpu_fx_target_t {
     int32_t height;                 /**< Render height */
     WGPUTexture hdr[2];             /**< The images a chain alternates between */
     WGPUTextureView hdr_views[2];   /**< Views of the images */
-    WGPUTexture ao;                 /**< Ambient occlusion, created on first use */
-    WGPUTextureView ao_view;        /**< View of the ambient occlusion */
     WGPUTexture smaa_edges;         /**< Edges of SMAA, created on first use */
     WGPUTextureView smaa_edges_view; /**< View of the edges */
     WGPUTexture smaa_weights;       /**< Blending weights of SMAA, created on first use */
@@ -185,13 +180,6 @@ typedef struct box_gpu_bloom_uniforms_t {
     float params[4];                /**< Firefly clamp, blend of the first mip, history blend */
     float first[4];                 /**< Tap offset of the first downsample in uv */
 } box_gpu_bloom_uniforms_t;
-
-/** Uniforms of the ambient occlusion passes, matching Ssao in etc/shaders/ssao.wgsl */
-typedef struct box_gpu_ssao_uniforms_t {
-    mat4 proj;                      /**< Projection of the view */
-    mat4 inv_proj;                  /**< Its inverse */
-    float params[4];                /**< Radius, bias, intensity, unused */
-} box_gpu_ssao_uniforms_t;
 
 /** Uniforms of the SMAA passes, matching Smaa in etc/shaders/smaa.wgsl */
 typedef struct box_gpu_smaa_uniforms_t {
@@ -553,10 +541,22 @@ static void box_gpu_fx_target_free(
 {
     box_gpu_fx_release(&ft->hdr[0], &ft->hdr_views[0]);
     box_gpu_fx_release(&ft->hdr[1], &ft->hdr_views[1]);
-    box_gpu_fx_release(&ft->ao, &ft->ao_view);
     box_gpu_fx_release(&ft->smaa_edges, &ft->smaa_edges_view);
     box_gpu_fx_release(&ft->smaa_weights, &ft->smaa_weights_view);
     ecs_os_free(ft);
+}
+
+/** Release a compute pipeline when it exists.
+ *
+ * @param pipeline The pipeline, set to NULL
+ */
+static void box_gpu_fx_compute_release(
+    WGPUComputePipeline *pipeline)
+{
+    if (*pipeline) {
+        wgpuComputePipelineRelease(*pipeline);
+        *pipeline = NULL;
+    }
 }
 
 /** Release the effect pipelines.
@@ -584,6 +584,7 @@ static void box_gpu_fx_pipelines_free(
         wgpuComputePipelineRelease(fx->adapt);
         fx->adapt = NULL;
     }
+
 }
 
 void box_gpu_effects_fini(
@@ -685,8 +686,8 @@ static WGPUBlendState* box_gpu_fx_blend(
 }
 
 /** Get the pipeline of an effect entry point, created on first use and again when its shader
- * was recompiled. The SMAA shader has a layout of its own; the vertex entry point of a pass
- * follows from its fragment entry point.
+ * was recompiled. The SMAA shader has a layout of its own; the vertex
+ * entry point of a pass follows from its fragment entry point.
  *
  * @param gpu The backend
  * @param pass The pass
@@ -1280,62 +1281,6 @@ static void box_gpu_fx_projection(
         (float)ctx->t->desc.point_width, (float)ctx->t->desc.point_height, proj);
 }
 
-/** Record the passes of ambient occlusion: the occlusion of every other pixel into the half
- * size occlusion image, then the image darkened by its smoothed occlusion.
- *
- * @param gpu The backend
- * @param ctx The chain
- * @param e The pass
- * @return Whether the image was written to the output
- */
-static bool box_gpu_fx_ssao(
-    box_gpu_t *gpu,
-    const box_gpu_fx_ctx_t *ctx,
-    const box_render_effect_t *e)
-{
-    box_gpu_fx_target_t *ft = ctx->ft;
-    box_gpu_ssao_uniforms_t u;
-    box_gpu_fx_state_t *s = box_gpu_fx_state(gpu, ctx, e->entity, (int32_t)e->kind);
-    bool result = false;
-    ecs_os_memset_t(&u, 0, box_gpu_ssao_uniforms_t);
-    box_gpu_fx_projection(ctx, u.proj);
-    glm_mat4_inv(u.proj, u.inv_proj);
-    u.params[0] = e->ssao.radius;
-    u.params[1] = e->ssao.bias;
-    u.params[2] = e->ssao.intensity;
-    box_gpu_fx_uniforms(gpu, s, &u, sizeof(u));
-    if (!ft->ao) {
-        ft->ao = box_gpu_fx_texture(gpu, (uint32_t)(ft->width + 1) / 2,
-            (uint32_t)(ft->height + 1) / 2, BOX_GPU_AO_FORMAT, 1);
-        ft->ao_view = wgpuTextureCreateView(ft->ao, NULL);
-    }
-
-    if (!box_gpu_fx_draw(gpu, ctx, &(box_gpu_fx_pass_t){
-        .shader = BOX_RENDER_SHADER_SSAO,
-        .entry = "occlusion",
-        .input = ctx->input,
-        .uniforms = s->uniforms,
-        .output = ft->ao_view,
-        .format = BOX_GPU_AO_FORMAT,
-        .blend = BOX_GPU_FX_REPLACE
-    })) {
-        goto done;
-    }
-
-    result = box_gpu_fx_draw(gpu, ctx, &(box_gpu_fx_pass_t){
-        .shader = BOX_RENDER_SHADER_SSAO,
-        .entry = "composite",
-        .input = ctx->input,
-        .aux = ft->ao_view,
-        .uniforms = s->uniforms,
-        .output = ctx->output,
-        .format = ctx->format,
-        .blend = ctx->blend
-    });
-done:
-    return result;
-}
-
 /** Highest phase asymmetry of the glow of a fog colored by the atmosphere */
 #define BOX_GPU_FOG_ANISOTROPY_MAX (0.92f)
 
@@ -1576,7 +1521,6 @@ static box_gpu_fx_target_t* box_gpu_fx_target(
 
     box_gpu_fx_release(&result->hdr[0], &result->hdr_views[0]);
     box_gpu_fx_release(&result->hdr[1], &result->hdr_views[1]);
-    box_gpu_fx_release(&result->ao, &result->ao_view);
     box_gpu_fx_release(&result->smaa_edges, &result->smaa_edges_view);
     box_gpu_fx_release(&result->smaa_weights, &result->smaa_weights_view);
     result->width = t->desc.render_width;
@@ -1632,9 +1576,6 @@ static bool box_gpu_fx_effect(
         break;
     case BOX_RENDER_EFFECT_BLOOM:
         result = box_gpu_fx_bloom(gpu, ctx, e);
-        break;
-    case BOX_RENDER_EFFECT_SSAO:
-        result = box_gpu_fx_ssao(gpu, ctx, e);
         break;
     case BOX_RENDER_EFFECT_FOG:
         result = box_gpu_fx_fog(gpu, ctx, e);
@@ -1726,7 +1667,7 @@ void box_gpu_effects_sweep(
     }
 
 done:
-    return;
+    box_gpu_gtao_sweep(gpu, packet);
 }
 
 #endif

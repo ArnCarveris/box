@@ -1098,7 +1098,7 @@ window {
 }
 
 contact_shadows {
-  Ssao: {radius: 0.32, bias: 0.025, intensity: 0.9}
+  Gtao: {radius: 0.5, final_value_power: 2}
 }
 
 lantern_bloom {

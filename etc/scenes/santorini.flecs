@@ -617,7 +617,7 @@ template IslandPaving {
 }
 
 window { Surface: {width: 1440, height: 960, vsync: true} }
-contact_shadows { Ssao: {radius: 0.38, bias: 0.025, intensity: 1.1} }
+contact_shadows { Gtao: {radius: 0.6, final_value_power: 2.2} }
 sun_bloom { Bloom: {intensity: 0.07, threshold: 1.5} }
 tonemap { Tonemap: {} }
 

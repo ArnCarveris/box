@@ -18,8 +18,8 @@ bloom {
   Bloom: {intensity: 0.2, threshold: 1}
 }
 
-ssao {
-  Ssao: {radius: 0.5, intensity: 1}
+gtao {
+  Gtao: {radius: 0.5, final_value_power: 2.2}
 }
 
 tonemap {
@@ -37,7 +37,7 @@ main_view {
     camera: camera,
     clear: {enabled: true, color: {120, 150, 190, 255}},
     shadows: {enabled: true},
-    effects: [{effect: ssao}, {effect: bloom}, {effect: tonemap}]
+    effects: [{effect: gtao}, {effect: bloom}, {effect: tonemap}]
   }
 }
 

@@ -53,7 +53,7 @@ static WGPUBuffer box_gpu_buffer_new(
 void box_gpu_draw_init(
     box_gpu_t *gpu)
 {
-    WGPUBindGroupLayoutEntry entries[14] = {
+    WGPUBindGroupLayoutEntry entries[15] = {
         {
             .binding = 0,
             .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
@@ -142,9 +142,17 @@ void box_gpu_draw_init(
                 .type = WGPUBufferBindingType_Uniform,
                 .minBindingSize = BOX_GPU_PROBE_SIZE
             }
+        },
+        {
+            .binding = 14,
+            .visibility = WGPUShaderStage_Fragment,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_UnfilterableFloat,
+                .viewDimension = WGPUTextureViewDimension_2D
+            }
         }
     };
-    WGPUBindGroupLayoutDescriptor layout = { .entryCount = 14, .entries = entries };
+    WGPUBindGroupLayoutDescriptor layout = { .entryCount = 15, .entries = entries };
     box_gpu_cull_init(gpu);
     box_gpu_volume_init(gpu);
     box_gpu_reflect_init(gpu);
@@ -187,6 +195,7 @@ void box_gpu_draw_init(
     box_gpu_light_init(gpu);
     box_gpu_shadow_init(gpu);
     box_gpu_effects_init(gpu);
+    box_gpu_gtao_init(gpu);
     box_gpu_atmosphere_init(gpu);
     box_gpu_particles_init(gpu);
 }
@@ -482,6 +491,7 @@ void box_gpu_draw_fini(
     box_gpu_reflect_fini(gpu);
     box_gpu_environment_fini(gpu);
     box_gpu_effects_fini(gpu);
+    box_gpu_gtao_fini(gpu);
     box_gpu_atmosphere_fini(gpu);
     box_gpu_particles_fini(gpu);
     if (gpu->view_buffer) {
@@ -1666,12 +1676,18 @@ void box_gpu_draw_views(
         box_gpu_cull_record(gpu, encoder, slot);
         box_gpu_shadow_render(gpu, encoder, packet, i, slot);
         box_gpu_particles_sort(gpu, encoder, v, slot);
-        WGPUBindGroup group = box_gpu_light_group(gpu, t, v, slot);
-        if (box_gpu_draw_prepasses(gpu, packet, v, slot)) {
+        bool prepasses = box_gpu_draw_prepasses(gpu, packet, v, slot);
+        WGPUTextureView ao = prepasses ? box_gpu_gtao_begin(gpu, t, packet, v) : NULL;
+        WGPUBindGroup group = box_gpu_light_group(gpu, t, v, slot, ao);
+        if (prepasses) {
             box_gpu_draw_prepass(gpu, t, encoder, packet, v, group, slot, false);
             if (occludes) {
                 box_gpu_cull_record_late(gpu, encoder, t->depth_view, slot);
                 box_gpu_draw_prepass(gpu, t, encoder, packet, v, group, slot, true);
+            }
+
+            if (ao) {
+                box_gpu_gtao_record(gpu, t, encoder, v);
             }
 
             box_gpu_draw_pass(gpu, t, encoder, color, hdr, packet, v, group, slot, 3);

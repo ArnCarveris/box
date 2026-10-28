@@ -154,13 +154,13 @@ whose work was under 2 ms: the sleep woke late on a busy machine, not the scene;
 | `occluded_city_fast` | Hi-Z history | 120 | The city with a revolution per second at 15 degrees: 3 degrees per frame, so the history the early phase draws is out of date every frame. | 2.7k..8k | 58k..62k | 36k..40k |
 | `shadows_40k` | cascaded shadows | 120 | 40,000 pillars casting into four 2048 texel cascades of a low sun; the cascades are fitted to the moving frustum every frame. | 39k..40k | 0 | 0..1k |
 | `lights_1000` | clustered lights | 120 | 1,000 colored point lights over a floor, one above each of 1,000 boxes; the clusters are culled again for the moving view every frame. | 1,001 | 0 | 0 |
-| `effects_chain` | post effects | 120 | Auto exposure, SSAO, height fog, bloom and tonemapping over 10,000 lit blocks and 2,500 glowing spheres. | 11k..12.3k | 0 | 0.1k..1.6k |
+| `effects_chain` | post effects | 120 | Auto exposure, GTAO, height fog, bloom and tonemapping over 10,000 lit blocks and 2,500 glowing spheres. | 11k..12.3k | 0 | 0.1k..1.6k |
 | `text_10k` | text | 120 | 10,000 labels, about 50,000 glyphs, lying on a board. | 20k..22k | 26k..28k | 0..0.1k |
 | `shapes2d_100k` | 2D shapes | 120 | 100,467 bordered rectangles, bordered circles and lines on the ground, one batch. | 87k..88k | 12.5k..13.4k | 0..1k |
 | `walk_1m` | 1M collision | 120 | A first person controller walks a circle through 1,000,000 boxes, spheres, cylinders and cones (250,000 each), colliding through the spatial index, while the view looks at the field through a 5 degree lens on the orbit. | 78k | 922k | 0 |
 | `town_orbit_30` .. `town_orbit_120` | windowed town | 30, 60, 90, 120 | The town at the retina size of its window for a minute, orbiting, presenting to its window. | 2.5k..3.6k | 0.1k | 1.1k..2.2k |
 | `town_fly_30` .. `town_fly_120` | moving through the town | 30, 60, 90, 120 | The same, flown through the streets by the scene's `CameraController` with synthetic input for a minute. | 0..2.4k | 0.1k..4.8k | 0..2.4k |
-| `town` | a real scene | 120 | The town of `etc/scenes/town.flecs` with its view: cascaded shadows, occlusion culling with a 4 pixel smallest size, SSAO and tonemapping. | 2.3k..3k | 1k | 0.8k..1.4k |
+| `town` | a real scene | 120 | The town of `etc/scenes/town.flecs` with its view: cascaded shadows, occlusion culling with a 4 pixel smallest size, GTAO and tonemapping. | 2.3k..3k | 1k | 0.8k..1.4k |
 | `walk_1m_first_person` | 1M collision, two views | 120 | `walk_1m` with a second view through the walking controller's own camera, rendered after the orbit view. | 78k | 922k | 0 |
 
 Frustum culled includes the size cull: shapes below one pixel (the far street boxes of the city,

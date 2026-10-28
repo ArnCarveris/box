@@ -4,6 +4,9 @@
  *
  * Disabled entries, entries whose entity is gone and entities without effect settings add no
  * pass; a view without passes renders straight into its target, without an HDR target.
+ *
+ * Gtao adds no pass: the first enabled one of a lit view with a perspective camera sets the
+ * ambient occlusion of the view, which runs before its forward pass.
  */
 
 #include "render.h"
@@ -25,6 +28,9 @@
 #define BOX_EFFECTS_SMAA_STEPS_MAX (112)
 #define BOX_EFFECTS_SMAA_DIAG_STEPS_MAX (20)
 
+/** Most edge aware denoise passes of Gtao */
+#define BOX_EFFECTS_GTAO_DENOISE_MAX (3)
+
 void box_render_bloom_settings(
     const Bloom *in,
     Bloom *out)
@@ -43,13 +49,17 @@ void box_render_bloom_settings(
     }
 }
 
-void box_render_ssao_settings(
-    const Ssao *in,
-    Ssao *out)
+void box_render_gtao_settings(
+    const Gtao *in,
+    Gtao *out)
 {
+    *out = *in;
     out->radius = glm_max(in->radius, 0.0f);
-    out->bias = glm_max(in->bias, 0.0f);
-    out->intensity = glm_max(in->intensity, 0.0f);
+    out->falloff_range = glm_clamp(in->falloff_range, 0.0f, 1.0f);
+    out->final_value_power = glm_max(in->final_value_power, 0.0f);
+    out->quality = in->quality >= GtaoLow && in->quality <= GtaoUltra ? in->quality : GtaoHigh;
+    out->denoise_passes = glm_imax(glm_imin(in->denoise_passes,
+        BOX_EFFECTS_GTAO_DENOISE_MAX), 0);
 }
 
 void box_render_fog_settings(
@@ -131,17 +141,11 @@ static void box_effects_entity(
     box_render_view_t *v,
     ecs_entity_t e)
 {
-    const Ssao *ssao = ecs_get(world, e, Ssao);
     const HeightFog *fog = ecs_get(world, e, HeightFog);
     const Bloom *bloom = ecs_get(world, e, Bloom);
     const AutoExposure *exposure = ecs_get(world, e, AutoExposure);
     const Tonemap *tonemap = ecs_get(world, e, Tonemap);
     const Smaa *smaa = ecs_get(world, e, Smaa);
-    if (ssao) {
-        box_render_ssao_settings(ssao, &box_effects_append(
-            p, v, BOX_RENDER_EFFECT_SSAO, e)->ssao);
-    }
-
     if (fog) {
         box_render_fog_settings(fog, &box_effects_append(p, v, BOX_RENDER_EFFECT_FOG, e)->fog);
     }
@@ -194,14 +198,24 @@ static void box_effects_view(
         : NULL;
     int32_t i, count = view ? ecs_vec_count(&view->effects) : 0;
     const ViewEffect *effects = view ? ecs_vec_first_t(&view->effects, ViewEffect) : NULL;
+    bool gtao = false;
     v->effect_first = ecs_vec_count(&p->effects);
     v->effect_count = 0;
+    ecs_os_memset_t(&v->gtao, 0, box_render_view_gtao_t);
     for (i = 0; i < count; i ++) {
         ecs_entity_t e = effects[i].effect;
         if (!effects[i].enabled || !e || !ecs_is_alive(world, e) ||
             ecs_has_id(world, e, EcsDisabled))
         {
             continue;
+        }
+
+        const Gtao *ao = gtao ? NULL : ecs_get(world, e, Gtao);
+        if (ao) {
+            gtao = true;
+            v->gtao.enabled = v->lights.enabled && !v->camera_data.ortho;
+            v->gtao.effect = e;
+            box_render_gtao_settings(ao, &v->gtao.settings);
         }
 
         box_effects_entity(world, p, v, e);
@@ -240,9 +254,6 @@ bool box_render_effects_use(
         case BOX_RENDER_SHADER_BLOOM:
             result = e->kind == BOX_RENDER_EFFECT_BLOOM;
             break;
-        case BOX_RENDER_SHADER_SSAO:
-            result = e->kind == BOX_RENDER_EFFECT_SSAO;
-            break;
         case BOX_RENDER_SHADER_FOG:
             result = e->kind == BOX_RENDER_EFFECT_FOG;
             break;
@@ -252,6 +263,11 @@ bool box_render_effects_use(
         default:
             break;
         }
+    }
+
+    count = handle == BOX_RENDER_SHADER_GTAO ? ecs_vec_count(&p->views) : 0;
+    for (i = 0; i < count && !result; i ++) {
+        result = ecs_vec_get_t(&p->views, box_render_view_t, i)->gtao.enabled;
     }
 
     return result;

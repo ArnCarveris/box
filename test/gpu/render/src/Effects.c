@@ -1,6 +1,7 @@
 /**
  * @file Effects.c
- * @brief Tests for the effect chain of a view: bloom, tonemap, exposure, fog, SSAO and SMAA.
+ * @brief Tests for the effect chain of a view: bloom, tonemap, exposure, fog and SMAA, and for
+ * the ambient occlusion (Gtao) of the indirect light.
  *
  * Most cases render an unlit view (a C literal View) from 5 units in front of the origin into
  * a 64x64 capture; a unit cube at the origin covers columns 26 to 38 of the middle row.
@@ -15,6 +16,10 @@
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_STATIC
 #include <stb_image.h>
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_STATIC
+#include <stb_image_write.h>
 
 /** Create a world that renders headless, with a camera 5 units in front of the origin.
  *
@@ -806,73 +811,533 @@ void Effects_fog_lit_by_scene_sun(void) {
     ecs_fini(world);
 }
 
-void Effects_ssao_darkens_crease(void) {
-    // lighting/effects
+/** Create a headless world with the crease of the Gtao cases: a white floor meeting a white wall
+ * of a width, seen from above by a camera 4 units in front of the wall. The crease is near the
+ * middle row, the floor 2.7 units from the wall at the bottom rows.
+ *
+ * A white ambient light of an intensity lights it, and a directional light of an intensity, or
+ * when that is 0 a point light of intensity 0 out of reach, which replaces the default sun.
+ *
+ * @param ambient Intensity of the ambient light
+ * @param sun Intensity of the directional light, 0 for none
+ * @param wall_width Width of the wall
+ * @param camera Receives the camera
+ * @param floor Receives the floor
+ * @param wall Receives the wall
+ * @return The world
+ */
+static ecs_world_t* gtao_world(
+    float ambient,
+    float sun,
+    float wall_width,
+    ecs_entity_t *camera,
+    ecs_entity_t *floor,
+    ecs_entity_t *wall)
+{
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
+    ecs_singleton_set(world, AmbientLight, {.sky = {255, 255, 255}, .ground = {255, 255, 255},
+        .intensity = ambient});
+    ecs_entity_t light = ecs_new(world);
+    if (sun > 0) {
+        ecs_set(world, light, Rotation, {1.2f, 0, 0});
+        ecs_set(world, light, DirectionalLight, {.intensity = sun * GLM_PIf});
+    } else {
+        ecs_set(world, light, Position, {1000, 1000, 1000});
+        ecs_set(world, light, PointLight, {.intensity = 0, .range = 0.1f});
+    }
 
-    ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Position, {0, 1.5f, 3});
-    ecs_set(world, camera, Rotation, {-0.35f, 0, 0});
-    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
-    ecs_entity_t view = ecs_new(world);
-    ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
-        .color = {0, 0, 0, 255}}});
-    ecs_entity_t floor = ecs_new(world);
-    ecs_set(world, floor, Position, {0, -0.1f, 0});
-    ecs_set(world, floor, Box, {10, 0.2f, 10});
-    ecs_set(world, floor, Rgb, {255, 255, 255});
-    ecs_entity_t wall = ecs_new(world);
-    ecs_set(world, wall, Position, {0, 2, -1.1f});
-    ecs_set(world, wall, Box, {10, 4, 0.2f});
-    ecs_set(world, wall, Rgb, {255, 255, 255});
-    ecs_entity_t s = ecs_new(world);
-    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "ssao.png",
-        .resolution_scale = 1});
+    *camera = ecs_new(world);
+    ecs_set(world, *camera, Position, {0, 1.5f, 3});
+    ecs_set(world, *camera, Rotation, {-0.35f, 0, 0});
+    ecs_set(world, *camera, Camera, {.fov = 60, .near_ = 0.1f});
+    *floor = ecs_new(world);
+    ecs_set(world, *floor, Position, {0, -0.1f, 0});
+    ecs_set(world, *floor, Box, {10, 0.2f, 10});
+    ecs_set(world, *floor, Rgb, {255, 255, 255});
+    *wall = ecs_new(world);
+    ecs_set(world, *wall, Position, {0, 2, -1.1f});
+    ecs_set(world, *wall, Box, {wall_width, 4, 0.2f});
+    ecs_set(world, *wall, Rgb, {255, 255, 255});
+
+    return world;
+}
+
+/** Set the camera, lighting and effects of a view with a black clear.
+ *
+ * @param world The world
+ * @param view The view
+ * @param camera The camera
+ * @param lit Whether the view is lit
+ * @param effects The effect entities, in order
+ * @param count Number of effects
+ */
+static void gtao_view_set(
+    ecs_world_t *world,
+    ecs_entity_t view,
+    ecs_entity_t camera,
+    bool lit,
+    const ecs_entity_t *effects,
+    int32_t count)
+{
+    View value = {.camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}},
+        .lighting.enabled = lit};
+    int32_t i;
+    ecs_vec_init_t(NULL, &value.effects, ViewEffect, count);
+    for (i = 0; i < count; i ++) {
+        *ecs_vec_append_t(NULL, &value.effects, ViewEffect) = (ViewEffect){
+            .enabled = true, .effect = effects[i] };
+    }
+
+    ecs_set_ptr(world, view, View, &value);
+    ecs_vec_fini_t(NULL, &value.effects, ViewEffect);
+}
+
+/** Create a Gtao effect entity.
+ *
+ * @param world The world
+ * @param radius World radius of the occlusion
+ * @param power Final value power, the strength
+ * @param half Whether it computes at half resolution
+ * @return The entity
+ */
+static ecs_entity_t gtao_effect(
+    ecs_world_t *world,
+    float radius,
+    float power,
+    bool half)
+{
+    ecs_entity_t result = ecs_new(world);
+    ecs_set(world, result, Gtao, {.radius = radius, .falloff_range = 0.615f,
+        .final_value_power = power, .quality = GtaoHigh, .denoise_passes = 1,
+        .half_resolution = half});
+
+    return result;
+}
+
+/** Render a frame into the 64x64 capture of a surface and copy it.
+ *
+ * @param world The world
+ * @param file File name of the capture of the surface
+ * @return The RGBA pixels, freed with ecs_os_free
+ */
+static unsigned char* gtao_frame(
+    ecs_world_t *world,
+    const char *file)
+{
     ecs_progress(world, 1.0f / 60);
     box_render_sync(world);
-
-    char *path = flecs_asprintf("%s/ssao.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
-    int w = 0, h = 0, n = 0;
-    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
-    test_assert(px != NULL);
-    unsigned char *before = ecs_os_malloc(64 * 64 * 4);
-    ecs_os_memcpy(before, px, 64 * 64 * 4);
+    unsigned char *px = effects_load(world, file);
+    unsigned char *result = ecs_os_malloc(64 * 64 * 4);
+    ecs_os_memcpy(result, px, 64 * 64 * 4);
     stbi_image_free(px);
 
-    ecs_entity_t ssao = ecs_new(world);
-    ecs_set(world, ssao, Ssao, {.radius = 0.5f, .bias = 0.025f, .intensity = 2});
-    View *v = ecs_get_mut(world, view, View);
-    *ecs_vec_append_t(NULL, &v->effects, ViewEffect) = (ViewEffect){
-        .enabled = true, .effect = ssao };
-    ecs_modified(world, view, View);
-    ecs_progress(world, 1.0f / 60);
-    box_render_sync(world);
+    return result;
+}
 
-    px = stbi_load(path, &w, &h, &n, 4);
-    test_assert(px != NULL);
-    int32_t y, white = 0, darkest = 255;
-    for (y = 0; y < 64; y ++) {
-        if (before[(y * 64 + 32) * 4] == 255) {
-            white ++;
-            if (px[(y * 64 + 32) * 4] < darkest) {
-                darkest = px[(y * 64 + 32) * 4];
+/** Add the 64x64 surface that captures the views.
+ *
+ * @param world The world
+ * @param file File name of the capture
+ */
+static void gtao_surface(
+    ecs_world_t *world,
+    const char *file)
+{
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 64, .height = 64,
+        .write_to_file = ECS_CONST_CAST(char*, file), .resolution_scale = 1});
+}
+
+/** Get the largest difference of a color channel between two captures in a region.
+ *
+ * @param a The first capture
+ * @param b The second capture
+ * @param x0 First column
+ * @param y0 First row
+ * @param x1 Last column, included
+ * @param y1 Last row, included
+ * @return The difference
+ */
+static int gtao_diff(
+    const unsigned char *a,
+    const unsigned char *b,
+    int x0,
+    int y0,
+    int x1,
+    int y1)
+{
+    int x, y, c, result = 0;
+    for (y = y0; y <= y1; y ++) {
+        for (x = x0; x <= x1; x ++) {
+            for (c = 0; c < 3; c ++) {
+                int d = abs((int)a[(y * 64 + x) * 4 + c] - (int)b[(y * 64 + x) * 4 + c]);
+                result = d > result ? d : result;
             }
         }
     }
 
-    test_assert(white > 32);
-    test_assert(darkest < 230);
-    test_assert(px[(62 * 64 + 32) * 4] > 245);
-    test_assert(px[(4 * 64 + 32) * 4] > 245);
+    return result;
+}
+
+/** Get how much darker the second capture is than the first at most, in the red channel of
+ * the middle column between two rows: the crease.
+ *
+ * @param before The capture without Gtao
+ * @param after The capture with Gtao
+ * @param y0 First row
+ * @param y1 Last row, included
+ * @return The darkening, negative when every pixel got brighter
+ */
+static int gtao_darkening(
+    const unsigned char *before,
+    const unsigned char *after,
+    int y0,
+    int y1)
+{
+    int y, result = -255;
+    for (y = y0; y <= y1; y ++) {
+        int d = (int)before[(y * 64 + 32) * 4] - (int)after[(y * 64 + 32) * 4];
+        result = d > result ? d : result;
+    }
+
+    return result;
+}
+
+void Effects_gtao_darkens_crease(void) {
+    // lighting/effects
+    ecs_entity_t camera, floor, wall;
+    ecs_world_t *world = gtao_world(0.5f, 0, 10, &camera, &floor, &wall);
+    ecs_entity_t view = ecs_new(world);
+    gtao_view_set(world, view, camera, true, NULL, 0);
+    gtao_surface(world, "gtao_crease.png");
+    unsigned char *before = gtao_frame(world, "gtao_crease.png");
+
+    ecs_entity_t gtao = gtao_effect(world, 0.5f, 2.2f, true);
+    gtao_view_set(world, view, camera, true, &gtao, 1);
+    unsigned char *after = gtao_frame(world, "gtao_crease.png");
+
+    test_assert(before[(62 * 64 + 32) * 4] > 60);
+    test_assert(before[(62 * 64 + 32) * 4] < 250);
+    test_assert(gtao_darkening(before, after, 16, 48) > 10);
+    test_assert(gtao_diff(before, after, 8, 40, 56, 47) <= 2);
+    test_assert(gtao_diff(before, after, 24, 0, 40, 3) <= 2);
 
     ecs_os_free(before);
-    stbi_image_free(px);
-    ecs_os_free(path);
+    ecs_os_free(after);
     ecs_fini(world);
+}
+
+void Effects_gtao_spares_direct_light(void) {
+    // lighting/effects
+    ecs_entity_t camera, floor, wall;
+    ecs_world_t *world = gtao_world(0, 0.5f, 10, &camera, &floor, &wall);
+    ecs_entity_t view = ecs_new(world);
+    gtao_view_set(world, view, camera, true, NULL, 0);
+    gtao_surface(world, "gtao_direct.png");
+    unsigned char *before = gtao_frame(world, "gtao_direct.png");
+
+    ecs_entity_t gtao = gtao_effect(world, 1, 4, true);
+    gtao_view_set(world, view, camera, true, &gtao, 1);
+    unsigned char *after = gtao_frame(world, "gtao_direct.png");
+
+    test_assert(before[(62 * 64 + 32) * 4] > 20);
+    test_assert(gtao_diff(before, after, 0, 0, 63, 63) <= 1);
+
+    ecs_os_free(before);
+    ecs_os_free(after);
+    ecs_fini(world);
+}
+
+void Effects_gtao_spares_emission_and_blended(void) {
+    // lighting/effects
+    ecs_entity_t camera, floor, wall;
+    ecs_world_t *world = gtao_world(0.5f, 0, 10, &camera, &floor, &wall);
+    ecs_entity_t lamp = ecs_new(world);
+    ecs_set(world, lamp, Position, {0, 0.5f, -0.5f});
+    ecs_set(world, lamp, Box, {1, 1, 1});
+    ecs_set(world, lamp, Rgb, {0, 0, 0});
+    ecs_set(world, lamp, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, lamp, Emissive, {.strength = 1, .color = {255, 128, 64}});
+    ecs_entity_t pane = ecs_new(world);
+    ecs_set(world, pane, Position, {0, 0.5f, 0.4f});
+    ecs_set(world, pane, Quad, {0.6f, 0.6f});
+    ecs_set(world, pane, Rgb, {128, 160, 255});
+    ecs_set(world, pane, Opacity, {0.5f});
+    ecs_entity_t view = ecs_new(world);
+    gtao_view_set(world, view, camera, true, NULL, 0);
+    gtao_surface(world, "gtao_emission.png");
+    unsigned char *before = gtao_frame(world, "gtao_emission.png");
+
+    ecs_entity_t gtao = gtao_effect(world, 1, 4, true);
+    gtao_view_set(world, view, camera, true, &gtao, 1);
+    unsigned char *after = gtao_frame(world, "gtao_emission.png");
+
+    test_assert(before[(32 * 64 + 32) * 4] > 60);
+    test_assert(gtao_diff(before, after, 30, 30, 34, 34) <= 1);
+    test_assert(gtao_diff(before, after, 32, 24, 32, 25) <= 1);
+    test_assert(gtao_diff(before, after, 25, 32, 25, 32) <= 1);
+    int x, y, darkest = 0;
+    for (y = 0; y < 64; y ++) {
+        for (x = 0; x < 64; x ++) {
+            int d = (int)before[(y * 64 + x) * 4 + 2] - (int)after[(y * 64 + x) * 4 + 2];
+            darkest = d > darkest ? d : darkest;
+        }
+    }
+
+    test_assert(darkest > 8);
+
+    ecs_os_free(before);
+    ecs_os_free(after);
+    ecs_fini(world);
+}
+
+void Effects_gtao_unlit_view_unchanged(void) {
+    // lighting/effects
+    ecs_entity_t camera, floor, wall;
+    ecs_world_t *world = gtao_world(0.5f, 0, 10, &camera, &floor, &wall);
+    ecs_entity_t view = ecs_new(world);
+    gtao_view_set(world, view, camera, false, NULL, 0);
+    gtao_surface(world, "gtao_unlit.png");
+    unsigned char *before = gtao_frame(world, "gtao_unlit.png");
+
+    ecs_entity_t gtao = gtao_effect(world, 1, 4, true);
+    gtao_view_set(world, view, camera, false, &gtao, 1);
+    unsigned char *after = gtao_frame(world, "gtao_unlit.png");
+
+    test_assert(before[(62 * 64 + 32) * 4] > 250);
+    test_assert(gtao_diff(before, after, 0, 0, 63, 63) == 0);
+
+    ecs_os_free(before);
+    ecs_os_free(after);
+    ecs_fini(world);
+}
+
+void Effects_gtao_ortho_view_unchanged(void) {
+    // lighting/effects
+    ecs_entity_t camera, floor, wall;
+    ecs_world_t *world = gtao_world(0.5f, 0, 10, &camera, &floor, &wall);
+    ecs_set(world, camera, Position, {0, 3, 6});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 4, .near_ = 0.1f,
+        .far_ = 100});
+    ecs_entity_t view = ecs_new(world);
+    gtao_view_set(world, view, camera, true, NULL, 0);
+    gtao_surface(world, "gtao_ortho.png");
+    unsigned char *before = gtao_frame(world, "gtao_ortho.png");
+
+    ecs_entity_t gtao = gtao_effect(world, 1, 4, true);
+    gtao_view_set(world, view, camera, true, &gtao, 1);
+    unsigned char *after = gtao_frame(world, "gtao_ortho.png");
+
+    test_assert(before[(62 * 64 + 32) * 4] > 60);
+    test_assert(gtao_diff(before, after, 0, 0, 63, 63) == 0);
+
+    ecs_os_free(before);
+    ecs_os_free(after);
+    ecs_fini(world);
+}
+
+void Effects_gtao_combines_orm_min(void) {
+    // lighting/effects
+    ecs_entity_t camera, floor, wall;
+    ecs_world_t *world = gtao_world(0.5f, 0, 10, &camera, &floor, &wall);
+    char *file = flecs_asprintf("%s/gtao_orm_half.png",
+        ecs_singleton_get(world, AppStatus)->tmp_dir);
+    uint8_t texels[4 * 4 * 4];
+    int32_t i;
+    for (i = 0; i < 16; i ++) {
+        texels[i * 4 + 0] = 128;
+        texels[i * 4 + 1] = 255;
+        texels[i * 4 + 2] = 255;
+        texels[i * 4 + 3] = 255;
+    }
+
+    test_assert(stbi_write_png(file, 4, 4, 4, texels, 4 * 4) != 0);
+    ecs_entity_t orm = ecs_new(world);
+    ecs_set(world, orm, TexturePath, {.path = file});
+    ecs_set(world, floor, PbrTextures, {.orm = orm});
+    ecs_set(world, wall, PbrTextures, {.orm = orm});
+    ecs_entity_t view = ecs_new(world);
+    gtao_view_set(world, view, camera, true, NULL, 0);
+    gtao_surface(world, "gtao_orm.png");
+    const TextureStatus *status = NULL;
+    for (i = 0; i < 200 && (!status || status->state != TextureReady); i ++) {
+        ecs_progress(world, 1.0f / 60);
+        box_render_sync(world);
+        status = ecs_get(world, orm, TextureStatus);
+    }
+
+    test_assert(status != NULL);
+    test_int(status->state, TextureReady);
+    ecs_progress(world, 1.0f / 60);
+    unsigned char *before = gtao_frame(world, "gtao_orm.png");
+
+    ecs_entity_t gtao = gtao_effect(world, 1, 4, true);
+    gtao_view_set(world, view, camera, true, &gtao, 1);
+    unsigned char *after = gtao_frame(world, "gtao_orm.png");
+
+    test_assert(before[(62 * 64 + 32) * 4] > 30);
+    test_assert(gtao_diff(before, after, 24, 60, 40, 63) <= 1);
+    test_assert(gtao_darkening(before, after, 16, 48) > 4);
+
+    ecs_os_free(before);
+    ecs_os_free(after);
+    ecs_os_free(file);
+    ecs_fini(world);
+}
+
+void Effects_gtao_specular_occlusion(void) {
+    // lighting/effects
+    ecs_entity_t camera, floor, wall;
+    ecs_world_t *world = gtao_world(0.5f, 0, 10, &camera, &floor, &wall);
+    ecs_set(world, floor, PbrMaterial, {.metallic = 1, .roughness = 0.2f});
+    ecs_entity_t view = ecs_new(world);
+    gtao_view_set(world, view, camera, true, NULL, 0);
+    gtao_surface(world, "gtao_specular.png");
+    unsigned char *before = gtao_frame(world, "gtao_specular.png");
+
+    ecs_entity_t gtao = gtao_effect(world, 1, 4, true);
+    gtao_view_set(world, view, camera, true, &gtao, 1);
+    unsigned char *after = gtao_frame(world, "gtao_specular.png");
+
+    test_assert(before[(62 * 64 + 32) * 4] > 30);
+    test_assert(gtao_diff(before, after, 8, 40, 56, 47) <= 2);
+    test_assert(gtao_darkening(before, after, 34, 48) > 4);
+
+    ecs_os_free(before);
+    ecs_os_free(after);
+    ecs_fini(world);
+}
+
+void Effects_gtao_half_resolution_close_to_full(void) {
+    // lighting/effects
+    ecs_entity_t camera, floor, wall;
+    ecs_world_t *world = gtao_world(0.5f, 0, 2, &camera, &floor, &wall);
+    ecs_entity_t view = ecs_new(world);
+    gtao_view_set(world, view, camera, true, NULL, 0);
+    gtao_surface(world, "gtao_half.png");
+    unsigned char *none = gtao_frame(world, "gtao_half.png");
+
+    ecs_entity_t full = gtao_effect(world, 1.5f, 2.2f, false);
+    gtao_view_set(world, view, camera, true, &full, 1);
+    unsigned char *at_full = gtao_frame(world, "gtao_half.png");
+
+    ecs_entity_t half = gtao_effect(world, 1.5f, 2.2f, true);
+    gtao_view_set(world, view, camera, true, &half, 1);
+    unsigned char *at_half = gtao_frame(world, "gtao_half.png");
+
+    test_assert(gtao_darkening(none, at_full, 16, 48) > 10);
+    test_assert(gtao_darkening(none, at_half, 16, 48) > 10);
+    test_assert(gtao_diff(at_full, at_half, 32, 16, 32, 48) <= 16);
+
+    int x, left = -1, right = -1;
+    for (x = 0; x < 64; x ++) {
+        if (none[(8 * 64 + x) * 4] > 8) {
+            right = x;
+            if (left < 0) {
+                left = x;
+            }
+        }
+    }
+
+    test_assert(left > 4);
+    test_assert(right < 59);
+    test_assert(gtao_diff(none, at_half, left - 3, 2, left + 3, 12) <= 2);
+    test_assert(gtao_diff(none, at_half, right - 3, 2, right + 3, 12) <= 2);
+    test_assert(gtao_diff(none, at_full, left - 3, 2, left + 3, 12) <= 2);
+    test_assert(gtao_diff(none, at_full, right - 3, 2, right + 3, 12) <= 2);
+    box_render_gpu_stats_t stats;
+    test_bool(box_render_gpu_stats(world, &stats), true);
+    test_int(stats.errors, 0);
+
+    ecs_os_free(none);
+    ecs_os_free(at_full);
+    ecs_os_free(at_half);
+    ecs_fini(world);
+}
+
+void Effects_gtao_same_every_frame(void) {
+    // lighting/effects
+    ecs_entity_t camera, floor, wall;
+    ecs_world_t *world = gtao_world(0.5f, 0, 10, &camera, &floor, &wall);
+    ecs_entity_t gtao = gtao_effect(world, 0.5f, 2.2f, true);
+    ecs_entity_t view = ecs_new(world);
+    gtao_view_set(world, view, camera, true, &gtao, 1);
+    gtao_surface(world, "gtao_frames.png");
+    unsigned char *first = gtao_frame(world, "gtao_frames.png");
+    unsigned char *second = gtao_frame(world, "gtao_frames.png");
+    unsigned char *third = gtao_frame(world, "gtao_frames.png");
+
+    test_assert(gtao_diff(first, second, 0, 0, 63, 63) == 0);
+    test_assert(gtao_diff(second, third, 0, 0, 63, 63) == 0);
+
+    ecs_os_free(first);
+    ecs_os_free(second);
+    ecs_os_free(third);
+    ecs_fini(world);
+}
+
+void Effects_gtao_position_in_list(void) {
+    // lighting/effects
+    ecs_entity_t camera, floor, wall;
+    ecs_world_t *world = gtao_world(0.5f, 0, 10, &camera, &floor, &wall);
+    ecs_entity_t gtao = gtao_effect(world, 0.5f, 2.2f, true);
+    ecs_entity_t tonemap = ecs_new(world);
+    ecs_add(world, tonemap, Tonemap);
+    ecs_entity_t first[2] = {gtao, tonemap};
+    ecs_entity_t last[2] = {tonemap, gtao};
+    ecs_entity_t view = ecs_new(world);
+    gtao_view_set(world, view, camera, true, &tonemap, 1);
+    gtao_surface(world, "gtao_order.png");
+    unsigned char *none = gtao_frame(world, "gtao_order.png");
+    gtao_view_set(world, view, camera, true, first, 2);
+    unsigned char *listed_first = gtao_frame(world, "gtao_order.png");
+    gtao_view_set(world, view, camera, true, last, 2);
+    unsigned char *listed_last = gtao_frame(world, "gtao_order.png");
+
+    test_assert(gtao_darkening(none, listed_first, 16, 48) > 8);
+    test_assert(gtao_diff(listed_first, listed_last, 0, 0, 63, 63) == 0);
+
+    ecs_os_free(none);
+    ecs_os_free(listed_first);
+    ecs_os_free(listed_last);
+    ecs_fini(world);
+}
+
+void Effects_gtao_settings_clamped(void) {
+    // lighting/effects
+    Gtao out;
+    box_render_gtao_settings(&(Gtao){.radius = -1, .falloff_range = -0.5f,
+        .final_value_power = -2, .quality = (GtaoQuality)-1, .denoise_passes = -4,
+        .half_resolution = false}, &out);
+    test_flt(out.radius, 0);
+    test_flt(out.falloff_range, 0);
+    test_flt(out.final_value_power, 0);
+    test_int(out.quality, GtaoHigh);
+    test_int(out.denoise_passes, 0);
+    test_bool(out.half_resolution, false);
+
+    box_render_gtao_settings(&(Gtao){.radius = 20, .falloff_range = 3,
+        .final_value_power = 8, .quality = (GtaoQuality)12, .denoise_passes = 9,
+        .half_resolution = true}, &out);
+    test_flt(out.radius, 20);
+    test_flt(out.falloff_range, 1);
+    test_flt(out.final_value_power, 8);
+    test_int(out.quality, GtaoHigh);
+    test_int(out.denoise_passes, 3);
+    test_bool(out.half_resolution, true);
+
+    box_render_gtao_settings(&(Gtao){.radius = 0.75f, .falloff_range = 0.3f,
+        .final_value_power = 1.5f, .quality = GtaoUltra, .denoise_passes = 2,
+        .half_resolution = true}, &out);
+    test_flt(out.radius, 0.75f);
+    test_flt(out.falloff_range, 0.3f);
+    test_flt(out.final_value_power, 1.5f);
+    test_int(out.quality, GtaoUltra);
+    test_int(out.denoise_passes, 2);
 }
 
 void Effects_chain_order_matters(void) {
@@ -1142,7 +1607,7 @@ void Effects_default_settings(void) {
 
     ecs_entity_t e = ecs_new(world);
     ecs_add(world, e, Bloom);
-    ecs_add(world, e, Ssao);
+    ecs_add(world, e, Gtao);
     ecs_add(world, e, HeightFog);
     ecs_add(world, e, AutoExposure);
     ecs_add(world, e, Tonemap);
@@ -1156,10 +1621,21 @@ void Effects_default_settings(void) {
     test_flt(b->firefly_clamp, 12);
     test_flt(b->temporal, 0);
     test_int(b->max_mip_dimension, 512);
-    const Ssao *ao = ecs_get(world, e, Ssao);
+    const Gtao *ao = ecs_get(world, e, Gtao);
     test_flt(ao->radius, 0.5f);
-    test_flt(ao->bias, 0.025f);
-    test_flt(ao->intensity, 1);
+    test_flt(ao->falloff_range, 0.615f);
+    test_flt(ao->final_value_power, 2.2f);
+    test_int(ao->quality, GtaoHigh);
+    test_int(ao->denoise_passes, 1);
+    test_bool(ao->half_resolution, true);
+    Gtao resolved;
+    box_render_gtao_settings(ao, &resolved);
+    test_flt(resolved.radius, 0.5f);
+    test_flt(resolved.falloff_range, 0.615f);
+    test_flt(resolved.final_value_power, 2.2f);
+    test_int(resolved.quality, GtaoHigh);
+    test_int(resolved.denoise_passes, 1);
+    test_bool(resolved.half_resolution, true);
     const HeightFog *f = ecs_get(world, e, HeightFog);
     test_flt(f->density, 0.1f);
     test_flt(f->falloff, 0.3f);
@@ -1277,13 +1753,13 @@ void Effects_follow_surface_resize(void) {
     ecs_entity_t bloom = ecs_new(world);
     ecs_set(world, bloom, Bloom, {.intensity = 0.5f, .threshold = 1, .high_pass_frequency = 1,
         .max_mip_dimension = 512});
-    ecs_entity_t ssao = ecs_new(world);
-    ecs_add(world, ssao, Ssao);
+    ecs_entity_t gtao = ecs_new(world);
+    ecs_add(world, gtao, Gtao);
     ecs_entity_t view = ecs_new(world);
     View value = {.camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}};
     ecs_vec_init_t(NULL, &value.effects, ViewEffect, 2);
     *ecs_vec_append_t(NULL, &value.effects, ViewEffect) = (ViewEffect){
-        .enabled = true, .effect = ssao };
+        .enabled = true, .effect = gtao };
     *ecs_vec_append_t(NULL, &value.effects, ViewEffect) = (ViewEffect){
         .enabled = true, .effect = bloom };
     ecs_set_ptr(world, view, View, &value);

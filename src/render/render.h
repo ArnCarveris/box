@@ -44,8 +44,8 @@
 /** Shader handle of the engine shader of the bloom passes */
 #define BOX_RENDER_SHADER_BLOOM (42)
 
-/** Shader handle of the engine shader of the ambient occlusion passes */
-#define BOX_RENDER_SHADER_SSAO (43)
+/** Shader handle of the engine shader of the ambient occlusion (Gtao) passes */
+#define BOX_RENDER_SHADER_GTAO (43)
 
 /** Shader handle of the engine shader of the height fog pass */
 #define BOX_RENDER_SHADER_FOG (44)
@@ -294,6 +294,13 @@ typedef struct box_render_view_cull_t {
     float min_dimension;    /**< Projected size in pixels below which an instance is culled */
 } box_render_view_cull_t;
 
+/** The ambient occlusion of a view, resolved from the first enabled Gtao of its effects */
+typedef struct box_render_view_gtao_t {
+    bool enabled;           /**< The view is lit, has a perspective camera and lists a Gtao */
+    ecs_entity_t effect;    /**< The Gtao entity, keys the images the passes keep */
+    Gtao settings;          /**< Resolved settings */
+} box_render_view_gtao_t;
+
 /** A view of the frame: the camera it renders, the scene it draws and how it clears.
  *
  * The projection is built by the renderer per target, because its aspect follows the
@@ -316,6 +323,8 @@ typedef struct box_render_view_t {
     box_render_view_cull_t cull; /**< Culling of the view and of its shadow casters */
     int32_t effect_first;       /**< Index of the first effect pass of the view in the packet */
     int32_t effect_count;       /**< Effect passes of the view, 0 renders without an HDR target */
+    box_render_view_gtao_t gtao; /**< Ambient occlusion of the indirect light, which runs between
+                                 *   the depth prepass and the forward pass, not in the chain */
     uint32_t volume;            /**< Probe volume the view samples, 0 for the hemisphere ambient */
     uint32_t volume_buffer;     /**< Probe buffer of the volume the view samples, 0 or 1 */
     uint32_t reflections;       /**< Reflection probe buffer of the scene, 0 for none or when
@@ -335,7 +344,6 @@ typedef enum box_render_effect_kind_t {
     BOX_RENDER_EFFECT_TONEMAP,  /**< Tonemap, optionally scaled by an adapted exposure first */
     BOX_RENDER_EFFECT_EXPOSURE, /**< AutoExposure on its own: scales by the adapted exposure */
     BOX_RENDER_EFFECT_BLOOM,    /**< Bloom */
-    BOX_RENDER_EFFECT_SSAO,     /**< Ssao */
     BOX_RENDER_EFFECT_FOG,      /**< HeightFog */
     BOX_RENDER_EFFECT_SMAA      /**< Smaa */
 } box_render_effect_kind_t;
@@ -348,7 +356,6 @@ typedef struct box_render_effect_t {
     AutoExposure auto_exposure; /**< Resolved exposure settings when exposure is set */
     TonemapOperator tonemap;    /**< Operator of a tone map pass */
     Bloom bloom;                /**< Resolved settings of a bloom pass */
-    Ssao ssao;                  /**< Resolved settings of an ambient occlusion pass */
     HeightFog fog;              /**< Resolved settings of a fog pass */
     Smaa smaa;                  /**< Resolved settings of an anti aliasing pass */
 } box_render_effect_t;
@@ -1864,14 +1871,14 @@ void box_render_bloom_settings(
     const Bloom *in,
     Bloom *out);
 
-/** Resolve the settings of an ambient occlusion pass.
+/** Resolve the settings of the ambient occlusion of a view.
  *
  * @param in The settings of an effect entity
  * @param out Receives the resolved settings
  */
-void box_render_ssao_settings(
-    const Ssao *in,
-    Ssao *out);
+void box_render_gtao_settings(
+    const Gtao *in,
+    Gtao *out);
 
 /** Resolve the settings of a fog pass.
  *
@@ -1953,7 +1960,7 @@ void box_render_tonemap_tony(
  *
  * @param p The packet
  * @param handle Handle of the shader
- * @return Whether a pass of a view uses the shader
+ * @return Whether a pass of a view uses the shader, or a view applies Gtao
  */
 bool box_render_effects_use(
     const box_render_packet_t *p,

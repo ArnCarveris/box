@@ -692,7 +692,8 @@ WGPUBindGroup box_gpu_light_group_with(
     const box_render_view_t *v,
     WGPUBuffer uniforms,
     WGPUBuffer clusters,
-    WGPUTextureView shadow)
+    WGPUTextureView shadow,
+    WGPUTextureView ao)
 {
     uint64_t size = 0;
     WGPUBuffer lights = box_gpu_light_binding(gpu, v, &size);
@@ -701,7 +702,7 @@ WGPUBindGroup box_gpu_light_group_with(
     cube = cube ? cube : gpu->no_reflection;
     box_gpu_buffer_t *clips = ecs_map_get_deref(
         &gpu->buffers, box_gpu_buffer_t, BOX_RENDER_BUFFER_CLIPS);
-    WGPUBindGroupEntry entries[14] = {
+    WGPUBindGroupEntry entries[15] = {
         { .binding = 0, .buffer = uniforms, .size = sizeof(box_gpu_view_uniforms_t) },
         { .binding = 1, .buffer = lights, .size = size },
         { .binding = 2, .buffer = clusters, .size = wgpuBufferGetSize(clusters) },
@@ -719,13 +720,14 @@ WGPUBindGroup box_gpu_light_group_with(
             .binding = 11,
             .buffer = clips ? clips->buffer : gpu->no_clips,
             .size = clips ? clips->size : sizeof(box_render_clip_t)
-        }
+        },
+        [14] = { .binding = 14, .textureView = ao ? ao : box_gpu_gtao_white(gpu) }
     };
     box_gpu_atmosphere_bindings(gpu, t, v, &entries[9]);
     box_gpu_environment_bindings(gpu, t ? v : NULL, &entries[12]);
     WGPUBindGroupDescriptor desc = {
         .layout = gpu->view_layout,
-        .entryCount = 14,
+        .entryCount = 15,
         .entries = entries
     };
 
@@ -736,10 +738,11 @@ WGPUBindGroup box_gpu_light_group(
     box_gpu_t *gpu,
     const box_gpu_target_t *t,
     const box_render_view_t *v,
-    int32_t slot)
+    int32_t slot,
+    WGPUTextureView ao)
 {
     return box_gpu_light_group_with(gpu, t, v, gpu->view_buffer,
-        box_gpu_cluster_buffer(gpu, t, v), box_gpu_shadow_binding(gpu, v));
+        box_gpu_cluster_buffer(gpu, t, v), box_gpu_shadow_binding(gpu, v), ao);
 }
 
 void box_gpu_light_purge(
