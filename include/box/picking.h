@@ -114,6 +114,30 @@ ECS_STRUCT(PickStatus, {
     PointerCursor shape;  /**< Shape of the pointer cursor, from the Cursor on the path of target */
 });
 
+/** Get the world space ray through the cursor in a view, the ray picking casts in it.
+ *
+ * It follows only the camera of the view and the cursor of its surface (PickStatus.cursor), not
+ * what the pick hit, InputBlockers or the views drawn over it, so an application can meet it
+ * with its own geometry, such as the ground under the buildings of a scene or under a HUD.
+ *
+ * A view covers its whole surface, with a perspective or orthographic camera. Picking runs in
+ * PreUpdate, so the systems of later phases get the ray of the cursor of the frame.
+ *
+ * @param world The world
+ * @param view The view, an entity with View
+ * @param origin Receives the point of the cursor on the near plane of the camera in world space,
+ * unchanged when the function returns false
+ * @param dir Receives the unit direction of the ray into the scene, unchanged on false
+ * @return false when the view has no camera, its surface is not the one the cursor is on (see
+ * Input.surface) or renders into a texture, no pointer event has arrived yet, or the cursor is
+ * outside the view
+ */
+bool box_view_cursor_ray(
+    const ecs_world_t *world,
+    ecs_entity_t view,
+    vec3 origin,
+    vec3 dir);
+
 /** Register the box.picking module.
  *
  * Also registers the async script function flecs.script.on.scroll(target), which resolves

@@ -168,6 +168,17 @@
                 ]
             },
             {
+                "id": "CursorRay",
+                "testcases": [
+                    "perspective_center",
+                    "perspective_corner",
+                    "orthographic",
+                    "ground_behind_shape",
+                    "ui_view_over",
+                    "no_ray"
+                ]
+            },
+            {
                 "id": "TextSpans",
                 "testcases": [
                     "glyph_to_color",

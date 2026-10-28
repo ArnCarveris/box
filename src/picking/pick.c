@@ -1106,6 +1106,19 @@ static int32_t box_pick_views(
     return count;
 }
 
+/** Check whether a cursor is on a surface, edges included.
+ *
+ * @param s The surface
+ * @param cursor Cursor in points of the surface, origin at the top left
+ * @return Whether the cursor is on the surface
+ */
+static bool box_pick_inside(
+    const box_pick_surface_t *s,
+    const vec2 cursor)
+{
+    return cursor[0] >= 0 && cursor[1] >= 0 && cursor[0] <= s->width && cursor[1] <= s->height;
+}
+
 /** Pick through the views of a surface, the last rendered first.
  *
  * @param world The world
@@ -1209,7 +1222,7 @@ static bool box_pick_surface(
     ecs_entity_t views[BOX_PICK_VIEW_MAX];
     bool result = false;
     int32_t i, count;
-    if (cursor[0] < 0 || cursor[1] < 0 || cursor[0] > s->width || cursor[1] > s->height) {
+    if (!box_pick_inside(s, cursor)) {
         goto done;
     }
 
@@ -1294,6 +1307,40 @@ int32_t box_pick_input_views(
     box_pick_input_surface(world, st, &s);
 
     return box_pick_views(world, st, &s, out);
+}
+
+bool box_pick_cursor_ray(
+    const ecs_world_t *world,
+    box_pick_state_t *st,
+    ecs_entity_t view,
+    vec3 origin,
+    vec3 dir)
+{
+    ecs_entity_t views[BOX_PICK_VIEW_MAX];
+    box_pick_surface_t s;
+    box_pick_ray_t ray;
+    bool result = false;
+    int32_t i, count;
+    if (!st->has_cursor || !view || !ecs_is_alive(world, view)) {
+        goto done;
+    }
+
+    box_pick_input_surface(world, st, &s);
+    if (!box_pick_inside(&s, st->cursor)) {
+        goto done;
+    }
+
+    count = box_pick_views(world, st, &s, views);
+    for (i = 0; i < count && views[i] != view; i ++) { }
+    if (i == count || !box_pick_view_ray(world, view, &s, st->cursor, &ray)) {
+        goto done;
+    }
+
+    glm_vec3_copy(ray.origin, origin);
+    glm_vec3_copy(ray.dir, dir);
+    result = true;
+done:
+    return result;
 }
 
 /** Find where the ray of a cursor meets the plane of an entity.
