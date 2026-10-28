@@ -1,0 +1,128 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.layout
+using box.projection
+
+world_camera {
+  Position: {0, 4, 10}
+  Rotation: {-0.35, 0, 0}
+  Camera: {fov: 50}
+}
+
+world_view {
+  View: {camera: world_camera, clear: {enabled: true, color: {30, 40, 70, 255}}}
+}
+
+floor {
+  Position: {0, -0.1, -6}
+  Box: {30, 0.2, 30}
+  Rgb: {120, 128, 110}
+}
+
+house {
+  Position: {-3, 1, 3}
+  Box: {2, 2, 2}
+  Rgb: {200, 170, 90}
+}
+
+tower {
+  Position: {2, 1.5, -3}
+  Box: {2, 3, 2}
+  Rgb: {170, 90, 70}
+}
+
+hall {
+  Position: {-1, 1, -14}
+  Box: {4, 2, 3}
+  Rgb: {90, 140, 200}
+}
+
+ghost {
+  Position: {0, 1, 14}
+  Box: {1, 1, 1}
+  Rgb: {255, 255, 255}
+}
+
+ui {
+  Scene: {}
+
+  camera {
+    Position: {0, 0, 100}
+    Camera: {ortho: true, ortho_scale: 1}
+  }
+
+  house_bar {
+    ProjectedAnchor: {target: house, view: world_view}
+    ProjectedBox: {min: {-1, -1, -1}, max: {1, 1, 1}, offset: {0, 10}, fit_width: true}
+    Layout: {direction: Row, padding: {1, 1, 1, 1}}
+    LayoutItem: {width: {mode: Fixed}, height: {mode: Fixed, value: 8}}
+    Rect: {1, 8}
+    Rgb: {20, 20, 24}
+
+    fill {
+      Position: {0, 0, 1}
+      LayoutItem: {width: {mode: Grow, value: 0.8}, height: {mode: Grow}}
+      Rect: {1, 1}
+      Rgb: {80, 220, 90}
+    }
+
+    empty {
+      LayoutItem: {width: {mode: Grow, value: 0.2}, height: {mode: Grow}}
+    }
+  }
+
+  tower_bar {
+    ProjectedAnchor: {target: tower, view: world_view}
+    ProjectedBox: {min: {-1, -1.5, -1}, max: {1, 1.5, 1}, offset: {0, 10}, fit_width: true}
+    Layout: {direction: Row, padding: {1, 1, 1, 1}}
+    LayoutItem: {width: {mode: Fixed}, height: {mode: Fixed, value: 8}}
+    Rect: {1, 8}
+    Rgb: {20, 20, 24}
+
+    fill {
+      Position: {0, 0, 1}
+      LayoutItem: {width: {mode: Grow, value: 0.5}, height: {mode: Grow}}
+      Rect: {1, 1}
+      Rgb: {240, 200, 40}
+    }
+
+    empty {
+      LayoutItem: {width: {mode: Grow, value: 0.5}, height: {mode: Grow}}
+    }
+  }
+
+  hall_bar {
+    ProjectedAnchor: {target: hall, view: world_view}
+    ProjectedBox: {min: {-2, -1, -1.5}, max: {2, 1, 1.5}, offset: {0, 10}, fit_width: true}
+    Layout: {direction: Row, padding: {1, 1, 1, 1}}
+    LayoutItem: {width: {mode: Fixed}, height: {mode: Fixed, value: 8}}
+    Rect: {1, 8}
+    Rgb: {20, 20, 24}
+
+    fill {
+      Position: {0, 0, 1}
+      LayoutItem: {width: {mode: Grow, value: 0.25}, height: {mode: Grow}}
+      Rect: {1, 1}
+      Rgb: {230, 60, 50}
+    }
+
+    empty {
+      LayoutItem: {width: {mode: Grow, value: 0.75}, height: {mode: Grow}}
+    }
+  }
+
+  ghost_bar {
+    ProjectedAnchor: {target: ghost, view: world_view}
+    ProjectedBox: {min: {-0.5, -0.5, -0.5}, max: {0.5, 0.5, 0.5}, offset: {0, 10}, fit_width: true}
+    LayoutItem: {width: {mode: Fixed}, height: {mode: Fixed, value: 8}}
+    Rect: {1, 8}
+    Rgb: {255, 0, 255}
+  }
+}
+
+ui_view {
+  View: {camera: ui.camera, lighting: {enabled: false}}
+}

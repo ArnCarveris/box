@@ -35,7 +35,15 @@
                     "deleted_target_hidden",
                     "from_script",
                     "drawn_at_projection",
-                    "transformed_once_per_frame"
+                    "transformed_once_per_frame",
+                    "box_perspective",
+                    "box_camera_moves",
+                    "box_fit_width",
+                    "box_fit_height",
+                    "box_behind_camera",
+                    "box_off_screen",
+                    "box_removed",
+                    "box_from_script"
                 ]
             }
         ]
