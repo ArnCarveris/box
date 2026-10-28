@@ -1,0 +1,3 @@
+include gantry
+
+component { ServiceGantry: {} }

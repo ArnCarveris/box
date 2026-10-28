@@ -13,7 +13,7 @@ ship_plate_normal { TexturePath: {path: "etc/scenes/spaceship/assets/normal.png"
 ship_registry { TexturePath: {path: "etc/scenes/spaceship/assets/registry.svg", width: 2048} }
 ship_warning { TexturePath: {path: "etc/scenes/spaceship/assets/hazard.svg", width: 512} }
 ship_display { TexturePath: {path: "etc/scenes/spaceship/assets/display.svg", width: 512} }
-prefab HullArmor { Rgb: {155, 173, 178}; PbrMaterial: {metallic: 0.62, roughness: 0.68}; PbrTextures: {albedo: ship_plate_color, orm: ship_plate_orm, normal: ship_plate_normal} }
+prefab HullArmor { Rgb: {155, 173, 178}; PbrMaterial: {metallic: 0.62, roughness: 0.68}; PbrTextures: {orm: ship_plate_orm} }
 prefab PaleArmor { Rgb: {204, 214, 207}; PbrMaterial: {metallic: 0.45, roughness: 0.54} }
 prefab DarkArmor { Rgb: {39, 54, 65}; PbrMaterial: {metallic: 0.7, roughness: 0.63} }
 prefab RecessMetal { Rgb: {12, 22, 30}; PbrMaterial: {metallic: 0.55, roughness: 0.8} }
@@ -25,3 +25,11 @@ prefab AmberLight { Rgb: {245, 137, 45}; Emissive: {strength: 3, color: {255, 13
 prefab WhiteLight { Rgb: {175, 218, 230}; Emissive: {strength: 2.5, color: {195, 230, 255}} }
 
 dock_registry { TexturePath: {path: "etc/scenes/spaceship/assets/dock_registry.svg", width: 1024} }
+
+prefab ServiceTeal { Rgb: {42, 103, 112}; PbrMaterial: {metallic: 0.45, roughness: 0.6} }
+prefab CeramicArmor { Rgb: {179, 191, 184}; PbrMaterial: {metallic: 0.25, roughness: 0.72} }
+prefab ReplacementArmor { Rgb: {94, 119, 132}; PbrMaterial: {metallic: 0.65, roughness: 0.48} }
+dock_deck_fuel { TexturePath: {path: "etc/scenes/spaceship/assets/deck_fuel.svg", width: 1024} }
+dock_deck_power { TexturePath: {path: "etc/scenes/spaceship/assets/deck_power.svg", width: 1024} }
+dock_deck_cargo { TexturePath: {path: "etc/scenes/spaceship/assets/deck_cargo.svg", width: 1024} }
+dock_deck_repair { TexturePath: {path: "etc/scenes/spaceship/assets/deck_repair.svg", width: 1024} }

@@ -10,7 +10,7 @@ using box.light
 template FrigateRadiator {
   prop width: f32 = 5
   prop length: f32 = 12
-  backing : RecessMetal { Box: {width, 0.4, length} }
+  backing : RecessMetal { Position: {}; Box: {width, 0.4, length} }
   fins {
     Array: {axis: Z, count: 22, spacing: length / 23}
     Align: {target: backing, self: {y: Min}, other: {y: Max}}
@@ -25,7 +25,7 @@ template FrigateRadiator {
   headers {
     Align: {target: backing, self: {y: Min}, other: {y: Max}}
     Array: {axis: Z, count: 2, spacing: length - 0.42}
-    header : DarkArmor {
+    header : DarkArmor { Position: {};
       Box: {width + 0.5, 0.48, 0.38}
       shield : PaleArmor { Box: {width - 0.2, 0.12, 0.26}; Position: {0, 0.3, 0} }
       for k in 0..4 {
@@ -43,7 +43,7 @@ template FrigateRadiator {
       clips {
         Position: {(side - 0.5) * (width + 0.3), 0.15, -length * 0.32}
         Array: {axis: Z, count: 4, spacing: length * 0.21}
-        clip : DarkArmor { Box: {0.4, 0.38, 0.15} }
+        clip : DarkArmor { Position: {}; Box: {0.4, 0.38, 0.15} }
       }
     }
   }

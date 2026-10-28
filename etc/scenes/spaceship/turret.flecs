@@ -8,7 +8,7 @@ using box.light
 
 @tree Parent
 template FrigateTurret {
-  pedestal : DarkArmor { Cylinder: {radius: 2.6, length: 0.7, segments: 12} }
+  pedestal : DarkArmor { Position: {}; Cylinder: {radius: 2.6, length: 0.7, segments: 12} }
   race : Titanium { Position: {0, 0.48, 0}; Tube: {radius: 2.3, thickness: 0.15, length: 0.3, segments: 24} }
   body : HullArmor { Position: {0, 1.2, 0}; BeveledPrism: {footprint: [{-2, -2}, {2, -2}, {1.7, 2.5}, {-1.7, 2.5}], depth: 1.8, inset: 0.4, bevel: 0.3} }
   for i in 0..2 {
@@ -36,7 +36,7 @@ template FrigateTurret {
       barrel_rings { Position: {(side - 0.5) * 1.6, 1.2, 3.2}; Array: {axis: Z, count: 5, spacing: 0.35}; collar : Titanium { Rotation: {1.5707963, 0, 0}; Tube: {radius: 0.44, thickness: 0.08, length: 0.12, segments: 8} } }
     }
   }
-  rear_vents { Position: {-0.9, 1.3, -2.04}; Array: {axis: X, count: 7, spacing: 0.3}; vane : RecessMetal { Box: {0.12, 0.5, 0.08} } }
+  rear_vents { Position: {-0.9, 1.3, -2.04}; Array: {axis: X, count: 7, spacing: 0.3}; vane : RecessMetal { Position: {}; Box: {0.12, 0.5, 0.08} } }
   hatch : DarkArmor { Position: {0, 2.32, -0.7}; Cylinder: {radius: 0.48, length: 0.1, segments: 8} }
   hatch_handle : Titanium { Align: {target: hatch, self: {y: Min}, other: {y: Max}}; Box: {0.35, 0.1, 0.08} }
 

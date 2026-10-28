@@ -1,4 +1,5 @@
 include catwalk
+include dock_equipment
 using flecs.script
 using box.transform
 using box.geometry
@@ -9,6 +10,7 @@ using box.light
 
 @tree Parent
 template DockModule {
+  prop bay: i32 = 0
   for side in 0..2 {
     {
       const x = (side - 0.5) * 39
@@ -47,27 +49,65 @@ template DockModule {
       }
     }
   }
-  core : RecessMetal { Box: {27, 7, 24} }
+  core : RecessMetal { Position: {}; Box: {27, 7, 24} }
   cap : DarkArmor { Box: {1, 0.8, 1}; Fit: {target: core, axes: XZ, padding: {0.5, 0, 0.5}}; Align: {target: core, self: {y: Min}, other: {y: Max}} }
-  for row in 0..7 {
+  deck : DarkArmor { Position: {0, 4.15, 0}; Box: {27, 0.25, 24} }
+  for i in 0..5 {
     {
-      for col in 0..9 {
+      seam : Titanium { Position: {-12 + i * 6, 4.3, 0}; Box: {0.04, 0.02, 23} }
+    }
+  }
+  for side in 0..2 {
+    {
+      lane : DockYellow { Position: {(side - 0.5) * 25, 4.32, 0}; Box: {0.16, 0.03, 23} }
+      pipe : ServiceTeal { Position: {(side - 0.5) * 32, -2.8, 0}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 0.7, length: 30.5, segments: 12} }
+      for j in 0..4 {
         {
-          roof { HullPanel: {width: 2.8, length: 2.8}; Position: {-12 + col * 3, 4.4, -9 + row * 3} }
+          coupling : Titanium { Position: {(side - 0.5) * 32, -2.8, -12 + j * 8}; Rotation: {1.5707963, 0, 0}; Tube: {radius: 0.88, thickness: 0.2, length: 0.4, segments: 12} }
         }
       }
     }
   }
-  for i in 0..6 {
-    {
-      coolant : Titanium { Position: {-12 + i * 4.8, -4, 0}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 0.55, length: 25, segments: 12} }
-      pump : DockYellow { Position: {-12 + i * 4.8, -4, 8}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 0.95, length: 3, segments: 12} }
-      utility : DarkArmor { Position: {-12 + i * 4.8, 6.5, 5}; Box: {3.4, 3.5, 4.4} }
-      vent { FrigateRadiator: {width: 2.8, length: 3.8}; Position: {-12 + i * 4.8, 8.3, 5} }
-      warning { Position: {-12 + i * 4.8, 6.4, 7.24}; Quad: {2.4, 0.5}; Rgb: {255, 255, 255}; PbrTextures: {albedo: ship_warning} }
+  if bay == 0 {
+    fuel_markings { Position: {0, 4.34, 0}; Rotation: {-1.5707963, 0, 0}; Quad: {27, 24}; Rgb: {255, 255, 255}; PbrTextures: {albedo: dock_deck_fuel}; PbrMaterial: {roughness: 0.85}; AlphaCutoff: {0.5}; NoShadow }
+    tank_a { DockTank: {}; Position: {-6, 4.4, -3} }
+    tank_b { DockTank: {}; Position: {2, 4.4, 1} }
+    pump { DockPower: {}; Position: {0, 4.7, 9}; Scale: {0.6, 0.6, 0.6} }
+    technician { DockCrew: {suit: {180, 206, 210}}; Position: {-8, 4.4, 5} }
+  }
+  if bay == 1 {
+    power_markings { Position: {0, 4.34, 0}; Rotation: {-1.5707963, 0, 0}; Quad: {27, 24}; Rgb: {255, 255, 255}; PbrTextures: {albedo: dock_deck_power}; PbrMaterial: {roughness: 0.85}; AlphaCutoff: {0.5}; NoShadow }
+    power { DockPower: {}; Position: {-5, 4.7, -5} }
+    power_b { DockPower: {}; Position: {5, 4.7, 5}; Rotation: {0, 3.1415927, 0} }
+    spool : RustRed { Position: {5, 6, -6}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 1.5, length: 2.5, segments: 16} }
+    for end in 0..2 {
+      {
+        flange : DockYellow { Position: {5, 6, -6 + (end - 0.5) * 2.5}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 2, length: 0.2, segments: 16} }
+      }
     }
   }
+  if bay == 2 {
+    cargo_markings { Position: {0, 4.34, 0}; Rotation: {-1.5707963, 0, 0}; Quad: {27, 24}; Rgb: {255, 255, 255}; PbrTextures: {albedo: dock_deck_cargo}; PbrMaterial: {roughness: 0.85}; AlphaCutoff: {0.5}; NoShadow }
+    cargo_a { DockCargo: {length: 9}; Position: {-7, 4.4, -4} }
+    cargo_b { DockCargo: {length: 6, color: {70, 113, 125}}; Position: {-7, 9, -4} }
+    cargo_c { DockCargo: {length: 6, color: {187, 170, 118}}; Position: {0, 4.4, -5} }
+    tug { DockTug: {}; Position: {7, 4.4, 6}; Rotation: {0, 0.35, 0} }
+    marshal { DockCrew: {}; Position: {3, 4.4, 8}; Rotation: {0, 1.2, 0} }
+  }
+  if bay == 3 {
+    repair_markings { Position: {0, 4.34, 0}; Rotation: {-1.5707963, 0, 0}; Quad: {27, 24}; Rgb: {255, 255, 255}; PbrTextures: {albedo: dock_deck_repair}; PbrMaterial: {roughness: 0.85}; AlphaCutoff: {0.5}; NoShadow }
+    bench : Titanium { Position: {-3, 5.6, -4}; Box: {12, 0.4, 5} }
+    for side in 0..2 {
+      {
+        leg : DarkArmor { Position: {-3 + (side - 0.5) * 10, 4.9, -4}; Box: {0.5, 1.4, 4} }
+      }
+    }
+    spare : ReplacementArmor { Position: {-3, 6.4, -4}; Rotation: {0, 0, 1.5707963}; Tube: {radius: 2, thickness: 0.5, length: 7, segments: 16} }
+    crate { DockCargo: {length: 4, color: {72, 110, 122}}; Position: {7, 4.4, -6}; Scale: {0.65, 0.65, 0.65} }
+    mechanic { DockCrew: {}; Position: {-3, 4.4, 0}; Rotation: {0, 3.1415927, 0} }
+    supervisor { DockCrew: {suit: {170, 198, 200}}; Position: {0, 4.4, 2}; Rotation: {0, -2.3, 0} }
+  }
   floodbar : DarkArmor { Position: {-15, 10, -8}; Rotation: {0, 0, -0.4}; Box: {1, 5, 8} }
-  floodface : WhiteLight { Position: {-15.55, 10.2, -8}; Rotation: {0, 0, -0.4}; Box: {0.15, 3, 6} }
+  floodface : WhiteLight { Position: {-15.55, 10.2, -8}; Rotation: {0, 0, -0.4}; Box: {0.15, 3, 6}; Emissive: {strength: 1.2, color: {195, 230, 255}} }
   worklight { Position: {-17, 11, -8}; PointLight: {intensity: 380, range: 40}; Rgb: {176, 215, 245} }
 }

@@ -475,7 +475,7 @@ uvs: [{-0.522, -4.25},
         cassettes {
           Array: {axis: Z, count: 9, spacing: 2.1}
           Align: {target: service_spine}
-          cassette : DarkArmor {
+          cassette : DarkArmor { Position: {};
             Box: {0.65, 3.2, 1.8}
             lock : Titanium { Position: {(side - 0.5) * 0.76, 0, 0}; Box: {0.12, 1.8, 0.22} }
             indicator : AmberLight { Position: {(side - 0.5) * 0.78, 1.1, 0}; Box: {0.08, 0.12, 0.5} }
@@ -494,7 +494,7 @@ uvs: [{-0.522, -4.25},
       nozzle_actuator {
         Position: {math.sin(a) * 6.65, math.cos(a) * 6.65, -30.2}
         Rotation: {0, 0, -a}
-        collar : DarkArmor { Box: {0.85, 0.7, 1.2} }
+        collar : DarkArmor { Position: {}; Box: {0.85, 0.7, 1.2} }
         ram : Titanium { Position: {0, 0, -2}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 0.18, length: 3.1, segments: 8} }
         clevis : DarkArmor { Position: {0, 0, -3.5}; Box: {0.65, 0.58, 0.6} }
         hinge : Titanium { Position: {0, 0, -3.5}; Rotation: {0, 0, 1.5707963}; Cylinder: {radius: 0.18, length: 0.84, segments: 8} }
