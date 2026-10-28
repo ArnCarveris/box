@@ -17,6 +17,9 @@
 /** Most slots one 2D draw holds, so the ordered cull pass splits long runs over workgroups */
 #define BOX_DRAWS_RUN_MAX (512)
 
+/** Ranks a shape or glyphs may keep above twice the count of the ranks before it in its tree */
+#define BOX_DRAWS_RANK_SLACK (16)
+
 void box_draws_order_init(
     box_render_draws_t *d)
 {
@@ -363,6 +366,26 @@ done:
     return;
 }
 
+/** Give the next shape or glyphs of a tree a rank: the rank it had while that is above the
+ * ranks before it and at most twice their count plus BOX_DRAWS_RANK_SLACK, else the next one.
+ * Keeping ranks leaves the shading of the rest of a tree as it is when a slot leaves it.
+ *
+ * @param tree The ranks of the tree: the next free rank in the low and the count of the ranks
+ * given in the high 32 bits
+ * @param old The rank the shape or glyphs had
+ * @return The rank
+ */
+static uint32_t box_draws_rank_next(
+    ecs_map_val_t *tree,
+    uint32_t old)
+{
+    uint32_t next = (uint32_t)*tree, count = (uint32_t)(*tree >> 32);
+    uint32_t result = old >= next && old <= 2 * count + BOX_DRAWS_RANK_SLACK ? old : next;
+    *tree = ((uint64_t)(count + 1) << 32) | (result + 1);
+
+    return result;
+}
+
 /** Write the rank of a 2D slot into its shading when it changed.
  *
  * @param b The batch
@@ -382,8 +405,8 @@ static void box_draws_rank_write(
 }
 
 /** Make the runs: the shape slot and then the glyph slots of every entity in order. Rank the
- * shape and the glyphs of every entity in the order of its tree, the floating elements of a tree
- * after the rest of it, and write the ranks that changed.
+ * shape and the glyphs of every entity in the order of its tree (box_draws_rank_next), the
+ * floating elements of a tree after the rest of it, and write the ranks that changed.
  *
  * @param world The world
  * @param d The state
@@ -402,12 +425,12 @@ static void box_draws_order_runs(
             continue;
         }
 
-        ecs_map_val_t *next = ecs_map_ensure(&d->tree_ranks, order[i].tree);
+        ecs_map_val_t *tree = ecs_map_ensure(&d->tree_ranks, order[i].tree);
         DrawSlot *s = ecs_get_mut(world, e, DrawSlot);
         if (s && s->batch >= 0 &&
             box_draws_batch(d, s->batch)->key.pipeline == BOX_RENDER_SHADER_SHAPE2D)
         {
-            s->rank = (uint32_t)(*next) ++;
+            s->rank = box_draws_rank_next(tree, s->rank);
             box_draws_run_add(d, s->batch, s->slot);
             box_draws_rank_write(box_draws_batch(d, s->batch), s->slot, s->rank);
         }
@@ -415,7 +438,7 @@ static void box_draws_order_runs(
         TextSlots *ts = ecs_get_mut(world, e, TextSlots);
         int32_t glyphs = ts ? ecs_vec_count(&ts->slots) : 0;
         if (glyphs) {
-            ts->rank = (uint32_t)(*next) ++;
+            ts->rank = box_draws_rank_next(tree, ts->rank);
         }
 
         for (g = 0; g < glyphs; g ++) {

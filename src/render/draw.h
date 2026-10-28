@@ -142,7 +142,7 @@ typedef struct box_draw_glyph_slot_t {
 /** Slots of the glyphs of a Text, one per glyph of its TextGlyphs, added with every Text */
 typedef struct TextSlots {
     ecs_vec_t slots; /**< box_draw_glyph_slot_t */
-    uint32_t rank;   /**< Rank of the glyphs in the draw order of the tree of the Text, one above
+    uint32_t rank;   /**< Rank of the glyphs in the draw order of the tree of the Text, above
                       *   the shape of its entity */
 } TextSlots;
 
@@ -303,7 +303,8 @@ typedef struct box_render_draws_t {
     ecs_map_t ranks;            /**< Child to its rank, while the order is made */
     ecs_map_t parents;          /**< Parents whose children have a rank, while the order is made */
     ecs_map_t order_z;          /**< Entity of a path to the z key it was ordered by */
-    ecs_map_t tree_ranks;       /**< Tree of the order to its next rank, while the runs are made */
+    ecs_map_t tree_ranks;       /**< Tree of the order to its next rank and its count of ranks,
+                                 *   while the runs are made */
     const void *backend;        /**< Context of the backend the GPU state was sent to */
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
     int32_t generation;         /**< Generation of that backend, see box_render_backend_t */
@@ -845,17 +846,12 @@ void box_draws_order_slot(
 /** Bring the draw order of the 2D slots up to date.
  *
  * 2D shapes and glyphs draw in hierarchy order, not by view depth: parents before children,
- * siblings by Position z, then OrderedChildren order or entity id, a shape before its glyphs.
+ * siblings by Position z, then OrderedChildren order or entity id, a shape before its glyphs. New
+ * entities, hierarchy, z or child order changes make the order again, moved slots only the runs.
  *
- * The order is made again when an entity got 2D slots, the hierarchy or the z of an entity in
- * it changed, or an OrderedChildren parent reordered its children; moved slots only make the
- * runs again.
- *
- * Making the runs also ranks the shapes and glyphs of every tree (box_draw_order_t) in their
- * order from 0, the glyphs of an entity one above its shape, and writes a changed rank into the
- * shading of the slots (ids[1]). The 2D shader lifts the depth of an instance by its rank, so an
- * element wins the depth test over the coplanar elements of its tree drawn before it, whose
- * interpolated depths round differently when the plane is rotated in perspective.
+ * Making the runs ranks the shapes and glyphs of every tree (box_draw_order_t) along the order
+ * into their shading (ids[1]) with box_draws_rank_next. The 2D shader lifts the depth of each by
+ * its rank over the coplanar elements of its tree drawn before it, at any angle in perspective.
  *
  * @param world The world
  * @param d The state

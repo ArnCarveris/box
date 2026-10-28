@@ -521,6 +521,7 @@
                     "coplanar_siblings_in_perspective",
                     "coplanar_sibling_over_descendants",
                     "coplanar_glyphs_in_perspective",
+                    "coplanar_float_in_perspective",
                     "coplanar_siblings_depth_with_3d_shapes",
                     "edges_crisp_at_any_scale",
                     "edges_crisp_in_perspective",

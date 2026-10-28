@@ -556,13 +556,40 @@ typedef enum Shapes2D_siblings_t {
     Shapes2DGroove,     /**< A red groove, then the smaller green fill over it */
     Shapes2DNested,     /**< A red groove with a yellow child, then the green fill over both */
     Shapes2DTextAlone,  /**< A white text alone, the mask of its pixels */
-    Shapes2DText        /**< A red rect, then a white text over it */
+    Shapes2DText,       /**< A red rect, then a white text over it */
+    Shapes2DFloatAlone, /**< The green fill floating (LayoutFloat) alone, the mask of its pixels */
+    Shapes2DFloat       /**< The floating green fill, then a red groove that it stays over */
 } Shapes2D_siblings_t;
 
+/** Add a rect in the plane of its parent.
+ *
+ * @param world The world
+ * @param parent The parent
+ * @param x Its x position
+ * @param w Its width
+ * @param h Its height
+ * @param rgb Its color as 0xRRGGBB
+ * @return The rect
+ */
+static ecs_entity_t Shapes2D_child(
+    ecs_world_t *world,
+    ecs_entity_t parent,
+    float x,
+    float w,
+    float h,
+    uint32_t rgb)
+{
+    ecs_entity_t e = ecs_new_w_pair(world, EcsChildOf, parent);
+    ecs_set(world, e, Position, {x, 0, 0});
+    ecs_set(world, e, Rect, {w, h});
+    ecs_set(world, e, Rgb, {(uint8_t)(rgb >> 16), (uint8_t)(rgb >> 8), (uint8_t)rgb});
+
+    return e;
+}
+
 /** Make a world with a perspective camera at the origin and a blue 300x120 panel turned toward
- * it like the panel of ui_world_widgets, scaled with its distance so it covers the same part of
- * the image, holding coplanar overlapping children of different sizes like the groove and fill
- * of a Slider.
+ * it like the panel of ui_world_widgets, scaled with its distance to cover the same part of the
+ * image, holding coplanar overlapping children of different sizes like a Slider's groove and fill.
  *
  * @param dist The distance of the panel from the camera
  * @param mode The children of the panel
@@ -590,24 +617,21 @@ static ecs_world_t* Shapes2D_siblings_world(
     ecs_set(world, panel, Scale, {0.003f * dist, 0.003f * dist, 0.003f * dist});
     ecs_set(world, panel, Rect, {300, 120});
     ecs_set(world, panel, Rgb, {0, 0, 255});
-    if (mode == Shapes2DGroove || mode == Shapes2DNested) {
-        ecs_entity_t g = ecs_new_w_pair(world, EcsChildOf, panel);
-        ecs_set(world, g, Position, {0, 0, 0});
-        ecs_set(world, g, Rect, {260, 40});
-        ecs_set(world, g, Rgb, {255, 0, 0});
+    bool floats = mode == Shapes2DFloatAlone || mode == Shapes2DFloat;
+    if (floats) {
+        ecs_entity_t fill = Shapes2D_child(world, panel, -40, 180, 40, 0x00FF00);
+        ecs_set(world, fill, LayoutFloat, {0});
+    }
+
+    if (mode == Shapes2DGroove || mode == Shapes2DNested || mode == Shapes2DFloat) {
+        ecs_entity_t g = Shapes2D_child(world, panel, 0, 260, 40, 0xFF0000);
         if (mode == Shapes2DNested) {
-            ecs_entity_t mark = ecs_new_w_pair(world, EcsChildOf, g);
-            ecs_set(world, mark, Position, {-20, 0, 0});
-            ecs_set(world, mark, Rect, {200, 30});
-            ecs_set(world, mark, Rgb, {255, 255, 0});
+            Shapes2D_child(world, g, -20, 200, 30, 0xFFFF00);
         }
     }
 
     if (mode == Shapes2DText) {
-        ecs_entity_t back = ecs_new_w_pair(world, EcsChildOf, panel);
-        ecs_set(world, back, Position, {0, 0, 0});
-        ecs_set(world, back, Rect, {280, 110});
-        ecs_set(world, back, Rgb, {255, 0, 0});
+        Shapes2D_child(world, panel, 0, 280, 110, 0xFF0000);
     }
 
     if (mode == Shapes2DText || mode == Shapes2DTextAlone) {
@@ -616,11 +640,8 @@ static ecs_world_t* Shapes2D_siblings_world(
         ecs_set(world, label, Text, {.value = "HHH", .size = 60,
             .font = ecs_lookup(world, "box.text.DefaultFont")});
         ecs_set(world, label, Rgb, {255, 255, 255});
-    } else {
-        ecs_entity_t fill = ecs_new_w_pair(world, EcsChildOf, panel);
-        ecs_set(world, fill, Position, {-40, 0, 0});
-        ecs_set(world, fill, Rect, {180, 40});
-        ecs_set(world, fill, Rgb, {0, 255, 0});
+    } else if (!floats) {
+        Shapes2D_child(world, panel, -40, 180, 40, 0x00FF00);
     }
 
     return world;
@@ -651,6 +672,7 @@ static unsigned char* Shapes2D_siblings_capture(
     test_int(h, 160);
     ecs_os_free(path);
     ecs_fini(world);
+
     return px;
 }
 
@@ -725,6 +747,12 @@ void Shapes2D_coplanar_glyphs_in_perspective(void) {
     Shapes2D_siblings_check(Shapes2DTextAlone, Shapes2DText, white, 10);
 }
 
+void Shapes2D_coplanar_float_in_perspective(void) {
+    // ui/shapes_2d
+    const unsigned char green[3] = { 0, 255, 0 };
+    Shapes2D_siblings_check(Shapes2DFloatAlone, Shapes2DFloat, green, 100);
+}
+
 /** Render a turned panel at a distance of 2 with an emissive red box on the ray through the
  * center of the image, the center of the green fill.
  *
@@ -745,6 +773,7 @@ static uint32_t Shapes2D_siblings_box(
     const unsigned char *c = &px[(80 * 160 + 80) * 4];
     uint32_t result = (uint32_t)c[0] | ((uint32_t)c[1] << 8) | ((uint32_t)c[2] << 16);
     stbi_image_free(px);
+
     return result;
 }
 
