@@ -1,0 +1,105 @@
+// The items of the game except the buildings, prefabs the deposits, the inventory and the
+// recipes name. Every item has its OreItem (the name and the detail text the UI shows); the
+// ores have the mining time of a swing (OreMined), the others the recipe that crafts them
+// (OreRecipe: the inputs and their amounts, the yield of a craft and its time in seconds). The
+// buildings add their items with the same components.
+
+using oreelse
+
+items {
+  // The ores of the deposits
+  prefab Iron {
+    OreItem: {name: "Iron", detail: "Raw iron. Refines into iron plates."}
+    OreMined: {time: 4.5}
+  }
+
+  prefab Copper {
+    OreItem: {name: "Copper", detail: "Raw copper. Refines into copper plates."}
+    OreMined: {time: 6}
+  }
+
+  prefab Stone {
+    OreItem: {name: "Stone", detail: "Stone. Refines into stone bricks."}
+    OreMined: {time: 1.5}
+  }
+
+  prefab Luminite {
+    OreItem: {name: "Luminite", detail: "Precious mineral that can only be mined on this planet."}
+    OreMined: {time: 24}
+  }
+
+  // The refined materials
+  prefab IronPlate {
+    OreItem: {name: "Iron plate", detail: "Refined iron."}
+    OreRecipe: {inputs: [{item: items.Iron, amount: 2}], yield: 1, time: 0.5}
+  }
+
+  prefab CopperPlate {
+    OreItem: {name: "Copper plate", detail: "Refined copper."}
+    OreRecipe: {inputs: [{item: items.Copper, amount: 2}], yield: 1, time: 0.5}
+  }
+
+  prefab StoneBrick {
+    OreItem: {name: "Stone brick", detail: "Sturdy building material."}
+    OreRecipe: {inputs: [{item: items.Stone, amount: 2}], yield: 1, time: 0.75}
+  }
+
+  prefab Wire {
+    OreItem: {name: "Wire", detail: "A wire."}
+    OreRecipe: {inputs: [{item: items.CopperPlate, amount: 1}], yield: 2, time: 0.5}
+  }
+
+  prefab Electronics {
+    OreItem: {name: "Electronics", detail: "An electronics circuit."}
+    OreRecipe: {
+      inputs: [{item: items.Wire, amount: 2}, {item: items.CopperPlate, amount: 1}],
+      yield: 1, time: 0.5
+    }
+  }
+
+  // The rocket parts
+  prefab RocketEngine {
+    OreItem: {name: "Rocket engine", detail: "Puts rockets in orbit."}
+    OreRecipe: {
+      inputs: [{item: items.IronPlate, amount: 8}, {item: items.CopperPlate, amount: 4}],
+      yield: 1, time: 30
+    }
+  }
+
+  prefab RocketCargoBay {
+    OreItem: {
+      name: "Rocket cargo bay",
+      detail: "Can store 25 luminite. Up to 4 cargo bays per rocket."
+    }
+    OreRecipe: {
+      inputs: [{item: items.IronPlate, amount: 12}, {item: items.CopperPlate, amount: 6}],
+      yield: 1, time: 30
+    }
+  }
+
+  prefab RocketLifeSupport {
+    OreItem: {
+      name: "Rocket life support",
+      detail: "Life support module that lets you evacuate the planet in a rocket."
+    }
+    OreRecipe: {
+      inputs: [
+        {item: items.IronPlate, amount: 8},
+        {item: items.CopperPlate, amount: 8},
+        {item: items.Electronics, amount: 4}
+      ],
+      yield: 1, time: 120
+    }
+  }
+
+  prefab RocketFuelStorage {
+    OreItem: {
+      name: "Rocket fuel storage",
+      detail: "Rocket fuel. One per cargo bay or life support."
+    }
+    OreRecipe: {
+      inputs: [{item: items.IronPlate, amount: 10}, {item: items.CopperPlate, amount: 4}],
+      yield: 1, time: 30
+    }
+  }
+}
