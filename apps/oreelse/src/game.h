@@ -4,7 +4,7 @@
  *
  * The scene (apps/oreelse/etc) holds the constants cfg.*, the models, the items, the singletons
  * and the entities of a run; the systems of each area (flow.c, map.c, player.c, inventory.c,
- * mining.c, look.c) play the game.
+ * mining.c, look.c, particles.c) play the game.
  */
 
 #ifndef OREELSE_GAME_H
@@ -252,6 +252,16 @@ ECS_STRUCT(OreLook, {
     ecs_entity_t view;  /**< The world view, its shadows and effects follow the tier */
     ecs_entity_t gtao;  /**< Gtao effect of the world view */
     ecs_entity_t bloom; /**< Bloom effect of the world view */
+});
+
+/** The flash light of a play of an explosion or a combust, on the root of the instance.
+ *
+ * ore_explosion and ore_combust set it at every play, and the light of the instance (its child
+ * with an EffectFlash and a PointLight) takes the peak and the range of the play.
+ */
+ECS_STRUCT(OreBlastFlash, {
+    float peak;  /**< Intensity the flash starts at, the EffectFlash.intensity of the light */
+    float range; /**< Range of the light */
 });
 
 /** Marks an entity created by a script that sets up a run: restart() reloads the script of
@@ -517,6 +527,73 @@ bool ore_deposit_mine(
     ecs_world_t *world,
     ecs_entity_t deposit);
 
+/** Play a one shot effect template at a position, the oreBurst of the original: its sizes,
+ * speeds, spawn volumes and layer offsets at scale, unturned.
+ *
+ * @param world The world, or the stage of a system before EcsPreStore
+ * @param effect The effect template (etc/particles)
+ * @param position World position of the play
+ * @param scale Scale of the play, 0 or less for 1
+ * @return The root of the instance that plays, 0 when none does
+ */
+ecs_entity_t ore_burst(
+    ecs_world_t *world,
+    ecs_entity_t effect,
+    const vec3 position,
+    float scale);
+
+/** Play a one shot effect template turned about Y, at its size: the launch of a missile
+ * (MissileLaunch, authored along -Z) toward the aim of its turret, as the original's
+ * oreLaunchFx turns the velocities and offsets of the bursts.
+ *
+ * @param world The world, or the stage of a system before EcsPreStore
+ * @param effect The effect template
+ * @param position World position of the play
+ * @param aim Angle about Y in radians the template is turned by
+ * @return The root of the instance that plays, 0 when none does
+ */
+ecs_entity_t ore_burst_aimed(
+    ecs_world_t *world,
+    ecs_entity_t effect,
+    const vec3 position,
+    float aim);
+
+/** Play an explosion at a position, the oreExplosion of the original: the effect (BoomBurst)
+ * at scale, and its flash light at cfg.explosionPeak and cfg.explosionRange times the scale.
+ *
+ * @param world The world, or the stage of a system before EcsPreStore
+ * @param effect The effect template, BoomBurst
+ * @param position World position of the blast
+ * @param scale Scale of the blast, 0 or less for 1
+ * @return The root of the instance that plays, 0 when none does
+ */
+ecs_entity_t ore_explosion(
+    ecs_world_t *world,
+    ecs_entity_t effect,
+    const vec3 position,
+    float scale);
+
+/** Play the combust of a critter that died, the oreCombust of the original.
+ *
+ * The effect (CombustBurst, authored for radius 1) plays cfg.combustLift * r above the position,
+ * its sizes and speeds at sqrt(r) and its spawn volumes and offsets, the scale of the root, at r.
+ * The radius is clamped to cfg.combustRadiusMin and cfg.combustRadiusMax.
+ *
+ * Its flash light peaks at cfg.combustPeak * sqrt(r) and reaches cfg.combustRange +
+ * cfg.combustRangeRadius * r.
+ *
+ * @param world The world, or the stage of a system before EcsPreStore
+ * @param effect The effect template, CombustBurst
+ * @param position World position of the critter
+ * @param radius Body radius of the critter
+ * @return The root of the instance that plays, 0 when none does
+ */
+ecs_entity_t ore_combust(
+    ecs_world_t *world,
+    ecs_entity_t effect,
+    const vec3 position,
+    float radius);
+
 /** Register the game flow: states, clock, blink, toast, cancel() and restart().
  *
  * @param world The world
@@ -560,10 +637,19 @@ void ore_mining_import(
 void ore_look_import(
     ecs_world_t *world);
 
+/** Register the particle effects: the flash lights of the explosions and combusts and the
+ * script functions oreelse.explosion() and oreelse.combust().
+ *
+ * @param world The world
+ */
+void ore_particles_import(
+    ecs_world_t *world);
+
 /** Register the oreelse module.
  *
  * Registers the components, the systems of every area and the script functions
- * oreelse.seed(), oreelse.cancel(), oreelse.restart() and oreelse.cycleQuality().
+ * oreelse.seed(), oreelse.cancel(), oreelse.restart(), oreelse.cycleQuality(),
+ * oreelse.explosion() and oreelse.combust().
  *
  * @param world The world
  */

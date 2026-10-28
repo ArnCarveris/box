@@ -1,0 +1,56 @@
+// The guided missile of the missile turret, the Missile prefab of the original: a steel body
+// with an orange tip and two fins, and a glowing flame at its tail that lights what it passes.
+// Its origin is its center and it flies along +Z. The trail child is where the smoke trail
+// comes out of; the effect task gives it its emitter. OreWeapons gives the prefab its gameplay
+// data.
+
+using box.transform
+using box.geometry
+using box.material
+using box.light
+
+const missileSteel: Rgb = {198, 202, 214}
+const missileFlame: Rgb = {255, 148, 72}
+
+prefab Missile {
+  body {
+    Position: {0, 0, 0}
+    Rotation: {1.5708, 0, 0}
+    Cylinder: {segments: 8, smooth: true, length: 0.6, radius: 0.5}
+    Scale: {0.1, 1, 0.1}
+    Rgb: missileSteel
+  }
+
+  tip {
+    Position: {0, 0, 0.4}
+    Rotation: {1.5708, 0, 0}
+    Cone: {segments: 8, smooth: true, length: 0.28, radius: 0.5}
+    Scale: {0.1, 1, 0.1}
+    Rgb: missileFlame
+  }
+
+  fin_left {
+    Position: {-0.12, 0, -0.22}
+    Box: {0.16, 0.04, 0.2}
+    Rgb: missileSteel
+  }
+
+  fin_right {
+    Position: {0.12, 0, -0.22}
+    Box: {0.16, 0.04, 0.2}
+    Rgb: missileSteel
+  }
+
+  flame {
+    Position: {0, 0, -0.38}
+    Sphere: {segments: 8, smooth: true, radius: 0.12}
+    Rgb: missileFlame
+    Emissive: {strength: 3, color: missileFlame}
+    // A moving light, left out of any bake
+    PointLight: {intensity: 3, range: 6, bake: Realtime}
+  }
+
+  trail {
+    Position: {0, 0, -0.44}
+  }
+}

@@ -1,0 +1,37 @@
+// The particle effects of the original's particles.flecs and the factory's press bursts, one file
+// per effect group. pools.flecs holds the sprites and the budgets the effects share and comes
+// first.
+//
+// One shot effects are prefabs played with box_particle_burst_at, or the helpers of
+// src/particles.c (ore_burst, ore_burst_aimed, ore_explosion, ore_combust); emitter templates
+// play and stop with their ParticlePlayback.
+
+include particles/pools
+
+// One shot effects
+include particles/poof_burst
+include particles/mine_burst
+include particles/splat_burst
+include particles/combust_burst
+include particles/boom_burst
+include particles/flame_burst
+include particles/smoke_burst
+include particles/spark_burst
+include particles/foot_dust
+include particles/impact_dust
+include particles/hit_puff
+include particles/smoke_puff
+include particles/missile_launch
+include particles/press_burst
+
+// Emitter templates
+include particles/corpse_embers
+include particles/jet_plume
+include particles/muzzle_flash
+include particles/beam_glow
+include particles/beam_sparks
+include particles/deposit_sparkle
+include particles/weld_sparks
+include particles/missile_trail
+include particles/vent_steam
+include particles/drill_dust

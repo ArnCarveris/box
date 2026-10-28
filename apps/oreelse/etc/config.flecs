@@ -51,6 +51,24 @@ cfg {
   export const blinkSlow: f32 = 6
   export const lampRate: f32 = 1.4
 
+  // The flash light of an explosion (ore_explosion, BoomBurst) at scale 1: its peak intensity
+  // and its range, both times the scale of the blast. It fades to 0 over 1 / 4.5 s, the
+  // EffectFlash of BoomBurst, so it fades at 9 * 4.5 times the scale a second as the original's
+  export const explosionPeak: f32 = 9
+  export const explosionRange: f32 = 13
+
+  // The combust of a critter of body radius r (ore_combust, CombustBurst), r clamped to
+  // [combustRadiusMin, combustRadiusMax]: it plays combustLift * r above the critter's position,
+  // its sizes and speeds at sqrt(r) and its spawn volumes and offsets at r. Its flash light peaks
+  // at combustPeak * sqrt(r) and reaches combustRange + combustRangeRadius * r; it fades to 0
+  // over 1 / 7 s, the EffectFlash of CombustBurst
+  export const combustRadiusMin: f32 = 0.1
+  export const combustRadiusMax: f32 = 4
+  export const combustLift: f32 = 0.9
+  export const combustPeak: f32 = 4.5
+  export const combustRange: f32 = 3
+  export const combustRangeRadius: f32 = 4
+
   // The render quality tiers Low, Medium and High (OreQuality.tier), the quality.flecs of the
   // original: the resolution scale of the surfaces (2 renders at half the pixels), the shadow
   // map resolution and distance of the world view, and whether its Gtao and Bloom run

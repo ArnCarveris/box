@@ -20,7 +20,7 @@ bake3 run apps/oreelse --local-env -- --headless --frames 10   # headless run, e
 bake3 --target em --local-env apps/oreelse                     # build for the browser
 
 python3 tools/integration.py e2e oreelse_flow oreelse_look     # the end-to-end scenarios
-python3 tools/integration.py e2e oreelse_mining
+python3 tools/integration.py e2e oreelse_mining oreelse_particles
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -224,6 +224,40 @@ Every task of the port follows these.
 - **README**: this file describes the game like a player's manual (controls, rules); each task
   adds its mechanics to it.
 
+## Critter and projectile models
+
+The critters and projectiles are prefabs ported from the original with its names, geometry and
+colors. They carry no gameplay data and stand still: OreCritters and OreWeapons give them their
+components, the effect tasks drive their named parts. Each faces +Z.
+
+### Critters
+
+A critter's origin is between its feet on the ground. Its legs are pivots `leg_0` ... `leg_n`
+at the hips, with `OreLimb {phase, swing}` for the walk (Rotation x swings); even legs are on the
+left (+X), odd ones on the right, front to back. Each leg holds a `thigh`, a `shin` and a `foot`.
+The parts marked glowing are emissive.
+
+| Prefab | File | Legs | Parts |
+| --- | --- | --- | --- |
+| `Mite` | `etc/critters/mite.flecs` | 4 | `abdomen` (with the glowing `spark`), `thorax`, `head` (glowing `visor`, `fang_left`, `fang_right`), `antenna_left`, `antenna_right` |
+| `Skitter` | `etc/critters/skitter.flecs` | 6 | `abdomen` (`ridge`), `thorax` (`plate`), `head` (glowing `eye_left`, `eye_right`, `mandible_left`, `mandible_right`), the glowing `stinger` |
+| `Brute` | `etc/critters/brute.flecs` | 6 | `abdomen` (`spike_a`, `spike_b`), `thorax` (`carapace`), `head` (`crest`, glowing `eye_left`, `eye_right`, `mandible_left`, `mandible_right`, `tusk_left`, `tusk_right`) |
+| `Behemoth` | `etc/critters/behemoth.flecs` | 8 | `abdomen` (glowing `spot_a`, `spot_b`, `spot_c`, and `spine_left`, `spine_right`, `spine_mid`), `thorax` (glowing `flank_left`, `flank_right`), the back plates `plate_0` ... `plate_3`, `head` (`crown`, glowing `eye_0` ... `eye_4`, glowing `brow`, `mandible_left`, `mandible_right`, `tusk_left`, `tusk_right`, `horn_left`, `horn_right`) |
+
+The behemoth's back plates are pivots with `OreLimb` like the legs (a swing of 0.05), each with
+a `shell`, a `ridge`, a glowing `seam`, `barb_left` and `barb_right`. Its tusks and horns are
+turned in two axes; their angles are converted to box's Euler order (`reference/PORTING.md`).
+
+### Projectiles
+
+A projectile's origin is its center.
+
+| Prefab | File | Parts |
+| --- | --- | --- |
+| `Tracer` | `etc/projectiles/tracer.flecs` | `core`, a glowing gold streak with a point light (2.6, range 4.5) |
+| `Missile` | `etc/projectiles/missile.flecs` | `body`, `tip`, `fin_left`, `fin_right`, the glowing `flame` with a point light (3, range 6), and `trail`, the point the smoke trail comes out of |
+| `LaserBeam` | `etc/projectiles/laser_beam.flecs` | One glowing pink box, 1 unit long along Z: the laser turret places an instance halfway between its muzzle and the target, turned toward the target and scaled along Z to their distance |
+
 ## Building models
 
 The buildings are prefabs in `etc/buildings/`, one file per building, with the original's names
@@ -300,8 +334,12 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 | `etc/deposits.flecs` | The deposits of a run |
 | `etc/player.flecs` | The `Astronaut` template |
 | `etc/props/ore.flecs` | The `Ore` template of the deposits |
+| `etc/critters/` | The `Mite`, `Skitter`, `Brute` and `Behemoth` prefabs |
+| `etc/projectiles/` | The `Tracer`, `Missile` and `LaserBeam` prefabs |
 | `etc/props/markers.flecs` | The `TileMarker` and `TileMarkerBad` prefabs |
-| `etc/particles/jet_plume.flecs` | The `JetPlume` template of the jetpack |
+| `etc/particles.flecs` | Includes the particle effects |
+| `etc/particles/pools.flecs` | The particle sprites, how the original's pools map to the layers, the effect budgets (`ParticleSettings`) |
+| `etc/particles/*.flecs` | The particle effects, one file per effect group of the original: one shot prefabs (`BoomBurst`, `CombustBurst`, `MissileLaunch`, `FootDust`, ...) and emitter templates (`JetPlume`, `DrillDust`, `BeamGlow`, `MuzzleFlash`, ...) |
 | `etc/materials/terrain.flecs` | The `GroundSurface` and `BasinSurface` materials and the dirt textures |
 | `etc/materials/hazard.flecs` | The hazard stripe texture and the `Hazard*` trim prefabs |
 | `etc/materials/solar_cells.flecs` | The solar cell texture and `SolarCells` |
@@ -319,3 +357,4 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 | `src/inventory.c` | The inventory and the item components |
 | `src/mining.c` | Mining and its tile marker |
 | `src/look.c` | The render quality tiers, `oreelse.cycleQuality()` |
+| `src/particles.c` | The helpers that play the effects (`ore_burst`, `ore_burst_aimed`, `ore_explosion`, `ore_combust`), the flash of their lights, `oreelse.explosion()`, `oreelse.combust()` |
