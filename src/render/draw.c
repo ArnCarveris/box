@@ -86,6 +86,7 @@ static void box_draws_free(
     ecs_vec_fini_t(NULL, &d->released, uint32_t);
     ecs_vec_fini_t(NULL, &d->blended, int32_t);
     ecs_vec_fini_t(NULL, &d->sorted, box_draw_sorted_t);
+    ecs_vec_fini_t(NULL, &d->shadow_regions, box_render_shadow_region_t);
     ecs_vec_fini_t(NULL, &d->dirty, ecs_entity_t);
     ecs_vec_fini_t(NULL, &d->moved, box_draw_moved_t);
     ecs_vec_fini_t(NULL, &d->walk, ecs_entity_t);
@@ -564,6 +565,51 @@ static void box_draws_key(
         !box_projection_anchored(world, e) && box_draws_baked(world, key->scene);
 }
 
+/** Record the regions of a caster slot whose instance was written, as bake_change.c records
+ * the bounds of changed static shapes; the light extract renders the tiles they reach into.
+ *
+ * They are the bounds it had and has when its transform or surface changed, or when an alpha
+ * tested caster changed its shading, which its alpha test reads; for a new slot the bounds it has.
+ *
+ * @param world The world
+ * @param d The state
+ * @param b The batch of the slot
+ * @param slot The slot
+ * @param was_transform The transform the slot had, NULL for a new slot
+ * @param was_surface The surface the slot had, NULL for a new slot
+ * @param kinds box_draw_kind_t, the streams the change wrote
+ */
+static void box_draws_shadow_update(
+    const ecs_world_t *world,
+    box_render_draws_t *d,
+    const box_draw_batch_t *b,
+    int32_t slot,
+    const box_render_transform_t *was_transform,
+    const box_render_surface_t *was_surface,
+    uint8_t kinds)
+{
+    const box_render_transform_t *transform = box_draws_slot_transform(
+        ECS_CONST_CAST(box_draw_batch_t*, b), slot);
+    const box_render_surface_t *surface = box_draws_slot_surface(
+        ECS_CONST_CAST(box_draw_batch_t*, b), slot);
+    if (!d->shadow_record || !box_draws_caster(b)) {
+        goto done;
+    }
+
+    if (!was_transform) {
+        box_draws_shadow_region(world, d, b, transform, surface);
+    } else if (ecs_os_memcmp_t(was_transform, transform, box_render_transform_t) ||
+        ecs_os_memcmp_t(was_surface, surface, box_render_surface_t) ||
+        (b->key.cutout && (kinds & BOX_DRAW_SHADING)))
+    {
+        box_draws_shadow_region(world, d, b, was_transform, was_surface);
+        box_draws_shadow_region(world, d, b, transform, surface);
+    }
+
+done:
+    return;
+}
+
 /** Bring the shape of a changed entity into the batch of its key and write its instance.
  *
  * A shape that keeps its slot writes the streams of its change, plus its shading when the clip
@@ -590,8 +636,11 @@ static void box_draws_update_shape(
     box_draw_batch_t *b;
     const WorldTransform *transform;
     box_draw_material_t material;
+    box_render_transform_t was_transform;
+    box_render_surface_t was_surface;
     const ShapeMesh *shape = ecs_get(world, e, ShapeMesh);
     bool drawn = shape && shape->mesh && !ecs_has_id(world, e, EcsPrefab);
+    bool kept = false;
     s->dirty = false;
     d->stats.processed ++;
     if (drawn) {
@@ -615,6 +664,7 @@ static void box_draws_update_shape(
     if (s->batch >= 0) {
         b = box_draws_batch(d, s->batch);
         if (drawn && !ecs_os_memcmp_t(&b->key, &key, box_draw_key_t)) {
+            kept = true;
             goto write;
         }
 
@@ -633,6 +683,11 @@ static void box_draws_update_shape(
     b = box_draws_batch(d, s->batch);
     kinds = BOX_DRAW_ALL;
 write:
+    if (kept && d->shadow_record && box_draws_caster(b)) {
+        was_transform = *box_draws_slot_transform(b, s->slot);
+        was_surface = *box_draws_slot_surface(b, s->slot);
+    }
+
     if (material.shape2d) {
         int32_t clip = box_draws_clip_of(world, d, e);
         if (clip != s->clip) {
@@ -665,6 +720,8 @@ write:
         box_draws_surface(box_draws_slot_surface(b, s->slot), shape);
     }
 
+    box_draws_shadow_update(world, d, b, s->slot, kept ? &was_transform : NULL,
+        kept ? &was_surface : NULL, kinds);
     box_draws_slot_changed(b, s->slot, kinds);
 done:
     return;
@@ -995,6 +1052,7 @@ void box_render_draws_init(
     ecs_vec_init_t(NULL, &d->released, uint32_t, 0);
     ecs_vec_init_t(NULL, &d->blended, int32_t, 0);
     ecs_vec_init_t(NULL, &d->sorted, box_draw_sorted_t, 0);
+    ecs_vec_init_t(NULL, &d->shadow_regions, box_render_shadow_region_t, 0);
     ecs_map_init(&d->lookup, NULL);
     ecs_map_init(&d->meshes, NULL);
     box_draws_order_init(d);
@@ -1030,6 +1088,41 @@ void box_render_draws_init(
         .ctx = d,
         .ctx_free = box_draws_free
     });
+}
+
+/** Get the state of the draw extract of a world.
+ *
+ * @param world The world
+ * @return The state, NULL without the draw extract
+ */
+static box_render_draws_t* box_draws_state(
+    const ecs_world_t *world)
+{
+    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractDraws");
+    const ecs_system_t *s = system ? ecs_system_get(world, system) : NULL;
+
+    return s ? s->ctx : NULL;
+}
+
+ecs_vec_t* box_render_draws_shadow_regions(
+    const ecs_world_t *world)
+{
+    box_render_draws_t *d = box_draws_state(world);
+
+    return d ? &d->shadow_regions : NULL;
+}
+
+void box_render_draws_shadow_record(
+    const ecs_world_t *world,
+    bool record)
+{
+    box_render_draws_t *d = box_draws_state(world);
+    if (d) {
+        d->shadow_record = record;
+        if (!record) {
+            ecs_vec_clear(&d->shadow_regions);
+        }
+    }
 }
 
 void box_render_draws_stats(

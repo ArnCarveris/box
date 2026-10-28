@@ -347,11 +347,13 @@ void SpotShadow_atlas_full_drops_farthest(void) {
     ecs_fini(world);
 }
 
-/* The tile tests the floor and both slabs and keeps the floor and the slab inside its frustum */
+/* The tile tests the floor and both slabs and keeps the floor and the slab inside its frustum;
+ * the tile renders every frame without the shadow cache */
 void SpotShadow_light_view_culls_casters(void) {
     // lighting/shadows
     ecs_entity_t light, slab;
     ecs_world_t *world = spot_scene(&light, &slab);
+    test_bool(box_render_shadow_cache(world, false), true);
     spot_slab(world, (vec3){30, 6, 0}, 1);
     box_render_gpu_stats_t before, after;
     unsigned char *px = spot_capture(world, "spot_cull.png");
@@ -374,10 +376,12 @@ void SpotShadow_light_view_culls_casters(void) {
     ecs_fini(world);
 }
 
+/* Without the shadow cache, so the tile renders in every frame */
 void SpotShadow_two_views_render_atlas_once(void) {
     // lighting/shadows
     ecs_entity_t light, slab;
     ecs_world_t *world = spot_scene(&light, &slab);
+    test_bool(box_render_shadow_cache(world, false), true);
     spot_view(world, 5, 90, true);
     unsigned char *px = spot_capture(world, "spot_two.png");
     stbi_image_free(px);

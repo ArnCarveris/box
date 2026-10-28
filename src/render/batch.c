@@ -339,6 +339,7 @@ int32_t box_draws_batch_ensure(
     b->full = BOX_DRAW_ALL;
     b->bounds_dirty = false;
     b->bounded = false;
+    b->was_ready = false;
     head = ecs_map_ensure(&d->lookup, hash);
     b->next = *head ? (int32_t)*head - 1 : -1;
     *head = (uint64_t)result + 1;
@@ -482,6 +483,88 @@ static void box_draws_glyph_moved(
     }
 }
 
+bool box_draws_caster(
+    const box_draw_batch_t *b)
+{
+    return b->key.pipeline == BOX_RENDER_SHADER_MESH && b->key.shadow &&
+        b->key.blend == Opaque && !b->key.atlas;
+}
+
+void box_draws_shadow_region(
+    const ecs_world_t *world,
+    box_render_draws_t *d,
+    const box_draw_batch_t *b,
+    const box_render_transform_t *transform,
+    const box_render_surface_t *surface)
+{
+    const box_mesh_cache_t *cache = NULL;
+    const box_mesh_t *mesh = NULL;
+    vec3 lo, hi;
+    int32_t c, r;
+    if (!d->shadow_record || !box_draws_caster(b)) {
+        goto done;
+    }
+
+    if (surface->p[0][0] != 0.0f) {
+        for (r = 0; r < 3; r ++) {
+            lo[r] = surface->p[22][r] - surface->p[23][r];
+            hi[r] = surface->p[22][r] + surface->p[23][r];
+        }
+    } else {
+        cache = box_mesh_cache_of(world);
+        mesh = cache ? box_mesh_cache_get(cache, b->key.mesh) : NULL;
+        if (!mesh || !mesh->vertex_count) {
+            goto done;
+        }
+
+        glm_vec3_copy(ECS_CONST_CAST(float*, mesh->min), lo);
+        glm_vec3_copy(ECS_CONST_CAST(float*, mesh->max), hi);
+    }
+
+    box_render_shadow_region_t *out = ecs_vec_append_t(
+        NULL, &d->shadow_regions, box_render_shadow_region_t);
+    out->scene = b->key.scene;
+    glm_vec3_fill(out->min, FLT_MAX);
+    glm_vec3_fill(out->max, -FLT_MAX);
+    for (c = 0; c < 8; c ++) {
+        vec3 local = {
+            (c & 1) ? hi[0] : lo[0],
+            (c & 2) ? hi[1] : lo[1],
+            (c & 4) ? hi[2] : lo[2]
+        };
+        for (r = 0; r < 3; r ++) {
+            const float *row = transform->rows[r];
+            float world_r = row[0] * local[0] + row[1] * local[1] + row[2] * local[2] + row[3];
+            out->min[r] = glm_min(out->min[r], world_r);
+            out->max[r] = glm_max(out->max[r], world_r);
+        }
+    }
+
+done:
+    return;
+}
+
+/** Record the regions of every slot of a caster batch, which the tiles did not draw while the
+ * backend lacked its mesh.
+ *
+ * @param world The world
+ * @param d The state
+ * @param b The batch
+ */
+static void box_draws_shadow_batch(
+    const ecs_world_t *world,
+    box_render_draws_t *d,
+    box_draw_batch_t *b)
+{
+    int32_t i;
+    for (i = 0; d->shadow_record && box_draws_caster(b) &&
+        i < ecs_vec_count(&b->entities); i ++)
+    {
+        box_draws_shadow_region(world, d, b, box_draws_slot_transform(b, i),
+            box_draws_slot_surface(b, i));
+    }
+}
+
 void box_draws_slot_remove(
     ecs_world_t *world,
     box_render_draws_t *d,
@@ -491,6 +574,8 @@ void box_draws_slot_remove(
     box_draw_batch_t *b = box_draws_batch(d, index);
     int32_t last = ecs_vec_count(&b->entities) - 1;
     bool flat = box_draws_is_2d(b);
+    box_draws_shadow_region(world, d, b, box_draws_slot_transform(b, slot),
+        box_draws_slot_surface(b, slot));
     if (flat) {
         box_draws_order_slot(d, 0);
     }
@@ -1532,9 +1617,14 @@ static void box_draws_fill_transform(
         }
 
         box_render_transform_t *out = box_draws_slot_transform(b, slots[i].slot);
+        box_render_transform_t was = *out;
         box_draws_transform(out, transforms ? &transforms[i] : NULL, &shapes[i]);
         if (box_draws_is_2d(b)) {
             box_draws_lift(out, transforms ? &transforms[i] : NULL, slots[i].layer);
+        } else if (d->shadow_record && ecs_os_memcmp_t(&was, out, box_render_transform_t)) {
+            const box_render_surface_t *surface = box_draws_slot_surface(b, slots[i].slot);
+            box_draws_shadow_region(it->world, d, b, &was, surface);
+            box_draws_shadow_region(it->world, d, b, out, surface);
         }
     }
 }
@@ -1613,6 +1703,12 @@ void box_draws_send(
         if (b->ready) {
             box_draws_reserve(p, d, b);
         }
+
+        if (b->ready && !b->was_ready) {
+            box_draws_shadow_batch(world, d, b);
+        }
+
+        b->was_ready = b->ready;
     }
 
     box_draws_pages(p, d);

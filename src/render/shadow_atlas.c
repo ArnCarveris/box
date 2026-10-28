@@ -314,3 +314,100 @@ void box_render_shadow_point_planes(
         out[i][3] = tile->far_ - sign * tile->position[i / 2];
     }
 }
+
+void box_render_shadow_tile_bounds(
+    const box_render_shadow_tile_t *tile,
+    float *min,
+    float *max)
+{
+    float far_ = glm_max(tile->far_, 0.0f);
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        min[i] = tile->position[i] - far_;
+        max[i] = tile->position[i] + far_;
+    }
+
+    if (tile->projection == BOX_RENDER_SHADOW_OCTAHEDRAL) {
+        goto done;
+    }
+
+    vec3 forward, right;
+    for (i = 0; i < 3; i ++) {
+        forward[i] = tile->matrix[i][3];
+        right[i] = tile->matrix[i][0];
+    }
+
+    float scale = glm_vec3_norm(right);
+    if (scale < 1e-6f || glm_vec3_norm(forward) < 1e-6f) {
+        goto done;
+    }
+
+    glm_vec3_normalize(forward);
+    float radius = far_ * GLM_SQRT2f / scale;
+    for (i = 0; i < 3; i ++) {
+        float center = tile->position[i] + forward[i] * far_;
+        float extent = radius * sqrtf(glm_max(1.0f - forward[i] * forward[i], 0.0f));
+        float lo = glm_min(tile->position[i], center - extent);
+        float hi = glm_max(tile->position[i], center + extent);
+        min[i] = glm_max(min[i], lo);
+        max[i] = glm_min(max[i], hi);
+    }
+
+done:
+    return;
+}
+
+bool box_render_shadow_tile_touches(
+    const box_render_shadow_tile_t *tile,
+    const float *min,
+    const float *max)
+{
+    bool result = true;
+    int32_t i;
+    if (tile->projection == BOX_RENDER_SHADOW_OCTAHEDRAL) {
+        float far_ = glm_max(tile->far_, 0.0f), distance = 0.0f;
+        for (i = 0; i < 3; i ++) {
+            float d = glm_max(glm_max(min[i] - tile->position[i],
+                tile->position[i] - max[i]), 0.0f);
+            distance += d * d;
+        }
+
+        result = distance <= far_ * far_;
+    } else {
+        vec3 lo, hi;
+        box_render_shadow_tile_bounds(tile, lo, hi);
+        for (i = 0; i < 3 && result; i ++) {
+            result = min[i] <= hi[i] && max[i] >= lo[i];
+        }
+    }
+
+    return result;
+}
+
+void box_render_shadow_touched(
+    box_render_shadow_tile_t *tiles,
+    int32_t count,
+    ecs_entity_t scene,
+    const box_render_shadow_region_t *regions,
+    int32_t region_count)
+{
+    int32_t i, j, left = 0;
+    for (j = 0; j < count; j ++) {
+        left += !tiles[j].render;
+    }
+
+    for (i = 0; left && i < region_count; i ++) {
+        if (regions[i].scene != scene) {
+            continue;
+        }
+
+        for (j = 0; j < count; j ++) {
+            if (!tiles[j].render &&
+                box_render_shadow_tile_touches(&tiles[j], regions[i].min, regions[i].max))
+            {
+                tiles[j].render = true;
+                left --;
+            }
+        }
+    }
+}

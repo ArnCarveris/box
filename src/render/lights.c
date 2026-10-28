@@ -93,6 +93,14 @@ typedef struct box_light_caster_t {
     bool point;             /**< A point light, whose tile is octahedral */
 } box_light_caster_t;
 
+/** A tile the shadow atlas of a scene holds, as it last rendered or kept it */
+typedef struct box_light_tile_t {
+    ecs_entity_t light;     /**< Entity of the light */
+    int32_t resolution;     /**< Its shadow_resolution */
+    bool point;             /**< A point light tile */
+    box_render_shadow_record_t record; /**< Its record, which holds the projection and place */
+} box_light_tile_t;
+
 /** The shadow atlas of a scene and what the backend holds of it */
 typedef struct box_light_atlas_t {
     ShadowAtlas settings;   /**< ShadowAtlas of the scene this frame, resolved */
@@ -103,6 +111,8 @@ typedef struct box_light_atlas_t {
     ecs_vec_t records;      /**< box_render_shadow_record_t of this frame */
     ecs_vec_t tiles;        /**< box_render_shadow_tile_t of this frame, as records */
     ecs_vec_t sent;         /**< box_render_shadow_record_t the tile buffer holds */
+    ecs_vec_t known;        /**< box_light_tile_t, the tiles of the last frame, which the atlas
+                             *   holds */
 } box_light_atlas_t;
 
 /** The TimeOfDay of a scene in this frame */
@@ -154,6 +164,9 @@ typedef struct box_render_lights_t {
     ecs_vec_t places;           /**< box_render_shadow_place_t, scratch of the allocation */
     ecs_vec_t candidates;       /**< int32_t, scratch: the spot of each request */
     ecs_vec_t views;            /**< int32_t, scratch: the views that sample an atlas */
+    ecs_vec_t *regions;         /**< box_render_shadow_region_t the shadow casters changed since
+                                 *   the last extract, NULL without the draw extract */
+    bool uncached;              /**< Every tile renders every frame, see box_render_shadow_cache */
     bool default_sent;          /**< The backend has the buffer of the default sun */
     const void *backend;        /**< Context of the backend the buffers were sent to */
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
@@ -262,6 +275,7 @@ static void box_lights_atlas_init(
     ecs_vec_init_t(NULL, &s->atlas.records, box_render_shadow_record_t, 0);
     ecs_vec_init_t(NULL, &s->atlas.tiles, box_render_shadow_tile_t, 0);
     ecs_vec_init_t(NULL, &s->atlas.sent, box_render_shadow_record_t, 0);
+    ecs_vec_init_t(NULL, &s->atlas.known, box_light_tile_t, 0);
 }
 
 /** Free the shadow atlas state of a scene; its atlas is released by the caller.
@@ -275,6 +289,7 @@ static void box_lights_atlas_fini(
     ecs_vec_fini_t(NULL, &s->atlas.records, box_render_shadow_record_t);
     ecs_vec_fini_t(NULL, &s->atlas.tiles, box_render_shadow_tile_t);
     ecs_vec_fini_t(NULL, &s->atlas.sent, box_render_shadow_record_t);
+    ecs_vec_fini_t(NULL, &s->atlas.known, box_light_tile_t);
 }
 
 /** Find the lights of a scene, adding an entry when it has none.
@@ -1079,6 +1094,7 @@ static void box_lights_atlas_release(
     a->resolution = 0;
     a->buffer = false;
     ecs_vec_clear(&a->sent);
+    ecs_vec_clear(&a->known);
 done:
     return;
 }
@@ -1225,6 +1241,7 @@ static void box_lights_reset_backend(
         s->atlas.resolution = 0;
         s->atlas.buffer = false;
         ecs_vec_clear(&s->atlas.sent);
+        ecs_vec_clear(&s->atlas.known);
     }
 
     l->default_sent = false;
@@ -1331,9 +1348,40 @@ static bool box_lights_view_sees(
     return result;
 }
 
+/** Check whether a tile must render because it or its light changed since the last frame: it
+ * is new, moved, resized, or its record, kind or shadow_resolution differ.
+ *
+ * @param a The atlas, whose known tiles are those of the last frame
+ * @param caster The light of the tile
+ * @param record The record of the tile in this frame
+ * @return Whether the tile renders
+ */
+static bool box_lights_tile_changed(
+    const box_light_atlas_t *a,
+    const box_light_caster_t *caster,
+    const box_render_shadow_record_t *record)
+{
+    bool result = true;
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&a->known); i ++) {
+        const box_light_tile_t *k = ecs_vec_get_t(&a->known, box_light_tile_t, i);
+        if (k->light == caster->entity) {
+            result = k->point != caster->point || k->resolution != caster->resolution ||
+                ecs_os_memcmp_t(&k->record, record, box_render_shadow_record_t);
+            break;
+        }
+    }
+
+    return result;
+}
+
 /** Allocate the tiles of the shadow casting spot and point lights of a scene that a view with
  * shadows sees, write their tile records and give each light its record index; both kinds
  * share the budget and the placement of the atlas.
+ *
+ * A tile renders when it changed (box_lights_tile_changed), a shadow caster changed within its
+ * bounds (box_render_shadow_touched), the atlas is created in this frame or caching is off; the
+ * atlas keeps the others. The tiles become the known tiles of the atlas.
  *
  * @param world The world
  * @param l The state
@@ -1350,6 +1398,7 @@ static void box_lights_shadow_tiles(
     box_render_light_t *lights = ecs_vec_first_t(
         &s->lists[BOX_LIGHTS_VIEW].lights, box_render_light_t);
     int32_t i, j, n, dropped = 0, count = ecs_vec_count(&s->casters);
+    bool all = l->uncached || a->resolution != a->settings.resolution;
     ecs_vec_clear(&l->requests);
     ecs_vec_clear(&l->candidates);
     ecs_vec_clear(&l->views);
@@ -1427,10 +1476,35 @@ static void box_lights_shadow_tiles(
         glm_vec3_copy(light->position, t->position);
         t->near_ = r->params[0];
         t->far_ = r->params[1];
+        t->render = all || box_lights_tile_changed(a, caster, r);
         light->shadow = (uint32_t)ecs_vec_count(&a->records) - 1;
     }
 
+    if (l->regions) {
+        box_render_shadow_touched(ecs_vec_first(&a->tiles), ecs_vec_count(&a->tiles), s->scene,
+            ecs_vec_first(l->regions), ecs_vec_count(l->regions));
+    }
+
+    for (i = 0, j = 0; i < n; i ++) {
+        const box_light_caster_t *caster = ecs_vec_get_t(&s->casters, box_light_caster_t,
+            *ecs_vec_get_t(&l->candidates, int32_t, i));
+        if (!ecs_vec_get_t(&l->places, box_render_shadow_place_t, i)->size) {
+            continue;
+        }
+
+        box_light_tile_t *k = j < ecs_vec_count(&a->known)
+            ? ecs_vec_get_t(&a->known, box_light_tile_t, j)
+            : ecs_vec_append_t(NULL, &a->known, box_light_tile_t);
+        k->light = caster->entity;
+        k->resolution = caster->resolution;
+        k->point = caster->point;
+        k->record = *ecs_vec_get_t(&a->records, box_render_shadow_record_t, j);
+        j ++;
+    }
+
 done:
+    ecs_vec_set_count_t(NULL, &a->known, box_light_tile_t, ecs_vec_count(&a->records));
+
     return;
 }
 
@@ -1508,6 +1582,9 @@ done:
 /** Allocate the shadow tiles of every scene and send its atlas, before the light buffers are
  * sent, since the lights hold the index of their tile records.
  *
+ * Takes the regions of the shadow casters that changed since the last extract and has the
+ * draw extract record them while a scene has a tile the atlas keeps.
+ *
  * @param world The world
  * @param l The state
  * @param p The packet
@@ -1518,12 +1595,22 @@ static void box_lights_shadows(
     box_render_packet_t *p)
 {
     int32_t i;
+    bool tiles = false;
+    l->regions = box_render_draws_shadow_regions(world);
     box_lights_collect_atlases(world, l);
     for (i = 0; i < ecs_vec_count(&l->scenes); i ++) {
         box_light_scene_t *s = ecs_vec_get_t(&l->scenes, box_light_scene_t, i);
         box_lights_shadow_tiles(world, l, p, s);
         box_lights_atlas_send(l, s, p);
+        tiles = tiles || ecs_vec_count(&s->atlas.known) > 0;
     }
+
+    if (l->regions) {
+        ecs_vec_clear(l->regions);
+        l->regions = NULL;
+    }
+
+    box_render_draws_shadow_record(world, tiles);
 }
 
 /** Collect the lights of every scene, send the changed light buffers and light the views.
@@ -1699,6 +1786,19 @@ const void* box_render_lights_state(
     const ecs_system_t *sys = system ? ecs_system_get(world, system) : NULL;
 
     return sys ? sys->ctx : NULL;
+}
+
+bool box_render_shadow_cache(
+    ecs_world_t *world,
+    bool enabled)
+{
+    box_render_lights_t *l = ECS_CONST_CAST(box_render_lights_t*,
+        box_render_lights_state(world));
+    if (l) {
+        l->uncached = !enabled;
+    }
+
+    return l != NULL;
 }
 
 void box_render_lights_atmosphere(

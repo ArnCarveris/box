@@ -425,6 +425,19 @@
                 ]
             },
             {
+                "id": "ShadowCache",
+                "testcases": [
+                    "static_scene_renders_once",
+                    "moved_caster_renders_its_tile",
+                    "added_removed_caster",
+                    "dynamic_caster_renders_when_moved",
+                    "light_change_renders_its_tile",
+                    "camera_move_renders_none",
+                    "atlas_resolution_renders_all",
+                    "reused_equals_rendered"
+                ]
+            },
+            {
                 "id": "Shadow",
                 "testcases": [
                     "splits_uniform",

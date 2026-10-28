@@ -767,6 +767,7 @@ void box_gpu_cull_casters_add(
     ecs_entity_t scene,
     int32_t slot,
     const box_render_shadow_tile_t *tiles,
+    const bool *renders,
     int32_t count)
 {
     box_gpu_cull_t *c = &gpu->cull;
@@ -775,6 +776,10 @@ void box_gpu_cull_casters_add(
     ecs_os_memset_t(&base, 0, box_gpu_cull_uniforms_t);
     ecs_vec_clear(&c->frustums);
     for (i = 0; i < count; i ++) {
+        if (renders && !renders[i]) {
+            continue;
+        }
+
         box_gpu_cull_desc_t *f = ecs_vec_append_t(NULL, &c->frustums, box_gpu_cull_desc_t);
         ecs_os_memset_t(f, 0, box_gpu_cull_desc_t);
         f->slot = slot;
@@ -789,9 +794,9 @@ void box_gpu_cull_casters_add(
         }
     }
 
-    if (count) {
-        box_gpu_cull_groups_add(gpu, packet, scene, ecs_vec_first(&c->frustums), count, &base,
-            NULL, NULL);
+    if (ecs_vec_count(&c->frustums)) {
+        box_gpu_cull_groups_add(gpu, packet, scene, ecs_vec_first(&c->frustums),
+            ecs_vec_count(&c->frustums), &base, NULL, NULL);
     }
 }
 

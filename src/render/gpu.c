@@ -670,6 +670,12 @@ void box_gpu_count(
     case BOX_GPU_STAT_SHADOW_TILE:
         gpu->pending.shadow_tiles ++;
         break;
+    case BOX_GPU_STAT_SHADOW_REUSED:
+        gpu->pending.shadow_reused ++;
+        break;
+    case BOX_GPU_STAT_SHADOW_PASS:
+        gpu->pending.shadow_passes ++;
+        break;
     case BOX_GPU_STAT_SHADOW_DRAW:
         gpu->pending.shadow_draws ++;
         break;
@@ -710,6 +716,8 @@ void box_gpu_stats_publish(
     s->atmosphere_views += p->atmosphere_views;
     s->atmosphere_builds += p->atmosphere_builds;
     s->shadow_tiles += p->shadow_tiles;
+    s->shadow_reused += p->shadow_reused;
+    s->shadow_passes += p->shadow_passes;
     s->shadow_draws += p->shadow_draws;
     for (i = 0; i < BOX_RENDER_ATMOS_PASSES; i ++) {
         s->atmosphere_ns[i] += p->atmosphere_ns[i];

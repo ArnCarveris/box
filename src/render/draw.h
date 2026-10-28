@@ -206,6 +206,8 @@ typedef struct box_draw_batch_t {
     uint8_t full;           /**< box_draw_kind_t, streams that upload every instance instead of
                              *   the changed slots */
     bool ready;             /**< The backend has the mesh and the instances this frame */
+    bool was_ready;         /**< It had them in the last frame, so a caster batch that gets
+                             *   them records the regions of its slots */
     bool bounds_dirty;      /**< The surface of a slot changed since the bounds were computed */
     bool bounded;           /**< A slot holds a parametric surface, see center and extent */
     float center[3];        /**< Center of the local bounds of every slot, when bounded */
@@ -304,6 +306,9 @@ typedef struct box_render_draws_t {
     box_draw_clips_t clips;     /**< The clip areas of the 2D draws */
     const ecs_table_t *scene_table; /**< Table whose entities share scene_of while processing */
     ecs_entity_t scene_of;      /**< Scene of the entities of scene_table */
+    ecs_vec_t shadow_regions;   /**< box_render_shadow_region_t, the bounds shadow casters had
+                                 *   and have after their changes, which the light extract takes */
+    bool shadow_record;         /**< Record shadow_regions, while a scene keeps shadow tiles */
     int32_t refs;               /**< Observers and systems that use the state */
 } box_render_draws_t;
 
@@ -389,6 +394,31 @@ void box_draws_slot_changed(
  */
 uint8_t box_draws_dynamic_kinds(
     const box_draw_batch_t *b);
+
+/** Check whether the slots of a batch cast shadows into the shadow atlas tiles: opaque mesh
+ * shapes without NoShadow, as the cull of the tiles keeps them.
+ *
+ * @param b The batch
+ * @return Whether its instances are shadow casters
+ */
+bool box_draws_caster(
+    const box_draw_batch_t *b);
+
+/** Record the world bounds a caster slot of a batch has with a transform and a surface, while
+ * the state records the regions of changed shadow casters; nothing for a batch of no caster.
+ *
+ * @param world The world, whose mesh cache has the mesh of the batch
+ * @param d The state
+ * @param b The batch
+ * @param transform The transform of the slot
+ * @param surface The surface of the slot
+ */
+void box_draws_shadow_region(
+    const ecs_world_t *world,
+    box_render_draws_t *d,
+    const box_draw_batch_t *b,
+    const box_render_transform_t *transform,
+    const box_render_surface_t *surface);
 
 /** Get the transform of a slot.
  *
