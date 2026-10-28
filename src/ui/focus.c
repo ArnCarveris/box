@@ -329,11 +329,28 @@ bool box_ui_focus_step(
     return result;
 }
 
-/** Clear the focus when its entity loses Focusable or is deleted. flecs sends on.blur while the
- * entity is still alive.
+/** Clear the focus after the remove or delete that took Focusable from the focused entity, when
+ * its tables are no longer locked and the scripts of on.blur can change the world.
  *
- * The changes go through the main stage, which the remove or delete in progress merges when it
- * ends, because the entity must not move to another table while its observers run.
+ * flecs sends on.blur to an entity that only lost Focusable; a deleted entity is no longer the
+ * flecs focus and gets none.
+ *
+ * @param it Iterator of the observer
+ */
+static void box_ui_focus_sync(
+    ecs_iter_t *it)
+{
+    box_ui_state_t *st = box_ui_state(it->world);
+    ecs_world_t *world = ECS_CONST_CAST(ecs_world_t*, ecs_get_world(it->world));
+    if (st && !ecs_should_quit(world)) {
+        box_ui_focus_check(world, st);
+        box_ui_progress(world, st);
+    }
+}
+
+/** Queue the check of the focus when its entity loses Focusable or is deleted. The check runs
+ * once the remove or delete in progress merges its commands: the entity must not move to
+ * another table while its observers run, nor the scripts of on.blur change the world.
  *
  * @param it Iterator of the observer
  */
@@ -341,15 +358,19 @@ static void box_ui_focusable_on_remove(
     ecs_iter_t *it)
 {
     box_ui_state_t *st = box_ui_state(it->world);
-    ecs_world_t *world = ecs_get_stage(ecs_get_world(it->world), 0);
+    ecs_world_t *world = ECS_CONST_CAST(ecs_world_t*, ecs_get_world(it->world));
     int32_t i;
-    if (!st || ecs_should_quit(it->world)) {
+    if (!st || ecs_should_quit(world)) {
         goto done;
     }
 
     for (i = 0; i < it->count; i ++) {
         if (it->entities[i] == st->focused) {
-            box_ui_focus_set(world, st, 0, false);
+            ecs_enqueue(ecs_get_stage(world, 0), &(ecs_event_desc_t){
+                .event = st->focus_lost,
+                .ids = &(ecs_type_t){ .array = (ecs_id_t[]){ ecs_id(UiState) }, .count = 1 },
+                .entity = ecs_id(UiState)
+            });
         }
     }
 
@@ -361,7 +382,7 @@ void box_ui_focus_import(
     ecs_world_t *world,
     box_ui_state_t *st)
 {
-    (void)st;
+    st->focus_lost = ecs_entity(world, { .name = "FocusLost" });
     ecs_add_pair(world, Focusable, EcsWith, Interactive);
     ecs_singleton_set(world, FocusStatus, {0});
     ecs_observer(world, {
@@ -369,5 +390,11 @@ void box_ui_focus_import(
         .query.terms = {{ .id = Focusable }},
         .events = { EcsOnRemove },
         .callback = box_ui_focusable_on_remove
+    });
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "FocusSync" }),
+        .query.terms = {{ .id = ecs_id(UiState) }},
+        .events = { st->focus_lost },
+        .callback = box_ui_focus_sync
     });
 }

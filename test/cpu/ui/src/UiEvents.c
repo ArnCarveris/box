@@ -708,7 +708,6 @@ void UiEvents_focus_blur_target_related(void) {
     test_int(events_focus(world, "on_form")->focus, 1);
     test_int(events_focus(world, "on_form")->blur, 0);
 
-    /* A move between two children of the form blurs and focuses the form once each */
     events_run(world, s, "mouse.click left [840, 260]");
     test_uint(ecs_script_get_focus(world), b);
     test_int(events_focus(world, "on_a")->focus, 1);
@@ -726,14 +725,12 @@ void UiEvents_focus_blur_target_related(void) {
     test_uint(events_focus(world, "on_form")->blur_target, a);
     test_uint(events_focus(world, "on_form")->blur_related, b);
 
-    /* A press on the focused entity changes nothing */
     events_run(world, s, "mouse.click left [880, 260]");
     test_int(events_focus(world, "on_b")->focus, 1);
     test_int(events_focus(world, "on_b")->blur, 0);
     test_int(events_focus(world, "on_form")->focus, 2);
     test_int(events_focus(world, "on_form")->blur, 1);
 
-    /* box_ui_focus and clearing the focus */
     test_bool(box_ui_focus(world, a), true);
     test_int(events_focus(world, "on_b")->blur, 1);
     test_uint(events_focus(world, "on_b")->blur_related, a);
@@ -745,6 +742,27 @@ void UiEvents_focus_blur_target_related(void) {
     test_int(events_focus(world, "on_form")->focus, 3);
     test_int(events_focus(world, "on_form")->blur, 3);
     test_uint(ecs_script_get_focus(world), 0);
+
+    test_bool(box_ui_focus(world, b), true);
+    test_int(events_focus(world, "on_b")->focus, 2);
+    ecs_remove(world, b, Focusable);
+    test_uint(ecs_script_get_focus(world), 0);
+    test_uint(ecs_singleton_get(world, FocusStatus)->focused, 0);
+    test_bool(ecs_has(world, b, Focused), false);
+    test_int(events_focus(world, "on_b")->blur, 2);
+    test_uint(events_focus(world, "on_b")->blur_target, b);
+    test_uint(events_focus(world, "on_b")->blur_related, 0);
+    test_int(events_focus(world, "on_form")->blur, 4);
+
+    test_bool(box_ui_focus(world, a), true);
+    test_int(events_focus(world, "on_form")->focus, 5);
+    ecs_delete(world, a);
+    test_uint(ecs_script_get_focus(world), 0);
+    test_uint(ecs_singleton_get(world, FocusStatus)->focused, 0);
+    test_int(ecs_count_id(world, Focused), 0);
+    test_int(events_focus(world, "on_form")->blur, 4);
+    events_run(world, s, "key.press Tab");
+    test_uint(ecs_script_get_focus(world), ecs_singleton_get(world, FocusStatus)->focused);
 
     ecs_fini(world);
 }
@@ -771,7 +789,6 @@ void UiEvents_key_down_once_on_widget_and_parents(void) {
     test_int(events_key(world, "on_b")->downs, 0);
     test_int(events_key(world, "on_b")->ups, 0);
 
-    /* Tab goes to the focused entity, then moves the focus */
     events_run(world, s, "key.press Tab");
     test_uint(ecs_script_get_focus(world), events_e(world, "hud.form.b"));
     test_int(events_key(world, "on_a")->downs, 3);

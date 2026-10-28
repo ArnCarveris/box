@@ -910,7 +910,6 @@ void Focus_flecs_focus_is_focused(void) {
     test_uint(focus_flecs(world), c);
     test_bool(focus_status(world)->visible, false);
 
-    /* A press on the label of b focuses b */
     focus_run(world, s, "mouse.click left [640, 260]");
     test_uint(ecs_singleton_get(world, PickStatus)->target, focus_e(world, "hud.form.b.label"));
     test_uint(focus_flecs(world), b);
@@ -926,7 +925,6 @@ void Focus_flecs_focus_is_focused(void) {
     test_bool(box_ui_focus(world, c), true);
     test_uint(focus_flecs(world), c);
 
-    /* The press on plain clears the focus, the click then focuses c from the script */
     focus_run(world, s, "mouse.click left [640, 460]");
     const ecs_entity_t *moved = ecs_get_id(world, focus_e(world, "mover"),
         focus_e(world, "Mover.mut"));
@@ -950,7 +948,6 @@ void Focus_press_non_focusable_keeps_flecs_focus(void) {
     ecs_entity_t s = box_terminal_new(world);
     ecs_entity_t b = focus_e(world, "hud.form.b");
 
-    /* Without the hook of box.ui flecs would focus what the press went to */
     focus_run(world, s, "mouse.click left [640, 460]");
     test_uint(ecs_singleton_get(world, PickStatus)->handler, focus_e(world, "hud.form.plain"));
     test_uint(focus_flecs(world), 0);
@@ -961,7 +958,6 @@ void Focus_press_non_focusable_keeps_flecs_focus(void) {
     test_int(focus_probe(world, "probe")->focuses, 0);
     test_int(focus_probe(world, "probe")->blurs, 0);
 
-    /* A press on the body of b, then on its label, which is not Focusable */
     focus_run(world, s, "mouse.click left [600, 260]");
     test_uint(ecs_singleton_get(world, PickStatus)->target, b);
     test_uint(focus_flecs(world), b);
@@ -1005,7 +1001,6 @@ void Focus_script_focus_redirected_or_refused(void) {
     test_uint(m->refused, b);
     test_uint(focus_flecs(world), b);
 
-    /* ecs_script_set_focus from the application follows the same rules */
     test_uint(ecs_script_set_focus(world, plain), b);
     test_uint(focus_flecs(world), b);
     test_uint(ecs_script_set_focus(world, a), a);

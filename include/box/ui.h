@@ -3,10 +3,9 @@
  * @brief UI: the keyboard focus, Tab navigation, keys kept from the bindings, widget events and
  * the text field.
  *
- * One Focusable entity holds the keyboard focus, which is the focus of flecs.script.event: the
- * Focused entity is ecs_script_get_focus at all times. A press or Tab moves it, KeyCapture keeps
- * the keys from the game's bindings, and widgets report changes to the scope that uses them.
- * TextEdit is a single line text field whose editing is done by the engine.
+ * One Focusable entity holds the keyboard focus, the focus of flecs.script.event: Focused is
+ * ecs_script_get_focus at all times. A press or Tab moves it, KeyCapture keeps the keys from the
+ * bindings, widgets report changes to their scope and TextEdit is a single line text field.
  */
 
 #ifndef BOX_UI_H
@@ -29,16 +28,13 @@ extern "C" {
 
 /** Marks an element that can take the keyboard focus; adding it makes it Interactive.
  *
- * A press of any mouse button focuses the first Focusable entity on the bubbling path of the
- * press and clears the focus when there is none, Tab the next one in its FocusScope. Disabled
- * entities and prefabs never take it, and disabling or deleting the focused entity or removing
- * its Focusable clears the focus.
+ * A press focuses the first Focusable entity on its bubbling path, or clears the focus when there
+ * is none. Disabled entities and prefabs never take it; disabling, deleting or removing Focusable
+ * from the focused entity clears it, and a deleted entity gets no on.blur.
  *
- * box.ui decides every move of the flecs focus with the to_focus hook of flecs.script.event, so
- * focus(e) from an async block and ecs_script_set_focus focus e, or the Focusable ancestor a
- * press on e would focus, and change nothing when there is none. flecs sends on.blur and on.focus
- * (EcsScriptFocusEvent) to the entities that lost and gained the focus and to their ancestors,
- * and on.key_down and on.key_up (EcsScriptKeyboardEvent) to the focused entity and its ancestors.
+ * The to_focus hook of box.ui decides every move of the flecs focus: focus(e) in a script and
+ * ecs_script_set_focus focus e or the Focusable ancestor a press on e would, else change nothing.
+ * flecs sends on.blur, on.focus, on.key_down and on.key_up to the focus and its ancestors.
  */
 extern ECS_TAG_DECLARE(Focusable);
 
@@ -161,10 +157,9 @@ ECS_STRUCT(TextEditStatus, {
 
 /** Register the box.ui module.
  *
- * Registers the async script functions flecs.script.on.activate, change and submit, each taking
- * a target and resolving on the target and its ancestors, and ui.changed and ui.submit, which
- * resolve at once (await ui.changed(this)). The focus events and focus() are those of
- * flecs.script.event, whose focus box.ui drives (see Focusable).
+ * Registers flecs.script.on.activate, change and submit, which resolve on a target and its
+ * ancestors, and ui.changed and ui.submit, which resolve at once. The focus events and focus()
+ * are those of flecs.script.event, whose focus box.ui drives (see Focusable).
  *
  * Creates box.ui.theme with a UiTheme and loads the widget library box.widgets as a managed
  * script from etc/ui/widgets.flecs, found as a Font.path is; without it there are no widgets.

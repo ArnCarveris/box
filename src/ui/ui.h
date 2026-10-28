@@ -88,6 +88,7 @@ struct box_ui_state_t {
     bool setting;                /**< box_ui_focus_set is in ecs_script_set_focus */
     bool set_visible;            /**< Whether the focus box_ui_focus_set moves is visible */
     bool decided;                /**< The to_focus hook ran since box_ui_focus_set called flecs */
+    ecs_entity_t focus_lost;     /**< Event queued when the focused entity loses Focusable */
     ecs_entity_t press;          /**< Target of the held left button press, 0 for none */
     ecs_entity_t press_handler;  /**< Handler of that press */
     ecs_entity_t space;          /**< Focused entity Space went down on, 0 for none */
@@ -207,7 +208,7 @@ bool box_ui_focus_step(
     box_pick_state_t *pst,
     bool back);
 
-/** Register Focusable, the observer that clears the focus and the FocusStatus singleton.
+/** Register Focusable, the observers that clear the focus and the FocusStatus singleton.
  *
  * @param world The world
  * @param st The module state
