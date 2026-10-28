@@ -320,10 +320,9 @@ typedef struct box_gpu_cull_job_t {
     float center[3];                /**< Center of the mesh bounds */
     uint32_t history;               /**< First history word of its page, UINT32_MAX for none */
     float extent[3];                /**< Half size of the mesh bounds */
-    uint32_t late;                  /**< Draw arguments of its late phase, UINT32_MAX for none */
     uint32_t list;                  /**< 1 when first indexes the slot lists, 0 for a range */
     uint32_t mask;                  /**< Frustums of its group that draw a parallel job */
-    uint32_t pad[2];                /**< Pads the job to the size of Job in cull.wgsl */
+    uint32_t pad[3];                /**< Pads the job to the size of Job in cull.wgsl */
 } box_gpu_cull_job_t;
 
 /** A frustum of a cull group in the uniforms, as in Frustum of cull.wgsl */

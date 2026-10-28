@@ -197,7 +197,6 @@ static uint32_t box_gpu_cull_job(
     job->args = draw->args;
     job->base = draw->base;
     job->history = history;
-    job->late = draw->late;
     job->mask = mask;
     if (b->bounded) {
         glm_vec3_copy(ECS_CONST_CAST(float*, b->center), job->center);

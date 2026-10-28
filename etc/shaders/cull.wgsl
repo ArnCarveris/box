@@ -67,9 +67,9 @@ struct Job {
     center: vec3f,
     history: u32,
     extent: vec3f,
-    late: u32,
     list: u32,
     mask: u32,
+    pad: u32,
 };
 
 // World space box around an instance.
