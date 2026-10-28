@@ -76,6 +76,11 @@ static box_render_shadow_place_t tile_of(
     return result;
 }
 
+/* The allocation cases call no flecs function that would set up the OS API it allocates with. */
+void ShadowAtlas_setup(void) {
+    ecs_os_set_api_defaults();
+}
+
 void ShadowAtlas_script_defaults(void) {
     // lighting/shadows
     ecs_world_t *world = ecs_init();

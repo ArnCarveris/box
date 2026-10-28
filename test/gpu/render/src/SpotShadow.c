@@ -3,9 +3,10 @@
  * @brief Tests for the shadows of spot lights through the shadow atlas, with the GPU backend.
  *
  * Most cases look straight down from 4 units above a white floor into a 64x64 image with a 90
- * degree camera: world x = 0 lands on column 32 and a world unit is 8 pixels, -Z is up in the
- * image. A spot light 10 units above the origin shines straight down; a 1x1 slab 6 units above
- * the floor, behind the camera, shadows the floor from x = -1.25 to 1.25.
+ * degree camera: world x = 0 lands on column 32 and a world unit is 8 pixels.
+ *
+ * A spot light 10 units above the origin shines straight down; a 1x1 slab 6 units above the
+ * floor, behind the camera, shadows the floor from x = -1.25 to 1.25.
  */
 
 #include <box.h>
@@ -284,8 +285,7 @@ void SpotShadow_baked_light_has_no_tile(void) {
     ecs_modified(world, light, SpotLight);
     int32_t i;
     for (i = 0; i < 3; i ++) {
-        ecs_progress(world, 0);
-        box_render_sync(world);
+        stbi_image_free(spot_capture(world, "spot_baked.png"));
         test_int(ecs_singleton_get(world, RenderStatus)->shadow_tiles, 0);
         test_int(ecs_singleton_get(world, RenderStatus)->shadow_dropped, 0);
     }
@@ -347,9 +347,9 @@ void SpotShadow_atlas_full_drops_farthest(void) {
     ecs_fini(world);
 }
 
+/* The tile tests the floor and both slabs and keeps the floor and the slab inside its frustum */
 void SpotShadow_light_view_culls_casters(void) {
     // lighting/shadows
-    // The tile tests the floor and both slabs and keeps the floor and the slab inside its frustum
     ecs_entity_t light, slab;
     ecs_world_t *world = spot_scene(&light, &slab);
     spot_slab(world, (vec3){30, 6, 0}, 1);

@@ -262,6 +262,7 @@
             },
             {
                 "id": "ShadowAtlas",
+                "setup": true,
                 "testcases": [
                     "script_defaults",
                     "c_defaults",
