@@ -338,7 +338,7 @@ static box_gpu_bake_t* box_gpu_bake_state_new(
     };
     b->cull_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
         &(WGPUBindGroupLayoutDescriptor){ .entryCount = 5, .entries = cull });
-    WGPUBindGroupLayout cull_groups[2] = { b->cull_layout, gpu->instance_layout };
+    WGPUBindGroupLayout cull_groups[2] = { b->cull_layout, gpu->transform_layout };
     b->cull_pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
         &(WGPUPipelineLayoutDescriptor){
             .bindGroupLayoutCount = 2,
@@ -481,16 +481,14 @@ static void box_gpu_bake_draws(
         const box_render_batch_t *rb = ecs_vec_get_t(&packet->batches, box_render_batch_t, i);
         if (box_gpu_cull_capture_draws(gpu, rb, scene, -1)) {
             box_gpu_mesh_t *m = ecs_map_get_deref(&gpu->meshes, box_gpu_mesh_t, rb->mesh);
-            box_gpu_buffer_t *inst = ecs_map_get_deref(
-                &gpu->buffers, box_gpu_buffer_t, rb->instances);
             *ecs_vec_append_t(NULL, &b->draws, box_gpu_bake_draw_t) = (box_gpu_bake_draw_t){
                 .batch = i,
                 .region = b->stride,
                 .count = rb->instance_count,
                 .pipeline = box_gpu_forward_pipeline(gpu, BOX_GPU_HDR_FORMAT, rb),
                 .material = box_gpu_material_group(gpu, rb, packet->anisotropy),
-                .instances = box_gpu_instance_group(gpu, inst, rb->mesh, m),
-                .page = box_gpu_instance_group(gpu, inst, 0, NULL),
+                .instances = box_gpu_instance_group(gpu, rb->instances, rb->mesh, m, true),
+                .page = box_gpu_instance_group(gpu, rb->instances, 0, NULL, false),
                 .vertices = m->vertices,
                 .indices = m->indices
             };

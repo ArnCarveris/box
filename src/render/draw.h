@@ -2,12 +2,15 @@
  * @file render/draw.h
  * @brief Instanced batches of the forward pass, shared by the change tracking and the extract.
  *
- * Shapes live in batches keyed by scene, mesh, pipeline, whether they are dynamic and whether
- * they cast shadows; a batch keeps one slot per entity, swap-removed so its instances stay
- * contiguous, and holds at most BOX_DRAWS_CHUNK of them, so a key may have several batches.
+ * Shapes live in batches keyed by scene, mesh, pipeline, whether their transform and their
+ * material are dynamic and whether they cast shadows; a batch keeps one slot per entity,
+ * swap-removed so its instances stay contiguous, and holds at most BOX_DRAWS_CHUNK of them, so
+ * a key may have several batches.
  *
  * The instances of every batch live in one store of instance pages: a batch owns one run of
- * contiguous slots of one page, handed out by the slot allocator of the store (store.c).
+ * contiguous slots of one page, handed out by the slot allocator of the store (store.c). A
+ * page has a buffer per stream (transform, shading, surface) with the same slots, and a change
+ * writes and uploads only the streams it changes.
  */
 
 #ifndef BOX_RENDER_DRAW_H
@@ -18,16 +21,25 @@
 #include "../texture/texture.h"
 #include "../text/text.h"
 
-/** Instances of one batch and slots of one instance page: one page stays within the 128 MiB
- * storage binding that every WebGPU device supports, and a key with more shapes continues in
- * another batch */
-#define BOX_DRAWS_CHUNK ((uint32_t)((128u << 20) / sizeof(box_render_instance_t)))
+/** Instances of one batch and slots of one instance page: every stream of a page, the surface
+ * stream being the largest, stays within the 128 MiB storage binding that every WebGPU device
+ * supports, and a key with more shapes continues in another batch */
+#define BOX_DRAWS_CHUNK ((uint32_t)((128u << 20) / sizeof(box_render_surface_t)))
 
 /** Slots the smallest run of a batch holds, and the smallest page buffer */
 #define BOX_DRAWS_MIN_CAPACITY (64)
 
 /** Buffers of an instance page at most, one per stream of its layout */
-#define BOX_DRAWS_STREAMS (2)
+#define BOX_DRAWS_STREAMS (BOX_RENDER_INSTANCE_STREAMS)
+
+/** Streams of an instance that a change writes, a bit per stream of the instance pages */
+typedef enum box_draw_kind_t {
+    BOX_DRAW_TRANSFORM = 1 << BOX_RENDER_STREAM_TRANSFORM, /**< The transform stream */
+    BOX_DRAW_SHADING = 1 << BOX_RENDER_STREAM_SHADING,     /**< The shading stream */
+    BOX_DRAW_SURFACE = 1 << BOX_RENDER_STREAM_SURFACE,     /**< The surface stream */
+    BOX_DRAW_BOTH = BOX_DRAW_TRANSFORM | BOX_DRAW_SHADING, /**< Transform and shading */
+    BOX_DRAW_ALL = BOX_DRAW_BOTH | BOX_DRAW_SURFACE        /**< Every stream */
+} box_draw_kind_t;
 
 /** Layout of the instance pages of a store: one buffer per stream, each with its bytes per slot */
 typedef struct box_draw_layout_t {
@@ -49,9 +61,10 @@ typedef struct box_draw_page_t {
     uint32_t top;           /**< End of its highest run, the slots its buffers must hold */
     int32_t runs;           /**< Runs handed out */
     ecs_vec_t holes;        /**< box_draw_hole_t below top by first slot, never adjacent */
-    uint32_t entries;       /**< Scatter entries of the frame */
-    uint32_t offset;        /**< Byte offset of its scatter segment in the change buffer */
-    uint32_t written;       /**< Entries written into its segment */
+    uint32_t entries[BOX_DRAWS_STREAMS]; /**< Scatter entries of the frame per stream */
+    uint32_t offset[BOX_DRAWS_STREAMS];  /**< Byte offset of the scatter segment of each stream
+                                          *   in the change buffer */
+    uint32_t written[BOX_DRAWS_STREAMS]; /**< Entries written into the segment of each stream */
 } box_draw_page_t;
 
 /** The instance pages every batch shares and the slot allocator that hands out their runs.
@@ -88,6 +101,7 @@ typedef struct DrawSlot {
     float layer;    /**< Layer of a 2D shape, its depth in the hierarchy */
     int32_t clip;   /**< Clip index of the nearest ClipChildren ancestor of a 2D shape, 0 none */
     bool dirty;     /**< The entity is in the list of changed entities */
+    uint8_t changed; /**< box_draw_kind_t, the streams its changes since the last extract write */
     bool tinted;    /**< An ancestor has a Tint of a strength above 0 */
     box_draw_tint_t tint; /**< Tints of the ancestors, composed from the root down */
 } DrawSlot;
@@ -104,7 +118,10 @@ typedef struct box_draw_key_t {
     bool cutout;            /**< A 3D shape with AlphaCutoff, alpha tested */
     uint8_t back_face;      /**< BackFaceMode */
     uint8_t wrap;           /**< TextureWrap of the texture samplers */
-    bool dynamic;           /**< Instances are uploaded every frame */
+    bool dynamic_transform; /**< The shapes have DynamicTransform, owned or inherited, so the
+                             *   transforms upload every frame */
+    bool dynamic_material;  /**< The shapes or a ChildOf ancestor have DynamicMaterial, so the
+                             *   shading uploads every frame */
     bool shadow;            /**< Instances cast shadows, false under NoShadow */
     bool bake;              /**< Static 3D instances without NoBake of a scene with LightBake or
                              *   ReflectionBake, drawn by the captures */
@@ -138,6 +155,7 @@ typedef struct box_draw_material_t {
     const box_draw_tint_t *inherited; /**< Composed tints of the ancestors, NULL for none */
     const Shape2D *shape2d;     /**< Resolved 2D shape, NULL for a 3D shape */
     float fade;                 /**< Product of the Opacity of the ancestors */
+    int32_t clip;               /**< Clip index of a 2D shape or glyph, 0 for none */
 } box_draw_material_t;
 
 /** A blended instance of a view, ordered back to front by its view depth */
@@ -178,12 +196,20 @@ typedef struct box_draw_batch_t {
     int32_t page;           /**< Instance page of its run, -1 before it has one */
     uint32_t first;         /**< First slot of its run in the page */
     uint32_t capacity;      /**< Slots of its run */
-    bool full;              /**< Upload every instance instead of the changed slots */
+    uint8_t full;           /**< box_draw_kind_t, streams that upload every instance instead of
+                             *   the changed slots */
     bool ready;             /**< The backend has the mesh and the instances this frame */
+    bool bounds_dirty;      /**< The surface of a slot changed since the bounds were computed */
+    bool bounded;           /**< A slot holds a parametric surface, see center and extent */
+    float center[3];        /**< Center of the local bounds of every slot, when bounded */
+    float extent[3];        /**< Half size of the local bounds of every slot, when bounded */
     ecs_vec_t entities;     /**< ecs_entity_t per slot */
     ecs_vec_t glyphs;       /**< int32_t per slot of a glyph batch, the glyph of its Text */
-    ecs_vec_t instances;    /**< box_render_instance_t per slot */
-    ecs_vec_t changed;      /**< int32_t, slots of a static batch the GPU does not have */
+    ecs_vec_t transforms;   /**< box_render_transform_t per slot */
+    ecs_vec_t shadings;     /**< box_render_shading_t per slot */
+    ecs_vec_t surfaces;     /**< box_render_surface_t per slot */
+    ecs_vec_t changed[BOX_DRAWS_STREAMS]; /**< int32_t per stream, slots whose data of a stream
+                             *   that does not upload every frame the GPU does not have */
 } box_draw_batch_t;
 
 /** The ClipChildren elements the 2D draws clip to, by clip index.
@@ -203,10 +229,17 @@ typedef struct box_draw_clips_t {
     bool dirty;             /**< A record changed since the last upload */
 } box_draw_clips_t;
 
+/** The root of a changed subtree and the streams the change writes for each of its entities */
+typedef struct box_draw_moved_t {
+    ecs_entity_t root;      /**< Root of the subtree */
+    uint8_t kinds;          /**< box_draw_kind_t */
+} box_draw_moved_t;
+
 /** Main thread state of the instanced batches */
 typedef struct box_render_draws_t {
     ecs_query_t *dynamic_transform; /**< Shapes with DynamicTransform */
-    ecs_query_t *dynamic_material;  /**< Shapes with DynamicMaterial and no DynamicTransform */
+    ecs_query_t *dynamic_material;  /**< Shapes with DynamicMaterial, self or up, and no owned
+                                     *   DynamicTransform */
     ecs_query_t *dynamic_texts;     /**< Texts with DynamicTransform */
     ecs_query_t *dynamic_text_materials; /**< Texts with DynamicMaterial, self or up */
     uint32_t text_mesh;         /**< Mesh handle of the glyph quad */
@@ -214,7 +247,7 @@ typedef struct box_render_draws_t {
     ecs_vec_t free_batches;     /**< int32_t, indices of batches not in use */
     ecs_map_t lookup;           /**< Key hash to the index of the first batch plus one */
     ecs_vec_t dirty;            /**< ecs_entity_t, entities whose instance may have changed */
-    ecs_vec_t moved;            /**< ecs_entity_t, roots of subtrees whose parent changed */
+    ecs_vec_t moved;            /**< box_draw_moved_t, roots of changed subtrees */
     ecs_vec_t walk;             /**< ecs_entity_t, stack of a subtree walk */
     ecs_map_t meshes;           /**< Mesh handles the backend received */
     ecs_vec_t released;         /**< uint32_t, meshes to release this frame */
@@ -310,37 +343,74 @@ void box_draws_slot_remove(
     int32_t index,
     int32_t slot);
 
-/** Remember that a slot of a static batch changed.
+/** Remember that streams of a slot changed. The streams the batch uploads every frame are left
+ * out; a stream with as many changed slots as the batch has slots uploads every instance.
  *
  * @param b The batch
  * @param slot The slot
+ * @param kinds box_draw_kind_t, the streams written
  */
 void box_draws_slot_changed(
     box_draw_batch_t *b,
+    int32_t slot,
+    uint8_t kinds);
+
+/** Get the streams a batch uploads every frame.
+ *
+ * @param b The batch
+ * @return box_draw_kind_t: the transform for dynamic_transform, the shading for dynamic_material
+ */
+uint8_t box_draws_dynamic_kinds(
+    const box_draw_batch_t *b);
+
+/** Get the transform of a slot.
+ *
+ * @param b The batch
+ * @param slot The slot
+ * @return The transform
+ */
+box_render_transform_t* box_draws_slot_transform(
+    box_draw_batch_t *b,
     int32_t slot);
 
-/** Write the instance data of a shape: its model matrix and material.
+/** Get the shading of a slot.
  *
- * @param out The instance
- * @param transform World transform of the entity, NULL for the identity
- * @param shape Mesh and instance scale of the entity
- * @param material Material components of the entity
+ * @param b The batch
+ * @param slot The slot
+ * @return The shading
  */
-void box_draws_instance(
-    box_render_instance_t *out,
-    const WorldTransform *transform,
-    const ShapeMesh *shape,
-    const box_draw_material_t *material);
+box_render_shading_t* box_draws_slot_shading(
+    box_draw_batch_t *b,
+    int32_t slot);
 
-/** Write the model matrix of a shape into its instance data.
+/** Get the surface of a slot.
  *
- * @param out The instance
+ * @param b The batch
+ * @param slot The slot
+ * @return The surface
+ */
+box_render_surface_t* box_draws_slot_surface(
+    box_draw_batch_t *b,
+    int32_t slot);
+
+/** Write the transform of a shape: the rows of its model matrix with the instance scale.
+ *
+ * @param out The transform
  * @param transform World transform of the entity, NULL for the identity
  * @param shape Mesh and instance scale of the entity
  */
 void box_draws_transform(
-    box_render_instance_t *out,
+    box_render_transform_t *out,
     const WorldTransform *transform,
+    const ShapeMesh *shape);
+
+/** Write the surface parameters of a shape, zero for a plain mesh.
+ *
+ * @param out The surface
+ * @param shape Mesh and surface of the entity
+ */
+void box_draws_surface(
+    box_render_surface_t *out,
     const ShapeMesh *shape);
 
 /** Write the material of a shape into its instance data.
@@ -349,13 +419,14 @@ void box_draws_transform(
  * the tint of the shape, in display encoding, before it and the emission are converted to
  * linear light. The alpha is the opacity of the shape times the opacity of its ancestors.
  *
- * The cutoff of a 3D shape with AlphaCutoff goes into material z, clamped to 0..1.
+ * The cutoff of a 3D shape with AlphaCutoff goes into material z, clamped to 0..1, and the clip
+ * index into ids[0].
  *
- * @param out The instance
+ * @param out The shading
  * @param material Material components of the entity
  */
 void box_draws_material(
-    box_render_instance_t *out,
+    box_render_shading_t *out,
     const box_draw_material_t *material);
 
 /** Write the shape of a 2D shape into its instance data, over the 3D surface constants.
@@ -363,12 +434,12 @@ void box_draws_material(
  * Material holds the corner radius, border width and border color of a rectangle or the end
  * points of a line, emissive w the aspect of a rectangle or the negated width of a line.
  *
- * @param out The instance
+ * @param out The shading
  * @param material Material components of the entity, with its Shape2D
  * @param border Linear border color mixed toward the tints, NULL for the color of the Border
  */
 void box_draws_shape2d(
-    box_render_instance_t *out,
+    box_render_shading_t *out,
     const box_draw_material_t *material,
     const float *border);
 
@@ -403,16 +474,19 @@ bool box_draws_cutout(
 float box_draws_alpha(
     const box_draw_material_t *material);
 
-/** Add a shape to the changed entities unless it is in the list.
+/** Add a shape to the changed entities unless it is in the list, with the streams its change
+ * writes.
  *
  * @param world The world
  * @param d The state
  * @param e The entity
+ * @param kinds box_draw_kind_t, the streams the change writes
  */
 void box_draws_mark(
     ecs_world_t *world,
     box_render_draws_t *d,
-    ecs_entity_t e);
+    ecs_entity_t e,
+    uint8_t kinds);
 
 /** Multiply the Opacity and compose the Tint of the ancestors, through ChildOf and Parent.
  *
@@ -445,12 +519,12 @@ float box_draws_layer(
  * faces, so it wins the depth test over coplanar ancestors whose depth rounds differently when
  * the plane is rotated in perspective. A step is a tenth of a millimeter in world units.
  *
- * @param out The instance
+ * @param out The transform
  * @param transform World transform of the entity, NULL for the identity
  * @param layer The layer
  */
 void box_draws_lift(
-    box_render_instance_t *out,
+    box_render_transform_t *out,
     const WorldTransform *transform,
     float layer);
 
@@ -642,14 +716,18 @@ void box_draws_text_init(
 
 /** Bring the glyphs of a changed Text into their batches and write their instances.
  *
+ * Glyphs that keep their slots record the streams of the change; new slots write every stream.
+ *
  * @param world The world
  * @param d The state
  * @param e The entity
+ * @param kinds box_draw_kind_t, the streams the change writes
  */
 void box_draws_text_update(
     ecs_world_t *world,
     box_render_draws_t *d,
-    ecs_entity_t e);
+    ecs_entity_t e,
+    uint8_t kinds);
 
 /** Remove every glyph slot of a Text.
  *
@@ -662,7 +740,8 @@ void box_draws_text_remove(
     box_render_draws_t *d,
     ecs_entity_t e);
 
-/** Mark the texts whose instances change every frame.
+/** Mark the texts whose instances change every frame, without streams of their own: their
+ * glyphs write the streams their batches upload every frame.
  *
  * @param world The world
  * @param d The state

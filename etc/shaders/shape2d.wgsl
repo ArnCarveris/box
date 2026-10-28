@@ -14,14 +14,14 @@
 // emissive.w of 0: its quad is the glyph area, uv the area of the atlas page and shape.xy the
 // distance range of the page; its coverage comes from the multi channel signed distance field
 // of the page (distance_map, a linear layer), so the edge stays sharp at any scale. Instances
-// are read by the slot the cull pass wrote, from the instance buffer of the batch (group 2).
+// are read by the slot the cull pass wrote, from the transform and shading streams of the
+// instance page of the batch (group 2).
 //
-// The w of the first model column is the clip index of the instance, 0 when no ClipChildren
-// ancestor clips it. A clip maps the world position of a fragment into the local plane of its
+// ids.x of the shading is the clip index of the instance, 0 when no ClipChildren ancestor clips
+// it. A clip maps the world position of a fragment into the local plane of its
 // element, where the coverage of its rounded area multiplies the alpha, anti-aliased over the
 // footprint of the fragment there; the clips it is nested in follow through its parent index.
 #include "include/lights.wgsl"
-#include "include/surface.wgsl"
 
 // BlendMode of the pipeline: the output is shaped for the blend equation it is drawn with.
 override blend_mode: u32 = 0u;
@@ -45,18 +45,24 @@ const clip_depth: u32 = 16u;
 @group(1) @binding(2) var distance_map: texture_2d<f32>;
 @group(1) @binding(4) var material_sampler: sampler;
 
-// The instance layout of the forward pass with the material words read as integers.
-struct Shape2DInstance {
-    model: mat4x4f,
+// The transform stream of the instance page (InstanceTransform of instance.wgsl): the rows of
+// the model matrix.
+struct Shape2DTransform {
+    rows: array<vec4f, 3>,
+};
+
+// The shading stream of the instance page (InstanceShading of instance.wgsl) with the material
+// words read as integers.
+struct Shape2DShading {
     color: vec4f,
     emissive: vec4f,
     shape: vec4u,
     uv: vec4f,
-    surface: SurfaceData,
+    ids: vec4u,
 };
 
-@group(2) @binding(0) var<storage, read> instances: array<Shape2DInstance>;
-@group(2) @binding(1) var<storage, read> surface_assets: array<vec4f>;
+@group(2) @binding(0) var<storage, read> transforms: array<Shape2DTransform>;
+@group(2) @binding(2) var<storage, read> shadings: array<Shape2DShading>;
 
 struct VertexIn {
     @location(0) position: vec3f,
@@ -94,9 +100,10 @@ fn pixels_per_unit(mvp: mat4x4f, clip: vec4f, dir: vec2f) -> f32 {
 }
 
 @vertex fn vs(v: VertexIn) -> VertexOut {
-    let inst = instances[v.slot];
-    let model = mat4x4f(vec4f(inst.model[0].xyz, 0.0), vec4f(inst.model[1].xyz, 0.0),
-        vec4f(inst.model[2].xyz, 0.0), vec4f(inst.model[3].xyz, 1.0));
+    let inst = shadings[v.slot];
+    let r = transforms[v.slot].rows;
+    let model = mat4x4f(vec4f(r[0].x, r[1].x, r[2].x, 0.0), vec4f(r[0].y, r[1].y, r[2].y, 0.0),
+        vec4f(r[0].z, r[1].z, r[2].z, 0.0), vec4f(r[0].w, r[1].w, r[2].w, 1.0));
     let mvp = view.view_proj * model;
     var origin = vec2f(0.0);
     var axis = vec2f(1.0, 0.0);
@@ -138,7 +145,7 @@ fn pixels_per_unit(mvp: mat4x4f, clip: vec4f, dir: vec2f) -> f32 {
     let point = vec4f(origin + dir_x * q.x + dir_y * q.y, 0.0, 1.0);
     o.pos = mvp * point;
     o.world = (model * point).xyz;
-    o.clip = u32(max(inst.model[0].w, 0.0) + 0.5);
+    o.clip = inst.ids.x;
     o.local = q;
     o.uv = vec2f(q.x / (2.0 * extent.x) + 0.5, 0.5 - q.y / (2.0 * extent.y));
     o.extent = extent;

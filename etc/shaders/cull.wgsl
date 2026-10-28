@@ -3,10 +3,11 @@
 // geometry it drew first, and writes the slots of the instances to draw, compacted per draw,
 // with the instance count of its indexed indirect draw arguments.
 //
-// A job is the slot range of one draw in its instance page, which group 1 binds: every batch
-// owns a run of slots of a page shared by many batches, so a job's first is its page slot. Its
-// bounds are the box around the mesh, moved into world space by the model matrix (mesh bounds
-// times the instance scale and the world transform); the planes are the frustum in world space.
+// A job is the slot range of one draw in its instance page, whose transform stream group 1
+// binds: every batch owns a run of slots of a page shared by many batches, so a job's first is
+// its page slot. Its bounds are the box around the mesh, or around the parametric surfaces of
+// its batch, moved into world space by the model matrix (local bounds times the instance scale
+// and the world transform); the planes are the frustum in world space.
 //
 // A view that culls by occlusion runs two phases. The early phase draws the instances in the
 // frustum that its history (group 2, one word per instance slot, 0 when the instance was
@@ -80,7 +81,7 @@ const PHASE_LATE: u32 = 2u;
 @group(0) @binding(4) var<storage, read_write> counters: array<atomic<u32>>;
 @group(0) @binding(5) var<storage, read> slot_lists: array<u32>;
 @group(0) @binding(6) var<storage, read_write> scan_words: array<u32>;
-@group(1) @binding(0) var<storage, read> instances: array<Instance>;
+@group(1) @binding(0) var<storage, read> transforms: array<InstanceTransform>;
 @group(1) @binding(1) var<storage, read> surface_assets: array<vec4f>;
 @group(2) @binding(0) var<storage, read_write> history: array<u32>;
 @group(2) @binding(1) var pyramid: texture_2d<f32>;
@@ -101,14 +102,9 @@ var<workgroup> scan_sums: array<u32, 256>;
 // The size is the diameter of the sphere around the box in pixels, tested only when the box is
 // in front of the camera (w beyond the radius); size.z is 0 for orthographic projections.
 fn visible(job: Job, slot: u32) -> bool {
-    let inst = instances[slot];
-    let m = inst.model;
-    var local_center = job.center;
-    var local_extent = job.extent;
-    if (inst.surface.p[0].x != 0.0) {
-        local_center = inst.surface.p[22].xyz;
-        local_extent = inst.surface.p[23].xyz;
-    }
+    let m = instance_model(transforms[slot]);
+    let local_center = job.center;
+    let local_extent = job.extent;
     let c0 = m[0].xyz;
     let c1 = m[1].xyz;
     let c2 = m[2].xyz;
@@ -138,14 +134,9 @@ fn visible(job: Job, slot: u32) -> bool {
 // and the instance is hidden when its nearest depth is farther than the farthest depth they
 // hold. A box that reaches behind the camera or in front of the near plane is never hidden.
 fn occluded(job: Job, slot: u32) -> bool {
-    let inst = instances[slot];
-    let m = inst.model;
-    var local_center = job.center;
-    var local_extent = job.extent;
-    if (inst.surface.p[0].x != 0.0) {
-        local_center = inst.surface.p[22].xyz;
-        local_extent = inst.surface.p[23].xyz;
-    }
+    let m = instance_model(transforms[slot]);
+    let local_center = job.center;
+    let local_extent = job.extent;
     let center = m[0].xyz * local_center.x + m[1].xyz * local_center.y + m[2].xyz * local_center.z +
         m[3].xyz;
     let origin = cull.view_proj * vec4f(center, 1.0);

@@ -89,14 +89,28 @@
 
 /** Buffer handle of the first instance page, the first handle of the instance pages.
  *
- * Every batch draws a run of slots of one instance page, a storage buffer of at most
- * BOX_DRAWS_CHUNK instances shared by the batches (box_render_batch_t.instances is the page and
- * first_instance the first slot of the run).
+ * Every batch draws a run of slots of one instance page, BOX_RENDER_INSTANCE_STREAMS storage
+ * buffers of at most BOX_DRAWS_CHUNK instances with the same slots, shared by the batches
+ * (box_render_batch_t.instances is the transform stream of the page and first_instance the
+ * first slot of the run).
  *
- * Page p of the store has the handle BOX_RENDER_BUFFER_FIRST + p * buffers + b for buffer b of
- * its layout (one buffer today), so the first page is BOX_RENDER_BUFFER_FIRST once a batch
- * exists. A released page index is reused by the next page the store needs. */
+ * Page p of the store has the handle BOX_RENDER_BUFFER_FIRST + p * BOX_RENDER_INSTANCE_STREAMS
+ * + s for stream s, so the transform stream of the first page is BOX_RENDER_BUFFER_FIRST once a
+ * batch exists and the other streams of a page follow the handle of its transform stream. A
+ * released page index is reused by the next page the store needs. */
 #define BOX_RENDER_BUFFER_FIRST (16)
+
+/** Buffers of an instance page, one per stream, at consecutive handles */
+#define BOX_RENDER_INSTANCE_STREAMS (3)
+
+/** Stream of the transforms of an instance page, box_render_transform_t per slot */
+#define BOX_RENDER_STREAM_TRANSFORM (0)
+
+/** Stream of the shading constants of an instance page, box_render_shading_t per slot */
+#define BOX_RENDER_STREAM_SHADING (1)
+
+/** Stream of the surface parameters of an instance page, box_render_surface_t per slot */
+#define BOX_RENDER_STREAM_SURFACE (2)
 
 /** Byte alignment of a scatter segment in the change buffer, the storage offset alignment */
 #define BOX_RENDER_SCATTER_ALIGN (256)
@@ -581,8 +595,8 @@ typedef enum box_render_buffer_usage_t {
 /** The area of a ClipChildren element as shape2d.wgsl reads it from the clip buffer.
  *
  * The rows map a world position into the local XY plane of the element, where the area is a
- * rounded rectangle on the origin. A 2D instance holds its clip index in model[0][3] (0 for
- * none, index 0 of the buffer is unused) and a clip the index of the clip it is nested in.
+ * rounded rectangle on the origin. A 2D instance holds its clip index in ids[0] of its shading
+ * (0 for none, index 0 of the buffer is unused) and a clip the index of the clip it is nested in.
  */
 typedef struct box_render_clip_t {
     float x[4];             /**< First row of the inverse world transform of the element */
@@ -596,30 +610,47 @@ typedef struct box_render_buffer_desc_t {
     uint32_t usage;         /**< box_render_buffer_usage_t flags */
 } box_render_buffer_desc_t;
 
-/** Instance data of the forward pass, one per drawn instance in an instance buffer.
+/** Transform of an instance, the hot stream of an instance page that moved instances upload.
  *
- * The shader derives the normal matrix from the model matrix, so an instance holds the
- * transform and the material constants only.
+ * The three rows of the affine model matrix, the world transform with the instance scale:
+ * row r is (m[0][r], m[1][r], m[2][r], m[3][r]). The shaders derive the normal matrix from it.
  */
-typedef struct box_render_instance_t {
-    mat4 model;             /**< World transform with the instance scale, affine; a 2D instance
-                             *   holds its clip index in model[0][3] */
+typedef struct box_render_transform_t {
+    vec4 rows[3];           /**< Rows of the model matrix, the fourth row is (0, 0, 0, 1) */
+} box_render_transform_t;
+
+/** Shading constants of an instance, the stream of an instance page that changes with its
+ * material.
+ *
+ * A 2D instance holds the words of its shape in material (see shape2d.wgsl) and its clip index
+ * in ids[0].
+ */
+typedef struct box_render_shading_t {
     vec4 color;             /**< Linear base color, alpha is the opacity with its ancestors */
     vec4 emissive;          /**< Linear emitted color times its strength, w unused */
     vec4 material;          /**< Metallic, roughness, the AlphaCutoff of an alpha tested
                              *   instance (0 otherwise), w unused */
     vec4 uv;                /**< TextureTransform: u scale, v scale, u offset, v offset */
-    struct { vec4 p[BOX_SURFACE_VECTORS]; } surface;
-} box_render_instance_t;
+    uint32_t ids[4];        /**< Clip index of a 2D instance (0 for none), three reserved 0 */
+} box_render_shading_t;
 
-/** Compute pass that copies changed instances from the change buffer into their slots.
+/** Surface parameters of an instance, the stream of an instance page that changes with its
+ * ShapeMesh: the parametric surface the vertex shaders evaluate (surface.wgsl), zero for a
+ * plain mesh. p[0].x is the surface kind and p[22], p[23] the center and half extent of the
+ * local bounds of a surface. */
+typedef struct box_render_surface_t {
+    vec4 p[BOX_SURFACE_VECTORS]; /**< Surface words, as box_surface_data_t.p */
+} box_render_surface_t;
+
+/** Compute pass that copies changed instances from the change buffer into their slots of one
+ * stream of an instance page.
  *
- * The segment at offset holds BOX_RENDER_SCATTER_HEADER words (count, words per instance)
- * followed by count entries of a slot index and the words of the instance.
+ * The segment at offset holds BOX_RENDER_SCATTER_HEADER words (count, words per instance of
+ * the stream) followed by count entries of a slot index and the words of the instance.
  */
 typedef struct box_render_scatter_t {
-    uint32_t buffer;        /**< Handle of the instance page the slots are in, one scatter per
-                             *   page and frame */
+    uint32_t buffer;        /**< Handle of the stream of the instance page the slots are in, one
+                             *   scatter per page, stream and frame */
     uint32_t changes;       /**< Handle of the buffer holding the segment */
     uint32_t offset;        /**< Byte offset of the segment, a BOX_RENDER_SCATTER_ALIGN multiple */
     uint32_t size;          /**< Bytes of the segment */
@@ -674,8 +705,13 @@ typedef struct box_render_batch_t {
     uint32_t mesh;              /**< Mesh handle */
     uint32_t textures[BOX_RENDER_TEXTURE_SLOTS]; /**< Texture handles of the layers, 0 for none */
     uint32_t wrap;              /**< TextureWrap of the samplers */
-    uint32_t instances;         /**< Handle of the instance page holding the instance data */
+    uint32_t instances;         /**< Handle of the transform stream of the instance page
+                                 *   holding the instance data; its other streams follow */
     uint32_t first_instance;    /**< First slot in the instance page, unused when listed */
+    bool bounded;               /**< The instances are parametric surfaces whose local bounds
+                                 *   are center and extent instead of the bounds of the mesh */
+    float center[3];            /**< Center of the local bounds of every instance when bounded */
+    float extent[3];            /**< Half size of the local bounds of every instance when bounded */
     uint32_t instance_count;    /**< Instances to draw */
     bool listed;                /**< The instances are the slots at slots, not a range */
     uint32_t slots;             /**< Data offset of instance_count uint32_t page slots in draw
@@ -1150,16 +1186,27 @@ typedef struct box_render_draws_stats_t {
     int32_t scatters;           /**< Scatters the last extract sent, one per instance page with
                                  *   static changes */
     int32_t pages;              /**< Instance pages alive */
-    int64_t upload_bytes;       /**< Bytes the last extract uploaded into instance buffers */
+    int64_t upload_bytes;       /**< Bytes the last extract uploaded into instance buffers, the
+                                 *   sum of the bytes of the streams */
+    int64_t transform_bytes;    /**< Bytes the last extract uploaded into the transform streams:
+                                 *   the runs of batches whose transforms upload (every frame for
+                                 *   DynamicTransform) and the scatter segments of moved slots */
+    int64_t shading_bytes;      /**< Bytes the last extract uploaded into the shading streams:
+                                 *   the runs of batches whose shading uploads (every frame for
+                                 *   DynamicMaterial) and the scatter segments of changed materials */
+    int64_t surface_bytes;      /**< Bytes the last extract uploaded into the surface streams,
+                                 *   runs and scatter segments, only when a ShapeMesh changed */
     int32_t clips;              /**< ClipChildren elements in the clip buffer */
     int64_t clip_bytes;         /**< Bytes the last extract uploaded into the clip buffer */
 } box_render_draws_stats_t;
 
 /** Register the observers and the system that keep the shapes of the world in batches.
  *
- * Shapes are instanced in batches keyed by scene, mesh, pipeline and whether they are dynamic,
- * which persist between frames. Static instances live in instance buffers that are updated
- * on change through the scatter pass, dynamic instances are uploaded every frame.
+ * Shapes are instanced in batches keyed by scene, mesh, pipeline and whether their transform
+ * and their material are dynamic, which persist between frames. An instance page holds a
+ * transform, a shading and a surface stream. The transforms of DynamicTransform shapes and the
+ * shading of DynamicMaterial shapes upload every frame; every other stream is updated on change
+ * through the scatter pass, only the streams that changed.
  *
  * @param world The world
  */

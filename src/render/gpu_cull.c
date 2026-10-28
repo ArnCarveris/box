@@ -64,15 +64,6 @@ void box_gpu_cull_init(
     box_gpu_t *gpu)
 {
     box_gpu_cull_t *c = &gpu->cull;
-    WGPUBindGroupLayoutEntry instance[2] = {{
-        .binding = 0,
-        .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Compute,
-        .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
-    }, {
-        .binding = 1,
-        .visibility = WGPUShaderStage_Vertex,
-        .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
-    }};
     WGPUBindGroupLayoutEntry entries[7] = {
         {
             .binding = 0,
@@ -115,8 +106,7 @@ void box_gpu_cull_init(
         }
     };
     int32_t i;
-    gpu->instance_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
-        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 2, .entries = instance });
+    box_gpu_instance_layouts_init(gpu);
     gpu->no_assets = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
         .usage = WGPUBufferUsage_Storage,
         .size = sizeof(vec4)
@@ -124,7 +114,7 @@ void box_gpu_cull_init(
     c->layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
         &(WGPUBindGroupLayoutDescriptor){ .entryCount = 7, .entries = entries });
     box_gpu_hiz_init(gpu);
-    WGPUBindGroupLayout groups[3] = { c->layout, gpu->instance_layout, c->history_layout };
+    WGPUBindGroupLayout groups[3] = { c->layout, gpu->transform_layout, c->history_layout };
     c->pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
         &(WGPUPipelineLayoutDescriptor){
             .bindGroupLayoutCount = 3,
@@ -278,10 +268,7 @@ void box_gpu_cull_fini(
         c->layout = NULL;
     }
 
-    if (gpu->instance_layout) {
-        wgpuBindGroupLayoutRelease(gpu->instance_layout);
-        gpu->instance_layout = NULL;
-    }
+    box_gpu_instance_layouts_fini(gpu);
 
     box_gpu_cull_release(&gpu->no_assets);
 }
@@ -694,8 +681,13 @@ static uint32_t box_gpu_cull_job(
     job->base = draw->base;
     job->history = history;
     job->late = draw->late;
-    glm_vec3_copy(m->center, job->center);
-    glm_vec3_copy(m->extent, job->extent);
+    if (b->bounded) {
+        glm_vec3_copy(ECS_CONST_CAST(float*, b->center), job->center);
+        glm_vec3_copy(ECS_CONST_CAST(float*, b->extent), job->extent);
+    } else {
+        glm_vec3_copy(m->center, job->center);
+        glm_vec3_copy(m->extent, job->extent);
+    }
 
     return result;
 }
@@ -1407,8 +1399,7 @@ static bool box_gpu_cull_run(
     WGPUBindGroup instances = any ? *bound : NULL;
     uint32_t offset = uniform * BOX_GPU_CULL_STRIDE;
     if (!instances) {
-        box_gpu_buffer_t *b = ecs_map_get_deref(&gpu->buffers, box_gpu_buffer_t, buffer);
-        instances = b ? box_gpu_instance_group(gpu, b, 0, NULL) : NULL;
+        instances = box_gpu_instance_group(gpu, buffer, 0, NULL, false);
     }
 
     if (!instances) {
@@ -1778,14 +1769,15 @@ bool box_gpu_cull_draw(
     const box_gpu_cull_draw_t *draw,
     uint32_t group,
     bool late,
+    bool shading,
     WGPUBindGroup *bound)
 {
     box_gpu_cull_t *c = &gpu->cull;
     const box_render_batch_t *b = ecs_vec_get_t(
         &packet->batches, box_render_batch_t, draw->batch);
     box_gpu_mesh_t *m = ecs_map_get_deref(&gpu->meshes, box_gpu_mesh_t, b->mesh);
-    box_gpu_buffer_t *inst = ecs_map_get_deref(&gpu->buffers, box_gpu_buffer_t, b->instances);
-    WGPUBindGroup instances = inst && m ? box_gpu_instance_group(gpu, inst, b->mesh, m) : NULL;
+    WGPUBindGroup instances = m
+        ? box_gpu_instance_group(gpu, b->instances, b->mesh, m, shading) : NULL;
     uint32_t args = late ? draw->late : draw->args;
     uint32_t base = late ? draw->base + draw->count : draw->base;
     bool result = m && instances && args != UINT32_MAX;

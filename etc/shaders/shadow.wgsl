@@ -1,9 +1,11 @@
 // Shadow pass: draws the shadow casters of a view into one cascade of its shadow map, depth
 // only. The cull pass writes the slots of the casters inside the cascade, which step per
-// instance; vs only reads the model matrix and the surface of the instance.
-// Alpha tested casters (AlphaCutoff) draw with vs_cutout and fs_cutout, which also read the UV,
-// the UV transform, the alpha and the cutoff of the instance and discard where the alpha times
-// the albedo alpha of the batch (group 2) is below the cutoff, as the forward pass does.
+// instance; vs only reads the transform stream and the surface stream of the instance page
+// (group 1 without the shading stream).
+// Alpha tested casters (AlphaCutoff) draw with vs_cutout and fs_cutout, which also bind the
+// shading stream and read the UV, the UV transform, the alpha and the cutoff of the instance and
+// discard where the alpha times the albedo alpha of the batch (group 2) is below the cutoff, as
+// the forward pass does.
 #include "include/instance.wgsl"
 
 struct Cascade {
@@ -11,8 +13,10 @@ struct Cascade {
 };
 
 @group(0) @binding(0) var<uniform> cascade: Cascade;
-@group(1) @binding(0) var<storage, read> instances: array<Instance>;
+@group(1) @binding(0) var<storage, read> transforms: array<InstanceTransform>;
 @group(1) @binding(1) var<storage, read> surface_assets: array<vec4f>;
+@group(1) @binding(2) var<storage, read> shadings: array<InstanceShading>;
+@group(1) @binding(3) var<storage, read> surfaces: array<SurfaceData>;
 
 @group(2) @binding(0) var albedo_map: texture_2d<f32>;
 @group(2) @binding(4) var material_sampler: sampler;
@@ -37,36 +41,36 @@ struct CutoutOut {
 };
 
 // Position of a vertex of a caster in the clip space of the cascade.
-fn caster_position(inst: Instance, vertex: vec3f) -> vec4f {
-    surface_data = inst.surface;
-    let model = instance_model(inst);
+fn caster_position(slot: u32, vertex: vec3f) -> vec4f {
+    surface_data = surfaces[slot];
+    let model = instance_model(transforms[slot]);
     var position = vertex;
-    if (inst.surface.p[19].x != 0.0) {
+    if (surface_data.p[19].x != 0.0) {
         position = vertex;
-    } else if (inst.surface.p[0].x == 7.0) {
-        position.y *= inst.surface.p[1].y;
-    } else if (inst.surface.p[0].x != 0.0) {
+    } else if (surface_data.p[0].x == 7.0) {
+        position.y *= surface_data.p[1].y;
+    } else if (surface_data.p[0].x != 0.0) {
         position = surface_position(i32(position.z), position.x, position.y);
     }
     return cascade.matrix * (model * vec4f(position, 1.0));
 }
 
 @vertex fn vs(v: VertexIn) -> @builtin(position) vec4f {
-    return caster_position(instances[v.slot], v.position);
+    return caster_position(v.slot, v.position);
 }
 
 // The UV as vs of mesh.wgsl transforms it: the side region of a kind 7 surface, whose UVs start
 // two tiles over, moves back.
 @vertex fn vs_cutout(v: CutoutIn) -> CutoutOut {
-    let inst = instances[v.slot];
+    let shading = shadings[v.slot];
     var o: CutoutOut;
-    o.pos = caster_position(inst, v.position);
-    o.uv = v.uv * inst.uv.xy + inst.uv.zw;
-    if (inst.surface.p[0].x == 7.0 && v.uv.x >= 2.0 && abs(v.normal.y) <= 0.5) {
-        o.uv.x -= 2.0 * inst.uv.x;
+    o.pos = caster_position(v.slot, v.position);
+    o.uv = v.uv * shading.uv.xy + shading.uv.zw;
+    if (surface_data.p[0].x == 7.0 && v.uv.x >= 2.0 && abs(v.normal.y) <= 0.5) {
+        o.uv.x -= 2.0 * shading.uv.x;
     }
-    o.alpha = inst.color.a;
-    o.cutoff = inst.material.z;
+    o.alpha = shading.color.a;
+    o.cutoff = shading.material.z;
     return o;
 }
 

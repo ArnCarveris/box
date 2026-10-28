@@ -380,7 +380,7 @@ static uint32_t box_gpu_hiz_words(
     box_gpu_buffer_t *inst = ecs_map_get_deref(&gpu->buffers, box_gpu_buffer_t, b->instances);
     if (inst && (inst->usage & BOX_RENDER_BUFFER_STORAGE) && inst->counted != mark) {
         inst->counted = mark;
-        result = (uint32_t)(inst->size / sizeof(box_render_instance_t));
+        result = (uint32_t)(inst->size / sizeof(box_render_transform_t));
     }
 
 done:

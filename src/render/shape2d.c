@@ -75,12 +75,12 @@ static void box_shape2d_pack(
  *
  * Lengths are relative to half the smaller side, the unit the shader measures distances in.
  *
- * @param out The instance
+ * @param out The shading
  * @param s The shape
  * @param border Linear border color, NULL for the color of the shape
  */
 static void box_shape2d_rect(
-    box_render_instance_t *out,
+    box_render_shading_t *out,
     const Shape2D *s,
     const float *border)
 {
@@ -100,11 +100,11 @@ static void box_shape2d_rect(
 
 /** Write the end points and width of a line.
  *
- * @param out The instance
+ * @param out The shading
  * @param s The shape
  */
 static void box_shape2d_line(
-    box_render_instance_t *out,
+    box_render_shading_t *out,
     const Shape2D *s)
 {
     out->material[0] = s->line[0];
@@ -115,7 +115,7 @@ static void box_shape2d_line(
 }
 
 void box_draws_shape2d(
-    box_render_instance_t *out,
+    box_render_shading_t *out,
     const box_draw_material_t *material,
     const float *border)
 {

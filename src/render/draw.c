@@ -2,8 +2,12 @@
  * @file render/draw.c
  * @brief Tracks which shapes changed and keeps them in their instanced batch.
  *
- * Observers collect changed entities and the roots of changed subtrees, so an extract only
- * visits what changed; static instances are written once per change, dynamic ones per frame.
+ * Observers collect changed entities and the roots of changed subtrees with the streams their
+ * change writes (box_draw_kind_t), so an extract only visits what changed and writes what it
+ * changed: a moved shape its transform, a recolored one its shading.
+ *
+ * Static streams are written once per change, the transforms of DynamicTransform and the
+ * shading of DynamicMaterial shapes per frame.
  */
 
 #include "draw.h"
@@ -82,7 +86,7 @@ static void box_draws_free(
     ecs_vec_fini_t(NULL, &d->blended, int32_t);
     ecs_vec_fini_t(NULL, &d->sorted, box_draw_sorted_t);
     ecs_vec_fini_t(NULL, &d->dirty, ecs_entity_t);
-    ecs_vec_fini_t(NULL, &d->moved, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &d->moved, box_draw_moved_t);
     ecs_vec_fini_t(NULL, &d->walk, ecs_entity_t);
     box_draws_order_fini(d);
     box_draws_clips_fini(d);
@@ -94,42 +98,76 @@ done:
 void box_draws_mark(
     ecs_world_t *world,
     box_render_draws_t *d,
-    ecs_entity_t e)
+    ecs_entity_t e,
+    uint8_t kinds)
 {
     DrawSlot *s = ecs_get_mut(world, e, DrawSlot);
-    if (s && !s->dirty) {
+    if (!s) {
+        goto done;
+    }
+
+    s->changed |= kinds;
+    if (!s->dirty) {
         s->dirty = true;
         *ecs_vec_append_t(NULL, &d->dirty, ecs_entity_t) = e;
     }
+
+done:
+    return;
 }
 
 /** Mark the entities of an observer event as changed.
+ *
+ * @param it The iterator of the observer
+ * @param kinds box_draw_kind_t, the streams the change writes
+ */
+static void box_draws_on_change(
+    ecs_iter_t *it,
+    uint8_t kinds)
+{
+    box_render_draws_t *d = it->ctx;
+    int32_t i;
+    if (ecs_is_fini(it->world)) {
+        goto done;
+    }
+
+    for (i = 0; i < it->count; i ++) {
+        box_draws_mark(it->world, d, it->entities[i], kinds);
+    }
+
+done:
+    return;
+}
+
+/** Mark the entities of an observer event as changed in every stream: a change of the shape or
+ * of its batch key.
  *
  * @param it The iterator of the observer
  */
 static void BoxDrawsOnChange(
     ecs_iter_t *it)
 {
-    box_render_draws_t *d = it->ctx;
-    int32_t i;
-    if (ecs_is_fini(it->world)) {
-        goto done;
-    }
+    box_draws_on_change(it, BOX_DRAW_ALL);
+}
 
-    for (i = 0; i < it->count; i ++) {
-        box_draws_mark(it->world, d, it->entities[i]);
-    }
-
-done:
-    return;
+/** Mark the entities of an observer event as changed in their shading: a material change.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxDrawsOnShading(
+    ecs_iter_t *it)
+{
+    box_draws_on_change(it, BOX_DRAW_SHADING);
 }
 
 /** Remember the entities of an observer event as roots of changed subtrees.
  *
  * @param it The iterator of the observer
+ * @param kinds box_draw_kind_t, the streams the change writes for the entities of the subtrees
  */
-static void BoxDrawsOnMove(
-    ecs_iter_t *it)
+static void box_draws_on_move(
+    ecs_iter_t *it,
+    uint8_t kinds)
 {
     box_render_draws_t *d = it->ctx;
     int32_t i;
@@ -138,15 +176,39 @@ static void BoxDrawsOnMove(
     }
 
     for (i = 0; i < it->count; i ++) {
-        *ecs_vec_append_t(NULL, &d->moved, ecs_entity_t) = it->entities[i];
+        *ecs_vec_append_t(NULL, &d->moved, box_draw_moved_t) = (box_draw_moved_t){
+            .root = it->entities[i], .kinds = kinds
+        };
     }
 
 done:
     return;
 }
 
-/** Mark the static entities whose WorldTransform was set; the descendants of a ManualTransform
- * entity arrive through box_transform_on_moved once their static transform is computed.
+/** Remember the entities of an observer event as roots of subtrees whose key may have changed.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxDrawsOnMove(
+    ecs_iter_t *it)
+{
+    box_draws_on_move(it, BOX_DRAW_ALL);
+}
+
+/** Remember the entities of an observer event as roots of subtrees whose shading changed: the
+ * Opacity and the Tint of the ancestors.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxDrawsOnShadingMove(
+    ecs_iter_t *it)
+{
+    box_draws_on_move(it, BOX_DRAW_SHADING);
+}
+
+/** Mark the static entities whose WorldTransform was set, in their transform; the descendants
+ * of a ManualTransform entity arrive through box_transform_on_moved once their static transform
+ * is computed.
  *
  * The DynamicTransform filter runs in the callback, because a Not term on an inherited tag
  * allocates for every event.
@@ -157,11 +219,11 @@ static void BoxDrawsOnStaticWorld(
     ecs_iter_t *it)
 {
     if (!box_transform_dynamic(it->world, it->table)) {
-        BoxDrawsOnChange(it);
+        box_draws_on_change(it, BOX_DRAW_TRANSFORM);
     }
 }
 
-/** Mark the entities whose static transform was computed.
+/** Mark the entities whose static transform was computed, in their transform.
  *
  * @param world The world
  * @param entities The entities
@@ -176,12 +238,13 @@ static void box_draws_on_moved(
 {
     int32_t i;
     for (i = 0; i < count; i ++) {
-        box_draws_mark(world, ctx, entities[i]);
+        box_draws_mark(world, ctx, entities[i], BOX_DRAW_TRANSFORM);
     }
 }
 
 /** Remember the entities whose parent changed as roots of changed subtrees, and make the 2D
- * draw order again.
+ * draw order again. A reparented entity writes its transform and its shading: its layer,
+ * clip, opacity and tints follow the new ancestors.
  *
  * @param it The iterator of the observer
  */
@@ -190,11 +253,11 @@ static void BoxDrawsOnHierarchy(
 {
     box_render_draws_t *d = it->ctx;
     d->order_dirty = true;
-    BoxDrawsOnMove(it);
+    box_draws_on_move(it, BOX_DRAW_BOTH);
 }
 
 /** Follow an element that got or lost ClipChildren: its descendants take the clip index of
- * their nearest clip again.
+ * their nearest clip again, which their shading holds.
  *
  * @param it The iterator of the observer
  */
@@ -215,7 +278,7 @@ static void BoxDrawsOnClip(
         }
     }
 
-    BoxDrawsOnMove(it);
+    box_draws_on_move(it, BOX_DRAW_SHADING);
 done:
     return;
 }
@@ -303,16 +366,16 @@ static void box_draws_walk(
 {
     int32_t i;
     for (i = 0; i < ecs_vec_count(&d->moved); i ++) {
-        ecs_entity_t root = *ecs_vec_get_t(&d->moved, ecs_entity_t, i);
-        if (!ecs_is_alive(world, root)) {
+        box_draw_moved_t moved = *ecs_vec_get_t(&d->moved, box_draw_moved_t, i);
+        if (!ecs_is_alive(world, moved.root)) {
             continue;
         }
 
-        *ecs_vec_append_t(NULL, &d->walk, ecs_entity_t) = root;
+        *ecs_vec_append_t(NULL, &d->walk, ecs_entity_t) = moved.root;
         while (ecs_vec_count(&d->walk)) {
             ecs_entity_t e = *ecs_vec_last_t(&d->walk, ecs_entity_t);
             ecs_vec_remove_last(&d->walk);
-            box_draws_mark(world, d, e);
+            box_draws_mark(world, d, e, moved.kinds);
             ecs_iter_t it = ecs_children(world, e);
             while (ecs_children_next(&it)) {
                 int32_t c;
@@ -439,7 +502,8 @@ static void BoxDrawsOnLightBake(
             }
 
             for (s = 0; s < ecs_vec_count(&batch->entities); s ++) {
-                box_draws_mark(it->world, d, *ecs_vec_get_t(&batch->entities, ecs_entity_t, s));
+                box_draws_mark(it->world, d, *ecs_vec_get_t(&batch->entities, ecs_entity_t, s),
+                    BOX_DRAW_ALL);
             }
         }
     }
@@ -485,8 +549,8 @@ static void box_draws_key(
         key->textures[0] = shape2d->texture;
     }
 
-    key->dynamic = ecs_has_id(world, e, DynamicTransform) ||
-        ecs_has_id(world, e, DynamicMaterial) ||
+    key->dynamic_transform = box_transform_dynamic(world, ecs_get_table(world, e));
+    key->dynamic_material = ecs_has_id(world, e, DynamicMaterial) ||
         ecs_get_target_for_id(world, e, EcsChildOf, DynamicMaterial) != 0;
     key->shadow = !shape2d && !ecs_has_id(world, e, NoShadow) &&
         !ecs_get_target_for_id(world, e, EcsChildOf, NoShadow);
@@ -497,20 +561,24 @@ static void box_draws_key(
 
 /** Bring the shape of a changed entity into the batch of its key and write its instance.
  *
+ * A shape that keeps its slot writes the streams of its change, plus its shading when the clip
+ * index of a 2D shape changed; a shape that gets a slot writes every stream.
+ *
  * @param world The world
  * @param d The state
  * @param e The entity
  * @param s Its DrawSlot
+ * @param kinds box_draw_kind_t, the streams the change writes
  */
 static void box_draws_update_shape(
     ecs_world_t *world,
     box_render_draws_t *d,
     ecs_entity_t e,
-    DrawSlot *s)
+    DrawSlot *s,
+    uint8_t kinds)
 {
     box_draw_key_t key;
     box_draw_batch_t *b;
-    box_render_instance_t *inst;
     const WorldTransform *transform;
     box_draw_material_t material;
     const ShapeMesh *shape = ecs_get(world, e, ShapeMesh);
@@ -553,18 +621,37 @@ static void box_draws_update_shape(
     s->batch = box_draws_batch_ensure(d, &key);
     s->slot = box_draws_slot_add(d, s->batch, e);
     b = box_draws_batch(d, s->batch);
+    kinds = BOX_DRAW_ALL;
 write:
-    inst = ecs_vec_get_t(&b->instances, box_render_instance_t, s->slot);
-    transform = ecs_get(world, e, WorldTransform);
-    box_draws_instance(inst, transform, shape, &material);
     if (material.shape2d) {
+        int32_t clip = box_draws_clip_of(world, d, e);
+        if (clip != s->clip) {
+            kinds |= BOX_DRAW_SHADING;
+        }
+
         s->layer = box_draws_layer(world, e, false);
-        s->clip = box_draws_clip_of(world, d, e);
-        box_draws_lift(inst, transform, s->layer);
-        inst->model[0][3] = (float)s->clip;
+        s->clip = clip;
+        material.clip = clip;
     }
 
-    box_draws_slot_changed(b, s->slot);
+    if (kinds & BOX_DRAW_TRANSFORM) {
+        box_render_transform_t *out = box_draws_slot_transform(b, s->slot);
+        transform = ecs_get(world, e, WorldTransform);
+        box_draws_transform(out, transform, shape);
+        if (material.shape2d) {
+            box_draws_lift(out, transform, s->layer);
+        }
+    }
+
+    if (kinds & BOX_DRAW_SHADING) {
+        box_draws_material(box_draws_slot_shading(b, s->slot), &material);
+    }
+
+    if (kinds & BOX_DRAW_SURFACE) {
+        box_draws_surface(box_draws_slot_surface(b, s->slot), shape);
+    }
+
+    box_draws_slot_changed(b, s->slot, kinds);
 done:
     return;
 }
@@ -581,13 +668,16 @@ static void box_draws_update(
     ecs_entity_t e)
 {
     DrawSlot *s = ecs_is_alive(world, e) ? ecs_get_mut(world, e, DrawSlot) : NULL;
+    uint8_t kinds;
     if (!s) {
         goto done;
     }
 
-    box_draws_update_shape(world, d, e, s);
+    kinds = s->changed;
+    s->changed = 0;
+    box_draws_update_shape(world, d, e, s, kinds);
     if (ecs_has(world, e, TextSlots)) {
-        box_draws_text_update(world, d, e);
+        box_draws_text_update(world, d, e, kinds);
     }
 
 done:
@@ -644,6 +734,9 @@ static void BoxRenderExtractDraws(
     d->stats.scattered = 0;
     d->stats.scatters = 0;
     d->stats.upload_bytes = 0;
+    d->stats.transform_bytes = 0;
+    d->stats.shading_bytes = 0;
+    d->stats.surface_bytes = 0;
     box_draws_process(world, d);
     box_draws_clips_send(world, d, p);
     box_draws_order_update(world, d);
@@ -680,8 +773,11 @@ static void box_draws_observer(
     ecs_observer_init(world, &desc);
 }
 
-/** Register the observers of the material components. AlphaCutoff is followed when it is
- * added too, since an added cutoff moves the shape into an alpha tested batch.
+/** Register the observers of the material components, which write the shading of a shape; a
+ * change of its batch key moves it to a new slot, which writes every stream.
+ *
+ * AlphaCutoff is followed when it is added too, since an added cutoff moves the shape into an
+ * alpha tested batch.
  *
  * @param world The world
  * @param d The state
@@ -702,12 +798,12 @@ static void box_draws_material_observers(
     for (i = 0; i < 6; i ++) {
         box_draws_observer(world, d, names[i], (ecs_observer_desc_t){
             .query.terms = {{ .id = components[i] }},
-            .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnChange);
+            .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnShading);
     }
 
     box_draws_observer(world, d, "DrawsOnAlphaCutoff", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(AlphaCutoff) }},
-        .events = { EcsOnAdd, EcsOnSet, EcsOnRemove } }, BoxDrawsOnChange);
+        .events = { EcsOnAdd, EcsOnSet, EcsOnRemove } }, BoxDrawsOnShading);
 
     box_draws_observer(world, d, "DrawsOnPbrTextures", (ecs_observer_desc_t){
         .query.terms = {{
@@ -715,14 +811,14 @@ static void box_draws_material_observers(
             .src.id = EcsSelf | EcsUp,
             .trav = EcsIsA
         }},
-        .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnChange);
+        .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnShading);
 
     box_draws_observer(world, d, "DrawsOnOpacity", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(Opacity) }},
-        .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnMove);
+        .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnShadingMove);
     box_draws_observer(world, d, "DrawsOnTint", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(Tint) }},
-        .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnMove);
+        .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnShadingMove);
 }
 
 /** Register the observers that collect changed entities and changed subtrees.
@@ -742,7 +838,7 @@ static void box_draws_observers(
         .events = { EcsOnRemove } }, BoxDrawsOnRemove);
     box_draws_observer(world, d, "DrawsOnShape2D", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(Shape2D) }},
-        .events = { EcsOnSet } }, BoxDrawsOnChange);
+        .events = { EcsOnSet } }, BoxDrawsOnShading);
     box_draws_observer(world, d, "DrawsOnTextGlyphs", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(TextGlyphs) }},
         .events = { EcsOnSet } }, BoxDrawsOnChange);
@@ -751,10 +847,10 @@ static void box_draws_observers(
         .events = { EcsOnRemove } }, BoxDrawsOnTextRemove);
     box_draws_observer(world, d, "DrawsOnTextSpans", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(TextSpans) }},
-        .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnChange);
+        .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnShading);
     box_draws_observer(world, d, "DrawsOnColor", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(Rgb) }},
-        .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnChange);
+        .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnShading);
     box_draws_material_observers(world, d);
     d->refs ++;
     box_transform_on_dynamic(world, BoxDrawsOnChange, d, box_draws_free);
@@ -896,7 +992,7 @@ void box_render_draws_init(
     ecs_vec_init_t(NULL, &d->batches, box_draw_batch_t, 0);
     ecs_vec_init_t(NULL, &d->free_batches, int32_t, 0);
     ecs_vec_init_t(NULL, &d->dirty, ecs_entity_t, 0);
-    ecs_vec_init_t(NULL, &d->moved, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &d->moved, box_draw_moved_t, 0);
     ecs_vec_init_t(NULL, &d->walk, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &d->released, uint32_t, 0);
     ecs_vec_init_t(NULL, &d->blended, int32_t, 0);
@@ -906,8 +1002,12 @@ void box_render_draws_init(
     box_draws_order_init(d);
     box_draws_clips_init(d);
     box_draws_store_init(&d->store, &(box_draw_layout_t){
-        .streams = 1,
-        .stride = { (uint32_t)sizeof(box_render_instance_t) }
+        .streams = BOX_DRAWS_STREAMS,
+        .stride = {
+            [BOX_RENDER_STREAM_TRANSFORM] = (uint32_t)sizeof(box_render_transform_t),
+            [BOX_RENDER_STREAM_SHADING] = (uint32_t)sizeof(box_render_shading_t),
+            [BOX_RENDER_STREAM_SURFACE] = (uint32_t)sizeof(box_render_surface_t)
+        }
     }, BOX_RENDER_BUFFER_FIRST, BOX_DRAWS_CHUNK);
     d->chunk = BOX_DRAWS_CHUNK;
     d->refs = 1;

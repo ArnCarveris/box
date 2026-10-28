@@ -185,57 +185,112 @@ static void box_gpu_mesh_free(
     box_gpu_count(gpu, BOX_GPU_STAT_MESH_DESTROYED);
 }
 
-/** Create a bind group of an instance page and surface assets.
+void box_gpu_instance_layouts_init(
+    box_gpu_t *gpu)
+{
+    WGPUBindGroupLayoutEntry entries[4] = {{
+        .binding = 0,
+        .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Compute,
+        .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
+    }, {
+        .binding = 1,
+        .visibility = WGPUShaderStage_Vertex,
+        .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
+    }, {
+        .binding = 3,
+        .visibility = WGPUShaderStage_Vertex,
+        .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
+    }, {
+        .binding = 2,
+        .visibility = WGPUShaderStage_Vertex,
+        .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
+    }};
+    gpu->instance_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 4, .entries = entries });
+    gpu->transform_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 3, .entries = entries });
+}
+
+void box_gpu_instance_layouts_fini(
+    box_gpu_t *gpu)
+{
+    if (gpu->instance_layout) {
+        wgpuBindGroupLayoutRelease(gpu->instance_layout);
+        gpu->instance_layout = NULL;
+    }
+
+    if (gpu->transform_layout) {
+        wgpuBindGroupLayoutRelease(gpu->transform_layout);
+        gpu->transform_layout = NULL;
+    }
+}
+
+/** Create a bind group of the streams of an instance page and surface assets.
  *
  * @param gpu The backend
- * @param b The page
+ * @param streams The buffers of the streams of the page, by stream
  * @param assets The surface assets
  * @param size Bytes of the surface assets
+ * @param shading Bind the shading stream too, instance_layout, else transform_layout
  * @return The bind group
  */
 static WGPUBindGroup box_gpu_instance_group_new(
     box_gpu_t *gpu,
-    const box_gpu_buffer_t *b,
+    box_gpu_buffer_t *const *streams,
     WGPUBuffer assets,
-    uint64_t size)
+    uint64_t size,
+    bool shading)
 {
-    WGPUBindGroupEntry entry[2] = {
-        {.binding = 0, .buffer = b->buffer, .size = b->size},
-        {.binding = 1, .buffer = assets, .size = size}
+    const box_gpu_buffer_t *transforms = streams[BOX_RENDER_STREAM_TRANSFORM];
+    const box_gpu_buffer_t *shadings = streams[BOX_RENDER_STREAM_SHADING];
+    const box_gpu_buffer_t *surfaces = streams[BOX_RENDER_STREAM_SURFACE];
+    WGPUBindGroupEntry entry[4] = {
+        {.binding = 0, .buffer = transforms->buffer, .size = transforms->size},
+        {.binding = 1, .buffer = assets, .size = size},
+        {.binding = 3, .buffer = surfaces->buffer, .size = surfaces->size},
+        {.binding = 2, .buffer = shadings->buffer, .size = shadings->size}
     };
 
     return wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
-        .layout = gpu->instance_layout,
-        .entryCount = 2,
+        .layout = shading ? gpu->instance_layout : gpu->transform_layout,
+        .entryCount = shading ? 4 : 3,
         .entries = entry
     });
 }
 
 WGPUBindGroup box_gpu_instance_group(
     box_gpu_t *gpu,
-    box_gpu_buffer_t *b,
+    uint32_t page,
     uint32_t handle,
-    const box_gpu_mesh_t *m)
+    const box_gpu_mesh_t *m,
+    bool shading)
 {
     WGPUBindGroup result = NULL;
+    box_gpu_buffer_t *streams[BOX_RENDER_INSTANCE_STREAMS];
     int32_t i;
-    if (!(b->usage & BOX_RENDER_BUFFER_STORAGE)) {
-        goto done;
+    for (i = 0; i < BOX_RENDER_INSTANCE_STREAMS; i ++) {
+        streams[i] = ecs_map_get_deref(&gpu->buffers, box_gpu_buffer_t, page + (uint32_t)i);
+        if (!streams[i] || !(streams[i]->usage & BOX_RENDER_BUFFER_STORAGE)) {
+            goto done;
+        }
     }
 
+    box_gpu_buffer_t *b = streams[BOX_RENDER_STREAM_TRANSFORM];
     if (!m || !m->assets) {
-        if (!b->instances) {
-            b->instances = box_gpu_instance_group_new(gpu, b, gpu->no_assets, sizeof(vec4));
+        WGPUBindGroup *group = shading ? &b->instances : &b->transforms;
+        if (!*group) {
+            *group = box_gpu_instance_group_new(gpu, streams, gpu->no_assets, sizeof(vec4),
+                shading);
         }
 
-        result = b->instances;
+        result = *group;
         goto done;
     }
 
     box_gpu_instance_group_t *g = NULL;
     for (i = 0; i < ecs_vec_count(&b->mesh_groups); i ++) {
         g = ecs_vec_get_t(&b->mesh_groups, box_gpu_instance_group_t, i);
-        if (g->mesh == handle) {
+        if (g->mesh == handle && g->shading == shading) {
             break;
         }
 
@@ -251,11 +306,13 @@ WGPUBindGroup box_gpu_instance_group(
     } else {
         g = ecs_vec_append_t(NULL, &b->mesh_groups, box_gpu_instance_group_t);
         g->mesh = handle;
+        g->shading = shading;
     }
 
     g->assets = m->surface_assets;
     wgpuBufferAddRef(g->assets);
-    g->group = box_gpu_instance_group_new(gpu, b, m->surface_assets, m->surface_asset_size);
+    g->group = box_gpu_instance_group_new(gpu, streams, m->surface_assets,
+        m->surface_asset_size, shading);
     result = g->group;
 done:
     return result;
@@ -272,6 +329,11 @@ static void box_gpu_instance_groups_release(
     if (b->instances) {
         wgpuBindGroupRelease(b->instances);
         b->instances = NULL;
+    }
+
+    if (b->transforms) {
+        wgpuBindGroupRelease(b->transforms);
+        b->transforms = NULL;
     }
 
     for (i = 0; i < ecs_vec_count(&b->mesh_groups); i ++) {
@@ -298,17 +360,41 @@ static void box_gpu_instance_groups_drop(
     int32_t i;
     while (ecs_map_next(&it)) {
         box_gpu_buffer_t *b = ecs_map_ptr(&it);
-        for (i = 0; i < ecs_vec_count(&b->mesh_groups); i ++) {
+        for (i = ecs_vec_count(&b->mesh_groups) - 1; i >= 0; i --) {
             box_gpu_instance_group_t *g = ecs_vec_get_t(
                 &b->mesh_groups, box_gpu_instance_group_t, i);
             if (g->mesh == handle) {
                 wgpuBindGroupRelease(g->group);
                 wgpuBufferRelease(g->assets);
                 ecs_vec_remove_t(&b->mesh_groups, box_gpu_instance_group_t, i);
-                break;
             }
         }
     }
+}
+
+/** Release the bind groups of the instance page a buffer is a stream of, before the buffer is
+ * created again or destroyed: they live with the transform stream of the page.
+ *
+ * @param gpu The backend
+ * @param handle Handle of the buffer
+ */
+static void box_gpu_instance_page_changed(
+    box_gpu_t *gpu,
+    uint32_t handle)
+{
+    box_gpu_buffer_t *b;
+    if (handle < BOX_RENDER_BUFFER_FIRST || handle >= BOX_RENDER_BUFFER_LIGHT_FIRST) {
+        goto done;
+    }
+
+    handle -= (handle - BOX_RENDER_BUFFER_FIRST) % BOX_RENDER_INSTANCE_STREAMS;
+    b = ecs_map_get_deref(&gpu->buffers, box_gpu_buffer_t, handle);
+    if (b) {
+        box_gpu_instance_groups_release(b);
+    }
+
+done:
+    return;
 }
 
 /** Release a buffer and its handle.
@@ -478,6 +564,7 @@ void box_gpu_buffer_apply(
 {
     box_gpu_buffer_t *b = ecs_map_get_deref(&gpu->buffers, box_gpu_buffer_t, handle);
     WGPUBufferUsage usage = 0;
+    box_gpu_instance_page_changed(gpu, handle);
     if (b) {
         ecs_map_remove(&gpu->buffers, handle);
         box_gpu_buffer_free(gpu, b);
@@ -1140,7 +1227,9 @@ static void box_gpu_draw_batches(
             material = group;
         }
 
-        if (box_gpu_cull_draw(gpu, vp->pass, packet, d, 2, phase == 2 && mesh, &instances)) {
+        if (box_gpu_cull_draw(gpu, vp->pass, packet, d, 2, phase == 2 && mesh, true,
+            &instances))
+        {
             box_gpu_count(gpu, BOX_GPU_STAT_DRAW);
         }
     }
