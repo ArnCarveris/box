@@ -42,7 +42,8 @@
             {
                 "id": "Projection",
                 "benchcases": [
-                    "anchors_1k_moving"
+                    "anchors_1k_moving",
+                    "bars_1k_zooming"
                 ]
             }
         ]

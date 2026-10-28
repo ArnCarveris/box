@@ -33,10 +33,44 @@ ECS_STRUCT(ProjectedAnchor, {
     vec3 offset;         /**< World units added to the position of the target */
 });
 
+/** Makes a ProjectedAnchor follow and size to the projection of a box around its target.
+ *
+ * Every frame the 8 corners of the box are projected into ProjectedBounds and the entity goes
+ * to the top center of that rectangle plus offset pixels. Elements are centered on Position:
+ * a bar of height h sits 6 pixels above the box with offset {0, 6 + h / 2}.
+ *
+ * The part of the box behind the near plane is clipped away, the corners in front and where
+ * edges cross the plane are projected. The entity is ProjectedHidden when nothing is left, all
+ * of it is past the far plane or the rectangle misses the surface.
+ */
+ECS_STRUCT(ProjectedBox, {
+    vec3 min;        /**< Smallest corner, world units along the world axes from the target
+                      *   position plus the anchor offset; target rotation and scale ignored */
+    vec3 max;        /**< Largest corner, the same way as min */
+    vec2 offset;     /**< Surface pixels from the top center of the rectangle to the entity */
+    bool fit_width;  /**< Make the width of the LayoutItem of the entity Fixed at the width of
+                      *   the rectangle; its tree is laid out again the same frame, so Grow
+                      *   children split it and their world transforms are final */
+    bool fit_height; /**< Make the height of the LayoutItem Fixed at the rectangle, as width */
+});
+
+/** Projection of the ProjectedBox of an entity, written by the module every frame.
+ *
+ * Surface pixels with the origin at the center and y up, as the Position of a ProjectedAnchor,
+ * not clamped to the surface. Added with ProjectedBox, written without OnSet, kept while hidden.
+ */
+ECS_STRUCT(ProjectedBounds, {
+    float left;   /**< Smallest x of the projected box */
+    float right;  /**< Largest x of the projected box */
+    float top;    /**< Largest y of the projected box */
+    float bottom; /**< Smallest y of the projected box */
+});
+
 /** Added while the projection of a ProjectedAnchor is not visible.
  *
- * Behind the camera, past its far plane, off view or without target, view or camera. The
- * entity keeps its last Position and the world transforms of its subtree collapse to a point.
+ * Behind the camera, past its far plane, off view or without target, view or camera; for a
+ * ProjectedBox when all of the box is. The entity keeps its last Position and the world
+ * transforms of its subtree collapse to a point.
  */
 extern ECS_TAG_DECLARE(ProjectedHidden);
 

@@ -238,6 +238,24 @@ int32_t box_pick_input_views(
     box_pick_state_t *st,
     ecs_entity_t *out);
 
+/** Build the ray of the window cursor in a view of the surface the cursor is on (see
+ * box_pick_at), the same ray the picks of that cursor cast, whatever they hit.
+ *
+ * @param world The world
+ * @param st The module state
+ * @param view The view
+ * @param origin Receives the point of the cursor on the near plane, unchanged on false
+ * @param dir Receives the unit direction into the scene, unchanged on false
+ * @return false when no cursor is known, the cursor is off the surface, the view is not one of
+ * its views or has no camera
+ */
+bool box_pick_cursor_ray(
+    const ecs_world_t *world,
+    box_pick_state_t *st,
+    ecs_entity_t view,
+    vec3 origin,
+    vec3 dir);
+
 /** Check whether one element is drawn after another in the hierarchy order of 2D drawing.
  *
  * Floating elements and their descendants draw after the others. Parents draw before their

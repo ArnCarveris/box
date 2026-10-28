@@ -624,20 +624,20 @@ done:
     return;
 }
 
-/** Lay out the trees of the elements marked since the last frame, move the children of the
+/** Lay out the trees of the elements marked since the last layout, move the children of the
  * elements that only scrolled and place the floating elements.
  *
  * What reacts to a scroll, such as a template that reads the LayoutContent of its scroll view
  * and sets its Rect again, marks elements while the children move; their trees are laid out
  * again in the same frame, so nothing is drawn or picked at the size the reaction set.
  *
- * @param it The system iterator
+ * @param world The world
+ * @param state The state of the layout module
  */
-static void LayoutUpdate(
-    ecs_iter_t *it)
+static void box_layout_run(
+    ecs_world_t *world,
+    box_layout_state_t *state)
 {
-    ecs_world_t *world = it->world;
-    box_layout_state_t *state = it->ctx;
     int32_t i;
     box_layout_order(world, state);
     box_layout_moved(world, state, true);
@@ -654,6 +654,25 @@ static void LayoutUpdate(
     box_layout_marked(world, state);
     box_layout_floats(world, state);
     box_layout_moved(world, state, false);
+}
+
+/** Lay out what changed since the last frame (box_layout_run).
+ *
+ * @param it The system iterator
+ */
+static void LayoutUpdate(
+    ecs_iter_t *it)
+{
+    box_layout_run(it->world, it->ctx);
+}
+
+void box_layout_update(
+    ecs_world_t *world)
+{
+    const LayoutRegistry *r = ecs_singleton_get(world, LayoutRegistry);
+    if (r && r->state) {
+        box_layout_run(world, r->state);
+    }
 }
 
 /** Free the states of LayoutRegistry values.

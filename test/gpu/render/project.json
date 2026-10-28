@@ -769,7 +769,9 @@
                     "two_plays_one_frame",
                     "flash_lights_wall",
                     "lingering_renders_after_delete",
-                    "drift_moves_particles"
+                    "drift_moves_particles",
+                    "radial_ring_in_plane",
+                    "radial_burst_scaled"
                 ]
             },
             {

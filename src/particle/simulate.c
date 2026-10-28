@@ -149,6 +149,8 @@ void box_particle_sample(
     box_particle_cone(n, cosf(glm_rad(spread)), u, out->direction);
     out->speed = box_particle_draw(seed, index, BOX_PARTICLE_STREAM_SPEED,
         emitter->speed.min, emitter->speed.max);
+    out->radial = box_particle_draw(seed, index, BOX_PARTICLE_STREAM_RADIAL,
+        emitter->radial.min, emitter->radial.max);
     out->life = box_particle_life(seed, index, life_min,
         life_max > life_min ? life_max - life_min : 0);
     out->size = box_particle_draw(seed, index, BOX_PARTICLE_STREAM_SIZE,

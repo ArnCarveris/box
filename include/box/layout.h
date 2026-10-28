@@ -188,6 +188,20 @@ ECS_STRUCT(LayoutFill, {
  */
 extern ECS_TAG_DECLARE(ClipChildren);
 
+/** Lay out now the trees whose input changed since the layout last ran.
+ *
+ * Does the work the layout does in EcsPostUpdate, for a module that changes layout input later
+ * in the frame, such as box.projection sizing elements to a ProjectedBox. Call it outside of
+ * deferred mode, from an immediate system.
+ *
+ * Laid out children get their Position with OnSet: their world transforms follow in the next
+ * frame unless the caller computes them.
+ *
+ * @param world The world
+ */
+void box_layout_update(
+    ecs_world_t *world);
+
 /** Register the box.layout module.
  *
  * @param world The world

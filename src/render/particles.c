@@ -925,7 +925,8 @@ static void box_particles_block_forces(
  * @param collision Its ground collision, NULL for none
  * @param inherit World velocity its spawns get
  * @param delta Seconds of the frame
- * @param scale Multiplier of the speeds and sizes, the scale of the effect it plays in
+ * @param scale Multiplier of the speeds, radial speeds and sizes, the scale of the effect it
+ *              plays in
  * @param out Receives the block, every padding member zero
  */
 static void box_particles_block(
@@ -962,6 +963,8 @@ static void box_particles_block(
     out->color[3] = 1.0f;
     out->speed[0] = emitter->speed.min * scale;
     out->speed[1] = emitter->speed.max * scale;
+    out->radial[0] = emitter->radial.min * scale;
+    out->radial[1] = emitter->radial.max * scale;
     out->size[0] = emitter->size.min * scale;
     out->size[1] = emitter->size.max * scale;
     out->rotation[0] = emitter->rotation.min;

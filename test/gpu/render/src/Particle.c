@@ -4,7 +4,8 @@
  * are, scenes and full pools are respected, a fixed seed renders the same image twice, additive
  * pools brighten, soft particles fade near geometry and sprites show the frame of their age.
  * An effect flash lights a wall while it plays, a deleted lingering emitter still draws and the
- * drift of the forces carries particles at rest across the image.
+ * drift of the forces carries particles at rest across the image, and a radial speed expands
+ * a ring in the rotated plane of its emitter and by the scale of its effect.
  *
  * Frames advance a fixed 1/60 s.
  * An unlit orthographic camera 10 units in front of the origin looks into a 32x32 capture of
@@ -532,6 +533,77 @@ void Particle_drift_moves_particles(void) {
     px = run(world, "drift.png", 60);
     test_assert(green_at(px, 0, 2) > 128);
     test_assert(green_at(px, 0, 0) < 8);
+
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+/** Create a template that bursts a ring of particles over a disc in its XZ plane, outward at a
+ * radial speed of 2 units per second.
+ *
+ * @param world The world
+ * @return The template
+ */
+static ecs_entity_t ring_template_new(
+    ecs_world_t *world)
+{
+    test_assert(ecs_script_run(world, "ring",
+        "using box.particle\n"
+        "prefab Ring {\n"
+        "  ParticleEmitter: {max: 400, shape: EmitterDisc, radius: 0.25, "
+        "direction: {0, 0, 0}, speed: {0, 0}, radial: {2, 2}, lifetime: {100, 100}, "
+        "size: {0.25, 0.25}, seed: 5}\n"
+        "  ParticleBurst: {count: 400}\n"
+        "}\n", NULL) == 0);
+    ecs_entity_t result = ecs_lookup(world, "Ring");
+    test_assert(result != 0);
+
+    return result;
+}
+
+void Particle_radial_ring_in_plane(void) {
+    // particle/radial
+    ecs_world_t *world = world_new("radial.png");
+    ecs_entity_t e = emitter_new(world, 0, 0, 400);
+    ecs_set(world, e, Rotation, {1.5707964f, 0, 0});
+    ecs_set(world, e, ParticleBurst, {.count = 400});
+    ParticleEmitter *p = ecs_get_mut(world, e, ParticleEmitter);
+    p->shape = EmitterDisc;
+    p->radius = 0.25f;
+    p->speed = (ParticleRange){0, 0};
+    p->radial = (ParticleRange){4, 4};
+    p->size = (ParticleRange){0.5f, 0.5f};
+    ecs_modified(world, e, ParticleEmitter);
+    unsigned char *px = run(world, "radial.png", 31);
+
+    test_assert(green_at(px, 2.1f, 0) > 128);
+    test_assert(green_at(px, -2.1f, 0) > 128);
+    test_assert(green_at(px, 0, 2.1f) > 128);
+    test_assert(green_at(px, 0, -2.1f) > 128);
+    test_assert(green_at(px, 0, 0) < 8);
+    test_assert(green_at(px, 1, 1) < 8);
+    test_assert(green_at(px, 3.5f, 0) < 8);
+    test_int(ecs_singleton_get(world, ParticleStats)->particles, 400);
+
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+void Particle_radial_burst_scaled(void) {
+    // particle/radial
+    ecs_world_t *world = world_new("radial_burst.png");
+    ecs_entity_t ring = ring_template_new(world);
+    vec3 at = {0, 0, 0};
+    test_assert(box_particle_burst_at(world, ring, at, 2) != 0);
+    unsigned char *px = run(world, "radial_burst.png", 31);
+
+    test_assert(green_at(px, 1.5f, 0) > 128);
+    test_assert(green_at(px, -1.5f, 0) > 128);
+    test_assert(green_at(px, 0, 1.5f) < 8);
+    test_assert(green_at(px, 0, -1.5f) < 8);
+    test_assert(green_at(px, 3.25f, 0) < 8);
+    test_int(ecs_singleton_get(world, ParticleStats)->effects, 1);
+    test_int(ecs_singleton_get(world, ParticleStats)->particles, 400);
 
     stbi_image_free(px);
     ecs_fini(world);
