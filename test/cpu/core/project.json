@@ -226,6 +226,18 @@
                     "select_camera",
                     "invalid_camera"
                 ]
+            },
+            {
+                "id": "FileWatch",
+                "testcases": [
+                    "defaults",
+                    "polls_every_frame",
+                    "disabled",
+                    "shared_file_counts_once",
+                    "new_path_stops_watching",
+                    "remove_stops_watching",
+                    "change_status"
+                ]
             }
         ]
     }

@@ -108,6 +108,42 @@ ECS_STRUCT(FrameTiming, {
     int64_t total_dropped;  /**< Dropped frames since the world started */
 });
 
+/** Seconds between two checks of the watched files when FileWatch is not set */
+#define BOX_FILE_WATCH_INTERVAL (0.25f)
+
+/** How the engine watches the files it loaded, a singleton box.app sets to
+ * BOX_FILE_WATCH_INTERVAL.
+ *
+ * The engine watches the file each load read: the files a Shader preprocessing read, its
+ * includes too, and the file of a TexturePath, a Font (box.text.DefaultFont too) and an
+ * EnvironmentImage, at the path the lookup found. Once per interval, on the main thread before
+ * the render extract, it compares the modification time and size of every distinct file once,
+ * however many entities watch it; a file that disappears counts as changed, and so does its
+ * return. A changed file loads again like a newly set component, and the previous content stays
+ * in use until the new load is ready:
+ * - a Shader preprocesses again and ShaderStatus.revision counts the new code
+ * - a TexturePath turns TextureStatus to TextureLoading; success increments its revision and
+ *   updates Texture, failure sets TextureFailed and keeps the previous image
+ * - a Font in use loads again; success drops the glyphs of the old face, increments
+ *   FontStatus.revision and lays the texts out again, failure keeps the previous face
+ * - an EnvironmentImage sends the new image to its cubemap and increments
+ *   EnvironmentStatus.version, failure sets EnvironmentStatus.error and keeps the content
+ *
+ * Only the files of the latest load of a component are watched: a new path or removing the
+ * component stops watching the old file. A file that was never found is not watched.
+ */
+ECS_STRUCT(FileWatch, {
+    float interval;     /**< Wall seconds between checks, 0 every frame, < 0 never */
+});
+
+/** What the file watch did, written by the engine after each check that ran */
+ECS_STRUCT(FileWatchStatus, {
+    int32_t files;      /**< Distinct files watched */
+    int64_t polls;      /**< Checks run since the world started */
+    int64_t changes;    /**< Changed files found since the world started */
+    char *last;         /**< The file that changed last, NULL before the first change */
+});
+
 /** Register the box.app module.
  *
  * @param world The world

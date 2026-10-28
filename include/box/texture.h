@@ -33,7 +33,8 @@ ECS_STRUCT(Texture, {
  * requested size; with one requested dimension the other keeps the aspect ratio.
  *
  * The largest dimension is capped by Surface.texture_quality. Changing a member loads the
- * image again; the previous image stays in use until the new one is ready.
+ * image again, and so does a change of its file that FileWatch (box/app.h) sees; the previous
+ * image stays in use until the new one is ready.
  */
 ECS_STRUCT(TexturePath, {
     char *path;     /**< Image file, relative to the working directory or an ancestor of it */

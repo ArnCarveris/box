@@ -3,7 +3,8 @@
  * @brief Shader component: a WGSL file with includes and macros that the renderer compiles.
  *
  * The file is preprocessed on the main thread and compiled on the render thread; a change of
- * the component or of a file it includes recompiles it. Engine shaders live in etc/shaders.
+ * the component, or of a file it includes as the FileWatch of box.app (box/app.h) sees it,
+ * recompiles it. Engine shaders live in etc/shaders.
  */
 
 #ifndef BOX_SHADER_H
@@ -20,9 +21,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/** Seconds between two checks of the files of the shaders when ShaderSettings is not set */
-#define BOX_SHADER_POLL_INTERVAL (0.25f)
 
 /** A WGSL file the renderer compiles, preprocessed with its defines.
  *
@@ -46,11 +44,6 @@ ECS_STRUCT(ShaderStatus, {
     int32_t revision;   /**< Times preprocessing produced new code */
     bool ok;            /**< The last preprocessing succeeded and no GPU error is reported */
     char *error;        /**< First error as file:line: message, NULL when ok */
-});
-
-/** How the engine watches the files of the shaders */
-ECS_STRUCT(ShaderSettings, {
-    float poll_interval;    /**< Wall seconds between file checks, 0 every frame, < 0 never */
 });
 
 /** Register the box.shader module.

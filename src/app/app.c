@@ -5,6 +5,7 @@
 
 #define BOX_APP_IMPL
 #include "app.h"
+#include "watch.h"
 #include "../render/render.h"
 #include <math.h>
 #include <stdlib.h>
@@ -474,9 +475,13 @@ void BoxAppImport(
     box_owned_hooks(world, App, BOX_OWNED_STR(App, scene), BOX_OWNED_STR(App, camera),
         BOX_OWNED_STR(App, out));
     box_owned_hooks(world, AppStatus, BOX_OWNED_STR(AppStatus, tmp_dir));
+    ECS_META_COMPONENT(world, FileWatch);
+    ECS_META_COMPONENT(world, FileWatchStatus);
+    box_owned_hooks(world, FileWatchStatus, BOX_OWNED_STR(FileWatchStatus, last));
 
     ecs_singleton_set(world, AppStatus, {0});
     ecs_singleton_set(world, FrameTiming, {0});
+    box_file_watch_init(world);
 
     ecs_observer(world, {
         .entity = ecs_entity(world, { .name = "AppOnSet" }),

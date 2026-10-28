@@ -23,7 +23,8 @@ extern "C" {
 
 /** A TrueType or OpenType font, loaded on the job system once a Text uses it.
  *
- * A new path loads the font again; the previous font stays in use until the new one is ready.
+ * A new path loads the font again, and so does a change of its file that FileWatch (box/app.h)
+ * sees; the previous font stays in use until the new one is ready.
  *
  * Atlas pages beyond atlas_pages that no Text shows are released, least recently used first, and
  * their glyphs drawn again on next use; only shown pages pass it. A new Font keeps 4, 0 none.

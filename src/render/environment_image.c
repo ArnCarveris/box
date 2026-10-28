@@ -2,6 +2,7 @@
  * @file render/environment_image.c
  * @brief The EnvironmentImage source: equirectangular images loaded on the job system and sent
  * into the cubemap of their entity once per version, following the environment source contract.
+ * The file watch loads an image again when its file changes.
  */
 
 #include "environment.h"
@@ -27,6 +28,7 @@ typedef struct box_env_image_t {
 /** Main thread state of the environment images of a world */
 typedef struct box_env_images_t {
     ecs_map_t images;       /**< Entity to box_env_image_t* */
+    int32_t watch;          /**< Kind of the images in the file watch */
 } box_env_images_t;
 
 /** A decode that runs on a worker: what to load and what came out */
@@ -34,6 +36,8 @@ typedef struct box_env_image_job_t {
     ecs_entity_t entity;    /**< Entity with the EnvironmentImage */
     uint32_t generation;    /**< Load request the result belongs to */
     char *path;             /**< Image file */
+    char *file;             /**< The file the decode found, NULL when it was not found */
+    box_file_stamp_t stamp; /**< Stamp of file, taken before it was read */
     uint16_t *texels;       /**< rgba16float texels of the result, NULL on failure */
     int32_t width;          /**< Width of the result */
     int32_t height;         /**< Height of the result */
@@ -101,7 +105,7 @@ static void box_env_image_work(
 {
     box_env_image_job_t *job = ctx;
     float *texels = box_texture_decode_float(job->path, BOX_RENDER_ENVIRONMENT_IMAGE_MAX,
-        &job->width, &job->height, &job->error);
+        &job->width, &job->height, &job->error, &job->file, &job->stamp);
     size_t i, count;
     if (!texels) {
         goto done;
@@ -136,6 +140,11 @@ static void box_env_image_complete(
         goto done;
     }
 
+    if (job->file) {
+        box_file_watch_clear(world, state->watch, job->entity);
+        box_file_watch_add(world, state->watch, job->entity, job->file, &job->stamp);
+    }
+
     if (job->error) {
         ecs_err("%s", job->error);
         box_render_environment_error(world, job->entity, job->error);
@@ -162,12 +171,68 @@ static void box_env_image_job_free(
 {
     box_env_image_job_t *job = ctx;
     ecs_os_free(job->path);
+    ecs_os_free(job->file);
     ecs_os_free(job->texels);
     ecs_os_free(job->error);
     ecs_os_free(job);
 }
 
-/** Load the image of every set EnvironmentImage.
+/** Submit a load of the image of an EnvironmentImage, which drops older loads in flight.
+ *
+ * @param world The world or a stage
+ * @param state The state of the images
+ * @param e Entity with the EnvironmentImage
+ * @param value Its EnvironmentImage
+ */
+static void box_env_image_request(
+    ecs_world_t *world,
+    box_env_images_t *state,
+    ecs_entity_t e,
+    const EnvironmentImage *value)
+{
+    box_env_image_t *img = ecs_map_get_deref(&state->images, box_env_image_t, e);
+    if (!img) {
+        img = ecs_os_calloc_t(box_env_image_t);
+        img->entity = e;
+        ecs_map_insert_ptr(&state->images, e, img);
+    }
+
+    box_env_image_job_t *job = ecs_os_calloc_t(box_env_image_job_t);
+    job->entity = e;
+    job->generation = ++ img->generation;
+    job->path = value->path ? ecs_os_strdup(value->path) : NULL;
+    if (box_job_submit(world, &(box_job_desc_t){
+        .work = box_env_image_work,
+        .complete = box_env_image_complete,
+        .ctx_free = box_env_image_job_free,
+        .ctx = job
+    })) {
+        box_render_environment_error(world, e, "cannot submit the load job");
+        box_env_image_job_free(job);
+    }
+}
+
+/** Load the image of an EnvironmentImage again whose file changed, called by the file watch.
+ *
+ * @param world The world
+ * @param ctx The state of the images
+ * @param owner Entity with the EnvironmentImage
+ */
+static void box_env_image_changed(
+    ecs_world_t *world,
+    void *ctx,
+    ecs_entity_t owner)
+{
+    const EnvironmentImage *value = ecs_is_alive(world, owner)
+        ? ecs_get(world, owner, EnvironmentImage)
+        : NULL;
+    if (value) {
+        box_env_image_request(world, ctx, owner, value);
+    }
+}
+
+/** Load the image of every set EnvironmentImage, which stops watching the file of the
+ * previous one.
  *
  * @param it The iterator of the observer
  */
@@ -178,27 +243,8 @@ static void BoxEnvironmentImageOnSet(
     const EnvironmentImage *values = ecs_field(it, EnvironmentImage, 0);
     int32_t i;
     for (i = 0; state && i < it->count; i ++) {
-        ecs_entity_t e = it->entities[i];
-        box_env_image_t *img = ecs_map_get_deref(&state->images, box_env_image_t, e);
-        if (!img) {
-            img = ecs_os_calloc_t(box_env_image_t);
-            img->entity = e;
-            ecs_map_insert_ptr(&state->images, e, img);
-        }
-
-        box_env_image_job_t *job = ecs_os_calloc_t(box_env_image_job_t);
-        job->entity = e;
-        job->generation = ++ img->generation;
-        job->path = values[i].path ? ecs_os_strdup(values[i].path) : NULL;
-        if (box_job_submit(it->world, &(box_job_desc_t){
-            .work = box_env_image_work,
-            .complete = box_env_image_complete,
-            .ctx_free = box_env_image_job_free,
-            .ctx = job
-        })) {
-            box_render_environment_error(it->world, e, "cannot submit the load job");
-            box_env_image_job_free(job);
-        }
+        box_file_watch_clear(it->world, state->watch, it->entities[i]);
+        box_env_image_request(it->world, state, it->entities[i], &values[i]);
     }
 }
 
@@ -214,6 +260,7 @@ static void BoxEnvironmentImageOnRemove(
     for (i = 0; state && !ecs_is_fini(it->world) && i < it->count; i ++) {
         box_env_image_t *img = ecs_map_get_deref(
             &state->images, box_env_image_t, it->entities[i]);
+        box_file_watch_clear(it->world, state->watch, it->entities[i]);
         if (img) {
             ecs_map_remove(&state->images, it->entities[i]);
             ecs_os_free(img->texels);
@@ -294,6 +341,8 @@ void box_render_environment_image_init(
 {
     box_env_images_t *state = ecs_os_calloc_t(box_env_images_t);
     ecs_map_init(&state->images, NULL);
+    state->watch = box_file_watch_kind(world, "environment image", box_env_image_changed,
+        state);
 
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "RenderExtractEnvironmentImage" }),

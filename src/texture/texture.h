@@ -10,6 +10,7 @@
 #define BOX_TEXTURE_INTERNAL_H
 
 #include <box.h>
+#include "../app/watch.h"
 
 /** Largest dimension of a texture when no surface sets a texture quality */
 #define BOX_TEXTURE_QUALITY_DEFAULT (4096)
@@ -48,6 +49,7 @@ typedef struct box_textures_t {
     int32_t quality;            /**< Largest dimension the current loads are capped to */
     box_texture_sync_t *sync;   /**< Decodes in flight */
     ecs_query_t *surfaces;      /**< Entities with a Surface */
+    int32_t watch;              /**< Kind of the textures in the file watch */
 } box_textures_t;
 
 /** Singleton that holds the registry of a world */
@@ -64,6 +66,8 @@ typedef struct box_texture_job_t {
     ecs_entity_t entity;        /**< Texture entity */
     uint32_t generation;        /**< Load request the result belongs to */
     char *path;                 /**< Image file */
+    char *file;                 /**< The file the decode found, NULL when it was not found */
+    box_file_stamp_t stamp;     /**< Stamp of file, taken before it was read */
     int32_t request_width;      /**< Requested width, 0 for the source width */
     int32_t request_height;     /**< Requested height, 0 for the source height */
     int32_t quality;            /**< Largest dimension of the result */
@@ -79,7 +83,7 @@ void box_texture_decode_init(void);
 
 /** Decode the image of a job into RGBA8 pixels, on a worker thread.
  *
- * @param job The job, receives the pixels or the error
+ * @param job The job, receives the pixels or the error, and the file it found with its stamp
  */
 void box_texture_decode(
     box_texture_job_t *job);
@@ -94,6 +98,8 @@ void box_texture_decode(
  * @param width Receives the width
  * @param height Receives the height
  * @param error Receives why the decode failed, freed by the caller
+ * @param file Receives the file that was found, NULL when none, freed by the caller; may be NULL
+ * @param stamp Receives the stamp of that file taken before it was read, may be NULL
  * @return Four floats per texel row by row from the top, freed by the caller, NULL on failure
  */
 float* box_texture_decode_float(
@@ -101,7 +107,9 @@ float* box_texture_decode_float(
     int32_t max_width,
     int32_t *width,
     int32_t *height,
-    char **error);
+    char **error,
+    char **file,
+    box_file_stamp_t *stamp);
 
 /** Get the registry of a world.
  *

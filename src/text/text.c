@@ -3,7 +3,8 @@
  * @brief Text components, the font registry and the systems that keep texts laid out.
  *
  * Setting a Text lays it out at once; a font that loads or an atlas page that grows lays out
- * the texts of its font again. Headless frames wait for the font and glyph jobs in flight.
+ * the texts of its font again. The file watch loads a font again when its file changes.
+ * Headless frames wait for the font and glyph jobs in flight.
  */
 
 #define BOX_TEXT_IMPL
@@ -186,6 +187,7 @@ static void BoxFontOnSet(
         const Font *f = ecs_get(it->world, it->entities[i], Font);
         const char *path = f && f->path ? f->path : "";
         if (font && font->requested && strcmp(font->path ? font->path : "", path)) {
+            box_file_watch_clear(it->world, s->watch, it->entities[i]);
             box_text_font_load(it->world, s, font);
             s->relayout = true;
         }
@@ -194,6 +196,26 @@ static void BoxFontOnSet(
     s->trim = true;
 done:
     return;
+}
+
+/** Load a font in use again whose file changed, called by the file watch. A load that
+ * succeeds drops the atlas of the old face and lays out the texts of the font again.
+ *
+ * @param world The world
+ * @param ctx Unused
+ * @param owner The font entity
+ */
+static void box_text_font_changed(
+    ecs_world_t *world,
+    void *ctx,
+    ecs_entity_t owner)
+{
+    box_text_state_t *s = box_text_state_get(world);
+    box_text_font_t *font = s ? ecs_map_get_deref(&s->fonts, box_text_font_t, owner) : NULL;
+    (void)ctx;
+    if (font && font->requested && ecs_is_alive(world, owner) && ecs_has(world, owner, Font)) {
+        box_text_font_load(world, s, font);
+    }
 }
 
 /** Forget a font whose Font is removed; its texts lay out with the default font.
@@ -211,6 +233,7 @@ static void BoxFontOnRemove(
 
     for (i = 0; i < it->count; i ++) {
         box_text_font_t *font = ecs_map_get_deref(&s->fonts, box_text_font_t, it->entities[i]);
+        box_file_watch_clear(it->world, s->watch, it->entities[i]);
         if (font) {
             ecs_map_remove(&s->fonts, it->entities[i]);
             box_text_font_free(s, font);
@@ -344,6 +367,7 @@ static void box_text_state_init(
     ecs_vec_init_t(NULL, &s->rows, box_text_row_t, 0);
     ecs_vec_init_t(NULL, &s->texts, ecs_entity_t, 0);
     s->next_page = BOX_TEXT_PAGE_FIRST;
+    s->watch = box_file_watch_kind(world, "font", box_text_font_changed, NULL);
     s->sync = ecs_os_calloc_t(box_text_sync_t);
     s->sync->lock = ecs_os_mutex_new();
     s->sync->refs = 1;

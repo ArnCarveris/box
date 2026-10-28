@@ -9,6 +9,7 @@
 #define BOX_RENDER_PREPROCESS_H
 
 #include <box.h>
+#include "../app/watch.h"
 
 /** Deepest nesting of included files */
 #define BOX_SHADER_INCLUDE_DEPTH (32)
@@ -26,17 +27,10 @@ typedef char* (*box_shader_read_t)(
     void *ctx,
     const char *path);
 
-/** Modification time and size of a file, to see whether it changed */
-typedef struct box_shader_stamp_t {
-    int64_t sec;    /**< Seconds of the modification time, -1 when the file is missing */
-    int64_t nsec;   /**< Nanoseconds of the modification time */
-    int64_t size;   /**< Bytes of the file */
-} box_shader_stamp_t;
-
 /** A file a preprocessing read or looked for */
 typedef struct box_shader_file_t {
     char *path;                 /**< The file as it was opened */
-    box_shader_stamp_t stamp;   /**< Stamp taken before reading, unset with a read callback */
+    box_file_stamp_t stamp;     /**< Stamp taken before reading, unset with a read callback */
 } box_shader_file_t;
 
 /** What to preprocess */
@@ -103,24 +97,5 @@ char* box_shader_locate(
  */
 char* box_shader_read_file(
     const char *path);
-
-/** Take the stamp of a file.
- *
- * @param path The file
- * @param stamp The stamp, with sec -1 when the file is missing
- */
-void box_shader_stamp(
-    const char *path,
-    box_shader_stamp_t *stamp);
-
-/** Compare two stamps.
- *
- * @param a The first stamp
- * @param b The second stamp
- * @return Whether the stamps are equal
- */
-bool box_shader_stamp_equals(
-    const box_shader_stamp_t *a,
-    const box_shader_stamp_t *b);
 
 #endif

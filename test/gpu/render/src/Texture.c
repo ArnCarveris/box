@@ -3,11 +3,18 @@
  * @brief Tests for loading textures from files and sampling them in PBR texture layers.
  */
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include <box.h>
 #include <bake_test.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 #include "render.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -391,6 +398,210 @@ void Texture_texture_quality_caps_size(void) {
     test_int(ecs_get(world, tex, Texture)->height, 256);
     test_int(ecs_get(world, tex, TextureStatus)->revision, 2);
     test_int(ecs_get(world, small, Texture)->width, 128);
+
+    ecs_os_free(file);
+    ecs_fini(world);
+}
+
+/** Write a grey PNG and give it a modification time, so its stamp differs for sure from the
+ * stamp of any earlier content.
+ *
+ * @param path The file
+ * @param width Width of the image
+ * @param height Height of the image
+ * @param mtime Seconds of the modification time
+ */
+static void texture_write(
+    const char *path,
+    int32_t width,
+    int32_t height,
+    int64_t mtime)
+{
+    uint8_t *px = ecs_os_malloc(width * height * 4);
+    memset(px, 200, (size_t)(width * height * 4));
+    test_assert(stbi_write_png(path, width, height, 4, px, width * 4) != 0);
+    ecs_os_free(px);
+    struct timespec times[2] = {{ .tv_sec = (time_t)mtime }, { .tv_sec = (time_t)mtime }};
+    test_int(utimensat(AT_FDCWD, path, times, 0), 0);
+}
+
+/** Run frames until a texture is no longer loading, checking that the previous image stays
+ * until the new one is ready.
+ *
+ * @param world The world
+ * @param tex The texture entity
+ * @param width Width of the previous image, 0 when it is not checked
+ * @return The status
+ */
+static const TextureStatus* texture_wait(
+    ecs_world_t *world,
+    ecs_entity_t tex,
+    int32_t width)
+{
+    int32_t frames = 0;
+    while (ecs_get(world, tex, TextureStatus)->state == TextureLoading && frames < 100) {
+        if (width) {
+            test_int(ecs_get(world, tex, Texture)->width, width);
+        }
+
+        ecs_progress(world, 0);
+        frames ++;
+    }
+
+    return ecs_get(world, tex, TextureStatus);
+}
+
+void Texture_file_change_reloads(void) {
+    // engine/file_watch
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    ecs_singleton_set(world, FileWatch, {.interval = 0});
+    char *file = flecs_asprintf("%s/change.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    texture_write(file, 8, 4, 1000000000);
+
+    ecs_entity_t tex = ecs_new(world);
+    ecs_set(world, tex, TexturePath, {.path = file});
+    test_int(texture_wait(world, tex, 0)->revision, 1);
+    ecs_progress(world, 0);
+    test_int(ecs_get(world, tex, TextureStatus)->revision, 1);
+
+    texture_write(file, 2, 6, 1000000100);
+    test_int(ecs_get(world, tex, Texture)->width, 8);
+    ecs_progress(world, 0);
+    const TextureStatus *status = ecs_get(world, tex, TextureStatus);
+    test_assert(status->state == TextureLoading || status->revision == 2);
+    if (status->state == TextureLoading) {
+        test_int(ecs_get(world, tex, Texture)->width, 8);
+        test_int(ecs_get(world, tex, Texture)->height, 4);
+    }
+
+    status = texture_wait(world, tex, 8);
+    test_int(status->state, TextureReady);
+    test_int(status->revision, 2);
+    test_assert(status->error == NULL);
+    test_int(ecs_get(world, tex, Texture)->width, 2);
+    test_int(ecs_get(world, tex, Texture)->height, 6);
+
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_int(ecs_get(world, tex, TextureStatus)->state, TextureReady);
+    test_int(ecs_get(world, tex, TextureStatus)->revision, 2);
+
+    ecs_os_free(file);
+    ecs_fini(world);
+}
+
+void Texture_file_touch_reloads(void) {
+    // engine/file_watch
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    ecs_singleton_set(world, FileWatch, {.interval = 0});
+    char *file = flecs_asprintf("%s/touch.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    texture_write(file, 8, 4, 1000000000);
+
+    ecs_entity_t tex = ecs_new(world);
+    ecs_set(world, tex, TexturePath, {.path = file});
+    test_int(texture_wait(world, tex, 0)->revision, 1);
+    ecs_progress(world, 0);
+    test_int(ecs_get(world, tex, TextureStatus)->revision, 1);
+
+    struct timespec times[2] = {{ .tv_sec = 1000000100 }, { .tv_sec = 1000000100 }};
+    test_int(utimensat(AT_FDCWD, file, times, 0), 0);
+    ecs_progress(world, 0);
+    const TextureStatus *status = texture_wait(world, tex, 8);
+    test_int(status->state, TextureReady);
+    test_int(status->revision, 2);
+    test_int(ecs_get(world, tex, Texture)->width, 8);
+    test_int(ecs_get(world, tex, Texture)->height, 4);
+    test_int(ecs_singleton_get(world, FileWatchStatus)->changes, 1);
+
+    ecs_os_free(file);
+    ecs_fini(world);
+}
+
+void Texture_file_removed_keeps_image(void) {
+    // engine/file_watch
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    ecs_singleton_set(world, FileWatch, {.interval = 0});
+    char *file = flecs_asprintf("%s/removed.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    texture_write(file, 8, 4, 1000000000);
+
+    ecs_entity_t tex = ecs_new(world);
+    ecs_set(world, tex, TexturePath, {.path = file});
+    test_int(texture_wait(world, tex, 0)->revision, 1);
+    ecs_progress(world, 0);
+
+    test_int(remove(file), 0);
+    ecs_log_set_level(-4);
+    ecs_progress(world, 0);
+    const TextureStatus *status = texture_wait(world, tex, 8);
+    test_int(status->state, TextureFailed);
+    test_int(status->revision, 1);
+    test_assert(status->error != NULL);
+    test_assert(strstr(status->error, "removed.png") != NULL);
+    test_int(ecs_get(world, tex, Texture)->width, 8);
+    test_int(ecs_get(world, tex, Texture)->height, 4);
+    test_int(ecs_singleton_get(world, FileWatchStatus)->files, 1);
+
+    ecs_progress(world, 0);
+    test_int(ecs_get(world, tex, TextureStatus)->state, TextureFailed);
+
+    texture_write(file, 4, 4, 1000000100);
+    ecs_progress(world, 0);
+    status = texture_wait(world, tex, 8);
+    test_int(status->state, TextureReady);
+    test_int(status->revision, 2);
+    test_assert(status->error == NULL);
+    test_int(ecs_get(world, tex, Texture)->width, 4);
+    test_int(ecs_singleton_get(world, FileWatchStatus)->changes, 2);
+
+    ecs_os_free(file);
+    ecs_fini(world);
+}
+
+void Texture_file_change_while_loading(void) {
+    // engine/file_watch
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    ecs_singleton_set(world, FileWatch, {.interval = 0});
+    char *file = flecs_asprintf("%s/inflight.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    texture_write(file, 8, 4, 1000000000);
+
+    ecs_entity_t tex = ecs_new(world);
+    ecs_set(world, tex, TexturePath, {.path = file});
+    test_int(texture_wait(world, tex, 0)->revision, 1);
+    ecs_progress(world, 0);
+
+    texture_write(file, 2, 2, 1000000100);
+    ecs_progress(world, 0);
+    texture_write(file, 6, 2, 1000000200);
+    ecs_progress(world, 0);
+    const TextureStatus *status = texture_wait(world, tex, 0);
+    ecs_progress(world, 0);
+    status = texture_wait(world, tex, 0);
+    test_int(status->state, TextureReady);
+    test_assert(status->revision >= 2);
+    test_int(ecs_get(world, tex, Texture)->width, 6);
+    test_int(ecs_get(world, tex, Texture)->height, 2);
+
+    int32_t revision = status->revision;
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_int(ecs_get(world, tex, TextureStatus)->revision, revision);
+    test_int(ecs_get(world, tex, Texture)->width, 6);
 
     ecs_os_free(file);
     ecs_fini(world);
