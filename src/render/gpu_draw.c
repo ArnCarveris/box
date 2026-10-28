@@ -1460,6 +1460,7 @@ static void box_gpu_draw_batches(
  * @param hdr The HDR image of a view with effects, NULL to render into color
  * @param packet The packet
  * @param v The view
+ * @param group The bind group of the view
  * @param slot Slot of the view in the view buffer
  * @param phase 0 for the only pass, 1 for the early and 2 for the late pass of a view that
  * culls by occlusion, 3 for the forward pass after the depth prepasses, which clears the color
@@ -1473,6 +1474,7 @@ static void box_gpu_draw_pass(
     WGPUTextureView hdr,
     const box_render_packet_t *packet,
     const box_render_view_t *v,
+    WGPUBindGroup group,
     int32_t slot,
     int32_t phase)
 {
@@ -1513,7 +1515,6 @@ static void box_gpu_draw_pass(
     };
     uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
     WGPUTextureFormat format = hdr ? BOX_GPU_HDR_FORMAT : t->format;
-    WGPUBindGroup group = box_gpu_light_group(gpu, t, v, slot);
     vp.pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
     if (phase != 2) {
         box_gpu_environment_draw_background(gpu, vp.pass, format, v, offset);
@@ -1524,7 +1525,6 @@ static void box_gpu_draw_pass(
     box_gpu_draw_batches(gpu, t, &vp, format, packet, v, group, slot, phase);
     wgpuRenderPassEncoderEnd(vp.pass);
     wgpuRenderPassEncoderRelease(vp.pass);
-    wgpuBindGroupRelease(group);
 }
 
 /** Check whether a view draws a depth prepass: it is lit, its camera has a depth range and it
@@ -1574,6 +1574,7 @@ done:
  * @param encoder The encoder of the frame
  * @param packet The packet
  * @param v The view
+ * @param group The bind group of the view
  * @param slot Slot of the view in the view buffer
  * @param late Whether it loads the depth of the early prepass and draws the late arguments of
  * a view that culls by occlusion, else it clears the depth and draws the early arguments, the
@@ -1585,6 +1586,7 @@ static void box_gpu_draw_prepass(
     WGPUCommandEncoder encoder,
     const box_render_packet_t *packet,
     const box_render_view_t *v,
+    WGPUBindGroup group,
     int32_t slot,
     bool late)
 {
@@ -1599,7 +1601,6 @@ static void box_gpu_draw_prepass(
     };
     WGPURenderPassDescriptor desc = { .depthStencilAttachment = &depth };
     uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
-    WGPUBindGroup group = box_gpu_light_group(gpu, t, v, slot);
     WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
     int32_t i;
     wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
@@ -1636,7 +1637,6 @@ static void box_gpu_draw_prepass(
 
     wgpuRenderPassEncoderEnd(pass);
     wgpuRenderPassEncoderRelease(pass);
-    wgpuBindGroupRelease(group);
     box_gpu_count(gpu, BOX_GPU_STAT_PREPASS);
 }
 
@@ -1666,21 +1666,25 @@ void box_gpu_draw_views(
         box_gpu_cull_record(gpu, encoder, slot);
         box_gpu_shadow_render(gpu, encoder, packet, i, slot);
         box_gpu_particles_sort(gpu, encoder, v, slot);
+        WGPUBindGroup group = box_gpu_light_group(gpu, t, v, slot);
         if (box_gpu_draw_prepasses(gpu, packet, v, slot)) {
-            box_gpu_draw_prepass(gpu, t, encoder, packet, v, slot, false);
+            box_gpu_draw_prepass(gpu, t, encoder, packet, v, group, slot, false);
             if (occludes) {
                 box_gpu_cull_record_late(gpu, encoder, t->depth_view, slot);
-                box_gpu_draw_prepass(gpu, t, encoder, packet, v, slot, true);
+                box_gpu_draw_prepass(gpu, t, encoder, packet, v, group, slot, true);
             }
 
-            box_gpu_draw_pass(gpu, t, encoder, color, hdr, packet, v, slot, 3);
+            box_gpu_draw_pass(gpu, t, encoder, color, hdr, packet, v, group, slot, 3);
         } else {
-            box_gpu_draw_pass(gpu, t, encoder, color, hdr, packet, v, slot, occludes ? 1 : 0);
+            box_gpu_draw_pass(gpu, t, encoder, color, hdr, packet, v, group, slot,
+                occludes ? 1 : 0);
             if (occludes) {
                 box_gpu_cull_record_late(gpu, encoder, t->depth_view, slot);
-                box_gpu_draw_pass(gpu, t, encoder, color, hdr, packet, v, slot, 2);
+                box_gpu_draw_pass(gpu, t, encoder, color, hdr, packet, v, group, slot, 2);
             }
         }
+
+        wgpuBindGroupRelease(group);
 
         if (hdr) {
             box_gpu_effects_run(gpu, t, encoder, packet, v, color);
