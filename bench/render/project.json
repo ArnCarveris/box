@@ -72,7 +72,8 @@
                 "benchcases": [
                     "off_100k",
                     "on_100k",
-                    "spots_16_100k"
+                    "spots_16_100k",
+                    "points_8_100k"
                 ]
             },
             {

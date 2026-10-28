@@ -411,6 +411,20 @@
                 ]
             },
             {
+                "id": "PointShadow",
+                "testcases": [
+                    "shadows_every_octant",
+                    "octant_seams_lit_evenly",
+                    "core_matches_clip_distances",
+                    "range_culls_casters",
+                    "shadows_false_unshadowed",
+                    "view_shadows_disabled_unshadowed",
+                    "baked_light_has_no_tile",
+                    "draws_per_light",
+                    "device_loss_recreates_tile"
+                ]
+            },
+            {
                 "id": "Shadow",
                 "testcases": [
                     "splits_uniform",

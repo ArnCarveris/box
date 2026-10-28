@@ -25,7 +25,8 @@ static void box_directional_light_ctor(
     }
 }
 
-/** Construct PointLight values at full intensity with the default range, Mixed.
+/** Construct PointLight values at full intensity with the default range, Mixed, without
+ * shadows.
  *
  * @param ptr The components
  * @param count Number of components
@@ -41,7 +42,8 @@ static void box_point_light_ctor(
     (void)ti;
     for (i = 0; i < count; i ++) {
         values[i] = (PointLight){
-            .intensity = 1.0f, .range = 10.0f, .bake = LightBakeModeMixed
+            .intensity = 1.0f, .range = 10.0f, .bake = LightBakeModeMixed,
+            .shadows = false, .shadow_resolution = 512
         };
     }
 }

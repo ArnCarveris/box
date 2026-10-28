@@ -1,11 +1,11 @@
 /**
  * @file ShadowAtlas.c
- * @brief Tests for the shadow atlas of the spot lights: its settings, the tile allocation and
- * what the light extract sends for it.
+ * @brief Tests for the shadow atlas of the spot and point lights: its settings, the tile
+ * allocation and what the light extract sends for it.
  *
  * The allocation cases call box_render_shadow_allocate directly; the extract cases render into
  * the null backend with a camera at (0, 2, 10) looking down -Z and a spot light 4 units above
- * the origin shining straight down.
+ * the origin shining straight down, or a point light there.
  */
 
 #include <box.h>
@@ -347,6 +347,54 @@ static ecs_entity_t spot_new(
     return e;
 }
 
+/** Create a point light.
+ *
+ * @param world The world
+ * @param position World position of the light
+ * @param shadows Whether it casts shadows
+ * @param mode Its bake mode
+ * @return The light, with the default range of 10
+ */
+static ecs_entity_t point_new(
+    ecs_world_t *world,
+    vec3 position,
+    bool shadows,
+    LightBakeMode mode)
+{
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {position[0], position[1], position[2]});
+    ecs_add(world, e, PointLight);
+    PointLight *p = ecs_get_mut(world, e, PointLight);
+    p->shadows = shadows;
+    p->bake = mode;
+    ecs_modified(world, e, PointLight);
+
+    return e;
+}
+
+/** Find the tile of a light in a packet.
+ *
+ * @param p The packet
+ * @param light The light
+ * @return Its tile, NULL for none
+ */
+static const box_render_shadow_tile_t* extract_tile_of(
+    const box_render_packet_t *p,
+    ecs_entity_t light)
+{
+    const box_render_shadow_tile_t *result = NULL;
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&p->shadow_tiles); i ++) {
+        const box_render_shadow_tile_t *t = ecs_vec_get_t(
+            &p->shadow_tiles, box_render_shadow_tile_t, i);
+        if (t->light == light) {
+            result = t;
+        }
+    }
+
+    return result;
+}
+
 /** Run a frame into the null backend.
  *
  * @param world The world
@@ -668,4 +716,194 @@ void ShadowAtlas_spot_projection(void) {
     box_render_shadow_spot(position, direction, 10, 89, &place, 1024, &r);
     test_assert(fabsf(r.params[2] * 128.0f - tanf(glm_rad(BOX_RENDER_SHADOW_SPOT_ANGLE_MAX))) <
         1e-3f);
+}
+
+void ShadowAtlas_point_projection(void) {
+    // lighting/shadows
+    box_render_shadow_record_t r;
+    box_render_shadow_place_t place = {256, 512, 256};
+    vec3 position = {1, 5, 2};
+    int32_t i, j;
+    box_render_shadow_point(position, 10, &place, 1024, &r);
+    test_flt(r.params[0], 0.05f);
+    test_flt(r.params[1], 10.0f);
+    test_assert(fabsf(r.params[2] - 2.0f * 2.4494897f / 256.0f) < 1e-6f);
+    test_flt(r.params[3], 256.0f);
+    test_flt(r.rect[0], 0.5f);
+    test_flt(r.rect[1], 0.25f);
+    test_flt(r.rect[2], 0.25f);
+    test_flt(r.rect[3], 1.0f / 1024.0f);
+    test_flt(r.light[0], 1.0f);
+    test_flt(r.light[1], 5.0f);
+    test_flt(r.light[2], 2.0f);
+    test_flt(r.light[3], (float)BOX_RENDER_SHADOW_OCTAHEDRAL);
+    for (i = 0; i < 4; i ++) {
+        for (j = 0; j < 4; j ++) {
+            test_flt(r.matrix[i][j], 0.0f);
+        }
+    }
+
+    box_render_shadow_place_t spot = {256, 0, 0};
+    box_render_shadow_spot(position, (vec3){0, -1, 0}, 10, 30, &spot, 1024, &r);
+    test_flt(r.light[3], (float)BOX_RENDER_SHADOW_PERSPECTIVE);
+    test_flt(r.light[1], 5.0f);
+
+    test_flt(box_render_shadow_near(10), 0.05f);
+    test_flt(box_render_shadow_far(10), 10.0f);
+    test_flt(box_render_shadow_near(0.01f), BOX_RENDER_SHADOW_NEAR_MIN);
+    test_flt(box_render_shadow_far(0.0001f), 2.0f * BOX_RENDER_SHADOW_NEAR_MIN);
+}
+
+/* The 6 planes keep the box around the sphere of the range and nothing beyond it */
+void ShadowAtlas_point_cull_planes(void) {
+    // lighting/shadows
+    box_render_shadow_tile_t tile = {
+        .projection = BOX_RENDER_SHADOW_OCTAHEDRAL,
+        .position = {1, 5, 2},
+        .near_ = 0.05f,
+        .far_ = 10.0f
+    };
+    vec4 planes[6];
+    vec3 inside[3] = {{1, 5, 2}, {10.5f, -4.5f, 11.5f}, {-8.5f, 14.5f, -7.5f}};
+    vec3 outside[3] = {{11.5f, 5, 2}, {1, -5.5f, 2}, {1, 5, -8.5f}};
+    int32_t i, k;
+    box_render_shadow_point_planes(&tile, planes);
+    for (i = 0; i < 6; i ++) {
+        float len = sqrtf(planes[i][0] * planes[i][0] + planes[i][1] * planes[i][1] +
+            planes[i][2] * planes[i][2]);
+        test_assert(fabsf(len - 1.0f) < 1e-6f);
+    }
+
+    for (k = 0; k < 3; k ++) {
+        bool in = true, out = false;
+        for (i = 0; i < 6; i ++) {
+            in = in && glm_vec3_dot(planes[i], inside[k]) + planes[i][3] >= 0;
+            out = out || glm_vec3_dot(planes[i], outside[k]) + planes[i][3] < 0;
+        }
+
+        test_bool(in, true);
+        test_bool(out, true);
+    }
+}
+
+void ShadowAtlas_extract_point_assigns_tile(void) {
+    // lighting/shadows
+    box_render_null_t *null;
+    ecs_entity_t view;
+    ecs_world_t *world = extract_world(&null, &view);
+    ecs_entity_t light = point_new(world, (vec3){0, 4, 0}, true, LightBakeModeMixed);
+    const box_render_packet_t *p = extract_frame(world, null);
+
+    test_int(ecs_vec_count(&p->shadow_atlases), 1);
+    test_int(ecs_vec_count(&p->shadow_tiles), 1);
+    const box_render_shadow_atlas_t *atlas = ecs_vec_first(&p->shadow_atlases);
+    const box_render_shadow_tile_t *tile = ecs_vec_first(&p->shadow_tiles);
+    test_int(atlas->count, 1);
+    test_uint(tile->light, light);
+    test_int(tile->size, 512);
+    test_int(tile->projection, BOX_RENDER_SHADOW_OCTAHEDRAL);
+    test_flt(tile->position[0], 0.0f);
+    test_flt(tile->position[1], 4.0f);
+    test_flt(tile->position[2], 0.0f);
+    test_flt(tile->near_, 0.05f);
+    test_flt(tile->far_, 10.0f);
+    test_int(extract_tile(world, light), 0);
+    test_int(extract_uploads(p, atlas->handle), 1);
+
+    const box_render_view_t *v = ecs_vec_first(&p->views);
+    test_bool(v->shadows.spots, true);
+    test_int(v->shadows.tiles, 1);
+    test_int(ecs_singleton_get(world, RenderStatus)->shadow_tiles, 1);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void ShadowAtlas_extract_point_shadows_false_no_tile(void) {
+    // lighting/shadows
+    box_render_null_t *null;
+    ecs_entity_t view;
+    ecs_world_t *world = extract_world(&null, &view);
+    ecs_entity_t light = point_new(world, (vec3){0, 4, 0}, false, LightBakeModeMixed);
+    const box_render_packet_t *p = extract_frame(world, null);
+
+    test_int(ecs_vec_count(&p->shadow_atlases), 0);
+    test_int(extract_tile(world, light), BOX_RENDER_SHADOW_NONE);
+    test_int(ecs_singleton_get(world, RenderStatus)->shadow_tiles, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void ShadowAtlas_extract_point_baked_no_tile(void) {
+    // lighting/shadows
+    box_render_null_t *null;
+    ecs_entity_t view;
+    ecs_world_t *world = extract_world(&null, &view);
+    ecs_singleton_add(world, LightBake);
+    ecs_entity_t baked = point_new(world, (vec3){-2, 4, 0}, true, LightBakeModeBaked);
+    ecs_entity_t mixed = point_new(world, (vec3){2, 4, 0}, true, LightBakeModeMixed);
+    const box_render_packet_t *p = extract_frame(world, null);
+
+    test_int(ecs_vec_count(&p->shadow_tiles), 1);
+    test_uint(((const box_render_shadow_tile_t*)ecs_vec_first(&p->shadow_tiles))->light,
+        mixed);
+    test_int(extract_tile(world, baked), 0xDEAD);
+    test_int(extract_tile(world, mixed), 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/* A spot and a point light are candidates of one allocation: the nearer one takes the only
+ * tile, whichever kind it is, and both fit side by side when the atlas holds them */
+void ShadowAtlas_extract_point_and_spot_share_budget(void) {
+    // lighting/shadows
+    box_render_null_t *null;
+    ecs_entity_t view;
+    ecs_world_t *world = extract_world(&null, &view);
+    ecs_singleton_set(world, ShadowAtlas, {.resolution = 512, .min_tile = 512});
+    ecs_entity_t point = point_new(world, (vec3){0, 4, 2}, true, LightBakeModeMixed);
+    ecs_entity_t spot = spot_new(world, (vec3){0, 4, -30}, true, LightBakeModeMixed);
+    const box_render_packet_t *p = extract_frame(world, null);
+
+    test_int(ecs_vec_count(&p->shadow_tiles), 1);
+    test_int(extract_tile(world, point), 0);
+    test_int(extract_tile(world, spot), BOX_RENDER_SHADOW_NONE);
+    const RenderStatus *status = ecs_singleton_get(world, RenderStatus);
+    test_int(status->shadow_tiles, 1);
+    test_int(status->shadow_dropped, 1);
+
+    ecs_set(world, point, Position, {0, 4, -30});
+    ecs_set(world, spot, Position, {0, 4, 2});
+    p = extract_frame(world, null);
+    test_int(ecs_vec_count(&p->shadow_tiles), 1);
+    test_int(extract_tile(world, spot), 0);
+    test_int(extract_tile(world, point), BOX_RENDER_SHADOW_NONE);
+    test_int(((const box_render_shadow_tile_t*)ecs_vec_first(&p->shadow_tiles))->projection,
+        BOX_RENDER_SHADOW_PERSPECTIVE);
+    status = ecs_singleton_get(world, RenderStatus);
+    test_int(status->shadow_dropped, 1);
+
+    ecs_singleton_set(world, ShadowAtlas, {.resolution = 1024, .min_tile = 64});
+    p = extract_frame(world, null);
+    test_int(ecs_vec_count(&p->shadow_tiles), 2);
+    const box_render_shadow_tile_t *a = extract_tile_of(p, point);
+    const box_render_shadow_tile_t *b = extract_tile_of(p, spot);
+    test_assert(a != NULL);
+    test_assert(b != NULL);
+    test_int(a->projection, BOX_RENDER_SHADOW_OCTAHEDRAL);
+    test_int(b->projection, BOX_RENDER_SHADOW_PERSPECTIVE);
+    test_int(a->size, 512);
+    test_int(b->size, 512);
+    box_render_shadow_place_t places[2] = {
+        {a->size, a->x, a->y}, {b->size, b->x, b->y}
+    };
+    tiles_check(places, 2, 1024);
+    test_bool(extract_tile(world, point) != extract_tile(world, spot), true);
+    test_int(ecs_singleton_get(world, RenderStatus)->shadow_tiles, 2);
+    test_int(ecs_singleton_get(world, RenderStatus)->shadow_dropped, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
 }

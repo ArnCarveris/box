@@ -1,0 +1,88 @@
+// Spot and point light shadows in one shadow atlas: two spot lights shine down from behind the
+// outer posts and a point light hangs between them over the middle post, each with a tile of
+// the same 1024 atlas. The spots throw their posts' shadows toward the camera, the point light
+// throws the shadows of all three posts and of a floating cube outward in every direction,
+// onto the floor and the back wall.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+
+camera {
+  Position: {0, 6, 10}
+  Rotation: {-0.5, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {8, 8, 12, 255}}, shadows: {enabled: true}}
+}
+
+$ {
+  AmbientLight: {intensity: 0.1}
+  ShadowAtlas: {resolution: 1024, min_tile: 64}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {16, 0.2, 10}
+  Rgb: {200, 200, 200}
+}
+
+wall {
+  Position: {0, 2.5, -3}
+  Box: {16, 5, 0.2}
+  Rgb: {200, 200, 200}
+}
+
+post_left {
+  Position: {-4, 0.8, 0.5}
+  Box: {0.5, 1.6, 0.5}
+  Rgb: {230, 230, 230}
+}
+
+post_middle {
+  Position: {0, 0.6, 0}
+  Box: {0.5, 1.2, 0.5}
+  Rgb: {230, 230, 230}
+}
+
+post_right {
+  Position: {4, 0.8, 0.5}
+  Box: {0.5, 1.6, 0.5}
+  Rgb: {230, 230, 230}
+}
+
+floating_cube {
+  Position: {1.2, 2.4, -1.2}
+  Box: {0.5, 0.5, 0.5}
+  Rgb: {230, 230, 230}
+}
+
+spot_left {
+  Position: {-4, 4, -1}
+  Rotation: {1.2, 0, 0}
+  SpotLight: {intensity: 20 * flecs.script.math.PI, range: 9, inner_angle: 15, outer_angle: 28,
+    shadows: true, shadow_resolution: 512}
+  Rgb: {255, 170, 80}
+}
+
+spot_right {
+  Position: {4, 4, -1}
+  Rotation: {1.2, 0, 0}
+  SpotLight: {intensity: 20 * flecs.script.math.PI, range: 9, inner_angle: 15, outer_angle: 28,
+    shadows: true, shadow_resolution: 512}
+  Rgb: {80, 220, 255}
+}
+
+bulb {
+  Position: {0, 2.2, 0}
+  PointLight: {intensity: 6 * flecs.script.math.PI, range: 8, shadows: true,
+    shadow_resolution: 512}
+  Rgb: {255, 255, 255}
+  Sphere: {segments: 12, smooth: true, radius: 0.1}
+  Emissive: {strength: 1, color: {255, 255, 255}}
+  NoShadow
+}

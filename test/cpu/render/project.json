@@ -301,7 +301,13 @@
                     "extract_uploads_on_change",
                     "extract_released_without_tiles",
                     "extract_resolution_change",
-                    "extract_full_atlas_drops"
+                    "extract_full_atlas_drops",
+                    "point_projection",
+                    "point_cull_planes",
+                    "extract_point_assigns_tile",
+                    "extract_point_shadows_false_no_tile",
+                    "extract_point_baked_no_tile",
+                    "extract_point_and_spot_share_budget"
                 ]
             },
             {

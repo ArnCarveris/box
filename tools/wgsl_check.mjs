@@ -2,7 +2,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const PACKAGE = 'webgpu@0.6.2';
@@ -10,6 +10,12 @@ const HOME = process.env.BOX_WGSL_HOME || join(homedir(), '.cache', 'box', 'wgsl
 const ENTRY = join(HOME, 'node_modules', 'webgpu', 'index.js');
 const DEFAULT_DIR = 'etc/shaders';
 const keep = {};
+// Variants of a shader the engine compiles besides the file as is: the define it adds and the
+// device feature the variant needs, requested from the validator when its adapter has it.
+const VARIANTS = {
+  'shadow.wgsl': [{ define: 'BOX_SHADOW_CLIP_DISTANCES', feature: 'clip-distances' }],
+};
+const FEATURES = [...new Set(Object.values(VARIANTS).flat().map((v) => v.feature))];
 const USAGE = `Validates WGSL with Tint, the browser's compiler, through Dawn's node binding.
 
   node tools/wgsl_check.mjs --install          install the validator when it is missing
@@ -20,7 +26,9 @@ const USAGE = `Validates WGSL with Tint, the browser's compiler, through Dawn's 
 
 Files go through the engine's preprocessor rules (#include "file", #pragma once, #define,
 #undef, #ifdef, #ifndef, #else, #endif) before Tint sees them, and errors point at the
-original file and line. Tint runs the WGSL uniformity analysis that native wgpu skips. The
+original file and line. A file the engine also compiles with a define (shadow.wgsl with
+BOX_SHADOW_CLIP_DISTANCES) is validated in both variants; a variant that needs a device feature
+(clip-distances) is skipped, and reported, when the validator's adapter lacks it. Tint runs the WGSL uniformity analysis that native wgpu skips. The
 validator is installed in $BOX_WGSL_HOME, ~/.cache/box/wgsl when unset, which every worktree
 shares. Exits 0 when every shader compiles, 1 when one fails and 2 when the validator cannot
 run.`;
@@ -176,6 +184,13 @@ function readInputs(args) {
       const out = preprocess(file, new Map(defines));
       shaders.push({ name: file, code: out.lines.join('\n'), origin: out.origin,
         error: out.error });
+      for (const variant of VARIANTS[basename(file)] || []) {
+        const variantDefines = new Map(defines);
+        variantDefines.set(variant.define, '');
+        const v = preprocess(file, variantDefines);
+        shaders.push({ name: `${file} -D ${variant.define}`, code: v.lines.join('\n'),
+          origin: v.origin, error: v.error, feature: variant.feature });
+      }
     }
   }
   return shaders;
@@ -195,7 +210,8 @@ async function openDevice() {
     console.log('wgsl_check: no WebGPU adapter');
     return null;
   }
-  return adapter.requestDevice();
+  const requiredFeatures = FEATURES.filter((f) => adapter.features.has(f));
+  return adapter.requestDevice({ requiredFeatures });
 }
 
 async function check(device, shader) {
@@ -239,7 +255,13 @@ async function main() {
     return 2;
   }
   let failed = 0;
+  let skipped = 0;
   for (const shader of shaders) {
+    if (shader.feature && !device.features.has(shader.feature)) {
+      console.log(`skip ${shader.name}: the validator lacks the ${shader.feature} feature`);
+      skipped++;
+      continue;
+    }
     const errors = await check(device, shader);
     failed += errors ? 1 : 0;
     if (!errors) {
@@ -247,7 +269,9 @@ async function main() {
     }
   }
   device.destroy();
-  console.log(`wgsl_check: ${shaders.length - failed} of ${shaders.length} shader(s) passed`);
+  const checked = shaders.length - skipped;
+  console.log(`wgsl_check: ${checked - failed} of ${checked} shader(s) passed` +
+    (skipped ? `, ${skipped} skipped` : ''));
   return failed ? 1 : 0;
 }
 
