@@ -31,6 +31,8 @@ static const uint8_t box_draws_image_color[3] = { 255, 255, 255 };
  * supports; a batch whose segment does not fit any more uploads all its instances instead */
 #define BOX_DRAWS_MAX_CHANGES ((uint64_t)128 << 20)
 
+_Static_assert(sizeof(box_render_transform_t) == 48, "InstanceTransform of instance.wgsl");
+_Static_assert(sizeof(box_render_shading_t) == 80, "InstanceShading of instance.wgsl");
 
 /** Bytes of the header of a scatter segment */
 #define BOX_DRAWS_HEADER ((uint32_t)(BOX_RENDER_SCATTER_HEADER * sizeof(uint32_t)))

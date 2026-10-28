@@ -2,15 +2,12 @@
  * @file render/draw.h
  * @brief Instanced batches of the forward pass, shared by the change tracking and the extract.
  *
- * Shapes live in batches keyed by scene, mesh, pipeline, whether their transform and their
- * material are dynamic and whether they cast shadows; a batch keeps one slot per entity,
- * swap-removed so its instances stay contiguous, and holds at most BOX_DRAWS_CHUNK of them, so
- * a key may have several batches.
+ * Shapes live in batches keyed by scene, mesh, pipeline, whether their transform and material
+ * are dynamic and whether they cast shadows, one swap-removed slot per entity and at most
+ * BOX_DRAWS_CHUNK of them, so a key may have several batches.
  *
- * The instances of every batch live in one store of instance pages: a batch owns one run of
- * contiguous slots of one page, handed out by the slot allocator of the store (store.c). A
- * page has a buffer per stream (transform, shading, surface) with the same slots, and a change
- * writes and uploads only the streams it changes.
+ * A batch owns a run of slots of an instance page (store.c). A page has a buffer per stream
+ * (transform, shading, surface) with the same slots; a change uploads only its streams.
  */
 
 #ifndef BOX_RENDER_DRAW_H

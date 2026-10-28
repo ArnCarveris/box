@@ -89,15 +89,12 @@
 
 /** Buffer handle of the first instance page, the first handle of the instance pages.
  *
- * Every batch draws a run of slots of one instance page, BOX_RENDER_INSTANCE_STREAMS storage
- * buffers of at most BOX_DRAWS_CHUNK instances with the same slots, shared by the batches
- * (box_render_batch_t.instances is the transform stream of the page and first_instance the
- * first slot of the run).
+ * Every batch draws a run of slots of one instance page: BOX_RENDER_INSTANCE_STREAMS storage
+ * buffers of at most BOX_DRAWS_CHUNK instances with the same slots, shared by the batches.
+ * box_render_batch_t.instances is the transform stream of the page, first_instance its slot.
  *
- * Page p of the store has the handle BOX_RENDER_BUFFER_FIRST + p * BOX_RENDER_INSTANCE_STREAMS
- * + s for stream s, so the transform stream of the first page is BOX_RENDER_BUFFER_FIRST once a
- * batch exists and the other streams of a page follow the handle of its transform stream. A
- * released page index is reused by the next page the store needs. */
+ * Page p has the handle BOX_RENDER_BUFFER_FIRST + p * BOX_RENDER_INSTANCE_STREAMS + s for
+ * stream s. A released page index is reused by the next page the store needs. */
 #define BOX_RENDER_BUFFER_FIRST (16)
 
 /** Buffers of an instance page, one per stream, at consecutive handles */
@@ -635,9 +632,9 @@ typedef struct box_render_shading_t {
 } box_render_shading_t;
 
 /** Surface parameters of an instance, the stream of an instance page that changes with its
- * ShapeMesh: the parametric surface the vertex shaders evaluate (surface.wgsl), zero for a
- * plain mesh. p[0].x is the surface kind and p[22], p[23] the center and half extent of the
- * local bounds of a surface. */
+ * ShapeMesh: the parametric surface the vertex shaders evaluate (surface.wgsl), 0 for a mesh.
+ *
+ * p[0].x is the surface kind and p[22], p[23] the center and half extent of its local bounds. */
 typedef struct box_render_surface_t {
     vec4 p[BOX_SURFACE_VECTORS]; /**< Surface words, as box_surface_data_t.p */
 } box_render_surface_t;
@@ -1192,8 +1189,8 @@ typedef struct box_render_draws_stats_t {
                                  *   the runs of batches whose transforms upload (every frame for
                                  *   DynamicTransform) and the scatter segments of moved slots */
     int64_t shading_bytes;      /**< Bytes the last extract uploaded into the shading streams:
-                                 *   the runs of batches whose shading uploads (every frame for
-                                 *   DynamicMaterial) and the scatter segments of changed materials */
+                                 *   the runs of batches whose shading uploads (every frame
+                                 *   for DynamicMaterial) and scatter segments of materials */
     int64_t surface_bytes;      /**< Bytes the last extract uploaded into the surface streams,
                                  *   runs and scatter segments, only when a ShapeMesh changed */
     int32_t clips;              /**< ClipChildren elements in the clip buffer */
@@ -1203,10 +1200,11 @@ typedef struct box_render_draws_stats_t {
 /** Register the observers and the system that keep the shapes of the world in batches.
  *
  * Shapes are instanced in batches keyed by scene, mesh, pipeline and whether their transform
- * and their material are dynamic, which persist between frames. An instance page holds a
- * transform, a shading and a surface stream. The transforms of DynamicTransform shapes and the
- * shading of DynamicMaterial shapes upload every frame; every other stream is updated on change
- * through the scatter pass, only the streams that changed.
+ * and their material are dynamic, which persist between frames.
+ *
+ * An instance page holds a transform, a shading and a surface stream. The transforms of
+ * DynamicTransform shapes and the shading of DynamicMaterial shapes upload every frame; every
+ * other stream is updated on change through the scatter pass, only the streams that changed.
  *
  * @param world The world
  */

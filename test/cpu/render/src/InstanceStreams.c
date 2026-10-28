@@ -403,10 +403,16 @@ void InstanceStreams_dynamic_shape2d_keeps_clip(void) {
     ecs_set(world, second, Position, {30, 0, 0});
     ecs_set(world, second, Rect, {20, 20});
     ecs_add_id(world, second, ClipChildren);
-    ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, first);
-    ecs_add(world, child, DynamicTransform);
-    ecs_set(world, child, Position, {0, 0, 0});
-    ecs_set(world, child, Rect, {10, 10});
+    ecs_entity_t children[COUNT];
+    int32_t i;
+    for (i = 0; i < COUNT; i ++) {
+        children[i] = ecs_new_w_pair(world, EcsChildOf, first);
+        ecs_add(world, children[i], DynamicTransform);
+        ecs_set(world, children[i], Position, {0, (float)i, 0});
+        ecs_set(world, children[i], Rect, {10, 10});
+    }
+
+    ecs_entity_t child = children[0];
 
     frame(world);
     frame(world);
@@ -414,7 +420,6 @@ void InstanceStreams_dynamic_shape2d_keeps_clip(void) {
     test_assert(clip != 0);
     test_int(ecs_get(world, child, DrawSlot)->clip, (int32_t)clip);
 
-    int32_t i;
     for (i = 0; i < 3; i ++) {
         ecs_set(world, child, Position, {(float)i, 1, 0});
         box_render_draws_stats_t stats = frame(world);
