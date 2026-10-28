@@ -183,9 +183,11 @@ The buildings are prefabs in `etc/buildings/`, one file per building, with the o
 and geometry, materials and lights. They stand still: the gameplay tasks add their components
 (item, recipe, footprint, health, power) to the same prefabs, and the animation and effect tasks
 drive the named parts below. Every building's origin is the center of its tile on the ground,
-and it faces +Z. The parts are children of the instance, found by path from it (for example
-`ecs_lookup_from(world, drill, "carriage.slider.bit")`); they have no `DynamicTransform`, so a
-system that moves one every frame adds it.
+and it faces +Z. The names are those of the prefab's parts (`ecs_lookup_from(world, Drill,
+"carriage.slider.bit")`): the parts of an instance are unnamed children, each an instance
+(`IsA`) of the prefab's part of the same path, so a system finds the part of an instance as the
+child of its parent whose `IsA` target is the prefab's part, the way the original's `oreChild`
+does. The parts have no `DynamicTransform`, so a system that moves one every frame adds it.
 
 | Prefab | File | Named parts |
 | --- | --- | --- |
@@ -206,7 +208,8 @@ is turned by PI / 2 about x). The `bulb` is the part the game drives: it has the
 is the power lamp of its building, which OrePower colors `color` (live), `ok`, `warn` or `dead`
 and blinks at `blink` per second while dead; a work lamp (`work: true`) lights while its
 building works. The props are on the `Light` component of the lamp entity (`lamp_l`, `sight`,
-...), the bulb is its child `bulb`.
+...). The template builds the parts on every lamp of an instance, not on the prefab's, so they
+keep their names there: the bulb is the lamp's child `bulb`.
 
 The shared materials are inherited prefabs that a part derives from and resizes with its own
 `Box`: `HazardTag`, `HazardTrim`, `HazardTrimShort`, `HazardBorderShort`, `HazardBorderLong`

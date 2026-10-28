@@ -10,6 +10,7 @@ include apps/oreelse/test/visual/setup/seed
 include apps/oreelse/etc/oreelse
 
 using box.transform
+using box.material
 using oreelse
 
 const lampLive: Rgb = {92, 236, 222}
