@@ -15,6 +15,10 @@
 // cubemap as an infinitely distant probe below the scene probe. A view
 // that renders the atmosphere of its scene attenuates the shaded color and adds the in scattered
 // light from one trilinear tap of its aerial perspective volume.
+// The occlusion of opaque and alpha tested fragments is the smaller of the ambient occlusion of
+// the view (Gtao, white without one) at their pixel and the occlusion of their ORM layer; it
+// scales the indirect diffuse light, and the indirect specular light by the specular occlusion
+// of Lagarde that follows from it. Blended draws take the ORM occlusion alone.
 // An alpha tested pipeline (alpha_cutout) discards the fragments whose alpha, the instance alpha
 // times the albedo alpha, is below the cutoff of their instance, once every texture is sampled.
 // A lit view draws its opaque meshes depth only first (vs_depth, vs_depth_cutout and
@@ -61,6 +65,10 @@ const MIN_ROUGHNESS: f32 = 0.045;
 // view.environment.w is 0.
 @group(0) @binding(12) var environment_cube: texture_cube<f32>;
 @group(0) @binding(13) var<uniform> environment_sh: array<vec4f, 9>;
+
+// Ambient occlusion of the view (Gtao) at the render size, read at the pixel of a fragment; a
+// view without Gtao, and the probe and reflection captures, bind a 1x1 white image.
+@group(0) @binding(14) var gtao_image: texture_2d<f32>;
 
 @group(2) @binding(0) var<storage, read> transforms: array<InstanceTransform>;
 @group(2) @binding(1) var<storage, read> surface_assets: array<vec4f>;
@@ -724,6 +732,18 @@ fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32) -> vec3f {
     return sum;
 }
 
+// Ambient occlusion of the view at the pixel of a fragment.
+fn view_occlusion(pos: vec4f) -> f32 {
+    let size = vec2i(textureDimensions(gtao_image));
+    return textureLoad(gtao_image, min(vec2i(pos.xy), size - 1), 0).r;
+}
+
+// Specular occlusion from the ambient occlusion (Lagarde, Moving Frostbite to PBR), with a the
+// squared perceptual roughness.
+fn specular_occlusion(ndv: f32, ao: f32, a: f32) -> f32 {
+    return clamp(pow(ndv + ao, exp2(-16.0 * a - 1.0)) - 1.0 + ao, 0.0, 1.0);
+}
+
 fn shade(s: Surface, v: vec3f, world: vec3f) -> vec3f {
     if (view.lights.z == 0u) {
         return s.albedo + s.emissive;
@@ -763,7 +783,8 @@ fn shade(s: Surface, v: vec3f, world: vec3f) -> vec3f {
     // roughness, so the grazing reflection of a rough surface fades without a roughness aware
     // f90. What the lobe reflects is not available to the diffuse term, as 1 - F in brdf().
     let specular_albedo = f0 * ab.x + ab.y;
-    let indirect_specular = specular_albedo * specular_light * s.occlusion;
+    let indirect_specular = specular_albedo * specular_light *
+        specular_occlusion(ndv, s.occlusion, a);
     let indirect_diffuse = (vec3f(1.0) - specular_albedo) * diffuse_color * diffuse_light *
         s.occlusion;
     return lights_direct(s, v, world, cluster) + indirect_diffuse + indirect_specular +
@@ -814,9 +835,13 @@ fn output(color: vec3f, alpha: f32) -> vec4f {
 }
 
 @fragment fn fs(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
-    let s = surface(f, front);
+    var s = surface(f, front);
     if (alpha_cutout && s.alpha < f.cutoff) {
         discard;
+    }
+
+    if (blend_mode == 0u) {
+        s.occlusion = min(s.occlusion, view_occlusion(f.pos));
     }
 
     let v = normalize(view.camera.xyz - f.world);

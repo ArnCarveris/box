@@ -33,22 +33,29 @@ static void box_bloom_ctor(
     }
 }
 
-/** Construct Ssao values with the documented defaults.
+/** Construct Gtao values with the documented defaults.
  *
  * @param ptr The components
  * @param count Number of components
  * @param ti Type info
  */
-static void box_ssao_ctor(
+static void box_gtao_ctor(
     void *ptr,
     int32_t count,
     const ecs_type_info_t *ti)
 {
-    Ssao *values = ptr;
+    Gtao *values = ptr;
     int32_t i;
     (void)ti;
     for (i = 0; i < count; i ++) {
-        values[i] = (Ssao){ .radius = 0.5f, .bias = 0.025f, .intensity = 1.0f };
+        values[i] = (Gtao){
+            .radius = 0.5f,
+            .falloff_range = 0.615f,
+            .final_value_power = 2.2f,
+            .quality = GtaoHigh,
+            .denoise_passes = 1,
+            .half_resolution = true
+        };
     }
 }
 
@@ -138,7 +145,8 @@ void BoxEffectsImport(
     ECS_IMPORT(world, BoxTypes);
 
     ECS_META_COMPONENT(world, Bloom);
-    ECS_META_COMPONENT(world, Ssao);
+    ECS_META_COMPONENT(world, GtaoQuality);
+    ECS_META_COMPONENT(world, Gtao);
     ECS_META_COMPONENT(world, HeightFog);
     ECS_META_COMPONENT(world, AutoExposure);
     ECS_META_COMPONENT(world, TonemapOperator);
@@ -146,7 +154,7 @@ void BoxEffectsImport(
     ECS_META_COMPONENT(world, Smaa);
 
     ecs_set_hooks(world, Bloom, { .ctor = box_bloom_ctor });
-    ecs_set_hooks(world, Ssao, { .ctor = box_ssao_ctor });
+    ecs_set_hooks(world, Gtao, { .ctor = box_gtao_ctor });
     ecs_set_hooks(world, HeightFog, { .ctor = box_fog_ctor });
     ecs_set_hooks(world, AutoExposure, { .ctor = box_exposure_ctor });
     ecs_set_hooks(world, Tonemap, { .ctor = flecs_default_ctor });

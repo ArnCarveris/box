@@ -2,13 +2,13 @@
  * @file box/effects.h
  * @brief Post process effect settings, a view lists the effect entities it applies.
  *
- * An effect entity is added to the effects of a View, which renders into an HDR target and
- * runs its effects in order. Constructors set the defaults; values apply as specified, so a
- * C literal that leaves a field out sets it to zero.
+ * A View renders into an HDR target and runs its effects in order, on its own image only, so a
+ * later UI view keeps its text crisp under Smaa. Constructors set the defaults; values apply as
+ * specified, so a C literal that leaves a field out sets it to zero.
  *
- * Effects only touch the image of their own view: a later view of the target, such as a screen
- * space UI view, draws on top of the finished image, so anti aliasing (Smaa) leaves its text
- * and shapes crisp.
+ * Gtao is listed like the others but is no pass of the chain: it runs between the depth prepass
+ * and the forward pass wherever it is listed, only the first enabled one counts, and a view whose
+ * only effect is a Gtao renders without an HDR image, like a view without effects.
  */
 
 #ifndef BOX_EFFECTS_H
@@ -39,11 +39,34 @@ ECS_STRUCT(Bloom, {
     int32_t max_mip_dimension;           /**< Longest edge of the first mip, default 512 */
 });
 
-/** Screen space ambient occlusion from the depth of the view, with normals derived from it */
-ECS_STRUCT(Ssao, {
-    float radius;    /**< Sample radius in world units, default 0.5 */
-    float bias;      /**< Depth offset against self occlusion, default 0.025 */
-    float intensity; /**< Strength of the occlusion, default 1 */
+/** Slices and steps per slice of the horizon search of Gtao, the quality levels of XeGTAO */
+ECS_ENUM(GtaoQuality, {
+    GtaoLow = 0,    /**< 1 slice of 2 steps */
+    GtaoMedium = 1, /**< 2 slices of 2 steps */
+    GtaoHigh = 2,   /**< 3 slices of 3 steps */
+    GtaoUltra = 3   /**< 9 slices of 3 steps */
+});
+
+/** Ground truth ambient occlusion (XeGTAO) of the indirect light of a view.
+ *
+ * Computed from the depth prepass before the forward pass, which scales the indirect diffuse
+ * light of opaque and alpha tested meshes by the smaller of it and their ORM occlusion and the
+ * indirect specular by its specular occlusion; direct light, emission and blended draws are not.
+ *
+ * No pass of the chain: it applies wherever View.effects lists it, the first enabled one counts.
+ * Lit views with a perspective camera apply it; unlit views, orthographic cameras and the probe
+ * and reflection captures ignore it, and 2D shapes and particles are never occluded.
+ */
+ECS_STRUCT(Gtao, {
+    float radius;            /**< World radius of the occlusion sphere, default 0.5, at least 0 */
+    float falloff_range;     /**< Fraction of the radius over which occluders fade out, default
+                              *   0.615, clamped to 0..1 */
+    float final_value_power; /**< Power applied to the visibility, the strength, default 2.2, at
+                              *   least 0; 0 is no occlusion */
+    GtaoQuality quality;     /**< Slices and steps of the search, default GtaoHigh */
+    int32_t denoise_passes;  /**< Edge aware denoise passes, default 1, clamped to 0..3 */
+    bool half_resolution;    /**< Compute at half the render size and upsample with a depth aware
+                              *   filter, default true */
 });
 
 /** Exponential fog that thins out with height, lit by the sun and ambient light of the scene.

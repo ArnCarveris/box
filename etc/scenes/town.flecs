@@ -13,8 +13,8 @@ window {
   Surface: {width: 1280, height: 720, vsync: true}
 }
 
-ssao {
-  Ssao: {radius: 0.25, bias: 0.025, intensity: 1}
+gtao {
+  Gtao: {radius: 0.6, final_value_power: 2.2}
 }
 
 tonemap {
@@ -35,7 +35,7 @@ camera {
 }
 
 view {
-  View: {camera: camera, clear: {enabled: true, color: {150, 178, 210, 255}}, lighting: {enabled: true}, shadows: {enabled: true, cascades: 4, resolution: 2048, max_distance: 200, split_lambda: 0.7, depth_bias: 2, normal_offset: 2, filter_size: 3, fade: 0.2, blend: 0.1}, culling: {enabled: true, occlusion: true, min_dimension_px: 4}, effects: [{enabled: true, effect: ssao}, {enabled: true, effect: tonemap}, {enabled: true, effect: smaa}]}
+  View: {camera: camera, clear: {enabled: true, color: {150, 178, 210, 255}}, lighting: {enabled: true}, shadows: {enabled: true, cascades: 4, resolution: 2048, max_distance: 200, split_lambda: 0.7, depth_bias: 2, normal_offset: 2, filter_size: 3, fade: 0.2, blend: 0.1}, culling: {enabled: true, occlusion: true, min_dimension_px: 4}, effects: [{enabled: true, effect: gtao}, {enabled: true, effect: tonemap}, {enabled: true, effect: smaa}]}
 }
 
 $ {

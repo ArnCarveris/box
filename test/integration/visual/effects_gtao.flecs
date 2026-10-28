@@ -5,8 +5,8 @@ using box.camera
 using box.view
 using box.effects
 
-ssao {
-  Ssao: {radius: 0.8, intensity: 2}
+gtao {
+  Gtao: {radius: 0.8, final_value_power: 2.5}
 }
 
 camera {
@@ -16,7 +16,7 @@ camera {
 }
 
 main_view {
-  View: {camera: camera, clear: {enabled: true, color: {150, 170, 200, 255}}, effects: [{effect: ssao}]}
+  View: {camera: camera, clear: {enabled: true, color: {150, 170, 200, 255}}, effects: [{effect: gtao}]}
 }
 
 floor {

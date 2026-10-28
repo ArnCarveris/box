@@ -1304,6 +1304,7 @@ WGPUBuffer box_gpu_light_binding(
  * @param uniforms Buffer with the uniforms, bound with a dynamic offset
  * @param clusters Cluster buffer of the view
  * @param shadow Array view of the shadow map the view samples
+ * @param ao Ambient occlusion image of the view (box_gpu_gtao_begin), NULL for the white image
  * @return The bind group, released by the caller
  */
 WGPUBindGroup box_gpu_light_group_with(
@@ -1312,22 +1313,25 @@ WGPUBindGroup box_gpu_light_group_with(
     const box_render_view_t *v,
     WGPUBuffer uniforms,
     WGPUBuffer clusters,
-    WGPUTextureView shadow);
+    WGPUTextureView shadow,
+    WGPUTextureView ao);
 
 /** Create the bind group of the forward pass of a view: its uniforms, lights, clusters, shadow
- * map, aerial perspective volume and environment.
+ * map, aerial perspective volume, environment and ambient occlusion.
  *
  * @param gpu The backend
  * @param t The target
  * @param v The view
  * @param slot Slot of the view in the view buffer
+ * @param ao Ambient occlusion image of the view (box_gpu_gtao_begin), NULL for the white image
  * @return The bind group, released by the caller
  */
 WGPUBindGroup box_gpu_light_group(
     box_gpu_t *gpu,
     const box_gpu_target_t *t,
     const box_render_view_t *v,
-    int32_t slot);
+    int32_t slot,
+    WGPUTextureView ao);
 
 /** Create the layouts, sampler and empty shadow map of the shadow pass.
  *
@@ -1741,6 +1745,49 @@ void box_gpu_effects_run(
     const box_render_packet_t *packet,
     const box_render_view_t *v,
     WGPUTextureView color);
+
+/** Get the 1x1 white R32Float image bound as the ambient occlusion of a view without Gtao.
+ *
+ * @param gpu The backend
+ * @return The view of the image
+ */
+WGPUTextureView box_gpu_effects_white(
+    box_gpu_t *gpu);
+
+/** Get the ambient occlusion image a view binds for its forward pass, created or resized to the
+ * render size, when the view applies Gtao (box_render_view_gtao_t) and its shader is ready.
+ *
+ * Call it only for a view that draws its depth prepass; box_gpu_gtao_record then fills the image
+ * between the last prepass and the forward pass.
+ *
+ * @param gpu The backend
+ * @param t The target
+ * @param packet The packet
+ * @param v The view
+ * @return The view of the image, NULL when the view does not apply Gtao this frame
+ */
+WGPUTextureView box_gpu_gtao_begin(
+    box_gpu_t *gpu,
+    box_gpu_target_t *t,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v);
+
+/** Record the Gtao passes of a view from the depth of its prepass: the prefilter into the depth
+ * mips, the main pass, the denoise passes and at half resolution the bilateral upsample into the
+ * image box_gpu_gtao_begin returned.
+ *
+ * @param gpu The backend
+ * @param t The target
+ * @param encoder The encoder of the frame
+ * @param packet The packet
+ * @param v The view, for which box_gpu_gtao_begin returned an image this frame
+ */
+void box_gpu_gtao_record(
+    box_gpu_t *gpu,
+    box_gpu_target_t *t,
+    WGPUCommandEncoder encoder,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v);
 
 /** Release the HDR targets and effect state that the targets of a packet did not use.
  *

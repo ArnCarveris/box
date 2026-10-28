@@ -95,7 +95,7 @@
                     "auto_exposure",
                     "bloom",
                     "smaa",
-                    "ssao",
+                    "gtao",
                     "fog",
                     "all"
                 ]

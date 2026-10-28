@@ -8,13 +8,13 @@ using box.effects
 using box.perf
 
 // The whole post effect chain on a lit city of 10,000 blocks with 2,500 glowing spheres:
-// auto exposure, SSAO, height fog, bloom and tonemapping, every pass at full HDR resolution.
+// auto exposure, GTAO, height fog, bloom and tonemapping, every pass at full HDR resolution.
 exposure {
   AutoExposure: {speed_up: 3, speed_down: 1}
 }
 
-ssao {
-  Ssao: {radius: 0.8, intensity: 1.5}
+gtao {
+  Gtao: {radius: 0.8, final_value_power: 2.2}
 }
 
 fog {
@@ -34,7 +34,7 @@ camera {
 }
 
 main_view {
-  View: {camera: camera, clear: {enabled: true, color: {110, 150, 210, 255}}, effects: [{effect: exposure}, {effect: ssao}, {effect: fog}, {effect: bloom}, {effect: tonemap}]}
+  View: {camera: camera, clear: {enabled: true, color: {110, 150, 210, 255}}, effects: [{effect: exposure}, {effect: gtao}, {effect: fog}, {effect: bloom}, {effect: tonemap}]}
 }
 
 sun {

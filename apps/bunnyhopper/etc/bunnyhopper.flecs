@@ -55,8 +55,8 @@ exposure {
   AutoExposure: {min_log_luma: -16, low_percentile: 0, min_brightness: 0.05, max_brightness: 0.55}
 }
 
-ssao {
-  Ssao: {radius: 0.5}
+gtao {
+  Gtao: {radius: 0.5, final_value_power: 2.2}
 }
 
 bloom {
@@ -77,7 +77,7 @@ main_view {
     lighting: {enabled: true, baked: true, reflections: true, atmosphere: true,
       environment: {source: Atmosphere, intensity: 0.5, yaw: 0, background: false}},
     shadows: {enabled: true, max_distance: 200},
-    effects: [{effect: ssao}, {effect: bloom}, {effect: tonemap}]
+    effects: [{effect: gtao}, {effect: bloom}, {effect: tonemap}]
   }
 }
 

@@ -18,10 +18,10 @@ typedef enum bench_effect_t {
     BENCH_EFFECT_TONEMAP,   /**< Tonemap */
     BENCH_EFFECT_EXPOSURE,  /**< Tonemap with AutoExposure */
     BENCH_EFFECT_BLOOM,     /**< Bloom */
-    BENCH_EFFECT_SSAO,      /**< Ssao */
+    BENCH_EFFECT_GTAO,      /**< Gtao, before the forward pass and outside the chain */
     BENCH_EFFECT_FOG,       /**< HeightFog */
     BENCH_EFFECT_SMAA,      /**< Tonemap then Smaa, its cost is the difference with tonemap */
-    BENCH_EFFECT_ALL        /**< Ssao, fog, bloom and tonemap with exposure */
+    BENCH_EFFECT_ALL        /**< Gtao, fog, bloom and tonemap with exposure */
 } bench_effect_t;
 
 /** Add an effect entry to a view.
@@ -63,8 +63,8 @@ static void bench_effects(
         kind == BENCH_EFFECT_TONEMAP || kind == BENCH_EFFECT_SMAA ? 0 : exposure});
     ecs_entity_t bloom = ecs_new(world);
     ecs_add(world, bloom, Bloom);
-    ecs_entity_t ssao = ecs_new(world);
-    ecs_add(world, ssao, Ssao);
+    ecs_entity_t gtao = ecs_new(world);
+    ecs_add(world, gtao, Gtao);
     ecs_entity_t fog = ecs_new(world);
     ecs_add(world, fog, HeightFog);
     ecs_entity_t smaa = ecs_new(world);
@@ -77,8 +77,8 @@ static void bench_effects(
         .lighting.enabled = true};
     ecs_vec_init_t(NULL, &value.effects, ViewEffect, 4);
     bool disabled = kind == BENCH_EFFECT_DISABLED;
-    if (kind == BENCH_EFFECT_SSAO || kind == BENCH_EFFECT_ALL || disabled) {
-        bench_effects_add(&value, ssao, !disabled);
+    if (kind == BENCH_EFFECT_GTAO || kind == BENCH_EFFECT_ALL || disabled) {
+        bench_effects_add(&value, gtao, !disabled);
     }
 
     if (kind == BENCH_EFFECT_FOG || kind == BENCH_EFFECT_ALL || disabled) {
@@ -181,11 +181,11 @@ void Effects_smaa(
     bench_effects(b, BENCH_EFFECT_SMAA);
 }
 
-void Effects_ssao(
+void Effects_gtao(
     bench_t *b)
 {
     // lighting/effects
-    bench_effects(b, BENCH_EFFECT_SSAO);
+    bench_effects(b, BENCH_EFFECT_GTAO);
 }
 
 void Effects_fog(
