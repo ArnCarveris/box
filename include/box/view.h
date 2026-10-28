@@ -37,7 +37,12 @@ ECS_STRUCT(EnvironmentSettings, {
 
 /** Light settings for a view */
 ECS_STRUCT(LightSettings, {
-    bool enabled;           /**< Enable lighting for the view */
+    bool enabled;           /**< Enable lighting for the view. A lit view whose camera has a
+                             *   depth range draws its opaque and alpha tested 3D meshes
+                             *   into the depth buffer first (a depth prepass, two for a
+                             *   view that culls by occlusion), then shades them once per
+                             *   pixel with an Equal depth test; an unlit view shades every
+                             *   opaque fragment that passes the depth test as it draws */
     bool baked;             /**< Sample the baked lighting of the scene, View ctor sets true */
     bool reflections;       /**< Sample the reflection probes of the scene, View ctor sets
                              *   true */
