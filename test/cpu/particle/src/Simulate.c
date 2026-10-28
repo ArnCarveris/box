@@ -348,6 +348,7 @@ static ParticleEmitter sample_emitter(void)
         .direction = {0, 1, 0},
         .spread = 40,
         .speed = {1, 3},
+        .radial = {0.5f, 2},
         .lifetime = {1, 2},
         .size = {0.1f, 0.4f},
         .rotation = {-30, 30},
@@ -565,6 +566,7 @@ void Simulate_sample_in_range(void) {
         test_assert(fabsf(len - 1) < 1e-4f);
         test_assert(s.direction[1] >= cos_spread - 1e-4f);
         test_assert(s.speed >= 1 && s.speed < 3);
+        test_assert(s.radial >= 0.5f && s.radial < 2);
         test_assert(s.life >= 1000000 && s.life <= 2000000);
         test_assert(s.size >= 0.1f && s.size < 0.4f);
         test_assert(s.rotation >= -30 && s.rotation < 30);
@@ -583,7 +585,7 @@ void Simulate_sample_streams_independent(void) {
     // particle/simulate
     ParticleEmitter base = sample_emitter();
     int32_t change, i;
-    for (change = 0; change < 8; change ++) {
+    for (change = 0; change < 9; change ++) {
         ParticleEmitter e = base;
         int32_t moved = 0;
         switch (change) {
@@ -594,7 +596,8 @@ void Simulate_sample_streams_independent(void) {
         case 4: e.spin = (ParticleRange){-200, -100}; break;
         case 5: e.opacity = (ParticleRange){0, 1}; break;
         case 6: e.spread = 90; break;
-        default: e.color_variance = (rgb){60, 60, 60}; break;
+        case 7: e.color_variance = (rgb){60, 60, 60}; break;
+        default: e.radial = (ParticleRange){5, 9}; break;
         }
 
         for (i = 0; i < 200; i ++) {
@@ -637,6 +640,10 @@ void Simulate_sample_streams_independent(void) {
                 test_flt(a.color[1], b.color[1]);
                 test_flt(a.color[2], b.color[2]);
             }
+
+            if (change != 8) {
+                test_flt(a.radial, b.radial);
+            }
         }
 
         test_assert(moved > 190);
@@ -659,6 +666,35 @@ void Simulate_sample_fixed_seed(void) {
     }
 
     test_assert(differ > 190);
+}
+
+void Simulate_radial_along_offset(void) {
+    // particle/simulate
+    float offset[3] = {3, 0, -4}, v[3];
+    box_particle_radial(offset, 2, v);
+    test_assert(fabsf(v[0] - 1.2f) < 1e-6f);
+    test_flt(v[1], 0);
+    test_assert(fabsf(v[2] + 1.6f) < 1e-6f);
+
+    float tiny[3] = {0, 1e-6f, 0};
+    box_particle_radial(tiny, 5, v);
+    test_flt(v[0], 0);
+    test_assert(fabsf(v[1] - 5) < 1e-5f);
+    test_flt(v[2], 0);
+
+    box_particle_radial(offset, 0, v);
+    test_flt(v[0], 0);
+    test_flt(v[1], 0);
+    test_flt(v[2], 0);
+}
+
+void Simulate_radial_at_origin(void) {
+    // particle/simulate
+    float offset[3] = {0, 0, 0}, v[3] = {1, 1, 1};
+    box_particle_radial(offset, 3, v);
+    test_flt(v[0], 0);
+    test_flt(v[1], 0);
+    test_flt(v[2], 0);
 }
 
 void Simulate_ground_bounce(void) {

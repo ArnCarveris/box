@@ -71,7 +71,7 @@ copies the settings of its pool. One-shot effects are prefabs played with
 | size, max_age with variance | `size {min, max}`, `lifetime {min, max}` |
 | rotation, spin (radians) | `rotation`, `spin` (degrees) |
 | velocity with variance | `direction`, `speed {min, max}`, `spread` |
-| radial | `ParticleEmitter`'s radial speed (the ParticleRadial task adds it) |
+| radial | `radial {r, r}`, along the offset of the spawn point in the frame of the emitter |
 | shape Sphere, Disc | `EmitterSphere`, `EmitterDisc` with `radius` |
 | shape Hemisphere, Ring | `EmitterMesh` over a `HemiSphere` or `Torus` |
 | shape Cone with angle | `EmitterDisc` with `spread` |

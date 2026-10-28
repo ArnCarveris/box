@@ -118,6 +118,8 @@ static void check_defaults(
     test_flt(p->spread, 0);
     test_flt(p->speed.min, 1);
     test_flt(p->speed.max, 1);
+    test_flt(p->radial.min, 0);
+    test_flt(p->radial.max, 0);
     test_flt(p->lifetime.min, 1);
     test_flt(p->lifetime.max, 2);
     test_flt(p->size.min, 0.1f);
@@ -169,7 +171,7 @@ void Emitter_script_defaults(void) {
         "plain { ParticleEmitter: {} }\n"
         "stream { ParticleEmitter: {rate: 400} }\n"
         "custom { ParticleEmitter: {max: 20, rate: 5, shape: EmitterBox, radius: 2, "
-        "extents: {1, 2, 3}, direction: {1, 0, 0}, spread: 30, speed: {2, 4}, "
+        "extents: {1, 2, 3}, direction: {1, 0, 0}, spread: 30, speed: {2, 4}, radial: {1, 3}, "
         "lifetime: {3, 5}, size: {0.5, 1}, rotation: {10, 20}, spin: {-90, 90}, "
         "opacity: {0.25, 0.75}, acceleration: {0, -9.8, 0}, color: {10, 20, 30}, "
         "seed: 7} }\n", NULL) == 0);
@@ -197,6 +199,8 @@ void Emitter_script_defaults(void) {
     test_flt(p->direction[1], 0);
     test_flt(p->spread, 30);
     test_flt(p->speed.max, 4);
+    test_flt(p->radial.min, 1);
+    test_flt(p->radial.max, 3);
     test_flt(p->lifetime.min, 3);
     test_flt(p->size.min, 0.5f);
     test_flt(p->rotation.max, 20);

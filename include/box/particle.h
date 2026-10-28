@@ -113,6 +113,9 @@ ECS_STRUCT(ParticleEmitter, {
     float spread;           /**< Half angle in degrees of the cone around direction the
                              *   velocity is drawn in, 0 to 180, default 0 */
     ParticleRange speed;    /**< Initial speed in world units per second, default {1, 1} */
+    ParticleRange radial;   /**< Speed added along the offset of the spawn point from the
+                             *   origin in emitter space, a ring over a disc or torus, none at
+                             *   the origin, default {0, 0} */
     ParticleRange lifetime; /**< Seconds a particle lives, default {1, 2} */
     ParticleRange size;     /**< Diameter of the drawn circle in world units, default
                              *   {0.1, 0.1} */
@@ -337,8 +340,8 @@ ECS_STRUCT(ParticleSettings, {
  */
 ECS_STRUCT(ParticleEffect, {
     ecs_entity_t effect;    /**< The template, a prefab or a script template */
-    float scale;            /**< Multiplier of the sizes, speeds, spawn volumes and layer
-                             *   offsets, above 0 */
+    float scale;            /**< Multiplier of the sizes, speeds and radial speeds, spawn
+                             *   volumes and layer offsets, above 0 */
     float time;             /**< Seconds into the play, written by the engine every frame */
     float emit;             /**< Seconds into the play at which the last burst of its layers
                              *   goes off and their emission ends */

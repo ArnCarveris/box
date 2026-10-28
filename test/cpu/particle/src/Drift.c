@@ -148,7 +148,7 @@ static void replay_spawn(
     uint32_t index,
     box_particle_t *out)
 {
-    float u[3], local[3], c[2], cone[3], world[3], len2, speed;
+    float u[3], local[3], c[2], cone[3], world[3], offset[3], radial[3], len2, speed;
     int32_t i;
     for (i = 0; i < 3; i ++) {
         u[i] = box_particle_unit(
@@ -163,16 +163,19 @@ static void replay_spawn(
     for (i = 0; i < 3; i ++) {
         world[i] = b->model[0][i] * cone[0] + b->model[1][i] * cone[1] +
             b->model[2][i] * cone[2];
+        offset[i] = b->model[0][i] * local[0] + b->model[1][i] * local[1] +
+            b->model[2][i] * local[2];
     }
 
     len2 = world[0] * world[0] + world[1] * world[1] + world[2] * world[2];
     speed = box_particle_draw(b->seed, index, BOX_PARTICLE_STREAM_SPEED, b->speed[0],
         b->speed[1]);
+    box_particle_radial(offset, box_particle_draw(b->seed, index, BOX_PARTICLE_STREAM_RADIAL,
+        b->radial[0], b->radial[1]), radial);
     for (i = 0; i < 3; i ++) {
         float dir = len2 > 0 ? world[i] / sqrtf(len2) : 0.0f;
-        out->position[i] = b->model[0][i] * local[0] + b->model[1][i] * local[1] +
-            b->model[2][i] * local[2] + b->model[3][i];
-        out->velocity[i] = dir * speed + b->inherit[i];
+        out->position[i] = offset[i] + b->model[3][i];
+        out->velocity[i] = dir * speed + radial[i] + b->inherit[i];
     }
 
     out->remaining = box_particle_life(b->seed, index, b->life_min, b->life_span);

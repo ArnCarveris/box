@@ -1,0 +1,58 @@
+// Ring bursts of a radial speed, two frames after the burst: on the left an orange shock ring
+// from a disc expanding flat in the XZ plane, seen from above as a wide ellipse; in the middle a
+// cyan ring from the surface of a torus turned a quarter turn about X, a circle facing the
+// camera; on the right a green ring from a disc tilted about X and Z, expanding in its tilted
+// plane and lifted a little along its normal by its direction and speed.
+using box.transform
+using box.geometry
+using box.camera
+using box.view
+using box.particle
+
+camera {
+  Position: {0, 4, 12}
+  Rotation: {-0.3, 0, 0}
+  Camera: {fov: 60}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {10, 12, 20, 255}}}
+}
+
+// Source of the mesh emitter, out of view: the table is in the space of its shape
+torus {
+  Position: {0, -1000, 0}
+  Torus: {radius: 0.5, tube: 0.08}
+}
+
+shock {
+  Position: {-5, 0, 0}
+  ParticleEmitter: {
+    max: 1500, rate: 0, shape: EmitterDisc, radius: 0.3, direction: {0, 0, 0},
+    speed: {0, 0}, radial: {55, 60}, lifetime: {2, 2}, size: {0.08, 0.14},
+    opacity: {0.6, 1}, color: {255, 140, 50}, seed: 1
+  }
+  ParticleBurst: {count: 1500}
+}
+
+halo {
+  Position: {0, 2, 0}
+  Rotation: {1.5707964, 0, 0}
+  ParticleEmitter: {
+    max: 1500, rate: 0, shape: EmitterMesh, source: torus, direction: {0, 0, 0},
+    speed: {0, 0}, radial: {50, 50}, lifetime: {2, 2}, size: {0.08, 0.14},
+    opacity: {0.6, 1}, color: {80, 220, 255}, seed: 2
+  }
+  ParticleBurst: {count: 1500}
+}
+
+tilted {
+  Position: {5, 1, 0}
+  Rotation: {0.5, 0, 0.6}
+  ParticleEmitter: {
+    max: 1500, rate: 0, shape: EmitterDisc, radius: 0.3, direction: {0, 1, 0},
+    speed: {10, 10}, radial: {45, 50}, lifetime: {2, 2}, size: {0.08, 0.14},
+    opacity: {0.6, 1}, color: {120, 255, 110}, seed: 3
+  }
+  ParticleBurst: {count: 1500}
+}
