@@ -921,9 +921,17 @@ void Projection_box_fit_width(void) {
     test_assert(fabsf(t->m[3][0] + 54.0f) < 0.01f);
     test_assert(fabsf(t->m[3][1] - 154.0f) < 0.01f);
 
+    projection_count_t fill_set = { .entity = fill };
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(WorldTransform) }},
+        .events = { EcsOnSet },
+        .callback = ProjectionCountSet,
+        .ctx = &fill_set
+    });
     ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 5, .near_ = 0.1f,
         .far_ = 1000});
     ecs_progress(world, 0);
+    test_int(fill_set.count, 1);
     test_assert(fabsf(ecs_get(world, bar, Rect)->width - 288.0f) < 0.01f);
     test_assert(fabsf(ecs_get(world, fill, Rect)->width - 72.0f) < 0.01f);
     test_assert(fabsf(ecs_get(world, rest, Rect)->width - 216.0f) < 0.01f);
@@ -936,6 +944,7 @@ void Projection_box_fit_width(void) {
     test_assert(fabsf(t->m[3][0] - 36.0f) < 0.01f);
 
     ecs_progress(world, 0);
+    test_int(fill_set.count, 1);
     test_assert(fabsf(ecs_get(world, fill, Rect)->width - 72.0f) < 0.01f);
     t = ecs_get(world, fill, WorldTransform);
     test_assert(fabsf(t->m[3][0] + 108.0f) < 0.01f);

@@ -394,6 +394,7 @@ static void box_projection_show(
  * @param r The rotation of the entity, NULL for none
  * @param s The scale of the entity, NULL for none
  * @param visible Whether the projection is visible
+ * @param subtree Whether to write the subtree too, false when BoxProjectionLayout will
  */
 static void box_projection_transform(
     ecs_world_t *world,
@@ -402,7 +403,8 @@ static void box_projection_transform(
     const Position *p,
     const Rotation *r,
     const Scale *s,
-    bool visible)
+    bool visible,
+    bool subtree)
 {
     if (!ecs_has(world, e, ManualTransform)) {
         ecs_entity_t parent = ecs_get_parent(world, e);
@@ -419,7 +421,9 @@ static void box_projection_transform(
         box_projection_store(world, e, t, &next);
     }
 
-    box_projection_children(world, e, t);
+    if (subtree) {
+        box_projection_children(world, e, t);
+    }
 }
 
 /** Move every anchored entity to the projection of its target or of its box.
@@ -454,7 +458,7 @@ static void BoxProjectionUpdate(
             box_projection_lens(world, state->surfaces, anchor[i].view, &lens);
         }
 
-        bool visible;
+        bool visible, resized = false;
         if (box && bounds) {
             ProjectedBounds b = {0};
             visible = box_projection_box(world, &anchor[i], &box[i], &lens, &b);
@@ -462,7 +466,8 @@ static void BoxProjectionUpdate(
                 bounds[i] = b;
                 p[i].x = (b.left + b.right) * 0.5f + box[i].offset[0];
                 p[i].y = b.top + box[i].offset[1];
-                if (item && box_projection_fit(world, e, &item[i], &box[i], &b)) {
+                resized = item && box_projection_fit(world, e, &item[i], &box[i], &b);
+                if (resized) {
                     *ecs_vec_append_t(NULL, &state->resized, ecs_entity_t) = e;
                 }
             }
@@ -476,7 +481,7 @@ static void BoxProjectionUpdate(
 
         box_projection_show(world, e, visible);
         box_projection_transform(world, e, &t[i], &p[i], r ? &r[i] : NULL,
-            s ? &s[i] : NULL, visible);
+            s ? &s[i] : NULL, visible, !resized);
     }
 }
 
