@@ -1,0 +1,52 @@
+// A cargo bay of the rocket, the RocketBay template of the original: the hull with a low rim
+// and a rib, and four port lights around it that glow while lit. Its origin is the middle of
+// the bay.
+
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+
+const rocketShade: Rgb = {150, 158, 174}
+const rocketDark: Rgb = {48, 54, 68}
+const rocketSteel: Rgb = {172, 180, 194}
+const rkBayH: f32 = 0.78
+const rkRadius: f32 = 0.42
+
+template RocketBay {
+  prop lit: bool = false
+
+  hull {
+    Position: {0, 0, 0}
+    Cylinder: {segments: 20, smooth: true, length: rkBayH - 0.03, radius: 0.5}
+    Scale: {(rkRadius + 0.05) * 2, 1, (rkRadius + 0.05) * 2}
+    Rgb: rocketShade
+    PbrMaterial: {metallic: 0.66, roughness: 0.36}
+  }
+
+  rim_low {
+    Position: {0, 0 - rkBayH * 0.5 + 0.035, 0}
+    Cylinder: {segments: 20, smooth: true, length: 0.07, radius: 0.5}
+    Scale: {(rkRadius + 0.09) * 2, 1, (rkRadius + 0.09) * 2}
+    Rgb: rocketDark
+    PbrMaterial: {metallic: 0.8, roughness: 0.3}
+  }
+
+  rib {
+    Position: {0, 0, 0}
+    Cylinder: {segments: 20, smooth: true, length: 0.05, radius: 0.5}
+    Scale: {(rkRadius + 0.08) * 2, 1, (rkRadius + 0.08) * 2}
+    Rgb: rocketSteel
+    PbrMaterial: {metallic: 0.8, roughness: 0.3}
+  }
+
+  for i in 0..4 {
+    const a = 1.5708 * i
+
+    "port_{i}" {
+      Position: {cos(a) * (rkRadius + 0.06), 0.06, sin(a) * (rkRadius + 0.06)}
+      Rotation: {0, 0 - a, 0}
+      RocketPort: {lit: lit}
+    }
+  }
+}

@@ -229,8 +229,9 @@ Every task of the port follows these.
 The buildings are prefabs in `etc/buildings/`, one file per building, with the original's names
 and geometry, materials and lights. They stand still: the gameplay tasks add their components
 (item, recipe, footprint, health, power) to the same prefabs, and the animation and effect tasks
-drive the named parts below. Every building's origin is the center of its tile on the ground,
-and it faces +Z. The names are those of the prefab's parts (`ecs_lookup_from(world, Drill,
+drive the named parts below. Every building's origin is the center of its footprint on the
+ground (the center of its tile, the corner between the four tiles of a 2x2 building, the center
+of the middle tile of a 3x3 one), and it faces +Z. The names are those of the prefab's parts (`ecs_lookup_from(world, Drill,
 "carriage.slider.bit")`): the parts of an instance are unnamed children, each an instance
 (`IsA`) of the prefab's part of the same path, so a system finds the part of an instance as the
 child of its parent whose `IsA` target is the prefab's part, the way the original's `oreChild`
@@ -246,6 +247,26 @@ does. The parts have no `DynamicTransform`, so a system that moves one every fra
 | `LaserTurret` | `laser_turret.flecs` | `head` (turns about y to aim), `head/fx` (the lens: beam start and glow), `hit_fx` (the beam's sparks where it hits), `column/lamp` (status lamp) |
 | `MissileTurret` | `missile_turret.flecs` | `head` (turns about y to aim), `head/fx` (the launch above the pods), `pillar/light` (status lamp) |
 | `PadBeacon` | `pad_beacon.flecs` | A template, the corner beacon of the rocket pad: `lamp` (amber lamp) |
+| `Factory` | `factory.flecs` | 2x2. `ram` (the press, moves along y, rest y 1.72, travel 0.62), `roller_a` to `roller_d` (each with its `drum`, which spins about its own y; the rollers lie along x), `wheel_left/flywheel`, `wheel_right/flywheel` (spin about y), `puff_l`, `puff_r` (the tops of the stacks, the smoke puffs), `hall/steam_l`, `hall/steam_c`, `hall/steam_r` (the vents of the grille, the steam), `hot_plate` (emissive 0.06 at rest, 2.6 while working), `work_glow` (emissive 0.08 at rest, 1.8 while working, and its `PointLight` of range 6.5 at intensity 0, 5.5 while working), `beacon_l`, `beacon_r` (work lamps, blink 2), `crown/status_l`, `crown/status_r` (status lamps) |
+| `DronePad` | `drone_pad.flecs` | 2x2. `bay_a` to `bay_d` (the landing bays, on the corners at x and z of +-0.99) with their `lamp` (status lamps), `column/head/beacon_l`, `column/head/beacon_r` (status lamps), `column/cabinet/readout`, `column/mast/tip` (lamps always on). Drone b of its 4 docks at the angle (b + 0.5) * 2 PI / 4, at (sin, cos) * 1.4 from the center and 0.62 above the ground |
+| `RepairDrone` | `drone.flecs` | The drone of the pad, its origin the center of the hull: `rotor_a` to `rotor_d` (spin about y), `hull/eye` (lamp), `weld` (the nozzle, the weld sparks). Its rotors share the `RotorBlade` prefab |
+| `RocketPad` | `rocket_pad.flecs` | 3x3. `clamp_a` to `clamp_d` (`PadClamp` templates: the hold-down clamps, which swing out by their `tilt` at the launch), `tower/beacon` (lamp), `beacon_b`, `beacon_c`, `beacon_d` (`PadBeacon`). The rocket stands on its axis at y 0.74, the original's `LaunchPad.base_y` |
+| `PadClamp` | `rocket/pad_clamp.flecs` | A template, the clamp: props `yaw` (faces the rocket), `tx`, `tz` (which way it swings) and `tilt` (0 at rest; the original's `cfg.clampTilt` 0.6 at the launch). The original turns it by (tx * tilt, yaw, tz * tilt) in flecs-engine's X Y Z order; the template converts that to box's Y X Z order |
+| `Rocket` | `rocket/rocket.flecs` | A template, the rocket on the pad (see below) |
+
+The rocket is an entity with the `Rocket` template, its origin the bottom of the stack on its
+axis, which OreRocket places on the pad and keeps in step with its rocket state by setting the
+props of its `Rocket` component; the template rebuilds the stack in the script whenever they
+change, so nothing in C builds or deletes its parts:
+
+| Prop | Type | Builds |
+| --- | --- | --- |
+| `engines` | i32 | The engine skirt and four fins when above 0, and an engine bell (`RocketBell`, `rocket/rocket_bell.flecs`) per engine: up to 4 on a ring of radius 0.22, above 4 on a ring of 0.32 at 0.72 of their size, above 6 a third of them on an inner ring of 0.13, above 8 at 0.56 of their size |
+| `fuel` | i32 | A fuel tank of height 1.02 per fuel storage, above the skirt |
+| `cargo` | i32 | A cargo bay of height 0.78 per bay (`RocketBay`, `rocket/rocket_bay.flecs`, with four port lights, `RocketPort`, `rocket/rocket_port.flecs`), above the tanks, each turned 0.5 more about y |
+| `life_support` | i32 | The capsule with its window and hatch when above 0, above the bays |
+| `loaded` | bool | Lights the port lights of the bays (the rocket holds Luminite) |
+| `valid` | bool | The nose cone on top (the rocket can launch: `enginesPerUnit` engines and one fuel storage per unit, a unit being a cargo bay or the life support) |
 
 The lamps are instances of the `Light` template (`etc/props/light.flecs`): a `housing`, a
 `bulb` and a `glass` cover, its origin the bottom of the housing, facing +Y (a lamp on a wall
@@ -289,7 +310,8 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 | `etc/materials/fan.flecs` | The fan blade textures and `FanDisc` |
 | `etc/materials/drone_bay.flecs` | The drone bay textures and `BayPad` |
 | `etc/props/light.flecs` | The `Light` template of the lamps |
-| `etc/buildings/` | The building prefabs, one file per building (see Building models) |
+| `etc/buildings/` | The building prefabs, one file per building, and the drone (see Building models) |
+| `etc/rocket/` | The `Rocket` template and its parts `RocketBell`, `RocketBay` and `RocketPort`, and the `PadClamp` template of the rocket pad |
 | `etc/assets/` | The original's textures (SVG), unchanged, and `terrain_dirt_orm.svg` |
 | `src/flow.c` | States, clock, blink, toast, seeds, `oreelse.cancel()`, `oreelse.restart()` |
 | `src/map.c` | The tile grid, the deposits' registration and the hover tile |

@@ -24,6 +24,15 @@ include buildings/solar_panel
 include buildings/gun_turret
 include buildings/laser_turret
 include buildings/missile_turret
+include buildings/factory
+include buildings/drone
+include buildings/drone_pad
+include rocket/pad_clamp
+include rocket/rocket_bell
+include rocket/rocket_port
+include rocket/rocket_bay
+include rocket/rocket
+include buildings/rocket_pad
 include particles/jet_plume
 include player
 include input

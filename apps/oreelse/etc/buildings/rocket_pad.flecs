@@ -1,0 +1,241 @@
+// The rocket pad, the RocketPad prefab of the original, a 3x3 launch facility: a concrete
+// apron, a steel deck with hazard trims, a platform with ducts and a ramp in front, the launch
+// ring with its glowing band, the soot trench and the glowing core, four hold-down clamps
+// around the rocket, the service tower on the north west corner and a corner beacon on each of
+// the other three. Its origin is the center of its 3x3 footprint on the ground and it faces +Z.
+// The rocket (the Rocket template, rocket/rocket.flecs) stands on its axis at y 0.74, the
+// base_y of the original's LaunchPad.
+//
+// Named parts: clamp_a to clamp_d (PadClamp, OreRocket sets their tilt), tower/beacon (Light)
+// and beacon_b, beacon_c and beacon_d (PadBeacon, their lamp a Light).
+
+using box.transform
+using box.geometry
+using box.material
+
+const steel: Rgb = {172, 180, 194}
+const steelShade: Rgb = {112, 120, 136}
+const steelDeep: Rgb = {56, 62, 76}
+const hazard: Rgb = {240, 176, 58}
+const accent: Rgb = {92, 236, 222}
+const concrete: Rgb = {126, 122, 114}
+const soot: Rgb = {28, 29, 34}
+
+prefab RocketPad {
+  apron {
+    Position: {0, 0.09, 0}
+    Box: {5.9, 0.18, 5.9}
+    Rgb: concrete
+    PbrMaterial: {metallic: 0, roughness: 0.94}
+  }
+
+  deck {
+    Position: {0, 0.27, 0}
+    Box: {5.5, 0.18, 5.5}
+    Rgb: steelDeep
+    PbrMaterial: {metallic: 0.4, roughness: 0.55}
+  }
+
+  platform {
+    Position: {0, 0.44, 0}
+    Box: {3.4, 0.16, 3.4}
+    Rgb: steelShade
+    PbrMaterial: {metallic: 0.5, roughness: 0.45}
+  }
+
+  ramp {
+    Position: {0, 0.42, 1.98}
+    Rotation: {-0.22, 0, 0}
+    Box: {1.5, 0.09, 0.86}
+    Rgb: steelShade
+    PbrMaterial: {metallic: 0.5, roughness: 0.48}
+  }
+
+  duct_l {
+    Position: {-2.24, 0.42, 0.9}
+    Box: {0.34, 0.14, 1.5}
+    Rgb: steelDeep
+  }
+
+  duct_r {
+    Position: {2.24, 0.42, -0.9}
+    Box: {0.34, 0.14, 1.5}
+    Rgb: steelDeep
+  }
+
+  trim_n : HazardBorderLong {
+    Position: {0, 0.39, -2.42}
+  }
+
+  trim_s : HazardBorderLong {
+    Position: {0, 0.39, 2.42}
+  }
+
+  trim_w : HazardBorderShort {
+    Position: {-2.42, 0.39, 0}
+    Rotation: {0, 1.5708, 0}
+  }
+
+  trim_e : HazardBorderShort {
+    Position: {2.42, 0.39, 0}
+    Rotation: {0, 1.5708, 0}
+  }
+
+  ring {
+    Position: {0, 0.58, 0}
+    Cylinder: {segments: 24, smooth: true, length: 0.12, radius: 0.5}
+    Scale: {2.7, 1, 2.7}
+    Rgb: steelDeep
+    PbrMaterial: {metallic: 0.6, roughness: 0.42}
+  }
+
+  ring_band {
+    Position: {0, 0.67, 0}
+    Cylinder: {segments: 24, smooth: true, length: 0.06, radius: 0.5}
+    Scale: {2.25, 1, 2.25}
+    Rgb: hazard
+    Emissive: {strength: 1.1, color: hazard}
+  }
+
+  trench {
+    Position: {0, 0.68, 0}
+    Cylinder: {segments: 24, smooth: true, length: 0.08, radius: 0.5}
+    Scale: {1.7, 1, 1.7}
+    Rgb: soot
+    PbrMaterial: {metallic: 0.3, roughness: 0.8}
+  }
+
+  core {
+    Position: {0, 0.71, 0}
+    Cylinder: {segments: 20, smooth: true, length: 0.06, radius: 0.5}
+    Scale: {0.95, 1, 0.95}
+    Rgb: accent
+    Emissive: {strength: 2, color: accent}
+  }
+
+  // The clamps face the rocket; tx and tz say which way each one swings out with its tilt
+  clamp_a {
+    Position: {-0.76, 0.92, -0.76}
+    PadClamp: {yaw: 0.7854, tx: -1, tz: 1}
+  }
+
+  clamp_b {
+    Position: {0.76, 0.92, -0.76}
+    PadClamp: {yaw: -0.7854, tx: -1, tz: -1}
+  }
+
+  clamp_c {
+    Position: {-0.76, 0.92, 0.76}
+    PadClamp: {yaw: 2.356, tx: 1, tz: 1}
+  }
+
+  clamp_d {
+    Position: {0.76, 0.92, 0.76}
+    PadClamp: {yaw: -2.356, tx: 1, tz: -1}
+  }
+
+  tower {
+    Position: {-2.14, 0.36, -2.14}
+
+    leg_a {
+      Position: {-0.34, 0.76, -0.34}
+      Box: {0.14, 1.52, 0.14}
+      Rgb: steelShade
+      PbrMaterial: {metallic: 0.62, roughness: 0.38}
+    }
+
+    leg_b {
+      Position: {0.34, 0.76, -0.34}
+      Box: {0.14, 1.52, 0.14}
+      Rgb: steelShade
+      PbrMaterial: {metallic: 0.62, roughness: 0.38}
+    }
+
+    leg_c {
+      Position: {-0.34, 0.76, 0.34}
+      Box: {0.14, 1.52, 0.14}
+      Rgb: steelShade
+      PbrMaterial: {metallic: 0.62, roughness: 0.38}
+    }
+
+    leg_d {
+      Position: {0.34, 0.76, 0.34}
+      Box: {0.14, 1.52, 0.14}
+      Rgb: steelShade
+      PbrMaterial: {metallic: 0.62, roughness: 0.38}
+    }
+
+    brace_low {
+      Position: {0, 0.44, 0}
+      Box: {0.86, 0.1, 0.86}
+      Rgb: steelDeep
+    }
+
+    brace_mid {
+      Position: {0, 1.0, 0}
+      Box: {0.86, 0.1, 0.86}
+      Rgb: steelDeep
+    }
+
+    gantry {
+      Position: {0, 1.58, 0}
+      Box: {1.1, 0.14, 1.1}
+      Rgb: steel
+      PbrMaterial: {metallic: 0.6, roughness: 0.4}
+    }
+
+    stripe : HazardTag {
+      Position: {0, 1.68, 0}
+    }
+
+    rail_n {
+      Position: {0, 1.84, -0.52}
+      Box: {1.1, 0.34, 0.06}
+      Rgb: steelShade
+    }
+
+    rail_w {
+      Position: {-0.52, 1.84, 0}
+      Box: {0.06, 0.34, 1.1}
+      Rgb: steelShade
+    }
+
+    arm {
+      Position: {0.62, 1.72, 0.62}
+      Rotation: {0, 0.7854, 0}
+      Box: {0.16, 0.14, 1.5}
+      Rgb: steelDeep
+      PbrMaterial: {metallic: 0.6, roughness: 0.4}
+    }
+
+    mast {
+      Position: {0, 2.34, 0}
+      Box: {0.16, 1.2, 0.16}
+      Rgb: steelShade
+      PbrMaterial: {metallic: 0.64, roughness: 0.34}
+    }
+
+    beacon {
+      Position: {0, 2.94, 0}
+      Light: {
+        color: hazard, w: 0.24, d: 0.24, h: 0.16,
+        strength: 3
+      }
+    }
+  }
+
+  beacon_b {
+    Position: {2.14, 0.36, -2.14}
+    PadBeacon: {}
+  }
+
+  beacon_c {
+    Position: {-2.14, 0.36, 2.14}
+    PadBeacon: {}
+  }
+
+  beacon_d {
+    Position: {2.14, 0.36, 2.14}
+    PadBeacon: {}
+  }
+}

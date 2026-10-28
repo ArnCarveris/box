@@ -1,0 +1,58 @@
+// The hold-down clamp of the rocket pad, the PadClamp template of the original: a block with an
+// arm and a jaw that reach in toward the rocket and an emissive lamp on top. Its origin is the
+// center of the block. The pad turns each clamp by yaw to face the rocket.
+//
+// tilt swings the clamp out: the original turns it by (tx * tilt, yaw, tz * tilt) in the X Y Z
+// order of flecs-engine, which OreRocket sets to cfg.clampTilt at the launch. Box turns in the
+// Y X Z order, so the angles here are the same rotation converted to that order: with the
+// original's matrix M = Rx(a) Ry(b) Rz(c), x = asin(-M12), y = atan2(M02, M22) and
+// z = atan2(M10, M11). At tilt 0 that is {0, yaw, 0}.
+
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+
+const rocketShade: Rgb = {150, 158, 174}
+const rocketDark: Rgb = {48, 54, 68}
+const rocketSteel: Rgb = {172, 180, 194}
+const rocketTrim: Rgb = {238, 138, 52}
+
+template PadClamp {
+  prop yaw: f32 = 0
+  prop tx: f32 = 0
+  prop tz: f32 = 0
+  prop tilt: f32 = 0
+
+  const ax = tx * tilt
+  const az = tz * tilt
+
+  Rotation: {
+    asin(cos(yaw) * sin(ax)),
+    atan2(sin(yaw), cos(ax) * cos(yaw)),
+    atan2(cos(az) * sin(ax) * sin(yaw) + cos(ax) * sin(az),
+      cos(ax) * cos(az) - sin(ax) * sin(yaw) * sin(az))
+  }
+  Box: {0.34, 0.78, 0.2}
+  Rgb: rocketSteel
+  PbrMaterial: {metallic: 0.6, roughness: 0.4}
+
+  arm {
+    Position: {0, 0.22, 0.28}
+    Box: {0.18, 0.14, 0.46}
+    Rgb: rocketShade
+  }
+
+  jaw {
+    Position: {0, 0.22, 0.53}
+    Box: {0.26, 0.2, 0.12}
+    Rgb: rocketDark
+  }
+
+  lamp {
+    Position: {0, 0.47, 0}
+    Box: {0.24, 0.1, 0.22}
+    Rgb: rocketTrim
+    Emissive: {strength: 2.4, color: rocketTrim}
+  }
+}

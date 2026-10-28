@@ -1,0 +1,21 @@
+// A port light of a cargo bay, the RocketPort template of the original: dark, or glowing while
+// lit (the rocket holds Luminite).
+
+using box.geometry
+using box.material
+
+const rocketDark: Rgb = {48, 54, 68}
+const cargoGlow: Rgb = {92, 236, 222}
+
+template RocketPort {
+  prop lit: bool = false
+
+  Box: {0.06, 0.24, 0.22}
+
+  if lit {
+    Rgb: cargoGlow
+    Emissive: {strength: 2.6, color: cargoGlow}
+  } else {
+    Rgb: rocketDark
+  }
+}
