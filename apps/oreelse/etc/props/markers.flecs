@@ -1,0 +1,17 @@
+// The tile markers of placement, the TileMarker and TileMarkerBad of the original: a glowing
+// plate over a tile, yellow where a building fits and red where it does not.
+
+using box.geometry
+using box.material
+
+prefab TileMarker {
+  Box: {1.92, 0.06, 1.92}
+  Rgb: {236, 244, 150}
+  Emissive: {strength: 1.1, color: {236, 244, 150}}
+}
+
+prefab TileMarkerBad {
+  Box: {1.92, 0.06, 1.92}
+  Rgb: {248, 96, 84}
+  Emissive: {strength: 1.2, color: {248, 96, 84}}
+}

@@ -1,0 +1,35 @@
+// The corner beacon of the rocket pad, the PadBeacon template of the original: a post, a collar
+// and an amber lamp on top. Its origin is the foot of the post on the ground.
+//
+// Named parts: lamp (Light).
+
+using box.transform
+using box.geometry
+using box.material
+
+const steelShade: Rgb = {112, 120, 136}
+const steelDeep: Rgb = {56, 62, 76}
+const hazard: Rgb = {240, 176, 58}
+
+template PadBeacon {
+  post {
+    Position: {0, 0.34, 0}
+    Box: {0.18, 0.68, 0.18}
+    Rgb: steelShade
+    PbrMaterial: {metallic: 0.6, roughness: 0.4}
+  }
+
+  collar {
+    Position: {0, 0.7, 0}
+    Box: {0.26, 0.08, 0.26}
+    Rgb: steelDeep
+  }
+
+  lamp {
+    Position: {0, 0.74, 0}
+    Light: {
+      color: hazard, w: 0.22, d: 0.22, h: 0.14,
+      strength: 2.6
+    }
+  }
+}

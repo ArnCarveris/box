@@ -177,6 +177,43 @@ Every task of the port follows these.
 - **README**: this file describes the game like a player's manual (controls, rules); each task
   adds its mechanics to it.
 
+## Building models
+
+The buildings are prefabs in `etc/buildings/`, one file per building, with the original's names
+and geometry, materials and lights. They stand still: the gameplay tasks add their components
+(item, recipe, footprint, health, power) to the same prefabs, and the animation and effect tasks
+drive the named parts below. Every building's origin is the center of its tile on the ground,
+and it faces +Z. The parts are children of the instance, found by path from it (for example
+`ecs_lookup_from(world, drill, "carriage.slider.bit")`); they have no `DynamicTransform`, so a
+system that moves one every frame adds it.
+
+| Prefab | File | Named parts |
+| --- | --- | --- |
+| `Drill` | `drill.flecs` | `carriage` (the piston that rides the legs, rest y 1.48, travel 0.26), `carriage/slider` (rides fore and aft, rest z 0.12, travel 0.24), `carriage/slider/bit` (spins about y and shakes), `crown/pod_l/lamp_l`, `crown/pod_r/lamp_r` (status lamps), `dust` (the drill dust) |
+| `SolarPanel` | `solar_panel.flecs` | `junction/light` (indicator light) |
+| `Wall` | `wall.flecs` | `lamp` (hazard lamp) |
+| `WallSegment` | `wall_segment.flecs` | The connector between two walls on neighboring tiles: placed on the middle of their shared edge, turned by PI / 2 about y between two walls of one column |
+| `GunTurret` | `gun_turret.flecs` | `head` (turns about y to aim), `head/fx` (the muzzle: flash and tracers), `head/sight` (status lamp) |
+| `LaserTurret` | `laser_turret.flecs` | `head` (turns about y to aim), `head/fx` (the lens: beam start and glow), `hit_fx` (the beam's sparks where it hits), `column/lamp` (status lamp) |
+| `MissileTurret` | `missile_turret.flecs` | `head` (turns about y to aim), `head/fx` (the launch above the pods), `pillar/light` (status lamp) |
+| `PadBeacon` | `pad_beacon.flecs` | A template, the corner beacon of the rocket pad: `lamp` (amber lamp) |
+
+The lamps are instances of the `Light` template (`etc/props/light.flecs`): a `housing`, a
+`bulb` and a `glass` cover, its origin the bottom of the housing, facing +Y (a lamp on a wall
+is turned by PI / 2 about x). The `bulb` is the part the game drives: it has the `Rgb` and the
+`Emissive` of the lamp's color at `strength` while `on`, and a `PointLight` of intensity
+`light` and `range` when `light` is above 0. The props say how: a status lamp (`status: true`)
+is the power lamp of its building, which OrePower colors `color` (live), `ok`, `warn` or `dead`
+and blinks at `blink` per second while dead; a work lamp (`work: true`) lights while its
+building works. The props are on the `Light` component of the lamp entity (`lamp_l`, `sight`,
+...), the bulb is its child `bulb`.
+
+The shared materials are inherited prefabs that a part derives from and resizes with its own
+`Box`: `HazardTag`, `HazardTrim`, `HazardTrimShort`, `HazardBorderShort`, `HazardBorderLong`
+and `HazardBoundary` (`etc/materials/hazard.flecs`), `SolarCells`, `AccessPlate`, `VentGrille`,
+`FanDisc` and `BayPad`. `TileMarker` and `TileMarkerBad` (`etc/props/markers.flecs`) are the
+glowing plates placement shows over a tile, drawn 0.12 above the ground.
+
 ## Files
 
 | File | Holds |
@@ -195,6 +232,14 @@ Every task of the port follows these.
 | `etc/particles/jet_plume.flecs` | The `JetPlume` template of the jetpack |
 | `etc/materials/terrain.flecs` | The `GroundSurface` and `BasinSurface` materials and the dirt textures |
 | `etc/materials/hazard.flecs` | The hazard stripe texture and the `Hazard*` trim prefabs |
+| `etc/materials/solar_cells.flecs` | The solar cell texture and `SolarCells` |
+| `etc/materials/wall_plate.flecs` | The wall plate textures and `AccessPlate` |
+| `etc/materials/vent.flecs` | The vent grille textures and `VentGrille` |
+| `etc/materials/fan.flecs` | The fan blade textures and `FanDisc` |
+| `etc/materials/drone_bay.flecs` | The drone bay textures and `BayPad` |
+| `etc/props/light.flecs` | The `Light` template of the lamps |
+| `etc/props/markers.flecs` | The `TileMarker` and `TileMarkerBad` prefabs |
+| `etc/buildings/` | The building prefabs, one file per building (see Building models) |
 | `etc/assets/` | The original's textures (SVG), unchanged, and `terrain_dirt_orm.svg` |
 | `src/flow.c` | States, clock, blink, toast, seeds, `oreelse.cancel()`, `oreelse.restart()` |
 | `src/map.c` | The tile grid and the deposits' registration |
