@@ -1,12 +1,13 @@
 /**
  * @file render/gpu_shadow.c
- * @brief Cascaded shadow maps and spot light shadow atlases of the webgpu backend.
+ * @brief Cascaded shadow maps and spot and point light shadow atlases of the webgpu backend.
  *
- * The opaque casters the cull pass kept render with etc/shaders/shadow.wgsl, depth only and
- * reversed Z, into each cascade before its view draws and into each atlas tile once per packet
- * before the targets; alpha tested casters discard below their cutoff, so shadows have holes.
+ * The casters the cull pass kept render with etc/shaders/shadow.wgsl, depth only and reversed Z,
+ * into each cascade before its view draws and into each atlas tile once per packet; alpha tested
+ * ones discard below their cutoff. Probe captures use a map of their own with one cascade.
  *
- * Probe captures use a map of their own with one cascade around the static bounds of the scene.
+ * A point light tile records each caster draw once per octant, the octant in the dynamic offset;
+ * the shadow_clip variant clips to the octant with clip distances, the core one discards.
  */
 
 #include "gpu.h"
@@ -23,7 +24,7 @@ void box_gpu_shadow_init(
         .buffer = {
             .type = WGPUBufferBindingType_Uniform,
             .hasDynamicOffset = true,
-            .minBindingSize = sizeof(mat4)
+            .minBindingSize = BOX_GPU_SHADOW_UNIFORM_SIZE
         }
     };
     WGPUBindGroupLayoutDescriptor layout = { .entryCount = 1, .entries = &entry };
@@ -86,6 +87,7 @@ void box_gpu_shadow_init(
     });
     ecs_vec_init_t(NULL, &gpu->shadow_data, uint8_t, 0);
     ecs_vec_init_t(NULL, &gpu->atlas_data, uint8_t, 0);
+    ecs_vec_init_t(NULL, &gpu->atlas_blocks, int32_t, 0);
     ecs_vec_init_t(NULL, &gpu->atlas_reads, box_gpu_atlas_read_t, 0);
     ecs_map_init(&gpu->atlases, NULL);
 }
@@ -183,6 +185,7 @@ void box_gpu_shadow_fini(
     box_gpu_shadow_capture_free(gpu);
     ecs_vec_fini_t(NULL, &gpu->shadow_data, uint8_t);
     ecs_vec_fini_t(NULL, &gpu->atlas_data, uint8_t);
+    ecs_vec_fini_t(NULL, &gpu->atlas_blocks, int32_t);
     ecs_vec_fini_t(NULL, &gpu->atlas_reads, box_gpu_atlas_read_t);
     if (gpu->atlas_counts) {
         wgpuBufferRelease(gpu->atlas_counts);
@@ -220,6 +223,18 @@ void box_gpu_shadow_fini(
         wgpuRenderPipelineRelease(gpu->shadow_cutout);
         gpu->shadow_cutout = NULL;
     }
+
+    if (gpu->shadow_point) {
+        wgpuRenderPipelineRelease(gpu->shadow_point);
+        gpu->shadow_point = NULL;
+    }
+
+    if (gpu->shadow_point_cutout) {
+        wgpuRenderPipelineRelease(gpu->shadow_point_cutout);
+        gpu->shadow_point_cutout = NULL;
+    }
+
+    gpu->shadow_point_shader = 0;
 
     if (gpu->shadow_buffer) {
         wgpuBufferRelease(gpu->shadow_buffer);
@@ -373,16 +388,29 @@ done:
  * The plain pipeline only reads the position and has no fragment stage; the alpha tested one
  * also reads the normal and UV of the vertices, and its fragment stage discards below the cutoff.
  *
+ * The point light pipelines project into an octant of the tile; without clip distances the
+ * plain one has a fragment stage that discards outside the octant.
+ *
  * @param gpu The backend
  * @param module The shadow shader module
  * @param cutout Whether to create the alpha tested pipeline
+ * @param point Whether to create a pipeline of the octants of the point light tiles
+ * @param discard Whether that pipeline discards outside the octant instead of clipping
  * @return The pipeline
  */
 static WGPURenderPipeline box_gpu_shadow_create(
     box_gpu_t *gpu,
     WGPUShaderModule module,
-    bool cutout)
+    bool cutout,
+    bool point,
+    bool discard)
 {
+    const char *vs = point
+        ? (cutout ? "vs_point_cutout" : "vs_point")
+        : (cutout ? "vs_cutout" : "vs");
+    const char *fs = point
+        ? (cutout ? "fs_point_cutout" : (discard ? "fs_point" : NULL))
+        : (cutout ? "fs_cutout" : NULL);
     WGPUVertexAttribute vertex_attrs[3] = {
         { .format = WGPUVertexFormat_Float32x3, .offset = 0, .shaderLocation = 0 },
         { .format = WGPUVertexFormat_Float32x3, .offset = 12, .shaderLocation = 1 },
@@ -414,13 +442,13 @@ static WGPURenderPipeline box_gpu_shadow_create(
     };
     WGPUFragmentState fragment = {
         .module = module,
-        .entryPoint = { .data = "fs_cutout", .length = WGPU_STRLEN }
+        .entryPoint = { .data = fs, .length = WGPU_STRLEN }
     };
     WGPURenderPipelineDescriptor desc = {
         .layout = cutout ? gpu->shadow_cutout_layout : gpu->shadow_pipeline_layout,
         .vertex = {
             .module = module,
-            .entryPoint = { .data = cutout ? "vs_cutout" : "vs", .length = WGPU_STRLEN },
+            .entryPoint = { .data = vs, .length = WGPU_STRLEN },
             .bufferCount = 2,
             .buffers = buffers
         },
@@ -431,7 +459,7 @@ static WGPURenderPipeline box_gpu_shadow_create(
         },
         .depthStencil = &depth,
         .multisample = { .count = 1, .mask = 0xFFFFFFFF },
-        .fragment = cutout ? &fragment : NULL
+        .fragment = fs ? &fragment : NULL
     };
 
     return wgpuDeviceCreateRenderPipeline(gpu->device, &desc);
@@ -464,11 +492,63 @@ static WGPURenderPipeline box_gpu_shadow_pipeline(
         wgpuRenderPipelineRelease(gpu->shadow_cutout);
     }
 
-    gpu->shadow = box_gpu_shadow_create(gpu, s->module, false);
-    gpu->shadow_cutout = box_gpu_shadow_create(gpu, s->module, true);
+    gpu->shadow = box_gpu_shadow_create(gpu, s->module, false, false, false);
+    gpu->shadow_cutout = box_gpu_shadow_create(gpu, s->module, true, false, false);
     gpu->shadow_revision = s->revision;
 done:
     return s && s->module ? gpu->shadow : NULL;
+}
+
+/** Get the pipelines of the octants of the point light tiles, created again when the variant
+ * they need changed or its shader was recompiled.
+ *
+ * They come from the clip distances variant when the device has the feature, it is not forced
+ * off and that variant compiled, else from the core variant, which discards.
+ *
+ * @param gpu The backend
+ * @return The plain pipeline, NULL while no variant has a module; the alpha tested one is
+ * gpu->shadow_point_cutout
+ */
+static WGPURenderPipeline box_gpu_shadow_point_pipeline(
+    box_gpu_t *gpu)
+{
+    uint32_t handle = BOX_RENDER_SHADER_SHADOW;
+    box_gpu_shader_t *s = NULL;
+    if (gpu->clip_distances && !gpu->shadow_core) {
+        s = ecs_map_get_deref(&gpu->shaders, box_gpu_shader_t, BOX_RENDER_SHADER_SHADOW_CLIP);
+        handle = BOX_RENDER_SHADER_SHADOW_CLIP;
+    }
+
+    if (!s || !s->module) {
+        s = ecs_map_get_deref(&gpu->shaders, box_gpu_shader_t, BOX_RENDER_SHADER_SHADOW);
+        handle = BOX_RENDER_SHADER_SHADOW;
+    }
+
+    if (!s || !s->module) {
+        goto done;
+    }
+
+    if (gpu->shadow_point && gpu->shadow_point_shader == handle &&
+        gpu->shadow_point_revision == s->revision)
+    {
+        goto done;
+    }
+
+    if (gpu->shadow_point) {
+        wgpuRenderPipelineRelease(gpu->shadow_point);
+    }
+
+    if (gpu->shadow_point_cutout) {
+        wgpuRenderPipelineRelease(gpu->shadow_point_cutout);
+    }
+
+    bool discard = handle == BOX_RENDER_SHADER_SHADOW;
+    gpu->shadow_point = box_gpu_shadow_create(gpu, s->module, false, true, discard);
+    gpu->shadow_point_cutout = box_gpu_shadow_create(gpu, s->module, true, true, discard);
+    gpu->shadow_point_shader = handle;
+    gpu->shadow_point_revision = s->revision;
+done:
+    return s && s->module ? gpu->shadow_point : NULL;
 }
 
 /** Make the shadow map hold the cascades of a view at its resolution.
@@ -531,6 +611,8 @@ done:
  * @param pass The shadow pass of the cascade or the atlas
  * @param packet The packet
  * @param cv The cull view of the cascade or the tile
+ * @param plain Pipeline of the plain casters
+ * @param alpha Pipeline of the alpha tested casters, NULL to draw them with the plain one
  * @param counted Whether the draws count in the shadow draws of the stats, false for the
  * probe captures
  */
@@ -539,6 +621,8 @@ static void box_gpu_shadow_draw(
     WGPURenderPassEncoder pass,
     const box_render_packet_t *packet,
     const box_gpu_cull_view_t *cv,
+    WGPURenderPipeline plain,
+    WGPURenderPipeline alpha,
     bool counted)
 {
     WGPURenderPipeline bound = NULL;
@@ -549,8 +633,8 @@ static void box_gpu_shadow_draw(
             &gpu->cull.draws, box_gpu_cull_draw_t, cv->first_draw + i);
         const box_render_batch_t *b = ecs_vec_get_t(
             &packet->batches, box_render_batch_t, d->batch);
-        bool cutout = b->cutout && gpu->shadow_cutout;
-        WGPURenderPipeline pipeline = cutout ? gpu->shadow_cutout : gpu->shadow;
+        bool cutout = b->cutout && alpha;
+        WGPURenderPipeline pipeline = cutout ? alpha : plain;
         if (pipeline != bound) {
             wgpuRenderPassEncoderSetPipeline(pass, pipeline);
             bound = pipeline;
@@ -590,7 +674,7 @@ void box_gpu_shadow_render(
     }
 
     WGPUBindGroupEntry entry = {
-        .binding = 0, .buffer = gpu->shadow_buffer, .size = sizeof(mat4)
+        .binding = 0, .buffer = gpu->shadow_buffer, .size = BOX_GPU_SHADOW_UNIFORM_SIZE
     };
     WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
         .layout = gpu->shadow_layout,
@@ -611,7 +695,7 @@ void box_gpu_shadow_render(
         WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
         wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
         if (cv) {
-            box_gpu_shadow_draw(gpu, pass, packet, cv, true);
+            box_gpu_shadow_draw(gpu, pass, packet, cv, gpu->shadow, gpu->shadow_cutout, true);
         }
 
         wgpuRenderPassEncoderEnd(pass);
@@ -713,7 +797,7 @@ static void box_gpu_shadow_capture_ensure(
         .size = BOX_GPU_CASCADE_STRIDE
     });
     WGPUBindGroupEntry entry = {
-        .binding = 0, .buffer = gpu->capture_shadow_buffer, .size = sizeof(mat4)
+        .binding = 0, .buffer = gpu->capture_shadow_buffer, .size = BOX_GPU_SHADOW_UNIFORM_SIZE
     };
     gpu->capture_shadow_group = wgpuDeviceCreateBindGroup(gpu->device,
         &(WGPUBindGroupDescriptor){
@@ -753,7 +837,7 @@ WGPUTextureView box_gpu_shadow_capture(
     WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
     wgpuRenderPassEncoderSetBindGroup(pass, 0, gpu->capture_shadow_group, 1, &offset);
     if (cv) {
-        box_gpu_shadow_draw(gpu, pass, packet, cv, false);
+        box_gpu_shadow_draw(gpu, pass, packet, cv, gpu->shadow, gpu->shadow_cutout, false);
     }
 
     wgpuRenderPassEncoderEnd(pass);
@@ -864,7 +948,9 @@ done:
     return;
 }
 
-/** Make the matrix buffer of the atlas tiles hold the matrices of a packet and write them.
+/** Make the matrix buffer of the atlas tiles hold the uniforms of a packet and write them: a
+ * block with the matrix of each spot light tile, a block with the light, the octant and the
+ * planes of each octant of a point light tile.
  *
  * @param gpu The backend
  * @param packet The packet
@@ -873,18 +959,44 @@ static void box_gpu_atlas_matrices(
     box_gpu_t *gpu,
     const box_render_packet_t *packet)
 {
-    int32_t i, count = ecs_vec_count(&packet->shadow_tiles);
+    int32_t i, o, count = ecs_vec_count(&packet->shadow_tiles), blocks = 0;
     int32_t capacity = gpu->atlas_capacity ? gpu->atlas_capacity : BOX_RENDER_SHADOW_TILES;
-    ecs_vec_set_count_t(NULL, &gpu->atlas_data, uint8_t, count * BOX_GPU_CASCADE_STRIDE);
+    ecs_vec_set_count_t(NULL, &gpu->atlas_blocks, int32_t, count);
     for (i = 0; i < count; i ++) {
         const box_render_shadow_tile_t *tile = ecs_vec_get_t(
             &packet->shadow_tiles, box_render_shadow_tile_t, i);
-        ecs_os_memcpy(ecs_vec_get_t(&gpu->atlas_data, uint8_t, i * BOX_GPU_CASCADE_STRIDE),
-            tile->matrix, sizeof(mat4));
+        *ecs_vec_get_t(&gpu->atlas_blocks, int32_t, i) = blocks;
+        blocks += tile->projection == BOX_RENDER_SHADOW_OCTAHEDRAL
+            ? BOX_RENDER_SHADOW_OCTANTS
+            : 1;
     }
 
-    if (!gpu->atlas_buffer || count > gpu->atlas_capacity) {
-        while (capacity < count) {
+    ecs_vec_set_count_t(NULL, &gpu->atlas_data, uint8_t, blocks * BOX_GPU_CASCADE_STRIDE);
+    ecs_os_memset(ecs_vec_first(&gpu->atlas_data), 0, blocks * BOX_GPU_CASCADE_STRIDE);
+    for (i = 0; i < count; i ++) {
+        const box_render_shadow_tile_t *tile = ecs_vec_get_t(
+            &packet->shadow_tiles, box_render_shadow_tile_t, i);
+        int32_t first = *ecs_vec_get_t(&gpu->atlas_blocks, int32_t, i);
+        if (tile->projection != BOX_RENDER_SHADOW_OCTAHEDRAL) {
+            ecs_os_memcpy(ecs_vec_get_t(&gpu->atlas_data, uint8_t,
+                first * BOX_GPU_CASCADE_STRIDE), tile->matrix, sizeof(mat4));
+            continue;
+        }
+
+        for (o = 0; o < BOX_RENDER_SHADOW_OCTANTS; o ++) {
+            float *u = (float*)ecs_vec_get_t(&gpu->atlas_data, uint8_t,
+                (first + o) * BOX_GPU_CASCADE_STRIDE);
+            u[16] = tile->position[0];
+            u[17] = tile->position[1];
+            u[18] = tile->position[2];
+            u[19] = (float)o;
+            u[20] = tile->near_;
+            u[21] = tile->far_;
+        }
+    }
+
+    if (!gpu->atlas_buffer || blocks > gpu->atlas_capacity) {
+        while (capacity < blocks) {
             capacity *= 2;
         }
 
@@ -900,7 +1012,7 @@ static void box_gpu_atlas_matrices(
     }
 
     wgpuQueueWriteBuffer(gpu->queue, gpu->atlas_buffer, 0, ecs_vec_first(&gpu->atlas_data),
-        (size_t)count * BOX_GPU_CASCADE_STRIDE);
+        (size_t)blocks * BOX_GPU_CASCADE_STRIDE);
 }
 
 /** Get the backend atlas a packet atlas renders into.
@@ -919,7 +1031,7 @@ static const box_gpu_atlas_t* box_gpu_atlas_target(
 }
 
 /** Record the render pass that clears an atlas and draws the casters of each of its tiles,
- * within the viewport of the tile.
+ * within the viewport of the tile; a point light tile draws them once per octant.
  *
  * @param gpu The backend
  * @param encoder The encoder
@@ -937,7 +1049,8 @@ static void box_gpu_atlas_pass(
     const box_render_shadow_atlas_t *a = ecs_vec_get_t(
         &packet->shadow_atlases, box_render_shadow_atlas_t, index);
     const box_gpu_atlas_t *atlas = box_gpu_atlas_target(gpu, a);
-    int32_t i;
+    WGPURenderPipeline point = box_gpu_shadow_point_pipeline(gpu);
+    int32_t i, o;
     if (!atlas) {
         goto done;
     }
@@ -954,10 +1067,15 @@ static void box_gpu_atlas_pass(
         const box_render_shadow_tile_t *tile = ecs_vec_get_t(
             &packet->shadow_tiles, box_render_shadow_tile_t, a->first + i);
         const box_gpu_cull_view_t *cv = box_gpu_cull_view(gpu, index, i);
-        uint32_t offset = (uint32_t)((a->first + i) * BOX_GPU_CASCADE_STRIDE);
+        int32_t block = *ecs_vec_get_t(&gpu->atlas_blocks, int32_t, a->first + i);
+        bool octahedral = tile->projection == BOX_RENDER_SHADOW_OCTAHEDRAL;
         if (tile->size < 1 || tile->x < 0 || tile->y < 0 ||
             tile->x + tile->size > atlas->resolution || tile->y + tile->size > atlas->resolution)
         {
+            continue;
+        }
+
+        if (octahedral && !point) {
             continue;
         }
 
@@ -965,9 +1083,16 @@ static void box_gpu_atlas_pass(
             (float)tile->size, (float)tile->size, 0.0f, 1.0f);
         wgpuRenderPassEncoderSetScissorRect(pass, (uint32_t)tile->x, (uint32_t)tile->y,
             (uint32_t)tile->size, (uint32_t)tile->size);
-        wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
-        if (cv) {
-            box_gpu_shadow_draw(gpu, pass, packet, cv, true);
+        for (o = 0; o < (octahedral ? BOX_RENDER_SHADOW_OCTANTS : 1); o ++) {
+            uint32_t offset = (uint32_t)((block + o) * BOX_GPU_CASCADE_STRIDE);
+            wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
+            if (cv && octahedral) {
+                box_gpu_shadow_draw(gpu, pass, packet, cv, point, gpu->shadow_point_cutout,
+                    true);
+            } else if (cv) {
+                box_gpu_shadow_draw(gpu, pass, packet, cv, gpu->shadow, gpu->shadow_cutout,
+                    true);
+            }
         }
 
         box_gpu_count(gpu, BOX_GPU_STAT_SHADOW_TILE);
@@ -1041,6 +1166,9 @@ void box_gpu_atlas_render(
         goto done;
     }
 
+    ecs_os_mutex_lock(gpu->lock);
+    gpu->shadow_core = gpu->shadow_core_request;
+    ecs_os_mutex_unlock(gpu->lock);
     pipeline = box_gpu_shadow_pipeline(gpu);
     if (!pipeline) {
         goto done;
@@ -1059,7 +1187,7 @@ void box_gpu_atlas_render(
 
     box_gpu_cull_upload(gpu);
     WGPUBindGroupEntry entry = {
-        .binding = 0, .buffer = gpu->atlas_buffer, .size = sizeof(mat4)
+        .binding = 0, .buffer = gpu->atlas_buffer, .size = BOX_GPU_SHADOW_UNIFORM_SIZE
     };
     WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
         .layout = gpu->shadow_layout,

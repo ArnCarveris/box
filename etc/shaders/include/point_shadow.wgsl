@@ -1,0 +1,110 @@
+// Point light shadows from the shadow atlas of the scene, read by the forward pass.
+//
+// A shadow casting point light has a square tile of the atlas holding the whole sphere around
+// it: the octahedron of directions unfolded into the square (Praun and Hoppe; Cigolle et al.),
+// each of its 8 octants a perspective along the axis signs / sqrt(3) with reversed Z, clip depth
+// near * (far - z) / (z * (far - near)) at the distance z along the axis, the depth the shadow
+// pass writes. The 4 octants with z >= 0 fill the inner diamond, those with z < 0 fold out to
+// the corners. A position beyond the far plane is lit.
+//
+// The lookup moves along the geometric normal by normal_offset texels of the tile at its
+// distance, times 1 - N.L with l toward the light, rebuilds the octahedral uv from the moved
+// position and filters with the tent of shadow.wgsl. A tap across an octant edge reads another
+// projection, so every tap compares the depth along the axis of its own octant, moved toward the
+// light by depth_bias texels. The inner octant edges are continuous; the outer edges of the
+// square wrap to the opposite side, which the taps do not follow: they are clamped half a texel
+// inside the tile, so none reads a neighbouring tile. Ported from SamplePointLightShadow of
+// Esoterica.
+#pragma once
+
+#include "spot_shadow.wgsl"
+
+// 1 / sqrt(3), the length of the axis of an octant
+const POINT_SHADOW_AXIS: f32 = 0.57735026919;
+
+// ShadowTile.light.w above which a tile record is the octahedron of a point light, 1 against 0
+// for a spot light.
+const SHADOW_OCTAHEDRAL: f32 = 0.5;
+
+// Sign of each component, 1 for 0.
+fn point_shadow_sign(v: vec2f) -> vec2f {
+    return select(vec2f(-1.0), vec2f(1.0), v >= vec2f(0.0));
+}
+
+// Octahedral uv in the tile of a direction from the light, not necessarily normalized
+// (ComputeOctahedralShadowCoordinates of Esoterica).
+fn point_shadow_uv(to: vec3f) -> vec2f {
+    let l1 = max(abs(to.x) + abs(to.y) + abs(to.z), 1e-20);
+    var p = to.xy / l1;
+    if (to.z < 0.0) {
+        p = (1.0 - abs(p.yx)) * point_shadow_sign(p);
+    }
+    return p * 0.5 + vec2f(0.5);
+}
+
+// Axis signs of the octant a uv of the tile lies in (ComputeOctahedralShadowFaceSigns).
+fn point_shadow_signs(uv: vec2f) -> vec3f {
+    let p = uv * 2.0 - vec2f(1.0);
+    return vec3f(
+        select(1.0, -1.0, p.x < 0.0),
+        select(1.0, -1.0, p.y < 0.0),
+        select(-1.0, 1.0, abs(p.x) + abs(p.y) <= 1.0));
+}
+
+// Reference depth of a distance along an octant axis moved toward the light by a world bias,
+// in the reversed Z of the tile.
+fn point_shadow_depth(axis: f32, near_: f32, far_: f32, bias: f32) -> f32 {
+    let depth = clamp(axis - bias, near_, far_);
+    return near_ * (far_ - depth) / (depth * (far_ - near_));
+}
+
+// Fraction of a point light with a tile that reaches a position with a geometric normal.
+fn point_shadow(light: Light, world: vec3f, normal: vec3f) -> f32 {
+    let tile = shadow_tiles[light.shadow];
+    let near_ = tile.params.x;
+    let far_ = tile.params.y;
+    let to = world - tile.light.xyz;
+    let len = length(to);
+    if (len < 1e-6) {
+        return 1.0;
+    }
+
+    let uv = point_shadow_uv(to);
+    let along = dot(to, point_shadow_signs(uv) * POINT_SHADOW_AXIS);
+    if (along <= 0.0 || along >= far_) {
+        return 1.0;
+    }
+
+    let texel = along * tile.params.z;
+    let moved = world + shadow_normal_offset(normal, -to / len, view.spot_bias.y * texel);
+    let moved_to = moved - tile.light.xyz;
+    let sample_uv = point_shadow_uv(moved_to);
+    let bias = view.spot_bias.x * texel;
+    let size = tile.rect.w;
+    let lo = tile.rect.xy + vec2f(0.5 * size);
+    let hi = tile.rect.xy + vec2f(tile.rect.z - 0.5 * size);
+    let t = shadow_filter_taps(tile.rect.xy + sample_uv * tile.rect.z, vec2f(size),
+        view.spot_config.y);
+    var sum = 0.0;
+    for (var j = 0u; j < t.count; j++) {
+        for (var i = 0u; i < t.count; i++) {
+            let tap = clamp(t.base + vec2f(t.x[i], t.y[j]), lo, hi);
+            let signs = point_shadow_signs((tap - tile.rect.xy) / tile.rect.z);
+            let axis = dot(moved_to, signs * POINT_SHADOW_AXIS);
+            let reference = point_shadow_depth(axis, near_, far_, bias);
+            let lit = textureSampleCompareLevel(shadow_atlas, shadow_sampler, tap, reference);
+            sum += t.wx[i] * t.wy[j] * lit;
+        }
+    }
+
+    return sum;
+}
+
+// Fraction of a spot or point light with a tile that reaches a position with a geometric normal,
+// by the projection of its tile record.
+fn punctual_shadow(light: Light, world: vec3f, normal: vec3f) -> f32 {
+    if (shadow_tiles[light.shadow].light.w > SHADOW_OCTAHEDRAL) {
+        return point_shadow(light, world, normal);
+    }
+    return spot_shadow(light, world, normal);
+}

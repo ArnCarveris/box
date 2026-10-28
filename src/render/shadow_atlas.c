@@ -1,9 +1,10 @@
 /**
  * @file render/shadow_atlas.c
- * @brief Tile allocation of the shadow atlases and the projection of a spot light tile.
+ * @brief Tile allocation of the shadow atlases and the projections of spot and point light tiles.
  *
  * Lights get power of two tiles nearest first; the tiles are placed by size and entity in
- * quadtree order, so where a tile lies depends only on the set of lights and their sizes.
+ * quadtree order, so where a tile lies depends only on the set of lights and their sizes. Spot
+ * and point lights share the allocation, one tile each.
  */
 
 #include "render.h"
@@ -17,6 +18,9 @@
 
 /** Above this vertical component a spot light tile takes +Z as its up axis */
 #define BOX_SHADOW_SPOT_POLE (0.99f)
+
+/** Tangent of the half field of view of an octant of a point light tile, sqrt(6) */
+#define BOX_SHADOW_OCTAHEDRAL_TANGENT (2.4494897427831781f)
 
 /** Round a value down to a power of two.
  *
@@ -198,6 +202,18 @@ int32_t box_render_shadow_allocate(
     return tiles;
 }
 
+float box_render_shadow_near(
+    float range)
+{
+    return glm_max(range * BOX_RENDER_SHADOW_NEAR_FRACTION, BOX_RENDER_SHADOW_NEAR_MIN);
+}
+
+float box_render_shadow_far(
+    float range)
+{
+    return glm_max(range, box_render_shadow_near(range) * 2.0f);
+}
+
 void box_render_shadow_spot(
     const float *position,
     const float *direction,
@@ -208,8 +224,8 @@ void box_render_shadow_spot(
     box_render_shadow_record_t *out)
 {
     vec3 forward, right, up, pole = {0, 1, 0};
-    float near_ = glm_max(range * BOX_RENDER_SHADOW_NEAR_FRACTION, BOX_RENDER_SHADOW_NEAR_MIN);
-    float far_ = glm_max(range, near_ * 2.0f);
+    float near_ = box_render_shadow_near(range);
+    float far_ = box_render_shadow_far(range);
     float size = (float)glm_max(place->size, 1);
     float margin = 0.5f * (float)BOX_RENDER_SHADOW_FILTER_MAX + 1.0f;
     float widen = size > 4.0f * margin ? size / (size - 2.0f * margin) : 2.0f;
@@ -253,4 +269,48 @@ void box_render_shadow_spot(
     out->params[1] = far_;
     out->params[2] = 2.0f * tangent / size;
     out->params[3] = size;
+    for (i = 0; i < 3; i ++) {
+        out->light[i] = position[i];
+    }
+
+    out->light[3] = (float)BOX_RENDER_SHADOW_PERSPECTIVE;
+}
+
+void box_render_shadow_point(
+    const float *position,
+    float range,
+    const box_render_shadow_place_t *place,
+    int32_t resolution,
+    box_render_shadow_record_t *out)
+{
+    float size = (float)glm_max(place->size, 1);
+    float res = (float)glm_max(resolution, 1);
+    int32_t i;
+    glm_mat4_zero(out->matrix);
+    out->rect[0] = (float)place->x / res;
+    out->rect[1] = (float)place->y / res;
+    out->rect[2] = size / res;
+    out->rect[3] = 1.0f / res;
+    out->params[0] = box_render_shadow_near(range);
+    out->params[1] = box_render_shadow_far(range);
+    out->params[2] = 2.0f * BOX_SHADOW_OCTAHEDRAL_TANGENT / size;
+    out->params[3] = size;
+    for (i = 0; i < 3; i ++) {
+        out->light[i] = position[i];
+    }
+
+    out->light[3] = (float)BOX_RENDER_SHADOW_OCTAHEDRAL;
+}
+
+void box_render_shadow_point_planes(
+    const box_render_shadow_tile_t *tile,
+    vec4 *out)
+{
+    int32_t i;
+    for (i = 0; i < 6; i ++) {
+        float sign = (i & 1) ? -1.0f : 1.0f;
+        glm_vec4_zero(out[i]);
+        out[i][i / 2] = sign;
+        out[i][3] = tile->far_ - sign * tile->position[i / 2];
+    }
 }

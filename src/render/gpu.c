@@ -222,6 +222,7 @@ static void box_gpu_device_init(
     gpu->device = emscripten_webgpu_get_device();
     gpu->queue = wgpuDeviceGetQueue(gpu->device);
     gpu->timestamps = wgpuDeviceHasFeature(gpu->device, WGPUFeatureName_TimestampQuery);
+    gpu->clip_distances = wgpuDeviceHasFeature(gpu->device, WGPUFeatureName_ClipDistances);
 done:
     return;
 }
@@ -261,11 +262,20 @@ static void box_gpu_device_init(
 {
     WGPUDeviceDescriptor desc = WGPU_DEVICE_DESCRIPTOR_INIT;
     WGPUFeatureName timestamps = WGPUFeatureName_TimestampQuery;
+    WGPUFeatureName clip = WGPUFeatureName_ClipDistances;
+    WGPUFeatureName features[2];
     WGPULimits adapter = WGPU_LIMITS_INIT, limits = WGPU_LIMITS_INIT;
+    size_t feature_count = 0;
     if (wgpuAdapterHasFeature(gpu->adapter, timestamps)) {
-        desc.requiredFeatureCount = 1;
-        desc.requiredFeatures = &timestamps;
+        features[feature_count ++] = timestamps;
     }
+
+    if (wgpuAdapterHasFeature(gpu->adapter, clip)) {
+        features[feature_count ++] = clip;
+    }
+
+    desc.requiredFeatureCount = feature_count;
+    desc.requiredFeatures = feature_count ? features : NULL;
 
     if (wgpuAdapterGetLimits(gpu->adapter, &adapter) == WGPUStatus_Success &&
         adapter.maxTextureArrayLayers != WGPU_LIMIT_U32_UNDEFINED)
@@ -287,6 +297,7 @@ static void box_gpu_device_init(
     if (gpu->device) {
         gpu->queue = wgpuDeviceGetQueue(gpu->device);
         gpu->timestamps = wgpuDeviceHasFeature(gpu->device, timestamps);
+        gpu->clip_distances = wgpuDeviceHasFeature(gpu->device, clip);
     }
 }
 
@@ -378,6 +389,7 @@ done:
     gpu->stats.ready = result == 0;
     gpu->stats.failed = result != 0;
     gpu->stats.texture_layers = result == 0 ? box_gpu_texture_layers(gpu) : 0;
+    gpu->stats.clip_distances = result == 0 && gpu->clip_distances;
     ecs_os_mutex_unlock(gpu->lock);
 
     return result;
@@ -560,6 +572,7 @@ static void box_gpu_fini(
     ecs_os_mutex_lock(gpu->lock);
     gpu->stats.ready = false;
     gpu->stats.texture_layers = 0;
+    gpu->stats.clip_distances = false;
     ecs_os_mutex_unlock(gpu->lock);
 }
 
@@ -812,6 +825,22 @@ bool box_render_gpu_cull_copies(
     return result;
 }
 
+bool box_render_gpu_shadow_core(
+    ecs_world_t *world,
+    bool core)
+{
+    const box_render_backend_t *backend = box_render_get_backend(world);
+    bool result = backend->render == box_gpu_render;
+    if (result) {
+        box_gpu_t *gpu = backend->ctx;
+        ecs_os_mutex_lock(gpu->lock);
+        gpu->shadow_core_request = core;
+        ecs_os_mutex_unlock(gpu->lock);
+    }
+
+    return result;
+}
+
 bool box_render_gpu_readback_delivery(
     ecs_world_t *world,
     box_render_readback_delivery_t delivery)
@@ -905,6 +934,16 @@ bool box_render_gpu_cull_copies(
 {
     (void)world;
     (void)copies;
+
+    return false;
+}
+
+bool box_render_gpu_shadow_core(
+    ecs_world_t *world,
+    bool core)
+{
+    (void)world;
+    (void)core;
 
     return false;
 }

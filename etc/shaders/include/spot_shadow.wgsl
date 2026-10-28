@@ -24,6 +24,9 @@ struct ShadowTile {
     // x: near plane, y: far plane, z: world size of a texel per unit of distance along the axis,
     // w: edge of the tile in texels
     params: vec4f,
+    // xyz: world position of the light, w: projection, 0 for the matrix of a spot light, 1 for
+    // the octahedron of a point light (point_shadow.wgsl)
+    light: vec4f,
 };
 
 // Tile records at most, BOX_RENDER_SHADOW_TILES.

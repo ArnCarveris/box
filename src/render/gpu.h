@@ -49,6 +49,11 @@
 /** Bytes between the matrices of two cascades, the dynamic offset alignment of webgpu */
 #define BOX_GPU_CASCADE_STRIDE (256)
 
+/** Bytes of the uniforms of one cascade, tile or octant of the shadow pass, Cascade of
+ * etc/shaders/shadow.wgsl: the matrix, the light of a point light tile and its octant, its near
+ * and far plane */
+#define BOX_GPU_SHADOW_UNIFORM_SIZE (sizeof(mat4) + 2 * sizeof(vec4))
+
 /** Depth format of the shadow maps, cleared to 0 and compared with greater for reversed Z */
 #define BOX_GPU_SHADOW_FORMAT (WGPUTextureFormat_Depth32Float)
 
@@ -530,7 +535,7 @@ typedef struct box_gpu_view_uniforms_t {
                                      *   of a tile, two unused */
 } box_gpu_view_uniforms_t;
 
-/** The shadow atlas of a scene: the depth texture its spot light tiles render into */
+/** The shadow atlas of a scene: the depth texture its spot and point light tiles render into */
 typedef struct box_gpu_atlas_t {
     WGPUTexture texture;            /**< BOX_GPU_SHADOW_FORMAT, resolution squared */
     WGPUTextureView view;           /**< 2D view, sampled by the forward pass and rendered into */
@@ -663,6 +668,13 @@ typedef struct box_gpu_t {
     WGPURenderPipeline shadow;      /**< Shadow pipeline, NULL until the shader exists */
     WGPURenderPipeline shadow_cutout; /**< Shadow pipeline of the alpha tested casters */
     int32_t shadow_revision;        /**< Revision of the shader the pipelines were made with */
+    WGPURenderPipeline shadow_point; /**< Pipeline of the octants of the point light tiles */
+    WGPURenderPipeline shadow_point_cutout; /**< Its pipeline of the alpha tested casters */
+    uint32_t shadow_point_shader;   /**< Handle of the shadow shader variant they were made
+                                     *   with, BOX_RENDER_SHADER_SHADOW_CLIP or _SHADOW */
+    int32_t shadow_point_revision;  /**< Revision of that shader */
+    bool shadow_core;               /**< Point light tiles discard instead of clipping in this
+                                     *   packet, see box_render_gpu_shadow_core */
     WGPUSampler shadow_sampler;     /**< Comparison sampler of the shadow lookups */
     WGPUTexture shadow_empty;       /**< Shadow map bound by views without shadows */
     WGPUTextureView shadow_empty_view; /**< Array view of the empty shadow map */
@@ -684,8 +696,11 @@ typedef struct box_gpu_t {
     WGPUTextureView no_atlas_view;  /**< 2D view of the empty atlas */
     WGPUBuffer no_tiles;            /**< Zero tile records bound by views without spot shadows */
     WGPUBuffer atlas_buffer;        /**< Tile matrices of the atlases of a packet */
-    int32_t atlas_capacity;         /**< Tiles the matrix buffer holds */
-    ecs_vec_t atlas_data;           /**< Bytes of the tile matrices of a packet */
+    int32_t atlas_capacity;         /**< Blocks the matrix buffer holds */
+    ecs_vec_t atlas_data;           /**< Bytes of the tile matrices of a packet, one block of
+                                     *   BOX_GPU_CASCADE_STRIDE per spot light tile and one per
+                                     *   octant of a point light tile */
+    ecs_vec_t atlas_blocks;         /**< int32_t, the first block of each tile of a packet */
     WGPUBuffer atlas_counts;        /**< Copy of the draw arguments the cull of the tiles of the
                                      *   last packet wrote, for box_render_gpu_cull_tile */
     uint64_t atlas_counts_size;     /**< Bytes of that copy */
@@ -716,6 +731,8 @@ typedef struct box_gpu_t {
     uint32_t cull_window;           /**< Slots of a cull page from the next pass, under the lock */
     int32_t cull_copies;            /**< Copies of cascade 0 the views cull from the next pass,
                                      *   under the lock */
+    bool shadow_core_request;       /**< Point light tiles discard instead of clipping from the
+                                     *   next packet, under the lock */
     uint64_t buffer_writes;         /**< Writes to buffers, the version of the last one */
     box_render_gpu_stats_t stats;   /**< Counters read by the main thread */
     box_render_gpu_stats_t pending; /**< Counter changes not yet published, render thread only */
@@ -725,6 +742,7 @@ typedef struct box_gpu_t {
     box_gpu_gtao_t *gtao;           /**< Ambient occlusion of the views */
     uint32_t rendering;             /**< Target that is rendering, materials cannot sample it */
     bool timestamps;                /**< The device has timestamp queries */
+    bool clip_distances;            /**< The device has clip distances */
     box_gpu_bake_t *bake;           /**< Probe captures, created on the first capture */
     box_gpu_atmos_t *atmosphere;    /**< Atmosphere passes */
     ecs_map_t environments;         /**< Handle to box_gpu_environment_t* */
@@ -864,7 +882,8 @@ void box_gpu_target_fini(
 
 /** Compile, recompile or release a shader module.
  *
- * A module that fails to compile is reported and leaves the previous module in place.
+ * A module that fails to compile is reported and leaves the previous module in place. The clip
+ * distances variant of the shadow shader is not compiled by a device without the feature.
  *
  * @param gpu The backend
  * @param op What happens to the module
@@ -1625,6 +1644,9 @@ void box_gpu_atlas_apply(
  * scene of its atlas; the tiles of an atlas then draw their casters in one render pass that
  * clears it, with a viewport per tile.
  *
+ * A point light tile draws every caster draw once per octant, 8 draws, the octant in the dynamic
+ * offset of the shadow uniforms, clipped to it with clip distances or by a discard.
+ *
  * @param gpu The backend
  * @param packet The packet
  */
@@ -2147,6 +2169,9 @@ void box_gpu_cull_add(
 
 /** Add the tiles of a shadow atlas as cull groups of shadow casters of its scene, at most
  * BOX_GPU_CULL_GROUP_VIEWS tiles per group; tile i is cascade i of the slot.
+ *
+ * A spot light tile culls by the frustum of its matrix, a point light tile by the 6 planes of
+ * the box around the sphere of its range, as the multi view cull only tests planes.
  *
  * @param gpu The backend
  * @param packet The packet

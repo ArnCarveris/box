@@ -1,0 +1,94 @@
+// The geometry of lights_point in a room, every point light casting shadows into the shadow
+// atlas through its octahedral tile: the ball and the columns throw shadows of all three colors
+// onto the floor, the back wall and the side walls. The bulbs cast none, the lights sit inside
+// them.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+
+camera {
+  Position: {0, 5, 10}
+  Rotation: {-0.45, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {8, 8, 12, 255}}, shadows: {enabled: true}}
+}
+
+$ {
+  AmbientLight: {intensity: 0.15}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {16, 0.2, 10}
+  Rgb: {200, 200, 200}
+}
+
+wall {
+  Position: {0, 2, -3}
+  Box: {16, 4, 0.2}
+  Rgb: {200, 200, 200}
+}
+
+wall_left {
+  Position: {-6, 2, 1}
+  Box: {0.2, 4, 8}
+  Rgb: {200, 200, 200}
+}
+
+wall_right {
+  Position: {6, 2, 1}
+  Box: {0.2, 4, 8}
+  Rgb: {200, 200, 200}
+}
+
+ball {
+  Position: {0, 0.8, 0}
+  Sphere: {segments: 32, smooth: true, radius: 0.8}
+  Rgb: {240, 240, 240}
+  PbrMaterial: {roughness: 0.3}
+}
+
+column_left {
+  Position: {-3.5, 1, 0.5}
+  Cylinder: {segments: 24, smooth: true, length: 2, radius: 0.4}
+  Rgb: {240, 240, 240}
+}
+
+column_right {
+  Position: {3.5, 1, 0.5}
+  Cylinder: {segments: 24, smooth: true, length: 2, radius: 0.4}
+  Rgb: {240, 240, 240}
+}
+
+red {
+  Position: {-2, 1.5, 1}
+  PointLight: {intensity: 4 * flecs.script.math.PI, range: 6, shadows: true}
+  Rgb: {255, 60, 40}
+  Sphere: {segments: 12, smooth: true, radius: 0.1}
+  Emissive: {strength: 1, color: {255, 60, 40}}
+  NoShadow
+}
+
+green {
+  Position: {0, 2.5, -1.5}
+  PointLight: {intensity: 4 * flecs.script.math.PI, range: 6, shadows: true}
+  Rgb: {60, 255, 80}
+  Sphere: {segments: 12, smooth: true, radius: 0.1}
+  Emissive: {strength: 1, color: {60, 255, 80}}
+  NoShadow
+}
+
+blue {
+  Position: {2, 1.5, 1}
+  PointLight: {intensity: 4 * flecs.script.math.PI, range: 6, shadows: true}
+  Rgb: {60, 120, 255}
+  Sphere: {segments: 12, smooth: true, radius: 0.1}
+  Emissive: {strength: 1, color: {60, 120, 255}}
+  NoShadow
+}

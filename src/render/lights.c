@@ -8,7 +8,7 @@
  *
  * With LightBake views get the Mixed and Realtime lights, captures the Mixed and Baked ones over
  * a black ambient and the Mixed ones over a pass, while every light is Mixed all share the view
- * list (see box_lights_push); shadowed spot lights of the view list get atlas tiles.
+ * list (see box_lights_push); shadowed spot and point lights of the view list get atlas tiles.
  */
 
 #include "bake.h"
@@ -84,13 +84,14 @@ typedef struct box_light_atmos_t {
     float moon_illumination; /**< Lit fraction of the moon, 0 without a sun or a moon */
 } box_light_atmos_t;
 
-/** A shadow casting spot light of the view list of a scene in this frame */
-typedef struct box_light_spot_t {
+/** A shadow casting spot or point light of the view list of a scene in this frame */
+typedef struct box_light_caster_t {
     ecs_entity_t entity;    /**< The light entity */
     int32_t index;          /**< Index of the light in the view list */
-    int32_t resolution;     /**< SpotLight.shadow_resolution */
-    float outer;            /**< Outer half angle in degrees */
-} box_light_spot_t;
+    int32_t resolution;     /**< SpotLight.shadow_resolution or PointLight.shadow_resolution */
+    float outer;            /**< Outer half angle in degrees of a spot light */
+    bool point;             /**< A point light, whose tile is octahedral */
+} box_light_caster_t;
 
 /** The shadow atlas of a scene and what the backend holds of it */
 typedef struct box_light_atlas_t {
@@ -128,7 +129,8 @@ typedef struct box_light_scene_t {
     float sky[3];           /**< Linear ambient light from above, summed */
     float ground[3];        /**< Linear ambient light from below, summed */
     box_light_list_t lists[BOX_LIGHTS_LISTS]; /**< The lists, by box_light_list_kind_t */
-    ecs_vec_t spots;        /**< box_light_spot_t, the shadow casting spot lights of this frame */
+    ecs_vec_t casters;      /**< box_light_caster_t, the shadow casting spot and point lights
+                             *   of this frame */
     box_light_atlas_t atlas; /**< The shadow atlas of the scene */
 } box_light_scene_t;
 
@@ -256,7 +258,7 @@ static int32_t box_lights_find(
 static void box_lights_atlas_init(
     box_light_scene_t *s)
 {
-    ecs_vec_init_t(NULL, &s->spots, box_light_spot_t, 0);
+    ecs_vec_init_t(NULL, &s->casters, box_light_caster_t, 0);
     ecs_vec_init_t(NULL, &s->atlas.records, box_render_shadow_record_t, 0);
     ecs_vec_init_t(NULL, &s->atlas.tiles, box_render_shadow_tile_t, 0);
     ecs_vec_init_t(NULL, &s->atlas.sent, box_render_shadow_record_t, 0);
@@ -269,7 +271,7 @@ static void box_lights_atlas_init(
 static void box_lights_atlas_fini(
     box_light_scene_t *s)
 {
-    ecs_vec_fini_t(NULL, &s->spots, box_light_spot_t);
+    ecs_vec_fini_t(NULL, &s->casters, box_light_caster_t);
     ecs_vec_fini_t(NULL, &s->atlas.records, box_render_shadow_record_t);
     ecs_vec_fini_t(NULL, &s->atlas.tiles, box_render_shadow_tile_t);
     ecs_vec_fini_t(NULL, &s->atlas.sent, box_render_shadow_record_t);
@@ -326,7 +328,7 @@ static void box_lights_reset(
         s->has_ambient = false;
         glm_vec3_zero(s->sky);
         glm_vec3_zero(s->ground);
-        ecs_vec_clear(&s->spots);
+        ecs_vec_clear(&s->casters);
         ecs_vec_clear(&s->atlas.records);
         ecs_vec_clear(&s->atlas.tiles);
         s->atlas.found = false;
@@ -612,8 +614,20 @@ static void box_lights_collect(
                 const PointLight *p = &ecs_field(&it, PointLight, 0)[i];
                 if (p->intensity > 0 && p->range > 0) {
                     box_render_light_t out;
+                    int32_t index = ecs_vec_count(&s->lists[BOX_LIGHTS_VIEW].lights);
                     box_lights_point(transform, rgb, p->intensity, p->range, &out);
                     box_lights_push(s, it.entities[i], p->bake, &out);
+                    if (p->shadows && p->bake != LightBakeModeBaked &&
+                        ecs_vec_count(&s->lists[BOX_LIGHTS_VIEW].lights) > index)
+                    {
+                        *ecs_vec_append_t(NULL, &s->casters, box_light_caster_t) =
+                            (box_light_caster_t){
+                                .entity = it.entities[i],
+                                .index = index,
+                                .resolution = p->shadow_resolution,
+                                .point = true
+                            };
+                    }
                 }
             } else {
                 const SpotLight *sp = &ecs_field(&it, SpotLight, 0)[i];
@@ -632,8 +646,8 @@ static void box_lights_collect(
                     if (sp->shadows && sp->bake != LightBakeModeBaked &&
                         ecs_vec_count(&s->lists[BOX_LIGHTS_VIEW].lights) > index)
                     {
-                        *ecs_vec_append_t(NULL, &s->spots, box_light_spot_t) =
-                            (box_light_spot_t){
+                        *ecs_vec_append_t(NULL, &s->casters, box_light_caster_t) =
+                            (box_light_caster_t){
                                 .entity = it.entities[i],
                                 .index = index,
                                 .resolution = sp->shadow_resolution,
@@ -1250,7 +1264,8 @@ static void box_lights_collect_atlases(
     }
 }
 
-/** Check whether a view of the packet renders the shadows of the spot lights of a scene: it is
+/** Check whether a view of the packet renders the shadows of the spot and point lights of a
+ * scene: it is
  * lit by the lights of the scene, renders shadows and its camera has a depth range.
  *
  * @param world The world
@@ -1316,8 +1331,9 @@ static bool box_lights_view_sees(
     return result;
 }
 
-/** Allocate the tiles of the shadow casting spot lights of a scene that a view with shadows
- * sees, write their tile records and give each light its record index.
+/** Allocate the tiles of the shadow casting spot and point lights of a scene that a view with
+ * shadows sees, write their tile records and give each light its record index; both kinds
+ * share the budget and the placement of the atlas.
  *
  * @param world The world
  * @param l The state
@@ -1333,7 +1349,7 @@ static void box_lights_shadow_tiles(
     box_light_atlas_t *a = &s->atlas;
     box_render_light_t *lights = ecs_vec_first_t(
         &s->lists[BOX_LIGHTS_VIEW].lights, box_render_light_t);
-    int32_t i, j, n, dropped = 0, count = ecs_vec_count(&s->spots);
+    int32_t i, j, n, dropped = 0, count = ecs_vec_count(&s->casters);
     ecs_vec_clear(&l->requests);
     ecs_vec_clear(&l->candidates);
     ecs_vec_clear(&l->views);
@@ -1346,8 +1362,8 @@ static void box_lights_shadow_tiles(
     }
 
     for (i = 0; i < count && ecs_vec_count(&l->views); i ++) {
-        const box_light_spot_t *spot = ecs_vec_get_t(&s->spots, box_light_spot_t, i);
-        const box_render_light_t *light = &lights[spot->index];
+        const box_light_caster_t *caster = ecs_vec_get_t(&s->casters, box_light_caster_t, i);
+        const box_render_light_t *light = &lights[caster->index];
         float distance = FLT_MAX;
         bool seen = false;
         for (j = 0; j < ecs_vec_count(&l->views); j ++) {
@@ -1362,8 +1378,8 @@ static void box_lights_shadow_tiles(
         if (seen) {
             *ecs_vec_append_t(NULL, &l->requests, box_render_shadow_request_t) =
                 (box_render_shadow_request_t){
-                    .light = spot->entity,
-                    .size = box_render_shadow_request_size(spot->resolution, &a->settings),
+                    .light = caster->entity,
+                    .size = box_render_shadow_request_size(caster->resolution, &a->settings),
                     .distance = distance
                 };
             *ecs_vec_append_t(NULL, &l->candidates, int32_t) = i;
@@ -1382,23 +1398,35 @@ static void box_lights_shadow_tiles(
     for (i = 0; i < n; i ++) {
         const box_render_shadow_place_t *place = ecs_vec_get_t(
             &l->places, box_render_shadow_place_t, i);
-        const box_light_spot_t *spot = ecs_vec_get_t(&s->spots, box_light_spot_t,
+        const box_light_caster_t *caster = ecs_vec_get_t(&s->casters, box_light_caster_t,
             *ecs_vec_get_t(&l->candidates, int32_t, i));
-        box_render_light_t *light = &lights[spot->index];
+        box_render_light_t *light = &lights[caster->index];
         if (!place->size) {
             continue;
         }
 
         box_render_shadow_record_t *r = ecs_vec_append_t(
             NULL, &a->records, box_render_shadow_record_t);
-        box_render_shadow_spot(light->position, light->direction, light->range, spot->outer,
-            place, a->settings.resolution, r);
+        if (caster->point) {
+            box_render_shadow_point(light->position, light->range, place,
+                a->settings.resolution, r);
+        } else {
+            box_render_shadow_spot(light->position, light->direction, light->range,
+                caster->outer, place, a->settings.resolution, r);
+        }
+
         box_render_shadow_tile_t *t = ecs_vec_append_t(NULL, &a->tiles, box_render_shadow_tile_t);
-        t->light = spot->entity;
+        t->light = caster->entity;
         t->x = place->x;
         t->y = place->y;
         t->size = place->size;
+        t->projection = caster->point
+            ? BOX_RENDER_SHADOW_OCTAHEDRAL
+            : BOX_RENDER_SHADOW_PERSPECTIVE;
         glm_mat4_copy(r->matrix, t->matrix);
+        glm_vec3_copy(light->position, t->position);
+        t->near_ = r->params[0];
+        t->far_ = r->params[1];
         light->shadow = (uint32_t)ecs_vec_count(&a->records) - 1;
     }
 

@@ -438,7 +438,8 @@ static void box_shader_changed(
  * @param p The packet
  * @param handle Handle of the shader
  * @return Whether a batch uses the shader as its pipeline, it scatters and runs a scatter, or
- * it assigns lights to clusters or draws shadow casters and a batch draws with the mesh shader,
+ * it assigns lights to clusters or draws shadow casters (either variant of the shadow shader)
+ * and a batch draws with the mesh shader,
  * or it culls and a batch draws with the mesh or the 2D shape shader, or an effect pass of a
  * view runs it, or it projects probe captures and the packet captures probes or reflections or
  * may process environments, or it builds atmosphere LUTs and the packet has an atmosphere, or
@@ -453,7 +454,8 @@ static bool box_shader_used(
     bool result = handle == BOX_RENDER_SHADER_SCATTER && ecs_vec_count(&p->scatters);
 
     uint32_t pipeline = handle == BOX_RENDER_SHADER_CLUSTER ||
-        handle == BOX_RENDER_SHADER_SHADOW || handle == BOX_RENDER_SHADER_CULL
+        handle == BOX_RENDER_SHADER_SHADOW || handle == BOX_RENDER_SHADER_SHADOW_CLIP ||
+        handle == BOX_RENDER_SHADER_CULL
         ? BOX_RENDER_SHADER_MESH
         : handle;
     uint32_t also = handle == BOX_RENDER_SHADER_CULL ? BOX_RENDER_SHADER_SHAPE2D : pipeline;
@@ -643,6 +645,37 @@ static void BoxShaderOnRemove(
     }
 }
 
+/** Create an engine shader with a fixed handle and defines.
+ *
+ * @param world The world
+ * @param state The module state
+ * @param parent Scope of the engine shaders
+ * @param name Name of the shader entity
+ * @param path WGSL file
+ * @param defines Macros of the shader, NULL for none
+ * @param handle Handle the backend knows the shader by
+ * @param on_demand Send the shader once a batch draws with it instead of right away
+ */
+static void box_shader_builtin_defines(
+    ecs_world_t *world,
+    box_shader_state_t *state,
+    ecs_entity_t parent,
+    const char *name,
+    const char *path,
+    const char *defines,
+    uint32_t handle,
+    bool on_demand)
+{
+    ecs_entity_t e = ecs_entity(world, { .name = name, .parent = parent });
+    box_shader_t *s = box_shader_ensure(state, e, handle);
+    s->builtin = true;
+    s->on_demand = on_demand;
+    ecs_set(world, e, Shader, {
+        .path = ECS_CONST_CAST(char*, path),
+        .defines = ECS_CONST_CAST(char*, defines)
+    });
+}
+
 /** Create an engine shader with a fixed handle.
  *
  * @param world The world
@@ -662,11 +695,7 @@ static void box_shader_builtin(
     uint32_t handle,
     bool on_demand)
 {
-    ecs_entity_t e = ecs_entity(world, { .name = name, .parent = parent });
-    box_shader_t *s = box_shader_ensure(state, e, handle);
-    s->builtin = true;
-    s->on_demand = on_demand;
-    ecs_set(world, e, Shader, { .path = ECS_CONST_CAST(char*, path) });
+    box_shader_builtin_defines(world, state, parent, name, path, NULL, handle, on_demand);
 }
 
 void BoxShaderImport(
@@ -736,6 +765,8 @@ void BoxShaderImport(
         BOX_RENDER_SHADER_CLUSTER, true);
     box_shader_builtin(world, state, builtin, "shadow", "etc/shaders/shadow.wgsl",
         BOX_RENDER_SHADER_SHADOW, true);
+    box_shader_builtin_defines(world, state, builtin, "shadow_clip", "etc/shaders/shadow.wgsl",
+        "BOX_SHADOW_CLIP_DISTANCES", BOX_RENDER_SHADER_SHADOW_CLIP, true);
     box_shader_builtin(world, state, builtin, "cull", "etc/shaders/cull.wgsl",
         BOX_RENDER_SHADER_CULL, true);
     box_shader_builtin(world, state, builtin, "shape2d", "etc/shaders/shape2d.wgsl",

@@ -707,6 +707,8 @@ void Light_component_defaults(void) {
     test_assert(point != NULL);
     test_flt(point->intensity, 1);
     test_flt(point->range, 5);
+    test_bool(point->shadows, false);
+    test_int(point->shadow_resolution, 512);
     const SpotLight *spot = ecs_get(world, ecs_lookup(world, "spot"), SpotLight);
     test_assert(spot != NULL);
     test_flt(spot->intensity, 2);
@@ -719,6 +721,10 @@ void Light_component_defaults(void) {
     ecs_add(world, literal, SpotLight);
     test_bool(ecs_get(world, literal, SpotLight)->shadows, false);
     test_int(ecs_get(world, literal, SpotLight)->shadow_resolution, 512);
+    ecs_entity_t bulb = ecs_new(world);
+    ecs_add(world, bulb, PointLight);
+    test_bool(ecs_get(world, bulb, PointLight)->shadows, false);
+    test_int(ecs_get(world, bulb, PointLight)->shadow_resolution, 512);
     const DirectionalLight *sun = ecs_get(world, ecs_lookup(world, "sun"), DirectionalLight);
     test_assert(sun != NULL);
     test_flt(sun->intensity, 1);

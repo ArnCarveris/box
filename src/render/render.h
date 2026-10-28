@@ -32,6 +32,10 @@
 /** Shader handle of the engine compute shader that culls the instances of a view */
 #define BOX_RENDER_SHADER_CULL (6)
 
+/** Shader handle of the variant of the shadow shader that clips the octants of the point light
+ * tiles with clip distances, compiled only by a device with that feature */
+#define BOX_RENDER_SHADER_SHADOW_CLIP (7)
+
 /** Projected size in pixels below which a capture of a camera without a view culls */
 #define BOX_RENDER_CULL_MIN_DIMENSION (1.0f)
 
@@ -219,7 +223,8 @@ typedef enum box_render_resource_kind_t {
                                   *   cubemap of its handle */
     BOX_RENDER_ATMOSPHERE_ENVIRONMENT, /**< Sky an Atmosphere renders into the cubemap of its
                                        *   handle */
-    BOX_RENDER_SHADOW_ATLAS /**< Depth32Float shadow atlas of the spot light tiles of a scene */
+    BOX_RENDER_SHADOW_ATLAS /**< Depth32Float shadow atlas of the spot and point light tiles of
+                             *   a scene */
 } box_render_resource_kind_t;
 
 /** What a resource change does to its object */
@@ -269,18 +274,33 @@ typedef struct box_render_light_t {
 /** Bytes of a light record that describe the light, its tile index excluded */
 #define BOX_RENDER_LIGHT_SHADING (offsetof(box_render_light_t, shadow))
 
+/** Projection of a shadow atlas tile: the perspective of a spot light, its record matrix */
+#define BOX_RENDER_SHADOW_PERSPECTIVE (0)
+
+/** Projection of a shadow atlas tile: the 8 octants of a point light unfolded into the tile */
+#define BOX_RENDER_SHADOW_OCTAHEDRAL (1)
+
+/** Octants of the octahedral projection of a point light tile */
+#define BOX_RENDER_SHADOW_OCTANTS (8)
+
 /** A tile of a shadow atlas as the forward pass reads it from the tile records of the scene,
  * ShadowTile of etc/shaders/include/spot_shadow.wgsl.
  *
- * The matrix is a reversed Z perspective along the light: clip depth near * (far - z) /
- * (z * (far - near)) at the distance z along its axis, 1 at the near plane.
+ * A spot light tile has a reversed Z perspective along the light in its matrix: clip depth
+ * near * (far - z) / (z * (far - near)) at the distance z along its axis, 1 at the near plane.
+ *
+ * A point light tile has a zero matrix; each octant of its octahedron is a perspective of the
+ * same depth with z the distance along the axis (+-1, +-1, +-1) / sqrt(3) of the octant.
  */
 typedef struct box_render_shadow_record_t {
-    mat4 matrix;        /**< World to shadow clip space of the light */
+    mat4 matrix;        /**< World to shadow clip space of a spot light, zero for a point light */
     float rect[4];      /**< Left and top of the tile in atlas uv, its edge in uv, a texel of
                          *   the atlas in uv */
     float params[4];    /**< Near and far plane, world size of a texel per unit of distance
-                         *   along the light axis, edge of the tile in texels */
+                         *   along the light axis (the octant axis of a point light), edge of
+                         *   the tile in texels */
+    float light[4];     /**< World position of the light, the projection of the tile in w:
+                         *   BOX_RENDER_SHADOW_PERSPECTIVE or BOX_RENDER_SHADOW_OCTAHEDRAL */
 } box_render_shadow_record_t;
 
 /** A tile the renderer draws the shadow casters of its light into */
@@ -289,7 +309,12 @@ typedef struct box_render_shadow_tile_t {
     int32_t x;              /**< Left column of the tile in the atlas */
     int32_t y;              /**< Top row of the tile in the atlas */
     int32_t size;           /**< Edge of the tile in texels */
+    int32_t projection;     /**< BOX_RENDER_SHADOW_PERSPECTIVE or BOX_RENDER_SHADOW_OCTAHEDRAL */
     mat4 matrix;            /**< World to shadow clip space of the light, as its record */
+    float position[3];      /**< World position of the light */
+    float near_;            /**< Near plane */
+    float far_;             /**< Far plane, the radius of the sphere an octahedral tile culls its
+                             *   casters by */
 } box_render_shadow_tile_t;
 
 /** The shadow atlas of a scene in a packet: its tiles, rendered once per packet before the
@@ -341,8 +366,8 @@ typedef struct box_render_view_shadows_t {
     float near_;            /**< View depth the first cascade starts at */
     float splits[BOX_RENDER_SHADOW_CASCADES]; /**< View depth each cascade ends at */
     float direction[3];     /**< Direction toward the light that casts the shadows */
-    bool spots;             /**< The view samples the spot light tiles of the shadow atlas of
-                             *   its scene: it renders shadows and is lit; filter_size,
+    bool spots;             /**< The view samples the spot and point light tiles of the atlas
+                             *   of its scene: it renders shadows and is lit; filter_size,
                              *   depth_bias and normal_offset apply, in texels of a tile */
     uint32_t atlas;         /**< Handle of that atlas and its tile buffer, 0 for none */
     uint32_t tiles;         /**< Tile records of that atlas */
@@ -982,7 +1007,10 @@ typedef struct box_render_gpu_stats_t {
                                  *   atmosphere_ns holds */
     int32_t shadow_tiles;       /**< Shadow atlas tiles rendered */
     int32_t shadow_draws;       /**< Draw calls recorded in the shadow passes of the cascades
-                                 *   and the atlas tiles, not those of the probe captures */
+                                 *   and the atlas tiles, not those of the probe captures; a
+                                 *   point light tile draws each caster draw once per octant */
+    bool clip_distances;        /**< The device has the clip distances feature, which clips the
+                                 *   octants of the point light tiles */
 } box_render_gpu_stats_t;
 
 /** GPU time of the probe captures the GPU backend measured since the last time it was taken */
@@ -1247,6 +1275,18 @@ bool box_render_gpu_cull_window(
 bool box_render_gpu_cull_copies(
     ecs_world_t *world,
     int32_t copies);
+
+/** Make the GPU backend of a world render the octants of the point light tiles the core
+ * WebGPU way, discarding the fragments outside an octant, even when the device has clip
+ * distances, for tests. Applies from the next packet.
+ *
+ * @param world The world
+ * @param core Whether to discard instead of clipping
+ * @return Whether the world renders with the GPU backend
+ */
+bool box_render_gpu_shadow_core(
+    ecs_world_t *world,
+    bool core);
 
 /** Set when the GPU backend of a world publishes cull counters, for tests.
  *
@@ -1924,6 +1964,49 @@ void box_render_shadow_spot(
     const box_render_shadow_place_t *place,
     int32_t resolution,
     box_render_shadow_record_t *out);
+
+/** Get the near plane of the shadow tile of a spot or a point light.
+ *
+ * @param range Range of the light
+ * @return max(BOX_RENDER_SHADOW_NEAR_FRACTION range, BOX_RENDER_SHADOW_NEAR_MIN)
+ */
+float box_render_shadow_near(
+    float range);
+
+/** Get the far plane of the shadow tile of a spot or a point light.
+ *
+ * @param range Range of the light
+ * @return max(range, 2 near)
+ */
+float box_render_shadow_far(
+    float range);
+
+/** Write the tile record of a point light: the octahedral projection of the sphere around it,
+ * from near to far of its range (box_render_shadow_near, box_render_shadow_far). The world size
+ * of a texel per unit of distance along an octant axis is 2 sqrt(6) over the edge of the tile.
+ *
+ * @param position World position of the light
+ * @param range Range of the light
+ * @param place The tile, with a size
+ * @param resolution Edge of the atlas in texels
+ * @param out Receives the record
+ */
+void box_render_shadow_point(
+    const float *position,
+    float range,
+    const box_render_shadow_place_t *place,
+    int32_t resolution,
+    box_render_shadow_record_t *out);
+
+/** Write the 6 world planes of the box around the sphere a point light tile culls its casters
+ * by, inside where non negative, normalized.
+ *
+ * @param tile The tile, octahedral
+ * @param out Receives the planes
+ */
+void box_render_shadow_point_planes(
+    const box_render_shadow_tile_t *tile,
+    vec4 *out);
 
 /** Get the shadow atlas of a scene as the light extract of this frame left it.
  *

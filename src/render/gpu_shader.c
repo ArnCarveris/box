@@ -514,6 +514,10 @@ void box_gpu_shader_apply(
         goto done;
     }
 
+    if (handle == BOX_RENDER_SHADER_SHADOW_CLIP && !gpu->clip_distances) {
+        goto done;
+    }
+
     const char *code = (const char*)(desc + 1);
     box_gpu_shader_compile(gpu, code, code + desc->code_size, handle, desc->revision);
 done:

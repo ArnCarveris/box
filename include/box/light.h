@@ -57,11 +57,23 @@ ECS_STRUCT(DirectionalLight, {
 /** Omnidirectional light. Intensity is the irradiance on a facing surface 1 unit away: at
  * distance d (from 0.01 up) it is intensity / d^2, windowed by (1 - (d / range)^4)^2 so the light
  * reaches zero at range, and a white diffuse surface reflects that over pi.
+ *
+ * A light with shadows gets a square tile of the ShadowAtlas of its scene while a view of the
+ * scene that renders shadows (ShadowSettings.enabled) sees its range, as a spot light does.
+ *
+ * The tile holds the whole sphere around the light as an octahedron unfolded into the square, 8
+ * perspective octants from 0.005 range (at least 0.001) to range; casters beyond it cast none.
  */
 ECS_STRUCT(PointLight, {
     float intensity;    /**< Irradiance on a facing surface 1 unit away, default 1, 0 none */
     float range;        /**< Distance at which the light reaches zero, default 10 */
     LightBakeMode bake; /**< Part of the light in the bake of its scene, default Mixed */
+    bool shadows;       /**< The light casts shadows in the views of its scene that render
+                         *   them, default false; a Baked light has no realtime light and casts
+                         *   none */
+    int32_t shadow_resolution; /**< Edge of its tile in texels, rounded down to a power of two
+                         *   and clamped to ShadowAtlas min_tile and resolution, default 512;
+                         *   a light shrinks below it when the atlas is full */
 });
 
 /** Cone light along the entity's local +Z, angles are half angles in degrees.
@@ -98,8 +110,9 @@ ECS_STRUCT(AmbientLight, {
     float intensity; /**< Scale of both colors, default 1 */
 });
 
-/** The depth atlas the shadow casting spot lights of a scene render their tiles into, placed on
- * a Scene root or as a singleton for the default scene; a scene without one uses the defaults.
+/** The depth atlas the shadow casting spot and point lights of a scene render their tiles into,
+ * one tile per light, placed on a Scene root or as a singleton for the default scene; a scene
+ * without one uses the defaults.
  *
  * Lights get power of two tiles nearest to the cameras first: the largest that fits in the area
  * still free up to its shadow_resolution, at least min_tile, else none and it stays unshadowed.
@@ -253,8 +266,8 @@ ECS_STRUCT(EnvironmentImage, {
 /** Register the box.light module.
  *
  * The first directional light of a scene casts the shadows of the views that enable them, and
- * so do its spot lights with SpotLight.shadows through the tiles of its ShadowAtlas; NoShadow
- * shapes and blended shapes cast none. Point lights cast no shadows.
+ * so do its spot and point lights with shadows through the tiles of its ShadowAtlas; NoShadow
+ * shapes and blended shapes cast none.
  *
  * In a scene with LightBake the views are shadowed by the first directional light that is not
  * Baked and the probe captures by the first one they shade surfaces with (see LightBakeMode).

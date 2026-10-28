@@ -6,8 +6,8 @@
 // every cluster, then the index list: a cluster lists cluster_lights(count) light indices from
 // its offset, followed by cluster_probes(count) indices into the reflection probe buffer of the
 // scene in blend order, at most CLUSTER_PROBES. The shadow members describe the cascaded shadow map of the first directional light,
-// see shadow.wgsl; the spot members the spot light tiles of the shadow atlas, see
-// spot_shadow.wgsl.
+// see shadow.wgsl; the spot members the spot and point light tiles of the shadow atlas, see
+// spot_shadow.wgsl and point_shadow.wgsl.
 #pragma once
 
 struct View {
@@ -57,8 +57,8 @@ struct View {
     spot_bias: vec4f,
 };
 
-// shadow is the index of the tile record of a spot light in the shadow atlas of the scene,
-// 0xFFFFFFFF for none.
+// shadow is the index of the tile record of a spot or point light in the shadow atlas of the
+// scene, 0xFFFFFFFF for none.
 struct Light {
     position: vec3f,
     range: f32,

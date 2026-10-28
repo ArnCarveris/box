@@ -782,7 +782,11 @@ void box_gpu_cull_casters_add(
         f->index = -1;
         f->flags = BOX_GPU_CULL_CASTERS;
         box_gpu_cull_frustum_all(&f->frustum);
-        box_gpu_cull_planes(ECS_CONST_CAST(vec4*, tiles[i].matrix), f->frustum.planes);
+        if (tiles[i].projection == BOX_RENDER_SHADOW_OCTAHEDRAL) {
+            box_render_shadow_point_planes(&tiles[i], f->frustum.planes);
+        } else {
+            box_gpu_cull_planes(ECS_CONST_CAST(vec4*, tiles[i].matrix), f->frustum.planes);
+        }
     }
 
     if (count) {
