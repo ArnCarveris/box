@@ -1589,7 +1589,7 @@ void Material_instance_override_keeps_prefab_roughness(void) {
 
     unsigned char *px = prefab_render(world, "prefab_override.png");
     unsigned char *a = &px[(16 * 64 + 25) * 4];
-    unsigned char *b = &px[(16 * 64 + 38) * 4];
+    unsigned char *b = &px[(16 * 64 + 39) * 4];
     unsigned char *shared = &px[(16 * 64 + 11) * 4];
     test_assert(prefab_near(a, b[0], b[1], b[2], 4));
     test_assert(shared[0] > shared[1] + 20);
@@ -1599,7 +1599,7 @@ void Material_instance_override_keeps_prefab_roughness(void) {
     ecs_set(world, reference, PbrMaterial, {.metallic = 0, .roughness = 1});
     px = prefab_render(world, "prefab_override_rough.png");
     a = &px[(16 * 64 + 25) * 4];
-    b = &px[(16 * 64 + 38) * 4];
+    b = &px[(16 * 64 + 39) * 4];
     test_assert(a[1] > a[0] + 20);
     test_assert(prefab_near(a, b[0], b[1], b[2], 4));
 
@@ -1667,6 +1667,35 @@ void Material_light_prefab_inherits_color(void) {
     near_ = &px[(16 * 64 + 20) * 4];
     test_assert(near_[0] < 8);
     test_assert(near_[1] > 200);
+
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+void Material_table_growth_keeps_instances(void) {
+    // materials/material_ids
+    ecs_world_t *world = prefab_world(false);
+    ecs_entity_t red = ecs_new_w_id(world, EcsPrefab);
+    ecs_set(world, red, Box, {1.2f, 1.2f, 0.1f});
+    ecs_set(world, red, Rgb, {255, 0, 0});
+    prefab_instance(world, red, -1.5f);
+    unsigned char *px = prefab_render(world, "prefab_small_table.png");
+    test_assert(prefab_near(&px[(16 * 64 + 25) * 4], 255, 0, 0, 2));
+    stbi_image_free(px);
+
+    ecs_entity_t prefab = 0;
+    int32_t i;
+    for (i = 0; i < 100; i ++) {
+        prefab = ecs_new_w_id(world, EcsPrefab);
+        ecs_set(world, prefab, Box, {1.2f, 1.2f, 0.1f});
+        ecs_set(world, prefab, Rgb, {0, (uint8_t)(i * 2), 255});
+    }
+
+    prefab_instance(world, prefab, 1.5f);
+    px = prefab_render(world, "prefab_grown_table.png");
+    test_assert(ecs_get(world, prefab, MaterialId)->value >= BOX_RENDER_MATERIALS_MIN);
+    test_assert(prefab_near(&px[(16 * 64 + 25) * 4], 255, 0, 0, 2));
+    test_assert(prefab_near(&px[(16 * 64 + 39) * 4], 0, 198, 255, 2));
 
     stbi_image_free(px);
     ecs_fini(world);

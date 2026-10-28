@@ -260,7 +260,8 @@
                     "tinted_instance_keeps_prefab_id",
                     "lights_2d_texts_get_no_slot",
                     "dynamic_material_own_slot_repacks",
-                    "dynamic_material_instance_uploads_shading"
+                    "dynamic_material_instance_uploads_shading",
+                    "table_grows"
                 ]
             },
             {

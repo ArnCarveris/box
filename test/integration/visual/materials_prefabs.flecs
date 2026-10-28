@@ -1,31 +1,25 @@
-// Material prefabs and their material ids, one column per case, left to right:
+// Material prefabs and their material ids, one column per case, left to right, front to back:
 // - shared: three instances of one material prefab, which render with its slot;
 // - override: instances that set their own Rgb, Emissive or PbrMaterial and keep the fields
 //   they do not set from the prefab;
 // - nested: a prefab of the prefab that sets its own emission and keeps the color, and one that
 //   sets nothing and shares the slot of its base;
-// - tinted: instances with their own Tint and below a tinted parent, next to an entity that
-//   owns the same material and Tint.
+// - tinted: an instance with its own Tint, one below a tinted parent and an entity that owns the
+//   same material and Tint, which all look the same.
 using box.transform
 using box.geometry
 using box.material
 using box.camera
 using box.view
-using box.light
 
 camera {
-  Position: {0, 3.4, 10}
-  Rotation: {-0.3, 0, 0}
+  Position: {0, 7.5, 8}
+  Rotation: {-0.75, 0, 0}
   Camera: {fov: 50}
 }
 
 main_view {
   View: {camera: camera, clear: {enabled: true, color: {30, 34, 44, 255}}}
-}
-
-sun {
-  Rotation: {-0.9, 0.5, 0}
-  DirectionalLight: {intensity: 3}
 }
 
 floor {
@@ -34,65 +28,65 @@ floor {
   Rgb: {200, 200, 205}
 }
 
-prefab Copper {
-  Sphere: {segments: 32, smooth: true, radius: 0.5}
+prefab Clay {
+  Sphere: {segments: 32, smooth: true, radius: 0.6}
   Rgb: {225, 140, 80}
-  PbrMaterial: {metallic: 1, roughness: 0.3}
+  PbrMaterial: {metallic: 0, roughness: 0.35}
 }
 
-prefab Glowing : Copper {
+prefab Glowing : Clay {
   Emissive: {strength: 2, color: {255, 60, 20}}
 }
 
-prefab Plain : Copper {
+prefab Plain : Clay {
 }
 
 shared {
   Position: {-5.4, 0, 0}
-  a : Copper { Position: {0, 0.5, 1.5} }
-  b : Copper { Position: {0, 0.5, 0} }
-  c : Copper { Position: {0, 0.5, -1.5} }
+  a : Clay { Position: {0, 0.6, 1.8} }
+  b : Clay { Position: {0, 0.6, 0} }
+  c : Clay { Position: {0, 0.6, -1.8} }
 }
 
 override {
   Position: {-1.8, 0, 0}
-  green : Copper {
-    Position: {0, 0.5, 1.5}
+  green : Clay {
+    Position: {0, 0.6, 1.8}
     Rgb: {60, 200, 90}
   }
-  glow : Copper {
-    Position: {0, 0.5, 0}
+  glow : Clay {
+    Position: {0, 0.6, 0}
     Emissive: {strength: 1.5, color: {40, 120, 255}}
   }
-  matte : Copper {
-    Position: {0, 0.5, -1.5}
-    PbrMaterial: {metallic: 0, roughness: 1}
+  metal : Clay {
+    Position: {0, 0.6, -1.8}
+    PbrMaterial: {metallic: 1, roughness: 0.3}
   }
 }
 
 nested {
   Position: {1.8, 0, 0}
-  a : Glowing { Position: {0, 0.5, 1.5} }
-  b : Glowing { Position: {0, 0.5, 0} }
-  c : Plain { Position: {0, 0.5, -1.5} }
+  a : Glowing { Position: {0, 0.6, 1.8} }
+  b : Glowing { Position: {0, 0.6, 0} }
+  c : Plain { Position: {0, 0.6, -1.8} }
 }
 
 tinted {
   Position: {5.4, 0, 0}
-  own : Copper {
-    Position: {0, 0.5, 1.5}
+  own : Clay {
+    Position: {0, 0.6, 1.8}
     Tint: {r: 40, g: 80, b: 255, a: 128}
   }
   parent {
     Position: {0, 0, 0}
     Tint: {r: 40, g: 80, b: 255, a: 128}
-    child : Copper { Position: {0, 0.5, 0} }
+    child : Clay { Position: {0, 0.6, 0} }
   }
   owner {
-    Position: {0, 0.5, -1.5}
-    Sphere: {segments: 32, smooth: true, radius: 0.5}
+    Position: {0, 0.6, -1.8}
+    Sphere: {segments: 32, smooth: true, radius: 0.6}
     Rgb: {225, 140, 80}
-    PbrMaterial: {metallic: 1, roughness: 0.3}
+    PbrMaterial: {metallic: 0, roughness: 0.35}
     Tint: {r: 40, g: 80, b: 255, a: 128}
   }
 }

@@ -636,3 +636,65 @@ void MaterialIds_dynamic_material_instance_uploads_shading(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+/** Get the size the last packet created the material table with.
+ *
+ * @param null The backend
+ * @return The bytes of the buffer, 0 when the packet did not create it
+ */
+static uint64_t table_created(
+    box_render_null_t *null)
+{
+    uint64_t result = 0;
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&null->last.resources); i ++) {
+        const box_render_resource_t *r = ecs_vec_get_t(
+            &null->last.resources, box_render_resource_t, i);
+        if (r->kind == BOX_RENDER_BUFFER && r->op == BOX_RENDER_CREATE &&
+            r->handle == BOX_RENDER_BUFFER_MATERIALS)
+        {
+            result = ((const box_render_buffer_desc_t*)box_render_packet_data(
+                &null->last, r->data))->size;
+        }
+    }
+
+    return result;
+}
+
+void MaterialIds_table_grows(void) {
+    // materials/material_ids
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t prefab = prefab_new(world);
+    ecs_set(world, prefab, Rgb, {200, 100, 50});
+    instance_new(world, prefab, 0);
+    box_render_draws_stats_t stats = frame(world);
+    test_int(table_created(null), BOX_RENDER_MATERIALS_MIN * MATERIAL);
+    test_int(stats.material_bytes, 2 * MATERIAL);
+
+    int32_t i;
+    for (i = 0; i < 62; i ++) {
+        ecs_set(world, ecs_new_w_id(world, EcsPrefab), Rgb, {(uint8_t)i, 0, 0});
+    }
+
+    stats = frame(world);
+    test_int(stats.materials, 64);
+    test_int(table_created(null), 0);
+    test_int(stats.material_bytes, 62 * MATERIAL);
+
+    ecs_entity_t last = ecs_new_w_id(world, EcsPrefab);
+    ecs_set(world, last, Rgb, {1, 2, 3});
+    stats = frame(world);
+    test_int(stats.materials, 65);
+    test_int(table_created(null), 2 * BOX_RENDER_MATERIALS_MIN * MATERIAL);
+    test_int(stats.material_bytes, 65 * MATERIAL);
+    test_uint(id_of(world, last), 64);
+    test_uint(record_of(world, 64)->color, color_word(1, 2, 3));
+
+    stats = frame(world);
+    test_int(table_created(null), 0);
+    test_int(stats.material_bytes, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}

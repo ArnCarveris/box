@@ -202,7 +202,8 @@
                     "prefab_color_reaches_instances",
                     "instance_override_keeps_prefab_roughness",
                     "tinted_instance_matches_owner",
-                    "light_prefab_inherits_color"
+                    "light_prefab_inherits_color",
+                    "table_growth_keeps_instances"
                 ]
             },
             {

@@ -112,9 +112,8 @@
 /** Buffers of an instance page, one per stream, at consecutive handles */
 #define BOX_RENDER_INSTANCE_STREAMS (3)
 
-/** Buffer handle of the first instance page of the 2D shapes and glyphs, whose shading stream
- * holds box_render_shading_t; the pages from BOX_RENDER_BUFFER_FIRST hold the meshes, whose
- * shading stream holds box_render_mesh_shading_t. Page p of the 2D pages has the handle
+/** Buffer handle of the first instance page of the 2D shapes and glyphs; the pages from
+ * BOX_RENDER_BUFFER_FIRST hold the meshes. Page p of the 2D pages has the handle
  * BOX_RENDER_BUFFER_FIRST_2D + p * BOX_RENDER_INSTANCE_STREAMS + s for stream s. */
 #define BOX_RENDER_BUFFER_FIRST_2D \
     (BOX_RENDER_BUFFER_FIRST + BOX_RENDER_INSTANCE_STREAMS * 0x04000000u)
@@ -122,7 +121,8 @@
 /** Stream of the transforms of an instance page, box_render_transform_t per slot */
 #define BOX_RENDER_STREAM_TRANSFORM (0)
 
-/** Stream of the shading constants of an instance page, box_render_shading_t per slot */
+/** Stream of the shading constants of an instance page: box_render_mesh_shading_t per slot of
+ * a mesh page, box_render_shading_t per slot of a 2D page */
 #define BOX_RENDER_STREAM_SHADING (1)
 
 /** Stream of the surface parameters of an instance page, box_render_surface_t per slot */
