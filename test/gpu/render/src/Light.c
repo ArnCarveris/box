@@ -713,6 +713,12 @@ void Light_component_defaults(void) {
     test_flt(spot->range, 10);
     test_flt(spot->inner_angle, 20);
     test_flt(spot->outer_angle, 30);
+    test_bool(spot->shadows, false);
+    test_int(spot->shadow_resolution, 512);
+    ecs_entity_t literal = ecs_new(world);
+    ecs_add(world, literal, SpotLight);
+    test_bool(ecs_get(world, literal, SpotLight)->shadows, false);
+    test_int(ecs_get(world, literal, SpotLight)->shadow_resolution, 512);
     const DirectionalLight *sun = ecs_get(world, ecs_lookup(world, "sun"), DirectionalLight);
     test_assert(sun != NULL);
     test_flt(sun->intensity, 1);

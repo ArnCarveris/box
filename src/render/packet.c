@@ -21,6 +21,8 @@ void box_render_packet_init(
     ecs_vec_init_t(NULL, &p->probes, box_render_probe_capture_t, 0);
     ecs_vec_init_t(NULL, &p->reflections, box_render_reflect_batch_t, 0);
     ecs_vec_init_t(NULL, &p->particles, box_render_particle_pool_t, 0);
+    ecs_vec_init_t(NULL, &p->shadow_atlases, box_render_shadow_atlas_t, 0);
+    ecs_vec_init_t(NULL, &p->shadow_tiles, box_render_shadow_tile_t, 0);
     ecs_vec_init_t(NULL, &p->data, uint8_t, 0);
 }
 
@@ -38,6 +40,8 @@ void box_render_packet_fini(
     ecs_vec_fini_t(NULL, &p->probes, box_render_probe_capture_t);
     ecs_vec_fini_t(NULL, &p->reflections, box_render_reflect_batch_t);
     ecs_vec_fini_t(NULL, &p->particles, box_render_particle_pool_t);
+    ecs_vec_fini_t(NULL, &p->shadow_atlases, box_render_shadow_atlas_t);
+    ecs_vec_fini_t(NULL, &p->shadow_tiles, box_render_shadow_tile_t);
     ecs_vec_fini_t(NULL, &p->data, uint8_t);
 }
 
@@ -64,6 +68,8 @@ void box_render_packet_reset(
     ecs_vec_clear(&p->probes);
     ecs_vec_clear(&p->reflections);
     ecs_vec_clear(&p->particles);
+    ecs_vec_clear(&p->shadow_atlases);
+    ecs_vec_clear(&p->shadow_tiles);
     ecs_vec_clear(&p->data);
     if (capacity > BOX_RENDER_DATA_KEEP && (used <= BOX_RENDER_DATA_KEEP ||
         used < capacity / BOX_RENDER_DATA_TRIM_FILL))
@@ -123,6 +129,10 @@ void box_render_packet_copy(
         ECS_SIZEOF(box_render_reflect_batch_t));
     box_render_vec_copy(&dst->particles, &src->particles,
         ECS_SIZEOF(box_render_particle_pool_t));
+    box_render_vec_copy(&dst->shadow_atlases, &src->shadow_atlases,
+        ECS_SIZEOF(box_render_shadow_atlas_t));
+    box_render_vec_copy(&dst->shadow_tiles, &src->shadow_tiles,
+        ECS_SIZEOF(box_render_shadow_tile_t));
     box_render_vec_copy(&dst->data, &src->data, ECS_SIZEOF(uint8_t));
 }
 

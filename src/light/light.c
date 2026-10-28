@@ -46,7 +46,8 @@ static void box_point_light_ctor(
     }
 }
 
-/** Construct SpotLight values at full intensity with the default range and cone, Mixed.
+/** Construct SpotLight values at full intensity with the default range and cone, Mixed, without
+ * shadows.
  *
  * @param ptr The components
  * @param count Number of components
@@ -63,7 +64,7 @@ static void box_spot_light_ctor(
     for (i = 0; i < count; i ++) {
         values[i] = (SpotLight){
             .intensity = 1.0f, .range = 10.0f, .inner_angle = 20.0f, .outer_angle = 30.0f,
-            .bake = LightBakeModeMixed
+            .bake = LightBakeModeMixed, .shadows = false, .shadow_resolution = 512
         };
     }
 }
@@ -86,6 +87,25 @@ static void box_ambient_light_ctor(
         values[i] = (AmbientLight){
             .sky = {118, 130, 149}, .ground = {79, 74, 68}, .intensity = 1.0f
         };
+    }
+}
+
+/** Construct ShadowAtlas values with the default resolution and smallest tile.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_shadow_atlas_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    ShadowAtlas *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (ShadowAtlas){ .resolution = 2048, .min_tile = 64 };
     }
 }
 
@@ -280,6 +300,8 @@ void BoxLightImport(
     ecs_set_hooks(world, PointLight, { .ctor = box_point_light_ctor });
     ecs_set_hooks(world, SpotLight, { .ctor = box_spot_light_ctor });
     ecs_set_hooks(world, AmbientLight, { .ctor = box_ambient_light_ctor });
+    ECS_META_COMPONENT(world, ShadowAtlas);
+    ecs_set_hooks(world, ShadowAtlas, { .ctor = box_shadow_atlas_ctor });
     ECS_META_COMPONENT(world, LightBake);
     box_owned_hooks(world, LightBake, BOX_OWNED_STR(LightBake, cache));
     ecs_set_hooks(world, LightBake, { .ctor = box_light_bake_ctor });

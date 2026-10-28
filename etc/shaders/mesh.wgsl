@@ -1,5 +1,7 @@
 // Forward pass: draws shape meshes with a physically based surface, a GGX distribution with
-// height correlated Smith visibility and Schlick Fresnel, lit by the lights of the scene.
+// height correlated Smith visibility and Schlick Fresnel, lit by the lights of the scene; the
+// first directional light is shadowed by its cascades, a spot light with a tile by the shadow
+// atlas of the scene (spot_shadow.wgsl).
 // Instance normals use the cofactor matrix of the model rotation, the inverse transpose up to
 // a scale, so non-uniform scale keeps them perpendicular. Texture layers (group 1) are sampled
 // with the instance UV transform; the normal map uses a tangent frame from screen derivatives.
@@ -29,6 +31,7 @@
 #include "include/material.wgsl"
 #include "include/lights.wgsl"
 #include "include/shadow.wgsl"
+#include "include/spot_shadow.wgsl"
 
 // BlendMode of the pipeline: the output is shaped for the blend equation it is drawn with.
 override blend_mode: u32 = 0u;
@@ -715,7 +718,7 @@ fn attenuation(light: Light, l: vec3f, dist: f32) -> f32 {
 
 // Light inputs. Every direct light the forward pass uses comes from here: the directional
 // lights of the scene, the first one through its shadow map, then the point and spot lights
-// of the cluster of the fragment.
+// of the cluster of the fragment, a spot light with a tile of the shadow atlas through it.
 fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32) -> vec3f {
     var sum = vec3f(0.0);
     let shadow = shadow_factor(world, s.geometric);
@@ -733,7 +736,12 @@ fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32) -> vec3f {
             let delta = light.position - world;
             let dist = length(delta);
             let l = delta / max(dist, 1e-4);
-            sum += brdf(s, v, l, light.color * attenuation(light, l, dist));
+            var visible = 1.0;
+            if (light.shadow < view.spot_config.x) {
+                visible = spot_shadow(light, world, s.geometric);
+            }
+
+            sum += brdf(s, v, l, light.color * attenuation(light, l, dist)) * visible;
         }
     }
 

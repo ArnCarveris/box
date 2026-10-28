@@ -53,7 +53,7 @@ static WGPUBuffer box_gpu_buffer_new(
 void box_gpu_draw_init(
     box_gpu_t *gpu)
 {
-    WGPUBindGroupLayoutEntry entries[15] = {
+    WGPUBindGroupLayoutEntry entries[17] = {
         {
             .binding = 0,
             .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
@@ -150,9 +150,25 @@ void box_gpu_draw_init(
                 .sampleType = WGPUTextureSampleType_UnfilterableFloat,
                 .viewDimension = WGPUTextureViewDimension_2D
             }
+        },
+        {
+            .binding = 15,
+            .visibility = WGPUShaderStage_Fragment,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Depth,
+                .viewDimension = WGPUTextureViewDimension_2D
+            }
+        },
+        {
+            .binding = 16,
+            .visibility = WGPUShaderStage_Fragment,
+            .buffer = {
+                .type = WGPUBufferBindingType_Uniform,
+                .minBindingSize = BOX_GPU_ATLAS_TILES_SIZE
+            }
         }
     };
-    WGPUBindGroupLayoutDescriptor layout = { .entryCount = 15, .entries = entries };
+    WGPUBindGroupLayoutDescriptor layout = { .entryCount = 17, .entries = entries };
     box_gpu_cull_init(gpu);
     box_gpu_volume_init(gpu);
     box_gpu_reflect_init(gpu);
@@ -670,6 +686,10 @@ void box_gpu_buffer_apply(
 
     if (desc->usage & BOX_RENDER_BUFFER_STORAGE) {
         usage |= WGPUBufferUsage_Storage | WGPUBufferUsage_CopySrc;
+    }
+
+    if (desc->usage & BOX_RENDER_BUFFER_UNIFORM) {
+        usage |= WGPUBufferUsage_Uniform;
     }
 
     b = ecs_os_calloc_t(box_gpu_buffer_t);
@@ -1253,6 +1273,7 @@ static int32_t box_gpu_view_write(
         u->viewport[3] = 1.0f / (float)(t->desc.render_height > 0 ? t->desc.render_height : 1);
         box_gpu_light_uniforms(gpu, v, proj, u);
         box_gpu_shadow_uniforms(gpu, v, proj, result, u);
+        box_gpu_atlas_uniforms(gpu, v, u);
         box_gpu_atmosphere_uniforms(gpu, v, u);
         box_gpu_environment_uniforms(gpu, v, u);
         box_gpu_cull_add(gpu, t, packet, i, result, proj, u);

@@ -1,14 +1,12 @@
 /**
  * @file render/gpu_shadow.c
- * @brief Cascaded shadow maps of the webgpu backend.
+ * @brief Cascaded shadow maps and spot light shadow atlases of the webgpu backend.
  *
- * Before a view with shadows draws, the opaque casters the cull pass kept in each cascade render
- * with etc/shaders/shadow.wgsl into that cascade of the shared shadow map, depth only, reversed
- * Z; alpha tested casters discard below their cutoff there, so their shadows have the holes.
+ * The opaque casters the cull pass kept render with etc/shaders/shadow.wgsl, depth only and
+ * reversed Z, into each cascade before its view draws and into each atlas tile once per packet
+ * before the targets; alpha tested casters discard below their cutoff, so shadows have holes.
+ *
  * Probe captures use a map of their own with one cascade around the static bounds of the scene.
- *
- * The forward pass samples the map with etc/shaders/include/shadow.wgsl: the first cascade
- * whose box, shrunk by the reach of the filter and the normal offset, contains a position.
  */
 
 #include "gpu.h"
@@ -74,7 +72,40 @@ void box_gpu_shadow_init(
     gpu->shadow_sampler = wgpuDeviceCreateSampler(gpu->device, &sampler);
     gpu->shadow_empty = wgpuDeviceCreateTexture(gpu->device, &empty);
     gpu->shadow_empty_view = wgpuTextureCreateView(gpu->shadow_empty, &view);
+    gpu->no_atlas = wgpuDeviceCreateTexture(gpu->device, &empty);
+    gpu->no_atlas_view = wgpuTextureCreateView(gpu->no_atlas, &(WGPUTextureViewDescriptor){
+        .format = BOX_GPU_SHADOW_FORMAT,
+        .dimension = WGPUTextureViewDimension_2D,
+        .mipLevelCount = 1,
+        .arrayLayerCount = 1,
+        .aspect = WGPUTextureAspect_DepthOnly
+    });
+    gpu->no_tiles = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
+        .usage = WGPUBufferUsage_Uniform,
+        .size = BOX_GPU_ATLAS_TILES_SIZE
+    });
     ecs_vec_init_t(NULL, &gpu->shadow_data, uint8_t, 0);
+    ecs_vec_init_t(NULL, &gpu->atlas_data, uint8_t, 0);
+    ecs_vec_init_t(NULL, &gpu->atlas_reads, box_gpu_atlas_read_t, 0);
+    ecs_map_init(&gpu->atlases, NULL);
+}
+
+/** Release a shadow atlas and its view.
+ *
+ * @param a The atlas
+ */
+static void box_gpu_atlas_free(
+    box_gpu_atlas_t *a)
+{
+    if (a->view) {
+        wgpuTextureViewRelease(a->view);
+    }
+
+    if (a->texture) {
+        wgpuTextureRelease(a->texture);
+    }
+
+    ecs_os_free(a);
 }
 
 /** Release the shadow map and the views of its cascades.
@@ -142,9 +173,44 @@ static void box_gpu_shadow_capture_free(
 void box_gpu_shadow_fini(
     box_gpu_t *gpu)
 {
+    ecs_map_iter_t it = ecs_map_iter(&gpu->atlases);
+    while (ecs_map_next(&it)) {
+        box_gpu_atlas_free(ecs_map_ptr(&it));
+    }
+
+    ecs_map_fini(&gpu->atlases);
     box_gpu_shadow_map_free(gpu);
     box_gpu_shadow_capture_free(gpu);
     ecs_vec_fini_t(NULL, &gpu->shadow_data, uint8_t);
+    ecs_vec_fini_t(NULL, &gpu->atlas_data, uint8_t);
+    ecs_vec_fini_t(NULL, &gpu->atlas_reads, box_gpu_atlas_read_t);
+    if (gpu->atlas_counts) {
+        wgpuBufferRelease(gpu->atlas_counts);
+        gpu->atlas_counts = NULL;
+        gpu->atlas_counts_size = 0;
+    }
+
+    if (gpu->atlas_buffer) {
+        wgpuBufferRelease(gpu->atlas_buffer);
+        gpu->atlas_buffer = NULL;
+        gpu->atlas_capacity = 0;
+    }
+
+    if (gpu->no_tiles) {
+        wgpuBufferRelease(gpu->no_tiles);
+        gpu->no_tiles = NULL;
+    }
+
+    if (gpu->no_atlas_view) {
+        wgpuTextureViewRelease(gpu->no_atlas_view);
+        gpu->no_atlas_view = NULL;
+    }
+
+    if (gpu->no_atlas) {
+        wgpuTextureRelease(gpu->no_atlas);
+        gpu->no_atlas = NULL;
+    }
+
     if (gpu->shadow) {
         wgpuRenderPipelineRelease(gpu->shadow);
         gpu->shadow = NULL;
@@ -456,21 +522,24 @@ done:
     return;
 }
 
-/** Record the indirect draws of the shadow casters the cull pass kept in a cascade.
+/** Record the indirect draws of the shadow casters the cull pass kept in a cascade or a tile.
  *
  * Plain casters draw with the plain pipeline; alpha tested ones with the alpha tested pipeline
  * and the material group of their batch, whose albedo texture they sample.
  *
  * @param gpu The backend
- * @param pass The shadow pass of the cascade
+ * @param pass The shadow pass of the cascade or the atlas
  * @param packet The packet
- * @param cv The cull view of the cascade
+ * @param cv The cull view of the cascade or the tile
+ * @param counted Whether the draws count in the shadow draws of the stats, false for the
+ * probe captures
  */
 static void box_gpu_shadow_draw(
     box_gpu_t *gpu,
     WGPURenderPassEncoder pass,
     const box_render_packet_t *packet,
-    const box_gpu_cull_view_t *cv)
+    const box_gpu_cull_view_t *cv,
+    bool counted)
 {
     WGPURenderPipeline bound = NULL;
     WGPUBindGroup instances = NULL, material = NULL;
@@ -495,7 +564,9 @@ static void box_gpu_shadow_draw(
             }
         }
 
-        box_gpu_cull_draw(gpu, pass, packet, d, 1, false, cutout, &instances);
+        if (box_gpu_cull_draw(gpu, pass, packet, d, 1, false, cutout, &instances) && counted) {
+            box_gpu_count(gpu, BOX_GPU_STAT_SHADOW_DRAW);
+        }
     }
 }
 
@@ -540,7 +611,7 @@ void box_gpu_shadow_render(
         WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
         wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
         if (cv) {
-            box_gpu_shadow_draw(gpu, pass, packet, cv);
+            box_gpu_shadow_draw(gpu, pass, packet, cv, true);
         }
 
         wgpuRenderPassEncoderEnd(pass);
@@ -682,7 +753,7 @@ WGPUTextureView box_gpu_shadow_capture(
     WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
     wgpuRenderPassEncoderSetBindGroup(pass, 0, gpu->capture_shadow_group, 1, &offset);
     if (cv) {
-        box_gpu_shadow_draw(gpu, pass, packet, cv);
+        box_gpu_shadow_draw(gpu, pass, packet, cv, false);
     }
 
     wgpuRenderPassEncoderEnd(pass);
@@ -707,6 +778,378 @@ WGPUTextureView box_gpu_shadow_binding(
     result = gpu->shadow_map_view;
 done:
     return result;
+}
+
+void box_gpu_atlas_apply(
+    box_gpu_t *gpu,
+    box_render_resource_op_t op,
+    uint32_t handle,
+    const box_render_shadow_atlas_desc_t *desc)
+{
+    box_gpu_atlas_t *a = ecs_map_get_deref(&gpu->atlases, box_gpu_atlas_t, handle);
+    if (a) {
+        ecs_map_remove(&gpu->atlases, handle);
+        box_gpu_atlas_free(a);
+    }
+
+    if (op == BOX_RENDER_DESTROY || !desc || desc->resolution < 1) {
+        goto done;
+    }
+
+    uint32_t res = (uint32_t)desc->resolution;
+    a = ecs_os_calloc_t(box_gpu_atlas_t);
+    a->resolution = desc->resolution;
+    a->texture = wgpuDeviceCreateTexture(gpu->device, &(WGPUTextureDescriptor){
+        .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding,
+        .dimension = WGPUTextureDimension_2D,
+        .size = { res, res, 1 },
+        .format = BOX_GPU_SHADOW_FORMAT,
+        .mipLevelCount = 1,
+        .sampleCount = 1
+    });
+    a->view = wgpuTextureCreateView(a->texture, &(WGPUTextureViewDescriptor){
+        .format = BOX_GPU_SHADOW_FORMAT,
+        .dimension = WGPUTextureViewDimension_2D,
+        .mipLevelCount = 1,
+        .arrayLayerCount = 1,
+        .aspect = WGPUTextureAspect_DepthOnly
+    });
+    ecs_map_insert_ptr(&gpu->atlases, handle, a);
+done:
+    return;
+}
+
+const box_gpu_atlas_t* box_gpu_atlas_of(
+    box_gpu_t *gpu,
+    const box_render_view_t *v,
+    WGPUBuffer *tiles)
+{
+    const box_gpu_atlas_t *result = NULL;
+    box_gpu_buffer_t *b = NULL;
+    *tiles = NULL;
+    if (!v->shadows.spots || !v->shadows.atlas) {
+        goto done;
+    }
+
+    result = ecs_map_get_deref(&gpu->atlases, box_gpu_atlas_t, v->shadows.atlas);
+    b = ecs_map_get_deref(&gpu->buffers, box_gpu_buffer_t, v->shadows.atlas);
+    if (!result || !b || b->size < BOX_GPU_ATLAS_TILES_SIZE ||
+        !(b->usage & BOX_RENDER_BUFFER_UNIFORM))
+    {
+        result = NULL;
+        goto done;
+    }
+
+    *tiles = b->buffer;
+done:
+    return result;
+}
+
+void box_gpu_atlas_uniforms(
+    box_gpu_t *gpu,
+    const box_render_view_t *v,
+    box_gpu_view_uniforms_t *u)
+{
+    const box_render_view_shadows_t *s = &v->shadows;
+    WGPUBuffer tiles;
+    if (!box_gpu_atlas_of(gpu, v, &tiles)) {
+        goto done;
+    }
+
+    u->spot_config[0] = s->tiles < BOX_RENDER_SHADOW_TILES ? s->tiles : BOX_RENDER_SHADOW_TILES;
+    u->spot_config[1] = (uint32_t)(s->filter_size > 0 ? s->filter_size : 1);
+    u->spot_bias[0] = s->depth_bias;
+    u->spot_bias[1] = s->normal_offset;
+done:
+    return;
+}
+
+/** Make the matrix buffer of the atlas tiles hold the matrices of a packet and write them.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+static void box_gpu_atlas_matrices(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet)
+{
+    int32_t i, count = ecs_vec_count(&packet->shadow_tiles);
+    int32_t capacity = gpu->atlas_capacity ? gpu->atlas_capacity : BOX_RENDER_SHADOW_TILES;
+    ecs_vec_set_count_t(NULL, &gpu->atlas_data, uint8_t, count * BOX_GPU_CASCADE_STRIDE);
+    for (i = 0; i < count; i ++) {
+        const box_render_shadow_tile_t *tile = ecs_vec_get_t(
+            &packet->shadow_tiles, box_render_shadow_tile_t, i);
+        ecs_os_memcpy(ecs_vec_get_t(&gpu->atlas_data, uint8_t, i * BOX_GPU_CASCADE_STRIDE),
+            tile->matrix, sizeof(mat4));
+    }
+
+    if (!gpu->atlas_buffer || count > gpu->atlas_capacity) {
+        while (capacity < count) {
+            capacity *= 2;
+        }
+
+        if (gpu->atlas_buffer) {
+            wgpuBufferRelease(gpu->atlas_buffer);
+        }
+
+        gpu->atlas_capacity = capacity;
+        gpu->atlas_buffer = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
+            .usage = WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst,
+            .size = (uint64_t)capacity * BOX_GPU_CASCADE_STRIDE
+        });
+    }
+
+    wgpuQueueWriteBuffer(gpu->queue, gpu->atlas_buffer, 0, ecs_vec_first(&gpu->atlas_data),
+        (size_t)count * BOX_GPU_CASCADE_STRIDE);
+}
+
+/** Get the backend atlas a packet atlas renders into.
+ *
+ * @param gpu The backend
+ * @param a The atlas of the packet
+ * @return The atlas, NULL when the backend lacks it at the resolution of the packet
+ */
+static const box_gpu_atlas_t* box_gpu_atlas_target(
+    box_gpu_t *gpu,
+    const box_render_shadow_atlas_t *a)
+{
+    const box_gpu_atlas_t *result = ecs_map_get_deref(&gpu->atlases, box_gpu_atlas_t, a->handle);
+
+    return result && result->resolution == a->resolution ? result : NULL;
+}
+
+/** Record the render pass that clears an atlas and draws the casters of each of its tiles,
+ * within the viewport of the tile.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder
+ * @param packet The packet
+ * @param index Index of the atlas in the packet, the slot of the cull views of its tiles
+ * @param group Binds the matrix buffer of the tiles
+ */
+static void box_gpu_atlas_pass(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    const box_render_packet_t *packet,
+    int32_t index,
+    WGPUBindGroup group)
+{
+    const box_render_shadow_atlas_t *a = ecs_vec_get_t(
+        &packet->shadow_atlases, box_render_shadow_atlas_t, index);
+    const box_gpu_atlas_t *atlas = box_gpu_atlas_target(gpu, a);
+    int32_t i;
+    if (!atlas) {
+        goto done;
+    }
+
+    WGPURenderPassDepthStencilAttachment depth = {
+        .view = atlas->view,
+        .depthLoadOp = WGPULoadOp_Clear,
+        .depthStoreOp = WGPUStoreOp_Store,
+        .depthClearValue = 0.0f
+    };
+    WGPURenderPassDescriptor desc = { .depthStencilAttachment = &depth };
+    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+    for (i = 0; i < a->count; i ++) {
+        const box_render_shadow_tile_t *tile = ecs_vec_get_t(
+            &packet->shadow_tiles, box_render_shadow_tile_t, a->first + i);
+        const box_gpu_cull_view_t *cv = box_gpu_cull_view(gpu, index, i);
+        uint32_t offset = (uint32_t)((a->first + i) * BOX_GPU_CASCADE_STRIDE);
+        if (tile->size < 1 || tile->x < 0 || tile->y < 0 ||
+            tile->x + tile->size > atlas->resolution || tile->y + tile->size > atlas->resolution)
+        {
+            continue;
+        }
+
+        wgpuRenderPassEncoderSetViewport(pass, (float)tile->x, (float)tile->y,
+            (float)tile->size, (float)tile->size, 0.0f, 1.0f);
+        wgpuRenderPassEncoderSetScissorRect(pass, (uint32_t)tile->x, (uint32_t)tile->y,
+            (uint32_t)tile->size, (uint32_t)tile->size);
+        wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
+        if (cv) {
+            box_gpu_shadow_draw(gpu, pass, packet, cv, true);
+        }
+
+        box_gpu_count(gpu, BOX_GPU_STAT_SHADOW_TILE);
+    }
+
+    wgpuRenderPassEncoderEnd(pass);
+    wgpuRenderPassEncoderRelease(pass);
+done:
+    return;
+}
+
+/** Copy the draw arguments the cull of the tiles wrote and remember the draws of each tile, so
+ * box_render_gpu_cull_tile can read what each tile kept.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder, after the cull dispatches
+ * @param packet The packet
+ */
+static void box_gpu_atlas_counts(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    const box_render_packet_t *packet)
+{
+    box_gpu_cull_t *c = &gpu->cull;
+    uint64_t size = (uint64_t)ecs_vec_count(&c->arg_data) * sizeof(uint32_t);
+    int32_t i, j, d;
+    ecs_vec_clear(&gpu->atlas_reads);
+    if (!size || !c->args) {
+        goto done;
+    }
+
+    for (i = 0; i < ecs_vec_count(&packet->shadow_atlases); i ++) {
+        const box_render_shadow_atlas_t *a = ecs_vec_get_t(
+            &packet->shadow_atlases, box_render_shadow_atlas_t, i);
+        for (j = 0; j < a->count; j ++) {
+            const box_gpu_cull_view_t *cv = box_gpu_cull_view(gpu, i, j);
+            for (d = 0; cv && d < cv->draw_count; d ++) {
+                const box_gpu_cull_draw_t *draw = ecs_vec_get_t(
+                    &c->draws, box_gpu_cull_draw_t, cv->first_draw + d);
+                *ecs_vec_append_t(NULL, &gpu->atlas_reads, box_gpu_atlas_read_t) =
+                    (box_gpu_atlas_read_t){ a->first + j, draw->args, draw->count };
+            }
+        }
+    }
+
+    if (!gpu->atlas_counts || gpu->atlas_counts_size < size) {
+        if (gpu->atlas_counts) {
+            wgpuBufferRelease(gpu->atlas_counts);
+        }
+
+        gpu->atlas_counts = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
+            .usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_CopySrc,
+            .size = size
+        });
+        gpu->atlas_counts_size = size;
+    }
+
+    wgpuCommandEncoderCopyBufferToBuffer(encoder, c->args, 0, gpu->atlas_counts, 0, size);
+done:
+    return;
+}
+
+void box_gpu_atlas_render(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet)
+{
+    int32_t i, count = ecs_vec_count(&packet->shadow_atlases);
+    WGPURenderPipeline pipeline = NULL;
+    ecs_vec_clear(&gpu->atlas_reads);
+    if (!count || !ecs_vec_count(&packet->shadow_tiles)) {
+        goto done;
+    }
+
+    pipeline = box_gpu_shadow_pipeline(gpu);
+    if (!pipeline) {
+        goto done;
+    }
+
+    box_gpu_atlas_matrices(gpu, packet);
+    box_gpu_cull_reset(gpu);
+    for (i = 0; i < count; i ++) {
+        const box_render_shadow_atlas_t *a = ecs_vec_get_t(
+            &packet->shadow_atlases, box_render_shadow_atlas_t, i);
+        if (box_gpu_atlas_target(gpu, a)) {
+            box_gpu_cull_casters_add(gpu, packet, a->scene, i, ecs_vec_get_t(
+                &packet->shadow_tiles, box_render_shadow_tile_t, a->first), a->count);
+        }
+    }
+
+    box_gpu_cull_upload(gpu);
+    WGPUBindGroupEntry entry = {
+        .binding = 0, .buffer = gpu->atlas_buffer, .size = sizeof(mat4)
+    };
+    WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
+        .layout = gpu->shadow_layout,
+        .entryCount = 1,
+        .entries = &entry
+    });
+    WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
+    box_gpu_cull_record_all(gpu, encoder, NULL);
+    box_gpu_atlas_counts(gpu, encoder, packet);
+    for (i = 0; i < count; i ++) {
+        box_gpu_atlas_pass(gpu, encoder, packet, i, group);
+    }
+
+    WGPUCommandBuffer commands = wgpuCommandEncoderFinish(encoder, NULL);
+    wgpuQueueSubmit(gpu->queue, 1, &commands);
+    wgpuCommandBufferRelease(commands);
+    wgpuCommandEncoderRelease(encoder);
+    wgpuBindGroupRelease(group);
+done:
+    return;
+}
+
+bool box_render_gpu_cull_tile(
+    ecs_world_t *world,
+    int32_t tile,
+    box_render_cull_stats_t *out)
+{
+    bool result = false;
+    box_render_gpu_stats_t stats;
+    ecs_vec_t args = {0};
+    uint32_t words = 0;
+    int32_t i;
+    ecs_os_memset_t(out, 0, box_render_cull_stats_t);
+    if (!box_render_gpu_stats(world, &stats) || !stats.ready) {
+        goto done;
+    }
+
+    box_gpu_t *gpu = box_render_get_backend(world)->ctx;
+    bool renders = ecs_os_thread_self() == gpu->thread;
+    ecs_assert(renders, ECS_INVALID_OPERATION,
+        "box_render_gpu_cull_tile needs RenderSettings.main_thread and box_render_sync");
+    if (!renders || !gpu->atlas_counts) {
+        goto done;
+    }
+
+    for (i = 0; i < ecs_vec_count(&gpu->atlas_reads); i ++) {
+        const box_gpu_atlas_read_t *r = ecs_vec_get_t(&gpu->atlas_reads, box_gpu_atlas_read_t, i);
+        if (r->tile == tile && (r->args + 1) * BOX_GPU_CULL_ARGS > words) {
+            words = (r->args + 1) * BOX_GPU_CULL_ARGS;
+        }
+    }
+
+    if (!words || words * sizeof(uint32_t) > gpu->atlas_counts_size) {
+        goto done;
+    }
+
+    ecs_vec_init_t(NULL, &args, uint32_t, (int32_t)words);
+    ecs_vec_set_count_t(NULL, &args, uint32_t, (int32_t)words);
+    uint32_t *counts = ecs_vec_first(&args);
+    if (!box_gpu_read(gpu, gpu->atlas_counts, 0, words * (uint32_t)sizeof(uint32_t), counts)) {
+        goto done;
+    }
+
+    for (i = 0; i < ecs_vec_count(&gpu->atlas_reads); i ++) {
+        const box_gpu_atlas_read_t *r = ecs_vec_get_t(&gpu->atlas_reads, box_gpu_atlas_read_t, i);
+        if (r->tile == tile) {
+            out->tested += (int32_t)r->count;
+            out->visible += (int32_t)counts[r->args * BOX_GPU_CULL_ARGS + 1];
+            result = true;
+        }
+    }
+
+done:
+    ecs_vec_fini_t(NULL, &args, uint32_t);
+
+    return result;
+}
+
+#else
+
+bool box_render_gpu_cull_tile(
+    ecs_world_t *world,
+    int32_t tile,
+    box_render_cull_stats_t *out)
+{
+    (void)world;
+    (void)tile;
+    ecs_os_memset_t(out, 0, box_render_cull_stats_t);
+
+    return false;
 }
 
 #endif

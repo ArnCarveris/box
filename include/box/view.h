@@ -54,9 +54,14 @@ ECS_STRUCT(LightSettings, {
     ecs_entity_t scene;
 });
 
-/** Shadow settings of a view */
+/** Shadow settings of a view: the cascades of the first directional light of its scene and the
+ * tiles of its shadow casting spot lights (SpotLight.shadows).
+ *
+ * depth_bias, normal_offset and filter_size apply to the spot lights in texels of their tile;
+ * max_distance does not limit them, they reach as far as the range of the light.
+ */
 ECS_STRUCT(ShadowSettings, {
-    bool enabled;        /**< The view renders shadows */
+    bool enabled;        /**< The view renders shadows, those of the spot lights included */
     int32_t cascades;    /**< Cascades of the shadow map, default 4, at most 4 */
     int32_t resolution;  /**< Edge of one cascade in texels, default 2048 */
     float max_distance;  /**< View distance the shadows reach, default 200 */

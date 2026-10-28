@@ -2,9 +2,9 @@
  * @file render/gpu_cull_group.c
  * @brief Cull groups of the webgpu backend: the frustums one pass of the cull shader tests.
  *
- * A group is a scene and up to BOX_GPU_CULL_GROUP_VIEWS frustums (a view and its cascades, or
- * the frustum of probe captures), each a cull view with its own draws; more frustums are split
- * into further groups. A batch several frustums draw is one job with the mask of those frustums.
+ * A group is a scene and up to BOX_GPU_CULL_GROUP_VIEWS frustums (a view and its cascades, the
+ * tiles of a shadow atlas or the probe captures), each a cull view with its own draws; more
+ * are split into further groups. A batch several frustums draw is one job with their mask.
  *
  * Its draws share a page of visible slots, so the scan words of its job are in one buffer.
  * Blended draws are culled in slot order, keeping their back to front sort; only a view has them.
@@ -759,6 +759,36 @@ void box_gpu_cull_add(
 
     box_gpu_cull_groups_add(gpu, packet, v->scene, ecs_vec_first(&c->frustums),
         ecs_vec_count(&c->frustums), &base, history, hiz);
+}
+
+void box_gpu_cull_casters_add(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet,
+    ecs_entity_t scene,
+    int32_t slot,
+    const box_render_shadow_tile_t *tiles,
+    int32_t count)
+{
+    box_gpu_cull_t *c = &gpu->cull;
+    box_gpu_cull_uniforms_t base;
+    int32_t i;
+    ecs_os_memset_t(&base, 0, box_gpu_cull_uniforms_t);
+    ecs_vec_clear(&c->frustums);
+    for (i = 0; i < count; i ++) {
+        box_gpu_cull_desc_t *f = ecs_vec_append_t(NULL, &c->frustums, box_gpu_cull_desc_t);
+        ecs_os_memset_t(f, 0, box_gpu_cull_desc_t);
+        f->slot = slot;
+        f->cascade = i;
+        f->index = -1;
+        f->flags = BOX_GPU_CULL_CASTERS;
+        box_gpu_cull_frustum_all(&f->frustum);
+        box_gpu_cull_planes(ECS_CONST_CAST(vec4*, tiles[i].matrix), f->frustum.planes);
+    }
+
+    if (count) {
+        box_gpu_cull_groups_add(gpu, packet, scene, ecs_vec_first(&c->frustums), count, &base,
+            NULL, NULL);
+    }
 }
 
 void box_gpu_cull_reset(

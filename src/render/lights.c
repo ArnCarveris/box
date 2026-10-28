@@ -8,11 +8,12 @@
  *
  * With LightBake views get the Mixed and Realtime lights, captures the Mixed and Baked ones over
  * a black ambient and the Mixed ones over a pass, while every light is Mixed all share the view
- * list (see box_lights_push); without it every light is realtime.
+ * list (see box_lights_push); shadowed spot lights of the view list get atlas tiles.
  */
 
 #include "bake.h"
 #include "../atmosphere/atmosphere.h"
+#include <float.h>
 #include <math.h>
 
 /** Lights the light buffer of a scene holds at least */
@@ -20,6 +21,10 @@
 
 /** Buffer handle of the shared buffer that holds the default sun */
 #define BOX_LIGHTS_DEFAULT_BUFFER (BOX_RENDER_BUFFER_LIGHT_FIRST)
+
+/** Aspect ratio the frustum of a camera that follows its surface is assumed to have at most
+ * when the lights it sees are picked for shadow tiles, so a light it may see is never left out */
+#define BOX_LIGHTS_SHADOW_ASPECT (4.0f)
 
 /** Direction toward the default sun, in world space */
 static const float box_lights_sun[3] = { 0.35f, 0.8f, 0.5f };
@@ -79,6 +84,26 @@ typedef struct box_light_atmos_t {
     float moon_illumination; /**< Lit fraction of the moon, 0 without a sun or a moon */
 } box_light_atmos_t;
 
+/** A shadow casting spot light of the view list of a scene in this frame */
+typedef struct box_light_spot_t {
+    ecs_entity_t entity;    /**< The light entity */
+    int32_t index;          /**< Index of the light in the view list */
+    int32_t resolution;     /**< SpotLight.shadow_resolution */
+    float outer;            /**< Outer half angle in degrees */
+} box_light_spot_t;
+
+/** The shadow atlas of a scene and what the backend holds of it */
+typedef struct box_light_atlas_t {
+    ShadowAtlas settings;   /**< ShadowAtlas of the scene this frame, resolved */
+    bool found;             /**< The scene has a ShadowAtlas this frame */
+    uint32_t handle;        /**< Handle of the atlas and its tile buffer, 0 while it has none */
+    int32_t resolution;     /**< Edge the backend has the atlas at, 0 when it lacks it */
+    bool buffer;            /**< The backend has the tile buffer */
+    ecs_vec_t records;      /**< box_render_shadow_record_t of this frame */
+    ecs_vec_t tiles;        /**< box_render_shadow_tile_t of this frame, as records */
+    ecs_vec_t sent;         /**< box_render_shadow_record_t the tile buffer holds */
+} box_light_atlas_t;
+
 /** The TimeOfDay of a scene in this frame */
 typedef struct box_light_tod_t {
     ecs_entity_t entity;    /**< Entity with the TimeOfDay, 0 when the scene has none */
@@ -103,6 +128,8 @@ typedef struct box_light_scene_t {
     float sky[3];           /**< Linear ambient light from above, summed */
     float ground[3];        /**< Linear ambient light from below, summed */
     box_light_list_t lists[BOX_LIGHTS_LISTS]; /**< The lists, by box_light_list_kind_t */
+    ecs_vec_t spots;        /**< box_light_spot_t, the shadow casting spot lights of this frame */
+    box_light_atlas_t atlas; /**< The shadow atlas of the scene */
 } box_light_scene_t;
 
 /** Main thread state of the light extract */
@@ -112,12 +139,19 @@ typedef struct box_render_lights_t {
     ecs_query_t *spot;          /**< Entities with SpotLight */
     ecs_query_t *ambient;       /**< Entities with AmbientLight */
     ecs_query_t *bakes;         /**< Entities with LightBake */
+    ecs_query_t *atlases;       /**< Entities with ShadowAtlas */
     ecs_query_t *atmospheres;   /**< Entities with Atmosphere, NULL without box.atmosphere */
     ecs_query_t *times;         /**< Entities with TimeOfDay, NULL without box.atmosphere */
     ecs_vec_t scenes;           /**< box_light_scene_t */
     ecs_map_t lookup;           /**< Scene root plus one to the index of its scene plus one */
     ecs_vec_t free_buffers;     /**< uint32_t, light buffer handles to reuse */
     uint32_t next_buffer;       /**< Next light buffer handle */
+    ecs_vec_t free_atlases;     /**< uint32_t, shadow atlas handles to reuse */
+    uint32_t next_atlas;        /**< Next shadow atlas handle */
+    ecs_vec_t requests;         /**< box_render_shadow_request_t, scratch of the allocation */
+    ecs_vec_t places;           /**< box_render_shadow_place_t, scratch of the allocation */
+    ecs_vec_t candidates;       /**< int32_t, scratch: the spot of each request */
+    ecs_vec_t views;            /**< int32_t, scratch: the views that sample an atlas */
     bool default_sent;          /**< The backend has the buffer of the default sun */
     const void *backend;        /**< Context of the backend the buffers were sent to */
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
@@ -215,6 +249,32 @@ static int32_t box_lights_find(
     return index ? (int32_t)*index - 1 : -1;
 }
 
+/** Prepare the empty shadow atlas state of a scene.
+ *
+ * @param s The scene
+ */
+static void box_lights_atlas_init(
+    box_light_scene_t *s)
+{
+    ecs_vec_init_t(NULL, &s->spots, box_light_spot_t, 0);
+    ecs_vec_init_t(NULL, &s->atlas.records, box_render_shadow_record_t, 0);
+    ecs_vec_init_t(NULL, &s->atlas.tiles, box_render_shadow_tile_t, 0);
+    ecs_vec_init_t(NULL, &s->atlas.sent, box_render_shadow_record_t, 0);
+}
+
+/** Free the shadow atlas state of a scene; its atlas is released by the caller.
+ *
+ * @param s The scene
+ */
+static void box_lights_atlas_fini(
+    box_light_scene_t *s)
+{
+    ecs_vec_fini_t(NULL, &s->spots, box_light_spot_t);
+    ecs_vec_fini_t(NULL, &s->atlas.records, box_render_shadow_record_t);
+    ecs_vec_fini_t(NULL, &s->atlas.tiles, box_render_shadow_tile_t);
+    ecs_vec_fini_t(NULL, &s->atlas.sent, box_render_shadow_record_t);
+}
+
 /** Find the lights of a scene, adding an entry when it has none.
  *
  * @param l The state
@@ -234,6 +294,8 @@ static box_light_scene_t* box_lights_ensure(
         for (k = 0; k < BOX_LIGHTS_LISTS; k ++) {
             box_lights_list_init(&s->lists[k]);
         }
+
+        box_lights_atlas_init(s);
 
         ecs_map_insert(&l->lookup, scene + 1, (ecs_map_val_t)index + 1);
     }
@@ -264,6 +326,10 @@ static void box_lights_reset(
         s->has_ambient = false;
         glm_vec3_zero(s->sky);
         glm_vec3_zero(s->ground);
+        ecs_vec_clear(&s->spots);
+        ecs_vec_clear(&s->atlas.records);
+        ecs_vec_clear(&s->atlas.tiles);
+        s->atlas.found = false;
     }
 }
 
@@ -321,12 +387,14 @@ static void box_lights_point(
     float range,
     box_render_light_t *out)
 {
+    ecs_os_memset_t(out, 0, box_render_light_t);
     if (transform) {
         glm_vec3_copy(ECS_CONST_CAST(float*, transform->m[3]), out->position);
     } else {
         glm_vec3_zero(out->position);
     }
 
+    out->shadow = BOX_RENDER_SHADOW_NONE;
     out->range = range;
     box_lights_color(rgb, intensity, out->color);
     glm_vec3_copy((vec3){0, 0, 1}, out->direction);
@@ -401,6 +469,7 @@ static void box_lights_default_sun(
     glm_vec3_scale(ECS_CONST_CAST(float*, box_lights_sun_color), GLM_PIf, out->color);
     glm_vec3_copy((vec3){0, 0, 1}, out->direction);
     out->spot_offset = 1.0f;
+    out->shadow = BOX_RENDER_SHADOW_NONE;
 }
 
 /** Attenuate the sun or moon of an atmosphere by the transmittance toward it and its fade at
@@ -554,11 +623,23 @@ static void box_lights_collect(
                     float cos_outer = cosf(glm_rad(outer));
                     float cos_inner = cosf(glm_rad(inner));
                     box_render_light_t out;
+                    int32_t index = ecs_vec_count(&s->lists[BOX_LIGHTS_VIEW].lights);
                     box_lights_point(transform, rgb, sp->intensity, sp->range, &out);
                     box_lights_axis(transform, out.direction);
                     out.spot_scale = 1.0f / glm_max(cos_inner - cos_outer, 1e-4f);
                     out.spot_offset = -cos_outer * out.spot_scale;
                     box_lights_push(s, it.entities[i], sp->bake, &out);
+                    if (sp->shadows && sp->bake != LightBakeModeBaked &&
+                        ecs_vec_count(&s->lists[BOX_LIGHTS_VIEW].lights) > index)
+                    {
+                        *ecs_vec_append_t(NULL, &s->spots, box_light_spot_t) =
+                            (box_light_spot_t){
+                                .entity = it.entities[i],
+                                .index = index,
+                                .resolution = sp->shadow_resolution,
+                                .outer = outer
+                            };
+                    }
                 }
             }
         }
@@ -955,10 +1036,43 @@ static void box_lights_release(
     }
 }
 
+/** Destroy the shadow atlas of a scene and its tile buffer when it has them.
+ *
+ * @param l The state
+ * @param s The scene
+ * @param p The packet, receives the destroys
+ */
+static void box_lights_atlas_release(
+    box_render_lights_t *l,
+    box_light_scene_t *s,
+    box_render_packet_t *p)
+{
+    box_light_atlas_t *a = &s->atlas;
+    if (!a->handle) {
+        goto done;
+    }
+
+    if (a->resolution) {
+        box_render_packet_resource(p, BOX_RENDER_SHADOW_ATLAS, BOX_RENDER_DESTROY, a->handle, 0);
+    }
+
+    if (a->buffer) {
+        box_render_packet_resource(p, BOX_RENDER_BUFFER, BOX_RENDER_DESTROY, a->handle, 0);
+    }
+
+    *ecs_vec_append_t(NULL, &l->free_atlases, uint32_t) = a->handle;
+    a->handle = 0;
+    a->resolution = 0;
+    a->buffer = false;
+    ecs_vec_clear(&a->sent);
+done:
+    return;
+}
+
 /** Remove the entry of a scene, moving the last entry into its place.
  *
  * @param l The state
- * @param p The packet, receives the destroy of the light buffers
+ * @param p The packet, receives the destroy of the light buffers and the shadow atlas
  * @param index Index of the scene
  */
 static void box_lights_remove(
@@ -974,6 +1088,8 @@ static void box_lights_remove(
         box_lights_list_fini(&s->lists[k]);
     }
 
+    box_lights_atlas_release(l, s, p);
+    box_lights_atlas_fini(s);
     if (index != last) {
         *s = *ecs_vec_get_t(&l->scenes, box_light_scene_t, last);
         ecs_map_val_t *moved = ecs_map_get(&l->lookup, s->scene + 1);
@@ -1091,9 +1207,295 @@ static void box_lights_reset_backend(
             s->lists[k].capacity = 0;
             ecs_vec_clear(&s->lists[k].sent);
         }
+
+        s->atlas.resolution = 0;
+        s->atlas.buffer = false;
+        ecs_vec_clear(&s->atlas.sent);
     }
 
     l->default_sent = false;
+}
+
+/** Give every scene with lights its ShadowAtlas, the first one of a scene that has several, or
+ * the defaults.
+ *
+ * @param world The world
+ * @param l The state
+ */
+static void box_lights_collect_atlases(
+    ecs_world_t *world,
+    box_render_lights_t *l)
+{
+    int32_t i;
+    ecs_iter_t it = ecs_query_iter(world, l->atlases);
+    while (ecs_query_next(&it)) {
+        const ShadowAtlas *values = ecs_field(&it, ShadowAtlas, 0);
+        for (i = 0; i < it.count; i ++) {
+            int32_t index = box_lights_find(l, box_render_scene_field(&it, 1, i));
+            box_light_scene_t *s = index != -1
+                ? ecs_vec_get_t(&l->scenes, box_light_scene_t, index)
+                : NULL;
+            if (s && !s->atlas.found) {
+                s->atlas.found = true;
+                box_render_shadow_atlas_settings(&values[i], &s->atlas.settings);
+            }
+        }
+    }
+
+    for (i = 0; i < ecs_vec_count(&l->scenes); i ++) {
+        box_light_scene_t *s = ecs_vec_get_t(&l->scenes, box_light_scene_t, i);
+        if (!s->atlas.found) {
+            box_render_shadow_atlas_settings(NULL, &s->atlas.settings);
+        }
+    }
+}
+
+/** Check whether a view of the packet renders the shadows of the spot lights of a scene: it is
+ * lit by the lights of the scene, renders shadows and its camera has a depth range.
+ *
+ * @param world The world
+ * @param v The view
+ * @param scene The scene of the lights
+ * @return Whether the view samples the shadow atlas of the scene
+ */
+static bool box_lights_shadow_view(
+    ecs_world_t *world,
+    const box_render_view_t *v,
+    ecs_entity_t scene)
+{
+    const View *view = v->view && ecs_is_alive(world, v->view)
+        ? ecs_get(world, v->view, View)
+        : NULL;
+    ecs_entity_t lit = view && view->lighting.scene ? view->lighting.scene : v->scene;
+
+    return view && view->lighting.enabled && view->shadows.enabled && lit == scene &&
+        box_camera_has_depth(&v->camera_data);
+}
+
+/** Check whether a sphere may reach into the frustum of a view.
+ *
+ * A camera that follows the aspect of its surface is tested with the wide
+ * BOX_LIGHTS_SHADOW_ASPECT, an orthographic one sized by its surface only by its depth range,
+ * so a sphere the view may see is never left out.
+ *
+ * @param v The view
+ * @param center World center of the sphere
+ * @param radius Radius of the sphere
+ * @return Whether the sphere is not entirely outside a plane of the frustum
+ */
+static bool box_lights_view_sees(
+    const box_render_view_t *v,
+    const float *center,
+    float radius)
+{
+    const Camera *c = &v->camera_data;
+    bool sides = !c->ortho || c->ortho_scale <= 0, result = true;
+    float aspect = c->aspect_ratio > 0 ? c->aspect_ratio : BOX_LIGHTS_SHADOW_ASPECT;
+    mat4 proj, m;
+    int32_t i, j;
+    box_camera_projection(c, aspect, 1.0f, proj);
+    glm_mat4_mul(proj, ECS_CONST_CAST(vec4*, v->view_matrix), m);
+    for (i = sides ? 0 : 4; i < 6 && result; i ++) {
+        vec4 plane;
+        for (j = 0; j < 4; j ++) {
+            if (i < 4) {
+                plane[j] = m[j][3] + ((i & 1) ? -1.0f : 1.0f) * m[j][i / 2];
+            } else {
+                plane[j] = i == 4 ? m[j][3] - m[j][2] : m[j][2];
+            }
+        }
+
+        float len = sqrtf(plane[0] * plane[0] + plane[1] * plane[1] + plane[2] * plane[2]);
+        if (len > 1e-12f) {
+            float d = (plane[0] * center[0] + plane[1] * center[1] + plane[2] * center[2] +
+                plane[3]) / len;
+            result = d >= -radius;
+        }
+    }
+
+    return result;
+}
+
+/** Allocate the tiles of the shadow casting spot lights of a scene that a view with shadows
+ * sees, write their tile records and give each light its record index.
+ *
+ * @param world The world
+ * @param l The state
+ * @param p The packet
+ * @param s The scene
+ */
+static void box_lights_shadow_tiles(
+    ecs_world_t *world,
+    box_render_lights_t *l,
+    box_render_packet_t *p,
+    box_light_scene_t *s)
+{
+    box_light_atlas_t *a = &s->atlas;
+    box_render_light_t *lights = ecs_vec_first_t(
+        &s->lists[BOX_LIGHTS_VIEW].lights, box_render_light_t);
+    int32_t i, j, n, dropped = 0, count = ecs_vec_count(&s->spots);
+    ecs_vec_clear(&l->requests);
+    ecs_vec_clear(&l->candidates);
+    ecs_vec_clear(&l->views);
+    for (i = 0; count && i < ecs_vec_count(&p->views); i ++) {
+        if (box_lights_shadow_view(world,
+            ecs_vec_get_t(&p->views, box_render_view_t, i), s->scene))
+        {
+            *ecs_vec_append_t(NULL, &l->views, int32_t) = i;
+        }
+    }
+
+    for (i = 0; i < count && ecs_vec_count(&l->views); i ++) {
+        const box_light_spot_t *spot = ecs_vec_get_t(&s->spots, box_light_spot_t, i);
+        const box_render_light_t *light = &lights[spot->index];
+        float distance = FLT_MAX;
+        bool seen = false;
+        for (j = 0; j < ecs_vec_count(&l->views); j ++) {
+            const box_render_view_t *v = ecs_vec_get_t(&p->views, box_render_view_t,
+                *ecs_vec_get_t(&l->views, int32_t, j));
+            float d = glm_vec3_distance(ECS_CONST_CAST(float*, v->camera_transform[3]),
+                ECS_CONST_CAST(float*, light->position)) - light->range;
+            distance = glm_min(distance, glm_max(d, 0.0f));
+            seen = seen || box_lights_view_sees(v, light->position, light->range);
+        }
+
+        if (seen) {
+            *ecs_vec_append_t(NULL, &l->requests, box_render_shadow_request_t) =
+                (box_render_shadow_request_t){
+                    .light = spot->entity,
+                    .size = box_render_shadow_request_size(spot->resolution, &a->settings),
+                    .distance = distance
+                };
+            *ecs_vec_append_t(NULL, &l->candidates, int32_t) = i;
+        }
+    }
+
+    n = ecs_vec_count(&l->requests);
+    ecs_vec_set_count_t(NULL, &l->places, box_render_shadow_place_t, n);
+    if (!n) {
+        goto done;
+    }
+
+    l->stats.shadow_tiles += box_render_shadow_allocate(ecs_vec_first(&l->requests), n,
+        &a->settings, ecs_vec_first(&l->places), &dropped);
+    l->stats.shadow_dropped += dropped;
+    for (i = 0; i < n; i ++) {
+        const box_render_shadow_place_t *place = ecs_vec_get_t(
+            &l->places, box_render_shadow_place_t, i);
+        const box_light_spot_t *spot = ecs_vec_get_t(&s->spots, box_light_spot_t,
+            *ecs_vec_get_t(&l->candidates, int32_t, i));
+        box_render_light_t *light = &lights[spot->index];
+        if (!place->size) {
+            continue;
+        }
+
+        box_render_shadow_record_t *r = ecs_vec_append_t(
+            NULL, &a->records, box_render_shadow_record_t);
+        box_render_shadow_spot(light->position, light->direction, light->range, spot->outer,
+            place, a->settings.resolution, r);
+        box_render_shadow_tile_t *t = ecs_vec_append_t(NULL, &a->tiles, box_render_shadow_tile_t);
+        t->light = spot->entity;
+        t->x = place->x;
+        t->y = place->y;
+        t->size = place->size;
+        glm_mat4_copy(r->matrix, t->matrix);
+        light->shadow = (uint32_t)ecs_vec_count(&a->records) - 1;
+    }
+
+done:
+    return;
+}
+
+/** Send the shadow atlas of a scene, its tile records when they changed and its tiles; release
+ * it when the scene has no tile.
+ *
+ * The atlas is created when the scene first gets a tile and again when its resolution changes;
+ * the tile buffer always holds BOX_RENDER_SHADOW_TILES records.
+ *
+ * @param l The state
+ * @param s The scene
+ * @param p The packet
+ */
+static void box_lights_atlas_send(
+    box_render_lights_t *l,
+    box_light_scene_t *s,
+    box_render_packet_t *p)
+{
+    box_light_atlas_t *a = &s->atlas;
+    int32_t count = ecs_vec_count(&a->records);
+    uint32_t size = (uint32_t)count * (uint32_t)sizeof(box_render_shadow_record_t);
+    if (!count) {
+        box_lights_atlas_release(l, s, p);
+        goto done;
+    }
+
+    if (!a->handle) {
+        if (ecs_vec_count(&l->free_atlases)) {
+            a->handle = *ecs_vec_last_t(&l->free_atlases, uint32_t);
+            ecs_vec_remove_last(&l->free_atlases);
+        } else {
+            a->handle = l->next_atlas ++;
+        }
+    }
+
+    if (a->resolution != a->settings.resolution) {
+        box_render_shadow_atlas_desc_t *desc = box_render_packet_resource(p,
+            BOX_RENDER_SHADOW_ATLAS, BOX_RENDER_CREATE, a->handle,
+            sizeof(box_render_shadow_atlas_desc_t));
+        desc->resolution = a->settings.resolution;
+        a->resolution = a->settings.resolution;
+    }
+
+    if (!a->buffer) {
+        box_render_buffer_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_BUFFER,
+            BOX_RENDER_CREATE, a->handle, sizeof(box_render_buffer_desc_t));
+        desc->size = BOX_RENDER_SHADOW_TILES * sizeof(box_render_shadow_record_t);
+        desc->usage = BOX_RENDER_BUFFER_UNIFORM;
+        a->buffer = true;
+        ecs_vec_clear(&a->sent);
+    }
+
+    if (count != ecs_vec_count(&a->sent) ||
+        ecs_os_memcmp(ecs_vec_first(&a->records), ecs_vec_first(&a->sent), (ecs_size_t)size))
+    {
+        ecs_os_memcpy(box_render_packet_upload(p, a->handle, 0, size),
+            ecs_vec_first(&a->records), (ecs_size_t)size);
+        ecs_vec_set_count_t(NULL, &a->sent, box_render_shadow_record_t, count);
+        ecs_os_memcpy(ecs_vec_first(&a->sent), ecs_vec_first(&a->records), (ecs_size_t)size);
+    }
+
+    box_render_shadow_atlas_t *atlas = ecs_vec_append_t(
+        NULL, &p->shadow_atlases, box_render_shadow_atlas_t);
+    atlas->scene = s->scene;
+    atlas->handle = a->handle;
+    atlas->resolution = a->resolution;
+    atlas->first = ecs_vec_count(&p->shadow_tiles);
+    atlas->count = count;
+    ecs_os_memcpy_n(ecs_vec_grow_t(NULL, &p->shadow_tiles, box_render_shadow_tile_t, count),
+        ecs_vec_first(&a->tiles), box_render_shadow_tile_t, count);
+done:
+    return;
+}
+
+/** Allocate the shadow tiles of every scene and send its atlas, before the light buffers are
+ * sent, since the lights hold the index of their tile records.
+ *
+ * @param world The world
+ * @param l The state
+ * @param p The packet
+ */
+static void box_lights_shadows(
+    ecs_world_t *world,
+    box_render_lights_t *l,
+    box_render_packet_t *p)
+{
+    int32_t i;
+    box_lights_collect_atlases(world, l);
+    for (i = 0; i < ecs_vec_count(&l->scenes); i ++) {
+        box_light_scene_t *s = ecs_vec_get_t(&l->scenes, box_light_scene_t, i);
+        box_lights_shadow_tiles(world, l, p, s);
+        box_lights_atlas_send(l, s, p);
+    }
 }
 
 /** Collect the lights of every scene, send the changed light buffers and light the views.
@@ -1127,9 +1529,15 @@ static void BoxRenderExtractLights(
     box_lights_atmos_defaults(l);
     box_lights_atmos_moonlight(l);
     box_lights_collect_ambient(world, l);
+    box_lights_shadows(world, l, p);
     box_lights_send(l, p);
     box_lights_views(world, l, p);
     box_lights_atmos_status(it, l);
+    RenderStatus *status = ecs_singleton_get_mut(world, RenderStatus);
+    if (status) {
+        status->shadow_tiles = l->stats.shadow_tiles;
+        status->shadow_dropped = l->stats.shadow_dropped;
+    }
 }
 
 /** Free the state of the light extract.
@@ -1146,10 +1554,17 @@ static void box_lights_free(
         for (k = 0; k < BOX_LIGHTS_LISTS; k ++) {
             box_lights_list_fini(&s->lists[k]);
         }
+
+        box_lights_atlas_fini(s);
     }
 
     ecs_vec_fini_t(NULL, &l->scenes, box_light_scene_t);
     ecs_vec_fini_t(NULL, &l->free_buffers, uint32_t);
+    ecs_vec_fini_t(NULL, &l->free_atlases, uint32_t);
+    ecs_vec_fini_t(NULL, &l->requests, box_render_shadow_request_t);
+    ecs_vec_fini_t(NULL, &l->places, box_render_shadow_place_t);
+    ecs_vec_fini_t(NULL, &l->candidates, int32_t);
+    ecs_vec_fini_t(NULL, &l->views, int32_t);
     ecs_map_fini(&l->lookup);
     ecs_os_free(l);
 }
@@ -1213,13 +1628,20 @@ void box_render_lights_init(
     box_lights_table_init();
     ecs_vec_init_t(NULL, &l->scenes, box_light_scene_t, 0);
     ecs_vec_init_t(NULL, &l->free_buffers, uint32_t, 0);
+    ecs_vec_init_t(NULL, &l->free_atlases, uint32_t, 0);
+    ecs_vec_init_t(NULL, &l->requests, box_render_shadow_request_t, 0);
+    ecs_vec_init_t(NULL, &l->places, box_render_shadow_place_t, 0);
+    ecs_vec_init_t(NULL, &l->candidates, int32_t, 0);
+    ecs_vec_init_t(NULL, &l->views, int32_t, 0);
     ecs_map_init(&l->lookup, NULL);
     l->next_buffer = BOX_LIGHTS_DEFAULT_BUFFER + 1;
+    l->next_atlas = BOX_RENDER_BUFFER_SHADOW_FIRST;
     l->directional = box_lights_query(world, ecs_id(DirectionalLight));
     l->point = box_lights_query(world, ecs_id(PointLight));
     l->spot = box_lights_query(world, ecs_id(SpotLight));
     l->ambient = box_lights_scene_query(world, ecs_id(AmbientLight));
     l->bakes = box_lights_scene_query(world, ecs_id(LightBake));
+    l->atlases = box_lights_scene_query(world, ecs_id(ShadowAtlas));
 
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "RenderExtractLights" }),
@@ -1337,6 +1759,22 @@ bool box_render_lights_atmos_main(
     }
 
     return light != NULL;
+}
+
+uint32_t box_render_lights_atlas(
+    const void *state,
+    ecs_entity_t scene,
+    uint32_t *handle)
+{
+    const box_render_lights_t *l = state;
+    int32_t index = l ? box_lights_find(ECS_CONST_CAST(box_render_lights_t*, l), scene) : -1;
+    const box_light_scene_t *s = index != -1
+        ? ecs_vec_get_t(&l->scenes, box_light_scene_t, index)
+        : NULL;
+    uint32_t result = s ? (uint32_t)ecs_vec_count(&s->atlas.records) : 0;
+    *handle = result ? s->atlas.handle : 0;
+
+    return result;
 }
 
 void box_render_lights_time_of_day(

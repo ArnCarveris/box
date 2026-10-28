@@ -4,7 +4,7 @@
  *
  * The main thread resolves View.shadows and splits the shadowed view depths into cascades;
  * the renderer fits each cascade to its target with box_render_shadow_cascade, because the
- * view frustum follows the aspect of the target.
+ * view frustum follows the aspect of the target. Views with shadows sample the spot tiles too.
  */
 
 #include "render.h"
@@ -224,13 +224,21 @@ static void box_shadows_view(
     const Camera *c = &v->camera_data;
     ShadowSettings s;
     ecs_os_memset_t(out, 0, box_render_view_shadows_t);
-    if (!view || !view->shadows.enabled || !v->lights.enabled || !v->lights.directional ||
-        glm_vec3_norm(v->lights.sun) < 1e-6f)
-    {
+    if (!view || !view->shadows.enabled || !v->lights.enabled) {
         goto done;
     }
 
     box_render_shadow_settings(&view->shadows, &s);
+    out->filter_size = s.filter_size;
+    out->depth_bias = s.depth_bias;
+    out->normal_offset = s.normal_offset;
+    out->tiles = box_render_lights_atlas(box_render_lights_state(world),
+        view->lighting.scene ? view->lighting.scene : v->scene, &out->atlas);
+    out->spots = out->tiles > 0;
+    if (!v->lights.directional || glm_vec3_norm(v->lights.sun) < 1e-6f) {
+        goto done;
+    }
+
     float near_ = glm_max(c->near_, 1e-3f);
     float far_ = c->far_ > near_ || c->ortho ? c->far_ : s.max_distance;
     float distance = glm_min(s.max_distance, far_);
@@ -241,9 +249,6 @@ static void box_shadows_view(
     out->enabled = true;
     out->cascades = s.cascades;
     out->resolution = s.resolution;
-    out->filter_size = s.filter_size;
-    out->depth_bias = s.depth_bias;
-    out->normal_offset = s.normal_offset;
     out->fade = s.fade;
     out->blend = s.blend;
     out->near_ = near_;

@@ -409,7 +409,7 @@ static void box_gpu_targets_render(
 }
 
 /** Apply the resources of a packet, build its atmosphere LUTs, write and process its
- * environments, capture its probes and render its targets.
+ * environments, capture its probes, render its shadow atlases and render its targets.
  *
  * @param ctx The backend
  * @param packet The packet
@@ -457,6 +457,9 @@ static void box_gpu_render(
         } else if (r->kind == BOX_RENDER_ATMOSPHERE_ENVIRONMENT) {
             box_gpu_atmosphere_environment_apply(gpu, r->handle,
                 r->size >= sizeof(box_render_atmosphere_env_t) ? data : NULL);
+        } else if (r->kind == BOX_RENDER_SHADOW_ATLAS) {
+            box_gpu_atlas_apply(gpu, r->op, r->handle,
+                r->size >= sizeof(box_render_shadow_atlas_desc_t) ? data : NULL);
         }
 
         if (r->kind != BOX_RENDER_TARGET) {
@@ -481,6 +484,7 @@ static void box_gpu_render(
     box_gpu_environment_process(gpu, packet);
     box_gpu_particles_simulate(gpu, packet);
     box_gpu_bake_capture(gpu, packet);
+    box_gpu_atlas_render(gpu, packet);
     box_gpu_targets_render(gpu, packet);
 
     box_gpu_effects_sweep(gpu, packet);
@@ -650,6 +654,12 @@ void box_gpu_count(
     case BOX_GPU_STAT_CULL_INSTANCES:
         gpu->pending.cull_instance_dispatches ++;
         break;
+    case BOX_GPU_STAT_SHADOW_TILE:
+        gpu->pending.shadow_tiles ++;
+        break;
+    case BOX_GPU_STAT_SHADOW_DRAW:
+        gpu->pending.shadow_draws ++;
+        break;
     }
 }
 
@@ -686,6 +696,8 @@ void box_gpu_stats_publish(
     s->atmosphere_luts += p->atmosphere_luts;
     s->atmosphere_views += p->atmosphere_views;
     s->atmosphere_builds += p->atmosphere_builds;
+    s->shadow_tiles += p->shadow_tiles;
+    s->shadow_draws += p->shadow_draws;
     for (i = 0; i < BOX_RENDER_ATMOS_PASSES; i ++) {
         s->atmosphere_ns[i] += p->atmosphere_ns[i];
         s->atmosphere_passes[i] += p->atmosphere_passes[i];
