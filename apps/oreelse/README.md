@@ -224,8 +224,7 @@ Every task of the port follows these.
 - **README**: this file describes the game like a player's manual (controls, rules); each task
   adds its mechanics to it.
 
-<<<<<<< HEAD
-## Models
+## Critter and projectile models
 
 The critters and projectiles are prefabs ported from the original with its names, geometry and
 colors. They carry no gameplay data and stand still: OreCritters and OreWeapons give them their
@@ -258,7 +257,7 @@ A projectile's origin is its center.
 | `Tracer` | `etc/projectiles/tracer.flecs` | `core`, a glowing gold streak with a point light (2.6, range 4.5) |
 | `Missile` | `etc/projectiles/missile.flecs` | `body`, `tip`, `fin_left`, `fin_right`, the glowing `flame` with a point light (3, range 6), and `trail`, the point the smoke trail comes out of |
 | `LaserBeam` | `etc/projectiles/laser_beam.flecs` | One glowing pink box, 1 unit long along Z: the laser turret places an instance halfway between its muzzle and the target, turned toward the target and scaled along Z to their distance |
-=======
+
 ## Building models
 
 The buildings are prefabs in `etc/buildings/`, one file per building, with the original's names
@@ -298,7 +297,6 @@ The shared materials are inherited prefabs that a part derives from and resizes 
 and `HazardBoundary` (`etc/materials/hazard.flecs`), `SolarCells`, `AccessPlate`, `VentGrille`,
 `FanDisc` and `BayPad`. `TileMarker` and `TileMarkerBad` (`etc/props/markers.flecs`) are the
 glowing plates mining and placement show over a tile, instances placed at y 0.14.
->>>>>>> 1cf34bfbe6d36fa4a853340d362d3f730b8d1748
 
 ## Files
 
@@ -315,12 +313,9 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 | `etc/deposits.flecs` | The deposits of a run |
 | `etc/player.flecs` | The `Astronaut` template |
 | `etc/props/ore.flecs` | The `Ore` template of the deposits |
-<<<<<<< HEAD
 | `etc/critters/` | The `Mite`, `Skitter`, `Brute` and `Behemoth` prefabs |
 | `etc/projectiles/` | The `Tracer`, `Missile` and `LaserBeam` prefabs |
-=======
 | `etc/props/markers.flecs` | The `TileMarker` and `TileMarkerBad` prefabs |
->>>>>>> 1cf34bfbe6d36fa4a853340d362d3f730b8d1748
 | `etc/particles/jet_plume.flecs` | The `JetPlume` template of the jetpack |
 | `etc/materials/terrain.flecs` | The `GroundSurface` and `BasinSurface` materials and the dirt textures |
 | `etc/materials/hazard.flecs` | The hazard stripe texture and the `Hazard*` trim prefabs |
