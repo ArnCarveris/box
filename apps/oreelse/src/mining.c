@@ -5,7 +5,7 @@
  *
  * A swing takes the mining time of the ore (OreMined) and is keyed to its target: a new target
  * restarts it, releasing the action, leaving reach or losing the target resets it. A tile
- * marker shows the target, the TileMarkerBad one when it is out of reach.
+ * marker shows the target while playing, the TileMarkerBad one when it is out of reach.
  */
 
 #include "game.h"
@@ -150,6 +150,19 @@ static void OrePlayerMine(
     ore_marker_show(it->world, it->stage, marker->bad, target && !in_reach, tx, tz);
 }
 
+/** Hide the markers outside of play: like the original's markers, which it drew every frame
+ * of play, they do not stay on the pause or end screens.
+ *
+ * @param it Iterator with OreMineMarker, while not playing
+ */
+static void OreMineMarkerHide(
+    ecs_iter_t *it)
+{
+    const OreMineMarker *marker = ecs_field(it, OreMineMarker, 0);
+    ore_marker_show(it->world, it->stage, marker->good, false, 0, 0);
+    ore_marker_show(it->world, it->stage, marker->bad, false, 0, 0);
+}
+
 void ore_mining_import(
     ecs_world_t *world)
 {
@@ -171,5 +184,15 @@ void ore_mining_import(
             { .id = playing, .src.id = state }
         },
         .callback = OrePlayerMine
+    });
+
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "OreMineMarkerHide" }),
+        .phase = EcsOnUpdate,
+        .query.terms = {
+            { .id = ecs_id(OreMineMarker), .src.id = ecs_id(OreMineMarker), .inout = EcsIn },
+            { .id = playing, .src.id = state, .oper = EcsNot }
+        },
+        .callback = OreMineMarkerHide
     });
 }

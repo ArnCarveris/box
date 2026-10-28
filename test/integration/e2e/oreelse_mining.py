@@ -52,11 +52,12 @@ OTHER_KINDS = ["items.Iron", "items.Copper", "items.Luminite", "items.IronPlate"
                "items.RocketEngine", "items.RocketCargoBay", "items.RocketLifeSupport",
                "items.RocketFuelStorage", "TileMarker", "TileMarkerBad", "Astronaut"]
 
-# Cursor positions in 0..1 of the window: the center hovers a tile next to the astronaut, the
-# top hovers one out of reach
-CENTER = (0.5, 0.5)
-LEFT = (0.4, 0.5)
-TOP = (0.5, 0.1)
+# Cursor positions in points of the 640x360 window (the headless app has no window size to
+# scale normalized positions with): the center hovers a tile next to the astronaut, the top
+# hovers one out of reach
+CENTER = (320, 180)
+LEFT = (256, 180)
+TOP = (320, 36)
 
 # Frames for the cursor ray and the camera to follow a change
 SETTLE = 5
@@ -202,7 +203,7 @@ def player(app):
 
 
 def move_cursor(app, cursor):
-    app.exec("mouse.move [%g, %g] true" % cursor)
+    app.exec("mouse.move [%g, %g]" % cursor)
     app.wait_input()
     app.wait_frames(SETTLE)
 
@@ -397,6 +398,12 @@ def test_out_of_reach(app):
     app.check(count(app, "items.Stone") == 0, "a stone was mined out of reach")
     app.check(amount(app, path) == DEPOSIT_AMOUNT, "%s was mined out of reach" % path)
     check_marker(app, d, False)
+
+    # The marker only shows while playing
+    set_state(app, "Paused")
+    check_no_marker(app)
+    set_state(app, "Playing")
+    check_marker(app, d, False)
     mouse(app, False)
     check_no_marker(app)
 
@@ -488,7 +495,7 @@ def test_slot_frees(app):
 
 def test_hover_through_box(app):
     start(app)
-    cursors = [CENTER, LEFT, (0.6, 0.4)]
+    cursors = [CENTER, LEFT, (384, 144)]
     tiles = []
     for cursor in cursors:
         move_cursor(app, cursor)
