@@ -6,8 +6,9 @@
  * a surface stream. It uploads its run when the run is handed out, then the changed slots of
  * each stream through a segment of the change buffer per page and stream, which scatter copies.
  *
- * A batch with dynamic_transform uploads the transform stream of its run every frame, one with
- * dynamic_material the shading stream.
+ * Mesh and 2D batches take their runs from stores of their own, a mesh shading being a material
+ * slot, a tint and an alpha. A batch with dynamic_transform uploads the transform stream of its
+ * run every frame, one with dynamic_material the shading stream.
  */
 
 #include "draw.h"
@@ -32,7 +33,9 @@ static const uint8_t box_draws_image_color[3] = { 255, 255, 255 };
 #define BOX_DRAWS_MAX_CHANGES ((uint64_t)128 << 20)
 
 _Static_assert(sizeof(box_render_transform_t) == 48, "InstanceTransform of instance.wgsl");
-_Static_assert(sizeof(box_render_shading_t) == 80, "InstanceShading of instance.wgsl");
+_Static_assert(sizeof(box_render_shading_t) == 80, "Shape2DShading of shape2d.wgsl");
+_Static_assert(sizeof(box_render_mesh_shading_t) == 16, "MeshShading of instance.wgsl");
+_Static_assert(sizeof(box_render_material_t) == 48, "Material of material.wgsl");
 
 /** Bytes of the header of a scatter segment */
 #define BOX_DRAWS_HEADER ((uint32_t)(BOX_RENDER_SCATTER_HEADER * sizeof(uint32_t)))
@@ -182,6 +185,31 @@ box_render_shading_t* box_draws_slot_shading(
     return ecs_vec_get_t(&b->shadings, box_render_shading_t, slot);
 }
 
+box_render_mesh_shading_t* box_draws_slot_mesh_shading(
+    box_draw_batch_t *b,
+    int32_t slot)
+{
+    return ecs_vec_get_t(&b->mesh_shadings, box_render_mesh_shading_t, slot);
+}
+
+/** Check whether a batch is drawn by the 2D shape pipeline, whose pages hold the whole shading.
+ *
+ * @param b The batch
+ * @return Whether its key has the 2D shape pipeline
+ */
+static bool box_draws_is_2d(
+    const box_draw_batch_t *b)
+{
+    return b->key.pipeline == BOX_RENDER_SHADER_SHAPE2D;
+}
+
+box_draw_store_t* box_draws_batch_store(
+    box_render_draws_t *d,
+    const box_draw_batch_t *b)
+{
+    return &d->stores[box_draws_is_2d(b) ? BOX_DRAWS_STORE_2D : BOX_DRAWS_STORE_MESH];
+}
+
 box_render_surface_t* box_draws_slot_surface(
     box_draw_batch_t *b,
     int32_t slot)
@@ -203,7 +231,7 @@ static ecs_vec_t* box_draws_stream(
     if (stream == BOX_RENDER_STREAM_TRANSFORM) {
         result = &b->transforms;
     } else if (stream == BOX_RENDER_STREAM_SHADING) {
-        result = &b->shadings;
+        result = box_draws_is_2d(b) ? &b->shadings : &b->mesh_shadings;
     }
 
     return result;
@@ -260,7 +288,9 @@ static void box_draws_changed_clear(
 static uint32_t box_draws_limit(
     const box_render_draws_t *d)
 {
-    return d->chunk < d->store.slots ? d->chunk : d->store.slots;
+    uint32_t slots = d->stores[BOX_DRAWS_STORE_MESH].slots;
+
+    return d->chunk < slots ? d->chunk : slots;
 }
 
 int32_t box_draws_batch_ensure(
@@ -294,6 +324,7 @@ int32_t box_draws_batch_ensure(
         ecs_vec_init_t(NULL, &b->glyphs, int32_t, 0);
         ecs_vec_init_t(NULL, &b->transforms, box_render_transform_t, 0);
         ecs_vec_init_t(NULL, &b->shadings, box_render_shading_t, 0);
+        ecs_vec_init_t(NULL, &b->mesh_shadings, box_render_mesh_shading_t, 0);
         ecs_vec_init_t(NULL, &b->surfaces, box_render_surface_t, 0);
         for (int32_t s = 0; s < BOX_DRAWS_STREAMS; s ++) {
             ecs_vec_init_t(NULL, &b->changed[s], int32_t, 0);
@@ -345,13 +376,14 @@ static void box_draws_batch_free(
     }
 
     if (b->page >= 0) {
-        box_draws_store_free(&d->store, p, b->page, b->first, b->capacity);
+        box_draws_store_free(box_draws_batch_store(d, b), p, b->page, b->first, b->capacity);
     }
 
     ecs_vec_clear(&b->entities);
     ecs_vec_clear(&b->glyphs);
     ecs_vec_clear(&b->transforms);
     ecs_vec_clear(&b->shadings);
+    ecs_vec_clear(&b->mesh_shadings);
     ecs_vec_clear(&b->surfaces);
     box_draws_changed_clear(b);
     b->alive = false;
@@ -397,15 +429,18 @@ int32_t box_draws_slot_add(
 {
     box_draw_batch_t *b = box_draws_batch(d, index);
     int32_t result = ecs_vec_count(&b->entities);
-    if (b->key.pipeline == BOX_RENDER_SHADER_SHAPE2D) {
+    if (box_draws_is_2d(b)) {
         box_draws_order_slot(d, e);
+        ecs_os_memset_t(ecs_vec_append_t(NULL, &b->shadings, box_render_shading_t), 0,
+            box_render_shading_t);
+    } else {
+        ecs_os_memset_t(ecs_vec_append_t(NULL, &b->mesh_shadings, box_render_mesh_shading_t),
+            0, box_render_mesh_shading_t);
     }
 
     *ecs_vec_append_t(NULL, &b->entities, ecs_entity_t) = e;
     ecs_os_memset_t(ecs_vec_append_t(NULL, &b->transforms, box_render_transform_t), 0,
         box_render_transform_t);
-    ecs_os_memset_t(ecs_vec_append_t(NULL, &b->shadings, box_render_shading_t), 0,
-        box_render_shading_t);
     ecs_os_memset_t(ecs_vec_append_t(NULL, &b->surfaces, box_render_surface_t), 0,
         box_render_surface_t);
 
@@ -455,7 +490,8 @@ void box_draws_slot_remove(
 {
     box_draw_batch_t *b = box_draws_batch(d, index);
     int32_t last = ecs_vec_count(&b->entities) - 1;
-    if (b->key.pipeline == BOX_RENDER_SHADER_SHAPE2D) {
+    bool flat = box_draws_is_2d(b);
+    if (flat) {
         box_draws_order_slot(d, 0);
     }
 
@@ -468,7 +504,12 @@ void box_draws_slot_remove(
 
         *ecs_vec_get_t(&b->entities, ecs_entity_t, slot) = moved;
         *box_draws_slot_transform(b, slot) = *box_draws_slot_transform(b, last);
-        *box_draws_slot_shading(b, slot) = *box_draws_slot_shading(b, last);
+        if (flat) {
+            *box_draws_slot_shading(b, slot) = *box_draws_slot_shading(b, last);
+        } else {
+            *box_draws_slot_mesh_shading(b, slot) = *box_draws_slot_mesh_shading(b, last);
+        }
+
         *box_draws_slot_surface(b, slot) = *box_draws_slot_surface(b, last);
         if (s) {
             s->slot = slot;
@@ -483,7 +524,7 @@ void box_draws_slot_remove(
 
     ecs_vec_remove_last(&b->entities);
     ecs_vec_remove_last(&b->transforms);
-    ecs_vec_remove_last(&b->shadings);
+    ecs_vec_remove_last(flat ? &b->shadings : &b->mesh_shadings);
     ecs_vec_remove_last(&b->surfaces);
     if (b->key.atlas) {
         ecs_vec_remove_last(&b->glyphs);
@@ -570,8 +611,7 @@ void box_draws_material(
     out->emissive[3] = 0.0f;
     out->material[0] = pbr ? glm_clamp(pbr->metallic, 0.0f, 1.0f) : BOX_MATERIAL_METALLIC;
     out->material[1] = pbr ? glm_clamp(pbr->roughness, 0.0f, 1.0f) : BOX_MATERIAL_ROUGHNESS;
-    out->material[2] = box_draws_cutout(material->cutoff, material->shape2d)
-        ? glm_clamp(material->cutoff->value, 0.0f, 1.0f) : 0.0f;
+    out->material[2] = 0.0f;
     out->material[3] = 0.0f;
     out->uv[0] = uv ? uv->scale_x : 1.0f;
     out->uv[1] = uv ? uv->scale_y : 1.0f;
@@ -584,6 +624,71 @@ void box_draws_material(
     if (material->inherited || material->tint || material->shape2d) {
         box_draws_material_mixed(out, material, base);
     }
+}
+
+void box_draws_material_pack(
+    box_render_material_t *out,
+    const box_draw_material_t *material)
+{
+    const Rgb *color = material->color;
+    const Emissive *emissive = material->emissive;
+    const PbrMaterial *pbr = material->pbr;
+    const TextureTransform *uv = material->uv;
+    const uint8_t *base = color ? &color->r : box_draws_default_color;
+    float strength = emissive && emissive->strength > 0.0f ? emissive->strength : 0.0f;
+    out->color = (uint32_t)base[0] | ((uint32_t)base[1] << 8) | ((uint32_t)base[2] << 16);
+    out->metallic = pbr ? glm_clamp(pbr->metallic, 0.0f, 1.0f) : BOX_MATERIAL_METALLIC;
+    out->roughness = pbr ? glm_clamp(pbr->roughness, 0.0f, 1.0f) : BOX_MATERIAL_ROUGHNESS;
+    out->cutoff = material->cutoff ? glm_clamp(material->cutoff->value, 0.0f, 1.0f) : 0.0f;
+    out->emissive[0] = emissive ? box_draws_linear(emissive->color.r) * strength : 0.0f;
+    out->emissive[1] = emissive ? box_draws_linear(emissive->color.g) * strength : 0.0f;
+    out->emissive[2] = emissive ? box_draws_linear(emissive->color.b) * strength : 0.0f;
+    out->reserved = 0;
+    out->uv[0] = uv ? uv->scale_x : 1.0f;
+    out->uv[1] = uv ? uv->scale_y : 1.0f;
+    out->uv[2] = uv ? uv->offset_x : 0.0f;
+    out->uv[3] = uv ? uv->offset_y : 0.0f;
+}
+
+/** Convert a value from 0 to 1 to unorm16.
+ *
+ * @param value The value
+ * @return The unorm16 bits
+ */
+static uint32_t box_draws_unorm16(
+    float value)
+{
+    return (uint32_t)(glm_clamp(value, 0.0f, 1.0f) * 65535.0f + 0.5f);
+}
+
+void box_draws_mesh_shading(
+    box_render_mesh_shading_t *out,
+    uint32_t id,
+    const box_draw_material_t *material)
+{
+    const box_draw_tint_t *inherited = material->inherited;
+    const Tint *tint = material->tint;
+    float keep = inherited ? inherited->keep : 1.0f;
+    float add[3] = { 0.0f, 0.0f, 0.0f };
+    int32_t i;
+    if (inherited) {
+        glm_vec3_copy(ECS_CONST_CAST(float*, inherited->add), add);
+    }
+
+    if (tint) {
+        float a = (float)tint->a / 255.0f;
+        const uint8_t *own = &tint->r;
+        for (i = 0; i < 3; i ++) {
+            add[i] = add[i] * (1.0f - a) + (float)own[i] / 255.0f * a;
+        }
+
+        keep *= 1.0f - a;
+    }
+
+    out->material = id;
+    out->tint[0] = box_draws_unorm16(add[0]) | (box_draws_unorm16(add[1]) << 16);
+    out->tint[1] = box_draws_unorm16(add[2]) | (box_draws_unorm16(keep) << 16);
+    out->alpha = box_draws_alpha(material);
 }
 
 void box_draws_transform(
@@ -750,9 +855,13 @@ void box_draws_reset_backend(
         box_draws_changed_clear(b);
     }
 
-    box_draws_store_reset(&d->store);
+    for (i = 0; i < BOX_DRAWS_STORES; i ++) {
+        box_draws_store_reset(&d->stores[i]);
+    }
+
     d->changes_size = 0;
     box_draws_clips_reset(d);
+    box_draws_materials_reset(d);
 }
 
 /** Give a batch a run of slots that holds all its instances, moving it to a new run when it
@@ -767,6 +876,7 @@ static void box_draws_reserve(
     box_render_draws_t *d,
     box_draw_batch_t *b)
 {
+    box_draw_store_t *store = box_draws_batch_store(d, b);
     uint32_t count = (uint32_t)ecs_vec_count(&b->entities);
     uint32_t limit = box_draws_limit(d);
     uint32_t capacity = BOX_DRAWS_MIN_CAPACITY, first;
@@ -783,9 +893,9 @@ static void box_draws_reserve(
         capacity = limit;
     }
 
-    box_draws_store_alloc(&d->store, capacity, &page, &first);
+    box_draws_store_alloc(store, capacity, &page, &first);
     if (b->page >= 0) {
-        box_draws_store_free(&d->store, p, b->page, b->first, b->capacity);
+        box_draws_store_free(store, p, b->page, b->first, b->capacity);
     }
 
     b->page = page;
@@ -807,17 +917,20 @@ static void box_draws_pages(
     box_render_packet_t *p,
     box_render_draws_t *d)
 {
-    int32_t i, pg, count = ecs_vec_count(&d->batches);
-    for (pg = 0; pg < ecs_vec_count(&d->store.pages); pg ++) {
-        if (!box_draws_store_reserve(&d->store, p, pg)) {
-            continue;
-        }
+    int32_t i, pg, st, count = ecs_vec_count(&d->batches);
+    for (st = 0; st < BOX_DRAWS_STORES; st ++) {
+        box_draw_store_t *store = &d->stores[st];
+        for (pg = 0; pg < ecs_vec_count(&store->pages); pg ++) {
+            if (!box_draws_store_reserve(store, p, pg)) {
+                continue;
+            }
 
-        for (i = 0; i < count; i ++) {
-            box_draw_batch_t *b = box_draws_batch(d, i);
-            if (b->alive && b->page == pg) {
-                b->full = BOX_DRAW_ALL;
-                box_draws_changed_clear(b);
+            for (i = 0; i < count; i ++) {
+                box_draw_batch_t *b = box_draws_batch(d, i);
+                if (b->alive && b->page == pg && box_draws_batch_store(d, b) == store) {
+                    b->full = BOX_DRAW_ALL;
+                    box_draws_changed_clear(b);
+                }
             }
         }
     }
@@ -836,13 +949,14 @@ static void box_draws_upload_all(
     box_draw_batch_t *b,
     int32_t stream)
 {
+    box_draw_store_t *store = box_draws_batch_store(d, b);
     ecs_vec_t *data = box_draws_stream(b, stream);
-    uint32_t stride = d->store.layout.stride[stream];
+    uint32_t stride = store->layout.stride[stream];
     uint32_t size = (uint32_t)ecs_vec_count(data) * stride;
     uint32_t offset = b->first * stride;
     if (size) {
         void *dst = box_render_packet_upload(p,
-            box_draws_store_handle(&d->store, b->page, stream), offset, size);
+            box_draws_store_handle(store, b->page, stream), offset, size);
         ecs_os_memcpy(dst, ecs_vec_first(data), (ecs_size_t)size);
         box_draws_count_bytes(d, stream, size);
     }
@@ -853,30 +967,30 @@ static void box_draws_upload_all(
 
 /** Get the bytes of one scatter entry of a stream: the slot and the instance data.
  *
- * @param d The state
+ * @param s The store of the pages of the stream
  * @param stream The stream
  * @return The bytes
  */
 static uint32_t box_draws_entry_size(
-    const box_render_draws_t *d,
+    const box_draw_store_t *s,
     int32_t stream)
 {
-    return (uint32_t)sizeof(uint32_t) + d->store.layout.stride[stream];
+    return (uint32_t)sizeof(uint32_t) + s->layout.stride[stream];
 }
 
 /** Get the bytes of a scatter segment, aligned for the next segment.
  *
- * @param d The state
+ * @param s The store of the pages of the stream
  * @param stream The stream of the segment
  * @param entries Entries of the segment
  * @return The bytes, 0 for a segment without entries
  */
 static uint64_t box_draws_segment_size(
-    const box_render_draws_t *d,
+    const box_draw_store_t *s,
     int32_t stream,
     uint32_t entries)
 {
-    uint64_t size = BOX_DRAWS_HEADER + (uint64_t)entries * box_draws_entry_size(d, stream);
+    uint64_t size = BOX_DRAWS_HEADER + (uint64_t)entries * box_draws_entry_size(s, stream);
 
     return entries
         ? (size + BOX_RENDER_SCATTER_ALIGN - 1) & ~(uint64_t)(BOX_RENDER_SCATTER_ALIGN - 1)
@@ -960,11 +1074,12 @@ static void box_draws_bounds(
  * @param out The draw
  */
 static void box_draws_batch_page(
-    const box_render_draws_t *d,
+    box_render_draws_t *d,
     const box_draw_batch_t *b,
     box_render_batch_t *out)
 {
-    out->instances = box_draws_store_handle(&d->store, b->page, BOX_RENDER_STREAM_TRANSFORM);
+    out->instances = box_draws_store_handle(box_draws_batch_store(d, b), b->page,
+        BOX_RENDER_STREAM_TRANSFORM);
     out->first_instance = b->first;
     out->bounded = b->bounded;
     if (b->bounded) {
@@ -992,6 +1107,7 @@ static void box_draws_send_batch(
     box_draw_batch_t *b,
     uint64_t *changes)
 {
+    box_draw_store_t *store = box_draws_batch_store(d, b);
     uint32_t count = (uint32_t)ecs_vec_count(&b->entities);
     uint8_t dynamic = box_draws_dynamic_kinds(b);
     int32_t s;
@@ -1000,11 +1116,11 @@ static void box_draws_send_batch(
         if ((dynamic | b->full) & (1 << s)) {
             box_draws_upload_all(p, d, b, s);
         } else if (entries) {
-            box_draw_page_t *pg = box_draws_store_page(&d->store, b->page);
-            uint64_t grow = box_draws_segment_size(d, s, pg->entries[s] + entries) -
-                box_draws_segment_size(d, s, pg->entries[s]);
-            uint64_t run = (uint64_t)count * d->store.layout.stride[s];
-            if ((uint64_t)entries * box_draws_entry_size(d, s) >= run ||
+            box_draw_page_t *pg = box_draws_store_page(store, b->page);
+            uint64_t grow = box_draws_segment_size(store, s, pg->entries[s] + entries) -
+                box_draws_segment_size(store, s, pg->entries[s]);
+            uint64_t run = (uint64_t)count * store->layout.stride[s];
+            if ((uint64_t)entries * box_draws_entry_size(store, s) >= run ||
                 *changes + grow > BOX_DRAWS_MAX_CHANGES)
             {
                 box_draws_upload_all(p, d, b, s);
@@ -1163,11 +1279,12 @@ static void box_draws_scatter(
     int32_t stream,
     uint8_t *data)
 {
-    box_draw_page_t *pg = box_draws_store_page(&d->store, b->page);
+    box_draw_store_t *store = box_draws_batch_store(d, b);
+    box_draw_page_t *pg = box_draws_store_page(store, b->page);
     const ecs_vec_t *changed = &b->changed[stream];
     const uint8_t *src = ecs_vec_first(box_draws_stream(b, stream));
-    uint32_t stride = d->store.layout.stride[stream];
-    uint32_t size = box_draws_entry_size(d, stream);
+    uint32_t stride = store->layout.stride[stream];
+    uint32_t size = box_draws_entry_size(store, stream);
     uint8_t *entry = data + pg->offset[stream] + BOX_DRAWS_HEADER + pg->written[stream] * size;
     int32_t i, count = ecs_vec_count(changed), slots = ecs_vec_count(&b->entities);
     for (i = 0; i < count; i ++) {
@@ -1200,7 +1317,7 @@ static void box_draws_send_changes(
     uint64_t total)
 {
     uint32_t offset = 0;
-    int32_t i, s, count = ecs_vec_count(&d->batches), pages = ecs_vec_count(&d->store.pages);
+    int32_t i, s, st, pages, count = ecs_vec_count(&d->batches);
     if (total > d->changes_size) {
         uint64_t size = d->changes_size ? d->changes_size : BOX_DRAWS_MIN_CHANGES;
         while (size < total) {
@@ -1219,14 +1336,18 @@ static void box_draws_send_changes(
     }
 
     uint8_t *data = box_render_packet_upload(p, BOX_RENDER_BUFFER_CHANGES, 0, (uint32_t)total);
-    for (i = 0; i < pages; i ++) {
-        box_draw_page_t *pg = box_draws_store_page(&d->store, i);
-        for (s = 0; s < BOX_DRAWS_STREAMS; s ++) {
-            uint64_t size = box_draws_segment_size(d, s, pg->entries[s]);
-            pg->offset[s] = offset;
-            pg->written[s] = 0;
-            offset += (uint32_t)size;
-            box_draws_count_bytes(d, s, (int64_t)size);
+    for (st = 0; st < BOX_DRAWS_STORES; st ++) {
+        box_draw_store_t *store = &d->stores[st];
+        pages = ecs_vec_count(&store->pages);
+        for (i = 0; i < pages; i ++) {
+            box_draw_page_t *pg = box_draws_store_page(store, i);
+            for (s = 0; s < BOX_DRAWS_STREAMS; s ++) {
+                uint64_t size = box_draws_segment_size(store, s, pg->entries[s]);
+                pg->offset[s] = offset;
+                pg->written[s] = 0;
+                offset += (uint32_t)size;
+                box_draws_count_bytes(d, s, (int64_t)size);
+            }
         }
     }
 
@@ -1239,28 +1360,32 @@ static void box_draws_send_changes(
         }
     }
 
-    for (i = 0; i < pages; i ++) {
-        box_draw_page_t *pg = box_draws_store_page(&d->store, i);
-        for (s = 0; s < BOX_DRAWS_STREAMS; s ++) {
-            uint32_t *header = (uint32_t*)(data + pg->offset[s]);
-            if (!pg->entries[s]) {
-                continue;
-            }
+    for (st = 0; st < BOX_DRAWS_STORES; st ++) {
+        box_draw_store_t *store = &d->stores[st];
+        pages = ecs_vec_count(&store->pages);
+        for (i = 0; i < pages; i ++) {
+            box_draw_page_t *pg = box_draws_store_page(store, i);
+            for (s = 0; s < BOX_DRAWS_STREAMS; s ++) {
+                uint32_t *header = (uint32_t*)(data + pg->offset[s]);
+                if (!pg->entries[s]) {
+                    continue;
+                }
 
-            header[0] = pg->written[s];
-            header[1] = d->store.layout.stride[s] / (uint32_t)sizeof(uint32_t);
-            header[2] = 0;
-            header[3] = 0;
-            pg->entries[s] = 0;
-            if (pg->written[s]) {
-                box_render_scatter_t *sc = box_render_packet_scatter(p);
-                sc->buffer = box_draws_store_handle(&d->store, i, s);
-                sc->changes = BOX_RENDER_BUFFER_CHANGES;
-                sc->offset = pg->offset[s];
-                sc->size = BOX_DRAWS_HEADER + pg->written[s] * box_draws_entry_size(d, s);
-                sc->count = pg->written[s];
-                d->stats.scattered += (int32_t)pg->written[s];
-                d->stats.scatters ++;
+                header[0] = pg->written[s];
+                header[1] = store->layout.stride[s] / (uint32_t)sizeof(uint32_t);
+                header[2] = 0;
+                header[3] = 0;
+                pg->entries[s] = 0;
+                if (pg->written[s]) {
+                    box_render_scatter_t *sc = box_render_packet_scatter(p);
+                    sc->buffer = box_draws_store_handle(store, i, s);
+                    sc->changes = BOX_RENDER_BUFFER_CHANGES;
+                    sc->offset = pg->offset[s];
+                    sc->size = BOX_DRAWS_HEADER + pg->written[s] * box_draws_entry_size(store, s);
+                    sc->count = pg->written[s];
+                    d->stats.scattered += (int32_t)pg->written[s];
+                    d->stats.scatters ++;
+                }
             }
         }
     }
@@ -1300,6 +1425,10 @@ static const void* box_draws_at(
 
 /** Write the shading of the dynamic material shapes of a query result into their instances.
  *
+ * A mesh shape writes the slot of its material, its tint and its alpha, and packs the slot it
+ * owns again; a shape that renders with the slot of its prefab leaves the slot as it is. A 2D
+ * shape writes its whole material.
+ *
  * A shape whose resolved blend mode or alpha test no longer matches its batch is queued to
  * move.
  *
@@ -1337,7 +1466,7 @@ static void box_draws_fill_material(
         }
 
         box_draw_batch_t *b = box_draws_batch(d, slots[i].batch);
-        if (!b->key.dynamic_material || slots[i].slot >= ecs_vec_count(&b->shadings)) {
+        if (!b->key.dynamic_material || slots[i].slot >= ecs_vec_count(&b->entities)) {
             continue;
         }
 
@@ -1359,10 +1488,20 @@ static void box_draws_fill_material(
             material.inherited = &inherited;
         }
 
-        box_render_shading_t *out = box_draws_slot_shading(b, slots[i].slot);
-        box_draws_material(out, &material);
+        float alpha;
+        if (box_draws_is_2d(b)) {
+            box_render_shading_t *out = box_draws_slot_shading(b, slots[i].slot);
+            box_draws_material(out, &material);
+            alpha = out->color[3];
+        } else {
+            uint32_t id = box_draws_material_id(it->world, d, it->entities[i], true);
+            box_draws_material_changed(d, it->entities[i]);
+            box_draws_mesh_shading(box_draws_slot_mesh_shading(b, slots[i].slot), id, &material);
+            alpha = box_draws_alpha(&material);
+        }
+
         bool cutout = box_draws_cutout(material.cutoff, material.shape2d);
-        uint8_t blend = box_draws_blend(box_draws_at(modes, mode_step, i), out->color[3], cutout);
+        uint8_t blend = box_draws_blend(box_draws_at(modes, mode_step, i), alpha, cutout);
         if (blend != b->key.blend || cutout != b->key.cutout) {
             box_draws_mark(it->world, d, it->entities[i], BOX_DRAW_ALL);
         }
@@ -1394,7 +1533,7 @@ static void box_draws_fill_transform(
 
         box_render_transform_t *out = box_draws_slot_transform(b, slots[i].slot);
         box_draws_transform(out, transforms ? &transforms[i] : NULL, &shapes[i]);
-        if (b->key.pipeline == BOX_RENDER_SHADER_SHAPE2D) {
+        if (box_draws_is_2d(b)) {
             box_draws_lift(out, transforms ? &transforms[i] : NULL, slots[i].layer);
         }
     }
@@ -1466,6 +1605,7 @@ void box_draws_send(
     }
 
     box_draws_dynamic(world, d);
+    box_draws_materials_send(world, d, p);
     ecs_vec_clear(&d->blended);
     for (i = 0; i < count; i ++) {
         box_draw_batch_t *b = box_draws_batch(d, i);
@@ -1503,7 +1643,12 @@ void box_draws_send(
     }
 
 done:
-    d->stats.pages = d->store.alive;
+    d->stats.pages = 0;
+    for (i = 0; i < BOX_DRAWS_STORES; i ++) {
+        d->stats.pages += d->stores[i].alive;
+    }
+
+    d->stats.materials = d->materials.alive;
 
     return;
 }
@@ -1518,6 +1663,7 @@ void box_draws_batches_fini(
         ecs_vec_fini_t(NULL, &b->glyphs, int32_t);
         ecs_vec_fini_t(NULL, &b->transforms, box_render_transform_t);
         ecs_vec_fini_t(NULL, &b->shadings, box_render_shading_t);
+        ecs_vec_fini_t(NULL, &b->mesh_shadings, box_render_mesh_shading_t);
         ecs_vec_fini_t(NULL, &b->surfaces, box_render_surface_t);
         for (int32_t s = 0; s < BOX_DRAWS_STREAMS; s ++) {
             ecs_vec_fini_t(NULL, &b->changed[s], int32_t);
@@ -1526,7 +1672,10 @@ void box_draws_batches_fini(
 
     ecs_vec_fini_t(NULL, &d->batches, box_draw_batch_t);
     ecs_vec_fini_t(NULL, &d->free_batches, int32_t);
-    box_draws_store_fini(&d->store);
+    for (i = 0; i < BOX_DRAWS_STORES; i ++) {
+        box_draws_store_fini(&d->stores[i]);
+    }
+
     ecs_map_fini(&d->lookup);
 }
 
@@ -1538,7 +1687,10 @@ void box_render_draws_page(
     const ecs_system_t *s = system ? ecs_system_get(world, system) : NULL;
     if (s && s->ctx && slots > 0) {
         box_render_draws_t *d = s->ctx;
-        d->store.slots = (uint32_t)slots < BOX_DRAWS_CHUNK ? (uint32_t)slots : BOX_DRAWS_CHUNK;
+        for (int32_t i = 0; i < BOX_DRAWS_STORES; i ++) {
+            d->stores[i].slots = (uint32_t)slots < BOX_DRAWS_CHUNK
+                ? (uint32_t)slots : BOX_DRAWS_CHUNK;
+        }
     }
 }
 

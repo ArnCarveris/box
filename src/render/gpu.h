@@ -658,11 +658,14 @@ typedef struct box_gpu_t {
     WGPUBindGroup capture_shadow_group; /**< Binds the matrix to the shadow pipeline */
     WGPUBindGroupLayout instance_layout; /**< Binds the streams of an instance page and surface
                                      *   assets: 0 transforms, 1 surface assets, 2 shading,
-                                     *   3 surfaces; the forward pass and alpha tested casters */
+                                     *   3 surfaces, 4 the material table; the forward pass and
+                                     *   alpha tested casters */
     WGPUBindGroupLayout transform_layout; /**< instance_layout without the shading stream: the
                                      *   cull, the shadow casters and the capture cull */
     WGPUBuffer no_assets;           /**< One zero vec4, the surface assets of the draws of
                                      *   meshes without any */
+    WGPUBuffer no_materials;        /**< One default material record, the material table of
+                                     *   the draws before the main thread sent one */
     box_gpu_cull_t cull;            /**< Cull pass state */
     WGPUBindGroupLayout scatter_layout; /**< Bind group layout of the scatter pass */
     WGPUPipelineLayout scatter_pipeline_layout; /**< Pipeline layout of the scatter pass */
@@ -1985,9 +1988,9 @@ void box_gpu_cull_fini(
     box_gpu_t *gpu);
 
 /** Create the bind group layouts of the instance pages: instance_layout binds the transform
- * stream (0), the surface assets of the mesh (1), the shading stream (2) and the surface stream
- * (3); transform_layout every binding but the shading stream. Only the transform stream is
- * visible to compute passes.
+ * stream (0), the surface assets of the mesh (1), the shading stream (2), the surface stream
+ * (3) and the material table (4); transform_layout every binding but the shading stream and the
+ * material table. Only the transform stream is visible to compute passes.
  *
  * @param gpu The backend
  */
@@ -2006,7 +2009,7 @@ void box_gpu_instance_layouts_fini(
  * The draws of every mesh without surface assets share one group per page, so a pass sets it
  * once per page; a mesh with surface assets has a group of its own per page. The groups live
  * with the transform stream of the page and are released when any stream of the page is
- * created again or destroyed.
+ * created again or destroyed, and every group when the material table is.
  *
  * @param gpu The backend
  * @param page Handle of the transform stream of the page, box_render_batch_t.instances

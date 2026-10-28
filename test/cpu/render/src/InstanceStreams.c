@@ -18,8 +18,14 @@
 /** Bytes of one instance in the transform stream */
 #define TRANSFORM ((int64_t)sizeof(box_render_transform_t))
 
-/** Bytes of one instance in the shading stream */
-#define SHADING ((int64_t)sizeof(box_render_shading_t))
+/** Bytes of one mesh instance in the shading stream */
+#define SHADING ((int64_t)sizeof(box_render_mesh_shading_t))
+
+/** Bytes of one 2D instance in the shading stream */
+#define SHADING_2D ((int64_t)sizeof(box_render_shading_t))
+
+/** Bytes of one record of the material table */
+#define MATERIAL ((int64_t)sizeof(box_render_material_t))
 
 /** Bytes of one instance in the surface stream */
 #define SURFACE ((int64_t)sizeof(box_render_surface_t))
@@ -163,7 +169,7 @@ static int64_t scattered_clip(
         }
 
         const uint32_t *words = box_render_packet_data(&null->last, changes->data + sc->offset);
-        test_uint(words[1], (uint32_t)(SHADING / 4));
+        test_uint(words[1], (uint32_t)(SHADING_2D / 4));
         result = words[BOX_RENDER_SCATTER_HEADER + 1 + 16];
     }
 
@@ -286,9 +292,16 @@ void InstanceStreams_static_change_scatters_its_stream(void) {
 
     ecs_set(world, boxes[5], Rgb, {0, 255, 0});
     stats = frame(world);
+    test_int(stats.scatters, 0);
+    test_bytes(&stats, 0, 0);
+    test_int(stats.material_bytes, MATERIAL);
+
+    ecs_set(world, boxes[5], Tint, {0, 255, 0, 128});
+    stats = frame(world);
     test_int(stats.scatters, 1);
     test_int(stats.scattered, 1);
     test_bytes(&stats, 0, segment_size(1, SHADING));
+    test_int(stats.material_bytes, 0);
 
     stats = frame(world);
     test_bytes(&stats, 0, 0);
@@ -434,7 +447,7 @@ void InstanceStreams_dynamic_shape2d_keeps_clip(void) {
     test_assert(moved != 0);
     test_assert(moved != clip);
     test_int(ecs_get(world, child, DrawSlot)->clip, (int32_t)moved);
-    test_int(stats.shading_bytes, segment_size(1, SHADING));
+    test_int(stats.shading_bytes, segment_size(1, SHADING_2D));
     test_int(scattered_clip(null), moved);
 
     stats = frame(world);

@@ -20,7 +20,7 @@
 #define STRIDE ((uint32_t)sizeof(box_render_transform_t))
 
 /** Bytes of one instance in every stream */
-#define INSTANCE ((uint32_t)(sizeof(box_render_transform_t) + sizeof(box_render_shading_t) + \
+#define INSTANCE ((uint32_t)(sizeof(box_render_transform_t) + sizeof(box_render_mesh_shading_t) + \
     sizeof(box_render_surface_t)))
 
 /** Handle of the transform stream of a page */

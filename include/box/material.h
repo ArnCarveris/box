@@ -21,7 +21,25 @@
 extern "C" {
 #endif
 
-/** Base color, display encoded bytes */
+/** Slot of the material table a shape renders with, set by the engine and read only for
+ * applications, inherited by instances.
+ *
+ * Rgb, PbrMaterial, Emissive, TextureTransform and AlphaCutoff bring it along, so the owner of a
+ * material component owns a MaterialId. A prefab that owns one gets a slot its instances share, a
+ * 3D shape that owns one a slot of its own, composed of what it owns and what it still inherits.
+ *
+ * Slot 0 is the default material, of a shape without any material component. An owned id that
+ * was never handed a slot (a light, a 2D shape, a text) is UINT32_MAX.
+ */
+ECS_STRUCT(MaterialId, {
+    uint32_t value; /**< Slot of the material table */
+});
+
+/** Base color, display encoded bytes, inherited by instances.
+ *
+ * An instance of a prefab reads the color of the prefab until it sets its own, and a change of
+ * the color of the prefab reaches every instance that does not set its own.
+ */
 ECS_STRUCT(Rgb, {
     uint8_t r; /**< Red */
     uint8_t g; /**< Green */
@@ -46,6 +64,7 @@ ECS_STRUCT(Opacity, {
 #define BOX_MATERIAL_CUTOFF (0.5f)
 
 /** Alpha test of a shape, default 0.5: its fragments are kept or discarded, not blended.
+ * Inherited by instances, like Rgb.
  *
  * The alpha a fragment is tested with is the alpha the shape draws with without it (its
  * Opacity times the Opacity of its ancestors) times the alpha of its albedo texture (PbrTextures);
@@ -85,7 +104,8 @@ ECS_STRUCT(Tint, {
  * glTF. A smooth or glossy surface sets it explicitly. */
 #define BOX_MATERIAL_ROUGHNESS (1.0f)
 
-/** Physically based surface parameters, default metallic 0 and roughness 1 (matte).
+/** Physically based surface parameters, default metallic 0 and roughness 1 (matte), inherited
+ * by instances, like Rgb.
  *
  * A field a scene does not set keeps its default, so a PbrMaterial that only sets metallic is as
  * rough as a shape without PbrMaterial.
@@ -95,7 +115,7 @@ ECS_STRUCT(PbrMaterial, {
     float roughness; /**< 0 mirror to 1 fully diffuse */
 });
 
-/** Emitted light */
+/** Emitted light, inherited by instances, like Rgb. Tints do not apply to it. */
 ECS_STRUCT(Emissive, {
     float strength; /**< Emission intensity */
     Rgb color;      /**< Emission color */
@@ -127,7 +147,8 @@ ECS_ENUM(TextureWrap, {
     WrapMirror = 2  /**< Every other tile is mirrored */
 });
 
-/** Scale and offset applied to the UVs of a material, defaults to 1, 1, 0, 0.
+/** Scale and offset applied to the UVs of a material, defaults to 1, 1, 0, 0, inherited by
+ * instances, like Rgb.
  *
  * A scale of 4 tiles the texture four times across the shape (with WrapRepeat); the offset
  * shifts the texture after the scale, in texture widths. UV 0, 0 is the top left of an image.
@@ -139,7 +160,8 @@ ECS_STRUCT(TextureTransform, {
     float offset_y; /**< V addend, applied after the scale */
 });
 
-/** Texture entities for each PBR layer, 0 for none, inherited by instances.
+/** Texture entities for each PBR layer, 0 for none, inherited by instances like Rgb. They are
+ * part of the batch of a shape, not of the material table, so PbrTextures brings no MaterialId.
  *
  * A texture entity has a TexturePath (box/texture.h), or is the texture of a Surface, whose
  * image of the same frame it then samples; until it loaded, or when it is missing, the layer

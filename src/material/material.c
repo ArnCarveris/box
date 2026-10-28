@@ -28,6 +28,25 @@ static void box_opacity_ctor(
     }
 }
 
+/** Construct MaterialId values that were never handed a slot.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_material_id_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    MaterialId *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i].value = UINT32_MAX;
+    }
+}
+
 /** Construct AlphaCutoff values that discard below BOX_MATERIAL_CUTOFF.
  *
  * @param ptr The components
@@ -92,6 +111,7 @@ void BoxMaterialImport(
     ECS_MODULE(world, BoxMaterial);
     ECS_IMPORT(world, BoxTypes);
 
+    ECS_META_COMPONENT(world, MaterialId);
     ECS_META_COMPONENT(world, Rgb);
     ECS_META_COMPONENT(world, Opacity);
     ECS_META_COMPONENT(world, AlphaCutoff);
@@ -107,7 +127,19 @@ void BoxMaterialImport(
     ecs_set_hooks(world, AlphaCutoff, { .ctor = box_alpha_cutoff_ctor });
     ecs_set_hooks(world, PbrMaterial, { .ctor = box_pbr_material_ctor });
     ecs_set_hooks(world, TextureTransform, { .ctor = box_texture_transform_ctor });
+    ecs_set_hooks(world, MaterialId, { .ctor = box_material_id_ctor });
+    ecs_add_pair(world, ecs_id(MaterialId), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(PbrTextures), EcsOnInstantiate, EcsInherit);
+
+    ecs_entity_t materials[5] = {
+        ecs_id(Rgb), ecs_id(PbrMaterial), ecs_id(Emissive), ecs_id(TextureTransform),
+        ecs_id(AlphaCutoff)
+    };
+    int32_t i;
+    for (i = 0; i < 5; i ++) {
+        ecs_add_pair(world, materials[i], EcsOnInstantiate, EcsInherit);
+        ecs_add_pair(world, materials[i], EcsWith, ecs_id(MaterialId));
+    }
 
     ECS_TAG_DEFINE(world, DynamicMaterial);
     ECS_TAG_DEFINE(world, NoShadow);

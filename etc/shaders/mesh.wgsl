@@ -7,7 +7,9 @@
 // and metallic (blue) multipliers.
 // The cull pass writes the slots of the visible instances, which step per instance; the
 // instance data is read from the transform, shading and surface streams of the instance page of
-// the batch (group 2). Indirect light comes
+// the batch (group 2). The vertex stage fetches the material of its instance from the material
+// table by the id of its shading and mixes the base color toward the tint of the instance in
+// display encoding before converting it to linear light. Indirect light comes
 // from the hemisphere ambient, or for a view that samples baked lighting from the irradiance
 // probe volume of its scene (group 3). The indirect specular light of a view that samples
 // reflection probes comes from the prefiltered cubemaps of the probes its clusters list. A view
@@ -20,17 +22,18 @@
 // scales the indirect diffuse light, and the indirect specular light by the specular occlusion
 // of Lagarde that follows from it. Blended draws take the ORM occlusion alone.
 // An alpha tested pipeline (alpha_cutout) discards the fragments whose alpha, the instance alpha
-// times the albedo alpha, is below the cutoff of their instance, once every texture is sampled.
+// times the albedo alpha, is below the cutoff of their material, once every texture is sampled.
 // A lit view draws its opaque meshes depth only first (vs_depth, vs_depth_cutout and
 // fs_depth_cutout), then shades them with depth compare Equal and without the alpha test.
 #include "include/instance.wgsl"
+#include "include/material.wgsl"
 #include "include/lights.wgsl"
 #include "include/shadow.wgsl"
 
 // BlendMode of the pipeline: the output is shaped for the blend equation it is drawn with.
 override blend_mode: u32 = 0u;
 
-// The pipeline alpha tests its fragments against the cutoff of their instance (AlphaCutoff).
+// The pipeline alpha tests its fragments against the cutoff of their material (AlphaCutoff).
 override alpha_cutout: bool = false;
 
 const PI: f32 = 3.141592653589793;
@@ -72,8 +75,9 @@ const MIN_ROUGHNESS: f32 = 0.045;
 
 @group(2) @binding(0) var<storage, read> transforms: array<InstanceTransform>;
 @group(2) @binding(1) var<storage, read> surface_assets: array<vec4f>;
-@group(2) @binding(2) var<storage, read> shadings: array<InstanceShading>;
+@group(2) @binding(2) var<storage, read> shadings: array<MeshShading>;
 @group(2) @binding(3) var<storage, read> surfaces: array<SurfaceData>;
+@group(2) @binding(4) var<storage, read> materials: array<Material>;
 
 // Grid of the probe volume: probe (x, y, z) sits at origin.xyz + (x, y, z) * origin.w, x
 // fastest in the probe buffer. size.w is 0 for the 1x1x1 volume of views that keep the
@@ -177,19 +181,20 @@ fn place(v: VertexIn) -> Placed {
     return Placed(model, normal, world, view.view_proj * world);
 }
 
-// Color, metallic and roughness, and UV of a vertex from the shading of its instance, with the
-// tint and material of its region on a parametric surface. Reads the surface_data place set.
+// Color, metallic and roughness, and UV of a vertex from the shading of its instance and its
+// material, with the tint and material of its region on a parametric surface. Reads the
+// surface_data place set.
 struct VertexShading {
     color: vec4f,
     material: vec2f,
     uv: vec2f,
 };
 
-fn vertex_shading(v: VertexIn, shading: InstanceShading) -> VertexShading {
+fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material) -> VertexShading {
     var o: VertexShading;
-    o.color = shading.color;
-    o.material = shading.material.xy;
-    o.uv = v.uv * shading.uv.xy + shading.uv.zw;
+    o.color = vec4f(material_color(material, mesh_shading_tint(shading)), shading.alpha);
+    o.material = vec2f(material.metallic, material.roughness);
+    o.uv = v.uv * material.uv.xy + material.uv.zw;
     if (surface_data.p[0].x != 0.0) {
         var region = i32(v.position.z);
         if (surface_data.p[0].x == 7.0) {
@@ -197,7 +202,7 @@ fn vertex_shading(v: VertexIn, shading: InstanceShading) -> VertexShading {
             if (abs(v.normal.y) > 0.5) {
                 region = 2;
             } else if (region == 1) {
-                o.uv.x -= 2.0 * shading.uv.x;
+                o.uv.x -= 2.0 * material.uv.x;
             }
         }
         var material_region = 2;
@@ -224,21 +229,22 @@ fn vertex_shading(v: VertexIn, shading: InstanceShading) -> VertexShading {
 
 @vertex fn vs(v: VertexIn) -> VertexOut {
     let shading = shadings[v.slot];
+    let material = material_fetch(shading.material);
     let p = place(v);
     let c0 = p.model[0].xyz;
     let c1 = p.model[1].xyz;
     let c2 = p.model[2].xyz;
     let cofactor = mat3x3f(cross(c1, c2), cross(c2, c0), cross(c0, c1));
     let flip = select(1.0, -1.0, dot(c0, cross(c1, c2)) < 0.0);
-    let s = vertex_shading(v, shading);
+    let s = vertex_shading(v, shading, material);
     var o: VertexOut;
     o.pos = p.pos;
     o.world = p.world.xyz;
     o.normal = cofactor * p.normal * flip;
     o.color = s.color;
-    o.emissive = shading.emissive.rgb;
+    o.emissive = material.emissive;
     o.material = s.material;
-    o.cutoff = shading.material.z;
+    o.cutoff = material.cutoff;
     o.uv = s.uv;
     return o;
 }
@@ -255,9 +261,10 @@ struct DepthOut {
 }
 
 // The alpha tested meshes of the prepass draw with vs_depth_cutout and fs_depth_cutout, which
-// also bind the shading stream and the texture layers and discard what fs discards: the alpha
-// of the vertex as vs makes it times the albedo alpha, below the cutoff of the instance. The
-// forward pass after the prepass does not alpha test, its Equal depth test rejects those.
+// also bind the shading stream, the material table and the texture layers and discard what fs
+// discards: the alpha of the vertex as vs makes it times the albedo alpha, below the cutoff of
+// the material. The forward pass after the prepass does not alpha test, its Equal depth test
+// rejects those.
 struct DepthCutoutOut {
     @builtin(position) @invariant pos: vec4f,
     @location(0) uv: vec2f,
@@ -267,9 +274,10 @@ struct DepthCutoutOut {
 
 @vertex fn vs_depth_cutout(v: VertexIn) -> DepthCutoutOut {
     let shading = shadings[v.slot];
+    let material = material_fetch(shading.material);
     let p = place(v);
-    let s = vertex_shading(v, shading);
-    return DepthCutoutOut(p.pos, s.uv, s.color.a, shading.material.z);
+    let s = vertex_shading(v, shading, material);
+    return DepthCutoutOut(p.pos, s.uv, s.color.a, material.cutoff);
 }
 
 @fragment fn fs_depth_cutout(f: DepthCutoutOut) {

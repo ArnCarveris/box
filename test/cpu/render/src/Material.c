@@ -1,6 +1,7 @@
 /**
  * @file Material.c
- * @brief Tests for the material defaults the draws write into the shading of the instances.
+ * @brief Tests for the material defaults the draws write into the material table and into the
+ * shading of the 2D instances.
  */
 
 #include <box.h>
@@ -11,16 +12,26 @@
 void Material_default_roughness_without_material(void) {
     // materials/pbr
     box_render_shading_t inst = {0};
+    box_render_material_t record = {0};
     box_draw_material_t material = {0};
     box_draws_material(&inst, &material);
     test_flt(inst.material[0], 0);
     test_flt(inst.material[1], 1);
+    box_draws_material_pack(&record, &material);
+    test_flt(record.metallic, 0);
+    test_flt(record.roughness, 1);
+    test_uint(record.color, 204u | (204u << 8) | (204u << 16));
+    test_flt(record.uv[0], 1);
+    test_flt(record.uv[1], 1);
 
     PbrMaterial pbr = { .metallic = 0.25f, .roughness = 0.3f };
     material.pbr = &pbr;
     box_draws_material(&inst, &material);
     test_flt(inst.material[0], 0.25f);
     test_flt(inst.material[1], 0.3f);
+    box_draws_material_pack(&record, &material);
+    test_flt(record.metallic, 0.25f);
+    test_flt(record.roughness, 0.3f);
 }
 
 void Material_default_roughness_metallic_only(void) {
@@ -51,11 +62,11 @@ void Material_default_roughness_metallic_only(void) {
     test_flt(pbr->metallic, 0);
     test_flt(pbr->roughness, 0.3f);
 
-    box_render_shading_t inst = {0};
-    box_draws_material(&inst, &(box_draw_material_t){
+    box_render_material_t record = {0};
+    box_draws_material_pack(&record, &(box_draw_material_t){
         .pbr = ecs_get(world, ecs_lookup(world, "metal"), PbrMaterial)});
-    test_flt(inst.material[0], 1);
-    test_flt(inst.material[1], 1);
+    test_flt(record.metallic, 1);
+    test_flt(record.roughness, 1);
 
     ecs_fini(world);
 }
@@ -69,16 +80,16 @@ void Material_alpha_cutoff_instance(void) {
     test_flt(ecs_get(world, e, AlphaCutoff)->value, 0.5f);
     ecs_fini(world);
 
-    box_render_shading_t inst = {0};
+    box_render_material_t record = {0};
     AlphaCutoff mid = {0.3f}, high = {2}, low = {-1};
-    box_draws_material(&inst, &(box_draw_material_t){ .fade = 1 });
-    test_flt(inst.material[2], 0);
-    box_draws_material(&inst, &(box_draw_material_t){ .cutoff = &mid, .fade = 1 });
-    test_flt(inst.material[2], 0.3f);
-    box_draws_material(&inst, &(box_draw_material_t){ .cutoff = &high, .fade = 1 });
-    test_flt(inst.material[2], 1);
-    box_draws_material(&inst, &(box_draw_material_t){ .cutoff = &low, .fade = 1 });
-    test_flt(inst.material[2], 0);
+    box_draws_material_pack(&record, &(box_draw_material_t){ .fade = 1 });
+    test_flt(record.cutoff, 0);
+    box_draws_material_pack(&record, &(box_draw_material_t){ .cutoff = &mid, .fade = 1 });
+    test_flt(record.cutoff, 0.3f);
+    box_draws_material_pack(&record, &(box_draw_material_t){ .cutoff = &high, .fade = 1 });
+    test_flt(record.cutoff, 1);
+    box_draws_material_pack(&record, &(box_draw_material_t){ .cutoff = &low, .fade = 1 });
+    test_flt(record.cutoff, 0);
 
     Shape2D shape = {0};
     test_bool(box_draws_cutout(&mid, NULL), true);

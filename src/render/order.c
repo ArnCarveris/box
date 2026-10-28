@@ -473,7 +473,7 @@ void box_draws_send_ordered(
             out->shadow = false;
             out->mesh = b->key.mesh;
             box_draws_batch_textures(d, b, out);
-            out->instances = box_draws_store_handle(&d->store, b->page,
+            out->instances = box_draws_store_handle(box_draws_batch_store(d, b), b->page,
                 BOX_RENDER_STREAM_TRANSFORM);
             out->first_instance = b->first + run->first;
             out->instance_count = run->count;

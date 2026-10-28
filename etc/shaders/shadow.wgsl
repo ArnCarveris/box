@@ -3,10 +3,11 @@
 // instance; vs only reads the transform stream and the surface stream of the instance page
 // (group 1 without the shading stream).
 // Alpha tested casters (AlphaCutoff) draw with vs_cutout and fs_cutout, which also bind the
-// shading stream and read the UV, the UV transform, the alpha and the cutoff of the instance and
-// discard where the alpha times the albedo alpha of the batch (group 2) is below the cutoff, as
-// the forward pass does.
+// shading stream and the material table, read the alpha of the instance and the UV transform and
+// the cutoff of its material, and discard where the alpha times the albedo alpha of the batch
+// (group 2) is below the cutoff, as the forward pass does.
 #include "include/instance.wgsl"
+#include "include/material.wgsl"
 
 struct Cascade {
     matrix: mat4x4f,
@@ -15,8 +16,9 @@ struct Cascade {
 @group(0) @binding(0) var<uniform> cascade: Cascade;
 @group(1) @binding(0) var<storage, read> transforms: array<InstanceTransform>;
 @group(1) @binding(1) var<storage, read> surface_assets: array<vec4f>;
-@group(1) @binding(2) var<storage, read> shadings: array<InstanceShading>;
+@group(1) @binding(2) var<storage, read> shadings: array<MeshShading>;
 @group(1) @binding(3) var<storage, read> surfaces: array<SurfaceData>;
+@group(1) @binding(4) var<storage, read> materials: array<Material>;
 
 @group(2) @binding(0) var albedo_map: texture_2d<f32>;
 @group(2) @binding(4) var material_sampler: sampler;
@@ -63,14 +65,15 @@ fn caster_position(slot: u32, vertex: vec3f) -> vec4f {
 // two tiles over, moves back.
 @vertex fn vs_cutout(v: CutoutIn) -> CutoutOut {
     let shading = shadings[v.slot];
+    let material = material_fetch(shading.material);
     var o: CutoutOut;
     o.pos = caster_position(v.slot, v.position);
-    o.uv = v.uv * shading.uv.xy + shading.uv.zw;
+    o.uv = v.uv * material.uv.xy + material.uv.zw;
     if (surface_data.p[0].x == 7.0 && v.uv.x >= 2.0 && abs(v.normal.y) <= 0.5) {
-        o.uv.x -= 2.0 * shading.uv.x;
+        o.uv.x -= 2.0 * material.uv.x;
     }
-    o.alpha = shading.color.a;
-    o.cutoff = shading.material.z;
+    o.alpha = shading.alpha;
+    o.cutoff = material.cutoff;
     return o;
 }
 

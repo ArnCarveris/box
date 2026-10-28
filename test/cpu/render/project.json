@@ -247,6 +247,24 @@
                 ]
             },
             {
+                "id": "MaterialIds",
+                "testcases": [
+                    "prefab_instances_share_slot",
+                    "prefab_color_uploads_one_record",
+                    "override_gets_own_slot",
+                    "override_slot_freed_and_reused",
+                    "nested_prefab_own_slot",
+                    "plain_entity_own_slot_keeps_it_with_base",
+                    "prefab_delete_frees_slot",
+                    "script_reload_keeps_slot_count",
+                    "tinted_instance_keeps_prefab_id",
+                    "lights_2d_texts_get_no_slot",
+                    "dynamic_material_own_slot_repacks",
+                    "dynamic_material_instance_uploads_shading",
+                    "table_grows"
+                ]
+            },
+            {
                 "id": "InstanceStreams",
                 "testcases": [
                     "dynamic_transform_uploads_transforms",
