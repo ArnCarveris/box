@@ -1,0 +1,46 @@
+// Constants of the game. The oreelse systems read them as cfg.<name>, once per run of a system.
+
+using oreelse
+
+cfg {
+  // The map: rows by cols tiles with an edge of tile units. Tile (row, col) is centered at
+  // x = x0 + col * tile, z = z0 + row * tile, so the centers span -47 to 47 and the world
+  // origin is the corner of tiles (23, 23), (23, 24), (24, 23) and (24, 24)
+  export const rows: i32 = 48
+  export const cols: i32 = 48
+  export const tile: f32 = 2
+  export const x0: f32 = -47
+  export const z0: f32 = -47
+
+  // The astronaut stays within [-mapClamp, mapClamp] on x and z, the centers of the edge tiles
+  export const mapClamp: f32 = 47
+
+  // Ore of a new deposit, its amount and its capacity
+  export const depositAmount: i32 = 1000
+
+  // Walking speed in units per second, and its multiplier while the run key is held
+  export const walkSpeed: f32 = 7
+  export const runMultiplier: f32 = 2
+
+  // The zoom levels of the camera, from 0 (closest, 44.6 degrees down) to 2 (59.5 degrees):
+  // the camera sits height above the ground and back behind the astronaut and looks at the
+  // point look above it
+  export const zoom: OreZoom = {
+    height: [15, 26.3, 38.9],
+    back: [14, 18.7, 20.7],
+    look: [1.2, 2.5, 3.8]
+  }
+
+  // The camera covers cameraGlide * dt of the distance to its target every frame
+  export const cameraGlide: f32 = 5
+
+  // Seconds of play a warning toast and any other toast are shown
+  export const warnToast: f32 = 2.5
+  export const infoToast: f32 = 4
+
+  // The blink signals: fast is sin(elapsed * blinkFast) > 0, slow sin(elapsed * blinkSlow) > 0,
+  // and the lamp is on for the first half of every 1 / lampRate seconds
+  export const blinkFast: f32 = 8
+  export const blinkSlow: f32 = 6
+  export const lampRate: f32 = 1.4
+}

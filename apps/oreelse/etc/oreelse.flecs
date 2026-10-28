@@ -1,0 +1,67 @@
+// Ore Else: you crash-landed on a hostile planet. The game is played top down on a 48x48 tile
+// map with a camera that follows the astronaut. This scene holds the window, the camera, the
+// light and the view; the included scripts hold the constants, the models, the input, the map
+// and the run. The game boots into the title screen.
+
+include config
+include items
+include materials/terrain
+include props/ore
+include particles/jet_plume
+include player
+include input
+include world
+include deposits
+include run
+
+using flecs.script.math
+using box.transform
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.surface
+using oreelse
+
+window {
+  Surface: {width: 1280, height: 720, vsync: true}
+}
+
+// The camera of the original, 50 degrees of field of view. OreCameraFollow places it above the
+// astronaut at the zoom level of OreView every frame
+camera {
+  Camera: {fov: 50, near_: 0.5, far_: 500}
+  Position: {0, 15, 14}
+  Rotation: {-atan2(15 - 1.2, 14), 0, 0}
+  DynamicTransform
+}
+
+// The sun of the original shines from (-1.4, 1.8, 1.2) toward the origin, its +Z along
+// -(-1.4, 1.8, 1.2), in its warm color. Without exposure and tone mapping (OreLook) it is
+// brighter than the original's 1.5, so the scene reads clearly
+sun {
+  Rotation: {asin(1.8 / sqrt(1.96 + 3.24 + 1.44)), atan2(1.4, -1.2), 0}
+  DirectionalLight: {intensity: 3}
+  Rgb: {255, 206, 168}
+}
+
+// Ambient light from a pale dusty sky above and the sand below
+ambient {
+  AmbientLight: {sky: {150, 158, 178}, ground: {120, 92, 70}, intensity: 1}
+}
+
+main_view {
+  View: {
+    camera: camera,
+    clear: {enabled: true, color: {178, 150, 128, 255}},
+    lighting: {enabled: true, atmosphere: false},
+    shadows: {enabled: true, resolution: 4096, max_distance: 140},
+    effects: []
+  }
+}
+
+// The camera starts at zoom level 0; height 0 snaps it there on the first frame
+$ {
+  OreView: {camera: camera, level: 0, height: 0, back: 0, look: 0}
+  (OreGameState, Title)
+}

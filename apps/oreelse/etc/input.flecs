@@ -1,0 +1,77 @@
+// Input: every key is an Action with a Binding. The held actions (walking, running) are read
+// by the oreelse systems through the OreActions singleton; the actions that fire once are
+// awaited by the loops below, each calling the oreelse function behind it. The key that starts
+// the game on the title screen is any key (OreTitleStart reads the keys).
+
+using flecs.script
+using box.input
+using oreelse
+
+actions {
+  // Walking keys apply with the run key held too
+  Forward {
+    Action: {description: "Walk north, toward -Z"}
+    Binding: {key: W, ignore_modifiers: true}
+  }
+
+  Back {
+    Action: {description: "Walk south, toward +Z"}
+    Binding: {key: S, ignore_modifiers: true}
+  }
+
+  Left {
+    Action: {description: "Walk west, toward -X"}
+    Binding: {key: A, ignore_modifiers: true}
+  }
+
+  Right {
+    Action: {description: "Walk east, toward +X"}
+    Binding: {key: D, ignore_modifiers: true}
+  }
+
+  Run {
+    Action: {description: "Run at twice the walking speed while held"}
+
+    left_shift {
+      Binding: {key: ShiftLeft, ignore_modifiers: true}
+    }
+
+    right_shift {
+      Binding: {key: ShiftRight, ignore_modifiers: true}
+    }
+  }
+
+  Cancel {
+    Action: {description: "Back out of one thing; with nothing left, pause or resume"}
+    Binding: {key: Escape}
+  }
+
+  Restart {
+    Action: {description: "Start a new run once the game is won or lost"}
+    Binding: {key: R}
+  }
+}
+
+$ {
+  OreActions: {
+    forward: actions.Forward,
+    back: actions.Back,
+    left: actions.Left,
+    right: actions.Right,
+    run: actions.Run
+  }
+}
+
+async {
+  while true {
+    await on.pressed(actions.Cancel)
+    await oreelse.cancel()
+  }
+}
+
+async {
+  while true {
+    await on.pressed(actions.Restart)
+    await oreelse.restart()
+  }
+}

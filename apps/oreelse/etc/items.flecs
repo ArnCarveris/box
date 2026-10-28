@@ -1,0 +1,10 @@
+// The items of the game, prefabs the deposits and later the inventory and the recipes name.
+// The mining and inventory tasks give them their components (mining time, name, icon).
+
+items {
+  // The ores of the deposits
+  prefab Iron {}
+  prefab Copper {}
+  prefab Stone {}
+  prefab Luminite {}
+}

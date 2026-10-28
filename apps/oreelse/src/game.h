@@ -1,0 +1,344 @@
+/**
+ * @file game.h
+ * @brief The oreelse module: components of the game and the functions its areas share.
+ *
+ * The scene (apps/oreelse/etc) holds the constants cfg.*, the models, the singletons and the
+ * entities of a run; the systems of each area (flow.c, map.c, player.c) play the game.
+ */
+
+#ifndef OREELSE_GAME_H
+#define OREELSE_GAME_H
+
+#include <oreelse.h>
+
+#ifdef OREELSE_IMPL
+#define ECS_META_IMPL IMPL
+#else
+#define ECS_META_IMPL EXTERN
+#endif
+
+/** Zoom levels of the camera, the size of the arrays of OreZoom */
+#define ORE_ZOOM_LEVELS (3)
+
+/** Read the float constant cfg.<name> of the scene (etc/config.flecs) */
+#define ORE_CFG(world, name) ecs_const_var_get_t(world, "cfg." name, ecs_f32_t)
+
+/** Read the integer constant cfg.<name> of the scene (etc/config.flecs) */
+#define ORE_CFG_I32(world, name) ecs_const_var_get_t(world, "cfg." name, ecs_i32_t)
+
+/** State of the game, an exclusive relationship on its own singleton entity: scripts test it
+ * with `OreGameState?[(OreGameState, Paused)]`. The game boots into Title and restart()
+ * starts a new run in Playing. Gameplay systems match (OreGameState, Playing).
+ */
+ECS_ENUM(OreGameState, {
+    OreGameStateTitle,   /**< The title screen, any key or a left or right click starts */
+    OreGameStatePlaying, /**< The game runs */
+    OreGameStatePaused,  /**< Everything stands still until cancel() resumes */
+    OreGameStateWon,     /**< The astronaut left on a rocket with life support */
+    OreGameStateLost     /**< The swarm killed the astronaut */
+});
+
+/** Seed of the session, a singleton main.c sets from --seed or the time. Run k after the start
+ * draws from a seed derived from seed and k, see ore_seed_get.
+ */
+ECS_STRUCT(OreSeed, {
+    uint64_t seed; /**< Seed of the session */
+    int32_t run;   /**< Runs started before the current one, restart() counts it up */
+});
+
+/** The generator of the random choices C makes, a splitmix64 state that run.flecs seeds with
+ * oreelse.seed(0) at the start of every run and every draw of ore_random01 advances.
+ */
+ECS_STRUCT(OreRandom, {
+    uint64_t state; /**< State of the generator */
+});
+
+/** Play time of the run, counted while playing; run.flecs sets it to 0 */
+ECS_STRUCT(OreClock, {
+    float elapsed; /**< Seconds played, the survival time of the end screen */
+});
+
+/** Blink signals of the UI and the building lamps, computed from OreClock.elapsed, so they
+ * freeze while paused. Modified only when one of them flips.
+ */
+ECS_STRUCT(OreBlink, {
+    bool fast; /**< sin(elapsed * cfg.blinkFast) > 0 */
+    bool slow; /**< sin(elapsed * cfg.blinkSlow) > 0 */
+    bool lamp; /**< On for the first half of every 1 / cfg.lampRate seconds */
+});
+
+/** The one line message at the bottom of the screen, shown with ore_toast. Modified when a
+ * message starts and when it ends, not while it counts.
+ */
+ECS_STRUCT(OreToast, {
+    char *text; /**< The message, empty when none is shown */
+    bool warn;  /**< The message is a warning, shown cfg.warnToast instead of cfg.infoToast */
+    float age;  /**< Seconds the message was shown while playing */
+});
+
+/** The zoom levels of the camera, the type of cfg.zoom: level i sits height above the
+ * astronaut and back behind it, looking at look above it.
+ */
+ECS_STRUCT(OreZoom, {
+    float height[3]; /**< Height of the camera above the ground per level */
+    float back[3];   /**< Distance of the camera behind the astronaut along +Z per level */
+    float look[3];   /**< Height of the point the camera looks at per level */
+});
+
+/** The camera that follows the astronaut, a singleton scene.flecs sets. A restart keeps it,
+ * and so the zoom level. Modified when the level or the glide changes.
+ */
+ECS_STRUCT(OreView, {
+    ecs_entity_t camera; /**< Camera entity the view moves */
+    int32_t level;       /**< Zoom level, 0 to ORE_ZOOM_LEVELS - 1, the wheel steps it */
+    float height;        /**< Height of the camera, gliding to the level's; 0 snaps to it */
+    float back;          /**< Distance behind the astronaut, gliding to the level's */
+    float look;          /**< Height of the look point, gliding to the level's */
+});
+
+/** The held actions the C systems read, a singleton input.flecs sets */
+ECS_STRUCT(OreActions, {
+    ecs_entity_t forward; /**< Walk toward -Z */
+    ecs_entity_t back;    /**< Walk toward +Z */
+    ecs_entity_t left;    /**< Walk toward -X */
+    ecs_entity_t right;   /**< Walk toward +X */
+    ecs_entity_t run;     /**< Run at cfg.runMultiplier times the walk speed */
+});
+
+/** The astronaut the player walks with WASD. Modified when a member changes */
+ECS_STRUCT(OrePlayer, {
+    bool moving;  /**< A walk key is held while playing */
+    bool running; /**< Moving with the run key held */
+});
+
+/** A limb pivot of a model; its Rotation.x swings with the walk (OrePlayerFx) */
+ECS_STRUCT(OreLimb, {
+    float phase; /**< Offset of the limb in the walk cycle */
+    float swing; /**< Largest angle of the swing in radians */
+});
+
+/** An ore deposit on one tile, registered in the tile grid of OreMap when it is set */
+ECS_STRUCT(OreDeposit, {
+    ecs_entity_t resource; /**< Item prefab the deposit yields (items.flecs) */
+    int32_t amount;        /**< Ore left, the deposit is deleted at 0 */
+    int32_t capacity;      /**< Ore of the full deposit */
+    int32_t row;           /**< Row of its tile, set when it registers, -1 off the grid */
+    int32_t col;           /**< Column of its tile, set when it registers, -1 off the grid */
+});
+
+/** The tile grid, a singleton: the deposit and the building on every tile. A deposit and a
+ * building can share a tile (a drill sits on a deposit). The cells clear themselves when their
+ * entities are deleted, so a restart that deletes the run's entities empties it.
+ */
+ECS_STRUCT(OreMap, {
+    int32_t rows;              /**< Rows of the grid, cfg.rows once a cell was registered */
+    int32_t cols;              /**< Columns of the grid, cfg.cols once a cell was registered */
+ECS_PRIVATE                    /**< The cells are not reflected */
+    ecs_entity_t *deposits;    /**< Deposit of every tile, row major, 0 for none */
+    ecs_entity_t *buildings;   /**< Building of every tile, row major, 0 for none */
+});
+
+/** Marks an entity created by a script that sets up a run: restart() reloads the script of
+ * every entity with it, which deletes the entities of the run and creates those of a new one
+ */
+extern ECS_TAG_DECLARE(OreRunScript);
+
+/** The geometry of the tile grid, read from cfg once per system run */
+typedef struct ore_grid_t {
+    int32_t rows; /**< Rows, cfg.rows */
+    int32_t cols; /**< Columns, cfg.cols */
+    float tile;   /**< Edge of a tile, cfg.tile */
+    float x0;     /**< X of the center of column 0, cfg.x0 */
+    float z0;     /**< Z of the center of row 0, cfg.z0 */
+} ore_grid_t;
+
+/** Check whether the game is in a state.
+ *
+ * @param world The world
+ * @param state The state
+ * @return Whether (OreGameState, state) is on the singleton
+ */
+bool ore_state_is(
+    const ecs_world_t *world,
+    OreGameState state);
+
+/** Switch the game to a state.
+ *
+ * @param world The world or a stage
+ * @param state The state
+ */
+void ore_state_set(
+    ecs_world_t *world,
+    OreGameState state);
+
+/** Get the pair of a state, for a query term with OreGameState as its source.
+ *
+ * @param world The world
+ * @param state The state
+ * @return The pair (OreGameState, state)
+ */
+ecs_id_t ore_state_pair(
+    const ecs_world_t *world,
+    OreGameState state);
+
+/** Complete the future of an async script function with a bool result.
+ *
+ * @param future The future
+ * @param value The result
+ */
+void ore_resolve(
+    ecs_script_future_t *future,
+    bool value);
+
+/** Derive a seed for the current run from the session seed (OreSeed): run k of a session
+ * draws from a seed of its own, and every stream of a run is independent.
+ *
+ * @param world The world
+ * @param stream Stream of the run: 0 the C generator, others the scripts (oreelse.seed)
+ * @return The seed, never 0
+ */
+uint64_t ore_seed_get(
+    const ecs_world_t *world,
+    int32_t stream);
+
+/** Draw the next number of the generator of the run (OreRandom).
+ *
+ * @param world The world
+ * @return A number from 0 up to but not including 1
+ */
+float ore_random01(
+    ecs_world_t *world);
+
+/** Show a one line message at the bottom of the screen, replacing the current one.
+ *
+ * Warnings last cfg.warnToast seconds of play, other messages cfg.infoToast.
+ *
+ * @param world The world
+ * @param warn Whether the message is a warning
+ * @param fmt printf format of the message
+ * @param ... Arguments of the format
+ */
+void ore_toast(
+    ecs_world_t *world,
+    bool warn,
+    const char *fmt,
+    ...);
+
+/** Read the geometry of the tile grid from cfg.
+ *
+ * @param world The world
+ * @return The grid
+ */
+ore_grid_t ore_grid_get(
+    const ecs_world_t *world);
+
+/** Get the x of the center of a column.
+ *
+ * @param grid The grid
+ * @param col The column
+ * @return x0 + col * tile
+ */
+float ore_tile_x(
+    const ore_grid_t *grid,
+    int32_t col);
+
+/** Get the z of the center of a row.
+ *
+ * @param grid The grid
+ * @param row The row
+ * @return z0 + row * tile
+ */
+float ore_tile_z(
+    const ore_grid_t *grid,
+    int32_t row);
+
+/** Get the column of the tile an x lies in.
+ *
+ * @param grid The grid
+ * @param x World x
+ * @return floor((x - x0) / tile + 0.5), possibly off the grid
+ */
+int32_t ore_col_at(
+    const ore_grid_t *grid,
+    float x);
+
+/** Get the row of the tile a z lies in.
+ *
+ * @param grid The grid
+ * @param z World z
+ * @return floor((z - z0) / tile + 0.5), possibly off the grid
+ */
+int32_t ore_row_at(
+    const ore_grid_t *grid,
+    float z);
+
+/** Check whether a tile is on the grid.
+ *
+ * @param grid The grid
+ * @param row The row
+ * @param col The column
+ * @return Whether row and col are within the rows and columns
+ */
+bool ore_on_grid(
+    const ore_grid_t *grid,
+    int32_t row,
+    int32_t col);
+
+/** Get the deposit cell of a tile.
+ *
+ * @param map The tile grid
+ * @param row The row
+ * @param col The column
+ * @return The cell, NULL off the grid or before the first registration
+ */
+ecs_entity_t* ore_map_deposit(
+    OreMap *map,
+    int32_t row,
+    int32_t col);
+
+/** Get the building cell of a tile.
+ *
+ * @param map The tile grid
+ * @param row The row
+ * @param col The column
+ * @return The cell, NULL off the grid or before the first registration
+ */
+ecs_entity_t* ore_map_building(
+    OreMap *map,
+    int32_t row,
+    int32_t col);
+
+/** Register the game flow: states, clock, blink, toast, cancel() and restart().
+ *
+ * @param world The world
+ */
+void ore_flow_import(
+    ecs_world_t *world);
+
+/** Register the map: the tile grid and the deposits that register in it.
+ *
+ * @param world The world
+ */
+void ore_map_import(
+    ecs_world_t *world);
+
+/** Register the player: walking and the camera that follows the astronaut.
+ *
+ * @param world The world
+ */
+void ore_player_import(
+    ecs_world_t *world);
+
+/** Register the oreelse module.
+ *
+ * Registers the components, the systems of every area and the script functions
+ * oreelse.seed(), oreelse.cancel() and oreelse.restart().
+ *
+ * @param world The world
+ */
+void OreelseImport(
+    ecs_world_t *world);
+
+#undef ECS_META_IMPL
+
+#endif

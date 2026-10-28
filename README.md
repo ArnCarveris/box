@@ -30,6 +30,7 @@ bake3 run apps/boxrun --local-env -- etc/scenes/default.flecs  # open the defaul
 bake3 run apps/boxrun --local-env -- --surface 1280x720 test/integration/visual/bake_bounces.flecs
                                                           # a window for a scene without a Surface
 bake3 run apps/bunnyhopper --local-env                    # play the bunny hopper
+bake3 run apps/oreelse --local-env                        # play Ore Else (apps/oreelse/README.md)
 ```
 
 Box opens files relative to the working directory or, failing that, one of its ancestors, so a

@@ -1,0 +1,8 @@
+// A fixed session seed for the visual scenes, which include it before the game: the map and
+// the models of the deposits are the same in every render.
+
+using oreelse
+
+$ {
+  OreSeed: {seed: 7, run: 0}
+}

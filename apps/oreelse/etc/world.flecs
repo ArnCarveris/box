@@ -1,0 +1,17 @@
+// The ground: a wide plain, and the basin of the playable area sunk into it with its top just
+// above the plain. OreLook adds the hazard band around the basin.
+
+using box.transform
+using box.geometry
+
+world {
+  ground : GroundSurface {
+    Position: {0, -0.5, 0}
+    Box: {260, 1, 260}
+  }
+
+  basin : BasinSurface {
+    Position: {0, -0.45, 0}
+    Box: {104, 0.92, 104}
+  }
+}

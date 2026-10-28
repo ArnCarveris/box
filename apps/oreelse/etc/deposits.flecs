@@ -1,0 +1,120 @@
+// The ore deposits of a run, one tile each, generated from the seed of the run (rng.f(x) is
+// uniform in [0, x)). Luminite takes the four tiles at the center of the map around the
+// astronaut's start. Iron, copper and stone come in two 3x3 clusters each, on opposite sides of
+// the center: cluster i draws its angle, then its radius in tiles, and every tile one more
+// draw for the rotation of its model. A deposit on a tile an earlier one took is deleted when
+// it registers in the tile grid. oreelse.restart() reloads this script for a new map.
+
+using flecs.script.math
+using box.transform
+using oreelse
+
+const rng: Rng = {seed: oreelse.seed(1)}
+const centerRng: Rng = {seed: oreelse.seed(2)}
+
+// The look of each ore: the tint of the chunks, the tint of the pad and the slabs, the glow
+const ironTint: Rgb = {84, 138, 210}
+const ironPad: Rgb = {66, 66, 74}
+const copperTint: Rgb = {244, 138, 46}
+const copperPad: Rgb = {78, 62, 52}
+const stoneTint: Rgb = {186, 184, 180}
+const stonePad: Rgb = {82, 76, 70}
+const luminiteTint: Rgb = {84, 240, 216}
+const luminitePad: Rgb = {50, 68, 72}
+
+deposits {
+  OreRunScript
+
+  for j in 0..4 {
+    const col = 23 + j % 2
+    const row = 23 + floor(j / 2)
+
+    "luminite_{j}" {
+      Position: {cfg.x0 + col * cfg.tile, 0, cfg.z0 + row * cfg.tile}
+      Rotation: {0, centerRng.f(6.28), 0}
+      Ore: {
+        tint: luminiteTint, padTint: luminitePad, glow: 1.4,
+        metallic: 0.1, roughness: 0.06,
+        chunks: 10, chunkSize: 0.2, chunkTall: 2.2, spread: 0.5
+      }
+      OreDeposit: {
+        resource: items.Luminite, amount: cfg.depositAmount, capacity: cfg.depositAmount
+      }
+    }
+  }
+
+  for i in 0..2 {
+    const a = i * PI + rng.f(0.9)
+    const r = 4.5 + rng.f(3)
+    const cc = round(24 + cos(a) * r)
+    const cr = round(24 + sin(a) * r)
+
+    for j in 0..9 {
+      const col = cc + j % 3 - 1
+      const row = cr + floor(j / 3) - 1
+
+      "iron_{i}_{j}" {
+        Position: {cfg.x0 + col * cfg.tile, 0, cfg.z0 + row * cfg.tile}
+        Rotation: {0, rng.f(6.28), 0}
+        Ore: {
+          tint: ironTint, padTint: ironPad, glow: 0.25,
+          metallic: 0.45, roughness: 0.12,
+          chunks: 12, chunkSize: 0.28, spread: 0.62
+        }
+        OreDeposit: {
+          resource: items.Iron, amount: cfg.depositAmount, capacity: cfg.depositAmount
+        }
+      }
+    }
+  }
+
+  for i in 0..2 {
+    const a = 1.0472 + i * PI + rng.f(0.9)
+    const r = 6 + rng.f(3.75)
+    const cc = round(24 + cos(a) * r)
+    const cr = round(24 + sin(a) * r)
+
+    for j in 0..9 {
+      const col = cc + j % 3 - 1
+      const row = cr + floor(j / 3) - 1
+
+      "copper_{i}_{j}" {
+        Position: {cfg.x0 + col * cfg.tile, 0, cfg.z0 + row * cfg.tile}
+        Rotation: {0, rng.f(6.28), 0}
+        Ore: {
+          tint: copperTint, padTint: copperPad, glow: 0.25,
+          metallic: 0.25, roughness: 0.12,
+          chunks: 12, chunkSize: 0.28, spread: 0.62
+        }
+        OreDeposit: {
+          resource: items.Copper, amount: cfg.depositAmount, capacity: cfg.depositAmount
+        }
+      }
+    }
+  }
+
+  for i in 0..2 {
+    const a = 2.0944 + i * PI + rng.f(0.8)
+    const r = 3.75 + rng.f(3)
+    const cc = round(24 + cos(a) * r)
+    const cr = round(24 + sin(a) * r)
+
+    for j in 0..9 {
+      const col = cc + j % 3 - 1
+      const row = cr + floor(j / 3) - 1
+
+      "stone_{i}_{j}" {
+        Position: {cfg.x0 + col * cfg.tile, 0, cfg.z0 + row * cfg.tile}
+        Rotation: {0, rng.f(6.28), 0}
+        Ore: {
+          tint: stoneTint, padTint: stonePad, glow: 0.25,
+          metallic: 0.05, roughness: 0.3,
+          chunks: 13, chunkSize: 0.34, chunkTall: 0.85, spread: 0.66
+        }
+        OreDeposit: {
+          resource: items.Stone, amount: cfg.depositAmount, capacity: cfg.depositAmount
+        }
+      }
+    }
+  }
+}

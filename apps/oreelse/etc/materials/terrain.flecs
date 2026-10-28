@@ -1,0 +1,14 @@
+// The materials of the ground and the basin, the GroundSurface and BasinSurface of the
+// original. OreLook adds the dirt textures.
+
+using box.material
+
+prefab GroundSurface {
+  Rgb: {187, 137, 96}
+  PbrMaterial: {metallic: 0, roughness: 1}
+}
+
+prefab BasinSurface {
+  Rgb: {212, 160, 114}
+  PbrMaterial: {metallic: 0, roughness: 1}
+}
