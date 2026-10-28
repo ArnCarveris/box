@@ -52,7 +52,7 @@ void ShaderCompile_failed_recompile_keeps_module(void) {
     // render_fixes/shader_compile_web
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, ShaderSettings, {.poll_interval = -1});
+    ecs_singleton_set(world, FileWatch, {.interval = -1});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -132,7 +132,7 @@ void ShaderCompile_recompile_in_flight_keeps_old_module(void) {
     // render_fixes/shader_compile_web
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, ShaderSettings, {.poll_interval = -1});
+    ecs_singleton_set(world, FileWatch, {.interval = -1});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -188,7 +188,7 @@ void ShaderCompile_broken_recompile_in_flight_reports_error(void) {
     // render_fixes/shader_compile_web
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, ShaderSettings, {.poll_interval = -1});
+    ecs_singleton_set(world, FileWatch, {.interval = -1});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -251,7 +251,7 @@ void ShaderCompile_error_stays_until_outcome(void) {
     // render_fixes/shader_compile_web
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, ShaderSettings, {.poll_interval = -1});
+    ecs_singleton_set(world, FileWatch, {.interval = -1});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -321,7 +321,7 @@ void ShaderCompile_two_recompiles_in_flight_end_with_newest(void) {
     // render_fixes/shader_compile_web
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, ShaderSettings, {.poll_interval = -1});
+    ecs_singleton_set(world, FileWatch, {.interval = -1});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -383,7 +383,7 @@ void ShaderCompile_late_older_outcome_is_ignored(void) {
     // render_fixes/shader_compile_web
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, ShaderSettings, {.poll_interval = -1});
+    ecs_singleton_set(world, FileWatch, {.interval = -1});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -441,7 +441,7 @@ void ShaderCompile_new_shader_before_first_outcome(void) {
     // render_fixes/shader_compile_web
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, ShaderSettings, {.poll_interval = -1});
+    ecs_singleton_set(world, FileWatch, {.interval = -1});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -500,7 +500,7 @@ void ShaderCompile_delete_shader_mid_compile(void) {
     // render_fixes/shader_compile_web
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, ShaderSettings, {.poll_interval = -1});
+    ecs_singleton_set(world, FileWatch, {.interval = -1});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -552,7 +552,7 @@ void ShaderCompile_fini_mid_compile(void) {
     // render_fixes/shader_compile_web
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, ShaderSettings, {.poll_interval = -1});
+    ecs_singleton_set(world, FileWatch, {.interval = -1});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);

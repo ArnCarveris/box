@@ -108,6 +108,31 @@ ECS_STRUCT(FrameTiming, {
     int64_t total_dropped;  /**< Dropped frames since the world started */
 });
 
+/** Seconds between two checks of the watched files when FileWatch is not set */
+#define BOX_FILE_WATCH_INTERVAL (0.25f)
+
+/** How the engine watches the files it loaded, set to BOX_FILE_WATCH_INTERVAL by box.app.
+ *
+ * Watched are the files a Shader read (includes too) and the file of a TexturePath, Font and
+ * EnvironmentImage, at the located path. Once per interval, before the render extract, every
+ * distinct file is stat'ed once; a changed, removed or returned file loads again.
+ *
+ * The previous content stays until the new load is ready, and a failed load keeps it (see the
+ * components for their statuses). A new path or removing the component stops watching the old
+ * file; a missing file is not watched, except the files a Shader looked for.
+ */
+ECS_STRUCT(FileWatch, {
+    float interval;     /**< Wall seconds between checks, 0 every frame, < 0 never */
+});
+
+/** What the file watch did, written by the engine after each check that ran */
+ECS_STRUCT(FileWatchStatus, {
+    int32_t files;      /**< Distinct files watched */
+    int64_t polls;      /**< Checks run since the world started */
+    int64_t changes;    /**< Changed files found since the world started */
+    char *last;         /**< The file that changed last, NULL before the first change */
+});
+
 /** Register the box.app module.
  *
  * @param world The world

@@ -258,8 +258,12 @@ void box_texture_decode(
 {
     int32_t size = 0;
     char *file = box_shader_locate(job->path);
+    if (file) {
+        box_file_stamp(file, &job->stamp);
+    }
+
     uint8_t *data = file ? box_texture_read(file, &size) : NULL;
-    ecs_os_free(file);
+    job->file = file;
     if (!data) {
         job->error = flecs_asprintf("cannot read image '%s'", job->path ? job->path : "");
         goto done;
@@ -281,14 +285,25 @@ float* box_texture_decode_float(
     int32_t max_width,
     int32_t *width,
     int32_t *height,
-    char **error)
+    char **error,
+    char **file,
+    box_file_stamp_t *stamp)
 {
     int w = 0, h = 0, n = 0;
     int32_t size = 0;
     float *result = NULL;
-    char *file = path ? box_shader_locate(path) : NULL;
-    uint8_t *data = file ? box_texture_read(file, &size) : NULL;
-    ecs_os_free(file);
+    char *found = path ? box_shader_locate(path) : NULL;
+    if (found && stamp) {
+        box_file_stamp(found, stamp);
+    }
+
+    uint8_t *data = found ? box_texture_read(found, &size) : NULL;
+    if (file) {
+        *file = found;
+    } else {
+        ecs_os_free(found);
+    }
+
     if (!data) {
         *error = flecs_asprintf("cannot read image '%s'", path ? path : "");
         goto done;

@@ -204,7 +204,9 @@
                     "resolution_change_recreates_cubemap",
                     "removing_source_destroys_cubemap",
                     "image_sent_once_per_version",
-                    "missing_file_sets_error"
+                    "missing_file_sets_error",
+                    "image_file_change_reloads",
+                    "image_file_removed_keeps_version"
                 ]
             },
             {

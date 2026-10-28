@@ -2,8 +2,9 @@
  * @file render/shader.c
  * @brief Registers the box.shader module and sends preprocessed Shader code to the renderer.
  *
- * Shaders are preprocessed in RenderExtract when they were set or a file they read changed,
- * and their code goes into the packet; the backend compiles it on the thread that renders.
+ * Shaders are preprocessed in RenderExtract when they were set or the file watch of box.app
+ * found a change of a file they read, and their code goes into the packet; the backend compiles
+ * it on the thread that renders.
  */
 
 #define BOX_SHADER_IMPL
@@ -24,7 +25,6 @@ typedef struct box_shader_t {
     char *gpu_error;        /**< Error of the newest GPU outcome, NULL when it compiled */
     bool prep_failed;       /**< The last preprocessing failed */
     char *label;            /**< Path the code was read from, the label of the module */
-    ecs_vec_t files;        /**< box_shader_file_t the last preprocessing read */
     ecs_vec_t sources;      /**< char*, files the lines of the code come from */
     ecs_vec_t lines;        /**< box_shader_loc_t, source position of every line of the code */
 } box_shader_t;
@@ -37,14 +37,12 @@ typedef struct box_shader_state_t {
     const void *backend;        /**< Context of the backend the shaders were sent to */
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
     int32_t generation;         /**< Generation of that backend, see box_render_backend_t */
-    ecs_time_t last_poll;       /**< Time the files were last checked */
-    bool polled;                /**< The files were checked at least once */
+    int32_t watch;              /**< Kind of the shaders in the file watch */
     int32_t refs;               /**< Observers and systems that use the state */
 } box_shader_state_t;
 
 ECS_COMPONENT_DECLARE(Shader);
 ECS_COMPONENT_DECLARE(ShaderStatus);
-ECS_COMPONENT_DECLARE(ShaderSettings);
 
 /** Free the strings of Shader components.
  *
@@ -196,21 +194,6 @@ static void box_shader_status_move(
     }
 }
 
-/** Free the files of a preprocessing.
- *
- * @param files The box_shader_file_t
- */
-static void box_shader_files_fini(
-    ecs_vec_t *files)
-{
-    int32_t i;
-    for (i = 0; i < ecs_vec_count(files); i ++) {
-        ecs_os_free(ecs_vec_get_t(files, box_shader_file_t, i)->path);
-    }
-
-    ecs_vec_fini_t(NULL, files, box_shader_file_t);
-}
-
 /** Free the line table of a shader.
  *
  * @param sources The source files
@@ -236,7 +219,6 @@ static void box_shader_lines_fini(
 static void box_shader_free(
     box_shader_t *s)
 {
-    box_shader_files_fini(&s->files);
     box_shader_lines_fini(&s->sources, &s->lines);
     ecs_os_free(s->code);
     ecs_os_free(s->label);
@@ -288,7 +270,6 @@ static box_shader_t* box_shader_ensure(
     result = ecs_os_calloc_t(box_shader_t);
     result->entity = entity;
     result->handle = handle ? handle : ++ state->last_handle;
-    ecs_vec_init_t(NULL, &result->files, box_shader_file_t, 0);
     ecs_vec_init_t(NULL, &result->sources, char*, 0);
     ecs_vec_init_t(NULL, &result->lines, box_shader_loc_t, 0);
     ecs_map_insert_ptr(&state->shaders, entity, result);
@@ -296,13 +277,37 @@ done:
     return result;
 }
 
+/** Watch the files a preprocessing read, and the missing files it looked for, instead of the
+ * files of the previous one.
+ *
+ * @param world The world or a stage
+ * @param state The module state
+ * @param s The shader
+ * @param files The box_shader_file_t of the preprocessing
+ */
+static void box_shader_watch(
+    ecs_world_t *world,
+    box_shader_state_t *state,
+    box_shader_t *s,
+    ecs_vec_t *files)
+{
+    int32_t i;
+    box_shader_file_t *f = ecs_vec_first(files);
+    box_file_watch_clear(world, state->watch, s->entity);
+    for (i = 0; i < ecs_vec_count(files); i ++) {
+        box_file_watch_add(world, state->watch, s->entity, f[i].path, &f[i].stamp);
+    }
+}
+
 /** Preprocess a shader and publish the outcome in its ShaderStatus.
  *
  * @param world The world or a stage
+ * @param state The module state
  * @param s The shader
  */
 static void box_shader_compile(
     ecs_world_t *world,
+    box_shader_state_t *state,
     box_shader_t *s)
 {
     const Shader *shader = ecs_get(world, s->entity, Shader);
@@ -316,9 +321,7 @@ static void box_shader_compile(
         .path = shader->path,
         .defines = shader->defines
     }, &out);
-    box_shader_files_fini(&s->files);
-    s->files = out.files;
-    ecs_vec_init_t(NULL, &out.files, box_shader_file_t, 0);
+    box_shader_watch(world, state, s, &out.files);
     if (out.code) {
         box_shader_lines_fini(&s->sources, &s->lines);
         s->sources = out.sources;
@@ -411,39 +414,23 @@ done:
     return;
 }
 
-/** Mark the shaders whose files changed since they were read, at most once per interval.
+/** Mark a shader whose file changed for preprocessing, called by the file watch.
  *
- * @param world The world or a stage
- * @param state The module state
+ * @param world The world
+ * @param ctx The module state
+ * @param owner The shader entity
  */
-static void box_shader_poll(
+static void box_shader_changed(
     ecs_world_t *world,
-    box_shader_state_t *state)
+    void *ctx,
+    ecs_entity_t owner)
 {
-    const ShaderSettings *settings = ecs_singleton_get(world, ShaderSettings);
-    float interval = settings ? settings->poll_interval : BOX_SHADER_POLL_INTERVAL;
-    ecs_time_t now = state->last_poll;
-    double elapsed = ecs_time_measure(&now);
-    int32_t i;
-    if (interval < 0 || (state->polled && elapsed < interval)) {
-        goto done;
+    box_shader_state_t *state = ctx;
+    box_shader_t *s = ecs_map_get_deref(&state->shaders, box_shader_t, owner);
+    (void)world;
+    if (s) {
+        s->dirty = true;
     }
-
-    state->last_poll = now;
-    state->polled = true;
-    ecs_map_iter_t it = ecs_map_iter(&state->shaders);
-    while (ecs_map_next(&it)) {
-        box_shader_t *s = ecs_map_ptr(&it);
-        box_shader_file_t *files = ecs_vec_first(&s->files);
-        for (i = 0; !s->dirty && i < ecs_vec_count(&s->files); i ++) {
-            box_shader_stamp_t stamp;
-            box_shader_stamp(files[i].path, &stamp);
-            s->dirty = !box_shader_stamp_equals(&stamp, &files[i].stamp);
-        }
-    }
-
-done:
-    return;
 }
 
 /** Check whether a batch or a scatter of a packet runs a shader.
@@ -585,7 +572,6 @@ static void BoxShaderExtract(
     bool gpu = box_render_gpu_stats(world, &stats);
     int32_t i;
     box_shader_backend(state, box_render_get_backend(world));
-    box_shader_poll(world, state);
     box_shader_results(world, state);
     for (i = 0; i < ecs_vec_count(&state->destroyed); i ++) {
         box_render_packet_resource(box_render_packet(world), BOX_RENDER_SHADER,
@@ -605,7 +591,7 @@ static void BoxShaderExtract(
         }
 
         if (s->dirty) {
-            box_shader_compile(world, s);
+            box_shader_compile(world, state, s);
         }
 
         if (s->code && (!s->sent || s->pending)) {
@@ -649,6 +635,8 @@ static void BoxShaderOnRemove(
             box_shader_free(s);
         }
 
+        box_file_watch_clear(it->world, state->watch, it->entities[i]);
+
         if (alive) {
             ecs_remove(it->stage, it->entities[i], ShaderStatus);
         }
@@ -689,7 +677,6 @@ void BoxShaderImport(
 
     ECS_META_COMPONENT(world, Shader);
     ECS_META_COMPONENT(world, ShaderStatus);
-    ECS_META_COMPONENT(world, ShaderSettings);
 
     ecs_set_hooks(world, Shader, {
         .ctor = flecs_default_ctor,
@@ -710,6 +697,7 @@ void BoxShaderImport(
     ecs_vec_init_t(NULL, &state->destroyed, uint32_t, 0);
     state->last_handle = BOX_RENDER_SHADER_FIRST - 1;
     state->refs = 3;
+    state->watch = box_file_watch_kind(world, "shader", box_shader_changed, state);
 
     ecs_observer(world, {
         .entity = ecs_entity(world, { .name = "ShaderOnSet" }),
@@ -736,8 +724,6 @@ void BoxShaderImport(
         .ctx = state,
         .ctx_free = box_shader_state_release
     });
-
-    ecs_singleton_set(world, ShaderSettings, { .poll_interval = BOX_SHADER_POLL_INTERVAL });
 
     ecs_entity_t builtin = ecs_entity(world, { .name = "builtin" });
     box_shader_builtin(world, state, builtin, "blit", "etc/shaders/blit.wgsl",

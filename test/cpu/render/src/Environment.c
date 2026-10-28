@@ -4,10 +4,19 @@
  * cubemaps and images the packets carry.
  */
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include <box.h>
 #include <bake_test.h>
+#include <stdio.h>
 #include <string.h>
+#include <time.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 #include "environment.h"
+#include "preprocess.h"
 
 /** Create a world that renders into a null backend.
  *
@@ -545,5 +554,150 @@ void Environment_missing_file_sets_error(void) {
     test_int(status->version, 1);
     test_assert(status->error == NULL);
 
+    ecs_fini(world);
+}
+
+/** Copy an engine file into a file and give the copy a modification time, so its stamp differs
+ * for sure from the stamp of any earlier content.
+ *
+ * @param from The engine file, found like a load finds it
+ * @param to The copy
+ * @param mtime Seconds of the modification time
+ */
+static void copy_file(
+    const char *from,
+    const char *to,
+    int64_t mtime)
+{
+    char *src = box_shader_locate(from);
+    test_assert(src != NULL);
+    FILE *f = fopen(src, "rb");
+    test_assert(f != NULL);
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    uint8_t *data = ecs_os_malloc((ecs_size_t)size);
+    test_int((long)fread(data, 1, (size_t)size, f), size);
+    fclose(f);
+    f = fopen(to, "wb");
+    test_assert(f != NULL);
+    test_int((long)fwrite(data, 1, (size_t)size, f), size);
+    fclose(f);
+    struct timespec times[2] = {{ .tv_sec = (time_t)mtime }, { .tv_sec = (time_t)mtime }};
+    test_int(utimensat(AT_FDCWD, to, times, 0), 0);
+    ecs_os_free(data);
+    ecs_os_free(src);
+}
+
+/** Create a world that renders into a null backend, watches its files every frame and has a
+ * temporary folder.
+ *
+ * @param null Receives the backend
+ * @return The world
+ */
+static ecs_world_t* watched_world_new(
+    box_render_null_t **null)
+{
+    ecs_world_t *world = world_new(null);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    ecs_singleton_set(world, FileWatch, {.interval = 0});
+
+    return world;
+}
+
+void Environment_image_file_change_reloads(void) {
+    // engine/file_watch
+    box_render_null_t *null;
+    ecs_world_t *world = watched_world_new(&null);
+    char *file = flecs_asprintf("%s/env.hdr", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    copy_file("etc/environments/axes.hdr", file, 1000000000);
+
+    ecs_entity_t source = ecs_new(world);
+    ecs_set(world, source, EnvironmentImage, {.path = file});
+    const EnvironmentStatus *status = wait_status(world, source);
+    test_assert(status->error == NULL);
+    test_int(status->version, 1);
+    frame(world);
+    test_int(resources(null, BOX_RENDER_ENVIRONMENT_IMAGE, BOX_RENDER_UPDATE, NULL), 0);
+    test_int(ecs_get(world, source, EnvironmentStatus)->version, 1);
+
+    copy_file("etc/environments/sky.hdr", file, 1000000100);
+    int32_t i, updates = 0;
+    for (i = 0; i < 500 && ecs_get(world, source, EnvironmentStatus)->version == 1; i ++) {
+        frame(world);
+        ecs_os_sleep(0, 1000 * 1000);
+    }
+
+    status = ecs_get(world, source, EnvironmentStatus);
+    test_int(status->version, 2);
+    test_assert(status->error == NULL);
+    test_int(resources(null, BOX_RENDER_ENVIRONMENT_IMAGE, BOX_RENDER_UPDATE, NULL), 1);
+    test_int(resources(null, BOX_RENDER_ENVIRONMENT, BOX_RENDER_CREATE, NULL), 0);
+    for (i = 0; i < ecs_vec_count(&null->last.resources); i ++) {
+        const box_render_resource_t *r = ecs_vec_get_t(
+            &null->last.resources, box_render_resource_t, i);
+        if (r->kind == BOX_RENDER_ENVIRONMENT_IMAGE) {
+            const box_render_environment_image_t *img = box_render_packet_data(
+                &null->last, r->data);
+            test_int(img->width, 128);
+            test_int(img->height, 64);
+            test_int(img->version, 2);
+            updates ++;
+        }
+    }
+
+    test_int(updates, 1);
+    test_int(ecs_singleton_get(world, FileWatchStatus)->changes, 1);
+    test_str(ecs_singleton_get(world, FileWatchStatus)->last, file);
+    frame(world);
+    test_int(resources(null, BOX_RENDER_ENVIRONMENT_IMAGE, BOX_RENDER_UPDATE, NULL), 0);
+    test_int(ecs_get(world, source, EnvironmentStatus)->version, 2);
+
+    ecs_os_free(file);
+    ecs_fini(world);
+}
+
+void Environment_image_file_removed_keeps_version(void) {
+    // engine/file_watch
+    box_render_null_t *null;
+    ecs_world_t *world = watched_world_new(&null);
+    char *file = flecs_asprintf("%s/gone.hdr", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    copy_file("etc/environments/axes.hdr", file, 1000000000);
+
+    ecs_entity_t source = ecs_new(world);
+    ecs_set(world, source, EnvironmentImage, {.path = file});
+    const EnvironmentStatus *status = wait_status(world, source);
+    test_assert(status->error == NULL);
+    test_int(status->version, 1);
+
+    test_int(remove(file), 0);
+    ecs_log_set_level(-4);
+    int32_t i;
+    for (i = 0; i < 500 && !ecs_get(world, source, EnvironmentStatus)->error; i ++) {
+        frame(world);
+        ecs_os_sleep(0, 1000 * 1000);
+    }
+
+    status = ecs_get(world, source, EnvironmentStatus);
+    test_assert(status->error != NULL);
+    test_assert(strstr(status->error, "gone.hdr") != NULL);
+    test_int(status->version, 1);
+    frame(world);
+    test_int(resources(null, BOX_RENDER_ENVIRONMENT_IMAGE, BOX_RENDER_UPDATE, NULL), 0);
+    test_int(ecs_get(world, source, EnvironmentStatus)->version, 1);
+
+    copy_file("etc/environments/sky.hdr", file, 1000000100);
+    for (i = 0; i < 500 && ecs_get(world, source, EnvironmentStatus)->version == 1; i ++) {
+        frame(world);
+        ecs_os_sleep(0, 1000 * 1000);
+    }
+
+    status = ecs_get(world, source, EnvironmentStatus);
+    test_int(status->version, 2);
+    test_assert(status->error == NULL);
+
+    ecs_os_free(file);
     ecs_fini(world);
 }

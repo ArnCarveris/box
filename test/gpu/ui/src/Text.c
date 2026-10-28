@@ -3,12 +3,19 @@
  * @brief Text: measurement, line breaks, kerning, font changes and crisp rendered glyphs.
  */
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include <box.h>
 #include <bake_test.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 #include "render.h"
 #include "preprocess.h"
 
@@ -1080,6 +1087,128 @@ void Text_font_without_units_fails(void) {
     test_assert(strstr(status->error, "units per em") != NULL);
     test_flt(ecs_get(world, e, TextBounds)->width, 0);
     test_assert(ecs_get(world, other, TextBounds)->width > 0);
+
+    ecs_os_free(path);
+    ecs_os_free(data);
+    ecs_os_free(src);
+    ecs_fini(world);
+}
+
+/** Write bytes into a file and give it a modification time, so its stamp differs for sure
+ * from the stamp of any earlier content.
+ *
+ * @param path The file
+ * @param data The bytes
+ * @param size Number of bytes
+ * @param mtime Seconds of the modification time
+ */
+static void text_write_file(
+    const char *path,
+    const uint8_t *data,
+    long size,
+    int64_t mtime)
+{
+    FILE *f = fopen(path, "wb");
+    test_assert(f != NULL);
+    test_int((long)fwrite(data, 1, (size_t)size, f), size);
+    fclose(f);
+    struct timespec times[2] = {{ .tv_sec = (time_t)mtime }, { .tv_sec = (time_t)mtime }};
+    test_int(utimensat(AT_FDCWD, path, times, 0), 0);
+}
+
+/** Run frames until a font is no longer loading.
+ *
+ * @param world The world
+ * @param font The font entity
+ * @return The status
+ */
+static const FontStatus* text_wait_font(
+    ecs_world_t *world,
+    ecs_entity_t font)
+{
+    int32_t frames = 0;
+    ecs_progress(world, 0);
+    while (ecs_get(world, font, FontStatus)->state == FontLoading && frames < 100) {
+        ecs_progress(world, 0);
+        frames ++;
+    }
+
+    ecs_progress(world, 0);
+
+    return ecs_get(world, font, FontStatus);
+}
+
+void Text_font_file_change_reloads(void) {
+    // engine/file_watch
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    ecs_singleton_set(world, FileWatch, {.interval = 0});
+
+    char *src = box_shader_locate("etc/fonts/B612-Regular.ttf");
+    test_assert(src != NULL);
+    FILE *f = fopen(src, "rb");
+    test_assert(f != NULL);
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    uint8_t *data = ecs_os_malloc((ecs_size_t)size);
+    test_int((long)fread(data, 1, (size_t)size, f), size);
+    fclose(f);
+
+    char *path = flecs_asprintf("%s/watched.ttf", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    text_write_file(path, data, size, 1000000000);
+
+    ecs_entity_t font = ecs_new(world);
+    ecs_set(world, font, Font, {.path = path});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Text, {.value = "WA", .size = 20, .font = font});
+    const FontStatus *status = text_wait_font(world, font);
+    test_int(status->state, FontReady);
+    test_int(status->revision, 1);
+    float w = ecs_get(world, e, TextBounds)->width;
+    test_assert(w > 0);
+    test_int(ecs_singleton_get(world, FileWatchStatus)->files, 1);
+
+    uint32_t head = 0;
+    int32_t i, tables = (data[4] << 8) | data[5];
+    for (i = 0; i < tables; i ++) {
+        const uint8_t *rec = data + 12 + i * 16;
+        if (!memcmp(rec, "head", 4)) {
+            head = ((uint32_t)rec[8] << 24) | (rec[9] << 16) | (rec[10] << 8) | rec[11];
+        }
+    }
+
+    test_assert(head != 0);
+    uint32_t units = ((uint32_t)data[head + 18] << 8) | data[head + 19];
+    test_assert(units > 0);
+    units *= 2;
+    data[head + 18] = (uint8_t)(units >> 8);
+    data[head + 19] = (uint8_t)(units & 0xff);
+    text_write_file(path, data, size, 1000000100);
+
+    status = text_wait_font(world, font);
+    test_int(status->state, FontReady);
+    test_int(status->revision, 2);
+    test_assert(status->error == NULL);
+    float reloaded = ecs_get(world, e, TextBounds)->width;
+    test_assert(reloaded > 0);
+    test_assert(fabsf(reloaded - w) > 1);
+    test_assert(reloaded < w);
+    float h = ecs_get(world, e, TextBounds)->height;
+
+    ecs_log_set_level(-4);
+    text_write_file(path, data, 10, 1000000200);
+    status = text_wait_font(world, font);
+    test_int(status->state, FontFailed);
+    test_int(status->revision, 2);
+    test_assert(status->error != NULL);
+    test_flt(ecs_get(world, e, TextBounds)->width, reloaded);
+    test_flt(ecs_get(world, e, TextBounds)->height, h);
+    test_int(ecs_singleton_get(world, FileWatchStatus)->files, 1);
+    test_int(ecs_singleton_get(world, FileWatchStatus)->changes, 2);
 
     ecs_os_free(path);
     ecs_os_free(data);

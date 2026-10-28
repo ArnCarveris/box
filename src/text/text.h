@@ -10,6 +10,7 @@
 #define BOX_TEXT_INTERNAL_H
 
 #include <box.h>
+#include "../app/watch.h"
 
 /** Atlas texels per em of a glyph field */
 #define BOX_TEXT_EM (40)
@@ -164,6 +165,7 @@ typedef struct box_text_state_t {
     bool trim;                  /**< A layout or a budget changed, idle pages may be released */
     ecs_entity_t default_font;  /**< box.text.DefaultFont */
     bool relayout;              /**< A font was removed, every Text lays out again */
+    int32_t watch;              /**< Kind of the fonts in the file watch */
 } box_text_state_t;
 
 /** Singleton that holds the font registry of a world */

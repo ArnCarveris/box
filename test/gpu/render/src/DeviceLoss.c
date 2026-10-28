@@ -50,7 +50,7 @@ void DeviceLoss_pipeline_error_keeps_previous(void) {
     // render_fixes/device_loss
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, ShaderSettings, {.poll_interval = -1});
+    ecs_singleton_set(world, FileWatch, {.interval = -1});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);

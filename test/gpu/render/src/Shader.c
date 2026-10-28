@@ -568,7 +568,7 @@ void Shader_unchanged_not_recompiled(void)
     box_render_null_t *null = box_render_null_new();
     box_render_backend_t backend = box_render_null_backend(null);
     box_render_set_backend(world, &backend);
-    ecs_singleton_set(world, ShaderSettings, {.poll_interval = 0});
+    ecs_singleton_set(world, FileWatch, {.interval = 0});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -633,7 +633,7 @@ void Shader_file_change_recompiles(void)
     box_render_null_t *null = box_render_null_new();
     box_render_backend_t backend = box_render_null_backend(null);
     box_render_set_backend(world, &backend);
-    ecs_singleton_set(world, ShaderSettings, {.poll_interval = 0});
+    ecs_singleton_set(world, FileWatch, {.interval = 0});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -673,7 +673,7 @@ void Shader_include_change_recompiles(void)
     box_render_null_t *null = box_render_null_new();
     box_render_backend_t backend = box_render_null_backend(null);
     box_render_set_backend(world, &backend);
-    ecs_singleton_set(world, ShaderSettings, {.poll_interval = 0});
+    ecs_singleton_set(world, FileWatch, {.interval = 0});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -707,6 +707,69 @@ void Shader_include_change_recompiles(void)
     box_render_null_free(null);
 }
 
+void Shader_shared_include_counted_once(void)
+{
+    // engine/file_watch
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+    ecs_singleton_set(world, FileWatch, {.interval = 0});
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    const char *tmp = ecs_singleton_get(world, AppStatus)->tmp_dir;
+    char *path_a = flecs_asprintf("%s/a.wgsl", tmp);
+    char *path_b = flecs_asprintf("%s/b.wgsl", tmp);
+    char *inc = flecs_asprintf("%s/shared.wgsl", tmp);
+    FILE *f = fopen(path_a, "w");
+    fputs("#include \"shared.wgsl\"\na\n", f);
+    fclose(f);
+    f = fopen(path_b, "w");
+    fputs("#include \"shared.wgsl\"\nb\n", f);
+    fclose(f);
+    f = fopen(inc, "w");
+    fputs("v1\n", f);
+    fclose(f);
+
+    ecs_entity_t a = ecs_new(world);
+    ecs_set(world, a, Shader, {.path = path_a});
+    ecs_entity_t b = ecs_new(world);
+    ecs_set(world, b, Shader, {.path = path_b});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    test_int(ecs_get(world, a, ShaderStatus)->revision, 1);
+    test_int(ecs_get(world, b, ShaderStatus)->revision, 1);
+    test_int(ecs_singleton_get(world, FileWatchStatus)->files, 3);
+
+    f = fopen(inc, "w");
+    fputs("version 2\n", f);
+    fclose(f);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    test_int(ecs_get(world, a, ShaderStatus)->revision, 2);
+    test_int(ecs_get(world, b, ShaderStatus)->revision, 2);
+    const FileWatchStatus *status = ecs_singleton_get(world, FileWatchStatus);
+    test_int(status->files, 3);
+    test_int(status->changes, 1);
+    test_str(status->last, inc);
+
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    test_int(ecs_get(world, a, ShaderStatus)->revision, 2);
+    test_int(ecs_get(world, b, ShaderStatus)->revision, 2);
+
+    ecs_os_free(path_a);
+    ecs_os_free(path_b);
+    ecs_os_free(inc);
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
 void Shader_poll_disabled(void)
 {
     // renderer/shader
@@ -715,7 +778,7 @@ void Shader_poll_disabled(void)
     box_render_null_t *null = box_render_null_new();
     box_render_backend_t backend = box_render_null_backend(null);
     box_render_set_backend(world, &backend);
-    ecs_singleton_set(world, ShaderSettings, {.poll_interval = -1});
+    ecs_singleton_set(world, FileWatch, {.interval = -1});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -787,7 +850,7 @@ void Shader_error_keeps_code(void)
     box_render_null_t *null = box_render_null_new();
     box_render_backend_t backend = box_render_null_backend(null);
     box_render_set_backend(world, &backend);
-    ecs_singleton_set(world, ShaderSettings, {.poll_interval = 0});
+    ecs_singleton_set(world, FileWatch, {.interval = 0});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -836,7 +899,7 @@ void Shader_missing_file_appears(void)
     box_render_null_t *null = box_render_null_new();
     box_render_backend_t backend = box_render_null_backend(null);
     box_render_set_backend(world, &backend);
-    ecs_singleton_set(world, ShaderSettings, {.poll_interval = 0});
+    ecs_singleton_set(world, FileWatch, {.interval = 0});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -991,7 +1054,7 @@ void Shader_gpu_compiles_component(void)
     // renderer/shader
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, ShaderSettings, {.poll_interval = 0});
+    ecs_singleton_set(world, FileWatch, {.interval = 0});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -1064,7 +1127,7 @@ void Shader_gpu_recompiles_on_change(void)
     // renderer/shader
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, ShaderSettings, {.poll_interval = 0});
+    ecs_singleton_set(world, FileWatch, {.interval = 0});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -1102,7 +1165,7 @@ void Shader_gpu_error_in_status(void)
     // renderer/shader_errors
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, ShaderSettings, {.poll_interval = 0});
+    ecs_singleton_set(world, FileWatch, {.interval = 0});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -1151,7 +1214,7 @@ void Shader_gpu_error_in_include(void)
     // renderer/shader_lines
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, ShaderSettings, {.poll_interval = 0});
+    ecs_singleton_set(world, FileWatch, {.interval = 0});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -1193,7 +1256,7 @@ void Shader_gpu_error_after_directives(void)
     // renderer/shader_lines
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, ShaderSettings, {.poll_interval = 0});
+    ecs_singleton_set(world, FileWatch, {.interval = 0});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);

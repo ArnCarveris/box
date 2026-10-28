@@ -2,7 +2,8 @@
  * @file render/preprocess.c
  * @brief WGSL preprocessor: #include, #define, #undef, #ifdef, #ifndef, #else, #endif, #pragma.
  *
- * Also finds files on the search path of the engine and stamps them so changes can be seen.
+ * Also finds files on the search path of the engine and stamps them so changes can be seen,
+ * with the stamps of the file watch (app/watch.h).
  */
 
 #include "preprocess.h"
@@ -421,36 +422,6 @@ done:
     return result;
 }
 
-void box_shader_stamp(
-    const char *path,
-    box_shader_stamp_t *stamp)
-{
-    struct stat st;
-    ecs_os_memset_t(stamp, 0, box_shader_stamp_t);
-    stamp->sec = -1;
-    if (stat(path, &st)) {
-        goto done;
-    }
-
-#ifdef __APPLE__
-    stamp->sec = (int64_t)st.st_mtimespec.tv_sec;
-    stamp->nsec = (int64_t)st.st_mtimespec.tv_nsec;
-#else
-    stamp->sec = (int64_t)st.st_mtim.tv_sec;
-    stamp->nsec = (int64_t)st.st_mtim.tv_nsec;
-#endif
-    stamp->size = (int64_t)st.st_size;
-done:
-    return;
-}
-
-bool box_shader_stamp_equals(
-    const box_shader_stamp_t *a,
-    const box_shader_stamp_t *b)
-{
-    return a->sec == b->sec && a->nsec == b->nsec && a->size == b->size;
-}
-
 /** Add a file to the files of the result once.
  *
  * @param pp The preprocessing
@@ -460,7 +431,7 @@ bool box_shader_stamp_equals(
 static void box_shader_add_file(
     box_shader_pp_t *pp,
     const char *path,
-    const box_shader_stamp_t *stamp)
+    const box_file_stamp_t *stamp)
 {
     int32_t i, count = ecs_vec_count(&pp->out->files);
     box_shader_file_t *files = ecs_vec_first(&pp->out->files);
@@ -487,12 +458,12 @@ static char* box_shader_try(
     box_shader_pp_t *pp,
     const char *path)
 {
-    box_shader_stamp_t stamp = {0};
+    box_file_stamp_t stamp = {0};
     char *result;
     if (pp->desc->read) {
         result = pp->desc->read(pp->desc->ctx, path);
     } else {
-        box_shader_stamp(path, &stamp);
+        box_file_stamp(path, &stamp);
         result = box_shader_read_file(path);
     }
 
@@ -536,7 +507,7 @@ static char* box_shader_load(
         *resolved = candidate;
         candidate = NULL;
     } else if (!pp->desc->read) {
-        box_shader_stamp_t missing = { .sec = -1 };
+        box_file_stamp_t missing = { .sec = -1 };
         box_shader_add_file(pp, first ? first : path, &missing);
     }
 

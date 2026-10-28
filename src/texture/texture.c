@@ -3,7 +3,8 @@
  * @brief Texture components and the loads of TexturePath on the job system.
  *
  * Setting a TexturePath submits a decode job; its completion writes Texture and
- * TextureStatus and queues the pixels in the registry, which the render extract sends.
+ * TextureStatus and queues the pixels in the registry, which the render extract sends. The
+ * file watch loads the image again when the file the decode read changes.
  */
 
 #define BOX_TEXTURE_IMPL
@@ -223,6 +224,11 @@ static void box_texture_complete(
         goto done;
     }
 
+    if (job->file) {
+        box_file_watch_clear(world, t->watch, job->entity);
+        box_file_watch_add(world, t->watch, job->entity, job->file, &job->stamp);
+    }
+
     int32_t revision = box_texture_revision(world, job->entity);
     if (job->error) {
         ecs_err("%s", job->error);
@@ -256,6 +262,7 @@ static void box_texture_job_free(
 {
     box_texture_job_t *job = ctx;
     ecs_os_free(job->path);
+    ecs_os_free(job->file);
     ecs_os_free(job->pixels);
     ecs_os_free(job->error);
     box_texture_sync_release(job->sync);
@@ -333,7 +340,28 @@ void box_textures_reload(
     }
 }
 
-/** Load the image of every set TexturePath.
+/** Load the image of a texture again whose file changed, called by the file watch.
+ *
+ * @param world The world
+ * @param ctx Unused
+ * @param owner The texture entity
+ */
+static void box_texture_changed(
+    ecs_world_t *world,
+    void *ctx,
+    ecs_entity_t owner)
+{
+    box_textures_t *t = box_textures_get(world);
+    const TexturePath *path = t && ecs_is_alive(world, owner)
+        ? ecs_get(world, owner, TexturePath)
+        : NULL;
+    (void)ctx;
+    if (path) {
+        box_texture_request(world, t, owner, path);
+    }
+}
+
+/** Load the image of every set TexturePath, which stops watching the file of the previous one.
  *
  * @param it The iterator of the observer
  */
@@ -348,6 +376,7 @@ static void BoxTextureOnSet(
     }
 
     for (i = 0; i < it->count; i ++) {
+        box_file_watch_clear(it->world, t->watch, it->entities[i]);
         box_texture_request(it->world, t, it->entities[i], &paths[i]);
     }
 
@@ -372,6 +401,7 @@ static void BoxTextureOnRemove(
     for (i = 0; i < it->count; i ++) {
         ecs_entity_t e = it->entities[i];
         box_texture_t *tex = ecs_map_get_deref(&t->textures, box_texture_t, e);
+        box_file_watch_clear(it->world, t->watch, e);
         if (tex) {
             if (tex->handle) {
                 *ecs_vec_append_t(NULL, &t->released, uint32_t) = tex->handle;
@@ -525,6 +555,7 @@ void BoxTextureImport(
         .terms = {{ .id = ecs_id(Surface), .inout = EcsIn }},
         .cache_kind = EcsQueryCacheAuto
     });
+    t->watch = box_file_watch_kind(world, "texture", box_texture_changed, NULL);
     ecs_singleton_ensure(world, TextureRegistry)->textures = t;
 
     ecs_observer(world, {

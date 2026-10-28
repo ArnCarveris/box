@@ -66,6 +66,8 @@ typedef struct box_text_load_job_t {
     ecs_entity_t font;      /**< Font entity */
     uint32_t generation;    /**< Load request the result belongs to */
     char *path;             /**< Font file */
+    char *file;             /**< The file the load found, NULL when it was not found */
+    box_file_stamp_t stamp; /**< Stamp of file, taken before it was read */
     box_text_face_t *face;  /**< The result, NULL on failure */
     char *error;            /**< Why the load failed, NULL on success */
 } box_text_load_job_t;
@@ -278,6 +280,10 @@ static void box_text_load_work(
     box_text_load_job_t *job = ctx;
     char *resolved = box_shader_locate(job->path);
     int32_t size = 0;
+    if (resolved) {
+        box_file_stamp(resolved, &job->stamp);
+    }
+
     uint8_t *data = resolved ? box_text_read(resolved, &size) : NULL;
     int offset = data && size >= BOX_TEXT_MIN_FILE ? stbtt_GetFontOffsetForIndex(data, 0) : -1;
     int64_t loca[2], glyf[2];
@@ -320,7 +326,7 @@ static void box_text_load_work(
 
     job->face = face;
 done:
-    ecs_os_free(resolved);
+    job->file = resolved;
     box_text_working(job->sync, -1);
 }
 
@@ -379,6 +385,11 @@ static void box_text_load_complete(
         goto done;
     }
 
+    if (job->file) {
+        box_file_watch_clear(world, s->watch, job->font);
+        box_file_watch_add(world, s->watch, job->font, job->file, &job->stamp);
+    }
+
     int32_t revision = box_text_revision(world, job->font);
     if (job->error) {
         ecs_err("%s", job->error);
@@ -409,6 +420,7 @@ static void box_text_load_free(
     box_text_load_job_t *job = ctx;
     box_text_face_release(job->face);
     ecs_os_free(job->path);
+    ecs_os_free(job->file);
     ecs_os_free(job->error);
     box_text_sync_release(job->sync);
     ecs_os_free(job);

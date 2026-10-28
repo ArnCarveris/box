@@ -215,7 +215,9 @@ ECS_STRUCT(EnvironmentStatus, {
  */
 ECS_STRUCT(EnvironmentImage, {
     char *path;           /**< Image file, relative to the working directory or an ancestor
-                           *   of it; a file that cannot be read sets EnvironmentStatus.error */
+                           *   of it; a file that cannot be read sets EnvironmentStatus.error.
+                           *   A change of the file that FileWatch (box/app.h) sees loads it
+                           *   again */
 });
 
 /** Register the box.light module.

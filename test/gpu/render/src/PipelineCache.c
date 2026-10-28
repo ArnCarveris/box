@@ -158,7 +158,7 @@ void PipelineCache_shader_reload_redraws_every_state(void) {
     // render_fixes/pipeline_cache
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, ShaderSettings, {.poll_interval = -1});
+    ecs_singleton_set(world, FileWatch, {.interval = -1});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);

@@ -37,6 +37,11 @@ run from the repository root or from an app's folder finds the engine's assets a
 app keeps its own assets in `apps/<app>/etc` and names them from the repository root, e.g.
 `apps/bunnyhopper/etc/bunnyhopper.flecs`.
 
+Box watches the files it loaded, shaders with their includes, textures, fonts and environment
+images, and loads one again when it changes on disk; the previous content stays in use until the
+new load is ready. The `FileWatch` singleton of box.app sets how often the files are checked:
+every 0.25 s by default, `{interval: 0}` every frame and `{interval: -1}` never.
+
 Parameterized surfaces and surface-relative placement are described in
 [Geometry surfaces](docs/geometry-surfaces.md).
 
