@@ -262,7 +262,7 @@ The shared materials are inherited prefabs that a part derives from and resizes 
 `Box`: `HazardTag`, `HazardTrim`, `HazardTrimShort`, `HazardBorderShort`, `HazardBorderLong`
 and `HazardBoundary` (`etc/materials/hazard.flecs`), `SolarCells`, `AccessPlate`, `VentGrille`,
 `FanDisc` and `BayPad`. `TileMarker` and `TileMarkerBad` (`etc/props/markers.flecs`) are the
-glowing plates placement shows over a tile, drawn 0.12 above the ground.
+glowing plates mining and placement show over a tile, instances placed at y 0.14.
 
 ## Files
 
@@ -289,7 +289,6 @@ glowing plates placement shows over a tile, drawn 0.12 above the ground.
 | `etc/materials/fan.flecs` | The fan blade textures and `FanDisc` |
 | `etc/materials/drone_bay.flecs` | The drone bay textures and `BayPad` |
 | `etc/props/light.flecs` | The `Light` template of the lamps |
-| `etc/props/markers.flecs` | The `TileMarker` and `TileMarkerBad` prefabs |
 | `etc/buildings/` | The building prefabs, one file per building (see Building models) |
 | `etc/assets/` | The original's textures (SVG), unchanged, and `terrain_dirt_orm.svg` |
 | `src/flow.c` | States, clock, blink, toast, seeds, `oreelse.cancel()`, `oreelse.restart()` |
