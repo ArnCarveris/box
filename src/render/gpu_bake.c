@@ -43,10 +43,10 @@
 /** Depth bias of the capture cascade in texels, as the View default */
 #define BOX_GPU_BAKE_SHADOW_BIAS (2.0f)
 
-/** Normal offset of the capture cascade in texels, as the View default */
-#define BOX_GPU_BAKE_SHADOW_OFFSET (1.5f)
+/** Normal offset of the capture cascade in texels at grazing light, as the View default */
+#define BOX_GPU_BAKE_SHADOW_OFFSET (2.0f)
 
-/** PCF taps per axis of the capture cascade, as the View default */
+/** Width of the tent filter of the capture cascade in texels, as the View default */
 #define BOX_GPU_BAKE_SHADOW_FILTER (3)
 
 /** View depth beyond every capture, where the capture cascade would end */
@@ -735,15 +735,12 @@ static void box_gpu_bake_face(
     u->grid[1] = 1;
     u->grid[2] = 1;
     if (cascade) {
-        glm_mat4_copy(ECS_CONST_CAST(vec4*, cascade->matrix), u->shadow_matrix[0]);
-        u->shadow_split[0] = BOX_GPU_BAKE_FAR;
-        u->shadow_bias[0] = BOX_GPU_BAKE_SHADOW_BIAS * cascade->texel / cascade->depth_range;
-        u->shadow_offset[0] = BOX_GPU_BAKE_SHADOW_OFFSET * cascade->texel;
+        box_gpu_shadow_cascade_uniforms(u, 0, cascade, BOX_GPU_BAKE_SHADOW_BIAS,
+            BOX_GPU_BAKE_SHADOW_OFFSET, BOX_GPU_CAPTURE_SHADOW_RESOLUTION);
         u->shadow_params[0] = BOX_GPU_BAKE_FAR;
         u->shadow_params[1] = BOX_GPU_BAKE_FAR;
-        u->shadow_params[2] = 1.0f / (float)BOX_GPU_CAPTURE_SHADOW_RESOLUTION;
-        u->shadow_config[0] = 1;
-        u->shadow_config[1] = BOX_GPU_BAKE_SHADOW_FILTER;
+        box_gpu_shadow_filter_uniforms(u, 1, BOX_GPU_BAKE_SHADOW_FILTER,
+            BOX_GPU_BAKE_SHADOW_OFFSET, 0.0f, BOX_GPU_CAPTURE_SHADOW_RESOLUTION);
     }
 }
 

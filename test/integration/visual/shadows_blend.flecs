@@ -1,0 +1,45 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+
+// A long floor at a shallow angle with a regular row of thin casters across the seam of the
+// first two cascades: the default blend band changes the penumbra width over several pixels
+// instead of at a seam.
+
+camera {
+  Position: {0, 1.6, 6}
+  Rotation: {-0.12, 0, 0}
+  Camera: {fov: 60}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {150, 180, 220, 255}}, shadows: {enabled: true, resolution: 1024, max_distance: 60}}
+}
+
+sun {
+  Rotation: {0.6, 1.2, 0}
+  DirectionalLight: {intensity: 1.5 * flecs.script.math.PI}
+  Rgb: {255, 240, 220}
+}
+
+ground {
+  Position: {0, -0.1, -30}
+  Box: {30, 0.2, 80}
+  Rgb: {190, 190, 180}
+}
+
+for i in 0..24 {
+  {
+    Position: {-1, 0.75, 4 - i * 1.5}
+    Box: {0.08, 1.5, 0.08}
+    Rgb: {200, 80, 60}
+  }
+  {
+    Position: {1.5, 1.2, 4 - i * 1.5}
+    Box: {1.2, 0.05, 0.1}
+    Rgb: {80, 140, 210}
+  }
+}

@@ -395,7 +395,12 @@
                     "no_shadow_removed_casts_again",
                     "beyond_max_distance_unshadowed",
                     "fade_softens_last_cascade",
-                    "default_settings"
+                    "default_settings",
+                    "tent_filter_ramps_smoothly",
+                    "even_filter_size_rounds_up",
+                    "cascade_blend_hides_seam",
+                    "grazing_light_no_acne",
+                    "contact_shadow_close"
                 ]
             },
             {

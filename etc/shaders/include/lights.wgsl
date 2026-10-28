@@ -26,15 +26,19 @@ struct View {
     grid: vec4u,
     // World to shadow clip space of each cascade, reversed Z: 1 is nearest the light
     shadow_matrix: array<mat4x4f, 4>,
-    // View depth each cascade ends at
-    shadow_split: vec4f,
+    // Clip depth range of each cascade over its half extent
+    shadow_depth: vec4f,
     // Depth added to the compared depth of each cascade
     shadow_bias: vec4f,
-    // World distance a lookup in each cascade moves along the normal
+    // World distance a lookup in each cascade moves along the geometric normal at grazing
+    // light
     shadow_offset: vec4f,
     // x: view depth the fade starts at, y: view depth the shadows end at, z: texel in uv
     shadow_params: vec4f,
-    // x: cascades, 0 without shadows, y: PCF taps per axis
+    // x: margin the box of a cascade shrinks by in clip units, y: blend band at its edge in
+    // half extents
+    shadow_edge: vec4f,
+    // x: cascades, 0 without shadows, y: width of the tent filter in texels
     shadow_config: vec4u,
     // x: reflection probes of the reflection probe buffer the view samples, 0 for none; the
     // scene probe is the last of them when there are more than the clusters list (grid.w)

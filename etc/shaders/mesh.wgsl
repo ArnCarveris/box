@@ -491,7 +491,9 @@ fn reflections(world: vec3f, spec: vec3f, roughness: f32, cluster: u32, fallback
 
 // Surface of a fragment from the material constants of its instance. Texture layers apply
 // here on front faces; a plain back face keeps the constants, is unoccluded and faces the
-// camera. The occlusion scales the indirect light only.
+// camera. The occlusion scales the indirect light only. geometric is the interpolated vertex
+// normal before the normal map, negated on back faces as normal is, which the shadow lookup
+// is offset along.
 struct Surface {
     albedo: vec3f,
     alpha: f32,
@@ -500,6 +502,7 @@ struct Surface {
     occlusion: f32,
     emissive: vec3f,
     normal: vec3f,
+    geometric: vec3f,
 };
 
 // Tangent frame from the screen derivatives of the position and the UVs (cotangent frame),
@@ -535,6 +538,7 @@ fn surface(f: VertexOut, front: bool) -> Surface {
     s.occlusion = 1.0;
     s.emissive = f.emissive;
     s.normal = -geometric;
+    s.geometric = -geometric;
     if (front) {
         s.albedo *= albedo.rgb;
         s.alpha *= albedo.a;
@@ -543,6 +547,7 @@ fn surface(f: VertexOut, front: bool) -> Surface {
         s.occlusion = orm.r;
         s.emissive *= emissive;
         s.normal = mapped;
+        s.geometric = geometric;
     }
     return s;
 }
@@ -611,7 +616,7 @@ fn attenuation(light: Light, l: vec3f, dist: f32) -> f32 {
 // of the cluster of the fragment.
 fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32) -> vec3f {
     var sum = vec3f(0.0);
-    let shadow = shadow_factor(world, s.normal);
+    let shadow = shadow_factor(world, s.geometric);
     for (var i = 0u; i < view.lights.x; i++) {
         let light = lights[i];
         let visible = select(1.0, shadow, i == 0u);

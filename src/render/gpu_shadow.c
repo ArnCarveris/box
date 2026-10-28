@@ -3,11 +3,11 @@
  * @brief Cascaded shadow maps of the webgpu backend.
  *
  * Before a view with shadows draws, the opaque casters the cull pass kept in each cascade
- * render with etc/shaders/shadow.wgsl into that cascade of the shared shadow map, depth only
- * and with reversed Z.
+ * render with etc/shaders/shadow.wgsl into the shared shadow map, depth only, reversed Z. Probe
+ * captures use a map of their own with one cascade around the static bounds of the scene.
  *
- * The forward pass then samples the map through a comparison sampler. Probe captures use a
- * map of their own with one cascade around the static bounds of the scene.
+ * The forward pass samples the map with etc/shaders/include/shadow.wgsl: the first cascade
+ * whose box, shrunk by the reach of the filter and the normal offset, contains a position.
  */
 
 #include "gpu.h"
@@ -172,6 +172,44 @@ void box_gpu_shadow_fini(
     }
 }
 
+float box_gpu_shadow_margin(
+    int32_t filter_size,
+    float normal_offset)
+{
+    return 0.5f * (float)filter_size + 1.0f + glm_max(normal_offset, 0.0f);
+}
+
+void box_gpu_shadow_cascade_uniforms(
+    box_gpu_view_uniforms_t *u,
+    int32_t index,
+    const box_render_cascade_t *cascade,
+    float depth_bias,
+    float normal_offset,
+    int32_t resolution)
+{
+    float extent = 0.5f * cascade->texel * (float)resolution;
+    glm_mat4_copy(ECS_CONST_CAST(vec4*, cascade->matrix), u->shadow_matrix[index]);
+    u->shadow_depth[index] = cascade->depth_range / glm_max(extent, 1e-6f);
+    u->shadow_bias[index] = depth_bias * cascade->texel / cascade->depth_range;
+    u->shadow_offset[index] = normal_offset * cascade->texel;
+}
+
+void box_gpu_shadow_filter_uniforms(
+    box_gpu_view_uniforms_t *u,
+    int32_t cascades,
+    int32_t filter_size,
+    float normal_offset,
+    float blend,
+    int32_t resolution)
+{
+    float texels = box_gpu_shadow_margin(filter_size, normal_offset);
+    u->shadow_params[2] = 1.0f / (float)resolution;
+    u->shadow_edge[0] = glm_min(2.0f * texels / (float)resolution, 0.5f);
+    u->shadow_edge[1] = blend;
+    u->shadow_config[0] = (uint32_t)cascades;
+    u->shadow_config[1] = (uint32_t)filter_size;
+}
+
 void box_gpu_shadow_uniforms(
     box_gpu_t *gpu,
     const box_render_view_t *v,
@@ -197,20 +235,17 @@ void box_gpu_shadow_uniforms(
         box_render_shadow_cascade(ECS_CONST_CAST(vec4*, v->camera_transform), proj,
             i ? s->splits[i - 1] : s->near_, s->splits[i], s->direction, s->resolution,
             distance, &cascade);
-        glm_mat4_copy(cascade.matrix, u->shadow_matrix[i]);
         ecs_os_memcpy(ecs_vec_get_t(&gpu->shadow_data, uint8_t,
             (slot * BOX_RENDER_SHADOW_CASCADES + i) * BOX_GPU_CASCADE_STRIDE),
             cascade.matrix, sizeof(mat4));
-        u->shadow_split[i] = s->splits[i];
-        u->shadow_bias[i] = s->depth_bias * cascade.texel / cascade.depth_range;
-        u->shadow_offset[i] = s->normal_offset * cascade.texel;
+        box_gpu_shadow_cascade_uniforms(u, i, &cascade, s->depth_bias, s->normal_offset,
+            s->resolution);
     }
 
     u->shadow_params[0] = distance - s->fade * (distance - last);
     u->shadow_params[1] = distance;
-    u->shadow_params[2] = 1.0f / (float)s->resolution;
-    u->shadow_config[0] = (uint32_t)n;
-    u->shadow_config[1] = (uint32_t)s->filter_size;
+    box_gpu_shadow_filter_uniforms(u, n, s->filter_size, s->normal_offset, s->blend,
+        s->resolution);
 done:
     return;
 }
@@ -461,7 +496,7 @@ void box_gpu_shadow_capture_fit(
 
     float radius = glm_max(glm_vec3_distance(ECS_CONST_CAST(float*, min),
         ECS_CONST_CAST(float*, max)) * 0.5f, 1e-3f);
-    float extent = radius * res / (res - 2.0f);
+    float extent = radius * res / (res - 2.0f * (float)BOX_GPU_CAPTURE_SHADOW_MARGIN);
     if (glm_vec3_norm(forward) < 1e-6f) {
         glm_vec3_copy((vec3){0, -1, 0}, forward);
     }

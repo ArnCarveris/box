@@ -61,6 +61,10 @@ typedef struct box_gpu_effects_t box_gpu_effects_t;
 /** Edge in texels of the shadow map of the probe captures */
 #define BOX_GPU_CAPTURE_SHADOW_RESOLUTION (2048)
 
+/** Texels the capture cascade reaches beyond the bounding sphere of the static bounds, at least
+ * the filter footprint and normal offset of the capture lookup (box_gpu_shadow_margin) */
+#define BOX_GPU_CAPTURE_SHADOW_MARGIN (8)
+
 /** Textures, pipelines and timing of the probe captures */
 typedef struct box_gpu_bake_t box_gpu_bake_t;
 
@@ -406,11 +410,16 @@ typedef struct box_gpu_view_uniforms_t {
     uint32_t lights[4];             /**< Directional lights, lights, lit, orthographic */
     uint32_t grid[4];               /**< Clusters per axis, reflection probes the clusters list */
     mat4 shadow_matrix[BOX_RENDER_SHADOW_CASCADES]; /**< World to shadow clip per cascade */
-    vec4 shadow_split;              /**< View depth each cascade ends at */
+    vec4 shadow_depth;              /**< Clip depth range of each cascade over its half
+                                     *   extent */
     vec4 shadow_bias;               /**< Depth added to the compared depth per cascade */
-    vec4 shadow_offset;             /**< World offset along the normal per cascade */
+    vec4 shadow_offset;             /**< World offset along the geometric normal per cascade
+                                     *   at grazing light */
     vec4 shadow_params;             /**< Fade start, shadow end, texel in uv, unused */
-    uint32_t shadow_config[4];      /**< Cascades, 0 without shadows, PCF taps, two unused */
+    vec4 shadow_edge;               /**< Margin a cascade box shrinks by in clip units, blend
+                                     *   band in half extents, two unused */
+    uint32_t shadow_config[4];      /**< Cascades, 0 without shadows, width of the tent
+                                     *   filter in texels, two unused */
     uint32_t reflection[4];         /**< Probes of the reflection probe buffer the view samples,
                                      *   0 for none, three unused */
     vec4 aerial;                    /**< Aerial perspective: km per world unit, inverse of the
@@ -1341,6 +1350,51 @@ void box_gpu_shadow_render(
     const box_render_packet_t *packet,
     int32_t index,
     int32_t slot);
+
+/** Write the uniforms of one cascade of a shadow lookup.
+ *
+ * @param u The view uniforms
+ * @param index The cascade
+ * @param cascade The fitted cascade
+ * @param depth_bias Depth offset of the comparison in texels
+ * @param normal_offset Offset along the geometric normal in texels at grazing light
+ * @param resolution Edge of the cascade in texels
+ */
+void box_gpu_shadow_cascade_uniforms(
+    box_gpu_view_uniforms_t *u,
+    int32_t index,
+    const box_render_cascade_t *cascade,
+    float depth_bias,
+    float normal_offset,
+    int32_t resolution);
+
+/** Write the uniforms of the filter and the cascade choice of a shadow lookup.
+ *
+ * @param u The view uniforms
+ * @param cascades The cascades, 0 without shadows
+ * @param filter_size Width of the tent filter in texels, odd
+ * @param normal_offset Offset along the geometric normal in texels at grazing light
+ * @param blend Blend band at the edge of a cascade in half extents
+ * @param resolution Edge of a cascade in texels
+ */
+void box_gpu_shadow_filter_uniforms(
+    box_gpu_view_uniforms_t *u,
+    int32_t cascades,
+    int32_t filter_size,
+    float normal_offset,
+    float blend,
+    int32_t resolution);
+
+/** Get the texels a position stays away from the edge of the cascade it is looked up in: the
+ * reach of the tent filter beyond the position, plus the normal offset.
+ *
+ * @param filter_size Width of the tent filter in texels, odd
+ * @param normal_offset Offset along the geometric normal in texels at grazing light
+ * @return The margin in texels
+ */
+float box_gpu_shadow_margin(
+    int32_t filter_size,
+    float normal_offset);
 
 /** Fit the cascade of the probe captures around the bounding sphere of static bounds.
  *

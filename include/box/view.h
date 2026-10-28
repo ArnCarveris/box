@@ -56,10 +56,17 @@ ECS_STRUCT(ShadowSettings, {
     int32_t resolution;  /**< Edge of one cascade in texels, default 2048 */
     float max_distance;  /**< View distance the shadows reach, default 200 */
     float split_lambda;  /**< 0 splits uniformly, 1 logarithmically, default 0.7 */
-    float depth_bias;    /**< Depth offset of the comparison in texels, default 2 */
-    float normal_offset; /**< Offset along the geometric normal in texels, default 1.5 */
-    int32_t filter_size; /**< PCF taps per axis, default 3, at most 7 */
+    float depth_bias;    /**< Depth offset of the comparison in texels of the cascade, default 2 */
+    float normal_offset; /**< Offset along the geometric normal (before the normal map) in
+                          *   texels of the cascade times 1 - N.L: none facing the light, all
+                          *   of it at grazing light; default 2 */
+    int32_t filter_size; /**< Tent filter width in texels: 1 is one bilinear comparison (2x2
+                          *   PCF), 3 four, 5 nine, 7 sixteen; even values round up to the next
+                          *   odd one; default 3, 1 to 7 */
     float fade;          /**< Fraction of the last cascade that fades out, default 0.2 */
+    float blend;         /**< Fraction of the half extent of a cascade at the edge of its box
+                          *   that blends into the next cascade, 0 for hard seams, the last one
+                          *   fades instead; default 0.1, 0 to 0.5 */
 });
 
 /** Culling settings of a view, applied as specified: all zero draws every instance.

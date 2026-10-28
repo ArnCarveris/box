@@ -10,6 +10,10 @@
  * their scene, render its atmosphere, light with an environment at intensity 1, have the
  * documented shadow defaults and cull with occlusion and a smallest size of one pixel.
  *
+ * The shadow lookup moves along the geometric normal by 2 texels times 1 - N.L, Esoterica's
+ * offset scale, and compares 2 texels closer to the light, which covers the depth slope across
+ * the 3 texel tent at any light angle; a 0.1 band at a cascade edge blends into the next one.
+ *
  * @param ptr The components
  * @param count Number of components
  * @param ti Type info
@@ -34,9 +38,10 @@ static void box_view_ctor(
             .max_distance = 200.0f,
             .split_lambda = 0.7f,
             .depth_bias = 2.0f,
-            .normal_offset = 1.5f,
+            .normal_offset = 2.0f,
             .filter_size = 3,
-            .fade = 0.2f
+            .fade = 0.2f,
+            .blend = 0.1f
         };
         values[i].culling = (CullSettings){
             .enabled = true,

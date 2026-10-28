@@ -17,6 +17,273 @@
 #define STB_IMAGE_STATIC
 #include <stb_image.h>
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_STATIC
+#include <stb_image_write.h>
+
+/** Create a headless world without ambient light with a white rough floor on y = 0 and a sun.
+ *
+ * @param pitch Rotation.x of the sun, its elevation: pi / 2 shines straight down
+ * @return The world
+ */
+static ecs_world_t* shadow_world(
+    float pitch)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    ecs_singleton_set(world, AmbientLight, {.intensity = 0});
+    ecs_entity_t floor = ecs_new(world);
+    ecs_set_name(world, floor, "floor");
+    ecs_set(world, floor, Position, {0, -0.1f, -20});
+    ecs_set(world, floor, Box, {40, 0.2f, 60});
+    ecs_set(world, floor, Rgb, {255, 255, 255});
+    ecs_set(world, floor, PbrMaterial, {.roughness = 1});
+    ecs_entity_t sun = ecs_new(world);
+    ecs_set(world, sun, Rotation, {pitch, 0, 0});
+    ecs_set(world, sun, DirectionalLight, {.intensity = GLM_PIf});
+
+    return world;
+}
+
+/** Create a view with the View defaults and shadows enabled, or with shadow settings.
+ *
+ * @param world The world
+ * @param camera The camera
+ * @param shadows The shadow settings, NULL for the defaults
+ * @return The view
+ */
+static ecs_entity_t shadow_view(
+    ecs_world_t *world,
+    ecs_entity_t camera,
+    const ShadowSettings *shadows)
+{
+    ecs_entity_t view = ecs_new(world);
+    ecs_add(world, view, View);
+    View *v = ecs_get_mut(world, view, View);
+    v->camera = camera;
+    v->clear = (ClearSettings){.enabled = true, .color = {0, 0, 0, 255}};
+    v->shadows.enabled = true;
+    if (shadows) {
+        v->shadows = *shadows;
+    }
+
+    ecs_modified(world, view, View);
+
+    return view;
+}
+
+/** Render a frame into an image file and load its pixels.
+ *
+ * @param world The world, without a Surface
+ * @param file Image file in the temporary folder
+ * @param size Width and height of the image
+ * @return RGBA pixels, freed with stbi_image_free
+ */
+static unsigned char* shadow_capture(
+    ecs_world_t *world,
+    const char *file,
+    int32_t size)
+{
+    ecs_entity_t e = ecs_lookup(world, "capture");
+    if (!e) {
+        e = ecs_entity(world, { .name = "capture" });
+    }
+
+    ecs_set(world, e, Surface, {.width = size, .height = size, .write_to_file = file,
+        .resolution_scale = 1});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    char *path = flecs_asprintf("%s/%s", ecs_singleton_get(world, AppStatus)->tmp_dir, file);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_int(w, size);
+    test_int(h, size);
+    ecs_os_free(path);
+
+    return px;
+}
+
+/** Edge in pixels of the images of the filter cases */
+#define SHADOW_EDGE_SIZE (128)
+
+/** Render the edge of a slab 6 units above a floor lit straight down, seen from 3 units above
+ * the floor, so the slab (x < 0) is behind the camera and its shadow edge runs down the middle
+ * column. The single cascade has 64 texels, about 4 pixels each.
+ *
+ * @param filter_size The filter size of the view
+ * @param file Image file in the temporary folder
+ * @return RGBA pixels of a SHADOW_EDGE_SIZE square image, freed with stbi_image_free
+ */
+static unsigned char* shadow_edge_render(
+    int32_t filter_size,
+    const char *file)
+{
+    ecs_world_t *world = shadow_world((float)GLM_PI_2);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 3, 0});
+    ecs_set(world, camera, Rotation, {-(float)GLM_PI_2, 0, 0});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    shadow_view(world, camera, &(ShadowSettings){.enabled = true, .cascades = 1,
+        .resolution = 64, .max_distance = 4, .depth_bias = 2, .normal_offset = 2,
+        .filter_size = filter_size});
+    ecs_entity_t slab = ecs_new(world);
+    ecs_set(world, slab, Position, {-10, 6, 0});
+    ecs_set(world, slab, Box, {20, 0.2f, 20});
+    unsigned char *px = shadow_capture(world, file, SHADOW_EDGE_SIZE);
+    ecs_fini(world);
+
+    return px;
+}
+
+/** Check that the middle row of an edge image rises monotonically from the shadow to the lit
+ * floor and get the width of its ramp, the pixels between 10% and 90% of the rise.
+ *
+ * @param px Pixels of a shadow_edge_render image
+ * @return The width of the ramp in pixels
+ */
+static int32_t shadow_ramp_width(
+    const unsigned char *px)
+{
+    const unsigned char *row = &px[(SHADOW_EDGE_SIZE / 2) * SHADOW_EDGE_SIZE * 4];
+    int32_t lo = row[4 * 4], hi = row[(SHADOW_EDGE_SIZE - 5) * 4];
+    int32_t x, width = 0;
+    test_assert(lo < 30);
+    test_assert(hi > 150);
+    for (x = 1; x < SHADOW_EDGE_SIZE; x ++) {
+        test_assert((int32_t)row[x * 4] >= (int32_t)row[(x - 1) * 4] - 2);
+    }
+
+    for (x = 0; x < SHADOW_EDGE_SIZE; x ++) {
+        int32_t v = row[x * 4];
+        if (v * 10 > lo * 9 + hi && v * 10 < lo + hi * 9) {
+            width ++;
+        }
+    }
+
+    return width;
+}
+
+/** Edge in pixels of the image of the cascade blend case */
+#define SHADOW_BLEND_SIZE (256)
+
+/** Render a long floor lit straight down at a shallow angle with a row of thin bars 6 units
+ * above it, out of the image, whose shadows run away from the camera across the seam of
+ * cascades 0 and 1, and measure for every row how sharp the shadows are.
+ *
+ * The measure is the darkness below the brightest pixel of the row, squared and summed over
+ * the row, over its sum. Filtering keeps the sum and spreads it, so the measure drops where
+ * the texels grow, and it does not depend on where the pixels sample the stripes.
+ *
+ * @param blend The blend band of the view
+ * @param file Image file in the temporary folder
+ * @param out Receives the measure of every row
+ */
+static void shadow_blend_render(
+    float blend,
+    const char *file,
+    float *out)
+{
+    ecs_world_t *world = shadow_world((float)GLM_PI_2);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 1.5f, 2});
+    ecs_set(world, camera, Rotation, {-0.3f, 0, 0});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    shadow_view(world, camera, &(ShadowSettings){.enabled = true, .cascades = 4,
+        .resolution = 128, .max_distance = 30, .split_lambda = 0.7f, .depth_bias = 2,
+        .normal_offset = 2, .filter_size = 3, .fade = 0.2f, .blend = blend});
+    int32_t i, x, y;
+    for (i = 0; i < 9; i ++) {
+        ecs_entity_t bar = ecs_new(world);
+        ecs_set(world, bar, Position, {-1.4f + 0.35f * (float)i, 6, -4});
+        ecs_set(world, bar, Box, {0.06f, 0.05f, 16});
+    }
+
+    unsigned char *px = shadow_capture(world, file, SHADOW_BLEND_SIZE);
+    for (y = 0; y < SHADOW_BLEND_SIZE; y ++) {
+        const unsigned char *row = &px[y * SHADOW_BLEND_SIZE * 4];
+        float lit = 0, sum = 0, square = 0;
+        for (x = 40; x < SHADOW_BLEND_SIZE - 40; x ++) {
+            lit = glm_max(lit, (float)row[x * 4]);
+        }
+
+        for (x = 40; x < SHADOW_BLEND_SIZE - 40; x ++) {
+            float d = lit - (float)row[x * 4];
+            sum += d;
+            square += d * d;
+        }
+
+        out[y] = square / glm_max(sum, 1.0f);
+    }
+
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+/** Get the largest change of the sharpness measure between neighbouring rows of the floor in
+ * front of z = -5, where the stripes are wide enough to measure.
+ *
+ * @param m The measure of every row
+ * @return The largest change
+ */
+static float shadow_blend_jump(
+    const float *m)
+{
+    float jump = 0;
+    int32_t y;
+    for (y = 110; y < SHADOW_BLEND_SIZE - 2; y ++) {
+        jump = glm_max(jump, fabsf(m[y + 1] - m[y]));
+    }
+
+    return jump;
+}
+
+/** Write a strong normal map: bumps tilted up to about 50 degrees in both axes.
+ *
+ * @param world The world
+ * @return The texture
+ */
+static ecs_entity_t shadow_normal_map(
+    ecs_world_t *world)
+{
+    char *file = flecs_asprintf("%s/bumps.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    uint8_t px[32 * 32 * 4];
+    int32_t x, y;
+    for (y = 0; y < 32; y ++) {
+        for (x = 0; x < 32; x ++) {
+            vec3 n = {
+                0.8f * sinf((float)x * GLM_PIf / 8.0f),
+                0.8f * cosf((float)y * GLM_PIf / 8.0f),
+                1.0f
+            };
+            glm_vec3_normalize(n);
+            uint8_t *p = &px[(y * 32 + x) * 4];
+            p[0] = (uint8_t)roundf((n[0] * 0.5f + 0.5f) * 255.0f);
+            p[1] = (uint8_t)roundf((n[1] * 0.5f + 0.5f) * 255.0f);
+            p[2] = (uint8_t)roundf((n[2] * 0.5f + 0.5f) * 255.0f);
+            p[3] = 255;
+        }
+    }
+
+    test_assert(stbi_write_png(file, 32, 32, 4, px, 32 * 4) != 0);
+    ecs_entity_t tex = ecs_new(world);
+    ecs_set(world, tex, TexturePath, {.path = file});
+    int32_t frames = 0;
+    while (ecs_get(world, tex, TextureStatus)->state == TextureLoading && frames < 100) {
+        ecs_progress(world, 0);
+        frames ++;
+    }
+
+    test_int(ecs_get(world, tex, TextureStatus)->state, TextureReady);
+    ecs_os_free(file);
+
+    return tex;
+}
+
 void Shadow_splits_uniform(void) {
     // lighting/shadows
     float splits[4];
@@ -574,14 +841,151 @@ void Shadow_default_settings(void) {
     test_flt(view->shadows.max_distance, 200);
     test_flt(view->shadows.split_lambda, 0.7f);
     test_flt(view->shadows.depth_bias, 2);
-    test_flt(view->shadows.normal_offset, 1.5f);
+    test_flt(view->shadows.normal_offset, 2);
     test_int(view->shadows.filter_size, 3);
     test_flt(view->shadows.fade, 0.2f);
+    test_flt(view->shadows.blend, 0.1f);
     const View *shadowed = ecs_get(world, ecs_lookup(world, "shadowed"), View);
     test_assert(shadowed != NULL);
     test_bool(shadowed->shadows.enabled, true);
     test_int(shadowed->shadows.cascades, 4);
     test_flt(shadowed->shadows.split_lambda, 0.7f);
 
+    ecs_fini(world);
+}
+
+void Shadow_tent_filter_ramps_smoothly(void) {
+    // lighting/shadows
+    unsigned char *px1 = shadow_edge_render(1, "tent1.png");
+    unsigned char *px3 = shadow_edge_render(3, "tent3.png");
+    unsigned char *px7 = shadow_edge_render(7, "tent7.png");
+    int32_t w1 = shadow_ramp_width(px1);
+    int32_t w3 = shadow_ramp_width(px3);
+    int32_t w7 = shadow_ramp_width(px7);
+    test_assert(w1 >= 1);
+    test_assert(w3 > w1);
+    test_assert(w7 > w3);
+
+    stbi_image_free(px1);
+    stbi_image_free(px3);
+    stbi_image_free(px7);
+}
+
+void Shadow_even_filter_size_rounds_up(void) {
+    // lighting/shadows
+    ShadowSettings in = {.filter_size = 4}, out;
+    box_render_shadow_settings(&in, &out);
+    test_int(out.filter_size, 5);
+    in.filter_size = 2;
+    box_render_shadow_settings(&in, &out);
+    test_int(out.filter_size, 3);
+    in.filter_size = 8;
+    box_render_shadow_settings(&in, &out);
+    test_int(out.filter_size, 7);
+
+    unsigned char *even = shadow_edge_render(4, "even4.png");
+    unsigned char *odd = shadow_edge_render(5, "odd5.png");
+    int32_t i;
+    for (i = 0; i < SHADOW_EDGE_SIZE * SHADOW_EDGE_SIZE * 4; i ++) {
+        test_assert(abs((int)even[i] - (int)odd[i]) <= 1);
+    }
+
+    stbi_image_free(even);
+    stbi_image_free(odd);
+}
+
+void Shadow_cascade_blend_hides_seam(void) {
+    // lighting/shadows
+    float hard[SHADOW_BLEND_SIZE], soft[SHADOW_BLEND_SIZE];
+    shadow_blend_render(0, "seam_hard.png", hard);
+    shadow_blend_render(0.1f, "seam_soft.png", soft);
+    float jump_hard = shadow_blend_jump(hard);
+    float jump_soft = shadow_blend_jump(soft);
+    test_assert(jump_hard > 8);
+    test_assert(jump_soft < 0.6f * jump_hard);
+}
+
+void Shadow_grazing_light_no_acne(void) {
+    // lighting/shadows
+    ecs_world_t *world = shadow_world(glm_rad(10));
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 10, -20});
+    ecs_set(world, camera, Rotation, {-(float)GLM_PI_2, 0, 0});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = shadow_view(world, camera, NULL);
+    unsigned char *flat = shadow_capture(world, "grazing.png", 64);
+    int32_t i, count = 64 * 64;
+    float mean = 0;
+    for (i = 0; i < count; i ++) {
+        mean += (float)flat[i * 4];
+    }
+
+    mean /= (float)count;
+    test_assert(mean > 40);
+    for (i = 0; i < count; i ++) {
+        test_assert((float)flat[i * 4] >= 0.9f * mean);
+    }
+
+    stbi_image_free(flat);
+
+    ecs_entity_t floor = ecs_lookup(world, "floor");
+    ecs_set(world, floor, PbrTextures, {.normal = shadow_normal_map(world)});
+    ecs_set(world, floor, TextureTransform, {.scale_x = 8, .scale_y = 8});
+    unsigned char *bumpy = shadow_capture(world, "grazing_bumpy.png", 64);
+    View *v = ecs_get_mut(world, view, View);
+    v->shadows.enabled = false;
+    ecs_modified(world, view, View);
+    unsigned char *unshadowed = shadow_capture(world, "grazing_unshadowed.png", 64);
+    for (i = 0; i < count; i ++) {
+        int32_t ref = unshadowed[i * 4], value = bumpy[i * 4];
+        if (ref > 24) {
+            test_assert((float)value >= 0.9f * (float)ref);
+        } else {
+            test_assert(abs(value - ref) <= 3);
+        }
+    }
+
+    stbi_image_free(bumpy);
+    stbi_image_free(unshadowed);
+    ecs_fini(world);
+}
+
+void Shadow_contact_shadow_close(void) {
+    // lighting/shadows
+    ecs_world_t *world = shadow_world(glm_rad(45));
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 10, 0});
+    ecs_set(world, camera, Rotation, {-(float)GLM_PI_2, 0, 0});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 4, .near_ = 0.1f,
+        .far_ = 20});
+    shadow_view(world, camera, NULL);
+    ecs_entity_t box = ecs_new(world);
+    ecs_set(world, box, Position, {0, 0.5f, 0});
+    ecs_set(world, box, Box, {2, 1, 2});
+    ecs_set(world, box, Rgb, {255, 0, 0});
+    ecs_set(world, box, PbrMaterial, {.roughness = 1});
+    unsigned char *px = shadow_capture(world, "contact.png", 64);
+    int32_t y, first = -1, last = -1;
+    for (y = 0; y < 64; y ++) {
+        const unsigned char *p = &px[(y * 64 + 32) * 4];
+        if (p[0] > 2 * (int32_t)p[1] + 20) {
+            first = first < 0 ? y : first;
+            last = y;
+        }
+    }
+
+    test_assert(first > 8);
+    test_assert(last < 55);
+    const unsigned char *before = &px[((first - 8) * 64 + 32) * 4];
+    const unsigned char *after = &px[((last + 8) * 64 + 32) * 4];
+    int32_t lit = before[0] > after[0] ? before[0] : after[0];
+    int32_t dir = after[0] < before[0] ? 1 : -1;
+    int32_t edge = dir > 0 ? last : first;
+    test_assert(lit > 60);
+    test_assert(abs((int)before[0] - (int)after[0]) > lit / 2);
+    test_assert(px[((edge + 2 * dir) * 64 + 32) * 4] < lit / 2);
+    test_assert(px[((edge + 4 * dir) * 64 + 32) * 4] < lit / 3);
+
+    stbi_image_free(px);
     ecs_fini(world);
 }
