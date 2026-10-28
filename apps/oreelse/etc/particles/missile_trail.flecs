@@ -2,9 +2,6 @@
 // the start, as the missile is made in flight, and its particles stay where they were left.
 // The size ramp is computed for the default age.
 
-using box.transform
-using box.geometry
-using box.light
 using box.particle
 
 template MissileTrail {

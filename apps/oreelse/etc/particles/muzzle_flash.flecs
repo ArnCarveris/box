@@ -6,10 +6,10 @@
 // it linearly to 0 over peak / fade seconds of the playback clock, so it pauses with the
 // game. A stopped flash is dark.
 
-using box.transform
-using box.geometry
+using box.types
 using box.light
 using box.particle
+using box.material
 
 template MuzzleFlash {
   prop color: rgb = {255, 196, 112}
@@ -17,8 +17,8 @@ template MuzzleFlash {
   prop fade: f32 = 45
   prop radius: f32 = 4.5
 
-  Rgb: color
-  PointLight: {intensity: 0, range: radius, bake: LightBakeModeRealtime}
+  Rgb: {color.r, color.g, color.b}
+  PointLight: {intensity: 0, range: radius}
   ParticleEmitter: {max: 1, rate: 0, lifetime: {0.1, 0.1}, seed: 238}
   ParticlePlayback: {state: ParticleStopped}
   ParticleLight: {intensity: peak, curve: {1, 0.667, 0.333, 0}, period: peak / fade}

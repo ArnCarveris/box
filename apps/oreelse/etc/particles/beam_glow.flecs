@@ -4,10 +4,10 @@
 // peak while it plays and turns it off at once when it stops, the FlashLight with fade 0 of
 // the original.
 
-using box.transform
-using box.geometry
+using box.types
 using box.light
 using box.particle
+using box.material
 
 template BeamGlow {
   prop color: rgb = {240, 96, 172}
@@ -15,8 +15,8 @@ template BeamGlow {
   prop radius: f32 = 7
   prop rate: f32 = 55
 
-  Rgb: color
-  PointLight: {intensity: 0, range: radius, bake: LightBakeModeRealtime}
+  Rgb: {color.r, color.g, color.b}
+  PointLight: {intensity: 0, range: radius}
   ParticleLight: {intensity: peak}
 
   // The stream: 55 a second into the glow pool, from a sphere of 0.05, at {0, 0.4, 0} +-

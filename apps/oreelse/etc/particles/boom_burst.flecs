@@ -12,6 +12,7 @@ using box.transform
 using box.geometry
 using box.light
 using box.particle
+using box.material
 
 // The ring the shock wave spawns on: radius 0.5, 0.2 thick
 prefab shapeBoomRing {
@@ -355,7 +356,7 @@ prefab BoomBurst {
   light {
     Position: {0, 0.45, 0}
     Rgb: {255, 190, 118}
-    PointLight: {intensity: 9, range: 13, bake: LightBakeModeRealtime}
+    PointLight: {intensity: 9, range: 13}
     EffectFlash: {intensity: 9, seconds: 0.222}
   }
 }

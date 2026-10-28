@@ -2,9 +2,7 @@
 // original. The drill plays it while it runs. The color ramp through mid to end is computed
 // for the default colors.
 
-using box.transform
-using box.geometry
-using box.light
+using box.types
 using box.particle
 
 template DrillDust {

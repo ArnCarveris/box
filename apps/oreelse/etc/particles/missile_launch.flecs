@@ -4,8 +4,6 @@
 // the original's oreLaunchFx turns the velocities and offsets.
 
 using box.transform
-using box.geometry
-using box.light
 using box.particle
 
 prefab MissileLaunch {

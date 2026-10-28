@@ -1,8 +1,6 @@
 // Dust where a bullet or a missile hits the ground, the ImpactDust of the original.
 
 using box.transform
-using box.geometry
-using box.light
 using box.particle
 
 prefab ImpactDust {

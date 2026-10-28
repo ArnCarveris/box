@@ -46,19 +46,18 @@ ONE_SHOTS = {
     "PressSparks": (12, 0.36),
 }
 
-# The emitter templates: whether an instance is made with the template or inherits a prefab,
-# its layers (paths under the instance), the longest lifetime of its particles in seconds and
-# the peak of its ParticleLight (0 for none)
+# The emitter templates: their layers (paths under the instance), the longest lifetime of their
+# particles in seconds and the peak of their ParticleLight (0 for none)
 EMITTERS = {
-    "BeamGlow": ("template", [""], 0.3, 4.5),
-    "BeamSparks": ("template", [""], 0.44, 5),
-    "WeldSparks": ("template", [""], 0.54, 3.4),
-    "DrillDust": ("template", [""], 0.9, 0),
-    "VentSteam": ("template", [""], 1.55, 0),
-    "MissileTrail": ("template", [""], 1.5, 0),
-    "JetPlume": ("template", [""], 0.4, 0),
-    "DepositSparkle": ("template", [".sparkle", ".sparkle_halo"], 1.8, 0),
-    "CorpseEmbers": ("prefab", [".embers", ".embers_halo"], 1.7, 0),
+    "BeamGlow": ([""], 0.3, 4.5),
+    "BeamSparks": ([""], 0.44, 5),
+    "WeldSparks": ([""], 0.54, 3.4),
+    "DrillDust": ([""], 0.9, 0),
+    "VentSteam": ([""], 1.55, 0),
+    "MissileTrail": ([""], 1.5, 0),
+    "JetPlume": ([""], 0.4, 0),
+    "DepositSparkle": ([".sparkle", ".sparkle_halo"], 1.8, 0),
+    "CorpseEmbers": ([".embers", ".embers_halo"], 1.7, 0),
 }
 
 # Frames a burst or a stop is allowed beyond the longest lifetime
@@ -181,12 +180,9 @@ def test_one_shots(app):
 def check_emitter(app, name):
     """Make an instance of an emitter template, play it until it spawns, stop it and wait for its
     particles to die."""
-    kind, layers, longest, peak = EMITTERS[name]
+    layers, longest, peak = EMITTERS[name]
     entity = "fx_%s" % name
-    if kind == "prefab":
-        code = "%s : %s { Position: {0, 1, 6} }" % (entity, name)
-    else:
-        code = "%s { Position: {0, 1, 6}\n  %s: {} }" % (entity, name)
+    code = "%s { Position: {0, 1, 6}\n  %s: {} }" % (entity, name)
     script(app, entity, "using box.transform\n" + code)
     app.wait_for("get %s%s ParticleEmitter.rate" % (entity, layers[0]),
                  lambda out: float(out) > 0, what="the emitter of %s" % name)
@@ -247,14 +243,15 @@ def flash_light(app, name):
 
 
 def check_flash(app, light, peak, range_, fade):
-    """The light of a flash has the range of its play and fades from at most its peak to 0."""
-    app.wait_for("get %s PointLight.range" % light, lambda out: near(float(out), range_),
-                 what="a range of %g" % range_)
-    app.wait_for("get %s EffectFlash.intensity" % light,
-                 lambda out: near(float(out), peak), what="a peak of %g" % peak)
+    """The light of a flash has the range of its play from its first frame and fades from at
+    most its peak to 0."""
     first = float(app.exec("get %s PointLight.intensity" % light))
     app.check(0 <= first <= peak + TOLERANCE, "the flash is at %g, above its peak %g" % (
         first, peak))
+    app.check(near(float(app.exec("get %s PointLight.range" % light)), range_),
+              "the flash does not reach %g" % range_)
+    app.check(near(float(app.exec("get %s EffectFlash.intensity" % light)), peak),
+              "the flash does not peak at %g" % peak)
     app.wait_for("get %s PointLight.intensity" % light, "0", frames=frames(fade),
                  what="the flash faded to 0 after %g s" % fade)
     app.wait_frames(5)
@@ -288,8 +285,8 @@ def test_combust_flash(app):
 
 def test_muzzle_flash(app):
     setup(app)
-    script(app, "fx_muzzle", "using box.transform\nfx_muzzle { Position: {0, 1, 6} "
-           "MuzzleFlash: {} }")
+    script(app, "fx_muzzle", "using box.transform\nfx_muzzle { Position: {0, 1, 6}\n"
+           "  MuzzleFlash: {} }")
     app.wait_for("get fx_muzzle PointLight.range", "4.5", what="the muzzle flash")
     app.wait_frames(3)
     app.expect("get fx_muzzle PointLight.intensity", "0")

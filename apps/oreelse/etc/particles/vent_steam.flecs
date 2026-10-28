@@ -1,9 +1,6 @@
 // Steam rising from a factory's vents while it crafts, the VentSteam of the original. The
 // factory plays it while it works.
 
-using box.transform
-using box.geometry
-using box.light
 using box.particle
 
 template VentSteam {

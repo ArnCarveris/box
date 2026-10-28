@@ -3,7 +3,6 @@
 
 using box.transform
 using box.geometry
-using box.light
 using box.particle
 
 // The hemisphere of radius 0.34 the dust spawns over

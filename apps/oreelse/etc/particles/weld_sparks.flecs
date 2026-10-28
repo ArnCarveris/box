@@ -4,10 +4,10 @@
 // stops. The sparks start white and take the arc's color by 0.28 of their life, a ramp
 // computed for the default color.
 
-using box.transform
-using box.geometry
+using box.types
 using box.light
 using box.particle
+using box.material
 
 template WeldSparks {
   prop color: rgb = {120, 216, 255}
@@ -15,8 +15,8 @@ template WeldSparks {
   prop peak: f32 = 3.4
   prop radius: f32 = 4.5
 
-  Rgb: color
-  PointLight: {intensity: 0, range: radius, bake: LightBakeModeRealtime}
+  Rgb: {color.r, color.g, color.b}
+  PointLight: {intensity: 0, range: radius}
   ParticleLight: {intensity: peak}
 
   // The stream: 120 a second into the glow pool, from a sphere of 0.05, at {0, -5.5, 0} +-

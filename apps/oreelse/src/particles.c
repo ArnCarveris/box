@@ -102,7 +102,8 @@ ecs_entity_t ore_combust(
  * PointLight, the peak and the range of the flash of its play.
  *
  * A burst in a system sets OreBlastFlash after the commands that make the instance, so the
- * children exist when it merges.
+ * children exist when it merges. The play already lit a light at the peak of its EffectFlash,
+ * the previous play's, so the light moves to this play's peak by the same ratio.
  *
  * @param it Iterator over the roots whose OreBlastFlash was set
  */
@@ -129,12 +130,18 @@ static void OreBlastFlashApply(
         for (j = 0; j < count; j ++) {
             EffectFlash f = *ecs_get(it->world, lights[j], EffectFlash);
             PointLight light = *ecs_get(it->world, lights[j], PointLight);
+            bool changed = light.range != flash[i].range;
             if (f.intensity != flash[i].peak) {
+                if (f.intensity > 0) {
+                    light.intensity *= flash[i].peak / f.intensity;
+                    changed = true;
+                }
+
                 f.intensity = flash[i].peak;
                 ecs_set_ptr(it->world, lights[j], EffectFlash, &f);
             }
 
-            if (light.range != flash[i].range) {
+            if (changed) {
                 light.range = flash[i].range;
                 ecs_set_ptr(it->world, lights[j], PointLight, &light);
             }

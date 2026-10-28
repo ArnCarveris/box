@@ -2,8 +2,6 @@
 // SplatBurst of the original.
 
 using box.transform
-using box.geometry
-using box.light
 using box.particle
 
 prefab SplatBurst {

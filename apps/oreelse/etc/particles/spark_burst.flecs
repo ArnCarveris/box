@@ -1,9 +1,6 @@
 // Sparks where a bullet hits, at the muzzle of a gun turret as it fires, the SparkBurst
 // of the original.
 
-using box.transform
-using box.geometry
-using box.light
 using box.particle
 
 prefab SparkBurst {

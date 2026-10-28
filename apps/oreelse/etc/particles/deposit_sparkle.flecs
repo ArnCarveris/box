@@ -3,8 +3,7 @@
 // the original's offset of 0.18 above the deposit.
 
 using box.transform
-using box.geometry
-using box.light
+using box.types
 using box.particle
 
 template DepositSparkle {

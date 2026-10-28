@@ -1,11 +1,11 @@
 // The embers smoldering on a critter's corpse, the CorpseEmbers of the original: a slow
-// stream of embers off the ashes and three glowing specks. The game makes an instance on the
-// corpse, scaled by the size of the critter; it plays from the start. The stream is a child
-// at the original's offset of 0.05.
+// stream of embers off the ashes and three glowing specks. A prefab in the original, it is a
+// template here, as an instance of a prefab does not name its children: the game makes an
+// instance on the corpse, scaled by the size of the critter, and it plays from the start. The
+// stream is a child at the original's offset of 0.05.
 
 using box.transform
 using box.geometry
-using box.light
 using box.particle
 using box.material
 
@@ -13,7 +13,7 @@ using box.material
 const emberHot: Rgb = {255, 138, 52}
 const emberDim: Rgb = {236, 92, 34}
 
-prefab CorpseEmbers {
+template CorpseEmbers {
   // The embers: 8 a second into the ember pool, from a disc of 0.2, offset {0, 0.05, 0}, at
   // {0, 0.7, 0} +- {0.2, 0.25, 0.2}, radial 0.25, living 1.2 +- 0.5 s, sized 0.048 +- 0.022,
   // colored {255, 138, 52} through {236, 92, 34} at 0.45 to {58, 26, 16, 140}

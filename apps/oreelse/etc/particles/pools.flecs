@@ -48,12 +48,13 @@ sprChunk {
   TexturePath: {path: "apps/oreelse/etc/assets/particles/chunk.svg", width: 64, height: 64}
 }
 
-// The budgets for a late game base, the original's stress test mode: rings of some 50 turrets
-// whose every shot plays sparks and a puff or dust, a wave of critters dying in combusts and
-// splats, missiles exploding, rockets launching and the presses of the factories. A template
-// plays at most 64 times at once and all of them together 640 times. Past a budget a burst that
-// no view sees, or that lies more than 80 units from the camera, is dropped, and one in view
-// replays the play of its template that has played longest.
+// The budgets for a late game base, the original's stress test mode: a ring of some 90 gun,
+// laser and missile turrets whose every shot plays sparks and a puff or dust, a wave of critters
+// dying in combusts and splats, missiles exploding, rockets launching and the presses of two
+// factories. A template plays at most 64 times at once, about what the original's pools hold
+// (its glow pool of 512 fits some 50 spark bursts), and all of them together 640 times. Past a
+// budget a burst that no view sees, or that lies more than 80 units from the camera, is
+// dropped, and one in view replays the play of its template that has played longest.
 $ {
   ParticleSettings: {
     effect_max: 64,

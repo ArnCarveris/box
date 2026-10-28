@@ -2,8 +2,6 @@
 // beat of the vent. Its script names no pool; the factory fires it into the fx pool.
 
 using box.transform
-using box.geometry
-using box.light
 using box.particle
 
 prefab SmokePuff {

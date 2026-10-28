@@ -3,8 +3,6 @@
 // no pool; the factory fires the puff into the fx pool and the sparks into the glow pool.
 
 using box.transform
-using box.geometry
-using box.light
 using box.particle
 
 // A puff of dust squeezed out from under the factory's press as it lands, fired into the

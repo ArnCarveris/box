@@ -6,8 +6,6 @@
 // forces of the glow pool, what the original shows.
 
 using box.transform
-using box.geometry
-using box.light
 using box.particle
 
 prefab FlameBurst {

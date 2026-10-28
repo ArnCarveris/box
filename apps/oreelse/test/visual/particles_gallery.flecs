@@ -1,92 +1,132 @@
-// Every particle effect of etc/particles three frames after it started, on a grid of the ground
-// in front of the astronaut from zoom level 0, for checking by eye. Far to near:
+// Every particle effect of etc/particles three frames after it started, for checking by eye, on
+// the open basin south west of the deposits. The scene detaches the camera from the astronaut
+// (OreView.camera 0) and places it closer than zoom level 0, 7 units up and 9 back from the
+// middle of the grid, looking down at 38 degrees. Far to near:
 // - The emitter templates that play while working: BeamGlow, BeamSparks, WeldSparks (with their
-//   lights), DrillDust, VentSteam and MissileTrail.
+//   lights), DrillDust, VentSteam and MissileTrail, and the astronaut for scale.
 // - DepositSparkle, CorpseEmbers, JetPlume, the light of MuzzleFlash, and the FlameBurst and
 //   SmokeBurst of a rocket's lift off.
-// - The explosion (oreelse.explosion of BoomBurst at scale 1) and its flash, the combust of a
-//   critter of radius 1 (oreelse.combust of CombustBurst), MissileLaunch, MineBurst, and the
-//   PressPuff and PressSparks of a factory's press.
+// - The explosion (oreelse.explosion of BoomBurst at scale 1) and its flash, MissileLaunch,
+//   MineBurst, the PressPuff and PressSparks of a factory's press, and the combust of a critter
+//   of radius 1 (oreelse.combust of CombustBurst).
 // - FootDust, HitPuff, ImpactDust, PoofBurst, SplatBurst, SparkBurst and SmokePuff.
+//
+// Three frames of a stream show a few particles at most, so every emitter template also bursts
+// what it keeps alive while it plays (rate times the mean lifetime) on its first frame: the
+// colors and sizes its particles start with.
 include apps/oreelse/test/visual/setup/seed
 include apps/oreelse/etc/oreelse
 
+using flecs.script.math
 using box.transform
 using box.particle
 using oreelse
 
-astronaut {
-  Position: {0, 0, 24}
+$ {
+  OreView: {camera: 0, level: 0, height: 0, back: 0, look: 0}
+}
+
+camera {
+  Position: {-26, 7, 44}
+  Rotation: {-atan2(7, 9), 0, 0}
 }
 
 gallery_beamGlow {
-  Position: {-10, 1, 8}
+  Position: {-32.5, 1, 31}
   BeamGlow: {}
   ParticlePlayback: {state: ParticlePlaying}
+  ParticleBurst: {count: 12}
 }
 
 gallery_beamSparks {
-  Position: {-6, 0.3, 8}
+  Position: {-29.9, 0.3, 31}
   BeamSparks: {}
   ParticlePlayback: {state: ParticlePlaying}
+  ParticleBurst: {count: 61}
 }
 
 gallery_weldSparks {
-  Position: {-2, 1.5, 8}
+  Position: {-27.3, 1.5, 31}
   WeldSparks: {}
   ParticlePlayback: {state: ParticlePlaying}
+  ParticleBurst: {count: 50}
 }
 
 gallery_drillDust {
-  Position: {2, 0.1, 8}
+  Position: {-24.7, 0.1, 31}
   DrillDust: {}
   ParticlePlayback: {state: ParticlePlaying}
+  ParticleBurst: {count: 18}
 }
 
 gallery_ventSteam {
-  Position: {6, 0.8, 8}
+  Position: {-22.1, 0.8, 31}
   VentSteam: {}
   ParticlePlayback: {state: ParticlePlaying}
+  ParticleBurst: {count: 10}
 }
 
 gallery_missileTrail {
-  Position: {10, 1, 8}
+  Position: {-19.5, 1, 31}
   MissileTrail: {}
+  ParticleBurst: {count: 96}
 }
 
 gallery_depositSparkle {
-  Position: {-10, 0, 12}
+  Position: {-32.6, 0, 33.5}
   DepositSparkle: {}
+
+  sparkle {
+    ParticleBurst: {count: 3}
+  }
+
+  sparkle_halo {
+    ParticleBurst: {count: 3}
+  }
 }
 
-gallery_corpseEmbers : CorpseEmbers {
-  Position: {-6, 0, 12}
+gallery_corpseEmbers {
+  Position: {-30.4, 0, 33.5}
+  CorpseEmbers: {}
+
+  embers {
+    ParticleBurst: {count: 10}
+  }
+
+  embers_halo {
+    ParticleBurst: {count: 10}
+  }
 }
 
 gallery_jetPlume {
-  Position: {-2, 1.2, 12}
+  Position: {-28.2, 1.2, 33.5}
   JetPlume: {}
   ParticlePlayback: {state: ParticlePlaying}
+  ParticleBurst: {count: 21}
 }
 
 gallery_muzzleFlash {
-  Position: {2, 1.2, 12}
+  Position: {-26, 1.2, 33.5}
   MuzzleFlash: {}
   ParticlePlayback: {state: ParticlePlaying}
 }
 
-const flameBurst: entity = box.particle.burst_at(FlameBurst, {6, 1.5, 12}, 1)
-const smokeBurst: entity = box.particle.burst_at(SmokeBurst, {10, 0.2, 12}, 1)
-const boomBurst: entity = oreelse.explosion(BoomBurst, {-10, 0.55, 16}, 1)
-const combustBurst: entity = oreelse.combust(CombustBurst, {-6, 0, 16}, 1)
-const missileLaunch: entity = box.particle.burst_at(MissileLaunch, {-2, 1, 16}, 1)
-const mineBurst: entity = box.particle.burst_at(MineBurst, {2, 0.6, 16}, 1)
-const pressPuff: entity = box.particle.burst_at(PressPuff, {6, 0.3, 16}, 1)
-const pressSparks: entity = box.particle.burst_at(PressSparks, {10, 0.3, 16}, 1)
-const footDust: entity = box.particle.burst_at(FootDust, {-12, 0.04, 20}, 1)
-const hitPuff: entity = box.particle.burst_at(HitPuff, {-8, 0.6, 20}, 1)
-const impactDust: entity = box.particle.burst_at(ImpactDust, {-4, 0.05, 20}, 1)
-const poofBurst: entity = box.particle.burst_at(PoofBurst, {0, 0.4, 20}, 1)
-const splatBurst: entity = box.particle.burst_at(SplatBurst, {4, 0.6, 20}, 1)
-const sparkBurst: entity = box.particle.burst_at(SparkBurst, {8, 0.6, 20}, 1)
-const smokePuff: entity = box.particle.burst_at(SmokePuff, {12, 1, 20}, 1)
+astronaut {
+  Position: {-16.5, 0, 31}
+}
+
+const flameBurst: entity = box.particle.burst_at(FlameBurst, {-23.8, 1.5, 33.5}, 1)
+const smokeBurst: entity = box.particle.burst_at(SmokeBurst, {-21.6, 0.2, 33.5}, 1)
+const boomBurst: entity = oreelse.explosion(BoomBurst, {-32.5, 0.55, 36}, 1)
+const missileLaunch: entity = box.particle.burst_at(MissileLaunch, {-29.9, 1, 36}, 1)
+const mineBurst: entity = box.particle.burst_at(MineBurst, {-27.3, 0.6, 36}, 1)
+const pressPuff: entity = box.particle.burst_at(PressPuff, {-24.7, 0.3, 36}, 1)
+const pressSparks: entity = box.particle.burst_at(PressSparks, {-22.1, 0.3, 36}, 1)
+const combustBurst: entity = oreelse.combust(CombustBurst, {-19.5, 0, 36}, 1)
+const footDust: entity = box.particle.burst_at(FootDust, {-32, 0.04, 38.5}, 1)
+const hitPuff: entity = box.particle.burst_at(HitPuff, {-30, 0.6, 38.5}, 1)
+const impactDust: entity = box.particle.burst_at(ImpactDust, {-28, 0.05, 38.5}, 1)
+const poofBurst: entity = box.particle.burst_at(PoofBurst, {-26, 0.4, 38.5}, 1)
+const splatBurst: entity = box.particle.burst_at(SplatBurst, {-24, 0.6, 38.5}, 1)
+const sparkBurst: entity = box.particle.burst_at(SparkBurst, {-22, 0.6, 38.5}, 1)
+const smokePuff: entity = box.particle.burst_at(SmokePuff, {-20, 1, 38.5}, 1)

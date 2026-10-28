@@ -4,10 +4,10 @@
 // once when it stops. The sparks start white and take the beam's color by 0.3 of their life,
 // a ramp computed for the default color.
 
-using box.transform
-using box.geometry
+using box.types
 using box.light
 using box.particle
+using box.material
 
 template BeamSparks {
   prop color: rgb = {240, 96, 172}
@@ -15,8 +15,8 @@ template BeamSparks {
   prop peak: f32 = 5
   prop radius: f32 = 5.5
 
-  Rgb: color
-  PointLight: {intensity: 0, range: radius, bake: LightBakeModeRealtime}
+  Rgb: {color.r, color.g, color.b}
+  PointLight: {intensity: 0, range: radius}
   ParticleLight: {intensity: peak}
 
   // The stream: 180 a second into the glow pool, from a sphere of 0.07, at {0, 1.2, 0} +-

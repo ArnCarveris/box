@@ -1,8 +1,6 @@
 // A puff of dust where a bullet hits a critter, the HitPuff of the original.
 
 using box.transform
-using box.geometry
-using box.light
 using box.particle
 
 prefab HitPuff {
