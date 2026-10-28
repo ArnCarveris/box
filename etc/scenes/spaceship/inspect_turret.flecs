@@ -1,0 +1,12 @@
+include materials
+include structure
+include turret
+using flecs.script
+using box.transform
+using box.geometry
+using box.spatial
+using box.material
+using box.texture
+using box.light
+
+component { FrigateTurret: {} }

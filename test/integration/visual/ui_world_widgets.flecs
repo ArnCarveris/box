@@ -1,0 +1,94 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.layout
+using box.text
+using box.ui
+using box.widgets
+
+camera {
+  Position: {0, 1.5, 1.6}
+  Rotation: {-0.08, 0, 0}
+  Camera: {fov: 55}
+}
+
+main_view {
+  View: {
+    camera: camera,
+    clear: {enabled: true, color: {120, 150, 190, 255}},
+    shadows: {enabled: true}
+  }
+}
+
+sun {
+  Rotation: {0.5574, 2.221, 0}
+  DirectionalLight: {intensity: 2 * flecs.script.math.PI}
+  Rgb: {255, 244, 225}
+}
+
+ground {
+  Position: {0, -0.05, 0}
+  Box: {24, 0.1, 24}
+  Rgb: {140, 150, 125}
+  PbrMaterial: {roughness: 0.9}
+}
+
+stand {
+  Position: {-0.55, 0.6, -0.6}
+  Box: {0.1, 1.2, 0.1}
+  Rgb: {110, 80, 60}
+}
+
+panel {
+  Position: {-0.55, 1.5, -0.6}
+  Rotation: {-0.35, 0.95, 0}
+  Scale: {0.006, 0.006, 0.006}
+  Layout: {direction: Column, spacing: 10, padding: {14, 14, 16, 16}}
+  LayoutItem: {width: {mode: Fixed, value: 320}}
+  Rect: {1, 1}
+  Rgb: {46, 50, 58}
+  Border: {width: 2, radius: 8, color: {70, 76, 87, 255}}
+
+  title {
+    Text: {value: "Settings", size: 20}
+    Rgb: {214, 218, 224}
+  }
+
+  volume {
+    Slider: {label: "Volume", value: 70, width: 288, thumb: 20}
+  }
+
+  brightness {
+    Slider: {label: "Brightness", value: 35, width: 288, thumb: 20}
+  }
+
+  shadows {
+    Switch: {label: "Shadows", value: true}
+  }
+
+  vsync {
+    Checkbox: {label: "Vsync", value: true}
+  }
+}
+
+far_panel {
+  Position: {1.6, 1.4, -4}
+  Rotation: {0, -0.8, 0}
+  Scale: {0.012, 0.012, 0.012}
+  Layout: {direction: Column, spacing: 10, padding: {14, 14, 16, 16}}
+  LayoutItem: {width: {mode: Fixed, value: 260}}
+  Rect: {1, 1}
+  Rgb: {46, 50, 58}
+  Border: {width: 2, radius: 8, color: {70, 76, 87, 255}}
+
+  speed {
+    Slider: {label: "Speed", value: 55, width: 228, thumb: 20}
+  }
+
+  sound {
+    Switch: {label: "Sound", value: true}
+  }
+}

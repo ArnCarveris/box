@@ -1,0 +1,17 @@
+include materials
+include structure
+include bridge
+include turret
+include railgun
+using flecs.script
+using box.transform
+using box.geometry
+using box.spatial
+using box.material
+using box.texture
+using box.light
+
+bridge { FrigateBridge: {} }
+cockpit { FrigateCockpit: {}; Position: {-25, 0, 0} }
+turret { FrigateTurret: {}; Position: {23, 0, -8} }
+railgun { FrigateRailgun: {}; Position: {33, 0, -2} }
