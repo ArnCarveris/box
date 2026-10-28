@@ -6,7 +6,8 @@
  * toast), then the player (walking, the camera). Those that only run while playing match
  * (OreGameState, Playing), the game's only pause mechanism.
  *
- * The look applies the render quality tier in every state, in EcsPreStore.
+ * The look applies the render quality tier in every state, in EcsPreStore. The particles
+ * register the helpers that play the effects of etc/particles and the flash of their lights.
  */
 
 #define OREELSE_IMPL
@@ -37,6 +38,7 @@ void OreelseImport(
     ECS_META_COMPONENT(world, OreQuality);
     ECS_META_COMPONENT(world, OreQualityTiers);
     ECS_META_COMPONENT(world, OreLook);
+    ECS_META_COMPONENT(world, OreBlastFlash);
     ECS_TAG_DEFINE(world, OreRunScript);
 
     ecs_add_id(world, ecs_id(OreGameState), EcsExclusive);
@@ -46,4 +48,5 @@ void OreelseImport(
     ore_map_import(world);
     ore_player_import(world);
     ore_look_import(world);
+    ore_particles_import(world);
 }

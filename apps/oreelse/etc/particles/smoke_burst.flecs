@@ -1,0 +1,60 @@
+// The smoke rolling out under a rocket while it lifts off, the SmokeBurst of the original,
+// played with every FlameBurst.
+//
+// Its script names the smoke pool, but the original's rocket fires it with oreBurst into
+// the fx pool, which ignores the pool of a burst: the layer carries the look and the
+// forces of the fx pool, what the original shows.
+
+using box.transform
+using box.geometry
+using box.light
+using box.particle
+
+// The hemisphere of radius 0.4 the smoke spawns over
+prefab shapeSmokeBurst {
+  HemiSphere: {segments: 16, radius: 0.4}
+}
+
+prefab SmokeBurst {
+  // The burst: 20 particles of the fx pool, from a hemisphere of 0.4, offset {0, 0.05, 0}, at
+  // {0, 0.9, 0} +- {0.6, 0.4, 0.6}, radial 3.4, living 1.6 +- 0.6 s, sized 0.45 +- 0.2 growing
+  // 0.55 a second, colored {206, 198, 190, 235} through {150, 143, 138, 190} at 0.4 to
+  // {104, 98, 94, 110}
+  particles {
+    Position: {0, 0.05, 0}
+    ParticleEmitter: {
+      max: 20,
+      rate: 0,
+      shape: EmitterMesh,
+      source: shapeSmokeBurst,
+      direction: {0, 1, 0},
+      spread: 34,
+      speed: {0.5, 1.3},
+      radial: {3.4, 3.4},
+      lifetime: {1, 2.2},
+      size: {0.25, 0.65},
+      rotation: {-180, 180},
+      spin: {-69, 69},
+      color: {206, 198, 190},
+      seed: 219
+    }
+    ParticleBurst: {count: 20}
+    ParticleForces: {gravity: {0, -5, 0}, drag: 2.5, turbulence: 0.7, turbulence_scale: 1.2}
+    ParticleAppearance: {
+      shape: ParticleSprite,
+      texture: sprPuff,
+      softness: 0.35,
+      lit: 0.8
+    }
+    ParticleCurves: {
+      size: {0.45, 1.93, 3.22, 4.43},
+      opacity: {0.92, 0.77, 0.54, 0},
+      color: {
+        start: {255, 255, 255},
+        early: {198, 197, 198},
+        late: {162, 160, 161},
+        end: {130, 128, 128}
+      }
+    }
+  }
+}

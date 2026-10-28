@@ -1,0 +1,50 @@
+// Dust kicked up by the astronaut's boots at every step on the ground, the FootDust of the
+// original.
+
+using box.transform
+using box.geometry
+using box.light
+using box.particle
+
+prefab FootDust {
+  // The burst: 8 particles of the fx pool, from a disc of 0.16, offset {0, 0.03, 0}, at
+  // {0, 0.75, 0} +- {0.3, 0.3, 0.3}, radial 1.5, living 0.5 +- 0.18 s, sized 0.16 +- 0.07
+  // growing 0.55 a second, colored {212, 184, 150, 210} to {186, 164, 138, 90}
+  particles {
+    Position: {0, 0.03, 0}
+    ParticleEmitter: {
+      max: 8,
+      rate: 0,
+      shape: EmitterDisc,
+      radius: 0.16,
+      direction: {0, 1, 0},
+      spread: 22,
+      speed: {0.45, 1.05},
+      radial: {1.5, 1.5},
+      lifetime: {0.32, 0.68},
+      size: {0.09, 0.23},
+      rotation: {-180, 180},
+      spin: {-149, 149},
+      color: {212, 184, 150},
+      seed: 220
+    }
+    ParticleBurst: {count: 8}
+    ParticleForces: {gravity: {0, -5, 0}, drag: 2.5, turbulence: 0.7, turbulence_scale: 1.2}
+    ParticleAppearance: {
+      shape: ParticleSprite,
+      texture: sprPuff,
+      softness: 0.35,
+      lit: 0.8
+    }
+    ParticleCurves: {
+      size: {0.45, 1.84, 3, 4.08},
+      opacity: {0.82, 0.67, 0.45, 0},
+      color: {
+        start: {255, 255, 255},
+        early: {245, 246, 248},
+        late: {234, 237, 242},
+        end: {224, 228, 235}
+      }
+    }
+  }
+}

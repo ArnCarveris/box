@@ -1,0 +1,48 @@
+// A puff from a factory's exhaust vent, the SmokePuff of the original, shot up at every
+// beat of the vent. Its script names no pool; the factory fires it into the fx pool.
+
+using box.transform
+using box.geometry
+using box.light
+using box.particle
+
+prefab SmokePuff {
+  // The burst: 5 particles of the fx pool, from a box of {0.14, 0.06, 0.14}, offset
+  // {0, 0.06, 0}, at {0, 3.4, 0} +- {0.5, 0.6, 0.5}, radial 0.3, living 0.9 +- 0.3 s, sized 0.24
+  // +- 0.1 growing 1.1 a second, colored {148, 144, 140, 200} to {104, 98, 94, 120}
+  particles {
+    Position: {0, 0.06, 0}
+    ParticleEmitter: {
+      max: 5,
+      rate: 0,
+      shape: EmitterBox,
+      extents: {0.14, 0.06, 0.14},
+      direction: {0, 1, 0},
+      spread: 8,
+      speed: {2.8, 4},
+      radial: {0.3, 0.3},
+      lifetime: {0.6, 1.2},
+      size: {0.14, 0.34},
+      color: {148, 144, 140},
+      seed: 225
+    }
+    ParticleBurst: {count: 5}
+    ParticleForces: {gravity: {0, -5, 0}, drag: 2.5, turbulence: 0.7, turbulence_scale: 1.2}
+    ParticleAppearance: {
+      shape: ParticleSprite,
+      texture: sprPuff,
+      softness: 0.35,
+      lit: 0.8
+    }
+    ParticleCurves: {
+      size: {0.45, 2.78, 5.25, 7.69},
+      opacity: {0.78, 0.68, 0.51, 0},
+      color: {
+        start: {255, 255, 255},
+        early: {231, 229, 228},
+        late: {206, 203, 201},
+        end: {182, 177, 175}
+      }
+    }
+  }
+}

@@ -1,0 +1,15 @@
+// An explosion at its peak, three frames after oreelse.explosion played BoomBurst at scale 1
+// on the basin to the left of the astronaut, seen from zoom level 0: the white hot flash and
+// its halo over the fireball, the shock ring and the sparks flying out, the rubble thrown up,
+// the first cinders and the smoke of the plume, and the warm flash light on the ground, the
+// deposits and the astronaut
+include apps/oreelse/test/visual/setup/seed
+include apps/oreelse/etc/oreelse
+
+using oreelse
+
+astronaut {
+  box.transform.Rotation: {0, 0.6, 0}
+}
+
+const boom: entity = oreelse.explosion(BoomBurst, {-4, 0.55, 3}, 1)

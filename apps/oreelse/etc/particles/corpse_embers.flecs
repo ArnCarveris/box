@@ -1,0 +1,117 @@
+// The embers smoldering on a critter's corpse, the CorpseEmbers of the original: a slow
+// stream of embers off the ashes and three glowing specks. The game makes an instance on the
+// corpse, scaled by the size of the critter; it plays from the start. The stream is a child
+// at the original's offset of 0.05.
+
+using box.transform
+using box.geometry
+using box.light
+using box.particle
+using box.material
+
+// The hot and the dim color of the embers
+const emberHot: Rgb = {255, 138, 52}
+const emberDim: Rgb = {236, 92, 34}
+
+prefab CorpseEmbers {
+  // The embers: 8 a second into the ember pool, from a disc of 0.2, offset {0, 0.05, 0}, at
+  // {0, 0.7, 0} +- {0.2, 0.25, 0.2}, radial 0.25, living 1.2 +- 0.5 s, sized 0.048 +- 0.022,
+  // colored {255, 138, 52} through {236, 92, 34} at 0.45 to {58, 26, 16, 140}
+  embers {
+    Position: {0, 0.05, 0}
+    ParticleEmitter: {
+      max: 21,
+      rate: 8,
+      shape: EmitterDisc,
+      radius: 0.2,
+      direction: {0, 1, 0},
+      spread: 16,
+      speed: {0.45, 0.95},
+      radial: {0.25, 0.25},
+      lifetime: {0.7, 1.7},
+      size: {0.026, 0.07},
+      color: {255, 138, 52},
+      seed: 237
+    }
+    ParticleForces: {gravity: {0, 0.8, 0}, drag: 1.1, turbulence: 1.8, turbulence_scale: 1.1}
+    ParticleAppearance: {
+      shape: ParticleSprite,
+      blend: ParticleAdditive,
+      texture: sprSpark,
+      softness: 0.25,
+      lit: 0
+    }
+    ParticleCurves: {
+      size: {1.25, 0.9, 0.47, 0.05},
+      opacity: {0.15, 0.77, 0.49, 0},
+      color: {
+        start: {255, 255, 255},
+        early: {241, 195, 201},
+        late: {166, 128, 153},
+        end: {58, 57, 108}
+      }
+    }
+  }
+
+  // The embers again, twice as large at half the opacity and with the same seed, so a halo
+  // sits on each of its particles: the original's ember pool is emissive at 2.2, brighter than
+  // box draws a particle, and it looks flat without it
+  embers_halo {
+    Position: {0, 0.05, 0}
+    ParticleEmitter: {
+      max: 21,
+      rate: 8,
+      shape: EmitterDisc,
+      radius: 0.2,
+      direction: {0, 1, 0},
+      spread: 16,
+      speed: {0.45, 0.95},
+      radial: {0.25, 0.25},
+      lifetime: {0.7, 1.7},
+      size: {0.052, 0.14},
+      opacity: {0.5, 0.5},
+      color: {255, 138, 52},
+      seed: 237
+    }
+    ParticleForces: {gravity: {0, 0.8, 0}, drag: 1.1, turbulence: 1.8, turbulence_scale: 1.1}
+    ParticleAppearance: {
+      shape: ParticleSprite,
+      blend: ParticleAdditive,
+      texture: sprFlare,
+      softness: 0.25,
+      lit: 0
+    }
+    ParticleCurves: {
+      size: {1.25, 0.9, 0.47, 0.05},
+      opacity: {0.15, 0.77, 0.49, 0},
+      color: {
+        start: {255, 255, 255},
+        early: {241, 195, 201},
+        late: {166, 128, 153},
+        end: {58, 57, 108}
+      }
+    }
+  }
+
+  // Glowing specks in the ashes
+  speck_a {
+    Position: {0.16, 0.03, 0.1}
+    Sphere: {segments: 6, smooth: true, radius: 0.045}
+    Rgb: emberHot
+    Emissive: {strength: 3.6, color: emberHot}
+  }
+
+  speck_b {
+    Position: {-0.13, 0.05, -0.14}
+    Sphere: {segments: 6, smooth: true, radius: 0.035}
+    Rgb: emberDim
+    Emissive: {strength: 3, color: emberDim}
+  }
+
+  speck_c {
+    Position: {0.02, 0.02, -0.22}
+    Sphere: {segments: 6, smooth: true, radius: 0.028}
+    Rgb: emberHot
+    Emissive: {strength: 3.2, color: emberHot}
+  }
+}

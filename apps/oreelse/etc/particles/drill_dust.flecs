@@ -1,0 +1,53 @@
+// Rock dust thrown off a drill's bit where it bites the ground, the DrillDust of the
+// original. The drill plays it while it runs. The color ramp through mid to end is computed
+// for the default colors.
+
+using box.transform
+using box.geometry
+using box.light
+using box.particle
+
+template DrillDust {
+  prop rate: f32 = 26
+  prop size: f32 = 0.24
+  prop color: rgb = {192, 150, 108}
+
+  // The stream: 26 a second into the fx pool, from a disc of 0.2, at {0, 0.9, 0} +-
+  // {0.18, 0.16, 0.18}, radial 2.6, living 0.7 +- 0.2 s, sized 0.24 +- 0.05 growing 0.42 a
+  // second, colored {192, 150, 108, 230} through {170, 132, 98, 130} at 0.35 to
+  // {152, 120, 92, 0}
+  ParticleEmitter: {
+    max: 36,
+    rate: rate,
+    shape: EmitterDisc,
+    radius: 0.2,
+    direction: {0, 1, 0},
+    spread: 11,
+    speed: {0.74, 1.06},
+    radial: {2.6, 2.6},
+    lifetime: {0.5, 0.9},
+    size: {size - 0.05, size + 0.05},
+    rotation: {-180, 180},
+    spin: {-126, 126},
+    color: color,
+    seed: 233
+  }
+  ParticlePlayback: {state: ParticleStopped}
+  ParticleForces: {gravity: {0, -5, 0}, drag: 2.5, turbulence: 0.7, turbulence_scale: 1.2}
+  ParticleAppearance: {
+    shape: ParticleSprite,
+    texture: sprPuff,
+    softness: 0.35,
+    lit: 0.8
+  }
+  ParticleCurves: {
+    size: {0.45, 1.65, 2.54, 3.34},
+    opacity: {0.9, 0.53, 0.23, 0},
+    color: {
+      start: {255, 255, 255},
+      early: {228, 227, 234},
+      late: {215, 216, 227},
+      end: {203, 206, 220}
+    }
+  }
+}

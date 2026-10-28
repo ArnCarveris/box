@@ -1,0 +1,52 @@
+// A splash of green ichor where a critter is hit or dies without a CombustBurst, the
+// SplatBurst of the original.
+
+using box.transform
+using box.geometry
+using box.light
+using box.particle
+
+prefab SplatBurst {
+  // The burst: 22 particles of the fx pool, from a sphere of 0.18, offset {0, 0.1, 0}, at
+  // {0, 2.6, 0} +- {1.1, 1.1, 1.1}, radial 3.2, living 0.6 +- 0.22 s, sized 0.12 +- 0.055
+  // stretched 1.5, colored {138, 226, 118} through {104, 190, 88, 240} at 0.45 to
+  // {62, 122, 54, 130}
+  particles {
+    Position: {0, 0.1, 0}
+    ParticleEmitter: {
+      max: 22,
+      rate: 0,
+      shape: EmitterSphere,
+      radius: 0.18,
+      direction: {0, 1, 0},
+      spread: 23,
+      speed: {1.5, 3.7},
+      radial: {3.2, 3.2},
+      lifetime: {0.38, 0.82},
+      size: {0.065, 0.175},
+      rotation: {-180, 180},
+      spin: {-229, 229},
+      color: {138, 226, 118},
+      seed: 227
+    }
+    ParticleBurst: {count: 22}
+    ParticleForces: {gravity: {0, -5, 0}, drag: 2.5, turbulence: 0.7, turbulence_scale: 1.2}
+    ParticleAppearance: {
+      shape: ParticleSprite,
+      texture: sprPuff,
+      softness: 0.35,
+      stretch: 0.17,
+      lit: 0.8
+    }
+    ParticleCurves: {
+      size: {0.45, 1.17, 1.4, 1.5},
+      opacity: {1, 0.96, 0.69, 0},
+      color: {
+        start: {255, 255, 255},
+        early: {210, 225, 210},
+        late: {166, 185, 167},
+        end: {121, 138, 125}
+      }
+    }
+  }
+}

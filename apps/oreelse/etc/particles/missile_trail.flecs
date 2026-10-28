@@ -1,0 +1,51 @@
+// The smoke trail behind a missile in flight, the MissileTrail of the original. It plays from
+// the start, as the missile is made in flight, and its particles stay where they were left.
+// The size ramp is computed for the default age.
+
+using box.transform
+using box.geometry
+using box.light
+using box.particle
+
+template MissileTrail {
+  prop rate: f32 = 80
+  prop size: f32 = 0.22
+  prop age: f32 = 1.2
+
+  // The stream: 80 a second into the trail pool, from a sphere of 0.05, at {0, 0.35, 0} +-
+  // {0.3, 0.25, 0.3}, living 1.2 +- 0.3 s, sized 0.22 +- 0.06 growing 1 a second, colored
+  // {228, 220, 210, 210} through {158, 152, 148, 150} at 0.28 to {104, 100, 98, 0}
+  ParticleEmitter: {
+    max: 180,
+    rate: rate,
+    shape: EmitterSphere,
+    radius: 0.05,
+    direction: {0, 1, 0},
+    spread: 41,
+    speed: {0.1, 0.6},
+    lifetime: {age - 0.3, age + 0.3},
+    size: {size - 0.06, size + 0.06},
+    rotation: {-180, 180},
+    spin: {-115, 115},
+    inherit_velocity: 0.1,
+    color: {228, 220, 210},
+    seed: 235
+  }
+  ParticleForces: {gravity: {0, 0.35, 0}, drag: 1.4, turbulence: 0.9, turbulence_scale: 0.7}
+  ParticleAppearance: {
+    shape: ParticleSprite,
+    texture: sprPuff,
+    softness: 0.5,
+    lit: 0.9
+  }
+  ParticleCurves: {
+    size: {0.35, 3.53, 8.17, 13.55},
+    opacity: {0, 0.44, 0.17, 0},
+    color: {
+      start: {255, 255, 255},
+      early: {173, 172, 176},
+      late: {145, 145, 148},
+      end: {117, 117, 121}
+    }
+  }
+}

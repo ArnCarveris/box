@@ -1,0 +1,25 @@
+// The flash of a gun or missile turret's muzzle as it fires, the MuzzleFlash of the original:
+// a light alone, which the turret flashes at every shot and which fades at fade a second.
+//
+// It is a ParticleLight on an emitter that spawns nothing: playing it from the start
+// (ParticlePlayback {state: ParticlePlaying, reset: true}) lights the light at peak and fades
+// it linearly to 0 over peak / fade seconds of the playback clock, so it pauses with the
+// game. A stopped flash is dark.
+
+using box.transform
+using box.geometry
+using box.light
+using box.particle
+
+template MuzzleFlash {
+  prop color: rgb = {255, 196, 112}
+  prop peak: f32 = 5
+  prop fade: f32 = 45
+  prop radius: f32 = 4.5
+
+  Rgb: color
+  PointLight: {intensity: 0, range: radius, bake: LightBakeModeRealtime}
+  ParticleEmitter: {max: 1, rate: 0, lifetime: {0.1, 0.1}, seed: 238}
+  ParticlePlayback: {state: ParticleStopped}
+  ParticleLight: {intensity: peak, curve: {1, 0.667, 0.333, 0}, period: peak / fade}
+}

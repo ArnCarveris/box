@@ -1,0 +1,134 @@
+// The launch of a missile from its rack, the MissileLaunch of the original: a flash and
+// exhaust of the fire pool and smoke blown back along -Z, the launch direction of a turret
+// aimed at 0. ore_burst_aimed (src/particles.c) turns it about Y to the aim of the turret, as
+// the original's oreLaunchFx turns the velocities and offsets.
+
+using box.transform
+using box.geometry
+using box.light
+using box.particle
+
+prefab MissileLaunch {
+  // The flash: 4 particles of the fire pool, from a sphere of 0.16, at {0, 0.3, -1.2} +-
+  // {0.4, 0.3, 0.5}, living 0.17 +- 0.05 s, sized 0.58 +- 0.18 growing 1.2 a second, colored
+  // {255, 246, 224} through {255, 208, 132} at 0.45 to {255, 138, 62, 190}
+  flash {
+    ParticleEmitter: {
+      max: 4,
+      rate: 0,
+      shape: EmitterSphere,
+      radius: 0.16,
+      direction: {0, 0.243, -0.97},
+      spread: 18,
+      speed: {0.679, 1.795},
+      lifetime: {0.12, 0.22},
+      size: {0.4, 0.76},
+      rotation: {-180, 180},
+      spin: {-115, 115},
+      color: {255, 246, 224},
+      seed: 215
+    }
+    ParticleBurst: {count: 4}
+    ParticleForces: {gravity: {0, 1.6, 0}, drag: 3, turbulence: 2.2, turbulence_scale: 1.4}
+    ParticleAppearance: {
+      shape: ParticleSprite,
+      blend: ParticleAdditive,
+      texture: sprFlare,
+      softness: 0.6,
+      lit: 0
+    }
+    ParticleCurves: {
+      size: {0.3, 1.55, 1.58, 1.28},
+      opacity: {0.9, 0.56, 0.17, 0},
+      color: {
+        start: {255, 255, 255},
+        early: {255, 226, 178},
+        late: {255, 187, 120},
+        end: {255, 143, 72}
+      }
+    }
+  }
+
+  // The exhaust: 10 particles of the fire pool, from a sphere of 0.18, at {0, 0.2, -4.6} +-
+  // {0.7, 0.5, 1.3}, radial 1.4, living 0.32 +- 0.12 s, sized 0.42 +- 0.14 growing 0.9 a second,
+  // colored {255, 226, 176} through {255, 152, 66, 235} at 0.38 to {148, 70, 40, 120}
+  exhaust {
+    ParticleEmitter: {
+      max: 10,
+      rate: 0,
+      shape: EmitterSphere,
+      radius: 0.18,
+      direction: {0, 0.043, -0.999},
+      spread: 9,
+      speed: {3.284, 5.925},
+      radial: {1.4, 1.4},
+      lifetime: {0.2, 0.44},
+      size: {0.28, 0.56},
+      rotation: {-180, 180},
+      spin: {-172, 172},
+      color: {255, 226, 176},
+      seed: 216
+    }
+    ParticleBurst: {count: 10}
+    ParticleForces: {gravity: {0, 1.6, 0}, drag: 3, turbulence: 2.2, turbulence_scale: 1.4}
+    ParticleAppearance: {
+      shape: ParticleSprite,
+      blend: ParticleAdditive,
+      texture: sprFlare,
+      softness: 0.6,
+      lit: 0
+    }
+    ParticleCurves: {
+      size: {0.3, 1.7, 1.86, 1.6},
+      opacity: {0.9, 0.52, 0.13, 0},
+      color: {
+        start: {255, 255, 255},
+        early: {255, 182, 118},
+        late: {206, 130, 82},
+        end: {148, 80, 62}
+      }
+    }
+  }
+
+  // The smoke: 13 particles of the smoke pool, from a sphere of 0.2, offset {0, 0, -0.12}, at
+  // {0, 0.35, -3} +- {0.6, 0.4, 1.1}, radial 1.2, living 0.95 +- 0.3 s, sized 0.42 +- 0.13
+  // growing 1.05 a second, colored {150, 138, 128, 220} through {110, 102, 96, 175} at 0.35 to
+  // {80, 76, 72, 0}
+  smoke {
+    Position: {0, 0, -0.12}
+    ParticleEmitter: {
+      max: 13,
+      rate: 0,
+      shape: EmitterSphere,
+      radius: 0.2,
+      direction: {0, 0.116, -0.993},
+      spread: 11,
+      speed: {1.881, 4.159},
+      radial: {1.2, 1.2},
+      lifetime: {0.65, 1.25},
+      size: {0.29, 0.55},
+      rotation: {-180, 180},
+      spin: {-80, 80},
+      color: {150, 138, 128},
+      seed: 217
+    }
+    ParticleBurst: {count: 13}
+    ParticleForces: {gravity: {0, -0.6, 0}, drag: 0.9, turbulence: 1.5, turbulence_scale: 0.55}
+    ParticleAppearance: {
+      shape: ParticleSprite,
+      texture: sprPuff,
+      softness: 0.5,
+      lit: 0.85
+    }
+    ParticleCurves: {
+      size: {0.35, 2.24, 4.55, 7.09},
+      opacity: {0, 0.56, 0.21, 0},
+      color: {
+        start: {255, 255, 255},
+        early: {193, 194, 197},
+        late: {165, 169, 172},
+        end: {140, 145, 149}
+      }
+    }
+  }
+}

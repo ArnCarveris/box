@@ -9,7 +9,7 @@ include items
 include materials/terrain
 include materials/hazard
 include props/ore
-include particles/jet_plume
+include particles
 include player
 include input
 include world

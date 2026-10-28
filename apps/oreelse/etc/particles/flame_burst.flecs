@@ -1,0 +1,55 @@
+// The flame under a rocket's engines while it lifts off, the FlameBurst of the original,
+// played every few frames of the launch, shooting down in a cone of 20 degrees.
+//
+// Its script names the fire pool, but the original's rocket fires it with oreBurst into
+// the glow pool, which ignores the pool of a burst: the layer carries the look and the
+// forces of the glow pool, what the original shows.
+
+using box.transform
+using box.geometry
+using box.light
+using box.particle
+
+prefab FlameBurst {
+  // The burst: 16 particles of the glow pool, from a cone of 0.2 opening 20 degrees, offset
+  // {0, 0.1, 0}, at {0, -4.5, 0} +- {0.5, 0.9, 0.5}, living 0.34 +- 0.12 s, sized 0.28 +- 0.12
+  // growing 0.45 a second, colored {255, 232, 180} through {244, 106, 44, 240} at 0.45 to
+  // {132, 74, 52, 120}
+  particles {
+    Position: {0, 0.1, 0}
+    ParticleEmitter: {
+      max: 16,
+      rate: 0,
+      shape: EmitterDisc,
+      radius: 0.2,
+      direction: {0, -1, 0},
+      spread: 20,
+      speed: {3.6, 5.4},
+      lifetime: {0.22, 0.46},
+      size: {0.16, 0.4},
+      rotation: {-180, 180},
+      spin: {-172, 172},
+      color: {255, 232, 180},
+      seed: 218
+    }
+    ParticleBurst: {count: 16}
+    ParticleForces: {gravity: {0, -4, 0}, drag: 1.5}
+    ParticleAppearance: {
+      shape: ParticleSprite,
+      blend: ParticleAdditive,
+      texture: sprSpark,
+      softness: 0.25,
+      lit: 0
+    }
+    ParticleCurves: {
+      size: {1.25, 1.07, 0.65, 0.08},
+      opacity: {1, 0.96, 0.7, 0},
+      color: {
+        start: {255, 255, 255},
+        early: {247, 153, 115},
+        late: {200, 103, 71},
+        end: {132, 82, 78}
+      }
+    }
+  }
+}

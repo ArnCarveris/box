@@ -1,0 +1,361 @@
+// The explosion of a building or a missile, the BoomBurst of the original: layered bursts
+// that ore_explosion (src/particles.c) plays at the blast at its scale, with the flash light
+// of the original's oreExplosion. A white hot flash and a fireball of the fire pool, a shock
+// ring and sparks of the glow pool, rubble of the debris pool, cinders of the ember pool and
+// a plume of smoke.
+//
+// The ring's squash (stretch 0.45) has no equivalent and is left out, and so is the mass of
+// the rubble. The original also scales the count of every layer with the blast; box plays the
+// counts of scale 1 at every scale.
+
+using box.transform
+using box.geometry
+using box.light
+using box.particle
+
+// The ring the shock wave spawns on: radius 0.5, 0.2 thick
+prefab shapeBoomRing {
+  Torus: {segments: 32, rings: 6, radius: 0.5, tube: 0.1}
+}
+
+// The hemisphere of radius 0.7 the plume rises from
+prefab shapeBoomPlume {
+  HemiSphere: {segments: 16, radius: 0.7}
+}
+
+prefab BoomBurst {
+  // The flash: 8 particles of the fire pool, from a sphere of 0.18, offset {0, 0.25, 0}, living
+  // 0.18 +- 0.05 s, sized 1.3 +- 0.3 growing 1.4 a second, colored {255, 252, 240} through
+  // {255, 226, 158} at 0.5 to {255, 150, 70, 200}
+  flash {
+    Position: {0, 0.25, 0}
+    ParticleEmitter: {
+      max: 8,
+      rate: 0,
+      shape: EmitterSphere,
+      radius: 0.18,
+      direction: {0, 0, 0},
+      speed: {0, 0},
+      lifetime: {0.13, 0.23},
+      size: {1, 1.6},
+      rotation: {-180, 180},
+      spin: {-143, 143},
+      color: {255, 252, 240},
+      seed: 201
+    }
+    ParticleBurst: {count: 8}
+    ParticleForces: {gravity: {0, 1.6, 0}, drag: 3, turbulence: 2.2, turbulence_scale: 1.4}
+    ParticleAppearance: {
+      shape: ParticleSprite,
+      blend: ParticleAdditive,
+      texture: sprFlare,
+      softness: 0.6,
+      lit: 0
+    }
+    ParticleCurves: {
+      size: {0.3, 1.48, 1.44, 1.13},
+      opacity: {0.9, 0.56, 0.17, 0},
+      color: {
+        start: {255, 255, 255},
+        early: {255, 237, 197},
+        late: {255, 203, 137},
+        end: {255, 152, 75}
+      }
+    }
+  }
+
+  // The flash again, twice as large at half the opacity and with the same seed, so a halo
+  // sits on each of its particles: the original's fire pool is emissive at 2.6, brighter than
+  // box draws a particle, and it looks flat without it
+  flash_halo {
+    Position: {0, 0.25, 0}
+    ParticleEmitter: {
+      max: 8,
+      rate: 0,
+      shape: EmitterSphere,
+      radius: 0.18,
+      direction: {0, 0, 0},
+      speed: {0, 0},
+      lifetime: {0.13, 0.23},
+      size: {2, 3.2},
+      rotation: {-180, 180},
+      spin: {-143, 143},
+      opacity: {0.5, 0.5},
+      color: {255, 252, 240},
+      seed: 201
+    }
+    ParticleBurst: {count: 8}
+    ParticleForces: {gravity: {0, 1.6, 0}, drag: 3, turbulence: 2.2, turbulence_scale: 1.4}
+    ParticleAppearance: {
+      shape: ParticleSprite,
+      blend: ParticleAdditive,
+      texture: sprFlare,
+      softness: 0.6,
+      lit: 0
+    }
+    ParticleCurves: {
+      size: {0.3, 1.48, 1.44, 1.13},
+      opacity: {0.9, 0.56, 0.17, 0},
+      color: {
+        start: {255, 255, 255},
+        early: {255, 237, 197},
+        late: {255, 203, 137},
+        end: {255, 152, 75}
+      }
+    }
+  }
+
+  // The ball: 30 particles of the fire pool, from a sphere of 0.5, offset {0, 0.3, 0}, at
+  // {0, 1.6, 0} +- {1.4, 1.2, 1.4}, radial 6.5, living 0.48 +- 0.16 s, sized 0.75 +- 0.28
+  // growing 1.1 a second, colored {255, 238, 196} through {255, 146, 54} at 0.34 to
+  // {132, 58, 34, 190}
+  ball {
+    Position: {0, 0.3, 0}
+    ParticleEmitter: {
+      max: 30,
+      rate: 0,
+      shape: EmitterSphere,
+      radius: 0.5,
+      direction: {0, 1, 0},
+      spread: 41,
+      speed: {0.4, 2.8},
+      radial: {6.5, 6.5},
+      lifetime: {0.32, 0.64},
+      size: {0.47, 1.03},
+      rotation: {-180, 180},
+      spin: {-229, 229},
+      color: {255, 238, 196},
+      seed: 202
+    }
+    ParticleBurst: {count: 30}
+    ParticleForces: {gravity: {0, 1.6, 0}, drag: 3, turbulence: 2.2, turbulence_scale: 1.4}
+    ParticleAppearance: {
+      shape: ParticleSprite,
+      blend: ParticleAdditive,
+      texture: sprFlare,
+      softness: 0.6,
+      lit: 0
+    }
+    ParticleCurves: {
+      size: {0.3, 1.71, 1.88, 1.62},
+      opacity: {0.9, 0.56, 0.16, 0},
+      color: {
+        start: {255, 255, 255},
+        early: {255, 159, 77},
+        late: {194, 110, 60},
+        end: {132, 63, 47}
+      }
+    }
+  }
+
+  // The ring: 46 particles of the glow pool, from a ring of 0.5 and 0.2 thick, offset
+  // {0, 0.14, 0}, radial 11, living 0.34 +- 0.06 s, sized 0.62 +- 0.1 growing 0.9 a second
+  // stretched 0.45, colored {255, 236, 198, 235} to {255, 138, 62, 0}
+  ring {
+    Position: {0, 0.14, 0}
+    ParticleEmitter: {
+      max: 46,
+      rate: 0,
+      shape: EmitterMesh,
+      source: shapeBoomRing,
+      direction: {0, 0, 0},
+      speed: {0, 0},
+      radial: {11, 11},
+      lifetime: {0.28, 0.4},
+      size: {0.52, 0.72},
+      color: {255, 236, 198},
+      seed: 203
+    }
+    ParticleBurst: {count: 46}
+    ParticleForces: {gravity: {0, -4, 0}, drag: 1.5}
+    ParticleAppearance: {
+      shape: ParticleSprite,
+      blend: ParticleAdditive,
+      texture: sprSpark,
+      softness: 0.25,
+      lit: 0
+    }
+    ParticleCurves: {
+      size: {1.25, 1.05, 0.63, 0.07},
+      opacity: {0.92, 0.61, 0.29, 0},
+      color: {
+        start: {255, 255, 255},
+        early: {255, 220, 197},
+        late: {255, 185, 140},
+        end: {255, 150, 82}
+      }
+    }
+  }
+
+  // The sparks: 38 particles of the glow pool, from a sphere of 0.28, offset {0, 0.25, 0}, at
+  // {0, 4.2, 0} +- {3.2, 3, 3.2}, radial 11, living 0.6 +- 0.28 s, sized 0.1 +- 0.045 stretched
+  // 2.6, colored {255, 250, 226} through {255, 224, 140} at 0.32 to {255, 104, 24, 200}
+  sparks {
+    Position: {0, 0.25, 0}
+    ParticleEmitter: {
+      max: 38,
+      rate: 0,
+      shape: EmitterSphere,
+      radius: 0.28,
+      direction: {0, 1, 0},
+      spread: 37,
+      speed: {1.2, 7.2},
+      radial: {11, 11},
+      lifetime: {0.32, 0.88},
+      size: {0.055, 0.145},
+      color: {255, 250, 226},
+      seed: 204
+    }
+    ParticleBurst: {count: 38}
+    ParticleForces: {gravity: {0, -4, 0}, drag: 1.5}
+    ParticleAppearance: {
+      shape: ParticleSprite,
+      blend: ParticleAdditive,
+      texture: sprSpark,
+      softness: 0.25,
+      stretch: 0.21,
+      lit: 0
+    }
+    ParticleCurves: {
+      size: {1.25, 0.9, 0.47, 0.05},
+      opacity: {1, 1, 0.83, 0},
+      color: {
+        start: {255, 255, 255},
+        early: {255, 226, 156},
+        late: {255, 166, 92},
+        end: {255, 106, 29}
+      }
+    }
+  }
+
+  // The rubble: 18 particles of the debris pool, from a sphere of 0.32, offset {0, 0.2, 0}, at
+  // {0, 6.2, 0} +- {2.6, 2.6, 2.6}, radial 7, living 1.5 +- 0.5 s, sized 0.115 +- 0.05, colored
+  // {74, 66, 60} through {58, 52, 48} at 0.5 to {44, 40, 38}
+  rubble {
+    Position: {0, 0.2, 0}
+    ParticleEmitter: {
+      max: 18,
+      rate: 0,
+      shape: EmitterSphere,
+      radius: 0.32,
+      direction: {0, 1, 0},
+      spread: 23,
+      speed: {3.6, 8.8},
+      radial: {7, 7},
+      lifetime: {1, 2},
+      size: {0.065, 0.165},
+      rotation: {-180, 180},
+      spin: {-745, 745},
+      color: {74, 66, 60},
+      seed: 205
+    }
+    ParticleBurst: {count: 18}
+    ParticleForces: {gravity: {0, -17, 0}, drag: 0.3}
+    ParticleAppearance: {
+      shape: ParticleSprite,
+      texture: sprChunk,
+      lit: 1
+    }
+    ParticleCurves: {
+      opacity: {1, 1, 1, 0},
+      color: {
+        start: {255, 255, 255},
+        early: {222, 224, 226},
+        late: {192, 194, 199},
+        end: {163, 168, 175}
+      }
+    }
+  }
+
+  // The cinders: 24 particles of the ember pool, from a sphere of 0.7, offset {0, 0.3, 0}, at
+  // {0, 1.1, 0} +- {0.9, 0.7, 0.9}, radial 1.6, living 1.7 +- 0.7 s, sized 0.09 +- 0.04, colored
+  // {255, 172, 76} through {248, 108, 38, 240} at 0.45 to {110, 38, 20, 140}
+  cinders {
+    Position: {0, 0.3, 0}
+    ParticleEmitter: {
+      max: 24,
+      rate: 0,
+      shape: EmitterSphere,
+      radius: 0.7,
+      direction: {0, 1, 0},
+      spread: 39,
+      speed: {0.4, 1.8},
+      radial: {1.6, 1.6},
+      lifetime: {1, 2.4},
+      size: {0.05, 0.13},
+      color: {255, 172, 76},
+      seed: 206
+    }
+    ParticleBurst: {count: 24}
+    ParticleForces: {gravity: {0, 0.8, 0}, drag: 1.1, turbulence: 1.8, turbulence_scale: 1.1}
+    ParticleAppearance: {
+      shape: ParticleSprite,
+      blend: ParticleAdditive,
+      texture: sprSpark,
+      softness: 0.25,
+      lit: 0
+    }
+    ParticleCurves: {
+      size: {1.25, 0.9, 0.47, 0.05},
+      opacity: {0.15, 0.74, 0.47, 0},
+      color: {
+        start: {255, 255, 255},
+        early: {250, 186, 171},
+        late: {194, 123, 120},
+        end: {110, 61, 88}
+      }
+    }
+  }
+
+  // The plume: 24 particles of the smoke pool, from a hemisphere of 0.7, offset {0, 0.35, 0}, at
+  // {0, 1.3, 0} +- {0.7, 0.5, 0.7}, radial 3.2, living 1.9 +- 0.6 s, sized 0.85 +- 0.32 growing
+  // 0.4 a second, colored {188, 176, 162, 215} through {130, 120, 112, 190} at 0.35 to
+  // {86, 80, 76, 80}
+  plume {
+    Position: {0, 0.35, 0}
+    ParticleEmitter: {
+      max: 24,
+      rate: 0,
+      shape: EmitterMesh,
+      source: shapeBoomPlume,
+      direction: {0, 1, 0},
+      spread: 28,
+      speed: {0.8, 1.8},
+      radial: {3.2, 3.2},
+      lifetime: {1.3, 2.5},
+      size: {0.53, 1.17},
+      rotation: {-180, 180},
+      spin: {-63, 63},
+      color: {188, 176, 162},
+      seed: 207
+    }
+    ParticleBurst: {count: 24}
+    ParticleForces: {gravity: {0, -0.6, 0}, drag: 0.9, turbulence: 1.5, turbulence_scale: 0.55}
+    ParticleAppearance: {
+      shape: ParticleSprite,
+      texture: sprPuff,
+      softness: 0.5,
+      lit: 0.85
+    }
+    ParticleCurves: {
+      size: {0.35, 1.62, 2.81, 3.98},
+      opacity: {0, 0.6, 0.33, 0},
+      color: {
+        start: {255, 255, 255},
+        early: {181, 179, 182},
+        late: {149, 148, 152},
+        end: {119, 119, 124}
+      }
+    }
+  }
+
+  // The flash light of oreExplosion 0.45 above the blast, warm white: it starts at its peak and
+  // fades linearly to 0 over 1 / 4.5 s. ore_explosion sets the peak and the range of a play to
+  // cfg.explosionPeak and cfg.explosionRange times the scale of the blast
+  light {
+    Position: {0, 0.45, 0}
+    Rgb: {255, 190, 118}
+    PointLight: {intensity: 9, range: 13, bake: LightBakeModeRealtime}
+    EffectFlash: {intensity: 9, seconds: 0.222}
+  }
+}

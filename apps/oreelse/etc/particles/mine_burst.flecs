@@ -1,0 +1,52 @@
+// Sparks and grit thrown up from a deposit the astronaut mines, the MineBurst of the
+// original, in a cone of 38 degrees.
+
+using box.transform
+using box.geometry
+using box.light
+using box.particle
+
+prefab MineBurst {
+  // The burst: 14 particles of the glow pool, from a cone of 0.16 opening 38 degrees, offset
+  // {0, 0.2, 0}, at {0, 3.4, 0} +- {0.5, 0.8, 0.5}, living 0.45 +- 0.15 s, sized 0.08 +- 0.035
+  // stretched 1.6, colored {255, 224, 158} through {228, 186, 130, 235} at 0.4 to
+  // {176, 152, 124, 190}
+  particles {
+    Position: {0, 0.2, 0}
+    ParticleEmitter: {
+      max: 14,
+      rate: 0,
+      shape: EmitterDisc,
+      radius: 0.16,
+      direction: {0, 1, 0},
+      spread: 38,
+      speed: {2.6, 4.2},
+      lifetime: {0.3, 0.6},
+      size: {0.045, 0.115},
+      rotation: {-180, 180},
+      spin: {-286, 286},
+      color: {255, 224, 158},
+      seed: 223
+    }
+    ParticleBurst: {count: 14}
+    ParticleForces: {gravity: {0, -4, 0}, drag: 1.5}
+    ParticleAppearance: {
+      shape: ParticleSprite,
+      blend: ParticleAdditive,
+      texture: sprSpark,
+      softness: 0.25,
+      stretch: 0.35,
+      lit: 0
+    }
+    ParticleCurves: {
+      size: {1.25, 0.9, 0.47, 0.05},
+      opacity: {1, 0.93, 0.79, 0},
+      color: {
+        start: {255, 255, 255},
+        early: {232, 219, 219},
+        late: {205, 195, 207},
+        end: {176, 174, 202}
+      }
+    }
+  }
+}

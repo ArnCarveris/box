@@ -1,0 +1,58 @@
+// Sparks where a laser beam lands, the BeamSparks of the original, with a light of the
+// beam's color. The turret plays it at the end of the beam while the beam is on; the
+// ParticleLight of the emitter lights the light at peak while it plays and turns it off at
+// once when it stops. The sparks start white and take the beam's color by 0.3 of their life,
+// a ramp computed for the default color.
+
+using box.transform
+using box.geometry
+using box.light
+using box.particle
+
+template BeamSparks {
+  prop color: rgb = {240, 96, 172}
+  prop rate: f32 = 180
+  prop peak: f32 = 5
+  prop radius: f32 = 5.5
+
+  Rgb: color
+  PointLight: {intensity: 0, range: radius, bake: LightBakeModeRealtime}
+  ParticleLight: {intensity: peak}
+
+  // The stream: 180 a second into the glow pool, from a sphere of 0.07, at {0, 1.2, 0} +-
+  // {2.4, 2.4, 2.4}, radial 3.2, living 0.34 +- 0.1 s, sized 0.12 +- 0.05 growing -0.22 a
+  // second, colored {255, 250, 252} through {240, 96, 172} at 0.3 to {120, 30, 80, 0}
+  ParticleEmitter: {
+    max: 119,
+    rate: rate,
+    shape: EmitterSphere,
+    radius: 0.07,
+    direction: {0, 1, 0},
+    spread: 63,
+    speed: {0, 3.6},
+    radial: {3.2, 3.2},
+    lifetime: {0.24, 0.44},
+    size: {0.07, 0.17},
+    color: {255, 250, 252},
+    seed: 231
+  }
+  ParticlePlayback: {state: ParticleStopped}
+  ParticleForces: {gravity: {0, -4, 0}, drag: 1.5}
+  ParticleAppearance: {
+    shape: ParticleSprite,
+    blend: ParticleAdditive,
+    texture: sprSpark,
+    softness: 0.25,
+    lit: 0
+  }
+  ParticleCurves: {
+    size: {1.25, 0.71, 0.28, 0.02},
+    opacity: {1, 0.95, 0.44, 0},
+    color: {
+      start: {255, 255, 255},
+      early: {234, 95, 170},
+      late: {177, 63, 125},
+      end: {120, 31, 81}
+    }
+  }
+}

@@ -1,0 +1,92 @@
+// Every particle effect of etc/particles three frames after it started, on a grid of the ground
+// in front of the astronaut from zoom level 0, for checking by eye. Far to near:
+// - The emitter templates that play while working: BeamGlow, BeamSparks, WeldSparks (with their
+//   lights), DrillDust, VentSteam and MissileTrail.
+// - DepositSparkle, CorpseEmbers, JetPlume, the light of MuzzleFlash, and the FlameBurst and
+//   SmokeBurst of a rocket's lift off.
+// - The explosion (oreelse.explosion of BoomBurst at scale 1) and its flash, the combust of a
+//   critter of radius 1 (oreelse.combust of CombustBurst), MissileLaunch, MineBurst, and the
+//   PressPuff and PressSparks of a factory's press.
+// - FootDust, HitPuff, ImpactDust, PoofBurst, SplatBurst, SparkBurst and SmokePuff.
+include apps/oreelse/test/visual/setup/seed
+include apps/oreelse/etc/oreelse
+
+using box.transform
+using box.particle
+using oreelse
+
+astronaut {
+  Position: {0, 0, 24}
+}
+
+gallery_beamGlow {
+  Position: {-10, 1, 8}
+  BeamGlow: {}
+  ParticlePlayback: {state: ParticlePlaying}
+}
+
+gallery_beamSparks {
+  Position: {-6, 0.3, 8}
+  BeamSparks: {}
+  ParticlePlayback: {state: ParticlePlaying}
+}
+
+gallery_weldSparks {
+  Position: {-2, 1.5, 8}
+  WeldSparks: {}
+  ParticlePlayback: {state: ParticlePlaying}
+}
+
+gallery_drillDust {
+  Position: {2, 0.1, 8}
+  DrillDust: {}
+  ParticlePlayback: {state: ParticlePlaying}
+}
+
+gallery_ventSteam {
+  Position: {6, 0.8, 8}
+  VentSteam: {}
+  ParticlePlayback: {state: ParticlePlaying}
+}
+
+gallery_missileTrail {
+  Position: {10, 1, 8}
+  MissileTrail: {}
+}
+
+gallery_depositSparkle {
+  Position: {-10, 0, 12}
+  DepositSparkle: {}
+}
+
+gallery_corpseEmbers : CorpseEmbers {
+  Position: {-6, 0, 12}
+}
+
+gallery_jetPlume {
+  Position: {-2, 1.2, 12}
+  JetPlume: {}
+  ParticlePlayback: {state: ParticlePlaying}
+}
+
+gallery_muzzleFlash {
+  Position: {2, 1.2, 12}
+  MuzzleFlash: {}
+  ParticlePlayback: {state: ParticlePlaying}
+}
+
+const flameBurst: entity = box.particle.burst_at(FlameBurst, {6, 1.5, 12}, 1)
+const smokeBurst: entity = box.particle.burst_at(SmokeBurst, {10, 0.2, 12}, 1)
+const boomBurst: entity = oreelse.explosion(BoomBurst, {-10, 0.55, 16}, 1)
+const combustBurst: entity = oreelse.combust(CombustBurst, {-6, 0, 16}, 1)
+const missileLaunch: entity = box.particle.burst_at(MissileLaunch, {-2, 1, 16}, 1)
+const mineBurst: entity = box.particle.burst_at(MineBurst, {2, 0.6, 16}, 1)
+const pressPuff: entity = box.particle.burst_at(PressPuff, {6, 0.3, 16}, 1)
+const pressSparks: entity = box.particle.burst_at(PressSparks, {10, 0.3, 16}, 1)
+const footDust: entity = box.particle.burst_at(FootDust, {-12, 0.04, 20}, 1)
+const hitPuff: entity = box.particle.burst_at(HitPuff, {-8, 0.6, 20}, 1)
+const impactDust: entity = box.particle.burst_at(ImpactDust, {-4, 0.05, 20}, 1)
+const poofBurst: entity = box.particle.burst_at(PoofBurst, {0, 0.4, 20}, 1)
+const splatBurst: entity = box.particle.burst_at(SplatBurst, {4, 0.6, 20}, 1)
+const sparkBurst: entity = box.particle.burst_at(SparkBurst, {8, 0.6, 20}, 1)
+const smokePuff: entity = box.particle.burst_at(SmokePuff, {12, 1, 20}, 1)

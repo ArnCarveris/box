@@ -1,0 +1,49 @@
+// Dust where a bullet or a missile hits the ground, the ImpactDust of the original.
+
+using box.transform
+using box.geometry
+using box.light
+using box.particle
+
+prefab ImpactDust {
+  // The burst: 12 particles of the fx pool, from a disc of 0.22, offset {0, 0.05, 0}, at
+  // {0, 1.1, 0} +- {0.5, 0.5, 0.5}, radial 2.6, living 0.62 +- 0.24 s, sized 0.19 +- 0.08
+  // growing 0.7 a second, colored {198, 176, 148, 215} to {162, 148, 130, 80}
+  particles {
+    Position: {0, 0.05, 0}
+    ParticleEmitter: {
+      max: 12,
+      rate: 0,
+      shape: EmitterDisc,
+      radius: 0.22,
+      direction: {0, 1, 0},
+      spread: 24,
+      speed: {0.6, 1.6},
+      radial: {2.6, 2.6},
+      lifetime: {0.38, 0.86},
+      size: {0.11, 0.27},
+      rotation: {-180, 180},
+      spin: {-138, 138},
+      color: {198, 176, 148},
+      seed: 222
+    }
+    ParticleBurst: {count: 12}
+    ParticleForces: {gravity: {0, -5, 0}, drag: 2.5, turbulence: 0.7, turbulence_scale: 1.2}
+    ParticleAppearance: {
+      shape: ParticleSprite,
+      texture: sprPuff,
+      softness: 0.35,
+      lit: 0.8
+    }
+    ParticleCurves: {
+      size: {0.45, 2.06, 3.53, 4.93},
+      opacity: {0.84, 0.67, 0.44, 0},
+      color: {
+        start: {255, 255, 255},
+        early: {240, 242, 245},
+        late: {225, 229, 235},
+        end: {209, 215, 225}
+      }
+    }
+  }
+}
