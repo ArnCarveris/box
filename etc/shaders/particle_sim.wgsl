@@ -2,10 +2,11 @@
 // the used slots of the pool by the frame, frees the particles whose age reached their
 // lifetime, moves the others under the acceleration, gravity, wander field and drag toward the
 // wind and with the drift of their frame of reference, collides them with the ground plane,
-// and writes the indirect draw arguments of the pool. spawn then writes the spawned particles into the slots the extract picked. Each spawn
-// draws its lifetime, position, direction, speed and radial speed from the seed and its spawn
-// index, each from its own stream, and adds the velocity it inherits from the emitter; the C twin is
-// box_particle_* in src/particle/simulate.h.
+// and writes the indirect draw arguments of the pool. spawn then writes the spawned particles
+// into the slots the extract picked. Each spawn draws its lifetime, position, direction, speed
+// and radial speed from the seed and its spawn index, each from its own stream, and adds the
+// velocity it inherits from the emitter; the C twin is box_particle_* in
+// src/particle/simulate.h.
 //
 // An alpha blended pool that is drawn back to front is sorted for each view that draws it:
 // sort_keys writes the key of every slot from its view depth, then a bitonic sort orders the
@@ -102,7 +103,7 @@ fn spawn(@builtin(global_invocation_id) id: vec3u) {
     let direction = select(vec3f(0.0), world * inverseSqrt(length2), length2 > 0.0);
     let speed = particle_draw(seed, index, STREAM_SPEED, emitter.speed_size.xy);
     let offset = (emitter.model * vec4f(local, 0.0)).xyz;
-    let radial = particle_draw(seed, index, STREAM_RADIAL, emitter.opacity.zw);
+    let radial = particle_draw(seed, index, STREAM_RADIAL, emitter.opacity_radial.zw);
 
     var p: Particle;
     p.position = (emitter.model * vec4f(local, 1.0)).xyz;

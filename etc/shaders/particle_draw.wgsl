@@ -125,7 +125,7 @@ fn vs(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32
     out.clip = view.view_proj * vec4f(world, 1.0);
     out.world = world;
     out.depth = -(view.view * vec4f(world, 1.0)).z;
-    out.opacity = particle_draw(seed, p.index, STREAM_OPACITY, emitter.opacity.xy) *
+    out.opacity = particle_draw(seed, p.index, STREAM_OPACITY, emitter.opacity_radial.xy) *
         particle_curve(emitter.curve_opacity, t);
     out.color = particle_color(seed, p.index, emitter.color.rgb, emitter.variance.rgb) *
         particle_gradient(emitter.gradient, t);

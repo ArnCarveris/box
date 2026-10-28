@@ -22,7 +22,7 @@ struct Emitter {
     // xy: initial rotation range in degrees, zw: spin range in degrees per second
     rotation_spin: vec4f,
     // xy: opacity range, zw: range of the speed away from the origin of the emitter
-    opacity: vec4f,
+    opacity_radial: vec4f,
     // x: EmitterShape, y: seed, z: particles to spawn, w: spawn index of the first of them
     spawn: vec4u,
     // x: used slots, y: first spawn slot in the slot buffer, z: mesh table points,
