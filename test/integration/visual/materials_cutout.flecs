@@ -1,0 +1,175 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+
+// Alpha tested materials (AlphaCutoff) on a floor lit by a sun from behind on the right, whose
+// shadows fall toward the camera.
+// Two panels of a lattice fence (fence.png, BackFacePlain) form a corner, the right one turned
+// away so its plain back shows, with a blue box behind them seen through the holes. A small tree
+// of crossed leaf quads (leaf.png, whose alpha is soft at the edges) stands on a trunk. Every
+// alpha tested shape casts a shadow with the same holes. On the right a fence panel with
+// Opacity 0.7 stays opaque with holes and a shadow, and a leaf quad with BlendMode AlphaBlend
+// blends the soft edge above the cutoff and casts no shadow.
+
+camera {
+  Position: {0.6, 2.8, 7.5}
+  Rotation: {-0.27, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {120, 160, 210, 255}}, shadows: {enabled: true}}
+}
+
+sun {
+  Rotation: {0.7, -0.6, 0}
+  DirectionalLight: {intensity: 1.5 * flecs.script.math.PI}
+  Rgb: {255, 245, 230}
+}
+
+fence_tex {
+  TexturePath: {path: "test/integration/visual/assets/fence.png"}
+}
+
+leaf_tex {
+  TexturePath: {path: "test/integration/visual/assets/leaf.png"}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {16, 0.2, 10}
+  Rgb: {176, 180, 166}
+}
+
+behind {
+  Position: {-2.2, 0.6, -2.4}
+  Box: {1.2, 1.2, 1.2}
+  Rgb: {60, 110, 210}
+}
+
+fence_front {
+  Position: {-3.6, 0.8, -0.3}
+  Rotation: {0, 0.6, 0}
+  Quad: {3.2, 1.6}
+  Rgb: {235, 215, 190}
+  PbrTextures: {albedo: fence_tex}
+  TextureTransform: {scale_x: 2, scale_y: 1, offset_x: 0, offset_y: 0}
+  BackFaceMode: {BackFacePlain}
+  AlphaCutoff: {value: 0.5}
+}
+
+fence_back {
+  Position: {-1.4, 0.8, -1.0}
+  Rotation: {0, 2.9, 0}
+  Quad: {3.2, 1.6}
+  Rgb: {235, 215, 190}
+  PbrTextures: {albedo: fence_tex}
+  TextureTransform: {scale_x: 2, scale_y: 1, offset_x: 0, offset_y: 0}
+  BackFaceMode: {BackFacePlain}
+  AlphaCutoff: {value: 0.5}
+}
+
+tree {
+  Position: {1.4, 0, -0.6}
+
+  trunk {
+    Position: {0, 0.9, 0}
+    Cylinder: {segments: 16, smooth: true, length: 1.8, radius: 0.1}
+    Rgb: {104, 74, 48}
+  }
+
+  leaves_a {
+    Position: {0, 2.0, 0}
+    Quad: {1.8, 1.8}
+    Rgb: {170, 225, 150}
+    PbrTextures: {albedo: leaf_tex}
+    BackFaceMode: {BackFacePlain}
+    AlphaCutoff: {value: 0.5}
+  }
+
+  leaves_b {
+    Position: {0, 2.0, 0}
+    Rotation: {0, 1.047, 0}
+    Quad: {1.8, 1.8}
+    Rgb: {170, 225, 150}
+    PbrTextures: {albedo: leaf_tex}
+    BackFaceMode: {BackFacePlain}
+    AlphaCutoff: {value: 0.5}
+  }
+
+  leaves_c {
+    Position: {0, 2.0, 0}
+    Rotation: {0, 2.094, 0}
+    Quad: {1.8, 1.8}
+    Rgb: {170, 225, 150}
+    PbrTextures: {albedo: leaf_tex}
+    BackFaceMode: {BackFacePlain}
+    AlphaCutoff: {value: 0.5}
+  }
+
+  leaves_low_left {
+    Position: {-0.45, 1.35, 0.2}
+    Rotation: {0, 0.5, 0.6}
+    Quad: {1.0, 1.0}
+    Rgb: {170, 225, 150}
+    PbrTextures: {albedo: leaf_tex}
+    BackFaceMode: {BackFacePlain}
+    AlphaCutoff: {value: 0.5}
+  }
+
+  leaves_low_right {
+    Position: {0.45, 1.45, -0.2}
+    Rotation: {0, 2.0, -0.6}
+    Quad: {1.0, 1.0}
+    Rgb: {170, 225, 150}
+    PbrTextures: {albedo: leaf_tex}
+    BackFaceMode: {BackFacePlain}
+    AlphaCutoff: {value: 0.5}
+  }
+
+  leaves_front {
+    Position: {0.1, 1.6, 0.45}
+    Rotation: {0.5, -0.4, 0.3}
+    Quad: {1.0, 1.0}
+    Rgb: {170, 225, 150}
+    PbrTextures: {albedo: leaf_tex}
+    BackFaceMode: {BackFacePlain}
+    AlphaCutoff: {value: 0.5}
+  }
+
+  leaves_back {
+    Position: {-0.1, 1.7, -0.5}
+    Rotation: {-0.5, 0.4, -0.3}
+    Quad: {1.0, 1.0}
+    Rgb: {170, 225, 150}
+    PbrTextures: {albedo: leaf_tex}
+    BackFaceMode: {BackFacePlain}
+    AlphaCutoff: {value: 0.5}
+  }
+}
+
+faded_fence {
+  Position: {3.5, 0.8, 0}
+  Rotation: {0, -0.4, 0}
+  Quad: {1.6, 1.6}
+  Rgb: {235, 215, 190}
+  Opacity: {value: 0.7}
+  PbrTextures: {albedo: fence_tex}
+  BackFaceMode: {BackFacePlain}
+  AlphaCutoff: {value: 0.5}
+}
+
+blended_leaf {
+  Position: {5.2, 1.0, 0.4}
+  Rotation: {0, -0.3, 0}
+  Quad: {1.6, 1.6}
+  Rgb: {170, 225, 150}
+  PbrTextures: {albedo: leaf_tex}
+  BlendMode: {AlphaBlend}
+  BackFaceMode: {BackFacePlain}
+  AlphaCutoff: {value: 0.5}
+}

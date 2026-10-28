@@ -28,6 +28,25 @@ static void box_opacity_ctor(
     }
 }
 
+/** Construct AlphaCutoff values that discard below BOX_MATERIAL_CUTOFF.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_alpha_cutoff_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    AlphaCutoff *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i].value = BOX_MATERIAL_CUTOFF;
+    }
+}
+
 /** Construct PbrMaterial values: the material of a shape without PbrMaterial, a matte dielectric.
  *
  * @param ptr The components
@@ -75,6 +94,7 @@ void BoxMaterialImport(
 
     ECS_META_COMPONENT(world, Rgb);
     ECS_META_COMPONENT(world, Opacity);
+    ECS_META_COMPONENT(world, AlphaCutoff);
     ECS_META_COMPONENT(world, Tint);
     ECS_META_COMPONENT(world, PbrMaterial);
     ECS_META_COMPONENT(world, Emissive);
@@ -84,6 +104,7 @@ void BoxMaterialImport(
     ECS_META_COMPONENT(world, TextureTransform);
     ECS_META_COMPONENT(world, PbrTextures);
     ecs_set_hooks(world, Opacity, { .ctor = box_opacity_ctor });
+    ecs_set_hooks(world, AlphaCutoff, { .ctor = box_alpha_cutoff_ctor });
     ecs_set_hooks(world, PbrMaterial, { .ctor = box_pbr_material_ctor });
     ecs_set_hooks(world, TextureTransform, { .ctor = box_texture_transform_ctor });
     ecs_add_pair(world, ecs_id(PbrTextures), EcsOnInstantiate, EcsInherit);

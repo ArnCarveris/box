@@ -132,7 +132,7 @@ static uint64_t box_draws_hash(
     int32_t i;
     h ^= ((uint64_t)key->mesh + 0x632BE59BD9B4E019ull) * 0xC2B2AE3D27D4EB4Full;
     h ^= ((uint64_t)key->pipeline * 2 + key->dynamic) * 0x165667B19E3779F9ull;
-    h ^= (((uint64_t)key->blend * 2 + key->back_face) * 4 + key->wrap + 1) *
+    h ^= ((((uint64_t)key->blend * 2 + key->back_face) * 4 + key->wrap) * 2 + key->cutout + 1) *
         0x27D4EB2F165667C5ull;
     for (i = 0; i < BOX_RENDER_TEXTURE_SLOTS; i ++) {
         h = (h ^ (h >> 31)) * 0x9E3779B97F4A7C15ull + key->textures[i];
@@ -155,7 +155,8 @@ static bool box_draws_key_eq(
     const box_draw_key_t *b)
 {
     return a->scene == b->scene && a->mesh == b->mesh && a->pipeline == b->pipeline &&
-        a->blend == b->blend && a->back_face == b->back_face && a->dynamic == b->dynamic &&
+        a->blend == b->blend && a->cutout == b->cutout && a->back_face == b->back_face &&
+        a->dynamic == b->dynamic &&
         a->wrap == b->wrap && !ecs_os_memcmp(a->textures, b->textures, ECS_SIZEOF(a->textures)) &&
         a->shadow == b->shadow && a->bake == b->bake && a->atlas == b->atlas;
 }
@@ -384,12 +385,20 @@ float box_draws_alpha(
     return glm_clamp(alpha, 0.0f, 1.0f) * material->fade;
 }
 
+bool box_draws_cutout(
+    const AlphaCutoff *cutoff,
+    const Shape2D *shape2d)
+{
+    return cutoff != NULL && shape2d == NULL;
+}
+
 uint8_t box_draws_blend(
     const BlendMode *mode,
-    float alpha)
+    float alpha,
+    bool cutout)
 {
     uint8_t result = mode ? (uint8_t)*mode : (uint8_t)Opaque;
-    if (result == Opaque && alpha < 1.0f) {
+    if (result == Opaque && alpha < 1.0f && !cutout) {
         result = AlphaBlend;
     }
 
@@ -448,7 +457,8 @@ void box_draws_material(
     out->emissive[3] = 0.0f;
     out->material[0] = pbr ? glm_clamp(pbr->metallic, 0.0f, 1.0f) : BOX_MATERIAL_METALLIC;
     out->material[1] = pbr ? glm_clamp(pbr->roughness, 0.0f, 1.0f) : BOX_MATERIAL_ROUGHNESS;
-    out->material[2] = 0.0f;
+    out->material[2] = box_draws_cutout(material->cutoff, material->shape2d)
+        ? glm_clamp(material->cutoff->value, 0.0f, 1.0f) : 0.0f;
     out->material[3] = 0.0f;
     out->uv[0] = uv ? uv->scale_x : 1.0f;
     out->uv[1] = uv ? uv->scale_y : 1.0f;
@@ -789,6 +799,7 @@ static void box_draws_send_batch(
     out->pipeline = b->key.pipeline;
     out->blend = b->key.blend;
     out->back_face = b->key.back_face;
+    out->cutout = b->key.cutout;
     out->shadow = b->key.shadow;
     out->bake = b->key.bake;
     out->mesh = b->key.mesh;
@@ -900,6 +911,7 @@ static void box_draws_send_blended(
             out->pipeline = b->key.pipeline;
             out->blend = b->key.blend;
             out->back_face = b->key.back_face;
+            out->cutout = b->key.cutout;
             out->shadow = b->key.shadow;
             out->mesh = b->key.mesh;
             box_draws_batch_textures(d, b, out);
@@ -1048,7 +1060,8 @@ static const void* box_draws_at(
 
 /** Write the material of the dynamic shapes of a query result into their instances.
  *
- * A shape whose resolved blend mode no longer matches its batch is queued to move.
+ * A shape whose resolved blend mode or alpha test no longer matches its batch is queued to
+ * move.
  *
  * @param it The query result
  * @param d The state
@@ -1067,6 +1080,7 @@ static void box_draws_fill_material(
     const void *modes = ecs_field(it, BlendMode, 7);
     const void *uvs = ecs_field(it, TextureTransform, 8);
     const Shape2D *shapes2d = ecs_field(it, Shape2D, 11);
+    const void *cutoffs = ecs_field(it, AlphaCutoff, 12);
     const Tint *tints = ecs_table_get_id(it->world, it->table, ecs_id(Tint), it->offset);
     ecs_size_t color_step = box_draws_stride(it, colors, ECS_SIZEOF(Rgb), 3);
     ecs_size_t opacity_step = box_draws_stride(it, opacities, ECS_SIZEOF(Opacity), 4);
@@ -1074,6 +1088,7 @@ static void box_draws_fill_material(
     ecs_size_t emissive_step = box_draws_stride(it, emissives, ECS_SIZEOF(Emissive), 6);
     ecs_size_t mode_step = box_draws_stride(it, modes, ECS_SIZEOF(BlendMode), 7);
     ecs_size_t uv_step = box_draws_stride(it, uvs, ECS_SIZEOF(TextureTransform), 8);
+    ecs_size_t cutoff_step = box_draws_stride(it, cutoffs, ECS_SIZEOF(AlphaCutoff), 12);
     box_draw_tint_t inherited;
     int32_t i;
     for (i = 0; i < it->count; i ++) {
@@ -1089,6 +1104,7 @@ static void box_draws_fill_material(
         box_draw_material_t material = {
             .color = box_draws_at(colors, color_step, i),
             .opacity = box_draws_at(opacities, opacity_step, i),
+            .cutoff = box_draws_at(cutoffs, cutoff_step, i),
             .pbr = box_draws_at(pbrs, pbr_step, i),
             .emissive = box_draws_at(emissives, emissive_step, i),
             .uv = box_draws_at(uvs, uv_step, i),
@@ -1105,7 +1121,9 @@ static void box_draws_fill_material(
         box_render_instance_t *inst = ecs_vec_get_t(
             &b->instances, box_render_instance_t, slots[i].slot);
         box_draws_material(inst, &material);
-        if (box_draws_blend(box_draws_at(modes, mode_step, i), inst->color[3]) != b->key.blend) {
+        bool cutout = box_draws_cutout(material.cutoff, material.shape2d);
+        uint8_t blend = box_draws_blend(box_draws_at(modes, mode_step, i), inst->color[3], cutout);
+        if (blend != b->key.blend || cutout != b->key.cutout) {
             box_draws_mark(it->world, d, it->entities[i]);
         }
     }

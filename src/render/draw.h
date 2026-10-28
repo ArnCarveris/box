@@ -101,6 +101,7 @@ typedef struct box_draw_key_t {
     uint32_t mesh;          /**< Mesh handle */
     uint32_t pipeline;      /**< Shader handle of the pipeline */
     uint8_t blend;          /**< Resolved BlendMode, Opaque unless the shape blends */
+    bool cutout;            /**< A 3D shape with AlphaCutoff, alpha tested */
     uint8_t back_face;      /**< BackFaceMode */
     uint8_t wrap;           /**< TextureWrap of the texture samplers */
     bool dynamic;           /**< Instances are uploaded every frame */
@@ -129,6 +130,7 @@ extern ECS_COMPONENT_DECLARE(TextSlots);
 typedef struct box_draw_material_t {
     const Rgb *color;           /**< Base color, display encoded */
     const Opacity *opacity;     /**< Opacity of the shape itself */
+    const AlphaCutoff *cutoff;  /**< Alpha test of the shape, ignored by 2D shapes */
     const PbrMaterial *pbr;     /**< Metallic and roughness */
     const Emissive *emissive;   /**< Emitted light */
     const TextureTransform *uv; /**< Scale and offset of the texture coordinates */
@@ -345,7 +347,8 @@ void box_draws_transform(
  *
  * The base color is mixed toward the tints of the ancestors from the root down and then toward
  * the tint of the shape, in display encoding, before it and the emission are converted to
- * linear light. The alpha is the opacity of the shape times the opacity of its ancestors.
+ * linear light. The alpha is the opacity of the shape times the opacity of its ancestors. The
+ * cutoff of a 3D shape with AlphaCutoff goes into material z, clamped to 0..1.
  *
  * @param out The instance
  * @param material Material components of the entity
@@ -368,15 +371,28 @@ void box_draws_shape2d(
     const box_draw_material_t *material,
     const float *border);
 
-/** Resolve the blend mode a shape draws with: Opaque turns into AlphaBlend below alpha 1.
+/** Resolve the blend mode a shape draws with: Opaque turns into AlphaBlend below alpha 1,
+ * unless the shape is alpha tested, which keeps it in the opaque pass.
  *
  * @param mode The BlendMode of the shape, NULL for Opaque
  * @param alpha The resolved alpha of the shape
+ * @param cutout Whether the shape is alpha tested (box_draws_cutout)
  * @return The blend mode
  */
 uint8_t box_draws_blend(
     const BlendMode *mode,
-    float alpha);
+    float alpha,
+    bool cutout);
+
+/** Check whether a shape is alpha tested: a 3D shape with AlphaCutoff.
+ *
+ * @param cutoff The AlphaCutoff of the shape, NULL for none
+ * @param shape2d The resolved 2D shape, NULL for a 3D shape
+ * @return Whether its fragments are tested against the cutoff
+ */
+bool box_draws_cutout(
+    const AlphaCutoff *cutoff,
+    const Shape2D *shape2d);
 
 /** Get the resolved alpha of a shape.
  *

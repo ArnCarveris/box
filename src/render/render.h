@@ -606,7 +606,8 @@ typedef struct box_render_instance_t {
                              *   holds its clip index in model[0][3] */
     vec4 color;             /**< Linear base color, alpha is the opacity with its ancestors */
     vec4 emissive;          /**< Linear emitted color times its strength, w unused */
-    vec4 material;          /**< Metallic, roughness, z and w unused */
+    vec4 material;          /**< Metallic, roughness, the AlphaCutoff of an alpha tested
+                             *   instance (0 otherwise), w unused */
     vec4 uv;                /**< TextureTransform: u scale, v scale, u offset, v offset */
     struct { vec4 p[BOX_SURFACE_VECTORS]; } surface;
 } box_render_instance_t;
@@ -655,7 +656,8 @@ typedef struct box_render_target_t {
 /** Instanced draw of one mesh with one pipeline, drawn by the views of its scene.
  *
  * Opaque batches come first in a packet; the blended instances follow as draws of one view,
- * sorted back to front, so they draw after the opaque ones in the order of the packet.
+ * sorted back to front, so they draw after the opaque ones in the order of the packet. Alpha
+ * tested opaque batches (cutout) are opaque batches.
  */
 typedef struct box_render_batch_t {
     int32_t view;               /**< Index of the view that draws it, -1 for every view */
@@ -663,6 +665,9 @@ typedef struct box_render_batch_t {
     uint32_t pipeline;          /**< Shader handle of the pipeline */
     uint32_t blend;             /**< BlendMode of the pipeline, Opaque writes depth */
     uint32_t back_face;         /**< BackFaceMode of the pipeline, BackFaceCull culls */
+    bool cutout;                /**< The pipeline alpha tests against the cutoff of the
+                                 *   instances (AlphaCutoff), in the opaque pass after the
+                                 *   plain opaque batches and in the shadow pass */
     bool shadow;                /**< The instances cast shadows, false for NoShadow */
     bool bake;                  /**< Static 3D instances without NoBake of a scene with LightBake or
                                  *   ReflectionBake, drawn by the captures */

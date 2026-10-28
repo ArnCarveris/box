@@ -509,7 +509,8 @@ typedef struct box_gpu_t {
     WGPUSampler reflect_sampler;    /**< Trilinear sampler of the source cubes */
     box_gpu_reflect_t *reflect_source; /**< Source cubes of a chunk, NULL before the first */
     box_gpu_reflect_t *no_reflection; /**< One black slot, bound by views without probes */
-    ecs_map_t forward;              /**< Forward pipeline by shader, format, blend, back face */
+    ecs_map_t forward;              /**< Forward pipeline by shader, format, blend, back face,
+                                     *   alpha test */
     WGPUBuffer view_buffer;         /**< Uniforms of the views of a target */
     int32_t view_capacity;          /**< Views the view buffer holds */
     WGPUBindGroupLayout cluster_layout; /**< Bind group layout of the cluster pass */
@@ -523,8 +524,11 @@ typedef struct box_gpu_t {
     ecs_vec_t view_data;            /**< Bytes of the view uniforms of a target */
     WGPUBindGroupLayout shadow_layout; /**< Bind group layout of the shadow pass */
     WGPUPipelineLayout shadow_pipeline_layout; /**< Pipeline layout of the shadow pass */
+    WGPUPipelineLayout shadow_cutout_layout; /**< Pipeline layout of the alpha tested casters:
+                                     *   the shadow pass groups and the material group */
     WGPURenderPipeline shadow;      /**< Shadow pipeline, NULL until the shader exists */
-    int32_t shadow_revision;        /**< Revision of the shader the pipeline was made with */
+    WGPURenderPipeline shadow_cutout; /**< Shadow pipeline of the alpha tested casters */
+    int32_t shadow_revision;        /**< Revision of the shader the pipelines were made with */
     WGPUSampler shadow_sampler;     /**< Comparison sampler of the shadow lookups */
     WGPUTexture shadow_empty;       /**< Shadow map bound by views without shadows */
     WGPUTextureView shadow_empty_view; /**< Array view of the empty shadow map */

@@ -1,6 +1,8 @@
 // Instance data of a batch, one per slot of its instance buffer (box_render_instance_t). The
 // model matrix is affine with the instance scale; the w of its first three columns is unused,
-// except that a 2D instance keeps its clip index in the w of the first (shape2d.wgsl).
+// except that a 2D instance keeps its clip index in the w of the first (shape2d.wgsl). Material
+// holds metallic, roughness and, for an alpha tested instance (AlphaCutoff), in z the cutoff
+// below which its fragments are discarded; color.a is its alpha.
 #pragma once
 #include "surface.wgsl"
 
