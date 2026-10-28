@@ -6,6 +6,11 @@
 #define BOX_TYPES_IMPL
 #include <box.h>
 
+/* cglm only takes its wasm SIMD path when the compiler targets SIMD128 */
+#if defined(__EMSCRIPTEN__) && !defined(CGLM_SIMD_WASM)
+#error "the browser build needs wasm SIMD: compile with -msimd128"
+#endif
+
 ECS_COMPONENT_DECLARE(vec2);
 ECS_COMPONENT_DECLARE(vec3);
 ECS_COMPONENT_DECLARE(vec4);

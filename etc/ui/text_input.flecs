@@ -43,6 +43,7 @@ template HeadlessTextInput {
     }
   }
 
+  // The field takes the focus, and flecs sends its focus and blur on to this widget
   async {
     while true {
       await on.focus(this)

@@ -210,18 +210,18 @@ template HeadlessScrollView {
 
   async {
     while true {
-      const e = await on.key(this)
-      if e.down && keys && focused {
+      const e = await on.key_down(this)
+      if keys && focused {
         const b = this[LayoutBounds]
         const content = this[LayoutContent]
         if vertical {
           const ty = match e.key {
-            Up: content.y - step
-            Down: content.y + step
-            PageUp: content.y - b.height
-            PageDown: content.y + b.height
-            Home: 0
-            End: content.max_y
+            "ArrowUp": content.y - step
+            "ArrowDown": content.y + step
+            "PageUp": content.y - b.height
+            "PageDown": content.y + b.height
+            "Home": 0
+            "End": content.max_y
             _: content.y
           }
           if ty != content.y {
@@ -230,10 +230,10 @@ template HeadlessScrollView {
         }
         if horizontal {
           const tx = match e.key {
-            Left: content.x - step
-            Right: content.x + step
-            Home: match vertical { true: content.x; _: 0 }
-            End: match vertical { true: content.x; _: content.max_x }
+            "ArrowLeft": content.x - step
+            "ArrowRight": content.x + step
+            "Home": match vertical { true: content.x; _: 0 }
+            "End": match vertical { true: content.x; _: content.max_x }
             _: content.x
           }
           if tx != content.x {
@@ -441,18 +441,18 @@ template HeadlessListView : HeadlessScrollView {
 
   async {
     while true {
-      const e = await on.key(this)
-      if e.down && !disabled && count > 0 && focused {
+      const e = await on.key_down(this)
+      if !disabled && count > 0 && focused {
         const b = this[LayoutBounds]
         const content = this[LayoutContent]
         const page = max(floor(b.height / max(row, 1)) - 1, 1)
         const target = match e.key {
-          Down: match current < 0 { true: 0; _: current + 1 }
-          Up: match current < 0 { true: 0; _: current - 1 }
-          PageDown: current + page
-          PageUp: current - page
-          Home: 0
-          End: count - 1
+          "ArrowDown": match current < 0 { true: 0; _: current + 1 }
+          "ArrowUp": match current < 0 { true: 0; _: current - 1 }
+          "PageDown": current + page
+          "PageUp": current - page
+          "Home": 0
+          "End": count - 1
           _: current
         }
         const i = clamp(target, 0, count - 1)

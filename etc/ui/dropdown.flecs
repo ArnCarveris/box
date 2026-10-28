@@ -157,17 +157,21 @@ template HeadlessDropdown {
 
   async {
     while true {
-      await on.focus(this)
-      focused = true
+      const e = await on.focus(this)
+      if e.target == this {
+        focused = true
+      }
     }
   }
 
   async {
     while true {
-      await on.blur(this)
-      focused = false
-      down = false
-      open = false
+      const e = await on.blur(this)
+      if e.target == this {
+        focused = false
+        down = false
+        open = false
+      }
     }
   }
 
@@ -223,12 +227,12 @@ template HeadlessDropdown {
 
   async {
     while true {
-      const e = await on.key(this)
-      if e.down && !disabled {
+      const e = await on.key_down(this)
+      if !disabled {
         if open {
-          if e.key == Escape {
+          if e.key == "Escape" {
             open = false
-          } else if e.key == Enter || e.key == KpEnter || e.key == Space {
+          } else if e.key == "Enter" || e.key == " " {
             open = false
             if highlight != current {
               current = highlight
@@ -236,18 +240,18 @@ template HeadlessDropdown {
             }
           } else {
             const target = match e.key {
-              Down: highlight + 1
-              Up: highlight - 1
-              PageDown: highlight + 10
-              PageUp: highlight - 10
-              Home: 0
-              End: count - 1
+              "ArrowDown": highlight + 1
+              "ArrowUp": highlight - 1
+              "PageDown": highlight + 10
+              "PageUp": highlight - 10
+              "Home": 0
+              "End": count - 1
               _: highlight
             }
             highlight = clamp(target, 0, count - 1)
           }
-        } else if !e.repeat && (e.key == Enter || e.key == KpEnter || e.key == Space ||
-          e.key == Down || e.key == Up)
+        } else if !e.repeat && (e.key == "Enter" || e.key == " " ||
+          e.key == "ArrowDown" || e.key == "ArrowUp")
         {
           highlight = current
           over = false

@@ -1,0 +1,72 @@
+include gantry
+include materials
+include structure
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.light
+
+@tree Parent
+template DockServices {
+  overhead { ServiceGantry: {}; Position: {0, -3, -57} }
+  aft_gantry {
+    Position: {0, -12, -99}
+    for level in 0..2 {
+      {
+        chord : DarkArmor { Position: {0, level * 9, 0}; Box: {177, 1.6, 5} }
+      }
+    }
+    for i in 0..22 {
+      {
+        diagonal { ShipBeam: {ax: -86 + i * 8, ay: 0, az: 0, bx: -78 + i * 8, by: 9, bz: 0, radius: 0.55} }
+        upright : Titanium { Position: {-86 + i * 8, 4.5, 0}; Box: {0.6, 9, 4.6} }
+        marker : AmberLight { Position: {-86 + i * 8, 10, 0}; Box: {0.5, 0.25, 1} }
+      }
+    }
+    deck : RecessMetal { Position: {0, 9, 0}; Box: {177, 0.5, 6} }
+    for side in 0..2 {
+      {
+        return : DarkArmor { Position: {(side - 0.5) * 173, 4.5, 12}; Box: {8, 11, 26} }
+        cap : DockYellow { Position: {(side - 0.5) * 173, 10.2, 12}; Box: {9, 0.8, 27} }
+        rail : Titanium { Position: {0, 11, (side - 0.5) * 5.6}; Box: {177, 0.16, 0.16} }
+      }
+    }
+  }
+  control {
+    Position: {86.5, 0, -96}
+    pedestal : DarkArmor { Position: {}; Box: {11, 23, 13} }
+    for side in 0..2 {
+      {
+        for end in 0..2 {
+          {
+            upright : DockYellow { Position: {(side - 0.5) * 11.5, 3.7, (end - 0.5) * 13.5}; Box: {0.6, 14, 0.6} }
+          }
+        }
+        brace { ShipBeam: {ax: -5.7, ay: -3, az: (side - 0.5) * 13.5, bx: 5.7, by: 10.5, bz: (side - 0.5) * 13.5, radius: 0.3} }
+        balcony_rail : Titanium { Position: {(side - 0.5) * 20, 12.6, 0}; Box: {0.1, 0.1, 21} }
+        for post in 0..7 {
+          {
+            stanchion : Titanium { Position: {(side - 0.5) * 20, 11.8, -10 + post * 3.33}; Box: {0.1, 1.6, 0.1} }
+          }
+        }
+      }
+    }
+    balcony : DarkArmor { Position: {0, 10.9, 0}; Box: {21, 0.3, 22} }
+    door : RecessMetal { Position: {-9.05, 13.1, 0}; Box: {0.2, 3.5, 1.8} }
+    collar : RustRed { Position: {0, 10, 0}; Box: {16, 2, 18} }
+    cabin : HullArmor { Position: {0, 15, 0}; BeveledPrism: {footprint: [{-9, -8}, {9, -8}, {8, 9}, {-8, 9}], depth: 8, inset: 0.6, bevel: 0.6} }
+    windows : IceLight { Position: {0, 16, 9.05}; Box: {11, 2.4, 0.12}; Emissive: {strength: 0.7, color: {78, 207, 255}} }
+    for i in 0..5 {
+      {
+        mullion : DarkArmor { Position: {-5 + i * 2.5, 16, 9.15}; Box: {0.22, 2.6, 0.2} }
+      }
+    }
+    roof : PaleArmor { Position: {0, 19.4, 0}; Box: {20, 0.9, 19} }
+    mast : Titanium { Position: {3, 25, -3}; Cylinder: {radius: 0.22, length: 11, segments: 8} }
+    beacon : AmberLight { Position: {3, 30.6, -3}; Sphere: {radius: 0.5} }
+    aerial : Titanium { Position: {3, 28, -3}; Box: {6, 0.15, 0.15} }
+    sign { Position: {0, 12, 9.15}; Quad: {9, 1.5}; Rgb: {255, 255, 255}; PbrTextures: {albedo: dock_registry} }
+  }
+}

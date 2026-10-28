@@ -1,11 +1,12 @@
 /**
  * @file ui/keys.c
  * @brief Keys and presses of the UI: the claim that keeps keys from the bindings, Tab, Enter and
- * Space on the focused entity, the focus of a press and the activation of a click, and the
- * hand off of keys, text and presses to a focused TextEdit.
+ * Space on the focused entity, the to_focus hook that decides every move of the flecs focus, the
+ * activation of a click, and the hand off of keys, text and presses to a focused TextEdit.
  *
  * The claim runs in InputUpdate with the focus the last frame left; the keys and presses then
- * reach the hook in box.picking in order, which moves the focus and activates.
+ * reach the hook in box.picking in order. flecs moves the focus of a press through to_focus
+ * before it sends the press, the hook sends the keys to flecs and moves the focus for Tab.
  */
 
 #include "ui.h"
@@ -207,7 +208,7 @@ static void box_ui_activate_key(
     ecs_world_t *world,
     box_ui_state_t *st,
     ecs_entity_t e,
-    const UiKeyEvent *evt)
+    const box_ui_key_t *evt)
 {
     UiActivateEvent act = { .target = e, .keyboard = true };
     Key key = evt->key == KeyKpEnter ? KeyEnter : evt->key;
@@ -233,9 +234,9 @@ done:
     return;
 }
 
-/** Follow a keyboard event: on.key to the focused entity, Tab moves the focus, a focused
- * TextEdit edits, Enter and Space activate unless KeyCapture keeps them for the widget. An open
- * console takes every key.
+/** Take a keyboard event: flecs sends on.key_down or on.key_up to the focused entity and its
+ * ancestors, then Tab moves the focus, a focused TextEdit edits, Enter and Space activate unless
+ * KeyCapture keeps them for the widget. An open console takes every key, the scripts see none.
  *
  * @param world The world
  * @param pst The picking state
@@ -250,7 +251,7 @@ static void box_ui_key(
 {
     box_ui_state_t *st = ctx;
     const EcsScriptKeyboardEvent *kb = &emit->keyboard;
-    UiKeyEvent evt = {
+    box_ui_key_t evt = {
         .key = emit->key,
         .down = kb->down,
         .repeat = kb->repeat,
@@ -266,9 +267,7 @@ static void box_ui_key(
 
     box_ui_focus_check(world, st);
     e = st->focused;
-    if (e) {
-        box_ui_shim_key(world, st, e, &evt);
-    }
+    ecs_script_keyboard_event(world, kb);
 
     if (evt.key == KeyTab && evt.down && !evt.ctrl && !evt.alt && !evt.meta) {
         st->keyboard = box_ui_focus_step(world, st, pst, evt.shift) || st->keyboard;
@@ -300,6 +299,80 @@ static ecs_entity_t box_ui_press_focus(
         result = box_ui_can_focus(world, e) ? e : 0;
         e = e == pick->handler ? 0 : ecs_get_parent(world, e);
         depth ++;
+    }
+
+    return result;
+}
+
+/** Find the entity box.ui focuses for an entity: the entity or the first Focusable ancestor up
+ * to the first Interactive entity on the way, as a press on it would.
+ *
+ * @param world The world
+ * @param e The entity, 0 for none
+ * @param refused What to return when the path has no entity that can take the focus
+ * @return The entity, refused when there is none
+ */
+static ecs_entity_t box_ui_focus_rule(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    ecs_entity_t refused)
+{
+    ecs_entity_t result = 0;
+    int32_t depth = 0;
+    while (e && ecs_is_alive(world, e) && !result && depth < BOX_UI_DEPTH_MAX) {
+        result = box_ui_can_focus(world, e) ? e : 0;
+        e = ecs_has_id(world, e, Interactive) ? 0 : ecs_get_parent(world, e);
+        depth ++;
+    }
+
+    return result ? result : refused;
+}
+
+/** Decide a move of the flecs focus and publish it in Focused and FocusStatus, the to_focus hook
+ * that box.picking sets for flecs.script.event.
+ *
+ * A press focuses the first Focusable entity on the bubbling path of its pick or clears the
+ * focus, without a visible focus. box_ui_focus_set has decided already.
+ *
+ * Anything else, focus() from a script or ecs_script_set_focus from the application, gets the
+ * entity or the Focusable ancestor a press on it would focus, else keeps the focus; 0 clears it.
+ *
+ * @param world The world
+ * @param pst The picking state
+ * @param entity The entity flecs would focus, 0 for none
+ * @param current The entity with the focus, 0 for none
+ * @param source What moves the focus
+ * @param pick The pick of the press, NULL when the press does not come from box.picking
+ * @param ctx The module state
+ * @return The entity that gets the focus
+ */
+static ecs_entity_t box_ui_to_focus(
+    ecs_world_t *world,
+    box_pick_state_t *pst,
+    ecs_entity_t entity,
+    ecs_entity_t current,
+    ecs_script_focus_source_t source,
+    const box_pick_t *pick,
+    void *ctx)
+{
+    box_ui_state_t *st = ctx;
+    bool press = source == EcsScriptFocusPress, visible = st->keyboard;
+    ecs_entity_t result;
+    (void)pst;
+    if (press) {
+        st->keyboard = false;
+        visible = false;
+        result = pick ? box_ui_press_focus(world, pick) : box_ui_focus_rule(world, entity, 0);
+    } else if (source == EcsScriptFocusSet && st->setting) {
+        result = entity;
+        visible = st->set_visible;
+    } else {
+        result = entity ? box_ui_focus_rule(world, entity, current) : 0;
+    }
+
+    st->decided = true;
+    if (result != st->focused || press) {
+        box_ui_focus_apply(world, st, result, visible);
     }
 
     return result;
@@ -366,8 +439,9 @@ static void box_ui_activate_click(
     }
 }
 
-/** Follow a pointer event: a press of any button focuses the first Focusable entity on its path
- * or clears the focus, a left click activates and a left press and drag select in a TextEdit.
+/** Follow a pointer event: a press of any button makes the focus it moved (or kept, on the
+ * focused entity) not visible, a left click activates and a left press and drag select in a
+ * TextEdit. box_ui_to_focus moved the focus before the scripts saw the press.
  *
  * @param world The world
  * @param pst The picking state
@@ -388,8 +462,11 @@ static void box_ui_pointer(
 {
     box_ui_state_t *st = ctx;
     if (pressed) {
+        ecs_entity_t e = box_ui_press_focus(world, pick);
         st->keyboard = false;
-        box_ui_focus_set(world, st, box_ui_press_focus(world, pick), false);
+        if (e && e == st->focused) {
+            box_ui_focus_apply(world, st, e, false);
+        }
     }
 
     if ((released & 1u) && st->press) {
@@ -456,6 +533,7 @@ void box_ui_keys_import(
         .begin = box_ui_begin,
         .key = box_ui_key,
         .pointer = box_ui_pointer,
+        .focus = box_ui_to_focus,
         .ctx = st
     });
 }

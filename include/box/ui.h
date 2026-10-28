@@ -3,9 +3,9 @@
  * @brief UI: the keyboard focus, Tab navigation, keys kept from the bindings, widget events and
  * the text field.
  *
- * One Focusable entity holds the keyboard focus. A press or Tab moves it, KeyCapture keeps the
- * keys from the game's bindings, and widgets report changes to the scope that uses them.
- * TextEdit is a single line text field whose editing is done by the engine.
+ * One Focusable entity holds the keyboard focus, the focus of flecs.script.event: Focused is
+ * ecs_script_get_focus at all times. A press or Tab moves it, KeyCapture keeps the keys from the
+ * bindings, widgets report changes to their scope and TextEdit is a single line text field.
  */
 
 #ifndef BOX_UI_H
@@ -28,9 +28,13 @@ extern "C" {
 
 /** Marks an element that can take the keyboard focus; adding it makes it Interactive.
  *
- * A press of any mouse button focuses the first Focusable entity on the bubbling path of the
- * press, Tab the next one in its FocusScope. Disabled entities and prefabs never take it, and
- * disabling or deleting the focused entity or removing its Focusable clears the focus.
+ * A press focuses the first Focusable entity on its bubbling path, or clears the focus when there
+ * is none. Disabled entities and prefabs never take it; disabling, deleting or removing Focusable
+ * from the focused entity clears it, and a deleted entity gets no on.blur.
+ *
+ * The to_focus hook of box.ui decides every move of the flecs focus: focus(e) in a script and
+ * ecs_script_set_focus focus e or the Focusable ancestor a press on e would, else change nothing.
+ * flecs sends on.blur, on.focus, on.key_down and on.key_up to the focus and its ancestors.
  */
 extern ECS_TAG_DECLARE(Focusable);
 
@@ -66,23 +70,6 @@ ECS_STRUCT(FocusStatus, {
     ecs_entity_t focused;  /**< Entity with the focus, 0 when nothing has it */
     ecs_entity_t previous; /**< Entity that had the focus before the last change, 0 for none */
     bool visible;          /**< The focus came from the keyboard, so widgets show a focus ring */
-});
-
-/** What on.focus and on.blur resolve with */
-ECS_STRUCT(UiFocusEvent, {
-    ecs_entity_t target; /**< Entity that gained or lost the focus */
-    bool visible;        /**< The focus that was gained or lost came from the keyboard */
-});
-
-/** What on.key resolves with, for each key event while the target or a descendant is focused */
-ECS_STRUCT(UiKeyEvent, {
-    Key key;     /**< The key */
-    bool down;   /**< The key went down or repeated, false when it came up */
-    bool repeat; /**< The platform repeated the held key */
-    bool ctrl;   /**< A control key is held */
-    bool shift;  /**< A shift key is held */
-    bool alt;    /**< An alt key is held */
-    bool meta;   /**< A super key is held */
 });
 
 /** What on.activate resolves with */
@@ -170,22 +157,23 @@ ECS_STRUCT(TextEditStatus, {
 
 /** Register the box.ui module.
  *
- * Registers the async script functions flecs.script.on.focus, blur, key, activate, change and
- * submit, each taking a target and resolving on the target and its ancestors, and ui.focus,
- * ui.changed and ui.submit, which resolve at once (await ui.changed(this)).
+ * Registers flecs.script.on.activate, change and submit, which resolve on a target and its
+ * ancestors, and ui.changed and ui.submit, which resolve at once. The focus events and focus()
+ * are those of flecs.script.event, whose focus box.ui drives (see Focusable).
  *
  * Creates box.ui.theme with a UiTheme and loads the widget library box.widgets as a managed
  * script from etc/ui/widgets.flecs, found as a Font.path is; without it there are no widgets.
+ * Clears the flecs focus, which box.input gave its screen, since nothing is Focused yet.
  *
  * @param world The world
  */
 void BoxUiImport(
     ecs_world_t *world);
 
-/** Move the keyboard focus to an entity from C, as ui.focus does from an async block.
+/** Move the keyboard focus to an entity from C, as focus() does from an async block.
  *
- * The focus is visible when the last press or Tab that moved the focus was Tab. Resumes the async
- * blocks that on.focus and on.blur resolved.
+ * Goes through ecs_script_set_focus. The focus is visible when the last press or Tab that moved
+ * the focus was Tab. Resumes the async blocks that on.focus and on.blur resolved.
  *
  * @param world The world
  * @param entity The entity, 0 clears the focus; an entity that cannot take it changes nothing

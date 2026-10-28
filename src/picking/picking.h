@@ -105,7 +105,8 @@ typedef void (*box_pick_begin_t)(
     box_pick_state_t *st,
     void *ctx);
 
-/** Follow a keyboard event after it went out through flecs.script.event.
+/** Take a keyboard event in place of flecs.script.event, which the hook sends it to when the
+ * scripts should see it.
  *
  * @param world The world
  * @param st The module state
@@ -137,11 +138,34 @@ typedef void (*box_pick_pointer_t)(
     uint32_t released,
     void *ctx);
 
+/** Decide which entity gets the flecs focus, the to_focus hook of flecs.script.event that
+ * box.picking sets together with its to_local.
+ *
+ * @param world The world
+ * @param st The module state
+ * @param entity The entity flecs would focus, for a press its target, 0 for none
+ * @param current The entity with the flecs focus, 0 for none
+ * @param source What moves the focus
+ * @param pick The pick of the press being delivered, NULL for other sources or a press that
+ * box.picking does not send
+ * @param ctx Context of the hook
+ * @return The entity that gets the focus, current to keep it
+ */
+typedef ecs_entity_t (*box_pick_focus_t)(
+    ecs_world_t *world,
+    box_pick_state_t *st,
+    ecs_entity_t entity,
+    ecs_entity_t current,
+    ecs_script_focus_source_t source,
+    const box_pick_t *pick,
+    void *ctx);
+
 /** Follows the events the router delivers, which box.ui installs for the keyboard focus */
 typedef struct box_pick_hook_t {
     box_pick_begin_t begin;     /**< Called before the events of a frame, NULL for none */
-    box_pick_key_t key;         /**< Called after each keyboard event, NULL for none */
+    box_pick_key_t key;         /**< Takes each keyboard event, NULL sends it to flecs */
     box_pick_pointer_t pointer; /**< Called after each pointer event, NULL for none */
+    box_pick_focus_t focus;     /**< Decides each focus change, NULL accepts what flecs asks */
     void *ctx;                  /**< Passed to the callbacks */
 } box_pick_hook_t;
 

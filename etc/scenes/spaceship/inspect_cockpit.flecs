@@ -1,0 +1,11 @@
+include materials
+include structure
+include cockpit
+using box.transform
+using box.camera
+using box.view
+using box.light
+component { FrigateCockpit: {} }
+camera { Position: {11, 9, 15}; Rotation: {-0.4, 0.63, 0}; Camera: {fov: 48} }
+main_view { View: {camera: camera, clear: {enabled: true, color: {9, 16, 24, 255}}, shadows: {enabled: true}} }
+sun { Rotation: {0.7, 2.4, 0}; DirectionalLight: {intensity: 2} }

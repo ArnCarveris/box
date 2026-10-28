@@ -1,0 +1,105 @@
+include materials
+include structure
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.light
+
+@tree Parent
+template DockTank {
+  saddle : DarkArmor { Position: {0, 0.6, 0}; Box: {5.8, 1.2, 10} }
+  vessel : ServiceTeal { Position: {0, 3, 0}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 2.4, length: 9, segments: 24} }
+  for end in 0..2 {
+    {
+      cap : PaleArmor { Position: {0, 3, (end - 0.5) * 9}; Sphere: {radius: 2.35}; Scale: {1, 1, 0.3} }
+      strap : Titanium { Position: {0, 3, (end - 0.5) * 6}; Rotation: {1.5707963, 0, 0}; Tube: {radius: 2.5, thickness: 0.16, length: 0.4, segments: 24} }
+      foot : DockYellow { Position: {0, 1, (end - 0.5) * 6}; Box: {5.6, 1.3, 1.2} }
+    }
+  }
+  valve : RustRed { Position: {0, 5.8, 1}; Cylinder: {radius: 0.22, length: 1.6, segments: 8} }
+  wheel : DockYellow { Position: {0, 6.5, 1}; Tube: {radius: 0.7, thickness: 0.12, length: 0.14, segments: 16} }
+  spindle : Titanium { Position: {0, 6.5, 1}; Box: {1.2, 0.12, 0.12} }
+  gauge : PaleArmor { Position: {0, 3, 5.1}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 0.55, length: 0.16, segments: 16} }
+  outlet : Titanium { Position: {1.5, 1.5, 5.1}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 0.35, length: 1.6, segments: 12} }
+}
+
+@tree Parent
+template DockCargo {
+  prop length: f32 = 8
+  prop color: Rgb = {164, 68, 39}
+  case : RustRed { Position: {0, 2.2, 0}; Box: {5, 4.4, length}; Rgb: {color.r, color.g, color.b} }
+  for side in 0..2 {
+    {
+      edge : PaleArmor { Position: {(side - 0.5) * 5.1, 4.5, 0}; Box: {0.25, 0.3, length + 0.3} }
+      for j in 0..6 {
+        {
+          rib : DarkArmor { Position: {(side - 0.5) * 5.1, 2.2, -length / 2 + 0.4 + j * (length - 0.8) / 5}; Box: {0.12, 3.8, 0.18} }
+        }
+      }
+      door : DarkArmor { Position: {(side - 0.5) * 2.4, 2.2, length / 2 + 0.05}; Box: {2.25, 3.9, 0.1} }
+      lock : Titanium { Position: {(side - 0.5) * 1.3, 2.2, length / 2 + 0.17}; Box: {0.1, 3.5, 0.1} }
+      for end in 0..2 {
+        {
+          corner : DockYellow { Position: {(side - 0.5) * 4.7, 0.3, (end - 0.5) * (length - 0.3)}; Box: {0.6, 0.6, 0.6} }
+        }
+      }
+    }
+  }
+}
+
+@tree Parent
+template DockCrew {
+  prop suit: Rgb = {221, 156, 60}
+  torso : DockYellow { Position: {0, 1.2, 0}; Box: {0.62, 0.75, 0.38}; Rgb: {suit.r, suit.g, suit.b} }
+  helmet : PaleArmor { Position: {0, 1.82, 0}; Sphere: {radius: 0.3, segments: 12} }
+  visor : RecessMetal { Position: {0, 1.84, 0.24}; Box: {0.4, 0.18, 0.12} }
+  pack : PaleArmor { Position: {0, 1.25, -0.3}; Box: {0.5, 0.55, 0.23} }
+  for side in 0..2 {
+    {
+      leg : DarkArmor { Position: {(side - 0.5) * 0.35, 0.5, 0}; Box: {0.23, 0.85, 0.26} }
+      boot : RecessMetal { Position: {(side - 0.5) * 0.35, 0.12, 0.08}; Box: {0.28, 0.22, 0.46} }
+      arm : DockYellow { Position: {(side - 0.5) * 0.9, 1.23, 0.13}; Rotation: {-0.5, 0, (side - 0.5) * 0.4}; Box: {0.22, 0.7, 0.22}; Rgb: {suit.r, suit.g, suit.b} }
+    }
+  }
+}
+
+@tree Parent
+template DockTug {
+  chassis : DockYellow { Position: {0, 0.9, 0}; BeveledPrism: {footprint: [{-1.5, -2.5}, {1.5, -2.5}, {1.2, 2.6}, {-1.2, 2.6}], depth: 1.4, inset: 0.15, bevel: 0.2} }
+  cabin : DarkArmor { Position: {0, 2.2, -0.8}; Box: {2.3, 1.9, 2} }
+  glass : IceLight { Position: {0, 2.5, 0.23}; Box: {1.9, 1, 0.08}; Emissive: {strength: 0.2, color: {78, 207, 255}} }
+  roof : PaleArmor { Position: {0, 3.2, -0.8}; Box: {2.6, 0.2, 2.3} }
+  beacon : AmberLight { Position: {0, 3.5, -0.8}; Cylinder: {radius: 0.18, length: 0.4, segments: 12} }
+  for side in 0..2 {
+    {
+      lamp : WhiteLight { Position: {(side - 0.5) * 2, 1.1, 2.5}; Box: {0.5, 0.22, 0.08} }
+      for axle in 0..2 {
+        {
+          wheel : RecessMetal { Position: {(side - 0.5) * 3.1, 0.65, (axle - 0.5) * 3.2}; Rotation: {0, 0, 1.5707963}; Cylinder: {radius: 0.65, length: 0.45, segments: 16} }
+        }
+      }
+    }
+  }
+  towbar : Titanium { Position: {0, 0.6, -3.5}; Box: {0.3, 0.3, 3} }
+}
+
+@tree Parent
+template DockPower {
+  plinth : DarkArmor { Position: {}; Box: {10, 0.7, 8} }
+  cabinet : ServiceTeal { Position: {-2.5, 2.5, 0}; Box: {4.2, 5, 6.6} }
+  display { Position: {-2.5, 3, 3.36}; Quad: {2.7, 1.7}; Rgb: {255, 255, 255}; PbrTextures: {albedo: ship_display}; Emissive: {strength: 0.3, color: {60, 150, 180}} }
+  for i in 0..3 {
+    {
+      transformer : Titanium { Position: {1 + i * 1.4, 2, 0}; Cylinder: {radius: 0.5, length: 3.5, segments: 12} }
+      for j in 0..6 {
+        {
+          fin : DarkArmor { Position: {1 + i * 1.4, 0.8 + j * 0.5, 0}; Cylinder: {radius: 0.8, length: 0.13, segments: 12} }
+        }
+      }
+      terminal : RustRed { Position: {1 + i * 1.4, 4.3, 0}; Cylinder: {radius: 0.23, length: 1, segments: 12} }
+    }
+  }
+  busbar : Titanium { Position: {2.4, 4.9, 0}; Box: {4, 0.2, 0.3} }
+}

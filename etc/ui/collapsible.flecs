@@ -105,9 +105,18 @@ template HeadlessCollapsible {
 
   async {
     while true {
-      const e = await on.key(this)
-      if focused && e.key == Space && !e.repeat {
-        down = e.down
+      const e = await on.key_down(this)
+      if focused && e.key == " " && !e.repeat {
+        down = true
+      }
+    }
+  }
+
+  async {
+    while true {
+      const e = await on.key_up(this)
+      if focused && e.key == " " {
+        down = false
       }
     }
   }

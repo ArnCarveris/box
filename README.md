@@ -93,7 +93,7 @@ for direct and ambient lighting; design mode uses it to light each camera indepe
 
 ```sh
 bake3 --target em --local-env apps/boxrun                 # boxrun.html, .js and .wasm
-bake3 --target em --cfg release --local-env apps/boxrun   # optimized, about 1.7 MB of wasm
+bake3 --target em --cfg release --local-env apps/boxrun   # optimized, about 7.2 MB of wasm
 bake3 run apps/boxrun --target em --local-env             # serve the page on localhost:8080
 ```
 

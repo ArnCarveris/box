@@ -8,7 +8,7 @@
 
 /** Names of the waiting functions in flecs.script.on, indexed by kind */
 static const char *box_ui_wait_names[BoxUiWaitCount] = {
-    "focus", "blur", "key", "activate", "change", "submit"
+    "activate", "change", "submit"
 };
 
 /** Resolve the waiters of an event on one entity.
@@ -71,8 +71,7 @@ void box_ui_progress(
 {
     int32_t rounds = 0;
     while (st->progress && rounds < BOX_UI_PROGRESS_MAX) {
-        st->progress = false;
-        ecs_script_tasks_progress(world);
+        st->progress = ecs_script_tasks_progress(world) > 0;
         rounds ++;
     }
 }

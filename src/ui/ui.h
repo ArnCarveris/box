@@ -1,7 +1,7 @@
 /**
  * @file ui/ui.h
  * @brief Private state of box.ui and the functions its sources share: the focus model, the key
- * claim, the event waiters and the temporary flecs workarounds of shim.c.
+ * claim, the event waiters and the temporary flecs workaround of shim.c.
  */
 
 #ifndef BOX_UI_INTERNAL_H
@@ -19,9 +19,6 @@
 
 /** What a script task waits for */
 typedef enum box_ui_wait_kind_t {
-    BoxUiWaitFocus,    /**< on.focus */
-    BoxUiWaitBlur,     /**< on.blur */
-    BoxUiWaitKey,      /**< on.key */
     BoxUiWaitActivate, /**< on.activate */
     BoxUiWaitChange,   /**< on.change */
     BoxUiWaitSubmit,   /**< on.submit */
@@ -42,6 +39,17 @@ typedef struct box_ui_waiter_t {
     box_ui_wait_kind_t kind;     /**< What it waits for */
     ecs_script_future_t *future; /**< Future the event resolves */
 } box_ui_waiter_t;
+
+/** A key event as the focus model and the text field follow it */
+typedef struct box_ui_key_t {
+    Key key;     /**< The key */
+    bool down;   /**< The key went down or repeated, false when it came up */
+    bool repeat; /**< The platform repeated the held key */
+    bool ctrl;   /**< A control key is held */
+    bool shift;  /**< A shift key is held */
+    bool alt;    /**< An alt key is held */
+    bool meta;   /**< A super key is held */
+} box_ui_key_t;
 
 /** Private state of a TextEdit: the parts the engine built and what the last sync saw */
 typedef struct TextEditState {
@@ -76,7 +84,11 @@ struct box_ui_state_t {
     ecs_entity_t focused;        /**< Entity with the focus, 0 for none */
     ecs_entity_t previous;       /**< Entity that had the focus before */
     bool visible;                /**< The focus came from the keyboard */
-    bool keyboard;               /**< The last press or Tab was Tab, so ui.focus is visible */
+    bool keyboard;               /**< The last press or Tab was Tab, so focus() is visible */
+    bool setting;                /**< box_ui_focus_set is in ecs_script_set_focus */
+    bool set_visible;            /**< Whether the focus box_ui_focus_set moves is visible */
+    bool decided;                /**< The to_focus hook ran since box_ui_focus_set called flecs */
+    ecs_entity_t focus_lost;     /**< Event queued when the focused entity loses Focusable */
     ecs_entity_t press;          /**< Target of the held left button press, 0 for none */
     ecs_entity_t press_handler;  /**< Handler of that press */
     ecs_entity_t space;          /**< Focused entity Space went down on, 0 for none */
@@ -134,7 +146,10 @@ ecs_entity_t box_ui_up(
     ecs_entity_t e,
     ecs_id_t id);
 
-/** Move the focus, publishing Focused and FocusStatus and sending on.blur and on.focus.
+/** Move the focus through ecs_script_set_focus, whose to_focus hook publishes Focused and
+ * FocusStatus before flecs sends on.blur and on.focus.
+ *
+ * flecs does not call the hook when its focus already is e, so the call publishes then.
  *
  * @param world The world
  * @param st The module state
@@ -146,6 +161,29 @@ void box_ui_focus_set(
     box_ui_state_t *st,
     ecs_entity_t e,
     bool visible);
+
+/** Publish a focus the flecs focus already has or is about to get: Focused, FocusStatus and the
+ * end of the Space press and hold of the entity that lost it. Sends no event.
+ *
+ * @param world The world
+ * @param st The module state
+ * @param e The entity, 0 for none
+ * @param visible Whether the focus comes from the keyboard
+ */
+void box_ui_focus_apply(
+    ecs_world_t *world,
+    box_ui_state_t *st,
+    ecs_entity_t e,
+    bool visible);
+
+/** Check whether the flecs focus can be used: flecs.script.event is imported and the world is
+ * not torn down.
+ *
+ * @param world The world or a stage
+ * @return Whether ecs_script_set_focus can be called
+ */
+bool box_ui_events_ready(
+    const ecs_world_t *world);
 
 /** Clear the focus when the focused entity can no longer take it.
  *
@@ -170,7 +208,7 @@ bool box_ui_focus_step(
     box_pick_state_t *pst,
     bool back);
 
-/** Register Focusable, the observer that clears the focus and the FocusStatus singleton.
+/** Register Focusable, the observers that clear the focus and the FocusStatus singleton.
  *
  * @param world The world
  * @param st The module state
@@ -179,7 +217,8 @@ void box_ui_focus_import(
     ecs_world_t *world,
     box_ui_state_t *st);
 
-/** Install the key claim in box.input and the hook in box.picking.
+/** Install the key claim in box.input and the hook in box.picking, whose to_focus decides every
+ * change of the flecs focus.
  *
  * @param world The world
  * @param st The module state
@@ -215,7 +254,9 @@ int32_t box_ui_deliver(
     ecs_entity_t type,
     const void *value);
 
-/** Resume the tasks whose futures were resolved, unless called from inside a task.
+/** Resume the tasks whose futures were resolved, unless called from inside a task, and again
+ * while that resumes tasks: a resumed task that calls focus() resolves on.blur and on.focus, and
+ * flecs leaves the tasks they resume to the next progress inside a task.
  *
  * @param world The world
  * @param st The module state
@@ -254,48 +295,16 @@ void box_ui_events_import(
     ecs_entity_t on,
     ecs_entity_t ui);
 
-/** Register the temporary script functions on.focus, on.blur, on.key, on.activate and ui.focus.
+/** Register the temporary script function on.activate.
  *
  * @param world The world
  * @param st The module state
  * @param on The flecs.script.on scope
- * @param ui The flecs.script.ui scope
  */
 void box_ui_shim_import(
     ecs_world_t *world,
     box_ui_state_t *st,
-    ecs_entity_t on,
-    ecs_entity_t ui);
-
-/** Send on.blur to the entity that lost the focus and on.focus to the one that gained it.
- *
- * @param world The world
- * @param st The module state
- * @param from Entity that lost the focus, 0 for none
- * @param from_visible Whether its focus came from the keyboard
- * @param to Entity that gained the focus, 0 for none
- * @param to_visible Whether the new focus comes from the keyboard
- */
-void box_ui_shim_focus(
-    ecs_world_t *world,
-    box_ui_state_t *st,
-    ecs_entity_t from,
-    bool from_visible,
-    ecs_entity_t to,
-    bool to_visible);
-
-/** Send on.key for a key event to the focused entity.
- *
- * @param world The world
- * @param st The module state
- * @param focused The focused entity
- * @param evt The key event
- */
-void box_ui_shim_key(
-    ecs_world_t *world,
-    box_ui_state_t *st,
-    ecs_entity_t focused,
-    const UiKeyEvent *evt);
+    ecs_entity_t on);
 
 /** Send on.activate for an activation of an entity.
  *
@@ -337,7 +346,7 @@ void box_ui_text_edit_key(
     ecs_world_t *world,
     box_ui_state_t *st,
     ecs_entity_t e,
-    const UiKeyEvent *evt);
+    const box_ui_key_t *evt);
 
 /** Place the caret or select in a TextEdit for a pointer event after the press focused it.
  *

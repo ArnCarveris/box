@@ -1,7 +1,7 @@
 /**
  * @file Focus.c
  * @brief The keyboard focus: presses and Tab move it, KeyCapture and a visible focus keep keys
- * from the bindings, and key repeats reach C.
+ * from the bindings, key repeats reach C, and the flecs focus is the Focused entity.
  */
 
 #include <box.h>
@@ -218,6 +218,12 @@ void Focus_tags_and_status(void) {
     test_assert(ecs_lookup(world, "box.ui.FocusScope") == FocusScope);
     test_assert(ecs_lookup(world, "flecs.script.on.activate") != 0);
     test_assert(ecs_lookup(world, "flecs.script.ui.changed") != 0);
+    test_assert(ecs_lookup(world, "flecs.script.focus") != 0);
+    test_assert(ecs_lookup(world, "flecs.script.ui.focus") == 0);
+    test_assert(ecs_lookup(world, "flecs.script.on.key") == 0);
+    test_assert(ecs_lookup(world, "box.ui.UiKeyEvent") == 0);
+    test_assert(ecs_lookup(world, "box.ui.UiFocusEvent") == 0);
+    test_uint(ecs_script_get_focus(world), 0);
 
     ecs_fini(world);
 }
@@ -690,7 +696,7 @@ void Focus_api_from_script(void) {
         "  async {\n"
         "    while true {\n"
         "      await on.click(hud.form.plain)\n"
-        "      await ui.focus(hud.form.c)\n"
+        "      await focus(hud.form.c)\n"
         "      moved = moved + 1\n"
         "    }\n"
         "  }\n"
@@ -705,6 +711,7 @@ void Focus_api_from_script(void) {
     test_int(*moved, 1);
     test_uint(focus_status(world)->focused, c);
     test_bool(ecs_has(world, c, Focused), true);
+    test_uint(ecs_script_get_focus(world), c);
 
     ecs_fini(world);
 }
@@ -807,6 +814,237 @@ void Focus_tab_first_scope_of_front_view(void) {
     test_uint(focus_status(world)->focused, 0);
     focus_run(world, s, "key.press Tab");
     test_uint(focus_status(world)->focused, focus_e(world, "hud.form.a"));
+
+    ecs_fini(world);
+}
+
+/** Check that the flecs focus is the Focused entity and FocusStatus.focused.
+ *
+ * @param world The world
+ * @return The flecs focus
+ */
+static ecs_entity_t focus_flecs(
+    ecs_world_t *world)
+{
+    ecs_entity_t result = ecs_script_get_focus(world);
+    test_uint(result, focus_status(world)->focused);
+    test_int(focus_tagged(world), result ? 1 : 0);
+    if (result) {
+        test_bool(ecs_has(world, result, Focused), true);
+    }
+
+    return result;
+}
+
+/** A template that counts on.focus and on.blur on its target */
+#define FOCUS_PROBE \
+    "template Probe {\n" \
+    "  prop target: entity = 0\n" \
+    "  mut focuses: i32 = 0\n" \
+    "  mut blurs: i32 = 0\n" \
+    "  async {\n" \
+    "    while true {\n" \
+    "      await on.focus(target)\n" \
+    "      focuses = focuses + 1\n" \
+    "    }\n" \
+    "  }\n" \
+    "  async {\n" \
+    "    while true {\n" \
+    "      await on.blur(target)\n" \
+    "      blurs = blurs + 1\n" \
+    "    }\n" \
+    "  }\n" \
+    "}\n"
+
+/** The muts of Probe */
+typedef struct {
+    int32_t focuses; /**< Times on.focus resolved */
+    int32_t blurs;   /**< Times on.blur resolved */
+} focus_probe_t;
+
+/** Get the muts of a Probe.
+ *
+ * @param world The world
+ * @param path Path of the probe
+ * @return The muts
+ */
+static const focus_probe_t* focus_probe(
+    ecs_world_t *world,
+    const char *path)
+{
+    const focus_probe_t *result = ecs_get_id(world, focus_e(world, path),
+        focus_e(world, "Probe.mut"));
+    test_assert(result != NULL);
+
+    return result;
+}
+
+void Focus_flecs_focus_is_focused(void) {
+    // ui/focus
+    ecs_world_t *world = focus_world(
+        FOCUS_FORM
+        "template Mover {\n"
+        "  mut moved: entity = 0\n"
+        "  async {\n"
+        "    while true {\n"
+        "      await on.click(hud.form.plain)\n"
+        "      const f = await focus(hud.form.c)\n"
+        "      moved = f\n"
+        "    }\n"
+        "  }\n"
+        "}\n"
+        "mover { Mover: {} }\n");
+    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t a = focus_e(world, "hud.form.a");
+    ecs_entity_t b = focus_e(world, "hud.form.b");
+    ecs_entity_t c = focus_e(world, "hud.form.c");
+    test_uint(focus_flecs(world), 0);
+
+    focus_run(world, s, "key.press Tab");
+    test_uint(focus_flecs(world), b);
+    test_bool(focus_status(world)->visible, true);
+    focus_run(world, s, "key.press Tab");
+    test_uint(focus_flecs(world), a);
+
+    focus_run(world, s, "mouse.click left [840, 260]");
+    test_uint(focus_flecs(world), c);
+    test_bool(focus_status(world)->visible, false);
+
+    focus_run(world, s, "mouse.click left [640, 260]");
+    test_uint(ecs_singleton_get(world, PickStatus)->target, focus_e(world, "hud.form.b.label"));
+    test_uint(focus_flecs(world), b);
+    test_uint(focus_status(world)->previous, c);
+
+    focus_run(world, s, "mouse.click left [1200, 50]");
+    test_uint(focus_flecs(world), 0);
+
+    test_bool(box_ui_focus(world, a), true);
+    test_uint(focus_flecs(world), a);
+    test_bool(box_ui_focus(world, 0), true);
+    test_uint(focus_flecs(world), 0);
+    test_bool(box_ui_focus(world, c), true);
+    test_uint(focus_flecs(world), c);
+
+    focus_run(world, s, "mouse.click left [640, 460]");
+    const ecs_entity_t *moved = ecs_get_id(world, focus_e(world, "mover"),
+        focus_e(world, "Mover.mut"));
+    test_assert(moved != NULL);
+    test_uint(*moved, c);
+    test_uint(focus_flecs(world), c);
+
+    ecs_delete(world, c);
+    ecs_progress(world, 0);
+    test_uint(focus_flecs(world), 0);
+
+    ecs_fini(world);
+}
+
+void Focus_press_non_focusable_keeps_flecs_focus(void) {
+    // ui/focus
+    ecs_world_t *world = focus_world(
+        FOCUS_FORM
+        FOCUS_PROBE
+        "probe { Probe: {target: hud} }\n");
+    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t b = focus_e(world, "hud.form.b");
+
+    focus_run(world, s, "mouse.click left [640, 460]");
+    test_uint(ecs_singleton_get(world, PickStatus)->handler, focus_e(world, "hud.form.plain"));
+    test_uint(focus_flecs(world), 0);
+    test_int(focus_probe(world, "probe")->focuses, 0);
+    test_int(focus_probe(world, "probe")->blurs, 0);
+    focus_run(world, s, "mouse.click left [900, 360]");
+    test_uint(focus_flecs(world), 0);
+    test_int(focus_probe(world, "probe")->focuses, 0);
+    test_int(focus_probe(world, "probe")->blurs, 0);
+
+    focus_run(world, s, "mouse.click left [600, 260]");
+    test_uint(ecs_singleton_get(world, PickStatus)->target, b);
+    test_uint(focus_flecs(world), b);
+    test_int(focus_probe(world, "probe")->focuses, 1);
+    test_int(focus_probe(world, "probe")->blurs, 0);
+    focus_run(world, s, "mouse.click left [640, 260]");
+    test_uint(ecs_singleton_get(world, PickStatus)->target, focus_e(world, "hud.form.b.label"));
+    test_uint(focus_flecs(world), b);
+    test_int(focus_probe(world, "probe")->focuses, 1);
+    test_int(focus_probe(world, "probe")->blurs, 0);
+
+    ecs_fini(world);
+}
+
+void Focus_script_focus_redirected_or_refused(void) {
+    // ui/focus
+    ecs_world_t *world = focus_world(
+        FOCUS_FORM
+        "template Mover {\n"
+        "  mut redirected: entity = 0\n"
+        "  mut refused: entity = 0\n"
+        "  async {\n"
+        "    await on.click(hud.form.plain)\n"
+        "    const r = await focus(hud.form.b.label)\n"
+        "    redirected = r\n"
+        "    const f = await focus(hud.form.plain)\n"
+        "    refused = f\n"
+        "  }\n"
+        "}\n"
+        "mover { Mover: {} }\n");
+    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t a = focus_e(world, "hud.form.a");
+    ecs_entity_t b = focus_e(world, "hud.form.b");
+    ecs_entity_t c = focus_e(world, "hud.form.c");
+    ecs_entity_t plain = focus_e(world, "hud.form.plain");
+    typedef struct { ecs_entity_t redirected, refused; } mover_t;
+    focus_run(world, s, "mouse.click left [640, 460]");
+    const mover_t *m = ecs_get_id(world, focus_e(world, "mover"), focus_e(world, "Mover.mut"));
+    test_assert(m != NULL);
+    test_uint(m->redirected, b);
+    test_uint(m->refused, b);
+    test_uint(focus_flecs(world), b);
+
+    test_uint(ecs_script_set_focus(world, plain), b);
+    test_uint(focus_flecs(world), b);
+    test_uint(ecs_script_set_focus(world, a), a);
+    test_uint(focus_flecs(world), a);
+    test_uint(ecs_script_set_focus(world, focus_e(world, "hud.form.b.label")), b);
+    test_uint(focus_flecs(world), b);
+    test_uint(focus_status(world)->previous, a);
+    ecs_enable(world, c, false);
+    test_uint(ecs_script_set_focus(world, c), b);
+    test_uint(focus_flecs(world), b);
+    ecs_enable(world, c, true);
+    test_uint(ecs_script_set_focus(world, 0), 0);
+    test_uint(focus_flecs(world), 0);
+
+    ecs_fini(world);
+}
+
+void Focus_to_local_with_focus_hook(void) {
+    // ui/focus
+    ecs_world_t *world = focus_world(
+        FOCUS_FORM
+        "template Local {\n"
+        "  mut x: f32 = 0\n"
+        "  mut y: f32 = 0\n"
+        "  mut target: entity = 0\n"
+        "  async {\n"
+        "    while true {\n"
+        "      const e = await on.press(hud.form)\n"
+        "      x = e.local_x\n"
+        "      y = e.local_y\n"
+        "      target = e.target\n"
+        "    }\n"
+        "  }\n"
+        "}\n"
+        "local { Local: {} }\n");
+    ecs_entity_t s = box_terminal_new(world);
+    typedef struct { float x, y; ecs_entity_t target; } local_t;
+    focus_run(world, s, "mouse.click left [650, 255]");
+    const local_t *l = ecs_get_id(world, focus_e(world, "local"), focus_e(world, "Local.mut"));
+    test_assert(l != NULL);
+    test_uint(l->target, focus_e(world, "hud.form.b.label"));
+    test_flt(l->x, 10);
+    test_flt(l->y, 105);
+    test_uint(focus_flecs(world), focus_e(world, "hud.form.b"));
 
     ecs_fini(world);
 }

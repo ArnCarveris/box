@@ -56,5 +56,5 @@ gallery {
 async {
   const controls = gallery.lookup("hud").lookup("root").lookup("page").lookup("bottom")
     .lookup("form").lookup("body").lookup("controls")
-  await ui.focus(controls.lookup("name").lookup("field"))
+  await focus(controls.lookup("name").lookup("field"))
 }

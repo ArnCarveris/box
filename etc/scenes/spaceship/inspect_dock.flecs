@@ -1,0 +1,12 @@
+include frigate
+include dock
+include dock_services
+using flecs.script
+using box.transform
+using box.geometry
+using box.spatial
+using box.material
+using box.texture
+using box.light
+
+component { OrbitalDock: {}; services { DockServices: {} } }

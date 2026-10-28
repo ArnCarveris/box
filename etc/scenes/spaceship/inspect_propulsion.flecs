@@ -1,0 +1,12 @@
+include frigate
+using flecs.script
+using box.transform
+using box.geometry
+using box.spatial
+using box.material
+using box.texture
+using box.light
+
+shoulder { FrigateShoulder: {} }
+engine { FrigateEngine: {}; Position: {46, -1, -36} }
+radiator { FrigateRadiator: {width: 7, length: 20}; Position: {-12, 0, -30} }

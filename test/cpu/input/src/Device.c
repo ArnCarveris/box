@@ -665,7 +665,7 @@ void Device_pending(void) {
 void Device_script_key_down(void) {
     // input/devices
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
+    ECS_IMPORT(world, BoxInput);
 
     ecs_entity_t s = ecs_script(world, {
         .code =
@@ -723,7 +723,7 @@ void Device_script_key_down(void) {
 void Device_script_key_modifiers(void) {
     // input/devices
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
+    ECS_IMPORT(world, BoxInput);
 
     ecs_entity_t s = ecs_script(world, {
         .code =
@@ -764,7 +764,7 @@ void Device_script_key_modifiers(void) {
 void Device_script_key_repeat(void) {
     // input/devices
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
+    ECS_IMPORT(world, BoxInput);
 
     ecs_entity_t s = ecs_script(world, {
         .code =

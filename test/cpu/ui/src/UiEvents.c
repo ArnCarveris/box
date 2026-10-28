@@ -1,7 +1,8 @@
 /**
  * @file UiEvents.c
- * @brief The box.ui script events: on.focus, on.blur, on.key, on.activate, on.change and
- * on.submit, counted in the muts of probe templates.
+ * @brief The script events of the UI: on.focus, on.blur, on.key_down and on.key_up of flecs on
+ * the focus box.ui drives, and on.activate, on.change and on.submit of box.ui, counted in the
+ * muts of probe templates.
  */
 
 #include <box.h>
@@ -30,12 +31,12 @@
     "  Focusable\n" \
     "  async {\n" \
     "    while true {\n" \
-    "      const e = await on.key(this)\n" \
-    "      if e.down && e.key == Right {\n" \
+    "      const e = await on.key_down(this)\n" \
+    "      if e.key == \"ArrowRight\" {\n" \
     "        value = value + 1\n" \
     "        await ui.changed(this)\n" \
     "      }\n" \
-    "      if e.down && e.key == Enter {\n" \
+    "      if e.key == \"Enter\" {\n" \
     "        await ui.submit(this)\n" \
     "      }\n" \
     "    }\n" \
@@ -70,22 +71,26 @@
     "}\n" \
     "template FocusProbe {\n" \
     "  prop target: entity = 0\n" \
-    "  mut focus: i32 = 0\n" \
-    "  mut blur: i32 = 0\n" \
+    "  mut focuses: i32 = 0\n" \
+    "  mut blurs: i32 = 0\n" \
     "  mut last: entity = 0\n" \
-    "  mut visible: bool = false\n" \
+    "  mut related: entity = 0\n" \
+    "  mut blur_target: entity = 0\n" \
+    "  mut blur_related: entity = 0\n" \
     "  async {\n" \
     "    while true {\n" \
     "      const e = await on.focus(target)\n" \
-    "      focus = focus + 1\n" \
+    "      focuses = focuses + 1\n" \
     "      last = e.target\n" \
-    "      visible = e.visible\n" \
+    "      related = e.related\n" \
     "    }\n" \
     "  }\n" \
     "  async {\n" \
     "    while true {\n" \
-    "      await on.blur(target)\n" \
-    "      blur = blur + 1\n" \
+    "      const e = await on.blur(target)\n" \
+    "      blurs = blurs + 1\n" \
+    "      blur_target = e.target\n" \
+    "      blur_related = e.related\n" \
     "    }\n" \
     "  }\n" \
     "}\n" \
@@ -94,20 +99,25 @@
     "  mut downs: i32 = 0\n" \
     "  mut ups: i32 = 0\n" \
     "  mut repeats: i32 = 0\n" \
-    "  mut key: Key = None\n" \
+    "  mut key: string = \"\"\n" \
     "  mut shift: bool = false\n" \
     "  mut ctrl: bool = false\n" \
     "  async {\n" \
     "    while true {\n" \
-    "      const e = await on.key(target)\n" \
-    "      if e.down {\n" \
-    "        downs = downs + 1\n" \
-    "      } else {\n" \
-    "        ups = ups + 1\n" \
-    "      }\n" \
+    "      const e = await on.key_down(target)\n" \
+    "      downs = downs + 1\n" \
     "      if e.repeat {\n" \
     "        repeats = repeats + 1\n" \
     "      }\n" \
+    "      key = e.key\n" \
+    "      shift = e.shift\n" \
+    "      ctrl = e.ctrl\n" \
+    "    }\n" \
+    "  }\n" \
+    "  async {\n" \
+    "    while true {\n" \
+    "      const e = await on.key_up(target)\n" \
+    "      ups = ups + 1\n" \
     "      key = e.key\n" \
     "      shift = e.shift\n" \
     "      ctrl = e.ctrl\n" \
@@ -153,10 +163,12 @@
 
 /** The muts of FocusProbe */
 typedef struct {
-    int32_t focus;     /**< Times on.focus resolved */
-    int32_t blur;      /**< Times on.blur resolved */
-    ecs_entity_t last; /**< Target of the last on.focus */
-    bool visible;      /**< Visible of the last on.focus */
+    int32_t focus;             /**< Times on.focus resolved */
+    int32_t blur;              /**< Times on.blur resolved */
+    ecs_entity_t last;         /**< Target of the last on.focus */
+    ecs_entity_t related;      /**< Related of the last on.focus */
+    ecs_entity_t blur_target;  /**< Target of the last on.blur */
+    ecs_entity_t blur_related; /**< Related of the last on.blur */
 } events_focus_t;
 
 /** The muts of KeyProbe */
@@ -164,7 +176,7 @@ typedef struct {
     int32_t downs;   /**< Key downs and repeats */
     int32_t ups;     /**< Key ups */
     int32_t repeats; /**< Repeats */
-    Key key;         /**< Key of the last event */
+    char *key;       /**< Key value of the last event */
     bool shift;      /**< Shift of the last event */
     bool ctrl;       /**< Ctrl of the last event */
 } events_key_t;
@@ -332,7 +344,7 @@ void UiEvents_focus_blur_bubble(void) {
     test_int(events_focus(world, "on_a")->focus, 1);
     test_int(events_focus(world, "on_a")->blur, 0);
     test_uint(events_focus(world, "on_a")->last, a);
-    test_bool(events_focus(world, "on_a")->visible, false);
+    test_bool(ecs_singleton_get(world, FocusStatus)->visible, false);
     test_int(events_focus(world, "on_form")->focus, 1);
     test_uint(events_focus(world, "on_form")->last, a);
 
@@ -348,7 +360,7 @@ void UiEvents_focus_blur_bubble(void) {
         events_e(world, "hud.form.group.slider"));
     test_int(events_focus(world, "on_form")->focus, 3);
     test_int(events_focus(world, "on_form")->blur, 2);
-    test_bool(events_focus(world, "on_form")->visible, true);
+    test_bool(ecs_singleton_get(world, FocusStatus)->visible, true);
 
     events_run(world, s, "mouse.click left [1200, 50]");
     test_int(events_focus(world, "on_form")->focus, 3);
@@ -368,7 +380,7 @@ void UiEvents_key_reports_key_and_modifiers(void) {
     events_run(world, s, "key.press A");
     test_int(events_key(world, "on_a")->downs, 1);
     test_int(events_key(world, "on_a")->ups, 1);
-    test_int(events_key(world, "on_a")->key, KeyA);
+    test_str(events_key(world, "on_a")->key, "a");
     test_bool(events_key(world, "on_a")->shift, false);
     test_int(events_key(world, "on_form")->downs, 1);
     test_int(events_key(world, "on_form")->ups, 1);
@@ -376,7 +388,7 @@ void UiEvents_key_reports_key_and_modifiers(void) {
     events_run(world, s, "key.down ShiftLeft");
     events_run(world, s, "key.down CtrlLeft");
     events_run(world, s, "key.press Z");
-    test_int(events_key(world, "on_a")->key, KeyZ);
+    test_str(events_key(world, "on_a")->key, "z");
     test_bool(events_key(world, "on_a")->shift, true);
     test_bool(events_key(world, "on_a")->ctrl, true);
     test_int(events_key(world, "on_a")->downs, 4);
@@ -420,7 +432,7 @@ void UiEvents_key_repeats(void) {
     test_int(events_key(world, "on_a")->downs, 4);
     test_int(events_key(world, "on_a")->repeats, 3);
     test_int(events_key(world, "on_a")->ups, 0);
-    test_int(events_key(world, "on_a")->key, KeyBackspace);
+    test_str(events_key(world, "on_a")->key, "Backspace");
     events_run(world, s, "key.up Backspace");
     test_int(events_key(world, "on_a")->ups, 1);
     test_int(events_key(world, "on_a")->repeats, 3);
@@ -673,6 +685,123 @@ void UiEvents_change_once_per_report(void) {
 
     test_int(events_change(world, "on_form")->changes, 5);
     test_int(events_slider(world), 5);
+
+    ecs_fini(world);
+}
+
+void UiEvents_focus_blur_target_related(void) {
+    // ui/events
+    ecs_world_t *world = events_world(
+        "on_a { FocusProbe: {target: hud.form.a} }\n"
+        "on_b { FocusProbe: {target: hud.form.b} }\n"
+        "on_form { FocusProbe: {target: hud.form} }\n");
+    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t a = events_e(world, "hud.form.a");
+    ecs_entity_t b = events_e(world, "hud.form.b");
+    events_run(world, s, "mouse.click left [440, 260]");
+    test_uint(ecs_script_get_focus(world), a);
+    test_int(events_focus(world, "on_a")->focus, 1);
+    test_uint(events_focus(world, "on_a")->last, a);
+    test_uint(events_focus(world, "on_a")->related, 0);
+    test_int(events_focus(world, "on_a")->blur, 0);
+    test_int(events_focus(world, "on_b")->focus, 0);
+    test_int(events_focus(world, "on_form")->focus, 1);
+    test_int(events_focus(world, "on_form")->blur, 0);
+
+    events_run(world, s, "mouse.click left [840, 260]");
+    test_uint(ecs_script_get_focus(world), b);
+    test_int(events_focus(world, "on_a")->focus, 1);
+    test_int(events_focus(world, "on_a")->blur, 1);
+    test_uint(events_focus(world, "on_a")->blur_target, a);
+    test_uint(events_focus(world, "on_a")->blur_related, b);
+    test_int(events_focus(world, "on_b")->focus, 1);
+    test_int(events_focus(world, "on_b")->blur, 0);
+    test_uint(events_focus(world, "on_b")->last, b);
+    test_uint(events_focus(world, "on_b")->related, a);
+    test_int(events_focus(world, "on_form")->focus, 2);
+    test_int(events_focus(world, "on_form")->blur, 1);
+    test_uint(events_focus(world, "on_form")->last, b);
+    test_uint(events_focus(world, "on_form")->related, a);
+    test_uint(events_focus(world, "on_form")->blur_target, a);
+    test_uint(events_focus(world, "on_form")->blur_related, b);
+
+    events_run(world, s, "mouse.click left [880, 260]");
+    test_int(events_focus(world, "on_b")->focus, 1);
+    test_int(events_focus(world, "on_b")->blur, 0);
+    test_int(events_focus(world, "on_form")->focus, 2);
+    test_int(events_focus(world, "on_form")->blur, 1);
+
+    test_bool(box_ui_focus(world, a), true);
+    test_int(events_focus(world, "on_b")->blur, 1);
+    test_uint(events_focus(world, "on_b")->blur_related, a);
+    test_int(events_focus(world, "on_a")->focus, 2);
+    test_uint(events_focus(world, "on_a")->related, b);
+    test_bool(box_ui_focus(world, 0), true);
+    test_int(events_focus(world, "on_a")->blur, 2);
+    test_uint(events_focus(world, "on_a")->blur_related, 0);
+    test_int(events_focus(world, "on_form")->focus, 3);
+    test_int(events_focus(world, "on_form")->blur, 3);
+    test_uint(ecs_script_get_focus(world), 0);
+
+    test_bool(box_ui_focus(world, b), true);
+    test_int(events_focus(world, "on_b")->focus, 2);
+    ecs_remove(world, b, Focusable);
+    test_uint(ecs_script_get_focus(world), 0);
+    test_uint(ecs_singleton_get(world, FocusStatus)->focused, 0);
+    test_bool(ecs_has(world, b, Focused), false);
+    test_int(events_focus(world, "on_b")->blur, 2);
+    test_uint(events_focus(world, "on_b")->blur_target, b);
+    test_uint(events_focus(world, "on_b")->blur_related, 0);
+    test_int(events_focus(world, "on_form")->blur, 4);
+
+    test_bool(box_ui_focus(world, a), true);
+    test_int(events_focus(world, "on_form")->focus, 5);
+    ecs_delete(world, a);
+    test_uint(ecs_script_get_focus(world), 0);
+    test_uint(ecs_singleton_get(world, FocusStatus)->focused, 0);
+    test_int(ecs_count_id(world, Focused), 0);
+    test_int(events_focus(world, "on_form")->blur, 4);
+    events_run(world, s, "key.press Tab");
+    test_uint(ecs_script_get_focus(world), ecs_singleton_get(world, FocusStatus)->focused);
+
+    ecs_fini(world);
+}
+
+void UiEvents_key_down_once_on_widget_and_parents(void) {
+    // ui/events
+    ecs_world_t *world = events_world(
+        "on_a { KeyProbe: {target: hud.form.a} }\n"
+        "on_b { KeyProbe: {target: hud.form.b} }\n"
+        "on_form { KeyProbe: {target: hud.form} }\n"
+        "on_hud { KeyProbe: {target: hud} }\n");
+    ecs_entity_t s = box_terminal_new(world);
+    events_run(world, s, "mouse.click left [440, 260]");
+    test_uint(ecs_script_get_focus(world), events_e(world, "hud.form.a"));
+    events_run(world, s, "key.press A");
+    events_run(world, s, "key.press B");
+    test_int(events_key(world, "on_a")->downs, 2);
+    test_int(events_key(world, "on_a")->ups, 2);
+    test_str(events_key(world, "on_a")->key, "b");
+    test_int(events_key(world, "on_form")->downs, 2);
+    test_int(events_key(world, "on_form")->ups, 2);
+    test_int(events_key(world, "on_hud")->downs, 2);
+    test_int(events_key(world, "on_hud")->ups, 2);
+    test_int(events_key(world, "on_b")->downs, 0);
+    test_int(events_key(world, "on_b")->ups, 0);
+
+    events_run(world, s, "key.press Tab");
+    test_uint(ecs_script_get_focus(world), events_e(world, "hud.form.b"));
+    test_int(events_key(world, "on_a")->downs, 3);
+    test_str(events_key(world, "on_a")->key, "Tab");
+    test_int(events_key(world, "on_b")->downs, 0);
+    test_int(events_key(world, "on_b")->ups, 1);
+    test_int(events_key(world, "on_form")->downs, 3);
+    test_int(events_key(world, "on_form")->ups, 3);
+    events_run(world, s, "key.press Right");
+    test_int(events_key(world, "on_b")->downs, 1);
+    test_str(events_key(world, "on_b")->key, "ArrowRight");
+    test_int(events_key(world, "on_a")->downs, 3);
+    test_int(events_key(world, "on_form")->downs, 4);
 
     ecs_fini(world);
 }
