@@ -520,7 +520,30 @@ typedef struct box_gpu_view_uniforms_t {
     vec4 environment;               /**< Environment: intensity, cosine and sine of the yaw, 1
                                      *   when the view is lit by a processed environment and 0
                                      *   when not */
+    uint32_t spot_config[4];        /**< Tile records of the shadow atlas the view samples, 0
+                                     *   without spot shadows, width of the tent filter in
+                                     *   texels, two unused */
+    vec4 spot_bias;                 /**< Depth bias and normal offset at grazing light in texels
+                                     *   of a tile, two unused */
 } box_gpu_view_uniforms_t;
+
+/** The shadow atlas of a scene: the depth texture its spot light tiles render into */
+typedef struct box_gpu_atlas_t {
+    WGPUTexture texture;            /**< BOX_GPU_SHADOW_FORMAT, resolution squared */
+    WGPUTextureView view;           /**< 2D view, sampled by the forward pass and rendered into */
+    int32_t resolution;             /**< Edge of the atlas in texels */
+} box_gpu_atlas_t;
+
+/** A draw of the casters of a tile of the last packet, read by box_render_gpu_cull_tile */
+typedef struct box_gpu_atlas_read_t {
+    int32_t tile;                   /**< Index of the tile in the shadow tiles of the packet */
+    uint32_t args;                  /**< Index of its draw arguments */
+    uint32_t count;                 /**< Instances it tested */
+} box_gpu_atlas_read_t;
+
+/** Bytes of the tile records of a shadow atlas, the uniform array the forward pass binds */
+#define BOX_GPU_ATLAS_TILES_SIZE \
+    ((uint64_t)BOX_RENDER_SHADOW_TILES * sizeof(box_render_shadow_record_t))
 
 /** Pipeline of the blit or the forward pass for one color format */
 typedef struct box_gpu_blit_t {
@@ -653,6 +676,17 @@ typedef struct box_gpu_t {
     WGPUTextureView capture_shadow_layer; /**< View the casters render into */
     WGPUBuffer capture_shadow_buffer; /**< Matrix of the cascade of the captures */
     WGPUBindGroup capture_shadow_group; /**< Binds the matrix to the shadow pipeline */
+    ecs_map_t atlases;              /**< Handle to box_gpu_atlas_t, the shadow atlases */
+    WGPUTexture no_atlas;           /**< Atlas bound by views without spot shadows */
+    WGPUTextureView no_atlas_view;  /**< 2D view of the empty atlas */
+    WGPUBuffer no_tiles;            /**< Zero tile records bound by views without spot shadows */
+    WGPUBuffer atlas_buffer;        /**< Tile matrices of the atlases of a packet */
+    int32_t atlas_capacity;         /**< Tiles the matrix buffer holds */
+    ecs_vec_t atlas_data;           /**< Bytes of the tile matrices of a packet */
+    WGPUBuffer atlas_counts;        /**< Copy of the draw arguments the cull of the tiles of the
+                                     *   last packet wrote, for box_render_gpu_cull_tile */
+    uint64_t atlas_counts_size;     /**< Bytes of that copy */
+    ecs_vec_t atlas_reads;          /**< box_gpu_atlas_read_t, the draws of those tiles */
     WGPUBindGroupLayout instance_layout; /**< Binds the streams of an instance page and surface
                                      *   assets: 0 transforms, 1 surface assets, 2 shading,
                                      *   3 surfaces; the forward pass and alpha tested casters */
@@ -725,7 +759,9 @@ typedef enum box_gpu_stat_t {
     BOX_GPU_STAT_SCATTER,           /**< A scatter dispatch was recorded */
     BOX_GPU_STAT_INSTANCE_BIND,     /**< An instance bind group was set in a pass or bundle */
     BOX_GPU_STAT_CULL_DISPATCH,     /**< A dispatch of the cull pass of a view was recorded */
-    BOX_GPU_STAT_CULL_INSTANCES     /**< A cull_instances dispatch of a view was recorded */
+    BOX_GPU_STAT_CULL_INSTANCES,    /**< A cull_instances dispatch of a view was recorded */
+    BOX_GPU_STAT_SHADOW_TILE,       /**< A shadow atlas tile was rendered */
+    BOX_GPU_STAT_SHADOW_DRAW        /**< A draw call was recorded in a cascade or a tile */
 } box_gpu_stat_t;
 
 #ifdef __EMSCRIPTEN__
@@ -1389,8 +1425,8 @@ WGPUBuffer box_gpu_light_binding(
  *
  * @param gpu The backend
  * @param t The target whose aerial perspective volume of the view it binds, NULL for the
- * placeholder volume, the black environment and the zero environment SH of the probe and
- * reflection captures
+ * placeholder volume, the black environment, the zero environment SH, the empty shadow atlas and
+ * the zero tile records of the probe and reflection captures
  * @param v The view
  * @param uniforms Buffer with the uniforms, bound with a dynamic offset
  * @param clusters Cluster buffer of the view
@@ -1406,7 +1442,7 @@ WGPUBindGroup box_gpu_light_group_with(
     WGPUTextureView shadow);
 
 /** Create the bind group of the forward pass of a view: its uniforms, lights, clusters, shadow
- * map, aerial perspective volume and environment.
+ * map, aerial perspective volume, environment, shadow atlas and tile records.
  *
  * @param gpu The backend
  * @param t The target
@@ -1556,6 +1592,59 @@ WGPUTextureView box_gpu_shadow_capture(
 WGPUTextureView box_gpu_shadow_binding(
     box_gpu_t *gpu,
     const box_render_view_t *v);
+
+/** Create, recreate or release the shadow atlas of a scene from a BOX_RENDER_SHADOW_ATLAS
+ * resource.
+ *
+ * @param gpu The backend
+ * @param op What happens to the atlas
+ * @param handle Handle of the atlas
+ * @param desc Its resolution, NULL for a release
+ */
+void box_gpu_atlas_apply(
+    box_gpu_t *gpu,
+    box_render_resource_op_t op,
+    uint32_t handle,
+    const box_render_shadow_atlas_desc_t *desc);
+
+/** Render the tiles of the shadow atlases of a packet, after its probe captures and before its
+ * targets, so every forward pass of the packet samples them.
+ *
+ * The tiles of all atlases are culled in one cull pass, each a frustum of shadow casters of the
+ * scene of its atlas; the tiles of an atlas then draw their casters in one render pass that
+ * clears it, with a viewport per tile.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+void box_gpu_atlas_render(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
+
+/** Get the shadow atlas and the tile records a view samples.
+ *
+ * @param gpu The backend
+ * @param v The view
+ * @param tiles Receives the tile buffer, NULL when the view samples none
+ * @return The atlas, NULL when the view has no spot shadows or the backend lacks the atlas or
+ *         its tile buffer
+ */
+const box_gpu_atlas_t* box_gpu_atlas_of(
+    box_gpu_t *gpu,
+    const box_render_view_t *v,
+    WGPUBuffer *tiles);
+
+/** Write the spot shadow members of the uniforms of a view: its tile records and filter, zero
+ * when it samples no atlas.
+ *
+ * @param gpu The backend
+ * @param v The view
+ * @param u The uniforms
+ */
+void box_gpu_atlas_uniforms(
+    box_gpu_t *gpu,
+    const box_render_view_t *v,
+    box_gpu_view_uniforms_t *u);
 
 /** Create the layouts, sampler and timestamp queries of the atmosphere passes.
  *
@@ -1979,6 +2068,24 @@ void box_gpu_cull_add(
     int32_t slot,
     mat4 proj,
     const box_gpu_view_uniforms_t *u);
+
+/** Add the tiles of a shadow atlas as cull groups of shadow casters of its scene, at most
+ * BOX_GPU_CULL_GROUP_VIEWS tiles per group; tile i is cascade i of the slot.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ * @param scene Scene of the casters
+ * @param slot Slot that identifies the cull views of the atlas
+ * @param tiles The tiles, whose matrices give the frustums
+ * @param count Tiles
+ */
+void box_gpu_cull_casters_add(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet,
+    ecs_entity_t scene,
+    int32_t slot,
+    const box_render_shadow_tile_t *tiles,
+    int32_t count);
 
 /** Count the bits of a mask.
  *

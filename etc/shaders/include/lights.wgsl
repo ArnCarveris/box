@@ -6,7 +6,8 @@
 // every cluster, then the index list: a cluster lists cluster_lights(count) light indices from
 // its offset, followed by cluster_probes(count) indices into the reflection probe buffer of the
 // scene in blend order, at most CLUSTER_PROBES. The shadow members describe the cascaded shadow map of the first directional light,
-// see shadow.wgsl.
+// see shadow.wgsl; the spot members the spot light tiles of the shadow atlas, see
+// spot_shadow.wgsl.
 #pragma once
 
 struct View {
@@ -49,8 +50,15 @@ struct View {
     // Environment: x its intensity, y and z the cosine and sine of its yaw, w 1 when the view is
     // lit by an environment
     environment: vec4f,
+    // x: tile records of the shadow atlas the view samples, 0 without spot shadows, y: width of
+    // the tent filter in texels
+    spot_config: vec4u,
+    // x: depth bias, y: normal offset at grazing light, both in texels of a tile
+    spot_bias: vec4f,
 };
 
+// shadow is the index of the tile record of a spot light in the shadow atlas of the scene,
+// 0xFFFFFFFF for none.
 struct Light {
     position: vec3f,
     range: f32,
@@ -58,6 +66,10 @@ struct Light {
     spot_scale: f32,
     direction: vec3f,
     spot_offset: f32,
+    shadow: u32,
+    pad0: u32,
+    pad1: u32,
+    pad2: u32,
 };
 
 // A resident reflection probe of the scene, see box_render_reflection_probe_t. The influence

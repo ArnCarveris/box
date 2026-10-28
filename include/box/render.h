@@ -57,6 +57,10 @@ ECS_STRUCT(RenderStatus, {
     int32_t device_losses;  /**< Lost GPU devices the renderer recreated, 0 for none; a failed
                              *   recreation is not counted and drops later frames, and the
                              *   browser neither reports nor recovers a loss (its page does) */
+    int32_t shadow_tiles;   /**< Shadow atlas tiles the last extract allocated, over every
+                             *   ShadowAtlas */
+    int32_t shadow_dropped; /**< Shadow casting lights that needed a tile in the last extract
+                             *   and got none, so they light unshadowed */
 });
 
 /** How a view culled its instances in the last frame the GPU finished, set on the View entity.

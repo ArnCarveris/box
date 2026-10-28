@@ -73,6 +73,28 @@
 /** Widest blend band at the edge of a cascade, a fraction of its half extent */
 #define BOX_RENDER_SHADOW_BLEND_MAX (0.5f)
 
+/** Tiles of the shadow atlas of a scene at most, the tile records of its uniform buffer */
+#define BOX_RENDER_SHADOW_TILES (64)
+
+/** Tile record index of a light without a tile */
+#define BOX_RENDER_SHADOW_NONE (0xFFFFFFFFu)
+
+/** Smallest edge of a shadow atlas in texels */
+#define BOX_RENDER_SHADOW_ATLAS_MIN (256)
+
+/** Largest edge of a shadow atlas in texels, the 2D texture limit webgpu guarantees */
+#define BOX_RENDER_SHADOW_ATLAS_MAX (8192)
+
+/** Widest half angle of the projection of a spot light tile in degrees; a wider cone is
+ * unshadowed outside it */
+#define BOX_RENDER_SHADOW_SPOT_ANGLE_MAX (80.0f)
+
+/** Near plane of a spot light tile as a fraction of the range of the light */
+#define BOX_RENDER_SHADOW_NEAR_FRACTION (0.005f)
+
+/** Smallest near plane of a spot light tile */
+#define BOX_RENDER_SHADOW_NEAR_MIN (0.001f)
+
 
 /** Shader handle of the engine shader of the forward pass that draws the 2D shapes */
 #define BOX_RENDER_SHADER_SHAPE2D (7)
@@ -124,6 +146,10 @@
 /** First buffer handle of the reflection probe buffers of scenes */
 #define BOX_RENDER_BUFFER_REFLECT_FIRST (0x30000000u)
 
+/** First handle of the shadow atlases of scenes: a BOX_RENDER_SHADOW_ATLAS and the uniform
+ * BOX_RENDER_BUFFER of its tile records share the handle */
+#define BOX_RENDER_BUFFER_SHADOW_FIRST (0x50000000u)
+
 /** First target handle of captures, the handles below belong to surfaces */
 #define BOX_RENDER_CAPTURE_TARGET_FIRST (0x40000000u)
 
@@ -172,8 +198,9 @@ typedef enum box_render_resource_kind_t {
     BOX_RENDER_ENVIRONMENT, /**< Cubemap of an environment source */
     BOX_RENDER_ENVIRONMENT_IMAGE, /**< Equirectangular image an EnvironmentImage writes into the
                                   *   cubemap of its handle */
-    BOX_RENDER_ATMOSPHERE_ENVIRONMENT /**< Sky an Atmosphere renders into the cubemap of its
+    BOX_RENDER_ATMOSPHERE_ENVIRONMENT, /**< Sky an Atmosphere renders into the cubemap of its
                                        *   handle */
+    BOX_RENDER_SHADOW_ATLAS /**< Depth32Float shadow atlas of the spot light tiles of a scene */
 } box_render_resource_kind_t;
 
 /** What a resource change does to its object */
@@ -204,6 +231,9 @@ typedef struct box_render_upload_t {
  *
  * The directional lights of a scene come first in its buffer, then its point and spot lights.
  * A light without a cone has a spot_scale of 0 and a spot_offset of 1.
+ *
+ * shadow is the only member that is not the light itself: the bake and the reflection
+ * invalidation compare the members before it (BOX_RENDER_LIGHT_SHADING bytes).
  */
 typedef struct box_render_light_t {
     float position[3];  /**< World position, the direction toward a directional light */
@@ -212,7 +242,51 @@ typedef struct box_render_light_t {
     float spot_scale;   /**< Cone falloff scale, 1 / (cos inner - cos outer) */
     float direction[3]; /**< Direction a spot light shines in */
     float spot_offset;  /**< Cone falloff offset, -cos outer times spot_scale */
+    uint32_t shadow;    /**< Index of the tile record of the light in the shadow atlas of its
+                         *   scene, BOX_RENDER_SHADOW_NONE for none */
+    uint32_t pad[3];    /**< Unused, zero */
 } box_render_light_t;
+
+/** Bytes of a light record that describe the light, its tile index excluded */
+#define BOX_RENDER_LIGHT_SHADING (offsetof(box_render_light_t, shadow))
+
+/** A tile of a shadow atlas as the forward pass reads it from the tile records of the scene,
+ * ShadowTile of etc/shaders/include/spot_shadow.wgsl.
+ *
+ * The matrix is a reversed Z perspective along the light: clip depth near * (far - z) /
+ * (z * (far - near)) at the distance z along its axis, 1 at the near plane.
+ */
+typedef struct box_render_shadow_record_t {
+    mat4 matrix;        /**< World to shadow clip space of the light */
+    float rect[4];      /**< Left and top of the tile in atlas uv, its edge in uv, a texel of
+                         *   the atlas in uv */
+    float params[4];    /**< Near and far plane, world size of a texel per unit of distance
+                         *   along the light axis, edge of the tile in texels */
+} box_render_shadow_record_t;
+
+/** A tile the renderer draws the shadow casters of its light into */
+typedef struct box_render_shadow_tile_t {
+    ecs_entity_t light;     /**< Entity of the light */
+    int32_t x;              /**< Left column of the tile in the atlas */
+    int32_t y;              /**< Top row of the tile in the atlas */
+    int32_t size;           /**< Edge of the tile in texels */
+    mat4 matrix;            /**< World to shadow clip space of the light, as its record */
+} box_render_shadow_tile_t;
+
+/** The shadow atlas of a scene in a packet: its tiles, rendered once per packet before the
+ * targets, all in one render pass that clears the atlas */
+typedef struct box_render_shadow_atlas_t {
+    ecs_entity_t scene;     /**< Scene root of the lights and their casters, 0 for the default */
+    uint32_t handle;        /**< Handle of the BOX_RENDER_SHADOW_ATLAS and of its tile buffer */
+    int32_t resolution;     /**< Edge of the atlas in texels */
+    int32_t first;          /**< First of its tiles in the shadow tiles of the packet */
+    int32_t count;          /**< Its tiles, in the order of their records */
+} box_render_shadow_atlas_t;
+
+/** Description of a BOX_RENDER_SHADOW_ATLAS create; a create of an existing handle replaces it */
+typedef struct box_render_shadow_atlas_desc_t {
+    int32_t resolution;     /**< Edge of the atlas in texels, a power of two */
+} box_render_shadow_atlas_desc_t;
 
 /** The lights a view is shaded with: the light buffer of its scene and its ambient light */
 typedef struct box_render_view_lights_t {
@@ -229,8 +303,9 @@ typedef struct box_render_view_lights_t {
 
 /** The shadow settings of a view, resolved, with the view depths its cascades end at.
  *
- * The first directional light of the scene casts the shadows; the cascades are fitted to the
- * target the view renders into, because the frustum follows its aspect.
+ * The first directional light of the scene casts the cascades; they are fitted to the target
+ * the view renders into, because the frustum follows its aspect. The spot lights with a tile in
+ * the shadow atlas of the scene are shadowed through it.
  */
 typedef struct box_render_view_shadows_t {
     bool enabled;           /**< The view renders shadows and its scene has a directional light */
@@ -247,6 +322,11 @@ typedef struct box_render_view_shadows_t {
     float near_;            /**< View depth the first cascade starts at */
     float splits[BOX_RENDER_SHADOW_CASCADES]; /**< View depth each cascade ends at */
     float direction[3];     /**< Direction toward the light that casts the shadows */
+    bool spots;             /**< The view samples the spot light tiles of the shadow atlas of
+                             *   its scene: it renders shadows and is lit; filter_size,
+                             *   depth_bias and normal_offset apply, in texels of a tile */
+    uint32_t atlas;         /**< Handle of that atlas and its tile buffer, 0 for none */
+    uint32_t tiles;         /**< Tile records of that atlas */
 } box_render_view_shadows_t;
 
 /** What the sky view and aerial perspective passes of a view read besides the medium of the
@@ -593,7 +673,8 @@ typedef struct box_render_atmosphere_env_t {
 /** How a buffer is used, flags of box_render_buffer_desc_t */
 typedef enum box_render_buffer_usage_t {
     BOX_RENDER_BUFFER_INSTANCE = 1 << 0, /**< Per instance vertex data of batches */
-    BOX_RENDER_BUFFER_STORAGE = 1 << 1   /**< Read and written by compute shaders */
+    BOX_RENDER_BUFFER_STORAGE = 1 << 1,  /**< Read and written by compute shaders */
+    BOX_RENDER_BUFFER_UNIFORM = 1 << 2   /**< Bound as uniforms */
 } box_render_buffer_usage_t;
 
 /** The area of a ClipChildren element as shape2d.wgsl reads it from the clip buffer.
@@ -747,6 +828,8 @@ typedef struct box_render_packet_t {
     ecs_vec_t probes;       /**< box_render_probe_capture_t of the bake and reflection batches */
     ecs_vec_t reflections;  /**< box_render_reflect_batch_t, the reflection captures of the frame */
     ecs_vec_t particles;    /**< box_render_particle_pool_t, simulated after the scatters */
+    ecs_vec_t shadow_atlases; /**< box_render_shadow_atlas_t, the atlases with tiles */
+    ecs_vec_t shadow_tiles; /**< box_render_shadow_tile_t of those atlases */
     ecs_vec_t data;         /**< Bytes the resources and uploads point into */
     int32_t generation;     /**< Backend generation the extract built it for, the ring drops a
                              *   packet of an older generation instead of rendering it */
@@ -848,6 +931,9 @@ typedef struct box_render_gpu_stats_t {
                                  *   queries */
     int32_t atmosphere_passes[BOX_RENDER_ATMOS_PASSES]; /**< Passes whose GPU time
                                  *   atmosphere_ns holds */
+    int32_t shadow_tiles;       /**< Shadow atlas tiles rendered */
+    int32_t shadow_draws;       /**< Draw calls recorded in the shadow passes of the cascades
+                                 *   and the atlas tiles, not those of the probe captures */
 } box_render_gpu_stats_t;
 
 /** GPU time of the probe captures the GPU backend measured since the last time it was taken */
@@ -1205,6 +1291,22 @@ bool box_render_gpu_cull_frustum(
     int32_t cascade,
     box_render_cull_stats_t *out);
 
+/** Read back what the cull pass kept of the shadow casters of one tile of the shadow atlases of
+ * the last packet the GPU backend rendered.
+ *
+ * Only call this when the main thread renders, after box_render_sync, as
+ * box_render_gpu_cull_stats.
+ *
+ * @param world The world
+ * @param tile Index of the tile in the shadow tiles of the packet
+ * @param out Receives the casters tested and drawn in tested and visible
+ * @return Whether the last packet culled the tile
+ */
+bool box_render_gpu_cull_tile(
+    ecs_world_t *world,
+    int32_t tile,
+    box_render_cull_stats_t *out);
+
 /** Take the culling status of the views the GPU backend read back since the last call.
  *
  * @param world The world
@@ -1378,6 +1480,8 @@ typedef struct box_render_lights_stats_t {
     int32_t scenes;             /**< Scenes that have lights */
     int32_t lights;             /**< Lights that light something, of every scene */
     int64_t upload_bytes;       /**< Bytes the last extract uploaded into light buffers */
+    int32_t shadow_tiles;       /**< Shadow atlas tiles of every scene */
+    int32_t shadow_dropped;     /**< Shadow casting lights a view sees that got no tile */
 } box_render_lights_stats_t;
 
 /** Register the system that sends the lights of every scene and the lights of every view.
@@ -1619,8 +1723,9 @@ ecs_entity_t box_render_scene_field(
 
 /** Register the system that resolves the shadow settings of every view of the packet.
  *
- * Runs after the light extract, because a view only renders shadows when its scene has a
- * directional light.
+ * Runs after the light extract, because a view only renders cascades when its scene has a
+ * directional light and samples the spot light tiles the light extract allocated in the shadow
+ * atlas of its scene.
  *
  * @param world The world
  */
@@ -1689,6 +1794,97 @@ void box_render_shadow_cascade(
     int32_t resolution,
     float distance,
     box_render_cascade_t *out);
+
+/** Resolve the settings of a shadow atlas: resolution rounds down to a power of two within
+ * BOX_RENDER_SHADOW_ATLAS_MIN and BOX_RENDER_SHADOW_ATLAS_MAX, min_tile to a power of two
+ * within 1 and the resolution.
+ *
+ * @param in The settings of a scene, NULL for the defaults
+ * @param out Receives the resolved settings
+ */
+void box_render_shadow_atlas_settings(
+    const ShadowAtlas *in,
+    ShadowAtlas *out);
+
+/** Get the tile edge a light asks for: its shadow_resolution rounded down to a power of two
+ * within the min_tile and the resolution of an atlas.
+ *
+ * @param resolution SpotLight.shadow_resolution
+ * @param atlas Resolved settings of the atlas
+ * @return The edge in texels
+ */
+int32_t box_render_shadow_request_size(
+    int32_t resolution,
+    const ShadowAtlas *atlas);
+
+/** A light that asks for a tile of a shadow atlas */
+typedef struct box_render_shadow_request_t {
+    ecs_entity_t light;     /**< Entity of the light, which breaks ties */
+    int32_t size;           /**< Tile edge it asks for, a power of two */
+    float distance;         /**< Distance from the nearest camera to its range sphere, 0 inside */
+} box_render_shadow_request_t;
+
+/** Where a light got its tile */
+typedef struct box_render_shadow_place_t {
+    int32_t size;           /**< Edge of the tile in texels, 0 for no tile */
+    int32_t x;              /**< Left column of the tile in the atlas */
+    int32_t y;              /**< Top row of the tile in the atlas */
+} box_render_shadow_place_t;
+
+/** Allocate the tiles of the lights of a shadow atlas.
+ *
+ * Lights are taken nearest first, then larger request, then lower entity; at most
+ * BOX_RENDER_SHADOW_TILES of them. Each gets the largest power of two up to its request that
+ * fits in the area still free, at least min_tile, else no tile. Tiles are then placed by size
+ * (largest first), then entity, in quadtree (Morton) order, which fits whenever their area does
+ * and depends only on the set of lights and their sizes.
+ *
+ * @param requests The lights, in any order
+ * @param count Number of lights
+ * @param atlas Resolved settings of the atlas
+ * @param out Receives where each light got its tile, in the order of requests
+ * @param dropped Receives the lights that got no tile, NULL for none
+ * @return Tiles allocated
+ */
+int32_t box_render_shadow_allocate(
+    const box_render_shadow_request_t *requests,
+    int32_t count,
+    const ShadowAtlas *atlas,
+    box_render_shadow_place_t *out,
+    int32_t *dropped);
+
+/** Write the tile record of a spot light: the reversed Z perspective along its axis from
+ * near max(0.005 range, 0.001) to far max(range, 2 near), over its outer angle widened by the
+ * reach of the widest shadow filter, at most BOX_RENDER_SHADOW_SPOT_ANGLE_MAX.
+ *
+ * @param position World position of the light
+ * @param direction Normalized direction it shines in
+ * @param range Range of the light
+ * @param outer Outer half angle in degrees
+ * @param place The tile, with a size
+ * @param resolution Edge of the atlas in texels
+ * @param out Receives the record
+ */
+void box_render_shadow_spot(
+    const float *position,
+    const float *direction,
+    float range,
+    float outer,
+    const box_render_shadow_place_t *place,
+    int32_t resolution,
+    box_render_shadow_record_t *out);
+
+/** Get the shadow atlas of a scene as the light extract of this frame left it.
+ *
+ * @param state The state of the light extract, see box_render_lights_state
+ * @param scene The scene, 0 for the default scene
+ * @param handle Receives the handle of the atlas and its tile buffer, 0 for none
+ * @return Tile records of the atlas, 0 when the scene has none
+ */
+uint32_t box_render_lights_atlas(
+    const void *state,
+    ecs_entity_t scene,
+    uint32_t *handle);
 
 /** Register the system that keeps the irradiance probe volume of every scene with LightBake.
  *

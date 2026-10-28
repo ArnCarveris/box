@@ -701,7 +701,9 @@ WGPUBindGroup box_gpu_light_group_with(
     cube = cube ? cube : gpu->no_reflection;
     box_gpu_buffer_t *clips = ecs_map_get_deref(
         &gpu->buffers, box_gpu_buffer_t, BOX_RENDER_BUFFER_CLIPS);
-    WGPUBindGroupEntry entries[14] = {
+    WGPUBuffer tiles = NULL;
+    const box_gpu_atlas_t *atlas = t ? box_gpu_atlas_of(gpu, v, &tiles) : NULL;
+    WGPUBindGroupEntry entries[16] = {
         { .binding = 0, .buffer = uniforms, .size = sizeof(box_gpu_view_uniforms_t) },
         { .binding = 1, .buffer = lights, .size = size },
         { .binding = 2, .buffer = clusters, .size = wgpuBufferGetSize(clusters) },
@@ -719,13 +721,22 @@ WGPUBindGroup box_gpu_light_group_with(
             .binding = 11,
             .buffer = clips ? clips->buffer : gpu->no_clips,
             .size = clips ? clips->size : sizeof(box_render_clip_t)
+        },
+        [14] = {
+            .binding = 14,
+            .textureView = atlas ? atlas->view : gpu->no_atlas_view
+        },
+        [15] = {
+            .binding = 15,
+            .buffer = atlas ? tiles : gpu->no_tiles,
+            .size = BOX_GPU_ATLAS_TILES_SIZE
         }
     };
     box_gpu_atmosphere_bindings(gpu, t, v, &entries[9]);
     box_gpu_environment_bindings(gpu, t ? v : NULL, &entries[12]);
     WGPUBindGroupDescriptor desc = {
         .layout = gpu->view_layout,
-        .entryCount = 14,
+        .entryCount = 16,
         .entries = entries
     };
 

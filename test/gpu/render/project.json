@@ -389,6 +389,23 @@
                 ]
             },
             {
+                "id": "SpotShadow",
+                "testcases": [
+                    "caster_shadows_floor",
+                    "shadows_false_unshadowed",
+                    "view_shadows_disabled_unshadowed",
+                    "no_shadow_caster_casts_none",
+                    "baked_light_has_no_tile",
+                    "moved_light_moves_shadow",
+                    "atlas_full_drops_farthest",
+                    "light_view_culls_casters",
+                    "two_views_render_atlas_once",
+                    "tile_change_rebakes_nothing",
+                    "atlas_resolution_change",
+                    "device_loss_recreates_atlas"
+                ]
+            },
+            {
                 "id": "Shadow",
                 "testcases": [
                     "splits_uniform",

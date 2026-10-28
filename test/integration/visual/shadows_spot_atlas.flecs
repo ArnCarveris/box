@@ -1,0 +1,116 @@
+// More shadowed spot lights than the atlas holds at their requested size: a 512 atlas, the
+// front row of lamps asks for 256 tiles and the back row for 512. The three front lamps, nearest
+// to the camera, get their 256; the middle back lamp is shrunk to the 256 left and the two outer
+// back lamps get no tile and light their posts unshadowed. Each spot shines down from behind
+// a post, whose shadow falls toward the camera.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+
+camera {
+  Position: {0, 7, 11}
+  Rotation: {-0.55, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {8, 8, 12, 255}}, shadows: {enabled: true}}
+}
+
+$ {
+  AmbientLight: {intensity: 0.1}
+  ShadowAtlas: {resolution: 512, min_tile: 64}
+}
+
+floor {
+  Position: {0, -0.1, -2}
+  Box: {18, 0.2, 14}
+  Rgb: {200, 200, 200}
+}
+
+post_a {
+  Position: {-5, 0.8, 2}
+  Box: {0.5, 1.6, 0.5}
+  Rgb: {230, 230, 230}
+}
+
+post_b {
+  Position: {0, 0.8, 2}
+  Box: {0.5, 1.6, 0.5}
+  Rgb: {230, 230, 230}
+}
+
+post_c {
+  Position: {5, 0.8, 2}
+  Box: {0.5, 1.6, 0.5}
+  Rgb: {230, 230, 230}
+}
+
+post_d {
+  Position: {-5, 0.8, -4}
+  Box: {0.5, 1.6, 0.5}
+  Rgb: {230, 230, 230}
+}
+
+post_e {
+  Position: {0, 0.8, -4}
+  Box: {0.5, 1.6, 0.5}
+  Rgb: {230, 230, 230}
+}
+
+post_f {
+  Position: {5, 0.8, -4}
+  Box: {0.5, 1.6, 0.5}
+  Rgb: {230, 230, 230}
+}
+
+lamp_a {
+  Position: {-5, 4, 0.8}
+  Rotation: {1.3, 0, 0}
+  SpotLight: {intensity: 20 * flecs.script.math.PI, range: 8, inner_angle: 15, outer_angle: 28,
+    shadows: true, shadow_resolution: 256}
+  Rgb: {255, 255, 255}
+}
+
+lamp_b {
+  Position: {0, 4, 0.8}
+  Rotation: {1.3, 0, 0}
+  SpotLight: {intensity: 20 * flecs.script.math.PI, range: 8, inner_angle: 15, outer_angle: 28,
+    shadows: true, shadow_resolution: 256}
+  Rgb: {255, 170, 80}
+}
+
+lamp_c {
+  Position: {5, 4, 0.8}
+  Rotation: {1.3, 0, 0}
+  SpotLight: {intensity: 20 * flecs.script.math.PI, range: 8, inner_angle: 15, outer_angle: 28,
+    shadows: true, shadow_resolution: 256}
+  Rgb: {80, 220, 255}
+}
+
+lamp_d {
+  Position: {-5, 4, -5.2}
+  Rotation: {1.3, 0, 0}
+  SpotLight: {intensity: 20 * flecs.script.math.PI, range: 8, inner_angle: 15, outer_angle: 28,
+    shadows: true, shadow_resolution: 512}
+  Rgb: {255, 120, 200}
+}
+
+lamp_e {
+  Position: {0, 4, -5.2}
+  Rotation: {1.3, 0, 0}
+  SpotLight: {intensity: 20 * flecs.script.math.PI, range: 8, inner_angle: 15, outer_angle: 28,
+    shadows: true, shadow_resolution: 512}
+  Rgb: {140, 255, 120}
+}
+
+lamp_f {
+  Position: {5, 4, -5.2}
+  Rotation: {1.3, 0, 0}
+  SpotLight: {intensity: 20 * flecs.script.math.PI, range: 8, inner_angle: 15, outer_angle: 28,
+    shadows: true, shadow_resolution: 512}
+  Rgb: {255, 240, 140}
+}

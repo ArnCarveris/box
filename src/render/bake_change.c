@@ -499,6 +499,41 @@ void box_bake_light_record_fini(
     ecs_vec_fini_t(NULL, &r->scratch, box_render_light_t);
 }
 
+/** Check whether two light records describe the same light. The index of the shadow tile of
+ * a light is not part of it, so a change of the tiles rebakes and recaptures nothing.
+ *
+ * @param a The first light
+ * @param b The second light
+ * @return Whether the lights are the same
+ */
+static bool box_bake_light_same(
+    const box_render_light_t *a,
+    const box_render_light_t *b)
+{
+    return !ecs_os_memcmp(a, b, (ecs_size_t)BOX_RENDER_LIGHT_SHADING);
+}
+
+/** Check whether two lists of light records describe the same lights.
+ *
+ * @param a The first lights
+ * @param b The second lights
+ * @param count Lights of each list
+ * @return Whether every light is the same, see box_bake_light_same
+ */
+static bool box_bake_lights_same(
+    const box_render_light_t *a,
+    const box_render_light_t *b,
+    int32_t count)
+{
+    bool result = true;
+    int32_t i;
+    for (i = 0; i < count && result; i ++) {
+        result = box_bake_light_same(&a[i], &b[i]);
+    }
+
+    return result;
+}
+
 /** Pass the lights that differ between a record and a frame to mark, matched by their entity:
  * a light added, removed or changed, its bake mode included, counts in both its old and new
  * place.
@@ -531,8 +566,7 @@ static void box_bake_lights_diff(
             mark(ctx, &l->lights[i]);
         } else {
             const box_render_light_t *was = &before[*old];
-            if (ecs_os_memcmp_t(was, &l->lights[i], box_render_light_t) ||
-                modes[*old] != l->modes[i])
+            if (!box_bake_light_same(was, &l->lights[i]) || modes[*old] != l->modes[i])
             {
                 mark(ctx, was);
                 mark(ctx, &l->lights[i]);
@@ -639,7 +673,7 @@ static const box_render_light_t* box_bake_lights_hold(
     for (i = 0; i < now->count; i ++) {
         ecs_map_val_t *old = ecs_map_get(map, now->entities[i]);
         if (!old || (now->lights[i].range > 0) || modes[*old] != now->modes[i] ||
-            !ecs_os_memcmp_t(&before[*old], &now->lights[i], box_render_light_t))
+            box_bake_light_same(&before[*old], &now->lights[i]))
         {
             continue;
         }
@@ -677,8 +711,7 @@ void box_bake_lights_compare(
         (ecs_os_memcmp(r->view.ambient_sky, view->ambient_sky, ECS_SIZEOF(float) * 3) ||
         ecs_os_memcmp(r->view.ambient_ground, view->ambient_ground, ECS_SIZEOF(float) * 3));
     bool same = count == known && (!count ||
-        (!ecs_os_memcmp(now->lights, ecs_vec_first(&r->lights),
-            count * ECS_SIZEOF(box_render_light_t)) &&
+        (box_bake_lights_same(now->lights, ecs_vec_first(&r->lights), count) &&
         !ecs_os_memcmp(now->entities, ecs_vec_first(&r->entities),
             count * ECS_SIZEOF(ecs_entity_t)) &&
         !ecs_os_memcmp(now->modes, ecs_vec_first(&r->modes), count)));

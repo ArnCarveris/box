@@ -1,6 +1,6 @@
 /**
  * @file Shadow.c
- * @brief Benchmarks for the cost of the cascaded shadow pass on the GPU.
+ * @brief Benchmarks for the cost of the cascaded shadow pass and the spot light shadow atlas.
  *
  * A headless world renders 100k static boxes on a floor into a 1280x720 offscreen surface on
  * the main thread, and waits for the GPU after every frame by reading back a word of the
@@ -17,14 +17,20 @@
 /** Boxes along z */
 #define BENCH_SHADOW_Z (250)
 
-/** Render frames of 100k boxes lit by a sun, with or without shadows.
+/** Spot lights of the spot case, on a 4 by 4 grid */
+#define BENCH_SHADOW_SPOTS (16)
+
+/** Render frames of 100k boxes lit by a sun, with or without shadows, and optionally by
+ * BENCH_SHADOW_SPOTS shadowed spot lights.
  *
  * @param b The benchmark
  * @param shadows Whether the view renders shadows
+ * @param spots Whether 16 spot lights with shadows light the boxes too
  */
 static void bench_shadow(
     bench_t *b,
-    bool shadows)
+    bool shadows,
+    bool spots)
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -53,6 +59,16 @@ static void bench_shadow(
     ecs_set(world, floor, Box, {204, 0.2f, 129});
     ecs_set(world, floor, Rgb, {90, 96, 104});
     int32_t x, z;
+    for (x = 0; spots && x < BENCH_SHADOW_SPOTS; x ++) {
+        ecs_entity_t spot = ecs_new(world);
+        ecs_set(world, spot, Position, {(float)(x % 4) * 40.0f - 60.0f, 12,
+            (float)(x / 4) * 30.0f - 45.0f});
+        ecs_set(world, spot, Rotation, {1.3f, 0, 0});
+        ecs_set(world, spot, SpotLight, {.intensity = 200 * GLM_PIf, .range = 30,
+            .inner_angle = 30, .outer_angle = 40, .shadows = true,
+            .shadow_resolution = 512});
+    }
+
     for (x = 0; x < BENCH_SHADOW_X; x ++) {
         for (z = 0; z < BENCH_SHADOW_Z; z ++) {
             ecs_entity_t e = ecs_new(world);
@@ -87,12 +103,19 @@ void Shadow_off_100k(
     bench_t *b)
 {
     // lighting/shadows
-    bench_shadow(b, false);
+    bench_shadow(b, false, false);
 }
 
 void Shadow_on_100k(
     bench_t *b)
 {
     // lighting/shadows
-    bench_shadow(b, true);
+    bench_shadow(b, true, false);
+}
+
+void Shadow_spots_16_100k(
+    bench_t *b)
+{
+    // lighting/shadows
+    bench_shadow(b, true, true);
 }

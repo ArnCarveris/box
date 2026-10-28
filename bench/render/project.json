@@ -71,7 +71,8 @@
                 "id": "Shadow",
                 "benchcases": [
                     "off_100k",
-                    "on_100k"
+                    "on_100k",
+                    "spots_16_100k"
                 ]
             },
             {

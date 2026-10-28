@@ -261,6 +261,31 @@
                 ]
             },
             {
+                "id": "ShadowAtlas",
+                "testcases": [
+                    "script_defaults",
+                    "c_defaults",
+                    "settings_resolve",
+                    "every_light_fits",
+                    "over_budget_shrinks_then_drops",
+                    "shrinks_to_min_tile",
+                    "camera_move_keeps_placement",
+                    "same_in_any_input_order",
+                    "ties_by_size_then_entity",
+                    "at_most_64_tiles",
+                    "spot_projection",
+                    "extract_assigns_tile",
+                    "extract_shadows_false_no_tile",
+                    "extract_view_shadows_disabled_no_tile",
+                    "extract_baked_light_no_tile",
+                    "extract_unseen_light_no_tile",
+                    "extract_uploads_on_change",
+                    "extract_released_without_tiles",
+                    "extract_resolution_change",
+                    "extract_full_atlas_drops"
+                ]
+            },
+            {
                 "id": "Tonemap",
                 "setup": true,
                 "testcases": [
