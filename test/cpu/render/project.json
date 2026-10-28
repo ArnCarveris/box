@@ -247,6 +247,20 @@
                 ]
             },
             {
+                "id": "InstanceStreams",
+                "testcases": [
+                    "dynamic_transform_uploads_transforms",
+                    "dynamic_material_uploads_shading",
+                    "both_tags_upload_both",
+                    "dynamic_material_parent_uploads_shading",
+                    "static_change_scatters_its_stream",
+                    "reparent_writes_both",
+                    "scene_change_writes_both",
+                    "toggle_dynamic_transform",
+                    "dynamic_shape2d_keeps_clip"
+                ]
+            },
+            {
                 "id": "Tonemap",
                 "setup": true,
                 "testcases": [

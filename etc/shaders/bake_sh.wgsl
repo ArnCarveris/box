@@ -120,7 +120,7 @@ struct CullJob {
 @group(0) @binding(15) var source_sampler: sampler;
 @group(0) @binding(16) var prefiltered: texture_storage_2d_array<rgba16float, write>;
 @group(0) @binding(17) var environment_cube: texture_cube<f32>;
-@group(1) @binding(0) var<storage, read> instances: array<Instance>;
+@group(1) @binding(0) var<storage, read> transforms: array<InstanceTransform>;
 @group(1) @binding(1) var<storage, read> surface_assets: array<vec4f>;
 
 const GROUP: u32 = 64u;
@@ -355,7 +355,7 @@ fn project(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_index)
 // sees along axis a = f / 2 where the depth along a is at least the distance along the other
 // two axes; the box reaches into it when it does so for each of them on its nearest corner.
 fn cull_faces(slot: u32, eye: vec3f) -> u32 {
-    let m = instances[slot].model;
+    let m = instance_model(transforms[slot]);
     let c0 = m[0].xyz;
     let c1 = m[1].xyz;
     let c2 = m[2].xyz;

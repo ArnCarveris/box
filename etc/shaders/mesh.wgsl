@@ -6,7 +6,8 @@
 // The ORM layer holds the glTF occlusion (red, of the indirect light only), roughness (green)
 // and metallic (blue) multipliers.
 // The cull pass writes the slots of the visible instances, which step per instance; the
-// instance data is read from the instance buffer of the batch (group 2). Indirect light comes
+// instance data is read from the transform, shading and surface streams of the instance page of
+// the batch (group 2). Indirect light comes
 // from the hemisphere ambient, or for a view that samples baked lighting from the irradiance
 // probe volume of its scene (group 3). The indirect specular light of a view that samples
 // reflection probes comes from the prefiltered cubemaps of the probes its clusters list. A view
@@ -59,8 +60,10 @@ const MIN_ROUGHNESS: f32 = 0.045;
 @group(0) @binding(12) var environment_cube: texture_cube<f32>;
 @group(0) @binding(13) var<uniform> environment_sh: array<vec4f, 9>;
 
-@group(2) @binding(0) var<storage, read> instances: array<Instance>;
+@group(2) @binding(0) var<storage, read> transforms: array<InstanceTransform>;
 @group(2) @binding(1) var<storage, read> surface_assets: array<vec4f>;
+@group(2) @binding(2) var<storage, read> shadings: array<InstanceShading>;
+@group(2) @binding(3) var<storage, read> surfaces: array<SurfaceData>;
 
 // Grid of the probe volume: probe (x, y, z) sits at origin.xyz + (x, y, z) * origin.w, x
 // fastest in the probe buffer. size.w is 0 for the 1x1x1 volume of views that keep the
@@ -127,9 +130,9 @@ struct VertexOut {
 };
 
 @vertex fn vs(v: VertexIn) -> VertexOut {
-    let inst = instances[v.slot];
-    surface_data = inst.surface;
-    let model = inst.model;
+    let shading = shadings[v.slot];
+    surface_data = surfaces[v.slot];
+    let model = instance_model(transforms[v.slot]);
     let c0 = model[0].xyz;
     let c1 = model[1].xyz;
     let c2 = model[2].xyz;
@@ -137,19 +140,19 @@ struct VertexOut {
     let flip = select(1.0, -1.0, dot(c0, cross(c1, c2)) < 0.0);
     var position = v.position;
     var normal = v.normal;
-    if (inst.surface.p[19].x != 0.0) {
+    if (surface_data.p[19].x != 0.0) {
         position = v.position;
         normal = v.normal;
-    } else if (inst.surface.p[0].x == 7.0) {
-        position.y *= inst.surface.p[1].y;
-    } else if (inst.surface.p[0].x == 1.0 && v.position.z < 2.0) {
+    } else if (surface_data.p[0].x == 7.0) {
+        position.y *= surface_data.p[1].y;
+    } else if (surface_data.p[0].x == 1.0 && v.position.z < 2.0) {
         let sample = surface_sweep_sample(i32(v.position.z), v.position.x, v.position.y);
         position = sample.position;
         normal = sv_unit(sample.normal);
         if (sv_dot(sample.normal, sample.normal) < 0.000000000001) {
             normal = surface_normal(i32(v.position.z), v.position.x, v.position.y);
         }
-    } else if (inst.surface.p[0].x != 0.0) {
+    } else if (surface_data.p[0].x != 0.0) {
         position = surface_position(i32(v.position.z), v.position.x, v.position.y);
         normal = surface_normal(i32(v.position.z), v.position.x, v.position.y);
     }
@@ -158,19 +161,19 @@ struct VertexOut {
     o.pos = view.view_proj * world;
     o.world = world.xyz;
     o.normal = cofactor * normal * flip;
-    o.color = inst.color;
-    o.emissive = inst.emissive.rgb;
-    o.material = inst.material.xy;
-    o.cutoff = inst.material.z;
-    o.uv = v.uv * inst.uv.xy + inst.uv.zw;
-    if (inst.surface.p[0].x != 0.0) {
+    o.color = shading.color;
+    o.emissive = shading.emissive.rgb;
+    o.material = shading.material.xy;
+    o.cutoff = shading.material.z;
+    o.uv = v.uv * shading.uv.xy + shading.uv.zw;
+    if (surface_data.p[0].x != 0.0) {
         var region = i32(v.position.z);
-        if (inst.surface.p[0].x == 7.0) {
+        if (surface_data.p[0].x == 7.0) {
             region = select(0, 1, v.uv.x >= 2.0);
             if (abs(v.normal.y) > 0.5) {
                 region = 2;
             } else if (region == 1) {
-                o.uv.x -= 2.0 * inst.uv.x;
+                o.uv.x -= 2.0 * shading.uv.x;
             }
         }
         var material_region = 2;
@@ -179,12 +182,12 @@ struct VertexOut {
         } else if (region == 2 || region == 3 || region == 8 || region == 9) {
             material_region = 3;
         }
-        if (inst.surface.p[19].x != 0.0) {
+        if (surface_data.p[19].x != 0.0) {
             material_region = i32(surface_assets[v.vertex / 4u][v.vertex % 4u]);
         }
-        let packed = bitcast<u32>(inst.surface.p[21][material_region]);
+        let packed = bitcast<u32>(surface_data.p[21][material_region]);
         if ((packed & 0x80000000u) != 0u) {
-            let tint = unpack4x8unorm(bitcast<u32>(inst.surface.p[20][material_region]));
+            let tint = unpack4x8unorm(bitcast<u32>(surface_data.p[20][material_region]));
             let linear = select(pow((tint.rgb + vec3f(0.055)) / 1.055, vec3f(2.4)),
                 tint.rgb / 12.92, tint.rgb <= vec3f(0.04045));
             o.color *= vec4f(linear, tint.a);

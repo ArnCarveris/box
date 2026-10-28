@@ -1,6 +1,6 @@
 /**
  * @file Material.c
- * @brief Tests for the material defaults the draws write into the instance data.
+ * @brief Tests for the material defaults the draws write into the shading of the instances.
  */
 
 #include <box.h>
@@ -10,7 +10,7 @@
 
 void Material_default_roughness_without_material(void) {
     // materials/pbr
-    box_render_instance_t inst = {0};
+    box_render_shading_t inst = {0};
     box_draw_material_t material = {0};
     box_draws_material(&inst, &material);
     test_flt(inst.material[0], 0);
@@ -51,7 +51,7 @@ void Material_default_roughness_metallic_only(void) {
     test_flt(pbr->metallic, 0);
     test_flt(pbr->roughness, 0.3f);
 
-    box_render_instance_t inst = {0};
+    box_render_shading_t inst = {0};
     box_draws_material(&inst, &(box_draw_material_t){
         .pbr = ecs_get(world, ecs_lookup(world, "metal"), PbrMaterial)});
     test_flt(inst.material[0], 1);
@@ -69,7 +69,7 @@ void Material_alpha_cutoff_instance(void) {
     test_flt(ecs_get(world, e, AlphaCutoff)->value, 0.5f);
     ecs_fini(world);
 
-    box_render_instance_t inst = {0};
+    box_render_shading_t inst = {0};
     AlphaCutoff mid = {0.3f}, high = {2}, low = {-1};
     box_draws_material(&inst, &(box_draw_material_t){ .fade = 1 });
     test_flt(inst.material[2], 0);

@@ -10,14 +10,21 @@
 #include <bake_test.h>
 #include "render.h"
 
-/** Bytes of one scatter entry: the slot and the instance */
-#define ENTRY ((int64_t)sizeof(uint32_t) + (int64_t)sizeof(box_render_instance_t))
+/** Bytes of one scatter entry of the transform stream: the slot and the transform */
+#define ENTRY ((int64_t)sizeof(uint32_t) + (int64_t)sizeof(box_render_transform_t))
 
 /** Slots of the smallest run, BOX_DRAWS_MIN_CAPACITY of the extract */
 #define MIN_RUN (64u)
 
-/** Bytes of one instance */
-#define STRIDE ((uint32_t)sizeof(box_render_instance_t))
+/** Bytes of one instance in the transform stream */
+#define STRIDE ((uint32_t)sizeof(box_render_transform_t))
+
+/** Bytes of one instance in every stream */
+#define INSTANCE ((uint32_t)(sizeof(box_render_transform_t) + sizeof(box_render_shading_t) + \
+    sizeof(box_render_surface_t)))
+
+/** Handle of the transform stream of a page */
+#define PAGE(index) (BOX_RENDER_BUFFER_FIRST + (uint32_t)(index) * BOX_RENDER_INSTANCE_STREAMS)
 
 /** Create a world that renders with a null backend and has a view.
  *
@@ -412,12 +419,12 @@ void InstanceStore_lowered_pages_spread(void) {
     for (i = 0; i < 6; i ++) {
         const box_render_batch_t *b = ecs_vec_get_t(
             &null->last.batches, box_render_batch_t, i);
-        test_uint(b->instances, BOX_RENDER_BUFFER_FIRST + (uint32_t)(i / 2));
+        test_uint(b->instances, PAGE(i / 2));
         test_uint(b->first_instance, (uint32_t)(i % 2) * 2);
     }
 
     for (i = 0; i < 3; i ++) {
-        test_int(buffer_ops(null, BOX_RENDER_CREATE, BOX_RENDER_BUFFER_FIRST + (uint32_t)i), 1);
+        test_int(buffer_ops(null, BOX_RENDER_CREATE, PAGE(i)), 1);
     }
 
     for (i = 0; i < 3; i ++) {
@@ -431,7 +438,7 @@ void InstanceStore_lowered_pages_spread(void) {
     for (i = 0; i < 3; i ++) {
         const box_render_scatter_t *sc = ecs_vec_get_t(
             &null->last.scatters, box_render_scatter_t, i);
-        test_uint(sc->buffer, BOX_RENDER_BUFFER_FIRST + (uint32_t)i);
+        test_uint(sc->buffer, PAGE(i));
         test_uint(sc->count, 1);
     }
 
@@ -446,9 +453,9 @@ void InstanceStore_lowered_pages_spread(void) {
     stats = frame(world);
     test_int(stats.batches, 4);
     test_int(stats.pages, 2);
-    test_int(buffer_ops(null, BOX_RENDER_DESTROY, BOX_RENDER_BUFFER_FIRST + 1), 1);
-    test_int(buffer_ops(null, BOX_RENDER_DESTROY, BOX_RENDER_BUFFER_FIRST), 0);
-    test_int(buffer_ops(null, BOX_RENDER_DESTROY, BOX_RENDER_BUFFER_FIRST + 2), 0);
+    test_int(buffer_ops(null, BOX_RENDER_DESTROY, PAGE(1)), 1);
+    test_int(buffer_ops(null, BOX_RENDER_DESTROY, PAGE(0)), 0);
+    test_int(buffer_ops(null, BOX_RENDER_DESTROY, PAGE(2)), 0);
 
     for (j = 0; j < 2; j ++) {
         shape_new(world, 30, (float)j, false);
@@ -457,7 +464,7 @@ void InstanceStore_lowered_pages_spread(void) {
     stats = frame(world);
     test_int(stats.pages, 3);
     test_uint(batch_of(null, 2) != NULL, true);
-    test_int(buffer_ops(null, BOX_RENDER_CREATE, BOX_RENDER_BUFFER_FIRST + 1), 1);
+    test_int(buffer_ops(null, BOX_RENDER_CREATE, PAGE(1)), 1);
 
     ecs_fini(world);
     box_render_null_free(null);
@@ -521,15 +528,15 @@ void InstanceStore_new_backend_sends_pages_again(void) {
     stats = frame(world);
     test_int(second->packets, 1);
     test_int(stats.pages, 2);
-    test_int(buffer_ops(second, BOX_RENDER_CREATE, BOX_RENDER_BUFFER_FIRST), 1);
-    test_int(buffer_ops(second, BOX_RENDER_CREATE, BOX_RENDER_BUFFER_FIRST + 1), 1);
+    test_int(buffer_ops(second, BOX_RENDER_CREATE, PAGE(0)), 1);
+    test_int(buffer_ops(second, BOX_RENDER_CREATE, PAGE(1)), 1);
     int64_t bytes;
-    test_int(page_uploads(second, &bytes), 4);
-    test_int(bytes, 4 * 2 * STRIDE);
+    test_int(page_uploads(second, &bytes), 4 * BOX_RENDER_INSTANCE_STREAMS);
+    test_int(bytes, 4 * 2 * INSTANCE);
     for (i = 0; i < 4; i ++) {
         const box_render_batch_t *b = ecs_vec_get_t(
             &second->last.batches, box_render_batch_t, i);
-        test_uint(b->instances, BOX_RENDER_BUFFER_FIRST + (uint32_t)(i / 2));
+        test_uint(b->instances, PAGE(i / 2));
         test_uint(b->first_instance, (uint32_t)(i % 2) * 2);
     }
 

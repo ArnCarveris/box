@@ -179,47 +179,51 @@ static void box_draws_text_key(
     key->blend = box_draws_blend(ecs_get(world, e, BlendMode), alpha, false);
     key->back_face = back_face ? (uint8_t)*back_face : (uint8_t)BackFaceCull;
     key->wrap = WrapClamp;
-    key->dynamic = ecs_has_id(world, e, DynamicTransform) ||
-        ecs_has_id(world, e, DynamicMaterial) ||
+    key->dynamic_transform = box_transform_dynamic(world, ecs_get_table(world, e));
+    key->dynamic_material = ecs_has_id(world, e, DynamicMaterial) ||
         ecs_get_target_for_id(world, e, EcsChildOf, DynamicMaterial) != 0;
 }
 
-/** Write the instance of a glyph: its quad in world space, the material and the atlas area.
+/** Write the instance of a glyph: its quad in world space into the transform, the material and
+ * the atlas area into the shading.
  *
- * @param out The instance
+ * @param transform_out The transform of the glyph, NULL to leave it
+ * @param shading_out The shading of the glyph, NULL to leave it
  * @param transform World transform of the text, NULL for the identity
  * @param g The glyph
  * @param material Material components of the text
  */
 static void box_draws_glyph(
-    box_render_instance_t *out,
+    box_render_transform_t *transform_out,
+    box_render_shading_t *shading_out,
     const WorldTransform *transform,
     const box_text_glyph_t *g,
     const box_draw_material_t *material)
 {
-    ecs_os_memset(&out->surface, 0, sizeof(out->surface));
     mat4 m;
-    int32_t i;
+    int32_t r;
     if (transform) {
         glm_mat4_copy(ECS_CONST_CAST(vec4*, transform->m), m);
     } else {
         glm_mat4_identity(m);
     }
 
-    box_draws_material(out, material);
-    for (i = 0; i < 4; i ++) {
-        out->model[0][i] = m[0][i] * g->width;
-        out->model[1][i] = m[1][i] * g->height;
-        out->model[2][i] = m[2][i];
-        out->model[3][i] = m[0][i] * g->x + m[1][i] * g->y + m[3][i];
+    for (r = 0; transform_out && r < 3; r ++) {
+        transform_out->rows[r][0] = m[0][r] * g->width;
+        transform_out->rows[r][1] = m[1][r] * g->height;
+        transform_out->rows[r][2] = m[2][r];
+        transform_out->rows[r][3] = m[0][r] * g->x + m[1][r] * g->y + m[3][r];
     }
 
-    out->emissive[3] = 0.0f;
-    out->material[0] = g->range;
-    out->material[1] = g->range;
-    out->material[2] = 0.0f;
-    out->material[3] = 0.0f;
-    ecs_os_memcpy(out->uv, g->uv, ECS_SIZEOF(g->uv));
+    if (shading_out) {
+        box_draws_material(shading_out, material);
+        shading_out->emissive[3] = 0.0f;
+        shading_out->material[0] = g->range;
+        shading_out->material[1] = g->range;
+        shading_out->material[2] = 0.0f;
+        shading_out->material[3] = 0.0f;
+        ecs_os_memcpy(shading_out->uv, g->uv, ECS_SIZEOF(g->uv));
+    }
 }
 
 /** Check whether the glyphs of a Text keep the batches their slots are in.
@@ -277,14 +281,16 @@ static float box_draws_text_spans_alpha(
 
 /** Write the instance of a glyph in the color of the span it falls in.
  *
- * @param out The instance
+ * @param transform_out The transform of the glyph, NULL to leave it
+ * @param shading_out The shading of the glyph, NULL to leave it
  * @param transform World transform of the text, NULL for the identity
  * @param g The glyph
  * @param material Material components of the text
  * @param color Display encoded color of the span, NULL for the color of the entity
  */
 static void box_draws_glyph_span(
-    box_render_instance_t *out,
+    box_render_transform_t *transform_out,
+    box_render_shading_t *shading_out,
     const WorldTransform *transform,
     const box_text_glyph_t *g,
     const box_draw_material_t *material,
@@ -294,7 +300,7 @@ static void box_draws_glyph_span(
     Rgb rgb;
     Opacity opacity;
     if (!color) {
-        box_draws_glyph(out, transform, g, material);
+        box_draws_glyph(transform_out, shading_out, transform, g, material);
         goto done;
     }
 
@@ -304,7 +310,7 @@ static void box_draws_glyph_span(
     opacity.value *= (float)color->a / 255.0f;
     m.color = &rgb;
     m.opacity = &opacity;
-    box_draws_glyph(out, transform, g, &m);
+    box_draws_glyph(transform_out, shading_out, transform, g, &m);
 done:
     return;
 }
@@ -312,7 +318,8 @@ done:
 void box_draws_text_update(
     ecs_world_t *world,
     box_render_draws_t *d,
-    ecs_entity_t e)
+    ecs_entity_t e,
+    uint8_t kinds)
 {
     const TextGlyphs *tg = ecs_get(world, e, TextGlyphs);
     bool drawn = tg && ecs_has(world, e, Text) && !ecs_has_id(world, e, EcsPrefab);
@@ -342,6 +349,7 @@ void box_draws_text_update(
     box_draws_text_key(world, d, e, alpha, &key);
     TextSlots *ts = ecs_get_mut(world, e, TextSlots);
     if (!box_draws_text_fits(d, ts, glyphs, count, &key)) {
+        kinds = BOX_DRAW_ALL;
         box_draws_text_remove(world, d, e);
         for (i = 0; i < count; i ++) {
             key.atlas = glyphs[i].page;
@@ -355,22 +363,27 @@ void box_draws_text_update(
 
     const WorldTransform *transform = ecs_get(world, e, WorldTransform);
     float layer = count ? box_draws_layer(world, e, true) : 0.0f;
-    float clip = count ? (float)box_draws_clip_of(world, d, e) : 0.0f;
+    material.clip = count ? box_draws_clip_of(world, d, e) : 0;
     for (i = 0; i < count; i ++) {
         const box_draw_glyph_slot_t *at = ecs_vec_get_t(&ts->slots, box_draw_glyph_slot_t, i);
         box_draw_batch_t *b = box_draws_batch(d, at->batch);
-        box_render_instance_t *inst = ecs_vec_get_t(
-            &b->instances, box_render_instance_t, at->slot);
+        uint8_t written = kinds | box_draws_dynamic_kinds(b);
+        box_render_transform_t *t = written & BOX_DRAW_TRANSFORM
+            ? box_draws_slot_transform(b, at->slot) : NULL;
+        box_render_shading_t *sh = written & BOX_DRAW_SHADING
+            ? box_draws_slot_shading(b, at->slot) : NULL;
         if (spans) {
-            box_draws_glyph_span(inst, transform, &glyphs[i], &material,
+            box_draws_glyph_span(t, sh, transform, &glyphs[i], &material,
                 box_text_span_color(spans, length, glyphs[i].offset));
         } else {
-            box_draws_glyph(inst, transform, &glyphs[i], &material);
+            box_draws_glyph(t, sh, transform, &glyphs[i], &material);
         }
 
-        box_draws_lift(inst, transform, layer);
-        inst->model[0][3] = clip;
-        box_draws_slot_changed(b, at->slot);
+        if (t) {
+            box_draws_lift(t, transform, layer);
+        }
+
+        box_draws_slot_changed(b, at->slot, kinds & BOX_DRAW_BOTH);
     }
 }
 
@@ -382,7 +395,7 @@ void box_draws_text_dynamic(
     int32_t i;
     while (ecs_query_next(&it)) {
         for (i = 0; i < it.count; i ++) {
-            box_draws_mark(world, d, it.entities[i]);
+            box_draws_mark(world, d, it.entities[i], 0);
         }
     }
 
@@ -390,7 +403,7 @@ void box_draws_text_dynamic(
     while (ecs_query_next(&it)) {
         int32_t count = box_transform_dynamic(world, it.table) ? 0 : it.count;
         for (i = 0; i < count; i ++) {
-            box_draws_mark(world, d, it.entities[i]);
+            box_draws_mark(world, d, it.entities[i], 0);
         }
     }
 }

@@ -132,6 +132,8 @@ typedef struct box_gpu_material_t {
 /** Bind group of an instance page with the surface assets of a mesh that has them */
 typedef struct box_gpu_instance_group_t {
     uint32_t mesh;                  /**< Handle of the mesh */
+    bool shading;                   /**< It binds the shading stream, instance_layout, else
+                                     *   transform_layout */
     WGPUBuffer assets;              /**< Surface assets of the mesh it binds, held */
     WGPUBindGroup group;            /**< The bind group */
 } box_gpu_instance_group_t;
@@ -141,10 +143,13 @@ typedef struct box_gpu_buffer_t {
     WGPUBuffer buffer;              /**< The buffer */
     uint64_t size;                  /**< Bytes of the buffer */
     uint32_t usage;                 /**< box_render_buffer_usage_t flags */
-    WGPUBindGroup instances;        /**< Binds it as the instance page of the draws of meshes
-                                     *   without surface assets, made on use */
-    ecs_vec_t mesh_groups;          /**< box_gpu_instance_group_t, binds it with the surface
-                                     *   assets of a mesh that has them, made on use */
+    WGPUBindGroup instances;        /**< Binds the streams of the instance page whose transform
+                                     *   stream it is for the draws of meshes without surface
+                                     *   assets (instance_layout), made on use */
+    WGPUBindGroup transforms;       /**< The same without the shading stream, for the passes
+                                     *   that read no material (transform_layout) */
+    ecs_vec_t mesh_groups;          /**< box_gpu_instance_group_t, binds the page with the
+                                     *   surface assets of a mesh that has them, made on use */
     int64_t counted;                /**< History ranges pass that last counted its words */
     uint64_t version;               /**< Write that last changed it, unique across buffers */
 } box_gpu_buffer_t;
@@ -545,7 +550,11 @@ typedef struct box_gpu_t {
     WGPUTextureView capture_shadow_layer; /**< View the casters render into */
     WGPUBuffer capture_shadow_buffer; /**< Matrix of the cascade of the captures */
     WGPUBindGroup capture_shadow_group; /**< Binds the matrix to the shadow pipeline */
-    WGPUBindGroupLayout instance_layout; /**< Binds an instance page and surface assets */
+    WGPUBindGroupLayout instance_layout; /**< Binds the streams of an instance page and surface
+                                     *   assets: 0 transforms, 1 surface assets, 2 shading,
+                                     *   3 surfaces; the forward pass and alpha tested casters */
+    WGPUBindGroupLayout transform_layout; /**< instance_layout without the shading stream: the
+                                     *   cull, the shadow casters and the capture cull */
     WGPUBuffer no_assets;           /**< One zero vec4, the surface assets of the draws of
                                      *   meshes without any */
     box_gpu_cull_t cull;            /**< Cull pass state */
@@ -1739,22 +1748,43 @@ void box_gpu_cull_init(
 void box_gpu_cull_fini(
     box_gpu_t *gpu);
 
+/** Create the bind group layouts of the instance pages: instance_layout binds the transform
+ * stream (0), the surface assets of the mesh (1), the shading stream (2) and the surface stream
+ * (3); transform_layout every binding but the shading stream. Only the transform stream is
+ * visible to compute passes.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_instance_layouts_init(
+    box_gpu_t *gpu);
+
+/** Release the bind group layouts of the instance pages.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_instance_layouts_fini(
+    box_gpu_t *gpu);
+
 /** Get the bind group of an instance page for the draws of a mesh, made on first use.
  *
  * The draws of every mesh without surface assets share one group per page, so a pass sets it
- * once per page; a mesh with surface assets has a group of its own per page.
+ * once per page; a mesh with surface assets has a group of its own per page. The groups live
+ * with the transform stream of the page and are released when any stream of the page is
+ * created again or destroyed.
  *
  * @param gpu The backend
- * @param b The page
+ * @param page Handle of the transform stream of the page, box_render_batch_t.instances
  * @param handle Handle of the mesh
  * @param m The mesh, NULL for a pass that reads no surface assets, such as the cull
- * @return The bind group, NULL when the buffer is not a storage buffer
+ * @param shading Bind the shading stream too (instance_layout), else transform_layout
+ * @return The bind group, NULL when a stream of the page is missing or not a storage buffer
  */
 WGPUBindGroup box_gpu_instance_group(
     box_gpu_t *gpu,
-    box_gpu_buffer_t *b,
+    uint32_t page,
     uint32_t handle,
-    const box_gpu_mesh_t *m);
+    const box_gpu_mesh_t *m,
+    bool shading);
 
 /** Forget the cull views of the previous target, before the views of a target are written.
  *
@@ -2034,6 +2064,7 @@ const box_gpu_cull_view_t* box_gpu_cull_view(
  * @param draw The draw
  * @param group Bind group index the instance page is bound at
  * @param late Draw what the late phase kept instead of the early or only phase
+ * @param shading Bind the shading stream of the page too, for a pipeline with instance_layout
  * @param bound Instance bind group bound last in the pass, NULL for none, updated
  * @return Whether the draw was recorded
  */
@@ -2044,6 +2075,7 @@ bool box_gpu_cull_draw(
     const box_gpu_cull_draw_t *draw,
     uint32_t group,
     bool late,
+    bool shading,
     WGPUBindGroup *bound);
 
 /** Record a copy of a presented image into the readback buffer of its target.

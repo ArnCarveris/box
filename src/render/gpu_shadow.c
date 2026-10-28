@@ -56,7 +56,8 @@ void box_gpu_shadow_init(
         .aspect = WGPUTextureAspect_DepthOnly
     };
     gpu->shadow_layout = wgpuDeviceCreateBindGroupLayout(gpu->device, &layout);
-    WGPUBindGroupLayout groups[3] = {
+    WGPUBindGroupLayout groups[2] = { gpu->shadow_layout, gpu->transform_layout };
+    WGPUBindGroupLayout cutout[3] = {
         gpu->shadow_layout, gpu->instance_layout, gpu->material_layout
     };
     gpu->shadow_pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
@@ -67,7 +68,7 @@ void box_gpu_shadow_init(
     gpu->shadow_cutout_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
         &(WGPUPipelineLayoutDescriptor){
             .bindGroupLayoutCount = 3,
-            .bindGroupLayouts = groups
+            .bindGroupLayouts = cutout
         });
     gpu->shadow_sampler = wgpuDeviceCreateSampler(gpu->device, &sampler);
     gpu->shadow_empty = wgpuDeviceCreateTexture(gpu->device, &empty);
@@ -458,7 +459,7 @@ static void box_gpu_shadow_draw(
             }
         }
 
-        box_gpu_cull_draw(gpu, pass, packet, d, 1, false, &instances);
+        box_gpu_cull_draw(gpu, pass, packet, d, 1, false, cutout, &instances);
     }
 }
 
