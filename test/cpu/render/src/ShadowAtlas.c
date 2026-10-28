@@ -907,3 +907,183 @@ void ShadowAtlas_extract_point_and_spot_share_budget(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+/** Make the tile of a spot light the way the light extract does.
+ *
+ * @param position World position of the light
+ * @param direction Direction it shines in
+ * @param range Its range
+ * @param outer Its outer half angle in degrees
+ * @return The tile, 256 texels at the origin of a 1024 atlas
+ */
+static box_render_shadow_tile_t spot_tile(
+    vec3 position,
+    vec3 direction,
+    float range,
+    float outer)
+{
+    box_render_shadow_record_t r;
+    box_render_shadow_place_t place = {256, 0, 0};
+    box_render_shadow_tile_t result = {
+        .size = 256,
+        .projection = BOX_RENDER_SHADOW_PERSPECTIVE
+    };
+    box_render_shadow_spot(position, direction, range, outer, &place, 1024, &r);
+    glm_mat4_copy(r.matrix, result.matrix);
+    glm_vec3_copy(position, result.position);
+    result.near_ = r.params[0];
+    result.far_ = r.params[1];
+
+    return result;
+}
+
+/* The box of a spot light tile holds its cone: down to the range below the light, about
+ * range * tan(30) to the side, nothing above the light */
+void ShadowAtlas_spot_tile_bounds(void) {
+    // lighting/shadows
+    box_render_shadow_tile_t tile = spot_tile((vec3){1, 5, 2}, (vec3){0, -1, 0}, 10, 30);
+    vec3 lo, hi;
+    float side = 10.0f * tanf(glm_rad(30));
+    box_render_shadow_tile_bounds(&tile, lo, hi);
+    test_assert(fabsf(lo[1] - -5.0f) < 1e-4f);
+    test_assert(fabsf(hi[1] - 5.0f) < 1e-4f);
+    test_assert(lo[0] <= 1.0f - side);
+    test_assert(hi[0] >= 1.0f + side);
+    test_assert(lo[2] <= 2.0f - side);
+    test_assert(hi[2] >= 2.0f + side);
+    test_assert(lo[0] >= 1.0f - 10.0f);
+    test_assert(hi[2] <= 2.0f + 10.0f);
+
+    test_bool(box_render_shadow_tile_touches(&tile, (vec3){0.5f, 0, 1.5f}, (vec3){1.5f, 1, 2.5f}),
+        true);
+    test_bool(box_render_shadow_tile_touches(&tile,
+        (vec3){1 + 0.9f * side, -4.5f, 2}, (vec3){1 + side, -4, 2.5f}), true);
+    test_bool(box_render_shadow_tile_touches(&tile, (vec3){0, 5.5f, 1}, (vec3){2, 6, 3}), false);
+    test_bool(box_render_shadow_tile_touches(&tile, (vec3){12, 0, 1}, (vec3){13, 1, 3}), false);
+    test_bool(box_render_shadow_tile_touches(&tile, (vec3){0, -7, 1}, (vec3){2, -6, 3}), false);
+}
+
+/* A box in the corner of the cube around the range of a point light is outside its sphere */
+void ShadowAtlas_point_tile_bounds(void) {
+    // lighting/shadows
+    box_render_shadow_tile_t tile = {
+        .projection = BOX_RENDER_SHADOW_OCTAHEDRAL,
+        .position = {1, 5, 2},
+        .near_ = 0.05f,
+        .far_ = 10.0f
+    };
+    vec3 lo, hi;
+    box_render_shadow_tile_bounds(&tile, lo, hi);
+    test_flt(lo[0], -9.0f);
+    test_flt(hi[1], 15.0f);
+    test_flt(lo[2], -8.0f);
+
+    test_bool(box_render_shadow_tile_touches(&tile, (vec3){1, 5, 11}, (vec3){2, 6, 11.5f}), true);
+    test_bool(box_render_shadow_tile_touches(&tile, (vec3){-20, 4, 1}, (vec3){20, 5, 2}), true);
+    test_bool(box_render_shadow_tile_touches(&tile, (vec3){8.5f, 12.5f, 9.5f},
+        (vec3){9, 13, 10}), false);
+    test_bool(box_render_shadow_tile_touches(&tile, (vec3){1, 5, 12.5f}, (vec3){2, 6, 13}),
+        false);
+}
+
+/* Regions of another scene are left out; a tile that renders already stays so */
+void ShadowAtlas_touched_by_scene(void) {
+    // lighting/shadows
+    box_render_shadow_tile_t tiles[3] = {
+        spot_tile((vec3){-8, 6, 0}, (vec3){0, -1, 0}, 10, 20),
+        spot_tile((vec3){8, 6, 0}, (vec3){0, -1, 0}, 10, 20),
+        {
+            .projection = BOX_RENDER_SHADOW_OCTAHEDRAL,
+            .position = {0, 6, 16},
+            .near_ = 0.05f,
+            .far_ = 8.0f,
+            .render = true
+        }
+    };
+    box_render_shadow_region_t regions[2] = {
+        { .scene = 42, .min = {-9, 2, -1}, .max = {-7, 3, 1} },
+        { .scene = 0, .min = {7, 2, -1}, .max = {9, 3, 1} }
+    };
+    box_render_shadow_touched(tiles, 3, 0, regions, 2);
+    test_bool(tiles[0].render, false);
+    test_bool(tiles[1].render, true);
+    test_bool(tiles[2].render, true);
+
+    tiles[1].render = false;
+    box_render_shadow_touched(tiles, 3, 42, regions, 2);
+    test_bool(tiles[0].render, true);
+    test_bool(tiles[1].render, false);
+
+    tiles[0].render = false;
+    tiles[2].render = false;
+    regions[1].min[1] = 20;
+    regions[1].max[1] = 21;
+    box_render_shadow_touched(tiles, 3, 0, regions, 2);
+    test_bool(tiles[0].render, false);
+    test_bool(tiles[1].render, false);
+    test_bool(tiles[2].render, false);
+}
+
+/** Run a frame into the null backend and get whether the tile of a light renders in it.
+ *
+ * @param world The world
+ * @param null The backend
+ * @param light The light
+ * @return Whether its tile renders
+ */
+static bool extract_renders(
+    ecs_world_t *world,
+    box_render_null_t *null,
+    ecs_entity_t light)
+{
+    const box_render_shadow_tile_t *tile = extract_tile_of(extract_frame(world, null), light);
+    test_assert(tile != NULL);
+
+    return tile->render;
+}
+
+/* The tile of a spot light renders in the first frame and again when a caster under it, the
+ * light or the atlas changes; the light extract decides it on the main thread */
+void ShadowAtlas_extract_renders_changed_tiles(void) {
+    // lighting/shadows
+    box_render_null_t *null;
+    ecs_entity_t view;
+    ecs_world_t *world = extract_world(&null, &view);
+    ecs_entity_t light = spot_new(world, (vec3){0, 4, 0}, true, LightBakeModeMixed);
+    ecs_entity_t caster = ecs_new(world);
+    ecs_set(world, caster, Position, {0, 2, 0});
+    ecs_set(world, caster, Box, {1, 0.1f, 1});
+    ecs_entity_t far = ecs_new(world);
+    ecs_set(world, far, Position, {0, 2, -40});
+    ecs_set(world, far, Box, {1, 0.1f, 1});
+
+    test_bool(extract_renders(world, null, light), true);
+    test_bool(extract_renders(world, null, light), false);
+    test_bool(extract_renders(world, null, light), false);
+
+    ecs_set(world, caster, Position, {0.5f, 2, 0});
+    test_bool(extract_renders(world, null, light), true);
+    test_bool(extract_renders(world, null, light), false);
+
+    ecs_set(world, far, Position, {1, 2, -40});
+    test_bool(extract_renders(world, null, light), false);
+
+    ecs_add(world, caster, NoShadow);
+    test_bool(extract_renders(world, null, light), true);
+    test_bool(extract_renders(world, null, light), false);
+
+    ecs_set(world, light, Position, {0, 4.5f, 0});
+    test_bool(extract_renders(world, null, light), true);
+    test_bool(extract_renders(world, null, light), false);
+
+    ecs_singleton_set(world, ShadowAtlas, {.resolution = 1024, .min_tile = 64});
+    test_bool(extract_renders(world, null, light), true);
+    test_bool(extract_renders(world, null, light), false);
+
+    test_bool(box_render_shadow_cache(world, false), true);
+    test_bool(extract_renders(world, null, light), true);
+    test_bool(extract_renders(world, null, light), true);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}

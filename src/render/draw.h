@@ -208,6 +208,8 @@ typedef struct box_draw_batch_t {
     bool ready;             /**< The backend has the mesh and the instances this frame */
     bool was_ready;         /**< It had them in the last frame, so a caster batch that gets
                              *   them records the regions of its slots */
+    uint32_t shadow_texture; /**< Revision of the albedo image an alpha tested caster batch had
+                             *   in the last frame, see box_textures_revision */
     bool bounds_dirty;      /**< The surface of a slot changed since the bounds were computed */
     bool bounded;           /**< A slot holds a parametric surface, see center and extent */
     float center[3];        /**< Center of the local bounds of every slot, when bounded */
@@ -308,6 +310,9 @@ typedef struct box_render_draws_t {
     ecs_entity_t scene_of;      /**< Scene of the entities of scene_table */
     ecs_vec_t shadow_regions;   /**< box_render_shadow_region_t, the bounds shadow casters had
                                  *   and have after their changes, which the light extract takes */
+    ecs_vec_t shadow_materials; /**< uint32_t, slots of the material table whose cutoff or UV
+                                 *   transform, which alpha tested casters read, changed in this
+                                 *   extract while recording */
     bool shadow_record;         /**< Record shadow_regions, while a scene keeps shadow tiles */
     int32_t refs;               /**< Observers and systems that use the state */
 } box_render_draws_t;
@@ -825,7 +830,8 @@ bool box_draws_material_changed(
     ecs_entity_t e);
 
 /** Pack the changed slots of the material table and upload them: merged runs of consecutive
- * slots, or the whole table when its buffer is created.
+ * slots, or the whole table when its buffer is created. While recording shadow regions, the
+ * slots whose cutoff or UV transform changed go to shadow_materials.
  *
  * @param world The world
  * @param d The state

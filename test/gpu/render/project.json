@@ -431,6 +431,8 @@
                     "moved_caster_renders_its_tile",
                     "added_removed_caster",
                     "dynamic_caster_renders_when_moved",
+                    "cutoff_change_renders_its_tile",
+                    "texture_reload_renders_its_tile",
                     "light_change_renders_its_tile",
                     "camera_move_renders_none",
                     "atlas_resolution_renders_all",

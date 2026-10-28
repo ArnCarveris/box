@@ -545,7 +545,7 @@ done:
 }
 
 /** Record the regions of every slot of a caster batch, which the tiles did not draw while the
- * backend lacked its mesh.
+ * backend lacked its mesh, or drew with another albedo image of an alpha tested batch.
  *
  * @param world The world
  * @param d The state
@@ -563,6 +563,56 @@ static void box_draws_shadow_batch(
         box_draws_shadow_region(world, d, b, box_draws_slot_transform(b, i),
             box_draws_slot_surface(b, i));
     }
+}
+
+/** Record the regions of the slots of the alpha tested caster batches that render with a slot
+ * of the material table whose cutoff or UV transform changed, and forget those slots.
+ *
+ * @param world The world
+ * @param d The state
+ */
+static void box_draws_shadow_materials(
+    const ecs_world_t *world,
+    box_render_draws_t *d)
+{
+    const uint32_t *changed = ecs_vec_first_t(&d->shadow_materials, uint32_t);
+    int32_t i, j, k, count = ecs_vec_count(&d->shadow_materials);
+    for (i = 0; count && i < ecs_vec_count(&d->batches); i ++) {
+        box_draw_batch_t *b = box_draws_batch(d, i);
+        if (!b->alive || !b->key.cutout || !box_draws_caster(b)) {
+            continue;
+        }
+
+        for (j = 0; j < ecs_vec_count(&b->entities); j ++) {
+            uint32_t material = box_draws_slot_mesh_shading(b, j)->material;
+            bool hit = false;
+            for (k = 0; k < count && !hit; k ++) {
+                hit = changed[k] == material;
+            }
+
+            if (hit) {
+                box_draws_shadow_region(world, d, b, box_draws_slot_transform(b, j),
+                    box_draws_slot_surface(b, j));
+            }
+        }
+    }
+
+    ecs_vec_clear(&d->shadow_materials);
+}
+
+/** Get the revision of the albedo image an alpha tested caster batch renders its tiles with.
+ *
+ * @param d The state
+ * @param b The batch
+ * @return The revision, 0 for a batch that is no alpha tested caster
+ */
+static uint32_t box_draws_shadow_texture(
+    const box_render_draws_t *d,
+    const box_draw_batch_t *b)
+{
+    return b->key.cutout && box_draws_caster(b)
+        ? box_textures_revision(d->textures, b->key.textures[0])
+        : 0;
 }
 
 void box_draws_slot_remove(
@@ -1580,9 +1630,16 @@ static void box_draws_fill_material(
             alpha = out->color[3];
         } else {
             uint32_t id = box_draws_material_id(it->world, d, it->entities[i], true);
+            box_render_mesh_shading_t *out = box_draws_slot_mesh_shading(b, slots[i].slot);
+            box_render_mesh_shading_t was = *out;
             box_draws_material_changed(d, it->entities[i]);
-            box_draws_mesh_shading(box_draws_slot_mesh_shading(b, slots[i].slot), id, &material);
+            box_draws_mesh_shading(out, id, &material);
             alpha = box_draws_alpha(&material);
+            if (b->key.cutout && (was.material != out->material || was.alpha != out->alpha)) {
+                box_render_transform_t *transform = box_draws_slot_transform(b, slots[i].slot);
+                box_draws_shadow_region(it->world, d, b, transform,
+                    box_draws_slot_surface(b, slots[i].slot));
+            }
         }
 
         bool cutout = box_draws_cutout(material.cutoff, material.shape2d);
@@ -1696,6 +1753,7 @@ void box_draws_send(
 
     box_draws_dynamic(world, d);
     box_draws_materials_send(world, d, p);
+    box_draws_shadow_materials(world, d);
     ecs_vec_clear(&d->blended);
     for (i = 0; i < count; i ++) {
         box_draw_batch_t *b = box_draws_batch(d, i);
@@ -1704,11 +1762,13 @@ void box_draws_send(
             box_draws_reserve(p, d, b);
         }
 
-        if (b->ready && !b->was_ready) {
+        uint32_t texture = box_draws_shadow_texture(d, b);
+        if (b->ready && (!b->was_ready || texture != b->shadow_texture)) {
             box_draws_shadow_batch(world, d, b);
         }
 
         b->was_ready = b->ready;
+        b->shadow_texture = texture;
     }
 
     box_draws_pages(p, d);

@@ -2043,7 +2043,8 @@ bool box_render_shadow_tile_touches(
     const float *max);
 
 /** A region a shadow caster covered or covers after a change: it moved, was added or removed,
- * changed mesh, scale or surface, or started or stopped casting */
+ * changed mesh, scale or surface, started or stopped casting, or, alpha tested, changed what its
+ * alpha test reads: its alpha, the cutoff or UV transform of its material or its albedo image */
 typedef struct box_render_shadow_region_t {
     ecs_entity_t scene;     /**< Scene root of the caster, 0 for the default scene */
     float min[3];           /**< Minimum corner of its world bounds */

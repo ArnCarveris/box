@@ -357,8 +357,19 @@ done:
     return;
 }
 
-bool box_render_shadow_tile_touches(
+/** Check whether a box reaches into what a shadow atlas tile holds, given the bounds of the tile.
+ *
+ * @param tile The tile
+ * @param lo Minimum corner of the tile bounds, see box_render_shadow_tile_bounds
+ * @param hi Maximum corner of the tile bounds
+ * @param min Minimum corner of the box
+ * @param max Maximum corner of the box
+ * @return Whether a caster in the box may change the tile
+ */
+static bool box_shadow_tile_reaches(
     const box_render_shadow_tile_t *tile,
+    const float *lo,
+    const float *hi,
     const float *min,
     const float *max)
 {
@@ -374,14 +385,23 @@ bool box_render_shadow_tile_touches(
 
         result = distance <= far_ * far_;
     } else {
-        vec3 lo, hi;
-        box_render_shadow_tile_bounds(tile, lo, hi);
         for (i = 0; i < 3 && result; i ++) {
             result = min[i] <= hi[i] && max[i] >= lo[i];
         }
     }
 
     return result;
+}
+
+bool box_render_shadow_tile_touches(
+    const box_render_shadow_tile_t *tile,
+    const float *min,
+    const float *max)
+{
+    vec3 lo, hi;
+    box_render_shadow_tile_bounds(tile, lo, hi);
+
+    return box_shadow_tile_reaches(tile, lo, hi, min, max);
 }
 
 void box_render_shadow_touched(
@@ -391,9 +411,12 @@ void box_render_shadow_touched(
     const box_render_shadow_region_t *regions,
     int32_t region_count)
 {
+    vec3 lo[BOX_RENDER_SHADOW_TILES], hi[BOX_RENDER_SHADOW_TILES];
     int32_t i, j, left = 0;
+    ecs_assert(count <= BOX_RENDER_SHADOW_TILES, ECS_INVALID_PARAMETER, NULL);
     for (j = 0; j < count; j ++) {
         left += !tiles[j].render;
+        box_render_shadow_tile_bounds(&tiles[j], lo[j], hi[j]);
     }
 
     for (i = 0; left && i < region_count; i ++) {
@@ -402,8 +425,8 @@ void box_render_shadow_touched(
         }
 
         for (j = 0; j < count; j ++) {
-            if (!tiles[j].render &&
-                box_render_shadow_tile_touches(&tiles[j], regions[i].min, regions[i].max))
+            if (!tiles[j].render && box_shadow_tile_reaches(&tiles[j], lo[j], hi[j],
+                regions[i].min, regions[i].max))
             {
                 tiles[j].render = true;
                 left --;

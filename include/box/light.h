@@ -116,7 +116,7 @@ ECS_STRUCT(AmbientLight, {
  *
  * Lights get power of two tiles nearest to the cameras first: the largest that fits in the area
  * still free up to its shadow_resolution, at least min_tile, else none. At most 64 tiles, placed
- * by size and entity; a tile renders again only when its light or a caster in its range changed.
+ * by size and entity; one renders again only when its light, place or a caster in range changed.
  *
  * Values that are not powers of two round down to one; resolution clamps to 256 to 8192 and
  * min_tile to 1 to resolution.

@@ -87,6 +87,7 @@ static void box_draws_free(
     ecs_vec_fini_t(NULL, &d->blended, int32_t);
     ecs_vec_fini_t(NULL, &d->sorted, box_draw_sorted_t);
     ecs_vec_fini_t(NULL, &d->shadow_regions, box_render_shadow_region_t);
+    ecs_vec_fini_t(NULL, &d->shadow_materials, uint32_t);
     ecs_vec_fini_t(NULL, &d->dirty, ecs_entity_t);
     ecs_vec_fini_t(NULL, &d->moved, box_draw_moved_t);
     ecs_vec_fini_t(NULL, &d->walk, ecs_entity_t);
@@ -640,7 +641,7 @@ static void box_draws_update_shape(
     box_render_surface_t was_surface;
     const ShapeMesh *shape = ecs_get(world, e, ShapeMesh);
     bool drawn = shape && shape->mesh && !ecs_has_id(world, e, EcsPrefab);
-    bool kept = false;
+    bool kept = false, recorded = false;
     s->dirty = false;
     d->stats.processed ++;
     if (drawn) {
@@ -686,6 +687,7 @@ write:
     if (kept && d->shadow_record && box_draws_caster(b)) {
         was_transform = *box_draws_slot_transform(b, s->slot);
         was_surface = *box_draws_slot_surface(b, s->slot);
+        recorded = true;
     }
 
     if (material.shape2d) {
@@ -720,8 +722,8 @@ write:
         box_draws_surface(box_draws_slot_surface(b, s->slot), shape);
     }
 
-    box_draws_shadow_update(world, d, b, s->slot, kept ? &was_transform : NULL,
-        kept ? &was_surface : NULL, kinds);
+    box_draws_shadow_update(world, d, b, s->slot, recorded ? &was_transform : NULL,
+        recorded ? &was_surface : NULL, kinds);
     box_draws_slot_changed(b, s->slot, kinds);
 done:
     return;
@@ -1053,6 +1055,7 @@ void box_render_draws_init(
     ecs_vec_init_t(NULL, &d->blended, int32_t, 0);
     ecs_vec_init_t(NULL, &d->sorted, box_draw_sorted_t, 0);
     ecs_vec_init_t(NULL, &d->shadow_regions, box_render_shadow_region_t, 0);
+    ecs_vec_init_t(NULL, &d->shadow_materials, uint32_t, 0);
     ecs_map_init(&d->lookup, NULL);
     ecs_map_init(&d->meshes, NULL);
     box_draws_order_init(d);
@@ -1121,6 +1124,7 @@ void box_render_draws_shadow_record(
         d->shadow_record = record;
         if (!record) {
             ecs_vec_clear(&d->shadow_regions);
+            ecs_vec_clear(&d->shadow_materials);
         }
     }
 }

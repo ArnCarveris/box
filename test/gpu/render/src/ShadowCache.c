@@ -8,15 +8,26 @@
  * a fourth at z = -14 outside every range; tiles are point, A, B, in the order of collection.
  */
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include <box.h>
 #include <bake_test.h>
 #include <math.h>
 #include <string.h>
+#include <time.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 #include "render.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_STATIC
 #include <stb_image.h>
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_STATIC
+#include <stb_image_write.h>
 
 /** Edge in pixels of the images */
 #define CACHE_SIZE (64)
@@ -345,6 +356,113 @@ void ShadowCache_dynamic_caster_renders_when_moved(void) {
     ecs_fini(s.world);
 }
 
+/* The alpha of the slabs, 0.5, passes a cutoff of 0.3 and not one of 0.6 */
+void ShadowCache_cutoff_change_renders_its_tile(void) {
+    // lighting/shadows
+    cache_scene_t s;
+    cache_scene(&s);
+    ecs_set(s.world, s.slab_a, Opacity, {0.5f});
+    ecs_set(s.world, s.slab_a, AlphaCutoff, {0.3f});
+    ecs_entity_t prefab = ecs_new_w_id(s.world, EcsPrefab);
+    ecs_set(s.world, prefab, AlphaCutoff, {0.3f});
+    ecs_add_pair(s.world, s.slab_b, EcsIsA, prefab);
+    ecs_set(s.world, s.slab_b, Opacity, {0.5f});
+    cache_first(&s);
+    cache_none(s.world);
+
+    ecs_set(s.world, s.slab_a, AlphaCutoff, {0.6f});
+    cache_one(s.world, CACHE_SPOT_A);
+    cache_none(s.world);
+
+    ecs_set(s.world, prefab, AlphaCutoff, {0.6f});
+    cache_one(s.world, CACHE_SPOT_B);
+    cache_none(s.world);
+    cache_no_errors(s.world);
+    ecs_fini(s.world);
+}
+
+/** Write an 8x8 white image whose left half has no alpha, or none of it when it is opaque.
+ *
+ * @param path Path of the PNG
+ * @param opaque Whether every pixel has full alpha
+ * @param mtime Modification time it gets, so the file watch sees each write
+ */
+static void cache_halves(
+    const char *path,
+    bool opaque,
+    int64_t mtime)
+{
+    uint8_t px[8 * 8 * 4];
+    int32_t i;
+    for (i = 0; i < 64; i ++) {
+        px[i * 4 + 0] = 255;
+        px[i * 4 + 1] = 255;
+        px[i * 4 + 2] = 255;
+        px[i * 4 + 3] = opaque || (i % 8) >= 4 ? 255 : 0;
+    }
+
+    test_assert(stbi_write_png(path, 8, 8, 4, px, 8 * 4) != 0);
+    struct timespec times[2] = {{ .tv_sec = (time_t)mtime }, { .tv_sec = (time_t)mtime }};
+    test_int(utimensat(AT_FDCWD, path, times, 0), 0);
+}
+
+/* The albedo image of an alpha tested quad under spot light A loads again with other holes, under
+ * the same handle */
+void ShadowCache_texture_reload_renders_its_tile(void) {
+    // lighting/shadows
+    cache_scene_t s;
+    box_render_gpu_stats_t before, after;
+    int32_t frames = 0;
+    cache_scene(&s);
+    ecs_singleton_set(s.world, FileWatch, {.interval = 0});
+    char *png = flecs_asprintf("%s/cache_halves.png",
+        ecs_singleton_get(s.world, AppStatus)->tmp_dir);
+    cache_halves(png, false, 1000000000);
+    ecs_entity_t tex = ecs_new(s.world);
+    ecs_set(s.world, tex, TexturePath, {.path = png});
+    ecs_entity_t quad = ecs_new(s.world);
+    ecs_set(s.world, quad, Position, {-8, 4, 0});
+    ecs_set(s.world, quad, Rotation, {(float)GLM_PI_2, 0, 0});
+    ecs_set(s.world, quad, Quad, {3, 3});
+    ecs_set(s.world, quad, AlphaCutoff, {0.5f});
+    ecs_set(s.world, quad, PbrTextures, {.albedo = tex});
+    cache_first(&s);
+    while (frames < 100 && ecs_get(s.world, tex, TextureStatus)->state == TextureLoading) {
+        cache_frame(s.world);
+        frames ++;
+    }
+
+    test_int(ecs_get(s.world, tex, TextureStatus)->state, TextureReady);
+    test_int(ecs_get(s.world, tex, TextureStatus)->revision, 1);
+    cache_frame(s.world);
+    cache_none(s.world);
+
+    cache_halves(png, true, 1000000100);
+    test_assert(box_render_gpu_stats(s.world, &before));
+    for (frames = 0; frames < 100 &&
+        ecs_get(s.world, tex, TextureStatus)->revision < 2; frames ++)
+    {
+        cache_frame(s.world);
+    }
+
+    test_int(ecs_get(s.world, tex, TextureStatus)->state, TextureReady);
+    test_int(ecs_get(s.world, tex, TextureStatus)->revision, 2);
+    cache_frame(s.world);
+    test_assert(box_render_gpu_stats(s.world, &after));
+    test_assert(after.shadow_tiles - before.shadow_tiles >= 1);
+    cache_none(s.world);
+
+    unsigned char *cached = cache_capture(s.world, "cache_reload.png");
+    test_bool(box_render_shadow_cache(s.world, false), true);
+    unsigned char *full = cache_capture(s.world, "cache_reload_rendered.png");
+    test_assert(memcmp(cached, full, CACHE_SIZE * CACHE_SIZE * 4) == 0);
+    stbi_image_free(cached);
+    stbi_image_free(full);
+    cache_no_errors(s.world);
+    ecs_fini(s.world);
+    ecs_os_free(png);
+}
+
 /* The color and the intensity of a light are not in its tile */
 void ShadowCache_light_change_renders_its_tile(void) {
     // lighting/shadows
@@ -357,7 +475,7 @@ void ShadowCache_light_change_renders_its_tile(void) {
     cache_one(s.world, CACHE_SPOT_A);
     cache_none(s.world);
 
-    ecs_set(s.world, s.spot_b, Rotation, {(float)GLM_PI_2, 0, 0.1f});
+    ecs_set(s.world, s.spot_b, Rotation, {(float)GLM_PI_2 - 0.1f, 0, 0});
     cache_one(s.world, CACHE_SPOT_B);
     cache_none(s.world);
 
