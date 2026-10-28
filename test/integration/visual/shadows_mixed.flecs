@@ -1,8 +1,8 @@
 // Spot and point light shadows in one shadow atlas: two spot lights shine down from behind the
 // outer posts and a point light hangs between them over the middle post, each with a tile of
 // the same 1024 atlas. The spots throw their posts' shadows toward the camera, the point light
-// throws the shadows of all three posts and of the cube on the shelf outward in every
-// direction, onto the floor and the back wall.
+// throws the shadows of all three posts and of a floating cube outward in every direction,
+// onto the floor and the back wall.
 using box.transform
 using box.geometry
 using box.material
@@ -55,7 +55,7 @@ post_right {
   Rgb: {230, 230, 230}
 }
 
-shelf_cube {
+floating_cube {
   Position: {1.2, 2.4, -1.2}
   Box: {0.5, 0.5, 0.5}
   Rgb: {230, 230, 230}

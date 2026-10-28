@@ -556,3 +556,27 @@ void PointShadow_draws_per_light(void) {
     point_no_errors(world);
     ecs_fini(world);
 }
+
+/* A lost device recreates the atlas and the octant pipelines, and the tile shadows again */
+void PointShadow_device_loss_recreates_tile(void) {
+    // lighting/shadows
+    ecs_entity_t light, slab;
+    ecs_world_t *world = point_scene(&light, &slab);
+    unsigned char *px = point_capture(world, "point_loss_a.png");
+    test_assert(point_red(px, 32, 32) < POINT_DARK);
+    stbi_image_free(px);
+
+    box_render_gpu_lose_device(world);
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    px = point_capture(world, "point_loss_b.png");
+    test_assert(point_red(px, 32, 32) < POINT_DARK);
+    test_assert(point_red(px, 56, 32) > POINT_LIT);
+    stbi_image_free(px);
+    test_int(ecs_singleton_get(world, RenderStatus)->shadow_tiles, 1);
+    test_int(ecs_singleton_get(world, RenderStatus)->device_losses, 1);
+    ecs_fini(world);
+}

@@ -420,7 +420,8 @@
                     "shadows_false_unshadowed",
                     "view_shadows_disabled_unshadowed",
                     "baked_light_has_no_tile",
-                    "draws_per_light"
+                    "draws_per_light",
+                    "device_loss_recreates_tile"
                 ]
             },
             {

@@ -32,10 +32,6 @@
 /** Shader handle of the engine compute shader that culls the instances of a view */
 #define BOX_RENDER_SHADER_CULL (6)
 
-/** Shader handle of the variant of the shadow shader that clips the octants of the point light
- * tiles with clip distances, compiled only by a device with that feature */
-#define BOX_RENDER_SHADER_SHADOW_CLIP (7)
-
 /** Projected size in pixels below which a capture of a camera without a view culls */
 #define BOX_RENDER_CULL_MIN_DIMENSION (1.0f)
 
@@ -105,6 +101,10 @@
 
 /** Shader handle of the engine compute shader that projects probe captures onto SH */
 #define BOX_RENDER_SHADER_BAKE (8)
+
+/** Shader handle of the variant of the shadow shader that clips the octants of the point light
+ * tiles with clip distances, compiled only by a device with that feature */
+#define BOX_RENDER_SHADER_SHADOW_CLIP (9)
 
 /** Buffer handle of the change buffer the scatter pass reads changed instances from */
 #define BOX_RENDER_BUFFER_CHANGES (1)
