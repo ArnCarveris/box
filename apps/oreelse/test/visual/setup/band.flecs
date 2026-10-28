@@ -1,0 +1,10 @@
+// The astronaut near the north east corner of the map, facing the camera, for the scenes of the
+// look: the camera that follows it sees the corner of the hazard band ahead, the textured basin
+// and plain around it and the boulders of the seeded map. Included after the game.
+
+using box.transform
+
+astronaut {
+  Position: {40, 0, -42}
+  Rotation: {0, 0.6, 0}
+}
