@@ -31,6 +31,18 @@ shipyard {
     Camera: {fov: 42, near_: 0.5, far_: 1400}
     CameraController: {speed: 55}
   }
+  gantry_camera {
+    Position: {-142, 78, 42}
+    Rotation: {-0.31, -0.69, 0}
+    Camera: {fov: 47, near_: 0.2, far_: 1400}
+    CameraController: {speed: 25}
+  }
+  hull_camera {
+    Position: {-66, 64, 108}
+    Rotation: {-0.42, -0.55, 0}
+    Camera: {fov: 45, near_: 0.2, far_: 1400}
+    CameraController: {speed: 20}
+  }
   aft_camera {
     Position: {147, 90, -228}
     Rotation: {-0.32, 2.568, 0}

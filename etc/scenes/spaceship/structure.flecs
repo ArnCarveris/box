@@ -30,7 +30,7 @@ template ShipBeam {
 template HullPanel {
   prop width: f32 = 3
   prop length: f32 = 5
-  plate : HullArmor { Box: {width, 0.16, length} }
+  plate : HullArmor { Position: {}; Box: {width, 0.16, length} }
   latch : Titanium { Position: {width / 2 - 0.24, 0.11, length / 2 - 0.4}; Box: {0.12, 0.06, 0.42} }
   for i in 0..2 {
     {

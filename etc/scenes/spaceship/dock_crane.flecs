@@ -9,7 +9,7 @@ using box.light
 
 @tree Parent
 template DockCrane {
-  pedestal : DarkArmor { Cylinder: {radius: 3.5, length: 1.5, segments: 12} }
+  pedestal : DarkArmor { Position: {}; Cylinder: {radius: 3.5, length: 1.5, segments: 12} }
   race : Titanium { Position: {0, 1, 0}; Tube: {radius: 3, thickness: 0.3, length: 0.5, segments: 24} }
   tower : DockYellow { Position: {0, 5, 0}; BeveledPrism: {footprint: [{-2.5, -3}, {2.5, -3}, {1.7, 2.5}, {-1.7, 2.5}], depth: 8, inset: 0.3, offset: {0, -1}, bevel: 0.4} }
   boom : DockYellow { Position: {-6, 11, 0}; Rotation: {0, 0, -0.25}; Box: {18, 1.4, 2.2} }

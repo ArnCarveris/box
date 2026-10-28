@@ -52,11 +52,11 @@ template DockClamp {
   hose_profile { Path2D: {start: {0.3, 0}, segments: [{kind: Line, end: {0.21, 0.21}}, {kind: Line, end: {0, 0.3}}, {kind: Line, end: {-0.21, 0.21}}, {kind: Line, end: {-0.3, 0}}, {kind: Line, end: {-0.21, -0.21}}, {kind: Line, end: {0, -0.3}}, {kind: Line, end: {0.21, -0.21}}], closed: true} }
   hose_section { Profile2D: {outer: hose_profile} }
   hose : RecessMetal { Sweep: {path: hose_path, profile: hose_section, scale: {1, 1}, taper: 1, cap_start: true, cap_end: true, segments: 8, rings: 32} }
-  shoe_lugs { Position: {-2.8, 3.85, 0}; Array: {axis: X, count: 8, spacing: 0.8}; tooth : DarkArmor { Box: {0.45, 0.5, 2.4} } }
+  shoe_lugs { Position: {-2.8, 3.85, 0}; Array: {axis: X, count: 8, spacing: 0.8}; tooth : DarkArmor { Position: {}; Box: {0.45, 0.5, 2.4} } }
 
   back_panel : DockYellow { Position: {0, -5, reach + 2.1}; Box: {10.5, 8, 0.35} }
   back_inset : RecessMetal { Position: {0, -5, reach + 2.31}; Box: {8.5, 6, 0.1} }
-  grille { Position: {-3.8, -5, reach + 2.45}; Array: {axis: X, count: 16, spacing: 0.5}; fin : Titanium { Box: {0.12, 5.5, 0.2} } }
+  grille { Position: {-3.8, -5, reach + 2.45}; Array: {axis: X, count: 16, spacing: 0.5}; fin : Titanium { Position: {}; Box: {0.12, 5.5, 0.2} } }
   for i in 0..4 {
     {
       support : DockYellow { Position: {-6 + i * 4, -10.6, reach + 1}; Rotation: {0.3, 0, 0}; Box: {0.45, 5, 6} }
