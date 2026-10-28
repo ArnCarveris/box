@@ -518,6 +518,7 @@
                     "opacity_blends",
                     "depth_with_3d_shapes",
                     "coplanar_draw_in_order",
+                    "coplanar_siblings_in_perspective",
                     "edges_crisp_at_any_scale",
                     "edges_crisp_in_perspective",
                     "edges_antialiased_when_rotated",

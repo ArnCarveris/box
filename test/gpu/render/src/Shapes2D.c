@@ -550,6 +550,92 @@ void Shapes2D_coplanar_draw_in_order(void) {
     ecs_fini(world);
 }
 
+/** Render a panel turned in perspective with a red groove and a smaller green fill over it, two
+ * coplanar overlapping siblings of different sizes like the groove and fill of a Slider.
+ *
+ * @param dist The distance of the panel from the camera
+ * @param groove Whether the groove is created; without it the render is the mask of the fill
+ * @param file The name of the capture
+ * @return The pixels of the 160x160 capture, freed with stbi_image_free
+ */
+static unsigned char* Shapes2D_siblings_render(
+    float dist,
+    bool groove,
+    const char *file)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 0});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f, .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t panel = ecs_new(world);
+    ecs_set(world, panel, Position, {0, 0, -dist});
+    ecs_set(world, panel, Rotation, {-0.35f, 0.95f, 0});
+    ecs_set(world, panel, Scale, {0.003f * dist, 0.003f * dist, 0.003f * dist});
+    ecs_set(world, panel, Rect, {300, 120});
+    ecs_set(world, panel, Rgb, {0, 0, 255});
+    if (groove) {
+        ecs_entity_t g = ecs_new_w_pair(world, EcsChildOf, panel);
+        ecs_set(world, g, Position, {0, 0, 0});
+        ecs_set(world, g, Rect, {260, 40});
+        ecs_set(world, g, Rgb, {255, 0, 0});
+    }
+    ecs_entity_t fill = ecs_new_w_pair(world, EcsChildOf, panel);
+    ecs_set(world, fill, Position, {-40, 0, 0});
+    ecs_set(world, fill, Rect, {180, 40});
+    ecs_set(world, fill, Rgb, {0, 255, 0});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 160, .height = 160,
+        .write_to_file = ECS_CONST_CAST(char*, file), .resolution_scale = 1});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    char *path = flecs_asprintf("%s/%s", ecs_singleton_get(world, AppStatus)->tmp_dir, file);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_int(w, 160);
+    test_int(h, 160);
+    ecs_os_free(path);
+    ecs_fini(world);
+    return px;
+}
+
+void Shapes2D_coplanar_siblings_in_perspective(void) {
+    // ui/shapes_2d
+    float distances[3] = { 2, 10, 40 };
+    int32_t d;
+    for (d = 0; d < 3; d ++) {
+        unsigned char *mask = Shapes2D_siblings_render(distances[d], false, "fill.png");
+        unsigned char *px = Shapes2D_siblings_render(distances[d], true, "siblings.png");
+        int32_t i, covered = 0, hidden = 0;
+        for (i = 0; i < 160 * 160; i ++) {
+            unsigned char *m = &mask[i * 4];
+            if (m[0] > 10 || m[1] < 245 || m[2] > 10) {
+                continue;
+            }
+
+            covered ++;
+            unsigned char *c = &px[i * 4];
+            if (c[0] > 10 || c[1] < 245 || c[2] > 10) {
+                hidden ++;
+            }
+        }
+
+        test_assert(covered > 100);
+        test_int(hidden, 0);
+        stbi_image_free(mask);
+        stbi_image_free(px);
+    }
+}
+
 void Shapes2D_edges_crisp_at_any_scale(void) {
     // ui/shapes_2d
     ecs_world_t *world = ecs_init();
