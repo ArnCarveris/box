@@ -9,13 +9,7 @@
 #include "game.h"
 #include <math.h>
 
-/** Check whether an action is held.
- *
- * @param world The world
- * @param action The action entity, 0 for none
- * @return Whether the action is down this frame
- */
-static bool ore_action_down(
+bool ore_action_down(
     const ecs_world_t *world,
     ecs_entity_t action)
 {

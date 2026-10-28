@@ -119,7 +119,16 @@
                     "diagnostic_cleanup",
                     "fit_in_aligned_group",
                     "nested_arrays",
-                    "empty_distribution"
+                    "empty_distribution",
+                    "incremental_unchanged",
+                    "incremental_fit_target_moved",
+                    "incremental_array_count",
+                    "incremental_prototype_edit",
+                    "incremental_reparent",
+                    "incremental_delete_prototype",
+                    "incremental_dynamic_parent",
+                    "incremental_hot_reload",
+                    "incremental_parent_component"
                 ]
             }
         ]
