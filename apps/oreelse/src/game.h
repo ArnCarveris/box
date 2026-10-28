@@ -2,15 +2,9 @@
  * @file game.h
  * @brief The oreelse module: components of the game and the functions its areas share.
  *
-<<<<<<< HEAD
- * The scene (apps/oreelse/etc) holds the constants cfg.*, the models, the singletons and the
- * entities of a run; the systems of each area (flow.c, map.c, player.c, look.c, particles.c)
- * play the game.
-=======
  * The scene (apps/oreelse/etc) holds the constants cfg.*, the models, the items, the singletons
  * and the entities of a run; the systems of each area (flow.c, map.c, player.c, inventory.c,
- * mining.c, look.c) play the game.
->>>>>>> cb8903751bb3621a330e944fc6c2bf20ff0624ee
+ * mining.c, look.c, particles.c) play the game.
  */
 
 #ifndef OREELSE_GAME_H
@@ -458,74 +452,6 @@ ecs_entity_t* ore_map_building(
 void ore_map_purge(
     ecs_world_t *world);
 
-<<<<<<< HEAD
-/** Play a one shot effect template at a position, the oreBurst of the original: its sizes,
- * speeds, spawn volumes and layer offsets at scale, unturned.
- *
- * @param world The world, or the stage of a system before EcsPreStore
- * @param effect The effect template (etc/particles)
- * @param position World position of the play
- * @param scale Scale of the play, 0 or less for 1
- * @return The root of the instance that plays, 0 when none does
- */
-ecs_entity_t ore_burst(
-    ecs_world_t *world,
-    ecs_entity_t effect,
-    const vec3 position,
-    float scale);
-
-/** Play a one shot effect template turned about Y, at its size: the launch of a missile
- * (MissileLaunch, authored along -Z) toward the aim of its turret, as the original's
- * oreLaunchFx turns the velocities and offsets of the bursts.
- *
- * @param world The world, or the stage of a system before EcsPreStore
- * @param effect The effect template
- * @param position World position of the play
- * @param aim Angle about Y in radians the template is turned by
- * @return The root of the instance that plays, 0 when none does
- */
-ecs_entity_t ore_burst_aimed(
-    ecs_world_t *world,
-    ecs_entity_t effect,
-    const vec3 position,
-    float aim);
-
-/** Play an explosion at a position, the oreExplosion of the original: the effect (BoomBurst)
- * at scale, and its flash light at cfg.explosionPeak and cfg.explosionRange times the scale.
- *
- * @param world The world, or the stage of a system before EcsPreStore
- * @param effect The effect template, BoomBurst
- * @param position World position of the blast
- * @param scale Scale of the blast, 0 or less for 1
- * @return The root of the instance that plays, 0 when none does
- */
-ecs_entity_t ore_explosion(
-    ecs_world_t *world,
-    ecs_entity_t effect,
-    const vec3 position,
-    float scale);
-
-/** Play the combust of a critter that died, the oreCombust of the original.
- *
- * The effect (CombustBurst, authored for radius 1) plays cfg.combustLift * r above the position,
- * its sizes and speeds at sqrt(r) and its spawn volumes and offsets, the scale of the root, at r.
- * The radius is clamped to cfg.combustRadiusMin and cfg.combustRadiusMax.
- *
- * Its flash light peaks at cfg.combustPeak * sqrt(r) and reaches cfg.combustRange +
- * cfg.combustRangeRadius * r.
- *
- * @param world The world, or the stage of a system before EcsPreStore
- * @param effect The effect template, CombustBurst
- * @param position World position of the critter
- * @param radius Body radius of the critter
- * @return The root of the instance that plays, 0 when none does
- */
-ecs_entity_t ore_combust(
-    ecs_world_t *world,
-    ecs_entity_t effect,
-    const vec3 position,
-    float radius);
-=======
 /** Get the amount of an item in the inventory.
  *
  * @param world The world or a stage
@@ -600,7 +526,73 @@ void ore_inventory_full(
 bool ore_deposit_mine(
     ecs_world_t *world,
     ecs_entity_t deposit);
->>>>>>> cb8903751bb3621a330e944fc6c2bf20ff0624ee
+
+/** Play a one shot effect template at a position, the oreBurst of the original: its sizes,
+ * speeds, spawn volumes and layer offsets at scale, unturned.
+ *
+ * @param world The world, or the stage of a system before EcsPreStore
+ * @param effect The effect template (etc/particles)
+ * @param position World position of the play
+ * @param scale Scale of the play, 0 or less for 1
+ * @return The root of the instance that plays, 0 when none does
+ */
+ecs_entity_t ore_burst(
+    ecs_world_t *world,
+    ecs_entity_t effect,
+    const vec3 position,
+    float scale);
+
+/** Play a one shot effect template turned about Y, at its size: the launch of a missile
+ * (MissileLaunch, authored along -Z) toward the aim of its turret, as the original's
+ * oreLaunchFx turns the velocities and offsets of the bursts.
+ *
+ * @param world The world, or the stage of a system before EcsPreStore
+ * @param effect The effect template
+ * @param position World position of the play
+ * @param aim Angle about Y in radians the template is turned by
+ * @return The root of the instance that plays, 0 when none does
+ */
+ecs_entity_t ore_burst_aimed(
+    ecs_world_t *world,
+    ecs_entity_t effect,
+    const vec3 position,
+    float aim);
+
+/** Play an explosion at a position, the oreExplosion of the original: the effect (BoomBurst)
+ * at scale, and its flash light at cfg.explosionPeak and cfg.explosionRange times the scale.
+ *
+ * @param world The world, or the stage of a system before EcsPreStore
+ * @param effect The effect template, BoomBurst
+ * @param position World position of the blast
+ * @param scale Scale of the blast, 0 or less for 1
+ * @return The root of the instance that plays, 0 when none does
+ */
+ecs_entity_t ore_explosion(
+    ecs_world_t *world,
+    ecs_entity_t effect,
+    const vec3 position,
+    float scale);
+
+/** Play the combust of a critter that died, the oreCombust of the original.
+ *
+ * The effect (CombustBurst, authored for radius 1) plays cfg.combustLift * r above the position,
+ * its sizes and speeds at sqrt(r) and its spawn volumes and offsets, the scale of the root, at r.
+ * The radius is clamped to cfg.combustRadiusMin and cfg.combustRadiusMax.
+ *
+ * Its flash light peaks at cfg.combustPeak * sqrt(r) and reaches cfg.combustRange +
+ * cfg.combustRangeRadius * r.
+ *
+ * @param world The world, or the stage of a system before EcsPreStore
+ * @param effect The effect template, CombustBurst
+ * @param position World position of the critter
+ * @param radius Body radius of the critter
+ * @return The root of the instance that plays, 0 when none does
+ */
+ecs_entity_t ore_combust(
+    ecs_world_t *world,
+    ecs_entity_t effect,
+    const vec3 position,
+    float radius);
 
 /** Register the game flow: states, clock, blink, toast, cancel() and restart().
  *

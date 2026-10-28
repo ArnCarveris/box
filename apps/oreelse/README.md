@@ -19,12 +19,8 @@ bake3 run apps/oreelse --local-env -- --seed 42                # play the map of
 bake3 run apps/oreelse --local-env -- --headless --frames 10   # headless run, exits 0
 bake3 --target em --local-env apps/oreelse                     # build for the browser
 
-<<<<<<< HEAD
-python3 tools/integration.py e2e oreelse_flow oreelse_look oreelse_particles  # end to end
-=======
 python3 tools/integration.py e2e oreelse_flow oreelse_look     # the end-to-end scenarios
-python3 tools/integration.py e2e oreelse_mining
->>>>>>> cb8903751bb3621a330e944fc6c2bf20ff0624ee
+python3 tools/integration.py e2e oreelse_mining oreelse_particles
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -317,16 +313,12 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 | `etc/deposits.flecs` | The deposits of a run |
 | `etc/player.flecs` | The `Astronaut` template |
 | `etc/props/ore.flecs` | The `Ore` template of the deposits |
-<<<<<<< HEAD
-| `etc/particles.flecs` | Includes the particle effects |
-| `etc/particles/pools.flecs` | The particle sprites, how the original's pools map to the layers, the effect budgets (`ParticleSettings`) |
-| `etc/particles/*.flecs` | The particle effects, one file per effect group of the original: one shot prefabs (`BoomBurst`, `CombustBurst`, `MissileLaunch`, `FootDust`, ...) and emitter templates (`JetPlume`, `DrillDust`, `BeamGlow`, `MuzzleFlash`, ...) |
-=======
 | `etc/critters/` | The `Mite`, `Skitter`, `Brute` and `Behemoth` prefabs |
 | `etc/projectiles/` | The `Tracer`, `Missile` and `LaserBeam` prefabs |
 | `etc/props/markers.flecs` | The `TileMarker` and `TileMarkerBad` prefabs |
-| `etc/particles/jet_plume.flecs` | The `JetPlume` template of the jetpack |
->>>>>>> cb8903751bb3621a330e944fc6c2bf20ff0624ee
+| `etc/particles.flecs` | Includes the particle effects |
+| `etc/particles/pools.flecs` | The particle sprites, how the original's pools map to the layers, the effect budgets (`ParticleSettings`) |
+| `etc/particles/*.flecs` | The particle effects, one file per effect group of the original: one shot prefabs (`BoomBurst`, `CombustBurst`, `MissileLaunch`, `FootDust`, ...) and emitter templates (`JetPlume`, `DrillDust`, `BeamGlow`, `MuzzleFlash`, ...) |
 | `etc/materials/terrain.flecs` | The `GroundSurface` and `BasinSurface` materials and the dirt textures |
 | `etc/materials/hazard.flecs` | The hazard stripe texture and the `Hazard*` trim prefabs |
 | `etc/materials/solar_cells.flecs` | The solar cell texture and `SolarCells` |

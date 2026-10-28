@@ -14,9 +14,6 @@ include materials/vent
 include materials/fan
 include materials/drone_bay
 include props/ore
-<<<<<<< HEAD
-include particles
-=======
 include props/light
 include props/markers
 include buildings/pad_beacon
@@ -27,8 +24,7 @@ include buildings/solar_panel
 include buildings/gun_turret
 include buildings/laser_turret
 include buildings/missile_turret
-include particles/jet_plume
->>>>>>> cb8903751bb3621a330e944fc6c2bf20ff0624ee
+include particles
 include player
 include critters/mite
 include critters/skitter
