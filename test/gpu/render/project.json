@@ -432,6 +432,16 @@
                 ]
             },
             {
+                "id": "MultiViewCull",
+                "testcases": [
+                    "one_pass_without_occlusion",
+                    "one_pass_with_occlusion",
+                    "stats_match_scene",
+                    "split_over_32_frustums",
+                    "views_cull_separately"
+                ]
+            },
+            {
                 "id": "Occlusion",
                 "testcases": [
                     "wall_hides_object",

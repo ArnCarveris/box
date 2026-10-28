@@ -827,6 +827,10 @@ typedef struct box_render_gpu_stats_t {
                                  *   forward, shadow and capture passes, only when the page (or
                                  *   surface assets of the mesh) differs from the one bound last
                                  *   in the pass */
+    int32_t cull_dispatches;    /**< Compute dispatches the cull passes of views recorded:
+                                 *   cull_instances, cull_ordered, cull_scan and cull_write,
+                                 *   not the pyramid reductions nor the probe capture culls */
+    int32_t cull_instance_dispatches; /**< cull_instances dispatches among cull_dispatches */
     int32_t scatters;           /**< Scatter dispatches recorded */
     int32_t scattered;          /**< Instances the scatter dispatches copied */
     int32_t probes;             /**< Probes captured */
@@ -1095,6 +1099,20 @@ bool box_render_gpu_cull_window(
     ecs_world_t *world,
     uint32_t slots);
 
+/** Add copies of the frustum of cascade 0 to the cull of every view with shadows, for tests.
+ *
+ * A copy is culled like a cascade, as cascade cascades + i of the view, and nothing draws it;
+ * box_render_gpu_cull_frustum reads it. It makes a view cull more frustums than one cull group
+ * holds (BOX_GPU_CULL_GROUP_VIEWS). Applies from the next cull pass.
+ *
+ * @param world The world
+ * @param copies Copies per view, 0 for none
+ * @return Whether the world renders with the GPU backend
+ */
+bool box_render_gpu_cull_copies(
+    ecs_world_t *world,
+    int32_t copies);
+
 /** Set when the GPU backend of a world publishes cull counters, for tests.
  *
  * @param world The world
@@ -1167,6 +1185,24 @@ bool box_render_gpu_read_buffer(
 bool box_render_gpu_cull_stats(
     ecs_world_t *world,
     ecs_entity_t view,
+    box_render_cull_stats_t *out);
+
+/** Read back what one frustum of the cull pass of a view kept in the last target the GPU
+ * backend rendered: the view itself or one of its cascades.
+ *
+ * Only call this when the main thread renders, after box_render_sync, as
+ * box_render_gpu_cull_stats.
+ *
+ * @param world The world
+ * @param view Entity with the View
+ * @param cascade Cascade, -1 for the view itself
+ * @param out Receives the counts in tested and visible
+ * @return Whether the last rendered target culled the frustum
+ */
+bool box_render_gpu_cull_frustum(
+    ecs_world_t *world,
+    ecs_entity_t view,
+    int32_t cascade,
     box_render_cull_stats_t *out);
 
 /** Take the culling status of the views the GPU backend read back since the last call.

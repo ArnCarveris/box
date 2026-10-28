@@ -202,6 +202,49 @@ typedef struct box_gpu_cull_history_t {
     int64_t stamp;                  /**< Cull pass the view was last culled in */
 } box_gpu_cull_history_t;
 
+/** Frustums of a cull group at most, one bit each of the u32 mask of a job */
+#define BOX_GPU_CULL_GROUP_VIEWS (32)
+
+/** Flag of a frustum that draws only shadow casters: opaque mesh batches that cast shadows */
+#define BOX_GPU_CULL_CASTERS (1u << 0)
+
+/** Flag of a frustum that tests the smallest projected size */
+#define BOX_GPU_CULL_SIZE (1u << 1)
+
+/** Flag of a frustum with an occlusion history, culled in an early and a late phase */
+#define BOX_GPU_CULL_HISTORY (1u << 2)
+
+/** Flag of a frustum of probe captures: the batches baked into the captures */
+#define BOX_GPU_CULL_BAKE (1u << 3)
+
+/** Flag of a frustum that draws nothing, a camera without a depth range */
+#define BOX_GPU_CULL_EMPTY (1u << 4)
+
+/** Bytes between the uniforms of two dispatches, the dynamic offset alignment of webgpu */
+#define BOX_GPU_CULL_STRIDE (256)
+
+/** Invocations of a workgroup of the cull shader */
+#define BOX_GPU_CULL_GROUP (64)
+
+/** Words of the indexed indirect draw arguments of one draw */
+#define BOX_GPU_CULL_ARGS (5)
+
+/** Scan words of a workgroup of a parallel dispatch: two mask words and its count or offset */
+#define BOX_GPU_CULL_SCAN_WORDS (3)
+
+/** Phase of a dispatch without occlusion: draw what is in the frustum */
+#define BOX_GPU_CULL_PHASE_ALL (0)
+
+/** Phase that draws what is in the frustum and was drawn the previous frame */
+#define BOX_GPU_CULL_PHASE_EARLY (1)
+
+/** Phase that draws what is in the frustum, not hidden and not drawn early */
+#define BOX_GPU_CULL_PHASE_LATE (2)
+
+/** Bytes of the frustums of a cull group in the uniforms, a multiple of the uniform stride */
+#define BOX_GPU_CULL_FRUSTUMS_SIZE \
+    ((uint32_t)sizeof(box_gpu_cull_frustum_t) * BOX_GPU_CULL_GROUP_VIEWS)
+
 /** A frustum the cull pass tests instances against: a view, or a cascade of its shadows */
 typedef struct box_gpu_cull_view_t {
     ecs_entity_t view;              /**< Entity of the view */
@@ -209,8 +252,9 @@ typedef struct box_gpu_cull_view_t {
     int32_t cascade;                /**< Cascade of its shadow map, -1 for the view itself */
     int32_t first_draw;             /**< First of its draws */
     int32_t draw_count;             /**< Batches it draws */
-    int32_t first_dispatch;         /**< First of its dispatches */
-    int32_t dispatch_count;         /**< Dispatches that cull its batches */
+    int32_t group_index;            /**< Index of its cull group */
+    int32_t frustum;                /**< Its bit in the masks of the jobs of the group */
+    uint32_t flags;                 /**< BOX_GPU_CULL_CASTERS, _SIZE, _HISTORY, _BAKE, _EMPTY */
     uint32_t counter;               /**< Index of its counters */
     box_gpu_hiz_t *hiz;             /**< Pyramid of a view that culls by occlusion, else NULL */
     WGPUBindGroup group;            /**< History and pyramid, or the empty ones */
@@ -227,69 +271,106 @@ typedef struct box_gpu_cull_draw_t {
     uint32_t count;                 /**< Instances it tests */
 } box_gpu_cull_draw_t;
 
-/** A dispatch of the cull pass over the jobs of one instance page */
+/** A dispatch of the cull pass: the parallel job of a batch of a group and phase, with the
+ * frustums that draw it, or an ordered dispatch over the jobs of one instance page */
 typedef struct box_gpu_cull_dispatch_t {
+    int32_t group;                  /**< Index of its cull group */
     uint32_t buffer;                /**< Handle of the instance page */
     uint32_t groups;                /**< Workgroups to dispatch */
     bool ordered;                   /**< One invocation per job keeps the order of its slots */
     bool late;                      /**< Runs after the early draw, against the pyramid */
     uint32_t page;                  /**< Page that holds the visible slots of its jobs */
-    WGPUBindGroup history;          /**< History page and pyramid, NULL for those of the view */
+    WGPUBindGroup history;          /**< History page and pyramid, NULL for those of the group */
     uint32_t first;                 /**< Its job */
-    uint32_t scan;                  /**< First scan word of its workgroups, parallel only */
-    uint32_t scan_groups;           /**< Its workgroups, 0 for an ordered dispatch */
+    uint32_t uniform;               /**< Byte offset of the uniforms of an ordered dispatch */
+    uint32_t mask;                  /**< Frustums of the group that draw a parallel job */
+    int32_t first_entry;            /**< First of the draws of its frustums in entries, in the
+                                     *   order of their bits */
+    uint32_t scan;                  /**< First scan word of a parallel job, then those of each
+                                     *   of its frustums in the order of their bits */
 } box_gpu_cull_dispatch_t;
 
-/** The parallel dispatches of one cull view, phase and page that one cull_scan and one
- * cull_write dispatch finish */
+/** The parallel jobs of one cull group, phase and page that one cull_scan and one cull_write
+ * dispatch finish, per (job, frustum) entry */
 typedef struct box_gpu_cull_table_t {
-    int32_t view;                   /**< Index of the cull view */
-    bool late;                      /**< Phase of its dispatches */
-    uint32_t page;                  /**< Page of its dispatches */
-    uint32_t uniform;               /**< Index of its uniforms in the uniform buffer */
-    uint32_t buffer;                /**< An instance page of its dispatches, for group 1 */
-    uint32_t entries;               /**< Draws, the workgroups of cull_scan */
-    uint32_t groups;                /**< Workgroups of all its draws, those of cull_write */
+    int32_t group;                  /**< Index of the cull group */
+    bool late;                      /**< Phase of its jobs */
+    uint32_t page;                  /**< Page of its jobs */
+    uint32_t uniform;               /**< Byte offset of its uniforms in the uniform buffer */
+    uint32_t buffer;                /**< An instance page of its jobs, for group 1 */
+    uint32_t entries;               /**< (job, frustum) entries, the workgroups of cull_scan */
+    uint32_t groups;                /**< Workgroups of all its entries, those of cull_write */
 } box_gpu_cull_table_t;
 
-/** One cull_instances dispatch over consecutive parallel draws of a table that share an
+/** One cull_instances dispatch over consecutive parallel jobs of a table that share an
  * instance page and a history */
 typedef struct box_gpu_cull_run_t {
-    int32_t view;                   /**< Index of the cull view */
-    bool late;                      /**< Phase of its draws */
-    uint32_t page;                  /**< Page of its draws */
-    uint32_t uniform;               /**< Index of its uniforms, its part of the workgroup list */
-    uint32_t buffer;                /**< Instance page of its draws, bound as group 1 */
-    WGPUBindGroup history;          /**< History page and pyramid, NULL for those of the view */
-    uint32_t groups;                /**< Workgroups of its draws */
+    int32_t group;                  /**< Index of the cull group */
+    bool late;                      /**< Phase of its jobs */
+    uint32_t page;                  /**< Page of its jobs */
+    uint32_t uniform;               /**< Its part of the workgroup list, then the byte offset of
+                                     *   its uniforms */
+    uint32_t buffer;                /**< Instance page of its jobs, bound as group 1 */
+    WGPUBindGroup history;          /**< History page and pyramid, NULL for those of the group */
+    uint32_t groups;                /**< Workgroups of its jobs */
 } box_gpu_cull_run_t;
 
-/** Range of instances of one draw the cull shader tests, as in Job of cull.wgsl */
+/** Range of instances of one batch the cull shader tests, as in Job of cull.wgsl */
 typedef struct box_gpu_cull_job_t {
     uint32_t first;                 /**< First slot in the instance page */
     uint32_t count;                 /**< Slots to test */
-    uint32_t args;                  /**< Index of the draw arguments it counts into */
-    uint32_t base;                  /**< First entry it writes in the visible slots of its page */
+    uint32_t args;                  /**< Draw arguments of an ordered job */
+    uint32_t base;                  /**< First entry an ordered job writes in the visible slots */
     float center[3];                /**< Center of the mesh bounds */
     uint32_t history;               /**< First history word of its page, UINT32_MAX for none */
     float extent[3];                /**< Half size of the mesh bounds */
-    uint32_t late;                  /**< Draw arguments of its late phase, UINT32_MAX for none */
     uint32_t list;                  /**< 1 when first indexes the slot lists, 0 for a range */
+    uint32_t mask;                  /**< Frustums of its group that draw a parallel job */
     uint32_t pad[3];                /**< Pads the job to the size of Job in cull.wgsl */
 } box_gpu_cull_job_t;
 
-/** Uniforms of one cull dispatch, as in Cull of cull.wgsl */
-typedef struct box_gpu_cull_uniforms_t {
+/** A frustum of a cull group in the uniforms, as in Frustum of cull.wgsl */
+typedef struct box_gpu_cull_frustum_t {
     vec4 planes[6];                 /**< World space planes, inside where non negative */
-    vec4 clip_w;                    /**< Row of the view projection that gives clip w, the
-                                     *   probe position when size[3] is 1 */
-    vec4 size;                      /**< Pixels per unit at w 1, smallest size, w guard, 1 when
-                                     *   w is the depth in a face of the probe at clip_w */
-    uint32_t jobs[4];               /**< First job, jobs, phase, counters of the cull view */
+    vec4 clip_w;                    /**< Row of the view projection that gives clip w */
+    vec4 size;                      /**< Pixels per unit at w 1, smallest size, w guard, unused */
+    uint32_t flags[4];              /**< Index of its counters, its flags, two unused */
+} box_gpu_cull_frustum_t;
+
+/** A frustum a cull group is built with */
+typedef struct box_gpu_cull_desc_t {
+    ecs_entity_t view;              /**< Entity of the view it culls for, 0 for captures */
+    int32_t slot;                   /**< Slot of the view in the view buffer */
+    int32_t cascade;                /**< Cascade of its shadow map, -1 for the view itself */
+    int32_t index;                  /**< Index of the view in the packet, whose own batches it
+                                     *   draws, -1 for none */
+    uint32_t flags;                 /**< BOX_GPU_CULL_CASTERS, _SIZE, _HISTORY, _BAKE, _EMPTY */
+    bool report;                    /**< Its counts become the CullStatus of the view */
+    box_gpu_cull_frustum_t frustum; /**< Its planes and smallest size */
+} box_gpu_cull_desc_t;
+
+/** Uniforms of one cull dispatch, as in Cull of cull.wgsl; the frustums of its group are
+ * bound next to them */
+typedef struct box_gpu_cull_uniforms_t {
+    uint32_t jobs[4];               /**< First job, jobs, phase, frustum of an ordered dispatch */
     mat4 view_proj;                 /**< World to clip space of the view */
     uint32_t hiz[4];                /**< Pyramid width, height and levels, 0 levels for none */
-    uint32_t scan[4];               /**< First scan word of a parallel dispatch, three unused */
+    uint32_t scan[4];               /**< Table entries, their count, workgroup list, workgroups */
 } box_gpu_cull_uniforms_t;
+
+/** The frustums one pass of the cull shader tests together: a view of a target and the
+ * cascades of its shadows, frustum 0 being the view, or the frustum of probe captures */
+typedef struct box_gpu_cull_group_t {
+    int32_t slot;                   /**< Slot of its view in the view buffer */
+    int32_t first_view;             /**< First of its cull views */
+    int32_t view_count;             /**< Its cull views, at most BOX_GPU_CULL_GROUP_VIEWS */
+    int32_t first_dispatch;         /**< First of its dispatches */
+    int32_t dispatch_count;         /**< Its dispatches, parallel jobs and ordered ones */
+    uint32_t frustums;              /**< Byte offset of its frustums in the uniform buffer */
+    bool occlusion;                 /**< A frustum has a history: an early and a late phase */
+    box_gpu_cull_uniforms_t base;   /**< Uniforms of its view: view projection and pyramid */
+    WGPUBindGroup history;          /**< History and pyramid of its view, or the empty ones */
+} box_gpu_cull_group_t;
 
 /** What a view culled in a target, kept until its counters are read back */
 typedef struct box_gpu_cull_record_t {
@@ -393,6 +474,12 @@ typedef struct box_gpu_cull_t {
     ecs_vec_t order;                /**< uint64_t, instance page and draw of blended draws */
     ecs_vec_t tables;               /**< box_gpu_cull_table_t of the target */
     ecs_vec_t runs;                 /**< box_gpu_cull_run_t of the target */
+    ecs_vec_t groups;               /**< box_gpu_cull_group_t of the target */
+    ecs_vec_t entries;              /**< int32_t, the draw of each frustum of a parallel job */
+    ecs_vec_t masks;                /**< uint32_t, the frustums of the group being added that
+                                     *   draw each batch of the packet */
+    ecs_vec_t frustums;             /**< Frustums of the view being added */
+    int32_t copies;                 /**< Copies of cascade 0 added to each view, for tests */
     int64_t counting;               /**< History ranges passes, marks the pages counted */
     WGPUQuerySet stamps;            /**< Begin and end of the cull passes of a target, NULL
                                      *   without timestamp queries */
@@ -587,6 +674,8 @@ typedef struct box_gpu_t {
     box_render_compile_delivery_t delivery; /**< When compile outcomes apply, under the lock */
     box_render_readback_delivery_t readbacks; /**< When cull counters publish, under the lock */
     uint32_t cull_window;           /**< Slots of a cull page from the next pass, under the lock */
+    int32_t cull_copies;            /**< Copies of cascade 0 the views cull from the next pass,
+                                     *   under the lock */
     uint64_t buffer_writes;         /**< Writes to buffers, the version of the last one */
     box_render_gpu_stats_t stats;   /**< Counters read by the main thread */
     box_render_gpu_stats_t pending; /**< Counter changes not yet published, render thread only */
@@ -634,7 +723,9 @@ typedef enum box_gpu_stat_t {
     BOX_GPU_STAT_PREPASS,           /**< A depth prepass render pass was recorded */
     BOX_GPU_STAT_PREPASS_DRAW,      /**< A draw call was recorded in a depth prepass */
     BOX_GPU_STAT_SCATTER,           /**< A scatter dispatch was recorded */
-    BOX_GPU_STAT_INSTANCE_BIND      /**< An instance bind group was set in a pass or bundle */
+    BOX_GPU_STAT_INSTANCE_BIND,     /**< An instance bind group was set in a pass or bundle */
+    BOX_GPU_STAT_CULL_DISPATCH,     /**< A dispatch of the cull pass of a view was recorded */
+    BOX_GPU_STAT_CULL_INSTANCES     /**< A cull_instances dispatch of a view was recorded */
 } box_gpu_stat_t;
 
 #ifdef __EMSCRIPTEN__
@@ -1888,6 +1979,26 @@ void box_gpu_cull_add(
     int32_t slot,
     mat4 proj,
     const box_gpu_view_uniforms_t *u);
+
+/** Count the bits of a mask.
+ *
+ * @param mask The mask
+ * @return Its set bits
+ */
+uint32_t box_gpu_cull_bits(
+    uint32_t mask);
+
+/** Append a block of cull uniforms, padded to the dynamic offset alignment.
+ *
+ * @param c The cull state
+ * @param data The uniforms
+ * @param size Bytes of the uniforms
+ * @return Byte offset of the block in the uniform buffer
+ */
+uint32_t box_gpu_cull_uniform(
+    box_gpu_cull_t *c,
+    const void *data,
+    uint32_t size);
 
 /** Write the uniforms, jobs and draw arguments of the cull views of a target.
  *
