@@ -322,14 +322,14 @@ template ScrollView : HeadlessScrollView {
   }
   LayoutItem: {}
   if width > 0 {
-    LayoutItem: {width: {mode: Fixed, value: width}}
+    LayoutItem = {width: {mode: Fixed, value: width}}
   } else {
-    LayoutItem: {width: {mode: Grow}}
+    LayoutItem = {width: {mode: Grow}}
   }
   if height > 0 {
-    LayoutItem: {height: {mode: Fixed, value: height}}
+    LayoutItem = {height: {mode: Fixed, value: height}}
   } else {
-    LayoutItem: {height: {mode: Grow}}
+    LayoutItem = {height: {mode: Grow}}
   }
   Rect: {1, 1}
 

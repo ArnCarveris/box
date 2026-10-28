@@ -166,10 +166,10 @@ template TabView {
   Layout: {direction: Column}
   LayoutItem: {}
   if width > 0 {
-    LayoutItem: {width: {mode: Fixed, value: width}}
+    LayoutItem = {width: {mode: Fixed, value: width}}
   }
   if height > 0 {
-    LayoutItem: {height: {mode: Fixed, value: bar_h + height}}
+    LayoutItem = {height: {mode: Fixed, value: bar_h + height}}
   }
   Rect: {1, 1}
   Rgb: t.surface_alt

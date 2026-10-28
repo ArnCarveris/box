@@ -55,7 +55,7 @@ template PickButton {
 
   if down {
     Rgb: {30, 90, 200}
-    Border: {radius: 8, width: 3, color: {255, 220, 90, 255}}
+    Border = {radius: 8, width: 3, color: {255, 220, 90, 255}}
   } else {
     if hover {
       Rgb: {110, 150, 220}

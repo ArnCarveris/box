@@ -140,7 +140,7 @@ void Report_script_run(void) {
         "using box.perf\n"
         "cam { Camera: {fov: 50} }\n"
         "$ { PerfRun: {fps: 90, frames: 4, warmup: 3, camera: cam} }\n"
-        "$ { PerfRun: {quit: true, stall: 1} }\n", NULL) == 0);
+        "$ { PerfRun = {quit: true, stall: 1} }\n", NULL) == 0);
 
     const PerfRun *run = ecs_singleton_get(world, PerfRun);
     test_assert(run != NULL);
