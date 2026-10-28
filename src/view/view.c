@@ -10,9 +10,13 @@
  * their scene, render its atmosphere, light with an environment at intensity 1, have the
  * documented shadow defaults and cull with occlusion and a smallest size of one pixel.
  *
- * The shadow lookup moves along the geometric normal by 2 texels times 1 - N.L, Esoterica's
- * offset scale, and compares 2 texels closer to the light, which covers the depth slope across
- * the 3 texel tent at any light angle; a 0.1 band at a cascade edge blends into the next one.
+ * The shadow lookup moves along the geometric normal by 2 texels times 1 - N.L: Esoterica's
+ * offset scale, and the smallest offset that keeps a normal mapped floor under a 10 degree sun
+ * free of acne.
+ *
+ * It compares 2 texels closer to the light, which covers the depth slope across the 3 texel
+ * tent where the light is too steep for the offset to help (N.L above 0.5). A 0.1 band at the
+ * edge of a cascade blends into the next one.
  *
  * @param ptr The components
  * @param count Number of components
