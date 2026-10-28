@@ -185,10 +185,13 @@ An existing application-owned `ManualTransform` or `SurfaceAttachment` cannot
 also be driven by spatial placement.
 
 Evaluation follows a directed dependency graph with separate geometry-bounds,
-orientation, pose, and distribution steps. Each step is evaluated once per pass. The graph is
-rebuilt each frame so reparenting, edited references, direct dynamic-transform
-writes, geometry changes, and count changes are picked up. Unchanged results do
-not emit change events. Scenes without spatial rules skip array processing.
+orientation, pose, and distribution steps. Each step is evaluated once per pass. Results are
+kept between frames: a frame only solves and publishes again the entities whose inputs
+changed (layout rules, transforms, geometry, parents, prefabs) and the entities that depend
+on them, and only arrays that contain a change sync their instances. Entities that follow a
+`DynamicTransform` are solved every frame, so direct dynamic-transform writes are picked up.
+A frame in which nothing changed does no layout work. Unchanged results do not emit change
+events. Scenes without spatial rules skip array processing.
 
 An entity with geometry uses its own shape as its reference bounds, excluding
 children. An entity without geometry aggregates its children. This prevents
