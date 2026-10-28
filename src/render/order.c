@@ -5,6 +5,10 @@
  * The entities with 2D slots are sorted by the sibling keys (Position z, then rank) of their
  * ancestors and themselves, floating elements (LayoutFloat) and their descendants after the
  * rest; their slots are drawn per view as runs of consecutive slots.
+ *
+ * The shapes and glyphs of a tree, the descendants of a topmost entity below the scene roots,
+ * are ranked in that order, so the 2D shader lifts the depth of every one over the coplanar
+ * elements of its tree drawn before it.
  */
 
 #include "draw.h"
@@ -26,6 +30,7 @@ void box_draws_order_init(
     ecs_map_init(&d->ranks, NULL);
     ecs_map_init(&d->parents, NULL);
     ecs_map_init(&d->order_z, NULL);
+    ecs_map_init(&d->tree_ranks, NULL);
 }
 
 void box_draws_order_fini(
@@ -41,6 +46,7 @@ void box_draws_order_fini(
     ecs_map_fini(&d->ranks);
     ecs_map_fini(&d->parents);
     ecs_map_fini(&d->order_z);
+    ecs_map_fini(&d->tree_ranks);
 }
 
 void box_draws_order_slot(
@@ -232,19 +238,26 @@ void box_draws_order_position(
     }
 }
 
-/** Check whether an entity or one of its ancestors floats (LayoutFloat).
+/** Check whether an entity or one of its ancestors floats (LayoutFloat), and find its tree.
  *
  * @param world The world
  * @param e The entity
+ * @param tree Receives the topmost of the entity and its ancestors that is not a scene root, the
+ * entity itself when every one is
  * @return Whether it floats
  */
 static bool box_draws_floating(
     const ecs_world_t *world,
-    ecs_entity_t e)
+    ecs_entity_t e,
+    ecs_entity_t *tree)
 {
     bool result = false;
-    for (; e && !result; e = ecs_get_parent(world, e)) {
-        result = ecs_has(world, e, LayoutFloat);
+    *tree = e;
+    for (; e; e = ecs_get_parent(world, e)) {
+        result |= ecs_has(world, e, LayoutFloat);
+        if (!ecs_has(world, e, Scene)) {
+            *tree = e;
+        }
     }
 
     return result;
@@ -310,7 +323,7 @@ static void box_draws_order_collect(
             o->entity = e;
             o->path = (const uint64_t*)(uintptr_t)(uint32_t)path;
             o->depth = (int32_t)(path >> 32);
-            o->floating = box_draws_floating(world, e);
+            o->floating = box_draws_floating(world, e, &o->tree);
         }
     }
 
@@ -350,37 +363,66 @@ done:
     return;
 }
 
-/** Make the runs: the shape slot and then the glyph slots of every entity in order.
+/** Write the rank of a 2D slot into its shading when it changed.
+ *
+ * @param b The batch
+ * @param slot The slot
+ * @param rank The rank
+ */
+static void box_draws_rank_write(
+    box_draw_batch_t *b,
+    int32_t slot,
+    uint32_t rank)
+{
+    box_render_shading_t *shading = box_draws_slot_shading(b, slot);
+    if (shading->ids[1] != rank) {
+        shading->ids[1] = rank;
+        box_draws_slot_changed(b, slot, BOX_DRAW_SHADING);
+    }
+}
+
+/** Make the runs: the shape slot and then the glyph slots of every entity in order. Rank the
+ * shape and the glyphs of every entity in the order of its tree, the floating elements of a tree
+ * after the rest of it, and write the ranks that changed.
  *
  * @param world The world
  * @param d The state
  */
 static void box_draws_order_runs(
-    const ecs_world_t *world,
+    ecs_world_t *world,
     box_render_draws_t *d)
 {
     int32_t i, g, count = ecs_vec_count(&d->order);
     const box_draw_order_t *order = ecs_vec_first_t(&d->order, box_draw_order_t);
     ecs_vec_clear(&d->runs);
+    ecs_map_clear(&d->tree_ranks);
     for (i = 0; i < count; i ++) {
         ecs_entity_t e = order[i].entity;
         if (!ecs_is_alive(world, e)) {
             continue;
         }
 
-        const DrawSlot *s = ecs_get(world, e, DrawSlot);
+        ecs_map_val_t *next = ecs_map_ensure(&d->tree_ranks, order[i].tree);
+        DrawSlot *s = ecs_get_mut(world, e, DrawSlot);
         if (s && s->batch >= 0 &&
             box_draws_batch(d, s->batch)->key.pipeline == BOX_RENDER_SHADER_SHAPE2D)
         {
+            s->rank = (uint32_t)(*next) ++;
             box_draws_run_add(d, s->batch, s->slot);
+            box_draws_rank_write(box_draws_batch(d, s->batch), s->slot, s->rank);
         }
 
-        const TextSlots *ts = ecs_get(world, e, TextSlots);
+        TextSlots *ts = ecs_get_mut(world, e, TextSlots);
         int32_t glyphs = ts ? ecs_vec_count(&ts->slots) : 0;
+        if (glyphs) {
+            ts->rank = (uint32_t)(*next) ++;
+        }
+
         for (g = 0; g < glyphs; g ++) {
             const box_draw_glyph_slot_t *at = ecs_vec_get_t(
                 &ts->slots, box_draw_glyph_slot_t, g);
             box_draws_run_add(d, at->batch, at->slot);
+            box_draws_rank_write(box_draws_batch(d, at->batch), at->slot, ts->rank);
         }
     }
 }

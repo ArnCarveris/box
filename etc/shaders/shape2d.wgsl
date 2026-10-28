@@ -21,12 +21,28 @@
 // it. A clip maps the world position of a fragment into the local plane of its
 // element, where the coverage of its rounded area multiplies the alpha, anti-aliased over the
 // footprint of the fragment there; the clips it is nested in follow through its parent index.
+//
+// ids.y is the rank of the instance in the 2D draw order of its tree (order.c). The elements of
+// a UI lie in one plane and draw in order over equal depths, but quads of different sizes
+// interpolate their depths from different vertices: in a plane rotated under perspective the
+// depths of two of them round differently at the same pixel, and the one drawn later can fail
+// the test. The fragment lifts its depth by its rank times a part of the depth slope (more than
+// the subpixel snapping of the vertices moves the depth) and, in perspective, a part of the
+// depth (more than the rounding of the vertex transform), so it wins over every coplanar element
+// of its tree drawn before it without moving its pixels. A camera facing plane in an ortho view
+// has neither, so screen space UI keeps the depths of its geometry.
 #include "include/lights.wgsl"
 
 // BlendMode of the pipeline: the output is shaped for the blend equation it is drawn with.
 override blend_mode: u32 = 0u;
 
 @group(0) @binding(0) var<uniform> view: View;
+
+// Depth slope in pixels the depth of an instance is lifted by per rank
+const rank_slope: f32 = 1.0 / 64.0;
+
+// Part of the depth of an instance it is lifted by per rank in a perspective view
+const rank_depth: f32 = 1.0 / 131072.0;
 
 // The area of a ClipChildren element (box_render_clip_t): x and y are the first two rows of its
 // inverse world transform, area its half extents, corner radius and the index of its parent clip.
@@ -89,6 +105,13 @@ struct VertexOut {
     @location(9) world: vec3f,
     // Clip index, 0 for none
     @location(10) @interpolate(flat) clip: u32,
+    // Rank in the draw order of the tree of the instance
+    @location(11) @interpolate(flat) rank: u32,
+};
+
+struct FragmentOut {
+    @location(0) color: vec4f,
+    @builtin(frag_depth) depth: f32,
 };
 
 // Pixels the image moves per model unit along a direction, at a projected point.
@@ -146,6 +169,7 @@ fn pixels_per_unit(mvp: mat4x4f, clip: vec4f, dir: vec2f) -> f32 {
     o.pos = mvp * point;
     o.world = (model * point).xyz;
     o.clip = inst.ids.x;
+    o.rank = inst.ids.y;
     o.local = q;
     o.uv = vec2f(q.x / (2.0 * extent.x) + 0.5, 0.5 - q.y / (2.0 * extent.y));
     o.extent = extent;
@@ -233,7 +257,15 @@ fn output(color: vec3f, alpha: f32, cover: f32) -> vec4f {
     }
 }
 
-@fragment fn fs(f: VertexOut) -> @location(0) vec4f {
+// Depth of a fragment lifted over the coplanar elements of its tree drawn before it.
+fn ranked_depth(depth: f32, rank: u32) -> f32 {
+    let slope = max(abs(dpdx(depth)), abs(dpdy(depth)));
+    let part = select(rank_depth, 0.0, view.lights.w == 1u);
+    return depth + f32(rank) * (rank_slope * slope + part * depth);
+}
+
+@fragment fn fs(f: VertexOut) -> FragmentOut {
+    let depth = ranked_depth(f.pos.z, f.rank);
     let world_dx = dpdx(f.world);
     let world_dy = dpdy(f.world);
     let footprint = vec2f(
@@ -267,5 +299,5 @@ fn output(color: vec3f, alpha: f32, cover: f32) -> vec4f {
         discard;
     }
 
-    return output(color, alpha, cover);
+    return FragmentOut(output(color, alpha, cover), depth);
 }
