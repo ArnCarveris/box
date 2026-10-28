@@ -27,6 +27,21 @@
 /** Inputs a recipe can have, the size of OreRecipe.inputs */
 #define ORE_RECIPE_INPUTS (6)
 
+/** Orders the order book holds, the size of OreCraftBook.orders and the most cfg.craftOrders */
+#define ORE_CRAFT_ORDERS (8)
+
+/** Entries an order holds, the size of OreCraftOrder.entries and the most cfg.craftEntries */
+#define ORE_CRAFT_ENTRIES (8)
+
+/** Item kinds a pool of an order holds, the size of OreCraftBag.stacks */
+#define ORE_CRAFT_BAG (24)
+
+/** Rows of the queue, the size of OreCraftBook.rows and the most cfg.craftRows */
+#define ORE_CRAFT_ROWS (16)
+
+/** Raw ores, the size of OreNeeds.ores */
+#define ORE_RAW_ORES (4)
+
 /** Read the float constant cfg.<name> of the scene (etc/config.flecs) */
 #define ORE_CFG(world, name) ecs_const_var_get_t(world, "cfg." name, ecs_f32_t)
 
@@ -159,7 +174,8 @@ ECS_STRUCT(OreItem, {
 
 /** A mined item, on its prefab: a swing at a deposit of it yields 1 */
 ECS_STRUCT(OreMined, {
-    float time; /**< Seconds a swing takes */
+    float time;   /**< Seconds a swing takes */
+    int32_t rank; /**< Place of the ore in lists of raw ore (OreNeeds), Iron first */
 });
 
 /** A crafted item, on its prefab: the inputs a craft takes and what it yields */
@@ -177,6 +193,104 @@ ECS_STRUCT(OreRecipe, {
  */
 ECS_STRUCT(OreInventory, {
     OreStack slots[15]; /**< The slots in order, item 0 for a free one, else amount above 0 */
+});
+
+/** A worker of the order book: the astronaut, later every factory. An idle worker starts the
+ * first startable entry of the oldest order; a craft takes the recipe's time divided by speed.
+ */
+ECS_STRUCT(OreCrafter, {
+    ecs_entity_t item; /**< Item of the entry it crafts, 0 when idle */
+    int32_t order;     /**< Id of the order of the entry, 0 when idle */
+    float left;        /**< Work left in seconds at speed 1; 0 with an item: done, waiting to
+                        *   deliver it to a full inventory */
+    float total;       /**< Work of the craft in seconds at speed 1, the recipe's time */
+    float speed;       /**< Work done per second, 1 for 0 or less */
+    bool paused;       /**< Stopped: it neither works nor starts and keeps its craft */
+});
+
+/** Amounts of item kinds, the pool of an order: any amount of at most ORE_CRAFT_BAG kinds */
+ECS_STRUCT(OreCraftBag, {
+    OreStack stacks[24]; /**< The kinds, the first count of them with an amount above 0 */
+    int32_t count;       /**< Kinds held */
+});
+
+/** A crafted item of an order and its crafts */
+ECS_STRUCT(OreCraftEntry, {
+    ecs_entity_t item; /**< The crafted item */
+    int32_t count;     /**< Crafts left, those running included */
+    int32_t running;   /**< Crafts workers are on */
+    bool active;       /**< A worker is on it */
+    float progress;    /**< Progress of the furthest worker on it, 0 to 1 */
+    bool full;         /**< Blocked by a full inventory: it cannot start or deliver */
+    bool stalled;      /**< The order is stalled and this entry has work or is blocked */
+});
+
+/** An order of the order book: the demand of one item, paid when placed, with its own pool */
+ECS_STRUCT(OreCraftOrder, {
+    int32_t id;              /**< Stable id, never reused within a run */
+    ecs_entity_t item;       /**< The ordered item */
+    int32_t demand;          /**< Units still to deliver, cancel takes one off */
+    int32_t count;           /**< Crafts of the ordered item left plus running */
+    int32_t entry_count;     /**< Entries held */
+    OreCraftEntry entries[8]; /**< Crafted items, inputs before their parent, the ordered item
+                               *   last */
+    OreCraftBag pool;        /**< Materials the order paid and the surplus of its crafts */
+    bool stalled;            /**< No worker live on it, nothing can start, and there is work
+                              *   left or delivery is blocked */
+    bool full;               /**< Its leftover pool does not fit the inventory */
+    bool wrapping;           /**< No entries left, the leftover pool still to deliver */
+});
+
+/** A row of the queue panel: a header per order, then one per entry other than the ordered
+ * item. (order, item) identifies a row.
+ */
+ECS_STRUCT(OreCraftRow, {
+    int32_t order;     /**< Id of the order */
+    ecs_entity_t item; /**< The ordered item for a header, else the entry's item */
+    bool sub;          /**< An entry row, indented under its header */
+    int32_t count;     /**< Crafts left plus running of the item */
+    bool active;       /**< A worker is on it */
+    float progress;    /**< Progress of the furthest worker on it, 0 to 1 */
+    bool full;         /**< Blocked by a full inventory */
+    bool stalled;      /**< Stalled, see OreCraftOrder and OreCraftEntry */
+    bool wrapping;     /**< A header of an order wrapping up */
+    bool cancel;       /**< A header of an order cancel can take a unit off */
+});
+
+/** The order book, a singleton run.flecs resets: the orders oldest first and the rows of the
+ * queue panel. Modified when a value changes.
+ */
+ECS_STRUCT(OreCraftBook, {
+    OreCraftOrder orders[8]; /**< The orders oldest first */
+    int32_t count;           /**< Orders held */
+    int32_t next_id;         /**< Id of the last order placed */
+    OreCraftRow rows[16];    /**< The rows of the queue panel in order */
+    int32_t row_count;       /**< Rows held */
+    bool stalled;            /**< An order is stalled */
+});
+
+/** Whether ordering one unit of a crafted item now would succeed: paid from the inventory and
+ * within every limit. On every item prefab with a recipe, updated while playing.
+ */
+ECS_STRUCT(OreCanOrder, {
+    bool value; /**< Ordering one unit would succeed */
+});
+
+/** The raw ore of one unit of an item, a row of OreNeeds */
+ECS_STRUCT(OreNeed, {
+    ecs_entity_t item; /**< The raw ore */
+    int32_t need;      /**< The larger of its full raw cost and what is missing */
+    int32_t have;      /**< need minus what is missing, parts in the inventory count as ore */
+});
+
+/** The raw ore of the item the UI shows, a singleton: the UI sets item, the game the rest.
+ * Modified when a value changes.
+ */
+ECS_STRUCT(OreNeeds, {
+    ecs_entity_t item; /**< The item, set by the UI, 0 for none */
+    OreNeed ores[4];   /**< The ores with a need above 0 in the order Iron, Copper, Stone,
+                        *   Luminite (OreMined.rank) */
+    int32_t count;     /**< Ores listed */
 });
 
 /** The tile under the cursor, a singleton: where the cursor ray of the world view (OreView)
@@ -551,6 +665,39 @@ void ore_inventory_import(
  * @param world The world
  */
 void ore_mining_import(
+    ecs_world_t *world);
+
+/** Place an order for units of an item: the first unit creates a new order, every further
+ * unit merges into it, until a unit cannot be paid or breaks a limit. Every unit is paid at
+ * once: what the order borrows leaves the inventory for its pool.
+ *
+ * @param world The world
+ * @param item The crafted item
+ * @param count Units to order
+ * @return Units ordered, 0 when the order was refused
+ */
+int32_t ore_craft_order(
+    ecs_world_t *world,
+    ecs_entity_t item,
+    int32_t count);
+
+/** Take one unit off an order and refund what the rest does not need. Refused with a warning
+ * when the refund does not fit the inventory.
+ *
+ * @param world The world
+ * @param id Id of the order
+ * @return Whether a unit was taken off
+ */
+bool ore_craft_cancel(
+    ecs_world_t *world,
+    int32_t id);
+
+/** Register crafting: the order book, the workers, OreCanOrder, OreNeeds and the script
+ * functions oreelse.craft_order(item, count) and oreelse.craft_cancel(order).
+ *
+ * @param world The world
+ */
+void ore_craft_import(
     ecs_world_t *world);
 
 /** Register the look: the render quality tiers and oreelse.cycleQuality().

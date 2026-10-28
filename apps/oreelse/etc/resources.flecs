@@ -1,8 +1,8 @@
 // The items of the game except the buildings, prefabs the deposits, the inventory and the
 // recipes name. Every item has its OreItem (the name and the detail text the UI shows); the
-// ores have the mining time of a swing (OreMined), the others the recipe that crafts them
-// (OreRecipe: the inputs and their amounts, the yield of a craft and its time in seconds). The
-// buildings add their items with the same components.
+// ores have the mining time of a swing and their place in lists of raw ore (OreMined), the
+// others the recipe that crafts them (OreRecipe: the inputs and their amounts, the yield of a
+// craft and its time in seconds). The buildings add their items with the same components.
 
 using oreelse
 
@@ -10,22 +10,22 @@ items {
   // The ores of the deposits
   prefab Iron {
     OreItem: {name: "Iron", detail: "Raw iron. Refines into iron plates."}
-    OreMined: {time: 4.5}
+    OreMined: {time: 4.5, rank: 0}
   }
 
   prefab Copper {
     OreItem: {name: "Copper", detail: "Raw copper. Refines into copper plates."}
-    OreMined: {time: 6}
+    OreMined: {time: 6, rank: 1}
   }
 
   prefab Stone {
     OreItem: {name: "Stone", detail: "Stone. Refines into stone bricks."}
-    OreMined: {time: 1.5}
+    OreMined: {time: 1.5, rank: 2}
   }
 
   prefab Luminite {
     OreItem: {name: "Luminite", detail: "Precious mineral that can only be mined on this planet."}
-    OreMined: {time: 24}
+    OreMined: {time: 24, rank: 3}
   }
 
   // The refined materials

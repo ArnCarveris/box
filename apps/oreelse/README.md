@@ -21,6 +21,7 @@ bake3 --target em --local-env apps/oreelse                     # build for the b
 
 python3 tools/integration.py e2e oreelse_flow oreelse_look     # the end-to-end scenarios
 python3 tools/integration.py e2e oreelse_mining
+python3 tools/integration.py e2e oreelse_crafting
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -136,6 +137,63 @@ Moving the cursor to another deposit starts the swing over. Releasing the button
 of reach or moving the cursor off the deposit loses the progress of the swing. The right button
 over a panel of the UI does not mine.
 
+### Crafting
+
+You order the thing you want, not its parts. Ordering an item queues the whole chain of its
+prerequisites, deepest first, and you pay when you order: the chain is priced against what you
+hold and its materials leave the inventory at once. If you cannot pay for the whole chain now,
+the order is refused (its craft button shows dim); there is no ordering against ore you hope to
+have later. Shift orders a batch of 5: one order of as many units as you can pay for, so asking
+for five with materials for three gives one order of three.
+
+Planning a unit takes every input, at every level of the chain:
+
+1. from the order's own pool first (the surplus of its earlier crafts, such as the second wire
+   of a wire craft);
+2. then from the inventory: plates, wire and electronics you hold are used before new ones
+   are crafted;
+3. then from new crafts, `ceil(need / yield)` of them, whose inputs are planned the same way;
+   the surplus yield goes to the order's pool.
+
+Raw ore has to be in the inventory. Each order is its own block with its own pool of parts;
+orders never share parts.
+
+| Item | Raw ore of one unit |
+| --- | --- |
+| Electronics | 4 Copper |
+| Rocket engine | 16 Iron, 8 Copper |
+| Rocket cargo bay | 24 Iron, 12 Copper |
+| Rocket life support | 16 Iron, 32 Copper |
+| Rocket fuel storage | 20 Iron, 8 Copper |
+
+The order book takes at most 8 orders, 8 crafted items per order, 12 item kinds held per order
+(its pool, what it borrows and what it plans) and 16 queue rows in total, an order counting a
+row per crafted item and at least one; recipes are planned at most 8 levels deep. An order or a
+unit that would break a limit is refused.
+
+The astronaut is a worker that crafts at speed 1, wherever it is. An idle worker takes the next
+startable craft of the oldest order: the first of its items, inputs first, that has crafts left
+and whose inputs for one craft are in the order's pool; the ordered item also needs room in the
+inventory. The inputs leave the pool when the craft starts, and a craft takes its time divided
+by the worker's speed. A finished part goes to the order's pool, the ordered item into the
+inventory. When it does not fit (15 kinds held), the worker waits holding it and the order is
+stalled (inventory full) until a slot frees. Once every unit is delivered, the order's leftover
+pool (a spare wire, say) goes into the inventory, each kind as soon as it fits; until then the
+order is wrapping up. A worker that is removed mid-craft returns the inputs of its craft to the
+order's pool and loses its progress; another worker picks the craft up.
+
+Cancel takes one unit off an order. The pool keeps what the remaining units need; the rest is
+refunded into the inventory in whatever form the pool holds it (ore, plates, wire, electronics),
+not counting the outputs of crafts still running. Cancelling the last unit stops the crafts in
+progress for the order and refunds their inputs too, so you get back everything it took. When
+the refund does not fit the 15 kinds of the inventory the cancel is refused with the warning
+`No room for the refund`.
+
+While you look at an item, its raw ore shows per ore (Iron, Copper, Stone, Luminite): the full
+cost of one unit, or what is still missing when that is more, and how much of it you have, the
+parts you hold counting as the ore they are made of. A row falls short only when ore is really
+missing.
+
 ### Render quality
 
 Three render quality tiers trade the look for speed; the button on the pause screen cycles them
@@ -169,7 +227,10 @@ Every task of the port follows these.
 - **State in reflected singletons and components**, marked modified only when a value changes,
   so the UI scripts re-evaluate only what changed: `OreClock` every frame of play, `OreBlink`
   when a signal flips, `OreToast` when a message starts and ends, `OreView` while it glides,
-  `OreHover` when the cursor tile moves, `OreInventory` when an amount changes.
+  `OreHover` when the cursor tile moves, `OreInventory` when an amount changes,
+  `OreCraftBook` (the orders oldest first and the rows of the queue panel) when an order or a
+  craft's progress changes, `OreCanOrder` on an item prefab when it flips, `OreNeeds` (the raw
+  ore of the item the UI sets in it) when a row changes. The C formats no text for the UI.
 - **Game state** is the exclusive pair `(OreGameState, Title | Playing | Paused | Won | Lost)`
   on its own singleton (`ore_state_is`, `ore_state_set`). Gameplay systems run only while
   `Playing`, with a query term on `ore_state_pair(world, OreGameStatePlaying)` whose source is
@@ -235,7 +296,7 @@ Every task of the port follows these.
 | `etc/world.flecs` | The ground and the basin |
 | `etc/boundary.flecs` | The hazard band around the playable area |
 | `etc/scenery.flecs` | The boulders and dunes of a run |
-| `etc/run.flecs` | The astronaut and the singletons of a run |
+| `etc/run.flecs` | The astronaut and the singletons of a run, the order book included |
 | `etc/deposits.flecs` | The deposits of a run |
 | `etc/player.flecs` | The `Astronaut` template |
 | `etc/props/ore.flecs` | The `Ore` template of the deposits |
@@ -249,4 +310,5 @@ Every task of the port follows these.
 | `src/player.c` | Walking and the camera |
 | `src/inventory.c` | The inventory and the item components |
 | `src/mining.c` | Mining and its tile marker |
+| `src/craft.c` | The order book, the workers, `oreelse.craft_order()`, `oreelse.craft_cancel()` |
 | `src/look.c` | The render quality tiers, `oreelse.cycleQuality()` |

@@ -25,6 +25,20 @@ cfg {
   // the slots of OreInventory)
   export const inventorySlots: i32 = 15
 
+  // The order book: at most craftOrders orders, craftEntries crafted items per order,
+  // craftHold item kinds held per order (its pool, what it borrows and what it plans) and
+  // craftRows queue rows in total, where an order counts max(1, entries); recipes are planned
+  // at most craftDepth levels deep. Placing or growing an order that breaks one is refused
+  // (orders, entries and rows up to 8, 8 and 16, the arrays of OreCraftBook)
+  export const craftOrders: i32 = 8
+  export const craftEntries: i32 = 8
+  export const craftHold: i32 = 12
+  export const craftRows: i32 = 16
+  export const craftDepth: i32 = 8
+
+  // Units a batch order (shift) asks for
+  export const craftBatch: i32 = 5
+
   // Walking speed in units per second, and its multiplier while the run key is held
   export const walkSpeed: f32 = 7
   export const runMultiplier: f32 = 2
