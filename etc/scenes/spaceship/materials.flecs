@@ -1,0 +1,27 @@
+
+using flecs.script
+using box.transform
+using box.geometry
+using box.spatial
+using box.material
+using box.texture
+using box.light
+
+ship_plate_color { TexturePath: {path: "etc/scenes/spaceship/assets/plating.svg", width: 1024} }
+ship_plate_orm { TexturePath: {path: "etc/scenes/spaceship/assets/orm.svg", width: 1024} }
+ship_plate_normal { TexturePath: {path: "etc/scenes/spaceship/assets/normal.png"} }
+ship_registry { TexturePath: {path: "etc/scenes/spaceship/assets/registry.svg", width: 2048} }
+ship_warning { TexturePath: {path: "etc/scenes/spaceship/assets/hazard.svg", width: 512} }
+ship_display { TexturePath: {path: "etc/scenes/spaceship/assets/display.svg", width: 512} }
+prefab HullArmor { Rgb: {155, 173, 178}; PbrMaterial: {metallic: 0.62, roughness: 0.68}; PbrTextures: {albedo: ship_plate_color, orm: ship_plate_orm, normal: ship_plate_normal} }
+prefab PaleArmor { Rgb: {204, 214, 207}; PbrMaterial: {metallic: 0.45, roughness: 0.54} }
+prefab DarkArmor { Rgb: {39, 54, 65}; PbrMaterial: {metallic: 0.7, roughness: 0.63} }
+prefab RecessMetal { Rgb: {12, 22, 30}; PbrMaterial: {metallic: 0.55, roughness: 0.8} }
+prefab Titanium { Rgb: {120, 142, 154}; PbrMaterial: {metallic: 0.85, roughness: 0.3} }
+prefab RustRed { Rgb: {164, 53, 34}; PbrMaterial: {metallic: 0.42, roughness: 0.65} }
+prefab DockYellow { Rgb: {210, 140, 45}; PbrMaterial: {metallic: 0.6, roughness: 0.65} }
+prefab IceLight { Rgb: {48, 137, 167}; Emissive: {strength: 3, color: {78, 207, 255}} }
+prefab AmberLight { Rgb: {245, 137, 45}; Emissive: {strength: 3, color: {255, 139, 40}} }
+prefab WhiteLight { Rgb: {175, 218, 230}; Emissive: {strength: 2.5, color: {195, 230, 255}} }
+
+dock_registry { TexturePath: {path: "etc/scenes/spaceship/assets/dock_registry.svg", width: 1024} }

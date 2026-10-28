@@ -1,0 +1,73 @@
+include catwalk
+using flecs.script
+using box.transform
+using box.geometry
+using box.spatial
+using box.material
+using box.texture
+using box.light
+
+@tree Parent
+template DockModule {
+  for side in 0..2 {
+    {
+      const x = (side - 0.5) * 39
+      for tier in 0..2 {
+        {
+          chord : DarkArmor { Position: {x, -6 + tier * 13, 0}; BeveledPrism: {footprint: [{-2, -15}, {2, -15}, {2, 15}, {-2, 15}], depth: 2.8, inset: 0.3, bevel: 0.3} }
+          flange : Titanium { Position: {x, -4.5 + tier * 10, 0}; Box: {4.5, 0.5, 30} }
+        }
+      }
+      for j in 0..3 {
+        {
+          strut { ShipBeam: {ax: x, ay: -5, az: -14 + j * 9.3, bx: x, by: 6, bz: -4.7 + j * 9.3, radius: 0.65} }
+          reverse { ShipBeam: {ax: x, ay: 6, az: -14 + j * 9.3, bx: x, by: -5, bz: -4.7 + j * 9.3, radius: 0.35} }
+          gusset : DockYellow { Position: {x, 6, -14 + j * 9.3}; Box: {4.8, 2, 2.8} }
+        }
+      }
+      walkway { DockCatwalk: {length: 29}; Position: {x, 8.8, 0} }
+      for j in 0..10 {
+        {
+          fastener : Titanium { Position: {x + 2.05, -5.5, -13.5 + j * 3}; Rotation: {0, 0, 1.5707963}; Cylinder: {radius: 0.17, length: 0.2, segments: 6} }
+          safety_light : AmberLight { Position: {x, 10.7, -13.5 + j * 3}; Box: {0.3, 0.2, 0.3} }
+        }
+      }
+    }
+  }
+  for zside in 0..2 {
+    {
+      crossmember : DarkArmor { Position: {0, 0, (zside - 0.5) * 27}; Box: {41, 9, 2.3} }
+      upper : DockYellow { Position: {0, 5.5, (zside - 0.5) * 27}; Box: {42, 2, 2.6} }
+      lower : DarkArmor { Position: {0, -5.5, (zside - 0.5) * 27}; Box: {42, 2, 2.6} }
+      for k in 0..11 {
+        {
+          rib : Titanium { Position: {-19 + k * 3.8, 0, (zside - 0.5) * 29.5}; Box: {0.25, 8.4, 0.4} }
+          recess : RecessMetal { Position: {-17.5 + k * 3.4, 0, (zside - 0.5) * 29.4}; Box: {2.8, 6.6, 0.1} }
+        }
+      }
+    }
+  }
+  core : RecessMetal { Box: {27, 7, 24} }
+  cap : DarkArmor { Box: {1, 0.8, 1}; Fit: {target: core, axes: XZ, padding: {0.5, 0, 0.5}}; Align: {target: core, self: {y: Min}, other: {y: Max}} }
+  for row in 0..7 {
+    {
+      for col in 0..9 {
+        {
+          roof { HullPanel: {width: 2.8, length: 2.8}; Position: {-12 + col * 3, 4.4, -9 + row * 3} }
+        }
+      }
+    }
+  }
+  for i in 0..6 {
+    {
+      coolant : Titanium { Position: {-12 + i * 4.8, -4, 0}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 0.55, length: 25, segments: 12} }
+      pump : DockYellow { Position: {-12 + i * 4.8, -4, 8}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 0.95, length: 3, segments: 12} }
+      utility : DarkArmor { Position: {-12 + i * 4.8, 6.5, 5}; Box: {3.4, 3.5, 4.4} }
+      vent { FrigateRadiator: {width: 2.8, length: 3.8}; Position: {-12 + i * 4.8, 8.3, 5} }
+      warning { Position: {-12 + i * 4.8, 6.4, 7.24}; Quad: {2.4, 0.5}; Rgb: {255, 255, 255}; PbrTextures: {albedo: ship_warning} }
+    }
+  }
+  floodbar : DarkArmor { Position: {-15, 10, -8}; Rotation: {0, 0, -0.4}; Box: {1, 5, 8} }
+  floodface : WhiteLight { Position: {-15.55, 10.2, -8}; Rotation: {0, 0, -0.4}; Box: {0.15, 3, 6} }
+  worklight { Position: {-17, 11, -8}; PointLight: {intensity: 380, range: 40}; Rgb: {176, 215, 245} }
+}
