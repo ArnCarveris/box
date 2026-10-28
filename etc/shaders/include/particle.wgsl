@@ -21,8 +21,8 @@ struct Emitter {
     speed_size: vec4f,
     // xy: initial rotation range in degrees, zw: spin range in degrees per second
     rotation_spin: vec4f,
-    // xy: opacity range
-    opacity: vec4f,
+    // xy: opacity range, zw: range of the speed away from the origin of the emitter
+    opacity_radial: vec4f,
     // x: EmitterShape, y: seed, z: particles to spawn, w: spawn index of the first of them
     spawn: vec4u,
     // x: used slots, y: first spawn slot in the slot buffer, z: mesh table points,
@@ -114,6 +114,7 @@ const STREAM_SHAPE: u32 = 6u;
 const STREAM_DIRECTION: u32 = 9u;
 const STREAM_POINT: u32 = 11u;
 const STREAM_COLOR: u32 = 15u;
+const STREAM_RADIAL: u32 = 19u;
 
 // Ground collision modes, BOX_PARTICLE_GROUND_*
 const GROUND_NONE: u32 = 0u;
@@ -211,6 +212,13 @@ fn particle_cone(n: vec3f, cos_spread: f32, u: vec2f) -> vec3f {
     let t = vec3f(1.0 + sign * n.x * n.x * a, sign * b, -sign * n.x);
     let s = vec3f(b, sign + n.y * n.y * a, -n.y);
     return select(t * x + s * y + n * cos_t, vec3f(0.0), all(n == vec3f(0.0)));
+}
+
+// The radial velocity of a particle: its radial speed along the world offset of its spawn
+// point from the origin of the emitter, zero for an offset of zero.
+fn particle_radial(offset: vec3f, speed: f32) -> vec3f {
+    let len2 = dot(offset, offset);
+    return select(vec3f(0.0), offset * (speed * inverseSqrt(len2)), len2 > 0.0);
 }
 
 // The wander field: a sum of sines of the position times the scale, offset by the phase,

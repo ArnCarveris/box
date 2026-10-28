@@ -457,3 +457,48 @@ void InstanceStreams_dynamic_shape2d_keeps_clip(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+void InstanceStreams_shape2d_ranks_follow_order(void) {
+    // ui/shapes_2d
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t panel = ecs_new(world);
+    ecs_set(world, panel, Position, {0, 0, 0});
+    ecs_set(world, panel, Rect, {100, 100});
+    ecs_entity_t children[COUNT];
+    uint32_t ranks[COUNT];
+    int32_t i;
+    for (i = 0; i < COUNT; i ++) {
+        children[i] = ecs_new_w_pair(world, EcsChildOf, panel);
+        ecs_set(world, children[i], Position, {(float)i, 0, 0});
+        ecs_set(world, children[i], Rect, {10, 10});
+    }
+
+    frame(world);
+    frame(world);
+    test_uint(shading_of(world, panel)->ids[1], 0);
+    for (i = 0; i < COUNT; i ++) {
+        ranks[i] = shading_of(world, children[i])->ids[1];
+        test_uint(ecs_get(world, children[i], DrawSlot)->rank, ranks[i]);
+        test_assert(ranks[i] > (i ? ranks[i - 1] : 0));
+    }
+
+    ecs_delete(world, children[2]);
+    box_render_draws_stats_t stats = frame(world);
+    test_int(stats.shading_bytes, segment_size(1, SHADING_2D));
+    for (i = 3; i < COUNT; i ++) {
+        test_uint(shading_of(world, children[i])->ids[1], ranks[i]);
+    }
+
+    ecs_entity_t last = ecs_new_w_pair(world, EcsChildOf, panel);
+    ecs_set(world, last, Position, {0, 0, 1});
+    ecs_set(world, last, Rect, {10, 10});
+    frame(world);
+    test_assert(shading_of(world, last)->ids[1] > ranks[COUNT - 1]);
+    for (i = 3; i < COUNT; i ++) {
+        test_uint(shading_of(world, children[i])->ids[1], ranks[i]);
+    }
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}

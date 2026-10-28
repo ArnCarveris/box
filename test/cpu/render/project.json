@@ -275,7 +275,8 @@
                     "reparent_writes_both",
                     "scene_change_writes_both",
                     "toggle_dynamic_transform",
-                    "dynamic_shape2d_keeps_clip"
+                    "dynamic_shape2d_keeps_clip",
+                    "shape2d_ranks_follow_order"
                 ]
             },
             {

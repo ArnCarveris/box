@@ -52,7 +52,8 @@ typedef struct box_render_particle_block_t {
     float rotation[2];      /**< Range of the initial rotation in degrees */
     float spin[2];          /**< Range of the spin in degrees per second */
     float opacity[2];       /**< Range of the opacity */
-    float pad0[2];          /**< Unused */
+    float radial[2];        /**< Range of the initial speed away from the origin of the
+                             *   emitter */
     uint32_t shape;         /**< EmitterShape */
     uint32_t seed;          /**< Seed of the draws */
     uint32_t count;         /**< Particles the spawn pass writes */

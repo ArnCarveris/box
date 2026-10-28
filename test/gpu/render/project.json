@@ -518,6 +518,11 @@
                     "opacity_blends",
                     "depth_with_3d_shapes",
                     "coplanar_draw_in_order",
+                    "coplanar_siblings_in_perspective",
+                    "coplanar_sibling_over_descendants",
+                    "coplanar_glyphs_in_perspective",
+                    "coplanar_float_in_perspective",
+                    "coplanar_siblings_depth_with_3d_shapes",
                     "edges_crisp_at_any_scale",
                     "edges_crisp_in_perspective",
                     "edges_antialiased_when_rotated",
@@ -764,7 +769,9 @@
                     "two_plays_one_frame",
                     "flash_lights_wall",
                     "lingering_renders_after_delete",
-                    "drift_moves_particles"
+                    "drift_moves_particles",
+                    "radial_ring_in_plane",
+                    "radial_burst_scaled"
                 ]
             },
             {

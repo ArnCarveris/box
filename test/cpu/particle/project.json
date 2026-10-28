@@ -82,6 +82,8 @@
                     "sample_in_range",
                     "sample_streams_independent",
                     "sample_fixed_seed",
+                    "radial_along_offset",
+                    "radial_at_origin",
                     "ground_bounce",
                     "ground_friction",
                     "ground_die",
@@ -252,6 +254,21 @@
                     "slides_on_ground",
                     "burst_from_system",
                     "burst_from_system_world"
+                ]
+            },
+            {
+                "id": "Radial",
+                "testcases": [
+                    "c_default",
+                    "in_block",
+                    "disc_ring_expands",
+                    "disc_ring_band",
+                    "sphere_points_outward",
+                    "box_points_outward",
+                    "torus_mesh_ring",
+                    "adds_to_direction_speed",
+                    "rotated_scaled_effect",
+                    "zero_keeps_results"
                 ]
             },
             {

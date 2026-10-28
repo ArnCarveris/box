@@ -555,6 +555,18 @@ void box_pick_hook_set(
     }
 }
 
+bool box_view_cursor_ray(
+    const ecs_world_t *world,
+    ecs_entity_t view,
+    vec3 origin,
+    vec3 dir)
+{
+    const PickingState *ps = ecs_id(PickingState) ?
+        ecs_singleton_get(world, PickingState) : NULL;
+
+    return ps && ps->state && box_pick_cursor_ray(world, ps->state, view, origin, dir);
+}
+
 /** Suspend a task until the wheel moves over the entity of the argument.
  *
  * @param ctx Call context, whose ctx is the module state

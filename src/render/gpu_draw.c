@@ -789,7 +789,8 @@ static void box_gpu_blend_state(
  * test and depth mode.
  *
  * The 2D shape shader blends its edges in the opaque pass too and draws over equal depths, so
- * coplanar shapes draw in order.
+ * coplanar shapes draw in order; it lifts the depth of a fragment by the rank of its instance,
+ * so the order holds where coplanar quads interpolate their depths differently.
  *
  * An alpha tested mesh pipeline sets the alpha_cutout constant of mesh.wgsl, which discards the
  * fragments below the cutoff of their instance, except after a depth prepass, where Equal rejects

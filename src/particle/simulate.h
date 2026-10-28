@@ -55,6 +55,9 @@
 /** Hash stream of the phase of the wander field of an emitter, drawn for indices 0 to 2 */
 #define BOX_PARTICLE_STREAM_WANDER (18u)
 
+/** Hash stream of the radial speed of a particle */
+#define BOX_PARTICLE_STREAM_RADIAL (19u)
+
 /** Ground collision mode of an emitter without a ground plane */
 #define BOX_PARTICLE_GROUND_NONE (0u)
 
@@ -121,6 +124,7 @@ typedef struct box_particle_ground_t {
 typedef struct box_particle_sample_t {
     float direction[3];     /**< Unit direction in emitter space, zero for none */
     float speed;            /**< Initial speed */
+    float radial;           /**< Initial speed away from the origin of the emitter */
     uint32_t life;          /**< Lifetime in microseconds */
     float size;             /**< Diameter */
     float rotation;         /**< Initial rotation in degrees */
@@ -356,6 +360,27 @@ static inline void box_particle_cone(
         for (i = 0; i < 3; i ++) {
             out[i] = t[i] * x + s[i] * y + n[i] * cos_t;
         }
+    }
+}
+
+/** Get the radial velocity of a particle: its radial speed along the offset of its spawn point
+ * from the origin of the emitter.
+ *
+ * @param offset World offset of the spawn point from the origin of the emitter, the spawn
+ *               position in emitter space through the rotation and scale of the emitter
+ * @param speed The radial speed
+ * @param out Receives the velocity, zero for an offset of zero
+ */
+static inline void box_particle_radial(
+    const float *offset,
+    float speed,
+    float *out)
+{
+    float len2 = offset[0] * offset[0] + offset[1] * offset[1] + offset[2] * offset[2];
+    float k = len2 > 0.0f ? speed / sqrtf(len2) : 0.0f;
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        out[i] = offset[i] * k;
     }
 }
 
