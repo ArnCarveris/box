@@ -1,0 +1,21 @@
+// The face of a cooling fan, the FanDisc of the original: the blades texture and its normal map
+// on a quad. The factory wears it.
+
+using box.geometry
+using box.material
+using box.texture
+
+fan_tex {
+  TexturePath: {path: "apps/oreelse/etc/assets/fan_blades.svg", width: 256, height: 256}
+}
+
+fan_norm {
+  TexturePath: {path: "apps/oreelse/etc/assets/fan_blades_normal.svg", width: 256, height: 256}
+}
+
+prefab FanDisc {
+  Quad: {1.02, 1.02}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {metallic: 0.62, roughness: 0.34}
+  PbrTextures: {albedo: fan_tex, normal: fan_norm}
+}

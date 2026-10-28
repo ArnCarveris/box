@@ -1,0 +1,149 @@
+// The laser turret, the LaserTurret prefab of the original: a base and an apron with a hazard
+// lip, two coils with pink glowing rings at the back, a column with the status lamp on its
+// front, and the head with its yoke, the emitter, a fin, the barrel, its collar and the glowing
+// lens. Its origin is the center of its tile on the ground and the head faces +Z.
+//
+// Named parts: head (turns about y to aim), head/fx (the lens, where the beam starts and glows),
+// hit_fx (moves to where the beam hits, for its sparks) and column/lamp (status lamp, Light).
+
+using box.transform
+using box.geometry
+using box.material
+
+const steel: Rgb = {172, 180, 194}
+const steelShade: Rgb = {112, 120, 136}
+const steelDeep: Rgb = {56, 62, 76}
+const laserPink: Rgb = {238, 96, 168}
+const lampLive: Rgb = {92, 236, 222}
+const lampDead: Rgb = {248, 84, 72}
+
+prefab LaserTurret {
+  hit_fx {
+    Position: {0, 0, 0}
+  }
+
+  base {
+    Position: {0, 0.13, 0}
+    Box: {1.74, 0.26, 1.74}
+    Rgb: steelDeep
+    PbrMaterial: {metallic: 0.35, roughness: 0.6}
+  }
+
+  apron {
+    Position: {0, 0.28, 0}
+    Box: {1.44, 0.08, 1.44}
+    Rgb: steelShade
+    PbrMaterial: {metallic: 0.45, roughness: 0.5}
+  }
+
+  lip : HazardTrim {
+    Position: {0, 0.35, 0.55}
+    Box: {1.44, 0.06, 0.34}
+  }
+
+  coil_a {
+    Position: {-0.54, 0.52, -0.56}
+    Cylinder: {segments: 10, smooth: true, length: 0.42, radius: 0.5}
+    Scale: {0.12, 1, 0.12}
+    Rgb: steelShade
+
+    glow {
+      Position: {0, 0.06, 0}
+      Cylinder: {segments: 10, smooth: true, length: 0.12, radius: 0.5}
+      Scale: {1.24, 1, 1.24}
+      Rgb: laserPink
+      Emissive: {strength: 2.6, color: laserPink}
+    }
+  }
+
+  coil_b {
+    Position: {0.54, 0.52, -0.56}
+    Cylinder: {segments: 10, smooth: true, length: 0.42, radius: 0.5}
+    Scale: {0.12, 1, 0.12}
+    Rgb: steelShade
+
+    glow {
+      Position: {0, 0.06, 0}
+      Cylinder: {segments: 10, smooth: true, length: 0.12, radius: 0.5}
+      Scale: {1.24, 1, 1.24}
+      Rgb: laserPink
+      Emissive: {strength: 2.6, color: laserPink}
+    }
+  }
+
+  column {
+    Position: {0, 0.945, 0.04}
+    Box: {0.68, 1.31, 0.68}
+    Rgb: steelShade
+    PbrMaterial: {metallic: 0.55, roughness: 0.45}
+
+    lamp {
+      Position: {0, 0.12, 0.32}
+      Rotation: {1.5708, 0, 0}
+      Light: {
+        color: lampLive, dead: lampDead, status: true,
+        w: 0.3, d: 0.1, h: 0.05, strength: 2.8
+      }
+    }
+  }
+
+  head {
+    Position: {0, 1.68, 0.04}
+    Rotation: {0, 0, 0}
+
+    yoke_l {
+      Position: {-0.35, 0, -0.06}
+      Box: {0.1, 0.46, 0.36}
+      Rgb: steel
+    }
+
+    yoke_r {
+      Position: {0.35, 0, -0.06}
+      Box: {0.1, 0.46, 0.36}
+      Rgb: steel
+    }
+
+    emitter {
+      Position: {0, 0.02, -0.02}
+      Box: {0.52, 0.4, 0.52}
+      Rgb: steel
+      PbrMaterial: {metallic: 0.6, roughness: 0.38}
+    }
+
+    fin {
+      Position: {0, 0.26, -0.1}
+      Box: {0.36, 0.12, 0.42}
+      Rgb: steelShade
+    }
+
+    barrel {
+      Position: {0, 0.02, 0.42}
+      Cylinder: {segments: 12, smooth: true, length: 0.6, radius: 0.5}
+      Rotation: {1.5708, 0, 0}
+      Scale: {0.15, 1, 0.15}
+      Rgb: steelShade
+      PbrMaterial: {metallic: 0.65, roughness: 0.35}
+    }
+
+    collar {
+      Position: {0, 0.02, 0.6}
+      Cylinder: {segments: 12, smooth: true, length: 0.1, radius: 0.5}
+      Rotation: {1.5708, 0, 0}
+      Scale: {0.2, 1, 0.2}
+      Rgb: steelDeep
+    }
+
+    lens {
+      Position: {0, 0.02, 0.7}
+      Cylinder: {segments: 12, smooth: true, length: 0.1, radius: 0.5}
+      Rotation: {1.5708, 0, 0}
+      Scale: {0.14, 1, 0.14}
+      Rgb: laserPink
+      Emissive: {strength: 3.4, color: laserPink}
+    }
+
+    fx {
+      Position: {0, 0.02, 0.82}
+    }
+  }
+}

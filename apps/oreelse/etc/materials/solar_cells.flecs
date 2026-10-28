@@ -1,0 +1,19 @@
+// The solar cell texture and SolarCells, the material of the cells of the solar panel, as the
+// original. The top face of box's Box runs u along z and v against x (hazard.flecs); the
+// texture repeats 1.5 times both ways, so only the direction of the cell rows turns.
+
+using box.geometry
+using box.material
+using box.texture
+
+solar_tex {
+  TexturePath: {path: "apps/oreelse/etc/assets/solar_cells.svg", width: 256, height: 256}
+}
+
+prefab SolarCells {
+  Box: {0.68, 0.03, 0.6}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {metallic: 0.3, roughness: 0.18}
+  PbrTextures: {albedo: solar_tex}
+  TextureTransform: {scale_x: 1.5, scale_y: 1.5}
+}

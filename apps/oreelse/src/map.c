@@ -1,11 +1,11 @@
 /**
  * @file map.c
- * @brief The map: the tile grid, the conversions between tiles and world positions, and the
- * deposits that register in the grid.
+ * @brief The map: the tile grid, the conversions between tiles and world positions, the
+ * deposits that register in the grid and the hover tile under the cursor.
  *
- * Tile (row, col) is centered at x = x0 + col * tile, z = z0 + row * tile (cfg.x0, cfg.z0,
- * cfg.tile). A deposit registers in its tile when its OreDeposit is set; a later deposit on a
- * taken tile is rejected and deleted by ore_map_purge, so the first one generated keeps it.
+ * Tile (row, col) is centered at x = x0 + col * tile, z = z0 + row * tile. A deposit registers
+ * in its tile when its OreDeposit is set; a later deposit on a taken tile is rejected and
+ * deleted by ore_map_purge, so the first one generated keeps it. OreHover is the hover tile.
  */
 
 #include "game.h"
@@ -217,6 +217,52 @@ static void OreDepositPurge(
     ore_map_purge(it->stage);
 }
 
+/** Find the tile under the cursor: where the cursor ray of the world view meets the ground
+ * y = 0, whatever stands in between. Without a ray, a ray that misses the ground or a point off
+ * the grid there is no tile. Runs in every state.
+ *
+ * @param it Iterator with the OreView and OreHover singletons
+ */
+static void OreHoverUpdate(
+    ecs_iter_t *it)
+{
+    const OreView *view = ecs_field(it, OreView, 0);
+    OreHover *hover = ecs_field(it, OreHover, 1);
+    ore_grid_t grid = ore_grid_get(it->world);
+    OreHover next = { .on_grid = false, .row = -1, .col = -1 };
+    vec3 origin, dir;
+    float t, cf, rf;
+    int32_t row, col;
+    glm_vec3_copy(hover->point, next.point);
+    if (box_view_cursor_ray(it->world, view->view, origin, dir) && fabsf(dir[1]) > 1e-6f) {
+        t = -origin[1] / dir[1];
+        if (t >= 0) {
+            next.point[0] = origin[0] + dir[0] * t;
+            next.point[1] = 0;
+            next.point[2] = origin[2] + dir[2] * t;
+            col = ore_col_at(&grid, next.point[0]);
+            row = ore_row_at(&grid, next.point[2]);
+            if (ore_on_grid(&grid, row, col)) {
+                cf = (next.point[0] - grid.x0) / grid.tile + 0.5f;
+                rf = (next.point[2] - grid.z0) / grid.tile + 0.5f;
+                next.on_grid = true;
+                next.row = row;
+                next.col = col;
+                next.fx = cf - (float)col;
+                next.fz = rf - (float)row;
+            }
+        }
+    }
+
+    if (next.on_grid != hover->on_grid || next.row != hover->row || next.col != hover->col ||
+        next.fx != hover->fx || next.fz != hover->fz || next.point[0] != hover->point[0] ||
+        next.point[2] != hover->point[2])
+    {
+        *hover = next;
+        ecs_singleton_modified(it->stage, OreHover);
+    }
+}
+
 void ore_map_import(
     ecs_world_t *world)
 {
@@ -250,5 +296,17 @@ void ore_map_import(
             { .id = ecs_id(OreMap), .src.id = ecs_id(OreMap), .inout = EcsInOut }
         },
         .callback = OreDepositPurge
+    });
+
+    ecs_singleton_set(world, OreHover, { .on_grid = false, .row = -1, .col = -1 });
+
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "OreHoverUpdate" }),
+        .phase = EcsOnUpdate,
+        .query.terms = {
+            { .id = ecs_id(OreView), .src.id = ecs_id(OreView), .inout = EcsIn },
+            { .id = ecs_id(OreHover), .src.id = ecs_id(OreHover), .inout = EcsInOut }
+        },
+        .callback = OreHoverUpdate
     });
 }

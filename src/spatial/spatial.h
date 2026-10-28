@@ -56,6 +56,13 @@ typedef struct box_spatial_stats_t {
     int32_t moved;    /**< Dynamic entities the last update moved in their tree */
 } box_spatial_stats_t;
 
+/** Counters of the spatial layout of a world */
+typedef struct box_spatial_layout_stats_t {
+    int32_t nodes;  /**< Layout nodes kept between updates */
+    int32_t solved; /**< Nodes the last update solved again */
+    int32_t synced; /**< Arrays whose instances the last update synced with their prototypes */
+} box_spatial_layout_stats_t;
+
 /** Find the nearest entity a ray hits.
  *
  * @param world The world
@@ -166,6 +173,15 @@ void box_spatial_rebuild(
 void box_spatial_stats(
     const ecs_world_t *world,
     box_spatial_stats_t *stats);
+
+/** Read the counters of the spatial layout.
+ *
+ * @param world The world
+ * @param stats Receives the counters
+ */
+void box_spatial_layout_stats(
+    const ecs_world_t *world,
+    box_spatial_layout_stats_t *stats);
 
 #ifdef __cplusplus
 }

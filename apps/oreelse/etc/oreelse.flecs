@@ -1,14 +1,29 @@
 // Ore Else: you crash-landed on a hostile planet. The game is played top down on a 48x48 tile
 // map with a camera that follows the astronaut. This scene holds the window, the camera, the
 // look of the original's engine.flecs (the sun, the atmosphere, the effects of the view and the
-// render quality tier); the included scripts hold the constants, the models, the input, the map
-// and the run. The game boots into the title screen.
+// render quality tier) and the tile markers; the included scripts hold the constants, the
+// items, the models, the input, the map and the run. The game boots into the title screen.
 
 include config
-include items
+include resources
 include materials/terrain
 include materials/hazard
+include materials/solar_cells
+include materials/wall_plate
+include materials/vent
+include materials/fan
+include materials/drone_bay
 include props/ore
+include props/light
+include props/markers
+include buildings/pad_beacon
+include buildings/wall
+include buildings/wall_segment
+include buildings/drill
+include buildings/solar_panel
+include buildings/gun_turret
+include buildings/laser_turret
+include buildings/missile_turret
 include particles/jet_plume
 include player
 include critters/mite
@@ -102,6 +117,22 @@ main_view {
   }
 }
 
+// The markers of mining, which OrePlayerMine moves to the target and shows while the Mine
+// action is held
+markers {
+  mine : TileMarker {
+    Position: {0, 0.14, 0}
+    DynamicTransform
+    Disabled
+  }
+
+  mine_bad : TileMarkerBad {
+    Position: {0, 0.14, 0}
+    DynamicTransform
+    Disabled
+  }
+}
+
 // The render quality tier, High at every start of the app; the pause screen's button cycles it
 // with oreelse.cycleQuality(). A restart keeps it. OreLook names what the tier applies to
 $ {
@@ -111,6 +142,7 @@ $ {
 
 // The camera starts at zoom level 0; height 0 snaps it there on the first frame
 $ {
-  OreView: {camera: camera, level: 0, height: 0, back: 0, look: 0}
+  OreView: {camera: camera, view: main_view, level: 0, height: 0, back: 0, look: 0}
+  OreMineMarker: {good: markers.mine, bad: markers.mine_bad}
   (OreGameState, Title)
 }

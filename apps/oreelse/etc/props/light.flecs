@@ -1,0 +1,72 @@
+// The indicator light of the buildings, the Light template of the original: a housing, an
+// emissive bulb and a glass cover over it. Its origin is the bottom of the housing and it faces
+// +Y; a lamp on a wall turns it with Rotation {PI / 2, 0, 0} to face +Z.
+//
+// The bulb glows in color while on, and is the part the game drives: a status lamp (status) is
+// the power lamp of its building, which OrePower colors live, ok, warn or dead and blinks at
+// blink per second while dead; a work lamp (work) lights while its building works, blinking at
+// blink per second if blink is above 0. Standing still both show color at strength. With
+// light above 0 the bulb also lights its surroundings with a point light of that intensity
+// and range in its color.
+
+using box.transform
+using box.geometry
+using box.material
+using box.light
+
+const lightHousing: Rgb = {42, 46, 56}
+const lightOff: Rgb = {40, 44, 52}
+const lightGlass: Rgb = {206, 226, 236}
+
+template Light {
+  prop color: Rgb = {92, 236, 222}
+  prop dead: Rgb = {248, 84, 72}
+  prop warn: Rgb = {240, 152, 72}
+  prop ok: Rgb = {124, 226, 148}
+  prop on = true
+  prop status = false
+  prop work = false
+  prop w: f32 = 0.22
+  prop d: f32 = 0.22
+  prop h: f32 = 0.1
+  prop strength: f32 = 2.6
+  prop blink: f32 = 1.4
+  prop light: f32 = 0
+  prop range: f32 = 2.6
+
+  const bulbY = 0.04 + h * 0.5
+  const glassY = 0.04 + h + 0.005
+
+  housing {
+    Position: {0, 0.02, 0}
+    Box: {w + 0.07, 0.04, d + 0.07}
+    Rgb: lightHousing
+    PbrMaterial: {metallic: 0.55, roughness: 0.45}
+  }
+
+  bulb {
+    Position: {0, bulbY, 0}
+    Box: {w, h, d}
+    PbrMaterial: {metallic: 0, roughness: 0.35}
+
+    if on {
+      Rgb: color
+      Emissive: {strength: strength, color: color}
+    } else {
+      Rgb: lightOff
+    }
+
+    if on && light > 0 {
+      PointLight: {intensity: light, range: range}
+    }
+  }
+
+  // The original's glass, alpha 78 of 255
+  glass {
+    Position: {0, glassY, 0}
+    Box: {w + 0.04, 0.04, d + 0.04}
+    Rgb: lightGlass
+    Opacity: {0.306}
+    PbrMaterial: {metallic: 0, roughness: 0.06}
+  }
+}
