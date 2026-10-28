@@ -1,8 +1,8 @@
 // A new run: the astronaut at the center of the map facing north, and the clock, the blink
 // signals, the toast and the generator of the run. oreelse.restart() reloads this script (it
-// created the astronaut, which has OreRunScript) and deposits.flecs: the reload deletes the
-// astronaut and creates it again, so nothing of the previous run stays. The camera, its zoom
-// level and the session seed (OreSeed) are not part of a run.
+// created the astronaut, which has OreRunScript), deposits.flecs and scenery.flecs: the reload
+// deletes the astronaut and creates it again, so nothing of the previous run stays. The camera,
+// its zoom level, the render quality tier and the session seed (OreSeed) are not part of a run.
 
 using flecs.script.math
 using box.transform

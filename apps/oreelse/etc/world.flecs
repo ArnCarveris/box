@@ -1,5 +1,6 @@
 // The ground: a wide plain, and the basin of the playable area sunk into it with its top just
-// above the plain. OreLook adds the hazard band around the basin.
+// above the plain. The hazard band around the playable area is in boundary.flecs, the boulders
+// and dunes of a run in scenery.flecs.
 
 using box.transform
 using box.geometry

@@ -5,6 +5,8 @@
  * The systems of EcsOnUpdate run in the order the areas register them: the flow (clock, blink,
  * toast), then the player (walking, the camera). Those that only run while playing match
  * (OreGameState, Playing), the game's only pause mechanism.
+ *
+ * The look applies the render quality tier in every state, in EcsPreStore.
  */
 
 #define OREELSE_IMPL
@@ -31,6 +33,10 @@ void OreelseImport(
     ECS_META_COMPONENT(world, OreLimb);
     ECS_META_COMPONENT(world, OreDeposit);
     ECS_META_COMPONENT(world, OreMap);
+    ECS_META_COMPONENT(world, OreRenderQuality);
+    ECS_META_COMPONENT(world, OreQuality);
+    ECS_META_COMPONENT(world, OreQualityTiers);
+    ECS_META_COMPONENT(world, OreLook);
     ECS_TAG_DEFINE(world, OreRunScript);
 
     ecs_add_id(world, ecs_id(OreGameState), EcsExclusive);
@@ -39,4 +45,5 @@ void OreelseImport(
     ore_flow_import(world);
     ore_map_import(world);
     ore_player_import(world);
+    ore_look_import(world);
 }
