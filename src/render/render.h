@@ -810,7 +810,12 @@ typedef struct box_render_gpu_stats_t {
     int32_t meshes;             /**< Meshes alive */
     int32_t buffers;            /**< Buffers alive */
     int32_t passes;             /**< View passes rendered */
-    int32_t draws;              /**< Draw calls recorded */
+    int32_t draws;              /**< Draw calls recorded, those of the depth prepasses
+                                 *   excluded */
+    int32_t prepasses;          /**< Depth prepass render passes recorded, of the lit views
+                                 *   that draw opaque meshes: one per frame, two for a view
+                                 *   that culls by occlusion */
+    int32_t prepass_draws;      /**< Draw calls recorded in the depth prepasses */
     int32_t instance_binds;     /**< Instance bind groups set in the cull, forward, shadow and
                                  *   capture passes, only when the page (or surface assets of
                                  *   the mesh) differs from the one bound last in the pass */

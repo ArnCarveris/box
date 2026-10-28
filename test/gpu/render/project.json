@@ -692,6 +692,17 @@
                 ]
             },
             {
+                "id": "DepthPrepass",
+                "testcases": [
+                    "lit_view_counts_prepass",
+                    "unlit_view_has_no_prepass",
+                    "occlusion_two_prepasses",
+                    "equal_matches_unlit",
+                    "cutout_prepass_holes",
+                    "blended_and_2d_after_prepass"
+                ]
+            },
+            {
                 "id": "Parametric",
                 "testcases": [
                     "profile_hole",

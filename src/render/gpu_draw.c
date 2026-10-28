@@ -2,13 +2,13 @@
  * @file render/gpu_draw.c
  * @brief Meshes, buffers and the forward pass of the webgpu backend.
  *
- * Every view of a target renders in order into its color texture with a depth buffer that is
- * cleared to 0 and compared with greater, and draws the batches of its scene indirectly, after
- * its environment background when it has one.
+ * Every view renders in order into the color texture of its target with a depth buffer cleared
+ * to 0 and compared with greater (reversed Z), drawing its batches indirectly. A view that culls
+ * by occlusion draws twice: what its early cull phase kept, then what its late phase kept.
  *
- * A view that culls by occlusion draws twice: what its early cull phase kept, then what the
- * late phase found visible behind the depth of the first draw, with the blended draws. A view
- * that renders the atmosphere of its scene draws the sky after its last opaque 3D mesh.
+ * A lit view first draws its opaque meshes depth only (a prepass, early and late around the Hi-Z
+ * build with occlusion), then shades them once per pixel with compare Equal and no depth writes,
+ * the same instances placed by one function of mesh.wgsl with an invariant clip position.
  */
 
 #include "gpu_environment.h"
@@ -157,6 +157,28 @@ void box_gpu_draw_init(
         &(WGPUPipelineLayoutDescriptor){
             .bindGroupLayoutCount = 4,
             .bindGroupLayouts = groups
+        });
+    gpu->prepass_empty_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 0 });
+    gpu->prepass_empty = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
+        .layout = gpu->prepass_empty_layout,
+        .entryCount = 0
+    });
+    WGPUBindGroupLayout prepass[3] = {
+        gpu->view_layout, gpu->prepass_empty_layout, gpu->transform_layout
+    };
+    WGPUBindGroupLayout prepass_cutout[3] = {
+        gpu->view_layout, gpu->material_layout, gpu->instance_layout
+    };
+    gpu->prepass_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
+        &(WGPUPipelineLayoutDescriptor){
+            .bindGroupLayoutCount = 3,
+            .bindGroupLayouts = prepass
+        });
+    gpu->prepass_cutout_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
+        &(WGPUPipelineLayoutDescriptor){
+            .bindGroupLayoutCount = 3,
+            .bindGroupLayouts = prepass_cutout
         });
     ecs_map_init(&gpu->meshes, NULL);
     ecs_map_init(&gpu->buffers, NULL);
@@ -472,6 +494,26 @@ void box_gpu_draw_fini(
         gpu->mesh_layout = NULL;
     }
 
+    if (gpu->prepass_layout) {
+        wgpuPipelineLayoutRelease(gpu->prepass_layout);
+        gpu->prepass_layout = NULL;
+    }
+
+    if (gpu->prepass_cutout_layout) {
+        wgpuPipelineLayoutRelease(gpu->prepass_cutout_layout);
+        gpu->prepass_cutout_layout = NULL;
+    }
+
+    if (gpu->prepass_empty) {
+        wgpuBindGroupRelease(gpu->prepass_empty);
+        gpu->prepass_empty = NULL;
+    }
+
+    if (gpu->prepass_empty_layout) {
+        wgpuBindGroupLayoutRelease(gpu->prepass_empty_layout);
+        gpu->prepass_empty_layout = NULL;
+    }
+
     if (gpu->view_layout) {
         wgpuBindGroupLayoutRelease(gpu->view_layout);
         gpu->view_layout = NULL;
@@ -675,15 +717,15 @@ static void box_gpu_blend_state(
     out->alpha = alpha;
 }
 
-/** Create the forward pipeline of a shader, color format, blend mode, back face mode and alpha
- * test.
+/** Create the forward pipeline of a shader, color format, blend mode, back face mode, alpha
+ * test and depth mode.
  *
  * The 2D shape shader blends its edges in the opaque pass too and draws over equal depths, so
  * coplanar shapes draw in order.
  *
  * An alpha tested mesh pipeline sets the alpha_cutout constant of mesh.wgsl, which discards the
- * fragments below the cutoff of their instance; the others leave it at its default, so a mesh
- * shader without the constant still makes them.
+ * fragments below the cutoff of their instance, except after a depth prepass, where Equal rejects
+ * them; the others leave it at its default, so a mesh shader without the constant makes them.
  *
  * @param gpu The backend
  * @param handle Handle of the shader, the mesh or the 2D shape shader
@@ -692,6 +734,8 @@ static void box_gpu_blend_state(
  * @param blend The BlendMode, Opaque writes depth and does not blend
  * @param back_face The BackFaceMode, BackFaceCull culls the back faces
  * @param cutout Whether the fragments are alpha tested, ignored by the 2D shape shader
+ * @param equal Whether the pipeline draws after a depth prepass: compare Equal, no depth
+ * writes, no alpha test; ignored by the 2D shape shader
  * @return The pipeline
  */
 static WGPURenderPipeline box_gpu_forward_create(
@@ -701,9 +745,18 @@ static WGPURenderPipeline box_gpu_forward_create(
     WGPUTextureFormat format,
     uint32_t blend,
     uint32_t back_face,
-    bool cutout)
+    bool cutout,
+    bool equal)
 {
     bool shape2d = handle == BOX_RENDER_SHADER_SHAPE2D;
+    WGPUCompareFunction compare = WGPUCompareFunction_Greater;
+    equal = equal && !shape2d;
+    if (shape2d) {
+        compare = WGPUCompareFunction_GreaterEqual;
+    } else if (equal) {
+        compare = WGPUCompareFunction_Equal;
+    }
+
     WGPUVertexAttribute vertex_attrs[3] = {
         { .format = WGPUVertexFormat_Float32x3, .offset = 0, .shaderLocation = 0 },
         { .format = WGPUVertexFormat_Float32x3, .offset = 12, .shaderLocation = 1 },
@@ -746,17 +799,16 @@ static WGPURenderPipeline box_gpu_forward_create(
     WGPUFragmentState fragment = {
         .module = shader,
         .entryPoint = { .data = "fs", .length = WGPU_STRLEN },
-        .constantCount = cutout && !shape2d ? 2 : 1,
+        .constantCount = cutout && !shape2d && !equal ? 2 : 1,
         .constants = constants,
         .targetCount = 1,
         .targets = &target
     };
     WGPUDepthStencilState depth = {
         .format = BOX_GPU_DEPTH_FORMAT,
-        .depthWriteEnabled = blend == Opaque ? WGPUOptionalBool_True : WGPUOptionalBool_False,
-        .depthCompare = shape2d
-            ? WGPUCompareFunction_GreaterEqual
-            : WGPUCompareFunction_Greater,
+        .depthWriteEnabled = blend == Opaque && !equal
+            ? WGPUOptionalBool_True : WGPUOptionalBool_False,
+        .depthCompare = compare,
         .stencilFront = { .compare = WGPUCompareFunction_Always },
         .stencilBack = { .compare = WGPUCompareFunction_Always }
     };
@@ -776,6 +828,82 @@ static WGPURenderPipeline box_gpu_forward_create(
         .depthStencil = &depth,
         .multisample = { .count = 1, .mask = 0xFFFFFFFF },
         .fragment = &fragment
+    };
+
+    return wgpuDeviceCreateRenderPipeline(gpu->device, &desc);
+}
+
+/** Create a depth prepass pipeline of the mesh shader and a back face mode.
+ *
+ * It has no color target and writes the depth with compare Greater, as an unlit view does.
+ *
+ * The plain pipeline has no fragment stage and binds the transform stream of its page only; the
+ * alpha tested one binds the shading stream and the texture layers and discards as fs does.
+ *
+ * @param gpu The backend
+ * @param shader The mesh shader module
+ * @param back_face The BackFaceMode, BackFaceCull culls the back faces
+ * @param cutout Whether the fragments are alpha tested
+ * @return The pipeline
+ */
+static WGPURenderPipeline box_gpu_prepass_create(
+    box_gpu_t *gpu,
+    WGPUShaderModule shader,
+    uint32_t back_face,
+    bool cutout)
+{
+    WGPUVertexAttribute vertex_attrs[3] = {
+        { .format = WGPUVertexFormat_Float32x3, .offset = 0, .shaderLocation = 0 },
+        { .format = WGPUVertexFormat_Float32x3, .offset = 12, .shaderLocation = 1 },
+        { .format = WGPUVertexFormat_Float32x2, .offset = 24, .shaderLocation = 2 }
+    };
+    WGPUVertexAttribute slot_attr = {
+        .format = WGPUVertexFormat_Uint32, .offset = 0, .shaderLocation = 3
+    };
+    WGPUVertexBufferLayout buffers[2] = {
+        {
+            .stepMode = WGPUVertexStepMode_Vertex,
+            .arrayStride = sizeof(box_vertex_t),
+            .attributeCount = 3,
+            .attributes = vertex_attrs
+        },
+        {
+            .stepMode = WGPUVertexStepMode_Instance,
+            .arrayStride = sizeof(uint32_t),
+            .attributeCount = 1,
+            .attributes = &slot_attr
+        }
+    };
+    WGPUFragmentState fragment = {
+        .module = shader,
+        .entryPoint = { .data = "fs_depth_cutout", .length = WGPU_STRLEN }
+    };
+    WGPUDepthStencilState depth = {
+        .format = BOX_GPU_DEPTH_FORMAT,
+        .depthWriteEnabled = WGPUOptionalBool_True,
+        .depthCompare = WGPUCompareFunction_Greater,
+        .stencilFront = { .compare = WGPUCompareFunction_Always },
+        .stencilBack = { .compare = WGPUCompareFunction_Always }
+    };
+    WGPURenderPipelineDescriptor desc = {
+        .layout = cutout ? gpu->prepass_cutout_layout : gpu->prepass_layout,
+        .vertex = {
+            .module = shader,
+            .entryPoint = {
+                .data = cutout ? "vs_depth_cutout" : "vs_depth",
+                .length = WGPU_STRLEN
+            },
+            .bufferCount = 2,
+            .buffers = buffers
+        },
+        .primitive = {
+            .topology = WGPUPrimitiveTopology_TriangleList,
+            .frontFace = WGPUFrontFace_CCW,
+            .cullMode = back_face == BackFaceCull ? WGPUCullMode_Back : WGPUCullMode_None
+        },
+        .depthStencil = &depth,
+        .multisample = { .count = 1, .mask = 0xFFFFFFFF },
+        .fragment = cutout ? &fragment : NULL
     };
 
     return wgpuDeviceCreateRenderPipeline(gpu->device, &desc);
@@ -842,14 +970,20 @@ char* box_gpu_forward_check(
 {
     char *result = NULL;
 #ifndef __EMSCRIPTEN__
-    WGPURenderPipeline pipeline;
+    WGPURenderPipeline pipeline, prepass[2] = {NULL, NULL};
+    int32_t i;
     if (!gpu->device || !gpu->mesh_layout) {
         goto done;
     }
 
     wgpuDevicePushErrorScope(gpu->device, WGPUErrorFilter_Validation);
-    pipeline = box_gpu_forward_create(
-        gpu, handle, shader, WGPUTextureFormat_RGBA8Unorm, Opaque, BackFaceCull, false);
+    pipeline = box_gpu_forward_create(gpu, handle, shader, WGPUTextureFormat_RGBA8Unorm, Opaque,
+        BackFaceCull, false, false);
+    if (handle == BOX_RENDER_SHADER_MESH) {
+        prepass[0] = box_gpu_prepass_create(gpu, shader, BackFaceCull, false);
+        prepass[1] = box_gpu_prepass_create(gpu, shader, BackFaceCull, true);
+    }
+
     wgpuDevicePopErrorScope(gpu->device, (WGPUPopErrorScopeCallbackInfo){
         .mode = WGPUCallbackMode_AllowSpontaneous,
         .callback = box_gpu_forward_on_scope,
@@ -857,6 +991,12 @@ char* box_gpu_forward_check(
     });
     if (pipeline) {
         wgpuRenderPipelineRelease(pipeline);
+    }
+
+    for (i = 0; i < 2; i ++) {
+        if (prepass[i]) {
+            wgpuRenderPipelineRelease(prepass[i]);
+        }
     }
 
 done:
@@ -869,13 +1009,21 @@ done:
     return result;
 }
 
-/** Pack the state a forward pipeline is created for into its cache key.
+/** Depth state of a pipeline of the forward cache */
+typedef enum box_gpu_depth_mode_t {
+    BOX_GPU_DEPTH_GREATER,          /**< Forward, compare Greater, opaque draws write depth */
+    BOX_GPU_DEPTH_EQUAL,            /**< Forward after a depth prepass, compare Equal */
+    BOX_GPU_DEPTH_PREPASS           /**< Depth prepass, no color target */
+} box_gpu_depth_mode_t;
+
+/** Pack the state a forward or depth prepass pipeline is created for into its cache key.
  *
  * @param shader Shader handle
- * @param format Format of the color target, below 2^24
+ * @param format Format of the color target, below 2^24, Undefined for a depth prepass
  * @param blend BlendMode, below 16
  * @param back_face BackFaceMode, of which the pipeline only tells BackFaceCull from the rest
  * @param cutout Whether the fragments are alpha tested
+ * @param depth Depth state of the pipeline
  * @return The key, distinct for every distinct pipeline
  */
 static uint64_t box_gpu_forward_key(
@@ -883,18 +1031,32 @@ static uint64_t box_gpu_forward_key(
     WGPUTextureFormat format,
     uint32_t blend,
     uint32_t back_face,
-    bool cutout)
+    bool cutout,
+    box_gpu_depth_mode_t depth)
 {
     ecs_assert((uint32_t)format < (1u << 24), ECS_INTERNAL_ERROR, NULL);
 
     return ((uint64_t)shader << 32) | ((uint64_t)format << 8) | ((uint64_t)blend << 4) |
-        (cutout ? 2u : 0u) | (back_face == BackFaceCull ? 0u : 1u);
+        ((uint64_t)depth << 2) | (cutout ? 2u : 0u) | (back_face == BackFaceCull ? 0u : 1u);
+}
+
+/** Check whether a batch draws in the depth prepass of a lit view: an opaque mesh of the mesh
+ * shader, plain or alpha tested. Its forward pipeline in such a view tests with Equal.
+ *
+ * @param b The batch
+ * @return Whether the prepass draws it
+ */
+static bool box_gpu_prepass_draws(
+    const box_render_batch_t *b)
+{
+    return b->view == -1 && b->pipeline == BOX_RENDER_SHADER_MESH && b->blend == Opaque;
 }
 
 WGPURenderPipeline box_gpu_forward_pipeline(
     box_gpu_t *gpu,
     WGPUTextureFormat format,
-    const box_render_batch_t *b)
+    const box_render_batch_t *b,
+    bool equal)
 {
     WGPURenderPipeline result = NULL;
     WGPUShaderModule shader;
@@ -909,7 +1071,9 @@ WGPURenderPipeline box_gpu_forward_pipeline(
         goto done;
     }
 
-    key = box_gpu_forward_key(b->pipeline, format, b->blend, b->back_face, b->cutout);
+    equal = equal && box_gpu_prepass_draws(b);
+    key = box_gpu_forward_key(b->pipeline, format, b->blend, b->back_face, b->cutout,
+        equal ? BOX_GPU_DEPTH_EQUAL : BOX_GPU_DEPTH_GREATER);
     cached = ecs_map_get(&gpu->forward, key);
     if (cached) {
         result = (WGPURenderPipeline)(uintptr_t)*cached;
@@ -917,7 +1081,40 @@ WGPURenderPipeline box_gpu_forward_pipeline(
     }
 
     result = box_gpu_forward_create(
-        gpu, b->pipeline, shader, format, b->blend, b->back_face, b->cutout);
+        gpu, b->pipeline, shader, format, b->blend, b->back_face, b->cutout, equal);
+    ecs_map_insert_ptr(&gpu->forward, key, result);
+done:
+    return result;
+}
+
+/** Get the depth prepass pipeline of a batch the prepass draws, created on first use in the
+ * forward cache, so a recompiled or released mesh shader empties it too.
+ *
+ * @param gpu The backend
+ * @param b The batch, box_gpu_prepass_draws
+ * @return The pipeline, NULL without a mesh shader
+ */
+static WGPURenderPipeline box_gpu_prepass_pipeline(
+    box_gpu_t *gpu,
+    const box_render_batch_t *b)
+{
+    WGPURenderPipeline result = NULL;
+    WGPUShaderModule shader = box_gpu_shader_get(gpu, BOX_RENDER_SHADER_MESH);
+    ecs_map_val_t *cached;
+    uint64_t key;
+    if (!shader) {
+        goto done;
+    }
+
+    key = box_gpu_forward_key(BOX_RENDER_SHADER_MESH, WGPUTextureFormat_Undefined, Opaque,
+        b->back_face, b->cutout, BOX_GPU_DEPTH_PREPASS);
+    cached = ecs_map_get(&gpu->forward, key);
+    if (cached) {
+        result = (WGPURenderPipeline)(uintptr_t)*cached;
+        goto done;
+    }
+
+    result = box_gpu_prepass_create(gpu, shader, b->back_face, b->cutout);
     ecs_map_insert_ptr(&gpu->forward, key, result);
 done:
     return result;
@@ -1158,6 +1355,9 @@ static bool box_gpu_draw_particles(
  * the opaque 3D meshes and before the 2D shapes and the blended draws, in the phases that draw
  * those.
  *
+ * After a depth prepass the opaque meshes draw with the Equal pipelines, both the early and the
+ * late arguments of a view that culls by occlusion, so they draw what the prepasses drew.
+ *
  * @param gpu The backend
  * @param t The target
  * @param vp The render pass of the view, which the particles may split
@@ -1167,7 +1367,8 @@ static bool box_gpu_draw_particles(
  * @param group The bind group of the view
  * @param slot Slot of the view in the view buffer
  * @param phase 0 for every draw of a view without occlusion, 1 for the opaque meshes of the
- * early phase, 2 for what the late phase kept, the 2D shapes and the blended draws
+ * early phase, 2 for what the late phase kept, the 2D shapes and the blended draws, 3 for every
+ * draw of a view after its depth prepasses
  */
 static void box_gpu_draw_batches(
     box_gpu_t *gpu,
@@ -1186,13 +1387,14 @@ static void box_gpu_draw_batches(
     uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
     bool sky = phase == 1 || !box_gpu_atmosphere_sky(gpu, v);
     bool particles = phase == 1;
+    bool late = phase == 3 && box_gpu_cull_occludes(gpu, slot);
     int32_t i;
     for (i = 0; cv && i < cv->draw_count; i ++) {
         const box_gpu_cull_draw_t *d = ecs_vec_get_t(
             &gpu->cull.draws, box_gpu_cull_draw_t, cv->first_draw + i);
         const box_render_batch_t *b = ecs_vec_get_t(
             &packet->batches, box_render_batch_t, d->batch);
-        WGPURenderPipeline pipeline = box_gpu_forward_pipeline(gpu, format, b);
+        WGPURenderPipeline pipeline = box_gpu_forward_pipeline(gpu, format, b, phase == 3);
         bool mesh = b->view == -1 && b->pipeline == BOX_RENDER_SHADER_MESH;
         if (!sky && !mesh) {
             sky = true;
@@ -1232,6 +1434,12 @@ static void box_gpu_draw_batches(
         {
             box_gpu_count(gpu, BOX_GPU_STAT_DRAW);
         }
+
+        if (late && mesh && box_gpu_cull_draw(gpu, vp->pass, packet, d, 2, true, true,
+            &instances))
+        {
+            box_gpu_count(gpu, BOX_GPU_STAT_DRAW);
+        }
     }
 
     if (!sky) {
@@ -1254,7 +1462,8 @@ static void box_gpu_draw_batches(
  * @param v The view
  * @param slot Slot of the view in the view buffer
  * @param phase 0 for the only pass, 1 for the early and 2 for the late pass of a view that
- * culls by occlusion
+ * culls by occlusion, 3 for the forward pass after the depth prepasses, which clears the color
+ * and loads their depth
  */
 static void box_gpu_draw_pass(
     box_gpu_t *gpu,
@@ -1267,7 +1476,7 @@ static void box_gpu_draw_pass(
     int32_t slot,
     int32_t phase)
 {
-    bool clear = (v->clear.enabled || hdr) && phase < 2;
+    bool clear = (v->clear.enabled || hdr) && phase != 2;
     WGPURenderPassColorAttachment attachment = {
         .view = hdr ? hdr : color,
         .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
@@ -1306,7 +1515,7 @@ static void box_gpu_draw_pass(
     WGPUTextureFormat format = hdr ? BOX_GPU_HDR_FORMAT : t->format;
     WGPUBindGroup group = box_gpu_light_group(gpu, t, v, slot);
     vp.pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
-    if (phase < 2) {
+    if (phase != 2) {
         box_gpu_environment_draw_background(gpu, vp.pass, format, v, offset);
     }
 
@@ -1316,6 +1525,119 @@ static void box_gpu_draw_pass(
     wgpuRenderPassEncoderEnd(vp.pass);
     wgpuRenderPassEncoderRelease(vp.pass);
     wgpuBindGroupRelease(group);
+}
+
+/** Check whether a view draws a depth prepass: it is lit, its camera has a depth range and it
+ * draws an opaque or alpha tested mesh with the mesh shader.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ * @param v The view
+ * @param slot Slot of the view in the view buffer
+ * @return Whether the view draws its opaque meshes depth only before its forward pass
+ */
+static bool box_gpu_draw_prepasses(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v,
+    int32_t slot)
+{
+    const box_gpu_cull_view_t *cv = NULL;
+    bool result = false;
+    int32_t i;
+    if (!v->lights.enabled || !box_camera_has_depth(&v->camera_data) ||
+        !box_gpu_shader_get(gpu, BOX_RENDER_SHADER_MESH))
+    {
+        goto done;
+    }
+
+    cv = box_gpu_cull_view(gpu, slot, -1);
+    for (i = 0; cv && i < cv->draw_count && !result; i ++) {
+        const box_gpu_cull_draw_t *d = ecs_vec_get_t(
+            &gpu->cull.draws, box_gpu_cull_draw_t, cv->first_draw + i);
+        result = box_gpu_prepass_draws(ecs_vec_get_t(
+            &packet->batches, box_render_batch_t, d->batch));
+    }
+
+done:
+    return result;
+}
+
+/** Record a depth prepass of a view: its opaque and alpha tested mesh draws, depth only, from
+ * the visible slots and indirect arguments of its cull view that its forward pass draws too.
+ *
+ * Plain meshes bind the empty group 1 and the transform stream of their page; alpha tested
+ * ones the material group of their batch and the instance group with the shading stream.
+ *
+ * @param gpu The backend
+ * @param t The target
+ * @param encoder The encoder of the frame
+ * @param packet The packet
+ * @param v The view
+ * @param slot Slot of the view in the view buffer
+ * @param late Whether it loads the depth of the early prepass and draws the late arguments of
+ * a view that culls by occlusion, else it clears the depth and draws the early arguments, the
+ * only ones of a view without occlusion
+ */
+static void box_gpu_draw_prepass(
+    box_gpu_t *gpu,
+    box_gpu_target_t *t,
+    WGPUCommandEncoder encoder,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v,
+    int32_t slot,
+    bool late)
+{
+    const box_gpu_cull_view_t *cv = box_gpu_cull_view(gpu, slot, -1);
+    WGPURenderPipeline bound = NULL;
+    WGPUBindGroup material = NULL, instances = NULL;
+    WGPURenderPassDepthStencilAttachment depth = {
+        .view = t->depth_view,
+        .depthLoadOp = late ? WGPULoadOp_Load : WGPULoadOp_Clear,
+        .depthStoreOp = WGPUStoreOp_Store,
+        .depthClearValue = 0.0f
+    };
+    WGPURenderPassDescriptor desc = { .depthStencilAttachment = &depth };
+    uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
+    WGPUBindGroup group = box_gpu_light_group(gpu, t, v, slot);
+    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+    int32_t i;
+    wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
+    for (i = 0; cv && i < cv->draw_count; i ++) {
+        const box_gpu_cull_draw_t *d = ecs_vec_get_t(
+            &gpu->cull.draws, box_gpu_cull_draw_t, cv->first_draw + i);
+        const box_render_batch_t *b = ecs_vec_get_t(
+            &packet->batches, box_render_batch_t, d->batch);
+        if (!box_gpu_prepass_draws(b)) {
+            continue;
+        }
+
+        WGPURenderPipeline pipeline = box_gpu_prepass_pipeline(gpu, b);
+        if (!pipeline) {
+            continue;
+        }
+
+        if (pipeline != bound) {
+            wgpuRenderPassEncoderSetPipeline(pass, pipeline);
+            bound = pipeline;
+        }
+
+        WGPUBindGroup layers = b->cutout
+            ? box_gpu_material_group(gpu, b, packet->anisotropy) : gpu->prepass_empty;
+        if (layers != material) {
+            wgpuRenderPassEncoderSetBindGroup(pass, 1, layers, 0, NULL);
+            material = layers;
+        }
+
+        if (box_gpu_cull_draw(gpu, pass, packet, d, 2, late, b->cutout, &instances)) {
+            box_gpu_count(gpu, BOX_GPU_STAT_PREPASS_DRAW);
+        }
+    }
+
+    wgpuRenderPassEncoderEnd(pass);
+    wgpuRenderPassEncoderRelease(pass);
+    wgpuBindGroupRelease(group);
+    box_gpu_count(gpu, BOX_GPU_STAT_PREPASS);
 }
 
 void box_gpu_draw_views(
@@ -1344,10 +1666,20 @@ void box_gpu_draw_views(
         box_gpu_cull_record(gpu, encoder, slot);
         box_gpu_shadow_render(gpu, encoder, packet, i, slot);
         box_gpu_particles_sort(gpu, encoder, v, slot);
-        box_gpu_draw_pass(gpu, t, encoder, color, hdr, packet, v, slot, occludes ? 1 : 0);
-        if (occludes) {
-            box_gpu_cull_record_late(gpu, encoder, t->depth_view, slot);
-            box_gpu_draw_pass(gpu, t, encoder, color, hdr, packet, v, slot, 2);
+        if (box_gpu_draw_prepasses(gpu, packet, v, slot)) {
+            box_gpu_draw_prepass(gpu, t, encoder, packet, v, slot, false);
+            if (occludes) {
+                box_gpu_cull_record_late(gpu, encoder, t->depth_view, slot);
+                box_gpu_draw_prepass(gpu, t, encoder, packet, v, slot, true);
+            }
+
+            box_gpu_draw_pass(gpu, t, encoder, color, hdr, packet, v, slot, 3);
+        } else {
+            box_gpu_draw_pass(gpu, t, encoder, color, hdr, packet, v, slot, occludes ? 1 : 0);
+            if (occludes) {
+                box_gpu_cull_record_late(gpu, encoder, t->depth_view, slot);
+                box_gpu_draw_pass(gpu, t, encoder, color, hdr, packet, v, slot, 2);
+            }
         }
 
         if (hdr) {

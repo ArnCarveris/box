@@ -497,6 +497,12 @@ typedef struct box_gpu_t {
     ecs_map_t materials;            /**< Key hash to the first box_gpu_material_t */
     ecs_vec_t mips;                 /**< uint32_t, textures whose mip levels are not generated */
     WGPUPipelineLayout mesh_layout; /**< Pipeline layout of the forward pass */
+    WGPUBindGroupLayout prepass_empty_layout; /**< Group 1 of the plain depth prepass, empty */
+    WGPUBindGroup prepass_empty;    /**< The empty group 1 of the plain depth prepass */
+    WGPUPipelineLayout prepass_layout; /**< Pipeline layout of the plain depth prepass: the view,
+                                     *   the empty group and the transform stream */
+    WGPUPipelineLayout prepass_cutout_layout; /**< Pipeline layout of the alpha tested depth
+                                     *   prepass: the view, the material and the instance group */
     WGPUBindGroupLayout volume_layout; /**< Binds the probe volume a view samples */
     ecs_map_t volumes;              /**< Handle to box_gpu_volume_t */
     box_gpu_volume_t *no_volume;    /**< 1x1x1 volume of the views that use the hemisphere */
@@ -515,7 +521,8 @@ typedef struct box_gpu_t {
     box_gpu_reflect_t *reflect_source; /**< Source cubes of a chunk, NULL before the first */
     box_gpu_reflect_t *no_reflection; /**< One black slot, bound by views without probes */
     ecs_map_t forward;              /**< Forward pipeline by shader, format, blend, back face,
-                                     *   alpha test */
+                                     *   alpha test and depth mode, and the depth prepass
+                                     *   pipelines by back face and alpha test */
     WGPUBuffer view_buffer;         /**< Uniforms of the views of a target */
     int32_t view_capacity;          /**< Views the view buffer holds */
     WGPUBindGroupLayout cluster_layout; /**< Bind group layout of the cluster pass */
@@ -615,6 +622,8 @@ typedef enum box_gpu_stat_t {
     BOX_GPU_STAT_BUFFER_DESTROYED,  /**< A buffer was released */
     BOX_GPU_STAT_PASS,              /**< A view pass was rendered */
     BOX_GPU_STAT_DRAW,              /**< A draw call was recorded */
+    BOX_GPU_STAT_PREPASS,           /**< A depth prepass render pass was recorded */
+    BOX_GPU_STAT_PREPASS_DRAW,      /**< A draw call was recorded in a depth prepass */
     BOX_GPU_STAT_SCATTER,           /**< A scatter dispatch was recorded */
     BOX_GPU_STAT_INSTANCE_BIND      /**< An instance bind group was set in a pass or bundle */
 } box_gpu_stat_t;
@@ -1091,12 +1100,16 @@ void box_gpu_bake_capture(
  * @param gpu The backend
  * @param format The format of the color target
  * @param b The batch
+ * @param equal Whether the pipeline draws after a depth prepass: compare Equal without depth
+ * writes and, alpha tested, without discarding, for the opaque meshes of a lit view; false for
+ * the compare Greater with depth writes of the other draws, unlit views and the captures
  * @return The pipeline, NULL without a shader or for an unknown blend mode
  */
 WGPURenderPipeline box_gpu_forward_pipeline(
     box_gpu_t *gpu,
     WGPUTextureFormat format,
-    const box_render_batch_t *b);
+    const box_render_batch_t *b,
+    bool equal);
 
 /** Create the layouts the forward pass shares.
  *
@@ -1120,7 +1133,8 @@ void box_gpu_forward_reset(
     box_gpu_t *gpu);
 
 /** Create a forward pipeline from a mesh or 2D shape module inside an error scope, to find out
- * whether the module fits the pipeline layout before it replaces the module that renders.
+ * whether the module fits the pipeline layout before it replaces the module that renders. A
+ * mesh module also creates the depth prepass pipelines, so it needs their entry points.
  *
  * wgpu-native reports the scope at once; the browser reports it later, so there the check
  * passes and an invalid pipeline shows as a device error.
@@ -1172,6 +1186,10 @@ void box_gpu_upload(
     const box_render_packet_t *packet);
 
 /** Render the views of a target in order with the forward pass.
+ *
+ * A lit view with opaque meshes records its depth prepasses before its forward pass. Between
+ * the last prepass and the forward pass the depth of every opaque mesh is complete and nothing
+ * is shaded yet: the compute passes that read that depth (Gtao) record there.
  *
  * @param gpu The backend
  * @param t The target

@@ -17,6 +17,8 @@
 // light from one trilinear tap of its aerial perspective volume.
 // An alpha tested pipeline (alpha_cutout) discards the fragments whose alpha, the instance alpha
 // times the albedo alpha, is below the cutoff of their instance, once every texture is sampled.
+// A lit view draws its opaque meshes depth only first (vs_depth, vs_depth_cutout and
+// fs_depth_cutout), then shades them with depth compare Equal and without the alpha test.
 #include "include/instance.wgsl"
 #include "include/lights.wgsl"
 #include "include/shadow.wgsl"
@@ -119,7 +121,7 @@ struct VertexIn {
 };
 
 struct VertexOut {
-    @builtin(position) pos: vec4f,
+    @builtin(position) @invariant pos: vec4f,
     @location(0) world: vec3f,
     @location(1) normal: vec3f,
     @location(2) color: vec4f,
@@ -129,15 +131,22 @@ struct VertexOut {
     @location(6) @interpolate(flat) cutoff: f32,
 };
 
-@vertex fn vs(v: VertexIn) -> VertexOut {
-    let shading = shadings[v.slot];
+// A vertex placed in the world: the model matrix of its instance, the normal of its mesh or
+// parametric surface in the frame of the instance, its world and its clip position. vs and the
+// depth prepass entry points all place their vertices with it, and the clip position is
+// invariant, so the forward pass of a view with a depth prepass rasterizes the depths the
+// prepass wrote and tests them with Equal. It reads the transform and surface streams and the
+// surface assets only, which the plain prepass binds, and sets surface_data.
+struct Placed {
+    model: mat4x4f,
+    normal: vec3f,
+    world: vec4f,
+    pos: vec4f,
+};
+
+fn place(v: VertexIn) -> Placed {
     surface_data = surfaces[v.slot];
     let model = instance_model(transforms[v.slot]);
-    let c0 = model[0].xyz;
-    let c1 = model[1].xyz;
-    let c2 = model[2].xyz;
-    let cofactor = mat3x3f(cross(c1, c2), cross(c2, c0), cross(c0, c1));
-    let flip = select(1.0, -1.0, dot(c0, cross(c1, c2)) < 0.0);
     var position = v.position;
     var normal = v.normal;
     if (surface_data.p[19].x != 0.0) {
@@ -157,14 +166,21 @@ struct VertexOut {
         normal = surface_normal(i32(v.position.z), v.position.x, v.position.y);
     }
     let world = model * vec4f(position, 1.0);
-    var o: VertexOut;
-    o.pos = view.view_proj * world;
-    o.world = world.xyz;
-    o.normal = cofactor * normal * flip;
+    return Placed(model, normal, world, view.view_proj * world);
+}
+
+// Color, metallic and roughness, and UV of a vertex from the shading of its instance, with the
+// tint and material of its region on a parametric surface. Reads the surface_data place set.
+struct VertexShading {
+    color: vec4f,
+    material: vec2f,
+    uv: vec2f,
+};
+
+fn vertex_shading(v: VertexIn, shading: InstanceShading) -> VertexShading {
+    var o: VertexShading;
     o.color = shading.color;
-    o.emissive = shading.emissive.rgb;
     o.material = shading.material.xy;
-    o.cutoff = shading.material.z;
     o.uv = v.uv * shading.uv.xy + shading.uv.zw;
     if (surface_data.p[0].x != 0.0) {
         var region = i32(v.position.z);
@@ -196,6 +212,63 @@ struct VertexOut {
         }
     }
     return o;
+}
+
+@vertex fn vs(v: VertexIn) -> VertexOut {
+    let shading = shadings[v.slot];
+    let p = place(v);
+    let c0 = p.model[0].xyz;
+    let c1 = p.model[1].xyz;
+    let c2 = p.model[2].xyz;
+    let cofactor = mat3x3f(cross(c1, c2), cross(c2, c0), cross(c0, c1));
+    let flip = select(1.0, -1.0, dot(c0, cross(c1, c2)) < 0.0);
+    let s = vertex_shading(v, shading);
+    var o: VertexOut;
+    o.pos = p.pos;
+    o.world = p.world.xyz;
+    o.normal = cofactor * p.normal * flip;
+    o.color = s.color;
+    o.emissive = shading.emissive.rgb;
+    o.material = s.material;
+    o.cutoff = shading.material.z;
+    o.uv = s.uv;
+    return o;
+}
+
+// Depth prepass of a lit view (box_gpu_draw_prepass): the opaque meshes draw depth only with
+// vs_depth, which binds the transform stream of the instance page without the shading stream
+// (group 2) and nothing in group 1, and has no fragment stage.
+struct DepthOut {
+    @builtin(position) @invariant pos: vec4f,
+};
+
+@vertex fn vs_depth(v: VertexIn) -> DepthOut {
+    return DepthOut(place(v).pos);
+}
+
+// The alpha tested meshes of the prepass draw with vs_depth_cutout and fs_depth_cutout, which
+// also bind the shading stream and the texture layers and discard what fs discards: the alpha
+// of the vertex as vs makes it times the albedo alpha, below the cutoff of the instance. The
+// forward pass after the prepass does not alpha test, its Equal depth test rejects those.
+struct DepthCutoutOut {
+    @builtin(position) @invariant pos: vec4f,
+    @location(0) uv: vec2f,
+    @location(1) alpha: f32,
+    @location(2) @interpolate(flat) cutoff: f32,
+};
+
+@vertex fn vs_depth_cutout(v: VertexIn) -> DepthCutoutOut {
+    let shading = shadings[v.slot];
+    let p = place(v);
+    let s = vertex_shading(v, shading);
+    return DepthCutoutOut(p.pos, s.uv, s.color.a, shading.material.z);
+}
+
+@fragment fn fs_depth_cutout(f: DepthCutoutOut) {
+    let alpha = f.alpha * textureSample(albedo_map, material_sampler, f.uv).a;
+    if (alpha < f.cutoff) {
+        discard;
+    }
 }
 
 // Irradiance in a direction from the L2 SH irradiance coefficients E_lm of a probe
