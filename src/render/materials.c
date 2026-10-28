@@ -475,8 +475,15 @@ void box_draws_materials_send(
         ecs_entity_t owner = box_materials_owner(m, slot);
         *ecs_vec_get_t(&m->marked, bool, (int32_t)slot) = false;
         if (slot == BOX_MATERIALS_DEFAULT || (owner && ecs_is_alive(world, owner))) {
-            box_materials_pack(world, owner,
-                ecs_vec_get_t(&m->records, box_render_material_t, (int32_t)slot));
+            box_render_material_t *record = ecs_vec_get_t(
+                &m->records, box_render_material_t, (int32_t)slot);
+            box_render_material_t was = *record;
+            box_materials_pack(world, owner, record);
+            if (d->shadow_record && (was.cutoff != record->cutoff ||
+                ecs_os_memcmp(was.uv, record->uv, ECS_SIZEOF(float) * 4)))
+            {
+                *ecs_vec_append_t(NULL, &d->shadow_materials, uint32_t) = slot;
+            }
         }
     }
 

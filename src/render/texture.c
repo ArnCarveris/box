@@ -173,6 +173,7 @@ static uint32_t box_render_texture_send(
     desc->height = (uint32_t)tex->height;
     ecs_os_memcpy(desc + 1, tex->pixels, (ecs_size_t)size);
     tex->sent = true;
+    tex->revision ++;
 
     return size;
 }

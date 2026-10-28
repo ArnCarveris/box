@@ -540,6 +540,12 @@ typedef struct box_gpu_atlas_t {
     WGPUTexture texture;            /**< BOX_GPU_SHADOW_FORMAT, resolution squared */
     WGPUTextureView view;           /**< 2D view, sampled by the forward pass and rendered into */
     int32_t resolution;             /**< Edge of the atlas in texels */
+    bool valid;                     /**< Every tile of the last pass rendered, so the tiles that
+                                     *   did not change may be kept; false once created */
+    int32_t revision;               /**< Revision of the shadow shader its tiles rendered with */
+    uint32_t point_shader;          /**< Shadow shader variant its point light tiles rendered
+                                     *   with, 0 for none */
+    int32_t point_revision;         /**< Revision of that variant */
 } box_gpu_atlas_t;
 
 /** A draw of the casters of a tile of the last packet, read by box_render_gpu_cull_tile */
@@ -701,6 +707,11 @@ typedef struct box_gpu_t {
                                      *   BOX_GPU_CASCADE_STRIDE per spot light tile and one per
                                      *   octant of a point light tile */
     ecs_vec_t atlas_blocks;         /**< int32_t, the first block of each tile of a packet */
+    ecs_vec_t atlas_renders;        /**< bool, whether each tile of a packet renders: its render
+                                     *   flag, or every tile of an atlas that cannot keep them */
+    WGPUPipelineLayout shadow_clear_layout; /**< Pipeline layout without bind groups */
+    WGPURenderPipeline shadow_clear; /**< Writes depth 0 over the viewport with compare always,
+                                     *   which clears a tile of an atlas the pass loads */
     WGPUBuffer atlas_counts;        /**< Copy of the draw arguments the cull of the tiles of the
                                      *   last packet wrote, for box_render_gpu_cull_tile */
     uint64_t atlas_counts_size;     /**< Bytes of that copy */
@@ -786,6 +797,8 @@ typedef enum box_gpu_stat_t {
     BOX_GPU_STAT_CULL_DISPATCH,     /**< A dispatch of the cull pass of a view was recorded */
     BOX_GPU_STAT_CULL_INSTANCES,    /**< A cull_instances dispatch of a view was recorded */
     BOX_GPU_STAT_SHADOW_TILE,       /**< A shadow atlas tile was rendered */
+    BOX_GPU_STAT_SHADOW_REUSED,     /**< A shadow atlas tile was kept from an earlier frame */
+    BOX_GPU_STAT_SHADOW_PASS,       /**< A shadow atlas render pass was recorded */
     BOX_GPU_STAT_SHADOW_DRAW        /**< A draw call was recorded in a cascade or a tile */
 } box_gpu_stat_t;
 
@@ -1640,9 +1653,9 @@ void box_gpu_atlas_apply(
 /** Render the tiles of the shadow atlases of a packet, after its probe captures and before its
  * targets, so every forward pass of the packet samples them.
  *
- * The tiles of all atlases are culled in one cull pass, each a frustum of shadow casters of the
- * scene of its atlas; the tiles of an atlas then draw their casters in one render pass that
- * clears it, with a viewport per tile.
+ * The tiles that render (flagged, or all of an atlas that cannot keep them) are culled in one
+ * cull pass; the tiles of an atlas then draw in one render pass with a viewport per tile, which
+ * clears the atlas when all render, else loads it and clears each tile; none when none renders.
  *
  * A point light tile draws every caster draw once per octant, 8 draws, the octant in the dynamic
  * offset of the shadow uniforms, clipped to it with clip distances or by a discard.
@@ -2178,6 +2191,8 @@ void box_gpu_cull_add(
  * @param scene Scene of the casters
  * @param slot Slot that identifies the cull views of the atlas
  * @param tiles The tiles, whose matrices give the frustums
+ * @param renders Whether each tile renders, NULL for every tile; a tile that does not is left
+ * out of the cull, so it has no cull view
  * @param count Tiles
  */
 void box_gpu_cull_casters_add(
@@ -2186,6 +2201,7 @@ void box_gpu_cull_casters_add(
     ecs_entity_t scene,
     int32_t slot,
     const box_render_shadow_tile_t *tiles,
+    const bool *renders,
     int32_t count);
 
 /** Count the bits of a mask.

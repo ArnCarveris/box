@@ -315,10 +315,14 @@ typedef struct box_render_shadow_tile_t {
     float near_;            /**< Near plane */
     float far_;             /**< Far plane, the radius of the sphere an octahedral tile culls its
                              *   casters by */
+    bool render;            /**< The tile renders in this packet: it is new, moved or resized, or
+                             *   its light or a caster within its range changed since it last
+                             *   rendered; else the atlas keeps what it holds */
 } box_render_shadow_tile_t;
 
-/** The shadow atlas of a scene in a packet: its tiles, rendered once per packet before the
- * targets, all in one render pass that clears the atlas */
+/** The shadow atlas of a scene in a packet: its tiles that render, once per packet before the
+ * targets, in one render pass that clears only those tiles or the atlas when every tile renders.
+ * An atlas that cannot keep its tiles (new, shadow pipelines changed) renders every tile */
 typedef struct box_render_shadow_atlas_t {
     ecs_entity_t scene;     /**< Scene root of the lights and their casters, 0 for the default */
     uint32_t handle;        /**< Handle of the BOX_RENDER_SHADOW_ATLAS and of its tile buffer */
@@ -1006,6 +1010,10 @@ typedef struct box_render_gpu_stats_t {
     int32_t atmosphere_passes[BOX_RENDER_ATMOS_PASSES]; /**< Passes whose GPU time
                                  *   atmosphere_ns holds */
     int32_t shadow_tiles;       /**< Shadow atlas tiles rendered */
+    int32_t shadow_reused;      /**< Shadow atlas tiles kept from an earlier frame instead of
+                                 *   rendered */
+    int32_t shadow_passes;      /**< Shadow atlas render passes recorded, none in a frame that
+                                 *   renders no tile */
     int32_t shadow_draws;       /**< Draw calls recorded in the shadow passes of the cascades
                                  *   and the atlas tiles, not those of the probe captures; a
                                  *   point light tile draws each caster draw once per octant */
@@ -1389,7 +1397,7 @@ bool box_render_gpu_cull_frustum(
  * @param world The world
  * @param tile Index of the tile in the shadow tiles of the packet
  * @param out Receives the casters tested and drawn in tested and visible
- * @return Whether the last packet culled the tile
+ * @return Whether the last packet culled the tile, false for a tile it kept instead of rendering
  */
 bool box_render_gpu_cull_tile(
     ecs_world_t *world,
@@ -2007,6 +2015,89 @@ void box_render_shadow_point(
 void box_render_shadow_point_planes(
     const box_render_shadow_tile_t *tile,
     vec4 *out);
+
+/** Get the world bounds of what a shadow atlas tile holds: the box around the sphere of the far
+ * plane of a point light tile, or for a spot light tile the box around its frustum (the cone
+ * through its corners) within that sphere.
+ *
+ * @param tile The tile
+ * @param min Receives the minimum corner
+ * @param max Receives the maximum corner
+ */
+void box_render_shadow_tile_bounds(
+    const box_render_shadow_tile_t *tile,
+    float *min,
+    float *max);
+
+/** Check whether a box may reach into what a shadow atlas tile holds: the sphere of the far
+ * plane of a point light tile, the bounds of the frustum of a spot light tile.
+ *
+ * @param tile The tile
+ * @param min Minimum corner of the box
+ * @param max Maximum corner of the box
+ * @return Whether a caster in the box may change the tile
+ */
+bool box_render_shadow_tile_touches(
+    const box_render_shadow_tile_t *tile,
+    const float *min,
+    const float *max);
+
+/** A region a shadow caster covered or covers after a change: it moved, was added or removed,
+ * changed mesh, scale or surface, started or stopped casting, or, alpha tested, changed what its
+ * alpha test reads: its alpha, the cutoff or UV transform of its material or its albedo image */
+typedef struct box_render_shadow_region_t {
+    ecs_entity_t scene;     /**< Scene root of the caster, 0 for the default scene */
+    float min[3];           /**< Minimum corner of its world bounds */
+    float max[3];           /**< Maximum corner of its world bounds */
+} box_render_shadow_region_t;
+
+/** Render the tiles of an atlas that a shadow caster changed within: those a region of their
+ * scene reaches into (box_render_shadow_tile_touches).
+ *
+ * @param tiles The tiles, whose render flag is set for the touched ones
+ * @param count Tiles
+ * @param scene Scene of the atlas
+ * @param regions The regions of every scene
+ * @param region_count Regions
+ */
+void box_render_shadow_touched(
+    box_render_shadow_tile_t *tiles,
+    int32_t count,
+    ecs_entity_t scene,
+    const box_render_shadow_region_t *regions,
+    int32_t region_count);
+
+/** Get the regions the shadow casters of a world covered before and after their changes since
+ * the light extract last took them, recorded on the main thread by the draw extract.
+ *
+ * The caller clears the vector once it tested the regions against the tiles.
+ *
+ * @param world The world
+ * @return box_render_shadow_region_t, NULL without the draw extract
+ */
+ecs_vec_t* box_render_draws_shadow_regions(
+    const ecs_world_t *world);
+
+/** Set whether the draw extract of a world records the regions of changed shadow casters: while
+ * a scene has a shadow atlas tile to keep. A tile that appears renders anyway.
+ *
+ * @param world The world
+ * @param record Whether to record them
+ */
+void box_render_draws_shadow_record(
+    const ecs_world_t *world,
+    bool record);
+
+/** Make the light extract of a world render every shadow atlas tile every frame instead of only
+ * the tiles that changed, for tests that compare both. Applies from the next extract.
+ *
+ * @param world The world
+ * @param enabled Whether tiles that did not change are kept
+ * @return Whether the world has the light extract
+ */
+bool box_render_shadow_cache(
+    ecs_world_t *world,
+    bool enabled);
 
 /** Get the shadow atlas of a scene as the light extract of this frame left it.
  *

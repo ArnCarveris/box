@@ -137,6 +137,17 @@ done:
     return result;
 }
 
+uint32_t box_textures_revision(
+    const box_textures_t *t,
+    ecs_entity_t e)
+{
+    const box_texture_t *tex = t && e
+        ? ecs_map_get_deref(&t->textures, box_texture_t, e)
+        : NULL;
+
+    return tex ? tex->revision : 0;
+}
+
 int32_t box_textures_quality(
     const ecs_world_t *world,
     const box_textures_t *t)

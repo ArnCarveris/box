@@ -13,6 +13,10 @@
 // along the axis signs / sqrt(3) with fixed signs, and a triangle is kept to its octant by 3
 // half spaces. With BOX_SHADOW_CLIP_DISTANCES (the device has clip distances) they are clip
 // distances; without, fs_point and fs_point_cutout discard where one is negative.
+//
+// An atlas pass that keeps the tiles that did not change loads the atlas and clears each tile it
+// renders with vs_clear: a triangle over the viewport of the tile at depth 0, the reversed Z
+// clear value, drawn with depth compare always and no bind groups.
 #ifdef BOX_SHADOW_CLIP_DISTANCES
 enable clip_distances;
 #endif
@@ -136,6 +140,11 @@ fn octant_position(world: vec3f) -> vec4f {
 // negative inside it.
 fn octant_distances(world: vec3f) -> vec3f {
     return octant_signs(u32(cascade.light.w)) * (world - cascade.light.xyz);
+}
+
+@vertex fn vs_clear(@builtin(vertex_index) index: u32) -> @builtin(position) vec4f {
+    let corner = vec2f(f32((index << 1u) & 2u), f32(index & 2u));
+    return vec4f(corner * 2.0 - 1.0, 0.0, 1.0);
 }
 
 @vertex fn vs(v: VertexIn) -> @builtin(position) vec4f {

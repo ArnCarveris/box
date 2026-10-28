@@ -430,11 +430,13 @@ done:
     ecs_fini(world);
 }
 
-/* The tile tests the floor and both boxes and keeps the floor and the box inside the range */
+/* The tile tests the floor and both boxes and keeps the floor and the box inside the range;
+ * the tile renders every frame without the shadow cache */
 void PointShadow_range_culls_casters(void) {
     // lighting/shadows
     ecs_entity_t light, slab;
     ecs_world_t *world = point_scene(&light, &slab);
+    test_bool(box_render_shadow_cache(world, false), true);
     point_box(world, (vec3){40, 6, 0}, (vec3){1, 0.1f, 1});
     unsigned char *px = point_capture(world, "point_cull.png");
     test_assert(point_red(px, 32, 32) < POINT_DARK);
@@ -531,9 +533,11 @@ void PointShadow_baked_light_has_no_tile(void) {
 
 /* One caster in one batch draws once per octant of the tile: 8 shadow draws per frame, with
  * clip distances and on the core path alike */
+/* Without the shadow cache, so the tile renders in every frame */
 void PointShadow_draws_per_light(void) {
     // lighting/shadows
     ecs_world_t *world = point_world(false);
+    test_bool(box_render_shadow_cache(world, false), true);
     point_view(world, 4, true, NULL);
     point_light(world, (vec3){0, 10, 0}, 20, 60 * GLM_PIf);
     point_box(world, (vec3){0, 6, 0}, (vec3){1, 0.1f, 1});

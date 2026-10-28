@@ -34,6 +34,8 @@ typedef struct box_texture_t {
                              *   backend gets it again in its first packet */
     int32_t width;          /**< Width of the current image */
     int32_t height;         /**< Height of the current image */
+    uint32_t revision;      /**< Images sent to a backend, so a user of the image sees when it
+                             *   changed under the same handle */
     bool loaded;            /**< A load succeeded, so the backend should have an image */
     bool sent;              /**< The current backend has the image under handle */
     bool queued;            /**< The entity is in the list of textures to send */
@@ -126,6 +128,17 @@ box_textures_t* box_textures_get(
  * @return The handle, 0 when the backend has no image of the entity
  */
 uint32_t box_textures_handle(
+    const box_textures_t *t,
+    ecs_entity_t e);
+
+/** Get the revision of the image of a texture entity, which changes with every image sent to
+ * the backend.
+ *
+ * @param t The registry, may be NULL
+ * @param e The texture entity
+ * @return The images of the entity sent, 0 before the first
+ */
+uint32_t box_textures_revision(
     const box_textures_t *t,
     ecs_entity_t e);
 

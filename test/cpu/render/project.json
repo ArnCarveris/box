@@ -307,7 +307,11 @@
                     "extract_point_assigns_tile",
                     "extract_point_shadows_false_no_tile",
                     "extract_point_baked_no_tile",
-                    "extract_point_and_spot_share_budget"
+                    "extract_point_and_spot_share_budget",
+                    "spot_tile_bounds",
+                    "point_tile_bounds",
+                    "touched_by_scene",
+                    "extract_renders_changed_tiles"
                 ]
             },
             {
