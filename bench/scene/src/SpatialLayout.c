@@ -95,6 +95,21 @@ static ecs_world_t* bench_layout_world(
     return world;
 }
 
+/** Count the nodes the last layout update solved and the arrays it synced, per iteration.
+ *
+ * @param b The case
+ * @param world The world
+ */
+static void bench_layout_count(
+    bench_t *b,
+    const ecs_world_t *world)
+{
+    box_spatial_layout_stats_t stats = {0};
+    box_spatial_layout_stats(world, &stats);
+    bench_counter(b, "solved", stats.solved);
+    bench_counter(b, "synced", stats.synced);
+}
+
 void SpatialLayout_unchanged_100_ships(
     bench_t *b)
 {
@@ -102,16 +117,12 @@ void SpatialLayout_unchanged_100_ships(
     ecs_entity_t hull = 0;
     ecs_world_t *world = bench_layout_world(&hull);
     ecs_entity_t system = ecs_lookup(world, "box.spatial.SpatialLayout");
-    box_spatial_layout_stats_t stats = {0};
     bench_set_items(b, BENCH_SHIPS);
     while (bench_iter(b)) {
         ecs_run(world, system, 0, NULL);
+        bench_layout_count(b, world);
     }
 
-    box_spatial_layout_stats(world, &stats);
-    bench_counter(b, "nodes", stats.nodes);
-    bench_counter(b, "solved", stats.solved);
-    bench_counter(b, "synced", stats.synced);
     ecs_fini(world);
 }
 
@@ -122,18 +133,14 @@ void SpatialLayout_one_target_resized_100_ships(
     ecs_entity_t hull = 0;
     ecs_world_t *world = bench_layout_world(&hull);
     ecs_entity_t system = ecs_lookup(world, "box.spatial.SpatialLayout");
-    box_spatial_layout_stats_t stats = {0};
     int32_t frame = 0;
     bench_set_items(b, BENCH_SHIPS);
     while (bench_iter(b)) {
         frame ++;
         ecs_set(world, hull, Box, {8, 3, (frame % 2) ? 20.0f : 18.0f});
         ecs_run(world, system, 0, NULL);
+        bench_layout_count(b, world);
     }
 
-    box_spatial_layout_stats(world, &stats);
-    bench_counter(b, "nodes", stats.nodes);
-    bench_counter(b, "solved", stats.solved);
-    bench_counter(b, "synced", stats.synced);
     ecs_fini(world);
 }

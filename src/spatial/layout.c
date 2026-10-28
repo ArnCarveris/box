@@ -55,6 +55,7 @@ typedef struct layout_ctx_t {
     int32_t solved;
     int32_t synced;
     bool arrays_dirty;
+    bool active; /* The world has layout rules, so changed inputs are recorded */
     bool writing;
     int refs;
     bool ok;
@@ -1741,6 +1742,7 @@ bool box_spatial_layout_update(
         // Changes of a world without layout rules: an entity that gets a rule is recorded then.
         ecs_vec_clear(&ctx->seeds);
         ecs_vec_clear(&ctx->dynamic);
+        ctx->active = false;
         ctx->ok = true;
 
         return true;
@@ -1837,21 +1839,42 @@ static void shape_changed(
     }
 }
 
+/* The parent of an entity while its hierarchy changes: a Parent component is added before its
+ * value is assigned, and points to a parent that is being deleted while its children are. */
+static ecs_entity_t event_parent(
+    ecs_world_t *world,
+    ecs_entity_t e)
+{
+    const EcsParent *p = ecs_get(world, e, EcsParent);
+
+    return !p ? ecs_get_parent(world, e) : p->value && ecs_is_alive(world, p->value) ? p->value : 0;
+}
+
 /* Record the entities whose layout inputs changed. Adding or removing a component or a pair
- * also changes the children the parent of the entity measures or lays out. */
+ * also changes the children the parent of the entity measures or lays out, and so does setting
+ * the Parent component. */
 static void input_changed(
     ecs_iter_t *it)
 {
     layout_ctx_t *ctx = it->ctx;
-    bool structure = it->event != EcsOnSet;
-    if (it->event_id == ecs_id(Array) || it->event_id == ecs_id(ArrayInstance)) {
+    ecs_id_t id = it->event_id;
+    bool structure = it->event != EcsOnSet || id == ecs_id(EcsParent);
+    if (id == ecs_id(Array) || id == ecs_id(ArrayInstance)) {
         ctx->arrays_dirty = true;
+    }
+
+    // Until an entity gets a layout rule nothing is solved, and nothing needs to be recorded.
+    ctx->active |= id == ecs_id(Fit) || id == ecs_id(SpatialAlign) || id == ecs_id(Array) ||
+                   id == ecs_id(Distribute) || id == ecs_id(ArrayInstance);
+    if (!ctx->active) {
+
+        return;
     }
 
     for (int i = 0; i < it->count; i++) {
         ecs_entity_t e = it->entities[i];
         *ecs_vec_append_t(NULL, &ctx->seeds, ecs_entity_t) = e;
-        ecs_entity_t parent = structure ? ecs_get_parent(it->world, e) : 0;
+        ecs_entity_t parent = structure ? event_parent(it->world, e) : 0;
         if (parent) {
             *ecs_vec_append_t(NULL, &ctx->seeds, ecs_entity_t) = parent;
         }
@@ -1947,7 +1970,7 @@ void box_spatial_layout_init(
                              ecs_id(Distribute), ecs_id(AttachmentFrame), ecs_id(ArrayInstance),
                              ecs_id(Position),   ecs_id(Rotation),        ecs_id(Scale),
                              ecs_id(ShapeMesh),  ecs_id(Box),             ecs_id(LayoutOutput),
-                             ecs_id(EcsParent)};
+                             ecs_id(EcsParent),  ecs_pair(ecs_id(EcsIdentifier), EcsName)};
     ecs_id_t tags[] = {ecs_pair(EcsChildOf, EcsWildcard), ecs_pair(EcsIsA, EcsWildcard),
                        EcsDisabled, EcsPrefab, ManualTransform, DynamicTransform};
     for (size_t i = 0; i < sizeof(components) / sizeof(components[0]); i++) {

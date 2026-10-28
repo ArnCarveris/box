@@ -127,7 +127,8 @@
                     "incremental_reparent",
                     "incremental_delete_prototype",
                     "incremental_dynamic_parent",
-                    "incremental_hot_reload"
+                    "incremental_hot_reload",
+                    "incremental_parent_component"
                 ]
             }
         ]

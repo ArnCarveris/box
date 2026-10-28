@@ -773,3 +773,31 @@ void SpatialLayout_incremental_hot_reload(void) {
     test_int(ecs_count(world, SpatialDiagnostic), 0);
     ecs_fini(world);
 }
+
+void SpatialLayout_incremental_parent_component(void) {
+    // engine/spatial_layout_incremental
+    ecs_world_t *world = setup();
+    ecs_entity_t group = ecs_new(world), a = shape(world, 2, 2, 2), e = shape(world, 1, 1, 1);
+    ecs_set(world, a, EcsParent, {group});
+    ecs_set(world, a, Position, {-2, 0, 0});
+    ecs_set(world, e, SpatialAlign, {.target = group, .self = {.x = SpatialMin}, .other = {.x = SpatialMax}});
+    converge(world);
+    near(transform(world, e)->m[3][0], -0.5f);
+    ecs_entity_t b = ecs_new(world);
+    ecs_set(world, b, EcsParent, {group});
+    ecs_set(world, b, Position, {2, 0, 0});
+    ecs_set(world, b, Box, {2, 2, 2});
+    layout_frame(world);
+    near(transform(world, e)->m[3][0], 3.5f);
+    converge(world);
+    ecs_delete(world, b);
+    layout_frame(world);
+    near(transform(world, e)->m[3][0], -0.5f);
+    converge(world);
+    ecs_log_set_level(-4);
+    ecs_delete(world, group);
+    layout_frame(world);
+    test_assert(!ecs_is_alive(world, a));
+    test_int(ecs_get(world, e, SpatialDiagnostic)->code, SpatialInvalidTarget);
+    ecs_fini(world);
+}
