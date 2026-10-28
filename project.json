@@ -28,7 +28,8 @@
                 "_GNU_SOURCE"
             ],
             "cflags": [
-                "--use-port=emdawnwebgpu"
+                "--use-port=emdawnwebgpu",
+                "-msimd128"
             ]
         },
         "${os Linux}": {
@@ -62,10 +63,12 @@
             },
             "${os Emscripten}": {
                 "cflags": [
-                    "--use-port=emdawnwebgpu"
+                    "--use-port=emdawnwebgpu",
+                    "-msimd128"
                 ],
                 "ldflags": [
                     "--use-port=emdawnwebgpu",
+                    "-msimd128",
                     "-sDEFAULT_TO_CXX=1",
                     "-sSTACK_SIZE=8388608"
                 ]

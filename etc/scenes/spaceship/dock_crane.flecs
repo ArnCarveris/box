@@ -1,0 +1,22 @@
+
+using flecs.script
+using box.transform
+using box.geometry
+using box.spatial
+using box.material
+using box.texture
+using box.light
+
+@tree Parent
+template DockCrane {
+  pedestal : DarkArmor { Cylinder: {radius: 3.5, length: 1.5, segments: 12} }
+  race : Titanium { Position: {0, 1, 0}; Tube: {radius: 3, thickness: 0.3, length: 0.5, segments: 24} }
+  tower : DockYellow { Position: {0, 5, 0}; BeveledPrism: {footprint: [{-2.5, -3}, {2.5, -3}, {1.7, 2.5}, {-1.7, 2.5}], depth: 8, inset: 0.3, offset: {0, -1}, bevel: 0.4} }
+  boom : DockYellow { Position: {-6, 11, 0}; Rotation: {0, 0, -0.25}; Box: {18, 1.4, 2.2} }
+  boom_tip : RecessMetal { Position: {-14.5, 13.2, 0}; Box: {2.3, 2, 2.4} }
+  piston { ShipBeam: {ax: 1, ay: 4, az: 0, bx: -8, by: 11.5, bz: 0, radius: 0.55} }
+  cable : Titanium { Position: {-14.5, 8.5, 0}; Cylinder: {radius: 0.09, length: 9, segments: 8} }
+  hook : DockYellow { Position: {-14.5, 3.8, 0}; Tube: {radius: 0.75, thickness: 0.25, length: 0.3, arc: 4.5, segments: 16}; Rotation: {1.5707963, 0, 0} }
+  cab : DarkArmor { Position: {2.8, 5.5, 0}; Box: {3, 3.4, 3.7} }
+  window : IceLight { Position: {2.8, 6, 1.9}; Box: {2.4, 1.8, 0.1}; Emissive: {strength: 0.3, color: {80, 175, 205}} }
+}

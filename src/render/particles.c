@@ -942,7 +942,7 @@ static void box_particles_block(
     if (transform) {
         ecs_os_memcpy_t(out->model, transform->m, mat4);
     } else {
-        glm_mat4_identity(out->model);
+        ecs_os_memcpy_t(out->model, GLM_MAT4_IDENTITY, mat4);
     }
 
     glm_vec3_copy(ECS_CONST_CAST(float*, emitter->direction), out->direction);

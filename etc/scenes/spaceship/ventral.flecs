@@ -1,0 +1,46 @@
+using flecs.script
+using box.transform
+using box.geometry
+using box.spatial
+using box.material
+
+@tree Parent
+template FrigateVentral {
+  service_bays {
+    Position: {0, 0, -12}
+    for i in 0..7 {
+    {
+      Position: {0, 0, i * 4}
+      recess : RecessMetal { Box: {6.6, 0.22, 3.7} }
+      lid : HullArmor {
+        Box: {5.9, 0.16, 3.15}
+        Align: {target: recess, self: {y: Max}, other: {y: Min}, offset: {0, -0.04, 0}}
+      }
+      lock_rows {
+        Align: {target: lid, self: {y: Max}, other: {y: Min}}
+        Distribute: {axis: X, span: 5.6, mode: SpaceBetween}
+        port : Titanium { Box: {0.24, 0.19, 1.6} }
+        starboard : Titanium { Box: {0.24, 0.19, 1.6} }
+      }
+      latch : DockYellow {
+        Box: {0.8, 0.12, 0.18}
+        Align: {target: lid, self: {y: Max}, other: {y: Min}, offset: {0, -0.01, 1.1}}
+      }
+      service_number : PaleArmor {
+        Box: {0.32, 0.03, 0.42}
+        Align: {target: lid, self: {y: Max}, other: {y: Min}, offset: {-1.8, -0.02, 0.8}}
+      }
+    }
+  }
+  }
+  for side in 0..2 {
+    {
+      conduit : Titanium { Position: {(side - 0.5) * 7.4, -0.15, 0}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 0.12, length: 28.7, segments: 8} }
+      couplings {
+        Position: {(side - 0.5) * 7.4, -0.15, -12}
+        Array: {axis: Z, count: 7, spacing: 4}
+        collar : DarkArmor { Rotation: {1.5707963, 0, 0}; Tube: {radius: 0.2, thickness: 0.08, length: 0.3, segments: 8} }
+      }
+    }
+  }
+}
