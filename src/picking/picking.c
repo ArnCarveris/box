@@ -280,6 +280,36 @@ static void box_pick_capture(
     }
 }
 
+/** Express the screen position of the event being delivered in the local space of a parent of
+ * its target, the to_local hook of flecs.script.event.
+ *
+ * @param world The world
+ * @param entity The parent
+ * @param screen_x X of the cursor in window points
+ * @param screen_y Y of the cursor in window points
+ * @param local_x Receives the local X
+ * @param local_y Receives the local Y
+ * @param ctx The module state
+ */
+static void box_pick_to_local(
+    ecs_world_t *world,
+    ecs_entity_t entity,
+    float screen_x,
+    float screen_y,
+    float *local_x,
+    float *local_y,
+    void *ctx)
+{
+    const box_pick_state_t *st = ctx;
+    EcsScriptMouseEvent evt = { .screen_x = screen_x, .screen_y = screen_y };
+    if (st->sending) {
+        box_pick_local(world, entity, st->sending, &evt);
+    }
+
+    *local_x = st->sending ? evt.local_x : screen_x;
+    *local_y = st->sending ? evt.local_y : screen_y;
+}
+
 /** Send a pointer event along the path of its pick through flecs.script.event.
  *
  * @param world The world
@@ -293,8 +323,6 @@ static void box_pick_send(
     const EcsScriptMouseEvent *src,
     const box_pick_t *pick)
 {
-    ecs_entity_t chain[BOX_PICK_CHAIN_MAX];
-    int32_t i, count = box_pick_chain(world, st, pick, chain);
     EcsScriptMouseEvent evt = *src;
     uint32_t pressed = src->buttons & ~st->buttons;
     uint32_t released = st->buttons & ~src->buttons;
@@ -306,11 +334,11 @@ static void box_pick_send(
         evt.delta_x = evt.delta_y = 0;
     }
 
-    for (i = 0; i < count && ecs_is_alive(world, chain[i]); i ++) {
-        evt.target = chain[i];
-        box_pick_local(world, chain[i], pick, &evt);
-        ecs_script_mouse_event(world, &evt);
-    }
+    evt.target = pick->target ? pick->target : st->screen;
+    box_pick_local(world, evt.target, pick, &evt);
+    st->sending = pick;
+    ecs_script_mouse_event(world, &evt);
+    st->sending = NULL;
 
     box_pick_triggers(world, st, src, pick, pressed, released);
     if (st->hook.pointer) {
@@ -589,6 +617,8 @@ void BoxPickingImport(
     ecs_singleton_set(world, PickStatus, {0});
     box_input_router_set(world, &(box_input_router_t){
         .route = box_pick_route, .blocks = box_pick_blocks, .ctx = st });
+    ecs_script_set_event_hooks(world, &(ecs_script_event_hooks_t){
+        .to_local = box_pick_to_local, .ctx = st });
 
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "PickingUpdate" }),

@@ -21,6 +21,7 @@
 #define TEMPLATES \
     "using box.particle\n" \
     "using box.light\n" \
+    "@tree ChildOf\n" \
     "prefab Boom {\n" \
     "  ParticleEmitter: {lifetime: {0.3, 0.3}}\n" \
     "  ParticleBurst: {count: 2}\n" \
@@ -29,12 +30,14 @@
     "    EffectFlash: {intensity: 6, seconds: 0.6}\n" \
     "  }\n" \
     "}\n" \
+    "@tree ChildOf\n" \
     "prefab Pop {\n" \
     "  ParticleEmitter: {lifetime: {0.1, 0.1}}\n" \
     "  ParticleBurst: {count: 1}\n" \
     "  PointLight: {intensity: 3, range: 5}\n" \
     "  EffectFlash: {}\n" \
     "}\n" \
+    "@tree ChildOf\n" \
     "prefab Glow {\n" \
     "  ParticleEmitter: {lifetime: {5, 5}}\n" \
     "  ParticleBurst: {count: 1}\n" \

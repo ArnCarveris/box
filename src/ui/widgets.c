@@ -10,6 +10,34 @@
 /** Path of the widget library, found in the working directory or an ancestor of it */
 #define BOX_UI_WIDGETS_PATH "etc/ui/widgets.flecs"
 
+/** The dark theme, box.widgets.DarkTheme, in static storage so its padding is zero */
+static const UiTheme box_ui_dark_theme = {
+    .background = { 32, 35, 41 },
+    .surface = { 46, 50, 58 },
+    .surface_alt = { 38, 41, 48 },
+    .border = { 70, 76, 87 },
+    .text = { 214, 218, 224 },
+    .text_muted = { 142, 149, 160 },
+    .accent = { 98, 168, 122 },
+    .accent_text = { 22, 26, 30 },
+    .hover = { 60, 65, 75 },
+    .pressed = { 36, 39, 46 },
+    .focus = { 120, 172, 240 },
+    .danger = { 210, 104, 91 },
+    .selection = { 60, 104, 84 },
+    .caret = { 214, 218, 224 },
+    .disabled_opacity = 0.45f,
+    .font_size = 14,
+    .small_font_size = 12,
+    .heading_font_size = 18,
+    .radius = 4,
+    .padding = 8,
+    .spacing = 8,
+    .control_height = 28,
+    .focus_width = 2,
+    .caret_blink = 0.5f
+};
+
 /** Fill themes with the dark theme, box.widgets.DarkTheme.
  *
  * @param ptr The components
@@ -25,32 +53,7 @@ static void box_ui_theme_ctor(
     int32_t i;
     (void)ti;
     for (i = 0; i < count; i ++) {
-        themes[i] = (UiTheme){
-            .background = { 32, 35, 41 },
-            .surface = { 46, 50, 58 },
-            .surface_alt = { 38, 41, 48 },
-            .border = { 70, 76, 87 },
-            .text = { 214, 218, 224 },
-            .text_muted = { 142, 149, 160 },
-            .accent = { 98, 168, 122 },
-            .accent_text = { 22, 26, 30 },
-            .hover = { 60, 65, 75 },
-            .pressed = { 36, 39, 46 },
-            .focus = { 120, 172, 240 },
-            .danger = { 210, 104, 91 },
-            .selection = { 60, 104, 84 },
-            .caret = { 214, 218, 224 },
-            .disabled_opacity = 0.45f,
-            .font_size = 14,
-            .small_font_size = 12,
-            .heading_font_size = 18,
-            .radius = 4,
-            .padding = 8,
-            .spacing = 8,
-            .control_height = 28,
-            .focus_width = 2,
-            .caret_blink = 0.5f
-        };
+        ecs_os_memcpy_t(&themes[i], &box_ui_dark_theme, UiTheme);
     }
 }
 
@@ -116,7 +119,7 @@ static void box_ui_sibling(
 static void box_ui_widgets_load(
     ecs_world_t *world)
 {
-    char *path = box_shader_locate(BOX_UI_WIDGETS_PATH);
+    char *path = box_shader_locate_cwd(BOX_UI_WIDGETS_PATH);
     ecs_entity_t scope;
     if (!path) {
         ecs_dbg("box.ui: %s not found, the world has no widgets", BOX_UI_WIDGETS_PATH);

@@ -1410,26 +1410,33 @@ done:
 }
 
 /** Find the ParticleEffect of the instance the emitters of a table play in, on the emitters
- * themselves or on the nearest ChildOf ancestor that has one.
+ * themselves or on the nearest ancestor that has one.
  *
- * Searched per table instead of matched by the query, whose up traversal allocates.
+ * Searched per table instead of matched by the query, whose up traversal allocates. The rows of
+ * a table with a Parent component have parents of their own, so their ancestor is searched per
+ * emitter.
  *
  * @param world The world
  * @param table The table of the emitters
+ * @param e The emitter whose ancestor is searched, 0 to search the ancestor of the table
  * @param src Receives the ancestor that has it, 0 when the emitters have it or none does
  * @return Whether the emitters have it themselves
  */
 static bool box_particles_effect_of(
     const ecs_world_t *world,
     ecs_table_t *table,
+    ecs_entity_t e,
     ecs_entity_t *src)
 {
     bool result = false;
     *src = 0;
     if (ecs_table_has_id(world, table, ecs_id(ParticleEffect))) {
         result = true;
-    } else if (ecs_search_relation(world, table, 0, ecs_id(ParticleEffect), EcsChildOf,
-        EcsUp, src, NULL, NULL) == -1)
+    } else if (e) {
+        *src = ecs_get_target_for_id(world, e, EcsChildOf, ecs_id(ParticleEffect));
+    } else if (!ecs_table_has_id(world, table, ecs_id(EcsParent)) &&
+        ecs_search_relation(world, table, 0, ecs_id(ParticleEffect), EcsChildOf, EcsUp, src,
+            NULL, NULL) == -1)
     {
         *src = 0;
     }
@@ -1452,8 +1459,7 @@ static bool box_particles_keeps(
     if (ecs_is_alive(world, e) && ecs_has_id(world, e, EcsDisabled) &&
         ecs_has(world, e, ParticleEmitter))
     {
-        result = ecs_search_relation(world, ecs_get_table(world, e), 0,
-            ecs_id(ParticleEffect), EcsChildOf, EcsSelf | EcsUp, NULL, NULL, NULL) != -1;
+        result = ecs_get_target_for_id(world, e, EcsChildOf, ecs_id(ParticleEffect)) != 0;
     }
 
     return result;
@@ -1508,11 +1514,17 @@ static void BoxRenderExtractParticles(
         bool curves_shared = curves && !ecs_field_is_self(&qit, 4);
         bool looks_shared = looks && !ecs_field_is_self(&qit, 5);
         ecs_entity_t effect_src = 0;
-        bool effect_self = box_particles_effect_of(world, qit.table, &effect_src);
+        bool effect_self = box_particles_effect_of(world, qit.table, 0, &effect_src);
+        bool effect_rows = !effect_self && ecs_table_has_id(world, qit.table, ecs_id(EcsParent));
         const ParticleEffect *shared_effect = effect_src
             ? ecs_get(world, effect_src, ParticleEffect)
             : NULL;
         for (i = 0; i < qit.count; i ++) {
+            if (effect_rows) {
+                box_particles_effect_of(world, qit.table, qit.entities[i], &effect_src);
+                shared_effect = effect_src ? ecs_get(world, effect_src, ParticleEffect) : NULL;
+            }
+
             const WorldTransform *t = transforms ? &transforms[shared ? 0 : i] : NULL;
             box_particles_light_t light = {
                 .light = lights ? &lights[lights_shared ? 0 : i] : NULL,

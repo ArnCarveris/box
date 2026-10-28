@@ -79,6 +79,14 @@ int box_shader_preprocess(
 void box_shader_output_fini(
     box_shader_output_t *out);
 
+/** Find a file: absolute, or relative to the working directory or one of its ancestors.
+ *
+ * @param path The file
+ * @return The path the file was found at, NULL when it was not found
+ */
+char* box_shader_locate_cwd(
+    const char *path);
+
 /** Find a file: absolute, relative to the working directory or one of its ancestors, or
  * relative to an ancestor of the folder of the executable.
  *

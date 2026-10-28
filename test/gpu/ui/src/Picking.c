@@ -567,20 +567,20 @@ void Picking_bubbling(void) {
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, label, mut))->clicks, 1);
     test_int(((const Mut*)ecs_get_id(world, button, mut))->clicks, 1);
-    test_int(((const Mut*)ecs_get_id(world, panel, mut))->clicks, 0);
+    test_int(((const Mut*)ecs_get_id(world, panel, mut))->clicks, 1);
     test_uint(ecs_singleton_get(world, PickStatus)->handler, button);
 
     ecs_os_free(box_terminal_run(world, s, "mouse.click left [740, 360]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, deco, mut))->clicks, 1);
-    test_int(((const Mut*)ecs_get_id(world, panel, mut))->clicks, 1);
+    test_int(((const Mut*)ecs_get_id(world, panel, mut))->clicks, 2);
     test_int(((const Mut*)ecs_get_id(world, button, mut))->clicks, 1);
 
     ecs_os_free(box_terminal_run(world, s, "mouse.click left [540, 300]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
-    test_int(((const Mut*)ecs_get_id(world, panel, mut))->clicks, 2);
+    test_int(((const Mut*)ecs_get_id(world, panel, mut))->clicks, 3);
     test_int(((const Mut*)ecs_get_id(world, button, mut))->clicks, 1);
     test_int(((const Mut*)ecs_get_id(world, label, mut))->clicks, 1);
 
@@ -971,7 +971,7 @@ void Picking_layout_bounds(void) {
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, dot, mut))->clicks, 1);
-    test_int(((const Mut*)ecs_get_id(world, menu, mut))->clicks, 2);
+    test_int(((const Mut*)ecs_get_id(world, menu, mut))->clicks, 3);
 
     ecs_fini(world);
 }

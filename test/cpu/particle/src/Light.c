@@ -452,6 +452,7 @@ void Light_effect_layers_own_lights(void) {
     test_assert(ecs_script_run(world, "templates",
         "using box.particle\n"
         "using box.light\n"
+        "@tree ChildOf\n"
         "prefab Lamp {\n"
         "  ParticleEmitter: {lifetime: {0.3, 0.3}}\n"
         "  ParticleBurst: {count: 2}\n"
