@@ -7,6 +7,7 @@
 
 using flecs.script.math
 using box.transform
+using box.material
 using oreelse
 
 const rng: Rng = {seed: oreelse.seed(1)}

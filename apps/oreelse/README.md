@@ -139,13 +139,21 @@ Every task of the port follows these.
   in `src/map.c`, over the `ore_grid_t` of `ore_grid_get` (read once per system run). The
   `OreMap` singleton is the tile grid: `ore_map_deposit` and `ore_map_building` give the cell
   of a tile. Entities register when they are set and clear their cell when they are removed.
+  A deposit that registers on a tile another deposit holds is rejected and deleted by
+  `ore_map_purge` (every frame in `OnLoad`, and by `restart()` right after its reload): an
+  entity cannot be deleted in the observer of a component its script is still setting.
+- **Systems write through `it->stage`** (`ecs_set`, `ecs_modified`, `ore_state_set`,
+  `ore_toast`): the world is read only while the pipeline runs.
 - **Tests**: end-to-end scenarios over the command port, one file per area,
   `test/integration/e2e/oreelse_<area>.py` (shrink the window, drop shadows and effects, count
   frames at a fixed 1/60 s delta, run with `--seed`), and visual scenes in
   `apps/oreelse/test/visual` with baselines. The test machines render in software at a few
   frames per second, so scenarios set up state directly (components, singletons, timers)
-  instead of waiting minutes of game time, and keep their frame counts small. Visual scenes
-  include `apps/oreelse/test/visual/setup/seed` before the game for a fixed map.
+  instead of waiting minutes of game time, and keep their frame counts small. The commands of
+  the port do not write the entities of a module, which hold the game's singletons, so the
+  scenarios write those through the REST endpoints of the same port (`PUT /component/...`,
+  `put` in `oreelse_flow.py`). Visual scenes include `apps/oreelse/test/visual/setup/seed`
+  before the game for a fixed map.
 - **Visuals** are ported from `reference/ore_else` following `reference/PORTING.md`, with the
   original's prefab and part names (`Ore`, `Astronaut`, `JetPlume`, `GroundSurface`, ...), and
   never as placeholder geometry. Animation runs in C systems that only run while `Playing`;

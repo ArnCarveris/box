@@ -62,7 +62,7 @@ static void OrePlayerMove(
         if (player[i].moving != moving || player[i].running != running) {
             player[i].moving = moving;
             player[i].running = running;
-            ecs_modified(it->world, it->entities[i], OrePlayer);
+            ecs_modified(it->stage, it->entities[i], OrePlayer);
         }
     }
 }
@@ -138,11 +138,11 @@ static void OreCameraFollow(
     changed |= ore_glide(&view->back, zoom.back[level], alpha, snap);
     changed |= ore_glide(&view->look, zoom.look[level], alpha, snap);
     if (changed) {
-        ecs_singleton_modified(it->world, OreView);
+        ecs_singleton_modified(it->stage, OreView);
     }
 
     if (it->count && view->camera && ecs_is_alive(it->world, view->camera)) {
-        ore_camera_place(it->world, view, &p[0]);
+        ore_camera_place(it->stage, view, &p[0]);
     }
 }
 

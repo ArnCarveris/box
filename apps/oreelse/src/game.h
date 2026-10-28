@@ -136,6 +136,9 @@ ECS_STRUCT(OreMap, {
 ECS_PRIVATE                    /**< The cells are not reflected */
     ecs_entity_t *deposits;    /**< Deposit of every tile, row major, 0 for none */
     ecs_entity_t *buildings;   /**< Building of every tile, row major, 0 for none */
+    ecs_vec_t rejected;        /**< Deposits that registered on a taken tile, deleted by
+                                *   ore_map_purge: an entity cannot be deleted while the
+                                *   script that creates it still sets it */
 });
 
 /** Marks an entity created by a script that sets up a run: restart() reloads the script of
@@ -213,7 +216,7 @@ float ore_random01(
  *
  * Warnings last cfg.warnToast seconds of play, other messages cfg.infoToast.
  *
- * @param world The world
+ * @param world The world, or the stage of a system
  * @param warn Whether the message is a warning
  * @param fmt printf format of the message
  * @param ... Arguments of the format
@@ -307,6 +310,14 @@ ecs_entity_t* ore_map_building(
     OreMap *map,
     int32_t row,
     int32_t col);
+
+/** Delete the deposits that registered on a tile another deposit holds. The OnLoad phase
+ * does it every frame, restart() right after it reloaded the scripts of the run.
+ *
+ * @param world The world or a stage
+ */
+void ore_map_purge(
+    ecs_world_t *world);
 
 /** Register the game flow: states, clock, blink, toast, cancel() and restart().
  *

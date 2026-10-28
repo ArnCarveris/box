@@ -3,6 +3,7 @@
 // stopped; OrePlayerFx plays it while the astronaut hovers.
 
 using box.transform
+using box.types
 using box.texture
 using box.particle
 
@@ -13,7 +14,7 @@ sprFlare {
 
 template JetPlume {
   prop rate: f32 = 70
-  prop color: Rgb = {255, 236, 150}
+  prop color: rgb = {255, 236, 150}
   prop vy: f32 = -6
   prop size: f32 = 0.13
 

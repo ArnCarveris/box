@@ -5,7 +5,7 @@
  *
  * Tile (row, col) is centered at x = x0 + col * tile, z = z0 + row * tile (cfg.x0, cfg.z0,
  * cfg.tile). A deposit registers in its tile when its OreDeposit is set; a later deposit on a
- * taken tile is deleted, so the first one generated keeps it.
+ * taken tile is rejected and deleted by ore_map_purge, so the first one generated keeps it.
  */
 
 #include "game.h"
@@ -120,19 +120,38 @@ static void ore_map_fit(
 static ECS_DTOR(OreMap, ptr, {
     ecs_os_free(ptr->deposits);
     ecs_os_free(ptr->buildings);
+    ecs_vec_fini_t(NULL, &ptr->rejected, ecs_entity_t);
 })
 
 /** Move the cells of a map, leaving the source without them */
 static ECS_MOVE(OreMap, dst, src, {
     ecs_os_free(dst->deposits);
     ecs_os_free(dst->buildings);
+    ecs_vec_fini_t(NULL, &dst->rejected, ecs_entity_t);
     *dst = *src;
-    src->deposits = NULL;
-    src->buildings = NULL;
+    ecs_os_zeromem(src);
 })
 
+void ore_map_purge(
+    ecs_world_t *world)
+{
+    OreMap *map = ecs_singleton_get_mut(world, OreMap);
+    int32_t i, count = map ? ecs_vec_count(&map->rejected) : 0;
+    for (i = 0; i < count; i ++) {
+        ecs_entity_t e = *ecs_vec_get_t(&map->rejected, ecs_entity_t, i);
+        if (ecs_is_alive(world, e)) {
+            ecs_delete(world, e);
+        }
+    }
+
+    if (count) {
+        ecs_vec_clear(&map->rejected);
+    }
+}
+
 /** Register deposits in the tiles of their positions. A deposit on a tile another deposit
- * already holds is deleted; a deposit off the grid keeps row and col at -1.
+ * already holds is rejected, row and col -1, and deleted by ore_map_purge; a deposit off the
+ * grid keeps row and col at -1 too.
  *
  * @param it Iterator over the deposits whose OreDeposit was set
  */
@@ -152,12 +171,18 @@ static void OreDepositRegister(
         const Position *p = ecs_get(it->world, e, Position);
         int32_t row = p ? ore_row_at(&grid, p->z) : -1;
         int32_t col = p ? ore_col_at(&grid, p->x) : -1;
+        ecs_entity_t *prev = ore_map_deposit(map, d[i].row, d[i].col);
         ecs_entity_t *cell = ore_map_deposit(map, row, col);
+        if (prev && *prev == e && prev != cell) {
+            *prev = 0;
+        }
+
         d[i].row = cell ? row : -1;
         d[i].col = cell ? col : -1;
-        d[i].capacity = d[i].capacity < d[i].amount ? d[i].amount : d[i].capacity;
         if (cell && *cell && *cell != e && ecs_is_alive(it->world, *cell)) {
-            ecs_delete(it->world, e);
+            d[i].row = -1;
+            d[i].col = -1;
+            ecs_vec_append_t(NULL, &map->rejected, ecs_entity_t)[0] = e;
         } else if (cell) {
             *cell = e;
         }
@@ -180,6 +205,16 @@ static void OreDepositUnregister(
             *cell = 0;
         }
     }
+}
+
+/** Delete the deposits rejected since the previous frame, before anything draws them.
+ *
+ * @param it Iterator with the OreMap singleton
+ */
+static void OreDepositPurge(
+    ecs_iter_t *it)
+{
+    ore_map_purge(it->stage);
 }
 
 void ore_map_import(
@@ -206,5 +241,14 @@ void ore_map_import(
         .query.terms = {{ .id = ecs_id(OreDeposit), .inout = EcsIn }},
         .events = { EcsOnRemove },
         .callback = OreDepositUnregister
+    });
+
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "OreDepositPurge" }),
+        .phase = EcsOnLoad,
+        .query.terms = {
+            { .id = ecs_id(OreMap), .src.id = ecs_id(OreMap), .inout = EcsInOut }
+        },
+        .callback = OreDepositPurge
     });
 }

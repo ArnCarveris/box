@@ -9,21 +9,26 @@ software renderer of the test machines draws a few frames per second. So every c
 with setup: the window shrinks to 640x360 and the world view drops its shadows; --fps 20 caps
 it on faster machines. Waits count frames, so they hold under load: FPS frames are one second
 of the game. The cases set up state directly (the game state, the clock, the toast) instead of
-playing up to it.
+playing up to it. Those are singletons of the oreelse module, which the commands of the port do
+not write, so the cases write them through the REST endpoints of the same port.
 """
+import json
 import math
+import urllib.error
+import urllib.request
 
 from box_client import App, DELTA_TIME, parse_value
 
 APP = "apps/oreelse"
-SEED = 1234
+# The map of seed 8 has two clusters that overlap on two tiles, so the cases also see the first
+# deposit generated keep a tile
+SEED = 8
 ARGS = ["--seed", str(SEED), "--fps", "20"]
 
 # Frames per second of game time
 FPS = round(1 / float(DELTA_TIME))
 
 STATE = "has oreelse.OreGameState (oreelse.OreGameState, oreelse.OreGameState.%s)"
-SET_STATE = "add oreelse.OreGameState (oreelse.OreGameState,oreelse.OreGameState.%s)"
 CLOCK = "get oreelse.OreClock OreClock.elapsed"
 TOAST = "get oreelse.OreToast OreToast.text"
 LEVEL = "get oreelse.OreView OreView.level"
@@ -58,9 +63,38 @@ LUMINITE_TILES = [(23, 23), (23, 24), (24, 23), (24, 24)]
 DEPOSIT_AMOUNT = 1000
 CLUSTER_ORES = {"iron": "items.Iron", "copper": "items.Copper", "stone": "items.Stone"}
 
+# Deposits of a map without overlaps: 4 Luminite and two clusters of 9 of the other kinds
+DEPOSITS = len(LUMINITE_TILES) + 2 * 9 * len(CLUSTER_ORES)
+
 
 def number(out):
     return float(out)
+
+
+def put(app, entity, component, value=None):
+    """Add a component or pair to an entity, or set it to a value, through the REST endpoint of
+    the port."""
+    params = {"component": component}
+    if value is not None:
+        params["value"] = json.dumps(value)
+    path = "component/" + entity.replace(".", "/")
+    request = urllib.request.Request(app.url(path, params), method="PUT")
+    try:
+        with urllib.request.urlopen(request, timeout=10) as r:
+            status, body = r.status, r.read().decode(errors="replace")
+    except urllib.error.HTTPError as e:
+        status, body = e.code, e.read().decode(errors="replace")
+    app.check(status == 200, "PUT %s %s failed (%d): %s" % (entity, component, status, body))
+
+
+def set_state(app, state):
+    put(app, "oreelse.OreGameState",
+        "(oreelse.OreGameState,oreelse.OreGameState.%s)" % state)
+    app.wait_for(STATE % state, "true")
+
+
+def toast(app, text, warn):
+    put(app, "oreelse.OreToast", "oreelse.OreToast", {"text": text, "warn": warn, "age": 0})
 
 
 def setup(app):
@@ -107,9 +141,19 @@ def layout(found):
     return sorted((path, d["resource"], d["row"], d["col"]) for path, d in found.items())
 
 
+def generated(path):
+    """The place of a deposit in the generation order: Luminite, then the clusters of iron,
+    copper and stone, each cluster tile by tile."""
+    name = path.split(".")[-1]
+    kind, numbers = name.split("_", 1)
+    order = ["luminite"] + list(CLUSTER_ORES)
+    return [order.index(kind)] + [int(n) for n in numbers.split("_")]
+
+
 def check_layout(app, found):
     """The Luminite at the center tiles, every other kind in 3x3 clusters, no two deposits on
-    one tile, every deposit full."""
+    one tile, a tile two clusters share held by the deposit generated first, every deposit
+    full."""
     tiles = {}
     for path, d in found.items():
         tile = (d["row"], d["col"])
@@ -139,8 +183,11 @@ def check_layout(app, found):
                 tile = (cr + j // 3 - 1, cc + j % 3 - 1)
                 d = members.get(j)
                 if d is None:
-                    app.check(tile in tiles, "%s_%d_%d is missing but %s is free" %
-                              (kind, i, j, tile))
+                    path = "deposits.%s_%d_%d" % (kind, i, j)
+                    app.check(tile in tiles, "%s is missing but %s is free" % (path, tile))
+                    app.check(generated(tiles[tile]) < generated(path),
+                              "%s holds %s, which %s was generated before" %
+                              (tiles[tile], tile, path))
                     continue
                 app.check((d["row"], d["col"]) == tile and d["resource"] == resource,
                           "%s_%d_%d is %s at %s, not %s at %s of the 3x3 cluster" %
@@ -189,9 +236,11 @@ def test_restart(app):
 
     key(app, "D", 30)
     app.check(player(app)["x"] > 1, "the astronaut did not walk away from the start")
-    app.exec("set oreelse.OreClock OreClock {elapsed: 100}")
-    app.exec(SET_STATE % "Lost")
-    app.expect(STATE % "Lost", "true")
+    put(app, "oreelse.OreClock", "oreelse.OreClock", {"elapsed": 100})
+    app.exec("mouse.scroll 0 -1")
+    app.wait_input()
+    app.wait_for(LEVEL, "1")
+    set_state(app, "Lost")
 
     key(app, "R")
     app.wait_for(STATE % "Playing", "true")
@@ -199,6 +248,7 @@ def test_restart(app):
     app.check(elapsed < 2, "the clock is at %g after the restart" % elapsed)
     pos = player(app)
     app.check(pos == {"x": 0, "y": 0, "z": 0}, "the astronaut is at %s after the restart" % pos)
+    app.expect(LEVEL, "1")
     after = deposits(app)
     check_layout(app, after)
     app.check(layout(after) != layout(before), "the new run has the map of the previous one")
@@ -207,6 +257,7 @@ def test_restart(app):
 def test_seeded_map(app):
     first = deposits(app)
     check_layout(app, first)
+    app.check(len(first) < DEPOSITS, "the map of seed %d has no overlapping clusters" % SEED)
     log = app.log[:-len(".log")] + ".second.log" if app.log else None
     with App(app.binary, app.args, log=log, timeout=app.timeout, out=app.out,
              prefix=app.prefix + ".second") as other:
@@ -279,8 +330,7 @@ def test_toast(app):
     start(app)
     for warn, seconds in ((True, WARN_TOAST), (False, INFO_TOAST)):
         shown = number(app.exec(CLOCK))
-        app.exec('set oreelse.OreToast OreToast {text: "%s", warn: %s, age: 0}' %
-                 (TOAST_TEXT, "true" if warn else "false"))
+        toast(app, TOAST_TEXT, warn)
         app.wait_for(TOAST, '"%s"' % TOAST_TEXT)
         app.wait_for(TOAST, '""', frames=round((seconds + 2) * FPS),
                      what="the toast gone after %g s" % seconds)
@@ -288,7 +338,7 @@ def test_toast(app):
         app.check(seconds - 0.05 <= shown <= seconds + 0.5,
                   "a toast with warn %s was shown %g s of play, not %g" % (warn, shown, seconds))
 
-    app.exec('set oreelse.OreToast OreToast {text: "%s", warn: true, age: 0}' % TOAST_TEXT)
+    toast(app, TOAST_TEXT, True)
     key(app, "Escape")
     app.wait_for(STATE % "Paused", "true")
     app.wait_frames(round(WARN_TOAST * FPS) + 30)

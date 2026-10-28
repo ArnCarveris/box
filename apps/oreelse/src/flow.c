@@ -125,7 +125,7 @@ static void OreClockUpdate(
     OreClock *clock = ecs_field(it, OreClock, 0);
     if (it->delta_time > 0) {
         clock->elapsed += it->delta_time;
-        ecs_singleton_modified(it->world, OreClock);
+        ecs_singleton_modified(it->stage, OreClock);
     }
 }
 
@@ -148,7 +148,7 @@ static void OreBlinkUpdate(
 
     if (next.fast != blink->fast || next.slow != blink->slow || next.lamp != blink->lamp) {
         *blink = next;
-        ecs_singleton_modified(it->world, OreBlink);
+        ecs_singleton_modified(it->stage, OreBlink);
     }
 }
 
@@ -169,7 +169,7 @@ static void OreToastUpdate(
         if (toast->age >= duration) {
             ecs_os_free(toast->text);
             toast->text = ecs_os_strdup("");
-            ecs_singleton_modified(it->world, OreToast);
+            ecs_singleton_modified(it->stage, OreToast);
         }
     }
 }
@@ -191,7 +191,7 @@ static void OreTitleStart(
     }
 
     if (pressed) {
-        ore_state_set(it->world, OreGameStatePlaying);
+        ore_state_set(it->stage, OreGameStatePlaying);
     }
 }
 
@@ -338,6 +338,7 @@ static void ore_restart(
         seed->run ++;
         ecs_singleton_modified(world, OreSeed);
         result = !ore_run_reload(world);
+        ore_map_purge(world);
     }
 
     if (result) {
