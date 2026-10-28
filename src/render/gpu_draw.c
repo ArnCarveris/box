@@ -188,7 +188,13 @@ static void box_gpu_mesh_free(
 void box_gpu_instance_layouts_init(
     box_gpu_t *gpu)
 {
-    WGPUBindGroupLayoutEntry entries[4] = {{
+    box_render_material_t fallback = {
+        .color = 204u | (204u << 8) | (204u << 16),
+        .metallic = BOX_MATERIAL_METALLIC,
+        .roughness = BOX_MATERIAL_ROUGHNESS,
+        .uv = { 1.0f, 1.0f, 0.0f, 0.0f }
+    };
+    WGPUBindGroupLayoutEntry entries[5] = {{
         .binding = 0,
         .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Compute,
         .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
@@ -204,11 +210,18 @@ void box_gpu_instance_layouts_init(
         .binding = 2,
         .visibility = WGPUShaderStage_Vertex,
         .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
+    }, {
+        .binding = 4,
+        .visibility = WGPUShaderStage_Vertex,
+        .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
     }};
     gpu->instance_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
-        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 4, .entries = entries });
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 5, .entries = entries });
     gpu->transform_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
         &(WGPUBindGroupLayoutDescriptor){ .entryCount = 3, .entries = entries });
+    gpu->no_materials = box_gpu_buffer_new(gpu, sizeof(box_render_material_t),
+        WGPUBufferUsage_Storage);
+    wgpuQueueWriteBuffer(gpu->queue, gpu->no_materials, 0, &fallback, sizeof(fallback));
 }
 
 void box_gpu_instance_layouts_fini(
@@ -223,9 +236,17 @@ void box_gpu_instance_layouts_fini(
         wgpuBindGroupLayoutRelease(gpu->transform_layout);
         gpu->transform_layout = NULL;
     }
+
+    if (gpu->no_materials) {
+        wgpuBufferRelease(gpu->no_materials);
+        gpu->no_materials = NULL;
+    }
 }
 
 /** Create a bind group of the streams of an instance page and surface assets.
+ *
+ * A group with the shading stream binds the material table too, or the default record before
+ * the main thread sent one.
  *
  * @param gpu The backend
  * @param streams The buffers of the streams of the page, by stream
@@ -244,16 +265,23 @@ static WGPUBindGroup box_gpu_instance_group_new(
     const box_gpu_buffer_t *transforms = streams[BOX_RENDER_STREAM_TRANSFORM];
     const box_gpu_buffer_t *shadings = streams[BOX_RENDER_STREAM_SHADING];
     const box_gpu_buffer_t *surfaces = streams[BOX_RENDER_STREAM_SURFACE];
-    WGPUBindGroupEntry entry[4] = {
+    const box_gpu_buffer_t *materials = ecs_map_get_deref(
+        &gpu->buffers, box_gpu_buffer_t, BOX_RENDER_BUFFER_MATERIALS);
+    WGPUBindGroupEntry entry[5] = {
         {.binding = 0, .buffer = transforms->buffer, .size = transforms->size},
         {.binding = 1, .buffer = assets, .size = size},
         {.binding = 3, .buffer = surfaces->buffer, .size = surfaces->size},
-        {.binding = 2, .buffer = shadings->buffer, .size = shadings->size}
+        {.binding = 2, .buffer = shadings->buffer, .size = shadings->size},
+        {
+            .binding = 4,
+            .buffer = materials ? materials->buffer : gpu->no_materials,
+            .size = materials ? materials->size : sizeof(box_render_material_t)
+        }
     };
 
     return wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
         .layout = shading ? gpu->instance_layout : gpu->transform_layout,
-        .entryCount = shading ? 4 : 3,
+        .entryCount = shading ? 5 : 3,
         .entries = entry
     });
 }
@@ -373,7 +401,8 @@ static void box_gpu_instance_groups_drop(
 }
 
 /** Release the bind groups of the instance page a buffer is a stream of, before the buffer is
- * created again or destroyed: they live with the transform stream of the page.
+ * created again or destroyed: they live with the transform stream of the page. The material
+ * table is bound by the groups of every page, which are all released with it.
  *
  * @param gpu The backend
  * @param handle Handle of the buffer
@@ -383,6 +412,15 @@ static void box_gpu_instance_page_changed(
     uint32_t handle)
 {
     box_gpu_buffer_t *b;
+    if (handle == BOX_RENDER_BUFFER_MATERIALS) {
+        ecs_map_iter_t it = ecs_map_iter(&gpu->buffers);
+        while (ecs_map_next(&it)) {
+            box_gpu_instance_groups_release(ecs_map_ptr(&it));
+        }
+
+        goto done;
+    }
+
     if (handle < BOX_RENDER_BUFFER_FIRST || handle >= BOX_RENDER_BUFFER_LIGHT_FIRST) {
         goto done;
     }

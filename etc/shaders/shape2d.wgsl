@@ -51,8 +51,8 @@ struct Shape2DTransform {
     rows: array<vec4f, 3>,
 };
 
-// The shading stream of the instance page (InstanceShading of instance.wgsl) with the material
-// words read as integers.
+// The shading stream of the 2D instance page (box_render_shading_t, see instance.wgsl) with the
+// material words read as integers.
 struct Shape2DShading {
     color: vec4f,
     emissive: vec4f,

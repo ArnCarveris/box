@@ -6,8 +6,9 @@
  * are dynamic and whether they cast shadows, one swap-removed slot per entity and at most
  * BOX_DRAWS_CHUNK of them, so a key may have several batches.
  *
- * A batch owns a run of slots of an instance page (store.c). A page has a buffer per stream
- * (transform, shading, surface) with the same slots; a change uploads only its streams.
+ * A batch owns a run of slots of an instance page (store.c), a buffer per stream (transform,
+ * shading, surface) with the same slots; a change uploads only its streams. Mesh and 2D batches
+ * have stores of their own: a mesh shading is a material slot (materials.c), a tint and an alpha.
  */
 
 #ifndef BOX_RENDER_DRAW_H
@@ -28,6 +29,15 @@
 
 /** Buffers of an instance page at most, one per stream of its layout */
 #define BOX_DRAWS_STREAMS (BOX_RENDER_INSTANCE_STREAMS)
+
+/** Store of the instance pages of the mesh batches */
+#define BOX_DRAWS_STORE_MESH (0)
+
+/** Store of the instance pages of the 2D shape and glyph batches */
+#define BOX_DRAWS_STORE_2D (1)
+
+/** Stores of instance pages, one per page layout */
+#define BOX_DRAWS_STORES (2)
 
 /** Streams of an instance that a change writes, a bit per stream of the instance pages */
 typedef enum box_draw_kind_t {
@@ -203,7 +213,8 @@ typedef struct box_draw_batch_t {
     ecs_vec_t entities;     /**< ecs_entity_t per slot */
     ecs_vec_t glyphs;       /**< int32_t per slot of a glyph batch, the glyph of its Text */
     ecs_vec_t transforms;   /**< box_render_transform_t per slot */
-    ecs_vec_t shadings;     /**< box_render_shading_t per slot */
+    ecs_vec_t shadings;     /**< box_render_shading_t per slot of a 2D batch */
+    ecs_vec_t mesh_shadings; /**< box_render_mesh_shading_t per slot of a mesh batch */
     ecs_vec_t surfaces;     /**< box_render_surface_t per slot */
     ecs_vec_t changed[BOX_DRAWS_STREAMS]; /**< int32_t per stream, slots whose data of a stream
                              *   that does not upload every frame the GPU does not have */
@@ -225,6 +236,24 @@ typedef struct box_draw_clips_t {
                              *   walk up the hierarchy */
     bool dirty;             /**< A record changed since the last upload */
 } box_draw_clips_t;
+
+/** The material table: a slot per prefab or mesh shape that owns material components, slot 0
+ * the default material, as the main thread packed it and what the GPU still needs of it.
+ *
+ * Slots are handed out from the free list, last freed first, else after the highest slot, so
+ * the same adds and removes give the same slots.
+ */
+typedef struct box_draw_materials_t {
+    ecs_vec_t records;      /**< box_render_material_t per slot, as packed last */
+    ecs_vec_t owners;       /**< ecs_entity_t per slot, 0 for slot 0 and free slots */
+    ecs_vec_t marked;       /**< bool per slot, the slot is in dirty */
+    ecs_vec_t dirty;        /**< uint32_t, slots the next send packs and uploads */
+    ecs_vec_t free;         /**< uint32_t, freed slots */
+    ecs_map_t owned;        /**< Owner entity to its slot */
+    uint32_t capacity;      /**< Records the table buffer holds, 0 before it is created */
+    int32_t alive;          /**< Slots alive, slot 0 included */
+    bool overflow;          /**< An id past what the binding holds was logged */
+} box_draw_materials_t;
 
 /** The root of a changed subtree and the streams the change writes for each of its entities */
 typedef struct box_draw_moved_t {
@@ -250,7 +279,8 @@ typedef struct box_render_draws_t {
     ecs_vec_t released;         /**< uint32_t, meshes to release this frame */
     ecs_vec_t blended;          /**< int32_t, blended batches the frame draws */
     ecs_vec_t sorted;           /**< box_draw_sorted_t, blended instances of one view */
-    box_draw_store_t store;     /**< Instance pages of the batches */
+    box_draw_store_t stores[BOX_DRAWS_STORES]; /**< Instance pages of the batches, by layout */
+    box_draw_materials_t materials; /**< The material table */
     uint32_t chunk;             /**< Instances a batch holds before a key starts another */
     uint32_t changes_size;      /**< Bytes of the change buffer, 0 before it is created */
     const box_textures_t *textures; /**< Registry the texture handles resolve from in a send */
@@ -370,7 +400,7 @@ box_render_transform_t* box_draws_slot_transform(
     box_draw_batch_t *b,
     int32_t slot);
 
-/** Get the shading of a slot.
+/** Get the shading of a slot of a 2D batch.
  *
  * @param b The batch
  * @param slot The slot
@@ -379,6 +409,26 @@ box_render_transform_t* box_draws_slot_transform(
 box_render_shading_t* box_draws_slot_shading(
     box_draw_batch_t *b,
     int32_t slot);
+
+/** Get the shading of a slot of a mesh batch.
+ *
+ * @param b The batch
+ * @param slot The slot
+ * @return The shading
+ */
+box_render_mesh_shading_t* box_draws_slot_mesh_shading(
+    box_draw_batch_t *b,
+    int32_t slot);
+
+/** Get the store of the instance pages of a batch.
+ *
+ * @param d The state
+ * @param b The batch
+ * @return The store of its layout
+ */
+box_draw_store_t* box_draws_batch_store(
+    box_render_draws_t *d,
+    const box_draw_batch_t *b);
 
 /** Get the surface of a slot.
  *
@@ -410,20 +460,45 @@ void box_draws_surface(
     box_render_surface_t *out,
     const ShapeMesh *shape);
 
-/** Write the material of a shape into its instance data.
+/** Write the material of a 2D shape or glyph into its instance data.
  *
  * The base color is mixed toward the tints of the ancestors from the root down and then toward
  * the tint of the shape, in display encoding, before it and the emission are converted to
  * linear light. The alpha is the opacity of the shape times the opacity of its ancestors.
  *
- * The cutoff of a 3D shape with AlphaCutoff goes into material z, clamped to 0..1, and the clip
- * index into ids[0].
+ * The clip index goes into ids[0].
  *
  * @param out The shading
  * @param material Material components of the entity
  */
 void box_draws_material(
     box_render_shading_t *out,
+    const box_draw_material_t *material);
+
+/** Pack the material components of the owner of a slot into its record of the material table.
+ *
+ * The record holds the display encoded base color (the default color without Rgb), metallic and
+ * roughness, the linear emission times its strength, the texture transform and the AlphaCutoff
+ * (0 without one), clamped as the shading was. Opacity, tints and the 2D shape are not in it.
+ *
+ * @param out The record
+ * @param material Material components of the owner
+ */
+void box_draws_material_pack(
+    box_render_material_t *out,
+    const box_draw_material_t *material);
+
+/** Write the shading of a mesh instance: the slot of its material, the tints of its ancestors
+ * composed with its own Tint, and its alpha.
+ *
+ * @param out The shading
+ * @param id Slot of the material table the instance renders with
+ * @param material Material components of the entity, of which the tints, the opacity and the
+ * fade are read
+ */
+void box_draws_mesh_shading(
+    box_render_mesh_shading_t *out,
+    uint32_t id,
     const box_draw_material_t *material);
 
 /** Write the shape of a 2D shape into its instance data, over the 3D surface constants.
@@ -629,6 +704,107 @@ bool box_draws_store_reserve(
 box_draw_page_t* box_draws_store_page(
     box_draw_store_t *s,
     int32_t page);
+
+/** Register an observer of the instanced batches, which holds a reference to the state.
+ *
+ * @param world The world
+ * @param d The state
+ * @param name Name of the observer
+ * @param desc Terms and events of the observer
+ * @param callback What the observer does
+ */
+void box_draws_observer(
+    ecs_world_t *world,
+    box_render_draws_t *d,
+    const char *name,
+    ecs_observer_desc_t desc,
+    ecs_iter_action_t callback);
+
+/** Initialize the material table with its default slot 0.
+ *
+ * @param d The state
+ */
+void box_draws_materials_init(
+    box_render_draws_t *d);
+
+/** Release the material table.
+ *
+ * @param d The state
+ */
+void box_draws_materials_fini(
+    box_render_draws_t *d);
+
+/** Forget the table buffer the backend had, so it is created and uploaded again.
+ *
+ * @param d The state
+ */
+void box_draws_materials_reset(
+    box_render_draws_t *d);
+
+/** Register the observers that hand out and free the slots of the material table and pack them
+ * again when a material component of their owner, or one they inherit, changes.
+ *
+ * A prefab gets a slot when it gets its MaterialId; a mesh shape that owns a MaterialId gets
+ * one in the extract (box_draws_material_id). Both are freed when the owner loses its
+ * MaterialId or is deleted.
+ *
+ * @param world The world
+ * @param d The state
+ */
+void box_draws_materials_observers(
+    ecs_world_t *world,
+    box_render_draws_t *d);
+
+/** Get the slot of the material table an entity renders with.
+ *
+ * A mesh shape that owns a MaterialId renders with a slot of its own, handed out when it has
+ * none. Any other entity renders with the MaterialId it inherits, or slot 0, and gives back an
+ * own slot it had. A slot past what the binding holds is logged once and renders as slot 0.
+ *
+ * @param world The world
+ * @param d The state
+ * @param e The entity
+ * @param mesh Whether the entity is drawn by the mesh pipeline
+ * @return The slot
+ */
+uint32_t box_draws_material_id(
+    ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e,
+    bool mesh);
+
+/** Give back the own slot of an entity that stops being a mesh shape, not the slot of a prefab.
+ *
+ * @param world The world
+ * @param d The state
+ * @param e The entity
+ */
+void box_draws_material_release(
+    ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e);
+
+/** Pack the slot an entity owns again in the next send, when it owns one.
+ *
+ * @param d The state
+ * @param e The entity
+ * @return Whether the entity owns a slot
+ */
+bool box_draws_material_changed(
+    box_render_draws_t *d,
+    ecs_entity_t e);
+
+/** Pack the changed slots of the material table and upload them: merged runs of consecutive
+ * slots, or the whole table when its buffer is created.
+ *
+ * @param world The world
+ * @param d The state
+ * @param p The packet
+ */
+void box_draws_materials_send(
+    ecs_world_t *world,
+    box_render_draws_t *d,
+    box_render_packet_t *p);
 
 /** Initialize the draw order of the 2D slots.
  *

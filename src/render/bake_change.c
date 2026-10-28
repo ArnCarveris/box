@@ -716,6 +716,9 @@ void box_bake_lights(
 /** Register the observers of the changes of static shapes that rebake the probes near them,
  * AlphaCutoff also when it is added, as its holes change what the captures see.
  *
+ * The terms take the default source, so the change of a material component of a prefab
+ * reaches the instances that inherit it.
+ *
  * @param world The world
  * @param b The state
  */

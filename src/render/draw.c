@@ -7,7 +7,8 @@
  * changed: a moved shape its transform, a recolored one its shading.
  *
  * Static streams are written once per change, the transforms of DynamicTransform and the
- * shading of DynamicMaterial shapes per frame.
+ * shading of DynamicMaterial shapes per frame. A mesh instance references a slot of the
+ * material table (materials.c), so a material change packs a slot, not the instances.
  */
 
 #include "draw.h"
@@ -90,6 +91,7 @@ static void box_draws_free(
     ecs_vec_fini_t(NULL, &d->walk, ecs_entity_t);
     box_draws_order_fini(d);
     box_draws_clips_fini(d);
+    box_draws_materials_fini(d);
     ecs_os_free(d);
 done:
     return;
@@ -308,7 +310,8 @@ static void BoxDrawsOnOrdered(
     d->order_dirty = true;
 }
 
-/** Free the slots of entities that lose their shape.
+/** Free the slots of entities that lose their shape, and the slot of the material table a mesh
+ * shape owns.
  *
  * @param it The iterator of the observer
  */
@@ -328,6 +331,8 @@ static void BoxDrawsOnRemove(
             s->batch = -1;
             s->slot = -1;
         }
+
+        box_draws_material_release(it->world, d, it->entities[i]);
     }
 
 done:
@@ -564,6 +569,10 @@ static void box_draws_key(
  * A shape that keeps its slot writes the streams of its change, plus its shading when the clip
  * index of a 2D shape changed; a shape that gets a slot writes every stream.
  *
+ * The shading of a mesh shape is the slot of the material table it renders with, its tint and
+ * its alpha; a mesh shape that owns a MaterialId gets a slot of its own there, and gives it back
+ * when it is no longer drawn by the mesh pipeline.
+ *
  * @param world The world
  * @param d The state
  * @param e The entity
@@ -615,6 +624,7 @@ static void box_draws_update_shape(
     }
 
     if (!drawn) {
+        box_draws_material_release(world, d, e);
         goto done;
     }
 
@@ -643,8 +653,12 @@ write:
         }
     }
 
-    if (kinds & BOX_DRAW_SHADING) {
+    if ((kinds & BOX_DRAW_SHADING) && material.shape2d) {
+        box_draws_material_release(world, d, e);
         box_draws_material(box_draws_slot_shading(b, s->slot), &material);
+    } else if (kinds & BOX_DRAW_SHADING) {
+        box_draws_mesh_shading(box_draws_slot_mesh_shading(b, s->slot),
+            box_draws_material_id(world, d, e, true), &material);
     }
 
     if (kinds & BOX_DRAW_SURFACE) {
@@ -737,28 +751,21 @@ static void BoxRenderExtractDraws(
     d->stats.transform_bytes = 0;
     d->stats.shading_bytes = 0;
     d->stats.surface_bytes = 0;
+    d->stats.material_bytes = 0;
     box_draws_process(world, d);
     box_draws_clips_send(world, d, p);
     box_draws_order_update(world, d);
     box_draws_send(world, d, p);
     RenderStatus *status = ecs_singleton_get_mut(world, RenderStatus);
     if (status) {
-        status->upload_bytes = d->stats.upload_bytes;
+        status->upload_bytes = d->stats.upload_bytes + d->stats.material_bytes;
     }
 
 done:
     return;
 }
 
-/** Register an observer of the instanced batches.
- *
- * @param world The world
- * @param d The state
- * @param name Name of the observer
- * @param desc Terms and events of the observer
- * @param callback What the observer does
- */
-static void box_draws_observer(
+void box_draws_observer(
     ecs_world_t *world,
     box_render_draws_t *d,
     const char *name,
@@ -773,11 +780,9 @@ static void box_draws_observer(
     ecs_observer_init(world, &desc);
 }
 
-/** Register the observers of the material components, which write the shading of a shape; a
- * change of its batch key moves it to a new slot, which writes every stream.
- *
- * AlphaCutoff is followed when it is added too, since an added cutoff moves the shape into an
- * alpha tested batch.
+/** Register the observers of the material state outside the material table, which write the
+ * shading or the batch key of a shape; a new key moves it to a new slot, writing every stream.
+ * The material components are followed by box_draws_materials_observers.
  *
  * @param world The world
  * @param d The state
@@ -786,24 +791,20 @@ static void box_draws_material_observers(
     ecs_world_t *world,
     box_render_draws_t *d)
 {
-    ecs_entity_t components[6] = {
-        ecs_id(PbrMaterial), ecs_id(Emissive), ecs_id(BlendMode), ecs_id(BackFaceMode),
-        ecs_id(TextureWrap), ecs_id(TextureTransform)
+    ecs_entity_t components[3] = {
+        ecs_id(BlendMode), ecs_id(BackFaceMode), ecs_id(TextureWrap)
     };
-    const char *names[6] = {
-        "DrawsOnPbrMaterial", "DrawsOnEmissive", "DrawsOnBlendMode", "DrawsOnBackFaceMode",
-        "DrawsOnTextureWrap", "DrawsOnTextureTransform"
+    const char *names[3] = {
+        "DrawsOnBlendMode", "DrawsOnBackFaceMode", "DrawsOnTextureWrap"
     };
     int32_t i;
-    for (i = 0; i < 6; i ++) {
+    for (i = 0; i < 3; i ++) {
         box_draws_observer(world, d, names[i], (ecs_observer_desc_t){
             .query.terms = {{ .id = components[i] }},
             .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnShading);
     }
 
-    box_draws_observer(world, d, "DrawsOnAlphaCutoff", (ecs_observer_desc_t){
-        .query.terms = {{ .id = ecs_id(AlphaCutoff) }},
-        .events = { EcsOnAdd, EcsOnSet, EcsOnRemove } }, BoxDrawsOnShading);
+    box_draws_materials_observers(world, d);
 
     box_draws_observer(world, d, "DrawsOnPbrTextures", (ecs_observer_desc_t){
         .query.terms = {{
@@ -847,9 +848,6 @@ static void box_draws_observers(
         .events = { EcsOnRemove } }, BoxDrawsOnTextRemove);
     box_draws_observer(world, d, "DrawsOnTextSpans", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(TextSpans) }},
-        .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnShading);
-    box_draws_observer(world, d, "DrawsOnColor", (ecs_observer_desc_t){
-        .query.terms = {{ .id = ecs_id(Rgb) }},
         .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnShading);
     box_draws_material_observers(world, d);
     d->refs ++;
@@ -1001,14 +999,23 @@ void box_render_draws_init(
     ecs_map_init(&d->meshes, NULL);
     box_draws_order_init(d);
     box_draws_clips_init(d);
-    box_draws_store_init(&d->store, &(box_draw_layout_t){
+    box_draws_materials_init(d);
+    box_draws_store_init(&d->stores[BOX_DRAWS_STORE_MESH], &(box_draw_layout_t){
+        .streams = BOX_DRAWS_STREAMS,
+        .stride = {
+            [BOX_RENDER_STREAM_TRANSFORM] = (uint32_t)sizeof(box_render_transform_t),
+            [BOX_RENDER_STREAM_SHADING] = (uint32_t)sizeof(box_render_mesh_shading_t),
+            [BOX_RENDER_STREAM_SURFACE] = (uint32_t)sizeof(box_render_surface_t)
+        }
+    }, BOX_RENDER_BUFFER_FIRST, BOX_DRAWS_CHUNK);
+    box_draws_store_init(&d->stores[BOX_DRAWS_STORE_2D], &(box_draw_layout_t){
         .streams = BOX_DRAWS_STREAMS,
         .stride = {
             [BOX_RENDER_STREAM_TRANSFORM] = (uint32_t)sizeof(box_render_transform_t),
             [BOX_RENDER_STREAM_SHADING] = (uint32_t)sizeof(box_render_shading_t),
             [BOX_RENDER_STREAM_SURFACE] = (uint32_t)sizeof(box_render_surface_t)
         }
-    }, BOX_RENDER_BUFFER_FIRST, BOX_DRAWS_CHUNK);
+    }, BOX_RENDER_BUFFER_FIRST_2D, BOX_DRAWS_CHUNK);
     d->chunk = BOX_DRAWS_CHUNK;
     d->refs = 1;
     box_draws_queries(world, d);

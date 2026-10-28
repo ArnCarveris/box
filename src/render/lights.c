@@ -496,7 +496,8 @@ done:
 
 /** Collect the lights one query matches into the scenes they belong to.
  *
- * The scene of a light comes from the Scene(self|up) field of the query.
+ * The scene of a light comes from the Scene(self|up) field of the query. Its Rgb may be
+ * inherited from a prefab, which the field then holds once for every row.
  *
  * @param world The world
  * @param l The state
@@ -513,12 +514,13 @@ static void box_lights_collect(
     while (ecs_query_next(&it)) {
         const WorldTransform *transforms = ecs_field(&it, WorldTransform, 1);
         const Rgb *colors = ecs_field(&it, Rgb, 2);
+        int32_t color_step = colors && ecs_field_is_self(&it, 2) ? 1 : 0;
         box_light_scene_t *s = NULL;
         ecs_entity_t scene = 0;
         int32_t i;
         for (i = 0; i < it.count; i ++) {
             const WorldTransform *transform = transforms ? &transforms[i] : NULL;
-            const Rgb *rgb = colors ? &colors[i] : NULL;
+            const Rgb *rgb = colors ? &colors[i * color_step] : NULL;
             ecs_entity_t member = box_render_scene_field(&it, 3, i);
             if (!s || member != scene) {
                 scene = member;

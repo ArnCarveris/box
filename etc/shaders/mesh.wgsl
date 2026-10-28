@@ -7,7 +7,9 @@
 // and metallic (blue) multipliers.
 // The cull pass writes the slots of the visible instances, which step per instance; the
 // instance data is read from the transform, shading and surface streams of the instance page of
-// the batch (group 2). Indirect light comes
+// the batch (group 2). The vertex stage fetches the material of its instance from the material
+// table by the id of its shading and mixes the base color toward the tint of the instance in
+// display encoding before converting it to linear light. Indirect light comes
 // from the hemisphere ambient, or for a view that samples baked lighting from the irradiance
 // probe volume of its scene (group 3). The indirect specular light of a view that samples
 // reflection probes comes from the prefiltered cubemaps of the probes its clusters list. A view
@@ -16,8 +18,9 @@
 // that renders the atmosphere of its scene attenuates the shaded color and adds the in scattered
 // light from one trilinear tap of its aerial perspective volume.
 // An alpha tested pipeline (alpha_cutout) discards the fragments whose alpha, the instance alpha
-// times the albedo alpha, is below the cutoff of their instance, once every texture is sampled.
+// times the albedo alpha, is below the cutoff of their material, once every texture is sampled.
 #include "include/instance.wgsl"
+#include "include/material.wgsl"
 #include "include/lights.wgsl"
 #include "include/shadow.wgsl"
 
@@ -62,8 +65,9 @@ const MIN_ROUGHNESS: f32 = 0.045;
 
 @group(2) @binding(0) var<storage, read> transforms: array<InstanceTransform>;
 @group(2) @binding(1) var<storage, read> surface_assets: array<vec4f>;
-@group(2) @binding(2) var<storage, read> shadings: array<InstanceShading>;
+@group(2) @binding(2) var<storage, read> shadings: array<MeshShading>;
 @group(2) @binding(3) var<storage, read> surfaces: array<SurfaceData>;
+@group(2) @binding(4) var<storage, read> materials: array<Material>;
 
 // Grid of the probe volume: probe (x, y, z) sits at origin.xyz + (x, y, z) * origin.w, x
 // fastest in the probe buffer. size.w is 0 for the 1x1x1 volume of views that keep the
@@ -131,6 +135,7 @@ struct VertexOut {
 
 @vertex fn vs(v: VertexIn) -> VertexOut {
     let shading = shadings[v.slot];
+    let material = material_fetch(shading.material);
     surface_data = surfaces[v.slot];
     let model = instance_model(transforms[v.slot]);
     let c0 = model[0].xyz;
@@ -161,11 +166,11 @@ struct VertexOut {
     o.pos = view.view_proj * world;
     o.world = world.xyz;
     o.normal = cofactor * normal * flip;
-    o.color = shading.color;
-    o.emissive = shading.emissive.rgb;
-    o.material = shading.material.xy;
-    o.cutoff = shading.material.z;
-    o.uv = v.uv * shading.uv.xy + shading.uv.zw;
+    o.color = vec4f(material_color(material, mesh_shading_tint(shading)), shading.alpha);
+    o.emissive = material.emissive;
+    o.material = vec2f(material.metallic, material.roughness);
+    o.cutoff = material.cutoff;
+    o.uv = v.uv * material.uv.xy + material.uv.zw;
     if (surface_data.p[0].x != 0.0) {
         var region = i32(v.position.z);
         if (surface_data.p[0].x == 7.0) {
@@ -173,7 +178,7 @@ struct VertexOut {
             if (abs(v.normal.y) > 0.5) {
                 region = 2;
             } else if (region == 1) {
-                o.uv.x -= 2.0 * shading.uv.x;
+                o.uv.x -= 2.0 * material.uv.x;
             }
         }
         var material_region = 2;

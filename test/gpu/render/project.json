@@ -198,7 +198,11 @@
                     "cutout_writes_depth",
                     "cutout_back_face_plain_keeps_holes",
                     "cutout_change_and_remove",
-                    "cutout_blended_discards"
+                    "cutout_blended_discards",
+                    "prefab_color_reaches_instances",
+                    "instance_override_keeps_prefab_roughness",
+                    "tinted_instance_matches_owner",
+                    "light_prefab_inherits_color"
                 ]
             },
             {

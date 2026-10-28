@@ -84,6 +84,18 @@
  * box_render_clip_t by clip index */
 #define BOX_RENDER_BUFFER_CLIPS (2)
 
+/** Buffer handle of the material table: box_render_material_t by MaterialId slot, which the mesh
+ * instances reference by the id of their shading (box_render_mesh_shading_t). Bound with the
+ * instance streams of every pass that draws meshes. */
+#define BOX_RENDER_BUFFER_MATERIALS (3)
+
+/** Records the material table holds at least, doubling from there */
+#define BOX_RENDER_MATERIALS_MIN (64)
+
+/** Records the material table holds at most, the 128 MiB storage binding every WebGPU device
+ * supports; an id past it renders with slot 0 */
+#define BOX_RENDER_MATERIALS_MAX ((uint32_t)((128u << 20) / sizeof(box_render_material_t)))
+
 /** Most nested clips a 2D draw intersects; clips further up the hierarchy are not applied */
 #define BOX_RENDER_CLIP_DEPTH (16)
 
@@ -99,6 +111,13 @@
 
 /** Buffers of an instance page, one per stream, at consecutive handles */
 #define BOX_RENDER_INSTANCE_STREAMS (3)
+
+/** Buffer handle of the first instance page of the 2D shapes and glyphs, whose shading stream
+ * holds box_render_shading_t; the pages from BOX_RENDER_BUFFER_FIRST hold the meshes, whose
+ * shading stream holds box_render_mesh_shading_t. Page p of the 2D pages has the handle
+ * BOX_RENDER_BUFFER_FIRST_2D + p * BOX_RENDER_INSTANCE_STREAMS + s for stream s. */
+#define BOX_RENDER_BUFFER_FIRST_2D \
+    (BOX_RENDER_BUFFER_FIRST + BOX_RENDER_INSTANCE_STREAMS * 0x04000000u)
 
 /** Stream of the transforms of an instance page, box_render_transform_t per slot */
 #define BOX_RENDER_STREAM_TRANSFORM (0)
@@ -616,8 +635,8 @@ typedef struct box_render_transform_t {
     vec4 rows[3];           /**< Rows of the model matrix, the fourth row is (0, 0, 0, 1) */
 } box_render_transform_t;
 
-/** Shading constants of an instance, the stream of an instance page that changes with its
- * material.
+/** Shading constants of a 2D shape or glyph, the shading stream of a 2D instance page, which
+ * changes with its material.
  *
  * A 2D instance holds the words of its shape in material (see shape2d.wgsl) and its clip index
  * in ids[0].
@@ -625,11 +644,34 @@ typedef struct box_render_transform_t {
 typedef struct box_render_shading_t {
     vec4 color;             /**< Linear base color, alpha is the opacity with its ancestors */
     vec4 emissive;          /**< Linear emitted color times its strength, w unused */
-    vec4 material;          /**< Metallic, roughness, the AlphaCutoff of an alpha tested
-                             *   instance (0 otherwise), w unused */
+    vec4 material;          /**< Metallic, roughness, zw unused (the words of a 2D shape) */
     vec4 uv;                /**< TextureTransform: u scale, v scale, u offset, v offset */
     uint32_t ids[4];        /**< Clip index of a 2D instance (0 for none), three reserved 0 */
 } box_render_shading_t;
+
+/** A record of the material table (BOX_RENDER_BUFFER_MATERIALS), Material of material.wgsl: the
+ * material of a prefab or of a shape that owns material components, slot 0 the default one */
+typedef struct box_render_material_t {
+    uint32_t color;         /**< Rgb, display encoded bytes: r | g << 8 | b << 16 */
+    float metallic;         /**< PbrMaterial.metallic, clamped to 0..1 */
+    float roughness;        /**< PbrMaterial.roughness, clamped to 0..1 */
+    float cutoff;           /**< AlphaCutoff clamped to 0..1, 0 without one */
+    float emissive[3];      /**< Linear emitted color times its strength */
+    uint32_t reserved;      /**< 0 */
+    float uv[4];            /**< TextureTransform: u scale, v scale, u offset, v offset */
+} box_render_material_t;
+
+/** Shading of a mesh instance, the shading stream of a mesh instance page, MeshShading of
+ * instance.wgsl.
+ *
+ * The tint is the composed mix of the tints of the ancestors and of the instance's own Tint
+ * (box_draw_tint_t): a display encoded color becomes color * keep + add, as four unorm16.
+ */
+typedef struct box_render_mesh_shading_t {
+    uint32_t material;      /**< Slot of the material table the instance renders with */
+    uint32_t tint[2];       /**< Tint add red | add green << 16, add blue | keep << 16 */
+    float alpha;            /**< The opacity of the instance times that of its ancestors */
+} box_render_mesh_shading_t;
 
 /** Surface parameters of an instance, the stream of an instance page that changes with its
  * ShapeMesh: the parametric surface the vertex shaders evaluate (surface.wgsl), 0 for a mesh.
@@ -1195,6 +1237,8 @@ typedef struct box_render_draws_stats_t {
                                  *   runs and scatter segments, only when a ShapeMesh changed */
     int32_t clips;              /**< ClipChildren elements in the clip buffer */
     int64_t clip_bytes;         /**< Bytes the last extract uploaded into the clip buffer */
+    int32_t materials;          /**< Slots of the material table alive, slot 0 included */
+    int64_t material_bytes;     /**< Bytes of the material table the last extract uploaded */
 } box_render_draws_stats_t;
 
 /** Register the observers and the system that keep the shapes of the world in batches.

@@ -4,12 +4,14 @@
 // - binding 0, InstanceTransform (box_render_transform_t): the three rows of the affine model
 //   matrix with the instance scale, which the cull, the shadow casters and the capture cull
 //   read, and which a moved instance uploads;
-// - binding 2, InstanceShading (box_render_shading_t): the material constants. Material holds
-//   metallic, roughness and, for an alpha tested instance (AlphaCutoff), in z the cutoff below
-//   which its fragments are discarded; color.a is its alpha. ids.x is the clip index of a 2D
-//   instance (shape2d.wgsl), yzw are 0;
+// - binding 2, the shading stream. A mesh page holds MeshShading (box_render_mesh_shading_t):
+//   the slot of the material table (material.wgsl) the instance renders with, the composed tint
+//   of its ancestors and its own Tint as four unorm16 (the display encoded base color becomes
+//   color * keep + add) and its alpha. A 2D page holds the whole material of a 2D shape or glyph
+//   (Shape2DShading of shape2d.wgsl);
 // - binding 3, SurfaceData (box_render_surface_t): the parametric surface the vertex stage
-//   evaluates (surface.wgsl), zero for a plain mesh.
+//   evaluates (surface.wgsl), zero for a plain mesh;
+// - binding 4, the material table (box_render_material_t), which every page binds.
 //
 // Binding 1 holds the surface assets of the mesh of the draw.
 #pragma once
@@ -19,13 +21,18 @@ struct InstanceTransform {
     rows: array<vec4f, 3>,
 };
 
-struct InstanceShading {
-    color: vec4f,
-    emissive: vec4f,
-    material: vec4f,
-    uv: vec4f,
-    ids: vec4u,
+struct MeshShading {
+    material: u32,
+    // Add red | add green << 16, add blue | keep << 16, unorm16
+    tint_rg: u32,
+    tint_bk: u32,
+    alpha: f32,
 };
+
+// Composed tint of a mesh instance: xyz is added to the display encoded color times w.
+fn mesh_shading_tint(s: MeshShading) -> vec4f {
+    return vec4f(unpack2x16unorm(s.tint_rg), unpack2x16unorm(s.tint_bk));
+}
 
 // Model matrix of an instance, its fourth row (0, 0, 0, 1).
 fn instance_model(t: InstanceTransform) -> mat4x4f {

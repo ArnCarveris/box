@@ -1441,3 +1441,233 @@ void Material_cutout_blended_discards(void) {
     ecs_fini(world);
     ecs_os_free(file);
 }
+
+/** Create a headless world with a view 6 units in front of the origin, unlit or lit without
+ * ambient light, for the prefab material cases.
+ *
+ * @param lit Whether the view is lit
+ * @return The world
+ */
+static ecs_world_t* prefab_world(
+    bool lit)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 6});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
+        .color = {0, 0, 0, 255}}, .lighting.enabled = lit});
+    if (lit) {
+        ecs_singleton_set(world, AmbientLight, {.intensity = 0});
+    }
+
+    return world;
+}
+
+/** Render two frames of a prefab material case into a 64x32 PNG and load it.
+ *
+ * @param world The world
+ * @param name File name of the capture
+ * @return The pixels, RGBA, freed with stbi_image_free
+ */
+static unsigned char* prefab_render(
+    ecs_world_t *world,
+    const char *name)
+{
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 64, .height = 32,
+        .write_to_file = ECS_CONST_CAST(char*, name), .resolution_scale = 1});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    ecs_delete(world, e);
+
+    char *path = flecs_asprintf("%s/%s", ecs_singleton_get(world, AppStatus)->tmp_dir, name);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    ecs_os_free(path);
+    test_assert(px != NULL);
+
+    return px;
+}
+
+/** Check whether a pixel is within a tolerance of a color.
+ *
+ * @param p The pixel
+ * @param r Red
+ * @param g Green
+ * @param b Blue
+ * @param tolerance Largest channel difference
+ * @return Whether every channel is within the tolerance
+ */
+static bool prefab_near(
+    const unsigned char *p,
+    int r,
+    int g,
+    int b,
+    int tolerance)
+{
+    return abs((int)p[0] - r) <= tolerance && abs((int)p[1] - g) <= tolerance &&
+        abs((int)p[2] - b) <= tolerance;
+}
+
+/** Create an instance of a prefab at a position on the x axis.
+ *
+ * @param world The world
+ * @param prefab The prefab
+ * @param x The x position
+ * @return The instance
+ */
+static ecs_entity_t prefab_instance(
+    ecs_world_t *world,
+    ecs_entity_t prefab,
+    float x)
+{
+    ecs_entity_t result = ecs_new_w_pair(world, EcsIsA, prefab);
+    ecs_set(world, result, Position, {x, 0, 0});
+
+    return result;
+}
+
+void Material_prefab_color_reaches_instances(void) {
+    // materials/material_ids
+    ecs_world_t *world = prefab_world(false);
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_set(world, prefab, Box, {1.2f, 1.2f, 0.1f});
+    ecs_set(world, prefab, Rgb, {255, 0, 0});
+    float x[4] = { -4.5f, -1.5f, 1.5f, 4.5f };
+    int32_t columns[4] = { 11, 25, 39, 53 };
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        prefab_instance(world, prefab, x[i]);
+    }
+
+    unsigned char *px = prefab_render(world, "prefab_red.png");
+    for (i = 0; i < 4; i ++) {
+        test_assert(prefab_near(&px[(16 * 64 + columns[i]) * 4], 255, 0, 0, 2));
+    }
+
+    stbi_image_free(px);
+    ecs_set(world, prefab, Rgb, {0, 0, 255});
+    px = prefab_render(world, "prefab_blue.png");
+    for (i = 0; i < 4; i ++) {
+        test_assert(prefab_near(&px[(16 * 64 + columns[i]) * 4], 0, 0, 255, 2));
+    }
+
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+void Material_instance_override_keeps_prefab_roughness(void) {
+    // materials/material_ids
+    ecs_world_t *world = prefab_world(true);
+    ecs_entity_t left = ecs_new(world);
+    ecs_set(world, left, Position, {-3, 0, 6});
+    ecs_set(world, left, PointLight, {.intensity = 8 * GLM_PIf, .range = 20});
+    ecs_entity_t right = ecs_new(world);
+    ecs_set(world, right, Position, {3, 0, 6});
+    ecs_set(world, right, PointLight, {.intensity = 8 * GLM_PIf, .range = 20});
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_set(world, prefab, Box, {1.2f, 1.2f, 0.1f});
+    ecs_set(world, prefab, Rgb, {255, 0, 0});
+    ecs_set(world, prefab, PbrMaterial, {.metallic = 0, .roughness = 0.2f});
+    ecs_entity_t own = prefab_instance(world, prefab, -1.5f);
+    ecs_set(world, own, Rgb, {0, 200, 0});
+    ecs_entity_t reference = ecs_new(world);
+    ecs_set(world, reference, Position, {1.5f, 0, 0});
+    ecs_set(world, reference, Box, {1.2f, 1.2f, 0.1f});
+    ecs_set(world, reference, Rgb, {0, 200, 0});
+    ecs_set(world, reference, PbrMaterial, {.metallic = 0, .roughness = 0.2f});
+    prefab_instance(world, prefab, -4.5f);
+
+    unsigned char *px = prefab_render(world, "prefab_override.png");
+    unsigned char *a = &px[(16 * 64 + 25) * 4];
+    unsigned char *b = &px[(16 * 64 + 38) * 4];
+    unsigned char *shared = &px[(16 * 64 + 11) * 4];
+    test_assert(prefab_near(a, b[0], b[1], b[2], 4));
+    test_assert(shared[0] > shared[1] + 20);
+
+    stbi_image_free(px);
+    ecs_set(world, prefab, PbrMaterial, {.metallic = 0, .roughness = 1});
+    ecs_set(world, reference, PbrMaterial, {.metallic = 0, .roughness = 1});
+    px = prefab_render(world, "prefab_override_rough.png");
+    a = &px[(16 * 64 + 25) * 4];
+    b = &px[(16 * 64 + 38) * 4];
+    test_assert(a[1] > a[0] + 20);
+    test_assert(prefab_near(a, b[0], b[1], b[2], 4));
+
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+void Material_tinted_instance_matches_owner(void) {
+    // materials/material_ids
+    ecs_world_t *world = prefab_world(false);
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_set(world, prefab, Box, {1.2f, 1.2f, 0.1f});
+    ecs_set(world, prefab, Rgb, {200, 100, 50});
+    ecs_entity_t tinted = prefab_instance(world, prefab, -1.5f);
+    ecs_set(world, tinted, Tint, {0, 0, 255, 128});
+    ecs_entity_t owner = ecs_new(world);
+    ecs_set(world, owner, Position, {1.5f, 0, 0});
+    ecs_set(world, owner, Box, {1.2f, 1.2f, 0.1f});
+    ecs_set(world, owner, Rgb, {200, 100, 50});
+    ecs_set(world, owner, Tint, {0, 0, 255, 128});
+    ecs_entity_t parent = ecs_new(world);
+    ecs_set(world, parent, Tint, {0, 0, 255, 128});
+    ecs_entity_t child = prefab_instance(world, prefab, 4.5f);
+    ecs_add_pair(world, child, EcsChildOf, parent);
+    prefab_instance(world, prefab, -4.5f);
+
+    unsigned char *px = prefab_render(world, "prefab_tint.png");
+    unsigned char *a = &px[(16 * 64 + 25) * 4];
+    unsigned char *b = &px[(16 * 64 + 39) * 4];
+    unsigned char *c = &px[(16 * 64 + 53) * 4];
+    unsigned char *plain = &px[(16 * 64 + 11) * 4];
+    test_assert(prefab_near(a, 100, 50, 153, 2));
+    test_assert(prefab_near(a, b[0], b[1], b[2], 1));
+    test_assert(prefab_near(c, b[0], b[1], b[2], 1));
+    test_assert(prefab_near(plain, 200, 100, 50, 2));
+
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+void Material_light_prefab_inherits_color(void) {
+    // materials/material_ids
+    ecs_world_t *world = prefab_world(true);
+    ecs_entity_t wall = ecs_new(world);
+    ecs_set(world, wall, Position, {0, 0, -1});
+    ecs_set(world, wall, Box, {20, 20, 0.1f});
+    ecs_set(world, wall, Rgb, {255, 255, 255});
+    ecs_set(world, wall, PbrMaterial, {.roughness = 1});
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_set(world, prefab, PointLight, {.intensity = 4 * GLM_PIf, .range = 3});
+    ecs_set(world, prefab, Rgb, {255, 0, 0});
+    ecs_entity_t light = ecs_new_w_pair(world, EcsIsA, prefab);
+    ecs_set(world, light, Position, {-3, 0, 0});
+    test_bool(ecs_owns(world, light, Rgb), false);
+
+    unsigned char *px = prefab_render(world, "prefab_light.png");
+    unsigned char *near_ = &px[(16 * 64 + 20) * 4];
+    test_assert(near_[0] > 200);
+    test_assert(near_[1] < 8);
+    test_assert(near_[2] < 8);
+
+    stbi_image_free(px);
+    ecs_set(world, prefab, Rgb, {0, 255, 0});
+    px = prefab_render(world, "prefab_light_green.png");
+    near_ = &px[(16 * 64 + 20) * 4];
+    test_assert(near_[0] < 8);
+    test_assert(near_[1] > 200);
+
+    stbi_image_free(px);
+    ecs_fini(world);
+}
