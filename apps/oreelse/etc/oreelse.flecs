@@ -24,7 +24,6 @@ include buildings/solar_panel
 include buildings/gun_turret
 include buildings/laser_turret
 include buildings/missile_turret
-<<<<<<< HEAD
 include buildings/factory
 include buildings/drone
 include buildings/drone_pad
@@ -34,10 +33,7 @@ include rocket/rocket_port
 include rocket/rocket_bay
 include rocket/rocket
 include buildings/rocket_pad
-include particles/jet_plume
-=======
 include particles
->>>>>>> dbbe62ec9431d5c39eec386c4572988fe2d15ce8
 include player
 include critters/mite
 include critters/skitter
