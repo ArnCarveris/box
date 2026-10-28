@@ -4,9 +4,11 @@
  *
  * The capture cases look straight down from 10 units above a white floor lit by a sun that
  * shines straight down, into a 64x64 image: world x = -3 lands on pixel column 15, x = 3 on
- * column 48. A small slab 5 units above x = -3 shadows the floor below it. The alpha tested
- * caster is a 3x3 quad 5 units above x = -3 that faces the floor, so the camera culls it: world
- * x = -3.75 below its left half lands on column 11, x = -2.25 below its right half on column 20.
+ * column 48. A small slab 5 units above x = -3 shadows the floor below it.
+ *
+ * The alpha tested caster is a 3x3 quad 5 units above x = -3 that faces the floor, so the camera
+ * culls it: world x = -3.75 below its left half lands on column 11, x = -2.25 below its right
+ * half on column 20.
  */
 
 #include <box.h>

@@ -347,8 +347,9 @@ void box_draws_transform(
  *
  * The base color is mixed toward the tints of the ancestors from the root down and then toward
  * the tint of the shape, in display encoding, before it and the emission are converted to
- * linear light. The alpha is the opacity of the shape times the opacity of its ancestors. The
- * cutoff of a 3D shape with AlphaCutoff goes into material z, clamped to 0..1.
+ * linear light. The alpha is the opacity of the shape times the opacity of its ancestors.
+ *
+ * The cutoff of a 3D shape with AlphaCutoff goes into material z, clamped to 0..1.
  *
  * @param out The instance
  * @param material Material components of the entity

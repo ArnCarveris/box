@@ -3,7 +3,8 @@
  * @brief Tests for the forward pipelines: every combination of state in use draws.
  *
  * Shapes on a grid cover every blend mode, back face mode, alpha test and shader of the forward
- * pass; two 96x96 surfaces render them, one directly and one through an HDR effect.
+ * pass; two 96x96 surfaces render them, one directly and one through an HDR effect. The grid has
+ * 8 columns 11 units apart: 18 boxes, 18 rectangles, then 18 alpha tested boxes.
  */
 
 #include <box.h>
@@ -42,7 +43,6 @@ void PipelineCache_every_state_combination_draws(void) {
     ecs_set_ptr(world, hdr, View, &value);
     ecs_vec_fini_t(NULL, &value.effects, ViewEffect);
 
-    // 8 columns 11 units apart: boxes, rectangles, then alpha tested boxes, 18 of each
     int32_t i;
     for (i = 0; i < 54; i ++) {
         ecs_entity_t e = ecs_new(world);
