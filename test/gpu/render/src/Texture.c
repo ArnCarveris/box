@@ -16,6 +16,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include "render.h"
+#include "../../../../src/jobs/jobs.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_STATIC
@@ -569,6 +570,9 @@ void Texture_file_removed_keeps_image(void) {
     ecs_fini(world);
 }
 
+/* Without workers and without the headless wait a decode runs at the end of the frame that
+ * requested it and completes in the next frame, before its poll, so a file written between the
+ * two frames changes while the reload of the previous change is in flight. */
 void Texture_file_change_while_loading(void) {
     // engine/file_watch
     ecs_world_t *world = ecs_init();
@@ -578,6 +582,10 @@ void Texture_file_change_while_loading(void) {
     ecs_singleton_modified(world, App);
     ecs_singleton_set(world, FileWatch, {.interval = 0});
     char *file = flecs_asprintf("%s/inflight.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    test_int(box_jobs_set_workers(world, 0), 0);
+    app = ecs_singleton_get_mut(world, App);
+    app->headless = false;
+    ecs_singleton_modified(world, App);
     texture_write(file, 8, 4, 1000000000);
 
     ecs_entity_t tex = ecs_new(world);
@@ -587,20 +595,24 @@ void Texture_file_change_while_loading(void) {
 
     texture_write(file, 2, 2, 1000000100);
     ecs_progress(world, 0);
+    test_int(ecs_get(world, tex, TextureStatus)->state, TextureLoading);
     texture_write(file, 6, 2, 1000000200);
     ecs_progress(world, 0);
-    const TextureStatus *status = texture_wait(world, tex, 0);
-    ecs_progress(world, 0);
-    status = texture_wait(world, tex, 0);
+    const TextureStatus *status = ecs_get(world, tex, TextureStatus);
+    test_int(status->state, TextureLoading);
+    test_int(status->revision, 2);
+    test_int(ecs_get(world, tex, Texture)->width, 2);
+
+    status = texture_wait(world, tex, 2);
     test_int(status->state, TextureReady);
-    test_assert(status->revision >= 2);
+    test_int(status->revision, 3);
     test_int(ecs_get(world, tex, Texture)->width, 6);
     test_int(ecs_get(world, tex, Texture)->height, 2);
+    test_int(ecs_singleton_get(world, FileWatchStatus)->changes, 2);
 
-    int32_t revision = status->revision;
     ecs_progress(world, 0);
     ecs_progress(world, 0);
-    test_int(ecs_get(world, tex, TextureStatus)->revision, revision);
+    test_int(ecs_get(world, tex, TextureStatus)->revision, 3);
     test_int(ecs_get(world, tex, Texture)->width, 6);
 
     ecs_os_free(file);

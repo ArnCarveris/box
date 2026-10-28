@@ -111,26 +111,15 @@ ECS_STRUCT(FrameTiming, {
 /** Seconds between two checks of the watched files when FileWatch is not set */
 #define BOX_FILE_WATCH_INTERVAL (0.25f)
 
-/** How the engine watches the files it loaded, a singleton box.app sets to
- * BOX_FILE_WATCH_INTERVAL.
+/** How the engine watches the files it loaded, set to BOX_FILE_WATCH_INTERVAL by box.app.
  *
- * The engine watches the file each load read: the files a Shader preprocessing read, its
- * includes too, and the file of a TexturePath, a Font (box.text.DefaultFont too) and an
- * EnvironmentImage, at the path the lookup found. Once per interval, on the main thread before
- * the render extract, it compares the modification time and size of every distinct file once,
- * however many entities watch it; a file that disappears counts as changed, and so does its
- * return. A changed file loads again like a newly set component, and the previous content stays
- * in use until the new load is ready:
- * - a Shader preprocesses again and ShaderStatus.revision counts the new code
- * - a TexturePath turns TextureStatus to TextureLoading; success increments its revision and
- *   updates Texture, failure sets TextureFailed and keeps the previous image
- * - a Font in use loads again; success drops the glyphs of the old face, increments
- *   FontStatus.revision and lays the texts out again, failure keeps the previous face
- * - an EnvironmentImage sends the new image to its cubemap and increments
- *   EnvironmentStatus.version, failure sets EnvironmentStatus.error and keeps the content
+ * Watched are the files a Shader read (includes too) and the file of a TexturePath, Font and
+ * EnvironmentImage, at the located path. Once per interval, before the render extract, every
+ * distinct file is stat'ed once; a changed, removed or returned file loads again.
  *
- * Only the files of the latest load of a component are watched: a new path or removing the
- * component stops watching the old file. A file that was never found is not watched.
+ * The previous content stays until the new load is ready, and a failed load keeps it (see the
+ * components for their statuses). A new path or removing the component stops watching the old
+ * file; a missing file is not watched, except the files a Shader looked for.
  */
 ECS_STRUCT(FileWatch, {
     float interval;     /**< Wall seconds between checks, 0 every frame, < 0 never */
