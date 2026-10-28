@@ -1,0 +1,260 @@
+// The behemoth, the Behemoth prefab of the original: the boss critter, a green body of boxes
+// with glowing spots and flanks, spines on its abdomen, four armor plates down its back with
+// glowing seams, a head with five glowing eyes, a glowing brow, mandibles, tusks and horns,
+// and eight legs. Its origin is between its feet on the ground and it faces +Z. The legs and
+// the plates are pivots with OreLimb; here they stand still. OreCritters gives the prefab its
+// gameplay data.
+//
+// The original turns the tusks and horns by Rx(a) * Ry(b) (its Euler order xyz); box composes
+// Ry * Rx * Rz, so their angles here are the same orientation in box's order:
+// {asin(sin(a) cos(b)), atan2(sin(b), cos(a) cos(b)), atan2(sin(a) sin(b), cos(a))}.
+
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using oreelse
+
+const beheShell: Rgb = {86, 132, 58}
+const beheDark: Rgb = {50, 82, 38}
+const beheLimb: Rgb = {34, 56, 30}
+const beheEye: Rgb = {168, 255, 96}
+const beheSpot: Rgb = {126, 255, 158}
+const beheHorn: Rgb = {228, 224, 186}
+
+prefab Behemoth {
+  abdomen {
+    Position: {0, 2.1, -1.9}
+    Rotation: {0.18, 0, 0}
+    Box: {2.3, 1.9, 2.6}
+    Rgb: beheDark
+
+    spot_a {
+      Position: {-0.8, 0.9, 0.2}
+      Sphere: {segments: 8, smooth: true, radius: 0.22}
+      Rgb: beheSpot
+      Emissive: {strength: 2.4, color: beheSpot}
+    }
+
+    spot_b {
+      Position: {0.72, 0.86, -0.5}
+      Sphere: {segments: 8, smooth: true, radius: 0.18}
+      Rgb: beheSpot
+      Emissive: {strength: 2.4, color: beheSpot}
+    }
+
+    spot_c {
+      Position: {0.1, 0.98, 0.75}
+      Sphere: {segments: 8, smooth: true, radius: 0.15}
+      Rgb: beheSpot
+      Emissive: {strength: 2.4, color: beheSpot}
+    }
+
+    spine_left {
+      Position: {-0.6, 1.0, -0.4}
+      Rotation: {-0.42, 0, -0.26}
+      Cone: {segments: 8, smooth: true, length: 1.7, radius: 0.5}
+      Scale: {0.26, 1, 0.26}
+      Rgb: beheShell
+    }
+
+    spine_right {
+      Position: {0.6, 1.0, -0.4}
+      Rotation: {-0.42, 0, 0.26}
+      Cone: {segments: 8, smooth: true, length: 1.7, radius: 0.5}
+      Scale: {0.26, 1, 0.26}
+      Rgb: beheShell
+    }
+
+    spine_mid {
+      Position: {0, 1.05, -1.0}
+      Rotation: {-0.6, 0, 0}
+      Cone: {segments: 8, smooth: true, length: 1.4, radius: 0.5}
+      Scale: {0.2, 1, 0.2}
+      Rgb: beheShell
+    }
+  }
+
+  thorax {
+    Position: {0, 2.2, 0.3}
+    Box: {2.4, 1.9, 2.2}
+    Rgb: beheShell
+
+    flank_left {
+      Position: {-1.16, -0.2, 0.1}
+      Box: {0.2, 0.6, 1.3}
+      Rgb: beheSpot
+      Emissive: {strength: 1.6, color: beheSpot}
+    }
+
+    flank_right {
+      Position: {1.16, -0.2, 0.1}
+      Box: {0.2, 0.6, 1.3}
+      Rgb: beheSpot
+      Emissive: {strength: 1.6, color: beheSpot}
+    }
+  }
+
+  // Armor plates from the neck down the back, each a little narrower and lower
+  for i in 0..4 {
+    const w: f32 = 2.5 - i * 0.22
+
+    "plate_{i}" {
+      Position: {0, 3.06 - i * 0.09, 1.0 - i * 0.86}
+      OreLimb: {phase: i * 0.7, swing: 0.05}
+
+      shell {
+        Position: {0, 0, 0}
+        Rotation: {0.14, 0, 0}
+        Box: {w, 0.38, 1.0}
+        Rgb: beheDark
+      }
+
+      ridge {
+        Position: {0, 0.24, -0.06}
+        Box: {w * 0.4, 0.3, 0.62}
+        Rgb: beheShell
+      }
+
+      seam {
+        Position: {0, 0.06, 0.48}
+        Box: {w * 0.92, 0.1, 0.1}
+        Rgb: beheSpot
+        Emissive: {strength: 2.6, color: beheSpot}
+      }
+
+      barb_left {
+        Position: {-w * 0.44, 0.22, 0}
+        Rotation: {0, 0, -0.9}
+        Cone: {segments: 6, smooth: true, length: 0.72, radius: 0.5}
+        Scale: {0.13, 1, 0.13}
+        Rgb: beheShell
+      }
+
+      barb_right {
+        Position: {w * 0.44, 0.22, 0}
+        Rotation: {0, 0, 0.9}
+        Cone: {segments: 6, smooth: true, length: 0.72, radius: 0.5}
+        Scale: {0.13, 1, 0.13}
+        Rgb: beheShell
+      }
+    }
+  }
+
+  head {
+    Position: {0, 2.36, 2.36}
+    Rotation: {-0.12, 0, 0}
+    Box: {1.86, 1.34, 1.7}
+    Rgb: beheDark
+
+    crown {
+      Position: {0, 0.82, -0.16}
+      Box: {1.62, 0.42, 1.16}
+      Rgb: beheShell
+    }
+
+    // Five eyes in ranks, smaller and wider apart down the face
+    for i in 0..5 {
+      const side: f32 = 1 - 2 * (i % 2)
+      const rank: f32 = floor(i / 2)
+
+      "eye_{i}" {
+        Position: {
+          side * (0.2 + rank * 0.24),
+          0.5 - rank * 0.26,
+          0.8 - rank * 0.06
+        }
+        Sphere: {segments: 8, smooth: true, radius: 0.17 - rank * 0.03}
+        Rgb: beheEye
+        Emissive: {strength: 3.6, color: beheEye}
+      }
+    }
+
+    brow {
+      Position: {0, 0.62, 0.66}
+      Box: {1.5, 0.16, 0.34}
+      Rgb: beheSpot
+      Emissive: {strength: 2.2, color: beheSpot}
+    }
+
+    mandible_left {
+      Position: {-0.66, -0.52, 1.0}
+      Rotation: {0, 0.5, 0}
+      Box: {0.32, 0.36, 1.3}
+      Rgb: beheLimb
+    }
+
+    mandible_right {
+      Position: {0.66, -0.52, 1.0}
+      Rotation: {0, -0.5, 0}
+      Box: {0.32, 0.36, 1.3}
+      Rgb: beheLimb
+    }
+
+    // The original's {0.75, -0.22, 0}
+    tusk_left {
+      Position: {-0.52, -0.66, 1.1}
+      Rotation: {0.7278, -0.2966, -0.2006}
+      Cone: {segments: 8, smooth: true, length: 1.5, radius: 0.5}
+      Scale: {0.2, 1, 0.2}
+      Rgb: beheHorn
+    }
+
+    // The original's {0.75, 0.22, 0}
+    tusk_right {
+      Position: {0.52, -0.66, 1.1}
+      Rotation: {0.7278, 0.2966, 0.2006}
+      Cone: {segments: 8, smooth: true, length: 1.5, radius: 0.5}
+      Scale: {0.2, 1, 0.2}
+      Rgb: beheHorn
+    }
+
+    // The original's {-1.05, -0.3, 0}
+    horn_left {
+      Position: {-0.72, 0.72, 0.1}
+      Rotation: {-0.9767, -0.5562, 0.4757}
+      Cone: {segments: 8, smooth: true, length: 2.1, radius: 0.5}
+      Scale: {0.17, 1, 0.17}
+      Rgb: beheHorn
+    }
+
+    // The original's {-1.05, 0.3, 0}
+    horn_right {
+      Position: {0.72, 0.72, 0.1}
+      Rotation: {-0.9767, 0.5562, -0.4757}
+      Cone: {segments: 8, smooth: true, length: 2.1, radius: 0.5}
+      Scale: {0.17, 1, 0.17}
+      Rgb: beheHorn
+    }
+  }
+
+  // Four rows of legs, even ones on the left (+X), odd ones on the right
+  for i in 0..8 {
+    const side: f32 = 1 - 2 * (i % 2)
+    const row: f32 = floor(i / 2)
+
+    "leg_{i}" {
+      Position: {side * 1.14, 1.7, 1.0 - row * 1.0}
+      OreLimb: {phase: i * 0.79, swing: 0.28}
+
+      thigh {
+        Position: {side * 0.72, 0.12, 0}
+        Rotation: {0, 0, side * -0.5}
+        Box: {1.44, 0.32, 0.32}
+        Rgb: beheLimb
+      }
+
+      shin {
+        Position: {side * 1.42, -0.72, 0}
+        Box: {0.32, 1.44, 0.32}
+        Rgb: beheLimb
+      }
+
+      foot {
+        Position: {side * 1.42, -1.44, 0.12}
+        Box: {0.54, 0.26, 0.78}
+        Rgb: beheLimb
+      }
+    }
+  }
+}

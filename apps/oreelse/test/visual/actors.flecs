@@ -1,0 +1,56 @@
+// The critters and the projectiles from zoom level 0: the astronaut on the basin south of the
+// deposits, turned toward the camera, with the behemoth and the brute behind it, the skitter
+// and the mite in front of it, a tracer and a missile in flight beside it and a laser beam
+// reaching the brute. Every actor faces about toward the camera, turned to show a side
+include apps/oreelse/test/visual/setup/seed
+include apps/oreelse/etc/oreelse
+
+using flecs.script.math
+using box.transform
+
+// Beyond the deposit clusters, which reach about 23 units from the center
+astronaut {
+  Position: {0, 0, 30}
+  Rotation: {0, 0.6, 0}
+}
+
+actors {
+  behemoth : Behemoth {
+    Position: {-9, 0, 23}
+    Rotation: {0, 0.5, 0}
+  }
+
+  brute : Brute {
+    Position: {8, 0, 25}
+    Rotation: {0, -0.5, 0}
+  }
+
+  skitter : Skitter {
+    Position: {-4.5, 0, 33}
+    Rotation: {0, 0.4, 0}
+  }
+
+  mite : Mite {
+    Position: {-2, 0, 35}
+    Rotation: {0, -0.3, 0}
+  }
+
+  // Flying across the view at the height of a turret's muzzle
+  tracer : Tracer {
+    Position: {2.5, 1, 34}
+    Rotation: {0, 1.2, 0}
+  }
+
+  missile : Missile {
+    Position: {5, 1.2, 33}
+    Rotation: {0, -1.0, 0}
+  }
+
+  // From (2, 1.2, 31) to the brute's head at (8, 1.2, 26.5): halfway between them, turned
+  // toward the brute and 7.5 units long
+  laser_beam : LaserBeam {
+    Position: {5, 1.2, 28.75}
+    Rotation: {0, atan2(6, -4.5), 0}
+    Scale: {1, 1, 7.5}
+  }
+}

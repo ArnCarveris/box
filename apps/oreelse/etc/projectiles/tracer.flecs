@@ -1,0 +1,21 @@
+// The bullet of the gun turret, the Tracer prefab of the original: a glowing gold streak that
+// lights what it passes. Its origin is its center and it flies along +Z. OreWeapons gives the
+// prefab its gameplay data.
+
+using box.transform
+using box.geometry
+using box.material
+using box.light
+
+const tracerGold: Rgb = {255, 226, 128}
+
+prefab Tracer {
+  core {
+    Position: {0, 0, 0}
+    Box: {0.08, 0.08, 0.42}
+    Rgb: tracerGold
+    Emissive: {strength: 3.2, color: tracerGold}
+    // A moving light, left out of any bake
+    PointLight: {intensity: 2.6, range: 4.5, bake: Realtime}
+  }
+}

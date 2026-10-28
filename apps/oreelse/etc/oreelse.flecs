@@ -11,6 +11,13 @@ include materials/hazard
 include props/ore
 include particles/jet_plume
 include player
+include critters/mite
+include critters/skitter
+include critters/brute
+include critters/behemoth
+include projectiles/tracer
+include projectiles/missile
+include projectiles/laser_beam
 include input
 include world
 include boundary
