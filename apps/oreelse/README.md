@@ -19,8 +19,12 @@ bake3 run apps/oreelse --local-env -- --seed 42                # play the map of
 bake3 run apps/oreelse --local-env -- --headless --frames 10   # headless run, exits 0
 bake3 --target em --local-env apps/oreelse                     # build for the browser
 
+<<<<<<< HEAD
 python3 tools/integration.py e2e oreelse_flow                  # the end-to-end scenarios
 python3 tools/integration.py e2e oreelse_mining
+=======
+python3 tools/integration.py e2e oreelse_flow oreelse_look     # the end-to-end scenarios
+>>>>>>> 977cdca8bd554220e44c8411bfce33c774d005ef
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -78,6 +82,10 @@ The map is 48 by 48 tiles of 2 units, the astronaut's start at its center. Depos
   iron 4.5 to 7.5 tiles out, copper 6 to 9.75, stone 3.75 to 6.75, at angles that change with
   every map. Where two clusters overlap, the deposit generated first keeps the tile.
 
+A hazard band runs around the playable area, just outside the edge tiles. Boulders lie scattered
+over the basin and the plain, and dunes rise on the plain beyond; they change with every map and
+nothing collides with them.
+
 ### The astronaut
 
 The astronaut walks at 7 units per second and runs at 14, as fast diagonally as straight, and
@@ -88,6 +96,7 @@ up, looking down at 44.6, 51.8 and 59.5 degrees. It glides to a new level and fo
 astronaut smoothly, also on the title screen and while paused. The wheel over a panel of the UI
 does not zoom.
 
+<<<<<<< HEAD
 ### Items
 
 | Item | Name | Detail | Recipe | Yield | Time (s) |
@@ -131,6 +140,19 @@ and the full warning shows at every swing.
 Moving the cursor to another deposit starts the swing over. Releasing the button, walking out
 of reach or moving the cursor off the deposit loses the progress of the swing. The right button
 over a panel of the UI does not mine.
+=======
+### Render quality
+
+Three render quality tiers trade the look for speed; the button on the pause screen cycles them
+from High to Medium to Low and back to High. The game starts on High every time it is launched,
+and a restart keeps the tier.
+
+| Tier | Resolution | Shadow map | Shadow distance | Ambient occlusion | Bloom |
+| --- | --- | --- | --- | --- | --- |
+| Low | half | 1024 | 91 | off | off |
+| Medium | full | 2048 | 140 | off | on |
+| High | full | 4096 | 140 | on | on |
+>>>>>>> 977cdca8bd554220e44c8411bfce33c774d005ef
 
 ## Conventions of the port
 
@@ -158,7 +180,7 @@ Every task of the port follows these.
   on its own singleton (`ore_state_is`, `ore_state_set`). Gameplay systems run only while
   `Playing`, with a query term on `ore_state_pair(world, OreGameStatePlaying)` whose source is
   `OreGameState`. That is the only pause mechanism: no time scale, no frozen flags. Only the
-  camera runs in every state.
+  camera and the render quality tier run in every state.
 - **Input**: every key is a box `Action` with a `Binding` in `apps/oreelse/etc/input.flecs`.
   Actions that fire once are awaited by async loops that call an `oreelse` script function
   implemented in C (`ecs_async_function`, like `oreelse.cancel()`); held actions (walking,
@@ -175,11 +197,11 @@ Every task of the port follows these.
   the runs since the start. `ore_seed_get(world, stream)` derives the seed of a stream of the
   current run: stream 0 seeds the C generator (`OreRandom`, drawn with `ore_random01`), and
   the scripts seed their `flecs.script.math.Rng` with `oreelse.seed(stream)`, one stream per
-  script (1 and 2 the deposits, 3 the ore models). A new random stream takes the next number.
+  script (1 and 2 the deposits, 3 the ore models, 4 the scenery). A new random stream takes the next number.
 - **Restart** reloads the scripts that create a run's entities (`ecs_script_reload`): every
   script that creates the entities of a run puts the `OreRunScript` tag on one of them, and
   `restart()` reloads the script of every entity with the tag (today `run.flecs` with the
-  astronaut and `deposits.flecs`). A run's state is reset by its scripts. No static globals:
+  astronaut, `deposits.flecs` and `scenery.flecs`). A run's state is reset by its scripts. No static globals:
   every piece of game state lives in a component or singleton and is reset with the run.
 - **The map**: tile (row, col) is centered at `x = x0 + col * tile`, `z = z0 + row * tile`.
   The conversions are `ore_tile_x`, `ore_tile_z`, `ore_col_at`, `ore_row_at` and `ore_on_grid`
@@ -212,20 +234,32 @@ Every task of the port follows these.
 
 | File | Holds |
 | --- | --- |
+<<<<<<< HEAD
 | `etc/oreelse.flecs` | The window, the camera, the sun and ambient light, the view, the mining markers; includes the rest |
+=======
+| `etc/oreelse.flecs` | The window, the camera, the sun, the atmosphere, the effects and the view, the render quality tier; includes the rest |
+>>>>>>> 977cdca8bd554220e44c8411bfce33c774d005ef
 | `etc/config.flecs` | The constants `cfg.*` |
 | `etc/resources.flecs` | The item prefabs other than the buildings, with names and recipes |
 | `etc/input.flecs` | The actions, their bindings and the loops of the actions that fire once |
 | `etc/world.flecs` | The ground and the basin |
+| `etc/boundary.flecs` | The hazard band around the playable area |
+| `etc/scenery.flecs` | The boulders and dunes of a run |
 | `etc/run.flecs` | The astronaut and the singletons of a run |
 | `etc/deposits.flecs` | The deposits of a run |
 | `etc/player.flecs` | The `Astronaut` template |
 | `etc/props/ore.flecs` | The `Ore` template of the deposits |
 | `etc/props/markers.flecs` | The `TileMarker` and `TileMarkerBad` prefabs |
 | `etc/particles/jet_plume.flecs` | The `JetPlume` template of the jetpack |
-| `etc/materials/terrain.flecs` | The `GroundSurface` and `BasinSurface` materials |
+| `etc/materials/terrain.flecs` | The `GroundSurface` and `BasinSurface` materials and the dirt textures |
+| `etc/materials/hazard.flecs` | The hazard stripe texture and the `Hazard*` trim prefabs |
+| `etc/assets/` | The original's textures (SVG), unchanged, and `terrain_dirt_orm.svg` |
 | `src/flow.c` | States, clock, blink, toast, seeds, `oreelse.cancel()`, `oreelse.restart()` |
 | `src/map.c` | The tile grid, the deposits' registration and the hover tile |
 | `src/player.c` | Walking and the camera |
+<<<<<<< HEAD
 | `src/inventory.c` | The inventory and the item components |
 | `src/mining.c` | Mining and its tile marker |
+=======
+| `src/look.c` | The render quality tiers, `oreelse.cycleQuality()` |
+>>>>>>> 977cdca8bd554220e44c8411bfce33c774d005ef

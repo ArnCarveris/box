@@ -1,7 +1,15 @@
+<<<<<<< HEAD
 // Input: every key is an Action with a Binding. The held actions (walking, running, mining) are
 // read by the oreelse systems through the OreActions singleton; the actions that fire once are
 // awaited by the loops below, each calling the oreelse function behind it. The key that starts
 // the game on the title screen is any key (OreTitleStart reads the keys).
+=======
+// Input: every key is an Action with a Binding. The held actions (walking, running) are read
+// by the oreelse systems through the OreActions singleton; the actions that fire once are
+// awaited by the loops below, each calling the oreelse function behind it. Quality has no key,
+// the pause screen raises it. The key that starts the game on the title screen is any key
+// (OreTitleStart reads the keys).
+>>>>>>> 977cdca8bd554220e44c8411bfce33c774d005ef
 
 using flecs.script
 using box.input
@@ -56,6 +64,11 @@ actions {
     Action: {description: "Start a new run once the game is won or lost"}
     Binding: {key: R}
   }
+
+  // No key: the pause screen's button raises it (ActionTrigger)
+  Quality {
+    Action: {description: "Cycle the render quality, High to Medium to Low and back to High"}
+  }
 }
 
 $ {
@@ -80,5 +93,12 @@ async {
   while true {
     await on.pressed(actions.Restart)
     await oreelse.restart()
+  }
+}
+
+async {
+  while true {
+    await on.pressed(actions.Quality)
+    await oreelse.cycleQuality()
   }
 }

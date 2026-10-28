@@ -50,4 +50,15 @@ cfg {
   export const blinkFast: f32 = 8
   export const blinkSlow: f32 = 6
   export const lampRate: f32 = 1.4
+
+  // The render quality tiers Low, Medium and High (OreQuality.tier), the quality.flecs of the
+  // original: the resolution scale of the surfaces (2 renders at half the pixels), the shadow
+  // map resolution and distance of the world view, and whether its Gtao and Bloom run
+  export const quality: OreQualityTiers = {
+    resolution_scale: [2, 1, 1],
+    shadow_resolution: [1024, 2048, 4096],
+    shadow_distance: [91, 140, 140],
+    gtao: [false, false, true],
+    bloom: [false, true, true]
+  }
 }

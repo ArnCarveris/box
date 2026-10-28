@@ -521,3 +521,283 @@ void SpatialLayout_empty_distribution(void) {
     test_assert(!ecs_has(world, e, SpatialDiagnostic));
     ecs_fini(world);
 }
+
+/* Run frames until the layout has nothing left to solve, and check that it gets there. */
+static void converge(ecs_world_t *world) {
+    box_spatial_layout_stats_t stats = {0};
+    int32_t i;
+    for (i = 0; i < 10; i ++) {
+        ecs_progress(world, 0);
+        box_spatial_layout_stats(world, &stats);
+        if (!stats.solved && !stats.synced) {
+            break;
+        }
+    }
+    test_assert(i < 10);
+}
+
+static box_spatial_layout_stats_t layout_frame(ecs_world_t *world) {
+    box_spatial_layout_stats_t stats = {0};
+    ecs_progress(world, 0);
+    box_spatial_layout_stats(world, &stats);
+    return stats;
+}
+
+void SpatialLayout_incremental_unchanged(void) {
+    // engine/spatial_layout_incremental
+    ecs_world_t *world = setup();
+    ecs_entity_t hull = shape(world, 8, 3, 18), armor = shape(world, 1, 0.2f, 1), cockpit = shape(world, 3, 1, 4);
+    ecs_set(world, armor, Fit, {.target = hull, .axes = SpatialXZ});
+    ecs_set(world, cockpit, SpatialAlign, {.target = hull, .self = {.y = SpatialMin}, .other = {.y = SpatialMax}});
+    ecs_entity_t owner = ecs_new(world), prototype = shape(world, 0.5f, 0.5f, 0.5f);
+    ecs_add_pair(world, prototype, EcsChildOf, owner);
+    ecs_set(world, owner, Array, {.axis = SpatialX, .count = 6, .spacing = 1});
+    ecs_entity_t group = ecs_new(world), a = shape(world, 1, 1, 1), b = shape(world, 1, 1, 1);
+    ecs_add_pair(world, a, EcsChildOf, group); ecs_add_pair(world, b, EcsChildOf, group);
+    ecs_set(world, group, Distribute, {.axis = SpatialX, .span = 6});
+    converge(world);
+    box_spatial_layout_stats_t stats = layout_frame(world);
+    test_assert(stats.nodes > 0);
+    test_int(stats.solved, 0);
+    test_int(stats.synced, 0);
+    test_bool(box_spatial_layout_update(world), true);
+    int64_t before = ecs_os_api_malloc_count + ecs_os_api_calloc_count + ecs_os_api_realloc_count;
+    for (int32_t i = 0; i < 10; i ++) {
+        test_bool(box_spatial_layout_update(world), true);
+    }
+    int64_t after = ecs_os_api_malloc_count + ecs_os_api_calloc_count + ecs_os_api_realloc_count;
+    test_int(after - before, 0);
+    test_int(ecs_count(world, ArrayInstance), 6);
+    near(transform(world, cockpit)->m[3][1], 2);
+    near(ecs_get(world, armor, ResolvedBox)->z, 18);
+    near(transform(world, a)->m[3][0], -2.5f);
+    ecs_fini(world);
+}
+
+void SpatialLayout_incremental_fit_target_moved(void) {
+    // engine/spatial_layout_incremental
+    ecs_world_t *world = setup();
+    ecs_entity_t hull = shape(world, 8, 3, 18), armor = shape(world, 1, 0.2f, 1), cockpit = shape(world, 3, 1, 4);
+    ecs_set(world, armor, Fit, {.target = hull, .axes = SpatialXZ});
+    ecs_set(world, cockpit, SpatialAlign, {.target = hull, .self = {.y = SpatialMin}, .other = {.y = SpatialMax}});
+    ecs_entity_t other = shape(world, 4, 4, 4), other_armor = shape(world, 1, 1, 1);
+    ecs_set(world, other, Position, {20, 0, 0});
+    ecs_set(world, other_armor, Fit, {.target = other});
+    converge(world);
+    ecs_set(world, hull, Position, {4, 5, 0});
+    box_spatial_layout_stats_t stats = layout_frame(world);
+    test_assert(stats.solved > 0);
+    test_assert(stats.solved < stats.nodes);
+    near(transform(world, cockpit)->m[3][0], 4);
+    near(transform(world, cockpit)->m[3][1], 7);
+    ecs_set(world, hull, Box, {10, 3, 20});
+    stats = layout_frame(world);
+    test_assert(stats.solved < stats.nodes);
+    near(ecs_get(world, armor, ResolvedBox)->x, 10);
+    near(ecs_get(world, armor, ResolvedBox)->z, 20);
+    near(ecs_get(world, other_armor, ResolvedBox)->x, 4);
+    converge(world);
+    near(transform(world, cockpit)->m[3][1], 7);
+    test_int(ecs_count(world, SpatialDiagnostic), 0);
+    ecs_fini(world);
+}
+
+void SpatialLayout_incremental_array_count(void) {
+    // engine/spatial_layout_incremental
+    ecs_world_t *world = setup();
+    ecs_entity_t owner = ecs_new(world), prototype = shape(world, 1, 1, 1);
+    ecs_add_pair(world, prototype, EcsChildOf, owner);
+    ecs_set(world, owner, Array, {.axis = SpatialX, .count = 3, .spacing = 2});
+    ecs_entity_t other = ecs_new(world), other_prototype = shape(world, 1, 1, 1);
+    ecs_add_pair(world, other_prototype, EcsChildOf, other);
+    ecs_set(world, other, Array, {.axis = SpatialZ, .count = 2, .spacing = 2});
+    converge(world);
+    test_int(ecs_count(world, ArrayInstance), 5);
+    ecs_entity_t kept = instance_at(world, owner, 1);
+    ecs_set(world, owner, Array, {.axis = SpatialX, .count = 5, .spacing = 2});
+    box_spatial_layout_stats_t stats = layout_frame(world);
+    test_int(stats.synced, 1);
+    test_int(ecs_count(world, ArrayInstance), 7);
+    test_uint(instance_at(world, owner, 1), kept);
+    near(transform(world, instance_at(world, owner, 4))->m[3][0], 8);
+    converge(world);
+    ecs_set(world, owner, Array, {.axis = SpatialX, .count = 2, .spacing = 3});
+    layout_frame(world);
+    test_int(ecs_count(world, ArrayInstance), 4);
+    test_uint(instance_at(world, owner, 1), kept);
+    near(transform(world, kept)->m[3][0], 3);
+    near(transform(world, instance_at(world, other, 1))->m[3][2], 2);
+    converge(world);
+    test_int(ecs_count(world, SpatialDiagnostic), 0);
+    ecs_fini(world);
+}
+
+void SpatialLayout_incremental_prototype_edit(void) {
+    // engine/spatial_layout_incremental
+    ecs_world_t *world = setup();
+    ecs_entity_t target = shape(world, 8, 3, 8), owner = ecs_new(world), prototype = shape(world, 1, 1, 1);
+    ecs_add_pair(world, prototype, EcsChildOf, owner);
+    ecs_set(world, owner, Array, {.axis = SpatialX, .count = 3, .spacing = 2});
+    ecs_set(world, owner, SpatialAlign, {.target = target, .self = {.y = SpatialMin}, .other = {.y = SpatialMax}});
+    converge(world);
+    ecs_entity_t e = instance_at(world, owner, 2);
+    near(transform(world, e)->m[3][1], 2);
+    ecs_set(world, prototype, Box, {1, 3, 1});
+    ecs_set(world, prototype, Position, {0, 0, 1});
+    box_spatial_layout_stats_t stats = layout_frame(world);
+    test_assert(stats.synced > 0);
+    near(ecs_get(world, e, Box)->y, 3);
+    near(ecs_get(world, e, Position)->z, 1);
+    converge(world);
+    near(ecs_get(world, e, Box)->y, 3);
+    near(transform(world, e)->m[3][0], 2);
+    near(transform(world, e)->m[3][1], 3);
+    near(transform(world, e)->m[3][2], 0);
+    test_int(ecs_count(world, SpatialDiagnostic), 0);
+    ecs_fini(world);
+}
+
+void SpatialLayout_incremental_reparent(void) {
+    // engine/spatial_layout_incremental
+    ecs_world_t *world = setup();
+    ecs_entity_t group = ecs_new(world), a = shape(world, 2, 2, 2), b = shape(world, 2, 2, 2), e = shape(world, 1, 1, 1);
+    ecs_add_pair(world, a, EcsChildOf, group);
+    ecs_set(world, a, Position, {-2, 0, 0});
+    ecs_set(world, b, Position, {2, 0, 0});
+    ecs_set(world, e, SpatialAlign, {.target = group, .self = {.x = SpatialMin}, .other = {.x = SpatialMax}});
+    converge(world);
+    near(transform(world, e)->m[3][0], -0.5f);
+    ecs_add_pair(world, b, EcsChildOf, group);
+    layout_frame(world);
+    near(transform(world, e)->m[3][0], 3.5f);
+    converge(world);
+    ecs_remove_pair(world, b, EcsChildOf, group);
+    layout_frame(world);
+    near(transform(world, e)->m[3][0], -0.5f);
+
+    ecs_entity_t row = ecs_new(world), c = shape(world, 1, 1, 1), d = shape(world, 1, 1, 1);
+    ecs_add_pair(world, c, EcsChildOf, row); ecs_add_pair(world, d, EcsChildOf, row);
+    ecs_set(world, row, Distribute, {.axis = SpatialX, .span = 6});
+    converge(world);
+    near(transform(world, c)->m[3][0], -2.5f);
+    near(transform(world, d)->m[3][0], 2.5f);
+    ecs_remove_pair(world, d, EcsChildOf, row);
+    layout_frame(world);
+    near(transform(world, c)->m[3][0], 0);
+    test_assert(!ecs_has_id(world, d, ManualTransform));
+    converge(world);
+    near(transform(world, d)->m[3][0], 0);
+    test_int(ecs_count(world, SpatialDiagnostic), 0);
+    ecs_fini(world);
+}
+
+void SpatialLayout_incremental_delete_prototype(void) {
+    // engine/spatial_layout_incremental
+    ecs_world_t *world = setup();
+    ecs_entity_t owner = ecs_new(world), first = shape(world, 1, 1, 1), second = shape(world, 1, 2, 1);
+    ecs_add_pair(world, first, EcsChildOf, owner);
+    ecs_add_pair(world, second, EcsChildOf, owner);
+    ecs_set(world, owner, Array, {.axis = SpatialX, .count = 3, .spacing = 2});
+    ecs_entity_t e = shape(world, 1, 1, 1);
+    ecs_set(world, e, SpatialAlign, {.target = owner, .self = {.y = SpatialMin}, .other = {.y = SpatialMax}});
+    converge(world);
+    test_int(ecs_count(world, ArrayInstance), 6);
+    near(transform(world, e)->m[3][1], 1.5f);
+    ecs_delete(world, second);
+    layout_frame(world);
+    test_int(ecs_count(world, ArrayInstance), 3);
+    ecs_iter_t it = ecs_each(world, ArrayInstance);
+    while (ecs_each_next(&it)) {
+        const ArrayInstance *instances = ecs_field(&it, ArrayInstance, 0);
+        for (int i = 0; i < it.count; i ++) test_uint(instances[i].prototype, first);
+    }
+    near(transform(world, e)->m[3][1], 1);
+    converge(world);
+    test_int(ecs_count(world, SpatialDiagnostic), 0);
+    ecs_fini(world);
+}
+
+void SpatialLayout_incremental_dynamic_parent(void) {
+    // engine/spatial_layout_incremental
+    ecs_world_t *world = setup();
+    ecs_entity_t parent = ecs_new(world), target = shape(world, 2, 2, 2), e = shape(world, 1, 1, 1);
+    ecs_set(world, parent, Position, {0, 0, 0});
+    ecs_add(world, parent, DynamicTransform);
+    ecs_add_pair(world, target, EcsChildOf, parent);
+    ecs_set(world, e, SpatialAlign, {.target = target, .self = {.y = SpatialMin}, .other = {.y = SpatialMax}});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    near(transform(world, e)->m[3][1], 1.5f);
+    for (int32_t i = 1; i <= 3; i ++) {
+        ecs_get_mut(world, parent, Position)->x = (float)i;
+        ecs_progress(world, 0);
+        near(transform(world, e)->m[3][0], (float)i);
+    }
+    ecs_fini(world);
+}
+
+void SpatialLayout_incremental_hot_reload(void) {
+    // engine/spatial_layout_incremental
+    ecs_world_t *world = setup();
+    const char *code =
+        "using box.geometry\nusing box.spatial\n"
+        "hull { Box: {8, 3, 18} }\n"
+        "armor { Box: {1, 0.2, 1}\n Fit: {target: hull, axes: XZ} }\n"
+        "vents { Array: {axis: Z, count: 4, spacing: 1}\n rib { Box: {0.2, 0.2, 0.2} } }\n";
+    const char *edited =
+        "using box.geometry\nusing box.spatial\n"
+        "hull { Box: {6, 3, 12} }\n"
+        "armor { Box: {1, 0.2, 1}\n Fit: {target: hull, axes: XZ} }\n"
+        "vents { Array: {axis: Z, count: 2, spacing: 3}\n rib { Box: {0.2, 0.4, 0.2} } }\n";
+    ecs_entity_t script = ecs_script(world, {
+        .entity = ecs_entity(world, { .name = "scene" }),
+        .code = code
+    });
+    test_assert(script != 0);
+    converge(world);
+    near(ecs_get(world, ecs_lookup(world, "armor"), ResolvedBox)->z, 18);
+    test_int(ecs_count(world, ArrayInstance), 4);
+    test_assert(ecs_script_update(world, script, 0, edited) == 0);
+    converge(world);
+    ecs_entity_t armor = ecs_lookup(world, "armor"), vents = ecs_lookup(world, "vents");
+    near(ecs_get(world, armor, ResolvedBox)->x, 6);
+    near(ecs_get(world, armor, ResolvedBox)->z, 12);
+    test_int(ecs_count(world, ArrayInstance), 2);
+    ecs_entity_t e = instance_at(world, vents, 1);
+    near(transform(world, e)->m[3][2], 3);
+    near(ecs_get(world, e, Box)->y, 0.4f);
+    test_assert(ecs_script_update(world, script, 0, code) == 0);
+    converge(world);
+    near(ecs_get(world, ecs_lookup(world, "armor"), ResolvedBox)->z, 18);
+    test_int(ecs_count(world, ArrayInstance), 4);
+    test_int(ecs_count(world, SpatialDiagnostic), 0);
+    ecs_fini(world);
+}
+
+void SpatialLayout_incremental_parent_component(void) {
+    // engine/spatial_layout_incremental
+    ecs_world_t *world = setup();
+    ecs_entity_t group = ecs_new(world), a = shape(world, 2, 2, 2), e = shape(world, 1, 1, 1);
+    ecs_set(world, a, EcsParent, {group});
+    ecs_set(world, a, Position, {-2, 0, 0});
+    ecs_set(world, e, SpatialAlign, {.target = group, .self = {.x = SpatialMin}, .other = {.x = SpatialMax}});
+    converge(world);
+    near(transform(world, e)->m[3][0], -0.5f);
+    ecs_entity_t b = ecs_new(world);
+    ecs_set(world, b, EcsParent, {group});
+    ecs_set(world, b, Position, {2, 0, 0});
+    ecs_set(world, b, Box, {2, 2, 2});
+    layout_frame(world);
+    near(transform(world, e)->m[3][0], 3.5f);
+    converge(world);
+    ecs_delete(world, b);
+    layout_frame(world);
+    near(transform(world, e)->m[3][0], -0.5f);
+    converge(world);
+    ecs_log_set_level(-4);
+    ecs_delete(world, group);
+    layout_frame(world);
+    test_assert(!ecs_is_alive(world, a));
+    test_int(ecs_get(world, e, SpatialDiagnostic)->code, SpatialInvalidTarget);
+    ecs_fini(world);
+}

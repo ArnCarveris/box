@@ -2,9 +2,14 @@
  * @file game.h
  * @brief The oreelse module: components of the game and the functions its areas share.
  *
+<<<<<<< HEAD
  * The scene (apps/oreelse/etc) holds the constants cfg.*, the models, the items, the singletons
  * and the entities of a run; the systems of each area (flow.c, map.c, player.c, inventory.c,
  * mining.c) play the game.
+=======
+ * The scene (apps/oreelse/etc) holds the constants cfg.*, the models, the singletons and the
+ * entities of a run; the systems of each area (flow.c, map.c, player.c, look.c) play the game.
+>>>>>>> 977cdca8bd554220e44c8411bfce33c774d005ef
  */
 
 #ifndef OREELSE_GAME_H
@@ -213,6 +218,45 @@ ECS_PRIVATE                    /**< The cells are not reflected */
     ecs_vec_t rejected;        /**< Deposits that registered on a taken tile, deleted by
                                 *   ore_map_purge: an entity cannot be deleted while the
                                 *   script that creates it still sets it */
+});
+
+/** Render quality tiers, the type of OreQuality.tier. The pause screen's button cycles
+ * them down, High to Medium to Low and back to High (oreelse.cycleQuality()).
+ */
+ECS_ENUM(OreRenderQuality, {
+    OreRenderQualityLow,    /**< Half resolution, small and short shadows, no Gtao or Bloom */
+    OreRenderQualityMedium, /**< Full resolution, smaller shadow map, no Gtao */
+    OreRenderQualityHigh    /**< Full resolution and every effect, the tier at every start */
+});
+
+/** Number of render quality tiers, the size of the arrays of OreQualityTiers */
+#define ORE_QUALITY_TIERS (3)
+
+/** The render quality tier, a singleton oreelse.flecs sets to High. A restart keeps it.
+ * Modified when cycleQuality() changes it.
+ */
+ECS_STRUCT(OreQuality, {
+    OreRenderQuality tier; /**< The tier the look applies */
+});
+
+/** The settings of every render quality tier, the type of cfg.quality, indexed by
+ * OreRenderQuality.
+ */
+ECS_STRUCT(OreQualityTiers, {
+    float resolution_scale[3];    /**< Surface.resolution_scale of the surfaces */
+    int32_t shadow_resolution[3]; /**< ShadowSettings.resolution of the world view */
+    float shadow_distance[3];     /**< ShadowSettings.max_distance of the world view */
+    bool gtao[3];                 /**< The Gtao effect of the world view runs */
+    bool bloom[3];                /**< The Bloom effect of the world view runs */
+});
+
+/** What the render quality tier applies to, a singleton oreelse.flecs sets: the world view and
+ * its effects. Every surface that does not render into a texture takes the resolution scale.
+ */
+ECS_STRUCT(OreLook, {
+    ecs_entity_t view;  /**< The world view, its shadows and effects follow the tier */
+    ecs_entity_t gtao;  /**< Gtao effect of the world view */
+    ecs_entity_t bloom; /**< Bloom effect of the world view */
 });
 
 /** Marks an entity created by a script that sets up a run: restart() reloads the script of
@@ -499,6 +543,7 @@ void ore_map_import(
 void ore_player_import(
     ecs_world_t *world);
 
+<<<<<<< HEAD
 /** Register the inventory, the item components and the script functions
  * oreelse.inventory_add(item, amount) and oreelse.inventory_remove(item, amount).
  *
@@ -512,12 +557,19 @@ void ore_inventory_import(
  * @param world The world
  */
 void ore_mining_import(
+=======
+/** Register the look: the render quality tiers and oreelse.cycleQuality().
+ *
+ * @param world The world
+ */
+void ore_look_import(
+>>>>>>> 977cdca8bd554220e44c8411bfce33c774d005ef
     ecs_world_t *world);
 
 /** Register the oreelse module.
  *
  * Registers the components, the systems of every area and the script functions
- * oreelse.seed(), oreelse.cancel() and oreelse.restart().
+ * oreelse.seed(), oreelse.cancel(), oreelse.restart() and oreelse.cycleQuality().
  *
  * @param world The world
  */

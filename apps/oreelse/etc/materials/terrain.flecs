@@ -1,14 +1,32 @@
 // The materials of the ground and the basin, the GroundSurface and BasinSurface of the
-// original. OreLook adds the dirt textures.
+// original: the dirt albedo, its occlusion, roughness and metallic (the original's roughness
+// texture with red and blue at 255) and its normal map, repeated over the plain and the basin.
 
 using box.material
+using box.texture
+
+dirt_tex {
+  TexturePath: {path: "apps/oreelse/etc/assets/terrain_dirt.svg", width: 256, height: 256}
+}
+
+dirt_orm_tex {
+  TexturePath: {path: "apps/oreelse/etc/assets/terrain_dirt_orm.svg", width: 256, height: 256}
+}
+
+dirt_norm {
+  TexturePath: {path: "apps/oreelse/etc/assets/terrain_dirt_normal.svg", width: 256, height: 256}
+}
 
 prefab GroundSurface {
   Rgb: {187, 137, 96}
   PbrMaterial: {metallic: 0, roughness: 1}
+  PbrTextures: {albedo: dirt_tex, orm: dirt_orm_tex, normal: dirt_norm}
+  TextureTransform: {scale_x: 43.3333, scale_y: 43.3333}
 }
 
 prefab BasinSurface {
   Rgb: {212, 160, 114}
   PbrMaterial: {metallic: 0, roughness: 1}
+  PbrTextures: {albedo: dirt_tex, orm: dirt_orm_tex, normal: dirt_norm}
+  TextureTransform: {scale_x: 17.3333, scale_y: 17.3333}
 }

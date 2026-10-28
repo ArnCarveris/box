@@ -1,0 +1,42 @@
+// The scenery of a run, generated from the seed of the run as the original's (rng.f(x) is
+// uniform in [0, x)): boulders scattered over the basin and the plain around it, and dunes in
+// a ring on the plain beyond. They are decoration, nothing collides with them.
+// oreelse.restart() reloads this script (scenery has OreRunScript) for the scenery of a new
+// map. The flora of the original's scenery.flecs comes with the flora.
+
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using oreelse
+
+const rng: Rng = {seed: oreelse.seed(4)}
+
+scenery {
+  OreRunScript
+
+  for i in 0..50 {
+    const s = 0.4 + rng.f(0.9)
+
+    "boulder_{i}" {
+      Position: {-56 + rng.f(112), 0.06, -56 + rng.f(112)}
+      Rotation: {0, rng.f(3.14), 0}
+      Scale: {s, s * 0.7, s}
+      Box: {1, 1, 1}
+      Rgb: {130, 98, 70}
+    }
+  }
+
+  for i in 0..26 {
+    const a = rng.f(6.283)
+    const rad = 62 + rng.f(52)
+    const s = 4 + rng.f(8)
+
+    "dune_{i}" {
+      Position: {cos(a) * rad, -0.1, sin(a) * rad}
+      Scale: {s, s * 0.35, s}
+      HemiSphere: {segments: 12, smooth: true, radius: 1}
+      Rgb: {162, 120, 82}
+    }
+  }
+}

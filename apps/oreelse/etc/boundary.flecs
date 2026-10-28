@@ -1,0 +1,43 @@
+// The hazard band around the playable area, just outside the edge tiles: twelve segments on
+// every side, the north and south caps a little longer so they cover the corners. The band is
+// not part of a run, a restart keeps it.
+
+using box.transform
+using box.geometry
+
+const bandOut: f32 = 48.45
+const bandY: f32 = 0.06
+const capSeg: f32 = 8.15
+const sideSeg: f32 = 8
+const capStart: f32 = -44.825
+const sideStart: f32 = -44
+
+boundary {
+  for i in 0..12 {
+    const x = capStart + i * capSeg
+
+    "north_{i}" : HazardBoundary {
+      Position: {x, bandY, -bandOut}
+      Box: {capSeg, 0.06, 0.9}
+    }
+
+    "south_{i}" : HazardBoundary {
+      Position: {x, bandY, bandOut}
+      Box: {capSeg, 0.06, 0.9}
+    }
+  }
+
+  for i in 0..12 {
+    const z = sideStart + i * sideSeg
+
+    "west_{i}" : HazardBoundary {
+      Position: {-bandOut, bandY, z}
+      Rotation: {0, 1.570796, 0}
+    }
+
+    "east_{i}" : HazardBoundary {
+      Position: {bandOut, bandY, z}
+      Rotation: {0, 1.570796, 0}
+    }
+  }
+}

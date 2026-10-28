@@ -1,17 +1,26 @@
 // Ore Else: you crash-landed on a hostile planet. The game is played top down on a 48x48 tile
 // map with a camera that follows the astronaut. This scene holds the window, the camera, the
+<<<<<<< HEAD
 // light, the view and the tile markers; the included scripts hold the constants, the items,
 // the models, the input, the map and the run. The game boots into the title screen.
+=======
+// look of the original's engine.flecs (the sun, the atmosphere, the effects of the view and the
+// render quality tier); the included scripts hold the constants, the models, the input, the map
+// and the run. The game boots into the title screen.
+>>>>>>> 977cdca8bd554220e44c8411bfce33c774d005ef
 
 include config
 include resources
 include materials/terrain
+include materials/hazard
 include props/ore
 include props/markers
 include particles/jet_plume
 include player
 include input
 include world
+include boundary
+include scenery
 include deposits
 include run
 
@@ -21,7 +30,9 @@ using box.material
 using box.camera
 using box.view
 using box.light
+using box.effects
 using box.surface
+using box.atmosphere
 using oreelse
 
 window {
@@ -38,29 +49,59 @@ camera {
 }
 
 // The sun of the original shines from (-1.4, 1.8, 1.2) toward the origin, its +Z along
-// -(-1.4, 1.8, 1.2), in its warm color. Without exposure and tone mapping (OreLook) it is
-// brighter than the original's 1.5, so the scene reads clearly
+// -(-1.4, 1.8, 1.2), in its warm color. The original's moon has no light and its stars and top
+// of atmosphere light are not ported
 sun {
   Rotation: {asin(1.8 / sqrt(1.96 + 3.24 + 1.44)), atan2(1.4, -1.2), 0}
-  DirectionalLight: {intensity: 3}
+  DirectionalLight: {intensity: 1.5}
   Rgb: {255, 206, 168}
 }
 
-// Ambient light from a pale dusty sky above and the sand below
-ambient {
-  AmbientLight: {sky: {150, 158, 178}, ground: {120, 92, 70}, intensity: 1}
+// The sky lit by the sun. The Atmosphere singleton is also the environment the world view takes
+// its ambient light from, so there is no hemisphere AmbientLight
+$ {
+  Atmosphere: {sun: sun}
 }
 
+// The contact shadows of the original's SSAO
+gtao {
+  Gtao: {radius: 0.5}
+}
+
+bloom {
+  Bloom: {}
+}
+
+// The metering of the original: no share of the histogram left out at the dark end and a wider
+// accepted brightness range than the defaults
+exposure {
+  AutoExposure: {min_log_luma: -16, low_percentile: 0, min_brightness: 0.05, max_brightness: 0.5}
+}
+
+// Tony McMapface, as the original, desaturates the colors as they brighten
+tonemap {
+  Tonemap: {auto_exposure: exposure, operator_: TonyMcMapface}
+}
+
+// The world view. OreQualityApply sets the resolution of its shadows, their distance and whether
+// its Gtao and Bloom run from the render quality tier (cfg.quality); the values here are High's
 main_view {
   View: {
     camera: camera,
     clear: {enabled: true, color: {178, 150, 128, 255}},
-    lighting: {enabled: true, atmosphere: false},
+    // Lit by the sky of the atmosphere at half intensity, the ambient_intensity 0.5 of the
+    // original; the atmosphere draws the sky, so the environment draws no background
+    lighting: {enabled: true, baked: true, reflections: true, atmosphere: true,
+      environment: {source: Atmosphere, intensity: 0.5, yaw: 0, background: false}},
     shadows: {enabled: true, resolution: 4096, max_distance: 140},
-    effects: []
+    // Instances smaller than 3 pixels on screen are not drawn, the screen_px_threshold of the
+    // original
+    culling: {enabled: true, occlusion: true, min_dimension_px: 3},
+    effects: [{effect: gtao}, {effect: bloom}, {effect: tonemap}]
   }
 }
 
+<<<<<<< HEAD
 // The markers of mining, which OrePlayerMine moves to the target and shows while the Mine
 // action is held
 markers {
@@ -75,6 +116,13 @@ markers {
     DynamicTransform
     Disabled
   }
+=======
+// The render quality tier, High at every start of the app; the pause screen's button cycles it
+// with oreelse.cycleQuality(). A restart keeps it. OreLook names what the tier applies to
+$ {
+  OreLook: {view: main_view, gtao: gtao, bloom: bloom}
+  OreQuality: {tier: High}
+>>>>>>> 977cdca8bd554220e44c8411bfce33c774d005ef
 }
 
 // The camera starts at zoom level 0; height 0 snaps it there on the first frame
