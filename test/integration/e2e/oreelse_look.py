@@ -1,6 +1,6 @@
 """Ore Else's render quality tiers driven through its command port: cycling the tier changes the
 resolution scale of the window and the shadows and effects of the world view as cfg.quality
-gives them, and the tier survives a restart.
+gives them, and the tier survives a restart, which builds the scenery of the new map.
 
 Every case runs in a fresh apps/oreelse process with its default scene
 (apps/oreelse/etc/oreelse.flecs) and a fixed session seed, and gets the App of
@@ -32,6 +32,9 @@ TIERS = {
 
 # The pause screen's button cycles the tier down from High, the tier of every start
 CYCLE = ["High", "Medium", "Low", "High"]
+
+# The first and last boulder and dune of the scenery of a run (scenery.flecs)
+SCENERY = ["scenery.boulder_0", "scenery.boulder_49", "scenery.dune_0", "scenery.dune_25"]
 
 
 def tier_name(out):
@@ -73,6 +76,11 @@ def check_tier(app, name):
     app.expect("get main_view View.shadows.enabled", "false")
 
 
+def scenery(app):
+    """The positions of the first and last boulder and dune."""
+    return [app.get(e, "Position") for e in SCENERY]
+
+
 def cycle(app):
     app.exec("action.press actions.Quality")
     app.wait_input()
@@ -103,11 +111,17 @@ def test_restart_keeps_tier(app):
     cycle(app)
     cycle(app)
     check_tier(app, "Low")
+    before = scenery(app)
 
     set_state(app, "Lost")
     key(app, "R")
     app.wait_for(STATE % "Playing", "true")
     app.wait_frames(5)
     check_tier(app, "Low")
+
+    # The restart scattered the boulders and dunes of the new map
+    after = scenery(app)
+    for name, a, b in zip(SCENERY, before, after):
+        app.check(a != b, "%s stayed at %s after the restart" % (name, a))
     cycle(app)
     check_tier(app, "High")
