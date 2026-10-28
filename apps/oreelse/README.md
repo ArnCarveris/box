@@ -231,11 +231,11 @@ and geometry, materials and lights. They stand still: the gameplay tasks add the
 (item, recipe, footprint, health, power) to the same prefabs, and the animation and effect tasks
 drive the named parts below. Every building's origin is the center of its footprint on the
 ground (the center of its tile, the corner between the four tiles of a 2x2 building, the center
-of the middle tile of a 3x3 one), and it faces +Z. The names are those of the prefab's parts (`ecs_lookup_from(world, Drill,
-"carriage.slider.bit")`): the parts of an instance are unnamed children, each an instance
-(`IsA`) of the prefab's part of the same path, so a system finds the part of an instance as the
-child of its parent whose `IsA` target is the prefab's part, the way the original's `oreChild`
-does. The parts have no `DynamicTransform`, so a system that moves one every frame adds it.
+of the middle tile of a 3x3 one), and it faces +Z. The names are those of the prefab's parts
+(`ecs_lookup_from(world, Drill, "carriage.slider.bit")`): the parts of an instance are unnamed
+children, each an instance (`IsA`) of the prefab's part of the same path, so a system finds the
+part of an instance as the child of its parent whose `IsA` target is the prefab's part, the way
+the original's `oreChild` does. The parts have no `DynamicTransform`, so a system that moves one every frame adds it.
 
 | Prefab | File | Named parts |
 | --- | --- | --- |
