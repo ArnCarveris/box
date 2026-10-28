@@ -17,11 +17,13 @@
 #define TEMPLATES \
     "using box.particle\n" \
     "using box.transform\n" \
+    "@tree ChildOf\n" \
     "prefab Spark {\n" \
     "  ParticleEmitter: {max: 100, lifetime: {0.3, 0.3}, speed: {2, 2}, size: {0.5, 0.5}, " \
     "shape: EmitterSphere, radius: 1}\n" \
     "  ParticleBurst: {count: 5}\n" \
     "}\n" \
+    "@tree ChildOf\n" \
     "prefab Layered {\n" \
     "  flash {\n" \
     "    Position: {1, 0, 0}\n" \
@@ -38,10 +40,12 @@
     "    ParticleBurst: {count: 3, at: 0.1, repeat: 1}\n" \
     "  }\n" \
     "}\n" \
+    "@tree ChildOf\n" \
     "prefab Glow {\n" \
     "  ParticleEmitter: {lifetime: {0.3, 0.3}}\n" \
     "  ParticleBurst: {count: 2}\n" \
     "}\n" \
+    "@tree ChildOf\n" \
     "prefab Empty {\n" \
     "  child { Position: {1, 0, 0} }\n" \
     "}\n"

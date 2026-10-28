@@ -364,7 +364,7 @@ static bool box_shader_exe_dir(
     return result;
 }
 
-char* box_shader_locate(
+char* box_shader_locate_cwd(
     const char *path)
 {
     char *result = NULL;
@@ -382,11 +382,19 @@ char* box_shader_locate(
         result = box_shader_search(dir, path);
     }
 
-    if (!result && box_shader_exe_dir(dir, sizeof(dir))) {
+done:
+    return result;
+}
+
+char* box_shader_locate(
+    const char *path)
+{
+    char *result = box_shader_locate_cwd(path);
+    char dir[BOX_SHADER_PATH_MAX];
+    if (!result && path && path[0] && path[0] != '/' && box_shader_exe_dir(dir, sizeof(dir))) {
         result = box_shader_search(dir, path);
     }
 
-done:
     return result;
 }
 

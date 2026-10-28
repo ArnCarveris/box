@@ -26,6 +26,7 @@
 #define TEMPLATES \
     "using box.particle\n" \
     "using box.transform\n" \
+    "@tree ChildOf\n" \
     "prefab Puff {\n" \
     "  ParticleEmitter: {lifetime: {1, 1}}\n" \
     "  ParticleBurst: {count: 3}\n" \
