@@ -467,7 +467,8 @@ static void box_draws_key(
     const TextureWrap *wrap = ecs_get(world, e, TextureWrap);
     const Shape2D *shape2d = ecs_get(world, e, Shape2D);
     ecs_os_memset_t(key, 0, box_draw_key_t);
-    key->blend = box_draws_blend(ecs_get(world, e, BlendMode), alpha);
+    key->cutout = box_draws_cutout(ecs_get(world, e, AlphaCutoff), shape2d);
+    key->blend = box_draws_blend(ecs_get(world, e, BlendMode), alpha, key->cutout);
     key->back_face = back_face ? (uint8_t)*back_face : (uint8_t)BackFaceCull;
     key->wrap = wrap ? (uint8_t)*wrap : (uint8_t)WrapRepeat;
     if (textures) {
@@ -522,6 +523,7 @@ static void box_draws_update_shape(
         material = (box_draw_material_t){
             .color = ecs_get(world, e, Rgb),
             .opacity = ecs_get(world, e, Opacity),
+            .cutoff = ecs_get(world, e, AlphaCutoff),
             .pbr = ecs_get(world, e, PbrMaterial),
             .emissive = ecs_get(world, e, Emissive),
             .uv = ecs_get(world, e, TextureTransform),
@@ -678,7 +680,8 @@ static void box_draws_observer(
     ecs_observer_init(world, &desc);
 }
 
-/** Register the observers of the material components.
+/** Register the observers of the material components. AlphaCutoff is followed when it is
+ * added too, since an added cutoff moves the shape into an alpha tested batch.
  *
  * @param world The world
  * @param d The state
@@ -701,6 +704,10 @@ static void box_draws_material_observers(
             .query.terms = {{ .id = components[i] }},
             .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnChange);
     }
+
+    box_draws_observer(world, d, "DrawsOnAlphaCutoff", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ecs_id(AlphaCutoff) }},
+        .events = { EcsOnAdd, EcsOnSet, EcsOnRemove } }, BoxDrawsOnChange);
 
     box_draws_observer(world, d, "DrawsOnPbrTextures", (ecs_observer_desc_t){
         .query.terms = {{
@@ -837,7 +844,8 @@ static void box_draws_queries(
                 .inout = EcsInOutNone,
                 .oper = EcsOptional
             },
-            { .id = ecs_id(Shape2D), .src.id = EcsSelf, .inout = EcsIn, .oper = EcsOptional }
+            { .id = ecs_id(Shape2D), .src.id = EcsSelf, .inout = EcsIn, .oper = EcsOptional },
+            { .id = ecs_id(AlphaCutoff), .inout = EcsIn, .oper = EcsOptional }
         },
         .cache_kind = EcsQueryCacheAuto
     });
@@ -865,7 +873,8 @@ static void box_draws_queries(
                 .inout = EcsInOutNone,
                 .oper = EcsNot
             },
-            { .id = ecs_id(Shape2D), .src.id = EcsSelf, .inout = EcsIn, .oper = EcsOptional }
+            { .id = ecs_id(Shape2D), .src.id = EcsSelf, .inout = EcsIn, .oper = EcsOptional },
+            { .id = ecs_id(AlphaCutoff), .inout = EcsIn, .oper = EcsOptional }
         },
         .cache_kind = EcsQueryCacheAuto
     });

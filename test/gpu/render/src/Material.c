@@ -7,11 +7,16 @@
 #include <bake_test.h>
 #include <stdlib.h>
 #include <math.h>
+#include <string.h>
 #include "render.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_STATIC
 #include <stb_image.h>
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_STATIC
+#include <stb_image_write.h>
 
 void Material_default_material(void) {
     // materials/pbr
@@ -1051,4 +1056,388 @@ void Material_default_material_sphere_matte(void) {
     stbi_image_free(px);
     ecs_os_free(path);
     ecs_fini(world);
+}
+
+/** Create the world of the alpha tested cases: a camera 6 units in front of the origin looking
+ * down -z into a 64x32 surface, where world x = -1.5 lands on pixel column 25 and x = 1.5 on 39,
+ * and an emissive red wall at z = -1 behind everything.
+ *
+ * @param file Name of the PNG the surface writes into the temporary directory
+ * @return The world
+ */
+static ecs_world_t* cutout_world(
+    const char *file)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 6});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t wall = ecs_new(world);
+    ecs_set(world, wall, Position, {0, 0, -1});
+    ecs_set(world, wall, Box, {20, 20, 0.1f});
+    ecs_set(world, wall, Rgb, {0, 0, 0});
+    ecs_set(world, wall, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, wall, Emissive, {.strength = 1, .color = {255, 0, 0}});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 64, .height = 32,
+        .write_to_file = ECS_CONST_CAST(char*, file), .resolution_scale = 1});
+
+    return world;
+}
+
+/** Write a texture of white texels with the alpha of each texel and load it.
+ *
+ * @param world The world
+ * @param name Name of the PNG in the temporary directory
+ * @param width Texels per row
+ * @param height Rows
+ * @param alpha Alpha per texel, rows from the top
+ * @param path Receives the path of the PNG, freed by the caller after the world
+ * @return The texture entity
+ */
+static ecs_entity_t cutout_texture(
+    ecs_world_t *world,
+    const char *name,
+    int32_t width,
+    int32_t height,
+    const uint8_t *alpha,
+    char **path)
+{
+    uint8_t px[16 * 16 * 4];
+    int32_t i;
+    test_assert(width * height <= 16 * 16);
+    *path = flecs_asprintf("%s/%s", ecs_singleton_get(world, AppStatus)->tmp_dir, name);
+    for (i = 0; i < width * height; i ++) {
+        px[i * 4 + 0] = 255;
+        px[i * 4 + 1] = 255;
+        px[i * 4 + 2] = 255;
+        px[i * 4 + 3] = alpha[i];
+    }
+
+    test_assert(stbi_write_png(*path, width, height, 4, px, width * 4) != 0);
+    ecs_entity_t tex = ecs_new(world);
+    ecs_set(world, tex, TexturePath, {.path = *path});
+
+    return tex;
+}
+
+/** Fill the alpha of an 8x8 texture by quadrant.
+ *
+ * @param out Receives 64 alpha values
+ * @param tl Alpha of the top left quadrant
+ * @param tr Alpha of the top right quadrant
+ * @param bl Alpha of the bottom left quadrant
+ * @param br Alpha of the bottom right quadrant
+ */
+static void cutout_quadrants(
+    uint8_t *out,
+    uint8_t tl,
+    uint8_t tr,
+    uint8_t bl,
+    uint8_t br)
+{
+    int32_t i;
+    for (i = 0; i < 64; i ++) {
+        bool right = (i % 8) >= 4, bottom = (i / 8) >= 4;
+        out[i] = bottom ? (right ? br : bl) : (right ? tr : tl);
+    }
+}
+
+/** Render frames until a texture loaded, then one that samples it.
+ *
+ * @param world The world
+ * @param tex The texture, 0 for none
+ */
+static void cutout_render(
+    ecs_world_t *world,
+    ecs_entity_t tex)
+{
+    int32_t frames = 0;
+    while (tex && frames < 100 &&
+        ecs_get(world, tex, TextureStatus)->state == TextureLoading)
+    {
+        ecs_progress(world, 0);
+        box_render_sync(world);
+        frames ++;
+    }
+
+    test_assert(!tex || ecs_get(world, tex, TextureStatus)->state == TextureReady);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+}
+
+/** Load a capture of the temporary directory.
+ *
+ * @param world The world
+ * @param file Name of the PNG
+ * @return The pixels, 64x32 RGBA, freed with stbi_image_free
+ */
+static unsigned char* cutout_load(
+    ecs_world_t *world,
+    const char *file)
+{
+    char *path = flecs_asprintf("%s/%s", ecs_singleton_get(world, AppStatus)->tmp_dir, file);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_int(w, 64);
+    test_int(h, 32);
+    ecs_os_free(path);
+
+    return px;
+}
+
+/** Check whether a pixel is the red of the wall, not mixed with anything.
+ *
+ * @param p The pixel
+ * @return Whether it is red
+ */
+static bool cutout_red(
+    const unsigned char *p)
+{
+    return p[0] > 240 && p[1] < 20 && p[2] < 20;
+}
+
+/** Check whether a pixel is the green of an alpha tested shape, not mixed with anything.
+ *
+ * @param p The pixel
+ * @return Whether it is green
+ */
+static bool cutout_green(
+    const unsigned char *p)
+{
+    return p[0] < 20 && p[1] > 240 && p[2] < 20;
+}
+
+/** Add an emissive green shape with an albedo texture whose alpha it is tested with.
+ *
+ * @param world The world
+ * @param tex The albedo texture, 0 for none
+ * @param cutoff The AlphaCutoff value
+ * @return The shape, a 4x4 quad on the origin facing the camera
+ */
+static ecs_entity_t cutout_quad(
+    ecs_world_t *world,
+    ecs_entity_t tex,
+    float cutoff)
+{
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Quad, {4, 4});
+    ecs_set(world, e, Rgb, {0, 0, 0});
+    ecs_set(world, e, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, e, Emissive, {.strength = 1, .color = {0, 255, 0}});
+    if (tex) {
+        ecs_set(world, e, PbrTextures, {.albedo = tex});
+    }
+
+    ecs_set(world, e, AlphaCutoff, {cutoff});
+
+    return e;
+}
+
+void Material_cutout_discards_below_cutoff(void) {
+    // materials/cutout
+    ecs_world_t *world = cutout_world("cutout.png");
+    uint8_t alpha[64];
+    char *file = NULL;
+    cutout_quadrants(alpha, 77, 179, 179, 77);
+    ecs_entity_t tex = cutout_texture(world, "checker.png", 8, 8, alpha, &file);
+    cutout_quad(world, tex, 0.5f);
+    cutout_render(world, tex);
+
+    unsigned char *px = cutout_load(world, "cutout.png");
+    const unsigned char *tl = &px[(11 * 64 + 27) * 4];
+    const unsigned char *tr = &px[(11 * 64 + 37) * 4];
+    const unsigned char *bl = &px[(21 * 64 + 27) * 4];
+    const unsigned char *br = &px[(21 * 64 + 37) * 4];
+    test_assert(cutout_red(tl) || cutout_green(tl));
+    test_assert(cutout_red(tr) || cutout_green(tr));
+    test_bool(cutout_red(tl), cutout_red(br));
+    test_bool(cutout_red(tr), cutout_red(bl));
+    test_assert(cutout_red(tl) != cutout_red(tr));
+
+    int32_t x, y;
+    for (y = 9; y <= 23; y ++) {
+        for (x = 25; x <= 39; x ++) {
+            const unsigned char *p = &px[(y * 64 + x) * 4];
+            if (!cutout_red(p) && !cutout_green(p)) {
+                printf("pixel %d, %d is blended: %d %d %d\n", x, y, p[0], p[1], p[2]);
+            }
+
+            test_assert(cutout_red(p) || cutout_green(p));
+        }
+    }
+
+    stbi_image_free(px);
+    ecs_fini(world);
+    ecs_os_free(file);
+}
+
+void Material_cutout_opaque_with_opacity(void) {
+    // materials/cutout
+    ecs_world_t *world = cutout_world("cutout_opacity.png");
+    ecs_entity_t kept = cutout_quad(world, 0, 0.5f);
+    ecs_set(world, kept, Position, {-1.5f, 0, 0});
+    ecs_set(world, kept, Quad, {2, 2});
+    ecs_set(world, kept, Opacity, {0.8f});
+    ecs_entity_t dropped = cutout_quad(world, 0, 0.5f);
+    ecs_set(world, dropped, Position, {1.5f, 0, 0});
+    ecs_set(world, dropped, Quad, {2, 2});
+    ecs_set(world, dropped, Opacity, {0.4f});
+    cutout_render(world, 0);
+
+    unsigned char *px = cutout_load(world, "cutout_opacity.png");
+    test_assert(cutout_green(&px[(16 * 64 + 25) * 4]));
+    test_assert(cutout_red(&px[(16 * 64 + 39) * 4]));
+
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+void Material_cutout_writes_depth(void) {
+    // materials/cutout
+    ecs_world_t *world = cutout_world("cutout_depth.png");
+    uint8_t alpha[64];
+    char *file = NULL;
+    cutout_quadrants(alpha, 0, 255, 0, 255);
+    ecs_entity_t tex = cutout_texture(world, "halves.png", 8, 8, alpha, &file);
+    cutout_quad(world, tex, 0.5f);
+    int32_t i;
+    for (i = 0; i < 2; i ++) {
+        ecs_entity_t behind = ecs_new(world);
+        ecs_set(world, behind, Position, {i ? 1.0f : -1.0f, 0, -0.5f});
+        ecs_set(world, behind, Box, {1, 1, 0.1f});
+        ecs_set(world, behind, Rgb, {0, 0, 0});
+        ecs_set(world, behind, PbrMaterial, {.metallic = 1, .roughness = 1});
+        ecs_set(world, behind, Emissive, {.strength = 1, .color = {0, 0, 255}});
+        ecs_set(world, behind, BlendMode, {AlphaBlend});
+    }
+
+    cutout_render(world, tex);
+
+    unsigned char *px = cutout_load(world, "cutout_depth.png");
+    const unsigned char *hole = &px[(16 * 64 + 28) * 4];
+    const unsigned char *solid = &px[(16 * 64 + 36) * 4];
+    test_assert(hole[2] > 240);
+    test_assert(hole[0] < 20);
+    test_assert(hole[1] < 20);
+    test_assert(cutout_green(solid));
+    test_assert(cutout_red(&px[(16 * 64 + 20) * 4]));
+
+    stbi_image_free(px);
+    ecs_fini(world);
+    ecs_os_free(file);
+}
+
+void Material_cutout_back_face_plain_keeps_holes(void) {
+    // materials/cutout
+    ecs_world_t *world = cutout_world("cutout_back.png");
+    uint8_t alpha[64];
+    char *file = NULL;
+    cutout_quadrants(alpha, 0, 255, 0, 255);
+    ecs_entity_t tex = cutout_texture(world, "halves.png", 8, 8, alpha, &file);
+    ecs_entity_t quad = cutout_quad(world, tex, 0.5f);
+    ecs_set(world, quad, Rotation, {0, (float)GLM_PI, 0});
+    ecs_set(world, quad, BackFaceMode, {BackFacePlain});
+    cutout_render(world, tex);
+
+    unsigned char *px = cutout_load(world, "cutout_back.png");
+    const unsigned char *left = &px[(16 * 64 + 28) * 4];
+    const unsigned char *right = &px[(16 * 64 + 36) * 4];
+    test_assert((cutout_red(left) && cutout_green(right)) ||
+        (cutout_green(left) && cutout_red(right)));
+
+    stbi_image_free(px);
+    ecs_fini(world);
+    ecs_os_free(file);
+}
+
+void Material_cutout_change_and_remove(void) {
+    // materials/cutout
+    ecs_world_t *world = cutout_world("cutout_change.png");
+    uint8_t alpha[16 * 4];
+    char *file = NULL;
+    int32_t i;
+    for (i = 0; i < 16 * 4; i ++) {
+        alpha[i] = (uint8_t)((i % 16) * 17);
+    }
+
+    ecs_entity_t tex = cutout_texture(world, "gradient.png", 16, 4, alpha, &file);
+    ecs_entity_t quad = cutout_quad(world, tex, 0.25f);
+    cutout_render(world, tex);
+
+    unsigned char *px = cutout_load(world, "cutout_change.png");
+    test_assert(cutout_red(&px[(16 * 64 + 25) * 4]));
+    test_assert(cutout_green(&px[(16 * 64 + 32) * 4]));
+    test_assert(cutout_green(&px[(16 * 64 + 39) * 4]));
+    stbi_image_free(px);
+
+    ecs_set(world, quad, AlphaCutoff, {0.75f});
+    cutout_render(world, 0);
+    px = cutout_load(world, "cutout_change.png");
+    test_assert(cutout_red(&px[(16 * 64 + 25) * 4]));
+    test_assert(cutout_red(&px[(16 * 64 + 32) * 4]));
+    test_assert(cutout_green(&px[(16 * 64 + 39) * 4]));
+    stbi_image_free(px);
+
+    ecs_remove(world, quad, AlphaCutoff);
+    cutout_render(world, 0);
+    px = cutout_load(world, "cutout_change.png");
+    test_assert(cutout_green(&px[(16 * 64 + 25) * 4]));
+    test_assert(cutout_green(&px[(16 * 64 + 32) * 4]));
+    test_assert(cutout_green(&px[(16 * 64 + 39) * 4]));
+    stbi_image_free(px);
+
+    ecs_add(world, quad, DynamicMaterial);
+    ecs_set(world, quad, AlphaCutoff, {0.25f});
+    cutout_render(world, 0);
+    px = cutout_load(world, "cutout_change.png");
+    test_assert(cutout_red(&px[(16 * 64 + 25) * 4]));
+    test_assert(cutout_green(&px[(16 * 64 + 32) * 4]));
+    stbi_image_free(px);
+
+    ecs_get_mut(world, quad, AlphaCutoff)->value = 0.75f;
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    px = cutout_load(world, "cutout_change.png");
+    test_assert(cutout_red(&px[(16 * 64 + 32) * 4]));
+    test_assert(cutout_green(&px[(16 * 64 + 39) * 4]));
+    stbi_image_free(px);
+
+    ecs_fini(world);
+    ecs_os_free(file);
+}
+
+void Material_cutout_blended_discards(void) {
+    // materials/cutout
+    ecs_world_t *world = cutout_world("cutout_blend.png");
+    uint8_t alpha[64];
+    char *file = NULL;
+    cutout_quadrants(alpha, 77, 179, 77, 179);
+    ecs_entity_t tex = cutout_texture(world, "blend_halves.png", 8, 8, alpha, &file);
+    ecs_entity_t quad = cutout_quad(world, tex, 0.5f);
+    ecs_set(world, quad, BlendMode, {AlphaBlend});
+    cutout_render(world, tex);
+
+    unsigned char *px = cutout_load(world, "cutout_blend.png");
+    const unsigned char *dropped = &px[(16 * 64 + 28) * 4];
+    const unsigned char *mixed = &px[(16 * 64 + 36) * 4];
+    test_assert(cutout_red(dropped));
+    test_assert(mixed[0] > 110 && mixed[0] < 200);
+    test_assert(mixed[1] > 180 && mixed[1] < 245);
+    test_assert(mixed[2] < 40);
+
+    stbi_image_free(px);
+    ecs_fini(world);
+    ecs_os_free(file);
 }

@@ -5,6 +5,10 @@
  * The capture cases look straight down from 10 units above a white floor lit by a sun that
  * shines straight down, into a 64x64 image: world x = -3 lands on pixel column 15, x = 3 on
  * column 48. A small slab 5 units above x = -3 shadows the floor below it.
+ *
+ * The alpha tested caster is a 3x3 quad 5 units above x = -3 that faces the floor, so the camera
+ * culls it: world x = -3.75 below its left half lands on column 11, x = -2.25 below its right
+ * half on column 20.
  */
 
 #include <box.h>
@@ -16,6 +20,10 @@
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_STATIC
 #include <stb_image.h>
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_STATIC
+#include <stb_image_write.h>
 
 void Shadow_splits_uniform(void) {
     // lighting/shadows
@@ -584,4 +592,120 @@ void Shadow_default_settings(void) {
     test_flt(shadowed->shadows.split_lambda, 0.7f);
 
     ecs_fini(world);
+}
+
+/** Render the floor of the capture cases under an alpha tested quad facing it.
+ *
+ * @param file Name of the PNG the surface writes
+ * @param holes Whether the albedo texture of the quad has no alpha in its left half, else the
+ * quad has no texture
+ * @return The pixels, 64x64 RGBA, freed with stbi_image_free
+ */
+static unsigned char* cutout_shadow_render(
+    const char *file,
+    bool holes)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    const char *tmp = ecs_singleton_get(world, AppStatus)->tmp_dir;
+    char *png = flecs_asprintf("%s/shadow_halves.png", tmp);
+    uint8_t px[8 * 8 * 4];
+    int32_t i;
+    for (i = 0; i < 64; i ++) {
+        px[i * 4 + 0] = 255;
+        px[i * 4 + 1] = 255;
+        px[i * 4 + 2] = 255;
+        px[i * 4 + 3] = (i % 8) < 4 ? 0 : 255;
+    }
+
+    test_assert(stbi_write_png(png, 8, 8, 4, px, 8 * 4) != 0);
+    ecs_entity_t tex = ecs_new(world);
+    ecs_set(world, tex, TexturePath, {.path = png});
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 10, 0});
+    ecs_set(world, camera, Rotation, {-(float)GLM_PI_2, 0, 0});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
+        .color = {0, 0, 0, 255}}, .lighting.enabled = true,
+        .shadows = {.enabled = true, .depth_bias = 2, .normal_offset = 1.5f, .fade = 0.2f,
+            .cascades = 4, .resolution = 2048, .max_distance = 200, .filter_size = 3}});
+    ecs_singleton_set(world, AmbientLight, {.intensity = 0});
+    ecs_entity_t floor = ecs_new(world);
+    ecs_set(world, floor, Position, {0, -0.1f, 0});
+    ecs_set(world, floor, Box, {20, 0.2f, 20});
+    ecs_set(world, floor, Rgb, {255, 255, 255});
+    ecs_set(world, floor, PbrMaterial, {.roughness = 1});
+    ecs_entity_t caster = ecs_new(world);
+    ecs_set(world, caster, Position, {-3, 5, 0});
+    ecs_set(world, caster, Rotation, {(float)GLM_PI_2, 0, 0});
+    ecs_set(world, caster, Quad, {3, 3});
+    ecs_set(world, caster, AlphaCutoff, {0.5f});
+    if (holes) {
+        ecs_set(world, caster, PbrTextures, {.albedo = tex});
+    }
+
+    ecs_entity_t sun = ecs_new(world);
+    ecs_set(world, sun, Rotation, {(float)GLM_PI_2, 0, 0});
+    ecs_set(world, sun, DirectionalLight, {.intensity = GLM_PIf});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 64, .height = 64,
+        .write_to_file = ECS_CONST_CAST(char*, file), .resolution_scale = 1});
+    int32_t frames = 0;
+    while (frames < 100 && ecs_get(world, tex, TextureStatus)->state == TextureLoading) {
+        ecs_progress(world, 0);
+        box_render_sync(world);
+        frames ++;
+    }
+
+    test_int(ecs_get(world, tex, TextureStatus)->state, TextureReady);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    char *path = flecs_asprintf("%s/%s", tmp, file);
+    int w = 0, h = 0, n = 0;
+    unsigned char *result = stbi_load(path, &w, &h, &n, 4);
+    test_assert(result != NULL);
+    test_int(w, 64);
+    test_int(h, 64);
+
+    ecs_os_free(path);
+    ecs_fini(world);
+    ecs_os_free(png);
+
+    return result;
+}
+
+void Shadow_cutout_shadow_has_holes(void) {
+    // lighting/shadows
+    unsigned char *px = cutout_shadow_render("cutout_shadow.png", true);
+    unsigned char *hole = &px[(32 * 64 + 11) * 4];
+    unsigned char *solid = &px[(32 * 64 + 20) * 4];
+    unsigned char *open = &px[(32 * 64 + 48) * 4];
+    test_assert(open[0] > 200);
+    test_assert(abs((int)hole[0] - (int)open[0]) < 30);
+    test_assert(solid[0] < 30);
+    test_assert(solid[1] < 30);
+    test_assert(solid[2] < 30);
+
+    stbi_image_free(px);
+}
+
+void Shadow_cutout_without_texture_casts_full_shadow(void) {
+    // lighting/shadows
+    unsigned char *px = cutout_shadow_render("cutout_full_shadow.png", false);
+    unsigned char *left = &px[(32 * 64 + 11) * 4];
+    unsigned char *right = &px[(32 * 64 + 20) * 4];
+    unsigned char *open = &px[(32 * 64 + 48) * 4];
+    test_assert(open[0] > 200);
+    test_assert(left[0] < 30);
+    test_assert(right[0] < 30);
+
+    stbi_image_free(px);
 }

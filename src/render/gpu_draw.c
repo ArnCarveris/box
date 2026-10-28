@@ -588,10 +588,15 @@ static void box_gpu_blend_state(
     out->alpha = alpha;
 }
 
-/** Create the forward pipeline of a shader, color format, blend mode and back face mode.
+/** Create the forward pipeline of a shader, color format, blend mode, back face mode and alpha
+ * test.
  *
  * The 2D shape shader blends its edges in the opaque pass too and draws over equal depths, so
  * coplanar shapes draw in order.
+ *
+ * An alpha tested mesh pipeline sets the alpha_cutout constant of mesh.wgsl, which discards the
+ * fragments below the cutoff of their instance; the others leave it at its default, so a mesh
+ * shader without the constant still makes them.
  *
  * @param gpu The backend
  * @param handle Handle of the shader, the mesh or the 2D shape shader
@@ -599,6 +604,7 @@ static void box_gpu_blend_state(
  * @param format The format of the color target
  * @param blend The BlendMode, Opaque writes depth and does not blend
  * @param back_face The BackFaceMode, BackFaceCull culls the back faces
+ * @param cutout Whether the fragments are alpha tested, ignored by the 2D shape shader
  * @return The pipeline
  */
 static WGPURenderPipeline box_gpu_forward_create(
@@ -607,7 +613,8 @@ static WGPURenderPipeline box_gpu_forward_create(
     WGPUShaderModule shader,
     WGPUTextureFormat format,
     uint32_t blend,
-    uint32_t back_face)
+    uint32_t back_face,
+    bool cutout)
 {
     bool shape2d = handle == BOX_RENDER_SHADER_SHAPE2D;
     WGPUVertexAttribute vertex_attrs[3] = {
@@ -639,15 +646,21 @@ static WGPURenderPipeline box_gpu_forward_create(
         .blend = blend == Opaque && !shape2d ? NULL : &blend_state,
         .writeMask = WGPUColorWriteMask_All
     };
-    WGPUConstantEntry constant = {
-        .key = { .data = "blend_mode", .length = WGPU_STRLEN },
-        .value = (double)blend
+    WGPUConstantEntry constants[2] = {
+        {
+            .key = { .data = "blend_mode", .length = WGPU_STRLEN },
+            .value = (double)blend
+        },
+        {
+            .key = { .data = "alpha_cutout", .length = WGPU_STRLEN },
+            .value = 1.0
+        }
     };
     WGPUFragmentState fragment = {
         .module = shader,
         .entryPoint = { .data = "fs", .length = WGPU_STRLEN },
-        .constantCount = 1,
-        .constants = &constant,
+        .constantCount = cutout && !shape2d ? 2 : 1,
+        .constants = constants,
         .targetCount = 1,
         .targets = &target
     };
@@ -749,7 +762,7 @@ char* box_gpu_forward_check(
 
     wgpuDevicePushErrorScope(gpu->device, WGPUErrorFilter_Validation);
     pipeline = box_gpu_forward_create(
-        gpu, handle, shader, WGPUTextureFormat_RGBA8Unorm, Opaque, BackFaceCull);
+        gpu, handle, shader, WGPUTextureFormat_RGBA8Unorm, Opaque, BackFaceCull, false);
     wgpuDevicePopErrorScope(gpu->device, (WGPUPopErrorScopeCallbackInfo){
         .mode = WGPUCallbackMode_AllowSpontaneous,
         .callback = box_gpu_forward_on_scope,
@@ -775,18 +788,20 @@ done:
  * @param format Format of the color target, below 2^24
  * @param blend BlendMode, below 16
  * @param back_face BackFaceMode, of which the pipeline only tells BackFaceCull from the rest
+ * @param cutout Whether the fragments are alpha tested
  * @return The key, distinct for every distinct pipeline
  */
 static uint64_t box_gpu_forward_key(
     uint32_t shader,
     WGPUTextureFormat format,
     uint32_t blend,
-    uint32_t back_face)
+    uint32_t back_face,
+    bool cutout)
 {
     ecs_assert((uint32_t)format < (1u << 24), ECS_INTERNAL_ERROR, NULL);
 
     return ((uint64_t)shader << 32) | ((uint64_t)format << 8) | ((uint64_t)blend << 4) |
-        (back_face == BackFaceCull ? 0u : 1u);
+        (cutout ? 2u : 0u) | (back_face == BackFaceCull ? 0u : 1u);
 }
 
 WGPURenderPipeline box_gpu_forward_pipeline(
@@ -807,14 +822,15 @@ WGPURenderPipeline box_gpu_forward_pipeline(
         goto done;
     }
 
-    key = box_gpu_forward_key(b->pipeline, format, b->blend, b->back_face);
+    key = box_gpu_forward_key(b->pipeline, format, b->blend, b->back_face, b->cutout);
     cached = ecs_map_get(&gpu->forward, key);
     if (cached) {
         result = (WGPURenderPipeline)(uintptr_t)*cached;
         goto done;
     }
 
-    result = box_gpu_forward_create(gpu, b->pipeline, shader, format, b->blend, b->back_face);
+    result = box_gpu_forward_create(
+        gpu, b->pipeline, shader, format, b->blend, b->back_face, b->cutout);
     ecs_map_insert_ptr(&gpu->forward, key, result);
 done:
     return result;

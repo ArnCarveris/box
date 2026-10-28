@@ -829,9 +829,15 @@ static void box_gpu_cull_draw_add(
     }
 }
 
-/** Get the phase a batch draws in: opaque meshes, then opaque 2D shapes, then blended.
+/** Phases of the draws of a cull view, see box_gpu_cull_phase */
+#define BOX_GPU_CULL_DRAW_PHASES (4)
+
+/** Get the phase a batch draws in: plain opaque meshes, then alpha tested opaque meshes, then
+ * opaque 2D shapes, then blended.
  *
- * The 2D shapes blend their anti-aliased edges, so they draw over the opaque meshes behind.
+ * The alpha tested meshes discard fragments, which turns off early depth rejection for their
+ * pipelines, so they draw after the plain ones and are rejected by the depth those wrote. The 2D
+ * shapes blend their anti-aliased edges, so they draw over the opaque meshes behind.
  *
  * @param b The batch
  * @return The phase
@@ -839,9 +845,13 @@ static void box_gpu_cull_draw_add(
 static int32_t box_gpu_cull_phase(
     const box_render_batch_t *b)
 {
-    int32_t result = b->pipeline == BOX_RENDER_SHADER_SHAPE2D ? 1 : 0;
-    if (b->view != -1) {
+    int32_t result = b->cutout ? 1 : 0;
+    if (b->pipeline == BOX_RENDER_SHADER_SHAPE2D) {
         result = 2;
+    }
+
+    if (b->view != -1) {
+        result = 3;
     }
 
     return result;
@@ -849,7 +859,8 @@ static int32_t box_gpu_cull_phase(
 
 /** Add a cull view with its draws, jobs and dispatches.
  *
- * Draws are added by phase, in packet order within a phase.
+ * Draws are added by phase, in packet order within a phase, in the cascades too, so the alpha
+ * tested casters follow the plain ones.
  *
  * @param gpu The backend
  * @param packet The packet
@@ -887,7 +898,7 @@ static void box_gpu_cull_view_add(
     cv->report = cascade < 0 && !v->target && v->view;
     cv->group = history ? box_gpu_hiz_group(gpu, history, hiz, 0) : c->empty_group;
     ecs_vec_clear(&c->order);
-    for (i = 0; i < count * 3; i ++) {
+    for (i = 0; i < count * BOX_GPU_CULL_DRAW_PHASES; i ++) {
         const box_render_batch_t *b = ecs_vec_get_t(
             &packet->batches, box_render_batch_t, i % count);
         if (draws && box_gpu_cull_phase(b) == i / count &&
@@ -1027,10 +1038,11 @@ static void box_gpu_cull_capture_view(
     cv->first_dispatch = ecs_vec_count(&c->dispatches);
     cv->counter = base->jobs[3];
     cv->group = c->empty_group;
-    for (i = 0; i < count; i ++) {
-        const box_render_batch_t *b = ecs_vec_get_t(&packet->batches, box_render_batch_t, i);
-        if (box_gpu_cull_capture_draws(gpu, b, scene, cascade)) {
-            box_gpu_cull_draw_add(gpu, packet, i, base, NULL);
+    for (i = 0; i < count * 2; i ++) {
+        const box_render_batch_t *b = ecs_vec_get_t(
+            &packet->batches, box_render_batch_t, i % count);
+        if (b->cutout == (i >= count) && box_gpu_cull_capture_draws(gpu, b, scene, cascade)) {
+            box_gpu_cull_draw_add(gpu, packet, i % count, base, NULL);
         }
     }
 

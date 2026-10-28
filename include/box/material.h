@@ -34,11 +34,35 @@ ECS_STRUCT(Rgb, {
  * entity, which needs no shape of its own, so one Opacity on a node fades a hierarchy.
  *
  * A shape whose resulting alpha is under 1 is drawn by the sorted blended pass and
- * casts no shadow; at 1 it stays in its opaque batch. In a UI tree an element with
+ * casts no shadow; at 1 it stays in its opaque batch. A shape with AlphaCutoff tests the
+ * alpha against its cutoff in the opaque pass instead. In a UI tree an element with
  * children composites its subtree with the opacity instead.
  */
 ECS_STRUCT(Opacity, {
     float value; /**< Opacity */
+});
+
+/** Cutoff a constructed AlphaCutoff tests against */
+#define BOX_MATERIAL_CUTOFF (0.5f)
+
+/** Alpha test of a shape, default 0.5: its fragments are kept or discarded, not blended.
+ *
+ * The alpha a fragment is tested with is the alpha the shape draws with without it (its
+ * Opacity times the Opacity of its ancestors) times the alpha of its albedo texture (PbrTextures);
+ * a fragment whose alpha is below value is discarded and the others are written as opaque. The
+ * value is clamped to 0..1.
+ *
+ * A shape with AlphaCutoff whose BlendMode is Opaque or missing draws in the opaque pass whatever
+ * its Opacity, writes depth and casts shadows with the same holes; the probe and reflection
+ * captures see the holes too. With another BlendMode it stays in the sorted blended pass and
+ * casts no shadow, and the cutoff discards there as well. A back face drawn with BackFacePlain
+ * keeps the holes of the albedo texture.
+ *
+ * Only 3D meshes are alpha tested; 2D shapes and text ignore AlphaCutoff. Picking does not read
+ * textures, so an alpha tested shape is picked by its whole geometry, holes included.
+ */
+ECS_STRUCT(AlphaCutoff, {
+    float value; /**< Alpha below which a fragment is discarded */
 });
 
 /** Color the display encoded base color (Rgb) mixes toward by the strength in a, before lighting.
@@ -119,7 +143,8 @@ ECS_STRUCT(TextureTransform, {
  *
  * A texture entity has a TexturePath (box/texture.h), or is the texture of a Surface, whose
  * image of the same frame it then samples; until it loaded, or when it is missing, the layer
- * has no effect. Back faces drawn with BackFacePlain do not sample the textures.
+ * has no effect. Back faces drawn with BackFacePlain do not sample the textures, except for the
+ * albedo alpha of a shape with AlphaCutoff.
  *
  * The ORM layer holds occlusion (red), roughness (green) and metallic (blue) in one image, as
  * glTF's occlusion and metallic roughness textures share one: green multiplies
@@ -131,7 +156,8 @@ ECS_STRUCT(TextureTransform, {
  * the stored values; a texture shared by a color and a data layer is filtered as color in both.
  */
 ECS_STRUCT(PbrTextures, {
-    ecs_entity_t albedo;    /**< Multiplied with the base color and opacity, display encoded */
+    ecs_entity_t albedo;    /**< Multiplied with the base color and opacity, display encoded;
+                             *   its alpha only shows with a blend mode or AlphaCutoff */
     ecs_entity_t emissive;  /**< Multiplied with the Emissive color times its strength */
     ecs_entity_t orm;       /**< Occlusion (red), roughness (green) and metallic (blue), stored */
     ecs_entity_t normal;    /**< Tangent space normal map, green points up the image */

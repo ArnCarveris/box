@@ -713,7 +713,8 @@ void box_bake_lights(
     }
 }
 
-/** Register the observers of the changes of static shapes that rebake the probes near them.
+/** Register the observers of the changes of static shapes that rebake the probes near them,
+ * AlphaCutoff also when it is added, as its holes change what the captures see.
  *
  * @param world The world
  * @param b The state
@@ -746,6 +747,13 @@ void box_bake_observers(
             .ctx = b
         });
     }
+
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(AlphaCutoff) }},
+        .events = { EcsOnAdd, EcsOnSet, EcsOnRemove },
+        .callback = BakeOnChange,
+        .ctx = b
+    });
 
     box_transform_on_dynamic(world, BakeOnChange, b, NULL);
     for (i = 0; i < 2; i ++) {

@@ -176,7 +176,7 @@ static void box_draws_text_key(
     key->scene = box_render_scene_of(world, e);
     key->mesh = d->text_mesh;
     key->pipeline = BOX_RENDER_SHADER_SHAPE2D;
-    key->blend = box_draws_blend(ecs_get(world, e, BlendMode), alpha);
+    key->blend = box_draws_blend(ecs_get(world, e, BlendMode), alpha, false);
     key->back_face = back_face ? (uint8_t)*back_face : (uint8_t)BackFaceCull;
     key->wrap = WrapClamp;
     key->dynamic = ecs_has_id(world, e, DynamicTransform) ||

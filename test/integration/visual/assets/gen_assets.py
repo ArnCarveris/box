@@ -110,10 +110,51 @@ def ring(x, y):
     return (v, v, v, 255)
 
 
+def fence(x, y):
+    """Wooden lattice of slats crossing at 45 degrees inside a frame, transparent between the
+    slats, for alpha tested shapes. The edges of the slats are hard: alpha is 0 or 255."""
+    period = SIZE // 4
+    half = 5
+    frame = min(x, y, SIZE - 1 - x, SIZE - 1 - y) < 6
+    a = (x + y) % period
+    b = (x - y) % period
+    slat_a = min(a, period - a) < half
+    slat_b = min(b, period - b) < half
+    if not (frame or slat_a or slat_b):
+        return (0, 0, 0, 0)
+    grain = 0.88 + 0.12 * math.sin(y * 0.9 if slat_a and not frame else x * 0.9)
+    base = (150, 104, 62) if frame else (178, 128, 80)
+    return tuple(int(c * grain) for c in base) + (255,)
+
+
+def leaf(x, y):
+    """One broad leaf from a short stem at the bottom to a pointed tip at the top, green with a
+    paler midrib and side veins, whose alpha falls off smoothly over the last few texels of the
+    edge, for alpha tested foliage."""
+    px, py = (x + 0.5) / SIZE - 0.5, (y + 0.5) / SIZE
+    t = (0.9 - py) / 0.84
+    across = abs(px + 0.06 * math.sin(math.pi * t))
+    if t < 0.0:
+        coverage = max(0.0, min(1.0, (0.014 - abs(px)) / 0.01)) if t > -0.08 else 0.0
+        return (70, 96, 40) + (int(round(coverage * 255)),)
+    if t >= 1.0:
+        return (0, 0, 0, 0)
+    width = 0.4 * math.sin(math.pi * t ** 0.75) * (1.0 - 0.25 * t)
+    coverage = max(0.0, min(1.0, (width - across) / 0.035))
+    if coverage <= 0.0:
+        return (0, 0, 0, 0)
+    shade = 0.8 + 0.2 * (1.0 - across / max(width, 1e-3))
+    color = (int(58 * shade), int(142 * shade), int(50 * shade))
+    side = (t - 1.1 * across) / 0.12
+    if across < 0.007 or (abs(side - round(side)) < 0.07 and across < width * 0.8):
+        color = (104, 170, 80)
+    return color + (int(round(coverage * 255)),)
+
+
 def main():
     for name, fn in (("checker.png", checker), ("letter.png", letter),
                      ("bumps.png", bumps), ("stripes.png", stripes), ("ring.png", ring),
-                     ("orm.png", orm)):
+                     ("orm.png", orm), ("fence.png", fence), ("leaf.png", leaf)):
         write_png(name, SIZE, image(SIZE, fn))
         print("%s %d bytes" % (name, os.path.getsize(os.path.join(HERE, name))))
 

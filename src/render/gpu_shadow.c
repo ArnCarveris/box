@@ -2,9 +2,9 @@
  * @file render/gpu_shadow.c
  * @brief Cascaded shadow maps of the webgpu backend.
  *
- * Before a view with shadows draws, the opaque casters the cull pass kept in each cascade
- * render with etc/shaders/shadow.wgsl into that cascade of the shared shadow map, depth only
- * and with reversed Z.
+ * Before a view with shadows draws, the opaque casters the cull pass kept in each cascade render
+ * with etc/shaders/shadow.wgsl into that cascade of the shared shadow map, depth only, reversed
+ * Z; alpha tested casters discard below their cutoff there, so their shadows have the holes.
  *
  * The forward pass then samples the map through a comparison sampler. Probe captures use a
  * map of their own with one cascade around the static bounds of the scene.
@@ -56,10 +56,17 @@ void box_gpu_shadow_init(
         .aspect = WGPUTextureAspect_DepthOnly
     };
     gpu->shadow_layout = wgpuDeviceCreateBindGroupLayout(gpu->device, &layout);
-    WGPUBindGroupLayout groups[2] = { gpu->shadow_layout, gpu->instance_layout };
+    WGPUBindGroupLayout groups[3] = {
+        gpu->shadow_layout, gpu->instance_layout, gpu->material_layout
+    };
     gpu->shadow_pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
         &(WGPUPipelineLayoutDescriptor){
             .bindGroupLayoutCount = 2,
+            .bindGroupLayouts = groups
+        });
+    gpu->shadow_cutout_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
+        &(WGPUPipelineLayoutDescriptor){
+            .bindGroupLayoutCount = 3,
             .bindGroupLayouts = groups
         });
     gpu->shadow_sampler = wgpuDeviceCreateSampler(gpu->device, &sampler);
@@ -141,6 +148,11 @@ void box_gpu_shadow_fini(
         gpu->shadow = NULL;
     }
 
+    if (gpu->shadow_cutout) {
+        wgpuRenderPipelineRelease(gpu->shadow_cutout);
+        gpu->shadow_cutout = NULL;
+    }
+
     if (gpu->shadow_buffer) {
         wgpuBufferRelease(gpu->shadow_buffer);
         gpu->shadow_buffer = NULL;
@@ -164,6 +176,11 @@ void box_gpu_shadow_fini(
     if (gpu->shadow_pipeline_layout) {
         wgpuPipelineLayoutRelease(gpu->shadow_pipeline_layout);
         gpu->shadow_pipeline_layout = NULL;
+    }
+
+    if (gpu->shadow_cutout_layout) {
+        wgpuPipelineLayoutRelease(gpu->shadow_cutout_layout);
+        gpu->shadow_cutout_layout = NULL;
     }
 
     if (gpu->shadow_layout) {
@@ -248,36 +265,35 @@ done:
     return;
 }
 
-/** Get the shadow pipeline, created again when the shadow shader was recompiled.
+/** Create a shadow pipeline from the shadow shader.
+ *
+ * The plain pipeline only reads the position and has no fragment stage; the alpha tested one
+ * also reads the normal and UV of the vertices, and its fragment stage discards below the cutoff.
  *
  * @param gpu The backend
- * @return The pipeline, NULL while the shader has no module
+ * @param module The shadow shader module
+ * @param cutout Whether to create the alpha tested pipeline
+ * @return The pipeline
  */
-static WGPURenderPipeline box_gpu_shadow_pipeline(
-    box_gpu_t *gpu)
+static WGPURenderPipeline box_gpu_shadow_create(
+    box_gpu_t *gpu,
+    WGPUShaderModule module,
+    bool cutout)
 {
-    box_gpu_shader_t *s = ecs_map_get_deref(
-        &gpu->shaders, box_gpu_shader_t, BOX_RENDER_SHADER_SHADOW);
-    WGPUVertexAttribute vertex_attr = {
-        .format = WGPUVertexFormat_Float32x3, .offset = 0, .shaderLocation = 0
+    WGPUVertexAttribute vertex_attrs[3] = {
+        { .format = WGPUVertexFormat_Float32x3, .offset = 0, .shaderLocation = 0 },
+        { .format = WGPUVertexFormat_Float32x3, .offset = 12, .shaderLocation = 1 },
+        { .format = WGPUVertexFormat_Float32x2, .offset = 24, .shaderLocation = 2 }
     };
     WGPUVertexAttribute slot_attr = {
         .format = WGPUVertexFormat_Uint32, .offset = 0, .shaderLocation = 3
     };
-    if (!s || !s->module) {
-        goto done;
-    }
-
-    if (gpu->shadow && gpu->shadow_revision == s->revision) {
-        goto done;
-    }
-
     WGPUVertexBufferLayout buffers[2] = {
         {
             .stepMode = WGPUVertexStepMode_Vertex,
             .arrayStride = sizeof(box_vertex_t),
-            .attributeCount = 1,
-            .attributes = &vertex_attr
+            .attributeCount = cutout ? 3 : 1,
+            .attributes = vertex_attrs
         },
         {
             .stepMode = WGPUVertexStepMode_Instance,
@@ -293,11 +309,15 @@ static WGPURenderPipeline box_gpu_shadow_pipeline(
         .stencilFront = { .compare = WGPUCompareFunction_Always },
         .stencilBack = { .compare = WGPUCompareFunction_Always }
     };
+    WGPUFragmentState fragment = {
+        .module = module,
+        .entryPoint = { .data = "fs_cutout", .length = WGPU_STRLEN }
+    };
     WGPURenderPipelineDescriptor desc = {
-        .layout = gpu->shadow_pipeline_layout,
+        .layout = cutout ? gpu->shadow_cutout_layout : gpu->shadow_pipeline_layout,
         .vertex = {
-            .module = s->module,
-            .entryPoint = { .data = "vs", .length = WGPU_STRLEN },
+            .module = module,
+            .entryPoint = { .data = cutout ? "vs_cutout" : "vs", .length = WGPU_STRLEN },
             .bufferCount = 2,
             .buffers = buffers
         },
@@ -307,13 +327,42 @@ static WGPURenderPipeline box_gpu_shadow_pipeline(
             .cullMode = WGPUCullMode_None
         },
         .depthStencil = &depth,
-        .multisample = { .count = 1, .mask = 0xFFFFFFFF }
+        .multisample = { .count = 1, .mask = 0xFFFFFFFF },
+        .fragment = cutout ? &fragment : NULL
     };
+
+    return wgpuDeviceCreateRenderPipeline(gpu->device, &desc);
+}
+
+/** Get the shadow pipelines, created again when the shadow shader was recompiled.
+ *
+ * @param gpu The backend
+ * @return The plain pipeline, NULL while the shader has no module; the alpha tested one is
+ * gpu->shadow_cutout
+ */
+static WGPURenderPipeline box_gpu_shadow_pipeline(
+    box_gpu_t *gpu)
+{
+    box_gpu_shader_t *s = ecs_map_get_deref(
+        &gpu->shaders, box_gpu_shader_t, BOX_RENDER_SHADER_SHADOW);
+    if (!s || !s->module) {
+        goto done;
+    }
+
+    if (gpu->shadow && gpu->shadow_revision == s->revision) {
+        goto done;
+    }
+
     if (gpu->shadow) {
         wgpuRenderPipelineRelease(gpu->shadow);
     }
 
-    gpu->shadow = wgpuDeviceCreateRenderPipeline(gpu->device, &desc);
+    if (gpu->shadow_cutout) {
+        wgpuRenderPipelineRelease(gpu->shadow_cutout);
+    }
+
+    gpu->shadow = box_gpu_shadow_create(gpu, s->module, false);
+    gpu->shadow_cutout = box_gpu_shadow_create(gpu, s->module, true);
     gpu->shadow_revision = s->revision;
 done:
     return s && s->module ? gpu->shadow : NULL;
@@ -372,6 +421,9 @@ done:
 
 /** Record the indirect draws of the shadow casters the cull pass kept in a cascade.
  *
+ * Plain casters draw with the plain pipeline; alpha tested ones with the alpha tested pipeline
+ * and the material group of their batch, whose albedo texture they sample.
+ *
  * @param gpu The backend
  * @param pass The shadow pass of the cascade
  * @param packet The packet
@@ -383,11 +435,30 @@ static void box_gpu_shadow_draw(
     const box_render_packet_t *packet,
     const box_gpu_cull_view_t *cv)
 {
-    WGPUBindGroup instances = NULL;
+    WGPURenderPipeline bound = NULL;
+    WGPUBindGroup instances = NULL, material = NULL;
     int32_t i;
     for (i = 0; i < cv->draw_count; i ++) {
-        box_gpu_cull_draw(gpu, pass, packet, ecs_vec_get_t(
-            &gpu->cull.draws, box_gpu_cull_draw_t, cv->first_draw + i), 1, false, &instances);
+        const box_gpu_cull_draw_t *d = ecs_vec_get_t(
+            &gpu->cull.draws, box_gpu_cull_draw_t, cv->first_draw + i);
+        const box_render_batch_t *b = ecs_vec_get_t(
+            &packet->batches, box_render_batch_t, d->batch);
+        bool cutout = b->cutout && gpu->shadow_cutout;
+        WGPURenderPipeline pipeline = cutout ? gpu->shadow_cutout : gpu->shadow;
+        if (pipeline != bound) {
+            wgpuRenderPassEncoderSetPipeline(pass, pipeline);
+            bound = pipeline;
+        }
+
+        if (cutout) {
+            WGPUBindGroup group = box_gpu_material_group(gpu, b, packet->anisotropy);
+            if (group != material) {
+                wgpuRenderPassEncoderSetBindGroup(pass, 2, group, 0, NULL);
+                material = group;
+            }
+        }
+
+        box_gpu_cull_draw(gpu, pass, packet, d, 1, false, &instances);
     }
 }
 
@@ -430,7 +501,6 @@ void box_gpu_shadow_render(
         };
         WGPURenderPassDescriptor desc = { .depthStencilAttachment = &depth };
         WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
-        wgpuRenderPassEncoderSetPipeline(pass, pipeline);
         wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
         if (cv) {
             box_gpu_shadow_draw(gpu, pass, packet, cv);
@@ -573,7 +643,6 @@ WGPUTextureView box_gpu_shadow_capture(
     };
     WGPURenderPassDescriptor desc = { .depthStencilAttachment = &depth };
     WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
-    wgpuRenderPassEncoderSetPipeline(pass, pipeline);
     wgpuRenderPassEncoderSetBindGroup(pass, 0, gpu->capture_shadow_group, 1, &offset);
     if (cv) {
         box_gpu_shadow_draw(gpu, pass, packet, cv);

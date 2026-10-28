@@ -192,7 +192,13 @@
                     "blended_no_alloc_steady_state",
                     "gpu_alpha_blend",
                     "gpu_back_face_plain",
-                    "default_material_sphere_matte"
+                    "default_material_sphere_matte",
+                    "cutout_discards_below_cutoff",
+                    "cutout_opaque_with_opacity",
+                    "cutout_writes_depth",
+                    "cutout_back_face_plain_keeps_holes",
+                    "cutout_change_and_remove",
+                    "cutout_blended_discards"
                 ]
             },
             {
@@ -400,7 +406,9 @@
                     "no_shadow_removed_casts_again",
                     "beyond_max_distance_unshadowed",
                     "fade_softens_last_cascade",
-                    "default_settings"
+                    "default_settings",
+                    "cutout_shadow_has_holes",
+                    "cutout_without_texture_casts_full_shadow"
                 ]
             },
             {

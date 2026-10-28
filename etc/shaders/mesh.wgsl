@@ -14,12 +14,17 @@
 // cubemap as an infinitely distant probe below the scene probe. A view
 // that renders the atmosphere of its scene attenuates the shaded color and adds the in scattered
 // light from one trilinear tap of its aerial perspective volume.
+// An alpha tested pipeline (alpha_cutout) discards the fragments whose alpha, the instance alpha
+// times the albedo alpha, is below the cutoff of their instance, once every texture is sampled.
 #include "include/instance.wgsl"
 #include "include/lights.wgsl"
 #include "include/shadow.wgsl"
 
 // BlendMode of the pipeline: the output is shaped for the blend equation it is drawn with.
 override blend_mode: u32 = 0u;
+
+// The pipeline alpha tests its fragments against the cutoff of their instance (AlphaCutoff).
+override alpha_cutout: bool = false;
 
 const PI: f32 = 3.141592653589793;
 const MIN_ROUGHNESS: f32 = 0.045;
@@ -118,6 +123,7 @@ struct VertexOut {
     @location(3) emissive: vec3f,
     @location(4) material: vec2f,
     @location(5) uv: vec2f,
+    @location(6) @interpolate(flat) cutoff: f32,
 };
 
 @vertex fn vs(v: VertexIn) -> VertexOut {
@@ -155,6 +161,7 @@ struct VertexOut {
     o.color = inst.color;
     o.emissive = inst.emissive.rgb;
     o.material = inst.material.xy;
+    o.cutoff = inst.material.z;
     o.uv = v.uv * inst.uv.xy + inst.uv.zw;
     if (inst.surface.p[0].x != 0.0) {
         var region = i32(v.position.z);
@@ -491,7 +498,8 @@ fn reflections(world: vec3f, spec: vec3f, roughness: f32, cluster: u32, fallback
 
 // Surface of a fragment from the material constants of its instance. Texture layers apply
 // here on front faces; a plain back face keeps the constants, is unoccluded and faces the
-// camera. The occlusion scales the indirect light only.
+// camera, except that an alpha tested one takes the albedo alpha, so its holes go through both
+// sides. The occlusion scales the indirect light only.
 struct Surface {
     albedo: vec3f,
     alpha: f32,
@@ -543,6 +551,8 @@ fn surface(f: VertexOut, front: bool) -> Surface {
         s.occlusion = orm.r;
         s.emissive *= emissive;
         s.normal = mapped;
+    } else if (alpha_cutout) {
+        s.alpha *= albedo.a;
     }
     return s;
 }
@@ -724,6 +734,10 @@ fn output(color: vec3f, alpha: f32) -> vec4f {
 
 @fragment fn fs(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
     let s = surface(f, front);
+    if (alpha_cutout && s.alpha < f.cutoff) {
+        discard;
+    }
+
     let v = normalize(view.camera.xyz - f.world);
     var color = shade(s, v, f.world);
     if (view.aerial.w > 0.0) {

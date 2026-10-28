@@ -2,8 +2,9 @@
  * @file PipelineCache.c
  * @brief Tests for the forward pipelines: every combination of state in use draws.
  *
- * Shapes on a 6x6 grid 14 units apart cover every blend mode, back face mode and shader of
- * the forward pass; two 96x96 surfaces render them, one directly and one through an HDR effect.
+ * Shapes on a grid cover every blend mode, back face mode, alpha test and shader of the forward
+ * pass; two 96x96 surfaces render them, one directly and one through an HDR effect. The grid has
+ * 8 columns 11 units apart: 18 boxes, 18 rectangles, then 18 alpha tested boxes.
  */
 
 #include <box.h>
@@ -43,15 +44,19 @@ void PipelineCache_every_state_combination_draws(void) {
     ecs_vec_fini_t(NULL, &value.effects, ViewEffect);
 
     int32_t i;
-    for (i = 0; i < 36; i ++) {
+    for (i = 0; i < 54; i ++) {
         ecs_entity_t e = ecs_new(world);
         BlendMode blend = (BlendMode)(i % 9);
         BackFaceMode back_face = (BackFaceMode)((i / 9) % 2);
-        ecs_set(world, e, Position, {(float)(i % 6) * 14 - 35, 35 - (float)(i / 6) * 14, 0});
-        if (i < 18) {
+        ecs_set(world, e, Position, {(float)(i % 8) * 11 - 38, 38 - (float)(i / 8) * 11, 0});
+        if (i < 18 || i >= 36) {
             ecs_set(world, e, Box, {8, 8, 8});
         } else {
             ecs_set(world, e, Rect, {8, 8});
+        }
+
+        if (i >= 36) {
+            ecs_set(world, e, AlphaCutoff, {0.5f});
         }
 
         ecs_set(world, e, Rgb, {255, 0, 0});
@@ -80,9 +85,9 @@ void PipelineCache_every_state_combination_draws(void) {
         test_assert(px != NULL);
         test_int(w, 96);
         const unsigned char *clear = &px[(2 * 96 + 2) * 4];
-        for (i = 0; i < 36; i ++) {
-            int32_t x = 48 + (i % 6) * 14 - 35;
-            int32_t y = 48 - (35 - (i / 6) * 14);
+        for (i = 0; i < 54; i ++) {
+            int32_t x = 48 + (i % 8) * 11 - 38;
+            int32_t y = 48 - (38 - (i / 8) * 11);
             const unsigned char *p = &px[(y * 96 + x) * 4];
             int32_t c, diff = 0;
             for (c = 0; c < 3; c ++) {
@@ -91,8 +96,8 @@ void PipelineCache_every_state_combination_draws(void) {
             }
 
             if (diff <= 24) {
-                printf("%s: shape %d (blend %d, back face %d) not drawn\n", files[f], i,
-                    i % 9, (i / 9) % 2);
+                printf("%s: shape %d (blend %d, back face %d, cutout %d) not drawn\n", files[f],
+                    i, i % 9, (i / 9) % 2, i >= 36);
             }
 
             test_assert(diff > 24);
