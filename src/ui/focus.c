@@ -2,6 +2,10 @@
  * @file ui/focus.c
  * @brief The keyboard focus: the Focused tag, FocusStatus, the checks that clear it and the Tab
  * walk through the Focusable entities of a FocusScope in 2D draw order.
+ *
+ * The flecs focus (ecs_script_get_focus) is the Focused entity at all times: every move goes
+ * through ecs_script_set_focus or a press or focus() of flecs, and the to_focus hook of keys.c
+ * publishes what it decides. flecs sends on.blur and on.focus.
  */
 
 #include "ui.h"
@@ -50,15 +54,20 @@ static void box_ui_focus_publish(
     }
 }
 
-void box_ui_focus_set(
+bool box_ui_events_ready(
+    const ecs_world_t *world)
+{
+    return ecs_id(EcsScriptFocusEvent) && !ecs_is_fini(ecs_get_world(world));
+}
+
+void box_ui_focus_apply(
     ecs_world_t *world,
     box_ui_state_t *st,
     ecs_entity_t e,
     bool visible)
 {
     ecs_entity_t from = st->focused;
-    bool from_visible = st->visible;
-    if (from == e && (!e || from_visible == visible)) {
+    if (from == e && (!e || st->visible == visible)) {
         goto done;
     }
 
@@ -81,9 +90,35 @@ void box_ui_focus_set(
     }
 
     box_ui_focus_publish(world, st);
-    if (from != e) {
-        box_ui_shim_focus(world, st, from, from_visible, e, st->visible);
+
+done:
+    return;
+}
+
+void box_ui_focus_set(
+    ecs_world_t *world,
+    box_ui_state_t *st,
+    ecs_entity_t e,
+    bool visible)
+{
+    bool setting = st->setting, set_visible = st->set_visible, decided = st->decided;
+    ecs_entity_t result;
+    if (e == st->focused || !box_ui_events_ready(world)) {
+        box_ui_focus_apply(world, st, e, visible);
+        goto done;
     }
+
+    st->setting = true;
+    st->set_visible = visible;
+    st->decided = false;
+    result = ecs_script_set_focus(world, e);
+    if (!st->decided) {
+        box_ui_focus_apply(world, st, result, visible);
+    }
+
+    st->setting = setting;
+    st->set_visible = set_visible;
+    st->decided = decided;
 
 done:
     return;
@@ -294,8 +329,8 @@ bool box_ui_focus_step(
     return result;
 }
 
-/** Clear the focus when its entity loses Focusable or is deleted. The tasks that on.blur
- * resolved resume with the next progress of the tasks.
+/** Clear the focus when its entity loses Focusable or is deleted. flecs sends on.blur while the
+ * entity is still alive.
  *
  * The changes go through the main stage, which the remove or delete in progress merges when it
  * ends, because the entity must not move to another table while its observers run.

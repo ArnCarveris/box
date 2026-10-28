@@ -310,6 +310,33 @@ static void box_pick_to_local(
     *local_y = st->sending ? evt.local_y : screen_y;
 }
 
+/** Decide which entity gets the flecs focus through the focus callback of the hook, the
+ * to_focus hook of flecs.script.event. Without one the focus goes where flecs asks.
+ *
+ * box.picking is the only module that sets the hooks of flecs.script.event; box.ui decides the
+ * focus through box_pick_hook_t, so the two do not replace each other's hooks.
+ *
+ * @param world The world
+ * @param entity The entity flecs would focus, 0 for none
+ * @param current The entity with the focus, 0 for none
+ * @param source What moves the focus
+ * @param ctx The module state
+ * @return The entity that gets the focus
+ */
+static ecs_entity_t box_pick_to_focus(
+    ecs_world_t *world,
+    ecs_entity_t entity,
+    ecs_entity_t current,
+    ecs_script_focus_source_t source,
+    void *ctx)
+{
+    box_pick_state_t *st = ctx;
+    const box_pick_t *pick = source == EcsScriptFocusPress ? st->sending : NULL;
+
+    return st->hook.focus ?
+        st->hook.focus(world, st, entity, current, source, pick, st->hook.ctx) : entity;
+}
+
 /** Send a pointer event along the path of its pick through flecs.script.event.
  *
  * @param world The world
@@ -483,9 +510,10 @@ void BoxPickingUpdate(
         box_input_emit_t emit = *ecs_vec_get_t(&st->emits, box_input_emit_t, i);
         box_pick_t pick;
         if (!emit.is_mouse) {
-            ecs_script_keyboard_event(world, &emit.keyboard);
             if (st->hook.key) {
                 st->hook.key(world, st, &emit, st->hook.ctx);
+            } else {
+                ecs_script_keyboard_event(world, &emit.keyboard);
             }
 
             continue;
@@ -618,7 +646,7 @@ void BoxPickingImport(
     box_input_router_set(world, &(box_input_router_t){
         .route = box_pick_route, .blocks = box_pick_blocks, .ctx = st });
     ecs_script_set_event_hooks(world, &(ecs_script_event_hooks_t){
-        .to_local = box_pick_to_local, .ctx = st });
+        .to_local = box_pick_to_local, .to_focus = box_pick_to_focus, .ctx = st });
 
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "PickingUpdate" }),

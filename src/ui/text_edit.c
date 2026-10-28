@@ -1014,7 +1014,7 @@ void box_ui_text_edit_key(
     ecs_world_t *world,
     box_ui_state_t *st,
     ecs_entity_t e,
-    const UiKeyEvent *evt)
+    const box_ui_key_t *evt)
 {
     box_ui_edit_t ed;
     UiChangeEvent submit = { .widget = e };

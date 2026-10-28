@@ -60,19 +60,37 @@ template HeadlessToggle {
 
   async {
     while true {
-      await on.focus(this)
-      focused = true
-      await on.blur(this)
-      focused = false
-      down = false
+      const e = await on.focus(this)
+      if e.target == this {
+        focused = true
+      }
     }
   }
 
   async {
     while true {
-      const e = await on.key(this)
-      if e.key == Space && !e.repeat {
-        down = e.down
+      const e = await on.blur(this)
+      if e.target == this {
+        focused = false
+        down = false
+      }
+    }
+  }
+
+  async {
+    while true {
+      const e = await on.key_down(this)
+      if e.key == " " && !e.repeat {
+        down = true
+      }
+    }
+  }
+
+  async {
+    while true {
+      const e = await on.key_up(this)
+      if e.key == " " {
+        down = false
       }
     }
   }

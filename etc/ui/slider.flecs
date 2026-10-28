@@ -110,26 +110,35 @@ template HeadlessSlider {
 
   async {
     while true {
-      await on.focus(this)
-      focused = true
-      await on.blur(this)
-      focused = false
+      const e = await on.focus(this)
+      if e.target == this {
+        focused = true
+      }
     }
   }
 
   async {
     while true {
-      const e = await on.key(this)
-      if e.down && !disabled {
+      const e = await on.blur(this)
+      if e.target == this {
+        focused = false
+      }
+    }
+  }
+
+  async {
+    while true {
+      const e = await on.key_down(this)
+      if !disabled {
         const target = match e.key {
-          Left: current - key_step
-          Down: current - key_step
-          Right: current + key_step
-          Up: current + key_step
-          PageDown: current - range / 10
-          PageUp: current + range / 10
-          Home: min
-          End: max
+          "ArrowLeft": current - key_step
+          "ArrowDown": current - key_step
+          "ArrowRight": current + key_step
+          "ArrowUp": current + key_step
+          "PageDown": current - range / 10
+          "PageUp": current + range / 10
+          "Home": min
+          "End": max
           _: current
         }
         const v = slider_snap(target, min, max, step)

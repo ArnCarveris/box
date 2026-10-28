@@ -93,36 +93,55 @@ template HeadlessRadioButton : parent RadioGroup {
 
   async {
     while true {
-      await on.focus(this)
-      focused = true
-      if pending == this {
-        pending = none
-        if current != label {
-          current = label
-          await ui.changed(this.parent())
+      const e = await on.focus(this)
+      if e.target == this {
+        focused = true
+        if pending == this {
+          pending = none
+          if current != label {
+            current = label
+            await ui.changed(this.parent())
+          }
         }
       }
-
-      await on.blur(this)
-      focused = false
-      down = false
     }
   }
 
   async {
     while true {
-      const e = await on.key(this)
-      if e.key == Space && !e.repeat {
-        down = e.down
+      const e = await on.blur(this)
+      if e.target == this {
+        focused = false
+        down = false
+      }
+    }
+  }
+
+  async {
+    while true {
+      const e = await on.key_down(this)
+      if e.key == " " && !e.repeat {
+        down = true
       }
 
-      if e.down && !off && (e.key == Down || e.key == Right || e.key == Up || e.key == Left) {
-        const forward = e.key == Down || e.key == Right
+      const arrow = (e.key == "ArrowDown" || e.key == "ArrowRight" || e.key == "ArrowUp" ||
+        e.key == "ArrowLeft")
+      if !off && arrow {
+        const forward = e.key == "ArrowDown" || e.key == "ArrowRight"
         const next = ui.sibling(this, match forward { true: 1; _: -1 }, Interactive)
         if next != this {
           pending = next
-          await ui.focus(next)
+          await focus(next)
         }
+      }
+    }
+  }
+
+  async {
+    while true {
+      const e = await on.key_up(this)
+      if e.key == " " {
+        down = false
       }
     }
   }
@@ -135,7 +154,7 @@ template HeadlessRadioButton : parent RadioGroup {
         current = label
         pending = none
         await ui.changed(this.parent())
-        await ui.focus(this)
+        await focus(this)
       }
     }
   }

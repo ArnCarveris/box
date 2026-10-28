@@ -266,7 +266,11 @@
                     "api_from_script",
                     "prefab_never_focused",
                     "key_repeat_state",
-                    "tab_first_scope_of_front_view"
+                    "tab_first_scope_of_front_view",
+                    "flecs_focus_is_focused",
+                    "press_non_focusable_keeps_flecs_focus",
+                    "script_focus_redirected_or_refused",
+                    "to_local_with_focus_hook"
                 ]
             },
             {
@@ -285,7 +289,9 @@
                     "space_holds_trigger",
                     "change_on_widget_and_ancestor",
                     "submit_on_widget_and_ancestor",
-                    "change_once_per_report"
+                    "change_once_per_report",
+                    "focus_blur_target_related",
+                    "key_down_once_on_widget_and_parents"
                 ]
             },
             {

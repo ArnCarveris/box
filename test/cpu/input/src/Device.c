@@ -665,7 +665,9 @@ void Device_pending(void) {
 void Device_script_key_down(void) {
     // input/devices
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
+    /* box.ui makes the flecs focus the Focused entity, none here, so the keys reach the screen
+     * only without it */
+    ECS_IMPORT(world, BoxInput);
 
     ecs_entity_t s = ecs_script(world, {
         .code =
@@ -723,7 +725,9 @@ void Device_script_key_down(void) {
 void Device_script_key_modifiers(void) {
     // input/devices
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
+    /* box.ui makes the flecs focus the Focused entity, none here, so the keys reach the screen
+     * only without it */
+    ECS_IMPORT(world, BoxInput);
 
     ecs_entity_t s = ecs_script(world, {
         .code =
@@ -764,7 +768,9 @@ void Device_script_key_modifiers(void) {
 void Device_script_key_repeat(void) {
     // input/devices
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
+    /* box.ui makes the flecs focus the Focused entity, none here, so the keys reach the screen
+     * only without it */
+    ECS_IMPORT(world, BoxInput);
 
     ecs_entity_t s = ecs_script(world, {
         .code =

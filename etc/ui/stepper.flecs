@@ -85,10 +85,19 @@ template HeadlessStepper {
 
   async {
     while true {
-      await on.focus(this)
-      focused = true
-      await on.blur(this)
-      focused = false
+      const e = await on.focus(this)
+      if e.target == this {
+        focused = true
+      }
+    }
+  }
+
+  async {
+    while true {
+      const e = await on.blur(this)
+      if e.target == this {
+        focused = false
+      }
     }
   }
 
@@ -115,17 +124,17 @@ template HeadlessStepper {
 
   async {
     while true {
-      const e = await on.key(this)
-      if e.down && !disabled {
+      const e = await on.key_down(this)
+      if !disabled {
         const target = match e.key {
-          Left: current - step
-          Down: current - step
-          Right: current + step
-          Up: current + step
-          PageDown: current - step * 10
-          PageUp: current + step * 10
-          Home: min
-          End: max
+          "ArrowLeft": current - step
+          "ArrowDown": current - step
+          "ArrowRight": current + step
+          "ArrowUp": current + step
+          "PageDown": current - step * 10
+          "PageUp": current + step * 10
+          "Home": min
+          "End": max
           _: current
         }
         const v = clamp(target, min, max)
