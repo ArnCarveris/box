@@ -408,7 +408,12 @@
                     "fade_softens_last_cascade",
                     "default_settings",
                     "cutout_shadow_has_holes",
-                    "cutout_without_texture_casts_full_shadow"
+                    "cutout_without_texture_casts_full_shadow",
+                    "tent_filter_ramps_smoothly",
+                    "even_filter_size_rounds_up",
+                    "cascade_blend_hides_seam",
+                    "grazing_light_no_acne",
+                    "contact_shadow_close"
                 ]
             },
             {

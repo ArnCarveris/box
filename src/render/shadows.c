@@ -57,9 +57,11 @@ void box_render_shadow_settings(
     out->resolution = box_shadow_count(
         settings->resolution, BOX_SHADOW_RESOLUTION_MIN, BOX_SHADOW_RESOLUTION_MAX);
     out->filter_size = box_shadow_count(settings->filter_size, 1, BOX_RENDER_SHADOW_FILTER_MAX);
+    out->filter_size |= 1;
     out->max_distance = glm_max(settings->max_distance, 0.0f);
     out->split_lambda = box_shadow_clampf(settings->split_lambda, 0.0f, 1.0f);
     out->fade = box_shadow_clampf(settings->fade, 0.0f, 1.0f);
+    out->blend = box_shadow_clampf(settings->blend, 0.0f, BOX_RENDER_SHADOW_BLEND_MAX);
     out->depth_bias = glm_max(settings->depth_bias, 0.0f);
     out->normal_offset = glm_max(settings->normal_offset, 0.0f);
 }
@@ -243,6 +245,7 @@ static void box_shadows_view(
     out->depth_bias = s.depth_bias;
     out->normal_offset = s.normal_offset;
     out->fade = s.fade;
+    out->blend = s.blend;
     out->near_ = near_;
     box_render_shadow_splits(near_, distance, s.split_lambda, s.cascades, out->splits);
     glm_vec3_normalize_to(v->lights.sun, out->direction);

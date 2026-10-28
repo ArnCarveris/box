@@ -1,0 +1,41 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+
+// A regular row of thin bars above a long floor, under a high sun, so their shadows run away
+// from the camera across the seams of the first cascades. The low resolution makes the texels
+// of the cascades differ in size: the default blend band widens the penumbra over several
+// pixels where blend 0 would make it jump at the seam.
+
+camera {
+  Position: {0, 4, 6}
+  Rotation: {-0.5, 0, 0}
+  Camera: {fov: 60}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {150, 180, 220, 255}}, shadows: {enabled: true, resolution: 256, max_distance: 40}}
+}
+
+sun {
+  Rotation: {1.2, 0.3, 0}
+  DirectionalLight: {intensity: 1.5 * flecs.script.math.PI}
+  Rgb: {255, 240, 220}
+}
+
+ground {
+  Position: {0, -0.1, -30}
+  Box: {40, 0.2, 80}
+  Rgb: {190, 190, 180}
+}
+
+for i in 0..9 {
+  {
+    Position: {-4 + i, 2, -12}
+    Box: {0.06, 0.06, 32}
+    Rgb: {200, 80, 60}
+  }
+}

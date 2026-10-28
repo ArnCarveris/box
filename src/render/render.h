@@ -67,8 +67,11 @@
 /** Cascades of the shadow map of a view at most */
 #define BOX_RENDER_SHADOW_CASCADES (4)
 
-/** PCF taps per axis of a shadow lookup at most */
+/** Widest tent filter of a shadow lookup in texels, odd */
 #define BOX_RENDER_SHADOW_FILTER_MAX (7)
+
+/** Widest blend band at the edge of a cascade, a fraction of its half extent */
+#define BOX_RENDER_SHADOW_BLEND_MAX (0.5f)
 
 
 /** Shader handle of the engine shader of the forward pass that draws the 2D shapes */
@@ -233,10 +236,14 @@ typedef struct box_render_view_shadows_t {
     bool enabled;           /**< The view renders shadows and its scene has a directional light */
     int32_t cascades;       /**< Cascades, 1 to BOX_RENDER_SHADOW_CASCADES */
     int32_t resolution;     /**< Edge of a cascade in texels */
-    int32_t filter_size;    /**< PCF taps per axis, 1 to BOX_RENDER_SHADOW_FILTER_MAX */
+    int32_t filter_size;    /**< Width of the tent filter in texels, odd, 1 to
+                             *   BOX_RENDER_SHADOW_FILTER_MAX */
     float depth_bias;       /**< Depth offset of the comparison in texels */
-    float normal_offset;    /**< Offset of the lookup along the normal in texels */
+    float normal_offset;    /**< Offset of the lookup along the geometric normal in texels at
+                             *   grazing light, scaled by 1 - N.L */
     float fade;             /**< Fraction of the last cascade that fades out */
+    float blend;            /**< Fraction of the half extent of a cascade that blends into
+                             *   the next one at its edge */
     float near_;            /**< View depth the first cascade starts at */
     float splits[BOX_RENDER_SHADOW_CASCADES]; /**< View depth each cascade ends at */
     float direction[3];     /**< Direction toward the light that casts the shadows */
@@ -1578,7 +1585,8 @@ ecs_entity_t box_render_scene_field(
 void box_render_shadows_init(
     ecs_world_t *world);
 
-/** Resolve shadow settings: every field is clamped to its valid range, values apply as set.
+/** Resolve shadow settings: every field is clamped to its valid range and an even
+ * filter_size rounds up to the next odd one, other values apply as set.
  *
  * @param settings The settings of a view
  * @param out Receives the resolved settings

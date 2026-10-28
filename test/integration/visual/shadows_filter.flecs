@@ -1,0 +1,49 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+
+// A soft shadow: the widest tent filter (7 texels) on a low resolution map, so a texel covers
+// several pixels and the penumbra ramps smoothly instead of in steps.
+
+camera {
+  Position: {0, 5, 8}
+  Rotation: {-0.55, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {40, 44, 52, 255}}, shadows: {enabled: true, cascades: 1, resolution: 256, max_distance: 30, filter_size: 7}}
+}
+
+sun {
+  Rotation: {0.9, 0.5, 0}
+  DirectionalLight: {intensity: 1.5 * flecs.script.math.PI}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {20, 0.2, 16}
+  Rgb: {180, 180, 185}
+}
+
+slab {
+  Position: {-1.5, 2, 0}
+  Rotation: {0, 0.3, 0}
+  Box: {2.5, 0.1, 1.5}
+  Rgb: {220, 90, 70}
+}
+
+pole {
+  Position: {2, 1, 1}
+  Box: {0.3, 2, 0.3}
+  Rgb: {90, 160, 220}
+}
+
+ball {
+  Position: {0.5, 0.6, 2.5}
+  Sphere: {segments: 32, smooth: true, radius: 0.6}
+  Rgb: {230, 230, 230}
+}

@@ -107,7 +107,7 @@ static void bench_cull(
         .culling = {.enabled = culled, .occlusion = culled, .min_dimension_px = 1},
         .shadows = {.enabled = shadows, .cascades = 4, .resolution = 2048,
             .max_distance = 200, .split_lambda = 0.7f, .depth_bias = 2,
-            .normal_offset = 1.5f, .filter_size = 3, .fade = 0.2f}});
+            .normal_offset = 2, .filter_size = 3, .fade = 0.2f, .blend = 0.1f}});
     ecs_entity_t sun = ecs_new(world);
     ecs_set(world, sun, Rotation, {0.5423041f, 2.3679806f, -0.4669112f});
     ecs_set(world, sun, DirectionalLight, {.intensity = 1.5f * GLM_PIf});
