@@ -11,3 +11,6 @@ test/*/*/src/main.c
 bench/*/src/main.c
 test/integration/out
 .claude
+core
+!core/
+core.[0-9]*
