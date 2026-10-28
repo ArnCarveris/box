@@ -1,15 +1,8 @@
-<<<<<<< HEAD
 // Input: every key is an Action with a Binding. The held actions (walking, running, mining) are
 // read by the oreelse systems through the OreActions singleton; the actions that fire once are
-// awaited by the loops below, each calling the oreelse function behind it. The key that starts
-// the game on the title screen is any key (OreTitleStart reads the keys).
-=======
-// Input: every key is an Action with a Binding. The held actions (walking, running) are read
-// by the oreelse systems through the OreActions singleton; the actions that fire once are
 // awaited by the loops below, each calling the oreelse function behind it. Quality has no key,
 // the pause screen raises it. The key that starts the game on the title screen is any key
 // (OreTitleStart reads the keys).
->>>>>>> 977cdca8bd554220e44c8411bfce33c774d005ef
 
 using flecs.script
 using box.input

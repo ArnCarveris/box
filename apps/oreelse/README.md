@@ -19,12 +19,8 @@ bake3 run apps/oreelse --local-env -- --seed 42                # play the map of
 bake3 run apps/oreelse --local-env -- --headless --frames 10   # headless run, exits 0
 bake3 --target em --local-env apps/oreelse                     # build for the browser
 
-<<<<<<< HEAD
-python3 tools/integration.py e2e oreelse_flow                  # the end-to-end scenarios
-python3 tools/integration.py e2e oreelse_mining
-=======
 python3 tools/integration.py e2e oreelse_flow oreelse_look     # the end-to-end scenarios
->>>>>>> 977cdca8bd554220e44c8411bfce33c774d005ef
+python3 tools/integration.py e2e oreelse_mining
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -96,7 +92,6 @@ up, looking down at 44.6, 51.8 and 59.5 degrees. It glides to a new level and fo
 astronaut smoothly, also on the title screen and while paused. The wheel over a panel of the UI
 does not zoom.
 
-<<<<<<< HEAD
 ### Items
 
 | Item | Name | Detail | Recipe | Yield | Time (s) |
@@ -140,7 +135,7 @@ and the full warning shows at every swing.
 Moving the cursor to another deposit starts the swing over. Releasing the button, walking out
 of reach or moving the cursor off the deposit loses the progress of the swing. The right button
 over a panel of the UI does not mine.
-=======
+
 ### Render quality
 
 Three render quality tiers trade the look for speed; the button on the pause screen cycles them
@@ -152,7 +147,6 @@ and a restart keeps the tier.
 | Low | half | 1024 | 91 | off | off |
 | Medium | full | 2048 | 140 | off | on |
 | High | full | 4096 | 140 | on | on |
->>>>>>> 977cdca8bd554220e44c8411bfce33c774d005ef
 
 ## Conventions of the port
 
@@ -234,11 +228,7 @@ Every task of the port follows these.
 
 | File | Holds |
 | --- | --- |
-<<<<<<< HEAD
-| `etc/oreelse.flecs` | The window, the camera, the sun and ambient light, the view, the mining markers; includes the rest |
-=======
-| `etc/oreelse.flecs` | The window, the camera, the sun, the atmosphere, the effects and the view, the render quality tier; includes the rest |
->>>>>>> 977cdca8bd554220e44c8411bfce33c774d005ef
+| `etc/oreelse.flecs` | The window, the camera, the sun, the atmosphere, the effects and the view, the render quality tier, the mining markers; includes the rest |
 | `etc/config.flecs` | The constants `cfg.*` |
 | `etc/resources.flecs` | The item prefabs other than the buildings, with names and recipes |
 | `etc/input.flecs` | The actions, their bindings and the loops of the actions that fire once |
@@ -257,9 +247,6 @@ Every task of the port follows these.
 | `src/flow.c` | States, clock, blink, toast, seeds, `oreelse.cancel()`, `oreelse.restart()` |
 | `src/map.c` | The tile grid, the deposits' registration and the hover tile |
 | `src/player.c` | Walking and the camera |
-<<<<<<< HEAD
 | `src/inventory.c` | The inventory and the item components |
 | `src/mining.c` | Mining and its tile marker |
-=======
 | `src/look.c` | The render quality tiers, `oreelse.cycleQuality()` |
->>>>>>> 977cdca8bd554220e44c8411bfce33c774d005ef

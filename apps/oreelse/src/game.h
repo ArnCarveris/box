@@ -2,14 +2,9 @@
  * @file game.h
  * @brief The oreelse module: components of the game and the functions its areas share.
  *
-<<<<<<< HEAD
  * The scene (apps/oreelse/etc) holds the constants cfg.*, the models, the items, the singletons
  * and the entities of a run; the systems of each area (flow.c, map.c, player.c, inventory.c,
- * mining.c) play the game.
-=======
- * The scene (apps/oreelse/etc) holds the constants cfg.*, the models, the singletons and the
- * entities of a run; the systems of each area (flow.c, map.c, player.c, look.c) play the game.
->>>>>>> 977cdca8bd554220e44c8411bfce33c774d005ef
+ * mining.c, look.c) play the game.
  */
 
 #ifndef OREELSE_GAME_H
@@ -543,7 +538,6 @@ void ore_map_import(
 void ore_player_import(
     ecs_world_t *world);
 
-<<<<<<< HEAD
 /** Register the inventory, the item components and the script functions
  * oreelse.inventory_add(item, amount) and oreelse.inventory_remove(item, amount).
  *
@@ -557,13 +551,13 @@ void ore_inventory_import(
  * @param world The world
  */
 void ore_mining_import(
-=======
+    ecs_world_t *world);
+
 /** Register the look: the render quality tiers and oreelse.cycleQuality().
  *
  * @param world The world
  */
 void ore_look_import(
->>>>>>> 977cdca8bd554220e44c8411bfce33c774d005ef
     ecs_world_t *world);
 
 /** Register the oreelse module.

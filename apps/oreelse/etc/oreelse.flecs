@@ -1,13 +1,8 @@
 // Ore Else: you crash-landed on a hostile planet. The game is played top down on a 48x48 tile
 // map with a camera that follows the astronaut. This scene holds the window, the camera, the
-<<<<<<< HEAD
-// light, the view and the tile markers; the included scripts hold the constants, the items,
-// the models, the input, the map and the run. The game boots into the title screen.
-=======
 // look of the original's engine.flecs (the sun, the atmosphere, the effects of the view and the
-// render quality tier); the included scripts hold the constants, the models, the input, the map
-// and the run. The game boots into the title screen.
->>>>>>> 977cdca8bd554220e44c8411bfce33c774d005ef
+// render quality tier) and the tile markers; the included scripts hold the constants, the
+// items, the models, the input, the map and the run. The game boots into the title screen.
 
 include config
 include resources
@@ -101,7 +96,6 @@ main_view {
   }
 }
 
-<<<<<<< HEAD
 // The markers of mining, which OrePlayerMine moves to the target and shows while the Mine
 // action is held
 markers {
@@ -116,13 +110,13 @@ markers {
     DynamicTransform
     Disabled
   }
-=======
+}
+
 // The render quality tier, High at every start of the app; the pause screen's button cycles it
 // with oreelse.cycleQuality(). A restart keeps it. OreLook names what the tier applies to
 $ {
   OreLook: {view: main_view, gtao: gtao, bloom: bloom}
   OreQuality: {tier: High}
->>>>>>> 977cdca8bd554220e44c8411bfce33c774d005ef
 }
 
 // The camera starts at zoom level 0; height 0 snaps it there on the first frame
