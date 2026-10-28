@@ -1,0 +1,18 @@
+// The tile markers of the original: a flat glowing box on a tile, TileMarker on a tile the
+// astronaut reaches or can build on, TileMarkerBad on one it cannot. Their origin is the center
+// of the box; the mining marker and the placement markers are instances placed at y 0.14.
+
+using box.geometry
+using box.material
+
+prefab TileMarker {
+  Box: {1.92, 0.06, 1.92}
+  Rgb: {236, 244, 150}
+  Emissive: {strength: 1.1, color: {236, 244, 150}}
+}
+
+prefab TileMarkerBad {
+  Box: {1.92, 0.06, 1.92}
+  Rgb: {248, 96, 84}
+  Emissive: {strength: 1.2, color: {248, 96, 84}}
+}

@@ -1,8 +1,9 @@
 // A new run: the astronaut at the center of the map facing north, and the clock, the blink
-// signals, the toast and the generator of the run. oreelse.restart() reloads this script (it
-// created the astronaut, which has OreRunScript), deposits.flecs and scenery.flecs: the reload
-// deletes the astronaut and creates it again, so nothing of the previous run stays. The camera,
-// its zoom level, the render quality tier and the session seed (OreSeed) are not part of a run.
+// signals, the toast, the generator and the inventory of the run, the starting crate in its
+// slot order. oreelse.restart() reloads this script (it created the astronaut, which has
+// OreRunScript), deposits.flecs and scenery.flecs: the reload deletes the astronaut and creates
+// it again, so nothing of the previous run stays. The camera, its zoom level, the render quality
+// tier and the session seed (OreSeed) are not part of a run.
 
 using flecs.script.math
 using box.transform
@@ -21,4 +22,7 @@ $ {
   OreClock: {elapsed: 0}
   OreBlink: {fast: false, slow: false, lamp: true}
   OreToast: {text: "", warn: false, age: 0}
+  OreInventory: {
+    slots: [{item: items.IronPlate, amount: 16}, {item: items.CopperPlate, amount: 12}]
+  }
 }

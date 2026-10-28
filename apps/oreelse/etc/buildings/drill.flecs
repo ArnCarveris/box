@@ -1,0 +1,314 @@
+// The drill, the Drill prefab of the original, which mines the deposit it stands on: a frame of
+// beams on the ground with a hazard lip, two legs with their rails up to a crown with the two
+// status lamps, a carriage that rides the legs (a piston in the original), a slider on it that
+// rides fore and aft with the motor and the bit, and the housing at the back. Its origin is the
+// center of its tile on the ground and it faces +Z.
+//
+// Named parts: carriage (moves along y), carriage/slider (moves along z), carriage/slider/bit
+// (spins about y and shakes), crown/pod_l/lamp_l and crown/pod_r/lamp_r (status lamps, Light)
+// and dust (where the drill dust comes out). Standing still, all rest where the original's do.
+
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+
+const steel: Rgb = {172, 180, 194}
+const steelDeep: Rgb = {56, 62, 76}
+const hazard: Rgb = {240, 176, 58}
+const lampLive: Rgb = {92, 236, 222}
+const lampDead: Rgb = {248, 84, 72}
+
+prefab Drill {
+  beam_front {
+    Position: {0, 0.11, 0.76}
+    Box: {1.86, 0.22, 0.34}
+    Rgb: steelDeep
+    PbrMaterial: {metallic: 0.35, roughness: 0.6}
+  }
+
+  beam_back {
+    Position: {0, 0.11, -0.76}
+    Box: {1.86, 0.22, 0.34}
+    Rgb: steelDeep
+    PbrMaterial: {metallic: 0.35, roughness: 0.6}
+  }
+
+  beam_left {
+    Position: {-0.76, 0.11, 0}
+    Box: {0.34, 0.22, 1.18}
+    Rgb: steelDeep
+    PbrMaterial: {metallic: 0.35, roughness: 0.6}
+  }
+
+  beam_right {
+    Position: {0.76, 0.11, 0}
+    Box: {0.34, 0.22, 1.18}
+    Rgb: steelDeep
+    PbrMaterial: {metallic: 0.35, roughness: 0.6}
+  }
+
+  lip : HazardTrim {
+    Position: {0, 0.25, 0.76}
+    Box: {1.86, 0.06, 0.34}
+  }
+
+  leg_l {
+    Position: {-0.74, 1.06, 0}
+    Box: {0.2, 1.68, 0.28}
+    Rgb: steel
+    PbrMaterial: {metallic: 0.5, roughness: 0.45}
+
+    rail {
+      Position: {0, 0, 0}
+      Box: {0.3, 1.46, 0.1}
+      Rgb: steelDeep
+      PbrMaterial: {metallic: 0.7, roughness: 0.3}
+    }
+  }
+
+  leg_r {
+    Position: {0.74, 1.06, 0}
+    Box: {0.2, 1.68, 0.28}
+    Rgb: steel
+    PbrMaterial: {metallic: 0.5, roughness: 0.45}
+
+    rail {
+      Position: {0, 0, 0}
+      Box: {0.3, 1.46, 0.1}
+      Rgb: steelDeep
+      PbrMaterial: {metallic: 0.7, roughness: 0.3}
+    }
+  }
+
+  crown {
+    Position: {0, 1.98, 0}
+    Box: {1.7, 0.22, 0.42}
+    Rgb: steel
+    PbrMaterial: {metallic: 0.55, roughness: 0.42}
+
+    stripe {
+      Position: {0, 0, 0.23}
+      Box: {1.7, 0.09, 0.05}
+      Rgb: hazard
+    }
+
+    ram_ear_l {
+      Position: {-0.42, -0.13, 0.24}
+      Box: {0.28, 0.14, 0.3}
+      Rgb: steel
+      PbrMaterial: {metallic: 0.55, roughness: 0.42}
+    }
+
+    ram_ear_r {
+      Position: {0.42, -0.13, 0.24}
+      Box: {0.28, 0.14, 0.3}
+      Rgb: steel
+      PbrMaterial: {metallic: 0.55, roughness: 0.42}
+    }
+
+    sleeve_l {
+      Position: {-0.42, -0.34, 0.26}
+      Cylinder: {segments: 10, smooth: true, length: 0.46, radius: 0.5}
+      Scale: {0.16, 1, 0.16}
+      Rgb: steelDeep
+      PbrMaterial: {metallic: 0.6, roughness: 0.38}
+    }
+
+    sleeve_r {
+      Position: {0.42, -0.34, 0.26}
+      Cylinder: {segments: 10, smooth: true, length: 0.46, radius: 0.5}
+      Scale: {0.16, 1, 0.16}
+      Rgb: steelDeep
+      PbrMaterial: {metallic: 0.6, roughness: 0.38}
+    }
+
+    pod_l {
+      Position: {-0.72, 0.15, 0}
+      Box: {0.32, 0.2, 0.34}
+      Rgb: steelDeep
+      PbrMaterial: {metallic: 0.5, roughness: 0.5}
+
+      lamp_l {
+        Position: {0, 0.1, 0}
+        Light: {
+          color: lampLive, dead: lampDead, status: true,
+          w: 0.22, d: 0.24, h: 0.12, strength: 2.8
+        }
+      }
+    }
+
+    pod_r {
+      Position: {0.72, 0.15, 0}
+      Box: {0.32, 0.2, 0.34}
+      Rgb: steelDeep
+      PbrMaterial: {metallic: 0.5, roughness: 0.5}
+
+      lamp_r {
+        Position: {0, 0.1, 0}
+        Light: {
+          color: lampLive, dead: lampDead, status: true,
+          w: 0.22, d: 0.24, h: 0.12, strength: 2.8
+        }
+      }
+    }
+  }
+
+  carriage {
+    Position: {0, 1.48, 0}
+
+    yoke {
+      Position: {0, -0.07, 0}
+      Box: {1.6, 0.12, 0.2}
+      Rgb: steel
+      PbrMaterial: {metallic: 0.55, roughness: 0.4}
+    }
+
+    shoe_l {
+      Position: {-0.74, -0.07, 0}
+      Box: {0.38, 0.24, 0.4}
+      Rgb: steelDeep
+      PbrMaterial: {metallic: 0.65, roughness: 0.32}
+    }
+
+    shoe_r {
+      Position: {0.74, -0.07, 0}
+      Box: {0.38, 0.24, 0.4}
+      Rgb: steelDeep
+      PbrMaterial: {metallic: 0.65, roughness: 0.32}
+    }
+
+    foot_l {
+      Position: {-0.42, -0.05, 0.18}
+      Box: {0.28, 0.14, 0.32}
+      Rgb: steel
+      PbrMaterial: {metallic: 0.55, roughness: 0.4}
+    }
+
+    foot_r {
+      Position: {0.42, -0.05, 0.18}
+      Box: {0.28, 0.14, 0.32}
+      Rgb: steel
+      PbrMaterial: {metallic: 0.55, roughness: 0.4}
+    }
+
+    rod_l {
+      Position: {-0.42, 0.1, 0.24}
+      Cylinder: {segments: 8, smooth: true, length: 0.52, radius: 0.5}
+      Scale: {0.1, 1, 0.1}
+      Rgb: steel
+      PbrMaterial: {metallic: 0.78, roughness: 0.2}
+    }
+
+    rod_r {
+      Position: {0.42, 0.1, 0.24}
+      Cylinder: {segments: 8, smooth: true, length: 0.52, radius: 0.5}
+      Scale: {0.1, 1, 0.1}
+      Rgb: steel
+      PbrMaterial: {metallic: 0.78, roughness: 0.2}
+    }
+
+    way_l {
+      Position: {-0.17, 0.02, 0}
+      Box: {0.1, 0.1, 1.02}
+      Rgb: steelDeep
+      PbrMaterial: {metallic: 0.7, roughness: 0.3}
+    }
+
+    way_r {
+      Position: {0.17, 0.02, 0}
+      Box: {0.1, 0.1, 1.02}
+      Rgb: steelDeep
+      PbrMaterial: {metallic: 0.7, roughness: 0.3}
+    }
+
+    way_stop_f {
+      Position: {0, 0.04, 0.47}
+      Box: {0.5, 0.16, 0.08}
+      Rgb: steelDeep
+    }
+
+    way_stop_b {
+      Position: {0, 0.04, -0.47}
+      Box: {0.5, 0.16, 0.08}
+      Rgb: steelDeep
+    }
+
+    slider {
+      Position: {0, 0, 0.12}
+
+      trolley {
+        Position: {0, 0.08, 0}
+        Box: {0.56, 0.18, 0.36}
+        Rgb: steelDeep
+        PbrMaterial: {metallic: 0.6, roughness: 0.35}
+      }
+
+      motor {
+        Position: {0, 0.22, 0}
+        Cylinder: {segments: 12, smooth: true, length: 0.34, radius: 0.5}
+        Scale: {0.32, 1, 0.32}
+        Rgb: hazard
+      }
+
+      bit {
+        Position: {0, 0, 0}
+        Rotation: {0, 0, 0}
+
+        shaft {
+          Position: {0, -0.72, 0}
+          Cylinder: {segments: 10, smooth: true, length: 1.5, radius: 0.5}
+          Scale: {0.19, 1, 0.19}
+          Rgb: steel
+          PbrMaterial: {metallic: 0.72, roughness: 0.28}
+        }
+
+        flute_a {
+          Position: {0.2, -0.5, 0}
+          Rotation: {0, 0.4, 0.46}
+          Box: {0.56, 0.12, 0.18}
+          Rgb: hazard
+        }
+
+        flute_b {
+          Position: {-0.2, -0.84, 0}
+          Rotation: {0, 0.4, -0.46}
+          Box: {0.56, 0.12, 0.18}
+          Rgb: hazard
+        }
+
+        flute_c {
+          Position: {0.2, -1.18, 0}
+          Rotation: {0, 0.4, 0.46}
+          Box: {0.56, 0.12, 0.18}
+          Rgb: hazard
+        }
+
+        tip {
+          Position: {0, -1.44, 0}
+          Cone: {segments: 10, smooth: true, length: 0.4, radius: 0.5}
+          Rotation: {PI, 0, 0}
+          Scale: {0.22, 1, 0.22}
+          Rgb: steelDeep
+        }
+      }
+    }
+  }
+
+  housing {
+    Position: {0, 0.68, -0.8}
+    Box: {1.24, 0.9, 0.4}
+    Rgb: steel
+    PbrMaterial: {metallic: 0.55, roughness: 0.42}
+
+    vent {
+      Position: {0, -0.14, 0.23}
+      Box: {0.72, 0.34, 0.04}
+      Rgb: steelDeep
+    }
+  }
+
+  dust {
+    Position: {0, 0.45, 0}
+  }
+}

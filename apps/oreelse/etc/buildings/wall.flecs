@@ -1,0 +1,130 @@
+// The wall, the Wall prefab of the original: a concrete plinth and kerb, a steel column with
+// corner angles, a band with the access plate (AccessPlate) on the front, a rail with a small
+// mast and cap on top and the hazard lamp on the mast. Its origin is the center of its tile on
+// the ground and it faces +Z. Walls next to each other are joined by a WallSegment.
+//
+// Named parts: lamp (hazard lamp, Light).
+
+using box.transform
+using box.geometry
+using box.material
+
+const steelShade: Rgb = {112, 120, 136}
+const steelDeep: Rgb = {56, 62, 76}
+const hazard: Rgb = {240, 176, 58}
+const concrete: Rgb = {126, 122, 114}
+const concreteShade: Rgb = {88, 86, 82}
+
+prefab Wall {
+  plinth {
+    Position: {0, 0.15, 0}
+    Box: {0.98, 0.3, 0.98}
+    Rgb: concrete
+    PbrMaterial: {metallic: 0, roughness: 0.94}
+  }
+
+  kerb {
+    Position: {0, 0.33, 0}
+    Box: {0.9, 0.06, 0.9}
+    Rgb: concreteShade
+    PbrMaterial: {metallic: 0.1, roughness: 0.8}
+  }
+
+  column {
+    Position: {0, 0.63, 0}
+    Box: {0.84, 0.54, 0.84}
+    Rgb: steelDeep
+    PbrMaterial: {metallic: 0.55, roughness: 0.45}
+  }
+
+  angle_a {
+    Position: {-0.38, 0.63, -0.38}
+    Box: {0.15, 0.54, 0.15}
+    Rgb: steelShade
+    PbrMaterial: {metallic: 0.62, roughness: 0.38}
+  }
+
+  angle_b {
+    Position: {0.38, 0.63, -0.38}
+    Box: {0.15, 0.54, 0.15}
+    Rgb: steelShade
+    PbrMaterial: {metallic: 0.62, roughness: 0.38}
+  }
+
+  angle_c {
+    Position: {-0.38, 0.63, 0.38}
+    Box: {0.15, 0.54, 0.15}
+    Rgb: steelShade
+    PbrMaterial: {metallic: 0.62, roughness: 0.38}
+  }
+
+  angle_d {
+    Position: {0.38, 0.63, 0.38}
+    Box: {0.15, 0.54, 0.15}
+    Rgb: steelShade
+    PbrMaterial: {metallic: 0.62, roughness: 0.38}
+  }
+
+  band {
+    Position: {0, 0.72, 0}
+    Box: {0.9, 0.08, 0.9}
+    Rgb: steelShade
+    PbrMaterial: {metallic: 0.62, roughness: 0.36}
+  }
+
+  plate : AccessPlate {
+    Position: {0, 0.68, 0.44}
+  }
+
+  rail {
+    Position: {0, 0.96, 0}
+    Box: {0.92, 0.12, 0.92}
+    Rgb: steelShade
+    PbrMaterial: {metallic: 0.6, roughness: 0.4}
+  }
+
+  gusset_l {
+    Position: {-0.24, 1.09, 0}
+    Rotation: {0, 0, 0.9}
+    Box: {0.36, 0.06, 0.18}
+    Rgb: steelDeep
+    PbrMaterial: {metallic: 0.6, roughness: 0.42}
+  }
+
+  gusset_r {
+    Position: {0.24, 1.09, 0}
+    Rotation: {0, 0, -0.9}
+    Box: {0.36, 0.06, 0.18}
+    Rgb: steelDeep
+    PbrMaterial: {metallic: 0.6, roughness: 0.42}
+  }
+
+  collar {
+    Position: {0, 1.06, 0}
+    Box: {0.44, 0.08, 0.44}
+    Rgb: steelDeep
+  }
+
+  mast {
+    Position: {0, 1.1, 0}
+    Box: {0.26, 0.14, 0.26}
+    Rgb: steelShade
+    PbrMaterial: {metallic: 0.64, roughness: 0.34}
+  }
+
+  cap {
+    Position: {0, 1.2, 0}
+    Box: {0.4, 0.08, 0.4}
+    Rgb: steelDeep
+    PbrMaterial: {metallic: 0.5, roughness: 0.5}
+  }
+
+  lamp {
+    Position: {0, 1.13, 0.13}
+    Rotation: {1.5708, 0, 0}
+    Light: {
+      color: hazard, w: 0.22, d: 0.1, h: 0.05,
+      strength: 1.6
+    }
+  }
+}

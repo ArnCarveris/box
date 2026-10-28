@@ -19,7 +19,12 @@ bake3 run apps/oreelse --local-env -- --seed 42                # play the map of
 bake3 run apps/oreelse --local-env -- --headless --frames 10   # headless run, exits 0
 bake3 --target em --local-env apps/oreelse                     # build for the browser
 
+<<<<<<< HEAD
 python3 tools/integration.py e2e oreelse_flow oreelse_look oreelse_particles  # end to end
+=======
+python3 tools/integration.py e2e oreelse_flow oreelse_look     # the end-to-end scenarios
+python3 tools/integration.py e2e oreelse_mining
+>>>>>>> cb8903751bb3621a330e944fc6c2bf20ff0624ee
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -35,6 +40,7 @@ session with the same seed.
 | Any key, left or right click | Start (on the title screen) |
 | W A S D | Walk north, west, south, east |
 | Shift (hold) | Run, twice the walking speed |
+| Right mouse button (hold) | Mine the deposit under the cursor |
 | Mouse wheel | Zoom: up zooms in, down zooms out, three levels |
 | ESC | One step back; with nothing left to back out of, pause or resume |
 | R | Restart (on the win or lose screen) |
@@ -90,6 +96,50 @@ up, looking down at 44.6, 51.8 and 59.5 degrees. It glides to a new level and fo
 astronaut smoothly, also on the title screen and while paused. The wheel over a panel of the UI
 does not zoom.
 
+### Items
+
+| Item | Name | Detail | Recipe | Yield | Time (s) |
+| --- | --- | --- | --- | --- | --- |
+| Iron | Iron | Raw iron. Refines into iron plates. | mined | | 4.5 |
+| Copper | Copper | Raw copper. Refines into copper plates. | mined | | 6.0 |
+| Stone | Stone | Stone. Refines into stone bricks. | mined | | 1.5 |
+| Luminite | Luminite | Precious mineral that can only be mined on this planet. | mined | | 24 |
+| IronPlate | Iron plate | Refined iron. | Iron 2 | 1 | 0.5 |
+| CopperPlate | Copper plate | Refined copper. | Copper 2 | 1 | 0.5 |
+| StoneBrick | Stone brick | Sturdy building material. | Stone 2 | 1 | 0.75 |
+| Wire | Wire | A wire. | CopperPlate 1 | 2 | 0.5 |
+| Electronics | Electronics | An electronics circuit. | Wire 2, CopperPlate 1 | 1 | 0.5 |
+| RocketEngine | Rocket engine | Puts rockets in orbit. | IronPlate 8, CopperPlate 4 | 1 | 30 |
+| RocketCargoBay | Rocket cargo bay | Can store 25 luminite. Up to 4 cargo bays per rocket. | IronPlate 12, CopperPlate 6 | 1 | 30 |
+| RocketLifeSupport | Rocket life support | Life support module that lets you evacuate the planet in a rocket. | IronPlate 8, CopperPlate 8, Electronics 4 | 1 | 120 |
+| RocketFuelStorage | Rocket fuel storage | Rocket fuel. One per cargo bay or life support. | IronPlate 10, CopperPlate 4 | 1 | 30 |
+
+### The inventory
+
+The astronaut has one inventory, a pack that holds any amount of an item, but at most 15 kinds
+of items. Drills and crafting deliver into it from anywhere on the map. A new kind takes the
+first free one of the 15 slots and keeps it until its count drops to 0, which frees the slot;
+the inventory screen shows the slots in that order. When 15 kinds are held, a new kind does not
+fit and the warning `Inventory full - 15 item kinds is the limit` shows.
+
+Every run starts with the crate of the crash: 16 iron plates and 12 copper plates.
+
+### Mining
+
+Hold the right mouse button over a deposit to mine it. The deposit must be within reach: the
+center of its tile at most 15 units from the astronaut. A tile marker shows the target, yellow
+in reach and red out of reach.
+
+A swing takes the mining time of the ore (iron 4.5 seconds, copper 6, stone 1.5, Luminite 24);
+power does not change it. When it completes, 1 of the ore goes into the inventory and 1 comes
+off the deposit, and the next swing starts. A deposit that runs out is gone and its tile is
+empty ground. With a full inventory a new kind of ore is not mined: the deposit keeps its ore
+and the full warning shows at every swing.
+
+Moving the cursor to another deposit starts the swing over. Releasing the button, walking out
+of reach or moving the cursor off the deposit loses the progress of the swing. The right button
+over a panel of the UI does not mine.
+
 ### Render quality
 
 Three render quality tiers trade the look for speed; the button on the pause screen cycles them
@@ -119,10 +169,11 @@ Every task of the port follows these.
   `cfg { export const name: type = value }` with a comment, read in C with
   `ecs_const_var_get_t` (`ORE_CFG`, `ORE_CFG_I32`) where it is used, once per system run rather
   than per entity inside a loop. Items, recipes, buildings and critters are prefabs with
-  reflected components in scripts (`items.flecs`), not C tables.
+  reflected components in scripts (`resources.flecs`), not C tables.
 - **State in reflected singletons and components**, marked modified only when a value changes,
   so the UI scripts re-evaluate only what changed: `OreClock` every frame of play, `OreBlink`
-  when a signal flips, `OreToast` when a message starts and ends, `OreView` while it glides.
+  when a signal flips, `OreToast` when a message starts and ends, `OreView` while it glides,
+  `OreHover` when the cursor tile moves, `OreInventory` when an amount changes.
 - **Game state** is the exclusive pair `(OreGameState, Title | Playing | Paused | Won | Lost)`
   on its own singleton (`ore_state_is`, `ore_state_set`). Gameplay systems run only while
   `Playing`, with a query term on `ore_state_pair(world, OreGameStatePlaying)` whose source is
@@ -177,13 +228,87 @@ Every task of the port follows these.
 - **README**: this file describes the game like a player's manual (controls, rules); each task
   adds its mechanics to it.
 
+## Critter and projectile models
+
+The critters and projectiles are prefabs ported from the original with its names, geometry and
+colors. They carry no gameplay data and stand still: OreCritters and OreWeapons give them their
+components, the effect tasks drive their named parts. Each faces +Z.
+
+### Critters
+
+A critter's origin is between its feet on the ground. Its legs are pivots `leg_0` ... `leg_n`
+at the hips, with `OreLimb {phase, swing}` for the walk (Rotation x swings); even legs are on the
+left (+X), odd ones on the right, front to back. Each leg holds a `thigh`, a `shin` and a `foot`.
+The parts marked glowing are emissive.
+
+| Prefab | File | Legs | Parts |
+| --- | --- | --- | --- |
+| `Mite` | `etc/critters/mite.flecs` | 4 | `abdomen` (with the glowing `spark`), `thorax`, `head` (glowing `visor`, `fang_left`, `fang_right`), `antenna_left`, `antenna_right` |
+| `Skitter` | `etc/critters/skitter.flecs` | 6 | `abdomen` (`ridge`), `thorax` (`plate`), `head` (glowing `eye_left`, `eye_right`, `mandible_left`, `mandible_right`), the glowing `stinger` |
+| `Brute` | `etc/critters/brute.flecs` | 6 | `abdomen` (`spike_a`, `spike_b`), `thorax` (`carapace`), `head` (`crest`, glowing `eye_left`, `eye_right`, `mandible_left`, `mandible_right`, `tusk_left`, `tusk_right`) |
+| `Behemoth` | `etc/critters/behemoth.flecs` | 8 | `abdomen` (glowing `spot_a`, `spot_b`, `spot_c`, and `spine_left`, `spine_right`, `spine_mid`), `thorax` (glowing `flank_left`, `flank_right`), the back plates `plate_0` ... `plate_3`, `head` (`crown`, glowing `eye_0` ... `eye_4`, glowing `brow`, `mandible_left`, `mandible_right`, `tusk_left`, `tusk_right`, `horn_left`, `horn_right`) |
+
+The behemoth's back plates are pivots with `OreLimb` like the legs (a swing of 0.05), each with
+a `shell`, a `ridge`, a glowing `seam`, `barb_left` and `barb_right`. Its tusks and horns are
+turned in two axes; their angles are converted to box's Euler order (`reference/PORTING.md`).
+
+### Projectiles
+
+A projectile's origin is its center.
+
+| Prefab | File | Parts |
+| --- | --- | --- |
+| `Tracer` | `etc/projectiles/tracer.flecs` | `core`, a glowing gold streak with a point light (2.6, range 4.5) |
+| `Missile` | `etc/projectiles/missile.flecs` | `body`, `tip`, `fin_left`, `fin_right`, the glowing `flame` with a point light (3, range 6), and `trail`, the point the smoke trail comes out of |
+| `LaserBeam` | `etc/projectiles/laser_beam.flecs` | One glowing pink box, 1 unit long along Z: the laser turret places an instance halfway between its muzzle and the target, turned toward the target and scaled along Z to their distance |
+
+## Building models
+
+The buildings are prefabs in `etc/buildings/`, one file per building, with the original's names
+and geometry, materials and lights. They stand still: the gameplay tasks add their components
+(item, recipe, footprint, health, power) to the same prefabs, and the animation and effect tasks
+drive the named parts below. Every building's origin is the center of its tile on the ground,
+and it faces +Z. The names are those of the prefab's parts (`ecs_lookup_from(world, Drill,
+"carriage.slider.bit")`): the parts of an instance are unnamed children, each an instance
+(`IsA`) of the prefab's part of the same path, so a system finds the part of an instance as the
+child of its parent whose `IsA` target is the prefab's part, the way the original's `oreChild`
+does. The parts have no `DynamicTransform`, so a system that moves one every frame adds it.
+
+| Prefab | File | Named parts |
+| --- | --- | --- |
+| `Drill` | `drill.flecs` | `carriage` (the piston that rides the legs, rest y 1.48, travel 0.26), `carriage/slider` (rides fore and aft, rest z 0.12, travel 0.24), `carriage/slider/bit` (spins about y and shakes), `crown/pod_l/lamp_l`, `crown/pod_r/lamp_r` (status lamps), `dust` (the drill dust) |
+| `SolarPanel` | `solar_panel.flecs` | `junction/light` (indicator light) |
+| `Wall` | `wall.flecs` | `lamp` (hazard lamp) |
+| `WallSegment` | `wall_segment.flecs` | The connector between two walls on neighboring tiles: placed on the middle of their shared edge, turned by PI / 2 about y between two walls of one column |
+| `GunTurret` | `gun_turret.flecs` | `head` (turns about y to aim), `head/fx` (the muzzle: flash and tracers), `head/sight` (status lamp) |
+| `LaserTurret` | `laser_turret.flecs` | `head` (turns about y to aim), `head/fx` (the lens: beam start and glow), `hit_fx` (the beam's sparks where it hits), `column/lamp` (status lamp) |
+| `MissileTurret` | `missile_turret.flecs` | `head` (turns about y to aim), `head/fx` (the launch above the pods), `pillar/light` (status lamp) |
+| `PadBeacon` | `pad_beacon.flecs` | A template, the corner beacon of the rocket pad: `lamp` (amber lamp) |
+
+The lamps are instances of the `Light` template (`etc/props/light.flecs`): a `housing`, a
+`bulb` and a `glass` cover, its origin the bottom of the housing, facing +Y (a lamp on a wall
+is turned by PI / 2 about x). The `bulb` is the part the game drives: it has the `Rgb` and the
+`Emissive` of the lamp's color at `strength` while `on`, and a `PointLight` of intensity
+`light` and `range` when `light` is above 0. The props say how: a status lamp (`status: true`)
+is the power lamp of its building, which OrePower colors `color` (live), `ok`, `warn` or `dead`
+and blinks at `blink` per second while dead; a work lamp (`work: true`) lights while its
+building works. The props are on the `Light` component of the lamp entity (`lamp_l`, `sight`,
+...). The template builds the parts on every lamp of an instance, not on the prefab's, so they
+keep their names there: the bulb is the lamp's child `bulb`.
+
+The shared materials are inherited prefabs that a part derives from and resizes with its own
+`Box`: `HazardTag`, `HazardTrim`, `HazardTrimShort`, `HazardBorderShort`, `HazardBorderLong`
+and `HazardBoundary` (`etc/materials/hazard.flecs`), `SolarCells`, `AccessPlate`, `VentGrille`,
+`FanDisc` and `BayPad`. `TileMarker` and `TileMarkerBad` (`etc/props/markers.flecs`) are the
+glowing plates mining and placement show over a tile, instances placed at y 0.14.
+
 ## Files
 
 | File | Holds |
 | --- | --- |
-| `etc/oreelse.flecs` | The window, the camera, the sun, the atmosphere, the effects and the view, the render quality tier; includes the rest |
+| `etc/oreelse.flecs` | The window, the camera, the sun, the atmosphere, the effects and the view, the render quality tier, the mining markers; includes the rest |
 | `etc/config.flecs` | The constants `cfg.*` |
-| `etc/items.flecs` | The item prefabs |
+| `etc/resources.flecs` | The item prefabs other than the buildings, with names and recipes |
 | `etc/input.flecs` | The actions, their bindings and the loops of the actions that fire once |
 | `etc/world.flecs` | The ground and the basin |
 | `etc/boundary.flecs` | The hazard band around the playable area |
@@ -192,14 +317,30 @@ Every task of the port follows these.
 | `etc/deposits.flecs` | The deposits of a run |
 | `etc/player.flecs` | The `Astronaut` template |
 | `etc/props/ore.flecs` | The `Ore` template of the deposits |
+<<<<<<< HEAD
 | `etc/particles.flecs` | Includes the particle effects |
 | `etc/particles/pools.flecs` | The particle sprites, how the original's pools map to the layers, the effect budgets (`ParticleSettings`) |
 | `etc/particles/*.flecs` | The particle effects, one file per effect group of the original: one shot prefabs (`BoomBurst`, `CombustBurst`, `MissileLaunch`, `FootDust`, ...) and emitter templates (`JetPlume`, `DrillDust`, `BeamGlow`, `MuzzleFlash`, ...) |
+=======
+| `etc/critters/` | The `Mite`, `Skitter`, `Brute` and `Behemoth` prefabs |
+| `etc/projectiles/` | The `Tracer`, `Missile` and `LaserBeam` prefabs |
+| `etc/props/markers.flecs` | The `TileMarker` and `TileMarkerBad` prefabs |
+| `etc/particles/jet_plume.flecs` | The `JetPlume` template of the jetpack |
+>>>>>>> cb8903751bb3621a330e944fc6c2bf20ff0624ee
 | `etc/materials/terrain.flecs` | The `GroundSurface` and `BasinSurface` materials and the dirt textures |
 | `etc/materials/hazard.flecs` | The hazard stripe texture and the `Hazard*` trim prefabs |
+| `etc/materials/solar_cells.flecs` | The solar cell texture and `SolarCells` |
+| `etc/materials/wall_plate.flecs` | The wall plate textures and `AccessPlate` |
+| `etc/materials/vent.flecs` | The vent grille textures and `VentGrille` |
+| `etc/materials/fan.flecs` | The fan blade textures and `FanDisc` |
+| `etc/materials/drone_bay.flecs` | The drone bay textures and `BayPad` |
+| `etc/props/light.flecs` | The `Light` template of the lamps |
+| `etc/buildings/` | The building prefabs, one file per building (see Building models) |
 | `etc/assets/` | The original's textures (SVG), unchanged, and `terrain_dirt_orm.svg` |
 | `src/flow.c` | States, clock, blink, toast, seeds, `oreelse.cancel()`, `oreelse.restart()` |
-| `src/map.c` | The tile grid and the deposits' registration |
+| `src/map.c` | The tile grid, the deposits' registration and the hover tile |
 | `src/player.c` | Walking and the camera |
+| `src/inventory.c` | The inventory and the item components |
+| `src/mining.c` | Mining and its tile marker |
 | `src/look.c` | The render quality tiers, `oreelse.cycleQuality()` |
 | `src/particles.c` | The helpers that play the effects (`ore_burst`, `ore_burst_aimed`, `ore_explosion`, `ore_combust`), the flash of their lights, `oreelse.explosion()`, `oreelse.combust()` |

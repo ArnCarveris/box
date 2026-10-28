@@ -3,8 +3,8 @@
  * @brief The oreelse module: registers the components and the systems of every area.
  *
  * The systems of EcsOnUpdate run in the order the areas register them: the flow (clock, blink,
- * toast), then the player (walking, the camera). Those that only run while playing match
- * (OreGameState, Playing), the game's only pause mechanism.
+ * toast), the map (the hover tile), the player (walking, the camera), then mining. Those that
+ * only run while playing match (OreGameState, Playing), the game's only pause mechanism.
  *
  * The look applies the render quality tier in every state, in EcsPreStore. The particles
  * register the helpers that play the effects of etc/particles and the flash of their lights.
@@ -32,6 +32,14 @@ void OreelseImport(
     ECS_META_COMPONENT(world, OreActions);
     ECS_META_COMPONENT(world, OrePlayer);
     ECS_META_COMPONENT(world, OreLimb);
+    ECS_META_COMPONENT(world, OreMining);
+    ECS_META_COMPONENT(world, OreMineMarker);
+    ECS_META_COMPONENT(world, OreStack);
+    ECS_META_COMPONENT(world, OreItem);
+    ECS_META_COMPONENT(world, OreMined);
+    ECS_META_COMPONENT(world, OreRecipe);
+    ECS_META_COMPONENT(world, OreInventory);
+    ECS_META_COMPONENT(world, OreHover);
     ECS_META_COMPONENT(world, OreDeposit);
     ECS_META_COMPONENT(world, OreMap);
     ECS_META_COMPONENT(world, OreRenderQuality);
@@ -47,6 +55,8 @@ void OreelseImport(
     ore_flow_import(world);
     ore_map_import(world);
     ore_player_import(world);
+    ore_inventory_import(world);
+    ore_mining_import(world);
     ore_look_import(world);
     ore_particles_import(world);
 }

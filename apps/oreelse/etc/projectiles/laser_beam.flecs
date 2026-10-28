@@ -1,0 +1,15 @@
+// The beam of the laser turret, the LaserBeam prefab of the original: a glowing pink bar one
+// unit long along Z. The original draws it every frame; in box it is an instance that the laser
+// turret (OreWeapons) places halfway between its muzzle and the target, turns toward the
+// target, scales along Z to their distance and hides while it does not fire.
+
+using box.geometry
+using box.material
+
+const beamPink: Rgb = {248, 108, 178}
+
+prefab LaserBeam {
+  Box: {0.1, 0.1, 1}
+  Rgb: beamPink
+  Emissive: {strength: 4, color: beamPink}
+}

@@ -18,6 +18,13 @@ cfg {
   // Ore of a new deposit, its amount and its capacity
   export const depositAmount: i32 = 1000
 
+  // The astronaut mines a tile whose center is at most reach away on x and z
+  export const reach: f32 = 15
+
+  // The inventory holds at most inventorySlots kinds of items with a count above 0 (up to 15,
+  // the slots of OreInventory)
+  export const inventorySlots: i32 = 15
+
   // Walking speed in units per second, and its multiplier while the run key is held
   export const walkSpeed: f32 = 7
   export const runMultiplier: f32 = 2

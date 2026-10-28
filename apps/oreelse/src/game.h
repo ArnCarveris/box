@@ -2,9 +2,15 @@
  * @file game.h
  * @brief The oreelse module: components of the game and the functions its areas share.
  *
+<<<<<<< HEAD
  * The scene (apps/oreelse/etc) holds the constants cfg.*, the models, the singletons and the
  * entities of a run; the systems of each area (flow.c, map.c, player.c, look.c, particles.c)
  * play the game.
+=======
+ * The scene (apps/oreelse/etc) holds the constants cfg.*, the models, the items, the singletons
+ * and the entities of a run; the systems of each area (flow.c, map.c, player.c, inventory.c,
+ * mining.c, look.c) play the game.
+>>>>>>> cb8903751bb3621a330e944fc6c2bf20ff0624ee
  */
 
 #ifndef OREELSE_GAME_H
@@ -20,6 +26,12 @@
 
 /** Zoom levels of the camera, the size of the arrays of OreZoom */
 #define ORE_ZOOM_LEVELS (3)
+
+/** Slots of the inventory, the size of OreInventory.slots and the most kinds it holds */
+#define ORE_INVENTORY_SLOTS (15)
+
+/** Inputs a recipe can have, the size of OreRecipe.inputs */
+#define ORE_RECIPE_INPUTS (6)
 
 /** Read the float constant cfg.<name> of the scene (etc/config.flecs) */
 #define ORE_CFG(world, name) ecs_const_var_get_t(world, "cfg." name, ecs_f32_t)
@@ -91,6 +103,7 @@ ECS_STRUCT(OreZoom, {
  */
 ECS_STRUCT(OreView, {
     ecs_entity_t camera; /**< Camera entity the view moves */
+    ecs_entity_t view;   /**< The world view of the camera, whose cursor ray gives OreHover */
     int32_t level;       /**< Zoom level, 0 to ORE_ZOOM_LEVELS - 1, the wheel steps it */
     float height;        /**< Height of the camera, gliding to the level's; 0 snaps to it */
     float back;          /**< Distance behind the astronaut, gliding to the level's */
@@ -104,6 +117,7 @@ ECS_STRUCT(OreActions, {
     ecs_entity_t left;    /**< Walk toward -X */
     ecs_entity_t right;   /**< Walk toward +X */
     ecs_entity_t run;     /**< Run at cfg.runMultiplier times the walk speed */
+    ecs_entity_t mine;    /**< Mine the target on the hover tile */
 });
 
 /** The astronaut the player walks with WASD. Modified when a member changes */
@@ -118,9 +132,74 @@ ECS_STRUCT(OreLimb, {
     float swing; /**< Largest angle of the swing in radians */
 });
 
+/** The mining of the astronaut: the target of the swing and its progress, which the HUD shows.
+ * Modified when the progress or the target changes.
+ */
+ECS_STRUCT(OreMining, {
+    ecs_entity_t target; /**< Entity the swing is keyed to, 0 for none */
+    float left;          /**< Seconds left of the swing */
+    float progress;      /**< Progress of the swing from 0 to 1, 1 - left / time */
+});
+
+/** The tile markers of mining, a singleton oreelse.flecs sets: an instance of each marker
+ * prefab, disabled while it is not shown.
+ */
+ECS_STRUCT(OreMineMarker, {
+    ecs_entity_t good; /**< The TileMarker, shown on a target in reach */
+    ecs_entity_t bad;  /**< The TileMarkerBad, shown on a target out of reach */
+});
+
+/** An amount of an item: an input of a recipe or a slot of the inventory */
+ECS_STRUCT(OreStack, {
+    ecs_entity_t item; /**< Item prefab, 0 for none */
+    int32_t amount;    /**< How many */
+});
+
+/** An item, on its prefab in resources.flecs (or a building's): what the UI shows of it.
+ * Instances inherit it.
+ */
+ECS_STRUCT(OreItem, {
+    char *name;   /**< Display name */
+    char *detail; /**< One line of detail text */
+});
+
+/** A mined item, on its prefab: a swing at a deposit of it yields 1 */
+ECS_STRUCT(OreMined, {
+    float time; /**< Seconds a swing takes */
+});
+
+/** A crafted item, on its prefab: the inputs a craft takes and what it yields */
+ECS_STRUCT(OreRecipe, {
+    OreStack inputs[6]; /**< Items and amounts a craft takes, item 0 after the last */
+    int32_t yield;      /**< Items one craft makes */
+    float time;         /**< Seconds one craft takes */
+});
+
+/** The player's pack, a singleton run.flecs sets to the starting crate: any amount of an item
+ * kind, at most cfg.inventorySlots kinds. Modified when an amount changes.
+ *
+ * A new kind takes the first free slot and keeps it until its count drops to 0, so the slot
+ * order is the order the inventory screen shows.
+ */
+ECS_STRUCT(OreInventory, {
+    OreStack slots[15]; /**< The slots in order, item 0 for a free one, else amount above 0 */
+});
+
+/** The tile under the cursor, a singleton: where the cursor ray of the world view (OreView)
+ * meets the ground y = 0. Mining, placement and the pipette read it. Modified when it changes.
+ */
+ECS_STRUCT(OreHover, {
+    bool on_grid; /**< The ray meets the ground on a tile of the grid; else there is no tile */
+    int32_t row;  /**< Row of the tile, -1 without one */
+    int32_t col;  /**< Column of the tile, -1 without one */
+    float fx;     /**< Fraction of the point inside the tile along x, 0 to 1 */
+    float fz;     /**< Fraction of the point inside the tile along z, 0 to 1 */
+    vec3 point;   /**< Point on the ground, kept when the ray misses it */
+});
+
 /** An ore deposit on one tile, registered in the tile grid of OreMap when it is set */
 ECS_STRUCT(OreDeposit, {
-    ecs_entity_t resource; /**< Item prefab the deposit yields (items.flecs) */
+    ecs_entity_t resource; /**< Item prefab the deposit yields (resources.flecs) */
     int32_t amount;        /**< Ore left, the deposit is deleted at 0 */
     int32_t capacity;      /**< Ore of the full deposit */
     int32_t row;           /**< Row of its tile, set when it registers, -1 off the grid */
@@ -277,6 +356,16 @@ void ore_toast(
     const char *fmt,
     ...);
 
+/** Check whether an action is held.
+ *
+ * @param world The world
+ * @param action The action entity, 0 for none
+ * @return Whether the action is down this frame
+ */
+bool ore_action_down(
+    const ecs_world_t *world,
+    ecs_entity_t action);
+
 /** Read the geometry of the tile grid from cfg.
  *
  * @param world The world
@@ -369,6 +458,7 @@ ecs_entity_t* ore_map_building(
 void ore_map_purge(
     ecs_world_t *world);
 
+<<<<<<< HEAD
 /** Play a one shot effect template at a position, the oreBurst of the original: its sizes,
  * speeds, spawn volumes and layer offsets at scale, unturned.
  *
@@ -435,6 +525,82 @@ ecs_entity_t ore_combust(
     ecs_entity_t effect,
     const vec3 position,
     float radius);
+=======
+/** Get the amount of an item in the inventory.
+ *
+ * @param world The world or a stage
+ * @param item The item
+ * @return The amount, 0 when the inventory does not hold the item
+ */
+int32_t ore_inventory_count(
+    const ecs_world_t *world,
+    ecs_entity_t item);
+
+/** Get the kinds of items the inventory holds, the slots that are taken.
+ *
+ * @param world The world or a stage
+ * @return The kinds, at most ORE_INVENTORY_SLOTS
+ */
+int32_t ore_inventory_kinds(
+    const ecs_world_t *world);
+
+/** Check whether a set of additions fits: the kinds the inventory would hold after adding
+ * every new kind with a positive amount are at most ORE_INVENTORY_SLOTS.
+ *
+ * @param world The world or a stage
+ * @param stacks The items and amounts to add, an item may appear more than once
+ * @param count Number of stacks
+ * @return Whether the additions fit
+ */
+bool ore_inventory_fits(
+    const ecs_world_t *world,
+    const OreStack *stacks,
+    int32_t count);
+
+/** Add an amount of an item to the inventory. A new kind takes the first free slot; when every
+ * slot is taken nothing changes and the inventory full warning shows.
+ *
+ * @param world The world or the stage of a system
+ * @param item The item
+ * @param amount How many, nothing changes for 0 or less
+ * @return Whether the amount was added, true for 0
+ */
+bool ore_inventory_add(
+    ecs_world_t *world,
+    ecs_entity_t item,
+    int32_t amount);
+
+/** Remove an amount of an item from the inventory. At 0 the slot of the item frees up.
+ *
+ * @param world The world or the stage of a system
+ * @param item The item
+ * @param amount How many, nothing changes for 0 or less
+ * @return Whether the amount was removed: false, and nothing changes, when the inventory holds
+ * less of the item, true for 0
+ */
+bool ore_inventory_remove(
+    ecs_world_t *world,
+    ecs_entity_t item,
+    int32_t amount);
+
+/** Show the warning that the inventory holds as many kinds as it can.
+ *
+ * @param world The world or the stage of a system
+ */
+void ore_inventory_full(
+    ecs_world_t *world);
+
+/** Mine 1 off a deposit into the inventory: at 0 the deposit is deleted. When its item is a
+ * new kind and the inventory is full nothing is mined and the full warning shows.
+ *
+ * @param world The world or the stage of a system
+ * @param deposit The deposit
+ * @return Whether the deposit is still there to mine, false once it is deleted or gone
+ */
+bool ore_deposit_mine(
+    ecs_world_t *world,
+    ecs_entity_t deposit);
+>>>>>>> cb8903751bb3621a330e944fc6c2bf20ff0624ee
 
 /** Register the game flow: states, clock, blink, toast, cancel() and restart().
  *
@@ -455,6 +621,21 @@ void ore_map_import(
  * @param world The world
  */
 void ore_player_import(
+    ecs_world_t *world);
+
+/** Register the inventory, the item components and the script functions
+ * oreelse.inventory_add(item, amount) and oreelse.inventory_remove(item, amount).
+ *
+ * @param world The world
+ */
+void ore_inventory_import(
+    ecs_world_t *world);
+
+/** Register mining: the swing at the deposit on the hover tile and its marker.
+ *
+ * @param world The world
+ */
+void ore_mining_import(
     ecs_world_t *world);
 
 /** Register the look: the render quality tiers and oreelse.cycleQuality().

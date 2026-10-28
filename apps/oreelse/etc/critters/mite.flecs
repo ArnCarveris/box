@@ -1,0 +1,110 @@
+// The mite, the Mite prefab of the original: the smallest and fastest critter, a blue body of
+// boxes with a glowing visor and a glowing spark on its abdomen, and four legs. Its origin is
+// between its feet on the ground and it faces +Z. The legs are pivots with OreLimb at the
+// hips; here they stand still. OreCritters gives the prefab its gameplay data.
+
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using oreelse
+
+const miteShell: Rgb = {74, 96, 138}
+const miteDark: Rgb = {42, 54, 82}
+const miteLimb: Rgb = {28, 36, 58}
+const miteEye: Rgb = {128, 248, 255}
+
+prefab Mite {
+  abdomen {
+    Position: {0, 0.31, -0.2}
+    Rotation: {0.34, 0, 0}
+    Box: {0.22, 0.2, 0.26}
+    Rgb: miteDark
+
+    spark {
+      Position: {0, 0.11, -0.06}
+      Box: {0.1, 0.06, 0.14}
+      Rgb: miteEye
+      Emissive: {strength: 2.8, color: miteEye}
+    }
+  }
+
+  thorax {
+    Position: {0, 0.28, 0.02}
+    Box: {0.26, 0.18, 0.22}
+    Rgb: miteShell
+  }
+
+  head {
+    Position: {0, 0.27, 0.19}
+    Box: {0.18, 0.15, 0.16}
+    Rgb: miteDark
+
+    visor {
+      Position: {0, 0.03, 0.09}
+      Box: {0.14, 0.07, 0.04}
+      Rgb: miteEye
+      Emissive: {strength: 3.2, color: miteEye}
+    }
+
+    fang_left {
+      Position: {-0.06, -0.07, 0.11}
+      Rotation: {0, 0.5, 0}
+      Box: {0.03, 0.04, 0.14}
+      Rgb: miteLimb
+    }
+
+    fang_right {
+      Position: {0.06, -0.07, 0.11}
+      Rotation: {0, -0.5, 0}
+      Box: {0.03, 0.04, 0.14}
+      Rgb: miteLimb
+    }
+  }
+
+  antenna_left {
+    Position: {-0.07, 0.4, 0.2}
+    Rotation: {0.9, 0, -0.3}
+    Cone: {segments: 6, smooth: true, length: 0.26, radius: 0.5}
+    Scale: {0.045, 1, 0.045}
+    Rgb: miteLimb
+  }
+
+  antenna_right {
+    Position: {0.07, 0.4, 0.2}
+    Rotation: {0.9, 0, 0.3}
+    Cone: {segments: 6, smooth: true, length: 0.26, radius: 0.5}
+    Scale: {0.045, 1, 0.045}
+    Rgb: miteLimb
+  }
+
+  // Two rows of legs, even ones on the left (+X), odd ones on the right
+  for i in 0..4 {
+    const side: f32 = 1 - 2 * (i % 2)
+    const row: f32 = floor(i / 2)
+
+    "leg_{i}" {
+      Position: {side * 0.13, 0.22, 0.08 - row * 0.18}
+      OreLimb: {phase: i * 1.57, swing: 0.68}
+
+      thigh {
+        Position: {side * 0.1, 0.025, 0}
+        Rotation: {0, 0, side * -0.55}
+        Box: {0.2, 0.045, 0.045}
+        Rgb: miteLimb
+      }
+
+      shin {
+        Position: {side * 0.2, -0.1, 0}
+        Box: {0.045, 0.2, 0.045}
+        Rgb: miteLimb
+      }
+
+      foot {
+        Position: {side * 0.2, -0.2, 0.02}
+        Box: {0.07, 0.04, 0.1}
+        Rgb: miteLimb
+      }
+    }
+  }
+}
