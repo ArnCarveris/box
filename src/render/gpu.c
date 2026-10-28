@@ -638,6 +638,12 @@ void box_gpu_count(
     case BOX_GPU_STAT_INSTANCE_BIND:
         gpu->pending.instance_binds ++;
         break;
+    case BOX_GPU_STAT_CULL_DISPATCH:
+        gpu->pending.cull_dispatches ++;
+        break;
+    case BOX_GPU_STAT_CULL_INSTANCES:
+        gpu->pending.cull_instance_dispatches ++;
+        break;
     }
 }
 
@@ -663,6 +669,8 @@ void box_gpu_stats_publish(
     s->passes += p->passes;
     s->draws += p->draws;
     s->instance_binds += p->instance_binds;
+    s->cull_dispatches += p->cull_dispatches;
+    s->cull_instance_dispatches += p->cull_instance_dispatches;
     s->scatters += p->scatters;
     s->scattered += p->scattered;
     s->cull_ns += p->cull_ns;
@@ -768,6 +776,22 @@ bool box_render_gpu_cull_window(
     return result;
 }
 
+bool box_render_gpu_cull_copies(
+    ecs_world_t *world,
+    int32_t copies)
+{
+    const box_render_backend_t *backend = box_render_get_backend(world);
+    bool result = backend->render == box_gpu_render && copies >= 0;
+    if (result) {
+        box_gpu_t *gpu = backend->ctx;
+        ecs_os_mutex_lock(gpu->lock);
+        gpu->cull_copies = copies;
+        ecs_os_mutex_unlock(gpu->lock);
+    }
+
+    return result;
+}
+
 bool box_render_gpu_readback_delivery(
     ecs_world_t *world,
     box_render_readback_delivery_t delivery)
@@ -851,6 +875,16 @@ bool box_render_gpu_cull_window(
 {
     (void)world;
     (void)slots;
+
+    return false;
+}
+
+bool box_render_gpu_cull_copies(
+    ecs_world_t *world,
+    int32_t copies)
+{
+    (void)world;
+    (void)copies;
 
     return false;
 }
