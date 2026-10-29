@@ -22,11 +22,7 @@ bake3 --target em --local-env apps/oreelse                     # build for the b
 python3 tools/integration.py e2e oreelse_flow oreelse_look     # the end-to-end scenarios
 python3 tools/integration.py e2e oreelse_mining oreelse_particles
 python3 tools/integration.py e2e oreelse_crafting oreelse_buildings
-<<<<<<< HEAD
-python3 tools/integration.py e2e oreelse_power
-=======
-python3 tools/integration.py e2e oreelse_critters
->>>>>>> 354ca02b4b6af3b4435bac3dc7ff8d987ca01e7e
+python3 tools/integration.py e2e oreelse_power oreelse_critters
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -270,7 +266,6 @@ at half health gives 2 bricks and a gun turret at 10% 1 iron plate and 1 wire; i
 deposit under it (a drill's) is mined by the next swing. A building whose health drops to 0 is
 destroyed.
 
-<<<<<<< HEAD
 ### Power
 
 Solar panels produce power and the other powered buildings consume it, whether they work or
@@ -327,7 +322,7 @@ Every powered building shows its state on its status lamps:
 | Its category at 3 or 4, or no category | Cyan {92, 236, 222} |
 
 A gun turret draws no power, so a blackout does not kill its lamps; Weapons at 0 does.
-=======
+
 ### Critters
 
 | Critter | HP | Speed | Damage/s | Attack range | Radius | Wave cost | From wave |
@@ -387,7 +382,6 @@ tile inside the edge, up to 5 units off on both axes.
 
 The astronaut has 100 HP. After 5 seconds without damage it regenerates 2 HP a second up to
 the full 100. At 0 HP the game is lost.
->>>>>>> 354ca02b4b6af3b4435bac3dc7ff8d987ca01e7e
 
 ### The jetpack
 
@@ -599,11 +593,7 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 | `etc/world.flecs` | The ground and the basin |
 | `etc/boundary.flecs` | The hazard band around the playable area |
 | `etc/scenery.flecs` | The boulders and dunes of a run |
-<<<<<<< HEAD
-| `etc/run.flecs` | The astronaut, the parent of the placed buildings and the singletons of a run, the order book, the selection and the power allocation included |
-=======
-| `etc/run.flecs` | The astronaut, the parents of the placed buildings and of the critters, and the singletons of a run, the order book, the selection and the waves included |
->>>>>>> 354ca02b4b6af3b4435bac3dc7ff8d987ca01e7e
+| `etc/run.flecs` | The astronaut, the parents of the placed buildings and of the critters, and the singletons of a run, the order book, the selection, the power allocation and the waves included |
 | `etc/deposits.flecs` | The deposits of a run |
 | `etc/player.flecs` | The `Astronaut` template |
 | `etc/props/ore.flecs` | The `Ore` template of the deposits |
