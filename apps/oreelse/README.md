@@ -310,7 +310,9 @@ Every wave has a style, drawn per wave, that sets the share of the budget of eve
 The wave buys its critters one at a time, each picked at random with the weight share / cost
 among the critters its number unlocked that the budget left can pay for (and the most
 expensive affordable one when none of them has a weight), until the budget runs out. A wave
-holds at most 10000 critters and 25 behemoths. So wave 1 is two mites, and although brutes
+holds at most 10000 critters and 25 behemoths; near 10000 critters it buys only what still lets
+it spend the rest, so a wave too rich for 10000 critters takes 25 behemoths whatever its style.
+So wave 1 is two mites, and although brutes
 come from wave 7 and behemoths from wave 13, the first brute can be afforded in wave 9 and the
 first behemoth in wave 17.
 

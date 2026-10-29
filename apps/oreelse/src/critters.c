@@ -194,7 +194,8 @@ static void ore_building_try(
 /** Find the nearest building with hit points left strictly closer to a point than a distance,
  * measured to its center, searching the tile grid outward ring by ring from the point's tile.
  *
- * A building first seen in ring k lies at least (k - 1) tiles away, so the search ends there.
+ * A ring is its top and bottom rows whole and the two ends of the rows between, clipped to the
+ * map. A building first seen in ring k lies at least (k - 1) tiles away, so the search ends there.
  *
  * @param world The world
  * @param map The tile grid
@@ -215,7 +216,7 @@ static ecs_entity_t ore_building_nearest(
     int32_t row = ore_row_at(grid, z), col = ore_col_at(grid, x);
     int32_t rings = grid->rows > grid->cols ? grid->rows : grid->cols;
     ecs_entity_t result = 0;
-    int32_t k, r, c, step;
+    int32_t k, r, c, step, r0, r1, c0, c1;
     float near;
     for (k = 0; k <= rings; k ++) {
         near = (float)(k - 1) * grid->tile;
@@ -223,10 +224,16 @@ static ecs_entity_t ore_building_nearest(
             break;
         }
 
-        for (r = row - k; r <= row + k; r ++) {
+        r0 = row - k < 0 ? 0 : row - k;
+        r1 = row + k >= grid->rows ? grid->rows - 1 : row + k;
+        c0 = col - k < 0 ? 0 : col - k;
+        c1 = col + k >= grid->cols ? grid->cols - 1 : col + k;
+        for (r = r0; r <= r1; r ++) {
             step = r == row - k || r == row + k ? 1 : 2 * k;
-            for (c = col - k; c <= col + k; c += step) {
-                ore_building_try(world, map, r, c, x, z, best_d2, &result);
+            for (c = step == 1 ? c0 : col - k; c <= c1; c += step) {
+                if (c >= c0) {
+                    ore_building_try(world, map, r, c, x, z, best_d2, &result);
+                }
             }
         }
     }

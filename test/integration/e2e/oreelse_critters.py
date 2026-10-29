@@ -157,13 +157,15 @@ def rows_of(app, expr):
     """Run a query of the port: the path and the value of the first field of every result."""
     app.exec("query found %s" % expr)
     app.exec("iter found")
-    out = app.exec("next 100000")
     result = {}
-    for line in out.splitlines():
-        if not line.strip() or line == "(end)":
-            continue
-        parts = line.split(" ", 1)
-        result[parts[0]] = parse_value(parts[1]) if len(parts) > 1 else None
+    done = False
+    while not done:
+        for line in app.exec("next 1000").splitlines():
+            done = done or line == "(end)"
+            if not line.strip() or line == "(end)":
+                continue
+            parts = line.split(" ", 1)
+            result[parts[0]] = parse_value(parts[1]) if len(parts) > 1 else None
     return result
 
 
@@ -393,10 +395,12 @@ def test_composition(app):
         found = found or counts[3] > 0
     app.check(found, "no wave from 28 to 32 has behemoths")
 
-    # A wave whose budget would buy far more holds 25 behemoths, unless it is a swarm
+    # A wave whose budget the unit cap cannot spend holds 25 behemoths in every style: near the
+    # cap the fit rule turns down the cheap tiers and the dearest affordable one is picked, even
+    # in a swarm, whose share of behemoths is 0
     counts, w = compose(app, 40)
     check_budget(app, 40, counts, w)
-    app.check(counts[3] == (0 if w["style"] == "Swarm" else BEHEMOTH_CAP),
+    app.check(counts[3] == BEHEMOTH_CAP,
               "the %s wave 40 has %d behemoths" % (w["style"], counts[3]))
 
 
