@@ -105,7 +105,7 @@ template HeadlessStepper {
     while true {
       const e = await on.activate(this)
       const w = this[LayoutBounds].width
-      if !e.keyboard && !disabled {
+      if ui.activation(e) == this && !e.keyboard && !disabled {
         const dir = match e.local_x < button - w / 2 {
           true: -1
           _: match e.local_x > w / 2 - button {

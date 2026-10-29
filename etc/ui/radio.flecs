@@ -148,13 +148,15 @@ template HeadlessRadioButton : parent RadioGroup {
 
   async {
     while true {
-      await on.activate(this)
-      down = false
-      if !off && current != label {
-        current = label
-        pending = none
-        await ui.changed(this.parent())
-        await focus(this)
+      const e = await on.activate(this)
+      if ui.activation(e) == this {
+        down = false
+        if !off && current != label {
+          current = label
+          pending = none
+          await ui.changed(this.parent())
+          await focus(this)
+        }
       }
     }
   }

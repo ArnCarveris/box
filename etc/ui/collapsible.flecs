@@ -125,10 +125,12 @@ template HeadlessCollapsible {
   async {
     while true {
       const e = await on.activate(this)
-      down = false
-      if !disabled && e.target == this && (e.keyboard || hover) {
-        current = !current
-        await ui.changed(this)
+      if ui.activation(e) == this {
+        down = false
+        if !disabled && (e.keyboard || hover) {
+          current = !current
+          await ui.changed(this)
+        }
       }
     }
   }
