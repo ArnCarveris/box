@@ -1,10 +1,10 @@
 // Ore Else: you crash-landed on a hostile planet. The game is played top down on a 48x48 tile
 // map with a camera that follows the astronaut. This scene holds the window, the camera, the
 // look of the original's engine.flecs (the sun, the atmosphere, the effects of the view and the
-// render quality tier), the tile markers, the preview of placement and the HUD; the included
-// scripts hold the constants, the palette and the icons of the UI, the items, the buildings and
-// their connector rules, the models, the input, the map, the run and the UI kit and HUD
-// templates. The game boots into the title screen.
+// render quality tier), the tile markers, the preview of placement, the health bars and the HUD;
+// the included scripts hold the constants, the palette and the icons of the UI, the items, the
+// buildings and their connector rules, the models, the input, the map, the run and the UI kit,
+// health bar, inventory screen and HUD templates. The game boots into the title screen.
 
 include config
 include ui/palette
@@ -57,10 +57,15 @@ include deposits
 include run
 include launch
 include ui/panel
+<<<<<<< HEAD
 include ui/queue
 include ui/power
 include ui/rocket_panel
+=======
+include ui/inventory
+>>>>>>> c114738101f209461eb03527e05b575c78142b1d
 include ui/hud
+include ui/health_bar
 
 using flecs.script.math
 using box.transform
@@ -187,6 +192,32 @@ $ {
   OreMineMarker: {good: markers.mine, bad: markers.mine_bad}
   OrePreview: {root: markers.place, good: TileMarker, bad: TileMarkerBad}
   (OreGameState, Title)
+}
+
+// The health bars of the damaged buildings (ui/health_bar.flecs): a screen space UI scene whose
+// view is created after the world view and before the HUD, so the bars draw over the world and
+// under the panels of the HUD. OreHealthBarsShow gives the view its camera only while playing;
+// the game creates the bars under bars
+health_bars {
+  Scene: {}
+
+  camera {
+    Position: {0, 0, 100}
+    Camera: {ortho: true, ortho_scale: 1}
+  }
+
+  bars {}
+}
+
+health_bars_view {
+  View: {camera: health_bars.camera, lighting: {enabled: false}, culling: {enabled: false}}
+}
+
+$ {
+  OreHealthBars: {
+    bar: HealthBar, root: health_bars.bars, view: health_bars_view, camera: health_bars.camera,
+    world: main_view
+  }
 }
 
 // The HUD (ui/hud.flecs), created after the world view so it draws over it

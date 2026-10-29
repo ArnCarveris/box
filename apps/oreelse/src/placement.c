@@ -481,7 +481,8 @@ bool ore_placement_deselect(
 }
 
 /** Select a building for placement with a key: the selected building again clears the
- * selection, a building the inventory holds none of does nothing.
+ * selection, a building the inventory holds none of does nothing. A change of the selection
+ * closes the inventory screen.
  *
  * @param ctx Call context
  * @param argc Number of arguments
@@ -517,6 +518,7 @@ static void ore_select_function(
 
     if (result) {
         ecs_singleton_modified(world, OrePlacement);
+        ore_inventory_screen_set(world, false);
     }
 
     ore_resolve(future, result);
@@ -524,7 +526,7 @@ static void ore_select_function(
 
 /** The pipette: the building under the cursor selects its type, else a deposit selects the
  * drill, else the selection clears. A type the inventory holds none of shows a warning and
- * keeps the selection.
+ * keeps the selection. It does nothing while the inventory screen is open.
  *
  * @param ctx Call context
  * @param argc Number of arguments
@@ -545,7 +547,9 @@ static void ore_pipette_function(
     (void)argc;
     (void)argv;
 
-    if (!pl || !map || !ore_state_is(world, OreGameStatePlaying)) {
+    if (!pl || !map || !ore_state_is(world, OreGameStatePlaying) ||
+        ore_inventory_screen_open(world))
+    {
         goto done;
     }
 
@@ -578,8 +582,8 @@ done:
     ore_resolve(future, pl && pl->selected != 0);
 }
 
-/** The press of Place: with a building selected and the cursor on a tile, a drag starts,
- * anchored at the tile once.
+/** The press of Place: with a building selected, the cursor on a tile and the inventory screen
+ * closed, a drag starts, anchored at the tile once.
  *
  * @param ctx Call context
  * @param argc Number of arguments
@@ -596,7 +600,7 @@ static void ore_place_start_function(
     OrePlacement *pl = ecs_singleton_get_mut(world, OrePlacement);
     ore_cell_t cell;
     bool result = pl && pl->selected && ore_state_is(world, OreGameStatePlaying) &&
-        ore_cursor_cell(world, &cell);
+        !ore_inventory_screen_open(world) && ore_cursor_cell(world, &cell);
     (void)argc;
     (void)argv;
 
@@ -914,7 +918,7 @@ done:
 }
 
 /** Show the preview of the selected building on the cells of the current region while the
- * cursor is on the grid.
+ * cursor is on the grid and the inventory screen is closed.
  *
  * @param it Iterator with OrePlacement, OreHover, OreMap, OrePreview and OreActions, while
  * playing
@@ -927,8 +931,8 @@ static void OrePlacePreview(
     OreMap *map = ecs_field(it, OreMap, 2);
     const OrePreview *preview = ecs_field(it, OrePreview, 3);
     const OreActions *a = ecs_field(it, OreActions, 4);
-    ecs_entity_t prefab = pl->selected && ecs_is_alive(it->world, pl->selected) ?
-        pl->selected : 0;
+    ecs_entity_t prefab = pl->selected && ecs_is_alive(it->world, pl->selected) &&
+        !ore_inventory_screen_open(it->world) ? pl->selected : 0;
     ore_preview_t *out = ecs_os_calloc_t(ore_preview_t);
     ore_place_ctx_t ctx;
     if (prefab && hover->on_grid) {

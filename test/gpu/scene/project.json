@@ -42,6 +42,7 @@
                     "box_fit_height",
                     "box_behind_camera",
                     "box_off_screen",
+                    "box_min_width",
                     "box_removed",
                     "box_from_script"
                 ]

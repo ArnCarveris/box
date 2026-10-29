@@ -127,7 +127,7 @@ static void ore_mining_publish(
  *
  * Within reach a swing takes the mining time of the ore or cfg.dozeTime; when it completes 1 of
  * the ore goes from the deposit into the inventory, or the building is demolished. Aboard the
- * rocket the astronaut does not mine.
+ * rocket or with the inventory screen open the astronaut does not mine.
  *
  * @param it Iterator over the players, with OreActions, OreHover, OreMap and OreMineMarker,
  * while playing
@@ -145,7 +145,8 @@ static void OrePlayerMine(
     ore_grid_t grid = ore_grid_get(it->world);
     float reach = ORE_CFG(it->world, "reach");
     float poof_y = ORE_CFG(it->world, "demolishPoofY");
-    bool holding = ore_action_down(it->world, a->mine) && !ore_rocket_aboard(it->world);
+    bool holding = ore_action_down(it->world, a->mine) && !ore_rocket_aboard(it->world) &&
+        !ore_inventory_screen_open(it->world);
     ecs_entity_t *bcell = holding && hover->on_grid ?
         ore_map_building(map, hover->row, hover->col) : NULL;
     ecs_entity_t building = bcell && *bcell && ecs_is_alive(it->world, *bcell) ? *bcell : 0;

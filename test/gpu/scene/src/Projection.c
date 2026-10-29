@@ -1080,6 +1080,42 @@ void Projection_box_off_screen(void) {
     ecs_fini(world);
 }
 
+void Projection_box_min_width(void) {
+    // engine/projected_bounds
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 10, .near_ = 0.1f,
+        .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true});
+    ecs_entity_t target = ecs_new(world);
+    ecs_set(world, target, Position, {0, 0, 0});
+    ecs_entity_t bar = ecs_new(world);
+    ecs_set(world, bar, ProjectedAnchor, {.target = target, .view = view});
+    ecs_set(world, bar, ProjectedBox, {
+        .min = {-1, -1, -1}, .max = {1, 1, 1}, .min_width = 144.5f});
+    ecs_progress(world, 0);
+
+    test_assert(ecs_has(world, bar, ProjectedHidden));
+
+    ecs_set(world, bar, ProjectedBox, {
+        .min = {-1, -1, -1}, .max = {1, 1, 1}, .min_width = 143.5f});
+    ecs_progress(world, 0);
+    test_assert(!ecs_has(world, bar, ProjectedHidden));
+    const ProjectedBounds *b = ecs_get(world, bar, ProjectedBounds);
+    test_assert(fabsf(b->left + 72.0f) < 0.01f);
+    test_assert(fabsf(b->right - 72.0f) < 0.01f);
+
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 20, .near_ = 0.1f,
+        .far_ = 1000});
+    ecs_progress(world, 0);
+    test_assert(ecs_has(world, bar, ProjectedHidden));
+
+    ecs_fini(world);
+}
+
 void Projection_box_removed(void) {
     // engine/projected_bounds
     ecs_world_t *world = ecs_init();
