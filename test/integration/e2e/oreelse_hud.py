@@ -182,13 +182,7 @@ def test_health_and_mining(app):
     # Below 30%: the suit breach alert blinks with the fast signal
     app.exec("set %s OreHealth {value: 25, max: 100}" % PLAYER)
     wait_shown(app, ALERT, "! SUIT BREACH !")
-<<<<<<< HEAD
-    for fast, expected in ((True, (255, 96, 84)), (False, (124, 44, 40))):
-=======
-    check_bar(app, "hp", HP_BAR, 0.25)
-    app.check(color(app, STATUS + ".hp.fill") == RED, "the HP bar at 25% is not red")
     for fast, expected in ALERT_BLINK.items():
->>>>>>> 5d60df0198b57c10dfabb0d7730fed473b3e3a84
         put(app, BLINK, BLINK, {"fast": fast})
         app.wait_frames(SETTLE)
         app.check(color(app, ALERT) == expected,

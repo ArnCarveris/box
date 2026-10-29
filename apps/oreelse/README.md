@@ -1167,13 +1167,8 @@ its tile in the grid.
 | `src/craft.c` | The order book, the workers, `oreelse.craft_order()`, `oreelse.craft_cancel()` |
 | `src/power.c` | Production, demand and the blackout, the drills, the factories' crafters, the status lamps, `oreelse.power_set(category, level)` |
 | `src/rocket.c` | The rocket state, installing, uninstalling, loading, the launch and the flight, the look of the flight (`OreRocketFx`: the shake, the clamps, the flames and the smoke), `oreelse.rocket_install()`, `oreelse.rocket_uninstall()`, `oreelse.rocket_load()`, `oreelse.rocket_launch()`, `oreelse.craft_key()` |
-<<<<<<< HEAD
 | `src/health_bars.c` | The health bars: a `HealthBar` instance per damaged building and over the damaged astronaut under `health_bars.bars`, its fraction set when the health changes, the bars' view shown while playing |
-| `src/look.c` | The render quality tiers, `oreelse.cycleQuality()` |
-=======
-| `src/health_bars.c` | The health bars: a `HealthBar` instance per damaged building under `health_bars.bars`, its fraction set when the health changes, the bars' view shown while playing |
 | `src/look.c` | The render quality tiers, `oreelse.cycleQuality()`, `oreelse.srgb()` |
->>>>>>> 5d60df0198b57c10dfabb0d7730fed473b3e3a84
 | `src/stresstest.c` | The stress test: the late game base every run of a `--stresstest` session starts with (`OreStressTestApply`) |
 | `src/stresstest.h` | The stress test's components (`OreStressTest`, `OreStressKit`) and `ore_placement_build`, included by `src/game.h` |
 | `tools/linear_colors.py` | The conversion of the original's color bytes to the port's (see Colors), kept for reference |

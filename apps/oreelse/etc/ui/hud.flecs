@@ -188,19 +188,6 @@ template OreHud {
   const hpFrac: f32 = health.value / health.max
   const mineProgress: f32 = astronaut[OreMining].progress
 
-<<<<<<< HEAD
-=======
-  const hpWarn: Rgb = match hpFrac < 0.6 {
-    true: {252, 227, 177}
-    false: {185, 242, 200}
-  }
-
-  const hpColor: Rgb = match hpFrac < 0.3 {
-    true: {243, 165, 155}
-    false: hpWarn
-  }
-
->>>>>>> 5d60df0198b57c10dfabb0d7730fed473b3e3a84
   const waveFlash: Rgb = match fast {
     true: {252, 165, 155}
     false: {190, 120, 115}
