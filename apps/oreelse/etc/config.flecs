@@ -109,6 +109,59 @@ cfg {
   export const combustRange: f32 = 3
   export const combustRangeRadius: f32 = 4
 
+  // The astronaut's hit points. Any damage starts its hurt timer over; after playerRegenDelay
+  // seconds without damage it regenerates playerRegen hit points a second up to the maximum
+  export const playerHp: f32 = 100
+  export const playerRegen: f32 = 2
+  export const playerRegenDelay: f32 = 5
+
+  // The waves: the first starts firstWaveAt seconds into the run, every next one waveGap seconds
+  // after the last critter of the previous one spawned. Wave w has a budget of
+  // waveBudgetBase * waveBudgetGrowth ^ (w - 1), spent on at most waveUnitCap critters, at most
+  // waveBehemothCap of them behemoths. The costs and the first waves of the tiers are on the
+  // critter prefabs (OreWaveTier)
+  export const firstWaveAt: f32 = 90
+  export const waveGap: f32 = 50
+  export const waveBudgetBase: f32 = 2
+  export const waveBudgetGrowth: f32 = 1.3
+  export const waveUnitCap: i32 = 10000
+  export const waveBehemothCap: i32 = 25
+
+  // The style of a wave, one draw per wave: below swarmChance a swarm, below swarmChance +
+  // eliteChance an elite wave, otherwise mixed. A style's mix is the share of the budget of
+  // every tier, mite, skitter, brute and behemoth (the order of OreArsenal)
+  export const swarmChance: f32 = 0.25
+  export const eliteChance: f32 = 0.25
+  export const mixedMix: OreWaveMix = {tier: [0.25, 0.25, 0.25, 0.25]}
+  export const swarmMix: OreWaveMix = {tier: [0.7, 0.2, 0.1, 0]}
+  export const eliteMix: OreWaveMix = {tier: [0.05, 0.15, 0.55, 0.25]}
+
+  // The spawns of a wave: one every min(spawnStagger, spawnWindow / count) seconds, the first at
+  // once, on a side of the map edgeInset inside the edge tiles, edgeSpawnJitter off on both axes
+  export const spawnStagger: f32 = 0.45
+  export const spawnWindow: f32 = 20
+  export const edgeInset: f32 = 1
+  export const edgeSpawnJitter: f32 = 5
+
+  // A critter goes for the astronaut within aggroRange, unless a building is closer, and looks
+  // for a target again every retargetInterval * U(0.75, 1.25) seconds. It walks critterJitter
+  // times its heading jitter radians off the direction to its goal, and the building on the tile
+  // wallProbe ahead becomes its target
+  export const aggroRange: f32 = 14
+  export const retargetInterval: f32 = 0.5
+  export const critterJitter: f32 = 0.22
+  export const wallProbe: f32 = 1.2
+
+  // The crowd separation and the critter spatial index: cells of crowdCell, at most crowdBucket
+  // critters of a cell looked at and the crowdNeighbors most overlapping pairs of a critter kept
+  // (up to 12, ORE_CROWD_NEAR). A critter's push is scaled by crowdPush * dt and moves it at
+  // most crowdMaxSpeed * dt
+  export const crowdCell: f32 = 1.6
+  export const crowdPush: f32 = 30
+  export const crowdMaxSpeed: f32 = 14
+  export const crowdNeighbors: i32 = 6
+  export const crowdBucket: i32 = 12
+
   // The render quality tiers Low, Medium and High (OreQuality.tier), the quality.flecs of the
   // original: the resolution scale of the surfaces (2 renders at half the pixels), the shadow
   // map resolution and distance of the world view, and whether its Gtao and Bloom run

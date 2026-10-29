@@ -22,6 +22,7 @@ bake3 --target em --local-env apps/oreelse                     # build for the b
 python3 tools/integration.py e2e oreelse_flow oreelse_look     # the end-to-end scenarios
 python3 tools/integration.py e2e oreelse_mining oreelse_particles
 python3 tools/integration.py e2e oreelse_crafting oreelse_buildings
+python3 tools/integration.py e2e oreelse_critters
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -265,6 +266,64 @@ at half health gives 2 bricks and a gun turret at 10% 1 iron plate and 1 wire; i
 deposit under it (a drill's) is mined by the next swing. A building whose health drops to 0 is
 destroyed.
 
+### Critters
+
+| Critter | HP | Speed | Damage/s | Attack range | Radius | Wave cost | From wave |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Mite | 12 | 6.8 | 4 | 1.1 | 0.34 | 1 | 1 |
+| Skitter | 50 | 5.2 | 8 | 1.4 | 0.56 | 3 | 4 |
+| Brute | 100 | 2.4 | 50 | 1.9 | 1.1 | 15 | 7 |
+| Behemoth | 1400 | 1.2 | 100 | 3.2 | 2.2 | 120 | 13 |
+
+A critter goes for the astronaut when it is within 14 units, unless a building (measured to its
+center) is closer; with the astronaut farther away it goes for the nearest building anywhere,
+and with no building on the map for the center of the map. It looks again every 0.375 to
+0.625 seconds, and every moment it has no target. Within its attack range of the target's
+center it chews it: the target loses the critter's damage per second.
+
+There is no pathfinding and buildings do not block critters: walls are targets, not obstacles.
+A critter walks straight at its goal, a little off to the side by a heading of its own (up to
+0.22 radians), and the building on the tile 1.2 units ahead of it becomes its target, so it
+chews through whatever stands in its way.
+
+Critters do not stack: overlapping critters push each other apart, the light ones more than
+the heavy ones (a critter weighs its radius squared, so a behemoth shoves mites aside and barely
+moves). They stay on the map.
+
+A critter at 0 HP dies and counts as a kill of the run. A building at 0 HP is destroyed.
+
+### Waves
+
+The first wave comes 90 seconds into the run, every next one 50 seconds after the last critter
+of the previous wave spawned. The waves never end and grow by 30% each: wave w has a budget of
+`2 * 1.3^(w - 1)` (2 for wave 1, 4.39 for wave 4, 9.65 for wave 7, 16.3 for wave 9, 46.6 for
+wave 13, 133 for wave 17, 4031 for wave 30).
+
+Every wave has a style, drawn per wave, that sets the share of the budget of every critter:
+
+| Style | Chance | Mite | Skitter | Brute | Behemoth |
+| --- | --- | --- | --- | --- | --- |
+| Swarm | 25% | 0.7 | 0.2 | 0.1 | 0 |
+| Elite | 25% | 0.05 | 0.15 | 0.55 | 0.25 |
+| Mixed | 50% | 0.25 | 0.25 | 0.25 | 0.25 |
+
+The wave buys its critters one at a time, each picked at random with the weight share / cost
+among the critters its number unlocked that the budget left can pay for (and the most
+expensive affordable one when none of them has a weight), until the budget runs out. A wave
+holds at most 10000 critters and 25 behemoths. So wave 1 is two mites, and although brutes
+come from wave 7 and behemoths from wave 13, the first brute can be afforded in wave 9 and the
+first behemoth in wave 17.
+
+The critters of a wave spawn one by one, the first at once, then one every 0.45 seconds, faster
+for big waves so that a wave takes at most 20 seconds to spawn. Each spawns on a side of the map
+other than the previous critter's (north, south, west or east), at a random place along it a
+tile inside the edge, up to 5 units off on both axes.
+
+### Health
+
+The astronaut has 100 HP. After 5 seconds without damage it regenerates 2 HP a second up to
+the full 100. At 0 HP the game is lost.
+
 ### The jetpack
 
 Over a tile with a building the astronaut hovers on its jetpack 3 units up, rising at 7 units a
@@ -365,8 +424,10 @@ Every task of the port follows these.
 ## Critter and projectile models
 
 The critters and projectiles are prefabs ported from the original with its names, geometry and
-colors. They carry no gameplay data and stand still: OreCritters and OreWeapons give them their
-components, the effect tasks drive their named parts. Each faces +Z.
+colors. The critters carry their gameplay data (`OreHealth`, `OreSpeed`, `OreDamage`,
+`OreRange`, `OreRadius`, `OreWaveTier`) and the waves give their instances `OreCritter`,
+`OreTarget` and `OreVelocity`; OreWeapons gives the projectiles theirs, the effect tasks drive
+the named parts. Each faces +Z.
 
 ### Critters
 
@@ -461,7 +522,7 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 
 | File | Holds |
 | --- | --- |
-| `etc/oreelse.flecs` | The window, the camera, the sun, the atmosphere, the effects and the view, the render quality tier, the mining markers; includes the rest |
+| `etc/oreelse.flecs` | The window, the camera, the sun, the atmosphere, the effects and the view, the render quality tier, the mining markers, the critter tiers (`OreArsenal`); includes the rest |
 | `etc/config.flecs` | The constants `cfg.*` |
 | `etc/resources.flecs` | The item prefabs other than the buildings, with names and recipes |
 | `etc/buildings/*.flecs` | The building prefabs, models with their item, recipe, footprint, health and power |
@@ -470,11 +531,11 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 | `etc/world.flecs` | The ground and the basin |
 | `etc/boundary.flecs` | The hazard band around the playable area |
 | `etc/scenery.flecs` | The boulders and dunes of a run |
-| `etc/run.flecs` | The astronaut, the parent of the placed buildings and the singletons of a run, the order book and the selection included |
+| `etc/run.flecs` | The astronaut, the parents of the placed buildings and of the critters, and the singletons of a run, the order book, the selection and the waves included |
 | `etc/deposits.flecs` | The deposits of a run |
 | `etc/player.flecs` | The `Astronaut` template |
 | `etc/props/ore.flecs` | The `Ore` template of the deposits |
-| `etc/critters/` | The `Mite`, `Skitter`, `Brute` and `Behemoth` prefabs |
+| `etc/critters/` | The `Mite`, `Skitter`, `Brute` and `Behemoth` prefabs, models with their health, speed, damage, range, radius and wave tier |
 | `etc/projectiles/` | The `Tracer`, `Missile` and `LaserBeam` prefabs |
 | `etc/props/markers.flecs` | The `TileMarker` and `TileMarkerBad` prefabs |
 | `etc/particles.flecs` | Includes the particle effects |
@@ -496,6 +557,7 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 | `src/player.c` | Walking, the jetpack and the camera |
 | `src/inventory.c` | The inventory and the item components |
 | `src/mining.c` | Mining, demolishing and their tile marker |
+| `src/critters.c` | The waves, the critters' targets, attacks and moves, the crowd separation and the critter spatial index, their deaths, the astronaut's health and regen, `oreelse.spawn_critter()` |
 | `src/buildings.c` | The buildings in the tile grid, the wall connectors, demolish and salvage, destroyed buildings, the look of the ghosts |
 | `src/placement.c` | The selection, `canPlace`, the click and the drag, the pipette, the preview, `oreelse.select()`, `oreelse.pipette()`, `oreelse.placeStart()`, `oreelse.placeEnd()`, `oreelse.cancelDrag()` |
 | `src/craft.c` | The order book, the workers, `oreelse.craft_order()`, `oreelse.craft_cancel()` |
