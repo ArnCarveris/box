@@ -14,13 +14,13 @@ using box.geometry
 using box.material
 using oreelse
 
-const steel: Rgb = {172, 180, 194}
-const steelShade: Rgb = {112, 120, 136}
-const steelDeep: Rgb = {56, 62, 76}
-const hazard: Rgb = {240, 176, 58}
-const accent: Rgb = {92, 236, 222}
-const concrete: Rgb = {126, 122, 114}
-const soot: Rgb = {28, 29, 34}
+const steel: Rgb = {214, 219, 226}
+const steelShade: Rgb = {177, 182, 193}
+const steelDeep: Rgb = {129, 135, 148}
+const hazard: Rgb = {248, 216, 131}
+const accent: Rgb = {162, 246, 240}
+const concrete: Rgb = {187, 184, 178}
+const soot: Rgb = {93, 95, 102}
 
 prefab RocketPad {
   // The item: crafted through the order book into the inventory, placed by spending one

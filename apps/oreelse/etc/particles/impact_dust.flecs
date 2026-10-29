@@ -22,7 +22,7 @@ prefab ImpactDust {
       size: {0.11, 0.27},
       rotation: {-180, 180},
       spin: {-138, 138},
-      color: {198, 176, 148},
+      color: {228, 216, 200},
       seed: 222
     }
     ParticleBurst: {count: 12}
@@ -38,9 +38,9 @@ prefab ImpactDust {
       opacity: {0.84, 0.67, 0.44, 0},
       color: {
         start: {255, 255, 255},
-        early: {240, 242, 245},
-        late: {225, 229, 235},
-        end: {209, 215, 225}
+        early: {248, 249, 251},
+        late: {241, 243, 246},
+        end: {234, 237, 241}
       }
     }
   }

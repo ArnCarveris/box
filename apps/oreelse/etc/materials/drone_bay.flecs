@@ -10,7 +10,9 @@ using box.material
 using box.texture
 
 bay_tex {
-  TexturePath: {path: "apps/oreelse/etc/assets/drone_bay.svg", width: 256, height: 256}
+  TexturePath: {
+    path: "apps/oreelse/etc/assets/drone_bay.svg", width: 256, height: 256, linear: true
+  }
 }
 
 bay_norm {

@@ -10,14 +10,14 @@ using box.material
 using oreelse
 
 template Astronaut {
-  prop suit: Rgb = {228, 232, 240}
+  prop suit: Rgb = {243, 245, 248}
 
-  const suitShade: Rgb = {182, 189, 204}
-  const trim: Rgb = {236, 142, 56}
-  const visorColor: Rgb = {92, 236, 222}
-  const rubber: Rgb = {58, 64, 78}
-  const seam: Rgb = {148, 156, 172}
-  const hardware: Rgb = {96, 104, 120}
+  const suitShade: Rgb = {220, 223, 231}
+  const trim: Rgb = {246, 197, 129}
+  const visorColor: Rgb = {162, 246, 240}
+  const rubber: Rgb = {131, 137, 150}
+  const seam: Rgb = {200, 205, 214}
+  const hardware: Rgb = {165, 171, 182}
 
   leg_left {
     Position: {0.16, 0.66, 0}

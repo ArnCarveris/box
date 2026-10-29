@@ -623,7 +623,8 @@ static void box_draws_update_shape(
     box_render_transform_t was_transform;
     box_render_surface_t was_surface;
     const ShapeMesh *shape = ecs_get(world, e, ShapeMesh);
-    bool drawn = shape && shape->mesh && !ecs_has_id(world, e, EcsPrefab);
+    bool drawn = shape && shape->mesh && !ecs_has_id(world, e, EcsPrefab) &&
+        !ecs_has_id(world, e, EcsDisabled);
     bool kept = false, recorded = false;
     s->dirty = false;
     d->stats.processed ++;
@@ -866,6 +867,10 @@ static void box_draws_material_observers(
  * The observers that free slots match disabled entities too: a shape or a text deleted while
  * disabled would otherwise leave its dead entity in its batch.
  *
+ * The other observers skip disabled entities, so a shape that gets or loses EcsDisabled is
+ * written again: a disabled shape gives back its slots, an enabled one takes them with what
+ * it has now, also what changed while it was disabled.
+ *
  * @param world The world
  * @param d The state
  */
@@ -880,6 +885,10 @@ static void box_draws_observers(
         .query.terms = {{ .id = ecs_id(ShapeMesh) }},
         .query.flags = EcsQueryMatchDisabled,
         .events = { EcsOnRemove } }, BoxDrawsOnRemove);
+    box_draws_observer(world, d, "DrawsOnDisabled", (ecs_observer_desc_t){
+        .query.terms = {{ .id = EcsDisabled }},
+        .query.flags = EcsQueryMatchDisabled,
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnChange);
     box_draws_observer(world, d, "DrawsOnShape2D", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(Shape2D) }},
         .events = { EcsOnSet } }, BoxDrawsOnShading);

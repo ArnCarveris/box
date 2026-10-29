@@ -14,12 +14,12 @@ using box.geometry
 using box.material
 using oreelse
 
-const padSteel: Rgb = {172, 180, 194}
-const padShade: Rgb = {112, 120, 136}
-const padDeep: Rgb = {56, 62, 76}
-const padHazard: Rgb = {240, 176, 58}
-const padAccent: Rgb = {92, 236, 222}
-const padLampDead: Rgb = {248, 84, 72}
+const padSteel: Rgb = {214, 219, 226}
+const padShade: Rgb = {177, 182, 193}
+const padDeep: Rgb = {129, 135, 148}
+const padHazard: Rgb = {248, 216, 131}
+const padAccent: Rgb = {162, 246, 240}
+const padLampDead: Rgb = {252, 155, 145}
 
 prefab DronePad {
   // The item: crafted through the order book into the inventory, placed by spending one

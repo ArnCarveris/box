@@ -268,3 +268,74 @@ void Picking_first_hover_dense_mesh(
     bench_counter(b, "hits", hits);
     ecs_fini(world);
 }
+
+/** Rows and columns of the wave of critters */
+#define BENCH_WAVE_SIDE (40)
+
+void Picking_still_cursor_moving_wave_1600(
+    bench_t *b)
+{
+    // ui/picking
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 30, 30});
+    ecs_set(world, camera, Rotation, {-0.785f, 0, 0});
+    ecs_set(world, camera, Camera, {.fov = 50, .near_ = 0.5f, .far_ = 500});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    ecs_entity_t ground = ecs_new(world);
+    ecs_set(world, ground, Position, {0, -0.5f, 0});
+    ecs_set(world, ground, Box, {400, 1, 400});
+
+    /* A critter of 8 parts, none of them Interactive */
+    ecs_entity_t critter = ecs_new_w_id(world, EcsPrefab);
+    int32_t i;
+    for (i = 0; i < 8; i ++) {
+        ecs_entity_t part = ecs_new_w_pair(world, EcsChildOf, critter);
+        ecs_set(world, part, Position, {(float)(i % 2) * 0.4f - 0.2f, (float)(i / 2) * 0.3f,
+            0});
+        ecs_set(world, part, Box, {0.3f, 0.3f, 0.3f});
+    }
+
+    /* A wave around the point under the cursor, every critter turning every frame */
+    for (i = 0; i < BENCH_WAVE_SIDE * BENCH_WAVE_SIDE; i ++) {
+        ecs_entity_t e = ecs_new_w_pair(world, EcsIsA, critter);
+        ecs_set(world, e, Position, {(float)(i % BENCH_WAVE_SIDE) * 1.5f - 30.0f, 0,
+            (float)(i / BENCH_WAVE_SIDE) * 1.5f - 30.0f});
+        ecs_set(world, e, Rotation, {0, 0, 0});
+        ecs_set(world, e, AngularVelocity, {0, 1, 0});
+    }
+
+    /* A HUD with one button */
+    ecs_entity_t hud = ecs_new(world);
+    ecs_set(world, hud, Scene, {0});
+    ecs_entity_t hud_camera = ecs_new_w_pair(world, EcsChildOf, hud);
+    ecs_set(world, hud_camera, Position, {0, 0, 100});
+    ecs_set(world, hud_camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f,
+        .far_ = 1000});
+    ecs_entity_t hud_view = ecs_new(world);
+    ecs_set(world, hud_view, View, {.camera = hud_camera});
+    ecs_entity_t button = ecs_new_w_pair(world, EcsChildOf, hud);
+    ecs_set(world, button, Position, {-500, 300, 0});
+    ecs_set(world, button, Rect, {80, 40});
+    ecs_add(world, button, Interactive);
+
+    ecs_entity_t system = ecs_lookup(world, "box.picking.PickingUpdate");
+    ecs_measure_system_time(world, true);
+    box_input_mouse_move(world, 640, 360, false);
+    ecs_progress(world, 0.016f);
+    ecs_progress(world, 0.016f);
+    const ecs_system_t *s = system ? ecs_system_get(world, system) : NULL;
+    ecs_ftime_t start = s ? s->time_spent : 0;
+    int32_t frames = 0;
+    while (bench_iter(b)) {
+        ecs_progress(world, 0.016f);
+        frames ++;
+    }
+
+    s = system ? ecs_system_get(world, system) : NULL;
+    bench_counter(b, "picking_ms_per_frame",
+        s && frames ? (double)(s->time_spent - start) * 1000.0 / frames : 0);
+    ecs_fini(world);
+}

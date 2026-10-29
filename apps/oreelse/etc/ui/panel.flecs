@@ -14,7 +14,9 @@ using box.picking
 // The hazard strip of the cap, rasterized at 2048x12
 ui_textures {
   hazard_strip {
-    TexturePath: {path: "apps/oreelse/etc/ui/hazard_strip.svg", width: 2048, height: 12}
+    TexturePath: {
+      path: "apps/oreelse/etc/ui/hazard_strip.svg", width: 2048, height: 12, linear: true
+    }
   }
 }
 
@@ -47,8 +49,8 @@ template Panel {
   prop height: f32 = 100
   prop cap: bool = true
   prop capH: f32 = 7
-  prop fill: rgba = {21, 23, 27, 236}
-  prop edge: rgba = {74, 80, 90, 255}
+  prop fill: rgba = {81, 85, 92, 236}
+  prop edge: rgba = {147, 152, 160, 255}
   prop block: bool = true
 
   const scale = max(width / stripWidth, capH / stripHeight)

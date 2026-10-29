@@ -5,8 +5,8 @@ critter waves, and build rockets to ship Luminite into orbit. Install a life sup
 rocket and you leave with it (win). You lose when the swarm kills you. The waves grow forever.
 
 The game is played top down on a 48x48 tile grid, with a camera that follows the astronaut. It
-is the port of flecs-engine's ore_else to box; the original's sources are in
-`reference/ore_else` and `reference/PORTING.md` maps the features it uses to box.
+is the port of flecs-engine's ore_else to box, complete but for the few rendering features box
+lacks (see Not ported). From flecs-engine to box tells how the original maps to box.
 
 ## Build, run and test
 
@@ -775,7 +775,7 @@ and a restart keeps the tier.
 
 ## Conventions of the port
 
-Every task of the port follows these.
+The port follows these; new code keeps to them.
 
 - **Structure** like `apps/bunnyhopper`: `project.json` (an application using box, its
   Emscripten section embedding `../../etc` and `../../apps/oreelse/etc`),
@@ -861,12 +861,95 @@ Every task of the port follows these.
   scenarios write those through the REST endpoints of the same port (`PUT /component/...`,
   `put` in `oreelse_flow.py`). Visual scenes include `apps/oreelse/test/visual/setup/seed`
   before the game for a fixed map.
-- **Visuals** are ported from `reference/ore_else` following `reference/PORTING.md`, with the
+- **Visuals** are ported from the original as From flecs-engine to box describes, with the
   original's prefab and part names (`Ore`, `Astronaut`, `JetPlume`, `GroundSurface`, ...), and
   never as placeholder geometry. Animation runs in C systems that only run while `Playing`;
   visuals read the game's state instead of keeping their own copy.
-- **README**: this file describes the game like a player's manual (controls, rules); each task
-  adds its mechanics to it.
+- **Colors** are the original's linear light, in the port's bytes (see Colors below).
+- **README**: this file describes the game like a player's manual (controls, rules); a change
+  to the mechanics updates it.
+
+## Colors
+
+flecs-engine reads a color byte `b` as the linear light `b / 255` and samples its textures as
+they are stored (`RGBA8Unorm`, no sRGB decoding), then writes to an sRGB target. Box decodes
+color bytes and the color layers of textures (albedo, emissive, particle sprites, UI images)
+from sRGB. With the original's bytes the port looked darker and more saturated than the
+original, so every color reaches box at the original's linear value:
+
+- **Color bytes** of the port are the sRGB encoding of the original's:
+  `round(255 * srgb_encode(b / 255))` per channel, alpha (and a `Tint`'s strength) unchanged.
+  That covers every color: the materials (`Rgb`), `Emissive`, the lights, the particle colors
+  and color curves, the `Tint`s of the ghosts and corpses, the sun, the clear color and the UI
+  (palette, panels, texts, borders, the HUD), whose colors went through the same linear path
+  in the original. `tools/linear_colors.py` converted them once (`apply`, over `etc` and
+  `test/visual`) and is kept for reference: `linear_colors.py encode r g b` gives the bytes of a
+  new color of the original, `linear_colors.py decode r g b` the original's bytes of a color of
+  the port, to read it against the original. The comments quote the original's bytes.
+- **Colors computed in script** compute the original's bytes and encode them with
+  `oreelse.srgb(v)` (`src/look.c`): the random tints of the flora (`scenery.flecs`), and the fill
+  of the health bars, which blends `cfg.hpBarFull`, `hpBarMid` and `hpBarLow` as the original
+  does; those three keep the original's bytes.
+- **Color textures** load with `TexturePath.linear` (`include/box/texture.h`), which encodes
+  their pixels to sRGB on load, so the color layers read the stored values as linear light as
+  the original does; the SVGs stay unchanged. The normal and ORM maps load as they are.
+
+The conversion stays in the app: box, its visual baselines and the other apps keep decoding
+color bytes as sRGB (bunnyhopper kept its original's bytes). The colors stay plain bytes in
+the same places, and the C code, which takes every color from the scripts, did not change.
+The scenarios compare colors with `box_client.srgb()` of the original's bytes.
+
+## From flecs-engine to box
+
+How the features of flecs-engine the original uses map to box, for reading the port against the
+original and for porting more of it.
+
+- **Transforms**: `Position3`, `Rotation3`, `Scale3` are `Position`, `Rotation`, `Scale`; animated
+  parts have `DynamicTransform`. flecs-engine composes the Euler angles as `Rx * Ry * Rz`, box as
+  `Ry * Rx * Rz`; they agree unless both x and y are non-zero, so the parts turned in both (the
+  behemoth's tusks and horns, the pad clamp, the missiles' pitch and yaw, the corpses) have their
+  angles converted. `LookAt` has no equivalent: the camera and the sun have a computed
+  `Rotation`. Box's `Camera.fov` is in degrees.
+- **Geometry**: `Box`, `Quad`, `Sphere`, `HemiSphere` and `IcoSphere` are the same. flecs-engine's
+  `Cylinder` and `Cone` have a built-in radius of 0.5; box's default to 0, so the port sets
+  `radius: 0.5`. The original's immediate draws (the laser beam, the tile markers, the ghosts)
+  are persistent entities that are moved, shown and hidden.
+- **Materials**: `Rgba` is `Rgb` plus `Opacity` below 255 alpha, in the port's bytes (see
+  Colors). `AlphaBlend` is `Opacity`, or `AlphaCutoff` for the textured fronds and membranes.
+  `PbrMaterial`, `Emissive` and `TextureTransform` map one to one; `Emissive` is not affected by
+  `Tint`, so the ghosts and corpses, recolored with a `Tint` on their root, have the emission of
+  their parts turned off by a system (`OreGhostDim`, `OreCorpseChar`). `Texture` and `Svg` are
+  `TexturePath`. `PbrTextures.roughness` is `PbrTextures.orm` (red occlusion, green roughness,
+  blue metallic): `terrain_dirt_orm.svg` is the original's `terrain_dirt_rough.svg` with red and
+  blue at 255.
+- **Lights**: `PointLight` has the same units, but box's falloff `(1 - (d/r)^4)^2 / d^2` is much
+  brighter within a unit of the light than flecs-engine's `(1 - (d/r)^4) / (d^2 + 1)`; the small
+  lamps are retuned by eye. The sun is a `DirectionalLight` with an `Atmosphere`.
+- **Particles**: flecs-engine's shared pools become one box layer per burst or emitter, with
+  the pool's settings in its `ParticleAppearance`, `ParticleForces` and `ParticleCurves`
+  (`etc/particles/pools.flecs`); the envelopes are sampled at t = 0, 1/3, 2/3, 1, angles are in
+  degrees, and the one shot effects play with `box_particle_burst_at`. A squash stretch below 1
+  and `turbulence_speed` are left out.
+- **Scene** (`etc/oreelse.flecs`): the ambient light is the world view's `lighting` with the
+  `Atmosphere` environment at 0.5, `SSAO` is `Gtao`, `Tony` is
+  `Tonemap {operator_: TonyMcMapface}`, the shadow map the view's `shadows` (4096, 140) and
+  `screen_px_threshold` its `culling.min_dimension_px`; `Bloom` and `AutoExposure` are the same.
+- **Animation**: the original's animation components (`Spinner`, `Piston`, `Shake`, `Vent`,
+  `Limb`, ...) are app components and C systems that run only while `Playing`, not box's
+  `AngularVelocity`, which ignores the game state.
+
+## Not ported
+
+The rendering features box does not have:
+
+- **Surface wear and scorch**: flecs-engine's `SurfaceWear` and `SurfaceEffects` (dust, grime,
+  scratches, grain, streaks, edge wear, burn), which age the buildings and scorch them where
+  they take damage, and the C that drives them.
+- **Cloud shadows.**
+- **Stars**, and the top of atmosphere settings of the celestial light.
+- **Particles brighter than 1**: box clamps particle color and opacity to [0, 1], so the
+  original's emissive glow, fire and ember pools are dimmer; additive halo layers make up for it
+  where it matters.
 
 ## Critter and projectile models
 
@@ -894,7 +977,7 @@ The parts marked glowing are emissive.
 
 The behemoth's back plates are pivots with `OreLimb` like the legs (a swing of 0.05), each with
 a `shell`, a `ridge`, a glowing `seam`, `barb_left` and `barb_right`. Its tusks and horns are
-turned in two axes; their angles are converted to box's Euler order (`reference/PORTING.md`).
+turned in two axes; their angles are converted to box's Euler order (see From flecs-engine to box).
 
 The animation (`src/critter_fx.c`) reads the critters' state. `OreCritter.anim`, the walk cycle,
 starts at U(0, 2 PI) and advances by `dt * speed * step` while the critter walks (not while it
@@ -1054,7 +1137,7 @@ its tile in the grid.
 | `etc/props/light.flecs` | The `Light` template of the lamps |
 | `etc/buildings/` | The building prefabs, one file per building, and the drone (see Building models) |
 | `etc/rocket/` | The `Rocket` template and its parts `RocketBell`, `RocketBay` and `RocketPort`, and the `PadClamp` template of the rocket pad |
-| `etc/assets/` | The original's textures (SVG), unchanged, and `terrain_dirt_orm.svg` |
+| `etc/assets/` | The original's textures (SVG), unchanged, and `terrain_dirt_orm.svg`; the color textures load with `linear: true` |
 | `etc/ui/palette.flecs` | The colors of the UI, `palette.*` |
 | `etc/ui/icons.flecs` | The icon textures, `icons.*`, which the items name with `OreIcon` |
 | `etc/ui/panel.flecs` | The `Panel` template, the chrome of every panel: the plate, its edge, the hazard strip and the `InputBlocker` |
@@ -1086,7 +1169,8 @@ its tile in the grid.
 | `src/power.c` | Production, demand and the blackout, the drills, the factories' crafters, the status lamps, `oreelse.power_set(category, level)` |
 | `src/rocket.c` | The rocket state, installing, uninstalling, loading, the launch and the flight, the look of the flight (`OreRocketFx`: the shake, the clamps, the flames and the smoke), `oreelse.rocket_install()`, `oreelse.rocket_uninstall()`, `oreelse.rocket_load()`, `oreelse.rocket_launch()`, `oreelse.craft_key()` |
 | `src/health_bars.c` | The health bars: a `HealthBar` instance per damaged building under `health_bars.bars`, its fraction set when the health changes, the bars' view shown while playing |
-| `src/look.c` | The render quality tiers, `oreelse.cycleQuality()` |
+| `src/look.c` | The render quality tiers, `oreelse.cycleQuality()`, `oreelse.srgb()` |
 | `src/stresstest.c` | The stress test: the late game base every run of a `--stresstest` session starts with (`OreStressTestApply`) |
 | `src/stresstest.h` | The stress test's components (`OreStressTest`, `OreStressKit`) and `ore_placement_build`, included by `src/game.h` |
+| `tools/linear_colors.py` | The conversion of the original's color bytes to the port's (see Colors), kept for reference |
 | `src/particles.c` | The helpers that play the effects (`ore_burst`, `ore_burst_aimed`, `ore_explosion`, `ore_combust`), the flash of their lights, `oreelse.explosion()`, `oreelse.combust()` |

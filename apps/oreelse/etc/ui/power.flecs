@@ -42,22 +42,22 @@ template PowerBar {
   const lit = level <= tone
 
   const warnColor: Rgb = match hover {
-    true: {252, 190, 130}
-    false: {240, 152, 72}
+    true: {254, 224, 189}
+    false: {248, 203, 145}
   }
 
   const okColor: Rgb = match hover {
-    true: {174, 242, 192}
-    false: {124, 226, 148}
+    true: {215, 249, 225}
+    false: {185, 242, 200}
   }
 
   const liveColor: Rgb = match hover {
-    true: {156, 246, 238}
-    false: {92, 236, 222}
+    true: {205, 251, 247}
+    false: {162, 246, 240}
   }
 
   const offColor: Rgb = match hover {
-    true: {34, 37, 44}
+    true: {102, 106, 115}
     false: palette.well
   }
 
@@ -79,7 +79,7 @@ template PowerBar {
   }
   Rect: {1, 1}
   Rgb: barColor
-  Border: {width: 1, radius: 2, color: {52, 56, 64, 255}}
+  Border: {width: 1, radius: 2, color: {125, 129, 137, 255}}
 
   // Entering and leaving in loops of their own: a change of the props or of the state read
   // evaluates the template again and restarts its async blocks, and a single loop restarted

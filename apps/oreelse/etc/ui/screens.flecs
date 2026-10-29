@@ -27,20 +27,24 @@ using oreelse
 // rasterized at 512x512 as the original's
 ui_signs {
   mine {
-    TexturePath: {path: "apps/oreelse/etc/ui/signs/mine.svg", width: 512, height: 512}
+    TexturePath: {path: "apps/oreelse/etc/ui/signs/mine.svg", width: 512, height: 512, linear: true}
   }
 
   defend {
-    TexturePath: {path: "apps/oreelse/etc/ui/signs/defend.svg", width: 512, height: 512}
+    TexturePath: {
+      path: "apps/oreelse/etc/ui/signs/defend.svg", width: 512, height: 512, linear: true
+    }
   }
 
   escape {
-    TexturePath: {path: "apps/oreelse/etc/ui/signs/escape.svg", width: 512, height: 512}
+    TexturePath: {
+      path: "apps/oreelse/etc/ui/signs/escape.svg", width: 512, height: 512, linear: true
+    }
   }
 }
 
 // The plate of the three screens and the height of their hazard strip
-const screenFill: rgba = {15, 16, 19, 252}
+const screenFill: rgba = {69, 71, 77, 252}
 const screenCap: f32 = 7
 
 // The text sizes of the screens: the headings, the lines and the small lines
@@ -61,7 +65,7 @@ const titleHeight: f32 = 640
 const signWidth: f32 = 260
 const signHeight: f32 = 240
 const signGap: f32 = 24
-const signFill: rgba = {24, 26, 31, 255}
+const signFill: rgba = {86, 90, 98, 255}
 const signArtWidth: f32 = 170
 const signArtHeight: f32 = 150
 const signArtX: f32 = 45
@@ -149,7 +153,7 @@ template OreControls {
 // A sign of the title screen: a panel edged in its color with its art and its label
 template OreSign {
   prop label: string = ""
-  prop color: Rgb = {226, 231, 238}
+  prop color: Rgb = {242, 244, 247}
   prop art: entity = 0
 
   Panel: {
@@ -270,13 +274,13 @@ template OreQualityButton {
     }
     Rect: {1, 1}
     if hover {
-      Rgb: {38, 42, 49}
+      Rgb: {108, 113, 121}
       Opacity: {240 / 255.0}
     } else {
-      Rgb: {21, 23, 27}
+      Rgb: {81, 85, 92}
       Opacity: {236 / 255.0}
     }
-    Border: {width: 1, radius: 3, color: {74, 80, 90, 255}}
+    Border: {width: 1, radius: 3, color: {147, 152, 160, 255}}
   }
 
   caption {

@@ -23,7 +23,7 @@ prefab MineBurst {
       size: {0.045, 0.115},
       rotation: {-180, 180},
       spin: {-286, 286},
-      color: {255, 224, 158},
+      color: {255, 241, 206},
       seed: 223
     }
     ParticleBurst: {count: 14}
@@ -41,9 +41,9 @@ prefab MineBurst {
       opacity: {1, 0.93, 0.79, 0},
       color: {
         start: {255, 255, 255},
-        early: {232, 219, 219},
-        late: {205, 195, 207},
-        end: {176, 174, 202}
+        early: {245, 238, 238},
+        late: {232, 227, 233},
+        end: {216, 215, 230}
       }
     }
   }

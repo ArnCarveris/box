@@ -16,12 +16,12 @@ using box.geometry
 using box.material
 using oreelse
 
-const beheShell: Rgb = {86, 132, 58}
-const beheDark: Rgb = {50, 82, 38}
-const beheLimb: Rgb = {34, 56, 30}
-const beheEye: Rgb = {168, 255, 96}
-const beheSpot: Rgb = {126, 255, 158}
-const beheHorn: Rgb = {228, 224, 186}
+const beheShell: Rgb = {157, 190, 131}
+const beheDark: Rgb = {122, 154, 108}
+const beheLimb: Rgb = {102, 129, 96}
+const beheEye: Rgb = {212, 255, 165}
+const beheSpot: Rgb = {187, 255, 206}
+const beheHorn: Rgb = {243, 241, 222}
 
 prefab Behemoth {
   OreHealth: {value: 1400, max: 1400}

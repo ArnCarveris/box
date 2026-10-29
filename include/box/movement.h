@@ -9,6 +9,10 @@
  * Systems write without notifying observers, so Velocity and AngularVelocity imply
  * DynamicTransform (also from script), which spreads to every descendant and stays when the
  * velocity is removed.
+ *
+ * Velocity implies Position and AngularVelocity implies Rotation (which implies Position), also
+ * from script and in prefab instances, so an entity with only a velocity moves from the next
+ * frame. An existing Position or Rotation keeps its value; a missing one starts at zero.
  */
 
 #ifndef BOX_MOVEMENT_H

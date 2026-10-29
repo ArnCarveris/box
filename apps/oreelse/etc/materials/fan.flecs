@@ -10,7 +10,9 @@ using box.material
 using box.texture
 
 fan_tex {
-  TexturePath: {path: "apps/oreelse/etc/assets/fan_blades.svg", width: 256, height: 256}
+  TexturePath: {
+    path: "apps/oreelse/etc/assets/fan_blades.svg", width: 256, height: 256, linear: true
+  }
 }
 
 fan_norm {

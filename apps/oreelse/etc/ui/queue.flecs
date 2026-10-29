@@ -59,7 +59,7 @@ template QueueRow {
 
   const labelTone: Rgb = match sub {
     true: palette.soft
-    false: {224, 229, 237}
+    false: {241, 243, 247}
   }
 
   const labelColor: Rgb = match stalled {
@@ -68,8 +68,8 @@ template QueueRow {
   }
 
   const fillColor: Rgb = match stalled {
-    true: {104, 36, 30}
-    false: {102, 74, 26}
+    true: {171, 105, 96}
+    false: {170, 147, 90}
   }
 
   Layout: {}
@@ -86,11 +86,11 @@ template QueueRow {
   // else none
   if hot {
     Rect: {1, 1}
-    Rgb: {52, 56, 66}
-    Border: {width: 1, radius: 3, color: {228, 96, 84, 255}}
+    Rgb: {125, 129, 139}
+    Border: {width: 1, radius: 3, color: {243, 165, 155, 255}}
   } else if active {
     Rect: {1, 1}
-    Rgb: {15, 16, 20}
+    Rgb: {69, 71, 79}
     Border: {radius: 3}
   }
 
@@ -115,7 +115,7 @@ template QueueRow {
         width: {mode: Fixed, value: 7}, height: {mode: Fixed, value: 2}
       }
       Rect: {1, 1}
-      Rgb: {92, 98, 112}
+      Rgb: {162, 167, 177}
     }
   }
 

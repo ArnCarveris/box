@@ -32,8 +32,8 @@ template Frondstalk {
   prop blade: f32 = 1.65
   prop bladeWide: f32 = 0.6
   prop stalkR: f32 = 0.105
-  prop stalkTint: Rgb = {98, 78, 84}
-  prop rootTint: Rgb = {80, 64, 60}
+  prop stalkTint: Rgb = {167, 150, 155}
+  prop rootTint: Rgb = {152, 137, 133}
 
   const h = height * (0.78 + floraRng.f(0.48))
   const lean = 0.05 + floraRng.f(0.22)
@@ -174,8 +174,8 @@ template Ashcup {
   prop leaves: i32 = 7
   prop size: f32 = 0.68
   prop nubs: i32 = 3
-  prop rootTint: Rgb = {84, 70, 66}
-  prop nubTint: Rgb = {150, 128, 118}
+  prop rootTint: Rgb = {155, 143, 139}
+  prop nubTint: Rgb = {202, 188, 181}
 
   const s = size * (0.68 + floraRng.f(0.7))
   const tone = floor(floraRng.f(1.999))
@@ -241,10 +241,10 @@ template Quillbulb {
   prop size: f32 = 0.62
   prop quills: i32 = 7
   prop veils: i32 = 3
-  prop bulbTint: Rgb = {138, 122, 116}
-  prop quillTint: Rgb = {112, 88, 100}
-  prop rootTint: Rgb = {82, 68, 62}
-  prop podTint: Rgb = {214, 122, 154}
+  prop bulbTint: Rgb = {194, 184, 180}
+  prop quillTint: Rgb = {177, 159, 168}
+  prop rootTint: Rgb = {154, 141, 135}
+  prop podTint: Rgb = {236, 184, 204}
   prop podGlow: f32 = 0.35
 
   const s = size * (0.72 + floraRng.f(0.62))

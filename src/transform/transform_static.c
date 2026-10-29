@@ -527,6 +527,17 @@ void TransformStaticImport(
         .callback = TransformStatic_OnChange
     });
 
+    transformStaticObserver(world, state, (ecs_observer_desc_t){
+        .entity = ecs_entity(world, { .name = "TransformStatic_OnEnable" }),
+        .query.terms = {
+            { .id = EcsDisabled, .src.id = EcsSelf },
+            { .id = ecs_id(Position), .src.id = EcsSelf, .inout = EcsInOutFilter }
+        },
+        .query.flags = EcsQueryMatchDisabled,
+        .events = { EcsOnRemove },
+        .callback = TransformStatic_OnChange
+    });
+
     state->refs ++;
     ecs_system(world, {
         .entity = ecs_entity(world, {

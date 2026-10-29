@@ -29,7 +29,7 @@ prefab PoofBurst {
       size: {0.09, 0.21},
       rotation: {-180, 180},
       spin: {-126, 126},
-      color: {198, 168, 132},
+      color: {228, 212, 190},
       seed: 224
     }
     ParticleBurst: {count: 18}
@@ -45,9 +45,9 @@ prefab PoofBurst {
       opacity: {1, 0.82, 0.58, 0},
       color: {
         start: {255, 255, 255},
-        early: {235, 237, 243},
-        late: {214, 220, 230},
-        end: {194, 202, 218}
+        early: {246, 247, 250},
+        late: {236, 239, 244},
+        end: {226, 230, 238}
       }
     }
   }

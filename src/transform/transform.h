@@ -88,6 +88,9 @@ void TransformDynamicImport(
 
 /** Register the systems and observers of static transforms.
  *
+ * Changes of a disabled entity do not reach the observers, so an entity that is enabled again
+ * computes its transform from what it has now.
+ *
  * @param world The world
  */
 void TransformStaticImport(

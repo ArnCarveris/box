@@ -17,15 +17,15 @@ using box.geometry
 using box.material
 using box.light
 
-const lightHousing: Rgb = {42, 46, 56}
-const lightOff: Rgb = {40, 44, 52}
-const lightGlass: Rgb = {206, 226, 236}
+const lightHousing: Rgb = {113, 118, 129}
+const lightOff: Rgb = {110, 115, 125}
+const lightGlass: Rgb = {232, 242, 246}
 
 template Light {
-  prop color: Rgb = {92, 236, 222}
-  prop dead: Rgb = {248, 84, 72}
-  prop warn: Rgb = {240, 152, 72}
-  prop ok: Rgb = {124, 226, 148}
+  prop color: Rgb = {162, 246, 240}
+  prop dead: Rgb = {252, 155, 145}
+  prop warn: Rgb = {248, 203, 145}
+  prop ok: Rgb = {185, 242, 200}
   prop on = true
   prop status = false
   prop work = false

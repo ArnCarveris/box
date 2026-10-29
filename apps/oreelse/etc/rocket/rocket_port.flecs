@@ -4,8 +4,8 @@
 using box.geometry
 using box.material
 
-const rocketDark: Rgb = {48, 54, 68}
-const cargoGlow: Rgb = {92, 236, 222}
+const rocketDark: Rgb = {120, 127, 141}
+const cargoGlow: Rgb = {162, 246, 240}
 
 template RocketPort {
   prop lit: bool = false

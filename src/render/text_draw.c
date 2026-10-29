@@ -324,7 +324,8 @@ void box_draws_text_update(
     uint8_t kinds)
 {
     const TextGlyphs *tg = ecs_get(world, e, TextGlyphs);
-    bool drawn = tg && ecs_has(world, e, Text) && !ecs_has_id(world, e, EcsPrefab);
+    bool drawn = tg && ecs_has(world, e, Text) && !ecs_has_id(world, e, EcsPrefab) &&
+        !ecs_has_id(world, e, EcsDisabled);
     int32_t i, count = drawn ? ecs_vec_count(&tg->glyphs) : 0;
     const box_text_glyph_t *glyphs = drawn ? ecs_vec_first(&tg->glyphs) : NULL;
     box_draw_tint_t tint;

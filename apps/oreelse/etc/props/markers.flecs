@@ -7,12 +7,12 @@ using box.material
 
 prefab TileMarker {
   Box: {1.92, 0.06, 1.92}
-  Rgb: {236, 244, 150}
-  Emissive: {strength: 1.1, color: {236, 244, 150}}
+  Rgb: {246, 250, 202}
+  Emissive: {strength: 1.1, color: {246, 250, 202}}
 }
 
 prefab TileMarkerBad {
   Box: {1.92, 0.06, 1.92}
-  Rgb: {248, 96, 84}
-  Emissive: {strength: 1.2, color: {248, 96, 84}}
+  Rgb: {252, 165, 155}
+  Emissive: {strength: 1.2, color: {252, 165, 155}}
 }

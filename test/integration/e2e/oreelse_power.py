@@ -14,7 +14,7 @@ import json
 import urllib.error
 import urllib.request
 
-from box_client import DELTA_TIME, parse_value
+from box_client import DELTA_TIME, parse_value, srgb
 
 APP = "apps/oreelse"
 SEED = 8
@@ -59,11 +59,12 @@ ENGINE_TIME = 30
 DOZE_TIME = 0.8
 SWING_SLACK = 1.5
 
-# The colors of a status lamp (the Light template's props) and the strength of a drill's lamps
-DEAD = (248, 84, 72)
-WARN = (240, 152, 72)
-OK = (124, 226, 148)
-LIVE = (92, 236, 222)
+# The colors of a status lamp (the Light template's props), the original's bytes encoded as the
+# port writes them (apps/oreelse/README.md, Colors), and the strength of a drill's lamps
+DEAD = srgb((248, 84, 72))
+WARN = srgb((240, 152, 72))
+OK = srgb((124, 226, 148))
+LIVE = srgb((92, 236, 222))
 DRILL_LAMP = 2.8
 
 # A corner of the map of seed 8 without deposits, where the cases build: rows and columns 3 to

@@ -16,6 +16,7 @@ tells how much play the frames were.
 """
 import math
 
+from box_client import srgb
 from oreelse_power import (DRILL, ENGINE, FACTORY, PANEL, PLAYER, crafter, deposit_of, deposits,
                            entity, lamps_of, order, orders, place, play, rows_of, run_script,
                            set_state, start, wait_lamps, wait_power)
@@ -41,9 +42,10 @@ SLIDER = {"rest": 0.12, "travel": 0.24, "speed": 0.9}
 BIT_SPIN = 7
 BIT_REST = 0
 
-# The point light of a status lamp (cfg.statusLampLight) and the OK color of a lamp at level 2
+# The point light of a status lamp (cfg.statusLampLight) and the OK color of a lamp at level 2,
+# the original's bytes encoded as the port writes them (apps/oreelse/README.md, Colors)
 STATUS_LIGHT = 0.35
-OK = (124, 226, 148)
+OK = srgb((124, 226, 148))
 
 TOLERANCE = 1e-3
 

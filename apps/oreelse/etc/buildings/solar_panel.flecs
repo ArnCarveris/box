@@ -10,11 +10,11 @@ using box.geometry
 using box.material
 using oreelse
 
-const steelShade: Rgb = {112, 120, 136}
-const steelDeep: Rgb = {56, 62, 76}
-const hazard: Rgb = {240, 176, 58}
-const accent: Rgb = {92, 236, 222}
-const solarFrame: Rgb = {96, 104, 122}
+const steelShade: Rgb = {177, 182, 193}
+const steelDeep: Rgb = {129, 135, 148}
+const hazard: Rgb = {248, 216, 131}
+const accent: Rgb = {162, 246, 240}
+const solarFrame: Rgb = {165, 171, 184}
 
 prefab SolarPanel {
   // The item: crafted through the order book into the inventory, placed by spending one
