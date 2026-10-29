@@ -153,8 +153,8 @@ ECS_STRUCT(TextEditStatus, {
  * entity box.ui counts an on.activate of flecs for (see etc/ui/widgets.flecs). The focus events,
  * focus() and on.activate are those of flecs.script.input, whose focus box.ui drives.
  *
- * Creates box.ui.theme with a UiTheme and loads the widget library box.widgets as a managed
- * script from etc/ui/widgets.flecs, found as a Font.path is; without it there are no widgets.
+ * Creates box.ui.theme with a UiTheme. The widget library box.widgets (etc/ui/widgets.flecs) is
+ * not loaded: an application that uses widgets loads it as a script.
  * Clears the flecs focus, which box.input gave its screen, since nothing is Focused yet.
  *
  * @param world The world

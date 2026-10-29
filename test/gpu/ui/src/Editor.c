@@ -43,8 +43,8 @@ static bool editor_in_scope(
     return root != 0 && e == root;
 }
 
-/** Create a headless world with a game view that clears to blue and a surface that is written
- * to a file.
+/** Create a headless world with the widget library, a game view that clears to blue and a
+ * surface that is written to a file.
  *
  * @param file Name of the PNG in the temporary folder
  * @param width Width of the surface
@@ -60,6 +60,12 @@ static ecs_world_t* editor_world(
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    char *widgets = box_app_locate("etc/ui/widgets.flecs");
+    test_assert(ecs_script(world, {
+        .entity = ecs_entity(world, { .name = "box.ui.widgets" }),
+        .filename = widgets
+    }) != 0);
+    ecs_os_free(widgets);
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);

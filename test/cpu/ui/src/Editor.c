@@ -19,13 +19,19 @@
 /** Path of the body of the panel that later widgets fill */
 #define EDITOR_BODY BOX_EDITOR_PANEL ".body"
 
-/** Create a world with box and no surface.
+/** Create a world with box, the widget library and no surface.
  *
  * @return The world
  */
 static ecs_world_t* editor_world(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    char *widgets = box_app_locate("etc/ui/widgets.flecs");
+    test_assert(ecs_script(world, {
+        .entity = ecs_entity(world, { .name = "box.ui.widgets" }),
+        .filename = widgets
+    }) != 0);
+    ecs_os_free(widgets);
 
     return world;
 }

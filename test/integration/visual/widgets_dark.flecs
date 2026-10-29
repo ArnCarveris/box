@@ -1,8 +1,8 @@
-// The widget gallery of etc/scenes/widgets.flecs in the dark theme with every section in view:
+// The widget gallery of etc/ui/gallery.flecs in the dark theme with every section in view:
 // the window is made tall enough for the page not to scroll and the cameras of the gallery show
 // all of it in the capture. The form has its Name field focused with "idg" selected and the caret
 // on, and its Shape dropdown open with Sphere highlighted over the sliders.
-include etc/scenes/widgets
+include etc/ui/gallery
 
 using flecs.script
 using box.camera

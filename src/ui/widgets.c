@@ -1,14 +1,10 @@
 /**
  * @file ui/widgets.c
- * @brief The UiTheme component and the box.ui.theme entity, ui.sibling, and the load of the
- * widget library etc/ui/widgets.flecs, the script module box.widgets.
+ * @brief The UiTheme component and the box.ui.theme entity, and ui.sibling, which the widget
+ * library etc/ui/widgets.flecs uses.
  */
 
 #include "ui.h"
-#include "../render/preprocess.h"
-
-/** Path of the widget library, found in the working directory or an ancestor of it */
-#define BOX_UI_WIDGETS_PATH "etc/ui/widgets.flecs"
 
 /** The dark theme, box.widgets.DarkTheme, in static storage so its padding is zero */
 static const UiTheme box_ui_dark_theme = {
@@ -112,33 +108,6 @@ static void box_ui_sibling(
     *(ecs_entity_t*)result->ptr = found;
 }
 
-/** Load the widget library as a managed script in the root scope, when the file is found.
- *
- * @param world The world
- */
-static void box_ui_widgets_load(
-    ecs_world_t *world)
-{
-    char *path = box_shader_locate_cwd(BOX_UI_WIDGETS_PATH);
-    ecs_entity_t scope;
-    if (!path) {
-        ecs_dbg("box.ui: %s not found, the world has no widgets", BOX_UI_WIDGETS_PATH);
-        goto done;
-    }
-
-    scope = ecs_set_scope(world, 0);
-    if (!ecs_script(world, {
-        .entity = ecs_entity(world, { .name = "box.ui.widgets" }),
-        .filename = path
-    })) {
-        ecs_err("box.ui: failed to load %s", path);
-    }
-
-    ecs_set_scope(world, scope);
-done:
-    ecs_os_free(path);
-}
-
 void box_ui_widgets_import(
     ecs_world_t *world,
     ecs_entity_t ui)
@@ -158,5 +127,4 @@ void box_ui_widgets_import(
         },
         .callback = box_ui_sibling
     });
-    box_ui_widgets_load(world);
 }

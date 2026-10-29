@@ -12,7 +12,7 @@
 #include <unistd.h>
 
 /** Path of the gallery scene in the repository */
-#define GALLERY_SCENE "etc/scenes/widgets.flecs"
+#define GALLERY_SCENE "etc/ui/gallery.flecs"
 
 /** Divides the render pixels of the surfaces of the gallery in the tests */
 #define GALLERY_RESOLUTION_SCALE (4.0f)

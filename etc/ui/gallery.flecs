@@ -10,6 +10,8 @@
 // focused widget into view, Enter, Space and the arrow keys operate it. The pointer shows what
 // can be clicked, typed into or is disabled.
 
+include widgets
+
 using flecs.script
 using box.transform
 using box.camera

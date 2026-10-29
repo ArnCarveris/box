@@ -1,7 +1,8 @@
 /**
  * @file Widgets.c
- * @brief The widget library box.ui loads: the box.widgets module and its templates, a world
- * without the library, the UiTheme of box.ui.theme, a script that assigns it and ui.sibling.
+ * @brief The widget library etc/ui/widgets.flecs: the box.widgets module and its templates, a
+ * world without the library, the UiTheme of box.ui.theme, a script that assigns it and
+ * ui.sibling.
  */
 
 #include <box.h>
@@ -76,6 +77,12 @@ void Widgets_library_loads(void) {
     // ui/widgets
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    char *widgets = box_app_locate("etc/ui/widgets.flecs");
+    test_assert(ecs_script(world, {
+        .entity = ecs_entity(world, { .name = "box.ui.widgets" }),
+        .filename = widgets
+    }) != 0);
+    ecs_os_free(widgets);
 
     ecs_entity_t module = ecs_lookup(world, "box.widgets");
     test_assert(module != 0);
@@ -115,6 +122,12 @@ void Widgets_templates_exist(void) {
     // ui/widgets
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    char *widgets = box_app_locate("etc/ui/widgets.flecs");
+    test_assert(ecs_script(world, {
+        .entity = ecs_entity(world, { .name = "box.ui.widgets" }),
+        .filename = widgets
+    }) != 0);
+    ecs_os_free(widgets);
     int32_t i;
 
     for (i = 0; i < WIDGETS_TEMPLATES; i ++) {
@@ -202,6 +215,12 @@ void Widgets_theme_dark(void) {
     // ui/widgets
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    char *widgets = box_app_locate("etc/ui/widgets.flecs");
+    test_assert(ecs_script(world, {
+        .entity = ecs_entity(world, { .name = "box.ui.widgets" }),
+        .filename = widgets
+    }) != 0);
+    ecs_os_free(widgets);
 
     ecs_entity_t theme = ecs_lookup(world, "box.ui.theme");
     test_assert(theme != 0);
@@ -234,6 +253,12 @@ void Widgets_theme_from_script(void) {
     // ui/widgets
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    char *widgets = box_app_locate("etc/ui/widgets.flecs");
+    test_assert(ecs_script(world, {
+        .entity = ecs_entity(world, { .name = "box.ui.widgets" }),
+        .filename = widgets
+    }) != 0);
+    ecs_os_free(widgets);
     ecs_entity_t theme = ecs_lookup(world, "box.ui.theme");
     test_assert(theme != 0);
 

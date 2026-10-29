@@ -2,6 +2,8 @@
 // left and widened to three quarters of the surface, so the console, which covers the left half,
 // draws over most of it: the editor view renders after the 3D view and before the console view.
 // The scrollback holds help edit, which the console colors as a known command.
+include etc/ui/widgets
+
 using box.transform
 using box.geometry
 using box.material

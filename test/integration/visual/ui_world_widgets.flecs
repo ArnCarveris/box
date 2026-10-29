@@ -1,3 +1,5 @@
+include etc/ui/widgets
+
 using box.transform
 using box.geometry
 using box.material

@@ -327,13 +327,7 @@ static void box_app_serve(
 #endif
 }
 
-/** Find a scene file: the path as given, or a relative path in the working directory or one
- * of its ancestors, so a run from inside the repository finds `etc/scenes/...`.
- *
- * @param path The scene path from the command line
- * @return The path to load, owned by the caller
- */
-static char* box_app_scene_path(
+char* box_app_locate(
     const char *path)
 {
     char dir[4096];
@@ -394,7 +388,7 @@ static int box_app_start(
     }
 
     if (app->scene && app->scene[0]) {
-        char *scene = box_app_scene_path(app->scene);
+        char *scene = box_app_locate(app->scene);
         ecs_entity_t script = ecs_script(world, {
             .entity = ecs_entity(world, { .name = "box.app.scene" }),
             .filename = scene

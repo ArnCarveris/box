@@ -159,6 +159,15 @@ int box_app_parse(
     int argc,
     char *argv[]);
 
+/** Find a file: the path as given, or a relative path in the working directory or one of its
+ * ancestors, so a run from inside the repository finds `etc/...`.
+ *
+ * @param path The path of the file
+ * @return The path to load, the path as given when it is not found, owned by the caller
+ */
+char* box_app_locate(
+    const char *path);
+
 /** Block the calling thread with an OS sleep until a time on the ecs_os_get_time clock.
  *
  * Sleeps 60% of the time left until less than 0.1 ms is left, then the rest, so timer leeway
