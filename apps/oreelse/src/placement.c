@@ -321,8 +321,8 @@ static int32_t ore_drag_max(
     return result < 1 ? 1 : (result > ORE_DRAG_MAX ? ORE_DRAG_MAX : result);
 }
 
-/** Place the selected building at a cell when it can be, spending one; the selection clears
- * when none is left.
+/** Place the selected building at a cell when it can be, spending one, with a PoofBurst
+ * cfg.placePoofY above the center of its footprint; the selection clears when none is left.
  *
  * @param world The world
  * @param ctx The context
@@ -339,9 +339,18 @@ static bool ore_place_at(
     int32_t col)
 {
     ecs_entity_t prefab = pl->selected;
+    const OreEffects *fx = ecs_singleton_get(world, OreEffects);
     bool result = prefab && ore_can_place(ctx, prefab, row, col);
+    int32_t w, h;
     if (result) {
+        ore_footprint(world, prefab, &w, &h);
+        vec3 at = {
+            ore_tile_x(&ctx->grid, col) + (float)(w - 1) * ctx->grid.tile * 0.5f,
+            ORE_CFG(world, "placePoofY"),
+            ore_tile_z(&ctx->grid, row) + (float)(h - 1) * ctx->grid.tile * 0.5f
+        };
         ore_building_place(world, prefab, row, col);
+        ore_burst(world, fx ? fx->poof_burst : 0, at, 1.0f);
         ore_inventory_remove(world, prefab, 1);
         if (ore_inventory_count(world, prefab) <= 0) {
             pl->selected = 0;

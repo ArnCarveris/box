@@ -4,6 +4,10 @@
  * hovers on its jetpack over the tiles of buildings, and the camera follows it from above at the
  * zoom level of OreView in every state.
  *
+ * While playing OrePlayerFx advances its walk cycle (OrePlayerGait), bobs it, kicks up its foot
+ * dust and plays its jet plume in the air, and OreLimbs swings its limbs (OreLimb). Its death
+ * (ore_player_die) plays the splat and drops it on its face.
+ *
  * The camera never rotates, so W walks toward -Z, S toward +Z, A toward -X and D toward +X.
  */
 
@@ -107,6 +111,143 @@ static void OrePlayerMove(
     }
 }
 
+void ore_player_die(
+    ecs_world_t *world,
+    ecs_entity_t player)
+{
+    const ecs_world_t *real = ecs_get_world(world);
+    const Position *p = ecs_get(world, player, Position);
+    const OreEffects *fx = ecs_singleton_get(world, OreEffects);
+    if (p && fx) {
+        vec3 at = { p->x, p->y + ORE_CFG(real, "playerSplatLift"), p->z };
+        ore_burst(world, fx->splat_burst, at, 1.0f);
+    }
+
+    ecs_set(world, player, Rotation, { ORE_CFG(real, "deathPitch"), 0, 0 });
+    ore_state_set(world, OreGameStateLost);
+}
+
+/** Set the playback of the jet plume of an astronaut, its child jet (a JetPlume).
+ *
+ * @param world The world
+ * @param stage The stage of the system
+ * @param player The astronaut
+ * @param state The playback state of the plume
+ * @param playing_only Only change a plume that plays
+ */
+static void ore_jet_set(
+    const ecs_world_t *world,
+    ecs_world_t *stage,
+    ecs_entity_t player,
+    PlaybackState state,
+    bool playing_only)
+{
+    ore_playback_set(world, stage, ecs_lookup_child(world, player, "jet"), state, playing_only);
+}
+
+/** Animate the astronaut after its walk, the rest of the original's OrePlayerMove.
+ *
+ * While it moves its walk cycle advances its speed times cfg.stepRate a second and on the ground
+ * it bobs |sin(cycle)| * cfg.bobHeight up. Every half step on the ground kicks up FootDust at its
+ * feet, and the jet plume plays while it is airborne.
+ *
+ * @param it Iterator over the players, with OreEffects, while playing
+ */
+static void OrePlayerFx(
+    ecs_iter_t *it)
+{
+    const OrePlayer *player = ecs_field(it, OrePlayer, 0);
+    OrePlayerGait *gait = ecs_field(it, OrePlayerGait, 1);
+    Position *p = ecs_field(it, Position, 2);
+    const OreEffects *fx = ecs_field(it, OreEffects, 3);
+    float speed = ORE_CFG(it->world, "walkSpeed");
+    float run = ORE_CFG(it->world, "runMultiplier");
+    float rate = ORE_CFG(it->world, "stepRate");
+    float bob = ORE_CFG(it->world, "bobHeight");
+    float dust_y = ORE_CFG(it->world, "footDustY");
+    float two_pi = 2.0f * GLM_PIf;
+    int32_t i, step;
+    for (i = 0; i < it->count; i ++) {
+        bool grounded = !player[i].airborne;
+        if (player[i].moving) {
+            gait[i].cycle += it->delta_time * speed * (player[i].running ? run : 1.0f) * rate;
+            gait[i].cycle = fmodf(gait[i].cycle, two_pi);
+            if (grounded) {
+                p[i].y += fabsf(sinf(gait[i].cycle)) * bob;
+            }
+        }
+
+        step = (int32_t)floorf(gait[i].cycle / GLM_PIf);
+        if (step != gait[i].step) {
+            gait[i].step = step;
+            if (player[i].moving && grounded) {
+                vec3 at = { p[i].x, dust_y, p[i].z };
+                ore_burst(it->stage, fx->foot_dust, at, 1.0f);
+            }
+        }
+
+        ore_jet_set(it->world, it->stage, it->entities[i],
+            player[i].airborne ? ParticlePlaying : ParticleStopped, false);
+    }
+}
+
+/** Pause a playing jet plume outside of play, so it stands still with the game; OrePlayerFx
+ * plays or stops it again when the game resumes.
+ *
+ * @param it Iterator over the players, while not playing
+ */
+static void OrePlayerFxHold(
+    ecs_iter_t *it)
+{
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        ore_jet_set(it->world, it->stage, it->entities[i], ParticlePaused, true);
+    }
+}
+
+/** Swing the limbs of the astronaut toward their pose, covering cfg.limbBlend * dt of the
+ * distance a frame.
+ *
+ * On the ground a moving astronaut swings them sin(cycle + phase) * swing, a standing one holds
+ * them straight.
+ *
+ * In the air they trail cfg.airTrail times their swing behind while it moves (times the run
+ * multiplier while running, at most cfg.airTrailMax) and dangle cfg.airDangle times their swing
+ * at cfg.airDangleRate radians a second of play.
+ *
+ * @param it Iterator over the limbs of the players, with OreClock, while playing
+ */
+static void OreLimbs(
+    ecs_iter_t *it)
+{
+    const OreLimb *limb = ecs_field(it, OreLimb, 0);
+    Rotation *r = ecs_field(it, Rotation, 1);
+    const OrePlayer *player = ecs_field(it, OrePlayer, 2);
+    const OrePlayerGait *gait = ecs_field(it, OrePlayerGait, 3);
+    const OreClock *clock = ecs_field(it, OreClock, 4);
+    float alpha = glm_min(it->delta_time * ORE_CFG(it->world, "limbBlend"), 1.0f);
+    float dangle = ORE_CFG(it->world, "airDangle");
+    float dangle_rate = ORE_CFG(it->world, "airDangleRate");
+    float lag = 0, target;
+    int32_t i;
+    if (player->moving) {
+        lag = glm_min(ORE_CFG(it->world, "airTrail") *
+            (player->running ? ORE_CFG(it->world, "runMultiplier") : 1.0f),
+            ORE_CFG(it->world, "airTrailMax"));
+    }
+
+    for (i = 0; i < it->count; i ++) {
+        if (player->airborne) {
+            target = (lag + sinf(clock->elapsed * dangle_rate + limb[i].phase) * dangle) *
+                limb[i].swing;
+        } else {
+            target = player->moving ? sinf(gait->cycle + limb[i].phase) * limb[i].swing : 0;
+        }
+
+        r[i].x += (target - r[i].x) * alpha;
+    }
+}
+
 /** Step a glide value toward its target, or snap to it.
  *
  * @param value The value
@@ -195,6 +336,7 @@ void ore_player_import(
     ecs_add_pair(world, ecs_id(OrePlayer), EcsWith, ecs_id(Position));
     ecs_add_pair(world, ecs_id(OrePlayer), EcsWith, ecs_id(Rotation));
     ecs_add_pair(world, ecs_id(OrePlayer), EcsWith, DynamicTransform);
+    ecs_add_pair(world, ecs_id(OrePlayer), EcsWith, ecs_id(OrePlayerGait));
     ecs_add_pair(world, ecs_id(OreLimb), EcsWith, ecs_id(Rotation));
 
     ecs_system(world, {
@@ -209,6 +351,43 @@ void ore_player_import(
             { .id = playing, .src.id = state }
         },
         .callback = OrePlayerMove
+    });
+
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "OrePlayerFx" }),
+        .phase = EcsOnUpdate,
+        .query.terms = {
+            { .id = ecs_id(OrePlayer), .inout = EcsIn },
+            { .id = ecs_id(OrePlayerGait), .src.id = EcsSelf, .inout = EcsInOut },
+            { .id = ecs_id(Position), .src.id = EcsSelf, .inout = EcsInOut },
+            { .id = ecs_id(OreEffects), .src.id = ecs_id(OreEffects), .inout = EcsIn },
+            { .id = playing, .src.id = state }
+        },
+        .callback = OrePlayerFx
+    });
+
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "OrePlayerFxHold" }),
+        .phase = EcsOnUpdate,
+        .query.terms = {
+            { .id = ecs_id(OrePlayer), .inout = EcsInOutNone },
+            { .id = playing, .src.id = state, .oper = EcsNot }
+        },
+        .callback = OrePlayerFxHold
+    });
+
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "OreLimbs" }),
+        .phase = EcsOnUpdate,
+        .query.terms = {
+            { .id = ecs_id(OreLimb), .src.id = EcsSelf, .inout = EcsIn },
+            { .id = ecs_id(Rotation), .src.id = EcsSelf, .inout = EcsInOut },
+            { .id = ecs_id(OrePlayer), .src.id = EcsUp, .trav = EcsChildOf, .inout = EcsIn },
+            { .id = ecs_id(OrePlayerGait), .src.id = EcsUp, .trav = EcsChildOf, .inout = EcsIn },
+            { .id = ecs_id(OreClock), .src.id = ecs_id(OreClock), .inout = EcsIn },
+            { .id = playing, .src.id = state }
+        },
+        .callback = OreLimbs
     });
 
     ecs_system(world, {

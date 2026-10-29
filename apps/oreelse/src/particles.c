@@ -30,7 +30,7 @@ ecs_entity_t ore_burst(
     float scale)
 {
     ecs_world_t *w = ore_particles_world(world);
-    ecs_entity_t result = box_particle_burst_at(w, effect, position, scale);
+    ecs_entity_t result = effect ? box_particle_burst_at(w, effect, position, scale) : 0;
     if (result && ecs_has(w, result, Rotation)) {
         ecs_set(w, result, Rotation, {0, 0, 0});
     }
@@ -96,6 +96,22 @@ ecs_entity_t ore_combust(
     }
 
     return result;
+}
+
+void ore_playback_set(
+    const ecs_world_t *world,
+    ecs_world_t *stage,
+    ecs_entity_t emitter,
+    PlaybackState state,
+    bool playing_only)
+{
+    const ParticlePlayback *playback = emitter ? ecs_get(world, emitter, ParticlePlayback) : NULL;
+    ParticlePlayback next = playback ? *playback : (ParticlePlayback){ .state = ParticlePlaying };
+    if (emitter && next.state != state && (!playing_only || next.state == ParticlePlaying)) {
+        next.state = state;
+        next.reset = false;
+        ecs_set_ptr(stage, emitter, ParticlePlayback, &next);
+    }
 }
 
 /** Give the lights of an instance, the children of the root with an EffectFlash and a

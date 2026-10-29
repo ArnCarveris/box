@@ -153,12 +153,31 @@ ECS_STRUCT(OrePlayer, {
     bool airborne; /**< hover is above cfg.airborne, the jetpack fires */
 });
 
-/** A limb pivot of a model; its Rotation.x swings with the walk (OrePlayerFx for the astronaut,
+/** A limb pivot of a model; its Rotation.x swings with the walk (OreLimbs for the astronaut,
  * OreCritterLimbs for a critter's legs)
  */
 ECS_STRUCT(OreLimb, {
     float phase; /**< Offset of the limb in the walk cycle */
     float swing; /**< Largest angle of the swing in radians */
+});
+
+/** The walk cycle of the astronaut, the state of its animation (OrePlayerFx), on the astronaut.
+ * It comes with OrePlayer and starts at 0 with every run.
+ */
+ECS_STRUCT(OrePlayerGait, {
+    float cycle;  /**< Phase of the walk cycle in radians, from 0 up to 2 PI: it advances the
+                   *   astronaut's speed times cfg.stepRate a second while it moves */
+    int32_t step; /**< Half of the cycle it is in, floor(cycle / PI): a new half step on the
+                   *   ground kicks up FootDust */
+});
+
+/** The one shot effects the C plays (etc/particles), a singleton oreelse.flecs sets */
+ECS_STRUCT(OreEffects, {
+    ecs_entity_t foot_dust;   /**< FootDust, at every half step of the astronaut on the ground */
+    ecs_entity_t mine_burst;  /**< MineBurst, at every yield of a deposit */
+    ecs_entity_t poof_burst;  /**< PoofBurst, where a deposit is used up and a building is placed
+                               *   or demolished */
+    ecs_entity_t splat_burst; /**< SplatBurst, at the death of the astronaut */
 });
 
 /** The mining of the astronaut: the target of the swing and its progress, which the HUD shows.
@@ -831,6 +850,17 @@ bool ore_action_down(
     const ecs_world_t *world,
     ecs_entity_t action);
 
+/** Kill the astronaut, the end of the original's orePlayerDamage: SplatBurst plays
+ * cfg.playerSplatLift above it, it falls over (turned cfg.deathPitch about x) and the game is lost.
+ * OrePlayerHealth calls it when the astronaut's hit points drop to 0.
+ *
+ * @param world The world or the stage of a system
+ * @param player The astronaut
+ */
+void ore_player_die(
+    ecs_world_t *world,
+    ecs_entity_t player);
+
 /** Read the geometry of the tile grid from cfg.
  *
  * @param world The world
@@ -1065,6 +1095,9 @@ void ore_marker_show(
 /** Mine 1 off a deposit into the inventory: at 0 the deposit is deleted. When its item is a
  * new kind and the inventory is full nothing is mined and the full warning shows.
  *
+ * Every yield plays MineBurst cfg.mineBurstY above it and shrinks it to cfg.depositScaleMin +
+ * (1 - cfg.depositScaleMin) * amount / capacity; at 0 PoofBurst plays cfg.depositPoofY above it.
+ *
  * @param world The world or the stage of a system
  * @param deposit The deposit
  * @return Whether the deposit is still there to mine, false once it is deleted or gone
@@ -1077,7 +1110,7 @@ bool ore_deposit_mine(
  * speeds, spawn volumes and layer offsets at scale, unturned.
  *
  * @param world The world, or the stage of a system before EcsPreStore
- * @param effect The effect template (etc/particles)
+ * @param effect The effect template (etc/particles), 0 plays nothing
  * @param position World position of the play
  * @param scale Scale of the play, 0 or less for 1
  * @return The root of the instance that plays, 0 when none does
@@ -1087,6 +1120,22 @@ ecs_entity_t ore_burst(
     ecs_entity_t effect,
     const vec3 position,
     float scale);
+
+/** Set the playback state of an emitter that keeps playing (the jet plume, the glints of the
+ * Luminite); it is only written when it changes, and an emitter without a ParticlePlayback plays.
+ *
+ * @param world The world
+ * @param stage The stage of the system
+ * @param emitter The emitter, 0 for none
+ * @param state The playback state
+ * @param playing_only Only change an emitter that plays (pause it, leave a stopped one stopped)
+ */
+void ore_playback_set(
+    const ecs_world_t *world,
+    ecs_world_t *stage,
+    ecs_entity_t emitter,
+    PlaybackState state,
+    bool playing_only);
 
 /** Play a one shot effect template turned about Y, at its size: the launch of a missile
  * (MissileLaunch, authored along -Z) toward the aim of its turret, as the original's
@@ -1311,7 +1360,8 @@ void ore_flow_import(
 void ore_map_import(
     ecs_world_t *world);
 
-/** Register the player: walking and the camera that follows the astronaut.
+/** Register the player: walking, the camera that follows the astronaut and the astronaut's
+ * animation (its walk cycle, bob, foot dust, jet plume and limbs).
  *
  * @param world The world
  */

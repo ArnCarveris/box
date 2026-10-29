@@ -1,6 +1,7 @@
 // Glints rising off a Luminite deposit, the DepositSparkle of the original: a few pale blue
-// sparks a second over the pad of the deposit, always playing. The layers are children at
-// the original's offset of 0.18 above the deposit.
+// sparks a second over the pad of the deposit. On a deposit OreDepositSparkle plays it while the
+// game plays and OreDepositSparkleHold pauses it otherwise. The layers are children at the
+// original's offset of 0.18 above the deposit.
 
 using box.transform
 using box.types
