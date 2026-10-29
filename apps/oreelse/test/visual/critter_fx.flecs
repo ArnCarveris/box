@@ -22,35 +22,31 @@ $ {
 }
 
 // Each out of its attack range of the astronaut, so it walks rather than chews, turned toward it
-// by OreCritterMove and posed at its walk cycle by OreCritterFx and OreCritterLimbs
-critter_fx {
-  behemoth : Behemoth {
-    Position: {-10, 0, 23}
-    OreSpeed: {value: 0}
-    OreTarget: {value: astronaut}
-    OreCritter: {retarget: 100, jitter: 0, attacking: false, anim: 1.1}
-  }
+// by OreCritterMove and posed at its walk cycle by OreCritterFx and OreCritterLimbs. They are
+// spawned like the waves' critters, under the critters' parent, and stand still (speed 0)
+const behemoth: entity = oreelse.spawn_critter(Behemoth, -10, 23)
+const brute: entity = oreelse.spawn_critter(Brute, 8, 25)
+const skitter: entity = oreelse.spawn_critter(Skitter, -5.5, 33.5)
+const mite: entity = oreelse.spawn_critter(Mite, -3.5, 31)
 
-  brute : Brute {
-    Position: {8, 0, 25}
-    OreSpeed: {value: 0}
-    OreTarget: {value: astronaut}
-    OreCritter: {retarget: 100, jitter: 0, attacking: false, anim: 2.0}
-  }
+$behemoth {
+  OreSpeed = {value: 0}
+  OreCritter = {retarget: 100, jitter: 0, attacking: false, anim: 1.1}
+}
 
-  skitter : Skitter {
-    Position: {-5.5, 0, 33.5}
-    OreSpeed: {value: 0}
-    OreTarget: {value: astronaut}
-    OreCritter: {retarget: 100, jitter: 0, attacking: false, anim: 0.8}
-  }
+$brute {
+  OreSpeed = {value: 0}
+  OreCritter = {retarget: 100, jitter: 0, attacking: false, anim: 2.0}
+}
 
-  mite : Mite {
-    Position: {-3.5, 0, 31}
-    OreSpeed: {value: 0}
-    OreTarget: {value: astronaut}
-    OreCritter: {retarget: 100, jitter: 0, attacking: false, anim: 1.3}
-  }
+$skitter {
+  OreSpeed = {value: 0}
+  OreCritter = {retarget: 100, jitter: 0, attacking: false, anim: 0.8}
+}
+
+$mite {
+  OreSpeed = {value: 0}
+  OreCritter = {retarget: 100, jitter: 0, attacking: false, anim: 1.3}
 }
 
 // A skitter's corpse in front of the astronaut, as one that died heading 2.2 radians about y

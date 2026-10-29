@@ -45,21 +45,22 @@ SQUASH = 0.55
 CHAR = {"r": 40, "g": 36, "b": 34, "a": 255}
 MITE_DEPTH = 2 * MITE_RADIUS + 1
 
-INDEX = "get oreelse.OreCritterIndex OreCritterIndex.count"
+INDEX = "oreelse.OreCritterIndex"
 PARTICLES = "get box.particle.ParticleStats ParticleStats.particles"
 
 # Tolerance of a pose against the walk cycle read back through the port
 POSE_TOLERANCE = 2e-3
 
 
-def under(path, rows):
-    """The rows of the descendants of an entity."""
-    return {p: v for p, v in rows.items() if p.startswith(path + ".")}
+def under(app, path, expr):
+    """The results of a query among the descendants of an entity, whose parts are unnamed
+    instances of the prefab's: path -> the value of the first field."""
+    return rows_of(app, "%s, ChildOf(self|up ChildOf, %s)" % (expr, path))
 
 
 def legs(app, critter):
     """The legs of a critter: path -> OreLimb."""
-    result = under(critter, rows_of(app, "oreelse.OreLimb"))
+    result = under(app, critter, "oreelse.OreLimb")
     app.check(len(result) == MITE_LEGS, "the mite %s has the legs %s" % (critter, list(result)))
     return result
 
@@ -89,6 +90,17 @@ def check_pose(app, critter):
         app.check(abs(x - want) < POSE_TOLERANCE,
                   "at the walk cycle %g the leg %s swings %g, not %g" % (a, path, x, want))
     return c, p["y"]
+
+
+def indexed(app):
+    """The critters in the spatial index the turrets search, read after two frames of play: it
+    is rebuilt every frame of play and empty while paused. The index has no copy hook, so it is
+    read through a query instead of get. The game is paused after."""
+    set_state(app, "Playing")
+    app.wait_frames(2)
+    count = rows_of(app, INDEX)[INDEX]["count"]
+    set_state(app, "Paused")
+    return count
 
 
 def corpses(app, prefab=None):
@@ -241,28 +253,30 @@ def test_corpse(app):
               "the fresh corpse has %s" % o)
 
     # Its glowing parts are dark; the embers on it glow
-    embers = under(corpse, rows_of(app, "CorpseEmbers"))
+    embers = under(app, corpse, "CorpseEmbers")
     app.check(len(embers) == 1, "the corpse has the embers %s" % list(embers))
     ember = list(embers)[0]
-    glow = under(corpse, rows_of(app, "box.material.Emissive(self|up IsA)"))
-    body = {k: v for k, v in glow.items() if k != ember and not k.startswith(ember + ".")}
-    specks = under(ember, glow)
+    glow = under(app, corpse, "box.material.Emissive(self|up IsA)")
+    specks = under(app, ember, "box.material.Emissive(self|up IsA)")
+    body = {k: v for k, v in glow.items() if k not in specks}
     app.check(len(body) >= 2 and all(v["strength"] == 0 for v in body.values()),
               "the corpse's parts glow: %s" % body)
     app.check(len(specks) >= 3 and all(v["strength"] > 0 for v in specks.values()),
               "the embers' specks do not glow: %s" % specks)
 
     # It is no critter: not in the spatial index the turrets search, not pushed by a mite on it
-    app.check(app.exec(INDEX) == "0", "the spatial index holds %s critters" % app.exec(INDEX))
+    count = indexed(app)
+    app.check(count == 0, "the spatial index holds %d critters" % count)
     other = still_mite(app, p["x"], p["z"])
     measure(app, lambda: 0, frames=10)
     ox, oz = position(app, other)
     app.check(abs(ox - p["x"]) < 1e-4 and abs(oz - p["z"]) < 1e-4,
               "the mite on the corpse was pushed to %s" % ((ox, oz),))
-    app.check(app.exec(INDEX) == "1", "the spatial index holds %s critters" % app.exec(INDEX))
+    count = indexed(app)
+    app.check(count == 1, "the spatial index holds %d critters" % count)
     q = app.get(corpse, "Position")
     app.check(q["x"] == p["x"] and q["z"] == p["z"], "the corpse moved to %s" % q)
-    app.check(not under(corpse, rows_of(app, "oreelse.OreCritter")) and
+    app.check(not under(app, corpse, "oreelse.OreCritter") and
               corpse not in critters(app), "the corpse is a critter")
 
 

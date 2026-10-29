@@ -94,8 +94,10 @@ static void OreCritterLimbs(
 }
 
 /** Char the corpses: the parts that inherit their emission from the critter's prefab (its eyes,
- * visors and glowing spots) go dark; the Tint of the corpse colors the rest. Parts that own
- * their emission, the dark ones and the specks of the embers, do not match.
+ * visors and glowing spots) go dark; the Tint of the corpse colors the rest.
+ *
+ * A charred part owns its Emissive and no longer matches, so each is set once. The specks of the
+ * embers own theirs from the start and keep glowing.
  *
  * @param it Iterator over the parts below a corpse that inherit Emissive, while playing
  */
@@ -277,7 +279,6 @@ void ore_critter_fx_import(
 
     ecs_add_pair(world, ecs_id(OreGait), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(OreDeathBurst), EcsOnInstantiate, EcsInherit);
-    ecs_add_pair(world, ecs_id(OreLimb), EcsWith, DynamicTransform);
 
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "OreCritterFx" }),
@@ -311,6 +312,7 @@ void ore_critter_fx_import(
         .phase = EcsOnUpdate,
         .query.terms = {
             { .id = ecs_id(Emissive), .src.id = EcsUp, .trav = EcsIsA, .inout = EcsIn },
+            { .id = ecs_id(Emissive), .src.id = EcsSelf, .oper = EcsNot },
             { .id = ecs_id(OreCorpse), .src.id = EcsUp, .trav = EcsChildOf,
               .inout = EcsInOutNone },
             { .id = playing, .src.id = state }
