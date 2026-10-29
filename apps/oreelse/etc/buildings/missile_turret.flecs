@@ -32,6 +32,8 @@ prefab MissileTurret {
   }
   OreFootprint: {w: 1, h: 1}
   OreHealth: {value: 180, max: 180}
+  // The box of the model, the health bar's anchor
+  OreModelBox: {w: 1.86, d: 1.86, h: 1.62}
   OrePowerConsumer: {watts: 20}
   OrePowerCategory: {kind: Weapons}
   // The weapon: a homing missile every 0.5 s at multiplier 1 at a target within 17, at 18 from

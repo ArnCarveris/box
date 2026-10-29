@@ -24,7 +24,7 @@ python3 tools/integration.py e2e oreelse_mining oreelse_particles
 python3 tools/integration.py e2e oreelse_crafting oreelse_buildings oreelse_rocket
 python3 tools/integration.py e2e oreelse_power oreelse_critters oreelse_critter_fx
 python3 tools/integration.py e2e oreelse_player_fx oreelse_hud oreelse_building_animation
-python3 tools/integration.py e2e oreelse_weapons
+python3 tools/integration.py e2e oreelse_weapons oreelse_health_bars
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -544,6 +544,14 @@ it needs: `Install a cargo bay (U) or life support (I)`, `Needs 4 engines, 2 ins
 `Needs 1 fuel tanks, 0 installed (Y)`. Below 30% health `! SUIT BREACH !` blinks red at the top
 of the screen.
 
+A building that is damaged (above 0 and below its full HP) shows a health bar over it: a dark
+bar 4 px tall, 6 px above the top of the building as the camera sees it and as wide as the
+building looks, so it follows the zoom and the camera in the same frame. Its fill, inset 1 px,
+covers `(width - 2) * frac` of it, blended from amber {240, 176, 58} at half health to green
+{92, 236, 140} at full, and below half from red {248, 84, 72} to amber; a 1 px edge frames it.
+The bar goes when the building is repaired to full or destroyed. Bars narrower than 6 px or off
+screen are not drawn, the panels of the HUD cover them, and they show only while playing.
+
 Clicks, the right button and the wheel over a panel of the UI (the status bar) do not reach the
 world: they place, mine and zoom nothing. The plain lines of text let them through.
 
@@ -593,8 +601,8 @@ Every task of the port follows these.
   `Playing`, with a query term on `ore_state_pair(world, OreGameStatePlaying)` whose source is
   `OreGameState`. That is the only pause mechanism: no time scale, no frozen flags. Only the
   camera and the render quality tier run in every state; outside play, systems only hide what
-  belongs to play (the tile markers, the placement preview) and pause the effects that play
-  (the jet plume, the glints of the Luminite).
+  belongs to play (the tile markers, the placement preview, the health bars) and pause the
+  effects that play (the jet plume, the glints of the Luminite).
 - **Input**: every key is a box `Action` with a `Binding` in `apps/oreelse/etc/input.flecs`.
   Actions that fire once are awaited by async loops that call an `oreelse` script function
   implemented in C (`ecs_async_function`, like `oreelse.cancel()`); held actions (walking,
@@ -708,7 +716,8 @@ box's Euler order), with the velocity in its `OreProjectile`, the weapon's `OreD
 
 The buildings are prefabs in `etc/buildings/`, one file per building, with the original's names
 and geometry, materials and lights. The gameplay tasks add their components (item, recipe,
-footprint, health, power) to the same prefabs, and the animation and effect tasks drive the named
+footprint, health, power, and `OreModelBox`, the width, depth and height of the model that the
+health bar is anchored to) to the same prefabs, and the animation and effect tasks drive the named
 parts below. A model that is not a placed building (no `OreBuilding` above it, a ghost) stands
 still. Every building's origin is the center of its footprint on the
 ground (the center of its tile, the corner between the four tiles of a 2x2 building, the center
@@ -775,7 +784,7 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 
 | File | Holds |
 | --- | --- |
-| `etc/oreelse.flecs` | The window, the camera, the sun, the atmosphere, the effects and the view, the render quality tier, the mining markers, the critter tiers and their death effects (`OreArsenal`), the one shot effects the C plays (`OreEffects`), the HUD; includes the rest |
+| `etc/oreelse.flecs` | The window, the camera, the sun, the atmosphere, the effects and the view, the render quality tier, the mining markers, the critter tiers and their death effects (`OreArsenal`), the one shot effects the C plays (`OreEffects`), the scene and view of the health bars (`OreHealthBars`), the HUD; includes the rest |
 | `etc/config.flecs` | The constants `cfg.*` |
 | `etc/resources.flecs` | The item prefabs other than the buildings, with names and recipes |
 | `etc/buildings/*.flecs` | The building prefabs, models with their item, recipe, footprint, health and power, and the turrets' weapons |
@@ -809,6 +818,7 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 | `etc/ui/palette.flecs` | The colors of the UI, `palette.*` |
 | `etc/ui/icons.flecs` | The icon textures, `icons.*`, which the items name with `OreIcon` |
 | `etc/ui/panel.flecs` | The `Panel` template, the chrome of every panel: the plate, its edge, the hazard strip and the `InputBlocker` |
+| `etc/ui/health_bar.flecs` | The `HealthBar` template, the health bar of a damaged building, anchored to the projection of its model box (`OreModelBox`) |
 | `etc/ui/hud.flecs` | The `OreHud` template: the status bar (`StatusGauge`, `StatusDivider`), the toast, the mine progress bar, the suit breach alert and the rocket status line |
 | `etc/icons/` | The original's icons (SVG), unchanged |
 | `etc/ui/hazard_strip.svg` | The original's hazard strip of the panels, unchanged |
@@ -826,5 +836,6 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 | `src/craft.c` | The order book, the workers, `oreelse.craft_order()`, `oreelse.craft_cancel()` |
 | `src/power.c` | Production, demand and the blackout, the drills, the factories' crafters, the status lamps, `oreelse.power_set(category, level)` |
 | `src/rocket.c` | The rocket state, installing, uninstalling, loading, the launch and the flight, `oreelse.rocket_install()`, `oreelse.rocket_uninstall()`, `oreelse.rocket_load()`, `oreelse.rocket_launch()`, `oreelse.craft_key()` |
+| `src/health_bars.c` | The health bars: a `HealthBar` instance per damaged building under `health_bars.bars`, its fraction set when the health changes, the bars' view shown while playing |
 | `src/look.c` | The render quality tiers, `oreelse.cycleQuality()` |
 | `src/particles.c` | The helpers that play the effects (`ore_burst`, `ore_burst_aimed`, `ore_explosion`, `ore_combust`), the flash of their lights, `oreelse.explosion()`, `oreelse.combust()` |

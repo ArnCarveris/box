@@ -1,0 +1,75 @@
+// The health bars over damaged buildings, from zoom level 1 while playing, on the basin south
+// west of the deposits. Back row, from left to right: the rocket pad (3x3) at 10% health and the
+// factory (2x2) at 50%. Front row: the gun turret, undamaged and without a bar, and a wall at
+// 90%. Each damaged building has a dark bar 4 px tall (2 px in the half size capture) 6 px above
+// the top of its model, as wide as the model looks on screen: widest over the rocket pad,
+// narrower over the factory, narrowest over the wall. The fills: nearly empty and red-orange
+// {246, 102, 69} over the pad, half and amber {240, 176, 58} over the factory, nine tenths and
+// light green {121, 224, 123} over the wall. The status bar of the HUD at the top right covers
+// any bar under it. The astronaut stands in front, facing the camera.
+include apps/oreelse/test/visual/setup/seed
+include apps/oreelse/etc/oreelse
+
+using box.transform
+using box.camera
+using box.surface
+using oreelse
+
+// The capture is 640x360: the UI lays out for a 1280x720 window and its cameras show it at half
+// size, so the capture holds the bars and the HUD as a 1280x720 window shows them
+window {
+  Surface: {width: 1280, height: 720}
+}
+
+health_bars {
+  camera {
+    Camera: {ortho: true, ortho_scale: 0.5}
+  }
+}
+
+hud {
+  ui {
+    camera {
+      Camera: {ortho: true, ortho_scale: 0.5}
+    }
+  }
+}
+
+// The bars show while playing. Height 0 snaps the camera to level 1 on the first frame
+$ {
+  (OreGameState, Playing)
+  OreView: {camera: camera, view: main_view, level: 1, height: 0, back: 0, look: 0}
+}
+
+astronaut {
+  Position: {-23, 0, 37}
+  Rotation: {0, 0.3, 0}
+}
+
+// Placed buildings, each at the center of its footprint. Tile (row, col) is centered at
+// x = -47 + 2 col, z = -47 + 2 row. The health is set after OreBuilding, which the game's bars
+// follow
+damaged {
+  rocket_pad : RocketPad {
+    Position: {-35, 0, 23}
+    OreBuilding: {row: 34, col: 5}
+    OreHealth: {value: 40, max: 400}
+  }
+
+  factory : Factory {
+    Position: {-28, 0, 22}
+    OreBuilding: {row: 34, col: 9}
+    OreHealth: {value: 50, max: 100}
+  }
+
+  gun_turret : GunTurret {
+    Position: {-29, 0, 27}
+    OreBuilding: {row: 37, col: 9}
+  }
+
+  wall : Wall {
+    Position: {-21, 0, 27}
+    OreBuilding: {row: 37, col: 13}
+    OreHealth: {value: 270, max: 300}
+  }
+}

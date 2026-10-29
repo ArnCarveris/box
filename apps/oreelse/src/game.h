@@ -533,6 +533,35 @@ ECS_STRUCT(OreBuilding, {
     int32_t col; /**< Column of its top left tile */
 });
 
+/** The box of the model of a building, on its prefab and inherited: w along x and d along z
+ * centered on its origin, h up from the ground. The building's health bar is anchored to the
+ * projection of this box.
+ */
+ECS_STRUCT(OreModelBox, {
+    float w; /**< Width along x */
+    float d; /**< Depth along z */
+    float h; /**< Height above the ground */
+});
+
+/** The health bar of a damaged building, on the building (every OreBuilding gets one, 0 while
+ * the building is undamaged). The bar is an instance of the HealthBar template under the root
+ * of OreHealthBars with the pair (OreBarOf, building), which deletes it with the building.
+ */
+ECS_STRUCT(OreHealthBar, {
+    ecs_entity_t bar; /**< The bar, 0 for none */
+});
+
+/** The health bars: the screen space UI scene they are drawn in, between the world view and
+ * the HUD, shown while playing (the view has its camera only then).
+ */
+ECS_STRUCT(OreHealthBars, {
+    ecs_entity_t bar;    /**< The HealthBar template */
+    ecs_entity_t root;   /**< Parent of the bars, in the scene of the bars */
+    ecs_entity_t view;   /**< View of the scene of the bars */
+    ecs_entity_t camera; /**< Camera of the view of the bars */
+    ecs_entity_t world;  /**< World view the bars project their buildings through */
+});
+
 /** An auto tiling rule of rules.flecs, the BuildingRule2x1 of the original: out joins two
  * buildings on orthogonally neighboring tiles.
  *
@@ -994,6 +1023,9 @@ extern ECS_TAG_DECLARE(OreRunScript);
  * without emission (OreGhostDim)
  */
 extern ECS_TAG_DECLARE(OreGhost);
+
+/** Relationship of a health bar to its building: deleting the building deletes the bar */
+extern ECS_TAG_DECLARE(OreBarOf);
 
 /** The geometry of the tile grid, read from cfg once per system run */
 typedef struct ore_grid_t {
@@ -1705,6 +1737,14 @@ void ore_craft_import(
  * @param world The world
  */
 void ore_buildings_import(
+    ecs_world_t *world);
+
+/** Register the health bars: a HealthBar instance for every damaged building, its fraction
+ * kept in step with the building's health, and the view of the bars shown while playing.
+ *
+ * @param world The world
+ */
+void ore_health_bars_import(
     ecs_world_t *world);
 
 /** Register the buildings' animation and lights: the spinners, pistons, shakes, vents, work

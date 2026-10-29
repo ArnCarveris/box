@@ -1,0 +1,136 @@
+// The health bar of a damaged building, the original's health_bars.c as screen space UI. The
+// game (src/health_bars.c) creates an instance under the scene of the bars when a building
+// gets damaged, sets frac when its health changes and deletes it when the building is repaired
+// to full or destroyed.
+//
+// box.projection anchors the bar to the projection of the building's model box through the
+// world view every frame: as wide as the box looks on screen, cfg.hpBarMargin above its top
+// edge and cfg.hpBarHeight tall, hidden when narrower than cfg.hpBarMinWidth or off screen.
+
+using flecs.script.math
+using box.types
+using box.transform
+using box.geometry
+using box.material
+using box.layout
+using box.projection
+using oreelse
+
+// The bar of a building: the dark plate, the fill inset 1 pixel and (width - 2) * frac wide in
+// the color of the blend, and the 1 pixel edge over both. w, d and h are the building's model
+// box (OreModelBox), view the world view
+template HealthBar {
+  prop building: entity = 0
+  prop view: entity = 0
+  prop w: f32 = 0
+  prop d: f32 = 0
+  prop h: f32 = 0
+  prop frac: f32 = 1
+
+  const back = cfg.hpBarBack
+  const edge = cfg.hpBarEdge
+  const full = cfg.hpBarFull
+  const mid = cfg.hpBarMid
+  const low = cfg.hpBarLow
+
+  // Amber to green at half health and above, red to amber below, truncated as the original
+  const hi: f32 = clamp((frac - 0.5) * 2, 0, 1)
+  const lo: f32 = clamp(frac * 2, 0, 1)
+  const upper: Rgb = {
+    floor(mid.r * (1 - hi) + full.r * hi),
+    floor(mid.g * (1 - hi) + full.g * hi),
+    floor(mid.b * (1 - hi) + full.b * hi)
+  }
+  const lower: Rgb = {
+    floor(low.r * (1 - lo) + mid.r * lo),
+    floor(low.g * (1 - lo) + mid.g * lo),
+    floor(low.b * (1 - lo) + mid.b * lo)
+  }
+  const color: Rgb = match frac >= 0.5 {
+    true: upper
+    false: lower
+  }
+
+  // Elements are centered on their Position: the bar's bottom edge sits hpBarMargin above the
+  // top of the box
+  ProjectedAnchor: {target: building, view: view}
+  ProjectedBox: {
+    min: {-w / 2, 0, -d / 2}, max: {w / 2, h, d / 2},
+    offset: {0, cfg.hpBarMargin + cfg.hpBarHeight / 2},
+    fit_width: true, min_width: cfg.hpBarMinWidth
+  }
+  Layout: {}
+  LayoutItem: {width: {mode: Fixed}, height: {mode: Fixed, value: cfg.hpBarHeight}}
+
+  plate {
+    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+    Rect: {1, 1}
+    Rgb: {back.r, back.g, back.b}
+    Opacity: {back.a / 255.0}
+  }
+
+  track {
+    Position: {0, 0, 1}
+    Layout: {direction: Row, padding: {1, 1, 1, 1}}
+    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+
+    fill {
+      LayoutItem: {width: {mode: Grow, value: frac}, height: {mode: Grow}}
+      Rect: {1, 1}
+      Rgb: color
+    }
+
+    rest {
+      LayoutItem: {width: {mode: Grow, value: 1 - frac}, height: {mode: Grow}}
+    }
+  }
+
+  // The edge as four 1 pixel strips, the sides between the top and the bottom so no pixel is
+  // blended twice
+  border {
+    Position: {0, 0, 2}
+    Layout: {}
+    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+
+    top {
+      LayoutItem: {
+        h: Left, v: Top, width: {mode: Grow}, height: {mode: Fixed, value: 1}
+      }
+      Rect: {1, 1}
+      Rgb: {edge.r, edge.g, edge.b}
+      Opacity: {edge.a / 255.0}
+    }
+
+    bottom {
+      LayoutItem: {
+        h: Left, v: Bottom, width: {mode: Grow}, height: {mode: Fixed, value: 1}
+      }
+      Rect: {1, 1}
+      Rgb: {edge.r, edge.g, edge.b}
+      Opacity: {edge.a / 255.0}
+    }
+
+    sides {
+      Layout: {padding: {1, 1, 0, 0}}
+      LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+
+      left {
+        LayoutItem: {
+          h: Left, v: Top, width: {mode: Fixed, value: 1}, height: {mode: Grow}
+        }
+        Rect: {1, 1}
+        Rgb: {edge.r, edge.g, edge.b}
+        Opacity: {edge.a / 255.0}
+      }
+
+      right {
+        LayoutItem: {
+          h: Right, v: Top, width: {mode: Fixed, value: 1}, height: {mode: Grow}
+        }
+        Rect: {1, 1}
+        Rgb: {edge.r, edge.g, edge.b}
+        Opacity: {edge.a / 255.0}
+      }
+    }
+  }
+}

@@ -35,6 +35,8 @@ prefab DronePad {
   }
   OreFootprint: {w: 2, h: 2}
   OreHealth: {value: 140, max: 140}
+  // The box of the model, the health bar's anchor
+  OreModelBox: {w: 3.9, d: 3.9, h: 1.93}
   OrePowerConsumer: {watts: 20}
 
   deck {
