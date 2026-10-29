@@ -3,8 +3,13 @@
  * @brief The oreelse module: components of the game and the functions its areas share.
  *
  * The scene (apps/oreelse/etc) holds the constants cfg.*, the models, the items, the singletons
+<<<<<<< HEAD
  * and the entities of a run; the systems of each area (flow.c, map.c, player.c, ...,
  * critters.c, critter_fx.c, buildings.c, placement.c, look.c, particles.c) play the game.
+=======
+ * and the entities of a run; the areas (flow.c, map.c, player.c, inventory.c, mining.c, craft.c,
+ * power.c, critters.c, buildings.c, placement.c, look.c, particles.c) play the game.
+>>>>>>> b4908f1d686408b3b030484f07b1f84a8d6a56cd
  */
 
 #ifndef OREELSE_GAME_H
@@ -47,6 +52,12 @@
 
 /** Cells a placement drag covers at most, the most cfg.dragMax */
 #define ORE_DRAG_MAX (64)
+
+/** Categories of the power allocation (OrePowerKind), the size of OrePowerAlloc.level */
+#define ORE_POWER_KINDS (3)
+
+/** Levels of a category of the power allocation, the bars of its column */
+#define ORE_POWER_LEVELS (4)
 
 /** Read the float constant cfg.<name> of the scene (etc/config.flecs) */
 #define ORE_CFG(world, name) ecs_const_var_get_t(world, "cfg." name, ecs_f32_t)
@@ -330,7 +341,7 @@ ECS_STRUCT(OreHealth, {
     float max;   /**< Hit points of the undamaged entity */
 });
 
-/** Power a building draws while it works, on its prefab and inherited (OrePower) */
+/** Power a building draws all the time it stands, on its prefab and inherited (OrePower) */
 ECS_STRUCT(OrePowerConsumer, {
     float watts; /**< Watts it draws */
 });
@@ -350,6 +361,59 @@ ECS_ENUM(OrePowerKind, {
 /** The power category of a building, on its prefab and inherited (OrePower) */
 ECS_STRUCT(OrePowerCategory, {
     OrePowerKind kind; /**< Category its power comes out of */
+});
+
+/** The power allocation, a singleton run.flecs sets to [2, 2, 2]: the level of every category,
+ * 0 to ORE_POWER_LEVELS, at most cfg.powerBars in total. Modified when a level changes.
+ */
+ECS_STRUCT(OrePowerAlloc, {
+    int32_t level[3]; /**< Level of Mining, Weapons and Construction, indexed by OrePowerKind */
+});
+
+/** The power of the base, a singleton run.flecs resets, for the HUD and the systems that stop
+ * in a blackout. Modified when a value changes.
+ */
+ECS_STRUCT(OrePowerState, {
+    float production; /**< Watts the producers generate */
+    float demand;     /**< Watts of the consumers times the bars assigned / cfg.powerBars */
+    float ratio;      /**< production / demand capped at 1, 1 without demand */
+    bool blackout;    /**< demand above 0 and production below it: every consumer stops */
+});
+
+/** The mining of a drill, on its prefab and copied to every instance */
+ECS_STRUCT(OreDrill, {
+    float timer;  /**< Seconds of mining toward the next ore, kept through a blackout */
+    bool running; /**< It mines: a live deposit on its tile, power and Mining above 0 */
+});
+
+/** A building that is a worker of the order book (the factory), on its prefab and inherited:
+ * placed, it gets an OreCrafter of speed times the multiplier of its category.
+ */
+ECS_STRUCT(OreWorker, {
+    float speed; /**< Speed of its crafter at multiplier 1 */
+});
+
+/** The bulb of a status lamp, which the Light template (etc/props/light.flecs) sets with the
+ * colors of its props: OrePower colors it by the power of the building it is part of.
+ */
+ECS_STRUCT(OreStatusLamp, {
+    Rgb live;            /**< Color at level 3 and 4, and without a category */
+    Rgb dead;            /**< Color in a blackout (a consumer) or at level 0 */
+    Rgb warn;            /**< Color at level 1 */
+    Rgb ok;              /**< Color at level 2 */
+    float strength;      /**< Emissive strength while lit */
+    float light;         /**< Intensity of the bulb's point light while lit */
+    ecs_entity_t owner;  /**< The building, found by OrePower, 0 until then */
+    bool consumer;       /**< The building draws power, so a blackout kills the lamp */
+});
+
+/** The status lamps to update, a singleton: observers count version up when the power state,
+ * the allocation, the blink signals, a building or a lamp change, and OreStatusLamps updates
+ * every lamp while applied lags behind.
+ */
+ECS_STRUCT(OreLamps, {
+    int32_t version; /**< Changes counted */
+    int32_t applied; /**< The version the lamps show */
 });
 
 /** A placed building, on the instance: its footprint starts at (row, col), every tile of it maps
@@ -1323,6 +1387,49 @@ void ore_buildings_import(
  * @param world The world
  */
 void ore_placement_import(
+    ecs_world_t *world);
+
+/** Get the level of the power category of a building.
+ *
+ * @param world The world or a stage
+ * @param building The building or its prefab
+ * @return The level of its category in OrePowerAlloc, -1 without a category
+ */
+int32_t ore_power_level(
+    const ecs_world_t *world,
+    ecs_entity_t building);
+
+/** Get the power multiplier of a building: the level of its category times cfg.powerStep. For
+ * one building; a system over many reads OrePowerAlloc and cfg.powerStep once.
+ *
+ * @param world The world or a stage
+ * @param building The building or its prefab
+ * @return The multiplier, 1 without a category, 0 at level 0
+ */
+float ore_power_mul(
+    const ecs_world_t *world,
+    ecs_entity_t building);
+
+/** Click bar level of the column of a category: the topmost lit bar steps the category down
+ * one level, any other sets it to level, an increase capped by the free bars. When nothing can
+ * be raised the warning that the bars are all assigned shows.
+ *
+ * @param world The world
+ * @param kind The category, an OrePowerKind
+ * @param level The bar clicked, 1 to ORE_POWER_LEVELS
+ * @return Whether the level of the category changed
+ */
+bool ore_power_set(
+    ecs_world_t *world,
+    int32_t kind,
+    int32_t level);
+
+/** Register power: production, demand and the blackout, the drills, the factories' crafters,
+ * the status lamps and the script function oreelse.power_set(category, level).
+ *
+ * @param world The world
+ */
+void ore_power_import(
     ecs_world_t *world);
 
 /** Register the look: the render quality tiers and oreelse.cycleQuality().

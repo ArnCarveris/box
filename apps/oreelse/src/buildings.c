@@ -460,9 +460,6 @@ void ore_buildings_import(
 
     ecs_add_pair(world, ecs_id(OreFootprint), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(OreBuildLimit), EcsOnInstantiate, EcsInherit);
-    ecs_add_pair(world, ecs_id(OrePowerConsumer), EcsOnInstantiate, EcsInherit);
-    ecs_add_pair(world, ecs_id(OrePowerProducer), EcsOnInstantiate, EcsInherit);
-    ecs_add_pair(world, ecs_id(OrePowerCategory), EcsOnInstantiate, EcsInherit);
 
     ecs_observer(world, {
         .entity = ecs_entity(world, { .name = "OreBuildingRegister" }),

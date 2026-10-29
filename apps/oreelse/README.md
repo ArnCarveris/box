@@ -22,7 +22,11 @@ bake3 --target em --local-env apps/oreelse                     # build for the b
 python3 tools/integration.py e2e oreelse_flow oreelse_look     # the end-to-end scenarios
 python3 tools/integration.py e2e oreelse_mining oreelse_particles
 python3 tools/integration.py e2e oreelse_crafting oreelse_buildings
+<<<<<<< HEAD
 python3 tools/integration.py e2e oreelse_critters oreelse_critter_fx
+=======
+python3 tools/integration.py e2e oreelse_power oreelse_critters
+>>>>>>> b4908f1d686408b3b030484f07b1f84a8d6a56cd
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -266,6 +270,63 @@ at half health gives 2 bricks and a gun turret at 10% 1 iron plate and 1 wire; i
 deposit under it (a drill's) is mined by the next swing. A building whose health drops to 0 is
 destroyed.
 
+### Power
+
+Solar panels produce power and the other powered buildings consume it, whether they work or
+not: an idle drill on a depleted tile and an idle factory draw as much as busy ones.
+
+| Building | Watts | Category |
+| --- | --- | --- |
+| Solar panel | +20 | |
+| Drill | 4 | Mining |
+| Gun turret | 0 | Weapons |
+| Laser turret | 25 | Weapons |
+| Missile turret | 20 | Weapons |
+| Factory | 75 | Construction |
+| Drone pad | 20 | |
+
+The power panel splits 6 bars between three categories, Mining, Weapons and Construction, each
+at a level of 0 to 4; every run starts at 2, 2 and 2. A category runs at half its level: 0, 0.5,
+1, 1.5 or 2 times the normal speed, and at level 0 it stops. A building without a category (the
+drone pad) runs at 1.
+
+The production is the sum of the panels' watts. The demand is the sum of the consumers' watts
+times the bars assigned out of 6, one scale for every consumer, the drone pads included: with
+every category at 1 the base draws half its watts, with all 6 bars assigned the full watts.
+
+When there is demand and the production is below it, the base is in a **blackout**, all or
+nothing. In a blackout the drills, the factories, the laser and missile turrets and the drones
+stop, keeping their progress, and resume when the power is back. The gun turrets (scaled by
+Weapons), the astronaut's crafting and mining, the pistol and the rockets keep working.
+
+Clicking bar n (1 to 4) of a category's column sets the category to level n, or, when it is at
+n already (the topmost lit bar), steps it down to n - 1, so a click on the single lit bar of a
+category switches it off. An increase is capped by the free bars; when there is none to take,
+the warning `Only 6 power bars - free one somewhere else` shows and nothing changes.
+
+A drill on a deposit mines without a blackout and with Mining above 0: every mining time of its
+ore (iron 4.5 seconds, copper 6, stone 1.5, Luminite 24) at multiplier 1, so every 0.75 seconds
+of stone at level 4, it moves 1 of the ore into the inventory. When the ore does not fit (a new
+kind with 15 kinds held) nothing is mined, the deposit keeps it and the interval is used up.
+Once its deposit is gone the drill stands idle, still drawing power.
+
+A factory is a worker of the order book that crafts at the Construction multiplier, so two
+crafts of an order go twice as fast with one factory at level 2. In a blackout or at level 0 it
+holds its craft and goes on with it when the power is back. A factory demolished or destroyed
+mid-craft returns the inputs of its craft to the order. The astronaut crafts at speed 1 whatever
+the power.
+
+Every powered building shows its state on its status lamps:
+
+| State | Lamp |
+| --- | --- |
+| Blackout (a consumer) or its category at 0 | Red {248, 84, 72}, blinking |
+| Its category at 1 | Orange {240, 152, 72} |
+| Its category at 2 | Green {124, 226, 148} |
+| Its category at 3 or 4, or no category | Cyan {92, 236, 222} |
+
+A gun turret draws no power, so a blackout does not kill its lamps; Weapons at 0 does.
+
 ### Critters
 
 | Critter | HP | Speed | Damage/s | Attack range | Radius | Wave cost | From wave |
@@ -377,7 +438,9 @@ Every task of the port follows these.
   `OreHover` when the cursor tile moves, `OreInventory` when an amount changes,
   `OreCraftBook` (the orders oldest first and the rows of the queue panel) when an order or a
   craft's progress changes, `OreCanOrder` on an item prefab when it flips, `OreNeeds` (the raw
-  ore of the item the UI sets in it) when a row changes. The C formats no text for the UI.
+  ore of the item the UI sets in it) when a row changes, `OrePowerAlloc` (the levels of the
+  power categories) when a level changes, `OrePowerState` (production, demand, ratio and
+  blackout) when a value changes. The C formats no text for the UI.
 - **Game state** is the exclusive pair `(OreGameState, Title | Playing | Paused | Won | Lost)`
   on its own singleton (`ore_state_is`, `ore_state_set`). Gameplay systems run only while
   `Playing`, with a query term on `ore_state_pair(world, OreGameStatePlaying)` whose source is
@@ -538,7 +601,8 @@ is turned by PI / 2 about x). The `bulb` is the part the game drives: it has the
 `Emissive` of the lamp's color at `strength` while `on`, and a `PointLight` of intensity
 `light` and `range` when `light` is above 0. The props say how: a status lamp (`status: true`)
 is the power lamp of its building, which OrePower colors `color` (live), `ok`, `warn` or `dead`
-and blinks at `blink` per second while dead; a work lamp (`work: true`) lights while its
+and blinks with the lamp signal of `OreBlink` while dead (the template gives its bulb an
+`OreStatusLamp` with those colors); a work lamp (`work: true`) lights while its
 building works. The props are on the `Light` component of the lamp entity (`lamp_l`, `sight`,
 ...). The template builds the parts on every lamp of an instance, not on the prefab's, so they
 keep their names there: the bulb is the lamp's child `bulb`.
@@ -562,7 +626,7 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 | `etc/world.flecs` | The ground and the basin |
 | `etc/boundary.flecs` | The hazard band around the playable area |
 | `etc/scenery.flecs` | The boulders and dunes of a run |
-| `etc/run.flecs` | The astronaut, the parents of the placed buildings and of the critters, and the singletons of a run, the order book, the selection and the waves included |
+| `etc/run.flecs` | The astronaut, the parents of the placed buildings and of the critters, and the singletons of a run, the order book, the selection, the power allocation and the waves included |
 | `etc/deposits.flecs` | The deposits of a run |
 | `etc/player.flecs` | The `Astronaut` template |
 | `etc/props/ore.flecs` | The `Ore` template of the deposits |
@@ -593,5 +657,6 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 | `src/buildings.c` | The buildings in the tile grid, the wall connectors, demolish and salvage, destroyed buildings, the look of the ghosts |
 | `src/placement.c` | The selection, `canPlace`, the click and the drag, the pipette, the preview, `oreelse.select()`, `oreelse.pipette()`, `oreelse.placeStart()`, `oreelse.placeEnd()`, `oreelse.cancelDrag()` |
 | `src/craft.c` | The order book, the workers, `oreelse.craft_order()`, `oreelse.craft_cancel()` |
+| `src/power.c` | Production, demand and the blackout, the drills, the factories' crafters, the status lamps, `oreelse.power_set(category, level)` |
 | `src/look.c` | The render quality tiers, `oreelse.cycleQuality()` |
 | `src/particles.c` | The helpers that play the effects (`ore_burst`, `ore_burst_aimed`, `ore_explosion`, `ore_combust`), the flash of their lights, `oreelse.explosion()`, `oreelse.combust()` |

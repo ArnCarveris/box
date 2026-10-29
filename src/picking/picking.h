@@ -105,7 +105,7 @@ typedef void (*box_pick_begin_t)(
     box_pick_state_t *st,
     void *ctx);
 
-/** Take a keyboard event in place of flecs.script.event, which the hook sends it to when the
+/** Take a keyboard event in place of flecs.script.input, which the hook sends it to when the
  * scripts should see it.
  *
  * @param world The world
@@ -138,7 +138,7 @@ typedef void (*box_pick_pointer_t)(
     uint32_t released,
     void *ctx);
 
-/** Decide which entity gets the flecs focus, the to_focus hook of flecs.script.event that
+/** Decide which entity gets the flecs focus, the to_focus hook of flecs.script.input that
  * box.picking sets together with its to_local.
  *
  * @param world The world
