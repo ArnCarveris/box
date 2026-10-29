@@ -24,7 +24,11 @@ python3 tools/integration.py e2e oreelse_mining oreelse_particles
 python3 tools/integration.py e2e oreelse_crafting oreelse_buildings oreelse_rocket
 python3 tools/integration.py e2e oreelse_power oreelse_critters oreelse_critter_fx
 python3 tools/integration.py e2e oreelse_player_fx oreelse_hud oreelse_building_animation
+<<<<<<< HEAD
 python3 tools/integration.py e2e oreelse_drones
+=======
+python3 tools/integration.py e2e oreelse_weapons oreelse_flora
+>>>>>>> 3a92b43bc9d6429c4033f0274bc336d5ed367d2a
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -92,6 +96,11 @@ The map is 48 by 48 tiles of 2 units, the astronaut's start at its center. Depos
 A hazard band runs around the playable area, just outside the edge tiles. Boulders lie scattered
 over the basin and the plain, and dunes rise on the plain beyond; they change with every map and
 nothing collides with them.
+
+Alien flora grows from 8 to 58 units out from the center: 96 frondstalks, 200 ashcups and 84
+quillbulbs, each near the center of a tile, changing with every map. It is decoration: nothing
+collides with it. A tile holds at most one plant and a deposit's tile none. A plant under a
+building sinks out of sight when the building is placed and comes back when it is gone.
 
 ### The astronaut
 
@@ -452,6 +461,49 @@ for big waves so that a wave takes at most 20 seconds to spawn. Each spawns on a
 other than the previous critter's (north, south, west or east), at a random place along it a
 tile inside the edge, up to 5 units off on both axes.
 
+### Weapons
+
+Weapons shoot critters only: no shot, missile, splash or beam ever hurts a building or the
+astronaut.
+
+| Weapon | Damage | Range | Interval | Projectile | Muzzle (height, forward) |
+| --- | --- | --- | --- | --- | --- |
+| Pistol (the astronaut) | 6 | 9 | 0.45 s | Tracer, speed 30 | 1.3 above the astronaut, no forward offset |
+| Gun turret | 2.5 per shot | 10 | 0.12 s | Tracer, speed 34 | 1.7, 1.06 |
+| Laser turret | 50 per second | 13 | continuous | beam | 1.7, 0.74 |
+| Missile turret | 150, splash radius 5 | 17 | 0.5 s | Missile, speed 18, homing | 1.8, 0.44 |
+
+Ranges are measured on the ground (XZ) between centers. Shots aim 0.6 above a critter's
+position.
+
+**The pistol** is fully automatic: every 0.45 seconds it fires at the nearest live critter
+within 9 units, without lead. With no critter in range it waits ready, so it fires as soon as
+one comes in range. Its muzzle rises with the jetpack. It works in a blackout and whatever the
+power allocation.
+
+**Turrets** keep their target while it lives and stays within range; otherwise they take the
+nearest live critter within range, and the head turns to it at once. A turret does not fire
+while its Weapons multiplier is 0, nor in a blackout when it draws power: the gun turret draws
+none, so a blackout does not stop it, but Weapons at 0 does.
+
+- The gun turret fires every `0.12 / multiplier` seconds (8.33 shots a second at level 2) from
+  its muzzle, 1.06 ahead of its center along its aim and 1.7 up. It leads a moving target: it
+  estimates the time of flight twice, the second time to the first lead point, caps it at 2
+  seconds and aims where the target will be by then.
+- The laser turret burns its target continuously for `50 * multiplier` hit points a second,
+  instantly, with no projectile; a thin pink beam runs from its lens to the target while it
+  fires.
+- The missile turret launches a homing missile at its target every `0.5 / multiplier` seconds.
+
+**Projectiles** fly straight without gravity: a tracer hits within 0.55 and lasts 0.7 seconds,
+a missile hits within 0.8 and lasts 5 seconds. A shot hits the nearest live critter within its
+hit radius on the ground, whichever critter that is, not only the one it was fired at; it is
+gone at the end of its life or when it reaches the ground. A tracer deals its full damage to
+the critter it hits. A missile keeps its speed and turns toward its target at up to 6 radians
+a second, straight at it within 3 units; when its target is gone it takes the nearest live
+critter within 6 of it, if any. A missile explodes when it hits or runs out: every live critter
+within 5 of the explosion on the ground takes the full 150, with no falloff.
+
 ### Health
 
 The astronaut has 100 HP. After 5 seconds without damage it regenerates 2 HP a second up to
@@ -599,7 +651,8 @@ Every task of the port follows these.
   the runs since the start. `ore_seed_get(world, stream)` derives the seed of a stream of the
   current run: stream 0 seeds the C generator (`OreRandom`, drawn with `ore_random01`), and
   the scripts seed their `flecs.script.math.Rng` with `oreelse.seed(stream)`, one stream per
-  script (1 and 2 the deposits, 3 the ore models, 4 the scenery). A new random stream takes the next number.
+  script (1 and 2 the deposits, 3 the ore models, 4 the scenery, 5 the placement of the flora,
+  6 the plant models). A new random stream takes the next number.
 - **Restart** reloads the scripts that create a run's entities (`ecs_script_reload`): every
   script that creates the entities of a run puts the `OreRunScript` tag on one of them, and
   `restart()` reloads the script of every entity with the tag (today `run.flecs` with the
@@ -608,11 +661,15 @@ Every task of the port follows these.
 - **The map**: tile (row, col) is centered at `x = x0 + col * tile`, `z = z0 + row * tile`.
   The conversions are `ore_tile_x`, `ore_tile_z`, `ore_col_at`, `ore_row_at` and `ore_on_grid`
   in `src/map.c`, over the `ore_grid_t` of `ore_grid_get` (read once per system run). The
-  `OreMap` singleton is the tile grid: `ore_map_deposit` and `ore_map_building` give the cell
-  of a tile. Entities register when they are set and clear their cell when they are removed.
-  A deposit that registers on a tile another deposit holds is rejected and deleted by
-  `ore_map_purge` (every frame in `OnLoad`, and by `restart()` right after its reload): an
-  entity cannot be deleted in the observer of a component its script is still setting.
+  `OreMap` singleton is the tile grid: `ore_map_deposit`, `ore_map_building` and
+  `ore_map_flora` give the cell of a tile. Entities register when they are set and clear their
+  cell when they are removed.
+  A deposit that registers on a tile another deposit holds (a plant on one another plant
+  holds) is rejected and deleted by `ore_map_purge` (every frame in `OnLoad`, and by
+  `restart()` right after its reload): an entity cannot be deleted in the observer of a
+  component its script is still setting. `ore_map_purge` then syncs the flora
+  (`ore_flora_sync`): it deletes the plants that registered on a deposit's tile and sinks or
+  raises the plants of the tiles whose building changed.
 - **Systems write through `it->stage`** (`ecs_set`, `ecs_modified`, `ore_state_set`,
   `ore_toast`): the world is read only while the pipeline runs.
 - **Tests**: end-to-end scenarios over the command port, one file per area,
@@ -638,8 +695,9 @@ The critters and projectiles are prefabs ported from the original with its names
 colors. The critters carry their gameplay data (`OreHealth`, `OreSpeed`, `OreDamage`,
 `OreRange`, `OreRadius`, `OreWaveTier`), their gait (`OreGait {step, bob}`) and the effect they
 die in (`OreDeathBurst {burst}`, `CombustBurst` for all four), and the waves give their
-instances `OreCritter`, `OreTarget` and `OreVelocity`; OreWeapons gives the projectiles theirs,
-the effect tasks drive the named parts. Each faces +Z.
+instances `OreCritter`, `OreTarget` and `OreVelocity`. The projectiles carry theirs
+(`OreProjectile {radius, life}`, and `OreHoming` on the missile); the effect tasks drive the
+named parts. Each faces +Z.
 
 ### Critters
 
@@ -679,7 +737,10 @@ position, yaw)` lays one from a script.
 
 ### Projectiles
 
-A projectile's origin is its center.
+A projectile's origin is its center. A weapon fires an instance of its prefab under the
+`projectiles` parent of the run (`OreArmory.root`), turned along its velocity (pitch and yaw in
+box's Euler order), with the velocity in its `OreProjectile`, the weapon's `OreDamage`, its
+`OreSplash` for a missile and, for a homing projectile, its `OreTarget`.
 
 | Prefab | File | Parts |
 | --- | --- | --- |
@@ -754,6 +815,27 @@ and `HazardBoundary` (`etc/materials/hazard.flecs`), `SolarCells`, `AccessPlate`
 `FanDisc` and `BayPad`. `TileMarker` and `TileMarkerBad` (`etc/props/markers.flecs`) are the
 glowing plates mining and placement show over a tile, instances placed at y 0.14.
 
+## Flora models
+
+The plants are templates in `etc/props/flora.flecs` with the original's names, geometry and
+colors. A plant's origin is the middle of its root mound on the ground, and every instance draws
+its own shape from the seeded `floraRng`. The fronds and membranes are the cutouts of
+`etc/materials/flora.flecs`: `FloraFrond`, `FloraFrondB`, `FloraMembrane` and `FloraMembraneB`,
+a one sided unit quad with the texture and its normal map, alpha tested (`AlphaCutoff`) instead
+of the original's alpha blending. Every blade of a plant has a `back` child of the same cutout
+turned by PI about y, so it shows its texture from both sides. The back is written out in the
+templates, not as a child of the cutout prefabs: flecs' instancing of prefab children at the
+scale of the flora (thousands of blades) aborts at world teardown.
+
+| Template | Props | Parts |
+| --- | --- | --- |
+| `Frondstalk` | `height`, `fronds`, `skirt`, `blade`, `bladeWide`, `stalkR`, `stalkTint`, `rootTint` | `mound`, `root_0` ... `root_2`, the stalk `seg_a`, `seg_b`, `seg_c`, the crown `frond_0` ... and the skirt `skirt_0` ... |
+| `Ashcup` | `leaves`, `size`, `nubs`, `rootTint`, `nubTint` | `mound`, the cup `leaf_0` ..., `nub_0` ... |
+| `Quillbulb` | `size`, `quills`, `veils`, `bulbTint`, `quillTint`, `rootTint`, `podTint`, `podGlow` | `mound`, `neck`, `bulb`, `quill_0` ..., `veil_0` ..., the glowing `pod_0`, `pod_1` |
+
+The plants of a run are the children of `flora` in `etc/scenery.flecs`, each with `OreFlora`,
+its tile in the grid.
+
 ## Files
 
 | File | Holds |
@@ -761,19 +843,21 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 | `etc/oreelse.flecs` | The window, the camera, the sun, the atmosphere, the effects and the view, the render quality tier, the mining markers, the critter tiers and their death effects (`OreArsenal`), the one shot effects the C plays (`OreEffects`), the HUD; includes the rest |
 | `etc/config.flecs` | The constants `cfg.*` |
 | `etc/resources.flecs` | The item prefabs other than the buildings, with names and recipes |
-| `etc/buildings/*.flecs` | The building prefabs, models with their item, recipe, footprint, health and power |
+| `etc/buildings/*.flecs` | The building prefabs, models with their item, recipe, footprint, health and power, and the turrets' weapons |
 | `etc/buildings/rules.flecs` | The connector rules (`OreConnectRule`): the wall segment between two walls |
 | `etc/input.flecs` | The actions, their bindings and the loops of the actions that fire once |
 | `etc/world.flecs` | The ground and the basin |
 | `etc/boundary.flecs` | The hazard band around the playable area |
-| `etc/scenery.flecs` | The boulders and dunes of a run |
-| `etc/run.flecs` | The astronaut, the parents of the placed buildings and of the critters, and the singletons of a run, the order book, the selection, the power allocation, the rocket state and the waves included |
+| `etc/scenery.flecs` | The boulders, dunes and flora of a run |
+| `etc/run.flecs` | The astronaut with its pistol, the parents of the placed buildings, of the critters and of the projectiles, and the singletons of a run, the order book, the selection, the power allocation, the rocket state and the waves included |
 | `etc/launch.flecs` | The items of a rocket (`OreRocketKit`) and the rocket on the pad, a `Rocket` instance that follows the rocket state |
 | `etc/deposits.flecs` | The deposits of a run, the Luminite's with their glints (`DepositSparkle`) |
 | `etc/player.flecs` | The `Astronaut` template |
 | `etc/props/ore.flecs` | The `Ore` template of the deposits |
+| `etc/props/flora.flecs` | The `Frondstalk`, `Ashcup` and `Quillbulb` templates of the flora |
+| `etc/materials/flora.flecs` | The frond and membrane textures and their cutouts `FloraFrond`, `FloraFrondB`, `FloraMembrane`, `FloraMembraneB` |
 | `etc/critters/` | The `Mite`, `Skitter`, `Brute` and `Behemoth` prefabs, models with their health, speed, damage, range, radius and wave tier |
-| `etc/projectiles/` | The `Tracer`, `Missile` and `LaserBeam` prefabs |
+| `etc/projectiles/` | The `Tracer`, `Missile` and `LaserBeam` prefabs, the first two with their hit radius and life |
 | `etc/props/markers.flecs` | The `TileMarker` and `TileMarkerBad` prefabs |
 | `etc/particles.flecs` | Includes the particle effects |
 | `etc/particles/pools.flecs` | The particle sprites, how the original's pools map to the layers, the effect budgets (`ParticleSettings`) |
@@ -800,8 +884,10 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 | `src/player.c` | Walking, the jetpack and the camera; the astronaut's animation (`OrePlayerFx`: the walk cycle `OrePlayerGait`, the bob, the foot dust and the jet plume; `OreLimbs`: the limbs) and its death (`ore_player_die`) |
 | `src/inventory.c` | The inventory and the item components |
 | `src/mining.c` | Mining, demolishing and their tile marker; the burst and the shrink of a mined deposit, the poofs of a used up deposit and of a demolished building, the glints of the Luminite while playing |
+| `src/flora.c` | The plants in the tile grid: removed on deposits and taken tiles, sunk under buildings |
 | `src/critters.c` | The waves, the critters' targets, attacks and moves, the crowd separation and the critter spatial index, their deaths, the astronaut's health and regen, `oreelse.spawn_critter()` |
 | `src/critter_fx.c` | The critters' walk, bob, waddle and legs, their death bursts, the corpses' char, sinking and cap, `oreelse.corpse()` |
+| `src/weapons.c` | The astronaut's pistol, the turrets' targets, aim, lead and fire, the laser beams, the projectiles' flight, homing, hits and splash |
 | `src/buildings.c` | The buildings in the tile grid, the wall connectors, demolish and salvage, destroyed buildings, the look of the ghosts |
 | `src/building_fx.c` | The buildings' animation and lights at the work rate of their building: the spinners, pistons, shakes, vents, work emitters and work lights |
 | `src/placement.c` | The selection, `canPlace`, the click and the drag, the poof of a placed building, the pipette, the preview, `oreelse.select()`, `oreelse.pipette()`, `oreelse.placeStart()`, `oreelse.placeEnd()`, `oreelse.cancelDrag()` |

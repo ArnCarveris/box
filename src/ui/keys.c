@@ -529,11 +529,19 @@ static ecs_entity_t box_ui_activated(
     }
 
     handler = box_ui_handler(world, e);
+<<<<<<< HEAD
     if (!handler || !ps || !ps->state || !ps->state->has_sent) {
         goto done;
     }
 
     last = &ps->state->sent;
+=======
+    if (!handler || !ps || !ps->state || !ps->state->has_event) {
+        goto done;
+    }
+
+    last = &ps->state->event;
+>>>>>>> 3a92b43bc9d6429c4033f0274bc336d5ed367d2a
     if (last->button != 0) {
         goto done;
     }

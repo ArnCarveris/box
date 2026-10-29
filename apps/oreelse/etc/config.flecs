@@ -19,6 +19,10 @@ cfg {
   // Ore of a new deposit, its amount and its capacity
   export const depositAmount: i32 = 1000
 
+  // A plant of the flora under a building sinks floraSink units below the ground, out of sight,
+  // until the building is gone
+  export const floraSink: f32 = 8
+
   // The astronaut mines a tile whose center is at most reach away on x and z, and places a
   // building whose footprint (the rectangle of its tile centers) is at most reach away
   export const reach: f32 = 15
@@ -265,6 +269,26 @@ cfg {
   export const corpseRoll: f32 = 0.8
   export const corpseSquash: f32 = 0.55
   export const corpseColor: Tint = {40, 36, 34, 255}
+
+  // The astronaut's pistol: fully automatic, it fires a Tracer of pistolDamage at pistolSpeed
+  // every pistolInterval seconds at the nearest live critter within pistolRange, from pistolY
+  // above the astronaut
+  export const pistolDamage: f32 = 6
+  export const pistolRange: f32 = 9
+  export const pistolInterval: f32 = 0.45
+  export const pistolSpeed: f32 = 30
+  export const pistolY: f32 = 1.3
+
+  // The aim of the weapons: shots and missiles aim turretAimY above a critter's position, the
+  // laser beam turretAimPerRadius times the critter's radius above it. The gun turret leads its
+  // shots by at most leadCap seconds of the target's walk. A missile turns at most
+  // missileTurnRate radians a second (straight at its target within speed / missileTurnRate)
+  // and, when its target is gone, takes the nearest live critter within missileReacquire
+  export const turretAimY: f32 = 0.6
+  export const turretAimPerRadius: f32 = 0.9
+  export const leadCap: f32 = 2
+  export const missileTurnRate: f32 = 6
+  export const missileReacquire: f32 = 6
 
   // The render quality tiers Low, Medium and High (OreQuality.tier), the quality.flecs of the
   // original: the resolution scale of the surfaces (2 renders at half the pixels), the shadow

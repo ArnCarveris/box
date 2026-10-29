@@ -1,18 +1,23 @@
 // The guided missile of the missile turret, the Missile prefab of the original: a steel body
 // with an orange tip and two fins, and a glowing flame at its tail that lights what it passes.
 // Its origin is its center and it flies along +Z. The trail child is where the smoke trail
-// comes out of; the effect task gives it its emitter. OreWeapons gives the prefab its gameplay
-// data.
+// comes out of; the effect task gives it its emitter. It homes in on its target, hits the
+// nearest live critter within 0.8 on XZ and expires after 5 s, without gravity
+// (OreProjectileFly).
 
 using box.transform
 using box.geometry
 using box.material
 using box.light
+using oreelse
 
 const missileSteel: Rgb = {198, 202, 214}
 const missileFlame: Rgb = {255, 148, 72}
 
 prefab Missile {
+  OreProjectile: {vx: 0, vy: 0, vz: 0, life: 5, radius: 0.8}
+  OreHoming
+
   body {
     Position: {0, 0, 0}
     Rotation: {1.5708, 0, 0}
