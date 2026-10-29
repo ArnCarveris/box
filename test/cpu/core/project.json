@@ -173,7 +173,16 @@
                     "zero_velocity",
                     "without_velocity",
                     "child_follows_parent",
-                    "moving_child"
+                    "moving_child",
+                    "velocity_adds_position",
+                    "angular_velocity_adds_rotation",
+                    "velocity_keeps_position",
+                    "angular_velocity_keeps_rotation",
+                    "velocity_only_moves",
+                    "angular_velocity_only_rotates",
+                    "velocity_from_script",
+                    "angular_velocity_from_script",
+                    "velocity_prefab_instance"
                 ]
             },
             {

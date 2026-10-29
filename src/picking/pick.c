@@ -572,7 +572,8 @@ static void box_pick_candidate(
 /** Narrow phase of the spatial ray: the area of a UI element or the triangles of a shape.
  *
  * A hit on a UI element or a 2D shape outside the area of a ClipChildren ancestor is no hit, as
- * it is not drawn there, and an element with PickThrough is never hit.
+ * it is not drawn there, and an element with PickThrough is never hit. Neither is a disabled
+ * entity, which the index skips, nor an entity that is no longer alive.
  *
  * The distance it reports is moved out by the tie margin, so the walk still reaches every hit
  * that ties with the nearest one, which the selection weighs.
@@ -592,11 +593,10 @@ static bool box_pick_filter(
     vec2 size, local;
     bool circle = false;
     float t = 0;
-    bool ui = box_pick_ui_size(cast->world, e, size, &circle);
+    bool alive = ecs_is_alive(cast->world, e);
+    bool ui = alive && box_pick_ui_size(cast->world, e, size, &circle);
     bool result;
-    if (ecs_has_id(cast->world, e, PickThrough)) {
-        result = false;
-    } else if (ui && !ecs_has(cast->world, e, ShapeMesh) &&
+    if (!alive || ecs_has_id(cast->world, e, PickThrough) ||
         ecs_has_id(cast->world, e, EcsDisabled))
     {
         result = false;

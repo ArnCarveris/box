@@ -1987,6 +1987,9 @@ void ore_particles_import(
 void OreelseImport(
     ecs_world_t *world);
 
+/* The stress test's components, apart as this file is at the size limit of the lint */
+#include "stresstest.h"
+
 #undef ECS_META_IMPL
 
 #endif
