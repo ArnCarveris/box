@@ -391,4 +391,11 @@ void box_command_usage(
 void box_cmd_quit_init(
     ecs_world_t *world);
 
+/** Register the edit command that opens and closes the editor.
+ *
+ * @param world The world
+ */
+void box_cmd_edit_init(
+    ecs_world_t *world);
+
 #endif

@@ -1,0 +1,315 @@
+/**
+ * @file Editor.c
+ * @brief The editor overlay: opening creates its view and content, closing deletes the view,
+ * reopening works, and the Editor singleton drives all of it from C, scripts and commands.
+ */
+
+#include <box.h>
+#include <bake_test.h>
+#include <string.h>
+
+/** Path of the title label the script template creates in the panel */
+#define EDITOR_TITLE BOX_EDITOR_PANEL ".title_bar.label"
+
+/** Path of the body of the panel that later widgets fill */
+#define EDITOR_BODY BOX_EDITOR_PANEL ".body"
+
+/** Create a world with box and no surface.
+ *
+ * @return The world
+ */
+static ecs_world_t* editor_world(void) {
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    return world;
+}
+
+/** Set Editor.open and run frames until the editor followed it.
+ *
+ * @param world The world
+ * @param open Whether the editor is open
+ */
+static void editor_open(
+    ecs_world_t *world,
+    bool open)
+{
+    Editor *e = ecs_singleton_get_mut(world, Editor);
+    e->open = open;
+    ecs_singleton_modified(world, Editor);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+}
+
+/** Check that the editor view exists and draws the editor scene as an overlay.
+ *
+ * @param world The world
+ * @return The view
+ */
+static ecs_entity_t editor_check_view(
+    ecs_world_t *world)
+{
+    ecs_entity_t view = ecs_lookup(world, BOX_EDITOR_VIEW);
+    test_assert(view != 0);
+    const View *v = ecs_get(world, view, View);
+    test_assert(v != NULL);
+    test_int(v->order, BOX_VIEW_ORDER_EDITOR);
+    test_assert(v->camera == ecs_lookup(world, BOX_EDITOR_UI ".camera"));
+    test_bool(v->clear.enabled, false);
+    test_bool(v->lighting.enabled, false);
+    test_bool(v->shadows.enabled, false);
+    test_bool(v->culling.enabled, false);
+    test_int(ecs_vec_count(&v->effects), 0);
+
+    return view;
+}
+
+void Editor_closed_by_default(void) {
+    // editor/overlay
+    ecs_world_t *world = editor_world();
+    ecs_progress(world, 0);
+
+    test_bool(ecs_singleton_get(world, Editor)->open, false);
+    test_assert(ecs_lookup(world, BOX_EDITOR_VIEW) == 0);
+    test_assert(ecs_lookup(world, BOX_EDITOR_UI) == 0);
+    test_assert(ecs_lookup(world, BOX_EDITOR_SCRIPT) == 0);
+
+    ecs_fini(world);
+}
+
+void Editor_open_creates_view_and_content(void) {
+    // editor/overlay
+    ecs_world_t *world = editor_world();
+    editor_open(world, true);
+
+    editor_check_view(world);
+    ecs_entity_t root = ecs_lookup(world, BOX_EDITOR_UI);
+    test_assert(root != 0);
+    test_assert(ecs_has(world, root, Scene));
+    const Camera *cam = ecs_get(world, ecs_lookup(world, BOX_EDITOR_UI ".camera"), Camera);
+    test_bool(cam->ortho, true);
+    test_flt(cam->ortho_scale, 1);
+
+    ecs_entity_t script = ecs_lookup(world, BOX_EDITOR_SCRIPT);
+    test_assert(script != 0);
+    const EcsScript *s = ecs_get(world, script, EcsScript);
+    test_assert(s != NULL);
+    test_assert(s->error == NULL);
+
+    ecs_entity_t tmpl = ecs_lookup(world, BOX_EDITOR_TEMPLATE);
+    test_assert(tmpl != 0);
+    ecs_entity_t panel = ecs_lookup(world, BOX_EDITOR_PANEL);
+    test_assert(panel != 0);
+    test_assert(ecs_has_id(world, panel, tmpl));
+    test_assert(ecs_has(world, panel, InputBlocker));
+    test_assert(ecs_has(world, panel, Rect));
+
+    ecs_entity_t title = ecs_lookup(world, EDITOR_TITLE);
+    test_assert(title != 0);
+    const Text *t = ecs_get(world, title, Text);
+    test_assert(t != NULL);
+    test_str(t->value, "Entities");
+
+    ecs_entity_t body = ecs_lookup(world, EDITOR_BODY);
+    test_assert(body != 0);
+    test_assert(ecs_has(world, body, ClipChildren));
+
+    ecs_fini(world);
+}
+
+void Editor_close_removes_view(void) {
+    // editor/overlay
+    ecs_world_t *world = editor_world();
+    editor_open(world, true);
+    ecs_entity_t view = editor_check_view(world);
+    ecs_entity_t panel = ecs_lookup(world, BOX_EDITOR_PANEL);
+
+    editor_open(world, false);
+    test_assert(!ecs_is_alive(world, view));
+    test_assert(ecs_lookup(world, BOX_EDITOR_VIEW) == 0);
+
+    /* The content is kept so the editor opens again quickly */
+    test_assert(ecs_is_alive(world, panel));
+    test_assert(ecs_lookup(world, BOX_EDITOR_UI) != 0);
+
+    ecs_fini(world);
+}
+
+void Editor_reopen(void) {
+    // editor/overlay
+    ecs_world_t *world = editor_world();
+    editor_open(world, true);
+    ecs_entity_t panel = ecs_lookup(world, BOX_EDITOR_PANEL);
+    ecs_entity_t script = ecs_lookup(world, BOX_EDITOR_SCRIPT);
+    editor_open(world, false);
+    editor_open(world, true);
+
+    editor_check_view(world);
+    test_uint(ecs_lookup(world, BOX_EDITOR_PANEL), panel);
+    test_uint(ecs_lookup(world, BOX_EDITOR_SCRIPT), script);
+    test_assert(ecs_lookup(world, EDITOR_TITLE) != 0);
+
+    editor_open(world, false);
+    test_assert(ecs_lookup(world, BOX_EDITOR_VIEW) == 0);
+
+    ecs_fini(world);
+}
+
+void Editor_open_from_script(void) {
+    // editor/overlay
+    ecs_world_t *world = editor_world();
+    test_int(ecs_script_run(world, "open_editor",
+        "using box.editor\n"
+        "$ {\n"
+        "  Editor: {open: true}\n"
+        "}\n", NULL), 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+
+    editor_check_view(world);
+    test_assert(ecs_lookup(world, EDITOR_TITLE) != 0);
+
+    test_int(ecs_script_run(world, "close_editor",
+        "using box.editor\n"
+        "$ {\n"
+        "  Editor: {open: false}\n"
+        "}\n", NULL), 0);
+    ecs_progress(world, 0);
+    test_assert(ecs_lookup(world, BOX_EDITOR_VIEW) == 0);
+
+    ecs_fini(world);
+}
+
+void Editor_open_from_command(void) {
+    // editor/overlay
+    ecs_world_t *world = editor_world();
+    ecs_entity_t s = box_terminal_new(world);
+    ecs_os_free(box_terminal_run(world, s, "edit", NULL));
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    editor_check_view(world);
+
+    ecs_os_free(box_terminal_run(world, s, "edit", NULL));
+    ecs_progress(world, 0);
+    test_assert(ecs_lookup(world, BOX_EDITOR_VIEW) == 0);
+
+    ecs_os_free(box_terminal_run(world, s, "edit on", NULL));
+    ecs_progress(world, 0);
+    editor_check_view(world);
+
+    ecs_fini(world);
+}
+
+void Editor_docks_right(void) {
+    // editor/overlay
+    ecs_world_t *world = editor_world();
+    editor_open(world, true);
+
+    ecs_entity_t screen = ecs_lookup(world, BOX_EDITOR_SCREEN);
+    test_int(ecs_get(world, screen, Layout)->h, AlignRight);
+    const LayoutItem *item = ecs_get(world, ecs_lookup(world, BOX_EDITOR_PANEL), LayoutItem);
+    test_int(item->width.mode, SizeModeFixed);
+    test_flt(item->width.value, 0.25f * 1280);
+    test_int(item->height.mode, SizeModeGrow);
+
+    const LayoutBounds *b = ecs_get(world, ecs_lookup(world, BOX_EDITOR_PANEL), LayoutBounds);
+    test_assert(b != NULL);
+    test_flt(b->width, 320);
+    test_flt(b->height, 720);
+
+    ecs_fini(world);
+}
+
+void Editor_width_and_side(void) {
+    // editor/overlay
+    ecs_world_t *world = editor_world();
+    editor_open(world, true);
+
+    Editor *e = ecs_singleton_get_mut(world, Editor);
+    e->width = 0.5f;
+    e->side = EditorSideLeft;
+    ecs_singleton_modified(world, Editor);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+
+    ecs_entity_t screen = ecs_lookup(world, BOX_EDITOR_SCREEN);
+    test_int(ecs_get(world, screen, Layout)->h, AlignLeft);
+    const LayoutItem *item = ecs_get(world, ecs_lookup(world, BOX_EDITOR_PANEL), LayoutItem);
+    test_flt(item->width.value, 640);
+
+    e = ecs_singleton_get_mut(world, Editor);
+    e->width = 2;
+    ecs_singleton_modified(world, Editor);
+    ecs_progress(world, 0);
+    item = ecs_get(world, ecs_lookup(world, BOX_EDITOR_PANEL), LayoutItem);
+    test_flt(item->width.value, 1280);
+
+    e = ecs_singleton_get_mut(world, Editor);
+    e->width = -1;
+    ecs_singleton_modified(world, Editor);
+    ecs_progress(world, 0);
+    item = ecs_get(world, ecs_lookup(world, BOX_EDITOR_PANEL), LayoutItem);
+    test_flt(item->width.value, 0);
+
+    ecs_fini(world);
+}
+
+void Editor_rebuilt_after_delete(void) {
+    // editor/overlay
+    ecs_world_t *world = editor_world();
+    editor_open(world, true);
+
+    ecs_delete(world, ecs_lookup(world, BOX_EDITOR_UI));
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    editor_check_view(world);
+    test_assert(ecs_lookup(world, BOX_EDITOR_PANEL) != 0);
+    test_assert(ecs_lookup(world, EDITOR_TITLE) != 0);
+
+    ecs_delete(world, ecs_lookup(world, BOX_EDITOR_VIEW));
+    ecs_progress(world, 0);
+    editor_check_view(world);
+
+    ecs_fini(world);
+}
+
+void Editor_close_clears_focus(void) {
+    // editor/overlay
+    ecs_world_t *world = editor_world();
+    editor_open(world, true);
+
+    ecs_entity_t body = ecs_lookup(world, EDITOR_BODY);
+    ecs_entity_t field = ecs_entity(world, { .name = "field", .parent = body });
+    ecs_add(world, field, Focusable);
+    ecs_entity_t game = ecs_entity(world, { .name = "game_button" });
+    ecs_add(world, game, Focusable);
+    ecs_progress(world, 0);
+
+    test_uint(ecs_script_set_focus(world, field), field);
+    editor_open(world, false);
+    test_uint(ecs_script_get_focus(world), 0);
+
+    editor_open(world, true);
+    test_uint(ecs_script_set_focus(world, game), game);
+    editor_open(world, false);
+    test_uint(ecs_script_get_focus(world), game);
+
+    ecs_fini(world);
+}
+
+void Editor_view_order_with_console(void) {
+    // editor/overlay
+    ecs_world_t *world = editor_world();
+    Console *c = ecs_singleton_get_mut(world, Console);
+    c->open = true;
+    ecs_singleton_modified(world, Console);
+    editor_open(world, true);
+
+    ecs_entity_t editor = editor_check_view(world);
+    ecs_entity_t console = ecs_lookup(world, BOX_CONSOLE_VIEW);
+    test_assert(console != 0);
+    test_assert(ecs_get(world, editor, View)->order <
+        ecs_get(world, console, View)->order);
+
+    ecs_fini(world);
+}

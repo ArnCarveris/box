@@ -1,0 +1,72 @@
+// The editor, a panel on the right quarter of the surface at full height, open over the default
+// scene: its own UI scene and view, drawn after the 3D view and its effects. The panel is the
+// EditorPanel template of etc/editor/editor.flecs, a title bar over an empty body.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.editor
+using box.console
+
+exposure {
+  AutoExposure: {}
+}
+
+bloom {
+  Bloom: {intensity: 0.2, threshold: 1}
+}
+
+gtao {
+  Gtao: {radius: 0.5, final_value_power: 2.2}
+}
+
+tonemap {
+  Tonemap: {auto_exposure: exposure}
+}
+
+camera {
+  Position: {0, 2.5, 6}
+  Rotation: {-0.35, 0, 0}
+  Camera: {fov: 60}
+}
+
+main_view {
+  View: {
+    camera: camera,
+    clear: {enabled: true, color: {120, 150, 190, 255}},
+    shadows: {enabled: true},
+    effects: [{effect: gtao}, {effect: bloom}, {effect: tonemap}]
+  }
+}
+
+sun {
+  Rotation: {0.7359, 2.3726, 0}
+  DirectionalLight: {intensity: 2 * flecs.script.math.PI}
+  Rgb: {255, 244, 225}
+}
+
+$ {
+  AmbientLight: {sky: {90, 110, 140}, ground: {40, 36, 30}, intensity: 0.6}
+}
+
+ground {
+  Position: {0, -0.05, 0}
+  Box: {20, 0.1, 20}
+  Rgb: {170, 170, 165}
+  PbrMaterial: {roughness: 0.9}
+}
+
+cube {
+  Position: {0, 0.5, 0}
+  Rotation: {0, 0.4, 0}
+  Box: {1, 1, 1}
+  Rgb: {220, 90, 60}
+  PbrMaterial: {roughness: 0.4, metallic: 0}
+}
+
+$ {
+  Editor: {open: true}
+}

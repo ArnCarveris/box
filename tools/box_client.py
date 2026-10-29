@@ -7,6 +7,7 @@
   app.wait_input()                 # input.wait until 0
   app.wait_for("get showcase Showcase.mut.clicks", "3")
   app.get("box.picking.PickStatus", "PickStatus")["handler"]
+  app.edit("on")                   # edit on, True while the editor is open
   width, height, rows = app.capture()
   app.quit()                       # exit 0 within 10 s, /tmp/box/<pid> removed
 
@@ -353,6 +354,15 @@ class App:
         if out != expected:
             self.fail("expected %r, got %r" % (expected, out), cmd, out)
         return out
+
+    def edit(self, state=None):
+        """Run the edit command: toggle the editor, or open it with "on" and close it with "off".
+        Returns whether the editor is open now; the view follows in the next frame."""
+        cmd = "edit" if state is None else "edit %s" % state
+        out = self.exec(cmd)
+        if out not in ("editor open", "editor closed"):
+            self.fail("unexpected output %r" % out, cmd, out)
+        return out == "editor open"
 
     def check(self, condition, message):
         """Fail with message and the last command when condition is false."""
