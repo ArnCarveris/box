@@ -763,3 +763,76 @@ void FileWatch_restored_between_passes_reloads_once(void) {
     ecs_os_free(file);
     ecs_fini(world);
 }
+
+/** Fail to create a thread, like an OS that is out of threads.
+ *
+ * The test replaces the API in place, ecs_os_set_api does nothing once the OS API is
+ * initialized. It first runs a frame with the watch off, which starts the render thread.
+ *
+ * So only the watch thread fails to start. A poll that does not wait then sees the pass stuck
+ * on a thread that never ran, a headless poll would wait for it forever.
+ *
+ * @param callback The thread function
+ * @param param Passed to callback
+ * @return 0, no thread
+ */
+static ecs_os_thread_t thread_new_fails(
+    ecs_os_thread_callback_t callback,
+    void *param)
+{
+    (void)callback;
+    (void)param;
+
+    return 0;
+}
+
+void FileWatch_thread_fails_inline_passes(void) {
+    // engine/file_watch
+    ecs_world_t *world = world_new(-1);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = false;
+    ecs_singleton_modified(world, App);
+    changed_log_t log = {0};
+    watch_files(world, &log, 4);
+
+    ecs_progress(world, 0.05f);
+    test_int(ecs_singleton_get(world, FileWatchStatus)->polls, 0);
+    ecs_singleton_set(world, FileWatch, {.interval = 0.25f});
+
+    ecs_os_api_t saved = ecs_os_get_api();
+    ecs_os_api_t api = saved;
+    api.thread_new_ = thread_new_fails;
+    ecs_os_api = api;
+    test_assert(ecs_os_get_api().thread_new_ == thread_new_fails);
+    test_assert(ecs_os_has_threading());
+
+    int32_t i;
+    for (i = 1; i <= 3; i ++) {
+        test_assert(run_pass(world, 0.05f, 10) <= 6);
+        test_int(ecs_singleton_get(world, FileWatchStatus)->polls, i);
+    }
+
+    write_text(log.paths[2], "changed content", 1000000100);
+    test_assert(run_pass(world, 0.05f, 10) <= 6);
+    const FileWatchStatus *status = ecs_singleton_get(world, FileWatchStatus);
+    test_int(status->polls, 4);
+    test_int(status->changes, 1);
+    test_str(status->last, log.paths[2]);
+    test_int(log.calls[2], 1);
+    test_int(log_calls(&log), 1);
+
+    app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    write_text(log.paths[0], "changed content", 1000000100);
+    test_assert(run_pass(world, 0.05f, 10) <= 6);
+    status = ecs_singleton_get(world, FileWatchStatus);
+    test_int(status->polls, 5);
+    test_int(status->changes, 2);
+    test_int(log.calls[0], 1);
+    test_int(log_calls(&log), 2);
+
+    ecs_os_api = saved;
+    log_fini(&log);
+    ecs_fini(world);
+}

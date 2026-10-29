@@ -257,7 +257,8 @@
                     "stop_watching_during_pass",
                     "stale_registration_starts_pass",
                     "restored_while_queued_reloads_once",
-                    "restored_between_passes_reloads_once"
+                    "restored_between_passes_reloads_once",
+                    "thread_fails_inline_passes"
                 ]
             },
             {
