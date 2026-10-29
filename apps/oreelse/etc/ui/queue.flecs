@@ -6,6 +6,7 @@
 using flecs.script
 using flecs.script.math
 using box.layout
+using box.transform
 using box.geometry
 using box.material
 using box.texture
@@ -22,6 +23,12 @@ const queueRowY: f32 = 11
 
 // How far the icon and the label of an indented row move right
 const queueIndent: f32 = 16
+
+// The draw order of the tick, the icon and the label among the children of a row: over the
+// progress fill. Siblings of a Layout draw in the order of their Position z, then of the row's
+// child list, and the fill only exists while the row is active: a row made while waiting gets it
+// at the end of its children when a worker starts on it, after the icon and the label
+const queueContentZ: f32 = 1
 
 // A row of the queue panel, the row-th from the top: the item's icon of 22x22 at (4 + indent, 2)
 // and the label at (32 + indent, 5), red while the row is stalled. While a worker is on it the
@@ -102,6 +109,7 @@ template QueueRow {
 
   if sub {
     tick {
+      Position: {0, 0, queueContentZ}
       LayoutItem: {
         h: Left, v: Top, x: 7, y: -12,
         width: {mode: Fixed, value: 7}, height: {mode: Fixed, value: 2}
@@ -113,6 +121,7 @@ template QueueRow {
 
   if icon != 0 {
     symbol {
+      Position: {0, 0, queueContentZ}
       LayoutItem: {
         h: Left, v: Top, x: 4 + indent, y: -2,
         width: {mode: Fixed, value: 22}, height: {mode: Fixed, value: 22}
@@ -123,6 +132,7 @@ template QueueRow {
   }
 
   name_label {
+    Position: {0, 0, queueContentZ}
     LayoutItem: {h: Left, v: Top, x: 32 + indent, y: -5}
     Text: {value: label, size: 15, wrap: Newlines}
     Rgb: labelColor
