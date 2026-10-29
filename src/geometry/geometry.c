@@ -129,6 +129,7 @@ static void box_shape_resolve(
                 shape->desc.surface_world(it->world, value, &resolved[i].surface,
                     resolved[i].min, resolved[i].max);
             }
+
             if (shape->desc.surface) {
                 shape->desc.surface(value, &resolved[i].surface,
                     resolved[i].min, resolved[i].max);
@@ -138,14 +139,17 @@ static void box_shape_resolve(
                 } else {
                     shape->desc.key(value, &key);
                 }
+
                 resolved[i].surface.p[3][3] = (float)key.i[2];
             }
+
             if (resolved[i].surface.assets) {
                 ecs_os_free(resolved[i].surface.assets);
                 const box_mesh_t *mesh = box_mesh_cache_get(shape->cache, resolved[i].mesh);
                 resolved[i].surface.assets = mesh->surface_assets;
                 resolved[i].surface.asset_count = mesh->surface_asset_count;
             }
+
             if (shape->desc.surface_world) {
                 const box_mesh_t *mesh = box_mesh_cache_get(shape->cache, resolved[i].mesh);
                 if (!mesh || !mesh->vertex_count || !mesh->index_count) {
@@ -154,9 +158,11 @@ static void box_shape_resolve(
                     glm_vec3_one(resolved[i].scale);
                 }
             }
+
             if (shape->desc.scale) {
                 shape->desc.scale(value, resolved[i].scale);
             }
+
             resolved[i].render_mesh = box_mesh_cache_resolve(shape->cache, &resolved[i]);
         }
     }

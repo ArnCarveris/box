@@ -100,17 +100,13 @@ ECS_STRUCT(LayoutBounds, {
 /** Shifts the children of an element with a Layout to show another part of its content, like
  * CSS overflow: auto. A scroll view is a ClipChildren element with a LayoutScroll.
  *
- * The children are placed shifted by -x and -y logical pixels: a positive y shows content
- * further down, a positive x content further right. The layout applies the offset clamped to
- * 0..LayoutContent.max_x and 0..max_y and never writes the clamped value back, so a script owns
- * the offset. A change of the offset alone moves the children without measuring the tree again.
+ * The children are shifted by -x and -y logical pixels (a positive y shows content further down),
+ * the offset clamped to 0..LayoutContent.max_x and 0..max_y but never written back, so a script
+ * owns it. A change of the offset alone moves the children without measuring the tree again.
  *
- * Along an axis whose flag is set the children are not narrowed to the element: they keep their
- * fit size, grow children included, which only grow across that axis, and the element no
- * longer needs its content as its minimum. An axis whose flag is clear lays out as without a
- * LayoutScroll, so its offset only applies when the content minimum overflows the element.
- * Children of a DirectionNone element without a LayoutItem keep their position and do not
- * scroll; floating children (LayoutFloat) follow their anchor instead.
+ * A flagged axis does not narrow the children: they keep their fit size, grow children growing
+ * only across it, and the content is no minimum. A clear axis scrolls only on content overflow.
+ * Floats follow their anchor; DirectionNone children without a LayoutItem do not scroll.
  */
 ECS_STRUCT(LayoutScroll, {
     float x;         /**< Offset of the content to the left, in logical pixels */
@@ -135,35 +131,30 @@ ECS_STRUCT(LayoutContent, {
 });
 
 /** Places an element next to an anchor outside the flow of its parent, for dropdowns, popup
- * menus and tooltips.
+ * menus and tooltips. The parent must have a Layout and leaves the element out of its fit size
+ * and flow. A LayoutFloat on the root of a layout tree does nothing.
  *
- * The element is left out of the fit size and the flow of its parent, which must have a Layout.
- * Its own h/v point sits on the anchor_h/anchor_v point of the anchor plus the x/y offset (y up,
- * as LayoutItem.y). A dropdown list has h: Left, v: Top, anchor_h: Left, anchor_v: Bottom.
- * The anchor is found through the Position of it and its ancestors, rotation and scale left out.
+ * Its h/v point sits on the anchor_h/anchor_v point of the anchor plus the x/y offset (y up, as
+ * LayoutItem.y); a dropdown list has h: Left, v: Top, anchor_h: Left, anchor_v: Bottom. It sizes
+ * from its LayoutItem, a grow axis taking the size of the anchor within min and max.
  *
- * It sizes itself as any element from its LayoutItem: fit, fixed, and a grow axis takes the size
- * of the anchor within min and max, so a list can be as wide as its button.
- *
- * With flip, an element that does not fit inside the root of its layout tree (the surface for a
- * LayoutFill root) along y is placed on the other side of the anchor when that fits better, its
- * y offset mirrored; along x it is shifted to stay inside.
- *
- * It draws above every non floating element of its scene, and picking agrees; floating elements
- * draw among each other in hierarchy order. ClipChildren ancestors of its parent do not clip it
- * or its descendants, a ClipChildren on the element itself clips its children. It follows its
- * anchor when the anchor moves, scrolls or resizes, in the same frame. A LayoutFloat on the root
- * of a layout tree does nothing.
+ * It draws and picks above every non floating element of its scene, floats among each other in
+ * hierarchy order, and ClipChildren ancestors of its parent do not clip it or its descendants.
+ * It follows its anchor when the anchor moves, scrolls or resizes, in the same frame.
  */
 ECS_STRUCT(LayoutFloat, {
-    ecs_entity_t anchor; /**< Element the float is placed against, 0 for its parent */
+    ecs_entity_t anchor; /**< Element the float is placed against, 0 for its parent; found
+                          *   through the Position of it and its ancestors, rotation and scale
+                          *   left out */
     Align h;             /**< Point of the float on the x axis that sits on the anchor point */
     VAlign v;            /**< Point of the float on the y axis that sits on the anchor point */
     Align anchor_h;      /**< Point of the anchor on the x axis */
     VAlign anchor_v;     /**< Point of the anchor on the y axis */
     float x;             /**< Offset from the anchor point on the x axis */
     float y;             /**< Offset from the anchor point on the y axis, up */
-    bool flip;           /**< Keep the float inside the root of its layout tree */
+    bool flip;           /**< Keep the float inside its layout root (or LayoutFill surface): on y
+                          *   it flips to the anchor's other side when that fits better, y offset
+                          *   mirrored; on x it is shifted to stay inside */
 });
 
 /** Makes an element take the size of a surface in points, the root of a layout that fills the
@@ -180,11 +171,11 @@ ECS_STRUCT(LayoutFill, {
  * area, like CSS overflow: hidden; the element itself is not clipped.
  *
  * The area is its LayoutBounds, else its Rect, centered in its local XY plane and rounded by its
- * Border.radius. Nested clips intersect, anti-aliased per pixel in screen, world and texture UI,
- * and picking misses outside the area. An empty area (zero width or height) hides everything
- * below it, and Tab skips the Focusable entities it clips away entirely, unless the element has a
- * LayoutScroll. 3D shapes below the
- * element are not clipped.
+ * Border.radius. Nested clips intersect, anti-aliased per pixel in screen, world and texture UI;
+ * picking misses outside the area. 3D shapes below the element are not clipped.
+ *
+ * An empty area (zero width or height) hides everything below it, and Tab skips the Focusable
+ * entities it clips away entirely, unless the element has a LayoutScroll.
  */
 extern ECS_TAG_DECLARE(ClipChildren);
 

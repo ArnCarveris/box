@@ -1,22 +1,41 @@
+/**
+ * @file geometry/profiles.c
+ * @brief Surface asset packing, triangulation, and mesh generation for profile shapes.
+ *
+ * Covers Sweep, Loft, Lathe, and ProfileExtrusion, and re-triggers them when their paths change.
+ */
+
 #include "paths.h"
 #include <limits.h>
 #include <math.h>
 
-static bool box_asset_append(ecs_vec_t *data, const vec4 value)
+/** Append a finite vec4 to a surface asset buffer.
+ *
+ * @param data The asset buffer (vector of vec4)
+ * @param value The value to append
+ * @return False if the value is not finite or the asset capacity is exceeded
+ */
+static bool box_asset_append(
+    ecs_vec_t *data,
+    const vec4 value)
 {
-    for (int i = 0; i < 4; i ++) {
-        if (!isfinite(value[i])) {
-            return false;
-        }
+    bool result = true;
+    for (int i = 0; result && i < 4; i ++) {
+        result = isfinite(value[i]);
     }
-    if (ecs_vec_count(data) >= INT_MAX / (int)sizeof(vec4) ||
-        ecs_vec_count(data) >= (1 << 24) - 24)
+
+    if (result && (ecs_vec_count(data) >= INT_MAX / (int)sizeof(vec4) ||
+        ecs_vec_count(data) >= (1 << 24) - 24))
     {
         ecs_err("surface asset capacity exceeded");
-        return false;
+        result = false;
     }
-    glm_vec4_copy(ECS_CONST_CAST(float*, value), *ecs_vec_append_t(NULL, data, vec4));
-    return true;
+
+    if (result) {
+        glm_vec4_copy(ECS_CONST_CAST(float*, value), *ecs_vec_append_t(NULL, data, vec4));
+    }
+
+    return result;
 }
 
 static bool box_profile_resolve(const ecs_world_t *world, ecs_entity_t entity,
@@ -76,27 +95,67 @@ static bool box_profile_resolve(const ecs_world_t *world, ecs_entity_t entity,
     return true;
 }
 
-static double box_cross2(const float *a, const float *b, const float *c)
+/** Compute the 2D cross product of (b - a) and (c - a) in double precision.
+ *
+ * @param a The origin point
+ * @param b The first point
+ * @param c The second point
+ * @return The signed cross product, positive if a, b, c turn counterclockwise
+ */
+static double box_cross2(
+    const float *a,
+    const float *b,
+    const float *c)
 {
     return ((double)b[0] - a[0]) * ((double)c[1] - a[1]) -
         ((double)b[1] - a[1]) * ((double)c[0] - a[0]);
 }
 
-static bool box_equal2(const float *a, const float *b)
+/** Test whether two 2D points are exactly equal.
+ *
+ * @param a The first point
+ * @param b The second point
+ * @return True if both coordinates are equal
+ */
+static bool box_equal2(
+    const float *a,
+    const float *b)
 {
     return a[0] == b[0] && a[1] == b[1];
 }
 
-static bool box_intersects(const float *a, const float *b, const float *c, const float *d)
+/** Test whether segments ab and cd intersect, ignoring segments that share an endpoint.
+ *
+ * @param a Start of the first segment
+ * @param b End of the first segment
+ * @param c Start of the second segment
+ * @param d End of the second segment
+ * @return True if the segments intersect and share no endpoint
+ */
+static bool box_intersects(
+    const float *a,
+    const float *b,
+    const float *c,
+    const float *d)
 {
-    if (box_equal2(a, c) || box_equal2(a, d) || box_equal2(b, c) || box_equal2(b, d)) {
-        return false;
-    }
-    return box_cross2(a, b, c) * box_cross2(a, b, d) <= 0 &&
+    return !(box_equal2(a, c) || box_equal2(a, d) || box_equal2(b, c) || box_equal2(b, d)) &&
+        box_cross2(a, b, c) * box_cross2(a, b, d) <= 0 &&
         box_cross2(c, d, a) * box_cross2(c, d, b) <= 0;
 }
 
-static bool box_polygon_contains(const vec4 *points, int count, float x, float z)
+/** Even-odd point in polygon test over profile points linked by their next index (w).
+ *
+ * @param points The profile points
+ * @param count Number of points
+ * @param x The x coordinate of the test point
+ * @param z The z coordinate of the test point
+ * @return True if the point is inside
+ */
+static bool box_polygon_contains(
+    const vec4 *points,
+    int count,
+    float x,
+    float z)
 {
     bool inside = false;
     for (int i = 0; i < count; i ++) {
@@ -107,33 +166,50 @@ static bool box_polygon_contains(const vec4 *points, int count, float x, float z
             inside = !inside;
         }
     }
+
     return inside;
 }
 
-static bool box_triangulate(const vec4 *points, int count, int outer, ecs_vec_t *triangles)
+/** Triangulate a profile by bridging holes into the outer ring and ear clipping.
+ *
+ * @param points The profile points, outer ring first followed by hole rings
+ * @param count Number of points
+ * @param outer Number of points in the outer ring
+ * @param triangles Output vector of int triangle indices, cleared on failure
+ * @return True if triangulation succeeded
+ */
+static bool box_triangulate(
+    const vec4 *points,
+    int count,
+    int outer,
+    ecs_vec_t *triangles)
 {
+    bool success = false;
     if (count > INT_MAX / (int)(sizeof(int) * 9)) {
         ecs_err("profile triangulation capacity exceeded");
-        return false;
+        goto error;
     }
+
     int capacity = count * 3;
     int *polygon = ecs_os_malloc_n(int, capacity);
     int *merged = ecs_os_malloc_n(int, capacity);
     if (!polygon || !merged) {
         ecs_os_free(polygon);
         ecs_os_free(merged);
-        return false;
+        goto error;
     }
+
     int length = outer;
     for (int i = 0; i < outer; i ++) {
         polygon[i] = i;
     }
-    bool success = false;
+
     for (int first = outer; first < count;) {
         int end = first + 1;
         while (end < count && points[end][2] == points[first][2]) {
             end ++;
         }
+
         int n = end - first, best_i = -1, best_j = -1;
         double best = INFINITY;
         for (int i = 0; i < length; i ++) {
@@ -144,9 +220,12 @@ static bool box_triangulate(const vec4 *points, int count, int outer, ecs_vec_t 
                 for (int k = 0; valid && k < count; k ++) {
                     valid = !box_intersects(a, b, points[k], points[(int)points[k][3]]);
                 }
+
                 for (int k = 0; valid && k < length; k ++) {
-                    valid = !box_intersects(a, b, points[polygon[k]], points[polygon[(k + 1) % length]]);
+                    valid = !box_intersects(a, b, points[polygon[k]],
+                        points[polygon[(k + 1) % length]]);
                 }
+
                 double dx = (double)a[0] - b[0], dy = (double)a[1] - b[1];
                 double distance = dx * dx + dy * dy;
                 if (valid && distance < best) {
@@ -156,9 +235,11 @@ static bool box_triangulate(const vec4 *points, int count, int outer, ecs_vec_t 
                 }
             }
         }
+
         if (best_i < 0 || length + n + 2 > capacity) {
             goto done;
         }
+
         int next = 0;
         for (int i = 0; i < length; i ++) {
             merged[next ++] = polygon[i];
@@ -166,9 +247,11 @@ static bool box_triangulate(const vec4 *points, int count, int outer, ecs_vec_t 
                 for (int j = 0; j <= n; j ++) {
                     merged[next ++] = first + (best_j + j) % n;
                 }
+
                 merged[next ++] = polygon[i];
             }
         }
+
         int *swap = polygon;
         polygon = merged;
         merged = swap;
@@ -178,7 +261,8 @@ static bool box_triangulate(const vec4 *points, int count, int outer, ecs_vec_t 
     while (length > 2) {
         bool found = false;
         for (int i = 0; i < length; i ++) {
-            int ia = polygon[(i + length - 1) % length], ib = polygon[i], ic = polygon[(i + 1) % length];
+            int ia = polygon[(i + length - 1) % length], ib = polygon[i];
+            int ic = polygon[(i + 1) % length];
             const float *a = points[ia], *b = points[ib], *c = points[ic];
             bool ear = box_cross2(a, b, c) > 1e-8;
             for (int j = 0; ear && j < length; j ++) {
@@ -186,12 +270,14 @@ static bool box_triangulate(const vec4 *points, int count, int outer, ecs_vec_t 
                 if (box_equal2(p, a) || box_equal2(p, b) || box_equal2(p, c)) {
                     continue;
                 }
+
                 if (box_cross2(a, b, p) >= -1e-8 && box_cross2(b, c, p) >= -1e-8 &&
                     box_cross2(c, a, p) >= -1e-8)
                 {
                     ear = false;
                 }
             }
+
             if (ear) {
                 *ecs_vec_append_t(NULL, triangles, int) = ia;
                 *ecs_vec_append_t(NULL, triangles, int) = ib;
@@ -199,15 +285,18 @@ static bool box_triangulate(const vec4 *points, int count, int outer, ecs_vec_t 
                 for (int j = i; j + 1 < length; j ++) {
                     polygon[j] = polygon[j + 1];
                 }
+
                 length --;
                 found = true;
                 break;
             }
         }
+
         if (!found) {
             goto done;
         }
     }
+
     success = true;
 done:
     ecs_os_free(polygon);
@@ -216,6 +305,7 @@ done:
         ecs_vec_clear(triangles);
         ecs_err("profile triangulation failed");
     }
+error:
     return success;
 }
 
@@ -278,14 +368,22 @@ static bool box_path_pack(const ecs_world_t *world, ecs_entity_t entity, bool th
     return true;
 }
 
-static bool box_finite(const float *value, int count)
+/** Test whether all values in an array are finite.
+ *
+ * @param value The values
+ * @param count Number of values
+ * @return True if every value is finite
+ */
+static bool box_finite(
+    const float *value,
+    int count)
 {
-    for (int i = 0; i < count; i ++) {
-        if (!isfinite(value[i])) {
-            return false;
-        }
+    bool result = true;
+    for (int i = 0; result && i < count; i ++) {
+        result = isfinite(value[i]);
     }
-    return true;
+
+    return result;
 }
 
 static bool box_resolve(const ecs_world_t *world, const void *value, int kind,
@@ -443,7 +541,9 @@ static bool box_resolve(const ecs_world_t *world, const void *value, int kind,
                     vec3 p = {samples[i][0] * s->scale[0], 0, samples[i][1] * s->scale[1]};
                     glm_mat4_mulv3(rotation, p, 1, p);
                     glm_vec3_add(p, ECS_CONST_CAST(float*, s->offset), p);
-                    if (!box_finite(p, 3) || !box_asset_append(&data, (vec4){p[0], p[1], p[2], 0})) {
+                    if (!box_finite(p, 3) ||
+                        !box_asset_append(&data, (vec4){p[0], p[1], p[2], 0}))
+                    {
                         ecs_vec_fini_t(NULL, &next, vec4);
                         goto done;
                     }
@@ -495,7 +595,15 @@ done:
     return ok;
 }
 
-static int box_steps(int value, int fallback)
+/** Resolve a tessellation step count.
+ *
+ * @param value The requested step count
+ * @param fallback The step count to use if value is not positive
+ * @return The fallback, or value clamped to [3, 256]
+ */
+static int box_steps(
+    int value,
+    int fallback)
 {
     return value <= 0 ? fallback : (int)glm_clamp(value, 3, 256);
 }
@@ -545,7 +653,9 @@ static void box_asset_generate(const ecs_world_t *world, const void *value, int 
     int regions = (int)d.p[3][3];
     int64_t vertices = (int64_t)edges * (rows + 1) * 2 * (kind == 3 ? 4 : 1) + count * 2;
     int64_t indices = (int64_t)edges * rows * 6 * (kind == 3 ? 4 : 1) + (int64_t)count * 18;
-    if (vertices > INT_MAX / (int)sizeof(box_vertex_t) || indices > INT_MAX / (int)sizeof(uint32_t)) {
+    if (vertices > INT_MAX / (int)sizeof(box_vertex_t) ||
+        indices > INT_MAX / (int)sizeof(uint32_t))
+    {
         ecs_err("surface mesh capacity exceeded");
         ecs_os_free(d.assets);
         return;
@@ -660,15 +770,29 @@ BOX_ASSET_SHAPE(loft, 2)
 BOX_ASSET_SHAPE(lathe, 3)
 BOX_ASSET_SHAPE(profile, 7)
 
-bool box_profile_contains(const box_surface_data_t *d, float x, float z)
+bool box_profile_contains(
+    const box_surface_data_t *d,
+    float x,
+    float z)
 {
-    if (!d->assets) {
-        return false;
+    bool result = false;
+    if (d->assets) {
+        result = box_polygon_contains(d->assets + (int)d->p[5][0] - 24, (int)d->p[5][1], x, z);
     }
-    return box_polygon_contains(d->assets + (int)d->p[5][0] - 24, (int)d->p[5][1], x, z);
+
+    return result;
 }
 
-static void box_sweep_ctor(void *ptr, int32_t count, const ecs_type_info_t *ti)
+/** Constructor for Sweep that sets unit scale and taper with both caps enabled.
+ *
+ * @param ptr The component values
+ * @param count Number of values
+ * @param ti The type info
+ */
+static void box_sweep_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
 {
     (void)ti;
     Sweep *values = ptr;
@@ -677,7 +801,16 @@ static void box_sweep_ctor(void *ptr, int32_t count, const ecs_type_info_t *ti)
     }
 }
 
-static void box_section_ctor(void *ptr, int32_t count, const ecs_type_info_t *ti)
+/** Constructor for LoftSection that sets unit scale.
+ *
+ * @param ptr The component values
+ * @param count Number of values
+ * @param ti The type info
+ */
+static void box_section_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
 {
     (void)ti;
     LoftSection *values = ptr;
@@ -686,53 +819,80 @@ static void box_section_ctor(void *ptr, int32_t count, const ecs_type_info_t *ti
     }
 }
 
-static bool box_profile_uses(const ecs_world_t *world, ecs_entity_t profile, ecs_entity_t asset)
+/** Test whether a profile is, or references, an asset entity.
+ *
+ * @param world The world
+ * @param profile The Profile2D entity
+ * @param asset The asset entity
+ * @return True if profile equals asset or uses it as outer path or hole
+ */
+static bool box_profile_uses(
+    const ecs_world_t *world,
+    ecs_entity_t profile,
+    ecs_entity_t asset)
 {
-    if (profile == asset) {
-        return true;
-    }
-    const Profile2D *p = profile && ecs_is_alive(world, profile) ? ecs_get(world, profile, Profile2D) : NULL;
-    if (!p) {
-        return false;
-    }
-    if (p->outer == asset) {
-        return true;
-    }
-    const ecs_entity_t *holes = ecs_vec_first(&p->holes);
-    for (int i = 0; i < ecs_vec_count(&p->holes); i ++) {
-        if (holes[i] == asset) {
-            return true;
-        }
-    }
-    return false;
-}
-
-static bool box_consumer_uses(const ecs_world_t *world, ecs_entity_t e, int c, ecs_entity_t asset)
-{
-    if (c == 0) {
-        const Sweep *s = ecs_get(world, e, Sweep);
-        return s->path == asset || s->contour == asset || box_profile_uses(world, s->profile, asset);
-    }
-    if (c == 1) {
-        const Loft *s = ecs_get(world, e, Loft);
-        const LoftSection *sections = ecs_vec_first(&s->sections);
-        for (int i = 0; i < ecs_vec_count(&s->sections); i ++) {
-            if (box_profile_uses(world, sections[i].profile, asset)) {
-                return true;
+    bool result = profile == asset;
+    if (!result) {
+        const Profile2D *p = profile && ecs_is_alive(world, profile) ?
+            ecs_get(world, profile, Profile2D) : NULL;
+        if (p) {
+            result = p->outer == asset;
+            const ecs_entity_t *holes = ecs_vec_first(&p->holes);
+            for (int i = 0; !result && i < ecs_vec_count(&p->holes); i ++) {
+                result = holes[i] == asset;
             }
         }
-        return false;
     }
-    if (c == 2) {
-        const Lathe *s = ecs_get(world, e, Lathe);
-        return s->profile == asset || s->inner == asset;
-    }
-    return box_profile_uses(world, ecs_get(world, e, ProfileExtrusion)->profile, asset);
+
+    return result;
 }
 
-static void box_asset_changed(ecs_iter_t *it)
+/** Test whether a surface entity depends on an asset entity.
+ *
+ * @param world The world
+ * @param e The surface entity
+ * @param c Component index: 0 Sweep, 1 Loft, 2 Lathe, otherwise ProfileExtrusion
+ * @param asset The asset entity
+ * @return True if the surface references the asset
+ */
+static bool box_consumer_uses(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    int c,
+    ecs_entity_t asset)
 {
-    ecs_entity_t components[] = {ecs_id(Sweep), ecs_id(Loft), ecs_id(Lathe), ecs_id(ProfileExtrusion)};
+    bool result = false;
+    if (c == 0) {
+        const Sweep *s = ecs_get(world, e, Sweep);
+        result = s->path == asset || s->contour == asset ||
+            box_profile_uses(world, s->profile, asset);
+    } else if (c == 1) {
+        const Loft *s = ecs_get(world, e, Loft);
+        const LoftSection *sections = ecs_vec_first(&s->sections);
+        for (int i = 0; !result && i < ecs_vec_count(&s->sections); i ++) {
+            result = box_profile_uses(world, sections[i].profile, asset);
+        }
+    } else if (c == 2) {
+        const Lathe *s = ecs_get(world, e, Lathe);
+        result = s->profile == asset || s->inner == asset;
+    } else {
+        result = box_profile_uses(world, ecs_get(world, e, ProfileExtrusion)->profile, asset);
+    }
+
+    return result;
+}
+
+/** Observer that marks surfaces modified when a path or profile they use changes.
+ *
+ * On removal of an asset, dependent ShapeMesh components are released and reset instead.
+ *
+ * @param it The observer iterator
+ */
+static void box_asset_changed(
+    ecs_iter_t *it)
+{
+    ecs_entity_t components[] = {
+        ecs_id(Sweep), ecs_id(Loft), ecs_id(Lathe), ecs_id(ProfileExtrusion)};
     for (int c = 0; c < 4; c ++) {
         ecs_query_t *query = ecs_query(it->world, {.terms = {{.id = components[c]}},
             .flags = EcsQueryMatchPrefab | EcsQueryMatchDisabled});
@@ -744,9 +904,11 @@ static void box_asset_changed(ecs_iter_t *it)
                 for (int j = 0; j < it->count; j ++) {
                     affected |= box_consumer_uses(it->world, e, c, it->entities[j]);
                 }
+
                 if (!affected) {
                     continue;
                 }
+
                 if (it->event == EcsOnRemove) {
                     ShapeMesh *shape = ecs_get_mut(it->world, e, ShapeMesh);
                     if (shape) {
@@ -760,11 +922,13 @@ static void box_asset_changed(ecs_iter_t *it)
                 }
             }
         }
+
         ecs_query_fini(query);
     }
 }
 
-void box_geometry_profiles_init(ecs_world_t *world)
+void box_geometry_profiles_init(
+    ecs_world_t *world)
 {
     ecs_set_hooks(world, Sweep, {.ctor = box_sweep_ctor});
     ecs_set_hooks(world, LoftSection, {.ctor = box_section_ctor});
@@ -772,13 +936,17 @@ void box_geometry_profiles_init(ecs_world_t *world)
     box_owned_hooks(world, Profile2D, BOX_OWNED_VEC(Profile2D, holes, ecs_entity_t));
     ecs_add_pair(world, ecs_id(Profile2D), EcsOnInstantiate, EcsInherit);
     box_shape_register(world, &(box_shape_desc_t){.component = ecs_id(Sweep),
-        .key_world = box_sweep_key, .generate_world = box_sweep_generate, .surface_world = box_sweep_surface});
+        .key_world = box_sweep_key, .generate_world = box_sweep_generate,
+        .surface_world = box_sweep_surface});
     box_shape_register(world, &(box_shape_desc_t){.component = ecs_id(Loft),
-        .key_world = box_loft_key, .generate_world = box_loft_generate, .surface_world = box_loft_surface});
+        .key_world = box_loft_key, .generate_world = box_loft_generate,
+        .surface_world = box_loft_surface});
     box_shape_register(world, &(box_shape_desc_t){.component = ecs_id(Lathe),
-        .key_world = box_lathe_key, .generate_world = box_lathe_generate, .surface_world = box_lathe_surface});
+        .key_world = box_lathe_key, .generate_world = box_lathe_generate,
+        .surface_world = box_lathe_surface});
     box_shape_register(world, &(box_shape_desc_t){.component = ecs_id(ProfileExtrusion),
-        .key_world = box_profile_key, .generate_world = box_profile_generate, .surface_world = box_profile_surface});
+        .key_world = box_profile_key, .generate_world = box_profile_generate,
+        .surface_world = box_profile_surface});
     ecs_entity_t assets[] = {ecs_id(Path2D), ecs_id(Path3D), ecs_id(Profile2D)};
     for (int i = 0; i < 3; i ++) {
         ecs_observer(world, {.query.terms = {{.id = assets[i]}},

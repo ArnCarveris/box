@@ -896,8 +896,10 @@ static bool box_draws_mesh(
         (uint64_t)mesh->surface_asset_count * sizeof(vec4);
     if (total_size + (uint64_t)ecs_vec_count(&p->data) + BOX_RENDER_DATA_ALIGN > INT32_MAX) {
         ecs_err("surface render packet capacity exceeded");
-        return false;
+        result = false;
+        goto done;
     }
+
     uint32_t vertex_size = (uint32_t)mesh->vertex_count * (uint32_t)sizeof(box_vertex_t);
     uint32_t index_size = (uint32_t)mesh->index_count * (uint32_t)sizeof(uint32_t);
     box_render_mesh_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_MESH,
@@ -914,6 +916,7 @@ static bool box_draws_mesh(
         ecs_os_memcpy(data + vertex_size + index_size, mesh->surface_assets,
             mesh->surface_asset_count * sizeof(vec4));
     }
+
     box_mesh_cache_hold(cache, handle);
     ecs_map_insert(&d->meshes, handle, 1);
 done:

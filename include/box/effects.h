@@ -70,12 +70,11 @@ ECS_STRUCT(Gtao, {
 });
 
 /** Exponential fog that thins out with height, lit by the sun and ambient light of the scene.
+ * The fog applies on top of the aerial perspective.
  *
- * With atmosphere set, a view that renders the Atmosphere of its scene takes the in scatter
- * color of the fog from its sky instead: the ambient is the horizon of the sky mixed a little
- * toward its zenith, the glow the horizon toward the main light (the sun by day, the moon by
- * night) with the Mie phase of the atmosphere. color is then ignored. The fog applies on top of
- * the aerial perspective.
+ * With atmosphere set, a view rendering the Atmosphere of its scene takes the in scatter color
+ * from its sky, ignoring color: the ambient is the sky horizon mixed a little toward its zenith,
+ * the glow the horizon toward the main light (sun by day, moon by night) with the Mie phase.
  */
 ECS_STRUCT(HeightFog, {
     float density;           /**< Fog density at the base height, default 0.1 */
@@ -135,13 +134,13 @@ ECS_STRUCT(Tonemap, {
 
 /** SMAA 1x anti aliasing: color edge detection with diagonal and corner detection.
  *
- * Belongs after the Tonemap: edges are found on the input clamped to 0..1 and sRGB encoded,
- * while the blend reads the input as it is, in linear light and all four channels, so values
- * above 1 are kept but no edges are found between them. Placed before the Tonemap it runs
- * there, on the clamped HDR values. A view without clear composites anti aliased coverage.
+ * Belongs after the Tonemap: edges are found on the input clamped to 0..1 and sRGB encoded, while
+ * the blend reads it as is (linear light, all four channels), keeping values above 1 but finding
+ * no edges between them. Placed before the Tonemap it runs on the clamped HDR values.
  *
  * It only touches the image of its own view: text and UI of a later view stay crisp, while 2D
- * shapes and text drawn inside the same 3D view (world space UI) are anti aliased with it.
+ * shapes and text inside the same 3D view (world space UI) are anti aliased with it. A view
+ * without clear composites anti aliased coverage.
  */
 ECS_STRUCT(Smaa, {
     float threshold;               /**< Color edge detection threshold on display encoded

@@ -31,7 +31,7 @@ typedef struct box_surface_state_t {
 
 /** Engine side of a surface: its target, its window and what the backend was told */
 typedef struct SurfaceImpl {
-    bool opened;
+    bool opened;                    /**< The target was opened by the first frame */
     uint32_t handle;                /**< Handle of the target, 0 before it was created */
     box_window_t *window;           /**< The window, NULL for an offscreen target */
     int32_t window_width;           /**< Width in points the window was given */
