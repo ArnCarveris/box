@@ -8,6 +8,8 @@
 #include <bake_test.h>
 #include "render.h"
 #include "draw.h"
+#include <stdio.h>
+#include <string.h>
 
 void Material_default_roughness_without_material(void) {
     // materials/pbr
@@ -267,4 +269,107 @@ void Material_alpha_cutoff_prefab_and_dynamic(void) {
 
     ecs_fini(world);
     box_render_null_free(null);
+}
+
+/** Path of this file in the repository, which locates the repository root */
+#define MATERIAL_SOURCE "test/cpu/render/src/"
+
+/** Read a file of the repository into a string.
+ *
+ * @param file Path of the file in the repository
+ * @return The contents, owned by the caller, NULL when the file cannot be read
+ */
+static char* material_file_read(
+    const char *file)
+{
+    char *result = NULL;
+    const char *source = strstr(__FILE__, MATERIAL_SOURCE);
+    int32_t root = source ? (int32_t)(source - __FILE__) : 0;
+    char *path = flecs_asprintf("%.*s%s", root, __FILE__, file);
+    FILE *f = fopen(path, "rb");
+    ecs_os_free(path);
+    if (!f) {
+        goto done;
+    }
+
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    result = ecs_os_malloc((ecs_size_t)size + 1);
+    size_t read = fread(result, 1, (size_t)size, f);
+    result[read] = '\0';
+    fclose(f);
+done:
+    return result;
+}
+
+/** Load a material script of Ore Else, place two instances of one of its prefabs back to back
+ * the way the buildings wear them (a face turned up and one turned down) and check that both are
+ * alpha tested at 0.5 and draw in an opaque cutout batch: their textures are transparent around
+ * the shape, which without the test draws as an opaque square.
+ *
+ * @param file Path of the material script in the repository
+ * @param name Name of the prefab
+ */
+static void oreelse_cutout(
+    const char *file,
+    const char *name)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 4, 4});
+    ecs_set(world, camera, Rotation, {-0.785f, 0, 0});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+
+    char *text = material_file_read(file);
+    test_assert(text != NULL);
+    test_assert(ecs_script_run(world, file, text, NULL) == 0);
+    ecs_os_free(text);
+    ecs_entity_t prefab = ecs_lookup(world, name);
+    test_assert(prefab != 0);
+    test_assert(ecs_has_id(world, prefab, EcsPrefab));
+
+    ecs_entity_t front = ecs_new_w_pair(world, EcsIsA, prefab);
+    ecs_set(world, front, Position, {0, 0.06f, 0});
+    ecs_set(world, front, Rotation, {-1.5708f, 0, 0});
+    ecs_entity_t back = ecs_new_w_pair(world, EcsIsA, prefab);
+    ecs_set(world, back, Position, {0, -0.06f, 0});
+    ecs_set(world, back, Rotation, {1.5708f, 0, 0});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    ecs_entity_t faces[] = {front, back};
+    int32_t i;
+    for (i = 0; i < 2; i ++) {
+        const PbrTextures *textures = ecs_get(world, faces[i], PbrTextures);
+        test_assert(textures != NULL);
+        test_assert(textures->albedo != 0);
+        const AlphaCutoff *cutoff = ecs_get(world, faces[i], AlphaCutoff);
+        test_assert(cutoff != NULL);
+        test_flt(cutoff->value, 0.5f);
+        const box_render_batch_t *b = cutout_batch(null, cutout_mesh(world, faces[i]));
+        test_assert(b != NULL);
+        test_bool(b->cutout, true);
+        test_int(b->blend, Opaque);
+        test_bool(b->shadow, true);
+    }
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void Material_oreelse_fan_cutout(void) {
+    // materials/cutout: the fan faces of the factory, round blades on a transparent background
+    oreelse_cutout("apps/oreelse/etc/materials/fan.flecs", "FanDisc");
+}
+
+void Material_oreelse_bay_cutout(void) {
+    // materials/cutout: the landing marking of the drone pad, a ring transparent inside and out
+    oreelse_cutout("apps/oreelse/etc/materials/drone_bay.flecs", "BayPad");
 }
