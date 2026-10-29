@@ -1,7 +1,7 @@
 // The HUD of a base in good shape, over the seeded map at the start, the game paused so nothing
-// moves; the slow blink is on and the fast one off. The status bar at the top right: full health
-// (a full green bar), Luminite 12 held / 25 shipped, the next wave 0.8 of the gap away (an orange
-// bar at 0.8) and enough power (40 / 24 W, a full green bar). No alert and no mine bar. At the
+// moves; the slow blink is on and the fast one off. The status bar at the top right, without a
+// health gauge: Luminite 12 held / 25 shipped, the next wave 0.8 of the gap away (an orange bar
+// at 0.8) and enough power (40 / 24 W, a full green bar). No alert and no mine bar. At the
 // bottom the toast of a shipment in teal and the rocket status line of a ready rocket (a cargo
 // bay, 4 engines and a fuel tank) in bright green. The pause screen covers the middle of the
 // window.

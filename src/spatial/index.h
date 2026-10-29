@@ -7,6 +7,7 @@
  * A query computes bounds only for dynamic shapes whose transform differs from SpatialPose.
  *
  * Items hold the bounds of the last update; moved static leaves catch up on the next query.
+ * Entities under SpatialIgnore have no item and no SpatialPose, so they cost no update.
  */
 
 #ifndef BOX_SPATIAL_INDEX_H
@@ -99,10 +100,9 @@ extern ECS_COMPONENT_DECLARE(SpatialIndex);
 
 /** Get the index of a world to query it.
  *
- * Moves the leaves of the static items of the last update and places the dynamic entities
- * whose transform changed first when that did not happen yet, so a frame without queries does
- * not visit them. Once queried, the next update places them itself, so the first query of
- * a frame (often the pick of PickingUpdate) does not pay for every moving entity.
+ * Moves the static leaves of the last update and places the changed dynamic entities when that
+ * did not happen yet, so a frame without queries visits none; once queried, the next update
+ * places them itself, so the first query of a frame (often a pick) pays for no moving entity.
  *
  * @param world The world
  * @return The index, NULL when box.spatial was not imported

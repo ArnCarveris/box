@@ -17,9 +17,6 @@ ECS_COMPONENT_DECLARE(ConsoleHost);
 /** Surface height in points while the world has no Surface */
 #define BOX_CONSOLE_DEFAULT_HEIGHT (720.0f)
 
-/** Most times the view is recreated in one frame to render after every other view */
-#define BOX_CONSOLE_VIEW_TRIES (256)
-
 /** Construct Console values: closed, the left half of the surface, light text on a dark panel,
  * command lines colored in light tones, unknown names and extra arguments in the error color.
  *
@@ -213,7 +210,8 @@ static void box_console_measure(
     }
 }
 
-/** Create the view of the console, a view without clear, lighting, culling or effects.
+/** Create the view of the console, a view without clear, lighting, culling or effects that
+ * renders after every other view at BOX_VIEW_ORDER_CONSOLE.
  *
  * @param world The world
  * @param con The console state
@@ -223,36 +221,10 @@ static void box_console_view_create(
     box_console_t *con)
 {
     con->view = ecs_entity(world, { .name = "view", .parent = box_console_scope(world, con) });
-    ecs_set(world, con->view, View, { .camera = con->ui.camera });
-}
-
-/** Recreate the view until it renders after every other view, which go in id order.
- *
- * @param world The world
- * @param con The console state
- */
-static void box_console_view_last(
-    ecs_world_t *world,
-    box_console_t *con)
-{
-    int32_t tries = 0, i;
-    bool last = false;
-    while (!last && tries < BOX_CONSOLE_VIEW_TRIES) {
-        ecs_iter_t it = ecs_query_iter(world, con->views);
-        last = true;
-        while (ecs_query_next(&it)) {
-            for (i = 0; i < it.count; i ++) {
-                last = last && it.entities[i] <= con->view;
-            }
-        }
-
-        if (!last) {
-            ecs_delete(world, con->view);
-            box_console_view_create(world, con);
-        }
-
-        tries ++;
-    }
+    ecs_set(world, con->view, View, {
+        .camera = con->ui.camera,
+        .order = BOX_VIEW_ORDER_CONSOLE
+    });
 }
 
 /** Show the console: build its content when needed and create its view.
@@ -335,7 +307,6 @@ static void BoxConsoleUpdate(
     if (con->shown) {
         box_console_measure(world, con);
         box_console_ui_sync(world, con, console);
-        box_console_view_last(world, con);
     }
 
 done:
@@ -463,10 +434,6 @@ void BoxConsoleImport(
 
     con->surfaces = ecs_query(world, {
         .terms = {{ .id = ecs_id(Surface), .inout = EcsIn }},
-        .cache_kind = EcsQueryCacheAuto
-    });
-    con->views = ecs_query(world, {
-        .terms = {{ .id = ecs_id(View), .inout = EcsInOutNone }},
         .cache_kind = EcsQueryCacheAuto
     });
 

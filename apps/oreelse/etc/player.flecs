@@ -12,6 +12,10 @@ using oreelse
 template Astronaut {
   prop suit: Rgb = {243, 245, 248}
 
+  // The bounds of the model, the anchor of its health bar (src/health_bars.c): out to the
+  // shoulder pads on x, the backpack on z and the antenna tip on y
+  OreModelBox: {w: 1.06, d: 0.9, h: 2.29}
+
   const suitShade: Rgb = {220, 223, 231}
   const trim: Rgb = {246, 197, 129}
   const visorColor: Rgb = {162, 246, 240}

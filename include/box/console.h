@@ -3,7 +3,8 @@
  * @brief The in game console: an overlay that runs command lines through a terminal session.
  *
  * The toggle action (the grave key) opens and closes it. The console is UI content in its own
- * scene, drawn by its own view after every other view, and takes the keyboard while open.
+ * scene, drawn by its own view after every other view (at
+ * BOX_VIEW_ORDER_CONSOLE), and takes the keyboard while open.
  *
  * The console runs cls itself, so it never reaches the session: cls empties the scrollback and
  * Ctrl+L does the same without touching the input line. help in the console lists cls too.

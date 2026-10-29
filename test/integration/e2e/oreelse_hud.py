@@ -1,5 +1,6 @@
 """Ore Else driven through its command port: the HUD. The status bar shows outside the title
-screen; its gauges follow the health, the Luminite held and shipped, the waves and the power;
+screen; its gauges follow the Luminite held and shipped, the waves and the power (the health of
+the astronaut shows in its bar over it, oreelse_health_bars.py);
 the toast shows its message until its time is up (frozen while paused); the suit breach alert,
 the mine progress bar and the rocket status line show with what they report, every text of the
 rocket included; and the status bar, a panel, keeps clicks and the wheel from the world.
@@ -44,8 +45,7 @@ READY = {True: (124, 226, 148), False: (68, 148, 96)}
 ALERT_BLINK = {True: (255, 96, 84), False: (124, 44, 40)}
 MINE_FILL = (236, 176, 104)
 
-# The bars: width of the HP, wave and power bars, the mine bar
-HP_BAR = 84
+# The bars: width of the wave and power bars, the mine bar
 WAVE_BAR = 92
 POWER_BAR = 72
 MINE_BAR_W = 224
@@ -54,7 +54,7 @@ MINE_BAR_W = 224
 WARN_TOAST = 2.5
 INFO_TOAST = 4
 
-# A point of the 640x360 window on the status bar (the panel spans x -18..622, y 16..62), whose
+# A point of the 640x360 window on the status bar (the panel spans x 116..622, y 16..62), whose
 # cursor ray meets the ground beyond the reach of the astronaut it is aimed from
 ON_PANEL = (320, 40)
 
@@ -168,24 +168,19 @@ def test_luminite_and_power(app):
 def test_health_and_mining(app):
     pause(app)
 
-    # Full health: a full green bar, no alert
+    # No health gauge in the status bar; at full health no alert
     app.wait_frames(SETTLE)
-    check_bar(app, "hp", HP_BAR, 1)
-    app.check(color(app, STATUS + ".hp.fill") == GREEN, "the full HP bar is not green")
+    app.check(not shown(app, STATUS + ".hp"), "the status bar has a health gauge")
     app.check(text(app, ALERT) is None, "the alert shows at full health")
 
-    # Below 60%: amber
+    # At 45%: no alert
     app.exec("set %s OreHealth {value: 45, max: 100}" % PLAYER)
     app.wait_frames(SETTLE)
-    check_bar(app, "hp", HP_BAR, 0.45)
-    app.check(color(app, STATUS + ".hp.fill") == AMBER, "the HP bar at 45% is not amber")
     app.check(text(app, ALERT) is None, "the alert shows at 45%")
 
-    # Below 30%: red, and the suit breach alert blinks with the fast signal
+    # Below 30%: the suit breach alert blinks with the fast signal
     app.exec("set %s OreHealth {value: 25, max: 100}" % PLAYER)
     wait_shown(app, ALERT, "! SUIT BREACH !")
-    check_bar(app, "hp", HP_BAR, 0.25)
-    app.check(color(app, STATUS + ".hp.fill") == RED, "the HP bar at 25% is not red")
     for fast, expected in ALERT_BLINK.items():
         put(app, BLINK, BLINK, {"fast": fast})
         app.wait_frames(SETTLE)

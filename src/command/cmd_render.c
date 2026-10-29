@@ -165,7 +165,7 @@ static void box_cmd_render_size(
     }
 }
 
-/** Find the first view, in creation order, that renders a camera.
+/** Find the first view, in render order (View.order, then creation), that renders a camera.
  *
  * @param world The world
  * @param camera The camera, 0 for any camera with a Camera
@@ -180,6 +180,7 @@ static ecs_entity_t box_cmd_render_view(
     bool clearing)
 {
     ecs_entity_t result = 0;
+    int32_t order = 0;
     ecs_query_t *q = ecs_query(world, { .terms = {{ .id = ecs_id(View) }} });
     ecs_iter_t it = ecs_query_iter(world, q);
     while (ecs_query_next(&it)) {
@@ -191,8 +192,11 @@ static ecs_entity_t box_cmd_render_view(
                 : c && ecs_is_alive(world, c) && ecs_has(world, c, Camera);
             match = match && (!clearing || views[i].clear.enabled);
             match = match && (!root || ecs_has_pair(world, it.entities[i], EcsChildOf, root));
-            if (match && (!result || it.entities[i] < result)) {
+            if (match && (!result ||
+                box_view_compare(views[i].order, it.entities[i], order, result) < 0))
+            {
                 result = it.entities[i];
+                order = views[i].order;
             }
         }
     }

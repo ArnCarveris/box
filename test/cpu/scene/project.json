@@ -85,6 +85,16 @@
                 ]
             },
             {
+                "id": "SpatialIgnore",
+                "testcases": [
+                    "moving_wave_not_refit",
+                    "moving_interactive_refit_and_picked",
+                    "interactive_under_ignore_not_picked",
+                    "tag_added_and_removed",
+                    "untagged_wave_still_refit"
+                ]
+            },
+            {
                 "id": "SpatialChurn",
                 "testcases": [
                     "static_vs_brute_force",

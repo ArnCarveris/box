@@ -50,6 +50,9 @@ Parameterized surfaces and surface-relative placement are described in
 Relational 3D modeling with Fit, Align, Array, and Distribute is described in
 [Spatial layout](docs/spatial-layout.md).
 
+The spatial index that picking reads, and `SpatialIgnore`, which keeps moving actors nobody picks
+out of it, are described in [Spatial index and picking](docs/spatial-index.md).
+
 Use `--design` to inspect a scene with top, bottom, left, right, front and back orthographic
 cameras and two perspective cameras:
 
@@ -90,6 +93,13 @@ the equivalent App fields are `design: true` and `camera: "entity.path"`, applie
 `box_app_run` after loading the scene. Both options create a surface if needed, using
 `--surface` dimensions when supplied. `View.lighting.scene` can select a separate scene
 for direct and ambient lighting; design mode uses it to light each camera independently.
+
+Views render in ascending `View.order` (default 0) and are picked and receive input in
+descending order, so a view with a higher order draws over and is hit before the views
+below it. Views with the same order keep their creation (entity id) order, and a changed
+order applies from the next frame. box's own overlays use orders above those of a game:
+`BOX_VIEW_ORDER_EDITOR` (1000000) for the editor and `BOX_VIEW_ORDER_CONSOLE` (2000000)
+for the in game console, which stays on top of every other view.
 
 ## Browser build
 

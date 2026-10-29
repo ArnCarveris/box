@@ -347,8 +347,8 @@ done:
 }
 
 /** Find the parts of a turret, its head, the head's fx and its hit_fx, and give a laser turret
- * its beam: an instance of the beam prefab under the turret, hidden. The head gets
- * DynamicTransform, as it turns, and so does hit_fx, which moves to where the beam hits.
+ * its beam: an instance of the beam prefab under the turret, hidden, with SpatialIgnore. The
+ * head gets DynamicTransform, as it turns, and so does hit_fx, which moves to where it hits.
  *
  * @param ctx The context of the system run
  * @param turret The turret's state, receives the head and the beam
@@ -379,6 +379,7 @@ static void ore_turret_parts(
         b = ecs_new_w_pair(ctx->stage, EcsChildOf, e);
         ecs_add_pair(ctx->stage, b, EcsIsA, beam->prefab);
         ecs_add_id(ctx->stage, b, DynamicTransform);
+        ecs_add_id(ctx->stage, b, SpatialIgnore);
         ecs_set(ctx->stage, b, Position, { 0, 0, 0 });
         ecs_set(ctx->stage, b, Rotation, { 0, 0, 0 });
         ecs_set(ctx->stage, b, Scale, { 1, 1, 1 });
@@ -1068,6 +1069,7 @@ void ore_weapons_import(
 
     ecs_add_pair(world, ecs_id(OreAttackInterval), EcsWith, ecs_id(OreAttackTimer));
     ecs_add_pair(world, ecs_id(OreTurret), EcsWith, ecs_id(OreTarget));
+    ecs_add_pair(world, ecs_id(OreProjectile), EcsWith, SpatialIgnore);
     ecs_singleton_ensure(world, OreArmory);
 
     ecs_system(world, {

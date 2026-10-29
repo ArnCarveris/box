@@ -110,7 +110,8 @@ done:
     return result;
 }
 
-/** Find the view that uses a camera, or else the first visible view of a surface.
+/** Find the view that uses a camera, or else the first visible view of a surface in render
+ * order (View.order, then creation).
  *
  * @param world The world.
  * @param surface The surface.
@@ -125,6 +126,7 @@ static ecs_entity_t box_app_view(
     const Surface *s = ecs_get(world, surface, Surface);
     ecs_entity_t root = s->view_root;
     ecs_entity_t fallback = 0;
+    int32_t order = 0;
     ecs_iter_t it = ecs_each(world, View);
     while (ecs_each_next(&it)) {
         const View *v = ecs_field(&it, View, 0);
@@ -149,10 +151,12 @@ static ecs_entity_t box_app_view(
                 }
             }
 
-            if (!fallback && visible && ecs_is_alive(world, v[i].camera) &&
-                ecs_has(world, v[i].camera, Camera))
+            if (visible && ecs_is_alive(world, v[i].camera) &&
+                ecs_has(world, v[i].camera, Camera) &&
+                (!fallback || box_view_compare(v[i].order, e, order, fallback) < 0))
             {
                 fallback = e;
+                order = v[i].order;
             }
         }
     }

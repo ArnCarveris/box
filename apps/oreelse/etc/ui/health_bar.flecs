@@ -1,7 +1,7 @@
-// The health bar of a damaged building, the original's health_bars.c as screen space UI. The
-// game (src/health_bars.c) creates an instance under the scene of the bars when a building
-// gets damaged, sets frac when its health changes and deletes it when the building is repaired
-// to full or destroyed.
+// The health bar of a damaged building or astronaut, the original's health_bars.c as screen
+// space UI. The game (src/health_bars.c) creates an instance under the scene of the bars when a
+// building or the astronaut gets damaged, sets frac when its health changes and deletes it when
+// it is back to full health, destroyed or dead.
 //
 // box.projection anchors the bar to the projection of the building's model box through the
 // world view every frame: as wide as the box looks on screen, cfg.hpBarMargin above its top
@@ -16,9 +16,9 @@ using box.layout
 using box.projection
 using oreelse
 
-// The bar of a building: the dark plate, the fill inset 1 pixel and (width - 2) * frac wide in
-// the color of the blend, and the 1 pixel edge over both. w, d and h are the building's model
-// box (OreModelBox), view the world view
+// The bar of a building or the astronaut: the dark plate, the fill inset 1 pixel and
+// (width - 2) * frac wide in the color of the blend, and the 1 pixel edge over both. building
+// is the building or the astronaut, w, d and h its model box (OreModelBox), view the world view
 template HealthBar {
   prop building: entity = 0
   prop view: entity = 0

@@ -4,8 +4,7 @@
  *
  * Static shapes are placed in a bounding volume hierarchy once and again on change, shapes
  * with DynamicTransform every frame; ray casts and overlap queries are scoped to one scene.
- * Prefabs are not indexed. Disabled entities stay indexed but ray casts and overlap queries
- * skip them until they are enabled again.
+ * Prefabs and SpatialIgnore subtrees are not indexed; queries skip disabled entities.
  */
 
 #ifndef BOX_SPATIAL_H
@@ -160,6 +159,15 @@ typedef struct ArrayInstance {
     ecs_entity_t prototype; /**< The child the instance was created from */
     int32_t index;          /**< Index of the instance in the array */
 } ArrayInstance;
+
+/** Keeps an entity and its descendants out of the spatial index, for actors that move every
+ * frame and that no query needs, such as enemies: they then cost SpatialUpdate nothing.
+ *
+ * No query finds them: picks neither hit them nor are blocked by them, Interactive or not, nor
+ * do move controllers, box_spatial_bounds, design mode or bake regions. Adding or removing the
+ * tag takes effect in the next update. See docs/spatial-index.md.
+ */
+extern ECS_TAG_DECLARE(SpatialIgnore);
 
 extern ECS_COMPONENT_DECLARE(SpatialAxis);
 extern ECS_COMPONENT_DECLARE(FitMode);

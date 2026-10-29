@@ -704,10 +704,8 @@ unless it is a building in a stock slot, lists its needs of raw ore (see Craftin
 ### The HUD
 
 The HUD shows over the world outside the title screen. In the top right corner the status bar
-holds four gauges, left to right:
+holds three gauges, left to right:
 
-- **Health**: the heart and a bar of the astronaut's HP, green, amber below 60% and red below
-  30%.
 - **Luminite**: `held / shipped`, the Luminite in the inventory and the Luminite shipped to
   orbit.
 - **Waves**: the critter and a bar of the time to the next wave, filling up as it nears: purple,
@@ -723,12 +721,13 @@ it needs: `Install a cargo bay (U) or life support (I)`, `Needs 4 engines, 2 ins
 `Needs 1 fuel tanks, 0 installed (Y)`. Below 30% health `! SUIT BREACH !` blinks red at the top
 of the screen.
 
-A building that is damaged (above 0 and below its full HP) shows a health bar over it: a dark
-bar 4 px tall, 6 px above the top of the building as the camera sees it and as wide as the
-building looks, so it follows the zoom and the camera in the same frame. Its fill, inset 1 px,
+A building or the astronaut that is damaged (above 0 and below its full HP) shows a health bar
+over it: a dark bar 4 px tall, 6 px above the top of its model as the camera sees it and as wide
+as the model looks, so it follows the zoom and the camera in the same frame. Its fill, inset 1 px,
 covers `(width - 2) * frac` of it, blended from amber {240, 176, 58} at half health to green
 {92, 236, 140} at full, and below half from red {248, 84, 72} to amber; a 1 px edge frames it.
-The bar goes when the building is repaired to full or destroyed. Bars narrower than 6 px or off
+The bar goes when the building is repaired to full or destroyed, the astronaut's when it is back
+to full health, dies or boards the rocket; the astronaut's bar follows it as it walks. Bars narrower than 6 px or off
 screen are not drawn, the panels of the HUD cover them, and they show only while playing.
 
 Clicks, the right button and the wheel over a panel of the UI (the status bar, the panels below,
@@ -970,6 +969,13 @@ instances `OreCritter`, `OreTarget` and `OreVelocity`. The projectiles carry the
 (`OreProjectile {radius, life}`, and `OreHoming` on the missile); the effect tasks drive the
 named parts. Each faces +Z.
 
+Nothing in the game picks a critter, a corpse, a projectile, a laser beam or a repair drone, and
+nothing finds them through box's spatial index (hover is the game's own ray against the map, and
+the critters have their own index in `src/critters.c`). So `OreCritter`, `OreCorpse`,
+`OreProjectile` and `OreDrone` come with box.spatial's `SpatialIgnore` (`With` pairs), and the
+turrets put it on their beams. Their moving parts are not in box's index, so a large wave costs
+SpatialUpdate nothing, and the cursor's pick goes through them to what lies behind.
+
 ### Critters
 
 A critter's origin is between its feet on the ground. Its legs are pivots `leg_0` ... `leg_n`
@@ -1150,7 +1156,7 @@ its tile in the grid.
 | `etc/ui/palette.flecs` | The colors of the UI, `palette.*` |
 | `etc/ui/icons.flecs` | The icon textures, `icons.*`, which the items name with `OreIcon` |
 | `etc/ui/panel.flecs` | The `Panel` template, the chrome of every panel: the plate, its edge, the hazard strip and the `InputBlocker` |
-| `etc/ui/health_bar.flecs` | The `HealthBar` template, the health bar of a damaged building, anchored to the projection of its model box (`OreModelBox`) |
+| `etc/ui/health_bar.flecs` | The `HealthBar` template, the health bar of a damaged building or astronaut, anchored to the projection of its model box (`OreModelBox`) |
 | `etc/ui/hud.flecs` | The `OreHud` template, which shows the screens in their states: the status bar (`StatusGauge`, `StatusDivider`), the toast, the mine progress bar, the suit breach alert, the rocket status line, the order queue, power allocator and rocket assembly panels, drawn and hit in that order (z 0, 1 and 2), the Inventory (E) button and the inventory screen with its info panel over them (z 3 and 4) |
 | `etc/ui/inventory.flecs` | The inventory screen (`InventoryScreen`: `StockBody` with its `StockSlot`s, `ConstructBody` with its `TabButton`s and the `BuildingsPage` and `RocketPage` of `SlotButton`s; the slots and buttons are restyled `box.widgets.HeadlessButton`s), its info panel (`ItemInfoPanel`) and the Inventory (E) button (`InventoryButton`), which the HUD shows |
 | `etc/ui/queue.flecs` | The `QueueRow` template, a row of the order queue |
@@ -1177,7 +1183,7 @@ its tile in the grid.
 | `src/craft.c` | The order book, the workers, `oreelse.craft_order()`, `oreelse.craft_cancel()` |
 | `src/power.c` | Production, demand and the blackout, the drills, the factories' crafters, the status lamps, `oreelse.power_set(category, level)` |
 | `src/rocket.c` | The rocket state, installing, uninstalling, loading, the launch and the flight, the look of the flight (`OreRocketFx`: the shake, the clamps, the flames and the smoke), `oreelse.rocket_install()`, `oreelse.rocket_uninstall()`, `oreelse.rocket_load()`, `oreelse.rocket_launch()`, `oreelse.craft_key()` |
-| `src/health_bars.c` | The health bars: a `HealthBar` instance per damaged building under `health_bars.bars`, its fraction set when the health changes, the bars' view shown while playing |
+| `src/health_bars.c` | The health bars: a `HealthBar` instance per damaged building and over the damaged astronaut under `health_bars.bars`, its fraction set when the health changes, the bars' view shown while playing |
 | `src/look.c` | The render quality tiers, `oreelse.cycleQuality()`, `oreelse.srgb()` |
 | `src/stresstest.c` | The stress test: the late game base every run of a `--stresstest` session starts with (`OreStressTestApply`) |
 | `src/stresstest.h` | The stress test's components (`OreStressTest`, `OreStressKit`) and `ore_placement_build`, included by `src/game.h` |

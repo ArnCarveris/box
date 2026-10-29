@@ -182,6 +182,16 @@
                 ]
             },
             {
+                "id": "PickOrder",
+                "testcases": [
+                    "ties_last_created_first",
+                    "highest_order_first",
+                    "negative_order_below",
+                    "runtime_change",
+                    "console_order_over_editor"
+                ]
+            },
+            {
                 "id": "TextSpans",
                 "testcases": [
                     "glyph_to_color",

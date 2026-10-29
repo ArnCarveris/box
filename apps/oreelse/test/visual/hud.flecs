@@ -1,8 +1,8 @@
 // The HUD with every element showing, over the seeded map at the start, the game paused so
-// nothing moves and the blink signals hold (both on). The status bar at the top right: health at
-// 25% (a short red bar), Luminite 40 held / 25 shipped, a wave spawning (a full bar in the
-// bright red of the fast blink) and a blackout (20 / 49 W, a red bar at 0.404). Below the top
-// center the suit breach alert in bright red. At the bottom, from the top down: the warning toast
+// nothing moves and the blink signals hold (both on). The status bar at the top right, without a
+// health gauge: Luminite 40 held / 25 shipped, a wave spawning (a full bar in the bright red of
+// the fast blink) and a blackout (20 / 49 W, a red bar at 0.404). The astronaut is at 25% health,
+// its bar hidden while paused; below the top center the suit breach alert in bright red. At the bottom, from the top down: the warning toast
 // in red, the mine progress bar at 0.6 and the rocket status line of a rocket with a cargo bay
 // and 2 of its 4 engines, in amber. The pause screen covers the middle of the window.
 include apps/oreelse/test/visual/setup/seed

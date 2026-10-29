@@ -49,8 +49,8 @@ ECS_ENUM(TextureQuality, {
 /** Window or offscreen render target.
  *
  * Headless, with a texture or with BOX_TEST=1 a surface is offscreen, where a point is a pixel.
- * Views render in creation order: those under view_root, or without one those not under the
- * view_root of another surface. A change reconfigures the surface before the next frame.
+ * Views render by View.order, then creation: those under view_root, or without one those
+ * not under the view_root of another surface. A change reconfigures it before the next frame.
  *
  * A surface with a texture renders before the others; a material that samples the texture
  * entity (PbrTextures, Image) samples its image of the same frame, never inside itself.
