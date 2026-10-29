@@ -8,6 +8,9 @@
  * Descendants inherit DynamicTransform through `(IsA, DynamicTransformSpread)` and lose it
  * with the root. One that owns the tag stays dynamic: tagged by the application at any time,
  * in C or in a script, or by a component that implies it, such as Velocity.
+ *
+ * Rotation and Scale imply Position, and every pose component implies WorldTransform. Velocity
+ * implies Position and AngularVelocity implies Rotation (see box/movement.h).
  */
 
 #ifndef BOX_TRANSFORM_H
