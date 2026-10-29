@@ -1,0 +1,45 @@
+// The HUD with every element showing, over the seeded map at the start, the game paused so
+// nothing moves and the blink signals hold (both on). The status bar at the top right: health at
+// 25% (a short red bar), Luminite 40 held / 25 shipped, a wave spawning (a full bar in the
+// bright red of the fast blink) and a blackout (20 / 49 W, a red bar at 0.404). Below the top
+// center the suit breach alert in bright red. At the bottom, from the top down: the warning toast
+// in red, the mine progress bar at 0.6 and the rocket status line of a rocket with a cargo bay
+// and 2 of its 4 engines, in amber.
+include apps/oreelse/test/visual/setup/seed
+include apps/oreelse/etc/oreelse
+
+using box.transform
+using oreelse
+
+// A rocket pad on the tiles (4..6, 4..6) in the corner of the map, which no deposit reaches;
+// it stands at the center of its middle tile (5, 5). Tile (row, col) is centered at
+// x = -47 + 2 col, z = -47 + 2 row
+hud_pad : RocketPad {
+  Position: {-37, 0, -37}
+  OreBuilding: {row: 4, col: 4}
+}
+
+astronaut {
+  OreHealth: {value: 25, max: 100}
+  OreMining: {target: 0, left: 1.8, progress: 0.6}
+}
+
+// Paused: no system of play changes the state below. The rocket state derives its units,
+// validity and the Luminite held from these parts and the inventory
+$ {
+  (OreGameState, Paused)
+  OreBlink: {fast: true, slow: true, lamp: true}
+  OreToast: {text: "Too far away", warn: true, age: 0}
+  OreInventory: {
+    slots: [{item: items.Luminite, amount: 40}, {item: items.RocketEngine, amount: 2}]
+  }
+  OrePowerState: {production: 20, demand: 49.5, ratio: 0.404, blackout: true}
+  OreWaveState: {
+    root: critters, wave: 3, timer: 0, gap: 50, frac: 1, left: 6, spawn: [6, 0, 0, 0],
+    spawn_timer: 0.3, stagger: 0.45, budget: 3.38, style: Mixed, side: 0, kills: 4
+  }
+  OreRocketState: {
+    pad: hud_pad, engines: 2, fuel: 0, cargo: 1, life_support: 0, shipped: 25,
+    x: -37, y: 0.74, z: -37
+  }
+}

@@ -146,7 +146,7 @@ done:
 }
 
 /** Compute the values of the rocket the UI and the model show from its parts, its load and
- * the inventory.
+ * the inventory, the Luminite held included.
  *
  * @param world The world or a stage
  * @param rocket The rocket
@@ -162,6 +162,7 @@ static void ore_rocket_derive(
     rocket->capacity = rocket->cargo * cfg.per_bay;
     rocket->valid = rocket->units > 0 && rocket->engines == rocket->units * cfg.per_unit &&
         rocket->fuel == rocket->units;
+    rocket->held = kit.luminite ? ore_inventory_count(world, kit.luminite) : 0;
     rocket->install = (OreRocketParts){
         .engine = ready && ore_rocket_installable(world, rocket, &kit, &cfg, kit.engine, NULL),
         .fuel = ready && ore_rocket_installable(world, rocket, &kit, &cfg, kit.fuel, NULL),

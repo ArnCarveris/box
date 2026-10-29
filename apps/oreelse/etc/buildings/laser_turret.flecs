@@ -21,6 +21,7 @@ const lampDead: Rgb = {248, 84, 72}
 prefab LaserTurret {
   // The item: crafted through the order book into the inventory, placed by spending one
   OreItem: {name: "Laser turret", detail: "High efficiency photon delivery for melting opponents."}
+  OreIcon: {texture: icons.laser_turret}
   OreRecipe: {
     inputs: [
       {item: items.IronPlate, amount: 30},

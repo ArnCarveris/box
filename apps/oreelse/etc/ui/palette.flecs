@@ -1,0 +1,23 @@
+// The colors of the UI, the original's palette, as palette.<name>: the text, the muted text,
+// the accents, the wells of the bars and the dividers.
+
+using box.material
+
+palette {
+  // Text and muted text
+  export const text: Rgb = {226, 231, 238}
+  export const soft: Rgb = {146, 154, 166}
+
+  // Accents: amber, red (warnings, a short supply), green (fine, in supply)
+  export const amber: Rgb = {240, 176, 58}
+  export const red: Rgb = {228, 96, 84}
+  export const green: Rgb = {124, 226, 148}
+
+  // Luminite and the other ores
+  export const luminite: Rgb = {96, 240, 218}
+  export const ore: Rgb = {236, 176, 104}
+
+  // The empty part of a bar and the lines between the groups of a panel
+  export const well: Rgb = {13, 14, 17}
+  export const divider: Rgb = {62, 68, 78}
+}

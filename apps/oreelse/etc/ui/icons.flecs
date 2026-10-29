@@ -1,0 +1,108 @@
+// The icons of the UI, the original's (etc/icons, unchanged), each rasterized from its SVG at
+// 128x128. The items (resources.flecs and the buildings) name theirs with OreIcon, so the UI
+// reads the icon from the item; heart, critter and power are the gauges of the status bar. An
+// Image shows an icon whole on a square Rect, so it is drawn with contain fit.
+
+using box.texture
+
+icons {
+  iron {
+    TexturePath: {path: "apps/oreelse/etc/icons/iron.svg", width: 128, height: 128}
+  }
+
+  copper {
+    TexturePath: {path: "apps/oreelse/etc/icons/copper.svg", width: 128, height: 128}
+  }
+
+  stone {
+    TexturePath: {path: "apps/oreelse/etc/icons/stone.svg", width: 128, height: 128}
+  }
+
+  luminite {
+    TexturePath: {path: "apps/oreelse/etc/icons/luminite.svg", width: 128, height: 128}
+  }
+
+  iron_plate {
+    TexturePath: {path: "apps/oreelse/etc/icons/iron_plate.svg", width: 128, height: 128}
+  }
+
+  copper_plate {
+    TexturePath: {path: "apps/oreelse/etc/icons/copper_plate.svg", width: 128, height: 128}
+  }
+
+  stone_brick {
+    TexturePath: {path: "apps/oreelse/etc/icons/stone_brick.svg", width: 128, height: 128}
+  }
+
+  wire {
+    TexturePath: {path: "apps/oreelse/etc/icons/wire.svg", width: 128, height: 128}
+  }
+
+  electronics {
+    TexturePath: {path: "apps/oreelse/etc/icons/electronics.svg", width: 128, height: 128}
+  }
+
+  rocket_engine {
+    TexturePath: {path: "apps/oreelse/etc/icons/rocket_engine.svg", width: 128, height: 128}
+  }
+
+  rocket_fuel {
+    TexturePath: {path: "apps/oreelse/etc/icons/rocket_fuel.svg", width: 128, height: 128}
+  }
+
+  rocket_cargo {
+    TexturePath: {path: "apps/oreelse/etc/icons/rocket_cargo.svg", width: 128, height: 128}
+  }
+
+  rocket_life {
+    TexturePath: {path: "apps/oreelse/etc/icons/rocket_life.svg", width: 128, height: 128}
+  }
+
+  wall {
+    TexturePath: {path: "apps/oreelse/etc/icons/wall.svg", width: 128, height: 128}
+  }
+
+  drill {
+    TexturePath: {path: "apps/oreelse/etc/icons/drill.svg", width: 128, height: 128}
+  }
+
+  solar {
+    TexturePath: {path: "apps/oreelse/etc/icons/solar.svg", width: 128, height: 128}
+  }
+
+  gun_turret {
+    TexturePath: {path: "apps/oreelse/etc/icons/gun_turret.svg", width: 128, height: 128}
+  }
+
+  laser_turret {
+    TexturePath: {path: "apps/oreelse/etc/icons/laser_turret.svg", width: 128, height: 128}
+  }
+
+  missile_turret {
+    TexturePath: {path: "apps/oreelse/etc/icons/missile_turret.svg", width: 128, height: 128}
+  }
+
+  factory {
+    TexturePath: {path: "apps/oreelse/etc/icons/factory.svg", width: 128, height: 128}
+  }
+
+  rocket_pad {
+    TexturePath: {path: "apps/oreelse/etc/icons/rocket_pad.svg", width: 128, height: 128}
+  }
+
+  drone_pad {
+    TexturePath: {path: "apps/oreelse/etc/icons/drone_pad.svg", width: 128, height: 128}
+  }
+
+  heart {
+    TexturePath: {path: "apps/oreelse/etc/icons/heart.svg", width: 128, height: 128}
+  }
+
+  critter {
+    TexturePath: {path: "apps/oreelse/etc/icons/critter.svg", width: 128, height: 128}
+  }
+
+  power {
+    TexturePath: {path: "apps/oreelse/etc/icons/power.svg", width: 128, height: 128}
+  }
+}

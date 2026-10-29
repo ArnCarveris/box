@@ -213,6 +213,13 @@ ECS_STRUCT(OreItem, {
     char *detail; /**< One line of detail text */
 });
 
+/** The icon of an item, on its prefab in resources.flecs (or a building's), which the UI draws
+ * for the item. Instances inherit it.
+ */
+ECS_STRUCT(OreIcon, {
+    ecs_entity_t texture; /**< Texture of the icon, an entity of icons (etc/ui/icons.flecs) */
+});
+
 /** A mined item, on its prefab: a swing at a deposit of it yields 1 */
 ECS_STRUCT(OreMined, {
     float time;   /**< Seconds a swing takes */
@@ -626,6 +633,7 @@ ECS_STRUCT(OreRocketState, {
     int32_t life_support; /**< Rocket life supports installed */
     int32_t loaded;       /**< Luminite in the cargo bays */
     int32_t shipped;      /**< Luminite shipped to orbit in the run, the score */
+    int32_t held;         /**< Luminite in the inventory, which the status bar shows */
     bool aboard;          /**< The astronaut rides the rocket: launched with life support */
     int32_t units;        /**< cargo + life_support */
     int32_t capacity;     /**< Luminite the cargo bays hold, cfg.cargoCapacity per bay */
