@@ -42,6 +42,8 @@ prefab RocketPad {
   // The map holds one
   OreBuildLimit: {max: 1}
   OreHealth: {value: 400, max: 400}
+  // The rocket stands on its axis at base_y (OreRocket)
+  OreLaunchPad: {base_y: 0.74}
 
   apron {
     Position: {0, 0.09, 0}

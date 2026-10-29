@@ -4,10 +4,11 @@
  *
  * The systems of EcsOnUpdate run in the order the areas register them: the flow, the map, the
  * player, mining, power, crafting, the critters, their animation and corpses, the buildings,
- * then placement and its preview. Gameplay systems match (OreGameState, Playing), the only pause.
+ * placement, its preview, then the rocket.
  *
- * The look applies the render quality tier in every state, in EcsPreStore. The particles
- * register the helpers that play the effects of etc/particles and the flash of their lights.
+ * Gameplay systems match (OreGameState, Playing), the only pause. The look applies the render
+ * quality tier in every state, in EcsPreStore. The particles register the helpers that play
+ * the effects of etc/particles and the flash of their lights.
  */
 
 #define OREELSE_IMPL
@@ -78,6 +79,12 @@ void OreelseImport(
     ECS_META_COMPONENT(world, OreQualityTiers);
     ECS_META_COMPONENT(world, OreLook);
     ECS_META_COMPONENT(world, OreBlastFlash);
+    ECS_META_COMPONENT(world, OreLaunchPhase);
+    ECS_META_COMPONENT(world, OreLaunchPad);
+    ECS_META_COMPONENT(world, OreRocketKit);
+    ECS_META_COMPONENT(world, OreRocketParts);
+    ECS_META_COMPONENT(world, OreRocketState);
+    ECS_META_COMPONENT(world, OreItemKey);
     ECS_META_COMPONENT(world, OreSpeed);
     ECS_META_COMPONENT(world, OreDamage);
     ECS_META_COMPONENT(world, OreRange);
@@ -112,6 +119,7 @@ void OreelseImport(
     ore_critter_fx_import(world);
     ore_buildings_import(world);
     ore_placement_import(world);
+    ore_rocket_import(world);
     ore_look_import(world);
     ore_particles_import(world);
 }

@@ -3,8 +3,10 @@
  * @brief The oreelse module: components of the game and the functions its areas share.
  *
  * The scene (apps/oreelse/etc) holds the constants cfg.*, the models, the items, the singletons
- * and the entities of a run; the systems of each area (flow.c, map.c, player.c, ..., power.c,
- * critters.c, critter_fx.c, buildings.c, placement.c, look.c, particles.c) play the game.
+ * and the entities of a run.
+ *
+ * The systems of each area (flow.c, map.c, player.c, ..., power.c, critters.c, critter_fx.c,
+ * buildings.c, placement.c, rocket.c, look.c, particles.c) play the game.
  */
 
 #ifndef OREELSE_GAME_H
@@ -577,6 +579,72 @@ ECS_STRUCT(OreLook, {
 ECS_STRUCT(OreBlastFlash, {
     float peak;  /**< Intensity the flash starts at, the EffectFlash.intensity of the light */
     float range; /**< Range of the light */
+});
+
+/** Phases of a rocket on the pad, the type of OreRocketState.phase */
+ECS_ENUM(OreLaunchPhase, {
+    OreLaunchPhaseIdle,     /**< On the pad: parts can be installed, Luminite loaded */
+    OreLaunchPhaseIgnition, /**< Launched, the engines fire for cfg.ignitionTime seconds */
+    OreLaunchPhaseAscent    /**< Climbing, cfg.launchAccel faster every second, to arrival */
+});
+
+/** The launch pad of a rocket, on the RocketPad prefab and inherited */
+ECS_STRUCT(OreLaunchPad, {
+    float base_y; /**< Height of the bottom of the rocket above the pad's origin */
+});
+
+/** The items a rocket is built from and ships, a singleton launch.flecs sets */
+ECS_STRUCT(OreRocketKit, {
+    ecs_entity_t engine;       /**< The rocket engine item */
+    ecs_entity_t fuel;         /**< The rocket fuel storage item */
+    ecs_entity_t cargo;        /**< The rocket cargo bay item */
+    ecs_entity_t life_support; /**< The rocket life support item */
+    ecs_entity_t luminite;     /**< The Luminite a rocket ships */
+});
+
+/** Which part of a rocket an action applies to, a member per part */
+ECS_STRUCT(OreRocketParts, {
+    bool engine;       /**< A rocket engine */
+    bool fuel;         /**< A rocket fuel storage */
+    bool cargo;        /**< A rocket cargo bay */
+    bool life_support; /**< A rocket life support */
+});
+
+/** The rocket on the pad and the score, a singleton run.flecs resets. Modified when a value
+ * changes: every frame of a flight, else when a part, the Luminite, the pad or what can be done
+ * changes. The UI formats every text from it; launch.flecs keeps the Rocket model in step.
+ *
+ * A unit is a cargo bay or the life support; a rocket is valid with units, cfg.enginesPerUnit
+ * engines and one fuel storage per unit.
+ */
+ECS_STRUCT(OreRocketState, {
+    ecs_entity_t pad;     /**< The rocket pad, 0 without one */
+    OreLaunchPhase phase; /**< Idle on the pad, or the phase of the flight */
+    int32_t engines;      /**< Rocket engines installed */
+    int32_t fuel;         /**< Rocket fuel storages installed */
+    int32_t cargo;        /**< Rocket cargo bays installed */
+    int32_t life_support; /**< Rocket life supports installed */
+    int32_t loaded;       /**< Luminite in the cargo bays */
+    int32_t shipped;      /**< Luminite shipped to orbit in the run, the score */
+    bool aboard;          /**< The astronaut rides the rocket: launched with life support */
+    int32_t units;        /**< cargo + life_support */
+    int32_t capacity;     /**< Luminite the cargo bays hold, cfg.cargoCapacity per bay */
+    bool valid;           /**< The rocket can launch */
+    OreRocketParts install;   /**< The part can be installed now */
+    OreRocketParts uninstall; /**< The part can be uninstalled now */
+    bool load;            /**< Loading would move Luminite into the rocket now */
+    bool launch;          /**< The rocket can launch now */
+    float x;              /**< X of the bottom of the rocket */
+    float y;              /**< Height of the bottom of the rocket, rising in the ascent */
+    float z;              /**< Z of the bottom of the rocket */
+    float timer;          /**< Seconds of ignition left */
+    float speed;          /**< Climbing speed of the ascent in units per second */
+    float altitude;       /**< Height climbed in the ascent */
+});
+
+/** An item a key applies to, on the actions of the rocket keys (input.flecs) */
+ECS_STRUCT(OreItemKey, {
+    ecs_entity_t item; /**< Item prefab of the key */
 });
 
 /** Tiers of critters the waves spawn, the size of the arrays of OreArsenal, OreWaveMix and
@@ -1336,6 +1404,14 @@ ecs_entity_t ore_critter_nearest(
  */
 void ore_critters_import(
     ecs_world_t *world);
+/** Check whether the astronaut rides the rocket: it is hidden, cannot move, mine, shoot or
+ * regenerate, is invulnerable and no target.
+ *
+ * @param world The world or a stage
+ * @return Whether the astronaut is aboard
+ */
+bool ore_rocket_aboard(
+    const ecs_world_t *world);
 
 /** Register the critters' animation, deaths and corpses: the walk, bob and waddle, the legs,
  * the corpses' char, aging, sinking and cap, and the script function oreelse.corpse(prefab,
@@ -1432,6 +1508,15 @@ void ore_buildings_import(
  * @param world The world
  */
 void ore_placement_import(
+    ecs_world_t *world);
+
+/** Register the rocket: the rocket state, the flight and the script functions
+ * oreelse.rocket_install(), oreelse.rocket_uninstall(), oreelse.rocket_load(),
+ * oreelse.rocket_launch() and oreelse.craft_key().
+ *
+ * @param world The world
+ */
+void ore_rocket_import(
     ecs_world_t *world);
 
 /** Get the level of the power category of a building.

@@ -2,10 +2,11 @@
 // the order book, the parent of the buildings placed in the run and their connectors, the parent
 // of the critters, and the clock, the blink signals, the toast, the generator, the inventory of
 // the run, the starting crate in its slot order, an empty order book, no building selected, the
-// power allocation at [2, 2, 2], no power and the waves before the first, which starts
-// cfg.firstWaveAt seconds in. oreelse.restart() reloads this script (it created the astronaut,
-// which has OreRunScript), deposits.flecs and scenery.flecs: the reload deletes the astronaut and
-// the buildings and creates them again, so nothing of the previous run stays.
+// power allocation at [2, 2, 2], no power, an empty rocket with nothing shipped and the waves
+// before the first, which starts cfg.firstWaveAt seconds in. oreelse.restart() reloads this
+// script (it created the astronaut, which has OreRunScript), deposits.flecs and scenery.flecs:
+// the reload deletes the astronaut and the buildings and creates them again, so nothing of the
+// previous run stays.
 // The camera, its zoom level, the render quality tier and the session seed (OreSeed) are not
 // part of a run.
 
@@ -44,6 +45,7 @@ $ {
   }
   OreCraftBook: {}
   OrePlacement: {root: buildings}
+  OreRocketState: {}
   OrePowerAlloc: {level: [2, 2, 2]}
   OrePowerState: {production: 0, demand: 0, ratio: 1, blackout: false}
   OreWaveState: {
