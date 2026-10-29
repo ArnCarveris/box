@@ -546,33 +546,32 @@ static bool box_watch_pass_start(
     }
 
     w->since = 0;
+    if (threaded) {
+        ecs_os_mutex_lock(pass->lock);
+        pass->state = BoxWatchRunning;
+        if (pass->thread) {
+            ecs_os_cond_signal(pass->wake);
+        } else {
+            pass->thread = ecs_os_thread_new(box_watch_thread, pass);
+        }
+
+        if (!pass->thread) {
+            pass->state = BoxWatchIdle;
+        }
+
+        ecs_os_mutex_unlock(pass->lock);
+        if (!pass->thread) {
+            ecs_warn("file watch: cannot start the watch thread, "
+                "checking files on the main thread");
+            w->no_thread = true;
+            threaded = false;
+        }
+    }
+
     if (!threaded) {
-        goto inline_pass;
+        box_watch_pass_run(pass);
     }
 
-    ecs_os_mutex_lock(pass->lock);
-    pass->state = BoxWatchRunning;
-    if (pass->thread) {
-        ecs_os_cond_signal(pass->wake);
-    } else {
-        pass->thread = ecs_os_thread_new(box_watch_thread, pass);
-    }
-
-    if (!pass->thread) {
-        pass->state = BoxWatchIdle;
-    }
-
-    ecs_os_mutex_unlock(pass->lock);
-    if (pass->thread) {
-        goto done;
-    }
-
-    ecs_warn("file watch: cannot start the watch thread, checking files on the main thread");
-    w->no_thread = true;
-    threaded = false;
-inline_pass:
-    box_watch_pass_run(pass);
-done:
     return threaded;
 }
 
