@@ -252,6 +252,54 @@ void Design_select_camera(void)
     box_render_null_free(backend);
 }
 
+/* Two views render the selected camera: the camera view copies the first in render order */
+static void design_select_camera_order(
+    int32_t first_order,
+    int32_t second_order,
+    uint8_t expect)
+{
+    box_render_null_t *backend;
+    ecs_world_t *world = design_world(&backend);
+    ecs_singleton_get_mut(world, App)->design = false;
+    char *argv[] = {"boxrun", "--camera", "scene.selected"};
+    test_int(box_app_parse(world, 3, argv), 0);
+    ecs_entity_t scene = ecs_entity(world, {.name = "scene"});
+    ecs_entity_t camera = ecs_entity(world, {.parent = scene, .name = "selected"});
+    ecs_set(world, camera, Camera, {.fov = 45, .near_ = 1, .far_ = 200});
+    ecs_entity_t first = ecs_new(world);
+    ecs_set(world, first, View, {
+        .camera = camera, .order = first_order,
+        .clear = {.enabled = true, .color = {1, 2, 3, 255}}
+    });
+    ecs_entity_t second = ecs_new(world);
+    ecs_set(world, second, View, {
+        .camera = camera, .order = second_order,
+        .clear = {.enabled = true, .color = {4, 5, 6, 255}}
+    });
+    test_assert(first < second);
+    test_int(box_app_run(world), 0);
+    ecs_iter_t it = ecs_each(world, Surface);
+    test_assert(ecs_each_next(&it));
+    ecs_entity_t root = ecs_field(&it, Surface, 0)->view_root;
+    ecs_iter_fini(&it);
+    ecs_entity_t view = ecs_lookup_child(world, root, "camera");
+    test_assert(view != 0);
+    test_int(ecs_get(world, view, View)->camera, camera);
+    test_int(ecs_get(world, view, View)->clear.color.g, expect);
+    ecs_fini(world);
+    box_render_null_free(backend);
+}
+
+void Design_select_camera_order(void)
+{
+    design_select_camera_order(10, 5, 5);
+}
+
+void Design_select_camera_order_tie(void)
+{
+    design_select_camera_order(3, 3, 2);
+}
+
 void Design_invalid_camera(void)
 {
     ecs_log_set_level(-4);

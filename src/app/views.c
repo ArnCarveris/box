@@ -110,8 +110,8 @@ done:
     return result;
 }
 
-/** Find the view that uses a camera, or else the first visible view of a surface in render
- * order (View.order, then creation).
+/** Find the first view in render order (View.order, then creation) that uses a camera, or
+ * else the first visible view of a surface in render order.
  *
  * @param world The world.
  * @param surface The surface.
@@ -125,17 +125,24 @@ static ecs_entity_t box_app_view(
 {
     const Surface *s = ecs_get(world, surface, Surface);
     ecs_entity_t root = s->view_root;
-    ecs_entity_t fallback = 0;
-    int32_t order = 0;
+    ecs_entity_t fallback = 0, match = 0;
+    int32_t order = 0, match_order = 0;
     ecs_iter_t it = ecs_each(world, View);
     while (ecs_each_next(&it)) {
         const View *v = ecs_field(&it, View, 0);
         for (int32_t i = 0; i < it.count; i ++) {
             ecs_entity_t e = it.entities[i];
             if (camera && v[i].camera == camera) {
-                fallback = e;
-                ecs_iter_fini(&it);
-                goto done;
+                if (!match || box_view_compare(v[i].order, e, match_order, match) < 0) {
+                    match = e;
+                    match_order = v[i].order;
+                }
+
+                continue;
+            }
+
+            if (match) {
+                continue;
             }
 
             ecs_entity_t parent = ecs_get_parent(world, e);
@@ -161,8 +168,7 @@ static ecs_entity_t box_app_view(
         }
     }
 
-done:
-    return fallback;
+    return match ? match : fallback;
 }
 
 /** Set the world transform of a manually transformed entity.

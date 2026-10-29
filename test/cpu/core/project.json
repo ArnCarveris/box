@@ -234,6 +234,8 @@
                     "empty_scene",
                     "capture_names",
                     "select_camera",
+                    "select_camera_order",
+                    "select_camera_order_tie",
                     "invalid_camera"
                 ]
             },
@@ -246,7 +248,16 @@
                     "shared_file_counts_once",
                     "new_path_stops_watching",
                     "remove_stops_watching",
-                    "change_status"
+                    "change_status",
+                    "pass_every_interval",
+                    "change_found_within_interval",
+                    "interval_zero_checks_every_file",
+                    "long_frame_one_pass",
+                    "interval_change_ends_pass",
+                    "stop_watching_during_pass",
+                    "stale_registration_starts_pass",
+                    "restored_while_queued_reloads_once",
+                    "restored_between_passes_reloads_once"
                 ]
             },
             {

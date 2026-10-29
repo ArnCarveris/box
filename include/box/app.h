@@ -108,27 +108,29 @@ ECS_STRUCT(FrameTiming, {
     int64_t total_dropped;  /**< Dropped frames since the world started */
 });
 
-/** Seconds between two checks of the watched files when FileWatch is not set */
+/** Seconds between two passes over the watched files when FileWatch is not set */
 #define BOX_FILE_WATCH_INTERVAL (0.25f)
 
 /** How the engine watches the files it loaded, set to BOX_FILE_WATCH_INTERVAL by box.app.
  *
- * Watched are the files a Shader read (includes too) and the file of a TexturePath, Font and
- * EnvironmentImage, at the located path. Once per interval, before the render extract, every
- * distinct file is stat'ed once; a changed, removed or returned file loads again.
+ * Watched are the files a Shader read or looked for and the file of a TexturePath, Font and
+ * EnvironmentImage. A changed, removed or returned file loads again; the old content stays until
+ * the new load is ready. A new path or removing the component stops watching the old file.
  *
- * The previous content stays until the new load is ready, and a failed load keeps it (see the
- * components for their statuses). A new path or removing the component stops watching the old
- * file; a missing file is not watched, except the files a Shader looked for.
+ * Every interval (unscaled) a watch thread stats each distinct file once; a later poll in
+ * EcsOnStore applies the pass (a headless one waits for it) and visits only the owners of changed
+ * files. At interval 0 and without threads (the browser, files in memory) it runs inline.
  */
 ECS_STRUCT(FileWatch, {
-    float interval;     /**< Wall seconds between checks, 0 every frame, < 0 never */
+    float interval;     /**< Seconds between passes, 0 a pass every frame, < 0 off */
 });
 
-/** What the file watch did, written by the engine after each check that ran */
+/** What the file watch did, written by the engine when a pass was applied or the number of
+ * watched files changed.
+ */
 ECS_STRUCT(FileWatchStatus, {
     int32_t files;      /**< Distinct files watched */
-    int64_t polls;      /**< Checks run since the world started */
+    int64_t polls;      /**< Passes over all files applied since the world started */
     int64_t changes;    /**< Changed files found since the world started */
     char *last;         /**< The file that changed last, NULL before the first change */
 });
