@@ -21,13 +21,9 @@ bake3 --target em --local-env apps/oreelse                     # build for the b
 
 python3 tools/integration.py e2e oreelse_flow oreelse_look     # the end-to-end scenarios
 python3 tools/integration.py e2e oreelse_mining oreelse_particles
-<<<<<<< HEAD
-python3 tools/integration.py e2e oreelse_crafting oreelse_buildings oreelse_flora
-=======
 python3 tools/integration.py e2e oreelse_crafting oreelse_buildings oreelse_rocket
 python3 tools/integration.py e2e oreelse_power oreelse_critters oreelse_critter_fx
-python3 tools/integration.py e2e oreelse_player_fx oreelse_hud
->>>>>>> a3fa52251ca1bb044119d6d97d799003fa0c5ba9
+python3 tools/integration.py e2e oreelse_player_fx oreelse_hud oreelse_flora
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -749,24 +745,15 @@ its tile in the grid.
 | `etc/input.flecs` | The actions, their bindings and the loops of the actions that fire once |
 | `etc/world.flecs` | The ground and the basin |
 | `etc/boundary.flecs` | The hazard band around the playable area |
-<<<<<<< HEAD
 | `etc/scenery.flecs` | The boulders, dunes and flora of a run |
-| `etc/run.flecs` | The astronaut, the parent of the placed buildings and the singletons of a run, the order book and the selection included |
-| `etc/deposits.flecs` | The deposits of a run |
-| `etc/player.flecs` | The `Astronaut` template |
-| `etc/props/ore.flecs` | The `Ore` template of the deposits |
-| `etc/props/flora.flecs` | The `Frondstalk`, `Ashcup` and `Quillbulb` templates of the flora |
-| `etc/materials/flora.flecs` | The frond and membrane textures and their cutouts `FloraFrond`, `FloraFrondB`, `FloraMembrane`, `FloraMembraneB` |
-| `etc/critters/` | The `Mite`, `Skitter`, `Brute` and `Behemoth` prefabs |
-=======
-| `etc/scenery.flecs` | The boulders and dunes of a run |
 | `etc/run.flecs` | The astronaut, the parents of the placed buildings and of the critters, and the singletons of a run, the order book, the selection, the power allocation, the rocket state and the waves included |
 | `etc/launch.flecs` | The items of a rocket (`OreRocketKit`) and the rocket on the pad, a `Rocket` instance that follows the rocket state |
 | `etc/deposits.flecs` | The deposits of a run, the Luminite's with their glints (`DepositSparkle`) |
 | `etc/player.flecs` | The `Astronaut` template |
 | `etc/props/ore.flecs` | The `Ore` template of the deposits |
+| `etc/props/flora.flecs` | The `Frondstalk`, `Ashcup` and `Quillbulb` templates of the flora |
+| `etc/materials/flora.flecs` | The frond and membrane textures and their cutouts `FloraFrond`, `FloraFrondB`, `FloraMembrane`, `FloraMembraneB` |
 | `etc/critters/` | The `Mite`, `Skitter`, `Brute` and `Behemoth` prefabs, models with their health, speed, damage, range, radius and wave tier |
->>>>>>> a3fa52251ca1bb044119d6d97d799003fa0c5ba9
 | `etc/projectiles/` | The `Tracer`, `Missile` and `LaserBeam` prefabs |
 | `etc/props/markers.flecs` | The `TileMarker` and `TileMarkerBad` prefabs |
 | `etc/particles.flecs` | Includes the particle effects |
@@ -793,14 +780,10 @@ its tile in the grid.
 | `src/map.c` | The tile grid, the deposits' registration and the hover tile |
 | `src/player.c` | Walking, the jetpack and the camera; the astronaut's animation (`OrePlayerFx`: the walk cycle `OrePlayerGait`, the bob, the foot dust and the jet plume; `OreLimbs`: the limbs) and its death (`ore_player_die`) |
 | `src/inventory.c` | The inventory and the item components |
-<<<<<<< HEAD
-| `src/mining.c` | Mining, demolishing and their tile marker |
-| `src/flora.c` | The plants in the tile grid: removed on deposits and taken tiles, sunk under buildings |
-=======
 | `src/mining.c` | Mining, demolishing and their tile marker; the burst and the shrink of a mined deposit, the poofs of a used up deposit and of a demolished building, the glints of the Luminite while playing |
+| `src/flora.c` | The plants in the tile grid: removed on deposits and taken tiles, sunk under buildings |
 | `src/critters.c` | The waves, the critters' targets, attacks and moves, the crowd separation and the critter spatial index, their deaths, the astronaut's health and regen, `oreelse.spawn_critter()` |
 | `src/critter_fx.c` | The critters' walk, bob, waddle and legs, their death bursts, the corpses' char, sinking and cap, `oreelse.corpse()` |
->>>>>>> a3fa52251ca1bb044119d6d97d799003fa0c5ba9
 | `src/buildings.c` | The buildings in the tile grid, the wall connectors, demolish and salvage, destroyed buildings, the look of the ghosts |
 | `src/placement.c` | The selection, `canPlace`, the click and the drag, the poof of a placed building, the pipette, the preview, `oreelse.select()`, `oreelse.pipette()`, `oreelse.placeStart()`, `oreelse.placeEnd()`, `oreelse.cancelDrag()` |
 | `src/craft.c` | The order book, the workers, `oreelse.craft_order()`, `oreelse.craft_cancel()` |
