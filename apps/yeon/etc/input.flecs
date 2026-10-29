@@ -1,0 +1,39 @@
+using flecs.script
+using box.input
+using yeon
+
+actions {
+  Up {
+    Action: {description: "Pull the string: the kite climbs"}
+    Binding: {key: Up}
+  }
+
+  UpAlt {
+    Binding: {action: actions.Up, key: W}
+  }
+
+  Down {
+    Action: {description: "Let out string: the kite dives"}
+    Binding: {key: Down}
+  }
+
+  DownAlt {
+    Binding: {action: actions.Down, key: S}
+  }
+
+  Restart {
+    Action: {description: "Fly again after the string is cut"}
+    Binding: {key: R}
+  }
+}
+
+$ {
+  YeonControls: {up: actions.Up, down: actions.Down}
+}
+
+async {
+  while true {
+    await on.pressed(actions.Restart)
+    await yeon.restart()
+  }
+}
