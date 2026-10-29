@@ -164,31 +164,31 @@ void PickOrder_console_order_over_editor(void) {
 
 /** Create many views of b and one view of a at BOX_VIEW_ORDER_CONSOLE, check that the console
  * view is the first input view and gets the pick where it overlaps the others.
+ * The other views tie on order 0, so the last created of them follow it.
+ *
+ * The scene is built in a buffer: the OS API of flecs is not set up before the world.
  *
  * @param console_last Whether the console view is created after the others
  */
 static void order_many(
     bool console_last)
 {
-    ecs_strbuf_t buf = ECS_STRBUF_INIT;
-    ecs_strbuf_appendstr(&buf, ORDER_TWO);
-    if (!console_last) {
-        ecs_strbuf_append(&buf,
-            "console { View: {camera: a.camera, order: %d} }\n", BOX_VIEW_ORDER_CONSOLE);
+    char scene[8192];
+    int len = ecs_os_snprintf(scene, sizeof(scene), "%s", ORDER_TWO);
+    for (int i = 0; i <= ORDER_MANY; i ++) {
+        bool console = console_last ? i == ORDER_MANY : i == 0;
+        int v = console_last ? i : i - 1;
+        if (console) {
+            len += ecs_os_snprintf(scene + len, sizeof(scene) - (size_t)len,
+                "console { View: {camera: a.camera, order: %d} }\n", BOX_VIEW_ORDER_CONSOLE);
+        } else {
+            len += ecs_os_snprintf(scene + len, sizeof(scene) - (size_t)len,
+                "v%d { View: {camera: b.camera} }\n", v);
+        }
     }
 
-    for (int i = 0; i < ORDER_MANY; i ++) {
-        ecs_strbuf_append(&buf, "v%d { View: {camera: b.camera} }\n", i);
-    }
-
-    if (console_last) {
-        ecs_strbuf_append(&buf,
-            "console { View: {camera: a.camera, order: %d} }\n", BOX_VIEW_ORDER_CONSOLE);
-    }
-
-    char *scene = ecs_strbuf_get(&buf);
+    test_assert(len < (int)sizeof(scene));
     ecs_world_t *world = order_world(scene);
-    ecs_os_free(scene);
     ecs_entity_t console = order_e(world, "console");
     test_assert(console_last ? console > order_e(world, "v0") : console < order_e(world, "v0"));
 
@@ -199,7 +199,6 @@ static void order_many(
     test_int(count, BOX_PICK_VIEW_MAX);
     test_uint(views[0], console);
 
-    /* The others tie on order 0: the last created come first */
     char name[16];
     ecs_os_snprintf(name, sizeof(name), "v%d", ORDER_MANY - 1);
     test_uint(views[1], order_e(world, name));
