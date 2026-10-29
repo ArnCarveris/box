@@ -493,9 +493,11 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 | `etc/assets/` | The original's textures (SVG), unchanged, and `terrain_dirt_orm.svg` |
 | `src/flow.c` | States, clock, blink, toast, seeds, `oreelse.cancel()`, `oreelse.restart()` |
 | `src/map.c` | The tile grid, the deposits' registration and the hover tile |
-| `src/player.c` | Walking and the camera |
+| `src/player.c` | Walking, the jetpack and the camera |
 | `src/inventory.c` | The inventory and the item components |
-| `src/mining.c` | Mining and its tile marker |
+| `src/mining.c` | Mining, demolishing and their tile marker |
+| `src/buildings.c` | The buildings in the tile grid, the wall connectors, demolish and salvage, destroyed buildings, the look of the ghosts |
+| `src/placement.c` | The selection, `canPlace`, the click and the drag, the pipette, the preview, `oreelse.select()`, `oreelse.pipette()`, `oreelse.placeStart()`, `oreelse.placeEnd()`, `oreelse.cancelDrag()` |
 | `src/craft.c` | The order book, the workers, `oreelse.craft_order()`, `oreelse.craft_cancel()` |
 | `src/look.c` | The render quality tiers, `oreelse.cycleQuality()` |
 | `src/particles.c` | The helpers that play the effects (`ore_burst`, `ore_burst_aimed`, `ore_explosion`, `ore_combust`), the flash of their lights, `oreelse.explosion()`, `oreelse.combust()` |

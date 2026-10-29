@@ -442,12 +442,10 @@ static void OreGhostDark(
     ecs_iter_t *it)
 {
     const PointLight *light = ecs_field(it, PointLight, 0);
-    bool self = ecs_field_is_self(it, 0);
     int32_t i;
     for (i = 0; i < it->count; i ++) {
-        const PointLight *cur = self ? &light[i] : light;
-        if (cur->intensity != 0) {
-            PointLight next = *cur;
+        if (light[i].intensity != 0) {
+            PointLight next = light[i];
             next.intensity = 0;
             ecs_set_ptr(it->stage, it->entities[i], PointLight, &next);
         }
@@ -522,8 +520,7 @@ void ore_buildings_import(
         .entity = ecs_entity(world, { .name = "OreGhostDark" }),
         .phase = EcsPostUpdate,
         .query.terms = {
-            { .id = ecs_id(PointLight), .src.id = EcsSelf | EcsUp, .trav = EcsIsA,
-              .inout = EcsIn },
+            { .id = ecs_id(PointLight), .src.id = EcsSelf, .inout = EcsIn },
             { .id = OreGhost, .src.id = EcsUp, .trav = EcsChildOf }
         },
         .callback = OreGhostDark
