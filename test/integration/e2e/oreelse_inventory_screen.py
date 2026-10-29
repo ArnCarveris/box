@@ -40,10 +40,10 @@ ROCKET = PAGES + ".rocket_page"
 INFO_PANEL = UI + ".info_panel"
 BUTTON = UI + ".inventory_button"
 
-# A point of the window below the screen and left of the info panel and the Inventory (E)
-# button, where a click reaches the world (the screen spans y 116..484, the info panel x
-# 360..920 and the button x 542..738)
-OFF_SCREEN = (120, 660)
+# A point of the window below the screen, left of the info panel and the Inventory (E) button
+# and right of the power panel, where a click reaches the world (the screen spans y 116..484,
+# the info panel x 360..920, the button x 542..738 and the power panel x 18..282, y 544..702)
+OFF_SCREEN = (320, 660)
 
 # The face of a slot button that cannot order
 DIM_FACE = (30, 33, 39)

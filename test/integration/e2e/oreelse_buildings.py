@@ -250,13 +250,16 @@ OFFSETS = {}
 
 
 def offset(app, cursor):
-    """The ground point a cursor position hovers, relative to the astronaut."""
-    if cursor not in OFFSETS:
+    """The ground point a cursor position hovers, relative to the astronaut, per window size (the
+    scenarios that import this one set theirs)."""
+    k = (cursor, app.exec("get window SurfaceStatus.width"),
+         app.exec("get window SurfaceStatus.height"))
+    if k not in OFFSETS:
         move_cursor(app, cursor)
         p = player(app)
         x, z = point(hover(app))
-        OFFSETS[cursor] = (x - p["x"], z - p["z"])
-    return OFFSETS[cursor]
+        OFFSETS[k] = (x - p["x"], z - p["z"])
+    return OFFSETS[k]
 
 
 def aim(app, x, z, cursor=CENTER):

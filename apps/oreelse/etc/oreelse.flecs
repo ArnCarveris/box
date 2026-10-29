@@ -58,6 +58,9 @@ include run
 include launch
 include stresstest
 include ui/panel
+include ui/queue
+include ui/power
+include ui/rocket_panel
 include ui/inventory
 include ui/screens
 include ui/hud
