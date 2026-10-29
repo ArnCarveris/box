@@ -277,7 +277,10 @@
                     "toggle_dynamic_transform",
                     "dynamic_shape2d_keeps_clip",
                     "shape2d_ranks_follow_order",
-                    "disabled_delete_frees_slot"
+                    "disabled_delete_frees_slot",
+                    "disabled_shapes_leave_batches",
+                    "enabled_shape_takes_current_transform",
+                    "created_disabled_draws_once_enabled"
                 ]
             },
             {

@@ -537,3 +537,123 @@ void InstanceStreams_disabled_delete_frees_slot(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+/** Get the x translation of the slot of a shape as the extract keeps it.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return The x of the translation of its transform
+ */
+static float slot_x(
+    ecs_world_t *world,
+    ecs_entity_t e)
+{
+    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractDraws");
+    const ecs_system_t *s = ecs_system_get(world, system);
+    const DrawSlot *slot = ecs_get(world, e, DrawSlot);
+    test_assert(s != NULL && s->ctx != NULL);
+    test_assert(slot != NULL && slot->batch >= 0);
+
+    return box_draws_slot_transform(box_draws_batch(s->ctx, slot->batch), slot->slot)->rows[0][3];
+}
+
+/** A disabled mesh shape, 2D shape and text leave their batches, and take their slots again
+ * once enabled.
+ */
+void InstanceStreams_disabled_shapes_leave_batches(void) {
+    // renderer/draws
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t mesh = box_new(world, 0, 0);
+    ecs_entity_t rect = ecs_new(world);
+    ecs_set(world, rect, Position, {0, 0, 0});
+    ecs_set(world, rect, Rect, {10, 10});
+    ecs_entity_t text = ecs_new(world);
+    ecs_set(world, text, Position, {0, 1, 0});
+    ecs_set(world, text, Text, {.value = "disabled"});
+    frame(world);
+    frame(world);
+    box_render_draws_stats_t stats = frame(world);
+    int32_t all = stats.instances + stats.dynamic;
+    test_assert(all > 2);
+    test_assert(ecs_get(world, mesh, DrawSlot)->batch >= 0);
+    test_assert(ecs_get(world, rect, DrawSlot)->batch >= 0);
+    test_assert(ecs_vec_count(&ecs_get(world, text, TextSlots)->slots) > 0);
+
+    ecs_enable(world, mesh, false);
+    ecs_enable(world, rect, false);
+    ecs_enable(world, text, false);
+    stats = frame(world);
+    test_int(stats.instances + stats.dynamic, 0);
+    test_int(ecs_get(world, mesh, DrawSlot)->batch, -1);
+    test_int(ecs_get(world, rect, DrawSlot)->batch, -1);
+    test_int(ecs_vec_count(&ecs_get(world, text, TextSlots)->slots), 0);
+
+    ecs_enable(world, mesh, true);
+    ecs_enable(world, rect, true);
+    ecs_enable(world, text, true);
+    stats = frame(world);
+    test_int(stats.instances + stats.dynamic, all);
+    test_assert(ecs_get(world, mesh, DrawSlot)->batch >= 0);
+    test_assert(ecs_get(world, rect, DrawSlot)->batch >= 0);
+    test_assert(ecs_vec_count(&ecs_get(world, text, TextSlots)->slots) > 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** A shape moved while disabled draws where it is once enabled, static or dynamic. */
+void InstanceStreams_enabled_shape_takes_current_transform(void) {
+    // renderer/draws
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t still = box_new(world, 0, 0);
+    ecs_entity_t dynamic = box_new(world, 0, 0);
+    ecs_add(world, dynamic, DynamicTransform);
+    frame(world);
+    frame(world);
+    test_flt(slot_x(world, still), 0);
+    test_flt(slot_x(world, dynamic), 0);
+
+    ecs_enable(world, still, false);
+    ecs_enable(world, dynamic, false);
+    frame(world);
+    ecs_set(world, still, Position, {3, 0, 0});
+    ecs_set(world, dynamic, Position, {-3, 0, 0});
+    frame(world);
+    test_int(ecs_get(world, still, DrawSlot)->batch, -1);
+    test_int(ecs_get(world, dynamic, DrawSlot)->batch, -1);
+
+    ecs_enable(world, still, true);
+    ecs_enable(world, dynamic, true);
+    frame(world);
+    test_flt(slot_x(world, still), 3);
+    test_flt(slot_x(world, dynamic), -3);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** A shape set up while disabled gets no slot, and gets one with its transform once enabled. */
+void InstanceStreams_created_disabled_draws_once_enabled(void) {
+    // renderer/draws
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t e = ecs_new(world);
+    ecs_enable(world, e, false);
+    ecs_set(world, e, Position, {2, 0, 0});
+    ecs_set(world, e, Box, {1, 1, 1});
+    ecs_set(world, e, Rgb, {200, 100, 50});
+    box_render_draws_stats_t stats = frame(world);
+    stats = frame(world);
+    test_int(stats.instances + stats.dynamic, 0);
+    test_int(ecs_get(world, e, DrawSlot)->batch, -1);
+
+    ecs_enable(world, e, true);
+    stats = frame(world);
+    test_int(stats.instances + stats.dynamic, 1);
+    test_flt(slot_x(world, e), 2);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
