@@ -1,11 +1,13 @@
 /**
  * @file health_bars.c
- * @brief The health bars over the damaged buildings: a HealthBar instance per damaged building,
- * its fraction in step with the health, and the view of the bars shown while playing.
+ * @brief The health bars over the damaged buildings and the damaged astronaut: a HealthBar
+ * instance per damaged building or astronaut, its fraction in step with the health, and the view
+ * of the bars shown while playing.
  *
- * box.projection anchors a bar to its building's model box (OreModelBox) and sizes it every
- * frame; the game only creates, updates and deletes bars when a building's health changes, and
- * (OreBarOf, building) deletes a bar with its building.
+ * box.projection anchors a bar to the model box (OreModelBox) of its building or astronaut and
+ * sizes it every frame, so the astronaut's bar follows it as it moves; the game only creates,
+ * updates and deletes bars when the health changes, and (OreBarOf, owner) deletes a bar with its
+ * building or astronaut.
  */
 
 #include "game.h"
@@ -15,8 +17,8 @@
  * @param world The world
  * @param bars The health bars singleton
  * @param bar The bar
- * @param building The building of the bar
- * @param box The model box of the building, NULL for none
+ * @param building The building or astronaut of the bar
+ * @param box Its model box, NULL for none
  * @param frac Fraction of the health left
  */
 static void ore_health_bar_set(
@@ -57,13 +59,14 @@ done:
     return;
 }
 
-/** Keep the bar of a building in step with its health: create it when the building is damaged,
- * set its fraction while it is, delete it at full health or at 0.
+/** Keep the bar of a building or the astronaut in step with its health: create it when it is
+ * damaged, set its fraction while it is, delete it at full health or at 0 (the death of the
+ * astronaut).
  *
  * The link on the building is written in place, so a second change of the same health in one
  * merge finds the bar the first one created.
  *
- * @param it Iterator over the buildings whose health or registration was set
+ * @param it Iterator over the buildings or astronauts whose health or registration was set
  */
 static void OreHealthBarSync(
     ecs_iter_t *it)
@@ -131,6 +134,7 @@ void ore_health_bars_import(
 {
     ecs_add_pair(world, ecs_id(OreModelBox), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(OreBuilding), EcsWith, ecs_id(OreHealthBar));
+    ecs_add_pair(world, ecs_id(OrePlayer), EcsWith, ecs_id(OreHealthBar));
     ecs_add_pair(world, OreBarOf, EcsOnDeleteTarget, EcsDelete);
 
     ecs_observer(world, {
@@ -138,6 +142,17 @@ void ore_health_bars_import(
         .query.terms = {
             { .id = ecs_id(OreHealth), .src.id = EcsSelf, .inout = EcsIn },
             { .id = ecs_id(OreBuilding), .src.id = EcsSelf, .inout = EcsInOutNone }
+        },
+        .events = { EcsOnSet },
+        .callback = OreHealthBarSync
+    });
+
+    // The astronaut's bar, the same sync over the astronaut
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "OrePlayerHealthBarSync" }),
+        .query.terms = {
+            { .id = ecs_id(OreHealth), .src.id = EcsSelf, .inout = EcsIn },
+            { .id = ecs_id(OrePlayer), .src.id = EcsSelf, .inout = EcsInOutNone }
         },
         .events = { EcsOnSet },
         .callback = OreHealthBarSync

@@ -27,7 +27,7 @@ using oreelse
 const lineSize: f32 = 17
 
 // The status bar: its size, the height of its strip and where its gauges sit
-const statusWidth: f32 = 640
+const statusWidth: f32 = 506
 const statusHeight: f32 = 46
 const statusCap: f32 = 7
 const gaugeY: f32 = 8
@@ -188,16 +188,6 @@ template OreHud {
   const hpFrac: f32 = health.value / health.max
   const mineProgress: f32 = astronaut[OreMining].progress
 
-  const hpWarn: Rgb = match hpFrac < 0.6 {
-    true: {248, 196, 112}
-    false: {124, 226, 148}
-  }
-
-  const hpColor: Rgb = match hpFrac < 0.3 {
-    true: {228, 96, 84}
-    false: hpWarn
-  }
-
   const waveFlash: Rgb = match fast {
     true: {248, 96, 84}
     false: {132, 48, 44}
@@ -330,44 +320,35 @@ template OreHud {
       LayoutFill: {surface: surface}
       Layout: {}
 
-      // The status bar at the top right: health, Luminite held and shipped, the next wave and
-      // the power
+      // The status bar at the top right: Luminite held and shipped, the next wave and the power.
+      // The astronaut's health shows in its bar over it (ui/health_bar.flecs)
       if !title {
         status {
           Panel: {width: statusWidth, height: statusHeight, capH: statusCap}
           LayoutItem: {h: Right, v: Top, x: -18, y: -16}
 
-          hp {
-            LayoutItem: {h: Left, v: Top, x: 12, y: -gaugeY}
-            StatusGauge: {icon: icons.heart, bar: 84, frac: hpFrac, color: hpColor}
-          }
-
-          divider_a {
-            StatusDivider: {x: 134}
-          }
-
           luminite {
-            LayoutItem: {h: Left, v: Top, x: 146, y: -gaugeY}
+            LayoutItem: {h: Left, v: Top, x: 12, y: -gaugeY}
             StatusGauge: {
               icon: icons.luminite, readout: "{held} / {shipped}", color: palette.luminite
             }
           }
 
-          divider_b {
-            StatusDivider: {x: 278}
+          divider_a {
+            StatusDivider: {x: 144}
           }
 
           wave {
-            LayoutItem: {h: Left, v: Top, x: 290, y: -gaugeY}
+            LayoutItem: {h: Left, v: Top, x: 156, y: -gaugeY}
             StatusGauge: {icon: icons.critter, bar: 92, frac: waveFrac, color: waveColor}
           }
 
-          divider_c {
-            StatusDivider: {x: 420}
+          divider_b {
+            StatusDivider: {x: 286}
           }
 
           power {
-            LayoutItem: {h: Left, v: Top, x: 432, y: -gaugeY}
+            LayoutItem: {h: Left, v: Top, x: 298, y: -gaugeY}
             StatusGauge: {
               icon: icons.power, readout: "{production:.0} / {demand:.0} W",
               bar: 72, barX: 124, frac: powerRatio, color: powerColor

@@ -579,14 +579,16 @@ ECS_STRUCT(OreBuilding, {
     int32_t col; /**< Column of its top left tile */
 });
 
-/** The model box of a building (on its prefab), its health bar's anchor: centered, up from 0 */
+/** The model box of a building (on its prefab) or the astronaut (from its Astronaut template),
+ * its health bar's anchor: centered, up from 0 */
 ECS_STRUCT(OreModelBox, {
     float w; /**< Width along x */
     float d; /**< Depth along z */
     float h; /**< Height above the ground */
 });
 
-/** A building's HealthBar (0 while undamaged), deleted with it through (OreBarOf, building) */
+/** The HealthBar of a building or the astronaut (0 while undamaged), deleted with it through
+ * (OreBarOf, owner) */
 ECS_STRUCT(OreHealthBar, {
     ecs_entity_t bar; /**< The bar, 0 for none */
 });
@@ -1832,7 +1834,8 @@ void ore_craft_import(
 void ore_buildings_import(
     ecs_world_t *world);
 
-/** Register the health bars: one per damaged building, its fraction kept in step with the HP.
+/** Register the health bars: one per damaged building and over the damaged astronaut, its
+ * fraction kept in step with the HP.
  *
  * @param world The world
  */

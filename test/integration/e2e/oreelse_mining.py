@@ -53,7 +53,7 @@ OTHER_KINDS = ["items.Iron", "items.Copper", "items.Luminite", "items.IronPlate"
 
 # Cursor positions in points of the 640x360 window (the headless app has no window size to
 # scale normalized positions with): the center hovers a tile next to the astronaut, the far
-# point one out of reach, up and right of it beside the status bar of the HUD (x -18..622,
+# point one out of reach, up and right of it beside the status bar of the HUD (x 116..622,
 # y 16..62), which keeps the buttons from the world
 CENTER = (320, 180)
 LEFT = (256, 180)
