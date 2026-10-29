@@ -1980,3 +1980,110 @@ void Spatial_delete_dynamic_hierarchy(void) {
     ecs_vec_fini_t(NULL, &out, ecs_entity_t);
     ecs_fini(world);
 }
+
+/** Dynamic entities placed again before and after the ray of RayInPreUpdate */
+static int32_t ray_rebound_before, ray_rebound_after;
+
+/** Distance of the hit of RayInPreUpdate, -1 without a hit */
+static float ray_distance;
+
+/** Cast a ray at the moving shape in PreUpdate, as picking does, and record what the index
+ * placed again around it.
+ *
+ * @param it The iterator of the system
+ */
+static void RayInPreUpdate(
+    ecs_iter_t *it)
+{
+    box_spatial_stats_t stats;
+    box_spatial_hit_t hit = {0};
+    box_spatial_ray_t ray = { .origin = {0, 0, -5}, .dir = {0, 0, 1} };
+    box_spatial_stats(it->world, &stats);
+    ray_rebound_before = stats.rebound;
+    ray_distance = box_spatial_ray(it->world, &ray, &hit) ? hit.distance : -1;
+    box_spatial_stats(it->world, &stats);
+    ray_rebound_after = stats.rebound;
+}
+
+void Spatial_dynamic_placed_by_update_after_query(void) {
+    // spatial_perf/picking_cost
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t e = ecs_new(world);
+    ecs_add(world, e, DynamicTransform);
+    ecs_set(world, e, Position, {0, 0, 0});
+    ecs_set(world, e, Box, {1, 1, 1});
+    ECS_SYSTEM(world, RayInPreUpdate, EcsPreUpdate, 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+
+    /* The shape moves along the ray every frame: the update after a frame with a query
+     * places it, so the ray of the next frame finds it in place without placing anything */
+    int32_t i;
+    for (i = 1; i <= 10; i ++) {
+        ecs_set(world, e, Position, {0, 0, (float)i * 0.25f});
+        ecs_progress(world, 0);
+        box_spatial_stats_t stats;
+        box_spatial_stats(world, &stats);
+        test_int(stats.rebound, 1);
+        test_int(ray_rebound_after, ray_rebound_before);
+
+        /* The ray of this frame ran before the transform system saw the new position */
+        test_flt(ray_distance, 4.5f + (float)(i - 1) * 0.25f);
+        vec3 min, max;
+        test_assert(box_spatial_bounds(world, e, NULL, min, max));
+        test_flt(min[2], (float)i * 0.25f - 0.5f);
+    }
+
+    ecs_fini(world);
+}
+
+void Spatial_dynamic_placed_by_query_when_idle(void) {
+    // spatial_perf/picking_cost
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t e = ecs_new(world);
+    ecs_add(world, e, DynamicTransform);
+    ecs_set(world, e, Position, {0, 0, 0});
+    ecs_set(world, e, Box, {1, 1, 1});
+    ecs_progress(world, 0);
+
+    /* One query, then a frame whose update places the moved shape itself */
+    vec3 min, max;
+    box_spatial_stats_t stats;
+    test_assert(box_spatial_bounds(world, e, NULL, min, max));
+    ecs_set(world, e, Position, {2, 0, 0});
+    ecs_progress(world, 0);
+    box_spatial_stats(world, &stats);
+    test_int(stats.rebound, 1);
+
+    /* Without a query since the last update, the next update leaves the shape to the first
+     * query, which places it */
+    ecs_set(world, e, Position, {4, 0, 0});
+    ecs_progress(world, 0);
+    box_spatial_stats(world, &stats);
+    test_int(stats.rebound, 0);
+    test_assert(box_spatial_bounds(world, e, NULL, min, max));
+    test_flt(min[0], 3.5f);
+    box_spatial_stats(world, &stats);
+    test_int(stats.rebound, 1);
+
+    /* Frames without queries keep the shape waiting for the first one */
+    ecs_set(world, e, Position, {6, 0, 0});
+    ecs_progress(world, 0);
+    ecs_set(world, e, Position, {8, 0, 0});
+    ecs_progress(world, 0);
+    box_spatial_stats(world, &stats);
+    test_int(stats.rebound, 0);
+    ecs_set(world, e, Position, {10, 0, 0});
+    ecs_progress(world, 0);
+    box_spatial_stats(world, &stats);
+    test_int(stats.rebound, 0);
+    ecs_vec_t out;
+    ecs_vec_init_t(NULL, &out, ecs_entity_t, 0);
+    test_int(box_spatial_overlap_sphere(world, 0, (vec3){10, 0, 0}, 0.1f, &out), 1);
+    ecs_vec_clear(&out);
+    test_int(box_spatial_overlap_sphere(world, 0, (vec3){4, 0, 0}, 0.1f, &out), 0);
+    ecs_vec_fini_t(NULL, &out, ecs_entity_t);
+    ecs_fini(world);
+}

@@ -217,7 +217,8 @@
                     "dense_mesh_changed_after_pick",
                     "dense_mesh_released_after_use",
                     "dense_mesh_back_within_grace",
-                    "dense_mesh_deleted_while_building"
+                    "dense_mesh_deleted_while_building",
+                    "wave_not_placed_by_pick"
                 ]
             },
             {
