@@ -9,7 +9,6 @@ like oreelse_flow.py, which describes the setup. The cases that read the gauges 
 so no system of play overwrites the state they put; the HUD shows while paused. The HUD's texts
 and bars are read from the entities of its instance (hud.ui.screen).
 """
-from box_client import srgb
 from oreelse_buildings import (  # noqa: F401 (ARGS)
     ARGS, FPS, PLAYER, SETTLE, STATE, TOAST, aim_tile, click, count, key, put, rows_of, select,
     set_inventory, set_state, setup, start, tiles)
@@ -32,18 +31,18 @@ WAVES = "oreelse.OreWaveState"
 BLINK = "oreelse.OreBlink"
 LEVEL = "get oreelse.OreView OreView.level"
 
-# The colors of the HUD, the original's bytes encoded as the port writes them
+# The colors of the HUD, the original's bytes: the UI keeps them, decoded as sRGB
 # (apps/oreelse/README.md, Colors)
-RED = srgb((228, 96, 84))
-AMBER = srgb((248, 196, 112))
-GREEN = srgb((124, 226, 148))
-TEAL = srgb((96, 240, 218))
-WAVE_FLASH = {True: srgb((248, 96, 84)), False: srgb((132, 48, 44))}
-WAVE_SOON = srgb((240, 152, 72))
-WAVE_CALM = srgb((138, 122, 174))
-READY = {True: srgb((124, 226, 148)), False: srgb((68, 148, 96))}
-ALERT_BLINK = {True: srgb((255, 96, 84)), False: srgb((124, 44, 40))}
-MINE_FILL = srgb((236, 176, 104))
+RED = (228, 96, 84)
+AMBER = (248, 196, 112)
+GREEN = (124, 226, 148)
+TEAL = (96, 240, 218)
+WAVE_FLASH = {True: (248, 96, 84), False: (132, 48, 44)}
+WAVE_SOON = (240, 152, 72)
+WAVE_CALM = (138, 122, 174)
+READY = {True: (124, 226, 148), False: (68, 148, 96)}
+ALERT_BLINK = {True: (255, 96, 84), False: (124, 44, 40)}
+MINE_FILL = (236, 176, 104)
 
 # The bars: width of the HP, wave and power bars, the mine bar
 HP_BAR = 84

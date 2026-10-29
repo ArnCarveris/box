@@ -11,7 +11,6 @@ holds the building and the fraction) under health_bars.bars, laid out in the sce
 """
 import struct
 
-from box_client import srgb
 from oreelse_critters import (  # noqa: F401 (ARGS)
     ARGS, FPS, PLAYER, buildings, entity, health, hold_waves, place_player, rows_of, set_state,
     setup, spawn, start, tile_point, wait_until, wall)
@@ -29,7 +28,8 @@ BAR_MARGIN = 6
 BAR_MIN = 6
 
 # The fill colors: full, mid and low health (cfg.hpBarFull, cfg.hpBarMid, cfg.hpBarLow), the
-# original's bytes: the bar blends them and encodes the blend (apps/oreelse/README.md, Colors)
+# original's bytes: the bar blends them and keeps the blend's bytes, as the rest of the UI
+# (apps/oreelse/README.md, Colors)
 FULL = (92, 236, 140)
 MID = (240, 176, 58)
 LOW = (248, 84, 72)
@@ -88,12 +88,12 @@ def blend(a, b, t):
 
 
 def fill_color(value, max_hp):
-    """The fill color of the original at value / max_hp, in floats as its C code, encoded as the
-    port writes it."""
+    """The fill color of the original at value / max_hp, in floats as its C code: its bytes, which
+    the UI keeps."""
     frac = f32(value / max_hp)
     if frac >= 0.5:
-        return srgb(blend(MID, FULL, f32((frac - 0.5) * 2)))
-    return srgb(blend(LOW, MID, f32(frac * 2)))
+        return blend(MID, FULL, f32((frac - 0.5) * 2))
+    return blend(LOW, MID, f32(frac * 2))
 
 
 def color(app, path):
