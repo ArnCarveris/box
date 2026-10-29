@@ -173,6 +173,21 @@ static int32_t ore_build_count(
     return result;
 }
 
+/** Check the build limit of a building: fewer of it are placed than its OreBuildLimit allows.
+ *
+ * @param world The world
+ * @param prefab The building
+ * @return Whether one more can be placed, true without a limit
+ */
+static bool ore_within_limit(
+    const ecs_world_t *world,
+    ecs_entity_t prefab)
+{
+    const OreBuildLimit *limit = ecs_get(world, prefab, OreBuildLimit);
+
+    return !limit || limit->max <= 0 || ore_build_count(world, prefab) < limit->max;
+}
+
 /** Check whether a building can be placed at a cell: its tiles are free for it, it is in reach,
  * its build limit is not reached and the inventory holds one.
  *
@@ -188,13 +203,29 @@ static bool ore_can_place(
     int32_t row,
     int32_t col)
 {
-    const OreBuildLimit *limit = ecs_get(ctx->world, prefab, OreBuildLimit);
     int32_t w, h;
     ore_footprint(ctx->world, prefab, &w, &h);
 
     return ore_cell_free(ctx, prefab, row, col) && ore_in_reach(ctx, row, col, w, h) &&
-        (!limit || limit->max <= 0 || ore_build_count(ctx->world, prefab) < limit->max) &&
-        ore_inventory_count(ctx->world, prefab) > 0;
+        ore_within_limit(ctx->world, prefab) && ore_inventory_count(ctx->world, prefab) > 0;
+}
+
+ecs_entity_t ore_placement_build(
+    ecs_world_t *world,
+    ecs_entity_t prefab,
+    int32_t row,
+    int32_t col)
+{
+    OreMap *map = ecs_singleton_get_mut(world, OreMap);
+    ore_place_ctx_t ctx = { .world = world, .map = map, .grid = ore_grid_get(world) };
+    ecs_entity_t result = 0;
+    if (map && prefab && ore_cell_free(&ctx, prefab, row, col) &&
+        ore_within_limit(world, prefab))
+    {
+        result = ore_building_place(world, prefab, row, col);
+    }
+
+    return result;
 }
 
 /** Compute the region of a placement, the original's oreRegion.

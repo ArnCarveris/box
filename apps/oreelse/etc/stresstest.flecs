@@ -1,0 +1,38 @@
+// The layout of the stress test (--stresstest[=N], src/stresstest.c), which every run of such a
+// session starts with: a drill on every deposit, two rings of walls, a ring of turrets cycling
+// gun, laser, gun and missile turrets, the buildings of the sites each near its tile (a rocket
+// pad, two factories, two drone pads), a solar farm sized to the demand, and the stock added to
+// the starting crate. The rings and the farm are sized by cfg.stress*.
+
+using oreelse
+
+$ {
+  OreStressKit: {
+    wall: Wall,
+    drill: Drill,
+    solar: SolarPanel,
+    turrets: [GunTurret, LaserTurret, GunTurret, MissileTurret],
+    sites: [
+      {building: RocketPad, row: cfg.stressCenter + 5, col: cfg.stressCenter - 1},
+      {building: Factory, row: cfg.stressCenter - 4, col: cfg.stressCenter - 4},
+      {building: Factory, row: cfg.stressCenter - 4, col: cfg.stressCenter + 3},
+      {building: DronePad, row: cfg.stressCenter + 3, col: cfg.stressCenter + 4},
+      {building: DronePad, row: cfg.stressCenter - 1, col: cfg.stressCenter - 6}
+    ],
+    stock: [
+      {item: items.Iron, amount: 500},
+      {item: items.Copper, amount: 500},
+      {item: items.Stone, amount: 500},
+      {item: items.Luminite, amount: 200},
+      {item: items.IronPlate, amount: 200},
+      {item: items.CopperPlate, amount: 200},
+      {item: items.StoneBrick, amount: 200},
+      {item: Wall, amount: 40},
+      {item: Drill, amount: 6},
+      {item: SolarPanel, amount: 10},
+      {item: GunTurret, amount: 6},
+      {item: LaserTurret, amount: 4},
+      {item: MissileTurret, amount: 4}
+    ]
+  }
+}

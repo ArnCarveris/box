@@ -39,7 +39,9 @@
                     "default_roughness_metallic_only",
                     "alpha_cutoff_instance",
                     "alpha_cutoff_batches",
-                    "alpha_cutoff_prefab_and_dynamic"
+                    "alpha_cutoff_prefab_and_dynamic",
+                    "oreelse_fan_cutout",
+                    "oreelse_bay_cutout"
                 ]
             },
             {
