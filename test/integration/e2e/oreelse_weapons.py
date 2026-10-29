@@ -176,7 +176,10 @@ def test_gun_turret(app):
     # panel puts the base in a blackout
     set_levels(app, 2, 2, 2)
     building(app, "LaserTurret", 12, 3)
+    hp = health(app, skitter)
     wait_blackout(app, True)
+    # Back from level 0 it has no shot in flight: measure once the first one landed
+    wait_until(app, lambda: health(app, skitter) < hp, FPS, "the gun turret's hit in a blackout")
     lost, took = measure(app, lambda: -health(app, skitter), RATE_FRAMES)
     app.check(app.get(POWER, "OrePowerState")["blackout"], "the blackout ended")
     check_gun_rate(app, lost, took, "in a blackout")

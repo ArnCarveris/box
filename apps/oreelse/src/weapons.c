@@ -293,33 +293,6 @@ static void OrePistol(
     }
 }
 
-/** Find the instance's part of a prefab's part: the child of the instance that is an instance of
- * it, the way the original's oreChild finds a part.
- *
- * @param world The world
- * @param instance The instance
- * @param part The part of the prefab
- * @return The child, 0 for none
- */
-static ecs_entity_t ore_part_of(
-    const ecs_world_t *world,
-    ecs_entity_t instance,
-    ecs_entity_t part)
-{
-    ecs_iter_t it = ecs_children(world, instance);
-    ecs_entity_t result = 0;
-    int32_t i;
-    while (ecs_children_next(&it)) {
-        for (i = 0; i < it.count; i ++) {
-            if (!result && ecs_has_pair(world, it.entities[i], EcsIsA, part)) {
-                result = it.entities[i];
-            }
-        }
-    }
-
-    return result;
-}
-
 /** Find the head of a turret and give a laser turret its beam: an instance of the beam prefab
  * under the turret, hidden. The head gets DynamicTransform, as it turns.
  *
@@ -334,11 +307,9 @@ static void ore_turret_parts(
     ecs_entity_t e,
     const OreBeam *beam)
 {
-    ecs_entity_t prefab, part, b;
+    ecs_entity_t b;
     if (!turret->head) {
-        prefab = ore_building_prefab(ctx->world, e);
-        part = prefab ? ecs_lookup_from(ctx->world, prefab, "head") : 0;
-        turret->head = part ? ore_part_of(ctx->world, e, part) : 0;
+        turret->head = ecs_lookup_child(ctx->world, e, "head");
         if (turret->head) {
             ecs_add_id(ctx->stage, turret->head, DynamicTransform);
         }
@@ -836,8 +807,8 @@ void ore_weapons_import(
               .oper = EcsOptional },
             { .id = ecs_id(OreTarget), .src.id = EcsSelf, .inout = EcsInOut,
               .oper = EcsOptional },
-            { .id = OreHoming, .src.id = EcsSelf | EcsUp, .trav = EcsIsA,
-              .inout = EcsInOutNone, .oper = EcsOptional },
+            { .id = OreHoming, .src.id = EcsSelf, .inout = EcsInOutNone,
+              .oper = EcsOptional },
             { .id = ecs_id(OreCritterIndex), .src.id = ecs_id(OreCritterIndex),
               .inout = EcsIn },
             { .id = playing, .src.id = state }
