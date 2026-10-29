@@ -32,6 +32,26 @@ static const unsigned char editor_background[3] = {32, 35, 41};
  * @param game Receives the game view, NULL to ignore
  * @return The world
  */
+/** Test whether an entity is a scope or below it.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param scope Path of the scope
+ * @return Whether e is the scope or one of its descendants
+ */
+static bool editor_in_scope(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    const char *scope)
+{
+    ecs_entity_t root = ecs_lookup(world, scope);
+    while (e && e != root) {
+        e = ecs_get_parent(world, e);
+    }
+
+    return root != 0 && e == root;
+}
+
 static ecs_world_t* editor_world(
     const char *file,
     int32_t width,
@@ -265,6 +285,7 @@ void Editor_pick_panel_and_console(void) {
     test_uint(status->view, editor);
     test_uint(status->target, ecs_lookup(world, BOX_EDITOR_PANEL ".body"));
     test_uint(status->handler, panel);
+    test_assert(!editor_in_scope(world, status->hit, BOX_CONSOLE_UI ".screen.stack"));
 
     ecs_os_free(box_terminal_run(world, s, "mouse.move [100, 200]", NULL));
     while (box_input_pending(world)) {
@@ -274,8 +295,10 @@ void Editor_pick_panel_and_console(void) {
     ecs_progress(world, 0);
     status = ecs_singleton_get(world, PickStatus);
     test_uint(status->hit_view, console);
+    test_assert(editor_in_scope(world, status->hit, BOX_CONSOLE_UI ".screen.stack"));
     test_assert(status->view != editor);
     test_assert(status->handler != panel);
+    test_assert(!editor_in_scope(world, status->target, BOX_EDITOR_UI));
 
     ecs_fini(world);
 }
