@@ -7,12 +7,9 @@
  * registers in the tile of its position when its OreFlora is set, the first plant on a tile
  * keeping it. It is decoration: nothing collides with it.
  *
- * ore_flora_sync, run by ore_map_purge every frame and by restart() after its reload, settles
- * the plants with the rest of the run once every script created its entities: a plant on a
- * deposit's tile is deleted, and a plant whose tile has a building sinks cfg.floraSink below the
- * ground, coming back to it when the building is gone. The bookkeeping is the plant's OreFlora
- * and the cells of OreMap, which clear themselves when their entities are deleted, so a restart
- * starts from the plants and deposits of the new map.
+ * ore_flora_sync (ore_map_purge) deletes plants on deposits and sinks plants under buildings
+ * cfg.floraSink below the ground. Its state is OreFlora and cells of OreMap that clear with
+ * their entities, so a restart starts from the plants and deposits of the new map.
  */
 
 #include "game.h"
@@ -87,10 +84,9 @@ void ore_flora_sync(
     }
 }
 
-/** Register plants in the tiles of their positions. A plant on a tile another plant already
- * holds is rejected, row and col -1, and deleted by ore_map_purge; a plant off the grid keeps
- * row and col at -1 and stays. A registered plant waits for the next ore_flora_sync, which
- * checks its tile for a deposit and a building.
+/** Register plants in the tiles of their positions. A plant on a tile another plant holds is
+ * rejected, row and col -1, and deleted by ore_map_purge; a plant off the grid stays unregistered.
+ * The next ore_flora_sync checks the tile of a registered plant for a deposit and a building.
  *
  * @param it Iterator over the plants whose OreFlora was set
  */

@@ -202,8 +202,9 @@ void ore_map_purge(
 
 /** Register deposits in the tiles of their positions. A deposit on a tile another deposit
  * already holds is rejected, row and col -1, and deleted by ore_map_purge; a deposit off the
- * grid keeps row and col at -1 too. A plant on the tile of a deposit is checked again by the
- * next ore_flora_sync, which deletes it.
+ * grid keeps row and col at -1 too.
+ *
+ * A plant on the tile of a deposit is checked again by the next ore_flora_sync, which deletes it.
  *
  * @param it Iterator over the deposits whose OreDeposit was set
  */

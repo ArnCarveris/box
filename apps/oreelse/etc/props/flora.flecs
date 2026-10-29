@@ -11,8 +11,12 @@
 // - Quillbulb: a mound, a neck and a bulb on it with quills, membrane veils hanging off it and
 //   two glowing pods on top.
 //
-// The fronds and membranes are the alpha tested cutouts of materials/flora.flecs. Flora is
-// decoration: nothing collides with it.
+// The fronds and membranes are the alpha tested cutouts of materials/flora.flecs, which are one
+// sided: every blade has a child back of the same cutout turned by PI about y, so it shows its
+// texture from both sides. The back is written out in each blade rather than as a child of the
+// cutout prefabs, because flecs' instancing of prefab children at this scale (thousands of
+// blades) corrupts a query cache and aborts at world teardown. Flora is decoration: nothing
+// collides with it.
 
 using flecs.script.math
 using box.transform
@@ -114,12 +118,20 @@ template Frondstalk {
         Position: {px, py, pz}
         Rotation: {0, a, tt}
         Scale: {bw, bl, 1}
+        back : FloraFrond {
+          Position: {0, 0, 0}
+          Rotation: {0, PI, 0}
+        }
       }
     } else {
       "frond_{k}" : FloraFrondB {
         Position: {px, py, pz}
         Rotation: {0, a, tt}
         Scale: {bw, bl, 1}
+        back : FloraFrondB {
+          Position: {0, 0, 0}
+          Rotation: {0, PI, 0}
+        }
       }
     }
   }
@@ -139,12 +151,20 @@ template Frondstalk {
         Position: {px, py, pz}
         Rotation: {0, a, tt}
         Scale: {bw, bl, 1}
+        back : FloraFrondB {
+          Position: {0, 0, 0}
+          Rotation: {0, PI, 0}
+        }
       }
     } else {
       "skirt_{k}" : FloraFrond {
         Position: {px, py, pz}
         Rotation: {0, a, tt}
         Scale: {bw, bl, 1}
+        back : FloraFrond {
+          Position: {0, 0, 0}
+          Rotation: {0, PI, 0}
+        }
       }
     }
   }
@@ -184,12 +204,20 @@ template Ashcup {
         Position: {px, py, pz}
         Rotation: {0, a, tt}
         Scale: {bw, bl, 1}
+        back : FloraMembrane {
+          Position: {0, 0, 0}
+          Rotation: {0, PI, 0}
+        }
       }
     } else {
       "leaf_{k}" : FloraMembraneB {
         Position: {px, py, pz}
         Rotation: {0, a, tt}
         Scale: {bw, bl, 1}
+        back : FloraMembraneB {
+          Position: {0, 0, 0}
+          Rotation: {0, PI, 0}
+        }
       }
     }
   }
@@ -287,6 +315,10 @@ template Quillbulb {
       }
       Rotation: {0, a, tt}
       Scale: {vw, vl, 1}
+      back : FloraMembraneB {
+        Position: {0, 0, 0}
+        Rotation: {0, PI, 0}
+      }
     }
   }
 

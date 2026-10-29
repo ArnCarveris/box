@@ -432,9 +432,10 @@ ECS_STRUCT(OreDeposit, {
 });
 
 /** A plant of the flora (scenery.flecs), registered in the tile grid of OreMap when it is set.
- * A plant on a tile another plant took is rejected and deleted by ore_map_purge, as is a plant on
- * a deposit's tile; a plant under a building sinks cfg.floraSink below the ground until the
- * building is gone. A plant off the grid keeps row and col at -1 and stays as it is.
+ *
+ * ore_map_purge deletes a plant on a tile another plant took or on a deposit's tile; a plant under
+ * a building sinks cfg.floraSink below the ground until the building is gone. A plant off the
+ * grid keeps row and col at -1 and stays as it is.
  */
 ECS_STRUCT(OreFlora, {
     int32_t row; /**< Row of its tile, set when it registers, -1 off the grid */

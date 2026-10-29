@@ -7,6 +7,7 @@ Every case runs in a fresh apps/oreelse process with its default scene and the f
 seed of oreelse_buildings.py, whose helpers place and demolish the walls (it describes the setup:
 a 640x360 window without shadows, a fixed delta of 1/60 s per frame, waits that count frames).
 """
+from box_client import parse_value
 from oreelse_buildings import (  # noqa: F401 (ARGS)
     ARGS, SETTLE, STATE, building_at, buildings, click, count, demolish, deposits, key,
     rows_of, select, set_inventory, set_state, start)
@@ -34,8 +35,18 @@ def plants(app):
 
 
 def positions(app):
-    """The positions of the plants of the run: path -> Position."""
-    return rows_of(app, "box.transform.Position, oreelse.OreFlora")
+    """The positions of the plants of the run: path -> Position. A row of the query holds the
+    values of both fields, so only the first, up to its closing brace, is parsed."""
+    app.exec("query found box.transform.Position, oreelse.OreFlora")
+    app.exec("iter found")
+    out = app.exec("next 1000")
+    result = {}
+    for line in out.splitlines():
+        if not line.strip() or line == "(end)":
+            continue
+        path, values = line.split(" ", 1)
+        result[path] = parse_value(values[:values.index("}") + 1])
+    return result
 
 
 def tile_of(p):

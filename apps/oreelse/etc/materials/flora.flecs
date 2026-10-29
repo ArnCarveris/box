@@ -4,9 +4,9 @@
 // alpha; here they are alpha tested (AlphaCutoff), so they draw in the opaque pass with clean
 // edges and cast shadows with the holes of the texture.
 //
-// Each face is one side: the quad faces +Z and its back is culled. A blade is two faces back to
-// back, the prefab and its child back turned by PI about y, so it shows its texture from both
-// sides as the original's.
+// Each prefab is one side: the quad faces +Z and its back is culled. The plants draw a blade as
+// two of them back to back, the blade and its child back turned by PI about y, so it shows its
+// texture from both sides as the original's (props/flora.flecs).
 
 using flecs.script.math
 using box.transform
@@ -38,8 +38,7 @@ membrane_norm {
   TexturePath: {path: "apps/oreelse/etc/assets/flora_pad_normal.svg", width: 256, height: 256}
 }
 
-// One side of each material
-prefab FloraFrondFace {
+prefab FloraFrond {
   Quad: {1, 1}
   Rgb: {255, 255, 255}
   PbrMaterial: {metallic: 0, roughness: 0.78}
@@ -48,7 +47,7 @@ prefab FloraFrondFace {
   AlphaCutoff: {value: 0.5}
 }
 
-prefab FloraFrondBFace {
+prefab FloraFrondB {
   Quad: {1, 1}
   Rgb: {255, 255, 255}
   PbrMaterial: {metallic: 0, roughness: 0.78}
@@ -57,7 +56,7 @@ prefab FloraFrondBFace {
   AlphaCutoff: {value: 0.5}
 }
 
-prefab FloraMembraneFace {
+prefab FloraMembrane {
   Quad: {1, 1}
   Rgb: {255, 255, 255}
   PbrMaterial: {metallic: 0, roughness: 0.7}
@@ -66,40 +65,11 @@ prefab FloraMembraneFace {
   AlphaCutoff: {value: 0.5}
 }
 
-prefab FloraMembraneBFace {
+prefab FloraMembraneB {
   Quad: {1, 1}
   Rgb: {255, 255, 255}
   PbrMaterial: {metallic: 0, roughness: 0.7}
   PbrTextures: {albedo: membrane_b_tex, normal: membrane_norm}
   Emissive: {strength: 0.18, color: {114, 88, 108}}
   AlphaCutoff: {value: 0.5}
-}
-
-// The blades and membranes the plants use, both sides
-prefab FloraFrond : FloraFrondFace {
-  back : FloraFrondFace {
-    Position: {0, 0, 0}
-    Rotation: {0, PI, 0}
-  }
-}
-
-prefab FloraFrondB : FloraFrondBFace {
-  back : FloraFrondBFace {
-    Position: {0, 0, 0}
-    Rotation: {0, PI, 0}
-  }
-}
-
-prefab FloraMembrane : FloraMembraneFace {
-  back : FloraMembraneFace {
-    Position: {0, 0, 0}
-    Rotation: {0, PI, 0}
-  }
-}
-
-prefab FloraMembraneB : FloraMembraneBFace {
-  back : FloraMembraneBFace {
-    Position: {0, 0, 0}
-    Rotation: {0, PI, 0}
-  }
 }

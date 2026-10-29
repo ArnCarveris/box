@@ -345,7 +345,8 @@ Every task of the port follows these.
   The conversions are `ore_tile_x`, `ore_tile_z`, `ore_col_at`, `ore_row_at` and `ore_on_grid`
   in `src/map.c`, over the `ore_grid_t` of `ore_grid_get` (read once per system run). The
   `OreMap` singleton is the tile grid: `ore_map_deposit`, `ore_map_building` and
-  `ore_map_flora` give the cell of a tile. Entities register when they are set and clear their cell when they are removed.
+  `ore_map_flora` give the cell of a tile. Entities register when they are set and clear their
+  cell when they are removed.
   A deposit that registers on a tile another deposit holds (a plant on one another plant
   holds) is rejected and deleted by `ore_map_purge` (every frame in `OnLoad`, and by
   `restart()` right after its reload): an entity cannot be deleted in the observer of a
@@ -472,8 +473,11 @@ The plants are templates in `etc/props/flora.flecs` with the original's names, g
 colors. A plant's origin is the middle of its root mound on the ground, and every instance draws
 its own shape from the seeded `floraRng`. The fronds and membranes are the cutouts of
 `etc/materials/flora.flecs`: `FloraFrond`, `FloraFrondB`, `FloraMembrane` and `FloraMembraneB`,
-a unit quad with the texture and its normal map, alpha tested (`AlphaCutoff`) instead of the
-original's alpha blending, and two sided (a `back` child turned by PI about y).
+a one sided unit quad with the texture and its normal map, alpha tested (`AlphaCutoff`) instead
+of the original's alpha blending. Every blade of a plant has a `back` child of the same cutout
+turned by PI about y, so it shows its texture from both sides. The back is written out in the
+templates, not as a child of the cutout prefabs: flecs' instancing of prefab children at the
+scale of the flora (thousands of blades) aborts at world teardown.
 
 | Template | Props | Parts |
 | --- | --- | --- |
