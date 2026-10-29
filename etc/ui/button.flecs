@@ -90,10 +90,12 @@ template HeadlessButton {
 
   async {
     while true {
-      await on.activate(this)
-      down = false
-      if !disabled && action == 0 {
-        await ui.changed(this)
+      const e = await on.activate(this)
+      if ui.activation(e) == this {
+        down = false
+        if !disabled && action == 0 {
+          await ui.changed(this)
+        }
       }
     }
   }

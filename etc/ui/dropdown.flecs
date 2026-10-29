@@ -209,18 +209,20 @@ template HeadlessDropdown {
   async {
     while true {
       const e = await on.activate(this)
-      if !e.keyboard && !disabled && open && over {
-        open = false
-        if highlight != current {
-          current = highlight
-          await ui.changed(this)
+      if ui.activation(e) == this {
+        if !e.keyboard && !disabled && open && over {
+          open = false
+          if highlight != current {
+            current = highlight
+            await ui.changed(this)
+          }
+        } else if !e.keyboard && !disabled && open {
+          open = false
+        } else if !e.keyboard && !disabled {
+          highlight = current
+          over = false
+          open = true
         }
-      } else if !e.keyboard && !disabled && open {
-        open = false
-      } else if !e.keyboard && !disabled {
-        highlight = current
-        over = false
-        open = true
       }
     }
   }

@@ -72,14 +72,6 @@ ECS_STRUCT(FocusStatus, {
     bool visible;          /**< The focus came from the keyboard, so widgets show a focus ring */
 });
 
-/** What on.activate resolves with */
-ECS_STRUCT(UiActivateEvent, {
-    ecs_entity_t target; /**< Entity that was activated */
-    bool keyboard;       /**< Enter or Space activated it, false for a click */
-    float local_x;       /**< X of the click release in the space of target, 0 for keys */
-    float local_y;       /**< Y of the click release in the space of target, 0 for keys */
-});
-
 /** What on.change and on.submit resolve with */
 ECS_STRUCT(UiChangeEvent, {
     ecs_entity_t widget; /**< Widget that reported the change or the submit */
@@ -157,9 +149,9 @@ ECS_STRUCT(TextEditStatus, {
 
 /** Register the box.ui module.
  *
- * Registers flecs.script.on.activate, change and submit, which resolve on a target and its
- * ancestors, and ui.changed and ui.submit, which resolve at once. The focus events and focus()
- * are those of flecs.script.input, whose focus box.ui drives (see Focusable).
+ * Registers on.change, on.submit, ui.changed, ui.submit and ui.activation(e), which tells which
+ * entity box.ui counts an on.activate of flecs for (see etc/ui/widgets.flecs). The focus events,
+ * focus() and on.activate are those of flecs.script.input, whose focus box.ui drives.
  *
  * Creates box.ui.theme with a UiTheme and loads the widget library box.widgets as a managed
  * script from etc/ui/widgets.flecs, found as a Font.path is; without it there are no widgets.
