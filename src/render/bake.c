@@ -286,8 +286,10 @@ static bool box_bake_inside(
             if (!shape->scale[j]) {
                 goto done;
             }
+
             point[j] = local[j] / shape->scale[j];
         }
+
         result = box_surface_enclosed(shape, mesh, point);
         goto done;
     }

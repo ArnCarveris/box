@@ -99,14 +99,9 @@ ECS_STRUCT(AtmosphereStatus, {
 /** Time of day of a scene, placed on a Scene root or as a singleton for the default scene.
  * Adding it adds TimeOfDayStatus, removing it removes it.
  *
- * The sun and moon positions are computed from Paul Schlyter's orbital elements for the year
- * 2000 at Greenwich longitude, and the engine writes the Rotation of the sun and moon lights so
- * that they travel along their local +Z from the sky toward the ground. A light that inherits
- * its Rotation from a prefab gets an owned one; a light should have no rotated parent.
- *
- * Box is right handed with +Y up. With north 0, north is +Z and so east is -X: seen from
- * above with north up, east is on the right. The north yaw turns this compass about +Y, as the
- * Rotation yaw turns +Z: north 90 makes +X north and +Z east.
+ * The sun and moon positions come from Paul Schlyter's orbital elements for the year 2000 at
+ * Greenwich longitude. The engine writes the Rotation of their lights to travel along local +Z
+ * toward the ground; a prefab's Rotation becomes owned, and a light needs no rotated parent.
  *
  * Without an Atmosphere in the scene the light extract attenuates the sun and moon by the air
  * mass, warms their color toward the horizon and fades them out below it; the authored
@@ -118,7 +113,9 @@ ECS_STRUCT(TimeOfDay, {
     int32_t day_of_year;    /**< Day of the year, 1 to 365, default 80 (about the March
                              *   equinox) */
     float latitude;         /**< Latitude in degrees, -90 to 90, default 45 */
-    float north;            /**< World yaw of north in degrees, default 0 for north along +Z */
+    float north;            /**< World yaw of north in degrees about +Y, as Rotation yaw turns
+                             *   +Z; default 0 puts north on +Z and east on -X (right seen from
+                             *   above, north up), 90 makes +X north and +Z east */
     float time_scale;       /**< Simulated hours per real second, default 0 for paused */
     float moon_offset;      /**< Hours added to the time of the moon's position, default 0 */
     ecs_entity_t sun;       /**< DirectionalLight that is the sun, default 0 for the sun of the

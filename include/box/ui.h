@@ -46,10 +46,10 @@ extern ECS_TAG_DECLARE(Focused);
  * Tab focuses the next Focusable entity inside the nearest FocusScope ancestor of the focused
  * entity in 2D draw order, wrapping around; with nothing focused, the first one of the first
  * FocusScope in the scenes of the views of the focused surface. Without any, Tab is a plain key.
- * Tab passes over the entities that a ClipChildren ancestor clips away entirely, such as the
- * content of a collapsed section or a hidden tab page. It does not pass over the content that a
- * scrolling clip (a ClipChildren with a LayoutScroll) hides, which a scroll view scrolls into
- * view when it gets the focus.
+ *
+ * Tab passes over entities a ClipChildren ancestor clips away entirely, such as a collapsed
+ * section or hidden tab page, but not content a scrolling clip (ClipChildren with LayoutScroll)
+ * hides, which a scroll view scrolls into view when it gets the focus.
  */
 extern ECS_TAG_DECLARE(FocusScope);
 

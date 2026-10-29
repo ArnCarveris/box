@@ -1,10 +1,24 @@
+/**
+ * @file yeon.c
+ * @brief The systems of Yeon: flight, spawning, collisions and the strings of the kites.
+ */
+
 #define YEON_IMPL
 #include "game.h"
 #include <math.h>
 
+/** Read the float constant cfg.<name> of the scene (etc/config.flecs) */
 #define YEON_CFG(world, name) ecs_const_var_get_t(world, "cfg." name, ecs_f32_t)
+
+/** Read the integer constant cfg.<name> of the scene (etc/config.flecs) */
 #define YEON_CFG_I(world, name) ecs_const_var_get_t(world, "cfg." name, ecs_i32_t)
 
+/** Test whether the game is in a state.
+ *
+ * @param world The world
+ * @param state Name of the YeonGameState constant, such as "Over"
+ * @return Whether (YeonGameState, state) is set on the YeonGameState entity
+ */
 static bool yeon_state_is(
     const ecs_world_t *world,
     const char *state)
@@ -14,6 +28,11 @@ static bool yeon_state_is(
     return ecs_has_pair(world, ecs_id(YeonGameState), ecs_id(YeonGameState), s);
 }
 
+/** Draw a random number from the splitmix64 generator of the game.
+ *
+ * @param g The game, whose seed the draw advances
+ * @return A number in [0, 1)
+ */
 static float yeon_random01(
     YeonGame *g)
 {
@@ -24,6 +43,13 @@ static float yeon_random01(
     return (float)((z ^ (z >> 31)) >> 40) / (float)(1u << 24);
 }
 
+/** Draw a random number in a range.
+ *
+ * @param g The game, whose seed the draw advances
+ * @param min Lower bound of the range
+ * @param max Upper bound of the range
+ * @return A number in [min, max)
+ */
 static float yeon_random_range(
     YeonGame *g,
     float min,
@@ -32,6 +58,12 @@ static float yeon_random_range(
     return min + (max - min) * yeon_random01(g);
 }
 
+/** Test whether an action is held.
+ *
+ * @param world The world
+ * @param action The action entity, 0 when unbound
+ * @return Whether the action has an ActionState that is down
+ */
 static bool yeon_action_down(
     const ecs_world_t *world,
     ecs_entity_t action)
@@ -41,6 +73,11 @@ static bool yeon_action_down(
     return s && s->down;
 }
 
+/** Climb or dive the player kite with the controls and sway it while playing; once the game
+ * is over the kite falls to cfg.fallFloorY, spinning and drifting back.
+ *
+ * @param it Iterator over the player kite, with YeonGame, YeonControls and whether it plays
+ */
 static void YeonFlight(
     ecs_iter_t *it)
 {
@@ -87,6 +124,10 @@ static void YeonFlight(
     }
 }
 
+/** Count down the invulnerability of a hit kite and remove it at 0.
+ *
+ * @param it Iterator over invulnerable entities
+ */
 static void YeonInvulnerability(
     ecs_iter_t *it)
 {
@@ -100,6 +141,10 @@ static void YeonInvulnerability(
     }
 }
 
+/** Drift the rival kites toward the player while they sway, deleting those past cfg.despawnX.
+ *
+ * @param it Iterator over the rivals, with YeonGame
+ */
 static void YeonRivalMove(
     ecs_iter_t *it)
 {
@@ -121,6 +166,11 @@ static void YeonRivalMove(
     }
 }
 
+/** Scroll and bob the lanterns. A lantern within cfg.lanternReach of the player is caught: it
+ * plays the sparkle, counts and every cfg.speedUpLanterns catches speeds the run up.
+ *
+ * @param it Iterator over the lanterns, with YeonGame
+ */
 static void YeonLanternMove(
     ecs_iter_t *it)
 {
@@ -152,6 +202,10 @@ static void YeonLanternMove(
     }
 }
 
+/** Scroll the scenery with its parallax and wrap it around past wrap_min.
+ *
+ * @param it Iterator over the scenery, with YeonGame
+ */
 static void YeonSceneryScroll(
     ecs_iter_t *it)
 {
@@ -167,6 +221,15 @@ static void YeonSceneryScroll(
     }
 }
 
+/** Spawn an instance of a prefab at cfg.spawnX under the sky parent.
+ *
+ * @param world The world or stage
+ * @param g The game
+ * @param prefab The prefab to instantiate
+ * @param y Height of the instance
+ * @param z Depth of the instance
+ * @return The new entity
+ */
 static ecs_entity_t yeon_spawn(
     ecs_world_t *world,
     const YeonGame *g,
@@ -182,6 +245,11 @@ static ecs_entity_t yeon_spawn(
     return e;
 }
 
+/** Advance the time and the scrolled distance, and spawn a rival or a lantern with random
+ * parameters each time the distance to the next one is reached.
+ *
+ * @param it Iterator over YeonGame
+ */
 static void YeonSpawn(
     ecs_iter_t *it)
 {
@@ -235,6 +303,12 @@ static void YeonSpawn(
     ecs_singleton_modified(it->stage, YeonGame);
 }
 
+/** Cut a string of the player kite. The last cut ends the game and cuts its rope loose;
+ * otherwise the kite is invulnerable for cfg.invulnTime.
+ *
+ * @param world The world or stage
+ * @param g The game
+ */
 static void yeon_hit(
     ecs_world_t *world,
     const YeonGame *g)
@@ -258,6 +332,11 @@ static void yeon_hit(
     }
 }
 
+/** Hit the player kite when a rival is within cfg.rivalReach, at most once per frame and
+ * not while it is invulnerable.
+ *
+ * @param it Iterator over the rivals
+ */
 static void YeonCollision(
     ecs_iter_t *it)
 {
@@ -283,6 +362,14 @@ static void YeonCollision(
     }
 }
 
+/** Lay the points of a rope on the straight line between its two ends.
+ *
+ * @param rope The rope
+ * @param ax X of the end at the kite
+ * @param ay Y of the end at the kite
+ * @param bx X of the anchor
+ * @param by Y of the anchor
+ */
 static void yeon_rope_init(
     YeonRope *rope,
     float ax,
@@ -299,6 +386,12 @@ static void yeon_rope_init(
     rope->ready = true;
 }
 
+/** Integrate the free points of a rope with damped verlet, gravity and a flutter.
+ *
+ * @param rope The rope
+ * @param time Time of the game, phase of the flutter
+ * @param dt Time step
+ */
 static void yeon_rope_step(
     YeonRope *rope,
     float time,
@@ -317,6 +410,10 @@ static void yeon_rope_step(
     }
 }
 
+/** Pull the points of a rope back toward their segment length, keeping its pinned ends fixed.
+ *
+ * @param rope The rope
+ */
 static void yeon_rope_relax(
     YeonRope *rope)
 {
@@ -338,6 +435,10 @@ static void yeon_rope_relax(
     }
 }
 
+/** Pin the ropes to their kite and anchor and simulate them.
+ *
+ * @param it Iterator over the kites with a rope, with YeonGame
+ */
 static void YeonRopeSim(
     ecs_iter_t *it)
 {
@@ -372,6 +473,10 @@ static void YeonRopeSim(
     }
 }
 
+/** Place, rotate and stretch each segment of a rope between its two points.
+ *
+ * @param it Iterator over the segments, with the rope and position of their parent
+ */
 static void YeonRopeSegments(
     ecs_iter_t *it)
 {
@@ -394,6 +499,10 @@ static void YeonRopeSegments(
     }
 }
 
+/** Rotate the body parts of a kite to the pose of the kite.
+ *
+ * @param it Iterator over the body parts, with the YeonPose of their parent
+ */
 static void YeonBodyPose(
     ecs_iter_t *it)
 {
@@ -406,6 +515,10 @@ static void YeonBodyPose(
     }
 }
 
+/** Set the drift of the particle forces to the scroll speed while playing, 0 otherwise.
+ *
+ * @param it Iterator over YeonGame, with whether the game plays
+ */
 static void YeonDrift(
     ecs_iter_t *it)
 {
@@ -419,6 +532,11 @@ static void YeonDrift(
     }
 }
 
+/** Resolve a script future with a boolean and release it.
+ *
+ * @param future The future
+ * @param value The result
+ */
 static void yeon_resolve(
     ecs_script_future_t *future,
     bool value)
@@ -428,6 +546,13 @@ static void yeon_resolve(
     ecs_script_future_release(future);
 }
 
+/** The restart() script function: reload the run script when the game is over.
+ *
+ * @param ctx Context of the function call
+ * @param argc Argument count, unused
+ * @param argv Argument array, unused
+ * @param future Resolved with whether the run was reloaded
+ */
 static void yeon_restart(
     const ecs_function_ctx_t *ctx,
     int32_t argc,

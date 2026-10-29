@@ -65,9 +65,9 @@ ECS_STRUCT(App, {
     bool unguarded;     /**< A headless run starts on an oversubscribed machine */
     bool unpaced;       /**< A headless run ignores its CPU budget */
     char *scene;        /**< Script file loaded before the first frame, NULL for none */
-    bool design;
-    char *camera;
-    char *out;
+    bool design;        /**< Render the gallery of design cameras, set by --design */
+    char *camera;       /**< Name of the Camera the surface shows, set by --camera, NULL for none */
+    char *out;          /**< Image file the surface is written to, set by --out, NULL for none */
 });
 
 /** State of the process the engine writes, read only for applications */

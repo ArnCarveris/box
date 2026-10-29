@@ -1,5 +1,12 @@
+/**
+ * @file spatial/layout.c
+ * @brief Spatial layout solver: Fit, Align, Distribute and Array rules resolved to transforms.
+ *
+ * Every entity with a layout rule, or read by one, has a node that caches its pose, bounds and
+ * basis between passes. Changed inputs invalidate the nodes that read from them.
+ */
+
 #include "layout.h"
-#include "spatial.h"
 #include <float.h>
 #include <math.h>
 #include <stdlib.h>
@@ -7,81 +14,45 @@
 
 #define EPS 0.000001f
 
-typedef struct LayoutOutput {
-    vec3 source_scale;
-    bool fitted;
-    bool manual;
-} LayoutOutput;
-
-static ECS_COMPONENT_DECLARE(LayoutOutput);
-static ECS_TAG_DECLARE(ArrayPrototype);
-typedef struct PrototypeSource {
-    ecs_entity_t entity;
-} PrototypeSource;
-static ECS_COMPONENT_DECLARE(PrototypeSource);
-
-/* A node keeps its results between passes. It is reset and solved again when an input of its
- * own entity changed, or when a node it read from (deps) was reset. */
-typedef struct layout_node_t {
-    ecs_entity_t entity;
-    int pose_state, bounds_state, arrange_state, intrinsic_state, basis_state;
-    mat4 pose, basis;
-    vec3 min, max, intrinsic_min, intrinsic_max, fit;
-    vec3 placement;
-    bool has_bounds, has_intrinsic, controlled, placed, requested, arranged;
-    SpatialDiagnostic error;
-    SpatialDiagnostic array_error; /* Error of the last array sync, kept until the next sync */
-    int32_t index;                 /* Position in layout_ctx_t::list */
-    uint64_t epoch;                /* Pass that last reset the node */
-    uint64_t frame;                /* Pass that last added the node to layout_ctx_t::frame */
-    uint64_t mark;                 /* Pass that last invalidated the node */
-    uint64_t array_epoch;          /* Pass that last synced the instances of the node */
-    ecs_vec_t deps;                /* Nodes the results of the node were computed from */
-} layout_node_t;
-
-typedef struct layout_ctx_t {
-    ecs_world_t *world;
-    ecs_map_t nodes;
-    ecs_vec_t list;         /* Every node, by layout_node_t::index */
-    ecs_vec_t frame;        /* Nodes reset, created or given an error in the current pass */
-    ecs_vec_t seeds;        /* Entities with changed inputs since the last pass */
-    ecs_vec_t dynamic;      /* Entities of nodes that follow DynamicTransform */
-    ecs_vec_t queue;        /* Nodes invalidated in the current pass */
-    ecs_vec_t offsets;      /* Range in users of the users of every node index */
-    ecs_vec_t users;        /* Node indices of the nodes that read from a node */
-    ecs_vec_t roots;        /* Arrays with changed content, sorted */
-    layout_node_t *current; /* Node whose results are being computed */
-    uint64_t epoch;
-    int32_t solved;
-    int32_t synced;
-    bool arrays_dirty;
-    bool active; /* The world has layout rules, so changed inputs are recorded */
-    bool writing;
-    int refs;
-    bool ok;
-} layout_ctx_t;
+ECS_COMPONENT_DECLARE(LayoutOutput);
+ECS_TAG_DECLARE(ArrayPrototype);
+ECS_COMPONENT_DECLARE(PrototypeSource);
 
 static ECS_COMPONENT_DECLARE(LayoutContext);
+
+/** Singleton that holds the layout context of a world */
 typedef struct LayoutContext {
-    layout_ctx_t *ptr;
+    layout_ctx_t *ptr; /**< The layout context */
 } LayoutContext;
 
+/** Record that a node read from another node.
+ *
+ * Only the last four dependencies are checked for duplicates.
+ *
+ * @param node The node that read
+ * @param dependency The node that was read from
+ */
 static void depend(
     layout_node_t *node,
     layout_node_t *dependency)
 {
     int32_t count = ecs_vec_count(&node->deps);
     layout_node_t **deps = ecs_vec_first(&node->deps);
-    for (int32_t i = count - 1; i >= 0 && i >= count - 4; i--) {
-        if (deps[i] == dependency) {
-
-            return;
-        }
+    bool found = false;
+    for (int32_t i = count - 1; !found && i >= 0 && i >= count - 4; i--) {
+        found = deps[i] == dependency;
     }
 
-    *ecs_vec_append_t(NULL, &node->deps, layout_node_t *) = dependency;
+    if (!found) {
+        *ecs_vec_append_t(NULL, &node->deps, layout_node_t *) = dependency;
+    }
 }
 
+/** Add a node to the nodes that are solved and published in the current pass.
+ *
+ * @param ctx The layout context
+ * @param n The node
+ */
 static void frame_add(
     layout_ctx_t *ctx,
     layout_node_t *n)
@@ -92,6 +63,12 @@ static void frame_add(
     }
 }
 
+/** Test whether an entity has a layout rule or layout output of its own.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return Whether the node of the entity is solved and published
+ */
 static bool wants(
     ecs_world_t *world,
     ecs_entity_t e)
@@ -102,6 +79,13 @@ static bool wants(
            (ecs_owns(world, e, Array) && !ecs_has_id(world, e, EcsPrefab));
 }
 
+/** Clear the results of a node so that it is solved again in the current pass.
+ *
+ * The array error, the position in the node list and the pass marks are kept.
+ *
+ * @param ctx The layout context
+ * @param n The node
+ */
 static void node_reset(
     layout_ctx_t *ctx,
     layout_node_t *n)
@@ -130,7 +114,7 @@ static void node_reset(
     }
 }
 
-static layout_node_t *node_get(
+layout_node_t *box_spatial_layout_node_get(
     layout_ctx_t *ctx,
     ecs_entity_t e)
 {
@@ -148,6 +132,10 @@ static layout_node_t *node_get(
     return n;
 }
 
+/** Free a node.
+ *
+ * @param n The node
+ */
 static void node_free(
     layout_node_t *n)
 {
@@ -155,6 +143,11 @@ static void node_free(
     ecs_os_free(n);
 }
 
+/** Remove a node from the context and free it.
+ *
+ * @param ctx The layout context
+ * @param n The node
+ */
 static void node_remove(
     layout_ctx_t *ctx,
     layout_node_t *n)
@@ -180,20 +173,32 @@ static void node_remove(
     node_free(n);
 }
 
-/* Record that the node being computed reads from the node of an entity that is not visited
- * through pose, bounds, basis, arrange or intrinsic_bounds. */
+/** Record that the node being computed reads from the node of an entity.
+ *
+ * Used for entities that are not visited through pose, bounds, basis, arrange or
+ * intrinsic_bounds.
+ *
+ * @param ctx The layout context
+ * @param e The entity that is read from
+ */
 static void use(
     layout_ctx_t *ctx,
     ecs_entity_t e)
 {
     if (ctx->current && e && ecs_is_alive(ctx->world, e)) {
-        layout_node_t *n = node_get(ctx, e);
+        layout_node_t *n = box_spatial_layout_node_get(ctx, e);
         if (n != ctx->current) {
             depend(ctx->current, n);
         }
     }
 }
 
+/** Make a node the node being computed, recording it as a dependency of the previous one.
+ *
+ * @param ctx The layout context
+ * @param n The node
+ * @return The node that was being computed before
+ */
 static layout_node_t *enter(
     layout_ctx_t *ctx,
     layout_node_t *n)
@@ -208,6 +213,17 @@ static layout_node_t *enter(
     return previous;
 }
 
+/** Report an error on a node, keeping the first error of the node.
+ *
+ * A node that keeps its results from an earlier pass is published again with the error. The
+ * error goes away when the node that reported it is solved again.
+ *
+ * @param ctx The layout context
+ * @param n The node
+ * @param code The error
+ * @param related The entity the error is about
+ * @return Always false
+ */
 static bool fail(
     layout_ctx_t *ctx,
     layout_node_t *n,
@@ -216,11 +232,9 @@ static bool fail(
 {
     if (!n->error.code) {
         n->error = (SpatialDiagnostic){code, related};
-        // A node that keeps its results from an earlier pass is published again with the error.
         frame_add(ctx, n);
     }
 
-    // The error goes away when the node that reported it is solved again.
     if (ctx->current && ctx->current != n) {
         depend(n, ctx->current);
     }
@@ -230,34 +244,42 @@ static bool fail(
     return false;
 }
 
+/** Fail a node when a step of a dependency failed, passing on the error of the dependency.
+ *
+ * @param ctx The layout context
+ * @param n The node
+ * @param dependency The node the step was computed for
+ * @param ok The result of the step
+ * @return The value of ok
+ */
 static bool require(
     layout_ctx_t *ctx,
     layout_node_t *n,
     layout_node_t *dependency,
     bool ok)
 {
+    bool result = true;
     if (!ok) {
-
-        return fail(ctx, n, dependency->error.code ? dependency->error.code : SpatialMissingBounds,
-                    dependency->entity);
+        SpatialError code = dependency->error.code ? dependency->error.code : SpatialMissingBounds;
+        result = fail(ctx, n, code, dependency->entity);
     }
 
-    return true;
+    return result;
 }
 
-static int axis_index(
+int box_spatial_layout_axis_index(
     SpatialAxis axis)
 {
     return axis == SpatialX ? 0 : axis == SpatialY ? 1 : axis == SpatialZ ? 2 : -1;
 }
 
-static bool finite3(
+bool box_spatial_layout_finite3(
     const float *v)
 {
     return isfinite(v[0]) && isfinite(v[1]) && isfinite(v[2]);
 }
 
-static int entity_compare(
+int box_spatial_layout_entity_compare(
     const void *a,
     const void *b)
 {
@@ -266,7 +288,7 @@ static int entity_compare(
     return (x > y) - (x < y);
 }
 
-static ecs_vec_t children(
+ecs_vec_t box_spatial_layout_children(
     ecs_world_t *world,
     ecs_entity_t e,
     bool prototypes)
@@ -295,12 +317,18 @@ static ecs_vec_t children(
 
     if (ecs_vec_count(&result) > 1) {
         qsort(ecs_vec_first(&result), (size_t)ecs_vec_count(&result), sizeof(ecs_entity_t),
-              entity_compare);
+              box_spatial_layout_entity_compare);
     }
 
     return result;
 }
 
+/** Compute the local transform of an entity from its Position, Rotation and Scale.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param local The local transform
+ */
 static void authored_local(
     ecs_world_t *world,
     ecs_entity_t e,
@@ -323,6 +351,14 @@ static void authored_local(
     }
 }
 
+/** Compute the axis aligned bounds of a box after a transform.
+ *
+ * @param m The transform
+ * @param min Minimum of the box
+ * @param max Maximum of the box
+ * @param out_min Minimum of the transformed bounds
+ * @param out_max Maximum of the transformed bounds
+ */
 static void transform_bounds(
     mat4 m,
     const vec3 min,
@@ -346,16 +382,38 @@ static bool arrange(layout_ctx_t *ctx, layout_node_t *n);
 static bool basis(layout_ctx_t *ctx, layout_node_t *n, mat4 result);
 static bool intrinsic_bounds(layout_ctx_t *ctx, layout_node_t *n);
 
-static bool target_get(layout_ctx_t *ctx, layout_node_t *n, ecs_entity_t target,
-                       layout_node_t **out)
+/** Get the node of the target of a layout rule, failing when the target is not alive.
+ *
+ * @param ctx The layout context
+ * @param n The node of the rule
+ * @param target The target entity
+ * @param out The node of the target, set when the target is alive
+ * @return Whether the target is alive
+ */
+static bool target_get(
+    layout_ctx_t *ctx,
+    layout_node_t *n,
+    ecs_entity_t target,
+    layout_node_t **out)
 {
+    bool result = true;
     if (!target || !ecs_is_alive(ctx->world, target)) {
-        return fail(ctx, n, SpatialInvalidTarget, target);
+        result = fail(ctx, n, SpatialInvalidTarget, target);
+    } else {
+        *out = box_spatial_layout_node_get(ctx, target);
     }
-    *out = node_get(ctx, target);
-    return true;
+
+    return result;
 }
 
+/** Compute the bounds of the shape of a node, scaled by the scale of the shape.
+ *
+ * Adds a Position to a shape without one, so that the layout can place it.
+ *
+ * @param ctx The layout context
+ * @param n The node
+ * @return Whether the entity has a shape with finite bounds
+ */
 static bool source_bounds(
     layout_ctx_t *ctx,
     layout_node_t *n)
@@ -365,72 +423,83 @@ static bool source_bounds(
         ecs_set(ctx->world, n->entity, Position, {0});
     }
 
+    bool result = false;
     const ShapeMesh *s = ecs_get(ctx->world, n->entity, ShapeMesh);
     const box_mesh_t *mesh = s ? box_mesh_cache_get(box_mesh_cache_of(ctx->world), s->mesh) : NULL;
-    if (!mesh) {
+    if (mesh) {
+        const LayoutOutput *out = ecs_get(ctx->world, n->entity, LayoutOutput);
+        const float *scale = out && out->fitted ? out->source_scale : s->scale;
+        for (int i = 0; i < 3; i++) {
+            float a = (s->surface.p[0][0] ? s->min[i] : mesh->min[i]) * scale[i];
+            float b = (s->surface.p[0][0] ? s->max[i] : mesh->max[i]) * scale[i];
+            n->min[i] = fminf(a, b);
+            n->max[i] = fmaxf(a, b);
+        }
 
-        return false;
+        result = box_spatial_layout_finite3(n->min) && box_spatial_layout_finite3(n->max);
     }
 
-    const LayoutOutput *out = ecs_get(ctx->world, n->entity, LayoutOutput);
-    const float *scale = out && out->fitted ? out->source_scale : s->scale;
-    for (int i = 0; i < 3; i++) {
-        float a = (s->surface.p[0][0] ? s->min[i] : mesh->min[i]) * scale[i];
-        float b = (s->surface.p[0][0] ? s->max[i] : mesh->max[i]) * scale[i];
-        n->min[i] = fminf(a, b);
-        n->max[i] = fmaxf(a, b);
-    }
-
-    return finite3(n->min) && finite3(n->max);
+    return result;
 }
 
+/** Compute the bounds of a node before fitting, from its shape or else its prototype children.
+ *
+ * @param ctx The layout context
+ * @param n The node
+ * @return Whether the node has intrinsic bounds
+ */
 static bool intrinsic_bounds_solve(
     layout_ctx_t *ctx,
     layout_node_t *n)
 {
+    bool result = false;
     if (n->intrinsic_state == 2) {
+        result = n->has_intrinsic;
+    } else if (n->intrinsic_state != 1) {
+        n->intrinsic_state = 1;
+        layout_node_t source = {.entity = n->entity};
+        if (source_bounds(ctx, &source)) {
+            glm_vec3_copy(source.min, n->intrinsic_min);
+            glm_vec3_copy(source.max, n->intrinsic_max);
+            n->has_intrinsic = true;
+        } else {
+            glm_vec3_fill(n->intrinsic_min, FLT_MAX);
+            glm_vec3_fill(n->intrinsic_max, -FLT_MAX);
+            ecs_vec_t list = box_spatial_layout_children(ctx->world, n->entity, true);
+            for (int i = 0; i < ecs_vec_count(&list); i++) {
+                layout_node_t *c = box_spatial_layout_node_get(
+                    ctx, *ecs_vec_get_t(&list, ecs_entity_t, i));
+                if (!intrinsic_bounds(ctx, c)) {
+                    continue;
+                }
 
-        return n->has_intrinsic;
-    }
-
-    if (n->intrinsic_state == 1) {
-
-        return false;
-    }
-
-    n->intrinsic_state = 1;
-    layout_node_t source = {.entity = n->entity};
-    if (source_bounds(ctx, &source)) {
-        glm_vec3_copy(source.min, n->intrinsic_min);
-        glm_vec3_copy(source.max, n->intrinsic_max);
-        n->has_intrinsic = true;
-    } else {
-        glm_vec3_fill(n->intrinsic_min, FLT_MAX);
-        glm_vec3_fill(n->intrinsic_max, -FLT_MAX);
-        ecs_vec_t list = children(ctx->world, n->entity, true);
-        for (int i = 0; i < ecs_vec_count(&list); i++) {
-            layout_node_t *c = node_get(ctx, *ecs_vec_get_t(&list, ecs_entity_t, i));
-            if (!intrinsic_bounds(ctx, c)) {
-                continue;
+                mat4 local;
+                vec3 min, max;
+                authored_local(ctx->world, c->entity, local);
+                transform_bounds(local, c->intrinsic_min, c->intrinsic_max, min, max);
+                glm_vec3_minv(n->intrinsic_min, min, n->intrinsic_min);
+                glm_vec3_maxv(n->intrinsic_max, max, n->intrinsic_max);
+                n->has_intrinsic = true;
             }
 
-            mat4 local;
-            vec3 min, max;
-            authored_local(ctx->world, c->entity, local);
-            transform_bounds(local, c->intrinsic_min, c->intrinsic_max, min, max);
-            glm_vec3_minv(n->intrinsic_min, min, n->intrinsic_min);
-            glm_vec3_maxv(n->intrinsic_max, max, n->intrinsic_max);
-            n->has_intrinsic = true;
+            ecs_vec_fini_t(NULL, &list, ecs_entity_t);
         }
 
-        ecs_vec_fini_t(NULL, &list, ecs_entity_t);
+        n->intrinsic_state = 2;
+        result = n->has_intrinsic;
     }
 
-    n->intrinsic_state = 2;
-
-    return n->has_intrinsic;
+    return result;
 }
 
+/** Compute the local transform of a node, with the step of its array and its placement.
+ *
+ * @param ctx The layout context
+ * @param n The node
+ * @param local The local transform
+ * @param place Whether to add the placement of a parent Distribute
+ * @return Whether the local transform could be computed
+ */
 static bool local_pose(
     layout_ctx_t *ctx,
     layout_node_t *n,
@@ -444,10 +513,10 @@ static bool local_pose(
         use(ctx, instance->owner);
         const Array *a = ecs_get(world, instance->owner, Array);
         if (a) {
-            int axis = axis_index(a->axis);
+            int axis = box_spatial_layout_axis_index(a->axis);
             if (axis < 0) {
-
-                return fail(ctx, n, SpatialImpossible, instance->owner);
+                fail(ctx, n, SpatialImpossible, instance->owner);
+                goto error;
             }
 
             mat4 step;
@@ -461,8 +530,8 @@ static bool local_pose(
             }
 
             if (scale[0] <= EPS || scale[1] <= EPS || scale[2] <= EPS) {
-
-                return fail(ctx, n, SpatialImpossible, instance->owner);
+                fail(ctx, n, SpatialImpossible, instance->owner);
+                goto error;
             }
 
             glm_scale(local, scale);
@@ -473,10 +542,9 @@ static bool local_pose(
 
     ecs_entity_t parent = ecs_get_parent(world, n->entity);
     if (place && parent && ecs_has(world, parent, Distribute)) {
-        layout_node_t *p = node_get(ctx, parent);
+        layout_node_t *p = box_spatial_layout_node_get(ctx, parent);
         if (!require(ctx, n, p, arrange(ctx, p))) {
-
-            return false;
+            goto error;
         }
     }
 
@@ -486,39 +554,59 @@ static bool local_pose(
     }
 
     return true;
+error:
+    return false;
 }
 
-static bool anchor_frame(layout_ctx_t *ctx, layout_node_t *n, SpatialAnchor a, mat4 frame,
-                         bool position);
-static bool orthonormal(mat4 input, mat4 output);
+static bool anchor_frame(
+    layout_ctx_t *ctx,
+    layout_node_t *n,
+    SpatialAnchor a,
+    mat4 frame,
+    bool position);
 
+static bool orthonormal(
+    mat4 input,
+    mat4 output);
+
+/** Compute the world orientation and scale of a node, without translation.
+ *
+ * A SpatialAlign that matches rotation takes the orientation of the anchor of its target.
+ *
+ * @param ctx The layout context
+ * @param n The node
+ * @param result The basis of the node
+ * @return Whether the basis could be computed without error
+ */
 static bool basis_solve(
     layout_ctx_t *ctx,
     layout_node_t *n,
     mat4 result)
 {
+    bool ok = false;
     if (n->basis_state == 2) {
         glm_mat4_copy(n->basis, result);
-
-        return !n->error.code;
+        ok = !n->error.code;
+        goto done;
     }
 
     if (n->basis_state == 1) {
-        return fail(ctx, n, SpatialCycle, n->entity);
+        fail(ctx, n, SpatialCycle, n->entity);
+        goto done;
     }
 
     n->basis_state = 1;
     mat4 local;
     if (!local_pose(ctx, n, local, false)) {
-        return false;
+        goto done;
     }
 
     ecs_entity_t parent = ecs_get_parent(ctx->world, n->entity);
     if (parent) {
-        layout_node_t *p = node_get(ctx, parent);
+        layout_node_t *p = box_spatial_layout_node_get(ctx, parent);
         mat4 parent_basis;
         if (!require(ctx, n, p, basis(ctx, p, parent_basis))) {
-            return false;
+            goto done;
         }
 
         glm_mat4_mul(parent_basis, local, n->basis);
@@ -543,17 +631,18 @@ static bool basis_solve(
             layout_node_t *t;
             mat4 target, self, other, orientation, inverse;
             if (!target_get(ctx, n, a.target, &t) || !require(ctx, n, t, basis(ctx, t, target))) {
-                return false;
+                goto done;
             }
 
             if (!anchor_frame(ctx, n, a.self, self, false) ||
                 !require(ctx, n, t, anchor_frame(ctx, t, a.other, other, false))) {
-                return false;
+                goto done;
             }
 
             glm_mat4_mul(target, other, target);
             if (!orthonormal(target, orientation)) {
-                return fail(ctx, n, SpatialZeroBounds, t->entity);
+                fail(ctx, n, SpatialZeroBounds, t->entity);
+                goto done;
             }
 
             glm_mat4_mul(orientation, offset, orientation);
@@ -578,22 +667,33 @@ static bool basis_solve(
     glm_vec3_zero(n->basis[3]);
     n->basis_state = 2;
     glm_mat4_copy(n->basis, result);
-
-    return !n->error.code;
+    ok = !n->error.code;
+done:
+    return ok;
 }
 
+/** Compute the bounds of a node and the scale a Fit applies to it.
+ *
+ * The bounds come from the shape of the node, or else from the bounds of its children in the
+ * space of the node.
+ *
+ * @param ctx The layout context
+ * @param n The node
+ * @return Whether the node has bounds and no error
+ */
 static bool bounds_solve(
     layout_ctx_t *ctx,
     layout_node_t *n)
 {
+    bool ok = false;
     if (n->bounds_state == 2) {
-
-        return !n->error.code && n->has_bounds;
+        ok = !n->error.code && n->has_bounds;
+        goto done;
     }
 
     if (n->bounds_state == 1) {
-
-        return fail(ctx, n, SpatialCycle, n->entity);
+        fail(ctx, n, SpatialCycle, n->entity);
+        goto done;
     }
 
     n->bounds_state = 1;
@@ -603,15 +703,16 @@ static bool bounds_solve(
     const Fit *fit = ecs_get(world, n->entity, Fit);
     if (!n->has_bounds) {
         if (fit) {
-
-            return fail(ctx, n, SpatialMissingBounds, n->entity);
+            fail(ctx, n, SpatialMissingBounds, n->entity);
+            goto done;
         }
 
-        ecs_vec_t list = children(world, n->entity, false);
+        ecs_vec_t list = box_spatial_layout_children(world, n->entity, false);
         glm_vec3_fill(n->min, FLT_MAX);
         glm_vec3_fill(n->max, -FLT_MAX);
         for (int i = 0; i < ecs_vec_count(&list); i++) {
-            layout_node_t *c = node_get(ctx, *ecs_vec_get_t(&list, ecs_entity_t, i));
+            layout_node_t *c =
+                box_spatial_layout_node_get(ctx, *ecs_vec_get_t(&list, ecs_entity_t, i));
             if (!bounds(ctx, c)) {
                 if (c->error.code) {
                     require(ctx, n, c, false);
@@ -656,20 +757,18 @@ static bool bounds_solve(
         int axes = f.axes ? f.axes : SpatialXYZ;
         layout_node_t *t;
         if (axes < 1 || axes > 7 || f.mode < SpatialStretch || f.mode > SpatialCover ||
-            !finite3(f.padding)) {
-
-            return fail(ctx, n, SpatialImpossible, n->entity);
+            !box_spatial_layout_finite3(f.padding)) {
+            fail(ctx, n, SpatialImpossible, n->entity);
+            goto done;
         }
 
         if (!target_get(ctx, n, f.target, &t) || !require(ctx, n, t, bounds(ctx, t))) {
-
-            return false;
+            goto done;
         }
 
         mat4 self_basis, target_basis;
         if (!basis(ctx, n, self_basis) || !require(ctx, n, t, basis(ctx, t, target_basis))) {
-
-            return false;
+            goto done;
         }
 
         float uniform = f.mode == SpatialCover ? 0 : FLT_MAX;
@@ -683,24 +782,25 @@ static bool bounds_solve(
             float target_scale = glm_vec3_norm(target_basis[i]);
             float target_size = t->max[i] - t->min[i];
             if (target_size <= EPS) {
-                return fail(ctx, n, SpatialZeroBounds, t->entity);
+                fail(ctx, n, SpatialZeroBounds, t->entity);
+                goto done;
             }
 
             float available = (target_size - 2 * f.padding[i]) * target_scale;
             if (self_scale <= EPS || target_scale <= EPS) {
-
-                return fail(ctx, n, SpatialZeroBounds, t->entity);
+                fail(ctx, n, SpatialZeroBounds, t->entity);
+                goto done;
             }
 
             size *= self_scale;
             if (size <= EPS) {
-
-                return fail(ctx, n, SpatialZeroBounds, n->entity);
+                fail(ctx, n, SpatialZeroBounds, n->entity);
+                goto done;
             }
 
             if (available <= EPS || f.padding[i] < 0) {
-
-                return fail(ctx, n, SpatialImpossible, t->entity);
+                fail(ctx, n, SpatialImpossible, t->entity);
+                goto done;
             }
 
             n->fit[i] = available / size;
@@ -719,42 +819,65 @@ static bool bounds_solve(
     }
 
     n->bounds_state = 2;
-
-    return !n->error.code && n->has_bounds;
+    ok = !n->error.code && n->has_bounds;
+done:
+    return ok;
 }
 
-static bool anchor_frame(layout_ctx_t *ctx, layout_node_t *n, SpatialAnchor a, mat4 frame,
-                         bool position)
+/** Compute the frame of an anchor in the space of a node.
+ *
+ * The frame is an AttachmentFrame child, or else a point on the bounds of the node with the
+ * orientation of an optional face.
+ *
+ * @param ctx The layout context
+ * @param n The node
+ * @param a The anchor
+ * @param frame The frame of the anchor
+ * @param position Whether to compute the position of the frame, which needs the bounds
+ * @return Whether the anchor is valid
+ */
+static bool anchor_frame(
+    layout_ctx_t *ctx,
+    layout_node_t *n,
+    SpatialAnchor a,
+    mat4 frame,
+    bool position)
 {
+    bool ok = false;
     glm_mat4_identity(frame);
     if (a.frame) {
         use(ctx, a.frame);
         if (!ecs_is_alive(ctx->world, a.frame) ||
             ecs_get_parent(ctx->world, a.frame) != n->entity) {
-
-            return fail(ctx, n, SpatialInvalidAnchor, a.frame);
+            fail(ctx, n, SpatialInvalidAnchor, a.frame);
+            goto done;
         }
+
         const AttachmentFrame *attachment = ecs_get(ctx->world, a.frame, AttachmentFrame);
-        if (!attachment || !finite3(attachment->position) || !finite3(attachment->rotation)) {
-
-            return fail(ctx, n, SpatialInvalidAnchor, a.frame);
+        if (!attachment || !box_spatial_layout_finite3(attachment->position) ||
+            !box_spatial_layout_finite3(attachment->rotation)) {
+            fail(ctx, n, SpatialInvalidAnchor, a.frame);
+            goto done;
         }
+
         glm_euler_yxz(ECS_CONST_CAST(float *, attachment->rotation), frame);
         glm_vec3_copy(ECS_CONST_CAST(float *, attachment->position), frame[3]);
-
-        return true;
+        ok = true;
+        goto done;
     }
 
     if (position && !bounds(ctx, n)) {
-
-        return fail(ctx, n, n->error.code ? n->error.code : SpatialMissingBounds, n->entity);
+        fail(ctx, n, n->error.code ? n->error.code : SpatialMissingBounds, n->entity);
+        goto done;
     }
+
     AnchorPoint points[] = {a.x, a.y, a.z};
     for (int i = 0; i < 3; i++) {
         if (points[i] < SpatialCenter || points[i] > SpatialMax) {
-
-            return fail(ctx, n, SpatialInvalidAnchor, n->entity);
+            fail(ctx, n, SpatialInvalidAnchor, n->entity);
+            goto done;
         }
+
         if (position) {
             frame[3][i] = points[i] == SpatialMin   ? n->min[i]
                           : points[i] == SpatialMax ? n->max[i]
@@ -796,57 +919,78 @@ static bool anchor_frame(layout_ctx_t *ctx, layout_node_t *n, SpatialAnchor a, m
             sign = -1;
             break;
         default:
-            return fail(ctx, n, SpatialInvalidAnchor, n->entity);
+            fail(ctx, n, SpatialInvalidAnchor, n->entity);
+            goto done;
         }
 
         normal[axis] = sign;
         if (position) {
             frame[3][axis] = sign > 0 ? n->max[axis] : n->min[axis];
         }
+
         glm_vec3_copy(normal, frame[2]);
         glm_vec3_cross(up, normal, frame[0]);
         glm_vec3_copy(up, frame[1]);
     }
 
-    return true;
+    ok = true;
+done:
+    return ok;
 }
 
+/** Compute an orthonormal frame from a transform, keeping its Z axis and translation.
+ *
+ * The Z axis is the normal of the XY plane of the transform, and the X axis is projected onto
+ * the plane orthogonal to it.
+ *
+ * @param input The transform
+ * @param output The orthonormal frame
+ * @return Whether the transform is not singular
+ */
 static bool orthonormal(
     mat4 input,
     mat4 output)
 {
-    if (fabsf(glm_mat4_det(input)) < EPS) {
-
-        return false;
+    bool ok = !(fabsf(glm_mat4_det(input)) < EPS);
+    if (ok) {
+        mat4 inverse;
+        glm_mat4_inv(input, inverse);
+        glm_mat4_transpose(inverse);
+        glm_mat4_identity(output);
+        glm_vec3_copy(inverse[2], output[2]);
+        glm_vec3_normalize(output[2]);
+        glm_vec3_copy(input[0], output[0]);
+        glm_vec3_muladds(output[2], -glm_vec3_dot(output[0], output[2]), output[0]);
+        glm_vec3_normalize(output[0]);
+        glm_vec3_cross(output[2], output[0], output[1]);
+        glm_vec3_copy(input[3], output[3]);
     }
 
-    mat4 inverse;
-    glm_mat4_inv(input, inverse);
-    glm_mat4_transpose(inverse);
-    glm_mat4_identity(output);
-    glm_vec3_copy(inverse[2], output[2]);
-    glm_vec3_normalize(output[2]);
-    glm_vec3_copy(input[0], output[0]);
-    glm_vec3_muladds(output[2], -glm_vec3_dot(output[0], output[2]), output[0]);
-    glm_vec3_normalize(output[0]);
-    glm_vec3_cross(output[2], output[0], output[1]);
-    glm_vec3_copy(input[3], output[3]);
-
-    return true;
+    return ok;
 }
 
+/** Compute the world transform of a node.
+ *
+ * The transform of the parent is combined with the local pose, unless a ManualTransform or a
+ * SpatialAlign decides it.
+ *
+ * @param ctx The layout context
+ * @param n The node
+ * @return Whether the pose could be computed without error
+ */
 static bool pose_solve(
     layout_ctx_t *ctx,
     layout_node_t *n)
 {
+    bool ok = false;
     if (n->pose_state == 2) {
-
-        return !n->error.code;
+        ok = !n->error.code;
+        goto done;
     }
 
     if (n->pose_state == 1) {
-
-        return fail(ctx, n, SpatialCycle, n->entity);
+        fail(ctx, n, SpatialCycle, n->entity);
+        goto done;
     }
 
     n->pose_state = 1;
@@ -854,17 +998,15 @@ static bool pose_solve(
     ecs_entity_t e = n->entity, parent = ecs_get_parent(world, e);
     mat4 base = GLM_MAT4_IDENTITY_INIT, local;
     if (parent) {
-        layout_node_t *p = node_get(ctx, parent);
+        layout_node_t *p = box_spatial_layout_node_get(ctx, parent);
         if (!require(ctx, n, p, pose(ctx, p))) {
-
-            return false;
+            goto done;
         }
 
         glm_mat4_copy(p->pose, base);
         if (ecs_has(world, parent, Distribute)) {
             if (!require(ctx, n, p, arrange(ctx, p))) {
-
-                return false;
+                goto done;
             }
         }
     }
@@ -873,15 +1015,14 @@ static bool pose_solve(
     const SpatialAlign *align = ecs_get(world, e, SpatialAlign);
     const ArrayInstance *instance = ecs_get(world, e, ArrayInstance);
     if (!local_pose(ctx, n, local, true)) {
-
-        return false;
+        goto done;
     }
 
     glm_mat4_mul(base, local, n->pose);
     if (ecs_has_id(world, e, ManualTransform) && !(out && out->manual)) {
         if (align || n->controlled) {
-
-            return fail(ctx, n, SpatialConflictingLayout, e);
+            fail(ctx, n, SpatialConflictingLayout, e);
+            goto done;
         }
 
         const WorldTransform *manual = ecs_get(world, e, WorldTransform);
@@ -895,36 +1036,35 @@ static bool pose_solve(
         layout_node_t *t;
         n->controlled = true;
         if (n->placed || instance) {
-
-            return fail(ctx, n, SpatialConflictingLayout, e);
+            fail(ctx, n, SpatialConflictingLayout, e);
+            goto done;
         }
 
-        if (a.rotation < SpatialKeep || a.rotation > SpatialMatch || !finite3(a.offset) ||
-            !finite3(a.rotation_offset)) {
-
-            return fail(ctx, n, SpatialImpossible, e);
+        if (a.rotation < SpatialKeep || a.rotation > SpatialMatch ||
+            !box_spatial_layout_finite3(a.offset) ||
+            !box_spatial_layout_finite3(a.rotation_offset)) {
+            fail(ctx, n, SpatialImpossible, e);
+            goto done;
         }
 
         if (!target_get(ctx, n, a.target, &t) || !require(ctx, n, t, pose(ctx, t))) {
-
-            return false;
+            goto done;
         }
 
         mat4 self, other, target, frame;
         if (!anchor_frame(ctx, n, a.self, self, true) ||
             !require(ctx, n, t, anchor_frame(ctx, t, a.other, other, true))) {
-
-            return false;
+            goto done;
         }
 
         glm_mat4_mul(t->pose, other, target);
         if (!orthonormal(target, frame)) {
-
-            return fail(ctx, n, SpatialZeroBounds, t->entity);
+            fail(ctx, n, SpatialZeroBounds, t->entity);
+            goto done;
         }
 
         if (!basis(ctx, n, n->pose)) {
-            return false;
+            goto done;
         }
 
         vec3 desired, point;
@@ -934,49 +1074,58 @@ static bool pose_solve(
     }
 
     for (int i = 0; i < 4; i++) {
-        if (!finite3(n->pose[i])) {
-
-            return fail(ctx, n, SpatialImpossible, e);
+        if (!box_spatial_layout_finite3(n->pose[i])) {
+            fail(ctx, n, SpatialImpossible, e);
+            goto done;
         }
     }
 
     n->pose_state = 2;
-
-    return !n->error.code;
+    ok = !n->error.code;
+done:
+    return ok;
 }
 
+/** Place the children of a Distribute node along its axis.
+ *
+ * @param ctx The layout context
+ * @param n The node of the Distribute entity
+ * @return Whether the children could be placed without error
+ */
 static bool arrange_solve(
     layout_ctx_t *ctx,
     layout_node_t *n)
 {
+    bool ok = false;
     if (n->arrange_state == 2) {
-
-        return !n->error.code;
+        ok = !n->error.code;
+        goto done;
     }
 
     if (n->arrange_state == 1) {
-
-        return fail(ctx, n, SpatialCycle, n->entity);
+        fail(ctx, n, SpatialCycle, n->entity);
+        goto done;
     }
 
     n->arrange_state = 1;
     n->arranged = true;
     Distribute d = *ecs_get(ctx->world, n->entity, Distribute);
-    int axis = axis_index(d.axis);
+    int axis = box_spatial_layout_axis_index(d.axis);
     if (axis < 0 || d.span < 0 || d.gap < 0 || !isfinite(d.span) || !isfinite(d.gap) ||
         d.mode < SpatialSpaceBetween || d.mode > SpatialFixedGap ||
         ecs_has(ctx->world, n->entity, Array)) {
-
-        return fail(ctx, n, SpatialImpossible, n->entity);
+        fail(ctx, n, SpatialImpossible, n->entity);
+        goto done;
     }
 
-    ecs_vec_t list = children(ctx->world, n->entity, false);
+    ecs_vec_t list = box_spatial_layout_children(ctx->world, n->entity, false);
     int count = ecs_vec_count(&list);
     float *lo = count ? ecs_os_malloc_n(float, count) : NULL;
     float *hi = count ? ecs_os_malloc_n(float, count) : NULL;
     float total = 0;
     for (int i = 0; i < count; i++) {
-        layout_node_t *c = node_get(ctx, *ecs_vec_get_t(&list, ecs_entity_t, i));
+        layout_node_t *c =
+            box_spatial_layout_node_get(ctx, *ecs_vec_get_t(&list, ecs_entity_t, i));
         if (ecs_has(ctx->world, c->entity, SpatialAlign) || !require(ctx, n, c, bounds(ctx, c))) {
             fail(ctx, n, c->error.code ? c->error.code : SpatialConflictingLayout, c->entity);
             break;
@@ -1016,7 +1165,8 @@ static bool arrange_solve(
         }
 
         for (int i = 0; !n->error.code && i < count; i++) {
-            layout_node_t *c = node_get(ctx, *ecs_vec_get_t(&list, ecs_entity_t, i));
+            layout_node_t *c =
+                box_spatial_layout_node_get(ctx, *ecs_vec_get_t(&list, ecs_entity_t, i));
             c->placement[axis] = cursor - lo[i];
             c->placed = true;
             c->requested = true;
@@ -1028,11 +1178,17 @@ static bool arrange_solve(
     ecs_os_free(hi);
     ecs_vec_fini_t(NULL, &list, ecs_entity_t);
     n->arrange_state = 2;
-
-    return !n->error.code;
+    ok = !n->error.code;
+done:
+    return ok;
 }
 
-/* Every step records the node it is called from as a user of the node it computes. */
+/** Solve the pose of a node, recording the calling node as a user of it.
+ *
+ * @param ctx The layout context
+ * @param n The node
+ * @return Whether the pose could be computed without error
+ */
 static bool pose(
     layout_ctx_t *ctx,
     layout_node_t *n)
@@ -1044,6 +1200,12 @@ static bool pose(
     return ok;
 }
 
+/** Solve the bounds of a node, recording the calling node as a user of it.
+ *
+ * @param ctx The layout context
+ * @param n The node
+ * @return Whether the node has bounds and no error
+ */
 static bool bounds(
     layout_ctx_t *ctx,
     layout_node_t *n)
@@ -1055,6 +1217,12 @@ static bool bounds(
     return ok;
 }
 
+/** Arrange the children of a node, recording the calling node as a user of it.
+ *
+ * @param ctx The layout context
+ * @param n The node of the Distribute entity
+ * @return Whether the children could be placed without error
+ */
 static bool arrange(
     layout_ctx_t *ctx,
     layout_node_t *n)
@@ -1066,6 +1234,12 @@ static bool arrange(
     return ok;
 }
 
+/** Solve the intrinsic bounds of a node, recording the calling node as a user of it.
+ *
+ * @param ctx The layout context
+ * @param n The node
+ * @return Whether the node has intrinsic bounds
+ */
 static bool intrinsic_bounds(
     layout_ctx_t *ctx,
     layout_node_t *n)
@@ -1077,6 +1251,13 @@ static bool intrinsic_bounds(
     return ok;
 }
 
+/** Solve the basis of a node, recording the calling node as a user of it.
+ *
+ * @param ctx The layout context
+ * @param n The node
+ * @param result The basis of the node
+ * @return Whether the basis could be computed without error
+ */
 static bool basis(
     layout_ctx_t *ctx,
     layout_node_t *n,
@@ -1089,8 +1270,12 @@ static bool basis(
     return ok;
 }
 
-static void set_changed(ecs_world_t *world, ecs_entity_t e, ecs_id_t id, size_t size,
-                        const void *value)
+void box_spatial_layout_set_changed(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    ecs_id_t id,
+    size_t size,
+    const void *value)
 {
     const void *old = ecs_get_id(world, e, id);
     if (!old || memcmp(old, value, size)) {
@@ -1098,408 +1283,20 @@ static void set_changed(ecs_world_t *world, ecs_entity_t e, ecs_id_t id, size_t 
     }
 }
 
-static ecs_vec_t collect(
-    ecs_world_t *world,
-    ecs_id_t id)
-{
-    ecs_vec_t result;
-    ecs_vec_init_t(NULL, &result, ecs_entity_t, 0);
-    ecs_iter_t it = ecs_each_id(world, id);
-    while (ecs_each_next(&it)) {
-        for (int i = 0; i < it.count; i++) {
-            *ecs_vec_append_t(NULL, &result, ecs_entity_t) = it.entities[i];
-        }
-    }
-
-    return result;
-}
-
-static void sync_component(
-    ecs_world_t *world,
-    ecs_entity_t dst,
-    ecs_entity_t src,
-    ecs_id_t id)
-{
-    const ecs_type_info_t *ti = ecs_get_type_info(world, id);
-    if (!ti) {
-
-        return;
-    }
-
-    const void *value = ecs_get_id(world, src, id);
-    if (value) {
-        const void *old = ecs_get_id(world, dst, id);
-        if (!old || memcmp(old, value, (size_t)ti->size)) {
-            ecs_set_id(world, dst, id, (size_t)ti->size, value);
-        }
-    } else if (ecs_owns_id(world, dst, id)) {
-        ecs_remove_id(world, dst, id);
-    }
-}
-
-static void sync_prototype(
-    ecs_world_t *world,
-    ecs_entity_t dst,
-    ecs_entity_t src)
-{
-    ecs_id_t ids[] = {ecs_id(Position),   ecs_id(Rotation),       ecs_id(Scale),
-                      ecs_id(Fit),        ecs_id(SpatialAlign),   ecs_id(Array),
-                      ecs_id(Distribute), ecs_id(AttachmentFrame)};
-    for (int i = 0; i < 8; i++) {
-        if (ids[i] == ecs_id(Position) && !ecs_has(world, src, Position)) {
-            continue;
-        }
-
-        sync_component(world, dst, src, ids[i]);
-    }
-
-    const ecs_type_t *type = ecs_get_type(world, src);
-    ecs_vec_t shapes;
-    ecs_vec_init_t(NULL, &shapes, ecs_id_t, 0);
-    for (int i = 0; type && i < type->count; i++) {
-        ecs_id_t id = type->array[i];
-        if (!ECS_IS_PAIR(id) && ecs_has_pair(world, id, EcsWith, ecs_id(ShapeMesh))) {
-            *ecs_vec_append_t(NULL, &shapes, ecs_id_t) = id;
-        }
-    }
-
-    type = ecs_get_type(world, dst);
-    ecs_vec_t removed;
-    ecs_vec_init_t(NULL, &removed, ecs_id_t, 0);
-    for (int i = 0; type && i < type->count; i++) {
-        ecs_id_t id = type->array[i];
-        if (!ECS_IS_PAIR(id) && ecs_has_pair(world, id, EcsWith, ecs_id(ShapeMesh)) &&
-            !ecs_has_id(world, src, id)) {
-            *ecs_vec_append_t(NULL, &removed, ecs_id_t) = id;
-        }
-    }
-
-    for (int i = 0; i < ecs_vec_count(&removed); i++) {
-        ecs_remove_id(world, dst, *ecs_vec_get_t(&removed, ecs_id_t, i));
-    }
-
-    for (int i = 0; i < ecs_vec_count(&shapes); i++) {
-        sync_component(world, dst, src, *ecs_vec_get_t(&shapes, ecs_id_t, i));
-    }
-
-    ecs_vec_fini_t(NULL, &shapes, ecs_id_t);
-    ecs_vec_fini_t(NULL, &removed, ecs_id_t);
-    ecs_vec_t descendants = children(world, src, true);
-    for (int i = 0; i < ecs_vec_count(&descendants); i++) {
-        ecs_entity_t child = *ecs_vec_get_t(&descendants, ecs_entity_t, i);
-        const char *name = ecs_get_name(world, child);
-        char generated[64];
-        if (!name) {
-            ecs_os_snprintf(generated, sizeof(generated), "__prototype_%llu",
-                            (unsigned long long)child);
-            name = generated;
-        }
-
-        ecs_entity_t copy = ecs_lookup_child(world, dst, name);
-        if (!copy) {
-            copy = ecs_entity(world, {.name = name, .parent = dst});
-            ecs_add_pair(world, copy, EcsIsA, child);
-        }
-
-        PrototypeSource source = {child};
-        set_changed(world, copy, ecs_id(PrototypeSource), sizeof(source), &source);
-        sync_prototype(world, copy, child);
-    }
-
-    ecs_vec_fini_t(NULL, &descendants, ecs_entity_t);
-    descendants = children(world, dst, true);
-    for (int i = 0; i < ecs_vec_count(&descendants); i++) {
-        ecs_entity_t copy = *ecs_vec_get_t(&descendants, ecs_entity_t, i);
-        const PrototypeSource *source = ecs_get(world, copy, PrototypeSource);
-        if (source && (!ecs_is_alive(world, source->entity) ||
-                       ecs_get_parent(world, source->entity) != src)) {
-            ecs_delete(world, copy);
-        }
-    }
-
-    ecs_vec_fini_t(NULL, &descendants, ecs_entity_t);
-}
-
-static void prepare_prototype(
-    ecs_world_t *world,
-    ecs_entity_t e)
-{
-    if (!ecs_has_id(world, e, EcsPrefab)) {
-        if (ecs_has(world, e, ShapeMesh) && !ecs_has(world, e, Position)) {
-            ecs_set(world, e, Position, {0});
-        }
-
-        ecs_add_id(world, e, EcsPrefab);
-        ecs_add_id(world, e, ArrayPrototype);
-    }
-
-    ecs_vec_t list = children(world, e, true);
-    for (int i = 0; i < ecs_vec_count(&list); i++) {
-        prepare_prototype(world, *ecs_vec_get_t(&list, ecs_entity_t, i));
-    }
-
-    ecs_vec_fini_t(NULL, &list, ecs_entity_t);
-}
-
-typedef struct array_entry_t {
-    ecs_entity_t entity;
-    int depth;
-} array_entry_t;
-
-static int array_compare(
-    const void *a,
-    const void *b)
-{
-    const array_entry_t *x = a, *y = b;
-
-    return x->depth == y->depth ? entity_compare(&x->entity, &y->entity)
-                                : (x->depth > y->depth) - (x->depth < y->depth);
-}
-
-static ecs_vec_t ordered_arrays(
-    ecs_world_t *world)
-{
-    ecs_vec_t result = collect(world, ecs_id(Array));
-    int count = ecs_vec_count(&result);
-    array_entry_t *entries = count ? ecs_os_malloc_n(array_entry_t, count) : NULL;
-    for (int i = 0; i < count; i++) {
-        ecs_entity_t e = *ecs_vec_get_t(&result, ecs_entity_t, i);
-        entries[i] = (array_entry_t){.entity = e};
-        for (; e; e = ecs_get_parent(world, e)) {
-            entries[i].depth++;
-        }
-    }
-
-    if (count > 1) {
-        qsort(entries, (size_t)count, sizeof(array_entry_t), array_compare);
-    }
-
-    for (int i = 0; i < count; i++) {
-        *ecs_vec_get_t(&result, ecs_entity_t, i) = entries[i].entity;
-    }
-
-    ecs_os_free(entries);
-
-    return result;
-}
-
-static bool root_has(
-    const ecs_vec_t *roots,
-    ecs_entity_t e)
-{
-    int32_t count = ecs_vec_count(roots);
-
-    return count && bsearch(&e, ecs_vec_first(roots), (size_t)count, sizeof(ecs_entity_t),
-                            entity_compare);
-}
-
-static bool under_roots(
-    ecs_world_t *world,
-    const ecs_vec_t *roots,
-    ecs_entity_t e)
-{
-    for (; e; e = ecs_get_parent(world, e)) {
-        if (root_has(roots, e)) {
-
-            return true;
-        }
-    }
-
-    return false;
-}
-
-/* Collect the arrays that contain an entity with changed inputs, so that only their instances
- * are synced with their prototypes. */
-static void array_roots(
-    layout_ctx_t *ctx,
-    int32_t seed_count)
-{
-    ecs_world_t *world = ctx->world;
-    ecs_vec_t *roots = &ctx->roots;
-    ecs_vec_clear(roots);
-    for (int32_t i = 0; i < seed_count; i++) {
-        ecs_entity_t e = *ecs_vec_get_t(&ctx->seeds, ecs_entity_t, i);
-        if (!ecs_is_alive(world, e)) {
-            continue;
-        }
-
-        for (; e; e = ecs_get_parent(world, e)) {
-            if (ecs_owns(world, e, Array)) {
-                *ecs_vec_append_t(NULL, roots, ecs_entity_t) = e;
-            }
-        }
-    }
-
-    int32_t count = ecs_vec_count(roots);
-    if (count > 1) {
-        ecs_entity_t *array = ecs_vec_first(roots);
-        qsort(array, (size_t)count, sizeof(ecs_entity_t), entity_compare);
-        int32_t unique = 1;
-        for (int32_t i = 1; i < count; i++) {
-            if (array[i] != array[unique - 1]) {
-                array[unique++] = array[i];
-            }
-        }
-
-        ecs_vec_set_count_t(NULL, roots, ecs_entity_t, unique);
-    }
-}
-
-static void array_fail(
-    layout_node_t *n,
-    SpatialError code,
-    ecs_entity_t related)
-{
-    if (!n->array_error.code) {
-        n->array_error = (SpatialDiagnostic){code, related};
-    }
-}
-
-static void array_sync(
-    layout_ctx_t *ctx,
-    layout_node_t *n,
-    Array a)
-{
-    ecs_world_t *world = ctx->world;
-    ecs_entity_t e = n->entity;
-    if (axis_index(a.axis) < 0 || a.count < 0 || a.count > 100000 || !isfinite(a.spacing) ||
-        !finite3(a.rotation_step) || !finite3(a.scale_step) || ecs_has(world, e, Distribute)) {
-        array_fail(n, SpatialImpossible, e);
-
-        return;
-    }
-
-    ecs_vec_t current = children(world, e, false);
-    for (int j = 0; j < ecs_vec_count(&current); j++) {
-        ecs_entity_t child = *ecs_vec_get_t(&current, ecs_entity_t, j);
-        const ArrayInstance *instance = ecs_get(world, child, ArrayInstance);
-        if (instance && instance->owner == e && instance->index >= a.count) {
-            ecs_delete(world, child);
-        }
-    }
-
-    ecs_vec_fini_t(NULL, &current, ecs_entity_t);
-    ecs_vec_t prototypes = children(world, e, true);
-    for (int p = 0; p < ecs_vec_count(&prototypes); p++) {
-        ecs_entity_t prototype = *ecs_vec_get_t(&prototypes, ecs_entity_t, p);
-        prepare_prototype(world, prototype);
-        for (int index = 0; index < a.count; index++) {
-            char name[96];
-            ecs_os_snprintf(name, sizeof(name), "__array_%llu_%d", (unsigned long long)prototype,
-                            index);
-            ecs_entity_t instance = ecs_lookup_child(world, e, name);
-            if (!instance) {
-                instance = ecs_entity(world, {.name = name, .parent = e});
-                ecs_add_pair(world, instance, EcsIsA, prototype);
-                ecs_set(world, instance, ArrayInstance, {e, prototype, index});
-            }
-
-            const ArrayInstance *identity = ecs_get(world, instance, ArrayInstance);
-            if (!identity || identity->owner != e || identity->prototype != prototype ||
-                identity->index != index) {
-                array_fail(n, SpatialConflictingLayout, instance);
-                continue;
-            }
-
-            sync_prototype(world, instance, prototype);
-        }
-    }
-
-    ecs_vec_fini_t(NULL, &prototypes, ecs_entity_t);
-}
-
-static void arrays(
-    layout_ctx_t *ctx,
-    int32_t seed_count)
-{
-    ecs_world_t *world = ctx->world;
-    array_roots(ctx, seed_count);
-    if (!ecs_vec_count(&ctx->roots) && !ctx->arrays_dirty) {
-
-        return;
-    }
-
-    ctx->arrays_dirty = false;
-    ecs_vec_t instances = collect(world, ecs_id(ArrayInstance));
-    for (int i = 0; i < ecs_vec_count(&instances); i++) {
-        ecs_entity_t e = *ecs_vec_get_t(&instances, ecs_entity_t, i);
-        if (!ecs_is_alive(world, e)) {
-            continue;
-        }
-
-        ArrayInstance instance = *ecs_get(world, e, ArrayInstance);
-        const Array *a =
-            ecs_is_alive(world, instance.owner) ? ecs_get(world, instance.owner, Array) : NULL;
-        if (!a || instance.index >= a->count || !ecs_is_alive(world, instance.prototype) ||
-            ecs_get_parent(world, instance.prototype) != instance.owner) {
-            ecs_delete(world, e);
-        }
-    }
-
-    ecs_vec_fini_t(NULL, &instances, ecs_entity_t);
-    ecs_vec_t list;
-    bool pending = true;
-    while (pending) {
-        pending = false;
-        list = ordered_arrays(world);
-        for (int i = 0; i < ecs_vec_count(&list); i++) {
-            ecs_entity_t e = *ecs_vec_get_t(&list, ecs_entity_t, i);
-            if (!ecs_is_alive(world, e) || ecs_has_id(world, e, EcsPrefab) ||
-                !under_roots(world, &ctx->roots, e)) {
-                continue;
-            }
-
-            Array a = *ecs_get(world, e, Array);
-            layout_node_t *n = node_get(ctx, e);
-            if (n->array_epoch == ctx->epoch) {
-                continue;
-            }
-
-            n->array_epoch = ctx->epoch;
-            pending = true;
-            ctx->synced++;
-            SpatialDiagnostic previous = n->array_error;
-            n->array_error = (SpatialDiagnostic){0};
-            array_sync(ctx, n, a);
-            if (n->epoch == ctx->epoch) {
-                // Created in this pass and not solved yet
-                n->error = n->array_error;
-            } else if (previous.code != n->array_error.code ||
-                       previous.related != n->array_error.related) {
-                *ecs_vec_append_t(NULL, &ctx->seeds, ecs_entity_t) = e;
-            }
-        }
-
-        ecs_vec_fini_t(NULL, &list, ecs_entity_t);
-    }
-
-    list = collect(world, ArrayPrototype);
-    for (int i = 0; i < ecs_vec_count(&list); i++) {
-        ecs_entity_t e = *ecs_vec_get_t(&list, ecs_entity_t, i), parent = ecs_get_parent(world, e);
-        while (parent && !ecs_has(world, parent, Array)) {
-            parent = ecs_get_parent(world, parent);
-        }
-
-        if (!parent) {
-            ecs_remove_id(world, e, EcsPrefab);
-            ecs_remove_id(world, e, ArrayPrototype);
-        }
-    }
-
-    ecs_vec_fini_t(NULL, &list, ecs_entity_t);
-}
-
+/** Write the results of a solved node to its entity.
+ *
+ * Writes the fitted scale, the transform, the resolved bounds and the diagnostic, and removes
+ * what the layout wrote before when the entity is no longer managed. The entity must be alive.
+ *
+ * @param ctx The layout context
+ * @param n The node
+ */
 static void publish(
     layout_ctx_t *ctx,
     layout_node_t *n)
 {
     ecs_world_t *world = ctx->world;
     ecs_entity_t e = n->entity;
-    if (!ecs_is_alive(world, e)) {
-
-        return;
-    }
-
     bool managed = ecs_has(world, e, Fit) || ecs_has(world, e, SpatialAlign) ||
                    ecs_has(world, e, Array) || ecs_has(world, e, Distribute) ||
                    ecs_has(world, e, ArrayInstance) || n->placed;
@@ -1537,7 +1334,8 @@ static void publish(
 
         WorldTransform transform;
         glm_mat4_copy(n->pose, transform.m);
-        set_changed(world, e, ecs_id(WorldTransform), sizeof(transform), &transform);
+        box_spatial_layout_set_changed(
+            world, e, ecs_id(WorldTransform), sizeof(transform), &transform);
     } else if (out.manual) {
         ecs_remove_id(world, e, ManualTransform);
         if (ecs_has(world, e, Position)) {
@@ -1550,7 +1348,7 @@ static void publish(
     }
 
     if (managed) {
-        set_changed(world, e, ecs_id(LayoutOutput), sizeof(out), &out);
+        box_spatial_layout_set_changed(world, e, ecs_id(LayoutOutput), sizeof(out), &out);
     } else {
         ecs_remove(world, e, LayoutOutput);
     }
@@ -1562,8 +1360,10 @@ static void publish(
         glm_vec3_copy(n->intrinsic_max, intrinsic.max);
         glm_vec3_copy(n->min, resolved.min);
         glm_vec3_copy(n->max, resolved.max);
-        set_changed(world, e, ecs_id(IntrinsicBounds), sizeof(intrinsic), &intrinsic);
-        set_changed(world, e, ecs_id(ResolvedBounds), sizeof(resolved), &resolved);
+        box_spatial_layout_set_changed(
+            world, e, ecs_id(IntrinsicBounds), sizeof(intrinsic), &intrinsic);
+        box_spatial_layout_set_changed(
+            world, e, ecs_id(ResolvedBounds), sizeof(resolved), &resolved);
     } else {
         ecs_remove(world, e, IntrinsicBounds);
         ecs_remove(world, e, ResolvedBounds);
@@ -1572,7 +1372,7 @@ static void publish(
     const Box *box = ecs_get(world, e, Box);
     if (box && fitted) {
         ResolvedBox result = {box->x * n->fit[0], box->y * n->fit[1], box->z * n->fit[2]};
-        set_changed(world, e, ecs_id(ResolvedBox), sizeof(result), &result);
+        box_spatial_layout_set_changed(world, e, ecs_id(ResolvedBox), sizeof(result), &result);
     } else {
         ecs_remove(world, e, ResolvedBox);
     }
@@ -1599,6 +1399,11 @@ static void publish(
     }
 }
 
+/** Add a node to the nodes invalidated in the current pass.
+ *
+ * @param ctx The layout context
+ * @param n The node
+ */
 static void mark(
     layout_ctx_t *ctx,
     layout_node_t *n)
@@ -1609,9 +1414,13 @@ static void mark(
     }
 }
 
-/* Fill the users of every node, by node index: the users of node i are users[offsets[i + 1]] up
- * to users[offsets[i + 2]]. offsets[i + 1] counts up to the end of the range of node i and is
- * counted down while the range is filled. */
+/** Fill the users of every node, by node index.
+ *
+ * The users of node i are users[offsets[i + 1]] up to users[offsets[i + 2]]. offsets[i + 1]
+ * counts up to the end of the range of node i and is counted down while the range is filled.
+ *
+ * @param ctx The layout context
+ */
 static void users_build(
     layout_ctx_t *ctx)
 {
@@ -1643,8 +1452,14 @@ static void users_build(
     }
 }
 
-/* Reset the nodes of the entities with changed inputs and every node that read from a reset
- * node, so that they are solved and published again. Nodes of deleted entities are removed. */
+/** Reset the nodes of the entities with changed inputs and every node that read from them.
+ *
+ * Reset nodes are solved and published again, and nodes of deleted entities are removed. The
+ * children of a distribution are reset with it, as they do not read from it while placed by an
+ * arrange of an earlier pass.
+ *
+ * @param ctx The layout context
+ */
 static void invalidate(
     layout_ctx_t *ctx)
 {
@@ -1672,8 +1487,6 @@ static void invalidate(
             mark(ctx, list[users[u]]);
         }
 
-        // A distribution places its children, which do not read from it while they are placed
-        // by an arrange of an earlier pass.
         ecs_entity_t e = n->entity;
         if (ecs_is_alive(world, e) && (n->arranged || ecs_has(world, e, Distribute))) {
             ecs_iter_t it = ecs_children(world, e);
@@ -1701,13 +1514,18 @@ static void invalidate(
     for (int32_t i = 0; i < seed_count; i++) {
         ecs_entity_t e = seeds[i];
         if (!ecs_map_get(&ctx->nodes, e) && ecs_is_alive(world, e) && wants(world, e)) {
-            node_get(ctx, e);
+            box_spatial_layout_node_get(ctx, e);
         }
     }
 
     ecs_vec_clear(&ctx->seeds);
 }
 
+/** Test whether a world has layout rules or layout output.
+ *
+ * @param world The world
+ * @return Whether an entity has a layout rule or layout output
+ */
 static bool layout_used(
     ecs_world_t *world)
 {
@@ -1719,40 +1537,35 @@ static bool layout_used(
 bool box_spatial_layout_update(
     ecs_world_t *world)
 {
+    bool ok = true;
     const LayoutContext *singleton = ecs_singleton_get(world, LayoutContext);
     if (!singleton) {
-
-        return true;
+        goto done;
     }
 
     layout_ctx_t *ctx = singleton->ptr;
     if (ctx->writing) {
-
-        return false;
+        ok = false;
+        goto done;
     }
 
     ctx->solved = 0;
     ctx->synced = 0;
     if (!ecs_vec_count(&ctx->seeds) && !ecs_vec_count(&ctx->dynamic) && !ctx->arrays_dirty) {
-
-        return ctx->ok;
+        ok = ctx->ok;
+        goto done;
     }
 
     if (!ecs_map_count(&ctx->nodes) && !ctx->arrays_dirty && !layout_used(world)) {
-        // Changes of a world without layout rules: an entity that gets a rule is recorded then.
         ecs_vec_clear(&ctx->seeds);
         ecs_vec_clear(&ctx->dynamic);
         ctx->active = false;
         ctx->ok = true;
-
-        return true;
+        goto done;
     }
 
     ctx->epoch++;
     ecs_vec_clear(&ctx->frame);
-
-    // DynamicTransform entities move without change events, so what follows them is solved again
-    // every pass. Nodes reset in this pass add their entity again.
     int32_t seed_count = ecs_vec_count(&ctx->seeds);
     for (int32_t i = 0; i < ecs_vec_count(&ctx->dynamic); i++) {
         *ecs_vec_append_t(NULL, &ctx->seeds, ecs_entity_t) =
@@ -1760,12 +1573,11 @@ bool box_spatial_layout_update(
     }
 
     ecs_vec_clear(&ctx->dynamic);
-    arrays(ctx, seed_count);
+    box_spatial_layout_arrays(ctx, seed_count);
     invalidate(ctx);
     if (!ecs_vec_count(&ctx->frame) && !ecs_vec_count(&ctx->queue)) {
-        // Only entities outside the layout changed
-
-        return ctx->ok;
+        ok = ctx->ok;
+        goto done;
     }
 
     for (int pass = 0; pass < 2; pass++) {
@@ -1787,7 +1599,7 @@ bool box_spatial_layout_update(
     ctx->writing = true;
     for (int32_t i = 0; i < ecs_vec_count(&ctx->frame); i++) {
         layout_node_t *n = *ecs_vec_get_t(&ctx->frame, layout_node_t *, i);
-        if (n->requested) {
+        if (n->requested && ecs_is_alive(world, n->entity)) {
             publish(ctx, n);
         }
     }
@@ -1805,7 +1617,9 @@ bool box_spatial_layout_update(
         }
     }
 
-    return ctx->ok;
+    ok = ctx->ok;
+done:
+    return ok;
 }
 
 void box_spatial_layout_stats(
@@ -1821,26 +1635,34 @@ void box_spatial_layout_stats(
     }
 }
 
+/** Observer that keeps the source scale of a fitted shape when the shape is set by the user.
+ *
+ * @param it The iterator
+ */
 static void shape_changed(
     ecs_iter_t *it)
 {
     layout_ctx_t *ctx = it->ctx;
-    if (ctx->writing) {
-
-        return;
-    }
-
-    for (int i = 0; i < it->count; i++) {
-        LayoutOutput *out = ecs_get_mut(it->world, it->entities[i], LayoutOutput);
-        const ShapeMesh *shape = ecs_get(it->world, it->entities[i], ShapeMesh);
-        if (out && shape) {
-            glm_vec3_copy(ECS_CONST_CAST(float *, shape->scale), out->source_scale);
+    if (!ctx->writing) {
+        for (int i = 0; i < it->count; i++) {
+            LayoutOutput *out = ecs_get_mut(it->world, it->entities[i], LayoutOutput);
+            const ShapeMesh *shape = ecs_get(it->world, it->entities[i], ShapeMesh);
+            if (out && shape) {
+                glm_vec3_copy(ECS_CONST_CAST(float *, shape->scale), out->source_scale);
+            }
         }
     }
 }
 
-/* The parent of an entity while its hierarchy changes: a Parent component is added before its
- * value is assigned, and points to a parent that is being deleted while its children are. */
+/** Get the parent of an entity while its hierarchy changes.
+ *
+ * A Parent component is added before its value is assigned, and points to a parent that is
+ * being deleted while its children are.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return The parent of the entity, 0 when it has none or its parent is not alive
+ */
 static ecs_entity_t event_parent(
     ecs_world_t *world,
     ecs_entity_t e)
@@ -1850,9 +1672,14 @@ static ecs_entity_t event_parent(
     return !p ? ecs_get_parent(world, e) : p->value && ecs_is_alive(world, p->value) ? p->value : 0;
 }
 
-/* Record the entities whose layout inputs changed. Adding or removing a component or a pair
- * also changes the children the parent of the entity measures or lays out, and so does setting
- * the Parent component. */
+/** Observer that records the entities whose layout inputs changed.
+ *
+ * Adding or removing a component or a pair also changes the children the parent of the entity
+ * measures or lays out, and so does setting the Parent component. Until an entity gets a layout
+ * rule nothing is solved, and nothing needs to be recorded.
+ *
+ * @param it The iterator
+ */
 static void input_changed(
     ecs_iter_t *it)
 {
@@ -1863,56 +1690,64 @@ static void input_changed(
         ctx->arrays_dirty = true;
     }
 
-    // Until an entity gets a layout rule nothing is solved, and nothing needs to be recorded.
     ctx->active |= id == ecs_id(Fit) || id == ecs_id(SpatialAlign) || id == ecs_id(Array) ||
                    id == ecs_id(Distribute) || id == ecs_id(ArrayInstance);
-    if (!ctx->active) {
-
-        return;
-    }
-
-    for (int i = 0; i < it->count; i++) {
-        ecs_entity_t e = it->entities[i];
-        *ecs_vec_append_t(NULL, &ctx->seeds, ecs_entity_t) = e;
-        ecs_entity_t parent = structure ? event_parent(it->world, e) : 0;
-        if (parent) {
-            *ecs_vec_append_t(NULL, &ctx->seeds, ecs_entity_t) = parent;
+    if (ctx->active) {
+        for (int i = 0; i < it->count; i++) {
+            ecs_entity_t e = it->entities[i];
+            *ecs_vec_append_t(NULL, &ctx->seeds, ecs_entity_t) = e;
+            ecs_entity_t parent = structure ? event_parent(it->world, e) : 0;
+            if (parent) {
+                *ecs_vec_append_t(NULL, &ctx->seeds, ecs_entity_t) = parent;
+            }
         }
     }
 }
 
+/** System that solves the layout.
+ *
+ * @param it The iterator
+ */
 static void layout_run(
     ecs_iter_t *it)
 {
     box_spatial_layout_update(it->world);
 }
 
+/** Release a reference to the layout context, freeing it with the last reference.
+ *
+ * @param ptr The layout context
+ */
 static void layout_free(
     void *ptr)
 {
     layout_ctx_t *ctx = ptr;
-    if (--ctx->refs) {
+    if (--ctx->refs == 0) {
+        ecs_map_iter_t it = ecs_map_iter(&ctx->nodes);
+        while (ecs_map_next(&it)) {
+            node_free(ecs_map_ptr(&it));
+        }
 
-        return;
+        ecs_map_fini(&ctx->nodes);
+        ecs_vec_fini_t(NULL, &ctx->list, layout_node_t *);
+        ecs_vec_fini_t(NULL, &ctx->frame, layout_node_t *);
+        ecs_vec_fini_t(NULL, &ctx->seeds, ecs_entity_t);
+        ecs_vec_fini_t(NULL, &ctx->dynamic, ecs_entity_t);
+        ecs_vec_fini_t(NULL, &ctx->queue, layout_node_t *);
+        ecs_vec_fini_t(NULL, &ctx->offsets, int32_t);
+        ecs_vec_fini_t(NULL, &ctx->users, int32_t);
+        ecs_vec_fini_t(NULL, &ctx->roots, ecs_entity_t);
+        ecs_os_free(ctx);
     }
-
-    ecs_map_iter_t it = ecs_map_iter(&ctx->nodes);
-    while (ecs_map_next(&it)) {
-        node_free(ecs_map_ptr(&it));
-    }
-
-    ecs_map_fini(&ctx->nodes);
-    ecs_vec_fini_t(NULL, &ctx->list, layout_node_t *);
-    ecs_vec_fini_t(NULL, &ctx->frame, layout_node_t *);
-    ecs_vec_fini_t(NULL, &ctx->seeds, ecs_entity_t);
-    ecs_vec_fini_t(NULL, &ctx->dynamic, ecs_entity_t);
-    ecs_vec_fini_t(NULL, &ctx->queue, layout_node_t *);
-    ecs_vec_fini_t(NULL, &ctx->offsets, int32_t);
-    ecs_vec_fini_t(NULL, &ctx->users, int32_t);
-    ecs_vec_fini_t(NULL, &ctx->roots, ecs_entity_t);
-    ecs_os_free(ctx);
 }
 
+/** Create an observer that records changes of a layout input.
+ *
+ * @param world The world
+ * @param ctx The layout context
+ * @param id The input
+ * @param set Whether setting the input is a change, besides adding and removing it
+ */
 static void observe(
     ecs_world_t *world,
     layout_ctx_t *ctx,
@@ -1964,8 +1799,6 @@ void box_spatial_layout_init(
                          .ctx = ctx,
                          .ctx_free = layout_free});
     ctx->refs++;
-
-    // Inputs of the layout: the entities they change are solved and published again.
     ecs_id_t components[] = {ecs_id(Fit),        ecs_id(SpatialAlign),    ecs_id(Array),
                              ecs_id(Distribute), ecs_id(AttachmentFrame), ecs_id(ArrayInstance),
                              ecs_id(Position),   ecs_id(Rotation),        ecs_id(Scale),
@@ -1981,7 +1814,6 @@ void box_spatial_layout_init(
         observe(world, ctx, tags[i], false);
     }
 
-    // The layout reads the WorldTransform of a ManualTransform entity it does not place.
     ecs_observer(world, {.query.terms = {{.id = ecs_id(WorldTransform)},
                                          {.id = ManualTransform, .inout = EcsInOutFilter}},
                          .query.flags = EcsQueryMatchPrefab | EcsQueryMatchDisabled,

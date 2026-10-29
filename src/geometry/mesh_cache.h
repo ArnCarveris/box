@@ -17,7 +17,7 @@ typedef struct box_mesh_cache_t box_mesh_cache_t;
 
 /** Registered shape */
 typedef struct box_shape_t {
-    const ecs_world_t *world;
+    const ecs_world_t *world; /**< World passed to the world-aware shape callbacks */
     box_shape_desc_t desc;   /**< Registration */
     ecs_size_t size;         /**< Size of the shape component */
     box_mesh_cache_t *cache; /**< Cache the shape resolves through */
@@ -26,11 +26,11 @@ typedef struct box_shape_t {
 /** Mesh and instance scale an entity's shape resolved to; holds a reference to the mesh */
 typedef struct ShapeMesh {
     uint32_t mesh; /**< Mesh handle, 0 for none */
-    uint32_t render_mesh;
+    uint32_t render_mesh; /**< Mesh with surface positions resolved on the CPU, 0 for none */
     vec3 scale;    /**< Instance scale applied to the unit mesh */
-    box_surface_data_t surface;
-    vec3 min;
-    vec3 max;
+    box_surface_data_t surface; /**< Parameters of a parametric surface, p[0][0] is 0 for none */
+    vec3 min;      /**< Minimum of the local bounds of a parametric surface */
+    vec3 max;      /**< Maximum of the local bounds of a parametric surface */
 } ShapeMesh;
 
 /** Component id of ShapeMesh */

@@ -35,14 +35,14 @@ ECS_STRUCT(EnvironmentSettings, {
                              *   clear color */
 });
 
-/** Light settings for a view */
+/** Light settings for a view.
+ *
+ * A lit view whose camera has a depth range draws its opaque and alpha tested 3D meshes into the
+ * depth buffer first (two prepasses when it culls by occlusion), then shades them once per pixel
+ * with an Equal depth test; an unlit view shades every opaque fragment passing the depth test.
+ */
 ECS_STRUCT(LightSettings, {
-    bool enabled;           /**< Enable lighting for the view. A lit view whose camera has a
-                             *   depth range draws its opaque and alpha tested 3D meshes
-                             *   into the depth buffer first (a depth prepass, two for a
-                             *   view that culls by occlusion), then shades them once per
-                             *   pixel with an Equal depth test; an unlit view shades every
-                             *   opaque fragment that passes the depth test as it draws */
+    bool enabled;           /**< Enable lighting for the view */
     bool baked;             /**< Sample the baked lighting of the scene, View ctor sets true */
     bool reflections;       /**< Sample the reflection probes of the scene, View ctor sets
                              *   true */
@@ -51,7 +51,7 @@ ECS_STRUCT(LightSettings, {
                              *   ctor sets true */
     EnvironmentSettings environment; /**< Environment the view is lit with, used only when
                                       *   the view is lit */
-    ecs_entity_t scene;
+    ecs_entity_t scene;     /**< Scene whose lights and shadows light the view, 0 for its own */
 });
 
 /** Shadow settings of a view: the cascades of the first directional light of its scene and the
