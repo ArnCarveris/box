@@ -23,15 +23,6 @@
 /** Background of the body of the panel in the dark theme */
 static const unsigned char editor_background[3] = {32, 35, 41};
 
-/** Create a headless world with a game view that clears to blue and a surface that is written
- * to a file.
- *
- * @param file Name of the PNG in the temporary folder
- * @param width Width of the surface
- * @param height Height of the surface
- * @param game Receives the game view, NULL to ignore
- * @return The world
- */
 /** Test whether an entity is a scope or below it.
  *
  * @param world The world
@@ -52,6 +43,15 @@ static bool editor_in_scope(
     return root != 0 && e == root;
 }
 
+/** Create a headless world with a game view that clears to blue and a surface that is written
+ * to a file.
+ *
+ * @param file Name of the PNG in the temporary folder
+ * @param width Width of the surface
+ * @param height Height of the surface
+ * @param game Receives the game view, NULL to ignore
+ * @return The world
+ */
 static ecs_world_t* editor_world(
     const char *file,
     int32_t width,

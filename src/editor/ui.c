@@ -43,6 +43,7 @@ static void box_editor_script_load(
     const EcsScript *loaded;
     if (!path) {
         ecs_warn("box.editor: %s not found, the editor is empty", BOX_EDITOR_SCRIPT_PATH);
+        ed->missing = true;
         goto done;
     }
 
@@ -60,6 +61,7 @@ static void box_editor_script_load(
     }
 
     ed->script = script;
+    ed->missing = false;
     ecs_os_free(ed->path);
     ed->path = path;
     path = NULL;
@@ -107,6 +109,10 @@ void box_editor_script_sync(
     ecs_world_t *world,
     box_editor_t *ed)
 {
+    if (!ed->script && ed->missing) {
+        goto done;
+    }
+
     if (!ed->script || !ecs_is_alive(world, ed->script)) {
         if (ed->script && ed->watch) {
             box_file_watch_clear(world, ed->watch, ed->script);
@@ -119,6 +125,9 @@ void box_editor_script_sync(
         ed->reload = false;
         box_editor_script_reload(world, ed);
     }
+
+done:
+    return;
 }
 
 void box_editor_ui_build(

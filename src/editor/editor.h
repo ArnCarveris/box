@@ -26,6 +26,7 @@ typedef struct box_editor_t {
     char *path;                 /**< Path the script was found at, NULL before it loads */
     int32_t watch;              /**< Id of the file watch kind of the script, 0 without box.app */
     bool reload;                /**< The script changed on disk since the last update */
+    bool missing;               /**< The script was not found since the editor opened */
     bool shown;                 /**< The content is shown */
     bool relayout;              /**< Editor or surface size changed since the last sync */
     ecs_entity_t surface;       /**< Surface the content fills, 0 while the world has none */
@@ -54,6 +55,8 @@ ecs_entity_t box_editor_scope(
     box_editor_t *ed);
 
 /** Load etc/editor/editor.flecs when it did not load yet, and load it again when it changed.
+ *
+ * A file that was not found is not looked for again until the editor opens again.
  *
  * @param world The world
  * @param ed The editor state

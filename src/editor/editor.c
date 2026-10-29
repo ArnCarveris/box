@@ -132,6 +132,7 @@ static void box_editor_show(
     ecs_world_t *world,
     box_editor_t *ed)
 {
+    ed->missing = false;
     box_editor_script_sync(world, ed);
     box_editor_ui_build(world, ed);
     box_editor_view_create(world, ed);
