@@ -10,7 +10,7 @@ using box.particle
 using box.material
 
 template BeamSparks {
-  prop color: rgb = {240, 96, 172}
+  prop color: rgb = {248, 165, 214}
   prop rate: f32 = 180
   prop peak: f32 = 5
   prop radius: f32 = 5.5
@@ -33,7 +33,7 @@ template BeamSparks {
     radial: {3.2, 3.2},
     lifetime: {0.24, 0.44},
     size: {0.07, 0.17},
-    color: {255, 250, 252},
+    color: {255, 253, 254},
     seed: 231
   }
   ParticlePlayback: {state: ParticleStopped}
@@ -50,9 +50,9 @@ template BeamSparks {
     opacity: {1, 0.95, 0.44, 0},
     color: {
       start: {255, 255, 255},
-      early: {234, 95, 170},
-      late: {177, 63, 125},
-      end: {120, 31, 81}
+      early: {246, 164, 213},
+      late: {217, 136, 186},
+      end: {182, 98, 153}
     }
   }
 }

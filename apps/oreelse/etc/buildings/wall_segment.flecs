@@ -8,10 +8,10 @@ using box.transform
 using box.geometry
 using box.material
 
-const steelShade: Rgb = {112, 120, 136}
-const steelDeep: Rgb = {56, 62, 76}
-const concrete: Rgb = {126, 122, 114}
-const concreteShade: Rgb = {88, 86, 82}
+const steelShade: Rgb = {177, 182, 193}
+const steelDeep: Rgb = {129, 135, 148}
+const concrete: Rgb = {187, 184, 178}
+const concreteShade: Rgb = {159, 157, 154}
 
 prefab WallSegment {
   plinth {

@@ -6,7 +6,7 @@
 using box.geometry
 using box.material
 
-const beamPink: Rgb = {248, 108, 178}
+const beamPink: Rgb = {252, 174, 218}
 
 prefab LaserBeam {
   Box: {0.1, 0.1, 1}

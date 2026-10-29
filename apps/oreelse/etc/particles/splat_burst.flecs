@@ -24,7 +24,7 @@ prefab SplatBurst {
       size: {0.065, 0.175},
       rotation: {-180, 180},
       spin: {-229, 229},
-      color: {138, 226, 118},
+      color: {194, 242, 181},
       seed: 227
     }
     ParticleBurst: {count: 22}
@@ -41,9 +41,9 @@ prefab SplatBurst {
       opacity: {1, 0.96, 0.69, 0},
       color: {
         start: {255, 255, 255},
-        early: {210, 225, 210},
-        late: {166, 185, 167},
-        end: {121, 138, 125}
+        early: {234, 241, 234},
+        late: {211, 221, 212},
+        end: {183, 194, 186}
       }
     }
   }

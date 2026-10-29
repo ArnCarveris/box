@@ -7,7 +7,9 @@ using box.material
 using box.texture
 
 solar_tex {
-  TexturePath: {path: "apps/oreelse/etc/assets/solar_cells.svg", width: 256, height: 256}
+  TexturePath: {
+    path: "apps/oreelse/etc/assets/solar_cells.svg", width: 256, height: 256, linear: true
+  }
 }
 
 prefab SolarCells {

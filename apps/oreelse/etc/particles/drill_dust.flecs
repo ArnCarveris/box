@@ -8,7 +8,7 @@ using box.particle
 template DrillDust {
   prop rate: f32 = 26
   prop size: f32 = 0.24
-  prop color: rgb = {192, 150, 108}
+  prop color: rgb = {225, 202, 174}
 
   // The stream: 26 a second into the fx pool, from a disc of 0.2, at {0, 0.9, 0} +-
   // {0.18, 0.16, 0.18}, radial 2.6, living 0.7 +- 0.2 s, sized 0.24 +- 0.05 growing 0.42 a
@@ -43,9 +43,9 @@ template DrillDust {
     opacity: {0.9, 0.53, 0.23, 0},
     color: {
       start: {255, 255, 255},
-      early: {228, 227, 234},
-      late: {215, 216, 227},
-      end: {203, 206, 220}
+      early: {243, 242, 246},
+      late: {237, 237, 242},
+      end: {231, 232, 239}
     }
   }
 }

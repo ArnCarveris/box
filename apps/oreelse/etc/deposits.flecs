@@ -15,14 +15,14 @@ const rng: Rng = {seed: oreelse.seed(1)}
 const centerRng: Rng = {seed: oreelse.seed(2)}
 
 // The look of each ore: the tint of the chunks, the tint of the pad and the slabs, the glow
-const ironTint: Rgb = {84, 138, 210}
-const ironPad: Rgb = {66, 66, 74}
-const copperTint: Rgb = {244, 138, 46}
-const copperPad: Rgb = {78, 62, 52}
-const stoneTint: Rgb = {186, 184, 180}
-const stonePad: Rgb = {82, 76, 70}
-const luminiteTint: Rgb = {84, 240, 216}
-const luminitePad: Rgb = {50, 68, 72}
+const ironTint: Rgb = {155, 194, 234}
+const ironPad: Rgb = {139, 139, 147}
+const copperTint: Rgb = {250, 194, 118}
+const copperPad: Rgb = {150, 135, 125}
+const stoneTint: Rgb = {222, 221, 219}
+const stonePad: Rgb = {154, 148, 143}
+const luminiteTint: Rgb = {155, 248, 237}
+const luminitePad: Rgb = {122, 141, 145}
 
 deposits {
   OreRunScript

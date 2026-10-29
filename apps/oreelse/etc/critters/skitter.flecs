@@ -11,10 +11,10 @@ using box.geometry
 using box.material
 using oreelse
 
-const chitin: Rgb = {104, 78, 148}
-const chitinDark: Rgb = {62, 44, 92}
-const chitinLimb: Rgb = {46, 34, 68}
-const skitterEye: Rgb = {255, 196, 72}
+const chitin: Rgb = {171, 150, 200}
+const chitinDark: Rgb = {135, 115, 162}
+const chitinLimb: Rgb = {118, 102, 141}
+const skitterEye: Rgb = {255, 227, 145}
 
 prefab Skitter {
   OreHealth: {value: 50, max: 50}

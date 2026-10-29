@@ -15,6 +15,7 @@ frames the commands take.
 """
 import math
 
+from box_client import srgb
 from oreelse_critters import (FPS, WAVE, critters, hold_waves, measure, place_player, position,
                               rows_of, run_script, set_state, spawn, start, wait_until, waves)
 
@@ -42,7 +43,7 @@ CORPSE_CAP = 100
 TIP = (1.1, 1.3)
 ROLL = 0.4
 SQUASH = 0.55
-CHAR = {"r": 40, "g": 36, "b": 34, "a": 255}
+CHAR = dict(zip("rgba", srgb((40, 36, 34)) + (255,)))
 MITE_DEPTH = 2 * MITE_RADIUS + 1
 
 INDEX = "oreelse.OreCritterIndex"

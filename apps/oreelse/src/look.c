@@ -1,13 +1,19 @@
 /**
  * @file look.c
  * @brief The look: the render quality tier of OreQuality applied to the surfaces and the world
- * view, and the script function oreelse.cycleQuality() the pause screen's button calls.
+ * view, the script function oreelse.cycleQuality() the pause screen's button calls, and the
+ * script function oreelse.srgb() of the colors computed in script.
  *
  * The settings of every tier are cfg.quality (etc/config.flecs). The tier starts High at every
  * start of the app (oreelse.flecs) and a restart keeps it.
+ *
+ * The original reads a color byte as linear light, box decodes it from sRGB, so the port's colors
+ * are the sRGB encoding of the original's (README.md, Colors); a color computed in script
+ * computes the original's bytes and encodes them with srgb().
  */
 
 #include "game.h"
+#include <math.h>
 
 /** Set a float when it differs.
  *
@@ -144,6 +150,29 @@ static void ore_cycle_quality(
     ore_resolve(future, quality != NULL);
 }
 
+/** The oreelse.srgb(v) script function: the byte value from 0 to 255 box decodes to the linear
+ * light v / 255 of a color byte v of the original, not rounded: the conversion of
+ * tools/linear_colors.py for the colors computed in script.
+ *
+ * @param ctx Call context
+ * @param argc Number of arguments
+ * @param argv The linear byte value
+ * @param result Receives the sRGB encoded byte value
+ */
+static void ore_srgb_function(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_value_t *result)
+{
+    double c = *(double*)argv[0].ptr / 255.0;
+    (void)ctx;
+    (void)argc;
+    c = c < 0.0 ? 0.0 : (c > 1.0 ? 1.0 : c);
+    c = c <= 0.0031308 ? c * 12.92 : 1.055 * pow(c, 1.0 / 2.4) - 0.055;
+    *(double*)result->ptr = c * 255.0;
+}
+
 void ore_look_import(
     ecs_world_t *world)
 {
@@ -165,4 +194,13 @@ void ore_look_import(
         .return_type = ecs_id(ecs_bool_t),
         .callback = ore_cycle_quality
     });
+
+    ecs_function(world, {
+        .name = "srgb",
+        .parent = module,
+        .return_type = ecs_id(ecs_f64_t),
+        .params = {{ .name = "value", .type = ecs_id(ecs_f64_t) }},
+        .callback = ore_srgb_function
+    });
+
 }

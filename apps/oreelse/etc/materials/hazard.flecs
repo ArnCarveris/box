@@ -10,7 +10,9 @@ using box.material
 using box.texture
 
 hazard_tex {
-  TexturePath: {path: "apps/oreelse/etc/assets/hazard_stripes.svg", width: 256, height: 256}
+  TexturePath: {
+    path: "apps/oreelse/etc/assets/hazard_stripes.svg", width: 256, height: 256, linear: true
+  }
 }
 
 prefab HazardTag {

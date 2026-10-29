@@ -11,7 +11,8 @@
         "include": [
             "../../../src/app",
             "../../../src/jobs",
-            "../../../src/render"
+            "../../../src/render",
+            "../../../src/texture"
         ]
     },
     "test": {
@@ -237,6 +238,17 @@
                     "new_path_stops_watching",
                     "remove_stops_watching",
                     "change_status"
+                ]
+            },
+            {
+                "id": "TextureLinear",
+                "testcases": [
+                    "encode_table",
+                    "default_off",
+                    "png_encoded",
+                    "png_off_kept",
+                    "svg_encoded",
+                    "change_reloads"
                 ]
             }
         ]

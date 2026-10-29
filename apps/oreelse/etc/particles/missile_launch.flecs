@@ -23,7 +23,7 @@ prefab MissileLaunch {
       size: {0.4, 0.76},
       rotation: {-180, 180},
       spin: {-115, 115},
-      color: {255, 246, 224},
+      color: {255, 251, 241},
       seed: 215
     }
     ParticleBurst: {count: 4}
@@ -40,9 +40,9 @@ prefab MissileLaunch {
       opacity: {0.9, 0.56, 0.17, 0},
       color: {
         start: {255, 255, 255},
-        early: {255, 226, 178},
-        late: {255, 187, 120},
-        end: {255, 143, 72}
+        early: {255, 242, 218},
+        late: {255, 222, 182},
+        end: {255, 197, 145}
       }
     }
   }
@@ -64,7 +64,7 @@ prefab MissileLaunch {
       size: {0.28, 0.56},
       rotation: {-180, 180},
       spin: {-172, 172},
-      color: {255, 226, 176},
+      color: {255, 242, 216},
       seed: 216
     }
     ParticleBurst: {count: 10}
@@ -81,9 +81,9 @@ prefab MissileLaunch {
       opacity: {0.9, 0.52, 0.13, 0},
       color: {
         start: {255, 255, 255},
-        early: {255, 182, 118},
-        late: {206, 130, 82},
-        end: {148, 80, 62}
+        early: {255, 220, 181},
+        late: {232, 189, 154},
+        end: {200, 152, 135}
       }
     }
   }
@@ -107,7 +107,7 @@ prefab MissileLaunch {
       size: {0.29, 0.55},
       rotation: {-180, 180},
       spin: {-80, 80},
-      color: {150, 138, 128},
+      color: {202, 194, 188},
       seed: 217
     }
     ParticleBurst: {count: 13}
@@ -123,9 +123,9 @@ prefab MissileLaunch {
       opacity: {0, 0.56, 0.21, 0},
       color: {
         start: {255, 255, 255},
-        early: {193, 194, 197},
-        late: {165, 169, 172},
-        end: {140, 145, 149}
+        early: {226, 226, 228},
+        late: {210, 213, 214},
+        end: {196, 199, 201}
       }
     }
   }

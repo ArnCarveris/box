@@ -818,8 +818,39 @@ Every task of the port follows these.
   original's prefab and part names (`Ore`, `Astronaut`, `JetPlume`, `GroundSurface`, ...), and
   never as placeholder geometry. Animation runs in C systems that only run while `Playing`;
   visuals read the game's state instead of keeping their own copy.
+- **Colors** are the original's linear light, in the port's bytes (see Colors below).
 - **README**: this file describes the game like a player's manual (controls, rules); each task
   adds its mechanics to it.
+
+## Colors
+
+flecs-engine reads a color byte `b` as the linear light `b / 255` and samples its textures as
+they are stored (`RGBA8Unorm`, no sRGB decoding), then writes to an sRGB target. Box decodes
+color bytes and the color layers of textures (albedo, emissive, particle sprites, UI images)
+from sRGB. With the original's bytes the port looked darker and more saturated than the
+original, so every color reaches box at the original's linear value:
+
+- **Color bytes** of the port are the sRGB encoding of the original's:
+  `round(255 * srgb_encode(b / 255))` per channel, alpha (and a `Tint`'s strength) unchanged.
+  That covers every color: the materials (`Rgb`), `Emissive`, the lights, the particle colors
+  and color curves, the `Tint`s of the ghosts and corpses, the sun, the clear color and the UI
+  (palette, panels, texts, borders, the HUD), whose colors went through the same linear path
+  in the original. `tools/linear_colors.py` converted them once (`apply`, over `etc` and
+  `test/visual`) and is kept for reference: `linear_colors.py encode r g b` gives the bytes of a
+  new color of the original, `linear_colors.py decode r g b` the original's bytes of a color of
+  the port, to read it against `reference/ore_else`. The comments quote the original's bytes.
+- **Colors computed in script** compute the original's bytes and encode them with
+  `oreelse.srgb(v)` (`src/look.c`): the random tints of the flora (`scenery.flecs`), and the fill
+  of the health bars, which blends `cfg.hpBarFull`, `hpBarMid` and `hpBarLow` as the original
+  does; those three keep the original's bytes.
+- **Color textures** load with `TexturePath.linear` (`include/box/texture.h`), which encodes
+  their pixels to sRGB on load, so the color layers read the stored values as linear light as
+  the original does; the SVGs stay unchanged. The normal and ORM maps load as they are.
+
+The conversion stays in the app: box, its visual baselines and the other apps keep decoding
+color bytes as sRGB (bunnyhopper kept its original's bytes). The colors stay plain bytes in
+the same places, and the C code, which takes every color from the scripts, did not change.
+The scenarios compare colors with `box_client.srgb()` of the original's bytes.
 
 ## Critter and projectile models
 
@@ -1006,7 +1037,7 @@ its tile in the grid.
 | `etc/props/light.flecs` | The `Light` template of the lamps |
 | `etc/buildings/` | The building prefabs, one file per building, and the drone (see Building models) |
 | `etc/rocket/` | The `Rocket` template and its parts `RocketBell`, `RocketBay` and `RocketPort`, and the `PadClamp` template of the rocket pad |
-| `etc/assets/` | The original's textures (SVG), unchanged, and `terrain_dirt_orm.svg` |
+| `etc/assets/` | The original's textures (SVG), unchanged, and `terrain_dirt_orm.svg`; the color textures load with `linear: true` |
 | `etc/ui/palette.flecs` | The colors of the UI, `palette.*` |
 | `etc/ui/icons.flecs` | The icon textures, `icons.*`, which the items name with `OreIcon` |
 | `etc/ui/panel.flecs` | The `Panel` template, the chrome of every panel: the plate, its edge, the hazard strip and the `InputBlocker` |
@@ -1038,5 +1069,6 @@ its tile in the grid.
 | `src/power.c` | Production, demand and the blackout, the drills, the factories' crafters, the status lamps, `oreelse.power_set(category, level)` |
 | `src/rocket.c` | The rocket state, installing, uninstalling, loading, the launch and the flight, the look of the flight (`OreRocketFx`: the shake, the clamps, the flames and the smoke), `oreelse.rocket_install()`, `oreelse.rocket_uninstall()`, `oreelse.rocket_load()`, `oreelse.rocket_launch()`, `oreelse.craft_key()` |
 | `src/health_bars.c` | The health bars: a `HealthBar` instance per damaged building under `health_bars.bars`, its fraction set when the health changes, the bars' view shown while playing |
-| `src/look.c` | The render quality tiers, `oreelse.cycleQuality()` |
+| `src/look.c` | The render quality tiers, `oreelse.cycleQuality()`, `oreelse.srgb()` |
+| `tools/linear_colors.py` | The conversion of the original's color bytes to the port's (see Colors), kept for reference |
 | `src/particles.c` | The helpers that play the effects (`ore_burst`, `ore_burst_aimed`, `ore_explosion`, `ore_combust`), the flash of their lights, `oreelse.explosion()`, `oreelse.combust()` |

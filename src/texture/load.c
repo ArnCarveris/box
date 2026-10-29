@@ -3,7 +3,8 @@
  * @brief Decodes image files into RGBA8 pixels on a worker thread.
  *
  * Raster formats decode with stb_image, SVG files render with resvg at the requested size;
- * the result is scaled to the requested size and capped to the texture quality.
+ * the result is scaled to the requested size and capped to the texture quality. A linear image
+ * (TexturePath.linear) has its color channels encoded to sRGB last.
  */
 
 #include "texture.h"
@@ -246,6 +247,25 @@ done:
     return;
 }
 
+void box_texture_encode_linear(
+    uint8_t *pixels,
+    int32_t count)
+{
+    uint8_t table[256];
+    int32_t i, c;
+    for (i = 0; i < 256; i ++) {
+        double v = (double)i / 255.0;
+        v = v <= 0.0031308 ? v * 12.92 : 1.055 * pow(v, 1.0 / 2.4) - 0.055;
+        table[i] = (uint8_t)floor(v * 255.0 + 0.5);
+    }
+
+    for (i = 0; i < count; i ++) {
+        for (c = 0; c < 3; c ++) {
+            pixels[i * 4 + c] = table[pixels[i * 4 + c]];
+        }
+    }
+}
+
 void box_texture_decode_init(void)
 {
     if (!box_texture_svg_lock) {
@@ -276,6 +296,10 @@ void box_texture_decode(
     }
 
     ecs_os_free(data);
+    if (job->linear && job->pixels) {
+        box_texture_encode_linear(job->pixels, job->width * job->height);
+    }
+
 done:
     return;
 }

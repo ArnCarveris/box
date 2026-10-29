@@ -16,8 +16,8 @@ using box.material
 using box.particle
 using oreelse
 
-const stoneTint: Rgb = {186, 184, 180}
-const stonePad: Rgb = {82, 76, 70}
+const stoneTint: Rgb = {222, 221, 219}
+const stonePad: Rgb = {154, 148, 143}
 
 // The pistons start mid-stroke and the factory's work lights fully lit, as in a factory and a
 // drill that have worked for a while: the parts of a placed building copy the prefab's parts
