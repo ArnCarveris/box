@@ -48,7 +48,7 @@ ECS_ENUM(TextureQuality, {
 
 /** Window or offscreen render target.
  *
- * Headless, with a texture or with BOX_TEST=1 a surface is offscreen, where a point is a pixel.
+ * Headless or with a texture a surface is offscreen, where a point is a pixel.
  * Views render by View.order, then creation: those under view_root, or without one those
  * not under the view_root of another surface. A change reconfigures it before the next frame.
  *

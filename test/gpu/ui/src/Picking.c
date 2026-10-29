@@ -1625,6 +1625,9 @@ void Picking_focused_surface_views(void) {
     // input_fixes/multi_window_input
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
 
     test_assert(ecs_script(world, { .code =
         "using flecs.script\n"
@@ -1723,6 +1726,9 @@ void Picking_focus_click_without_move(void) {
     // input_fixes/multi_window_input
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
 
     test_assert(ecs_script(world, { .code =
         "using flecs.script\n"

@@ -504,7 +504,7 @@ void Invalidation_requeued_probes_keep_values(void) {
     ecs_set(world, glow, Rgb, {0, 0, 0});
     ecs_set(world, glow, Emissive, {.strength = 4, .color = {255, 255, 255}});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 48, .write_to_file = path,
+    ecs_set(world, e, Surface, {.texture = e, .width = 64, .height = 48, .write_to_file = path,
         .resolution_scale = 1});
 
     int32_t frames = 0;
@@ -615,7 +615,7 @@ void Invalidation_edge_changes_keep_the_volume(void) {
     ecs_set(world, edge, Box, {1, 1, 1});
     ecs_set(world, edge, Rgb, {0, 0, 0});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 48, .write_to_file = path,
+    ecs_set(world, e, Surface, {.texture = e, .width = 64, .height = 48, .write_to_file = path,
         .resolution_scale = 1});
 
     int32_t frames = 0, change, n = 0, iw = 0, ih = 0, x, y;
@@ -874,7 +874,7 @@ void Invalidation_newly_valid_probe_hidden_until_baked(void) {
     ecs_set(world, block, Box, {1.6f, 1.6f, 1.6f});
     ecs_set(world, block, Rgb, {0, 0, 0});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 48, .write_to_file = path,
+    ecs_set(world, e, Surface, {.texture = e, .width = 64, .height = 48, .write_to_file = path,
         .resolution_scale = 1});
 
     int32_t frames = 0, n = 0, iw = 0, ih = 0, x, y;
@@ -968,7 +968,7 @@ void Invalidation_full_rebakes_keep_values(void) {
         ecs_set(world, glow, Rgb, {0, 0, 0});
         ecs_set(world, glow, Emissive, {.strength = 4, .color = {255, 255, 255}});
         ecs_entity_t e = ecs_new(world);
-        ecs_set(world, e, Surface, {.width = 64, .height = 48, .write_to_file = path,
+        ecs_set(world, e, Surface, {.texture = e, .width = 64, .height = 48, .write_to_file = path,
             .resolution_scale = 1});
 
         int32_t frames = 0, n = 0, iw = 0, ih = 0, x, y;

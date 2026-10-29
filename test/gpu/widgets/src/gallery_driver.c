@@ -12,7 +12,7 @@
 #include <unistd.h>
 
 /** Path of the gallery scene in the repository */
-#define GALLERY_SCENE "etc/ui/gallery.flecs"
+#define GALLERY_SCENE "etc/scenes/ui/gallery.flecs"
 
 /** Divides the render pixels of the surfaces of the gallery in the tests */
 #define GALLERY_RESOLUTION_SCALE (4.0f)
@@ -362,6 +362,7 @@ ecs_world_t* gallery_load(
     ECS_IMPORT(world, Box);
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
+    app->unpaced = true;
     ecs_singleton_modified(world, App);
 
     char *path = gallery_path();

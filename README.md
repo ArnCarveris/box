@@ -24,6 +24,6 @@ bake3 run apps/boxrun --local-env -- etc/scenes/town.flecs
 ## Test
 
 ```sh
-BOX_TEST=1 bake3 run test/cpu/core --local-env -- -j 8
+bake3 run test/cpu/core --local-env -- -j 8
 python3 tools/integration.py visual
 ```

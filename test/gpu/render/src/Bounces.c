@@ -36,7 +36,7 @@ void Bounces_pass_reaches_bounces(void) {
     ecs_set(world, block, Box, {0.5f, 0.5f, 0.5f});
     ecs_set(world, block, Emissive, {.strength = 2, .color = {255, 200, 100}});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 32, .height = 24, .resolution_scale = 1});
+    ecs_set(world, e, Surface, {.texture = e, .width = 32, .height = 24, .resolution_scale = 1});
 
     int32_t frame, last = 0, drops = 0, previous = 0;
     bool seen[5] = {false, false, false, false, false};
@@ -73,6 +73,9 @@ void Bounces_zero_bounces_bakes_one_pass(void) {
     // baked_lighting/bounces
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
 
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
@@ -119,6 +122,9 @@ void Bounces_out_of_range_bakes_nothing(void) {
     for (i = 0; i < 2; i ++) {
         ecs_world_t *world = ecs_init();
         ECS_IMPORT(world, Box);
+        App *app = ecs_singleton_get_mut(world, App);
+        app->headless = true;
+        ecs_singleton_modified(world, App);
 
         ecs_singleton_set(world, LightBake, {.probe_spacing = 2, .bounds_padding = 0.5f,
             .capture_size = 8, .budget_ms = 20, .bounces = values[i]});
@@ -166,6 +172,9 @@ void Bounces_changing_bounces_restarts(void) {
     // baked_lighting/bounces
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
 
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
@@ -262,7 +271,7 @@ void Bounces_image_stable_once_converged(void) {
     app->headless = false;
     ecs_singleton_modified(world, App);
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 48, .write_to_file = path,
+    ecs_set(world, e, Surface, {.texture = e, .width = 64, .height = 48, .write_to_file = path,
         .resolution_scale = 1});
 
     const LightBakeStatus *status = NULL;
@@ -348,7 +357,7 @@ void Bounces_view_keeps_last_complete_pass(void) {
     app->headless = false;
     ecs_singleton_modified(world, App);
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 48, .write_to_file = path,
+    ecs_set(world, e, Surface, {.texture = e, .width = 64, .height = 48, .write_to_file = path,
         .resolution_scale = 1});
 
     const LightBakeStatus *status = NULL;

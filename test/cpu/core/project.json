@@ -92,9 +92,6 @@
                     "load_above_cores",
                     "load_at_cores",
                     "load_below_cores",
-                    "env_sets_unguarded",
-                    "env_zero_keeps_guard",
-                    "env_unset_keeps_guard",
                     "run_unguarded",
                     "budget_adds_to_load",
                     "no_limit_claims_one_core",
@@ -109,8 +106,7 @@
                     "no_sleep_within_budget",
                     "budget_above_one_core",
                     "unpaced_never_sleeps",
-                    "not_headless_never_sleeps",
-                    "env_sets_unpaced"
+                    "not_headless_never_sleeps"
                 ]
             },
             {

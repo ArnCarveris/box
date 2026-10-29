@@ -6,7 +6,6 @@
 #include <box.h>
 #include <app.h>
 #include <bake_test.h>
-#include <stdlib.h>
 #include <time.h>
 
 static void Busy(ecs_iter_t *it) {
@@ -78,21 +77,3 @@ void Pacing_not_headless_never_sleeps(void) {
     ecs_fini(world);
 }
 
-void Pacing_env_sets_unpaced(void) {
-    // engine_core/app
-    setenv("BOX_TEST", "1", 1);
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-
-    test_bool(ecs_singleton_get(world, App)->unpaced, true);
-
-    ecs_fini(world);
-
-    setenv("BOX_TEST", "0", 1);
-    world = ecs_init();
-    ECS_IMPORT(world, Box);
-
-    test_bool(ecs_singleton_get(world, App)->unpaced, false);
-
-    ecs_fini(world);
-}

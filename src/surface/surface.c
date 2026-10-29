@@ -158,17 +158,15 @@ static void box_surface_state_free(
  *
  * @param world The world
  * @param s The surface
- * @return Whether the run is headless or a test, or the surface renders to a texture
+ * @return Whether the run is headless or the surface renders to a texture
  */
 static bool box_surface_offscreen(
     const ecs_world_t *world,
     const Surface *s)
 {
     const App *app = ecs_singleton_get(world, App);
-    const char *test = getenv(BOX_TEST_ENV);
-    bool is_test = test && test[0] && strcmp(test, "0") != 0;
 
-    return !app || app->headless || s->texture || is_test;
+    return !app || app->headless || s->texture;
 }
 
 /** Clamp a size in points to the sizes a surface supports.

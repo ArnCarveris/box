@@ -274,6 +274,9 @@ void LightBake_projected_anchor_not_baked(void) {
     // core_fixes/projection_position
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
 
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);

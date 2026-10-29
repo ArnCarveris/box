@@ -60,7 +60,7 @@ static ecs_world_t* editor_world(
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    char *widgets = box_app_locate("etc/ui/widgets.flecs");
+    char *widgets = box_app_locate("etc/scenes/ui/widgets.flecs");
     test_assert(ecs_script(world, {
         .entity = ecs_entity(world, { .name = "box.ui.widgets" }),
         .filename = widgets

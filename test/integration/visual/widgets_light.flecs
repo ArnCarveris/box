@@ -1,8 +1,8 @@
-// The widget gallery of etc/ui/gallery.flecs in the light theme with every section in view,
+// The widget gallery of etc/scenes/ui/gallery.flecs in the light theme with every section in view,
 // as widgets_dark shows it in the dark theme: the theme dropdown of the header picked Light. The
 // form has its Name field focused with "idg" selected and the caret on, and its Shape dropdown
 // open with Sphere highlighted over the sliders.
-include etc/ui/gallery
+include etc/scenes/ui/gallery
 
 using flecs.script
 using box.camera
