@@ -960,6 +960,13 @@ instances `OreCritter`, `OreTarget` and `OreVelocity`. The projectiles carry the
 (`OreProjectile {radius, life}`, and `OreHoming` on the missile); the effect tasks drive the
 named parts. Each faces +Z.
 
+Nothing in the game picks a critter, a corpse, a projectile, a laser beam or a repair drone, and
+nothing finds them through box's spatial index (hover is the game's own ray against the map, and
+the critters have their own index in `src/critters.c`). So `OreCritter`, `OreCorpse`,
+`OreProjectile` and `OreDrone` come with box.spatial's `SpatialIgnore` (`With` pairs), and the
+turrets put it on their beams. Their moving parts are not in box's index, so a large wave costs
+SpatialUpdate nothing, and the cursor's pick goes through them to what lies behind.
+
 ### Critters
 
 A critter's origin is between its feet on the ground. Its legs are pivots `leg_0` ... `leg_n`

@@ -672,6 +672,7 @@ void ore_drones_import(
     ecs_add_pair(world, ecs_id(OreDroneBay), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(OreDrone), EcsWith, DynamicTransform);
     ecs_add_pair(world, ecs_id(OreDrone), EcsWith, ecs_id(Rotation));
+    ecs_add_pair(world, ecs_id(OreDrone), EcsWith, SpatialIgnore);
 
     queries->drones = ecs_query(world, {
         .entity = ecs_entity(world, { .name = "OreDroneQuery" }),

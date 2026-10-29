@@ -279,6 +279,7 @@ void ore_critter_fx_import(
 
     ecs_add_pair(world, ecs_id(OreGait), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(OreDeathBurst), EcsOnInstantiate, EcsInherit);
+    ecs_add_pair(world, ecs_id(OreCorpse), EcsWith, SpatialIgnore);
 
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "OreCritterFx" }),
