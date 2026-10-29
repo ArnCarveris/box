@@ -1028,6 +1028,22 @@ ecs_entity_t ore_burst(
     const vec3 position,
     float scale);
 
+/** Set the playback state of an emitter that keeps playing (the jet plume, the glints of the
+ * Luminite); it is only written when it changes, and an emitter without a ParticlePlayback plays.
+ *
+ * @param world The world
+ * @param stage The stage of the system
+ * @param emitter The emitter, 0 for none
+ * @param state The playback state
+ * @param playing_only Only change an emitter that plays (pause it, leave a stopped one stopped)
+ */
+void ore_playback_set(
+    const ecs_world_t *world,
+    ecs_world_t *stage,
+    ecs_entity_t emitter,
+    PlaybackState state,
+    bool playing_only);
+
 /** Play a one shot effect template turned about Y, at its size: the launch of a missile
  * (MissileLaunch, authored along -Z) toward the aim of its turret, as the original's
  * oreLaunchFx turns the velocities and offsets of the bursts.

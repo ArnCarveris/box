@@ -213,28 +213,31 @@ static void OreMineMarkerHide(
     ore_marker_show(it->world, it->stage, marker->bad, false, 0, ORE_MARKER_Y, 0);
 }
 
-/** Play the glints of the deposits (the layers of a DepositSparkle, the emitters below an
- * OreDeposit) while playing and pause them in every other state, so they stand still with the
- * game and none show on the title screen. Their playback is only written when it changes.
+/** Play the glints of the deposits, the layers of a DepositSparkle (the emitters below an
+ * OreDeposit), while playing.
  *
- * @param it Iterator over the emitters below the deposits
+ * @param it Iterator over the emitters below the deposits, while playing
  */
 static void OreDepositSparkle(
     ecs_iter_t *it)
 {
-    PlaybackState state = ore_state_is(it->world, OreGameStatePlaying) ?
-        ParticlePlaying : ParticlePaused;
-    const ParticlePlayback *playback;
-    ParticlePlayback next;
     int32_t i;
     for (i = 0; i < it->count; i ++) {
-        playback = ecs_get(it->world, it->entities[i], ParticlePlayback);
-        next = playback ? *playback : (ParticlePlayback){ .state = ParticlePlaying };
-        if (next.state != state) {
-            next.state = state;
-            next.reset = false;
-            ecs_set_ptr(it->stage, it->entities[i], ParticlePlayback, &next);
-        }
+        ore_playback_set(it->world, it->stage, it->entities[i], ParticlePlaying, false);
+    }
+}
+
+/** Pause the glints of the deposits outside of play, so they stand still with the game and none
+ * show on the title screen; OreDepositSparkle plays them again when the game resumes.
+ *
+ * @param it Iterator over the emitters below the deposits, while not playing
+ */
+static void OreDepositSparkleHold(
+    ecs_iter_t *it)
+{
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        ore_playback_set(it->world, it->stage, it->entities[i], ParticlePaused, true);
     }
 }
 
@@ -277,8 +280,21 @@ void ore_mining_import(
         .query.terms = {
             { .id = ecs_id(ParticleEmitter), .src.id = EcsSelf, .inout = EcsInOutNone },
             { .id = ecs_id(OreDeposit), .src.id = EcsUp, .trav = EcsChildOf,
-              .inout = EcsInOutNone }
+              .inout = EcsInOutNone },
+            { .id = playing, .src.id = state }
         },
         .callback = OreDepositSparkle
+    });
+
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "OreDepositSparkleHold" }),
+        .phase = EcsOnUpdate,
+        .query.terms = {
+            { .id = ecs_id(ParticleEmitter), .src.id = EcsSelf, .inout = EcsInOutNone },
+            { .id = ecs_id(OreDeposit), .src.id = EcsUp, .trav = EcsChildOf,
+              .inout = EcsInOutNone },
+            { .id = playing, .src.id = state, .oper = EcsNot }
+        },
+        .callback = OreDepositSparkleHold
     });
 }

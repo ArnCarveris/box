@@ -1,8 +1,8 @@
 """Ore Else's effects of the astronaut, mining and placement driven through the command port: the
 limbs swing and the astronaut bobs and kicks up dust while it walks, the jet plume plays while it
-hovers over a building and stops after, a mined deposit bursts and shrinks with its ore, a used
-up deposit poofs, placing and demolishing a building poof, and the astronaut's death splats and
-drops it.
+hovers over a building and stops after, the glints of the Luminite play only with the game, a
+mined deposit bursts and shrinks with its ore, a used up deposit poofs, placing and demolishing a
+building poof, and the astronaut's death splats and drops it.
 
 Every case runs in a fresh apps/oreelse process with its default scene and a fixed session seed,
 like oreelse_flow.py, which describes the setup: a 640x360 window without shadows, a fixed delta
@@ -24,6 +24,9 @@ APP = "apps/oreelse"
 
 STATE = "has oreelse.OreGameState (oreelse.OreGameState, oreelse.OreGameState.%s)"
 JET = PLAYER + ".jet"
+
+# The glints of a Luminite deposit, the layer of its DepositSparkle (etc/deposits.flecs)
+SPARKLE = "deposits.luminite_0.sparkle"
 
 # The limbs of the Astronaut template (etc/player.flecs): their swing in radians
 LIMBS = {"leg_left": 0.55, "leg_right": 0.55, "arm_left": 0.38, "arm_right": 0.38}
@@ -97,13 +100,13 @@ def limbs(app):
     return result
 
 
-def playback(app):
-    return app.exec("get %s ParticlePlayback.state" % JET).split(".")[-1]
+def playback(app, emitter=JET):
+    return app.exec("get %s ParticlePlayback.state" % emitter).split(".")[-1]
 
 
-def wait_playback(app, state, frames=FPS):
-    app.wait_for("get %s ParticlePlayback.state" % JET, lambda out: out.endswith(state),
-                 frames=frames, what="the jet plume %s" % state)
+def wait_playback(app, state, frames=FPS, emitter=JET):
+    app.wait_for("get %s ParticlePlayback.state" % emitter, lambda out: out.endswith(state),
+                 frames=frames, what="%s %s" % (emitter, state))
 
 
 def test_walk(app):
@@ -155,9 +158,12 @@ def test_walk(app):
 
 
 def test_jet_plume(app):
+    # The glints of the Luminite stand still on the title screen and play with the game
+    wait_playback(app, "ParticlePaused", emitter=SPARKLE)
     start(app)
     app.check(playback(app) == "ParticleStopped", "the jet plume is %s on the ground" %
               playback(app))
+    wait_playback(app, "ParticlePlaying", emitter=SPARKLE)
     set_inventory(app, [("Wall", 1)])
     select(app, "1", "Wall")
     click(app, 6, 6)
@@ -173,11 +179,13 @@ def test_jet_plume(app):
         app.check(abs(limb(app, name)) <= AIR_DANGLE * swing + TOLERANCE,
                   "%s hangs at %g in the air, beyond its dangle" % (name, limb(app, name)))
 
-    # The plume stands still with the game and plays again with it
+    # The plume and the glints stand still with the game and play again with it
     set_state(app, "Paused")
     wait_playback(app, "ParticlePaused")
+    wait_playback(app, "ParticlePaused", emitter=SPARKLE)
     set_state(app, "Playing")
     wait_playback(app, "ParticlePlaying")
+    wait_playback(app, "ParticlePlaying", emitter=SPARKLE)
 
     # Next to the wall the astronaut comes down and the plume stops
     x, z = tile_point(6, 7)

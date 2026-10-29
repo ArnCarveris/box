@@ -127,8 +127,7 @@ void ore_player_die(
     ore_state_set(world, OreGameStateLost);
 }
 
-/** Set the playback of the jet plume of an astronaut (its child jet, a JetPlume); it is only
- * written when that changes.
+/** Set the playback of the jet plume of an astronaut, its child jet (a JetPlume).
  *
  * @param world The world
  * @param stage The stage of the system
@@ -143,14 +142,7 @@ static void ore_jet_set(
     PlaybackState state,
     bool playing_only)
 {
-    ecs_entity_t jet = ecs_lookup_child(world, player, "jet");
-    const ParticlePlayback *playback = jet ? ecs_get(world, jet, ParticlePlayback) : NULL;
-    ParticlePlayback next = playback ? *playback : (ParticlePlayback){ .state = ParticlePlaying };
-    if (jet && next.state != state && (!playing_only || next.state == ParticlePlaying)) {
-        next.state = state;
-        next.reset = false;
-        ecs_set_ptr(stage, jet, ParticlePlayback, &next);
-    }
+    ore_playback_set(world, stage, ecs_lookup_child(world, player, "jet"), state, playing_only);
 }
 
 /** Animate the astronaut after its walk, the rest of the original's OrePlayerMove.
