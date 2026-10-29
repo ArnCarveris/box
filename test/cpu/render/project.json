@@ -280,7 +280,9 @@
                     "disabled_delete_frees_slot",
                     "disabled_shapes_leave_batches",
                     "enabled_shape_takes_current_transform",
-                    "created_disabled_draws_once_enabled"
+                    "created_disabled_draws_once_enabled",
+                    "text_created_disabled",
+                    "text_changed_while_disabled"
                 ]
             },
             {

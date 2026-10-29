@@ -659,3 +659,73 @@ void InstanceStreams_created_disabled_draws_once_enabled(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+/** Create a text with the default font.
+ *
+ * @param world The world
+ * @param e The entity, which may be disabled
+ * @param value The string
+ */
+static void text_set(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    const char *value)
+{
+    ecs_set(world, e, Position, {0, 1, 0});
+    ecs_set(world, e, Text, {
+        .value = (char*)value, .size = 16, .font = ecs_lookup(world, "box.text.DefaultFont")
+    });
+}
+
+/** A text set up while disabled is laid out, and draws its glyphs once enabled. */
+void InstanceStreams_text_created_disabled(void) {
+    // renderer/draws
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    text_set(world, ecs_new(world), "warm");
+    frame(world);
+    frame(world);
+
+    ecs_entity_t text = ecs_new(world);
+    ecs_enable(world, text, false);
+    text_set(world, text, "disabled");
+    frame(world);
+    frame(world);
+    test_int(ecs_vec_count(&ecs_get(world, text, TextSlots)->slots), 0);
+
+    ecs_enable(world, text, true);
+    frame(world);
+    frame(world);
+    test_int(ecs_vec_count(&ecs_get(world, text, TextGlyphs)->glyphs), 8);
+    test_int(ecs_vec_count(&ecs_get(world, text, TextSlots)->slots), 8);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** A text whose value changes while disabled draws the new string once enabled. */
+void InstanceStreams_text_changed_while_disabled(void) {
+    // renderer/draws
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t text = ecs_new(world);
+    text_set(world, text, "disabled");
+    frame(world);
+    frame(world);
+    test_int(ecs_vec_count(&ecs_get(world, text, TextSlots)->slots), 8);
+
+    ecs_enable(world, text, false);
+    frame(world);
+    text_set(world, text, "abc");
+    frame(world);
+    test_int(ecs_vec_count(&ecs_get(world, text, TextSlots)->slots), 0);
+
+    ecs_enable(world, text, true);
+    frame(world);
+    frame(world);
+    test_int(ecs_vec_count(&ecs_get(world, text, TextGlyphs)->glyphs), 3);
+    test_int(ecs_vec_count(&ecs_get(world, text, TextSlots)->slots), 3);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}

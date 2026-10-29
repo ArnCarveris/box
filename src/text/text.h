@@ -160,7 +160,7 @@ typedef struct box_text_state_t {
     ecs_vec_t texts;            /**< Scratch: entities to lay out again */
     uint32_t next_page;         /**< Next page handle */
     box_text_sync_t *sync;      /**< Jobs in flight */
-    ecs_query_t *query;         /**< Entities with a Text */
+    ecs_query_t *query;         /**< Entities with a Text, disabled ones included */
     ecs_query_t *shown;         /**< Entities with TextGlyphs, disabled ones included */
     bool trim;                  /**< A layout or a budget changed, idle pages may be released */
     ecs_entity_t default_font;  /**< box.text.DefaultFont */
