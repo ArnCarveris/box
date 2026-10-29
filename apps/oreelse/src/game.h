@@ -576,27 +576,19 @@ ECS_STRUCT(OreBuilding, {
     int32_t col; /**< Column of its top left tile */
 });
 
-/** The box of the model of a building, on its prefab and inherited: w along x and d along z
- * centered on its origin, h up from the ground. The building's health bar is anchored to the
- * projection of this box.
- */
+/** The model box of a building (on its prefab), its health bar's anchor: centered, up from 0 */
 ECS_STRUCT(OreModelBox, {
     float w; /**< Width along x */
     float d; /**< Depth along z */
     float h; /**< Height above the ground */
 });
 
-/** The health bar of a damaged building, on the building (every OreBuilding gets one, 0 while
- * the building is undamaged). The bar is an instance of the HealthBar template under the root
- * of OreHealthBars with the pair (OreBarOf, building), which deletes it with the building.
- */
+/** A building's HealthBar (0 while undamaged), deleted with it through (OreBarOf, building) */
 ECS_STRUCT(OreHealthBar, {
     ecs_entity_t bar; /**< The bar, 0 for none */
 });
 
-/** The health bars: the screen space UI scene they are drawn in, between the world view and
- * the HUD, shown while playing (the view has its camera only then).
- */
+/** The health bars' UI scene, between the world view and the HUD, shown while playing */
 ECS_STRUCT(OreHealthBars, {
     ecs_entity_t bar;    /**< The HealthBar template */
     ecs_entity_t root;   /**< Parent of the bars, in the scene of the bars */
@@ -732,9 +724,7 @@ ECS_STRUCT(OreQuality, {
     OreRenderQuality tier; /**< The tier the look applies */
 });
 
-/** The settings of every render quality tier, the type of cfg.quality, indexed by
- * OreRenderQuality.
- */
+/** The settings of every render quality tier (cfg.quality), indexed by OreRenderQuality */
 ECS_STRUCT(OreQualityTiers, {
     float resolution_scale[3];    /**< Surface.resolution_scale of the surfaces */
     int32_t shadow_resolution[3]; /**< ShadowSettings.resolution of the world view */
@@ -1851,8 +1841,7 @@ void ore_craft_import(
 void ore_buildings_import(
     ecs_world_t *world);
 
-/** Register the health bars: a HealthBar instance for every damaged building, its fraction
- * kept in step with the building's health, and the view of the bars shown while playing.
+/** Register the health bars: one per damaged building, its fraction kept in step with the HP.
  *
  * @param world The world
  */

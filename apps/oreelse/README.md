@@ -24,12 +24,8 @@ python3 tools/integration.py e2e oreelse_mining oreelse_particles
 python3 tools/integration.py e2e oreelse_crafting oreelse_buildings oreelse_rocket
 python3 tools/integration.py e2e oreelse_power oreelse_critters oreelse_critter_fx
 python3 tools/integration.py e2e oreelse_player_fx oreelse_hud oreelse_building_animation
-<<<<<<< HEAD
-python3 tools/integration.py e2e oreelse_weapons oreelse_health_bars
-=======
 python3 tools/integration.py e2e oreelse_weapons oreelse_flora oreelse_drones
-python3 tools/integration.py e2e oreelse_inventory_screen
->>>>>>> 11eb33efca9def0ef64f14dcd3a157f53c6ac977
+python3 tools/integration.py e2e oreelse_inventory_screen oreelse_health_bars
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -615,7 +611,6 @@ it needs: `Install a cargo bay (U) or life support (I)`, `Needs 4 engines, 2 ins
 `Needs 1 fuel tanks, 0 installed (Y)`. Below 30% health `! SUIT BREACH !` blinks red at the top
 of the screen.
 
-<<<<<<< HEAD
 A building that is damaged (above 0 and below its full HP) shows a health bar over it: a dark
 bar 4 px tall, 6 px above the top of the building as the camera sees it and as wide as the
 building looks, so it follows the zoom and the camera in the same frame. Its fill, inset 1 px,
@@ -624,13 +619,9 @@ covers `(width - 2) * frac` of it, blended from amber {240, 176, 58} at half hea
 The bar goes when the building is repaired to full or destroyed. Bars narrower than 6 px or off
 screen are not drawn, the panels of the HUD cover them, and they show only while playing.
 
-Clicks, the right button and the wheel over a panel of the UI (the status bar) do not reach the
-world: they place, mine and zoom nothing. The plain lines of text let them through.
-=======
 Clicks, the right button and the wheel over a panel of the UI (the status bar, the inventory
 screen, its info panel and the Inventory (E) button) do not reach the world: they place, mine
 and zoom nothing. The plain lines of text let them through.
->>>>>>> 11eb33efca9def0ef64f14dcd3a157f53c6ac977
 
 ### Render quality
 
@@ -927,13 +918,9 @@ its tile in the grid.
 | `etc/ui/palette.flecs` | The colors of the UI, `palette.*` |
 | `etc/ui/icons.flecs` | The icon textures, `icons.*`, which the items name with `OreIcon` |
 | `etc/ui/panel.flecs` | The `Panel` template, the chrome of every panel: the plate, its edge, the hazard strip and the `InputBlocker` |
-<<<<<<< HEAD
 | `etc/ui/health_bar.flecs` | The `HealthBar` template, the health bar of a damaged building, anchored to the projection of its model box (`OreModelBox`) |
-| `etc/ui/hud.flecs` | The `OreHud` template: the status bar (`StatusGauge`, `StatusDivider`), the toast, the mine progress bar, the suit breach alert and the rocket status line |
-=======
 | `etc/ui/hud.flecs` | The `OreHud` template: the status bar (`StatusGauge`, `StatusDivider`), the toast, the mine progress bar, the suit breach alert, the rocket status line, the Inventory (E) button and the inventory screen |
 | `etc/ui/inventory.flecs` | The inventory screen (`InventoryScreen`: `StockBody` with its `StockSlot`s, `ConstructBody` with its `TabButton`s and the `BuildingsPage` and `RocketPage` of `SlotButton`s; the slots and buttons are restyled `box.widgets.HeadlessButton`s), its info panel (`ItemInfoPanel`) and the Inventory (E) button (`InventoryButton`), which the HUD shows |
->>>>>>> 11eb33efca9def0ef64f14dcd3a157f53c6ac977
 | `etc/icons/` | The original's icons (SVG), unchanged |
 | `etc/ui/hazard_strip.svg` | The original's hazard strip of the panels, unchanged |
 | `src/flow.c` | States, clock, blink, toast, seeds, `oreelse.cancel()`, `oreelse.restart()` |
