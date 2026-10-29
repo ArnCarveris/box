@@ -107,12 +107,21 @@ static void box_input_focus_screen(
     ecs_script_mouse_event(world, &(EcsScriptMouseEvent){ .target = screen });
 }
 
+/** Import box.input. Its events go out through flecs.script.input, which flecs releases that
+ * predate the rename call flecs.script.event.
+ *
+ * @param world The world
+ */
 void BoxInputImport(
     ecs_world_t *world)
 {
     ECS_MODULE(world, BoxInput);
     ECS_IMPORT(world, BoxTypes);
+#if defined(FLECS_SCRIPT_INPUT) || !defined(FLECS_SCRIPT_EVENT_H)
     ECS_IMPORT(world, FlecsScriptInput);
+#else
+    ECS_IMPORT(world, FlecsScriptEvent);
+#endif
 
     ECS_META_COMPONENT(world, Key);
     ECS_META_COMPONENT(world, KeyState);
