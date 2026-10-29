@@ -7,9 +7,9 @@ using box.transform
 using box.geometry
 using box.material
 
-const rocketShade: Rgb = {150, 158, 174}
-const rocketDark: Rgb = {48, 54, 68}
-const rocketSteel: Rgb = {172, 180, 194}
+const rocketShade: Rgb = {202, 206, 215}
+const rocketDark: Rgb = {120, 127, 141}
+const rocketSteel: Rgb = {214, 219, 226}
 const rkBayH: f32 = 0.78
 const rkRadius: f32 = 0.42
 

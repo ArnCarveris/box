@@ -27,7 +27,7 @@ prefab FlameBurst {
       size: {0.16, 0.4},
       rotation: {-180, 180},
       spin: {-172, 172},
-      color: {255, 232, 180},
+      color: {255, 245, 219},
       seed: 218
     }
     ParticleBurst: {count: 16}
@@ -44,9 +44,9 @@ prefab FlameBurst {
       opacity: {1, 0.96, 0.7, 0},
       color: {
         start: {255, 255, 255},
-        early: {247, 153, 115},
-        late: {200, 103, 71},
-        end: {132, 82, 78}
+        early: {251, 203, 179},
+        late: {229, 170, 144},
+        end: {190, 154, 150}
       }
     }
   }

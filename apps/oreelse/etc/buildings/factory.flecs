@@ -26,14 +26,14 @@ using box.material
 using box.light
 using oreelse
 
-const facSteel: Rgb = {172, 180, 194}
-const facShade: Rgb = {112, 120, 136}
-const facDeep: Rgb = {56, 62, 76}
-const facHazard: Rgb = {240, 176, 58}
-const facAccent: Rgb = {92, 236, 222}
-const facGlow: Rgb = {255, 156, 62}
-const facEmber: Rgb = {255, 108, 38}
-const facLampDead: Rgb = {248, 84, 72}
+const facSteel: Rgb = {214, 219, 226}
+const facShade: Rgb = {177, 182, 193}
+const facDeep: Rgb = {129, 135, 148}
+const facHazard: Rgb = {248, 216, 131}
+const facAccent: Rgb = {162, 246, 240}
+const facGlow: Rgb = {255, 205, 135}
+const facEmber: Rgb = {255, 174, 108}
+const facLampDead: Rgb = {252, 155, 145}
 
 prefab Factory {
   // The item: crafted through the order book into the inventory, placed by spending one

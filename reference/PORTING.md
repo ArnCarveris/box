@@ -24,9 +24,18 @@ box does not have. The skipped features are listed at the end.
 
 ## Materials and textures
 
-- `Rgba {r, g, b, a}` becomes `Rgb {r, g, b}`, plus `Opacity {a / 255}` when a is below 255. Box
-  decodes colors as sRGB, flecs-engine as linear, so the same bytes look darker and more saturated
-  in box; keep the bytes (the bunnyhopper port made the same choice).
+- `Rgba {r, g, b, a}` becomes `Rgb {r, g, b}`, plus `Opacity {a / 255}` when a is below 255.
+- **Color bytes are linear in flecs-engine, sRGB in box.** flecs-engine divides a color byte by
+  255 (`flecsEngine_colorChannelToFloat`) and samples its textures as stored (`RGBA8Unorm`);
+  box decodes color bytes and color textures from sRGB, so the same bytes look darker and more
+  saturated in box. Write the sRGB encoding of the original's byte instead,
+  `round(255 * srgb_encode(b / 255))` (`apps/oreelse/tools/linear_colors.py encode r g b`), for
+  every color: `Rgb`, `Emissive`, light colors, particle colors and color curves, `Tint`s, the
+  UI. Alpha stays as it is. A color computed in script computes the original's bytes and
+  encodes them (`oreelse.srgb()`). Load color textures (albedo, emissive, sprites, UI images)
+  with `TexturePath: {..., linear: true}`, not normal or ORM maps. The bunnyhopper port kept
+  the bytes; ore_else does not, playtesting showed it too saturated (`apps/oreelse/README.md`,
+  Colors).
 - `AlphaBlend` becomes `Opacity` below 1 (or `BlendMode`). For the textured flora fronds and
   membranes use `AlphaCutoff: {0.5}` instead.
 - `PbrMaterial`, `Emissive` and `TextureTransform` map one to one. `Emissive` is not affected by
@@ -35,8 +44,9 @@ box does not have. The skipped features are listed at the end.
   `Emissive` of every part of a corpse) becomes a `Tint` on the model's root, which box composes
   down the hierarchy. As the tint leaves emission alone, the emissive parts (eyes, visors,
   glowing spots) get their emission turned off by a system, as the ghosts' `OreGhostDim` does.
-- `Texture` / `Svg` become `TexturePath {path, width, height}`; asset paths become
-  `apps/oreelse/etc/assets/...` (copy the SVGs from `ore_else/etc/assets` unchanged).
+- `Texture` / `Svg` become `TexturePath {path, width, height}`, with `linear: true` for a color
+  texture; asset paths become `apps/oreelse/etc/assets/...` (copy the SVGs from
+  `ore_else/etc/assets` unchanged).
 - `PbrTextures.roughness` becomes `PbrTextures.orm` (red occlusion, green roughness, blue
   metallic). `terrain_dirt_rough.svg` holds only green, so box would read it as full occlusion:
   add `terrain_dirt_orm.svg` with red and blue at 255.

@@ -12,7 +12,7 @@ using box.particle
 using box.material
 
 template MuzzleFlash {
-  prop color: rgb = {255, 196, 112}
+  prop color: rgb = {255, 227, 177}
   prop peak: f32 = 5
   prop fade: f32 = 45
   prop radius: f32 = 4.5

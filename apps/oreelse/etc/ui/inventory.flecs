@@ -43,9 +43,9 @@ const slotIconY: f32 = 8
 
 // The face of a filled slot and of a slot button that can order, lighter while hovered, and
 // its border
-const slotFace: Rgb = {46, 50, 58}
-const slotHover: Rgb = {66, 72, 82}
-const slotEdge: Rgb = {88, 94, 106}
+const slotFace: Rgb = {118, 122, 131}
+const slotHover: Rgb = {139, 145, 154}
+const slotEdge: Rgb = {159, 163, 173}
 
 // The padding of a section and the size of its title
 const sectionPad: f32 = 14
@@ -73,10 +73,10 @@ template StockSlot : box.widgets.HeadlessButton {
   const countY: f32 = 49
   const countWidth: f32 = 63
   const countSize: f32 = 15
-  const selectedFace: Rgb = {78, 62, 26}
-  const emptyFace: Rgb = {15, 16, 20}
-  const emptyEdge: Rgb = {44, 48, 56}
-  const countInk: Rgb = {224, 229, 237}
+  const selectedFace: Rgb = {150, 135, 90}
+  const emptyFace: Rgb = {69, 71, 79}
+  const emptyEdge: Rgb = {115, 120, 129}
+  const countInk: Rgb = {241, 243, 247}
 
   const none: entity = 0
   const filled = item != none
@@ -178,9 +178,9 @@ template SlotButton : box.widgets.HeadlessButton {
   prop can: bool = true
 
   const keySize: f32 = 13
-  const keyInk: Rgb = {132, 139, 152}
-  const dimFace: Rgb = {30, 33, 39}
-  const dimEdge: Rgb = {52, 56, 64}
+  const keyInk: Rgb = {190, 195, 203}
+  const dimFace: Rgb = {96, 101, 109}
+  const dimEdge: Rgb = {125, 129, 137}
   const dimAlpha: f32 = 150
 
   const faceLit: Rgb = match hover {
@@ -263,11 +263,11 @@ template TabButton : box.widgets.HeadlessButton {
   const labelSize: f32 = 15
   const underlineX: f32 = 8
   const underlineY: f32 = 27
-  const idleFace: Rgb = {32, 35, 41}
-  const hoverFace: Rgb = {50, 55, 63}
-  const activeFace: Rgb = {60, 52, 28}
-  const idleEdge: Rgb = {52, 56, 64}
-  const activeInk: Rgb = {246, 220, 168}
+  const idleFace: Rgb = {99, 104, 112}
+  const hoverFace: Rgb = {122, 128, 136}
+  const activeFace: Rgb = {133, 125, 93}
+  const idleEdge: Rgb = {125, 129, 137}
+  const activeInk: Rgb = {251, 239, 212}
 
   const faceIdle: Rgb = match hover {
     true: hoverFace
@@ -724,9 +724,9 @@ template InventoryScreen {
   const sectionHeight: f32 = 334
   const stockWidth: f32 = 420
   const constructWidth: f32 = 340
-  const screenFill: rgba = {17, 18, 22, 244}
-  const sectionFill: rgba = {26, 28, 33, 236}
-  const sectionEdge: rgba = {58, 63, 73, 255}
+  const screenFill: rgba = {73, 75, 83, 244}
+  const sectionFill: rgba = {90, 93, 101, 236}
+  const sectionEdge: rgba = {131, 136, 146, 255}
 
   const tab = OreInventoryScreen[OreInventoryScreen].tab
 

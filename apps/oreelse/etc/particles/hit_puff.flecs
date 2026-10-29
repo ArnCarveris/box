@@ -22,7 +22,7 @@ prefab HitPuff {
       size: {0.11, 0.23},
       rotation: {-180, 180},
       spin: {-115, 115},
-      color: {226, 209, 184},
+      color: {242, 234, 221},
       seed: 221
     }
     ParticleBurst: {count: 7}
@@ -38,9 +38,9 @@ prefab HitPuff {
       opacity: {0.88, 0.67, 0.4, 0},
       color: {
         start: {255, 255, 255},
-        early: {236, 236, 237},
-        late: {218, 217, 219},
-        end: {199, 198, 201}
+        early: {246, 246, 247},
+        late: {238, 238, 238},
+        end: {229, 228, 230}
       }
     }
   }

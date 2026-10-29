@@ -21,7 +21,7 @@ prefab SmokePuff {
       radial: {0.3, 0.3},
       lifetime: {0.6, 1.2},
       size: {0.14, 0.34},
-      color: {148, 144, 140},
+      color: {200, 198, 196},
       seed: 225
     }
     ParticleBurst: {count: 5}
@@ -37,9 +37,9 @@ prefab SmokePuff {
       opacity: {0.78, 0.68, 0.51, 0},
       color: {
         start: {255, 255, 255},
-        early: {231, 229, 228},
-        late: {206, 203, 201},
-        end: {182, 177, 175}
+        early: {244, 243, 243},
+        late: {232, 231, 230},
+        end: {220, 217, 216}
       }
     }
   }

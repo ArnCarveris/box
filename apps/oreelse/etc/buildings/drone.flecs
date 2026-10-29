@@ -16,12 +16,12 @@ using box.geometry
 using box.material
 using oreelse
 
-const droneSteel: Rgb = {172, 180, 194}
-const droneShade: Rgb = {112, 120, 136}
-const droneDeep: Rgb = {56, 62, 76}
-const droneHazard: Rgb = {240, 176, 58}
-const droneAccent: Rgb = {92, 236, 222}
-const droneWeld: Rgb = {120, 216, 255}
+const droneSteel: Rgb = {214, 219, 226}
+const droneShade: Rgb = {177, 182, 193}
+const droneDeep: Rgb = {129, 135, 148}
+const droneHazard: Rgb = {248, 216, 131}
+const droneAccent: Rgb = {162, 246, 240}
+const droneWeld: Rgb = {182, 237, 255}
 
 prefab RotorBlade {
   Box: {0.42, 0.015, 0.05}

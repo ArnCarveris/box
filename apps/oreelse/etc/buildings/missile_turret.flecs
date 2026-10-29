@@ -11,12 +11,12 @@ using box.geometry
 using box.material
 using oreelse
 
-const steel: Rgb = {172, 180, 194}
-const steelShade: Rgb = {112, 120, 136}
-const steelDeep: Rgb = {56, 62, 76}
-const missileRed: Rgb = {226, 84, 68}
-const lampLive: Rgb = {92, 236, 222}
-const lampDead: Rgb = {248, 84, 72}
+const steel: Rgb = {214, 219, 226}
+const steelShade: Rgb = {177, 182, 193}
+const steelDeep: Rgb = {129, 135, 148}
+const missileRed: Rgb = {242, 155, 141}
+const lampLive: Rgb = {162, 246, 240}
+const lampDead: Rgb = {252, 155, 145}
 
 prefab MissileTurret {
   // The item: crafted through the order book into the inventory, placed by spending one
@@ -168,7 +168,7 @@ prefab MissileTurret {
 
     fx {
       Position: {0, 0.64, 0.62}
-      MuzzleFlash: {color: {255, 172, 104}, peak: 6, fade: 20, radius: 7}
+      MuzzleFlash: {color: {255, 214, 171}, peak: 6, fade: 20, radius: 7}
     }
   }
 }

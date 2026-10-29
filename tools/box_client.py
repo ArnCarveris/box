@@ -159,6 +159,17 @@ def parse_value(text):
     return Parser(text.strip()).parse()
 
 
+def srgb(color):
+    """The bytes box decodes to the linear light of color bytes read as linear (c / 255), as
+    flecs-engine reads them: round(255 * srgb_encode(c / 255)) per channel, for a tuple of any
+    length (an alpha has to be kept by the caller)."""
+    def encode(c):
+        v = c / 255.0
+        v = v * 12.92 if v <= 0.0031308 else 1.055 * v ** (1 / 2.4) - 0.055
+        return int(v * 255.0 + 0.5)
+    return tuple(encode(c) for c in color)
+
+
 def mean_luma(image, box):
     """Mean luminance in 0..255 of the pixels of image (width, height, rows) in box (x0, y0, x1,
     y1), x1 and y1 exclusive."""

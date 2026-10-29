@@ -18,7 +18,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from box_client import parse_value
+from box_client import parse_value, srgb
 from oreelse_flow import ARGS, FPS, setup  # noqa: F401 (ARGS)
 
 APP = "apps/oreelse"
@@ -264,7 +264,7 @@ def test_explosion_flash(app):
     script(app, "fx_boom", "using oreelse\nconst boom: entity = "
            "oreelse.explosion(BoomBurst, {0, 0.55, 6}, %g)" % scale)
     light = flash_light(app, "BoomBurst")
-    app.check(app.get(light, "Rgb") == {"r": 255, "g": 190, "b": 118},
+    app.check(app.get(light, "Rgb") == dict(zip("rgb", srgb((255, 190, 118)))),
               "the flash of the explosion is %s, not warm white" % app.get(light, "Rgb"))
     check_flash(app, light, BOOM_PEAK * scale, BOOM_RANGE * scale, BOOM_FADE)
     app.wait_for(EFFECTS, "0", frames=frames(ONE_SHOTS["BoomBurst"][1]))

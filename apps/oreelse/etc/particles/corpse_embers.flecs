@@ -10,8 +10,8 @@ using box.particle
 using box.material
 
 // The hot and the dim color of the embers
-const emberHot: Rgb = {255, 138, 52}
-const emberDim: Rgb = {236, 92, 34}
+const emberHot: Rgb = {255, 194, 125}
+const emberDim: Rgb = {246, 162, 102}
 
 template CorpseEmbers {
   // The embers: 8 a second into the ember pool, from a disc of 0.2, offset {0, 0.05, 0}, at
@@ -30,7 +30,7 @@ template CorpseEmbers {
       radial: {0.25, 0.25},
       lifetime: {0.7, 1.7},
       size: {0.026, 0.07},
-      color: {255, 138, 52},
+      color: {255, 194, 125},
       seed: 237
     }
     ParticleForces: {gravity: {0, 0.8, 0}, drag: 1.1, turbulence: 1.8, turbulence_scale: 1.1}
@@ -46,9 +46,9 @@ template CorpseEmbers {
       opacity: {0.15, 0.77, 0.49, 0},
       color: {
         start: {255, 255, 255},
-        early: {241, 195, 201},
-        late: {166, 128, 153},
-        end: {58, 57, 108}
+        early: {249, 227, 230},
+        late: {211, 188, 203},
+        end: {131, 130, 174}
       }
     }
   }
@@ -70,7 +70,7 @@ template CorpseEmbers {
       lifetime: {0.7, 1.7},
       size: {0.052, 0.14},
       opacity: {0.5, 0.5},
-      color: {255, 138, 52},
+      color: {255, 194, 125},
       seed: 237
     }
     ParticleForces: {gravity: {0, 0.8, 0}, drag: 1.1, turbulence: 1.8, turbulence_scale: 1.1}
@@ -86,9 +86,9 @@ template CorpseEmbers {
       opacity: {0.15, 0.77, 0.49, 0},
       color: {
         start: {255, 255, 255},
-        early: {241, 195, 201},
-        late: {166, 128, 153},
-        end: {58, 57, 108}
+        early: {249, 227, 230},
+        late: {211, 188, 203},
+        end: {131, 130, 174}
       }
     }
   }

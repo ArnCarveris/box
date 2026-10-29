@@ -15,11 +15,15 @@ using box.material
 using box.texture
 
 frond_tex {
-  TexturePath: {path: "apps/oreelse/etc/assets/flora_frond.svg", width: 256, height: 256}
+  TexturePath: {
+    path: "apps/oreelse/etc/assets/flora_frond.svg", width: 256, height: 256, linear: true
+  }
 }
 
 frond_b_tex {
-  TexturePath: {path: "apps/oreelse/etc/assets/flora_frond_b.svg", width: 256, height: 256}
+  TexturePath: {
+    path: "apps/oreelse/etc/assets/flora_frond_b.svg", width: 256, height: 256, linear: true
+  }
 }
 
 frond_norm {
@@ -27,11 +31,15 @@ frond_norm {
 }
 
 membrane_tex {
-  TexturePath: {path: "apps/oreelse/etc/assets/flora_pad.svg", width: 256, height: 256}
+  TexturePath: {
+    path: "apps/oreelse/etc/assets/flora_pad.svg", width: 256, height: 256, linear: true
+  }
 }
 
 membrane_b_tex {
-  TexturePath: {path: "apps/oreelse/etc/assets/flora_pad_b.svg", width: 256, height: 256}
+  TexturePath: {
+    path: "apps/oreelse/etc/assets/flora_pad_b.svg", width: 256, height: 256, linear: true
+  }
 }
 
 membrane_norm {
@@ -43,7 +51,7 @@ prefab FloraFrond {
   Rgb: {255, 255, 255}
   PbrMaterial: {metallic: 0, roughness: 0.78}
   PbrTextures: {albedo: frond_tex, normal: frond_norm}
-  Emissive: {strength: 0.18, color: {112, 84, 122}}
+  Emissive: {strength: 0.18, color: {177, 155, 184}}
   AlphaCutoff: {value: 0.5}
 }
 
@@ -52,7 +60,7 @@ prefab FloraFrondB {
   Rgb: {255, 255, 255}
   PbrMaterial: {metallic: 0, roughness: 0.78}
   PbrTextures: {albedo: frond_b_tex, normal: frond_norm}
-  Emissive: {strength: 0.18, color: {88, 94, 128}}
+  Emissive: {strength: 0.18, color: {159, 163, 188}}
   AlphaCutoff: {value: 0.5}
 }
 
@@ -61,7 +69,7 @@ prefab FloraMembrane {
   Rgb: {255, 255, 255}
   PbrMaterial: {metallic: 0, roughness: 0.7}
   PbrTextures: {albedo: membrane_tex, normal: membrane_norm}
-  Emissive: {strength: 0.18, color: {84, 90, 124}}
+  Emissive: {strength: 0.18, color: {155, 160, 185}}
   AlphaCutoff: {value: 0.5}
 }
 
@@ -70,6 +78,6 @@ prefab FloraMembraneB {
   Rgb: {255, 255, 255}
   PbrMaterial: {metallic: 0, roughness: 0.7}
   PbrTextures: {albedo: membrane_b_tex, normal: membrane_norm}
-  Emissive: {strength: 0.18, color: {114, 88, 108}}
+  Emissive: {strength: 0.18, color: {178, 159, 174}}
   AlphaCutoff: {value: 0.5}
 }

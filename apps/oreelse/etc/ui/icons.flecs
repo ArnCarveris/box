@@ -7,102 +7,130 @@ using box.texture
 
 icons {
   iron {
-    TexturePath: {path: "apps/oreelse/etc/icons/iron.svg", width: 128, height: 128}
+    TexturePath: {path: "apps/oreelse/etc/icons/iron.svg", width: 128, height: 128, linear: true}
   }
 
   copper {
-    TexturePath: {path: "apps/oreelse/etc/icons/copper.svg", width: 128, height: 128}
+    TexturePath: {path: "apps/oreelse/etc/icons/copper.svg", width: 128, height: 128, linear: true}
   }
 
   stone {
-    TexturePath: {path: "apps/oreelse/etc/icons/stone.svg", width: 128, height: 128}
+    TexturePath: {path: "apps/oreelse/etc/icons/stone.svg", width: 128, height: 128, linear: true}
   }
 
   luminite {
-    TexturePath: {path: "apps/oreelse/etc/icons/luminite.svg", width: 128, height: 128}
+    TexturePath: {
+      path: "apps/oreelse/etc/icons/luminite.svg", width: 128, height: 128, linear: true
+    }
   }
 
   iron_plate {
-    TexturePath: {path: "apps/oreelse/etc/icons/iron_plate.svg", width: 128, height: 128}
+    TexturePath: {
+      path: "apps/oreelse/etc/icons/iron_plate.svg", width: 128, height: 128, linear: true
+    }
   }
 
   copper_plate {
-    TexturePath: {path: "apps/oreelse/etc/icons/copper_plate.svg", width: 128, height: 128}
+    TexturePath: {
+      path: "apps/oreelse/etc/icons/copper_plate.svg", width: 128, height: 128, linear: true
+    }
   }
 
   stone_brick {
-    TexturePath: {path: "apps/oreelse/etc/icons/stone_brick.svg", width: 128, height: 128}
+    TexturePath: {
+      path: "apps/oreelse/etc/icons/stone_brick.svg", width: 128, height: 128, linear: true
+    }
   }
 
   wire {
-    TexturePath: {path: "apps/oreelse/etc/icons/wire.svg", width: 128, height: 128}
+    TexturePath: {path: "apps/oreelse/etc/icons/wire.svg", width: 128, height: 128, linear: true}
   }
 
   electronics {
-    TexturePath: {path: "apps/oreelse/etc/icons/electronics.svg", width: 128, height: 128}
+    TexturePath: {
+      path: "apps/oreelse/etc/icons/electronics.svg", width: 128, height: 128, linear: true
+    }
   }
 
   rocket_engine {
-    TexturePath: {path: "apps/oreelse/etc/icons/rocket_engine.svg", width: 128, height: 128}
+    TexturePath: {
+      path: "apps/oreelse/etc/icons/rocket_engine.svg", width: 128, height: 128, linear: true
+    }
   }
 
   rocket_fuel {
-    TexturePath: {path: "apps/oreelse/etc/icons/rocket_fuel.svg", width: 128, height: 128}
+    TexturePath: {
+      path: "apps/oreelse/etc/icons/rocket_fuel.svg", width: 128, height: 128, linear: true
+    }
   }
 
   rocket_cargo {
-    TexturePath: {path: "apps/oreelse/etc/icons/rocket_cargo.svg", width: 128, height: 128}
+    TexturePath: {
+      path: "apps/oreelse/etc/icons/rocket_cargo.svg", width: 128, height: 128, linear: true
+    }
   }
 
   rocket_life {
-    TexturePath: {path: "apps/oreelse/etc/icons/rocket_life.svg", width: 128, height: 128}
+    TexturePath: {
+      path: "apps/oreelse/etc/icons/rocket_life.svg", width: 128, height: 128, linear: true
+    }
   }
 
   wall {
-    TexturePath: {path: "apps/oreelse/etc/icons/wall.svg", width: 128, height: 128}
+    TexturePath: {path: "apps/oreelse/etc/icons/wall.svg", width: 128, height: 128, linear: true}
   }
 
   drill {
-    TexturePath: {path: "apps/oreelse/etc/icons/drill.svg", width: 128, height: 128}
+    TexturePath: {path: "apps/oreelse/etc/icons/drill.svg", width: 128, height: 128, linear: true}
   }
 
   solar {
-    TexturePath: {path: "apps/oreelse/etc/icons/solar.svg", width: 128, height: 128}
+    TexturePath: {path: "apps/oreelse/etc/icons/solar.svg", width: 128, height: 128, linear: true}
   }
 
   gun_turret {
-    TexturePath: {path: "apps/oreelse/etc/icons/gun_turret.svg", width: 128, height: 128}
+    TexturePath: {
+      path: "apps/oreelse/etc/icons/gun_turret.svg", width: 128, height: 128, linear: true
+    }
   }
 
   laser_turret {
-    TexturePath: {path: "apps/oreelse/etc/icons/laser_turret.svg", width: 128, height: 128}
+    TexturePath: {
+      path: "apps/oreelse/etc/icons/laser_turret.svg", width: 128, height: 128, linear: true
+    }
   }
 
   missile_turret {
-    TexturePath: {path: "apps/oreelse/etc/icons/missile_turret.svg", width: 128, height: 128}
+    TexturePath: {
+      path: "apps/oreelse/etc/icons/missile_turret.svg", width: 128, height: 128, linear: true
+    }
   }
 
   factory {
-    TexturePath: {path: "apps/oreelse/etc/icons/factory.svg", width: 128, height: 128}
+    TexturePath: {path: "apps/oreelse/etc/icons/factory.svg", width: 128, height: 128, linear: true}
   }
 
   rocket_pad {
-    TexturePath: {path: "apps/oreelse/etc/icons/rocket_pad.svg", width: 128, height: 128}
+    TexturePath: {
+      path: "apps/oreelse/etc/icons/rocket_pad.svg", width: 128, height: 128, linear: true
+    }
   }
 
   drone_pad {
-    TexturePath: {path: "apps/oreelse/etc/icons/drone_pad.svg", width: 128, height: 128}
+    TexturePath: {
+      path: "apps/oreelse/etc/icons/drone_pad.svg", width: 128, height: 128, linear: true
+    }
   }
 
   heart {
-    TexturePath: {path: "apps/oreelse/etc/icons/heart.svg", width: 128, height: 128}
+    TexturePath: {path: "apps/oreelse/etc/icons/heart.svg", width: 128, height: 128, linear: true}
   }
 
   critter {
-    TexturePath: {path: "apps/oreelse/etc/icons/critter.svg", width: 128, height: 128}
+    TexturePath: {path: "apps/oreelse/etc/icons/critter.svg", width: 128, height: 128, linear: true}
   }
 
   power {
-    TexturePath: {path: "apps/oreelse/etc/icons/power.svg", width: 128, height: 128}
+    TexturePath: {path: "apps/oreelse/etc/icons/power.svg", width: 128, height: 128, linear: true}
   }
 }

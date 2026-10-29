@@ -12,8 +12,8 @@ using box.material
 const oreRng: Rng = {seed: oreelse.seed(3)}
 
 template Ore {
-  prop tint: Rgb = {140, 138, 132}
-  prop padTint: Rgb = {96, 82, 66}
+  prop tint: Rgb = {196, 194, 190}
+  prop padTint: Rgb = {165, 154, 139}
   prop glow: f32 = 0
   prop metallic: f32 = 0
   prop roughness: f32 = 0.7

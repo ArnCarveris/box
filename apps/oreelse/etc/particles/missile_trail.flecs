@@ -26,7 +26,7 @@ template MissileTrail {
     rotation: {-180, 180},
     spin: {-115, 115},
     inherit_velocity: 0.1,
-    color: {228, 220, 210},
+    color: {243, 239, 234},
     seed: 235,
     linger: true
   }
@@ -42,9 +42,9 @@ template MissileTrail {
     opacity: {0, 0.44, 0.17, 0},
     color: {
       start: {255, 255, 255},
-      early: {173, 172, 176},
-      late: {145, 145, 148},
-      end: {117, 117, 121}
+      early: {215, 214, 216},
+      late: {199, 199, 200},
+      end: {180, 180, 183}
     }
   }
 }

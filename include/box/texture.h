@@ -30,7 +30,8 @@ ECS_STRUCT(Texture, {
 /** Texture loaded from an image file, which writes Texture and TextureStatus.
  *
  * Raster formats load with stb_image, a file ending in .svg is rendered by resvg at the
- * requested size; with one requested dimension the other keeps the aspect ratio.
+ * requested size; with one requested dimension the other keeps the aspect ratio. Set linear
+ * for an image made for engines that sample color textures without decoding them from sRGB.
  *
  * The largest dimension is capped by Surface.texture_quality. Changing a member loads the
  * image again, and so does a change of its file that FileWatch (box/app.h) sees; the previous
@@ -40,6 +41,9 @@ ECS_STRUCT(TexturePath, {
     char *path;     /**< Image file, relative to the working directory or an ancestor of it */
     int32_t width;  /**< Requested width in pixels, 0 for source width. */
     int32_t height; /**< Requested height in pixels, 0 for source height. */
+    bool linear;    /**< The color channels hold linear light, not sRGB, default off: they are
+                     *   encoded to sRGB on load, so the layers that decode color read them as
+                     *   they are stored. Alpha is kept; leave it off for ORM and normal maps */
 });
 
 /** Progress of the load of a TexturePath */
