@@ -1,7 +1,7 @@
 /**
  * @file FileWatch.c
- * @brief Tests for the file watch of box.app: its settings, its status and the textures it
- * loads again when their file changes.
+ * @brief Tests for the file watch of box.app: its settings, its status, the slices of files a
+ * frame checks and the textures it loads again when their file changes.
  */
 
 #ifndef _GNU_SOURCE
@@ -10,8 +10,11 @@
 
 #include <box.h>
 #include <bake_test.h>
+#include <watch.h>
+#include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 
@@ -296,6 +299,397 @@ void FileWatch_change_status(void) {
     ecs_progress(world, 0);
     test_int(ecs_singleton_get(world, FileWatchStatus)->changes, 1);
     test_int(ecs_get(world, tex, TextureStatus)->revision, 2);
+
+    ecs_os_free(file);
+    ecs_fini(world);
+}
+
+/** Most files a test kind watches */
+#define LOG_FILES (32)
+
+/** Owners of a test kind, one per file, and how often the watch told each about a change */
+typedef struct changed_log_t {
+    ecs_entity_t owners[LOG_FILES]; /**< Owner of each file */
+    char *paths[LOG_FILES];         /**< Path of each file */
+    int32_t calls[LOG_FILES];       /**< Changes each owner was told */
+    int32_t count;                  /**< Files watched */
+} changed_log_t;
+
+/** Count a change an owner of the test kind was told.
+ *
+ * @param world The world
+ * @param ctx The log
+ * @param owner The owner
+ */
+static void on_changed(
+    ecs_world_t *world,
+    void *ctx,
+    ecs_entity_t owner)
+{
+    changed_log_t *log = ctx;
+    int32_t i;
+    (void)world;
+    for (i = 0; i < LOG_FILES; i ++) {
+        if (log->owners[i] == owner) {
+            log->calls[i] ++;
+        }
+    }
+}
+
+/** Write a text file and give it a modification time.
+ *
+ * @param path The file
+ * @param text Content of the file
+ * @param mtime Seconds of the modification time
+ */
+static void write_text(
+    const char *path,
+    const char *text,
+    int64_t mtime)
+{
+    FILE *f = fopen(path, "w");
+    test_assert(f != NULL);
+    fputs(text, f);
+    fclose(f);
+    struct timespec times[2] = {{ .tv_sec = (time_t)mtime }, { .tv_sec = (time_t)mtime }};
+    test_int(utimensat(AT_FDCWD, path, times, 0), 0);
+}
+
+/** Register a test kind and watch count text files, each by an owner of its own.
+ *
+ * @param world The world
+ * @param log The log, receives the owners and the paths
+ * @param count Number of files
+ * @return Id of the kind
+ */
+static int32_t watch_files(
+    ecs_world_t *world,
+    changed_log_t *log,
+    int32_t count)
+{
+    int32_t i, kind = box_file_watch_kind(world, "test", on_changed, log);
+    test_assert(kind != 0);
+    for (i = 0; i < count; i ++) {
+        char name[32];
+        box_file_stamp_t stamp;
+        snprintf(name, sizeof(name), "watch_%d.txt", i);
+        log->paths[i] = tmp_file(world, name);
+        write_text(log->paths[i], name, 1000000000);
+        box_file_stamp(log->paths[i], &stamp);
+        log->owners[i] = ecs_new(world);
+        box_file_watch_add(world, kind, log->owners[i], log->paths[i], &stamp);
+    }
+
+    log->count = count;
+
+    return kind;
+}
+
+/** Free the paths of a log.
+ *
+ * @param log The log
+ */
+static void log_fini(
+    changed_log_t *log)
+{
+    int32_t i;
+    for (i = 0; i < log->count; i ++) {
+        ecs_os_free(log->paths[i]);
+    }
+}
+
+/** Sum the changes the owners of a log were told.
+ *
+ * @param log The log
+ * @return Changes told to any owner
+ */
+static int32_t log_calls(
+    const changed_log_t *log)
+{
+    int32_t i, result = 0;
+    for (i = 0; i < LOG_FILES; i ++) {
+        result += log->calls[i];
+    }
+
+    return result;
+}
+
+/** Run frames of a fixed delta until the file watch completes a pass.
+ *
+ * @param world The world
+ * @param delta Seconds of each frame
+ * @param max Most frames to run
+ * @return Frames run, more than max when no pass completed
+ */
+static int32_t run_pass(
+    ecs_world_t *world,
+    ecs_ftime_t delta,
+    int32_t max)
+{
+    int64_t polls = ecs_singleton_get(world, FileWatchStatus)->polls;
+    int32_t frames = 0;
+    while (ecs_singleton_get(world, FileWatchStatus)->polls == polls && frames <= max) {
+        ecs_progress(world, delta);
+        frames ++;
+    }
+
+    return frames;
+}
+
+void FileWatch_slice_bounded(void) {
+    // engine/file_watch
+    ecs_world_t *world = world_new(0.25f);
+    changed_log_t log = {0};
+    watch_files(world, &log, 30);
+
+    int32_t frames = 0;
+    int64_t checks = 0;
+    while (ecs_singleton_get(world, FileWatchStatus)->polls == 0 && frames < 30) {
+        ecs_progress(world, 1.0f / 60.0f);
+        int64_t now = ecs_singleton_get(world, FileWatchStatus)->checks;
+        test_assert(now - checks <= 3);
+        checks = now;
+        frames ++;
+    }
+
+    test_assert(frames >= 14 && frames <= 16);
+    const FileWatchStatus *status = ecs_singleton_get(world, FileWatchStatus);
+    test_int(status->polls, 1);
+    test_int(status->checks, 30);
+    test_int(status->files, 30);
+    test_int(status->changes, 0);
+
+    frames = run_pass(world, 1.0f / 60.0f, 30);
+    test_assert(frames >= 14 && frames <= 16);
+    status = ecs_singleton_get(world, FileWatchStatus);
+    test_int(status->polls, 2);
+    test_int(status->checks, 60);
+    test_int(log_calls(&log), 0);
+
+    log_fini(&log);
+    ecs_fini(world);
+}
+
+void FileWatch_change_found_within_interval(void) {
+    // engine/file_watch
+    ecs_world_t *world = world_new(0.25f);
+    changed_log_t log = {0};
+    watch_files(world, &log, 30);
+    test_assert(run_pass(world, 0.025f, 20) <= 11);
+
+    const int32_t changed[] = {0, 17, 29, 5};
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        int32_t index = changed[i], frames = 0;
+        write_text(log.paths[index], "changed content", 1000000100 + i);
+        while (!log.calls[index] && frames < 30) {
+            ecs_progress(world, 0.025f);
+            frames ++;
+        }
+
+        test_assert(frames <= 11);
+        test_int(log.calls[index], 1);
+        test_int(log_calls(&log), i + 1);
+        const FileWatchStatus *status = ecs_singleton_get(world, FileWatchStatus);
+        test_int(status->changes, i + 1);
+        test_str(status->last, log.paths[index]);
+    }
+
+    run_pass(world, 0.025f, 20);
+    run_pass(world, 0.025f, 20);
+    test_int(log_calls(&log), 4);
+    test_int(ecs_singleton_get(world, FileWatchStatus)->changes, 4);
+
+    log_fini(&log);
+    ecs_fini(world);
+}
+
+void FileWatch_interval_zero_checks_every_file(void) {
+    // engine/file_watch
+    ecs_world_t *world = world_new(0);
+    changed_log_t log = {0};
+    watch_files(world, &log, 5);
+
+    int32_t i;
+    for (i = 1; i <= 3; i ++) {
+        ecs_progress(world, 0.001f);
+        const FileWatchStatus *status = ecs_singleton_get(world, FileWatchStatus);
+        test_int(status->polls, i);
+        test_int(status->checks, i * 5);
+    }
+
+    write_text(log.paths[3], "changed content", 1000000100);
+    ecs_progress(world, 0.001f);
+    test_int(log.calls[3], 1);
+    test_int(log_calls(&log), 1);
+    test_int(ecs_singleton_get(world, FileWatchStatus)->changes, 1);
+
+    log_fini(&log);
+    ecs_fini(world);
+}
+
+void FileWatch_long_frame_checks_one_pass(void) {
+    // engine/file_watch
+    ecs_world_t *world = world_new(0.25f);
+    changed_log_t log = {0};
+    watch_files(world, &log, 8);
+
+    int32_t i;
+    for (i = 1; i <= 3; i ++) {
+        ecs_progress(world, 2.0f);
+        const FileWatchStatus *status = ecs_singleton_get(world, FileWatchStatus);
+        test_int(status->polls, i);
+        test_int(status->checks, i * 8);
+    }
+
+    log_fini(&log);
+    ecs_fini(world);
+}
+
+void FileWatch_stop_watching_mid_pass(void) {
+    // engine/file_watch
+    ecs_world_t *world = world_new(0.25f);
+    changed_log_t log = {0};
+    int32_t kind = watch_files(world, &log, 10);
+
+    int32_t i;
+    for (i = 0; i < 5; i ++) {
+        ecs_progress(world, 0.025f);
+    }
+
+    const FileWatchStatus *status = ecs_singleton_get(world, FileWatchStatus);
+    test_int(status->polls, 0);
+    test_assert(status->checks >= 1 && status->checks < 10);
+
+    box_file_watch_clear(world, kind, log.owners[0]);
+    test_assert(run_pass(world, 0.025f, 10) <= 10);
+    status = ecs_singleton_get(world, FileWatchStatus);
+    test_int(status->polls, 1);
+    test_int(status->checks, 10);
+    test_int(status->files, 9);
+
+    run_pass(world, 0.025f, 10);
+    status = ecs_singleton_get(world, FileWatchStatus);
+    test_int(status->polls, 2);
+    test_int(status->checks, 19);
+
+    log_fini(&log);
+    ecs_fini(world);
+}
+
+void FileWatch_stale_registration_checked_next_frame(void) {
+    // engine/file_watch
+    ecs_world_t *world = world_new(0.25f);
+    changed_log_t log = {0};
+    int32_t kind = watch_files(world, &log, 1);
+    ecs_progress(world, 0.01f);
+    test_int(ecs_singleton_get(world, FileWatchStatus)->checks, 0);
+
+    box_file_stamp_t stale;
+    box_file_stamp(log.paths[0], &stale);
+    stale.sec -= 10;
+    log.owners[1] = ecs_new(world);
+    box_file_watch_add(world, kind, log.owners[1], log.paths[0], &stale);
+    ecs_progress(world, 0.01f);
+    const FileWatchStatus *status = ecs_singleton_get(world, FileWatchStatus);
+    test_int(status->checks, 1);
+    test_int(status->changes, 0);
+    test_int(status->files, 1);
+    test_int(log.calls[0], 0);
+    test_int(log.calls[1], 1);
+
+    ecs_progress(world, 0.01f);
+    test_int(log.calls[1], 1);
+    test_int(ecs_singleton_get(world, FileWatchStatus)->checks, 1);
+
+    char *other = tmp_file(world, "other.txt");
+    box_file_stamp_t stamp;
+    write_text(other, "other", 1000000000);
+    box_file_stamp(other, &stamp);
+    log.owners[2] = ecs_new(world);
+    log.owners[3] = ecs_new(world);
+    box_file_watch_add(world, kind, log.owners[2], other, &stamp);
+    box_file_watch_add(world, kind, log.owners[3], other, &stale);
+    box_file_watch_clear(world, kind, log.owners[2]);
+    box_file_watch_clear(world, kind, log.owners[3]);
+    ecs_progress(world, 0.01f);
+    test_int(ecs_singleton_get(world, FileWatchStatus)->checks, 1);
+    test_int(ecs_singleton_get(world, FileWatchStatus)->files, 1);
+    test_int(log.calls[2], 0);
+    test_int(log.calls[3], 0);
+
+    ecs_os_free(other);
+    log_fini(&log);
+    ecs_fini(world);
+}
+
+void FileWatch_restored_while_queued_reloads_once(void) {
+    // engine/file_watch
+    ecs_world_t *world = world_new(0.25f);
+    changed_log_t log = {0};
+    int32_t kind = watch_files(world, &log, 1);
+    ecs_progress(world, 0.01f);
+
+    box_file_stamp_t stale;
+    box_file_stamp(log.paths[0], &stale);
+    stale.sec -= 10;
+    log.owners[1] = ecs_new(world);
+    box_file_watch_add(world, kind, log.owners[1], log.paths[0], &stale);
+    test_int(unlink(log.paths[0]), 0);
+    write_text(log.paths[0], "restored content", 1000000100);
+    ecs_progress(world, 0.01f);
+
+    const FileWatchStatus *status = ecs_singleton_get(world, FileWatchStatus);
+    test_int(status->changes, 1);
+    test_str(status->last, log.paths[0]);
+    test_int(log.calls[0], 1);
+    test_int(log.calls[1], 1);
+
+    run_pass(world, 0.05f, 10);
+    run_pass(world, 0.05f, 10);
+    test_int(log.calls[0], 1);
+    test_int(log.calls[1], 1);
+    test_int(ecs_singleton_get(world, FileWatchStatus)->changes, 1);
+
+    log_fini(&log);
+    ecs_fini(world);
+}
+
+void FileWatch_restored_in_slice_reloads_once(void) {
+    // engine/file_watch
+    ecs_world_t *world = world_new(0.25f);
+    char *file = tmp_file(world, "restored.png");
+    write_png(file, 8, 4, 1000000000);
+
+    ecs_entity_t tex = ecs_new(world);
+    ecs_set(world, tex, TexturePath, {.path = file});
+    test_int(wait_texture(world, tex)->revision, 1);
+    test_assert(run_pass(world, 0.05f, 10) <= 10);
+    const FileWatchStatus *status = ecs_singleton_get(world, FileWatchStatus);
+    int64_t checks = status->checks;
+    test_int(status->files, 1);
+    test_int(status->changes, 0);
+
+    test_int(unlink(file), 0);
+    ecs_progress(world, 0.05f);
+    ecs_progress(world, 0.05f);
+    test_int(ecs_singleton_get(world, FileWatchStatus)->checks, checks);
+    write_png(file, 2, 2, 1000000100);
+    test_assert(run_pass(world, 0.05f, 10) <= 10);
+    status = ecs_singleton_get(world, FileWatchStatus);
+    test_int(status->checks, checks + 1);
+    test_int(status->changes, 1);
+    test_str(status->last, file);
+
+    const TextureStatus *tex_status = wait_texture(world, tex);
+    test_int(tex_status->state, TextureReady);
+    test_int(tex_status->revision, 2);
+    test_int(ecs_get(world, tex, Texture)->width, 2);
+
+    run_pass(world, 0.05f, 10);
+    run_pass(world, 0.05f, 10);
+    test_int(ecs_get(world, tex, TextureStatus)->revision, 2);
+    test_int(ecs_singleton_get(world, FileWatchStatus)->changes, 1);
 
     ecs_os_free(file);
     ecs_fini(world);

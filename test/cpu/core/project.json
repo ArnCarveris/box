@@ -246,7 +246,15 @@
                     "shared_file_counts_once",
                     "new_path_stops_watching",
                     "remove_stops_watching",
-                    "change_status"
+                    "change_status",
+                    "slice_bounded",
+                    "change_found_within_interval",
+                    "interval_zero_checks_every_file",
+                    "long_frame_checks_one_pass",
+                    "stop_watching_mid_pass",
+                    "stale_registration_checked_next_frame",
+                    "restored_while_queued_reloads_once",
+                    "restored_in_slice_reloads_once"
                 ]
             },
             {

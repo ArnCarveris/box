@@ -1,18 +1,25 @@
 /**
  * @file app/watch.c
- * @brief The file watch of box.app: stamps of the files modules loaded, checked once per
- * FileWatch.interval before the render extract, and the owners told when one changed.
+ * @brief The file watch of box.app: stamps of the files modules loaded, checked a slice per frame
+ * so each is checked about once per FileWatch.interval, and the owners told when one changed.
  */
 
 #include "watch.h"
 #include <string.h>
 #include <sys/stat.h>
 
+/** An owner of a kind, that watches a file or is told about a change */
+typedef struct box_watch_ref_t {
+    int32_t kind;               /**< Index of the kind */
+    ecs_entity_t owner;         /**< The owner entity */
+} box_watch_ref_t;
+
 /** A distinct file the registry watches */
 typedef struct box_watch_file_t {
     char *path;                 /**< The file as it was read */
     box_file_stamp_t stamp;     /**< Stamp of the last check, the first registration before */
-    int32_t watchers;           /**< Entries of owners that watch the file */
+    ecs_vec_t watchers;         /**< box_watch_ref_t, the owners with an entry for the file */
+    bool queued;                /**< In the queue of files the next poll checks first */
 } box_watch_file_t;
 
 /** A file an owner watches */
@@ -34,19 +41,14 @@ typedef struct box_watch_kind_t {
     ecs_map_t owners;           /**< Owner entity to box_watch_owner_t* */
 } box_watch_kind_t;
 
-/** An owner to tell about a change after the files were checked */
-typedef struct box_watch_notify_t {
-    int32_t kind;               /**< Index of the kind */
-    ecs_entity_t owner;         /**< The owner entity */
-} box_watch_notify_t;
-
 /** The watched files of a world */
 typedef struct box_file_watch_t {
     ecs_vec_t kinds;            /**< box_watch_kind_t */
-    ecs_vec_t files;            /**< box_watch_file_t*, distinct files with watchers */
-    ecs_vec_t notify;           /**< box_watch_notify_t, scratch of a poll */
-    ecs_time_t last_poll;       /**< Time the files were last checked */
-    bool polled;                /**< The files were checked at least once */
+    ecs_vec_t files;            /**< box_watch_file_t*, distinct files with watchers, in order */
+    ecs_vec_t queued;           /**< box_watch_file_t*, files an owner saw with another stamp */
+    ecs_vec_t notify;           /**< box_watch_ref_t, scratch of a poll */
+    int32_t cursor;             /**< Index of the next file the current pass checks */
+    double pass;                /**< Fraction of the current pass the frames so far are due */
 } box_file_watch_t;
 
 /** Singleton that holds the file watch of a world */
@@ -86,37 +88,105 @@ bool box_file_stamp_equals(
     return a->sec == b->sec && a->nsec == b->nsec && a->size == b->size;
 }
 
+/** Remove a file from a vector of files, keeping the order of the others.
+ *
+ * @param files box_watch_file_t*, the vector
+ * @param file The file
+ * @return Index the file had, -1 when the vector does not hold it
+ */
+static int32_t box_watch_files_remove(
+    ecs_vec_t *files,
+    const box_watch_file_t *file)
+{
+    int32_t i, result = -1;
+    box_watch_file_t **f = ecs_vec_first(files);
+    for (i = 0; i < ecs_vec_count(files); i ++) {
+        if (f[i] == file) {
+            ecs_vec_remove_ordered_t(files, box_watch_file_t*, i);
+            result = i;
+            break;
+        }
+    }
+
+    return result;
+}
+
+/** Free a file and its list of watchers.
+ *
+ * @param file The file
+ */
+static void box_watch_file_free(
+    box_watch_file_t *file)
+{
+    ecs_vec_fini_t(NULL, &file->watchers, box_watch_ref_t);
+    ecs_os_free(file->path);
+    ecs_os_free(file);
+}
+
+/** Drop an owner from the watchers of a file, and the file once nobody watches it anymore.
+ *
+ * A file that leaves the list before the cursor moves the cursor back, so the pass in progress
+ * still checks every file after it.
+ *
+ * @param w The registry
+ * @param file The file
+ * @param kind Index of the kind of the owner
+ * @param owner The owner entity
+ */
+static void box_watch_file_release(
+    box_file_watch_t *w,
+    box_watch_file_t *file,
+    int32_t kind,
+    ecs_entity_t owner)
+{
+    int32_t i;
+    box_watch_ref_t *refs = ecs_vec_first(&file->watchers);
+    for (i = 0; i < ecs_vec_count(&file->watchers); i ++) {
+        if (refs[i].kind == kind && refs[i].owner == owner) {
+            ecs_vec_remove_t(&file->watchers, box_watch_ref_t, i);
+            break;
+        }
+    }
+
+    if (ecs_vec_count(&file->watchers)) {
+        goto done;
+    }
+
+    int32_t index = box_watch_files_remove(&w->files, file);
+    if (index >= 0 && index < w->cursor) {
+        w->cursor --;
+    }
+
+    if (file->queued) {
+        box_watch_files_remove(&w->queued, file);
+    }
+
+    box_watch_file_free(file);
+done:
+    return;
+}
+
 /** Free the files of an owner, releasing the distinct files nobody watches anymore.
  *
  * @param w The registry
- * @param owner The owner
+ * @param kind Index of the kind of the owner
+ * @param owner The owner entity
+ * @param o The files of the owner
  */
 static void box_watch_owner_free(
     box_file_watch_t *w,
-    box_watch_owner_t *owner)
+    int32_t kind,
+    ecs_entity_t owner,
+    box_watch_owner_t *o)
 {
-    int32_t i, j;
-    box_watch_entry_t *entries = ecs_vec_first(&owner->entries);
-    for (i = 0; i < ecs_vec_count(&owner->entries); i ++) {
-        box_watch_file_t *file = entries[i].file;
-        if (-- file->watchers) {
-            continue;
-        }
-
-        box_watch_file_t **files = ecs_vec_first(&w->files);
-        for (j = 0; j < ecs_vec_count(&w->files); j ++) {
-            if (files[j] == file) {
-                ecs_vec_remove_t(&w->files, box_watch_file_t*, j);
-                break;
-            }
-        }
-
-        ecs_os_free(file->path);
-        ecs_os_free(file);
+    int32_t i;
+    box_watch_entry_t *entries = ecs_vec_first(&o->entries);
+    for (i = 0; i < ecs_vec_count(&o->entries); i ++) {
+        box_watch_file_release(w, entries[i].file, kind, owner);
     }
 
-    ecs_vec_fini_t(NULL, &owner->entries, box_watch_entry_t);
-    ecs_os_free(owner);
+    ecs_vec_fini_t(NULL, &o->entries, box_watch_entry_t);
+    ecs_os_free(o);
 }
 
 /** Free a registry.
@@ -131,16 +201,24 @@ static void box_file_watch_free(
     for (i = 0; i < ecs_vec_count(&w->kinds); i ++) {
         ecs_map_iter_t it = ecs_map_iter(&kinds[i].owners);
         while (ecs_map_next(&it)) {
-            box_watch_owner_free(w, ecs_map_ptr(&it));
+            box_watch_owner_t *o = ecs_map_ptr(&it);
+            ecs_vec_fini_t(NULL, &o->entries, box_watch_entry_t);
+            ecs_os_free(o);
         }
 
         ecs_map_fini(&kinds[i].owners);
         ecs_os_free(kinds[i].name);
     }
 
+    box_watch_file_t **files = ecs_vec_first(&w->files);
+    for (i = 0; i < ecs_vec_count(&w->files); i ++) {
+        box_watch_file_free(files[i]);
+    }
+
     ecs_vec_fini_t(NULL, &w->kinds, box_watch_kind_t);
     ecs_vec_fini_t(NULL, &w->files, box_watch_file_t*);
-    ecs_vec_fini_t(NULL, &w->notify, box_watch_notify_t);
+    ecs_vec_fini_t(NULL, &w->queued, box_watch_file_t*);
+    ecs_vec_fini_t(NULL, &w->notify, box_watch_ref_t);
     ecs_os_free(w);
 }
 
@@ -234,6 +312,22 @@ done:
     return result;
 }
 
+/** Queue a file for the next poll to check before its slice, because an owner registered it
+ * with a stamp the file does not have; the poll then tells the owners whose stamp differs.
+ *
+ * @param w The registry
+ * @param file The file
+ */
+static void box_watch_file_queue(
+    box_file_watch_t *w,
+    box_watch_file_t *file)
+{
+    if (!file->queued) {
+        file->queued = true;
+        *ecs_vec_append_t(NULL, &w->queued, box_watch_file_t*) = file;
+    }
+}
+
 void box_file_watch_add(
     ecs_world_t *world,
     int32_t kind,
@@ -260,7 +354,8 @@ void box_file_watch_add(
     for (i = 0; i < ecs_vec_count(&o->entries); i ++) {
         if (!strcmp(entries[i].file->path, path)) {
             entries[i].stamp = *stamp;
-            goto done;
+            file = entries[i].file;
+            goto queue;
         }
     }
 
@@ -276,13 +371,20 @@ void box_file_watch_add(
         file = ecs_os_calloc_t(box_watch_file_t);
         file->path = ecs_os_strdup(path);
         file->stamp = *stamp;
+        ecs_vec_init_t(NULL, &file->watchers, box_watch_ref_t, 0);
         *ecs_vec_append_t(NULL, &w->files, box_watch_file_t*) = file;
     }
 
-    file->watchers ++;
+    box_watch_ref_t *ref = ecs_vec_append_t(NULL, &file->watchers, box_watch_ref_t);
+    ref->kind = kind - 1;
+    ref->owner = owner;
     box_watch_entry_t *entry = ecs_vec_append_t(NULL, &o->entries, box_watch_entry_t);
     entry->file = file;
     entry->stamp = *stamp;
+queue:
+    if (!box_file_stamp_equals(stamp, &file->stamp)) {
+        box_watch_file_queue(w, file);
+    }
 done:
     return;
 }
@@ -299,7 +401,7 @@ void box_file_watch_clear(
         : NULL;
     if (o) {
         ecs_map_remove(&k->owners, owner);
-        box_watch_owner_free(w, o);
+        box_watch_owner_free(w, kind - 1, owner, o);
     }
 }
 
@@ -315,75 +417,138 @@ static void box_watch_queue(
     ecs_entity_t owner)
 {
     int32_t i;
-    box_watch_notify_t *queued = ecs_vec_first(&w->notify);
+    box_watch_ref_t *queued = ecs_vec_first(&w->notify);
     for (i = 0; i < ecs_vec_count(&w->notify); i ++) {
         if (queued[i].kind == kind && queued[i].owner == owner) {
             goto done;
         }
     }
 
-    box_watch_notify_t *n = ecs_vec_append_t(NULL, &w->notify, box_watch_notify_t);
+    box_watch_ref_t *n = ecs_vec_append_t(NULL, &w->notify, box_watch_ref_t);
     n->kind = kind;
     n->owner = owner;
 done:
     return;
 }
 
-/** Stat every distinct file once and record which changed since the last check.
- *
- * @param w The registry
- * @param status The status, receives the changes
- */
-static void box_watch_check(
-    box_file_watch_t *w,
-    FileWatchStatus *status)
-{
-    int32_t i;
-    box_watch_file_t **files = ecs_vec_first(&w->files);
-    for (i = 0; i < ecs_vec_count(&w->files); i ++) {
-        box_file_stamp_t stamp;
-        box_file_stamp(files[i]->path, &stamp);
-        if (box_file_stamp_equals(&stamp, &files[i]->stamp)) {
-            continue;
-        }
+/** What the checks of a frame found, added to FileWatchStatus */
+typedef struct box_watch_found_t {
+    int32_t checks;             /**< Files stat'ed */
+    int32_t changes;            /**< Files whose stamp changed */
+    const char *last;           /**< The file that changed last, NULL for none */
+} box_watch_found_t;
 
-        files[i]->stamp = stamp;
-        status->changes ++;
-        ecs_os_free(status->last);
-        status->last = ecs_os_strdup(files[i]->path);
-        ecs_trace("file watch: '%s' changed%s", files[i]->path,
-            stamp.sec < 0 ? ", it is missing" : "");
+/** Stat a file and record whether it changed since its last check.
+ *
+ * @param file The file
+ * @param found Receives the check and the change
+ * @return Whether the stamp of the file changed
+ */
+static bool box_watch_check(
+    box_watch_file_t *file,
+    box_watch_found_t *found)
+{
+    box_file_stamp_t stamp;
+    bool result = false;
+    box_file_stamp(file->path, &stamp);
+    found->checks ++;
+    if (box_file_stamp_equals(&stamp, &file->stamp)) {
+        goto done;
     }
+
+    file->stamp = stamp;
+    found->changes ++;
+    found->last = file->path;
+    ecs_trace("file watch: '%s' changed%s", file->path,
+        stamp.sec < 0 ? ", it is missing" : "");
+    result = true;
+done:
+    return result;
 }
 
-/** Find the owners whose files differ from what their load saw and queue them.
+/** Queue the owners of a file whose entry differs from the stamp of its last check.
+ *
+ * Only the watchers of the file are visited, so a poll walks no owner of an unchanged file.
  *
  * @param w The registry
+ * @param file The file
  */
 static void box_watch_collect(
-    box_file_watch_t *w)
+    box_file_watch_t *w,
+    box_watch_file_t *file)
 {
-    int32_t k, i;
-    box_watch_kind_t *kinds = ecs_vec_first(&w->kinds);
-    for (k = 0; k < ecs_vec_count(&w->kinds); k ++) {
-        ecs_map_iter_t it = ecs_map_iter(&kinds[k].owners);
-        while (ecs_map_next(&it)) {
-            box_watch_owner_t *o = ecs_map_ptr(&it);
-            box_watch_entry_t *entries = ecs_vec_first(&o->entries);
-            for (i = 0; i < ecs_vec_count(&o->entries); i ++) {
-                if (box_file_stamp_equals(&entries[i].stamp, &entries[i].file->stamp)) {
-                    continue;
-                }
-
-                entries[i].stamp = entries[i].file->stamp;
-                box_watch_queue(w, k, (ecs_entity_t)ecs_map_key(&it));
+    int32_t i, j;
+    box_watch_ref_t *refs = ecs_vec_first(&file->watchers);
+    for (i = 0; i < ecs_vec_count(&file->watchers); i ++) {
+        box_watch_kind_t *k = ecs_vec_get_t(&w->kinds, box_watch_kind_t, refs[i].kind);
+        box_watch_owner_t *o = ecs_map_get_deref(&k->owners, box_watch_owner_t,
+            refs[i].owner);
+        box_watch_entry_t *entries = o ? ecs_vec_first(&o->entries) : NULL;
+        for (j = 0; o && j < ecs_vec_count(&o->entries); j ++) {
+            bool same = entries[j].file != file ||
+                box_file_stamp_equals(&entries[j].stamp, &file->stamp);
+            if (same) {
+                continue;
             }
+
+            entries[j].stamp = file->stamp;
+            box_watch_queue(w, refs[i].kind, refs[i].owner);
         }
     }
 }
 
-/** Check the watched files once the interval of FileWatch elapsed, tell the owners of the
- * changed ones and update FileWatchStatus.
+/** Check the queued files and the slice of the current pass that the frame is due.
+ *
+ * A pass checks every file once, in order. Each frame advances it by the unscaled frame delta
+ * over the interval, at most one whole pass, and checks the files up to that fraction.
+ *
+ * @param w The registry
+ * @param interval FileWatch.interval, 0 or more
+ * @param delta Unscaled seconds of the frame
+ * @param found Receives the checks and the changes
+ * @return Whether the frame completed a pass
+ */
+static bool box_watch_slice(
+    box_file_watch_t *w,
+    float interval,
+    double delta,
+    box_watch_found_t *found)
+{
+    int32_t i;
+    double due = interval > 0 ? delta / (double)interval : 1.0;
+    box_watch_file_t **queued = ecs_vec_first(&w->queued);
+    for (i = 0; i < ecs_vec_count(&w->queued); i ++) {
+        queued[i]->queued = false;
+        box_watch_check(queued[i], found);
+        box_watch_collect(w, queued[i]);
+    }
+
+    ecs_vec_clear(&w->queued);
+    w->pass += due > 1.0 ? 1.0 : (due > 0 ? due : 0);
+    bool result = w->pass >= 1.0;
+    int32_t count = ecs_vec_count(&w->files);
+    int32_t end = result ? count : (int32_t)(w->pass * (double)count);
+    box_watch_file_t **files = ecs_vec_first(&w->files);
+    for (i = w->cursor; i < end && i < count; i ++) {
+        if (box_watch_check(files[i], found)) {
+            box_watch_collect(w, files[i]);
+        }
+    }
+
+    if (end > w->cursor) {
+        w->cursor = end;
+    }
+
+    if (result) {
+        w->pass -= 1.0;
+        w->cursor = 0;
+    }
+
+    return result;
+}
+
+/** Check the slice of the watched files a frame is due, tell the owners of the changed ones
+ * and update FileWatchStatus when the frame checked a file or completed a pass.
  *
  * @param it The iterator of the system
  */
@@ -394,23 +559,34 @@ static void BoxFileWatchPoll(
     box_file_watch_t *w = box_file_watch_get(world);
     const FileWatch *settings = ecs_singleton_get(world, FileWatch);
     float interval = settings ? settings->interval : BOX_FILE_WATCH_INTERVAL;
-    ecs_time_t now = w ? w->last_poll : (ecs_time_t){0};
-    double elapsed = ecs_time_measure(&now);
+    box_watch_found_t found = {0};
     int32_t i;
-    if (!w || interval < 0 || (w->polled && elapsed < interval)) {
+    if (!w || interval < 0) {
         goto done;
     }
 
-    w->last_poll = now;
-    w->polled = true;
-    FileWatchStatus *status = ecs_singleton_ensure(world, FileWatchStatus);
-    status->polls ++;
-    box_watch_check(w, status);
-    status->files = ecs_vec_count(&w->files);
-    ecs_singleton_modified(world, FileWatchStatus);
-    box_watch_collect(w);
+    double delta = (double)ecs_get_world_info(world)->delta_time_raw;
+    bool pass = box_watch_slice(w, interval, delta, &found);
+    int32_t files = ecs_vec_count(&w->files);
+    const FileWatchStatus *current = ecs_singleton_get(world, FileWatchStatus);
+    FileWatchStatus *status = current && (pass || found.checks || current->files != files)
+        ? ecs_singleton_get_mut(world, FileWatchStatus)
+        : NULL;
+    if (status) {
+        status->files = files;
+        status->polls += pass ? 1 : 0;
+        status->checks += found.checks;
+        status->changes += found.changes;
+        if (found.last) {
+            ecs_os_free(status->last);
+            status->last = ecs_os_strdup(found.last);
+        }
+
+        ecs_singleton_modified(world, FileWatchStatus);
+    }
+
     for (i = 0; i < ecs_vec_count(&w->notify); i ++) {
-        box_watch_notify_t *n = ecs_vec_get_t(&w->notify, box_watch_notify_t, i);
+        box_watch_ref_t *n = ecs_vec_get_t(&w->notify, box_watch_ref_t, i);
         box_watch_kind_t *kind = ecs_vec_get_t(&w->kinds, box_watch_kind_t, n->kind);
         ecs_dbg("file watch: %s %u reloads", kind->name, (uint32_t)n->owner);
         kind->changed(world, kind->ctx, n->owner);
@@ -434,7 +610,8 @@ void box_file_watch_init(
     box_file_watch_t *w = ecs_os_calloc_t(box_file_watch_t);
     ecs_vec_init_t(NULL, &w->kinds, box_watch_kind_t, 0);
     ecs_vec_init_t(NULL, &w->files, box_watch_file_t*, 0);
-    ecs_vec_init_t(NULL, &w->notify, box_watch_notify_t, 0);
+    ecs_vec_init_t(NULL, &w->queued, box_watch_file_t*, 0);
+    ecs_vec_init_t(NULL, &w->notify, box_watch_ref_t, 0);
     ecs_singleton_ensure(world, FileWatchRegistry)->watch = w;
 
     ecs_singleton_set(world, FileWatch, { .interval = BOX_FILE_WATCH_INTERVAL });
@@ -443,7 +620,6 @@ void box_file_watch_init(
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "FileWatchPoll" }),
         .phase = EcsOnStore,
-        .run = BoxFileWatchPoll,
-        .immediate = true
+        .run = BoxFileWatchPoll
     });
 }

@@ -2,8 +2,9 @@
  * @file app/watch.h
  * @brief File stamps and the per-world registry of watched files that box.app polls.
  *
- * Modules register the files their loads read under an owner entity; the poll stats every
- * distinct file once per FileWatch.interval and tells the owners whose file changed.
+ * Modules register the files their loads read under an owner entity; the poll stats a slice of
+ * the distinct files every frame, each about once per FileWatch.interval, and tells only the
+ * owners of a file that changed.
  */
 
 #ifndef BOX_APP_WATCH_H
@@ -71,7 +72,8 @@ int32_t box_file_watch_kind(
  * @param kind Id of the kind of the owner
  * @param owner The owner entity
  * @param path The file as it was read, the path the locate found
- * @param stamp Stamp of the file taken before it was read
+ * @param stamp Stamp of the file taken before it was read; when it differs from the stamp of
+ * the last check, the next poll checks the file and tells the owners that saw another stamp
  */
 void box_file_watch_add(
     ecs_world_t *world,
