@@ -59,7 +59,7 @@ template QueueRow {
 
   const labelTone: Rgb = match sub {
     true: palette.soft
-    false: {224, 228, 238}
+    false: {224, 229, 237}
   }
 
   const labelColor: Rgb = match stalled {

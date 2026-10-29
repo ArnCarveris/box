@@ -76,7 +76,7 @@ template StockSlot : box.widgets.HeadlessButton {
   const selectedFace: Rgb = {78, 62, 26}
   const emptyFace: Rgb = {15, 16, 20}
   const emptyEdge: Rgb = {44, 48, 56}
-  const countInk: Rgb = {224, 228, 238}
+  const countInk: Rgb = {224, 229, 237}
 
   const none: entity = 0
   const filled = item != none
