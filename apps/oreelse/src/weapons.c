@@ -243,7 +243,7 @@ static void ore_projectile_fire(
 
 /** Fire the astronaut's pistol: every interval at the nearest live critter within its range,
  * aimed cfg.turretAimY above it without lead, from its muzzle height above the astronaut (the
- * hover included), in a blackout too. (OreRocket adds: not while it is aboard a rocket.)
+ * hover included), in a blackout too, not while it is aboard the rocket.
  *
  * Its timer counts down and is held at 0 while there is no target, so it fires at once.
  *
@@ -265,8 +265,9 @@ static void OrePistol(
     const Position *tp;
     ecs_entity_t target;
     int32_t i, shots;
+    bool aboard = ore_rocket_aboard(it->world);
     vec3 from, to;
-    for (i = 0; i < it->count; i ++) {
+    for (i = 0; !aboard && i < it->count; i ++) {
         if (health[i].value <= 0) {
             continue;
         }

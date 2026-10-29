@@ -23,11 +23,8 @@ python3 tools/integration.py e2e oreelse_flow oreelse_look     # the end-to-end 
 python3 tools/integration.py e2e oreelse_mining oreelse_particles
 python3 tools/integration.py e2e oreelse_crafting oreelse_buildings oreelse_rocket
 python3 tools/integration.py e2e oreelse_power oreelse_critters oreelse_critter_fx
-<<<<<<< HEAD
-python3 tools/integration.py e2e oreelse_player_fx oreelse_weapons
-=======
 python3 tools/integration.py e2e oreelse_player_fx oreelse_hud oreelse_building_animation
->>>>>>> 7616982bb50f3620e900cd61c37a36609ce3d9f8
+python3 tools/integration.py e2e oreelse_weapons
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -787,12 +784,8 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 | `etc/world.flecs` | The ground and the basin |
 | `etc/boundary.flecs` | The hazard band around the playable area |
 | `etc/scenery.flecs` | The boulders and dunes of a run |
-<<<<<<< HEAD
-| `etc/run.flecs` | The astronaut with its pistol, the parents of the placed buildings, of the critters and of the projectiles, and the singletons of a run, the order book, the selection, the power allocation and the waves included |
-=======
-| `etc/run.flecs` | The astronaut, the parents of the placed buildings and of the critters, and the singletons of a run, the order book, the selection, the power allocation, the rocket state and the waves included |
+| `etc/run.flecs` | The astronaut with its pistol, the parents of the placed buildings, of the critters and of the projectiles, and the singletons of a run, the order book, the selection, the power allocation, the rocket state and the waves included |
 | `etc/launch.flecs` | The items of a rocket (`OreRocketKit`) and the rocket on the pad, a `Rocket` instance that follows the rocket state |
->>>>>>> 7616982bb50f3620e900cd61c37a36609ce3d9f8
 | `etc/deposits.flecs` | The deposits of a run, the Luminite's with their glints (`DepositSparkle`) |
 | `etc/player.flecs` | The `Astronaut` template |
 | `etc/props/ore.flecs` | The `Ore` template of the deposits |
