@@ -3,9 +3,10 @@
  * @brief The oreelse module: components of the game and the functions its areas share.
  *
  * The scene (apps/oreelse/etc) holds the constants cfg.*, the models, the items, the singletons
- * and the entities of a run; the systems of each area (flow.c, map.c, player.c, inventory.c,
- * mining.c, craft.c, critters.c, buildings.c, placement.c, rocket.c, look.c, particles.c) play
- * the game.
+ * and the entities of a run.
+ *
+ * The systems of each area (flow.c, map.c, player.c, inventory.c, mining.c, craft.c,
+ * critters.c, buildings.c, placement.c, rocket.c, look.c, particles.c) play the game.
  */
 
 #ifndef OREELSE_GAME_H
