@@ -3,7 +3,7 @@
  * @brief UI: the keyboard focus, Tab navigation, keys kept from the bindings, widget events and
  * the text field.
  *
- * One Focusable entity holds the keyboard focus, the focus of flecs.script.event: Focused is
+ * One Focusable entity holds the keyboard focus, the focus of flecs.script.input: Focused is
  * ecs_script_get_focus at all times. A press or Tab moves it, KeyCapture keeps the keys from the
  * bindings, widgets report changes to their scope and TextEdit is a single line text field.
  */
@@ -159,7 +159,7 @@ ECS_STRUCT(TextEditStatus, {
  *
  * Registers flecs.script.on.activate, change and submit, which resolve on a target and its
  * ancestors, and ui.changed and ui.submit, which resolve at once. The focus events and focus()
- * are those of flecs.script.event, whose focus box.ui drives (see Focusable).
+ * are those of flecs.script.input, whose focus box.ui drives (see Focusable).
  *
  * Creates box.ui.theme with a UiTheme and loads the widget library box.widgets as a managed
  * script from etc/ui/widgets.flecs, found as a Font.path is; without it there are no widgets.

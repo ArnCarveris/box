@@ -329,7 +329,7 @@ static ecs_entity_t box_ui_focus_rule(
 }
 
 /** Decide a move of the flecs focus and publish it in Focused and FocusStatus, the to_focus hook
- * that box.picking sets for flecs.script.event.
+ * that box.picking sets for flecs.script.input.
  *
  * A press focuses the first Focusable entity on the bubbling path of its pick or clears the
  * focus, without a visible focus. box_ui_focus_set has decided already.
