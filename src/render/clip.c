@@ -202,7 +202,6 @@ bool box_render_clip_hides(
     for (; cur && !result && depth < BOX_DRAWS_CLIP_WALK && clips < BOX_RENDER_CLIP_DEPTH;
         cur = box_draws_clip_up(world, cur))
     {
-        /* A scroll view keeps its content reachable: Tab scrolls it into view */
         if (ecs_has_id(world, cur, ClipChildren) &&
             !ecs_has(world, cur, LayoutScroll))
         {

@@ -1,3 +1,8 @@
+/**
+ * @file geometry/attachments.c
+ * @brief Places entities with a SurfaceAttachment on the surface of their target shape.
+ */
+
 #include "mesh_cache.h"
 #include <math.h>
 
@@ -5,6 +10,14 @@ static ECS_TAG_DECLARE(SurfaceOwnsManual);
 
 static bool box_attachment_update(ecs_world_t *world, ecs_entity_t e, int depth, mat4 output);
 
+/** Compute the world transform of an entity without relying on the transform system.
+ *
+ * @param world The world.
+ * @param e The entity.
+ * @param m Output matrix.
+ * @param depth Current recursion depth, used to break attachment cycles.
+ * @return True if the transform could be computed, false otherwise.
+ */
 static bool box_attachment_transform(
     ecs_world_t *world,
     ecs_entity_t e,
@@ -12,29 +25,32 @@ static bool box_attachment_transform(
     int depth)
 {
     if (depth > 64 || !ecs_is_alive(world, e)) {
-        return false;
+        goto error;
     }
 
     if (ecs_has(world, e, SurfaceAttachment)) {
-        return box_attachment_update(world, e, depth + 1, m);
+        if (!box_attachment_update(world, e, depth + 1, m)) {
+            goto error;
+        }
+
+        goto done;
     }
 
     if (ecs_has_id(world, e, ManualTransform)) {
         const WorldTransform *t = ecs_get(world, e, WorldTransform);
         if (!t) {
-            return false;
+            goto error;
         }
 
         glm_mat4_copy(ECS_CONST_CAST(vec4*, t->m), m);
-
-        return true;
+        goto done;
     }
 
     ecs_entity_t parent = ecs_get_parent(world, e);
     mat4 base, local;
     glm_mat4_identity(base);
     if (parent && !box_attachment_transform(world, parent, base, depth + 1)) {
-        return false;
+        goto error;
     }
 
     const Position *position = ecs_get(world, e, Position);
@@ -55,9 +71,20 @@ static bool box_attachment_transform(
 
     glm_mat4_mul(base, local, m);
 
+done:
     return true;
+error:
+    return false;
 }
 
+/** Compute and store the world transform of an attached entity.
+ *
+ * @param world The world.
+ * @param e The attached entity.
+ * @param depth Current recursion depth, used to break attachment cycles.
+ * @param output Optional output for the computed transform.
+ * @return True if the attachment could be resolved, false otherwise.
+ */
 static bool box_attachment_update(
     ecs_world_t *world,
     ecs_entity_t e,
@@ -68,7 +95,7 @@ static bool box_attachment_update(
     if (!value || !value->target || value->target == e || depth > 64 ||
         !ecs_is_alive(world, value->target))
     {
-        return false;
+        goto error;
     }
 
     SurfaceAttachment attachment = *value;
@@ -76,14 +103,14 @@ static bool box_attachment_update(
     if (!box_surface_evaluate(world, attachment.target, attachment.region,
         attachment.u, attachment.v, &sample))
     {
-        return false;
+        goto error;
     }
 
     mat4 target, inverse, frame, rotation;
     if (!box_attachment_transform(world, attachment.target, target, depth + 1) ||
         fabsf(glm_mat4_det(target)) < 0.00000001f)
     {
-        return false;
+        goto error;
     }
 
     glm_mat4_inv(target, inverse);
@@ -124,8 +151,14 @@ static bool box_attachment_update(
     }
 
     return true;
+error:
+    return false;
 }
 
+/** Observer that takes over ManualTransform for entities that get a SurfaceAttachment.
+ *
+ * @param it The iterator.
+ */
 static void box_attachment_set(
     ecs_iter_t *it)
 {
@@ -140,6 +173,10 @@ static void box_attachment_set(
     }
 }
 
+/** Observer that releases ManualTransform when a SurfaceAttachment is removed.
+ *
+ * @param it The iterator.
+ */
 static void box_attachment_remove(
     ecs_iter_t *it)
 {
@@ -152,6 +189,10 @@ static void box_attachment_remove(
     }
 }
 
+/** System that updates the transforms of all attached entities.
+ *
+ * @param it The iterator.
+ */
 static void box_attachments_update(
     ecs_iter_t *it)
 {

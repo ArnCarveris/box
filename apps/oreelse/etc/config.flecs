@@ -47,6 +47,40 @@ cfg {
   export const hoverFall: f32 = 5
   export const airborne: f32 = 0.01
 
+  // The walk of the astronaut (OrePlayerFx): its walk cycle (OrePlayerGait) advances its speed
+  // times stepRate radians a second, it bobs up to bobHeight above the ground with every step and
+  // kicks up FootDust footDustY above the ground at every half step on the ground
+  export const stepRate: f32 = 1.6
+  export const bobHeight: f32 = 0.07
+  export const footDustY: f32 = 0.04
+
+  // The limbs of the astronaut (OreLimb) cover limbBlend * dt of the distance to their pose every
+  // frame. In the air they trail airTrail times their swing behind while moving (times the run
+  // multiplier while running, at most airTrailMax) and dangle airDangle times their swing at
+  // airDangleRate radians a second
+  export const limbBlend: f32 = 14
+  export const airTrail: f32 = 0.85
+  export const airTrailMax: f32 = 1.25
+  export const airDangle: f32 = 0.14
+  export const airDangleRate: f32 = 1.6
+
+  // The death of the astronaut: SplatBurst plays playerSplatLift above its position and it falls
+  // over, turned deathPitch about x (and its yaw dropped, as the original)
+  export const playerSplatLift: f32 = 1.1
+  export const deathPitch: f32 = 1.5708
+
+  // A deposit shrinks with its ore, to a scale of depositScaleMin + (1 - depositScaleMin) *
+  // amount / capacity. Every yield plays MineBurst mineBurstY above its tile and a deposit that
+  // is used up PoofBurst depositPoofY above it
+  export const depositScaleMin: f32 = 0.55
+  export const mineBurstY: f32 = 0.6
+  export const depositPoofY: f32 = 0.4
+
+  // A building placed plays PoofBurst placePoofY above the center of its footprint, one
+  // demolished demolishPoofY above the tile the swing was at
+  export const placePoofY: f32 = 0.4
+  export const demolishPoofY: f32 = 0.6
+
   // The inventory holds at most inventorySlots kinds of items with a count above 0 (up to 15,
   // the slots of OreInventory)
   export const inventorySlots: i32 = 15
@@ -64,6 +98,21 @@ cfg {
 
   // Units a batch order (shift) asks for
   export const craftBatch: i32 = 5
+
+  // The rocket: a unit is a cargo bay or the life support. A rocket takes at most maxCargoBays
+  // cargo bays and maxLifeSupport life supports, and launches with enginesPerUnit engines and
+  // one fuel storage per unit; a cargo bay holds cargoCapacity Luminite
+  export const cargoCapacity: i32 = 25
+  export const maxCargoBays: i32 = 4
+  export const maxLifeSupport: i32 = 1
+  export const enginesPerUnit: i32 = 4
+
+  // The launch: the engines fire for ignitionTime seconds, then the rocket climbs, its speed
+  // growing by launchAccel units a second every second, until it is launchAltitude up, where it
+  // arrives (about 3.65 seconds of ascent)
+  export const ignitionTime: f32 = 1.6
+  export const launchAccel: f32 = 9
+  export const launchAltitude: f32 = 60
 
   // The power allocation: Mining, Weapons and Construction each take a level of 0 to 4 bars,
   // at most powerBars in total; the demand is the consumers' watts times the bars assigned /
@@ -112,6 +161,16 @@ cfg {
   export const blinkFast: f32 = 8
   export const blinkSlow: f32 = 6
   export const lampRate: f32 = 1.4
+
+  // The point light of a status lamp's bulb (the Light template), at statusLampLight while the
+  // bulb is lit and 0 in the off half of its blink, reaching statusLampRange. The original's
+  // lamps have none; it is kept small, as box's falloff is much brighter close to a light
+  export const statusLampLight: f32 = 0.35
+  export const statusLampRange: f32 = 1.8
+
+  // The work lights of the buildings (OreWorkLight) cover workLightRate * dt of the distance to
+  // their level every frame
+  export const workLightRate: f32 = 7
 
   // The flash light of an explosion (ore_explosion, BoomBurst) at scale 1: its peak intensity
   // and its range, both times the scale of the blast. It fades to 0 over 1 / 4.5 s, the

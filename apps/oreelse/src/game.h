@@ -3,8 +3,15 @@
  * @brief The oreelse module: components of the game and the functions its areas share.
  *
  * The scene (apps/oreelse/etc) holds the constants cfg.*, the models, the items, the singletons
+<<<<<<< HEAD
  * and the entities of a run; the systems of each area (flow.c, map.c, player.c, ..., critters.c,
  * critter_fx.c, buildings.c, drones.c, placement.c, look.c, particles.c) play the game.
+=======
+ * and the entities of a run.
+ *
+ * The systems of each area (flow.c, map.c, player.c, ..., power.c, critters.c, critter_fx.c,
+ * buildings.c, placement.c, rocket.c, look.c, particles.c) play the game.
+>>>>>>> 7616982bb50f3620e900cd61c37a36609ce3d9f8
  */
 
 #ifndef OREELSE_GAME_H
@@ -153,12 +160,31 @@ ECS_STRUCT(OrePlayer, {
     bool airborne; /**< hover is above cfg.airborne, the jetpack fires */
 });
 
-/** A limb pivot of a model; its Rotation.x swings with the walk (OrePlayerFx for the astronaut,
+/** A limb pivot of a model; its Rotation.x swings with the walk (OreLimbs for the astronaut,
  * OreCritterLimbs for a critter's legs)
  */
 ECS_STRUCT(OreLimb, {
     float phase; /**< Offset of the limb in the walk cycle */
     float swing; /**< Largest angle of the swing in radians */
+});
+
+/** The walk cycle of the astronaut, the state of its animation (OrePlayerFx), on the astronaut.
+ * It comes with OrePlayer and starts at 0 with every run.
+ */
+ECS_STRUCT(OrePlayerGait, {
+    float cycle;  /**< Phase of the walk cycle in radians, from 0 up to 2 PI: it advances the
+                   *   astronaut's speed times cfg.stepRate a second while it moves */
+    int32_t step; /**< Half of the cycle it is in, floor(cycle / PI): a new half step on the
+                   *   ground kicks up FootDust */
+});
+
+/** The one shot effects the C plays (etc/particles), a singleton oreelse.flecs sets */
+ECS_STRUCT(OreEffects, {
+    ecs_entity_t foot_dust;   /**< FootDust, at every half step of the astronaut on the ground */
+    ecs_entity_t mine_burst;  /**< MineBurst, at every yield of a deposit */
+    ecs_entity_t poof_burst;  /**< PoofBurst, where a deposit is used up and a building is placed
+                               *   or demolished */
+    ecs_entity_t splat_burst; /**< SplatBurst, at the death of the astronaut */
 });
 
 /** The mining of the astronaut: the target of the swing and its progress, which the HUD shows.
@@ -190,6 +216,13 @@ ECS_STRUCT(OreStack, {
 ECS_STRUCT(OreItem, {
     char *name;   /**< Display name */
     char *detail; /**< One line of detail text */
+});
+
+/** The icon of an item, on its prefab in resources.flecs (or a building's), which the UI draws
+ * for the item. Instances inherit it.
+ */
+ECS_STRUCT(OreIcon, {
+    ecs_entity_t texture; /**< Texture of the icon, an entity of icons (etc/ui/icons.flecs) */
 });
 
 /** A mined item, on its prefab: a swing at a deposit of it yields 1 */
@@ -446,6 +479,91 @@ ECS_STRUCT(OreLamps, {
     int32_t applied; /**< The version the lamps show */
 });
 
+/** A part of a building that spins about its y while the building works, the original's Spinner
+ * (the factory's roller drums and flywheels, the drill's bit). Its Rotation.y advances speed
+ * times the work rate of the building a second; it stops where it is when the rate is 0.
+ */
+ECS_STRUCT(OreSpinner, {
+    float speed;        /**< Radians a second at work rate 1 */
+    ecs_entity_t owner; /**< The building, found by OreSpinners, 0 until then */
+});
+
+/** A part of a building that strokes while the building works, the original's Piston (the
+ * factory's ram, the drill's carriage and slider).
+ *
+ * Its phase advances speed times the work rate of the building a second and the part sits at
+ * rest - travel * (0.5 - 0.5 * cos(phase)) along y, or z for a slide.
+ *
+ * At the bottom of every stroke (phase crossing PI) burst and spark play impact above the part.
+ */
+ECS_STRUCT(OrePiston, {
+    float rest;         /**< Position of the part at the top of the stroke */
+    float travel;       /**< Length of the stroke */
+    float speed;        /**< Radians of the phase a second at work rate 1 */
+    float phase;        /**< Phase of the stroke in radians, 0 at rest */
+    float impact;       /**< Height of the plays at the bottom of the stroke above the part */
+    ecs_entity_t burst; /**< One shot effect played at the bottom of the stroke, 0 for none */
+    ecs_entity_t spark; /**< Second one shot effect played with it, 0 for none */
+    ecs_entity_t owner; /**< The building, found by OrePistons, 0 until then */
+    bool slide;         /**< The part moves along z instead of y */
+});
+
+/** A part of a building that shakes up and down while the building works, the original's Shake
+ * (the drill's bit): rest + amplitude * (0.7 + 0.3 * sin(0.37 * phase)) * sin(phase) along y,
+ * back at rest when the work rate is 0.
+ */
+ECS_STRUCT(OreShake, {
+    float amplitude;    /**< Height of the shake */
+    float frequency;    /**< Shakes a second at work rate 1 */
+    float phase;        /**< Phase of the shake in radians */
+    float rest;         /**< Position.y of the part at rest, taken when it first runs */
+    ecs_entity_t owner; /**< The building, found by OreShakes, 0 until then */
+    bool ready;         /**< rest was taken */
+});
+
+/** A vent of a building that puffs a one shot effect at a beat while the building works, the
+ * original's Vent (the factory's smoke stacks): the timer counts down by the work rate and at 0
+ * the burst plays at the vent and the timer starts again from interval.
+ */
+ECS_STRUCT(OreVent, {
+    float interval;     /**< Seconds between two puffs at work rate 1, 0.5 for 0 or less */
+    float timer;        /**< Seconds to the next puff at work rate 1 */
+    ecs_entity_t burst; /**< The one shot effect, SmokePuff */
+    ecs_entity_t owner; /**< The building, found by OreVents, 0 until then */
+});
+
+/** An emitter of a building that plays while the building works, the original's WorkEmitter
+ * (the factory's vent steam, the drill's dust): OreWorkEmitters plays its ParticlePlayback while
+ * the work rate is above 0 and stops it otherwise.
+ */
+ECS_STRUCT(OreWorkEmitter, {
+    ecs_entity_t owner; /**< The building, found by OreWorkEmitters, 0 until then */
+});
+
+/** An emissive part of a building that glows while the building works, the original's
+ * WorkLight (the factory's hot plate and work glow, the bulbs of the work lamps).
+ *
+ * Its level eases toward 1 while the building works (or has power, with power) and toward 0
+ * hold seconds after it stops, at cfg.workLightRate; a blackout kills it at once. A blinking
+ * light (blink above 0) snaps to its level and blinks blink times the work rate a second.
+ *
+ * Its Emissive strength is off + (on - off) * level and its PointLight light * level, the share
+ * pulse of it following the stroke of the building's piston.
+ */
+ECS_STRUCT(OreWorkLight, {
+    float on;            /**< Emissive strength while lit */
+    float off;           /**< Emissive strength while dark */
+    float blink;         /**< Blinks a second at work rate 1, 0 for a steady light */
+    float light;         /**< Intensity of its point light while lit */
+    float pulse;         /**< Share of the point light that follows the stroke of the piston */
+    float hold;          /**< Seconds it stays lit after the work stops */
+    float hot;           /**< Seconds of hold left */
+    float level;         /**< How lit it is, 0 to 1 */
+    ecs_entity_t owner;  /**< The building, found by OreWorkLights, 0 until then */
+    ecs_entity_t piston; /**< The piston of the building the pulse follows, 0 until found */
+    bool power;          /**< It lights while the building has power, working or not */
+});
+
 /** A placed building, on the instance: its footprint starts at (row, col), every tile of it maps
  * to the building in the tile grid of OreMap while it is set. Its Position is the center of the
  * footprint.
@@ -593,6 +711,73 @@ ECS_STRUCT(OreLook, {
 ECS_STRUCT(OreBlastFlash, {
     float peak;  /**< Intensity the flash starts at, the EffectFlash.intensity of the light */
     float range; /**< Range of the light */
+});
+
+/** Phases of a rocket on the pad, the type of OreRocketState.phase */
+ECS_ENUM(OreLaunchPhase, {
+    OreLaunchPhaseIdle,     /**< On the pad: parts can be installed, Luminite loaded */
+    OreLaunchPhaseIgnition, /**< Launched, the engines fire for cfg.ignitionTime seconds */
+    OreLaunchPhaseAscent    /**< Climbing, cfg.launchAccel faster every second, to arrival */
+});
+
+/** The launch pad of a rocket, on the RocketPad prefab and inherited */
+ECS_STRUCT(OreLaunchPad, {
+    float base_y; /**< Height of the bottom of the rocket above the pad's origin */
+});
+
+/** The items a rocket is built from and ships, a singleton launch.flecs sets */
+ECS_STRUCT(OreRocketKit, {
+    ecs_entity_t engine;       /**< The rocket engine item */
+    ecs_entity_t fuel;         /**< The rocket fuel storage item */
+    ecs_entity_t cargo;        /**< The rocket cargo bay item */
+    ecs_entity_t life_support; /**< The rocket life support item */
+    ecs_entity_t luminite;     /**< The Luminite a rocket ships */
+});
+
+/** Which part of a rocket an action applies to, a member per part */
+ECS_STRUCT(OreRocketParts, {
+    bool engine;       /**< A rocket engine */
+    bool fuel;         /**< A rocket fuel storage */
+    bool cargo;        /**< A rocket cargo bay */
+    bool life_support; /**< A rocket life support */
+});
+
+/** The rocket on the pad and the score, a singleton run.flecs resets. Modified when a value
+ * changes: every frame of a flight, else when a part, the Luminite, the pad or what can be done
+ * changes. The UI formats every text from it; launch.flecs keeps the Rocket model in step.
+ *
+ * A unit is a cargo bay or the life support; a rocket is valid with units, cfg.enginesPerUnit
+ * engines and one fuel storage per unit.
+ */
+ECS_STRUCT(OreRocketState, {
+    ecs_entity_t pad;     /**< The rocket pad, 0 without one */
+    OreLaunchPhase phase; /**< Idle on the pad, or the phase of the flight */
+    int32_t engines;      /**< Rocket engines installed */
+    int32_t fuel;         /**< Rocket fuel storages installed */
+    int32_t cargo;        /**< Rocket cargo bays installed */
+    int32_t life_support; /**< Rocket life supports installed */
+    int32_t loaded;       /**< Luminite in the cargo bays */
+    int32_t shipped;      /**< Luminite shipped to orbit in the run, the score */
+    int32_t held;         /**< Luminite in the inventory, which the status bar shows */
+    bool aboard;          /**< The astronaut rides the rocket: launched with life support */
+    int32_t units;        /**< cargo + life_support */
+    int32_t capacity;     /**< Luminite the cargo bays hold, cfg.cargoCapacity per bay */
+    bool valid;           /**< The rocket can launch */
+    OreRocketParts install;   /**< The part can be installed now */
+    OreRocketParts uninstall; /**< The part can be uninstalled now */
+    bool load;            /**< Loading would move Luminite into the rocket now */
+    bool launch;          /**< The rocket can launch now */
+    float x;              /**< X of the bottom of the rocket */
+    float y;              /**< Height of the bottom of the rocket, rising in the ascent */
+    float z;              /**< Z of the bottom of the rocket */
+    float timer;          /**< Seconds of ignition left */
+    float speed;          /**< Climbing speed of the ascent in units per second */
+    float altitude;       /**< Height climbed in the ascent */
+});
+
+/** An item a key applies to, on the actions of the rocket keys (input.flecs) */
+ECS_STRUCT(OreItemKey, {
+    ecs_entity_t item; /**< Item prefab of the key */
 });
 
 /** Tiers of critters the waves spawn, the size of the arrays of OreArsenal, OreWaveMix and
@@ -866,6 +1051,17 @@ bool ore_action_down(
     const ecs_world_t *world,
     ecs_entity_t action);
 
+/** Kill the astronaut, the end of the original's orePlayerDamage: SplatBurst plays
+ * cfg.playerSplatLift above it, it falls over (turned cfg.deathPitch about x) and the game is lost.
+ * OrePlayerHealth calls it when the astronaut's hit points drop to 0.
+ *
+ * @param world The world or the stage of a system
+ * @param player The astronaut
+ */
+void ore_player_die(
+    ecs_world_t *world,
+    ecs_entity_t player);
+
 /** Read the geometry of the tile grid from cfg.
  *
  * @param world The world
@@ -1100,6 +1296,9 @@ void ore_marker_show(
 /** Mine 1 off a deposit into the inventory: at 0 the deposit is deleted. When its item is a
  * new kind and the inventory is full nothing is mined and the full warning shows.
  *
+ * Every yield plays MineBurst cfg.mineBurstY above it and shrinks it to cfg.depositScaleMin +
+ * (1 - cfg.depositScaleMin) * amount / capacity; at 0 PoofBurst plays cfg.depositPoofY above it.
+ *
  * @param world The world or the stage of a system
  * @param deposit The deposit
  * @return Whether the deposit is still there to mine, false once it is deleted or gone
@@ -1112,7 +1311,7 @@ bool ore_deposit_mine(
  * speeds, spawn volumes and layer offsets at scale, unturned.
  *
  * @param world The world, or the stage of a system before EcsPreStore
- * @param effect The effect template (etc/particles)
+ * @param effect The effect template (etc/particles), 0 plays nothing
  * @param position World position of the play
  * @param scale Scale of the play, 0 or less for 1
  * @return The root of the instance that plays, 0 when none does
@@ -1122,6 +1321,22 @@ ecs_entity_t ore_burst(
     ecs_entity_t effect,
     const vec3 position,
     float scale);
+
+/** Set the playback state of an emitter that keeps playing (the jet plume, the glints of the
+ * Luminite); it is only written when it changes, and an emitter without a ParticlePlayback plays.
+ *
+ * @param world The world
+ * @param stage The stage of the system
+ * @param emitter The emitter, 0 for none
+ * @param state The playback state
+ * @param playing_only Only change an emitter that plays (pause it, leave a stopped one stopped)
+ */
+void ore_playback_set(
+    const ecs_world_t *world,
+    ecs_world_t *stage,
+    ecs_entity_t emitter,
+    PlaybackState state,
+    bool playing_only);
 
 /** Play a one shot effect template turned about Y, at its size: the launch of a missile
  * (MissileLaunch, authored along -Z) toward the aim of its turret, as the original's
@@ -1322,6 +1537,14 @@ ecs_entity_t ore_critter_nearest(
  */
 void ore_critters_import(
     ecs_world_t *world);
+/** Check whether the astronaut rides the rocket: it is hidden, cannot move, mine, shoot or
+ * regenerate, is invulnerable and no target.
+ *
+ * @param world The world or a stage
+ * @return Whether the astronaut is aboard
+ */
+bool ore_rocket_aboard(
+    const ecs_world_t *world);
 
 /** Register the critters' animation, deaths and corpses: the walk, bob and waddle, the legs,
  * the corpses' char, aging, sinking and cap, and the script function oreelse.corpse(prefab,
@@ -1346,7 +1569,8 @@ void ore_flow_import(
 void ore_map_import(
     ecs_world_t *world);
 
-/** Register the player: walking and the camera that follows the astronaut.
+/** Register the player: walking, the camera that follows the astronaut and the astronaut's
+ * animation (its walk cycle, bob, foot dust, jet plume and limbs).
  *
  * @param world The world
  */
@@ -1410,12 +1634,21 @@ void ore_craft_import(
 void ore_buildings_import(
     ecs_world_t *world);
 
+<<<<<<< HEAD
 /** Register the repair drones: the drones a placed drone pad parks and the system that flies
  * them to the damaged buildings and welds them, paid from the inventory.
  *
  * @param world The world
  */
 void ore_drones_import(
+=======
+/** Register the buildings' animation and lights: the spinners, pistons, shakes, vents, work
+ * emitters and work lights, driven by the work rate of their building.
+ *
+ * @param world The world
+ */
+void ore_building_fx_import(
+>>>>>>> 7616982bb50f3620e900cd61c37a36609ce3d9f8
     ecs_world_t *world);
 
 /** Register placement: the selection, the click and drag placement, the preview and the script
@@ -1425,6 +1658,15 @@ void ore_drones_import(
  * @param world The world
  */
 void ore_placement_import(
+    ecs_world_t *world);
+
+/** Register the rocket: the rocket state, the flight and the script functions
+ * oreelse.rocket_install(), oreelse.rocket_uninstall(), oreelse.rocket_load(),
+ * oreelse.rocket_launch() and oreelse.craft_key().
+ *
+ * @param world The world
+ */
+void ore_rocket_import(
     ecs_world_t *world);
 
 /** Get the level of the power category of a building.

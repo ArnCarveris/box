@@ -100,13 +100,11 @@ void BoxUiImport(
     ECS_TAG_DEFINE(world, FocusScope);
     ECS_TAG_DEFINE(world, KeyCapture);
     ECS_META_COMPONENT(world, FocusStatus);
-    ECS_META_COMPONENT(world, UiActivateEvent);
     ECS_META_COMPONENT(world, UiChangeEvent);
     ECS_META_COMPONENT(world, UiTheme);
     ECS_META_COMPONENT(world, TextEdit);
     ECS_META_COMPONENT(world, TextEditStatus);
     ecs_set_hooks(world, FocusStatus, { .ctor = flecs_default_ctor });
-    ecs_set_hooks(world, UiActivateEvent, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, UiChangeEvent, { .ctor = flecs_default_ctor });
     ECS_COMPONENT_DEFINE(world, UiState);
     ecs_set_hooks(world, UiState, {
@@ -141,7 +139,7 @@ void BoxUiImport(
     box_ui_focus_import(world, st);
     box_ui_keys_import(world, st);
     box_ui_events_import(world, st, on, ui);
-    box_ui_shim_import(world, st, on);
+    box_ui_activation_import(world, ui);
     box_ui_text_edit_import(world, st);
     box_ui_widgets_import(world, ui);
     st->theme = ecs_lookup(world, "box.ui.theme");

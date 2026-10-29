@@ -31,10 +31,14 @@
 // Interactive widgets show hover, pressed and focused looks, with a focus ring only while the
 // focus came from the keyboard (FocusStatus.visible). They are Focusable, so a FocusScope above
 // them makes Tab move between them, and follow the keyboard of their WAI-ARIA role through
-// on.activate (Enter, Space, a click) and the on.key_down and on.key_up of flecs, whose key is a
-// key value such as "ArrowLeft", "Enter" or " ". on.focus and on.blur reach the ancestors of the
-// widget that gained or lost the focus too, so a widget checks e.target == this for its own focus
-// and await focus(e) moves the focus from a script. `prop disabled` dims a widget with the
+// the on.activate (Enter, Space, a click), on.key_down and on.key_up of flecs, whose key is a
+// key value such as "ArrowLeft", "Enter" or " ". A widget counts an on.activate only when
+// ui.activation(e) returns it: that is the entity box.ui activates, the Interactive entity a click
+// went to rather than the label under the cursor, 0 for a click released away from it, with
+// another button or for Enter and Space on a widget with KeyCapture. on.activate, on.focus and
+// on.blur reach the ancestors of the widget that gained or lost the focus too, so a widget checks
+// ui.activation(e) == this for its own activation and e.target == this for its own focus, and
+// await focus(e) moves the focus from a script. `prop disabled` dims a widget with the
 // disabled_opacity of the theme and makes it ignore input and Tab. Widgets fit their content;
 // a `width` prop fixes their width, 0 fits.
 //

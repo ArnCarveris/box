@@ -19,6 +19,7 @@
                 "testcases": [
                     "scene_loads",
                     "button_click",
+                    "button_release_outside",
                     "button_enter",
                     "button_space",
                     "button_action",

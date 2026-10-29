@@ -1,10 +1,28 @@
+/**
+ * @file geometry/surface_math.c
+ * @brief Evaluation and containment tests for parametric surfaces.
+ *
+ * Covers sweeps, lofts, lathes, ellipsoids, tori, prisms, and extrusions, described by
+ * box_surface_data_t parameter words and packed asset vectors.
+ */
+
 #include "paths.h"
 #include <math.h>
 
+/** Small 3D vector passed by value. */
 typedef struct box_sv {
-    float x, y, z;
+    float x; /**< X coordinate */
+    float y; /**< Y coordinate */
+    float z; /**< Z coordinate */
 } box_sv;
 
+/** Construct a vector.
+ *
+ * @param x The x coordinate
+ * @param y The y coordinate
+ * @param z The z coordinate
+ * @return The vector
+ */
 static box_sv sv(
     float x,
     float y,
@@ -13,6 +31,12 @@ static box_sv sv(
     return (box_sv){x, y, z};
 }
 
+/** Add two vectors.
+ *
+ * @param a The first vector
+ * @param b The second vector
+ * @return a + b
+ */
 static box_sv sv_add(
     box_sv a,
     box_sv b)
@@ -20,6 +44,12 @@ static box_sv sv_add(
     return sv(a.x + b.x, a.y + b.y, a.z + b.z);
 }
 
+/** Subtract two vectors.
+ *
+ * @param a The first vector
+ * @param b The second vector
+ * @return a - b
+ */
 static box_sv sv_sub(
     box_sv a,
     box_sv b)
@@ -27,6 +57,12 @@ static box_sv sv_sub(
     return sv(a.x - b.x, a.y - b.y, a.z - b.z);
 }
 
+/** Scale a vector.
+ *
+ * @param a The vector
+ * @param b The scale factor
+ * @return a * b
+ */
 static box_sv sv_mul(
     box_sv a,
     float b)
@@ -34,6 +70,12 @@ static box_sv sv_mul(
     return sv(a.x * b, a.y * b, a.z * b);
 }
 
+/** Dot product of two vectors.
+ *
+ * @param a The first vector
+ * @param b The second vector
+ * @return The dot product
+ */
 static float sv_dot(
     box_sv a,
     box_sv b)
@@ -41,6 +83,12 @@ static float sv_dot(
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
+/** Cross product of two vectors.
+ *
+ * @param a The first vector
+ * @param b The second vector
+ * @return a x b
+ */
 static box_sv sv_cross(
     box_sv a,
     box_sv b)
@@ -48,17 +96,32 @@ static box_sv sv_cross(
     return sv(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
 }
 
+/** Normalize a vector.
+ *
+ * @param a The vector
+ * @return The unit vector, or (0, 1, 0) if a is (near) zero length
+ */
 static box_sv sv_unit(
     box_sv a)
 {
     float length = sqrtf(sv_dot(a, a));
+    box_sv result;
     if (length < 0.000000000001f) {
-        return sv(0.0f, 1.0f, 0.0f);
+        result = sv(0.0f, 1.0f, 0.0f);
+    } else {
+        result = sv_mul(a, 1.0f / length);
     }
 
-    return sv_mul(a, 1.0f / length);
+    return result;
 }
 
+/** Linearly interpolate between two vectors.
+ *
+ * @param a The start vector
+ * @param b The end vector
+ * @param t The interpolation factor
+ * @return a * (1 - t) + b * t
+ */
 static box_sv sv_mix(
     box_sv a,
     box_sv b,
@@ -67,17 +130,34 @@ static box_sv sv_mix(
     return sv_add(sv_mul(a, 1.0f - t), sv_mul(b, t));
 }
 
+/** Read a surface word, where indices from 24 address the packed asset vectors.
+ *
+ * @param d The surface data
+ * @param i The vector index
+ * @param j The component index
+ * @return The value
+ */
 static float sf(
     const box_surface_data_t *d,
     int i,
     int j)
 {
+    float result;
     if (i >= 24) {
-        return d->assets[i - 24][j];
+        result = d->assets[i - 24][j];
+    } else {
+        result = d->p[i][j];
     }
-    return d->p[i][j];
+
+    return result;
 }
 
+/** Read the xyz components of a surface vector as a point.
+ *
+ * @param d The surface data
+ * @param i The vector index, see sf()
+ * @return The point
+ */
 static box_sv sp(
     const box_surface_data_t *d,
     int i)
@@ -85,6 +165,15 @@ static box_sv sp(
     return sv(sf(d, i, 0), sf(d, i, 1), sf(d, i, 2));
 }
 
+/** Evaluate a cubic Bezier curve.
+ *
+ * @param start The start point
+ * @param control1 The first control point
+ * @param control2 The second control point
+ * @param end The end point
+ * @param t The curve parameter in [0, 1]
+ * @return The point on the curve
+ */
 static box_sv surface_cubic(
     box_sv start,
     box_sv control1,
@@ -95,9 +184,18 @@ static box_sv surface_cubic(
     box_sv a = sv_mix(start, control1, t);
     box_sv b = sv_mix(control1, control2, t);
     box_sv c = sv_mix(control2, end, t);
+
     return sv_mix(sv_mix(a, b, t), sv_mix(b, c, t), t);
 }
 
+/** Evaluate a packed path of cubic segments, each stored as four consecutive vectors.
+ *
+ * @param d The surface data
+ * @param first Vector index of the first segment
+ * @param count Number of segments
+ * @param t The path parameter in [0, 1]
+ * @return The point on the path
+ */
 static box_sv surface_path(
     const box_surface_data_t *d,
     int first,
@@ -108,9 +206,16 @@ static box_sv surface_path(
     int index = (int)fminf(floorf(parameter), (float)(count - 1));
     float local = parameter - (float)index;
     int base = first + index * 4;
+
     return surface_cubic(sp(d, base), sp(d, base + 1), sp(d, base + 2), sp(d, base + 3), local);
 }
 
+/** Evaluate the primary path of the surface (sweep path or lathe profile).
+ *
+ * @param d The surface data
+ * @param t The path parameter in [0, 1]
+ * @return The point on the path
+ */
 static box_sv surface_curve(
     const box_surface_data_t *d,
     float t)
@@ -118,6 +223,12 @@ static box_sv surface_curve(
     return surface_path(d, (int)sf(d, 4, 0), (int)sf(d, 4, 1), t);
 }
 
+/** Compute the unit tangent of the primary path.
+ *
+ * @param d The surface data
+ * @param t The path parameter in [0, 1]
+ * @return The unit tangent
+ */
 static box_sv surface_direction(
     const box_surface_data_t *d,
     float t)
@@ -130,9 +241,15 @@ static box_sv surface_direction(
     box_sv a = sv_sub(sp(d, base + 1), sp(d, base));
     box_sv b = sv_sub(sp(d, base + 2), sp(d, base + 1));
     box_sv c = sv_sub(sp(d, base + 3), sp(d, base + 2));
+
     return sv_unit(sv_mix(sv_mix(a, b, local), sv_mix(b, c, local), local));
 }
 
+/** Compute an arbitrary unit vector perpendicular to a tangent.
+ *
+ * @param tangent The tangent
+ * @return A unit vector perpendicular to tangent
+ */
 static box_sv surface_axis(
     box_sv tangent)
 {
@@ -167,6 +284,13 @@ void box_surface_build_frames(
     }
 }
 
+/** Interpolate the precomputed sweep frame axis and orthogonalize it against the tangent.
+ *
+ * @param d The surface data
+ * @param t The path parameter in [0, 1]
+ * @param tangent The unit path tangent at t
+ * @return The unit frame axis
+ */
 static box_sv surface_frame(
     const box_surface_data_t *d,
     float t,
@@ -177,9 +301,17 @@ static box_sv surface_frame(
     int index = (int)fminf(floorf(parameter), (float)(steps - 1));
     int offset = (int)sf(d, 8, 0) + index;
     box_sv axis = sv_mix(sp(d, offset), sp(d, offset + 1), parameter - index);
+
     return sv_unit(sv_sub(axis, sv_mul(tangent, sv_dot(axis, tangent))));
 }
 
+/** Evaluate the profile boundary, linearly interpolated between profile points.
+ *
+ * @param d The surface data
+ * @param u The boundary parameter in [0, 1]
+ * @param inner 1 to evaluate the hole rings, otherwise the outer ring
+ * @return The 2D profile point in x and y
+ */
 static box_sv surface_boundary(
     const box_surface_data_t *d,
     float u,
@@ -192,21 +324,33 @@ static box_sv surface_boundary(
         first = count;
         count = (int)sf(d, 5, 1) - count;
     }
+
     float t = u * (float)count;
     if (sf(d, 0, 0) == 1.0f && sf(d, 4, 3) == 0.0f) {
         t = u * (float)(count - 1);
     }
+
     int i = (int)fminf(floorf(t), (float)(count - 1));
     int next = (int)sf(d, offset + first + i, 3);
+
     return sv_mix(sp(d, offset + first + i), sp(d, offset + next), t - (float)i);
 }
 
+/** Analytic sample of a sweep side surface. */
 typedef struct box_sweep_sample {
-    box_sv position;
-    box_sv normal;
-    box_sv tangent;
+    box_sv position; /**< Surface position */
+    box_sv normal; /**< Unnormalized surface normal */
+    box_sv tangent; /**< Unnormalized derivative along u */
 } box_sweep_sample;
 
+/** Analytically evaluate position, normal, and u derivative of a sweep side surface.
+ *
+ * @param d The surface data
+ * @param region The surface region, 1 for hole walls, otherwise the outer wall
+ * @param u The profile parameter in [0, 1]
+ * @param v The path parameter in [0, 1]
+ * @return The sample
+ */
 static box_sweep_sample surface_sweep_sample(
     const box_surface_data_t *d,
     int region,
@@ -281,9 +425,17 @@ static box_sweep_sample surface_sweep_sample(
         sv_mul(sv_add(sv_mul(axis, x), sv_mul(binormal, z)), taper));
     result.normal = normal;
     result.tangent = du;
+
     return result;
 }
 
+/** Place a 2D profile point on the sweep, applying scale, taper, and roll at v.
+ *
+ * @param d The surface data
+ * @param point The profile point in x and y
+ * @param v The path parameter in [0, 1]
+ * @return The swept point
+ */
 static box_sv surface_sweep_point(
     const box_surface_data_t *d,
     box_sv point,
@@ -297,9 +449,17 @@ static box_sv surface_sweep_point(
     float z = a * sinf(roll) + b * cosf(roll);
     box_sv tangent = surface_direction(d, v);
     box_sv axis = surface_frame(d, v, tangent);
+
     return sv_add(surface_curve(d, v), sv_add(sv_mul(axis, x), sv_mul(sv_cross(axis, tangent), z)));
 }
 
+/** Interpolate a profile point between the two loft sections surrounding v.
+ *
+ * @param d The surface data
+ * @param point The profile point index
+ * @param v The loft parameter in [0, 1]
+ * @return The lofted point
+ */
 static box_sv surface_loft_point(
     const box_surface_data_t *d,
     int point,
@@ -310,10 +470,18 @@ static box_sv surface_loft_point(
     int offset = (int)sf(d, 4, 0);
     float t = v * (float)(count - 1);
     int section = (int)fminf(floorf(t), (float)(count - 2));
+
     return sv_mix(sp(d, offset + section * points + point),
         sp(d, offset + (section + 1) * points + point), t - (float)section);
 }
 
+/** Compute a prism footprint corner offset along its adjacent edge normals.
+ *
+ * @param d The surface data
+ * @param i The corner index
+ * @param inset The offset distance
+ * @return The offset corner
+ */
 static box_sv surface_prism_corner(
     const box_surface_data_t *d,
     int i,
@@ -340,6 +508,14 @@ static box_sv surface_prism_corner(
     return sv_add(point, offset);
 }
 
+/** Evaluate the side wall of a surface, dispatching on the surface kind.
+ *
+ * @param d The surface data
+ * @param u The parameter around the wall in [0, 1]
+ * @param v The parameter along the wall in [0, 1]
+ * @param inner 1 for the inner wall (holes or thickness), 0 for the outer wall
+ * @return The position, or the origin for unknown kinds
+ */
 static box_sv surface_outer(
     const box_surface_data_t *d,
     float u,
@@ -348,35 +524,35 @@ static box_sv surface_outer(
 {
     int kind = (int)sf(d, 0, 0);
     float thickness = sf(d, 1, 0) * (float)inner;
+    box_sv result = sv(0.0f, 0.0f, 0.0f);
     if (kind == 1) {
-        return surface_sweep_point(d, surface_boundary(d, u, inner), v);
-    }
-    if (kind == 2) {
+        result = surface_sweep_point(d, surface_boundary(d, u, inner), v);
+    } else if (kind == 2) {
         int count = (int)sf(d, 5, 2);
         int first = 0;
         if (inner == 1) {
             first = count;
             count = (int)sf(d, 5, 1) - count;
         }
+
         float t = u * (float)count;
         int i = (int)fminf(floorf(t), (float)(count - 1));
         int profile_offset = (int)sf(d, 5, 0);
         int next = (int)sf(d, profile_offset + first + i, 3);
-        return sv_mix(surface_loft_point(d, first + i, v), surface_loft_point(d, next, v), t - (float)i);
-    }
-    if (kind == 3) {
+        result = sv_mix(surface_loft_point(d, first + i, v), surface_loft_point(d, next, v),
+            t - (float)i);
+    } else if (kind == 3) {
         int first = (int)sf(d, 4, 0);
         int count = (int)sf(d, 4, 1);
         if (inner == 1) {
             first = (int)sf(d, 4, 2);
             count = (int)sf(d, 4, 3);
         }
-        box_sv point = surface_path(d, first, count, v);
-        return sv(point.x * cosf(u * 6.28318530718f), point.y,
-            point.x * sinf(u * 6.28318530718f));
-    }
 
-    if (kind == 4 || kind == 5) {
+        box_sv point = surface_path(d, first, count, v);
+        result = sv(point.x * cosf(u * 6.28318530718f), point.y,
+            point.x * sinf(u * 6.28318530718f));
+    } else if (kind == 4 || kind == 5) {
         float a = sf(d, 2, 0) + u * (sf(d, 2, 1) - sf(d, 2, 0));
         float b = sf(d, 2, 2) + v * (sf(d, 2, 3) - sf(d, 2, 2));
         if (kind == 4) {
@@ -384,18 +560,14 @@ static box_sv surface_outer(
             box_sv normal = sv_unit(sv(cosf(a) * cosf(b) / fmaxf(radius.x, 0.000001f),
                 sinf(b) / fmaxf(radius.y, 0.000001f),
                 sinf(a) * cosf(b) / fmaxf(radius.z, 0.000001f)));
-
-            return sv_sub(sv(radius.x * cosf(a) * cosf(b), radius.y * sinf(b),
+            result = sv_sub(sv(radius.x * cosf(a) * cosf(b), radius.y * sinf(b),
                 radius.z * sinf(a) * cosf(b)), sv_mul(normal, thickness));
+        } else {
+            float tube = sf(d, 3, 1) - thickness;
+            float radial = sf(d, 3, 0) + tube * cosf(b);
+            result = sv(radial * cosf(a), tube * sinf(b), radial * sinf(a));
         }
-
-        float tube = sf(d, 3, 1) - thickness;
-        float radial = sf(d, 3, 0) + tube * cosf(b);
-
-        return sv(radial * cosf(a), tube * sinf(b), radial * sinf(a));
-    }
-
-    if (kind == 6) {
+    } else if (kind == 6) {
         int count = (int)sf(d, 0, 2);
         float t = u * (float)count;
         int i = (int)fminf(floorf(t), (float)(count - 1));
@@ -419,19 +591,24 @@ static box_sv surface_outer(
         float inset = sf(d, 1, 2) * height + fmaxf(bevel - edge, 0.0f);
         box_sv point = sv_mix(surface_prism_corner(d, i, inset),
             surface_prism_corner(d, next, inset), t - (float)i);
-
-        return sv(point.x + sf(d, 2, 0) * height, (height - 0.5f) * sf(d, 1, 1),
+        result = sv(point.x + sf(d, 2, 0) * height, (height - 0.5f) * sf(d, 1, 1),
             point.z + sf(d, 2, 1) * height);
-    }
-
-    if (kind == 7) {
+    } else if (kind == 7) {
         box_sv point = surface_boundary(d, u, inner);
-        return sv(point.x, (v - 0.5f) * sf(d, 1, 1), point.y);
+        result = sv(point.x, (v - 0.5f) * sf(d, 1, 1), point.y);
     }
 
-    return sv(0.0f, 0.0f, 0.0f);
+    return result;
 }
 
+/** Evaluate a point on a sweep or loft end cap over the profile bounds.
+ *
+ * @param d The surface data
+ * @param u The parameter across the profile x range in [0, 1]
+ * @param v The parameter across the profile y range in [0, 1]
+ * @param side 0 for the start cap, 1 for the end cap
+ * @return The cap position
+ */
 static box_sv surface_cap(
     const box_surface_data_t *d,
     float u,
@@ -440,96 +617,124 @@ static box_sv surface_cap(
 {
     float x = sf(d, 6, 0) + (sf(d, 6, 1) - sf(d, 6, 0)) * u;
     float y = sf(d, 6, 2) + (sf(d, 6, 3) - sf(d, 6, 2)) * v;
+    box_sv result = sv(0.0f, 0.0f, 0.0f);
     if (sf(d, 0, 0) == 1.0f) {
-        return surface_sweep_point(d, sv(x, y, 0.0f), side);
-    }
-    int offset = (int)sf(d, 7, 0);
-    int count = (int)sf(d, 7, 1);
-    int profile = (int)sf(d, 5, 0);
-    for (int i = 0; i < count; i ++) {
-        int ia = (int)sf(d, offset + i, 0);
-        int ib = (int)sf(d, offset + i, 1);
-        int ic = (int)sf(d, offset + i, 2);
-        box_sv a = sp(d, profile + ia);
-        box_sv b = sp(d, profile + ib);
-        box_sv c = sp(d, profile + ic);
-        float area = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
-        float wb = ((x - a.x) * (c.y - a.y) - (y - a.y) * (c.x - a.x)) / area;
-        float wc = ((b.x - a.x) * (y - a.y) - (b.y - a.y) * (x - a.x)) / area;
-        if (wb >= -0.00001f && wc >= -0.00001f && wb + wc <= 1.00001f) {
-            return sv_add(sv_mul(surface_loft_point(d, ia, side), 1.0f - wb - wc),
-                sv_add(sv_mul(surface_loft_point(d, ib, side), wb), sv_mul(surface_loft_point(d, ic, side), wc)));
+        result = surface_sweep_point(d, sv(x, y, 0.0f), side);
+    } else {
+        int offset = (int)sf(d, 7, 0);
+        int count = (int)sf(d, 7, 1);
+        int profile = (int)sf(d, 5, 0);
+        bool found = false;
+        for (int i = 0; !found && i < count; i ++) {
+            int ia = (int)sf(d, offset + i, 0);
+            int ib = (int)sf(d, offset + i, 1);
+            int ic = (int)sf(d, offset + i, 2);
+            box_sv a = sp(d, profile + ia);
+            box_sv b = sp(d, profile + ib);
+            box_sv c = sp(d, profile + ic);
+            float area = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+            float wb = ((x - a.x) * (c.y - a.y) - (y - a.y) * (c.x - a.x)) / area;
+            float wc = ((b.x - a.x) * (y - a.y) - (b.y - a.y) * (x - a.x)) / area;
+            if (wb >= -0.00001f && wc >= -0.00001f && wb + wc <= 1.00001f) {
+                result = sv_add(sv_mul(surface_loft_point(d, ia, side), 1.0f - wb - wc),
+                    sv_add(sv_mul(surface_loft_point(d, ib, side), wb),
+                        sv_mul(surface_loft_point(d, ic, side), wc)));
+                found = true;
+            }
+        }
+
+        if (!found) {
+            result = surface_loft_point(d, 0, side);
         }
     }
-    return surface_loft_point(d, 0, side);
+
+    return result;
 }
 
+/** Evaluate the position of a surface region.
+ *
+ * @param d The surface data
+ * @param region The region: walls, caps, cap vertices, or wall edges
+ * @param u The first surface parameter
+ * @param v The second surface parameter
+ * @return The position
+ */
 static box_sv surface_position(
     const box_surface_data_t *d,
     int region,
     float u,
     float v)
 {
+    box_sv result;
     if ((sf(d, 0, 0) == 1.0f || sf(d, 0, 0) == 2.0f) && (region == 2 || region == 3)) {
-        return surface_cap(d, u, v, (float)(region - 2));
-    }
-    if (region == 8 || region == 9) {
+        result = surface_cap(d, u, v, (float)(region - 2));
+    } else if (region == 8 || region == 9) {
         float side = (float)(region - 8);
         int point = (int)floorf(u + 0.5f);
         if (sf(d, 0, 0) == 1.0f) {
             int profile_offset = (int)sf(d, 5, 0);
-            return surface_sweep_point(d, sp(d, profile_offset + point), side);
+            result = surface_sweep_point(d, sp(d, profile_offset + point), side);
+        } else {
+            result = surface_loft_point(d, point, side);
         }
-        return surface_loft_point(d, point, side);
-    }
-    if (sf(d, 0, 0) == 7.0f && region >= 2) {
+    } else if (sf(d, 0, 0) == 7.0f && region >= 2) {
         float y = -0.5f;
         if (region == 3) {
             y = 0.5f;
         }
 
-        return sv(sf(d, 6, 0) + (sf(d, 6, 1) - sf(d, 6, 0)) * u,
+        result = sv(sf(d, 6, 0) + (sf(d, 6, 1) - sf(d, 6, 0)) * u,
             y * sf(d, 1, 1), sf(d, 6, 2) + (sf(d, 6, 3) - sf(d, 6, 2)) * v);
-    }
-
-    if (region < 2) {
-        return surface_outer(d, u, v, region);
-    }
-
-    float a = u;
-    float b = 0.0f;
-    if (region == 3 || region == 7) {
-        b = 1.0f;
-    }
-
-    if (region == 4 || region == 5) {
-        a = 0.0f;
-        if (region == 5) {
-            a = 1.0f;
+    } else if (region < 2) {
+        result = surface_outer(d, u, v, region);
+    } else {
+        float a = u;
+        float b = 0.0f;
+        if (region == 3 || region == 7) {
+            b = 1.0f;
         }
 
-        b = u;
+        if (region == 4 || region == 5) {
+            a = 0.0f;
+            if (region == 5) {
+                a = 1.0f;
+            }
+
+            b = u;
+        }
+
+        box_sv outer = surface_outer(d, a, b, 0);
+        box_sv inner = outer;
+        int kind = (int)sf(d, 0, 0);
+        if (sf(d, 1, 0) > 0.0f && kind != 6) {
+            inner = surface_outer(d, a, b, 1);
+        } else if (kind == 1) {
+            inner = surface_curve(d, b);
+        } else if (kind == 2) {
+            inner = surface_loft_point(d, 0, b);
+        } else if (kind == 3) {
+            inner = sv(0.0f, outer.y, 0.0f);
+        } else if (kind == 6) {
+            inner = sp(d, 8);
+            inner = sv(inner.x + sf(d, 2, 0) * b, outer.y, inner.z + sf(d, 2, 1) * b);
+        }
+
+        result = sv_mix(inner, outer, v);
     }
 
-    box_sv outer = surface_outer(d, a, b, 0);
-    box_sv inner = outer;
-    int kind = (int)sf(d, 0, 0);
-    if (sf(d, 1, 0) > 0.0f && kind != 6) {
-        inner = surface_outer(d, a, b, 1);
-    } else if (kind == 1) {
-        inner = surface_curve(d, b);
-    } else if (kind == 2) {
-        inner = surface_loft_point(d, 0, b);
-    } else if (kind == 3) {
-        inner = sv(0.0f, outer.y, 0.0f);
-    } else if (kind == 6) {
-        inner = sp(d, 8);
-        inner = sv(inner.x + sf(d, 2, 0) * b, outer.y, inner.z + sf(d, 2, 1) * b);
-    }
-
-    return sv_mix(inner, outer, v);
+    return result;
 }
 
+/** Evaluate the unit normal of a surface region.
+ *
+ * Uses analytic normals for caps and sweep walls, finite differences otherwise.
+ *
+ * @param d The surface data
+ * @param region The region, see surface_position()
+ * @param u The first surface parameter
+ * @param v The second surface parameter
+ * @return The unit normal
+ */
 static box_sv surface_normal(
     const box_surface_data_t *d,
     int region,
@@ -540,12 +745,16 @@ static box_sv surface_normal(
     if ((sf(d, 0, 0) == 1.0f || sf(d, 0, 0) == 2.0f) && (region == 2 || region == 3)) {
         cap_region = region + 6;
     }
+
+    box_sv result = sv(0.0f, 1.0f, 0.0f);
+    bool found = false;
     if (cap_region == 8 || cap_region == 9) {
         float side = (float)(cap_region - 8);
         box_sv normal = sv(0.0f, 1.0f, 0.0f);
         if (sf(d, 0, 0) == 1.0f) {
             normal = surface_direction(d, side);
         }
+
         if (sf(d, 0, 0) == 2.0f) {
             int triangle = (int)sf(d, 7, 0);
             int ia = (int)sf(d, triangle, 0);
@@ -556,55 +765,65 @@ static box_sv surface_normal(
             box_sv c = surface_loft_point(d, ic, side);
             normal = sv_unit(sv_cross(sv_sub(c, a), sv_sub(b, a)));
         }
+
         if (cap_region == 8) {
             normal = sv_mul(normal, -1.0f);
         }
-        return normal;
-    }
-    if (sf(d, 0, 0) == 7.0f && region >= 2) {
+
+        result = normal;
+        found = true;
+    } else if (sf(d, 0, 0) == 7.0f && region >= 2) {
         if (region == 2) {
-            return sv(0.0f, -1.0f, 0.0f);
+            result = sv(0.0f, -1.0f, 0.0f);
+        } else {
+            result = sv(0.0f, 1.0f, 0.0f);
         }
 
-        return sv(0.0f, 1.0f, 0.0f);
-    }
-
-    if (sf(d, 0, 0) == 1.0f && region < 2) {
+        found = true;
+    } else if (sf(d, 0, 0) == 1.0f && region < 2) {
         box_sweep_sample sample = surface_sweep_sample(d, region, u, v);
         if (sv_dot(sample.normal, sample.normal) >= 0.000000000001f) {
-            return sv_unit(sample.normal);
+            result = sv_unit(sample.normal);
+            found = true;
         }
     }
 
-    float delta = 0.0001f;
-    box_sv du = sv_sub(surface_position(d, region, fminf(u + delta, 1.0f), v),
-        surface_position(d, region, fmaxf(u - delta, 0.0f), v));
-    box_sv dv = sv_sub(surface_position(d, region, u, fminf(v + delta, 1.0f)),
-        surface_position(d, region, u, fmaxf(v - delta, 0.0f)));
-    box_sv normal = sv_cross(dv, du);
-    if ((region == 1 && sf(d, 0, 0) == 3.0f) || region == 3 || region == 4 || region == 7) {
-        normal = sv_mul(normal, -1.0f);
-    }
-
-    if (sv_dot(normal, normal) < 0.000000000001f) {
-        float fallback = fminf(fmaxf(v, 0.001f), 0.999f);
-        du = sv_sub(surface_position(d, region, fminf(u + delta, 1.0f), fallback),
-            surface_position(d, region, fmaxf(u - delta, 0.0f), fallback));
-        dv = sv_sub(surface_position(d, region, u, fallback + delta),
-            surface_position(d, region, u, fallback - delta));
-        normal = sv_cross(dv, du);
-        if ((region == 1 && sf(d, 0, 0) == 3.0f) || region == 3 || region == 4 || region == 7) {
+    if (!found) {
+        bool flip = (region == 1 && sf(d, 0, 0) == 3.0f) || region == 3 || region == 4 ||
+            region == 7;
+        float delta = 0.0001f;
+        box_sv du = sv_sub(surface_position(d, region, fminf(u + delta, 1.0f), v),
+            surface_position(d, region, fmaxf(u - delta, 0.0f), v));
+        box_sv dv = sv_sub(surface_position(d, region, u, fminf(v + delta, 1.0f)),
+            surface_position(d, region, u, fmaxf(v - delta, 0.0f)));
+        box_sv normal = sv_cross(dv, du);
+        if (flip) {
             normal = sv_mul(normal, -1.0f);
         }
+
+        if (sv_dot(normal, normal) < 0.000000000001f) {
+            float fallback = fminf(fmaxf(v, 0.001f), 0.999f);
+            du = sv_sub(surface_position(d, region, fminf(u + delta, 1.0f), fallback),
+                surface_position(d, region, fmaxf(u - delta, 0.0f), fallback));
+            dv = sv_sub(surface_position(d, region, u, fallback + delta),
+                surface_position(d, region, u, fallback - delta));
+            normal = sv_cross(dv, du);
+            if (flip) {
+                normal = sv_mul(normal, -1.0f);
+            }
+        }
+
+        if (sf(d, 0, 0) == 1.0f && region < 2) {
+            box_sv outward = sv_cross(surface_direction(d, v), du);
+            if (sv_dot(normal, outward) < 0.0f) {
+                normal = sv_mul(normal, -1.0f);
+            }
+        }
+
+        result = sv_unit(normal);
     }
 
-    if (sf(d, 0, 0) == 1.0f && region < 2) {
-        box_sv outward = sv_cross(surface_direction(d, v), du);
-        if (sv_dot(normal, outward) < 0.0f) {
-            normal = sv_mul(normal, -1.0f);
-        }
-    }
-    return sv_unit(normal);
+    return result;
 }
 
 void box_path_cubic_evaluate(const vec3 start, const vec3 control1, const vec3 control2,
@@ -629,7 +848,8 @@ void box_surface_sample(const box_surface_data_t *data, int region,
         }
 
         tangent = sv_unit(tangent);
-        glm_vec3_copy((vec3){value.position.x, value.position.y, value.position.z}, sample->position);
+        glm_vec3_copy((vec3){value.position.x, value.position.y, value.position.z},
+            sample->position);
         glm_vec3_copy((vec3){normal.x, normal.y, normal.z}, sample->normal);
         glm_vec3_copy((vec3){tangent.x, tangent.y, tangent.z}, sample->tangent);
         return;
@@ -665,6 +885,12 @@ void box_surface_vertex(
     }
 }
 
+/** Test whether a point lies inside a closed sweep.
+ *
+ * @param d The surface data
+ * @param position The point in shape space
+ * @return True if the point is inside
+ */
 static bool box_surface_sweep_contains(
     const box_surface_data_t *d,
     const vec3 position)
@@ -698,31 +924,45 @@ static bool box_surface_sweep_contains(
     box_sv delta = sv_sub(point, surface_curve(d, t));
     box_sv tangent = surface_direction(d, t);
     float axial = sv_dot(delta, tangent);
+    bool result;
     if ((t < 0.00001f && axial < 0) || (t > 0.99999f && axial > 0)) {
-        return false;
+        result = false;
+    } else {
+        box_sv axis = surface_frame(d, t, tangent);
+        box_sv binormal = sv_cross(axis, tangent);
+        float x = sv_dot(delta, axis), z = sv_dot(delta, binormal);
+        float roll = sf(d, 1, 2) * t;
+        float rx = x * cosf(roll) + z * sinf(roll);
+        float rz = -x * sinf(roll) + z * cosf(roll);
+        float taper = 1 + (sf(d, 1, 1) - 1) * t;
+        float sx = sf(d, 2, 0) * taper, sz = sf(d, 2, 1) * taper;
+        if (sf(d, 4, 3) == 0 || sx == 0 || sz == 0) {
+            result = false;
+        } else {
+            result = box_profile_contains(d, rx / sx, rz / sz);
+        }
     }
 
-    box_sv axis = surface_frame(d, t, tangent);
-    box_sv binormal = sv_cross(axis, tangent);
-    float x = sv_dot(delta, axis), z = sv_dot(delta, binormal);
-    float roll = sf(d, 1, 2) * t;
-    float rx = x * cosf(roll) + z * sinf(roll);
-    float rz = -x * sinf(roll) + z * cosf(roll);
-    float taper = 1 + (sf(d, 1, 1) - 1) * t;
-    float sx = sf(d, 2, 0) * taper, sz = sf(d, 2, 1) * taper;
-    if (sf(d, 4, 3) == 0 || sx == 0 || sz == 0) {
-        return false;
-    }
-    return box_profile_contains(d, rx / sx, rz / sz);
+    return result;
 }
 
-static bool box_surface_lathe_contains(const box_surface_data_t *d, const vec3 position)
+/** Test whether a point lies inside a lathe by testing its radius and height
+ * against the revolved profile.
+ *
+ * @param d The surface data
+ * @param position The point in shape space
+ * @return True if the point is inside
+ */
+static bool box_surface_lathe_contains(
+    const box_surface_data_t *d,
+    const vec3 position)
 {
     int outer = (int)sf(d, 4, 1) * 16 + 1;
     int inner = (int)sf(d, 4, 3) * 16 + 1;
     if (sf(d, 4, 3) == 0) {
         inner = 2;
     }
+
     int count = outer + inner;
     float radius = hypotf(position[0], position[2]), y = position[1];
     box_sv first = surface_curve(d, 0);
@@ -739,31 +979,50 @@ static bool box_surface_lathe_contains(const box_surface_data_t *d, const vec3 p
             point = surface_curve(d, i == outer ? 1 : 0);
             point.x = 0;
         }
+
         if ((previous.y > y) != (point.y > y) &&
-            radius < (point.x - previous.x) * (y - previous.y) / (point.y - previous.y) + previous.x)
+            radius < (point.x - previous.x) * (y - previous.y) / (point.y - previous.y) +
+                previous.x)
         {
             inside = !inside;
         }
+
         previous = point;
     }
+
     return inside;
 }
 
+/** Test whether an angle lies within an angular range.
+ *
+ * @param angle The angle in radians
+ * @param start The start of the range
+ * @param end The end of the range
+ * @return True if the angle lies in [start, end) modulo a full turn
+ */
 static bool box_surface_angle_contains(
     float angle,
     float start,
     float end)
 {
     float turn = 2.0f * GLM_PI;
+    bool result;
     if (end - start >= turn - 0.000001f) {
-        return true;
+        result = true;
+    } else {
+        float relative = fmodf(fmodf(angle - start, turn) + turn, turn);
+        result = relative < end - start;
     }
 
-    float relative = fmodf(fmodf(angle - start, turn) + turn, turn);
-
-    return relative < end - start;
+    return result;
 }
 
+/** Test whether a point lies inside a (partial, possibly hollow) torus.
+ *
+ * @param d The surface data
+ * @param position The point in shape space
+ * @return True if the point is inside
+ */
 static bool box_surface_torus_contains(
     const box_surface_data_t *d,
     const vec3 position)
@@ -771,36 +1030,47 @@ static bool box_surface_torus_contains(
     float radial = hypotf(position[0], position[2]) - sf(d, 3, 0);
     float radius = hypotf(radial, position[1]);
     float tube = sf(d, 3, 1), thickness = sf(d, 1, 0);
+    bool result;
     if (radius >= tube || (thickness > 0 && radius <= tube - thickness)) {
-        return false;
+        result = false;
+    } else {
+        result = box_surface_angle_contains(
+                atan2f(position[2], position[0]), sf(d, 2, 0), sf(d, 2, 1)) &&
+            box_surface_angle_contains(atan2f(position[1], radial), sf(d, 2, 2), sf(d, 2, 3));
     }
 
-    return box_surface_angle_contains(atan2f(position[2], position[0]), sf(d, 2, 0), sf(d, 2, 1)) &&
-        box_surface_angle_contains(atan2f(position[1], radial), sf(d, 2, 2), sf(d, 2, 3));
+    return result;
 }
 
+/** Test whether a point lies inside a beveled prism.
+ *
+ * @param d The surface data
+ * @param position The point in shape space
+ * @return True if the point is inside
+ */
 static bool box_surface_prism_contains(
     const box_surface_data_t *d,
     const vec3 position)
 {
     float depth = sf(d, 1, 1);
+    bool result = true;
     if (!depth || fabsf(position[1]) >= depth * 0.5f) {
-        return false;
-    }
-
-    float t = position[1] / depth + 0.5f;
-    float inset = sf(d, 1, 2) * t + fmaxf(sf(d, 1, 0) - fminf(t, 1 - t) * depth, 0);
-    float x = position[0] - sf(d, 2, 0) * t, z = position[2] - sf(d, 2, 1) * t;
-    int count = (int)sf(d, 0, 2);
-    for (int i = 0; i < count; i ++) {
-        box_sv a = sp(d, 4 + i), b = sp(d, 4 + (i + 1) % count);
-        float dx = b.x - a.x, dz = b.z - a.z;
-        if ((dx * (z - a.z) - dz * (x - a.x)) / hypotf(dx, dz) <= inset) {
-            return false;
+        result = false;
+    } else {
+        float t = position[1] / depth + 0.5f;
+        float inset = sf(d, 1, 2) * t + fmaxf(sf(d, 1, 0) - fminf(t, 1 - t) * depth, 0);
+        float x = position[0] - sf(d, 2, 0) * t, z = position[2] - sf(d, 2, 1) * t;
+        int count = (int)sf(d, 0, 2);
+        for (int i = 0; result && i < count; i ++) {
+            box_sv a = sp(d, 4 + i), b = sp(d, 4 + (i + 1) % count);
+            float dx = b.x - a.x, dz = b.z - a.z;
+            if ((dx * (z - a.z) - dz * (x - a.x)) / hypotf(dx, dz) <= inset) {
+                result = false;
+            }
         }
     }
 
-    return true;
+    return result;
 }
 
 bool box_surface_enclosed(
@@ -808,48 +1078,47 @@ bool box_surface_enclosed(
     const box_mesh_t *mesh,
     const vec3 point)
 {
-    for (int j = 0; j < 3; j ++) {
+    bool result = true;
+    for (int j = 0; result && j < 3; j ++) {
         if (point[j] <= shape->min[j] || point[j] >= shape->max[j]) {
-            return false;
+            result = false;
         }
     }
 
-    const box_surface_data_t *d = &shape->surface;
-    int kind = (int)d->p[0][0];
-    if (kind == 1) {
-        return box_surface_sweep_contains(d, point);
-    }
-    if (kind == 3) {
-        return box_surface_lathe_contains(d, point);
-    }
-    if (kind == 5) {
-        return box_surface_torus_contains(d, point);
+    if (result) {
+        const box_surface_data_t *d = &shape->surface;
+        int kind = (int)d->p[0][0];
+        if (kind == 1) {
+            result = box_surface_sweep_contains(d, point);
+        } else if (kind == 3) {
+            result = box_surface_lathe_contains(d, point);
+        } else if (kind == 5) {
+            result = box_surface_torus_contains(d, point);
+        } else if (kind == 6) {
+            result = box_surface_prism_contains(d, point);
+        } else if (kind == 7) {
+            result = box_profile_contains(&shape->surface, point[0], point[2]);
+        } else {
+            double angle = 0;
+            for (int i = 0; i < mesh->index_count; i += 3) {
+                vec3 a, b, c, cross;
+                box_surface_vertex(shape, &mesh->vertices[mesh->indices[i]], a);
+                box_surface_vertex(shape, &mesh->vertices[mesh->indices[i + 1]], b);
+                box_surface_vertex(shape, &mesh->vertices[mesh->indices[i + 2]], c);
+                glm_vec3_sub(a, ECS_CONST_CAST(float*, point), a);
+                glm_vec3_sub(b, ECS_CONST_CAST(float*, point), b);
+                glm_vec3_sub(c, ECS_CONST_CAST(float*, point), c);
+                glm_vec3_cross(b, c, cross);
+                double la = glm_vec3_norm(a), lb = glm_vec3_norm(b), lc = glm_vec3_norm(c);
+                double numerator = glm_vec3_dot(a, cross);
+                double denominator = la * lb * lc + glm_vec3_dot(a, b) * lc +
+                    glm_vec3_dot(b, c) * la + glm_vec3_dot(c, a) * lb;
+                angle += 2.0 * atan2(numerator, denominator);
+            }
+
+            result = fabs(angle) > 2.0 * GLM_PI;
+        }
     }
 
-    if (kind == 6) {
-        return box_surface_prism_contains(d, point);
-    }
-
-    if (kind == 7) {
-        return box_profile_contains(&shape->surface, point[0], point[2]);
-    }
-
-    double angle = 0;
-    for (int i = 0; i < mesh->index_count; i += 3) {
-        vec3 a, b, c, cross;
-        box_surface_vertex(shape, &mesh->vertices[mesh->indices[i]], a);
-        box_surface_vertex(shape, &mesh->vertices[mesh->indices[i + 1]], b);
-        box_surface_vertex(shape, &mesh->vertices[mesh->indices[i + 2]], c);
-        glm_vec3_sub(a, ECS_CONST_CAST(float*, point), a);
-        glm_vec3_sub(b, ECS_CONST_CAST(float*, point), b);
-        glm_vec3_sub(c, ECS_CONST_CAST(float*, point), c);
-        glm_vec3_cross(b, c, cross);
-        double la = glm_vec3_norm(a), lb = glm_vec3_norm(b), lc = glm_vec3_norm(c);
-        double numerator = glm_vec3_dot(a, cross);
-        double denominator = la * lb * lc + glm_vec3_dot(a, b) * lc +
-            glm_vec3_dot(b, c) * la + glm_vec3_dot(c, a) * lb;
-        angle += 2.0 * atan2(numerator, denominator);
-    }
-
-    return fabs(angle) > 2.0 * GLM_PI;
+    return result;
 }

@@ -1,3 +1,8 @@
+/**
+ * @file geometry/surface_materials.c
+ * @brief Packs SurfaceMaterials components into the surface parameters of a ShapeMesh.
+ */
+
 #include "mesh_cache.h"
 
 void box_surface_materials_apply(
@@ -6,13 +11,13 @@ void box_surface_materials_apply(
     ShapeMesh *shape)
 {
     if (!shape->surface.p[0][0]) {
-        return;
+        goto done;
     }
 
     const SurfaceMaterials *materials = ecs_get(world, e, SurfaceMaterials);
     ecs_os_memset(shape->surface.p[20], 0, sizeof(vec4) * 2);
     if (!materials) {
-        return;
+        goto done;
     }
 
     const SurfaceMaterial *regions[4] = {
@@ -28,8 +33,15 @@ void box_surface_materials_apply(
         ecs_os_memcpy(&shape->surface.p[20][i], &color, sizeof(color));
         ecs_os_memcpy(&shape->surface.p[21][i], &parameters, sizeof(parameters));
     }
+
+done:
+    return;
 }
 
+/** Observer that updates or clears shape material parameters when SurfaceMaterials changes.
+ *
+ * @param it The iterator.
+ */
 static void box_surface_materials_changed(
     ecs_iter_t *it)
 {
@@ -48,6 +60,12 @@ static void box_surface_materials_changed(
     }
 }
 
+/** Constructor that initializes all surface regions to the default material.
+ *
+ * @param ptr The component array.
+ * @param count The number of components.
+ * @param ti The type info.
+ */
 static void box_surface_materials_ctor(
     void *ptr,
     int32_t count,

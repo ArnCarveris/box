@@ -45,9 +45,8 @@ ECS_STRUCT(RenderStatus, {
                          *   in flight, the backpressure of the renderer */
     bool threaded;      /**< A render thread consumes the packets */
     int64_t upload_bytes; /**< Bytes of instance data the last frame uploaded, 0 when unchanged:
-                           *   the sum of the bytes of the transform, shading and surface
-                           *   streams (transform_bytes, shading_bytes and surface_bytes of
-                           *   box_render_draws_stats_t) */
+                           *   transform_bytes + shading_bytes + surface_bytes of
+                           *   box_render_draws_stats_t */
     bool vsync;         /**< Frames present to a window with vsync, FIFO */
     float refresh_rate; /**< Refresh rate in Hz the surface reports, 0 when unknown or none */
     int32_t presented;  /**< Frames the backend presented */

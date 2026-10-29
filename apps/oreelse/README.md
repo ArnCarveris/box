@@ -21,9 +21,13 @@ bake3 --target em --local-env apps/oreelse                     # build for the b
 
 python3 tools/integration.py e2e oreelse_flow oreelse_look     # the end-to-end scenarios
 python3 tools/integration.py e2e oreelse_mining oreelse_particles
-python3 tools/integration.py e2e oreelse_crafting oreelse_buildings
+python3 tools/integration.py e2e oreelse_crafting oreelse_buildings oreelse_rocket
 python3 tools/integration.py e2e oreelse_power oreelse_critters oreelse_critter_fx
+<<<<<<< HEAD
 python3 tools/integration.py e2e oreelse_drones
+=======
+python3 tools/integration.py e2e oreelse_player_fx oreelse_hud oreelse_building_animation
+>>>>>>> 7616982bb50f3620e900cd61c37a36609ce3d9f8
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -43,6 +47,10 @@ session with the same seed.
 | Left mouse button | Place the selected building; drag for a line, an L or a rectangle |
 | 1, 2, 3, 4, 5, 6, 8, 9, 0 | Select the wall, drill, solar panel, gun turret, laser turret, missile turret, rocket pad, drone pad, factory (again: clear the selection) |
 | Q | Pipette: select the building under the cursor, the drill over a deposit |
+| T, Y, U, I | Install a rocket engine, fuel storage, cargo bay, life support on the rocket |
+| O | Load the Luminite you carry into the rocket |
+| P | Launch the rocket |
+| F, G, H, J | Order a rocket engine, fuel storage, cargo bay, life support; with Shift five |
 | Mouse wheel | Zoom: up zooms in, down zooms out, three levels |
 | ESC | One step back; with nothing left to back out of, pause or resume |
 | R | Restart (on the win or lose screen) |
@@ -98,6 +106,10 @@ up, looking down at 44.6, 51.8 and 59.5 degrees. It glides to a new level and fo
 astronaut smoothly, also on the title screen and while paused. The wheel over a panel of the UI
 does not zoom.
 
+Walking, the astronaut swings its legs and its arms, each arm with the opposite leg, bobs up to
+0.07 units with every step and kicks up a puff of dust at every half step, twice as often while
+running. Standing, it holds its limbs straight.
+
 ### Items
 
 | Item | Name | Detail | Recipe | Yield | Time (s) |
@@ -140,6 +152,10 @@ power does not change it. When it completes, 1 of the ore goes into the inventor
 off the deposit, and the next swing starts. A deposit that runs out is gone and its tile is
 empty ground. With a full inventory a new kind of ore is not mined: the deposit keeps its ore
 and the full warning shows at every swing.
+
+Every ore mined bursts off the deposit, and a deposit shrinks as it runs out: to
+`0.55 + 0.45 * amount / 1000` of its size, so a deposit about to run out is a little over half
+its size. A deposit used up goes in a puff of dust. The Luminite deposits glint.
 
 Moving the cursor to another deposit starts the swing over. Releasing the button, walking out
 of reach or moving the cursor off the deposit loses the progress of the swing. The right button
@@ -246,7 +262,8 @@ otherwise an L whose corner follows where the cursor sits in the last tile. Hold
 release fills the rectangle instead. A drag covers at most 64 cells. The cells are placed row by
 row from the top left, one item each, until the item runs out (so the top left part gets built),
 skipping the cells that cannot be placed. When nothing was placed and a cell was too far away,
-the warning `Too far away` shows. When the last one is placed the selection clears. ESC or a
+the warning `Too far away` shows. When the last one is placed the selection clears. Every
+building placed comes down in a puff of dust. ESC or a
 right click during a drag throws it away (`Placement cancelled`).
 
 While a building is selected, a preview shows on the cells the click or the drag would place: the
@@ -264,7 +281,8 @@ back the salvage of its recipe instead: `trunc(amount * health / max)` of every 
 at half health gives 2 bricks and a gun turret at 10% 1 iron plate and 1 wire; it shows as
 `Salvaged 1 Iron plate, 1 Wire (10%)` (or `Salvaged nothing (5%)`), and is refused with
 `Inventory full - can't salvage` when the new kinds do not fit. Then the building is gone; a
-deposit under it (a drill's) is mined by the next swing. A building whose health drops to 0 is
+deposit under it (a drill's) is mined by the next swing. A building demolished goes in a puff
+of dust. A building whose health drops to 0 is
 destroyed.
 
 ### Power
@@ -322,7 +340,25 @@ Every powered building shows its state on its status lamps:
 | Its category at 2 | Green {124, 226, 148} |
 | Its category at 3 or 4, or no category | Cyan {92, 236, 222} |
 
-A gun turret draws no power, so a blackout does not kill its lamps; Weapons at 0 does.
+A gun turret draws no power, so a blackout does not kill its lamps; Weapons at 0 does. A lit
+status lamp also casts a little light of its color around it, which blinks with it.
+
+### Buildings at work
+
+A building works at its work rate: 0 for a consumer in a blackout, for a drill that does not
+mine (no deposit left under it, or Mining at 0) and for a factory whose crafter is idle (nothing
+in the queue it can start), otherwise the multiplier of its category (0.5 to 2, 1 without a
+category). While it works it moves at that rate, and at 0 it stops where it is; while the game
+is paused everything stands still.
+
+- The factory turns the drums of its four rollers and its two flywheels (5 radians a second),
+  strokes its press (6 radians of the stroke a second, 0.62 down from its rest) with a puff of
+  dust and sparks where it lands, puffs smoke out of its stacks every 0.5 and 0.62 seconds and
+  steams from its three vents. Its hot plate and its work glow light up (the glow lights the
+  press, brighter as the press comes down) and fade within about half a second when the work
+  stops; its beacons blink twice a second (times the rate). A blackout puts them out at once.
+- The drill turns its bit (7 radians a second) and shakes it, rides its carriage up and down
+  the legs and its slider fore and aft, and throws dust; idle, its bit settles back at rest.
 
 ### Repair drones
 
@@ -422,12 +458,84 @@ tile inside the edge, up to 5 units off on both axes.
 ### Health
 
 The astronaut has 100 HP. After 5 seconds without damage it regenerates 2 HP a second up to
-the full 100. At 0 HP the game is lost.
+the full 100. At 0 HP it falls over in a splat and the game is lost.
+
+### Rockets
+
+The score is the Luminite shipped to orbit. A cargo rocket ships it; a rocket with life support
+ships it and takes you off the planet, which wins the game. Shipped Luminite is banked even if
+you die later.
+
+The rocket is built on the rocket pad (one on the map) from the rocket parts in the inventory. A
+unit is a cargo bay or the life support: a rocket takes up to 4 cargo bays and 1 life support,
+and needs 4 engines and 1 fuel storage per unit. It is valid, ready to launch, with at least
+one unit, exactly 4 engines per unit and exactly one fuel storage per unit. A cargo bay holds 25
+Luminite, so a rocket ships at most 100. A rocket with only the life support (4 engines, 1 fuel
+storage) is valid, ships nothing and wins.
+
+Everything below works only while playing with a pad and the rocket on it, not in flight, and
+with or without a panel open:
+
+- T, Y, U and I install an engine, a fuel storage, a cargo bay and the life support, spending
+  one from the inventory. An engine only goes on while there are fewer than 4 per unit, a fuel
+  storage while there are fewer than the units; otherwise the warning
+  `Engines full for this payload - add a cargo bay (U) first` (or
+  `Fuel tanks full for this payload - add a cargo bay (U) first`) shows. A fifth cargo bay or a
+  second life support does not go on.
+- The minus buttons of the rocket panel uninstall a part into the inventory. The engines and
+  fuel storages above the limits of the units left and the Luminite above the capacity left come
+  back with it, shown as `Payload removed - returned 4 engines, 1 fuel tank, 25 Luminite` (only
+  what came back besides the part). When the returned kinds do not fit the inventory nothing
+  happens and the warning `No room in the inventory for the parts` shows.
+- O loads the Luminite you carry into the cargo bays, as much as they have room for.
+- P launches a valid rocket. It loads first, its engines fire for 1.6 seconds, then it climbs,
+  its speed growing by 9 units a second every second, until it is 60 units up, about 5.25
+  seconds after the launch. With life support you board it: the astronaut stands on the pad,
+  hidden, and cannot move, mine, shoot or regenerate, and the swarm can neither hurt nor target
+  it.
+
+When the rocket arrives its Luminite is added to the shipped total. With life support the game
+is won; a cargo rocket shows `Shipment away!  +25 Luminite` and leaves the pad empty for the
+next rocket.
+
+A pad that is demolished or destroyed while the rocket stands on it loses every part on it and
+the Luminite loaded. A rocket in flight flies on.
+
+F, G, H and J order a rocket engine, fuel storage, cargo bay and life support through the order
+book, one unit, or one order of five with Shift (as many as you can pay for), whatever screen is
+open.
 
 ### The jetpack
 
 Over a tile with a building the astronaut hovers on its jetpack 3 units up, rising at 7 units a
-second and coming back down at 5 once it is off the buildings.
+second and coming back down at 5 once it is off the buildings. The jet plume fires while it is
+in the air and stops when it lands; its limbs trail behind it while it flies and dangle while it
+hovers in place.
+
+### The HUD
+
+The HUD shows over the world outside the title screen. In the top right corner the status bar
+holds four gauges, left to right:
+
+- **Health**: the heart and a bar of the astronaut's HP, green, amber below 60% and red below
+  30%.
+- **Luminite**: `held / shipped`, the Luminite in the inventory and the Luminite shipped to
+  orbit.
+- **Waves**: the critter and a bar of the time to the next wave, filling up as it nears: purple,
+  orange once it is three quarters there, and full, blinking red, while a wave spawns.
+- **Power**: `production / demand W` (rounded down) and a bar of the ratio of the two, green, red
+  in a blackout.
+
+While playing or paused the bottom of the screen shows, from the top down: the message of the
+toast (red for a warning, teal otherwise), the progress bar of a swing at a deposit or a
+building while one is under way, and with a rocket pad the status of its rocket: `LAUNCHING`
+once it is launched, `Rocket ready to launch (P)` (blinking green) when it is valid, else what
+it needs: `Install a cargo bay (U) or life support (I)`, `Needs 4 engines, 2 installed (T)` or
+`Needs 1 fuel tanks, 0 installed (Y)`. Below 30% health `! SUIT BREACH !` blinks red at the top
+of the screen.
+
+Clicks, the right button and the wheel over a panel of the UI (the status bar) do not reach the
+world: they place, mine and zoom nothing. The plain lines of text let them through.
 
 ### Render quality
 
@@ -467,12 +575,16 @@ Every task of the port follows these.
   craft's progress changes, `OreCanOrder` on an item prefab when it flips, `OreNeeds` (the raw
   ore of the item the UI sets in it) when a row changes, `OrePowerAlloc` (the levels of the
   power categories) when a level changes, `OrePowerState` (production, demand, ratio and
-  blackout) when a value changes. The C formats no text for the UI.
+  blackout) when a value changes, `OreRocketState` (the rocket, the score, the Luminite held
+  and what can be done to the rocket) when a value changes, every frame of a flight. The C
+  formats no text for the UI.
 - **Game state** is the exclusive pair `(OreGameState, Title | Playing | Paused | Won | Lost)`
   on its own singleton (`ore_state_is`, `ore_state_set`). Gameplay systems run only while
   `Playing`, with a query term on `ore_state_pair(world, OreGameStatePlaying)` whose source is
   `OreGameState`. That is the only pause mechanism: no time scale, no frozen flags. Only the
-  camera and the render quality tier run in every state.
+  camera and the render quality tier run in every state; outside play, systems only hide what
+  belongs to play (the tile markers, the placement preview) and pause the effects that play
+  (the jet plume, the glints of the Luminite).
 - **Input**: every key is a box `Action` with a `Binding` in `apps/oreelse/etc/input.flecs`.
   Actions that fire once are awaited by async loops that call an `oreelse` script function
   implemented in C (`ecs_async_function`, like `oreelse.cancel()`); held actions (walking,
@@ -581,9 +693,10 @@ A projectile's origin is its center.
 ## Building models
 
 The buildings are prefabs in `etc/buildings/`, one file per building, with the original's names
-and geometry, materials and lights. They stand still: the gameplay tasks add their components
-(item, recipe, footprint, health, power) to the same prefabs, and the animation and effect tasks
-drive the named parts below. Every building's origin is the center of its footprint on the
+and geometry, materials and lights. The gameplay tasks add their components (item, recipe,
+footprint, health, power) to the same prefabs, and the animation and effect tasks drive the named
+parts below. A model that is not a placed building (no `OreBuilding` above it, a ghost) stands
+still. Every building's origin is the center of its footprint on the
 ground (the center of its tile, the corner between the four tiles of a 2x2 building, the center
 of the middle tile of a 3x3 one), and it faces +Z. The names are those of the prefab's parts
 (`ecs_lookup_from(world, Drill, "carriage.slider.bit")`): the parts of an instance are unnamed
@@ -609,9 +722,11 @@ the original's `oreChild` does. The parts have no `DynamicTransform`, so a syste
 | `Rocket` | `rocket/rocket.flecs` | A template, the rocket on the pad (see below) |
 
 The rocket is an entity with the `Rocket` template, its origin the bottom of the stack on its
-axis, which OreRocket places on the pad and keeps in step with its rocket state by setting the
-props of its `Rocket` component; the template rebuilds the stack in the script whenever they
-change, so nothing in C builds or deletes its parts:
+axis, which `launch.flecs` places on the pad and keeps in step with the rocket state
+(`OreRocketState`) by setting the props of its `Rocket` component; the template rebuilds the
+stack in the script whenever they change, so nothing in C builds or deletes its parts. It rises
+with the state's height during the ascent. The entity always exists; without parts (no pad, an
+empty pad, after the arrival) the template builds nothing, so the rocket is gone:
 
 | Prop | Type | Builds |
 | --- | --- | --- |
@@ -629,8 +744,10 @@ is turned by PI / 2 about x). The `bulb` is the part the game drives: it has the
 `light` and `range` when `light` is above 0. The props say how: a status lamp (`status: true`)
 is the power lamp of its building, which OrePower colors `color` (live), `ok`, `warn` or `dead`
 and blinks with the lamp signal of `OreBlink` while dead (the template gives its bulb an
-`OreStatusLamp` with those colors); a work lamp (`work: true`) lights while its
-building works. The props are on the `Light` component of the lamp entity (`lamp_l`, `sight`,
+`OreStatusLamp` with those colors and a `PointLight` of `cfg.statusLampLight` and
+`cfg.statusLampRange`, small for box's falloff, which blinks with it); a work lamp
+(`work: true`) lights while its building works, blinking at `blink` times the work rate (the
+template gives its bulb an `OreWorkLight`). The props are on the `Light` component of the lamp entity (`lamp_l`, `sight`,
 ...). The template builds the parts on every lamp of an instance, not on the prefab's, so they
 keep their names there: the bulb is the lamp's child `bulb`.
 
@@ -644,7 +761,7 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 
 | File | Holds |
 | --- | --- |
-| `etc/oreelse.flecs` | The window, the camera, the sun, the atmosphere, the effects and the view, the render quality tier, the mining markers, the critter tiers and their death effects (`OreArsenal`); includes the rest |
+| `etc/oreelse.flecs` | The window, the camera, the sun, the atmosphere, the effects and the view, the render quality tier, the mining markers, the critter tiers and their death effects (`OreArsenal`), the one shot effects the C plays (`OreEffects`), the HUD; includes the rest |
 | `etc/config.flecs` | The constants `cfg.*` |
 | `etc/resources.flecs` | The item prefabs other than the buildings, with names and recipes |
 | `etc/buildings/*.flecs` | The building prefabs, models with their item, recipe, footprint, health and power |
@@ -653,8 +770,9 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 | `etc/world.flecs` | The ground and the basin |
 | `etc/boundary.flecs` | The hazard band around the playable area |
 | `etc/scenery.flecs` | The boulders and dunes of a run |
-| `etc/run.flecs` | The astronaut, the parents of the placed buildings and of the critters, and the singletons of a run, the order book, the selection, the power allocation and the waves included |
-| `etc/deposits.flecs` | The deposits of a run |
+| `etc/run.flecs` | The astronaut, the parents of the placed buildings and of the critters, and the singletons of a run, the order book, the selection, the power allocation, the rocket state and the waves included |
+| `etc/launch.flecs` | The items of a rocket (`OreRocketKit`) and the rocket on the pad, a `Rocket` instance that follows the rocket state |
+| `etc/deposits.flecs` | The deposits of a run, the Luminite's with their glints (`DepositSparkle`) |
 | `etc/player.flecs` | The `Astronaut` template |
 | `etc/props/ore.flecs` | The `Ore` template of the deposits |
 | `etc/critters/` | The `Mite`, `Skitter`, `Brute` and `Behemoth` prefabs, models with their health, speed, damage, range, radius and wave tier |
@@ -674,16 +792,24 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 | `etc/buildings/` | The building prefabs, one file per building, and the drone (see Building models) |
 | `etc/rocket/` | The `Rocket` template and its parts `RocketBell`, `RocketBay` and `RocketPort`, and the `PadClamp` template of the rocket pad |
 | `etc/assets/` | The original's textures (SVG), unchanged, and `terrain_dirt_orm.svg` |
+| `etc/ui/palette.flecs` | The colors of the UI, `palette.*` |
+| `etc/ui/icons.flecs` | The icon textures, `icons.*`, which the items name with `OreIcon` |
+| `etc/ui/panel.flecs` | The `Panel` template, the chrome of every panel: the plate, its edge, the hazard strip and the `InputBlocker` |
+| `etc/ui/hud.flecs` | The `OreHud` template: the status bar (`StatusGauge`, `StatusDivider`), the toast, the mine progress bar, the suit breach alert and the rocket status line |
+| `etc/icons/` | The original's icons (SVG), unchanged |
+| `etc/ui/hazard_strip.svg` | The original's hazard strip of the panels, unchanged |
 | `src/flow.c` | States, clock, blink, toast, seeds, `oreelse.cancel()`, `oreelse.restart()` |
 | `src/map.c` | The tile grid, the deposits' registration and the hover tile |
-| `src/player.c` | Walking, the jetpack and the camera |
+| `src/player.c` | Walking, the jetpack and the camera; the astronaut's animation (`OrePlayerFx`: the walk cycle `OrePlayerGait`, the bob, the foot dust and the jet plume; `OreLimbs`: the limbs) and its death (`ore_player_die`) |
 | `src/inventory.c` | The inventory and the item components |
-| `src/mining.c` | Mining, demolishing and their tile marker |
+| `src/mining.c` | Mining, demolishing and their tile marker; the burst and the shrink of a mined deposit, the poofs of a used up deposit and of a demolished building, the glints of the Luminite while playing |
 | `src/critters.c` | The waves, the critters' targets, attacks and moves, the crowd separation and the critter spatial index, their deaths, the astronaut's health and regen, `oreelse.spawn_critter()` |
 | `src/critter_fx.c` | The critters' walk, bob, waddle and legs, their death bursts, the corpses' char, sinking and cap, `oreelse.corpse()` |
 | `src/buildings.c` | The buildings in the tile grid, the wall connectors, demolish and salvage, destroyed buildings, the look of the ghosts |
-| `src/placement.c` | The selection, `canPlace`, the click and the drag, the pipette, the preview, `oreelse.select()`, `oreelse.pipette()`, `oreelse.placeStart()`, `oreelse.placeEnd()`, `oreelse.cancelDrag()` |
+| `src/building_fx.c` | The buildings' animation and lights at the work rate of their building: the spinners, pistons, shakes, vents, work emitters and work lights |
+| `src/placement.c` | The selection, `canPlace`, the click and the drag, the poof of a placed building, the pipette, the preview, `oreelse.select()`, `oreelse.pipette()`, `oreelse.placeStart()`, `oreelse.placeEnd()`, `oreelse.cancelDrag()` |
 | `src/craft.c` | The order book, the workers, `oreelse.craft_order()`, `oreelse.craft_cancel()` |
 | `src/power.c` | Production, demand and the blackout, the drills, the factories' crafters, the status lamps, `oreelse.power_set(category, level)` |
+| `src/rocket.c` | The rocket state, installing, uninstalling, loading, the launch and the flight, `oreelse.rocket_install()`, `oreelse.rocket_uninstall()`, `oreelse.rocket_load()`, `oreelse.rocket_launch()`, `oreelse.craft_key()` |
 | `src/look.c` | The render quality tiers, `oreelse.cycleQuality()` |
 | `src/particles.c` | The helpers that play the effects (`ore_burst`, `ore_burst_aimed`, `ore_explosion`, `ore_combust`), the flash of their lights, `oreelse.explosion()`, `oreelse.combust()` |

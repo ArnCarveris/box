@@ -57,7 +57,8 @@ typedef struct {
     ecs_vec_t scrolls;            /**< Elements whose LayoutScroll was set since the last layout */
     ecs_vec_t shifts;             /**< Of those, the ones whose children only move */
     ecs_vec_t floats;             /**< Elements with LayoutFloat */
-    ecs_vec_t ordered;            /**< Parents that got OrderedChildren since the last layout, with their children */
+    ecs_vec_t ordered;            /**< Parents that got OrderedChildren since the last layout,
+                                   *   with their children */
     ecs_vec_t placing;            /**< Floats being placed, sorted by depth */
     ecs_map_t scrolled;           /**< Laid out scrolling element to the axes it scrolled */
     ecs_map_t anchor_sizes;       /**< Float to the anchor size it got, two packed floats */
