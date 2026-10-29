@@ -23,12 +23,9 @@ python3 tools/integration.py e2e oreelse_flow oreelse_look     # the end-to-end 
 python3 tools/integration.py e2e oreelse_mining oreelse_particles
 python3 tools/integration.py e2e oreelse_crafting oreelse_buildings oreelse_rocket
 python3 tools/integration.py e2e oreelse_power oreelse_critters oreelse_critter_fx
-<<<<<<< HEAD
-python3 tools/integration.py e2e oreelse_player_fx oreelse_hud oreelse_inventory_screen
-=======
 python3 tools/integration.py e2e oreelse_player_fx oreelse_hud oreelse_building_animation
 python3 tools/integration.py e2e oreelse_weapons oreelse_flora oreelse_drones
->>>>>>> de9e56c7a7047084a849fdfe5e8450ff7fb1320b
+python3 tools/integration.py e2e oreelse_inventory_screen
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -884,13 +881,8 @@ its tile in the grid.
 | `etc/input.flecs` | The actions, their bindings and the loops of the actions that fire once |
 | `etc/world.flecs` | The ground and the basin |
 | `etc/boundary.flecs` | The hazard band around the playable area |
-<<<<<<< HEAD
-| `etc/scenery.flecs` | The boulders and dunes of a run |
-| `etc/run.flecs` | The astronaut, the parents of the placed buildings and of the critters, and the singletons of a run, the order book, the selection, the inventory screen, the power allocation, the rocket state and the waves included |
-=======
 | `etc/scenery.flecs` | The boulders, dunes and flora of a run |
-| `etc/run.flecs` | The astronaut with its pistol, the parents of the placed buildings, of the critters and of the projectiles, and the singletons of a run, the order book, the selection, the power allocation, the rocket state and the waves included |
->>>>>>> de9e56c7a7047084a849fdfe5e8450ff7fb1320b
+| `etc/run.flecs` | The astronaut with its pistol, the parents of the placed buildings, of the critters and of the projectiles, and the singletons of a run, the order book, the selection, the inventory screen, the power allocation, the rocket state and the waves included |
 | `etc/launch.flecs` | The items of a rocket (`OreRocketKit`) and the rocket on the pad, a `Rocket` instance that follows the rocket state |
 | `etc/deposits.flecs` | The deposits of a run, the Luminite's with their glints (`DepositSparkle`) |
 | `etc/player.flecs` | The `Astronaut` template |
