@@ -7,16 +7,11 @@
 //
 // The numbers are the original's pixels, positions from the top left corner of the parent with
 // y down: an element of a panel sits at LayoutItem {h: Left, v: Top, x, y: -y}. The labels are
-<<<<<<< HEAD
 // centered vertically on their icons by the layout. The status bar, the order queue, the power
 // allocator and the rocket assembly are panels, whose clicks call the oreelse functions: the
-// other lines are plain labels, which the pointer passes through.
-=======
-// centered vertically on their icons by the layout. Only the status bar is a panel: the other
-// lines are plain labels, which the pointer passes through. The inventory screen and its info
-// panel come from the InventoryScreen and ItemInfoPanel templates, the Inventory (E) button from
-// InventoryButton (ui/inventory.flecs).
->>>>>>> c114738101f209461eb03527e05b575c78142b1d
+// other lines are plain labels, which the pointer passes through. The inventory screen and its
+// info panel come from the InventoryScreen and ItemInfoPanel templates, the Inventory (E) button
+// from InventoryButton (ui/inventory.flecs).
 
 using flecs.script.math
 using box.transform
@@ -435,7 +430,6 @@ template OreHud {
         }
       }
 
-<<<<<<< HEAD
       // The panels of play, hidden while paused. The power panel draws at z 0, the queue at 1
       // and the rocket panel at 2: a tall queue grows up into the rocket panel, which draws and
       // takes the pointer on top where they overlap
@@ -624,9 +618,13 @@ template OreHud {
             RocketLaunch: {
               x: 12, y: 306, width: 248, height: 48, enabled: canLaunch, note: launchNote
             }
-=======
+          }
+        }
+      }
+
       // The Inventory (E) button at the bottom center while playing, and the inventory screen
-      // with its info panel over the rest of the HUD (ui/inventory.flecs)
+      // with its info panel over the rest of the HUD (ui/inventory.flecs), above the panels of
+      // play at z 3 and 4
       if playing {
         inventory_button {
           InventoryButton: {label: "Inventory (E)", action: actions.Inventory}
@@ -635,14 +633,15 @@ template OreHud {
 
       if inventoryOpen {
         inventory {
+          Position: {0, 0, 3}
           InventoryScreen: {}
         }
 
         // While the pointer is over a stock slot holding an item or a slot button
         if itemInfo.item != none {
           info_panel {
+            Position: {0, 0, 4}
             ItemInfoPanel: {item: itemInfo.item, place: itemInfo.place}
->>>>>>> c114738101f209461eb03527e05b575c78142b1d
           }
         }
       }

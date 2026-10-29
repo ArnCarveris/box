@@ -57,13 +57,10 @@ include deposits
 include run
 include launch
 include ui/panel
-<<<<<<< HEAD
 include ui/queue
 include ui/power
 include ui/rocket_panel
-=======
 include ui/inventory
->>>>>>> c114738101f209461eb03527e05b575c78142b1d
 include ui/hud
 include ui/health_bar
 

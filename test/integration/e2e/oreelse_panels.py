@@ -15,7 +15,7 @@ astronaut's crafting, so the order book holds still.
 """
 from box_client import parse_value
 from oreelse_buildings import (  # noqa: F401 (ARGS)
-    ARGS, OFFSETS, PLAYER, SETTLE, STATE, TOAST, aim_tile, count, free_area, key,
+    ARGS, PLAYER, SETTLE, STATE, TOAST, aim_tile, count, free_area, key,
     move_cursor, run_script, select, set_inventory, set_state, setup, tiles)
 from oreelse_hud import color, shown, text, wait_shown
 from oreelse_rocket import (
@@ -82,7 +82,6 @@ def start(app):
     setup(app)
     app.exec("set window Surface {width: %d, height: %d}" % (WIDTH, HEIGHT))
     app.wait_for("get window SurfaceStatus.height", str(HEIGHT))
-    OFFSETS.clear()
     app.expect(STATE % "Title", "true")
     key(app, "Space")
     app.wait_for(STATE % "Playing", "true")

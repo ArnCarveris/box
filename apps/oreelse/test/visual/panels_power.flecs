@@ -4,7 +4,9 @@
 // four cyan; the cursor rests on the third bar of Construction, which is a lighter cyan. Under
 // the bars the drill, the gun turret and the factory and the captions MINING, WEAPONS and
 // CONSTRUCTION. The window is the size of the capture, so the cursor's point is the point of
-// the layout: the bar spans x 207..259 and y 238..249 of the window
+// the layout: the bar spans x 207..259 and y 238..249 of the window. In a window this small the
+// Inventory (E) button at the bottom center (x 222..418, y 300..338) covers the right end of
+// the panel, the CONSTRUCTION caption; in the 1280x720 window of the game they are apart
 include apps/oreelse/test/visual/setup/seed
 include apps/oreelse/etc/oreelse
 
