@@ -4,7 +4,7 @@
  *
  * The scene (apps/oreelse/etc) holds the constants cfg.*, the models, the items, the singletons
  * and the entities of a run; the systems of each area (flow.c, map.c, player.c, inventory.c,
- * mining.c, craft.c, buildings.c, placement.c, look.c, particles.c) play the game.
+ * mining.c, craft.c, buildings.c, flora.c, placement.c, look.c, particles.c) play the game.
  */
 
 #ifndef OREELSE_GAME_H
@@ -431,9 +431,19 @@ ECS_STRUCT(OreDeposit, {
     int32_t col;           /**< Column of its tile, set when it registers, -1 off the grid */
 });
 
-/** The tile grid, a singleton: the deposit and the building on every tile. A deposit and a
- * building can share a tile (a drill sits on a deposit). The cells clear themselves when their
- * entities are deleted, so a restart that deletes the run's entities empties it.
+/** A plant of the flora (scenery.flecs), registered in the tile grid of OreMap when it is set.
+ * A plant on a tile another plant took is rejected and deleted by ore_map_purge, as is a plant on
+ * a deposit's tile; a plant under a building sinks cfg.floraSink below the ground until the
+ * building is gone. A plant off the grid keeps row and col at -1 and stays as it is.
+ */
+ECS_STRUCT(OreFlora, {
+    int32_t row; /**< Row of its tile, set when it registers, -1 off the grid */
+    int32_t col; /**< Column of its tile, set when it registers, -1 off the grid */
+});
+
+/** The tile grid, a singleton: the deposit, the building and the plant on every tile. A deposit
+ * and a building can share a tile (a drill sits on a deposit). The cells clear themselves when
+ * their entities are deleted, so a restart that deletes the run's entities empties it.
  */
 ECS_STRUCT(OreMap, {
     int32_t rows;              /**< Rows of the grid, cfg.rows once a cell was registered */
@@ -443,11 +453,17 @@ ECS_PRIVATE                    /**< The cells are not reflected */
     ecs_entity_t *buildings;   /**< Building of every tile, row major, 0 for none */
     ecs_entity_t *links;       /**< Connector of the east (2 i) and south (2 i + 1) edge of
                                 *   every tile i, 0 for none */
-    ecs_vec_t rejected;        /**< Deposits that registered on a taken tile, deleted by
-                                *   ore_map_purge: an entity cannot be deleted while the
+    ecs_entity_t *flora;       /**< Plant of every tile, row major, 0 for none */
+    ecs_vec_t rejected;        /**< Deposits and plants that registered on a taken tile, deleted
+                                *   by ore_map_purge: an entity cannot be deleted while the
                                 *   script that creates it still sets it */
     ecs_vec_t dirty;           /**< Tiles (row major indices) whose building changed, the
                                 *   connectors of their edges to sync */
+    ecs_vec_t flora_new;       /**< Plants that registered (or whose tile got a deposit) since
+                                *   the last ore_map_purge, to check against the deposits once
+                                *   every script of the run created its entities */
+    ecs_vec_t flora_dirty;     /**< Tiles (row major indices) whose building changed, their
+                                *   plants to sink or raise */
 });
 
 /** Render quality tiers, the type of OreQuality.tier. The pause screen's button cycles
@@ -707,7 +723,20 @@ void ore_map_fit(
     OreMap *map,
     const ore_grid_t *grid);
 
-/** Mark a tile whose building changed, so the connectors of its edges are synced.
+/** Get the plant cell of a tile.
+ *
+ * @param map The tile grid
+ * @param row The row
+ * @param col The column
+ * @return The cell, NULL off the grid or before the first registration
+ */
+ecs_entity_t* ore_map_flora(
+    OreMap *map,
+    int32_t row,
+    int32_t col);
+
+/** Mark a tile whose building changed, so the connectors of its edges and its plant are
+ * synced.
  *
  * @param map The tile grid
  * @param row The row
@@ -730,13 +759,25 @@ bool ore_hover_find(
     const OreView *view,
     OreHover *hover);
 
-/** Delete the deposits that registered on a tile another deposit holds. The OnLoad phase
- * does it every frame, restart() right after it reloaded the scripts of the run.
+/** Delete the deposits that registered on a tile another deposit holds and the plants that
+ * registered on a tile another plant holds, then sync the flora (ore_flora_sync). The OnLoad
+ * phase does it every frame, restart() right after it reloaded the scripts of the run.
  *
  * @param world The world or a stage
  */
 void ore_map_purge(
     ecs_world_t *world);
+
+/** Sync the flora with the tile grid: delete the plants that registered since the last sync on
+ * a deposit's tile, and sink the plants of those and of the tiles whose building changed under
+ * a building (cfg.floraSink below the ground) or raise them back to it.
+ *
+ * @param world The world or a stage
+ * @param map The tile grid
+ */
+void ore_flora_sync(
+    ecs_world_t *world,
+    OreMap *map);
 
 /** Get the amount of an item in the inventory.
  *
@@ -1051,6 +1092,13 @@ void ore_craft_import(
  * @param world The world
  */
 void ore_buildings_import(
+    ecs_world_t *world);
+
+/** Register the flora: the plants that register in the tile grid.
+ *
+ * @param world The world
+ */
+void ore_flora_import(
     ecs_world_t *world);
 
 /** Register placement: the selection, the click and drag placement, the preview and the script

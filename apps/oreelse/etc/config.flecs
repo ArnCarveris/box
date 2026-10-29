@@ -19,6 +19,10 @@ cfg {
   // Ore of a new deposit, its amount and its capacity
   export const depositAmount: i32 = 1000
 
+  // A plant of the flora under a building sinks floraSink units below the ground, out of sight,
+  // until the building is gone
+  export const floraSink: f32 = 8
+
   // The astronaut mines a tile whose center is at most reach away on x and z, and places a
   // building whose footprint (the rectangle of its tile centers) is at most reach away
   export const reach: f32 = 15

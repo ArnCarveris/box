@@ -21,7 +21,7 @@ bake3 --target em --local-env apps/oreelse                     # build for the b
 
 python3 tools/integration.py e2e oreelse_flow oreelse_look     # the end-to-end scenarios
 python3 tools/integration.py e2e oreelse_mining oreelse_particles
-python3 tools/integration.py e2e oreelse_crafting oreelse_buildings
+python3 tools/integration.py e2e oreelse_crafting oreelse_buildings oreelse_flora
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -85,6 +85,11 @@ The map is 48 by 48 tiles of 2 units, the astronaut's start at its center. Depos
 A hazard band runs around the playable area, just outside the edge tiles. Boulders lie scattered
 over the basin and the plain, and dunes rise on the plain beyond; they change with every map and
 nothing collides with them.
+
+Alien flora grows from 8 to 58 units out from the center: 96 frondstalks, 200 ashcups and 84
+quillbulbs, each near the center of a tile, changing with every map. It is decoration: nothing
+collides with it. A tile holds at most one plant and a deposit's tile none. A plant under a
+building sinks out of sight when the building is placed and comes back when it is gone.
 
 ### The astronaut
 
@@ -329,7 +334,8 @@ Every task of the port follows these.
   the runs since the start. `ore_seed_get(world, stream)` derives the seed of a stream of the
   current run: stream 0 seeds the C generator (`OreRandom`, drawn with `ore_random01`), and
   the scripts seed their `flecs.script.math.Rng` with `oreelse.seed(stream)`, one stream per
-  script (1 and 2 the deposits, 3 the ore models, 4 the scenery). A new random stream takes the next number.
+  script (1 and 2 the deposits, 3 the ore models, 4 the scenery, 5 the placement of the flora,
+  6 the plant models). A new random stream takes the next number.
 - **Restart** reloads the scripts that create a run's entities (`ecs_script_reload`): every
   script that creates the entities of a run puts the `OreRunScript` tag on one of them, and
   `restart()` reloads the script of every entity with the tag (today `run.flecs` with the
@@ -338,11 +344,14 @@ Every task of the port follows these.
 - **The map**: tile (row, col) is centered at `x = x0 + col * tile`, `z = z0 + row * tile`.
   The conversions are `ore_tile_x`, `ore_tile_z`, `ore_col_at`, `ore_row_at` and `ore_on_grid`
   in `src/map.c`, over the `ore_grid_t` of `ore_grid_get` (read once per system run). The
-  `OreMap` singleton is the tile grid: `ore_map_deposit` and `ore_map_building` give the cell
-  of a tile. Entities register when they are set and clear their cell when they are removed.
-  A deposit that registers on a tile another deposit holds is rejected and deleted by
-  `ore_map_purge` (every frame in `OnLoad`, and by `restart()` right after its reload): an
-  entity cannot be deleted in the observer of a component its script is still setting.
+  `OreMap` singleton is the tile grid: `ore_map_deposit`, `ore_map_building` and
+  `ore_map_flora` give the cell of a tile. Entities register when they are set and clear their cell when they are removed.
+  A deposit that registers on a tile another deposit holds (a plant on one another plant
+  holds) is rejected and deleted by `ore_map_purge` (every frame in `OnLoad`, and by
+  `restart()` right after its reload): an entity cannot be deleted in the observer of a
+  component its script is still setting. `ore_map_purge` then syncs the flora
+  (`ore_flora_sync`): it deletes the plants that registered on a deposit's tile and sinks or
+  raises the plants of the tiles whose building changed.
 - **Systems write through `it->stage`** (`ecs_set`, `ecs_modified`, `ore_state_set`,
   `ore_toast`): the world is read only while the pipeline runs.
 - **Tests**: end-to-end scenarios over the command port, one file per area,
@@ -457,6 +466,24 @@ and `HazardBoundary` (`etc/materials/hazard.flecs`), `SolarCells`, `AccessPlate`
 `FanDisc` and `BayPad`. `TileMarker` and `TileMarkerBad` (`etc/props/markers.flecs`) are the
 glowing plates mining and placement show over a tile, instances placed at y 0.14.
 
+## Flora models
+
+The plants are templates in `etc/props/flora.flecs` with the original's names, geometry and
+colors. A plant's origin is the middle of its root mound on the ground, and every instance draws
+its own shape from the seeded `floraRng`. The fronds and membranes are the cutouts of
+`etc/materials/flora.flecs`: `FloraFrond`, `FloraFrondB`, `FloraMembrane` and `FloraMembraneB`,
+a unit quad with the texture and its normal map, alpha tested (`AlphaCutoff`) instead of the
+original's alpha blending, and two sided (a `back` child turned by PI about y).
+
+| Template | Props | Parts |
+| --- | --- | --- |
+| `Frondstalk` | `height`, `fronds`, `skirt`, `blade`, `bladeWide`, `stalkR`, `stalkTint`, `rootTint` | `mound`, `root_0` ... `root_2`, the stalk `seg_a`, `seg_b`, `seg_c`, the crown `frond_0` ... and the skirt `skirt_0` ... |
+| `Ashcup` | `leaves`, `size`, `nubs`, `rootTint`, `nubTint` | `mound`, the cup `leaf_0` ..., `nub_0` ... |
+| `Quillbulb` | `size`, `quills`, `veils`, `bulbTint`, `quillTint`, `rootTint`, `podTint`, `podGlow` | `mound`, `neck`, `bulb`, `quill_0` ..., `veil_0` ..., the glowing `pod_0`, `pod_1` |
+
+The plants of a run are the children of `flora` in `etc/scenery.flecs`, each with `OreFlora`,
+its tile in the grid.
+
 ## Files
 
 | File | Holds |
@@ -469,11 +496,13 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 | `etc/input.flecs` | The actions, their bindings and the loops of the actions that fire once |
 | `etc/world.flecs` | The ground and the basin |
 | `etc/boundary.flecs` | The hazard band around the playable area |
-| `etc/scenery.flecs` | The boulders and dunes of a run |
+| `etc/scenery.flecs` | The boulders, dunes and flora of a run |
 | `etc/run.flecs` | The astronaut, the parent of the placed buildings and the singletons of a run, the order book and the selection included |
 | `etc/deposits.flecs` | The deposits of a run |
 | `etc/player.flecs` | The `Astronaut` template |
 | `etc/props/ore.flecs` | The `Ore` template of the deposits |
+| `etc/props/flora.flecs` | The `Frondstalk`, `Ashcup` and `Quillbulb` templates of the flora |
+| `etc/materials/flora.flecs` | The frond and membrane textures and their cutouts `FloraFrond`, `FloraFrondB`, `FloraMembrane`, `FloraMembraneB` |
 | `etc/critters/` | The `Mite`, `Skitter`, `Brute` and `Behemoth` prefabs |
 | `etc/projectiles/` | The `Tracer`, `Missile` and `LaserBeam` prefabs |
 | `etc/props/markers.flecs` | The `TileMarker` and `TileMarkerBad` prefabs |
@@ -496,6 +525,7 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 | `src/player.c` | Walking, the jetpack and the camera |
 | `src/inventory.c` | The inventory and the item components |
 | `src/mining.c` | Mining, demolishing and their tile marker |
+| `src/flora.c` | The plants in the tile grid: removed on deposits and taken tiles, sunk under buildings |
 | `src/buildings.c` | The buildings in the tile grid, the wall connectors, demolish and salvage, destroyed buildings, the look of the ghosts |
 | `src/placement.c` | The selection, `canPlace`, the click and the drag, the pipette, the preview, `oreelse.select()`, `oreelse.pipette()`, `oreelse.placeStart()`, `oreelse.placeEnd()`, `oreelse.cancelDrag()` |
 | `src/craft.c` | The order book, the workers, `oreelse.craft_order()`, `oreelse.craft_cancel()` |

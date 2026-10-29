@@ -1,0 +1,309 @@
+// The alien vegetation, the Frondstalk, Ashcup and Quillbulb templates of the original. A
+// plant's origin is the middle of its root mound on the ground. Every instance draws its own
+// shape from floraRng, seeded from the session, so a seeded session gives the same plants; the
+// props are the size and tints scenery.flecs varies per plant.
+//
+// - Frondstalk: a mound with three roots, a stalk of three segments that leans more toward its
+//   tip, a crown of fronds at the tip and a skirt of shorter ones at the first joint, in one of
+//   two tones.
+// - Ashcup: a mound with a cup of membrane leaves around it, in one of two tones, and nubs in
+//   the cup.
+// - Quillbulb: a mound, a neck and a bulb on it with quills, membrane veils hanging off it and
+//   two glowing pods on top.
+//
+// The fronds and membranes are the alpha tested cutouts of materials/flora.flecs. Flora is
+// decoration: nothing collides with it.
+
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+
+const floraRng: Rng = {seed: oreelse.seed(6)}
+
+template Frondstalk {
+  prop height: f32 = 2.1
+  prop fronds: i32 = 7
+  prop skirt: i32 = 3
+  prop blade: f32 = 1.65
+  prop bladeWide: f32 = 0.6
+  prop stalkR: f32 = 0.105
+  prop stalkTint: Rgb = {98, 78, 84}
+  prop rootTint: Rgb = {80, 64, 60}
+
+  const h = height * (0.78 + floraRng.f(0.48))
+  const lean = 0.05 + floraRng.f(0.22)
+  const tone = floor(floraRng.f(1.999))
+  const t1 = lean * 0.34
+  const t2 = lean * 1
+  const t3 = lean * 1.8
+  const l1 = h * 0.44
+  const l2 = h * 0.33
+  const l3 = h * 0.25
+  const e1x = sin(t1) * l1
+  const e1y = cos(t1) * l1
+  const e2x = e1x + sin(t2) * l2
+  const e2y = e1y + cos(t2) * l2
+  const e3x = e2x + sin(t3) * l3
+  const e3y = e2y + cos(t3) * l3
+  const r1 = stalkR * (0.84 + floraRng.f(0.4))
+  const scale = h / height
+
+  mound {
+    Position: {0, 0, 0}
+    Rotation: {0, floraRng.f(6.283), 0}
+    Scale: {0.4 * scale, 0.16 * scale, 0.34 * scale}
+    HemiSphere: {segments: 7, smooth: false, radius: 1}
+    Rgb: rootTint
+    PbrMaterial: {metallic: 0, roughness: 0.95}
+  }
+
+  for k in 0..3 {
+    const ra = 2.094 * k + floraRng.f(1.2)
+    const rr = 0.17 + floraRng.f(0.14)
+    const rw = 0.11 + floraRng.f(0.12)
+
+    "root_{k}" {
+      Position: {cos(ra) * rr, 0.03 + floraRng.f(0.04), sin(ra) * rr}
+      Rotation: {floraRng.f(0.5) - 0.25, floraRng.f(6.283), floraRng.f(0.5) - 0.25}
+      Box: {rw, 0.08 + floraRng.f(0.06), rw * 0.62}
+      Rgb: rootTint
+      PbrMaterial: {metallic: 0, roughness: 0.92}
+    }
+  }
+
+  seg_a {
+    Position: {e1x * 0.5, e1y * 0.5, 0}
+    Rotation: {0, 0, 0 - t1}
+    Cylinder: {segments: 7, smooth: false, length: l1 * 1.08, radius: 0.5}
+    Scale: {r1 * 2, 1, r1 * 2}
+    Rgb: stalkTint
+    PbrMaterial: {metallic: 0, roughness: 0.88}
+  }
+
+  seg_b {
+    Position: {(e1x + e2x) * 0.5, (e1y + e2y) * 0.5, 0}
+    Rotation: {0, 0, 0 - t2}
+    Cylinder: {segments: 7, smooth: false, length: l2 * 1.1, radius: 0.5}
+    Scale: {r1 * 1.58, 1, r1 * 1.58}
+    Rgb: stalkTint
+    PbrMaterial: {metallic: 0, roughness: 0.88}
+  }
+
+  seg_c {
+    Position: {(e2x + e3x) * 0.5, (e2y + e3y) * 0.5, 0}
+    Rotation: {0, 0, 0 - t3}
+    Cylinder: {segments: 7, smooth: false, length: l3 * 1.12, radius: 0.5}
+    Scale: {r1 * 1.1, 1, r1 * 1.1}
+    Rgb: stalkTint
+    PbrMaterial: {metallic: 0, roughness: 0.88}
+  }
+
+  // The crown at the tip: each frond leans out by tt from upright, its base at the tip
+  for k in 0..fronds {
+    const a = 6.283 * k / fronds + floraRng.f(0.9) - 0.45
+    const tt = 0.36 + floraRng.f(0.66)
+    const bl = blade * scale * (0.76 + floraRng.f(0.56))
+    const bw = bladeWide * scale * (0.8 + floraRng.f(0.46))
+    const px = e3x - sin(tt) * cos(a) * bl * 0.5
+    const py = e3y + cos(tt) * bl * 0.5
+    const pz = sin(tt) * sin(a) * bl * 0.5
+
+    if tone < 1 {
+      "frond_{k}" : FloraFrond {
+        Position: {px, py, pz}
+        Rotation: {0, a, tt}
+        Scale: {bw, bl, 1}
+      }
+    } else {
+      "frond_{k}" : FloraFrondB {
+        Position: {px, py, pz}
+        Rotation: {0, a, tt}
+        Scale: {bw, bl, 1}
+      }
+    }
+  }
+
+  // The skirt at the first joint, shorter and flatter, in the other tone
+  for k in 0..skirt {
+    const a = 6.283 * k / skirt + floraRng.f(1.4)
+    const tt = 1.1 + floraRng.f(0.46)
+    const bl = blade * scale * (0.5 + floraRng.f(0.34))
+    const bw = bladeWide * scale * (0.62 + floraRng.f(0.32))
+    const px = e1x - sin(tt) * cos(a) * bl * 0.5
+    const py = e1y + cos(tt) * bl * 0.5
+    const pz = sin(tt) * sin(a) * bl * 0.5
+
+    if tone < 1 {
+      "skirt_{k}" : FloraFrondB {
+        Position: {px, py, pz}
+        Rotation: {0, a, tt}
+        Scale: {bw, bl, 1}
+      }
+    } else {
+      "skirt_{k}" : FloraFrond {
+        Position: {px, py, pz}
+        Rotation: {0, a, tt}
+        Scale: {bw, bl, 1}
+      }
+    }
+  }
+}
+
+template Ashcup {
+  prop leaves: i32 = 7
+  prop size: f32 = 0.68
+  prop nubs: i32 = 3
+  prop rootTint: Rgb = {84, 70, 66}
+  prop nubTint: Rgb = {150, 128, 118}
+
+  const s = size * (0.68 + floraRng.f(0.7))
+  const tone = floor(floraRng.f(1.999))
+
+  mound {
+    Position: {0, 0, 0}
+    Rotation: {0, floraRng.f(6.283), 0}
+    Scale: {s * 0.66, s * 0.24, s * 0.58}
+    HemiSphere: {segments: 6, smooth: false, radius: 1}
+    Rgb: rootTint
+    PbrMaterial: {metallic: 0, roughness: 0.95}
+  }
+
+  // The cup: membranes leaning out by tt from upright around the mound
+  for k in 0..leaves {
+    const a = 6.283 * k / leaves + floraRng.f(1) - 0.5
+    const tt = 0.58 + floraRng.f(0.58)
+    const bl = s * (1 + floraRng.f(0.8))
+    const bw = s * (0.76 + floraRng.f(0.52))
+    const px = 0 - sin(tt) * cos(a) * bl * 0.46
+    const py = s * 0.06 + cos(tt) * bl * 0.46
+    const pz = sin(tt) * sin(a) * bl * 0.46
+
+    if tone < 1 {
+      "leaf_{k}" : FloraMembrane {
+        Position: {px, py, pz}
+        Rotation: {0, a, tt}
+        Scale: {bw, bl, 1}
+      }
+    } else {
+      "leaf_{k}" : FloraMembraneB {
+        Position: {px, py, pz}
+        Rotation: {0, a, tt}
+        Scale: {bw, bl, 1}
+      }
+    }
+  }
+
+  for k in 0..nubs {
+    const a = floraRng.f(6.283)
+    const rr = s * floraRng.f(0.3)
+    const nw = s * (0.07 + floraRng.f(0.06))
+
+    "nub_{k}" {
+      Position: {cos(a) * rr, s * 0.12 + nw * 0.5, sin(a) * rr}
+      Rotation: {floraRng.f(0.7) - 0.35, floraRng.f(6.283), floraRng.f(0.7) - 0.35}
+      Box: {nw, nw * 1.7, nw}
+      Rgb: nubTint
+      PbrMaterial: {metallic: 0, roughness: 0.8}
+    }
+  }
+}
+
+template Quillbulb {
+  prop size: f32 = 0.62
+  prop quills: i32 = 7
+  prop veils: i32 = 3
+  prop bulbTint: Rgb = {138, 122, 116}
+  prop quillTint: Rgb = {112, 88, 100}
+  prop rootTint: Rgb = {82, 68, 62}
+  prop podTint: Rgb = {214, 122, 154}
+  prop podGlow: f32 = 0.35
+
+  const s = size * (0.72 + floraRng.f(0.62))
+  const by = s * 0.62
+  const bw = s * (0.9 + floraRng.f(0.34))
+  const bh = s * (0.56 + floraRng.f(0.24))
+
+  mound {
+    Position: {0, 0, 0}
+    Rotation: {0, floraRng.f(6.283), 0}
+    Scale: {s * 0.72, s * 0.2, s * 0.64}
+    HemiSphere: {segments: 6, smooth: false, radius: 1}
+    Rgb: rootTint
+    PbrMaterial: {metallic: 0, roughness: 0.95}
+  }
+
+  neck {
+    Position: {0, by * 0.4, 0}
+    Rotation: {0, floraRng.f(6.283), 0}
+    Cone: {segments: 7, smooth: false, length: by * 0.9, radius: 0.5}
+    Scale: {bw * 0.62, 1, bw * 0.58}
+    Rgb: quillTint
+    PbrMaterial: {metallic: 0, roughness: 0.9}
+  }
+
+  bulb {
+    Position: {s * 0.05, by, 0}
+    Rotation: {floraRng.f(0.5) - 0.25, floraRng.f(6.283), floraRng.f(0.5) - 0.25}
+    Scale: {bw, bh, bw * 0.86}
+    IcoSphere: {segments: 2, smooth: false, radius: 0.5}
+    Rgb: bulbTint
+    PbrMaterial: {metallic: 0, roughness: 0.84}
+  }
+
+  // Quills out of the bulb, leaning out by tt from upright
+  for k in 0..quills {
+    const a = 6.283 * k / quills + floraRng.f(0.8) - 0.4
+    const tt = 0.24 + floraRng.f(0.72)
+    const ql = s * (0.75 + floraRng.f(0.9))
+    const qr = s * (0.035 + floraRng.f(0.03))
+
+    "quill_{k}" {
+      Position: {
+        0 - sin(tt) * cos(a) * ql * 0.42,
+        by + bh * 0.2 + cos(tt) * ql * 0.42,
+        sin(tt) * sin(a) * ql * 0.42
+      }
+      Rotation: {0, a, tt}
+      Cone: {segments: 5, smooth: false, length: ql, radius: 0.5}
+      Scale: {qr * 2, 1, qr * 2}
+      Rgb: quillTint
+      PbrMaterial: {metallic: 0, roughness: 0.82}
+    }
+  }
+
+  // Veils hanging off the bulb, nearly flat
+  for k in 0..veils {
+    const a = 6.283 * k / veils + floraRng.f(1.1)
+    const tt = 1.15 + floraRng.f(0.42)
+    const vl = s * (1.45 + floraRng.f(0.85))
+    const vw = s * (0.95 + floraRng.f(0.55))
+
+    "veil_{k}" : FloraMembraneB {
+      Position: {
+        0 - sin(tt) * cos(a) * vl * 0.44,
+        by * 0.7 + cos(tt) * vl * 0.44,
+        sin(tt) * sin(a) * vl * 0.44
+      }
+      Rotation: {0, a, tt}
+      Scale: {vw, vl, 1}
+    }
+  }
+
+  // Two glowing pods on opposite sides of the top of the bulb
+  for k in 0..2 {
+    const a = 3.14 * k + floraRng.f(2)
+    const pr = bw * 0.42
+    const pw = s * (0.055 + floraRng.f(0.035))
+
+    "pod_{k}" {
+      Position: {cos(a) * pr, by + bh * 0.44, sin(a) * pr}
+      Rotation: {floraRng.f(0.6) - 0.3, floraRng.f(6.283), floraRng.f(0.6) - 0.3}
+      Scale: {pw * 2, pw * 2.4, pw * 2}
+      IcoSphere: {segments: 1, smooth: false, radius: 0.5}
+      Rgb: podTint
+      PbrMaterial: {metallic: 0, roughness: 0.5}
+      Emissive: {strength: podGlow, color: podTint}
+    }
+  }
+}

@@ -1,8 +1,13 @@
 // The scenery of a run, generated from the seed of the run as the original's (rng.f(x) is
-// uniform in [0, x)): boulders scattered over the basin and the plain around it, and dunes in
-// a ring on the plain beyond. They are decoration, nothing collides with them.
-// oreelse.restart() reloads this script (scenery has OreRunScript) for the scenery of a new
-// map. The flora of the original's scenery.flecs comes with the flora.
+// uniform in [0, x)): boulders scattered over the basin and the plain around it, dunes in a ring
+// on the plain beyond, and the flora: 96 frondstalks, 200 ashcups and 84 quillbulbs scattered
+// from 8 to 58 units out from the center, each snapped to the center of a tile and nudged by up
+// to 0.45 off it. They are decoration, nothing collides with them.
+//
+// Every plant has OreFlora and registers in the tile grid (flora.c): a plant on a deposit or on
+// a tile another plant took is deleted, and a plant under a building sinks out of sight until
+// the building is gone. oreelse.restart() reloads this script (scenery has OreRunScript) for the
+// scenery and the flora of a new map.
 
 using flecs.script.math
 using box.transform
@@ -11,6 +16,7 @@ using box.material
 using oreelse
 
 const rng: Rng = {seed: oreelse.seed(4)}
+const floraSeed: Rng = {seed: oreelse.seed(5)}
 
 scenery {
   OreRunScript
@@ -37,6 +43,62 @@ scenery {
       Scale: {s, s * 0.35, s}
       HemiSphere: {segments: 12, smooth: true, radius: 1}
       Rgb: {162, 120, 82}
+    }
+  }
+}
+
+flora {
+  for i in 0..96 {
+    const a = floraSeed.f(6.283)
+    const rad = 8 + 50 * sqrt(floraSeed.f(1))
+    const cx = cfg.x0 + round((cos(a) * rad - cfg.x0) / cfg.tile) * cfg.tile
+    const cz = cfg.z0 + round((sin(a) * rad - cfg.z0) / cfg.tile) * cfg.tile
+    const sr = floor(86 + floraSeed.f(30))
+    const sg = floor(68 + floraSeed.f(22))
+    const sb = floor(74 + floraSeed.f(26))
+
+    "frondstalk_{i}" {
+      Position: {cx + floraSeed.f(0.9) - 0.45, 0, cz + floraSeed.f(0.9) - 0.45}
+      Rotation: {0, floraSeed.f(6.283), 0}
+      Scale: {1, 1, 1}
+      Frondstalk: {height: 1.75 + floraSeed.f(0.85), stalkTint: {sr, sg, sb}}
+      OreFlora: {row: -1, col: -1}
+    }
+  }
+
+  for i in 0..200 {
+    const a = floraSeed.f(6.283)
+    const rad = 8 + 50 * sqrt(floraSeed.f(1))
+    const cx = cfg.x0 + round((cos(a) * rad - cfg.x0) / cfg.tile) * cfg.tile
+    const cz = cfg.z0 + round((sin(a) * rad - cfg.z0) / cfg.tile) * cfg.tile
+    const nr = floor(132 + floraSeed.f(38))
+    const ng = floor(114 + floraSeed.f(30))
+    const nb = floor(106 + floraSeed.f(28))
+
+    "ashcup_{i}" {
+      Position: {cx + floraSeed.f(0.9) - 0.45, 0, cz + floraSeed.f(0.9) - 0.45}
+      Rotation: {0, floraSeed.f(6.283), 0}
+      Scale: {1, 1, 1}
+      Ashcup: {size: 0.52 + floraSeed.f(0.34), nubTint: {nr, ng, nb}}
+      OreFlora: {row: -1, col: -1}
+    }
+  }
+
+  for i in 0..84 {
+    const a = floraSeed.f(6.283)
+    const rad = 8 + 50 * sqrt(floraSeed.f(1))
+    const cx = cfg.x0 + round((cos(a) * rad - cfg.x0) / cfg.tile) * cfg.tile
+    const cz = cfg.z0 + round((sin(a) * rad - cfg.z0) / cfg.tile) * cfg.tile
+    const br = floor(146 + floraSeed.f(40))
+    const bg = floor(134 + floraSeed.f(34))
+    const bb = floor(126 + floraSeed.f(30))
+
+    "quillbulb_{i}" {
+      Position: {cx + floraSeed.f(0.9) - 0.45, 0, cz + floraSeed.f(0.9) - 0.45}
+      Rotation: {0, floraSeed.f(6.283), 0}
+      Scale: {1, 1, 1}
+      Quillbulb: {size: 0.5 + floraSeed.f(0.3), bulbTint: {br, bg, bb}}
+      OreFlora: {row: -1, col: -1}
     }
   }
 }
