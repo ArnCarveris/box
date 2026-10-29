@@ -124,6 +124,10 @@
                 "id": "Views",
                 "testcases": [
                     "creation_order",
+                    "order",
+                    "order_ties",
+                    "order_runtime_change",
+                    "order_view_root",
                     "camera_scene",
                     "view_matrix",
                     "no_camera_skipped"

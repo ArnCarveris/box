@@ -1044,7 +1044,14 @@ static ecs_entity_t box_pick_handler(
     return result;
 }
 
-/** Order views by descending id, the reverse of their render order.
+/** A view of a surface with its order, sorted for picking */
+typedef struct box_pick_view_order_t {
+    ecs_entity_t view;      /**< The view entity */
+    int32_t order;          /**< View.order */
+} box_pick_view_order_t;
+
+/** Order views by descending View.order, then by descending id: the reverse of their render
+ * order.
  *
  * @param a The first view
  * @param b The second view
@@ -1054,18 +1061,43 @@ static int box_pick_view_compare(
     const void *a,
     const void *b)
 {
-    ecs_entity_t x = *(const ecs_entity_t*)a;
-    ecs_entity_t y = *(const ecs_entity_t*)b;
+    const box_pick_view_order_t *x = a;
+    const box_pick_view_order_t *y = b;
 
-    return (x < y) - (x > y);
+    return box_view_compare(y->order, y->view, x->order, x->view);
+}
+
+/** Find the view that comes last in pick order: the first one rendered.
+ *
+ * @param views The views
+ * @param count Number of views, at least one
+ * @return Index of the view
+ */
+static int32_t box_pick_views_last(
+    const box_pick_view_order_t *views,
+    int32_t count)
+{
+    int32_t i, result = 0;
+    for (i = 1; i < count; i ++) {
+        if (box_pick_view_compare(&views[i], &views[result]) > 0) {
+            result = i;
+        }
+    }
+
+    return result;
 }
 
 /** Collect the views of a surface, the last rendered first.
  *
+ * With more than BOX_PICK_VIEW_MAX views it keeps the first ones in pick order, so the views
+ * left out are always the lowest in pick order whatever the order of the tables. The view roots
+ * of the surfaces have no cap: a view under the root of any surface is claimed, however many
+ * surfaces there are.
+ *
  * @param world The world
  * @param st The module state
  * @param s The surface
- * @param out Receives the views
+ * @param out Receives the views, BOX_PICK_VIEW_MAX entries
  * @return Number of views
  */
 static int32_t box_pick_views(
@@ -1074,34 +1106,57 @@ static int32_t box_pick_views(
     const box_pick_surface_t *s,
     ecs_entity_t *out)
 {
-    ecs_entity_t roots[BOX_PICK_VIEW_MAX];
-    int32_t i, k, root_count = 0, count = 0;
-    ecs_iter_t it = ecs_query_iter(world, st->surfaces);
-    while (ecs_query_next(&it)) {
-        const Surface *surface = ecs_field(&it, Surface, 0);
-        for (i = 0; i < it.count; i ++) {
-            if (surface[i].view_root && root_count < BOX_PICK_VIEW_MAX) {
-                roots[root_count ++] = surface[i].view_root;
+    box_pick_view_order_t views[BOX_PICK_VIEW_MAX];
+    ecs_entity_t *roots;
+    int32_t i, k, root_count, count = 0, last = 0;
+    ecs_iter_t it;
+    ecs_vec_clear(&st->roots);
+    if (!s->view_root) {
+        it = ecs_query_iter(world, st->surfaces);
+        while (ecs_query_next(&it)) {
+            const Surface *surface = ecs_field(&it, Surface, 0);
+            for (i = 0; i < it.count; i ++) {
+                if (surface[i].view_root) {
+                    *ecs_vec_append_t(NULL, &st->roots, ecs_entity_t) = surface[i].view_root;
+                }
             }
         }
     }
 
+    roots = ecs_vec_first_t(&st->roots, ecs_entity_t);
+    root_count = ecs_vec_count(&st->roots);
     it = ecs_query_iter(world, st->views);
     while (ecs_query_next(&it)) {
-        for (i = 0; i < it.count && count < BOX_PICK_VIEW_MAX; i ++) {
+        const View *view = ecs_field(&it, View, 0);
+        for (i = 0; i < it.count; i ++) {
             ecs_entity_t parent = ecs_get_parent(world, it.entities[i]);
+            box_pick_view_order_t candidate = { it.entities[i], view[i].order };
             bool claimed = false;
-            for (k = 0; k < root_count && !s->view_root; k ++) {
-                claimed |= parent && parent == roots[k];
+            for (k = 0; k < root_count && !claimed; k ++) {
+                claimed = parent && parent == roots[k];
             }
 
-            if (s->view_root ? parent == s->view_root : !claimed) {
-                out[count ++] = it.entities[i];
+            if (s->view_root ? parent != s->view_root : claimed) {
+                continue;
+            }
+
+            if (count < BOX_PICK_VIEW_MAX) {
+                views[count ++] = candidate;
+                if (count == BOX_PICK_VIEW_MAX) {
+                    last = box_pick_views_last(views, count);
+                }
+            } else if (box_pick_view_compare(&candidate, &views[last]) < 0) {
+                /* Full: the candidate comes before the last view in pick order, which drops */
+                views[last] = candidate;
+                last = box_pick_views_last(views, count);
             }
         }
     }
 
-    qsort(out, (size_t)count, sizeof(ecs_entity_t), box_pick_view_compare);
+    qsort(views, (size_t)count, sizeof(box_pick_view_order_t), box_pick_view_compare);
+    for (i = 0; i < count; i ++) {
+        out[i] = views[i].view;
+    }
 
     return count;
 }
@@ -1415,7 +1470,7 @@ void box_pick_queries_init(
     box_pick_state_t *st)
 {
     st->views = ecs_query(world, {
-        .terms = {{ .id = ecs_id(View), .inout = EcsInOutNone }},
+        .terms = {{ .id = ecs_id(View), .inout = EcsIn }},
         .cache_kind = EcsQueryCacheAuto
     });
 

@@ -344,13 +344,13 @@ cfg {
   // not shown when narrower than hpBarMinWidth. A hpBarBack plate with a 1 pixel hpBarEdge and a
   // fill inset 1 pixel, (width - 2) * frac wide, blended from hpBarMid to hpBarFull by
   // (frac - 0.5) * 2 at half health and above, from hpBarLow to hpBarMid by frac * 2 below.
-  // The three fill colors keep the original's bytes (linear light): the bar blends them as the
-  // original and encodes the blend for box (README.md, Colors)
+  // The bar is UI, so its colors keep the original's bytes and the bar blends them as the
+  // original (README.md, Colors)
   export const hpBarHeight: f32 = 4
   export const hpBarMargin: f32 = 6
   export const hpBarMinWidth: f32 = 6
-  export const hpBarBack: rgba = {66, 61, 71, 200}
-  export const hpBarEdge: rgba = {42, 38, 46, 230}
+  export const hpBarBack: rgba = {14, 12, 16, 200}
+  export const hpBarEdge: rgba = {6, 5, 7, 230}
   export const hpBarFull: Rgb = {92, 236, 140}
   export const hpBarMid: Rgb = {240, 176, 58}
   export const hpBarLow: Rgb = {248, 84, 72}

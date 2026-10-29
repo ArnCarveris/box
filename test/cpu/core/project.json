@@ -234,6 +234,8 @@
                     "empty_scene",
                     "capture_names",
                     "select_camera",
+                    "select_camera_order",
+                    "select_camera_order_tie",
                     "invalid_camera"
                 ]
             },

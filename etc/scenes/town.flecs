@@ -40,7 +40,7 @@ view {
 
 $ {
   AmbientLight: {sky: {150, 178, 210}, ground: {60, 56, 50}, intensity: 0.25}
-  LightBake: {probe_spacing: 0.5, bounds_padding: -0.3, capture_size: 16, bounces: 1, budget_ms: 8}
+  LightBake: {probe_spacing: 1, bounds_padding: -0.3, capture_size: 16, bounces: 0, budget_ms: 8}
 }
 
 sun {

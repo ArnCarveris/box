@@ -12,7 +12,6 @@ lies inside it and clear of the status bar. A case finds the window point of an 
 WorldTransform (the HUD's camera shows one point per unit, centered on the window) and checks
 with PickStatus that the element handles the pointer there before it clicks.
 """
-from box_client import srgb
 from oreelse_buildings import (  # noqa: F401 (ARGS)
     ARGS, PLACEMENT, PLAYER, SETTLE, STATE, aim_tile, button, count, deposit_tile, entity,
     inventory, key, placement, rows_of, selected, set_inventory, set_state, tiles, wait_toast)
@@ -46,9 +45,9 @@ BUTTON = UI + ".inventory_button"
 # the info panel x 360..920, the button x 542..738 and the power panel x 18..282, y 544..702)
 OFF_SCREEN = (320, 660)
 
-# The face of a slot button that cannot order, the original's bytes encoded as the port writes them
-# (apps/oreelse/README.md, Colors)
-DIM_FACE = srgb((30, 33, 39))
+# The face of a slot button that cannot order, the original's bytes: the UI keeps them, decoded
+# as sRGB (apps/oreelse/README.md, Colors)
+DIM_FACE = (30, 33, 39)
 
 # A corner of the map without deposits (oreelse_buildings.AREA)
 TILE = (6, 6)

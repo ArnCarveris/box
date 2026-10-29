@@ -10,7 +10,8 @@
     "lang.c": {
         "include": [
             "../../../src/render",
-            "../../../src/text"
+            "../../../src/text",
+            "../../../src/picking"
         ]
     },
     "test": {
@@ -179,6 +180,18 @@
                     "disabled_shape_not_picked",
                     "deleted_disabled_shape",
                     "deleted_disabled_element"
+                ]
+            },
+            {
+                "id": "PickOrder",
+                "testcases": [
+                    "ties_last_created_first",
+                    "highest_order_first",
+                    "negative_order_below",
+                    "runtime_change",
+                    "console_order_over_editor",
+                    "many_views_keep_top_created_first",
+                    "many_views_keep_top_created_last"
                 ]
             },
             {

@@ -31,8 +31,8 @@ template HealthBar {
   const edge = cfg.hpBarEdge
 
   // Amber to green at half health and above, red to amber below: the original's oreBarLerp,
-  // a + (b - a) * t in f32 per channel, truncated, of the original's bytes (linear light), then
-  // encoded for box with oreelse.srgb() (README.md, Colors)
+  // a + (b - a) * t in f32 per channel, truncated, of the original's bytes, which the UI keeps
+  // (README.md, Colors)
   const upper: bool = frac >= 0.5
   const from: Rgb = match upper {
     true: cfg.hpBarMid
@@ -55,9 +55,7 @@ template HealthBar {
   const r: f32 = fr + (tr - fr) * t
   const g: f32 = fg + (tg - fg) * t
   const b: f32 = fb + (tb - fb) * t
-  const color: Rgb = {
-    round(oreelse.srgb(floor(r))), round(oreelse.srgb(floor(g))), round(oreelse.srgb(floor(b)))
-  }
+  const color: Rgb = {floor(r), floor(g), floor(b)}
 
   // Elements are centered on their Position: the bar's bottom edge sits hpBarMargin above the
   // top of the box

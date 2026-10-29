@@ -94,6 +94,13 @@ the equivalent App fields are `design: true` and `camera: "entity.path"`, applie
 `--surface` dimensions when supplied. `View.lighting.scene` can select a separate scene
 for direct and ambient lighting; design mode uses it to light each camera independently.
 
+Views render in ascending `View.order` (default 0) and are picked and receive input in
+descending order, so a view with a higher order draws over and is hit before the views
+below it. Views with the same order keep their creation (entity id) order, and a changed
+order applies from the next frame. box's own overlays use orders above those of a game:
+`BOX_VIEW_ORDER_EDITOR` (1000000) for the editor and `BOX_VIEW_ORDER_CONSOLE` (2000000)
+for the in game console, which stays on top of every other view.
+
 ## Browser build
 
 ```sh

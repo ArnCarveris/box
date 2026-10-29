@@ -336,6 +336,16 @@
                     "brightness_rolls_off_to_white",
                     "saturated_color_loses_chroma"
                 ]
+            },
+            {
+                "id": "ViewOrder",
+                "testcases": [
+                    "default_is_zero",
+                    "render_ascending",
+                    "ties_keep_id_order",
+                    "render_runtime_change",
+                    "compare"
+                ]
             }
         ]
     }
