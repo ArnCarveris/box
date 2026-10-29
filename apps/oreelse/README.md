@@ -25,8 +25,12 @@ python3 tools/integration.py e2e oreelse_crafting oreelse_buildings oreelse_rock
 python3 tools/integration.py e2e oreelse_power oreelse_critters oreelse_critter_fx
 python3 tools/integration.py e2e oreelse_player_fx oreelse_hud oreelse_building_animation
 python3 tools/integration.py e2e oreelse_weapons oreelse_flora oreelse_drones
+<<<<<<< HEAD
 python3 tools/integration.py e2e oreelse_drone_rocket_fx
 python3 tools/integration.py e2e oreelse_inventory_screen oreelse_health_bars
+=======
+python3 tools/integration.py e2e oreelse_inventory_screen oreelse_health_bars oreelse_screens oreelse_combat_fx
+>>>>>>> 2cd501847431a6193e4d4203e73bb5466db6bb77
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -78,6 +82,36 @@ R starts a new run once the game is won or lost, straight into play, on a new ma
 nothing while playing. The camera keeps its zoom level.
 
 The clock counts the seconds of play; the end screen shows it as the survival time.
+
+### The screens
+
+The title screen shows three signs, MINE, DEFEND and ESCAPE, what the game is about, the list of
+the controls and `PRESS ANY KEY TO START`. The pause screen shows `PAUSED`, the quality button
+(see Render quality), the same list of the controls and `Press ESC to resume`; the quality button
+is the only control that works while paused. The end screen shows `YOU ESCAPED` when the game is
+won and `THE SWARM GOT YOU` when it is lost, the Luminite shipped, the critters killed, the time
+survived (the clock as minutes and seconds, `12:05`) with the last wave, and
+`Press R to land again`:
+
+```
+25 Luminite shipped
+37 critters killed - survived 12:05 to wave 9
+```
+
+The wheel zooms over every screen.
+
+The list of the controls on the title and pause screens:
+
+| Key | Action |
+| --- | --- |
+| W A S D | Walk |
+| Shift | Walk faster |
+| Mouse wheel | Zoom in/out |
+| Left click | Place selected building |
+| Right click | Demolish/mine object under mouse cursor |
+| E | Open / close the inventory |
+| Q | Select the building under the cursor / deselect |
+| ESC | Cancel / Pause |
 
 Messages show at the bottom of the screen for 4 seconds of play, warnings for 2.5. A new message
 replaces the current one.
@@ -510,6 +544,27 @@ a second, straight at it within 3 units; when its target is gone it takes the ne
 critter within 6 of it, if any. A missile explodes when it hits or runs out: every live critter
 within 5 of the explosion on the ground takes the full 150, with no falloff.
 
+**The look of combat** follows the weapons and changes nothing of the game:
+
+- While a laser burns its target, the beam runs from the lens of its head (the head's position
+  plus the lens turned with the aim) to the target, pink sparks fly where it lands, set back
+  toward the turret by 0.9 times the target's radius (at most halfway), and its lens glows; both
+  light their surroundings pink, at 4.5 at the lens and 5 at the sparks. They stop, and their
+  lights go out, as soon as it stops firing.
+- Every shot of a gun or missile turret throws sparks at its muzzle and flashes its muzzle
+  light: a warm light at 5 that fades out within 1/9 of a second on the gun turret, at 6 within
+  0.3 seconds on the missile turret. A missile launch also blows flame and smoke back from the
+  pods along the aim of the head. A turret without a target, in a blackout or at Weapons 0 goes
+  dark at once.
+- A missile flies nose first along its velocity, its flame lit, and trails smoke that stays
+  where it was left and fades after the missile is gone.
+- A tracer that hits a critter bursts into sparks and a puff of dust, one that reaches the ground
+  throws up dust and sparks. A missile explodes in a fireball where it ends, 0.2 above it,
+  sized by its splash radius (`clamp(radius / 5, 0.65, 1.25)`, 1 for the missile turret's), with a
+  flash of light.
+- A destroyed building explodes 0.55 above the ground at its center, at 0.8 the size.
+- While paused the effects of combat freeze with the game; they play on when it resumes.
+
 ### Health
 
 The astronaut has 100 HP. After 5 seconds without damage it regenerates 2 HP a second up to
@@ -800,7 +855,7 @@ box's Euler order), with the velocity in its `OreProjectile`, the weapon's `OreD
 | Prefab | File | Parts |
 | --- | --- | --- |
 | `Tracer` | `etc/projectiles/tracer.flecs` | `core`, a glowing gold streak with a point light (2.6, range 4.5) |
-| `Missile` | `etc/projectiles/missile.flecs` | `body`, `tip`, `fin_left`, `fin_right`, the glowing `flame` with a point light (3, range 6), and `trail`, the point the smoke trail comes out of |
+| `Missile` | `etc/projectiles/missile.flecs` | `body`, `tip`, `fin_left`, `fin_right`, the glowing `flame` with a point light (3, range 6), and `trail`, the point the smoke trail (`MissileTrail`, lingering after the missile) comes out of |
 | `LaserBeam` | `etc/projectiles/laser_beam.flecs` | One glowing pink box, 1 unit long along Z: the laser turret places an instance halfway between its muzzle and the target, turned toward the target and scaled along Z to their distance |
 
 ## Building models
@@ -824,9 +879,9 @@ the original's `oreChild` does. The parts have no `DynamicTransform`, so a syste
 | `SolarPanel` | `solar_panel.flecs` | `junction/light` (indicator light) |
 | `Wall` | `wall.flecs` | `lamp` (hazard lamp) |
 | `WallSegment` | `wall_segment.flecs` | The connector between two walls on neighboring tiles: placed on the middle of their shared edge, turned by PI / 2 about y between two walls of one column |
-| `GunTurret` | `gun_turret.flecs` | `head` (turns about y to aim), `head/fx` (the muzzle: flash and tracers), `head/sight` (status lamp) |
-| `LaserTurret` | `laser_turret.flecs` | `head` (turns about y to aim), `head/fx` (the lens: beam start and glow), `hit_fx` (the beam's sparks where it hits), `column/lamp` (status lamp) |
-| `MissileTurret` | `missile_turret.flecs` | `head` (turns about y to aim), `head/fx` (the launch above the pods), `pillar/light` (status lamp) |
+| `GunTurret` | `gun_turret.flecs` | `head` (turns about y to aim), `head/fx` (the muzzle: its `MuzzleFlash` and the tracers), `head/sight` (status lamp) |
+| `LaserTurret` | `laser_turret.flecs` | `head` (turns about y to aim), `head/fx` (the lens: beam start and its `BeamGlow`), `hit_fx` (the beam's `BeamSparks` where it hits), `column/lamp` (status lamp) |
+| `MissileTurret` | `missile_turret.flecs` | `head` (turns about y to aim), `head/fx` (the launch above the pods, its `MuzzleFlash`), `pillar/light` (status lamp); `OreLaunchFx {burst: MissileLaunch}`, the launch every shot plays turned to the aim |
 | `PadBeacon` | `pad_beacon.flecs` | A template, the corner beacon of the rocket pad: `lamp` (amber lamp) |
 | `Factory` | `factory.flecs` | 2x2. `ram` (the press, moves along y, rest y 1.72, travel 0.62), `roller_a` to `roller_d` (each with its `drum`, which spins about its own y; the rollers lie along x), `wheel_left/flywheel`, `wheel_right/flywheel` (spin about y), `puff_l`, `puff_r` (the tops of the stacks, the smoke puffs), `hall/steam_l`, `hall/steam_c`, `hall/steam_r` (the vents of the grille, the steam), `hot_plate` (emissive 0.06 at rest, 2.6 while working), `work_glow` (emissive 0.08 at rest, 1.8 while working, and its `PointLight` of range 6.5 at intensity 0, 5.5 while working), `beacon_l`, `beacon_r` (work lamps, blink 2), `crown/status_l`, `crown/status_r` (status lamps) |
 | `DronePad` | `drone_pad.flecs` | 2x2. `bay_a` to `bay_d` (the landing bays, on the corners at x and z of +-0.99) with their `lamp` (status lamps), `column/head/beacon_l`, `column/head/beacon_r` (status lamps), `column/cabinet/readout`, `column/mast/tip` (lamps always on). Drone b of its 4 docks at the angle (b + 0.5) * 2 PI / 4, at (sin, cos) * 1.4 from the center and 0.62 above the ground |
@@ -933,8 +988,10 @@ its tile in the grid.
 | `etc/ui/icons.flecs` | The icon textures, `icons.*`, which the items name with `OreIcon` |
 | `etc/ui/panel.flecs` | The `Panel` template, the chrome of every panel: the plate, its edge, the hazard strip and the `InputBlocker` |
 | `etc/ui/health_bar.flecs` | The `HealthBar` template, the health bar of a damaged building, anchored to the projection of its model box (`OreModelBox`) |
-| `etc/ui/hud.flecs` | The `OreHud` template: the status bar (`StatusGauge`, `StatusDivider`), the toast, the mine progress bar, the suit breach alert, the rocket status line, the Inventory (E) button and the inventory screen |
+| `etc/ui/hud.flecs` | The `OreHud` template, which shows the screens in their states: the status bar (`StatusGauge`, `StatusDivider`), the toast, the mine progress bar, the suit breach alert, the rocket status line, the Inventory (E) button and the inventory screen |
 | `etc/ui/inventory.flecs` | The inventory screen (`InventoryScreen`: `StockBody` with its `StockSlot`s, `ConstructBody` with its `TabButton`s and the `BuildingsPage` and `RocketPage` of `SlotButton`s; the slots and buttons are restyled `box.widgets.HeadlessButton`s), its info panel (`ItemInfoPanel`) and the Inventory (E) button (`InventoryButton`), which the HUD shows |
+| `etc/ui/screens.flecs` | The screens of the game flow: `OreTitleScreen` (with its signs, `OreSign`), `OrePauseScreen` (with `OreQualityButton` and its `OreQualityValue`), `OreEndScreen`, and `OreControls`, the list of the controls the title and pause screens share (`OreControl` rows) |
+| `etc/ui/signs/` | The original's sign art of the title screen (SVG), unchanged |
 | `etc/icons/` | The original's icons (SVG), unchanged |
 | `etc/ui/hazard_strip.svg` | The original's hazard strip of the panels, unchanged |
 | `src/flow.c` | States, clock, blink, toast, seeds, `oreelse.cancel()`, `oreelse.restart()` |
@@ -946,8 +1003,8 @@ its tile in the grid.
 | `src/flora.c` | The plants in the tile grid: removed on deposits and taken tiles, sunk under buildings |
 | `src/critters.c` | The waves, the critters' targets, attacks and moves, the crowd separation and the critter spatial index, their deaths, the astronaut's health and regen, `oreelse.spawn_critter()` |
 | `src/critter_fx.c` | The critters' walk, bob, waddle and legs, their death bursts, the corpses' char, sinking and cap, `oreelse.corpse()` |
-| `src/weapons.c` | The astronaut's pistol, the turrets' targets, aim, lead and fire, the laser beams, the projectiles' flight, homing, hits and splash |
-| `src/buildings.c` | The buildings in the tile grid, the wall connectors, demolish and salvage, destroyed buildings, the look of the ghosts |
+| `src/weapons.c` | The astronaut's pistol, the turrets' targets, aim, lead and fire, the laser beams, the projectiles' flight, homing, hits and splash; the effects of combat: the muzzle of a laser's parts, its glow and the sparks where its beam hits, the sparks, muzzle flash and launch of every shot, the end of a projectile (explosion, hit, impact), the missiles' trails (`OreTrails`) and the pause of the turrets' effects (`OreBeamHide`) |
+| `src/buildings.c` | The buildings in the tile grid, the wall connectors, demolish and salvage, destroyed buildings and their explosion, the look of the ghosts |
 | `src/building_fx.c` | The buildings' animation and lights at the work rate of their building: the spinners, pistons, shakes, vents, work emitters and work lights |
 | `src/drones.c` | The repair drones: the drones a placed pad parks, their targets, flight, turn, bob and welds (`OreDrones`), their rotors and weld sparks (`OreDroneFx`) |
 | `src/placement.c` | The selection, `canPlace`, the click and the drag, the poof of a placed building, the pipette, the preview, `oreelse.select()`, `oreelse.pipette()`, `oreelse.placeStart()`, `oreelse.placeEnd()`, `oreelse.cancelDrag()` |

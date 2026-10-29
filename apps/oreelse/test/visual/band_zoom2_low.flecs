@@ -4,6 +4,7 @@
 // boulders lie on the textured basin and plain, the dunes rise beyond
 include apps/oreelse/test/visual/setup/seed
 include apps/oreelse/etc/oreelse
+include apps/oreelse/test/visual/setup/world
 include apps/oreelse/test/visual/setup/band
 
 using oreelse

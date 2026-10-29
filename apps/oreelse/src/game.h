@@ -180,6 +180,12 @@ ECS_STRUCT(OreEffects, {
     ecs_entity_t poof_burst;  /**< PoofBurst, where a deposit is used up and a building is placed
                                *   or demolished */
     ecs_entity_t splat_burst; /**< SplatBurst, at the death of the astronaut */
+    ecs_entity_t boom_burst;  /**< BoomBurst, the explosion of a missile and of a destroyed
+                               *   building (ore_explosion) */
+    ecs_entity_t spark_burst; /**< SparkBurst, at the muzzle of a turret that fires, where a
+                               *   shot hits a critter or the ground */
+    ecs_entity_t hit_puff;    /**< HitPuff, where a shot hits a critter */
+    ecs_entity_t impact_dust; /**< ImpactDust, where a shot hits the ground */
 });
 
 /** The mining of the astronaut: the target of the swing and its progress, which the HUD shows.
@@ -1066,12 +1072,23 @@ ECS_STRUCT(OreSplash, {
     float radius; /**< Units */
 });
 
+/** The launch of a turret's projectile, on the missile turret's prefab: a one shot effect that
+ * plays at the muzzle at every shot, turned about Y to the aim of the head (ore_burst_aimed)
+ */
+ECS_STRUCT(OreLaunchFx, {
+    ecs_entity_t burst; /**< The effect template, MissileLaunch, authored along -Z */
+});
+
 /** The state of a turret, on a turret prefab (copied). Its OreTarget comes with it. */
 ECS_STRUCT(OreTurret, {
-    ecs_entity_t head; /**< The instance's part the head, found when it first plays, 0 before */
-    ecs_entity_t beam; /**< The instance of OreBeam.prefab under the turret that the turret
-                        *   moves, shows and hides, created when it first plays, 0 before */
-    float aim;         /**< Angle of the head about Y in radians, atan2(dx, dz) of the aim */
+    ecs_entity_t head;   /**< The instance's part the head, found when it first plays, 0 before */
+    ecs_entity_t fx;     /**< The head's part fx, found with the head: the muzzle, with the
+                          *   MuzzleFlash of a gun or missile turret and the BeamGlow of a laser */
+    ecs_entity_t hit_fx; /**< The instance's part hit_fx of a laser turret, found with the head:
+                          *   it moves to where the beam hits, with the BeamSparks */
+    ecs_entity_t beam;   /**< The instance of OreBeam.prefab under the turret that the turret
+                          *   moves, shows and hides, created when it first plays, 0 before */
+    float aim;           /**< Angle of the head about Y in radians, atan2(dx, dz) of the aim */
 });
 
 /** A projectile in flight, on its prefab (copied) with its radius and life: when it is fired its
@@ -1379,14 +1396,6 @@ int32_t ore_inventory_count(
     const ecs_world_t *world,
     ecs_entity_t item);
 
-/** Get the kinds of items the inventory holds, the slots that are taken.
- *
- * @param world The world or a stage
- * @return The kinds, at most ORE_INVENTORY_SLOTS
- */
-int32_t ore_inventory_kinds(
-    const ecs_world_t *world);
-
 /** Check whether a set of additions fits: the kinds the inventory would hold after adding
  * every new kind with a positive amount are at most ORE_INVENTORY_SLOTS.
  *
@@ -1435,13 +1444,6 @@ bool ore_inventory_remove(
 const char* ore_item_name(
     const ecs_world_t *world,
     ecs_entity_t item);
-
-/** Show the warning that the inventory holds as many kinds as it can.
- *
- * @param world The world or the stage of a system
- */
-void ore_inventory_full(
-    ecs_world_t *world);
 
 /** Show a tile marker at a position or hide it; it is only written when that changes.
  *
@@ -1813,17 +1815,6 @@ int32_t ore_craft_order(
     ecs_world_t *world,
     ecs_entity_t item,
     int32_t count);
-
-/** Take one unit off an order and refund what the rest does not need. Refused with a warning
- * when the refund does not fit the inventory.
- *
- * @param world The world
- * @param id Id of the order
- * @return Whether a unit was taken off
- */
-bool ore_craft_cancel(
-    ecs_world_t *world,
-    int32_t id);
 
 /** Register crafting: the order book, the workers, OreCanOrder, OreNeeds and the script
  * functions oreelse.craft_order(item, count) and oreelse.craft_cancel(order).

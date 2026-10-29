@@ -4,7 +4,7 @@
 // bright red of the fast blink) and a blackout (20 / 49 W, a red bar at 0.404). Below the top
 // center the suit breach alert in bright red. At the bottom, from the top down: the warning toast
 // in red, the mine progress bar at 0.6 and the rocket status line of a rocket with a cargo bay
-// and 2 of its 4 engines, in amber.
+// and 2 of its 4 engines, in amber. The pause screen covers the middle of the window.
 include apps/oreelse/test/visual/setup/seed
 include apps/oreelse/etc/oreelse
 

@@ -4,6 +4,7 @@
 // beam reaching the brute. Every actor faces about toward the camera, turned to show a side
 include apps/oreelse/test/visual/setup/seed
 include apps/oreelse/etc/oreelse
+include apps/oreelse/test/visual/setup/world
 
 using flecs.script.math
 using box.transform

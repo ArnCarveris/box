@@ -1183,7 +1183,14 @@ static void ore_craft_refund(
     }
 }
 
-bool ore_craft_cancel(
+/** Take one unit off an order and refund what the rest does not need. Refused with a warning
+ * when the refund does not fit the inventory.
+ *
+ * @param world The world
+ * @param id Id of the order
+ * @return Whether a unit was taken off
+ */
+static bool ore_craft_cancel(
     ecs_world_t *world,
     int32_t id)
 {

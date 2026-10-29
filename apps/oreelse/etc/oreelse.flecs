@@ -4,7 +4,7 @@
 // render quality tier), the tile markers, the preview of placement, the health bars and the HUD;
 // the included scripts hold the constants, the palette and the icons of the UI, the items, the
 // buildings and their connector rules, the models, the input, the map, the run and the UI kit,
-// health bar, inventory screen and HUD templates. The game boots into the title screen.
+// health bar, inventory screen, screen and HUD templates. The game boots into the title screen.
 
 include config
 include ui/palette
@@ -58,6 +58,7 @@ include run
 include launch
 include ui/panel
 include ui/inventory
+include ui/screens
 include ui/hud
 include ui/health_bar
 
@@ -165,11 +166,14 @@ $ {
 }
 
 // The one shot effects the game plays from C (etc/particles): the astronaut's foot dust and
-// death splat, the burst of every yield of a deposit, and the poof of a used up deposit and of a
-// building placed or demolished
+// death splat, the burst of every yield of a deposit, the poof of a used up deposit and of a
+// building placed or demolished, and the effects of combat: the explosion of a missile and of a
+// destroyed building, the sparks of a shot at the muzzle and where it hits, the puff of a hit on
+// a critter and the dust of a hit on the ground
 $ {
   OreEffects: {
-    foot_dust: FootDust, mine_burst: MineBurst, poof_burst: PoofBurst, splat_burst: SplatBurst
+    foot_dust: FootDust, mine_burst: MineBurst, poof_burst: PoofBurst, splat_burst: SplatBurst,
+    boom_burst: BoomBurst, spark_burst: SparkBurst, hit_puff: HitPuff, impact_dust: ImpactDust
   }
 }
 

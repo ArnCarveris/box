@@ -4,6 +4,7 @@
 // south west; the hazard band runs along the north and east edges of the playable area
 include apps/oreelse/test/visual/setup/seed
 include apps/oreelse/etc/oreelse
+include apps/oreelse/test/visual/setup/world
 include apps/oreelse/test/visual/setup/band
 
 using oreelse

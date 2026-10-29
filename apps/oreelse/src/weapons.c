@@ -4,8 +4,10 @@
  * tracers and missiles they fire and the laser beams. Shots hit critters only, in 2D.
  *
  * Damage only lowers the critters' hit points; OreCritterDeath kills the ones at 0 in the next
- * frame. The systems run while playing after OreCrowd, which rebuilt the critter spatial index,
- * in this order: OrePistol, OreTurrets, OreProjectileFly; OreBeamHide hides the beams otherwise.
+ * frame. The systems run while playing after OreCrowd, which rebuilt the spatial index.
+ *
+ * Their order: OrePistol, OreTurrets, OreProjectileFly; OreBeamHide hides the beams otherwise.
+ * The effects of combat play where a shot is fired, a beam burns or a projectile ends.
  */
 
 #include "game.h"
@@ -41,6 +43,17 @@ typedef struct ore_splash_t {
     ecs_world_t *stage; /**< The stage of the system */
     float damage;       /**< Hit points every critter within the radius loses */
 } ore_splash_t;
+
+/** The effects of combat and their constants, read once per system run (ore_combat_fx_get) */
+typedef struct ore_combat_fx_t {
+    const OreEffects *effects; /**< The one shot effects the C plays, NULL for none */
+    float hit_inset;           /**< cfg.turretHitInset */
+    float blast_per;           /**< cfg.splashBlastPer */
+    float blast_min;           /**< cfg.splashBlastMin */
+    float blast_max;           /**< cfg.splashBlastMax */
+    float blast_lift;          /**< cfg.splashBlastLift */
+    float impact_y;            /**< cfg.impactY */
+} ore_combat_fx_t;
 
 /** Read the constants of the weapons.
  *
@@ -294,8 +307,48 @@ static void OrePistol(
     }
 }
 
-/** Find the head of a turret and give a laser turret its beam: an instance of the beam prefab
- * under the turret, hidden. The head gets DynamicTransform, as it turns.
+/** Find a part of a building, the original's oreChild: the child of that name, or, as the parts
+ * of a placed building are unnamed, the child whose IsA base has that name.
+ *
+ * @param world The world
+ * @param parent The building or a part of it
+ * @param name The name of the part in the prefab
+ * @return The part, 0 for none
+ */
+static ecs_entity_t ore_child(
+    const ecs_world_t *world,
+    ecs_entity_t parent,
+    const char *name)
+{
+    ecs_entity_t result = parent ? ecs_lookup_child(world, parent, name) : 0;
+    ecs_entity_t base;
+    const char *base_name;
+    ecs_iter_t it;
+    int32_t i;
+    if (!parent || result) {
+        goto done;
+    }
+
+    it = ecs_children(world, parent);
+    while (!result && ecs_children_next(&it)) {
+        for (i = 0; !result && i < it.count; i ++) {
+            base = ecs_get_target(world, it.entities[i], EcsIsA, 0);
+            base_name = base ? ecs_get_name(world, base) : NULL;
+            result = base_name && !ecs_os_strcmp(base_name, name) ? it.entities[i] : 0;
+        }
+    }
+
+    if (result) {
+        ecs_iter_fini(&it);
+    }
+
+done:
+    return result;
+}
+
+/** Find the parts of a turret, its head, the head's fx and its hit_fx, and give a laser turret
+ * its beam: an instance of the beam prefab under the turret, hidden. The head gets
+ * DynamicTransform, as it turns, and so does hit_fx, which moves to where the beam hits.
  *
  * @param ctx The context of the system run
  * @param turret The turret's state, receives the head and the beam
@@ -310,9 +363,15 @@ static void ore_turret_parts(
 {
     ecs_entity_t b;
     if (!turret->head) {
-        turret->head = ecs_lookup_child(ctx->world, e, "head");
+        turret->head = ore_child(ctx->world, e, "head");
         if (turret->head) {
             ecs_add_id(ctx->stage, turret->head, DynamicTransform);
+            turret->fx = ore_child(ctx->world, turret->head, "fx");
+        }
+
+        turret->hit_fx = ore_child(ctx->world, e, "hit_fx");
+        if (turret->hit_fx) {
+            ecs_add_id(ctx->stage, turret->hit_fx, DynamicTransform);
         }
     }
 
@@ -509,9 +568,234 @@ static float ore_turret_mul(
     return result;
 }
 
+/** Read the effects of combat and their constants, once per system run.
+ *
+ * @param world The world
+ * @return The effects and the constants
+ */
+static ore_combat_fx_t ore_combat_fx_get(
+    const ecs_world_t *world)
+{
+    ore_combat_fx_t result = {
+        .effects = ecs_singleton_get(world, OreEffects),
+        .hit_inset = ORE_CFG(world, "turretHitInset"),
+        .blast_per = ORE_CFG(world, "splashBlastPer"),
+        .blast_min = ORE_CFG(world, "splashBlastMin"),
+        .blast_max = ORE_CFG(world, "splashBlastMax"),
+        .blast_lift = ORE_CFG(world, "splashBlastLift"),
+        .impact_y = ORE_CFG(world, "impactY")
+    };
+
+    return result;
+}
+
+/** Get a part of a turret when it is alive.
+ *
+ * @param world The world
+ * @param part The part, 0 for none
+ * @return The part, 0 when it is gone
+ */
+static ecs_entity_t ore_fx_part(
+    const ecs_world_t *world,
+    ecs_entity_t part)
+{
+    return part && ecs_is_alive(world, part) ? part : 0;
+}
+
+/** Get the muzzle of a turret from its parts, the original's oreTurretMuzzle: the position of
+ * its head plus the position of the head's fx turned by the aim, above the turret's position.
+ *
+ * @param world The world
+ * @param turret The turret's state, with its head, its fx and its aim
+ * @param p Position of the turret
+ * @param out Receives the muzzle in world space, left as it is without both parts
+ */
+static void ore_turret_muzzle(
+    const ecs_world_t *world,
+    const OreTurret *turret,
+    const Position *p,
+    vec3 out)
+{
+    ecs_entity_t head = ore_fx_part(world, turret->head);
+    ecs_entity_t fx = ore_fx_part(world, turret->fx);
+    const Position *hp = head ? ecs_get(world, head, Position) : NULL;
+    const Position *tp = fx ? ecs_get(world, fx, Position) : NULL;
+    float s = sinf(turret->aim), c = cosf(turret->aim);
+    if (hp && tp) {
+        out[0] = p->x + hp->x + tp->x * c + tp->z * s;
+        out[1] = p->y + hp->y + tp->y;
+        out[2] = p->z + hp->z - tp->x * s + tp->z * c;
+    }
+}
+
+/** Stop the effects of a turret that does not fire: the glow at the lens of a laser and the
+ * sparks where its beam hits, the muzzle flash of a gun or missile turret, which goes dark at
+ * once. Only written when they change.
+ *
+ * @param world The world
+ * @param stage The stage of the system
+ * @param turret The turret's state, with its fx and hit_fx
+ */
+static void ore_turret_fx_stop(
+    const ecs_world_t *world,
+    ecs_world_t *stage,
+    const OreTurret *turret)
+{
+    ore_playback_set(world, stage, ore_fx_part(world, turret->fx), ParticleStopped, false);
+    ore_playback_set(world, stage, ore_fx_part(world, turret->hit_fx), ParticleStopped, false);
+}
+
+/** Go on with the muzzle flash of a turret that fires again after a pause, where its fade was
+ * held: a paused fx plays on, a stopped or playing one is left alone.
+ *
+ * @param world The world
+ * @param stage The stage of the system
+ * @param turret The turret's state, with its fx
+ */
+static void ore_turret_fx_resume(
+    const ecs_world_t *world,
+    ecs_world_t *stage,
+    const OreTurret *turret)
+{
+    ecs_entity_t fx = ore_fx_part(world, turret->fx);
+    const ParticlePlayback *playback = fx ? ecs_get(world, fx, ParticlePlayback) : NULL;
+    if (playback && playback->state == ParticlePaused) {
+        ore_playback_set(world, stage, fx, ParticlePlaying, false);
+    }
+}
+
+/** Play the effects of a laser's beam from the muzzle to the point it hits: the glow at the lens
+ * (BeamGlow) and the sparks (BeamSparks) of hit_fx, whose ParticleLight lights while they play.
+ *
+ * hit_fx moves to the end of the beam, set back toward the muzzle by the target's radius (0.5
+ * without one) times cfg.turretHitInset, at most halfway.
+ *
+ * @param fx The effects of combat
+ * @param world The world
+ * @param stage The stage of the system
+ * @param turret The turret's state, with its fx and hit_fx
+ * @param p Position of the turret
+ * @param from The muzzle
+ * @param to The point the beam hits
+ * @param radius Radius of the target, 0 for none
+ */
+static void ore_beam_fx(
+    const ore_combat_fx_t *fx,
+    const ecs_world_t *world,
+    ecs_world_t *stage,
+    const OreTurret *turret,
+    const Position *p,
+    const vec3 from,
+    const vec3 to,
+    float radius)
+{
+    ecs_entity_t glow = ore_fx_part(world, turret->fx);
+    ecs_entity_t sparks = ore_fx_part(world, turret->hit_fx);
+    float bx = to[0] - from[0], by = to[1] - from[1], bz = to[2] - from[2];
+    float len = sqrtf(bx * bx + by * by + bz * bz);
+    float inset = (radius > 0 ? radius : 0.5f) * fx->hit_inset;
+    float back = len > 0.001f ? glm_min(inset / len, 0.5f) : 0;
+    Position at = {
+        from[0] + bx * (1.0f - back) - p->x,
+        from[1] + by * (1.0f - back) - p->y,
+        from[2] + bz * (1.0f - back) - p->z
+    };
+    const Position *cur;
+    ore_playback_set(world, stage, glow, ParticlePlaying, false);
+    if (sparks) {
+        cur = ecs_get(world, sparks, Position);
+        if (!cur || cur->x != at.x || cur->y != at.y || cur->z != at.z) {
+            ecs_set_ptr(stage, sparks, Position, &at);
+        }
+
+        ore_playback_set(world, stage, sparks, ParticlePlaying, false);
+    }
+}
+
+/** Play the effects of a shot of a turret at its muzzle: the SparkBurst, the muzzle flash of its
+ * fx played from the start (it lights at its peak and fades) and, with OreLaunchFx, the launch
+ * turned to the aim of the head.
+ *
+ * @param fx The effects of combat
+ * @param world The world
+ * @param stage The stage of the system
+ * @param e The turret
+ * @param turret The turret's state, with its fx and its aim
+ * @param from The muzzle
+ */
+static void ore_turret_shot_fx(
+    const ore_combat_fx_t *fx,
+    const ecs_world_t *world,
+    ecs_world_t *stage,
+    ecs_entity_t e,
+    const OreTurret *turret,
+    const vec3 from)
+{
+    ecs_entity_t flash = ore_fx_part(world, turret->fx);
+    const OreLaunchFx *launch = ecs_get(world, e, OreLaunchFx);
+    if (fx->effects) {
+        ore_burst(stage, fx->effects->spark_burst, from, 1.0f);
+    }
+
+    if (flash && ecs_has(world, flash, ParticleLight)) {
+        ecs_set(stage, flash, ParticlePlayback, { .state = ParticlePlaying, .reset = true });
+    }
+
+    if (launch && launch->burst) {
+        ore_burst_aimed(stage, launch->burst, from, turret->aim);
+    }
+}
+
+/** Play the effects of the end of a projectile, the original's: one with splash explodes
+ * (BoomBurst cfg.splashBlastLift above it, scaled clamp(splash / cfg.splashBlastPer,
+ * cfg.splashBlastMin, cfg.splashBlastMax)).
+ *
+ * One that hit a critter bursts into a SparkBurst and a HitPuff; one at cfg.impactY or below
+ * throws up ImpactDust and a SparkBurst at that height.
+ *
+ * @param fx The effects of combat
+ * @param stage The stage of the system
+ * @param p Position of the projectile at its end
+ * @param splash Splash radius, 0 for none
+ * @param hit Whether it hit a critter
+ */
+static void ore_shot_end_fx(
+    const ore_combat_fx_t *fx,
+    ecs_world_t *stage,
+    const Position *p,
+    float splash,
+    bool hit)
+{
+    const OreEffects *effects = fx->effects;
+    float per = fx->blast_per > 0 ? fx->blast_per : 1.0f;
+    vec3 at = { p->x, p->y, p->z };
+    if (!effects) {
+        goto done;
+    }
+
+    if (splash > 0) {
+        at[1] += fx->blast_lift;
+        ore_explosion(stage, effects->boom_burst, at,
+            glm_clamp(splash / per, fx->blast_min, fx->blast_max));
+    } else if (hit) {
+        ore_burst(stage, effects->spark_burst, at, 1.0f);
+        ore_burst(stage, effects->hit_puff, at, 1.0f);
+    } else if (p->y <= fx->impact_y) {
+        at[1] = fx->impact_y;
+        ore_burst(stage, effects->impact_dust, at, 1.0f);
+        ore_burst(stage, effects->spark_burst, at, 1.0f);
+    }
+
+done:
+    return;
+}
+
 /** Play the turrets: target the critters, turn the heads, burn with the lasers and fire. A
  * turret that draws power does not fire in a blackout, and none with its Weapons multiplier at 0.
- * The laser deals damage * dt * multiplier to its target every frame and shows its beam.
+ *
+ * The laser deals damage * dt * multiplier to its target every frame and shows its beam from the
+ * muzzle of its parts, with its glow and sparks. Every shot plays the effects of the muzzle; a
+ * turret that does not fire stops its effects.
  *
  * The gun and the missile turret count their timer down while they have a target and fire at 0
  * or below, adding interval / multiplier to it, so they keep that rate whatever the frame rate.
@@ -537,6 +821,7 @@ static void OreTurrets(
     const OrePowerAlloc *alloc = ecs_field(it, OrePowerAlloc, 15);
     ore_weapons_ctx_t ctx = ore_weapons_ctx(it, ecs_field(it, OreCritterIndex, 16),
         ecs_field(it, OreArmory, 17));
+    ore_combat_fx_t fx = ore_combat_fx_get(it->world);
     float step = ORE_CFG(it->world, "powerStep");
     bool ranged = interval && timer && ammo;
     bool lead = !beam && ranged && ammo->projectile &&
@@ -553,9 +838,11 @@ static void OreTurrets(
             ore_turret_target(&ctx, &target[i], &p[i], range[i].value);
         if (!tp) {
             ore_beam_hide(it->world, it->stage, turret[i].beam);
+            ore_turret_fx_stop(it->world, it->stage, &turret[i]);
             continue;
         }
 
+        ore_turret_fx_resume(it->world, it->stage, &turret[i]);
         lx = tp->x;
         lz = tp->z;
         if (lead) {
@@ -575,7 +862,10 @@ static void OreTurrets(
             to[0] = tp->x;
             to[1] = tp->y + r;
             to[2] = tp->z;
+            ore_turret_muzzle(it->world, &turret[i], &p[i], from);
             ore_beam_show(&ctx, turret[i].beam, &p[i], from, to);
+            ore_beam_fx(&fx, it->world, it->stage, &turret[i], &p[i], from, to,
+                radius ? radius->value : 0);
             continue;
         }
 
@@ -590,6 +880,7 @@ static void OreTurrets(
         for (shots = 0; timer[i].value <= 0 && shots < ORE_SHOTS_MAX; shots ++) {
             ore_projectile_fire(&ctx, ammo[i].projectile, from, to, muzzle[i].speed,
                 damage[i].value, splash ? splash[i].radius : 0, target[i].value);
+            ore_turret_shot_fx(&fx, it->world, it->stage, it->entities[i], &turret[i], from);
             timer[i].value += interval[i].value / mul;
         }
     }
@@ -671,7 +962,8 @@ done:
  * hits the nearest live critter within its radius on XZ and expires at life 0 or y 0 or below.
  *
  * On a hit or at its end a projectile with splash hurts every live critter within the splash
- * radius on XZ with its full damage, one without the critter it hit; then it is deleted.
+ * radius on XZ with its full damage, one without the critter it hit; then it plays the effects
+ * of its end (the explosion, the hit, the impact on the ground) and is deleted.
  *
  * @param it Iterator over the projectiles, while playing
  */
@@ -687,6 +979,7 @@ static void OreProjectileFly(
     bool homing = ecs_field_is_set(it, 6) && target;
     ore_weapons_ctx_t ctx = ore_weapons_ctx(it, ecs_field(it, OreCritterIndex, 7), NULL);
     ore_splash_t blast = { .world = it->world, .stage = it->stage };
+    ore_combat_fx_t fx = ore_combat_fx_get(it->world);
     ecs_entity_t hit;
     int32_t i;
     for (i = 0; i < it->count; i ++) {
@@ -713,12 +1006,14 @@ static void OreProjectileFly(
             ore_critter_hurt(it->world, it->stage, hit, damage[i].value);
         }
 
+        ore_shot_end_fx(&fx, it->stage, &p[i], splash ? splash[i].radius : 0, hit != 0);
         ecs_delete(it->stage, it->entities[i]);
     }
 }
 
 /** Hide the laser beams outside play: like the original's, which it drew every frame of play,
- * they do not stay on the pause or end screens.
+ * they do not stay on the pause or end screens. The effects of the turrets pause, the muzzle
+ * flashes holding their light; OreTurrets plays or stops them again when the game resumes.
  *
  * @param it Iterator over the placed turrets, while not playing
  */
@@ -729,6 +1024,39 @@ static void OreBeamHide(
     int32_t i;
     for (i = 0; i < it->count; i ++) {
         ore_beam_hide(it->world, it->stage, turret[i].beam);
+        ore_playback_set(it->world, it->stage, ore_fx_part(it->world, turret[i].fx),
+            ParticlePaused, true);
+        ore_playback_set(it->world, it->stage, ore_fx_part(it->world, turret[i].hit_fx),
+            ParticlePaused, true);
+    }
+}
+
+/** Play the smoke trails of the missiles in flight, the emitters below a projectile, while
+ * playing. A trail lingers after its missile, its particles finishing their lives where they
+ * were left.
+ *
+ * @param it Iterator over the emitters below the projectiles, while playing
+ */
+static void OreTrails(
+    ecs_iter_t *it)
+{
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        ore_playback_set(it->world, it->stage, it->entities[i], ParticlePlaying, false);
+    }
+}
+
+/** Pause the smoke trails outside of play, so they stand still with the missiles; OreTrails
+ * plays them again when the game resumes.
+ *
+ * @param it Iterator over the emitters below the projectiles, while not playing
+ */
+static void OreTrailsHold(
+    ecs_iter_t *it)
+{
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        ore_playback_set(it->world, it->stage, it->entities[i], ParticlePaused, true);
     }
 }
 
@@ -826,5 +1154,29 @@ void ore_weapons_import(
             { .id = playing, .src.id = state, .oper = EcsNot }
         },
         .callback = OreBeamHide
+    });
+
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "OreTrails" }),
+        .phase = EcsOnUpdate,
+        .query.terms = {
+            { .id = ecs_id(ParticleEmitter), .src.id = EcsSelf, .inout = EcsInOutNone },
+            { .id = ecs_id(OreProjectile), .src.id = EcsUp, .trav = EcsChildOf,
+              .inout = EcsInOutNone },
+            { .id = playing, .src.id = state }
+        },
+        .callback = OreTrails
+    });
+
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "OreTrailsHold" }),
+        .phase = EcsOnUpdate,
+        .query.terms = {
+            { .id = ecs_id(ParticleEmitter), .src.id = EcsSelf, .inout = EcsInOutNone },
+            { .id = ecs_id(OreProjectile), .src.id = EcsUp, .trav = EcsChildOf,
+              .inout = EcsInOutNone },
+            { .id = playing, .src.id = state, .oper = EcsNot }
+        },
+        .callback = OreTrailsHold
     });
 }

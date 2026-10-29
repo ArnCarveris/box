@@ -1,8 +1,8 @@
 // The guided missile of the missile turret, the Missile prefab of the original: a steel body
 // with an orange tip and two fins, and a glowing flame at its tail that lights what it passes.
 // Its origin is its center and it flies along +Z. The trail child is where the smoke trail
-// comes out of; the effect task gives it its emitter. It homes in on its target, hits the
-// nearest live critter within 0.8 on XZ and expires after 5 s, without gravity
+// comes out of (MissileTrail), which lingers after the missile. It homes in on its target, hits
+// the nearest live critter within 0.8 on XZ and expires after 5 s, without gravity
 // (OreProjectileFly).
 
 using box.transform
@@ -57,5 +57,6 @@ prefab Missile {
 
   trail {
     Position: {0, 0, -0.44}
+    MissileTrail: {}
   }
 }
