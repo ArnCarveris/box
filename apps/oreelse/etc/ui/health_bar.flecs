@@ -29,27 +29,32 @@ template HealthBar {
 
   const back = cfg.hpBarBack
   const edge = cfg.hpBarEdge
-  const full = cfg.hpBarFull
-  const mid = cfg.hpBarMid
-  const low = cfg.hpBarLow
 
-  // Amber to green at half health and above, red to amber below, truncated as the original
-  const hi: f32 = clamp((frac - 0.5) * 2, 0, 1)
-  const lo: f32 = clamp(frac * 2, 0, 1)
-  const upper: Rgb = {
-    floor(mid.r * (1 - hi) + full.r * hi),
-    floor(mid.g * (1 - hi) + full.g * hi),
-    floor(mid.b * (1 - hi) + full.b * hi)
+  // Amber to green at half health and above, red to amber below: the original's oreBarLerp,
+  // a + (b - a) * t in f32 per channel, truncated
+  const upper: bool = frac >= 0.5
+  const from: Rgb = match upper {
+    true: cfg.hpBarMid
+    false: cfg.hpBarLow
   }
-  const lower: Rgb = {
-    floor(low.r * (1 - lo) + mid.r * lo),
-    floor(low.g * (1 - lo) + mid.g * lo),
-    floor(low.b * (1 - lo) + mid.b * lo)
+  const to: Rgb = match upper {
+    true: cfg.hpBarFull
+    false: cfg.hpBarMid
   }
-  const color: Rgb = match frac >= 0.5 {
-    true: upper
-    false: lower
+  const t: f32 = match upper {
+    true: clamp((frac - 0.5) * 2, 0, 1)
+    false: clamp(frac * 2, 0, 1)
   }
+  const fr: f32 = from.r
+  const fg: f32 = from.g
+  const fb: f32 = from.b
+  const tr: f32 = to.r
+  const tg: f32 = to.g
+  const tb: f32 = to.b
+  const r: f32 = fr + (tr - fr) * t
+  const g: f32 = fg + (tg - fg) * t
+  const b: f32 = fb + (tb - fb) * t
+  const color: Rgb = {floor(r), floor(g), floor(b)}
 
   // Elements are centered on their Position: the bar's bottom edge sits hpBarMargin above the
   // top of the box

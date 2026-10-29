@@ -9,6 +9,8 @@ by a script on chosen tiles, their health set through the command port, a mite s
 oreelse.spawn_critter(). The bars are the instances of the HealthBar template (the component
 holds the building and the fraction) under health_bars.bars, laid out in the scene of the bars.
 """
+import struct
+
 from oreelse_critters import (  # noqa: F401 (ARGS)
     ARGS, FPS, PLAYER, buildings, entity, health, hold_waves, place_player, rows_of, set_state,
     setup, spawn, start, tile_point, wait_until, wall)
@@ -71,16 +73,24 @@ def set_health(app, building, value, max_hp=WALL_HP):
     app.exec("set %s OreHealth {value: %g, max: %g}" % (building, value, max_hp))
 
 
+def f32(x):
+    """x rounded to a C float."""
+    return struct.unpack("f", struct.pack("f", x))[0]
+
+
 def blend(a, b, t):
-    """The color of the original's oreBarLerp: a + (b - a) * t per channel, truncated."""
+    """The color of the original's oreBarLerp: a + (b - a) * t per channel in floats,
+    truncated."""
     t = min(max(t, 0), 1)
-    return tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(3))
+    return tuple(int(f32(a[i] + f32((b[i] - a[i]) * t))) for i in range(3))
 
 
-def fill_color(frac):
+def fill_color(value, max_hp):
+    """The fill color of the original at value / max_hp, in floats as its C code."""
+    frac = f32(value / max_hp)
     if frac >= 0.5:
-        return blend(MID, FULL, (frac - 0.5) * 2)
-    return blend(LOW, MID, frac * 2)
+        return blend(MID, FULL, f32((frac - 0.5) * 2))
+    return blend(LOW, MID, f32(frac * 2))
 
 
 def color(app, path):
@@ -98,8 +108,9 @@ def width(app, bar):
     return float(app.exec("get %s LayoutBounds.width" % bar))
 
 
-def check_fill(app, bar, frac):
+def check_fill(app, bar, value):
     """The fill: (width - 2) * frac wide, 2 px tall, in the color of the blend."""
+    frac = value / WALL_HP
     w = width(app, bar)
     fill = bar + ".track.fill"
     fw = float(app.exec("get %s LayoutBounds.width" % fill))
@@ -107,9 +118,9 @@ def check_fill(app, bar, frac):
     app.check(abs(fw - (w - 2) * frac) < 0.01,
               "the fill at %g is %g wide in a bar of %g" % (frac, fw, w))
     app.check(abs(fh - (BAR_HEIGHT - 2)) < 0.01, "the fill is %g tall" % fh)
-    expected = fill_color(frac)
+    expected = fill_color(value, WALL_HP)
     got = color(app, fill)
-    app.check(all(abs(got[i] - expected[i]) <= 1 for i in range(3)),
+    app.check(got == expected,
               "the fill at %g is %s, not %s" % (frac, got, expected))
 
 
@@ -185,14 +196,14 @@ def test_fill_and_repair(app):
     bar = wait_bar(app, w, 0.5)
     app.wait_frames(SETTLE)
     check_placed(app, bar)
-    check_fill(app, bar, 0.5)
+    check_fill(app, bar, 150)
 
     # The same bar follows the health: red to amber below half, amber to green above
     for value in (75, 270, 30):
         set_health(app, w, value)
         app.check(wait_bar(app, w, value / WALL_HP) == bar, "the bar was replaced")
         app.wait_frames(SETTLE)
-        check_fill(app, bar, value / WALL_HP)
+        check_fill(app, bar, value)
     app.check(len(bars(app)) == 1, "bars: %s" % bars(app))
 
     # Repaired to full: the bar goes
@@ -260,7 +271,7 @@ def test_zoom(app):
     far = stable_width(app, bar)
     app.check(far < near * 0.7, "zoomed out the bar is %g wide, %g zoomed in" % (far, near))
     check_placed(app, bar)
-    check_fill(app, bar, 0.5)
+    check_fill(app, bar, 150)
 
     # Back at level 0 it is as wide as before
     set_state(app, "Playing")
