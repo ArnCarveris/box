@@ -16,7 +16,7 @@ export const DarkTheme: UiTheme = {
   surface_alt: {38, 41, 48},
   border: {70, 76, 87},
   text: {214, 218, 224},
-  text_muted: {142, 149, 160},
+  text_muted: {164, 170, 180},
   accent: {98, 168, 122},
   accent_text: {22, 26, 30},
   hover: {60, 65, 75},
