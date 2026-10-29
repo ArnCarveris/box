@@ -1,8 +1,9 @@
 // The mite, the Mite prefab of the original: the smallest and fastest critter, a blue body of boxes
 // with a glowing visor and a glowing spark on its abdomen, and four legs. Its origin is between its
-// feet on the ground and it faces +Z. The legs are pivots with OreLimb at the hips; here they stand
-// still. Its gameplay data: hit points, speed, damage per second, attack range, body radius and
-// what it costs a wave.
+// feet on the ground and it faces +Z. The legs are pivots with OreLimb at the hips, swung by the
+// walk (OreCritterLimbs). Its gameplay data: hit points, speed, damage per second, attack range,
+// body radius and what it costs a wave; its gait (OreGait) and the effect it dies in
+// (OreDeathBurst).
 
 using flecs.script.math
 using box.transform
@@ -22,6 +23,8 @@ prefab Mite {
   OreRange: {value: 1.1}
   OreRadius: {value: 0.34}
   OreWaveTier: {cost: 1, wave: 1}
+  OreGait: {step: 2.8, bob: 0.13}
+  OreDeathBurst: {burst: CombustBurst}
 
   abdomen {
     Position: {0, 0.31, -0.2}

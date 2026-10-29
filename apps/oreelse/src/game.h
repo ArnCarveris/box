@@ -3,8 +3,8 @@
  * @brief The oreelse module: components of the game and the functions its areas share.
  *
  * The scene (apps/oreelse/etc) holds the constants cfg.*, the models, the items, the singletons
- * and the entities of a run; the systems of each area (flow.c, map.c, player.c, inventory.c,
- * mining.c, craft.c, critters.c, buildings.c, placement.c, look.c, particles.c) play the game.
+ * and the entities of a run; the systems of each area (flow.c, map.c, player.c, ...,
+ * critters.c, critter_fx.c, buildings.c, placement.c, look.c, particles.c) play the game.
  */
 
 #ifndef OREELSE_GAME_H
@@ -147,7 +147,9 @@ ECS_STRUCT(OrePlayer, {
     bool airborne; /**< hover is above cfg.airborne, the jetpack fires */
 });
 
-/** A limb pivot of a model; its Rotation.x swings with the walk (OrePlayerFx) */
+/** A limb pivot of a model; its Rotation.x swings with the walk (OrePlayerFx for the astronaut,
+ * OreCritterLimbs for a critter's legs)
+ */
 ECS_STRUCT(OreLimb, {
     float phase; /**< Offset of the limb in the walk cycle */
     float swing; /**< Largest angle of the swing in radians */
@@ -539,11 +541,29 @@ ECS_STRUCT(OreWaveTier, {
     int32_t wave; /**< First wave that can spawn the tier */
 });
 
-/** The critter prefabs of the tiers, a singleton oreelse.flecs sets: Mite, Skitter, Brute and
- * Behemoth, in the order of the tiers of OreWaveMix and OreWaveState.spawn
+/** The walk of a critter, on its prefab and inherited: its walk cycle advances step radians per
+ * unit walked and its body bobs up to bob units over it (OreCritterFx)
+ */
+ECS_STRUCT(OreGait, {
+    float step; /**< Radians of the walk cycle per unit walked */
+    float bob;  /**< Height of the bob in units, |sin(anim)| * bob */
+});
+
+/** The effect a critter dies in, on its prefab and inherited: ore_combust plays it at the
+ * critter's radius; a critter without one, or with burst 0, dies in OreArsenal.splat
+ */
+ECS_STRUCT(OreDeathBurst, {
+    ecs_entity_t burst; /**< The effect template, CombustBurst, 0 for the splat */
+});
+
+/** The critter prefabs of the tiers and the effects of their deaths, a singleton oreelse.flecs
+ * sets: Mite, Skitter, Brute and Behemoth, in the order of the tiers of OreWaveMix and
+ * OreWaveState.spawn
  */
 ECS_STRUCT(OreArsenal, {
     ecs_entity_t critters[4]; /**< Prefab of every tier */
+    ecs_entity_t splat;       /**< Effect of a death without OreDeathBurst, SplatBurst */
+    ecs_entity_t embers;      /**< Template that smolders on a corpse, CorpseEmbers */
 });
 
 /** A share of every tier, the type of the style mixes cfg.mixedMix, cfg.swarmMix, cfg.eliteMix */
@@ -589,6 +609,20 @@ ECS_STRUCT(OreCritter, {
     float jitter;    /**< Heading jitter from -1 to 1, drawn at the spawn: the critter walks
                       *   jitter * cfg.critterJitter radians off the direction to its goal */
     bool attacking;  /**< Its target is in range and it chews it */
+    float anim;      /**< Phase of the walk cycle in radians, drawn from U(0, 2 PI) at the spawn
+                      *   and advanced while it walks (OreCritterFx) */
+});
+
+/** A dead critter's corpse, on the corpse: an instance of the critter's prefab that is no critter
+ * (no OreCritter, so no AI, no target, no separation and not in OreCritterIndex), tipped over and
+ * charred, with the CorpseEmbers on it.
+ *
+ * It lies cfg.corpseTime seconds of play, sinks at cfg.corpseSink units a second and is deleted
+ * depth below the ground; at most cfg.corpseCap corpses, the oldest goes first (OreCorpses).
+ */
+ECS_STRUCT(OreCorpse, {
+    float age;   /**< Seconds of play since the critter died */
+    float depth; /**< Depth below the ground at which it is deleted, 2 r + 1 of its radius r */
 });
 
 /** What a critter goes for: the astronaut or a building */
@@ -1114,8 +1148,8 @@ bool ore_placement_deselect(
     ecs_world_t *world);
 
 /** Spawn a critter: an instance of its prefab under the root of OreWaveState at full health,
- * without a target, its retarget timer at cfg.retargetInterval * U(0, 1) and its heading jitter
- * drawn from U(-1, 1).
+ * without a target, its retarget timer at cfg.retargetInterval * U(0, 1), its heading jitter
+ * drawn from U(-1, 1) and its walk cycle from U(0, 2 PI).
  *
  * @param world The world or a stage
  * @param prefab The critter prefab (Mite, Skitter, Brute, Behemoth)
@@ -1129,8 +1163,9 @@ ecs_entity_t ore_critter_spawn(
     float x,
     float z);
 
-/** Kill a critter: the kill counter of OreWaveState goes up and the critter is deleted. The one
- * place a critter dies, OreCritterDeath calls it for the critters at 0 hit points or below.
+/** Kill a critter: the kill counter of OreWaveState goes up, its death plays and leaves its corpse
+ * (ore_critter_remains) and the critter is deleted. The one place a critter dies,
+ * OreCritterDeath calls it for the critters at 0 hit points or below.
  *
  * @param world The world or the stage of a system
  * @param critter The critter
@@ -1138,6 +1173,38 @@ ecs_entity_t ore_critter_spawn(
 void ore_critter_kill(
     ecs_world_t *world,
     ecs_entity_t critter);
+
+/** Play the death of a critter and leave its corpse (ore_corpse_spawn), the original's
+ * oreDamageCritter at 0 hit points: its OreDeathBurst at its position and radius (ore_combust),
+ * or OreArsenal.splat cfg.splatLift above it without one. ore_critter_kill deletes it after.
+ *
+ * @param world The world or the stage of a system
+ * @param critter The critter
+ */
+void ore_critter_remains(
+    ecs_world_t *world,
+    ecs_entity_t critter);
+
+/** Lay the corpse of a critter: a new instance of its prefab with OreCorpse under the root of
+ * OreWaveState, on the ground, tipped over in the original's pose turned by the critter's heading,
+ * squashed to cfg.corpseSquash and charred with the Tint cfg.corpseColor (OreCorpseChar).
+ *
+ * An instance of OreArsenal.embers on it is scaled by its radius. Nothing is laid when
+ * cfg.corpseTime is 0 or less.
+ *
+ * @param world The world or the stage of a system
+ * @param prefab The critter prefab
+ * @param x X of the corpse
+ * @param z Z of the corpse
+ * @param yaw Heading of the critter, its Rotation.y
+ * @return The corpse, 0 for none
+ */
+ecs_entity_t ore_corpse_spawn(
+    ecs_world_t *world,
+    ecs_entity_t prefab,
+    float x,
+    float z,
+    float yaw);
 
 /** Find the nearest critter of the spatial index within a range of a point on the ground.
  *
@@ -1160,6 +1227,15 @@ ecs_entity_t ore_critter_nearest(
  * @param world The world
  */
 void ore_critters_import(
+    ecs_world_t *world);
+
+/** Register the critters' animation, deaths and corpses: the walk, bob and waddle, the legs,
+ * the corpses' char, aging, sinking and cap, and the script function oreelse.corpse(prefab,
+ * position, yaw).
+ *
+ * @param world The world
+ */
+void ore_critter_fx_import(
     ecs_world_t *world);
 
 /** Register the game flow: states, clock, blink, toast, cancel() and restart().
@@ -1268,7 +1344,7 @@ void ore_particles_import(
  *
  * Registers the components, the systems of every area and the script functions
  * oreelse.seed(), oreelse.cancel(), oreelse.restart(), oreelse.cycleQuality(),
- * oreelse.explosion(), oreelse.combust() and oreelse.spawn_critter().
+ * oreelse.explosion(), oreelse.combust(), oreelse.spawn_critter() and oreelse.corpse().
  *
  * @param world The world
  */

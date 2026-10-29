@@ -3,8 +3,8 @@
  * @brief The oreelse module: registers the components and the systems of every area.
  *
  * The systems of EcsOnUpdate run in the order the areas register them: the flow, the map, the
- * player, mining, crafting, the critters, the buildings, then placement and its preview. Those
- * that only run while playing match (OreGameState, Playing), the only pause mechanism.
+ * player, mining, crafting, the critters, their animation and corpses, the buildings, then
+ * placement and its preview. Gameplay systems match (OreGameState, Playing), the only pause.
  *
  * The look applies the render quality tier in every state, in EcsPreStore. The particles
  * register the helpers that play the effects of etc/particles and the flash of their lights.
@@ -75,6 +75,8 @@ void OreelseImport(
     ECS_META_COMPONENT(world, OreRange);
     ECS_META_COMPONENT(world, OreRadius);
     ECS_META_COMPONENT(world, OreWaveTier);
+    ECS_META_COMPONENT(world, OreGait);
+    ECS_META_COMPONENT(world, OreDeathBurst);
     ECS_META_COMPONENT(world, OreArsenal);
     ECS_META_COMPONENT(world, OreWaveMix);
     ECS_META_COMPONENT(world, OreWaveStyle);
@@ -82,6 +84,7 @@ void OreelseImport(
     ECS_META_COMPONENT(world, OreCritter);
     ECS_META_COMPONENT(world, OreTarget);
     ECS_META_COMPONENT(world, OreVelocity);
+    ECS_META_COMPONENT(world, OreCorpse);
     ECS_META_COMPONENT(world, OreHurt);
     ECS_META_COMPONENT(world, OreCritterIndex);
     ECS_TAG_DEFINE(world, OreRunScript);
@@ -97,6 +100,7 @@ void OreelseImport(
     ore_mining_import(world);
     ore_craft_import(world);
     ore_critters_import(world);
+    ore_critter_fx_import(world);
     ore_buildings_import(world);
     ore_placement_import(world);
     ore_look_import(world);

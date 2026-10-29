@@ -2,8 +2,9 @@
 // glowing spots and flanks, spines on its abdomen, four armor plates down its back with glowing
 // seams, a head with five glowing eyes, a glowing brow, mandibles, tusks and horns, and eight legs.
 // Its origin is between its feet on the ground and it faces +Z. The legs and the plates are pivots
-// with OreLimb; here they stand still. Its gameplay data: hit points, speed, damage per second,
-// attack range, body radius and what it costs a wave.
+// with OreLimb, swung by the walk (OreCritterLimbs). Its gameplay data: hit points, speed, damage
+// per second, attack range, body radius and what it costs a wave; its gait (OreGait) and the
+// effect it dies in (OreDeathBurst).
 //
 // The original turns the tusks and horns by Rx(a) * Ry(b) (its Euler order xyz); box composes
 // Ry * Rx * Rz, so their angles here are the same orientation in box's order:
@@ -29,6 +30,8 @@ prefab Behemoth {
   OreRange: {value: 3.2}
   OreRadius: {value: 2.2}
   OreWaveTier: {cost: 120, wave: 13}
+  OreGait: {step: 2.2, bob: 0.2}
+  OreDeathBurst: {burst: CombustBurst}
 
   abdomen {
     Position: {0, 2.1, -1.9}

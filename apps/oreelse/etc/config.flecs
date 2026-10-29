@@ -162,6 +162,29 @@ cfg {
   export const crowdNeighbors: i32 = 6
   export const crowdBucket: i32 = 12
 
+  // The walk of a critter (OreCritterFx): its walk cycle advances its OreGait.step radians per
+  // unit walked and stands still while it attacks; it waddles critterWaddle * sin(cycle / 2)
+  // radians about z, and its legs swing at critterAttackSwing of their swing while it attacks
+  export const critterWaddle: f32 = 0.07
+  export const critterAttackSwing: f32 = 0.35
+
+  // The death of a critter: a critter without a death burst splats splatLift above its feet.
+  // Its corpse lies corpseTime seconds, then sinks at corpseSink units a second until it is
+  // 2 r + 1 below the ground, r its radius; at most corpseCap corpses, the oldest goes first.
+  // The corpse is tipped corpseTip + U(0, corpseTipJitter) radians about x and rolled
+  // (U(0, 1) - 0.5) * corpseRoll about z before it turns to the critter's heading (the
+  // original's Euler order x y z), squashed to corpseSquash of its height and charred with the
+  // tint corpseColor
+  export const splatLift: f32 = 0.6
+  export const corpseTime: f32 = 4
+  export const corpseSink: f32 = 0.7
+  export const corpseCap: i32 = 100
+  export const corpseTip: f32 = 1.1
+  export const corpseTipJitter: f32 = 0.2
+  export const corpseRoll: f32 = 0.8
+  export const corpseSquash: f32 = 0.55
+  export const corpseColor: Tint = {40, 36, 34, 255}
+
   // The render quality tiers Low, Medium and High (OreQuality.tier), the quality.flecs of the
   // original: the resolution scale of the surfaces (2 renders at half the pixels), the shadow
   // map resolution and distance of the world view, and whether its Gtao and Bloom run

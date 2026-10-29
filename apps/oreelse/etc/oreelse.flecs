@@ -155,9 +155,10 @@ $ {
 }
 
 // The critter prefabs of the tiers the waves spawn, cheapest first: the shares of the style
-// mixes (cfg.mixedMix, cfg.swarmMix, cfg.eliteMix) and OreWaveState.spawn follow this order
+// mixes (cfg.mixedMix, cfg.swarmMix, cfg.eliteMix) and OreWaveState.spawn follow this order. A
+// critter without a death burst splats; every corpse smolders with the embers
 $ {
-  OreArsenal: {critters: [Mite, Skitter, Brute, Behemoth]}
+  OreArsenal: {critters: [Mite, Skitter, Brute, Behemoth], splat: SplatBurst, embers: CorpseEmbers}
 }
 
 // The camera starts at zoom level 0; height 0 snaps it there on the first frame

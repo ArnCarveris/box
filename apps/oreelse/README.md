@@ -22,7 +22,7 @@ bake3 --target em --local-env apps/oreelse                     # build for the b
 python3 tools/integration.py e2e oreelse_flow oreelse_look     # the end-to-end scenarios
 python3 tools/integration.py e2e oreelse_mining oreelse_particles
 python3 tools/integration.py e2e oreelse_crafting oreelse_buildings
-python3 tools/integration.py e2e oreelse_critters
+python3 tools/integration.py e2e oreelse_critters oreelse_critter_fx
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -290,7 +290,17 @@ Critters do not stack: overlapping critters push each other apart, the light one
 the heavy ones (a critter weighs its radius squared, so a behemoth shoves mites aside and barely
 moves). They stay on the map.
 
-A critter at 0 HP dies and counts as a kill of the run. A building at 0 HP is destroyed.
+A critter at 0 HP dies and counts as a kill of the run: it bursts into green flame (the combust,
+as large as the critter) and leaves its corpse. A building at 0 HP is destroyed.
+
+A corpse is no longer a critter: it does not move, attack or push, and turrets do not shoot at
+it. It lies tipped over, charred black with its eyes gone dark and embers smoldering
+on it, for 4 seconds, then sinks into the ground at 0.7 units a second and is gone. At most 100
+corpses lie on the map; the 101st takes the place of the oldest.
+
+Critters walk with a gait of their own: each step bobs the body up and down and it waddles from
+side to side, its legs swinging in turn. A critter that chews stands on the ground and only
+twitches its legs.
 
 ### Waves
 
@@ -427,9 +437,10 @@ Every task of the port follows these.
 
 The critters and projectiles are prefabs ported from the original with its names, geometry and
 colors. The critters carry their gameplay data (`OreHealth`, `OreSpeed`, `OreDamage`,
-`OreRange`, `OreRadius`, `OreWaveTier`) and the waves give their instances `OreCritter`,
-`OreTarget` and `OreVelocity`; OreWeapons gives the projectiles theirs, the effect tasks drive
-the named parts. Each faces +Z.
+`OreRange`, `OreRadius`, `OreWaveTier`), their gait (`OreGait {step, bob}`) and the effect they
+die in (`OreDeathBurst {burst}`, `CombustBurst` for all four), and the waves give their
+instances `OreCritter`, `OreTarget` and `OreVelocity`; OreWeapons gives the projectiles theirs,
+the effect tasks drive the named parts. Each faces +Z.
 
 ### Critters
 
@@ -448,6 +459,24 @@ The parts marked glowing are emissive.
 The behemoth's back plates are pivots with `OreLimb` like the legs (a swing of 0.05), each with
 a `shell`, a `ridge`, a glowing `seam`, `barb_left` and `barb_right`. Its tusks and horns are
 turned in two axes; their angles are converted to box's Euler order (`reference/PORTING.md`).
+
+The animation (`src/critter_fx.c`) reads the critters' state. `OreCritter.anim`, the walk cycle,
+starts at U(0, 2 PI) and advances by `dt * speed * step` while the critter walks (not while it
+attacks). `OreCritterFx` sets the critter's `Position.y` to `|sin(anim)| * bob` (0 while it
+attacks) and its `Rotation.z` to `sin(anim / 2) * 0.07`; `OreCritterMove` turns it along its
+heading. `OreCritterLimbs` sets the `Rotation.x` of every `OreLimb` below a critter to
+`sin(anim + phase) * swing`, times 0.35 while it attacks.
+
+A dead critter's corpse is a new entity, an instance of the critter's prefab under the critters'
+parent with `OreCorpse {age, depth}` and no `OreCritter`, so none of the critter systems, the
+spatial index or the turrets see it. It lies at the critter's place on the ground, turned by
+(1.1 + U(0, 0.2), heading, (U(0, 1) - 0.5) * 0.8) in the original's Euler order (converted to
+box's), scaled (1, 0.55, 1), with the `Tint` `cfg.corpseColor` on its root; `OreCorpseChar`
+turns off the emission of the parts it inherits from the prefab (box does not tint emission),
+and a child instance of the `CorpseEmbers` template sits r / 2 above its origin, scaled 2 r, at a
+random yaw. `OreCorpses` ages it, sinks it after `cfg.corpseTime` and deletes it at 2 r + 1
+below the ground, and deletes the oldest above `cfg.corpseCap`. `oreelse.corpse(prefab,
+position, yaw)` lays one from a script.
 
 ### Projectiles
 
@@ -524,7 +553,7 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 
 | File | Holds |
 | --- | --- |
-| `etc/oreelse.flecs` | The window, the camera, the sun, the atmosphere, the effects and the view, the render quality tier, the mining markers, the critter tiers (`OreArsenal`); includes the rest |
+| `etc/oreelse.flecs` | The window, the camera, the sun, the atmosphere, the effects and the view, the render quality tier, the mining markers, the critter tiers and their death effects (`OreArsenal`); includes the rest |
 | `etc/config.flecs` | The constants `cfg.*` |
 | `etc/resources.flecs` | The item prefabs other than the buildings, with names and recipes |
 | `etc/buildings/*.flecs` | The building prefabs, models with their item, recipe, footprint, health and power |
@@ -560,6 +589,7 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 | `src/inventory.c` | The inventory and the item components |
 | `src/mining.c` | Mining, demolishing and their tile marker |
 | `src/critters.c` | The waves, the critters' targets, attacks and moves, the crowd separation and the critter spatial index, their deaths, the astronaut's health and regen, `oreelse.spawn_critter()` |
+| `src/critter_fx.c` | The critters' walk, bob, waddle and legs, their death bursts, the corpses' char, sinking and cap, `oreelse.corpse()` |
 | `src/buildings.c` | The buildings in the tile grid, the wall connectors, demolish and salvage, destroyed buildings, the look of the ghosts |
 | `src/placement.c` | The selection, `canPlace`, the click and the drag, the pipette, the preview, `oreelse.select()`, `oreelse.pipette()`, `oreelse.placeStart()`, `oreelse.placeEnd()`, `oreelse.cancelDrag()` |
 | `src/craft.c` | The order book, the workers, `oreelse.craft_order()`, `oreelse.craft_cancel()` |
