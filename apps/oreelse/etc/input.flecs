@@ -3,9 +3,10 @@
 // awaited by the loops below, each calling the oreelse function behind it. Placing awaits the
 // press and the release of Place: the press anchors a drag, the release places it. The rocket
 // keys act on the rocket and the craft keys order rocket parts, whether or not a panel shows; the
-// minus buttons of the rocket panel uninstall parts and have no keys. Quality has no key, the
-// pause screen raises it. The key that starts the game on the title screen is any key
-// (OreTitleStart reads the keys).
+// minus buttons of the rocket panel uninstall parts and have no keys. E opens and closes the
+// inventory screen, a loop that awaits every press rather than one parked until the next key, so
+// a restart never swallows a press. Quality has no key, the pause screen raises it. The key
+// that starts the game on the title screen is any key (OreTitleStart reads the keys).
 
 using flecs.script
 using box.input
@@ -191,6 +192,18 @@ actions {
     Binding: {key: Escape}
   }
 
+  // E opens and closes the inventory screen, the Inventory (E) button of the HUD too
+  // (ActionTrigger); Tab flips the tab of its construct section while it is open
+  Inventory {
+    Action: {description: "Open or close the inventory screen"}
+    Binding: {key: E, ignore_modifiers: true}
+  }
+
+  SwitchTab {
+    Action: {description: "Switch the open inventory screen between the Buildings and Rocket tab"}
+    Binding: {key: Tab, ignore_modifiers: true}
+  }
+
   Restart {
     Action: {description: "Start a new run once the game is won or lost"}
     Binding: {key: R}
@@ -284,6 +297,21 @@ async {
   while true {
     const e = await on.pressed(actions.Craft)
     await oreelse.craft_key(e.action)
+  }
+}
+
+async {
+  while true {
+    await on.pressed(actions.Inventory)
+    await oreelse.inventory_toggle()
+  }
+}
+
+// -1 flips to the other tab
+async {
+  while true {
+    await on.pressed(actions.SwitchTab)
+    await oreelse.inventory_tab(-1)
   }
 }
 

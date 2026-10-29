@@ -655,6 +655,33 @@ ECS_STRUCT(OreItemKey, {
     ecs_entity_t item; /**< Item prefab of the key */
 });
 
+/** Tabs of the construct section of the inventory screen, the range of OreInventoryScreen.tab:
+ * 0 the buildings, 1 the rocket parts
+ */
+#define ORE_INVENTORY_TABS (2)
+
+/** The inventory screen (E), a singleton run.flecs resets: closed on the Buildings tab. It shows
+ * while open and playing. Modified when a value changes.
+ */
+ECS_STRUCT(OreInventoryScreen, {
+    bool open;   /**< The screen is open: the right button does not mine, the left one does
+                  *   not place, the pipette does nothing and the preview hides */
+    int32_t tab; /**< The tab of the construct section, 0 Buildings, 1 Rocket */
+});
+
+/** The item the info panel of the inventory screen shows, a singleton run.flecs resets. The UI
+ * says what the pointer is over (oreelse.inventory_hover()), OreItemInfoUpdate derives the item
+ * and names it in OreNeeds. Modified when a value changes.
+ */
+ECS_STRUCT(OreItemInfo, {
+    int32_t slot;        /**< Stock slot under the pointer, -1 for none (set by the UI) */
+    ecs_entity_t button; /**< Item of the slot button under the pointer, 0 for none (set by the
+                          *   UI) */
+    ecs_entity_t item;   /**< Item the info panel shows: of the slot while it holds one, else
+                          *   of the button, 0 for none and while the screen is closed */
+    bool place;          /**< item is a building in a stock slot: Ready to place, no needs */
+});
+
 /** Tiers of critters the waves spawn, the size of the arrays of OreArsenal, OreWaveMix and
  * OreWaveState.spawn: mite, skitter, brute and behemoth
  */
@@ -1516,6 +1543,43 @@ void ore_buildings_import(
  * @param world The world
  */
 void ore_placement_import(
+    ecs_world_t *world);
+
+/** Check whether the inventory screen is open while playing, which keeps the right button from
+ * mining, the left one from placing and the pipette from picking, and hides the preview.
+ *
+ * @param world The world or a stage
+ * @return Whether OreInventoryScreen is open and the game is playing
+ */
+bool ore_inventory_screen_open(
+    const ecs_world_t *world);
+
+/** Open or close the inventory screen, only while playing. Opening throws away the placement
+ * drag in flight; closing forgets what the pointer was over.
+ *
+ * @param world The world
+ * @param open Whether to open it
+ * @return Whether it opened or closed
+ */
+bool ore_inventory_screen_set(
+    ecs_world_t *world,
+    bool open);
+
+/** Cancel step: close the inventory screen.
+ *
+ * @param world The world
+ * @return Whether it was open
+ */
+bool ore_inventory_screen_cancel(
+    ecs_world_t *world);
+
+/** Register the inventory screen: OreInventoryScreen, the item of its info panel (OreItemInfo)
+ * and the script functions oreelse.inventory_toggle(), inventory_tab(tab), inventory_pick(slot),
+ * inventory_order(item, batch) and inventory_hover(slot, item, over).
+ *
+ * @param world The world
+ */
+void ore_inventory_screen_import(
     ecs_world_t *world);
 
 /** Register the rocket: the rocket state, the flight and the script functions
