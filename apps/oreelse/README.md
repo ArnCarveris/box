@@ -20,12 +20,8 @@ bake3 run apps/oreelse --local-env -- --headless --frames 10   # headless run, e
 bake3 --target em --local-env apps/oreelse                     # build for the browser
 
 python3 tools/integration.py e2e oreelse_flow oreelse_look     # the end-to-end scenarios
-<<<<<<< HEAD
-python3 tools/integration.py e2e oreelse_mining
-python3 tools/integration.py e2e oreelse_crafting
-=======
 python3 tools/integration.py e2e oreelse_mining oreelse_particles
->>>>>>> 31811ee0a04d6cf9cd3cb51a32394f7f53b57735
+python3 tools/integration.py e2e oreelse_crafting
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
