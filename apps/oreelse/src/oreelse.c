@@ -3,13 +3,8 @@
  * @brief The oreelse module: registers the components and the systems of every area.
  *
  * The systems of EcsOnUpdate run in the order the areas register them: the flow, the map, the
-<<<<<<< HEAD
- * player, mining, crafting, the critters, their animation and corpses, the buildings, then
- * placement and its preview. Gameplay systems match (OreGameState, Playing), the only pause.
-=======
- * player, mining, power, crafting, the critters, the buildings, then placement and its preview.
- * Those that only run while playing match (OreGameState, Playing), the only pause mechanism.
->>>>>>> b4908f1d686408b3b030484f07b1f84a8d6a56cd
+ * player, mining, power, crafting, the critters, their animation and corpses, the buildings,
+ * then placement and its preview. Gameplay systems match (OreGameState, Playing), the only pause.
  *
  * The look applies the render quality tier in every state, in EcsPreStore. The particles
  * register the helpers that play the effects of etc/particles and the flash of their lights.

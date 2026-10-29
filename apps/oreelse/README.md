@@ -22,11 +22,7 @@ bake3 --target em --local-env apps/oreelse                     # build for the b
 python3 tools/integration.py e2e oreelse_flow oreelse_look     # the end-to-end scenarios
 python3 tools/integration.py e2e oreelse_mining oreelse_particles
 python3 tools/integration.py e2e oreelse_crafting oreelse_buildings
-<<<<<<< HEAD
-python3 tools/integration.py e2e oreelse_critters oreelse_critter_fx
-=======
-python3 tools/integration.py e2e oreelse_power oreelse_critters
->>>>>>> b4908f1d686408b3b030484f07b1f84a8d6a56cd
+python3 tools/integration.py e2e oreelse_power oreelse_critters oreelse_critter_fx
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
