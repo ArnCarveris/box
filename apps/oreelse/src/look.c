@@ -7,9 +7,10 @@
  * The settings of every tier are cfg.quality (etc/config.flecs). The tier starts High at every
  * start of the app (oreelse.flecs) and a restart keeps it.
  *
- * The original reads a color byte as linear light, box decodes it from sRGB, so the port's colors
- * are the sRGB encoding of the original's (README.md, Colors); a color computed in script
- * computes the original's bytes and encodes them with srgb().
+ * The original lights its world in linear light, box decodes a color byte from sRGB, so the
+ * world colors of the port are the sRGB encoding of the original's (README.md, Colors); a world
+ * color computed in script (the tints of the flora) computes the original's bytes and encodes
+ * them with srgb(). The UI keeps the original's bytes.
  */
 
 #include "game.h"
@@ -152,7 +153,7 @@ static void ore_cycle_quality(
 
 /** The oreelse.srgb(v) script function: the byte value from 0 to 255 box decodes to the linear
  * light v / 255 of a color byte v of the original, not rounded: the conversion of
- * tools/linear_colors.py for the colors computed in script.
+ * tools/linear_colors.py for the world colors computed in script.
  *
  * @param ctx Call context
  * @param argc Number of arguments

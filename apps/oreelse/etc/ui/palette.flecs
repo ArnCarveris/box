@@ -5,19 +5,19 @@ using box.material
 
 palette {
   // Text and muted text
-  export const text: Rgb = {242, 244, 247}
-  export const soft: Rgb = {199, 204, 211}
+  export const text: Rgb = {226, 231, 238}
+  export const soft: Rgb = {146, 154, 166}
 
   // Accents: amber, red (warnings, a short supply), green (fine, in supply)
-  export const amber: Rgb = {248, 216, 131}
-  export const red: Rgb = {243, 165, 155}
-  export const green: Rgb = {185, 242, 200}
+  export const amber: Rgb = {240, 176, 58}
+  export const red: Rgb = {228, 96, 84}
+  export const green: Rgb = {124, 226, 148}
 
   // Luminite and the other ores
-  export const luminite: Rgb = {165, 248, 238}
-  export const ore: Rgb = {246, 216, 171}
+  export const luminite: Rgb = {96, 240, 218}
+  export const ore: Rgb = {236, 176, 104}
 
   // The empty part of a bar and the lines between the groups of a panel
-  export const well: Rgb = {64, 66, 73}
-  export const divider: Rgb = {135, 141, 150}
+  export const well: Rgb = {13, 14, 17}
+  export const divider: Rgb = {62, 68, 78}
 }
