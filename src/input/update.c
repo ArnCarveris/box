@@ -745,7 +745,7 @@ static void box_input_derive(
     }
 }
 
-/** Emit the script events of the frame through the router or flecs.script.event.
+/** Emit the script events of the frame through the router or flecs.script.input.
  *
  * @param world The world
  * @param dev The device state

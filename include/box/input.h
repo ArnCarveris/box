@@ -3,7 +3,7 @@
  * @brief Keyboard and mouse device state, the synthetic input queue and the platform hook.
  *
  * A platform backend pushes device events and agents queue synthetic ones; the InputUpdate
- * system applies both to the Input singleton and emits them through flecs.script.event.
+ * system applies both to the Input singleton and emits them through flecs.script.input.
  * Binding entities map keys to Action entities, which ActionUpdate resolves every frame.
  */
 

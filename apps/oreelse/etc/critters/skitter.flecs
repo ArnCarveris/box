@@ -1,7 +1,8 @@
-// The skitter, the Skitter prefab of the original: a purple chitin body of boxes with two
-// glowing amber eyes, mandibles, a glowing stinger raised over its abdomen and six legs. Its
-// origin is between its feet on the ground and it faces +Z. The legs are pivots with OreLimb
-// at the hips; here they stand still. OreCritters gives the prefab its gameplay data.
+// The skitter, the Skitter prefab of the original: a purple chitin body of boxes with two glowing
+// amber eyes, mandibles, a glowing stinger raised over its abdomen and six legs. Its origin is
+// between its feet on the ground and it faces +Z. The legs are pivots with OreLimb at the hips;
+// here they stand still. Its gameplay data: hit points, speed, damage per second, attack range,
+// body radius and what it costs a wave.
 
 using flecs.script.math
 using box.transform
@@ -15,6 +16,13 @@ const chitinLimb: Rgb = {46, 34, 68}
 const skitterEye: Rgb = {255, 196, 72}
 
 prefab Skitter {
+  OreHealth: {value: 50, max: 50}
+  OreSpeed: {value: 5.2}
+  OreDamage: {value: 8}
+  OreRange: {value: 1.4}
+  OreRadius: {value: 0.56}
+  OreWaveTier: {cost: 3, wave: 4}
+
   abdomen {
     Position: {0, 0.46, -0.36}
     Rotation: {0.18, 0, 0}

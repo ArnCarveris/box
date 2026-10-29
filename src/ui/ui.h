@@ -176,7 +176,7 @@ void box_ui_focus_apply(
     ecs_entity_t e,
     bool visible);
 
-/** Check whether the flecs focus can be used: flecs.script.event is imported and the world is
+/** Check whether the flecs focus can be used: flecs.script.input is imported and the world is
  * not torn down.
  *
  * @param world The world or a stage
