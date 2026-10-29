@@ -364,13 +364,8 @@ static void box_pick_send(
     evt.target = pick->target ? pick->target : st->screen;
     box_pick_local(world, evt.target, pick, &evt);
     st->sending = pick;
-<<<<<<< HEAD
-    st->sent = evt;
-    st->has_sent = true;
-=======
     st->event = evt;
     st->has_event = true;
->>>>>>> 3a92b43bc9d6429c4033f0274bc336d5ed367d2a
     ecs_script_mouse_event(world, &evt);
     st->sending = NULL;
 

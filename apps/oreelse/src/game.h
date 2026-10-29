@@ -6,11 +6,7 @@
  * and the entities of a run.
  *
  * The systems of each area (flow.c, map.c, player.c, ..., power.c, critters.c, critter_fx.c,
-<<<<<<< HEAD
- * buildings.c, drones.c, placement.c, rocket.c, look.c, particles.c) play the game.
-=======
- * buildings.c, flora.c, placement.c, rocket.c, look.c, particles.c) play the game.
->>>>>>> 3a92b43bc9d6429c4033f0274bc336d5ed367d2a
+ * buildings.c, drones.c, flora.c, placement.c, rocket.c, look.c, particles.c) play the game.
  */
 
 #ifndef OREELSE_GAME_H
@@ -1796,20 +1792,19 @@ void ore_buildings_import(
 void ore_building_fx_import(
     ecs_world_t *world);
 
-<<<<<<< HEAD
 /** Register the repair drones: the drones a placed drone pad parks and the system that flies
  * them to the damaged buildings and welds them, paid from the inventory.
  *
  * @param world The world
  */
 void ore_drones_import(
-=======
+    ecs_world_t *world);
+
 /** Register the flora: the plants that register in the tile grid.
  *
  * @param world The world
  */
 void ore_flora_import(
->>>>>>> 3a92b43bc9d6429c4033f0274bc336d5ed367d2a
     ecs_world_t *world);
 
 /** Register placement: the selection, the click and drag placement, the preview and the script

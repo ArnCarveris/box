@@ -24,11 +24,7 @@ python3 tools/integration.py e2e oreelse_mining oreelse_particles
 python3 tools/integration.py e2e oreelse_crafting oreelse_buildings oreelse_rocket
 python3 tools/integration.py e2e oreelse_power oreelse_critters oreelse_critter_fx
 python3 tools/integration.py e2e oreelse_player_fx oreelse_hud oreelse_building_animation
-<<<<<<< HEAD
-python3 tools/integration.py e2e oreelse_drones
-=======
-python3 tools/integration.py e2e oreelse_weapons oreelse_flora
->>>>>>> 3a92b43bc9d6429c4033f0274bc336d5ed367d2a
+python3 tools/integration.py e2e oreelse_weapons oreelse_flora oreelse_drones
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 

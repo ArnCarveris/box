@@ -189,13 +189,8 @@ struct box_pick_state_t {
     box_pick_hold_t holds[BOX_PICK_BUTTONS]; /**< Hold trigger of each button */
     box_pick_hook_t hook;   /**< Follows the delivered events */
     const box_pick_t *sending; /**< Pick of the event being delivered, NULL between events */
-<<<<<<< HEAD
-    EcsScriptMouseEvent sent; /**< Last pointer event delivered to flecs, valid with has_sent */
-    bool has_sent;          /**< A pointer event was delivered to flecs */
-=======
     EcsScriptMouseEvent event; /**< Pointer event being delivered, else the last one delivered */
     bool has_event;         /**< A pointer event was delivered, so event is set */
->>>>>>> 3a92b43bc9d6429c4033f0274bc336d5ed367d2a
 };
 
 /** Singleton that owns the state of the module */
