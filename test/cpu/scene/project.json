@@ -28,8 +28,6 @@
                     "static_to_dynamic",
                     "remove_shape",
                     "delete_entity",
-                    "delete_disabled_entity",
-                    "remove_shape_disabled",
                     "delete_parent",
                     "prefab_not_indexed",
                     "reparent_across_scenes",
@@ -74,6 +72,14 @@
                     "hidden_from_shape_queries",
                     "follow_bounds_and_moves",
                     "delete_disabled_element"
+                ]
+            },
+            {
+                "id": "SpatialDisabled",
+                "testcases": [
+                    "delete_disabled_entity",
+                    "remove_shape_disabled",
+                    "disabled_not_indexed"
                 ]
             },
             {

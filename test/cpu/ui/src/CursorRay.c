@@ -247,6 +247,80 @@ void CursorRay_ground_behind_shape(void) {
     ecs_fini(world);
 }
 
+void CursorRay_disabled_shape_not_picked(void) {
+    // ui/picking
+    ecs_world_t *world = ray_world(RAY_GROUND);
+    ecs_entity_t crate = ecs_lookup(world, "crate");
+    ray_cursor(world, 640, 360);
+    const PickStatus *status = ecs_singleton_get(world, PickStatus);
+    test_uint(status->hit, crate);
+
+    ecs_enable(world, crate, false);
+    ray_cursor(world, 641, 360);
+    ray_cursor(world, 640, 360);
+    status = ecs_singleton_get(world, PickStatus);
+    test_assert(status->hit != crate);
+
+    ecs_enable(world, crate, true);
+    ray_cursor(world, 641, 360);
+    ray_cursor(world, 640, 360);
+    status = ecs_singleton_get(world, PickStatus);
+    test_uint(status->hit, crate);
+
+    ecs_fini(world);
+}
+
+void CursorRay_deleted_disabled_shape(void) {
+    // ui/picking
+    ecs_world_t *world = ray_world(RAY_GROUND);
+    ecs_entity_t crate = ecs_lookup(world, "crate");
+    ray_cursor(world, 640, 360);
+    test_uint(ecs_singleton_get(world, PickStatus)->hit, crate);
+
+    ecs_enable(world, crate, false);
+    ecs_progress(world, 0);
+    ecs_delete(world, crate);
+    ray_cursor(world, 641, 360);
+    ray_cursor(world, 640, 360);
+    const PickStatus *status = ecs_singleton_get(world, PickStatus);
+    test_assert(status->hit != crate);
+
+    ecs_fini(world);
+}
+
+void CursorRay_deleted_disabled_element(void) {
+    // ui/picking
+    ecs_world_t *world = ray_world(RAY_GROUND
+        "hud {\n"
+        "  Scene: {}\n"
+        "  camera {\n"
+        "    Position: {0, 0, 100}\n"
+        "    Camera: {ortho: true, ortho_scale: 1}\n"
+        "  }\n"
+        "  panel {\n"
+        "    Position: {0, 0, 0}\n"
+        "    Rect: {300, 200}\n"
+        "    InputBlocker\n"
+        "  }\n"
+        "}\n"
+        "hud_view {\n"
+        "  View: {camera: hud.camera}\n"
+        "}\n");
+    ecs_entity_t panel = ecs_lookup(world, "hud.panel");
+    ray_cursor(world, 640, 360);
+    test_uint(ecs_singleton_get(world, PickStatus)->hit, panel);
+
+    ecs_enable(world, panel, false);
+    ecs_progress(world, 0);
+    ecs_delete(world, panel);
+    ray_cursor(world, 641, 360);
+    ray_cursor(world, 640, 360);
+    const PickStatus *status = ecs_singleton_get(world, PickStatus);
+    test_assert(status->hit != panel);
+
+    ecs_fini(world);
+}
+
 void CursorRay_ui_view_over(void) {
     // ui/picking
     ecs_world_t *world = ray_world(RAY_GROUND

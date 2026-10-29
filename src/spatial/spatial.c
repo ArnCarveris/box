@@ -404,7 +404,7 @@ static void box_spatial_refresh(
     vec3 l_min, l_max;
     bool ui = false;
     bool indexed = box_spatial_local(world, cache, e, l_min, l_max, &ui) &&
-        !ecs_has_id(world, e, EcsPrefab);
+        !ecs_has_id(world, e, EcsPrefab) && !ecs_has_id(world, e, EcsDisabled);
     if (indexed) {
         box_spatial_world_bounds(l_min, l_max, t, min, max);
         scene = rescope ? box_render_scene_of(world, e) : p->scene;
@@ -650,7 +650,7 @@ done:
     return;
 }
 
-/** Register an observer of the index.
+/** Register an observer of the index, which also matches disabled entities.
  *
  * @param world The world
  * @param index The index
@@ -669,6 +669,7 @@ static void box_spatial_observer(
     desc.callback = callback;
     desc.ctx = index;
     desc.ctx_free = box_spatial_release;
+    desc.query.flags |= EcsQueryMatchDisabled;
     index->refs ++;
     ecs_observer_init(world, &desc);
 }
@@ -692,6 +693,10 @@ static void box_spatial_transform_observers(
 
 /** Register the observers that collect changed entities and changed subtrees.
  *
+ * A disabled entity is taken out of the index, like a prefab, and indexed again once enabled,
+ * so no query or ray sees it. The observers match disabled entities, so deleting one or
+ * removing its shape still takes it out.
+ *
  * @param world The world
  * @param index The index
  */
@@ -701,7 +706,10 @@ static void box_spatial_observers(
 {
     box_spatial_observer(world, index, "SpatialOnPrefab", (ecs_observer_desc_t){
         .query.terms = {{ .id = EcsPrefab }},
-        .query.flags = EcsQueryMatchPrefab | EcsQueryMatchDisabled,
+        .query.flags = EcsQueryMatchPrefab,
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxSpatialOnChange);
+    box_spatial_observer(world, index, "SpatialOnDisabled", (ecs_observer_desc_t){
+        .query.terms = {{ .id = EcsDisabled }},
         .events = { EcsOnAdd, EcsOnRemove } }, BoxSpatialOnChange);
     box_spatial_observer(world, index, "SpatialOnShape", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(ShapeMesh) }},
