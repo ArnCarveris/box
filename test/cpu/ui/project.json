@@ -10,7 +10,8 @@
     "lang.c": {
         "include": [
             "../../../src/render",
-            "../../../src/text"
+            "../../../src/text",
+            "../../../src/picking"
         ]
     },
     "test": {
@@ -188,7 +189,9 @@
                     "highest_order_first",
                     "negative_order_below",
                     "runtime_change",
-                    "console_order_over_editor"
+                    "console_order_over_editor",
+                    "many_views_keep_top_created_first",
+                    "many_views_keep_top_created_last"
                 ]
             },
             {

@@ -14,7 +14,8 @@
 /** Deepest render-to-texture nesting a pick follows */
 #define BOX_PICK_DEPTH_MAX (4)
 
-/** Most views of one surface a pick visits */
+/** Most views of one surface a pick visits: the first ones in pick order, the views that render
+ * last */
 #define BOX_PICK_VIEW_MAX (64)
 
 /** Most entities an event bubbles through */
@@ -176,6 +177,7 @@ struct box_pick_state_t {
     ecs_vec_t emits;        /**< box_input_emit_t the router queued this frame */
     ecs_vec_t candidates;   /**< box_pick_candidate_t of the ray being cast */
     ecs_vec_t waiters;      /**< box_pick_waiter_t of on.scroll */
+    ecs_vec_t roots;        /**< ecs_entity_t, view roots of the surfaces, reused by each pick */
     ecs_map_t meshes;       /**< Mesh handle to the box_pick_mesh_t of a mesh with many triangles */
     ecs_entity_t screen;    /**< Target of the events no view handles */
     ecs_entity_t hovered;   /**< Entity that carries Hovered */

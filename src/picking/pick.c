@@ -1067,12 +1067,37 @@ static int box_pick_view_compare(
     return box_view_compare(y->order, y->view, x->order, x->view);
 }
 
+/** Find the view that comes last in pick order: the first one rendered.
+ *
+ * @param views The views
+ * @param count Number of views, at least one
+ * @return Index of the view
+ */
+static int32_t box_pick_views_last(
+    const box_pick_view_order_t *views,
+    int32_t count)
+{
+    int32_t i, result = 0;
+    for (i = 1; i < count; i ++) {
+        if (box_pick_view_compare(&views[i], &views[result]) > 0) {
+            result = i;
+        }
+    }
+
+    return result;
+}
+
 /** Collect the views of a surface, the last rendered first.
+ *
+ * With more than BOX_PICK_VIEW_MAX views it keeps the first ones in pick order, so the views
+ * left out are always the lowest in pick order whatever the order of the tables. The view roots
+ * of the surfaces have no cap: a view under the root of any surface is claimed, however many
+ * surfaces there are.
  *
  * @param world The world
  * @param st The module state
  * @param s The surface
- * @param out Receives the views
+ * @param out Receives the views, BOX_PICK_VIEW_MAX entries
  * @return Number of views
  */
 static int32_t box_pick_views(
@@ -1081,33 +1106,49 @@ static int32_t box_pick_views(
     const box_pick_surface_t *s,
     ecs_entity_t *out)
 {
-    ecs_entity_t roots[BOX_PICK_VIEW_MAX];
     box_pick_view_order_t views[BOX_PICK_VIEW_MAX];
-    int32_t i, k, root_count = 0, count = 0;
-    ecs_iter_t it = ecs_query_iter(world, st->surfaces);
-    while (ecs_query_next(&it)) {
-        const Surface *surface = ecs_field(&it, Surface, 0);
-        for (i = 0; i < it.count; i ++) {
-            if (surface[i].view_root && root_count < BOX_PICK_VIEW_MAX) {
-                roots[root_count ++] = surface[i].view_root;
+    ecs_entity_t *roots;
+    int32_t i, k, root_count, count = 0, last = 0;
+    ecs_iter_t it;
+    ecs_vec_clear(&st->roots);
+    if (!s->view_root) {
+        it = ecs_query_iter(world, st->surfaces);
+        while (ecs_query_next(&it)) {
+            const Surface *surface = ecs_field(&it, Surface, 0);
+            for (i = 0; i < it.count; i ++) {
+                if (surface[i].view_root) {
+                    *ecs_vec_append_t(NULL, &st->roots, ecs_entity_t) = surface[i].view_root;
+                }
             }
         }
     }
 
+    roots = ecs_vec_first_t(&st->roots, ecs_entity_t);
+    root_count = ecs_vec_count(&st->roots);
     it = ecs_query_iter(world, st->views);
     while (ecs_query_next(&it)) {
         const View *view = ecs_field(&it, View, 0);
-        for (i = 0; i < it.count && count < BOX_PICK_VIEW_MAX; i ++) {
+        for (i = 0; i < it.count; i ++) {
             ecs_entity_t parent = ecs_get_parent(world, it.entities[i]);
+            box_pick_view_order_t candidate = { it.entities[i], view[i].order };
             bool claimed = false;
-            for (k = 0; k < root_count && !s->view_root; k ++) {
-                claimed |= parent && parent == roots[k];
+            for (k = 0; k < root_count && !claimed; k ++) {
+                claimed = parent && parent == roots[k];
             }
 
-            if (s->view_root ? parent == s->view_root : !claimed) {
-                views[count].view = it.entities[i];
-                views[count].order = view[i].order;
-                count ++;
+            if (s->view_root ? parent != s->view_root : claimed) {
+                continue;
+            }
+
+            if (count < BOX_PICK_VIEW_MAX) {
+                views[count ++] = candidate;
+                if (count == BOX_PICK_VIEW_MAX) {
+                    last = box_pick_views_last(views, count);
+                }
+            } else if (box_pick_view_compare(&candidate, &views[last]) < 0) {
+                /* Full: the candidate comes before the last view in pick order, which drops */
+                views[last] = candidate;
+                last = box_pick_views_last(views, count);
             }
         }
     }

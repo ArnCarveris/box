@@ -47,6 +47,7 @@ static void box_pick_state_dtor(
         ecs_vec_fini_t(NULL, &st->emits, box_input_emit_t);
         ecs_vec_fini_t(NULL, &st->candidates, box_pick_candidate_t);
         ecs_vec_fini_t(NULL, &st->waiters, box_pick_waiter_t);
+        ecs_vec_fini_t(NULL, &st->roots, ecs_entity_t);
         box_pick_meshes_fini(st);
         ecs_os_free(st);
     }
@@ -652,6 +653,7 @@ void BoxPickingImport(
     ecs_vec_init_t(NULL, &st->emits, box_input_emit_t, 0);
     ecs_vec_init_t(NULL, &st->candidates, box_pick_candidate_t, 0);
     ecs_vec_init_t(NULL, &st->waiters, box_pick_waiter_t, 0);
+    ecs_vec_init_t(NULL, &st->roots, ecs_entity_t, 0);
     ecs_map_init(&st->meshes, NULL);
     box_pick_queries_init(world, st);
     box_pick_triggers_import(world, st);

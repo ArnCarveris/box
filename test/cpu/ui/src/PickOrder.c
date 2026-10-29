@@ -6,6 +6,7 @@
 
 #include <box.h>
 #include <bake_test.h>
+#include "picking.h"
 
 /** Modules of the scenes */
 #define ORDER_PRELUDE \
@@ -156,4 +157,66 @@ void PickOrder_console_order_over_editor(void) {
     order_set(world, "b_view", BOX_VIEW_ORDER_EDITOR);
     test_uint(order_pick(world), order_e(world, "a.button"));
     ecs_fini(world);
+}
+
+/** Views over b besides the console view over a, more than BOX_PICK_VIEW_MAX */
+#define ORDER_MANY (BOX_PICK_VIEW_MAX + 6)
+
+/** Create many views of b and one view of a at BOX_VIEW_ORDER_CONSOLE, check that the console
+ * view is the first input view and gets the pick where it overlaps the others.
+ *
+ * @param console_last Whether the console view is created after the others
+ */
+static void order_many(
+    bool console_last)
+{
+    ecs_strbuf_t buf = ECS_STRBUF_INIT;
+    ecs_strbuf_appendstr(&buf, ORDER_TWO);
+    if (!console_last) {
+        ecs_strbuf_append(&buf,
+            "console { View: {camera: a.camera, order: %d} }\n", BOX_VIEW_ORDER_CONSOLE);
+    }
+
+    for (int i = 0; i < ORDER_MANY; i ++) {
+        ecs_strbuf_append(&buf, "v%d { View: {camera: b.camera} }\n", i);
+    }
+
+    if (console_last) {
+        ecs_strbuf_append(&buf,
+            "console { View: {camera: a.camera, order: %d} }\n", BOX_VIEW_ORDER_CONSOLE);
+    }
+
+    char *scene = ecs_strbuf_get(&buf);
+    ecs_world_t *world = order_world(scene);
+    ecs_os_free(scene);
+    ecs_entity_t console = order_e(world, "console");
+    test_assert(console_last ? console > order_e(world, "v0") : console < order_e(world, "v0"));
+
+    const PickingState *ps = ecs_singleton_get(world, PickingState);
+    test_assert(ps != NULL);
+    ecs_entity_t views[BOX_PICK_VIEW_MAX];
+    int32_t count = box_pick_input_views(world, ps->state, views);
+    test_int(count, BOX_PICK_VIEW_MAX);
+    test_uint(views[0], console);
+
+    /* The others tie on order 0: the last created come first */
+    char name[16];
+    ecs_os_snprintf(name, sizeof(name), "v%d", ORDER_MANY - 1);
+    test_uint(views[1], order_e(world, name));
+    ecs_os_snprintf(name, sizeof(name), "v%d", ORDER_MANY - BOX_PICK_VIEW_MAX + 1);
+    test_uint(views[BOX_PICK_VIEW_MAX - 1], order_e(world, name));
+
+    test_uint(order_pick(world), order_e(world, "a.button"));
+    test_uint(ecs_singleton_get(world, PickStatus)->view, console);
+    ecs_fini(world);
+}
+
+void PickOrder_many_views_keep_top_created_first(void) {
+    // ui/picking
+    order_many(false);
+}
+
+void PickOrder_many_views_keep_top_created_last(void) {
+    // ui/picking
+    order_many(true);
 }
