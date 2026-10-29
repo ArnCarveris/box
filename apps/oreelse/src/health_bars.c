@@ -4,10 +4,9 @@
  * instance per damaged building or astronaut, its fraction in step with the health, and the view
  * of the bars shown while playing.
  *
- * box.projection anchors a bar to the model box (OreModelBox) of its building or astronaut and
- * sizes it every frame, so the astronaut's bar follows it as it moves; the game only creates,
- * updates and deletes bars when the health changes, and (OreBarOf, owner) deletes a bar with its
- * building or astronaut.
+ * box.projection anchors a bar to the model box (OreModelBox) of its owner and sizes it every
+ * frame, so the astronaut's bar follows it as it moves; the game only creates, updates and deletes
+ * bars when the health changes, and (OreBarOf, owner) deletes a bar with its owner.
  */
 
 #include "game.h"
