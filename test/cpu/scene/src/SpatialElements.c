@@ -80,3 +80,27 @@ void SpatialElements_follow_bounds_and_moves(void) {
 
     ecs_fini(world);
 }
+
+void SpatialElements_delete_disabled_element(void) {
+    // spatial_perf/picking_cost
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t panel = ecs_new(world);
+    ecs_set(world, panel, Position, {0, 0, 0});
+    ecs_set(world, panel, LayoutBounds, {4, 2});
+    ecs_progress(world, 0);
+
+    box_spatial_hit_t hit = {0};
+    box_spatial_ray_t ray = { .origin = {0, 0, 10}, .dir = {0, 0, -1}, .ui = true };
+    test_assert(box_spatial_ray(world, &ray, &hit));
+    test_uint(hit.entity, panel);
+
+    ecs_enable(world, panel, false);
+    ecs_progress(world, 0);
+    ecs_delete(world, panel);
+    ecs_progress(world, 0);
+
+    test_assert(!box_spatial_ray(world, &ray, &hit));
+
+    ecs_fini(world);
+}
