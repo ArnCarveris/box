@@ -424,9 +424,8 @@ ECS_STRUCT(OreWorker, {
     float speed; /**< Speed of its crafter at multiplier 1 */
 });
 
-/** The drones of a drone pad, on its prefab and inherited: placed, the pad gets count
- * instances of drone as its children, docked over its bays. Drone b docks at the angle
- * (b + 0.5) * 2 PI / count, radius from the pad's center and dock above the ground.
+/** The drones of a drone pad, on its prefab and inherited: placed, the pad gets count drones as
+ * its children, drone b docked at the angle (b + 0.5) * 2 PI / count, radius from its center.
  */
 ECS_STRUCT(OreDroneBay, {
     ecs_entity_t drone; /**< Prefab of the drones, RepairDrone */
@@ -441,8 +440,7 @@ ECS_ENUM(OreDroneState, {
     OreDroneStateDocked,    /**< Parked over its bay, looking for a target every cfg.droneScan */
     OreDroneStateFlying,    /**< Flying straight to cfg.droneCruise above its target */
     OreDroneStateRepairing, /**< Within cfg.droneArrive of its target, welding it */
-    OreDroneStateReturning  /**< Flying back to its bay, looking for a target every
-                             *   cfg.droneScan */
+    OreDroneStateReturning  /**< Flying back to its bay, looking for a target every cfg.droneScan */
 });
 
 /** A repair drone of a drone pad, on the instance: a child of the pad, so it goes with it. Its
@@ -450,13 +448,12 @@ ECS_ENUM(OreDroneState, {
  */
 ECS_STRUCT(OreDrone, {
     ecs_entity_t pad;    /**< The pad, its parent */
-    ecs_entity_t target; /**< Building it repairs or flies to, 0 for none; never the target of
-                          *   another drone of its pad */
+    ecs_entity_t target; /**< Building it repairs, 0 for none; no other drone of its pad's */
     OreDroneState state; /**< What it does */
     int32_t bay;         /**< Its bay, 0 to OreDroneBay.count - 1 */
     float scan;          /**< Seconds to the next look for a target while docked or returning */
-    float credit;        /**< Hit points repaired not yet paid for, below cfg.droneHpPerIron; it
-                          *   carries over between targets */
+    float credit;        /**< Hit points welded not yet paid for, kept between targets */
+    float phase;         /**< Phase of the bob of the weld in radians */
 });
 
 /** The bulb of a status lamp, which the Light template (etc/props/light.flecs) sets with the
@@ -771,6 +768,9 @@ ECS_STRUCT(OreRocketKit, {
     ecs_entity_t cargo;        /**< The rocket cargo bay item */
     ecs_entity_t life_support; /**< The rocket life support item */
     ecs_entity_t luminite;     /**< The Luminite a rocket ships */
+    ecs_entity_t flame;        /**< FlameBurst, under the engines through the flight */
+    ecs_entity_t smoke;        /**< SmokeBurst, played with every FlameBurst */
+    ecs_entity_t clamp;        /**< PadClamp, the template of the clamps of the pad */
 });
 
 /** Which part of a rocket an action applies to, a member per part */

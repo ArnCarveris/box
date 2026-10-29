@@ -6,9 +6,26 @@
  *
  * OreRocketState holds every value the UI shows, validity included; launch.flecs keeps the
  * Rocket model in step with it, nothing here writes the model's props.
+ *
+ * The look of the flight (OreRocketFx) is read from the rocket state. The astronaut boarding
+ * a crewed rocket is hidden by the launch itself (ore_rocket_board), and only there.
  */
 
 #include "game.h"
+#include <math.h>
+
+/** Marks the rocket entity of launch.flecs, the Rocket model: OreRocketFx shakes it about its
+ * Rotation during the ignition. It comes with a Rotation.
+ */
+static ECS_TAG_DECLARE(OreRocketModel);
+
+/** Clamps of the rocket pad, the size of ore_rocket_clamp_names */
+#define ORE_ROCKET_CLAMPS (4)
+
+/** Names of the clamps of the rocket pad (RocketPad), PadClamp instances */
+static const char *ore_rocket_clamp_names[ORE_ROCKET_CLAMPS] = {
+    "clamp_a", "clamp_b", "clamp_c", "clamp_d"
+};
 
 /** The constants of the rocket, read from cfg once per run of a system or a function */
 typedef struct ore_rocket_cfg_t {
@@ -591,6 +608,128 @@ static void OreRocketIdle(
     ore_rocket_commit(it->stage, rocket, &before);
 }
 
+/** Get the seconds of the flight: the ignition time elapsed, then the ignition time plus the
+ * seconds of the ascent, which climbs from speed 0 at cfg.launchAccel.
+ *
+ * @param rocket The rocket
+ * @param ignition Seconds of the ignition, cfg.ignitionTime
+ * @param accel Acceleration of the ascent, cfg.launchAccel
+ * @return The seconds, 0 on the pad
+ */
+static float ore_rocket_flight_time(
+    const OreRocketState *rocket,
+    float ignition,
+    float accel)
+{
+    float result = 0;
+    if (rocket->phase == OreLaunchPhaseIgnition) {
+        result = ignition - rocket->timer;
+    } else if (rocket->phase == OreLaunchPhaseAscent) {
+        result = ignition + (accel > 0 ? rocket->speed / accel : 0);
+    }
+
+    return result;
+}
+
+/** Set the tilt of the clamps of a pad, the tilt prop of their PadClamp template, when it
+ * differs; the template rebuilds them.
+ *
+ * @param world The world
+ * @param stage The stage of the system
+ * @param pad The rocket pad, 0 for none
+ * @param tmpl The PadClamp template
+ * @param tilt The tilt
+ */
+static void ore_rocket_clamps(
+    const ecs_world_t *world,
+    ecs_world_t *stage,
+    ecs_entity_t pad,
+    ecs_entity_t tmpl,
+    float tilt)
+{
+    const ecs_type_info_t *ti = tmpl ? ecs_get_type_info(world, tmpl) : NULL;
+    ecs_meta_cursor_t cur;
+    ecs_value_t value;
+    ecs_entity_t clamp;
+    const void *ptr;
+    int32_t i;
+    if (!ti || !pad || !ecs_is_alive(world, pad)) {
+        goto done;
+    }
+
+    for (i = 0; i < ORE_ROCKET_CLAMPS; i ++) {
+        clamp = ecs_lookup_child(world, pad, ore_rocket_clamp_names[i]);
+        ptr = clamp ? ecs_get_id(world, clamp, tmpl) : NULL;
+        if (!ptr) {
+            continue;
+        }
+
+        value = ecs_value_init(world, tmpl, ptr);
+        cur = ecs_meta_cursor(world, tmpl, value.ptr);
+        ecs_meta_push(&cur);
+        if (!ecs_meta_member(&cur, "tilt") && (float)ecs_meta_get_float(&cur) != tilt) {
+            ecs_meta_set_float(&cur, tilt);
+            ecs_set_id(stage, clamp, tmpl, (size_t)ti->size, value.ptr);
+        }
+
+        ecs_value_fini(world, &value);
+    }
+
+done:
+    return;
+}
+
+/** The look of the flight, the original's oreRocketFly and oreRocketFx, from the rocket state.
+ *
+ * During the ignition the model shakes, turned by (sin(t * 47), 0, cos(t * 39)) times
+ * cfg.launchShake at the play time t, and stands straight otherwise. The clamps of the pad are
+ * tilted by cfg.clampTilt in flight and stand at 0 on the pad.
+ *
+ * Through the ignition and the ascent a FlameBurst and a SmokeBurst play at the bottom of the
+ * rocket on the first frame and every cfg.launchFxInterval seconds of the flight after.
+ *
+ * @param it Iterator over the rocket model with its Rotation, with OreRocketState, OreRocketKit
+ * and OreClock, while playing
+ */
+static void OreRocketFx(
+    ecs_iter_t *it)
+{
+    Rotation *rot = ecs_field(it, Rotation, 1);
+    const OreRocketState *rocket = ecs_field(it, OreRocketState, 2);
+    const OreRocketKit *kit = ecs_field(it, OreRocketKit, 3);
+    const OreClock *clock = ecs_field(it, OreClock, 4);
+    float shake = ORE_CFG(it->world, "launchShake");
+    float interval = ORE_CFG(it->world, "launchFxInterval");
+    float ignition = ORE_CFG(it->world, "ignitionTime");
+    float accel = ORE_CFG(it->world, "launchAccel");
+    bool flying = rocket->phase != OreLaunchPhaseIdle;
+    float t = ore_rocket_flight_time(rocket, ignition, accel), before = t - it->delta_time;
+    vec3 at = { rocket->x, rocket->y, rocket->z };
+    Rotation want = { 0, 0, 0 };
+    int32_t i;
+    if (rocket->phase == OreLaunchPhaseIgnition) {
+        want.x = sinf(clock->elapsed * 47.0f) * shake;
+        want.z = cosf(clock->elapsed * 39.0f) * shake;
+    }
+
+    for (i = 0; i < it->count; i ++) {
+        if (rot[i].x != want.x || rot[i].y != want.y || rot[i].z != want.z) {
+            rot[i] = want;
+            ecs_modified(it->stage, it->entities[i], Rotation);
+        }
+    }
+
+    if (flying && interval > 0 &&
+        (before <= 0 || floorf(before / interval) != floorf(t / interval)))
+    {
+        ore_burst(it->stage, kit->flame, at, 1.0f);
+        ore_burst(it->stage, kit->smoke, at, 1.0f);
+    }
+
+    ore_rocket_clamps(it->world, it->stage, rocket->pad, kit->clamp,
+        flying ? ORE_CFG(it->world, "clampTilt") : 0.0f);
+}
+
 /** Install a part on the rocket with a key, see ore_rocket_install.
  *
  * @param ctx Call context
@@ -708,7 +847,9 @@ void ore_rocket_import(
     ecs_query_t *pads;
     int32_t i;
 
+    ECS_TAG_DEFINE(world, OreRocketModel);
     ecs_add_pair(world, ecs_id(OreLaunchPad), EcsOnInstantiate, EcsInherit);
+    ecs_add_pair(world, OreRocketModel, EcsWith, ecs_id(Rotation));
     ecs_singleton_ensure(world, OreRocketState);
 
     pads = ecs_query(world, {
@@ -731,6 +872,21 @@ void ore_rocket_import(
         },
         .callback = OreRocketUpdate,
         .ctx = pads
+    });
+
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "OreRocketFx" }),
+        .phase = EcsOnUpdate,
+        .query.terms = {
+            { .id = OreRocketModel, .src.id = EcsSelf },
+            { .id = ecs_id(Rotation), .src.id = EcsSelf, .inout = EcsInOut },
+            { .id = ecs_id(OreRocketState), .src.id = ecs_id(OreRocketState),
+              .inout = EcsIn },
+            { .id = ecs_id(OreRocketKit), .src.id = ecs_id(OreRocketKit), .inout = EcsIn },
+            { .id = ecs_id(OreClock), .src.id = ecs_id(OreClock), .inout = EcsIn },
+            { .id = playing, .src.id = state }
+        },
+        .callback = OreRocketFx
     });
 
     ecs_system(world, {

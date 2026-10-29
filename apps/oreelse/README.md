@@ -25,6 +25,7 @@ python3 tools/integration.py e2e oreelse_crafting oreelse_buildings oreelse_rock
 python3 tools/integration.py e2e oreelse_power oreelse_critters oreelse_critter_fx
 python3 tools/integration.py e2e oreelse_player_fx oreelse_hud oreelse_building_animation
 python3 tools/integration.py e2e oreelse_weapons oreelse_flora oreelse_drones
+python3 tools/integration.py e2e oreelse_drone_rocket_fx
 python3 tools/integration.py e2e oreelse_inventory_screen oreelse_health_bars
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
@@ -394,6 +395,13 @@ reaches 10, 1 Iron leaves the inventory; the rest carries over to its next targe
 
 Drones cannot be hurt and critters never go for them.
 
+A drone turns toward where it flies at most 7 radians a second. Its four rotors spin up when it
+takes off, to 34 radians a second in 0.4 seconds (two of them the other way), keep spinning until
+it docks and then slow to a stop in 0.4 seconds; a blackout freezes them where they are, as it
+does the parts of the other buildings. While it welds it bobs 0.07 up and down about its height
+(3.2 radians of its phase a second) and a stream of white-blue sparks falls from its welding arm
+with a light of the arc's color, out the moment it stops welding.
+
 ### Critters
 
 | Critter | HP | Speed | Damage/s | Attack range | Radius | Wave cost | From wave |
@@ -540,6 +548,12 @@ with or without a panel open:
   seconds after the launch. With life support you board it: the astronaut stands on the pad,
   hidden, and cannot move, mine, shoot or regenerate, and the swarm can neither hurt nor target
   it.
+
+The launch shows: during the ignition the rocket shakes on the pad, tilted by
+`(sin(t * 47), 0, cos(t * 39)) * 0.045` radians at the play time t, and stands straight again
+when it climbs; the four clamps of the pad swing out by 0.6 radians at the launch and back in when
+the rocket arrives; and from the first frame of the ignition to the arrival a burst of flame and
+a burst of smoke play under the rocket every 0.08 seconds.
 
 When the rocket arrives its Luminite is added to the shipped total. With life support the game
 is won; a cargo rocket shows `Shipment away!  +25 Luminite` and leaves the pad empty for the
@@ -816,7 +830,7 @@ the original's `oreChild` does. The parts have no `DynamicTransform`, so a syste
 | `PadBeacon` | `pad_beacon.flecs` | A template, the corner beacon of the rocket pad: `lamp` (amber lamp) |
 | `Factory` | `factory.flecs` | 2x2. `ram` (the press, moves along y, rest y 1.72, travel 0.62), `roller_a` to `roller_d` (each with its `drum`, which spins about its own y; the rollers lie along x), `wheel_left/flywheel`, `wheel_right/flywheel` (spin about y), `puff_l`, `puff_r` (the tops of the stacks, the smoke puffs), `hall/steam_l`, `hall/steam_c`, `hall/steam_r` (the vents of the grille, the steam), `hot_plate` (emissive 0.06 at rest, 2.6 while working), `work_glow` (emissive 0.08 at rest, 1.8 while working, and its `PointLight` of range 6.5 at intensity 0, 5.5 while working), `beacon_l`, `beacon_r` (work lamps, blink 2), `crown/status_l`, `crown/status_r` (status lamps) |
 | `DronePad` | `drone_pad.flecs` | 2x2. `bay_a` to `bay_d` (the landing bays, on the corners at x and z of +-0.99) with their `lamp` (status lamps), `column/head/beacon_l`, `column/head/beacon_r` (status lamps), `column/cabinet/readout`, `column/mast/tip` (lamps always on). Drone b of its 4 docks at the angle (b + 0.5) * 2 PI / 4, at (sin, cos) * 1.4 from the center and 0.62 above the ground |
-| `RepairDrone` | `drone.flecs` | The drone of the pad, its origin the center of the hull: `rotor_a` to `rotor_d` (spin about y), `hull/eye` (lamp), `weld` (the nozzle, the weld sparks). Its rotors share the `RotorBlade` prefab |
+| `RepairDrone` | `drone.flecs` | The drone of the pad, its origin the center of the hull: `rotor_a` to `rotor_d` (`OreSpinner`, spin about y), `hull/eye` (lamp), `weld` (the nozzle, `WeldSparks`). Its rotors share the `RotorBlade` prefab |
 | `RocketPad` | `rocket_pad.flecs` | 3x3. `clamp_a` to `clamp_d` (`PadClamp` templates: the hold-down clamps, which swing out by their `tilt` at the launch), `tower/beacon` (lamp), `beacon_b`, `beacon_c`, `beacon_d` (`PadBeacon`). The rocket stands on its axis at y 0.74, the original's `LaunchPad.base_y` |
 | `PadClamp` | `rocket/pad_clamp.flecs` | A template, the clamp: props `yaw` (faces the rocket), `tx`, `tz` (which way it swings) and `tilt` (0 at rest; the original's `cfg.clampTilt` 0.6 at the launch). The original turns it by (tx * tilt, yaw, tz * tilt) in flecs-engine's X Y Z order; the template converts that to box's Y X Z order |
 | `Rocket` | `rocket/rocket.flecs` | A template, the rocket on the pad (see below) |
@@ -892,7 +906,7 @@ its tile in the grid.
 | `etc/boundary.flecs` | The hazard band around the playable area |
 | `etc/scenery.flecs` | The boulders, dunes and flora of a run |
 | `etc/run.flecs` | The astronaut with its pistol, the parents of the placed buildings, of the critters and of the projectiles, and the singletons of a run, the order book, the selection, the inventory screen, the power allocation, the rocket state and the waves included |
-| `etc/launch.flecs` | The items of a rocket (`OreRocketKit`) and the rocket on the pad, a `Rocket` instance that follows the rocket state |
+| `etc/launch.flecs` | The items of a rocket, the effects of its flight and the template of the pad's clamps (`OreRocketKit`), and the rocket on the pad, a `Rocket` instance (`OreRocketModel`) that follows the rocket state |
 | `etc/deposits.flecs` | The deposits of a run, the Luminite's with their glints (`DepositSparkle`) |
 | `etc/player.flecs` | The `Astronaut` template |
 | `etc/props/ore.flecs` | The `Ore` template of the deposits |
@@ -935,10 +949,11 @@ its tile in the grid.
 | `src/weapons.c` | The astronaut's pistol, the turrets' targets, aim, lead and fire, the laser beams, the projectiles' flight, homing, hits and splash |
 | `src/buildings.c` | The buildings in the tile grid, the wall connectors, demolish and salvage, destroyed buildings, the look of the ghosts |
 | `src/building_fx.c` | The buildings' animation and lights at the work rate of their building: the spinners, pistons, shakes, vents, work emitters and work lights |
+| `src/drones.c` | The repair drones: the drones a placed pad parks, their targets, flight, turn, bob and welds (`OreDrones`), their rotors and weld sparks (`OreDroneFx`) |
 | `src/placement.c` | The selection, `canPlace`, the click and the drag, the poof of a placed building, the pipette, the preview, `oreelse.select()`, `oreelse.pipette()`, `oreelse.placeStart()`, `oreelse.placeEnd()`, `oreelse.cancelDrag()` |
 | `src/craft.c` | The order book, the workers, `oreelse.craft_order()`, `oreelse.craft_cancel()` |
 | `src/power.c` | Production, demand and the blackout, the drills, the factories' crafters, the status lamps, `oreelse.power_set(category, level)` |
-| `src/rocket.c` | The rocket state, installing, uninstalling, loading, the launch and the flight, `oreelse.rocket_install()`, `oreelse.rocket_uninstall()`, `oreelse.rocket_load()`, `oreelse.rocket_launch()`, `oreelse.craft_key()` |
+| `src/rocket.c` | The rocket state, installing, uninstalling, loading, the launch and the flight, the look of the flight (`OreRocketFx`: the shake, the clamps, the flames and the smoke), `oreelse.rocket_install()`, `oreelse.rocket_uninstall()`, `oreelse.rocket_load()`, `oreelse.rocket_launch()`, `oreelse.craft_key()` |
 | `src/health_bars.c` | The health bars: a `HealthBar` instance per damaged building under `health_bars.bars`, its fraction set when the health changes, the bars' view shown while playing |
 | `src/look.c` | The render quality tiers, `oreelse.cycleQuality()` |
 | `src/particles.c` | The helpers that play the effects (`ore_burst`, `ore_burst_aimed`, `ore_explosion`, `ore_combust`), the flash of their lights, `oreelse.explosion()`, `oreelse.combust()` |

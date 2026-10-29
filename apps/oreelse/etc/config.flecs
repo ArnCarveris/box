@@ -119,6 +119,13 @@ cfg {
   export const launchAccel: f32 = 9
   export const launchAltitude: f32 = 60
 
+  // The look of the launch: the rocket shakes by launchShake radians during the ignition, a
+  // FlameBurst and a SmokeBurst play under it every launchFxInterval seconds of the flight, and
+  // the clamps of the pad swing out by clampTilt radians from the launch to the arrival
+  export const launchShake: f32 = 0.045
+  export const launchFxInterval: f32 = 0.08
+  export const clampTilt: f32 = 0.6
+
   // The power allocation: Mining, Weapons and Construction each take a level of 0 to 4 bars,
   // at most powerBars in total; the demand is the consumers' watts times the bars assigned /
   // powerBars, and a category runs at its level times powerStep (0, 0.5, 1, 1.5, 2)
@@ -144,6 +151,16 @@ cfg {
   export const droneRepair: f32 = 14
   export const droneHpPerIron: f32 = 10
   export const droneScan: f32 = 0.5
+
+  // The look of a drone's flight: it turns toward its goal at most droneTurn radians a second,
+  // bobs droneBob up and down at droneBobRate radians of its phase a second while it welds, and
+  // its rotors spin up to droneRotor radians a second in flight (alternating directions),
+  // gaining or losing droneSpinUp times droneRotor a second, down to 0 docked
+  export const droneTurn: f32 = 7
+  export const droneBob: f32 = 0.07
+  export const droneBobRate: f32 = 3.2
+  export const droneRotor: f32 = 34
+  export const droneSpinUp: f32 = 2.5
 
   // The zoom levels of the camera, from 0 (closest, 44.6 degrees down) to 2 (59.5 degrees):
   // the camera sits height above the ground and back behind the astronaut and looks at the

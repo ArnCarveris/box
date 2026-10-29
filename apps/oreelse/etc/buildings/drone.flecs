@@ -3,15 +3,18 @@
 // with a rotor of two blades on each, two skids and the welding arm below. Its origin is the
 // center of the hull and it faces +Z. RotorBlade is the blade the rotors share.
 //
-// Named parts: rotor_a to rotor_d (spin about y, still while docked), hull/eye (Light) and
-// weld (the nozzle of the arm, where the weld sparks come out).
+// Named parts: rotor_a to rotor_d (OreSpinner: spin about y, still while docked), hull/eye
+// (Light) and weld (the nozzle of the arm, where the WeldSparks come out while it repairs).
 //
 // A placed drone pad parks four instances as its children (its OreDroneBay), each with an
-// OreDrone; their flight and repair constants are cfg.drone* (apps/oreelse/src/drones.c).
+// OreDrone; their flight and repair constants are cfg.drone* (apps/oreelse/src/drones.c). The
+// drones set the speed of the rotors' spinners (OreDroneFx): up to cfg.droneRotor in flight,
+// the odd rotors the other way, and 0 docked; the spinners turn them at the work rate of the pad.
 
 using box.transform
 using box.geometry
 using box.material
+using oreelse
 
 const droneSteel: Rgb = {172, 180, 194}
 const droneShade: Rgb = {112, 120, 136}
@@ -90,6 +93,7 @@ prefab RepairDrone {
 
   rotor_a {
     Position: {0.29, 0.1, 0.29}
+    OreSpinner: {speed: 0}
 
     hub {
       Box: {0.07, 0.05, 0.07}
@@ -108,6 +112,7 @@ prefab RepairDrone {
 
   rotor_b {
     Position: {-0.29, 0.1, 0.29}
+    OreSpinner: {speed: 0}
 
     hub {
       Box: {0.07, 0.05, 0.07}
@@ -126,6 +131,7 @@ prefab RepairDrone {
 
   rotor_c {
     Position: {-0.29, 0.1, -0.29}
+    OreSpinner: {speed: 0}
 
     hub {
       Box: {0.07, 0.05, 0.07}
@@ -144,6 +150,7 @@ prefab RepairDrone {
 
   rotor_d {
     Position: {0.29, 0.1, -0.29}
+    OreSpinner: {speed: 0}
 
     hub {
       Box: {0.07, 0.05, 0.07}
@@ -186,5 +193,6 @@ prefab RepairDrone {
 
   weld {
     Position: {0, -0.24, 0.18}
+    WeldSparks: {}
   }
 }

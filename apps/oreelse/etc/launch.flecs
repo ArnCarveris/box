@@ -7,6 +7,10 @@
 // deleted by a reactive if aborts the app at exit.
 //
 // The state is reset with every run (run.flecs), which empties the rocket of the previous run.
+//
+// The kit also names the effects of the flight and the template of the pad's clamps: through
+// the flight OreRocketFx (apps/oreelse/src/rocket.c) plays FlameBurst and SmokeBurst under the
+// rocket, shakes it (OreRocketModel) during the ignition and swings the clamps out.
 
 using box.transform
 using oreelse
@@ -17,7 +21,10 @@ $ {
     fuel: items.RocketFuelStorage,
     cargo: items.RocketCargoBay,
     life_support: items.RocketLifeSupport,
-    luminite: items.Luminite
+    luminite: items.Luminite,
+    flame: FlameBurst,
+    smoke: SmokeBurst,
+    clamp: PadClamp
   }
 }
 
@@ -38,6 +45,7 @@ const rocketValid = rocketState.valid
 rocket {
   Position: {rocketX, rocketY, rocketZ}
   DynamicTransform
+  OreRocketModel
   Rocket: {
     engines: rocketEngines,
     fuel: rocketFuel,
