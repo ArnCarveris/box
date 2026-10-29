@@ -197,6 +197,55 @@ void AtmosphereSky_packet_view_sun_disk(void) {
     ecs_fini(world);
 }
 
+void AtmosphereSky_packet_view_atmosphere_entity(void) {
+    // atmosphere/entity
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+
+    ecs_entity_t view;
+    ecs_entity_t scene = scene_new(world, &view);
+    ecs_remove(world, scene, Atmosphere);
+    ecs_entity_t sky = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_add(world, sky, Atmosphere);
+    const box_render_view_t *v = frame_view(world, null);
+    test_assert(v->atmosphere != 0);
+    test_uint(v->atmos.entity, sky);
+
+    ecs_delete(world, sky);
+    v = frame_view(world, null);
+    test_uint(v->atmosphere, 0);
+
+    ecs_fini(world);
+}
+
+void AtmosphereSky_packet_view_atmosphere_entity_default_scene(void) {
+    // atmosphere/entity
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+
+    ecs_entity_t sky = ecs_new(world);
+    ecs_add(world, sky, Atmosphere);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 2, 10});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_add(world, view, View);
+    ecs_get_mut(world, view, View)->camera = camera;
+    ecs_modified(world, view, View);
+    const box_render_view_t *v = frame_view(world, null);
+    test_assert(v->atmosphere != 0);
+    test_uint(v->atmos.entity, sky);
+    test_bool(v->atmos.sky, true);
+
+    ecs_fini(world);
+}
+
 void AtmosphereSky_fog_atmosphere_defaults(void) {
     // atmosphere/fog
     ecs_world_t *world = ecs_init();
@@ -204,23 +253,26 @@ void AtmosphereSky_fog_atmosphere_defaults(void) {
 
     test_assert(ecs_script_run(world, "fog",
         "using box.effects\n"
+        "using box.atmosphere\n"
+        "sky { Atmosphere: {} }\n"
         "fog { HeightFog: {} }\n"
-        "off { HeightFog: {atmosphere: false} }\n", NULL) == 0);
+        "on { HeightFog: {atmosphere: sky} }\n", NULL) == 0);
 
+    ecs_entity_t sky = ecs_lookup(world, "sky");
     const HeightFog *fog = ecs_get(world, ecs_lookup(world, "fog"), HeightFog);
     test_assert(fog != NULL);
-    test_bool(fog->atmosphere, true);
+    test_uint(fog->atmosphere, 0);
     test_flt(fog->density, 0.1f);
-    fog = ecs_get(world, ecs_lookup(world, "off"), HeightFog);
-    test_bool(fog->atmosphere, false);
+    fog = ecs_get(world, ecs_lookup(world, "on"), HeightFog);
+    test_uint(fog->atmosphere, sky);
 
     ecs_entity_t added = ecs_new(world);
     ecs_add(world, added, HeightFog);
-    test_bool(ecs_get(world, added, HeightFog)->atmosphere, true);
+    test_uint(ecs_get(world, added, HeightFog)->atmosphere, 0);
 
     HeightFog resolved;
-    box_render_fog_settings(ecs_get(world, added, HeightFog), &resolved);
-    test_bool(resolved.atmosphere, true);
+    box_render_fog_settings(fog, &resolved);
+    test_uint(resolved.atmosphere, sky);
 
     ecs_fini(world);
 }

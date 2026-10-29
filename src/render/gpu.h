@@ -945,7 +945,7 @@ void box_gpu_atmosphere_environment(
 
 /** Record the sky view and then the aerial perspective pass of a view whose scene has built
  * atmosphere LUTs, before its forward pass, and the fog in scatter color when it runs a
- * HeightFog with atmosphere; other views record nothing.
+ * HeightFog whose atmosphere is that of its scene; other views record nothing.
  *
  * @param gpu The backend
  * @param t The target
@@ -974,7 +974,7 @@ bool box_gpu_atmosphere_sky(
 
 /** Get the fog in scatter color of a view in a target: a 2x1 image of the ambient and the glow
  * toward the main light of the atmosphere, written by box_gpu_atmosphere_view in this packet
- * for a view that renders its atmosphere and runs a HeightFog with atmosphere.
+ * for a view that renders its atmosphere and runs a HeightFog that refers to it.
  *
  * @param gpu The backend
  * @param t The target

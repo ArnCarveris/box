@@ -430,13 +430,20 @@ void AtmosphereSky_disk_center_brighter_than_limb(void) {
 /** Color of the fogs, which a fog colored by the atmosphere ignores */
 #define FOG_COLOR ((rgb){255, 0, 255})
 
+/** HeightFog.atmosphere of the fog of render_fog: none, the scene, or an atmosphere elsewhere */
+typedef enum fog_atmosphere_t {
+    FOG_ATMOSPHERE_NONE,
+    FOG_ATMOSPHERE_SCENE,
+    FOG_ATMOSPHERE_OTHER
+} fog_atmosphere_t;
+
 /** Render an unlit view at 1 m above the ground of a scene with 1 world unit per meter that
  * looks along -z at the horizon, toward a wall 2 km away in a dense ground fog.
  *
  * @param elevation Elevation of the sun in degrees
  * @param yaw Yaw of the sun in degrees, 0 in front of the camera and 180 behind it
  * @param fog Whether the view has the fog, else the wall is left out too
- * @param atmosphere HeightFog.atmosphere of the fog
+ * @param atmosphere Which atmosphere HeightFog.atmosphere refers to
  * @return The pixels, the wall at (WIDTH / 2, HEIGHT / 2), or the sky just above the horizon
  * at (WIDTH / 2, HEIGHT / 2 - 1) without fog
  */
@@ -444,7 +451,7 @@ static unsigned char* render_fog(
     float elevation,
     float yaw,
     bool fog,
-    bool atmosphere)
+    fog_atmosphere_t atmosphere)
 {
     ecs_world_t *world = world_new();
     ecs_entity_t scene = scene_new(world, 1000, elevation);
@@ -463,10 +470,17 @@ static unsigned char* render_fog(
     ecs_entity_t camera = camera_new(world, scene, 1, 60, 0);
     ecs_entity_t view = view_new(world, camera, false, true);
     if (fog) {
+        ecs_entity_t source = 0;
+        if (atmosphere == FOG_ATMOSPHERE_SCENE) {
+            source = scene;
+        } else if (atmosphere == FOG_ATMOSPHERE_OTHER) {
+            source = scene_new(world, 1000, elevation);
+        }
+
         ecs_entity_t e = ecs_new(world);
         ecs_set(world, e, HeightFog, {.density = 0.005f, .falloff = 0.001f, .max_opacity = 1,
             .color = FOG_COLOR, .sun_inscatter = 1, .ambient_inscatter = 1,
-            .atmosphere = atmosphere});
+            .atmosphere = source});
         View *v = ecs_get_mut(world, view, View);
         *ecs_vec_append_t(NULL, &v->effects, ViewEffect) = (ViewEffect){
             .enabled = true, .effect = e };
@@ -479,9 +493,9 @@ static unsigned char* render_fog(
 
 void AtmosphereSky_fog_at_noon_tints_toward_horizon(void) {
     // atmosphere/fog
-    unsigned char *sky = render_fog(90, 0, false, false);
-    unsigned char *colored = render_fog(90, 0, true, true);
-    unsigned char *plain = render_fog(90, 0, true, false);
+    unsigned char *sky = render_fog(90, 0, false, FOG_ATMOSPHERE_NONE);
+    unsigned char *colored = render_fog(90, 0, true, FOG_ATMOSPHERE_SCENE);
+    unsigned char *plain = render_fog(90, 0, true, FOG_ATMOSPHERE_NONE);
     int32_t horizon[3], wall_colored[3], wall_plain[3];
     int32_t fog[3] = {FOG_COLOR.r, FOG_COLOR.g, FOG_COLOR.b};
     pixel(sky, WIDTH / 2, HEIGHT / 2 - 1, horizon);
@@ -499,8 +513,8 @@ void AtmosphereSky_fog_at_noon_tints_toward_horizon(void) {
 
 void AtmosphereSky_fog_at_sunset_warmer_toward_sun(void) {
     // atmosphere/fog
-    unsigned char *toward = render_fog(3, 0, true, true);
-    unsigned char *away = render_fog(3, 180, true, true);
+    unsigned char *toward = render_fog(3, 0, true, FOG_ATMOSPHERE_SCENE);
+    unsigned char *away = render_fog(3, 180, true, FOG_ATMOSPHERE_SCENE);
     int32_t sun_side[3], other_side[3];
     pixel(toward, WIDTH / 2, HEIGHT / 2, sun_side);
     pixel(away, WIDTH / 2, HEIGHT / 2, other_side);
@@ -513,8 +527,8 @@ void AtmosphereSky_fog_at_sunset_warmer_toward_sun(void) {
 
 void AtmosphereSky_fog_without_atmosphere_uses_color(void) {
     // atmosphere/fog
-    unsigned char *plain = render_fog(3, 0, true, false);
-    unsigned char *colored = render_fog(3, 0, true, true);
+    unsigned char *plain = render_fog(3, 0, true, FOG_ATMOSPHERE_NONE);
+    unsigned char *colored = render_fog(3, 0, true, FOG_ATMOSPHERE_SCENE);
     int32_t wall_plain[3], wall_colored[3];
     int32_t fog[3] = {FOG_COLOR.r, FOG_COLOR.g, FOG_COLOR.b};
     pixel(plain, WIDTH / 2, HEIGHT / 2, wall_plain);
@@ -523,6 +537,16 @@ void AtmosphereSky_fog_without_atmosphere_uses_color(void) {
     test_assert(difference(wall_colored, fog) > 60);
     stbi_image_free(plain);
     stbi_image_free(colored);
+}
+
+void AtmosphereSky_fog_with_other_atmosphere_uses_color(void) {
+    // atmosphere/fog
+    unsigned char *other = render_fog(3, 0, true, FOG_ATMOSPHERE_OTHER);
+    int32_t wall[3];
+    int32_t fog[3] = {FOG_COLOR.r, FOG_COLOR.g, FOG_COLOR.b};
+    pixel(other, WIDTH / 2, HEIGHT / 2, wall);
+    test_assert(difference(wall, fog) <= 3);
+    stbi_image_free(other);
 }
 
 /** Elevation of the moon and pitch of the camera of render_moon in degrees */

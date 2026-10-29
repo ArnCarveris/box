@@ -7,10 +7,6 @@ using box.light
 using box.effects
 using box.atmosphere
 
-$ {
-  Atmosphere: {units_per_km: 100}
-}
-
 camera {
   Position: {0, 2, 12}
   Rotation: {0.06, 0, 0}
@@ -18,12 +14,13 @@ camera {
 }
 
 // The fog takes its color from the sky, so color is ignored: the pink would show without it
-fog {
-  HeightFog: {density: 0.004, falloff: 0.02, base_height: 0, color: {255, 0, 255}}
+sky {
+  Atmosphere: {units_per_km: 100}
+  HeightFog: {density: 0.004, falloff: 0.02, base_height: 0, color: {255, 0, 255}, atmosphere: sky}
 }
 
 main_view {
-  View: {camera: camera, clear: {enabled: true, color: {0, 0, 0, 255}}, effects: [{effect: fog}]}
+  View: {camera: camera, clear: {enabled: true, color: {0, 0, 0, 255}}, effects: [{effect: sky}]}
 }
 
 sun {

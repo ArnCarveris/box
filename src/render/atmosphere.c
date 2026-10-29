@@ -282,7 +282,7 @@ done:
 }
 
 /** Write the main light of the atmosphere of a scene, which the in scatter color of a fog
- * with HeightFog.atmosphere follows.
+ * whose HeightFog.atmosphere is the atmosphere of the scene follows.
  *
  * @param lights The state of the light extract
  * @param scene The scene
@@ -359,6 +359,7 @@ static void box_atmos_view(
     out->km_per_unit = 1.0f / value->units_per_km;
     box_atmos_view_fog(lights, v->scene, out);
     out->sky = view ? view->lighting.atmosphere : true;
+    out->entity = s->entity;
 }
 
 /** Give every view of a scene with LUTs its atmosphere, after the light extract found the sun.

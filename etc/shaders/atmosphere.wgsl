@@ -24,7 +24,7 @@
 // of the sky, over pi. Each 8x8 workgroup integrates that sky irradiance from 64 cosine
 // weighted directions of the sky view, one per invocation, summed by a tree reduction.
 //
-// fog (2x1): the in scatter color of a HeightFog with atmosphere, once per view. Texel 0 is the
+// fog (2x1): the in scatter color of a HeightFog that refers to the atmosphere, once per view. Texel 0 is the
 // ambient, the mean of 6 horizon samples of the sky view mixed 15% toward its zenith; texel 1
 // the glow toward the main light, the horizon sample at its azimuth minus the ambient times
 // its horizon fade, or the radiance of the moon when it is the main light, whose faint glow the

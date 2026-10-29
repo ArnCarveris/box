@@ -404,6 +404,7 @@ typedef struct box_render_view_atmos_t {
                              *   holds; w 1 when the moon is the main light */
     bool sky;               /**< LightSettings.atmosphere: the view draws the sky and applies
                              *   the aerial perspective to its 3D meshes */
+    ecs_entity_t entity;    /**< Entity with the Atmosphere of the scene of the view */
 } box_render_view_atmos_t;
 
 /** The environment a view is lit with, resolved from LightSettings.environment */

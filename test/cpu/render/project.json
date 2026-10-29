@@ -188,6 +188,8 @@
                     "view_atmosphere_defaults",
                     "packet_view_follows_atmosphere",
                     "packet_view_sun_disk",
+                    "packet_view_atmosphere_entity",
+                    "packet_view_atmosphere_entity_default_scene",
                     "fog_atmosphere_defaults",
                     "packet_view_fog_light_is_sun_by_day",
                     "packet_view_fog_light_is_moon_by_night",
