@@ -158,6 +158,7 @@
                     "covers_left_half",
                     "width_fraction",
                     "follows_resize",
+                    "covers_height_after_window_resize",
                     "scrollback_follows_height",
                     "paste_long",
                     "panel_keeps_fraction_with_long_text",

@@ -376,6 +376,13 @@
                 ]
             },
             {
+                "id": "Console",
+                "testcases": [
+                    "covers_height_after_window_resize",
+                    "covers_height_after_surface_resize"
+                ]
+            },
+            {
                 "id": "Editor",
                 "testcases": [
                     "closed_by_default",
