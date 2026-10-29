@@ -5,6 +5,7 @@
 // light on the ground and the astronaut
 include apps/oreelse/test/visual/setup/seed
 include apps/oreelse/etc/oreelse
+include apps/oreelse/test/visual/setup/world
 
 using oreelse
 

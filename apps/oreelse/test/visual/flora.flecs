@@ -6,6 +6,7 @@
 // out of sight, so only the patches show.
 include apps/oreelse/test/visual/setup/seed
 include apps/oreelse/etc/oreelse
+include apps/oreelse/test/visual/setup/world
 
 using box.transform
 using oreelse

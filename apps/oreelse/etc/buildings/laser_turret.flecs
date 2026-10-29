@@ -33,6 +33,8 @@ prefab LaserTurret {
   }
   OreFootprint: {w: 1, h: 1}
   OreHealth: {value: 150, max: 150}
+  // The box of the model, the health bar's anchor
+  OreModelBox: {w: 1.74, d: 1.74, h: 2}
   OrePowerConsumer: {watts: 25}
   OrePowerCategory: {kind: Weapons}
   // The weapon: a beam from the muzzle 1.7 up and 0.74 ahead that burns its target within 13

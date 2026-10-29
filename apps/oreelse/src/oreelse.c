@@ -17,6 +17,7 @@
 ECS_TAG_DECLARE(OreRunScript);
 ECS_TAG_DECLARE(OreGhost);
 ECS_TAG_DECLARE(OreHoming);
+ECS_TAG_DECLARE(OreBarOf);
 
 void OreelseImport(
     ecs_world_t *world)
@@ -78,6 +79,9 @@ void OreelseImport(
     ECS_META_COMPONENT(world, OreWorkEmitter);
     ECS_META_COMPONENT(world, OreWorkLight);
     ECS_META_COMPONENT(world, OreBuilding);
+    ECS_META_COMPONENT(world, OreModelBox);
+    ECS_META_COMPONENT(world, OreHealthBar);
+    ECS_META_COMPONENT(world, OreHealthBars);
     ECS_META_COMPONENT(world, OreConnectRule);
     ECS_META_COMPONENT(world, OreConnector);
     ECS_META_COMPONENT(world, OrePlacement);
@@ -130,6 +134,7 @@ void OreelseImport(
     ECS_TAG_DEFINE(world, OreRunScript);
     ECS_TAG_DEFINE(world, OreGhost);
     ECS_TAG_DEFINE(world, OreHoming);
+    ECS_TAG_DEFINE(world, OreBarOf);
 
     ecs_add_id(world, ecs_id(OreGameState), EcsExclusive);
     ecs_add_id(world, ecs_id(OreGameState), EcsPairIsTag);
@@ -152,5 +157,6 @@ void OreelseImport(
     ore_placement_import(world);
     ore_rocket_import(world);
     ore_look_import(world);
+    ore_health_bars_import(world);
     ore_particles_import(world);
 }

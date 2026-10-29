@@ -39,9 +39,9 @@ ECS_STRUCT(ProjectedAnchor, {
  * to the top center of that rectangle plus offset pixels. Elements are centered on Position:
  * a bar of height h sits 6 pixels above the box with offset {0, 6 + h / 2}.
  *
- * The part of the box behind the near plane is clipped away, the corners in front and where
- * edges cross the plane are projected. The entity is ProjectedHidden when nothing is left, all
- * of it is past the far plane or the rectangle misses the surface.
+ * Corners behind the near plane are clipped away, those in front and the crossings of edges
+ * with the plane projected. ProjectedHidden when nothing is left, all of it is past the far
+ * plane, the rectangle misses the surface or it is narrower than min_width.
  */
 ECS_STRUCT(ProjectedBox, {
     vec3 min;        /**< Smallest corner, world units along the world axes from the target
@@ -52,6 +52,7 @@ ECS_STRUCT(ProjectedBox, {
                       *   the rectangle; its tree is laid out again the same frame, so Grow
                       *   children split it and their world transforms are final */
     bool fit_height; /**< Make the height of the LayoutItem Fixed at the rectangle, as width */
+    float min_width; /**< Surface pixels the rectangle is at least wide to show, 0 for any */
 });
 
 /** Projection of the ProjectedBox of an entity, written by the module every frame.

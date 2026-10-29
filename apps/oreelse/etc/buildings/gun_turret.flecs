@@ -34,6 +34,8 @@ prefab GunTurret {
   }
   OreFootprint: {w: 1, h: 1}
   OreHealth: {value: 120, max: 120}
+  // The box of the model, the health bar's anchor
+  OreModelBox: {w: 1.74, d: 1.74, h: 2.13}
   // Draws no power (0 W), as the original: no OrePowerConsumer
   OrePowerCategory: {kind: Weapons}
   // The weapon: 2.5 per shot within 10, a shot every 0.12 s at multiplier 1, tracers at 34 from

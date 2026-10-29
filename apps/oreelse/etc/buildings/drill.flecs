@@ -33,6 +33,8 @@ prefab Drill {
   // It only goes on tiles with a deposit, which it mines
   OreFootprint: {w: 1, h: 1, deposit: true}
   OreHealth: {value: 100, max: 100}
+  // The box of the model, the health bar's anchor
+  OreModelBox: {w: 1.86, d: 1.86, h: 2.23}
   OrePowerConsumer: {watts: 4}
   OrePowerCategory: {kind: Mining}
   // Its mining toward the next ore, copied to every drill

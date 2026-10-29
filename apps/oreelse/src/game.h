@@ -582,6 +582,27 @@ ECS_STRUCT(OreBuilding, {
     int32_t col; /**< Column of its top left tile */
 });
 
+/** The model box of a building (on its prefab), its health bar's anchor: centered, up from 0 */
+ECS_STRUCT(OreModelBox, {
+    float w; /**< Width along x */
+    float d; /**< Depth along z */
+    float h; /**< Height above the ground */
+});
+
+/** A building's HealthBar (0 while undamaged), deleted with it through (OreBarOf, building) */
+ECS_STRUCT(OreHealthBar, {
+    ecs_entity_t bar; /**< The bar, 0 for none */
+});
+
+/** The health bars' UI scene, between the world view and the HUD, shown while playing */
+ECS_STRUCT(OreHealthBars, {
+    ecs_entity_t bar;    /**< The HealthBar template */
+    ecs_entity_t root;   /**< Parent of the bars, in the scene of the bars */
+    ecs_entity_t view;   /**< View of the scene of the bars */
+    ecs_entity_t camera; /**< Camera of the view of the bars */
+    ecs_entity_t world;  /**< World view the bars project their buildings through */
+});
+
 /** An auto tiling rule of rules.flecs, the BuildingRule2x1 of the original: out joins two
  * buildings on orthogonally neighboring tiles.
  *
@@ -709,9 +730,7 @@ ECS_STRUCT(OreQuality, {
     OreRenderQuality tier; /**< The tier the look applies */
 });
 
-/** The settings of every render quality tier, the type of cfg.quality, indexed by
- * OreRenderQuality.
- */
+/** The settings of every render quality tier (cfg.quality), indexed by OreRenderQuality */
 ECS_STRUCT(OreQualityTiers, {
     float resolution_scale[3];    /**< Surface.resolution_scale of the surfaces */
     int32_t shadow_resolution[3]; /**< ShadowSettings.resolution of the world view */
@@ -1098,6 +1117,9 @@ extern ECS_TAG_DECLARE(OreRunScript);
  * without emission (OreGhostDim)
  */
 extern ECS_TAG_DECLARE(OreGhost);
+
+/** Relationship of a health bar to its building: deleting the building deletes the bar */
+extern ECS_TAG_DECLARE(OreBarOf);
 
 /** The geometry of the tile grid, read from cfg once per system run */
 typedef struct ore_grid_t {
@@ -1834,6 +1856,13 @@ void ore_craft_import(
  * @param world The world
  */
 void ore_buildings_import(
+    ecs_world_t *world);
+
+/** Register the health bars: one per damaged building, its fraction kept in step with the HP.
+ *
+ * @param world The world
+ */
+void ore_health_bars_import(
     ecs_world_t *world);
 
 /** Register the buildings' animation and lights: the spinners, pistons, shakes, vents, work
