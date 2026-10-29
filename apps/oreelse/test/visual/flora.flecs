@@ -2,8 +2,8 @@
 // frondstalks on the left, of ashcups in the middle and of quillbulbs on the right, behind the
 // astronaut, who stands facing the camera for the scale. The fronds and membranes are alpha
 // tested cutouts: their edges are clean, without a blended fringe, and their shadows on the
-// ground have the holes of their textures. The plants of the seeded map's flora around them are
-// the scenery's.
+// ground have the holes of their textures. The seeded map's own flora (scenery.flecs) is moved
+// out of sight, so only the patches show.
 include apps/oreelse/test/visual/setup/seed
 include apps/oreelse/etc/oreelse
 
@@ -14,6 +14,11 @@ using oreelse
 astronaut {
   Position: {0, 0, 31}
   Rotation: {0, 0.4, 0}
+}
+
+// The map's plants are children of flora, which their positions are relative to
+flora {
+  Position: {0, -100, 0}
 }
 
 flora_patches {
