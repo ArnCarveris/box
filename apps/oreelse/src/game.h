@@ -3,15 +3,10 @@
  * @brief The oreelse module: components of the game and the functions its areas share.
  *
  * The scene (apps/oreelse/etc) holds the constants cfg.*, the models, the items, the singletons
-<<<<<<< HEAD
- * and the entities of a run; the systems of each area (flow.c, map.c, player.c, ..., critters.c,
- * critter_fx.c, buildings.c, drones.c, placement.c, look.c, particles.c) play the game.
-=======
  * and the entities of a run.
  *
  * The systems of each area (flow.c, map.c, player.c, ..., power.c, critters.c, critter_fx.c,
- * buildings.c, placement.c, rocket.c, look.c, particles.c) play the game.
->>>>>>> 7616982bb50f3620e900cd61c37a36609ce3d9f8
+ * buildings.c, drones.c, placement.c, rocket.c, look.c, particles.c) play the game.
  */
 
 #ifndef OREELSE_GAME_H
@@ -1634,21 +1629,20 @@ void ore_craft_import(
 void ore_buildings_import(
     ecs_world_t *world);
 
-<<<<<<< HEAD
-/** Register the repair drones: the drones a placed drone pad parks and the system that flies
- * them to the damaged buildings and welds them, paid from the inventory.
- *
- * @param world The world
- */
-void ore_drones_import(
-=======
 /** Register the buildings' animation and lights: the spinners, pistons, shakes, vents, work
  * emitters and work lights, driven by the work rate of their building.
  *
  * @param world The world
  */
 void ore_building_fx_import(
->>>>>>> 7616982bb50f3620e900cd61c37a36609ce3d9f8
+    ecs_world_t *world);
+
+/** Register the repair drones: the drones a placed drone pad parks and the system that flies
+ * them to the damaged buildings and welds them, paid from the inventory.
+ *
+ * @param world The world
+ */
+void ore_drones_import(
     ecs_world_t *world);
 
 /** Register placement: the selection, the click and drag placement, the preview and the script
