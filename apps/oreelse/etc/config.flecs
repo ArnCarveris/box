@@ -291,7 +291,6 @@ cfg {
   export const missileTurnRate: f32 = 6
   export const missileReacquire: f32 = 6
 
-<<<<<<< HEAD
   // The effects of combat (src/weapons.c, src/buildings.c). The sparks of a laser beam sit back
   // from its end toward the turret by the target's radius (0.5 without one) times
   // turretHitInset, at most halfway. A missile explodes splashBlastLift above where it ends, its BoomBurst scaled
@@ -306,7 +305,7 @@ cfg {
   export const impactY: f32 = 0.05
   export const wreckBlastY: f32 = 0.55
   export const wreckBlastScale: f32 = 0.8
-=======
+
   // The health bar of a damaged building (etc/ui/health_bar.flecs): hpBarHeight pixels tall,
   // hpBarMargin above the top of the projection of the building's model box and as wide as it,
   // not shown when narrower than hpBarMinWidth. A hpBarBack plate with a 1 pixel hpBarEdge and a
@@ -320,7 +319,6 @@ cfg {
   export const hpBarFull: Rgb = {92, 236, 140}
   export const hpBarMid: Rgb = {240, 176, 58}
   export const hpBarLow: Rgb = {248, 84, 72}
->>>>>>> c635b48a5bb633cb5d43fd7a392782c798c826cd
 
   // The render quality tiers Low, Medium and High (OreQuality.tier), the quality.flecs of the
   // original: the resolution scale of the surfaces (2 renders at half the pixels), the shadow

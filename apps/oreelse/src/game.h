@@ -1396,14 +1396,6 @@ int32_t ore_inventory_count(
     const ecs_world_t *world,
     ecs_entity_t item);
 
-/** Get the kinds of items the inventory holds, the slots that are taken.
- *
- * @param world The world or a stage
- * @return The kinds, at most ORE_INVENTORY_SLOTS
- */
-int32_t ore_inventory_kinds(
-    const ecs_world_t *world);
-
 /** Check whether a set of additions fits: the kinds the inventory would hold after adding
  * every new kind with a positive amount are at most ORE_INVENTORY_SLOTS.
  *
@@ -1452,13 +1444,6 @@ bool ore_inventory_remove(
 const char* ore_item_name(
     const ecs_world_t *world,
     ecs_entity_t item);
-
-/** Show the warning that the inventory holds as many kinds as it can.
- *
- * @param world The world or the stage of a system
- */
-void ore_inventory_full(
-    ecs_world_t *world);
 
 /** Show a tile marker at a position or hide it; it is only written when that changes.
  *
@@ -1830,17 +1815,6 @@ int32_t ore_craft_order(
     ecs_world_t *world,
     ecs_entity_t item,
     int32_t count);
-
-/** Take one unit off an order and refund what the rest does not need. Refused with a warning
- * when the refund does not fit the inventory.
- *
- * @param world The world
- * @param id Id of the order
- * @return Whether a unit was taken off
- */
-bool ore_craft_cancel(
-    ecs_world_t *world,
-    int32_t id);
 
 /** Register crafting: the order book, the workers, OreCanOrder, OreNeeds and the script
  * functions oreelse.craft_order(item, count) and oreelse.craft_cancel(order).
