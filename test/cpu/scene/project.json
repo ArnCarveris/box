@@ -79,7 +79,7 @@
                 "testcases": [
                     "delete_disabled_entity",
                     "remove_shape_disabled",
-                    "disabled_not_indexed"
+                    "disabled_skipped"
                 ]
             },
             {

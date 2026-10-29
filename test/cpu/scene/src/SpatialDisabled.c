@@ -1,7 +1,7 @@
 /**
  * @file SpatialDisabled.c
- * @brief Spatial index: disabled entities are left out of the index and indexed again once
- * enabled, and deleting one or removing its shape while disabled leaves nothing behind.
+ * @brief Spatial index: queries skip disabled entities until they are enabled again, and
+ * deleting one or removing its shape while disabled leaves nothing behind.
  */
 
 #include <box.h>
@@ -67,7 +67,7 @@ void SpatialDisabled_remove_shape_disabled(void) {
     ecs_fini(world);
 }
 
-void SpatialDisabled_disabled_not_indexed(void) {
+void SpatialDisabled_disabled_skipped(void) {
     // scenes/spatial
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -85,26 +85,33 @@ void SpatialDisabled_disabled_not_indexed(void) {
     test_int(box_spatial_overlap_box(world, 0, (vec3){-10, -10, -10}, (vec3){10, 10, 10}, &out), 2);
     ecs_vec_clear(&out);
 
+    /* Queries skip a disabled entity right away, its bounds stay indexed */
     ecs_enable(world, a, false);
     ecs_enable(world, b, false);
-    ecs_progress(world, 0);
     vec3 min, max;
-    test_assert(!box_spatial_bounds(world, a, NULL, min, max));
-    test_assert(!box_spatial_bounds(world, b, NULL, min, max));
+    test_assert(box_spatial_bounds(world, a, NULL, min, max));
+    test_assert(box_spatial_bounds(world, b, NULL, min, max));
     test_int(box_spatial_overlap_box(world, 0, (vec3){-10, -10, -10}, (vec3){10, 10, 10}, &out), 0);
+    test_int(box_spatial_overlap_sphere(world, 0, (vec3){0, 0, 0}, 10, &out), 0);
+    test_assert(!box_spatial_static_bounds(world, 0, min, max));
     box_spatial_hit_t hit = {0};
     box_spatial_ray_t ray = { .origin = {-10, 0, 0}, .dir = {1, 0, 0} };
     test_assert(!box_spatial_ray(world, &ray, &hit));
+    ecs_progress(world, 0);
+    test_int(box_spatial_overlap_box(world, 0, (vec3){-10, -10, -10}, (vec3){10, 10, 10}, &out), 0);
+    test_assert(!box_spatial_ray(world, &ray, &hit));
 
+    /* And see it again as soon as it is enabled */
     ecs_enable(world, a, true);
     ecs_enable(world, b, true);
-    ecs_progress(world, 0);
-    test_assert(box_spatial_bounds(world, a, NULL, min, max));
     test_assert(box_spatial_bounds(world, b, NULL, min, max));
     test_flt(min[0], 2.5f);
     test_int(box_spatial_overlap_box(world, 0, (vec3){-10, -10, -10}, (vec3){10, 10, 10}, &out), 2);
     test_assert(box_spatial_ray(world, &ray, &hit));
     test_uint(hit.entity, a);
+    ecs_progress(world, 0);
+    ecs_vec_clear(&out);
+    test_int(box_spatial_overlap_box(world, 0, (vec3){-10, -10, -10}, (vec3){10, 10, 10}, &out), 2);
 
     ecs_vec_fini_t(NULL, &out, ecs_entity_t);
     ecs_fini(world);

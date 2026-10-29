@@ -241,6 +241,29 @@ static void BoxSpatialOnShapeRemove(
     }
 }
 
+/** Flag the items of entities that are disabled or enabled, so queries skip them or see them
+ * again right away, without waiting for the next update.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxSpatialOnDisabled(
+    ecs_iter_t *it)
+{
+    box_spatial_t *index = it->ctx;
+    bool disabled = it->event == EcsOnAdd;
+    int32_t i;
+    if (!ecs_is_fini(it->world)) {
+        for (i = 0; i < it->count; i ++) {
+            const SpatialProxy *p = ecs_get(it->world, it->entities[i], SpatialProxy);
+            box_spatial_scene_t *s = p && p->item >= 0 ?
+                box_spatial_scene(index, p->scene) : NULL;
+            if (s) {
+                box_spatial_item(s, p->item)->disabled = disabled;
+            }
+        }
+    }
+}
+
 /** Get the unit mesh of a shape.
  *
  * @param cache The mesh cache
@@ -404,7 +427,7 @@ static void box_spatial_refresh(
     vec3 l_min, l_max;
     bool ui = false;
     bool indexed = box_spatial_local(world, cache, e, l_min, l_max, &ui) &&
-        !ecs_has_id(world, e, EcsPrefab) && !ecs_has_id(world, e, EcsDisabled);
+        !ecs_has_id(world, e, EcsPrefab);
     if (indexed) {
         box_spatial_world_bounds(l_min, l_max, t, min, max);
         scene = rescope ? box_render_scene_of(world, e) : p->scene;
@@ -420,6 +443,7 @@ static void box_spatial_refresh(
         box_spatial_scene_t *s = box_spatial_scene_ensure(index, scene);
         p->scene = scene;
         p->item = box_spatial_item_add(s, e, tree, min, max, index->frame);
+        box_spatial_item(s, p->item)->disabled = ecs_has_id(world, e, EcsDisabled);
     } else if (indexed) {
         box_spatial_item_set(
             box_spatial_scene(index, scene), p->item, tree, min, max, index->frame);
@@ -693,9 +717,9 @@ static void box_spatial_transform_observers(
 
 /** Register the observers that collect changed entities and changed subtrees.
  *
- * A disabled entity is taken out of the index, like a prefab, and indexed again once enabled,
- * so no query or ray sees it. The observers match disabled entities, so deleting one or
- * removing its shape still takes it out.
+ * A disabled entity stays in the index, with its item flagged so no query or ray sees it until
+ * it is enabled again. The observers match disabled entities, so deleting one, removing its
+ * shape or changing its bounds or scene still updates the index.
  *
  * @param world The world
  * @param index The index
@@ -710,7 +734,7 @@ static void box_spatial_observers(
         .events = { EcsOnAdd, EcsOnRemove } }, BoxSpatialOnChange);
     box_spatial_observer(world, index, "SpatialOnDisabled", (ecs_observer_desc_t){
         .query.terms = {{ .id = EcsDisabled }},
-        .events = { EcsOnAdd, EcsOnRemove } }, BoxSpatialOnChange);
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxSpatialOnDisabled);
     box_spatial_observer(world, index, "SpatialOnShape", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(ShapeMesh) }},
         .events = { EcsOnSet } }, BoxSpatialOnChange);

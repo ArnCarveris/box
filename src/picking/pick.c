@@ -573,7 +573,7 @@ static void box_pick_candidate(
  *
  * A hit on a UI element or a 2D shape outside the area of a ClipChildren ancestor is no hit, as
  * it is not drawn there, and an element with PickThrough is never hit. Neither is a disabled
- * entity, which the index leaves out, nor an entity that is no longer alive.
+ * entity, which the index skips, nor an entity that is no longer alive.
  *
  * The distance it reports is moved out by the tie margin, so the walk still reaches every hit
  * that ties with the nearest one, which the selection weighs.
