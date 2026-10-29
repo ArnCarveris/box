@@ -24,7 +24,7 @@ python3 tools/integration.py e2e oreelse_mining oreelse_particles
 python3 tools/integration.py e2e oreelse_crafting oreelse_buildings oreelse_rocket
 python3 tools/integration.py e2e oreelse_power oreelse_critters oreelse_critter_fx
 python3 tools/integration.py e2e oreelse_player_fx oreelse_hud oreelse_building_animation
-python3 tools/integration.py e2e oreelse_weapons oreelse_flora
+python3 tools/integration.py e2e oreelse_weapons oreelse_flora oreelse_panels
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -41,7 +41,7 @@ session with the same seed.
 | W A S D | Walk north, west, south, east |
 | Shift (hold) | Run, twice the walking speed; at the release of a placement drag, fill the rectangle |
 | Right mouse button (hold) | Mine the deposit under the cursor, or demolish the building there; a press cancels a placement drag |
-| Left mouse button | Place the selected building; drag for a line, an L or a rectangle |
+| Left mouse button | Place the selected building; drag for a line, an L or a rectangle; on a panel, its button |
 | 1, 2, 3, 4, 5, 6, 8, 9, 0 | Select the wall, drill, solar panel, gun turret, laser turret, missile turret, rocket pad, drone pad, factory (again: clear the selection) |
 | Q | Pipette: select the building under the cursor, the drill over a deposit |
 | T, Y, U, I | Install a rocket engine, fuel storage, cargo bay, life support on the rocket |
@@ -549,8 +549,35 @@ it needs: `Install a cargo bay (U) or life support (I)`, `Needs 4 engines, 2 ins
 `Needs 1 fuel tanks, 0 installed (Y)`. Below 30% health `! SUIT BREACH !` blinks red at the top
 of the screen.
 
-Clicks, the right button and the wheel over a panel of the UI (the status bar) do not reach the
-world: they place, mine and zoom nothing. The plain lines of text let them through.
+Clicks, the right button and the wheel over a panel of the UI (the status bar and the panels
+below) do not reach the world: they place, mine and zoom nothing. The plain lines of text let them
+through.
+
+### The panels of play
+
+Three more panels show while playing, and hide while paused:
+
+- **The order queue**, at the bottom right while the order book has orders, growing upward with
+  its rows (at most 16): per order, oldest first, a header row `Rocket engine (3x)`, then an
+  indented row per part still to craft for it, `Iron plate (8x)`. A row a worker is on fills up
+  with the progress of its craft, amber, or dark red while its order is stalled; a stalled row's
+  text is red. ` - inventory full` follows the text of a row whose item does not fit the
+  inventory; an order whose units are all delivered shows `Rocket engine - wrapping up` (or
+  `- inventory full`) until its leftovers are in the inventory. A click on a header row cancels
+  one unit of the order; the indented rows do nothing.
+- **The power allocator**, at the bottom left: `FREE n`, the bars not assigned out of 6, and a
+  column of four bars for Mining, Weapons and Construction. The bars up to a category's level are
+  lit, orange at level 1, green at 2 and cyan at 3 and 4. A click on a bar sets the level (see
+  Power).
+- **The rocket assembly**, at the right under the status bar while there is a rocket pad: a row
+  per part (life support, cargo bays, fuel tanks, engines) with its count of what the rocket
+  needs and a pip per part, green when the part is complete and red when the rocket cannot
+  launch for it (the fuel tanks or the engines not matching the units), with a minus and a plus
+  button that uninstall and install one (lit when it can be done now; the plus buttons show
+  their keys). Below them the Luminite loaded of the capacity, which a click loads (O), and the
+  LAUNCH button (P), lit amber when the rocket can launch, with what it still needs or the
+  Luminite it will carry: `NEEDS 2 MORE ENGINES`, `CREW + 25 LUMINITE ABOARD`. Where a long
+  queue reaches up under the rocket panel, the rocket panel is on top and takes the clicks.
 
 ### Render quality
 
@@ -842,7 +869,10 @@ its tile in the grid.
 | `etc/ui/palette.flecs` | The colors of the UI, `palette.*` |
 | `etc/ui/icons.flecs` | The icon textures, `icons.*`, which the items name with `OreIcon` |
 | `etc/ui/panel.flecs` | The `Panel` template, the chrome of every panel: the plate, its edge, the hazard strip and the `InputBlocker` |
-| `etc/ui/hud.flecs` | The `OreHud` template: the status bar (`StatusGauge`, `StatusDivider`), the toast, the mine progress bar, the suit breach alert and the rocket status line |
+| `etc/ui/hud.flecs` | The `OreHud` template: the status bar (`StatusGauge`, `StatusDivider`), the toast, the mine progress bar, the suit breach alert, the rocket status line, and the order queue, power allocator and rocket assembly panels, drawn and hit in that order (z 0, 1 and 2) |
+| `etc/ui/queue.flecs` | The `QueueRow` template, a row of the order queue |
+| `etc/ui/power.flecs` | The `PowerBar` and `PowerColumn` templates of the power allocator |
+| `etc/ui/rocket_panel.flecs` | The `RocketSection`, `RocketStep` and `RocketLaunch` templates of the rocket assembly |
 | `etc/icons/` | The original's icons (SVG), unchanged |
 | `etc/ui/hazard_strip.svg` | The original's hazard strip of the panels, unchanged |
 | `src/flow.c` | States, clock, blink, toast, seeds, `oreelse.cancel()`, `oreelse.restart()` |

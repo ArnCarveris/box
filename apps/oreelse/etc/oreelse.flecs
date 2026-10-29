@@ -57,6 +57,9 @@ include deposits
 include run
 include launch
 include ui/panel
+include ui/queue
+include ui/power
+include ui/rocket_panel
 include ui/hud
 
 using flecs.script.math

@@ -1,0 +1,46 @@
+// The rocket assembly panel at the right, while playing (the panels hide while paused), of a
+// crewed rocket ready to launch: life support, a cargo bay, 8 engines and 2 fuel tanks, with 20
+// Luminite loaded and 30 held. Every part section is complete or has a part (green edges and
+// counts): LIFE SUPPORT 1 / 1, CARGO BAYS 1 / 4, FUEL TANKS 2 / 2, ENGINES 8 / 8 with eight
+// narrower pips; the plus steps are dim (nothing more fits or none is held) and the minus steps
+// lit. The Luminite section 20 / 25 in green with its bar 0.8 teal. The LAUNCH button is lit,
+// warm with an amber edge, with the note CREW + 25 LUMINITE ABOARD (20 loaded and 5 that a load
+// adds).
+include apps/oreelse/test/visual/setup/seed
+include apps/oreelse/etc/oreelse
+
+using box.transform
+using box.camera
+using box.surface
+using oreelse
+
+// The capture is 640x360: the HUD lays out for a 1280x720 window and its camera shows it at
+// half size, so the capture holds the whole HUD as a 1280x720 window shows it
+window {
+  Surface: {width: 1280, height: 720}
+}
+
+hud {
+  ui {
+    camera {
+      Camera: {ortho: true, ortho_scale: 0.5}
+    }
+  }
+}
+
+// A rocket pad on the tiles (4..6, 4..6) in the corner of the map, which no deposit reaches
+panel_pad : RocketPad {
+  Position: {-37, 0, -37}
+  OreBuilding: {row: 4, col: 4}
+}
+
+$ {
+  (OreGameState, Playing)
+  OreInventory: {
+    slots: [{item: items.Luminite, amount: 30}]
+  }
+  OreRocketState: {
+    pad: panel_pad, engines: 8, fuel: 2, cargo: 1, life_support: 1, loaded: 20,
+    x: -37, y: 0.74, z: -37
+  }
+}

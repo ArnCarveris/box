@@ -1,0 +1,148 @@
+// The rows of the order queue, the original's QueueRow: a header row per order and an indented
+// row per crafted part of it. The HUD (ui/hud.flecs) lays them out in the queue panel at the
+// bottom right from the rows of the order book (OreCraftBook.rows), each named by its order and
+// item, so a row keeps its entity as the book changes.
+
+using flecs.script
+using flecs.script.math
+using box.layout
+using box.geometry
+using box.material
+using box.texture
+using box.text
+using box.picking
+using oreelse
+
+// Size of a row, the step from one row to the next and where the first sits in the panel
+const queueRowWidth: f32 = 228
+const queueRowHeight: f32 = 26
+const queueRowPitch: f32 = 28
+const queueRowX: f32 = 12
+const queueRowY: f32 = 11
+
+// How far the icon and the label of an indented row move right
+const queueIndent: f32 = 16
+
+// A row of the queue panel, the row-th from the top: the item's icon of 22x22 at (4 + indent, 2)
+// and the label at (32 + indent, 5), red while the row is stalled. While a worker is on it the
+// row has its dark base and a progress fill of 3 + 225 * progress, reddish while stalled. An
+// indented row (sub) has a tick and a soft label and does not react to the pointer; a header
+// row lights up while hovered and a click on it takes one unit off its order while its count is
+// above 0 (oreelse.craft_cancel).
+template QueueRow {
+  prop row: i32 = 0
+  prop order: i32 = 0
+  prop icon: entity = 0
+  prop label: string = ""
+  prop sub: bool = false
+  prop count: i32 = 0
+  prop active: bool = false
+  prop progress: f32 = 0
+  prop stalled: bool = false
+
+  mut hover = false
+
+  const header = !sub
+  const hot = hover && header && count > 0
+
+  const indent: f32 = match sub {
+    true: queueIndent
+    false: 0
+  }
+
+  const labelTone: Rgb = match sub {
+    true: palette.soft
+    false: {224, 229, 237}
+  }
+
+  const labelColor: Rgb = match stalled {
+    true: palette.red
+    false: labelTone
+  }
+
+  const fillColor: Rgb = match stalled {
+    true: {104, 36, 30}
+    false: {102, 74, 26}
+  }
+
+  Layout: {}
+  LayoutItem: {
+    h: Left, v: Top, x: queueRowX, y: -(queueRowY + row * queueRowPitch),
+    width: {mode: Fixed, value: queueRowWidth}, height: {mode: Fixed, value: queueRowHeight}
+  }
+
+  if header {
+    Interactive
+  }
+
+  // The face: lit with a red edge while hovered, the dark base while a worker is on the row,
+  // else none
+  if hot {
+    Rect: {1, 1}
+    Rgb: {52, 56, 66}
+    Border: {width: 1, radius: 3, color: {228, 96, 84, 255}}
+  } else if active {
+    Rect: {1, 1}
+    Rgb: {15, 16, 20}
+    Border: {radius: 3}
+  }
+
+  if active {
+    fill {
+      LayoutItem: {
+        h: Left, v: Top,
+        width: {mode: Fixed, value: 3 + (queueRowWidth - 3) * clamp(progress, 0, 1)},
+        height: {mode: Fixed, value: queueRowHeight}
+      }
+      Rect: {1, 1}
+      Rgb: fillColor
+      Border: {radius: 3}
+    }
+  }
+
+  if sub {
+    tick {
+      LayoutItem: {
+        h: Left, v: Top, x: 7, y: -12,
+        width: {mode: Fixed, value: 7}, height: {mode: Fixed, value: 2}
+      }
+      Rect: {1, 1}
+      Rgb: {92, 98, 112}
+    }
+  }
+
+  if icon != 0 {
+    symbol {
+      LayoutItem: {
+        h: Left, v: Top, x: 4 + indent, y: -2,
+        width: {mode: Fixed, value: 22}, height: {mode: Fixed, value: 22}
+      }
+      Rect: {1, 1}
+      Image: {texture: icon, u0: 0, v0: 0, u1: 1, v1: 1}
+    }
+  }
+
+  name_label {
+    LayoutItem: {h: Left, v: Top, x: 32 + indent, y: -5}
+    Text: {value: label, size: 15}
+    Rgb: labelColor
+  }
+
+  async {
+    while true {
+      await on.enter(this)
+      hover = true
+      await on.leave(this)
+      hover = false
+    }
+  }
+
+  async {
+    while true {
+      await on.click(this)
+      if header && count > 0 {
+        const cancelled: bool = oreelse.craft_cancel(order)
+      }
+    }
+  }
+}

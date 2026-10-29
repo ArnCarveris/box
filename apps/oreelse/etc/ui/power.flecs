@@ -1,0 +1,141 @@
+// The columns of the power allocator, the original's PowerSegment and power_panel: a column per
+// category of OrePowerAlloc with four bars, its icon and its caption. The HUD (ui/hud.flecs)
+// places the three columns in the power panel at the bottom left.
+
+using flecs.script
+using box.layout
+using box.geometry
+using box.material
+using box.texture
+using box.text
+using box.picking
+using oreelse
+
+// The bars: width, height, x in the column and the y of the top bar (level 4), one level lower
+// every powerBarPitch
+const powerBarWidth: f32 = 52
+const powerBarHeight: f32 = 11
+const powerBarX: f32 = 11
+const powerBarTop: f32 = 38
+const powerBarPitch: f32 = 16
+
+// Width of a column
+const powerColumnWidth: f32 = 74
+
+// A bar of a column, the bar of level in the column of the category kind (an OrePowerKind as an
+// i32), at y from the top of the column. It is lit when level is at most the level of the
+// category; the lit bars of a column share the color of its level, orange at 1, green at 2 and
+// cyan above, lighter while hovered. A click sets the level (oreelse.power_set).
+template PowerBar {
+  prop kind: i32 = 0
+  prop level: i32 = 1
+  prop y: f32 = 0
+
+  mut hover = false
+
+  const alloc = OrePowerAlloc[OrePowerAlloc]
+  const tone: i32 = match kind {
+    0: alloc.level[0]
+    1: alloc.level[1]
+    _: alloc.level[2]
+  }
+  const lit = level <= tone
+
+  const warnColor: Rgb = match hover {
+    true: {252, 190, 130}
+    false: {240, 152, 72}
+  }
+
+  const okColor: Rgb = match hover {
+    true: {174, 242, 192}
+    false: {124, 226, 148}
+  }
+
+  const liveColor: Rgb = match hover {
+    true: {156, 246, 238}
+    false: {92, 236, 222}
+  }
+
+  const offColor: Rgb = match hover {
+    true: {34, 37, 44}
+    false: palette.well
+  }
+
+  const litColor: Rgb = match tone {
+    1: warnColor
+    2: okColor
+    _: liveColor
+  }
+
+  const barColor: Rgb = match lit {
+    true: litColor
+    false: offColor
+  }
+
+  Interactive
+  LayoutItem: {
+    h: Left, v: Top, x: powerBarX, y: -y,
+    width: {mode: Fixed, value: powerBarWidth}, height: {mode: Fixed, value: powerBarHeight}
+  }
+  Rect: {1, 1}
+  Rgb: barColor
+  Border: {width: 1, radius: 2, color: {52, 56, 64, 255}}
+
+  async {
+    while true {
+      await on.enter(this)
+      hover = true
+      await on.leave(this)
+      hover = false
+    }
+  }
+
+  async {
+    while true {
+      await on.click(this)
+      const changed: bool = oreelse.power_set(kind, level)
+    }
+  }
+}
+
+// A column of the power panel for the category kind: the bars of levels 4, 3, 2 and 1 from the
+// top at y 38, 54, 70 and 86, the icon of 26x26 at (24, 104) and the caption at y 136, centered
+// in the column's 74 pixels. An instance places it at its x in the panel.
+template PowerColumn {
+  prop kind: i32 = 0
+  prop icon: entity = 0
+  prop caption: string = ""
+
+  Layout: {}
+
+  bar_4 {
+    PowerBar: {kind: kind, level: 4, y: powerBarTop}
+  }
+
+  bar_3 {
+    PowerBar: {kind: kind, level: 3, y: powerBarTop + powerBarPitch}
+  }
+
+  bar_2 {
+    PowerBar: {kind: kind, level: 2, y: powerBarTop + powerBarPitch * 2}
+  }
+
+  bar_1 {
+    PowerBar: {kind: kind, level: 1, y: powerBarTop + powerBarPitch * 3}
+  }
+
+  symbol {
+    LayoutItem: {
+      h: Left, v: Top, x: 24, y: -104,
+      width: {mode: Fixed, value: 26}, height: {mode: Fixed, value: 26}
+    }
+    Rect: {1, 1}
+    Image: {texture: icon, u0: 0, v0: 0, u1: 1, v1: 1}
+  }
+
+  caption_label {
+    LayoutItem: {h: Left, v: Top, y: -136, width: {mode: Fixed, value: powerColumnWidth}}
+    Text: {value: caption, size: 10, width: powerColumnWidth, align: Center}
+    Rgb: palette.soft
+  }
+}
