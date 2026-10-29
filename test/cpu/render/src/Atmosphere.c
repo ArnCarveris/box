@@ -165,8 +165,9 @@ static void sun_transmittance(
     box_render_null_t *null;
     ecs_world_t *world = world_new(&null);
     ecs_entity_t scene = scene_new(world);
-    ecs_set_ptr(world, scene, Atmosphere, a);
-    light_new(world, scene, elevation, 0, 1);
+    Atmosphere value = *a;
+    value.sun = light_new(world, scene, elevation, 0, 1);
+    ecs_set_ptr(world, scene, Atmosphere, &value);
     const AtmosphereStatus *status = frame_status(world, scene);
     test_assert(status->error == NULL);
     glm_vec3_copy(ECS_CONST_CAST(float*, status->sun_transmittance), out);
@@ -243,6 +244,12 @@ void Atmosphere_singleton_has_status(void) {
     ecs_singleton_add(world, Atmosphere);
     test_assert(ecs_has(world, ecs_id(Atmosphere), AtmosphereStatus));
     test_flt(ecs_singleton_get(world, Atmosphere)->planet_radius, 6360);
+    ecs_entity_t sun = ecs_new(world);
+    ecs_set(world, sun, DirectionalLight, {.intensity = 1});
+    ecs_set(world, sun, Rgb, {255, 255, 255});
+    ecs_set(world, sun, Rotation, {glm_rad(30), 0, 0});
+    ecs_singleton_get_mut(world, Atmosphere)->sun = sun;
+    ecs_singleton_modified(world, Atmosphere);
 
     const AtmosphereStatus *status = frame_status(world, ecs_id(Atmosphere));
     test_assert(status->error == NULL);
@@ -389,6 +396,7 @@ void Atmosphere_zero_is_literal(void) {
     zeros.ozone_scale = 0;
     zeros.sun_radius = 0;
     zeros.aerial_distance = 0;
+    zeros.sun = light_new(world, scene, 30, 0, 1);
     ecs_set_ptr(world, scene, Atmosphere, &zeros);
     a = ecs_get(world, scene, Atmosphere);
     test_flt(a->rayleigh.scattering_scale, 0);
@@ -451,7 +459,7 @@ void Atmosphere_error_clears_when_valid(void) {
     ecs_world_t *world = world_new(&null);
 
     ecs_entity_t scene = scene_new(world);
-    light_new(world, scene, 30, 0, 1);
+    ecs_get_mut(world, scene, Atmosphere)->sun = light_new(world, scene, 30, 0, 1);
     ecs_get_mut(world, scene, Atmosphere)->thickness = 0;
     ecs_modified(world, scene, Atmosphere);
     test_assert(frame_status(world, scene)->error != NULL);
@@ -530,6 +538,8 @@ void Atmosphere_sun_light_attenuated(void) {
 
     ecs_entity_t scene = scene_new(world);
     ecs_entity_t sun = light_new(world, scene, 30, 0, 2);
+    ecs_get_mut(world, scene, Atmosphere)->sun = sun;
+    ecs_modified(world, scene, Atmosphere);
     view_new(world, scene);
     const box_render_view_t *v = frame_view(world, null, scene);
     const AtmosphereStatus *status = ecs_get(world, scene, AtmosphereStatus);
@@ -555,6 +565,8 @@ void Atmosphere_sun_below_horizon_is_zero(void) {
 
     ecs_entity_t scene = scene_new(world);
     ecs_entity_t sun = light_new(world, scene, -10, 0, 1);
+    ecs_get_mut(world, scene, Atmosphere)->sun = sun;
+    ecs_modified(world, scene, Atmosphere);
     view_new(world, scene);
     const box_render_view_t *v = frame_view(world, null, scene);
     test_int(v->lights.directional, 1);
@@ -624,7 +636,7 @@ void Atmosphere_explicit_sun_and_moon_attenuated(void) {
     box_render_null_free(null);
 }
 
-void Atmosphere_default_sun_attenuated(void) {
+void Atmosphere_no_sun_leaves_scene_unlit(void) {
     // atmosphere/lights
     box_render_null_t *null;
     ecs_world_t *world = world_new(&null);
@@ -633,18 +645,37 @@ void Atmosphere_default_sun_attenuated(void) {
     view_new(world, scene);
     const box_render_view_t *v = frame_view(world, null, scene);
     const float *t = ecs_get(world, scene, AtmosphereStatus)->sun_transmittance;
-    test_assert(t[0] > t[2] && t[2] > 0.5f && t[0] < 1.0f);
+    test_flt(t[0], 0);
+    test_flt(t[2], 0);
     test_assert(v->lights.buffer != BOX_RENDER_BUFFER_LIGHT_FIRST);
-    test_int(v->lights.directional, 1);
-    test_int(v->lights.count, 1);
-    test_near(v->lights.sun_color[0], GLM_PIf * 1.0f * t[0], 1e-4f);
-    test_near(v->lights.sun_color[1], GLM_PIf * 0.96f * t[1], 1e-4f);
-    test_near(v->lights.sun_color[2], GLM_PIf * 0.9f * t[2], 1e-4f);
+    test_int(v->lights.directional, 0);
+    test_int(v->lights.count, 0);
 
     ecs_remove(world, scene, Atmosphere);
     v = frame_view(world, null, scene);
     test_assert(v->lights.buffer == BOX_RENDER_BUFFER_LIGHT_FIRST);
     test_near(v->lights.sun_color[0], GLM_PIf, 1e-5f);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void Atmosphere_zero_sun_leaves_light_unattenuated(void) {
+    // atmosphere/lights
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+
+    ecs_entity_t scene = scene_new(world);
+    ecs_entity_t light = light_new(world, scene, 30, 0, 2);
+    view_new(world, scene);
+    const box_render_view_t *v = frame_view(world, null, scene);
+    test_int(v->lights.directional, 1);
+    test_near(v->lights.sun_color[0], 2, 1e-5f);
+    test_near(v->lights.sun_color[2], 2, 1e-5f);
+    const AtmosphereStatus *status = ecs_get(world, scene, AtmosphereStatus);
+    test_flt(status->sun_transmittance[0], 0);
+    test_flt(status->sun_transmittance[2], 0);
+    test_assert(view_light(world, scene, light) != NULL);
 
     ecs_fini(world);
     box_render_null_free(null);
@@ -677,7 +708,8 @@ void Atmosphere_scene_without_atmosphere_unchanged(void) {
     ecs_entity_t sky = scene_new(world);
     ecs_entity_t plain = ecs_new(world);
     ecs_add(world, plain, Scene);
-    light_new(world, sky, 30, 0, 1);
+    ecs_get_mut(world, sky, Atmosphere)->sun = light_new(world, sky, 30, 0, 1);
+    ecs_modified(world, sky, Atmosphere);
     light_new(world, plain, 30, 0, 1);
     view_new(world, sky);
     view_new(world, plain);

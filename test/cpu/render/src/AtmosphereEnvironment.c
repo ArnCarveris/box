@@ -54,7 +54,8 @@ static void light_turn(
     ecs_set(world, light, Rotation, {glm_rad(elevation), glm_rad(30.0f), 0});
 }
 
-/** Create a white directional light in a scene that shines down from an elevation.
+/** Create a white directional light in a scene that shines down from an elevation, the sun of
+ * the Atmosphere of the scene when that has none.
  *
  * @param world The world
  * @param scene The scene
@@ -72,6 +73,11 @@ static ecs_entity_t light_new(
     ecs_set(world, light, DirectionalLight, {.intensity = intensity});
     ecs_set(world, light, Rgb, {255, 255, 255});
     light_turn(world, light, elevation);
+    const Atmosphere *a = ecs_get(world, scene, Atmosphere);
+    if (a && !a->sun) {
+        ecs_get_mut(world, scene, Atmosphere)->sun = light;
+        ecs_modified(world, scene, Atmosphere);
+    }
 
     return light;
 }

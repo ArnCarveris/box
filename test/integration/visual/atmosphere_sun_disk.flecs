@@ -6,10 +6,6 @@ using box.light
 using box.effects
 using box.atmosphere
 
-$ {
-  Atmosphere: {units_per_km: 100}
-}
-
 bloom {
   Bloom: {intensity: 0.35, threshold: 1, threshold_softness: 0.5}
 }
@@ -33,4 +29,8 @@ sun {
   Rotation: {0.34907, 0, 0}
   DirectionalLight: {intensity: 6 * flecs.script.math.PI}
   Rgb: {255, 255, 255}
+}
+
+$ {
+  Atmosphere: {units_per_km: 100, sun: sun}
 }

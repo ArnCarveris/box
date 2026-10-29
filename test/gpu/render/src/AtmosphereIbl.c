@@ -77,6 +77,8 @@ static ecs_entity_t sky_new(
     ecs_set(world, *sun, DirectionalLight, {.intensity = GLM_PIf});
     ecs_set(world, *sun, Rgb, {255, 255, 255});
     sun_turn(world, *sun, elevation, yaw);
+    ecs_get_mut(world, scene, Atmosphere)->sun = *sun;
+    ecs_modified(world, scene, Atmosphere);
 
     return scene;
 }

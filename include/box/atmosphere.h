@@ -50,9 +50,7 @@ ECS_STRUCT(AtmosphereMie, {
  * not positive or another negative distance sets AtmosphereStatus.error and renders nothing.
  */
 ECS_STRUCT(Atmosphere, {
-    ecs_entity_t sun;       /**< DirectionalLight that is the sun, default 0 for the light the
-                             *   light extract picks: the first DirectionalLight of the scene or
-                             *   the default sun */
+    ecs_entity_t sun;       /**< DirectionalLight that is the sun, default 0 for no sun */
     ecs_entity_t moon;      /**< DirectionalLight that is the moon, default 0 for no moon; its
                              *   light is scaled by AtmosphereStatus.moon_illumination */
     float planet_radius;    /**< Radius of the planet in km, default 6360 */
