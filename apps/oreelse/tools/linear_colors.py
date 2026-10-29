@@ -19,9 +19,10 @@ Usage: linear_colors.py encode r g b       the bytes to write for an original co
        linear_colors.py apply [files...]   convert the literals in place (once!)
 
 Without files, scan and apply go over every .flecs file of apps/oreelse/etc but etc/ui (apply
-also ran over apps/oreelse/test/visual). What counts as a
-color literal: three integers, or four with an alpha (rgba) or strength (Tint) that stays as it
-is, in braces, positional or named r, g, b, a, that are
+also ran over apps/oreelse/test/visual); the scan still lists the UI's health bar colors of
+etc/config.flecs, which stay as they are. What counts as a color literal: three integers, or
+four with an alpha (rgba) or strength (Tint) that stays as it is, in braces, positional or
+named r, g, b, a, that are
   - the value of a color component or member: Rgb, Tint, color, and the keys start, early,
     late and end of a ParticleGradient (inside color), the live, dead, warn and ok of
     OreStatusLamp, and the props of the templates declared with a color type (the Light's
