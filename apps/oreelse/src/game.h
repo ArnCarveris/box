@@ -4,11 +4,8 @@
  *
  * The scene (apps/oreelse/etc) holds the constants cfg.*, the models, the items, the singletons
  * and the entities of a run; the systems of each area (flow.c, map.c, player.c, inventory.c,
-<<<<<<< HEAD
- * mining.c, craft.c, buildings.c, placement.c, rocket.c, look.c, particles.c) play the game.
-=======
- * mining.c, craft.c, critters.c, buildings.c, placement.c, look.c, particles.c) play the game.
->>>>>>> b539245c95f4ad4f2bb0fffd535807532e543b8c
+ * mining.c, craft.c, critters.c, buildings.c, placement.c, rocket.c, look.c, particles.c) play
+ * the game.
  */
 
 #ifndef OREELSE_GAME_H
@@ -503,7 +500,6 @@ ECS_STRUCT(OreBlastFlash, {
     float range; /**< Range of the light */
 });
 
-<<<<<<< HEAD
 /** Phases of a rocket on the pad, the type of OreRocketState.phase */
 ECS_ENUM(OreLaunchPhase, {
     OreLaunchPhaseIdle,     /**< On the pad: parts can be installed, Luminite loaded */
@@ -568,7 +564,8 @@ ECS_STRUCT(OreRocketState, {
 /** An item a key applies to, on the actions of the rocket keys (input.flecs) */
 ECS_STRUCT(OreItemKey, {
     ecs_entity_t item; /**< Item prefab of the key */
-=======
+});
+
 /** Tiers of critters the waves spawn, the size of the arrays of OreArsenal, OreWaveMix and
  * OreWaveState.spawn: mite, skitter, brute and behemoth
  */
@@ -705,7 +702,6 @@ ECS_PRIVATE                 /**< The cells are not reflected */
     int32_t *start;         /**< First entry of order of every cell, and the end after the last */
     int32_t cap;            /**< Slots allocated */
     int32_t cells;          /**< Entries of start allocated */
->>>>>>> b539245c95f4ad4f2bb0fffd535807532e543b8c
 });
 
 /** Marks an entity created by a script that sets up a run: restart() reloads the script of
@@ -1184,16 +1180,6 @@ bool ore_placement_cancel_drag(
 bool ore_placement_deselect(
     ecs_world_t *world);
 
-<<<<<<< HEAD
-/** Check whether the astronaut rides the rocket: it is hidden, cannot move, mine, shoot or
- * regenerate, is invulnerable and no target.
- *
- * @param world The world or a stage
- * @return Whether the astronaut is aboard
- */
-bool ore_rocket_aboard(
-    const ecs_world_t *world);
-=======
 /** Spawn a critter: an instance of its prefab under the root of OreWaveState at full health,
  * without a target, its retarget timer at cfg.retargetInterval * U(0, 1) and its heading jitter
  * drawn from U(-1, 1).
@@ -1242,7 +1228,14 @@ ecs_entity_t ore_critter_nearest(
  */
 void ore_critters_import(
     ecs_world_t *world);
->>>>>>> b539245c95f4ad4f2bb0fffd535807532e543b8c
+/** Check whether the astronaut rides the rocket: it is hidden, cannot move, mine, shoot or
+ * regenerate, is invulnerable and no target.
+ *
+ * @param world The world or a stage
+ * @return Whether the astronaut is aboard
+ */
+bool ore_rocket_aboard(
+    const ecs_world_t *world);
 
 /** Register the game flow: states, clock, blink, toast, cancel() and restart().
  *

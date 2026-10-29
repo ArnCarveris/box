@@ -21,12 +21,8 @@ bake3 --target em --local-env apps/oreelse                     # build for the b
 
 python3 tools/integration.py e2e oreelse_flow oreelse_look     # the end-to-end scenarios
 python3 tools/integration.py e2e oreelse_mining oreelse_particles
-<<<<<<< HEAD
 python3 tools/integration.py e2e oreelse_crafting oreelse_buildings oreelse_rocket
-=======
-python3 tools/integration.py e2e oreelse_crafting oreelse_buildings
 python3 tools/integration.py e2e oreelse_critters
->>>>>>> b539245c95f4ad4f2bb0fffd535807532e543b8c
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -274,52 +270,6 @@ at half health gives 2 bricks and a gun turret at 10% 1 iron plate and 1 wire; i
 deposit under it (a drill's) is mined by the next swing. A building whose health drops to 0 is
 destroyed.
 
-<<<<<<< HEAD
-### Rockets
-
-The score is the Luminite shipped to orbit. A cargo rocket ships it; a rocket with life support
-ships it and takes you off the planet, which wins the game. Shipped Luminite is banked even if
-you die later.
-
-The rocket is built on the rocket pad (one on the map) from the rocket parts in the inventory. A
-unit is a cargo bay or the life support: a rocket takes up to 4 cargo bays and 1 life support,
-and needs 4 engines and 1 fuel storage per unit. It is valid, ready to launch, with at least
-one unit, exactly 4 engines per unit and exactly one fuel storage per unit. A cargo bay holds 25
-Luminite, so a rocket ships at most 100. A rocket with only the life support (4 engines, 1 fuel
-storage) is valid, ships nothing and wins.
-
-Everything below works only while playing with a pad and the rocket on it, not in flight, and
-with or without a panel open:
-
-- T, Y, U and I install an engine, a fuel storage, a cargo bay and the life support, spending
-  one from the inventory. An engine only goes on while there are fewer than 4 per unit, a fuel
-  storage while there are fewer than the units; otherwise the warning
-  `Engines full for this payload - add a cargo bay (U) first` (or
-  `Fuel tanks full for this payload - add a cargo bay (U) first`) shows. A fifth cargo bay or a
-  second life support does not go on.
-- The minus buttons of the rocket panel uninstall a part into the inventory. The engines and
-  fuel storages above the limits of the units left and the Luminite above the capacity left come
-  back with it, shown as `Payload removed - returned 4 engines, 1 fuel tank, 25 Luminite` (only
-  what came back besides the part). When the returned kinds do not fit the inventory nothing
-  happens and the warning `No room in the inventory for the parts` shows.
-- O loads the Luminite you carry into the cargo bays, as much as they have room for.
-- P launches a valid rocket. It loads first, its engines fire for 1.6 seconds, then it climbs,
-  its speed growing by 9 units a second every second, until it is 60 units up, about 5.25
-  seconds after the launch. With life support you board it: the astronaut stands on the pad,
-  hidden, and cannot move, mine, shoot or regenerate, and the swarm can neither hurt nor target
-  it.
-
-When the rocket arrives its Luminite is added to the shipped total. With life support the game
-is won; a cargo rocket shows `Shipment away!  +25 Luminite` and leaves the pad empty for the
-next rocket.
-
-A pad that is demolished or destroyed while the rocket stands on it loses every part on it and
-the Luminite loaded. A rocket in flight flies on.
-
-F, G, H and J order a rocket engine, fuel storage, cargo bay and life support through the order
-book, one unit, or one order of five with Shift (as many as you can pay for), whatever screen is
-open.
-=======
 ### Critters
 
 | Critter | HP | Speed | Damage/s | Attack range | Radius | Wave cost | From wave |
@@ -379,7 +329,51 @@ tile inside the edge, up to 5 units off on both axes.
 
 The astronaut has 100 HP. After 5 seconds without damage it regenerates 2 HP a second up to
 the full 100. At 0 HP the game is lost.
->>>>>>> b539245c95f4ad4f2bb0fffd535807532e543b8c
+
+### Rockets
+
+The score is the Luminite shipped to orbit. A cargo rocket ships it; a rocket with life support
+ships it and takes you off the planet, which wins the game. Shipped Luminite is banked even if
+you die later.
+
+The rocket is built on the rocket pad (one on the map) from the rocket parts in the inventory. A
+unit is a cargo bay or the life support: a rocket takes up to 4 cargo bays and 1 life support,
+and needs 4 engines and 1 fuel storage per unit. It is valid, ready to launch, with at least
+one unit, exactly 4 engines per unit and exactly one fuel storage per unit. A cargo bay holds 25
+Luminite, so a rocket ships at most 100. A rocket with only the life support (4 engines, 1 fuel
+storage) is valid, ships nothing and wins.
+
+Everything below works only while playing with a pad and the rocket on it, not in flight, and
+with or without a panel open:
+
+- T, Y, U and I install an engine, a fuel storage, a cargo bay and the life support, spending
+  one from the inventory. An engine only goes on while there are fewer than 4 per unit, a fuel
+  storage while there are fewer than the units; otherwise the warning
+  `Engines full for this payload - add a cargo bay (U) first` (or
+  `Fuel tanks full for this payload - add a cargo bay (U) first`) shows. A fifth cargo bay or a
+  second life support does not go on.
+- The minus buttons of the rocket panel uninstall a part into the inventory. The engines and
+  fuel storages above the limits of the units left and the Luminite above the capacity left come
+  back with it, shown as `Payload removed - returned 4 engines, 1 fuel tank, 25 Luminite` (only
+  what came back besides the part). When the returned kinds do not fit the inventory nothing
+  happens and the warning `No room in the inventory for the parts` shows.
+- O loads the Luminite you carry into the cargo bays, as much as they have room for.
+- P launches a valid rocket. It loads first, its engines fire for 1.6 seconds, then it climbs,
+  its speed growing by 9 units a second every second, until it is 60 units up, about 5.25
+  seconds after the launch. With life support you board it: the astronaut stands on the pad,
+  hidden, and cannot move, mine, shoot or regenerate, and the swarm can neither hurt nor target
+  it.
+
+When the rocket arrives its Luminite is added to the shipped total. With life support the game
+is won; a cargo rocket shows `Shipment away!  +25 Luminite` and leaves the pad empty for the
+next rocket.
+
+A pad that is demolished or destroyed while the rocket stands on it loses every part on it and
+the Luminite loaded. A rocket in flight flies on.
+
+F, G, H and J order a rocket engine, fuel storage, cargo bay and life support through the order
+book, one unit, or one order of five with Shift (as many as you can pay for), whatever screen is
+open.
 
 ### The jetpack
 
@@ -592,12 +586,8 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 | `etc/world.flecs` | The ground and the basin |
 | `etc/boundary.flecs` | The hazard band around the playable area |
 | `etc/scenery.flecs` | The boulders and dunes of a run |
-<<<<<<< HEAD
-| `etc/run.flecs` | The astronaut, the parent of the placed buildings and the singletons of a run, the order book, the selection and the rocket state included |
+| `etc/run.flecs` | The astronaut, the parents of the placed buildings and of the critters, and the singletons of a run, the order book, the selection, the rocket state and the waves included |
 | `etc/launch.flecs` | The items of a rocket (`OreRocketKit`) and the rocket on the pad, a `Rocket` instance that follows the rocket state |
-=======
-| `etc/run.flecs` | The astronaut, the parents of the placed buildings and of the critters, and the singletons of a run, the order book, the selection and the waves included |
->>>>>>> b539245c95f4ad4f2bb0fffd535807532e543b8c
 | `etc/deposits.flecs` | The deposits of a run |
 | `etc/player.flecs` | The `Astronaut` template |
 | `etc/props/ore.flecs` | The `Ore` template of the deposits |
