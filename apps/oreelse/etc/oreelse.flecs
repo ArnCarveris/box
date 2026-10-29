@@ -3,8 +3,8 @@
 // look of the original's engine.flecs (the sun, the atmosphere, the effects of the view and the
 // render quality tier), the tile markers, the preview of placement and the HUD; the included
 // scripts hold the constants, the palette and the icons of the UI, the items, the buildings and
-// their connector rules, the models, the input, the map, the run and the UI kit and HUD
-// templates. The game boots into the title screen.
+// their connector rules, the models, the input, the map, the run and the UI kit, screen and
+// HUD templates. The game boots into the title screen.
 
 include config
 include ui/palette
@@ -57,6 +57,7 @@ include deposits
 include run
 include launch
 include ui/panel
+include ui/screens
 include ui/hud
 
 using flecs.script.math

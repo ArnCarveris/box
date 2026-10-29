@@ -25,6 +25,7 @@ python3 tools/integration.py e2e oreelse_crafting oreelse_buildings oreelse_rock
 python3 tools/integration.py e2e oreelse_power oreelse_critters oreelse_critter_fx
 python3 tools/integration.py e2e oreelse_player_fx oreelse_hud oreelse_building_animation
 python3 tools/integration.py e2e oreelse_weapons oreelse_flora oreelse_drones
+python3 tools/integration.py e2e oreelse_screens
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -75,6 +76,34 @@ R starts a new run once the game is won or lost, straight into play, on a new ma
 nothing while playing. The camera keeps its zoom level.
 
 The clock counts the seconds of play; the end screen shows it as the survival time.
+
+### The screens
+
+The title screen shows three signs, MINE, DEFEND and ESCAPE, what the game is about, the list of
+the controls and `PRESS ANY KEY TO START`. The pause screen shows `PAUSED`, the quality button
+(see Render quality), the same list of the controls and `Press ESC to resume`; the quality button
+is the only control that works while paused. The end screen shows `YOU ESCAPED` when the game is
+won and `THE SWARM GOT YOU` when it is lost, the Luminite shipped, the critters killed, the time
+survived (the clock as minutes and seconds, `12:05`) with the last wave, and
+`Press R to land again`:
+
+```
+25 Luminite shipped
+37 critters killed - survived 12:05 to wave 9
+```
+
+The list of the controls on the title and pause screens:
+
+| Key | Action |
+| --- | --- |
+| W A S D | Walk |
+| Shift | Walk faster |
+| Mouse wheel | Zoom in/out |
+| Left click | Place selected building |
+| Right click | Demolish/mine object under mouse cursor |
+| E | Open / close the inventory |
+| Q | Select the building under the cursor / deselect |
+| ESC | Cancel / Pause |
 
 Messages show at the bottom of the screen for 4 seconds of play, warnings for 2.5. A new message
 replaces the current one.
@@ -872,7 +901,9 @@ its tile in the grid.
 | `etc/ui/palette.flecs` | The colors of the UI, `palette.*` |
 | `etc/ui/icons.flecs` | The icon textures, `icons.*`, which the items name with `OreIcon` |
 | `etc/ui/panel.flecs` | The `Panel` template, the chrome of every panel: the plate, its edge, the hazard strip and the `InputBlocker` |
-| `etc/ui/hud.flecs` | The `OreHud` template: the status bar (`StatusGauge`, `StatusDivider`), the toast, the mine progress bar, the suit breach alert and the rocket status line |
+| `etc/ui/screens.flecs` | The screens of the game flow: `OreTitleScreen` (with its signs, `OreSign`), `OrePauseScreen` (with `OreQualityButton`), `OreEndScreen`, and `OreControls`, the list of the controls the title and pause screens share (`OreControl` rows) |
+| `etc/ui/signs/` | The original's sign art of the title screen (SVG), unchanged |
+| `etc/ui/hud.flecs` | The `OreHud` template, which shows the screens in their states: the status bar (`StatusGauge`, `StatusDivider`), the toast, the mine progress bar, the suit breach alert and the rocket status line |
 | `etc/icons/` | The original's icons (SVG), unchanged |
 | `etc/ui/hazard_strip.svg` | The original's hazard strip of the panels, unchanged |
 | `src/flow.c` | States, clock, blink, toast, seeds, `oreelse.cancel()`, `oreelse.restart()` |
