@@ -9,6 +9,7 @@
 using box.transform
 using box.geometry
 using box.material
+using oreelse
 
 const steel: Rgb = {172, 180, 194}
 const steelShade: Rgb = {112, 120, 136}
@@ -19,6 +20,21 @@ const lampDead: Rgb = {248, 84, 72}
 const gunSteel: Rgb = {84, 92, 108}
 
 prefab GunTurret {
+  // The item: crafted through the order book into the inventory, placed by spending one
+  OreItem: {name: "Gun turret", detail: "Short range rapid fire."}
+  OreRecipe: {
+    inputs: [
+      {item: items.IronPlate, amount: 10},
+      {item: items.Wire, amount: 15},
+      {item: items.Electronics, amount: 5}
+    ],
+    yield: 1, time: 2
+  }
+  OreFootprint: {w: 1, h: 1}
+  OreHealth: {value: 120, max: 120}
+  // Draws no power (0 W), as the original: no OrePowerConsumer
+  OrePowerCategory: {kind: Weapons}
+
   base {
     Position: {0, 0.13, 0}
     Box: {1.74, 0.26, 1.74}

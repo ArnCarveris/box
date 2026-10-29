@@ -9,6 +9,7 @@
 using box.transform
 using box.geometry
 using box.material
+using oreelse
 
 const steel: Rgb = {172, 180, 194}
 const steelShade: Rgb = {112, 120, 136}
@@ -18,6 +19,21 @@ const lampLive: Rgb = {92, 236, 222}
 const lampDead: Rgb = {248, 84, 72}
 
 prefab MissileTurret {
+  // The item: crafted through the order book into the inventory, placed by spending one
+  OreItem: {name: "Missile turret", detail: "Firepower to deal with the most sturdy targets."}
+  OreRecipe: {
+    inputs: [
+      {item: items.IronPlate, amount: 40},
+      {item: items.Wire, amount: 20},
+      {item: items.Electronics, amount: 20}
+    ],
+    yield: 1, time: 5
+  }
+  OreFootprint: {w: 1, h: 1}
+  OreHealth: {value: 180, max: 180}
+  OrePowerConsumer: {watts: 20}
+  OrePowerCategory: {kind: Weapons}
+
   base {
     Position: {0, 0.15, 0}
     Box: {1.86, 0.3, 1.86}

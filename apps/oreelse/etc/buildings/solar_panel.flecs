@@ -8,6 +8,7 @@
 using box.transform
 using box.geometry
 using box.material
+using oreelse
 
 const steelShade: Rgb = {112, 120, 136}
 const steelDeep: Rgb = {56, 62, 76}
@@ -16,6 +17,19 @@ const accent: Rgb = {92, 236, 222}
 const solarFrame: Rgb = {96, 104, 122}
 
 prefab SolarPanel {
+  // The item: crafted through the order book into the inventory, placed by spending one
+  OreItem: {name: "Solar panel", detail: "Generates power."}
+  OreRecipe: {
+    inputs: [
+      {item: items.IronPlate, amount: 4},
+      {item: items.CopperPlate, amount: 6}
+    ],
+    yield: 1, time: 2
+  }
+  OreFootprint: {w: 1, h: 1}
+  OreHealth: {value: 100, max: 100}
+  OrePowerProducer: {watts: 20}
+
   base {
     Position: {0, 0.09, 0}
     Box: {1.72, 0.18, 1.72}

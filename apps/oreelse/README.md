@@ -21,7 +21,7 @@ bake3 --target em --local-env apps/oreelse                     # build for the b
 
 python3 tools/integration.py e2e oreelse_flow oreelse_look     # the end-to-end scenarios
 python3 tools/integration.py e2e oreelse_mining oreelse_particles
-python3 tools/integration.py e2e oreelse_crafting
+python3 tools/integration.py e2e oreelse_crafting oreelse_buildings
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -36,8 +36,11 @@ session with the same seed.
 | --- | --- |
 | Any key, left or right click | Start (on the title screen) |
 | W A S D | Walk north, west, south, east |
-| Shift (hold) | Run, twice the walking speed |
-| Right mouse button (hold) | Mine the deposit under the cursor |
+| Shift (hold) | Run, twice the walking speed; at the release of a placement drag, fill the rectangle |
+| Right mouse button (hold) | Mine the deposit under the cursor, or demolish the building there; a press cancels a placement drag |
+| Left mouse button | Place the selected building; drag for a line, an L or a rectangle |
+| 1, 2, 3, 4, 5, 6, 8, 9, 0 | Select the wall, drill, solar panel, gun turret, laser turret, missile turret, rocket pad, drone pad, factory (again: clear the selection) |
+| Q | Pipette: select the building under the cursor, the drill over a deposit |
 | Mouse wheel | Zoom: up zooms in, down zooms out, three levels |
 | ESC | One step back; with nothing left to back out of, pause or resume |
 | R | Restart (on the win or lose screen) |
@@ -58,8 +61,8 @@ ESC is one step back at a time, in this order:
 4. A building selected: clear the selection.
 5. Otherwise: pause.
 
-(Steps 2 to 4 come with placement, the inventory screen and the buildings.) Everything stops
-dead while paused, the clock included.
+(Step 3 comes with the inventory screen.) Everything stops dead while paused, the clock
+included.
 
 R starts a new run once the game is won or lost, straight into play, on a new map. It does
 nothing while playing. The camera keeps its zoom level.
@@ -111,6 +114,8 @@ does not zoom.
 | RocketLifeSupport | Rocket life support | Life support module that lets you evacuate the planet in a rocket. | IronPlate 8, CopperPlate 8, Electronics 4 | 1 | 120 |
 | RocketFuelStorage | Rocket fuel storage | Rocket fuel. One per cargo bay or life support. | IronPlate 10, CopperPlate 4 | 1 | 30 |
 
+The buildings are items too, see below.
+
 ### The inventory
 
 The astronaut has one inventory, a pack that holds any amount of an item, but at most 15 kinds
@@ -119,7 +124,8 @@ first free one of the 15 slots and keeps it until its count drops to 0, which fr
 the inventory screen shows the slots in that order. When 15 kinds are held, a new kind does not
 fit and the warning `Inventory full - 15 item kinds is the limit` shows.
 
-Every run starts with the crate of the crash: 16 iron plates and 12 copper plates.
+Every run starts with the crate of the crash: 16 iron plates, 12 copper plates and a solar
+panel.
 
 ### Mining
 
@@ -135,7 +141,8 @@ and the full warning shows at every swing.
 
 Moving the cursor to another deposit starts the swing over. Releasing the button, walking out
 of reach or moving the cursor off the deposit loses the progress of the swing. The right button
-over a panel of the UI does not mine.
+over a panel of the UI does not mine. Over a building the right button demolishes it instead
+(see below).
 
 ### Crafting
 
@@ -194,6 +201,75 @@ cost of one unit, or what is still missing when that is more, and how much of it
 parts you hold counting as the ore they are made of. A row falls short only when ore is really
 missing.
 
+### Buildings
+
+Every building is an item: it is crafted into the inventory through the order book like any
+other item (yield 1) and placed by spending one from the inventory.
+
+| Building | Name | Detail | Recipe | Time (s) | Footprint | HP | Power | Category |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Wall | Wall | Buys your base a bit more time. | StoneBrick 4 | 1 | 1x1 | 300 | | |
+| Drill | Drill | Mines ore deposits. | IronPlate 6 | 1 | 1x1, deposit tiles only | 100 | 4 W | Mining |
+| SolarPanel | Solar panel | Generates power. | IronPlate 4, CopperPlate 6 | 2 | 1x1 | 100 | +20 W | |
+| GunTurret | Gun turret | Short range rapid fire. | IronPlate 10, Wire 15, Electronics 5 | 2 | 1x1 | 120 | 0 W | Weapons |
+| LaserTurret | Laser turret | High efficiency photon delivery for melting opponents. | IronPlate 30, Wire 10, Electronics 10 | 4 | 1x1 | 150 | 25 W | Weapons |
+| MissileTurret | Missile turret | Firepower to deal with the most sturdy targets. | IronPlate 40, Wire 20, Electronics 20 | 5 | 1x1 | 180 | 20 W | Weapons |
+| Factory | Factory | Speeds up crafting. | IronPlate 20, Wire 20, Electronics 5, StoneBrick 10 | 12 | 2x2 | 100 | 75 W | Construction |
+| RocketPad | Rocket pad | Rocket launching facility for luminite shipments and evacuation. | IronPlate 25, CopperPlate 50, StoneBrick 25, Wire 50, Electronics 25 | 8 | 3x3, at most 1 | 400 | | |
+| DronePad | Drone pad | Drones repair buildings, repairs cost iron. | IronPlate 24, Wire 18, Electronics 12 | 5 | 2x2 | 140 | 20 W | |
+
+A building covers its footprint from its top left tile (the lowest row and column) on, and
+stands at the center of it. A tile holds one building. Two walls on orthogonally neighboring
+tiles are joined by a wall segment, which is only for the look.
+
+### Placement
+
+The digit keys select a building for placement (with Shift too): 1 the wall, 2 the drill, 3 the
+solar panel, 4 the gun turret, 5 the laser turret, 6 the missile turret, 8 the rocket pad, 9 the
+drone pad and 0 the factory. The key of the selected building clears the selection; the key of a
+building you have none of does nothing. Q, the pipette, selects the building under the cursor,
+the drill over a deposit, and clears the selection over empty ground or off the map; with none
+of that building in the inventory it warns `No Drill in inventory` (with the building's name)
+and keeps the selection.
+
+A building can be placed on a cell when every tile of its footprint is on the map without a
+building, every tile has a deposit for a drill and none has one for any other building, the
+nearest of its tile centers is at most 15 units from the astronaut, its limit is not reached (one
+rocket pad) and the inventory holds one. Critters and the astronaut do not block it.
+
+A left click places the selected building on the tile under the cursor, instantly, spending one.
+A drag places nothing until the button is released; then the cells step by the footprint from
+the tile the drag started on to the tile under the cursor: a line along a row or a column, and
+otherwise an L whose corner follows where the cursor sits in the last tile. Holding Shift at the
+release fills the rectangle instead. A drag covers at most 64 cells. The cells are placed row by
+row from the top left, one item each, until the item runs out (so the top left part gets built),
+skipping the cells that cannot be placed. When nothing was placed and a cell was too far away,
+the warning `Too far away` shows. When the last one is placed the selection clears. ESC or a
+right click during a drag throws it away (`Placement cancelled`).
+
+While a building is selected, a preview shows on the cells the click or the drag would place: the
+tile markers under every tile of a cell, yellow where it can be placed (counting the items the
+cells before it use) and red where it cannot, and a translucent ghost of the building, blue or
+red.
+
+### Demolish
+
+The right mouse button over a building demolishes it instead of mining the tile: the swing takes
+0.8 seconds for every building, with the reach and the marker of mining, and moving between the
+tiles of one building does not restart it. An undamaged building goes back into the inventory
+(refused with the full warning when it is a new kind and 15 kinds are held). A damaged one gives
+back the salvage of its recipe instead: `trunc(amount * health / max)` of every input, so a wall
+at half health gives 2 bricks and a gun turret at 10% 1 iron plate and 1 wire; it shows as
+`Salvaged 1 Iron plate, 1 Wire (10%)` (or `Salvaged nothing (5%)`), and is refused with
+`Inventory full - can't salvage` when the new kinds do not fit. Then the building is gone; a
+deposit under it (a drill's) is mined by the next swing. A building whose health drops to 0 is
+destroyed.
+
+### The jetpack
+
+Over a tile with a building the astronaut hovers on its jetpack 3 units up, rising at 7 units a
+second and coming back down at 5 once it is off the buildings.
+
 ### Render quality
 
 Three render quality tiers trade the look for speed; the button on the pause screen cycles them
@@ -243,7 +319,8 @@ Every task of the port follows these.
   singleton. No invisible widgets for hotkeys and no synthetic input events.
 - **The cancel chain** is the array `ore_cancel_steps` in `src/flow.c`: a later area inserts
   its step (a function that backs out of one thing and returns whether it did) at its place
-  in the chain above.
+  in the chain above (placement's are `ore_placement_cancel_drag` and
+  `ore_placement_deselect`).
 - **UI** is a screen space UI scene like bunnyhopper's HUD, reactive to the game's
   singletons, using box's layout, text, image and widget features. Clicks are `on.click`
   handlers (or `ActionTrigger`) that call `oreelse` functions. Panels have `InputBlocker` so a
@@ -387,11 +464,13 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 | `etc/oreelse.flecs` | The window, the camera, the sun, the atmosphere, the effects and the view, the render quality tier, the mining markers; includes the rest |
 | `etc/config.flecs` | The constants `cfg.*` |
 | `etc/resources.flecs` | The item prefabs other than the buildings, with names and recipes |
+| `etc/buildings/*.flecs` | The building prefabs, models with their item, recipe, footprint, health and power |
+| `etc/buildings/rules.flecs` | The connector rules (`OreConnectRule`): the wall segment between two walls |
 | `etc/input.flecs` | The actions, their bindings and the loops of the actions that fire once |
 | `etc/world.flecs` | The ground and the basin |
 | `etc/boundary.flecs` | The hazard band around the playable area |
 | `etc/scenery.flecs` | The boulders and dunes of a run |
-| `etc/run.flecs` | The astronaut and the singletons of a run, the order book included |
+| `etc/run.flecs` | The astronaut, the parent of the placed buildings and the singletons of a run, the order book and the selection included |
 | `etc/deposits.flecs` | The deposits of a run |
 | `etc/player.flecs` | The `Astronaut` template |
 | `etc/props/ore.flecs` | The `Ore` template of the deposits |

@@ -89,6 +89,16 @@ bool ore_inventory_fits(
     return kinds <= ore_inventory_limit(world);
 }
 
+const char* ore_item_name(
+    const ecs_world_t *world,
+    ecs_entity_t item)
+{
+    const OreItem *it = item ? ecs_get(world, item, OreItem) : NULL;
+    const char *name = it && it->name ? it->name : (item ? ecs_get_name(world, item) : NULL);
+
+    return name ? name : "";
+}
+
 void ore_inventory_full(
     ecs_world_t *world)
 {

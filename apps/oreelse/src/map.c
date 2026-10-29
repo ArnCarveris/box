@@ -5,7 +5,10 @@
  *
  * Tile (row, col) is centered at x = x0 + col * tile, z = z0 + row * tile. A deposit registers
  * in its tile when its OreDeposit is set; a later deposit on a taken tile is rejected and
- * deleted by ore_map_purge, so the first one generated keeps it. OreHover is the hover tile.
+ * deleted by ore_map_purge, so the first one generated keeps it.
+ *
+ * The buildings (buildings.c) register in their tiles, the connectors on the edges between
+ * them. OreHover is the hover tile.
  */
 
 #include "game.h"
@@ -96,12 +99,18 @@ ecs_entity_t* ore_map_building(
     return i < 0 ? NULL : &map->buildings[i];
 }
 
-/** Give the map the cells of a grid, empty, unless it has them already.
- *
- * @param map The tile grid
- * @param grid The grid of cfg
- */
-static void ore_map_fit(
+ecs_entity_t* ore_map_link(
+    OreMap *map,
+    int32_t row,
+    int32_t col,
+    bool vertical)
+{
+    int32_t i = ore_map_index(map, row, col);
+
+    return i < 0 ? NULL : &map->links[i * 2 + (vertical ? 1 : 0)];
+}
+
+void ore_map_fit(
     OreMap *map,
     const ore_grid_t *grid)
 {
@@ -109,10 +118,24 @@ static void ore_map_fit(
     if (count > 0 && (!map->deposits || map->rows != grid->rows || map->cols != grid->cols)) {
         ecs_os_free(map->deposits);
         ecs_os_free(map->buildings);
+        ecs_os_free(map->links);
         map->deposits = ecs_os_calloc_n(ecs_entity_t, count);
         map->buildings = ecs_os_calloc_n(ecs_entity_t, count);
+        map->links = ecs_os_calloc_n(ecs_entity_t, count * 2);
         map->rows = grid->rows;
         map->cols = grid->cols;
+        ecs_vec_clear(&map->dirty);
+    }
+}
+
+void ore_map_touch(
+    OreMap *map,
+    int32_t row,
+    int32_t col)
+{
+    int32_t i = ore_map_index(map, row, col);
+    if (i >= 0) {
+        ecs_vec_append_t(NULL, &map->dirty, int32_t)[0] = i;
     }
 }
 
@@ -120,14 +143,18 @@ static void ore_map_fit(
 static ECS_DTOR(OreMap, ptr, {
     ecs_os_free(ptr->deposits);
     ecs_os_free(ptr->buildings);
+    ecs_os_free(ptr->links);
     ecs_vec_fini_t(NULL, &ptr->rejected, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &ptr->dirty, int32_t);
 })
 
 /** Move the cells of a map, leaving the source without them */
 static ECS_MOVE(OreMap, dst, src, {
     ecs_os_free(dst->deposits);
     ecs_os_free(dst->buildings);
+    ecs_os_free(dst->links);
     ecs_vec_fini_t(NULL, &dst->rejected, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &dst->dirty, int32_t);
     *dst = *src;
     ecs_os_zeromem(src);
 })
@@ -217,24 +244,18 @@ static void OreDepositPurge(
     ore_map_purge(it->stage);
 }
 
-/** Find the tile under the cursor: where the cursor ray of the world view meets the ground
- * y = 0, whatever stands in between. Without a ray, a ray that misses the ground or a point off
- * the grid there is no tile. Runs in every state.
- *
- * @param it Iterator with the OreView and OreHover singletons
- */
-static void OreHoverUpdate(
-    ecs_iter_t *it)
+bool ore_hover_find(
+    const ecs_world_t *world,
+    const OreView *view,
+    OreHover *hover)
 {
-    const OreView *view = ecs_field(it, OreView, 0);
-    OreHover *hover = ecs_field(it, OreHover, 1);
-    ore_grid_t grid = ore_grid_get(it->world);
+    ore_grid_t grid = ore_grid_get(world);
     OreHover next = { .on_grid = false, .row = -1, .col = -1 };
     vec3 origin, dir;
     float t, cf, rf;
     int32_t row, col;
     glm_vec3_copy(hover->point, next.point);
-    if (box_view_cursor_ray(it->world, view->view, origin, dir) && fabsf(dir[1]) > 1e-6f) {
+    if (box_view_cursor_ray(world, view->view, origin, dir) && fabsf(dir[1]) > 1e-6f) {
         t = -origin[1] / dir[1];
         if (t >= 0) {
             next.point[0] = origin[0] + dir[0] * t;
@@ -254,6 +275,24 @@ static void OreHoverUpdate(
         }
     }
 
+    *hover = next;
+
+    return next.on_grid;
+}
+
+/** Find the tile under the cursor: where the cursor ray of the world view meets the ground
+ * y = 0, whatever stands in between. Without a ray, a ray that misses the ground or a point off
+ * the grid there is no tile. Runs in every state.
+ *
+ * @param it Iterator with the OreView and OreHover singletons
+ */
+static void OreHoverUpdate(
+    ecs_iter_t *it)
+{
+    const OreView *view = ecs_field(it, OreView, 0);
+    OreHover *hover = ecs_field(it, OreHover, 1);
+    OreHover next = *hover;
+    ore_hover_find(it->world, view, &next);
     if (next.on_grid != hover->on_grid || next.row != hover->row || next.col != hover->col ||
         next.fx != hover->fx || next.fz != hover->fz || next.point[0] != hover->point[0] ||
         next.point[2] != hover->point[2])

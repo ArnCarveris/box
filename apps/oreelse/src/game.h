@@ -4,7 +4,7 @@
  *
  * The scene (apps/oreelse/etc) holds the constants cfg.*, the models, the items, the singletons
  * and the entities of a run; the systems of each area (flow.c, map.c, player.c, inventory.c,
- * mining.c, look.c, particles.c) play the game.
+ * mining.c, craft.c, buildings.c, placement.c, look.c, particles.c) play the game.
  */
 
 #ifndef OREELSE_GAME_H
@@ -41,6 +41,12 @@
 
 /** Raw ores, the size of OreNeeds.ores */
 #define ORE_RAW_ORES (4)
+
+/** Buildings a slot of a connector rule names, the size of the arrays of OreConnectRule */
+#define ORE_RULE_SLOT (4)
+
+/** Cells a placement drag covers at most, the most cfg.dragMax */
+#define ORE_DRAG_MAX (64)
 
 /** Read the float constant cfg.<name> of the scene (etc/config.flecs) */
 #define ORE_CFG(world, name) ecs_const_var_get_t(world, "cfg." name, ecs_f32_t)
@@ -125,14 +131,20 @@ ECS_STRUCT(OreActions, {
     ecs_entity_t back;    /**< Walk toward +Z */
     ecs_entity_t left;    /**< Walk toward -X */
     ecs_entity_t right;   /**< Walk toward +X */
-    ecs_entity_t run;     /**< Run at cfg.runMultiplier times the walk speed */
-    ecs_entity_t mine;    /**< Mine the target on the hover tile */
+    ecs_entity_t run;     /**< Run at cfg.runMultiplier times the walk speed; held at the release
+                           *   of a placement drag it fills the rectangle */
+    ecs_entity_t mine;    /**< Mine the target on the hover tile, or demolish the building there */
+    ecs_entity_t place;   /**< Place the selected building; its drag (ActionState.drag) tells a
+                           *   click from a drag */
 });
 
 /** The astronaut the player walks with WASD. Modified when a member changes */
 ECS_STRUCT(OrePlayer, {
     bool moving;  /**< A walk key is held while playing */
     bool running; /**< Moving with the run key held */
+    float hover;  /**< Height of the jetpack above the ground, its Position.y: it rises to
+                   *   cfg.hoverHeight over a tile with a building and falls back to 0 */
+    bool airborne; /**< hover is above cfg.airborne, the jetpack fires */
 });
 
 /** A limb pivot of a model; its Rotation.x swings with the walk (OrePlayerFx) */
@@ -293,6 +305,111 @@ ECS_STRUCT(OreNeeds, {
     int32_t count;     /**< Ores listed */
 });
 
+/** The footprint of a building, on its prefab and inherited: it covers w columns and h rows from
+ * its top left tile (the lowest row and column). 1x1 without it.
+ */
+ECS_STRUCT(OreFootprint, {
+    int32_t w;    /**< Columns it covers */
+    int32_t h;    /**< Rows it covers */
+    bool deposit; /**< It only goes on tiles with a deposit (the drill); every other building
+                   *   only goes on tiles without one */
+});
+
+/** The most instances of a building the map holds, on its prefab and inherited */
+ECS_STRUCT(OreBuildLimit, {
+    int32_t max; /**< Most placed buildings of the prefab, 0 for no limit */
+});
+
+/** Hit points of a building (on its prefab, copied to every instance), the astronaut or a
+ * critter. A building at 0 or below is destroyed.
+ */
+ECS_STRUCT(OreHealth, {
+    float value; /**< Hit points left */
+    float max;   /**< Hit points of the undamaged entity */
+});
+
+/** Power a building draws while it works, on its prefab and inherited (OrePower) */
+ECS_STRUCT(OrePowerConsumer, {
+    float watts; /**< Watts it draws */
+});
+
+/** Power a building generates, on its prefab and inherited (OrePower) */
+ECS_STRUCT(OrePowerProducer, {
+    float watts; /**< Watts it generates */
+});
+
+/** Categories of the power allocation, the type of OrePowerCategory.kind */
+ECS_ENUM(OrePowerKind, {
+    OrePowerKindMining,      /**< Drills */
+    OrePowerKindWeapons,     /**< Turrets */
+    OrePowerKindConstruction /**< Factories */
+});
+
+/** The power category of a building, on its prefab and inherited (OrePower) */
+ECS_STRUCT(OrePowerCategory, {
+    OrePowerKind kind; /**< Category its power comes out of */
+});
+
+/** A placed building, on the instance: its footprint starts at (row, col), every tile of it maps
+ * to the building in the tile grid of OreMap while it is set. Its Position is the center of the
+ * footprint.
+ */
+ECS_STRUCT(OreBuilding, {
+    int32_t row; /**< Row of its top left tile */
+    int32_t col; /**< Column of its top left tile */
+});
+
+/** An auto tiling rule of rules.flecs, the BuildingRule2x1 of the original: out joins two
+ * buildings on orthogonally neighboring tiles.
+ *
+ * A slot names the buildings it accepts, 0 after the last; an empty slot accepts any tile. left
+ * and right match a pair in a row, top and bottom one in a column; with rotate the pair matches
+ * swapped too, and a rule with only left and right also matches a column, turned by PI / 2.
+ */
+ECS_STRUCT(OreConnectRule, {
+    ecs_entity_t left[4];   /**< Buildings of the west tile of a pair in a row */
+    ecs_entity_t right[4];  /**< Buildings of the east tile of a pair in a row */
+    ecs_entity_t top[4];    /**< Buildings of the north tile of a pair in a column */
+    ecs_entity_t bottom[4]; /**< Buildings of the south tile of a pair in a column */
+    ecs_entity_t out;       /**< Prefab of the connector placed on the shared edge */
+    bool rotate;            /**< The rule matches either order and turns for a column */
+});
+
+/** A connector a rule placed, on the instance: it sits on the edge between (row, col) and the
+ * tile east of it, or south of it when vertical, and is registered in OreMap. Purely visual.
+ */
+ECS_STRUCT(OreConnector, {
+    int32_t row;   /**< Row of the west or north tile of the edge */
+    int32_t col;   /**< Column of the west or north tile of the edge */
+    bool vertical; /**< The edge is between (row, col) and (row + 1, col) */
+});
+
+/** Placement, a singleton run.flecs resets: the building selected for placement and the drag in
+ * flight. Modified when a value changes, so the inventory screen can show the selection.
+ */
+ECS_STRUCT(OrePlacement, {
+    ecs_entity_t root;     /**< Parent of the placed buildings and connectors, an entity of the
+                            *   run, so a restart deletes them */
+    ecs_entity_t selected; /**< Building prefab selected for placement, 0 for none */
+    bool dragging;         /**< A press of Place on a tile with a selection, until its release */
+    int32_t anchor_row;    /**< Row of the tile the drag was pressed on */
+    int32_t anchor_col;    /**< Column of the tile the drag was pressed on */
+});
+
+/** The preview of placement, a singleton oreelse.flecs sets: the markers and the ghosts of the
+ * cells the selected building would go on are pooled children of root.
+ */
+ECS_STRUCT(OrePreview, {
+    ecs_entity_t root; /**< Parent of the markers and ghosts of the preview */
+    ecs_entity_t good; /**< Marker prefab of a tile of a cell that can be placed, TileMarker */
+    ecs_entity_t bad;  /**< Marker prefab of a tile of a cell that cannot, TileMarkerBad */
+});
+
+/** Selects a building for placement, on the actions of the digit keys (input.flecs) */
+ECS_STRUCT(OreSelectKey, {
+    ecs_entity_t building; /**< Building prefab the key selects */
+});
+
 /** The tile under the cursor, a singleton: where the cursor ray of the world view (OreView)
  * meets the ground y = 0. Mining, placement and the pipette read it. Modified when it changes.
  */
@@ -324,9 +441,13 @@ ECS_STRUCT(OreMap, {
 ECS_PRIVATE                    /**< The cells are not reflected */
     ecs_entity_t *deposits;    /**< Deposit of every tile, row major, 0 for none */
     ecs_entity_t *buildings;   /**< Building of every tile, row major, 0 for none */
+    ecs_entity_t *links;       /**< Connector of the east (2 i) and south (2 i + 1) edge of
+                                *   every tile i, 0 for none */
     ecs_vec_t rejected;        /**< Deposits that registered on a taken tile, deleted by
                                 *   ore_map_purge: an entity cannot be deleted while the
                                 *   script that creates it still sets it */
+    ecs_vec_t dirty;           /**< Tiles (row major indices) whose building changed, the
+                                *   connectors of their edges to sync */
 });
 
 /** Render quality tiers, the type of OreQuality.tier. The pause screen's button cycles
@@ -382,6 +503,11 @@ ECS_STRUCT(OreBlastFlash, {
  * every entity with it, which deletes the entities of the run and creates those of a new one
  */
 extern ECS_TAG_DECLARE(OreRunScript);
+
+/** Marks the root of a ghost, the translucent preview of a building: the parts below it draw
+ * without emission (OreGhostDim)
+ */
+extern ECS_TAG_DECLARE(OreGhost);
 
 /** The geometry of the tile grid, read from cfg once per system run */
 typedef struct ore_grid_t {
@@ -558,6 +684,52 @@ ecs_entity_t* ore_map_building(
     int32_t row,
     int32_t col);
 
+/** Get the connector cell of the edge between a tile and its east or south neighbor.
+ *
+ * @param map The tile grid
+ * @param row The row
+ * @param col The column
+ * @param vertical The edge to the south neighbor, else to the east one
+ * @return The cell, NULL off the grid or before the first registration
+ */
+ecs_entity_t* ore_map_link(
+    OreMap *map,
+    int32_t row,
+    int32_t col,
+    bool vertical);
+
+/** Give the map the cells of a grid, empty, unless it has them already.
+ *
+ * @param map The tile grid
+ * @param grid The grid of cfg
+ */
+void ore_map_fit(
+    OreMap *map,
+    const ore_grid_t *grid);
+
+/** Mark a tile whose building changed, so the connectors of its edges are synced.
+ *
+ * @param map The tile grid
+ * @param row The row
+ * @param col The column
+ */
+void ore_map_touch(
+    OreMap *map,
+    int32_t row,
+    int32_t col);
+
+/** Find the tile under the cursor: where the cursor ray of the world view meets the ground y = 0.
+ *
+ * @param world The world
+ * @param view The view, whose cursor ray it follows
+ * @param hover Receives the tile; its point is kept when the ray misses the ground
+ * @return Whether the cursor is on a tile of the grid
+ */
+bool ore_hover_find(
+    const ecs_world_t *world,
+    const OreView *view,
+    OreHover *hover);
+
 /** Delete the deposits that registered on a tile another deposit holds. The OnLoad phase
  * does it every frame, restart() right after it reloaded the scripts of the run.
  *
@@ -623,12 +795,41 @@ bool ore_inventory_remove(
     ecs_entity_t item,
     int32_t amount);
 
+/** Get the display name of an item.
+ *
+ * @param world The world or a stage
+ * @param item The item
+ * @return Its OreItem name, else its entity name, never NULL
+ */
+const char* ore_item_name(
+    const ecs_world_t *world,
+    ecs_entity_t item);
+
 /** Show the warning that the inventory holds as many kinds as it can.
  *
  * @param world The world or the stage of a system
  */
 void ore_inventory_full(
     ecs_world_t *world);
+
+/** Show a tile marker at a position or hide it; it is only written when that changes.
+ *
+ * @param world The world
+ * @param stage The stage of the system
+ * @param marker The marker entity, 0 for none
+ * @param show Whether to show it
+ * @param x X of the tile center
+ * @param y Height of the marker
+ * @param z Z of the tile center
+ */
+void ore_marker_show(
+    const ecs_world_t *world,
+    ecs_world_t *stage,
+    ecs_entity_t marker,
+    bool show,
+    float x,
+    float y,
+    float z);
 
 /** Mine 1 off a deposit into the inventory: at 0 the deposit is deleted. When its item is a
  * new kind and the inventory is full nothing is mined and the full warning shows.
@@ -708,6 +909,72 @@ ecs_entity_t ore_combust(
     const vec3 position,
     float radius);
 
+/** Get the footprint of a building or its prefab, 1x1 without OreFootprint.
+ *
+ * @param world The world or a stage
+ * @param building The building or its prefab
+ * @param w Receives the columns it covers
+ * @param h Receives the rows it covers
+ */
+void ore_footprint(
+    const ecs_world_t *world,
+    ecs_entity_t building,
+    int32_t *w,
+    int32_t *h);
+
+/** Get the building prefab of a placed building, its IsA target with OreFootprint or OreItem.
+ *
+ * @param world The world or a stage
+ * @param building The building
+ * @return The prefab, 0 for none
+ */
+ecs_entity_t ore_building_prefab(
+    const ecs_world_t *world,
+    ecs_entity_t building);
+
+/** Place a building: an instance of its prefab under the root of OrePlacement, with its
+ * footprint from (row, col) registered in the tile grid. Nothing is checked or spent.
+ *
+ * @param world The world or a stage
+ * @param prefab The building prefab
+ * @param row Row of the top left tile
+ * @param col Column of the top left tile
+ * @return The building
+ */
+ecs_entity_t ore_building_place(
+    ecs_world_t *world,
+    ecs_entity_t prefab,
+    int32_t row,
+    int32_t col);
+
+/** Demolish a building into the inventory: an undamaged one as its item, a damaged one as the
+ * salvage of its recipe at its health. Refused with a warning when the inventory has no room,
+ * else the building is deleted.
+ *
+ * @param world The world or the stage of a system
+ * @param building The building
+ * @return Whether the building was demolished
+ */
+bool ore_building_demolish(
+    ecs_world_t *world,
+    ecs_entity_t building);
+
+/** Cancel step: throw away the placement drag in flight with the toast Placement cancelled.
+ *
+ * @param world The world
+ * @return Whether a drag was in flight
+ */
+bool ore_placement_cancel_drag(
+    ecs_world_t *world);
+
+/** Cancel step: clear the selection of a building for placement.
+ *
+ * @param world The world
+ * @return Whether a building was selected
+ */
+bool ore_placement_deselect(
+    ecs_world_t *world);
+
 /** Register the game flow: states, clock, blink, toast, cancel() and restart().
  *
  * @param world The world
@@ -737,7 +1004,8 @@ void ore_player_import(
 void ore_inventory_import(
     ecs_world_t *world);
 
-/** Register mining: the swing at the deposit on the hover tile and its marker.
+/** Register mining: the swing at the deposit or the building on the hover tile and its
+ * marker.
  *
  * @param world The world
  */
@@ -775,6 +1043,23 @@ bool ore_craft_cancel(
  * @param world The world
  */
 void ore_craft_import(
+    ecs_world_t *world);
+
+/** Register the buildings: their registration in the tile grid, the connectors of the rules,
+ * destroyed buildings and the look of the ghosts.
+ *
+ * @param world The world
+ */
+void ore_buildings_import(
+    ecs_world_t *world);
+
+/** Register placement: the selection, the click and drag placement, the preview and the script
+ * functions oreelse.select(), oreelse.pipette(), oreelse.placeStart(), oreelse.placeEnd() and
+ * oreelse.cancelDrag().
+ *
+ * @param world The world
+ */
+void ore_placement_import(
     ecs_world_t *world);
 
 /** Register the look: the render quality tiers and oreelse.cycleQuality().

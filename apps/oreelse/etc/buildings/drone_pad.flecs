@@ -12,6 +12,7 @@
 using box.transform
 using box.geometry
 using box.material
+using oreelse
 
 const padSteel: Rgb = {172, 180, 194}
 const padShade: Rgb = {112, 120, 136}
@@ -21,6 +22,20 @@ const padAccent: Rgb = {92, 236, 222}
 const padLampDead: Rgb = {248, 84, 72}
 
 prefab DronePad {
+  // The item: crafted through the order book into the inventory, placed by spending one
+  OreItem: {name: "Drone pad", detail: "Drones repair buildings, repairs cost iron."}
+  OreRecipe: {
+    inputs: [
+      {item: items.IronPlate, amount: 24},
+      {item: items.Wire, amount: 18},
+      {item: items.Electronics, amount: 12}
+    ],
+    yield: 1, time: 5
+  }
+  OreFootprint: {w: 2, h: 2}
+  OreHealth: {value: 140, max: 140}
+  OrePowerConsumer: {watts: 20}
+
   deck {
     Position: {0, 0.12, 0}
     Box: {3.9, 0.24, 3.9}

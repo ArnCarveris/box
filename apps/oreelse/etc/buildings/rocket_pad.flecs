@@ -12,6 +12,7 @@
 using box.transform
 using box.geometry
 using box.material
+using oreelse
 
 const steel: Rgb = {172, 180, 194}
 const steelShade: Rgb = {112, 120, 136}
@@ -22,6 +23,26 @@ const concrete: Rgb = {126, 122, 114}
 const soot: Rgb = {28, 29, 34}
 
 prefab RocketPad {
+  // The item: crafted through the order book into the inventory, placed by spending one
+  OreItem: {
+    name: "Rocket pad",
+    detail: "Rocket launching facility for luminite shipments and evacuation."
+  }
+  OreRecipe: {
+    inputs: [
+      {item: items.IronPlate, amount: 25},
+      {item: items.CopperPlate, amount: 50},
+      {item: items.StoneBrick, amount: 25},
+      {item: items.Wire, amount: 50},
+      {item: items.Electronics, amount: 25}
+    ],
+    yield: 1, time: 8
+  }
+  OreFootprint: {w: 3, h: 3}
+  // The map holds one
+  OreBuildLimit: {max: 1}
+  OreHealth: {value: 400, max: 400}
+
   apron {
     Position: {0, 0.09, 0}
     Box: {5.9, 0.18, 5.9}

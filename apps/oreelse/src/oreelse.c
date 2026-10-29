@@ -3,8 +3,8 @@
  * @brief The oreelse module: registers the components and the systems of every area.
  *
  * The systems of EcsOnUpdate run in the order the areas register them: the flow, the map, the
- * player, mining, then crafting (the workers, the order book, OreCanOrder and OreNeeds). Those
- * that only run while playing match (OreGameState, Playing), the only pause mechanism.
+ * player, mining, crafting, the buildings, then placement and its preview. Those that only run
+ * while playing match (OreGameState, Playing), the only pause mechanism.
  *
  * The look applies the render quality tier in every state, in EcsPreStore. The particles
  * register the helpers that play the effects of etc/particles and the flash of their lights.
@@ -14,6 +14,7 @@
 #include "game.h"
 
 ECS_TAG_DECLARE(OreRunScript);
+ECS_TAG_DECLARE(OreGhost);
 
 void OreelseImport(
     ecs_world_t *world)
@@ -48,6 +49,19 @@ void OreelseImport(
     ECS_META_COMPONENT(world, OreCanOrder);
     ECS_META_COMPONENT(world, OreNeed);
     ECS_META_COMPONENT(world, OreNeeds);
+    ECS_META_COMPONENT(world, OreFootprint);
+    ECS_META_COMPONENT(world, OreBuildLimit);
+    ECS_META_COMPONENT(world, OreHealth);
+    ECS_META_COMPONENT(world, OrePowerConsumer);
+    ECS_META_COMPONENT(world, OrePowerProducer);
+    ECS_META_COMPONENT(world, OrePowerKind);
+    ECS_META_COMPONENT(world, OrePowerCategory);
+    ECS_META_COMPONENT(world, OreBuilding);
+    ECS_META_COMPONENT(world, OreConnectRule);
+    ECS_META_COMPONENT(world, OreConnector);
+    ECS_META_COMPONENT(world, OrePlacement);
+    ECS_META_COMPONENT(world, OrePreview);
+    ECS_META_COMPONENT(world, OreSelectKey);
     ECS_META_COMPONENT(world, OreHover);
     ECS_META_COMPONENT(world, OreDeposit);
     ECS_META_COMPONENT(world, OreMap);
@@ -57,6 +71,7 @@ void OreelseImport(
     ECS_META_COMPONENT(world, OreLook);
     ECS_META_COMPONENT(world, OreBlastFlash);
     ECS_TAG_DEFINE(world, OreRunScript);
+    ECS_TAG_DEFINE(world, OreGhost);
 
     ecs_add_id(world, ecs_id(OreGameState), EcsExclusive);
     ecs_add_id(world, ecs_id(OreGameState), EcsPairIsTag);
@@ -67,6 +82,8 @@ void OreelseImport(
     ore_inventory_import(world);
     ore_mining_import(world);
     ore_craft_import(world);
+    ore_buildings_import(world);
+    ore_placement_import(world);
     ore_look_import(world);
     ore_particles_import(world);
 }

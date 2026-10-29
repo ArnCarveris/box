@@ -1,7 +1,8 @@
 /**
  * @file player.c
  * @brief The player: the astronaut walks with the held actions of OreActions while playing,
- * and the camera follows it from above at the zoom level of OreView in every state.
+ * hovers on its jetpack over the tiles of buildings, and the camera follows it from above at the
+ * zoom level of OreView in every state.
  *
  * The camera never rotates, so W walks toward -Z, S toward +Z, A toward -X and D toward +X.
  */
@@ -18,10 +19,39 @@ bool ore_action_down(
     return s && s->down;
 }
 
+/** Step the height of the jetpack toward its target: up at rise, down at fall units a second.
+ *
+ * @param hover The height
+ * @param target The height it heads for
+ * @param rise Units a second it climbs
+ * @param fall Units a second it sinks
+ * @param dt Seconds of the frame
+ * @return The new height
+ */
+static float ore_hover_step(
+    float hover,
+    float target,
+    float rise,
+    float fall,
+    float dt)
+{
+    float result = hover;
+    if (hover < target) {
+        result = glm_min(hover + rise * dt, target);
+    } else if (hover > target) {
+        result = glm_max(hover - fall * dt, target);
+    }
+
+    return result;
+}
+
 /** Walk the astronaut: diagonals are normalized, the run action doubles the speed, the
  * astronaut faces where it walks and stays within cfg.mapClamp of the center on x and z.
  *
- * @param it Iterator over the players, with OreActions, while playing
+ * Over a tile with a building it hovers on its jetpack at cfg.hoverHeight, rising at
+ * cfg.hoverRise and falling at cfg.hoverFall units a second.
+ *
+ * @param it Iterator over the players, with OreActions and OreMap, while playing
  */
 static void OrePlayerMove(
     ecs_iter_t *it)
@@ -30,6 +60,12 @@ static void OrePlayerMove(
     Position *p = ecs_field(it, Position, 1);
     Rotation *r = ecs_field(it, Rotation, 2);
     const OreActions *a = ecs_field(it, OreActions, 3);
+    OreMap *map = ecs_field(it, OreMap, 4);
+    ore_grid_t grid = ore_grid_get(it->world);
+    float hover_height = ORE_CFG(it->world, "hoverHeight");
+    float rise = ORE_CFG(it->world, "hoverRise");
+    float fall = ORE_CFG(it->world, "hoverFall");
+    float airborne = ORE_CFG(it->world, "airborne");
     float clamp = ORE_CFG(it->world, "mapClamp");
     float speed = ORE_CFG(it->world, "walkSpeed");
     float dx = (float)ore_action_down(it->world, a->right) -
@@ -39,6 +75,8 @@ static void OrePlayerMove(
     float len = sqrtf(dx * dx + dz * dz);
     bool moving = len > 0.0f;
     bool running = moving && ore_action_down(it->world, a->run);
+    ecs_entity_t *cell;
+    float hover;
     int32_t i;
     if (running) {
         speed *= ORE_CFG(it->world, "runMultiplier");
@@ -53,9 +91,17 @@ static void OrePlayerMove(
 
         p[i].x = glm_clamp(p[i].x, -clamp, clamp);
         p[i].z = glm_clamp(p[i].z, -clamp, clamp);
-        if (player[i].moving != moving || player[i].running != running) {
+        cell = ore_map_building(map, ore_row_at(&grid, p[i].z), ore_col_at(&grid, p[i].x));
+        hover = ore_hover_step(player[i].hover, cell && *cell ? hover_height : 0, rise, fall,
+            it->delta_time);
+        p[i].y = hover;
+        if (player[i].moving != moving || player[i].running != running ||
+            player[i].hover != hover)
+        {
             player[i].moving = moving;
             player[i].running = running;
+            player[i].hover = hover;
+            player[i].airborne = hover > airborne;
             ecs_modified(it->stage, it->entities[i], OrePlayer);
         }
     }
@@ -159,6 +205,7 @@ void ore_player_import(
             { .id = ecs_id(Position), .src.id = EcsSelf },
             { .id = ecs_id(Rotation), .src.id = EcsSelf },
             { .id = ecs_id(OreActions), .src.id = ecs_id(OreActions), .inout = EcsIn },
+            { .id = ecs_id(OreMap), .src.id = ecs_id(OreMap), .inout = EcsIn },
             { .id = playing, .src.id = state }
         },
         .callback = OrePlayerMove

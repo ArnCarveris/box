@@ -36,7 +36,7 @@ REACH = 15
 
 # The slots of the inventory, the starting crate in slot order and the full warning
 SLOTS = 15
-CRATE = [("items.IronPlate", 16), ("items.CopperPlate", 12)]
+CRATE = [("items.IronPlate", 16), ("items.CopperPlate", 12), ("SolarPanel", 1)]
 FULL = "Inventory full - 15 item kinds is the limit"
 
 # Mining times in seconds (OreMined of resources.flecs) and a deposit's amount
@@ -44,9 +44,8 @@ STONE_TIME = 1.5
 IRON_TIME = 4.5
 DEPOSIT_AMOUNT = 1000
 
-# Fourteen kinds without stone for a full inventory: the items besides the buildings, and three
-# other prefabs of the scene, since the inventory holds any entity and the buildings are not
-# items yet
+# Fifteen kinds without stone for a full inventory: the items besides the buildings, and three
+# other prefabs of the scene, since the inventory holds any entity
 OTHER_KINDS = ["items.Iron", "items.Copper", "items.Luminite", "items.IronPlate",
                "items.CopperPlate", "items.StoneBrick", "items.Wire", "items.Electronics",
                "items.RocketEngine", "items.RocketCargoBay", "items.RocketLifeSupport",
@@ -311,13 +310,13 @@ def test_mine_stone_and_iron(app):
     app.check(abs(swing_time(m) - STONE_TIME) < 1e-3,
               "a swing at stone takes %g s, not %g" % (swing_time(m), STONE_TIME))
     check_marker(app, d, True)
-    app.wait_for("get %s OreInventory.slots[2].amount" % INVENTORY, "1",
+    app.wait_for("get %s OreInventory.slots[3].amount" % INVENTORY, "1",
                  frames=round((STONE_TIME + SWING_SLACK) * FPS), what="1 stone mined")
     took = float(app.exec("get oreelse.OreClock OreClock.elapsed")) - clock
     app.check(took >= STONE_TIME - 0.05, "the stone was mined after %g s, not %g" %
               (took, STONE_TIME))
-    app.check(inventory(app)[2] == ("items.Stone", 1),
-              "the stone is not in the third slot: %s" % inventory(app))
+    app.check(inventory(app)[3] == ("items.Stone", 1),
+              "the stone is not in the fourth slot, after the crate: %s" % inventory(app))
     app.check(amount(app, path) == DEPOSIT_AMOUNT - 1,
               "%s holds %s, not %d" % (path, amount(app, path), DEPOSIT_AMOUNT - 1))
 
@@ -339,10 +338,10 @@ def test_mine_stone_and_iron(app):
     # Skip ahead to the end of the swing
     app.exec("set %s OreMining {target: %s, left: 0.25, progress: %g}" %
              (PLAYER, path, 1 - 0.25 / IRON_TIME))
-    app.wait_for("get %s OreInventory.slots[3].amount" % INVENTORY, "1",
+    app.wait_for("get %s OreInventory.slots[4].amount" % INVENTORY, "1",
                  frames=round((0.25 + SWING_SLACK) * FPS), what="1 iron mined")
-    app.check(inventory(app)[3] == ("items.Iron", 1),
-              "the iron is not in the fourth slot: %s" % inventory(app))
+    app.check(inventory(app)[4] == ("items.Iron", 1),
+              "the iron is not in the fifth slot: %s" % inventory(app))
     app.check(amount(app, path) == DEPOSIT_AMOUNT - 1,
               "%s holds %s, not %d" % (path, amount(app, path), DEPOSIT_AMOUNT - 1))
     mouse(app, False)
@@ -417,7 +416,7 @@ def test_last_ore(app):
     aim(app, d)
 
     mouse(app, True)
-    app.wait_for("get %s OreInventory.slots[2].amount" % INVENTORY, "1",
+    app.wait_for("get %s OreInventory.slots[3].amount" % INVENTORY, "1",
                  frames=round((STONE_TIME + SWING_SLACK) * FPS), what="the last stone mined")
     app.wait_frames(SETTLE)
     app.check(path not in deposits(app), "%s is still there with 0 ore" % path)

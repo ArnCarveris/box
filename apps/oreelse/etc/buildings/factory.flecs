@@ -18,6 +18,7 @@ using box.transform
 using box.geometry
 using box.material
 using box.light
+using oreelse
 
 const facSteel: Rgb = {172, 180, 194}
 const facShade: Rgb = {112, 120, 136}
@@ -29,6 +30,22 @@ const facEmber: Rgb = {255, 108, 38}
 const facLampDead: Rgb = {248, 84, 72}
 
 prefab Factory {
+  // The item: crafted through the order book into the inventory, placed by spending one
+  OreItem: {name: "Factory", detail: "Speeds up crafting."}
+  OreRecipe: {
+    inputs: [
+      {item: items.IronPlate, amount: 20},
+      {item: items.Wire, amount: 20},
+      {item: items.Electronics, amount: 5},
+      {item: items.StoneBrick, amount: 10}
+    ],
+    yield: 1, time: 12
+  }
+  OreFootprint: {w: 2, h: 2}
+  OreHealth: {value: 100, max: 100}
+  OrePowerConsumer: {watts: 75}
+  OrePowerCategory: {kind: Construction}
+
   deck {
     Position: {0, 0.12, 0}
     Box: {3.9, 0.24, 3.9}

@@ -1,8 +1,10 @@
 // A new run: the astronaut at the center of the map facing north, a worker of the order book,
-// and the clock, the blink signals, the toast, the generator, the inventory of the run, the
-// starting crate in its slot order, and an empty order book. oreelse.restart() reloads this
-// script (it created the astronaut, which has OreRunScript), deposits.flecs and scenery.flecs:
-// the reload deletes the astronaut and creates it again, so nothing of the previous run stays.
+// the parent of the buildings placed in the run and their connectors, and the clock, the blink
+// signals, the toast, the generator, the inventory of the run, the starting crate in its slot
+// order, an empty order book and no building selected. oreelse.restart() reloads this script
+// (it created the astronaut, which has OreRunScript), deposits.flecs and scenery.flecs: the
+// reload deletes the astronaut and the buildings and creates them again, so nothing of the
+// previous run stays.
 // The camera, its zoom level, the render quality tier and the session seed (OreSeed) are not
 // part of a run.
 
@@ -19,13 +21,21 @@ astronaut {
   OreCrafter: {speed: 1}
 }
 
+// Placement puts the buildings and the connectors between them here
+buildings {}
+
 $ {
   OreRandom: {state: oreelse.seed(0)}
   OreClock: {elapsed: 0}
   OreBlink: {fast: false, slow: false, lamp: true}
   OreToast: {text: "", warn: false, age: 0}
   OreInventory: {
-    slots: [{item: items.IronPlate, amount: 16}, {item: items.CopperPlate, amount: 12}]
+    slots: [
+      {item: items.IronPlate, amount: 16},
+      {item: items.CopperPlate, amount: 12},
+      {item: SolarPanel, amount: 1}
+    ]
   }
   OreCraftBook: {}
+  OrePlacement: {root: buildings}
 }

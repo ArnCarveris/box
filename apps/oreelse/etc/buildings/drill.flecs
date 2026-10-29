@@ -12,6 +12,7 @@ using flecs.script.math
 using box.transform
 using box.geometry
 using box.material
+using oreelse
 
 const steel: Rgb = {172, 180, 194}
 const steelDeep: Rgb = {56, 62, 76}
@@ -20,6 +21,15 @@ const lampLive: Rgb = {92, 236, 222}
 const lampDead: Rgb = {248, 84, 72}
 
 prefab Drill {
+  // The item: crafted through the order book into the inventory, placed by spending one
+  OreItem: {name: "Drill", detail: "Mines ore deposits."}
+  OreRecipe: {inputs: [{item: items.IronPlate, amount: 6}], yield: 1, time: 1}
+  // It only goes on tiles with a deposit, which it mines
+  OreFootprint: {w: 1, h: 1, deposit: true}
+  OreHealth: {value: 100, max: 100}
+  OrePowerConsumer: {watts: 4}
+  OrePowerCategory: {kind: Mining}
+
   beam_front {
     Position: {0, 0.11, 0.76}
     Box: {1.86, 0.22, 0.34}

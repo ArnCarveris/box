@@ -1,0 +1,132 @@
+// Every building placed on the seeded map, from zoom level 1, on the textured basin south west of
+// the deposits, with the preview of placement. The buildings are placed as the game places them,
+// with OreBuilding on their top left tile and at the center of their footprint, so they register
+// in the tile grid and the wall segments join the walls. Back row, from left to right: the rocket
+// pad (3x3), the factory and the drone pad (2x2) and the solar panel. Middle row: the gun, laser
+// and missile turrets and the drill. Front left: four walls in an L, three in a row and one
+// turned down from the last, joined by three segments, one of them turned. Front right: the
+// preview of a drag of walls, the good markers and translucent blue ghosts on two cells and the
+// bad marker and a red ghost on a third. The astronaut stands in front, facing the camera
+include apps/oreelse/test/visual/setup/seed
+include apps/oreelse/etc/oreelse
+
+using box.transform
+using box.material
+using oreelse
+
+// Height 0 snaps the camera to level 1 on the first frame
+$ {
+  OreView: {camera: camera, level: 1, height: 0, back: 0, look: 0}
+}
+
+astronaut {
+  Position: {-23, 0, 37}
+  Rotation: {0, 0.3, 0}
+}
+
+// Tile (row, col) is centered at x = -47 + 2 col, z = -47 + 2 row
+all_buildings {
+  rocket_pad : RocketPad {
+    Position: {-35, 0, 23}
+    OreBuilding: {row: 34, col: 5}
+  }
+
+  factory : Factory {
+    Position: {-28, 0, 22}
+    OreBuilding: {row: 34, col: 9}
+  }
+
+  drone_pad : DronePad {
+    Position: {-22, 0, 22}
+    OreBuilding: {row: 34, col: 12}
+  }
+
+  solar_panel : SolarPanel {
+    Position: {-17, 0, 21}
+    OreBuilding: {row: 34, col: 15}
+  }
+
+  gun_turret : GunTurret {
+    Position: {-29, 0, 27}
+    OreBuilding: {row: 37, col: 9}
+  }
+
+  laser_turret : LaserTurret {
+    Position: {-25, 0, 27}
+    OreBuilding: {row: 37, col: 11}
+  }
+
+  missile_turret : MissileTurret {
+    Position: {-21, 0, 27}
+    OreBuilding: {row: 37, col: 13}
+  }
+
+  drill : Drill {
+    Position: {-17, 0, 27}
+    OreBuilding: {row: 37, col: 15}
+  }
+
+  wall_a : Wall {
+    Position: {-37, 0, 31}
+    OreBuilding: {row: 39, col: 5}
+  }
+
+  wall_b : Wall {
+    Position: {-35, 0, 31}
+    OreBuilding: {row: 39, col: 6}
+  }
+
+  wall_c : Wall {
+    Position: {-33, 0, 31}
+    OreBuilding: {row: 39, col: 7}
+  }
+
+  wall_d : Wall {
+    Position: {-33, 0, 33}
+    OreBuilding: {row: 40, col: 7}
+  }
+}
+
+// The preview of a drag of walls over row 39, columns 10 to 12, as OrePlacePreview shows it: the
+// markers at cfg.previewMarkerY, the ghosts at cfg.ghostY and cfg.ghostScale in the tint of
+// their cell at cfg.ghostOpacity, without shadows or emission
+preview {
+  good_a : TileMarker {
+    Position: {-27, 0.12, 31}
+  }
+
+  good_b : TileMarker {
+    Position: {-25, 0.12, 31}
+  }
+
+  bad : TileMarkerBad {
+    Position: {-23, 0.12, 31}
+  }
+
+  ghost_a : Wall {
+    OreGhost
+    NoShadow
+    Position: {-27, 0.1, 31}
+    Scale: {0.86, 0.86, 0.86}
+    Tint: cfg.ghostGood
+    Opacity: {cfg.ghostOpacity}
+  }
+
+  ghost_b : Wall {
+    OreGhost
+    NoShadow
+    Position: {-25, 0.1, 31}
+    Scale: {0.86, 0.86, 0.86}
+    Tint: cfg.ghostGood
+    Opacity: {cfg.ghostOpacity}
+  }
+
+  ghost_bad : Wall {
+    OreGhost
+    NoShadow
+    Position: {-23, 0.1, 31}
+    Scale: {0.86, 0.86, 0.86}
+    Tint: cfg.ghostBad
+    Opacity: {cfg.ghostOpacity}
+  }
+}

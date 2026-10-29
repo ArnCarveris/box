@@ -8,6 +8,7 @@
 using box.transform
 using box.geometry
 using box.material
+using oreelse
 
 const steelShade: Rgb = {112, 120, 136}
 const steelDeep: Rgb = {56, 62, 76}
@@ -16,6 +17,12 @@ const concrete: Rgb = {126, 122, 114}
 const concreteShade: Rgb = {88, 86, 82}
 
 prefab Wall {
+  // The item: crafted through the order book into the inventory, placed by spending one
+  OreItem: {name: "Wall", detail: "Buys your base a bit more time."}
+  OreRecipe: {inputs: [{item: items.StoneBrick, amount: 4}], yield: 1, time: 1}
+  OreFootprint: {w: 1, h: 1}
+  OreHealth: {value: 300, max: 300}
+
   plinth {
     Position: {0, 0.15, 0}
     Box: {0.98, 0.3, 0.98}

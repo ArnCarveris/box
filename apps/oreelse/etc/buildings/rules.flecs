@@ -1,0 +1,12 @@
+// The connector rules, the rules.flecs of the original's auto tiling: a WallSegment joins two
+// walls on orthogonally neighboring tiles, on the middle of their shared edge, turned by PI / 2
+// between two walls of one column. OreConnectorSync places and removes the connectors as walls
+// are placed and removed; they are purely visual (no health, not in the grid, not a target).
+
+using oreelse
+
+rules {
+  wall_segment {
+    OreConnectRule: {left: [Wall], right: [Wall], out: WallSegment, rotate: true}
+  }
+}

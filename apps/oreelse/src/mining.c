@@ -1,11 +1,14 @@
 /**
  * @file mining.c
  * @brief Mining: while the Mine action is held, the astronaut swings at the deposit on the
- * hover tile within cfg.reach, and every swing moves 1 of its ore into the inventory.
+ * hover tile within cfg.reach, and every swing moves 1 of its ore into the inventory. A
+ * building on the tile is the target instead: its swing demolishes it.
  *
- * A swing takes the mining time of the ore (OreMined) and is keyed to its target: a new target
- * restarts it, releasing the action, leaving reach or losing the target resets it. A tile
- * marker shows the target while playing, the TileMarkerBad one when it is out of reach.
+ * A swing takes the mining time of the ore (OreMined), cfg.dozeTime for a building, and is keyed
+ * to its target, the tiles of a building being one: a new target restarts it, releasing the
+ * action, leaving reach or losing the target resets it.
+ *
+ * A tile marker shows the target while playing, the TileMarkerBad one when it is out of reach.
  */
 
 #include "game.h"
@@ -39,29 +42,21 @@ done:
     return result;
 }
 
-/** Show a marker on a tile or hide it; it is only written when that changes.
- *
- * @param world The world
- * @param stage The stage of the system
- * @param marker The marker entity, 0 for none
- * @param show Whether to show it
- * @param x X of the tile center
- * @param z Z of the tile center
- */
-static void ore_marker_show(
+void ore_marker_show(
     const ecs_world_t *world,
     ecs_world_t *stage,
     ecs_entity_t marker,
     bool show,
     float x,
+    float y,
     float z)
 {
     const Position *p = NULL;
     bool alive = marker && ecs_is_alive(world, marker);
     if (alive && show) {
         p = ecs_get(world, marker, Position);
-        if (!p || p->x != x || p->y != ORE_MARKER_Y || p->z != z) {
-            ecs_set(stage, marker, Position, { x, ORE_MARKER_Y, z });
+        if (!p || p->x != x || p->y != y || p->z != z) {
+            ecs_set(stage, marker, Position, { x, y, z });
         }
     }
 
@@ -91,9 +86,11 @@ static void ore_mining_publish(
     }
 }
 
-/** Swing at the deposit on the hover tile while the Mine action is held: within reach a swing
- * takes the mining time of its ore, and when it completes 1 of the ore goes into the inventory
- * and comes off the deposit. The marker shows on the target while the action is held.
+/** Swing at the target on the hover tile while the Mine action is held, the building there or
+ * else the deposit, and show the marker on the tile.
+ *
+ * Within reach a swing takes the mining time of the ore or cfg.dozeTime; when it completes 1 of
+ * the ore goes from the deposit into the inventory, or the building is demolished.
  *
  * @param it Iterator over the players, with OreActions, OreHover, OreMap and OreMineMarker,
  * while playing
@@ -110,22 +107,28 @@ static void OrePlayerMine(
     ore_grid_t grid = ore_grid_get(it->world);
     float reach = ORE_CFG(it->world, "reach");
     bool holding = ore_action_down(it->world, a->mine);
-    ecs_entity_t *cell = holding && hover->on_grid ?
+    ecs_entity_t *bcell = holding && hover->on_grid ?
+        ore_map_building(map, hover->row, hover->col) : NULL;
+    ecs_entity_t building = bcell && *bcell && ecs_is_alive(it->world, *bcell) ? *bcell : 0;
+    ecs_entity_t *cell = holding && hover->on_grid && !building ?
         ore_map_deposit(map, hover->row, hover->col) : NULL;
-    ecs_entity_t target = cell && *cell && ecs_is_alive(it->world, *cell) ? *cell : 0;
-    const OreDeposit *deposit = target ? ecs_get(it->world, target, OreDeposit) : NULL;
-    const OreMined *mined = deposit ? ecs_get(it->world, deposit->resource, OreMined) : NULL;
+    ecs_entity_t deposit = cell && *cell && ecs_is_alive(it->world, *cell) ? *cell : 0;
+    ecs_entity_t target = building ? building : deposit;
+    const OreDeposit *d = deposit ? ecs_get(it->world, deposit, OreDeposit) : NULL;
+    const OreMined *mined = d ? ecs_get(it->world, d->resource, OreMined) : NULL;
     float tx = target ? ore_tile_x(&grid, hover->col) : 0;
     float tz = target ? ore_tile_z(&grid, hover->row) : 0;
-    float time = mined && mined->time > 0 ? mined->time : 1.0f;
+    float time = building ? ORE_CFG(it->world, "dozeTime") : (mined ? mined->time : 0);
+    bool timed = building || mined;
     bool in_reach = false;
     OreMining next;
     int32_t i;
+    time = time > 0 ? time : 1.0f;
     for (i = 0; i < it->count; i ++) {
         next = (OreMining){ 0 };
         in_reach = target &&
             (tx - p[i].x) * (tx - p[i].x) + (tz - p[i].z) * (tz - p[i].z) <= reach * reach;
-        if (in_reach && mined) {
+        if (in_reach && timed) {
             next = mining[i];
             if (next.target != target) {
                 next.target = target;
@@ -137,7 +140,10 @@ static void OrePlayerMine(
             if (next.left <= 0) {
                 next.left = time;
                 next.progress = 0;
-                if (!ore_deposit_mine(it->stage, target)) {
+                if (building) {
+                    ore_building_demolish(it->stage, building);
+                    next.target = 0;
+                } else if (!ore_deposit_mine(it->stage, target)) {
                     next.target = 0;
                 }
             }
@@ -146,8 +152,10 @@ static void OrePlayerMine(
         ore_mining_publish(it->stage, it->entities[i], &mining[i], &next);
     }
 
-    ore_marker_show(it->world, it->stage, marker->good, target && in_reach, tx, tz);
-    ore_marker_show(it->world, it->stage, marker->bad, target && !in_reach, tx, tz);
+    ore_marker_show(it->world, it->stage, marker->good, target && in_reach, tx, ORE_MARKER_Y,
+        tz);
+    ore_marker_show(it->world, it->stage, marker->bad, target && !in_reach, tx, ORE_MARKER_Y,
+        tz);
 }
 
 /** Hide the markers outside of play: like the original's markers, which it drew every frame
@@ -159,8 +167,8 @@ static void OreMineMarkerHide(
     ecs_iter_t *it)
 {
     const OreMineMarker *marker = ecs_field(it, OreMineMarker, 0);
-    ore_marker_show(it->world, it->stage, marker->good, false, 0, 0);
-    ore_marker_show(it->world, it->stage, marker->bad, false, 0, 0);
+    ore_marker_show(it->world, it->stage, marker->good, false, 0, ORE_MARKER_Y, 0);
+    ore_marker_show(it->world, it->stage, marker->bad, false, 0, ORE_MARKER_Y, 0);
 }
 
 void ore_mining_import(

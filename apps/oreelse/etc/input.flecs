@@ -1,7 +1,8 @@
 // Input: every key is an Action with a Binding. The held actions (walking, running, mining) are
 // read by the oreelse systems through the OreActions singleton; the actions that fire once are
-// awaited by the loops below, each calling the oreelse function behind it. Quality has no key,
-// the pause screen raises it. The key that starts the game on the title screen is any key
+// awaited by the loops below, each calling the oreelse function behind it. Placing awaits the
+// press and the release of Place: the press anchors a drag, the release places it. Quality has no
+// key, the pause screen raises it. The key that starts the game on the title screen is any key
 // (OreTitleStart reads the keys).
 
 using flecs.script
@@ -31,7 +32,7 @@ actions {
   }
 
   Run {
-    Action: {description: "Run at twice the walking speed while held"}
+    Action: {description: "Run at twice the walking speed; at the end of a drag fill a rectangle"}
 
     left_shift {
       Binding: {key: ShiftLeft, ignore_modifiers: true}
@@ -44,8 +45,77 @@ actions {
 
   // A press on a panel of the UI (an InputBlocker) does not reach the binding
   Mine {
-    Action: {description: "Mine the deposit under the cursor while held"}
+    Action: {description: "Mine or demolish what is under the cursor; a press cancels a drag"}
     Binding: {key: MouseRight, ignore_modifiers: true}
+  }
+
+  // A click places the selected building, a drag a line, an L or (with Run held) a rectangle
+  Place {
+    Action: {description: "Place the selected building under the cursor; drag for more"}
+    Binding: {key: MouseLeft, ignore_modifiers: true}
+  }
+
+  Pipette {
+    Action: {description: "Select the building under the cursor, a drill over a deposit"}
+    Binding: {key: Q, ignore_modifiers: true}
+  }
+
+  // The digit keys select a building for placement, Shift and the digit too; the key of the
+  // selected building clears the selection. The loop below awaits any of them
+  Select {
+    wall {
+      Action: {description: "Select the wall"}
+      Binding: {key: Num1, ignore_modifiers: true}
+      OreSelectKey: {building: Wall}
+    }
+
+    drill {
+      Action: {description: "Select the drill"}
+      Binding: {key: Num2, ignore_modifiers: true}
+      OreSelectKey: {building: Drill}
+    }
+
+    solar_panel {
+      Action: {description: "Select the solar panel"}
+      Binding: {key: Num3, ignore_modifiers: true}
+      OreSelectKey: {building: SolarPanel}
+    }
+
+    gun_turret {
+      Action: {description: "Select the gun turret"}
+      Binding: {key: Num4, ignore_modifiers: true}
+      OreSelectKey: {building: GunTurret}
+    }
+
+    laser_turret {
+      Action: {description: "Select the laser turret"}
+      Binding: {key: Num5, ignore_modifiers: true}
+      OreSelectKey: {building: LaserTurret}
+    }
+
+    missile_turret {
+      Action: {description: "Select the missile turret"}
+      Binding: {key: Num6, ignore_modifiers: true}
+      OreSelectKey: {building: MissileTurret}
+    }
+
+    rocket_pad {
+      Action: {description: "Select the rocket pad"}
+      Binding: {key: Num8, ignore_modifiers: true}
+      OreSelectKey: {building: RocketPad}
+    }
+
+    drone_pad {
+      Action: {description: "Select the drone pad"}
+      Binding: {key: Num9, ignore_modifiers: true}
+      OreSelectKey: {building: DronePad}
+    }
+
+    factory {
+      Action: {description: "Select the factory"}
+      Binding: {key: Num0, ignore_modifiers: true}
+      OreSelectKey: {building: Factory}
+    }
   }
 
   Cancel {
@@ -71,7 +141,8 @@ $ {
     left: actions.Left,
     right: actions.Right,
     run: actions.Run,
-    mine: actions.Mine
+    mine: actions.Mine,
+    place: actions.Place
   }
 }
 
@@ -79,6 +150,43 @@ async {
   while true {
     await on.pressed(actions.Cancel)
     await oreelse.cancel()
+  }
+}
+
+// The press of the Mine action throws a placement drag away, then mines while held
+async {
+  while true {
+    await on.pressed(actions.Mine)
+    await oreelse.cancelDrag()
+  }
+}
+
+async {
+  while true {
+    await on.pressed(actions.Place)
+    await oreelse.placeStart()
+  }
+}
+
+async {
+  while true {
+    await on.released(actions.Place)
+    await oreelse.placeEnd()
+  }
+}
+
+async {
+  while true {
+    await on.pressed(actions.Pipette)
+    await oreelse.pipette()
+  }
+}
+
+// The event names the digit's action under Select, whose OreSelectKey names the building
+async {
+  while true {
+    const e = await on.pressed(actions.Select)
+    await oreelse.select(e.action)
   }
 }
 

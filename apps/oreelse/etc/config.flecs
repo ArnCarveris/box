@@ -1,5 +1,6 @@
 // Constants of the game. The oreelse systems read them as cfg.<name>, once per run of a system.
 
+using box.material
 using oreelse
 
 cfg {
@@ -18,8 +19,33 @@ cfg {
   // Ore of a new deposit, its amount and its capacity
   export const depositAmount: i32 = 1000
 
-  // The astronaut mines a tile whose center is at most reach away on x and z
+  // The astronaut mines a tile whose center is at most reach away on x and z, and places a
+  // building whose footprint (the rectangle of its tile centers) is at most reach away
   export const reach: f32 = 15
+
+  // Seconds a swing at a building takes to demolish it
+  export const dozeTime: f32 = 0.8
+
+  // A placement drag covers at most dragMax cells (up to 64, ORE_DRAG_MAX)
+  export const dragMax: i32 = 64
+
+  // The preview of placement: the tile markers of a cell at previewMarkerY, the ghost of the
+  // building at ghostY and ghostScale, tinted ghostGood on a cell that can be placed and ghostBad
+  // on one that cannot, at ghostOpacity (the original's alpha 118 of 255)
+  export const previewMarkerY: f32 = 0.12
+  export const ghostY: f32 = 0.1
+  export const ghostScale: f32 = 0.86
+  export const ghostGood: Tint = {158, 226, 255, 255}
+  export const ghostBad: Tint = {248, 108, 96, 255}
+  export const ghostOpacity: f32 = 0.4627
+
+  // The jetpack: over a tile with a building the astronaut hovers at hoverHeight, rising at
+  // hoverRise and falling back to the ground at hoverFall units a second; above airborne it is
+  // in the air
+  export const hoverHeight: f32 = 3
+  export const hoverRise: f32 = 7
+  export const hoverFall: f32 = 5
+  export const airborne: f32 = 0.01
 
   // The inventory holds at most inventorySlots kinds of items with a count above 0 (up to 15,
   // the slots of OreInventory)
