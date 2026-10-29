@@ -566,11 +566,15 @@ void Console_view_on_top(void) {
     app->headless = true;
     ecs_singleton_modified(world, App);
     ecs_entity_t s = ecs_new(world);
-    ecs_set(world, s, Surface, {.width = 640, .height = 360, .resolution_scale = 1});
+    ecs_set(world, s, Surface, {.width = 320, .height = 180, .write_to_file = "console_top.png",
+        .resolution_scale = 1});
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t v1 = ecs_new(world);
     ecs_set(world, v1, View, {.camera = camera});
+    Console *c = ecs_singleton_get_mut(world, Console);
+    c->background = (rgba){200, 0, 0, 255};
+    ecs_singleton_modified(world, Console);
     ecs_progress(world, 0);
 
     box_input_key_type(world, "`", 1);
@@ -585,8 +589,11 @@ void Console_view_on_top(void) {
     ecs_entity_t v2 = ecs_new(world);
     ecs_set(world, v2, View, {.camera = camera});
     ecs_entity_t v3 = ecs_new(world);
-    ecs_set(world, v3, View, {.camera = camera, .order = BOX_VIEW_ORDER_EDITOR});
+    ecs_set(world, v3, View, {.camera = camera, .order = BOX_VIEW_ORDER_EDITOR,
+        .clear = {.enabled = true, .color = {0, 0, 255, 255}}});
     ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_render_sync(world);
     test_uint(ecs_lookup(world, "console.view"), view);
     test_assert(v2 > view);
     test_assert(v3 > view);
@@ -598,6 +605,19 @@ void Console_view_on_top(void) {
     test_assert(ecs_get(world, view, View)->camera ==
         ecs_lookup(world, "console.ui.camera"));
 
+    char *path = flecs_asprintf("%s/console_top.png",
+        ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    unsigned char *panel = &px[(4 * 320 + 150) * 4];
+    test_assert(abs((int)panel[0] - 200) < 3);
+    test_assert(panel[2] < 3);
+    unsigned char *right = &px[(90 * 320 + 200) * 4];
+    test_assert(right[0] < 3);
+    test_assert(right[2] > 252);
+    stbi_image_free(px);
+    ecs_os_free(path);
     ecs_fini(world);
 }
 
