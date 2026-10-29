@@ -11,6 +11,8 @@
  * run every frame, one with dynamic_material the shading stream.
  */
 
+#include <stdio.h>
+#include <stdlib.h>
 #include "draw.h"
 
 /** Color of a shape without Rgb, display encoded */
@@ -437,6 +439,7 @@ int32_t box_draws_slot_add(
     }
 
     *ecs_vec_append_t(NULL, &b->entities, ecs_entity_t) = e;
+    if (getenv("BOXDBG")) { fprintf(stderr, "DBG add b%d s%d e%u\n", index, result, (uint32_t)e); }
     ecs_os_memset_t(ecs_vec_append_t(NULL, &b->transforms, box_render_transform_t), 0,
         box_render_transform_t);
     ecs_os_memset_t(ecs_vec_append_t(NULL, &b->surfaces, box_render_surface_t), 0,
@@ -621,6 +624,10 @@ void box_draws_slot_remove(
     box_draw_batch_t *b = box_draws_batch(d, index);
     int32_t last = ecs_vec_count(&b->entities) - 1;
     bool flat = box_draws_is_2d(b);
+    if (getenv("BOXDBG")) { fprintf(stderr, "DBG rm b%d s%d e%u last e%u alive %d quit %d\n", index, slot,
+        (uint32_t)*ecs_vec_get_t(&b->entities, ecs_entity_t, slot),
+        (uint32_t)*ecs_vec_get_t(&b->entities, ecs_entity_t, last),
+        ecs_is_alive(world, *ecs_vec_get_t(&b->entities, ecs_entity_t, last)), ecs_should_quit(world)); }
     box_draws_shadow_region(world, d, b, box_draws_slot_transform(b, slot),
         box_draws_slot_surface(b, slot));
     if (flat) {

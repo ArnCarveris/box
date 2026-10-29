@@ -4,16 +4,13 @@
  * OreDroneBay over its bays, and they fly to the damaged buildings and weld them back to full,
  * paid from the inventory.
  *
- * A drone is a child of its pad, so it is deleted with the pad, and its Position is relative to
- * the pad's center (a building is never turned). A drone is ready without a blackout and with at
- * least one of the cost item (Iron) in the inventory; one that is not drops its target, flies
- * home and stays docked. Its target is the nearest damaged building (0 < health < max) of the
- * whole map, measured from the pad while docked and from the drone otherwise, that no other
- * drone of its pad targets.
+ * A drone is a child of its pad, deleted with it, its Position relative to the pad's center. It
+ * is ready without a blackout and with 1 of the cost item (Iron), else it flies home and docks;
+ * its target is the nearest damaged building of the map no other drone of its pad targets.
  *
- * Docked -> Flying (straight to cfg.droneCruise above the target) -> Repairing (within
- * cfg.droneArrive) -> the next target, or Returning -> Docked. Repairing heals cfg.droneRepair
- * hit points a second; every cfg.droneHpPerIron of them one cost item leaves the inventory.
+ * Docked -> Flying (to cfg.droneCruise above the target) -> Repairing (within cfg.droneArrive)
+ * -> the next target, or Returning -> Docked. Repairing heals cfg.droneRepair hit points a
+ * second; every cfg.droneHpPerIron of them one cost item leaves the inventory.
  */
 
 #include "game.h"
@@ -96,25 +93,23 @@ static bool ore_drone_pad_has(
 }
 
 /** Park the drones of a placed drone pad over its bays, docked, their scan timer at
- * cfg.droneScan * U(0, 1). A pad that has drones gets none.
+ * cfg.droneScan * U(0, 1). A pad that has drones gets none, and none spawn while the world shuts
+ * down (it deletes the pads, and the prefabs under them).
  *
- * @param it Iterator over the buildings whose OreBuilding was set, with OreDroneBay
+ * @param it Iterator over the buildings whose OreBuilding was set
  */
 static void OreDronePadPlace(
     ecs_iter_t *it)
 {
-    const OreDroneBay *bays = ecs_field(it, OreDroneBay, 1);
-    bool self = ecs_field_is_self(it, 1);
     float scan = ORE_CFG(it->world, "droneScan");
+    const OreDroneBay *bay;
     int32_t i, b;
     ecs_entity_t pad, e;
     vec3 p;
-    for (i = 0; i < it->count; i ++) {
-        const OreDroneBay *bay = self ? &bays[i] : bays;
+    for (i = 0; i < it->count && !ecs_is_fini(it->world); i ++) {
         pad = it->entities[i];
-        if (!bay->drone || bay->count <= 0 || ecs_has_id(it->world, pad, EcsPrefab) ||
-            ore_drone_pad_has(it->world, pad))
-        {
+        bay = ecs_get(it->world, pad, OreDroneBay);
+        if (!bay || !bay->drone || bay->count <= 0 || ore_drone_pad_has(it->world, pad)) {
             continue;
         }
 
@@ -281,7 +276,8 @@ static void ore_drone_move(
 }
 
 /** Weld a target a frame: it heals cfg.droneRepair * dt up to its maximum, and every
- * cfg.droneHpPerIron hit points of the drone's credit one cost item leaves the inventory.
+ * cfg.droneHpPerIron hit points of the drone's credit one cost item leaves the inventory. The
+ * credit counts the hit points the target gained, not the heal, which rounds at its health.
  *
  * @param ctx The context of the system run
  * @param drone The drone
@@ -295,11 +291,12 @@ static void ore_drone_weld(
     OreHealth *health)
 {
     float heal = ctx->repair * ctx->dt;
-    float room = health->max - health->value;
+    float before = health->value;
+    float room = health->max - before;
     heal = heal > room ? room : heal;
-    health->value += heal;
+    health->value = heal < room ? before + heal : health->max;
     ecs_modified(ctx->stage, drone->target, OreHealth);
-    drone->credit += heal;
+    drone->credit += health->value - before;
     while (ctx->per_iron > 0 && drone->credit >= ctx->per_iron - ORE_DRONE_CREDIT_SLACK &&
         ore_inventory_remove(ctx->stage, cost, 1))
     {
@@ -391,6 +388,7 @@ static void ore_drone_update(
         if (dx * dx + dy * dy + dz * dz < arrive2) {
             d->state = OreDroneStateRepairing;
         }
+
         break;
     case OreDroneStateRepairing:
         goal[0] = tpos->x - at->x;
@@ -404,6 +402,7 @@ static void ore_drone_update(
                 OreDroneStateFlying : OreDroneStateReturning;
             d->scan = ctx->scan;
         }
+
         break;
     case OreDroneStateReturning:
         dx = bay[0] - pos->x;
@@ -416,6 +415,7 @@ static void ore_drone_update(
             d->state = OreDroneStateDocked;
             d->scan = ctx->scan * ore_random01(ctx->world);
         }
+
         break;
     }
 
@@ -510,8 +510,7 @@ void ore_drones_import(
         .entity = ecs_entity(world, { .name = "OreDronePadPlace" }),
         .query.terms = {
             { .id = ecs_id(OreBuilding), .src.id = EcsSelf, .inout = EcsInOutNone },
-            { .id = ecs_id(OreDroneBay), .src.id = EcsSelf | EcsUp, .trav = EcsIsA,
-              .inout = EcsIn }
+            { .id = EcsPrefab, .oper = EcsNot }
         },
         .events = { EcsOnSet },
         .callback = OreDronePadPlace

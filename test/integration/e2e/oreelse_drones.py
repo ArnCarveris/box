@@ -4,11 +4,12 @@ over its bays; they fly to the nearest damaged building of the map, weld it back
 and dock without Iron or in a blackout.
 
 Every case runs in a fresh apps/oreelse process with its default scene and a fixed session seed,
-like oreelse_flow.py, which describes the setup: a 640x360 window without shadows, a fixed delta
-of 1/60 s per frame, waits that count frames. The cases place the buildings directly, with
-scripts that create instances of the prefabs with their OreBuilding (as oreelse_power.py does),
-damage them by setting their OreHealth and set the inventory through the REST endpoints of the
-port. The waves are held off. Every pad gets a solar panel, which covers its 20 W, so there is
+like oreelse_flow.py, which describes the setup, but in a 320x180 window without shadows: the
+cases play long flights and repairs, which the software renderer keeps up with at that size. A
+fixed delta of 1/60 s per frame, waits that count frames. The cases place the buildings directly,
+with scripts that create instances of the prefabs with their OreBuilding (as oreelse_power.py
+does), damage them by setting their OreHealth and set the inventory through the REST endpoints of
+the port. The waves are held off. Every pad gets a solar panel, which covers its 20 W, so there is
 no blackout unless a case removes the panel. Times are measured on the play clock (OreClock).
 """
 import json
@@ -65,9 +66,9 @@ RATE_TOLERANCE = 0.05
 # Slack in seconds of a time read by polling the clock
 TIME_SLACK = 0.5
 
-# Cursor position in points of the 640x360 window: the center hovers a tile next to the
+# Cursor position in points of the 320x180 window: the center hovers a tile next to the
 # astronaut
-CENTER = (320, 180)
+CENTER = (160, 90)
 
 SETTLE = 5
 
@@ -114,9 +115,9 @@ def set_state(app, state):
 def setup(app):
     """Shrink the window and drop the shadows of the world view, so the software renderer keeps
     up."""
-    app.exec("set window Surface {width: 640, height: 360}")
+    app.exec("set window Surface {width: 320, height: 180}")
     app.exec("set main_view View.shadows.enabled false")
-    app.wait_for("get window SurfaceStatus.height", "360")
+    app.wait_for("get window SurfaceStatus.height", "180")
 
 
 def start(app):
@@ -470,9 +471,12 @@ def test_nearest_far(app):
     set_inventory(app, [(IRON, 200)])
     place_pad(app, "pad_a", 4, 4)
 
-    # Two damaged walls far across the map, the corner near the pad's column nearer
+    # Two damaged walls far across the map, the corner near the pad's column nearer; paused, so
+    # no drone looks before both are damaged
+    set_state(app, "Paused")
     place_wall(app, "wall_far", 44, 44, 299)
     place_wall(app, "wall_near", 44, 4, 100)
+    set_state(app, "Playing")
     pad_x, pad_z = tile_point(4, 4)
     pad_x += TILE / 2
     pad_z += TILE / 2
@@ -487,7 +491,7 @@ def test_nearest_far(app):
             first[0] = targets
         return bool(targets)
     wait_until(app, taken, 2 * round(SCAN * FPS) + SETTLE, "a drone with a target")
-    app.check("wall_near" in first[0] and (len(first[0]) > 1 or first[0] == ["wall_near"]),
+    app.check("wall_near" in first[0],
               "the first drone out went for %s, not the nearest wall" % first[0])
 
     # The next drone takes the other one, the nearest left
