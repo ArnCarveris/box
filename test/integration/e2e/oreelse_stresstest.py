@@ -248,6 +248,9 @@ def test_next_wave(app):
 
 
 def test_minutes(app):
+    # The case's app quits first: two stress test apps at once outgrow the memory of a test box
+    app.expect("logs error", "")
+    app.quit()
     args = [a for a in app.args if a != "--stresstest"] + ["--stresstest=45"]
     log = app.log[:-len(".log")] + ".minutes.log" if app.log else None
     with App(app.binary, args, log=log, timeout=app.timeout, out=app.out,

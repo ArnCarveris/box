@@ -64,13 +64,23 @@ otherwise (free tiles, drills only on deposits, nothing else on them, one rocket
 The layout is `etc/stresstest.flecs` with the constants `cfg.stress*`; `src/stresstest.c` builds
 it with placement's own checks (`ore_placement_build`) once the scripts of a run loaded.
 
-Frame times of the stress test (`bake3 run apps/oreelse --local-env -- --stresstest`, 1280x720,
-High, 60 s of play into the first wave):
+Frame times of the stress test, measured on a machine without a GPU (4 arm64 cores, software
+renderer). The window could not be used, so the runs were headless, release build, seed 8, on a
+160x90 surface without shadows, at a fixed delta of 1/60 s, with the wave timer cut to start
+the first wave at once. `frames` (the command port) gave the frame intervals and flecs' system
+time measurement the cost of the game's systems. Both runs end early: the wave kills the
+astronaut, which stops the clock.
 
-| Run | Mean (ms) | p50 (ms) | p99 (ms) | Max (ms) |
-| --- | --- | --- | --- | --- |
-| `--stresstest` | to be measured | | | |
-| `--stresstest=60` | to be measured | | | |
+| Run | Wave | Critters | Played | Frame interval in the wave (ms) | Game systems (ms/frame) |
+| --- | --- | --- | --- | --- | --- |
+| `--stresstest` | 35 | not counted (budget 14960) | 25 s | 100 to 290, max 430 | about 5 |
+| `--stresstest=60` | 71 | about 6500 by the end | 13 s | 180 to 320, max 500 | about 4.5 |
+
+The game's systems stay well under 16 ms per frame. The heaviest are OreCorpseChar, OreLimbs,
+OreCritterLimbs and OreCrowd, about 1 ms or less each. Almost all of a frame is the engine
+waiting on the software renderer (box.app.AppFrame). Next come RenderExtractViews,
+RenderExtractDraws and TransformDynamic, 3 to 11 ms together. The 1280x720 window still needs
+measuring on a machine with a GPU.
 
 ## Controls
 
