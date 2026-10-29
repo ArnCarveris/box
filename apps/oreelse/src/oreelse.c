@@ -3,13 +3,8 @@
  * @brief The oreelse module: registers the components and the systems of every area.
  *
  * The systems of EcsOnUpdate run in the order the areas register them: the flow, the map, the
-<<<<<<< HEAD
- * player, mining, power, crafting, the critters, their animation and corpses, the buildings,
- * the flora, placement, its preview, then the rocket.
-=======
  * player, mining, power, crafting, the critters, their animation and corpses, the weapons, the
- * buildings, their animation and lights, placement, its preview, then the rocket.
->>>>>>> 1b15f21680f3bb05b9d370205f16a10daad1b18b
+ * buildings, their animation and lights, the flora, placement, its preview, then the rocket.
  *
  * Gameplay systems match (OreGameState, Playing), the only pause. The look applies the render
  * quality tier in every state, in EcsPreStore. The particles register the helpers that play
@@ -143,11 +138,8 @@ void OreelseImport(
     ore_critter_fx_import(world);
     ore_weapons_import(world);
     ore_buildings_import(world);
-<<<<<<< HEAD
-    ore_flora_import(world);
-=======
     ore_building_fx_import(world);
->>>>>>> 1b15f21680f3bb05b9d370205f16a10daad1b18b
+    ore_flora_import(world);
     ore_placement_import(world);
     ore_rocket_import(world);
     ore_look_import(world);

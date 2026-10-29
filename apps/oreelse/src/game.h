@@ -1749,20 +1749,19 @@ void ore_craft_import(
 void ore_buildings_import(
     ecs_world_t *world);
 
-<<<<<<< HEAD
-/** Register the flora: the plants that register in the tile grid.
- *
- * @param world The world
- */
-void ore_flora_import(
-=======
 /** Register the buildings' animation and lights: the spinners, pistons, shakes, vents, work
  * emitters and work lights, driven by the work rate of their building.
  *
  * @param world The world
  */
 void ore_building_fx_import(
->>>>>>> 1b15f21680f3bb05b9d370205f16a10daad1b18b
+    ecs_world_t *world);
+
+/** Register the flora: the plants that register in the tile grid.
+ *
+ * @param world The world
+ */
+void ore_flora_import(
     ecs_world_t *world);
 
 /** Register placement: the selection, the click and drag placement, the preview and the script
