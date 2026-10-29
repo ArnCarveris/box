@@ -552,8 +552,10 @@ Every task of the port follows these.
   when a signal flips, `OreToast` when a message starts and ends, `OreView` while it glides,
   `OreHover` when the cursor tile moves, `OreInventory` when an amount changes,
   `OreCraftBook` (the orders oldest first and the rows of the queue panel) when an order or a
-  craft's progress changes, `OreCanOrder` on an item prefab when it flips, `OreNeeds` (the raw
-  ore of the item the UI sets in it) when a row changes, `OreInventoryScreen` (open, the tab)
+  craft's progress changes, `OreCanOrder` on an item prefab when it flips, with
+  `OreCanOrderFlips` counting the flips (the observers of a script do not see the changes of a
+  prefab, so a script that shows `OreCanOrder` reads the count too), `OreNeeds` (the raw ore of
+  the item the UI sets in it) when a row changes, `OreInventoryScreen` (open, the tab)
   when it opens, closes or switches tabs, `OreItemInfo` (what the pointer is over on the
   inventory screen and the item of its info panel) when it changes, `OrePowerAlloc` (the
   levels of the power categories) when a level changes, `OrePowerState` (production, demand,
@@ -774,8 +776,8 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 | `etc/ui/palette.flecs` | The colors of the UI, `palette.*` |
 | `etc/ui/icons.flecs` | The icon textures, `icons.*`, which the items name with `OreIcon` |
 | `etc/ui/panel.flecs` | The `Panel` template, the chrome of every panel: the plate, its edge, the hazard strip and the `InputBlocker` |
-| `etc/ui/hud.flecs` | The `OreHud` template: the status bar (`StatusGauge`, `StatusDivider`), the toast, the mine progress bar, the suit breach alert, the rocket status line and the inventory screen |
-| `etc/ui/inventory.flecs` | The `InventoryScreen` template: the inventory screen (`StockSlot`, `TabButton`, `SlotButton`, restyled `box.widgets.HeadlessButton`s), the info panel and the Inventory (E) button (`InventoryButton`) |
+| `etc/ui/hud.flecs` | The `OreHud` template: the status bar (`StatusGauge`, `StatusDivider`), the toast, the mine progress bar, the suit breach alert, the rocket status line, the Inventory (E) button and the inventory screen |
+| `etc/ui/inventory.flecs` | The inventory screen (`InventoryScreen`: `StockBody` with its `StockSlot`s, `ConstructBody` with its `TabButton`s and the `BuildingsPage` and `RocketPage` of `SlotButton`s; the slots and buttons are restyled `box.widgets.HeadlessButton`s), its info panel (`ItemInfoPanel`) and the Inventory (E) button (`InventoryButton`), which the HUD shows |
 | `etc/icons/` | The original's icons (SVG), unchanged |
 | `etc/ui/hazard_strip.svg` | The original's hazard strip of the panels, unchanged |
 | `src/flow.c` | States, clock, blink, toast, seeds, `oreelse.cancel()`, `oreelse.restart()` |

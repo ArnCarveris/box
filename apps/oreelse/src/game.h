@@ -324,6 +324,14 @@ ECS_STRUCT(OreCanOrder, {
     bool value; /**< Ordering one unit would succeed */
 });
 
+/** The flips of OreCanOrder, a singleton modified when the OreCanOrder of an item flips. The
+ * observers of a script do not see the changes of a prefab, so a UI script that shows the
+ * OreCanOrder of item prefabs reads count with them, which makes it read them again.
+ */
+ECS_STRUCT(OreCanOrderFlips, {
+    int32_t count; /**< Flips since the start */
+});
+
 /** The raw ore of one unit of an item, a row of OreNeeds */
 ECS_STRUCT(OreNeed, {
     ecs_entity_t item; /**< The raw ore */

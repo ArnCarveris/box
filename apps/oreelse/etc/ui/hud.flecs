@@ -7,8 +7,9 @@
 // The numbers are the original's pixels, positions from the top left corner of the parent with
 // y down: an element of a panel sits at LayoutItem {h: Left, v: Top, x, y: -y}. The labels are
 // centered vertically on their icons by the layout. Only the status bar is a panel: the other
-// lines are plain labels, which the pointer passes through. The inventory screen, its info panel
-// and the Inventory (E) button come from the InventoryScreen template (ui/inventory.flecs).
+// lines are plain labels, which the pointer passes through. The inventory screen and its info
+// panel come from the InventoryScreen and ItemInfoPanel templates, the Inventory (E) button from
+// InventoryButton (ui/inventory.flecs).
 
 using flecs.script.math
 using box.transform
@@ -126,6 +127,12 @@ template OreHud {
   const playing = OreGameState?[(OreGameState, Playing)]
   const paused = OreGameState?[(OreGameState, Paused)]
   const live = playing || paused
+
+  // The inventory screen shows while it is open and the game plays, the info panel with it
+  // while OreItemInfo names an item
+  const none: entity = 0
+  const inventoryOpen = playing && OreInventoryScreen[OreInventoryScreen].open
+  const itemInfo = OreItemInfo[OreItemInfo]
 
   // Each value on its own, so a change of one only sets what depends on it (OreWaveState
   // changes every frame of play)
@@ -350,10 +357,25 @@ template OreHud {
         }
       }
 
-      // The inventory screen, its info panel and the Inventory (E) button (ui/inventory.flecs),
-      // over the rest of the HUD
-      inventory {
-        InventoryScreen: {}
+      // The Inventory (E) button at the bottom center while playing, and the inventory screen
+      // with its info panel over the rest of the HUD (ui/inventory.flecs)
+      if playing {
+        inventory_button {
+          InventoryButton: {label: "Inventory (E)", action: actions.Inventory}
+        }
+      }
+
+      if inventoryOpen {
+        inventory {
+          InventoryScreen: {}
+        }
+
+        // While the pointer is over a stock slot holding an item or a slot button
+        if itemInfo.item != none {
+          info_panel {
+            ItemInfoPanel: {item: itemInfo.item, place: itemInfo.place}
+          }
+        }
       }
     }
   }

@@ -1,10 +1,10 @@
 // The inventory screen (E), the original's inventory.flecs: the 15 stock slots of the inventory,
 // the construct section with its Buildings and Rocket tabs of slot buttons, the info panel of
-// the item under the pointer and the Inventory (E) button. It reads the game state,
-// OreInventoryScreen (open, tab), OreInventory, OrePlacement (the selection), OreItemInfo (the
-// item of the info panel), OreNeeds and the OreCanOrder of the items; it formats every text
-// from them. Its elements tell the game what the pointer is over (oreelse.inventory_hover()) and
-// call oreelse functions on a click.
+// the item under the pointer and the Inventory (E) button, which the HUD shows. It reads
+// OreInventoryScreen (the tab), OreInventory, OrePlacement (the selection), OreNeeds and the
+// OreCanOrder of the items, the HUD the game state, OreInventoryScreen (open) and OreItemInfo
+// (the item of the info panel); it formats every text from them. Its elements tell the game
+// what the pointer is over (oreelse.inventory_hover()) and call oreelse functions on a click.
 //
 // The slots, the tabs and the buttons restyle box.widgets.HeadlessButton, which follows the
 // pointer and the activations: the look is an expression of its hover and of props for the
@@ -14,7 +14,14 @@
 //
 // The numbers are the original's pixels, as in hud.flecs: an element of a panel sits at
 // LayoutItem {h: Left, v: Top, x, y: -y}, y down from the top left corner; the anchors of the
-// screen, the info panel and the button flip the original's y, which points down.
+// screen, the info panel and the button flip the original's y, which points down. The original
+// lays a line of text out as high as its size, box as high as the line of its font: the titles
+// and the hint in the columns of the sections take the height of their size, so what follows
+// them sits where the original puts it.
+//
+// A template that inherits one of another script captures every constant of this script, and
+// a template takes at most 64 reactive inputs: only the numbers several templates share are
+// constants of the script, the others are constants of their template.
 
 using flecs.script
 using flecs.script.math
@@ -26,99 +33,59 @@ using box.text
 using box.picking
 using oreelse
 
-// The screen and its sections
-const screenWidth: f32 = 802
-const screenHeight: f32 = 368
-const screenCap: f32 = 8
-const sectionTop: f32 = 20
-const sectionPad: f32 = 14
-const sectionHeight: f32 = 334
-const stockWidth: f32 = 420
-const constructWidth: f32 = 340
-const titleSize: f32 = 20
-const hintSize: f32 = 14
-const pageWidth: f32 = 312
-const pageHeight: f32 = 232
-const gridWidth: f32 = 392
-const gridHeight: f32 = 232
-
-// A slot of the stock or the construct section: 72x72 on a pitch of 80, the icon 44x44 at
-// (14, 8), the count at y 49 right aligned in 63, the key label at (8, 4)
+// A slot of the stock or of the construct section, 72x72 with corners of 3, its item's icon
+// 44x44 at (14, 8)
 const slotSize: f32 = 72
-const slotPitch: f32 = 80
 const slotRadius: f32 = 3
 const slotIcon: f32 = 44
 const slotIconX: f32 = 14
 const slotIconY: f32 = 8
-const countY: f32 = 49
-const countWidth: f32 = 63
-const countSize: f32 = 15
-const keySize: f32 = 13
-const socketSize: f32 = 32
-const socketAt: f32 = 20
 
-// A tab button: 148x30, the label at y 7, the underline 132x2 at (8, 27)
-const tabWidth: f32 = 148
-const tabHeight: f32 = 30
-const tabLabelY: f32 = 7
-const tabSize: f32 = 15
-const underlineX: f32 = 8
-const underlineY: f32 = 27
-
-// The info panel
-const infoWidth: f32 = 560
-const infoHeight: f32 = 154
-const infoCap: f32 = 7
-const infoText: f32 = 15
-const infoIcon: f32 = 56
-const needIcon: f32 = 26
-
-// The Inventory (E) button
-const buttonWidth: f32 = 196
-const buttonHeight: f32 = 38
-const buttonSize: f32 = 17
-
-// The colors of the screen
-const screenFill: rgba = {17, 18, 22, 244}
-const sectionFill: rgba = {26, 28, 33, 236}
-const sectionEdge: rgba = {58, 63, 73, 255}
+// The face of a filled slot and of a slot button that can order, lighter while hovered, and
+// its border
 const slotFace: Rgb = {46, 50, 58}
 const slotHover: Rgb = {66, 72, 82}
 const slotEdge: Rgb = {88, 94, 106}
-const slotSelected: Rgb = {78, 62, 26}
-const emptyFace: Rgb = {15, 16, 20}
-const emptyEdge: Rgb = {44, 48, 56}
-const dimFace: Rgb = {30, 33, 39}
-const dimEdge: Rgb = {52, 56, 64}
-const countInk: Rgb = {224, 229, 237}
-const keyInk: Rgb = {132, 139, 152}
-const tabFace: Rgb = {32, 35, 41}
-const tabHover: Rgb = {50, 55, 63}
-const tabActive: Rgb = {60, 52, 28}
-const tabEdge: Rgb = {52, 56, 64}
-const tabInkActive: Rgb = {246, 220, 168}
 
-// The alpha of the icon of a slot button that cannot order
-const iconDim: f32 = 150
+// The padding of a section and the size of its title
+const sectionPad: f32 = 14
+const titleSize: f32 = 20
+
+// The info panel and the size of its texts
+const infoWidth: f32 = 560
+const infoHeight: f32 = 154
+const infoText: f32 = 15
 
 // A stock slot, slot index of the inventory at (index % 5, floor(index / 5)) times the pitch
-// of its grid. Empty: a dark socket with an inner outline. Filled: the face, lighter while
-// hovered, the item's icon and its count. The selected building: an amber face and a 2 pixel
-// amber border, no hover change. A click on a building picks it (oreelse.inventory_pick()).
+// of 80 of its grid. Empty: a dark socket with an inner outline of 32x32 at (20, 20). Filled:
+// the face, lighter while hovered, the item's icon and its count at y 49, right aligned in 63.
+// The selected building: an amber face and a 2 pixel amber border, no hover change. A click on
+// a building picks it (oreelse.inventory_pick()).
 template StockSlot : box.widgets.HeadlessButton {
   prop index: i32 = 0
   prop item: entity = 0
   prop count: i32 = 0
   prop active: bool = false
 
+  const pitch: f32 = 80
+  const socketAt: f32 = 20
+  const socketSize: f32 = 32
+  const countY: f32 = 49
+  const countWidth: f32 = 63
+  const countSize: f32 = 15
+  const selectedFace: Rgb = {78, 62, 26}
+  const emptyFace: Rgb = {15, 16, 20}
+  const emptyEdge: Rgb = {44, 48, 56}
+  const countInk: Rgb = {224, 229, 237}
+
   const none: entity = 0
-  const filled = item != 0
+  const filled = item != none
   const faceIdle: Rgb = match hover {
     true: slotHover
     false: slotFace
   }
   const faceFilled: Rgb = match active {
-    true: slotSelected
+    true: selectedFace
     false: faceIdle
   }
   const face: Rgb = match filled {
@@ -140,7 +107,7 @@ template StockSlot : box.widgets.HeadlessButton {
 
   Layout: {}
   LayoutItem: {
-    h: Left, v: Top, x: (index % 5) * slotPitch, y: -floor(index / 5) * slotPitch,
+    h: Left, v: Top, x: (index % 5) * pitch, y: -floor(index / 5) * pitch,
     width: {mode: Fixed, value: slotSize}, height: {mode: Fixed, value: slotSize}
   }
   Rect: {1, 1}
@@ -200,15 +167,21 @@ template StockSlot : box.widgets.HeadlessButton {
   }
 }
 
-// A slot button of the construct section: the item's icon and, on the rocket page, its key.
-// When the item can be ordered (can, its OreCanOrder) the face lightens while hovered and the
-// icon is opaque; when it cannot the button is dim, the icon at alpha 150 and the face does not
-// change. A click orders one, cfg.craftBatch with Shift held at the click
+// A slot button of the construct section: the item's icon and, on the rocket page, its key at
+// (8, 4). When the item can be ordered (can, its OreCanOrder) the face lightens while hovered
+// and the icon is opaque; when it cannot the button is dim, the icon at alpha 150 and the face
+// does not change. A click orders one, cfg.craftBatch with Shift held at the click
 // (oreelse.inventory_order()); the screen stays open.
 template SlotButton : box.widgets.HeadlessButton {
   prop item: entity = 0
   prop key: string = ""
   prop can: bool = true
+
+  const keySize: f32 = 13
+  const keyInk: Rgb = {132, 139, 152}
+  const dimFace: Rgb = {30, 33, 39}
+  const dimEdge: Rgb = {52, 56, 64}
+  const dimAlpha: f32 = 150
 
   const faceLit: Rgb = match hover {
     true: slotHover
@@ -224,7 +197,7 @@ template SlotButton : box.widgets.HeadlessButton {
   }
   const iconAlpha: f32 = match can {
     true: 255
-    false: iconDim
+    false: dimAlpha
   }
 
   Layout: {}
@@ -276,27 +249,40 @@ template SlotButton : box.widgets.HeadlessButton {
   }
 }
 
-// A tab button of the construct section, tab its index. Inactive: a dark face, lighter while
-// hovered, and the label in the soft color. Active: an amber face and border, a light label and
-// an amber underline, no hover change. A click selects the tab (oreelse.inventory_tab()).
+// A tab button of the construct section, 148x30, tab its index, the label at y 7. Inactive: a
+// dark face, lighter while hovered, and the label in the soft color. Active: an amber face and
+// border, a light label and an amber underline of 132x2 at (8, 27), no hover change. A click
+// selects the tab (oreelse.inventory_tab()).
 template TabButton : box.widgets.HeadlessButton {
   prop tab: i32 = 0
   prop active: bool = false
 
+  const tabWidth: f32 = 148
+  const tabHeight: f32 = 30
+  const labelY: f32 = 7
+  const labelSize: f32 = 15
+  const underlineX: f32 = 8
+  const underlineY: f32 = 27
+  const idleFace: Rgb = {32, 35, 41}
+  const hoverFace: Rgb = {50, 55, 63}
+  const activeFace: Rgb = {60, 52, 28}
+  const idleEdge: Rgb = {52, 56, 64}
+  const activeInk: Rgb = {246, 220, 168}
+
   const faceIdle: Rgb = match hover {
-    true: tabHover
-    false: tabFace
+    true: hoverFace
+    false: idleFace
   }
   const face: Rgb = match active {
-    true: tabActive
+    true: activeFace
     false: faceIdle
   }
   const edge: Rgb = match active {
     true: palette.amber
-    false: tabEdge
+    false: idleEdge
   }
   const ink: Rgb = match active {
-    true: tabInkActive
+    true: activeInk
     false: palette.soft
   }
 
@@ -307,8 +293,8 @@ template TabButton : box.widgets.HeadlessButton {
   Border: {width: 1, radius: slotRadius, color: {edge.r, edge.g, edge.b, 255}}
 
   caption {
-    LayoutItem: {h: Left, v: Top, x: 0, y: -tabLabelY, width: {mode: Fixed, value: tabWidth}}
-    Text: {value: label, size: tabSize, width: tabWidth, align: Center}
+    LayoutItem: {h: Left, v: Top, x: 0, y: -labelY, width: {mode: Fixed, value: tabWidth}}
+    Text: {value: label, size: labelSize, width: tabWidth, align: Center}
     Rgb: ink
   }
 
@@ -340,10 +326,15 @@ template TabButton : box.widgets.HeadlessButton {
   }
 }
 
-// The Inventory (E) button at the bottom center: its ActionTrigger taps the Inventory action,
-// which E raises too. The face (with its alpha) lightens while hovered; it is a plate below the
-// caption, so the alpha leaves the caption opaque. InputBlocker keeps its clicks from the world.
+// The Inventory (E) button at the bottom center, 196x38: its ActionTrigger taps the Inventory
+// action, which E raises too. The face (with its alpha) lightens while hovered; it is a plate
+// below the caption, so the alpha leaves the caption opaque. InputBlocker keeps its clicks from
+// the world.
 template InventoryButton : box.widgets.HeadlessButton {
+  const buttonWidth: f32 = 196
+  const buttonHeight: f32 = 38
+  const captionSize: f32 = 17
+
   const face: Rgb = match hover {
     true: slotHover
     false: slotFace
@@ -379,7 +370,7 @@ template InventoryButton : box.widgets.HeadlessButton {
     }
 
     line {
-      Text: {value: label, size: buttonSize}
+      Text: {value: label, size: captionSize}
       Rgb: palette.text
     }
   }
@@ -392,339 +383,385 @@ template InventoryButton : box.widgets.HeadlessButton {
   }
 }
 
-// The inventory screen, the info panel and the Inventory (E) button, over the whole parent
-// (the screen of the HUD). The screen shows while it is open and the game plays, the info panel
-// with it while the pointer is over a stock slot holding an item or a slot button, the button
-// while the game plays.
-template InventoryScreen {
-  const none: entity = 0
+// The content of the inventory section: the title, the hint and a grid of 392x232 with the 15
+// stock slots of the inventory in its slot order, the building selected for placement in amber
+template StockBody {
+  const gridWidth: f32 = 392
+  const gridHeight: f32 = 232
+  const hintSize: f32 = 14
 
-  const playing = OreGameState?[(OreGameState, Playing)]
-  const screenState = OreInventoryScreen[OreInventoryScreen]
-  const open = playing && screenState.open
-  const tab = screenState.tab
+  const none: entity = 0
   const stock = OreInventory[OreInventory]
   const selected = OrePlacement[OrePlacement].selected
-  const info = OreItemInfo[OreItemInfo]
-  const shown = info.item
-  const needs = OreNeeds[OreNeeds]
 
-  Layout: {}
-  LayoutItem: {width: {mode: Grow, value: 1}, height: {mode: Grow, value: 1}}
+  Layout: {
+    direction: Column, spacing: 12, padding: {sectionPad, sectionPad, sectionPad, sectionPad}
+  }
+  LayoutItem: {h: Left, v: Top}
 
-  if open {
-    screen {
-      Panel: {width: screenWidth, height: screenHeight, capH: screenCap, fill: screenFill}
-      LayoutItem: {h: Center, v: Middle, y: 60}
+  title {
+    LayoutItem: {height: {mode: Fixed, value: titleSize}}
+    Text: {value: "INVENTORY", size: titleSize}
+    Rgb: palette.text
+  }
 
-      // The stock: the 15 slots of the inventory in its slot order
-      stock_section {
-        Panel: {
-          width: stockWidth, height: sectionHeight, cap: false,
-          fill: sectionFill, edge: sectionEdge
-        }
-        LayoutItem: {h: Left, v: Top, x: sectionPad, y: -sectionTop}
+  stock_body {
+    Layout: {direction: Column, spacing: 8}
 
-        body {
-          Layout: {
-            direction: Column, spacing: 12,
-            padding: {sectionPad, sectionPad, sectionPad, sectionPad}
-          }
-          LayoutItem: {h: Left, v: Top}
+    hint {
+      LayoutItem: {height: {mode: Fixed, value: hintSize}}
+      Text: {value: "Click a building to place it - 15 slots", size: hintSize}
+      Rgb: palette.soft
+    }
 
-          title {
-            Text: {value: "INVENTORY", size: titleSize}
-            Rgb: palette.text
-          }
-
-          stock_body {
-            Layout: {direction: Column, spacing: 8}
-
-            hint {
-              Text: {value: "Click a building to place it - 15 slots", size: hintSize}
-              Rgb: palette.soft
-            }
-
-            grid {
-              Layout: {}
-              LayoutItem: {
-                width: {mode: Fixed, value: gridWidth}, height: {mode: Fixed, value: gridHeight}
-              }
-
-              for i in 0..15 {
-                "slot_{i}" {
-                  StockSlot: {
-                    index: i, item: stock.slots[i].item, count: stock.slots[i].amount,
-                    active: stock.slots[i].item != none && stock.slots[i].item == selected
-                  }
-                }
-              }
-            }
-          }
-        }
+    grid {
+      Layout: {}
+      LayoutItem: {
+        width: {mode: Fixed, value: gridWidth}, height: {mode: Fixed, value: gridHeight}
       }
 
-      // The construct section: the tabs and the page of the active one
-      construct_section {
-        Panel: {
-          width: constructWidth, height: sectionHeight, cap: false,
-          fill: sectionFill, edge: sectionEdge
-        }
-        LayoutItem: {
-          h: Left, v: Top, x: sectionPad + stockWidth + sectionPad, y: -sectionTop
-        }
-
-        body {
-          Layout: {
-            direction: Column, spacing: 12,
-            padding: {sectionPad, sectionPad, sectionPad, sectionPad}
-          }
-          LayoutItem: {h: Left, v: Top}
-
-          title {
-            Text: {value: "CONSTRUCT", size: titleSize}
-            Rgb: palette.text
-          }
-
-          tabs {
-            Layout: {direction: Row, spacing: 8}
-
-            buildings_tab {
-              TabButton: {label: "Buildings", tab: 0, active: tab == 0}
-            }
-
-            rocket_tab {
-              TabButton: {label: "Rocket", tab: 1, active: tab == 1}
-            }
-          }
-
-          pages {
-            Layout: {direction: Column}
-            LayoutItem: {
-              width: {mode: Fixed, value: pageWidth}, height: {mode: Fixed, value: pageHeight}
-            }
-
-            if tab == 0 {
-              buildings_page {
-                Layout: {direction: Column, spacing: 8}
-
-                row_base {
-                  Layout: {direction: Row, spacing: 8}
-
-                  wall {
-                    SlotButton: {item: Wall, can: Wall[OreCanOrder].value}
-                  }
-
-                  drill {
-                    SlotButton: {item: Drill, can: Drill[OreCanOrder].value}
-                  }
-
-                  solar_panel {
-                    SlotButton: {item: SolarPanel, can: SolarPanel[OreCanOrder].value}
-                  }
-                }
-
-                row_turrets {
-                  Layout: {direction: Row, spacing: 8}
-
-                  gun_turret {
-                    SlotButton: {item: GunTurret, can: GunTurret[OreCanOrder].value}
-                  }
-
-                  laser_turret {
-                    SlotButton: {item: LaserTurret, can: LaserTurret[OreCanOrder].value}
-                  }
-
-                  missile_turret {
-                    SlotButton: {item: MissileTurret, can: MissileTurret[OreCanOrder].value}
-                  }
-                }
-
-                row_late {
-                  Layout: {direction: Row, spacing: 8}
-
-                  factory {
-                    SlotButton: {item: Factory, can: Factory[OreCanOrder].value}
-                  }
-
-                  rocket_pad {
-                    SlotButton: {item: RocketPad, can: RocketPad[OreCanOrder].value}
-                  }
-
-                  drone_pad {
-                    SlotButton: {item: DronePad, can: DronePad[OreCanOrder].value}
-                  }
-                }
-              }
-            } else {
-              rocket_page {
-                Layout: {direction: Column, spacing: 8}
-
-                row_rocket {
-                  Layout: {direction: Row, spacing: 8}
-
-                  engine {
-                    SlotButton: {
-                      item: items.RocketEngine, key: "F",
-                      can: items.RocketEngine[OreCanOrder].value
-                    }
-                  }
-
-                  fuel {
-                    SlotButton: {
-                      item: items.RocketFuelStorage, key: "G",
-                      can: items.RocketFuelStorage[OreCanOrder].value
-                    }
-                  }
-
-                  cargo_bay {
-                    SlotButton: {
-                      item: items.RocketCargoBay, key: "H",
-                      can: items.RocketCargoBay[OreCanOrder].value
-                    }
-                  }
-
-                  life_support {
-                    SlotButton: {
-                      item: items.RocketLifeSupport, key: "J",
-                      can: items.RocketLifeSupport[OreCanOrder].value
-                    }
-                  }
-                }
-              }
-            }
+      for i in 0..15 {
+        "slot_{i}" {
+          StockSlot: {
+            index: i, item: stock.slots[i].item, count: stock.slots[i].amount,
+            active: stock.slots[i].item != none && stock.slots[i].item == selected
           }
         }
       }
     }
+  }
+}
 
-    // The info panel of the item under the pointer: its icon, name, a note on how it is made
-    // (or that it is ready to place) with its power, its detail and, for an item with a recipe
-    // other than a building in a stock slot, its needs of raw ore once OreNeeds has them
-    if shown != none {
-      info_panel {
-        Panel: {width: infoWidth, height: infoHeight, capH: infoCap}
-        LayoutItem: {h: Center, v: Middle, y: -224}
+// The Buildings tab: three rows of three slot buttons. The observers of a script do not see the
+// changes of the item prefabs: every can reads the flips of OreCanOrder too, so it follows them
+template BuildingsPage {
+  const flips = OreCanOrderFlips[OreCanOrderFlips].count
 
-        const item = shown
-        const place = info.place
-        const recipe = item?[OreRecipe]
-        const consumer = item?[OrePowerConsumer]
-        const producer = item?[OrePowerProducer]
-        const draw: f32 = match consumer {
-          true: item[OrePowerConsumer].watts
-          false: 0
-        }
-        const gen: f32 = match producer {
-          true: item[OrePowerProducer].watts
-          false: 0
-        }
-        const craftTime: f32 = match recipe {
-          true: item[OreRecipe].time
-          false: 0
-        }
-        const yields: i32 = match recipe {
-          true: item[OreRecipe].yield
-          false: 0
-        }
+  Layout: {direction: Column, spacing: 8}
 
-        // The power suffix: what a consumer draws, what a producer makes, else nothing
-        const genText: string = match gen > 0 {
-          true: " - +{gen:.0} W"
-          false: ""
-        }
-        const powerText: string = match draw > 0 {
-          true: " - {draw:.0} W"
-          false: genText
-        }
-        const craftText: string = match yields > 1 {
-          true: "Craft {craftTime:.1}s - yields {yields}{powerText}"
-          false: "Craft {craftTime:.1}s{powerText}"
-        }
-        const recipeText: string = match recipe {
-          true: craftText
-          false: "Mined from deposits"
-        }
-        const noteText: string = match place {
-          true: "Ready to place{powerText}"
-          false: recipeText
-        }
+  row_base {
+    Layout: {direction: Row, spacing: 8}
 
-        icon {
-          LayoutItem: {
-            h: Left, v: Top, x: 14, y: -22,
-            width: {mode: Fixed, value: infoIcon}, height: {mode: Fixed, value: infoIcon}
+    wall {
+      SlotButton: {item: Wall, can: flips >= 0 && Wall[OreCanOrder].value}
+    }
+
+    drill {
+      SlotButton: {item: Drill, can: flips >= 0 && Drill[OreCanOrder].value}
+    }
+
+    solar_panel {
+      SlotButton: {item: SolarPanel, can: flips >= 0 && SolarPanel[OreCanOrder].value}
+    }
+  }
+
+  row_turrets {
+    Layout: {direction: Row, spacing: 8}
+
+    gun_turret {
+      SlotButton: {item: GunTurret, can: flips >= 0 && GunTurret[OreCanOrder].value}
+    }
+
+    laser_turret {
+      SlotButton: {item: LaserTurret, can: flips >= 0 && LaserTurret[OreCanOrder].value}
+    }
+
+    missile_turret {
+      SlotButton: {item: MissileTurret, can: flips >= 0 && MissileTurret[OreCanOrder].value}
+    }
+  }
+
+  row_late {
+    Layout: {direction: Row, spacing: 8}
+
+    factory {
+      SlotButton: {item: Factory, can: flips >= 0 && Factory[OreCanOrder].value}
+    }
+
+    rocket_pad {
+      SlotButton: {item: RocketPad, can: flips >= 0 && RocketPad[OreCanOrder].value}
+    }
+
+    drone_pad {
+      SlotButton: {item: DronePad, can: flips >= 0 && DronePad[OreCanOrder].value}
+    }
+  }
+}
+
+// The Rocket tab: one row of the four rocket parts with their craft keys, the cans following
+// the flips of OreCanOrder like those of the Buildings tab
+template RocketPage {
+  const flips = OreCanOrderFlips[OreCanOrderFlips].count
+
+  Layout: {direction: Column, spacing: 8}
+
+  row_rocket {
+    Layout: {direction: Row, spacing: 8}
+
+    engine {
+      SlotButton: {
+        item: items.RocketEngine, key: "F",
+        can: flips >= 0 && items.RocketEngine[OreCanOrder].value
+      }
+    }
+
+    fuel {
+      SlotButton: {
+        item: items.RocketFuelStorage, key: "G",
+        can: flips >= 0 && items.RocketFuelStorage[OreCanOrder].value
+      }
+    }
+
+    cargo_bay {
+      SlotButton: {
+        item: items.RocketCargoBay, key: "H",
+        can: flips >= 0 && items.RocketCargoBay[OreCanOrder].value
+      }
+    }
+
+    life_support {
+      SlotButton: {
+        item: items.RocketLifeSupport, key: "J",
+        can: flips >= 0 && items.RocketLifeSupport[OreCanOrder].value
+      }
+    }
+  }
+}
+
+// The content of the construct section: the title, the tab buttons and a page area of 312x232
+// with the page of the active tab
+template ConstructBody {
+  prop tab: i32 = 0
+
+  const pageWidth: f32 = 312
+  const pageHeight: f32 = 232
+
+  Layout: {
+    direction: Column, spacing: 12, padding: {sectionPad, sectionPad, sectionPad, sectionPad}
+  }
+  LayoutItem: {h: Left, v: Top}
+
+  title {
+    LayoutItem: {height: {mode: Fixed, value: titleSize}}
+    Text: {value: "CONSTRUCT", size: titleSize}
+    Rgb: palette.text
+  }
+
+  tabs {
+    Layout: {direction: Row, spacing: 8}
+
+    buildings_tab {
+      TabButton: {label: "Buildings", tab: 0, active: tab == 0}
+    }
+
+    rocket_tab {
+      TabButton: {label: "Rocket", tab: 1, active: tab == 1}
+    }
+  }
+
+  pages {
+    Layout: {direction: Column}
+    LayoutItem: {
+      width: {mode: Fixed, value: pageWidth}, height: {mode: Fixed, value: pageHeight}
+    }
+
+    if tab == 0 {
+      buildings_page {
+        BuildingsPage: {}
+      }
+    } else {
+      rocket_page {
+        RocketPage: {}
+      }
+    }
+  }
+}
+
+// The info panel of item, 560x154 below the screen: its icon 56x56, name, a note on how it is
+// made (or that it is ready to place, place) with its power, its detail and, for an item with a
+// recipe other than a building in a stock slot, its needs of raw ore once OreNeeds has them
+template ItemInfoPanel {
+  prop item: entity = 0
+  prop place: bool = false
+
+  const infoCap: f32 = 7
+  const iconSize: f32 = 56
+  const nameSize: f32 = 22
+  const needIcon: f32 = 26
+
+  const needs = OreNeeds[OreNeeds]
+  const recipe = item?[OreRecipe]
+  const consumer = item?[OrePowerConsumer]
+  const producer = item?[OrePowerProducer]
+  const draw: f32 = match consumer {
+    true: item[OrePowerConsumer].watts
+    false: 0
+  }
+  const gen: f32 = match producer {
+    true: item[OrePowerProducer].watts
+    false: 0
+  }
+  const craftTime: f32 = match recipe {
+    true: item[OreRecipe].time
+    false: 0
+  }
+  const yields: i32 = match recipe {
+    true: item[OreRecipe].yield
+    false: 0
+  }
+
+  // The power suffix: what a consumer draws, what a producer makes, else nothing
+  const genText: string = match gen > 0 {
+    true: " - +{gen:.0} W"
+    false: ""
+  }
+  const powerText: string = match draw > 0 {
+    true: " - {draw:.0} W"
+    false: genText
+  }
+  const craftText: string = match yields > 1 {
+    true: "Craft {craftTime:.1}s - yields {yields}{powerText}"
+    false: "Craft {craftTime:.1}s{powerText}"
+  }
+  const recipeText: string = match recipe {
+    true: craftText
+    false: "Mined from deposits"
+  }
+  const noteText: string = match place {
+    true: "Ready to place{powerText}"
+    false: recipeText
+  }
+
+  Layout: {}
+  LayoutItem: {
+    h: Center, v: Middle, y: -224,
+    width: {mode: Fixed, value: infoWidth}, height: {mode: Fixed, value: infoHeight}
+  }
+
+  // The chrome below the content
+  panel {
+    Panel: {width: infoWidth, height: infoHeight, capH: infoCap}
+    LayoutItem: {h: Left, v: Top}
+  }
+
+  icon {
+    LayoutItem: {
+      h: Left, v: Top, x: 14, y: -22,
+      width: {mode: Fixed, value: iconSize}, height: {mode: Fixed, value: iconSize}
+    }
+    Rect: {1, 1}
+    Image: {texture: item[OreIcon].texture, u0: 0, v0: 0, u1: 1, v1: 1}
+  }
+
+  item_name {
+    LayoutItem: {h: Left, v: Top, x: 82, y: -22}
+    Text: {value: item[OreItem].name, size: nameSize}
+    Rgb: palette.text
+  }
+
+  note {
+    LayoutItem: {h: Left, v: Top, x: 82, y: -54}
+    Text: {value: noteText, size: infoText}
+    Rgb: palette.amber
+  }
+
+  detail {
+    LayoutItem: {h: Left, v: Top, x: 82, y: -76}
+    Text: {value: item[OreItem].detail, size: infoText}
+    Rgb: palette.soft
+  }
+
+  if recipe && !place && needs.item == item && needs.count > 0 {
+    needs_label {
+      LayoutItem: {h: Left, v: Top, x: 14, y: -112}
+      Text: {value: "NEEDS", size: infoText}
+      Rgb: palette.amber
+    }
+
+    // A row per ore, Iron, Copper, Stone, Luminite: its icon and have/need, red while short
+    needs_list {
+      Layout: {direction: Row, spacing: 18}
+      LayoutItem: {h: Left, v: Top, x: 82, y: -108}
+
+      for i in 0..needs.count {
+        "need_{i}" {
+          const need = needs.ores[i]
+          const ore = need.item
+          const short = need.have < need.need
+
+          Layout: {direction: Row, spacing: 6, v: Middle}
+
+          icon {
+            LayoutItem: {
+              width: {mode: Fixed, value: needIcon}, height: {mode: Fixed, value: needIcon}
+            }
+            Rect: {1, 1}
+            Image: {texture: ore[OreIcon].texture, u0: 0, v0: 0, u1: 1, v1: 1}
           }
-          Rect: {1, 1}
-          Image: {texture: item[OreIcon].texture, u0: 0, v0: 0, u1: 1, v1: 1}
-        }
 
-        item_name {
-          LayoutItem: {h: Left, v: Top, x: 82, y: -22}
-          Text: {value: item[OreItem].name, size: 22}
-          Rgb: palette.text
-        }
-
-        note {
-          LayoutItem: {h: Left, v: Top, x: 82, y: -54}
-          Text: {value: noteText, size: infoText}
-          Rgb: palette.amber
-        }
-
-        detail {
-          LayoutItem: {h: Left, v: Top, x: 82, y: -76}
-          Text: {value: item[OreItem].detail, size: infoText}
-          Rgb: palette.soft
-        }
-
-        if recipe && !place && needs.item == item && needs.count > 0 {
-          needs_label {
-            LayoutItem: {h: Left, v: Top, x: 14, y: -112}
-            Text: {value: "NEEDS", size: infoText}
-            Rgb: palette.amber
-          }
-
-          // A row per ore, Iron, Copper, Stone, Luminite: its icon and have/need, red while
-          // short
-          needs_list {
-            Layout: {direction: Row, spacing: 18}
-            LayoutItem: {h: Left, v: Top, x: 82, y: -108}
-
-            for i in 0..needs.count {
-              "need_{i}" {
-                const need = needs.ores[i]
-                const ore = need.item
-                const short = need.have < need.need
-
-                Layout: {direction: Row, spacing: 6, v: Middle}
-
-                icon {
-                  LayoutItem: {
-                    width: {mode: Fixed, value: needIcon}, height: {mode: Fixed, value: needIcon}
-                  }
-                  Rect: {1, 1}
-                  Image: {texture: ore[OreIcon].texture, u0: 0, v0: 0, u1: 1, v1: 1}
-                }
-
-                amount {
-                  Text: {value: "{need.have}/{need.need}", size: infoText}
-                  Rgb: match short {
-                    true: palette.red
-                    false: palette.text
-                  }
-                }
-              }
+          amount {
+            Text: {value: "{need.have}/{need.need}", size: infoText}
+            Rgb: match short {
+              true: palette.red
+              false: palette.text
             }
           }
         }
       }
     }
   }
+}
 
-  // The Inventory (E) button, while playing
-  if playing {
-    inventory_button {
-      InventoryButton: {label: "Inventory (E)", action: actions.Inventory}
+// The inventory screen, 802x368 at the center of the parent (the screen of the HUD), with the
+// inventory section (420x334) at (14, 20) and the construct section (340x334) at (448, 20) on
+// the tab of OreInventoryScreen. The HUD shows it while the screen is open and the game plays;
+// wider than a small window, it hangs over its edges like the original's.
+template InventoryScreen {
+  const screenWidth: f32 = 802
+  const screenHeight: f32 = 368
+  const screenCap: f32 = 8
+  const sectionTop: f32 = 20
+  const sectionHeight: f32 = 334
+  const stockWidth: f32 = 420
+  const constructWidth: f32 = 340
+  const screenFill: rgba = {17, 18, 22, 244}
+  const sectionFill: rgba = {26, 28, 33, 236}
+  const sectionEdge: rgba = {58, 63, 73, 255}
+
+  const tab = OreInventoryScreen[OreInventoryScreen].tab
+
+  Layout: {}
+  LayoutItem: {
+    h: Center, v: Middle, y: 60,
+    width: {mode: Fixed, value: screenWidth}, height: {mode: Fixed, value: screenHeight}
+  }
+
+  // The chrome below the sections
+  panel {
+    Panel: {width: screenWidth, height: screenHeight, capH: screenCap, fill: screenFill}
+    LayoutItem: {h: Left, v: Top}
+  }
+
+  stock_section {
+    Panel: {
+      width: stockWidth, height: sectionHeight, cap: false, fill: sectionFill, edge: sectionEdge
+    }
+    LayoutItem: {h: Left, v: Top, x: sectionPad, y: -sectionTop}
+
+    body {
+      StockBody: {}
+    }
+  }
+
+  construct_section {
+    Panel: {
+      width: constructWidth, height: sectionHeight, cap: false,
+      fill: sectionFill, edge: sectionEdge
+    }
+    LayoutItem: {h: Left, v: Top, x: sectionPad + stockWidth + sectionPad, y: -sectionTop}
+
+    body {
+      ConstructBody: {tab: tab}
     }
   }
 }

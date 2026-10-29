@@ -51,6 +51,7 @@ void OreelseImport(
     ECS_META_COMPONENT(world, OreCraftRow);
     ECS_META_COMPONENT(world, OreCraftBook);
     ECS_META_COMPONENT(world, OreCanOrder);
+    ECS_META_COMPONENT(world, OreCanOrderFlips);
     ECS_META_COMPONENT(world, OreNeed);
     ECS_META_COMPONENT(world, OreNeeds);
     ECS_META_COMPONENT(world, OreFootprint);

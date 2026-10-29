@@ -6,16 +6,16 @@ mining, placing or pipette while it is open, the craft keys work with it closed,
 from an open screen leaves it closed with E opening it at the first press.
 
 Every case runs in a fresh apps/oreelse process with its default scene and a fixed session seed,
-like oreelse_flow.py, which describes the setup: a 640x360 window, so the 802x368 screen hangs
-over its edges and the cases click the elements that lie inside it. A case finds the window
-point of an element from its WorldTransform (the HUD's camera shows one point per unit, centered
-on the window) and checks with PickStatus that the element handles the pointer there before it
-clicks.
+like oreelse_flow.py, which describes the setup. The window then grows to the 1280x720 points
+the original lays the screen out for, rendered at half resolution (640x360 pixels), so the screen
+lies inside it and clear of the status bar. A case finds the window point of an element from its
+WorldTransform (the HUD's camera shows one point per unit, centered on the window) and checks
+with PickStatus that the element handles the pointer there before it clicks.
 """
 from oreelse_buildings import (  # noqa: F401 (ARGS)
     ARGS, PLACEMENT, PLAYER, SETTLE, STATE, aim_tile, button, count, deposit_tile, entity,
-    inventory, key, placement, press, selected, set_inventory, set_state, start, tiles,
-    wait_toast)
+    inventory, key, placement, rows_of, selected, set_inventory, set_state, tiles, wait_toast)
+from oreelse_buildings import start as start_game
 
 APP = "apps/oreelse"
 
@@ -24,13 +24,14 @@ INFO = "oreelse.OreItemInfo"
 BOOK = "oreelse.OreCraftBook"
 PICK = "get box.picking.PickStatus PickStatus."
 
-# The window of the cases, in points
-WIDTH = 640
-HEIGHT = 360
+# The window of the cases, in points, and the pixels a point renders at
+WIDTH = 1280
+HEIGHT = 720
+RESOLUTION_SCALE = 2
 
 # The elements of the screen (ui/inventory.flecs) under the HUD's screen
-UI = "hud.ui.screen.inventory"
-SCREEN = UI + ".screen"
+UI = "hud.ui.screen"
+SCREEN = UI + ".inventory"
 GRID = SCREEN + ".stock_section.body.stock_body.grid"
 TABS = SCREEN + ".construct_section.body.tabs"
 PAGES = SCREEN + ".construct_section.body.pages"
@@ -39,12 +40,38 @@ ROCKET = PAGES + ".rocket_page"
 INFO_PANEL = UI + ".info_panel"
 BUTTON = UI + ".inventory_button"
 
-# A point of the window below the screen and left of the Inventory (E) button, where a click
-# reaches the world (the screen spans y -64..304 and the button x 222..418)
-OFF_SCREEN = (60, 330)
+# A point of the window below the screen and left of the info panel and the Inventory (E)
+# button, where a click reaches the world (the screen spans y 116..484, the info panel x
+# 360..920 and the button x 542..738)
+OFF_SCREEN = (120, 660)
+
+# The face of a slot button that cannot order
+DIM_FACE = (30, 33, 39)
 
 # A corner of the map without deposits (oreelse_buildings.AREA)
 TILE = (6, 6)
+
+
+def start(app):
+    """Set up, leave the title screen and grow the window to the points of the original."""
+    start_game(app)
+    app.exec("set window Surface {width: %d, height: %d, resolution_scale: %g}" %
+             (WIDTH, HEIGHT, RESOLUTION_SCALE))
+    app.wait_for("get window SurfaceStatus.point_height", str(HEIGHT))
+    app.wait_frames(SETTLE)
+
+
+def press(app, row, col):
+    """Press the left button on a tile, aimed from OFF_SCREEN: the drag is anchored there."""
+    aim_tile(app, row, col, OFF_SCREEN)
+    button(app, "left", True)
+    app.wait_frames(2)
+    app.check(placement(app)["dragging"], "the press on %s started no drag" % ((row, col),))
+
+
+def shown(app, path):
+    """Whether an element of the screen is shown: it exists, with its Layout."""
+    return path in rows_of(app, "box.layout.Layout")
 
 
 def is_open(app):
@@ -116,19 +143,39 @@ def orders(app):
     return [(o["item"], o["demand"]) for o in book["orders"][:book["count"]]]
 
 
+def ordered(app):
+    """The orders taken in the run (next_id, the id of the last one) and the last one: its item
+    and demand, None once it is done."""
+    book = app.get(BOOK, "OreCraftBook")
+    last = [(o["item"], o["demand"]) for o in book["orders"][:book["count"]]
+            if o["id"] == book["next_id"]]
+    return book["next_id"], last[0] if last else None
+
+
+def wait_ordered(app, n, what):
+    app.wait_for("get %s OreCraftBook.next_id" % BOOK, str(n), what=what)
+
+
 def can_order(app, item):
     return app.get(item, "OreCanOrder")["value"]
+
+
+def lit(app, name):
+    """Whether a slot button of the Buildings page shows its item can be ordered: its face is
+    the lit one."""
+    c = app.get("%s.row_base.%s" % (BUILDINGS, name), "Rgb")
+    return (c["r"], c["g"], c["b"]) != DIM_FACE
 
 
 def test_open_close(app):
     start(app)
     app.check(not is_open(app), "the screen is open at the start")
-    app.check(app.exec("has %s Panel" % SCREEN) == "false", "the screen shows at the start")
+    app.check(not shown(app, SCREEN), "the screen shows at the start")
 
     # E opens it and closes it again; the game keeps running
     key(app, "E")
     wait_open(app, True)
-    app.check(app.exec("has %s Panel" % SCREEN) == "true", "the open screen does not show")
+    app.check(shown(app, SCREEN), "the open screen does not show")
     app.expect(STATE % "Playing", "true")
     key(app, "E")
     wait_open(app, False)
@@ -144,13 +191,13 @@ def test_open_close(app):
     wait_open(app, True)
     set_state(app, "Paused")
     app.wait_frames(SETTLE)
-    app.check(app.exec("has %s Panel" % SCREEN) == "false", "the screen shows while paused")
+    app.check(not shown(app, SCREEN), "the screen shows while paused")
     key(app, "E")
     app.wait_frames(SETTLE)
     app.check(is_open(app), "E changed the screen while paused")
     set_state(app, "Playing")
     app.wait_frames(SETTLE)
-    app.check(app.exec("has %s Panel" % SCREEN) == "true", "the screen did not come back")
+    app.check(shown(app, SCREEN), "the screen did not come back")
 
 
 def test_escape_and_drag(app):
@@ -192,11 +239,11 @@ def test_tabs(app):
     # Open, Tab flips between the pages
     key(app, "E")
     wait_open(app, True)
-    app.check(app.exec("has %s Layout" % BUILDINGS) == "true", "no Buildings page")
+    app.check(shown(app, BUILDINGS), "no Buildings page")
     key(app, "Tab")
     wait_tab(app, 1)
-    app.check(app.exec("has %s Layout" % ROCKET) == "true", "no Rocket page on the Rocket tab")
-    app.check(app.exec("has %s Layout" % BUILDINGS) == "false",
+    app.check(shown(app, ROCKET), "no Rocket page on the Rocket tab")
+    app.check(not shown(app, BUILDINGS),
               "the Buildings page shows on the Rocket tab")
     key(app, "Tab")
     wait_tab(app, 0)
@@ -261,44 +308,55 @@ def test_pick(app):
 
 def test_order(app):
     start(app)
-    set_inventory(app, [("items.IronPlate", 100), ("items.CopperPlate", 100)])
+    set_inventory(app, [("items.Stone", 1)])
     key(app, "E")
     wait_open(app, True)
+    app.check(not lit(app, "drill"), "the drill button is lit without iron plates")
+
+    # The buttons follow what can be ordered while the screen is open
+    set_inventory(app, [("items.IronPlate", 100), ("items.CopperPlate", 100)])
     app.wait_for("get Drill OreCanOrder.value", "true", what="a drill to order")
+    app.wait_for("get %s.row_base.drill SlotButton.can" % BUILDINGS, "true",
+                 what="the drill button lit")
     app.check(not can_order(app, "Wall"), "a wall can be ordered without stone")
+    app.check(not lit(app, "wall"), "the wall button is lit without stone")
 
     # Over a slot button the info panel shows the recipe and the needs
     hover(app, BUILDINGS + ".row_base.drill")
     app.wait_for("get %s OreItemInfo.item" % INFO, "Drill", what="the drill under the pointer")
     app.wait_for("get %s.note Text.value" % INFO_PANEL, '"Craft 1.0s - 4 W"',
                  what="the note of the drill")
+    app.wait_for("get %s.needs_list.need_0.amount Text.value" % INFO_PANEL, '"12/12"',
+                 what="the iron the drill needs")
 
-    # A click orders one, the screen stays open
+    # A click orders one, the screen stays open (a drill takes a second to craft, so the order
+    # may be done by the time the case looks)
     click(app, BUILDINGS + ".row_base.drill")
-    app.wait_for("get %s OreCraftBook.count" % BOOK, "1", what="the order of a drill")
-    app.check(orders(app) == [("Drill", 1)], "the order book holds %s" % orders(app))
+    wait_ordered(app, 1, "the order of a drill")
+    last = ordered(app)[1]
+    app.check(last in (("Drill", 1), None), "the click ordered %s" % (last,))
     app.check(count(app, "items.IronPlate") == 94, "the drill took %s" % inventory(app))
     app.check(is_open(app), "the order closed the screen")
 
     # With Shift five
     click(app, BUILDINGS + ".row_base.drill", shift=True)
-    app.wait_for("get %s OreCraftBook.count" % BOOK, "2", what="the order of five drills")
-    app.check(orders(app) == [("Drill", 1), ("Drill", 5)], "the order book holds %s" %
-              orders(app))
+    wait_ordered(app, 2, "the order of five drills")
+    app.check(ordered(app)[1] == ("Drill", 5), "the click with Shift ordered %s" %
+              (ordered(app)[1],))
     app.check(count(app, "items.IronPlate") == 64, "six drills took %s" % inventory(app))
 
     # A dim button orders nothing
     click(app, BUILDINGS + ".row_base.wall")
     app.wait_frames(SETTLE)
-    app.check(len(orders(app)) == 2, "the dim wall ordered %s" % orders(app))
+    app.check(ordered(app)[0] == 2, "the dim wall ordered %s" % orders(app))
 
     # The rocket page orders its parts the same way
     key(app, "Tab")
     wait_tab(app, 1)
     click(app, ROCKET + ".row_rocket.engine")
-    app.wait_for("get %s OreCraftBook.count" % BOOK, "3", what="the order of an engine")
-    app.check(orders(app)[2] == ("items.RocketEngine", 1), "the order book holds %s" %
-              orders(app))
+    wait_ordered(app, 3, "the order of an engine")
+    app.check(ordered(app)[1] == ("items.RocketEngine", 1), "the engine button ordered %s" %
+              (ordered(app)[1],))
     app.check(tiles(app) == [], "the clicks on the screen placed %s" % tiles(app))
 
 
@@ -370,7 +428,7 @@ def test_restart(app):
     # Lost with the screen open: it hides; the restart closes it on the Buildings tab
     set_state(app, "Lost")
     app.wait_frames(SETTLE)
-    app.check(app.exec("has %s Panel" % SCREEN) == "false", "the screen shows on the end screen")
+    app.check(not shown(app, SCREEN), "the screen shows on the end screen")
     key(app, "R")
     app.wait_for(STATE % "Playing", "true")
     wait_open(app, False)
@@ -382,4 +440,4 @@ def test_restart(app):
     # The first E opens it
     key(app, "E")
     wait_open(app, True)
-    app.check(app.exec("has %s Panel" % SCREEN) == "true", "the screen does not show")
+    app.check(shown(app, SCREEN), "the screen does not show")
