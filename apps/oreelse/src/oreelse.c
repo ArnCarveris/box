@@ -7,8 +7,8 @@
  * weapons, buildings, their animation and lights, drones, flora, placement, its preview, rocket.
  *
  * Gameplay systems match (OreGameState, Playing), the only pause. The look applies the render
- * quality tier in every state, in EcsPreStore. The particles register the helpers that play
- * the effects of etc/particles and the flash of their lights.
+ * quality tier in every state, in EcsPreStore; the particles play the effects of etc/particles.
+ * The stress test builds its base in EcsOnLoad, after the purge of the tile grid.
  */
 
 #define OREELSE_IMPL
@@ -131,6 +131,9 @@ void OreelseImport(
     ECS_META_COMPONENT(world, OreLaunchFx);
     ECS_META_COMPONENT(world, OreTurret);
     ECS_META_COMPONENT(world, OreProjectile);
+    ECS_META_COMPONENT(world, OreStressTest);
+    ECS_META_COMPONENT(world, OreStressSite);
+    ECS_META_COMPONENT(world, OreStressKit);
     ECS_TAG_DEFINE(world, OreRunScript);
     ECS_TAG_DEFINE(world, OreGhost);
     ECS_TAG_DEFINE(world, OreHoming);
@@ -159,4 +162,5 @@ void OreelseImport(
     ore_look_import(world);
     ore_health_bars_import(world);
     ore_particles_import(world);
+    ore_stresstest_import(world);
 }

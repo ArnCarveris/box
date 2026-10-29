@@ -17,6 +17,7 @@ bake3 --local-env                                              # build box and t
 bake3 run apps/oreelse --local-env                             # play in a 1280x720 window
 bake3 run apps/oreelse --local-env -- --seed 42                # play the map of seed 42
 bake3 run apps/oreelse --local-env -- --headless --frames 10   # headless run, exits 0
+bake3 run apps/oreelse --local-env -- --stresstest             # a late game base, see below
 bake3 --target em --local-env apps/oreelse                     # build for the browser
 
 python3 tools/integration.py e2e oreelse_flow oreelse_look     # the end-to-end scenarios
@@ -26,7 +27,7 @@ python3 tools/integration.py e2e oreelse_power oreelse_critters oreelse_critter_
 python3 tools/integration.py e2e oreelse_player_fx oreelse_hud oreelse_building_animation
 python3 tools/integration.py e2e oreelse_weapons oreelse_flora oreelse_drones
 python3 tools/integration.py e2e oreelse_inventory_screen oreelse_health_bars oreelse_screens oreelse_combat_fx
-python3 tools/integration.py e2e oreelse_drone_rocket_fx
+python3 tools/integration.py e2e oreelse_drone_rocket_fx oreelse_stresstest
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -34,6 +35,42 @@ python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 the time. A seeded session is reproducible: run k after the start (each restart) draws from a
 seed derived from N and k, so every restart is a new map and the same again in the next
 session with the same seed.
+
+### The stress test
+
+`--stresstest` skips the title screen and drops you into a late game base for performance
+testing, at 30 minutes of play; `--stresstest=N` at N minutes (N of 0 or less means 30). Every
+run of the session starts so, on its own map: a restart (R) builds the same layout on the new
+map. The buildings are placed for free and regardless of the reach, by the rules of placement
+otherwise (free tiles, drills only on deposits, nothing else on them, one rocket pad). On the
+48x48 grid:
+
+1. A drill on every deposit, Luminite included.
+2. A wall ring on the perimeter of rows and columns 10 to 37, a second one on 11 to 36, and a
+   turret ring on 12 to 35 cycling gun, laser, gun and missile turrets along the ring.
+3. A rocket pad near (row 29, column 23), factories near (20, 20) and (20, 27), drone pads near
+   (27, 28) and (23, 18): each at the first free cell of the square shells around its tile, up
+   to 8 out.
+4. Solar panels on the free tiles of successive rings 3 in from the edge of the map and further
+   in (rows and columns 3 to 44, then 4 to 43, ...) until the production is at least 1.15 times
+   the watts of the consumers.
+5. The astronaut on the free tile (no deposit, no building) nearest to (24, 24).
+6. Added to the starting crate: Iron 500, Copper 500, Stone 500, Luminite 200, IronPlate 200,
+   CopperPlate 200, StoneBrick 200, Wall 40, Drill 6, SolarPanel 10, GunTurret 6, LaserTurret 4,
+   MissileTurret 4.
+7. With s = N * 60 seconds: the clock at s, the wave counter at `floor((s - 90) / 50)` and the
+   next wave 10 seconds away. At 30 minutes the next wave is wave 35.
+
+The layout is `etc/stresstest.flecs` with the constants `cfg.stress*`; `src/stresstest.c` builds
+it with placement's own checks (`ore_placement_build`) once the scripts of a run loaded.
+
+Frame times of the stress test (`bake3 run apps/oreelse --local-env -- --stresstest`, 1280x720,
+High, 60 s of play into the first wave):
+
+| Run | Mean (ms) | p50 (ms) | p99 (ms) | Max (ms) |
+| --- | --- | --- | --- | --- |
+| `--stresstest` | to be measured | | | |
+| `--stresstest=60` | to be measured | | | |
 
 ## Controls
 
@@ -957,6 +994,7 @@ its tile in the grid.
 | `etc/boundary.flecs` | The hazard band around the playable area |
 | `etc/scenery.flecs` | The boulders, dunes and flora of a run |
 | `etc/run.flecs` | The astronaut with its pistol, the parents of the placed buildings, of the critters and of the projectiles, and the singletons of a run, the order book, the selection, the inventory screen, the power allocation, the rocket state and the waves included |
+| `etc/stresstest.flecs` | The layout of the stress test (`OreStressKit`): the buildings of its rings, the buildings near a tile and the stock it adds |
 | `etc/launch.flecs` | The items of a rocket, the effects of its flight and the template of the pad's clamps (`OreRocketKit`), and the rocket on the pad, a `Rocket` instance (`OreRocketModel`) that follows the rocket state |
 | `etc/deposits.flecs` | The deposits of a run, the Luminite's with their glints (`DepositSparkle`) |
 | `etc/player.flecs` | The `Astronaut` template |
@@ -1009,4 +1047,6 @@ its tile in the grid.
 | `src/rocket.c` | The rocket state, installing, uninstalling, loading, the launch and the flight, the look of the flight (`OreRocketFx`: the shake, the clamps, the flames and the smoke), `oreelse.rocket_install()`, `oreelse.rocket_uninstall()`, `oreelse.rocket_load()`, `oreelse.rocket_launch()`, `oreelse.craft_key()` |
 | `src/health_bars.c` | The health bars: a `HealthBar` instance per damaged building under `health_bars.bars`, its fraction set when the health changes, the bars' view shown while playing |
 | `src/look.c` | The render quality tiers, `oreelse.cycleQuality()` |
+| `src/stresstest.c` | The stress test: the late game base every run of a `--stresstest` session starts with (`OreStressTestApply`) |
+| `src/stresstest.h` | The stress test's components (`OreStressTest`, `OreStressKit`) and `ore_placement_build`, included by `src/game.h` |
 | `src/particles.c` | The helpers that play the effects (`ore_burst`, `ore_burst_aimed`, `ore_explosion`, `ore_combust`), the flash of their lights, `oreelse.explosion()`, `oreelse.combust()` |
