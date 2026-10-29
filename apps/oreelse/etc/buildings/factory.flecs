@@ -50,6 +50,8 @@ prefab Factory {
   }
   OreFootprint: {w: 2, h: 2}
   OreHealth: {value: 100, max: 100}
+  // The box of the model, the health bar's anchor
+  OreModelBox: {w: 3.9, d: 3.9, h: 2.92}
   OrePowerConsumer: {watts: 75}
   OrePowerCategory: {kind: Construction}
   // A worker of the order book: placed, it crafts at speed 1 times the Construction multiplier

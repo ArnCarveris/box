@@ -23,6 +23,8 @@ prefab Wall {
   OreRecipe: {inputs: [{item: items.StoneBrick, amount: 4}], yield: 1, time: 1}
   OreFootprint: {w: 1, h: 1}
   OreHealth: {value: 300, max: 300}
+  // The box of the model, the health bar's anchor
+  OreModelBox: {w: 0.98, d: 0.98, h: 1.24}
 
   plinth {
     Position: {0, 0.15, 0}

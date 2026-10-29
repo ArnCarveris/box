@@ -1,0 +1,51 @@
+// The inventory screen open on the Buildings tab over the seeded map at the start, the game
+// playing (the screen hides while paused). The stock: iron plates (16), an empty slot, the walls
+// (3), selected for placement (an amber face with a 2 pixel amber border), copper plates (3), raw
+// iron (7), an empty slot, drills (2) and wire (4), then the empty sockets of the other seven
+// slots. The construct section: the Buildings tab active (amber, underlined), the Rocket tab
+// dark; of the nine slot buttons only the drill can be ordered (6 of the iron plates), the other
+// eight are dim with their icons at alpha 150. The info panel below the screen shows the solar
+// panel of its slot button, as if hovered: its icon and name, "Craft 2.0s - +20 W" in amber,
+// "Generates power." and NEEDS Iron 8/8 in the text color and Copper 6/12 in red (the 3 copper
+// plates count as 6 copper of the 12 it takes). The Inventory (E) button at the bottom center.
+include apps/oreelse/test/visual/setup/seed
+include apps/oreelse/etc/oreelse
+
+using box.camera
+using box.surface
+using oreelse
+
+// The capture is 640x360: the HUD lays out for a 1280x720 window and its camera shows it at
+// half size, so the capture holds the whole screen as a 1280x720 window shows it
+window {
+  Surface: {width: 1280, height: 720}
+}
+
+hud {
+  ui {
+    camera {
+      Camera: {ortho: true, ortho_scale: 0.5}
+    }
+  }
+}
+
+// The pointer is over no element: OreItemInfo names the slot button of the solar panel as the
+// UI would, and OreItemInfoUpdate derives the item of the info panel and its needs
+$ {
+  (OreGameState, Playing)
+  OreInventory: {
+    slots: [
+      {item: items.IronPlate, amount: 16},
+      {item: 0, amount: 0},
+      {item: Wall, amount: 3},
+      {item: items.CopperPlate, amount: 3},
+      {item: items.Iron, amount: 7},
+      {item: 0, amount: 0},
+      {item: Drill, amount: 2},
+      {item: items.Wire, amount: 4}
+    ]
+  }
+  OrePlacement: {root: buildings, selected: Wall}
+  OreInventoryScreen: {open: true, tab: 0}
+  OreItemInfo: {slot: -1, button: SolarPanel, item: 0, place: false}
+}

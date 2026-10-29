@@ -196,7 +196,8 @@ static void box_projection_extend(
  * @param box The box of the anchor
  * @param lens The lens of the view of the anchor
  * @param out Receives the rectangle in pixels of the surface, origin at the center, y up
- * @return Whether some of the box is in front of the camera and overlaps the view
+ * @return Whether some of the box is in front of the camera, overlaps the view and is at least
+ *         min_width wide
  */
 static bool box_projection_box(
     ecs_world_t *world,
@@ -259,8 +260,14 @@ static bool box_projection_box(
         goto done;
     }
 
-    out->left = b.left * lens->width * 0.5f;
-    out->right = b.right * lens->width * 0.5f;
+    float left = b.left * lens->width * 0.5f;
+    float right = b.right * lens->width * 0.5f;
+    if (right - left < box->min_width) {
+        goto done;
+    }
+
+    out->left = left;
+    out->right = right;
     out->top = b.top * lens->height * 0.5f;
     out->bottom = b.bottom * lens->height * 0.5f;
     result = true;

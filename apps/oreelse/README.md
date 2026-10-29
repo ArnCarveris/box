@@ -25,7 +25,11 @@ python3 tools/integration.py e2e oreelse_crafting oreelse_buildings oreelse_rock
 python3 tools/integration.py e2e oreelse_power oreelse_critters oreelse_critter_fx
 python3 tools/integration.py e2e oreelse_player_fx oreelse_hud oreelse_building_animation
 python3 tools/integration.py e2e oreelse_weapons oreelse_flora oreelse_drones
+<<<<<<< HEAD
 python3 tools/integration.py e2e oreelse_screens
+=======
+python3 tools/integration.py e2e oreelse_inventory_screen oreelse_health_bars
+>>>>>>> c114738101f209461eb03527e05b575c78142b1d
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -45,6 +49,8 @@ session with the same seed.
 | Left mouse button | Place the selected building; drag for a line, an L or a rectangle |
 | 1, 2, 3, 4, 5, 6, 8, 9, 0 | Select the wall, drill, solar panel, gun turret, laser turret, missile turret, rocket pad, drone pad, factory (again: clear the selection) |
 | Q | Pipette: select the building under the cursor, the drill over a deposit |
+| E | Open or close the inventory screen (the Inventory (E) button too) |
+| Tab | Switch the open inventory screen between its Buildings and Rocket tabs |
 | T, Y, U, I | Install a rocket engine, fuel storage, cargo bay, life support on the rocket |
 | O | Load the Luminite you carry into the rocket |
 | P | Launch the rocket |
@@ -69,8 +75,7 @@ ESC is one step back at a time, in this order:
 4. A building selected: clear the selection.
 5. Otherwise: pause.
 
-(Step 3 comes with the inventory screen.) Everything stops dead while paused, the clock
-included.
+Everything stops dead while paused, the clock included.
 
 R starts a new run once the game is won or lost, straight into play, on a new map. It does
 nothing while playing. The camera keeps its zoom level.
@@ -588,6 +593,36 @@ second and coming back down at 5 once it is off the buildings. The jet plume fir
 in the air and stops when it lands; its limbs trail behind it while it flies and dangle while it
 hovers in place.
 
+### The inventory screen
+
+E, or the Inventory (E) button at the bottom center of the screen, opens the inventory screen
+while playing; E closes it again, and so does ESC (step 3 of the chain above). It hides while
+paused and shows again on resume; a restart closes it on the Buildings tab. Opening it throws a
+placement drag in flight away (`Placement cancelled`). The game keeps running while it is open,
+but the right button does not mine or demolish, the left button does not place, Q does nothing
+and the placement preview hides. The digit keys, F G H J and T Y U I O P work with the screen
+open or closed; a digit key that changes the selection closes it.
+
+The **inventory** section shows the 15 slots of the inventory in its slot order: a filled slot
+shows the item's icon and its count, the building selected for placement in amber. A click on a
+building selects it for placement (the selected one again clears the selection) and closes the
+screen; a click on any other item does nothing.
+
+The **construct** section has two tabs, Buildings and Rocket; Tab or a click on a tab button
+switches them. The Buildings tab holds a button per building (wall, drill, solar panel; gun,
+laser and missile turret; factory, rocket pad, drone pad), the Rocket tab one per rocket part
+with its craft key (engine F, fuel storage G, cargo bay H, life support J). A button shows dim
+when its item cannot be ordered now. A click orders one, with Shift held five, through the order
+book; the screen stays open.
+
+While the pointer is over a filled stock slot or a button, the info panel below the screen shows
+the item: its icon, its name, a note and its detail. The note is `Ready to place` for a building
+in a stock slot, `Craft 1.0s` (with `- yields 2` when a craft yields more than one) for an item
+with a recipe, `Mined from deposits` for an ore, followed by the power of a building:
+`Craft 1.0s - 4 W` for a consumer, `Craft 2.0s - +20 W` for a producer. An item with a recipe,
+unless it is a building in a stock slot, lists its needs of raw ore (see Crafting) as
+`have/need`, red where ore is short.
+
 ### The HUD
 
 The HUD shows over the world outside the title screen. In the top right corner the status bar
@@ -610,8 +645,17 @@ it needs: `Install a cargo bay (U) or life support (I)`, `Needs 4 engines, 2 ins
 `Needs 1 fuel tanks, 0 installed (Y)`. Below 30% health `! SUIT BREACH !` blinks red at the top
 of the screen.
 
-Clicks, the right button and the wheel over a panel of the UI (the status bar) do not reach the
-world: they place, mine and zoom nothing. The plain lines of text let them through.
+A building that is damaged (above 0 and below its full HP) shows a health bar over it: a dark
+bar 4 px tall, 6 px above the top of the building as the camera sees it and as wide as the
+building looks, so it follows the zoom and the camera in the same frame. Its fill, inset 1 px,
+covers `(width - 2) * frac` of it, blended from amber {240, 176, 58} at half health to green
+{92, 236, 140} at full, and below half from red {248, 84, 72} to amber; a 1 px edge frames it.
+The bar goes when the building is repaired to full or destroyed. Bars narrower than 6 px or off
+screen are not drawn, the panels of the HUD cover them, and they show only while playing.
+
+Clicks, the right button and the wheel over a panel of the UI (the status bar, the inventory
+screen, its info panel and the Inventory (E) button) do not reach the world: they place, mine
+and zoom nothing. The plain lines of text let them through.
 
 ### Render quality
 
@@ -648,19 +692,23 @@ Every task of the port follows these.
   when a signal flips, `OreToast` when a message starts and ends, `OreView` while it glides,
   `OreHover` when the cursor tile moves, `OreInventory` when an amount changes,
   `OreCraftBook` (the orders oldest first and the rows of the queue panel) when an order or a
-  craft's progress changes, `OreCanOrder` on an item prefab when it flips, `OreNeeds` (the raw
-  ore of the item the UI sets in it) when a row changes, `OrePowerAlloc` (the levels of the
-  power categories) when a level changes, `OrePowerState` (production, demand, ratio and
-  blackout) when a value changes, `OreRocketState` (the rocket, the score, the Luminite held
-  and what can be done to the rocket) when a value changes, every frame of a flight. The C
-  formats no text for the UI.
+  craft's progress changes, `OreCanOrder` on an item prefab when it flips, with
+  `OreCanOrderFlips` counting the flips (the observers of a script do not see the changes of a
+  prefab, so a script that shows `OreCanOrder` reads the count too), `OreNeeds` (the raw ore of
+  the item the UI sets in it) when a row changes, `OreInventoryScreen` (open, the tab)
+  when it opens, closes or switches tabs, `OreItemInfo` (what the pointer is over on the
+  inventory screen and the item of its info panel) when it changes, `OrePowerAlloc` (the
+  levels of the power categories) when a level changes, `OrePowerState` (production, demand,
+  ratio and blackout) when a value changes, `OreRocketState` (the rocket, the score, the
+  Luminite held and what can be done to the rocket) when a value changes, every frame of a
+  flight. The C formats no text for the UI.
 - **Game state** is the exclusive pair `(OreGameState, Title | Playing | Paused | Won | Lost)`
   on its own singleton (`ore_state_is`, `ore_state_set`). Gameplay systems run only while
   `Playing`, with a query term on `ore_state_pair(world, OreGameStatePlaying)` whose source is
   `OreGameState`. That is the only pause mechanism: no time scale, no frozen flags. Only the
   camera and the render quality tier run in every state; outside play, systems only hide what
-  belongs to play (the tile markers, the placement preview) and pause the effects that play
-  (the jet plume, the glints of the Luminite).
+  belongs to play (the tile markers, the placement preview, the health bars) and pause the
+  effects that play (the jet plume, the glints of the Luminite).
 - **Input**: every key is a box `Action` with a `Binding` in `apps/oreelse/etc/input.flecs`.
   Actions that fire once are awaited by async loops that call an `oreelse` script function
   implemented in C (`ecs_async_function`, like `oreelse.cancel()`); held actions (walking,
@@ -779,7 +827,8 @@ box's Euler order), with the velocity in its `OreProjectile`, the weapon's `OreD
 
 The buildings are prefabs in `etc/buildings/`, one file per building, with the original's names
 and geometry, materials and lights. The gameplay tasks add their components (item, recipe,
-footprint, health, power) to the same prefabs, and the animation and effect tasks drive the named
+footprint, health, power, and `OreModelBox`, the width, depth and height of the model that the
+health bar is anchored to) to the same prefabs, and the animation and effect tasks drive the named
 parts below. A model that is not a placed building (no `OreBuilding` above it, a ghost) stands
 still. Every building's origin is the center of its footprint on the
 ground (the center of its tile, the corner between the four tiles of a 2x2 building, the center
@@ -867,7 +916,7 @@ its tile in the grid.
 
 | File | Holds |
 | --- | --- |
-| `etc/oreelse.flecs` | The window, the camera, the sun, the atmosphere, the effects and the view, the render quality tier, the mining markers, the critter tiers and their death effects (`OreArsenal`), the one shot effects the C plays (`OreEffects`), the HUD; includes the rest |
+| `etc/oreelse.flecs` | The window, the camera, the sun, the atmosphere, the effects and the view, the render quality tier, the mining markers, the critter tiers and their death effects (`OreArsenal`), the one shot effects the C plays (`OreEffects`), the scene and view of the health bars (`OreHealthBars`), the HUD; includes the rest |
 | `etc/config.flecs` | The constants `cfg.*` |
 | `etc/resources.flecs` | The item prefabs other than the buildings, with names and recipes |
 | `etc/buildings/*.flecs` | The building prefabs, models with their item, recipe, footprint, health and power, and the turrets' weapons |
@@ -876,7 +925,7 @@ its tile in the grid.
 | `etc/world.flecs` | The ground and the basin |
 | `etc/boundary.flecs` | The hazard band around the playable area |
 | `etc/scenery.flecs` | The boulders, dunes and flora of a run |
-| `etc/run.flecs` | The astronaut with its pistol, the parents of the placed buildings, of the critters and of the projectiles, and the singletons of a run, the order book, the selection, the power allocation, the rocket state and the waves included |
+| `etc/run.flecs` | The astronaut with its pistol, the parents of the placed buildings, of the critters and of the projectiles, and the singletons of a run, the order book, the selection, the inventory screen, the power allocation, the rocket state and the waves included |
 | `etc/launch.flecs` | The items of a rocket (`OreRocketKit`) and the rocket on the pad, a `Rocket` instance that follows the rocket state |
 | `etc/deposits.flecs` | The deposits of a run, the Luminite's with their glints (`DepositSparkle`) |
 | `etc/player.flecs` | The `Astronaut` template |
@@ -903,15 +952,22 @@ its tile in the grid.
 | `etc/ui/palette.flecs` | The colors of the UI, `palette.*` |
 | `etc/ui/icons.flecs` | The icon textures, `icons.*`, which the items name with `OreIcon` |
 | `etc/ui/panel.flecs` | The `Panel` template, the chrome of every panel: the plate, its edge, the hazard strip and the `InputBlocker` |
+<<<<<<< HEAD
 | `etc/ui/screens.flecs` | The screens of the game flow: `OreTitleScreen` (with its signs, `OreSign`), `OrePauseScreen` (with `OreQualityButton` and its `OreQualityValue`), `OreEndScreen`, and `OreControls`, the list of the controls the title and pause screens share (`OreControl` rows) |
 | `etc/ui/signs/` | The original's sign art of the title screen (SVG), unchanged |
 | `etc/ui/hud.flecs` | The `OreHud` template, which shows the screens in their states: the status bar (`StatusGauge`, `StatusDivider`), the toast, the mine progress bar, the suit breach alert and the rocket status line |
+=======
+| `etc/ui/health_bar.flecs` | The `HealthBar` template, the health bar of a damaged building, anchored to the projection of its model box (`OreModelBox`) |
+| `etc/ui/hud.flecs` | The `OreHud` template: the status bar (`StatusGauge`, `StatusDivider`), the toast, the mine progress bar, the suit breach alert, the rocket status line, the Inventory (E) button and the inventory screen |
+| `etc/ui/inventory.flecs` | The inventory screen (`InventoryScreen`: `StockBody` with its `StockSlot`s, `ConstructBody` with its `TabButton`s and the `BuildingsPage` and `RocketPage` of `SlotButton`s; the slots and buttons are restyled `box.widgets.HeadlessButton`s), its info panel (`ItemInfoPanel`) and the Inventory (E) button (`InventoryButton`), which the HUD shows |
+>>>>>>> c114738101f209461eb03527e05b575c78142b1d
 | `etc/icons/` | The original's icons (SVG), unchanged |
 | `etc/ui/hazard_strip.svg` | The original's hazard strip of the panels, unchanged |
 | `src/flow.c` | States, clock, blink, toast, seeds, `oreelse.cancel()`, `oreelse.restart()` |
 | `src/map.c` | The tile grid, the deposits' registration and the hover tile |
 | `src/player.c` | Walking, the jetpack and the camera; the astronaut's animation (`OrePlayerFx`: the walk cycle `OrePlayerGait`, the bob, the foot dust and the jet plume; `OreLimbs`: the limbs) and its death (`ore_player_die`) |
 | `src/inventory.c` | The inventory and the item components |
+| `src/inventory_screen.c` | The inventory screen (`OreInventoryScreen`), the item of its info panel (`OreItemInfo`) and its needs, its step of the cancel chain, `oreelse.inventory_toggle()`, `oreelse.inventory_tab()`, `oreelse.inventory_pick()`, `oreelse.inventory_order()`, `oreelse.inventory_hover()` |
 | `src/mining.c` | Mining, demolishing and their tile marker; the burst and the shrink of a mined deposit, the poofs of a used up deposit and of a demolished building, the glints of the Luminite while playing |
 | `src/flora.c` | The plants in the tile grid: removed on deposits and taken tiles, sunk under buildings |
 | `src/critters.c` | The waves, the critters' targets, attacks and moves, the crowd separation and the critter spatial index, their deaths, the astronaut's health and regen, `oreelse.spawn_critter()` |
@@ -923,5 +979,6 @@ its tile in the grid.
 | `src/craft.c` | The order book, the workers, `oreelse.craft_order()`, `oreelse.craft_cancel()` |
 | `src/power.c` | Production, demand and the blackout, the drills, the factories' crafters, the status lamps, `oreelse.power_set(category, level)` |
 | `src/rocket.c` | The rocket state, installing, uninstalling, loading, the launch and the flight, `oreelse.rocket_install()`, `oreelse.rocket_uninstall()`, `oreelse.rocket_load()`, `oreelse.rocket_launch()`, `oreelse.craft_key()` |
+| `src/health_bars.c` | The health bars: a `HealthBar` instance per damaged building under `health_bars.bars`, its fraction set when the health changes, the bars' view shown while playing |
 | `src/look.c` | The render quality tiers, `oreelse.cycleQuality()` |
 | `src/particles.c` | The helpers that play the effects (`ore_burst`, `ore_burst_aimed`, `ore_explosion`, `ore_combust`), the flash of their lights, `oreelse.explosion()`, `oreelse.combust()` |

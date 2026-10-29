@@ -324,6 +324,14 @@ ECS_STRUCT(OreCanOrder, {
     bool value; /**< Ordering one unit would succeed */
 });
 
+/** The flips of OreCanOrder, a singleton modified when the OreCanOrder of an item flips. The
+ * observers of a script do not see the changes of a prefab, so a UI script that shows the
+ * OreCanOrder of item prefabs reads count with them, which makes it read them again.
+ */
+ECS_STRUCT(OreCanOrderFlips, {
+    int32_t count; /**< Flips since the start */
+});
+
 /** The raw ore of one unit of an item, a row of OreNeeds */
 ECS_STRUCT(OreNeed, {
     ecs_entity_t item; /**< The raw ore */
@@ -568,6 +576,27 @@ ECS_STRUCT(OreBuilding, {
     int32_t col; /**< Column of its top left tile */
 });
 
+/** The model box of a building (on its prefab), its health bar's anchor: centered, up from 0 */
+ECS_STRUCT(OreModelBox, {
+    float w; /**< Width along x */
+    float d; /**< Depth along z */
+    float h; /**< Height above the ground */
+});
+
+/** A building's HealthBar (0 while undamaged), deleted with it through (OreBarOf, building) */
+ECS_STRUCT(OreHealthBar, {
+    ecs_entity_t bar; /**< The bar, 0 for none */
+});
+
+/** The health bars' UI scene, between the world view and the HUD, shown while playing */
+ECS_STRUCT(OreHealthBars, {
+    ecs_entity_t bar;    /**< The HealthBar template */
+    ecs_entity_t root;   /**< Parent of the bars, in the scene of the bars */
+    ecs_entity_t view;   /**< View of the scene of the bars */
+    ecs_entity_t camera; /**< Camera of the view of the bars */
+    ecs_entity_t world;  /**< World view the bars project their buildings through */
+});
+
 /** An auto tiling rule of rules.flecs, the BuildingRule2x1 of the original: out joins two
  * buildings on orthogonally neighboring tiles.
  *
@@ -695,9 +724,7 @@ ECS_STRUCT(OreQuality, {
     OreRenderQuality tier; /**< The tier the look applies */
 });
 
-/** The settings of every render quality tier, the type of cfg.quality, indexed by
- * OreRenderQuality.
- */
+/** The settings of every render quality tier (cfg.quality), indexed by OreRenderQuality */
 ECS_STRUCT(OreQualityTiers, {
     float resolution_scale[3];    /**< Surface.resolution_scale of the surfaces */
     int32_t shadow_resolution[3]; /**< ShadowSettings.resolution of the world view */
@@ -790,6 +817,33 @@ ECS_STRUCT(OreRocketState, {
 /** An item a key applies to, on the actions of the rocket keys (input.flecs) */
 ECS_STRUCT(OreItemKey, {
     ecs_entity_t item; /**< Item prefab of the key */
+});
+
+/** Tabs of the construct section of the inventory screen, the range of OreInventoryScreen.tab:
+ * 0 the buildings, 1 the rocket parts
+ */
+#define ORE_INVENTORY_TABS (2)
+
+/** The inventory screen (E), a singleton run.flecs resets: closed on the Buildings tab. It shows
+ * while open and playing. Modified when a value changes.
+ */
+ECS_STRUCT(OreInventoryScreen, {
+    bool open;   /**< The screen is open: the right button does not mine, the left one does
+                  *   not place, the pipette does nothing and the preview hides */
+    int32_t tab; /**< The tab of the construct section, 0 Buildings, 1 Rocket */
+});
+
+/** The item the info panel of the inventory screen shows, a singleton run.flecs resets. The UI
+ * says what the pointer is over (oreelse.inventory_hover()), OreItemInfoUpdate derives the item
+ * and names it in OreNeeds. Modified when a value changes.
+ */
+ECS_STRUCT(OreItemInfo, {
+    int32_t slot;        /**< Stock slot under the pointer, -1 for none (set by the UI) */
+    ecs_entity_t button; /**< Item of the slot button under the pointer, 0 for none (set by the
+                          *   UI) */
+    ecs_entity_t item;   /**< Item the info panel shows: of the slot while it holds one, else
+                          *   of the button, 0 for none and while the screen is closed */
+    bool place;          /**< item is a building in a stock slot: Ready to place, no needs */
 });
 
 /** Tiers of critters the waves spawn, the size of the arrays of OreArsenal, OreWaveMix and
@@ -1046,6 +1100,9 @@ extern ECS_TAG_DECLARE(OreRunScript);
  * without emission (OreGhostDim)
  */
 extern ECS_TAG_DECLARE(OreGhost);
+
+/** Relationship of a health bar to its building: deleting the building deletes the bar */
+extern ECS_TAG_DECLARE(OreBarOf);
 
 /** The geometry of the tile grid, read from cfg once per system run */
 typedef struct ore_grid_t {
@@ -1784,6 +1841,13 @@ void ore_craft_import(
 void ore_buildings_import(
     ecs_world_t *world);
 
+/** Register the health bars: one per damaged building, its fraction kept in step with the HP.
+ *
+ * @param world The world
+ */
+void ore_health_bars_import(
+    ecs_world_t *world);
+
 /** Register the buildings' animation and lights: the spinners, pistons, shakes, vents, work
  * emitters and work lights, driven by the work rate of their building.
  *
@@ -1814,6 +1878,43 @@ void ore_flora_import(
  * @param world The world
  */
 void ore_placement_import(
+    ecs_world_t *world);
+
+/** Check whether the inventory screen is open while playing, which keeps the right button from
+ * mining, the left one from placing and the pipette from picking, and hides the preview.
+ *
+ * @param world The world or a stage
+ * @return Whether OreInventoryScreen is open and the game is playing
+ */
+bool ore_inventory_screen_open(
+    const ecs_world_t *world);
+
+/** Open or close the inventory screen, only while playing. Opening throws away the placement
+ * drag in flight; closing forgets what the pointer was over.
+ *
+ * @param world The world
+ * @param open Whether to open it
+ * @return Whether it opened or closed
+ */
+bool ore_inventory_screen_set(
+    ecs_world_t *world,
+    bool open);
+
+/** Cancel step: close the inventory screen.
+ *
+ * @param world The world
+ * @return Whether it was open
+ */
+bool ore_inventory_screen_cancel(
+    ecs_world_t *world);
+
+/** Register the inventory screen: OreInventoryScreen, the item of its info panel (OreItemInfo)
+ * and the script functions oreelse.inventory_toggle(), inventory_tab(tab), inventory_pick(slot),
+ * inventory_order(item, batch) and inventory_hover(slot, item, over).
+ *
+ * @param world The world
+ */
+void ore_inventory_screen_import(
     ecs_world_t *world);
 
 /** Register the rocket: the rocket state, the flight and the script functions

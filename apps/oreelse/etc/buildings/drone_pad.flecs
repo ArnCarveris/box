@@ -35,6 +35,8 @@ prefab DronePad {
   }
   OreFootprint: {w: 2, h: 2}
   OreHealth: {value: 140, max: 140}
+  // The box of the model, the health bar's anchor
+  OreModelBox: {w: 3.9, d: 3.9, h: 1.93}
   OrePowerConsumer: {watts: 20}
   // Placed, it parks four RepairDrones over its bays (apps/oreelse/src/drones.c)
   OreDroneBay: {drone: RepairDrone, count: 4, radius: 1.4, dock: 0.62, cost: items.Iron}

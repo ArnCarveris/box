@@ -29,6 +29,8 @@ prefab SolarPanel {
   }
   OreFootprint: {w: 1, h: 1}
   OreHealth: {value: 100, max: 100}
+  // The box of the model, the health bar's anchor
+  OreModelBox: {w: 1.72, d: 1.72, h: 1.17}
   OrePowerProducer: {watts: 20}
 
   base {
