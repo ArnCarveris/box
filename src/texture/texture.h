@@ -73,6 +73,8 @@ typedef struct box_texture_job_t {
     int32_t request_width;      /**< Requested width, 0 for the source width */
     int32_t request_height;     /**< Requested height, 0 for the source height */
     int32_t quality;            /**< Largest dimension of the result */
+    bool linear;                /**< Encode the color channels of the result from linear light
+                                 *   to sRGB (TexturePath.linear) */
     uint8_t *pixels;            /**< RGBA8 rows of the result, NULL on failure */
     int32_t width;              /**< Width of the result */
     int32_t height;             /**< Height of the result */
@@ -89,6 +91,18 @@ void box_texture_decode_init(void);
  */
 void box_texture_decode(
     box_texture_job_t *job);
+
+/** Encode the color channels of RGBA8 pixels from linear light to sRGB, keeping alpha.
+ *
+ * A channel c becomes round(255 * srgb(c / 255)), so decoding it from sRGB gives c / 255 back
+ * within half a step of the encoded value.
+ *
+ * @param pixels The pixels, straight alpha
+ * @param count Number of pixels
+ */
+void box_texture_encode_linear(
+    uint8_t *pixels,
+    int32_t count);
 
 /** Decode an image file into linear float RGBA texels, on a worker thread.
  *

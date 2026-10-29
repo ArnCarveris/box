@@ -373,7 +373,8 @@ static void box_text_state_init(
     s->sync->refs = 1;
     s->query = ecs_query(world, {
         .terms = {{ .id = ecs_id(Text), .inout = EcsIn }},
-        .cache_kind = EcsQueryCacheAuto
+        .cache_kind = EcsQueryCacheAuto,
+        .flags = EcsQueryMatchDisabled
     });
     s->shown = ecs_query(world, {
         .terms = {{ .id = ecs_id(TextGlyphs), .inout = EcsIn }},
@@ -461,12 +462,14 @@ static void box_text_systems_init(
     ecs_observer(world, {
         .entity = ecs_entity(world, { .name = "TextOnSet" }),
         .query.terms = {{ .id = ecs_id(Text) }},
+        .query.flags = EcsQueryMatchDisabled,
         .events = { EcsOnSet },
         .callback = BoxTextOnSet
     });
     ecs_observer(world, {
         .entity = ecs_entity(world, { .name = "TextOnRemove" }),
         .query.terms = {{ .id = ecs_id(Text) }},
+        .query.flags = EcsQueryMatchDisabled,
         .events = { EcsOnRemove },
         .callback = BoxTextOnRemove
     });

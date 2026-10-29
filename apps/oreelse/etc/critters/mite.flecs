@@ -11,10 +11,10 @@ using box.geometry
 using box.material
 using oreelse
 
-const miteShell: Rgb = {74, 96, 138}
-const miteDark: Rgb = {42, 54, 82}
-const miteLimb: Rgb = {28, 36, 58}
-const miteEye: Rgb = {128, 248, 255}
+const miteShell: Rgb = {147, 165, 194}
+const miteDark: Rgb = {113, 127, 154}
+const miteLimb: Rgb = {93, 105, 131}
+const miteEye: Rgb = {188, 252, 255}
 
 prefab Mite {
   OreHealth: {value: 12, max: 12}

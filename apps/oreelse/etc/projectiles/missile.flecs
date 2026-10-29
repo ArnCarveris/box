@@ -11,8 +11,8 @@ using box.material
 using box.light
 using oreelse
 
-const missileSteel: Rgb = {198, 202, 214}
-const missileFlame: Rgb = {255, 148, 72}
+const missileSteel: Rgb = {228, 230, 236}
+const missileFlame: Rgb = {255, 200, 145}
 
 prefab Missile {
   OreProjectile: {vx: 0, vy: 0, vz: 0, life: 5, radius: 0.8}

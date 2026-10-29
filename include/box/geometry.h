@@ -1,6 +1,9 @@
 /**
  * @file box/geometry.h
  * @brief Primitive shape components; setting one selects a cached mesh and an instance scale.
+ *
+ * A disabled shape, 2D shape or text draws in no pass until it is enabled, then with its current
+ * transform and material. Its children still draw, as flecs does not disable them.
  */
 
 #ifndef BOX_GEOMETRY_H

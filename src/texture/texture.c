@@ -313,6 +313,7 @@ static void box_texture_request(
     job->request_width = path->width;
     job->request_height = path->height;
     job->quality = t->quality;
+    job->linear = path->linear;
     t->sync->refs ++;
     ecs_os_mutex_lock(t->sync->lock);
     t->sync->working ++;

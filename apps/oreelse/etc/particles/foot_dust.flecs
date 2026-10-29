@@ -23,7 +23,7 @@ prefab FootDust {
       size: {0.09, 0.23},
       rotation: {-180, 180},
       spin: {-149, 149},
-      color: {212, 184, 150},
+      color: {235, 221, 202},
       seed: 220
     }
     ParticleBurst: {count: 8}
@@ -39,9 +39,9 @@ prefab FootDust {
       opacity: {0.82, 0.67, 0.45, 0},
       color: {
         start: {255, 255, 255},
-        early: {245, 246, 248},
-        late: {234, 237, 242},
-        end: {224, 228, 235}
+        early: {251, 251, 252},
+        late: {246, 247, 249},
+        end: {241, 243, 246}
       }
     }
   }

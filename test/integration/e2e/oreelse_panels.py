@@ -13,7 +13,7 @@ panels at the points of their layout, measured from the corners of the window as
 anchors them (ui/hud.flecs). They set the inventory and the orders directly and pause the
 astronaut's crafting, so the order book holds still.
 """
-from box_client import parse_value
+from box_client import parse_value, srgb
 from oreelse_buildings import (  # noqa: F401 (ARGS)
     ARGS, PLAYER, SETTLE, STATE, TOAST, aim_tile, count, free_area, key,
     move_cursor, run_script, select, set_inventory, set_state, setup, tiles)
@@ -67,14 +67,15 @@ QUEUE_BOTTOM = HEIGHT - 40
 ON_POWER = (POWER_LEFT + 150, POWER_TOP + 30)
 ON_ROCKET = (ROCKET_LEFT + 136, ROCKET_TOP + 38)
 
-# Colors of the panels
-ROW_HOVER = (52, 56, 66)
-STEP_FACE = (46, 50, 58)
-STEP_DIM = (30, 33, 39)
-LAUNCH_FACE = (78, 62, 26)
-CYAN = (92, 236, 222)
-ORANGE = (240, 152, 72)
-OFF_HOVER = (34, 37, 44)
+# Colors of the panels, the original's bytes encoded as the port writes them
+# (apps/oreelse/README.md, Colors)
+ROW_HOVER = srgb((52, 56, 66))
+STEP_FACE = srgb((46, 50, 58))
+STEP_DIM = srgb((30, 33, 39))
+LAUNCH_FACE = srgb((78, 62, 26))
+CYAN = srgb((92, 236, 222))
+ORANGE = srgb((240, 152, 72))
+OFF_HOVER = srgb((34, 37, 44))
 
 
 def start(app):

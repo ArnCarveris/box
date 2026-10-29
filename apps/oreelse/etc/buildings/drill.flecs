@@ -19,11 +19,11 @@ using box.geometry
 using box.material
 using oreelse
 
-const steel: Rgb = {172, 180, 194}
-const steelDeep: Rgb = {56, 62, 76}
-const hazard: Rgb = {240, 176, 58}
-const lampLive: Rgb = {92, 236, 222}
-const lampDead: Rgb = {248, 84, 72}
+const steel: Rgb = {214, 219, 226}
+const steelDeep: Rgb = {129, 135, 148}
+const hazard: Rgb = {248, 216, 131}
+const lampLive: Rgb = {162, 246, 240}
+const lampDead: Rgb = {252, 155, 145}
 
 prefab Drill {
   // The item: crafted through the order book into the inventory, placed by spending one

@@ -1963,7 +1963,8 @@ bool ore_power_set(
 void ore_power_import(
     ecs_world_t *world);
 
-/** Register the look: the render quality tiers and oreelse.cycleQuality().
+/** Register the look: the render quality tiers, oreelse.cycleQuality(), and oreelse.srgb(),
+ * which encodes a color byte of the original (linear light) for box.
  *
  * @param world The world
  */

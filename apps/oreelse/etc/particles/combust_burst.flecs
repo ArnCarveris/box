@@ -43,7 +43,7 @@ prefab CombustBurst {
       size: {0.81, 1.29},
       rotation: {-180, 180},
       spin: {-143, 143},
-      color: {255, 255, 238},
+      color: {255, 255, 247},
       seed: 208
     }
     ParticleBurst: {count: 6}
@@ -60,9 +60,9 @@ prefab CombustBurst {
       opacity: {0.9, 0.56, 0.17, 0},
       color: {
         start: {255, 255, 255},
-        early: {212, 254, 157},
-        late: {168, 240, 109},
-        end: {124, 226, 61}
+        early: {235, 255, 206},
+        late: {212, 248, 175},
+        end: {185, 242, 134}
       }
     }
   }
@@ -85,7 +85,7 @@ prefab CombustBurst {
       rotation: {-180, 180},
       spin: {-143, 143},
       opacity: {0.5, 0.5},
-      color: {255, 255, 238},
+      color: {255, 255, 247},
       seed: 208
     }
     ParticleBurst: {count: 6}
@@ -102,9 +102,9 @@ prefab CombustBurst {
       opacity: {0.9, 0.56, 0.17, 0},
       color: {
         start: {255, 255, 255},
-        early: {212, 254, 157},
-        late: {168, 240, 109},
-        end: {124, 226, 61}
+        early: {235, 255, 206},
+        late: {212, 248, 175},
+        end: {185, 242, 134}
       }
     }
   }
@@ -126,7 +126,7 @@ prefab CombustBurst {
       size: {0.1, 0.24},
       rotation: {-180, 180},
       spin: {-229, 229},
-      color: {138, 226, 118},
+      color: {194, 242, 181},
       seed: 209
     }
     ParticleBurst: {count: 16}
@@ -143,9 +143,9 @@ prefab CombustBurst {
       opacity: {1, 0.96, 0.69, 0},
       color: {
         start: {255, 255, 255},
-        early: {210, 225, 210},
-        late: {166, 185, 167},
-        end: {121, 138, 125}
+        early: {234, 241, 234},
+        late: {211, 221, 212},
+        end: {183, 194, 186}
       }
     }
   }
@@ -168,7 +168,7 @@ prefab CombustBurst {
       size: {0.15, 0.45},
       rotation: {-180, 180},
       spin: {-172, 172},
-      color: {186, 255, 110},
+      color: {222, 255, 175},
       seed: 210
     }
     ParticleBurst: {count: 18}
@@ -186,9 +186,9 @@ prefab CombustBurst {
       opacity: {0.9, 0.53, 0.14, 0},
       color: {
         start: {255, 255, 255},
-        early: {169, 190, 102},
-        late: {121, 125, 87},
-        end: {72, 60, 73}
+        early: {213, 224, 170},
+        late: {183, 186, 158},
+        end: {145, 133, 146}
       }
     }
   }
@@ -210,7 +210,7 @@ prefab CombustBurst {
       size: {0.12, 0.3},
       rotation: {-180, 180},
       spin: {-688, 688},
-      color: {78, 94, 46},
+      color: {150, 163, 118},
       seed: 211
     }
     ParticleBurst: {count: 10}
@@ -224,9 +224,9 @@ prefab CombustBurst {
       opacity: {1, 1, 1, 0},
       color: {
         start: {255, 255, 255},
-        early: {216, 212, 225},
-        late: {179, 170, 198},
-        end: {144, 130, 174}
+        early: {237, 235, 241},
+        late: {218, 213, 228},
+        end: {198, 189, 215}
       }
     }
   }
@@ -246,7 +246,7 @@ prefab CombustBurst {
       radial: {7, 7},
       lifetime: {0.4, 0.6},
       size: {0.36, 0.64},
-      color: {214, 255, 158},
+      color: {236, 255, 206},
       seed: 212
     }
     ParticleBurst: {count: 24}
@@ -263,9 +263,9 @@ prefab CombustBurst {
       opacity: {0.94, 0.63, 0.29, 0},
       color: {
         start: {255, 255, 255},
-        early: {207, 232, 207},
-        late: {159, 209, 159},
-        end: {111, 186, 111}
+        early: {233, 245, 233},
+        late: {207, 234, 207},
+        end: {176, 222, 176}
       }
     }
   }
@@ -286,7 +286,7 @@ prefab CombustBurst {
       radial: {1.4, 1.4},
       lifetime: {0.8, 1.9},
       size: {0.07, 0.17},
-      color: {255, 138, 52},
+      color: {255, 194, 125},
       seed: 213
     }
     ParticleBurst: {count: 9}
@@ -303,9 +303,9 @@ prefab CombustBurst {
       opacity: {0.15, 0.77, 0.49, 0},
       color: {
         start: {255, 255, 255},
-        early: {241, 195, 201},
-        late: {166, 128, 153},
-        end: {58, 57, 108}
+        early: {249, 227, 230},
+        late: {211, 188, 203},
+        end: {131, 130, 174}
       }
     }
   }
@@ -329,7 +329,7 @@ prefab CombustBurst {
       size: {0.31, 0.79},
       rotation: {-180, 180},
       spin: {-63, 63},
-      color: {74, 78, 54},
+      color: {147, 150, 127},
       seed: 214
     }
     ParticleBurst: {count: 12}
@@ -345,9 +345,9 @@ prefab CombustBurst {
       opacity: {0, 0.6, 0.3, 0},
       color: {
         start: {255, 255, 255},
-        early: {185, 177, 210},
-        late: {155, 148, 181},
-        end: {127, 121, 152}
+        early: {221, 217, 234},
+        late: {205, 200, 219},
+        end: {187, 183, 203}
       }
     }
   }
@@ -356,7 +356,7 @@ prefab CombustBurst {
   // and fades linearly to 0 over 1 / 7 s. ore_combust sets the peak of a play to
   // cfg.combustPeak * sqrt(r) and its range to cfg.combustRange + cfg.combustRangeRadius * r
   light {
-    Rgb: {168, 255, 116}
+    Rgb: {212, 255, 180}
     PointLight: {intensity: 4.5, range: 7}
     EffectFlash: {intensity: 4.5, seconds: 0.143}
   }

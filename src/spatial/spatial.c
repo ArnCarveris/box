@@ -5,6 +5,8 @@
  * Observers collect changed shapes and the roots of changed subtrees, so an update only
  * computes the bounds of what changed. Moved static leaves and DynamicTransform shapes are
  * placed by the first query after a frame, so a frame without queries does not move leaves.
+ * An update that follows a query places them itself: a world that queries every frame (as
+ * picking does) pays for them in SpatialUpdate instead of in whichever system queries first.
  *
  * A dynamic shape keeps the world transform of its bounds in SpatialPose, and only the shapes
  * whose transform differs from it get new bounds.
@@ -578,6 +580,7 @@ box_spatial_t* box_spatial_of(
 {
     box_spatial_t *index = box_spatial_get(world);
     if (index) {
+        index->queried = true;
         box_spatial_sync(world, index);
     }
 
@@ -587,6 +590,9 @@ box_spatial_t* box_spatial_of(
 /** Compute the bounds of the changed entities, commit the new static ones and mark the
  * leaves stale.
  *
+ * When the index was queried since the last update the leaves are placed at once, as the
+ * next frame most likely queries again: its first query then finds them in place.
+ *
  * @param world The world
  * @param index The index
  */
@@ -595,7 +601,9 @@ static void box_spatial_process(
     box_spatial_t *index)
 {
     const box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    bool queried = index->queried;
     int32_t i;
+    index->queried = false;
     index->stats.updated = 0;
     index->stats.rebound = 0;
     index->stats.moved = 0;
@@ -608,6 +616,9 @@ static void box_spatial_process(
     ecs_vec_clear(&index->dirty);
     index->stale = true;
     box_spatial_commit(index);
+    if (queried) {
+        box_spatial_sync(world, index);
+    }
 }
 
 /** Update the index once the transforms of the frame are known.

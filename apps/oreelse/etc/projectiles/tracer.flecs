@@ -9,7 +9,7 @@ using box.material
 using box.light
 using oreelse
 
-const tracerGold: Rgb = {255, 226, 128}
+const tracerGold: Rgb = {255, 242, 188}
 
 prefab Tracer {
   OreProjectile: {vx: 0, vy: 0, vz: 0, life: 0.7, radius: 0.55}

@@ -6,7 +6,9 @@ using box.material
 using box.texture
 
 vent_tex {
-  TexturePath: {path: "apps/oreelse/etc/assets/factory_vent.svg", width: 256, height: 256}
+  TexturePath: {
+    path: "apps/oreelse/etc/assets/factory_vent.svg", width: 256, height: 256, linear: true
+  }
 }
 
 vent_norm {

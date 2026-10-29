@@ -12,12 +12,12 @@ using box.geometry
 using box.material
 using oreelse
 
-const steel: Rgb = {172, 180, 194}
-const steelShade: Rgb = {112, 120, 136}
-const steelDeep: Rgb = {56, 62, 76}
-const laserPink: Rgb = {238, 96, 168}
-const lampLive: Rgb = {92, 236, 222}
-const lampDead: Rgb = {248, 84, 72}
+const steel: Rgb = {214, 219, 226}
+const steelShade: Rgb = {177, 182, 193}
+const steelDeep: Rgb = {129, 135, 148}
+const laserPink: Rgb = {247, 165, 212}
+const lampLive: Rgb = {162, 246, 240}
+const lampDead: Rgb = {252, 155, 145}
 
 prefab LaserTurret {
   // The item: crafted through the order book into the inventory, placed by spending one
@@ -47,7 +47,7 @@ prefab LaserTurret {
 
   hit_fx {
     Position: {0, 0, 0}
-    BeamSparks: {color: {238, 96, 168}}
+    BeamSparks: {color: {247, 165, 212}}
   }
 
   base {
@@ -172,7 +172,7 @@ prefab LaserTurret {
 
     fx {
       Position: {0, 0.02, 0.82}
-      BeamGlow: {color: {238, 96, 168}}
+      BeamGlow: {color: {247, 165, 212}}
     }
   }
 }

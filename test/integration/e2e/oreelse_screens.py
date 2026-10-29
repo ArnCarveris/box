@@ -9,6 +9,7 @@ Every case runs in a fresh apps/oreelse process with its default scene and a fix
 like oreelse_flow.py, which describes the setup. The screens' texts are read from the entities of
 the HUD's instance (hud.ui.screen), as oreelse_hud.py does.
 """
+from box_client import srgb
 from oreelse_buildings import SETTLE
 from oreelse_flow import ARGS, CLOCK, STATE, key, put, set_state, setup, start  # noqa: F401
 from oreelse_hud import color, hud_texts, wait_hidden, wait_shown
@@ -28,13 +29,14 @@ ROCKET = "oreelse.OreRocketState"
 WAVES = "oreelse.OreWaveState"
 
 # The colors of the screens (palette.text, palette.soft, palette.amber, palette.luminite) and
-# the face of the quality button, idle and under the cursor
-TEXT = (226, 231, 238)
-SOFT = (146, 154, 166)
-AMBER = (240, 176, 58)
-TEAL = (96, 240, 218)
-FACE = (21, 23, 27)
-FACE_HOVER = (38, 42, 49)
+# the face of the quality button, idle and under the cursor: the original's bytes encoded as the
+# port writes them (apps/oreelse/README.md, Colors)
+TEXT = srgb((226, 231, 238))
+SOFT = srgb((146, 154, 166))
+AMBER = srgb((240, 176, 58))
+TEAL = srgb((96, 240, 218))
+FACE = srgb((21, 23, 27))
+FACE_HOVER = srgb((38, 42, 49))
 
 # The list of the controls the title and pause screens share, row by row
 CONTROLS = [

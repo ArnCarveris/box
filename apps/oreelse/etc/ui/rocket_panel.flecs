@@ -23,11 +23,11 @@ const pipMax: f32 = 22
 const pipGap: f32 = 3
 
 // The face of a step or of the launch button that cannot act
-const dimFace: Rgb = {30, 33, 39}
-const dimEdge: rgba = {52, 56, 64, 255}
+const dimFace: Rgb = {96, 101, 109}
+const dimEdge: rgba = {125, 129, 137, 255}
 
 // The muted text of the key labels
-const keyColor: Rgb = {132, 139, 152}
+const keyColor: Rgb = {190, 195, 203}
 
 // A section of width by height at (x, y) of the panel: count of need of a part, with its icon of
 // 22x22 at (8, 5), its label at (36, 7) and `count / need` right aligned at y 5. It is ok with
@@ -65,33 +65,33 @@ template RocketSection {
   const stripY: f32 = height - 16
 
   const hoverFace: Rgb = match hover {
-    true: {46, 50, 58}
-    false: {34, 37, 44}
+    true: {118, 122, 131}
+    false: {102, 106, 115}
   }
 
   const loadFace: Rgb = match afford {
     true: hoverFace
-    false: {26, 28, 34}
+    false: {90, 93, 102}
   }
 
   const face: Rgb = match bar {
     true: loadFace
-    false: {34, 37, 44}
+    false: {102, 106, 115}
   }
 
   const okEdge: rgba = match ok {
-    true: {96, 168, 116, 255}
-    false: {66, 72, 82, 255}
+    true: {165, 212, 180, 255}
+    false: {139, 145, 154, 255}
   }
 
   const edge: rgba = match blocked {
-    true: {150, 66, 60, 255}
+    true: {202, 139, 133, 255}
     false: okEdge
   }
 
   const labelColor: Rgb = match ok || blocked {
-    true: {186, 194, 206}
-    false: {112, 118, 130}
+    true: {222, 226, 232}
+    false: {177, 181, 189}
   }
 
   const okCount: Rgb = match ok {
@@ -105,8 +105,8 @@ template RocketSection {
   }
 
   const emptyEdge: rgba = match blocked {
-    true: {188, 78, 70, 255}
-    false: {74, 80, 92, 255}
+    true: {223, 150, 143, 255}
+    false: {147, 152, 162, 255}
   }
 
   Layout: {}
@@ -153,7 +153,7 @@ template RocketSection {
       }
       Rect: {1, 1}
       Rgb: palette.well
-      Border: {width: 1, radius: 2, color: {74, 80, 92, 255}}
+      Border: {width: 1, radius: 2, color: {147, 152, 162, 255}}
     }
 
     if fill > 0 {
@@ -189,7 +189,7 @@ template RocketSection {
       }
 
       const pipEdge: rgba = match filled {
-        true: {252, 214, 140, 255}
+        true: {254, 236, 196, 255}
         false: emptyEdge
       }
 
@@ -252,8 +252,8 @@ template RocketStep {
   }
 
   const liveFace: Rgb = match hover {
-    true: {66, 72, 82}
-    false: {46, 50, 58}
+    true: {139, 145, 154}
+    false: {118, 122, 131}
   }
 
   const face: Rgb = match enabled {
@@ -262,18 +262,18 @@ template RocketStep {
   }
 
   const edge: rgba = match enabled {
-    true: {88, 94, 106, 255}
+    true: {159, 163, 173, 255}
     false: dimEdge
   }
 
   const signColor: Rgb = match enabled {
     true: palette.text
-    false: {90, 96, 108}
+    false: {160, 165, 174}
   }
 
   const keyTone: Rgb = match enabled {
     true: keyColor
-    false: {74, 79, 90}
+    false: {147, 151, 160}
   }
 
   Interactive
@@ -341,7 +341,7 @@ template RocketLaunch {
   prop note: string = ""
 
   const face: Rgb = match enabled {
-    true: {78, 62, 26}
+    true: {150, 135, 90}
     false: dimFace
   }
 
@@ -357,8 +357,8 @@ template RocketLaunch {
   }
 
   const nameColor: Rgb = match enabled {
-    true: {246, 220, 168}
-    false: {110, 116, 128}
+    true: {251, 239, 212}
+    false: {175, 180, 188}
   }
 
   Interactive

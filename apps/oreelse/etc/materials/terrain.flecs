@@ -6,7 +6,9 @@ using box.material
 using box.texture
 
 dirt_tex {
-  TexturePath: {path: "apps/oreelse/etc/assets/terrain_dirt.svg", width: 256, height: 256}
+  TexturePath: {
+    path: "apps/oreelse/etc/assets/terrain_dirt.svg", width: 256, height: 256, linear: true
+  }
 }
 
 dirt_orm_tex {
@@ -18,14 +20,14 @@ dirt_norm {
 }
 
 prefab GroundSurface {
-  Rgb: {187, 137, 96}
+  Rgb: {222, 194, 165}
   PbrMaterial: {metallic: 0, roughness: 1}
   PbrTextures: {albedo: dirt_tex, orm: dirt_orm_tex, normal: dirt_norm}
   TextureTransform: {scale_x: 43.3333, scale_y: 43.3333}
 }
 
 prefab BasinSurface {
-  Rgb: {212, 160, 114}
+  Rgb: {235, 208, 178}
   PbrMaterial: {metallic: 0, roughness: 1}
   PbrTextures: {albedo: dirt_tex, orm: dirt_orm_tex, normal: dirt_norm}
   TextureTransform: {scale_x: 17.3333, scale_y: 17.3333}

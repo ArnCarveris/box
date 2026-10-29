@@ -40,8 +40,8 @@ cfg {
   export const previewMarkerY: f32 = 0.12
   export const ghostY: f32 = 0.1
   export const ghostScale: f32 = 0.86
-  export const ghostGood: Tint = {158, 226, 255, 255}
-  export const ghostBad: Tint = {248, 108, 96, 255}
+  export const ghostGood: Tint = {206, 242, 255, 255}
+  export const ghostBad: Tint = {252, 174, 165, 255}
   export const ghostOpacity: f32 = 0.4627
 
   // The jetpack: over a tile with a building the astronaut hovers at hoverHeight, rising at
@@ -302,7 +302,7 @@ cfg {
   export const corpseTipJitter: f32 = 0.2
   export const corpseRoll: f32 = 0.8
   export const corpseSquash: f32 = 0.55
-  export const corpseColor: Tint = {40, 36, 34, 255}
+  export const corpseColor: Tint = {110, 105, 102, 255}
 
   // The astronaut's pistol: fully automatic, it fires a Tracer of pistolDamage at pistolSpeed
   // every pistolInterval seconds at the nearest live critter within pistolRange, from pistolY
@@ -343,12 +343,14 @@ cfg {
   // hpBarMargin above the top of the projection of the building's model box and as wide as it,
   // not shown when narrower than hpBarMinWidth. A hpBarBack plate with a 1 pixel hpBarEdge and a
   // fill inset 1 pixel, (width - 2) * frac wide, blended from hpBarMid to hpBarFull by
-  // (frac - 0.5) * 2 at half health and above, from hpBarLow to hpBarMid by frac * 2 below
+  // (frac - 0.5) * 2 at half health and above, from hpBarLow to hpBarMid by frac * 2 below.
+  // The three fill colors keep the original's bytes (linear light): the bar blends them as the
+  // original and encodes the blend for box (README.md, Colors)
   export const hpBarHeight: f32 = 4
   export const hpBarMargin: f32 = 6
   export const hpBarMinWidth: f32 = 6
-  export const hpBarBack: rgba = {14, 12, 16, 200}
-  export const hpBarEdge: rgba = {6, 5, 7, 230}
+  export const hpBarBack: rgba = {66, 61, 71, 200}
+  export const hpBarEdge: rgba = {42, 38, 46, 230}
   export const hpBarFull: Rgb = {92, 236, 140}
   export const hpBarMid: Rgb = {240, 176, 58}
   export const hpBarLow: Rgb = {248, 84, 72}

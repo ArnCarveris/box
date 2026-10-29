@@ -1,0 +1,58 @@
+// The order queue at the bottom right as a worker starts on a row that was waiting. Order 1, one
+// copper plate, has the astronaut on its last unit, done on the first frame; order 2, three iron
+// plates with the iron for them in its pool, has no worker yet, so its row `Iron plate (3x)` has
+// no progress fill when the HUD makes it. On the second frame the astronaut begins the first iron
+// plate and the row turns active, on the third it works 0.45 of the 0.5 seconds (at 27 times the
+// speed), so the capture shows the row with its dark base, an amber fill at 0.9 and its icon and
+// label `Iron plate (3x)` drawn over the fill, though the fill came into the row after them. The
+// power panel shows at the bottom left at the start levels 2, 2, 2.
+include apps/oreelse/test/visual/setup/seed
+include apps/oreelse/etc/oreelse
+
+using box.transform
+using box.camera
+using box.surface
+using oreelse
+
+// The capture is 640x360: the HUD lays out for a 1280x720 window and its camera shows it at
+// half size, so the capture holds the whole HUD as a 1280x720 window shows it
+window {
+  Surface: {width: 1280, height: 720}
+}
+
+hud {
+  ui {
+    camera {
+      Camera: {ortho: true, ortho_scale: 0.5}
+    }
+  }
+}
+
+// On the last copper plate of order 1, done on the first frame, so it begins the first iron
+// plate of order 2 on the next
+astronaut {
+  OreCrafter: {item: items.CopperPlate, order: 1, left: 0.01, total: 0.5, speed: 27}
+}
+
+$ {
+  (OreGameState, Playing)
+  OreCraftBook: {
+    orders: [
+      {
+        id: 1, item: items.CopperPlate, demand: 1, count: 1, entry_count: 1,
+        entries: [
+          {item: items.CopperPlate, count: 1, running: 1}
+        ],
+        pool: {count: 0}
+      },
+      {
+        id: 2, item: items.IronPlate, demand: 3, count: 3, entry_count: 1,
+        entries: [
+          {item: items.IronPlate, count: 3, running: 0}
+        ],
+        pool: {stacks: [{item: items.Iron, amount: 6}], count: 1}
+      }
+    ],
+    count: 2, next_id: 2
+  }
+}

@@ -22,7 +22,7 @@ template VentSteam {
     size: {size - 0.05, size + 0.05},
     rotation: {-180, 180},
     spin: {-46, 46},
-    color: {226, 236, 242},
+    color: {242, 246, 249},
     seed: 234
   }
   ParticlePlayback: {state: ParticleStopped}

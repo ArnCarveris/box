@@ -34,7 +34,7 @@ prefab SmokeBurst {
       size: {0.25, 0.65},
       rotation: {-180, 180},
       spin: {-69, 69},
-      color: {206, 198, 190},
+      color: {232, 228, 224},
       seed: 219
     }
     ParticleBurst: {count: 20}
@@ -50,9 +50,9 @@ prefab SmokeBurst {
       opacity: {0.92, 0.77, 0.54, 0},
       color: {
         start: {255, 255, 255},
-        early: {198, 197, 198},
-        late: {162, 160, 161},
-        end: {130, 128, 128}
+        early: {228, 228, 228},
+        late: {209, 208, 208},
+        end: {189, 188, 188}
       }
     }
   }
