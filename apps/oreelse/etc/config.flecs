@@ -149,6 +149,16 @@ cfg {
   export const blinkSlow: f32 = 6
   export const lampRate: f32 = 1.4
 
+  // The point light of a status lamp's bulb (the Light template), at statusLampLight while the
+  // bulb is lit and 0 in the off half of its blink, reaching statusLampRange. The original's
+  // lamps have none; it is kept small, as box's falloff is much brighter close to a light
+  export const statusLampLight: f32 = 0.35
+  export const statusLampRange: f32 = 1.8
+
+  // The work lights of the buildings (OreWorkLight) cover workLightRate * dt of the distance to
+  // their level every frame
+  export const workLightRate: f32 = 7
+
   // The flash light of an explosion (ore_explosion, BoomBurst) at scale 1: its peak intensity
   // and its range, both times the scale of the blast. It fades to 0 over 1 / 4.5 s, the
   // EffectFlash of BoomBurst, so it fades at 9 * 4.5 times the scale a second as the original's

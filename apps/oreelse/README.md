@@ -23,7 +23,7 @@ python3 tools/integration.py e2e oreelse_flow oreelse_look     # the end-to-end 
 python3 tools/integration.py e2e oreelse_mining oreelse_particles
 python3 tools/integration.py e2e oreelse_crafting oreelse_buildings oreelse_rocket
 python3 tools/integration.py e2e oreelse_power oreelse_critters oreelse_critter_fx
-python3 tools/integration.py e2e oreelse_player_fx
+python3 tools/integration.py e2e oreelse_player_fx oreelse_building_animation
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -336,7 +336,25 @@ Every powered building shows its state on its status lamps:
 | Its category at 2 | Green {124, 226, 148} |
 | Its category at 3 or 4, or no category | Cyan {92, 236, 222} |
 
-A gun turret draws no power, so a blackout does not kill its lamps; Weapons at 0 does.
+A gun turret draws no power, so a blackout does not kill its lamps; Weapons at 0 does. A lit
+status lamp also casts a little light of its color around it, which blinks with it.
+
+### Buildings at work
+
+A building works at its work rate: 0 for a consumer in a blackout, for a drill that does not
+mine (no deposit left under it, or Mining at 0) and for a factory whose crafter is idle (nothing
+in the queue it can start), otherwise the multiplier of its category (0.5 to 2, 1 without a
+category). While it works it moves at that rate, and at 0 it stops where it is; while the game
+is paused everything stands still.
+
+- The factory turns the drums of its four rollers and its two flywheels (5 radians a second),
+  strokes its press (6 radians of the stroke a second, 0.62 down from its rest) with a puff of
+  dust and sparks where it lands, puffs smoke out of its stacks every 0.5 and 0.62 seconds and
+  steams from its three vents. Its hot plate and its work glow light up (the glow lights the
+  press, brighter as the press comes down) and fade within about half a second when the work
+  stops; its beacons blink twice a second (times the rate). A blackout puts them out at once.
+- The drill turns its bit (7 radians a second) and shakes it, rides its carriage up and down
+  the legs and its slider fore and aft, and throws dust; idle, its bit settles back at rest.
 
 ### Critters
 
@@ -616,9 +634,10 @@ A projectile's origin is its center.
 ## Building models
 
 The buildings are prefabs in `etc/buildings/`, one file per building, with the original's names
-and geometry, materials and lights. They stand still: the gameplay tasks add their components
-(item, recipe, footprint, health, power) to the same prefabs, and the animation and effect tasks
-drive the named parts below. Every building's origin is the center of its footprint on the
+and geometry, materials and lights. The gameplay tasks add their components (item, recipe,
+footprint, health, power) to the same prefabs, and the animation and effect tasks drive the named
+parts below. A model that is not a placed building (no `OreBuilding` above it, a ghost) stands
+still. Every building's origin is the center of its footprint on the
 ground (the center of its tile, the corner between the four tiles of a 2x2 building, the center
 of the middle tile of a 3x3 one), and it faces +Z. The names are those of the prefab's parts
 (`ecs_lookup_from(world, Drill, "carriage.slider.bit")`): the parts of an instance are unnamed
@@ -666,8 +685,10 @@ is turned by PI / 2 about x). The `bulb` is the part the game drives: it has the
 `light` and `range` when `light` is above 0. The props say how: a status lamp (`status: true`)
 is the power lamp of its building, which OrePower colors `color` (live), `ok`, `warn` or `dead`
 and blinks with the lamp signal of `OreBlink` while dead (the template gives its bulb an
-`OreStatusLamp` with those colors); a work lamp (`work: true`) lights while its
-building works. The props are on the `Light` component of the lamp entity (`lamp_l`, `sight`,
+`OreStatusLamp` with those colors and a `PointLight` of `cfg.statusLampLight` and
+`cfg.statusLampRange`, small for box's falloff, which blinks with it); a work lamp
+(`work: true`) lights while its building works, blinking at `blink` times the work rate (the
+template gives its bulb an `OreWorkLight`). The props are on the `Light` component of the lamp entity (`lamp_l`, `sight`,
 ...). The template builds the parts on every lamp of an instance, not on the prefab's, so they
 keep their names there: the bulb is the lamp's child `bulb`.
 
@@ -720,6 +741,7 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 | `src/critters.c` | The waves, the critters' targets, attacks and moves, the crowd separation and the critter spatial index, their deaths, the astronaut's health and regen, `oreelse.spawn_critter()` |
 | `src/critter_fx.c` | The critters' walk, bob, waddle and legs, their death bursts, the corpses' char, sinking and cap, `oreelse.corpse()` |
 | `src/buildings.c` | The buildings in the tile grid, the wall connectors, demolish and salvage, destroyed buildings, the look of the ghosts |
+| `src/building_fx.c` | The buildings' animation and lights at the work rate of their building: the spinners, pistons, shakes, vents, work emitters and work lights |
 | `src/placement.c` | The selection, `canPlace`, the click and the drag, the poof of a placed building, the pipette, the preview, `oreelse.select()`, `oreelse.pipette()`, `oreelse.placeStart()`, `oreelse.placeEnd()`, `oreelse.cancelDrag()` |
 | `src/craft.c` | The order book, the workers, `oreelse.craft_order()`, `oreelse.craft_cancel()` |
 | `src/power.c` | Production, demand and the blackout, the drills, the factories' crafters, the status lamps, `oreelse.power_set(category, level)` |

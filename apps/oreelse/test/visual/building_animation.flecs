@@ -1,0 +1,112 @@
+// A factory and a drill at work on the basin south west of the deposits, from zoom level 0 while
+// playing, captured mid-stroke three frames into play. The factory crafts a rocket engine (the
+// astronaut's crafter is paused, so the factory takes the order): its ram halfway down, its
+// drums and flywheels turned, its hot plate and work glow lit with the glow lighting the press,
+// its beacons blinking, the first smoke puffs over the stacks and the first steam at the vents.
+// The drill mines a stone deposit of the scene's own: its carriage low on the legs, the slider
+// forward, the bit turned and shaking and the first dust at its foot. Four solar panels behind
+// them power both (80 W for 79), so the status lamps are green. The astronaut stands in front,
+// for the scale.
+include apps/oreelse/test/visual/setup/seed
+include apps/oreelse/etc/oreelse
+
+using box.transform
+using box.material
+using oreelse
+
+const stoneTint: Rgb = {186, 184, 180}
+const stonePad: Rgb = {82, 76, 70}
+
+// The pistons start mid-stroke and the factory's work lights fully lit, as in a factory and a
+// drill that have worked for a while: the parts of a placed building copy the prefab's parts
+// when it is placed, so the scene sets them on the prefabs before it places the buildings. In
+// three frames of play at multiplier 1 the ram goes from the phase 1.4 to 1.7, more than halfway
+// down its stroke, and lands no burst
+Factory {
+  ram {
+    OrePiston: {
+      rest: 1.72, travel: 0.62, speed: 6, phase: 1.4,
+      impact: -0.32, burst: PressPuff, spark: PressSparks
+    }
+  }
+
+  hot_plate {
+    OreWorkLight: {on: 2.6, off: 0.06, hold: 0.45, hot: 0.45, level: 1}
+  }
+
+  work_glow {
+    OreWorkLight: {on: 1.8, off: 0.08, light: 5.5, pulse: 0.45, hold: 0.45, hot: 0.45, level: 1}
+  }
+}
+
+Drill {
+  carriage {
+    OrePiston: {rest: 1.48, travel: 0.26, speed: 2.4, phase: 2.2}
+
+    slider {
+      OrePiston: {rest: 0.12, travel: 0.24, speed: 0.9, phase: 1.2, slide: true}
+    }
+  }
+}
+
+// The animation runs only while playing
+$ {
+  (OreGameState, Playing)
+}
+
+// In front of the buildings, on a tile without one; only the factory crafts
+astronaut {
+  Position: {-23, 0, 33}
+  Rotation: {0, 0.3, 0}
+  OreCrafter: {speed: 1, paused: true}
+}
+
+// The deposit the drill mines, on the tile (38, 14), with the look of the map's stone
+work_deposit {
+  Position: {-19, 0, 29}
+  Rotation: {0, 0.8, 0}
+  Ore: {
+    tint: stoneTint, padTint: stonePad, glow: 0.25,
+    metallic: 0.05, roughness: 0.3,
+    chunks: 13, chunkSize: 0.34, chunkTall: 0.85, spread: 0.66
+  }
+  OreDeposit: {resource: items.Stone, amount: 1000, capacity: 1000}
+}
+
+// Placed buildings, under the run's parent of the buildings, each at the center of its
+// footprint: the factory on the tiles (37, 10) to (38, 11), the drill on (38, 14) and the panels
+// on (35, 10) to (35, 13)
+buildings {
+  factory : Factory {
+    Position: {-26, 0, 28}
+    OreBuilding: {row: 37, col: 10}
+  }
+
+  drill : Drill {
+    Position: {-19, 0, 29}
+    OreBuilding: {row: 38, col: 14}
+  }
+
+  panel_a : SolarPanel {
+    Position: {-27, 0, 23}
+    OreBuilding: {row: 35, col: 10}
+  }
+
+  panel_b : SolarPanel {
+    Position: {-25, 0, 23}
+    OreBuilding: {row: 35, col: 11}
+  }
+
+  panel_c : SolarPanel {
+    Position: {-23, 0, 23}
+    OreBuilding: {row: 35, col: 12}
+  }
+
+  panel_d : SolarPanel {
+    Position: {-21, 0, 23}
+    OreBuilding: {row: 35, col: 13}
+  }
+}
+
+// One rocket engine ordered, paid from the crate of the crash
+const ordered: i32 = oreelse.craft_order(items.RocketEngine, 1)

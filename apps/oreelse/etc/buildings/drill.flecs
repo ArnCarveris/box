@@ -7,6 +7,11 @@
 // Named parts: carriage (moves along y), carriage/slider (moves along z), carriage/slider/bit
 // (spins about y and shakes), crown/pod_l/lamp_l and crown/pod_r/lamp_r (status lamps, Light)
 // and dust (where the drill dust comes out). Standing still, all rest where the original's do.
+//
+// While it mines (src/building_fx.c, at the work rate of the drill: a live deposit under it, no
+// blackout, the Mining multiplier) the carriage rides the legs and the slider fore and aft
+// (OrePiston), the bit spins and shakes (OreSpinner, OreShake) and the dust flies
+// (DrillDust, OreWorkEmitter).
 
 using flecs.script.math
 using box.transform
@@ -168,6 +173,7 @@ prefab Drill {
 
   carriage {
     Position: {0, 1.48, 0}
+    OrePiston: {rest: 1.48, travel: 0.26, speed: 2.4}
 
     yoke {
       Position: {0, -0.07, 0}
@@ -248,6 +254,7 @@ prefab Drill {
 
     slider {
       Position: {0, 0, 0.12}
+      OrePiston: {rest: 0.12, travel: 0.24, speed: 0.9, slide: true}
 
       trolley {
         Position: {0, 0.08, 0}
@@ -266,6 +273,8 @@ prefab Drill {
       bit {
         Position: {0, 0, 0}
         Rotation: {0, 0, 0}
+        OreSpinner: {speed: 7}
+        OreShake: {amplitude: 0.03, frequency: 13}
 
         shaft {
           Position: {0, -0.72, 0}
@@ -322,5 +331,7 @@ prefab Drill {
 
   dust {
     Position: {0, 0.45, 0}
+    DrillDust: {}
+    OreWorkEmitter: {}
   }
 }

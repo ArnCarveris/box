@@ -7,6 +7,7 @@
 
 include config
 include resources
+include particles
 include materials/terrain
 include materials/hazard
 include materials/solar_cells
@@ -35,7 +36,6 @@ include rocket/rocket_bay
 include rocket/rocket
 include buildings/rocket_pad
 include buildings/rules
-include particles
 include player
 include critters/mite
 include critters/skitter
