@@ -28,6 +28,7 @@ prefab RocketPad {
     name: "Rocket pad",
     detail: "Rocket launching facility for luminite shipments and evacuation."
   }
+  OreIcon: {texture: icons.rocket_pad}
   OreRecipe: {
     inputs: [
       {item: items.IronPlate, amount: 25},

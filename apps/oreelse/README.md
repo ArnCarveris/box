@@ -23,7 +23,11 @@ python3 tools/integration.py e2e oreelse_flow oreelse_look     # the end-to-end 
 python3 tools/integration.py e2e oreelse_mining oreelse_particles
 python3 tools/integration.py e2e oreelse_crafting oreelse_buildings oreelse_rocket
 python3 tools/integration.py e2e oreelse_power oreelse_critters oreelse_critter_fx
+<<<<<<< HEAD
 python3 tools/integration.py e2e oreelse_player_fx oreelse_building_animation
+=======
+python3 tools/integration.py e2e oreelse_player_fx oreelse_hud
+>>>>>>> a3fa52251ca1bb044119d6d97d799003fa0c5ba9
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -478,6 +482,31 @@ second and coming back down at 5 once it is off the buildings. The jet plume fir
 in the air and stops when it lands; its limbs trail behind it while it flies and dangle while it
 hovers in place.
 
+### The HUD
+
+The HUD shows over the world outside the title screen. In the top right corner the status bar
+holds four gauges, left to right:
+
+- **Health**: the heart and a bar of the astronaut's HP, green, amber below 60% and red below
+  30%.
+- **Luminite**: `held / shipped`, the Luminite in the inventory and the Luminite shipped to
+  orbit.
+- **Waves**: the critter and a bar of the time to the next wave, filling up as it nears: purple,
+  orange once it is three quarters there, and full, blinking red, while a wave spawns.
+- **Power**: `production / demand W` (rounded down) and a bar of the ratio of the two, green, red
+  in a blackout.
+
+While playing or paused the bottom of the screen shows, from the top down: the message of the
+toast (red for a warning, teal otherwise), the progress bar of a swing at a deposit or a
+building while one is under way, and with a rocket pad the status of its rocket: `LAUNCHING`
+once it is launched, `Rocket ready to launch (P)` (blinking green) when it is valid, else what
+it needs: `Install a cargo bay (U) or life support (I)`, `Needs 4 engines, 2 installed (T)` or
+`Needs 1 fuel tanks, 0 installed (Y)`. Below 30% health `! SUIT BREACH !` blinks red at the top
+of the screen.
+
+Clicks, the right button and the wheel over a panel of the UI (the status bar) do not reach the
+world: they place, mine and zoom nothing. The plain lines of text let them through.
+
 ### Render quality
 
 Three render quality tiers trade the look for speed; the button on the pause screen cycles them
@@ -516,9 +545,9 @@ Every task of the port follows these.
   craft's progress changes, `OreCanOrder` on an item prefab when it flips, `OreNeeds` (the raw
   ore of the item the UI sets in it) when a row changes, `OrePowerAlloc` (the levels of the
   power categories) when a level changes, `OrePowerState` (production, demand, ratio and
-  blackout) when a value changes, `OreRocketState` (the rocket, the score and what can be done
-  to the rocket) when a value changes, every frame of a flight. The C formats no text for the
-  UI.
+  blackout) when a value changes, `OreRocketState` (the rocket, the score, the Luminite held
+  and what can be done to the rocket) when a value changes, every frame of a flight. The C
+  formats no text for the UI.
 - **Game state** is the exclusive pair `(OreGameState, Title | Playing | Paused | Won | Lost)`
   on its own singleton (`ore_state_is`, `ore_state_set`). Gameplay systems run only while
   `Playing`, with a query term on `ore_state_pair(world, OreGameStatePlaying)` whose source is
@@ -702,7 +731,7 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 
 | File | Holds |
 | --- | --- |
-| `etc/oreelse.flecs` | The window, the camera, the sun, the atmosphere, the effects and the view, the render quality tier, the mining markers, the critter tiers and their death effects (`OreArsenal`), the one shot effects the C plays (`OreEffects`); includes the rest |
+| `etc/oreelse.flecs` | The window, the camera, the sun, the atmosphere, the effects and the view, the render quality tier, the mining markers, the critter tiers and their death effects (`OreArsenal`), the one shot effects the C plays (`OreEffects`), the HUD; includes the rest |
 | `etc/config.flecs` | The constants `cfg.*` |
 | `etc/resources.flecs` | The item prefabs other than the buildings, with names and recipes |
 | `etc/buildings/*.flecs` | The building prefabs, models with their item, recipe, footprint, health and power |
@@ -733,6 +762,12 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 | `etc/buildings/` | The building prefabs, one file per building, and the drone (see Building models) |
 | `etc/rocket/` | The `Rocket` template and its parts `RocketBell`, `RocketBay` and `RocketPort`, and the `PadClamp` template of the rocket pad |
 | `etc/assets/` | The original's textures (SVG), unchanged, and `terrain_dirt_orm.svg` |
+| `etc/ui/palette.flecs` | The colors of the UI, `palette.*` |
+| `etc/ui/icons.flecs` | The icon textures, `icons.*`, which the items name with `OreIcon` |
+| `etc/ui/panel.flecs` | The `Panel` template, the chrome of every panel: the plate, its edge, the hazard strip and the `InputBlocker` |
+| `etc/ui/hud.flecs` | The `OreHud` template: the status bar (`StatusGauge`, `StatusDivider`), the toast, the mine progress bar, the suit breach alert and the rocket status line |
+| `etc/icons/` | The original's icons (SVG), unchanged |
+| `etc/ui/hazard_strip.svg` | The original's hazard strip of the panels, unchanged |
 | `src/flow.c` | States, clock, blink, toast, seeds, `oreelse.cancel()`, `oreelse.restart()` |
 | `src/map.c` | The tile grid, the deposits' registration and the hover tile |
 | `src/player.c` | Walking, the jetpack and the camera; the astronaut's animation (`OrePlayerFx`: the walk cycle `OrePlayerGait`, the bob, the foot dust and the jet plume; `OreLimbs`: the limbs) and its death (`ore_player_die`) |

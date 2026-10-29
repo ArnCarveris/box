@@ -204,6 +204,7 @@ void ore_inventory_import(
     ecs_entity_t module = ecs_get_scope(world);
 
     ecs_add_pair(world, ecs_id(OreItem), EcsOnInstantiate, EcsInherit);
+    ecs_add_pair(world, ecs_id(OreIcon), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(OreMined), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(OreRecipe), EcsOnInstantiate, EcsInherit);
     ecs_singleton_ensure(world, OreInventory);

@@ -40,6 +40,7 @@ void OreelseImport(
     ECS_META_COMPONENT(world, OreMineMarker);
     ECS_META_COMPONENT(world, OreStack);
     ECS_META_COMPONENT(world, OreItem);
+    ECS_META_COMPONENT(world, OreIcon);
     ECS_META_COMPONENT(world, OreMined);
     ECS_META_COMPONENT(world, OreRecipe);
     ECS_META_COMPONENT(world, OreInventory);
