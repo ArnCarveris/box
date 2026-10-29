@@ -13,6 +13,7 @@ oreelse_mining.py. A one shot effect is found by the instances of its template t
 """
 import math
 
+from box_client import parse_value
 from oreelse_buildings import ARGS  # noqa: F401 (ARGS)
 from oreelse_buildings import (DOZE_TIME, FPS, PLAYER, SETTLE, SWING_SLACK, building_at, button,
                                click, mine, place_player, rows_of, select, set_inventory,
@@ -82,6 +83,20 @@ def limb(app, name):
     return float(app.exec("get %s.%s Rotation.x" % (PLAYER, name)))
 
 
+def limbs(app):
+    """The swing (Rotation.x) of every limb of the astronaut, read in one frame."""
+    app.exec("query found box.transform.Rotation, oreelse.OreLimb")
+    app.exec("iter found")
+    result = {}
+    for line in app.exec("next 1000").splitlines():
+        path, _, fields = line.partition(" ")
+        parent, _, name = path.rpartition(".")
+        if parent == PLAYER:
+            rotation = fields[:fields.index("}") + 1]
+            result[name] = parse_value(rotation)["x"]
+    return result
+
+
 def playback(app):
     return app.exec("get %s ParticlePlayback.state" % JET).split(".")[-1]
 
@@ -103,7 +118,8 @@ def test_walk(app):
     largest = {name: 0 for name in LIMBS}
     heights = []
     for _ in range(12):
-        values = {name: limb(app, name) for name in LIMBS}
+        values = limbs(app)
+        app.check(sorted(values) == sorted(LIMBS), "the limbs of the astronaut are %s" % values)
         for name, value in values.items():
             app.check(abs(value) <= LIMBS[name] + TOLERANCE,
                       "%s swings %g, beyond %g" % (name, value, LIMBS[name]))

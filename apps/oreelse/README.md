@@ -384,7 +384,9 @@ Every task of the port follows these.
   on its own singleton (`ore_state_is`, `ore_state_set`). Gameplay systems run only while
   `Playing`, with a query term on `ore_state_pair(world, OreGameStatePlaying)` whose source is
   `OreGameState`. That is the only pause mechanism: no time scale, no frozen flags. Only the
-  camera and the render quality tier run in every state.
+  camera and the render quality tier run in every state; outside play, systems only hide what
+  belongs to play (the tile markers, the placement preview) and pause the effects that play
+  (the jet plume, the glints of the Luminite).
 - **Input**: every key is a box `Action` with a `Binding` in `apps/oreelse/etc/input.flecs`.
   Actions that fire once are awaited by async loops that call an `oreelse` script function
   implemented in C (`ecs_async_function`, like `oreelse.cancel()`); held actions (walking,

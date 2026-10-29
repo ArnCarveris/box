@@ -1,5 +1,5 @@
 // The astronaut flying east on its jetpack over a row of walls, three frames into play, seen
-// from close up on its right: hovering 3 units up, its legs and arms trailing behind, and the
+// from behind on its right: hovering 3 units up, its legs and arms trailing behind, and the
 // jet plume shooting down from its backpack, flame yellow through orange to smoke. The game
 // plays, walked by a held action of the scene's own; the astronaut starts in the air with its
 // limbs trailing, and its plume also bursts what it keeps alive while it plays on its first frame
@@ -32,9 +32,11 @@ $ {
   OreView: {camera: 0, view: main_view, level: 0, height: 0, back: 0, look: 0}
 }
 
+// 2 west and 3.2 south of the astronaut, turned toward it and looking down at 0.6 above its
+// feet
 camera {
-  Position: {-6.6, 5, 36}
-  Rotation: {-atan2(5 - 3.6, 5), 0, 0}
+  Position: {-9, 5.5, 34.2}
+  Rotation: {-atan2(5.5 - 3.6, sqrt(2 * 2 + 3.2 * 3.2)), -atan2(2, 3.2), 0}
 }
 
 // Walls on row 39, columns 18 to 23, placed as the game places them so they register in the
