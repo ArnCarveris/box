@@ -764,6 +764,9 @@ void FileWatch_restored_between_passes_reloads_once(void) {
     ecs_fini(world);
 }
 
+/** Calls of thread_new_fails */
+static int32_t thread_new_calls;
+
 /** Fail to create a thread, like an OS that is out of threads.
  *
  * The test replaces the API in place, ecs_os_set_api does nothing once the OS API is
@@ -782,6 +785,7 @@ static ecs_os_thread_t thread_new_fails(
 {
     (void)callback;
     (void)param;
+    thread_new_calls ++;
 
     return 0;
 }
@@ -801,6 +805,7 @@ void FileWatch_thread_fails_inline_passes(void) {
 
     ecs_os_api_t saved = ecs_os_get_api();
     ecs_os_api_t api = saved;
+    thread_new_calls = 0;
     api.thread_new_ = thread_new_fails;
     ecs_os_api = api;
     test_assert(ecs_os_get_api().thread_new_ == thread_new_fails);
@@ -831,6 +836,7 @@ void FileWatch_thread_fails_inline_passes(void) {
     test_int(status->changes, 2);
     test_int(log.calls[0], 1);
     test_int(log_calls(&log), 2);
+    test_int(thread_new_calls, 1);
 
     ecs_os_api = saved;
     log_fini(&log);
