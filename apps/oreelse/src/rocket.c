@@ -19,14 +19,6 @@
  */
 static ECS_TAG_DECLARE(OreRocketModel);
 
-/** Clamps of the rocket pad, the size of ore_rocket_clamp_names */
-#define ORE_ROCKET_CLAMPS (4)
-
-/** Names of the clamps of the rocket pad (RocketPad), PadClamp instances */
-static const char *ore_rocket_clamp_names[ORE_ROCKET_CLAMPS] = {
-    "clamp_a", "clamp_b", "clamp_c", "clamp_d"
-};
-
 /** The constants of the rocket, read from cfg once per run of a system or a function */
 typedef struct ore_rocket_cfg_t {
     int32_t per_unit; /**< Engines per unit, cfg.enginesPerUnit */
@@ -631,8 +623,46 @@ static float ore_rocket_flight_time(
     return result;
 }
 
-/** Set the tilt of the clamps of a pad, the tilt prop of their PadClamp template, when it
- * differs; the template rebuilds them.
+/** Set the tilt of a clamp, the tilt prop of its PadClamp template, when it differs; the
+ * template rebuilds it.
+ *
+ * @param world The world
+ * @param stage The stage of the system
+ * @param clamp The clamp
+ * @param tmpl The PadClamp template
+ * @param tilt The tilt
+ */
+static void ore_rocket_clamp_tilt(
+    const ecs_world_t *world,
+    ecs_world_t *stage,
+    ecs_entity_t clamp,
+    ecs_entity_t tmpl,
+    float tilt)
+{
+    const ecs_type_info_t *ti = ecs_get_type_info(world, tmpl);
+    const void *ptr = ti ? ecs_get_id(world, clamp, tmpl) : NULL;
+    ecs_meta_cursor_t cur;
+    ecs_value_t value;
+    if (!ptr) {
+        goto done;
+    }
+
+    value = ecs_value_init(world, tmpl, ptr);
+    cur = ecs_meta_cursor(world, tmpl, value.ptr);
+    ecs_meta_push(&cur);
+    if (!ecs_meta_member(&cur, "tilt") && (float)ecs_meta_get_float(&cur) != tilt) {
+        ecs_meta_set_float(&cur, tilt);
+        ecs_set_id(stage, clamp, tmpl, (size_t)ti->size, value.ptr);
+    }
+
+    ecs_value_fini(world, &value);
+
+done:
+    return;
+}
+
+/** Set the tilt of the clamps of a pad, its children with the PadClamp template (the parts of
+ * an instance are unnamed), see ore_rocket_clamp_tilt.
  *
  * @param world The world
  * @param stage The stage of the system
@@ -647,32 +677,19 @@ static void ore_rocket_clamps(
     ecs_entity_t tmpl,
     float tilt)
 {
-    const ecs_type_info_t *ti = tmpl ? ecs_get_type_info(world, tmpl) : NULL;
-    ecs_meta_cursor_t cur;
-    ecs_value_t value;
-    ecs_entity_t clamp;
-    const void *ptr;
+    ecs_iter_t it;
     int32_t i;
-    if (!ti || !pad || !ecs_is_alive(world, pad)) {
+    if (!tmpl || !pad || !ecs_is_alive(world, pad)) {
         goto done;
     }
 
-    for (i = 0; i < ORE_ROCKET_CLAMPS; i ++) {
-        clamp = ecs_lookup_child(world, pad, ore_rocket_clamp_names[i]);
-        ptr = clamp ? ecs_get_id(world, clamp, tmpl) : NULL;
-        if (!ptr) {
-            continue;
+    it = ecs_children(world, pad);
+    while (ecs_children_next(&it)) {
+        for (i = 0; i < it.count; i ++) {
+            if (ecs_has_id(world, it.entities[i], tmpl)) {
+                ore_rocket_clamp_tilt(world, stage, it.entities[i], tmpl, tilt);
+            }
         }
-
-        value = ecs_value_init(world, tmpl, ptr);
-        cur = ecs_meta_cursor(world, tmpl, value.ptr);
-        ecs_meta_push(&cur);
-        if (!ecs_meta_member(&cur, "tilt") && (float)ecs_meta_get_float(&cur) != tilt) {
-            ecs_meta_set_float(&cur, tilt);
-            ecs_set_id(stage, clamp, tmpl, (size_t)ti->size, value.ptr);
-        }
-
-        ecs_value_fini(world, &value);
     }
 
 done:

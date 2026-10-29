@@ -512,6 +512,63 @@ static void OreDrones(
     }
 }
 
+/** Check whether an entity is an instance of a part of a prefab: one of its IsA targets (it may
+ * have more than one) has the name.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param name Name of the part
+ * @return Whether it is an instance of it
+ */
+static bool ore_drone_is_part(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    const char *name)
+{
+    ecs_entity_t base = ecs_get_target(world, e, EcsIsA, 0);
+    const char *base_name;
+    bool result = false;
+    int32_t n = 0;
+    while (base && !result) {
+        base_name = ecs_get_name(world, base);
+        result = base_name && !ecs_os_strcmp(base_name, name);
+        base = ecs_get_target(world, e, EcsIsA, ++ n);
+    }
+
+    return result;
+}
+
+/** Find a part of a drone, the original's oreChild: the parts of an instance are unnamed, so it
+ * is the child that is an instance of the prefab's part of the name.
+ *
+ * @param world The world
+ * @param drone The drone
+ * @param name Name of the part in RepairDrone
+ * @return The part, 0 for none
+ */
+static ecs_entity_t ore_drone_part(
+    const ecs_world_t *world,
+    ecs_entity_t drone,
+    const char *name)
+{
+    ecs_iter_t it = ecs_children(world, drone);
+    ecs_entity_t result = 0;
+    int32_t i;
+    while (!result && ecs_children_next(&it)) {
+        for (i = 0; i < it.count && !result; i ++) {
+            if (ore_drone_is_part(world, it.entities[i], name)) {
+                result = it.entities[i];
+            }
+        }
+    }
+
+    if (result) {
+        ecs_iter_fini(&it);
+    }
+
+    return result;
+}
+
 /** Spin the rotors of a drone a frame: their spin, the speed of the first rotor's spinner, moves
  * toward cfg.droneRotor away from the dock and toward 0 docked, by cfg.droneSpinUp times
  * cfg.droneRotor a second, and the odd rotors spin the other way.
@@ -537,7 +594,7 @@ static void ore_drone_spin(
     float spin = 0, want = docked ? 0 : rotor, speed;
     int32_t r;
     for (r = 0; r < ORE_DRONE_ROTORS; r ++) {
-        parts[r] = ecs_lookup_child(it->world, e, ore_drone_rotors[r]);
+        parts[r] = ore_drone_part(it->world, e, ore_drone_rotors[r]);
     }
 
     spinner = parts[0] ? ecs_get(it->world, parts[0], OreSpinner) : NULL;
@@ -576,7 +633,7 @@ static void OreDroneFx(
         ore_drone_spin(it, it->entities[i], drone[i].state == OreDroneStateDocked, rotor, step);
         welding = drone[i].state == OreDroneStateRepairing;
         ore_playback_set(it->world, it->stage,
-            ecs_lookup_child(it->world, it->entities[i], "weld"),
+            ore_drone_part(it->world, it->entities[i], "weld"),
             welding ? ParticlePlaying : ParticleStopped, false);
     }
 }
@@ -591,7 +648,7 @@ static void OreDroneFxHold(
     int32_t i;
     for (i = 0; i < it->count; i ++) {
         ore_playback_set(it->world, it->stage,
-            ecs_lookup_child(it->world, it->entities[i], "weld"), ParticlePaused, true);
+            ore_drone_part(it->world, it->entities[i], "weld"), ParticlePaused, true);
     }
 }
 

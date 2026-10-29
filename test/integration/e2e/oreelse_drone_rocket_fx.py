@@ -48,9 +48,25 @@ PAD = (4, 9)
 TOLERANCE = 1e-3
 
 
+def part(app, parent, base):
+    """The part of an instance whose IsA target is base, the part of the prefab: the parts of an
+    instance are unnamed."""
+    found = list(dr.rows_of(app, "(ChildOf, %s), (IsA, %s)" % (parent, base)))
+    app.check(len(found) == 1, "the parts %s of %s are %s" % (base, parent, found))
+    return found[0]
+
+
+def rotor(app, drone, name):
+    return part(app, drone, "RepairDrone.%s" % name)
+
+
+def weld(app, drone):
+    return part(app, drone, "RepairDrone.weld")
+
+
 def speeds(app, drone):
     """The speeds of the spinners of a drone's rotors, rotor_a to rotor_d."""
-    return [app.get("%s.%s" % (drone, r), "OreSpinner")["speed"] for r in ROTORS]
+    return [app.get(rotor(app, drone, r), "OreSpinner")["speed"] for r in ROTORS]
 
 
 def spin_of(app, drone):
@@ -66,11 +82,11 @@ def check_alternating(app, drone, spin):
 
 
 def weld_state(app, drone):
-    return app.exec("get %s.weld ParticlePlayback.state" % drone).split(".")[-1]
+    return app.exec("get %s ParticlePlayback.state" % weld(app, drone)).split(".")[-1]
 
 
 def weld_light(app, drone):
-    return app.get("%s.weld" % drone, "PointLight")["intensity"]
+    return app.get(weld(app, drone), "PointLight")["intensity"]
 
 
 def wrap(a):
@@ -120,9 +136,10 @@ def test_drone_rotors_and_weld(app):
     dr.wait_until(app, lambda: spin_of(app, drone) == ROTOR, round(SPIN_TIME * FPS) + dr.SETTLE,
                   "the rotors at full spin")
     check_alternating(app, drone, ROTOR)
-    rot = app.get("%s.rotor_a" % drone, "Rotation")["y"]
+    rotor_a = rotor(app, drone, "rotor_a")
+    rot = app.get(rotor_a, "Rotation")["y"]
     app.wait_frames(2)
-    app.check(app.get("%s.rotor_a" % drone, "Rotation")["y"] != rot, "the rotor does not turn")
+    app.check(app.get(rotor_a, "Rotation")["y"] != rot, "the rotor does not turn")
 
     # The others stay docked, their rotors still
     for path in found:
@@ -132,10 +149,11 @@ def test_drone_rotors_and_weld(app):
     # Welding: the sparks play and their light is lit
     dr.wait_until(app, lambda: dr.drones(app)[drone]["state"] == "Repairing",
                   dr.flight_frames(14), "the drone welding")
-    app.wait_for("get %s.weld ParticlePlayback.state" % drone,
+    nozzle = weld(app, drone)
+    app.wait_for("get %s ParticlePlayback.state" % nozzle,
                  lambda out: out.endswith("ParticlePlaying"), what="the weld sparks playing")
     app.wait_for(PARTICLES, lambda out: int(out) > 0, frames=FPS, what="the weld sparks")
-    app.wait_for("get %s.weld PointLight.intensity" % drone,
+    app.wait_for("get %s PointLight.intensity" % nozzle,
                  lambda out: abs(float(out) - WELD_PEAK) < 0.01,
                  what="the weld light at %g" % WELD_PEAK)
     for path in found:
@@ -169,9 +187,9 @@ def test_drone_rotors_and_weld(app):
     # The wall full, it flies home: the weld stops and its light goes out
     app.wait_for("get wall_a OreHealth.value", lambda out: float(out) >= dr.WALL_HP,
                  frames=round((dr.WALL_HP / dr.REPAIR + 2) * FPS), what="the wall repaired")
-    app.wait_for("get %s.weld ParticlePlayback.state" % drone,
+    app.wait_for("get %s ParticlePlayback.state" % nozzle,
                  lambda out: out.endswith("ParticleStopped"), what="the weld stopped")
-    app.wait_for("get %s.weld PointLight.intensity" % drone, "0", what="the weld light off")
+    app.wait_for("get %s PointLight.intensity" % nozzle, "0", what="the weld light off")
 
     # Docked, the rotors slow down to a stop within 0.4 s
     dr.wait_until(app, lambda: dr.drones(app)[drone]["state"] == "Docked",
@@ -201,7 +219,8 @@ def bursts(app, name):
 
 
 def tilts(app):
-    return [app.get("rocket_pad.%s" % c, "PadClamp")["tilt"] for c in CLAMPS]
+    return [app.get(part(app, "rocket_pad", "RocketPad.%s" % c), "PadClamp")["tilt"]
+            for c in CLAMPS]
 
 
 def test_launch_fx(app):

@@ -1,7 +1,7 @@
-// The drones and the rocket in flight, from zoom level 1 while playing, on the basin south west
+// The drones and the rocket in flight, from zoom level 0 while playing, on the basin south west
 // of the deposits. In front, a drone pad with two of its drones docked over its west bays (their
 // rotors still) and two flying 2.8 units above two damaged walls east of it, facing them, their
-// rotors at full spin, welding: a white-blue stream of sparks falls from the arm of each and its
+// rotors spinning up, welding: a white-blue stream of sparks falls from the arm of each and its
 // light, of the arc's color {120, 216, 255}, lights the wall and the ground below it. A solar
 // panel behind the pad powers it. Behind on the right, a cargo rocket 2.5 units into its ascent
 // over the rocket pad, standing straight: its four clamps swung out by 0.6 radians, the first
@@ -14,24 +14,25 @@ using box.transform
 using box.particle
 using oreelse
 
-// The animation runs only while playing. Height 0 snaps the camera to level 1 on the first
+// The animation runs only while playing. Height 0 snaps the camera to level 0 on the first
 // frame. The drones pay their welds in Iron.
-//
-// The rocket climbs at 3.495 units a second, 2.5 units up: 1.6 + 3.495 / 9 = 1.988 s into the
-// flight, so the first frame of play (+ 1/60 s) crosses the 2 s of the flight, where a flame
-// and a smoke burst play (every 0.08 s)
 $ {
   (OreGameState, Playing)
-  OreView: {camera: camera, view: main_view, level: 1, height: 0, back: 0, look: 0}
+  OreView: {camera: camera, view: main_view, level: 0, height: 0, back: 0, look: 0}
   OreInventory: {slots: [{item: items.Iron, amount: 50}]}
-  OreRocketState: {
-    pad: buildings.rocket_pad, phase: Ascent, engines: 4, fuel: 1, cargo: 1, loaded: 25,
-    x: -13, y: 3.24, z: 23, speed: 3.495, altitude: 2.5
+}
+
+// Three frames of the stream show a few sparks at most, so the weld bursts what it keeps alive
+// while it plays (rate times the mean lifetime) on its first frame; a docked drone's weld does
+// not play. The parts of an instance are unnamed, so the burst goes on the prefab's part
+RepairDrone {
+  weld {
+    ParticleBurst: {count: 50}
   }
 }
 
 astronaut {
-  Position: {-20, 0, 34}
+  Position: {-22, 0, 30}
   Rotation: {0, 0.3, 0}
 }
 
@@ -71,54 +72,12 @@ buildings {
       Position: {7, 2.8, -1}
       Rotation: {0, 1.5708, 0}
       OreDrone: {target: buildings.wall_a, state: Repairing, bay: 0, scan: 0.5}
-
-      rotor_a {
-        OreSpinner: {speed: 34}
-      }
-
-      rotor_b {
-        OreSpinner: {speed: -34}
-      }
-
-      rotor_c {
-        OreSpinner: {speed: 34}
-      }
-
-      rotor_d {
-        OreSpinner: {speed: -34}
-      }
-
-      // Three frames of the stream show a few sparks at most, so the weld bursts what it keeps
-      // alive while it plays (rate times the mean lifetime) on its first frame
-      weld {
-        ParticleBurst: {count: 50}
-      }
     }
 
     drone_b : RepairDrone {
       Position: {7, 2.8, 1}
       Rotation: {0, 1.5708, 0}
       OreDrone: {target: buildings.wall_b, state: Repairing, bay: 1, scan: 0.5}
-
-      rotor_a {
-        OreSpinner: {speed: 34}
-      }
-
-      rotor_b {
-        OreSpinner: {speed: -34}
-      }
-
-      rotor_c {
-        OreSpinner: {speed: 34}
-      }
-
-      rotor_d {
-        OreSpinner: {speed: -34}
-      }
-
-      weld {
-        ParticleBurst: {count: 50}
-      }
     }
 
     drone_c : RepairDrone {
@@ -132,5 +91,15 @@ buildings {
     }
 
     OreBuilding: {row: 37, col: 10}
+  }
+}
+
+// The rocket on its pad, which exists by now, climbs at 3.495 units a second, 2.5 units up:
+// 1.6 + 3.495 / 9 = 1.988 s into the flight, so the first frame of play (+ 1/60 s) crosses the
+// 2 s of the flight, where a flame and a smoke burst play (every 0.08 s)
+$ {
+  OreRocketState: {
+    pad: buildings.rocket_pad, phase: Ascent, engines: 4, fuel: 1, cargo: 1, loaded: 25,
+    x: -13, y: 3.24, z: 23, speed: 3.495, altitude: 2.5
   }
 }
