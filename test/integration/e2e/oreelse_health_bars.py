@@ -3,7 +3,7 @@ astronaut. A bar appears when a wall takes damage, its fill and color follow the
 when the wall is repaired to full and when it is destroyed; it is as wide as the projection of
 the wall's model box and sits 6 px above it, follows the zoom level, and its view draws only
 while playing. The astronaut's bar works the same: it appears when the astronaut is hurt,
-follows it as it moves, and goes at full health and at its death.
+follows it as it moves, and goes at full health, at its death and when it boards the rocket.
 
 Every case runs in a fresh apps/oreelse process with its default scene and a fixed session seed,
 like oreelse_flow.py, which describes the setup. The cases set up state directly: walls created
@@ -337,3 +337,24 @@ def test_player(app):
     set_health(app, PLAYER, 0, PLAYER_HP)
     app.wait_for(STATE % "Lost", "true", frames=2 * FPS, what="the game lost")
     wait_no_bar(app, PLAYER)
+
+
+def test_player_aboard(app):
+    """A hurt astronaut boarding a crewed rocket takes its bar with it: no bar over the pad
+    while the rocket flies."""
+    from oreelse_rocket import assemble, key, place_pad, wait_rocket
+    start(app)
+    hold_waves(app)
+    place_pad(app, [("items.RocketLifeSupport", 1), ("items.RocketEngine", 4),
+                    ("items.RocketFuelStorage", 1)])
+    assemble(app, life=True)
+    app.exec("set %s OreHurt {since: 0}" % PLAYER)
+    set_health(app, PLAYER, 40, PLAYER_HP)
+    wait_until(app, lambda: bar_of(app, PLAYER) is not None, 30, "the astronaut's bar")
+
+    key(app, "P")
+    wait_rocket(app, lambda r: r["aboard"], "the astronaut aboard")
+    wait_no_bar(app, PLAYER)
+    app.check(app.get(PLAYER, "OreHealth")["value"] < PLAYER_HP,
+              "the astronaut aboard healed: %s" % app.get(PLAYER, "OreHealth"))
+    app.check(not bars(app), "bars left: %s" % bars(app))

@@ -61,7 +61,7 @@ done:
 
 /** Keep the bar of a building or the astronaut in step with its health: create it when it is
  * damaged, set its fraction while it is, delete it at full health or at 0 (the death of the
- * astronaut).
+ * astronaut), and while the astronaut is aboard the rocket, hidden.
  *
  * The link on the building is written in place, so a second change of the same health in one
  * merge finds the bar the first one created.
@@ -83,7 +83,8 @@ static void OreHealthBarSync(
         OreHealthBar *link = ecs_get_mut(world, e, OreHealthBar);
         ecs_entity_t bar = link && link->bar && ecs_is_alive(real, link->bar) ? link->bar : 0;
         float max = health[i].max, value = health[i].value;
-        bool damaged = max > 0 && value > 0 && value < max;
+        bool damaged = max > 0 && value > 0 && value < max &&
+            !(ecs_has(real, e, OrePlayer) && ore_rocket_aboard(real));
         if (!damaged || !ready) {
             if (bar) {
                 ecs_delete(world, bar);
@@ -141,17 +142,8 @@ void ore_health_bars_import(
         .entity = ecs_entity(world, { .name = "OreHealthBarSync" }),
         .query.terms = {
             { .id = ecs_id(OreHealth), .src.id = EcsSelf, .inout = EcsIn },
-            { .id = ecs_id(OreBuilding), .src.id = EcsSelf, .inout = EcsInOutNone }
-        },
-        .events = { EcsOnSet },
-        .callback = OreHealthBarSync
-    });
-
-    // The astronaut's bar, the same sync over the astronaut
-    ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "OrePlayerHealthBarSync" }),
-        .query.terms = {
-            { .id = ecs_id(OreHealth), .src.id = EcsSelf, .inout = EcsIn },
+            { .id = ecs_id(OreBuilding), .src.id = EcsSelf, .inout = EcsInOutNone,
+              .oper = EcsOr },
             { .id = ecs_id(OrePlayer), .src.id = EcsSelf, .inout = EcsInOutNone }
         },
         .events = { EcsOnSet },

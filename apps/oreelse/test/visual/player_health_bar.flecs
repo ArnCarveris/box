@@ -1,6 +1,6 @@
 // The health bar over the damaged astronaut, from zoom level 0 while playing, on the basin south
 // west of the deposits: the astronaut at 35% health facing the camera, with a dark bar 4 px tall
-// (2 px in the half size capture) 6 px above the tip of its antenna, as wide as its model box
+// (2 px in the half size capture) 6 px above the top of its model box (OreModelBox), as wide as it
 // looks on screen. The fill covers about a third of the inside of the bar in a red-orange
 // between {248, 84, 72} and amber {240, 176, 58}. Below the top center the HUD shows no suit
 // breach alert (above 30%), and the status bar at the top right has no health gauge.

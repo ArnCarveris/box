@@ -722,13 +722,12 @@ it needs: `Install a cargo bay (U) or life support (I)`, `Needs 4 engines, 2 ins
 of the screen.
 
 A building or the astronaut that is damaged (above 0 and below its full HP) shows a health bar
-over it: a dark
-bar 4 px tall, 6 px above the top of the building as the camera sees it and as wide as the
-building looks, so it follows the zoom and the camera in the same frame. Its fill, inset 1 px,
+over it: a dark bar 4 px tall, 6 px above the top of its model as the camera sees it and as wide
+as the model looks, so it follows the zoom and the camera in the same frame. Its fill, inset 1 px,
 covers `(width - 2) * frac` of it, blended from amber {240, 176, 58} at half health to green
 {92, 236, 140} at full, and below half from red {248, 84, 72} to amber; a 1 px edge frames it.
 The bar goes when the building is repaired to full or destroyed, the astronaut's when it is back
-to full health or dies; the astronaut's bar follows it as it walks. Bars narrower than 6 px or off
+to full health, dies or boards the rocket; the astronaut's bar follows it as it walks. Bars narrower than 6 px or off
 screen are not drawn, the panels of the HUD cover them, and they show only while playing.
 
 Clicks, the right button and the wheel over a panel of the UI (the status bar, the panels below,

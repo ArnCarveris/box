@@ -438,7 +438,8 @@ static bool ore_rocket_load(
     return result;
 }
 
-/** Board the astronaut: it stands on the pad's axis, hidden, until the rocket arrives.
+/** Board the astronaut: it stands on the pad's axis, hidden, until the rocket arrives. Its
+ * health is marked modified once aboard, so the health bar of a damaged astronaut goes with it.
  *
  * @param world The world
  * @param rocket The rocket, its x and z the axis of the pad
@@ -457,6 +458,14 @@ static void ore_rocket_board(
     }
 
     rocket->aboard = true;
+    it = ecs_each(world, OrePlayer);
+    while (ecs_each_next(&it)) {
+        for (i = 0; i < it.count; i ++) {
+            if (ecs_has(world, it.entities[i], OreHealth)) {
+                ecs_modified(world, it.entities[i], OreHealth);
+            }
+        }
+    }
 }
 
 /** Launch the rocket, ready and valid: it loads what it has room for and its engines ignite.
