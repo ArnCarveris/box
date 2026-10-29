@@ -504,29 +504,44 @@ def test_nearest_far(app):
                  frames=flight_frames(near), what="the drone welding the near wall")
 
 
-def test_no_iron_or_blackout(app):
+def test_no_iron(app):
     start(app)
-    set_inventory(app, [(IRON, 5)])
+    set_inventory(app, [(IRON, 2)])
     place_pad(app, "pad_a", 4, 4)
-    place_wall(app, "wall_a", 10, 10, 50)
+    place_wall(app, "wall_a", 10, 10, 270)
 
-    # 5 Iron pay for 50 HP; then the drone returns and docks
+    # 2 Iron pay for 20 HP; then the drone returns and docks
     wait_until(app, lambda: count(app, IRON) == 0, flight_frames(14) +
-               round(50 / REPAIR * FPS), "the Iron spent")
+               round(20 / REPAIR * FPS), "the Iron spent")
     wait_until(app, lambda: all_docked(app, "pad_a"), flight_frames(14), "the drones docked")
     hp = health(app, "wall_a")
-    app.check(abs(hp - 100) < 1, "5 Iron repaired the wall from 50 to %g" % hp)
+    app.check(abs(hp - 290) < 1, "2 Iron repaired the wall from 270 to %g" % hp)
     app.wait_frames(2 * round(SCAN * FPS))
     app.check(all_docked(app, "pad_a") and health(app, "wall_a") == hp,
               "without Iron a drone took off or welded")
 
-    # With Iron it resumes
+    # With Iron it resumes and finishes the wall
     set_inventory(app, [(IRON, 100)])
+    app.wait_for("get wall_a OreHealth.value", lambda out: float(out) >= WALL_HP,
+                 frames=flight_frames(14) + round((WALL_HP - hp) / REPAIR * FPS),
+                 what="the wall repaired")
+    # The credit is per drone: a drone other than the first may weld the rest, short of 10 HP
+    app.check(count(app, IRON) in (99, 100), "the last %g HP left %d Iron of 100" %
+              (WALL_HP - hp, count(app, IRON)))
+
+
+def test_blackout(app):
+    start(app)
+    set_inventory(app, [(IRON, 100)])
+    place_pad(app, "pad_a", 4, 4)
+    place_wall(app, "wall_a", 10, 10, 200)
+
+    # A drone welds the wall
     wait_until(app, lambda: any(d["state"] == "Repairing"
                                 for d in drones_of(app, "pad_a").values()),
-               flight_frames(14), "the drone welding again")
+               flight_frames(14), "the drone welding")
     app.wait_frames(SETTLE)
-    app.check(health(app, "wall_a") > hp, "the wall stayed at %g" % hp)
+    app.check(health(app, "wall_a") > 200, "the wall stayed at 200")
 
     # A blackout sends it home
     app.exec("rm pad_a_panel")
@@ -535,13 +550,13 @@ def test_no_iron_or_blackout(app):
                "the drones docked in the blackout")
     hp = health(app, "wall_a")
     iron = count(app, IRON)
+    app.check(hp < WALL_HP, "the wall was repaired before the blackout")
     app.wait_frames(2 * round(SCAN * FPS))
     app.check(all_docked(app, "pad_a") and health(app, "wall_a") == hp and
               count(app, IRON) == iron, "in a blackout a drone took off or welded")
 
-    # The power back, it resumes and finishes the wall
+    # The power back, it resumes welding
     place(app, "panel_b", "SolarPanel", 3, 5)
     app.wait_for("get %s OrePowerState.blackout" % POWER, "false", what="the power back")
-    app.wait_for("get wall_a OreHealth.value", lambda out: float(out) >= WALL_HP,
-                 frames=flight_frames(14) + round((WALL_HP - hp) / REPAIR * FPS),
-                 what="the wall repaired")
+    app.wait_for("get wall_a OreHealth.value", lambda out: float(out) > hp + 1,
+                 frames=flight_frames(14), what="the drone welding again")
