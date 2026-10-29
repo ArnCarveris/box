@@ -106,6 +106,12 @@ def turret_at():
     return tile_point(*TURRET)
 
 
+def once(app, turret):
+    """Let a turret fire only once: its first shot goes at once, the next one after an interval
+    set far off."""
+    app.exec("set %s OreAttackInterval {value: 100000}" % turret)
+
+
 def check_gun_rate(app, lost, took, what):
     """Check the hits of a gun turret over a measure: 8 to 9 shots per second at level 2."""
     hits = lost / GUN_DAMAGE
@@ -300,11 +306,8 @@ def test_missile_splash(app):
     near = [still(app, "Mite", tx + 11.5, tz + 2), still(app, "Mite", tx + 12, tz - 3)]
     far = still(app, "Mite", tx + 10, tz + 6.5)
 
-    # One missile: the turret's timer is set far off once it is in flight
-    set_state(app, "Playing")
-    wait_until(app, lambda: instances(app, "Missile"), FPS, "the first missile")
-    set_state(app, "Paused")
-    app.exec("set %s OreAttackTimer {value: 1000}" % turret)
+    # One missile: it fires at once, and the next is far off
+    once(app, turret)
     set_state(app, "Playing")
     wait_until(app, lambda: brute not in critters(app), 2 * FPS, "the brute hit")
     app.wait_frames(2)
@@ -326,11 +329,11 @@ def test_missile_reacquire(app):
     tx, tz = turret_at()
     set_state(app, "Paused")
     first = still(app, "Mite", tx + 15, tz)
+    once(app, turret)
 
     set_state(app, "Playing")
     wait_until(app, lambda: instances(app, "Missile"), FPS, "the missile")
     set_state(app, "Paused")
-    app.exec("set %s OreAttackTimer {value: 1000}" % turret)
     missile = list(instances(app, "Missile"))[0]
     app.check(entity(app.get(missile, "OreTarget")["value"]) == first,
               "the missile flies to %s, not the mite" % app.get(missile, "OreTarget")["value"])
