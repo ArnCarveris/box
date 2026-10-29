@@ -1,7 +1,8 @@
 """Ore Else driven through its command port: the waves (the first at 90 s, the gap of 50 s after
 the last spawn, the budget, the styles and the tiers a wave unlocks, the spawns at the edges on
 alternating sides), the critters' targets, the probe ahead, chewing a wall, the crowd separation,
-the astronaut's health, its regen and losing, and the kill counter.
+the astronaut's health, its regen and losing, and the kill counter. The astronaut's pistol is
+held in every case (oreelse_weapons.py tests it).
 
 Every case runs in a fresh apps/oreelse process with its default scene and a fixed session seed,
 like oreelse_flow.py, which describes the setup: a 640x360 window without shadows, a fixed delta
@@ -65,6 +66,9 @@ REGEN = 2
 REGEN_DELAY = 5
 RETARGET = 0.5
 
+# The astronaut's pistol does not fire before its timer, set to this, runs out
+PISTOL_HOLD = 100000
+
 # Frames of play between the two pauses of a measured rate, and its tolerance
 MEASURE_FRAMES = 20
 RATE_TOLERANCE = 0.05
@@ -123,12 +127,19 @@ def setup(app):
 
 
 def start(app):
-    """Set up and leave the title screen with a key press."""
+    """Set up and leave the title screen with a key press. The astronaut's pistol is held, so it
+    does not shoot the critters of the case."""
     setup(app)
     app.expect(STATE % "Title", "true")
     app.exec("key.press Space")
     app.wait_input()
     app.wait_for(STATE % "Playing", "true")
+    hold_pistol(app)
+
+
+def hold_pistol(app):
+    """Keep the astronaut's pistol from firing: its timer far off."""
+    app.exec("set %s OreAttackTimer {value: %g}" % (PLAYER, PISTOL_HOLD))
 
 
 def entity(value):

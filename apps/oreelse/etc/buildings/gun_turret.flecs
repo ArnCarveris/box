@@ -35,6 +35,14 @@ prefab GunTurret {
   OreHealth: {value: 120, max: 120}
   // Draws no power (0 W), as the original: no OrePowerConsumer
   OrePowerCategory: {kind: Weapons}
+  // The weapon: 2.5 per shot within 10, a shot every 0.12 s at multiplier 1, tracers at 34 from
+  // the muzzle 1.7 up and 1.06 ahead, led on a moving target
+  OreTurret: {}
+  OreDamage: {value: 2.5}
+  OreRange: {value: 10}
+  OreAttackInterval: {value: 0.12}
+  OreMuzzle: {speed: 34, height: 1.7, forward: 1.06}
+  OreAmmo: {projectile: Tracer}
 
   base {
     Position: {0, 0.13, 0}

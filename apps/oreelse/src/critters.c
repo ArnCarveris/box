@@ -10,7 +10,7 @@
  *
  * The systems run while playing in this order: OreWaves, OreCritterMove, OrePlayerHealth,
  * OreCritterDeath, then OreCrowd, which pushes overlapping critters apart and rebuilds the
- * spatial index (OreCritterIndex) the systems after it search.
+ * spatial index (OreCritterIndex) the systems after it search (the weapons, weapons.c).
  */
 
 #include "game.h"
@@ -1177,17 +1177,54 @@ static void OreCrowd(
     }
 }
 
+/** The search of ore_critter_nearest */
+typedef struct ore_nearest_t {
+    ecs_entity_t best; /**< The nearest so far, 0 for none */
+    float best_d2;     /**< Its squared distance, the range squared to start */
+} ore_nearest_t;
+
+/** Take a critter of the index when it is closer than the nearest so far.
+ *
+ * @param ctx The search, an ore_nearest_t
+ * @param critter The critter
+ * @param d2 Its squared distance
+ */
+static void ore_nearest_visit(
+    void *ctx,
+    ecs_entity_t critter,
+    float d2)
+{
+    ore_nearest_t *n = ctx;
+    if (d2 < n->best_d2) {
+        n->best_d2 = d2;
+        n->best = critter;
+    }
+}
+
 ecs_entity_t ore_critter_nearest(
     const OreCritterIndex *index,
     float x,
     float z,
     float range)
 {
-    float best = range * range, dx, dz, d2;
+    ore_nearest_t n = { .best = 0, .best_d2 = range * range };
+    ore_critter_each(index, x, z, range, ore_nearest_visit, &n);
+
+    return n.best;
+}
+
+void ore_critter_each(
+    const OreCritterIndex *index,
+    float x,
+    float z,
+    float range,
+    ore_critter_visit_t visit,
+    void *ctx)
+{
+    float r2 = range * range, dx, dz, d2;
     int32_t reach, cx, cz, nx, nz, c, b, e, j;
-    ecs_entity_t result = 0;
     bool on;
-    if (index->count > 0 && index->cell > 0 && index->start) {
+    if (index->count > 0 && index->cell > 0 && index->start && range >= 0) {
         reach = (int32_t)ceilf(range / index->cell);
         cx = (int32_t)floorf((x - index->x0) / index->cell);
         cz = (int32_t)floorf((z - index->z0) / index->cell);
@@ -1202,16 +1239,13 @@ ecs_entity_t ore_critter_nearest(
                     dx = index->x[j] - x;
                     dz = index->z[j] - z;
                     d2 = dx * dx + dz * dz;
-                    if (d2 < best) {
-                        best = d2;
-                        result = index->entities[j];
+                    if (d2 <= r2) {
+                        visit(ctx, index->entities[j], d2);
                     }
                 }
             }
         }
     }
-
-    return result;
 }
 
 /** Spawn a critter from a script, oreelse.spawn_critter(prefab, x, z).

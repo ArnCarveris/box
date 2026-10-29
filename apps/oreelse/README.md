@@ -23,7 +23,12 @@ python3 tools/integration.py e2e oreelse_flow oreelse_look     # the end-to-end 
 python3 tools/integration.py e2e oreelse_mining oreelse_particles
 python3 tools/integration.py e2e oreelse_crafting oreelse_buildings oreelse_rocket
 python3 tools/integration.py e2e oreelse_power oreelse_critters oreelse_critter_fx
+<<<<<<< HEAD
 python3 tools/integration.py e2e oreelse_player_fx oreelse_hud oreelse_flora
+=======
+python3 tools/integration.py e2e oreelse_player_fx oreelse_hud oreelse_building_animation
+python3 tools/integration.py e2e oreelse_weapons
+>>>>>>> 1b15f21680f3bb05b9d370205f16a10daad1b18b
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -341,7 +346,25 @@ Every powered building shows its state on its status lamps:
 | Its category at 2 | Green {124, 226, 148} |
 | Its category at 3 or 4, or no category | Cyan {92, 236, 222} |
 
-A gun turret draws no power, so a blackout does not kill its lamps; Weapons at 0 does.
+A gun turret draws no power, so a blackout does not kill its lamps; Weapons at 0 does. A lit
+status lamp also casts a little light of its color around it, which blinks with it.
+
+### Buildings at work
+
+A building works at its work rate: 0 for a consumer in a blackout, for a drill that does not
+mine (no deposit left under it, or Mining at 0) and for a factory whose crafter is idle (nothing
+in the queue it can start), otherwise the multiplier of its category (0.5 to 2, 1 without a
+category). While it works it moves at that rate, and at 0 it stops where it is; while the game
+is paused everything stands still.
+
+- The factory turns the drums of its four rollers and its two flywheels (5 radians a second),
+  strokes its press (6 radians of the stroke a second, 0.62 down from its rest) with a puff of
+  dust and sparks where it lands, puffs smoke out of its stacks every 0.5 and 0.62 seconds and
+  steams from its three vents. Its hot plate and its work glow light up (the glow lights the
+  press, brighter as the press comes down) and fade within about half a second when the work
+  stops; its beacons blink twice a second (times the rate). A blackout puts them out at once.
+- The drill turns its bit (7 radians a second) and shakes it, rides its carriage up and down
+  the legs and its slider fore and aft, and throws dust; idle, its bit settles back at rest.
 
 ### Critters
 
@@ -407,6 +430,49 @@ The critters of a wave spawn one by one, the first at once, then one every 0.45 
 for big waves so that a wave takes at most 20 seconds to spawn. Each spawns on a side of the map
 other than the previous critter's (north, south, west or east), at a random place along it a
 tile inside the edge, up to 5 units off on both axes.
+
+### Weapons
+
+Weapons shoot critters only: no shot, missile, splash or beam ever hurts a building or the
+astronaut.
+
+| Weapon | Damage | Range | Interval | Projectile | Muzzle (height, forward) |
+| --- | --- | --- | --- | --- | --- |
+| Pistol (the astronaut) | 6 | 9 | 0.45 s | Tracer, speed 30 | 1.3 above the astronaut, no forward offset |
+| Gun turret | 2.5 per shot | 10 | 0.12 s | Tracer, speed 34 | 1.7, 1.06 |
+| Laser turret | 50 per second | 13 | continuous | beam | 1.7, 0.74 |
+| Missile turret | 150, splash radius 5 | 17 | 0.5 s | Missile, speed 18, homing | 1.8, 0.44 |
+
+Ranges are measured on the ground (XZ) between centers. Shots aim 0.6 above a critter's
+position.
+
+**The pistol** is fully automatic: every 0.45 seconds it fires at the nearest live critter
+within 9 units, without lead. With no critter in range it waits ready, so it fires as soon as
+one comes in range. Its muzzle rises with the jetpack. It works in a blackout and whatever the
+power allocation.
+
+**Turrets** keep their target while it lives and stays within range; otherwise they take the
+nearest live critter within range, and the head turns to it at once. A turret does not fire
+while its Weapons multiplier is 0, nor in a blackout when it draws power: the gun turret draws
+none, so a blackout does not stop it, but Weapons at 0 does.
+
+- The gun turret fires every `0.12 / multiplier` seconds (8.33 shots a second at level 2) from
+  its muzzle, 1.06 ahead of its center along its aim and 1.7 up. It leads a moving target: it
+  estimates the time of flight twice, the second time to the first lead point, caps it at 2
+  seconds and aims where the target will be by then.
+- The laser turret burns its target continuously for `50 * multiplier` hit points a second,
+  instantly, with no projectile; a thin pink beam runs from its lens to the target while it
+  fires.
+- The missile turret launches a homing missile at its target every `0.5 / multiplier` seconds.
+
+**Projectiles** fly straight without gravity: a tracer hits within 0.55 and lasts 0.7 seconds,
+a missile hits within 0.8 and lasts 5 seconds. A shot hits the nearest live critter within its
+hit radius on the ground, whichever critter that is, not only the one it was fired at; it is
+gone at the end of its life or when it reaches the ground. A tracer deals its full damage to
+the critter it hits. A missile keeps its speed and turns toward its target at up to 6 radians
+a second, straight at it within 3 units; when its target is gone it takes the nearest live
+critter within 6 of it, if any. A missile explodes when it hits or runs out: every live critter
+within 5 of the explosion on the ground takes the full 150, with no falloff.
 
 ### Health
 
@@ -599,8 +665,9 @@ The critters and projectiles are prefabs ported from the original with its names
 colors. The critters carry their gameplay data (`OreHealth`, `OreSpeed`, `OreDamage`,
 `OreRange`, `OreRadius`, `OreWaveTier`), their gait (`OreGait {step, bob}`) and the effect they
 die in (`OreDeathBurst {burst}`, `CombustBurst` for all four), and the waves give their
-instances `OreCritter`, `OreTarget` and `OreVelocity`; OreWeapons gives the projectiles theirs,
-the effect tasks drive the named parts. Each faces +Z.
+instances `OreCritter`, `OreTarget` and `OreVelocity`. The projectiles carry theirs
+(`OreProjectile {radius, life}`, and `OreHoming` on the missile); the effect tasks drive the
+named parts. Each faces +Z.
 
 ### Critters
 
@@ -640,7 +707,10 @@ position, yaw)` lays one from a script.
 
 ### Projectiles
 
-A projectile's origin is its center.
+A projectile's origin is its center. A weapon fires an instance of its prefab under the
+`projectiles` parent of the run (`OreArmory.root`), turned along its velocity (pitch and yaw in
+box's Euler order), with the velocity in its `OreProjectile`, the weapon's `OreDamage`, its
+`OreSplash` for a missile and, for a homing projectile, its `OreTarget`.
 
 | Prefab | File | Parts |
 | --- | --- | --- |
@@ -651,9 +721,10 @@ A projectile's origin is its center.
 ## Building models
 
 The buildings are prefabs in `etc/buildings/`, one file per building, with the original's names
-and geometry, materials and lights. They stand still: the gameplay tasks add their components
-(item, recipe, footprint, health, power) to the same prefabs, and the animation and effect tasks
-drive the named parts below. Every building's origin is the center of its footprint on the
+and geometry, materials and lights. The gameplay tasks add their components (item, recipe,
+footprint, health, power) to the same prefabs, and the animation and effect tasks drive the named
+parts below. A model that is not a placed building (no `OreBuilding` above it, a ghost) stands
+still. Every building's origin is the center of its footprint on the
 ground (the center of its tile, the corner between the four tiles of a 2x2 building, the center
 of the middle tile of a 3x3 one), and it faces +Z. The names are those of the prefab's parts
 (`ecs_lookup_from(world, Drill, "carriage.slider.bit")`): the parts of an instance are unnamed
@@ -701,8 +772,10 @@ is turned by PI / 2 about x). The `bulb` is the part the game drives: it has the
 `light` and `range` when `light` is above 0. The props say how: a status lamp (`status: true`)
 is the power lamp of its building, which OrePower colors `color` (live), `ok`, `warn` or `dead`
 and blinks with the lamp signal of `OreBlink` while dead (the template gives its bulb an
-`OreStatusLamp` with those colors); a work lamp (`work: true`) lights while its
-building works. The props are on the `Light` component of the lamp entity (`lamp_l`, `sight`,
+`OreStatusLamp` with those colors and a `PointLight` of `cfg.statusLampLight` and
+`cfg.statusLampRange`, small for box's falloff, which blinks with it); a work lamp
+(`work: true`) lights while its building works, blinking at `blink` times the work rate (the
+template gives its bulb an `OreWorkLight`). The props are on the `Light` component of the lamp entity (`lamp_l`, `sight`,
 ...). The template builds the parts on every lamp of an instance, not on the prefab's, so they
 keep their names there: the bulb is the lamp's child `bulb`.
 
@@ -740,13 +813,18 @@ its tile in the grid.
 | `etc/oreelse.flecs` | The window, the camera, the sun, the atmosphere, the effects and the view, the render quality tier, the mining markers, the critter tiers and their death effects (`OreArsenal`), the one shot effects the C plays (`OreEffects`), the HUD; includes the rest |
 | `etc/config.flecs` | The constants `cfg.*` |
 | `etc/resources.flecs` | The item prefabs other than the buildings, with names and recipes |
-| `etc/buildings/*.flecs` | The building prefabs, models with their item, recipe, footprint, health and power |
+| `etc/buildings/*.flecs` | The building prefabs, models with their item, recipe, footprint, health and power, and the turrets' weapons |
 | `etc/buildings/rules.flecs` | The connector rules (`OreConnectRule`): the wall segment between two walls |
 | `etc/input.flecs` | The actions, their bindings and the loops of the actions that fire once |
 | `etc/world.flecs` | The ground and the basin |
 | `etc/boundary.flecs` | The hazard band around the playable area |
+<<<<<<< HEAD
 | `etc/scenery.flecs` | The boulders, dunes and flora of a run |
 | `etc/run.flecs` | The astronaut, the parents of the placed buildings and of the critters, and the singletons of a run, the order book, the selection, the power allocation, the rocket state and the waves included |
+=======
+| `etc/scenery.flecs` | The boulders and dunes of a run |
+| `etc/run.flecs` | The astronaut with its pistol, the parents of the placed buildings, of the critters and of the projectiles, and the singletons of a run, the order book, the selection, the power allocation, the rocket state and the waves included |
+>>>>>>> 1b15f21680f3bb05b9d370205f16a10daad1b18b
 | `etc/launch.flecs` | The items of a rocket (`OreRocketKit`) and the rocket on the pad, a `Rocket` instance that follows the rocket state |
 | `etc/deposits.flecs` | The deposits of a run, the Luminite's with their glints (`DepositSparkle`) |
 | `etc/player.flecs` | The `Astronaut` template |
@@ -754,7 +832,7 @@ its tile in the grid.
 | `etc/props/flora.flecs` | The `Frondstalk`, `Ashcup` and `Quillbulb` templates of the flora |
 | `etc/materials/flora.flecs` | The frond and membrane textures and their cutouts `FloraFrond`, `FloraFrondB`, `FloraMembrane`, `FloraMembraneB` |
 | `etc/critters/` | The `Mite`, `Skitter`, `Brute` and `Behemoth` prefabs, models with their health, speed, damage, range, radius and wave tier |
-| `etc/projectiles/` | The `Tracer`, `Missile` and `LaserBeam` prefabs |
+| `etc/projectiles/` | The `Tracer`, `Missile` and `LaserBeam` prefabs, the first two with their hit radius and life |
 | `etc/props/markers.flecs` | The `TileMarker` and `TileMarkerBad` prefabs |
 | `etc/particles.flecs` | Includes the particle effects |
 | `etc/particles/pools.flecs` | The particle sprites, how the original's pools map to the layers, the effect budgets (`ParticleSettings`) |
@@ -784,7 +862,9 @@ its tile in the grid.
 | `src/flora.c` | The plants in the tile grid: removed on deposits and taken tiles, sunk under buildings |
 | `src/critters.c` | The waves, the critters' targets, attacks and moves, the crowd separation and the critter spatial index, their deaths, the astronaut's health and regen, `oreelse.spawn_critter()` |
 | `src/critter_fx.c` | The critters' walk, bob, waddle and legs, their death bursts, the corpses' char, sinking and cap, `oreelse.corpse()` |
+| `src/weapons.c` | The astronaut's pistol, the turrets' targets, aim, lead and fire, the laser beams, the projectiles' flight, homing, hits and splash |
 | `src/buildings.c` | The buildings in the tile grid, the wall connectors, demolish and salvage, destroyed buildings, the look of the ghosts |
+| `src/building_fx.c` | The buildings' animation and lights at the work rate of their building: the spinners, pistons, shakes, vents, work emitters and work lights |
 | `src/placement.c` | The selection, `canPlace`, the click and the drag, the poof of a placed building, the pipette, the preview, `oreelse.select()`, `oreelse.pipette()`, `oreelse.placeStart()`, `oreelse.placeEnd()`, `oreelse.cancelDrag()` |
 | `src/craft.c` | The order book, the workers, `oreelse.craft_order()`, `oreelse.craft_cancel()` |
 | `src/power.c` | Production, demand and the blackout, the drills, the factories' crafters, the status lamps, `oreelse.power_set(category, level)` |
