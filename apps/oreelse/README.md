@@ -23,6 +23,7 @@ python3 tools/integration.py e2e oreelse_flow oreelse_look     # the end-to-end 
 python3 tools/integration.py e2e oreelse_mining oreelse_particles
 python3 tools/integration.py e2e oreelse_crafting oreelse_buildings
 python3 tools/integration.py e2e oreelse_power oreelse_critters oreelse_critter_fx
+python3 tools/integration.py e2e oreelse_drones
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -322,6 +323,36 @@ Every powered building shows its state on its status lamps:
 | Its category at 3 or 4, or no category | Cyan {92, 236, 222} |
 
 A gun turret draws no power, so a blackout does not kill its lamps; Weapons at 0 does.
+
+### Repair drones
+
+Nothing else in the game gives health back. A drone pad parks 4 repair drones over its four
+bays: drone b docks at the angle `(b + 0.5) * 2 * PI / 4`, 1.4 units from the pad's center and
+0.62 above the ground. The drones are part of the pad: they go when it is demolished or
+destroyed.
+
+A drone works when there is no blackout and the inventory holds at least 1 Iron. One that does
+not drops its target, flies home and stays docked until both are back. The drone pad has no
+power category, so the allocation does not slow it; only a blackout stops it.
+
+A docked or returning drone looks for a target every 0.5 seconds: the nearest damaged building
+(above 0 and below its full health) anywhere on the map, measured from the pad while docked and
+from the drone otherwise. A building another drone of the same pad goes for is skipped; drones
+of different pads may share one. Any building can be repaired, drone pads included.
+
+| State | What the drone does |
+| --- | --- |
+| Docked | Parked over its bay |
+| Flying | Flies straight to 2.8 units above its target at 7 units a second, slowing down to 20% of it within 1.8 units of its goal |
+| Repairing | Within 0.45 units of that point: welds its target, 14 HP a second, until it is full |
+| Returning | Flies back to its bay at the same height and lands on it |
+
+A drone that finished a building goes straight for the next one, or returns when there is none.
+Repairs cost 1 Iron for every 10 HP: each drone counts the HP it welded, and every time the count
+reaches 10, 1 Iron leaves the inventory; the rest carries over to its next target. So a wall at
+200 of 300 HP takes 100 / 14 seconds of welding and 10 Iron.
+
+Drones cannot be hurt and critters never go for them.
 
 ### Critters
 

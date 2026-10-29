@@ -4,7 +4,8 @@
  *
  * The scene (apps/oreelse/etc) holds the constants cfg.*, the models, the items, the singletons
  * and the entities of a run; the systems of each area (flow.c, map.c, player.c, ..., power.c,
- * critters.c, critter_fx.c, buildings.c, placement.c, look.c, particles.c) play the game.
+ * critters.c, critter_fx.c, buildings.c, drones.c, placement.c, look.c, particles.c) play the
+ * game.
  */
 
 #ifndef OREELSE_GAME_H
@@ -386,6 +387,41 @@ ECS_STRUCT(OreDrill, {
  */
 ECS_STRUCT(OreWorker, {
     float speed; /**< Speed of its crafter at multiplier 1 */
+});
+
+/** The drones of a drone pad, on its prefab and inherited: placed, the pad gets count
+ * instances of drone as its children, docked over its bays. Drone b docks at the angle
+ * (b + 0.5) * 2 PI / count, radius from the pad's center and dock above the ground.
+ */
+ECS_STRUCT(OreDroneBay, {
+    ecs_entity_t drone; /**< Prefab of the drones, RepairDrone */
+    int32_t count;      /**< Drones of the pad */
+    float radius;       /**< Distance of the bays from the pad's center */
+    float dock;         /**< Height of a docked drone above the ground */
+    ecs_entity_t cost;  /**< Item the repairs are paid in, Iron */
+});
+
+/** States of a repair drone, the type of OreDrone.state */
+ECS_ENUM(OreDroneState, {
+    OreDroneStateDocked,    /**< Parked over its bay, looking for a target every cfg.droneScan */
+    OreDroneStateFlying,    /**< Flying straight to cfg.droneCruise above its target */
+    OreDroneStateRepairing, /**< Within cfg.droneArrive of its target, welding it */
+    OreDroneStateReturning  /**< Flying back to its bay, looking for a target every
+                             *   cfg.droneScan */
+});
+
+/** A repair drone of a drone pad, on the instance: a child of the pad, so it goes with it. Its
+ * Position is relative to the pad. Drones have no health: critters never target them.
+ */
+ECS_STRUCT(OreDrone, {
+    ecs_entity_t pad;    /**< The pad, its parent */
+    ecs_entity_t target; /**< Building it repairs or flies to, 0 for none; never the target of
+                          *   another drone of its pad */
+    OreDroneState state; /**< What it does */
+    int32_t bay;         /**< Its bay, 0 to OreDroneBay.count - 1 */
+    float scan;          /**< Seconds to the next look for a target while docked or returning */
+    float credit;        /**< Hit points repaired not yet paid for, below cfg.droneHpPerIron; it
+                          *   carries over between targets */
 });
 
 /** The bulb of a status lamp, which the Light template (etc/props/light.flecs) sets with the
@@ -1373,6 +1409,14 @@ void ore_craft_import(
  * @param world The world
  */
 void ore_buildings_import(
+    ecs_world_t *world);
+
+/** Register the repair drones: the drones a placed drone pad parks and the system that flies
+ * them to the damaged buildings and welds them, paid from the inventory.
+ *
+ * @param world The world
+ */
+void ore_drones_import(
     ecs_world_t *world);
 
 /** Register placement: the selection, the click and drag placement, the preview and the script

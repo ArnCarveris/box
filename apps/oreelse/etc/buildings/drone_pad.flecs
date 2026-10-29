@@ -5,8 +5,8 @@
 //
 // The drones dock over the bays: drone b of 4 at the angle (b + 0.5) * 2 PI / 4, at
 // (sin, cos) * 1.4 from the center, 0.62 above the ground (the original's DroneBay radius and
-// dock height). Named parts: bay_a to bay_d and their lamp (status lamps, Light),
-// column/head/beacon_l and column/head/beacon_r (status lamps, Light),
+// dock height, the OreDroneBay below). Named parts: bay_a to bay_d and their lamp (status
+// lamps, Light), column/head/beacon_l and column/head/beacon_r (status lamps, Light),
 // column/cabinet/readout and column/mast/tip (lamps that are always on, Light).
 
 using box.transform
@@ -35,6 +35,8 @@ prefab DronePad {
   OreFootprint: {w: 2, h: 2}
   OreHealth: {value: 140, max: 140}
   OrePowerConsumer: {watts: 20}
+  // Placed, it parks four RepairDrones over its bays (apps/oreelse/src/drones.c)
+  OreDroneBay: {drone: RepairDrone, count: 4, radius: 1.4, dock: 0.62, cost: items.Iron}
 
   deck {
     Position: {0, 0.12, 0}

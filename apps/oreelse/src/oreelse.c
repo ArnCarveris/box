@@ -4,7 +4,8 @@
  *
  * The systems of EcsOnUpdate run in the order the areas register them: the flow, the map, the
  * player, mining, power, crafting, the critters, their animation and corpses, the buildings,
- * then placement and its preview. Gameplay systems match (OreGameState, Playing), the only pause.
+ * the repair drones, then placement and its preview. Gameplay systems match (OreGameState,
+ * Playing), the only pause.
  *
  * The look applies the render quality tier in every state, in EcsPreStore. The particles
  * register the helpers that play the effects of etc/particles and the flash of their lights.
@@ -60,6 +61,9 @@ void OreelseImport(
     ECS_META_COMPONENT(world, OrePowerState);
     ECS_META_COMPONENT(world, OreDrill);
     ECS_META_COMPONENT(world, OreWorker);
+    ECS_META_COMPONENT(world, OreDroneBay);
+    ECS_META_COMPONENT(world, OreDroneState);
+    ECS_META_COMPONENT(world, OreDrone);
     ECS_META_COMPONENT(world, OreStatusLamp);
     ECS_META_COMPONENT(world, OreLamps);
     ECS_META_COMPONENT(world, OreBuilding);
@@ -109,6 +113,7 @@ void OreelseImport(
     ore_critters_import(world);
     ore_critter_fx_import(world);
     ore_buildings_import(world);
+    ore_drones_import(world);
     ore_placement_import(world);
     ore_look_import(world);
     ore_particles_import(world);

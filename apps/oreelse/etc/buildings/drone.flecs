@@ -5,6 +5,9 @@
 //
 // Named parts: rotor_a to rotor_d (spin about y, still while docked), hull/eye (Light) and
 // weld (the nozzle of the arm, where the weld sparks come out).
+//
+// A placed drone pad parks four instances as its children (its OreDroneBay), each with an
+// OreDrone; their flight and repair constants are cfg.drone* (apps/oreelse/src/drones.c).
 
 using box.transform
 using box.geometry

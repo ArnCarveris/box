@@ -78,6 +78,19 @@ cfg {
   export const walkSpeed: f32 = 7
   export const runMultiplier: f32 = 2
 
+  // The repair drones of a drone pad: they fly at droneSpeed units a second, slowed from 20% to
+  // 100% of it within droneEase of their goal, cruise droneCruise above the ground and arrive
+  // within droneArrive. A drone repairs droneRepair hit points a second, and every
+  // droneHpPerIron hit points one Iron leaves the inventory. Docked or returning, it looks for a
+  // target every droneScan seconds
+  export const droneSpeed: f32 = 7
+  export const droneCruise: f32 = 2.8
+  export const droneArrive: f32 = 0.45
+  export const droneEase: f32 = 1.8
+  export const droneRepair: f32 = 14
+  export const droneHpPerIron: f32 = 10
+  export const droneScan: f32 = 0.5
+
   // The zoom levels of the camera, from 0 (closest, 44.6 degrees down) to 2 (59.5 degrees):
   // the camera sits height above the ground and back behind the astronaut and looks at the
   // point look above it
