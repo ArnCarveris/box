@@ -307,6 +307,45 @@ static void OrePistol(
     }
 }
 
+/** Find a part of a building, the original's oreChild: the child of that name, or, as the parts
+ * of a placed building are unnamed, the child whose IsA base has that name.
+ *
+ * @param world The world
+ * @param parent The building or a part of it
+ * @param name The name of the part in the prefab
+ * @return The part, 0 for none
+ */
+static ecs_entity_t ore_child(
+    const ecs_world_t *world,
+    ecs_entity_t parent,
+    const char *name)
+{
+    ecs_entity_t result = parent ? ecs_lookup_child(world, parent, name) : 0;
+    ecs_entity_t base;
+    const char *base_name;
+    ecs_iter_t it;
+    int32_t i;
+    if (!parent || result) {
+        goto done;
+    }
+
+    it = ecs_children(world, parent);
+    while (!result && ecs_children_next(&it)) {
+        for (i = 0; !result && i < it.count; i ++) {
+            base = ecs_get_target(world, it.entities[i], EcsIsA, 0);
+            base_name = base ? ecs_get_name(world, base) : NULL;
+            result = base_name && !ecs_os_strcmp(base_name, name) ? it.entities[i] : 0;
+        }
+    }
+
+    if (result) {
+        ecs_iter_fini(&it);
+    }
+
+done:
+    return result;
+}
+
 /** Find the parts of a turret, its head, the head's fx and its hit_fx, and give a laser turret
  * its beam: an instance of the beam prefab under the turret, hidden. The head gets
  * DynamicTransform, as it turns, and so does hit_fx, which moves to where the beam hits.
@@ -324,13 +363,13 @@ static void ore_turret_parts(
 {
     ecs_entity_t b;
     if (!turret->head) {
-        turret->head = ecs_lookup_child(ctx->world, e, "head");
+        turret->head = ore_child(ctx->world, e, "head");
         if (turret->head) {
             ecs_add_id(ctx->stage, turret->head, DynamicTransform);
-            turret->fx = ecs_lookup_child(ctx->world, turret->head, "fx");
+            turret->fx = ore_child(ctx->world, turret->head, "fx");
         }
 
-        turret->hit_fx = ecs_lookup_child(ctx->world, e, "hit_fx");
+        turret->hit_fx = ore_child(ctx->world, e, "hit_fx");
         if (turret->hit_fx) {
             ecs_add_id(ctx->stage, turret->hit_fx, DynamicTransform);
         }

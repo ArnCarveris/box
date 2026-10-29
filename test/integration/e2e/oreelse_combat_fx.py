@@ -1,20 +1,23 @@
-"""Ore Else's combat effects (src/combat_fx.c) driven through its command port: a firing laser
-shows its beam from the lens of its head, plays the glow at the lens and the sparks where the beam
-lands, set back from its end, with their lights at their peaks, pauses them with the game and stops
-them, lights out and beam gone, when it stops firing; a gun shot throws sparks at the muzzle and
-flashes the muzzle light, which fades to 0, and its hit on a critter bursts into sparks and a puff;
-a missile launch plays MissileLaunch turned to the aim and the missile turret's flash, the missile
-points along its velocity, trails lingering smoke that pauses with the game and explodes with its
-flash; shots that reach the ground throw up dust and sparks, missiles explode scaled by their
-splash; a destroyed wall explodes.
+"""Ore Else's combat effects (src/weapons.c, src/buildings.c) driven through its command port: a
+firing laser shows its beam from the lens of its head, plays the glow at the lens and the sparks
+where the beam lands, set back from its end, with their lights at their peaks, pauses them with the
+game and stops them, lights out and beam gone, when it stops firing; a gun shot throws sparks at
+the muzzle and flashes the muzzle light, which fades to 0, and its hit on a critter bursts into
+sparks and a puff; a missile launch plays MissileLaunch turned to the aim and the missile turret's
+flash, the missile points along its velocity, trails lingering smoke that pauses with the game and
+explodes with its flash; shots that reach the ground throw up dust and sparks, missiles explode
+scaled by their splash; a destroyed wall explodes.
 
 The setup is oreelse_weapons.py's: a fresh apps/oreelse process per case with its default scene
 and a fixed session seed, a 640x360 window without shadows, a fixed delta of 1/60 s, waits that
 count frames, critters spawned with oreelse.spawn_critter() and standing still (speed 0) with hit
 points to spare, and buildings created by scripts on chosen tiles of the corner of the map of
 seed 8 without deposits. The astronaut's pistol is held and it stands far away from the turrets.
-The effects are read from the turrets' parts (head.fx, hit_fx), the box.particle.ParticleEffect
-of the effect instances that play and box.particle.ParticleStats.
+The effects are read from the turrets' parts (head, head/fx, hit_fx), the unnamed instances of
+the prefab's parts found by their IsA base among the turret's descendants, the
+box.particle.ParticleEffect of the effect instances and box.particle.ParticleStats. A burst counts
+as played while it plays and once it retired to the pool of its template, disabled where it played,
+so a pause that comes a few frames late on a loaded machine still finds the short ones.
 """
 import math
 
@@ -95,6 +98,23 @@ def playing(app, name):
             if str(value["effect"]).split(".")[-1] == name}
 
 
+def part(app, path, prefab, name):
+    """The part of a building or a projectile, whose parts are unnamed instances of the prefab's
+    parts: the descendant of path that is an instance of prefab's part name (a path, "head.fx")."""
+    found = list(rows_of(app, "(IsA, %s.%s), ChildOf(self|up ChildOf, %s)" % (prefab, name, path)))
+    app.check(len(found) == 1, "%s has the parts %s %s, not one" % (path, name, found))
+    return found[0]
+
+
+def played(app, name):
+    """The instances of an effect template that played: playing, or retired to the pool of the
+    template, disabled where they played until a new play takes them. Path -> its
+    ParticleEffect."""
+    return {path: value for path, value in
+            rows_of(app, "box.particle.ParticleEffect, ?Disabled").items()
+            if str(value["effect"]).split(".")[-1] == name}
+
+
 def point(app, path):
     p = app.get(path, "Position")
     return p["x"], p["y"], p["z"]
@@ -105,8 +125,8 @@ def close(a, b, tolerance):
 
 
 def played_at(app, name, at, tolerance):
-    """The instances of an effect template that play within a tolerance of a point."""
-    return [path for path in playing(app, name) if close(point(app, path), at, tolerance)]
+    """The instances of an effect template that played within a tolerance of a point."""
+    return [path for path in played(app, name) if close(point(app, path), at, tolerance)]
 
 
 def flash_light(app):
@@ -130,7 +150,8 @@ def test_laser_fx(app):
     powered(app)
     laser = building(app, "LaserTurret", *TURRET)
     tx, tz = turret_at()
-    glow, sparks = laser + ".head.fx", laser + ".hit_fx"
+    glow = part(app, laser, "LaserTurret", "head.fx")
+    sparks = part(app, laser, "LaserTurret", "hit_fx")
     set_state(app, "Paused")
     skitter = still(app, "Skitter", tx + 8, tz - 3, SPONGE)
 
@@ -162,13 +183,13 @@ def test_laser_fx(app):
     # times the inset
     set_state(app, "Playing")
     wait_until(app, lambda: instances(app, "LaserBeam"), FPS, "the beam back on")
-    set_state(app, "Paused")
     beams = list(instances(app, "LaserBeam"))
+    set_state(app, "Paused")
     app.check(len(beams) == 1, "while the laser fires the beams are %s" % beams)
     check_state(app, glow, "ParticlePaused", "the glow while paused")
     sx, sy, sz = point(app, skitter)
     aim = math.atan2(sx - tx, sz - tz)
-    head = app.get(laser + ".head", "Rotation")
+    head = app.get(part(app, laser, "LaserTurret", "head"), "Rotation")
     app.check(near(head["y"], aim, 1e-4), "the head aims at %g, not %g" % (head["y"], aim))
     s, c = math.sin(aim), math.cos(aim)
     lens = (tx + LASER_HEAD[0] + LASER_LENS[0] * c + LASER_LENS[2] * s,
@@ -206,10 +227,10 @@ def test_gun_fx(app):
     place_player(app, *FAR)
     gun = building(app, "GunTurret", *TURRET)
     tx, tz = turret_at()
-    flash = gun + ".head.fx"
+    flash = part(app, gun, "GunTurret", "head.fx")
     peak, fade = GUN_FLASH
     set_state(app, "Paused")
-    skitter = still(app, "Skitter", tx + 6, tz, SPONGE)
+    skitter = still(app, "Skitter", tx + 9, tz, SPONGE)
     once(app, gun)
     app.check(light(app, flash) == 0, "the muzzle flash is lit before the shot")
 
@@ -217,30 +238,35 @@ def test_gun_fx(app):
     set_state(app, "Playing")
     app.wait_for("get %s PointLight.intensity" % flash, lambda out: float(out) > 0, frames=FPS,
                  what="the muzzle flash lit")
+    set_state(app, "Paused")
     first = light(app, flash)
     app.check(first <= peak + TOLERANCE, "the muzzle flash is at %g, above %g" % (first, peak))
     muzzle = (tx + GUN_MUZZLE[1], GUN_MUZZLE[0], tz)
     app.check(played_at(app, "SparkBurst", muzzle, 1e-3),
               "no sparks at the muzzle %s: %s" % (muzzle, {
-                  p: point(app, p) for p in playing(app, "SparkBurst")}))
+                  p: point(app, p) for p in played(app, "SparkBurst")}))
+    check_state(app, flash, "ParticlePaused", "the muzzle flash while paused")
+    app.check(light(app, flash) == first, "the muzzle flash faded while paused")
 
-    # It fades to 0 within peak / fade seconds and stays dark without another shot
+    # It fades to 0 within peak / fade seconds, before the tracer reaches the skitter 9 away
+    set_state(app, "Playing")
     app.wait_for("get %s PointLight.intensity" % flash, "0", frames=frames(fade),
                  what="the muzzle flash faded to 0 after %g s" % fade)
-    app.wait_frames(5)
-    app.expect("get %s PointLight.intensity" % flash, "0")
 
-    # The tracer's hit on the skitter bursts into sparks and a puff where it hits
+    # The tracer's hit on the skitter bursts into sparks and a puff where it hits; the muzzle
+    # stays dark without another shot
     wait_until(app, lambda: health(app, skitter) < SPONGE, FPS, "the gun turret's hit")
     set_state(app, "Paused")
-    puffs = playing(app, "HitPuff")
+    app.expect("get %s PointLight.intensity" % flash, "0")
+    puffs = played(app, "HitPuff")
     app.check(len(puffs) == 1, "the hit puffs are %s, not one" % list(puffs))
     at = point(app, list(puffs)[0])
     sx, _, sz = point(app, skitter)
     app.check(math.hypot(at[0] - sx, at[2] - sz) <= 0.55 + 0.6,
               "the hit puff at %s is not at the skitter at %s" % (at, (sx, sz)))
-    app.check(played_at(app, "SparkBurst", at, 1e-3), "no sparks at the hit %s" % (at,))
-    app.check(not playing(app, "ImpactDust"), "the hit on the skitter threw up dust")
+    app.check(played_at(app, "SparkBurst", at, 1e-3), "no sparks at the hit %s: %s" % (at, {
+        p: point(app, p) for p in played(app, "SparkBurst")}))
+    app.check(not played(app, "ImpactDust"), "the hit on the skitter threw up dust")
 
 
 def test_missile_fx(app):
@@ -250,7 +276,7 @@ def test_missile_fx(app):
     powered(app)
     turret = building(app, "MissileTurret", *TURRET)
     tx, tz = turret_at()
-    flash = turret + ".head.fx"
+    flash = part(app, turret, "MissileTurret", "head.fx")
     peak, fade = MISSILE_FLASH
     set_state(app, "Paused")
     brute = still(app, "Brute", tx + 10, tz, SPONGE)
@@ -261,19 +287,19 @@ def test_missile_fx(app):
     set_state(app, "Playing")
     app.wait_for("get %s PointLight.intensity" % flash, lambda out: float(out) > 0, frames=FPS,
                  what="the missile turret's flash lit")
+    set_state(app, "Paused")
     first = light(app, flash)
     app.check(first <= peak + TOLERANCE, "the flash is at %g, above %g" % (first, peak))
-    wait_until(app, lambda: instances(app, "Missile"), FPS, "the missile")
-    set_state(app, "Paused")
-    app.wait_frames(2)
-    aim = app.get(turret + ".head", "Rotation")["y"]
+    app.check(len(instances(app, "Missile")) == 1, "the launch fired no missile")
+    aim = app.get(part(app, turret, "MissileTurret", "head"), "Rotation")["y"]
     app.check(near(aim, math.pi / 2, 1e-4), "the head aims at %g" % aim)
-    launches = playing(app, "MissileLaunch")
+    launches = played(app, "MissileLaunch")
     app.check(len(launches) == 1, "the launches are %s, not one" % list(launches))
     turned = app.get(list(launches)[0], "Rotation")
     app.check(near(turned["y"], aim, 1e-4) and turned["x"] == 0 and turned["z"] == 0,
               "the launch is turned by %s, not %g about y" % (turned, aim))
-    app.check(playing(app, "SparkBurst"), "the launch threw no sparks")
+    app.check(played_at(app, "SparkBurst", point(app, list(launches)[0]), 1e-3),
+              "the launch threw no sparks")
     check_state(app, flash, "ParticlePaused", "the flash while paused")
 
     # The missile points along its velocity, in box's Euler order (Ry * Rx * Rz turns +Z to
@@ -290,7 +316,7 @@ def test_missile_fx(app):
     app.check(abs(r["x"]) > 1e-3, "the missile flies level: %s" % r)
 
     # Its trail lingers after it, pauses with the game and plays again with it
-    trail = missile + ".trail"
+    trail = part(app, missile, "Missile", "trail")
     app.check(app.get(trail, "ParticleEmitter")["linger"] is True, "the trail does not linger")
     check_state(app, trail, "ParticlePaused", "the trail while paused")
     set_state(app, "Playing")
@@ -342,12 +368,12 @@ def test_ground_hits(app):
     set_state(app, "Paused")
 
     # The tracer throws up dust and sparks on the ground below where it ended
-    dust = playing(app, "ImpactDust")
+    dust = played(app, "ImpactDust")
     app.check(len(dust) == 1, "the dust is %s, not one" % list(dust))
     at = point(app, list(dust)[0])
     app.check(close(at, (tx, IMPACT_Y, tz), 1e-3), "the dust is at %s" % (at,))
     app.check(played_at(app, "SparkBurst", at, 1e-3), "no sparks with the dust at %s" % (at,))
-    app.check(not playing(app, "HitPuff"), "the tracer on the ground puffed")
+    app.check(not played(app, "HitPuff"), "the tracer on the ground puffed")
 
     # The missiles explode 0.2 above where they ended, at the bounds of the scale
     end_y = 0.3 - 30 / FPS
