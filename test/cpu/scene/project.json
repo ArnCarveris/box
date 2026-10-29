@@ -63,7 +63,9 @@
                     "dynamic_to_static_and_back",
                     "dynamic_fast_mover_exact_bounds",
                     "dynamic_resized_at_rest",
-                    "dynamic_moved_without_queries"
+                    "dynamic_moved_without_queries",
+                    "dynamic_placed_by_update_after_query",
+                    "dynamic_placed_by_query_when_idle"
                 ]
             },
             {

@@ -85,6 +85,7 @@ typedef struct box_spatial_t {
     box_spatial_stats_t stats; /**< Counters of the last update */
     uint32_t frame;            /**< Updates so far, which tell the frames between bounds */
     bool stale;                /**< Leaves may lag behind the entities since the last update */
+    bool queried;              /**< The index was queried since the last update */
     int32_t refs;              /**< Observers and systems that use the state */
 } box_spatial_t;
 
@@ -100,7 +101,8 @@ extern ECS_COMPONENT_DECLARE(SpatialIndex);
  *
  * Moves the leaves of the static items of the last update and places the dynamic entities
  * whose transform changed first when that did not happen yet, so a frame without queries does
- * not visit them.
+ * not visit them. Once queried, the next update places them itself, so the first query of
+ * a frame (often the pick of PickingUpdate) does not pay for every moving entity.
  *
  * @param world The world
  * @return The index, NULL when box.spatial was not imported
