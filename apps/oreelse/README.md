@@ -23,11 +23,7 @@ python3 tools/integration.py e2e oreelse_flow oreelse_look     # the end-to-end 
 python3 tools/integration.py e2e oreelse_mining oreelse_particles
 python3 tools/integration.py e2e oreelse_crafting oreelse_buildings oreelse_rocket
 python3 tools/integration.py e2e oreelse_power oreelse_critters oreelse_critter_fx
-<<<<<<< HEAD
-python3 tools/integration.py e2e oreelse_player_fx oreelse_building_animation
-=======
-python3 tools/integration.py e2e oreelse_player_fx oreelse_hud
->>>>>>> a3fa52251ca1bb044119d6d97d799003fa0c5ba9
+python3 tools/integration.py e2e oreelse_player_fx oreelse_hud oreelse_building_animation
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
