@@ -1,0 +1,81 @@
+// The order queue at the bottom right with two orders, while playing (the panels hide while
+// paused); both workers are paused, so the book stays as the scene sets it. The first order, a
+// rocket engine from ore, is in progress: its header `Rocket engine (1x)`, then its indented
+// parts `Iron plate (8x)`, which the astronaut crafts (a dark base and an amber fill at 0.6),
+// and `Copper plate (4x)`. The second, two electronics, is stalled: a worker holds a finished
+// unit that does not fit the full inventory (15 kinds, Electronics not among them) and its pool
+// has nothing to craft the rest from, so its header `Electronics (2x) - inventory full` has a
+// full dark red fill and a red label, and its indented `Wire (1x)` a red label. The power panel
+// shows at the bottom left at the start levels 2, 2, 2.
+include apps/oreelse/test/visual/setup/seed
+include apps/oreelse/etc/oreelse
+
+using box.transform
+using box.camera
+using box.surface
+using oreelse
+
+// The capture is 640x360: the HUD lays out for a 1280x720 window and its camera shows it at
+// half size, so the capture holds the whole HUD as a 1280x720 window shows it
+window {
+  Surface: {width: 1280, height: 720}
+}
+
+hud {
+  ui {
+    camera {
+      Camera: {ortho: true, ortho_scale: 0.5}
+    }
+  }
+}
+
+// The astronaut on the first plate craft of order 1, 0.3 of its 0.5 seconds done
+astronaut {
+  OreCrafter: {
+    item: items.IronPlate, order: 1, left: 0.2, total: 0.5, speed: 1, paused: true
+  }
+}
+
+// A second worker holding a finished electronics of order 2, waiting for room to deliver it
+queue_worker {
+  OreCrafter: {
+    item: items.Electronics, order: 2, left: 0, total: 0.5, speed: 1, paused: true
+  }
+}
+
+$ {
+  (OreGameState, Playing)
+  OreInventory: {
+    slots: [
+      {item: items.Iron, amount: 4}, {item: items.Copper, amount: 4},
+      {item: items.Stone, amount: 4}, {item: items.Luminite, amount: 4},
+      {item: items.IronPlate, amount: 4}, {item: items.CopperPlate, amount: 4},
+      {item: items.StoneBrick, amount: 4}, {item: items.Wire, amount: 4},
+      {item: items.RocketEngine, amount: 1}, {item: items.RocketCargoBay, amount: 1},
+      {item: items.RocketLifeSupport, amount: 1}, {item: items.RocketFuelStorage, amount: 1},
+      {item: Wall, amount: 4}, {item: Drill, amount: 1}, {item: SolarPanel, amount: 1}
+    ]
+  }
+  OreCraftBook: {
+    orders: [
+      {
+        id: 1, item: items.RocketEngine, demand: 1, count: 1, entry_count: 3,
+        entries: [
+          {item: items.IronPlate, count: 8, running: 1},
+          {item: items.CopperPlate, count: 4, running: 0},
+          {item: items.RocketEngine, count: 1, running: 0}
+        ],
+        pool: {stacks: [{item: items.Iron, amount: 14}, {item: items.Copper, amount: 8}], count: 2}
+      },
+      {
+        id: 2, item: items.Electronics, demand: 2, count: 2, entry_count: 2,
+        entries: [
+          {item: items.Wire, count: 1, running: 0},
+          {item: items.Electronics, count: 2, running: 1}
+        ],
+        pool: {count: 0}
+      }
+    ],
+    count: 2, next_id: 2
+  }
+}

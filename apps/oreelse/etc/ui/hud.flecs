@@ -1,14 +1,16 @@
 // The HUD: a screen space UI scene drawn over the world, the original's hud.flecs. It reads the
 // game state, the singletons of the run (OreBlink, OreToast, OrePowerState, OreWaveState,
-// OreRocketState) and the health and mining of the astronaut, so flecs evaluates the parts that
-// depend on them again when they change; nothing in it is set from C. Its root fills the window,
-// so the elements stay at their edges when the window is resized.
+// OreRocketState, OreCraftBook, OrePowerAlloc) and the health and mining of the astronaut, so
+// flecs evaluates the parts that depend on them again when they change; nothing in it is set
+// from C. Its root fills the window, so the elements stay at their edges when the window is
+// resized.
 //
 // The numbers are the original's pixels, positions from the top left corner of the parent with
 // y down: an element of a panel sits at LayoutItem {h: Left, v: Top, x, y: -y}. The labels are
-// centered vertically on their icons by the layout. The status bar and the screens of the game
-// flow (ui/screens.flecs) are panels: the other lines are plain labels, which the pointer passes
-// through. The inventory screen and its info panel come from the InventoryScreen and
+// centered vertically on their icons by the layout. The status bar, the order queue, the power
+// allocator, the rocket assembly and the screens of the game flow (ui/screens.flecs) are panels,
+// whose clicks call the oreelse functions: the other lines are plain labels, which the pointer
+// passes through. The inventory screen and its info panel come from the InventoryScreen and
 // ItemInfoPanel templates, the Inventory (E) button from InventoryButton (ui/inventory.flecs).
 
 using flecs.script.math
@@ -42,6 +44,19 @@ const gaugeRadius: f32 = 2
 // The mine progress bar
 const mineWidth: f32 = 224
 const mineHeight: f32 = 14
+
+// The panels of play: the power panel, the width of the queue and the rocket panel with where
+// its sections and their steps sit
+const powerWidth: f32 = 264
+const powerHeight: f32 = 158
+const queueWidth: f32 = 252
+const rocketWidth: f32 = 272
+const rocketHeight: f32 = 366
+const sectionY: f32 = 44
+const sectionPitch: f32 = 50
+const stepY: f32 = 8
+const minusX: f32 = 176
+const plusX: f32 = 220
 
 // A gauge of the status bar: the icon of 22x22 at (0, 8), with a readout a label in the
 // gauge's color at x 28 (centered on the icon) and with a bar above 0 a well of bar x 12 at
@@ -244,6 +259,64 @@ template OreHud {
     false: readyText
   }
 
+  // The order book and the power allocation, for the queue and the power panel
+  const book = OreCraftBook[OreCraftBook]
+  const rowCount = book.row_count
+
+  const alloc = OrePowerAlloc[OrePowerAlloc]
+  const freeBars = cfg.powerBars - alloc.level[0] - alloc.level[1] - alloc.level[2]
+
+  // The rocket assembly panel: the parts, the load and what can be done, from the rocket state
+  const lifeSupport = rocketState.life_support
+  const cargo = rocketState.cargo
+  const loaded = rocketState.loaded
+  const capacity = rocketState.capacity
+  const install = rocketState.install
+  const uninstall = rocketState.uninstall
+  const canLoad = rocketState.load
+  const canLaunch = rocketState.launch
+
+  const loadedAmount: f32 = loaded
+  const loadFill: f32 = match capacity > 0 {
+    true: loadedAmount / capacity
+    false: 0
+  }
+
+  // The note of the LAUNCH button, the first that applies of the flight, no units, the engines
+  // and the fuel tanks, else the Luminite aboard: what is loaded plus what a load adds now
+  const room = capacity - loaded
+  const fits: i32 = match held < room {
+    true: held
+    false: room
+  }
+  const pending: i32 = match room > 0 {
+    true: fits
+    false: 0
+  }
+  const aboard = loaded + pending
+  const missingEngines = engineNeed - engines
+  const missingFuel = units - fuel
+  const aboardNote: string = match lifeSupport > 0 {
+    true: "CREW + {aboard} LUMINITE ABOARD"
+    false: "{aboard} LUMINITE ABOARD"
+  }
+  const fuelNote: string = match fuel != units {
+    true: "NEEDS {missingFuel} MORE FUEL TANKS"
+    false: aboardNote
+  }
+  const engineNote: string = match engines != engineNeed {
+    true: "NEEDS {missingEngines} MORE ENGINES"
+    false: fuelNote
+  }
+  const unitNote: string = match units == 0 {
+    true: "FIT A CARGO BAY OR LIFE SUPPORT"
+    false: engineNote
+  }
+  const launchNote: string = match flying {
+    true: "LIFTOFF"
+    false: unitNote
+  }
+
   // Screen space UI: an orthographic camera at ortho_scale 1, so one logical pixel is one point
   ui {
     Scene: {}
@@ -360,8 +433,201 @@ template OreHud {
         }
       }
 
+      // The panels of play, hidden while paused. The power panel draws at z 0, the queue at 1
+      // and the rocket panel at 2: a tall queue grows up into the rocket panel, which draws and
+      // takes the pointer on top where they overlap
+
+      // The power allocator at the bottom left: the free bars and a column of four bars per
+      // category
+      if playing {
+        power_panel {
+          Panel: {width: powerWidth, height: powerHeight, capH: 7}
+          LayoutItem: {h: Left, v: Bottom, x: 18, y: 18}
+
+          title {
+            LayoutItem: {h: Left, v: Top, x: 12, y: -12}
+            Text: {value: "POWER", size: 13}
+            Rgb: palette.amber
+          }
+
+          free {
+            LayoutItem: {h: Left, v: Top, x: 12, y: -12, width: {mode: Fixed, value: 240}}
+            Text: {value: "FREE {freeBars}", size: 13, width: 240, align: Right}
+            Rgb: palette.amber
+          }
+
+          mining {
+            LayoutItem: {h: Left, v: Top, x: 12}
+            PowerColumn: {kind: 0, icon: icons.drill, caption: "MINING"}
+          }
+
+          weapons {
+            LayoutItem: {h: Left, v: Top, x: 95}
+            PowerColumn: {kind: 1, icon: icons.gun_turret, caption: "WEAPONS"}
+          }
+
+          construction {
+            LayoutItem: {h: Left, v: Top, x: 178}
+            PowerColumn: {kind: 2, icon: icons.factory, caption: "CONSTRUCTION"}
+          }
+        }
+      }
+
+      // The order queue at the bottom right, growing upward with its rows: per order a header
+      // row, then a row per crafted part. A row is named by its order and item, so it keeps its
+      // entity as the book changes
+      if playing && rowCount > 0 {
+        queue_panel {
+          Position: {0, 0, 1}
+          Panel: {width: queueWidth, height: 14 + rowCount * 28, capH: 6}
+          LayoutItem: {h: Right, v: Bottom, x: -18, y: 40}
+
+          for i in 0..rowCount {
+            const r = book.rows[i]
+            const thing: entity = r.item
+            const itemName = thing[OreItem].name
+            const countText = "{itemName} ({r.count}x)"
+            const fullText: string = match r.full {
+              true: " - inventory full"
+              false: ""
+            }
+            const doneText: string = match r.full {
+              true: "{itemName} - inventory full"
+              false: "{itemName} - wrapping up"
+            }
+            const rowText: string = match r.sub || r.count > 0 {
+              true: "{countText}{fullText}"
+              false: doneText
+            }
+
+            "row_{r.order}_{thing.name()}" {
+              QueueRow: {
+                row: i, order: r.order, icon: thing[OreIcon].texture, label: rowText,
+                sub: r.sub, count: r.count, active: r.active, progress: r.progress,
+                stalled: r.stalled
+              }
+            }
+          }
+        }
+      }
+
+      // The rocket assembly at the right, under the status bar: a section and a minus and a
+      // plus step per part, the Luminite load section and the LAUNCH button
+      if playing && hasPad {
+        rocket_panel {
+          Position: {0, 0, 2}
+          Panel: {width: rocketWidth, height: rocketHeight, capH: 7}
+          LayoutItem: {h: Right, v: Top, x: -18, y: -74}
+
+          title {
+            LayoutItem: {h: Left, v: Top, x: 12, y: -14}
+            Text: {value: "ROCKET ASSEMBLY", size: 15}
+            Rgb: palette.amber
+          }
+
+          life_section {
+            RocketSection: {
+              label: "LIFE SUPPORT", icon: icons.rocket_life, y: sectionY,
+              count: lifeSupport, need: cfg.maxLifeSupport
+            }
+          }
+
+          life_minus {
+            RocketStep: {
+              item: items.RocketLifeSupport, plus: false, enabled: uninstall.life_support,
+              x: minusX, y: sectionY + stepY
+            }
+          }
+
+          life_plus {
+            RocketStep: {
+              item: items.RocketLifeSupport, key: "I", enabled: install.life_support,
+              x: plusX, y: sectionY + stepY
+            }
+          }
+
+          cargo_section {
+            RocketSection: {
+              label: "CARGO BAYS", icon: icons.rocket_cargo, y: sectionY + sectionPitch,
+              count: cargo, need: cfg.maxCargoBays
+            }
+          }
+
+          cargo_minus {
+            RocketStep: {
+              item: items.RocketCargoBay, plus: false, enabled: uninstall.cargo,
+              x: minusX, y: sectionY + sectionPitch + stepY
+            }
+          }
+
+          cargo_plus {
+            RocketStep: {
+              item: items.RocketCargoBay, key: "U", enabled: install.cargo,
+              x: plusX, y: sectionY + sectionPitch + stepY
+            }
+          }
+
+          fuel_section {
+            RocketSection: {
+              label: "FUEL TANKS", icon: icons.rocket_fuel, y: sectionY + sectionPitch * 2,
+              count: fuel, need: units, exact: true, blocked: units > 0 && fuel != units
+            }
+          }
+
+          fuel_minus {
+            RocketStep: {
+              item: items.RocketFuelStorage, plus: false, enabled: uninstall.fuel,
+              x: minusX, y: sectionY + sectionPitch * 2 + stepY
+            }
+          }
+
+          fuel_plus {
+            RocketStep: {
+              item: items.RocketFuelStorage, key: "Y", enabled: install.fuel,
+              x: plusX, y: sectionY + sectionPitch * 2 + stepY
+            }
+          }
+
+          engine_section {
+            RocketSection: {
+              label: "ENGINES", icon: icons.rocket_engine, y: sectionY + sectionPitch * 3,
+              count: engines, need: engineNeed, exact: true,
+              blocked: units > 0 && engines != engineNeed
+            }
+          }
+
+          engine_minus {
+            RocketStep: {
+              item: items.RocketEngine, plus: false, enabled: uninstall.engine,
+              x: minusX, y: sectionY + sectionPitch * 3 + stepY
+            }
+          }
+
+          engine_plus {
+            RocketStep: {
+              item: items.RocketEngine, key: "T", enabled: install.engine,
+              x: plusX, y: sectionY + sectionPitch * 3 + stepY
+            }
+          }
+
+          load_section {
+            RocketSection: {
+              label: "LUMINITE", icon: icons.luminite, y: 254, width: 248, height: 40,
+              count: loaded, need: capacity, bar: true, afford: canLoad, fill: loadFill
+            }
+          }
+
+          launch_button {
+            RocketLaunch: {
+              x: 12, y: 306, width: 248, height: 48, enabled: canLaunch, note: launchNote
+            }
+          }
+        }
+      }
+
       // The Inventory (E) button at the bottom center while playing, and the inventory screen
-      // with its info panel over the rest of the HUD (ui/inventory.flecs)
+      // with its info panel over the rest of the HUD (ui/inventory.flecs), above the panels of
+      // play at z 3 and 4
       if playing {
         inventory_button {
           InventoryButton: {label: "Inventory (E)", action: actions.Inventory}
@@ -370,12 +636,14 @@ template OreHud {
 
       if inventoryOpen {
         inventory {
+          Position: {0, 0, 3}
           InventoryScreen: {}
         }
 
         // While the pointer is over a stock slot holding an item or a slot button
         if itemInfo.item != none {
           info_panel {
+            Position: {0, 0, 4}
             ItemInfoPanel: {item: itemInfo.item, place: itemInfo.place}
           }
         }
