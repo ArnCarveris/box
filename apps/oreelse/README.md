@@ -1117,12 +1117,8 @@ its tile in the grid.
 | `src/power.c` | Production, demand and the blackout, the drills, the factories' crafters, the status lamps, `oreelse.power_set(category, level)` |
 | `src/rocket.c` | The rocket state, installing, uninstalling, loading, the launch and the flight, the look of the flight (`OreRocketFx`: the shake, the clamps, the flames and the smoke), `oreelse.rocket_install()`, `oreelse.rocket_uninstall()`, `oreelse.rocket_load()`, `oreelse.rocket_launch()`, `oreelse.craft_key()` |
 | `src/health_bars.c` | The health bars: a `HealthBar` instance per damaged building under `health_bars.bars`, its fraction set when the health changes, the bars' view shown while playing |
-<<<<<<< HEAD
 | `src/look.c` | The render quality tiers, `oreelse.cycleQuality()`, `oreelse.srgb()` |
-| `tools/linear_colors.py` | The conversion of the original's color bytes to the port's (see Colors), kept for reference |
-=======
-| `src/look.c` | The render quality tiers, `oreelse.cycleQuality()` |
 | `src/stresstest.c` | The stress test: the late game base every run of a `--stresstest` session starts with (`OreStressTestApply`) |
 | `src/stresstest.h` | The stress test's components (`OreStressTest`, `OreStressKit`) and `ore_placement_build`, included by `src/game.h` |
->>>>>>> 565fa94a59d4436704374571d8434f844d7c2b51
+| `tools/linear_colors.py` | The conversion of the original's color bytes to the port's (see Colors), kept for reference |
 | `src/particles.c` | The helpers that play the effects (`ore_burst`, `ore_burst_aimed`, `ore_explosion`, `ore_combust`), the flash of their lights, `oreelse.explosion()`, `oreelse.combust()` |
