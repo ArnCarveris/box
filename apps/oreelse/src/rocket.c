@@ -40,7 +40,7 @@ static ore_rocket_cfg_t ore_rocket_cfg(
 /** Get the items of a rocket.
  *
  * @param world The world or a stage
- * @return The kit, all items 0 before rocket.flecs set it
+ * @return The kit, all items 0 before launch.flecs set it
  */
 static OreRocketKit ore_rocket_kit(
     const ecs_world_t *world)
@@ -158,7 +158,6 @@ static void ore_rocket_derive(
     ore_rocket_cfg_t cfg = ore_rocket_cfg(world);
     OreRocketKit kit = ore_rocket_kit(world);
     bool ready = ore_rocket_ready(world, rocket);
-    int32_t parts = rocket->engines + rocket->fuel + rocket->cargo + rocket->life_support;
     rocket->units = rocket->cargo + rocket->life_support;
     rocket->capacity = rocket->cargo * cfg.per_bay;
     rocket->valid = rocket->units > 0 && rocket->engines == rocket->units * cfg.per_unit &&
@@ -178,7 +177,6 @@ static void ore_rocket_derive(
     };
     rocket->load = ready && ore_rocket_pending(world, rocket, &kit, &cfg) > 0;
     rocket->launch = ready && rocket->valid;
-    rocket->shown = rocket->phase != OreLaunchPhaseIdle || (rocket->pad && parts > 0);
 }
 
 /** Derive the values of the rocket and mark the singleton when any value changed.

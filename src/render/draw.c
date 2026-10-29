@@ -863,6 +863,9 @@ static void box_draws_material_observers(
 
 /** Register the observers that collect changed entities and changed subtrees.
  *
+ * The observers that free slots match disabled entities too: a shape or a text deleted while
+ * disabled would otherwise leave its dead entity in its batch.
+ *
  * @param world The world
  * @param d The state
  */
@@ -875,6 +878,7 @@ static void box_draws_observers(
         .events = { EcsOnSet } }, BoxDrawsOnChange);
     box_draws_observer(world, d, "DrawsOnShapeRemove", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(ShapeMesh) }},
+        .query.flags = EcsQueryMatchDisabled,
         .events = { EcsOnRemove } }, BoxDrawsOnRemove);
     box_draws_observer(world, d, "DrawsOnShape2D", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(Shape2D) }},
@@ -884,6 +888,7 @@ static void box_draws_observers(
         .events = { EcsOnSet } }, BoxDrawsOnChange);
     box_draws_observer(world, d, "DrawsOnTextRemove", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(Text) }},
+        .query.flags = EcsQueryMatchDisabled,
         .events = { EcsOnRemove } }, BoxDrawsOnTextRemove);
     box_draws_observer(world, d, "DrawsOnTextSpans", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(TextSpans) }},

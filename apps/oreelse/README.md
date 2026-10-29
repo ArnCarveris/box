@@ -481,7 +481,8 @@ The rocket is an entity with the `Rocket` template, its origin the bottom of the
 axis, which `launch.flecs` places on the pad and keeps in step with the rocket state
 (`OreRocketState`) by setting the props of its `Rocket` component; the template rebuilds the
 stack in the script whenever they change, so nothing in C builds or deletes its parts. It rises
-with the state's height during the ascent and is gone at the arrival:
+with the state's height during the ascent. The entity always exists; without parts (no pad, an
+empty pad, after the arrival) the template builds nothing, so the rocket is gone:
 
 | Prop | Type | Builds |
 | --- | --- | --- |

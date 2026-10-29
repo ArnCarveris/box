@@ -511,7 +511,7 @@ ECS_STRUCT(OreLaunchPad, {
     float base_y; /**< Height of the bottom of the rocket above the pad's origin */
 });
 
-/** The items a rocket is built from and ships, a singleton rocket.flecs sets */
+/** The items a rocket is built from and ships, a singleton launch.flecs sets */
 ECS_STRUCT(OreRocketKit, {
     ecs_entity_t engine;       /**< The rocket engine item */
     ecs_entity_t fuel;         /**< The rocket fuel storage item */
@@ -530,7 +530,7 @@ ECS_STRUCT(OreRocketParts, {
 
 /** The rocket on the pad and the score, a singleton run.flecs resets. Modified when a value
  * changes: every frame of a flight, else when a part, the Luminite, the pad or what can be done
- * changes. The UI formats every text from it; rocket.flecs keeps the Rocket model in step.
+ * changes. The UI formats every text from it; launch.flecs keeps the Rocket model in step.
  *
  * A unit is a cargo bay or the life support; a rocket is valid with units, cfg.enginesPerUnit
  * engines and one fuel storage per unit.
@@ -552,7 +552,6 @@ ECS_STRUCT(OreRocketState, {
     OreRocketParts uninstall; /**< The part can be uninstalled now */
     bool load;            /**< Loading would move Luminite into the rocket now */
     bool launch;          /**< The rocket can launch now */
-    bool shown;           /**< The Rocket model stands: on the pad with parts, or in flight */
     float x;              /**< X of the bottom of the rocket */
     float y;              /**< Height of the bottom of the rocket, rising in the ascent */
     float z;              /**< Z of the bottom of the rocket */

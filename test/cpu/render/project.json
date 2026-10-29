@@ -276,7 +276,8 @@
                     "scene_change_writes_both",
                     "toggle_dynamic_transform",
                     "dynamic_shape2d_keeps_clip",
-                    "shape2d_ranks_follow_order"
+                    "shape2d_ranks_follow_order",
+                    "disabled_delete_frees_slot"
                 ]
             },
             {

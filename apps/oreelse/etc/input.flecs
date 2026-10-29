@@ -120,8 +120,8 @@ actions {
     }
   }
 
-  // The rocket keys install a part from the inventory on the rocket on the pad, Shift and the
-  // key too. The loop below awaits any of them; OreItemKey names the part
+  // The rocket keys install a part from the inventory on the rocket on the pad, with or without
+  // Shift. The loop below awaits any of them; OreItemKey names the part
   Install {
     engine {
       Action: {description: "Install a rocket engine on the rocket"}

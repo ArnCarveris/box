@@ -15,6 +15,8 @@ from oreelse_buildings import (  # noqa: F401 (ARGS)
     inventory, key, mine, place_player, put, run_script, select, set_inventory, start,
     tile_point, wait_toast)
 
+APP = "apps/oreelse"
+
 ROCKET = "oreelse.OreRocketState"
 BOOK = "oreelse.OreCraftBook"
 
@@ -92,6 +94,13 @@ def parts(r):
     return (r["engines"], r["fuel"], r["cargo"], r["life_support"])
 
 
+def model_empty(app):
+    """Whether the Rocket model builds nothing: no parts and no nose cone."""
+    model = app.get("rocket", "Rocket")
+    return (model["engines"], model["fuel"], model["cargo"], model["life_support"]) == \
+        (0, 0, 0, 0) and not model["valid"] and not model["loaded"]
+
+
 def test_install(app):
     start(app)
     place_pad(app, [(ENGINE, 5), (FUEL, 2), (CARGO, 2)])
@@ -107,13 +116,14 @@ def test_install(app):
     app.check(not r["install"]["engine"] and not r["install"]["fuel"] and
               r["install"]["cargo"] and not r["install"]["life_support"],
               "the rocket offers to install %s" % r["install"])
-    app.check(not r["valid"] and not r["launch"] and not r["shown"], "the empty rocket is %s" % r)
+    app.check(not r["valid"] and not r["launch"] and model_empty(app),
+              "the empty rocket is %s" % r)
 
     # A cargo bay, 4 engines and a fuel storage make a valid rocket
     r = assemble(app)
     app.check(parts(r) == (4, 1, 1, 0) and r["units"] == 1 and r["capacity"] == CAPACITY,
               "the rocket is %s" % r)
-    app.check(r["launch"] and r["shown"], "the valid rocket cannot launch: %s" % r)
+    app.check(r["launch"], "the valid rocket cannot launch: %s" % r)
     app.check(count(app, ENGINE) == 1 and count(app, FUEL) == 1 and count(app, CARGO) == 1,
               "the parts were not spent: %s" % inventory(app))
     x, z = tile_point(*PAD_CENTER)
@@ -169,7 +179,7 @@ def test_uninstall(app):
     uninstall(app, CARGO)
     wait_toast(app, "Payload removed - returned 4 engines, 1 fuel tank, 25 Luminite")
     r = rocket(app)
-    app.check(parts(r) == (0, 0, 0, 0) and r["loaded"] == 0 and not r["shown"],
+    app.check(parts(r) == (0, 0, 0, 0) and r["loaded"] == 0 and model_empty(app),
               "the rocket is %s" % r)
     app.check(count(app, CARGO) == 1 and count(app, ENGINE) == 4 and count(app, FUEL) == 1 and
               count(app, LUMINITE) == 30, "the inventory holds %s" % inventory(app))
@@ -224,7 +234,7 @@ def test_cargo_launch(app):
                  frames=round((FLIGHT - IGNITION - 1 + 0.6) * FPS), what="25 Luminite shipped")
     wait_toast(app, "Shipment away!  +25 Luminite")
     r = rocket(app)
-    app.check(parts(r) == (0, 0, 0, 0) and r["loaded"] == 0 and not r["shown"],
+    app.check(parts(r) == (0, 0, 0, 0) and r["loaded"] == 0 and model_empty(app),
               "the pad is not empty: %s" % r)
     app.check(r["phase"] in ("Idle", "OreLaunchPhaseIdle") and r["pad"] not in (0, "0", "#0"),
               "after the arrival the rocket is %s" % r)
@@ -276,7 +286,7 @@ def test_demolish_pad(app):
     button(app, "right", False)
     app.wait_frames(SETTLE)
     r = rocket(app)
-    app.check(parts(r) == (0, 0, 0, 0) and r["loaded"] == 0 and not r["shown"],
+    app.check(parts(r) == (0, 0, 0, 0) and r["loaded"] == 0 and model_empty(app),
               "the rocket of the demolished pad is %s" % r)
     app.check(count(app, "RocketPad") == 1, "the pad did not come back: %s" % inventory(app))
     app.check(count(app, ENGINE) == 0 and count(app, CARGO) == 0 and count(app, FUEL) == 0 and
