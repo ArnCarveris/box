@@ -230,6 +230,22 @@ cfg {
   export const waveUnitCap: i32 = 10000
   export const waveBehemothCap: i32 = 25
 
+  // The stress test (--stresstest[=N], etc/stresstest.flecs): every run starts stressMinutes
+  // minutes in (N when above 0) as a late game base. Its wall rings are the perimeters of rows
+  // and columns stressEdge to stressFar and one in, the turret ring two in; a building of its
+  // sites goes on the first free cell within stressSearch square shells of its tile; the solar
+  // panels fill rings stressSolarInset in from the edge of the map and further in until the
+  // production is stressPowerMargin times the watts of the consumers. The astronaut stands on
+  // the free tile nearest to (stressCenter, stressCenter), the next wave stressWaveLead away
+  export const stressMinutes: f32 = 30
+  export const stressEdge: i32 = 10
+  export const stressFar: i32 = 37
+  export const stressCenter: i32 = 24
+  export const stressSearch: i32 = 8
+  export const stressSolarInset: i32 = 3
+  export const stressPowerMargin: f32 = 1.15
+  export const stressWaveLead: f32 = 10
+
   // The style of a wave, one draw per wave: below swarmChance a swarm, below swarmChance +
   // eliteChance an elite wave, otherwise mixed. A style's mix is the share of the budget of
   // every tier, mite, skitter, brute and behemoth (the order of OreArsenal)

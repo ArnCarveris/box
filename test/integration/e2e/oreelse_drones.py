@@ -70,6 +70,10 @@ TIME_SLACK = 0.5
 # astronaut
 CENTER = (160, 90)
 
+# The power panel covers the center of the 320x180 window and takes its clicks: the cases that
+# click the world grow the window to 640x360, whose center (WIDE_CENTER) is clear of the panels
+WIDE_CENTER = (320, 180)
+
 SETTLE = 5
 
 
@@ -112,12 +116,16 @@ def set_state(app, state):
     app.wait_for(STATE % state, "true")
 
 
+def resize(app, width, height):
+    app.exec("set window Surface {width: %d, height: %d}" % (width, height))
+    app.wait_for("get window SurfaceStatus.height", str(height))
+
+
 def setup(app):
     """Shrink the window and drop the shadows of the world view, so the software renderer keeps
     up."""
-    app.exec("set window Surface {width: 320, height: 180}")
     app.exec("set main_view View.shadows.enabled false")
-    app.wait_for("get window SurfaceStatus.height", "180")
+    resize(app, 320, 180)
 
 
 def start(app):
@@ -287,9 +295,10 @@ def place_player(app, x, z):
     app.wait_frames(SETTLE)
 
 
-def aim_tile(app, row, col):
-    """Place the astronaut so that the center of the window hovers the center of a tile."""
-    move_cursor(app, CENTER)
+def aim_tile(app, row, col, cursor=CENTER):
+    """Place the astronaut so that a cursor position (the center of the window) hovers the center
+    of a tile."""
+    move_cursor(app, cursor)
     p = app.get(PLAYER, "Position")
     hx, hz = point(hover(app))
     x, z = tile_point(row, col)
@@ -330,13 +339,15 @@ def test_pad_spawns_drones(app):
     app.check(all_docked(app, "pad_a"), "drones left the dock with nothing to repair")
 
     # Demolishing the pad deletes its drones
-    aim_tile(app, 4, 4)
+    resize(app, 640, 360)
+    aim_tile(app, 4, 4, WIDE_CENTER)
     button(app, "right", True)
     app.wait_for("get %s OreInventory" % INVENTORY,
                  lambda out: any(s["item"] == "DronePad" and s["amount"] == 1
                                  for s in parse_value(out)["slots"]),
                  frames=round((DOZE_TIME + SWING_SLACK) * FPS), what="the pad demolished")
     button(app, "right", False)
+    resize(app, 320, 180)
     wait_until(app, lambda: not drones(app), SETTLE * 2, "the drones deleted with their pad")
 
     # A pad destroyed by damage takes its drones with it too

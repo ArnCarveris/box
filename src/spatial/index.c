@@ -189,6 +189,7 @@ int32_t box_spatial_item_add(
     it->tree = tree;
     it->frame = frame;
     it->moved = false;
+    it->disabled = false;
     glm_vec3_copy(ECS_CONST_CAST(float*, min), it->min);
     glm_vec3_copy(ECS_CONST_CAST(float*, max), it->max);
     s->count ++;

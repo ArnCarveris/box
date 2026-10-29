@@ -1,0 +1,398 @@
+// The parts of the rocket assembly panel, the original's RocketSection, RocketStep and
+// RocketButton: a section per part of the rocket with the strip of its pips, the Luminite load
+// section in bar mode, the plus and minus steps of the parts and the LAUNCH button. The HUD
+// (ui/hud.flecs) places them in the panel and passes them the rocket state (OreRocketState),
+// which decides every look: the UI computes nothing about the rocket of its own.
+
+using flecs.script
+using flecs.script.math
+using box.types
+using box.layout
+using box.geometry
+using box.material
+using box.texture
+using box.text
+using box.picking
+using oreelse
+
+// The strip of a section: its inset, the height of a pip or of the bar, the widest pip and the
+// gap between two pips
+const stripPad: f32 = 8
+const pipHeight: f32 = 10
+const pipMax: f32 = 22
+const pipGap: f32 = 3
+
+// The face of a step or of the launch button that cannot act
+const dimFace: Rgb = {30, 33, 39}
+const dimEdge: rgba = {52, 56, 64, 255}
+
+// The muted text of the key labels
+const keyColor: Rgb = {132, 139, 152}
+
+// A section of width by height at (x, y) of the panel: count of need of a part, with its icon of
+// 22x22 at (8, 5), its label at (36, 7) and `count / need` right aligned at y 5. It is ok with
+// count == need > 0 when exact, else with count above 0: a green edge, a green count and a
+// bright label; blocked, a red edge, a red count and a bright label. Under them, 16 pixels above
+// the bottom, the strip: max(need, count) pips, the first count of them filled amber; in bar
+// mode a well with a teal fill of fill of its width instead.
+//
+// The section in bar mode is the Luminite load section, which reacts to the pointer: lighter
+// while hovered with afford (loading would move Luminite now), darker without, and a click loads
+// (oreelse.rocket_load).
+template RocketSection {
+  prop label: string = ""
+  prop icon: entity = 0
+  prop x: f32 = 12
+  prop y: f32 = 0
+  prop width: f32 = 156
+  prop height: f32 = 46
+  prop count: i32 = 0
+  prop need: i32 = 0
+  prop exact: bool = false
+  prop blocked: bool = false
+  prop bar: bool = false
+  prop afford: bool = false
+  prop fill: f32 = 0
+
+  mut hover = false
+
+  const ok: bool = match exact {
+    true: need > 0 && count == need
+    false: count > 0
+  }
+
+  const span: f32 = width - stripPad * 2
+  const stripY: f32 = height - 16
+
+  const hoverFace: Rgb = match hover {
+    true: {46, 50, 58}
+    false: {34, 37, 44}
+  }
+
+  const loadFace: Rgb = match afford {
+    true: hoverFace
+    false: {26, 28, 34}
+  }
+
+  const face: Rgb = match bar {
+    true: loadFace
+    false: {34, 37, 44}
+  }
+
+  const okEdge: rgba = match ok {
+    true: {96, 168, 116, 255}
+    false: {66, 72, 82, 255}
+  }
+
+  const edge: rgba = match blocked {
+    true: {150, 66, 60, 255}
+    false: okEdge
+  }
+
+  const labelColor: Rgb = match ok || blocked {
+    true: {186, 194, 206}
+    false: {112, 118, 130}
+  }
+
+  const okCount: Rgb = match ok {
+    true: palette.green
+    false: palette.text
+  }
+
+  const countColor: Rgb = match blocked {
+    true: palette.red
+    false: okCount
+  }
+
+  const emptyEdge: rgba = match blocked {
+    true: {188, 78, 70, 255}
+    false: {74, 80, 92, 255}
+  }
+
+  Layout: {}
+  LayoutItem: {
+    h: Left, v: Top, x: x, y: -y,
+    width: {mode: Fixed, value: width}, height: {mode: Fixed, value: height}
+  }
+  Rect: {1, 1}
+  Rgb: face
+  Border: {width: 1, radius: 3, color: edge}
+
+  if bar {
+    Interactive
+  }
+
+  if icon != 0 {
+    symbol {
+      LayoutItem: {
+        h: Left, v: Top, x: stripPad, y: -5,
+        width: {mode: Fixed, value: 22}, height: {mode: Fixed, value: 22}
+      }
+      Rect: {1, 1}
+      Image: {texture: icon, u0: 0, v0: 0, u1: 1, v1: 1}
+    }
+  }
+
+  name_label {
+    LayoutItem: {h: Left, v: Top, x: 36, y: -7}
+    Text: {value: label, size: 13, wrap: Newlines}
+    Rgb: labelColor
+  }
+
+  count_label {
+    LayoutItem: {h: Left, v: Top, y: -5, width: {mode: Fixed, value: width - stripPad}}
+    Text: {value: "{count} / {need}", size: 15, width: width - stripPad, align: Right}
+    Rgb: countColor
+  }
+
+  if bar {
+    well {
+      LayoutItem: {
+        h: Left, v: Top, x: stripPad, y: -stripY,
+        width: {mode: Fixed, value: span}, height: {mode: Fixed, value: pipHeight}
+      }
+      Rect: {1, 1}
+      Rgb: palette.well
+      Border: {width: 1, radius: 2, color: {74, 80, 92, 255}}
+    }
+
+    if fill > 0 {
+      bar_fill {
+        LayoutItem: {
+          h: Left, v: Top, x: stripPad, y: -stripY,
+          width: {mode: Fixed, value: span * clamp(fill, 0, 1)},
+          height: {mode: Fixed, value: pipHeight}
+        }
+        Rect: {1, 1}
+        Rgb: palette.luminite
+        Border: {radius: 2}
+      }
+    }
+  }
+
+  // The pips: as many as the larger of need and count, at most 22 wide, 3 apart
+  const pips: i32 = match need > count {
+    true: need
+    false: count
+  }
+
+  if !bar && pips > 0 {
+    const room: f32 = (span - (pips - 1) * pipGap) / pips
+    const pipWidth: f32 = min(pipMax, room)
+
+    for i in 0..pips {
+      const filled = i < count
+
+      const pipFace: Rgb = match filled {
+        true: palette.amber
+        false: palette.well
+      }
+
+      const pipEdge: rgba = match filled {
+        true: {252, 214, 140, 255}
+        false: emptyEdge
+      }
+
+      "pip_{i}" {
+        LayoutItem: {
+          h: Left, v: Top, x: stripPad + i * (pipWidth + pipGap), y: -stripY,
+          width: {mode: Fixed, value: pipWidth}, height: {mode: Fixed, value: pipHeight}
+        }
+        Rect: {1, 1}
+        Rgb: pipFace
+        Border: {width: 1, radius: 2, color: pipEdge}
+      }
+    }
+  }
+
+  // Entering and leaving in loops of their own: a change of the props or of the state read
+  // evaluates the template again and restarts its async blocks, and a single loop restarted
+  // while hovered would wait for an enter and miss the leave
+  async {
+    while true {
+      await on.enter(this)
+      hover = true
+    }
+  }
+
+  async {
+    while true {
+      await on.leave(this)
+      hover = false
+    }
+  }
+
+  async {
+    while true {
+      await on.click(this)
+      if bar {
+        await oreelse.rocket_load()
+      }
+    }
+  }
+}
+
+// A step of 40x30 at (x, y) of the panel that installs (plus) or uninstalls one of a part of the
+// rocket (item) with a click (oreelse.rocket_install, oreelse.rocket_uninstall): its sign
+// centered, a plus step with its key label at (4, 1). Enabled, it has a face that lights up
+// while hovered; disabled, a dim one.
+template RocketStep {
+  prop item: entity = 0
+  prop plus: bool = true
+  prop key: string = ""
+  prop enabled: bool = false
+  prop x: f32 = 0
+  prop y: f32 = 0
+
+  mut hover = false
+
+  const sign: string = match plus {
+    true: "+"
+    false: "-"
+  }
+
+  const liveFace: Rgb = match hover {
+    true: {66, 72, 82}
+    false: {46, 50, 58}
+  }
+
+  const face: Rgb = match enabled {
+    true: liveFace
+    false: dimFace
+  }
+
+  const edge: rgba = match enabled {
+    true: {88, 94, 106, 255}
+    false: dimEdge
+  }
+
+  const signColor: Rgb = match enabled {
+    true: palette.text
+    false: {90, 96, 108}
+  }
+
+  const keyTone: Rgb = match enabled {
+    true: keyColor
+    false: {74, 79, 90}
+  }
+
+  Interactive
+  Layout: {}
+  LayoutItem: {
+    h: Left, v: Top, x: x, y: -y,
+    width: {mode: Fixed, value: 40}, height: {mode: Fixed, value: 30}
+  }
+  Rect: {1, 1}
+  Rgb: face
+  Border: {width: 1, radius: 3, color: edge}
+
+  sign_label {
+    LayoutItem: {h: Center, v: Middle}
+    Text: {value: sign, size: 19}
+    Rgb: signColor
+  }
+
+  if plus {
+    key_label {
+      LayoutItem: {h: Left, v: Top, x: 4, y: -1}
+      Text: {value: key, size: 11}
+      Rgb: keyTone
+    }
+  }
+
+  // Entering and leaving in loops of their own: a change of the props or of the state read
+  // evaluates the template again and restarts its async blocks, and a single loop restarted
+  // while hovered would wait for an enter and miss the leave
+  async {
+    while true {
+      await on.enter(this)
+      hover = true
+    }
+  }
+
+  async {
+    while true {
+      await on.leave(this)
+      hover = false
+    }
+  }
+
+  async {
+    while true {
+      await on.click(this)
+      if plus {
+        await oreelse.rocket_install(item)
+      } else {
+        await oreelse.rocket_uninstall(item)
+      }
+    }
+  }
+}
+
+// The LAUNCH button of width by height at (x, y) of the panel: `LAUNCH` centered at y 8, the key
+// label P at (6, 3) and the note centered at y 30. Enabled (the rocket can launch) its face is
+// warm with a 2 pixel amber edge, else dim. A click launches (oreelse.rocket_launch).
+template RocketLaunch {
+  prop x: f32 = 0
+  prop y: f32 = 0
+  prop width: f32 = 248
+  prop height: f32 = 48
+  prop enabled: bool = false
+  prop note: string = ""
+
+  const face: Rgb = match enabled {
+    true: {78, 62, 26}
+    false: dimFace
+  }
+
+  const amberEdge: rgba = {palette.amber.r, palette.amber.g, palette.amber.b, 255}
+  const edge: rgba = match enabled {
+    true: amberEdge
+    false: dimEdge
+  }
+
+  const edgeWidth: f32 = match enabled {
+    true: 2
+    false: 1
+  }
+
+  const nameColor: Rgb = match enabled {
+    true: {246, 220, 168}
+    false: {110, 116, 128}
+  }
+
+  Interactive
+  Layout: {}
+  LayoutItem: {
+    h: Left, v: Top, x: x, y: -y,
+    width: {mode: Fixed, value: width}, height: {mode: Fixed, value: height}
+  }
+  Rect: {1, 1}
+  Rgb: face
+  Border: {width: edgeWidth, radius: 3, color: edge}
+
+  name_label {
+    LayoutItem: {h: Center, v: Top, y: -8}
+    Text: {value: "LAUNCH", size: 19}
+    Rgb: nameColor
+  }
+
+  key_label {
+    LayoutItem: {h: Left, v: Top, x: 6, y: -3}
+    Text: {value: "P", size: 11}
+    Rgb: keyColor
+  }
+
+  note_label {
+    LayoutItem: {h: Center, v: Top, y: -30}
+    Text: {value: note, size: 12}
+    Rgb: palette.soft
+  }
+
+  async {
+    while true {
+      await on.click(this)
+      await oreelse.rocket_launch()
+    }
+  }
+}

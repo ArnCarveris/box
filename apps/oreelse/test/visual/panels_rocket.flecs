@@ -1,0 +1,52 @@
+// The rocket assembly panel at the right, while playing (the panels hide while paused), of a
+// rocket with a cargo bay, 2 engines and a fuel tank. LIFE SUPPORT 0 / 1, one empty pip, its
+// plus step dim (none in the inventory); CARGO BAYS 1 / 4 with a green edge and one of four
+// pips filled, both steps lit; FUEL TANKS 1 / 1 complete (green), its plus step dim; ENGINES
+// 2 / 4 blocked: a red edge, a red count and two empty pips with red edges, both steps lit (two
+// engines in the inventory). The Luminite section 0 / 25 with an empty bar, loadable (40 held).
+// The LAUNCH button is dim with the note NEEDS 2 MORE ENGINES.
+include apps/oreelse/test/visual/setup/seed
+include apps/oreelse/etc/oreelse
+
+using box.transform
+using box.camera
+using box.surface
+using oreelse
+
+// The capture is 640x360: the HUD lays out for a 1280x720 window and its camera shows it at
+// half size, so the capture holds the whole HUD as a 1280x720 window shows it
+window {
+  Surface: {width: 1280, height: 720}
+}
+
+hud {
+  ui {
+    camera {
+      Camera: {ortho: true, ortho_scale: 0.5}
+    }
+  }
+}
+
+// A rocket pad on the tiles (4..6, 4..6) in the corner of the map, which no deposit reaches;
+// it stands at the center of its middle tile (5, 5). Tile (row, col) is centered at
+// x = -47 + 2 col, z = -47 + 2 row
+panel_pad : RocketPad {
+  Position: {-37, 0, -37}
+  OreBuilding: {row: 4, col: 4}
+}
+
+// The rocket state derives its units, validity, what can be done and the Luminite held from
+// these parts and the inventory
+$ {
+  (OreGameState, Playing)
+  OreInventory: {
+    slots: [
+      {item: items.Luminite, amount: 40}, {item: items.RocketEngine, amount: 2},
+      {item: items.RocketCargoBay, amount: 1}
+    ]
+  }
+  OreRocketState: {
+    pad: panel_pad, engines: 2, fuel: 1, cargo: 1, life_support: 0,
+    x: -37, y: 0.74, z: -37
+  }
+}

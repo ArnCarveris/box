@@ -17,6 +17,7 @@ bake3 --local-env                                              # build box and t
 bake3 run apps/oreelse --local-env                             # play in a 1280x720 window
 bake3 run apps/oreelse --local-env -- --seed 42                # play the map of seed 42
 bake3 run apps/oreelse --local-env -- --headless --frames 10   # headless run, exits 0
+bake3 run apps/oreelse --local-env -- --stresstest             # a late game base, see below
 bake3 --target em --local-env apps/oreelse                     # build for the browser
 
 python3 tools/integration.py e2e oreelse_flow oreelse_look     # the end-to-end scenarios
@@ -26,7 +27,7 @@ python3 tools/integration.py e2e oreelse_power oreelse_critters oreelse_critter_
 python3 tools/integration.py e2e oreelse_player_fx oreelse_hud oreelse_building_animation
 python3 tools/integration.py e2e oreelse_weapons oreelse_flora oreelse_drones
 python3 tools/integration.py e2e oreelse_inventory_screen oreelse_health_bars oreelse_screens oreelse_combat_fx
-python3 tools/integration.py e2e oreelse_drone_rocket_fx
+python3 tools/integration.py e2e oreelse_drone_rocket_fx oreelse_panels oreelse_stresstest
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -34,6 +35,52 @@ python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 the time. A seeded session is reproducible: run k after the start (each restart) draws from a
 seed derived from N and k, so every restart is a new map and the same again in the next
 session with the same seed.
+
+### The stress test
+
+`--stresstest` skips the title screen and drops you into a late game base for performance
+testing, at 30 minutes of play; `--stresstest=N` at N minutes (N of 0 or less means 30). Every
+run of the session starts so, on its own map: a restart (R) builds the same layout on the new
+map. The buildings are placed for free and regardless of the reach, by the rules of placement
+otherwise (free tiles, drills only on deposits, nothing else on them, one rocket pad). On the
+48x48 grid:
+
+1. A drill on every deposit, Luminite included.
+2. A wall ring on the perimeter of rows and columns 10 to 37, a second one on 11 to 36, and a
+   turret ring on 12 to 35 cycling gun, laser, gun and missile turrets along the ring.
+3. A rocket pad near (row 29, column 23), factories near (20, 20) and (20, 27), drone pads near
+   (27, 28) and (23, 18): each at the first free cell of the square shells around its tile, up
+   to 8 out.
+4. Solar panels on the free tiles of successive rings 3 in from the edge of the map and further
+   in (rows and columns 3 to 44, then 4 to 43, ...) until the production is at least 1.15 times
+   the watts of the consumers.
+5. The astronaut on the free tile (no deposit, no building) nearest to (24, 24).
+6. Added to the starting crate: Iron 500, Copper 500, Stone 500, Luminite 200, IronPlate 200,
+   CopperPlate 200, StoneBrick 200, Wall 40, Drill 6, SolarPanel 10, GunTurret 6, LaserTurret 4,
+   MissileTurret 4.
+7. With s = N * 60 seconds: the clock at s, the wave counter at `floor((s - 90) / 50)` and the
+   next wave 10 seconds away. At 30 minutes the next wave is wave 35.
+
+The layout is `etc/stresstest.flecs` with the constants `cfg.stress*`; `src/stresstest.c` builds
+it with placement's own checks (`ore_placement_build`) once the scripts of a run loaded.
+
+Frame times of the stress test, measured on a machine without a GPU (4 arm64 cores, software
+renderer). The window could not be used, so the runs were headless, release build, seed 8, on a
+160x90 surface without shadows, at a fixed delta of 1/60 s, with the wave timer cut to start
+the first wave at once. `frames` (the command port) gave the frame intervals and flecs' system
+time measurement the cost of the game's systems. Both runs end early: the wave kills the
+astronaut, which stops the clock.
+
+| Run | Wave | Critters | Played | Frame interval in the wave (ms) | Game systems (ms/frame) |
+| --- | --- | --- | --- | --- | --- |
+| `--stresstest` | 35 | not counted (budget 14960) | 25 s | 100 to 290, max 430 | about 5 |
+| `--stresstest=60` | 71 | about 6500 by the end | 13 s | 180 to 320, max 500 | about 4.5 |
+
+The game's systems stay well under 16 ms per frame. The heaviest are OreCorpseChar, OreLimbs,
+OreCritterLimbs and OreCrowd, about 1 ms or less each. Almost all of a frame is the engine
+waiting on the software renderer (box.app.AppFrame). Next come RenderExtractViews,
+RenderExtractDraws and TransformDynamic, 3 to 11 ms together. The 1280x720 window still needs
+measuring on a machine with a GPU.
 
 ## Controls
 
@@ -43,7 +90,7 @@ session with the same seed.
 | W A S D | Walk north, west, south, east |
 | Shift (hold) | Run, twice the walking speed; at the release of a placement drag, fill the rectangle |
 | Right mouse button (hold) | Mine the deposit under the cursor, or demolish the building there; a press cancels a placement drag |
-| Left mouse button | Place the selected building; drag for a line, an L or a rectangle |
+| Left mouse button | Place the selected building; drag for a line, an L or a rectangle; on a panel, its button |
 | 1, 2, 3, 4, 5, 6, 8, 9, 0 | Select the wall, drill, solar panel, gun turret, laser turret, missile turret, rocket pad, drone pad, factory (again: clear the selection) |
 | Q | Pipette: select the building under the cursor, the drill over a deposit |
 | E | Open or close the inventory screen (the Inventory (E) button too) |
@@ -684,9 +731,35 @@ covers `(width - 2) * frac` of it, blended from amber {240, 176, 58} at half hea
 The bar goes when the building is repaired to full or destroyed. Bars narrower than 6 px or off
 screen are not drawn, the panels of the HUD cover them, and they show only while playing.
 
-Clicks, the right button and the wheel over a panel of the UI (the status bar, the inventory
-screen, its info panel and the Inventory (E) button) do not reach the world: they place, mine
-and zoom nothing. The plain lines of text let them through.
+Clicks, the right button and the wheel over a panel of the UI (the status bar, the panels below,
+the inventory screen, its info panel and the Inventory (E) button) do not reach the world: they
+place, mine and zoom nothing. The plain lines of text let them through.
+
+### The panels of play
+
+Three more panels show while playing, and hide while paused:
+
+- **The order queue**, at the bottom right while the order book has orders, growing upward with
+  its rows (at most 16): per order, oldest first, a header row `Rocket engine (3x)`, then an
+  indented row per part still to craft for it, `Iron plate (8x)`. A row a worker is on fills up
+  with the progress of its craft, amber, or dark red while its order is stalled; a stalled row's
+  text is red. ` - inventory full` follows the text of a row whose item does not fit the
+  inventory; an order whose units are all delivered shows `Rocket engine - wrapping up` (or
+  `- inventory full`) until its leftovers are in the inventory. A click on a header row cancels
+  one unit of the order; the indented rows do nothing.
+- **The power allocator**, at the bottom left: `FREE n`, the bars not assigned out of 6, and a
+  column of four bars for Mining, Weapons and Construction. The bars up to a category's level are
+  lit, orange at level 1, green at 2 and cyan at 3 and 4. A click on a bar sets the level (see
+  Power).
+- **The rocket assembly**, at the right under the status bar while there is a rocket pad: a row
+  per part (life support, cargo bays, fuel tanks, engines) with its count of what the rocket
+  needs and a pip per part, green when the part is complete and red when the rocket cannot
+  launch for it (the fuel tanks or the engines not matching the units), with a minus and a plus
+  button that uninstall and install one (lit when it can be done now; the plus buttons show
+  their keys). Below them the Luminite loaded of the capacity, which a click loads (O), and the
+  LAUNCH button (P), lit amber when the rocket can launch, with what it still needs or the
+  Luminite it will carry: `NEEDS 2 MORE ENGINES`, `CREW + 25 LUMINITE ABOARD`. Where a long
+  queue reaches up under the rocket panel, the rocket panel is on top and takes the clicks.
 
 ### Render quality
 
@@ -919,7 +992,8 @@ keep their names there: the bulb is the lamp's child `bulb`.
 The shared materials are inherited prefabs that a part derives from and resizes with its own
 `Box`: `HazardTag`, `HazardTrim`, `HazardTrimShort`, `HazardBorderShort`, `HazardBorderLong`
 and `HazardBoundary` (`etc/materials/hazard.flecs`), `SolarCells`, `AccessPlate`, `VentGrille`,
-`FanDisc` and `BayPad`. `TileMarker` and `TileMarkerBad` (`etc/props/markers.flecs`) are the
+`FanDisc` and `BayPad` (quads whose round fan and ring marking are alpha tested, `AlphaCutoff`,
+so their transparent corners do not draw). `TileMarker` and `TileMarkerBad` (`etc/props/markers.flecs`) are the
 glowing plates mining and placement show over a tile, instances placed at y 0.14.
 
 ## Flora models
@@ -957,6 +1031,7 @@ its tile in the grid.
 | `etc/boundary.flecs` | The hazard band around the playable area |
 | `etc/scenery.flecs` | The boulders, dunes and flora of a run |
 | `etc/run.flecs` | The astronaut with its pistol, the parents of the placed buildings, of the critters and of the projectiles, and the singletons of a run, the order book, the selection, the inventory screen, the power allocation, the rocket state and the waves included |
+| `etc/stresstest.flecs` | The layout of the stress test (`OreStressKit`): the buildings of its rings, the buildings near a tile and the stock it adds |
 | `etc/launch.flecs` | The items of a rocket, the effects of its flight and the template of the pad's clamps (`OreRocketKit`), and the rocket on the pad, a `Rocket` instance (`OreRocketModel`) that follows the rocket state |
 | `etc/deposits.flecs` | The deposits of a run, the Luminite's with their glints (`DepositSparkle`) |
 | `etc/player.flecs` | The `Astronaut` template |
@@ -984,8 +1059,11 @@ its tile in the grid.
 | `etc/ui/icons.flecs` | The icon textures, `icons.*`, which the items name with `OreIcon` |
 | `etc/ui/panel.flecs` | The `Panel` template, the chrome of every panel: the plate, its edge, the hazard strip and the `InputBlocker` |
 | `etc/ui/health_bar.flecs` | The `HealthBar` template, the health bar of a damaged building, anchored to the projection of its model box (`OreModelBox`) |
-| `etc/ui/hud.flecs` | The `OreHud` template, which shows the screens in their states: the status bar (`StatusGauge`, `StatusDivider`), the toast, the mine progress bar, the suit breach alert, the rocket status line, the Inventory (E) button and the inventory screen |
+| `etc/ui/hud.flecs` | The `OreHud` template, which shows the screens in their states: the status bar (`StatusGauge`, `StatusDivider`), the toast, the mine progress bar, the suit breach alert, the rocket status line, the order queue, power allocator and rocket assembly panels, drawn and hit in that order (z 0, 1 and 2), the Inventory (E) button and the inventory screen with its info panel over them (z 3 and 4) |
 | `etc/ui/inventory.flecs` | The inventory screen (`InventoryScreen`: `StockBody` with its `StockSlot`s, `ConstructBody` with its `TabButton`s and the `BuildingsPage` and `RocketPage` of `SlotButton`s; the slots and buttons are restyled `box.widgets.HeadlessButton`s), its info panel (`ItemInfoPanel`) and the Inventory (E) button (`InventoryButton`), which the HUD shows |
+| `etc/ui/queue.flecs` | The `QueueRow` template, a row of the order queue |
+| `etc/ui/power.flecs` | The `PowerBar` and `PowerColumn` templates of the power allocator |
+| `etc/ui/rocket_panel.flecs` | The `RocketSection`, `RocketStep` and `RocketLaunch` templates of the rocket assembly |
 | `etc/ui/screens.flecs` | The screens of the game flow: `OreTitleScreen` (with its signs, `OreSign`), `OrePauseScreen` (with `OreQualityButton` and its `OreQualityValue`), `OreEndScreen`, and `OreControls`, the list of the controls the title and pause screens share (`OreControl` rows) |
 | `etc/ui/signs/` | The original's sign art of the title screen (SVG), unchanged |
 | `etc/icons/` | The original's icons (SVG), unchanged |
@@ -1009,4 +1087,6 @@ its tile in the grid.
 | `src/rocket.c` | The rocket state, installing, uninstalling, loading, the launch and the flight, the look of the flight (`OreRocketFx`: the shake, the clamps, the flames and the smoke), `oreelse.rocket_install()`, `oreelse.rocket_uninstall()`, `oreelse.rocket_load()`, `oreelse.rocket_launch()`, `oreelse.craft_key()` |
 | `src/health_bars.c` | The health bars: a `HealthBar` instance per damaged building under `health_bars.bars`, its fraction set when the health changes, the bars' view shown while playing |
 | `src/look.c` | The render quality tiers, `oreelse.cycleQuality()` |
+| `src/stresstest.c` | The stress test: the late game base every run of a `--stresstest` session starts with (`OreStressTestApply`) |
+| `src/stresstest.h` | The stress test's components (`OreStressTest`, `OreStressKit`) and `ore_placement_build`, included by `src/game.h` |
 | `src/particles.c` | The helpers that play the effects (`ore_burst`, `ore_burst_aimed`, `ore_explosion`, `ore_combust`), the flash of their lights, `oreelse.explosion()`, `oreelse.combust()` |

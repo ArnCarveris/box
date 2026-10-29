@@ -1,5 +1,9 @@
 // The face of a cooling fan, the FanDisc of the original: the blades texture and its normal map
-// on a quad. The factory wears it.
+// on a quad. The factory wears it, a face_front and a face_back back to back.
+//
+// The blades are a round fan on a transparent background. The original has no alpha test, so its
+// transparent corners draw (and cast shadows) as a solid square; here the quad is alpha tested
+// (AlphaCutoff, as the flora), so the fan draws round in the opaque pass and casts a round shadow.
 
 using box.geometry
 using box.material
@@ -18,4 +22,5 @@ prefab FanDisc {
   Rgb: {255, 255, 255}
   PbrMaterial: {metallic: 0.62, roughness: 0.34}
   PbrTextures: {albedo: fan_tex, normal: fan_norm}
+  AlphaCutoff: {value: 0.5}
 }

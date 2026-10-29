@@ -175,7 +175,10 @@
                     "orthographic",
                     "ground_behind_shape",
                     "ui_view_over",
-                    "no_ray"
+                    "no_ray",
+                    "disabled_shape_not_picked",
+                    "deleted_disabled_shape",
+                    "deleted_disabled_element"
                 ]
             },
             {

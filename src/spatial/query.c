@@ -34,7 +34,7 @@ static bool box_spatial_ray_item(
     float *t)
 {
     const box_spatial_item_t *it = box_spatial_item(w->scene, item);
-    bool result = box_bvh_ray_box(&w->ray, it->min, it->max, w->reach, t);
+    bool result = !it->disabled && box_bvh_ray_box(&w->ray, it->min, it->max, w->reach, t);
     if (result && w->desc->filter) {
         result = w->desc->filter(w->desc->ctx, it->entity, t) && *t <= w->reach;
     }
@@ -98,7 +98,7 @@ static bool box_spatial_visit_box(
 {
     box_spatial_walk_t *w = ctx;
     const box_spatial_item_t *it = box_spatial_item(w->scene, item);
-    if (box_bvh_box_box(it->min, it->max, w->min, w->max)) {
+    if (!it->disabled && box_bvh_box_box(it->min, it->max, w->min, w->max)) {
         *ecs_vec_append_t(NULL, w->out, ecs_entity_t) = it->entity;
         w->count ++;
     }
@@ -118,7 +118,7 @@ static bool box_spatial_visit_sphere(
 {
     box_spatial_walk_t *w = ctx;
     const box_spatial_item_t *it = box_spatial_item(w->scene, item);
-    if (box_bvh_sphere_box(it->min, it->max, w->center, w->radius)) {
+    if (!it->disabled && box_bvh_sphere_box(it->min, it->max, w->center, w->radius)) {
         *ecs_vec_append_t(NULL, w->out, ecs_entity_t) = it->entity;
         w->count ++;
     }
@@ -285,7 +285,7 @@ bool box_spatial_static_bounds(
     const box_spatial_item_t *items = s ? ecs_vec_first(&s->items) : NULL;
     for (i = 0; i < count; i ++) {
         const box_spatial_item_t *it = &items[i];
-        if (!it->entity || it->tree != BOX_SPATIAL_STATIC) {
+        if (!it->entity || it->disabled || it->tree != BOX_SPATIAL_STATIC) {
             continue;
         }
 

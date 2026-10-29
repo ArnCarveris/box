@@ -4,6 +4,8 @@
  *
  * Static shapes are placed in a bounding volume hierarchy once and again on change, shapes
  * with DynamicTransform every frame; ray casts and overlap queries are scoped to one scene.
+ * Prefabs are not indexed. Disabled entities stay indexed but ray casts and overlap queries
+ * skip them until they are enabled again.
  */
 
 #ifndef BOX_SPATIAL_H
