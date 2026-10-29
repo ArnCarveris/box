@@ -1,17 +1,10 @@
 // Ore Else: you crash-landed on a hostile planet. The game is played top down on a 48x48 tile
 // map with a camera that follows the astronaut. This scene holds the window, the camera, the
 // look of the original's engine.flecs (the sun, the atmosphere, the effects of the view and the
-<<<<<<< HEAD
-// render quality tier), the tile markers, the preview of placement and the HUD; the included
-// scripts hold the constants, the palette and the icons of the UI, the items, the buildings and
-// their connector rules, the models, the input, the map, the run and the UI kit, screen and
-// HUD templates. The game boots into the title screen.
-=======
 // render quality tier), the tile markers, the preview of placement, the health bars and the HUD;
 // the included scripts hold the constants, the palette and the icons of the UI, the items, the
 // buildings and their connector rules, the models, the input, the map, the run and the UI kit,
-// health bar, inventory screen and HUD templates. The game boots into the title screen.
->>>>>>> c114738101f209461eb03527e05b575c78142b1d
+// health bar, inventory screen, screen and HUD templates. The game boots into the title screen.
 
 include config
 include ui/palette
@@ -64,11 +57,8 @@ include deposits
 include run
 include launch
 include ui/panel
-<<<<<<< HEAD
-include ui/screens
-=======
 include ui/inventory
->>>>>>> c114738101f209461eb03527e05b575c78142b1d
+include ui/screens
 include ui/hud
 include ui/health_bar
 
