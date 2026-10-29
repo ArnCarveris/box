@@ -1,7 +1,7 @@
 // The editor and the console open together over the default scene. The editor panel is docked
 // left and widened to three quarters of the surface, so the console, which covers the left half,
 // draws over most of it: the editor view renders after the 3D view and before the console view.
-// The scrollback holds the edit command, which the console colors as a known command.
+// The scrollback holds help edit, which the console colors as a known command.
 using box.transform
 using box.geometry
 using box.material

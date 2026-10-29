@@ -385,7 +385,8 @@
                     "width_and_side",
                     "rebuilt_after_delete",
                     "close_clears_focus",
-                    "view_order_with_console"
+                    "view_order_with_console",
+                    "script_reload"
                 ]
             }
         ]

@@ -163,9 +163,7 @@ static void editor_check_stack(
         ecs_get(world, console, View)->order, console) < 0);
 
     unsigned char *px = editor_render(world, file);
-    /* The console covers the editor on the left */
     test_assert(editor_pixel(px, 80, 60, 200, 0, 0));
-    /* The editor covers the game on the right */
     test_assert(editor_pixel(px, 240, 120, editor_background[0], editor_background[1],
         editor_background[2]));
     stbi_image_free(px);
@@ -178,12 +176,9 @@ void Editor_renders_over_game(void) {
     editor_open(world, 0.25f);
 
     unsigned char *px = editor_render(world, "editor_game.png");
-    /* The game on the left three quarters */
     test_assert(editor_pixel(px, 100, 120, 0, 0, 255));
-    /* The panel on the right quarter, its body in the background of the theme */
     test_assert(editor_pixel(px, 300, 120, editor_background[0], editor_background[1],
         editor_background[2]));
-    /* The title bar in the surface color of the theme, darker than the game */
     test_assert(!editor_pixel(px, 300, 4, 0, 0, 255));
     stbi_image_free(px);
 
@@ -267,8 +262,8 @@ void Editor_pick_panel_and_console(void) {
 
     ecs_progress(world, 0);
     const PickStatus *status = ecs_singleton_get(world, PickStatus);
-    test_uint(status->hit_view, editor);
     test_uint(status->view, editor);
+    test_uint(status->target, ecs_lookup(world, BOX_EDITOR_PANEL ".body"));
     test_uint(status->handler, panel);
 
     ecs_os_free(box_terminal_run(world, s, "mouse.move [100, 200]", NULL));
@@ -279,6 +274,8 @@ void Editor_pick_panel_and_console(void) {
     ecs_progress(world, 0);
     status = ecs_singleton_get(world, PickStatus);
     test_uint(status->hit_view, console);
+    test_assert(status->view != editor);
+    test_assert(status->handler != panel);
 
     ecs_fini(world);
 }
@@ -303,7 +300,6 @@ void Editor_panel_blocks_game(void) {
     test_uint(status->view, editor);
     test_uint(status->handler, panel);
 
-    /* Away from the panel the game keeps the mouse */
     ecs_os_free(box_terminal_run(world, s, "mouse.move [100, 200]", NULL));
     while (box_input_pending(world)) {
         ecs_progress(world, 0);

@@ -2,28 +2,13 @@
  * @file box/editor.h
  * @brief The in process editor: a panel docked to a side of the surface whose UI is flecs script.
  *
- * The editor is opened, closed and resized by changing the Editor singleton, from C, a script,
- * the REST API or the edit command of the terminal (edit, edit on, edit off). Nothing else
- * opens it.
+ * The Editor singleton opens, closes and resizes it, from C, a script, the REST API or the edit
+ * command (edit, edit on, edit off). Its content is a scene under BOX_EDITOR_UI drawn by
+ * BOX_EDITOR_VIEW at BOX_VIEW_ORDER_EDITOR: over the game views, under the console.
  *
- * While open, its content is UI in its own scene under BOX_EDITOR_UI, drawn by its own view
- * BOX_EDITOR_VIEW without clear, lighting, culling or effects at BOX_VIEW_ORDER_EDITOR: over the
- * views of the game and under the console when the console is open.
- *
- * C creates the scene root, its camera, the screen that fills the surface and the panel, which
- * it keeps docked to Editor.side at Editor.width of the surface. What the panel shows is the
- * template box.editor.EditorPanel of etc/editor/editor.flecs (script module box.editor, built
- * from the box.widgets library and theme), loaded when the editor first opens and loaded again
- * when the file changes on disk, as the other files box watches (FileWatch).
- *
- * Closing the editor deletes its view and keeps the content, so it opens again without
- * loading the script or instantiating the template again. Content that was deleted is created
- * again when the editor opens or the next frame it is open.
- *
- * The panel is an InputBlocker: the pointer events over it (hover, presses, clicks, the wheel)
- * go to the editor and not to the game views under it, the game keeps the mouse elsewhere. The
- * editor takes the keyboard only while one of its widgets has the focus; closing the editor
- * clears a focus inside it. While the console is open it keeps its own input rules.
+ * C creates the scene, camera, view and the panel docked to the surface; the panel shows the
+ * template BOX_EDITOR_TEMPLATE of BOX_EDITOR_SCRIPT_PATH, which reloads when the file changes.
+ * Closing deletes the view and keeps the content, so the editor opens again quickly.
  */
 
 #ifndef BOX_EDITOR_H
@@ -73,9 +58,11 @@ ECS_ENUM(EditorSide, {
 
 /** The editor singleton: whether it is open and where its panel sits.
  *
- * A change applies in the next frame. The panel takes the full height of the surface and width
- * times its width, follows the surface when it is resized; a width of zero or less is a panel
- * of zero width, one or more fills the surface.
+ * A change applies in the next frame. The panel is the full surface height and width times the
+ * surface width, clamped to [0, 1], and follows the surface when it is resized.
+ *
+ * The panel is an InputBlocker: the pointer over it goes to the editor, not the game. It takes
+ * the keyboard only while one of its widgets has the focus; closing clears a focus inside it.
  */
 ECS_STRUCT(Editor, {
     bool open;          /**< Shown, the edit command flips it */
