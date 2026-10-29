@@ -51,6 +51,11 @@ static void bench_atmosphere(
     ecs_entity_t sun = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, sun, DirectionalLight, {.intensity = GLM_PIf});
     ecs_set(world, sun, Rotation, {0.5f, 0, 0});
+    if (atmosphere) {
+        ecs_get_mut(world, scene, Atmosphere)->sun = sun;
+        ecs_modified(world, scene, Atmosphere);
+    }
+
     int32_t i;
     for (i = 0; i < views; i ++) {
         ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);

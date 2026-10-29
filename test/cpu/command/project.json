@@ -345,6 +345,21 @@
                 ]
             },
             {
+                "id": "Edit",
+                "testcases": [
+                    "toggle",
+                    "on_off",
+                    "keeps_other_members",
+                    "invalid_state",
+                    "default_editor",
+                    "set_from_script",
+                    "help_lists_edit",
+                    "http_exec",
+                    "from_console",
+                    "logged"
+                ]
+            },
+            {
                 "id": "Clipboard",
                 "testcases": [
                     "set_get",

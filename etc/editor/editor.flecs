@@ -1,0 +1,55 @@
+// The editor of box, the script module box.editor. box.editor loads it when the editor first
+// opens and loads it again when the file changes on disk.
+//
+// C creates the scene of the editor (editor.ui), its camera and view, and the panel
+// (editor.ui.screen.panel), which it docks to Editor.side at Editor.width of the surface and
+// makes an instance of EditorPanel. Everything the panel shows is defined here, from the
+// widgets and theme of box.widgets.
+//
+// The panel is a title bar over a body that the editor widgets fill; the body clips what does
+// not fit. The panel is an InputBlocker, so the pointer over it never reaches the game.
+
+module box.editor
+
+using flecs.script
+using box.ui
+using box.layout
+using box.geometry
+using box.material
+using box.text
+using box.widgets
+
+// The editor panel: a title bar and an empty body, in the colors of the theme
+template EditorPanel {
+  prop title: string = "Entities"
+
+  const t = box.ui.theme[UiTheme]
+  const bar_h = t.heading_font_size * 1.25 + t.padding * 2
+
+  Layout: {direction: Column}
+  Rect: {1, 1}
+  Rgb: t.background
+  Border: {width: 1, color: {t.border.r, t.border.g, t.border.b, 255}}
+
+  title_bar {
+    Layout: {direction: Row, padding: {t.padding, t.padding, t.padding * 1.5, t.padding}, v: Middle}
+    LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: bar_h}}
+    Rect: {1, 1}
+    Rgb: t.surface
+
+    label {
+      Label: {text: title, variant: "heading"}
+    }
+  }
+
+  separator {
+    Separator: {}
+  }
+
+  // Filled by the editor widgets
+  body {
+    Layout: {direction: Column, padding: {t.padding, t.padding, t.padding, t.padding}, spacing: t.spacing}
+    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+    ClipChildren
+  }
+}

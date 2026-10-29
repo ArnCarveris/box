@@ -283,6 +283,18 @@
                     "render_to_texture",
                     "tab_views_of_focused_surface"
                 ]
+            },
+            {
+                "id": "Editor",
+                "testcases": [
+                    "renders_over_game",
+                    "closed_renders_game",
+                    "under_console_editor_first",
+                    "under_console_console_first",
+                    "reopened_under_console",
+                    "pick_panel_and_console",
+                    "panel_blocks_game"
+                ]
             }
         ]
     }

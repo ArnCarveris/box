@@ -38,8 +38,9 @@ ECS_STRUCT(AtmosphereMie, {
                              *   {255, 255, 255} */
 });
 
-/** Atmosphere of a scene, placed on a Scene root or as a singleton for the default scene.
- * Adding it adds AtmosphereStatus, removing it removes it.
+/** Atmosphere of a scene, placed on an entity of the scene: the Scene root, an entity under it,
+ * or an entity outside any Scene for the default scene. Adding it adds AtmosphereStatus,
+ * removing it removes it.
  *
  * The entity is the environment source of the sky of its scene (LightSettings.environment):
  * Atmosphere adds Environment {128, Box} unless the entity has one. The sky has no sun or moon
@@ -49,9 +50,7 @@ ECS_STRUCT(AtmosphereMie, {
  * not positive or another negative distance sets AtmosphereStatus.error and renders nothing.
  */
 ECS_STRUCT(Atmosphere, {
-    ecs_entity_t sun;       /**< DirectionalLight that is the sun, default 0 for the light the
-                             *   light extract picks: the first DirectionalLight of the scene or
-                             *   the default sun */
+    ecs_entity_t sun;       /**< DirectionalLight that is the sun, default 0 for no sun */
     ecs_entity_t moon;      /**< DirectionalLight that is the moon, default 0 for no moon; its
                              *   light is scaled by AtmosphereStatus.moon_illumination */
     float planet_radius;    /**< Radius of the planet in km, default 6360 */

@@ -83,6 +83,11 @@ static ecs_entity_t scene_new(
     ecs_set(world, *sun, DirectionalLight, {.intensity = GLM_PIf});
     ecs_set(world, *sun, Rgb, {255, 255, 255});
     sun_turn(world, *sun, ELEVATION);
+    if (atmosphere) {
+        ecs_get_mut(world, scene, Atmosphere)->sun = *sun;
+        ecs_modified(world, scene, Atmosphere);
+    }
+
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, camera, Position, {0, 2, 6});
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});

@@ -1089,10 +1089,12 @@ static int32_t box_pick_views_last(
 
 /** Collect the views of a surface, the last rendered first.
  *
- * With more than BOX_PICK_VIEW_MAX views it keeps the first ones in pick order, so the views
- * left out are always the lowest in pick order whatever the order of the tables. The view roots
- * of the surfaces have no cap: a view under the root of any surface is claimed, however many
- * surfaces there are.
+ * With more than BOX_PICK_VIEW_MAX views it keeps the first ones in pick order: once the array
+ * is full, a view that comes before the last one in pick order replaces it, so the views left
+ * out are always the lowest in pick order whatever the order of the tables.
+ *
+ * The view roots of the surfaces have no cap: a view under the root of any surface is claimed,
+ * however many surfaces there are.
  *
  * @param world The world
  * @param st The module state
@@ -1146,7 +1148,6 @@ static int32_t box_pick_views(
                     last = box_pick_views_last(views, count);
                 }
             } else if (box_pick_view_compare(&candidate, &views[last]) < 0) {
-                /* Full: the candidate comes before the last view in pick order, which drops */
                 views[last] = candidate;
                 last = box_pick_views_last(views, count);
             }

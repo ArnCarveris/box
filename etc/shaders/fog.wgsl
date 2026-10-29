@@ -3,7 +3,7 @@
 // pixel without geometry integrates to infinity. The fog color is lit by the sun of the scene
 // with a Henyey-Greenstein phase that peaks toward the sun, and by its ambient light.
 //
-// In a view that renders the Atmosphere of its scene a fog with atmosphere takes its in scatter
+// In a view that renders the Atmosphere of its scene a fog that refers to it takes its in scatter
 // color from the sky instead: the ambient and the glow toward the main light, which the fog
 // pass of atmosphere.wgsl wrote once for the view into the 2x1 image at binding 4, the glow
 // with the phase of the reference, Henyey-Greenstein with g the Mie anisotropy clamped to 0.92

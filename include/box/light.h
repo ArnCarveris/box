@@ -3,7 +3,8 @@
  * @brief Light components; color comes from the entity's Rgb and direction from its transform.
  *
  * A light lights only its scene (nearest Scene ancestor, else the default scene); a scene
- * without light entities gets a default sun of intensity pi, View.lighting.enabled false draws
+ * without light entities gets a default sun of intensity pi unless it has a valid Atmosphere,
+ * View.lighting.enabled false draws
  * base color plus emission unlit. Intensity is irradiance, see DirectionalLight.
  *
  * The ambient of a scene sums its AmbientLight components, set on the Scene root (a singleton

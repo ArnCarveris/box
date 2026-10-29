@@ -101,6 +101,25 @@ order applies from the next frame. box's own overlays use orders above those of 
 `BOX_VIEW_ORDER_EDITOR` (1000000) for the editor and `BOX_VIEW_ORDER_CONSOLE` (2000000)
 for the in game console, which stays on top of every other view.
 
+The editor (box.editor, `include/box/editor.h`) is a panel docked to a side of the surface whose
+UI is flecs script: `etc/editor/editor.flecs` (script module `box.editor`, built from the
+`box.widgets` library and theme), loaded when the editor first opens and loaded again when the
+file changes. The `edit` command toggles it, `edit on` and `edit off` open and close it, from the
+in game console, a terminal session over HTTP or `tools/box_client.py`:
+
+```sh
+curl "localhost:<port>/terminal/exec?session=<s>&cmd=edit%20on"   # prints editor open
+```
+
+The `Editor` singleton drives it, so a script or the REST API opens, closes and resizes it too:
+`$ { Editor: {open: true, width: 0.25, side: Right} }`. `width` is the part of the surface width
+the panel covers (default 0.25), `side` the side it docks to (default `Right`, away from the
+console). While open its content lives in the scene `editor.ui`, drawn by the view `editor.view`
+at `BOX_VIEW_ORDER_EDITOR` without clear, lighting, culling or effects: above the game, below the
+console. Closing deletes the view and keeps the content, so it opens again at once. The panel
+takes the pointer over it (hover, clicks, the wheel) and the game keeps it elsewhere; the editor
+takes the keyboard only while one of its widgets has the focus.
+
 ## Browser build
 
 ```sh
