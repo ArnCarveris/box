@@ -10,7 +10,7 @@
  *
  * The systems run while playing in this order: OreWaves, OreCritterMove, OrePlayerHealth,
  * OreCritterDeath, then OreCrowd, which pushes overlapping critters apart and rebuilds the
- * spatial index (OreCritterIndex) the systems after it search.
+ * spatial index (OreCritterIndex) the systems after it search (the weapons, weapons.c).
  */
 
 #include "game.h"
@@ -1209,6 +1209,41 @@ ecs_entity_t ore_critter_nearest(
     }
 
     return result;
+}
+
+void ore_critter_each(
+    const OreCritterIndex *index,
+    float x,
+    float z,
+    float range,
+    ore_critter_visit_t visit,
+    void *ctx)
+{
+    float r2 = range * range, dx, dz, d2;
+    int32_t reach, cx, cz, nx, nz, c, b, e, j;
+    bool on;
+    if (index->count > 0 && index->cell > 0 && index->start && range >= 0) {
+        reach = (int32_t)ceilf(range / index->cell);
+        cx = (int32_t)floorf((x - index->x0) / index->cell);
+        cz = (int32_t)floorf((z - index->z0) / index->cell);
+        for (nz = cz - reach; nz <= cz + reach; nz ++) {
+            for (nx = cx - reach; nx <= cx + reach; nx ++) {
+                on = nz >= 0 && nz < index->dim_z && nx >= 0 && nx < index->dim_x;
+                c = on ? nz * index->dim_x + nx : 0;
+                b = on ? index->start[c] : 0;
+                e = on ? index->start[c + 1] : 0;
+                for (; b < e; b ++) {
+                    j = index->order[b];
+                    dx = index->x[j] - x;
+                    dz = index->z[j] - z;
+                    d2 = dx * dx + dz * dz;
+                    if (d2 <= r2) {
+                        visit(ctx, index->entities[j], d2);
+                    }
+                }
+            }
+        }
+    }
 }
 
 /** Spawn a critter from a script, oreelse.spawn_critter(prefab, x, z).

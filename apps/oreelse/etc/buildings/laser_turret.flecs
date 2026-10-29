@@ -33,6 +33,13 @@ prefab LaserTurret {
   OreHealth: {value: 150, max: 150}
   OrePowerConsumer: {watts: 25}
   OrePowerCategory: {kind: Weapons}
+  // The weapon: a beam from the muzzle 1.7 up and 0.74 ahead that burns its target within 13
+  // for 50 a second at multiplier 1
+  OreTurret: {}
+  OreDamage: {value: 50}
+  OreRange: {value: 13}
+  OreMuzzle: {speed: 0, height: 1.7, forward: 0.74}
+  OreBeam: {prefab: LaserBeam}
 
   hit_fx {
     Position: {0, 0, 0}

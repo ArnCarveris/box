@@ -17,6 +17,9 @@ include materials/drone_bay
 include props/ore
 include props/light
 include props/markers
+include projectiles/tracer
+include projectiles/missile
+include projectiles/laser_beam
 include buildings/pad_beacon
 include buildings/wall
 include buildings/wall_segment
@@ -41,9 +44,6 @@ include critters/mite
 include critters/skitter
 include critters/brute
 include critters/behemoth
-include projectiles/tracer
-include projectiles/missile
-include projectiles/laser_beam
 include input
 include world
 include boundary

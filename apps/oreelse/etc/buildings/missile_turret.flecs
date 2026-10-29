@@ -33,6 +33,15 @@ prefab MissileTurret {
   OreHealth: {value: 180, max: 180}
   OrePowerConsumer: {watts: 20}
   OrePowerCategory: {kind: Weapons}
+  // The weapon: a homing missile every 0.5 s at multiplier 1 at a target within 17, at 18 from
+  // the muzzle 1.8 up and 0.44 ahead, exploding for 150 on every critter within 5
+  OreTurret: {}
+  OreDamage: {value: 150}
+  OreRange: {value: 17}
+  OreAttackInterval: {value: 0.5}
+  OreSplash: {radius: 5}
+  OreMuzzle: {speed: 18, height: 1.8, forward: 0.44}
+  OreAmmo: {projectile: Missile}
 
   base {
     Position: {0, 0.15, 0}

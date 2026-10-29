@@ -3,8 +3,8 @@
  * @brief The oreelse module: registers the components and the systems of every area.
  *
  * The systems of EcsOnUpdate run in the order the areas register them: the flow, the map, the
- * player, mining, power, crafting, the critters, their animation and corpses, the buildings,
- * then placement and its preview. Gameplay systems match (OreGameState, Playing), the only pause.
+ * player, mining, power, crafting, the critters, their animation and corpses, the weapons, the
+ * buildings, then placement and its preview. Gameplay systems match (OreGameState, Playing).
  *
  * The look applies the render quality tier in every state, in EcsPreStore. The particles
  * register the helpers that play the effects of etc/particles and the flash of their lights.
@@ -15,6 +15,7 @@
 
 ECS_TAG_DECLARE(OreRunScript);
 ECS_TAG_DECLARE(OreGhost);
+ECS_TAG_DECLARE(OreHoming);
 
 void OreelseImport(
     ecs_world_t *world)
@@ -95,8 +96,18 @@ void OreelseImport(
     ECS_META_COMPONENT(world, OreCorpse);
     ECS_META_COMPONENT(world, OreHurt);
     ECS_META_COMPONENT(world, OreCritterIndex);
+    ECS_META_COMPONENT(world, OreArmory);
+    ECS_META_COMPONENT(world, OreAttackInterval);
+    ECS_META_COMPONENT(world, OreAttackTimer);
+    ECS_META_COMPONENT(world, OreMuzzle);
+    ECS_META_COMPONENT(world, OreAmmo);
+    ECS_META_COMPONENT(world, OreBeam);
+    ECS_META_COMPONENT(world, OreSplash);
+    ECS_META_COMPONENT(world, OreTurret);
+    ECS_META_COMPONENT(world, OreProjectile);
     ECS_TAG_DEFINE(world, OreRunScript);
     ECS_TAG_DEFINE(world, OreGhost);
+    ECS_TAG_DEFINE(world, OreHoming);
 
     ecs_add_id(world, ecs_id(OreGameState), EcsExclusive);
     ecs_add_id(world, ecs_id(OreGameState), EcsPairIsTag);
@@ -110,6 +121,7 @@ void OreelseImport(
     ore_craft_import(world);
     ore_critters_import(world);
     ore_critter_fx_import(world);
+    ore_weapons_import(world);
     ore_buildings_import(world);
     ore_placement_import(world);
     ore_look_import(world);
