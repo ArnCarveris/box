@@ -108,32 +108,29 @@ ECS_STRUCT(FrameTiming, {
     int64_t total_dropped;  /**< Dropped frames since the world started */
 });
 
-/** Seconds between two checks of a watched file when FileWatch is not set */
+/** Seconds between two passes over the watched files when FileWatch is not set */
 #define BOX_FILE_WATCH_INTERVAL (0.25f)
 
 /** How the engine watches the files it loaded, set to BOX_FILE_WATCH_INTERVAL by box.app.
  *
- * Watched are the files a Shader read or looked for (includes too) and the file of a TexturePath,
- * Font and EnvironmentImage; a new path or removing the component stops watching the old file.
- * A changed, removed or returned file loads again; the old content stays until a load succeeds.
+ * Watched are the files a Shader read or looked for and the file of a TexturePath, Font and
+ * EnvironmentImage. A changed, removed or returned file loads again; the old content stays until
+ * the new load is ready. A new path or removing the component stops watching the old file.
  *
- * Each frame stats the next slice of the distinct files, delta (unscaled) / interval of a pass and
- * at most one, so each file is checked about once per interval and no frame checks all of them.
- * Only the owners of a changed file are walked, and the poll is not an immediate system.
+ * Every interval (unscaled) a watch thread stats each distinct file once; a later poll in
+ * EcsOnStore applies the pass (a headless one waits for it) and visits only the owners of changed
+ * files. At interval 0 and without threads (the browser, files in memory) it runs inline.
  */
 ECS_STRUCT(FileWatch, {
-    float interval;     /**< Seconds of a pass over all files, 0 a pass every frame, < 0 off */
+    float interval;     /**< Seconds between passes, 0 a pass every frame, < 0 off */
 });
 
-/** What the file watch did, written by the engine on frames that check a file or end a pass.
- *
- * A poll is a completed pass: every watched file checked once. With interval 0 every frame
- * completes one, else a pass completes about once per interval, also with no files.
+/** What the file watch did, written by the engine when a pass was applied or the number of
+ * watched files changed.
  */
 ECS_STRUCT(FileWatchStatus, {
     int32_t files;      /**< Distinct files watched */
-    int64_t polls;      /**< Passes over all files completed since the world started */
-    int64_t checks;     /**< Files stat'ed since the world started */
+    int64_t polls;      /**< Passes over all files applied since the world started */
     int64_t changes;    /**< Changed files found since the world started */
     char *last;         /**< The file that changed last, NULL before the first change */
 });

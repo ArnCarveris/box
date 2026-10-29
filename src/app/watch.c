@@ -1,12 +1,19 @@
 /**
  * @file app/watch.c
- * @brief The file watch of box.app: stamps of the files modules loaded, checked a slice per frame
- * so each is checked about once per FileWatch.interval, and the owners told when one changed.
+ * @brief The file watch of box.app: stamps of the files modules loaded, checked by a pass on a
+ * watch thread about once per FileWatch.interval, and the owners told when one changed.
  */
 
 #include "watch.h"
 #include <string.h>
 #include <sys/stat.h>
+
+/** What the pass of a registry is doing */
+typedef enum box_watch_pass_state_t {
+    BoxWatchIdle,               /**< No pass in flight */
+    BoxWatchRunning,            /**< The watch thread stats the files of the pass */
+    BoxWatchDone                /**< The stamps of the pass wait for the poll */
+} box_watch_pass_state_t;
 
 /** An owner of a kind, that watches a file or is told about a change */
 typedef struct box_watch_ref_t {
@@ -16,10 +23,11 @@ typedef struct box_watch_ref_t {
 
 /** A distinct file the registry watches */
 typedef struct box_watch_file_t {
-    char *path;                 /**< The file as it was read */
+    char *path;                 /**< The file as it was read, read by the watch thread */
     box_file_stamp_t stamp;     /**< Stamp of the last check, the first registration before */
     ecs_vec_t watchers;         /**< box_watch_ref_t, the owners with an entry for the file */
-    bool queued;                /**< In the queue of files the next poll checks first */
+    bool queued;                /**< An owner saw another stamp, the next pass tells it */
+    bool in_pass;               /**< In the pass in flight, which frees it once nobody watches */
 } box_watch_file_t;
 
 /** A file an owner watches */
@@ -41,14 +49,26 @@ typedef struct box_watch_kind_t {
     ecs_map_t owners;           /**< Owner entity to box_watch_owner_t* */
 } box_watch_kind_t;
 
+/** A pass over the watched files and the thread that runs it */
+typedef struct box_watch_pass_t {
+    ecs_os_mutex_t lock;        /**< Guards state and quit */
+    ecs_os_cond_t wake;         /**< Wakes the thread for a pass or to quit */
+    ecs_os_cond_t done;         /**< Wakes the poll that waits for a pass */
+    ecs_os_thread_t thread;     /**< The watch thread, 0 before the first pass on it */
+    box_watch_pass_state_t state; /**< What the pass is doing */
+    bool quit;                  /**< The thread stops */
+    ecs_vec_t files;            /**< box_watch_file_t*, the files of the pass, in order */
+    ecs_vec_t stamps;           /**< box_file_stamp_t, the stamp of each file of the pass */
+} box_watch_pass_t;
+
 /** The watched files of a world */
 typedef struct box_file_watch_t {
     ecs_vec_t kinds;            /**< box_watch_kind_t */
     ecs_vec_t files;            /**< box_watch_file_t*, distinct files with watchers, in order */
-    ecs_vec_t queued;           /**< box_watch_file_t*, files an owner saw with another stamp */
     ecs_vec_t notify;           /**< box_watch_ref_t, scratch of a poll */
-    int32_t cursor;             /**< Index of the next file the current pass checks */
-    double pass;                /**< Fraction of the current pass the frames so far are due */
+    int32_t queued;             /**< Files an owner registered with another stamp */
+    double since;               /**< Unscaled seconds since the last pass started, -1 before */
+    box_watch_pass_t pass;      /**< The pass in flight */
 } box_file_watch_t;
 
 /** Singleton that holds the file watch of a world */
@@ -88,29 +108,6 @@ bool box_file_stamp_equals(
     return a->sec == b->sec && a->nsec == b->nsec && a->size == b->size;
 }
 
-/** Remove a file from a vector of files, keeping the order of the others.
- *
- * @param files box_watch_file_t*, the vector
- * @param file The file
- * @return Index the file had, -1 when the vector does not hold it
- */
-static int32_t box_watch_files_remove(
-    ecs_vec_t *files,
-    const box_watch_file_t *file)
-{
-    int32_t i, result = -1;
-    box_watch_file_t **f = ecs_vec_first(files);
-    for (i = 0; i < ecs_vec_count(files); i ++) {
-        if (f[i] == file) {
-            ecs_vec_remove_ordered_t(files, box_watch_file_t*, i);
-            result = i;
-            break;
-        }
-    }
-
-    return result;
-}
-
 /** Free a file and its list of watchers.
  *
  * @param file The file
@@ -125,8 +122,8 @@ static void box_watch_file_free(
 
 /** Drop an owner from the watchers of a file, and the file once nobody watches it anymore.
  *
- * A file that leaves the list before the cursor moves the cursor back, so the pass in progress
- * still checks every file after it.
+ * A file in the pass in flight stays allocated, the thread may read its path; applying the
+ * pass frees it.
  *
  * @param w The registry
  * @param file The file
@@ -152,16 +149,22 @@ static void box_watch_file_release(
         goto done;
     }
 
-    int32_t index = box_watch_files_remove(&w->files, file);
-    if (index >= 0 && index < w->cursor) {
-        w->cursor --;
+    box_watch_file_t **files = ecs_vec_first(&w->files);
+    for (i = 0; i < ecs_vec_count(&w->files); i ++) {
+        if (files[i] == file) {
+            ecs_vec_remove_t(&w->files, box_watch_file_t*, i);
+            break;
+        }
     }
 
     if (file->queued) {
-        box_watch_files_remove(&w->queued, file);
+        file->queued = false;
+        w->queued --;
     }
 
-    box_watch_file_free(file);
+    if (!file->in_pass) {
+        box_watch_file_free(file);
+    }
 done:
     return;
 }
@@ -189,14 +192,65 @@ static void box_watch_owner_free(
     ecs_os_free(o);
 }
 
-/** Free a registry.
+/** Stat the files of a pass.
+ *
+ * @param pass The pass
+ */
+static void box_watch_pass_run(
+    box_watch_pass_t *pass)
+{
+    int32_t i;
+    box_watch_file_t **files = ecs_vec_first(&pass->files);
+    box_file_stamp_t *stamps = ecs_vec_first(&pass->stamps);
+    for (i = 0; i < ecs_vec_count(&pass->files); i ++) {
+        box_file_stamp(files[i]->path, &stamps[i]);
+    }
+}
+
+/** Run the passes the poll requests until the registry stops.
+ *
+ * @param arg The pass
+ * @return NULL
+ */
+static void* box_watch_thread(
+    void *arg)
+{
+    box_watch_pass_t *pass = arg;
+    ecs_os_mutex_lock(pass->lock);
+    while (!pass->quit) {
+        if (pass->state == BoxWatchRunning) {
+            ecs_os_mutex_unlock(pass->lock);
+            box_watch_pass_run(pass);
+            ecs_os_mutex_lock(pass->lock);
+            pass->state = BoxWatchDone;
+            ecs_os_cond_signal(pass->done);
+        } else {
+            ecs_os_cond_wait(pass->wake, pass->lock);
+        }
+    }
+
+    ecs_os_mutex_unlock(pass->lock);
+
+    return NULL;
+}
+
+/** Free a registry, stopping its watch thread.
  *
  * @param w The registry
  */
 static void box_file_watch_free(
     box_file_watch_t *w)
 {
+    box_watch_pass_t *pass = &w->pass;
     int32_t i;
+    if (pass->thread) {
+        ecs_os_mutex_lock(pass->lock);
+        pass->quit = true;
+        ecs_os_cond_signal(pass->wake);
+        ecs_os_mutex_unlock(pass->lock);
+        ecs_os_thread_join(pass->thread);
+    }
+
     box_watch_kind_t *kinds = ecs_vec_first(&w->kinds);
     for (i = 0; i < ecs_vec_count(&w->kinds); i ++) {
         ecs_map_iter_t it = ecs_map_iter(&kinds[i].owners);
@@ -210,15 +264,26 @@ static void box_file_watch_free(
         ecs_os_free(kinds[i].name);
     }
 
-    box_watch_file_t **files = ecs_vec_first(&w->files);
+    box_watch_file_t **files = ecs_vec_first(&pass->files);
+    for (i = 0; i < ecs_vec_count(&pass->files); i ++) {
+        if (!ecs_vec_count(&files[i]->watchers)) {
+            box_watch_file_free(files[i]);
+        }
+    }
+
+    files = ecs_vec_first(&w->files);
     for (i = 0; i < ecs_vec_count(&w->files); i ++) {
         box_watch_file_free(files[i]);
     }
 
     ecs_vec_fini_t(NULL, &w->kinds, box_watch_kind_t);
     ecs_vec_fini_t(NULL, &w->files, box_watch_file_t*);
-    ecs_vec_fini_t(NULL, &w->queued, box_watch_file_t*);
     ecs_vec_fini_t(NULL, &w->notify, box_watch_ref_t);
+    ecs_vec_fini_t(NULL, &pass->files, box_watch_file_t*);
+    ecs_vec_fini_t(NULL, &pass->stamps, box_file_stamp_t);
+    ecs_os_cond_free(pass->done);
+    ecs_os_cond_free(pass->wake);
+    ecs_os_mutex_free(pass->lock);
     ecs_os_free(w);
 }
 
@@ -312,22 +377,6 @@ done:
     return result;
 }
 
-/** Queue a file for the next poll to check before its slice, because an owner registered it
- * with a stamp the file does not have; the poll then tells the owners whose stamp differs.
- *
- * @param w The registry
- * @param file The file
- */
-static void box_watch_file_queue(
-    box_file_watch_t *w,
-    box_watch_file_t *file)
-{
-    if (!file->queued) {
-        file->queued = true;
-        *ecs_vec_append_t(NULL, &w->queued, box_watch_file_t*) = file;
-    }
-}
-
 void box_file_watch_add(
     ecs_world_t *world,
     int32_t kind,
@@ -382,8 +431,9 @@ void box_file_watch_add(
     entry->file = file;
     entry->stamp = *stamp;
 queue:
-    if (!box_file_stamp_equals(stamp, &file->stamp)) {
-        box_watch_file_queue(w, file);
+    if (!file->queued && !box_file_stamp_equals(stamp, &file->stamp)) {
+        file->queued = true;
+        w->queued ++;
     }
 done:
     return;
@@ -431,44 +481,9 @@ done:
     return;
 }
 
-/** What the checks of a frame found, added to FileWatchStatus */
-typedef struct box_watch_found_t {
-    int32_t checks;             /**< Files stat'ed */
-    int32_t changes;            /**< Files whose stamp changed */
-    const char *last;           /**< The file that changed last, NULL for none */
-} box_watch_found_t;
-
-/** Stat a file and record whether it changed since its last check.
- *
- * @param file The file
- * @param found Receives the check and the change
- * @return Whether the stamp of the file changed
- */
-static bool box_watch_check(
-    box_watch_file_t *file,
-    box_watch_found_t *found)
-{
-    box_file_stamp_t stamp;
-    bool result = false;
-    box_file_stamp(file->path, &stamp);
-    found->checks ++;
-    if (box_file_stamp_equals(&stamp, &file->stamp)) {
-        goto done;
-    }
-
-    file->stamp = stamp;
-    found->changes ++;
-    found->last = file->path;
-    ecs_trace("file watch: '%s' changed%s", file->path,
-        stamp.sec < 0 ? ", it is missing" : "");
-    result = true;
-done:
-    return result;
-}
-
 /** Queue the owners of a file whose entry differs from the stamp of its last check.
  *
- * Only the watchers of the file are visited, so a poll walks no owner of an unchanged file.
+ * Only the watchers of the file are visited, so a pass walks no owner of an unchanged file.
  *
  * @param w The registry
  * @param file The file
@@ -497,58 +512,126 @@ static void box_watch_collect(
     }
 }
 
-/** Check the queued files and the slice of the current pass that the frame is due.
- *
- * A pass checks every file once, in order. Each frame advances it by the unscaled frame delta
- * over the interval, at most one whole pass, and checks the files up to that fraction.
+/** What a pass found, added to FileWatchStatus */
+typedef struct box_watch_found_t {
+    int32_t passes;             /**< Passes applied */
+    int32_t changes;            /**< Files whose stamp changed */
+    const char *last;           /**< The file that changed last, NULL for none */
+} box_watch_found_t;
+
+/** Start a pass over every watched file, on the watch thread or inline.
  *
  * @param w The registry
- * @param interval FileWatch.interval, 0 or more
- * @param delta Unscaled seconds of the frame
- * @param found Receives the checks and the changes
- * @return Whether the frame completed a pass
+ * @param threaded Whether the watch thread runs the pass, else it runs before this returns and
+ * the caller applies it
  */
-static bool box_watch_slice(
+static void box_watch_pass_start(
     box_file_watch_t *w,
-    float interval,
-    double delta,
-    box_watch_found_t *found)
+    bool threaded)
 {
-    int32_t i;
-    double due = interval > 0 ? delta / (double)interval : 1.0;
-    box_watch_file_t **queued = ecs_vec_first(&w->queued);
-    for (i = 0; i < ecs_vec_count(&w->queued); i ++) {
-        queued[i]->queued = false;
-        box_watch_check(queued[i], found);
-        box_watch_collect(w, queued[i]);
-    }
-
-    ecs_vec_clear(&w->queued);
-    w->pass += due > 1.0 ? 1.0 : (due > 0 ? due : 0);
-    bool result = w->pass >= 1.0;
-    int32_t count = ecs_vec_count(&w->files);
-    int32_t end = result ? count : (int32_t)(w->pass * (double)count);
+    box_watch_pass_t *pass = &w->pass;
+    int32_t i, count = ecs_vec_count(&w->files);
     box_watch_file_t **files = ecs_vec_first(&w->files);
-    for (i = w->cursor; i < end && i < count; i ++) {
-        if (box_watch_check(files[i], found)) {
-            box_watch_collect(w, files[i]);
-        }
+    ecs_vec_set_count_t(NULL, &pass->files, box_watch_file_t*, count);
+    ecs_vec_set_count_t(NULL, &pass->stamps, box_file_stamp_t, count);
+    box_watch_file_t **in_pass = ecs_vec_first(&pass->files);
+    for (i = 0; i < count; i ++) {
+        in_pass[i] = files[i];
+        files[i]->in_pass = true;
     }
 
-    if (end > w->cursor) {
-        w->cursor = end;
+    w->since = 0;
+    if (!threaded) {
+        box_watch_pass_run(pass);
+        goto done;
     }
 
-    if (result) {
-        w->pass -= 1.0;
-        w->cursor = 0;
+    ecs_os_mutex_lock(pass->lock);
+    pass->state = BoxWatchRunning;
+    if (!pass->thread) {
+        pass->thread = ecs_os_thread_new(box_watch_thread, pass);
+    } else {
+        ecs_os_cond_signal(pass->wake);
     }
+
+    ecs_os_mutex_unlock(pass->lock);
+done:
+    return;
+}
+
+/** Get what the pass is doing, waiting for a pass the thread runs when asked to.
+ *
+ * @param pass The pass
+ * @param wait Whether to wait for a pass the thread runs
+ * @return The state of the pass
+ */
+static box_watch_pass_state_t box_watch_pass_get(
+    box_watch_pass_t *pass,
+    bool wait)
+{
+    ecs_os_mutex_lock(pass->lock);
+    while (wait && pass->state == BoxWatchRunning) {
+        ecs_os_cond_wait(pass->done, pass->lock);
+    }
+
+    box_watch_pass_state_t result = pass->state;
+    ecs_os_mutex_unlock(pass->lock);
 
     return result;
 }
 
-/** Check the slice of the watched files a frame is due, tell the owners of the changed ones
- * and update FileWatchStatus when the frame checked a file or completed a pass.
+/** Apply the stamps of a finished pass: record the changed files and queue their owners, and
+ * the owners of queued files whose entry differs. Frees the files nobody watches anymore.
+ *
+ * @param w The registry
+ * @param found Receives the pass and the changes
+ */
+static void box_watch_pass_apply(
+    box_file_watch_t *w,
+    box_watch_found_t *found)
+{
+    box_watch_pass_t *pass = &w->pass;
+    int32_t i;
+    box_watch_file_t **files = ecs_vec_first(&pass->files);
+    box_file_stamp_t *stamps = ecs_vec_first(&pass->stamps);
+    for (i = 0; i < ecs_vec_count(&pass->files); i ++) {
+        box_watch_file_t *file = files[i];
+        bool collect = file->queued;
+        file->in_pass = false;
+        if (!ecs_vec_count(&file->watchers)) {
+            box_watch_file_free(file);
+            continue;
+        }
+
+        if (!box_file_stamp_equals(&stamps[i], &file->stamp)) {
+            file->stamp = stamps[i];
+            found->changes ++;
+            found->last = file->path;
+            ecs_trace("file watch: '%s' changed%s", file->path,
+                stamps[i].sec < 0 ? ", it is missing" : "");
+            collect = true;
+        }
+
+        if (file->queued) {
+            file->queued = false;
+            w->queued --;
+        }
+
+        if (collect) {
+            box_watch_collect(w, file);
+        }
+    }
+
+    ecs_vec_clear(&pass->files);
+    ecs_os_mutex_lock(pass->lock);
+    pass->state = BoxWatchIdle;
+    ecs_os_mutex_unlock(pass->lock);
+    found->passes ++;
+}
+
+/** Apply the pass the watch thread finished, start the next pass when one is due, tell the
+ * owners of the changed files and update FileWatchStatus when a pass ended or the number of
+ * files changed.
  *
  * @param it The iterator of the system
  */
@@ -565,17 +648,39 @@ static void BoxFileWatchPoll(
         goto done;
     }
 
-    double delta = (double)ecs_get_world_info(world)->delta_time_raw;
-    bool pass = box_watch_slice(w, interval, delta, &found);
+#ifdef __EMSCRIPTEN__
+    bool threaded = false;
+#else
+    bool threaded = interval > 0 && ecs_os_has_threading();
+#endif
+    const App *app = ecs_singleton_get(world, App);
+    bool wait = !threaded || (app && app->headless);
+    box_watch_pass_state_t state = box_watch_pass_get(&w->pass, wait);
+    if (state == BoxWatchDone) {
+        box_watch_pass_apply(w, &found);
+        state = BoxWatchIdle;
+    }
+
+    if (w->since >= 0) {
+        w->since += (double)ecs_get_world_info(world)->delta_time_raw;
+    }
+
+    bool due = w->since < 0 || w->since >= (double)interval || w->queued;
+    if (state == BoxWatchIdle && due) {
+        box_watch_pass_start(w, threaded);
+        if (!threaded) {
+            box_watch_pass_apply(w, &found);
+        }
+    }
+
     int32_t files = ecs_vec_count(&w->files);
     const FileWatchStatus *current = ecs_singleton_get(world, FileWatchStatus);
-    FileWatchStatus *status = current && (pass || found.checks || current->files != files)
+    FileWatchStatus *status = current && (found.passes || current->files != files)
         ? ecs_singleton_get_mut(world, FileWatchStatus)
         : NULL;
     if (status) {
         status->files = files;
-        status->polls += pass ? 1 : 0;
-        status->checks += found.checks;
+        status->polls += found.passes;
         status->changes += found.changes;
         if (found.last) {
             ecs_os_free(status->last);
@@ -610,8 +715,13 @@ void box_file_watch_init(
     box_file_watch_t *w = ecs_os_calloc_t(box_file_watch_t);
     ecs_vec_init_t(NULL, &w->kinds, box_watch_kind_t, 0);
     ecs_vec_init_t(NULL, &w->files, box_watch_file_t*, 0);
-    ecs_vec_init_t(NULL, &w->queued, box_watch_file_t*, 0);
     ecs_vec_init_t(NULL, &w->notify, box_watch_ref_t, 0);
+    ecs_vec_init_t(NULL, &w->pass.files, box_watch_file_t*, 0);
+    ecs_vec_init_t(NULL, &w->pass.stamps, box_file_stamp_t, 0);
+    w->pass.lock = ecs_os_mutex_new();
+    w->pass.wake = ecs_os_cond_new();
+    w->pass.done = ecs_os_cond_new();
+    w->since = -1;
     ecs_singleton_ensure(world, FileWatchRegistry)->watch = w;
 
     ecs_singleton_set(world, FileWatch, { .interval = BOX_FILE_WATCH_INTERVAL });

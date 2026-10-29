@@ -247,14 +247,15 @@
                     "new_path_stops_watching",
                     "remove_stops_watching",
                     "change_status",
-                    "slice_bounded",
+                    "pass_every_interval",
                     "change_found_within_interval",
                     "interval_zero_checks_every_file",
-                    "long_frame_checks_one_pass",
-                    "stop_watching_mid_pass",
-                    "stale_registration_checked_next_frame",
+                    "long_frame_one_pass",
+                    "interval_change_ends_pass",
+                    "stop_watching_during_pass",
+                    "stale_registration_starts_pass",
                     "restored_while_queued_reloads_once",
-                    "restored_in_slice_reloads_once"
+                    "restored_between_passes_reloads_once"
                 ]
             },
             {
