@@ -96,7 +96,22 @@ ECS_STRUCT(ViewEffect, {
     ecs_entity_t effect;    /**< Entity with effect settings. */
 });
 
-/** What a frame draws: a camera, the target it draws into and its settings. */
+/** Order of the view of the editor: over the views of a game, under the console.
+ *
+ * Game views use orders below BOX_VIEW_ORDER_EDITOR, normally 0 or small numbers around it.
+ */
+#define BOX_VIEW_ORDER_EDITOR (1000000)
+
+/** Order of the view of the in game console, which renders after every other view */
+#define BOX_VIEW_ORDER_CONSOLE (2000000)
+
+/** What a frame draws: a camera, the target it draws into and its settings.
+ *
+ * Views render in ascending order and are picked and get input in descending order, so a view
+ * of a higher order draws over and is hit first. Ties keep entity id (creation) order.
+ *
+ * A changed order takes effect in the next frame.
+ */
 ECS_STRUCT(View, {
     ecs_entity_t camera;            /**< Camera the view renders, a view without one is skipped */
     ClearSettings clear;            /**< Clear settings */
@@ -104,6 +119,8 @@ ECS_STRUCT(View, {
     ShadowSettings shadows;         /**< Shadow settings */
     CullSettings culling;           /**< Cull settings */
     ecs_vec(ViewEffect) effects;    /**< Post process effects */
+    int32_t order;                  /**< Render order, default 0; box's overlays use
+                                     *   BOX_VIEW_ORDER_EDITOR and BOX_VIEW_ORDER_CONSOLE */
 });
 
 /** Component added to scene root.
@@ -115,6 +132,20 @@ ECS_STRUCT(View, {
 ECS_STRUCT(Scene, {
     int32_t dummy_; /**< Unused, gives the component a size */
 });
+
+/** Compare the render order of two views: by order, then by entity id.
+ *
+ * @param order_a Order of the first view
+ * @param a The first view
+ * @param order_b Order of the second view
+ * @param b The second view
+ * @return Negative when a renders first, positive when b does, 0 for the same view
+ */
+int box_view_compare(
+    int32_t order_a,
+    ecs_entity_t a,
+    int32_t order_b,
+    ecs_entity_t b);
 
 /** Register the box.view module.
  *

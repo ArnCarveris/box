@@ -175,7 +175,7 @@ static void BoxRenderSettingsOnSet(
     box_render_ring_configure(box_render_get_ring(it->world), settings);
 }
 
-/** Order two views by creation, which is the order of their entity ids.
+/** Order two views by View.order, then by creation, which is the order of their entity ids.
  *
  * @param a The first view
  * @param b The second view
@@ -185,10 +185,10 @@ static int box_render_view_compare(
     const void *a,
     const void *b)
 {
-    ecs_entity_t x = ((const box_render_view_t*)a)->view;
-    ecs_entity_t y = ((const box_render_view_t*)b)->view;
+    const box_render_view_t *x = a;
+    const box_render_view_t *y = b;
 
-    return (x > y) - (x < y);
+    return box_view_compare(x->order, x->view, y->order, y->view);
 }
 
 /** Describe a view whose camera has a Camera in the packet.
@@ -215,6 +215,7 @@ static void box_render_extract_view(
     const WorldTransform *transform = ecs_get(world, camera, WorldTransform);
     box_render_view_t *v = box_render_packet_view(p);
     v->view = e;
+    v->order = view->order;
     v->camera = camera;
     v->parent = ecs_get_parent(world, e);
     v->scene = box_render_scene_of(world, camera);
@@ -235,7 +236,7 @@ done:
 }
 
 /** Add a view to the packet for every View whose camera is alive and has a Camera, in
- * creation order.
+ * render order: by View.order, then by creation.
  *
  * @param it The iterator of the system
  */

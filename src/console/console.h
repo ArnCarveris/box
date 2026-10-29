@@ -101,7 +101,6 @@ typedef struct box_console_t {
     float width;                /**< Surface width in points the content was laid out for */
     float height;               /**< Surface height in points the content was laid out for */
     ecs_query_t *surfaces;      /**< Entities with a Surface */
-    ecs_query_t *views;         /**< Entities with a View */
 } box_console_t;
 
 /** Get the root entity of the content, the view and the session, creating it when needed.

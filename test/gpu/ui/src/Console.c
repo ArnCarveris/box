@@ -558,7 +558,7 @@ void Console_scroll(void) {
     ecs_fini(world);
 }
 
-void Console_view_stacked_last(void) {
+void Console_view_on_top(void) {
     // ui/console
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -579,13 +579,22 @@ void Console_view_stacked_last(void) {
     }
 
     ecs_entity_t view = ecs_lookup(world, "console.view");
-    test_assert(view > v1);
+    test_assert(view != 0);
+    test_int(ecs_get(world, view, View)->order, BOX_VIEW_ORDER_CONSOLE);
 
     ecs_entity_t v2 = ecs_new(world);
     ecs_set(world, v2, View, {.camera = camera});
+    ecs_entity_t v3 = ecs_new(world);
+    ecs_set(world, v3, View, {.camera = camera, .order = BOX_VIEW_ORDER_EDITOR});
     ecs_progress(world, 0);
-    view = ecs_lookup(world, "console.view");
-    test_assert(view > v2);
+    test_uint(ecs_lookup(world, "console.view"), view);
+    test_assert(v2 > view);
+    test_assert(v3 > view);
+    test_int(ecs_get(world, view, View)->order, BOX_VIEW_ORDER_CONSOLE);
+    test_assert(box_view_compare(ecs_get(world, v2, View)->order, v2,
+        BOX_VIEW_ORDER_CONSOLE, view) < 0);
+    test_assert(box_view_compare(ecs_get(world, v3, View)->order, v3,
+        BOX_VIEW_ORDER_CONSOLE, view) < 0);
     test_assert(ecs_get(world, view, View)->camera ==
         ecs_lookup(world, "console.ui.camera"));
 

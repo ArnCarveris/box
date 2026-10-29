@@ -1044,7 +1044,14 @@ static ecs_entity_t box_pick_handler(
     return result;
 }
 
-/** Order views by descending id, the reverse of their render order.
+/** A view of a surface with its order, sorted for picking */
+typedef struct box_pick_view_order_t {
+    ecs_entity_t view;      /**< The view entity */
+    int32_t order;          /**< View.order */
+} box_pick_view_order_t;
+
+/** Order views by descending View.order, then by descending id: the reverse of their render
+ * order.
  *
  * @param a The first view
  * @param b The second view
@@ -1054,10 +1061,10 @@ static int box_pick_view_compare(
     const void *a,
     const void *b)
 {
-    ecs_entity_t x = *(const ecs_entity_t*)a;
-    ecs_entity_t y = *(const ecs_entity_t*)b;
+    const box_pick_view_order_t *x = a;
+    const box_pick_view_order_t *y = b;
 
-    return (x < y) - (x > y);
+    return box_view_compare(y->order, y->view, x->order, x->view);
 }
 
 /** Collect the views of a surface, the last rendered first.
@@ -1075,6 +1082,7 @@ static int32_t box_pick_views(
     ecs_entity_t *out)
 {
     ecs_entity_t roots[BOX_PICK_VIEW_MAX];
+    box_pick_view_order_t views[BOX_PICK_VIEW_MAX];
     int32_t i, k, root_count = 0, count = 0;
     ecs_iter_t it = ecs_query_iter(world, st->surfaces);
     while (ecs_query_next(&it)) {
@@ -1088,6 +1096,7 @@ static int32_t box_pick_views(
 
     it = ecs_query_iter(world, st->views);
     while (ecs_query_next(&it)) {
+        const View *view = ecs_field(&it, View, 0);
         for (i = 0; i < it.count && count < BOX_PICK_VIEW_MAX; i ++) {
             ecs_entity_t parent = ecs_get_parent(world, it.entities[i]);
             bool claimed = false;
@@ -1096,12 +1105,17 @@ static int32_t box_pick_views(
             }
 
             if (s->view_root ? parent == s->view_root : !claimed) {
-                out[count ++] = it.entities[i];
+                views[count].view = it.entities[i];
+                views[count].order = view[i].order;
+                count ++;
             }
         }
     }
 
-    qsort(out, (size_t)count, sizeof(ecs_entity_t), box_pick_view_compare);
+    qsort(views, (size_t)count, sizeof(box_pick_view_order_t), box_pick_view_compare);
+    for (i = 0; i < count; i ++) {
+        out[i] = views[i].view;
+    }
 
     return count;
 }
@@ -1415,7 +1429,7 @@ void box_pick_queries_init(
     box_pick_state_t *st)
 {
     st->views = ecs_query(world, {
-        .terms = {{ .id = ecs_id(View), .inout = EcsInOutNone }},
+        .terms = {{ .id = ecs_id(View), .inout = EcsIn }},
         .cache_kind = EcsQueryCacheAuto
     });
 

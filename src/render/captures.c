@@ -119,9 +119,9 @@ static float box_render_capture_linear(
     return c <= 0.04045f ? c / 12.92f : powf((c + 0.055f) / 1.055f, 2.4f);
 }
 
-/** Find the view of the packet that renders a camera, the first in creation order.
+/** Find the view of the packet that renders a camera, the first in render order.
  *
- * @param p The packet, whose views are sorted by creation
+ * @param p The packet, whose views are sorted by View.order, then by creation
  * @param camera The camera
  * @return The view, NULL when no view renders the camera
  */

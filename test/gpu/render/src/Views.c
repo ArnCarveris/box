@@ -1,7 +1,7 @@
 /**
  * @file Views.c
- * @brief Tests for views: render order, the scene of the camera, the camera transform and
- * views without a camera, checked on PNG captures.
+ * @brief Tests for views: render order (View.order, then creation), the scene of the camera,
+ * the camera transform and views without a camera, checked on PNG captures.
  */
 
 #include <box.h>
@@ -67,6 +67,171 @@ void Views_creation_order(void) {
 
     stbi_image_free(px);
     ecs_os_free(path);
+    ecs_fini(world);
+}
+
+/** Count the pixels of a capture of the temporary directory that are not a color.
+ *
+ * @param world The world
+ * @param file Name of the capture
+ * @param r Expected red
+ * @param g Expected green
+ * @param b Expected blue
+ * @return Pixels of another color, -1 when the capture has none
+ */
+static int views_wrong(
+    ecs_world_t *world,
+    const char *file,
+    unsigned char r,
+    unsigned char g,
+    unsigned char b)
+{
+    char *path = flecs_asprintf("%s/%s", ecs_singleton_get(world, AppStatus)->tmp_dir, file);
+    int w = 0, h = 0, n = 0, i, result = -1;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    if (px && w * h) {
+        for (i = 0, result = 0; i < w * h; i ++) {
+            result += px[i * 4] != r || px[i * 4 + 1] != g || px[i * 4 + 2] != b;
+        }
+    }
+
+    stbi_image_free(px);
+    ecs_os_free(path);
+
+    return result;
+}
+
+/** Create a view of a camera that clears to a color.
+ *
+ * @param world The world
+ * @param camera The camera
+ * @param order Order of the view
+ * @param r Red
+ * @param g Green
+ * @param b Blue
+ * @return The view
+ */
+static ecs_entity_t views_clear(
+    ecs_world_t *world,
+    ecs_entity_t camera,
+    int32_t order,
+    unsigned char r,
+    unsigned char g,
+    unsigned char b)
+{
+    ecs_entity_t result = ecs_new(world);
+    ecs_set(world, result, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {r, g, b, 255}},
+        .order = order});
+
+    return result;
+}
+
+void Views_order(void) {
+    // renderer/views
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    views_clear(world, camera, 2, 255, 0, 0);
+    views_clear(world, camera, 0, 0, 255, 0);
+    views_clear(world, camera, 1, 0, 0, 255);
+    ecs_entity_t surface = ecs_new(world);
+    ecs_set(world, surface, Surface, {.width = 8, .height = 8, .write_to_file = "view_order.png",
+        .resolution_scale = 1});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    test_int(views_wrong(world, "view_order.png", 255, 0, 0), 0);
+
+    ecs_fini(world);
+}
+
+void Views_order_ties(void) {
+    // renderer/views
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    views_clear(world, camera, 1, 255, 0, 0);
+    views_clear(world, camera, 1, 0, 255, 0);
+    views_clear(world, camera, 0, 0, 0, 255);
+    ecs_entity_t surface = ecs_new(world);
+    ecs_set(world, surface, Surface, {.width = 8, .height = 8, .write_to_file = "view_ties.png",
+        .resolution_scale = 1});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    test_int(views_wrong(world, "view_ties.png", 0, 255, 0), 0);
+
+    ecs_fini(world);
+}
+
+void Views_order_runtime_change(void) {
+    // renderer/views
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t a = views_clear(world, camera, 0, 255, 0, 0);
+    views_clear(world, camera, 0, 0, 255, 0);
+    ecs_entity_t surface = ecs_new(world);
+    ecs_set(world, surface, Surface, {.width = 8, .height = 8,
+        .write_to_file = "view_runtime.png", .resolution_scale = 1});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    test_int(views_wrong(world, "view_runtime.png", 0, 255, 0), 0);
+
+    ecs_get_mut(world, a, View)->order = 1;
+    ecs_modified(world, a, View);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    test_int(views_wrong(world, "view_runtime.png", 255, 0, 0), 0);
+
+    ecs_fini(world);
+}
+
+void Views_order_view_root(void) {
+    // renderer/views
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t root = ecs_new(world);
+    ecs_entity_t a = ecs_new_w_pair(world, EcsChildOf, root);
+    ecs_set(world, a, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {255, 0, 0, 255}},
+        .order = 1});
+    ecs_entity_t b = ecs_new_w_pair(world, EcsChildOf, root);
+    ecs_set(world, b, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 255, 255}}});
+    ecs_entity_t surface = ecs_new(world);
+    ecs_set(world, surface, Surface, {.width = 8, .height = 8, .view_root = root,
+        .write_to_file = "view_root_order.png", .resolution_scale = 1});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    test_int(views_wrong(world, "view_root_order.png", 255, 0, 0), 0);
+
+    ecs_get_mut(world, b, View)->order = 2;
+    ecs_modified(world, b, View);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    test_int(views_wrong(world, "view_root_order.png", 0, 0, 255), 0);
+
     ecs_fini(world);
 }
 

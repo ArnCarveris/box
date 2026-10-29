@@ -431,10 +431,11 @@ typedef struct box_render_view_gtao_t {
 /** A view of the frame: the camera it renders, the scene it draws and how it clears.
  *
  * The projection is built by the renderer per target, because its aspect follows the
- * surface; views are in render order, the order in which they were created.
+ * surface; views are in render order: by View.order, then in the order they were created.
  */
 typedef struct box_render_view_t {
     ecs_entity_t view;          /**< Entity with the View component */
+    int32_t order;              /**< View.order, the views render in ascending order */
     ecs_entity_t camera;        /**< Entity with the Camera component */
     ecs_entity_t parent;        /**< Parent of the view, matched against Surface.view_root */
     ecs_entity_t scene;         /**< Scene root of the camera, 0 for the default scene */

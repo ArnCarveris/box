@@ -75,6 +75,20 @@ static void box_view_effect_ctor(
     }
 }
 
+int box_view_compare(
+    int32_t order_a,
+    ecs_entity_t a,
+    int32_t order_b,
+    ecs_entity_t b)
+{
+    int result = (order_a > order_b) - (order_a < order_b);
+    if (!result) {
+        result = (a > b) - (a < b);
+    }
+
+    return result;
+}
+
 void BoxViewImport(
     ecs_world_t *world)
 {

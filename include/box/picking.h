@@ -2,9 +2,9 @@
  * @file box/picking.h
  * @brief Picking: the pointer events of a frame go to the entities under the cursor.
  *
- * Every view casts a ray from its camera into its scene, the front view first, so screen UI,
- * world UI and 3D shapes are picked the same way. Events go out through flecs.script.input,
- * and an element with an ActionTrigger drives an input Action.
+ * Every view casts a ray from its camera into its scene, the front view (highest View.order)
+ * first, so screen UI, world UI and 3D shapes are picked the same way. Events go out through
+ * flecs.script.input, and an element with an ActionTrigger drives an input Action.
  */
 
 #ifndef BOX_PICKING_H

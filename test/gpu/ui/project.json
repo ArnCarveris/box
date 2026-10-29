@@ -149,7 +149,7 @@
                     "history",
                     "cursor_editing",
                     "scroll",
-                    "view_stacked_last",
+                    "view_on_top",
                     "rebuilt_after_delete",
                     "look_from_script",
                     "run_from_script",
