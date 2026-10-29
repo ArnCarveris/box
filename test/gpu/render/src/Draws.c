@@ -198,6 +198,7 @@ static ecs_world_t* disabled_world(
     ecs_entity_t surface = ecs_new(world);
     ecs_set(world, surface, Surface, {.width = 32, .height = 32, .write_to_file = (char*)file,
         .resolution_scale = 1});
+
     return world;
 }
 
@@ -230,6 +231,7 @@ static int disabled_red(
     int r = px[(y * 32 + x) * 4];
     stbi_image_free(px);
     ecs_os_free(path);
+
     return r;
 }
 
@@ -295,6 +297,8 @@ void Draws_created_disabled(void) {
     ecs_fini(world);
 }
 
+/* A shape deleted while disabled frees its slot: a new shape reuses it and draws where it is
+ * placed, not where the deleted one was. */
 void Draws_deleted_while_disabled(void) {
     // renderer/draws
     ecs_world_t *world = disabled_world("dis_delete.png");
@@ -306,8 +310,6 @@ void Draws_deleted_while_disabled(void) {
     ecs_delete(world, e);
     test_assert(disabled_red(world, "dis_delete.png", 16, 16) < 40);
 
-    /* A new shape reuses the freed slot and draws where it is placed, not where the deleted one
-     * was. */
     ecs_entity_t f = ecs_new(world);
     disabled_box(world, f, 2);
     test_assert(disabled_red(world, "dis_delete.png", 16, 16) < 40);

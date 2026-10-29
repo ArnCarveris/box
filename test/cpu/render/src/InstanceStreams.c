@@ -570,7 +570,9 @@ void InstanceStreams_disabled_shapes_leave_batches(void) {
     ecs_set(world, rect, Rect, {10, 10});
     ecs_entity_t text = ecs_new(world);
     ecs_set(world, text, Position, {0, 1, 0});
-    ecs_set(world, text, Text, {.value = "disabled"});
+    ecs_set(world, text, Text, {
+        .value = "disabled", .size = 16, .font = ecs_lookup(world, "box.text.DefaultFont")
+    });
     frame(world);
     frame(world);
     box_render_draws_stats_t stats = frame(world);
