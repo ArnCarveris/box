@@ -65,6 +65,15 @@ cfg {
   // Units a batch order (shift) asks for
   export const craftBatch: i32 = 5
 
+  // The power allocation: Mining, Weapons and Construction each take a level of 0 to 4 bars,
+  // at most powerBars in total; the demand is the consumers' watts times the bars assigned /
+  // powerBars, and a category runs at its level times powerStep (0, 0.5, 1, 1.5, 2)
+  export const powerBars: i32 = 6
+  export const powerStep: f32 = 0.5
+
+  // A drill adds dt * drillSpeed times the Mining multiplier to its timer
+  export const drillSpeed: f32 = 1
+
   // Walking speed in units per second, and its multiplier while the run key is held
   export const walkSpeed: f32 = 7
   export const runMultiplier: f32 = 2
