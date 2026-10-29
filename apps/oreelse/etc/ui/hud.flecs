@@ -67,7 +67,7 @@ template StatusGauge {
   prop bar: f32 = 0
   prop barX: f32 = 28
   prop frac: f32 = 0
-  prop color: Rgb = {185, 242, 200}
+  prop color: Rgb = {124, 226, 148}
 
   Layout: {}
 
@@ -189,13 +189,13 @@ template OreHud {
   const mineProgress: f32 = astronaut[OreMining].progress
 
   const waveFlash: Rgb = match fast {
-    true: {252, 165, 155}
-    false: {190, 120, 115}
+    true: {248, 96, 84}
+    false: {132, 48, 44}
   }
 
   const waveSoon: Rgb = match waveFrac > 0.75 {
-    true: {248, 203, 145}
-    false: {194, 184, 215}
+    true: {240, 152, 72}
+    false: {138, 122, 174}
   }
 
   const waveColor: Rgb = match spawning {
@@ -204,8 +204,8 @@ template OreHud {
   }
 
   const powerColor: Rgb = match blackout {
-    true: {243, 165, 155}
-    false: {185, 242, 200}
+    true: {228, 96, 84}
+    false: {124, 226, 148}
   }
 
   const toastColor: Rgb = match toastWarn {
@@ -214,18 +214,18 @@ template OreHud {
   }
 
   const alertColor: Rgb = match fast {
-    true: {255, 165, 155}
-    false: {185, 115, 110}
+    true: {255, 96, 84}
+    false: {124, 44, 40}
   }
 
   const readyColor: Rgb = match slow {
-    true: {185, 242, 200}
-    false: {141, 200, 165}
+    true: {124, 226, 148}
+    false: {68, 148, 96}
   }
 
   const rocketColor: Rgb = match valid {
     true: readyColor
-    false: {252, 227, 177}
+    false: {248, 196, 112}
   }
 
   // The rocket status line, the first that applies of launching, ready, no units, the engines

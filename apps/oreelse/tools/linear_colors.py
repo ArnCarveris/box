@@ -1,25 +1,28 @@
 #!/usr/bin/env python3
-"""Re-encodes the color bytes of Ore Else so box shows the linear light of the original.
+"""Re-encodes the world colors of Ore Else so box shows the linear light of the original.
 
 flecs-engine reads a color byte b as the linear value b / 255; box decodes color bytes as sRGB.
 A byte the port writes for a byte b of the original is therefore the sRGB encoding of b / 255:
 round(255 * srgb_encode(b / 255)), and box decodes it back to the original's linear value
 (within half a step of the sRGB byte). See apps/oreelse/README.md (Colors).
 
-The conversion ran once over apps/oreelse/etc. Running `apply` again would encode the colors a
-second time; it is kept for reference and to show which literals count as colors. Port a new
-color of the original with `encode`, read a color of the port against the original with
-`decode`.
+The conversion ran once over apps/oreelse/etc. The UI (apps/oreelse/etc/ui and the health bar
+colors of etc/config.flecs) went back to the original's bytes afterwards: the original shows its
+UI bytes as sRGB, so only the world takes the conversion. Running `apply` again would encode
+the colors a second time; it is kept for reference and to show which literals count as colors.
+Port a new world color of the original with `encode`, read a world color of the port against the
+original with `decode`.
 
 Usage: linear_colors.py encode r g b       the bytes to write for an original color
        linear_colors.py decode r g b       the original color of bytes of the port
        linear_colors.py scan [files...]    list the literals apply would convert, change nothing
        linear_colors.py apply [files...]   convert the literals in place (once!)
 
-Without files, scan and apply go over every .flecs file of apps/oreelse/etc (apply also ran
-over apps/oreelse/test/visual). What counts as a
-color literal: three integers, or four with an alpha (rgba) or strength (Tint) that stays as it
-is, in braces, positional or named r, g, b, a, that are
+Without files, scan and apply go over every .flecs file of apps/oreelse/etc but etc/ui (apply
+also ran over apps/oreelse/test/visual); the scan still lists the UI's health bar colors of
+etc/config.flecs, which stay as they are. What counts as a color literal: three integers, or
+four with an alpha (rgba) or strength (Tint) that stays as it is, in braces, positional or
+named r, g, b, a, that are
   - the value of a color component or member: Rgb, Tint, color, and the keys start, early,
     late and end of a ParticleGradient (inside color), the live, dead, warn and ok of
     OreStatusLamp, and the props of the templates declared with a color type (the Light's
@@ -30,12 +33,13 @@ is, in braces, positional or named r, g, b, a, that are
 The scan also lists the remaining integer triplets and quads whose key it does not know, so
 they can be checked by hand. Colors computed in script cannot be converted literal by literal
 and were changed by hand: the random tints of the scenery's flora encode the original's bytes
-with oreelse.srgb() (src/look.c), and the health bar blends cfg.hpBarFull, hpBarMid and hpBarLow,
-which keep the original's bytes, and encodes the blend with it.
+with oreelse.srgb() (src/look.c). The health bar is UI: it blends cfg.hpBarFull, hpBarMid and
+hpBarLow, the original's bytes, and shows the blend as it is.
 
 apply also sets `linear: true` on every TexturePath except the normal and ORM maps, so the
-albedo, particle and UI images load as the original samples them (TexturePath.linear in
-include/box/texture.h).
+albedo and particle images load as the original samples them (TexturePath.linear in
+include/box/texture.h); the UI images (the icons, the hazard strip of the panels, the signs)
+load without it.
 """
 import glob
 import math
@@ -227,8 +231,9 @@ def main(argv):
         print(", ".join(str(fn(int(v))) for v in argv[2:5]))
         return 0
     if len(argv) >= 2 and argv[1] in ("scan", "apply"):
-        files = argv[2:] or sorted(glob.glob(os.path.join(APP, "etc", "**", "*.flecs"),
-            recursive=True))
+        ui = os.path.join(APP, "etc", "ui", "")
+        files = argv[2:] or sorted(p for p in glob.glob(os.path.join(APP, "etc", "**", "*.flecs"),
+            recursive=True) if not p.startswith(ui))
         total = unknown = 0
         for path in files:
             c, u = process(path, argv[1] == "apply")

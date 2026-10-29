@@ -864,39 +864,48 @@ The port follows these; new code keeps to them.
   original's prefab and part names (`Ore`, `Astronaut`, `JetPlume`, `GroundSurface`, ...), and
   never as placeholder geometry. Animation runs in C systems that only run while `Playing`;
   visuals read the game's state instead of keeping their own copy.
-- **Colors** are the original's linear light, in the port's bytes (see Colors below).
+- **Colors** of the world are the original's linear light, in the port's bytes; the UI keeps the
+  original's bytes (see Colors below).
 - **README**: this file describes the game like a player's manual (controls, rules); a change
   to the mechanics updates it.
 
 ## Colors
 
-flecs-engine reads a color byte `b` as the linear light `b / 255` and samples its textures as
-they are stored (`RGBA8Unorm`, no sRGB decoding), then writes to an sRGB target. Box decodes
-color bytes and the color layers of textures (albedo, emissive, particle sprites, UI images)
-from sRGB. With the original's bytes the port looked darker and more saturated than the
-original, so every color reaches box at the original's linear value:
+flecs-engine reads a color byte `b` of its world as the linear light `b / 255` and samples its
+textures as they are stored (`RGBA8Unorm`, no sRGB decoding), then writes to an sRGB target.
+Box decodes color bytes and the color layers of textures (albedo, emissive, particle sprites,
+UI images) from sRGB. With the original's bytes the world looked darker and more saturated than
+the original, so every world color reaches box at the original's linear value, while the UI
+keeps the original's bytes:
 
-- **Color bytes** of the port are the sRGB encoding of the original's:
+- **World color bytes** of the port are the sRGB encoding of the original's:
   `round(255 * srgb_encode(b / 255))` per channel, alpha (and a `Tint`'s strength) unchanged.
-  That covers every color: the materials (`Rgb`), `Emissive`, the lights, the particle colors
-  and color curves, the `Tint`s of the ghosts and corpses, the sun, the clear color and the UI
-  (palette, panels, texts, borders, the HUD), whose colors went through the same linear path
-  in the original. `tools/linear_colors.py` converted them once (`apply`, over `etc` and
-  `test/visual`) and is kept for reference: `linear_colors.py encode r g b` gives the bytes of a
-  new color of the original, `linear_colors.py decode r g b` the original's bytes of a color of
-  the port, to read it against the original. The comments quote the original's bytes.
-- **Colors computed in script** compute the original's bytes and encode them with
-  `oreelse.srgb(v)` (`src/look.c`): the random tints of the flora (`scenery.flecs`), and the fill
-  of the health bars, which blends `cfg.hpBarFull`, `hpBarMid` and `hpBarLow` as the original
-  does; those three keep the original's bytes.
-- **Color textures** load with `TexturePath.linear` (`include/box/texture.h`), which encodes
-  their pixels to sRGB on load, so the color layers read the stored values as linear light as
-  the original does; the SVGs stay unchanged. The normal and ORM maps load as they are.
+  That covers the materials (`Rgb`), `Emissive`, the lights, the particle colors and color
+  curves, the `Tint`s of the ghosts and corpses, the deposits, the flora, the sun and the clear
+  color. `tools/linear_colors.py` converted them once (`apply`, over `etc` and `test/visual`) and
+  is kept for reference: `linear_colors.py encode r g b` gives the bytes of a new world color of
+  the original, `linear_colors.py decode r g b` the original's bytes of a world color of the
+  port, to read it against the original. The comments quote the original's bytes.
+- **World colors computed in script** compute the original's bytes and encode them with
+  `oreelse.srgb(v)` (`src/look.c`): the random tints of the flora (`scenery.flecs`).
+- **World color textures** load with `TexturePath.linear` (`include/box/texture.h`), which
+  encodes their pixels to sRGB on load, so the color layers read the stored values as linear
+  light as the original does; the SVGs stay unchanged. The normal and ORM maps load as they are.
+- **The UI** keeps the original's bytes, decoded as sRGB: everything under `etc/ui` (the
+  palette, panels, texts, borders, the HUD, the inventory, the power, queue and rocket panels,
+  the screens) and the health bars, whose fill blends `cfg.hpBarFull`, `hpBarMid` and `hpBarLow`
+  as the original's `oreBarLerp` and shows the blend as it is, over `cfg.hpBarBack` with a
+  `cfg.hpBarEdge`. Its images (the icons of `etc/icons` in `etc/ui/icons.flecs`, the hazard strip
+  of the panels, the signs of the title screen) load without `TexturePath.linear`. The original
+  draws its UI as it is over the finished frame, after the lighting, so its UI bytes are shown
+  as sRGB: encoding them like the world's showed the UI lighter and less saturated than the
+  original, flat and washed out.
 
 The conversion stays in the app: box, its visual baselines and the other apps keep decoding
 color bytes as sRGB (bunnyhopper kept its original's bytes). The colors stay plain bytes in
 the same places, and the C code, which takes every color from the scripts, did not change.
-The scenarios compare colors with `box_client.srgb()` of the original's bytes.
+The scenarios compare world colors with `box_client.srgb()` of the original's bytes and UI
+colors with the original's bytes.
 
 ## From flecs-engine to box
 
@@ -1178,5 +1187,5 @@ its tile in the grid.
 | `src/look.c` | The render quality tiers, `oreelse.cycleQuality()`, `oreelse.srgb()` |
 | `src/stresstest.c` | The stress test: the late game base every run of a `--stresstest` session starts with (`OreStressTestApply`) |
 | `src/stresstest.h` | The stress test's components (`OreStressTest`, `OreStressKit`) and `ore_placement_build`, included by `src/game.h` |
-| `tools/linear_colors.py` | The conversion of the original's color bytes to the port's (see Colors), kept for reference |
+| `tools/linear_colors.py` | The conversion of the original's world color bytes to the port's (see Colors), kept for reference |
 | `src/particles.c` | The helpers that play the effects (`ore_burst`, `ore_burst_aimed`, `ore_explosion`, `ore_combust`), the flash of their lights, `oreelse.explosion()`, `oreelse.combust()` |
