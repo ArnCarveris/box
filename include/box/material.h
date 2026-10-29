@@ -48,13 +48,13 @@ ECS_STRUCT(Rgb, {
 
 /** Opacity from 0 (invisible) to 1 (opaque), default 1.
  *
- * Outside a UI tree the opacity multiplies into the alpha of every shape below the
- * entity, which needs no shape of its own, so one Opacity on a node fades a hierarchy.
- *
- * A shape whose resulting alpha is under 1 is drawn by the sorted blended pass and
- * casts no shadow; at 1 it stays in its opaque batch. A shape with AlphaCutoff tests the
- * alpha against its cutoff in the opaque pass instead. In a UI tree an element with
+ * Outside a UI tree it multiplies into the alpha of every shape below the entity, which needs
+ * no shape of its own, so one Opacity on a node fades a hierarchy. In a UI tree an element with
  * children composites its subtree with the opacity instead.
+ *
+ * A shape whose resulting alpha is under 1 is drawn by the sorted blended pass and casts no
+ * shadow; at 1 it stays in its opaque batch. A shape with AlphaCutoff tests the alpha against
+ * its cutoff in the opaque pass instead.
  */
 ECS_STRUCT(Opacity, {
     float value; /**< Opacity */
@@ -64,21 +64,16 @@ ECS_STRUCT(Opacity, {
 #define BOX_MATERIAL_CUTOFF (0.5f)
 
 /** Alpha test of a shape, default 0.5: its fragments are kept or discarded, not blended.
- * Inherited by instances, like Rgb.
+ * Inherited by instances, like Rgb. Only 3D meshes are alpha tested, 2D shapes and text ignore
+ * it; picking does not read textures, so a shape is picked by its whole geometry, holes included.
  *
- * The alpha a fragment is tested with is the alpha the shape draws with without it (its
- * Opacity times the Opacity of its ancestors) times the alpha of its albedo texture (PbrTextures);
- * a fragment whose alpha is below value is discarded and the others are written as opaque. The
- * value is clamped to 0..1.
+ * A fragment is tested with the alpha the shape draws with without it (its Opacity times that of
+ * its ancestors) times the alpha of its albedo texture (PbrTextures). Below value, clamped to
+ * 0..1, it is discarded; otherwise it is written as opaque.
  *
- * A shape with AlphaCutoff whose BlendMode is Opaque or missing draws in the opaque pass whatever
- * its Opacity, writes depth and casts shadows with the same holes; the probe and reflection
- * captures see the holes too. With another BlendMode it stays in the sorted blended pass and
- * casts no shadow, and the cutoff discards there as well. A back face drawn with BackFacePlain
- * keeps the holes of the albedo texture.
- *
- * Only 3D meshes are alpha tested; 2D shapes and text ignore AlphaCutoff. Picking does not read
- * textures, so an alpha tested shape is picked by its whole geometry, holes included.
+ * With an Opaque or missing BlendMode it draws in the opaque pass whatever its Opacity, with its
+ * holes in depth, shadows, probe and reflection captures and BackFacePlain back faces. Otherwise
+ * it stays in the sorted blended pass, casts no shadow and the cutoff discards there as well.
  */
 ECS_STRUCT(AlphaCutoff, {
     float value; /**< Alpha below which a fragment is discarded */
@@ -160,22 +155,17 @@ ECS_STRUCT(TextureTransform, {
     float offset_y; /**< V addend, applied after the scale */
 });
 
-/** Texture entities for each PBR layer, 0 for none, inherited by instances like Rgb. They are
- * part of the batch of a shape, not of the material table, so PbrTextures brings no MaterialId.
+/** Texture entities for each PBR layer, 0 for none, inherited by instances like Rgb, part of the
+ * batch of a shape, not the material table, so PbrTextures brings no MaterialId. Minified color
+ * layers average linear light, ORM and normal stored values, a texture shared by both as color.
  *
- * A texture entity has a TexturePath (box/texture.h), or is the texture of a Surface, whose
- * image of the same frame it then samples; until it loaded, or when it is missing, the layer
- * has no effect. Back faces drawn with BackFacePlain do not sample the textures, except for the
- * albedo alpha of a shape with AlphaCutoff.
+ * A texture entity has a TexturePath (box/texture.h) or is a Surface's texture, sampling its
+ * image of the same frame; until loaded or when missing the layer has no effect. BackFacePlain
+ * back faces sample no textures, except the albedo alpha of a shape with AlphaCutoff.
  *
- * The ORM layer holds occlusion (red), roughness (green) and metallic (blue) in one image, as
- * glTF's occlusion and metallic roughness textures share one: green multiplies
- * PbrMaterial.roughness, blue multiplies PbrMaterial.metallic and red is the ambient occlusion
- * of the indirect light, 1 for unoccluded. Its values are stored as they are, not display
- * encoded; a missing layer is white, which leaves the material as it is.
- *
- * Minified albedo and emissive textures average linear light, the data layers (ORM and normal)
- * the stored values; a texture shared by a color and a data layer is filtered as color in both.
+ * The ORM layer packs glTF's occlusion and metallic roughness textures, stored, not display
+ * encoded: green multiplies PbrMaterial.roughness, blue PbrMaterial.metallic, red is the
+ * indirect light occlusion (1 for unoccluded). A missing layer is white, a no-op.
  */
 ECS_STRUCT(PbrTextures, {
     ecs_entity_t albedo;    /**< Multiplied with the base color and opacity, display encoded;

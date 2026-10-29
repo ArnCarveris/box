@@ -1,3 +1,8 @@
+/**
+ * @file spatial/layout_types.c
+ * @brief Component and reflection registration of the spatial layout types.
+ */
+
 #include "layout.h"
 
 ECS_COMPONENT_DECLARE(SpatialAxis);

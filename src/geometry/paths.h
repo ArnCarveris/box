@@ -1,3 +1,8 @@
+/**
+ * @file geometry/paths.h
+ * @brief Sampling and evaluation of 2D and 3D path components.
+ */
+
 #ifndef BOX_GEOMETRY_PATHS_H
 #define BOX_GEOMETRY_PATHS_H
 

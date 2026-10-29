@@ -502,3 +502,38 @@ void InstanceStreams_shape2d_ranks_follow_order(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+/** A shape deleted while disabled frees its slot, so the batch keeps no dead entity: the last
+ * slot, which moves into a slot freed later, is a live entity.
+ */
+void InstanceStreams_disabled_delete_frees_slot(void) {
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t boxes[3];
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        boxes[i] = box_new(world, 0, (float)i);
+    }
+
+    frame(world);
+    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractDraws");
+    box_render_draws_t *d = ecs_system_get(world, system)->ctx;
+    const DrawSlot *slot = ecs_get(world, boxes[0], DrawSlot);
+    box_draw_batch_t *b = box_draws_batch(d, slot->batch);
+    test_int(ecs_vec_count(&b->entities), 3);
+    test_int(ecs_get(world, boxes[2], DrawSlot)->batch, slot->batch);
+
+    ecs_enable(world, boxes[2], false);
+    frame(world);
+    ecs_delete(world, boxes[2]);
+    test_int(ecs_vec_count(&b->entities), 2);
+
+    ecs_delete(world, boxes[0]);
+    frame(world);
+    test_int(ecs_vec_count(&b->entities), 1);
+    test_uint(*ecs_vec_get_t(&b->entities, ecs_entity_t, 0), boxes[1]);
+    test_int(ecs_get(world, boxes[1], DrawSlot)->slot, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}

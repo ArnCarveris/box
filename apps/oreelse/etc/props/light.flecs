@@ -6,9 +6,11 @@
 // the power lamp of its building, which OrePower colors live, ok, warn or dead and blinks with
 // the lamp signal of OreBlink (cfg.lampRate, the original's blink) while dead, through the
 // OreStatusLamp of its bulb; a work lamp (work) lights while its building works, blinking at
-// blink per second if blink is above 0. Standing still both show color at strength. With
-// light above 0 the bulb also lights its surroundings with a point light of that intensity
-// and range in its color.
+// blink per second if blink is above 0, through the OreWorkLight of its bulb. Standing still
+// both show color at strength. A status lamp lights its surroundings with a small point light
+// of cfg.statusLampLight and cfg.statusLampRange, retuned for box's falloff, which is much
+// brighter than the original's within a unit of the light; OrePower blinks it with the bulb.
+// Any other lamp with light above 0 lights them with a point light of that intensity and range.
 
 using box.transform
 using box.geometry
@@ -57,15 +59,25 @@ template Light {
       Rgb: lightOff
     }
 
-    if on && light > 0 {
-      PointLight: {intensity: light, range: range}
+    // OrePower colors the bulb of a status lamp and its light by the power of its building
+    if status {
+      if on {
+        PointLight: {intensity: cfg.statusLampLight, range: cfg.statusLampRange}
+      }
+
+      oreelse.OreStatusLamp: {
+        live: color, dead: dead, warn: warn, ok: ok, strength: strength,
+        light: cfg.statusLampLight
+      }
+    } else {
+      if on && light > 0 {
+        PointLight: {intensity: light, range: range}
+      }
     }
 
-    // OrePower colors the bulb of a status lamp by the power of its building
-    if status {
-      oreelse.OreStatusLamp: {
-        live: color, dead: dead, warn: warn, ok: ok, strength: strength, light: light
-      }
+    // The bulb of a work lamp lights while its building works (OreWorkLights)
+    if work {
+      oreelse.OreWorkLight: {on: strength, off: 0, blink: blink, light: light}
     }
   }
 

@@ -1,0 +1,81 @@
+// The chrome of every panel of the UI, the original's Panel: a dark plate with a thin edge and
+// a hazard strip across its top. The content of a panel are its children, placed from its top
+// left corner (h: Left, v: Top, y down as negative offsets) below the strip.
+
+using flecs.script.math
+using box.types
+using box.layout
+using box.geometry
+using box.material
+using box.texture
+using box.picking
+
+// The hazard strip of the cap, rasterized at 2048x12
+ui_textures {
+  hazard_strip {
+    TexturePath: {path: "apps/oreelse/etc/ui/hazard_strip.svg", width: 2048, height: 12}
+  }
+}
+
+// Corner radius of a panel
+const panelRadius: f32 = 3
+
+// Size the hazard strip is rasterized at
+const stripWidth: f32 = 2048
+const stripHeight: f32 = 12
+
+// A panel of width by height: the plate in the fill color, its corners rounded by 3, with a 1
+// pixel border in the edge color. With cap a strip of width by capH runs across its top, the
+// hazard strip tinted white with cover fit: scaled to the larger of the two ratios, so it takes
+// the strip's height and is cropped to its horizontal center, framed by a 1 pixel edge border.
+//
+// box rounds all four corners of a Rect alike, so the strip is square and the panel clips its
+// children to its own rounded rect (ClipChildren), which rounds the strip's top corners like the
+// panel's. The plate's opacity, the alpha of the fill, also applies to its border; the content
+// stays opaque. InputBlocker keeps clicks, the right button and the wheel over the panel from
+// the world. The children of the template size the panel (the layout fits it to the plate), so
+// an instance only anchors it with a LayoutItem.
+template Panel {
+  prop width: f32 = 252
+  prop height: f32 = 100
+  prop cap: bool = true
+  prop capH: f32 = 7
+  prop fill: rgba = {21, 23, 27, 236}
+  prop edge: rgba = {74, 80, 90, 255}
+
+  const scale = max(width / stripWidth, capH / stripHeight)
+  const spanU = width / (stripWidth * scale)
+  const spanV = capH / (stripHeight * scale)
+
+  Layout: {}
+  Border: {radius: panelRadius}
+  ClipChildren
+  InputBlocker
+
+  plate {
+    LayoutItem: {
+      h: Left, v: Top,
+      width: {mode: Fixed, value: width}, height: {mode: Fixed, value: height}
+    }
+    Rect: {1, 1}
+    Rgb: {fill.r, fill.g, fill.b}
+    Opacity: {fill.a / 255.0}
+    Border: {width: 1, radius: panelRadius, color: edge}
+  }
+
+  if cap {
+    strip {
+      LayoutItem: {
+        h: Left, v: Top,
+        width: {mode: Fixed, value: width}, height: {mode: Fixed, value: capH}
+      }
+      Rect: {1, 1}
+      Rgb: {255, 255, 255}
+      Image: {
+        texture: ui_textures.hazard_strip,
+        u0: 0.5 - spanU / 2, v0: 0.5 - spanV / 2, u1: 0.5 + spanU / 2, v1: 0.5 + spanV / 2
+      }
+      Border: {width: 1, radius: 0, color: edge}
+    }
+  }
+}

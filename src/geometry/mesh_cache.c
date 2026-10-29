@@ -158,6 +158,7 @@ uint32_t box_mesh_cache_acquire(
     } else {
         shape->desc.key(value, &key);
     }
+
     uint64_t hash = box_mesh_cache_hash(shape, &key);
     uint32_t handle = box_mesh_cache_find(cache, shape, &key, hash);
     if (!handle) {
@@ -167,6 +168,7 @@ uint32_t box_mesh_cache_acquire(
         } else {
             shape->desc.generate(value, &key, &mesh);
         }
+
         box_mesh_bounds(&mesh);
         if (ecs_vec_count(&cache->free_list)) {
             handle = *ecs_vec_last_t(&cache->free_list, uint32_t);
@@ -327,12 +329,18 @@ done:
     return result;
 }
 
+/** Shape value used to cache a source mesh resolved against a parametric surface */
 typedef struct box_resolved_mesh_t {
-    const ShapeMesh *shape;
-    const box_mesh_t *mesh;
-    uint64_t source_hash;
+    const ShapeMesh *shape;   /**< Shape with the surface parameters */
+    const box_mesh_t *mesh;   /**< Source grid mesh */
+    uint64_t source_hash;     /**< Cache hash of the source mesh */
 } box_resolved_mesh_t;
 
+/** Compute the cache key of a resolved mesh from the source hash and surface parameters.
+ *
+ * @param value The box_resolved_mesh_t value.
+ * @param key Output cache key.
+ */
 static void box_resolved_mesh_key(
     const void *value,
     box_shape_key_t *key)
@@ -343,10 +351,17 @@ static void box_resolved_mesh_key(
     for (size_t i = 0; i < 20 * sizeof(vec4); i ++) {
         hash = (hash ^ bytes[i]) * 1099511628211ull;
     }
+
     ecs_os_memcpy(key->i, &resolved->source_hash, sizeof(uint64_t));
     ecs_os_memcpy(key->f, &hash, sizeof(hash));
 }
 
+/** Generate a mesh by sampling the surface at each (u, v, region) vertex of the source mesh.
+ *
+ * @param value The box_resolved_mesh_t value.
+ * @param key The cache key (unused).
+ * @param mesh Output mesh, left empty when allocation fails.
+ */
 static void box_resolved_mesh_generate(
     const void *value,
     const box_shape_key_t *key,
@@ -362,8 +377,9 @@ static void box_resolved_mesh_generate(
     mesh->surface_assets = ecs_os_calloc_n(vec4, regions);
     if (!mesh->vertices || !mesh->indices || !mesh->surface_assets) {
         box_mesh_fini(mesh);
-        return;
+        goto done;
     }
+
     mesh->vertex_count = mesh->vertex_capacity = count;
     mesh->index_count = mesh->index_capacity = source->index_count;
     mesh->surface_asset_count = regions;
@@ -383,8 +399,12 @@ static void box_resolved_mesh_generate(
         } else if (region == 2 || region == 3 || region == 8 || region == 9) {
             material = 3;
         }
+
         mesh->surface_assets[i / 4][i % 4] = (float)material;
     }
+
+done:
+    return;
 }
 
 uint32_t box_mesh_cache_resolve(
@@ -394,20 +414,24 @@ uint32_t box_mesh_cache_resolve(
     static const box_shape_t resolved_shape = {
         .desc = {.key = box_resolved_mesh_key, .generate = box_resolved_mesh_generate}
     };
+    uint32_t handle = 0;
     int kind = (int)shape->surface.p[0][0];
     box_mesh_entry_t *source = box_mesh_cache_entry(cache, shape->mesh);
     if (kind < 1 || kind > 6 || !source || !source->shape ||
         !source->mesh.vertex_count || !source->mesh.index_count)
     {
-        return 0;
+        goto done;
     }
+
     box_resolved_mesh_t value = {shape, &source->mesh, source->hash};
-    uint32_t handle = box_mesh_cache_acquire(cache, &resolved_shape, &value);
+    handle = box_mesh_cache_acquire(cache, &resolved_shape, &value);
     const box_mesh_t *mesh = box_mesh_cache_get(cache, handle);
     if (!mesh || !mesh->vertex_count || !mesh->index_count) {
         box_mesh_cache_release(cache, handle);
-        return 0;
+        handle = 0;
     }
+
+done:
     return handle;
 }
 

@@ -13,6 +13,12 @@
 // intensity 0 at rest), beacon_l and beacon_r (work lamps, Light, blinking at 2 per second) and
 // crown/status_l and crown/status_r (status lamps, Light). Standing still, all rest where the
 // original's do.
+//
+// While it works (src/building_fx.c, at the work rate of the factory: its crafter busy, no
+// blackout, the Construction multiplier) the drums and flywheels spin (OreSpinner), the ram
+// strokes and fires PressPuff and PressSparks where it lands (OrePiston), the stacks puff
+// SmokePuff (OreVent), the vents steam (VentSteam, OreWorkEmitter), the hot plate and the work
+// glow light up with the glow pulsed by the stroke and the beacons blink (OreWorkLight).
 
 using box.transform
 using box.geometry
@@ -32,6 +38,7 @@ const facLampDead: Rgb = {248, 84, 72}
 prefab Factory {
   // The item: crafted through the order book into the inventory, placed by spending one
   OreItem: {name: "Factory", detail: "Speeds up crafting."}
+  OreIcon: {texture: icons.factory}
   OreRecipe: {
     inputs: [
       {item: items.IronPlate, amount: 20},
@@ -96,14 +103,20 @@ prefab Factory {
 
     steam_l {
       Position: {-0.9, -0.26, 0.86}
+      VentSteam: {rate: 8}
+      OreWorkEmitter: {}
     }
 
     steam_c {
       Position: {0, -0.26, 0.86}
+      VentSteam: {rate: 6}
+      OreWorkEmitter: {}
     }
 
     steam_r {
       Position: {0.9, -0.26, 0.86}
+      VentSteam: {rate: 8}
+      OreWorkEmitter: {}
     }
 
     saw_a {
@@ -161,10 +174,12 @@ prefab Factory {
   // The original's vents puff smoke every 0.5 and 0.62 seconds while the factory works
   puff_l {
     Position: {-1.24, 2.98, -1.5}
+    OreVent: {interval: 0.5, burst: SmokePuff}
   }
 
   puff_r {
     Position: {1.24, 2.98, -1.5}
+    OreVent: {interval: 0.62, burst: SmokePuff}
   }
 
   beacon_l {
@@ -210,6 +225,7 @@ prefab Factory {
     Rotation: {0, 0, 1.5708}
 
     drum {
+      OreSpinner: {speed: 5}
       Cylinder: {segments: 10, smooth: true, length: 0.78, radius: 0.5}
       Scale: {0.12, 1, 0.12}
       Rgb: facSteel
@@ -228,6 +244,7 @@ prefab Factory {
     Rotation: {0, 0, 1.5708}
 
     drum {
+      OreSpinner: {speed: 5}
       Cylinder: {segments: 10, smooth: true, length: 0.78, radius: 0.5}
       Scale: {0.12, 1, 0.12}
       Rgb: facSteel
@@ -246,6 +263,7 @@ prefab Factory {
     Rotation: {0, 0, 1.5708}
 
     drum {
+      OreSpinner: {speed: 5}
       Cylinder: {segments: 10, smooth: true, length: 0.78, radius: 0.5}
       Scale: {0.12, 1, 0.12}
       Rgb: facSteel
@@ -264,6 +282,7 @@ prefab Factory {
     Rotation: {0, 0, 1.5708}
 
     drum {
+      OreSpinner: {speed: 5}
       Cylinder: {segments: 10, smooth: true, length: 0.78, radius: 0.5}
       Scale: {0.12, 1, 0.12}
       Rgb: facSteel
@@ -291,6 +310,7 @@ prefab Factory {
     Box: {1.24, 0.04, 0.76}
     Rgb: facEmber
     Emissive: {strength: 0.06, color: facEmber}
+    OreWorkLight: {on: 2.6, off: 0.06, hold: 0.45}
   }
 
   // 0.08 at rest and 1.8 while working, when its point light rises to intensity 5.5 and pulses
@@ -300,6 +320,7 @@ prefab Factory {
     Rgb: facGlow
     Emissive: {strength: 0.08, color: facGlow}
     PointLight: {intensity: 0, range: 6.5}
+    OreWorkLight: {on: 1.8, off: 0.08, light: 5.5, pulse: 0.45, hold: 0.45}
   }
 
   column_l {
@@ -350,6 +371,10 @@ prefab Factory {
   // The press, the original's piston: it strikes 0.62 down from its rest at y 1.72 at speed 6
   ram {
     Position: {0, 1.72, 0.16}
+    OrePiston: {
+      rest: 1.72, travel: 0.62, speed: 6,
+      impact: -0.32, burst: PressPuff, spark: PressSparks
+    }
 
     rod {
       Position: {0, 0.3, 0}
@@ -422,6 +447,7 @@ prefab Factory {
     flywheel {
       Position: {0, 0, 0}
       Rotation: {0, 0, 0}
+      OreSpinner: {speed: 5}
 
       shroud {
         Cylinder: {segments: 16, smooth: true, length: 0.1, radius: 0.5}
@@ -450,6 +476,7 @@ prefab Factory {
     flywheel {
       Position: {0, 0, 0}
       Rotation: {0, 0, 0}
+      OreSpinner: {speed: 5}
 
       shroud {
         Cylinder: {segments: 16, smooth: true, length: 0.1, radius: 0.5}

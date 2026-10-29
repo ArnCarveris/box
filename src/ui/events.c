@@ -8,7 +8,7 @@
 
 /** Names of the waiting functions in flecs.script.on, indexed by kind */
 static const char *box_ui_wait_names[BoxUiWaitCount] = {
-    "activate", "change", "submit"
+    "change", "submit"
 };
 
 /** Resolve the waiters of an event on one entity.

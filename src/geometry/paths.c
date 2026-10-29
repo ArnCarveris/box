@@ -1,25 +1,48 @@
+/**
+ * @file geometry/paths.c
+ * @brief Validation, evaluation and sampling of Path2D and Path3D components.
+ */
+
 #include "paths.h"
 #include <limits.h>
 #include <math.h>
 
-static bool box_path_point(const float *p, int dimensions)
+/** Test whether all coordinates of a point are finite.
+ *
+ * @param p The point coordinates.
+ * @param dimensions The number of coordinates.
+ * @return True if all coordinates are finite.
+ */
+static bool box_path_point(
+    const float *p,
+    int dimensions)
 {
-    for (int i = 0; i < dimensions; i ++) {
-        if (!isfinite(p[i])) {
-            return false;
-        }
+    bool result = true;
+    for (int i = 0; result && i < dimensions; i ++) {
+        result = isfinite(p[i]);
     }
-    return true;
+
+    return result;
 }
 
-static bool box_path_equal(const float *a, const float *b, int dimensions)
+/** Test whether two points are exactly equal.
+ *
+ * @param a The first point.
+ * @param b The second point.
+ * @param dimensions The number of coordinates.
+ * @return True if all coordinates are equal.
+ */
+static bool box_path_equal(
+    const float *a,
+    const float *b,
+    int dimensions)
 {
-    for (int i = 0; i < dimensions; i ++) {
-        if (a[i] != b[i]) {
-            return false;
-        }
+    bool result = true;
+    for (int i = 0; result && i < dimensions; i ++) {
+        result = a[i] == b[i];
     }
-    return true;
+
+    return result;
 }
 
 static void box_path_segment(const float *start, const float *end,
@@ -90,7 +113,8 @@ bool box_path##D##_evaluate(const PATH *path, float t, POINT out) \
 } \
 bool box_path##D##_sample(const ecs_world_t *world, ecs_entity_t entity, ecs_vec_t *points) \
 { \
-    const PATH *path = entity && ecs_is_alive(world, entity) ? ecs_get(world, entity, PATH) : NULL; \
+    const PATH *path = entity && ecs_is_alive(world, entity) ? \
+        ecs_get(world, entity, PATH) : NULL; \
     if (!box_path##D##_valid(path)) { \
         return false; \
     } \
@@ -127,7 +151,8 @@ bool box_path##D##_sample(const ecs_world_t *world, ecs_entity_t entity, ecs_vec
 BOX_PATH_IMPLEMENT(2, vec2, PathSegment2D, Path2D)
 BOX_PATH_IMPLEMENT(3, vec3, PathSegment3D, Path3D)
 
-void box_geometry_paths_init(ecs_world_t *world)
+void box_geometry_paths_init(
+    ecs_world_t *world)
 {
     box_owned_hooks(world, Path2D, BOX_OWNED_VEC(Path2D, segments, PathSegment2D));
     box_owned_hooks(world, Path3D, BOX_OWNED_VEC(Path3D, segments, PathSegment3D));

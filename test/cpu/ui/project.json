@@ -296,6 +296,8 @@
                     "activate_enter",
                     "activate_space_on_release",
                     "key_capture_no_activate",
+                    "activate_key_values",
+                    "activation_registered",
                     "enter_taps_trigger",
                     "space_holds_trigger",
                     "change_on_widget_and_ancestor",

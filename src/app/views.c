@@ -1,3 +1,11 @@
+/**
+ * @file app/views.c
+ * @brief Applies the --camera, --out and --design command line options to the app surface.
+ *
+ * Design mode renders the scene from six orthographic and two perspective cameras into a
+ * gallery of tiles on the main surface.
+ */
+
 #include "app.h"
 #include "../render/render.h"
 #include "../spatial/spatial.h"
@@ -18,21 +26,26 @@ static const char *box_design_names[] = {
     "perspective", "perspective-back"
 };
 
+/** State of design mode, owned by the DesignUpdate system */
 typedef struct box_design_t {
-    ecs_entity_t scene;
-    ecs_entity_t surface;
-    ecs_entity_t camera[BOX_DESIGN_VIEW_COUNT];
-    ecs_entity_t view[BOX_DESIGN_VIEW_COUNT];
-    ecs_entity_t target[BOX_DESIGN_VIEW_COUNT];
-    ecs_entity_t tile[BOX_DESIGN_VIEW_COUNT];
-    ecs_entity_t light[BOX_DESIGN_VIEW_COUNT];
-    ecs_entity_t label[BOX_DESIGN_VIEW_COUNT];
-    ecs_entity_t caption[BOX_DESIGN_VIEW_COUNT];
-    ecs_entity_t overview;
-    char *capture;
-    ecs_vec_t points;
+    ecs_entity_t scene;                         /**< Scene that is shown */
+    ecs_entity_t surface;                       /**< Main surface that shows the gallery */
+    ecs_entity_t camera[BOX_DESIGN_VIEW_COUNT]; /**< Camera per design view */
+    ecs_entity_t view[BOX_DESIGN_VIEW_COUNT];   /**< View per design view */
+    ecs_entity_t target[BOX_DESIGN_VIEW_COUNT]; /**< Offscreen surface per design view */
+    ecs_entity_t tile[BOX_DESIGN_VIEW_COUNT];   /**< Gallery tile that shows the target */
+    ecs_entity_t light[BOX_DESIGN_VIEW_COUNT];  /**< Light scene per design view */
+    ecs_entity_t label[BOX_DESIGN_VIEW_COUNT];  /**< Caption text per design view */
+    ecs_entity_t caption[BOX_DESIGN_VIEW_COUNT]; /**< Caption background per design view */
+    ecs_entity_t overview;                      /**< Orthographic camera of the gallery */
+    char *capture;                              /**< Capture path of the main surface */
+    ecs_vec_t points;                           /**< Bounding box corners of the shapes */
 } box_design_t;
 
+/** Free the design mode state.
+ *
+ * @param ptr The box_design_t to free.
+ */
 static void box_design_free(
     void *ptr)
 {
@@ -42,6 +55,13 @@ static void box_design_free(
     ecs_os_free(design);
 }
 
+/** Create a named child entity.
+ *
+ * @param world The world.
+ * @param parent The parent.
+ * @param name The name of the child.
+ * @return The new entity.
+ */
 static ecs_entity_t box_app_child(
     ecs_world_t *world,
     ecs_entity_t parent,
@@ -53,6 +73,11 @@ static ecs_entity_t box_app_child(
     });
 }
 
+/** Find the first surface that is not a texture, or create one with the app dimensions.
+ *
+ * @param world The world.
+ * @return The surface entity.
+ */
 static ecs_entity_t box_app_surface(
     ecs_world_t *world)
 {
@@ -85,6 +110,13 @@ done:
     return result;
 }
 
+/** Find the view that uses a camera, or else the first visible view of a surface.
+ *
+ * @param world The world.
+ * @param surface The surface.
+ * @param camera The camera to look for, 0 for any.
+ * @return The view entity, 0 if none was found.
+ */
 static ecs_entity_t box_app_view(
     ecs_world_t *world,
     ecs_entity_t surface,
@@ -129,6 +161,12 @@ done:
     return fallback;
 }
 
+/** Set the world transform of a manually transformed entity.
+ *
+ * @param world The world.
+ * @param entity The entity.
+ * @param matrix The world transform.
+ */
 static void box_design_pose(
     ecs_world_t *world,
     ecs_entity_t entity,
@@ -139,6 +177,18 @@ static void box_design_pose(
     ecs_set_ptr(world, entity, WorldTransform, &transform);
 }
 
+/** Fit the camera and light of a design view around the scene bounds.
+ *
+ * Perspective views fit to the given points when available, other views to the bounds.
+ *
+ * @param world The world.
+ * @param design The design mode state.
+ * @param index The index of the design view.
+ * @param min The minimum of the scene bounds.
+ * @param max The maximum of the scene bounds.
+ * @param aspect The aspect ratio of the view.
+ * @param points The bounding box corners of the shapes in the scene.
+ */
 static void box_design_fit(
     ecs_world_t *world,
     box_design_t *design,
@@ -245,6 +295,12 @@ static void box_design_fit(
     ecs_modified(world, design->view[index], View);
 }
 
+/** Derive the capture filename of a design view from the main capture path.
+ *
+ * @param path The main capture path.
+ * @param name The name of the design view.
+ * @return The filename, NULL if path is empty.
+ */
 static char *box_design_filename(
     const char *path,
     const char *name)
@@ -262,6 +318,10 @@ done:
     return result;
 }
 
+/** System that updates the cameras, targets and gallery layout of design mode.
+ *
+ * @param it The iterator.
+ */
 static void BoxDesignUpdate(
     ecs_iter_t *it)
 {
@@ -382,6 +442,11 @@ static void BoxDesignUpdate(
     }
 }
 
+/** Remove the lights, bakes and atmosphere of a scene and add a dim white ambient light.
+ *
+ * @param world The world.
+ * @param scene The scene, 0 for the root scene.
+ */
 static void box_design_lighting(
     ecs_world_t *world,
     ecs_entity_t scene)

@@ -1,6 +1,17 @@
+/**
+ * @file geometry/surfaces.c
+ * @brief Parametric surface shapes (ellipsoid shell, torus shell, beveled prism).
+ */
+
 #include "mesh_cache.h"
 #include <math.h>
 
+/** Clamp a tessellation step count, using a fallback for non-positive values.
+ *
+ * @param value The requested step count.
+ * @param fallback The step count used when value is not positive.
+ * @return The step count to use.
+ */
 static int box_surface_steps(
     int value,
     int fallback)
@@ -8,6 +19,12 @@ static int box_surface_steps(
     return value <= 0 ? fallback : glm_clamp(value, 3, 256);
 }
 
+/** Generate a grid of (u, v, region) vertices for each enabled surface region.
+ *
+ * @param value The shape component (unused).
+ * @param key The cache key with step counts and the enabled region mask.
+ * @param mesh Output mesh.
+ */
 static void box_surface_grid(
     const void *value,
     const box_shape_key_t *key,
@@ -75,6 +92,11 @@ static void box_shell_key(box_shape_key_t *key, int segments, int rings,
     }
 }
 
+/** Compute the mesh cache key for a ellipsoid shell.
+ *
+ * @param value The EllipsoidShell component.
+ * @param key Output cache key.
+ */
 static void box_ellipsoid_key(
     const void *value,
     box_shape_key_t *key)
@@ -83,6 +105,13 @@ static void box_ellipsoid_key(
     box_shell_key(key, s->segments, s->rings, s->thickness, s->rims);
 }
 
+/** Fill the surface parameters and local bounds for a ellipsoid shell.
+ *
+ * @param value The EllipsoidShell component.
+ * @param d Output surface parameters.
+ * @param min Output minimum bound.
+ * @param max Output maximum bound.
+ */
 static void box_ellipsoid_data(
     const void *value,
     box_surface_data_t *d,
@@ -101,6 +130,11 @@ static void box_ellipsoid_data(
     }
 }
 
+/** Compute the mesh cache key for a torus shell.
+ *
+ * @param value The TorusShell component.
+ * @param key Output cache key.
+ */
 static void box_torus_shell_key(
     const void *value,
     box_shape_key_t *key)
@@ -109,6 +143,13 @@ static void box_torus_shell_key(
     box_shell_key(key, s->segments, s->rings, s->thickness, s->rims);
 }
 
+/** Fill the surface parameters and local bounds for a torus shell.
+ *
+ * @param value The TorusShell component.
+ * @param d Output surface parameters.
+ * @param min Output minimum bound.
+ * @param max Output maximum bound.
+ */
 static void box_torus_shell_data(
     const void *value,
     box_surface_data_t *d,
@@ -126,12 +167,17 @@ static void box_torus_shell_data(
     glm_vec3_negate_to(max, min);
 }
 
+/** Test whether a prism footprint is a strictly convex triangle or quad.
+ *
+ * @param s The BeveledPrism component.
+ * @return True if the footprint is valid.
+ */
 static bool box_prism_valid(
     const BeveledPrism *s)
 {
     int count = ecs_vec_count(&s->footprint);
     if (count != 3 && count != 4) {
-        return false;
+        goto error;
     }
 
     const vec2 *points = ecs_vec_first(&s->footprint);
@@ -140,15 +186,22 @@ static bool box_prism_valid(
         const float *a = points[i], *b = points[(i + 1) % count], *c = points[(i + 2) % count];
         float cross = (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]);
         if (!isfinite(cross) || fabsf(cross) < 0.000001f || (i && sign * cross < 0)) {
-            return false;
+            goto error;
         }
 
         sign = cross;
     }
 
     return true;
+error:
+    return false;
 }
 
+/** Compute the mesh cache key for a beveled prism.
+ *
+ * @param value The BeveledPrism component.
+ * @param key Output cache key.
+ */
 static void box_prism_key(
     const void *value,
     box_shape_key_t *key)
@@ -161,6 +214,13 @@ static void box_prism_key(
     }
 }
 
+/** Fill the surface parameters and local bounds for a beveled prism.
+ *
+ * @param value The BeveledPrism component.
+ * @param d Output surface parameters.
+ * @param min Output minimum bound.
+ * @param max Output maximum bound.
+ */
 static void box_prism_data(
     const void *value,
     box_surface_data_t *d,
@@ -170,7 +230,7 @@ static void box_prism_data(
     const BeveledPrism *s = value;
     int count = ecs_vec_count(&s->footprint);
     if (!box_prism_valid(s)) {
-        return;
+        goto done;
     }
 
     const vec2 *points = ecs_vec_first(&s->footprint);
@@ -197,6 +257,9 @@ static void box_prism_data(
 
     box_surface_bound_points(d, 4, count, fabsf(s->depth) + fabsf(s->offset[0]) +
         fabsf(s->offset[1]) + fabsf(s->inset) + fabsf(s->bevel), min, max);
+
+done:
+    return;
 }
 
 bool box_surface_evaluate(const ecs_world_t *world, ecs_entity_t entity,

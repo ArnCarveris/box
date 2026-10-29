@@ -230,16 +230,19 @@ template TabView {
   async {
     while true {
       const e = await on.activate(this)
-      if e.target.parent() == bar {
-        probe = 0
-        while probe < count && e.target.name() != "tab_{probe}" {
-          probe = probe + 1
+      const tab = ui.activation(e)
+      if tab != 0 {
+        if tab.parent() == bar {
+          probe = 0
+          while probe < count && tab.name() != "tab_{probe}" {
+            probe = probe + 1
+          }
+          if probe < count && probe != current {
+            current = probe
+            await ui.changed(this)
+          }
+          await focus(tab)
         }
-        if probe < count && probe != current {
-          current = probe
-          await ui.changed(this)
-        }
-        await focus(e.target)
       }
     }
   }

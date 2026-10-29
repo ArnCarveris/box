@@ -1,3 +1,8 @@
+/**
+ * @file main.c
+ * @brief Runs Yeon with the settings of the command line.
+ */
+
 #include "game.h"
 
 int main(

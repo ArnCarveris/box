@@ -179,6 +179,33 @@ void Basics_button_click(void) {
     ecs_fini(world);
 }
 
+/* A press on a button released over another activates neither, nor does a right click */
+void Basics_button_release_outside(void) {
+    // widgets/basics
+    ecs_entity_t s = 0;
+    ecs_world_t *world = gallery_load(&s);
+    char from[64], to[64];
+
+    gallery_hover(world, s, BASICS ".buttons.save", 0, 0, BASICS ".buttons.save");
+    gallery_point(world, BASICS ".buttons.save", 0, 0, from, sizeof(from));
+    gallery_point(world, BASICS ".buttons.cancel", 0, 0, to, sizeof(to));
+    ecs_os_free(gallery_run(world, s, "mouse.drag left %s %s", from, to));
+    gallery_settle(world, s);
+    test_int(gallery_changes(world, s), 0);
+    basics_expect_mut(world, s, "buttons.save", "Button", "down", "false");
+    basics_expect_mut(world, s, "buttons.cancel", "Button", "down", "false");
+
+    gallery_hover(world, s, BASICS ".buttons.save", 0, 0, BASICS ".buttons.save");
+    ecs_os_free(gallery_run(world, s, "mouse.click right %s", from));
+    gallery_settle(world, s);
+    test_int(gallery_changes(world, s), 0);
+    gallery_click(world, s, BASICS ".buttons.save", 0, 0, BASICS ".buttons.save");
+    test_int(gallery_changes(world, s), 1);
+    gallery_expect(world, s, "get gallery Gallery.mut.last", "\"save\"");
+
+    ecs_fini(world);
+}
+
 void Basics_button_enter(void) {
     // widgets/basics
     ecs_entity_t s = 0;

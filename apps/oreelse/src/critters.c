@@ -135,8 +135,8 @@ static ecs_entity_t ore_player_find(
     return result;
 }
 
-/** Get the position of a target that is still there: alive with hit points left. (OreRocket
- * adds that the astronaut aboard a rocket is no target.)
+/** Get the position of a target that is still there: alive with hit points left, and not the
+ * astronaut aboard a rocket.
  *
  * @param world The world
  * @param target The target, 0 for none
@@ -148,7 +148,9 @@ static const Position* ore_target_position(
 {
     const OreHealth *health = NULL;
     const Position *result = NULL;
-    if (target && ecs_is_alive(world, target)) {
+    if (target && ecs_is_alive(world, target) &&
+        !(ecs_has(world, target, OrePlayer) && ore_rocket_aboard(world)))
+    {
         health = ecs_get(world, target, OreHealth);
         result = health && health->value > 0 ? ecs_get(world, target, Position) : NULL;
     }
@@ -275,7 +277,7 @@ static ecs_entity_t ore_critter_acquire(
 }
 
 /** Hurt the astronaut: it loses hit points, down to 0, and its hurt timer starts over. At 0 it
- * dies, in OrePlayerHealth later in the same frame.
+ * dies, in OrePlayerHealth later in the same frame. Aboard a rocket it is invulnerable.
  *
  * @param ctx The context of the system run
  * @param damage Hit points it loses
@@ -286,7 +288,7 @@ static void ore_player_damage(
 {
     OreHealth *health = ecs_get_mut(ctx->world, ctx->player, OreHealth);
     OreHurt *hurt = ecs_get_mut(ctx->world, ctx->player, OreHurt);
-    if (health && health->value > 0) {
+    if (health && health->value > 0 && !ore_rocket_aboard(ctx->world)) {
         health->value -= damage;
         if (health->value <= 0) {
             health->value = 0;
@@ -831,7 +833,7 @@ static void OreWaves(
 
 /** Kill the astronaut when it has no hit points left (ore_player_die: the splat, the fall and
  * the lost game), else count the time since it was hurt and after cfg.playerRegenDelay seconds
- * regenerate cfg.playerRegen hit points a second.
+ * regenerate cfg.playerRegen hit points a second, not while aboard a rocket.
  *
  * @param it Iterator over the astronaut with its health, while playing
  */
@@ -842,13 +844,14 @@ static void OrePlayerHealth(
     OreHurt *hurt = ecs_field(it, OreHurt, 2);
     float regen = ORE_CFG(it->world, "playerRegen");
     float delay = ORE_CFG(it->world, "playerRegenDelay");
+    bool aboard = ore_rocket_aboard(it->world);
     int32_t i;
     for (i = 0; i < it->count; i ++) {
         if (health[i].value <= 0) {
             ore_player_die(it->stage, it->entities[i]);
         } else {
             hurt[i].since += it->delta_time;
-            if (hurt[i].since >= delay && health[i].value < health[i].max) {
+            if (!aboard && hurt[i].since >= delay && health[i].value < health[i].max) {
                 health[i].value = glm_min(health[i].value + regen * it->delta_time,
                     health[i].max);
                 ecs_modified(it->stage, it->entities[i], OreHealth);

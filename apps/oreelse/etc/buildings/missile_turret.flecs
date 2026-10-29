@@ -21,6 +21,7 @@ const lampDead: Rgb = {248, 84, 72}
 prefab MissileTurret {
   // The item: crafted through the order book into the inventory, placed by spending one
   OreItem: {name: "Missile turret", detail: "Firepower to deal with the most sturdy targets."}
+  OreIcon: {texture: icons.missile_turret}
   OreRecipe: {
     inputs: [
       {item: items.IronPlate, amount: 40},
