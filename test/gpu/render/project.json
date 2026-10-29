@@ -134,7 +134,12 @@
                 "testcases": [
                     "transform_and_color",
                     "replaced_shape_renders_new_mesh",
-                    "many_instances_all_drawn"
+                    "many_instances_all_drawn",
+                    "disable_hides_shape",
+                    "enable_shows_shape_again",
+                    "moved_while_disabled",
+                    "created_disabled",
+                    "deleted_while_disabled"
                 ]
             },
             {

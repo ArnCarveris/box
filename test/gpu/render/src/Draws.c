@@ -175,3 +175,143 @@ void Draws_many_instances_all_drawn(void) {
     ecs_os_free(path);
     ecs_fini(world);
 }
+
+/* Disabled shapes: EcsDisabled added to and removed from shapes that are in their batch. */
+
+/* Create a headless world with an ortho camera looking at the origin, writing 32x32 captures. */
+static ecs_world_t* disabled_world(
+    const char *file)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 8, .near_ = 0.1f,
+        .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t surface = ecs_new(world);
+    ecs_set(world, surface, Surface, {.width = 32, .height = 32, .write_to_file = (char*)file,
+        .resolution_scale = 1});
+    return world;
+}
+
+/* Create a red emissive box at x. */
+static void disabled_box(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    float x)
+{
+    ecs_set(world, e, Position, {x, 0, 0});
+    ecs_set(world, e, Box, {2, 2, 2});
+    ecs_set(world, e, Rgb, {0, 0, 0});
+    ecs_set(world, e, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, e, Emissive, {.strength = 1, .color = {255, 0, 0}});
+}
+
+/* Run a frame, wait for the capture and return the red channel of pixel (x, y). */
+static int disabled_red(
+    ecs_world_t *world,
+    const char *file,
+    int x,
+    int y)
+{
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    char *path = flecs_asprintf("%s/%s", ecs_singleton_get(world, AppStatus)->tmp_dir, file);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    int r = px[(y * 32 + x) * 4];
+    stbi_image_free(px);
+    ecs_os_free(path);
+    return r;
+}
+
+void Draws_disable_hides_shape(void) {
+    // renderer/draws
+    ecs_world_t *world = disabled_world("dis_hide.png");
+    ecs_entity_t e = ecs_new(world);
+    disabled_box(world, e, 0);
+    test_assert(disabled_red(world, "dis_hide.png", 16, 16) > 200);
+
+    ecs_enable(world, e, false);
+    test_assert(disabled_red(world, "dis_hide.png", 16, 16) < 40);
+
+    ecs_fini(world);
+}
+
+void Draws_enable_shows_shape_again(void) {
+    // renderer/draws
+    ecs_world_t *world = disabled_world("dis_show.png");
+    ecs_entity_t e = ecs_new(world);
+    disabled_box(world, e, 0);
+    test_assert(disabled_red(world, "dis_show.png", 16, 16) > 200);
+
+    ecs_enable(world, e, false);
+    test_assert(disabled_red(world, "dis_show.png", 16, 16) < 40);
+
+    ecs_enable(world, e, true);
+    test_assert(disabled_red(world, "dis_show.png", 16, 16) > 200);
+
+    ecs_fini(world);
+}
+
+void Draws_moved_while_disabled(void) {
+    // renderer/draws
+    ecs_world_t *world = disabled_world("dis_move.png");
+    ecs_entity_t e = ecs_new(world);
+    disabled_box(world, e, -2);
+    test_assert(disabled_red(world, "dis_move.png", 8, 16) > 200);
+
+    ecs_enable(world, e, false);
+    ecs_set(world, e, Position, {2, 0, 0});
+    test_assert(disabled_red(world, "dis_move.png", 8, 16) < 40);
+    test_assert(disabled_red(world, "dis_move.png", 24, 16) < 40);
+
+    ecs_enable(world, e, true);
+    test_assert(disabled_red(world, "dis_move.png", 8, 16) < 40);
+    test_assert(disabled_red(world, "dis_move.png", 24, 16) > 200);
+
+    ecs_fini(world);
+}
+
+void Draws_created_disabled(void) {
+    // renderer/draws
+    ecs_world_t *world = disabled_world("dis_created.png");
+    ecs_entity_t e = ecs_new(world);
+    ecs_enable(world, e, false);
+    disabled_box(world, e, 0);
+    test_assert(disabled_red(world, "dis_created.png", 16, 16) < 40);
+
+    ecs_enable(world, e, true);
+    test_assert(disabled_red(world, "dis_created.png", 16, 16) > 200);
+
+    ecs_fini(world);
+}
+
+void Draws_deleted_while_disabled(void) {
+    // renderer/draws
+    ecs_world_t *world = disabled_world("dis_delete.png");
+    ecs_entity_t e = ecs_new(world);
+    disabled_box(world, e, 0);
+    test_assert(disabled_red(world, "dis_delete.png", 16, 16) > 200);
+
+    ecs_enable(world, e, false);
+    ecs_delete(world, e);
+    test_assert(disabled_red(world, "dis_delete.png", 16, 16) < 40);
+
+    /* A new shape reuses the freed slot and draws where it is placed, not where the deleted one
+     * was. */
+    ecs_entity_t f = ecs_new(world);
+    disabled_box(world, f, 2);
+    test_assert(disabled_red(world, "dis_delete.png", 16, 16) < 40);
+    test_assert(disabled_red(world, "dis_delete.png", 24, 16) > 200);
+
+    ecs_fini(world);
+}
