@@ -117,9 +117,9 @@ ECS_STRUCT(FrameTiming, {
  * EnvironmentImage. A changed, removed or returned file loads again; the old content stays until
  * the new load is ready. A new path or removing the component stops watching the old file.
  *
- * Every interval (unscaled) a watch thread stats each distinct file once; a later poll in
- * EcsOnStore applies the pass (a headless one waits for it) and visits only the owners of changed
- * files. At interval 0 and without threads (the browser, files in memory) it runs inline.
+ * Every interval (unscaled) a watch thread stats each distinct file once; a poll in EcsOnStore
+ * applies the pass (a headless one waits) and visits only the owners of changed files. At interval
+ * 0, without threads (the browser) or when the thread cannot start (one warning) it runs inline.
  */
 ECS_STRUCT(FileWatch, {
     float interval;     /**< Seconds between passes, 0 a pass every frame, < 0 off */

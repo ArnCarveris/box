@@ -1,7 +1,8 @@
 /**
  * @file app/watch.c
  * @brief The file watch of box.app: stamps of the files modules loaded, checked by a pass on a
- * watch thread about once per FileWatch.interval, and the owners told when one changed.
+ * watch thread about once per FileWatch.interval (inline when the thread cannot start), and the
+ * owners told when one changed.
  */
 
 #include "watch.h"
@@ -68,6 +69,7 @@ typedef struct box_file_watch_t {
     ecs_vec_t notify;           /**< box_watch_ref_t, scratch of a poll */
     int32_t queued;             /**< Files an owner registered with another stamp */
     double since;               /**< Unscaled seconds since the last pass started, -1 before */
+    bool no_thread;             /**< The watch thread failed to start, passes run inline */
     box_watch_pass_t pass;      /**< The pass in flight */
 } box_file_watch_t;
 
@@ -521,11 +523,14 @@ typedef struct box_watch_found_t {
 
 /** Start a pass over every watched file, on the watch thread or inline.
  *
+ * When the watch thread cannot start, the registry remembers it and the pass runs inline.
+ *
  * @param w The registry
  * @param threaded Whether the watch thread runs the pass, else it runs before this returns and
  * the caller applies it
+ * @return Whether the watch thread runs the pass, false when the caller applies it
  */
-static void box_watch_pass_start(
+static bool box_watch_pass_start(
     box_file_watch_t *w,
     bool threaded)
 {
@@ -542,21 +547,33 @@ static void box_watch_pass_start(
 
     w->since = 0;
     if (!threaded) {
-        box_watch_pass_run(pass);
-        goto done;
+        goto inline_pass;
     }
 
     ecs_os_mutex_lock(pass->lock);
     pass->state = BoxWatchRunning;
-    if (!pass->thread) {
-        pass->thread = ecs_os_thread_new(box_watch_thread, pass);
-    } else {
+    if (pass->thread) {
         ecs_os_cond_signal(pass->wake);
+    } else {
+        pass->thread = ecs_os_thread_new(box_watch_thread, pass);
+    }
+
+    if (!pass->thread) {
+        pass->state = BoxWatchIdle;
     }
 
     ecs_os_mutex_unlock(pass->lock);
+    if (pass->thread) {
+        goto done;
+    }
+
+    ecs_warn("file watch: cannot start the watch thread, checking files on the main thread");
+    w->no_thread = true;
+    threaded = false;
+inline_pass:
+    box_watch_pass_run(pass);
 done:
-    return;
+    return threaded;
 }
 
 /** Get what the pass is doing, waiting for a pass the thread runs when asked to.
@@ -651,7 +668,7 @@ static void BoxFileWatchPoll(
 #ifdef __EMSCRIPTEN__
     bool threaded = false;
 #else
-    bool threaded = interval > 0 && ecs_os_has_threading();
+    bool threaded = interval > 0 && !w->no_thread && ecs_os_has_threading();
 #endif
     const App *app = ecs_singleton_get(world, App);
     bool wait = !threaded || (app && app->headless);
@@ -667,8 +684,7 @@ static void BoxFileWatchPoll(
 
     bool due = w->since < 0 || w->since >= (double)interval || w->queued;
     if (state == BoxWatchIdle && due) {
-        box_watch_pass_start(w, threaded);
-        if (!threaded) {
+        if (!box_watch_pass_start(w, threaded)) {
             box_watch_pass_apply(w, &found);
         }
     }
