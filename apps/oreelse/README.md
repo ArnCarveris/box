@@ -20,8 +20,12 @@ bake3 run apps/oreelse --local-env -- --headless --frames 10   # headless run, e
 bake3 --target em --local-env apps/oreelse                     # build for the browser
 
 python3 tools/integration.py e2e oreelse_flow oreelse_look     # the end-to-end scenarios
+<<<<<<< HEAD
 python3 tools/integration.py e2e oreelse_mining
 python3 tools/integration.py e2e oreelse_crafting
+=======
+python3 tools/integration.py e2e oreelse_mining oreelse_particles
+>>>>>>> 31811ee0a04d6cf9cd3cb51a32394f7f53b57735
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -285,6 +289,101 @@ Every task of the port follows these.
 - **README**: this file describes the game like a player's manual (controls, rules); each task
   adds its mechanics to it.
 
+## Critter and projectile models
+
+The critters and projectiles are prefabs ported from the original with its names, geometry and
+colors. They carry no gameplay data and stand still: OreCritters and OreWeapons give them their
+components, the effect tasks drive their named parts. Each faces +Z.
+
+### Critters
+
+A critter's origin is between its feet on the ground. Its legs are pivots `leg_0` ... `leg_n`
+at the hips, with `OreLimb {phase, swing}` for the walk (Rotation x swings); even legs are on the
+left (+X), odd ones on the right, front to back. Each leg holds a `thigh`, a `shin` and a `foot`.
+The parts marked glowing are emissive.
+
+| Prefab | File | Legs | Parts |
+| --- | --- | --- | --- |
+| `Mite` | `etc/critters/mite.flecs` | 4 | `abdomen` (with the glowing `spark`), `thorax`, `head` (glowing `visor`, `fang_left`, `fang_right`), `antenna_left`, `antenna_right` |
+| `Skitter` | `etc/critters/skitter.flecs` | 6 | `abdomen` (`ridge`), `thorax` (`plate`), `head` (glowing `eye_left`, `eye_right`, `mandible_left`, `mandible_right`), the glowing `stinger` |
+| `Brute` | `etc/critters/brute.flecs` | 6 | `abdomen` (`spike_a`, `spike_b`), `thorax` (`carapace`), `head` (`crest`, glowing `eye_left`, `eye_right`, `mandible_left`, `mandible_right`, `tusk_left`, `tusk_right`) |
+| `Behemoth` | `etc/critters/behemoth.flecs` | 8 | `abdomen` (glowing `spot_a`, `spot_b`, `spot_c`, and `spine_left`, `spine_right`, `spine_mid`), `thorax` (glowing `flank_left`, `flank_right`), the back plates `plate_0` ... `plate_3`, `head` (`crown`, glowing `eye_0` ... `eye_4`, glowing `brow`, `mandible_left`, `mandible_right`, `tusk_left`, `tusk_right`, `horn_left`, `horn_right`) |
+
+The behemoth's back plates are pivots with `OreLimb` like the legs (a swing of 0.05), each with
+a `shell`, a `ridge`, a glowing `seam`, `barb_left` and `barb_right`. Its tusks and horns are
+turned in two axes; their angles are converted to box's Euler order (`reference/PORTING.md`).
+
+### Projectiles
+
+A projectile's origin is its center.
+
+| Prefab | File | Parts |
+| --- | --- | --- |
+| `Tracer` | `etc/projectiles/tracer.flecs` | `core`, a glowing gold streak with a point light (2.6, range 4.5) |
+| `Missile` | `etc/projectiles/missile.flecs` | `body`, `tip`, `fin_left`, `fin_right`, the glowing `flame` with a point light (3, range 6), and `trail`, the point the smoke trail comes out of |
+| `LaserBeam` | `etc/projectiles/laser_beam.flecs` | One glowing pink box, 1 unit long along Z: the laser turret places an instance halfway between its muzzle and the target, turned toward the target and scaled along Z to their distance |
+
+## Building models
+
+The buildings are prefabs in `etc/buildings/`, one file per building, with the original's names
+and geometry, materials and lights. They stand still: the gameplay tasks add their components
+(item, recipe, footprint, health, power) to the same prefabs, and the animation and effect tasks
+drive the named parts below. Every building's origin is the center of its footprint on the
+ground (the center of its tile, the corner between the four tiles of a 2x2 building, the center
+of the middle tile of a 3x3 one), and it faces +Z. The names are those of the prefab's parts
+(`ecs_lookup_from(world, Drill, "carriage.slider.bit")`): the parts of an instance are unnamed
+children, each an instance (`IsA`) of the prefab's part of the same path, so a system finds the
+part of an instance as the child of its parent whose `IsA` target is the prefab's part, the way
+the original's `oreChild` does. The parts have no `DynamicTransform`, so a system that moves one every frame adds it.
+
+| Prefab | File | Named parts |
+| --- | --- | --- |
+| `Drill` | `drill.flecs` | `carriage` (the piston that rides the legs, rest y 1.48, travel 0.26), `carriage/slider` (rides fore and aft, rest z 0.12, travel 0.24), `carriage/slider/bit` (spins about y and shakes), `crown/pod_l/lamp_l`, `crown/pod_r/lamp_r` (status lamps), `dust` (the drill dust) |
+| `SolarPanel` | `solar_panel.flecs` | `junction/light` (indicator light) |
+| `Wall` | `wall.flecs` | `lamp` (hazard lamp) |
+| `WallSegment` | `wall_segment.flecs` | The connector between two walls on neighboring tiles: placed on the middle of their shared edge, turned by PI / 2 about y between two walls of one column |
+| `GunTurret` | `gun_turret.flecs` | `head` (turns about y to aim), `head/fx` (the muzzle: flash and tracers), `head/sight` (status lamp) |
+| `LaserTurret` | `laser_turret.flecs` | `head` (turns about y to aim), `head/fx` (the lens: beam start and glow), `hit_fx` (the beam's sparks where it hits), `column/lamp` (status lamp) |
+| `MissileTurret` | `missile_turret.flecs` | `head` (turns about y to aim), `head/fx` (the launch above the pods), `pillar/light` (status lamp) |
+| `PadBeacon` | `pad_beacon.flecs` | A template, the corner beacon of the rocket pad: `lamp` (amber lamp) |
+| `Factory` | `factory.flecs` | 2x2. `ram` (the press, moves along y, rest y 1.72, travel 0.62), `roller_a` to `roller_d` (each with its `drum`, which spins about its own y; the rollers lie along x), `wheel_left/flywheel`, `wheel_right/flywheel` (spin about y), `puff_l`, `puff_r` (the tops of the stacks, the smoke puffs), `hall/steam_l`, `hall/steam_c`, `hall/steam_r` (the vents of the grille, the steam), `hot_plate` (emissive 0.06 at rest, 2.6 while working), `work_glow` (emissive 0.08 at rest, 1.8 while working, and its `PointLight` of range 6.5 at intensity 0, 5.5 while working), `beacon_l`, `beacon_r` (work lamps, blink 2), `crown/status_l`, `crown/status_r` (status lamps) |
+| `DronePad` | `drone_pad.flecs` | 2x2. `bay_a` to `bay_d` (the landing bays, on the corners at x and z of +-0.99) with their `lamp` (status lamps), `column/head/beacon_l`, `column/head/beacon_r` (status lamps), `column/cabinet/readout`, `column/mast/tip` (lamps always on). Drone b of its 4 docks at the angle (b + 0.5) * 2 PI / 4, at (sin, cos) * 1.4 from the center and 0.62 above the ground |
+| `RepairDrone` | `drone.flecs` | The drone of the pad, its origin the center of the hull: `rotor_a` to `rotor_d` (spin about y), `hull/eye` (lamp), `weld` (the nozzle, the weld sparks). Its rotors share the `RotorBlade` prefab |
+| `RocketPad` | `rocket_pad.flecs` | 3x3. `clamp_a` to `clamp_d` (`PadClamp` templates: the hold-down clamps, which swing out by their `tilt` at the launch), `tower/beacon` (lamp), `beacon_b`, `beacon_c`, `beacon_d` (`PadBeacon`). The rocket stands on its axis at y 0.74, the original's `LaunchPad.base_y` |
+| `PadClamp` | `rocket/pad_clamp.flecs` | A template, the clamp: props `yaw` (faces the rocket), `tx`, `tz` (which way it swings) and `tilt` (0 at rest; the original's `cfg.clampTilt` 0.6 at the launch). The original turns it by (tx * tilt, yaw, tz * tilt) in flecs-engine's X Y Z order; the template converts that to box's Y X Z order |
+| `Rocket` | `rocket/rocket.flecs` | A template, the rocket on the pad (see below) |
+
+The rocket is an entity with the `Rocket` template, its origin the bottom of the stack on its
+axis, which OreRocket places on the pad and keeps in step with its rocket state by setting the
+props of its `Rocket` component; the template rebuilds the stack in the script whenever they
+change, so nothing in C builds or deletes its parts:
+
+| Prop | Type | Builds |
+| --- | --- | --- |
+| `engines` | i32 | The engine skirt and four fins when above 0, and an engine bell (`RocketBell`, `rocket/rocket_bell.flecs`) per engine: up to 4 on a ring of radius 0.22, above 4 on a ring of 0.32 at 0.72 of their size, above 6 a third of them on an inner ring of 0.13, above 8 at 0.56 of their size |
+| `fuel` | i32 | A fuel tank of height 1.02 per fuel storage, above the skirt |
+| `cargo` | i32 | A cargo bay of height 0.78 per bay (`RocketBay`, `rocket/rocket_bay.flecs`, with four port lights, `RocketPort`, `rocket/rocket_port.flecs`), above the tanks, each turned 0.5 more about y |
+| `life_support` | i32 | The capsule with its window and hatch when above 0, above the bays |
+| `loaded` | bool | Lights the port lights of the bays (the rocket holds Luminite) |
+| `valid` | bool | The nose cone on top (the rocket can launch: `enginesPerUnit` engines and one fuel storage per unit, a unit being a cargo bay or the life support) |
+
+The lamps are instances of the `Light` template (`etc/props/light.flecs`): a `housing`, a
+`bulb` and a `glass` cover, its origin the bottom of the housing, facing +Y (a lamp on a wall
+is turned by PI / 2 about x). The `bulb` is the part the game drives: it has the `Rgb` and the
+`Emissive` of the lamp's color at `strength` while `on`, and a `PointLight` of intensity
+`light` and `range` when `light` is above 0. The props say how: a status lamp (`status: true`)
+is the power lamp of its building, which OrePower colors `color` (live), `ok`, `warn` or `dead`
+and blinks at `blink` per second while dead; a work lamp (`work: true`) lights while its
+building works. The props are on the `Light` component of the lamp entity (`lamp_l`, `sight`,
+...). The template builds the parts on every lamp of an instance, not on the prefab's, so they
+keep their names there: the bulb is the lamp's child `bulb`.
+
+The shared materials are inherited prefabs that a part derives from and resizes with its own
+`Box`: `HazardTag`, `HazardTrim`, `HazardTrimShort`, `HazardBorderShort`, `HazardBorderLong`
+and `HazardBoundary` (`etc/materials/hazard.flecs`), `SolarCells`, `AccessPlate`, `VentGrille`,
+`FanDisc` and `BayPad`. `TileMarker` and `TileMarkerBad` (`etc/props/markers.flecs`) are the
+glowing plates mining and placement show over a tile, instances placed at y 0.14.
+
 ## Files
 
 | File | Holds |
@@ -300,10 +399,22 @@ Every task of the port follows these.
 | `etc/deposits.flecs` | The deposits of a run |
 | `etc/player.flecs` | The `Astronaut` template |
 | `etc/props/ore.flecs` | The `Ore` template of the deposits |
+| `etc/critters/` | The `Mite`, `Skitter`, `Brute` and `Behemoth` prefabs |
+| `etc/projectiles/` | The `Tracer`, `Missile` and `LaserBeam` prefabs |
 | `etc/props/markers.flecs` | The `TileMarker` and `TileMarkerBad` prefabs |
-| `etc/particles/jet_plume.flecs` | The `JetPlume` template of the jetpack |
+| `etc/particles.flecs` | Includes the particle effects |
+| `etc/particles/pools.flecs` | The particle sprites, how the original's pools map to the layers, the effect budgets (`ParticleSettings`) |
+| `etc/particles/*.flecs` | The particle effects, one file per effect group of the original: one shot prefabs (`BoomBurst`, `CombustBurst`, `MissileLaunch`, `FootDust`, ...) and emitter templates (`JetPlume`, `DrillDust`, `BeamGlow`, `MuzzleFlash`, ...) |
 | `etc/materials/terrain.flecs` | The `GroundSurface` and `BasinSurface` materials and the dirt textures |
 | `etc/materials/hazard.flecs` | The hazard stripe texture and the `Hazard*` trim prefabs |
+| `etc/materials/solar_cells.flecs` | The solar cell texture and `SolarCells` |
+| `etc/materials/wall_plate.flecs` | The wall plate textures and `AccessPlate` |
+| `etc/materials/vent.flecs` | The vent grille textures and `VentGrille` |
+| `etc/materials/fan.flecs` | The fan blade textures and `FanDisc` |
+| `etc/materials/drone_bay.flecs` | The drone bay textures and `BayPad` |
+| `etc/props/light.flecs` | The `Light` template of the lamps |
+| `etc/buildings/` | The building prefabs, one file per building, and the drone (see Building models) |
+| `etc/rocket/` | The `Rocket` template and its parts `RocketBell`, `RocketBay` and `RocketPort`, and the `PadClamp` template of the rocket pad |
 | `etc/assets/` | The original's textures (SVG), unchanged, and `terrain_dirt_orm.svg` |
 | `src/flow.c` | States, clock, blink, toast, seeds, `oreelse.cancel()`, `oreelse.restart()` |
 | `src/map.c` | The tile grid, the deposits' registration and the hover tile |
@@ -312,3 +423,4 @@ Every task of the port follows these.
 | `src/mining.c` | Mining and its tile marker |
 | `src/craft.c` | The order book, the workers, `oreelse.craft_order()`, `oreelse.craft_cancel()` |
 | `src/look.c` | The render quality tiers, `oreelse.cycleQuality()` |
+| `src/particles.c` | The helpers that play the effects (`ore_burst`, `ore_burst_aimed`, `ore_explosion`, `ore_combust`), the flash of their lights, `oreelse.explosion()`, `oreelse.combust()` |

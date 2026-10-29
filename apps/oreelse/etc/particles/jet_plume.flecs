@@ -1,16 +1,10 @@
 // The plume of the jetpack, the JetPlume template of the original: flame shooting down from
 // the backpack, from a pale yellow through orange to grey smoke, added onto the image. It is
-// stopped; OrePlayerFx plays it while the astronaut hovers.
+// stopped; OrePlayerFx plays it while the astronaut hovers. Its flare sprite is in pools.flecs.
 
 using box.transform
 using box.types
-using box.texture
 using box.particle
-
-// The flare sprite of the original's fire pool
-sprFlare {
-  TexturePath: {path: "apps/oreelse/etc/assets/particles/flare.svg", width: 256, height: 256}
-}
 
 template JetPlume {
   prop rate: f32 = 70

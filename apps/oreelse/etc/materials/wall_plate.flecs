@@ -1,0 +1,21 @@
+// The wall's access plate, the AccessPlate of the original: a riveted plate texture and its
+// normal map on the front (+Z) face of a thin box.
+
+using box.geometry
+using box.material
+using box.texture
+
+plate_tex {
+  TexturePath: {path: "apps/oreelse/etc/assets/wall_plate.svg", width: 256, height: 256}
+}
+
+plate_norm {
+  TexturePath: {path: "apps/oreelse/etc/assets/wall_plate_normal.svg", width: 256, height: 256}
+}
+
+prefab AccessPlate {
+  Box: {0.34, 0.36, 0.05}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {metallic: 0.66, roughness: 0.4}
+  PbrTextures: {albedo: plate_tex, normal: plate_norm}
+}

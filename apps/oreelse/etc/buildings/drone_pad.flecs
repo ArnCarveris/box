@@ -1,0 +1,199 @@
+// The drone pad, the DronePad prefab of the original, a 2x2 hangar for four repair drones: a
+// deck with hazard lips, four landing bays with their lamps, one on each corner, and a column
+// in the middle with a cabinet, a head with two beacons, a mast and a dish. Its origin is the
+// center of its 2x2 footprint on the ground and it faces +Z.
+//
+// The drones dock over the bays: drone b of 4 at the angle (b + 0.5) * 2 PI / 4, at
+// (sin, cos) * 1.4 from the center, 0.62 above the ground (the original's DroneBay radius and
+// dock height). Named parts: bay_a to bay_d and their lamp (status lamps, Light),
+// column/head/beacon_l and column/head/beacon_r (status lamps, Light),
+// column/cabinet/readout and column/mast/tip (lamps that are always on, Light).
+
+using box.transform
+using box.geometry
+using box.material
+
+const padSteel: Rgb = {172, 180, 194}
+const padShade: Rgb = {112, 120, 136}
+const padDeep: Rgb = {56, 62, 76}
+const padHazard: Rgb = {240, 176, 58}
+const padAccent: Rgb = {92, 236, 222}
+const padLampDead: Rgb = {248, 84, 72}
+
+prefab DronePad {
+  deck {
+    Position: {0, 0.12, 0}
+    Box: {3.9, 0.24, 3.9}
+    Rgb: padDeep
+    PbrMaterial: {metallic: 0.35, roughness: 0.6}
+  }
+
+  apron {
+    Position: {0, 0.28, 0}
+    Box: {3.5, 0.08, 3.5}
+    Rgb: padShade
+    PbrMaterial: {metallic: 0.45, roughness: 0.5}
+  }
+
+  lip_front : HazardBorderShort {
+    Position: {0, 0.34, 1.75}
+    Box: {3.9, 0.08, 0.34}
+  }
+
+  lip_back : HazardBorderShort {
+    Position: {0, 0.34, -1.75}
+    Box: {3.9, 0.08, 0.34}
+  }
+
+  lip_left : HazardBorderShort {
+    Position: {-1.75, 0.34, 0}
+    Rotation: {0, 1.5708, 0}
+    Box: {3.22, 0.08, 0.34}
+  }
+
+  lip_right : HazardBorderShort {
+    Position: {1.75, 0.34, 0}
+    Rotation: {0, 1.5708, 0}
+    Box: {3.22, 0.08, 0.34}
+  }
+
+  bay_a {
+    Position: {0.99, 0.35, 0.99}
+
+    pad : BayPad {
+      Position: {0, -0.01, 0}
+      Rotation: {-1.5708, 0, 0}
+    }
+
+    lamp {
+      Position: {0.62, -0.01, 0.62}
+      Light: {
+        color: padAccent, dead: padLampDead, status: true,
+        w: 0.14, d: 0.14, h: 0.09, strength: 2.8
+      }
+    }
+  }
+
+  bay_b {
+    Position: {0.99, 0.35, -0.99}
+
+    pad : BayPad {
+      Position: {0, -0.01, 0}
+      Rotation: {-1.5708, 0, 0}
+    }
+
+    lamp {
+      Position: {0.62, -0.01, -0.62}
+      Light: {
+        color: padAccent, dead: padLampDead, status: true,
+        w: 0.14, d: 0.14, h: 0.09, strength: 2.8
+      }
+    }
+  }
+
+  bay_c {
+    Position: {-0.99, 0.35, -0.99}
+
+    pad : BayPad {
+      Position: {0, -0.01, 0}
+      Rotation: {-1.5708, 0, 0}
+    }
+
+    lamp {
+      Position: {-0.62, -0.01, -0.62}
+      Light: {
+        color: padAccent, dead: padLampDead, status: true,
+        w: 0.14, d: 0.14, h: 0.09, strength: 2.8
+      }
+    }
+  }
+
+  bay_d {
+    Position: {-0.99, 0.35, 0.99}
+
+    pad : BayPad {
+      Position: {0, -0.01, 0}
+      Rotation: {-1.5708, 0, 0}
+    }
+
+    lamp {
+      Position: {-0.62, -0.01, 0.62}
+      Light: {
+        color: padAccent, dead: padLampDead, status: true,
+        w: 0.14, d: 0.14, h: 0.09, strength: 2.8
+      }
+    }
+  }
+
+  column {
+    Position: {0, 0.76, 0}
+    Box: {0.52, 0.88, 0.52}
+    Rgb: padShade
+    PbrMaterial: {metallic: 0.55, roughness: 0.42}
+
+    cabinet {
+      Position: {0, -0.16, 0.3}
+      Box: {0.36, 0.42, 0.12}
+      Rgb: padDeep
+
+      readout {
+        Position: {0, 0.06, 0.06}
+        Rotation: {1.5708, 0, 0}
+        Light: {
+          color: padAccent, w: 0.22, d: 0.12, h: 0.03,
+          strength: 1.8
+        }
+      }
+    }
+
+    head {
+      Position: {0, 0.56, 0}
+      Box: {0.92, 0.22, 0.92}
+      Rgb: padSteel
+      PbrMaterial: {metallic: 0.55, roughness: 0.42}
+
+      stripe : HazardTag {
+        Position: {0, 0.14, 0}
+        Box: {0.92, 0.06, 0.3}
+      }
+
+      beacon_l {
+        Position: {-0.36, 0.11, 0.36}
+        Light: {
+          color: padAccent, dead: padLampDead, status: true,
+          w: 0.14, d: 0.14, h: 0.09, strength: 2.8
+        }
+      }
+
+      beacon_r {
+        Position: {0.36, 0.11, 0.36}
+        Light: {
+          color: padAccent, dead: padLampDead, status: true,
+          w: 0.14, d: 0.14, h: 0.09, strength: 2.8
+        }
+      }
+    }
+
+    mast {
+      Position: {0, 0.92, -0.18}
+      Box: {0.08, 0.5, 0.08}
+      Rgb: padShade
+
+      tip {
+        Position: {0, 0.25, 0}
+        Light: {
+          color: padHazard, w: 0.12, d: 0.12, h: 0.1,
+          strength: 1.6
+        }
+      }
+    }
+
+    dish {
+      Position: {0, 0.78, 0.24}
+      Rotation: {-0.5, 0, 0}
+      Cylinder: {segments: 14, smooth: true, length: 0.05, radius: 0.5}
+      Scale: {0.3, 1, 0.3}
+      Rgb: padSteel
+    }
+  }
+}

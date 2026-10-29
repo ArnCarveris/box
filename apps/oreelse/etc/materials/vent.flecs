@@ -1,0 +1,21 @@
+// The machine vent grille, the VentGrille of the original: a slotted grille texture and its
+// normal map on the front (+Z) face of a thin box. The factory wears it.
+
+using box.geometry
+using box.material
+using box.texture
+
+vent_tex {
+  TexturePath: {path: "apps/oreelse/etc/assets/factory_vent.svg", width: 256, height: 256}
+}
+
+vent_norm {
+  TexturePath: {path: "apps/oreelse/etc/assets/factory_vent_normal.svg", width: 256, height: 256}
+}
+
+prefab VentGrille {
+  Box: {2.76, 0.86, 0.06}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {metallic: 0.5, roughness: 0.52}
+  PbrTextures: {albedo: vent_tex, normal: vent_norm}
+}

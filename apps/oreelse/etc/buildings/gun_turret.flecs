@@ -1,0 +1,136 @@
+// The gun turret, the GunTurret prefab of the original: a base and an apron with a hazard lip, a
+// pedestal with the hazard ring of the head and an ammo box, and the head with its body, the
+// mantlet, the status lamp sight, a fin and the two barrels. Its origin is the center of its
+// tile on the ground and the head faces +Z.
+//
+// Named parts: head (turns about y to aim), head/sight (status lamp, Light) and head/fx (the
+// muzzle, where the muzzle flash and the tracers come out).
+
+using box.transform
+using box.geometry
+using box.material
+
+const steel: Rgb = {172, 180, 194}
+const steelShade: Rgb = {112, 120, 136}
+const steelDeep: Rgb = {56, 62, 76}
+const hazard: Rgb = {240, 176, 58}
+const accent: Rgb = {92, 236, 222}
+const lampDead: Rgb = {248, 84, 72}
+const gunSteel: Rgb = {84, 92, 108}
+
+prefab GunTurret {
+  base {
+    Position: {0, 0.13, 0}
+    Box: {1.74, 0.26, 1.74}
+    Rgb: steelDeep
+    PbrMaterial: {metallic: 0.35, roughness: 0.6}
+  }
+
+  apron {
+    Position: {0, 0.28, 0}
+    Box: {1.44, 0.08, 1.44}
+    Rgb: steelShade
+    PbrMaterial: {metallic: 0.45, roughness: 0.5}
+  }
+
+  lip : HazardTrim {
+    Position: {0, 0.35, 0.55}
+    Box: {1.44, 0.06, 0.34}
+  }
+
+  pedestal {
+    Position: {0, 0.895, 0}
+    Box: {0.62, 1.15, 0.62}
+    Rgb: steelShade
+    PbrMaterial: {metallic: 0.55, roughness: 0.42}
+  }
+
+  ring {
+    Position: {0, 1.53, 0}
+    Cylinder: {segments: 16, smooth: true, length: 0.22, radius: 0.5}
+    Scale: {0.56, 1, 0.56}
+    Rgb: hazard
+  }
+
+  ammo {
+    Position: {-0.6, 0.4, -0.56}
+    Box: {0.4, 0.36, 0.46}
+    Rgb: steelShade
+
+    strap {
+      Position: {0, 0.06, 0}
+      Box: {0.44, 0.08, 0.5}
+      Rgb: steelDeep
+    }
+  }
+
+  head {
+    Position: {0, 1.54, 0}
+    Rotation: {0, 0, 0}
+
+    turret_body {
+      Position: {0, 0.16, -0.08}
+      Box: {0.82, 0.48, 0.72}
+      Rgb: steel
+      PbrMaterial: {metallic: 0.6, roughness: 0.38}
+    }
+
+    mantlet {
+      Position: {0, 0.16, 0.34}
+      Box: {0.62, 0.42, 0.22}
+      Rgb: steelShade
+      PbrMaterial: {metallic: 0.6, roughness: 0.4}
+    }
+
+    sight {
+      Position: {0, 0.4, 0.1}
+      Light: {
+        color: accent, dead: lampDead, status: true,
+        w: 0.16, d: 0.16, h: 0.08,
+        strength: 3
+      }
+    }
+
+    fin {
+      Position: {0, 0.42, -0.3}
+      Box: {0.5, 0.1, 0.3}
+      Rgb: steelShade
+    }
+
+    barrel_l {
+      Position: {-0.16, 0.16, 0.66}
+      Cylinder: {segments: 8, smooth: true, length: 0.86, radius: 0.5}
+      Rotation: {1.5708, 0, 0}
+      Scale: {0.085, 1, 0.085}
+      Rgb: gunSteel
+    }
+
+    barrel_r {
+      Position: {0.16, 0.16, 0.66}
+      Cylinder: {segments: 8, smooth: true, length: 0.86, radius: 0.5}
+      Rotation: {1.5708, 0, 0}
+      Scale: {0.085, 1, 0.085}
+      Rgb: gunSteel
+    }
+
+    muzzle_l {
+      Position: {-0.16, 0.16, 1.02}
+      Cylinder: {segments: 8, smooth: true, length: 0.14, radius: 0.5}
+      Rotation: {1.5708, 0, 0}
+      Scale: {0.12, 1, 0.12}
+      Rgb: steelDeep
+    }
+
+    muzzle_r {
+      Position: {0.16, 0.16, 1.02}
+      Cylinder: {segments: 8, smooth: true, length: 0.14, radius: 0.5}
+      Rotation: {1.5708, 0, 0}
+      Scale: {0.12, 1, 0.12}
+      Rgb: steelDeep
+    }
+
+    fx {
+      Position: {0, 0.16, 1.24}
+    }
+  }
+}

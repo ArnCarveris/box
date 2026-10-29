@@ -1,0 +1,115 @@
+// The skitter, the Skitter prefab of the original: a purple chitin body of boxes with two
+// glowing amber eyes, mandibles, a glowing stinger raised over its abdomen and six legs. Its
+// origin is between its feet on the ground and it faces +Z. The legs are pivots with OreLimb
+// at the hips; here they stand still. OreCritters gives the prefab its gameplay data.
+
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using oreelse
+
+const chitin: Rgb = {104, 78, 148}
+const chitinDark: Rgb = {62, 44, 92}
+const chitinLimb: Rgb = {46, 34, 68}
+const skitterEye: Rgb = {255, 196, 72}
+
+prefab Skitter {
+  abdomen {
+    Position: {0, 0.46, -0.36}
+    Rotation: {0.18, 0, 0}
+    Box: {0.44, 0.4, 0.52}
+    Rgb: chitinDark
+
+    ridge {
+      Position: {0, 0.22, 0}
+      Box: {0.2, 0.14, 0.4}
+      Rgb: chitin
+    }
+  }
+
+  thorax {
+    Position: {0, 0.46, 0.06}
+    Box: {0.5, 0.38, 0.42}
+    Rgb: chitin
+
+    plate {
+      Position: {0, 0.2, -0.02}
+      Box: {0.4, 0.1, 0.34}
+      Rgb: chitinDark
+    }
+  }
+
+  head {
+    Position: {0, 0.44, 0.42}
+    Box: {0.34, 0.28, 0.32}
+    Rgb: chitinDark
+
+    eye_left {
+      Position: {-0.11, 0.06, 0.16}
+      Box: {0.1, 0.1, 0.05}
+      Rgb: skitterEye
+      Emissive: {strength: 2.4, color: skitterEye}
+    }
+
+    eye_right {
+      Position: {0.11, 0.06, 0.16}
+      Box: {0.1, 0.1, 0.05}
+      Rgb: skitterEye
+      Emissive: {strength: 2.4, color: skitterEye}
+    }
+
+    mandible_left {
+      Position: {-0.13, -0.1, 0.2}
+      Rotation: {0, 0.42, 0}
+      Box: {0.06, 0.07, 0.26}
+      Rgb: chitinLimb
+    }
+
+    mandible_right {
+      Position: {0.13, -0.1, 0.2}
+      Rotation: {0, -0.42, 0}
+      Box: {0.06, 0.07, 0.26}
+      Rgb: chitinLimb
+    }
+  }
+
+  stinger {
+    Position: {0, 0.76, -0.6}
+    Rotation: {-0.7, 0, 0}
+    Cone: {segments: 8, smooth: true, length: 0.36, radius: 0.5}
+    Scale: {0.1, 1, 0.1}
+    Rgb: skitterEye
+    Emissive: {strength: 1.2, color: skitterEye}
+  }
+
+  // Three rows of legs, even ones on the left (+X), odd ones on the right
+  for i in 0..6 {
+    const side: f32 = 1 - 2 * (i % 2)
+    const row: f32 = floor(i / 2)
+
+    "leg_{i}" {
+      Position: {side * 0.23, 0.36, 0.2 - row * 0.22}
+      OreLimb: {phase: i * 1.05, swing: 0.5}
+
+      thigh {
+        Position: {side * 0.17, 0.04, 0}
+        Rotation: {0, 0, side * -0.55}
+        Box: {0.34, 0.07, 0.07}
+        Rgb: chitinLimb
+      }
+
+      shin {
+        Position: {side * 0.34, -0.17, 0}
+        Box: {0.07, 0.34, 0.07}
+        Rgb: chitinLimb
+      }
+
+      foot {
+        Position: {side * 0.34, -0.34, 0.03}
+        Box: {0.11, 0.06, 0.17}
+        Rgb: chitinLimb
+      }
+    }
+  }
+}

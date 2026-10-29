@@ -1,0 +1,47 @@
+// An engine bell of the rocket, the RocketBell template of the original: the cone with the
+// glowing ember at its mouth, the throat and the gimbal above it, scale times their size
+// across. Its origin is the mouth of the bell, at the bottom of the rocket.
+
+using box.transform
+using box.geometry
+using box.material
+
+const rocketShade: Rgb = {150, 158, 174}
+const rocketDark: Rgb = {48, 54, 68}
+const rocketSoot: Rgb = {32, 34, 42}
+const emberGlow: Rgb = {255, 150, 70}
+
+template RocketBell {
+  prop scale: f32 = 1
+
+  cone {
+    Position: {0, 0.105, 0}
+    Cone: {segments: 14, smooth: true, length: 0.21, radius: 0.5}
+    Scale: {0.34 * scale, 1, 0.34 * scale}
+    Rgb: rocketDark
+    PbrMaterial: {metallic: 0.78, roughness: 0.34}
+  }
+
+  ember {
+    Position: {0, 0.014, 0}
+    Cylinder: {segments: 12, smooth: true, length: 0.028, radius: 0.5}
+    Scale: {0.22 * scale, 1, 0.22 * scale}
+    Rgb: emberGlow
+    Emissive: {strength: 1.6, color: emberGlow}
+  }
+
+  throat {
+    Position: {0, 0.3, 0}
+    Cylinder: {segments: 12, smooth: true, length: 0.26, radius: 0.5}
+    Scale: {0.15 * scale, 1, 0.15 * scale}
+    Rgb: rocketShade
+    PbrMaterial: {metallic: 0.82, roughness: 0.24}
+  }
+
+  gimbal {
+    Position: {0, 0.45, 0}
+    Sphere: {segments: 10, smooth: true, radius: 0.088 * scale}
+    Rgb: rocketSoot
+    PbrMaterial: {metallic: 0.9, roughness: 0.3}
+  }
+}

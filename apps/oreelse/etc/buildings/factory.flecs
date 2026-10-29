@@ -1,0 +1,468 @@
+// The factory, the Factory prefab of the original, a 2x2 crafting building: a deck with hazard
+// lips, a hall at the back with its vent grille, saw tooth roof and two smoke stacks, two
+// flywheels on posts, a press in front (two columns and a crown with the status lamps over an
+// anvil with the hot plate) and a belt of four rollers along the front. Its origin is the
+// center of its 2x2 footprint on the ground and it faces +Z.
+//
+// Named parts: ram (the press, moves along y, rest y 1.72, travel 0.62), roller_a to roller_d
+// and their drum (spins about its axis), wheel_left/flywheel and wheel_right/flywheel (spin
+// about y), puff_l and puff_r (the tops of the stacks, where the smoke puffs come out),
+// hall/steam_l, hall/steam_c and hall/steam_r (the vents of the grille, for the steam),
+// hot_plate (glows while the press works, emissive strength 0.06 at rest), work_glow (glows
+// and lights its surroundings while it works, emissive strength 0.08 and a point light of
+// intensity 0 at rest), beacon_l and beacon_r (work lamps, Light, blinking at 2 per second) and
+// crown/status_l and crown/status_r (status lamps, Light). Standing still, all rest where the
+// original's do.
+
+using box.transform
+using box.geometry
+using box.material
+using box.light
+
+const facSteel: Rgb = {172, 180, 194}
+const facShade: Rgb = {112, 120, 136}
+const facDeep: Rgb = {56, 62, 76}
+const facHazard: Rgb = {240, 176, 58}
+const facAccent: Rgb = {92, 236, 222}
+const facGlow: Rgb = {255, 156, 62}
+const facEmber: Rgb = {255, 108, 38}
+const facLampDead: Rgb = {248, 84, 72}
+
+prefab Factory {
+  deck {
+    Position: {0, 0.12, 0}
+    Box: {3.9, 0.24, 3.9}
+    Rgb: facDeep
+    PbrMaterial: {metallic: 0.35, roughness: 0.6}
+  }
+
+  apron {
+    Position: {0, 0.28, 0}
+    Box: {3.5, 0.08, 3.5}
+    Rgb: facShade
+    PbrMaterial: {metallic: 0.45, roughness: 0.5}
+  }
+
+  lip_front : HazardBorderShort {
+    Position: {0, 0.34, 1.75}
+    Box: {3.9, 0.08, 0.34}
+  }
+
+  lip_back : HazardBorderShort {
+    Position: {0, 0.34, -1.75}
+    Box: {3.9, 0.08, 0.34}
+  }
+
+  lip_left : HazardBorderShort {
+    Position: {-1.75, 0.34, 0}
+    Rotation: {0, 1.5708, 0}
+    Box: {3.22, 0.08, 0.34}
+  }
+
+  lip_right : HazardBorderShort {
+    Position: {1.75, 0.34, 0}
+    Rotation: {0, 1.5708, 0}
+    Box: {3.22, 0.08, 0.34}
+  }
+
+  hall {
+    Position: {0, 1.12, -1.06}
+    Box: {3.4, 1.5, 1.5}
+    Rgb: facSteel
+    PbrMaterial: {metallic: 0.55, roughness: 0.42}
+
+    grille : VentGrille {
+      Position: {0, -0.32, 0.76}
+    }
+
+    steam_l {
+      Position: {-0.9, -0.26, 0.86}
+    }
+
+    steam_c {
+      Position: {0, -0.26, 0.86}
+    }
+
+    steam_r {
+      Position: {0.9, -0.26, 0.86}
+    }
+
+    saw_a {
+      Position: {-1.1, 0.9, 0}
+      Rotation: {-0.6, 0, 0}
+      Box: {1.0, 0.1, 1.28}
+      Rgb: facShade
+    }
+
+    saw_b {
+      Position: {0, 0.9, 0}
+      Rotation: {-0.6, 0, 0}
+      Box: {1.0, 0.1, 1.28}
+      Rgb: facShade
+    }
+
+    saw_c {
+      Position: {1.1, 0.9, 0}
+      Rotation: {-0.6, 0, 0}
+      Box: {1.0, 0.1, 1.28}
+      Rgb: facShade
+    }
+  }
+
+  stack_l {
+    Position: {-1.24, 2.42, -1.5}
+    Cylinder: {segments: 10, smooth: true, length: 1.0, radius: 0.5}
+    Scale: {0.2, 1, 0.2}
+    Rgb: facShade
+    PbrMaterial: {metallic: 0.5, roughness: 0.5}
+
+    band {
+      Position: {0, 0.4, 0}
+      Cylinder: {segments: 10, smooth: true, length: 0.14, radius: 0.5}
+      Scale: {1.2, 1, 1.2}
+      Rgb: facHazard
+    }
+  }
+
+  stack_r {
+    Position: {1.24, 2.42, -1.5}
+    Cylinder: {segments: 10, smooth: true, length: 1.0, radius: 0.5}
+    Scale: {0.2, 1, 0.2}
+    Rgb: facShade
+    PbrMaterial: {metallic: 0.5, roughness: 0.5}
+
+    band {
+      Position: {0, 0.4, 0}
+      Cylinder: {segments: 10, smooth: true, length: 0.14, radius: 0.5}
+      Scale: {1.2, 1, 1.2}
+      Rgb: facHazard
+    }
+  }
+
+  // The original's vents puff smoke every 0.5 and 0.62 seconds while the factory works
+  puff_l {
+    Position: {-1.24, 2.98, -1.5}
+  }
+
+  puff_r {
+    Position: {1.24, 2.98, -1.5}
+  }
+
+  beacon_l {
+    Position: {-1.62, 1.9, -1.06}
+    Light: {
+      color: facHazard, work: true,
+      w: 0.22, d: 0.22, h: 0.16, strength: 3.4,
+      blink: 2
+    }
+  }
+
+  beacon_r {
+    Position: {1.62, 1.9, -1.06}
+    Light: {
+      color: facHazard, work: true,
+      w: 0.22, d: 0.22, h: 0.16, strength: 3.4,
+      blink: 2
+    }
+  }
+
+  belt {
+    Position: {0, 0.56, 1.24}
+    Box: {3.3, 0.18, 0.86}
+    Rgb: facDeep
+    PbrMaterial: {metallic: 0.5, roughness: 0.5}
+
+    edge_l {
+      Position: {-1.7, 0.06, 0}
+      Box: {0.12, 0.22, 0.86}
+      Rgb: facShade
+    }
+
+    edge_r {
+      Position: {1.7, 0.06, 0}
+      Box: {0.12, 0.22, 0.86}
+      Rgb: facShade
+    }
+  }
+
+  // The rollers lie along x; their drum spins about its own y (the original's speed 5)
+  roller_a {
+    Position: {-1.3, 0.7, 1.24}
+    Rotation: {0, 0, 1.5708}
+
+    drum {
+      Cylinder: {segments: 10, smooth: true, length: 0.78, radius: 0.5}
+      Scale: {0.12, 1, 0.12}
+      Rgb: facSteel
+      PbrMaterial: {metallic: 0.7, roughness: 0.3}
+
+      key {
+        Position: {0, 0.06, 0.1}
+        Box: {0.06, 0.7, 0.06}
+        Rgb: facHazard
+      }
+    }
+  }
+
+  roller_b {
+    Position: {-0.44, 0.7, 1.24}
+    Rotation: {0, 0, 1.5708}
+
+    drum {
+      Cylinder: {segments: 10, smooth: true, length: 0.78, radius: 0.5}
+      Scale: {0.12, 1, 0.12}
+      Rgb: facSteel
+      PbrMaterial: {metallic: 0.7, roughness: 0.3}
+
+      key {
+        Position: {0, 0.06, 0.1}
+        Box: {0.06, 0.7, 0.06}
+        Rgb: facHazard
+      }
+    }
+  }
+
+  roller_c {
+    Position: {0.44, 0.7, 1.24}
+    Rotation: {0, 0, 1.5708}
+
+    drum {
+      Cylinder: {segments: 10, smooth: true, length: 0.78, radius: 0.5}
+      Scale: {0.12, 1, 0.12}
+      Rgb: facSteel
+      PbrMaterial: {metallic: 0.7, roughness: 0.3}
+
+      key {
+        Position: {0, 0.06, 0.1}
+        Box: {0.06, 0.7, 0.06}
+        Rgb: facHazard
+      }
+    }
+  }
+
+  roller_d {
+    Position: {1.3, 0.7, 1.24}
+    Rotation: {0, 0, 1.5708}
+
+    drum {
+      Cylinder: {segments: 10, smooth: true, length: 0.78, radius: 0.5}
+      Scale: {0.12, 1, 0.12}
+      Rgb: facSteel
+      PbrMaterial: {metallic: 0.7, roughness: 0.3}
+
+      key {
+        Position: {0, 0.06, 0.1}
+        Box: {0.06, 0.7, 0.06}
+        Rgb: facHazard
+      }
+    }
+  }
+
+  anvil {
+    Position: {0, 0.62, 0.16}
+    Box: {1.5, 0.3, 1.0}
+    Rgb: facShade
+    PbrMaterial: {metallic: 0.55, roughness: 0.45}
+  }
+
+  // At rest the original's work lights glow at their off strength: 0.06 here, 2.6 while the
+  // press works
+  hot_plate {
+    Position: {0, 0.79, 0.16}
+    Box: {1.24, 0.04, 0.76}
+    Rgb: facEmber
+    Emissive: {strength: 0.06, color: facEmber}
+  }
+
+  // 0.08 at rest and 1.8 while working, when its point light rises to intensity 5.5 and pulses
+  work_glow {
+    Position: {0, 0.83, 0.16}
+    Box: {1.1, 0.08, 0.66}
+    Rgb: facGlow
+    Emissive: {strength: 0.08, color: facGlow}
+    PointLight: {intensity: 0, range: 6.5}
+  }
+
+  column_l {
+    Position: {-1.28, 1.28, 0.16}
+    Box: {0.26, 1.6, 0.3}
+    Rgb: facShade
+    PbrMaterial: {metallic: 0.55, roughness: 0.45}
+  }
+
+  column_r {
+    Position: {1.28, 1.28, 0.16}
+    Box: {0.26, 1.6, 0.3}
+    Rgb: facShade
+    PbrMaterial: {metallic: 0.55, roughness: 0.45}
+  }
+
+  crown {
+    Position: {0, 2.14, 0.16}
+    Box: {2.9, 0.26, 0.56}
+    Rgb: facSteel
+    PbrMaterial: {metallic: 0.55, roughness: 0.42}
+
+    stripe {
+      Position: {0, 0, 0.3}
+      Box: {2.9, 0.09, 0.04}
+      Rgb: facHazard
+    }
+
+    status_l {
+      Position: {-1.0, 0.03, 0.28}
+      Rotation: {1.5708, 0, 0}
+      Light: {
+        color: facAccent, dead: facLampDead, status: true,
+        w: 0.44, d: 0.12, h: 0.05, strength: 2.6
+      }
+    }
+
+    status_r {
+      Position: {1.0, 0.03, 0.28}
+      Rotation: {1.5708, 0, 0}
+      Light: {
+        color: facAccent, dead: facLampDead, status: true,
+        w: 0.44, d: 0.12, h: 0.05, strength: 2.6
+      }
+    }
+  }
+
+  // The press, the original's piston: it strikes 0.62 down from its rest at y 1.72 at speed 6
+  ram {
+    Position: {0, 1.72, 0.16}
+
+    rod {
+      Position: {0, 0.3, 0}
+      Cylinder: {segments: 8, smooth: true, length: 0.66, radius: 0.5}
+      Scale: {0.12, 1, 0.12}
+      Rgb: facSteel
+      PbrMaterial: {metallic: 0.75, roughness: 0.22}
+    }
+
+    guide_l {
+      Position: {-0.5, 0.2, 0}
+      Box: {0.1, 0.5, 0.1}
+      Rgb: facShade
+    }
+
+    guide_r {
+      Position: {0.5, 0.2, 0}
+      Box: {0.1, 0.5, 0.1}
+      Rgb: facShade
+    }
+
+    head {
+      Position: {0, -0.14, 0}
+      Box: {1.16, 0.34, 0.72}
+      Rgb: facSteel
+      PbrMaterial: {metallic: 0.6, roughness: 0.35}
+
+      edge {
+        Position: {0, -0.2, 0}
+        Box: {1.0, 0.1, 0.6}
+        Rgb: facHazard
+      }
+    }
+  }
+
+  wheel_post_l {
+    Position: {-1.34, 2.18, -0.7}
+    Cylinder: {segments: 12, smooth: true, length: 0.62, radius: 0.5}
+    Scale: {0.56, 1, 0.56}
+    Rgb: facDeep
+    PbrMaterial: {metallic: 0.5, roughness: 0.5}
+
+    collar {
+      Position: {0, 0.28, 0}
+      Cylinder: {segments: 12, smooth: true, length: 0.1, radius: 0.5}
+      Scale: {1.18, 1, 1.18}
+      Rgb: facShade
+    }
+  }
+
+  wheel_post_r {
+    Position: {1.34, 2.18, -0.7}
+    Cylinder: {segments: 12, smooth: true, length: 0.62, radius: 0.5}
+    Scale: {0.56, 1, 0.56}
+    Rgb: facDeep
+    PbrMaterial: {metallic: 0.5, roughness: 0.5}
+
+    collar {
+      Position: {0, 0.28, 0}
+      Cylinder: {segments: 12, smooth: true, length: 0.1, radius: 0.5}
+      Scale: {1.18, 1, 1.18}
+      Rgb: facShade
+    }
+  }
+
+  // The flywheels lie flat on their posts and spin about y (the original's speed 5)
+  wheel_left {
+    Position: {-1.34, 2.62, -0.7}
+
+    flywheel {
+      Position: {0, 0, 0}
+      Rotation: {0, 0, 0}
+
+      shroud {
+        Cylinder: {segments: 16, smooth: true, length: 0.1, radius: 0.5}
+        Scale: {0.34, 1, 0.34}
+        Rgb: facShade
+        PbrMaterial: {metallic: 0.65, roughness: 0.32}
+      }
+
+      face_front : FanDisc {
+        Position: {0, 0.06, 0}
+        Rotation: {-1.5708, 0, 0}
+        Scale: {0.7, 0.7, 1}
+      }
+
+      face_back : FanDisc {
+        Position: {0, -0.06, 0}
+        Rotation: {1.5708, 0, 0}
+        Scale: {0.7, 0.7, 1}
+      }
+    }
+  }
+
+  wheel_right {
+    Position: {1.34, 2.62, -0.7}
+
+    flywheel {
+      Position: {0, 0, 0}
+      Rotation: {0, 0, 0}
+
+      shroud {
+        Cylinder: {segments: 16, smooth: true, length: 0.1, radius: 0.5}
+        Scale: {0.34, 1, 0.34}
+        Rgb: facShade
+        PbrMaterial: {metallic: 0.65, roughness: 0.32}
+      }
+
+      face_front : FanDisc {
+        Position: {0, 0.06, 0}
+        Rotation: {-1.5708, 0, 0}
+        Scale: {0.7, 0.7, 1}
+      }
+
+      face_back : FanDisc {
+        Position: {0, -0.06, 0}
+        Rotation: {1.5708, 0, 0}
+        Scale: {0.7, 0.7, 1}
+      }
+    }
+  }
+
+  crate_a {
+    Position: {-1.5, 0.55, 1.0}
+    Box: {0.5, 0.46, 0.5}
+    Rgb: facShade
+  }
+
+  crate_b {
+    Position: {-1.5, 0.55, 1.62}
+    Rotation: {0, 0.4, 0}
+    Box: {0.5, 0.46, 0.5}
+    Rgb: facSteel
+  }
+}

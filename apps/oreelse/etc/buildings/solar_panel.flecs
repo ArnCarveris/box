@@ -1,0 +1,112 @@
+// The solar panel, the SolarPanel prefab of the original: a base and an apron, a mast, a brace and
+// a strut holding the panel tilted toward +Z with four solar cells (SolarCells), and the
+// junction box at the back with its indicator light. Its origin is the center of its tile on
+// the ground.
+//
+// Named parts: junction/light (indicator light, Light).
+
+using box.transform
+using box.geometry
+using box.material
+
+const steelShade: Rgb = {112, 120, 136}
+const steelDeep: Rgb = {56, 62, 76}
+const hazard: Rgb = {240, 176, 58}
+const accent: Rgb = {92, 236, 222}
+const solarFrame: Rgb = {96, 104, 122}
+
+prefab SolarPanel {
+  base {
+    Position: {0, 0.09, 0}
+    Box: {1.72, 0.18, 1.72}
+    Rgb: steelDeep
+    PbrMaterial: {metallic: 0.35, roughness: 0.6}
+  }
+
+  apron {
+    Position: {0, 0.22, 0}
+    Box: {1.44, 0.08, 1.44}
+    Rgb: steelShade
+    PbrMaterial: {metallic: 0.45, roughness: 0.5}
+  }
+
+  mast {
+    Position: {0, 0.68, -0.54}
+    Box: {0.2, 0.98, 0.2}
+    Rgb: steelShade
+  }
+
+  brace {
+    Position: {0, 0.62, -0.22}
+    Rotation: {-0.62, 0, 0}
+    Box: {0.13, 0.8, 0.13}
+    Rgb: steelShade
+  }
+
+  strut {
+    Position: {0, 0.4, 0.52}
+    Box: {0.13, 0.56, 0.13}
+    Rgb: steelShade
+  }
+
+  panel {
+    Position: {0, 0.92, 0}
+    Rotation: {0.5, 0, 0}
+    Box: {1.62, 0.07, 1.46}
+    Rgb: solarFrame
+    PbrMaterial: {metallic: 0.5, roughness: 0.45}
+
+    rib {
+      Position: {0, 0.05, 0}
+      Box: {1.62, 0.04, 0.1}
+      Rgb: solarFrame
+    }
+
+    spine {
+      Position: {0, 0.05, 0}
+      Box: {0.1, 0.04, 1.46}
+      Rgb: solarFrame
+    }
+
+    cell_a : SolarCells {
+      Position: {-0.4, 0.05, 0.34}
+      Box: {0.68, 0.03, 0.6}
+    }
+
+    cell_b : SolarCells {
+      Position: {0.4, 0.05, 0.34}
+      Box: {0.68, 0.03, 0.6}
+    }
+
+    cell_c : SolarCells {
+      Position: {-0.4, 0.05, -0.34}
+      Box: {0.68, 0.03, 0.6}
+    }
+
+    cell_d : SolarCells {
+      Position: {0.4, 0.05, -0.34}
+      Box: {0.68, 0.03, 0.6}
+    }
+
+    lip {
+      Position: {0, 0.04, 0.71}
+      Box: {1.62, 0.05, 0.06}
+      Rgb: hazard
+    }
+  }
+
+  junction {
+    Position: {0.62, 0.32, -0.58}
+    Box: {0.4, 0.32, 0.3}
+    Rgb: steelShade
+
+    light {
+      Position: {0, 0.06, 0.14}
+      Rotation: {1.5708, 0, 0}
+      Light: {
+        color: accent, w: 0.22, d: 0.08, h: 0.04,
+        strength: 2.4
+      }
+    }
+  }
+}

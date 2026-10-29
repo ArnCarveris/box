@@ -1,0 +1,54 @@
+// A puff of dust where a building is placed or removed or a deposit is mined out, the
+// PoofBurst of the original.
+
+using box.transform
+using box.geometry
+using box.particle
+
+// The hemisphere of radius 0.34 the dust spawns over
+prefab shapePoof {
+  HemiSphere: {segments: 16, radius: 0.34}
+}
+
+prefab PoofBurst {
+  // The burst: 18 particles of the fx pool, from a hemisphere of 0.34, offset {0, 0.1, 0}, at
+  // {0, 1.5, 0} +- {0.7, 0.7, 0.7}, radial 1.9, living 0.55 +- 0.22 s, sized 0.15 +- 0.06
+  // growing 0.35 a second, colored {198, 168, 132} to {150, 132, 112, 120}
+  particles {
+    Position: {0, 0.1, 0}
+    ParticleEmitter: {
+      max: 18,
+      rate: 0,
+      shape: EmitterMesh,
+      source: shapePoof,
+      direction: {0, 1, 0},
+      spread: 25,
+      speed: {0.8, 2.2},
+      radial: {1.9, 1.9},
+      lifetime: {0.33, 0.77},
+      size: {0.09, 0.21},
+      rotation: {-180, 180},
+      spin: {-126, 126},
+      color: {198, 168, 132},
+      seed: 224
+    }
+    ParticleBurst: {count: 18}
+    ParticleForces: {gravity: {0, -5, 0}, drag: 2.5, turbulence: 0.7, turbulence_scale: 1.2}
+    ParticleAppearance: {
+      shape: ParticleSprite,
+      texture: sprPuff,
+      softness: 0.35,
+      lit: 0.8
+    }
+    ParticleCurves: {
+      size: {0.45, 1.67, 2.6, 3.43},
+      opacity: {1, 0.82, 0.58, 0},
+      color: {
+        start: {255, 255, 255},
+        early: {235, 237, 243},
+        late: {214, 220, 230},
+        end: {194, 202, 218}
+      }
+    }
+  }
+}

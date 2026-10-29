@@ -1,0 +1,40 @@
+// Steam rising from a factory's vents while it crafts, the VentSteam of the original. The
+// factory plays it while it works.
+
+using box.particle
+
+template VentSteam {
+  prop rate: f32 = 8
+  prop size: f32 = 0.15
+
+  // The stream: 8 a second into the smoke pool, from a sphere of 0.11, at {0, 1.4, 0} +-
+  // {0.18, 0.3, 0.18}, living 1.2 +- 0.35 s, sized 0.15 +- 0.05 growing 0.35 a second, colored
+  // {226, 236, 242, 140} through {232, 240, 246, 85} at 0.4 to {238, 244, 248, 0}
+  ParticleEmitter: {
+    max: 19,
+    rate: rate,
+    shape: EmitterSphere,
+    radius: 0.11,
+    direction: {0, 1, 0},
+    spread: 7,
+    speed: {1.1, 1.7},
+    lifetime: {0.85, 1.55},
+    size: {size - 0.05, size + 0.05},
+    rotation: {-180, 180},
+    spin: {-46, 46},
+    color: {226, 236, 242},
+    seed: 234
+  }
+  ParticlePlayback: {state: ParticleStopped}
+  ParticleForces: {gravity: {0, -0.6, 0}, drag: 0.9, turbulence: 1.5, turbulence_scale: 0.55}
+  ParticleAppearance: {
+    shape: ParticleSprite,
+    texture: sprPuff,
+    softness: 0.5,
+    lit: 0.85
+  }
+  ParticleCurves: {
+    size: {0.35, 2.42, 5.05, 7.98},
+    opacity: {0, 0.3, 0.11, 0}
+  }
+}

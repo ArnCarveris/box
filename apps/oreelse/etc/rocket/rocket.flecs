@@ -1,0 +1,257 @@
+// The rocket on the pad, the Rocket template of the original, stacked from the parts installed
+// on it: the engine skirt with its bells and four fins (engines > 0), a fuel tank per fuel,
+// a cargo bay per cargo (RocketBay, its ports lit while loaded), the capsule of the life support
+// (life_support > 0) and, once the rocket is valid, the nose cone. Its origin is the bottom of
+// the stack, on the axis; OreRocket places it on the pad at the base_y 0.74 of the original's
+// LaunchPad.
+//
+// The props are the rocket state of OreRocket, which sets them on the Rocket component of the
+// rocket entity: engines, fuel, cargo (cargo bays) and life_support are the counts of the parts,
+// loaded whether it holds Luminite and valid whether it can launch (enginesPerUnit engines and a
+// fuel storage per unit, a unit being a cargo bay or the life support). The template builds the
+// stack from them and rebuilds it whenever they change: the original wrote them from C through
+// a cursor and the same props drive the script here.
+//
+// Up to 4 engines the bells stand on a ring of radius 0.22; above 4 the ring widens to 0.32 and
+// the bells shrink to 0.72 of their size, above 6 a third of them move to an inner ring of
+// radius 0.13 and above 8 they shrink to 0.56.
+
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+
+const rocketHull: Rgb = {228, 232, 240}
+const rocketShade: Rgb = {150, 158, 174}
+const rocketDark: Rgb = {48, 54, 68}
+const rocketSoot: Rgb = {32, 34, 42}
+const rocketTrim: Rgb = {238, 138, 52}
+const rocketGlass: Rgb = {126, 214, 240}
+const rkSkirtH: f32 = 0.62
+const rkTankH: f32 = 1.02
+const rkBayH: f32 = 0.78
+const rkCapsuleH: f32 = 1.04
+const rkRadius: f32 = 0.42
+
+template Rocket {
+  prop engines: i32 = 0
+  prop fuel: i32 = 0
+  prop cargo: i32 = 0
+  prop life_support: i32 = 0
+  prop loaded: bool = false
+  prop valid: bool = false
+
+  const engineY: f32 = match engines > 0 {
+    true: rkSkirtH
+    false: 0
+  }
+
+  const tankY: f32 = engineY + fuel * rkTankH
+  const bayY: f32 = tankY + cargo * rkBayH
+  const noseY: f32 = bayY + life_support * rkCapsuleH
+
+  const bellMid: f32 = match engines > 4 {
+    true: 0.72
+    false: 1
+  }
+
+  const bellScale: f32 = match engines > 8 {
+    true: 0.56
+    false: bellMid
+  }
+
+  const bellRing: f32 = match engines > 4 {
+    true: 0.32
+    false: 0.22
+  }
+
+  const bellInner: i32 = match engines > 6 {
+    true: engines / 3
+    false: 0
+  }
+
+  const bellOuter: i32 = engines - bellInner
+
+  const finCount: i32 = match engines > 0 {
+    true: 4
+    false: 0
+  }
+
+  if engines > 0 {
+    thrust_plate {
+      Position: {0, 0.19, 0}
+      Cylinder: {segments: 20, smooth: true, length: 0.08, radius: 0.5}
+      Scale: {(rkRadius - 0.04) * 2, 1, (rkRadius - 0.04) * 2}
+      Rgb: rocketSoot
+      PbrMaterial: {metallic: 0.75, roughness: 0.45}
+    }
+
+    skirt_flare {
+      Position: {0, 0.26, 0}
+      Cylinder: {segments: 20, smooth: true, length: 0.12, radius: 0.5}
+      Scale: {(rkRadius + 0.05) * 2, 1, (rkRadius + 0.05) * 2}
+      Rgb: rocketSoot
+      PbrMaterial: {metallic: 0.7, roughness: 0.5}
+    }
+
+    skirt {
+      Position: {0, 0.44, 0}
+      Cylinder: {segments: 20, smooth: true, length: 0.36, radius: 0.5}
+      Scale: {rkRadius * 2, 1, rkRadius * 2}
+      Rgb: rocketDark
+      PbrMaterial: {metallic: 0.86, roughness: 0.28}
+    }
+
+    skirt_collar {
+      Position: {0, 0.605, 0}
+      Cylinder: {segments: 20, smooth: true, length: 0.07, radius: 0.5}
+      Scale: {(rkRadius + 0.02) * 2, 1, (rkRadius + 0.02) * 2}
+      Rgb: rocketTrim
+    }
+  }
+
+  for i in 0..bellInner {
+    const a = 6.2832 * i / bellInner
+
+    "bell_in_{i}" {
+      Position: {cos(a) * 0.13, 0, sin(a) * 0.13}
+      Rotation: {0, a, 0}
+      RocketBell: {scale: bellScale}
+    }
+  }
+
+  for i in 0..bellOuter {
+    const a = 6.2832 * i / bellOuter + 0.4
+
+    "bell_out_{i}" {
+      Position: {cos(a) * bellRing, 0, sin(a) * bellRing}
+      Rotation: {0, a, 0}
+      RocketBell: {scale: bellScale}
+    }
+  }
+
+  for i in 0..finCount {
+    const a = 1.5708 * i + 0.7854
+
+    "fin_{i}" {
+      Position: {cos(a) * (rkRadius + 0.02), 0.4, sin(a) * (rkRadius + 0.02)}
+      Rotation: {0, 0 - a, 0}
+      Box: {0.2, 0.56, 0.4}
+      Rgb: rocketTrim
+      PbrMaterial: {metallic: 0.6, roughness: 0.42}
+    }
+  }
+
+  for i in 0..fuel {
+    const y = engineY + i * rkTankH
+
+    "tank_{i}" {
+      Position: {0, y + rkTankH * 0.5, 0}
+      Cylinder: {segments: 20, smooth: true, length: rkTankH - 0.03, radius: 0.5}
+      Scale: {rkRadius * 2, 1, rkRadius * 2}
+      Rgb: rocketHull
+      PbrMaterial: {metallic: 0.72, roughness: 0.3}
+    }
+
+    "tank_collar_{i}" {
+      Position: {0, y + 0.04, 0}
+      Cylinder: {segments: 20, smooth: true, length: 0.08, radius: 0.5}
+      Scale: {(rkRadius + 0.03) * 2, 1, (rkRadius + 0.03) * 2}
+      Rgb: rocketShade
+      PbrMaterial: {metallic: 0.8, roughness: 0.26}
+    }
+
+    "tank_stripe_{i}" {
+      Position: {0, y + rkTankH * 0.5, rkRadius + 0.01}
+      Box: {0.18, rkTankH * 0.58, 0.06}
+      Rgb: rocketTrim
+    }
+
+    "tank_duct_{i}" {
+      Position: {0 - (rkRadius - 0.03), y + rkTankH * 0.5, -0.15}
+      Box: {0.11, rkTankH * 0.8, 0.11}
+      Rgb: rocketShade
+      PbrMaterial: {metallic: 0.8, roughness: 0.3}
+    }
+
+    "tank_clip_{i}" {
+      Position: {0 - (rkRadius - 0.1), y + rkTankH * 0.5, -0.15}
+      Box: {0.16, 0.1, 0.16}
+      Rgb: rocketDark
+    }
+  }
+
+  for i in 0..cargo {
+    const y = tankY + i * rkBayH
+
+    "bay_{i}" {
+      Position: {0, y + rkBayH * 0.5, 0}
+      Rotation: {0, 0.5 * i, 0}
+      RocketBay: {lit: loaded}
+    }
+  }
+
+  if life_support > 0 {
+    capsule_collar {
+      Position: {0, bayY + 0.05, 0}
+      Cylinder: {segments: 20, smooth: true, length: 0.1, radius: 0.5}
+      Scale: {(rkRadius + 0.03) * 2, 1, (rkRadius + 0.03) * 2}
+      Rgb: rocketTrim
+    }
+
+    capsule {
+      Position: {0, bayY + 0.53, 0}
+      Cylinder: {segments: 20, smooth: true, length: 0.86, radius: 0.5}
+      Scale: {(rkRadius - 0.02) * 2, 1, (rkRadius - 0.02) * 2}
+      Rgb: rocketHull
+      PbrMaterial: {metallic: 0.7, roughness: 0.28}
+    }
+
+    capsule_window {
+      Position: {0, bayY + 0.66, rkRadius - 0.05}
+      Box: {0.3, 0.26, 0.06}
+      Rgb: rocketGlass
+      Emissive: {strength: 2.6, color: rocketGlass}
+    }
+
+    capsule_hatch {
+      Position: {0 - (rkRadius - 0.05), bayY + 0.48, 0}
+      Box: {0.06, 0.34, 0.28}
+      Rgb: rocketShade
+      PbrMaterial: {metallic: 0.75, roughness: 0.3}
+    }
+
+    capsule_cap {
+      Position: {0, bayY + 1.0, 0}
+      Cylinder: {segments: 20, smooth: true, length: 0.1, radius: 0.5}
+      Scale: {(rkRadius - 0.01) * 2, 1, (rkRadius - 0.01) * 2}
+      Rgb: rocketShade
+      PbrMaterial: {metallic: 0.75, roughness: 0.3}
+    }
+  }
+
+  if valid {
+    nose_base {
+      Position: {0, noseY + 0.06, 0}
+      Cylinder: {segments: 20, smooth: true, length: 0.12, radius: 0.5}
+      Scale: {(rkRadius - 0.01) * 2, 1, (rkRadius - 0.01) * 2}
+      Rgb: rocketShade
+      PbrMaterial: {metallic: 0.78, roughness: 0.26}
+    }
+
+    nose_cone {
+      Position: {0, noseY + 0.57, 0}
+      Cone: {segments: 20, smooth: true, length: 0.88, radius: 0.5}
+      Scale: {(rkRadius - 0.02) * 2, 1, (rkRadius - 0.02) * 2}
+      Rgb: rocketHull
+      PbrMaterial: {metallic: 0.74, roughness: 0.24}
+    }
+
+    nose_tip {
+      Position: {0, noseY + 1.06, 0}
+      Sphere: {segments: 12, smooth: true, radius: 0.08}
+      Rgb: rocketTrim
+      Emissive: {strength: 2.4, color: rocketTrim}
+    }
+  }
+}

@@ -1,0 +1,187 @@
+// The repair drone of the drone pad, the RepairDrone prefab of the original: a hull with a
+// hazard stripe, an eye lamp in front and a weld beacon on top, four booms out to the corners
+// with a rotor of two blades on each, two skids and the welding arm below. Its origin is the
+// center of the hull and it faces +Z. RotorBlade is the blade the rotors share.
+//
+// Named parts: rotor_a to rotor_d (spin about y, still while docked), hull/eye (Light) and
+// weld (the nozzle of the arm, where the weld sparks come out).
+
+using box.transform
+using box.geometry
+using box.material
+
+const droneSteel: Rgb = {172, 180, 194}
+const droneShade: Rgb = {112, 120, 136}
+const droneDeep: Rgb = {56, 62, 76}
+const droneHazard: Rgb = {240, 176, 58}
+const droneAccent: Rgb = {92, 236, 222}
+const droneWeld: Rgb = {120, 216, 255}
+
+prefab RotorBlade {
+  Box: {0.42, 0.015, 0.05}
+  Rgb: droneDeep
+  PbrMaterial: {metallic: 0.6, roughness: 0.4}
+}
+
+prefab RepairDrone {
+  hull {
+    Position: {0, 0, 0}
+    Box: {0.3, 0.14, 0.42}
+    Rgb: droneSteel
+    PbrMaterial: {metallic: 0.55, roughness: 0.42}
+
+    stripe {
+      Position: {0, 0.08, -0.06}
+      Box: {0.24, 0.03, 0.14}
+      Rgb: droneHazard
+    }
+
+    eye {
+      Position: {0, 0.0, 0.2}
+      Rotation: {1.5708, 0, 0}
+      Light: {
+        color: droneAccent, w: 0.14, d: 0.07, h: 0.04,
+        strength: 2.6
+      }
+    }
+
+    beacon {
+      Position: {0, 0.09, 0.08}
+      Box: {0.06, 0.04, 0.06}
+      Rgb: droneWeld
+      Emissive: {strength: 2.2, color: droneWeld}
+    }
+  }
+
+  boom_a {
+    Position: {0.17, 0.02, 0.17}
+    Rotation: {0, 0.7854, 0}
+    Box: {0.06, 0.05, 0.3}
+    Rgb: droneShade
+    PbrMaterial: {metallic: 0.5, roughness: 0.5}
+  }
+
+  boom_b {
+    Position: {-0.17, 0.02, 0.17}
+    Rotation: {0, -0.7854, 0}
+    Box: {0.06, 0.05, 0.3}
+    Rgb: droneShade
+    PbrMaterial: {metallic: 0.5, roughness: 0.5}
+  }
+
+  boom_c {
+    Position: {-0.17, 0.02, -0.17}
+    Rotation: {0, 0.7854, 0}
+    Box: {0.06, 0.05, 0.3}
+    Rgb: droneShade
+    PbrMaterial: {metallic: 0.5, roughness: 0.5}
+  }
+
+  boom_d {
+    Position: {0.17, 0.02, -0.17}
+    Rotation: {0, -0.7854, 0}
+    Box: {0.06, 0.05, 0.3}
+    Rgb: droneShade
+    PbrMaterial: {metallic: 0.5, roughness: 0.5}
+  }
+
+  rotor_a {
+    Position: {0.29, 0.1, 0.29}
+
+    hub {
+      Box: {0.07, 0.05, 0.07}
+      Rgb: droneShade
+    }
+
+    blade_x : RotorBlade {
+      Position: {0, 0.03, 0}
+    }
+
+    blade_z : RotorBlade {
+      Position: {0, 0.03, 0}
+      Rotation: {0, 1.5708, 0}
+    }
+  }
+
+  rotor_b {
+    Position: {-0.29, 0.1, 0.29}
+
+    hub {
+      Box: {0.07, 0.05, 0.07}
+      Rgb: droneShade
+    }
+
+    blade_x : RotorBlade {
+      Position: {0, 0.03, 0}
+    }
+
+    blade_z : RotorBlade {
+      Position: {0, 0.03, 0}
+      Rotation: {0, 1.5708, 0}
+    }
+  }
+
+  rotor_c {
+    Position: {-0.29, 0.1, -0.29}
+
+    hub {
+      Box: {0.07, 0.05, 0.07}
+      Rgb: droneShade
+    }
+
+    blade_x : RotorBlade {
+      Position: {0, 0.03, 0}
+    }
+
+    blade_z : RotorBlade {
+      Position: {0, 0.03, 0}
+      Rotation: {0, 1.5708, 0}
+    }
+  }
+
+  rotor_d {
+    Position: {0.29, 0.1, -0.29}
+
+    hub {
+      Box: {0.07, 0.05, 0.07}
+      Rgb: droneShade
+    }
+
+    blade_x : RotorBlade {
+      Position: {0, 0.03, 0}
+    }
+
+    blade_z : RotorBlade {
+      Position: {0, 0.03, 0}
+      Rotation: {0, 1.5708, 0}
+    }
+  }
+
+  skid_l {
+    Position: {-0.13, -0.11, 0}
+    Box: {0.05, 0.08, 0.32}
+    Rgb: droneDeep
+  }
+
+  skid_r {
+    Position: {0.13, -0.11, 0}
+    Box: {0.05, 0.08, 0.32}
+    Rgb: droneDeep
+  }
+
+  arm {
+    Position: {0, -0.12, 0.16}
+    Box: {0.05, 0.12, 0.05}
+    Rgb: droneShade
+
+    nozzle {
+      Position: {0, -0.09, 0.02}
+      Box: {0.07, 0.06, 0.09}
+      Rgb: droneDeep
+    }
+  }
+
+  weld {
+    Position: {0, -0.24, 0.18}
+  }
+}

@@ -1,0 +1,47 @@
+// A puff of dust where a bullet hits a critter, the HitPuff of the original.
+
+using box.transform
+using box.particle
+
+prefab HitPuff {
+  // The burst: 7 particles of the fx pool, from a sphere of 0.12, offset {0, 0.02, 0}, at
+  // {0, 0.9, 0} +- {0.4, 0.4, 0.4}, radial 1.4, living 0.36 +- 0.12 s, sized 0.17 +- 0.06
+  // growing 0.6 a second, colored {226, 209, 184, 225} to {176, 162, 144, 60}
+  particles {
+    Position: {0, 0.02, 0}
+    ParticleEmitter: {
+      max: 7,
+      rate: 0,
+      shape: EmitterSphere,
+      radius: 0.12,
+      direction: {0, 1, 0},
+      spread: 24,
+      speed: {0.5, 1.3},
+      radial: {1.4, 1.4},
+      lifetime: {0.24, 0.48},
+      size: {0.11, 0.23},
+      rotation: {-180, 180},
+      spin: {-115, 115},
+      color: {226, 209, 184},
+      seed: 221
+    }
+    ParticleBurst: {count: 7}
+    ParticleForces: {gravity: {0, -5, 0}, drag: 2.5, turbulence: 0.7, turbulence_scale: 1.2}
+    ParticleAppearance: {
+      shape: ParticleSprite,
+      texture: sprPuff,
+      softness: 0.35,
+      lit: 0.8
+    }
+    ParticleCurves: {
+      size: {0.45, 1.66, 2.58, 3.41},
+      opacity: {0.88, 0.67, 0.4, 0},
+      color: {
+        start: {255, 255, 255},
+        early: {236, 236, 237},
+        late: {218, 217, 219},
+        end: {199, 198, 201}
+      }
+    }
+  }
+}
