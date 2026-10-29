@@ -81,10 +81,18 @@ template PowerBar {
   Rgb: barColor
   Border: {width: 1, radius: 2, color: {52, 56, 64, 255}}
 
+  // Entering and leaving in loops of their own: a change of the props or of the state read
+  // evaluates the template again and restarts its async blocks, and a single loop restarted
+  // while hovered would wait for an enter and miss the leave
   async {
     while true {
       await on.enter(this)
       hover = true
+    }
+  }
+
+  async {
+    while true {
       await on.leave(this)
       hover = false
     }
@@ -133,9 +141,16 @@ template PowerColumn {
     Image: {texture: icon, u0: 0, v0: 0, u1: 1, v1: 1}
   }
 
+  // Centered by the layout rather than wrapped at the column's width, so a caption wider than
+  // the column (CONSTRUCTION) stays on one line, centered on it
   caption_label {
+    Layout: {}
     LayoutItem: {h: Left, v: Top, y: -136, width: {mode: Fixed, value: powerColumnWidth}}
-    Text: {value: caption, size: 10, width: powerColumnWidth, align: Center}
-    Rgb: palette.soft
+
+    line {
+      LayoutItem: {h: Center, v: Top}
+      Text: {value: caption, size: 10, wrap: Newlines}
+      Rgb: palette.soft
+    }
   }
 }

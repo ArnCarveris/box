@@ -135,7 +135,7 @@ template RocketSection {
 
   name_label {
     LayoutItem: {h: Left, v: Top, x: 36, y: -7}
-    Text: {value: label, size: 13}
+    Text: {value: label, size: 13, wrap: Newlines}
     Rgb: labelColor
   }
 
@@ -205,10 +205,18 @@ template RocketSection {
     }
   }
 
+  // Entering and leaving in loops of their own: a change of the props or of the state read
+  // evaluates the template again and restarts its async blocks, and a single loop restarted
+  // while hovered would wait for an enter and miss the leave
   async {
     while true {
       await on.enter(this)
       hover = true
+    }
+  }
+
+  async {
+    while true {
       await on.leave(this)
       hover = false
     }
@@ -292,10 +300,18 @@ template RocketStep {
     }
   }
 
+  // Entering and leaving in loops of their own: a change of the props or of the state read
+  // evaluates the template again and restarts its async blocks, and a single loop restarted
+  // while hovered would wait for an enter and miss the leave
   async {
     while true {
       await on.enter(this)
       hover = true
+    }
+  }
+
+  async {
+    while true {
       await on.leave(this)
       hover = false
     }

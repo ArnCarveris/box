@@ -124,14 +124,22 @@ template QueueRow {
 
   name_label {
     LayoutItem: {h: Left, v: Top, x: 32 + indent, y: -5}
-    Text: {value: label, size: 15}
+    Text: {value: label, size: 15, wrap: Newlines}
     Rgb: labelColor
   }
 
+  // Entering and leaving in loops of their own: a change of the props or of the state read
+  // evaluates the template again and restarts its async blocks, and a single loop restarted
+  // while hovered would wait for an enter and miss the leave
   async {
     while true {
       await on.enter(this)
       hover = true
+    }
+  }
+
+  async {
+    while true {
       await on.leave(this)
       hover = false
     }

@@ -13,6 +13,7 @@ panels at the points of their layout, measured from the corners of the window as
 anchors them (ui/hud.flecs). They set the inventory and the orders directly and pause the
 astronaut's crafting, so the order book holds still.
 """
+from box_client import parse_value
 from oreelse_buildings import (  # noqa: F401 (ARGS)
     ARGS, OFFSETS, PLAYER, SETTLE, STATE, TOAST, aim_tile, count, free_area, key,
     move_cursor, run_script, select, set_inventory, set_state, setup, tiles)
@@ -139,8 +140,8 @@ def levels(app):
 
 
 def wait_levels(app, expected):
-    app.wait_for("get %s OrePowerAlloc.level" % ALLOC,
-                 lambda out: [int(v) for v in out.strip("[]").split(",")] == expected,
+    app.wait_for("get %s OrePowerAlloc" % ALLOC,
+                 lambda out: parse_value(out)["level"] == expected,
                  what="the levels %s" % expected)
 
 
@@ -178,12 +179,41 @@ def test_queue(app):
               "the cancel refunded %d iron and %d copper" %
               (count(app, "items.Iron"), count(app, "items.Copper")))
 
+    # The header, which the click changed, goes dark when the cursor leaves it: no face while
+    # no worker is on it
+    move_cursor(app, row_point(1, row_count(app)))
+    app.wait_frames(SETTLE)
+    faces = [line for line in app.exec("get %s" % header).splitlines()
+             if line.startswith("box.material.Rgb")]
+    app.check(faces == [], "the header keeps a face after the cursor left it: %s" % faces)
+
     # The last unit: the order is gone and the queue with it
     click_at(app, row_point(0, row_count(app)))
     app.wait_for("get %s OreCraftBook.count" % BOOK, "0", what="the order cancelled")
     app.wait_for("get %s OreCraftBook.row_count" % BOOK, "0", what="no rows")
     app.wait_frames(SETTLE)
     app.check(not shown(app, QUEUE), "the queue shows without orders")
+
+
+def test_queue_hover_while_crafting(app):
+    start(app)
+    set_inventory(app, [("items.Iron", 32), ("items.Copper", 16)])
+    order(app, ENGINE, 2)
+    oid = demands(app)[0][0]
+    header = "%s.row_%d_RocketEngine" % (QUEUE, oid)
+    move_cursor(app, row_point(0, row_count(app)))
+    app.wait_frames(SETTLE)
+    app.check(color(app, header) == ROW_HOVER, "the hovered header is %s" %
+              (color(app, header),))
+
+    # A slow craft changes the book every frame: the header stays lit under the cursor
+    app.exec("set %s OreCrafter {speed: 0.1, paused: false}" % PLAYER)
+    app.wait_for("get %s OreCraftBook.rows[1].progress" % BOOK, lambda out: float(out) > 0.05,
+                 what="the craft under way")
+    for _ in range(3):
+        app.wait_frames(2)
+        app.check(color(app, header) == ROW_HOVER, "the header is %s while the book changes" %
+                  (color(app, header),))
 
 
 def test_power(app):
@@ -248,6 +278,10 @@ def test_steps(app):
     for _ in range(4):
         click_at(app, step_point("engine", True))
     wait_rocket(app, lambda r: parts(r) == (4, 0, 1, 0), "4 engines")
+
+    # The cargo bay's plus step, clicked and left for the engines' one, is not lit any more
+    app.check(color(app, cargo_plus) == STEP_FACE, "the cargo bay's plus step is %s after the "
+              "cursor left it" % (color(app, cargo_plus),))
     wait_shown(app, NOTE, "NEEDS 1 MORE FUEL TANKS")
     click_at(app, step_point("fuel", True))
     r = wait_rocket(app, lambda r: r["valid"], "a valid rocket")
