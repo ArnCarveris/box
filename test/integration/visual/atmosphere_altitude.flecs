@@ -6,10 +6,6 @@ using box.view
 using box.light
 using box.atmosphere
 
-$ {
-  Atmosphere: {units_per_km: 100}
-}
-
 camera {
   Position: {0, 500, 0}
   Rotation: {-0.25, 0, 0}
@@ -24,6 +20,10 @@ sun {
   Rotation: {0.8, 0.9, 0}
   DirectionalLight: {intensity: 3 * flecs.script.math.PI}
   Rgb: {255, 255, 255}
+}
+
+$ {
+  Atmosphere: {units_per_km: 100, sun: sun}
 }
 
 ground {

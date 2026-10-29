@@ -329,10 +329,11 @@ void AtmosphereSky_packet_view_fog_light_without_lights(void) {
     scene_new(world, &view);
     const box_render_view_t *v = frame_view(world, null);
     test_assert(v->atmosphere != 0);
-    test_assert(fabsf(v->atmos.fog_light[0] - v->atmos.sun[0]) < 1e-5f);
-    test_assert(fabsf(v->atmos.fog_light[1] - v->atmos.sun[1]) < 1e-5f);
-    test_assert(v->atmos.fog_light[1] > 0);
-    test_assert(v->atmos.fog_light[3] > 0.99f);
+    test_flt(v->atmos.fog_light[0], 0.0f);
+    test_flt(v->atmos.fog_light[1], 0.0f);
+    test_flt(v->atmos.fog_light[2], 0.0f);
+    test_flt(v->atmos.fog_light[3], 0.0f);
+    test_flt(v->atmos.sun_color[0], 0.0f);
     test_flt(v->atmos.fog_moon[3], 0.0f);
 
     ecs_fini(world);

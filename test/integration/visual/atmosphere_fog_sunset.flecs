@@ -13,12 +13,6 @@ camera {
   Camera: {fov: 70, far_: 0}
 }
 
-// The fog takes its color from the sky, so color is ignored: the pink would show without it
-sky {
-  Atmosphere: {units_per_km: 100, sun_disk_intensity: 20}
-  HeightFog: {density: 0.0015, falloff: 0.05, base_height: 0, color: {255, 0, 255}, atmosphere: sky}
-}
-
 bloom {
   Bloom: {intensity: 0.35, threshold: 1, threshold_softness: 0.5}
 }
@@ -27,14 +21,20 @@ tonemap {
   Tonemap: {}
 }
 
-main_view {
-  View: {camera: camera, clear: {enabled: true, color: {0, 0, 0, 255}}, effects: [{effect: sky}, {effect: bloom}, {effect: tonemap}]}
-}
-
 sun {
   Rotation: {0.05236, 0.4, 0}
   DirectionalLight: {intensity: 6 * flecs.script.math.PI}
   Rgb: {255, 255, 255}
+}
+
+// The fog takes its color from the sky, so color is ignored: the pink would show without it
+sky {
+  Atmosphere: {units_per_km: 100, sun_disk_intensity: 20, sun: sun}
+  HeightFog: {density: 0.0015, falloff: 0.05, base_height: 0, color: {255, 0, 255}, atmosphere: sky}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {0, 0, 0, 255}}, effects: [{effect: sky}, {effect: bloom}, {effect: tonemap}]}
 }
 
 ground {

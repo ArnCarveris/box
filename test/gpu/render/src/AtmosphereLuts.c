@@ -89,6 +89,11 @@ static ecs_entity_t scene_new(
     }
 
     ecs_entity_t s = sun_new(world, scene, elevation);
+    if (atmosphere) {
+        ecs_get_mut(world, scene, Atmosphere)->sun = s;
+        ecs_modified(world, scene, Atmosphere);
+    }
+
     ecs_entity_t c = camera_new(world, scene);
     ecs_entity_t surface = ecs_new(world);
     ecs_set(world, surface, Surface, {.width = 64, .height = 48, .resolution_scale = 1,

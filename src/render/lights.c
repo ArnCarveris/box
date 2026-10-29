@@ -132,8 +132,8 @@ typedef struct box_light_scene_t {
     bool baking;            /**< The scene has LightBake, so bake modes apply */
     bool split;             /**< Baking with a light that is not Mixed: the capture, mixed and
                              *   baked lists are kept, else the captures use the view list */
-    bool default_sun;       /**< The view list holds the default sun attenuated by the
-                             *   atmosphere of a scene without light entities */
+    bool atmos_unlit;       /**< A scene without light entities with a valid atmosphere: its
+                             *   views get its empty view list rather than the default sun */
     box_light_atmos_t atmos; /**< The atmosphere of the scene */
     box_light_tod_t tod;    /**< The time of day of the scene */
     float sky[3];           /**< Linear ambient light from above, summed */
@@ -337,7 +337,7 @@ static void box_lights_reset(
         s->has_lights = false;
         s->baking = false;
         s->split = false;
-        s->default_sun = false;
+        s->atmos_unlit = false;
         ecs_os_memset_t(&s->atmos, 0, box_light_atmos_t);
         ecs_os_memset_t(&s->tod, 0, box_light_tod_t);
         s->has_ambient = false;
@@ -520,9 +520,6 @@ static void box_lights_atmos_light(
 
 /** Attenuate a directional light that is the sun or the moon of the atmosphere of its scene.
  *
- * Without Atmosphere.sun the sun is the first directional light of the scene that is not the
- * moon.
- *
  * @param s The scene of the light
  * @param e The light entity
  * @param light The light, its color is attenuated
@@ -538,7 +535,7 @@ static void box_lights_atmos_directional(
         goto done;
     }
 
-    if (!a->sun.found && (v->sun ? e == v->sun : e != v->moon)) {
+    if (!a->sun.found && v->sun && e == v->sun) {
         box_lights_atmos_light(a, &a->sun, v->sun_radius, light);
     } else if (!a->moon.found && v->moon && e == v->moon) {
         box_lights_atmos_light(a, &a->moon, v->moon_radius, light);
@@ -733,25 +730,18 @@ static void box_lights_collect_times(
     }
 }
 
-/** Light the scenes with a valid atmosphere, no light entities and no Atmosphere.sun by the
- * default sun of their atmosphere, kept in their view list.
+/** Keep the scenes with a valid atmosphere and no light entities from the default sun.
  *
  * @param l The state
  */
-static void box_lights_atmos_defaults(
+static void box_lights_atmos_unlit(
     box_render_lights_t *l)
 {
     int32_t i;
     for (i = 0; i < ecs_vec_count(&l->scenes); i ++) {
         box_light_scene_t *s = ecs_vec_get_t(&l->scenes, box_light_scene_t, i);
-        box_light_atmos_t *a = &s->atmos;
-        if (a->entity && !a->error && !s->has_lights && !a->value.sun) {
-            box_render_light_t sun;
-            box_lights_default_sun(&sun);
-            box_lights_atmos_light(a, &a->sun, a->value.sun_radius, &sun);
-            box_lights_push(s, a->entity, LightBakeModeMixed, &sun);
-            s->default_sun = true;
-        }
+        const box_light_atmos_t *a = &s->atmos;
+        s->atmos_unlit = a->entity && !a->error && !s->has_lights;
     }
 }
 
@@ -1150,7 +1140,7 @@ static void box_lights_send(
 
         for (k = 0; k < BOX_LIGHTS_LISTS; k ++) {
             box_light_list_t *list = &s->lists[k];
-            bool used = (s->has_lights || s->default_sun) && (k == BOX_LIGHTS_VIEW ||
+            bool used = (s->has_lights || s->atmos_unlit) && (k == BOX_LIGHTS_VIEW ||
                 (s->split && (k != BOX_LIGHTS_BAKED || ecs_vec_count(&list->lights))));
             if (used) {
                 box_lights_send_list(l, list, p);
@@ -1191,7 +1181,7 @@ static void box_lights_views(
             : NULL;
         out->enabled = view ? view->lighting.enabled : true;
         const box_light_list_t *list = s ? &s->lists[BOX_LIGHTS_VIEW] : NULL;
-        if (s && (s->has_lights || s->default_sun)) {
+        if (s && (s->has_lights || s->atmos_unlit)) {
             out->buffer = list->buffer;
             out->directional = list->directional;
             out->count = (uint32_t)ecs_vec_count(&list->lights);
@@ -1641,7 +1631,7 @@ static void BoxRenderExtractLights(
     box_lights_collect(world, l, l->directional, 0);
     box_lights_collect(world, l, l->point, 1);
     box_lights_collect(world, l, l->spot, 2);
-    box_lights_atmos_defaults(l);
+    box_lights_atmos_unlit(l);
     box_lights_atmos_moonlight(l);
     box_lights_collect_ambient(world, l);
     box_lights_shadows(world, l, p);

@@ -18,9 +18,15 @@ gtao {
   Gtao: {radius: 0.6, final_value_power: 2.2}
 }
 
+sun {
+  DirectionalLight: {intensity: 1.4 * math.PI}
+  Rgb: {255, 255, 255}
+}
+
 sky {
-  Atmosphere: {units_per_km: 100, mie: {scale_height: 1.2, anisotropy: 0.8, scattering_scale: 4}, ozone_scale: 5}
-  HeightFog: {density: 0.004, falloff: 0.1, base_height: 0, max_opacity: 0.25, atmosphere: sky}
+  Atmosphere: {sun: sun, units_per_km: 100, rayleigh: {scale_height: 8, scattering_scale: 3}, ozone_scale: 4, sun_disk_intensity: 10, sun_radius: 0.75}
+  TimeOfDay: {hour: 16, day_of_year: 80, latitude: 45, north: 60, sun: sun}
+  HeightFog: {density: 0.002, falloff: 0.1, base_height: 0, max_opacity: 0.25, atmosphere: sky}
 }
 
 bloom {
@@ -35,11 +41,9 @@ smaa {
   Smaa: {}
 }
 
-// The viewpoint of the town scene of ../flecs-engine, which looked from {-12.8, 9.455, 25.806} at
-// {-12.366, 9.044, 25}. box_old's own camera sat 225 units away, where the town is a speck.
 camera {
-  Position: {-12.8, 9.455, 25.806}
-  Rotation: {-0.4219, -0.4942, 0}
+  Position: {-23.767, 7.484, 30.355}
+  Rotation: {-0.1141, -0.6959, 0}
   Camera: {fov: 55, near_: 0.1}
   CameraController: {speed: 14, boost: 4, sensitivity: 0.003}
 }
@@ -50,12 +54,6 @@ view {
 
 $ {
   LightBake: {environment: sky, probe_spacing: 1, bounds_padding: -0.3, capture_size: 16, bounces: 0, budget_ms: 8}
-}
-
-sun {
-  Rotation: {0.45, -0.8332, 0}
-  DirectionalLight: {intensity: 1.4 * math.PI}
-  Rgb: {255, 255, 255}
 }
 
 const timber: Rgb = {91, 65, 57}
