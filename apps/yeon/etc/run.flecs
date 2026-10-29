@@ -1,0 +1,46 @@
+using box.transform
+using yeon
+
+player {
+  Position: {cfg.kiteX, 9, 0}
+  YeonKite: {v: 0, spin: 0}
+  YeonPose: {pitch: -0.25, roll: 0}
+  YeonRope: {
+    anchor_dx: cfg.playerAnchorDx,
+    anchor_y: cfg.anchorY,
+    attach_y: -0.2,
+    slack: cfg.ropeSlack,
+    gravity: cfg.ropeGravity,
+    segment: 0,
+    cut: false,
+    ready: false
+  }
+  YeonLives: {lives_left: cfg.maxLives}
+}
+
+sky {}
+
+$ {
+  YeonGame: {
+    lanterns: 0,
+    max_lives: cfg.maxLives,
+    speed: cfg.initialSpeed,
+    time: 0,
+    distance_since_rival: 0,
+    next_rival_distance: 30,
+    distance_since_lantern: 0,
+    next_lantern_distance: 6,
+    seed: cfg.seed,
+    player: player,
+    sky_parent: sky,
+    rival_red: RedKite,
+    rival_blue: BlueKite,
+    rival_yellow: YellowKite,
+    lantern: Lantern,
+    sparkle: LanternSparkle,
+    cut: StringCut,
+    effect_drift: effect_drift
+  }
+
+  (YeonGameState, Playing)
+}

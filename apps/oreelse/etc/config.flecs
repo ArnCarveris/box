@@ -51,6 +51,40 @@ cfg {
   export const hoverFall: f32 = 5
   export const airborne: f32 = 0.01
 
+  // The walk of the astronaut (OrePlayerFx): its walk cycle (OrePlayerGait) advances its speed
+  // times stepRate radians a second, it bobs up to bobHeight above the ground with every step and
+  // kicks up FootDust footDustY above the ground at every half step on the ground
+  export const stepRate: f32 = 1.6
+  export const bobHeight: f32 = 0.07
+  export const footDustY: f32 = 0.04
+
+  // The limbs of the astronaut (OreLimb) cover limbBlend * dt of the distance to their pose every
+  // frame. In the air they trail airTrail times their swing behind while moving (times the run
+  // multiplier while running, at most airTrailMax) and dangle airDangle times their swing at
+  // airDangleRate radians a second
+  export const limbBlend: f32 = 14
+  export const airTrail: f32 = 0.85
+  export const airTrailMax: f32 = 1.25
+  export const airDangle: f32 = 0.14
+  export const airDangleRate: f32 = 1.6
+
+  // The death of the astronaut: SplatBurst plays playerSplatLift above its position and it falls
+  // over, turned deathPitch about x (and its yaw dropped, as the original)
+  export const playerSplatLift: f32 = 1.1
+  export const deathPitch: f32 = 1.5708
+
+  // A deposit shrinks with its ore, to a scale of depositScaleMin + (1 - depositScaleMin) *
+  // amount / capacity. Every yield plays MineBurst mineBurstY above its tile and a deposit that
+  // is used up PoofBurst depositPoofY above it
+  export const depositScaleMin: f32 = 0.55
+  export const mineBurstY: f32 = 0.6
+  export const depositPoofY: f32 = 0.4
+
+  // A building placed plays PoofBurst placePoofY above the center of its footprint, one
+  // demolished demolishPoofY above the tile the swing was at
+  export const placePoofY: f32 = 0.4
+  export const demolishPoofY: f32 = 0.6
+
   // The inventory holds at most inventorySlots kinds of items with a count above 0 (up to 15,
   // the slots of OreInventory)
   export const inventorySlots: i32 = 15
@@ -68,6 +102,30 @@ cfg {
 
   // Units a batch order (shift) asks for
   export const craftBatch: i32 = 5
+
+  // The rocket: a unit is a cargo bay or the life support. A rocket takes at most maxCargoBays
+  // cargo bays and maxLifeSupport life supports, and launches with enginesPerUnit engines and
+  // one fuel storage per unit; a cargo bay holds cargoCapacity Luminite
+  export const cargoCapacity: i32 = 25
+  export const maxCargoBays: i32 = 4
+  export const maxLifeSupport: i32 = 1
+  export const enginesPerUnit: i32 = 4
+
+  // The launch: the engines fire for ignitionTime seconds, then the rocket climbs, its speed
+  // growing by launchAccel units a second every second, until it is launchAltitude up, where it
+  // arrives (about 3.65 seconds of ascent)
+  export const ignitionTime: f32 = 1.6
+  export const launchAccel: f32 = 9
+  export const launchAltitude: f32 = 60
+
+  // The power allocation: Mining, Weapons and Construction each take a level of 0 to 4 bars,
+  // at most powerBars in total; the demand is the consumers' watts times the bars assigned /
+  // powerBars, and a category runs at its level times powerStep (0, 0.5, 1, 1.5, 2)
+  export const powerBars: i32 = 6
+  export const powerStep: f32 = 0.5
+
+  // A drill adds dt * drillSpeed times the Mining multiplier to its timer
+  export const drillSpeed: f32 = 1
 
   // Walking speed in units per second, and its multiplier while the run key is held
   export const walkSpeed: f32 = 7
@@ -112,6 +170,82 @@ cfg {
   export const combustPeak: f32 = 4.5
   export const combustRange: f32 = 3
   export const combustRangeRadius: f32 = 4
+
+  // The astronaut's hit points. Any damage starts its hurt timer over; after playerRegenDelay
+  // seconds without damage it regenerates playerRegen hit points a second up to the maximum
+  export const playerHp: f32 = 100
+  export const playerRegen: f32 = 2
+  export const playerRegenDelay: f32 = 5
+
+  // The waves: the first starts firstWaveAt seconds into the run, every next one waveGap seconds
+  // after the last critter of the previous one spawned. Wave w has a budget of
+  // waveBudgetBase * waveBudgetGrowth ^ (w - 1), spent on at most waveUnitCap critters, at most
+  // waveBehemothCap of them behemoths. The costs and the first waves of the tiers are on the
+  // critter prefabs (OreWaveTier)
+  export const firstWaveAt: f32 = 90
+  export const waveGap: f32 = 50
+  export const waveBudgetBase: f32 = 2
+  export const waveBudgetGrowth: f32 = 1.3
+  export const waveUnitCap: i32 = 10000
+  export const waveBehemothCap: i32 = 25
+
+  // The style of a wave, one draw per wave: below swarmChance a swarm, below swarmChance +
+  // eliteChance an elite wave, otherwise mixed. A style's mix is the share of the budget of
+  // every tier, mite, skitter, brute and behemoth (the order of OreArsenal)
+  export const swarmChance: f32 = 0.25
+  export const eliteChance: f32 = 0.25
+  export const mixedMix: OreWaveMix = {tier: [0.25, 0.25, 0.25, 0.25]}
+  export const swarmMix: OreWaveMix = {tier: [0.7, 0.2, 0.1, 0]}
+  export const eliteMix: OreWaveMix = {tier: [0.05, 0.15, 0.55, 0.25]}
+
+  // The spawns of a wave: one every min(spawnStagger, spawnWindow / count) seconds, the first at
+  // once, on a side of the map edgeInset inside the edge tiles, edgeSpawnJitter off on both axes
+  export const spawnStagger: f32 = 0.45
+  export const spawnWindow: f32 = 20
+  export const edgeInset: f32 = 1
+  export const edgeSpawnJitter: f32 = 5
+
+  // A critter goes for the astronaut within aggroRange, unless a building is closer, and looks
+  // for a target again every retargetInterval * U(0.75, 1.25) seconds. It walks critterJitter
+  // times its heading jitter radians off the direction to its goal, and the building on the tile
+  // wallProbe ahead becomes its target
+  export const aggroRange: f32 = 14
+  export const retargetInterval: f32 = 0.5
+  export const critterJitter: f32 = 0.22
+  export const wallProbe: f32 = 1.2
+
+  // The crowd separation and the critter spatial index: cells of crowdCell, at most crowdBucket
+  // critters of a cell looked at and the crowdNeighbors most overlapping pairs of a critter kept
+  // (up to 12, ORE_CROWD_NEAR). A critter's push is scaled by crowdPush * dt and moves it at
+  // most crowdMaxSpeed * dt
+  export const crowdCell: f32 = 1.6
+  export const crowdPush: f32 = 30
+  export const crowdMaxSpeed: f32 = 14
+  export const crowdNeighbors: i32 = 6
+  export const crowdBucket: i32 = 12
+
+  // The walk of a critter (OreCritterFx): its walk cycle advances its OreGait.step radians per
+  // unit walked and stands still while it attacks; it waddles critterWaddle * sin(cycle / 2)
+  // radians about z, and its legs swing at critterAttackSwing of their swing while it attacks
+  export const critterWaddle: f32 = 0.07
+  export const critterAttackSwing: f32 = 0.35
+
+  // The death of a critter: a critter without a death burst splats splatLift above its feet.
+  // Its corpse lies corpseTime seconds, then sinks at corpseSink units a second until it is
+  // 2 r + 1 below the ground, r its radius; at most corpseCap corpses, the oldest goes first.
+  // The corpse is tipped corpseTip + U(0, corpseTipJitter) radians about x and rolled
+  // (U(0, 1) - 0.5) * corpseRoll about z before it turns to the critter's heading (the
+  // original's Euler order x y z), squashed to corpseSquash of its height and charred with the
+  // tint corpseColor
+  export const splatLift: f32 = 0.6
+  export const corpseTime: f32 = 4
+  export const corpseSink: f32 = 0.7
+  export const corpseCap: i32 = 100
+  export const corpseTip: f32 = 1.1
+  export const corpseTipJitter: f32 = 0.2
+  export const corpseRoll: f32 = 0.8
+  export const corpseSquash: f32 = 0.55
+  export const corpseColor: Tint = {40, 36, 34, 255}
 
   // The render quality tiers Low, Medium and High (OreQuality.tier), the quality.flecs of the
   // original: the resolution scale of the surfaces (2 renders at half the pixels), the shadow

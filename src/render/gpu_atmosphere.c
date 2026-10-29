@@ -3,16 +3,9 @@
  * @brief Atmosphere passes of the webgpu backend: the LUTs of each scene, the sky view and
  * aerial perspective of each view, and the GPU time of every pass.
  *
- * Every pass is a compute dispatch of etc/shaders/atmosphere.wgsl, the 2D LUTs included, so they
- * share one sampler and bind their outputs as storage textures. Scene LUTs build before the
- * targets of a packet, the passes of a view right before its forward pass, which draws the sky
- * from the sky view LUT and binds the aerial perspective volume for mesh.wgsl. A view with a
- * HeightFog that takes its color from the atmosphere also gets the 2x1 in scatter color of its
- * fog, after the sky view, which its fog pass reads.
- *
- * The environment of a scene is an environment source: a request renders a sky view LUT of the
- * scene at its ground altitude, then mip 0 of the cubemap of the source from it, before the
- * environments are processed.
+ * Every pass is a compute dispatch of etc/shaders/atmosphere.wgsl with one shared sampler. Scene
+ * LUTs build before the targets of a packet, view passes right before the forward pass, and a
+ * HeightFog colored by the atmosphere gets a 2x1 in scatter color after the sky view.
  */
 
 #include "gpu_environment.h"

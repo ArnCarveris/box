@@ -1,8 +1,8 @@
 /**
  * @file UiEvents.c
- * @brief The script events of the UI: on.focus, on.blur, on.key_down and on.key_up of flecs on
- * the focus box.ui drives, and on.activate, on.change and on.submit of box.ui, counted in the
- * muts of probe templates.
+ * @brief The script events of the UI: on.focus, on.blur, on.key_down, on.key_up and on.activate
+ * of flecs on the focus box.ui drives, the activations ui.activation counts of them, and
+ * on.change and on.submit of box.ui, counted in the muts of probe templates.
  */
 
 #include <box.h>
@@ -129,14 +129,21 @@
     "  mut count: i32 = 0\n" \
     "  mut keys: i32 = 0\n" \
     "  mut last: entity = 0\n" \
+    "  mut raw: i32 = 0\n" \
+    "  mut hit: entity = 0\n" \
     "  async {\n" \
     "    while true {\n" \
     "      const e = await on.activate(target)\n" \
-    "      count = count + 1\n" \
-    "      if e.keyboard {\n" \
-    "        keys = keys + 1\n" \
+    "      raw = raw + 1\n" \
+    "      hit = e.target\n" \
+    "      const activated = ui.activation(e)\n" \
+    "      if activated != 0 {\n" \
+    "        count = count + 1\n" \
+    "        if e.keyboard {\n" \
+    "          keys = keys + 1\n" \
+    "        }\n" \
+    "        last = activated\n" \
     "      }\n" \
-    "      last = e.target\n" \
     "    }\n" \
     "  }\n" \
     "}\n" \
@@ -183,9 +190,11 @@ typedef struct {
 
 /** The muts of ActivateProbe */
 typedef struct {
-    int32_t count;     /**< Activations */
-    int32_t keys;      /**< Activations from the keyboard */
-    ecs_entity_t last; /**< Target of the last activation */
+    int32_t count;     /**< on.activate events ui.activation counts */
+    int32_t keys;      /**< Those from the keyboard */
+    ecs_entity_t last; /**< Entity ui.activation returned for the last of them */
+    int32_t raw;       /**< Every on.activate event of flecs */
+    ecs_entity_t hit;  /**< EcsScriptActivateEvent.target of the last on.activate event */
 } events_activate_t;
 
 /** The muts of ChangeProbe */
@@ -447,7 +456,11 @@ void UiEvents_activate_click(void) {
         "on_form { ActivateProbe: {target: hud.form} }\n");
     ecs_entity_t s = box_terminal_new(world);
     ecs_entity_t b = events_e(world, "hud.form.b");
+    ecs_entity_t label = events_e(world, "hud.form.b.label");
+    ecs_entity_t a = events_e(world, "hud.form.a");
     events_run(world, s, "mouse.click left [840, 260]");
+    test_int(events_activate(world, "on_b")->raw, 1);
+    test_uint(events_activate(world, "on_b")->hit, label);
     test_int(events_activate(world, "on_b")->count, 1);
     test_int(events_activate(world, "on_b")->keys, 0);
     test_uint(events_activate(world, "on_b")->last, b);
@@ -456,11 +469,17 @@ void UiEvents_activate_click(void) {
 
     events_run(world, s, "mouse.click left [880, 260]");
     test_int(events_activate(world, "on_b")->count, 2);
+    test_uint(events_activate(world, "on_b")->hit, b);
+    test_uint(events_activate(world, "on_b")->last, b);
+
     events_run(world, s, "mouse.click right [840, 260]");
+    test_int(events_activate(world, "on_b")->raw, 3);
     test_int(events_activate(world, "on_b")->count, 2);
     events_run(world, s, "mouse.click left [440, 260]");
+    test_int(events_activate(world, "on_b")->raw, 3);
     test_int(events_activate(world, "on_b")->count, 2);
     test_int(events_activate(world, "on_form")->count, 3);
+    test_uint(events_activate(world, "on_form")->last, a);
 
     ecs_fini(world);
 }
@@ -471,14 +490,19 @@ void UiEvents_activate_not_released_elsewhere(void) {
         "on_b { ActivateProbe: {target: hud.form.b} }\n");
     ecs_entity_t s = box_terminal_new(world);
     events_run(world, s, "mouse.drag left [840, 260] [1200, 50]");
+    test_int(events_activate(world, "on_b")->raw, 1);
     test_int(events_activate(world, "on_b")->count, 0);
     events_run(world, s, "mouse.drag left [840, 260] [440, 260]");
+    test_int(events_activate(world, "on_b")->raw, 2);
     test_int(events_activate(world, "on_b")->count, 0);
     events_run(world, s, "mouse.drag left [840, 260] [1200, 50]");
     events_run(world, s, "mouse.drag left [1200, 50] [840, 260]");
+    test_int(events_activate(world, "on_b")->raw, 3);
     test_int(events_activate(world, "on_b")->count, 0);
     events_run(world, s, "mouse.drag left [840, 260] [870, 270]");
+    test_int(events_activate(world, "on_b")->raw, 4);
     test_int(events_activate(world, "on_b")->count, 1);
+    test_uint(events_activate(world, "on_b")->last, events_e(world, "hud.form.b"));
 
     ecs_fini(world);
 }
@@ -502,6 +526,10 @@ void UiEvents_activate_enter(void) {
     test_int(events_activate(world, "on_b")->count, 1);
     events_run(world, s, "key.press KpEnter");
     test_int(events_activate(world, "on_b")->count, 2);
+    test_int(events_activate(world, "on_b")->keys, 2);
+    test_int(events_activate(world, "on_b")->raw, 2);
+    test_uint(events_activate(world, "on_b")->hit, events_e(world, "hud.form.b"));
+    test_uint(events_activate(world, "on_b")->last, events_e(world, "hud.form.b"));
 
     ecs_fini(world);
 }
@@ -523,6 +551,7 @@ void UiEvents_activate_space_on_release(void) {
     events_run(world, s, "mouse.click left [440, 260]");
     events_run(world, s, "key.up Space");
     test_int(events_activate(world, "on_b")->count, 2);
+    test_int(events_activate(world, "on_b")->raw, 2);
 
     ecs_fini(world);
 }
@@ -537,7 +566,45 @@ void UiEvents_key_capture_no_activate(void) {
     test_int(events_activate(world, "on_a")->count, 1);
     events_run(world, s, "key.press Enter");
     events_run(world, s, "key.press Space");
+    test_int(events_activate(world, "on_a")->raw, 3);
     test_int(events_activate(world, "on_a")->count, 1);
+
+    ecs_fini(world);
+}
+
+/* The keys reach flecs with the values its activation matches: "Enter" for KpEnter, " " */
+void UiEvents_activate_key_values(void) {
+    // ui/events
+    ecs_world_t *world = events_world(
+        "on_b { KeyProbe: {target: hud.form.b} }\n"
+        "act_b { ActivateProbe: {target: hud.form.b} }\n");
+    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t b = events_e(world, "hud.form.b");
+    test_bool(box_ui_focus(world, b), true);
+    events_run(world, s, "key.down KpEnter");
+    test_str(events_key(world, "on_b")->key, "Enter");
+    test_int(events_activate(world, "act_b")->count, 1);
+    events_run(world, s, "key.up KpEnter");
+    events_run(world, s, "key.down Space");
+    test_str(events_key(world, "on_b")->key, " ");
+    test_int(events_activate(world, "act_b")->count, 1);
+    events_run(world, s, "key.up Space");
+    test_str(events_key(world, "on_b")->key, " ");
+    test_int(events_activate(world, "act_b")->count, 2);
+    test_int(events_activate(world, "act_b")->keys, 2);
+
+    ecs_fini(world);
+}
+
+void UiEvents_activation_registered(void) {
+    // ui/events
+    ecs_world_t *world = events_world(
+        "act_b { ActivateProbe: {target: hud.form.b} }\n");
+    ecs_entity_t f = ecs_lookup(world, "flecs.script.ui.activation");
+    test_assert(f != 0);
+    test_assert(ecs_lookup(world, "box.ui.UiActivateEvent") == 0);
+    test_int(events_activate(world, "act_b")->raw, 0);
+    test_int(events_activate(world, "act_b")->count, 0);
 
     ecs_fini(world);
 }

@@ -281,7 +281,7 @@ static void box_pick_capture(
 }
 
 /** Express the screen position of the event being delivered in the local space of a parent of
- * its target, the to_local hook of flecs.script.event.
+ * its target, the to_local hook of flecs.script.input.
  *
  * @param world The world
  * @param entity The parent
@@ -311,9 +311,9 @@ static void box_pick_to_local(
 }
 
 /** Decide which entity gets the flecs focus through the focus callback of the hook, the
- * to_focus hook of flecs.script.event. Without one the focus goes where flecs asks.
+ * to_focus hook of flecs.script.input. Without one the focus goes where flecs asks.
  *
- * box.picking is the only module that sets the hooks of flecs.script.event; box.ui decides the
+ * box.picking is the only module that sets the hooks of flecs.script.input; box.ui decides the
  * focus through box_pick_hook_t, so the two do not replace each other's hooks.
  *
  * @param world The world
@@ -337,7 +337,7 @@ static ecs_entity_t box_pick_to_focus(
         st->hook.focus(world, st, entity, current, source, pick, st->hook.ctx) : entity;
 }
 
-/** Send a pointer event along the path of its pick through flecs.script.event.
+/** Send a pointer event along the path of its pick through flecs.script.input.
  *
  * @param world The world
  * @param st The module state

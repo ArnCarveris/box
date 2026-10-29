@@ -1,7 +1,9 @@
-// The brute, the Brute prefab of the original: a big red body of boxes with spikes on its
-// abdomen, a crested head with two glowing orange eyes, mandibles and tusks, and six legs. Its
-// origin is between its feet on the ground and it faces +Z. The legs are pivots with OreLimb
-// at the hips; here they stand still. OreCritters gives the prefab its gameplay data.
+// The brute, the Brute prefab of the original: a big red body of boxes with spikes on its abdomen,
+// a crested head with two glowing orange eyes, mandibles and tusks, and six legs. Its origin is
+// between its feet on the ground and it faces +Z. The legs are pivots with OreLimb at the hips,
+// swung by the walk (OreCritterLimbs). Its gameplay data: hit points, speed, damage per second,
+// attack range, body radius and what it costs a wave; its gait (OreGait) and the effect it dies
+// in (OreDeathBurst).
 
 using flecs.script.math
 using box.transform
@@ -16,6 +18,15 @@ const bruteEye: Rgb = {255, 120, 64}
 const bruteTusk: Rgb = {236, 226, 204}
 
 prefab Brute {
+  OreHealth: {value: 100, max: 100}
+  OreSpeed: {value: 2.4}
+  OreDamage: {value: 50}
+  OreRange: {value: 1.9}
+  OreRadius: {value: 1.1}
+  OreWaveTier: {cost: 15, wave: 7}
+  OreGait: {step: 1.5, bob: 0.14}
+  OreDeathBurst: {burst: CombustBurst}
+
   abdomen {
     Position: {0, 1.04, -0.86}
     Rotation: {0.22, 0, 0}

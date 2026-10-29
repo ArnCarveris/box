@@ -31,6 +31,7 @@ bake3 run apps/boxrun --local-env -- --surface 1280x720 test/integration/visual/
                                                           # a window for a scene without a Surface
 bake3 run apps/bunnyhopper --local-env                    # play the bunny hopper
 bake3 run apps/oreelse --local-env                        # play Ore Else (apps/oreelse/README.md)
+bake3 run apps/yeon --local-env                           # play Yeon (apps/yeon/README.md)
 ```
 
 Box opens files relative to the working directory or, failing that, one of its ancestors, so a

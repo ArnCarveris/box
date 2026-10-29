@@ -1,0 +1,105 @@
+using box.particle
+using box.transform
+
+effect_drift {
+  ParticleForces: {gravity: {0, 0, 0}}
+}
+
+$ {
+  ParticleSettings: {effect_max: 8, effect_total: 32, effect_overflow: EffectRecycle}
+}
+
+prefab LanternSparkle {
+  particles {
+    ParticleEmitter: {
+      max: 40,
+      rate: 0,
+      shape: EmitterBox,
+      extents: {0.3, 0.4, 0.3},
+      direction: {0, 1, 0},
+      spread: 75,
+      speed: {1.5, 5},
+      lifetime: {0.5, 0.9},
+      size: {0.06, 0.16},
+      color: {255, 200, 90},
+      forces: effect_drift,
+      seed: 201
+    }
+    ParticleBurst: {count: 30}
+    ParticleForces: {gravity: {0, -1, 0}, drag: 1.5}
+    ParticleAppearance: {blend: ParticleAdditive}
+    ParticleCurves: {
+      opacity: {0.8, 1.1, 0.8, 0}
+    }
+  }
+
+  glow {
+    ParticleEmitter: {
+      max: 40,
+      rate: 0,
+      shape: EmitterBox,
+      extents: {0.3, 0.4, 0.3},
+      direction: {0, 1, 0},
+      spread: 75,
+      speed: {1.5, 5},
+      lifetime: {0.5, 0.9},
+      size: {0.14, 0.34},
+      opacity: {0.5, 0.5},
+      color: {255, 140, 60},
+      forces: effect_drift,
+      seed: 201
+    }
+    ParticleBurst: {count: 30}
+    ParticleForces: {gravity: {0, -1, 0}, drag: 1.5}
+    ParticleAppearance: {blend: ParticleAdditive}
+    ParticleCurves: {
+      opacity: {0.8, 1.1, 0.8, 0}
+    }
+  }
+}
+
+prefab StringCut {
+  paper {
+    ParticleEmitter: {
+      max: 40,
+      rate: 0,
+      shape: EmitterBox,
+      extents: {0.6, 0.8, 0.1},
+      direction: {0, 1, 0},
+      spread: 90,
+      speed: {2, 6},
+      lifetime: {0.6, 1.2},
+      size: {0.1, 0.24},
+      color: {246, 240, 225},
+      seed: 202
+    }
+    ParticleBurst: {count: 32}
+    ParticleForces: {gravity: {0, -6, 0}, drag: 2}
+    ParticleCurves: {
+      size: {1, 1, 0.9, 0.7},
+      opacity: {1, 1, 0.8, 0}
+    }
+  }
+
+  sparks {
+    ParticleEmitter: {
+      max: 24,
+      rate: 0,
+      shape: EmitterBox,
+      extents: {0.2, 0.2, 0.1},
+      direction: {0, 1, 0},
+      spread: 100,
+      speed: {3, 8},
+      lifetime: {0.25, 0.5},
+      size: {0.05, 0.12},
+      color: {255, 60, 40},
+      seed: 203
+    }
+    ParticleBurst: {count: 20}
+    ParticleForces: {gravity: {0, -4, 0}, drag: 2}
+    ParticleAppearance: {blend: ParticleAdditive}
+    ParticleCurves: {
+      opacity: {1, 1, 0.6, 0}
+    }
+  }
+}

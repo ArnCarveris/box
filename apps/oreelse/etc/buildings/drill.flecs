@@ -23,12 +23,15 @@ const lampDead: Rgb = {248, 84, 72}
 prefab Drill {
   // The item: crafted through the order book into the inventory, placed by spending one
   OreItem: {name: "Drill", detail: "Mines ore deposits."}
+  OreIcon: {texture: icons.drill}
   OreRecipe: {inputs: [{item: items.IronPlate, amount: 6}], yield: 1, time: 1}
   // It only goes on tiles with a deposit, which it mines
   OreFootprint: {w: 1, h: 1, deposit: true}
   OreHealth: {value: 100, max: 100}
   OrePowerConsumer: {watts: 4}
   OrePowerCategory: {kind: Mining}
+  // Its mining toward the next ore, copied to every drill
+  OreDrill: {timer: 0, running: false}
 
   beam_front {
     Position: {0, 0.11, 0.76}

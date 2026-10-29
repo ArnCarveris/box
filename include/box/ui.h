@@ -3,7 +3,7 @@
  * @brief UI: the keyboard focus, Tab navigation, keys kept from the bindings, widget events and
  * the text field.
  *
- * One Focusable entity holds the keyboard focus, the focus of flecs.script.event: Focused is
+ * One Focusable entity holds the keyboard focus, the focus of flecs.script.input: Focused is
  * ecs_script_get_focus at all times. A press or Tab moves it, KeyCapture keeps the keys from the
  * bindings, widgets report changes to their scope and TextEdit is a single line text field.
  */
@@ -46,10 +46,10 @@ extern ECS_TAG_DECLARE(Focused);
  * Tab focuses the next Focusable entity inside the nearest FocusScope ancestor of the focused
  * entity in 2D draw order, wrapping around; with nothing focused, the first one of the first
  * FocusScope in the scenes of the views of the focused surface. Without any, Tab is a plain key.
- * Tab passes over the entities that a ClipChildren ancestor clips away entirely, such as the
- * content of a collapsed section or a hidden tab page. It does not pass over the content that a
- * scrolling clip (a ClipChildren with a LayoutScroll) hides, which a scroll view scrolls into
- * view when it gets the focus.
+ *
+ * Tab passes over entities a ClipChildren ancestor clips away entirely, such as a collapsed
+ * section or hidden tab page, but not content a scrolling clip (ClipChildren with LayoutScroll)
+ * hides, which a scroll view scrolls into view when it gets the focus.
  */
 extern ECS_TAG_DECLARE(FocusScope);
 
@@ -70,14 +70,6 @@ ECS_STRUCT(FocusStatus, {
     ecs_entity_t focused;  /**< Entity with the focus, 0 when nothing has it */
     ecs_entity_t previous; /**< Entity that had the focus before the last change, 0 for none */
     bool visible;          /**< The focus came from the keyboard, so widgets show a focus ring */
-});
-
-/** What on.activate resolves with */
-ECS_STRUCT(UiActivateEvent, {
-    ecs_entity_t target; /**< Entity that was activated */
-    bool keyboard;       /**< Enter or Space activated it, false for a click */
-    float local_x;       /**< X of the click release in the space of target, 0 for keys */
-    float local_y;       /**< Y of the click release in the space of target, 0 for keys */
 });
 
 /** What on.change and on.submit resolve with */
@@ -157,9 +149,9 @@ ECS_STRUCT(TextEditStatus, {
 
 /** Register the box.ui module.
  *
- * Registers flecs.script.on.activate, change and submit, which resolve on a target and its
- * ancestors, and ui.changed and ui.submit, which resolve at once. The focus events and focus()
- * are those of flecs.script.event, whose focus box.ui drives (see Focusable).
+ * Registers on.change, on.submit, ui.changed, ui.submit and ui.activation(e), which tells which
+ * entity box.ui counts an on.activate of flecs for (see etc/ui/widgets.flecs). The focus events,
+ * focus() and on.activate are those of flecs.script.input, whose focus box.ui drives.
  *
  * Creates box.ui.theme with a UiTheme and loads the widget library box.widgets as a managed
  * script from etc/ui/widgets.flecs, found as a Font.path is; without it there are no widgets.

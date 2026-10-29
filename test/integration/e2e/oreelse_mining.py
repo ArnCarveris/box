@@ -52,11 +52,12 @@ OTHER_KINDS = ["items.Iron", "items.Copper", "items.Luminite", "items.IronPlate"
                "items.RocketFuelStorage", "TileMarker", "TileMarkerBad", "Astronaut"]
 
 # Cursor positions in points of the 640x360 window (the headless app has no window size to
-# scale normalized positions with): the center hovers a tile next to the astronaut, the top
-# hovers one out of reach
+# scale normalized positions with): the center hovers a tile next to the astronaut, the far
+# point one out of reach, up and right of it beside the status bar of the HUD (x -18..622,
+# y 16..62), which keeps the buttons from the world
 CENTER = (320, 180)
 LEFT = (256, 180)
-TOP = (320, 36)
+FAR = (630, 100)
 
 # Frames for the cursor ray and the camera to follow a change
 SETTLE = 5
@@ -385,7 +386,7 @@ def test_retarget_and_release(app):
 def test_out_of_reach(app):
     start(app)
     path, d, _ = deposit_of(app, "items.Stone")
-    distance = aim(app, d, TOP)
+    distance = aim(app, d, FAR)
     app.check(distance > REACH, "the tile is %g away, within reach" % distance)
 
     mouse(app, True)

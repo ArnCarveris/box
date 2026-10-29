@@ -17,7 +17,7 @@ typedef struct box_input_emit_t {
     EcsScriptKeyboardEvent keyboard;  /**< Keyboard event to emit */
 } box_input_emit_t;
 
-/** Take one event of the frame in place of flecs.script.event.
+/** Take one event of the frame in place of flecs.script.input.
  *
  * @param world The world
  * @param emit The event, a mouse event aimed at the screen entity or a keyboard event
@@ -40,7 +40,7 @@ typedef bool (*box_input_blocks_t)(
     const vec2 cursor,
     void *ctx);
 
-/** Receives the events of a frame in order instead of flecs.script.event.
+/** Receives the events of a frame in order instead of flecs.script.input.
  *
  * box.picking installs one to aim the mouse events at the entities under the cursor.
  */

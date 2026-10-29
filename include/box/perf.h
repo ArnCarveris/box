@@ -2,10 +2,9 @@
  * @file box/perf.h
  * @brief Performance runs: an orbiting camera fitted to the scene and frame time checks.
  *
- * Setting the PerfRun singleton starts a run that caps the frames at a target rate with
- * App.fps, orbits a camera around the bounds of every shape (or flies it with its controller)
- * and counts each frame interval outside 10% of the target and each delta_time that differs
- * from the wall time.
+ * Setting the PerfRun singleton starts a run that caps the frames at a target rate with App.fps,
+ * orbits a camera around the bounds of every shape (or flies it with its controller) and counts
+ * frame intervals outside 10% of the target and delta_times that differ from the wall time.
  */
 
 #ifndef BOX_PERF_H

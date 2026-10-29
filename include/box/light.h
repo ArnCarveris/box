@@ -257,10 +257,9 @@ ECS_STRUCT(EnvironmentStatus, {
  * The top row is +Y: direction d is at u = 0.5 + atan2(d.x, -d.z) / 2 pi, v = acos(d.y) / pi.
  */
 ECS_STRUCT(EnvironmentImage, {
-    char *path;           /**< Image file, relative to the working directory or an ancestor
-                           *   of it; a file that cannot be read sets EnvironmentStatus.error.
-                           *   A change of the file that FileWatch (box/app.h) sees loads it
-                           *   again */
+    char *path;           /**< Image file, relative to the working directory or an ancestor of
+                           *   it; an unreadable file sets EnvironmentStatus.error. A change
+                           *   that FileWatch (box/app.h) sees loads it again */
 });
 
 /** Register the box.light module.

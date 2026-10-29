@@ -1,23 +1,37 @@
+/**
+ * @file geometry/validate.c
+ * @brief On-validate hooks that report invalid paths, profiles, surfaces, and meshes.
+ */
+
 #include "paths.h"
 #include <math.h>
 
+/** Check that an entity holds a usable 2D or 3D path.
+ *
+ * @param world The world
+ * @param entity The path entity
+ * @param three True to check Path3D, false to check Path2D
+ * @param closed 1 if the path must be closed, 0 if it must be open, -1 if either
+ * @return NULL if the path is valid, otherwise a reason string
+ */
 static const char* box_validate_path(
     const ecs_world_t *world,
     ecs_entity_t entity,
     bool three,
     int32_t closed)
 {
+    const char *reason = NULL;
+    ecs_vec_t points = {0};
     if (!entity || !ecs_is_alive(world, entity) ||
         !(three ? ecs_has(world, entity, Path3D) : ecs_has(world, entity, Path2D)))
     {
-        return three ? "missing Path3D with at least one segment" :
+        reason = three ? "missing Path3D with at least one segment" :
             "missing Path2D with at least one segment";
+        goto out;
     }
 
-    ecs_vec_t points = {0};
     bool ok = three ? box_path3_sample(world, entity, &points) :
         box_path2_sample(world, entity, &points);
-    const char *reason = NULL;
     if (!ok) {
         reason = "path has no usable segments or contains invalid coordinates";
         goto done;
@@ -39,6 +53,7 @@ static const char* box_validate_path(
             span |= data[i * dimensions + j] != data[j];
         }
     }
+
     if (!span) {
         reason = "path is degenerate; move a point away from the start";
         goto done;
@@ -49,12 +64,14 @@ static const char* box_validate_path(
             reason = "closed path needs at least three distinct points";
             goto done;
         }
+
         double area = 0;
         for (int32_t i = 0; i < count; i ++) {
             int32_t next = (i + 1) % count;
             area += (double)data[2 * i] * data[2 * next + 1] -
                 (double)data[2 * next] * data[2 * i + 1];
         }
+
         if (fabs(area) < 1e-8) {
             reason = "closed path has zero area; correct its footprint";
         }
@@ -65,32 +82,44 @@ done:
     } else {
         ecs_vec_fini_t(NULL, &points, vec2);
     }
+out:
     return reason;
 }
 
+/** Check that an entity holds a Profile2D whose outer path and holes are valid.
+ *
+ * @param world The world
+ * @param entity The profile entity
+ * @return NULL if the profile is valid, otherwise a reason string
+ */
 static const char* box_validate_profile(
     const ecs_world_t *world,
     ecs_entity_t entity)
 {
     const Profile2D *profile = entity && ecs_is_alive(world, entity) ?
         ecs_get(world, entity, Profile2D) : NULL;
+    const char *reason = NULL;
     if (!profile) {
-        return "missing Profile2D with a closed outer Path2D";
-    }
-    const char *reason = box_validate_path(world, profile->outer, false, true);
-    if (reason) {
-        return reason;
-    }
-    const ecs_entity_t *holes = ecs_vec_first(&profile->holes);
-    for (int32_t i = 0; i < ecs_vec_count(&profile->holes); i ++) {
-        reason = box_validate_path(world, holes[i], false, true);
-        if (reason) {
-            return reason;
+        reason = "missing Profile2D with a closed outer Path2D";
+    } else {
+        reason = box_validate_path(world, profile->outer, false, true);
+        const ecs_entity_t *holes = ecs_vec_first(&profile->holes);
+        for (int32_t i = 0; !reason && i < ecs_vec_count(&profile->holes); i ++) {
+            reason = box_validate_path(world, holes[i], false, true);
         }
     }
-    return NULL;
+
+    return reason;
 }
 
+/** Log a validation error for an entity if a reason is set.
+ *
+ * @param world The world
+ * @param entity The entity being validated
+ * @param status Status word printed before the component name
+ * @param component Name of the validated component
+ * @param reason The failure reason, or NULL to report nothing
+ */
 static void box_validate_report_status(
     const ecs_world_t *world,
     ecs_entity_t entity,
@@ -98,14 +127,20 @@ static void box_validate_report_status(
     const char *component,
     const char *reason)
 {
-    if (!reason) {
-        return;
+    if (reason) {
+        char *path = ecs_get_path(world, entity);
+        ecs_err("%s %s on %s: %s", status, component, path, reason);
+        ecs_os_free(path);
     }
-    char *path = ecs_get_path(world, entity);
-    ecs_err("%s %s on %s: %s", status, component, path, reason);
-    ecs_os_free(path);
 }
 
+/** Log an "invalid" validation error for an entity if a reason is set.
+ *
+ * @param world The world
+ * @param entity The entity being validated
+ * @param component Name of the validated component
+ * @param reason The failure reason, or NULL to report nothing
+ */
 static void box_validate_report(
     const ecs_world_t *world,
     ecs_entity_t entity,
@@ -115,30 +150,73 @@ static void box_validate_report(
     box_validate_report_status(world, entity, "invalid", component, reason);
 }
 
-static bool box_validate_path2_hook(ecs_world_t *world, ecs_entity_t entity, void *ptr)
+/** Validate hook for Path2D.
+ *
+ * @param world The world
+ * @param entity The entity being validated
+ * @param ptr Pointer to the component value
+ * @return Always true; problems are only logged
+ */
+static bool box_validate_path2_hook(
+    ecs_world_t *world,
+    ecs_entity_t entity,
+    void *ptr)
 {
     const Path2D *path = ptr;
     box_validate_report(world, entity, "Path2D",
         box_validate_path(world, entity, false, path->closed));
+
     return true;
 }
 
-static bool box_validate_path3_hook(ecs_world_t *world, ecs_entity_t entity, void *ptr)
+/** Validate hook for Path3D.
+ *
+ * @param world The world
+ * @param entity The entity being validated
+ * @param ptr Pointer to the component value
+ * @return Always true; problems are only logged
+ */
+static bool box_validate_path3_hook(
+    ecs_world_t *world,
+    ecs_entity_t entity,
+    void *ptr)
 {
     const Path3D *path = ptr;
     box_validate_report(world, entity, "Path3D",
         box_validate_path(world, entity, true, path->closed));
+
     return true;
 }
 
-static bool box_validate_profile_hook(ecs_world_t *world, ecs_entity_t entity, void *ptr)
+/** Validate hook for Profile2D.
+ *
+ * @param world The world
+ * @param entity The entity being validated
+ * @param ptr Pointer to the component value
+ * @return Always true; problems are only logged
+ */
+static bool box_validate_profile_hook(
+    ecs_world_t *world,
+    ecs_entity_t entity,
+    void *ptr)
 {
     (void)ptr;
     box_validate_report(world, entity, "Profile2D", box_validate_profile(world, entity));
+
     return true;
 }
 
-static bool box_validate_sweep_hook(ecs_world_t *world, ecs_entity_t entity, void *ptr)
+/** Validate hook for Sweep.
+ *
+ * @param world The world
+ * @param entity The entity being validated
+ * @param ptr Pointer to the component value
+ * @return Always true; problems are only logged
+ */
+static bool box_validate_sweep_hook(
+    ecs_world_t *world,
+    ecs_entity_t entity,
+    void *ptr)
 {
     const Sweep *sweep = ptr;
     const char *reason = NULL;
@@ -151,16 +229,29 @@ static bool box_validate_sweep_hook(ecs_world_t *world, ecs_entity_t entity, voi
                 box_validate_path(world, sweep->contour, false, false);
         }
     }
+
     if (!reason && (!isfinite(sweep->scale[0]) || !isfinite(sweep->scale[1]) ||
         !isfinite(sweep->taper) || !isfinite(sweep->roll)))
     {
         reason = "scale, taper, and roll must be finite";
     }
+
     box_validate_report(world, entity, "Sweep", reason);
+
     return true;
 }
 
-static bool box_validate_loft_hook(ecs_world_t *world, ecs_entity_t entity, void *ptr)
+/** Validate hook for Loft.
+ *
+ * @param world The world
+ * @param entity The entity being validated
+ * @param ptr Pointer to the component value
+ * @return Always true; problems are only logged
+ */
+static bool box_validate_loft_hook(
+    ecs_world_t *world,
+    ecs_entity_t entity,
+    void *ptr)
 {
     const Loft *loft = ptr;
     int32_t count = ecs_vec_count(&loft->sections);
@@ -174,38 +265,75 @@ static bool box_validate_loft_hook(ecs_world_t *world, ecs_entity_t entity, void
                     reason = "section offsets and rotations must be finite";
                 }
             }
+
             if (!isfinite(sections[i].scale[0]) || !isfinite(sections[i].scale[1])) {
                 reason = "section scale must be finite";
             }
         }
     }
+
     box_validate_report(world, entity, "Loft", reason);
+
     return true;
 }
 
-static bool box_validate_lathe_hook(ecs_world_t *world, ecs_entity_t entity, void *ptr)
+/** Validate hook for Lathe.
+ *
+ * @param world The world
+ * @param entity The entity being validated
+ * @param ptr Pointer to the component value
+ * @return Always true; problems are only logged
+ */
+static bool box_validate_lathe_hook(
+    ecs_world_t *world,
+    ecs_entity_t entity,
+    void *ptr)
 {
     const Lathe *lathe = ptr;
     const char *reason = box_validate_path(world, lathe->profile, false, -1);
     if (!reason && lathe->inner) {
         reason = box_validate_path(world, lathe->inner, false, -1);
     }
+
     box_validate_report(world, entity, "Lathe", reason);
+
     return true;
 }
 
-static bool box_validate_extrusion_hook(ecs_world_t *world, ecs_entity_t entity, void *ptr)
+/** Validate hook for ProfileExtrusion.
+ *
+ * @param world The world
+ * @param entity The entity being validated
+ * @param ptr Pointer to the component value
+ * @return Always true; problems are only logged
+ */
+static bool box_validate_extrusion_hook(
+    ecs_world_t *world,
+    ecs_entity_t entity,
+    void *ptr)
 {
     const ProfileExtrusion *extrusion = ptr;
     const char *reason = box_validate_profile(world, extrusion->profile);
     if (!reason && !isfinite(extrusion->depth)) {
         reason = "depth must be finite";
     }
+
     box_validate_report(world, entity, "ProfileExtrusion", reason);
+
     return true;
 }
 
-static bool box_validate_prism_hook(ecs_world_t *world, ecs_entity_t entity, void *ptr)
+/** Validate hook for BeveledPrism.
+ *
+ * @param world The world
+ * @param entity The entity being validated
+ * @param ptr Pointer to the component value
+ * @return Always true; problems are only logged
+ */
+static bool box_validate_prism_hook(
+    ecs_world_t *world,
+    ecs_entity_t entity,
+    void *ptr)
 {
     const BeveledPrism *prism = ptr;
     int32_t count = ecs_vec_count(&prism->footprint);
@@ -224,45 +352,63 @@ static bool box_validate_prism_hook(ecs_world_t *world, ecs_entity_t entity, voi
                 reason = "footprint must be finite, convex, and nondegenerate";
                 break;
             }
+
             sign = cross;
         }
     }
+
     if (!reason && (!isfinite(prism->depth) || !isfinite(prism->inset) ||
         !isfinite(prism->bevel) || !isfinite(prism->offset[0]) ||
         !isfinite(prism->offset[1])))
     {
         reason = "depth, inset, bevel, and offset must be finite";
     }
+
     box_validate_report(world, entity, "BeveledPrism", reason);
+
     return true;
 }
 
-static bool box_validate_mesh_hook(ecs_world_t *world, ecs_entity_t entity, void *ptr)
+/** Validate hook for ShapeMesh that reports empty or invalid meshes.
+ *
+ * @param world The world
+ * @param entity The entity being validated
+ * @param ptr Pointer to the component value
+ * @return Always true; problems are only logged
+ */
+static bool box_validate_mesh_hook(
+    ecs_world_t *world,
+    ecs_entity_t entity,
+    void *ptr)
 {
     const ShapeMesh *shape = ptr;
     const box_mesh_cache_t *cache = box_mesh_cache_of(world);
     const box_mesh_t *mesh = shape->mesh ? box_mesh_cache_get(cache, shape->mesh) : NULL;
     if (!mesh) {
-        return true;
+        goto done;
     }
+
     if (!mesh->vertex_count || mesh->index_count < 3) {
         box_validate_report_status(world, entity, "empty", "ShapeMesh",
             "mesh has no triangles");
-        return true;
+        goto done;
     }
+
     const box_mesh_t *render = shape->render_mesh ?
         box_mesh_cache_get(cache, shape->render_mesh) : mesh;
     if (!render || render->index_count < 3) {
         box_validate_report_status(world, entity, "empty", "ShapeMesh",
             "resolved mesh has no triangles");
-        return true;
+        goto done;
     }
+
     for (int32_t j = 0; j < 3; j ++) {
         if (!isfinite(shape->scale[j])) {
             box_validate_report(world, entity, "ShapeMesh", "scale must be finite");
-            return true;
+            goto done;
         }
     }
+
     int32_t visible = 0;
     for (int32_t i = 0; i + 2 < render->index_count; i += 3) {
         uint32_t a = render->indices[i], b = render->indices[i + 1];
@@ -271,8 +417,9 @@ static bool box_validate_mesh_hook(ecs_world_t *world, ecs_entity_t entity, void
             c >= (uint32_t)render->vertex_count)
         {
             box_validate_report(world, entity, "ShapeMesh", "mesh index is out of range");
-            return true;
+            goto done;
         }
+
         vec3 ab, ac, normal;
         for (int32_t j = 0; j < 3; j ++) {
             ab[j] = (render->vertices[b].position[j] -
@@ -280,22 +427,27 @@ static bool box_validate_mesh_hook(ecs_world_t *world, ecs_entity_t entity, void
             ac[j] = (render->vertices[c].position[j] -
                 render->vertices[a].position[j]) * shape->scale[j];
         }
+
         glm_vec3_cross(ab, ac, normal);
         float area = glm_vec3_norm2(normal);
         if (!isfinite(area)) {
             box_validate_report(world, entity, "ShapeMesh", "mesh vertices must be finite");
-            return true;
+            goto done;
         }
+
         visible += area > 1e-20f;
     }
+
     if (!visible) {
         box_validate_report_status(world, entity, "empty", "ShapeMesh",
             "all triangles collapse after shape scale; check dimensions and paths");
     }
+done:
     return true;
 }
 
-void box_geometry_validation_init(ecs_world_t *world)
+void box_geometry_validation_init(
+    ecs_world_t *world)
 {
     ecs_set_hooks(world, Path2D, {.on_validate = box_validate_path2_hook});
     ecs_set_hooks(world, Path3D, {.on_validate = box_validate_path3_hook});

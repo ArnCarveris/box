@@ -89,15 +89,13 @@ ECS_STRUCT(ParticleCollision, {
  * Its WorldTransform places the spawn volume and direction; live particles stay in world space
  * but for the drift of their ParticleForces. A full pool spawns nothing; a new max empties it.
  *
- * ParticlePlayback pauses, stops and resets it; ParticleBurst spawns on top of the rate.
- *
  * Particles move under the acceleration and the ParticleForces, collide with the ground plane
- * of a ParticleCollision of the emitter entity and die once their age reaches their lifetime;
- * each is a camera facing soft circle of its size, color times opacity, over the opaque image,
- * unless ParticleCurves and ParticleAppearance on the emitter change that.
+ * of a ParticleCollision of the emitter entity and die once their age reaches their lifetime.
+ * ParticlePlayback pauses, stops and resets the emitter; ParticleBurst spawns on top of the rate.
  *
- * Every property a particle draws has its own random stream, so changing one range does not
- * change the other draws.
+ * Each is a camera facing soft circle of its size, color times opacity, over the opaque image,
+ * unless ParticleCurves and ParticleAppearance on the emitter change that. Every drawn property
+ * has its own random stream, so changing one range does not change the other draws.
  */
 ECS_STRUCT(ParticleEmitter, {
     int32_t max;            /**< Particles alive at once, clamped to BOX_PARTICLE_MAX, default
@@ -308,10 +306,8 @@ ECS_STRUCT(ParticleStats, {
 /** What box_particle_burst_at does with a burst while a budget of ParticleSettings is full */
 ECS_ENUM(EffectOverflow, {
     EffectRecycle = 0,      /**< The instance that has played longest plays the burst instead */
-    EffectSkip = 1,         /**< A burst no view sees, or beyond effect_distance from the camera
-                             *   of every view, is dropped; one a view sees recycles. With
-                             *   several views a burst is kept when one view both sees it and is
-                             *   within effect_distance of it */
+    EffectSkip = 1,         /**< A burst is dropped unless one view both sees it and has it
+                             *   within effect_distance of its camera; a kept burst recycles */
     EffectMerge = 2         /**< A burst within effect_merge of a play of its template joins
                              *   it; with no play nearby it recycles */
 });

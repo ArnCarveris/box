@@ -19,6 +19,7 @@ const concreteShade: Rgb = {88, 86, 82}
 prefab Wall {
   // The item: crafted through the order book into the inventory, placed by spending one
   OreItem: {name: "Wall", detail: "Buys your base a bit more time."}
+  OreIcon: {texture: icons.wall}
   OreRecipe: {inputs: [{item: items.StoneBrick, amount: 4}], yield: 1, time: 1}
   OreFootprint: {w: 1, h: 1}
   OreHealth: {value: 300, max: 300}

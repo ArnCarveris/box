@@ -1,0 +1,215 @@
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using yeon
+
+const hanji: Rgb = {246, 240, 225}
+const bamboo: Rgb = {125, 88, 48}
+const thread: Rgb = {235, 230, 215}
+
+prefab PlayerKite {
+  body {
+    YeonBody: {roll_scale: 1}
+    Position: {0, 0, 0}
+    Scale: {1.3, 1.3, 1.3}
+
+    face_left {
+      Position: {-0.525, 0, 0}
+      Box: {0.45, 2.0, 0.04}
+      Rgb: hanji
+    }
+
+    face_right {
+      Position: {0.525, 0, 0}
+      Box: {0.45, 2.0, 0.04}
+      Rgb: hanji
+    }
+
+    face_top {
+      Position: {0, 0.65, 0}
+      Box: {0.6, 0.7, 0.04}
+      Rgb: hanji
+    }
+
+    face_bottom {
+      Position: {0, -0.65, 0}
+      Box: {0.6, 0.7, 0.04}
+      Rgb: hanji
+    }
+
+    kkokji {
+      Position: {0, 0.62, 0.03}
+      Rotation: {PI / 2, 0, 0}
+      Cylinder: {segments: 32, smooth: true, length: 0.02, radius: 0.27}
+      Rgb: {205, 45, 45}
+    }
+
+    band {
+      Position: {0, -0.86, 0.025}
+      Box: {1.5, 0.28, 0.02}
+      Rgb: {30, 75, 145}
+    }
+
+    hole_rim {
+      Position: {0, 0, 0.02}
+      Rotation: {PI / 2, 0, 0}
+      Torus: {segments: 32, rings: 8, smooth: true, radius: 0.3, tube: 0.03}
+      Rgb: bamboo
+    }
+
+    stick_mid {
+      Position: {0, 0, 0.045}
+      Box: {0.05, 2.0, 0.04}
+      Rgb: bamboo
+    }
+
+    stick_top {
+      Position: {0, 0.97, 0.045}
+      Box: {1.5, 0.05, 0.04}
+      Rgb: bamboo
+    }
+
+    stick_cross {
+      Position: {0, 0, 0.045}
+      Box: {1.5, 0.05, 0.04}
+      Rgb: bamboo
+    }
+
+    stick_diag_a {
+      Position: {0, 0, 0.05}
+      Rotation: {0, 0, atan2(2.0, 1.5)}
+      Box: {2.5, 0.04, 0.03}
+      Rgb: bamboo
+    }
+
+    stick_diag_b {
+      Position: {0, 0, 0.05}
+      Rotation: {0, 0, -atan2(2.0, 1.5)}
+      Box: {2.5, 0.04, 0.03}
+      Rgb: bamboo
+    }
+  }
+
+  for i in 0..15 {
+    "rope_{i}" {
+      YeonRopeSegment: {index: i}
+      Box: {0.03, 1, 0.03}
+      Rgb: thread
+      NoShadow
+    }
+  }
+}
+
+template RivalKiteModel {
+  prop color: Rgb = {200, 40, 40}
+  prop accent: Rgb = {30, 60, 140}
+
+  body {
+    YeonBody: {roll_scale: 1}
+    Position: {0, 0, 0}
+    face {
+      Position: {0, 0, 0}
+      Rotation: {0, 0, PI / 4}
+      Box: {1.2, 1.2, 0.04}
+      Rgb: color
+    }
+
+    stripe_h {
+      Position: {0, 0, 0.025}
+      Box: {1.65, 0.16, 0.02}
+      Rgb: accent
+    }
+
+    stripe_v {
+      Position: {0, 0, 0.025}
+      Box: {0.16, 1.65, 0.02}
+      Rgb: accent
+    }
+
+    center {
+      Position: {0, 0, 0.04}
+      Rotation: {PI / 2, 0, 0}
+      Cylinder: {segments: 24, smooth: true, length: 0.02, radius: 0.2}
+      Rgb: {245, 235, 200}
+    }
+
+    for i in 0..5 {
+      "tail_{i}" {
+        Position: {0.08 * (i % 2) - 0.04, -1.05 - 0.38 * i, 0}
+        Rotation: {0, 0, 0.3 * (i % 2) - 0.15}
+        Box: {0.26, 0.2, 0.02}
+        if i % 2 == 0 {
+          Rgb: accent
+        } else {
+          Rgb: color
+        }
+      }
+    }
+  }
+
+  for i in 0..15 {
+    "rope_{i}" {
+      YeonRopeSegment: {index: i}
+      Box: {0.03, 1, 0.03}
+      Rgb: thread
+      NoShadow
+    }
+  }
+}
+
+prefab RedKite {
+  RivalKiteModel: {color: {200, 40, 40}, accent: {30, 60, 140}}
+}
+
+prefab BlueKite {
+  RivalKiteModel: {color: {35, 80, 160}, accent: {240, 200, 40}}
+}
+
+prefab YellowKite {
+  RivalKiteModel: {color: {240, 195, 40}, accent: {30, 30, 30}}
+}
+
+prefab Lantern {
+  Scale: {1.4, 1.4, 1.4}
+
+  body {
+    Position: {0, 0, 0}
+    Cylinder: {segments: 24, smooth: true, length: 0.7, radius: 0.34}
+    Rgb: {205, 40, 40}
+    Emissive: {strength: 1.2, color: {255, 90, 40}}
+  }
+
+  band_top {
+    Position: {0, 0.43, 0}
+    Cylinder: {segments: 24, smooth: true, length: 0.18, radius: 0.37}
+    Rgb: {30, 60, 145}
+    Emissive: {strength: 0.15, color: {60, 100, 220}}
+  }
+
+  band_bottom {
+    Position: {0, -0.43, 0}
+    Cylinder: {segments: 24, smooth: true, length: 0.18, radius: 0.37}
+    Rgb: {30, 60, 145}
+    Emissive: {strength: 0.15, color: {60, 100, 220}}
+  }
+
+  cap {
+    Position: {0, 0.62, 0}
+    Cone: {segments: 16, smooth: true, length: 0.2, radius: 0.22}
+    Rgb: {210, 170, 60}
+    PbrMaterial: {metallic: 1, roughness: 0.35}
+  }
+
+  hook {
+    Position: {0, 0.9, 0}
+    Box: {0.04, 0.4, 0.04}
+    Rgb: {60, 40, 25}
+  }
+
+  tassel {
+    Position: {0, -0.72, 0}
+    Box: {0.08, 0.35, 0.08}
+    Rgb: {220, 50, 50}
+  }
+}

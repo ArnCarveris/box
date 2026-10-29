@@ -3,8 +3,15 @@
  * @brief The oreelse module: components of the game and the functions its areas share.
  *
  * The scene (apps/oreelse/etc) holds the constants cfg.*, the models, the items, the singletons
+<<<<<<< HEAD
  * and the entities of a run; the systems of each area (flow.c, map.c, player.c, inventory.c,
  * mining.c, craft.c, buildings.c, flora.c, placement.c, look.c, particles.c) play the game.
+=======
+ * and the entities of a run.
+ *
+ * The systems of each area (flow.c, map.c, player.c, ..., power.c, critters.c, critter_fx.c,
+ * buildings.c, placement.c, rocket.c, look.c, particles.c) play the game.
+>>>>>>> a3fa52251ca1bb044119d6d97d799003fa0c5ba9
  */
 
 #ifndef OREELSE_GAME_H
@@ -47,6 +54,12 @@
 
 /** Cells a placement drag covers at most, the most cfg.dragMax */
 #define ORE_DRAG_MAX (64)
+
+/** Categories of the power allocation (OrePowerKind), the size of OrePowerAlloc.level */
+#define ORE_POWER_KINDS (3)
+
+/** Levels of a category of the power allocation, the bars of its column */
+#define ORE_POWER_LEVELS (4)
 
 /** Read the float constant cfg.<name> of the scene (etc/config.flecs) */
 #define ORE_CFG(world, name) ecs_const_var_get_t(world, "cfg." name, ecs_f32_t)
@@ -147,10 +160,31 @@ ECS_STRUCT(OrePlayer, {
     bool airborne; /**< hover is above cfg.airborne, the jetpack fires */
 });
 
-/** A limb pivot of a model; its Rotation.x swings with the walk (OrePlayerFx) */
+/** A limb pivot of a model; its Rotation.x swings with the walk (OreLimbs for the astronaut,
+ * OreCritterLimbs for a critter's legs)
+ */
 ECS_STRUCT(OreLimb, {
     float phase; /**< Offset of the limb in the walk cycle */
     float swing; /**< Largest angle of the swing in radians */
+});
+
+/** The walk cycle of the astronaut, the state of its animation (OrePlayerFx), on the astronaut.
+ * It comes with OrePlayer and starts at 0 with every run.
+ */
+ECS_STRUCT(OrePlayerGait, {
+    float cycle;  /**< Phase of the walk cycle in radians, from 0 up to 2 PI: it advances the
+                   *   astronaut's speed times cfg.stepRate a second while it moves */
+    int32_t step; /**< Half of the cycle it is in, floor(cycle / PI): a new half step on the
+                   *   ground kicks up FootDust */
+});
+
+/** The one shot effects the C plays (etc/particles), a singleton oreelse.flecs sets */
+ECS_STRUCT(OreEffects, {
+    ecs_entity_t foot_dust;   /**< FootDust, at every half step of the astronaut on the ground */
+    ecs_entity_t mine_burst;  /**< MineBurst, at every yield of a deposit */
+    ecs_entity_t poof_burst;  /**< PoofBurst, where a deposit is used up and a building is placed
+                               *   or demolished */
+    ecs_entity_t splat_burst; /**< SplatBurst, at the death of the astronaut */
 });
 
 /** The mining of the astronaut: the target of the swing and its progress, which the HUD shows.
@@ -182,6 +216,13 @@ ECS_STRUCT(OreStack, {
 ECS_STRUCT(OreItem, {
     char *name;   /**< Display name */
     char *detail; /**< One line of detail text */
+});
+
+/** The icon of an item, on its prefab in resources.flecs (or a building's), which the UI draws
+ * for the item. Instances inherit it.
+ */
+ECS_STRUCT(OreIcon, {
+    ecs_entity_t texture; /**< Texture of the icon, an entity of icons (etc/ui/icons.flecs) */
 });
 
 /** A mined item, on its prefab: a swing at a deposit of it yields 1 */
@@ -328,7 +369,7 @@ ECS_STRUCT(OreHealth, {
     float max;   /**< Hit points of the undamaged entity */
 });
 
-/** Power a building draws while it works, on its prefab and inherited (OrePower) */
+/** Power a building draws all the time it stands, on its prefab and inherited (OrePower) */
 ECS_STRUCT(OrePowerConsumer, {
     float watts; /**< Watts it draws */
 });
@@ -348,6 +389,59 @@ ECS_ENUM(OrePowerKind, {
 /** The power category of a building, on its prefab and inherited (OrePower) */
 ECS_STRUCT(OrePowerCategory, {
     OrePowerKind kind; /**< Category its power comes out of */
+});
+
+/** The power allocation, a singleton run.flecs sets to [2, 2, 2]: the level of every category,
+ * 0 to ORE_POWER_LEVELS, at most cfg.powerBars in total. Modified when a level changes.
+ */
+ECS_STRUCT(OrePowerAlloc, {
+    int32_t level[3]; /**< Level of Mining, Weapons and Construction, indexed by OrePowerKind */
+});
+
+/** The power of the base, a singleton run.flecs resets, for the HUD and the systems that stop
+ * in a blackout. Modified when a value changes.
+ */
+ECS_STRUCT(OrePowerState, {
+    float production; /**< Watts the producers generate */
+    float demand;     /**< Watts of the consumers times the bars assigned / cfg.powerBars */
+    float ratio;      /**< production / demand capped at 1, 1 without demand */
+    bool blackout;    /**< demand above 0 and production below it: every consumer stops */
+});
+
+/** The mining of a drill, on its prefab and copied to every instance */
+ECS_STRUCT(OreDrill, {
+    float timer;  /**< Seconds of mining toward the next ore, kept through a blackout */
+    bool running; /**< It mines: a live deposit on its tile, power and Mining above 0 */
+});
+
+/** A building that is a worker of the order book (the factory), on its prefab and inherited:
+ * placed, it gets an OreCrafter of speed times the multiplier of its category.
+ */
+ECS_STRUCT(OreWorker, {
+    float speed; /**< Speed of its crafter at multiplier 1 */
+});
+
+/** The bulb of a status lamp, which the Light template (etc/props/light.flecs) sets with the
+ * colors of its props: OrePower colors it by the power of the building it is part of.
+ */
+ECS_STRUCT(OreStatusLamp, {
+    Rgb live;            /**< Color at level 3 and 4, and without a category */
+    Rgb dead;            /**< Color in a blackout (a consumer) or at level 0 */
+    Rgb warn;            /**< Color at level 1 */
+    Rgb ok;              /**< Color at level 2 */
+    float strength;      /**< Emissive strength while lit */
+    float light;         /**< Intensity of the bulb's point light while lit */
+    ecs_entity_t owner;  /**< The building, found by OrePower, 0 until then */
+    bool consumer;       /**< The building draws power, so a blackout kills the lamp */
+});
+
+/** The status lamps to update, a singleton: observers count version up when the power state,
+ * the allocation, the blink signals, a building or a lamp change, and OreStatusLamps updates
+ * every lamp while applied lags behind.
+ */
+ECS_STRUCT(OreLamps, {
+    int32_t version; /**< Changes counted */
+    int32_t applied; /**< The version the lamps show */
 });
 
 /** A placed building, on the instance: its footprint starts at (row, col), every tile of it maps
@@ -516,6 +610,243 @@ ECS_STRUCT(OreBlastFlash, {
     float range; /**< Range of the light */
 });
 
+/** Phases of a rocket on the pad, the type of OreRocketState.phase */
+ECS_ENUM(OreLaunchPhase, {
+    OreLaunchPhaseIdle,     /**< On the pad: parts can be installed, Luminite loaded */
+    OreLaunchPhaseIgnition, /**< Launched, the engines fire for cfg.ignitionTime seconds */
+    OreLaunchPhaseAscent    /**< Climbing, cfg.launchAccel faster every second, to arrival */
+});
+
+/** The launch pad of a rocket, on the RocketPad prefab and inherited */
+ECS_STRUCT(OreLaunchPad, {
+    float base_y; /**< Height of the bottom of the rocket above the pad's origin */
+});
+
+/** The items a rocket is built from and ships, a singleton launch.flecs sets */
+ECS_STRUCT(OreRocketKit, {
+    ecs_entity_t engine;       /**< The rocket engine item */
+    ecs_entity_t fuel;         /**< The rocket fuel storage item */
+    ecs_entity_t cargo;        /**< The rocket cargo bay item */
+    ecs_entity_t life_support; /**< The rocket life support item */
+    ecs_entity_t luminite;     /**< The Luminite a rocket ships */
+});
+
+/** Which part of a rocket an action applies to, a member per part */
+ECS_STRUCT(OreRocketParts, {
+    bool engine;       /**< A rocket engine */
+    bool fuel;         /**< A rocket fuel storage */
+    bool cargo;        /**< A rocket cargo bay */
+    bool life_support; /**< A rocket life support */
+});
+
+/** The rocket on the pad and the score, a singleton run.flecs resets. Modified when a value
+ * changes: every frame of a flight, else when a part, the Luminite, the pad or what can be done
+ * changes. The UI formats every text from it; launch.flecs keeps the Rocket model in step.
+ *
+ * A unit is a cargo bay or the life support; a rocket is valid with units, cfg.enginesPerUnit
+ * engines and one fuel storage per unit.
+ */
+ECS_STRUCT(OreRocketState, {
+    ecs_entity_t pad;     /**< The rocket pad, 0 without one */
+    OreLaunchPhase phase; /**< Idle on the pad, or the phase of the flight */
+    int32_t engines;      /**< Rocket engines installed */
+    int32_t fuel;         /**< Rocket fuel storages installed */
+    int32_t cargo;        /**< Rocket cargo bays installed */
+    int32_t life_support; /**< Rocket life supports installed */
+    int32_t loaded;       /**< Luminite in the cargo bays */
+    int32_t shipped;      /**< Luminite shipped to orbit in the run, the score */
+    int32_t held;         /**< Luminite in the inventory, which the status bar shows */
+    bool aboard;          /**< The astronaut rides the rocket: launched with life support */
+    int32_t units;        /**< cargo + life_support */
+    int32_t capacity;     /**< Luminite the cargo bays hold, cfg.cargoCapacity per bay */
+    bool valid;           /**< The rocket can launch */
+    OreRocketParts install;   /**< The part can be installed now */
+    OreRocketParts uninstall; /**< The part can be uninstalled now */
+    bool load;            /**< Loading would move Luminite into the rocket now */
+    bool launch;          /**< The rocket can launch now */
+    float x;              /**< X of the bottom of the rocket */
+    float y;              /**< Height of the bottom of the rocket, rising in the ascent */
+    float z;              /**< Z of the bottom of the rocket */
+    float timer;          /**< Seconds of ignition left */
+    float speed;          /**< Climbing speed of the ascent in units per second */
+    float altitude;       /**< Height climbed in the ascent */
+});
+
+/** An item a key applies to, on the actions of the rocket keys (input.flecs) */
+ECS_STRUCT(OreItemKey, {
+    ecs_entity_t item; /**< Item prefab of the key */
+});
+
+/** Tiers of critters the waves spawn, the size of the arrays of OreArsenal, OreWaveMix and
+ * OreWaveState.spawn: mite, skitter, brute and behemoth
+ */
+#define ORE_WAVE_TIERS (4)
+
+/** Neighbors a critter keeps for the crowd separation, the most cfg.crowdNeighbors */
+#define ORE_CROWD_NEAR (12)
+
+/** Walking speed of a critter in units per second, on its prefab and copied */
+ECS_STRUCT(OreSpeed, {
+    float value; /**< Units per second */
+});
+
+/** Damage of a critter, on its prefab and copied: per second, applied as value * dt while its
+ * target is in range
+ */
+ECS_STRUCT(OreDamage, {
+    float value; /**< Hit points per second */
+});
+
+/** Attack range of a critter, on its prefab and copied: the XZ distance between the centers of
+ * the critter and its target at which it attacks
+ */
+ECS_STRUCT(OreRange, {
+    float value; /**< Units */
+});
+
+/** Body radius of a critter, on its prefab and copied: the crowd separation keeps two critters
+ * the sum of their radii apart, and its mass is radius squared
+ */
+ECS_STRUCT(OreRadius, {
+    float value; /**< Units */
+});
+
+/** What a critter costs a wave, on its prefab and inherited */
+ECS_STRUCT(OreWaveTier, {
+    float cost;   /**< Budget a critter of the tier takes */
+    int32_t wave; /**< First wave that can spawn the tier */
+});
+
+/** The walk of a critter, on its prefab and inherited: its walk cycle advances step radians per
+ * unit walked and its body bobs up to bob units over it (OreCritterFx)
+ */
+ECS_STRUCT(OreGait, {
+    float step; /**< Radians of the walk cycle per unit walked */
+    float bob;  /**< Height of the bob in units, |sin(anim)| * bob */
+});
+
+/** The effect a critter dies in, on its prefab and inherited: ore_combust plays it at the
+ * critter's radius; a critter without one, or with burst 0, dies in OreArsenal.splat
+ */
+ECS_STRUCT(OreDeathBurst, {
+    ecs_entity_t burst; /**< The effect template, CombustBurst, 0 for the splat */
+});
+
+/** The critter prefabs of the tiers and the effects of their deaths, a singleton oreelse.flecs
+ * sets: Mite, Skitter, Brute and Behemoth, in the order of the tiers of OreWaveMix and
+ * OreWaveState.spawn
+ */
+ECS_STRUCT(OreArsenal, {
+    ecs_entity_t critters[4]; /**< Prefab of every tier */
+    ecs_entity_t splat;       /**< Effect of a death without OreDeathBurst, SplatBurst */
+    ecs_entity_t embers;      /**< Template that smolders on a corpse, CorpseEmbers */
+});
+
+/** A share of every tier, the type of the style mixes cfg.mixedMix, cfg.swarmMix, cfg.eliteMix */
+ECS_STRUCT(OreWaveMix, {
+    float tier[4]; /**< Share of the tier in the wave's budget */
+});
+
+/** Styles of a wave, one draw per wave: the mix of tiers its budget is spent on */
+ECS_ENUM(OreWaveStyle, {
+    OreWaveStyleMixed, /**< Every tier alike, cfg.mixedMix */
+    OreWaveStyleSwarm, /**< Mostly mites, cfg.swarmMix */
+    OreWaveStyleElite  /**< Mostly brutes and behemoths, cfg.eliteMix */
+});
+
+/** The waves of a run, a singleton run.flecs resets. Modified every frame of play, the HUD
+ * shows the wave, frac and kills.
+ */
+ECS_STRUCT(OreWaveState, {
+    ecs_entity_t root;   /**< Parent of the critters, an entity of the run, so a restart
+                          *   deletes them */
+    int32_t wave;        /**< The last wave that started, 0 before the first */
+    float timer;         /**< Seconds to the next wave, counted down only while left is 0 */
+    float gap;           /**< Seconds the timer started from: cfg.firstWaveAt, then
+                          *   cfg.waveGap */
+    float frac;          /**< Part of the gap to the next wave that passed, 1 - timer / gap,
+                          *   1 while a wave spawns */
+    int32_t left;        /**< Critters of the wave still to spawn */
+    int32_t spawn[4];    /**< Critters of every tier still to spawn */
+    float spawn_timer;   /**< Seconds to the next spawn of the wave */
+    float stagger;       /**< Seconds between two spawns of the wave */
+    float budget;        /**< Budget of the last wave */
+    OreWaveStyle style;  /**< Style of the last wave */
+    int32_t side;        /**< Side of the map the last critter spawned on: 0 north, 1 south,
+                          *   2 west, 3 east, -1 for none */
+    int32_t kills;       /**< Critters killed in the run */
+});
+
+/** A critter of a wave, on the instance: the instance of a critter prefab that walks to its
+ * target and chews it. Its OreTarget and OreVelocity come with it.
+ */
+ECS_STRUCT(OreCritter, {
+    float retarget;  /**< Seconds to the next acquisition of a target */
+    float jitter;    /**< Heading jitter from -1 to 1, drawn at the spawn: the critter walks
+                      *   jitter * cfg.critterJitter radians off the direction to its goal */
+    bool attacking;  /**< Its target is in range and it chews it */
+    float anim;      /**< Phase of the walk cycle in radians, drawn from U(0, 2 PI) at the spawn
+                      *   and advanced while it walks (OreCritterFx) */
+});
+
+/** A dead critter's corpse, on the corpse: an instance of the critter's prefab that is no critter
+ * (no OreCritter, so no AI, no target, no separation and not in OreCritterIndex), tipped over and
+ * charred, with the CorpseEmbers on it.
+ *
+ * It lies cfg.corpseTime seconds of play, sinks at cfg.corpseSink units a second and is deleted
+ * depth below the ground; at most cfg.corpseCap corpses, the oldest goes first (OreCorpses).
+ */
+ECS_STRUCT(OreCorpse, {
+    float age;   /**< Seconds of play since the critter died */
+    float depth; /**< Depth below the ground at which it is deleted, 2 r + 1 of its radius r */
+});
+
+/** What a critter goes for: the astronaut or a building */
+ECS_STRUCT(OreTarget, {
+    ecs_entity_t value; /**< The target, 0 for none */
+});
+
+/** Velocity of a critter on the ground in units per second, 0 while it attacks: the gun turret
+ * leads its shots with it
+ */
+ECS_STRUCT(OreVelocity, {
+    float x; /**< Along X */
+    float z; /**< Along Z */
+});
+
+/** The time since the astronaut was last hurt, on the astronaut: after cfg.playerRegenDelay
+ * seconds it regenerates cfg.playerRegen hit points a second
+ */
+ECS_STRUCT(OreHurt, {
+    float since; /**< Seconds of play since the last damage */
+});
+
+/** The critter spatial index, a singleton: the critters with hit points left in a uniform grid of
+ * cells of cfg.crowdCell over the map. OreCrowd rebuilds it every frame of play after the
+ * separation, so the systems after it find critters near a point (ore_critter_nearest).
+ */
+ECS_STRUCT(OreCritterIndex, {
+    int32_t count;          /**< Critters indexed */
+    int32_t dim_x;          /**< Cells along X */
+    int32_t dim_z;          /**< Cells along Z */
+    float cell;             /**< Edge of a cell, cfg.crowdCell */
+    float x0;               /**< X of the west edge of the map, the first cell */
+    float z0;               /**< Z of the north edge of the map, the first cell */
+ECS_PRIVATE                 /**< The cells are not reflected */
+    ecs_entity_t *entities; /**< Critter of every slot */
+    float *x;               /**< X of every slot */
+    float *z;               /**< Z of every slot */
+    float *r;               /**< Radius of every slot */
+    float *px;              /**< Push of the separation along X of every slot */
+    float *pz;              /**< Push of the separation along Z of every slot */
+    Position **pos;         /**< Position of the critter of every slot, valid within OreCrowd */
+    int32_t *cell_of;       /**< Cell of every slot, row major */
+    int32_t *order;         /**< Slots sorted by cell */
+    int32_t *start;         /**< First entry of order of every cell, and the end after the last */
+    int32_t cap;            /**< Slots allocated */
+    int32_t cells;          /**< Entries of start allocated */
+});
+
 /** Marks an entity created by a script that sets up a run: restart() reloads the script of
  * every entity with it, which deletes the entities of the run and creates those of a new one
  */
@@ -616,6 +947,17 @@ void ore_toast(
 bool ore_action_down(
     const ecs_world_t *world,
     ecs_entity_t action);
+
+/** Kill the astronaut, the end of the original's orePlayerDamage: SplatBurst plays
+ * cfg.playerSplatLift above it, it falls over (turned cfg.deathPitch about x) and the game is lost.
+ * OrePlayerHealth calls it when the astronaut's hit points drop to 0.
+ *
+ * @param world The world or the stage of a system
+ * @param player The astronaut
+ */
+void ore_player_die(
+    ecs_world_t *world,
+    ecs_entity_t player);
 
 /** Read the geometry of the tile grid from cfg.
  *
@@ -876,6 +1218,9 @@ void ore_marker_show(
 /** Mine 1 off a deposit into the inventory: at 0 the deposit is deleted. When its item is a
  * new kind and the inventory is full nothing is mined and the full warning shows.
  *
+ * Every yield plays MineBurst cfg.mineBurstY above it and shrinks it to cfg.depositScaleMin +
+ * (1 - cfg.depositScaleMin) * amount / capacity; at 0 PoofBurst plays cfg.depositPoofY above it.
+ *
  * @param world The world or the stage of a system
  * @param deposit The deposit
  * @return Whether the deposit is still there to mine, false once it is deleted or gone
@@ -888,7 +1233,7 @@ bool ore_deposit_mine(
  * speeds, spawn volumes and layer offsets at scale, unturned.
  *
  * @param world The world, or the stage of a system before EcsPreStore
- * @param effect The effect template (etc/particles)
+ * @param effect The effect template (etc/particles), 0 plays nothing
  * @param position World position of the play
  * @param scale Scale of the play, 0 or less for 1
  * @return The root of the instance that plays, 0 when none does
@@ -898,6 +1243,22 @@ ecs_entity_t ore_burst(
     ecs_entity_t effect,
     const vec3 position,
     float scale);
+
+/** Set the playback state of an emitter that keeps playing (the jet plume, the glints of the
+ * Luminite); it is only written when it changes, and an emitter without a ParticlePlayback plays.
+ *
+ * @param world The world
+ * @param stage The stage of the system
+ * @param emitter The emitter, 0 for none
+ * @param state The playback state
+ * @param playing_only Only change an emitter that plays (pause it, leave a stopped one stopped)
+ */
+void ore_playback_set(
+    const ecs_world_t *world,
+    ecs_world_t *stage,
+    ecs_entity_t emitter,
+    PlaybackState state,
+    bool playing_only);
 
 /** Play a one shot effect template turned about Y, at its size: the launch of a missile
  * (MissileLaunch, authored along -Z) toward the aim of its turret, as the original's
@@ -1017,6 +1378,105 @@ bool ore_placement_cancel_drag(
 bool ore_placement_deselect(
     ecs_world_t *world);
 
+/** Spawn a critter: an instance of its prefab under the root of OreWaveState at full health,
+ * without a target, its retarget timer at cfg.retargetInterval * U(0, 1), its heading jitter
+ * drawn from U(-1, 1) and its walk cycle from U(0, 2 PI).
+ *
+ * @param world The world or a stage
+ * @param prefab The critter prefab (Mite, Skitter, Brute, Behemoth)
+ * @param x X of the critter
+ * @param z Z of the critter
+ * @return The critter, 0 when the prefab is no critter
+ */
+ecs_entity_t ore_critter_spawn(
+    ecs_world_t *world,
+    ecs_entity_t prefab,
+    float x,
+    float z);
+
+/** Kill a critter: the kill counter of OreWaveState goes up, its death plays and leaves its corpse
+ * (ore_critter_remains) and the critter is deleted. The one place a critter dies,
+ * OreCritterDeath calls it for the critters at 0 hit points or below.
+ *
+ * @param world The world or the stage of a system
+ * @param critter The critter
+ */
+void ore_critter_kill(
+    ecs_world_t *world,
+    ecs_entity_t critter);
+
+/** Play the death of a critter and leave its corpse (ore_corpse_spawn), the original's
+ * oreDamageCritter at 0 hit points: its OreDeathBurst at its position and radius (ore_combust),
+ * or OreArsenal.splat cfg.splatLift above it without one. ore_critter_kill deletes it after.
+ *
+ * @param world The world or the stage of a system
+ * @param critter The critter
+ */
+void ore_critter_remains(
+    ecs_world_t *world,
+    ecs_entity_t critter);
+
+/** Lay the corpse of a critter: a new instance of its prefab with OreCorpse under the root of
+ * OreWaveState, on the ground, tipped over in the original's pose turned by the critter's heading,
+ * squashed to cfg.corpseSquash and charred with the Tint cfg.corpseColor (OreCorpseChar).
+ *
+ * An instance of OreArsenal.embers on it is scaled by its radius. Nothing is laid when
+ * cfg.corpseTime is 0 or less.
+ *
+ * @param world The world or the stage of a system
+ * @param prefab The critter prefab
+ * @param x X of the corpse
+ * @param z Z of the corpse
+ * @param yaw Heading of the critter, its Rotation.y
+ * @return The corpse, 0 for none
+ */
+ecs_entity_t ore_corpse_spawn(
+    ecs_world_t *world,
+    ecs_entity_t prefab,
+    float x,
+    float z,
+    float yaw);
+
+/** Find the nearest critter of the spatial index within a range of a point on the ground.
+ *
+ * @param index The index, OreCrowd rebuilt it this frame
+ * @param x X of the point
+ * @param z Z of the point
+ * @param range Largest distance on XZ
+ * @return The critter, 0 for none
+ */
+ecs_entity_t ore_critter_nearest(
+    const OreCritterIndex *index,
+    float x,
+    float z,
+    float range);
+
+/** Register the critters: the waves that spawn them, their targets, attacks and moves, the
+ * crowd separation and the spatial index, their deaths, the astronaut's health and its regen,
+ * and the script function oreelse.spawn_critter(prefab, x, z).
+ *
+ * @param world The world
+ */
+void ore_critters_import(
+    ecs_world_t *world);
+/** Check whether the astronaut rides the rocket: it is hidden, cannot move, mine, shoot or
+ * regenerate, is invulnerable and no target.
+ *
+ * @param world The world or a stage
+ * @return Whether the astronaut is aboard
+ */
+bool ore_rocket_aboard(
+    const ecs_world_t *world);
+
+/** Register the critters' animation, deaths and corpses: the walk, bob and waddle, the legs,
+ * the corpses' char, aging, sinking and cap, and the script function oreelse.corpse(prefab,
+ * position, yaw).
+ *
+ * @param world The world
+ */
+void ore_critter_fx_import(
+    ecs_world_t *world);
+
 /** Register the game flow: states, clock, blink, toast, cancel() and restart().
  *
  * @param world The world
@@ -1031,7 +1491,8 @@ void ore_flow_import(
 void ore_map_import(
     ecs_world_t *world);
 
-/** Register the player: walking and the camera that follows the astronaut.
+/** Register the player: walking, the camera that follows the astronaut and the astronaut's
+ * animation (its walk cycle, bob, foot dust, jet plume and limbs).
  *
  * @param world The world
  */
@@ -1111,6 +1572,58 @@ void ore_flora_import(
 void ore_placement_import(
     ecs_world_t *world);
 
+/** Register the rocket: the rocket state, the flight and the script functions
+ * oreelse.rocket_install(), oreelse.rocket_uninstall(), oreelse.rocket_load(),
+ * oreelse.rocket_launch() and oreelse.craft_key().
+ *
+ * @param world The world
+ */
+void ore_rocket_import(
+    ecs_world_t *world);
+
+/** Get the level of the power category of a building.
+ *
+ * @param world The world or a stage
+ * @param building The building or its prefab
+ * @return The level of its category in OrePowerAlloc, -1 without a category
+ */
+int32_t ore_power_level(
+    const ecs_world_t *world,
+    ecs_entity_t building);
+
+/** Get the power multiplier of a building: the level of its category times cfg.powerStep. For
+ * one building; a system over many reads OrePowerAlloc and cfg.powerStep once.
+ *
+ * @param world The world or a stage
+ * @param building The building or its prefab
+ * @return The multiplier, 1 without a category, 0 at level 0
+ */
+float ore_power_mul(
+    const ecs_world_t *world,
+    ecs_entity_t building);
+
+/** Click bar level of the column of a category: the topmost lit bar steps the category down
+ * one level, any other sets it to level, an increase capped by the free bars. When nothing can
+ * be raised the warning that the bars are all assigned shows.
+ *
+ * @param world The world
+ * @param kind The category, an OrePowerKind
+ * @param level The bar clicked, 1 to ORE_POWER_LEVELS
+ * @return Whether the level of the category changed
+ */
+bool ore_power_set(
+    ecs_world_t *world,
+    int32_t kind,
+    int32_t level);
+
+/** Register power: production, demand and the blackout, the drills, the factories' crafters,
+ * the status lamps and the script function oreelse.power_set(category, level).
+ *
+ * @param world The world
+ */
+void ore_power_import(
+    ecs_world_t *world);
+
 /** Register the look: the render quality tiers and oreelse.cycleQuality().
  *
  * @param world The world
@@ -1130,7 +1643,7 @@ void ore_particles_import(
  *
  * Registers the components, the systems of every area and the script functions
  * oreelse.seed(), oreelse.cancel(), oreelse.restart(), oreelse.cycleQuality(),
- * oreelse.explosion() and oreelse.combust().
+ * oreelse.explosion(), oreelse.combust(), oreelse.spawn_critter() and oreelse.corpse().
  *
  * @param world The world
  */

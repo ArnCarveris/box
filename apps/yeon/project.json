@@ -1,0 +1,14 @@
+{
+    "id": "yeon",
+    "type": "application",
+    "value": {
+        "use": ["box"]
+    },
+    "lang.c": {
+        "${os Emscripten}": {
+            "shell": "../boxrun/shell.html",
+            "embed": ["../../etc", "../../apps/yeon/etc"],
+            "ldflags": ["-sEXPORTED_RUNTIME_METHODS=cwrap,FS"]
+        }
+    }
+}

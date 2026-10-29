@@ -22,6 +22,7 @@ const gunSteel: Rgb = {84, 92, 108}
 prefab GunTurret {
   // The item: crafted through the order book into the inventory, placed by spending one
   OreItem: {name: "Gun turret", detail: "Short range rapid fire."}
+  OreIcon: {texture: icons.gun_turret}
   OreRecipe: {
     inputs: [
       {item: items.IronPlate, amount: 10},

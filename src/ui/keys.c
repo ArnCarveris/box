@@ -1,8 +1,8 @@
 /**
  * @file ui/keys.c
  * @brief Keys and presses of the UI: the claim that keeps keys from the bindings, Tab, Enter and
- * Space on the focused entity, the to_focus hook that decides every move of the flecs focus, the
- * activation of a click, and the hand off of keys, text and presses to a focused TextEdit.
+ * Space on the focused entity, the to_focus hook that decides every move of the flecs focus,
+ * ui.activation, and the hand off of keys, text and presses to a focused TextEdit.
  *
  * The claim runs in InputUpdate with the focus the last frame left; the keys and presses then
  * reach the hook in box.picking in order. flecs moves the focus of a press through to_focus
@@ -197,20 +197,24 @@ done:
     return;
 }
 
-/** Activate the focused entity from Enter going down or Space coming up after it went down on it.
+/** Drive the ActionTrigger of the focused entity from Enter going down and from Space, which it
+ * follows from going down on the entity to coming up.
+ *
+ * These are the keys and the rule of the on.activate of flecs, sent with the same event. flecs
+ * only resolves the script futures for it and tells C the number of listeners, not whether the
+ * event activated the focus, so the trigger keeps this copy of the rule.
  *
  * @param world The world
  * @param st The module state
  * @param e The focused entity
  * @param evt The key event
  */
-static void box_ui_activate_key(
+static void box_ui_trigger_keys(
     ecs_world_t *world,
     box_ui_state_t *st,
     ecs_entity_t e,
     const box_ui_key_t *evt)
 {
-    UiActivateEvent act = { .target = e, .keyboard = true };
     Key key = evt->key == KeyKpEnter ? KeyEnter : evt->key;
     if (evt->repeat || (key != KeyEnter && key != KeySpace)) {
         goto done;
@@ -218,14 +222,12 @@ static void box_ui_activate_key(
 
     if (key == KeyEnter && evt->down) {
         box_ui_trigger_key(world, st, e, key, true);
-        box_ui_shim_activate(world, st, &act);
     } else if (key == KeySpace && evt->down) {
         st->space = e;
         box_ui_trigger_key(world, st, e, key, true);
     } else if (key == KeySpace && st->space == e) {
         st->space = 0;
         box_ui_trigger_key(world, st, e, key, false);
-        box_ui_shim_activate(world, st, &act);
     } else if (key == KeySpace && st->hold_source) {
         box_ui_hold_release(world, st);
     }
@@ -234,9 +236,12 @@ done:
     return;
 }
 
-/** Take a keyboard event: flecs sends on.key_down or on.key_up to the focused entity and its
- * ancestors, then Tab moves the focus, a focused TextEdit edits, Enter and Space activate unless
- * KeyCapture keeps them for the widget. An open console takes every key, the scripts see none.
+/** Take a keyboard event: flecs sends on.key_down, on.key_up and on.activate to the focus and its
+ * ancestors, then Tab moves the focus, a focused TextEdit edits, Enter and Space drive an
+ * ActionTrigger unless KeyCapture keeps them. An open console takes every key from the scripts.
+ *
+ * The key of the event is the value of box_input_key_value, from the platform and from the
+ * input queue alike: "Enter" for Enter and KpEnter, " " for Space, the names flecs activates on.
  *
  * @param world The world
  * @param pst The picking state
@@ -274,7 +279,7 @@ static void box_ui_key(
     } else if (e && st->focused == e && ecs_has(world, e, TextEdit)) {
         box_ui_text_edit_key(world, st, e, &evt);
     } else if (e && st->focused == e && !box_ui_up(world, e, KeyCapture)) {
-        box_ui_activate_key(world, st, e, &evt);
+        box_ui_trigger_keys(world, st, e, &evt);
     }
 
     box_ui_progress(world, st);
@@ -329,7 +334,7 @@ static ecs_entity_t box_ui_focus_rule(
 }
 
 /** Decide a move of the flecs focus and publish it in Focused and FocusStatus, the to_focus hook
- * that box.picking sets for flecs.script.event.
+ * that box.picking sets for flecs.script.input.
  *
  * A press focuses the first Focusable entity on the bubbling path of its pick or clears the
  * focus, without a visible focus. box_ui_focus_set has decided already.
@@ -401,47 +406,9 @@ static bool box_ui_is_up(
     return result;
 }
 
-/** Activate on the release of a left click: the handler of the press, the Interactive entity
- * it went to, when the cursor of the release is still over it or a child of it.
- *
- * @param world The world
- * @param st The module state
- * @param pst The picking state
- * @param src The release event
- */
-static void box_ui_activate_click(
-    ecs_world_t *world,
-    box_ui_state_t *st,
-    box_pick_state_t *pst,
-    const EcsScriptMouseEvent *src)
-{
-    UiActivateEvent act = {0};
-    const WorldTransform *t;
-    ecs_entity_t e = st->press_handler;
-    box_pick_t at;
-    box_pick_at(world, pst, (vec2){ src->screen_x, src->screen_y }, &at);
-    if (e && ecs_is_alive(world, e) && at.target && box_ui_is_up(world, e, at.target)) {
-        act.target = e;
-    }
-
-    t = act.target ? ecs_get(world, act.target, WorldTransform) : NULL;
-    if (t) {
-        mat4 inv;
-        vec3 local;
-        glm_mat4_inv(ECS_CONST_CAST(vec4*, t->m), inv);
-        glm_mat4_mulv3(inv, at.point, 1.0f, local);
-        act.local_x = local[0];
-        act.local_y = local[1];
-    }
-
-    if (act.target) {
-        box_ui_shim_activate(world, st, &act);
-    }
-}
-
 /** Follow a pointer event: a press of any button makes the focus it moved (or kept, on the
- * focused entity) not visible, a left click activates and a left press and drag select in a
- * TextEdit. box_ui_to_focus moved the focus before the scripts saw the press.
+ * focused entity) not visible and a left press and drag select in a TextEdit. box_ui_to_focus
+ * moved the focus before the scripts saw the press.
  *
  * @param world The world
  * @param pst The picking state
@@ -461,22 +428,13 @@ static void box_ui_pointer(
     void *ctx)
 {
     box_ui_state_t *st = ctx;
+    (void)pst;
     if (pressed) {
         ecs_entity_t e = box_ui_press_focus(world, pick);
         st->keyboard = false;
         if (e && e == st->focused) {
             box_ui_focus_apply(world, st, e, false);
         }
-    }
-
-    if ((released & 1u) && st->press) {
-        box_ui_activate_click(world, st, pst, src);
-        st->press = 0;
-    }
-
-    if (pressed & 1u) {
-        st->press = pick->target;
-        st->press_handler = pick->handler;
     }
 
     box_ui_text_edit_pointer(world, st, src, pick, pressed, released);
@@ -522,6 +480,99 @@ bool box_ui_focus(
     }
 
     return result;
+}
+
+/** Find the entity that handles the pointer events of an entity, as box.picking does: the first
+ * Interactive entity from it up, else the first InputBlocker.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return The handler, 0 when there is none
+ */
+static ecs_entity_t box_ui_handler(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    ecs_entity_t result = box_ui_up(world, e, Interactive);
+
+    return result ? result : box_ui_up(world, e, InputBlocker);
+}
+
+/** Decide whether box.ui counts an on.activate of flecs and for which entity.
+ *
+ * A key activates the focus unless KeyCapture keeps Enter and Space for it, as a TextEdit does.
+ * A click activates the handler of the press when the left button came up over it or a child.
+ *
+ * flecs activates on the release of any button on the pressed entity, which box.picking makes
+ * the release target wherever the cursor is, and reports the hit under the handler, as a label.
+ *
+ * @param world The world
+ * @param evt The event
+ * @return The activated entity, 0 when box.ui does not count the event as an activation
+ */
+static ecs_entity_t box_ui_activated(
+    ecs_world_t *world,
+    const EcsScriptActivateEvent *evt)
+{
+    const PickingState *ps = ecs_id(PickingState) ?
+        ecs_singleton_get(world, PickingState) : NULL;
+    ecs_entity_t e = evt->target, handler, result = 0;
+    EcsScriptMouseEvent last;
+    box_pick_t at;
+    if (!e || !ecs_is_alive(world, e)) {
+        goto done;
+    }
+
+    if (evt->keyboard) {
+        result = box_ui_up(world, e, KeyCapture) ? 0 : e;
+        goto done;
+    }
+
+    handler = box_ui_handler(world, e);
+    if (!handler || !ps || !ps->state || !ecs_script_get_mouse_state(world, &last, NULL) ||
+        last.button != 0)
+    {
+        goto done;
+    }
+
+    box_pick_at(world, ps->state, (vec2){ last.screen_x, last.screen_y }, &at);
+    if (at.target && box_ui_is_up(world, handler, at.target)) {
+        result = handler;
+    }
+
+done:
+    return result;
+}
+
+/** Tell which entity an on.activate of flecs activates for box.ui: ui.activation(event).
+ *
+ * @param ctx Call context
+ * @param argc Number of arguments
+ * @param argv The EcsScriptActivateEvent
+ * @param result Receives the activated entity, 0 when box.ui does not count the event
+ */
+static void box_ui_activation(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_value_t *result)
+{
+    ecs_world_t *world = ECS_CONST_CAST(ecs_world_t*, ctx->world);
+    (void)argc;
+    *(ecs_entity_t*)result->ptr = box_ui_activated(world, argv[0].ptr);
+}
+
+void box_ui_activation_import(
+    ecs_world_t *world,
+    ecs_entity_t ui)
+{
+    ecs_function(world, {
+        .name = "activation",
+        .parent = ui,
+        .return_type = ecs_id(ecs_entity_t),
+        .params = {{ "event", ecs_id(EcsScriptActivateEvent) }},
+        .callback = box_ui_activation
+    });
 }
 
 void box_ui_keys_import(

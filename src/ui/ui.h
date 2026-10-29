@@ -1,7 +1,7 @@
 /**
  * @file ui/ui.h
  * @brief Private state of box.ui and the functions its sources share: the focus model, the key
- * claim, the event waiters and the temporary flecs workaround of shim.c.
+ * claim, the event waiters and ui.activation, the filter of the on.activate of flecs.
  */
 
 #ifndef BOX_UI_INTERNAL_H
@@ -19,7 +19,6 @@
 
 /** What a script task waits for */
 typedef enum box_ui_wait_kind_t {
-    BoxUiWaitActivate, /**< on.activate */
     BoxUiWaitChange,   /**< on.change */
     BoxUiWaitSubmit,   /**< on.submit */
     BoxUiWaitCount     /**< Number of kinds */
@@ -89,8 +88,6 @@ struct box_ui_state_t {
     bool set_visible;            /**< Whether the focus box_ui_focus_set moves is visible */
     bool decided;                /**< The to_focus hook ran since box_ui_focus_set called flecs */
     ecs_entity_t focus_lost;     /**< Event queued when the focused entity loses Focusable */
-    ecs_entity_t press;          /**< Target of the held left button press, 0 for none */
-    ecs_entity_t press_handler;  /**< Handler of that press */
     ecs_entity_t space;          /**< Focused entity Space went down on, 0 for none */
     ecs_entity_t hold_source;    /**< Focused ActionTrigger element Space holds, 0 for none */
     ecs_entity_t hold_action;    /**< The action it holds */
@@ -176,7 +173,7 @@ void box_ui_focus_apply(
     ecs_entity_t e,
     bool visible);
 
-/** Check whether the flecs focus can be used: flecs.script.event is imported and the world is
+/** Check whether the flecs focus can be used: flecs.script.input is imported and the world is
  * not torn down.
  *
  * @param world The world or a stage
@@ -295,27 +292,14 @@ void box_ui_events_import(
     ecs_entity_t on,
     ecs_entity_t ui);
 
-/** Register the temporary script function on.activate.
+/** Register ui.activation, which tells which entity box.ui counts an on.activate of flecs for.
  *
  * @param world The world
- * @param st The module state
- * @param on The flecs.script.on scope
+ * @param ui The flecs.script.ui scope
  */
-void box_ui_shim_import(
+void box_ui_activation_import(
     ecs_world_t *world,
-    box_ui_state_t *st,
-    ecs_entity_t on);
-
-/** Send on.activate for an activation of an entity.
- *
- * @param world The world
- * @param st The module state
- * @param evt The activation, whose target is the activated entity
- */
-void box_ui_shim_activate(
-    ecs_world_t *world,
-    box_ui_state_t *st,
-    const UiActivateEvent *evt);
+    ecs_entity_t ui);
 
 /** Register TextEdit, TextEditStatus, their hooks, observer and update system.
  *

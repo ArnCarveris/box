@@ -32,6 +32,7 @@ const facLampDead: Rgb = {248, 84, 72}
 prefab Factory {
   // The item: crafted through the order book into the inventory, placed by spending one
   OreItem: {name: "Factory", detail: "Speeds up crafting."}
+  OreIcon: {texture: icons.factory}
   OreRecipe: {
     inputs: [
       {item: items.IronPlate, amount: 20},
@@ -45,6 +46,8 @@ prefab Factory {
   OreHealth: {value: 100, max: 100}
   OrePowerConsumer: {watts: 75}
   OrePowerCategory: {kind: Construction}
+  // A worker of the order book: placed, it crafts at speed 1 times the Construction multiplier
+  OreWorker: {speed: 1}
 
   deck {
     Position: {0, 0.12, 0}

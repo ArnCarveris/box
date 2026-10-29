@@ -19,6 +19,7 @@ const solarFrame: Rgb = {96, 104, 122}
 prefab SolarPanel {
   // The item: crafted through the order book into the inventory, placed by spending one
   OreItem: {name: "Solar panel", detail: "Generates power."}
+  OreIcon: {texture: icons.solar}
   OreRecipe: {
     inputs: [
       {item: items.IronPlate, amount: 4},
