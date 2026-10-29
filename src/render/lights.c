@@ -1678,13 +1678,16 @@ static void box_lights_free(
  *
  * @param world The world
  * @param component The component
+ * @param name The name of the query entity
  * @return The query, with the component and Scene(self|up)
  */
 static ecs_query_t* box_lights_scene_query(
     ecs_world_t *world,
-    ecs_entity_t component)
+    ecs_entity_t component,
+    const char *name)
 {
     return ecs_query(world, {
+        .entity = ecs_entity(world, { .name = name }),
         .terms = {
             { .id = component, .inout = EcsIn },
             {
@@ -1703,13 +1706,16 @@ static ecs_query_t* box_lights_scene_query(
  *
  * @param world The world
  * @param light The light component
+ * @param name The name of the query entity
  * @return The query, with the light, WorldTransform, Rgb and Scene(self|up)
  */
 static ecs_query_t* box_lights_query(
     ecs_world_t *world,
-    ecs_entity_t light)
+    ecs_entity_t light,
+    const char *name)
 {
     return ecs_query(world, {
+        .entity = ecs_entity(world, { .name = name }),
         .terms = {
             { .id = light, .inout = EcsIn },
             { .id = ecs_id(WorldTransform), .inout = EcsIn, .oper = EcsOptional },
@@ -1741,12 +1747,12 @@ void box_render_lights_init(
     ecs_map_init(&l->lookup, NULL);
     l->next_buffer = BOX_LIGHTS_DEFAULT_BUFFER + 1;
     l->next_atlas = BOX_RENDER_BUFFER_SHADOW_FIRST;
-    l->directional = box_lights_query(world, ecs_id(DirectionalLight));
-    l->point = box_lights_query(world, ecs_id(PointLight));
-    l->spot = box_lights_query(world, ecs_id(SpotLight));
-    l->ambient = box_lights_scene_query(world, ecs_id(AmbientLight));
-    l->bakes = box_lights_scene_query(world, ecs_id(LightBake));
-    l->atlases = box_lights_scene_query(world, ecs_id(ShadowAtlas));
+    l->directional = box_lights_query(world, ecs_id(DirectionalLight), "RenderDirectionalLights");
+    l->point = box_lights_query(world, ecs_id(PointLight), "RenderPointLights");
+    l->spot = box_lights_query(world, ecs_id(SpotLight), "RenderSpotLights");
+    l->ambient = box_lights_scene_query(world, ecs_id(AmbientLight), "RenderAmbientLights");
+    l->bakes = box_lights_scene_query(world, ecs_id(LightBake), "RenderLightBakes");
+    l->atlases = box_lights_scene_query(world, ecs_id(ShadowAtlas), "RenderShadowAtlases");
 
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "RenderExtractLights" }),
@@ -1797,7 +1803,8 @@ void box_render_lights_atmosphere(
     box_render_lights_t *l = ECS_CONST_CAST(box_render_lights_t*,
         box_render_lights_state(world));
     if (l && !l->atmospheres) {
-        l->atmospheres = box_lights_scene_query(world, ecs_id(Atmosphere));
+        l->atmospheres = box_lights_scene_query(
+            world, ecs_id(Atmosphere), "RenderLightAtmospheres");
     }
 }
 
@@ -1901,7 +1908,7 @@ void box_render_lights_time_of_day(
     box_render_lights_t *l = ECS_CONST_CAST(box_render_lights_t*,
         box_render_lights_state(world));
     if (l && !l->times) {
-        l->times = box_lights_scene_query(world, ecs_id(TimeOfDay));
+        l->times = box_lights_scene_query(world, ecs_id(TimeOfDay), "RenderTimesOfDay");
     }
 }
 

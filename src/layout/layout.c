@@ -52,6 +52,10 @@ void box_layout_observe_children(
 {
     if (!state->moved) {
         state->moved = ecs_query(world, {
+            .entity = ecs_entity(world, {
+                .name = "LayoutMoved",
+                .parent = ecs_get_parent(world, state->child_tag)
+            }),
             .terms = {
                 { .id = ecs_id(Position), .inout = EcsIn },
                 { .id = state->child_tag, .inout = EcsInOutFilter }

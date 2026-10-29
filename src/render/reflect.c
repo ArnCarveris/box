@@ -1541,14 +1541,17 @@ static void box_reflect_free(
  * @param world The world
  * @param component The component
  * @param transform Whether the optional WorldTransform comes between them
+ * @param name The name of the query entity
  * @return The query
  */
 static ecs_query_t* box_reflect_query(
     ecs_world_t *world,
     ecs_entity_t component,
-    bool transform)
+    bool transform,
+    const char *name)
 {
     ecs_query_desc_t desc = {
+        .entity = ecs_entity(world, { .name = name }),
         .terms = {{ .id = component, .inout = EcsIn }},
         .cache_kind = EcsQueryCacheAuto
     };
@@ -1582,8 +1585,8 @@ void box_render_reflect_init(
     ecs_map_init(&r->light_map, NULL);
     r->next_buffer = BOX_RENDER_BUFFER_REFLECT_FIRST;
     r->probe_ms = BOX_REFLECT_PROBE_MS;
-    r->bakes = box_reflect_query(world, ecs_id(ReflectionBake), false);
-    r->probes = box_reflect_query(world, ecs_id(ReflectionProbe), true);
+    r->bakes = box_reflect_query(world, ecs_id(ReflectionBake), false, "RenderReflectionBakes");
+    r->probes = box_reflect_query(world, ecs_id(ReflectionProbe), true, "RenderReflectionProbes");
 
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "RenderExtractReflect" }),

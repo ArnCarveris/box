@@ -973,6 +973,7 @@ static void box_draws_queries(
     box_render_draws_t *d)
 {
     d->dynamic_transform = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "RenderDynamicTransforms" }),
         .terms = {
             { .id = ecs_id(ShapeMesh), .inout = EcsIn },
             { .id = ecs_id(DrawSlot), .inout = EcsIn },
@@ -998,6 +999,7 @@ static void box_draws_queries(
     });
 
     d->dynamic_material = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "RenderDynamicMaterials" }),
         .terms = {
             { .id = ecs_id(ShapeMesh), .inout = EcsIn },
             { .id = ecs_id(DrawSlot), .inout = EcsIn },

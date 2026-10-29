@@ -568,6 +568,7 @@ void BoxProjectionImport(
     box_projection_state_t *state = ecs_os_calloc_t(box_projection_state_t);
     ecs_vec_init_t(NULL, &state->resized, ecs_entity_t, 0);
     state->surfaces = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "ProjectionSurfaces" }),
         .terms = {
             { .id = ecs_id(Surface), .inout = EcsIn },
             { .id = ecs_id(SurfaceStatus), .inout = EcsIn, .oper = EcsOptional }

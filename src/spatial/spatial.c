@@ -822,6 +822,7 @@ void BoxSpatialImport(
 
     index->refs = 1;
     index->dynamic = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "SpatialDynamic" }),
         .terms = {
             { .id = ecs_id(SpatialProxy), .inout = EcsIn },
             { .id = ecs_id(SpatialPose), .inout = EcsInOut },

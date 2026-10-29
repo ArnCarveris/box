@@ -513,6 +513,7 @@ void box_draws_text_init(
     }
 
     d->dynamic_texts = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "RenderDynamicTexts" }),
         .terms = {
             { .id = ecs_id(Text), .inout = EcsInOutNone },
             { .id = ecs_id(TextSlots), .inout = EcsInOutNone },
@@ -521,6 +522,7 @@ void box_draws_text_init(
         .cache_kind = EcsQueryCacheAuto
     });
     d->dynamic_text_materials = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "RenderDynamicTextMaterials" }),
         .terms = {
             { .id = ecs_id(Text), .inout = EcsInOutNone },
             { .id = ecs_id(TextSlots), .inout = EcsInOutNone },

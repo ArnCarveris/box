@@ -1052,10 +1052,12 @@ void box_particle_effects_import(
     ecs_vec_init_t(NULL, &s->effects, box_particle_effect_t*, 0);
     ecs_vec_init_t(NULL, &s->stack, ecs_entity_t, 0);
     s->views = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "ParticleEffectViews" }),
         .terms = {{ .id = ecs_id(View), .inout = EcsIn }},
         .cache_kind = EcsQueryCacheAuto
     });
     s->surfaces = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "ParticleEffectSurfaces" }),
         .terms = {
             { .id = ecs_id(Surface), .inout = EcsIn },
             { .id = ecs_id(SurfaceStatus), .inout = EcsIn, .oper = EcsOptional }

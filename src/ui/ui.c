@@ -124,10 +124,12 @@ void BoxUiImport(
     }
 
     st->focusables = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "UiFocusables" }),
         .terms = {{ .id = Focusable }},
         .cache_kind = EcsQueryCacheAuto
     });
     st->scopes = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "UiFocusScopes" }),
         .terms = {{ .id = FocusScope }},
         .cache_kind = EcsQueryCacheAuto
     });

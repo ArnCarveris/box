@@ -316,6 +316,7 @@ void box_render_environment_init(
     ecs_vec_init_t(NULL, &state->gone, ecs_entity_t, 0);
     state->next_handle = BOX_ENV_HANDLE_FIRST;
     state->environments = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "RenderEnvironments" }),
         .terms = {
             { .id = ecs_id(Environment), .inout = EcsIn },
             { .id = ecs_id(EnvironmentStatus), .inout = EcsInOutNone }

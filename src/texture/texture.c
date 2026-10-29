@@ -564,6 +564,7 @@ void BoxTextureImport(
     t->sync->lock = ecs_os_mutex_new();
     t->sync->refs = 1;
     t->surfaces = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "TextureSurfaces" }),
         .terms = {{ .id = ecs_id(Surface), .inout = EcsIn }},
         .cache_kind = EcsQueryCacheAuto
     });

@@ -282,6 +282,7 @@ void BoxEditorImport(
     ed->watch = box_file_watch_kind(world, "editor script", box_editor_script_changed, ed);
 
     ed->surfaces = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "EditorSurfaces" }),
         .terms = {{ .id = ecs_id(Surface), .inout = EcsIn }},
         .cache_kind = EcsQueryCacheAuto
     });

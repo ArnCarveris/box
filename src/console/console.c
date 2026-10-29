@@ -433,6 +433,7 @@ void BoxConsoleImport(
     ecs_singleton_add(world, Console);
 
     con->surfaces = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "ConsoleSurfaces" }),
         .terms = {{ .id = ecs_id(Surface), .inout = EcsIn }},
         .cache_kind = EcsQueryCacheAuto
     });

@@ -615,6 +615,7 @@ void box_render_atmosphere_import(
     box_render_atmos_t *a = box_atmos_state(world);
     if (a && !a->atmospheres) {
         a->atmospheres = ecs_query(world, {
+            .entity = ecs_entity(world, { .name = "RenderAtmospheres" }),
             .terms = {
                 { .id = ecs_id(Atmosphere), .inout = EcsIn },
                 {

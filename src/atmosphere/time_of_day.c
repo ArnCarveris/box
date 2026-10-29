@@ -496,13 +496,16 @@ static void box_tod_free(
  *
  * @param world The world
  * @param component The component
+ * @param name The name of the query entity
  * @return The query, with the component and Scene(self|up)
  */
 static ecs_query_t* box_tod_scene_query(
     ecs_world_t *world,
-    ecs_entity_t component)
+    ecs_entity_t component,
+    const char *name)
 {
     return ecs_query(world, {
+        .entity = ecs_entity(world, { .name = name }),
         .terms = {
             { .id = component, .inout = EcsIn },
             {
@@ -521,8 +524,8 @@ void box_tod_init(
     ecs_world_t *world)
 {
     box_tod_state_t *state = ecs_os_calloc_t(box_tod_state_t);
-    state->lights = box_tod_scene_query(world, ecs_id(DirectionalLight));
-    state->atmospheres = box_tod_scene_query(world, ecs_id(Atmosphere));
+    state->lights = box_tod_scene_query(world, ecs_id(DirectionalLight), "TimeOfDayLights");
+    state->atmospheres = box_tod_scene_query(world, ecs_id(Atmosphere), "TimeOfDayAtmospheres");
 
     ecs_set_hooks(world, TimeOfDay, { .ctor = box_tod_ctor });
 

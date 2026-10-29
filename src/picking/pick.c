@@ -1471,11 +1471,13 @@ void box_pick_queries_init(
     box_pick_state_t *st)
 {
     st->views = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "PickViews" }),
         .terms = {{ .id = ecs_id(View), .inout = EcsIn }},
         .cache_kind = EcsQueryCacheAuto
     });
 
     st->surfaces = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "PickSurfaces" }),
         .terms = {{ .id = ecs_id(Surface), .inout = EcsIn }},
         .cache_kind = EcsQueryCacheAuto
     });

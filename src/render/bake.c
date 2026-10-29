@@ -1610,6 +1610,7 @@ void box_render_bake_init(
     ecs_map_init(&b->light_map, NULL);
     b->next_handle = 1;
     b->bakes = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "RenderBakes" }),
         .terms = {
             { .id = ecs_id(LightBake), .inout = EcsIn },
             {

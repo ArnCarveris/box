@@ -1657,6 +1657,7 @@ void box_render_particles_import(
     box_render_particles_t *s = box_particles_state(world);
     if (s && !s->emitters) {
         s->emitters = ecs_query(world, {
+            .entity = ecs_entity(world, { .name = "RenderParticleEmitters" }),
             .terms = {
                 { .id = ecs_id(ParticleEmitter), .inout = EcsIn },
                 { .id = ecs_id(WorldTransform), .inout = EcsIn, .oper = EcsOptional },
@@ -1692,6 +1693,7 @@ void box_render_particles_import(
             .cache_kind = EcsQueryCacheAuto
         });
         s->burst_query = ecs_query(world, {
+            .entity = ecs_entity(world, { .name = "RenderParticleBursts" }),
             .terms = {
                 { .id = ecs_id(ParticleBurst), .inout = EcsIn },
                 {

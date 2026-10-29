@@ -372,11 +372,13 @@ static void box_text_state_init(
     s->sync->lock = ecs_os_mutex_new();
     s->sync->refs = 1;
     s->query = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "TextTexts" }),
         .terms = {{ .id = ecs_id(Text), .inout = EcsIn }},
         .cache_kind = EcsQueryCacheAuto,
         .flags = EcsQueryMatchDisabled
     });
     s->shown = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "TextShown" }),
         .terms = {{ .id = ecs_id(TextGlyphs), .inout = EcsIn }},
         .cache_kind = EcsQueryCacheAuto,
         .flags = EcsQueryMatchDisabled

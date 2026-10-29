@@ -1269,6 +1269,7 @@ void box_ui_text_edit_import(
     ecs_add_pair(world, ecs_id(TextEdit), EcsWith, ecs_id(TextEditStatus));
 
     st->edits = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "TextEdits" }),
         .terms = {{ .id = ecs_id(TextEdit), .inout = EcsInOutNone }},
         .cache_kind = EcsQueryCacheAuto
     });
