@@ -99,7 +99,6 @@ cfg {
   // Units a batch order (shift) asks for
   export const craftBatch: i32 = 5
 
-<<<<<<< HEAD
   // The rocket: a unit is a cargo bay or the life support. A rocket takes at most maxCargoBays
   // cargo bays and maxLifeSupport life supports, and launches with enginesPerUnit engines and
   // one fuel storage per unit; a cargo bay holds cargoCapacity Luminite
@@ -114,7 +113,7 @@ cfg {
   export const ignitionTime: f32 = 1.6
   export const launchAccel: f32 = 9
   export const launchAltitude: f32 = 60
-=======
+
   // The power allocation: Mining, Weapons and Construction each take a level of 0 to 4 bars,
   // at most powerBars in total; the demand is the consumers' watts times the bars assigned /
   // powerBars, and a category runs at its level times powerStep (0, 0.5, 1, 1.5, 2)
@@ -123,7 +122,6 @@ cfg {
 
   // A drill adds dt * drillSpeed times the Mining multiplier to its timer
   export const drillSpeed: f32 = 1
->>>>>>> 9cd93619de444074b2d548096e1fb906cb9dded3
 
   // Walking speed in units per second, and its multiplier while the run key is held
   export const walkSpeed: f32 = 7

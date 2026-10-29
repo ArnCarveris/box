@@ -3,15 +3,10 @@
  * @brief The oreelse module: components of the game and the functions its areas share.
  *
  * The scene (apps/oreelse/etc) holds the constants cfg.*, the models, the items, the singletons
-<<<<<<< HEAD
  * and the entities of a run.
  *
- * The systems of each area (flow.c, map.c, player.c, inventory.c, mining.c, craft.c,
- * critters.c, buildings.c, placement.c, rocket.c, look.c, particles.c) play the game.
-=======
- * and the entities of a run; the systems of each area (flow.c, map.c, player.c, ..., power.c,
- * critters.c, critter_fx.c, buildings.c, placement.c, look.c, particles.c) play the game.
->>>>>>> 9cd93619de444074b2d548096e1fb906cb9dded3
+ * The systems of each area (flow.c, map.c, player.c, ..., power.c, critters.c, critter_fx.c,
+ * buildings.c, placement.c, rocket.c, look.c, particles.c) play the game.
  */
 
 #ifndef OREELSE_GAME_H
@@ -1515,7 +1510,6 @@ void ore_buildings_import(
 void ore_placement_import(
     ecs_world_t *world);
 
-<<<<<<< HEAD
 /** Register the rocket: the rocket state, the flight and the script functions
  * oreelse.rocket_install(), oreelse.rocket_uninstall(), oreelse.rocket_load(),
  * oreelse.rocket_launch() and oreelse.craft_key().
@@ -1523,7 +1517,8 @@ void ore_placement_import(
  * @param world The world
  */
 void ore_rocket_import(
-=======
+    ecs_world_t *world);
+
 /** Get the level of the power category of a building.
  *
  * @param world The world or a stage
@@ -1565,7 +1560,6 @@ bool ore_power_set(
  * @param world The world
  */
 void ore_power_import(
->>>>>>> 9cd93619de444074b2d548096e1fb906cb9dded3
     ecs_world_t *world);
 
 /** Register the look: the render quality tiers and oreelse.cycleQuality().

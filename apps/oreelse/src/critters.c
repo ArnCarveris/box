@@ -276,13 +276,8 @@ static ecs_entity_t ore_critter_acquire(
     return other ? other : result;
 }
 
-<<<<<<< HEAD
-/** Hurt the astronaut: it loses hit points and its hurt timer starts over; at 0 the game is
- * lost. Aboard a rocket it is invulnerable.
-=======
 /** Hurt the astronaut: it loses hit points, down to 0, and its hurt timer starts over. At 0 it
- * dies, in OrePlayerHealth later in the same frame.
->>>>>>> 9cd93619de444074b2d548096e1fb906cb9dded3
+ * dies, in OrePlayerHealth later in the same frame. Aboard a rocket it is invulnerable.
  *
  * @param ctx The context of the system run
  * @param damage Hit points it loses
@@ -836,15 +831,9 @@ static void OreWaves(
     ecs_singleton_modified(it->stage, OreWaveState);
 }
 
-<<<<<<< HEAD
-/** Lose the game when the astronaut has no hit points left, else count the time since it was
- * hurt and after cfg.playerRegenDelay seconds regenerate cfg.playerRegen hit points a second,
- * not while aboard a rocket.
-=======
 /** Kill the astronaut when it has no hit points left (ore_player_die: the splat, the fall and
  * the lost game), else count the time since it was hurt and after cfg.playerRegenDelay seconds
- * regenerate cfg.playerRegen hit points a second.
->>>>>>> 9cd93619de444074b2d548096e1fb906cb9dded3
+ * regenerate cfg.playerRegen hit points a second, not while aboard a rocket.
  *
  * @param it Iterator over the astronaut with its health, while playing
  */

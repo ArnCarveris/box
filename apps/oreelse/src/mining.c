@@ -144,12 +144,8 @@ static void OrePlayerMine(
     const OreEffects *fx = ecs_singleton_get(it->world, OreEffects);
     ore_grid_t grid = ore_grid_get(it->world);
     float reach = ORE_CFG(it->world, "reach");
-<<<<<<< HEAD
-    bool holding = ore_action_down(it->world, a->mine) && !ore_rocket_aboard(it->world);
-=======
     float poof_y = ORE_CFG(it->world, "demolishPoofY");
-    bool holding = ore_action_down(it->world, a->mine);
->>>>>>> 9cd93619de444074b2d548096e1fb906cb9dded3
+    bool holding = ore_action_down(it->world, a->mine) && !ore_rocket_aboard(it->world);
     ecs_entity_t *bcell = holding && hover->on_grid ?
         ore_map_building(map, hover->row, hover->col) : NULL;
     ecs_entity_t building = bcell && *bcell && ecs_is_alive(it->world, *bcell) ? *bcell : 0;

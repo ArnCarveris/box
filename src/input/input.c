@@ -117,15 +117,11 @@ void BoxInputImport(
 {
     ECS_MODULE(world, BoxInput);
     ECS_IMPORT(world, BoxTypes);
-<<<<<<< HEAD
-    ECS_IMPORT(world, FlecsScriptEvent);
-=======
 #if defined(FLECS_SCRIPT_INPUT) || !defined(FLECS_SCRIPT_EVENT_H)
     ECS_IMPORT(world, FlecsScriptInput);
 #else
     ECS_IMPORT(world, FlecsScriptEvent);
 #endif
->>>>>>> 9cd93619de444074b2d548096e1fb906cb9dded3
 
     ECS_META_COMPONENT(world, Key);
     ECS_META_COMPONENT(world, KeyState);

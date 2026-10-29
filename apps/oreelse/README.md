@@ -21,14 +21,9 @@ bake3 --target em --local-env apps/oreelse                     # build for the b
 
 python3 tools/integration.py e2e oreelse_flow oreelse_look     # the end-to-end scenarios
 python3 tools/integration.py e2e oreelse_mining oreelse_particles
-<<<<<<< HEAD
 python3 tools/integration.py e2e oreelse_crafting oreelse_buildings oreelse_rocket
-python3 tools/integration.py e2e oreelse_critters
-=======
-python3 tools/integration.py e2e oreelse_crafting oreelse_buildings
 python3 tools/integration.py e2e oreelse_power oreelse_critters oreelse_critter_fx
 python3 tools/integration.py e2e oreelse_player_fx
->>>>>>> 9cd93619de444074b2d548096e1fb906cb9dded3
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -501,15 +496,11 @@ Every task of the port follows these.
   `OreHover` when the cursor tile moves, `OreInventory` when an amount changes,
   `OreCraftBook` (the orders oldest first and the rows of the queue panel) when an order or a
   craft's progress changes, `OreCanOrder` on an item prefab when it flips, `OreNeeds` (the raw
-<<<<<<< HEAD
-  ore of the item the UI sets in it) when a row changes, `OreRocketState` (the rocket, the score
-  and what can be done to the rocket) when a value changes, every frame of a flight. The C
-  formats no text for the UI.
-=======
   ore of the item the UI sets in it) when a row changes, `OrePowerAlloc` (the levels of the
   power categories) when a level changes, `OrePowerState` (production, demand, ratio and
-  blackout) when a value changes. The C formats no text for the UI.
->>>>>>> 9cd93619de444074b2d548096e1fb906cb9dded3
+  blackout) when a value changes, `OreRocketState` (the rocket, the score and what can be done
+  to the rocket) when a value changes, every frame of a flight. The C formats no text for the
+  UI.
 - **Game state** is the exclusive pair `(OreGameState, Title | Playing | Paused | Won | Lost)`
   on its own singleton (`ore_state_is`, `ore_state_set`). Gameplay systems run only while
   `Playing`, with a query term on `ore_state_pair(world, OreGameStatePlaying)` whose source is
@@ -699,14 +690,9 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 | `etc/world.flecs` | The ground and the basin |
 | `etc/boundary.flecs` | The hazard band around the playable area |
 | `etc/scenery.flecs` | The boulders and dunes of a run |
-<<<<<<< HEAD
-| `etc/run.flecs` | The astronaut, the parents of the placed buildings and of the critters, and the singletons of a run, the order book, the selection, the rocket state and the waves included |
+| `etc/run.flecs` | The astronaut, the parents of the placed buildings and of the critters, and the singletons of a run, the order book, the selection, the power allocation, the rocket state and the waves included |
 | `etc/launch.flecs` | The items of a rocket (`OreRocketKit`) and the rocket on the pad, a `Rocket` instance that follows the rocket state |
-| `etc/deposits.flecs` | The deposits of a run |
-=======
-| `etc/run.flecs` | The astronaut, the parents of the placed buildings and of the critters, and the singletons of a run, the order book, the selection, the power allocation and the waves included |
 | `etc/deposits.flecs` | The deposits of a run, the Luminite's with their glints (`DepositSparkle`) |
->>>>>>> 9cd93619de444074b2d548096e1fb906cb9dded3
 | `etc/player.flecs` | The `Astronaut` template |
 | `etc/props/ore.flecs` | The `Ore` template of the deposits |
 | `etc/critters/` | The `Mite`, `Skitter`, `Brute` and `Behemoth` prefabs, models with their health, speed, damage, range, radius and wave tier |
@@ -736,10 +722,7 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 | `src/buildings.c` | The buildings in the tile grid, the wall connectors, demolish and salvage, destroyed buildings, the look of the ghosts |
 | `src/placement.c` | The selection, `canPlace`, the click and the drag, the poof of a placed building, the pipette, the preview, `oreelse.select()`, `oreelse.pipette()`, `oreelse.placeStart()`, `oreelse.placeEnd()`, `oreelse.cancelDrag()` |
 | `src/craft.c` | The order book, the workers, `oreelse.craft_order()`, `oreelse.craft_cancel()` |
-<<<<<<< HEAD
-| `src/rocket.c` | The rocket state, installing, uninstalling, loading, the launch and the flight, `oreelse.rocket_install()`, `oreelse.rocket_uninstall()`, `oreelse.rocket_load()`, `oreelse.rocket_launch()`, `oreelse.craft_key()` |
-=======
 | `src/power.c` | Production, demand and the blackout, the drills, the factories' crafters, the status lamps, `oreelse.power_set(category, level)` |
->>>>>>> 9cd93619de444074b2d548096e1fb906cb9dded3
+| `src/rocket.c` | The rocket state, installing, uninstalling, loading, the launch and the flight, `oreelse.rocket_install()`, `oreelse.rocket_uninstall()`, `oreelse.rocket_load()`, `oreelse.rocket_launch()`, `oreelse.craft_key()` |
 | `src/look.c` | The render quality tiers, `oreelse.cycleQuality()` |
 | `src/particles.c` | The helpers that play the effects (`ore_burst`, `ore_burst_aimed`, `ore_explosion`, `ore_combust`), the flash of their lights, `oreelse.explosion()`, `oreelse.combust()` |
