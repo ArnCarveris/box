@@ -7,18 +7,11 @@
 //
 // The numbers are the original's pixels, positions from the top left corner of the parent with
 // y down: an element of a panel sits at LayoutItem {h: Left, v: Top, x, y: -y}. The labels are
-<<<<<<< HEAD
 // centered vertically on their icons by the layout. The status bar, the order queue, the power
-// allocator and the rocket assembly are panels, whose clicks call the oreelse functions: the
-// other lines are plain labels, which the pointer passes through. The inventory screen and its
-// info panel come from the InventoryScreen and ItemInfoPanel templates, the Inventory (E) button
-// from InventoryButton (ui/inventory.flecs).
-=======
-// centered vertically on their icons by the layout. The status bar and the screens of the game
-// flow (ui/screens.flecs) are panels: the other lines are plain labels, which the pointer passes
-// through. The inventory screen and its info panel come from the InventoryScreen and
+// allocator, the rocket assembly and the screens of the game flow (ui/screens.flecs) are panels,
+// whose clicks call the oreelse functions: the other lines are plain labels, which the pointer
+// passes through. The inventory screen and its info panel come from the InventoryScreen and
 // ItemInfoPanel templates, the Inventory (E) button from InventoryButton (ui/inventory.flecs).
->>>>>>> 3dd10f75f19b704b7b1eb480a41984e063a02aa5
 
 using flecs.script.math
 using box.transform

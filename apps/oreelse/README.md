@@ -25,12 +25,8 @@ python3 tools/integration.py e2e oreelse_crafting oreelse_buildings oreelse_rock
 python3 tools/integration.py e2e oreelse_power oreelse_critters oreelse_critter_fx
 python3 tools/integration.py e2e oreelse_player_fx oreelse_hud oreelse_building_animation
 python3 tools/integration.py e2e oreelse_weapons oreelse_flora oreelse_drones
-<<<<<<< HEAD
-python3 tools/integration.py e2e oreelse_inventory_screen oreelse_health_bars oreelse_panels
-=======
 python3 tools/integration.py e2e oreelse_inventory_screen oreelse_health_bars oreelse_screens oreelse_combat_fx
-python3 tools/integration.py e2e oreelse_drone_rocket_fx
->>>>>>> 3dd10f75f19b704b7b1eb480a41984e063a02aa5
+python3 tools/integration.py e2e oreelse_drone_rocket_fx oreelse_panels
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -1014,18 +1010,13 @@ its tile in the grid.
 | `etc/ui/icons.flecs` | The icon textures, `icons.*`, which the items name with `OreIcon` |
 | `etc/ui/panel.flecs` | The `Panel` template, the chrome of every panel: the plate, its edge, the hazard strip and the `InputBlocker` |
 | `etc/ui/health_bar.flecs` | The `HealthBar` template, the health bar of a damaged building, anchored to the projection of its model box (`OreModelBox`) |
-<<<<<<< HEAD
-| `etc/ui/hud.flecs` | The `OreHud` template: the status bar (`StatusGauge`, `StatusDivider`), the toast, the mine progress bar, the suit breach alert, the rocket status line, the order queue, power allocator and rocket assembly panels, drawn and hit in that order (z 0, 1 and 2), the Inventory (E) button and the inventory screen with its info panel over them (z 3 and 4) |
+| `etc/ui/hud.flecs` | The `OreHud` template, which shows the screens in their states: the status bar (`StatusGauge`, `StatusDivider`), the toast, the mine progress bar, the suit breach alert, the rocket status line, the order queue, power allocator and rocket assembly panels, drawn and hit in that order (z 0, 1 and 2), the Inventory (E) button and the inventory screen with its info panel over them (z 3 and 4) |
 | `etc/ui/inventory.flecs` | The inventory screen (`InventoryScreen`: `StockBody` with its `StockSlot`s, `ConstructBody` with its `TabButton`s and the `BuildingsPage` and `RocketPage` of `SlotButton`s; the slots and buttons are restyled `box.widgets.HeadlessButton`s), its info panel (`ItemInfoPanel`) and the Inventory (E) button (`InventoryButton`), which the HUD shows |
 | `etc/ui/queue.flecs` | The `QueueRow` template, a row of the order queue |
 | `etc/ui/power.flecs` | The `PowerBar` and `PowerColumn` templates of the power allocator |
 | `etc/ui/rocket_panel.flecs` | The `RocketSection`, `RocketStep` and `RocketLaunch` templates of the rocket assembly |
-=======
-| `etc/ui/hud.flecs` | The `OreHud` template, which shows the screens in their states: the status bar (`StatusGauge`, `StatusDivider`), the toast, the mine progress bar, the suit breach alert, the rocket status line, the Inventory (E) button and the inventory screen |
-| `etc/ui/inventory.flecs` | The inventory screen (`InventoryScreen`: `StockBody` with its `StockSlot`s, `ConstructBody` with its `TabButton`s and the `BuildingsPage` and `RocketPage` of `SlotButton`s; the slots and buttons are restyled `box.widgets.HeadlessButton`s), its info panel (`ItemInfoPanel`) and the Inventory (E) button (`InventoryButton`), which the HUD shows |
 | `etc/ui/screens.flecs` | The screens of the game flow: `OreTitleScreen` (with its signs, `OreSign`), `OrePauseScreen` (with `OreQualityButton` and its `OreQualityValue`), `OreEndScreen`, and `OreControls`, the list of the controls the title and pause screens share (`OreControl` rows) |
 | `etc/ui/signs/` | The original's sign art of the title screen (SVG), unchanged |
->>>>>>> 3dd10f75f19b704b7b1eb480a41984e063a02aa5
 | `etc/icons/` | The original's icons (SVG), unchanged |
 | `etc/ui/hazard_strip.svg` | The original's hazard strip of the panels, unchanged |
 | `src/flow.c` | States, clock, blink, toast, seeds, `oreelse.cancel()`, `oreelse.restart()` |
