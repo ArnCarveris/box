@@ -50,6 +50,7 @@ include boundary
 include scenery
 include deposits
 include run
+include launch
 
 using flecs.script.math
 using box.transform

@@ -1,0 +1,50 @@
+// The rocket on the pad: the items a rocket is built from, and the rocket entity, an instance
+// of the Rocket template (rocket/rocket.flecs) kept in step with the rocket state of OreRocket.
+// It stands while the state shows it (on the pad with parts, or in flight) at the bottom of the
+// rocket the state gives, so it rises during the ascent and is gone at the arrival; its props
+// follow the parts, the load and the validity of the state. Nothing in C writes them.
+//
+// The state is reset with every run (run.flecs), which removes the rocket of the previous run.
+
+using box.transform
+using oreelse
+
+$ {
+  OreRocketKit: {
+    engine: items.RocketEngine,
+    fuel: items.RocketFuelStorage,
+    cargo: items.RocketCargoBay,
+    life_support: items.RocketLifeSupport,
+    luminite: items.Luminite
+  }
+}
+
+const rocketState = OreRocketState[OreRocketState]
+
+// Each value on its own, so a change of one (the height, every frame of the ascent) only sets
+// what depends on it
+const rocketShown = rocketState.shown
+const rocketX = rocketState.x
+const rocketY = rocketState.y
+const rocketZ = rocketState.z
+const rocketEngines = rocketState.engines
+const rocketFuel = rocketState.fuel
+const rocketCargo = rocketState.cargo
+const rocketLife = rocketState.life_support
+const rocketLoaded = rocketState.loaded > 0
+const rocketValid = rocketState.valid
+
+if rocketShown {
+  rocket {
+    Position: {rocketX, rocketY, rocketZ}
+    DynamicTransform
+    Rocket: {
+      engines: rocketEngines,
+      fuel: rocketFuel,
+      cargo: rocketCargo,
+      life_support: rocketLife,
+      loaded: rocketLoaded,
+      valid: rocketValid
+    }
+  }
+}

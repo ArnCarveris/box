@@ -90,7 +90,8 @@ static void ore_mining_publish(
  * else the deposit, and show the marker on the tile.
  *
  * Within reach a swing takes the mining time of the ore or cfg.dozeTime; when it completes 1 of
- * the ore goes from the deposit into the inventory, or the building is demolished.
+ * the ore goes from the deposit into the inventory, or the building is demolished. Aboard the
+ * rocket the astronaut does not mine.
  *
  * @param it Iterator over the players, with OreActions, OreHover, OreMap and OreMineMarker,
  * while playing
@@ -106,7 +107,7 @@ static void OrePlayerMine(
     const OreMineMarker *marker = ecs_field(it, OreMineMarker, 5);
     ore_grid_t grid = ore_grid_get(it->world);
     float reach = ORE_CFG(it->world, "reach");
-    bool holding = ore_action_down(it->world, a->mine);
+    bool holding = ore_action_down(it->world, a->mine) && !ore_rocket_aboard(it->world);
     ecs_entity_t *bcell = holding && hover->on_grid ?
         ore_map_building(map, hover->row, hover->col) : NULL;
     ecs_entity_t building = bcell && *bcell && ecs_is_alive(it->world, *bcell) ? *bcell : 0;

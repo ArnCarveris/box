@@ -1,8 +1,10 @@
 // Input: every key is an Action with a Binding. The held actions (walking, running, mining) are
 // read by the oreelse systems through the OreActions singleton; the actions that fire once are
 // awaited by the loops below, each calling the oreelse function behind it. Placing awaits the
-// press and the release of Place: the press anchors a drag, the release places it. Quality has no
-// key, the pause screen raises it. The key that starts the game on the title screen is any key
+// press and the release of Place: the press anchors a drag, the release places it. The rocket
+// keys act on the rocket and the craft keys order rocket parts, whether or not a panel shows; the
+// minus buttons of the rocket panel uninstall parts and have no keys. Quality has no key, the
+// pause screen raises it. The key that starts the game on the title screen is any key
 // (OreTitleStart reads the keys).
 
 using flecs.script
@@ -118,6 +120,72 @@ actions {
     }
   }
 
+  // The rocket keys install a part from the inventory on the rocket on the pad, Shift and the
+  // key too. The loop below awaits any of them; OreItemKey names the part
+  Install {
+    engine {
+      Action: {description: "Install a rocket engine on the rocket"}
+      Binding: {key: T, ignore_modifiers: true}
+      OreItemKey: {item: items.RocketEngine}
+    }
+
+    fuel {
+      Action: {description: "Install a rocket fuel storage on the rocket"}
+      Binding: {key: Y, ignore_modifiers: true}
+      OreItemKey: {item: items.RocketFuelStorage}
+    }
+
+    cargo_bay {
+      Action: {description: "Install a rocket cargo bay on the rocket"}
+      Binding: {key: U, ignore_modifiers: true}
+      OreItemKey: {item: items.RocketCargoBay}
+    }
+
+    life_support {
+      Action: {description: "Install a rocket life support on the rocket"}
+      Binding: {key: I, ignore_modifiers: true}
+      OreItemKey: {item: items.RocketLifeSupport}
+    }
+  }
+
+  Load {
+    Action: {description: "Load the Luminite of the inventory into the rocket"}
+    Binding: {key: O, ignore_modifiers: true}
+  }
+
+  Launch {
+    Action: {description: "Launch the rocket"}
+    Binding: {key: P, ignore_modifiers: true}
+  }
+
+  // The craft keys order a rocket part through the order book, a batch with the Run action
+  // held, whatever screen is open. The loop below awaits any of them
+  Craft {
+    engine {
+      Action: {description: "Order a rocket engine, five with Shift"}
+      Binding: {key: F, ignore_modifiers: true}
+      OreItemKey: {item: items.RocketEngine}
+    }
+
+    fuel {
+      Action: {description: "Order a rocket fuel storage, five with Shift"}
+      Binding: {key: G, ignore_modifiers: true}
+      OreItemKey: {item: items.RocketFuelStorage}
+    }
+
+    cargo_bay {
+      Action: {description: "Order a rocket cargo bay, five with Shift"}
+      Binding: {key: H, ignore_modifiers: true}
+      OreItemKey: {item: items.RocketCargoBay}
+    }
+
+    life_support {
+      Action: {description: "Order a rocket life support, five with Shift"}
+      Binding: {key: J, ignore_modifiers: true}
+      OreItemKey: {item: items.RocketLifeSupport}
+    }
+  }
+
   Cancel {
     Action: {description: "Back out of one thing; with nothing left, pause or resume"}
     Binding: {key: Escape}
@@ -187,6 +255,35 @@ async {
   while true {
     const e = await on.pressed(actions.Select)
     await oreelse.select(e.action)
+  }
+}
+
+// The event names the key's action under Install or Craft, whose OreItemKey names the part
+async {
+  while true {
+    const e = await on.pressed(actions.Install)
+    await oreelse.rocket_install(e.action)
+  }
+}
+
+async {
+  while true {
+    await on.pressed(actions.Load)
+    await oreelse.rocket_load()
+  }
+}
+
+async {
+  while true {
+    await on.pressed(actions.Launch)
+    await oreelse.rocket_launch()
+  }
+}
+
+async {
+  while true {
+    const e = await on.pressed(actions.Craft)
+    await oreelse.craft_key(e.action)
   }
 }
 

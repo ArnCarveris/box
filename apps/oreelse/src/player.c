@@ -49,7 +49,7 @@ static float ore_hover_step(
  * astronaut faces where it walks and stays within cfg.mapClamp of the center on x and z.
  *
  * Over a tile with a building it hovers on its jetpack at cfg.hoverHeight, rising at
- * cfg.hoverRise and falling at cfg.hoverFall units a second.
+ * cfg.hoverRise and falling at cfg.hoverFall units a second. Aboard the rocket it stands still.
  *
  * @param it Iterator over the players, with OreActions and OreMap, while playing
  */
@@ -73,7 +73,8 @@ static void OrePlayerMove(
     float dz = (float)ore_action_down(it->world, a->back) -
         (float)ore_action_down(it->world, a->forward);
     float len = sqrtf(dx * dx + dz * dz);
-    bool moving = len > 0.0f;
+    bool aboard = ore_rocket_aboard(it->world);
+    bool moving = !aboard && len > 0.0f;
     bool running = moving && ore_action_down(it->world, a->run);
     ecs_entity_t *cell;
     float hover;
@@ -83,6 +84,16 @@ static void OrePlayerMove(
     }
 
     for (i = 0; i < it->count; i ++) {
+        if (aboard) {
+            if (player[i].moving || player[i].running) {
+                player[i].moving = false;
+                player[i].running = false;
+                ecs_modified(it->stage, it->entities[i], OrePlayer);
+            }
+
+            continue;
+        }
+
         if (moving) {
             p[i].x += dx / len * speed * it->delta_time;
             p[i].z += dz / len * speed * it->delta_time;
