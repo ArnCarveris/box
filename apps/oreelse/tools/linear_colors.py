@@ -4,8 +4,7 @@
 flecs-engine reads a color byte b as the linear value b / 255; box decodes color bytes as sRGB.
 A byte the port writes for a byte b of the original is therefore the sRGB encoding of b / 255:
 round(255 * srgb_encode(b / 255)), and box decodes it back to the original's linear value
-(within half a step of the sRGB byte). See apps/oreelse/README.md (Colors) and
-reference/PORTING.md (Materials and textures).
+(within half a step of the sRGB byte). See apps/oreelse/README.md (Colors).
 
 The conversion ran once over apps/oreelse/etc. Running `apply` again would encode the colors a
 second time; it is kept for reference and to show which literals count as colors. Port a new
