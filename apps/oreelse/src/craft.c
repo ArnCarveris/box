@@ -2,7 +2,8 @@
  * @file craft.c
  * @brief The order book: orders paid when placed and planned down to the raw ore, each with a
  * pool of its own, the workers (OreCrafter) that craft their entries oldest order first, cancel
- * and refunds, OreCanOrder on the item prefabs and the raw ore of OreNeeds.
+ * and refunds, OreCanOrder on the item prefabs with its flips (OreCanOrderFlips) and the raw ore
+ * of OreNeeds.
  */
 
 #include "game.h"
@@ -1414,18 +1415,21 @@ static void OreCraftUpdate(
     }
 }
 
-/** Check for every item prefab with a recipe whether ordering one unit would succeed now.
+/** Check for every item prefab with a recipe whether ordering one unit would succeed now, and
+ * count the flips in OreCanOrderFlips.
  *
- * @param it Iterator over the items with a recipe, with OreCraftBook, while playing
+ * @param it Iterator over the items with a recipe, with OreCraftBook and OreCanOrderFlips,
+ * while playing
  */
 static void OreCanOrderUpdate(
     ecs_iter_t *it)
 {
     OreCanOrder *can = ecs_field(it, OreCanOrder, 0);
     const OreCraftBook *book = ecs_field(it, OreCraftBook, 2);
+    OreCanOrderFlips *flips = ecs_field(it, OreCanOrderFlips, 5);
     ore_craft_limits_t limits = ore_craft_limits(it->world);
     ore_plan_t plan;
-    int32_t i, demand;
+    int32_t i, demand, count = flips->count;
     bool value;
     for (i = 0; i < it->count; i ++) {
         value = ore_craft_context(it->world, book, &limits, it->entities[i], false, false,
@@ -1433,7 +1437,12 @@ static void OreCanOrderUpdate(
         if (can[i].value != value) {
             can[i].value = value;
             ecs_modified(it->stage, it->entities[i], OreCanOrder);
+            flips->count ++;
         }
+    }
+
+    if (flips->count != count) {
+        ecs_singleton_modified(it->stage, OreCanOrderFlips);
     }
 }
 
@@ -1504,6 +1513,7 @@ void ore_craft_import(
     ecs_add_pair(world, ecs_id(OreCanOrder), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(OreRecipe), EcsWith, ecs_id(OreCanOrder));
     ecs_singleton_ensure(world, OreCraftBook);
+    ecs_singleton_ensure(world, OreCanOrderFlips);
     ecs_singleton_ensure(world, OreNeeds);
 
     ecs_observer(world, {
@@ -1545,7 +1555,9 @@ void ore_craft_import(
             { .id = ecs_id(OreRecipe), .src.id = EcsSelf, .inout = EcsIn },
             { .id = ecs_id(OreCraftBook), .src.id = ecs_id(OreCraftBook), .inout = EcsIn },
             { .id = EcsPrefab, .oper = EcsOptional },
-            { .id = playing, .src.id = state }
+            { .id = playing, .src.id = state },
+            { .id = ecs_id(OreCanOrderFlips), .src.id = ecs_id(OreCanOrderFlips),
+              .inout = EcsInOut }
         },
         .callback = OreCanOrderUpdate
     });

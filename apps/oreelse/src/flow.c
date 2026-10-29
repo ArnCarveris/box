@@ -228,12 +228,13 @@ static bool ore_cancel_pause(
 }
 
 /** The cancel chain in order; the first step that applies ends it: resume, cancel the
- * placement drag in flight, (the inventory screen comes in its own task), clear the selection
- * of a building, pause.
+ * placement drag in flight, close the inventory screen, clear the selection of a building,
+ * pause.
  */
 static const ore_cancel_step_t ore_cancel_steps[] = {
     ore_cancel_resume,
     ore_placement_cancel_drag,
+    ore_inventory_screen_cancel,
     ore_placement_deselect,
     ore_cancel_pause
 };

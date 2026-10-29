@@ -6,7 +6,7 @@
  * and the entities of a run.
  *
  * The systems of each area (flow.c, map.c, player.c, ..., power.c, critters.c, critter_fx.c,
- * buildings.c, placement.c, rocket.c, look.c, particles.c) play the game.
+ * buildings.c, drones.c, flora.c, placement.c, rocket.c, look.c, particles.c) play the game.
  */
 
 #ifndef OREELSE_GAME_H
@@ -324,6 +324,14 @@ ECS_STRUCT(OreCanOrder, {
     bool value; /**< Ordering one unit would succeed */
 });
 
+/** The flips of OreCanOrder, a singleton modified when the OreCanOrder of an item flips. The
+ * observers of a script do not see the changes of a prefab, so a UI script that shows the
+ * OreCanOrder of item prefabs reads count with them, which makes it read them again.
+ */
+ECS_STRUCT(OreCanOrderFlips, {
+    int32_t count; /**< Flips since the start */
+});
+
 /** The raw ore of one unit of an item, a row of OreNeeds */
 ECS_STRUCT(OreNeed, {
     ecs_entity_t item; /**< The raw ore */
@@ -414,6 +422,41 @@ ECS_STRUCT(OreDrill, {
  */
 ECS_STRUCT(OreWorker, {
     float speed; /**< Speed of its crafter at multiplier 1 */
+});
+
+/** The drones of a drone pad, on its prefab and inherited: placed, the pad gets count
+ * instances of drone as its children, docked over its bays. Drone b docks at the angle
+ * (b + 0.5) * 2 PI / count, radius from the pad's center and dock above the ground.
+ */
+ECS_STRUCT(OreDroneBay, {
+    ecs_entity_t drone; /**< Prefab of the drones, RepairDrone */
+    int32_t count;      /**< Drones of the pad */
+    float radius;       /**< Distance of the bays from the pad's center */
+    float dock;         /**< Height of a docked drone above the ground */
+    ecs_entity_t cost;  /**< Item the repairs are paid in, Iron */
+});
+
+/** States of a repair drone, the type of OreDrone.state */
+ECS_ENUM(OreDroneState, {
+    OreDroneStateDocked,    /**< Parked over its bay, looking for a target every cfg.droneScan */
+    OreDroneStateFlying,    /**< Flying straight to cfg.droneCruise above its target */
+    OreDroneStateRepairing, /**< Within cfg.droneArrive of its target, welding it */
+    OreDroneStateReturning  /**< Flying back to its bay, looking for a target every
+                             *   cfg.droneScan */
+});
+
+/** A repair drone of a drone pad, on the instance: a child of the pad, so it goes with it. Its
+ * Position is relative to the pad. Drones have no health: critters never target them.
+ */
+ECS_STRUCT(OreDrone, {
+    ecs_entity_t pad;    /**< The pad, its parent */
+    ecs_entity_t target; /**< Building it repairs or flies to, 0 for none; never the target of
+                          *   another drone of its pad */
+    OreDroneState state; /**< What it does */
+    int32_t bay;         /**< Its bay, 0 to OreDroneBay.count - 1 */
+    float scan;          /**< Seconds to the next look for a target while docked or returning */
+    float credit;        /**< Hit points repaired not yet paid for, below cfg.droneHpPerIron; it
+                          *   carries over between targets */
 });
 
 /** The bulb of a status lamp, which the Light template (etc/props/light.flecs) sets with the
@@ -634,9 +677,20 @@ ECS_STRUCT(OreDeposit, {
     int32_t col;           /**< Column of its tile, set when it registers, -1 off the grid */
 });
 
-/** The tile grid, a singleton: the deposit and the building on every tile. A deposit and a
- * building can share a tile (a drill sits on a deposit). The cells clear themselves when their
- * entities are deleted, so a restart that deletes the run's entities empties it.
+/** A plant of the flora (scenery.flecs), registered in the tile grid of OreMap when it is set.
+ *
+ * ore_map_purge deletes a plant on a tile another plant took or on a deposit's tile; a plant under
+ * a building sinks cfg.floraSink below the ground until the building is gone. A plant off the
+ * grid keeps row and col at -1 and stays as it is.
+ */
+ECS_STRUCT(OreFlora, {
+    int32_t row; /**< Row of its tile, set when it registers, -1 off the grid */
+    int32_t col; /**< Column of its tile, set when it registers, -1 off the grid */
+});
+
+/** The tile grid, a singleton: the deposit, the building and the plant on every tile. A deposit
+ * and a building can share a tile (a drill sits on a deposit). The cells clear themselves when
+ * their entities are deleted, so a restart that deletes the run's entities empties it.
  */
 ECS_STRUCT(OreMap, {
     int32_t rows;              /**< Rows of the grid, cfg.rows once a cell was registered */
@@ -646,11 +700,17 @@ ECS_PRIVATE                    /**< The cells are not reflected */
     ecs_entity_t *buildings;   /**< Building of every tile, row major, 0 for none */
     ecs_entity_t *links;       /**< Connector of the east (2 i) and south (2 i + 1) edge of
                                 *   every tile i, 0 for none */
-    ecs_vec_t rejected;        /**< Deposits that registered on a taken tile, deleted by
-                                *   ore_map_purge: an entity cannot be deleted while the
+    ecs_entity_t *flora;       /**< Plant of every tile, row major, 0 for none */
+    ecs_vec_t rejected;        /**< Deposits and plants that registered on a taken tile, deleted
+                                *   by ore_map_purge: an entity cannot be deleted while the
                                 *   script that creates it still sets it */
     ecs_vec_t dirty;           /**< Tiles (row major indices) whose building changed, the
                                 *   connectors of their edges to sync */
+    ecs_vec_t flora_new;       /**< Plants that registered (or whose tile got a deposit) since
+                                *   the last ore_map_purge, to check against the deposits once
+                                *   every script of the run created its entities */
+    ecs_vec_t flora_dirty;     /**< Tiles (row major indices) whose building changed, their
+                                *   plants to sink or raise */
 });
 
 /** Render quality tiers, the type of OreQuality.tier. The pause screen's button cycles
@@ -767,6 +827,33 @@ ECS_STRUCT(OreRocketState, {
 /** An item a key applies to, on the actions of the rocket keys (input.flecs) */
 ECS_STRUCT(OreItemKey, {
     ecs_entity_t item; /**< Item prefab of the key */
+});
+
+/** Tabs of the construct section of the inventory screen, the range of OreInventoryScreen.tab:
+ * 0 the buildings, 1 the rocket parts
+ */
+#define ORE_INVENTORY_TABS (2)
+
+/** The inventory screen (E), a singleton run.flecs resets: closed on the Buildings tab. It shows
+ * while open and playing. Modified when a value changes.
+ */
+ECS_STRUCT(OreInventoryScreen, {
+    bool open;   /**< The screen is open: the right button does not mine, the left one does
+                  *   not place, the pipette does nothing and the preview hides */
+    int32_t tab; /**< The tab of the construct section, 0 Buildings, 1 Rocket */
+});
+
+/** The item the info panel of the inventory screen shows, a singleton run.flecs resets. The UI
+ * says what the pointer is over (oreelse.inventory_hover()), OreItemInfoUpdate derives the item
+ * and names it in OreNeeds. Modified when a value changes.
+ */
+ECS_STRUCT(OreItemInfo, {
+    int32_t slot;        /**< Stock slot under the pointer, -1 for none (set by the UI) */
+    ecs_entity_t button; /**< Item of the slot button under the pointer, 0 for none (set by the
+                          *   UI) */
+    ecs_entity_t item;   /**< Item the info panel shows: of the slot while it holds one, else
+                          *   of the button, 0 for none and while the screen is closed */
+    bool place;          /**< item is a building in a stock slot: Ready to place, no needs */
 });
 
 /** Tiers of critters the waves spawn, the size of the arrays of OreArsenal, OreWaveMix and
@@ -1236,7 +1323,20 @@ void ore_map_fit(
     OreMap *map,
     const ore_grid_t *grid);
 
-/** Mark a tile whose building changed, so the connectors of its edges are synced.
+/** Get the plant cell of a tile.
+ *
+ * @param map The tile grid
+ * @param row The row
+ * @param col The column
+ * @return The cell, NULL off the grid or before the first registration
+ */
+ecs_entity_t* ore_map_flora(
+    OreMap *map,
+    int32_t row,
+    int32_t col);
+
+/** Mark a tile whose building changed, so the connectors of its edges and its plant are
+ * synced.
  *
  * @param map The tile grid
  * @param row The row
@@ -1259,13 +1359,25 @@ bool ore_hover_find(
     const OreView *view,
     OreHover *hover);
 
-/** Delete the deposits that registered on a tile another deposit holds. The OnLoad phase
- * does it every frame, restart() right after it reloaded the scripts of the run.
+/** Delete the deposits that registered on a tile another deposit holds and the plants that
+ * registered on a tile another plant holds, then sync the flora (ore_flora_sync). The OnLoad
+ * phase does it every frame, restart() right after it reloaded the scripts of the run.
  *
  * @param world The world or a stage
  */
 void ore_map_purge(
     ecs_world_t *world);
+
+/** Sync the flora with the tile grid: delete the plants that registered since the last sync on
+ * a deposit's tile, and sink the plants of those and of the tiles whose building changed under
+ * a building (cfg.floraSink below the ground) or raise them back to it.
+ *
+ * @param world The world or a stage
+ * @param map The tile grid
+ */
+void ore_flora_sync(
+    ecs_world_t *world,
+    OreMap *map);
 
 /** Get the amount of an item in the inventory.
  *
@@ -1755,6 +1867,21 @@ void ore_health_bars_import(
 void ore_building_fx_import(
     ecs_world_t *world);
 
+/** Register the repair drones: the drones a placed drone pad parks and the system that flies
+ * them to the damaged buildings and welds them, paid from the inventory.
+ *
+ * @param world The world
+ */
+void ore_drones_import(
+    ecs_world_t *world);
+
+/** Register the flora: the plants that register in the tile grid.
+ *
+ * @param world The world
+ */
+void ore_flora_import(
+    ecs_world_t *world);
+
 /** Register placement: the selection, the click and drag placement, the preview and the script
  * functions oreelse.select(), oreelse.pipette(), oreelse.placeStart(), oreelse.placeEnd() and
  * oreelse.cancelDrag().
@@ -1762,6 +1889,43 @@ void ore_building_fx_import(
  * @param world The world
  */
 void ore_placement_import(
+    ecs_world_t *world);
+
+/** Check whether the inventory screen is open while playing, which keeps the right button from
+ * mining, the left one from placing and the pipette from picking, and hides the preview.
+ *
+ * @param world The world or a stage
+ * @return Whether OreInventoryScreen is open and the game is playing
+ */
+bool ore_inventory_screen_open(
+    const ecs_world_t *world);
+
+/** Open or close the inventory screen, only while playing. Opening throws away the placement
+ * drag in flight; closing forgets what the pointer was over.
+ *
+ * @param world The world
+ * @param open Whether to open it
+ * @return Whether it opened or closed
+ */
+bool ore_inventory_screen_set(
+    ecs_world_t *world,
+    bool open);
+
+/** Cancel step: close the inventory screen.
+ *
+ * @param world The world
+ * @return Whether it was open
+ */
+bool ore_inventory_screen_cancel(
+    ecs_world_t *world);
+
+/** Register the inventory screen: OreInventoryScreen, the item of its info panel (OreItemInfo)
+ * and the script functions oreelse.inventory_toggle(), inventory_tab(tab), inventory_pick(slot),
+ * inventory_order(item, batch) and inventory_hover(slot, item, over).
+ *
+ * @param world The world
+ */
+void ore_inventory_screen_import(
     ecs_world_t *world);
 
 /** Register the rocket: the rocket state, the flight and the script functions

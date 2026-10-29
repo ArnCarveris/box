@@ -517,7 +517,7 @@ static ecs_entity_t box_ui_activated(
     const PickingState *ps = ecs_id(PickingState) ?
         ecs_singleton_get(world, PickingState) : NULL;
     ecs_entity_t e = evt->target, handler, result = 0;
-    EcsScriptMouseEvent last;
+    const EcsScriptMouseEvent *last;
     box_pick_t at;
     if (!e || !ecs_is_alive(world, e)) {
         goto done;
@@ -529,13 +529,16 @@ static ecs_entity_t box_ui_activated(
     }
 
     handler = box_ui_handler(world, e);
-    if (!handler || !ps || !ps->state || !ecs_script_get_mouse_state(world, &last, NULL) ||
-        last.button != 0)
-    {
+    if (!handler || !ps || !ps->state || !ps->state->has_event) {
         goto done;
     }
 
-    box_pick_at(world, ps->state, (vec2){ last.screen_x, last.screen_y }, &at);
+    last = &ps->state->event;
+    if (last->button != 0) {
+        goto done;
+    }
+
+    box_pick_at(world, ps->state, (vec2){ last->screen_x, last->screen_y }, &at);
     if (at.target && box_ui_is_up(world, handler, at.target)) {
         result = handler;
     }

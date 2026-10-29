@@ -24,7 +24,12 @@ python3 tools/integration.py e2e oreelse_mining oreelse_particles
 python3 tools/integration.py e2e oreelse_crafting oreelse_buildings oreelse_rocket
 python3 tools/integration.py e2e oreelse_power oreelse_critters oreelse_critter_fx
 python3 tools/integration.py e2e oreelse_player_fx oreelse_hud oreelse_building_animation
+<<<<<<< HEAD
 python3 tools/integration.py e2e oreelse_weapons oreelse_health_bars
+=======
+python3 tools/integration.py e2e oreelse_weapons oreelse_flora oreelse_drones
+python3 tools/integration.py e2e oreelse_inventory_screen
+>>>>>>> 11eb33efca9def0ef64f14dcd3a157f53c6ac977
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -44,6 +49,8 @@ session with the same seed.
 | Left mouse button | Place the selected building; drag for a line, an L or a rectangle |
 | 1, 2, 3, 4, 5, 6, 8, 9, 0 | Select the wall, drill, solar panel, gun turret, laser turret, missile turret, rocket pad, drone pad, factory (again: clear the selection) |
 | Q | Pipette: select the building under the cursor, the drill over a deposit |
+| E | Open or close the inventory screen (the Inventory (E) button too) |
+| Tab | Switch the open inventory screen between its Buildings and Rocket tabs |
 | T, Y, U, I | Install a rocket engine, fuel storage, cargo bay, life support on the rocket |
 | O | Load the Luminite you carry into the rocket |
 | P | Launch the rocket |
@@ -68,8 +75,7 @@ ESC is one step back at a time, in this order:
 4. A building selected: clear the selection.
 5. Otherwise: pause.
 
-(Step 3 comes with the inventory screen.) Everything stops dead while paused, the clock
-included.
+Everything stops dead while paused, the clock included.
 
 R starts a new run once the game is won or lost, straight into play, on a new map. It does
 nothing while playing. The camera keeps its zoom level.
@@ -92,6 +98,11 @@ The map is 48 by 48 tiles of 2 units, the astronaut's start at its center. Depos
 A hazard band runs around the playable area, just outside the edge tiles. Boulders lie scattered
 over the basin and the plain, and dunes rise on the plain beyond; they change with every map and
 nothing collides with them.
+
+Alien flora grows from 8 to 58 units out from the center: 96 frondstalks, 200 ashcups and 84
+quillbulbs, each near the center of a tile, changing with every map. It is decoration: nothing
+collides with it. A tile holds at most one plant and a deposit's tile none. A plant under a
+building sinks out of sight when the building is placed and comes back when it is gone.
 
 ### The astronaut
 
@@ -357,6 +368,36 @@ is paused everything stands still.
 - The drill turns its bit (7 radians a second) and shakes it, rides its carriage up and down
   the legs and its slider fore and aft, and throws dust; idle, its bit settles back at rest.
 
+### Repair drones
+
+Nothing else in the game gives health back. A drone pad parks 4 repair drones over its four
+bays: drone b docks at the angle `(b + 0.5) * 2 * PI / 4`, 1.4 units from the pad's center and
+0.62 above the ground. The drones are part of the pad: they go when it is demolished or
+destroyed.
+
+A drone works when there is no blackout and the inventory holds at least 1 Iron. One that does
+not drops its target, flies home and stays docked until both are back. The drone pad has no
+power category, so the allocation does not slow it; only a blackout stops it.
+
+A docked or returning drone looks for a target every 0.5 seconds: the nearest damaged building
+(above 0 and below its full health) anywhere on the map, measured from the pad while docked and
+from the drone otherwise. A building another drone of the same pad goes for is skipped; drones
+of different pads may share one. Any building can be repaired, drone pads included.
+
+| State | What the drone does |
+| --- | --- |
+| Docked | Parked over its bay |
+| Flying | Flies straight to 2.8 units above its target at 7 units a second, slowing down to 20% of it within 1.8 units of its goal |
+| Repairing | Within 0.45 units of that point: welds its target, 14 HP a second, until it is full |
+| Returning | Flies back to its bay at the same height and lands on it |
+
+A drone that finished a building goes straight for the next one, or returns when there is none.
+Repairs cost 1 Iron for every 10 HP: each drone counts the HP it welded, and every time the count
+reaches 10, 1 Iron leaves the inventory; the rest carries over to its next target. So a wall at
+200 of 300 HP takes 100 / 14 seconds of welding and 10 Iron.
+
+Drones cannot be hurt and critters never go for them.
+
 ### Critters
 
 | Critter | HP | Speed | Damage/s | Attack range | Radius | Wave cost | From wave |
@@ -522,6 +563,36 @@ second and coming back down at 5 once it is off the buildings. The jet plume fir
 in the air and stops when it lands; its limbs trail behind it while it flies and dangle while it
 hovers in place.
 
+### The inventory screen
+
+E, or the Inventory (E) button at the bottom center of the screen, opens the inventory screen
+while playing; E closes it again, and so does ESC (step 3 of the chain above). It hides while
+paused and shows again on resume; a restart closes it on the Buildings tab. Opening it throws a
+placement drag in flight away (`Placement cancelled`). The game keeps running while it is open,
+but the right button does not mine or demolish, the left button does not place, Q does nothing
+and the placement preview hides. The digit keys, F G H J and T Y U I O P work with the screen
+open or closed; a digit key that changes the selection closes it.
+
+The **inventory** section shows the 15 slots of the inventory in its slot order: a filled slot
+shows the item's icon and its count, the building selected for placement in amber. A click on a
+building selects it for placement (the selected one again clears the selection) and closes the
+screen; a click on any other item does nothing.
+
+The **construct** section has two tabs, Buildings and Rocket; Tab or a click on a tab button
+switches them. The Buildings tab holds a button per building (wall, drill, solar panel; gun,
+laser and missile turret; factory, rocket pad, drone pad), the Rocket tab one per rocket part
+with its craft key (engine F, fuel storage G, cargo bay H, life support J). A button shows dim
+when its item cannot be ordered now. A click orders one, with Shift held five, through the order
+book; the screen stays open.
+
+While the pointer is over a filled stock slot or a button, the info panel below the screen shows
+the item: its icon, its name, a note and its detail. The note is `Ready to place` for a building
+in a stock slot, `Craft 1.0s` (with `- yields 2` when a craft yields more than one) for an item
+with a recipe, `Mined from deposits` for an ore, followed by the power of a building:
+`Craft 1.0s - 4 W` for a consumer, `Craft 2.0s - +20 W` for a producer. An item with a recipe,
+unless it is a building in a stock slot, lists its needs of raw ore (see Crafting) as
+`have/need`, red where ore is short.
+
 ### The HUD
 
 The HUD shows over the world outside the title screen. In the top right corner the status bar
@@ -544,6 +615,7 @@ it needs: `Install a cargo bay (U) or life support (I)`, `Needs 4 engines, 2 ins
 `Needs 1 fuel tanks, 0 installed (Y)`. Below 30% health `! SUIT BREACH !` blinks red at the top
 of the screen.
 
+<<<<<<< HEAD
 A building that is damaged (above 0 and below its full HP) shows a health bar over it: a dark
 bar 4 px tall, 6 px above the top of the building as the camera sees it and as wide as the
 building looks, so it follows the zoom and the camera in the same frame. Its fill, inset 1 px,
@@ -554,6 +626,11 @@ screen are not drawn, the panels of the HUD cover them, and they show only while
 
 Clicks, the right button and the wheel over a panel of the UI (the status bar) do not reach the
 world: they place, mine and zoom nothing. The plain lines of text let them through.
+=======
+Clicks, the right button and the wheel over a panel of the UI (the status bar, the inventory
+screen, its info panel and the Inventory (E) button) do not reach the world: they place, mine
+and zoom nothing. The plain lines of text let them through.
+>>>>>>> 11eb33efca9def0ef64f14dcd3a157f53c6ac977
 
 ### Render quality
 
@@ -590,12 +667,16 @@ Every task of the port follows these.
   when a signal flips, `OreToast` when a message starts and ends, `OreView` while it glides,
   `OreHover` when the cursor tile moves, `OreInventory` when an amount changes,
   `OreCraftBook` (the orders oldest first and the rows of the queue panel) when an order or a
-  craft's progress changes, `OreCanOrder` on an item prefab when it flips, `OreNeeds` (the raw
-  ore of the item the UI sets in it) when a row changes, `OrePowerAlloc` (the levels of the
-  power categories) when a level changes, `OrePowerState` (production, demand, ratio and
-  blackout) when a value changes, `OreRocketState` (the rocket, the score, the Luminite held
-  and what can be done to the rocket) when a value changes, every frame of a flight. The C
-  formats no text for the UI.
+  craft's progress changes, `OreCanOrder` on an item prefab when it flips, with
+  `OreCanOrderFlips` counting the flips (the observers of a script do not see the changes of a
+  prefab, so a script that shows `OreCanOrder` reads the count too), `OreNeeds` (the raw ore of
+  the item the UI sets in it) when a row changes, `OreInventoryScreen` (open, the tab)
+  when it opens, closes or switches tabs, `OreItemInfo` (what the pointer is over on the
+  inventory screen and the item of its info panel) when it changes, `OrePowerAlloc` (the
+  levels of the power categories) when a level changes, `OrePowerState` (production, demand,
+  ratio and blackout) when a value changes, `OreRocketState` (the rocket, the score, the
+  Luminite held and what can be done to the rocket) when a value changes, every frame of a
+  flight. The C formats no text for the UI.
 - **Game state** is the exclusive pair `(OreGameState, Title | Playing | Paused | Won | Lost)`
   on its own singleton (`ore_state_is`, `ore_state_set`). Gameplay systems run only while
   `Playing`, with a query term on `ore_state_pair(world, OreGameStatePlaying)` whose source is
@@ -620,7 +701,8 @@ Every task of the port follows these.
   the runs since the start. `ore_seed_get(world, stream)` derives the seed of a stream of the
   current run: stream 0 seeds the C generator (`OreRandom`, drawn with `ore_random01`), and
   the scripts seed their `flecs.script.math.Rng` with `oreelse.seed(stream)`, one stream per
-  script (1 and 2 the deposits, 3 the ore models, 4 the scenery). A new random stream takes the next number.
+  script (1 and 2 the deposits, 3 the ore models, 4 the scenery, 5 the placement of the flora,
+  6 the plant models). A new random stream takes the next number.
 - **Restart** reloads the scripts that create a run's entities (`ecs_script_reload`): every
   script that creates the entities of a run puts the `OreRunScript` tag on one of them, and
   `restart()` reloads the script of every entity with the tag (today `run.flecs` with the
@@ -629,11 +711,15 @@ Every task of the port follows these.
 - **The map**: tile (row, col) is centered at `x = x0 + col * tile`, `z = z0 + row * tile`.
   The conversions are `ore_tile_x`, `ore_tile_z`, `ore_col_at`, `ore_row_at` and `ore_on_grid`
   in `src/map.c`, over the `ore_grid_t` of `ore_grid_get` (read once per system run). The
-  `OreMap` singleton is the tile grid: `ore_map_deposit` and `ore_map_building` give the cell
-  of a tile. Entities register when they are set and clear their cell when they are removed.
-  A deposit that registers on a tile another deposit holds is rejected and deleted by
-  `ore_map_purge` (every frame in `OnLoad`, and by `restart()` right after its reload): an
-  entity cannot be deleted in the observer of a component its script is still setting.
+  `OreMap` singleton is the tile grid: `ore_map_deposit`, `ore_map_building` and
+  `ore_map_flora` give the cell of a tile. Entities register when they are set and clear their
+  cell when they are removed.
+  A deposit that registers on a tile another deposit holds (a plant on one another plant
+  holds) is rejected and deleted by `ore_map_purge` (every frame in `OnLoad`, and by
+  `restart()` right after its reload): an entity cannot be deleted in the observer of a
+  component its script is still setting. `ore_map_purge` then syncs the flora
+  (`ore_flora_sync`): it deletes the plants that registered on a deposit's tile and sinks or
+  raises the plants of the tiles whose building changed.
 - **Systems write through `it->stage`** (`ecs_set`, `ecs_modified`, `ore_state_set`,
   `ore_toast`): the world is read only while the pipeline runs.
 - **Tests**: end-to-end scenarios over the command port, one file per area,
@@ -780,6 +866,27 @@ and `HazardBoundary` (`etc/materials/hazard.flecs`), `SolarCells`, `AccessPlate`
 `FanDisc` and `BayPad`. `TileMarker` and `TileMarkerBad` (`etc/props/markers.flecs`) are the
 glowing plates mining and placement show over a tile, instances placed at y 0.14.
 
+## Flora models
+
+The plants are templates in `etc/props/flora.flecs` with the original's names, geometry and
+colors. A plant's origin is the middle of its root mound on the ground, and every instance draws
+its own shape from the seeded `floraRng`. The fronds and membranes are the cutouts of
+`etc/materials/flora.flecs`: `FloraFrond`, `FloraFrondB`, `FloraMembrane` and `FloraMembraneB`,
+a one sided unit quad with the texture and its normal map, alpha tested (`AlphaCutoff`) instead
+of the original's alpha blending. Every blade of a plant has a `back` child of the same cutout
+turned by PI about y, so it shows its texture from both sides. The back is written out in the
+templates, not as a child of the cutout prefabs: flecs' instancing of prefab children at the
+scale of the flora (thousands of blades) aborts at world teardown.
+
+| Template | Props | Parts |
+| --- | --- | --- |
+| `Frondstalk` | `height`, `fronds`, `skirt`, `blade`, `bladeWide`, `stalkR`, `stalkTint`, `rootTint` | `mound`, `root_0` ... `root_2`, the stalk `seg_a`, `seg_b`, `seg_c`, the crown `frond_0` ... and the skirt `skirt_0` ... |
+| `Ashcup` | `leaves`, `size`, `nubs`, `rootTint`, `nubTint` | `mound`, the cup `leaf_0` ..., `nub_0` ... |
+| `Quillbulb` | `size`, `quills`, `veils`, `bulbTint`, `quillTint`, `rootTint`, `podTint`, `podGlow` | `mound`, `neck`, `bulb`, `quill_0` ..., `veil_0` ..., the glowing `pod_0`, `pod_1` |
+
+The plants of a run are the children of `flora` in `etc/scenery.flecs`, each with `OreFlora`,
+its tile in the grid.
+
 ## Files
 
 | File | Holds |
@@ -792,12 +899,14 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 | `etc/input.flecs` | The actions, their bindings and the loops of the actions that fire once |
 | `etc/world.flecs` | The ground and the basin |
 | `etc/boundary.flecs` | The hazard band around the playable area |
-| `etc/scenery.flecs` | The boulders and dunes of a run |
-| `etc/run.flecs` | The astronaut with its pistol, the parents of the placed buildings, of the critters and of the projectiles, and the singletons of a run, the order book, the selection, the power allocation, the rocket state and the waves included |
+| `etc/scenery.flecs` | The boulders, dunes and flora of a run |
+| `etc/run.flecs` | The astronaut with its pistol, the parents of the placed buildings, of the critters and of the projectiles, and the singletons of a run, the order book, the selection, the inventory screen, the power allocation, the rocket state and the waves included |
 | `etc/launch.flecs` | The items of a rocket (`OreRocketKit`) and the rocket on the pad, a `Rocket` instance that follows the rocket state |
 | `etc/deposits.flecs` | The deposits of a run, the Luminite's with their glints (`DepositSparkle`) |
 | `etc/player.flecs` | The `Astronaut` template |
 | `etc/props/ore.flecs` | The `Ore` template of the deposits |
+| `etc/props/flora.flecs` | The `Frondstalk`, `Ashcup` and `Quillbulb` templates of the flora |
+| `etc/materials/flora.flecs` | The frond and membrane textures and their cutouts `FloraFrond`, `FloraFrondB`, `FloraMembrane`, `FloraMembraneB` |
 | `etc/critters/` | The `Mite`, `Skitter`, `Brute` and `Behemoth` prefabs, models with their health, speed, damage, range, radius and wave tier |
 | `etc/projectiles/` | The `Tracer`, `Missile` and `LaserBeam` prefabs, the first two with their hit radius and life |
 | `etc/props/markers.flecs` | The `TileMarker` and `TileMarkerBad` prefabs |
@@ -818,15 +927,22 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 | `etc/ui/palette.flecs` | The colors of the UI, `palette.*` |
 | `etc/ui/icons.flecs` | The icon textures, `icons.*`, which the items name with `OreIcon` |
 | `etc/ui/panel.flecs` | The `Panel` template, the chrome of every panel: the plate, its edge, the hazard strip and the `InputBlocker` |
+<<<<<<< HEAD
 | `etc/ui/health_bar.flecs` | The `HealthBar` template, the health bar of a damaged building, anchored to the projection of its model box (`OreModelBox`) |
 | `etc/ui/hud.flecs` | The `OreHud` template: the status bar (`StatusGauge`, `StatusDivider`), the toast, the mine progress bar, the suit breach alert and the rocket status line |
+=======
+| `etc/ui/hud.flecs` | The `OreHud` template: the status bar (`StatusGauge`, `StatusDivider`), the toast, the mine progress bar, the suit breach alert, the rocket status line, the Inventory (E) button and the inventory screen |
+| `etc/ui/inventory.flecs` | The inventory screen (`InventoryScreen`: `StockBody` with its `StockSlot`s, `ConstructBody` with its `TabButton`s and the `BuildingsPage` and `RocketPage` of `SlotButton`s; the slots and buttons are restyled `box.widgets.HeadlessButton`s), its info panel (`ItemInfoPanel`) and the Inventory (E) button (`InventoryButton`), which the HUD shows |
+>>>>>>> 11eb33efca9def0ef64f14dcd3a157f53c6ac977
 | `etc/icons/` | The original's icons (SVG), unchanged |
 | `etc/ui/hazard_strip.svg` | The original's hazard strip of the panels, unchanged |
 | `src/flow.c` | States, clock, blink, toast, seeds, `oreelse.cancel()`, `oreelse.restart()` |
 | `src/map.c` | The tile grid, the deposits' registration and the hover tile |
 | `src/player.c` | Walking, the jetpack and the camera; the astronaut's animation (`OrePlayerFx`: the walk cycle `OrePlayerGait`, the bob, the foot dust and the jet plume; `OreLimbs`: the limbs) and its death (`ore_player_die`) |
 | `src/inventory.c` | The inventory and the item components |
+| `src/inventory_screen.c` | The inventory screen (`OreInventoryScreen`), the item of its info panel (`OreItemInfo`) and its needs, its step of the cancel chain, `oreelse.inventory_toggle()`, `oreelse.inventory_tab()`, `oreelse.inventory_pick()`, `oreelse.inventory_order()`, `oreelse.inventory_hover()` |
 | `src/mining.c` | Mining, demolishing and their tile marker; the burst and the shrink of a mined deposit, the poofs of a used up deposit and of a demolished building, the glints of the Luminite while playing |
+| `src/flora.c` | The plants in the tile grid: removed on deposits and taken tiles, sunk under buildings |
 | `src/critters.c` | The waves, the critters' targets, attacks and moves, the crowd separation and the critter spatial index, their deaths, the astronaut's health and regen, `oreelse.spawn_critter()` |
 | `src/critter_fx.c` | The critters' walk, bob, waddle and legs, their death bursts, the corpses' char, sinking and cap, `oreelse.corpse()` |
 | `src/weapons.c` | The astronaut's pistol, the turrets' targets, aim, lead and fire, the laser beams, the projectiles' flight, homing, hits and splash |
