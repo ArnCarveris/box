@@ -4,7 +4,11 @@
  *
  * The scene (apps/oreelse/etc) holds the constants cfg.*, the models, the items, the singletons
  * and the entities of a run; the systems of each area (flow.c, map.c, player.c, inventory.c,
+<<<<<<< HEAD
  * mining.c, craft.c, power.c, buildings.c, placement.c, look.c, particles.c) play the game.
+=======
+ * mining.c, craft.c, critters.c, buildings.c, placement.c, look.c, particles.c) play the game.
+>>>>>>> 354ca02b4b6af3b4435bac3dc7ff8d987ca01e7e
  */
 
 #ifndef OREELSE_GAME_H
@@ -558,6 +562,144 @@ ECS_STRUCT(OreBlastFlash, {
     float range; /**< Range of the light */
 });
 
+/** Tiers of critters the waves spawn, the size of the arrays of OreArsenal, OreWaveMix and
+ * OreWaveState.spawn: mite, skitter, brute and behemoth
+ */
+#define ORE_WAVE_TIERS (4)
+
+/** Neighbors a critter keeps for the crowd separation, the most cfg.crowdNeighbors */
+#define ORE_CROWD_NEAR (12)
+
+/** Walking speed of a critter in units per second, on its prefab and copied */
+ECS_STRUCT(OreSpeed, {
+    float value; /**< Units per second */
+});
+
+/** Damage of a critter, on its prefab and copied: per second, applied as value * dt while its
+ * target is in range
+ */
+ECS_STRUCT(OreDamage, {
+    float value; /**< Hit points per second */
+});
+
+/** Attack range of a critter, on its prefab and copied: the XZ distance between the centers of
+ * the critter and its target at which it attacks
+ */
+ECS_STRUCT(OreRange, {
+    float value; /**< Units */
+});
+
+/** Body radius of a critter, on its prefab and copied: the crowd separation keeps two critters
+ * the sum of their radii apart, and its mass is radius squared
+ */
+ECS_STRUCT(OreRadius, {
+    float value; /**< Units */
+});
+
+/** What a critter costs a wave, on its prefab and inherited */
+ECS_STRUCT(OreWaveTier, {
+    float cost;   /**< Budget a critter of the tier takes */
+    int32_t wave; /**< First wave that can spawn the tier */
+});
+
+/** The critter prefabs of the tiers, a singleton oreelse.flecs sets: Mite, Skitter, Brute and
+ * Behemoth, in the order of the tiers of OreWaveMix and OreWaveState.spawn
+ */
+ECS_STRUCT(OreArsenal, {
+    ecs_entity_t critters[4]; /**< Prefab of every tier */
+});
+
+/** A share of every tier, the type of the style mixes cfg.mixedMix, cfg.swarmMix, cfg.eliteMix */
+ECS_STRUCT(OreWaveMix, {
+    float tier[4]; /**< Share of the tier in the wave's budget */
+});
+
+/** Styles of a wave, one draw per wave: the mix of tiers its budget is spent on */
+ECS_ENUM(OreWaveStyle, {
+    OreWaveStyleMixed, /**< Every tier alike, cfg.mixedMix */
+    OreWaveStyleSwarm, /**< Mostly mites, cfg.swarmMix */
+    OreWaveStyleElite  /**< Mostly brutes and behemoths, cfg.eliteMix */
+});
+
+/** The waves of a run, a singleton run.flecs resets. Modified every frame of play, the HUD
+ * shows the wave, frac and kills.
+ */
+ECS_STRUCT(OreWaveState, {
+    ecs_entity_t root;   /**< Parent of the critters, an entity of the run, so a restart
+                          *   deletes them */
+    int32_t wave;        /**< The last wave that started, 0 before the first */
+    float timer;         /**< Seconds to the next wave, counted down only while left is 0 */
+    float gap;           /**< Seconds the timer started from: cfg.firstWaveAt, then
+                          *   cfg.waveGap */
+    float frac;          /**< Part of the gap to the next wave that passed, 1 - timer / gap,
+                          *   1 while a wave spawns */
+    int32_t left;        /**< Critters of the wave still to spawn */
+    int32_t spawn[4];    /**< Critters of every tier still to spawn */
+    float spawn_timer;   /**< Seconds to the next spawn of the wave */
+    float stagger;       /**< Seconds between two spawns of the wave */
+    float budget;        /**< Budget of the last wave */
+    OreWaveStyle style;  /**< Style of the last wave */
+    int32_t side;        /**< Side of the map the last critter spawned on: 0 north, 1 south,
+                          *   2 west, 3 east, -1 for none */
+    int32_t kills;       /**< Critters killed in the run */
+});
+
+/** A critter of a wave, on the instance: the instance of a critter prefab that walks to its
+ * target and chews it. Its OreTarget and OreVelocity come with it.
+ */
+ECS_STRUCT(OreCritter, {
+    float retarget;  /**< Seconds to the next acquisition of a target */
+    float jitter;    /**< Heading jitter from -1 to 1, drawn at the spawn: the critter walks
+                      *   jitter * cfg.critterJitter radians off the direction to its goal */
+    bool attacking;  /**< Its target is in range and it chews it */
+});
+
+/** What a critter goes for: the astronaut or a building */
+ECS_STRUCT(OreTarget, {
+    ecs_entity_t value; /**< The target, 0 for none */
+});
+
+/** Velocity of a critter on the ground in units per second, 0 while it attacks: the gun turret
+ * leads its shots with it
+ */
+ECS_STRUCT(OreVelocity, {
+    float x; /**< Along X */
+    float z; /**< Along Z */
+});
+
+/** The time since the astronaut was last hurt, on the astronaut: after cfg.playerRegenDelay
+ * seconds it regenerates cfg.playerRegen hit points a second
+ */
+ECS_STRUCT(OreHurt, {
+    float since; /**< Seconds of play since the last damage */
+});
+
+/** The critter spatial index, a singleton: the critters with hit points left in a uniform grid of
+ * cells of cfg.crowdCell over the map. OreCrowd rebuilds it every frame of play after the
+ * separation, so the systems after it find critters near a point (ore_critter_nearest).
+ */
+ECS_STRUCT(OreCritterIndex, {
+    int32_t count;          /**< Critters indexed */
+    int32_t dim_x;          /**< Cells along X */
+    int32_t dim_z;          /**< Cells along Z */
+    float cell;             /**< Edge of a cell, cfg.crowdCell */
+    float x0;               /**< X of the west edge of the map, the first cell */
+    float z0;               /**< Z of the north edge of the map, the first cell */
+ECS_PRIVATE                 /**< The cells are not reflected */
+    ecs_entity_t *entities; /**< Critter of every slot */
+    float *x;               /**< X of every slot */
+    float *z;               /**< Z of every slot */
+    float *r;               /**< Radius of every slot */
+    float *px;              /**< Push of the separation along X of every slot */
+    float *pz;              /**< Push of the separation along Z of every slot */
+    Position **pos;         /**< Position of the critter of every slot, valid within OreCrowd */
+    int32_t *cell_of;       /**< Cell of every slot, row major */
+    int32_t *order;         /**< Slots sorted by cell */
+    int32_t *start;         /**< First entry of order of every cell, and the end after the last */
+    int32_t cap;            /**< Slots allocated */
+    int32_t cells;          /**< Entries of start allocated */
+});
+
 /** Marks an entity created by a script that sets up a run: restart() reloads the script of
  * every entity with it, which deletes the entities of the run and creates those of a new one
  */
@@ -1034,6 +1176,55 @@ bool ore_placement_cancel_drag(
 bool ore_placement_deselect(
     ecs_world_t *world);
 
+/** Spawn a critter: an instance of its prefab under the root of OreWaveState at full health,
+ * without a target, its retarget timer at cfg.retargetInterval * U(0, 1) and its heading jitter
+ * drawn from U(-1, 1).
+ *
+ * @param world The world or a stage
+ * @param prefab The critter prefab (Mite, Skitter, Brute, Behemoth)
+ * @param x X of the critter
+ * @param z Z of the critter
+ * @return The critter, 0 when the prefab is no critter
+ */
+ecs_entity_t ore_critter_spawn(
+    ecs_world_t *world,
+    ecs_entity_t prefab,
+    float x,
+    float z);
+
+/** Kill a critter: the kill counter of OreWaveState goes up and the critter is deleted. The one
+ * place a critter dies, OreCritterDeath calls it for the critters at 0 hit points or below.
+ *
+ * @param world The world or the stage of a system
+ * @param critter The critter
+ */
+void ore_critter_kill(
+    ecs_world_t *world,
+    ecs_entity_t critter);
+
+/** Find the nearest critter of the spatial index within a range of a point on the ground.
+ *
+ * @param index The index, OreCrowd rebuilt it this frame
+ * @param x X of the point
+ * @param z Z of the point
+ * @param range Largest distance on XZ
+ * @return The critter, 0 for none
+ */
+ecs_entity_t ore_critter_nearest(
+    const OreCritterIndex *index,
+    float x,
+    float z,
+    float range);
+
+/** Register the critters: the waves that spawn them, their targets, attacks and moves, the
+ * crowd separation and the spatial index, their deaths, the astronaut's health and its regen,
+ * and the script function oreelse.spawn_critter(prefab, x, z).
+ *
+ * @param world The world
+ */
+void ore_critters_import(
+    ecs_world_t *world);
+
 /** Register the game flow: states, clock, blink, toast, cancel() and restart().
  *
  * @param world The world
@@ -1183,7 +1374,7 @@ void ore_particles_import(
  *
  * Registers the components, the systems of every area and the script functions
  * oreelse.seed(), oreelse.cancel(), oreelse.restart(), oreelse.cycleQuality(),
- * oreelse.explosion() and oreelse.combust().
+ * oreelse.explosion(), oreelse.combust() and oreelse.spawn_critter().
  *
  * @param world The world
  */
