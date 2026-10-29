@@ -154,9 +154,9 @@ def test_factory(app):
     spinners = parts(app, factory, "OreSpinner", FACTORY_SPINNERS)
     ram = list(parts(app, factory, "OrePiston", 1))[0]
     steam = list(parts(app, factory, "OreWorkEmitter", FACTORY_STEAM))
-    glow = under(app, factory, "oreelse.OreWorkLight, box.light.PointLight")
-    app.check(len(glow) == 1, "the factory's lit work lights are %s" % list(glow))
-    glow = list(glow)[0]
+    glow = [p for p, v in under(app, factory, "oreelse.OreWorkLight").items() if v["pulse"] > 0]
+    app.check(len(glow) == 1, "the factory's pulsed work lights are %s" % glow)
+    glow = glow[0]
     wait_playback(app, steam, "Playing", "the vents steaming while the factory works")
 
     # Working at level 2 (multiplier 1): the drums and flywheels turn at 5 radians a second and

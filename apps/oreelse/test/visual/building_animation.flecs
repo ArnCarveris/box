@@ -2,16 +2,18 @@
 // playing, captured mid-stroke three frames into play. The factory crafts a rocket engine (the
 // astronaut's crafter is paused, so the factory takes the order): its ram halfway down, its
 // drums and flywheels turned, its hot plate and work glow lit with the glow lighting the press,
-// its beacons blinking, the first smoke puffs over the stacks and the first steam at the vents.
-// The drill mines a stone deposit of the scene's own: its carriage low on the legs, the slider
-// forward, the bit turned and shaking and the first dust at its foot. Four solar panels behind
-// them power both (80 W for 79), so the status lamps are green. The astronaut stands in front,
-// for the scale.
+// its beacons blinking and the first smoke puffs over the stacks (its vents steam too, but the
+// steam fades in over more than three frames). The drill mines a stone deposit of the scene's
+// own: its carriage low on the legs, the slider forward, the bit turned and shaking and the
+// first dust at its foot. Four solar panels behind them power both (80 W for 79), so the status
+// lamps are green and light their surroundings a little. The astronaut stands between the
+// panels and the buildings, for the scale, so the camera that follows it sees them from close by.
 include apps/oreelse/test/visual/setup/seed
 include apps/oreelse/etc/oreelse
 
 using box.transform
 using box.material
+using box.particle
 using oreelse
 
 const stoneTint: Rgb = {186, 184, 180}
@@ -47,6 +49,13 @@ Drill {
       OrePiston: {rest: 0.12, travel: 0.24, speed: 0.9, phase: 1.2, slide: true}
     }
   }
+
+  // Three frames of the stream show a few particles at most, so the dust bursts what it keeps
+  // alive while it plays (rate times the mean lifetime) on its first frame. The steam needs no
+  // burst: its particles start transparent, so three frames show none of them either way
+  dust {
+    ParticleBurst: {count: 18}
+  }
 }
 
 // The animation runs only while playing
@@ -54,9 +63,9 @@ $ {
   (OreGameState, Playing)
 }
 
-// In front of the buildings, on a tile without one; only the factory crafts
+// On a tile without a building; only the factory crafts
 astronaut {
-  Position: {-23, 0, 33}
+  Position: {-23, 0, 25}
   Rotation: {0, 0.3, 0}
   OreCrafter: {speed: 1, paused: true}
 }
