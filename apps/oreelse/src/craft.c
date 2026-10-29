@@ -1320,19 +1320,21 @@ done:
 /** Return the inputs of the craft of a worker that is removed (a factory demolished or
  * destroyed) to the pool of its order; another worker can pick the entry up.
  *
- * @param it Iterator over the workers that lose OreCrafter
+ * The OreCraftBook term makes the world delete the observer before the singleton when it is
+ * deleted itself, so the observer never sees a book that is gone.
+ *
+ * @param it Iterator over the workers that lose OreCrafter, with OreCraftBook
  */
 static void OreCrafterRemove(
     ecs_iter_t *it)
 {
     const OreCrafter *crafter = ecs_field(it, OreCrafter, 0);
-    OreCraftBook *book = ecs_is_fini(it->world) ? NULL :
-        ecs_singleton_get_mut(it->world, OreCraftBook);
+    OreCraftBook *book = ecs_field(it, OreCraftBook, 1);
     const OreRecipe *recipe;
     OreCraftOrder *order;
     int32_t i, index, entry;
     bool changed = false;
-    for (i = 0; book && i < it->count; i ++) {
+    for (i = 0; i < it->count; i ++) {
         index = ore_crafter_busy(&crafter[i]) ? ore_order_index(book, crafter[i].order) : -1;
         if (index < 0) {
             continue;
@@ -1506,7 +1508,10 @@ void ore_craft_import(
 
     ecs_observer(world, {
         .entity = ecs_entity(world, { .name = "OreCrafterRemove" }),
-        .query.terms = {{ .id = ecs_id(OreCrafter) }},
+        .query.terms = {
+            { .id = ecs_id(OreCrafter) },
+            { .id = ecs_id(OreCraftBook), .src.id = ecs_id(OreCraftBook), .inout = EcsInOut }
+        },
         .events = { EcsOnRemove },
         .callback = OreCrafterRemove
     });

@@ -143,6 +143,12 @@ def worker(app, path, speed=1, paused=False):
              (path, speed, "true" if paused else "false"))
 
 
+def resume(app, speed, path=PLAYER):
+    """Set the speed of a worker and let it work; it keeps its craft (set assigns only the
+    members it names)."""
+    app.exec("set %s OreCrafter {speed: %g, paused: false}" % (path, speed))
+
+
 def crafter(app, path=PLAYER):
     c = app.get(path, "OreCrafter")
     c["item"] = entity(c["item"])
@@ -231,7 +237,7 @@ def test_order_from_ore(app):
               "the queue rows are %s" % rows(app))
 
     clock = float(app.exec(CLOCK))
-    app.exec("set %s OreCrafter {speed: %d}" % (PLAYER, FAST))
+    resume(app, FAST)
     app.wait_for("get %s OreInventory.slots[0].item" % INVENTORY, ENGINE,
                  frames=CRAFT_FRAMES, what="the engine in the inventory")
     took = float(app.exec(CLOCK)) - clock
@@ -340,7 +346,7 @@ def test_spare_wire(app):
     app.check(o["pool"] == {"items.Copper": 4, "items.Wire": 1}, "the pool holds %s" % o["pool"])
     app.check(held(app) == {}, "the inventory holds %s" % held(app))
 
-    app.exec("set %s OreCrafter {speed: %d}" % (PLAYER, FAST))
+    resume(app, FAST)
     app.wait_for("get %s OreCraftBook.count" % BOOK, "0", frames=CRAFT_FRAMES,
                  what="the order completed")
     app.check(held(app) == {"items.Electronics": 1, "items.Wire": 1},
@@ -354,7 +360,7 @@ def test_cancel(app):
     o = only_order(app)
 
     # A slow worker keeps its first plate craft in progress
-    app.exec("set %s OreCrafter {speed: 0.01}" % PLAYER)
+    resume(app, 0.01)
     app.wait_for("get %s OreCrafter.item" % PLAYER, "items.IronPlate",
                  what="a plate craft in progress")
 
@@ -408,7 +414,7 @@ def test_full_inventory_blocks_start(app):
     app.check(order(app, ENGINE) == 1, "the engine was not ordered")
     app.check(len(held(app)) == SLOTS, "the inventory holds %d kinds" % len(held(app)))
 
-    app.exec("set %s OreCrafter {speed: %d}" % (PLAYER, FAST))
+    resume(app, FAST)
     app.wait_frames(SETTLE * 2)
     app.check(crafter(app)["item"] is None, "the engine started with 15 kinds held")
     o = only_order(app)
@@ -467,7 +473,7 @@ def test_worker_deleted(app):
               "the deleted worker returned %s" % o["pool"])
     app.check(o["entries"][0]["running"] == 0, "the engine still runs: %s" % o["entries"])
 
-    app.exec("set %s OreCrafter {speed: %d}" % (PLAYER, FAST))
+    resume(app, FAST)
     app.wait_for("get %s OreCraftBook.count" % BOOK, "0", frames=CRAFT_FRAMES,
                  what="the astronaut completed the engine")
     app.check(count(app, ENGINE) == 1, "the engine is not in the inventory: %s" % held(app))
