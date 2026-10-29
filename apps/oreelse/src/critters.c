@@ -473,10 +473,11 @@ static ecs_entity_t ore_critter_create(
     const OreWaveState *w = ecs_singleton_get(world, OreWaveState);
     ecs_entity_t root = w && w->root && ecs_is_alive(world, w->root) ? w->root : 0;
     ecs_entity_t e = 0;
-    float wait, jitter;
+    float wait, jitter, anim;
     if (base && ecs_has(world, prefab, OreSpeed)) {
         wait = retarget * ore_random01(world);
         jitter = (ore_random01(world) - 0.5f) * 2.0f;
+        anim = ore_random01(world) * 2.0f * GLM_PIf;
         e = root ? ecs_new_w_pair(world, EcsChildOf, root) : ecs_new(world);
         ecs_add_pair(world, e, EcsIsA, prefab);
         ecs_set(world, e, Position, { x, 0, z });
@@ -484,7 +485,8 @@ static ecs_entity_t ore_critter_create(
         ecs_set(world, e, OreHealth, { base->value, base->value });
         ecs_set(world, e, OreTarget, { 0 });
         ecs_set(world, e, OreVelocity, { 0, 0 });
-        ecs_set(world, e, OreCritter, { .retarget = wait, .jitter = jitter, .attacking = false });
+        ecs_set(world, e, OreCritter, {
+            .retarget = wait, .jitter = jitter, .attacking = false, .anim = anim });
     }
 
     return e;
@@ -509,6 +511,7 @@ void ore_critter_kill(
         ecs_singleton_modified(world, OreWaveState);
     }
 
+    ore_critter_remains(world, critter);
     ecs_delete(world, critter);
 }
 

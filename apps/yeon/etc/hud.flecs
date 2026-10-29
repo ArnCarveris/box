@@ -1,0 +1,120 @@
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.layout
+using box.text
+using box.texture
+using yeon
+
+const lostAlpha: f32 = 70.0 / 255.0
+
+life_icon {
+  TexturePath: {path: "apps/yeon/etc/icons/kite_life.svg", width: 128, height: 128}
+}
+
+template LifeIcon {
+  prop index: i32 = 0
+  prop size: f32 = 46
+  prop alpha: f32 = 1
+
+  LayoutItem: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
+  Rect: {size, size}
+  Image: {texture: life_icon, u1: 1, v1: 1}
+  Opacity: {alpha}
+}
+
+template YeonHud {
+  prop surface: entity = 0
+
+  const game = YeonGame[YeonGame]
+  const lanternCount = game.lanterns
+  const maxLives = game.max_lives
+  const lives = player[YeonLives].lives_left
+  const over = YeonGameState?[(YeonGameState, Over)] && lives == 0
+
+  ui {
+    Scene: {}
+
+    camera {
+      Position: {0, 0, 100}
+      Camera: {ortho: true, ortho_scale: 1}
+    }
+
+    screen {
+      LayoutFill: {surface: surface}
+      Layout: {}
+
+      score {
+        LayoutItem: {h: Left, v: Top, x: 24, y: -24}
+        Text: {value: "Lanterns: {lanternCount}", size: 30}
+        Rgb: {255, 244, 220}
+      }
+
+      lives {
+        Layout: {direction: Row, spacing: 12, padding: {12, 12, 12, 12}}
+        LayoutItem: {h: Right, v: Top, x: -14, y: -14}
+
+        for i in 0..maxLives {
+          "life_{i}" {
+            if i < lives {
+              LifeIcon: {index: i, size: 46, alpha: 1}
+            } else {
+              LifeIcon: {index: i, size: 46, alpha: lostAlpha}
+            }
+          }
+        }
+      }
+
+      if !over && lanternCount < 3 {
+        hint {
+          LayoutItem: {h: Center, v: Bottom, y: 50}
+          Text: {value: "UP / DOWN to fly - catch the lanterns, dodge the rival kites!", size: 24}
+          Rgb: {255, 255, 255}
+        }
+      }
+
+      if over {
+        game_over {
+          Layout: {}
+          LayoutItem: {
+            h: Center, v: Top, y: -220,
+            width: {mode: Fixed, value: 600}, height: {mode: Fixed, value: 190}
+          }
+
+          background {
+            LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+            Rect: {1, 1}
+            Rgb: {40, 20, 20}
+            Opacity: {180.0 / 255.0}
+            Border: {radius: 8}
+          }
+
+          title {
+            LayoutItem: {h: Center, v: Top, y: -26}
+            Text: {value: "STRING CUT!", size: 64}
+            Rgb: {255, 220, 200}
+          }
+
+          result {
+            LayoutItem: {h: Center, v: Top, y: -102}
+            Text: {value: "{lanternCount} lanterns gathered", size: 26}
+            Rgb: {255, 255, 255}
+          }
+
+          prompt {
+            LayoutItem: {h: Center, v: Top, y: -142}
+            Text: {value: "Press R to fly again", size: 24}
+            Rgb: {255, 255, 255}
+          }
+        }
+      }
+    }
+  }
+
+  view {
+    View: {camera: ui.camera, lighting: {enabled: false}, culling: {enabled: false}}
+  }
+}

@@ -22,7 +22,11 @@ bake3 --target em --local-env apps/oreelse                     # build for the b
 python3 tools/integration.py e2e oreelse_flow oreelse_look     # the end-to-end scenarios
 python3 tools/integration.py e2e oreelse_mining oreelse_particles
 python3 tools/integration.py e2e oreelse_crafting oreelse_buildings
+<<<<<<< HEAD
 python3 tools/integration.py e2e oreelse_critters oreelse_player_fx
+=======
+python3 tools/integration.py e2e oreelse_power oreelse_critters oreelse_critter_fx
+>>>>>>> 6229efd34422b769dbb744805ba2cf9363666faf
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -276,6 +280,63 @@ deposit under it (a drill's) is mined by the next swing. A building demolished g
 of dust. A building whose health drops to 0 is
 destroyed.
 
+### Power
+
+Solar panels produce power and the other powered buildings consume it, whether they work or
+not: an idle drill on a depleted tile and an idle factory draw as much as busy ones.
+
+| Building | Watts | Category |
+| --- | --- | --- |
+| Solar panel | +20 | |
+| Drill | 4 | Mining |
+| Gun turret | 0 | Weapons |
+| Laser turret | 25 | Weapons |
+| Missile turret | 20 | Weapons |
+| Factory | 75 | Construction |
+| Drone pad | 20 | |
+
+The power panel splits 6 bars between three categories, Mining, Weapons and Construction, each
+at a level of 0 to 4; every run starts at 2, 2 and 2. A category runs at half its level: 0, 0.5,
+1, 1.5 or 2 times the normal speed, and at level 0 it stops. A building without a category (the
+drone pad) runs at 1.
+
+The production is the sum of the panels' watts. The demand is the sum of the consumers' watts
+times the bars assigned out of 6, one scale for every consumer, the drone pads included: with
+every category at 1 the base draws half its watts, with all 6 bars assigned the full watts.
+
+When there is demand and the production is below it, the base is in a **blackout**, all or
+nothing. In a blackout the drills, the factories, the laser and missile turrets and the drones
+stop, keeping their progress, and resume when the power is back. The gun turrets (scaled by
+Weapons), the astronaut's crafting and mining, the pistol and the rockets keep working.
+
+Clicking bar n (1 to 4) of a category's column sets the category to level n, or, when it is at
+n already (the topmost lit bar), steps it down to n - 1, so a click on the single lit bar of a
+category switches it off. An increase is capped by the free bars; when there is none to take,
+the warning `Only 6 power bars - free one somewhere else` shows and nothing changes.
+
+A drill on a deposit mines without a blackout and with Mining above 0: every mining time of its
+ore (iron 4.5 seconds, copper 6, stone 1.5, Luminite 24) at multiplier 1, so every 0.75 seconds
+of stone at level 4, it moves 1 of the ore into the inventory. When the ore does not fit (a new
+kind with 15 kinds held) nothing is mined, the deposit keeps it and the interval is used up.
+Once its deposit is gone the drill stands idle, still drawing power.
+
+A factory is a worker of the order book that crafts at the Construction multiplier, so two
+crafts of an order go twice as fast with one factory at level 2. In a blackout or at level 0 it
+holds its craft and goes on with it when the power is back. A factory demolished or destroyed
+mid-craft returns the inputs of its craft to the order. The astronaut crafts at speed 1 whatever
+the power.
+
+Every powered building shows its state on its status lamps:
+
+| State | Lamp |
+| --- | --- |
+| Blackout (a consumer) or its category at 0 | Red {248, 84, 72}, blinking |
+| Its category at 1 | Orange {240, 152, 72} |
+| Its category at 2 | Green {124, 226, 148} |
+| Its category at 3 or 4, or no category | Cyan {92, 236, 222} |
+
+A gun turret draws no power, so a blackout does not kill its lamps; Weapons at 0 does.
+
 ### Critters
 
 | Critter | HP | Speed | Damage/s | Attack range | Radius | Wave cost | From wave |
@@ -300,7 +361,17 @@ Critters do not stack: overlapping critters push each other apart, the light one
 the heavy ones (a critter weighs its radius squared, so a behemoth shoves mites aside and barely
 moves). They stay on the map.
 
-A critter at 0 HP dies and counts as a kill of the run. A building at 0 HP is destroyed.
+A critter at 0 HP dies and counts as a kill of the run: it bursts into green flame (the combust,
+as large as the critter) and leaves its corpse. A building at 0 HP is destroyed.
+
+A corpse is no longer a critter: it does not move, attack or push, and turrets do not shoot at
+it. It lies tipped over, charred black with its eyes gone dark and embers smoldering
+on it, for 4 seconds, then sinks into the ground at 0.7 units a second and is gone. At most 100
+corpses lie on the map; the 101st takes the place of the oldest.
+
+Critters walk with a gait of their own: each step bobs the body up and down and it waddles from
+side to side, its legs swinging in turn. A critter that chews stands on the ground and only
+twitches its legs.
 
 ### Waves
 
@@ -379,7 +450,9 @@ Every task of the port follows these.
   `OreHover` when the cursor tile moves, `OreInventory` when an amount changes,
   `OreCraftBook` (the orders oldest first and the rows of the queue panel) when an order or a
   craft's progress changes, `OreCanOrder` on an item prefab when it flips, `OreNeeds` (the raw
-  ore of the item the UI sets in it) when a row changes. The C formats no text for the UI.
+  ore of the item the UI sets in it) when a row changes, `OrePowerAlloc` (the levels of the
+  power categories) when a level changes, `OrePowerState` (production, demand, ratio and
+  blackout) when a value changes. The C formats no text for the UI.
 - **Game state** is the exclusive pair `(OreGameState, Title | Playing | Paused | Won | Lost)`
   on its own singleton (`ore_state_is`, `ore_state_set`). Gameplay systems run only while
   `Playing`, with a query term on `ore_state_pair(world, OreGameStatePlaying)` whose source is
@@ -441,9 +514,10 @@ Every task of the port follows these.
 
 The critters and projectiles are prefabs ported from the original with its names, geometry and
 colors. The critters carry their gameplay data (`OreHealth`, `OreSpeed`, `OreDamage`,
-`OreRange`, `OreRadius`, `OreWaveTier`) and the waves give their instances `OreCritter`,
-`OreTarget` and `OreVelocity`; OreWeapons gives the projectiles theirs, the effect tasks drive
-the named parts. Each faces +Z.
+`OreRange`, `OreRadius`, `OreWaveTier`), their gait (`OreGait {step, bob}`) and the effect they
+die in (`OreDeathBurst {burst}`, `CombustBurst` for all four), and the waves give their
+instances `OreCritter`, `OreTarget` and `OreVelocity`; OreWeapons gives the projectiles theirs,
+the effect tasks drive the named parts. Each faces +Z.
 
 ### Critters
 
@@ -462,6 +536,24 @@ The parts marked glowing are emissive.
 The behemoth's back plates are pivots with `OreLimb` like the legs (a swing of 0.05), each with
 a `shell`, a `ridge`, a glowing `seam`, `barb_left` and `barb_right`. Its tusks and horns are
 turned in two axes; their angles are converted to box's Euler order (`reference/PORTING.md`).
+
+The animation (`src/critter_fx.c`) reads the critters' state. `OreCritter.anim`, the walk cycle,
+starts at U(0, 2 PI) and advances by `dt * speed * step` while the critter walks (not while it
+attacks). `OreCritterFx` sets the critter's `Position.y` to `|sin(anim)| * bob` (0 while it
+attacks) and its `Rotation.z` to `sin(anim / 2) * 0.07`; `OreCritterMove` turns it along its
+heading. `OreCritterLimbs` sets the `Rotation.x` of every `OreLimb` below a critter to
+`sin(anim + phase) * swing`, times 0.35 while it attacks.
+
+A dead critter's corpse is a new entity, an instance of the critter's prefab under the critters'
+parent with `OreCorpse {age, depth}` and no `OreCritter`, so none of the critter systems, the
+spatial index or the turrets see it. It lies at the critter's place on the ground, turned by
+(1.1 + U(0, 0.2), heading, (U(0, 1) - 0.5) * 0.8) in the original's Euler order (converted to
+box's), scaled (1, 0.55, 1), with the `Tint` `cfg.corpseColor` on its root; `OreCorpseChar`
+turns off the emission of the parts it inherits from the prefab (box does not tint emission),
+and a child instance of the `CorpseEmbers` template sits r / 2 above its origin, scaled 2 r, at a
+random yaw. `OreCorpses` ages it, sinks it after `cfg.corpseTime` and deletes it at 2 r + 1
+below the ground, and deletes the oldest above `cfg.corpseCap`. `oreelse.corpse(prefab,
+position, yaw)` lays one from a script.
 
 ### Projectiles
 
@@ -523,7 +615,8 @@ is turned by PI / 2 about x). The `bulb` is the part the game drives: it has the
 `Emissive` of the lamp's color at `strength` while `on`, and a `PointLight` of intensity
 `light` and `range` when `light` is above 0. The props say how: a status lamp (`status: true`)
 is the power lamp of its building, which OrePower colors `color` (live), `ok`, `warn` or `dead`
-and blinks at `blink` per second while dead; a work lamp (`work: true`) lights while its
+and blinks with the lamp signal of `OreBlink` while dead (the template gives its bulb an
+`OreStatusLamp` with those colors); a work lamp (`work: true`) lights while its
 building works. The props are on the `Light` component of the lamp entity (`lamp_l`, `sight`,
 ...). The template builds the parts on every lamp of an instance, not on the prefab's, so they
 keep their names there: the bulb is the lamp's child `bulb`.
@@ -538,7 +631,11 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 
 | File | Holds |
 | --- | --- |
+<<<<<<< HEAD
 | `etc/oreelse.flecs` | The window, the camera, the sun, the atmosphere, the effects and the view, the render quality tier, the mining markers, the critter tiers (`OreArsenal`), the one shot effects the C plays (`OreEffects`); includes the rest |
+=======
+| `etc/oreelse.flecs` | The window, the camera, the sun, the atmosphere, the effects and the view, the render quality tier, the mining markers, the critter tiers and their death effects (`OreArsenal`); includes the rest |
+>>>>>>> 6229efd34422b769dbb744805ba2cf9363666faf
 | `etc/config.flecs` | The constants `cfg.*` |
 | `etc/resources.flecs` | The item prefabs other than the buildings, with names and recipes |
 | `etc/buildings/*.flecs` | The building prefabs, models with their item, recipe, footprint, health and power |
@@ -547,8 +644,13 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 | `etc/world.flecs` | The ground and the basin |
 | `etc/boundary.flecs` | The hazard band around the playable area |
 | `etc/scenery.flecs` | The boulders and dunes of a run |
+<<<<<<< HEAD
 | `etc/run.flecs` | The astronaut, the parents of the placed buildings and of the critters, and the singletons of a run, the order book, the selection and the waves included |
 | `etc/deposits.flecs` | The deposits of a run, the Luminite's with their glints (`DepositSparkle`) |
+=======
+| `etc/run.flecs` | The astronaut, the parents of the placed buildings and of the critters, and the singletons of a run, the order book, the selection, the power allocation and the waves included |
+| `etc/deposits.flecs` | The deposits of a run |
+>>>>>>> 6229efd34422b769dbb744805ba2cf9363666faf
 | `etc/player.flecs` | The `Astronaut` template |
 | `etc/props/ore.flecs` | The `Ore` template of the deposits |
 | `etc/critters/` | The `Mite`, `Skitter`, `Brute` and `Behemoth` prefabs, models with their health, speed, damage, range, radius and wave tier |
@@ -574,8 +676,10 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 | `src/inventory.c` | The inventory and the item components |
 | `src/mining.c` | Mining, demolishing and their tile marker; the burst and the shrink of a mined deposit, the poofs of a used up deposit and of a demolished building, the glints of the Luminite while playing |
 | `src/critters.c` | The waves, the critters' targets, attacks and moves, the crowd separation and the critter spatial index, their deaths, the astronaut's health and regen, `oreelse.spawn_critter()` |
+| `src/critter_fx.c` | The critters' walk, bob, waddle and legs, their death bursts, the corpses' char, sinking and cap, `oreelse.corpse()` |
 | `src/buildings.c` | The buildings in the tile grid, the wall connectors, demolish and salvage, destroyed buildings, the look of the ghosts |
 | `src/placement.c` | The selection, `canPlace`, the click and the drag, the poof of a placed building, the pipette, the preview, `oreelse.select()`, `oreelse.pipette()`, `oreelse.placeStart()`, `oreelse.placeEnd()`, `oreelse.cancelDrag()` |
 | `src/craft.c` | The order book, the workers, `oreelse.craft_order()`, `oreelse.craft_cancel()` |
+| `src/power.c` | Production, demand and the blackout, the drills, the factories' crafters, the status lamps, `oreelse.power_set(category, level)` |
 | `src/look.c` | The render quality tiers, `oreelse.cycleQuality()` |
 | `src/particles.c` | The helpers that play the effects (`ore_burst`, `ore_burst_aimed`, `ore_explosion`, `ore_combust`), the flash of their lights, `oreelse.explosion()`, `oreelse.combust()` |

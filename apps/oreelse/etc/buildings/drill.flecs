@@ -29,6 +29,8 @@ prefab Drill {
   OreHealth: {value: 100, max: 100}
   OrePowerConsumer: {watts: 4}
   OrePowerCategory: {kind: Mining}
+  // Its mining toward the next ore, copied to every drill
+  OreDrill: {timer: 0, running: false}
 
   beam_front {
     Position: {0, 0.11, 0.76}
