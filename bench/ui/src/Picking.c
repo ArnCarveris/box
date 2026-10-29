@@ -4,10 +4,14 @@
  *
  * The HUD covers part of the window, so a pick tests the UI and, where no element handles the
  * event, the shapes behind it. Cases move the cursor, keep it still and leave it unknown.
+ * The wave cases report PickingUpdate and SpatialUpdate per frame under a moving wave.
  */
 
 #include <box.h>
 #include <bake_bench.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include "spatial.h"
 
 /** Rows and columns of the UI grid */
 #define BENCH_UI_SIDE (100)
@@ -269,13 +273,52 @@ void Picking_first_hover_dense_mesh(
     ecs_fini(world);
 }
 
-/** Rows and columns of the wave of critters */
-#define BENCH_WAVE_SIDE (40)
-
-void Picking_still_cursor_moving_wave_1600(
-    bench_t *b)
+/** Find a system by its path, and abort the benchmark when it does not exist, so a renamed
+ * system fails loudly instead of being reported as taking no time.
+ *
+ * @param world The world
+ * @param path Path of the system
+ * @return The system
+ */
+static ecs_entity_t bench_picking_system(
+    ecs_world_t *world,
+    const char *path)
 {
-    // ui/picking
+    ecs_entity_t result = ecs_lookup(world, path);
+    if (!result || !ecs_system_get(world, result)) {
+        fprintf(stderr, "bench_ui: system %s not found\n", path);
+        abort();
+    }
+
+    return result;
+}
+
+/** Get the time a system spent so far.
+ *
+ * @param world The world
+ * @param system The system
+ * @return Seconds the system spent since time measurement was enabled
+ */
+static double bench_picking_time(
+    ecs_world_t *world,
+    ecs_entity_t system)
+{
+    return (double)ecs_system_get(world, system)->time_spent;
+}
+
+/** Run frames with a still cursor over a wave of critters of 8 parts, none Interactive, each
+ * turning every frame around the point under the cursor, below a HUD with one button, and
+ * report the time per frame of PickingUpdate and SpatialUpdate.
+ *
+ * @param b The benchmark
+ * @param side Rows and columns of the wave
+ * @param ignore Whether the critters have SpatialIgnore, which keeps them out of the index
+ */
+static void bench_picking_wave(
+    bench_t *b,
+    int32_t side,
+    bool ignore)
+{
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
     ecs_entity_t camera = ecs_new(world);
@@ -288,8 +331,11 @@ void Picking_still_cursor_moving_wave_1600(
     ecs_set(world, ground, Position, {0, -0.5f, 0});
     ecs_set(world, ground, Box, {400, 1, 400});
 
-    /* A critter of 8 parts, none of them Interactive */
     ecs_entity_t critter = ecs_new_w_id(world, EcsPrefab);
+    if (ignore) {
+        ecs_add(world, critter, SpatialIgnore);
+    }
+
     int32_t i;
     for (i = 0; i < 8; i ++) {
         ecs_entity_t part = ecs_new_w_pair(world, EcsChildOf, critter);
@@ -298,16 +344,14 @@ void Picking_still_cursor_moving_wave_1600(
         ecs_set(world, part, Box, {0.3f, 0.3f, 0.3f});
     }
 
-    /* A wave around the point under the cursor, every critter turning every frame */
-    for (i = 0; i < BENCH_WAVE_SIDE * BENCH_WAVE_SIDE; i ++) {
+    for (i = 0; i < side * side; i ++) {
         ecs_entity_t e = ecs_new_w_pair(world, EcsIsA, critter);
-        ecs_set(world, e, Position, {(float)(i % BENCH_WAVE_SIDE) * 1.5f - 30.0f, 0,
-            (float)(i / BENCH_WAVE_SIDE) * 1.5f - 30.0f});
+        ecs_set(world, e, Position, {(float)(i % side) * 1.5f - (float)side * 0.75f, 0,
+            (float)(i / side) * 1.5f - (float)side * 0.75f});
         ecs_set(world, e, Rotation, {0, 0, 0});
         ecs_set(world, e, AngularVelocity, {0, 1, 0});
     }
 
-    /* A HUD with one button */
     ecs_entity_t hud = ecs_new(world);
     ecs_set(world, hud, Scene, {0});
     ecs_entity_t hud_camera = ecs_new_w_pair(world, EcsChildOf, hud);
@@ -321,21 +365,49 @@ void Picking_still_cursor_moving_wave_1600(
     ecs_set(world, button, Rect, {80, 40});
     ecs_add(world, button, Interactive);
 
-    ecs_entity_t system = ecs_lookup(world, "box.picking.PickingUpdate");
+    ecs_entity_t picking = bench_picking_system(world, "box.picking.PickingUpdate");
+    ecs_entity_t spatial = bench_picking_system(world, "box.spatial.SpatialUpdate");
     ecs_measure_system_time(world, true);
     box_input_mouse_move(world, 640, 360, false);
     ecs_progress(world, 0.016f);
     ecs_progress(world, 0.016f);
-    const ecs_system_t *s = system ? ecs_system_get(world, system) : NULL;
-    ecs_ftime_t start = s ? s->time_spent : 0;
+    double picking_start = bench_picking_time(world, picking);
+    double spatial_start = bench_picking_time(world, spatial);
     int32_t frames = 0;
     while (bench_iter(b)) {
         ecs_progress(world, 0.016f);
         frames ++;
     }
 
-    s = system ? ecs_system_get(world, system) : NULL;
+    double scale = frames ? 1000.0 / frames : 0;
+    box_spatial_stats_t stats;
+    box_spatial_stats(world, &stats);
     bench_counter(b, "picking_ms_per_frame",
-        s && frames ? (double)(s->time_spent - start) * 1000.0 / frames : 0);
+        (bench_picking_time(world, picking) - picking_start) * scale);
+    bench_counter(b, "spatial_ms_per_frame",
+        (bench_picking_time(world, spatial) - spatial_start) * scale);
+    bench_counter(b, "indexed", stats.entities);
+    bench_counter(b, "rebound", stats.rebound);
     ecs_fini(world);
+}
+
+void Picking_still_cursor_moving_wave_1600(
+    bench_t *b)
+{
+    // ui/picking
+    bench_picking_wave(b, 40, false);
+}
+
+void Picking_still_cursor_ignored_wave_400(
+    bench_t *b)
+{
+    // spatial_perf/picking_cost
+    bench_picking_wave(b, 20, true);
+}
+
+void Picking_still_cursor_ignored_wave_1600(
+    bench_t *b)
+{
+    // spatial_perf/picking_cost
+    bench_picking_wave(b, 40, true);
 }

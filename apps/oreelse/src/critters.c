@@ -1278,6 +1278,7 @@ void ore_critters_import(
     ecs_add_pair(world, ecs_id(OreCritter), EcsWith, ecs_id(OreVelocity));
     ecs_add_pair(world, ecs_id(OreCritter), EcsWith, ecs_id(Rotation));
     ecs_add_pair(world, ecs_id(OreCritter), EcsWith, DynamicTransform);
+    ecs_add_pair(world, ecs_id(OreCritter), EcsWith, SpatialIgnore);
 
     ecs_set_hooks(world, OreCritterIndex, {
         .ctor = flecs_default_ctor,

@@ -8,6 +8,11 @@
             "box"
         ]
     },
+    "lang.c": {
+        "include": [
+            "../../src/spatial"
+        ]
+    },
     "bench": {
         "benchsuites": [
             {
@@ -33,7 +38,9 @@
                     "wheel_4_per_frame_10k_layout_ui",
                     "move_over_hires_mesh",
                     "first_hover_dense_mesh",
-                    "still_cursor_moving_wave_1600"
+                    "still_cursor_moving_wave_1600",
+                    "still_cursor_ignored_wave_400",
+                    "still_cursor_ignored_wave_1600"
                 ]
             }
         ]

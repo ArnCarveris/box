@@ -2,14 +2,12 @@
  * @file spatial/spatial.c
  * @brief Registers box.spatial and keeps the index of every scene up to date.
  *
- * Observers collect changed shapes and the roots of changed subtrees, so an update only
- * computes the bounds of what changed. Moved static leaves and DynamicTransform shapes are
- * placed by the first query after a frame, so a frame without queries does not move leaves.
- * An update that follows a query places them itself: a world that queries every frame (as
- * picking does) pays for them in SpatialUpdate instead of in whichever system queries first.
+ * Observers collect changed shapes and subtrees, so an update only bounds what changed. Moved
+ * leaves and DynamicTransform shapes (posed by SpatialPose) are placed by the first query of a
+ * frame, or by SpatialUpdate when the last frame queried, as picking does every frame.
  *
- * A dynamic shape keeps the world transform of its bounds in SpatialPose, and only the shapes
- * whose transform differs from it get new bounds.
+ * An entity with SpatialIgnore on itself or an ancestor is not indexed and has no SpatialPose,
+ * so it costs no update; adding or removing the tag walks the subtree like a change of scene.
  */
 
 #include "index.h"
@@ -20,6 +18,7 @@
 ECS_COMPONENT_DECLARE(SpatialProxy);
 ECS_COMPONENT_DECLARE(SpatialPose);
 ECS_COMPONENT_DECLARE(SpatialIndex);
+ECS_TAG_DECLARE(SpatialIgnore);
 
 /** World transform of a shape without one */
 static const WorldTransform box_spatial_identity = { .m = GLM_MAT4_IDENTITY_INIT };
@@ -401,6 +400,24 @@ static void box_spatial_pose(
     }
 }
 
+/** Check whether an entity or one of its ancestors has SpatialIgnore.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return Whether the entity stays out of the index
+ */
+static bool box_spatial_ignored(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    bool result = false;
+    for (; e && !result; e = ecs_get_parent(world, e)) {
+        result = ecs_has_id(world, e, SpatialIgnore);
+    }
+
+    return result;
+}
+
 /** Place a changed entity in the index of its scene, or take it out.
  *
  * @param world The world
@@ -429,7 +446,7 @@ static void box_spatial_refresh(
     vec3 l_min, l_max;
     bool ui = false;
     bool indexed = box_spatial_local(world, cache, e, l_min, l_max, &ui) &&
-        !ecs_has_id(world, e, EcsPrefab);
+        !ecs_has_id(world, e, EcsPrefab) && !box_spatial_ignored(world, e);
     if (indexed) {
         box_spatial_world_bounds(l_min, l_max, t, min, max);
         scene = rescope ? box_render_scene_of(world, e) : p->scene;
@@ -772,6 +789,9 @@ static void box_spatial_observers(
     box_spatial_observer(world, index, "SpatialOnParent", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(EcsParent) }},
         .events = { EcsOnSet, EcsOnRemove } }, BoxSpatialOnRescope);
+    box_spatial_observer(world, index, "SpatialOnIgnore", (ecs_observer_desc_t){
+        .query.terms = {{ .id = SpatialIgnore }},
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxSpatialOnRescope);
     box_spatial_transform_observers(world, index);
 }
 
@@ -795,6 +815,7 @@ void BoxSpatialImport(
     ecs_add_pair(world, ecs_id(TextBounds), EcsWith, ecs_id(SpatialProxy));
     ECS_COMPONENT_DEFINE(world, SpatialPose);
     ecs_set_hooks(world, SpatialPose, { .ctor = flecs_default_ctor });
+    ECS_TAG_DEFINE(world, SpatialIgnore);
     ECS_COMPONENT_DEFINE(world, SpatialIndex);
     ecs_set_hooks(world, SpatialIndex, { .ctor = flecs_default_ctor });
     ecs_singleton_set(world, SpatialIndex, { .index = index });

@@ -5,6 +5,9 @@
  * Every view casts a ray from its camera into its scene, the front view first, so screen UI,
  * world UI and 3D shapes are picked the same way. Events go out through flecs.script.input,
  * and an element with an ActionTrigger drives an input Action.
+ *
+ * Rays go through the spatial index, so an entity under SpatialIgnore (box.spatial) is never
+ * picked and does not block a pick, which reaches what is behind it (docs/spatial-index.md).
  */
 
 #ifndef BOX_PICKING_H

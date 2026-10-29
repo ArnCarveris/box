@@ -837,7 +837,8 @@ void PickingCost_wave_not_placed_by_pick(void) {
         "}\n" }) != 0);
 
     /* A wave of 400 critters of 4 parts around the point under the cursor, every one turning
-     * every frame, none of them Interactive */
+     * every frame, none of them Interactive. They have no SpatialIgnore, so they stay in the
+     * index and block the pick (SpatialIgnore.moving_wave_not_refit covers the tagged wave) */
     ecs_entity_t critter = ecs_lookup(world, "Critter");
     int32_t i, side = 20, count = side * side, parts = count * 4, frames = 10;
     for (i = 0; i < count; i ++) {

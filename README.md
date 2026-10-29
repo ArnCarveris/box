@@ -50,6 +50,9 @@ Parameterized surfaces and surface-relative placement are described in
 Relational 3D modeling with Fit, Align, Array, and Distribute is described in
 [Spatial layout](docs/spatial-layout.md).
 
+The spatial index that picking reads, and `SpatialIgnore`, which keeps moving actors nobody picks
+out of it, are described in [Spatial index and picking](docs/spatial-index.md).
+
 Use `--design` to inspect a scene with top, bottom, left, right, front and back orthographic
 cameras and two perspective cameras:
 
