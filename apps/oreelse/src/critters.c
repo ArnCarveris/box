@@ -276,8 +276,13 @@ static ecs_entity_t ore_critter_acquire(
     return other ? other : result;
 }
 
+<<<<<<< HEAD
 /** Hurt the astronaut: it loses hit points and its hurt timer starts over; at 0 the game is
  * lost. Aboard a rocket it is invulnerable.
+=======
+/** Hurt the astronaut: it loses hit points, down to 0, and its hurt timer starts over. At 0 it
+ * dies, in OrePlayerHealth later in the same frame.
+>>>>>>> 9cd93619de444074b2d548096e1fb906cb9dded3
  *
  * @param ctx The context of the system run
  * @param damage Hit points it loses
@@ -292,7 +297,6 @@ static void ore_player_damage(
         health->value -= damage;
         if (health->value <= 0) {
             health->value = 0;
-            ore_state_set(ctx->stage, OreGameStateLost);
         }
 
         if (hurt) {
@@ -476,10 +480,11 @@ static ecs_entity_t ore_critter_create(
     const OreWaveState *w = ecs_singleton_get(world, OreWaveState);
     ecs_entity_t root = w && w->root && ecs_is_alive(world, w->root) ? w->root : 0;
     ecs_entity_t e = 0;
-    float wait, jitter;
+    float wait, jitter, anim;
     if (base && ecs_has(world, prefab, OreSpeed)) {
         wait = retarget * ore_random01(world);
         jitter = (ore_random01(world) - 0.5f) * 2.0f;
+        anim = ore_random01(world) * 2.0f * GLM_PIf;
         e = root ? ecs_new_w_pair(world, EcsChildOf, root) : ecs_new(world);
         ecs_add_pair(world, e, EcsIsA, prefab);
         ecs_set(world, e, Position, { x, 0, z });
@@ -487,7 +492,8 @@ static ecs_entity_t ore_critter_create(
         ecs_set(world, e, OreHealth, { base->value, base->value });
         ecs_set(world, e, OreTarget, { 0 });
         ecs_set(world, e, OreVelocity, { 0, 0 });
-        ecs_set(world, e, OreCritter, { .retarget = wait, .jitter = jitter, .attacking = false });
+        ecs_set(world, e, OreCritter, {
+            .retarget = wait, .jitter = jitter, .attacking = false, .anim = anim });
     }
 
     return e;
@@ -512,6 +518,7 @@ void ore_critter_kill(
         ecs_singleton_modified(world, OreWaveState);
     }
 
+    ore_critter_remains(world, critter);
     ecs_delete(world, critter);
 }
 
@@ -829,9 +836,15 @@ static void OreWaves(
     ecs_singleton_modified(it->stage, OreWaveState);
 }
 
+<<<<<<< HEAD
 /** Lose the game when the astronaut has no hit points left, else count the time since it was
  * hurt and after cfg.playerRegenDelay seconds regenerate cfg.playerRegen hit points a second,
  * not while aboard a rocket.
+=======
+/** Kill the astronaut when it has no hit points left (ore_player_die: the splat, the fall and
+ * the lost game), else count the time since it was hurt and after cfg.playerRegenDelay seconds
+ * regenerate cfg.playerRegen hit points a second.
+>>>>>>> 9cd93619de444074b2d548096e1fb906cb9dded3
  *
  * @param it Iterator over the astronaut with its health, while playing
  */
@@ -846,7 +859,7 @@ static void OrePlayerHealth(
     int32_t i;
     for (i = 0; i < it->count; i ++) {
         if (health[i].value <= 0) {
-            ore_state_set(it->stage, OreGameStateLost);
+            ore_player_die(it->stage, it->entities[i]);
         } else {
             hurt[i].since += it->delta_time;
             if (!aboard && hurt[i].since >= delay && health[i].value < health[i].max) {

@@ -1,0 +1,73 @@
+include config
+include kites
+include particles
+include scenery
+include world
+include run
+include input
+include hud
+
+using flecs.script.math
+using box.transform
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.surface
+using box.atmosphere
+
+window {
+  Surface: {width: 1280, height: 800, vsync: true}
+}
+
+camera {
+  Position: {0, 8, 21}
+  Rotation: {-atan2(8 - 8.8, 21), 0, 0}
+  Camera: {fov: 60, near_: 0.5, far_: 2000}
+}
+
+const sunX: f32 = -1.0
+const sunY: f32 = 0.75
+const sunZ: f32 = 0.55
+
+sun {
+  Rotation: {asin(sunY / sqrt(sunX * sunX + sunY * sunY + sunZ * sunZ)), atan2(-sunX, -sunZ), 0}
+  DirectionalLight: {intensity: 2}
+  Rgb: {255, 255, 255}
+}
+
+$ {
+  Atmosphere: {sun: sun}
+}
+
+exposure {
+  AutoExposure: {min_log_luma: -16, low_percentile: 0, min_brightness: 0.05, max_brightness: 0.55}
+}
+
+gtao {
+  Gtao: {radius: 0.5, final_value_power: 2.2}
+}
+
+bloom {
+  Bloom: {}
+}
+
+tonemap {
+  Tonemap: {auto_exposure: exposure, operator_: TonyMcMapface}
+}
+
+main_view {
+  View: {
+    camera: camera,
+    clear: {enabled: true, color: {150, 195, 235, 255}},
+    lighting: {enabled: true, baked: true, reflections: true, atmosphere: true,
+      environment: {source: Atmosphere, intensity: 0.8, yaw: 0, background: false}},
+    shadows: {enabled: true, max_distance: 200},
+    effects: [{effect: gtao}, {effect: bloom}, {effect: tonemap}]
+  }
+}
+
+hud {
+  YeonHud: {surface: window}
+}

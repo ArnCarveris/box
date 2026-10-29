@@ -31,6 +31,10 @@ box does not have. The skipped features are listed at the end.
   membranes use `AlphaCutoff: {0.5}` instead.
 - `PbrMaterial`, `Emissive` and `TextureTransform` map one to one. `Emissive` is not affected by
   `Tint`.
+- Recoloring a whole model in C (the original's `oreCharParts`, which sets the `Rgba` and the
+  `Emissive` of every part of a corpse) becomes a `Tint` on the model's root, which box composes
+  down the hierarchy. As the tint leaves emission alone, the emissive parts (eyes, visors,
+  glowing spots) get their emission turned off by a system, as the ghosts' `OreGhostDim` does.
 - `Texture` / `Svg` become `TexturePath {path, width, height}`; asset paths become
   `apps/oreelse/etc/assets/...` (copy the SVGs from `ore_else/etc/assets` unchanged).
 - `PbrTextures.roughness` becomes `PbrTextures.orm` (red occlusion, green roughness, blue

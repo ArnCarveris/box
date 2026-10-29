@@ -3,8 +3,9 @@
 // +Y; a lamp on a wall turns it with Rotation {PI / 2, 0, 0} to face +Z.
 //
 // The bulb glows in color while on, and is the part the game drives: a status lamp (status) is
-// the power lamp of its building, which OrePower colors live, ok, warn or dead and blinks at
-// blink per second while dead; a work lamp (work) lights while its building works, blinking at
+// the power lamp of its building, which OrePower colors live, ok, warn or dead and blinks with
+// the lamp signal of OreBlink (cfg.lampRate, the original's blink) while dead, through the
+// OreStatusLamp of its bulb; a work lamp (work) lights while its building works, blinking at
 // blink per second if blink is above 0. Standing still both show color at strength. With
 // light above 0 the bulb also lights its surroundings with a point light of that intensity
 // and range in its color.
@@ -58,6 +59,13 @@ template Light {
 
     if on && light > 0 {
       PointLight: {intensity: light, range: range}
+    }
+
+    // OrePower colors the bulb of a status lamp by the power of its building
+    if status {
+      oreelse.OreStatusLamp: {
+        live: color, dead: dead, warn: warn, ok: ok, strength: strength, light: light
+      }
     }
   }
 

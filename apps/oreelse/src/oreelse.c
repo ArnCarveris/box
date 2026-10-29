@@ -3,8 +3,13 @@
  * @brief The oreelse module: registers the components and the systems of every area.
  *
  * The systems of EcsOnUpdate run in the order the areas register them: the flow, the map, the
+<<<<<<< HEAD
  * player, mining, crafting, the critters, the buildings, placement, its preview, the rocket.
  * Those that only run while playing match (OreGameState, Playing), the only pause mechanism.
+=======
+ * player, mining, power, crafting, the critters, their animation and corpses, the buildings,
+ * then placement and its preview. Gameplay systems match (OreGameState, Playing), the only pause.
+>>>>>>> 9cd93619de444074b2d548096e1fb906cb9dded3
  *
  * The look applies the render quality tier in every state, in EcsPreStore. The particles
  * register the helpers that play the effects of etc/particles and the flash of their lights.
@@ -33,6 +38,8 @@ void OreelseImport(
     ECS_META_COMPONENT(world, OreActions);
     ECS_META_COMPONENT(world, OrePlayer);
     ECS_META_COMPONENT(world, OreLimb);
+    ECS_META_COMPONENT(world, OrePlayerGait);
+    ECS_META_COMPONENT(world, OreEffects);
     ECS_META_COMPONENT(world, OreMining);
     ECS_META_COMPONENT(world, OreMineMarker);
     ECS_META_COMPONENT(world, OreStack);
@@ -56,6 +63,12 @@ void OreelseImport(
     ECS_META_COMPONENT(world, OrePowerProducer);
     ECS_META_COMPONENT(world, OrePowerKind);
     ECS_META_COMPONENT(world, OrePowerCategory);
+    ECS_META_COMPONENT(world, OrePowerAlloc);
+    ECS_META_COMPONENT(world, OrePowerState);
+    ECS_META_COMPONENT(world, OreDrill);
+    ECS_META_COMPONENT(world, OreWorker);
+    ECS_META_COMPONENT(world, OreStatusLamp);
+    ECS_META_COMPONENT(world, OreLamps);
     ECS_META_COMPONENT(world, OreBuilding);
     ECS_META_COMPONENT(world, OreConnectRule);
     ECS_META_COMPONENT(world, OreConnector);
@@ -81,6 +94,8 @@ void OreelseImport(
     ECS_META_COMPONENT(world, OreRange);
     ECS_META_COMPONENT(world, OreRadius);
     ECS_META_COMPONENT(world, OreWaveTier);
+    ECS_META_COMPONENT(world, OreGait);
+    ECS_META_COMPONENT(world, OreDeathBurst);
     ECS_META_COMPONENT(world, OreArsenal);
     ECS_META_COMPONENT(world, OreWaveMix);
     ECS_META_COMPONENT(world, OreWaveStyle);
@@ -88,6 +103,7 @@ void OreelseImport(
     ECS_META_COMPONENT(world, OreCritter);
     ECS_META_COMPONENT(world, OreTarget);
     ECS_META_COMPONENT(world, OreVelocity);
+    ECS_META_COMPONENT(world, OreCorpse);
     ECS_META_COMPONENT(world, OreHurt);
     ECS_META_COMPONENT(world, OreCritterIndex);
     ECS_TAG_DEFINE(world, OreRunScript);
@@ -101,8 +117,10 @@ void OreelseImport(
     ore_player_import(world);
     ore_inventory_import(world);
     ore_mining_import(world);
+    ore_power_import(world);
     ore_craft_import(world);
     ore_critters_import(world);
+    ore_critter_fx_import(world);
     ore_buildings_import(world);
     ore_placement_import(world);
     ore_rocket_import(world);
