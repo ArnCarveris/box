@@ -19,6 +19,10 @@ cfg {
   // Ore of a new deposit, its amount and its capacity
   export const depositAmount: i32 = 1000
 
+  // A plant of the flora under a building sinks floraSink units below the ground, out of sight,
+  // until the building is gone
+  export const floraSink: f32 = 8
+
   // The astronaut mines a tile whose center is at most reach away on x and z, and places a
   // building whose footprint (the rectangle of its tile centers) is at most reach away
   export const reach: f32 = 15
@@ -127,6 +131,19 @@ cfg {
   export const walkSpeed: f32 = 7
   export const runMultiplier: f32 = 2
 
+  // The repair drones of a drone pad: they fly at droneSpeed units a second, slowed from 20% to
+  // 100% of it within droneEase of their goal, cruise droneCruise above the ground and arrive
+  // within droneArrive. A drone repairs droneRepair hit points a second, and every
+  // droneHpPerIron hit points one Iron leaves the inventory. Docked or returning, it looks for a
+  // target every droneScan seconds
+  export const droneSpeed: f32 = 7
+  export const droneCruise: f32 = 2.8
+  export const droneArrive: f32 = 0.45
+  export const droneEase: f32 = 1.8
+  export const droneRepair: f32 = 14
+  export const droneHpPerIron: f32 = 10
+  export const droneScan: f32 = 0.5
+
   // The zoom levels of the camera, from 0 (closest, 44.6 degrees down) to 2 (59.5 degrees):
   // the camera sits height above the ground and back behind the astronaut and looks at the
   // point look above it
@@ -148,6 +165,16 @@ cfg {
   export const blinkFast: f32 = 8
   export const blinkSlow: f32 = 6
   export const lampRate: f32 = 1.4
+
+  // The point light of a status lamp's bulb (the Light template), at statusLampLight while the
+  // bulb is lit and 0 in the off half of its blink, reaching statusLampRange. The original's
+  // lamps have none; it is kept small, as box's falloff is much brighter close to a light
+  export const statusLampLight: f32 = 0.35
+  export const statusLampRange: f32 = 1.8
+
+  // The work lights of the buildings (OreWorkLight) cover workLightRate * dt of the distance to
+  // their level every frame
+  export const workLightRate: f32 = 7
 
   // The flash light of an explosion (ore_explosion, BoomBurst) at scale 1: its peak intensity
   // and its range, both times the scale of the blast. It fades to 0 over 1 / 4.5 s, the
@@ -242,6 +269,26 @@ cfg {
   export const corpseRoll: f32 = 0.8
   export const corpseSquash: f32 = 0.55
   export const corpseColor: Tint = {40, 36, 34, 255}
+
+  // The astronaut's pistol: fully automatic, it fires a Tracer of pistolDamage at pistolSpeed
+  // every pistolInterval seconds at the nearest live critter within pistolRange, from pistolY
+  // above the astronaut
+  export const pistolDamage: f32 = 6
+  export const pistolRange: f32 = 9
+  export const pistolInterval: f32 = 0.45
+  export const pistolSpeed: f32 = 30
+  export const pistolY: f32 = 1.3
+
+  // The aim of the weapons: shots and missiles aim turretAimY above a critter's position, the
+  // laser beam turretAimPerRadius times the critter's radius above it. The gun turret leads its
+  // shots by at most leadCap seconds of the target's walk. A missile turns at most
+  // missileTurnRate radians a second (straight at its target within speed / missileTurnRate)
+  // and, when its target is gone, takes the nearest live critter within missileReacquire
+  export const turretAimY: f32 = 0.6
+  export const turretAimPerRadius: f32 = 0.9
+  export const leadCap: f32 = 2
+  export const missileTurnRate: f32 = 6
+  export const missileReacquire: f32 = 6
 
   // The render quality tiers Low, Medium and High (OreQuality.tier), the quality.flecs of the
   // original: the resolution scale of the surfaces (2 renders at half the pixels), the shadow

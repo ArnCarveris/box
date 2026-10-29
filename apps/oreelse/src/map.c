@@ -8,7 +8,7 @@
  * deleted by ore_map_purge, so the first one generated keeps it.
  *
  * The buildings (buildings.c) register in their tiles, the connectors on the edges between
- * them. OreHover is the hover tile.
+ * them, the plants of the flora (flora.c) in theirs. OreHover is the hover tile.
  */
 
 #include "game.h"
@@ -99,6 +99,16 @@ ecs_entity_t* ore_map_building(
     return i < 0 ? NULL : &map->buildings[i];
 }
 
+ecs_entity_t* ore_map_flora(
+    OreMap *map,
+    int32_t row,
+    int32_t col)
+{
+    int32_t i = ore_map_index(map, row, col);
+
+    return i < 0 ? NULL : &map->flora[i];
+}
+
 ecs_entity_t* ore_map_link(
     OreMap *map,
     int32_t row,
@@ -119,12 +129,15 @@ void ore_map_fit(
         ecs_os_free(map->deposits);
         ecs_os_free(map->buildings);
         ecs_os_free(map->links);
+        ecs_os_free(map->flora);
         map->deposits = ecs_os_calloc_n(ecs_entity_t, count);
         map->buildings = ecs_os_calloc_n(ecs_entity_t, count);
         map->links = ecs_os_calloc_n(ecs_entity_t, count * 2);
+        map->flora = ecs_os_calloc_n(ecs_entity_t, count);
         map->rows = grid->rows;
         map->cols = grid->cols;
         ecs_vec_clear(&map->dirty);
+        ecs_vec_clear(&map->flora_dirty);
     }
 }
 
@@ -136,6 +149,7 @@ void ore_map_touch(
     int32_t i = ore_map_index(map, row, col);
     if (i >= 0) {
         ecs_vec_append_t(NULL, &map->dirty, int32_t)[0] = i;
+        ecs_vec_append_t(NULL, &map->flora_dirty, int32_t)[0] = i;
     }
 }
 
@@ -144,8 +158,11 @@ static ECS_DTOR(OreMap, ptr, {
     ecs_os_free(ptr->deposits);
     ecs_os_free(ptr->buildings);
     ecs_os_free(ptr->links);
+    ecs_os_free(ptr->flora);
     ecs_vec_fini_t(NULL, &ptr->rejected, ecs_entity_t);
     ecs_vec_fini_t(NULL, &ptr->dirty, int32_t);
+    ecs_vec_fini_t(NULL, &ptr->flora_new, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &ptr->flora_dirty, int32_t);
 })
 
 /** Move the cells of a map, leaving the source without them */
@@ -153,8 +170,11 @@ static ECS_MOVE(OreMap, dst, src, {
     ecs_os_free(dst->deposits);
     ecs_os_free(dst->buildings);
     ecs_os_free(dst->links);
+    ecs_os_free(dst->flora);
     ecs_vec_fini_t(NULL, &dst->rejected, ecs_entity_t);
     ecs_vec_fini_t(NULL, &dst->dirty, int32_t);
+    ecs_vec_fini_t(NULL, &dst->flora_new, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &dst->flora_dirty, int32_t);
     *dst = *src;
     ecs_os_zeromem(src);
 })
@@ -174,11 +194,17 @@ void ore_map_purge(
     if (count) {
         ecs_vec_clear(&map->rejected);
     }
+
+    if (map) {
+        ore_flora_sync(world, map);
+    }
 }
 
 /** Register deposits in the tiles of their positions. A deposit on a tile another deposit
  * already holds is rejected, row and col -1, and deleted by ore_map_purge; a deposit off the
  * grid keeps row and col at -1 too.
+ *
+ * A plant on the tile of a deposit is checked again by the next ore_flora_sync, which deletes it.
  *
  * @param it Iterator over the deposits whose OreDeposit was set
  */
@@ -200,6 +226,7 @@ static void OreDepositRegister(
         int32_t col = p ? ore_col_at(&grid, p->x) : -1;
         ecs_entity_t *prev = ore_map_deposit(map, d[i].row, d[i].col);
         ecs_entity_t *cell = ore_map_deposit(map, row, col);
+        ecs_entity_t *plant;
         if (prev && *prev == e && prev != cell) {
             *prev = 0;
         }
@@ -212,6 +239,10 @@ static void OreDepositRegister(
             ecs_vec_append_t(NULL, &map->rejected, ecs_entity_t)[0] = e;
         } else if (cell) {
             *cell = e;
+            plant = ore_map_flora(map, row, col);
+            if (plant && *plant) {
+                ecs_vec_append_t(NULL, &map->flora_new, ecs_entity_t)[0] = *plant;
+            }
         }
     }
 }
@@ -234,7 +265,9 @@ static void OreDepositUnregister(
     }
 }
 
-/** Delete the deposits rejected since the previous frame, before anything draws them.
+/** Delete the deposits and plants rejected since the previous frame and sync the flora,
+ * before anything draws them. Runs in every state, so a restart's deletions and the scenes'
+ * buildings are covered.
  *
  * @param it Iterator with the OreMap singleton
  */

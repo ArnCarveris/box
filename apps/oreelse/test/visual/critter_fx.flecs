@@ -10,10 +10,12 @@ include apps/oreelse/etc/oreelse
 using box.transform
 using oreelse
 
-// Beyond the deposit clusters, which reach about 23 units from the center
+// Beyond the deposit clusters, which reach about 23 units from the center. Its pistol is held
+// (its timer far off), so it does not shoot the critters around it
 astronaut {
   Position: {0, 0, 30}
   Rotation: {0, 0.6, 0}
+  OreAttackTimer: {value: 100000}
 }
 
 // The walk and the corpses animate only while playing

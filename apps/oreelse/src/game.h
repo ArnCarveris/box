@@ -6,7 +6,7 @@
  * and the entities of a run.
  *
  * The systems of each area (flow.c, map.c, player.c, ..., power.c, critters.c, critter_fx.c,
- * buildings.c, placement.c, rocket.c, look.c, particles.c) play the game.
+ * buildings.c, drones.c, flora.c, placement.c, rocket.c, look.c, particles.c) play the game.
  */
 
 #ifndef OREELSE_GAME_H
@@ -424,6 +424,41 @@ ECS_STRUCT(OreWorker, {
     float speed; /**< Speed of its crafter at multiplier 1 */
 });
 
+/** The drones of a drone pad, on its prefab and inherited: placed, the pad gets count
+ * instances of drone as its children, docked over its bays. Drone b docks at the angle
+ * (b + 0.5) * 2 PI / count, radius from the pad's center and dock above the ground.
+ */
+ECS_STRUCT(OreDroneBay, {
+    ecs_entity_t drone; /**< Prefab of the drones, RepairDrone */
+    int32_t count;      /**< Drones of the pad */
+    float radius;       /**< Distance of the bays from the pad's center */
+    float dock;         /**< Height of a docked drone above the ground */
+    ecs_entity_t cost;  /**< Item the repairs are paid in, Iron */
+});
+
+/** States of a repair drone, the type of OreDrone.state */
+ECS_ENUM(OreDroneState, {
+    OreDroneStateDocked,    /**< Parked over its bay, looking for a target every cfg.droneScan */
+    OreDroneStateFlying,    /**< Flying straight to cfg.droneCruise above its target */
+    OreDroneStateRepairing, /**< Within cfg.droneArrive of its target, welding it */
+    OreDroneStateReturning  /**< Flying back to its bay, looking for a target every
+                             *   cfg.droneScan */
+});
+
+/** A repair drone of a drone pad, on the instance: a child of the pad, so it goes with it. Its
+ * Position is relative to the pad. Drones have no health: critters never target them.
+ */
+ECS_STRUCT(OreDrone, {
+    ecs_entity_t pad;    /**< The pad, its parent */
+    ecs_entity_t target; /**< Building it repairs or flies to, 0 for none; never the target of
+                          *   another drone of its pad */
+    OreDroneState state; /**< What it does */
+    int32_t bay;         /**< Its bay, 0 to OreDroneBay.count - 1 */
+    float scan;          /**< Seconds to the next look for a target while docked or returning */
+    float credit;        /**< Hit points repaired not yet paid for, below cfg.droneHpPerIron; it
+                          *   carries over between targets */
+});
+
 /** The bulb of a status lamp, which the Light template (etc/props/light.flecs) sets with the
  * colors of its props: OrePower colors it by the power of the building it is part of.
  */
@@ -445,6 +480,91 @@ ECS_STRUCT(OreStatusLamp, {
 ECS_STRUCT(OreLamps, {
     int32_t version; /**< Changes counted */
     int32_t applied; /**< The version the lamps show */
+});
+
+/** A part of a building that spins about its y while the building works, the original's Spinner
+ * (the factory's roller drums and flywheels, the drill's bit). Its Rotation.y advances speed
+ * times the work rate of the building a second; it stops where it is when the rate is 0.
+ */
+ECS_STRUCT(OreSpinner, {
+    float speed;        /**< Radians a second at work rate 1 */
+    ecs_entity_t owner; /**< The building, found by OreSpinners, 0 until then */
+});
+
+/** A part of a building that strokes while the building works, the original's Piston (the
+ * factory's ram, the drill's carriage and slider).
+ *
+ * Its phase advances speed times the work rate of the building a second and the part sits at
+ * rest - travel * (0.5 - 0.5 * cos(phase)) along y, or z for a slide.
+ *
+ * At the bottom of every stroke (phase crossing PI) burst and spark play impact above the part.
+ */
+ECS_STRUCT(OrePiston, {
+    float rest;         /**< Position of the part at the top of the stroke */
+    float travel;       /**< Length of the stroke */
+    float speed;        /**< Radians of the phase a second at work rate 1 */
+    float phase;        /**< Phase of the stroke in radians, 0 at rest */
+    float impact;       /**< Height of the plays at the bottom of the stroke above the part */
+    ecs_entity_t burst; /**< One shot effect played at the bottom of the stroke, 0 for none */
+    ecs_entity_t spark; /**< Second one shot effect played with it, 0 for none */
+    ecs_entity_t owner; /**< The building, found by OrePistons, 0 until then */
+    bool slide;         /**< The part moves along z instead of y */
+});
+
+/** A part of a building that shakes up and down while the building works, the original's Shake
+ * (the drill's bit): rest + amplitude * (0.7 + 0.3 * sin(0.37 * phase)) * sin(phase) along y,
+ * back at rest when the work rate is 0.
+ */
+ECS_STRUCT(OreShake, {
+    float amplitude;    /**< Height of the shake */
+    float frequency;    /**< Shakes a second at work rate 1 */
+    float phase;        /**< Phase of the shake in radians */
+    float rest;         /**< Position.y of the part at rest, taken when it first runs */
+    ecs_entity_t owner; /**< The building, found by OreShakes, 0 until then */
+    bool ready;         /**< rest was taken */
+});
+
+/** A vent of a building that puffs a one shot effect at a beat while the building works, the
+ * original's Vent (the factory's smoke stacks): the timer counts down by the work rate and at 0
+ * the burst plays at the vent and the timer starts again from interval.
+ */
+ECS_STRUCT(OreVent, {
+    float interval;     /**< Seconds between two puffs at work rate 1, 0.5 for 0 or less */
+    float timer;        /**< Seconds to the next puff at work rate 1 */
+    ecs_entity_t burst; /**< The one shot effect, SmokePuff */
+    ecs_entity_t owner; /**< The building, found by OreVents, 0 until then */
+});
+
+/** An emitter of a building that plays while the building works, the original's WorkEmitter
+ * (the factory's vent steam, the drill's dust): OreWorkEmitters plays its ParticlePlayback while
+ * the work rate is above 0 and stops it otherwise.
+ */
+ECS_STRUCT(OreWorkEmitter, {
+    ecs_entity_t owner; /**< The building, found by OreWorkEmitters, 0 until then */
+});
+
+/** An emissive part of a building that glows while the building works, the original's
+ * WorkLight (the factory's hot plate and work glow, the bulbs of the work lamps).
+ *
+ * Its level eases toward 1 while the building works (or has power, with power) and toward 0
+ * hold seconds after it stops, at cfg.workLightRate; a blackout kills it at once. A blinking
+ * light (blink above 0) snaps to its level and blinks blink times the work rate a second.
+ *
+ * Its Emissive strength is off + (on - off) * level and its PointLight light * level, the share
+ * pulse of it following the stroke of the building's piston.
+ */
+ECS_STRUCT(OreWorkLight, {
+    float on;            /**< Emissive strength while lit */
+    float off;           /**< Emissive strength while dark */
+    float blink;         /**< Blinks a second at work rate 1, 0 for a steady light */
+    float light;         /**< Intensity of its point light while lit */
+    float pulse;         /**< Share of the point light that follows the stroke of the piston */
+    float hold;          /**< Seconds it stays lit after the work stops */
+    float hot;           /**< Seconds of hold left */
+    float level;         /**< How lit it is, 0 to 1 */
+    ecs_entity_t owner;  /**< The building, found by OreWorkLights, 0 until then */
+    ecs_entity_t piston; /**< The piston of the building the pulse follows, 0 until found */
+    bool power;          /**< It lights while the building has power, working or not */
 });
 
 /** A placed building, on the instance: its footprint starts at (row, col), every tile of it maps
@@ -528,9 +648,20 @@ ECS_STRUCT(OreDeposit, {
     int32_t col;           /**< Column of its tile, set when it registers, -1 off the grid */
 });
 
-/** The tile grid, a singleton: the deposit and the building on every tile. A deposit and a
- * building can share a tile (a drill sits on a deposit). The cells clear themselves when their
- * entities are deleted, so a restart that deletes the run's entities empties it.
+/** A plant of the flora (scenery.flecs), registered in the tile grid of OreMap when it is set.
+ *
+ * ore_map_purge deletes a plant on a tile another plant took or on a deposit's tile; a plant under
+ * a building sinks cfg.floraSink below the ground until the building is gone. A plant off the
+ * grid keeps row and col at -1 and stays as it is.
+ */
+ECS_STRUCT(OreFlora, {
+    int32_t row; /**< Row of its tile, set when it registers, -1 off the grid */
+    int32_t col; /**< Column of its tile, set when it registers, -1 off the grid */
+});
+
+/** The tile grid, a singleton: the deposit, the building and the plant on every tile. A deposit
+ * and a building can share a tile (a drill sits on a deposit). The cells clear themselves when
+ * their entities are deleted, so a restart that deletes the run's entities empties it.
  */
 ECS_STRUCT(OreMap, {
     int32_t rows;              /**< Rows of the grid, cfg.rows once a cell was registered */
@@ -540,11 +671,17 @@ ECS_PRIVATE                    /**< The cells are not reflected */
     ecs_entity_t *buildings;   /**< Building of every tile, row major, 0 for none */
     ecs_entity_t *links;       /**< Connector of the east (2 i) and south (2 i + 1) edge of
                                 *   every tile i, 0 for none */
-    ecs_vec_t rejected;        /**< Deposits that registered on a taken tile, deleted by
-                                *   ore_map_purge: an entity cannot be deleted while the
+    ecs_entity_t *flora;       /**< Plant of every tile, row major, 0 for none */
+    ecs_vec_t rejected;        /**< Deposits and plants that registered on a taken tile, deleted
+                                *   by ore_map_purge: an entity cannot be deleted while the
                                 *   script that creates it still sets it */
     ecs_vec_t dirty;           /**< Tiles (row major indices) whose building changed, the
                                 *   connectors of their edges to sync */
+    ecs_vec_t flora_new;       /**< Plants that registered (or whose tile got a deposit) since
+                                *   the last ore_map_purge, to check against the deposits once
+                                *   every script of the run created its entities */
+    ecs_vec_t flora_dirty;     /**< Tiles (row major indices) whose building changed, their
+                                *   plants to sink or raise */
 });
 
 /** Render quality tiers, the type of OreQuality.tier. The pause screen's button cycles
@@ -704,14 +841,16 @@ ECS_STRUCT(OreSpeed, {
 });
 
 /** Damage of a critter, on its prefab and copied: per second, applied as value * dt while its
- * target is in range
+ * target is in range. Also the damage of a weapon (on a turret prefab and the astronaut, copied):
+ * per shot, per second for a beam; and of a projectile, set when it is fired.
  */
 ECS_STRUCT(OreDamage, {
-    float value; /**< Hit points per second */
+    float value; /**< Hit points per second, or per shot of a weapon that fires projectiles */
 });
 
 /** Attack range of a critter, on its prefab and copied: the XZ distance between the centers of
- * the critter and its target at which it attacks
+ * the critter and its target at which it attacks. Also the range of a weapon (on a turret prefab
+ * and the astronaut, copied): it targets the critters within it on XZ.
  */
 ECS_STRUCT(OreRange, {
     float value; /**< Units */
@@ -859,6 +998,79 @@ ECS_PRIVATE                 /**< The cells are not reflected */
     int32_t cap;            /**< Slots allocated */
     int32_t cells;          /**< Entries of start allocated */
 });
+
+/** The projectiles of a run, a singleton run.flecs resets */
+ECS_STRUCT(OreArmory, {
+    ecs_entity_t root; /**< Parent of the projectiles, an entity of the run, so a restart
+                        *   deletes them */
+});
+
+/** Seconds between two shots of a weapon at multiplier 1, on a turret prefab (copied) and the
+ * astronaut (its pistol). Its OreAttackTimer comes with it.
+ */
+ECS_STRUCT(OreAttackInterval, {
+    float value; /**< Seconds; a turret divides it by its Weapons multiplier */
+});
+
+/** Seconds to the next shot of a weapon: it counts down while the weapon has a target, and at 0
+ * or below the weapon fires and the interval is added to it
+ */
+ECS_STRUCT(OreAttackTimer, {
+    float value; /**< Seconds */
+});
+
+/** Where the shots of a weapon come out and how fast they fly, on a turret prefab (copied) and
+ * the astronaut: height above its position and forward along the aim of the turret's head
+ */
+ECS_STRUCT(OreMuzzle, {
+    float speed;   /**< Speed of the projectiles in units per second, 0 for a beam */
+    float height;  /**< Height of the muzzle above the weapon's position */
+    float forward; /**< Distance of the muzzle ahead of the weapon's center on XZ */
+});
+
+/** The projectile a weapon fires, on a turret prefab (copied) and the astronaut */
+ECS_STRUCT(OreAmmo, {
+    ecs_entity_t projectile; /**< Projectile prefab, Tracer or Missile (etc/projectiles) */
+});
+
+/** A weapon that is a continuous beam, on the laser turret's prefab (copied): it deals its damage
+ * per second to its target, instantly, and shows the beam from its muzzle to the target
+ */
+ECS_STRUCT(OreBeam, {
+    ecs_entity_t prefab; /**< The beam prefab, LaserBeam: 1 unit long along Z */
+});
+
+/** Splash damage of a weapon, on the missile turret's prefab (copied) and its missiles: the
+ * explosion deals the full damage to every live critter within radius on XZ
+ */
+ECS_STRUCT(OreSplash, {
+    float radius; /**< Units */
+});
+
+/** The state of a turret, on a turret prefab (copied). Its OreTarget comes with it. */
+ECS_STRUCT(OreTurret, {
+    ecs_entity_t head; /**< The instance's part the head, found when it first plays, 0 before */
+    ecs_entity_t beam; /**< The instance of OreBeam.prefab under the turret that the turret
+                        *   moves, shows and hides, created when it first plays, 0 before */
+    float aim;         /**< Angle of the head about Y in radians, atan2(dx, dz) of the aim */
+});
+
+/** A projectile in flight, on its prefab (copied) with its radius and life: when it is fired its
+ * velocity is set. No gravity: it flies straight, or steers when it is homing (OreHoming).
+ */
+ECS_STRUCT(OreProjectile, {
+    float vx;     /**< Velocity along X in units per second */
+    float vy;     /**< Velocity along Y */
+    float vz;     /**< Velocity along Z */
+    float life;   /**< Seconds left, it expires at 0 or below */
+    float radius; /**< It hits the nearest live critter within radius on XZ */
+});
+
+/** Marks a projectile prefab that homes in on its target (OreTarget, set when it is fired),
+ * turning at cfg.missileTurnRate; without a target it takes the nearest live critter within
+ * cfg.missileReacquire
+ */
+extern ECS_TAG_DECLARE(OreHoming);
 
 /** Marks an entity created by a script that sets up a run: restart() reloads the script of
  * every entity with it, which deletes the entities of the run and creates those of a new one
@@ -1079,7 +1291,20 @@ void ore_map_fit(
     OreMap *map,
     const ore_grid_t *grid);
 
-/** Mark a tile whose building changed, so the connectors of its edges are synced.
+/** Get the plant cell of a tile.
+ *
+ * @param map The tile grid
+ * @param row The row
+ * @param col The column
+ * @return The cell, NULL off the grid or before the first registration
+ */
+ecs_entity_t* ore_map_flora(
+    OreMap *map,
+    int32_t row,
+    int32_t col);
+
+/** Mark a tile whose building changed, so the connectors of its edges and its plant are
+ * synced.
  *
  * @param map The tile grid
  * @param row The row
@@ -1102,13 +1327,25 @@ bool ore_hover_find(
     const OreView *view,
     OreHover *hover);
 
-/** Delete the deposits that registered on a tile another deposit holds. The OnLoad phase
- * does it every frame, restart() right after it reloaded the scripts of the run.
+/** Delete the deposits that registered on a tile another deposit holds and the plants that
+ * registered on a tile another plant holds, then sync the flora (ore_flora_sync). The OnLoad
+ * phase does it every frame, restart() right after it reloaded the scripts of the run.
  *
  * @param world The world or a stage
  */
 void ore_map_purge(
     ecs_world_t *world);
+
+/** Sync the flora with the tile grid: delete the plants that registered since the last sync on
+ * a deposit's tile, and sink the plants of those and of the tiles whose building changed under
+ * a building (cfg.floraSink below the ground) or raise them back to it.
+ *
+ * @param world The world or a stage
+ * @param map The tile grid
+ */
+void ore_flora_sync(
+    ecs_world_t *world,
+    OreMap *map);
 
 /** Get the amount of an item in the inventory.
  *
@@ -1439,6 +1676,36 @@ ecs_entity_t ore_critter_nearest(
     float z,
     float range);
 
+/** Visit a critter of the spatial index, see ore_critter_each.
+ *
+ * @param ctx The context of the caller
+ * @param critter The critter
+ * @param d2 Its squared distance to the point on XZ
+ */
+typedef void (*ore_critter_visit_t)(
+    void *ctx,
+    ecs_entity_t critter,
+    float d2);
+
+/** Visit every critter of the spatial index within a range of a point on the ground, distance
+ * range included. The index holds the critters that had hit points left when it was rebuilt;
+ * the visitor checks their health when damage since then matters.
+ *
+ * @param index The index, OreCrowd rebuilt it this frame
+ * @param x X of the point
+ * @param z Z of the point
+ * @param range Largest distance on XZ
+ * @param visit Called for every critter within range
+ * @param ctx Passed to visit
+ */
+void ore_critter_each(
+    const OreCritterIndex *index,
+    float x,
+    float z,
+    float range,
+    ore_critter_visit_t visit,
+    void *ctx);
+
 /** Register the critters: the waves that spawn them, their targets, attacks and moves, the
  * crowd separation and the spatial index, their deaths, the astronaut's health and its regen,
  * and the script function oreelse.spawn_critter(prefab, x, z).
@@ -1463,6 +1730,14 @@ bool ore_rocket_aboard(
  * @param world The world
  */
 void ore_critter_fx_import(
+    ecs_world_t *world);
+
+/** Register the weapons: the astronaut's pistol, the gun, laser and missile turrets, their
+ * projectiles and the laser beams.
+ *
+ * @param world The world
+ */
+void ore_weapons_import(
     ecs_world_t *world);
 
 /** Register the game flow: states, clock, blink, toast, cancel() and restart().
@@ -1542,6 +1817,29 @@ void ore_craft_import(
  * @param world The world
  */
 void ore_buildings_import(
+    ecs_world_t *world);
+
+/** Register the buildings' animation and lights: the spinners, pistons, shakes, vents, work
+ * emitters and work lights, driven by the work rate of their building.
+ *
+ * @param world The world
+ */
+void ore_building_fx_import(
+    ecs_world_t *world);
+
+/** Register the repair drones: the drones a placed drone pad parks and the system that flies
+ * them to the damaged buildings and welds them, paid from the inventory.
+ *
+ * @param world The world
+ */
+void ore_drones_import(
+    ecs_world_t *world);
+
+/** Register the flora: the plants that register in the tile grid.
+ *
+ * @param world The world
+ */
+void ore_flora_import(
     ecs_world_t *world);
 
 /** Register placement: the selection, the click and drag placement, the preview and the script

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // A new run: the astronaut at the center of the map facing north at full health, a worker of
 // the order book, the parent of the buildings placed in the run and their connectors, the parent
 // of the critters, and the clock, the blink signals, the toast, the generator, the inventory of
@@ -8,6 +9,17 @@
 // script (it created the astronaut, which has OreRunScript), deposits.flecs and scenery.flecs:
 // the reload deletes the astronaut and the buildings and creates them again, so nothing of the
 // previous run stays.
+=======
+// A new run: the astronaut at the center of the map facing north at full health with its pistol,
+// a worker of the order book, the parent of the buildings placed in the run and their
+// connectors, the parent of the critters, the parent of the projectiles, and the clock, the
+// blink signals, the toast, the generator, the inventory of the run, the starting crate in its
+// slot order, an empty order book, no building selected, the power allocation at [2, 2, 2], no
+// power, an empty rocket with nothing shipped and the waves before the first, which starts
+// cfg.firstWaveAt seconds in. oreelse.restart() reloads this script (it created the astronaut,
+// which has OreRunScript), deposits.flecs and scenery.flecs: the reload deletes the astronaut,
+// the buildings and the projectiles and creates them again, so nothing of the previous run stays.
+>>>>>>> de9e56c7a7047084a849fdfe5e8450ff7fb1320b
 // The camera, its zoom level, the render quality tier and the session seed (OreSeed) are not
 // part of a run.
 
@@ -24,6 +36,12 @@ astronaut {
   OreCrafter: {speed: 1}
   OreHealth: {value: cfg.playerHp, max: cfg.playerHp}
   OreHurt: {since: 0}
+  // The automatic pistol (OrePistol): its OreAttackTimer comes with the interval, at 0
+  OreDamage: {value: cfg.pistolDamage}
+  OreRange: {value: cfg.pistolRange}
+  OreAttackInterval: {value: cfg.pistolInterval}
+  OreMuzzle: {speed: cfg.pistolSpeed, height: cfg.pistolY, forward: 0}
+  OreAmmo: {projectile: Tracer}
 }
 
 // Placement puts the buildings and the connectors between them here
@@ -31,6 +49,9 @@ buildings {}
 
 // The waves spawn the critters here
 critters {}
+
+// The weapons fire the projectiles here
+projectiles {}
 
 $ {
   OreRandom: {state: oreelse.seed(0)}
@@ -46,8 +67,12 @@ $ {
   }
   OreCraftBook: {}
   OrePlacement: {root: buildings}
+<<<<<<< HEAD
   OreInventoryScreen: {open: false, tab: 0}
   OreItemInfo: {slot: -1, button: 0, item: 0, place: false}
+=======
+  OreArmory: {root: projectiles}
+>>>>>>> de9e56c7a7047084a849fdfe5e8450ff7fb1320b
   OreRocketState: {}
   OrePowerAlloc: {level: [2, 2, 2]}
   OrePowerState: {production: 0, demand: 0, ratio: 1, blackout: false}

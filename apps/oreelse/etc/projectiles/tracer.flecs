@@ -1,15 +1,19 @@
-// The bullet of the gun turret, the Tracer prefab of the original: a glowing gold streak that
-// lights what it passes. Its origin is its center and it flies along +Z. OreWeapons gives the
-// prefab its gameplay data.
+// The bullet of the gun turret and the astronaut's pistol, the Tracer prefab of the original: a
+// glowing gold streak that lights what it passes. Its origin is its center and it flies along
+// +Z. It hits the nearest live critter within 0.55 on XZ and expires after 0.7 s, without
+// gravity (OreProjectileFly).
 
 using box.transform
 using box.geometry
 using box.material
 using box.light
+using oreelse
 
 const tracerGold: Rgb = {255, 226, 128}
 
 prefab Tracer {
+  OreProjectile: {vx: 0, vy: 0, vz: 0, life: 0.7, radius: 0.55}
+
   core {
     Position: {0, 0, 0}
     Box: {0.08, 0.08, 0.42}
