@@ -180,6 +180,12 @@ ECS_STRUCT(OreEffects, {
     ecs_entity_t poof_burst;  /**< PoofBurst, where a deposit is used up and a building is placed
                                *   or demolished */
     ecs_entity_t splat_burst; /**< SplatBurst, at the death of the astronaut */
+    ecs_entity_t boom_burst;  /**< BoomBurst, the explosion of a missile and of a destroyed
+                               *   building (ore_explosion) */
+    ecs_entity_t spark_burst; /**< SparkBurst, at the muzzle of a turret that fires, where a
+                               *   shot hits a critter or the ground */
+    ecs_entity_t hit_puff;    /**< HitPuff, where a shot hits a critter */
+    ecs_entity_t impact_dust; /**< ImpactDust, where a shot hits the ground */
 });
 
 /** The mining of the astronaut: the target of the swing and its progress, which the HUD shows.
@@ -1047,12 +1053,23 @@ ECS_STRUCT(OreSplash, {
     float radius; /**< Units */
 });
 
+/** The launch of a turret's projectile, on the missile turret's prefab: a one shot effect that
+ * plays at the muzzle at every shot, turned about Y to the aim of the head (ore_burst_aimed)
+ */
+ECS_STRUCT(OreLaunchFx, {
+    ecs_entity_t burst; /**< The effect template, MissileLaunch, authored along -Z */
+});
+
 /** The state of a turret, on a turret prefab (copied). Its OreTarget comes with it. */
 ECS_STRUCT(OreTurret, {
-    ecs_entity_t head; /**< The instance's part the head, found when it first plays, 0 before */
-    ecs_entity_t beam; /**< The instance of OreBeam.prefab under the turret that the turret
-                        *   moves, shows and hides, created when it first plays, 0 before */
-    float aim;         /**< Angle of the head about Y in radians, atan2(dx, dz) of the aim */
+    ecs_entity_t head;   /**< The instance's part the head, found when it first plays, 0 before */
+    ecs_entity_t fx;     /**< The head's part fx, found with the head: the muzzle, with the
+                          *   MuzzleFlash of a gun or missile turret and the BeamGlow of a laser */
+    ecs_entity_t hit_fx; /**< The instance's part hit_fx of a laser turret, found with the head:
+                          *   it moves to where the beam hits, with the BeamSparks */
+    ecs_entity_t beam;   /**< The instance of OreBeam.prefab under the turret that the turret
+                          *   moves, shows and hides, created when it first plays, 0 before */
+    float aim;           /**< Angle of the head about Y in radians, atan2(dx, dz) of the aim */
 });
 
 /** A projectile in flight, on its prefab (copied) with its radius and life: when it is fired its

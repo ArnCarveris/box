@@ -124,6 +124,7 @@ void OreelseImport(
     ECS_META_COMPONENT(world, OreAmmo);
     ECS_META_COMPONENT(world, OreBeam);
     ECS_META_COMPONENT(world, OreSplash);
+    ECS_META_COMPONENT(world, OreLaunchFx);
     ECS_META_COMPONENT(world, OreTurret);
     ECS_META_COMPONENT(world, OreProjectile);
     ECS_TAG_DEFINE(world, OreRunScript);

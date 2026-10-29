@@ -1,7 +1,8 @@
 /**
  * @file buildings.c
  * @brief The buildings: placed buildings register in the tile grid, the connector rules join
- * neighbors, destroyed ones are deleted, and a demolished one goes back to the inventory.
+ * neighbors, destroyed ones explode and are deleted, and a demolished one goes back to the
+ * inventory.
  *
  * A building is an instance of its prefab (etc/buildings) with OreBuilding, its top left tile;
  * every tile of its footprint maps to it in OreMap while it is set.
@@ -400,7 +401,9 @@ static void OreConnectorSync(
     }
 }
 
-/** Delete the buildings whose health dropped to 0 or below.
+/** Delete the buildings whose health dropped to 0 or below. Each goes up in an explosion, the
+ * original's oreDamageBuilding: BoomBurst cfg.wreckBlastY above the ground at its position, at
+ * scale cfg.wreckBlastScale.
  *
  * @param it Iterator over the buildings with their own health, while playing
  */
@@ -408,9 +411,17 @@ static void OreBuildingDestroy(
     ecs_iter_t *it)
 {
     const OreHealth *health = ecs_field(it, OreHealth, 1);
+    const Position *p = ecs_field(it, Position, 2);
+    const OreEffects *fx = ecs_singleton_get(it->world, OreEffects);
+    float y = ORE_CFG(it->world, "wreckBlastY");
+    float scale = ORE_CFG(it->world, "wreckBlastScale");
     int32_t i;
     for (i = 0; i < it->count; i ++) {
         if (health[i].value <= 0) {
+            if (fx) {
+                ore_explosion(it->stage, fx->boom_burst, (vec3){ p[i].x, y, p[i].z }, scale);
+            }
+
             ecs_delete(it->stage, it->entities[i]);
         }
     }
@@ -497,6 +508,7 @@ void ore_buildings_import(
         .query.terms = {
             { .id = ecs_id(OreBuilding), .src.id = EcsSelf, .inout = EcsInOutNone },
             { .id = ecs_id(OreHealth), .src.id = EcsSelf, .inout = EcsIn },
+            { .id = ecs_id(Position), .src.id = EcsSelf, .inout = EcsIn },
             { .id = playing, .src.id = state }
         },
         .callback = OreBuildingDestroy

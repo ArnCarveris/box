@@ -3,8 +3,8 @@
 // launch pods tilted up toward +Z, each with two red missile tips. Its origin is the center of
 // its tile on the ground and the head faces +Z.
 //
-// Named parts: head (turns about y to aim), head/fx (above the pods, where the missiles launch)
-// and pillar/light (status lamp, Light).
+// Named parts: head (turns about y to aim), head/fx (above the pods, where the missiles launch,
+// with its MuzzleFlash, which every launch flashes) and pillar/light (status lamp, Light).
 
 using box.transform
 using box.geometry
@@ -43,6 +43,8 @@ prefab MissileTurret {
   OreSplash: {radius: 5}
   OreMuzzle: {speed: 18, height: 1.8, forward: 0.44}
   OreAmmo: {projectile: Missile}
+  // Every launch blows MissileLaunch back along the aim of the head
+  OreLaunchFx: {burst: MissileLaunch}
 
   base {
     Position: {0, 0.15, 0}
@@ -164,6 +166,7 @@ prefab MissileTurret {
 
     fx {
       Position: {0, 0.64, 0.62}
+      MuzzleFlash: {color: {255, 172, 104}, peak: 6, fade: 20, radius: 7}
     }
   }
 }
