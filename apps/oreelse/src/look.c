@@ -7,10 +7,9 @@
  * The settings of every tier are cfg.quality (etc/config.flecs). The tier starts High at every
  * start of the app (oreelse.flecs) and a restart keeps it.
  *
- * The original lights its world in linear light, box decodes a color byte from sRGB, so the
- * world colors of the port are the sRGB encoding of the original's (README.md, Colors); a world
- * color computed in script (the tints of the flora) computes the original's bytes and encodes
- * them with srgb(). The UI keeps the original's bytes.
+ * The world colors of the port are the sRGB encoding of the original's linear ones (README.md,
+ * Colors); a world color computed in script (the tints of the flora) computes the original's
+ * bytes and encodes them with srgb(). The UI keeps the original's bytes.
  */
 
 #include "game.h"
