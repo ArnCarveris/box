@@ -9,7 +9,23 @@ include apps/oreelse/test/visual/setup/seed
 include apps/oreelse/etc/oreelse
 
 using box.transform
+using box.camera
+using box.surface
 using oreelse
+
+// The capture is 640x360: the HUD lays out for a 1280x720 window and its camera shows it at
+// half size, so the capture holds the whole HUD as a 1280x720 window shows it
+window {
+  Surface: {width: 1280, height: 720}
+}
+
+hud {
+  ui {
+    camera {
+      Camera: {ortho: true, ortho_scale: 0.5}
+    }
+  }
+}
 
 // A rocket pad on the tiles (4..6, 4..6) in the corner of the map, which no deposit reaches;
 // it stands at the center of its middle tile (5, 5). Tile (row, col) is centered at

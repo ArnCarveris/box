@@ -320,7 +320,10 @@ def test_panel_blocks(app):
     app.wait_frames(SETTLE)
     app.expect(LEVEL, "0")
 
-    # Off the panel the click places the wall
+    # Off the panel the click places the wall and the wheel zooms out
     click(app, *TILE)
     app.check(tiles(app, "Wall") == [TILE], "the click off the panel placed %s" %
               tiles(app, "Wall"))
+    app.exec("mouse.scroll 0 -1")
+    app.wait_input()
+    app.wait_for(LEVEL, "1", what="the wheel off the panel zooming out")
