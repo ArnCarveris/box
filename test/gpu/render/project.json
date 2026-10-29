@@ -266,6 +266,12 @@
                 ]
             },
             {
+                "id": "TextureLinear",
+                "testcases": [
+                    "emissive_layer"
+                ]
+            },
+            {
                 "id": "Light",
                 "testcases": [
                     "point_light_reaches_its_range",
