@@ -456,6 +456,7 @@ void TextField_budget_more_glyphs_than_a_page(void) {
         ECS_IMPORT(world, Box);
         App *app = ecs_singleton_get_mut(world, App);
         app->headless = true;
+        app->unpaced = true;
         ecs_singleton_modified(world, App);
         char *path = flecs_asprintf("%s/big_glyphs.ttf",
             ecs_singleton_get(world, AppStatus)->tmp_dir);
@@ -563,6 +564,7 @@ void TextField_small_budget_reuses_pages(void) {
         ECS_IMPORT(world, Box);
         App *app = ecs_singleton_get_mut(world, App);
         app->headless = true;
+        app->unpaced = true;
         ecs_singleton_modified(world, App);
         char *path = flecs_asprintf("%s/big_glyphs.ttf",
             ecs_singleton_get(world, AppStatus)->tmp_dir);
@@ -867,6 +869,7 @@ void TextField_budget_keeps_shown_pages(void) {
         ECS_IMPORT(world, Box);
         App *app = ecs_singleton_get_mut(world, App);
         app->headless = true;
+        app->unpaced = true;
         ecs_singleton_modified(world, App);
         char *path = flecs_asprintf("%s/big_glyphs.ttf",
             ecs_singleton_get(world, AppStatus)->tmp_dir);
@@ -986,6 +989,7 @@ void TextField_budget_values_in_one_frame(void) {
         ECS_IMPORT(world, Box);
         App *app = ecs_singleton_get_mut(world, App);
         app->headless = true;
+        app->unpaced = true;
         ecs_singleton_modified(world, App);
         char *path = flecs_asprintf("%s/big_glyphs.ttf",
             ecs_singleton_get(world, AppStatus)->tmp_dir);
@@ -1116,6 +1120,7 @@ void TextField_budget_releases_idle_pages(void) {
         ECS_IMPORT(world, Box);
         App *app = ecs_singleton_get_mut(world, App);
         app->headless = true;
+        app->unpaced = true;
         ecs_singleton_modified(world, App);
         char *path = flecs_asprintf("%s/big_glyphs.ttf",
             ecs_singleton_get(world, AppStatus)->tmp_dir);

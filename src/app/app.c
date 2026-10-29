@@ -44,17 +44,6 @@ typedef struct box_app_clock_t {
 /** Name of the system whose context is the clock of the frame loop */
 #define BOX_APP_TIMING_SYSTEM "box.app.FrameTimingUpdate"
 
-/** Check whether the environment asks for test worlds.
- *
- * @return Whether BOX_TEST is set to anything but 0
- */
-static bool box_app_test_env(void)
-{
-    const char *value = getenv(BOX_TEST_ENV);
-
-    return value && value[0] && strcmp(value, "0") != 0;
-}
-
 /** Create the clock of the frame system.
  *
  * @return The clock, freed by box_app_clock_free
@@ -503,11 +492,8 @@ void BoxAppImport(
         .ctx = clock
     });
 
-    bool test = box_app_test_env();
     ecs_singleton_set(world, App, {
         .cpu_budget = 100,
-        .port = BOX_APP_PORT,
-        .unguarded = test,
-        .unpaced = test
+        .port = BOX_APP_PORT
     });
 }

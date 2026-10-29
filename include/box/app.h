@@ -21,9 +21,6 @@
 extern "C" {
 #endif
 
-/** Environment variable that, set to anything but 0, makes every new App unguarded and unpaced */
-#define BOX_TEST_ENV "BOX_TEST"
-
 /** Folder the temporary folders of headless processes are created in */
 #define BOX_TMP_ROOT "/tmp/box"
 

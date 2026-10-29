@@ -352,6 +352,12 @@ void ReflectionCapture_perf_run_waits_for_captures(void) {
 
     ecs_entity_t scene = scene_new(world, &(ReflectionBake){
         .resolution = 8, .budget_ms = 0.001f, .scene_probe = true, .scene_probe_height = 2});
+    ecs_iter_t it = ecs_each(world, Surface);
+    test_assert(ecs_each_next(&it));
+    ecs_entity_t surface = it.entities[0];
+    ecs_iter_fini(&it);
+    ecs_set(world, surface, Surface, {.width = 64, .height = 48, .resolution_scale = 1,
+        .texture = surface});
     int32_t i, frame;
     for (i = 0; i < 40; i ++) {
         probe_new(world, scene, (float)i * 0.1f);

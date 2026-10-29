@@ -6,7 +6,6 @@
 #include <box.h>
 #include <app.h>
 #include <bake_test.h>
-#include <stdlib.h>
 #include <unistd.h>
 
 void Guard_load_above_cores(void) {
@@ -42,39 +41,6 @@ void Guard_no_limit_claims_one_core(void) {
     // core_fixes/cpu_guard_budget
     test_bool(box_app_oversubscribed(11.0, 12, 0), false);
     test_bool(box_app_oversubscribed(11.5, 12, 0), true);
-}
-
-void Guard_env_sets_unguarded(void) {
-    // engine_core/app
-    setenv("BOX_TEST", "1", 1);
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-
-    test_bool(ecs_singleton_get(world, App)->unguarded, true);
-
-    ecs_fini(world);
-}
-
-void Guard_env_zero_keeps_guard(void) {
-    // engine_core/app
-    setenv("BOX_TEST", "0", 1);
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-
-    test_bool(ecs_singleton_get(world, App)->unguarded, false);
-
-    ecs_fini(world);
-}
-
-void Guard_env_unset_keeps_guard(void) {
-    // engine_core/app
-    unsetenv("BOX_TEST");
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-
-    test_bool(ecs_singleton_get(world, App)->unguarded, false);
-
-    ecs_fini(world);
 }
 
 void Guard_run_unguarded(void) {

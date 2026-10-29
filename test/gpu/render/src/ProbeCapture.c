@@ -17,6 +17,9 @@ void ProbeCapture_converges_in_bounded_frames(void) {
     // baked_lighting/probe_capture
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
 
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
@@ -68,6 +71,9 @@ void ProbeCapture_zero_budget_never_converges(void) {
     // baked_lighting/probe_capture
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
 
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
@@ -310,7 +316,7 @@ void ProbeCapture_perf_run_waits_for_convergence(void) {
     ecs_set(world, floor, Position, {0, -0.1f, 0});
     ecs_set(world, floor, Box, {3, 0.2f, 3});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 48, .resolution_scale = 1});
+    ecs_set(world, e, Surface, {.texture = e, .width = 64, .height = 48, .resolution_scale = 1});
     ecs_singleton_set(world, PerfRun, {.fps = 120, .frames = 4, .warmup = 2});
 
     int32_t frame;
@@ -363,7 +369,8 @@ void ProbeCapture_budget_spreads_over_frames(void) {
         ecs_set(world, floor, Position, {0, -0.1f, 0});
         ecs_set(world, floor, Box, {5, 0.2f, 5});
         ecs_entity_t e = ecs_new(world);
-        ecs_set(world, e, Surface, {.width = 64, .height = 48, .resolution_scale = 1});
+        ecs_set(world, e, Surface, {.texture = e, .width = 64, .height = 48,
+            .resolution_scale = 1});
 
         int32_t frame, last = 0, partial = 0, started = -1;
         const LightBakeStatus *status = NULL;
@@ -407,6 +414,9 @@ void ProbeCapture_invalid_capture_size_bakes_nothing(void) {
     // baked_lighting/probe_capture
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
 
     ecs_singleton_set(world, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
         .capture_size = 0, .budget_ms = 2, .bounces = 1});
@@ -458,6 +468,9 @@ void ProbeCapture_perf_run_measures_zero_budget(void) {
     // baked_lighting/probe_capture
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
 
     ecs_singleton_set(world, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
         .capture_size = 8, .budget_ms = 0, .bounces = 1});
@@ -489,6 +502,9 @@ void ProbeCapture_perf_run_ignores_unviewed_scene(void) {
     // baked_lighting/probe_capture
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
 
     ecs_entity_t level = ecs_new(world);
     ecs_add(world, level, Scene);

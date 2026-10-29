@@ -362,6 +362,7 @@ ecs_world_t* gallery_load(
     ECS_IMPORT(world, Box);
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
+    app->unpaced = true;
     ecs_singleton_modified(world, App);
 
     char *path = gallery_path();
