@@ -7,6 +7,9 @@
 // y down (an element sits at LayoutItem {h: Left, v: Top, x, y: -y}); the original's anchor
 // offsets are y down too, so a panel the original lifts by 40 has y: 40 here. A centered line
 // is a Text as wide as its panel with align Center.
+//
+// The screens show outside play only, where the world takes no clicks, so their panels do not
+// block the pointer: the wheel zooms over them, as over the original's screens.
 
 using flecs.script
 using flecs.script.math
@@ -78,6 +81,9 @@ const qualityHeight: f32 = 26
 const qualityPad: f32 = 11
 const qualitySize: f32 = 12
 
+// The texts of the button, the original's (height - size) / 2 - 1 from its top
+const qualityTextY: f32 = (qualityHeight - qualitySize) / 2 - 1
+
 // The end screen
 const endWidth: f32 = 640
 const endHeight: f32 = 218
@@ -148,7 +154,7 @@ template OreSign {
 
   Panel: {
     width: signWidth, height: signHeight, capH: screenCap, fill: signFill,
-    edge: {color.r, color.g, color.b, 255}
+    edge: {color.r, color.g, color.b, 255}, block: false
   }
 
   art_image {
@@ -175,7 +181,9 @@ template OreSign {
 // Any key or mouse button starts the game (OreTitleStart)
 template OreTitleScreen {
   LayoutItem: {h: Center, v: Middle}
-  Panel: {width: titleWidth, height: titleHeight, capH: screenCap, fill: screenFill}
+  Panel: {
+    width: titleWidth, height: titleHeight, capH: screenCap, fill: screenFill, block: false
+  }
 
   signs {
     LayoutItem: {h: Left, v: Top, x: 36, y: -44}
@@ -224,11 +232,9 @@ template OreTitleScreen {
   }
 }
 
-// The quality button of the pause screen: QUALITY and the render quality tier, amber. A click
-// raises the Quality action, which cycles the tier High, Medium, Low and back to High
-// (oreelse.cycleQuality()). The face is a child of its own, so its opacity leaves the texts
-// opaque; it lightens while the cursor is over the button.
-template OreQualityButton {
+// The render quality tier on the quality button, right aligned in the button less its padding,
+// amber. A template of its own: a click changes OreQuality, and only this label evaluates again
+template OreQualityValue {
   const tier = OreQuality[OreQuality].tier
   const mediumText: string = match tier == Medium {
     true: "MEDIUM"
@@ -239,6 +245,18 @@ template OreQualityButton {
     false: mediumText
   }
 
+  LayoutItem: {
+    h: Left, v: Top, y: -qualityTextY, width: {mode: Fixed, value: qualityWidth - qualityPad}
+  }
+  Text: {value: tierText, size: qualitySize, width: qualityWidth - qualityPad, align: Right}
+  Rgb: palette.amber
+}
+
+// The quality button of the pause screen: QUALITY and the render quality tier. A click raises
+// the Quality action, which cycles the tier High, Medium, Low and back to High
+// (oreelse.cycleQuality()). The face is a child of its own, so its opacity leaves the texts
+// opaque; it lightens while the cursor is over the button.
+template OreQualityButton {
   mut hover = false
 
   Layout: {}
@@ -262,17 +280,13 @@ template OreQualityButton {
   }
 
   caption {
-    LayoutItem: {h: Left, v: Top, x: qualityPad, y: -6}
+    LayoutItem: {h: Left, v: Top, x: qualityPad, y: -qualityTextY}
     Text: {value: "QUALITY", size: qualitySize}
     Rgb: palette.soft
   }
 
   value {
-    LayoutItem: {
-      h: Left, v: Top, y: -6, width: {mode: Fixed, value: qualityWidth - qualityPad}
-    }
-    Text: {value: tierText, size: qualitySize, width: qualityWidth - qualityPad, align: Right}
-    Rgb: palette.amber
+    OreQualityValue: {}
   }
 
   async {
@@ -288,7 +302,9 @@ template OreQualityButton {
 // The pause screen: the quality button, the controls and how to resume
 template OrePauseScreen {
   LayoutItem: {h: Center, v: Middle, y: 40}
-  Panel: {width: pauseWidth, height: pauseHeight, capH: screenCap, fill: screenFill}
+  Panel: {
+    width: pauseWidth, height: pauseHeight, capH: screenCap, fill: screenFill, block: false
+  }
 
   heading {
     LayoutItem: {h: Left, v: Top, y: -48, width: {mode: Fixed, value: pauseWidth}}
@@ -331,7 +347,9 @@ template OreEndScreen {
   }
 
   LayoutItem: {h: Center, v: Middle, y: 60}
-  Panel: {width: endWidth, height: endHeight, capH: screenCap, fill: screenFill}
+  Panel: {
+    width: endWidth, height: endHeight, capH: screenCap, fill: screenFill, block: false
+  }
 
   heading {
     LayoutItem: {h: Left, v: Top, y: -44, width: {mode: Fixed, value: endWidth}}

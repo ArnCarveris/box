@@ -16,6 +16,7 @@
 // colors and sizes its particles start with.
 include apps/oreelse/test/visual/setup/seed
 include apps/oreelse/etc/oreelse
+include apps/oreelse/test/visual/setup/world
 
 using flecs.script.math
 using box.transform

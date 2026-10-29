@@ -9,6 +9,7 @@
 // (b + 0.5) * 2 PI / 4, 1.4 from the center of the pad and 0.62 above the ground
 include apps/oreelse/test/visual/setup/seed
 include apps/oreelse/etc/oreelse
+include apps/oreelse/test/visual/setup/world
 
 using box.transform
 using oreelse

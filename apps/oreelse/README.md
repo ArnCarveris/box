@@ -92,6 +92,8 @@ survived (the clock as minutes and seconds, `12:05`) with the last wave, and
 37 critters killed - survived 12:05 to wave 9
 ```
 
+The wheel zooms over every screen.
+
 The list of the controls on the title and pause screens:
 
 | Key | Action |
@@ -901,7 +903,7 @@ its tile in the grid.
 | `etc/ui/palette.flecs` | The colors of the UI, `palette.*` |
 | `etc/ui/icons.flecs` | The icon textures, `icons.*`, which the items name with `OreIcon` |
 | `etc/ui/panel.flecs` | The `Panel` template, the chrome of every panel: the plate, its edge, the hazard strip and the `InputBlocker` |
-| `etc/ui/screens.flecs` | The screens of the game flow: `OreTitleScreen` (with its signs, `OreSign`), `OrePauseScreen` (with `OreQualityButton`), `OreEndScreen`, and `OreControls`, the list of the controls the title and pause screens share (`OreControl` rows) |
+| `etc/ui/screens.flecs` | The screens of the game flow: `OreTitleScreen` (with its signs, `OreSign`), `OrePauseScreen` (with `OreQualityButton` and its `OreQualityValue`), `OreEndScreen`, and `OreControls`, the list of the controls the title and pause screens share (`OreControl` rows) |
 | `etc/ui/signs/` | The original's sign art of the title screen (SVG), unchanged |
 | `etc/ui/hud.flecs` | The `OreHud` template, which shows the screens in their states: the status bar (`StatusGauge`, `StatusDivider`), the toast, the mine progress bar, the suit breach alert and the rocket status line |
 | `etc/icons/` | The original's icons (SVG), unchanged |
