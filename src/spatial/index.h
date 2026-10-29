@@ -57,6 +57,7 @@ typedef struct box_spatial_item_t {
     uint32_t frame;      /**< Update in which the bounds were last set */
     bool moved;          /**< The static leaf of the item waits for the bounds of the item */
     bool stretched;      /**< The dynamic leaf of the item reaches ahead of its margin */
+    bool disabled;       /**< The entity is disabled, queries skip the item */
 } box_spatial_item_t;
 
 /** The index of one scene */
