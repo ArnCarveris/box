@@ -1,7 +1,7 @@
 /**
  * @file ui/widgets.c
  * @brief The UiTheme component and the box.ui.theme entity, and ui.sibling, which the widget
- * library etc/ui/widgets.flecs uses.
+ * library etc/scenes/ui/widgets.flecs uses.
  */
 
 #include "ui.h"

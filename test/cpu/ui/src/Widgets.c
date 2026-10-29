@@ -1,6 +1,6 @@
 /**
  * @file Widgets.c
- * @brief The widget library etc/ui/widgets.flecs: the box.widgets module and its templates, a
+ * @brief The widget library etc/scenes/ui/widgets.flecs: the box.widgets module and its templates, a
  * world without the library, the UiTheme of box.ui.theme, a script that assigns it and
  * ui.sibling.
  */
@@ -77,7 +77,7 @@ void Widgets_library_loads(void) {
     // ui/widgets
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    char *widgets = box_app_locate("etc/ui/widgets.flecs");
+    char *widgets = box_app_locate("etc/scenes/ui/widgets.flecs");
     test_assert(ecs_script(world, {
         .entity = ecs_entity(world, { .name = "box.ui.widgets" }),
         .filename = widgets
@@ -94,7 +94,7 @@ void Widgets_library_loads(void) {
     test_assert(loaded != NULL);
     test_assert(loaded->script != NULL);
     test_assert(loaded->error == NULL);
-    test_assert(strstr(loaded->filename, "etc/ui/widgets.flecs") != NULL);
+    test_assert(strstr(loaded->filename, "etc/scenes/ui/widgets.flecs") != NULL);
 
     int32_t scripts = 0;
     ecs_iter_t it = ecs_each_id(world, ecs_id(EcsScript));
@@ -102,7 +102,7 @@ void Widgets_library_loads(void) {
         const EcsScript *sc = ecs_field(&it, EcsScript, 0);
         int32_t i;
         for (i = 0; i < it.count; i ++) {
-            if (sc[i].filename && strstr(sc[i].filename, "etc/ui/")) {
+            if (sc[i].filename && strstr(sc[i].filename, "etc/scenes/ui/")) {
                 test_assert(sc[i].error == NULL);
                 scripts ++;
             }
@@ -122,7 +122,7 @@ void Widgets_templates_exist(void) {
     // ui/widgets
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    char *widgets = box_app_locate("etc/ui/widgets.flecs");
+    char *widgets = box_app_locate("etc/scenes/ui/widgets.flecs");
     test_assert(ecs_script(world, {
         .entity = ecs_entity(world, { .name = "box.ui.widgets" }),
         .filename = widgets
@@ -215,7 +215,7 @@ void Widgets_theme_dark(void) {
     // ui/widgets
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    char *widgets = box_app_locate("etc/ui/widgets.flecs");
+    char *widgets = box_app_locate("etc/scenes/ui/widgets.flecs");
     test_assert(ecs_script(world, {
         .entity = ecs_entity(world, { .name = "box.ui.widgets" }),
         .filename = widgets
@@ -253,7 +253,7 @@ void Widgets_theme_from_script(void) {
     // ui/widgets
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    char *widgets = box_app_locate("etc/ui/widgets.flecs");
+    char *widgets = box_app_locate("etc/scenes/ui/widgets.flecs");
     test_assert(ecs_script(world, {
         .entity = ecs_entity(world, { .name = "box.ui.widgets" }),
         .filename = widgets

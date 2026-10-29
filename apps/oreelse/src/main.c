@@ -81,7 +81,7 @@ static int ore_stresstest_parse(
     return result;
 }
 
-/** Load the widget library etc/ui/widgets.flecs, set the game scene as the default, take the seed of the session and the stress test from
+/** Load the widget library etc/scenes/ui/widgets.flecs, set the game scene as the default, take the seed of the session and the stress test from
  * the command line, parse the rest into the App singleton, where a scene argument replaces the
  * default, and run the world.
  *
@@ -103,7 +103,7 @@ int main(
     ECS_IMPORT(world, Box);
     ECS_IMPORT(world, Oreelse);
 
-    widgets = box_app_locate("etc/ui/widgets.flecs");
+    widgets = box_app_locate("etc/scenes/ui/widgets.flecs");
     if (!ecs_script(world, {
         .entity = ecs_entity(world, { .name = "box.ui.widgets" }),
         .filename = widgets
