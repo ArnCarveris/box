@@ -422,3 +422,104 @@ void Editor_script_reload(void) {
     test_int(chdir(cwd), 0);
     test_int(rmdir(dir), 0);
 }
+
+/** Warnings the log captured, one per line */
+static char editor_warnings[8192];
+
+/** Log function that keeps the warnings, so a test can count them.
+ *
+ * @param level The level of the message
+ * @param file The file that logged it
+ * @param line The line that logged it
+ * @param msg The message
+ */
+static void editor_capture_log(
+    int32_t level,
+    const char *file,
+    int32_t line,
+    const char *msg)
+{
+    (void)file;
+    (void)line;
+    if (level == -2 &&
+        strlen(editor_warnings) + strlen(msg) + 2 < sizeof(editor_warnings))
+    {
+        strcat(editor_warnings, msg);
+        strcat(editor_warnings, "\n");
+    }
+}
+
+/** Count the occurrences of a string in another.
+ *
+ * @param str The string to search
+ * @param sub The string to count
+ * @return The number of occurrences
+ */
+static int editor_count(
+    const char *str,
+    const char *sub)
+{
+    int count = 0;
+    const char *at = str;
+    while ((at = strstr(at, sub)) != NULL) {
+        count ++;
+        at += strlen(sub);
+    }
+
+    return count;
+}
+
+void Editor_script_missing_looked_for_on_open(void) {
+    // editor/overlay
+    char cwd[4096], dir[] = "/tmp/box_editor_XXXXXX";
+    test_assert(getcwd(cwd, sizeof(cwd)) != NULL);
+    ecs_world_t *world = editor_world();
+    ecs_singleton_set(world, FileWatch, { .interval = 0 });
+    char fonts[PATH_MAX];
+    char *src = editor_read_script(fonts);
+    test_assert(src != NULL);
+
+    test_assert(mkdtemp(dir) != NULL);
+    test_int(chdir(dir), 0);
+    test_int(mkdir("etc", 0700), 0);
+    test_int(symlink(fonts, "etc/fonts"), 0);
+
+    int32_t level = ecs_log_set_level(-1);
+    bool colors = ecs_log_enable_colors(false);
+    ecs_os_api_log_t real_log = ecs_os_api.log_;
+    editor_warnings[0] = '\0';
+    ecs_os_api.log_ = editor_capture_log;
+
+    editor_open(world, true);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+
+    ecs_os_api.log_ = real_log;
+    ecs_log_set_level(level);
+    ecs_log_enable_colors(colors);
+
+    editor_check_view(world);
+    test_assert(ecs_lookup(world, BOX_EDITOR_PANEL) != 0);
+    test_assert(ecs_lookup(world, BOX_EDITOR_SCRIPT) == 0);
+    test_int(editor_count(editor_warnings, "not found, the editor is empty"), 1);
+
+    test_int(mkdir("etc/editor", 0700), 0);
+    editor_write_script(src, "Found");
+    editor_open(world, false);
+    editor_open(world, true);
+    ecs_progress(world, 0);
+    test_assert(ecs_lookup(world, BOX_EDITOR_SCRIPT) != 0);
+    const Text *t = ecs_get(world, ecs_lookup(world, EDITOR_TITLE), Text);
+    test_assert(t != NULL);
+    test_str(t->value, "Found");
+
+    ecs_fini(world);
+    ecs_os_free(src);
+    test_int(remove("etc/editor/editor.flecs"), 0);
+    test_int(rmdir("etc/editor"), 0);
+    test_int(unlink("etc/fonts"), 0);
+    test_int(rmdir("etc"), 0);
+    test_int(chdir(cwd), 0);
+    test_int(rmdir(dir), 0);
+}
