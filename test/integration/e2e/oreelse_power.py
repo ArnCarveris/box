@@ -227,8 +227,8 @@ def wait_power(app, production, demand, blackout):
 
 def set_levels(app, mining, weapons, construction):
     put(app, ALLOC, ALLOC, {"level": [mining, weapons, construction]})
-    app.wait_for("get %s OrePowerAlloc.level" % ALLOC,
-                 lambda out: parse_value(out) == [mining, weapons, construction])
+    app.wait_for("get %s OrePowerAlloc" % ALLOC,
+                 lambda out: parse_value(out)["level"] == [mining, weapons, construction])
 
 
 def levels(app):

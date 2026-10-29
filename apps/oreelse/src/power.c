@@ -442,6 +442,9 @@ void ore_power_import(
     ecs_id_t playing = ore_state_pair(world, OreGameStatePlaying);
     ecs_query_t *buildings, *lamps;
 
+    ecs_add_pair(world, ecs_id(OrePowerConsumer), EcsOnInstantiate, EcsInherit);
+    ecs_add_pair(world, ecs_id(OrePowerProducer), EcsOnInstantiate, EcsInherit);
+    ecs_add_pair(world, ecs_id(OrePowerCategory), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(OreWorker), EcsOnInstantiate, EcsInherit);
     ecs_singleton_ensure(world, OrePowerAlloc);
     ecs_singleton_ensure(world, OrePowerState);
