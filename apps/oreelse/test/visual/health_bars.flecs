@@ -6,7 +6,8 @@
 // narrower over the factory, narrowest over the wall. The fills: nearly empty and red-orange
 // {246, 102, 69} over the pad, half and amber {240, 176, 58} over the factory, nine tenths and
 // light green {121, 224, 123} over the wall. The status bar of the HUD at the top right covers
-// any bar under it. The astronaut stands in front, facing the camera.
+// any bar under it. The astronaut stands in front, facing the camera, at full health and without
+// a bar.
 include apps/oreelse/test/visual/setup/seed
 include apps/oreelse/etc/oreelse
 

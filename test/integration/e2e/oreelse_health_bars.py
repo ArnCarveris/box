@@ -1,7 +1,9 @@
-"""Ore Else driven through its command port: the health bars over the damaged buildings. A bar
-appears when a wall takes damage, its fill and color follow the health, it goes when the wall is
-repaired to full and when it is destroyed; it is as wide as the projection of the wall's model
-box and sits 6 px above it, follows the zoom level, and its view draws only while playing.
+"""Ore Else driven through its command port: the health bars over the damaged buildings and the
+astronaut. A bar appears when a wall takes damage, its fill and color follow the health, it goes
+when the wall is repaired to full and when it is destroyed; it is as wide as the projection of
+the wall's model box and sits 6 px above it, follows the zoom level, and its view draws only
+while playing. The astronaut's bar works the same: it appears when the astronaut is hurt,
+follows it as it moves, and goes at full health, at its death and when it boards the rocket.
 
 Every case runs in a fresh apps/oreelse process with its default scene and a fixed session seed,
 like oreelse_flow.py, which describes the setup. The cases set up state directly: walls created
@@ -13,8 +15,8 @@ import struct
 
 from box_client import srgb
 from oreelse_critters import (  # noqa: F401 (ARGS)
-    ARGS, FPS, PLAYER, buildings, entity, health, hold_waves, place_player, rows_of, set_state,
-    setup, spawn, start, tile_point, wait_until, wall)
+    ARGS, FPS, PLAYER, PLAYER_HP, STATE, buildings, entity, health, hold_waves, place_player,
+    rows_of, set_state, setup, spawn, start, tile_point, wait_until, wall)
 
 APP = "apps/oreelse"
 
@@ -111,9 +113,9 @@ def width(app, bar):
     return float(app.exec("get %s LayoutBounds.width" % bar))
 
 
-def check_fill(app, bar, value):
+def check_fill(app, bar, value, max_hp=WALL_HP):
     """The fill: (width - 2) * frac wide, 2 px tall, in the color of the blend."""
-    frac = value / WALL_HP
+    frac = value / max_hp
     w = width(app, bar)
     fill = bar + ".track.fill"
     fw = float(app.exec("get %s LayoutBounds.width" % fill))
@@ -121,7 +123,7 @@ def check_fill(app, bar, value):
     app.check(abs(fw - (w - 2) * frac) < 0.01,
               "the fill at %g is %g wide in a bar of %g" % (frac, fw, w))
     app.check(abs(fh - (BAR_HEIGHT - 2)) < 0.01, "the fill is %g tall" % fh)
-    expected = fill_color(value, WALL_HP)
+    expected = fill_color(value, max_hp)
     got = color(app, fill)
     app.check(got == expected,
               "the fill at %g is %s, not %s" % (frac, got, expected))
@@ -287,3 +289,75 @@ def test_zoom(app):
     app.check(abs(again - near) < 0.5, "back at level 0 the bar is %g wide, not %g" %
               (again, near))
     check_placed(app, bar)
+
+
+def test_player(app):
+    """The astronaut's bar: over it while it is hurt, following it, gone at full health and at
+    its death."""
+    start(app)
+    hold_waves(app)
+    x, z = tile_point(ROW, COL)
+    place_player(app, x, z)
+    app.wait_frames(GLIDE)
+    app.check(not bars(app), "bars at full health: %s" % bars(app))
+
+    # Hurt: the same HealthBar over the astronaut, anchored to its model box
+    set_health(app, PLAYER, 40, PLAYER_HP)
+    set_state(app, "Paused")
+    bar = wait_bar(app, PLAYER, 0.4)
+    props = bars(app)[bar]
+    app.check(props["h"] > 2 and props["w"] > 0.5 and props["d"] > 0.5,
+              "the astronaut's bar has the box %s" % props)
+    set_state(app, "Playing")
+    app.wait_frames(SETTLE)
+    set_state(app, "Paused")
+    app.wait_frames(SETTLE)
+    check_placed(app, bar)
+    check_fill(app, bar, 40, PLAYER_HP)
+    before = app.get(bar, "Position")["x"]
+
+    # It follows the astronaut: 3 units east the bar is further right on screen
+    set_state(app, "Playing")
+    app.exec("set %s OreHurt {since: 0}" % PLAYER)
+    place_player(app, x + 3, z)
+    app.wait_frames(SETTLE)
+    set_state(app, "Paused")
+    app.wait_frames(SETTLE)
+    app.check(bar_of(app, PLAYER) == bar, "the bar was replaced")
+    app.check(app.get(bar, "Position")["x"] != before,
+              "the bar stayed at x %g as the astronaut moved" % before)
+    check_placed(app, bar)
+
+    # Back to full health: the bar goes
+    set_health(app, PLAYER, PLAYER_HP, PLAYER_HP)
+    wait_no_bar(app, PLAYER)
+    app.check(not bars(app), "bars left: %s" % bars(app))
+
+    # Hurt again and killed: the bar goes with the death
+    set_health(app, PLAYER, 30, PLAYER_HP)
+    wait_bar(app, PLAYER, 0.3)
+    set_state(app, "Playing")
+    set_health(app, PLAYER, 0, PLAYER_HP)
+    app.wait_for(STATE % "Lost", "true", frames=2 * FPS, what="the game lost")
+    wait_no_bar(app, PLAYER)
+
+
+def test_player_aboard(app):
+    """A hurt astronaut boarding a crewed rocket takes its bar with it: no bar over the pad
+    while the rocket flies."""
+    from oreelse_rocket import assemble, key, place_pad, wait_rocket
+    start(app)
+    hold_waves(app)
+    place_pad(app, [("items.RocketLifeSupport", 1), ("items.RocketEngine", 4),
+                    ("items.RocketFuelStorage", 1)])
+    assemble(app, life=True)
+    app.exec("set %s OreHurt {since: 0}" % PLAYER)
+    set_health(app, PLAYER, 40, PLAYER_HP)
+    wait_until(app, lambda: bar_of(app, PLAYER) is not None, 30, "the astronaut's bar")
+
+    key(app, "P")
+    wait_rocket(app, lambda r: r["aboard"], "the astronaut aboard")
+    wait_no_bar(app, PLAYER)
+    app.check(app.get(PLAYER, "OreHealth")["value"] < PLAYER_HP,
+              "the astronaut aboard healed: %s" % app.get(PLAYER, "OreHealth"))
+    app.check(not bars(app), "bars left: %s" % bars(app))
