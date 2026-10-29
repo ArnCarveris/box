@@ -919,7 +919,8 @@ keep their names there: the bulb is the lamp's child `bulb`.
 The shared materials are inherited prefabs that a part derives from and resizes with its own
 `Box`: `HazardTag`, `HazardTrim`, `HazardTrimShort`, `HazardBorderShort`, `HazardBorderLong`
 and `HazardBoundary` (`etc/materials/hazard.flecs`), `SolarCells`, `AccessPlate`, `VentGrille`,
-`FanDisc` and `BayPad`. `TileMarker` and `TileMarkerBad` (`etc/props/markers.flecs`) are the
+`FanDisc` and `BayPad` (quads whose round fan and ring marking are alpha tested, `AlphaCutoff`,
+so their transparent corners do not draw). `TileMarker` and `TileMarkerBad` (`etc/props/markers.flecs`) are the
 glowing plates mining and placement show over a tile, instances placed at y 0.14.
 
 ## Flora models

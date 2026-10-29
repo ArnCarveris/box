@@ -1,0 +1,54 @@
+// The flywheels on top of a factory seen from close up, from the south and above, on the basin
+// south west of the deposits. Each flywheel is a fan face (FanDisc) on top and one below, back
+// to back on a shroud. The fan faces are alpha tested cutouts: the fans draw round, without the
+// square outline of the transparent corners of their texture, and cast round shadows on the
+// roof. The flywheels are turned part of a revolution, as spinning (OreSpinner) leaves them, so
+// a square quad would show at an angle. The game stays on the title screen, so nothing moves.
+include apps/oreelse/test/visual/setup/seed
+include apps/oreelse/etc/oreelse
+include apps/oreelse/test/visual/setup/world
+
+using flecs.script.math
+using box.transform
+using oreelse
+
+// The parts of an instance copy the prefab's parts, so the scene turns the prefab's flywheels
+// before it places the factory
+Factory {
+  wheel_left {
+    flywheel {
+      Rotation: {0, 0.5, 0}
+    }
+  }
+
+  wheel_right {
+    flywheel {
+      Rotation: {0, 1.1, 0}
+    }
+  }
+}
+
+// The camera stays put: it is detached from the astronaut (OreView.camera 0)
+$ {
+  OreView: {camera: 0, view: main_view, level: 0, height: 0, back: 0, look: 0}
+}
+
+// 2.7 south of the flywheels and 3.4 above them, looking north and down at them
+camera {
+  Position: {-26, 6, 30}
+  Rotation: {-atan2(3.4, 2.7), 0, 0}
+}
+
+// On a tile without a building, out of sight behind the camera
+astronaut {
+  Position: {-23, 0, 37}
+}
+
+// Placed under the run's parent of the buildings, at the center of its footprint on the tiles
+// (37, 10) to (38, 11)
+buildings {
+  factory : Factory {
+    Position: {-26, 0, 28}
+    OreBuilding: {row: 37, col: 10}
+  }
+}

@@ -303,10 +303,9 @@ done:
     return result;
 }
 
-/** Load a material script of Ore Else, place two instances of one of its prefabs back to back
- * the way the buildings wear them (a face turned up and one turned down) and check that both are
- * alpha tested at 0.5 and draw in an opaque cutout batch: their textures are transparent around
- * the shape, which without the test draws as an opaque square.
+/** Load an Ore Else material script and place two instances of a prefab back to back, the way
+ * the buildings wear them, then check that both draw alpha tested at 0.5 in an opaque cutout
+ * batch, so the transparent part of their texture does not draw as a square.
  *
  * @param file Path of the material script in the repository
  * @param name Name of the prefab
@@ -364,12 +363,12 @@ static void oreelse_cutout(
     box_render_null_free(null);
 }
 
+/* The fan faces of the factory, round blades on a transparent background */
 void Material_oreelse_fan_cutout(void) {
-    // materials/cutout: the fan faces of the factory, round blades on a transparent background
     oreelse_cutout("apps/oreelse/etc/materials/fan.flecs", "FanDisc");
 }
 
+/* The landing marking of the drone pad, a ring transparent inside and out */
 void Material_oreelse_bay_cutout(void) {
-    // materials/cutout: the landing marking of the drone pad, a ring transparent inside and out
     oreelse_cutout("apps/oreelse/etc/materials/drone_bay.flecs", "BayPad");
 }
