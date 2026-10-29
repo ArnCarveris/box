@@ -9,6 +9,7 @@
 #include <math.h>
 #include "../../../../src/geometry/mesh_cache.h"
 #include "../../../../src/jobs/jobs.h"
+#include "../../../../src/spatial/spatial.h"
 #include "render.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -746,6 +747,133 @@ void PickingCost_dense_mesh_deleted_while_building(void) {
     }
 
     test_int(box_mesh_cache_count(cache), base);
+
+    ecs_fini(world);
+}
+
+/** Dynamic entities the spatial index placed again while the systems of PreUpdate ran */
+static int32_t wave_rebound_before, wave_rebound_by_pick;
+
+/** Read the rebound counter of the index before PreUpdate, without placing anything.
+ *
+ * @param it The iterator of the system
+ */
+static void WaveReboundBefore(
+    ecs_iter_t *it)
+{
+    box_spatial_stats_t stats;
+    box_spatial_stats(it->world, &stats);
+    wave_rebound_before = stats.rebound;
+}
+
+/** Add what PreUpdate, the phase of PickingUpdate, placed again to the total.
+ *
+ * @param it The iterator of the system
+ */
+static void WaveReboundAfter(
+    ecs_iter_t *it)
+{
+    box_spatial_stats_t stats;
+    box_spatial_stats(it->world, &stats);
+    wave_rebound_by_pick += stats.rebound - wave_rebound_before;
+}
+
+void PickingCost_wave_not_placed_by_pick(void) {
+    // spatial_perf/picking_cost
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_assert(ecs_script(world, { .code =
+        "using flecs.script\n"
+        "using box.transform\n"
+        "using box.geometry\n"
+        "using box.camera\n"
+        "using box.view\n"
+        "using box.picking\n"
+        "camera {\n"
+        "  Position: {0, 30, 30}\n"
+        "  Rotation: {-0.785, 0, 0}\n"
+        "  Camera: {fov: 50, near_: 0.5, far_: 500}\n"
+        "}\n"
+        "view {\n"
+        "  View: {camera: camera}\n"
+        "}\n"
+        "ground {\n"
+        "  Position: {0, -0.5, 0}\n"
+        "  Box: {400, 1, 400}\n"
+        "}\n"
+        "prefab Critter {\n"
+        "  body {\n"
+        "    Position: {0, 0.5, 0}\n"
+        "    Box: {1, 1, 1}\n"
+        "  }\n"
+        "  head {\n"
+        "    Position: {0, 1.2, 0.3}\n"
+        "    Box: {0.6, 0.4, 0.6}\n"
+        "  }\n"
+        "  leg_l {\n"
+        "    Position: {-0.4, 0.2, 0}\n"
+        "    Box: {0.1, 0.4, 0.1}\n"
+        "  }\n"
+        "  leg_r {\n"
+        "    Position: {0.4, 0.2, 0}\n"
+        "    Box: {0.1, 0.4, 0.1}\n"
+        "  }\n"
+        "}\n"
+        "hud {\n"
+        "  Scene: {}\n"
+        "  camera {\n"
+        "    Position: {0, 0, 100}\n"
+        "    Camera: {ortho: true, ortho_scale: 1}\n"
+        "  }\n"
+        "  button {\n"
+        "    Position: {-500, 300, 0}\n"
+        "    Rect: {80, 40}\n"
+        "    Interactive\n"
+        "  }\n"
+        "}\n"
+        "hud_view {\n"
+        "  View: {camera: hud.camera}\n"
+        "}\n" }) != 0);
+
+    /* A wave of 400 critters of 4 parts around the point under the cursor, every one turning
+     * every frame, none of them Interactive */
+    ecs_entity_t critter = ecs_lookup(world, "Critter");
+    int32_t i, side = 20, count = side * side, parts = count * 4, frames = 10;
+    for (i = 0; i < count; i ++) {
+        ecs_entity_t e = ecs_new_w_pair(world, EcsIsA, critter);
+        ecs_set(world, e, Position, {
+            (float)(i % side) * 1.5f - 15.0f, 0, (float)(i / side) * 1.5f - 15.0f });
+        ecs_set(world, e, Rotation, {0, 0, 0});
+        ecs_set(world, e, AngularVelocity, {0, 1, 0});
+    }
+
+    ECS_SYSTEM(world, WaveReboundBefore, EcsPostLoad, 0);
+    ECS_SYSTEM(world, WaveReboundAfter, EcsOnUpdate, 0);
+    box_input_mouse_move(world, 640, 360, false);
+    ecs_progress(world, 0.016f);
+    ecs_progress(world, 0.016f);
+
+    /* The cursor stays still over the wave, so PickingUpdate picks again every frame */
+    wave_rebound_by_pick = 0;
+    for (i = 0; i < frames; i ++) {
+        ecs_progress(world, 0.016f);
+    }
+
+    /* The pick still hits a turning critter under the cursor, and it has no handler */
+    const PickStatus *status = ecs_singleton_get(world, PickStatus);
+    test_assert(status->hit != 0);
+    test_assert(ecs_has_pair(world, ecs_get_parent(world, status->hit), EcsIsA, critter));
+    test_uint(status->target, 0);
+
+    /* The button of the HUD is still found */
+    box_input_mouse_move(world, 100, 40, false);
+    ecs_progress(world, 0.016f);
+    test_uint(ecs_singleton_get(world, PickStatus)->target, ecs_lookup(world, "hud.button"));
+
+    /* Picking under a still cursor does not pay for placing every moving part of the wave in
+     * the index: what it places again does not grow with the number of critters */
+    test_assert(wave_rebound_by_pick < parts * frames / 10);
 
     ecs_fini(world);
 }
