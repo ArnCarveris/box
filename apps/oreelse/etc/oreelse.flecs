@@ -154,6 +154,15 @@ $ {
   OreQuality: {tier: High}
 }
 
+// The one shot effects the game plays from C (etc/particles): the astronaut's foot dust and
+// death splat, the burst of every yield of a deposit, and the poof of a used up deposit and of a
+// building placed or demolished
+$ {
+  OreEffects: {
+    foot_dust: FootDust, mine_burst: MineBurst, poof_burst: PoofBurst, splat_burst: SplatBurst
+  }
+}
+
 // The critter prefabs of the tiers the waves spawn, cheapest first: the shares of the style
 // mixes (cfg.mixedMix, cfg.swarmMix, cfg.eliteMix) and OreWaveState.spawn follow this order
 $ {

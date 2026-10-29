@@ -9,6 +9,8 @@
  * action, leaving reach or losing the target resets it.
  *
  * A tile marker shows the target while playing, the TileMarkerBad one when it is out of reach.
+ * Every yield plays MineBurst and shrinks the deposit; PoofBurst plays where a deposit is used
+ * up and where a building is demolished. The Luminite glints only while playing.
  */
 
 #include "game.h"
@@ -16,26 +18,60 @@
 /** Height of the tile marker above the ground */
 #define ORE_MARKER_Y (0.14f)
 
+/** Shrink a deposit with its ore: its scale goes from 1 when full down to cfg.depositScaleMin
+ * when empty, the original's oreDepositMine. It is only written when it changes.
+ *
+ * @param world The world or the stage of a system
+ * @param deposit The deposit
+ * @param d Its OreDeposit
+ */
+static void ore_deposit_shrink(
+    ecs_world_t *world,
+    ecs_entity_t deposit,
+    const OreDeposit *d)
+{
+    const Scale *scale = ecs_get(world, deposit, Scale);
+    float min = ORE_CFG(ecs_get_world(world), "depositScaleMin");
+    float s;
+    if (d->capacity > 0) {
+        s = min + (1.0f - min) * (float)d->amount / (float)d->capacity;
+        if (!scale || scale->x != s || scale->y != s || scale->z != s) {
+            ecs_set(world, deposit, Scale, { s, s, s });
+        }
+    }
+}
+
 bool ore_deposit_mine(
     ecs_world_t *world,
     ecs_entity_t deposit)
 {
+    const ecs_world_t *real = ecs_get_world(world);
     OreDeposit *d = deposit && ecs_is_alive(world, deposit) ?
         ecs_get_mut(world, deposit, OreDeposit) : NULL;
+    const OreEffects *fx = ecs_singleton_get(world, OreEffects);
+    const Position *p = d ? ecs_get(world, deposit, Position) : NULL;
     bool result = d && d->amount > 0;
+    bool empty = d && d->amount <= 0;
+    vec3 at = { p ? p->x : 0, 0, p ? p->z : 0 };
     if (!result || !ore_inventory_add(world, d->resource, 1)) {
         goto done;
     }
 
     d->amount --;
-    if (d->amount <= 0) {
+    empty = d->amount <= 0;
+    at[1] = ORE_CFG(real, "mineBurstY");
+    ore_burst(world, fx ? fx->mine_burst : 0, at, 1.0f);
+    if (empty) {
+        at[1] = ORE_CFG(real, "depositPoofY");
+        ore_burst(world, fx ? fx->poof_burst : 0, at, 1.0f);
         result = false;
     } else {
         ecs_modified(world, deposit, OreDeposit);
+        ore_deposit_shrink(world, deposit, d);
     }
 
 done:
-    if (d && d->amount <= 0) {
+    if (empty) {
         ecs_delete(world, deposit);
     }
 
@@ -104,8 +140,10 @@ static void OrePlayerMine(
     const OreHover *hover = ecs_field(it, OreHover, 3);
     OreMap *map = ecs_field(it, OreMap, 4);
     const OreMineMarker *marker = ecs_field(it, OreMineMarker, 5);
+    const OreEffects *fx = ecs_singleton_get(it->world, OreEffects);
     ore_grid_t grid = ore_grid_get(it->world);
     float reach = ORE_CFG(it->world, "reach");
+    float poof_y = ORE_CFG(it->world, "demolishPoofY");
     bool holding = ore_action_down(it->world, a->mine);
     ecs_entity_t *bcell = holding && hover->on_grid ?
         ore_map_building(map, hover->row, hover->col) : NULL;
@@ -141,7 +179,11 @@ static void OrePlayerMine(
                 next.left = time;
                 next.progress = 0;
                 if (building) {
-                    ore_building_demolish(it->stage, building);
+                    if (ore_building_demolish(it->stage, building)) {
+                        vec3 at = { tx, poof_y, tz };
+                        ore_burst(it->stage, fx ? fx->poof_burst : 0, at, 1.0f);
+                    }
+
                     next.target = 0;
                 } else if (!ore_deposit_mine(it->stage, target)) {
                     next.target = 0;
@@ -169,6 +211,31 @@ static void OreMineMarkerHide(
     const OreMineMarker *marker = ecs_field(it, OreMineMarker, 0);
     ore_marker_show(it->world, it->stage, marker->good, false, 0, ORE_MARKER_Y, 0);
     ore_marker_show(it->world, it->stage, marker->bad, false, 0, ORE_MARKER_Y, 0);
+}
+
+/** Play the glints of the deposits (the layers of a DepositSparkle, the emitters below an
+ * OreDeposit) while playing and pause them in every other state, so they stand still with the
+ * game and none show on the title screen. Their playback is only written when it changes.
+ *
+ * @param it Iterator over the emitters below the deposits
+ */
+static void OreDepositSparkle(
+    ecs_iter_t *it)
+{
+    PlaybackState state = ore_state_is(it->world, OreGameStatePlaying) ?
+        ParticlePlaying : ParticlePaused;
+    const ParticlePlayback *playback;
+    ParticlePlayback next;
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        playback = ecs_get(it->world, it->entities[i], ParticlePlayback);
+        next = playback ? *playback : (ParticlePlayback){ .state = ParticlePlaying };
+        if (next.state != state) {
+            next.state = state;
+            next.reset = false;
+            ecs_set_ptr(it->stage, it->entities[i], ParticlePlayback, &next);
+        }
+    }
 }
 
 void ore_mining_import(
@@ -202,5 +269,16 @@ void ore_mining_import(
             { .id = playing, .src.id = state, .oper = EcsNot }
         },
         .callback = OreMineMarkerHide
+    });
+
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "OreDepositSparkle" }),
+        .phase = EcsOnUpdate,
+        .query.terms = {
+            { .id = ecs_id(ParticleEmitter), .src.id = EcsSelf, .inout = EcsInOutNone },
+            { .id = ecs_id(OreDeposit), .src.id = EcsUp, .trav = EcsChildOf,
+              .inout = EcsInOutNone }
+        },
+        .callback = OreDepositSparkle
     });
 }

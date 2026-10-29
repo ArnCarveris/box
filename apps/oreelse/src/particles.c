@@ -30,7 +30,7 @@ ecs_entity_t ore_burst(
     float scale)
 {
     ecs_world_t *w = ore_particles_world(world);
-    ecs_entity_t result = box_particle_burst_at(w, effect, position, scale);
+    ecs_entity_t result = effect ? box_particle_burst_at(w, effect, position, scale) : 0;
     if (result && ecs_has(w, result, Rotation)) {
         ecs_set(w, result, Rotation, {0, 0, 0});
     }

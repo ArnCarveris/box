@@ -47,6 +47,40 @@ cfg {
   export const hoverFall: f32 = 5
   export const airborne: f32 = 0.01
 
+  // The walk of the astronaut (OrePlayerFx): its walk cycle (OreGait) advances its speed times
+  // stepRate radians a second, it bobs up to bobHeight above the ground with every step and kicks
+  // up FootDust footDustY above the ground at every half step on the ground
+  export const stepRate: f32 = 1.6
+  export const bobHeight: f32 = 0.07
+  export const footDustY: f32 = 0.04
+
+  // The limbs of the astronaut (OreLimb) cover limbBlend * dt of the distance to their pose every
+  // frame. In the air they trail airTrail times their swing behind while moving (times the run
+  // multiplier while running, at most airTrailMax) and dangle airDangle times their swing at
+  // airDangleRate radians a second
+  export const limbBlend: f32 = 14
+  export const airTrail: f32 = 0.85
+  export const airTrailMax: f32 = 1.25
+  export const airDangle: f32 = 0.14
+  export const airDangleRate: f32 = 1.6
+
+  // The death of the astronaut: SplatBurst plays splatLift above its position and it falls over,
+  // turned deathPitch about x (and its yaw dropped, as the original)
+  export const splatLift: f32 = 1.1
+  export const deathPitch: f32 = 1.5708
+
+  // A deposit shrinks with its ore, to a scale of depositScaleMin + (1 - depositScaleMin) *
+  // amount / capacity. Every yield plays MineBurst mineBurstY above its tile and a deposit that
+  // is used up PoofBurst depositPoofY above it
+  export const depositScaleMin: f32 = 0.55
+  export const mineBurstY: f32 = 0.6
+  export const depositPoofY: f32 = 0.4
+
+  // A building placed plays PoofBurst placePoofY above the center of its footprint, one
+  // demolished demolishPoofY above the tile the swing was at
+  export const placePoofY: f32 = 0.4
+  export const demolishPoofY: f32 = 0.6
+
   // The inventory holds at most inventorySlots kinds of items with a count above 0 (up to 15,
   // the slots of OreInventory)
   export const inventorySlots: i32 = 15

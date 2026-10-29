@@ -22,7 +22,7 @@ bake3 --target em --local-env apps/oreelse                     # build for the b
 python3 tools/integration.py e2e oreelse_flow oreelse_look     # the end-to-end scenarios
 python3 tools/integration.py e2e oreelse_mining oreelse_particles
 python3 tools/integration.py e2e oreelse_crafting oreelse_buildings
-python3 tools/integration.py e2e oreelse_critters
+python3 tools/integration.py e2e oreelse_critters oreelse_player_fx
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -97,6 +97,10 @@ up, looking down at 44.6, 51.8 and 59.5 degrees. It glides to a new level and fo
 astronaut smoothly, also on the title screen and while paused. The wheel over a panel of the UI
 does not zoom.
 
+Walking, the astronaut swings its legs and its arms, each arm with the opposite leg, bobs up to
+0.07 units with every step and kicks up a puff of dust at every half step, twice as often while
+running. Standing, it holds its limbs straight.
+
 ### Items
 
 | Item | Name | Detail | Recipe | Yield | Time (s) |
@@ -139,6 +143,10 @@ power does not change it. When it completes, 1 of the ore goes into the inventor
 off the deposit, and the next swing starts. A deposit that runs out is gone and its tile is
 empty ground. With a full inventory a new kind of ore is not mined: the deposit keeps its ore
 and the full warning shows at every swing.
+
+Every ore mined bursts off the deposit, and a deposit shrinks as it runs out: to
+`0.55 + 0.45 * amount / 1000` of its size, so a deposit about to run out is a little over half
+its size. A deposit used up goes in a puff of dust. The Luminite deposits glint.
 
 Moving the cursor to another deposit starts the swing over. Releasing the button, walking out
 of reach or moving the cursor off the deposit loses the progress of the swing. The right button
@@ -245,7 +253,8 @@ otherwise an L whose corner follows where the cursor sits in the last tile. Hold
 release fills the rectangle instead. A drag covers at most 64 cells. The cells are placed row by
 row from the top left, one item each, until the item runs out (so the top left part gets built),
 skipping the cells that cannot be placed. When nothing was placed and a cell was too far away,
-the warning `Too far away` shows. When the last one is placed the selection clears. ESC or a
+the warning `Too far away` shows. When the last one is placed the selection clears. Every
+building placed comes down in a puff of dust. ESC or a
 right click during a drag throws it away (`Placement cancelled`).
 
 While a building is selected, a preview shows on the cells the click or the drag would place: the
@@ -263,7 +272,8 @@ back the salvage of its recipe instead: `trunc(amount * health / max)` of every 
 at half health gives 2 bricks and a gun turret at 10% 1 iron plate and 1 wire; it shows as
 `Salvaged 1 Iron plate, 1 Wire (10%)` (or `Salvaged nothing (5%)`), and is refused with
 `Inventory full - can't salvage` when the new kinds do not fit. Then the building is gone; a
-deposit under it (a drill's) is mined by the next swing. A building whose health drops to 0 is
+deposit under it (a drill's) is mined by the next swing. A building demolished goes in a puff
+of dust. A building whose health drops to 0 is
 destroyed.
 
 ### Critters
@@ -324,12 +334,14 @@ tile inside the edge, up to 5 units off on both axes.
 ### Health
 
 The astronaut has 100 HP. After 5 seconds without damage it regenerates 2 HP a second up to
-the full 100. At 0 HP the game is lost.
+the full 100. At 0 HP it falls over in a splat and the game is lost.
 
 ### The jetpack
 
 Over a tile with a building the astronaut hovers on its jetpack 3 units up, rising at 7 units a
-second and coming back down at 5 once it is off the buildings.
+second and coming back down at 5 once it is off the buildings. The jet plume fires while it is
+in the air and stops when it lands; its limbs trail behind it while it flies and dangle while it
+hovers in place.
 
 ### Render quality
 
@@ -524,7 +536,7 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 
 | File | Holds |
 | --- | --- |
-| `etc/oreelse.flecs` | The window, the camera, the sun, the atmosphere, the effects and the view, the render quality tier, the mining markers, the critter tiers (`OreArsenal`); includes the rest |
+| `etc/oreelse.flecs` | The window, the camera, the sun, the atmosphere, the effects and the view, the render quality tier, the mining markers, the critter tiers (`OreArsenal`), the one shot effects the C plays (`OreEffects`); includes the rest |
 | `etc/config.flecs` | The constants `cfg.*` |
 | `etc/resources.flecs` | The item prefabs other than the buildings, with names and recipes |
 | `etc/buildings/*.flecs` | The building prefabs, models with their item, recipe, footprint, health and power |
@@ -534,7 +546,7 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 | `etc/boundary.flecs` | The hazard band around the playable area |
 | `etc/scenery.flecs` | The boulders and dunes of a run |
 | `etc/run.flecs` | The astronaut, the parents of the placed buildings and of the critters, and the singletons of a run, the order book, the selection and the waves included |
-| `etc/deposits.flecs` | The deposits of a run |
+| `etc/deposits.flecs` | The deposits of a run, the Luminite's with their glints (`DepositSparkle`) |
 | `etc/player.flecs` | The `Astronaut` template |
 | `etc/props/ore.flecs` | The `Ore` template of the deposits |
 | `etc/critters/` | The `Mite`, `Skitter`, `Brute` and `Behemoth` prefabs, models with their health, speed, damage, range, radius and wave tier |
@@ -556,12 +568,12 @@ glowing plates mining and placement show over a tile, instances placed at y 0.14
 | `etc/assets/` | The original's textures (SVG), unchanged, and `terrain_dirt_orm.svg` |
 | `src/flow.c` | States, clock, blink, toast, seeds, `oreelse.cancel()`, `oreelse.restart()` |
 | `src/map.c` | The tile grid, the deposits' registration and the hover tile |
-| `src/player.c` | Walking, the jetpack and the camera |
+| `src/player.c` | Walking, the jetpack and the camera; the astronaut's animation (`OrePlayerFx`: the walk cycle `OreGait`, the bob, the foot dust and the jet plume; `OreLimbs`: the limbs) and its death (`ore_player_die`) |
 | `src/inventory.c` | The inventory and the item components |
-| `src/mining.c` | Mining, demolishing and their tile marker |
+| `src/mining.c` | Mining, demolishing and their tile marker; the burst and the shrink of a mined deposit, the poofs of a used up deposit and of a demolished building, the glints of the Luminite while playing |
 | `src/critters.c` | The waves, the critters' targets, attacks and moves, the crowd separation and the critter spatial index, their deaths, the astronaut's health and regen, `oreelse.spawn_critter()` |
 | `src/buildings.c` | The buildings in the tile grid, the wall connectors, demolish and salvage, destroyed buildings, the look of the ghosts |
-| `src/placement.c` | The selection, `canPlace`, the click and the drag, the pipette, the preview, `oreelse.select()`, `oreelse.pipette()`, `oreelse.placeStart()`, `oreelse.placeEnd()`, `oreelse.cancelDrag()` |
+| `src/placement.c` | The selection, `canPlace`, the click and the drag, the poof of a placed building, the pipette, the preview, `oreelse.select()`, `oreelse.pipette()`, `oreelse.placeStart()`, `oreelse.placeEnd()`, `oreelse.cancelDrag()` |
 | `src/craft.c` | The order book, the workers, `oreelse.craft_order()`, `oreelse.craft_cancel()` |
 | `src/look.c` | The render quality tiers, `oreelse.cycleQuality()` |
 | `src/particles.c` | The helpers that play the effects (`ore_burst`, `ore_burst_aimed`, `ore_explosion`, `ore_combust`), the flash of their lights, `oreelse.explosion()`, `oreelse.combust()` |

@@ -1,7 +1,7 @@
 // The astronaut, the Astronaut template of the original: a suit of boxes with a helmet and
 // its visor, a backpack with two tanks, and the jet child that the jetpack plume comes out of.
 // Its origin is between its feet on the ground and it faces +Z. The legs and arms are pivots
-// with OreLimb (at the hips and shoulders) that OrePlayerFx swings; here they stand still.
+// with OreLimb (at the hips and shoulders) that OreLimbs swings while playing.
 
 using flecs.script.math
 using box.transform

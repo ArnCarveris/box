@@ -33,6 +33,8 @@ void OreelseImport(
     ECS_META_COMPONENT(world, OreActions);
     ECS_META_COMPONENT(world, OrePlayer);
     ECS_META_COMPONENT(world, OreLimb);
+    ECS_META_COMPONENT(world, OreGait);
+    ECS_META_COMPONENT(world, OreEffects);
     ECS_META_COMPONENT(world, OreMining);
     ECS_META_COMPONENT(world, OreMineMarker);
     ECS_META_COMPONENT(world, OreStack);
