@@ -3,8 +3,9 @@
 // front, and the head with its yoke, the emitter, a fin, the barrel, its collar and the glowing
 // lens. Its origin is the center of its tile on the ground and the head faces +Z.
 //
-// Named parts: head (turns about y to aim), head/fx (the lens, where the beam starts and glows),
-// hit_fx (moves to where the beam hits, for its sparks) and column/lamp (status lamp, Light).
+// Named parts: head (turns about y to aim), head/fx (the lens, where the beam starts and glows,
+// BeamGlow), hit_fx (moves to where the beam hits, with its sparks, BeamSparks) and column/lamp
+// (status lamp, Light). The turret plays the glow and the sparks while it fires.
 
 using box.transform
 using box.geometry
@@ -46,6 +47,7 @@ prefab LaserTurret {
 
   hit_fx {
     Position: {0, 0, 0}
+    BeamSparks: {color: {238, 96, 168}}
   }
 
   base {
@@ -170,6 +172,7 @@ prefab LaserTurret {
 
     fx {
       Position: {0, 0.02, 0.82}
+      BeamGlow: {color: {238, 96, 168}}
     }
   }
 }

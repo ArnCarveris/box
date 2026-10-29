@@ -52,7 +52,12 @@ int32_t ore_inventory_count(
     return slot < 0 ? 0 : inv->slots[slot].amount;
 }
 
-int32_t ore_inventory_kinds(
+/** Get the kinds of items the inventory holds, the slots that are taken.
+ *
+ * @param world The world or a stage
+ * @return The kinds, at most ORE_INVENTORY_SLOTS
+ */
+static int32_t ore_inventory_kinds(
     const ecs_world_t *world)
 {
     const OreInventory *inv = ecs_singleton_get(world, OreInventory);
@@ -99,7 +104,11 @@ const char* ore_item_name(
     return name ? name : "";
 }
 
-void ore_inventory_full(
+/** Show the warning that the inventory holds as many kinds as it can.
+ *
+ * @param world The world or the stage of a system
+ */
+static void ore_inventory_full(
     ecs_world_t *world)
 {
     ore_toast(world, true, "Inventory full - %d item kinds is the limit",

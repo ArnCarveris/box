@@ -3,6 +3,7 @@
 // stone deposit in front of it with the looks deposits.flecs gives them
 include apps/oreelse/test/visual/setup/seed
 include apps/oreelse/etc/oreelse
+include apps/oreelse/test/visual/setup/world
 
 using box.transform
 using oreelse

@@ -120,11 +120,13 @@ def pause(app):
 
 
 def test_title(app):
-    """Nothing of the HUD shows on the title screen; the status bar comes with play."""
+    """Nothing of the HUD but the title screen shows on the title screen; the status bar comes
+    with play."""
     setup(app)
     app.expect(STATE % "Title", "true")
     app.wait_frames(SETTLE)
-    app.check(not hud_texts(app), "the title screen shows %s" % hud_texts(app))
+    others = [p for p in hud_texts(app) if not p.startswith(SCREEN + ".title_screen.")]
+    app.check(not others, "the title screen shows %s" % others)
     key(app, "Space")
     app.wait_for(STATE % "Playing", "true")
     wait_text(app, LUMINITE_LABEL, lambda v: v is not None, "the Luminite readout")

@@ -4,6 +4,7 @@
 
 using flecs.script.math
 using box.types
+using box.transform
 using box.layout
 using box.geometry
 using box.material
@@ -20,6 +21,12 @@ ui_textures {
 // Corner radius of a panel
 const panelRadius: f32 = 3
 
+// The draw order of the plate and the strip among the children of a panel: below the content.
+// Siblings draw in the order of their Position z, then of their ids, and an instance inside a
+// template creates its content before the plate
+const plateZ: f32 = -2
+const stripZ: f32 = -1
+
 // Size the hazard strip is rasterized at
 const stripWidth: f32 = 2048
 const stripHeight: f32 = 12
@@ -32,9 +39,9 @@ const stripHeight: f32 = 12
 // box rounds all four corners of a Rect alike, so the strip is square and the panel clips its
 // children to its own rounded rect (ClipChildren), which rounds the strip's top corners like the
 // panel's. The plate's opacity, the alpha of the fill, also applies to its border; the content
-// stays opaque. InputBlocker keeps clicks, the right button and the wheel over the panel from
-// the world. The children of the template size the panel (the layout fits it to the plate), so
-// an instance only anchors it with a LayoutItem.
+// stays opaque. With block, InputBlocker keeps clicks, the right button and the wheel over the
+// panel from the world. The children of the template size the panel (the layout fits it to the
+// plate), so an instance only anchors it with a LayoutItem.
 template Panel {
   prop width: f32 = 252
   prop height: f32 = 100
@@ -42,6 +49,7 @@ template Panel {
   prop capH: f32 = 7
   prop fill: rgba = {21, 23, 27, 236}
   prop edge: rgba = {74, 80, 90, 255}
+  prop block: bool = true
 
   const scale = max(width / stripWidth, capH / stripHeight)
   const spanU = width / (stripWidth * scale)
@@ -50,9 +58,13 @@ template Panel {
   Layout: {}
   Border: {radius: panelRadius}
   ClipChildren
-  InputBlocker
+
+  if block {
+    InputBlocker
+  }
 
   plate {
+    Position: {0, 0, plateZ}
     LayoutItem: {
       h: Left, v: Top,
       width: {mode: Fixed, value: width}, height: {mode: Fixed, value: height}
@@ -65,6 +77,7 @@ template Panel {
 
   if cap {
     strip {
+      Position: {0, 0, stripZ}
       LayoutItem: {
         h: Left, v: Top,
         width: {mode: Fixed, value: width}, height: {mode: Fixed, value: capH}

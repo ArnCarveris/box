@@ -46,7 +46,18 @@ typedef struct ore_drone_ctx_t {
     float repair;          /**< cfg.droneRepair */
     float per_iron;        /**< cfg.droneHpPerIron */
     float scan;            /**< cfg.droneScan */
+    float turn;            /**< cfg.droneTurn */
+    float bob;             /**< cfg.droneBob */
+    float bob_rate;        /**< cfg.droneBobRate */
 } ore_drone_ctx_t;
+
+/** Rotors of a drone, the size of ore_drone_rotors */
+#define ORE_DRONE_ROTORS (4)
+
+/** Names of the rotors of a drone (RepairDrone); the odd ones spin the other way */
+static const char *ore_drone_rotors[ORE_DRONE_ROTORS] = {
+    "rotor_a", "rotor_b", "rotor_c", "rotor_d"
+};
 
 /** Get the dock of a bay, relative to the pad's center.
  *
@@ -246,22 +257,40 @@ static bool ore_drone_take(
 }
 
 /** Fly a drone a frame toward a goal: at cfg.droneSpeed, scaled from 20% to 100% within
- * cfg.droneEase of it, never past it.
+ * cfg.droneEase of it, never past it. Farther than 0.08 from it across the ground it turns
+ * toward it, at most cfg.droneTurn radians a second.
  *
  * @param ctx The context of the system run
  * @param pos Its position, relative to the pad
+ * @param rot Its rotation
  * @param goal The goal, relative to the pad
  */
 static void ore_drone_move(
     const ore_drone_ctx_t *ctx,
     Position *pos,
+    Rotation *rot,
     const vec3 goal)
 {
     float dx = goal[0] - pos->x;
     float dy = goal[1] - pos->y;
     float dz = goal[2] - pos->z;
     float dist = sqrtf(dx * dx + dy * dy + dz * dz);
-    float v = ctx->speed, step;
+    float h = sqrtf(dx * dx + dz * dz);
+    float v = ctx->speed, step, diff, max;
+    if (h > 0.08f) {
+        diff = atan2f(dx, dz) - rot->y;
+        while (diff > GLM_PIf) {
+            diff -= 2.0f * GLM_PIf;
+        }
+
+        while (diff < -GLM_PIf) {
+            diff += 2.0f * GLM_PIf;
+        }
+
+        max = ctx->turn * ctx->dt;
+        rot->y += glm_clamp(diff, -max, max);
+    }
+
     if (dist > 0.0001f) {
         if (ctx->ease > 0 && dist < ctx->ease) {
             v = ctx->speed * (0.2f + 0.8f * dist / ctx->ease);
@@ -310,12 +339,14 @@ static void ore_drone_weld(
  * @param e The drone
  * @param d Its state
  * @param pos Its position, relative to the pad
+ * @param rot Its rotation
  */
 static void ore_drone_update(
     const ore_drone_ctx_t *ctx,
     ecs_entity_t e,
     OreDrone *d,
-    Position *pos)
+    Position *pos,
+    Rotation *rot)
 {
     ecs_entity_t pad = d->pad ? d->pad : ecs_get_parent(ctx->world, e);
     const OreDroneBay *dock = pad && ecs_is_alive(ctx->world, pad) ?
@@ -331,6 +362,7 @@ static void ore_drone_update(
     }
 
     d->pad = pad;
+    d->phase = fmodf(d->phase + ctx->dt * ctx->bob_rate, 2.0f * GLM_PIf);
     ore_drone_bay_pos(dock, d->bay, bay);
     ready = !ctx->blackout && dock->cost && ore_inventory_count(ctx->world, dock->cost) >= 1;
     busy = d->state == OreDroneStateFlying || d->state == OreDroneStateRepairing;
@@ -392,7 +424,7 @@ static void ore_drone_update(
         break;
     case OreDroneStateRepairing:
         goal[0] = tpos->x - at->x;
-        goal[1] = ctx->cruise;
+        goal[1] = ctx->cruise + sinf(d->phase) * ctx->bob;
         goal[2] = tpos->z - at->z;
         ore_drone_weld(ctx, d, dock->cost, health);
         if (health->value >= health->max) {
@@ -427,22 +459,23 @@ static void ore_drone_update(
         }
     }
 
-    ore_drone_move(ctx, pos, goal);
+    ore_drone_move(ctx, pos, rot, goal);
 done:
     return;
 }
 
 /** Fly the drones, look for targets and weld them, see ore_drone_update.
  *
- * @param it Iterator over the drones, with OrePowerState, while playing; its context is the
- * ore_drone_queries_t
+ * @param it Iterator over the drones with their rotation, with OrePowerState, while playing;
+ * its context is the ore_drone_queries_t
  */
 static void OreDrones(
     ecs_iter_t *it)
 {
     OreDrone *drone = ecs_field(it, OreDrone, 0);
     Position *pos = ecs_field(it, Position, 1);
-    const OrePowerState *power = ecs_field(it, OrePowerState, 2);
+    Rotation *rot = ecs_field(it, Rotation, 2);
+    const OrePowerState *power = ecs_field(it, OrePowerState, 3);
     const ore_drone_queries_t *queries = it->ctx;
     ore_drone_ctx_t ctx = {
         .world = it->world,
@@ -457,16 +490,165 @@ static void OreDrones(
         .ease = ORE_CFG(it->world, "droneEase"),
         .repair = ORE_CFG(it->world, "droneRepair"),
         .per_iron = ORE_CFG(it->world, "droneHpPerIron"),
-        .scan = ORE_CFG(it->world, "droneScan")
+        .scan = ORE_CFG(it->world, "droneScan"),
+        .turn = ORE_CFG(it->world, "droneTurn"),
+        .bob = ORE_CFG(it->world, "droneBob"),
+        .bob_rate = ORE_CFG(it->world, "droneBobRate")
     };
     Position before;
+    float yaw;
     int32_t i;
     for (i = 0; i < it->count; i ++) {
         before = pos[i];
-        ore_drone_update(&ctx, it->entities[i], &drone[i], &pos[i]);
+        yaw = rot[i].y;
+        ore_drone_update(&ctx, it->entities[i], &drone[i], &pos[i], &rot[i]);
         if (before.x != pos[i].x || before.y != pos[i].y || before.z != pos[i].z) {
             ecs_modified(it->stage, it->entities[i], Position);
         }
+
+        if (yaw != rot[i].y) {
+            ecs_modified(it->stage, it->entities[i], Rotation);
+        }
+    }
+}
+
+/** Check whether an entity is an instance of a part of a prefab: one of its IsA targets (it may
+ * have more than one) has the name.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param name Name of the part
+ * @return Whether it is an instance of it
+ */
+static bool ore_drone_is_part(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    const char *name)
+{
+    ecs_entity_t base = ecs_get_target(world, e, EcsIsA, 0);
+    const char *base_name;
+    bool result = false;
+    int32_t n = 0;
+    while (base && !result) {
+        base_name = ecs_get_name(world, base);
+        result = base_name && !ecs_os_strcmp(base_name, name);
+        base = ecs_get_target(world, e, EcsIsA, ++ n);
+    }
+
+    return result;
+}
+
+/** Find a part of a drone, the original's oreChild: the parts of an instance are unnamed, so it
+ * is the child that is an instance of the prefab's part of the name.
+ *
+ * @param world The world
+ * @param drone The drone
+ * @param name Name of the part in RepairDrone
+ * @return The part, 0 for none
+ */
+static ecs_entity_t ore_drone_part(
+    const ecs_world_t *world,
+    ecs_entity_t drone,
+    const char *name)
+{
+    ecs_iter_t it = ecs_children(world, drone);
+    ecs_entity_t result = 0;
+    int32_t i;
+    while (!result && ecs_children_next(&it)) {
+        for (i = 0; i < it.count && !result; i ++) {
+            if (ore_drone_is_part(world, it.entities[i], name)) {
+                result = it.entities[i];
+            }
+        }
+    }
+
+    if (result) {
+        ecs_iter_fini(&it);
+    }
+
+    return result;
+}
+
+/** Spin the rotors of a drone a frame: their spin, the speed of the first rotor's spinner, moves
+ * toward cfg.droneRotor away from the dock and toward 0 docked, by cfg.droneSpinUp times
+ * cfg.droneRotor a second, and the odd rotors spin the other way.
+ *
+ * A spinner is written only when its speed changes; nothing else keeps the spin.
+ *
+ * @param it The iterator of the system
+ * @param e The drone
+ * @param docked Whether it is docked
+ * @param rotor Spin of the rotors in flight, cfg.droneRotor
+ * @param step Change of the spin this frame
+ */
+static void ore_drone_spin(
+    ecs_iter_t *it,
+    ecs_entity_t e,
+    bool docked,
+    float rotor,
+    float step)
+{
+    ecs_entity_t parts[ORE_DRONE_ROTORS];
+    const OreSpinner *spinner;
+    OreSpinner next;
+    float spin = 0, want = docked ? 0 : rotor, speed;
+    int32_t r;
+    for (r = 0; r < ORE_DRONE_ROTORS; r ++) {
+        parts[r] = ore_drone_part(it->world, e, ore_drone_rotors[r]);
+    }
+
+    spinner = parts[0] ? ecs_get(it->world, parts[0], OreSpinner) : NULL;
+    spin = spinner ? fabsf(spinner->speed) : 0;
+    if (spin < want) {
+        spin = glm_min(spin + step, want);
+    } else if (spin > want) {
+        spin = glm_max(spin - step, want);
+    }
+
+    for (r = 0; r < ORE_DRONE_ROTORS; r ++) {
+        spinner = parts[r] ? ecs_get(it->world, parts[r], OreSpinner) : NULL;
+        speed = (r & 1) ? -spin : spin;
+        if (spinner && spinner->speed != speed) {
+            next = *spinner;
+            next.speed = speed;
+            ecs_set_ptr(it->stage, parts[r], OreSpinner, &next);
+        }
+    }
+}
+
+/** Animate the drones: spin their rotors up in flight and down docked (ore_drone_spin) and
+ * play the weld's WeldSparks, whose ParticleLight lights its light, while they repair.
+ *
+ * @param it Iterator over the drones, while playing
+ */
+static void OreDroneFx(
+    ecs_iter_t *it)
+{
+    const OreDrone *drone = ecs_field(it, OreDrone, 0);
+    float rotor = ORE_CFG(it->world, "droneRotor");
+    float step = ORE_CFG(it->world, "droneSpinUp") * rotor * it->delta_time;
+    bool welding;
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        ore_drone_spin(it, it->entities[i], drone[i].state == OreDroneStateDocked, rotor, step);
+        welding = drone[i].state == OreDroneStateRepairing;
+        ore_playback_set(it->world, it->stage,
+            ore_drone_part(it->world, it->entities[i], "weld"),
+            welding ? ParticlePlaying : ParticleStopped, false);
+    }
+}
+
+/** Outside play the welds that spark pause, and play on when the game resumes.
+ *
+ * @param it Iterator over the drones, while not playing
+ */
+static void OreDroneFxHold(
+    ecs_iter_t *it)
+{
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        ore_playback_set(it->world, it->stage,
+            ore_drone_part(it->world, it->entities[i], "weld"), ParticlePaused, true);
     }
 }
 
@@ -489,6 +671,7 @@ void ore_drones_import(
 
     ecs_add_pair(world, ecs_id(OreDroneBay), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(OreDrone), EcsWith, DynamicTransform);
+    ecs_add_pair(world, ecs_id(OreDrone), EcsWith, ecs_id(Rotation));
 
     queries->drones = ecs_query(world, {
         .entity = ecs_entity(world, { .name = "OreDroneQuery" }),
@@ -522,11 +705,32 @@ void ore_drones_import(
         .query.terms = {
             { .id = ecs_id(OreDrone), .src.id = EcsSelf },
             { .id = ecs_id(Position), .src.id = EcsSelf },
+            { .id = ecs_id(Rotation), .src.id = EcsSelf },
             { .id = ecs_id(OrePowerState), .src.id = ecs_id(OrePowerState), .inout = EcsIn },
             { .id = playing, .src.id = state }
         },
         .callback = OreDrones,
         .ctx = queries,
         .ctx_free = ore_drone_queries_free
+    });
+
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "OreDroneFx" }),
+        .phase = EcsOnUpdate,
+        .query.terms = {
+            { .id = ecs_id(OreDrone), .src.id = EcsSelf, .inout = EcsIn },
+            { .id = playing, .src.id = state }
+        },
+        .callback = OreDroneFx
+    });
+
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "OreDroneFxHold" }),
+        .phase = EcsOnUpdate,
+        .query.terms = {
+            { .id = ecs_id(OreDrone), .src.id = EcsSelf, .inout = EcsInOutNone },
+            { .id = playing, .src.id = state, .oper = EcsNot }
+        },
+        .callback = OreDroneFxHold
     });
 }

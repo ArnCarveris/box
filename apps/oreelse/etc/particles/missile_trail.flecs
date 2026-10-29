@@ -1,6 +1,7 @@
 // The smoke trail behind a missile in flight, the MissileTrail of the original. It plays from
-// the start, as the missile is made in flight, and its particles stay where they were left.
-// The size ramp is computed for the default age.
+// the start, as the missile is made in flight, and its particles stay where they were left:
+// it lingers, so the smoke of a missile that exploded finishes its life. The size ramp is
+// computed for the default age.
 
 using box.particle
 
@@ -26,7 +27,8 @@ template MissileTrail {
     spin: {-115, 115},
     inherit_velocity: 0.1,
     color: {228, 220, 210},
-    seed: 235
+    seed: 235,
+    linger: true
   }
   ParticleForces: {gravity: {0, 0.35, 0}, drag: 1.4, turbulence: 0.9, turbulence_scale: 0.7}
   ParticleAppearance: {

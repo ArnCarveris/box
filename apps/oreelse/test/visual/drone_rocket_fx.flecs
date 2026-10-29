@@ -1,0 +1,105 @@
+// The drones and the rocket in flight, from zoom level 0 while playing, on the basin south west
+// of the deposits. In front, a drone pad with two of its drones docked over its west bays (their
+// rotors still) and two flying 2.8 units above two damaged walls east of it, facing them, their
+// rotors spinning up, welding: a white-blue stream of sparks falls from the arm of each and its
+// light, of the arc's color {120, 216, 255}, lights the wall and the ground below it. A solar
+// panel behind the pad powers it. Behind on the right, a cargo rocket 2.5 units into its ascent
+// over the rocket pad, standing straight: its four clamps swung out by 0.6 radians, the first
+// FlameBurst under its bells (orange-white, shooting down) and the first SmokeBurst rolling out
+// over the pad. The astronaut stands in front, facing the camera.
+include apps/oreelse/test/visual/setup/seed
+include apps/oreelse/etc/oreelse
+
+using box.transform
+using box.particle
+using oreelse
+
+// The animation runs only while playing. Height 0 snaps the camera to level 0 on the first
+// frame. The drones pay their welds in Iron.
+$ {
+  (OreGameState, Playing)
+  OreView: {camera: camera, view: main_view, level: 0, height: 0, back: 0, look: 0}
+  OreInventory: {slots: [{item: items.Iron, amount: 50}]}
+}
+
+// Three frames of the stream show a few sparks at most, so the weld bursts what it keeps alive
+// while it plays (rate times the mean lifetime) on its first frame; a docked drone's weld does
+// not play. The parts of an instance are unnamed, so the burst goes on the prefab's part
+RepairDrone {
+  weld {
+    ParticleBurst: {count: 50}
+  }
+}
+
+astronaut {
+  Position: {-22, 0, 30}
+  Rotation: {0, 0.3, 0}
+}
+
+// Placed buildings, each at the center of its footprint. Tile (row, col) is centered at
+// x = -47 + 2 col, z = -47 + 2 row: the walls on (37, 14) and (38, 14), the panel on (35, 10),
+// the rocket pad on (34, 16) to (36, 18) and the drone pad on (37, 10) to (38, 11)
+buildings {
+  wall_a : Wall {
+    Position: {-19, 0, 27}
+    OreBuilding: {row: 37, col: 14}
+    OreHealth: {value: 150, max: 300}
+  }
+
+  wall_b : Wall {
+    Position: {-19, 0, 29}
+    OreBuilding: {row: 38, col: 14}
+    OreHealth: {value: 210, max: 300}
+  }
+
+  panel : SolarPanel {
+    Position: {-27, 0, 23}
+    OreBuilding: {row: 35, col: 10}
+  }
+
+  rocket_pad : RocketPad {
+    Position: {-13, 0, 23}
+    OreBuilding: {row: 34, col: 16}
+  }
+
+  // The pad's drones, relative to its center, are made before its OreBuilding, so the pad
+  // parks none of its own. Two weld the walls (7, 2.8, -+1) away, at the cruise height; two
+  // are docked on the bays 2 and 3, at (-+0.99, 0.62, -+0.99)
+  drone_pad : DronePad {
+    Position: {-26, 0, 28}
+
+    drone_a : RepairDrone {
+      Position: {7, 2.8, -1}
+      Rotation: {0, 1.5708, 0}
+      OreDrone: {target: buildings.wall_a, state: Repairing, bay: 0, scan: 0.5}
+    }
+
+    drone_b : RepairDrone {
+      Position: {7, 2.8, 1}
+      Rotation: {0, 1.5708, 0}
+      OreDrone: {target: buildings.wall_b, state: Repairing, bay: 1, scan: 0.5}
+    }
+
+    drone_c : RepairDrone {
+      Position: {-0.99, 0.62, -0.99}
+      OreDrone: {state: Docked, bay: 2, scan: 5}
+    }
+
+    drone_d : RepairDrone {
+      Position: {-0.99, 0.62, 0.99}
+      OreDrone: {state: Docked, bay: 3, scan: 5}
+    }
+
+    OreBuilding: {row: 37, col: 10}
+  }
+}
+
+// The rocket on its pad, which exists by now, climbs at 3.495 units a second, 2.5 units up:
+// 1.6 + 3.495 / 9 = 1.988 s into the flight, so the first frame of play (+ 1/60 s) crosses the
+// 2 s of the flight, where a flame and a smoke burst play (every 0.08 s)
+$ {
+  OreRocketState: {
+    pad: buildings.rocket_pad, phase: Ascent, engines: 4, fuel: 1, cargo: 1, loaded: 25,
+    x: -13, y: 3.24, z: 23, speed: 3.495, altitude: 2.5
+  }
+}

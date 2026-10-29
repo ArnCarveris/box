@@ -1,0 +1,37 @@
+// The end screen of a lost run over the seeded map with the status bar of the HUD at the top
+// right: a panel of 640x218 above the middle of the window with THE SWARM GOT YOU, 25 Luminite
+// shipped in teal, 37 critters killed - survived 12:05 to wave 9 and Press R to land again in
+// the soft color.
+include apps/oreelse/test/visual/setup/seed
+include apps/oreelse/etc/oreelse
+
+using box.transform
+using box.camera
+using box.surface
+using oreelse
+
+// The capture is 640x360: the HUD lays out for a 1280x720 window and its camera shows it at
+// half size, so the capture holds the whole screen as a 1280x720 window shows it
+window {
+  Surface: {width: 1280, height: 720}
+}
+
+hud {
+  ui {
+    camera {
+      Camera: {ortho: true, ortho_scale: 0.5}
+    }
+  }
+}
+
+// The run is over, so no system of play changes the stats: 725 seconds survived, the ninth
+// wave, 37 kills and 25 Luminite shipped
+$ {
+  (OreGameState, Lost)
+  OreClock: {elapsed: 725.4}
+  OreWaveState: {
+    root: critters, wave: 9, timer: 50, gap: 50, frac: 0, left: 0, spawn: [0, 0, 0, 0],
+    spawn_timer: 0, stagger: 0.45, budget: 16.3, style: Mixed, side: 0, kills: 37
+  }
+  OreRocketState: {shipped: 25}
+}

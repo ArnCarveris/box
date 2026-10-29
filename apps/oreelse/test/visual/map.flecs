@@ -2,6 +2,7 @@
 // deposits, the iron, copper and stone clusters around them on the basin, the plain beyond
 include apps/oreelse/test/visual/setup/seed
 include apps/oreelse/etc/oreelse
+include apps/oreelse/test/visual/setup/world
 
 using oreelse
 
