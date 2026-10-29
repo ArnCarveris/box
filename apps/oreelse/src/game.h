@@ -153,13 +153,9 @@ ECS_STRUCT(OrePlayer, {
     bool airborne; /**< hover is above cfg.airborne, the jetpack fires */
 });
 
-<<<<<<< HEAD
-/** A limb pivot of a model; its Rotation.x swings with the walk (OreLimbs) */
-=======
-/** A limb pivot of a model; its Rotation.x swings with the walk (OrePlayerFx for the astronaut,
+/** A limb pivot of a model; its Rotation.x swings with the walk (OreLimbs for the astronaut,
  * OreCritterLimbs for a critter's legs)
  */
->>>>>>> 6229efd34422b769dbb744805ba2cf9363666faf
 ECS_STRUCT(OreLimb, {
     float phase; /**< Offset of the limb in the walk cycle */
     float swing; /**< Largest angle of the swing in radians */
@@ -168,7 +164,7 @@ ECS_STRUCT(OreLimb, {
 /** The walk cycle of the astronaut, the state of its animation (OrePlayerFx), on the astronaut.
  * It comes with OrePlayer and starts at 0 with every run.
  */
-ECS_STRUCT(OreGait, {
+ECS_STRUCT(OrePlayerGait, {
     float cycle;  /**< Phase of the walk cycle in radians, from 0 up to 2 PI: it advances the
                    *   astronaut's speed times cfg.stepRate a second while it moves */
     int32_t step; /**< Half of the cycle it is in, floor(cycle / PI): a new half step on the
@@ -855,7 +851,7 @@ bool ore_action_down(
     ecs_entity_t action);
 
 /** Kill the astronaut, the end of the original's orePlayerDamage: SplatBurst plays
- * cfg.splatLift above it, it falls over (turned cfg.deathPitch about x) and the game is lost.
+ * cfg.playerSplatLift above it, it falls over (turned cfg.deathPitch about x) and the game is lost.
  * OrePlayerHealth calls it when the astronaut's hit points drop to 0.
  *
  * @param world The world or the stage of a system

@@ -4,8 +4,8 @@
  * hovers on its jetpack over the tiles of buildings, and the camera follows it from above at the
  * zoom level of OreView in every state.
  *
- * While playing OrePlayerFx advances its walk cycle (OreGait), bobs it, kicks up its foot dust
- * and plays its jet plume in the air, and OreLimbs swings its limbs (OreLimb). Its death
+ * While playing OrePlayerFx advances its walk cycle (OrePlayerGait), bobs it, kicks up its foot
+ * dust and plays its jet plume in the air, and OreLimbs swings its limbs (OreLimb). Its death
  * (ore_player_die) plays the splat and drops it on its face.
  *
  * The camera never rotates, so W walks toward -Z, S toward +Z, A toward -X and D toward +X.
@@ -119,7 +119,7 @@ void ore_player_die(
     const Position *p = ecs_get(world, player, Position);
     const OreEffects *fx = ecs_singleton_get(world, OreEffects);
     if (p && fx) {
-        vec3 at = { p->x, p->y + ORE_CFG(real, "splatLift"), p->z };
+        vec3 at = { p->x, p->y + ORE_CFG(real, "playerSplatLift"), p->z };
         ore_burst(world, fx->splat_burst, at, 1.0f);
     }
 
@@ -157,7 +157,7 @@ static void OrePlayerFx(
     ecs_iter_t *it)
 {
     const OrePlayer *player = ecs_field(it, OrePlayer, 0);
-    OreGait *gait = ecs_field(it, OreGait, 1);
+    OrePlayerGait *gait = ecs_field(it, OrePlayerGait, 1);
     Position *p = ecs_field(it, Position, 2);
     const OreEffects *fx = ecs_field(it, OreEffects, 3);
     float speed = ORE_CFG(it->world, "walkSpeed");
@@ -223,7 +223,7 @@ static void OreLimbs(
     const OreLimb *limb = ecs_field(it, OreLimb, 0);
     Rotation *r = ecs_field(it, Rotation, 1);
     const OrePlayer *player = ecs_field(it, OrePlayer, 2);
-    const OreGait *gait = ecs_field(it, OreGait, 3);
+    const OrePlayerGait *gait = ecs_field(it, OrePlayerGait, 3);
     const OreClock *clock = ecs_field(it, OreClock, 4);
     float alpha = glm_min(it->delta_time * ORE_CFG(it->world, "limbBlend"), 1.0f);
     float dangle = ORE_CFG(it->world, "airDangle");
@@ -336,7 +336,7 @@ void ore_player_import(
     ecs_add_pair(world, ecs_id(OrePlayer), EcsWith, ecs_id(Position));
     ecs_add_pair(world, ecs_id(OrePlayer), EcsWith, ecs_id(Rotation));
     ecs_add_pair(world, ecs_id(OrePlayer), EcsWith, DynamicTransform);
-    ecs_add_pair(world, ecs_id(OrePlayer), EcsWith, ecs_id(OreGait));
+    ecs_add_pair(world, ecs_id(OrePlayer), EcsWith, ecs_id(OrePlayerGait));
     ecs_add_pair(world, ecs_id(OreLimb), EcsWith, ecs_id(Rotation));
 
     ecs_system(world, {
@@ -358,7 +358,7 @@ void ore_player_import(
         .phase = EcsOnUpdate,
         .query.terms = {
             { .id = ecs_id(OrePlayer), .inout = EcsIn },
-            { .id = ecs_id(OreGait), .src.id = EcsSelf, .inout = EcsInOut },
+            { .id = ecs_id(OrePlayerGait), .src.id = EcsSelf, .inout = EcsInOut },
             { .id = ecs_id(Position), .src.id = EcsSelf, .inout = EcsInOut },
             { .id = ecs_id(OreEffects), .src.id = ecs_id(OreEffects), .inout = EcsIn },
             { .id = playing, .src.id = state }
@@ -383,7 +383,7 @@ void ore_player_import(
             { .id = ecs_id(OreLimb), .src.id = EcsSelf, .inout = EcsIn },
             { .id = ecs_id(Rotation), .src.id = EcsSelf, .inout = EcsInOut },
             { .id = ecs_id(OrePlayer), .src.id = EcsUp, .trav = EcsChildOf, .inout = EcsIn },
-            { .id = ecs_id(OreGait), .src.id = EcsUp, .trav = EcsChildOf, .inout = EcsIn },
+            { .id = ecs_id(OrePlayerGait), .src.id = EcsUp, .trav = EcsChildOf, .inout = EcsIn },
             { .id = ecs_id(OreClock), .src.id = ecs_id(OreClock), .inout = EcsIn },
             { .id = playing, .src.id = state }
         },

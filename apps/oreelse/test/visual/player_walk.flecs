@@ -1,7 +1,7 @@
 // The astronaut walking east on the basin south of the deposits, three frames into play, seen
 // from close up on its right side: a full stride, the legs and arms swung opposite to
 // each other and the body bobbed up. The game plays, walked by a held action of the scene's own,
-// and the walk cycle (OreGait) and the limbs start in the stride, the half step before it
+// and the walk cycle (OrePlayerGait) and the limbs start in the stride, the half step before it
 // counted, so OrePlayerFx kicks up the dust on frame one; three frames old it is still too small
 // to show behind the boots (oreelse_player_fx.py checks it, particles_gallery shows FootDust)
 include apps/oreelse/test/visual/setup/seed
@@ -43,7 +43,7 @@ camera {
 astronaut {
   Position: {-6, 0, 31}
   Rotation: {0, PI / 2, 0}
-  OreGait: {cycle: 1, step: 1}
+  OrePlayerGait: {cycle: 1, step: 1}
 
   leg_left {
     Rotation: {0.463, 0, 0}

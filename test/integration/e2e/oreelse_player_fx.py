@@ -46,7 +46,7 @@ DEPOSIT_POOF_Y = 0.4
 PLACE_POOF_Y = 0.4
 DEMOLISH_POOF_Y = 0.6
 
-# The death: the splat above the astronaut (cfg.splatLift) and its fall (cfg.deathPitch)
+# The death: the splat above the astronaut (cfg.playerSplatLift) and its fall (cfg.deathPitch)
 SPLAT_LIFT = 1.1
 DEATH_PITCH = 1.5708
 
@@ -138,7 +138,7 @@ def test_walk(app):
         app.check(value > LIMBS[name] * 0.4, "%s swung at most %g while walking" % (name, value))
     app.check(all(-TOLERANCE <= y <= BOB + TOLERANCE for y in heights) and max(heights) > 0.01,
               "the astronaut bobbed through %s, not up to %g" % (heights, BOB))
-    gait = app.get(PLAYER, "OreGait")
+    gait = app.get(PLAYER, "OrePlayerGait")
     app.check(0 <= gait["cycle"] < 2 * math.pi, "the walk cycle is at %s" % gait)
 
     # Every half step on the ground kicks up dust at the astronaut's feet

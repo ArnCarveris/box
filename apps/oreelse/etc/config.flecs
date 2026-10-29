@@ -47,9 +47,9 @@ cfg {
   export const hoverFall: f32 = 5
   export const airborne: f32 = 0.01
 
-  // The walk of the astronaut (OrePlayerFx): its walk cycle (OreGait) advances its speed times
-  // stepRate radians a second, it bobs up to bobHeight above the ground with every step and kicks
-  // up FootDust footDustY above the ground at every half step on the ground
+  // The walk of the astronaut (OrePlayerFx): its walk cycle (OrePlayerGait) advances its speed
+  // times stepRate radians a second, it bobs up to bobHeight above the ground with every step and
+  // kicks up FootDust footDustY above the ground at every half step on the ground
   export const stepRate: f32 = 1.6
   export const bobHeight: f32 = 0.07
   export const footDustY: f32 = 0.04
@@ -64,9 +64,9 @@ cfg {
   export const airDangle: f32 = 0.14
   export const airDangleRate: f32 = 1.6
 
-  // The death of the astronaut: SplatBurst plays splatLift above its position and it falls over,
-  // turned deathPitch about x (and its yaw dropped, as the original)
-  export const splatLift: f32 = 1.1
+  // The death of the astronaut: SplatBurst plays playerSplatLift above its position and it falls
+  // over, turned deathPitch about x (and its yaw dropped, as the original)
+  export const playerSplatLift: f32 = 1.1
   export const deathPitch: f32 = 1.5708
 
   // A deposit shrinks with its ore, to a scale of depositScaleMin + (1 - depositScaleMin) *
