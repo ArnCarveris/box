@@ -1285,7 +1285,7 @@ static void box_gpu_fx_projection(
 #define BOX_GPU_FOG_ANISOTROPY_MAX (0.92f)
 
 /** Record the height fog pass, lit by the sun and ambient light of the scene of the view, or
- * colored by the sky of a view that renders its atmosphere when the fog has atmosphere set:
+ * colored by the sky of a view that renders the atmosphere the fog refers to:
  * the in scatter color the atmosphere wrote for the view, toward its main light.
  *
  * @param gpu The backend
@@ -1326,7 +1326,7 @@ static bool box_gpu_fx_fog(
         u.ambient[c] = (l->ambient_sky[c] + l->ambient_ground[c]) * 0.5f * f->ambient_inscatter;
     }
 
-    WGPUTextureView sky = f->atmosphere
+    WGPUTextureView sky = f->atmosphere && f->atmosphere == ctx->v->atmos.entity
         ? box_gpu_atmosphere_fog(gpu, ctx->t, ctx->packet, ctx->v)
         : NULL;
     if (sky) {

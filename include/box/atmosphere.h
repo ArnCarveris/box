@@ -38,8 +38,9 @@ ECS_STRUCT(AtmosphereMie, {
                              *   {255, 255, 255} */
 });
 
-/** Atmosphere of a scene, placed on a Scene root or as a singleton for the default scene.
- * Adding it adds AtmosphereStatus, removing it removes it.
+/** Atmosphere of a scene, placed on an entity of the scene: the Scene root, an entity under it,
+ * or an entity outside any Scene for the default scene. Adding it adds AtmosphereStatus,
+ * removing it removes it.
  *
  * The entity is the environment source of the sky of its scene (LightSettings.environment):
  * Atmosphere adds Environment {128, Box} unless the entity has one. The sky has no sun or moon

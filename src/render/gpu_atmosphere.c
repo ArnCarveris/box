@@ -1083,7 +1083,7 @@ static box_gpu_atmos_view_t* box_gpu_atmos_view(
     return result;
 }
 
-/** Check whether a view runs a HeightFog that takes its color from the atmosphere.
+/** Check whether a view runs a HeightFog that takes its color from the atmosphere it renders.
  *
  * @param packet The packet
  * @param v The view
@@ -1102,7 +1102,8 @@ static bool box_gpu_atmos_has_fog(
     for (i = 0; i < v->effect_count && !result; i ++) {
         const box_render_effect_t *e = ecs_vec_get_t(
             &packet->effects, box_render_effect_t, v->effect_first + i);
-        result = e->kind == BOX_RENDER_EFFECT_FOG && e->fog.atmosphere;
+        result = e->kind == BOX_RENDER_EFFECT_FOG && e->fog.atmosphere &&
+            e->fog.atmosphere == v->atmos.entity;
     }
 
 done:

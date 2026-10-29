@@ -8,6 +8,7 @@ using box.controllers
 using box.geometry
 using box.material
 using box.light
+using box.atmosphere
 
 window {
   Surface: {width: 1280, height: 720, vsync: true}
@@ -15,6 +16,15 @@ window {
 
 gtao {
   Gtao: {radius: 0.6, final_value_power: 2.2}
+}
+
+sky {
+  Atmosphere: {units_per_km: 100, mie: {scale_height: 1.2, anisotropy: 0.8, scattering_scale: 4}, ozone_scale: 5}
+  HeightFog: {density: 0.004, falloff: 0.1, base_height: 0, max_opacity: 0.25, atmosphere: sky}
+}
+
+bloom {
+  Bloom: {intensity: 0.25, threshold: 1, threshold_softness: 0.5}
 }
 
 tonemap {
@@ -35,17 +45,16 @@ camera {
 }
 
 view {
-  View: {camera: camera, clear: {enabled: true, color: {150, 178, 210, 255}}, lighting: {enabled: true}, shadows: {enabled: true, cascades: 4, resolution: 2048, max_distance: 200, split_lambda: 0.7, depth_bias: 2, normal_offset: 2, filter_size: 3, fade: 0.2, blend: 0.1}, culling: {enabled: true, occlusion: true, min_dimension_px: 4}, effects: [{enabled: true, effect: gtao}, {enabled: true, effect: tonemap}, {enabled: true, effect: smaa}]}
+  View: {camera: camera, clear: {enabled: true, color: {150, 178, 210, 255}}, lighting: {enabled: true, baked: true, reflections: true, atmosphere: true, environment: {source: sky, intensity: 0.5, yaw: 0, background: false}}, shadows: {enabled: true, cascades: 4, resolution: 2048, max_distance: 200, split_lambda: 0.7, depth_bias: 2, normal_offset: 2, filter_size: 3, fade: 0.2, blend: 0.1}, culling: {enabled: true, occlusion: true, min_dimension_px: 4}, effects: [{enabled: true, effect: gtao}, {enabled: true, effect: sky}, {enabled: true, effect: bloom}, {enabled: true, effect: tonemap}, {enabled: true, effect: smaa}]}
 }
 
 $ {
-  AmbientLight: {sky: {150, 178, 210}, ground: {60, 56, 50}, intensity: 0.25}
-  LightBake: {probe_spacing: 1, bounds_padding: -0.3, capture_size: 16, bounces: 0, budget_ms: 8}
+  LightBake: {environment: sky, probe_spacing: 1, bounds_padding: -0.3, capture_size: 16, bounces: 0, budget_ms: 8}
 }
 
 sun {
-  Rotation: {0.703, -0.8332, 0}
-  DirectionalLight: {intensity: 1.1 * math.PI}
+  Rotation: {0.45, -0.8332, 0}
+  DirectionalLight: {intensity: 1.4 * math.PI}
   Rgb: {255, 255, 255}
 }
 
