@@ -100,7 +100,12 @@ or copy an inherited map. Both work deferred, on a stage (`it->stage` in a syste
 `ecs_get_stage(world, 0)` until `ecs_merge`); several calls on one entity before the merge edit
 the same map. Deferred, `box_transition_remove` also removes an entry that `box_transition_set`
 added on the same stage before the merge, also on an entity that did not own `Transition` yet; an
-entity without an entry, owned, inherited or pending, still gets nothing. The storage
+entity without an entry, owned, inherited or pending, still gets nothing. Calls on the world
+pointer, also `it->world` in an immediate system or in an observer that runs during a merge, are
+never deferred by flecs: they apply at once, so a remove after a set always sees the entry and
+nothing is tracked. One limit: on an entity without `Transition`, a `box_transition_set`, an
+`ecs_remove` of `Transition` (or `ecs_clear`, `ecs_delete`) and a `box_transition_remove` on one
+stage leave an empty `Transition` after the merge, because flecs dropped the pending value. The storage
 is a flecs map (`ecs_map_t`) keyed by the component entity whose values are allocated
 `TransitionSpec`s, so `ecs_map_get_deref(map, TransitionSpec, ecs_id(Position))` also reads one.
 

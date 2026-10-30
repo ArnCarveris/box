@@ -750,6 +750,9 @@ void Transition_deferred_no_leak(void) {
     ecs_fini(world);
 }
 
+/** A deferred remove of an entry set on the same stage before the merge. The set added
+ * Transition, the remove leaves it with an empty map.
+ */
 void Transition_deferred_remove_pending(void) {
     // engine_core/transition
     ecs_world_t *world = ecs_init();
@@ -762,7 +765,6 @@ void Transition_deferred_remove_pending(void) {
     test_assert(!ecs_has(world, e, Transition));
     ecs_merge(stage);
 
-    /* The set added Transition, the remove leaves it with an empty map */
     test_assert(box_transition_get(world, e, ecs_id(Position)) == NULL);
     test_assert(ecs_owns(world, e, Transition));
     test_int(ecs_map_count(ecs_get(world, e, Transition)), 0);
@@ -875,6 +877,10 @@ void Transition_system_remove_pending(void) {
     ecs_fini(world);
 }
 
+/** A deferred remove of an entry the entity does not have adds and copies nothing. A set in an
+ * earlier, flushed block is no longer pending: after the component is removed, a deferred remove
+ * adds nothing.
+ */
 void Transition_deferred_remove_missing(void) {
     // engine_core/transition
     ecs_world_t *world = ecs_init();
@@ -902,8 +908,6 @@ void Transition_deferred_remove_missing(void) {
     test_assert(!ecs_owns(world, d.inst, Transition));
     test_int(ecs_map_count(ecs_get(world, d.prefab, Transition)), 2);
 
-    /* A set in an earlier, flushed block is no longer pending: after the component is removed,
-     * a deferred remove adds nothing */
     box_transition_set(stage, d.plain, ecs_id(Scale), &(TransitionSpec){ .duration = 1.0f });
     ecs_merge(stage);
     ecs_remove(world, d.plain, Transition);
@@ -998,6 +1002,329 @@ void Transition_deferred_remove_pending_no_leak(void) {
     test_int(transition_live_allocs(), before);
 
     ecs_delete(world, prefab);
+    ecs_fini(world);
+}
+
+/** Set then remove Position on the world pointer: the calls run at once, so the remove sees the
+ * entry and leaves an empty map, and nothing is recorded as pending on stage 0.
+ */
+void Transition_deferred_world_remove_pending(void) {
+    // engine_core/transition
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t e = ecs_new(world);
+    test_assert(!ecs_is_stage(world));
+    box_transition_set(world, e, ecs_id(Position), &(TransitionSpec){ .duration = 1.0f });
+    box_transition_remove(world, e, ecs_id(Position));
+    test_assert(box_transition_get(world, e, ecs_id(Position)) == NULL);
+    test_assert(ecs_owns(world, e, Transition));
+    test_int(ecs_map_count(ecs_get(world, e, Transition)), 0);
+
+    ecs_entity_t two = ecs_new(world);
+    box_transition_set(world, two, ecs_id(Position), &(TransitionSpec){ .duration = 1.0f });
+    box_transition_set(world, two, ecs_id(Rgb), &(TransitionSpec){ .duration = 2.0f });
+    box_transition_remove(world, two, ecs_id(Position));
+    test_int(ecs_map_count(ecs_get(world, two, Transition)), 1);
+    test_assert(box_transition_get(world, two, ecs_id(Position)) == NULL);
+    test_flt(box_transition_get(world, two, ecs_id(Rgb))->duration, 2.0f);
+
+    ecs_world_t *stage = ecs_get_stage(world, 0);
+    int32_t sets = 0;
+    transition_observe_set(world, &sets);
+    ecs_remove(world, e, Transition);
+    box_transition_remove(stage, e, ecs_id(Position));
+    ecs_merge(stage);
+    test_int(sets, 0);
+    test_assert(!ecs_has(world, e, Transition));
+
+    ecs_fini(world);
+}
+
+/** Set then remove on the world pointer on an instance: it gets the prefab entries without the
+ * removed one and the prefab is unchanged.
+ */
+void Transition_deferred_world_remove_pending_inherited(void) {
+    // engine_core/transition
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    transition_deferred_t d = transition_deferred_new(world);
+    box_transition_set(world, d.inst, ecs_id(Scale), &(TransitionSpec){ .duration = 3.0f });
+    box_transition_set(world, d.inst, ecs_id(Opacity), &(TransitionSpec){ .duration = 4.0f });
+    box_transition_remove(world, d.inst, ecs_id(Scale));
+
+    test_assert(ecs_owns(world, d.inst, Transition));
+    test_int(ecs_map_count(ecs_get(world, d.inst, Transition)), 3);
+    test_assert(box_transition_get(world, d.inst, ecs_id(Scale)) == NULL);
+    test_flt(box_transition_get(world, d.inst, ecs_id(Position))->duration, 1.0f);
+    test_flt(box_transition_get(world, d.inst, ecs_id(Rgb))->duration, 2.0f);
+    test_flt(box_transition_get(world, d.inst, ecs_id(Opacity))->duration, 4.0f);
+
+    ecs_entity_t inst2 = ecs_new_w_pair(world, EcsIsA, d.prefab);
+    box_transition_set(world, inst2, ecs_id(Scale), &(TransitionSpec){ .duration = 3.0f });
+    box_transition_remove(world, inst2, ecs_id(Rgb));
+    box_transition_remove(world, inst2, ecs_id(Scale));
+    test_int(ecs_map_count(ecs_get(world, inst2, Transition)), 1);
+    test_flt(box_transition_get(world, inst2, ecs_id(Position))->duration, 1.0f);
+    test_assert(box_transition_get(world, inst2, ecs_id(Rgb)) == NULL);
+
+    test_int(ecs_map_count(ecs_get(world, d.prefab, Transition)), 2);
+    test_flt(box_transition_get(world, d.prefab, ecs_id(Position))->duration, 1.0f);
+    test_flt(box_transition_get(world, d.prefab, ecs_id(Rgb))->duration, 2.0f);
+    test_assert(box_transition_get(world, d.prefab, ecs_id(Scale)) == NULL);
+    test_assert(box_transition_get(world, d.prefab, ecs_id(Opacity)) == NULL);
+
+    ecs_fini(world);
+}
+
+/** State of the system and observer that call on it->world */
+typedef struct transition_world_ctx_t {
+    transition_deferred_t entities; /**< Entities to edit */
+    int32_t runs;                   /**< Times the callback ran */
+    bool direct;                    /**< Whether it->world was never a stage or readonly */
+} transition_world_ctx_t;
+
+/** Set then remove Scale on the plain entity and the instance through it->world.
+ *
+ * @param it Iterator of the system or observer, ctx points at a transition_world_ctx_t
+ */
+static void transition_world_set_remove(
+    ecs_iter_t *it)
+{
+    transition_world_ctx_t *ctx = it->ctx;
+    transition_deferred_t *d = &ctx->entities;
+    ctx->runs ++;
+    ctx->direct = ctx->direct && !ecs_is_stage(it->world) && !ecs_stage_is_readonly(it->world);
+    box_transition_set(it->world, d->plain, ecs_id(Scale), &(TransitionSpec){ .duration = 5.0f });
+    box_transition_set(it->world, d->plain, ecs_id(Opacity),
+        &(TransitionSpec){ .duration = 6.0f });
+    box_transition_remove(it->world, d->plain, ecs_id(Scale));
+    box_transition_set(it->world, d->inst, ecs_id(Scale), &(TransitionSpec){ .duration = 3.0f });
+    box_transition_remove(it->world, d->inst, ecs_id(Scale));
+}
+
+/** Check the entities after transition_world_set_remove ran once.
+ *
+ * @param world The world
+ * @param d The entities
+ */
+static void transition_world_check_set_remove(
+    ecs_world_t *world,
+    const transition_deferred_t *d)
+{
+    test_int(ecs_map_count(ecs_get(world, d->plain, Transition)), 1);
+    test_assert(box_transition_get(world, d->plain, ecs_id(Scale)) == NULL);
+    test_flt(box_transition_get(world, d->plain, ecs_id(Opacity))->duration, 6.0f);
+    test_assert(ecs_owns(world, d->inst, Transition));
+    test_int(ecs_map_count(ecs_get(world, d->inst, Transition)), 2);
+    test_assert(box_transition_get(world, d->inst, ecs_id(Scale)) == NULL);
+    test_flt(box_transition_get(world, d->inst, ecs_id(Position))->duration, 1.0f);
+    test_int(ecs_map_count(ecs_get(world, d->prefab, Transition)), 2);
+}
+
+/** An immediate system run by ecs_progress sets then removes entries through it->world. A
+ * system that is not immediate runs readonly and must use it->stage instead.
+ */
+void Transition_system_world_remove_pending(void) {
+    // engine_core/transition
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    transition_world_ctx_t ctx = {
+        .entities = transition_deferred_new(world),
+        .direct = true
+    };
+
+    ecs_entity_t system = ecs_entity(world, { .name = "TransitionWorldSetRemove" });
+    ecs_add_pair(world, system, EcsDependsOn, EcsOnUpdate);
+    system = ecs_system(world, {
+        .entity = system,
+        .callback = transition_world_set_remove,
+        .ctx = &ctx,
+        .immediate = true
+    });
+    test_assert(system != 0);
+
+    ecs_progress(world, 0.1f);
+    test_int(ctx.runs, 1);
+    test_assert(ctx.direct);
+    transition_world_check_set_remove(world, &ctx.entities);
+
+    ecs_delete(world, system);
+    ecs_fini(world);
+}
+
+/** An observer that sets then removes entries through it->world, run while the commands of a
+ * deferred stage are merged.
+ */
+void Transition_observer_world_remove_pending(void) {
+    // engine_core/transition
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ECS_TAG(world, TransitionTrigger);
+
+    transition_world_ctx_t ctx = {
+        .entities = transition_deferred_new(world),
+        .direct = true
+    };
+
+    ecs_observer(world, {
+        .query.terms = {{ .id = TransitionTrigger }},
+        .events = { EcsOnAdd },
+        .callback = transition_world_set_remove,
+        .ctx = &ctx
+    });
+
+    ecs_entity_t trigger = ecs_new(world);
+    ecs_world_t *stage = ecs_get_stage(world, 0);
+    ecs_readonly_begin(world, false);
+    ecs_add(stage, trigger, TransitionTrigger);
+    test_int(ctx.runs, 0);
+    ecs_readonly_end(world);
+
+    test_int(ctx.runs, 1);
+    test_assert(ctx.direct);
+    transition_world_check_set_remove(world, &ctx.entities);
+
+    ecs_fini(world);
+}
+
+/** A remove through the world pointer of a key that is neither in the map nor pending adds and
+ * copies nothing and emits no OnSet.
+ */
+void Transition_deferred_world_remove_missing(void) {
+    // engine_core/transition
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    transition_deferred_t d = transition_deferred_new(world);
+    int32_t sets = 0;
+    transition_observe_set(world, &sets);
+
+    box_transition_remove(world, d.plain, ecs_id(Scale));
+    box_transition_remove(world, d.inst, ecs_id(Scale));
+    test_int(sets, 0);
+    test_assert(!ecs_has(world, d.plain, Transition));
+    test_assert(!ecs_owns(world, d.inst, Transition));
+    test_assert(ecs_get(world, d.inst, Transition) == ecs_get(world, d.prefab, Transition));
+
+    ecs_world_t *stage = ecs_get_stage(world, 0);
+    box_transition_set(stage, d.plain, ecs_id(Scale), &(TransitionSpec){ .duration = 1.0f });
+    box_transition_remove(world, d.inst, ecs_id(Scale));
+    box_transition_remove(world, d.plain, ecs_id(Opacity));
+    test_int(sets, 0);
+    test_assert(!ecs_owns(world, d.inst, Transition));
+    test_assert(!ecs_has(world, d.plain, Transition));
+    ecs_merge(stage);
+    test_int(ecs_map_count(ecs_get(world, d.plain, Transition)), 1);
+    test_int(ecs_map_count(ecs_get(world, d.prefab, Transition)), 2);
+
+    ecs_fini(world);
+}
+
+/** The known limit: a set, an ecs_remove of Transition and a remove of the entry on one stage
+ * leave an empty Transition after the merge, because flecs dropped the pending value while the
+ * mark stays. On the world pointer the calls run at once and the entity ends without Transition.
+ */
+void Transition_deferred_remove_after_component_remove(void) {
+    // engine_core/transition
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t e = ecs_new(world);
+    ecs_world_t *stage = ecs_get_stage(world, 0);
+    box_transition_set(stage, e, ecs_id(Position), &(TransitionSpec){ .duration = 1.0f });
+    ecs_remove(stage, e, Transition);
+    box_transition_remove(stage, e, ecs_id(Position));
+    ecs_merge(stage);
+    test_assert(ecs_owns(world, e, Transition));
+    test_int(ecs_map_count(ecs_get(world, e, Transition)), 0);
+    test_assert(box_transition_get(world, e, ecs_id(Position)) == NULL);
+
+    ecs_entity_t direct = ecs_new(world);
+    int32_t sets = 0;
+    box_transition_set(world, direct, ecs_id(Position), &(TransitionSpec){ .duration = 1.0f });
+    ecs_remove(world, direct, Transition);
+    transition_observe_set(world, &sets);
+    box_transition_remove(world, direct, ecs_id(Position));
+    test_int(sets, 0);
+    test_assert(!ecs_has(world, direct, Transition));
+
+    ecs_fini(world);
+}
+
+/** Set and remove entries through the world pointer, on its own and from an observer during a
+ * merge, then delete the entities.
+ *
+ * @param world The world
+ * @param prefab Prefab with Position and Rgb entries
+ * @param trigger Tag whose OnAdd observer calls transition_world_set_remove
+ * @param ctx Context of that observer
+ */
+static void transition_world_churn(
+    ecs_world_t *world,
+    ecs_entity_t prefab,
+    ecs_entity_t trigger,
+    transition_world_ctx_t *ctx)
+{
+    ecs_entity_t inst = ecs_new_w_pair(world, EcsIsA, prefab);
+    ecs_entity_t plain = ecs_new(world);
+    ecs_entity_t missing = ecs_new_w_pair(world, EcsIsA, prefab);
+
+    box_transition_set(world, plain, ecs_id(Scale), &(TransitionSpec){ .duration = 1.0f });
+    box_transition_remove(world, plain, ecs_id(Scale));
+    box_transition_set(world, plain, ecs_id(Scale), &(TransitionSpec){ .duration = 2.0f });
+    box_transition_set(world, inst, ecs_id(Scale), &(TransitionSpec){ .duration = 3.0f });
+    box_transition_remove(world, inst, ecs_id(Scale));
+    box_transition_remove(world, inst, ecs_id(Rgb));
+    box_transition_remove(world, missing, ecs_id(Scale));
+    test_int(ecs_map_count(ecs_get(world, plain, Transition)), 1);
+    test_int(ecs_map_count(ecs_get(world, inst, Transition)), 1);
+    test_assert(!ecs_owns(world, missing, Transition));
+
+    ctx->entities.inst = ecs_new_w_pair(world, EcsIsA, prefab);
+    ctx->entities.plain = ecs_new(world);
+    ecs_entity_t target = ecs_new(world);
+    ecs_world_t *stage = ecs_get_stage(world, 0);
+    ecs_add_id(stage, target, trigger);
+    ecs_merge(stage);
+    transition_world_check_set_remove(world, &ctx->entities);
+
+    ecs_delete(world, inst);
+    ecs_delete(world, plain);
+    ecs_delete(world, missing);
+    ecs_delete(world, target);
+    ecs_delete(world, ctx->entities.inst);
+    ecs_delete(world, ctx->entities.plain);
+}
+
+void Transition_deferred_world_no_leak(void) {
+    // engine_core/transition
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ECS_TAG(world, TransitionTrigger);
+
+    transition_world_ctx_t ctx = { .entities = transition_deferred_new(world), .direct = true };
+    ecs_observer(world, {
+        .query.terms = {{ .id = TransitionTrigger }},
+        .events = { EcsOnAdd },
+        .callback = transition_world_set_remove,
+        .ctx = &ctx
+    });
+    ecs_entity_t prefab = ctx.entities.prefab;
+
+    transition_world_churn(world, prefab, TransitionTrigger, &ctx);
+    int64_t before = transition_live_allocs();
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        transition_world_churn(world, prefab, TransitionTrigger, &ctx);
+    }
+
+    test_int(transition_live_allocs(), before);
+    test_int(ctx.runs, 5);
+    test_assert(ctx.direct);
+
     ecs_fini(world);
 }
 
