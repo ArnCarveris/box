@@ -136,7 +136,7 @@ void box_draws_transition_encode(
 
     box_draws_material(&shading, &m);
     ecs_os_memcpy(ECS_OFFSET(dst, offsetof(box_render_shading_t, color)), shading.color,
-        ECS_SIZEOF(vec4));
+        ECS_SIZEOF(shading.color));
     ecs_os_memcpy(ECS_OFFSET(dst, offsetof(box_render_shading_t, emissive)), shading.emissive,
         ECS_SIZEOF(float) * 3);
     if (material->kind == BOX_DRAW_TRANSITION_SHAPE) {

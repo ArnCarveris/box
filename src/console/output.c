@@ -1470,9 +1470,22 @@ void box_console_out_run(
         ecs_os_free(path);
     }
 
+<<<<<<< HEAD
     ecs_value_t *result = ecs_vec_last_t(&r.results, ecs_value_t);
     if (!count && result && result->type && result->ptr) {
         box_console_fmt_value(&fmt, result->type, result->ptr);
+=======
+    ecs_value_t *results = ecs_vec_first(&r.results);
+    int32_t result_count = count ? 0 : ecs_vec_count(&r.results);
+    for (i = 0; i < result_count; i ++) {
+        if (results[i].type && results[i].ptr) {
+            if (box_console_out_len(out)) {
+                box_console_out_add(out, BoxSpanNone, "\n", 1);
+            }
+
+            box_console_fmt_value(&fmt, results[i].type, results[i].ptr);
+        }
+>>>>>>> e5972a93d6a358ff7e884f700beb3959a8825bf3
     }
 
     for (i = 0; i < count; i ++) {

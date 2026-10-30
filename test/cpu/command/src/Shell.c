@@ -369,8 +369,13 @@ void Shell_rest_endpoint(void) {
     test_int(ecs_http_server_request(srv, "PUT", path, "key_press W 2", &reply), 0);
     test_int(reply.code, 200);
     body = ecs_strbuf_get(&reply.body);
+<<<<<<< HEAD
     test_str(body,
         "{\"results\":[{\"type\":\"flecs.meta.i32\", \"result\":3}], \"errors\":[]}");
+=======
+    test_str(body, "{\"results\":[{\"type\":\"flecs.meta.i32\", \"result\":3}], "
+        "\"errors\":[]}");
+>>>>>>> e5972a93d6a358ff7e884f700beb3959a8825bf3
     ecs_os_free(body);
 
     reply = (ecs_http_reply_t)ECS_HTTP_REPLY_INIT;

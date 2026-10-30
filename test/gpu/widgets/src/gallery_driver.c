@@ -143,7 +143,11 @@ static char* gallery_get_member(
         goto done;
     }
 
+<<<<<<< HEAD
     const ecs_value_t *last = ecs_vec_last_t(&r.results, ecs_value_t);
+=======
+    const ecs_value_t *last = box_command_value(&r);
+>>>>>>> e5972a93d6a358ff7e884f700beb3959a8825bf3
     if (!last || last->type != ecs_id(ecs_value_t)) {
         result = flecs_asprintf(BOX_COMMAND_ERROR "'%s' returned no value", line);
         goto done;

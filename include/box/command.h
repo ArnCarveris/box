@@ -43,9 +43,9 @@ void BoxCommandImport(
 
 /** Run a command line in a shell session and format its result as text.
  *
- * The result is formatted with box_command_format. When the command logged errors the output
- * is only the errors, one per line that starts with BOX_COMMAND_ERROR, as a command that logs
- * an error still returns a value.
+ * The result of each command is formatted with box_command_format, one per line. When the
+ * commands logged errors the output is only the errors, one per line that starts with
+ * BOX_COMMAND_ERROR, as a command that logs an error still returns a value.
  *
  * @param world The world
  * @param session The session, created with ecs_shell_session_init
@@ -58,6 +58,17 @@ char* box_command_run(
     ecs_entity_t session,
     const char *line,
     bool *error);
+
+/** Get the value of the last command that ran in a shell result.
+ *
+ * A command line can contain multiple commands, ecs_shell_run returns one value per command.
+ * The value of the line is the value of its last command.
+ *
+ * @param r The result of ecs_shell_run
+ * @return The value, NULL when no command ran
+ */
+const ecs_value_t* box_command_value(
+    const ecs_shell_result_t *r);
 
 /** Get the file of a resource that a command created in a session.
  *

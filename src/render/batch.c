@@ -33,7 +33,7 @@ static const uint8_t box_draws_image_color[3] = { 255, 255, 255 };
 #define BOX_DRAWS_MAX_CHANGES ((uint64_t)128 << 20)
 
 _Static_assert(sizeof(box_render_transform_t) == 48, "InstanceTransform of instance.wgsl");
-_Static_assert(sizeof(box_render_shading_t) == 80, "Shape2DShading of shape2d.wgsl");
+_Static_assert(sizeof(box_render_shading_t) == 64, "Shape2DShading of shape2d.wgsl");
 _Static_assert(sizeof(box_render_mesh_shading_t) == 16, "MeshShading of instance.wgsl");
 _Static_assert(sizeof(box_render_material_t) == 80, "Material of material.wgsl");
 
@@ -732,23 +732,54 @@ uint8_t box_draws_blend(
     return result;
 }
 
+/** Convert a value from 0 to 1 to unorm16.
+ *
+ * @param value The value
+ * @return The unorm16 bits
+ */
+static uint32_t box_draws_unorm16(
+    float value)
+{
+    return (uint32_t)(glm_clamp(value, 0.0f, 1.0f) * 65535.0f + 0.5f);
+}
+
+void box_draws_color_pack(
+    uint32_t *out,
+    const float *color)
+{
+    out[0] = box_draws_unorm16(color[0]) | (box_draws_unorm16(color[1]) << 16);
+    out[1] = box_draws_unorm16(color[2]) | (box_draws_unorm16(color[3]) << 16);
+}
+
+void box_draws_color_unpack(
+    float *out,
+    const uint32_t *packed)
+{
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        out[i] = (float)((packed[i / 2] >> (16 * (i % 2))) & 0xFFFFu) / 65535.0f;
+    }
+}
+
 /** Mix the color of a shape toward its tints and write the shape of a 2D shape.
  *
  * Kept out of line so the plain material path does not pay for the registers it needs.
  *
  * @param out The shading, with the plain material written
+ * @param color The linear base color, receives the tinted one
  * @param material Material components of the entity
  * @param base The base color, display encoded
  */
 static BOX_DRAWS_NOINLINE void box_draws_material_mixed(
     box_render_shading_t *out,
+    float *color,
     const box_draw_material_t *material,
     const uint8_t *base)
 {
     float border[3];
     bool tinted = material->inherited || material->tint;
     if (tinted) {
-        box_draws_tinted(out->color, base, material);
+        box_draws_tinted(color, base, material);
     }
 
     if (material->shape2d && tinted) {
@@ -773,10 +804,12 @@ void box_draws_material(
         base = box_draws_image_color;
     }
 
-    out->color[0] = box_draws_linear(base[0]);
-    out->color[1] = box_draws_linear(base[1]);
-    out->color[2] = box_draws_linear(base[2]);
-    out->color[3] = box_draws_alpha(material);
+    float linear[4] = {
+        box_draws_linear(base[0]),
+        box_draws_linear(base[1]),
+        box_draws_linear(base[2]),
+        box_draws_alpha(material)
+    };
     float strength = emissive && emissive->strength > 0.0f ? emissive->strength : 0.0f;
     out->emissive[0] = emissive ? box_draws_linear(emissive->color.r) * strength : 0.0f;
     out->emissive[1] = emissive ? box_draws_linear(emissive->color.g) * strength : 0.0f;
@@ -792,22 +825,11 @@ void box_draws_material(
     out->uv[3] = uv ? uv->offset_y : 0.0f;
     out->ids[0] = material->clip > 0 ? (uint32_t)material->clip : 0u;
     out->ids[1] = material->rank;
-    out->ids[2] = 0;
-    out->ids[3] = 0;
     if (material->inherited || material->tint || material->shape2d) {
-        box_draws_material_mixed(out, material, base);
+        box_draws_material_mixed(out, linear, material, base);
     }
-}
 
-/** Convert a value from 0 to 1 to unorm16.
- *
- * @param value The value
- * @return The unorm16 bits
- */
-static uint32_t box_draws_unorm16(
-    float value)
-{
-    return (uint32_t)(glm_clamp(value, 0.0f, 1.0f) * 65535.0f + 0.5f);
+    box_draws_color_pack(out->color, linear);
 }
 
 void box_draws_material_pack(
@@ -1841,7 +1863,7 @@ static void box_draws_fill_material(
         if (box_draws_is_2d(b)) {
             box_render_shading_t *out = box_draws_slot_shading(b, slots[i].slot);
             box_draws_material(out, &material);
-            alpha = out->color[3];
+            alpha = box_draws_alpha(&material);
         } else {
             uint32_t id = box_draws_material_id(it->world, d, it->entities[i], true, true);
             box_render_mesh_shading_t *out = box_draws_slot_mesh_shading(b, slots[i].slot);
