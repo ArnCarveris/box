@@ -117,9 +117,8 @@ typedef struct box_gpu_target_t {
     uint64_t readback_size;         /**< Bytes of the idle readback buffer */
     box_gpu_capture_t *capture;     /**< Copy recorded in this frame, not yet mapped */
     box_gpu_snapshot_t *snapshots[BOX_GPU_SNAPSHOT_FORMATS]; /**< Opaque snapshots of the
-                                     *   views with transmissive draws, the one in the format
-                                     *   of the target first, then the one in any other format
-                                     *   (BOX_GPU_HDR_FORMAT), NULL until a view draws in it */
+                                     *   format of the target, then of BOX_GPU_HDR_FORMAT, NULL
+                                     *   until a view draws a transmissive shape in that format */
 } box_gpu_target_t;
 
 /** A compiled shader module */

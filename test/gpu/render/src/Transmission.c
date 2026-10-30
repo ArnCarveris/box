@@ -1033,14 +1033,14 @@ void Transmission_forward_passes_by_phase(void) {
 void Transmission_two_formats_one_target(void) {
     // materials/transmission
     ecs_world_t *world = tr_world();
-    ecs_entity_t gtao = ecs_new(world);
-    ecs_add(world, gtao, Gtao);
+    ecs_entity_t smaa = ecs_new(world);
+    ecs_add(world, smaa, Smaa);
     View value = {.camera = tr_camera(world, 0),
         .clear = {.enabled = true, .color = {0, 0, 0, 255}},
         .lighting = {.enabled = true}};
     ecs_vec_init_t(NULL, &value.effects, ViewEffect, 1);
     *ecs_vec_append_t(NULL, &value.effects, ViewEffect) = (ViewEffect){
-        .enabled = true, .effect = gtao };
+        .enabled = true, .effect = smaa };
     ecs_entity_t hdr = ecs_new(world);
     ecs_set_ptr(world, hdr, View, &value);
     ecs_vec_fini_t(NULL, &value.effects, ViewEffect);
@@ -1086,62 +1086,74 @@ void Transmission_two_formats_one_target(void) {
     ecs_fini(world);
 }
 
-/** Frames rendered from a fresh world in first_frame_not_dark */
-#define TR_FIRST_FRAMES (12)
+/** Frames first_frame_not_dark renders after the one that first draws the glass */
+#define TR_FIRST_FRAMES (6)
 
-/** A rough glass tinted green-less by its albedo over a bright wall, rendered from a fresh
- * world. The first frame that shows the glass (the wall drawn, the center darker than it in
- * green) must not be darker than the frames after it: before the downsample shader exists the
- * glass samples the sharp snapshot, not blur mips that were never written. */
+/** Render one frame into the capture of first_frame_not_dark and get its center pixel.
+ *
+ * @param world The world
+ * @param path Path of the capture, removed once read
+ * @param out Receives the center pixel, RGBA
+ */
+static void tr_first_frame(
+    ecs_world_t *world,
+    const char *path,
+    unsigned char out[4])
+{
+    int w = 0, h = 0, n = 0;
+    tr_frames(world, 1);
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    remove(path);
+    test_int(w, TR_SIZE);
+    test_int(h, TR_SIZE);
+    ecs_os_memcpy(out, tr_px(px, TR_SIZE, TR_SIZE / 2, TR_SIZE / 2), 4);
+    test_assert(tr_px(px, TR_SIZE, 2, 2)[1] > 200);
+    stbi_image_free(px);
+}
+
+/** A rough glass, its green halved by its albedo, over a bright wall in a fresh world.
+ *
+ * The glass is added once the wall renders, with compile outcomes held as the browser holds
+ * them until after the frame, so the frame that first draws it has no downsample shader yet
+ * (etc/shaders/transmission.wgsl is only requested once a batch is transmissive).
+ *
+ * That frame samples the sharp snapshot, not blur mips that were never written, so it is not
+ * darker than the frames after the shader arrives. */
 void Transmission_first_frame_not_dark(void) {
     // materials/transmission
     ecs_world_t *world = tr_world();
     tr_view(world, tr_camera(world, 0), true, false);
     tr_wall(world, 0, -10, 40, 40, 230, 230, 230);
-    ecs_entity_t glass = tr_glass(world, 0, -4, 3, 3, 1, 1, 0);
-    ecs_set(world, glass, Rgb, {255, 128, 255});
-    ecs_set(world, glass, PbrMaterial, {.metallic = 0, .roughness = 1});
     tr_surface(world, TR_SIZE, TR_SIZE, "first_frame.png");
     char *path = flecs_asprintf("%s/first_frame.png",
         ecs_singleton_get(world, AppStatus)->tmp_dir);
-    unsigned char seen[TR_FIRST_FRAMES][4];
-    int32_t i, c, count = 0;
+    unsigned char first[4], later[4];
+    int32_t i, c;
+    tr_frames(world, 3);
+    test_bool(box_render_gpu_compile_delivery(world, BOX_RENDER_COMPILE_HOLD), true);
+    ecs_entity_t glass = tr_glass(world, 0, -4, 3, 3, 1, 1, 0);
+    ecs_set(world, glass, Rgb, {255, 128, 255});
+    ecs_set(world, glass, PbrMaterial, {.metallic = 0, .roughness = 1});
+    box_render_gpu_stats_t before = tr_frames(world, 0);
+    tr_first_frame(world, path, first);
+    printf("first frame: center %d %d %d\n", first[0], first[1], first[2]);
+    test_int(tr_frames(world, 0).transmission_snapshots - before.transmission_snapshots, 1);
+    test_int(tr_frames(world, 0).compiles, before.compiles);
+
+    box_render_gpu_compile_delivery(world, BOX_RENDER_COMPILE_AT_ONCE);
     for (i = 0; i < TR_FIRST_FRAMES; i ++) {
-        tr_frames(world, 1);
-        int w = 0, h = 0, n = 0;
-        unsigned char *px = stbi_load(path, &w, &h, &n, 4);
-        if (!px) {
-            continue;
-        }
-
-        remove(path);
-        test_int(w, TR_SIZE);
-        test_int(h, TR_SIZE);
-        const unsigned char *center = tr_px(px, TR_SIZE, TR_SIZE / 2, TR_SIZE / 2);
-        const unsigned char *corner = tr_px(px, TR_SIZE, 2, 2);
-        printf("frame %d: center %d %d %d, corner %d %d %d\n", i, center[0], center[1],
-            center[2], corner[0], corner[1], corner[2]);
-        if (count || (corner[1] > 150 && center[1] + 40 < corner[1])) {
-            ecs_os_memcpy(seen[count], center, 4);
-            count ++;
-        }
-
-        stbi_image_free(px);
-    }
-
-    test_assert(count >= 3);
-    for (i = 1; i < count; i ++) {
+        tr_first_frame(world, path, later);
+        printf("frame %d after it: center %d %d %d\n", i + 1, later[0], later[1], later[2]);
+        test_assert(later[1] + 40 < 230);
         for (c = 0; c < 3; c ++) {
-            if ((int32_t)seen[0][c] + 3 < (int32_t)seen[i][c]) {
-                printf("channel %d: first frame %d, frame %d after it %d\n", c, seen[0][c],
-                    i, seen[i][c]);
-            }
-
-            test_assert((int32_t)seen[0][c] + 3 >= (int32_t)seen[i][c]);
+            test_assert((int32_t)first[c] + 3 >= (int32_t)later[c]);
         }
     }
 
-    test_int(tr_frames(world, 0).errors, 0);
+    box_render_gpu_stats_t after = tr_frames(world, 0);
+    test_assert(after.compiles > before.compiles);
+    test_int(after.errors, 0);
     ecs_os_free(path);
     ecs_fini(world);
 }
