@@ -164,12 +164,14 @@ fn diffuse(n: vec3f, l: vec3f) -> f32 {
 }
 
 // Light a white particle reflects toward the eye: the directional lights, the first through its
-// shadow map, the point and spot lights of the cluster of the fragment and the ambient light.
+// shadow map and light cookie, the point and spot lights of the cluster of the fragment and the
+// ambient light. A billboard has no meaningful surface, so the cookie reads the footprint of a
+// horizontal one.
 fn particle_light(world: vec3f, n: vec3f) -> vec3f {
     var sum = ambient(n);
     var shadow = shadow_factor(world, n);
     if (view.lights.x > 0u) {
-        shadow *= light_cookie(world, normalize(lights[0].position));
+        shadow *= light_cookie(world, normalize(lights[0].position), vec3f(0.0, 1.0, 0.0));
     }
 
     for (var i = 0u; i < view.lights.x; i++) {

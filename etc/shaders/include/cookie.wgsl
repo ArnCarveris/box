@@ -10,7 +10,15 @@
 //
 // The texture is read as stored through a repeat sampler; the level follows the world size of
 // the pixel at the position over the world size of a texel, as textureSampleLevel needs no
-// derivatives and the plane projection skips positions. With t the value read the cookie is
+// derivatives and the plane projection skips positions. Under the plane projection a step dp
+// along the surface moves q by dq = dp - l * dp.y / l.y, which a wall or a steep slope under a
+// low sun stretches many times. The footprint is scaled by the bound 1 + sqrt(1 - n.y^2) / l.y
+// on that stretch over the tangent plane, n the geometric normal: |dp.y| <= |dp| sqrt(1 - n.y^2)
+// for dp in the tangent plane, and it is 1 on a horizontal surface, whose level does not change.
+// It bounds the largest stretch rather than the stretch along the view, so it may blur a little
+// more than needed, but it stays free of derivatives. The 1 / |dot(n, l)| scale of a
+// projection along the normal does not match this projection. The light projection is
+// orthogonal and never stretches, so it keeps the footprint. With t the value read the cookie is
 // mix(1, saturate((t - threshold) / (2 * softness) + 0.5), strength). A view without a cookie
 // (cookie_config.x 0) binds a white texture and skips the lookup in uniform control flow.
 #pragma once
@@ -22,13 +30,14 @@
 const COOKIE_MIN_RAMP: f32 = 1e-5;
 
 // Cookie of the first directional light at a world position, with l the normalized direction
-// toward that light: 1 where it does not apply.
-fn light_cookie(world: vec3f, l: vec3f) -> f32 {
+// toward that light and n the geometric normal of the surface: 1 where it does not apply.
+fn light_cookie(world: vec3f, l: vec3f, n: vec3f) -> f32 {
     if (view.cookie_config.x == 0u) {
         return 1.0;
     }
 
     var plane: vec2f;
+    var stretch = 1.0;
     if (view.cookie_config.y == 0u) {
         let height = view.cookie.y;
         if (l.y <= 0.0 || world.y >= height) {
@@ -37,13 +46,14 @@ fn light_cookie(world: vec3f, l: vec3f) -> f32 {
 
         let q = world + l * ((height - world.y) / l.y);
         plane = q.xz;
+        stretch = 1.0 + sqrt(saturate(1.0 - n.y * n.y)) / l.y;
     } else {
         plane = vec2f(dot(world, view.cookie_x.xyz), dot(world, view.cookie_y.xyz));
     }
 
     let uv = (plane + view.cookie_offset.xy) * view.cookie.x;
     let texels = vec2f(textureDimensions(cookie_texture));
-    var pixel = 2.0 * view.cluster.y * view.viewport.w;
+    var pixel = 2.0 * view.cluster.y * view.viewport.w * stretch;
     if (view.lights.w == 0u) {
         pixel *= length(world - view.camera.xyz);
     }

@@ -9,6 +9,8 @@ cookie_gray.png    16 x 16 of 128, a uniform half
 cookie_black.png   16 x 16 of 0
 cookie_ramp.png    256 x 16, the gray of column x is x: the value grows with u
 cookie_split.png   64 x 64, the rows above the middle 0 and the rows below 255
+cookie_stripes.png 64 x 64, stripes 2 rows high, alternately 0 and 255: the value changes
+                   with v, and its mip levels from the 16 x 16 one on are a uniform half
 """
 import os
 import sys
@@ -25,6 +27,7 @@ def main():
         "cookie_black.png": [bytes(16) for _ in range(16)],
         "cookie_ramp.png": [bytes(range(256)) for _ in range(16)],
         "cookie_split.png": [bytes([0 if y < 32 else 255] * 64) for y in range(64)],
+        "cookie_stripes.png": [bytes([255 * ((y // 2) % 2)] * 64) for y in range(64)],
     }
     for name, rows in images.items():
         write_png(os.path.join(HERE, name), rows)

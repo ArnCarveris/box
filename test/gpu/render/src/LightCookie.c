@@ -33,6 +33,9 @@
 /** Black top half, white bottom half */
 #define COOKIE_SPLIT_PNG "test/assets/textures/cookie_split.png"
 
+/** Stripes 2 rows high, alternately 0 and 255 */
+#define COOKIE_STRIPES_PNG "test/assets/textures/cookie_stripes.png"
+
 /** Seamless fbm noise, half of its texels below 128 */
 #define COOKIE_NOISE_PNG "test/assets/textures/cloud_noise_256.png"
 
@@ -83,6 +86,46 @@ static ecs_world_t* cookie_world(
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true,
         .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+
+    return world;
+}
+
+/** Create a headless world with a white rough wall on z = 0 facing the camera, which looks
+ * along -Z and sees the same 8 units in 64x64 pixels as over the floor (column c is
+ * x = (c + 0.5) / 8 - 4, row r is y = 4 - (r + 0.5) / 8), and a low sun 10 degrees above the
+ * horizon behind the camera, without ambient light.
+ *
+ * @param sun Receives the sun
+ * @return The world
+ */
+static ecs_world_t* wall_world(
+    ecs_entity_t *sun)
+{
+    ecs_world_t *world = cookie_world(0, sun);
+    ecs_delete_with(world, ecs_id(Box));
+
+    ecs_entity_t wall = ecs_new(world);
+    ecs_set(world, wall, Position, {0, 0, -0.1f});
+    ecs_set(world, wall, Box, {40, 40, 0.2f});
+    ecs_set(world, wall, Rgb, {255, 255, 255});
+    ecs_set(world, wall, PbrMaterial, {.roughness = 1});
+
+    ecs_set(world, *sun, Rotation, {(float)GLM_PI - glm_rad(10), 0, 0});
+
+    ecs_entity_t camera = 0;
+    ecs_query_t *q = ecs_query(world, { .terms = {{ ecs_id(Camera) }} });
+    ecs_iter_t it = ecs_query_iter(world, q);
+    while (ecs_query_next(&it)) {
+        int32_t i;
+        for (i = 0; i < it.count; i ++) {
+            camera = it.entities[i];
+        }
+    }
+
+    ecs_query_fini(q);
+    test_assert(camera != 0);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Rotation, {0, 0, 0});
 
     return world;
 }
@@ -745,5 +788,82 @@ void LightCookie_noise_coverage(void) {
 
     stbi_image_free(px);
     stbi_image_free(ambient);
+    ecs_fini(world);
+}
+
+/** The wall under the low sun moves the plane projection 1 / tan(10 degrees), about 5.7 units,
+ * per unit up the wall: a pixel, 1/8 unit, spans 2.8 periods of the stripes of size 4, 1/4 unit
+ * each. Threshold 0.5, softness 0.5 and strength 1 pass the stripes through, so every pixel of the
+ * wall gets the light of the mean of the cookie over it, a half. A level from the footprint of a
+ * horizontal surface aliases between dark and lit rows instead.
+ */
+void LightCookie_steep_surface_lod(void) {
+    // lighting/light_cookie
+    ecs_entity_t sun;
+    ecs_world_t *world = wall_world(&sun);
+    ecs_entity_t stripes = cookie_texture(world, COOKIE_STRIPES_PNG);
+    unsigned char *none = cookie_capture(world, "steep_none.png", 2);
+    LightCookie *c = cookie_set(world, sun, stripes, 4, 0);
+    c->height = 50;
+    ecs_modified(world, sun, LightCookie);
+    unsigned char *px = cookie_capture(world, "steep_stripes.png", 2);
+
+    int32_t r, col, count = 0;
+    float sum = 0, sum2 = 0, worst = 0;
+    for (r = 8; r < SIZE - 8; r ++) {
+        for (col = 8; col < SIZE - 8; col ++) {
+            float n = lum(none, col, r);
+            test_assert(n > 0.2f);
+            float ratio = lum(px, col, r) / n;
+            sum += ratio;
+            sum2 += ratio * ratio;
+            worst = glm_max(worst, fabsf(ratio - 0.5f));
+            count ++;
+        }
+    }
+
+    float mean = sum / (float)count;
+    float variance = sum2 / (float)count - mean * mean;
+    test_assert(fabsf(mean - 0.5f) < 0.05f);
+    test_assert(worst < 0.12f);
+    test_assert(variance < 0.002f);
+
+    stbi_image_free(none);
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+/** The light projection of the same wall reads the stripes along the light's Y axis, which is
+ * 0.98 times the height on the wall: with size 16 a stripe is 4 pixels high and a texel larger
+ * than a pixel, so the stripes stay sharp. Scaling the level by the stretch of the plane
+ * projection would blur them toward a half.
+ */
+void LightCookie_light_projection_lod_unchanged(void) {
+    // lighting/light_cookie
+    ecs_entity_t sun;
+    ecs_world_t *world = wall_world(&sun);
+    ecs_entity_t stripes = cookie_texture(world, COOKIE_STRIPES_PNG);
+    unsigned char *none = cookie_capture(world, "light_lod_none.png", 2);
+    LightCookie *c = cookie_set(world, sun, stripes, 16, 0);
+    c->projection = LightCookieProjectionLight;
+    ecs_modified(world, sun, LightCookie);
+    unsigned char *px = cookie_capture(world, "light_lod_stripes.png", 2);
+
+    int32_t r;
+    float low = 1, high = 0;
+    for (r = 8; r < SIZE - 8; r ++) {
+        float n = lum(none, 32, r);
+        test_assert(n > 0.2f);
+        float ratio = lum(px, 32, r) / n;
+        low = glm_min(low, ratio);
+        high = glm_max(high, ratio);
+        test_assert(fabsf(lum(px, 16, r) - lum(px, 48, r)) < 0.01f);
+    }
+
+    test_assert(low < 0.1f);
+    test_assert(high > 0.9f);
+
+    stbi_image_free(none);
+    stbi_image_free(px);
     ecs_fini(world);
 }
