@@ -29,7 +29,8 @@ node test/integration/web/transitions.mjs \
 ```
 
 Before starting Chrome on macOS, both scripts check the `.app` bundle that contains the Chrome
-executable for the `com.apple.quarantine` attribute (`xattr -p com.apple.quarantine <app>`).
+executable (after resolving symlinks) for the `com.apple.quarantine` attribute
+(`xattr -p com.apple.quarantine <app>`).
 macOS holds a quarantined app, such as one installed by Homebrew, at its first launch check, and
 no one can confirm the dialog of a headless session, so the scripts fail at once with exit status
 2 and name the app instead of reporting "chrome did not start" after the connect timeout. Open

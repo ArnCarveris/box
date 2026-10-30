@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { spawn, spawnSync } from 'node:child_process';
 import { createServer } from 'node:http';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, extname, join, resolve } from 'node:path';
 
@@ -41,7 +41,7 @@ function parse(argv) {
 // passes, so fail at once instead of "chrome did not start" after the connect timeout
 function checkQuarantine(chrome) {
   if (process.platform !== 'darwin') return;
-  let app = resolve(chrome);
+  let app = existsSync(chrome) ? realpathSync(chrome) : resolve(chrome);
   while (!app.endsWith('.app')) {
     if (dirname(app) === app) return;
     app = dirname(app);
