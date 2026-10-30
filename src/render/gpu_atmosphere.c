@@ -749,7 +749,7 @@ static WGPUComputePassEncoder box_gpu_atmos_begin(
 {
     box_gpu_atmos_readback_t *r = a->current != -1 ? &a->readbacks[a->current] : NULL;
     WGPUPassTimestampWrites writes;
-    WGPUComputePassDescriptor desc = {0};
+    const WGPUPassTimestampWrites *timed = NULL;
     if (r && r->count + 2 <= BOX_GPU_ATMOS_STAMPS) {
         uint32_t first = (uint32_t)a->current * BOX_GPU_ATMOS_STAMPS + r->count;
         writes = (WGPUPassTimestampWrites){
@@ -757,12 +757,12 @@ static WGPUComputePassEncoder box_gpu_atmos_begin(
             .beginningOfPassWriteIndex = first,
             .endOfPassWriteIndex = first + 1
         };
-        desc.timestampWrites = &writes;
+        timed = &writes;
         r->kinds[r->count / 2] = (uint8_t)pass;
         r->count += 2;
     }
 
-    WGPUComputePassEncoder result = wgpuCommandEncoderBeginComputePass(encoder, &desc);
+    WGPUComputePassEncoder result = box_gpu_compute_begin(encoder, timed);
     wgpuComputePassEncoderSetPipeline(result, a->pipelines[pass]);
 
     return result;

@@ -594,6 +594,22 @@ static void box_gpu_free(
     ecs_os_free(gpu);
 }
 
+WGPUComputePassEncoder box_gpu_compute_begin(
+    WGPUCommandEncoder encoder,
+    const WGPUPassTimestampWrites *writes)
+{
+    ecs_assert(!writes || writes->querySet, ECS_INVALID_PARAMETER,
+        "timestamp writes without a query set");
+    ecs_assert(!writes ||
+        writes->beginningOfPassWriteIndex < wgpuQuerySetGetCount(writes->querySet),
+        ECS_INVALID_PARAMETER, "timestamp beginning index out of range of its query set");
+    ecs_assert(!writes ||
+        writes->endOfPassWriteIndex < wgpuQuerySetGetCount(writes->querySet),
+        ECS_INVALID_PARAMETER, "timestamp end index out of range of its query set");
+    return wgpuCommandEncoderBeginComputePass(encoder,
+        &(WGPUComputePassDescriptor){ .timestampWrites = writes });
+}
+
 void box_gpu_count(
     box_gpu_t *gpu,
     box_gpu_stat_t stat)

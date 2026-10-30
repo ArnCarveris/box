@@ -36,6 +36,20 @@ void box_gpu_count(
     box_gpu_t *gpu,
     box_gpu_stat_t stat);
 
+/** Begin a compute pass, timed when it has timestamp writes.
+ *
+ * Debug builds assert that the query set of the writes is set and that both indices are below
+ * its count, so WGPU_QUERY_SET_INDEX_UNDEFINED fails natively too: emdawnwebgpu passes it on as
+ * an out of range index, which makes the pass and its command buffer invalid in the browser.
+ *
+ * @param encoder The encoder
+ * @param writes Timestamps the pass writes, NULL when the pass is not timed
+ * @return The compute pass
+ */
+WGPUComputePassEncoder box_gpu_compute_begin(
+    WGPUCommandEncoder encoder,
+    const WGPUPassTimestampWrites *writes);
+
 /** Add the pending counters to the counters the main thread reads, under the lock once.
  *
  * @param gpu The backend

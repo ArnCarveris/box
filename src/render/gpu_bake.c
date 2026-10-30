@@ -587,8 +587,7 @@ static bool box_gpu_bake_cull(
         goto done;
     }
 
-    WGPUComputePassEncoder pass = wgpuCommandEncoderBeginComputePass(encoder,
-        &(WGPUComputePassDescriptor){ .timestampWrites = writes });
+    WGPUComputePassEncoder pass = box_gpu_compute_begin(encoder, writes);
     WGPUBindGroup page = NULL;
     wgpuComputePassEncoderSetPipeline(pass, b->cull);
     for (d = 0; d < draws; d ++) {
@@ -1092,8 +1091,7 @@ static void box_gpu_bake_project_record(
         .entryCount = 6,
         .entries = entries
     });
-    WGPUComputePassEncoder cpass = wgpuCommandEncoderBeginComputePass(encoder,
-        &(WGPUComputePassDescriptor){ .timestampWrites = writes });
+    WGPUComputePassEncoder cpass = box_gpu_compute_begin(encoder, writes);
     wgpuComputePassEncoderSetPipeline(cpass, pipeline);
     wgpuComputePassEncoderSetBindGroup(cpass, 0, group, 0, NULL);
     wgpuComputePassEncoderDispatchWorkgroups(cpass, (uint32_t)count, 1, 1);
