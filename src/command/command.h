@@ -8,6 +8,7 @@
 
 #include <box.h>
 #include "../app/app.h"
+#include "../geometry/mesh_cache.h"
 
 /** Register a command as a script function in box.command.commands.
  *
@@ -48,6 +49,52 @@ void box_cmd_input_init(
  * @param world The world
  */
 void box_cmd_render_init(
+    ecs_world_t *world);
+
+/** Get the size of the images of the capture command: the size of the surface shown first.
+ *
+ * @param world The world
+ * @param width Receives the width in pixels
+ * @param height Receives the height in pixels
+ */
+void box_cmd_render_size(
+    ecs_world_t *world,
+    int32_t *width,
+    int32_t *height);
+
+/** Get the camera of a command: the camera argument, else the camera of the first view of the
+ * surface shown first. Logs an error when the argument is not a camera or there is no camera.
+ *
+ * @param world The world
+ * @param argc Number of arguments
+ * @param argv The camera, omitted for the active camera
+ * @return The camera, 0 on an error
+ */
+ecs_entity_t box_cmd_render_camera(
+    ecs_world_t *world,
+    int32_t argc,
+    const ecs_value_t *argv);
+
+/** Get the 8 world space corners of the local bounds of the mesh of a shape, with the scale
+ * of its ShapeMesh and its WorldTransform.
+ *
+ * @param world The world
+ * @param cache The mesh cache
+ * @param e The entity
+ * @param out Receives the corners
+ * @return Whether the entity has a mesh in the cache
+ */
+bool box_cmd_render_corners(
+    ecs_world_t *world,
+    const box_mesh_cache_t *cache,
+    ecs_entity_t e,
+    vec3 out[8]);
+
+/** Register the fit command that moves a camera to a tight fit of its scene.
+ *
+ * @param world The world
+ */
+void box_cmd_fit_init(
     ecs_world_t *world);
 
 /** Register the fps and frames commands that print the frame timing.

@@ -108,6 +108,9 @@ ECS_STRUCT(FrameTiming, {
 /** Wall time between the starts of the recent frames, one sample per frame: the intervals of
  * FrameTiming, written by the engine at the start of every frame while hold is false.
  *
+ * The engine notifies each sample it adds with ecs_singleton_modified, like FrameTiming, so OnSet
+ * observers and change detection see it; while hold is set it adds none and does not notify.
+ *
  * Read the samples with box_frame_sample. Tests and captures that show fixed samples write
  * interval, count and next and set hold. The size of interval is BOX_FRAME_WINDOW.
  */

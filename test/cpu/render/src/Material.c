@@ -665,3 +665,91 @@ void Material_transmission_dynamic_material_keeps_batch(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+void Material_clear_coat_defaults(void) {
+    // materials/pbr
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_assert(ecs_script_run(world, "clear_coat",
+        "using box.material\n"
+        "rough { ClearCoat: {roughness: 0.4} }\n"
+        "half { ClearCoat: {strength: 0.5} }\n", NULL) == 0);
+
+    ecs_entity_t added = ecs_new(world);
+    ecs_add(world, added, ClearCoat);
+    const ClearCoat *c = ecs_get(world, added, ClearCoat);
+    test_assert(c != NULL);
+    test_flt(c->strength, 1);
+    test_flt(c->roughness, 0);
+    test_bool(ecs_owns(world, added, MaterialId), true);
+
+    c = ecs_get(world, ecs_lookup(world, "rough"), ClearCoat);
+    test_assert(c != NULL);
+    test_flt(c->strength, 1);
+    test_flt(c->roughness, 0.4f);
+
+    c = ecs_get(world, ecs_lookup(world, "half"), ClearCoat);
+    test_assert(c != NULL);
+    test_flt(c->strength, 0.5f);
+    test_flt(c->roughness, 0);
+
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_set(world, prefab, ClearCoat, {.strength = 0.25f, .roughness = 0.75f});
+    ecs_entity_t instance = ecs_new_w_pair(world, EcsIsA, prefab);
+    test_bool(ecs_owns(world, instance, ClearCoat), false);
+    test_flt(ecs_get(world, instance, ClearCoat)->strength, 0.25f);
+
+    ecs_fini(world);
+}
+
+/** The record holds the clear coat as two unorm16 clamped to 0..1 and 0 without one, and a
+ * transition of another component encodes the record again with it. */
+void Material_clear_coat_pack(void) {
+    // materials/pbr
+    box_render_material_t record, plain;
+    ecs_os_memset_t(&record, 0x55, box_render_material_t);
+    box_draws_material_pack(&record, &(box_draw_material_t){ .fade = 1 });
+    test_uint(record.clear_coat, 0);
+    test_uint(record.reserved[0], 0);
+    test_uint(record.reserved[1], 0);
+    test_uint(record.reserved[2], 0);
+    plain = record;
+
+    ClearCoat full = { .strength = 1, .roughness = 0 };
+    box_draws_material_pack(&record, &(box_draw_material_t){ .clear_coat = &full, .fade = 1 });
+    test_uint(record.clear_coat, 0xFFFFu);
+
+    ClearCoat half = { .strength = 0.5f, .roughness = 0.25f };
+    box_draws_material_pack(&record, &(box_draw_material_t){ .clear_coat = &half, .fade = 1 });
+    test_uint(record.clear_coat & 0xFFFFu, 32768u);
+    test_uint(record.clear_coat >> 16, 16384u);
+
+    ClearCoat out = { .strength = 2, .roughness = -1 };
+    box_draws_material_pack(&record, &(box_draw_material_t){ .clear_coat = &out, .fade = 1 });
+    test_uint(record.clear_coat, 0xFFFFu);
+
+    ClearCoat high = { .strength = -1, .roughness = 3 };
+    box_draws_material_pack(&record, &(box_draw_material_t){ .clear_coat = &high, .fade = 1 });
+    test_uint(record.clear_coat, 0xFFFFu << 16);
+
+    box_draws_material_pack(&record, &(box_draw_material_t){ .clear_coat = &half, .fade = 1 });
+    record.clear_coat = 0;
+    test_assert(!ecs_os_memcmp_t(&record, &plain, box_render_material_t));
+
+    PbrMaterial pbr = { .metallic = 0.25f, .roughness = 0.125f };
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .clear_coat = &half, .pbr = &pbr, .fade = 1 });
+    box_draw_transition_material_t target;
+    box_render_material_t encoded;
+    box_draws_transition_target(&target, &(box_draw_material_t){
+        .clear_coat = &half, .pbr = &pbr, .fade = 1 }, BOX_DRAW_TRANSITION_TABLE);
+    box_draws_transition_encode(&target, &encoded);
+    test_assert(!ecs_os_memcmp_t(&encoded, &record, box_render_material_t));
+
+    box_render_shading_t a, b;
+    box_draws_material(&a, &(box_draw_material_t){ .pbr = &pbr, .fade = 1 });
+    box_draws_material(&b, &(box_draw_material_t){
+        .clear_coat = &half, .pbr = &pbr, .fade = 1 });
+    test_assert(!ecs_os_memcmp_t(&a, &b, box_render_shading_t));
+}

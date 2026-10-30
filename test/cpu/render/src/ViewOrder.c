@@ -87,6 +87,8 @@ void ViewOrder_default_is_zero(void) {
     test_int(ecs_get(world, e, View)->order, 0);
     test_assert(BOX_VIEW_ORDER_EDITOR > 0);
     test_assert(BOX_VIEW_ORDER_CONSOLE > BOX_VIEW_ORDER_EDITOR);
+    test_assert(BOX_VIEW_ORDER_FPS > BOX_VIEW_ORDER_EDITOR);
+    test_assert(BOX_VIEW_ORDER_CONSOLE > BOX_VIEW_ORDER_FPS);
     ecs_fini(world);
 }
 
@@ -163,5 +165,7 @@ void ViewOrder_compare(void) {
     test_assert(box_view_compare(1, 10, 0, 20) > 0);
     test_assert(box_view_compare(-1, 20, 0, 10) < 0);
     test_assert(box_view_compare(BOX_VIEW_ORDER_EDITOR, 30, BOX_VIEW_ORDER_CONSOLE, 10) < 0);
+    test_assert(box_view_compare(BOX_VIEW_ORDER_EDITOR, 30, BOX_VIEW_ORDER_FPS, 10) < 0);
+    test_assert(box_view_compare(BOX_VIEW_ORDER_FPS, 30, BOX_VIEW_ORDER_CONSOLE, 10) < 0);
     test_int(box_view_compare(3, 10, 3, 10), 0);
 }

@@ -418,6 +418,7 @@ static void BoxAppTiming(
     box_app_series_add(&clock->interval, interval);
     if (samples && !samples->hold) {
         box_frame_samples_add(samples, interval);
+        ecs_singleton_modified(it->world, FrameSamples);
     }
 
     box_app_series_add(&clock->error, fabs(delta - interval));

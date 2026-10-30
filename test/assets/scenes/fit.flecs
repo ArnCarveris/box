@@ -1,0 +1,44 @@
+// Scene of the fit e2e test: two crates far off to the right of a camera that looks along -Z,
+// outside of its view until fit moves it back from their center along its view.
+
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.surface
+
+window {
+  Surface: {width: 1280, height: 720, vsync: true}
+}
+
+camera {
+  Position: {0, 2, 0}
+  Camera: {fov: 60, aspect_ratio: 1.7777778}
+}
+
+view {
+  View: {
+    camera: camera,
+    clear: {enabled: true, color: {20, 20, 30, 255}}
+  }
+}
+
+$ {
+  AmbientLight: {sky: {255, 255, 255}, ground: {255, 255, 255}, intensity: 1}
+}
+
+left {
+  Position: {40, 1, -20}
+  Box: {2, 2, 2}
+  Rgb: {240, 220, 120}
+  PbrMaterial: {roughness: 1}
+}
+
+right {
+  Position: {44, 1, -20}
+  Box: {2, 2, 2}
+  Rgb: {240, 220, 120}
+  PbrMaterial: {roughness: 1}
+}
