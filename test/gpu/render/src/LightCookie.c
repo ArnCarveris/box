@@ -888,8 +888,10 @@ void LightCookie_light_projection_lod_unchanged(void) {
 
 /** A perspective camera 1 unit above a wide floor looks along -Z, 5 degrees down, with a field
  * of view of 8 degrees: the top rows see the floor 1 to 3 degrees below the horizon, 20 to 55
- * units away. A pixel there covers 0.04 to 0.08 units across the view and 1 to 3 units along
- * it, while the stripes of size 8 repeat every half unit along Z.
+ * units away.
+ *
+ * A pixel there covers 0.04 to 0.08 units across the view and 1 to 3 units along it, while the
+ * stripes of size 8 repeat every half unit along Z.
  *
  * The sun is straight up and the default remap passes the stripes through. A footprint that
  * follows the pixel across the view picks the finest level, where the rows land on the stripes
@@ -943,9 +945,11 @@ void LightCookie_grazing_view_lod(void) {
 }
 
 /** The wall of steep_surface_lod under the sun 10 degrees up behind the camera, whose
- * horizontal direction is the wall's normal. A step up the wall moves the plane projection
- * along Z, along the columns of the cookie, and a step across it moves it along X: with size 8
- * a texel is a pixel and the columns repeat every 4 pixels.
+ * horizontal direction is the wall's normal.
+ *
+ * A step up the wall moves the plane projection along Z, along the columns of the cookie, and a
+ * step across it moves it along X: with size 8 a texel is a pixel and the columns repeat every
+ * 4 pixels.
  *
  * The footprint is long only up the wall, so neighboring columns keep the contrast of the
  * stripes. The isotropic bound of the stretch, 6.8, would blur them to a half.

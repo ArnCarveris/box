@@ -84,7 +84,7 @@ fn light_cookie(world: vec3f, l: vec3f, n: vec3f) -> f32 {
         var size = 2.0 * view.cluster.xy * view.viewport.zw;
         var v = -toward;
         if (!orthographic) {
-            size *= max(-(view.view * vec4f(world, 1.0)).z, 0.0);
+            size *= max(cluster_view_position(view, world).z, 0.0);
             v = normalize(world - view.camera.xyz);
         }
 
