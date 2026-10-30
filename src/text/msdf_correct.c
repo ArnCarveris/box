@@ -73,6 +73,12 @@
 #define BOX_MSDF_CORNER_POINTS (BOX_MSDF_CORNER_CELLS * BOX_MSDF_CORNER_CELLS * \
     BOX_MSDF_CORNER_SAMPLES * BOX_MSDF_CORNER_SAMPLES)
 
+/** Side of a point of the block around a corner that is not found yet */
+#define BOX_MSDF_CORNER_UNKNOWN (INT8_MIN)
+
+/** Points of the four cells around a texel of the four around a corner */
+#define BOX_MSDF_CORNER_REACH (4 * BOX_MSDF_CORNER_SAMPLES * BOX_MSDF_CORNER_SAMPLES)
+
 /** Moves of a channel the repair of a corner makes at most */
 #define BOX_MSDF_CORNER_PASSES (8)
 
@@ -107,16 +113,33 @@ typedef struct box_msdf_block_t {
     int32_t b;            /**< Row of the first texel */
     const int32_t *edges; /**< The edges that can be the nearest to a tested point of the block */
     int32_t count;        /**< Number of edges */
+    int8_t *sides;        /**< Side of each point, BOX_MSDF_CORNER_UNKNOWN until it is found. The
+                           *   repair never moves the true distance, so a side holds for every
+                           *   repair of the corner */
 } box_msdf_block_t;
+
+/** A point of the block around a corner whose count a move of a channel changes */
+typedef struct box_msdf_reach_t {
+    int32_t point;        /**< Index of the point */
+    float wy;             /**< Weight of the moved texel along y at the point */
+    float wx;             /**< Weight of the moved texel along x at the point */
+} box_msdf_reach_t;
 
 /** The state of the push of the channels around a corner */
 typedef struct box_msdf_push_t {
     const box_msdf_gen_t *gen;                       /**< The generation */
     int32_t l;                                       /**< Column of the first texel */
     int32_t b;                                       /**< Row of the first texel */
-    int8_t sides[BOX_MSDF_CORNER_POINTS];            /**< Side of each point */
+    const int8_t *sides;                             /**< Side of each point */
     float before[BOX_MSDF_CORNER_POINTS];            /**< Median of each point before it */
     float channels[BOX_MSDF_CORNER_POINTS][3];       /**< Interpolated channels of each point */
+    int32_t counts[BOX_MSDF_CORNER_POINTS];          /**< Count of each point, as
+                                                      *   box_msdf_corner_point gives it */
+    int32_t wrongs[BOX_MSDF_CORNER_POINTS];          /**< The points that count */
+    int32_t wrong_count;                             /**< Number of points that count */
+    box_msdf_reach_t reach[BOX_MSDF_CORNER_REACH];   /**< Points a move changes */
+    int32_t reach_count;                             /**< Number of points a move changes */
+    int32_t fixed;                                   /**< Wrong points a move does not change */
 } box_msdf_push_t;
 
 /** A corner the corner repair repairs */
@@ -665,6 +688,35 @@ static int8_t box_msdf_corner_side(
     return result;
 }
 
+/** Find the side of a point of the block around a corner, once per corner.
+ *
+ * @param gen The generation
+ * @param block The block
+ * @param i Index of the point in the block
+ * @param tx Column of the upper left texel of the cell
+ * @param ty Row of the upper left texel of the cell
+ * @param fx Position of the point between the columns
+ * @param fy Position of the point between the rows
+ * @param v The interpolated channels at the point
+ * @return The side, as box_msdf_corner_side gives it
+ */
+static int8_t box_msdf_corner_known_side(
+    const box_msdf_gen_t *gen,
+    const box_msdf_block_t *block,
+    int32_t i,
+    int32_t tx,
+    int32_t ty,
+    double fx,
+    double fy,
+    const double *v)
+{
+    if (block->sides[i] == BOX_MSDF_CORNER_UNKNOWN) {
+        block->sides[i] = box_msdf_corner_side(gen, block, tx, ty, fx, fy, v);
+    }
+
+    return block->sides[i];
+}
+
 /** Check whether the interpolated median of a tested point of the block around a corner is
  * short of its side: less than BOX_MSDF_CORNER_MARGIN onto it for a deep point, less than
  * BOX_MSDF_CORNER_NEAR for a point from BOX_MSDF_CORNER_SHARP on, not on it for another.
@@ -758,7 +810,8 @@ static bool box_msdf_corner_clashes(
                         continue;
                     }
 
-                    int8_t side = box_msdf_corner_side(gen, block, tx, ty, fx, fy, v);
+                    int32_t i = ((cy * BOX_MSDF_CORNER_CELLS + cx) * n + sy) * n + sx;
+                    int8_t side = box_msdf_corner_known_side(gen, block, i, tx, ty, fx, fy, v);
                     double onto = (m - 0.5) * r->range * (side > 0 ? 1 : -1);
                     result = (side <= -3 || side >= 3) ? onto < BOX_MSDF_CORNER_MARGIN :
                         (side == -2 || side == 2) && onto <= 0.0;
@@ -773,13 +826,11 @@ static bool box_msdf_corner_clashes(
 /** Find the side of the outline each point of the block around a corner must be on.
  *
  * @param gen The generation
- * @param block The block
- * @param sides Receives the sides, as box_msdf_corner_side gives them
+ * @param block The block, receives the sides it lacks, as box_msdf_corner_side gives them
  */
 static void box_msdf_corner_sides(
     const box_msdf_gen_t *gen,
-    const box_msdf_block_t *block,
-    int8_t *sides)
+    const box_msdf_block_t *block)
 {
     const box_msdf_raster_t *r = gen->raster;
     int32_t cx, cy, sx, sy, n = BOX_MSDF_CORNER_SAMPLES, i = 0;
@@ -790,10 +841,11 @@ static void box_msdf_corner_sides(
             for (sy = 0; sy < n; sy ++) {
                 for (sx = 0; sx < n; sx ++, i ++) {
                     double fx = (sx + 0.5) / n, fy = (sy + 0.5) / n, v[4];
-                    sides[i] = 0;
-                    if (cell) {
+                    if (!cell) {
+                        block->sides[i] = 0;
+                    } else if (block->sides[i] == BOX_MSDF_CORNER_UNKNOWN) {
                         box_msdf_bilinear(gen, tx, ty, fx, fy, v);
-                        sides[i] = box_msdf_corner_side(gen, block, tx, ty, fx, fy, v);
+                        block->sides[i] = box_msdf_corner_side(gen, block, tx, ty, fx, fy, v);
                     }
                 }
             }
@@ -832,95 +884,245 @@ static void box_msdf_corner_channels(
     }
 }
 
-/** Count the wrong points of a cell of the block around a corner, the tested points that
- * box_msdf_corner_short finds short, with a channel of one of the four texels around it moved.
+/** Count whether a point of the block around a corner is wrong with a median: a tested point
+ * that box_msdf_corner_short finds short.
  *
  * A tested point that is short of the floor and was not before the push, and a point that is not
  * tested and whose median is on another side than before, count as all the points of the block,
  * so that the repair never trades the points it fixes for others nor moves another edge.
  *
  * @param push The push
- * @param cell The cell, row by row
- * @param k The texel of the four around the corner, row by row
- * @param channel The channel of the texel
- * @param delta The change of the channel
- * @param limit Count from which on the exact count does not matter
- * @return The number of wrong points, or at least limit
+ * @param i Index of the point
+ * @param m The median of the point
+ * @return The count of the point
  */
-static int32_t box_msdf_corner_wrong(
+static int32_t box_msdf_corner_point(
     const box_msdf_push_t *push,
-    int32_t cell,
-    int32_t k,
-    int32_t channel,
-    float delta,
-    int32_t limit)
+    int32_t i,
+    float m)
 {
     const box_msdf_gen_t *gen = push->gen;
-    const box_msdf_raster_t *r = gen->raster;
-    int32_t sx, sy, n = BOX_MSDF_CORNER_SAMPLES, i = cell * n * n, result = 0;
+    int8_t side = push->sides[i];
+    int32_t result;
+    if (!side) {
+        result = ((m > 0.5f) != (push->before[i] > 0.5f)) * BOX_MSDF_CORNER_POINTS;
+    } else if (box_msdf_corner_short(gen, side, m, true) &&
+        !box_msdf_corner_short(gen, side, push->before[i], true))
+    {
+        result = BOX_MSDF_CORNER_POINTS;
+    } else {
+        result = box_msdf_corner_short(gen, side, m, false);
+    }
+
+    return result;
+}
+
+/** Check whether a cell of the block around a corner lies on the field.
+ *
+ * @param push The push
+ * @param cell The cell, row by row
+ * @return Whether the four texels of the cell are on the field
+ */
+static bool box_msdf_corner_on(
+    const box_msdf_push_t *push,
+    int32_t cell)
+{
+    const box_msdf_raster_t *r = push->gen->raster;
+    int32_t tx = push->l + cell % BOX_MSDF_CORNER_CELLS;
+    int32_t ty = push->b + cell / BOX_MSDF_CORNER_CELLS;
+
+    return tx >= 0 && ty >= 0 && tx + 1 < r->width && ty + 1 < r->height;
+}
+
+/** Count the wrong points of a cell of the block around a corner, as box_msdf_corner_point
+ * counts them. A cell off the field has none.
+ *
+ * @param push The push, receives the count of each point of the cell
+ * @param cell The cell, row by row
+ * @return The number of wrong points
+ */
+static int32_t box_msdf_corner_wrong(
+    box_msdf_push_t *push,
+    int32_t cell)
+{
+    int32_t p, n = BOX_MSDF_CORNER_SAMPLES * BOX_MSDF_CORNER_SAMPLES, result = 0;
+    bool on = box_msdf_corner_on(push, cell);
+    for (p = cell * n; p < (cell + 1) * n; p ++) {
+        push->counts[p] = on
+            ? box_msdf_corner_point(push, p, box_msdf_median(push->channels[p]))
+            : 0;
+        result += push->counts[p];
+    }
+
+    return result;
+}
+
+/** Find the weights of a texel of the four around a corner at a point of the block.
+ *
+ * @param k The texel of the four around the corner, row by row
+ * @param point Index of the point
+ * @param reach Receives the point and the weights
+ * @return Whether the point lies in one of the four cells around the texel
+ */
+static bool box_msdf_corner_weights(
+    int32_t k,
+    int32_t point,
+    box_msdf_reach_t *reach)
+{
+    int32_t n = BOX_MSDF_CORNER_SAMPLES, cell = point / (n * n);
     int32_t cx = cell % BOX_MSDF_CORNER_CELLS, cy = cell / BOX_MSDF_CORNER_CELLS;
-    int32_t tx = push->l + cx, ty = push->b + cy;
+    int32_t sx = point % n, sy = point / n % n;
     bool right = 1 + (k & 1) > cx, below = 1 + (k >> 1) > cy;
-    bool on = tx >= 0 && ty >= 0 && tx + 1 < r->width && ty + 1 < r->height;
-    for (sy = 0; on && sy < n && result < limit; sy ++) {
-        float fy = ((float)sy + 0.5f) / (float)n, wy = below ? fy : 1.0f - fy;
-        for (sx = 0; sx < n; sx ++, i ++) {
-            float fx = ((float)sx + 0.5f) / (float)n, v[3];
-            v[0] = push->channels[i][0];
-            v[1] = push->channels[i][1];
-            v[2] = push->channels[i][2];
-            v[channel] += delta * wy * (right ? fx : 1.0f - fx);
-            float m = box_msdf_median(v);
-            if (push->sides[i]) {
-                if (box_msdf_corner_short(gen, push->sides[i], m, true) &&
-                    !box_msdf_corner_short(gen, push->sides[i], push->before[i], true))
-                {
-                    result += BOX_MSDF_CORNER_POINTS;
-                } else {
-                    result += box_msdf_corner_short(gen, push->sides[i], m, false);
-                }
-            } else {
-                result += ((m > 0.5f) != (push->before[i] > 0.5f)) * BOX_MSDF_CORNER_POINTS;
-            }
+    float fx = ((float)sx + 0.5f) / (float)n, fy = ((float)sy + 0.5f) / (float)n;
+    reach->point = point;
+    reach->wy = below ? fy : 1.0f - fy;
+    reach->wx = right ? fx : 1.0f - fx;
+
+    return cx - (k & 1) >= 0 && cx - (k & 1) <= 1 && cy - (k >> 1) >= 0 && cy - (k >> 1) <= 1;
+}
+
+/** Collect the points of the block around a corner that count.
+ *
+ * @param push The push, its counts set, receives the points
+ */
+static void box_msdf_corner_wrongs(
+    box_msdf_push_t *push)
+{
+    int32_t p;
+    push->wrong_count = 0;
+    for (p = 0; p < BOX_MSDF_CORNER_POINTS; p ++) {
+        if (push->counts[p]) {
+            push->wrongs[push->wrong_count ++] = p;
+        }
+    }
+}
+
+/** Count whether a point of the block around a corner is wrong with a channel of a texel of
+ * the four around the corner moved.
+ *
+ * @param push The push
+ * @param reach The point and the weights of the texel at it
+ * @param channel The channel of the texel
+ * @param delta The change of the channel
+ * @return The count of the point, as box_msdf_corner_point gives it
+ */
+static int32_t box_msdf_corner_moved(
+    const box_msdf_push_t *push,
+    const box_msdf_reach_t *reach,
+    int32_t channel,
+    float delta)
+{
+    float v[3];
+    v[0] = push->channels[reach->point][0];
+    v[1] = push->channels[reach->point][1];
+    v[2] = push->channels[reach->point][2];
+    v[channel] += delta * reach->wy * reach->wx;
+
+    return box_msdf_corner_point(push, reach->point, box_msdf_median(v));
+}
+
+/** Find by how much a move of a channel of a texel of the four around a corner, by up to an
+ * amount, can at most lower the number of wrong points of the block.
+ *
+ * The median of a point only moves one way as the channel moves one way, and so does its count.
+ * The count of a point is therefore between its count before the move and its count with the
+ * largest move, and only a point that counts now can count less.
+ *
+ * @param push The push
+ * @param k The texel of the four around the corner, row by row
+ * @param channel The channel of the texel
+ * @param delta The largest change of the channel
+ * @return The largest drop of the number of wrong points
+ */
+static int32_t box_msdf_corner_gain(
+    const box_msdf_push_t *push,
+    int32_t k,
+    int32_t channel,
+    float delta)
+{
+    int32_t p, result = 0;
+    for (p = 0; p < push->wrong_count; p ++) {
+        int32_t point = push->wrongs[p];
+        box_msdf_reach_t reach;
+        if (box_msdf_corner_weights(k, point, &reach) &&
+            box_msdf_corner_on(push, point / (BOX_MSDF_CORNER_SAMPLES * BOX_MSDF_CORNER_SAMPLES)))
+        {
+            int32_t count = box_msdf_corner_moved(push, &reach, channel, delta);
+            result += count < push->counts[point] ? push->counts[point] - count : 0;
         }
     }
 
     return result;
 }
 
-/** Count the wrong points of the block around a corner with a channel of a texel of the four
- * around the corner moved, from the counts of the cells before the move.
+/** Collect the points whose count a move of a channel of a texel of the four around a corner,
+ * by up to an amount, changes. As box_msdf_corner_gain finds, a point whose count the largest
+ * move keeps keeps it for every smaller move.
  *
- * @param push The push
+ * A channel that moves away from the median of a point keeps the median.
+ *
+ * @param push The push, receives the points and the count of the wrong points of the others
  * @param k The texel of the four around the corner, row by row
  * @param channel The channel of the texel
- * @param delta The change of the channel
- * @param cells The wrong points of each cell before the move, receives them after
- * @param limit Count from which on the exact count does not matter
- * @return The number of wrong points, or at least limit
+ * @param delta The largest change of the channel
+ * @param wrong The number of wrong points of the block
  */
-static int32_t box_msdf_corner_rewrong(
-    const box_msdf_push_t *push,
+static void box_msdf_corner_reach(
+    box_msdf_push_t *push,
     int32_t k,
     int32_t channel,
     float delta,
-    int32_t *cells,
+    int32_t wrong)
+{
+    int32_t c, sx, sy, n = BOX_MSDF_CORNER_SAMPLES;
+    push->reach_count = 0;
+    push->fixed = wrong;
+    for (c = 0; c < 4; c ++) {
+        int32_t cx = (k & 1) + (c & 1), cy = (k >> 1) + (c >> 1);
+        int32_t cell = cy * BOX_MSDF_CORNER_CELLS + cx, i = cell * n * n;
+        bool right = 1 + (k & 1) > cx, below = 1 + (k >> 1) > cy;
+        if (!box_msdf_corner_on(push, cell)) {
+            continue;
+        }
+
+        for (sy = 0; sy < n; sy ++) {
+            float fy = ((float)sy + 0.5f) / (float)n, wy = below ? fy : 1.0f - fy;
+            for (sx = 0; sx < n; sx ++, i ++) {
+                const float *v = push->channels[i];
+                float a = v[(channel + 1) % 3], b = v[(channel + 2) % 3];
+                if (delta > 0.0f ? v[channel] >= glm_max(a, b) : v[channel] <= glm_min(a, b)) {
+                    continue;
+                }
+
+                float fx = ((float)sx + 0.5f) / (float)n;
+                box_msdf_reach_t reach = { .point = i, .wy = wy, .wx = right ? fx : 1.0f - fx };
+                if (box_msdf_corner_moved(push, &reach, channel, delta) != push->counts[i]) {
+                    push->fixed -= push->counts[i];
+                    push->reach[push->reach_count ++] = reach;
+                }
+            }
+        }
+    }
+}
+
+/** Count the wrong points of the block around a corner with a channel of a texel of the four
+ * around the corner moved, from the points box_msdf_corner_reach collected for the move.
+ *
+ * @param push The push
+ * @param channel The channel of the texel
+ * @param delta The change of the channel, between 0 and the amount the points were collected for
+ * @param limit Count from which on the exact count does not matter
+ * @return The number of wrong points, or at least limit
+ */
+static int32_t box_msdf_corner_count(
+    const box_msdf_push_t *push,
+    int32_t channel,
+    float delta,
     int32_t limit)
 {
-    int32_t c, result = 0, cell[4];
-    for (c = 0; c < BOX_MSDF_CORNER_CELLS * BOX_MSDF_CORNER_CELLS; c ++) {
-        result += cells[c];
-    }
-
-    for (c = 0; c < 4; c ++) {
-        cell[c] = ((k >> 1) + (c >> 1)) * BOX_MSDF_CORNER_CELLS + (k & 1) + (c & 1);
-        result -= cells[cell[c]];
-    }
-
-    for (c = 0; c < 4 && result < limit; c ++) {
-        cells[cell[c]] = box_msdf_corner_wrong(
-            push, cell[c], k, channel, delta, limit - result);
-        result += cells[cell[c]];
+    int32_t p, result = push->fixed;
+    for (p = 0; p < push->reach_count && result < limit; p ++) {
+        result += box_msdf_corner_moved(push, &push->reach[p], channel, delta);
     }
 
     return result;
@@ -967,17 +1169,18 @@ static bool box_msdf_push_corner(
     const box_msdf_block_t *block)
 {
     const box_msdf_raster_t *r = gen->raster;
-    box_msdf_push_t push = { .gen = gen, .l = block->l, .b = block->b };
+    box_msdf_push_t push = { .gen = gen, .l = block->l, .b = block->b, .sides = block->sides };
     int32_t cells[BOX_MSDF_CORNER_CELLS * BOX_MSDF_CORNER_CELLS];
-    int32_t trial[BOX_MSDF_CORNER_CELLS * BOX_MSDF_CORNER_CELLS];
     int32_t pass, k, c, s, wrong = 0, l = block->l, b = block->b;
     bool result = false;
-    box_msdf_corner_sides(gen, block, push.sides);
+    box_msdf_corner_sides(gen, block);
     box_msdf_corner_channels(&push);
     for (c = 0; c < BOX_MSDF_CORNER_CELLS * BOX_MSDF_CORNER_CELLS; c ++) {
-        cells[c] = box_msdf_corner_wrong(&push, c, 0, 0, 0.0f, INT32_MAX);
+        cells[c] = box_msdf_corner_wrong(&push, c);
         wrong += cells[c];
     }
+
+    box_msdf_corner_wrongs(&push);
 
     for (pass = 0; pass < BOX_MSDF_CORNER_PASSES && wrong; pass ++) {
         int32_t best_k = -1, best_c = 0, best_wrong = wrong;
@@ -990,8 +1193,9 @@ static bool box_msdf_push_corner(
 
             float *v = &gen->values[(y * r->width + x) * 4], median = box_msdf_median(v);
             for (c = 0; c < 6; c ++) {
-                float keep = v[c >> 1];
+                float keep = v[c >> 1], deltas[BOX_MSDF_CORNER_STEPS];
                 float sign = (c & 1) ? -1.0f : 1.0f;
+                int32_t steps = 0;
                 for (s = 0; s < BOX_MSDF_CORNER_STEPS; s ++) {
                     float value = glm_clamp(keep + sign * box_msdf_corner_steps[s], 0.0f, 1.0f);
                     v[c >> 1] = value;
@@ -1001,13 +1205,22 @@ static bool box_msdf_push_corner(
                         break;
                     }
 
-                    ecs_os_memcpy(trial, cells, ECS_SIZEOF(cells));
-                    int32_t count = box_msdf_corner_rewrong(
-                        &push, k, c >> 1, value - keep, trial, best_wrong);
+                    deltas[steps ++] = value - keep;
+                }
+
+                if (!steps ||
+                    wrong - box_msdf_corner_gain(&push, k, c >> 1, deltas[steps - 1]) >= best_wrong)
+                {
+                    continue;
+                }
+
+                box_msdf_corner_reach(&push, k, c >> 1, deltas[steps - 1], wrong);
+                for (s = 0; s < steps; s ++) {
+                    int32_t count = box_msdf_corner_count(&push, c >> 1, deltas[s], best_wrong);
                     if (count < best_wrong) {
                         best_k = k;
                         best_c = c >> 1;
-                        best_delta = value - keep;
+                        best_delta = deltas[s];
                         best_wrong = count;
                     }
                 }
@@ -1021,7 +1234,15 @@ static bool box_msdf_push_corner(
         int32_t x = l + 1 + (best_k & 1), y = b + 1 + (best_k >> 1);
         gen->values[(y * r->width + x) * 4 + best_c] += best_delta;
         box_msdf_corner_shift(&push, best_k, best_c, best_delta);
-        wrong = box_msdf_corner_rewrong(&push, best_k, best_c, 0.0f, cells, INT32_MAX);
+        for (c = 0; c < 4; c ++) {
+            int32_t cell = ((best_k >> 1) + (c >> 1)) * BOX_MSDF_CORNER_CELLS +
+                (best_k & 1) + (c & 1);
+            wrong -= cells[cell];
+            cells[cell] = box_msdf_corner_wrong(&push, cell);
+            wrong += cells[cell];
+        }
+
+        box_msdf_corner_wrongs(&push);
         result = true;
     }
 
@@ -1080,14 +1301,16 @@ static void box_msdf_block_edges(
  * @param gen The generation
  * @param corner The corner
  * @param edges Room for the indices of every edge of the shape
+ * @param sides The sides of the points of the block of the corner, as box_msdf_block_t keeps them
  * @return Whether a channel moved
  */
 static bool box_msdf_repair_corner(
     box_msdf_gen_t *gen,
     const box_msdf_corner_t *corner,
-    int32_t *edges)
+    int32_t *edges,
+    int8_t *sides)
 {
-    box_msdf_block_t block = { .l = corner->l, .b = corner->b };
+    box_msdf_block_t block = { .l = corner->l, .b = corner->b, .sides = sides };
     bool result = false;
     box_msdf_block_edges(gen, &block, corner->prev, corner->next, edges);
     if (box_msdf_corner_clashes(gen, &block)) {
@@ -1137,6 +1360,7 @@ static void box_msdf_repair_corners(
     int32_t *near = ecs_os_malloc_n(int32_t, ecs_vec_count(&gen->shape->edges) + 1);
     box_msdf_corner_t *corners = ecs_os_malloc_n(
         box_msdf_corner_t, ecs_vec_count(&gen->shape->edges) + 1);
+    int8_t *sides = NULL;
     for (k = 0; k < contours; k ++) {
         int32_t prev = first + counts[k] - 1;
         for (i = first; i < first + counts[k]; i ++) {
@@ -1156,6 +1380,11 @@ static void box_msdf_repair_corners(
         first += counts[k];
     }
 
+    if (count) {
+        sides = ecs_os_malloc_n(int8_t, count * BOX_MSDF_CORNER_POINTS);
+        ecs_os_memset(sides, BOX_MSDF_CORNER_UNKNOWN, count * BOX_MSDF_CORNER_POINTS);
+    }
+
     for (round = 0; round < BOX_MSDF_CORNER_ROUNDS; round ++) {
         bool repaired = false;
         for (i = 0; i < count; i ++) {
@@ -1164,7 +1393,8 @@ static void box_msdf_repair_corners(
             }
 
             corners[i].done = ++ stamp;
-            if (box_msdf_repair_corner(gen, &corners[i], near)) {
+            int8_t *corner_sides = &sides[i * BOX_MSDF_CORNER_POINTS];
+            if (box_msdf_repair_corner(gen, &corners[i], near, corner_sides)) {
                 corners[i].moved = stamp;
             }
 
@@ -1176,6 +1406,7 @@ static void box_msdf_repair_corners(
         }
     }
 
+    ecs_os_free(sides);
     ecs_os_free(corners);
     ecs_os_free(near);
 }
