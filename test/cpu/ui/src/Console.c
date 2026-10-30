@@ -1386,6 +1386,117 @@ void Console_rewrap_trims_scrollback(void) {
     ecs_fini(world);
 }
 
+void Console_rewrap_trim_waits_for_font(void) {
+    // console/wrap
+    // A fresh world: the default font loads when the console first measures a line. The
+    // commands run before the first frame, while the console has no width to wrap at, so
+    // every line counts as one row and none is dropped
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 640, .height = 1200, .resolution_scale = 1});
+    int32_t limit = 12, runs = 4;
+    Console *w = ecs_singleton_get_mut(world, Console);
+    w->open = true;
+    w->width = 0.5f;
+    w->scrollback = limit;
+    ecs_singleton_modified(world, Console);
+    for (int32_t i = 0; i < runs; i ++) {
+        ecs_os_free(box_console_run(world, CONSOLE_LONG_COMMAND, NULL));
+    }
+
+    // The first frame lays out the panel, which resets the rows of the lines, while the font
+    // is still loading: the trim waits instead of counting one row per line
+    ecs_entity_t font = ecs_lookup(world, "box.text.DefaultFont");
+    test_assert(font != 0);
+    ecs_progress(world, 0);
+    const FontStatus *status = ecs_get(world, font, FontStatus);
+    test_assert(!status || status->state == FontLoading);
+    ecs_entity_t lines[256];
+    int32_t i, count = console_log_lines(world, lines, 256);
+    test_assert(console_find_line(world, CONSOLE_HINT) != 0);
+    test_int(console_count_line(world, CONSOLE_PROMPT CONSOLE_LONG_COMMAND), runs);
+    int32_t before = 0;
+    for (i = 0; i < count; i ++) {
+        const Text *t = ecs_get(world, lines[i], Text);
+        before += t->value && t->value[0];
+    }
+
+    test_int(before, 1 + 2 * runs);
+
+    // Once the font is loaded the trim happens without another command
+    for (i = 0; i < 100; i ++) {
+        status = ecs_get(world, font, FontStatus);
+        if (status && status->state == FontReady) {
+            break;
+        }
+
+        ecs_progress(world, 0);
+    }
+
+    status = ecs_get(world, font, FontStatus);
+    test_assert(status != NULL);
+    test_int(status->state, FontReady);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+
+    ecs_entity_t cmd = console_find_line(world, CONSOLE_PROMPT CONSOLE_LONG_COMMAND);
+    test_assert(cmd != 0);
+    int32_t narrow = box_text_line(world, cmd, 0, NULL, NULL);
+    test_assert(narrow > 1);
+    test_assert(runs * narrow > limit);
+
+    // The oldest lines were dropped: the hint and the first commands
+    test_assert(console_find_line(world, CONSOLE_HINT) == 0);
+    int32_t kept = console_count_line(world, CONSOLE_PROMPT CONSOLE_LONG_COMMAND);
+    test_assert(kept > 0);
+    test_assert(kept < runs);
+    test_assert(console_shown_rows(world) <= limit);
+    count = console_log_lines(world, lines, 256);
+    int32_t after = 0;
+    for (i = 0; i < count; i ++) {
+        const Text *t = ecs_get(world, lines[i], Text);
+        after += t->value && t->value[0];
+    }
+
+    test_assert(after < before);
+    ecs_entity_t log = ecs_lookup(world, CONSOLE_LOG);
+    test_flt(ecs_get(world, log, Layout)->padding.bottom, 0);
+
+    // The scroll offset stays valid: scrolled to the oldest line on a short surface, the
+    // lines shown fill the window
+    const Console *c = ecs_singleton_get(world, Console);
+    float lh = c->line_height;
+    ecs_set(world, s, Surface, {.width = 640, .height = 160, .resolution_scale = 1});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    for (i = 0; i < 20; i ++) {
+        box_input_mouse_scroll(world, 0, 1);
+    }
+
+    console_settle(world);
+    count = console_log_lines(world, lines, 256);
+    int32_t rows = 0;
+    int32_t visible = (int32_t)floorf(ecs_get(world, log, LayoutBounds)->height / lh);
+    float under = -ecs_get(world, log, Layout)->padding.bottom;
+    test_assert(count > 0);
+    test_assert(under >= 0);
+    for (i = 0; i < count; i ++) {
+        const Text *t = ecs_get(world, lines[i], Text);
+        test_assert(t->value && t->value[0]);
+        rows += box_text_line(world, lines[i], 0, NULL, NULL);
+    }
+
+    test_assert(rows <= limit);
+    test_assert(under < (float)box_text_line(world, lines[count - 1], 0, NULL, NULL) * lh);
+    test_assert(rows - (int32_t)(under / lh + 0.5f) >= visible);
+
+    ecs_fini(world);
+}
+
 void Console_trailing_spaces_move_cursor(void) {
     // console/wrap
     ecs_world_t *world = console_open(640, 360, NULL);
