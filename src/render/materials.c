@@ -1,33 +1,15 @@
 /**
  * @file render/materials.c
- * @brief The material table: GPU records shared by content, and private records of prefabs and
- * of the shapes whose record changes every frame.
+ * @brief The material table: GPU records shared by content with reference counts, and private
+ * records of prefabs and of the shapes whose record changes every frame.
  *
- * A mesh shape that owns a MaterialId renders with a shared record: its material, packed field by
- * field from what it owns and what it still inherits, is hashed and looked up in the records of
- * that content, which count their owners. Shapes with equal materials render with one slot, and
- * a shape whose material equals the default renders with slot 0. A change of a material
- * component packs and hashes the record of each owner it reaches once, in the next extract
- * (box_draws_materials_resolve): the owner takes the record with its new content, or creates
- * one, and releases the old one, which is freed with its last owner. Only an owner whose slot
- * changes writes its shading again; an owner that holds its record alone keeps its slot, which
- * is packed again in place. Nothing is hashed in an extract in which no material changed.
+ * Mesh shapes that own a MaterialId share the slot of the record their material packs to, found
+ * by its hash; slot 0, the default material, is never freed. A material change hashes its owners
+ * in the next extract, and a frame without one hashes nothing (box_draws_materials_resolve).
  *
- * Private records have one owner, are not looked up by content and are packed from their owner
- * in every send that marks them:
- * - A prefab gets one when it gets its MaterialId, which its instances inherit, so a change of
- *   the prefab uploads one record and does not touch the instances.
- * - A shape of a DynamicMaterial batch, which packs its record every frame.
- * - A shape with a running material transition, whose record transitions.c patches by slot. The
- *   walk of the active transitions takes it with box_draws_material_private in every frame the
- *   transition runs, before the extract of the batches. A record that holds no other owner turns
- *   private in place and keeps its slot; else the shape gets a new slot and writes its shading,
- *   and the shapes it shared with keep theirs. The first extract in which no walk took the record
- *   ends it: the shape takes the shared record of its content again, or the private slot turns
- *   shared in place, and uploads its target.
- *
- * Slot 0 is the default material, shared and never freed. Freed slots are reused, last freed
- * first.
+ * Prefabs, shapes of DynamicMaterial batches and shapes with a running material transition own
+ * a private slot, packed from its owner in the send that uploads it, so a prefab change uploads
+ * one record and transitions.c can patch the record by slot (box_materials_transitions_end).
  */
 
 #include "draw.h"
@@ -259,6 +241,27 @@ static void box_materials_pack(
     box_draws_material_pack(out, &material);
 }
 
+/** Record the shadow regions of the alpha tested casters that render with a slot whose cutoff
+ * or UV transform changed, while shadow regions are recorded.
+ *
+ * @param d The state
+ * @param slot The slot
+ * @param was Its record before
+ * @param record Its record now
+ */
+static void box_materials_shadow(
+    box_render_draws_t *d,
+    uint32_t slot,
+    const box_render_material_t *was,
+    const box_render_material_t *record)
+{
+    if (d->shadow_record && (was->cutoff != record->cutoff ||
+        ecs_os_memcmp(was->uv, record->uv, ECS_SIZEOF(float) * 4)))
+    {
+        *ecs_vec_append_t(NULL, &d->shadow_materials, uint32_t) = slot;
+    }
+}
+
 /** Hash the material of an owner and give it the shared record of that content.
  *
  * The owner takes the listed slot of its content, else the slot it had when it held it alone
@@ -266,17 +269,18 @@ static void box_materials_pack(
  * it moves.
  *
  * @param world The world
- * @param m The table
+ * @param d The state
  * @param e The owner
  * @param old Its slot, BOX_MATERIALS_NONE for none
  * @return The shared slot
  */
 static uint32_t box_materials_share(
     const ecs_world_t *world,
-    box_draw_materials_t *m,
+    box_render_draws_t *d,
     ecs_entity_t e,
     uint32_t old)
 {
+    box_draw_materials_t *m = &d->materials;
     box_render_material_t record;
     box_materials_pack(world, e, &record);
     uint64_t hash = box_materials_hash(&record);
@@ -300,6 +304,7 @@ static uint32_t box_materials_share(
             s->owner = 0;
             s->refs = 1;
             s->flags &= BOX_MATERIALS_LISTS;
+            box_materials_shadow(d, old, box_materials_record(m, old), &record);
             *box_materials_record(m, old) = record;
             box_materials_list(m, old, hash);
             box_materials_mark(m, old);
@@ -519,7 +524,20 @@ done:
     return result;
 }
 
-void box_draws_materials_resolve(
+/** End the material transitions that the walk of this frame did not take: their owners return
+ * to a shared record.
+ *
+ * A transition starts when the walk first takes the owner with box_draws_material_private: a
+ * shared slot it holds alone turns private in place, else it gets a new slot and its sharers keep
+ * theirs. Each frame the walk takes the slot it is stamped, and the walk uploads it again after.
+ *
+ * At the end the owner takes the shared slot of its content and frees the private one, or its
+ * slot turns shared in place. A prefab or a shape of a DynamicMaterial batch stays private.
+ *
+ * @param world The world
+ * @param d The state
+ */
+static void box_materials_transitions_end(
     ecs_world_t *world,
     box_render_draws_t *d)
 {
@@ -538,12 +556,21 @@ void box_draws_materials_resolve(
         if (e && !(s->flags & BOX_MATERIALS_DYNAMIC) && ecs_is_alive(world, e) &&
             !ecs_has_id(world, e, EcsPrefab))
         {
-            uint32_t shared = box_materials_share(world, m, e, slot);
+            uint32_t shared = box_materials_share(world, d, e, slot);
             box_materials_set(world, d, e, shared, shared != slot);
         }
     }
 
     ecs_vec_set_count_t(NULL, &m->transiting, uint32_t, kept);
+}
+
+void box_draws_materials_resolve(
+    ecs_world_t *world,
+    box_render_draws_t *d)
+{
+    box_draw_materials_t *m = &d->materials;
+    int32_t i;
+    box_materials_transitions_end(world, d);
     for (i = 0; i < ecs_vec_count(&m->pending); i ++) {
         ecs_entity_t e = *ecs_vec_get_t(&m->pending, ecs_entity_t, i);
         ecs_map_val_t *own = ecs_map_get(&m->owned, (ecs_map_key_t)e);
@@ -557,7 +584,7 @@ void box_draws_materials_resolve(
             continue;
         }
 
-        uint32_t shared = box_materials_share(world, m, e, slot);
+        uint32_t shared = box_materials_share(world, d, e, slot);
         if (shared != slot) {
             box_materials_set(world, d, e, shared, true);
         }
@@ -607,9 +634,9 @@ uint32_t box_draws_material_id(
         } else if (s && s->owner == e) {
             s->flags &= (uint8_t)~BOX_MATERIALS_DYNAMIC;
             result = (s->flags & BOX_MATERIALS_TRANSITION)
-                ? old : box_materials_share(world, m, e, old);
+                ? old : box_materials_share(world, d, e, old);
         } else if (!own || pending) {
-            result = box_materials_share(world, m, e, old);
+            result = box_materials_share(world, d, e, old);
         } else {
             result = old;
         }
@@ -934,11 +961,7 @@ void box_draws_materials_send(
             box_render_material_t *record = box_materials_record(m, slot);
             box_render_material_t was = *record;
             box_materials_pack(world, owner, record);
-            if (d->shadow_record && (was.cutoff != record->cutoff ||
-                ecs_os_memcmp(was.uv, record->uv, ECS_SIZEOF(float) * 4)))
-            {
-                *ecs_vec_append_t(NULL, &d->shadow_materials, uint32_t) = slot;
-            }
+            box_materials_shadow(d, slot, &was, record);
         }
     }
 

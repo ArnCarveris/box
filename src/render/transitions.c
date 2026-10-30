@@ -743,13 +743,8 @@ static bool box_transition_material_reads(
 }
 
 /** Add what reads a material value of an entity: the entity and its IsA instances, down
- * every level. The ones that own a slot of the material table patch it, the drawn 2D entities
- * patch their shading.
- *
- * A slot the transition patches is private to its owner for this frame
- * (box_draws_material_private): an owner of a shared slot gets a private slot, so the owners it
- * shared with keep their record, and returns to a shared slot in the first extract after the
- * last frame the walk listed it.
+ * every level. The ones that own a slot of the material table patch it, made private to them
+ * for this frame (box_draws_material_private); the drawn 2D entities patch their shading.
  *
  * A slot reads its value from its owner or an IsA base of it, and Transition is inherited over
  * IsA, so this reaches every affected slot and visits only entities with Transition.
@@ -953,9 +948,11 @@ static void box_transition_fade_tag(
  * the drawn 2D entities, which keep TransitionMaterial.
  *
  * The slots of the last frame upload again, so the frame after a transition ended has its
- * target; an owner of such a slot that the walk no longer lists returns to a shared slot in the
- * extract of the batches, which uploads it. A frame without an active material transition visits no entity, and a frame with
- * one visits only the entities of its nodes and their IsA instances.
+ * target; an owner the walk no longer lists returns to a shared slot in the extract of the
+ * batches.
+ *
+ * A frame without an active material transition visits no entity, and a frame with one visits
+ * only the entities of its nodes and their IsA instances.
  *
  * @param world The world
  * @param s The state of the extract
@@ -979,10 +976,7 @@ static void box_transition_materials(
     for (i = 0; d && i < ecs_vec_count(&s->material_slots); i ++) {
         const box_transition_material_t *item = ecs_vec_get_t(
             &s->material_slots, box_transition_material_t, i);
-        if (ecs_is_alive(world, item->entity)) {
-            box_draws_material_changed(d, item->entity);
-        }
-
+        box_draws_material_changed(d, item->entity);
         if (item->shadow && d->shadow_record) {
             *ecs_vec_append_t(NULL, &d->shadow_materials, uint32_t) = item->slot;
         }

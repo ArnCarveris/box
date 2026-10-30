@@ -1258,3 +1258,119 @@ void MaterialIds_dynamic_material_keeps_private_slot(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+void MaterialIds_base_slot_change_reaches_instances(void) {
+    // gpu_instance_data/material_dedup
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t base = shape_new(world, 0, 10, 200, 30);
+    ecs_entity_t other = shape_new(world, 1, 10, 200, 30);
+    ecs_entity_t inst = instance_new(world, base, 2);
+    ecs_entity_t nested = instance_new(world, inst, 3);
+    ecs_set(world, inst, Box, {2, 2, 2});
+    ecs_set(world, nested, Box, {3, 3, 3});
+    frame(world);
+    frame(world);
+    uint32_t shared = id_of(world, base);
+    test_bool(ecs_owns(world, inst, MaterialId), false);
+    test_bool(ecs_owns(world, nested, ShapeMesh), true);
+    test_uint(id_of(world, other), shared);
+    test_uint(shading_of(world, inst)->material, shared);
+    test_uint(shading_of(world, nested)->material, shared);
+
+    ecs_set(world, base, Rgb, {1, 2, 3});
+    box_render_draws_stats_t stats = frame(world);
+    uint32_t moved = id_of(world, base);
+    test_assert(moved != shared && moved != 0);
+    test_int(stats.scattered, 3);
+    test_uint(shading_of(world, base)->material, moved);
+    test_uint(shading_of(world, inst)->material, moved);
+    test_uint(shading_of(world, nested)->material, moved);
+    test_uint(shading_of(world, other)->material, shared);
+
+    ecs_delete(world, other);
+    ecs_set(world, base, Rgb, {10, 200, 30});
+    stats = frame(world);
+    test_int(stats.materials, 2);
+    test_uint(shading_of(world, base)->material, moved);
+    test_uint(shading_of(world, inst)->material, moved);
+    test_uint(shading_of(world, nested)->material, moved);
+
+    stats = frame(world);
+    test_int(stats.scattered, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** Stop the light extract, which takes and clears the shadow regions every frame, and have the
+ * draws record them, so a case reads the regions of each frame.
+ *
+ * @param world The world
+ * @return box_render_shadow_region_t, the regions recorded since the case cleared them
+ */
+static ecs_vec_t* regions_of(
+    ecs_world_t *world)
+{
+    ecs_entity_t lights = ecs_lookup(world, "box.render.RenderExtractLights");
+    test_assert(lights != 0);
+    ecs_enable(world, lights, false);
+    box_render_draws_shadow_record(world, true);
+    ecs_vec_t *result = box_render_draws_shadow_regions(world);
+    test_assert(result != NULL);
+
+    return result;
+}
+
+/** Check that shadow regions were recorded since they were cleared, all left of an x.
+ *
+ * @param regions The regions
+ * @param max_x Largest x a region may reach
+ */
+static void regions_check(
+    const ecs_vec_t *regions,
+    float max_x)
+{
+    int32_t i;
+    test_assert(ecs_vec_count(regions) > 0);
+    for (i = 0; i < ecs_vec_count(regions); i ++) {
+        test_assert(ecs_vec_get_t(regions, box_render_shadow_region_t, i)->max[0] <= max_x);
+    }
+}
+
+void MaterialIds_shared_cutoff_change_records_shadow(void) {
+    // gpu_instance_data/material_dedup
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_vec_t *regions = regions_of(world);
+    ecs_entity_t a = shape_new(world, 0, 10, 200, 30);
+    ecs_entity_t b = shape_new(world, 6, 10, 200, 30);
+    ecs_set(world, a, AlphaCutoff, {0.25f});
+    ecs_set(world, b, AlphaCutoff, {0.25f});
+    frame(world);
+    frame(world);
+    uint32_t shared = id_of(world, a);
+    test_uint(id_of(world, b), shared);
+    ecs_vec_clear(regions);
+
+    ecs_set(world, a, AlphaCutoff, {0.5f});
+    frame(world);
+    uint32_t own = id_of(world, a);
+    test_assert(own != shared);
+    regions_check(regions, 3);
+    ecs_vec_clear(regions);
+
+    ecs_set(world, a, AlphaCutoff, {0.75f});
+    box_render_draws_stats_t stats = frame(world);
+    test_uint(id_of(world, a), own);
+    test_int(stats.scatters, 0);
+    test_flt(record_of(world, own)->cutoff, 0.75f);
+    regions_check(regions, 3);
+    ecs_vec_clear(regions);
+
+    frame(world);
+    test_int(ecs_vec_count(regions), 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}

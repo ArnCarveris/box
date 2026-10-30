@@ -7,9 +7,8 @@
  * changed: a moved shape its transform, a recolored one its shading.
  *
  * Static streams are written once per change, the transforms of DynamicTransform and the
- * shading of DynamicMaterial shapes per frame. A mesh instance references a slot of the
- * material table (materials.c), shared by the shapes with equal materials, so a material change
- * packs a slot or moves its owner to another slot, not the instances.
+ * shading of DynamicMaterial shapes per frame. A mesh instance references a slot of the material
+ * table (materials.c), so a material change packs a slot or moves its owner to another one.
  */
 
 #include "draw.h"
@@ -620,10 +619,9 @@ done:
  * A shape that keeps its slot writes the streams of its change, plus its shading when the clip
  * index of a 2D shape changed; a shape that gets a slot writes every stream.
  *
- * The shading of a mesh shape is the slot of the material table it renders with, its tint and
- * its alpha; a mesh shape that owns a MaterialId takes the shared slot of its material there,
- * or a private slot in a DynamicMaterial batch, and gives it back when it is no longer drawn by
- * the mesh pipeline.
+ * The shading of a mesh shape is its slot of the material table, its tint and its alpha. A mesh
+ * shape that owns a MaterialId takes its slot here, private in a DynamicMaterial batch, and gives
+ * it back when it is no longer drawn by the mesh pipeline.
  *
  * @param world The world
  * @param d The state

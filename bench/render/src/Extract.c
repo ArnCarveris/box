@@ -96,9 +96,11 @@ static void bench_render_extract(
         ecs_set(world, e, Sphere, {.segments = 8, .radius = 0.25f});
     }
 
-    ecs_progress(world, 0);
-    ecs_progress(world, 0);
     box_render_draws_stats_t stats = {0};
+    ecs_progress(world, 0);
+    box_render_draws_stats(world, &stats);
+    int64_t setup_material_bytes = stats.material_bytes;
+    ecs_progress(world, 0);
     int64_t observers = 0, sets = 0;
     double frames = 0;
     uint64_t start = bench_extract_instructions();
@@ -125,6 +127,8 @@ static void bench_render_extract(
     bench_counter(b, "instructions", (double)(bench_extract_instructions() - start));
     bench_counter(b, "frames", frames);
     bench_counter(b, "scattered", (double)stats.scattered);
+    bench_counter(b, "materials", (double)stats.materials);
+    bench_counter(b, "setup_material_bytes", (double)setup_material_bytes);
     if (sets) {
         bench_counter(b, "observers_per_set", (double)observers / (double)sets);
     }

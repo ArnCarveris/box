@@ -8,8 +8,7 @@
  *
  * A batch owns a run of slots of an instance page (store.c), a buffer per stream (transform,
  * shading, surface) with the same slots; a change uploads only its streams. Mesh and 2D batches
- * have stores of their own: a mesh shading is a material slot (materials.c), a tint and an alpha.
- * Mesh shapes with equal materials share a slot of the material table.
+ * have stores of their own: a mesh shading is a tint, an alpha and a shared material slot.
  */
 
 #ifndef BOX_RENDER_DRAW_H
@@ -1032,10 +1031,9 @@ void box_draws_materials_reset(
  * again, or hash the material of their owners again, when a material component of their owner,
  * or one they inherit, changes.
  *
- * A prefab gets a private slot when it gets its MaterialId; a mesh shape that owns a MaterialId
- * takes the shared slot of its material in the extract (box_draws_material_id). A private slot
- * is freed when its owner loses its MaterialId or is deleted, a shared slot with its last
- * owner.
+ * A prefab gets a private slot when it gets its MaterialId, a mesh shape that owns one takes a
+ * slot in the extract (box_draws_material_id). A private slot is freed when its owner loses its
+ * MaterialId or is deleted, a shared slot with its last owner.
  *
  * @param world The world
  * @param d The state
@@ -1047,11 +1045,11 @@ void box_draws_materials_observers(
 /** Get the slot of the material table an entity renders with.
  *
  * A mesh shape that owns a MaterialId renders with the shared slot of its material, which it
- * takes or creates when it has none or its material changed since. A shape of a DynamicMaterial
- * batch renders with a private slot, which it keeps while its batch is dynamic or a material
- * transition runs. Any other entity renders with the MaterialId it inherits, or slot 0, and
- * gives back an own slot it had. A slot past what the binding holds is logged once and renders
- * as slot 0.
+ * takes or creates when it has none or its material changed since, or with a private slot while
+ * it is in a DynamicMaterial batch or a material transition runs.
+ *
+ * Any other entity renders with the MaterialId it inherits, or slot 0, and gives back an own
+ * slot it had. A slot past what the binding holds is logged once and renders as slot 0.
  *
  * @param world The world
  * @param d The state
@@ -1105,11 +1103,11 @@ bool box_draws_material_owns(
  * its record by slot, for the extract of this frame.
  *
  * The walk of the active material transitions calls it in every frame the transition runs,
- * before the extract of the batches. A shared slot the owner holds alone turns private and keeps
- * its slot; else the owner gets a new slot and writes its shading again, and the owners it
- * shared with keep their slot. The first box_draws_materials_resolve after a frame that did not
- * take the slot returns the owner to a shared slot, unless it is a prefab or in a
- * DynamicMaterial batch.
+ * before the extract of the batches. A shared slot the owner holds alone turns private in place;
+ * else the owner gets a new slot and its sharers keep theirs.
+ *
+ * The first box_draws_materials_resolve after a frame that did not take the slot returns the
+ * owner to a shared slot, unless it is a prefab or in a DynamicMaterial batch.
  *
  * @param world The world
  * @param d The state
@@ -1121,10 +1119,10 @@ uint32_t box_draws_material_private(
     box_render_draws_t *d,
     ecs_entity_t e);
 
-/** Bring the owners of shared slots to the slot of their material at the start of the extract:
- * hash the material of each owner whose material changed, and return the owners whose
- * material transition ended to a shared slot. An owner whose slot changes writes its shading
- * again.
+/** Bring the owners of shared slots to the slot of their material at the start of the extract.
+ *
+ * Hashes the material of each owner whose material changed and returns the owners whose
+ * material transition ended to a shared slot. An owner whose slot changes writes its shading.
  *
  * @param world The world
  * @param d The state
@@ -1134,9 +1132,10 @@ void box_draws_materials_resolve(
     box_render_draws_t *d);
 
 /** Pack the changed private slots of the material table from their owners and upload the
- * changed slots, a new shared slot with the record it was hashed with: merged runs of
- * consecutive slots, or the whole table when its buffer is created. Freed slots do not upload. While recording shadow regions, the
- * slots whose cutoff or UV transform changed go to shadow_materials.
+ * changed slots: merged runs of consecutive slots, or the whole table when its buffer is created.
+ *
+ * A shared slot uploads the record it was hashed with, a freed slot nothing. While recording
+ * shadow regions, the slots whose cutoff or UV transform changed go to shadow_materials.
  *
  * @param world The world
  * @param d The state

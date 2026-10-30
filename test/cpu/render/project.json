@@ -284,7 +284,9 @@
                     "alone_changed_material_keeps_slot",
                     "shared_slot_freed_with_last_owner",
                     "transition_takes_private_slot",
-                    "dynamic_material_keeps_private_slot"
+                    "dynamic_material_keeps_private_slot",
+                    "base_slot_change_reaches_instances",
+                    "shared_cutoff_change_records_shadow"
                 ]
             },
             {
