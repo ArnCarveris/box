@@ -722,12 +722,35 @@ static void box_msdf_corner_medians(
     }
 }
 
+/** Check whether the interpolated median of a tested point of the block around a corner is
+ * wrong: for a deep point less than BOX_MSDF_CORNER_MARGIN onto its side of the outline, for
+ * another point not on its side.
+ *
+ * @param gen The generation
+ * @param side The side of the point, as box_msdf_corner_side gives it
+ * @param m The interpolated median of the point
+ * @return Whether the median is wrong
+ */
+static bool box_msdf_corner_short(
+    const box_msdf_gen_t *gen,
+    int8_t side,
+    float m)
+{
+    if (side == 2 || side == -2) {
+        return (m - 0.5) * gen->raster->range * side < BOX_MSDF_CORNER_MARGIN * 2.0;
+    }
+
+    return (m - 0.5) * side <= 0.0;
+}
+
 /** Count the wrong points of a cell of the block around a corner: the deep points whose
  * interpolated median does not reach BOX_MSDF_CORNER_MARGIN onto their side of the outline and
  * the other tested points whose median is not on their side.
  *
- * A point that is not tested and whose median is on another side than before the repair counts
- * as all the points of the block, so that the repair never moves another edge.
+ * A tested point that was not wrong before the repair and is wrong now, and a point that is not
+ * tested and whose median is on another side than before the repair, count as all the points of
+ * the block, so that the repair never trades the points it fixes for others nor moves another
+ * edge.
  *
  * @param gen The generation
  * @param l Column of the first texel of the block
@@ -755,13 +778,14 @@ static int32_t box_msdf_corner_wrong(
         for (sx = 0; sx < n; sx ++, i ++) {
             double v[4];
             box_msdf_bilinear(gen, tx, ty, (sx + 0.5) / n, (sy + 0.5) / n, v);
-            double m = fmax(fmin(v[0], v[1]), fmin(fmax(v[0], v[1]), v[2]));
-            if (sides[i] == 2 || sides[i] == -2) {
-                result += (m - 0.5) * r->range * sides[i] < BOX_MSDF_CORNER_MARGIN * 2.0;
-            } else if (sides[i]) {
-                result += (m - 0.5) * sides[i] <= 0.0;
+            float m = (float)fmax(fmin(v[0], v[1]), fmin(fmax(v[0], v[1]), v[2]));
+            if (sides[i]) {
+                if (box_msdf_corner_short(gen, sides[i], m)) {
+                    result += box_msdf_corner_short(gen, sides[i], before[i])
+                        ? 1 : BOX_MSDF_CORNER_POINTS;
+                }
             } else {
-                result += ((m > 0.5) != (before[i] > 0.5f)) * BOX_MSDF_CORNER_POINTS;
+                result += ((m > 0.5f) != (before[i] > 0.5f)) * BOX_MSDF_CORNER_POINTS;
             }
         }
     }
