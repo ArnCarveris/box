@@ -69,6 +69,10 @@ typedef struct box_msdf_value_t {
 typedef struct box_msdf_prep_t {
     box_msdf_point_t a_dir; /**< Unit direction at the start, zero for a degenerate edge */
     box_msdf_point_t b_dir; /**< Unit direction at the end, zero for a degenerate edge */
+    box_msdf_point_t a_end; /**< The start */
+    box_msdf_point_t b_end; /**< The end, as the edge gives it at parameter 1 */
+    box_msdf_point_t a_unit; /**< Unit direction at the start, up for a degenerate edge */
+    box_msdf_point_t b_unit; /**< Unit direction at the end, up for a degenerate edge */
     box_msdf_point_t a_bis; /**< Unit bisector of the corner at the start */
     box_msdf_point_t b_bis; /**< Unit bisector of the corner at the end */
     box_msdf_point_t min;   /**< Lower corner of the box around the points of the edge */
@@ -114,10 +118,14 @@ typedef struct box_msdf_gen_t {
     box_msdf_span_t *span;           /**< Span of each contour in the current row */
     int32_t *span_edges;             /**< Edges of the spans, in the slots of each contour */
     box_msdf_multi_t *multi;         /**< Scratch selectors, one per contour, the nearest edges
-                                      *   of the previous texel until a texel resets them */
+                                      *   of the last texel near the outline until a texel
+                                      *   resets them */
     box_msdf_value_t *contour;       /**< Scratch distances, one per contour */
     float *values;                   /**< Four floats per texel, 0.5 on the outline */
     uint8_t *stencil;                /**< BOX_MSDF_ERROR and BOX_MSDF_PROTECTED per texel */
+    uint8_t *near;                   /**< Per texel, whether it lies near the outline */
+    float *medians;                  /**< Median of the channels of each texel while
+                                      *   box_msdf_correct runs */
 } box_msdf_gen_t;
 
 /** Initialize an empty shape.
@@ -199,7 +207,8 @@ void box_msdf_shape_finish(
 
 /** Generate the field of a shape: RGB the multi channel distance, A the true distance.
  *
- * A value of 0.5 is on the outline, larger values are inside.
+ * A value of 0.5 is on the outline, larger values are inside. Texels far enough from the
+ * outline that no sample of the field can see its distance only take the side they lie on.
  *
  * @param shape The finished shape
  * @param raster The texels to fill

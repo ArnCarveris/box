@@ -131,7 +131,7 @@ static void box_msdf_protect_pair(
     float radius)
 {
     const float *a = &gen->values[ia * 4], *b = &gen->values[ib * 4];
-    float am = box_msdf_median(a), bm = box_msdf_median(b);
+    float am = gen->medians[ia], bm = gen->medians[ib];
     int32_t mask = 0, c;
     if (fabsf(am - 0.5f) + fabsf(bm - 0.5f) >= radius) {
         goto done;
@@ -155,7 +155,8 @@ done:
     return;
 }
 
-/** Protect the texels whose extreme channels shape the edges of the outline.
+/** Protect the texels whose extreme channels shape the edges of the outline. A texel whose
+ * median alone is farther from 0.5 than the radius of a pair has no edge to a neighbor.
  *
  * @param gen The generation
  */
@@ -168,16 +169,20 @@ static void box_msdf_protect_edges(
     for (y = 0; y < h; y ++) {
         for (x = 0; x < w; x ++) {
             int32_t i = y * w + x;
-            if (x < w - 1) {
+            bool far = fabsf(gen->medians[i] - 0.5f) >= diagonal;
+            if (!far && x < w - 1) {
                 box_msdf_protect_pair(gen, i, i + 1, straight);
             }
 
-            if (y < h - 1) {
+            if (!far && y < h - 1) {
                 box_msdf_protect_pair(gen, i, i + w, straight);
             }
 
             if (x < w - 1 && y < h - 1) {
-                box_msdf_protect_pair(gen, i, i + w + 1, diagonal);
+                if (!far) {
+                    box_msdf_protect_pair(gen, i, i + w + 1, diagonal);
+                }
+
                 box_msdf_protect_pair(gen, i + 1, i + w, diagonal);
             }
         }
@@ -272,6 +277,7 @@ static bool box_msdf_linear_inner(
  *
  * @param cls The classifier
  * @param am Median of the texel
+ * @param bm Median of the neighbor
  * @param a Channels of the texel
  * @param b Channels of the neighbor
  * @return Whether the texel causes an artifact
@@ -279,11 +285,10 @@ static bool box_msdf_linear_inner(
 static bool box_msdf_linear(
     const box_msdf_class_t *cls,
     float am,
+    float bm,
     const float *a,
     const float *b)
 {
-    float bm = box_msdf_median(b);
-
     return fabsf(am - 0.5f) >= fabsf(bm - 0.5f) && (
         box_msdf_linear_inner(cls, am, bm, a, b, a[1] - a[0], b[1] - b[0]) ||
         box_msdf_linear_inner(cls, am, bm, a, b, a[2] - a[1], b[2] - b[1]) ||
@@ -384,6 +389,7 @@ static bool box_msdf_diagonal_inner(
  *
  * @param cls The classifier
  * @param am Median of the texel
+ * @param dm Median of the diagonal neighbor
  * @param a Channels of the texel
  * @param b Channels of the side neighbor along x
  * @param c Channels of the side neighbor along y
@@ -393,12 +399,12 @@ static bool box_msdf_diagonal_inner(
 static bool box_msdf_diagonal(
     const box_msdf_class_t *cls,
     float am,
+    float dm,
     const float *a,
     const float *b,
     const float *c,
     const float *d)
 {
-    float dm = box_msdf_median(d);
     float terms[9], diff[3][3];
     double ex[3];
     int32_t i, j;
@@ -442,7 +448,7 @@ static bool box_msdf_texel_error(
     };
     int32_t i, w = gen->raster->width, h = gen->raster->height;
     double unit = BOX_MSDF_DEVIATION / gen->raster->range;
-    float am = box_msdf_median(cls->texel);
+    float am = gen->medians[cls->y * w + cls->x];
     bool result = false;
     for (i = 0; i < 8 && !result; i ++) {
         int32_t nx = cls->x + dirs[i][0], ny = cls->y + dirs[i][1];
@@ -451,12 +457,13 @@ static bool box_msdf_texel_error(
         }
 
         const float *n = &gen->values[(ny * w + nx) * 4];
+        float nm = gen->medians[ny * w + nx];
         if (i < 4) {
             cls->span = unit;
-            result = box_msdf_linear(cls, am, cls->texel, n);
+            result = box_msdf_linear(cls, am, nm, cls->texel, n);
         } else {
             cls->span = unit * GLM_SQRT2;
-            result = box_msdf_diagonal(cls, am, cls->texel,
+            result = box_msdf_diagonal(cls, am, nm, cls->texel,
                 &gen->values[(cls->y * w + nx) * 4], &gen->values[(ny * w + cls->x) * 4], n);
         }
     }
@@ -465,6 +472,8 @@ static bool box_msdf_texel_error(
 }
 
 /** Flag the texels that cause artifacts, after msdfgen's findErrors without a distance check.
+ * A texel whose channels are equal, or all on the same side of the 0 to 1 that is kept, is the
+ * same flattened, so it is not tested.
  *
  * @param gen The generation
  */
@@ -475,9 +484,17 @@ static void box_msdf_find_errors(
     for (y = 0; y < h; y ++) {
         for (x = 0; x < w; x ++) {
             uint8_t *flags = &gen->stencil[y * w + x];
+            const float *v = &gen->values[(y * w + x) * 4];
+            if ((v[0] >= 1.0f && v[1] >= 1.0f && v[2] >= 1.0f) ||
+                (v[0] <= 0.0f && v[1] <= 0.0f && v[2] <= 0.0f) ||
+                (v[0] == v[1] && v[1] == v[2]))
+            {
+                continue;
+            }
+
             box_msdf_class_t cls = {
                 .protect = (*flags & BOX_MSDF_PROTECTED) != 0,
-                .texel = &gen->values[(y * w + x) * 4],
+                .texel = v,
                 .x = x,
                 .y = y
             };
@@ -492,14 +509,21 @@ void box_msdf_correct(
     box_msdf_gen_t *gen)
 {
     int32_t i, texels = gen->raster->width * gen->raster->height;
+    gen->medians = ecs_os_malloc_n(float, texels);
+    for (i = 0; i < texels; i ++) {
+        gen->medians[i] = box_msdf_median(&gen->values[i * 4]);
+    }
+
     box_msdf_protect_corners(gen);
     box_msdf_protect_edges(gen);
     box_msdf_find_errors(gen);
     for (i = 0; i < texels; i ++) {
         float *v = &gen->values[i * 4];
         if (gen->stencil[i] & BOX_MSDF_ERROR) {
-            float m = box_msdf_median(v);
-            v[0] = v[1] = v[2] = m;
+            v[0] = v[1] = v[2] = gen->medians[i];
         }
     }
+
+    ecs_os_free(gen->medians);
+    gen->medians = NULL;
 }
