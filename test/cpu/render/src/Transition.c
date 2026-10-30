@@ -1730,12 +1730,13 @@ void Transition_transform_reparent_out(void) {
 
     ecs_remove_pair(world, child, EcsChildOf, parent);
     for (i = 2; i < 4; i ++) {
-        box_render_transform_t rendered, target;
+        box_render_transform_t target;
         tr_frame(world);
         tr_test_pose(world, null, parent, NULL, &(Position){(float)i, 0, 0}, NULL, NULL);
-        tr_rendered(world, null, child, &rendered);
+        test_assert(tr_batch(world, parent)->key.dynamic_transform);
+        tr_test_static(world, null, child);
+        test_assert(!tr_batch(world, child)->key.dynamic_transform);
         tr_target(world, child, &target);
-        tr_test_transform(&rendered, &target);
         test_flt(target.rows[1][3], 1);
     }
 
