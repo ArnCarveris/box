@@ -253,9 +253,22 @@ float box_msdf_median3(
 float box_msdf_median(
     const float *v);
 
+/** Signed distance from a point to the nearer of the two edges that meet at a corner.
+ *
+ * @param a The edge that ends at the corner
+ * @param b The edge that starts at the corner
+ * @param p The point, in font units
+ * @return The distance in font units, positive inside
+ */
+double box_msdf_corner_distance(
+    const box_msdf_edge_t *a,
+    const box_msdf_edge_t *b,
+    box_msdf_point_t p);
+
 /** Correct the artifacts of the field after msdfgen's MSDFErrorCorrection without a distance
  * check: protect corners and edges, then flatten the texels whose interpolation leaves the range
- * their distance allows.
+ * their distance allows. Around each corner where the interpolated median leaves the side the
+ * distance of the corner edges gives, push the clashing channels away from the median.
  *
  * @param gen The generation
  */

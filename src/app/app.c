@@ -372,7 +372,10 @@ static int box_app_start(
 
     if (app->scene && app->scene[0]) {
         char *scene = box_app_locate(app->scene);
-        ecs_entity_t script = ecs_script(world, { .filename = scene });
+        ecs_entity_t script = ecs_script(world, {
+            .entity = ecs_new_from_path_w_sep(world, 0, app->scene, "/", "/"),
+            .filename = scene
+        });
         const EcsScript *loaded = script ? ecs_get(world, script, EcsScript) : NULL;
         ecs_os_free(scene);
         if (!loaded || !loaded->script || loaded->error) {

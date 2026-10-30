@@ -794,3 +794,86 @@ void Msdf_curves(void) {
     ecs_os_free(ref);
     ecs_os_free(pixels);
 }
+
+/** The "K" of the default font (B612) as TextField.sharp_corners_large renders it: 2000 units per
+ * em at BOX_TEXT_EM texels per em, in the area the atlas gives the glyph. The arms meet the stem
+ * at a reflex corner (463, 802) that lies close to a texel row of the field. Where the outline
+ * is at least a quarter texel away, the median of the field interpolated between the texels the
+ * way a linear sampler does is on the side of the outline by at least a sixteenth of a texel: at
+ * the 8 pixels per texel of the GPU test, a pixel 2 pixels from the edge is fully covered or
+ * fully uncovered. Where it is at least a 32nd of a texel away, the median is on its side, so
+ * the notches between the arms and the stem keep their tips. */
+void Msdf_reflex_corner(void) {
+    const double outline[][2] = {
+        {190, 0}, {190, 1290}, {160, 1500}, {400, 1520}, {400, 856}, {941, 1500}, {1163, 1500},
+        {632, 865}, {463, 802}, {637, 744}, {1190, 0}, {953, 0}, {400, 746}, {400, 0}
+    };
+
+    int32_t i, s, x, y, c, count = (int32_t)(sizeof(outline) / sizeof(outline[0]));
+    box_msdf_raster_t raster = {
+        .scale = 40.0 / 2000.0, .left = 0.0, .top = 1700.0, .width = 27, .height = 37,
+        .range = 4.0
+    };
+    int32_t bytes = raster.width * raster.height * 4;
+
+    box_msdf_shape_t shape;
+    box_msdf_shape_init(&shape);
+    box_msdf_move_to(&shape, outline[0][0], outline[0][1]);
+    for (i = 1; i <= count; i ++) {
+        box_msdf_line_to(&shape, outline[i % count][0], outline[i % count][1]);
+    }
+
+    box_msdf_shape_finish(&shape);
+    uint8_t *pixels = ecs_os_malloc_n(uint8_t, bytes);
+    box_msdf_generate(&shape, &raster, pixels);
+    box_msdf_shape_fini(&shape);
+
+    // Interpolate the field at 32 by 32 points per texel between the texel centers
+    int32_t checked = 0, wrong = 0, sharp = 0;
+    for (y = 0; y < (raster.height - 1) * 32; y ++) {
+        for (x = 0; x < (raster.width - 1) * 32; x ++) {
+            double u = 0.5 + (x + 0.5) / 32.0, v = 0.5 + (y + 0.5) / 32.0;
+            double cx = raster.left + u / raster.scale, cy = raster.top - v / raster.scale;
+            double dist = 1e30;
+            bool inside = false;
+            for (s = 0; s < count; s ++) {
+                double ax = outline[s][0], ay = outline[s][1];
+                double dx = outline[(s + 1) % count][0] - ax;
+                double dy = outline[(s + 1) % count][1] - ay;
+                double t = ((cx - ax) * dx + (cy - ay) * dy) / (dx * dx + dy * dy);
+                t = t < 0.0 ? 0.0 : (t > 1.0 ? 1.0 : t);
+                double ex = ax + t * dx - cx, ey = ay + t * dy - cy;
+                dist = fmin(dist, sqrt(ex * ex + ey * ey));
+                if ((ay > cy) != (ay + dy > cy) && ax + (cy - ay) * dx / dy > cx) {
+                    inside = !inside;
+                }
+            }
+
+            if (dist * raster.scale < 1.0 / 32.0) {
+                continue;
+            }
+
+            int32_t tx = (int32_t)floor(u - 0.5), ty = (int32_t)floor(v - 0.5);
+            double fx = u - 0.5 - tx, fy = v - 0.5 - ty, ch[3];
+            for (c = 0; c < 3; c ++) {
+                const uint8_t *t = &pixels[(ty * raster.width + tx) * 4 + c];
+                const uint8_t *b = t + raster.width * 4;
+                ch[c] = ((t[0] * (1.0 - fx) + t[4] * fx) * (1.0 - fy) +
+                    (b[0] * (1.0 - fx) + b[4] * fx) * fy) / 255.0;
+            }
+
+            double median = fmax(fmin(ch[0], ch[1]), fmin(fmax(ch[0], ch[1]), ch[2]));
+            double field = (median - 0.5) * raster.range;
+            sharp += inside ? field <= 0.0 : field >= 0.0;
+            if (dist * raster.scale >= 0.25) {
+                checked ++;
+                wrong += inside ? field < 1.0 / 16.0 : field > -1.0 / 16.0;
+            }
+        }
+    }
+
+    test_assert(checked > 0);
+    test_int(wrong, 0);
+    test_int(sharp, 0);
+    ecs_os_free(pixels);
+}
