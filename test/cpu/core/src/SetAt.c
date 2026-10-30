@@ -357,48 +357,113 @@ void SetAt_script_last_written(void) {
         "}\n", 5, 0.5f);
 }
 
-/** Look up the observer that records the writes to SetAt entities.
+/** A component without hooks or observers. */
+typedef struct SetAtValue {
+    int32_t value;
+} SetAtValue;
+
+/** A second component without hooks or observers, never written to a SetAt entity. */
+typedef struct SetAtOther {
+    int32_t value;
+} SetAtOther;
+
+/** Check whether the writes to SetAt entities are recorded: AppSetAtOnSet, the parent of their
+ * observers, exists only while the world has SetAt entities.
  *
  * @param world The world
- * @return The observer, 0 while the world has no SetAt entity
+ * @return Whether AppSetAtOnSet exists
  */
-static ecs_entity_t set_at_observer(
+static bool set_at_active(
     ecs_world_t *world)
 {
-    ecs_entity_t o = ecs_lookup(world, "box.app.AppSetAtOnSet");
-    test_assert(!o || ecs_observer_get(world, o) != NULL);
-    return o;
+    return ecs_lookup(world, "box.app.AppSetAtOnSet") != 0;
+}
+
+/** Check whether the writes to a component of SetAt entities are recorded.
+ *
+ * @param world The world
+ * @param id The component
+ * @return Whether an observer of AppSetAtOnSet records the writes to id
+ */
+static bool set_at_observes(
+    ecs_world_t *world,
+    ecs_id_t id)
+{
+    ecs_entity_t scope = ecs_lookup(world, "box.app.AppSetAtOnSet");
+    bool result = false;
+    if (scope) {
+        ecs_iter_t it = ecs_children(world, scope);
+        while (ecs_children_next(&it)) {
+            int32_t i;
+            for (i = 0; i < it.count; i ++) {
+                const ecs_observer_t *o = ecs_observer_get(world, it.entities[i]);
+                test_assert(o != NULL);
+                result |= o->query->terms[0].id == id;
+            }
+        }
+    }
+
+    return result;
+}
+
+/** Check whether flecs emits OnSet for the sets of the table of an entity.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return Whether the table of e emits OnSet
+ */
+static bool set_at_emits(
+    ecs_world_t *world,
+    ecs_entity_t e)
+{
+    return ecs_table_has_flags(ecs_get_table(world, e), EcsTableHasOnSet);
 }
 
 void SetAt_observer_on_demand(void) {
     ecs_entity_t e;
     ecs_world_t *world = set_at_world(&e);
+    ECS_COMPONENT(world, SetAtValue);
+    ECS_COMPONENT(world, SetAtOther);
     ecs_progress(world, 0.1f);
-    test_assert(set_at_observer(world) == 0);
+    test_bool(set_at_active(world), false);
+    ecs_entity_t plain = ecs_new(world);
+    ecs_set(world, plain, SetAtValue, {1});
+    test_bool(set_at_emits(world, plain), false);
 
     ecs_entity_t first = ecs_new(world);
     ecs_set(world, first, SetAt, { .frame = 2, .entity = e });
-    test_assert(set_at_observer(world) != 0);
+    test_bool(set_at_active(world), true);
     ecs_set(world, first, Position, {1, 2, 3});
+    ecs_set(world, first, SetAtValue, {5});
+    test_bool(set_at_observes(world, ecs_id(Position)), true);
+    test_bool(set_at_observes(world, ecs_id(SetAtValue)), true);
+    test_bool(set_at_observes(world, ecs_id(SetAtOther)), false);
+    ecs_entity_t other_plain = ecs_new(world);
+    ecs_set(world, other_plain, SetAtOther, {1});
+    test_bool(set_at_emits(world, other_plain), false);
+
     ecs_entity_t other = ecs_new(world);
     ecs_set(world, other, SetAt, { .frame = 3, .entity = e });
     ecs_set(world, other, Scale, {2, 2, 2});
     ecs_delete(world, other);
-    test_assert(set_at_observer(world) != 0);
+    test_bool(set_at_active(world), true);
 
     ecs_progress(world, 0.1f);
-    ecs_progress(world, 0.1f);
-    test_assert(set_at_observer(world) != 0);
+    test_bool(ecs_is_alive(world, first), true);
+    test_bool(set_at_active(world), true);
     ecs_progress(world, 0.1f);
     test_bool(ecs_is_alive(world, first), false);
     test_flt(ecs_get(world, e, Position)->x, 1);
+    test_int(ecs_get(world, e, SetAtValue)->value, 5);
     test_bool(ecs_has(world, e, Scale), false);
-    test_assert(set_at_observer(world) == 0);
+    test_bool(set_at_active(world), false);
 
     ecs_entity_t second = ecs_new(world);
     ecs_set(world, second, SetAt, { .frame = 4, .entity = e });
-    test_assert(set_at_observer(world) != 0);
+    test_bool(set_at_active(world), true);
+    test_bool(set_at_observes(world, ecs_id(SetAtValue)), true);
     ecs_set(world, second, Position, {0, 0, 0});
+    ecs_set(world, second, SetAtValue, {0});
     ecs_set(world, second, Rotation, {0, 0.5f, 0});
     ecs_progress(world, 0.1f);
     test_flt(ecs_get(world, e, Position)->x, 1);
@@ -409,13 +474,14 @@ void SetAt_observer_on_demand(void) {
     test_flt(p->y, 0);
     test_flt(p->z, 0);
     test_flt(ecs_get(world, e, Rotation)->y, 0.5f);
-    test_assert(set_at_observer(world) == 0);
+    test_int(ecs_get(world, e, SetAtValue)->value, 0);
+    test_bool(set_at_active(world), false);
 
     ecs_entity_t removed = ecs_new(world);
     ecs_set(world, removed, SetAt, { .frame = 9, .entity = e });
-    test_assert(set_at_observer(world) != 0);
+    test_bool(set_at_active(world), true);
     ecs_remove(world, removed, SetAt);
-    test_assert(set_at_observer(world) == 0);
+    test_bool(set_at_active(world), false);
 
     ecs_fini(world);
 }
@@ -423,18 +489,27 @@ void SetAt_observer_on_demand(void) {
 void SetAt_deferred_first(void) {
     ecs_entity_t e;
     ecs_world_t *world = set_at_world(&e);
+    ECS_COMPONENT(world, SetAtValue);
+    ECS_COMPONENT(world, SetAtOther);
     ecs_set(world, e, Position, {1, 2, 3});
     ecs_progress(world, 0.1f);
-    test_assert(set_at_observer(world) == 0);
+    test_bool(set_at_active(world), false);
 
     ecs_entity_t s = ecs_new(world);
+    ecs_readonly_begin(world, false);
     ecs_world_t *stage = ecs_get_stage(world, 0);
     ecs_set(stage, s, SetAt, { .frame = 1, .entity = e });
     ecs_set(stage, s, Rotation, {0, 0.5f, 0});
     ecs_set(stage, s, Position, {0, 0, 0});
     ecs_set(stage, s, Rgb, {40, 50, 60});
-    ecs_merge(stage);
-    test_assert(set_at_observer(world) != 0);
+    ecs_set(stage, s, SetAtValue, {7});
+    ecs_add(stage, s, SetAtOther);
+    ecs_set(stage, s, PointLight, { .intensity = 3, .range = 20 });
+    ecs_add(stage, s, SpotLight);
+    test_bool(ecs_has(world, s, SetAt), false);
+    ecs_readonly_end(world);
+    test_bool(ecs_has(world, s, SetAtValue), true);
+    test_bool(set_at_observes(world, ecs_id(SetAtValue)), true);
 
     ecs_progress(world, 0.1f);
     test_bool(ecs_is_alive(world, s), false);
@@ -444,7 +519,14 @@ void SetAt_deferred_first(void) {
     test_flt(p->z, 0);
     test_flt(ecs_get(world, e, Rotation)->y, 0.5f);
     test_int(ecs_get(world, e, Rgb)->r, 40);
-    test_assert(set_at_observer(world) == 0);
+    test_int(ecs_get(world, e, SetAtValue)->value, 7);
+    test_bool(ecs_has(world, e, SetAtOther), false);
+    const PointLight *light = ecs_get(world, e, PointLight);
+    test_assert(light != NULL);
+    test_flt(light->intensity, 3);
+    test_flt(light->range, 20);
+    test_bool(ecs_has(world, e, SpotLight), false);
+    test_bool(set_at_active(world), false);
 
     ecs_fini(world);
 }
@@ -452,24 +534,28 @@ void SetAt_deferred_first(void) {
 void SetAt_prefab_instance(void) {
     ecs_entity_t e;
     ecs_world_t *world = set_at_world(&e);
+    ECS_COMPONENT(world, SetAtValue);
     ecs_progress(world, 0.1f);
 
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
     ecs_set(world, prefab, SetAt, { .frame = 1, .entity = e });
     ecs_set(world, prefab, Rgb, {40, 50, 60});
-    test_assert(set_at_observer(world) == 0);
+    test_bool(set_at_active(world), false);
 
     ecs_entity_t inst = ecs_new_w_pair(world, EcsIsA, prefab);
-    test_assert(set_at_observer(world) != 0);
+    test_bool(set_at_active(world), true);
     test_bool(ecs_has_id(world, inst, EcsDisabled), true);
+    test_bool(ecs_owns(world, inst, Rgb), false);
+    ecs_set(world, inst, Position, {4, 5, 6});
+    ecs_set(world, inst, SetAtValue, {8});
 
     ecs_progress(world, 0.1f);
     test_bool(ecs_is_alive(world, inst), false);
-    const Rgb *c = ecs_get(world, e, Rgb);
-    test_assert(c != NULL);
-    test_int(c->r, 40);
+    test_flt(ecs_get(world, e, Position)->x, 4);
+    test_int(ecs_get(world, e, SetAtValue)->value, 8);
+    test_bool(ecs_has(world, e, Rgb), false);
     test_bool(ecs_is_alive(world, prefab), true);
-    test_assert(set_at_observer(world) == 0);
+    test_bool(set_at_active(world), false);
 
     ecs_fini(world);
 }

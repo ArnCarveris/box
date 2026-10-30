@@ -158,6 +158,12 @@ ECS_STRUCT(FileWatchStatus, {
  * Position a Rotation or Scale adds with With. Writes are recorded once the entity has SetAt, so
  * write SetAt first in a script body: of the components the entity had before SetAt was added,
  * one that another adds with With is copied only when it no longer holds its constructed value.
+ * A stage (a system) that writes SetAt and its components before they are merged can merge a
+ * component without OnSet, such as a light the first time a SetAt entity gets one: it is copied
+ * when it no longer holds its constructed value.
+ *
+ * The writes are recorded by OnSet observers of the components the SetAt entities have, which
+ * exist only while the world has SetAt entities: a world without them pays nothing.
  */
 ECS_STRUCT(SetAt, {
     int32_t frame;          /**< Frames completed (AppStatus.frame) before the values are set */

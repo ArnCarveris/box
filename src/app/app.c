@@ -181,11 +181,13 @@ done:
 }
 
 /** Private state of a SetAt entity, added with SetAt through With: the components written to
- * the entity since it has SetAt, and the components it had before SetAt was added.
+ * the entity since it has SetAt, the components it had before SetAt was added, and the ones
+ * added in the same operation as SetAt.
  */
 typedef struct SetAtWritten {
     ecs_vec_t written;  /**< ecs_id_t of the components set since the entity has SetAt */
     ecs_vec_t before;   /**< ecs_id_t of the components the entity had before SetAt */
+    ecs_vec_t batched;  /**< ecs_id_t of the components added with SetAt, as by a stage merge */
 } SetAtWritten;
 
 static ECS_COMPONENT_DECLARE(SetAtWritten);
@@ -207,6 +209,7 @@ static void box_app_set_at_written_dtor(
     for (i = 0; i < count; i ++) {
         ecs_vec_fini_t(NULL, &w[i].written, ecs_id_t);
         ecs_vec_fini_t(NULL, &w[i].before, ecs_id_t);
+        ecs_vec_fini_t(NULL, &w[i].batched, ecs_id_t);
     }
 }
 
@@ -248,6 +251,7 @@ static void box_app_set_at_written_copy(
     for (i = 0; i < count; i ++) {
         d[i].written = ecs_vec_copy_t(NULL, &s[i].written, ecs_id_t);
         d[i].before = ecs_vec_copy_t(NULL, &s[i].before, ecs_id_t);
+        d[i].batched = ecs_vec_copy_t(NULL, &s[i].batched, ecs_id_t);
     }
 }
 
@@ -271,7 +275,7 @@ static bool box_app_set_at_has(
     return result;
 }
 
-/** Record a component written to SetAt entities: OnSet of any component of an entity with
+/** Record a component written to SetAt entities: OnSet of a component of an entity with
  * SetAt. A component that With adds without a value gets OnAdd but no OnSet, so it is not
  * recorded.
  *
@@ -291,18 +295,70 @@ static void BoxAppSetAtOnSet(
     }
 }
 
-/** State of the SetAt observers: the observer that records writes exists only while the world
- * has SetAt entities, so that worlds without them keep the fast paths of ecs_set and
- * ecs_modified for components without OnSet observers.
+/** State of the SetAt observers. The writes to SetAt entities are recorded by one OnSet observer
+ * per component that a table with SetAtWritten has, created while the world has SetAt entities.
+ * A wildcard OnSet observer would make flecs emit OnSet for every set of every table that
+ * exists while it does, even after it is deleted, since flecs never clears the table flags.
  */
 typedef struct box_app_set_at_t {
-    ecs_entity_t module;    /**< The box.app module, parent of the observer */
-    ecs_entity_t observer;  /**< AppSetAtOnSet, 0 while the world has no SetAt entity */
+    ecs_entity_t module;    /**< The box.app module */
+    ecs_entity_t scope;     /**< AppSetAtOnSet, parent of the observers, 0 without SetAt entities */
+    ecs_vec_t ids;          /**< ecs_id_t of the components with an observer */
     int32_t count;          /**< SetAt entities in the world */
 } box_app_set_at_t;
 
-/** Create the observer that records the components written to SetAt entities: OnSet of every
- * component, which makes flecs emit OnSet for every set in the world while it exists.
+/** Free the state of the SetAt observers.
+ *
+ * @param ptr The state
+ */
+static void box_app_set_at_free(
+    void *ptr)
+{
+    box_app_set_at_t *state = ptr;
+    ecs_vec_fini_t(NULL, &state->ids, ecs_id_t);
+    ecs_os_free(state);
+}
+
+/** Create the observers that record the writes to the components of a table with SetAtWritten,
+ * for the components that have none yet.
+ *
+ * @param world The world
+ * @param state The state of the SetAt observers
+ * @param table The table
+ */
+static void box_app_set_at_observe_table(
+    ecs_world_t *world,
+    box_app_set_at_t *state,
+    ecs_table_t *table)
+{
+    const ecs_type_t *type = ecs_table_get_type(table);
+    int32_t i;
+    for (i = 0; i < type->count; i ++) {
+        ecs_id_t id = type->array[i];
+        if (ECS_IS_PAIR(id) || id == ecs_id(SetAt) || id == ecs_id(SetAtWritten) ||
+            !ecs_get_type_info(world, id) || box_app_set_at_has(&state->ids, id))
+        {
+            continue;
+        }
+
+        ecs_vec_append_t(NULL, &state->ids, ecs_id_t)[0] = id;
+        ecs_observer(world, {
+            .entity = ecs_entity(world, { .parent = state->scope }),
+            .query = {
+                .terms = {
+                    { .id = id },
+                    { .id = ecs_id(SetAtWritten), .inout = EcsInOutFilter }
+                },
+                .flags = EcsQueryMatchDisabled
+            },
+            .events = { EcsOnSet },
+            .callback = BoxAppSetAtOnSet
+        });
+    }
+}
+
+/** Create the observers of the components of every table with SetAtWritten, when the world gets
+ * its first SetAt entity.
  *
  * @param world The world
  * @param state The state of the SetAt observers
@@ -311,21 +367,21 @@ static void box_app_set_at_observe(
     ecs_world_t *world,
     box_app_set_at_t *state)
 {
-    state->observer = ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "AppSetAtOnSet", .parent = state->module }),
-        .query = {
-            .terms = {
-                { .id = EcsWildcard },
-                { .id = ecs_id(SetAtWritten), .inout = EcsInOutFilter }
-            },
-            .flags = EcsQueryMatchDisabled
-        },
-        .events = { EcsOnSet },
-        .callback = BoxAppSetAtOnSet
+    state->scope = ecs_entity(world, { .name = "AppSetAtOnSet", .parent = state->module });
+    ecs_query_t *q = ecs_query(world, {
+        .terms = {{ .id = ecs_id(SetAtWritten) }},
+        .flags = EcsQueryMatchDisabled | EcsQueryMatchEmptyTables
     });
+    ecs_iter_t it = ecs_query_iter(world, q);
+    while (ecs_query_next(&it)) {
+        box_app_set_at_observe_table(world, state, it.table);
+    }
+
+    ecs_query_fini(q);
 }
 
-/** Delete the observer that records the components written to SetAt entities.
+/** Delete the observers that record the writes to SetAt entities, when the world has no SetAt
+ * entity left.
  *
  * @param world The world
  * @param state The state of the SetAt observers
@@ -334,16 +390,64 @@ static void box_app_set_at_unobserve(
     ecs_world_t *world,
     box_app_set_at_t *state)
 {
-    ecs_entity_t observer = state->observer;
-    state->observer = 0;
-    if (observer) {
-        ecs_delete(world, observer);
+    ecs_entity_t scope = state->scope;
+    state->scope = 0;
+    ecs_vec_clear(&state->ids);
+    if (scope) {
+        ecs_delete(world, scope);
+    }
+}
+
+/** Create the observers of the components of a new table with SetAtWritten, while the world has
+ * SetAt entities. A table created before the first SetAt entity is covered when it is added.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxAppSetAtOnTable(
+    ecs_iter_t *it)
+{
+    ecs_world_t *world = (ecs_world_t*)ecs_get_world(it->world);
+    box_app_set_at_t *state = it->ctx;
+    if (!ecs_is_fini(world) && state->scope) {
+        box_app_set_at_observe_table(world, state, it->table);
+    }
+}
+
+/** Add the non pair ids of a type to a list of ids, except those another type has.
+ *
+ * @param ids The list of ecs_id_t
+ * @param type The type
+ * @param except The type whose ids are not added, or NULL
+ */
+static void box_app_set_at_add_type(
+    ecs_vec_t *ids,
+    const ecs_type_t *type,
+    const ecs_type_t *except)
+{
+    int32_t i, j;
+    for (i = 0; i < type->count; i ++) {
+        ecs_id_t id = type->array[i];
+        bool skip = ECS_IS_PAIR(id) || box_app_set_at_has(ids, id);
+        for (j = 0; except && j < except->count && !skip; j ++) {
+            skip = except->array[j] == id;
+        }
+
+        if (!skip) {
+            ecs_vec_append_t(NULL, ids, ecs_id_t)[0] = id;
+        }
     }
 }
 
 /** Record the components a SetAt entity had before SetAt was added, as when a script body
- * writes SetAt after the other components, and count the SetAt entities: the first one added
- * creates AppSetAtOnSet, the last one removed or deleted deletes it.
+ * writes SetAt after the other components, and the ones added with it, and count the SetAt
+ * entities: the first one added creates the observers of AppSetAtOnSet, the last one removed
+ * or deleted deletes them.
+ *
+ * A stage merge adds the components of an entity that the stage set in one operation, so they
+ * are added with SetAt. Their OnSet follows, except for a component with a low id and no OnSet
+ * hook or observer when the stage queued the set (a light, before a SetAt entity was written
+ * one): flecs then copies the value without OnSet. These are copied when they no longer hold
+ * their constructed value.
  *
  * @param it The iterator of the observer
  */
@@ -367,21 +471,47 @@ static void BoxAppSetAtOnAdd(
     }
 
     state->count += it->count;
-    if (!state->observer) {
+    if (!state->scope) {
         box_app_set_at_observe(world, state);
     }
 
-    const ecs_type_t *type = it->other_table ? ecs_table_get_type(it->other_table) : NULL;
-    int32_t i, j;
-    for (i = 0; i < it->count && type; i ++) {
+    const ecs_type_t *before = it->other_table ? ecs_table_get_type(it->other_table) : NULL;
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
         SetAtWritten *w = ecs_get_mut(it->world, it->entities[i], SetAtWritten);
-        for (j = 0; w && j < type->count; j ++) {
-            ecs_id_t id = type->array[j];
-            if (!ECS_IS_PAIR(id) && !box_app_set_at_has(&w->before, id)) {
-                ecs_vec_append_t(NULL, &w->before, ecs_id_t)[0] = id;
+        if (w) {
+            if (before) {
+                box_app_set_at_add_type(&w->before, before, NULL);
             }
+
+            box_app_set_at_add_type(
+                &w->batched, ecs_get_type(it->world, it->entities[i]), before);
         }
     }
+}
+
+/** Check whether a component holds the value it is constructed with.
+ *
+ * @param ti The type info of the component
+ * @param value The value of the component
+ * @return Whether value is the constructed value
+ */
+static bool box_app_set_at_constructed(
+    const ecs_type_info_t *ti,
+    const void *value)
+{
+    void *constructed = ecs_os_calloc(ti->size);
+    if (ti->hooks.ctor) {
+        ti->hooks.ctor(constructed, 1, ti);
+    }
+
+    bool result = !ecs_os_memcmp(constructed, value, ti->size);
+    if (ti->hooks.dtor) {
+        ti->hooks.dtor(constructed, 1, ti);
+    }
+
+    ecs_os_free(constructed);
+    return result;
 }
 
 /** Check whether a component a SetAt entity had before SetAt was added is one the engine
@@ -412,26 +542,13 @@ static bool box_app_set_at_implied(
         result = !ECS_IS_PAIR(other) && other != id && ecs_has_pair(world, other, EcsWith, id);
     }
 
-    if (result) {
-        void *constructed = ecs_os_calloc(ti->size);
-        if (ti->hooks.ctor) {
-            ti->hooks.ctor(constructed, 1, ti);
-        }
-
-        result = !ecs_os_memcmp(constructed, value, ti->size);
-        if (ti->hooks.dtor) {
-            ti->hooks.dtor(constructed, 1, ti);
-        }
-
-        ecs_os_free(constructed);
-    }
-
-    return result;
+    return result && box_app_set_at_constructed(ti, value);
 }
 
 /** Copy the components written to a SetAt entity to its target entity: the ones set since it
- * has SetAt, and the ones it had before, except those the engine added. Pairs, tags, SetAt and
- * the components only added are not copied.
+ * has SetAt, the ones it had before, except those the engine added, and the ones added with
+ * SetAt that no longer hold their constructed value. Pairs, tags, SetAt and the components only
+ * added are not copied.
  *
  * @param world The world
  * @param from The entity with SetAt
@@ -449,11 +566,15 @@ static void box_app_set_at_copy(
         ecs_id_t id = type->array[i];
         bool written = box_app_set_at_has(&w->written, id);
         bool before = !written && box_app_set_at_has(&w->before, id);
-        const ecs_type_info_t *ti = (written || before) && !ECS_IS_PAIR(id) &&
+        bool batched = !written && !before && box_app_set_at_has(&w->batched, id);
+        const ecs_type_info_t *ti = (written || before || batched) && !ECS_IS_PAIR(id) &&
             id != ecs_id(SetAt) && id != ecs_id(SetAtWritten)
                 ? ecs_get_type_info(world, id) : NULL;
         const void *value = ti ? ecs_get_id(world, from, id) : NULL;
-        if (value && (written || !box_app_set_at_implied(world, type, id, ti, value))) {
+        if (value && (written ||
+            (before && !box_app_set_at_implied(world, type, id, ti, value)) ||
+            (batched && !box_app_set_at_constructed(ti, value))))
+        {
             ecs_set_id(world, to, id, (size_t)ti->size, value);
         }
     }
@@ -855,14 +976,8 @@ void BoxAppImport(
         .callback = BoxAppOnSet
     });
 
-    /* AppSetAtOnSet is created when the first SetAt entity is added. Creating it once now
-     * makes flecs emit OnSet for the sets and modifies queued in a stage before that first SetAt
-     * is merged, which are decided when queued, so their writes are recorded as before. */
     box_app_set_at_t *set_at = ecs_os_calloc_t(box_app_set_at_t);
     set_at->module = ecs_id(BoxApp);
-    box_app_set_at_observe(world, set_at);
-    box_app_set_at_unobserve(world, set_at);
-
     ecs_observer(world, {
         .entity = ecs_entity(world, { .name = "AppSetAtOnAdd" }),
         .query = {
@@ -872,7 +987,18 @@ void BoxAppImport(
         .events = { EcsOnAdd, EcsOnRemove },
         .callback = BoxAppSetAtOnAdd,
         .ctx = set_at,
-        .ctx_free = ecs_os_api.free_
+        .ctx_free = box_app_set_at_free
+    });
+
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "AppSetAtOnTable" }),
+        .query = {
+            .terms = {{ .id = ecs_id(SetAtWritten) }},
+            .flags = EcsQueryMatchDisabled
+        },
+        .events = { EcsOnTableCreate },
+        .callback = BoxAppSetAtOnTable,
+        .ctx = set_at
     });
 
     box_app_clock_t *clock = box_app_clock_new();

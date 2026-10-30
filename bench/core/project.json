@@ -34,6 +34,13 @@
                 "benchcases": [
                     "moving_100k"
                 ]
+            },
+            {
+                "id": "Set",
+                "benchcases": [
+                    "set_100k",
+                    "modified_100k"
+                ]
             }
         ]
     }
