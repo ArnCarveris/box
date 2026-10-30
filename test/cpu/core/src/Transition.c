@@ -902,6 +902,17 @@ void Transition_deferred_remove_missing(void) {
     test_assert(!ecs_owns(world, d.inst, Transition));
     test_int(ecs_map_count(ecs_get(world, d.prefab, Transition)), 2);
 
+    /* A set in an earlier, flushed block is no longer pending: after the component is removed,
+     * a deferred remove adds nothing */
+    box_transition_set(stage, d.plain, ecs_id(Scale), &(TransitionSpec){ .duration = 1.0f });
+    ecs_merge(stage);
+    ecs_remove(world, d.plain, Transition);
+    sets = 0;
+    box_transition_remove(stage, d.plain, ecs_id(Scale));
+    ecs_merge(stage);
+    test_int(sets, 0);
+    test_assert(!ecs_has(world, d.plain, Transition));
+
     ecs_fini(world);
 }
 
