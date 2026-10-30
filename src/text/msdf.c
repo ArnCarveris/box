@@ -1015,6 +1015,44 @@ void box_msdf_shape_finish(
     }
 }
 
+/** Find where a horizontal line crosses one edge, flattening curves.
+ *
+ * Quadratic edges are flattened into BOX_MSDF_FLATTEN segments. Both the
+ * scanline sign pass and box_msdf_inside go through this, so the fill they
+ * see is the same.
+ *
+ * @param edge The edge
+ * @param y Font y of the line
+ * @param out Receives up to BOX_MSDF_FLATTEN crossings
+ * @return Number of crossings written to out
+ */
+static int32_t box_msdf_edge_crossings(
+    const box_msdf_edge_t *edge,
+    double y,
+    box_msdf_cross_t *out)
+{
+    int32_t s, n = 0, steps = edge->degree == 2 ? BOX_MSDF_FLATTEN : 1;
+    if (y >= fmin(fmin(edge->p[0].y, edge->p[1].y), edge->p[2].y) &&
+        y < fmax(fmax(edge->p[0].y, edge->p[1].y), edge->p[2].y))
+    {
+        box_msdf_point_t a = edge->p[0];
+        for (s = 1; s <= steps; s ++) {
+            box_msdf_point_t b = s == steps
+                ? edge->p[2]
+                : box_msdf_at(edge, (double)s / steps);
+            if ((a.y <= y) != (b.y <= y)) {
+                out[n].x = a.x + (y - a.y) * (b.x - a.x) / (b.y - a.y);
+                out[n].dir = b.y > a.y ? 1 : -1;
+                n ++;
+            }
+
+            a = b;
+        }
+    }
+
+    return n;
+}
+
 /** Collect where a horizontal line crosses the outline, flattening curves.
  *
  * @param shape The shape
@@ -1026,29 +1064,14 @@ static void box_msdf_crossings(
     double y,
     ecs_vec_t *out)
 {
-    int32_t i, s, count = ecs_vec_count(&shape->edges);
+    box_msdf_cross_t cross[BOX_MSDF_FLATTEN];
+    int32_t i, c, n, count = ecs_vec_count(&shape->edges);
     const box_msdf_edge_t *edges = ecs_vec_first(&shape->edges);
     ecs_vec_clear(out);
     for (i = 0; i < count; i ++) {
-        int32_t steps = edges[i].degree == 2 ? BOX_MSDF_FLATTEN : 1;
-        if (y < fmin(fmin(edges[i].p[0].y, edges[i].p[1].y), edges[i].p[2].y) ||
-            y >= fmax(fmax(edges[i].p[0].y, edges[i].p[1].y), edges[i].p[2].y))
-        {
-            continue;
-        }
-
-        box_msdf_point_t a = edges[i].p[0];
-        for (s = 1; s <= steps; s ++) {
-            box_msdf_point_t b = s == steps
-                ? edges[i].p[2]
-                : box_msdf_at(&edges[i], (double)s / steps);
-            if ((a.y <= y) != (b.y <= y)) {
-                box_msdf_cross_t *c = ecs_vec_append_t(NULL, out, box_msdf_cross_t);
-                c->x = a.x + (y - a.y) * (b.x - a.x) / (b.y - a.y);
-                c->dir = b.y > a.y ? 1 : -1;
-            }
-
-            a = b;
+        n = box_msdf_edge_crossings(&edges[i], y, cross);
+        for (c = 0; c < n; c ++) {
+            *ecs_vec_append_t(NULL, out, box_msdf_cross_t) = cross[c];
         }
     }
 }
@@ -1057,28 +1080,15 @@ bool box_msdf_inside(
     const box_msdf_shape_t *shape,
     box_msdf_point_t p)
 {
-    int32_t i, s, winding = 0, count = ecs_vec_count(&shape->edges);
+    box_msdf_cross_t cross[BOX_MSDF_FLATTEN];
+    int32_t i, c, n, winding = 0, count = ecs_vec_count(&shape->edges);
     const box_msdf_edge_t *edges = ecs_vec_first(&shape->edges);
     for (i = 0; i < count; i ++) {
-        int32_t steps = edges[i].degree == 2 ? BOX_MSDF_FLATTEN : 1;
-        if (p.y < fmin(fmin(edges[i].p[0].y, edges[i].p[1].y), edges[i].p[2].y) ||
-            p.y >= fmax(fmax(edges[i].p[0].y, edges[i].p[1].y), edges[i].p[2].y))
-        {
-            continue;
-        }
-
-        box_msdf_point_t a = edges[i].p[0];
-        for (s = 1; s <= steps; s ++) {
-            box_msdf_point_t b = s == steps
-                ? edges[i].p[2]
-                : box_msdf_at(&edges[i], (double)s / steps);
-            if ((a.y <= p.y) != (b.y <= p.y) &&
-                a.x + (p.y - a.y) * (b.x - a.x) / (b.y - a.y) > p.x)
-            {
-                winding += b.y > a.y ? 1 : -1;
+        n = box_msdf_edge_crossings(&edges[i], p.y, cross);
+        for (c = 0; c < n; c ++) {
+            if (cross[c].x > p.x) {
+                winding += cross[c].dir;
             }
-
-            a = b;
         }
     }
 
