@@ -1623,7 +1623,9 @@ bool box_render_transitions_node_active(
     double time);
 
 /** Count the entities the material extract visited in the last frame: the entities of the
- * nodes with an active material transition and their IsA instances, 0 in a frame without one.
+ * nodes with an active material transition and those of their IsA instances that own a slot of
+ * the material table, have 2D or text shading or are IsA bases themselves, 0 in a frame without
+ * one. Mesh instances that inherit their material are skipped per table and not counted.
  *
  * @param s The state of the transition extract
  * @return The entities

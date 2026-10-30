@@ -106,7 +106,7 @@ static box_console_t* box_console_get(
 }
 
 /** Input was written: while the console is open, take the typed and pasted text, the key presses,
- * the keys pressed with Ctrl held (the readline keys of the input line) and the wheel, and
+ * the keys pressed with Ctrl or Shift held (readline keys, Shift+Tab) and the wheel, and
  * release every key and button but those of the toggle so no other action fires.
  *
  * Ctrl is read from the keys the device holds, since the console releases it from Input.keys.
@@ -121,7 +121,7 @@ static void box_console_capture(
     bool keep[BOX_KEY_COUNT] = {0};
     const InputDevice *dev;
     int32_t i, size;
-    bool ctrl;
+    bool ctrl, shift;
     if (!con->shown || !it->count) {
         goto done;
     }
@@ -129,9 +129,11 @@ static void box_console_capture(
     box_input_action_keys(it->world, con->action, keep);
     dev = box_input_device(it->world);
     ctrl = dev && (dev->held[KeyCtrlLeft] || dev->held[KeyCtrlRight]);
+    shift = dev && (dev->held[KeyShiftLeft] || dev->held[KeyShiftRight]);
     for (i = KeyNone + 1; i < BOX_KEY_COUNT; i ++) {
         con->pressed[i] = con->pressed[i] || in->keys[i].pressed;
         con->chord[i] = con->chord[i] || (ctrl && in->keys[i].pressed);
+        con->shifted[i] = con->shifted[i] || (shift && in->keys[i].pressed);
         if (!keep[i]) {
             in->keys[i] = (KeyState){0};
         }
@@ -176,6 +178,7 @@ static void box_console_reset_input(
 {
     ecs_os_zeromem(&con->pressed);
     ecs_os_zeromem(&con->chord);
+    ecs_os_zeromem(&con->shifted);
     ecs_vec_clear(&con->typed);
     con->wheel = 0;
 }
@@ -310,6 +313,12 @@ static void BoxConsoleUpdate(
     bool toggled, escape = false;
     Console *console;
     box_console_enable(world, con);
+    if (con->complete.bell > 0) {
+        con->complete.bell -= it->delta_time;
+        con->complete.bell = con->complete.bell > 0 ? con->complete.bell : 0;
+        con->refresh = con->refresh || con->complete.bell == 0;
+    }
+
     toggle = con->enabled && ecs_is_alive(world, con->action) ?
         ecs_get(world, con->action, ActionState) : NULL;
     toggled = toggle && toggle->pressed;
@@ -419,7 +428,44 @@ char* box_console_type(
         goto done;
     }
 
+    box_console_complete_close(con);
     box_console_insert_text(con, text, (int32_t)strlen(text));
+    result = ecs_os_strdup(con->line);
+done:
+    return result;
+}
+
+/** Script function box.console.complete(back): complete the input line as Tab does.
+ *
+ * @param ctx Call context
+ * @param argc Number of arguments
+ * @param argv Whether to cycle backward
+ * @param result Receives the input line
+ */
+static void box_console_complete_function(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_value_t *result)
+{
+    bool back = *(const bool*)argv[0].ptr;
+    (void)argc;
+    *(char**)result->ptr = box_console_complete(ctx->world, back);
+}
+
+char* box_console_complete(
+    ecs_world_t *world,
+    bool back)
+{
+    ecs_world_t *real = ECS_CONST_CAST(ecs_world_t*, ecs_get_world(world));
+    box_console_t *con = box_console_get(real);
+    char *result = NULL;
+    if (!con) {
+        result = ecs_os_strdup("");
+        goto done;
+    }
+
+    box_console_complete_tab(real, con, back);
     result = ecs_os_strdup(con->line);
 done:
     return result;
@@ -500,6 +546,8 @@ void BoxConsoleImport(
     ecs_vec_init_t(NULL, &con->ui.lines, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &con->typed, char, 0);
     ecs_vec_init_t(NULL, &con->spans, box_console_span_t, 0);
+    ecs_vec_init_t(NULL, &con->complete.candidates, box_console_candidate_t, 0);
+    con->complete.active = -1;
     ecs_singleton_set(world, ConsoleHost, { con });
     ecs_atfini(world, box_console_free, con);
     box_console_action(world, con);
@@ -549,5 +597,13 @@ void BoxConsoleImport(
         .return_type = ecs_id(ecs_string_t),
         .params = {{ .name = "text", .type = ecs_id(ecs_string_t) }},
         .callback = box_console_type_function
+    });
+
+    ecs_function(world, {
+        .name = "complete",
+        .parent = con->module,
+        .return_type = ecs_id(ecs_string_t),
+        .params = {{ .name = "back", .type = ecs_id(ecs_bool_t) }},
+        .callback = box_console_complete_function
     });
 }

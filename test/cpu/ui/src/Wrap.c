@@ -6,6 +6,7 @@
 #include <box.h>
 #include <bake_test.h>
 #include <math.h>
+#include <string.h>
 
 /** A paragraph much wider than the panels of the tests */
 #define WRAP_PARAGRAPH "Box lays out text in rows and columns and wraps long paragraphs " \
@@ -655,5 +656,103 @@ void Wrap_hang_not_after_newline(void) {
     test_int(box_text_line(world, e, 0, NULL, NULL), 2);
     test_flt(wrap_caret_x(world, e, 8, NULL), wrap_caret_x(world, e, 0, NULL));
 
+    ecs_fini(world);
+}
+
+/** Append x to a string until one more would wrap it to a second line.
+ *
+ * @param world The world
+ * @param look The Text, its value the string, which has room for max bytes
+ * @param max Size of the string
+ * @return Length of the string
+ */
+static int32_t wrap_fill(
+    ecs_world_t *world,
+    Text *look,
+    int32_t max)
+{
+    int32_t result = (int32_t)strlen(look->value);
+    while (result < max - 2) {
+        look->value[result] = 'x';
+        look->value[result + 1] = '\0';
+        if (box_text_break_lines(world, look, NULL) > 1) {
+            look->value[result] = '\0';
+            break;
+        }
+
+        result ++;
+    }
+
+    test_assert(result < max - 2);
+
+    return result;
+}
+
+void Wrap_trailing_spaces_caret_next_line(void) {
+    // console/wrap
+    ecs_entity_t font;
+    ecs_world_t *world = wrap_font_world(&font);
+    char value[256] = "> ";
+    Text look = {
+        .value = value, .size = 16, .line_height = 20, .width = 200, .font = font, .hang = 2 };
+    int32_t full = wrap_fill(world, &look, 200);
+    test_int(box_text_break_lines(world, &look, NULL), 1);
+
+    // Without spaces the caret after the full line stays on it
+    ecs_entity_t e = ecs_new(world);
+    ecs_set_ptr(world, e, Text, &look);
+    ecs_progress(world, 0);
+    int32_t line;
+    test_int(box_text_line(world, e, 0, NULL, NULL), 1);
+    wrap_caret_x(world, e, full, &line);
+    test_int(line, 0);
+
+    // Spaces past the width put the caret after them on the next line at the hang
+    ecs_os_strcpy(value + full, "            ");
+    int32_t len = full + 12;
+    ecs_vec_t starts;
+    ecs_vec_init_t(NULL, &starts, int32_t, 0);
+    test_int(box_text_break_lines(world, &look, &starts), 2);
+    test_int(*ecs_vec_get_t(&starts, int32_t, 1), len);
+    ecs_set_ptr(world, e, Text, &look);
+    ecs_progress(world, 0);
+    test_int(box_text_line(world, e, 0, NULL, NULL), 2);
+    test_flt(ecs_get(world, e, TextBounds)->height, 40);
+    test_assert(ecs_get(world, e, TextBounds)->width <= 200);
+    float hang = wrap_caret_x(world, e, 2, NULL);
+    test_flt(wrap_caret_x(world, e, len, &line), hang);
+    test_int(line, 1);
+    test_assert(wrap_caret_x(world, e, len - 1, &line) > hang);
+    test_int(line, 0);
+    wrap_caret_x(world, e, full, &line);
+    test_int(line, 0);
+    int32_t start, end;
+    box_text_line(world, e, 0, &start, &end);
+    test_int(start, 0);
+    test_int(end, len);
+    box_text_line(world, e, 1, &start, &end);
+    test_int(start, len);
+    test_int(end, len);
+
+    // A word after the spaces wraps as before, the spaces stay on the first line
+    ecs_os_strcpy(value + len, "y");
+    test_int(box_text_break_lines(world, &look, &starts), 2);
+    test_int(*ecs_vec_get_t(&starts, int32_t, 1), len);
+    ecs_set_ptr(world, e, Text, &look);
+    ecs_progress(world, 0);
+    test_int(box_text_line(world, e, 0, NULL, NULL), 2);
+    test_flt(wrap_caret_x(world, e, len, &line), hang);
+    test_int(line, 1);
+    wrap_caret_x(world, e, len + 1, &line);
+    test_int(line, 1);
+    wrap_caret_x(world, e, len - 1, &line);
+    test_int(line, 0);
+
+    // Without a width the spaces never move the caret
+    value[len] = '\0';
+    look.width = 0;
+    test_int(box_text_break_lines(world, &look, NULL), 1);
+
+    ecs_vec_fini_t(NULL, &starts, int32_t);
     ecs_fini(world);
 }

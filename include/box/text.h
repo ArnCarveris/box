@@ -72,7 +72,7 @@ ECS_STRUCT(Text, {
     TextWrap wrap;      /**< How the lines follow the width of a layout, TextWrapWords */
     int32_t hang;       /**< Byte of the first line whose caret x the lines a width wraps start
                          *   at, as a hanging indent; 0 for the left edge, ignored past half
-                         *   the width */
+                         *   the width; the caret after spaces at the end past it too */
 });
 
 /** A byte range of Text.value drawn in a color of its own */
@@ -120,7 +120,8 @@ ECS_STRUCT(TextCaret, {
 /** Get the caret line at a byte offset of a Text, from the layout that draws it.
  *
  * An offset inside a character moves to its start; offsets clamp to 0 and the string length.
- * At a wrap point the caret starts the next line, after a trailing newline an empty line.
+ * At a wrap point the caret starts the next line, after a trailing newline an empty line, and
+ * after spaces at the end that pass the width an empty line at the hang indent.
  *
  * A Text whose value or parameters changed since its last layout is laid out again first.
  *
@@ -155,7 +156,9 @@ int32_t box_text_hit(
 
 /** Get the byte range of a line of a Text, without the newline that ends it.
  *
- * A wrapped line ends where the next one starts. The line clamps to the lines of the Text.
+ * A wrapped line ends where the next one starts. The line clamps to the lines of the Text. The
+ * line count includes the line of the caret after spaces at the end that pass the width, which
+ * starts and ends at the string length.
  *
  * @param world The world
  * @param text The entity with the Text
@@ -174,7 +177,9 @@ int32_t box_text_line(
 /** Break a Text into its lines without an entity, as it lays out outside a layout: at newlines
  * and between words at Text.width, inside a word wider than the width, with its hang indent.
  *
- * Glyphs are only measured, not added to the atlas. An empty string has one line.
+ * Glyphs are only measured, not added to the atlas. An empty string has one line. Spaces at the
+ * end that pass the width add the empty line of the caret after them, see Text; spaces before a
+ * newline or a word add none, the carets between spaces stay on their line past the width.
  *
  * @param world The world
  * @param text The Text, its font loaded when no other Text requested it before

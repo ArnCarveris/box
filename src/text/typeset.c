@@ -6,8 +6,9 @@
  * line, a word wider than the width breaks inside. The block is centered on the origin, y up.
  * A Text is measured at Text.width for box.layout, which can wrap it narrower afterwards.
  *
- * A line a width wraps starts at the hang indent, the caret x of Text.hang on the first line.
- * The caret before every character and the byte range of every line are kept for editing.
+ * A wrapped line starts at the hang indent, the caret x of Text.hang; so does the last caret
+ * when spaces at the end pass the width, as spaces never start a line themselves. The caret
+ * before every character and the byte range of every line are kept for editing.
  */
 
 #include "text.h"
@@ -318,16 +319,27 @@ static box_text_run_t box_text_run(
     box_text_run_t result = {
         .s = s, .wrap = wrap, .hang_at = hang, .draw = draw, .prev = -1, .cr = -1 };
     const char *p = str;
+    int32_t last = 0;
     ecs_vec_clear(&s->placed);
     ecs_vec_clear(&s->lines);
     ecs_vec_clear(&s->carets);
     ecs_vec_clear(&s->rows);
     while (*p) {
         int32_t offset = (int32_t)(p - str);
-        box_text_char(world, &result, font, box_utf8_next(&p), offset, px);
+        last = box_utf8_next(&p);
+        box_text_char(world, &result, font, last, offset, px);
     }
 
     int32_t length = (int32_t)(p - str);
+    if (wrap > 0.0f && (last == ' ' || last == '\t') &&
+        result.pen > wrap + BOX_TEXT_WRAP_SLACK)
+    {
+        box_text_break(&result, result.line_end, ecs_vec_count(&s->placed), length,
+            ecs_vec_count(&s->carets));
+        result.pen = result.hang;
+        result.line_end = 0.0f;
+    }
+
     *ecs_vec_append_t(NULL, &s->carets, box_text_caret_t) = (box_text_caret_t){
         .offset = length, .line = result.line, .x = result.pen };
     box_text_break(&result, result.line_end, ecs_vec_count(&s->placed),

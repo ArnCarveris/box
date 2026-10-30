@@ -106,9 +106,9 @@ ECS_STRUCT(ConsoleOutput, {
  * its resizes, a fraction of zero or less is a panel of zero size, one or more fills the axis.
  * Lines wrap at its width minus the padding, their rows under the prompt or the indentation.
  *
- * While open, text and key presses go to the input line and only the toggle sees the keyboard.
- * Enter runs, Up/Down walk the history, Right/End accept the suggestion, Ctrl+A/E/U/K/W/C/L edit
- * like readline, Page Up/Down and the wheel scroll and Escape closes, see the README console keys.
+ * While open, text and key presses go to the input line and only the toggle sees the keyboard:
+ * Enter runs, Up/Down walk the history, Right/End accept the suggestion, Tab completes,
+ * Ctrl+A/E/U/K/W/C/L edit like readline, Page Up/Down and the wheel scroll, Escape closes.
  */
 ECS_STRUCT(Console, {
     bool open;           /**< Shown and taking the keyboard, the toggle action flips it */
@@ -168,6 +168,19 @@ char* box_console_run(
 char* box_console_type(
     ecs_world_t *world,
     const char *text);
+
+/** Complete the word under the cursor of the input line, as if Tab was pressed.
+ *
+ * One candidate is inserted, several insert their common prefix or open the candidate list under
+ * the prompt, which further calls cycle. box.console.complete(back) does the same in a script.
+ *
+ * @param world The world
+ * @param back Whether to cycle backward through an open list, as Shift+Tab does
+ * @return The input line, which the caller frees
+ */
+char* box_console_complete(
+    ecs_world_t *world,
+    bool back);
 
 #ifdef __cplusplus
 }

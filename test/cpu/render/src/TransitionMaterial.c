@@ -613,6 +613,7 @@ void TransitionMaterial_prefab_one_slot(void) {
         tr_frame(world);
         test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 1);
         test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_SHADING), 0);
+        test_int(box_render_transitions_material_visited(box_render_transitions_get(world)), 1);
         test_assert(tr_material_rendered(world, null, slot, &rendered));
         test_uint(rendered.color, tr_color_word(50 * k, 25 * k, 10 * k));
         for (j = 0; j < 32; j ++) {
@@ -742,6 +743,56 @@ void TransitionMaterial_instance_override(void) {
     tr_frame(world);
     test_assert(tr_material_rendered(world, null, slot_p, &rendered));
     test_uint(rendered.color, tr_color_word(100, 0, 0));
+    tr_fini(world, null);
+}
+
+void TransitionMaterial_prefab_nested_instance(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    box_render_transitions_t *s = box_render_transitions_get(world);
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    box_render_material_t rendered;
+    int32_t i;
+    ecs_set(world, prefab, Box, {1, 1, 1});
+    ecs_set(world, prefab, Rgb, {0, 0, 0});
+    box_transition_set(world, prefab, ecs_id(Rgb), &(TransitionSpec){ .duration = 1.0f });
+
+    ecs_entity_t a = ecs_new_w_pair(world, EcsIsA, prefab);
+    ecs_set(world, a, Position, {0, 0, 0});
+    ecs_entity_t b = ecs_new_w_pair(world, EcsIsA, a);
+    ecs_set(world, b, Position, {2, 0, 0});
+    ecs_set(world, b, Emissive, {.strength = 1, .color = {10, 20, 30}});
+    ecs_entity_t others[16];
+    for (i = 0; i < 16; i ++) {
+        others[i] = ecs_new_w_pair(world, EcsIsA, prefab);
+        ecs_set(world, others[i], Position, {(float)i, 2, 0});
+    }
+
+    tr_frame(world);
+    tr_frame(world);
+    uint32_t slot_p = ecs_get(world, prefab, MaterialId)->value;
+    uint32_t slot_b = ecs_get(world, b, MaterialId)->value;
+    test_assert(!ecs_owns(world, a, MaterialId));
+    test_assert(ecs_owns(world, b, MaterialId));
+    test_assert(slot_b != slot_p);
+
+    ecs_set(world, prefab, Rgb, {200, 100, 40});
+    for (i = 0; i < 4; i ++) {
+        uint32_t k = (uint32_t)i;
+        tr_frame(world);
+        test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 2);
+        test_int(box_render_transitions_material_visited(s), 3);
+        test_assert(tr_material_rendered(world, null, slot_p, &rendered));
+        test_uint(rendered.color, tr_color_word(50 * k, 25 * k, 10 * k));
+        test_assert(tr_material_rendered(world, null, slot_b, &rendered));
+        test_uint(rendered.color, tr_color_word(50 * k, 25 * k, 10 * k));
+    }
+
+    tr_frame(world);
+    test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 0);
+    test_assert(tr_material_rendered(world, null, slot_b, &rendered));
+    test_uint(rendered.color, tr_color_word(200, 100, 40));
     tr_fini(world, null);
 }
 

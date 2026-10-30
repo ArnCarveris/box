@@ -26,6 +26,18 @@
 /** Name of the command the hint line points to */
 #define BOX_CONSOLE_HINT_HELP "help"
 
+/** Name of the help group of the console commands */
+#define BOX_CONSOLE_HELP_GROUP "console"
+
+/** Candidates Tab completion collects at most, so a large world stays cheap */
+#define BOX_CONSOLE_COMPLETE_MAX (256)
+
+/** Candidates the list under the prompt shows before a dimmed "... N more" */
+#define BOX_CONSOLE_COMPLETE_VISIBLE (24)
+
+/** Seconds the prompt flashes when Tab finds nothing to complete */
+#define BOX_CONSOLE_BELL (0.2f)
+
 /** Line that starts the scrollback the first time the console opens */
 #define BOX_CONSOLE_HINT "Flecs Shell  type " BOX_CONSOLE_HINT_HELP \
     " for a list of possible commands"
@@ -96,7 +108,29 @@ typedef struct box_console_line_t {
                                  *   a line that ran, the end of the indentation of others */
     int32_t rows;               /**< Rows the line wraps to at box_console_t.wrap, 0 until
                                  *   measured */
+    bool strip;                 /**< Spaces at its end pass the width, it is shown without them
+                                 *   so it does not gain the empty row of the caret after them */
 } box_console_line_t;
+
+/** A candidate of Tab completion */
+typedef struct box_console_candidate_t {
+    char *text;                 /**< Text that replaces the word, with its parent part */
+    char *label;                /**< Text the list shows, the name without the parent part */
+    char *brief;                /**< Description of a command, NULL for none */
+    box_console_syntax_t kind;  /**< Color of the label: command, entity, module or component */
+    ecs_entity_t entity;        /**< The entity of an entity candidate, 0 for others */
+} box_console_candidate_t;
+
+/** State of Tab completion: the candidates of the word under the cursor and the list of them */
+typedef struct box_console_complete_t {
+    ecs_vec_t candidates;       /**< box_console_candidate_t, sorted by text */
+    bool capped;                /**< More candidates matched than BOX_CONSOLE_COMPLETE_MAX */
+    bool open;                  /**< The list is shown under the prompt */
+    int32_t active;             /**< Candidate Tab cycled to and inserted, -1 for none */
+    int32_t start;              /**< First byte of the input line the candidate replaces */
+    int32_t end;                /**< Byte after the text the candidate replaces */
+    float bell;                 /**< Seconds the prompt still flashes, 0 for no bell */
+} box_console_complete_t;
 
 /** Entities of the console content, created the first time it opens */
 typedef struct box_console_ui_t {
@@ -113,6 +147,7 @@ typedef struct box_console_ui_t {
     ecs_entity_t input;         /**< Element of the input line and its cursor */
     ecs_entity_t line;          /**< Text of the prompt and the input line, wrapped */
     ecs_entity_t cursor;        /**< Rectangle of the cursor, placed on the caret of the line */
+    ecs_entity_t menu;          /**< Text of the candidate list under the input line, wrapped */
     ecs_vec_t lines;            /**< ecs_entity_t of the text of every visible line, and of an
                                  *   empty row for every row the scrollback does not fill */
 } box_console_ui_t;
@@ -139,12 +174,16 @@ typedef struct box_console_t {
     bool pressed[BOX_KEY_COUNT];/**< Keys pressed since the last update */
     float wheel;                /**< Wheel movement since the last update */
     bool chord[BOX_KEY_COUNT];  /**< Keys pressed with Ctrl held since the last update */
+    bool shifted[BOX_KEY_COUNT];/**< Keys pressed with Shift held since the last update */
+    box_console_complete_t complete; /**< Tab completion of the input line */
     bool greeted;               /**< The hint line was added, the console opened before */
     int32_t scroll;             /**< Scrollback rows scrolled up from the newest */
     int32_t rows;               /**< Scrollback rows that fit in the panel above the input */
     float wrap;                 /**< Width the rows of the scrollback lines were measured at */
     float wrap_size;            /**< Font size the rows of the scrollback were measured at */
     bool pending;               /**< A line could not be measured while its font loads */
+    bool trim;                  /**< The rows of the scrollback were reset, it is trimmed to
+                                 *   Console.scrollback once they are measured */
     ecs_entity_t font;          /**< Font of the console text, box.text.DefaultFont */
     bool shown;                 /**< The content is shown and the console takes the keyboard */
     bool enabled;               /**< The toggle action is enabled */
@@ -188,6 +227,60 @@ void box_console_insert_text(
 bool box_console_edit(
     ecs_world_t *world,
     box_console_t *con);
+
+/** Get a console command the console runs itself.
+ *
+ * @param index The command, from 0
+ * @param brief Receives its description, NULL to ignore
+ * @return Its name, NULL past the last command
+ */
+const char* box_console_command_at(
+    int32_t index,
+    const char **brief);
+
+/** Complete the word under the cursor, as Tab does: insert the one candidate, the common prefix
+ * of several, or open the list of them when the prefix adds nothing; ring the bell for none.
+ * While the list is open Tab, or Shift+Tab with back, cycles through it.
+ *
+ * @param world The world
+ * @param con The console state
+ * @param back Whether Shift was held, which cycles backward
+ */
+void box_console_complete_tab(
+    ecs_world_t *world,
+    box_console_t *con,
+    bool back);
+
+/** Accept the candidate Tab cycled to, as Enter does while the list is open: it stays in the
+ * line followed by a space, or a . for an entity with children, and the list closes.
+ *
+ * @param world The world
+ * @param con The console state
+ * @return Whether a candidate was accepted, false lets Enter run the line
+ */
+bool box_console_complete_accept(
+    ecs_world_t *world,
+    box_console_t *con);
+
+/** Close the candidate list and forget the candidates, keeping the input line.
+ *
+ * @param con The console state
+ */
+void box_console_complete_close(
+    box_console_t *con);
+
+/** Replace a range of the input line with text and put the cursor after it.
+ *
+ * @param con The console state
+ * @param from First byte of the range
+ * @param to Byte after the range
+ * @param text The text
+ */
+void box_console_replace(
+    box_console_t *con,
+    int32_t from,
+    int32_t to,
+    const char *text);
 
 /** Run a line in the session of the console and add it and its output to the scrollback.
  *
@@ -271,6 +364,54 @@ const char* box_console_ghost(
 void box_console_greet(
     ecs_world_t *world,
     box_console_t *con);
+
+/** Drop the oldest lines of the scrollback while it has more rows than Console.scrollback, and
+ * keep the scroll offset within the rows that are left.
+ *
+ * @param world The world
+ * @param con The console state
+ */
+void box_console_trim(
+    ecs_world_t *world,
+    box_console_t *con);
+
+/** Find the entity an entity argument names, as the shell resolves it.
+ *
+ * A path that starts with . or .. is relative to the scope and separated by /, other names
+ * resolve from the scope and its parents, then from the root. $ resolves to nothing here.
+ *
+ * @param world The world
+ * @param scope The scope of the session, 0 for the root
+ * @param text The argument
+ * @param found Set to whether the text names an entity, true for . at the root
+ * @return The entity, 0 for the root or when it names none
+ */
+ecs_entity_t box_console_syntax_resolve(
+    const ecs_world_t *world,
+    ecs_entity_t scope,
+    const char *text,
+    bool *found);
+
+/** The word under the cursor that Tab completes */
+typedef struct box_console_word_t {
+    int32_t start;              /**< First byte of the word */
+    int32_t end;                /**< The cursor, the byte after the part of the word it ends */
+    int32_t index;              /**< Token of the line, 0 for the command name */
+    char *command;              /**< Command name of the line, NULL for the first token */
+} box_console_word_t;
+
+/** Find the word under the cursor like completionContext of the explorer terminal: a bare word
+ * that ends at the cursor, or the empty word after whitespace, not in a string or a value.
+ *
+ * @param line The command line
+ * @param cursor Byte the cursor sits before
+ * @param out Receives the word, its command freed by the caller
+ * @return Whether there is a word to complete
+ */
+bool box_console_syntax_word_at(
+    const char *line,
+    int32_t cursor,
+    box_console_word_t *out);
 
 /** Find the command of a name as the shell does: the first function with that name in the
  * scopes of EcsScriptShell.command_paths.

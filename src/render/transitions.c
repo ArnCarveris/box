@@ -111,7 +111,8 @@ struct box_render_transitions_t {
     ecs_vec_t tag_remove;           /**< ecs_entity_t that lose TransitionTransform */
     ecs_vec_t shadow_scenes;        /**< ecs_entity_t, scenes with a moving shadow caster */
     ecs_vec_t shadow_last;          /**< ecs_entity_t, those of the last frame */
-    box_render_draws_t *draws;      /**< State of the batches, once the extract found it */
+    box_render_draws_t *draws;      /**< State of the batches, stored when the slot system is
+                                     *   registered, so no frame looks it up by name */
     ecs_vec_t material_slots;       /**< box_transition_material_t, the slots of the material
                                      *   table an active material transition patches in this
                                      *   frame, kept until the next so their target uploads */
@@ -576,22 +577,6 @@ done:
     return;
 }
 
-/** Get the state of the batches, found once.
- *
- * @param world The world
- * @param s The state of the extract
- * @return The state, NULL without the draw extract
- */
-static box_render_draws_t* box_transition_draws(
-    const ecs_world_t *world,
-    box_render_transitions_t *s)
-{
-    if (!s->draws) {
-        s->draws = box_draws_state(world);
-    }
-
-    return s->draws;
-}
 
 /** Find the nodes whose running transitions a record reads: for each material component of
  * a mask, the node of the entity the value comes from, the entity itself or the IsA base that
@@ -682,12 +667,37 @@ done:
     return result;
 }
 
+/** Check whether the entities of a table of IsA instances own a slot of the material table
+ * (MaterialId) or have the shading of a 2D shape or text. A mesh shape that inherits its
+ * material reads the slot of its base and has nothing to patch.
+ *
+ * @param world The world
+ * @param table The table
+ * @return Whether its entities are visited
+ */
+static bool box_transition_material_reads(
+    const ecs_world_t *world,
+    const ecs_table_t *table)
+{
+    return ecs_table_has_id(world, table, ecs_id(MaterialId)) ||
+        ecs_search_relation(world, table, 0, ecs_id(TextSlots), EcsIsA, EcsSelf | EcsUp,
+            NULL, NULL, NULL) != -1 ||
+        (ecs_search_relation(world, table, 0, ecs_id(DrawSlot), EcsIsA, EcsSelf | EcsUp,
+            NULL, NULL, NULL) != -1 &&
+         ecs_search_relation(world, table, 0, ecs_id(Shape2D), EcsIsA, EcsSelf | EcsUp,
+            NULL, NULL, NULL) != -1);
+}
+
 /** Add what reads a material value of an entity: the entity and its IsA instances, down
  * every level. The ones that own a slot of the material table patch it, the drawn 2D entities
  * patch their shading.
  *
  * A slot reads its value from its owner or an IsA base of it, and Transition is inherited over
  * IsA, so this reaches every affected slot and visits only entities with Transition.
+ *
+ * The instances are checked per table: a table whose entities own no slot and have no 2D or
+ * text shading is skipped, but for its entities that are IsA bases themselves, so one prefab
+ * with many mesh instances that inherit its material visits the prefab alone.
  *
  * @param world The world
  * @param s The state of the extract
@@ -733,8 +743,16 @@ static void box_transition_material_walk(
 
         ecs_iter_t it = ecs_each_id(world, ecs_pair(EcsIsA, cur));
         while (ecs_each_next(&it)) {
+            bool reads = box_transition_material_reads(world, it.table);
+            if (!reads && !ecs_table_has_flags(it.table, EcsTableHasTraversable)) {
+                continue;
+            }
+
             for (i = 0; i < it.count; i ++) {
-                *ecs_vec_append_t(NULL, &s->instances, ecs_entity_t) = it.entities[i];
+                ecs_entity_t inst = it.entities[i];
+                if (reads || ecs_id_in_use(world, ecs_pair(EcsIsA, inst))) {
+                    *ecs_vec_append_t(NULL, &s->instances, ecs_entity_t) = inst;
+                }
             }
         }
     }
@@ -895,7 +913,7 @@ static void box_transition_materials(
     ecs_vec_clear(&s->tag_add);
     ecs_vec_clear(&s->tag_remove);
     if (ecs_vec_count(&s->material_slots)) {
-        d = box_transition_draws(world, s);
+        d = s->draws;
     }
 
     for (i = 0; d && i < ecs_vec_count(&s->material_slots); i ++) {
@@ -920,7 +938,7 @@ static void box_transition_materials(
         ecs_map_clear(&s->visited);
     }
 
-    d = any ? box_transition_draws(world, s) : NULL;
+    d = any ? s->draws : NULL;
     for (i = 1; d && i < count; i ++) {
         const box_transition_node_t *node = ecs_vec_get_t(&s->nodes, box_transition_node_t, i);
         if (node->entity && ecs_is_alive(world, node->entity) &&
@@ -1654,7 +1672,7 @@ static void BoxRenderExtractTransitionSlots(
 {
     box_render_transitions_t *s = it->ctx;
     ecs_world_t *world = it->world;
-    box_render_draws_t *d = box_transition_draws(world, s);
+    box_render_draws_t *d = s->draws;
     box_render_packet_t *p;
     int32_t i, count = ecs_vec_count(&s->items);
     if (d && ecs_vec_count(&s->fade_items)) {
@@ -1844,6 +1862,7 @@ void box_render_transitions_slots_init(
 {
     box_render_transitions_t *s = box_render_transitions_get(world);
     ecs_assert(s != NULL, ECS_INTERNAL_ERROR, NULL);
+    s->draws = box_draws_state(world);
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "RenderExtractTransitionSlots" }),
         .phase = RenderExtract,

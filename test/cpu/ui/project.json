@@ -102,7 +102,8 @@
                     "hang_indents_wrapped_lines",
                     "hang_long_word_breaks_at_hang",
                     "hang_past_half_ignored",
-                    "hang_not_after_newline"
+                    "hang_not_after_newline",
+                    "trailing_spaces_caret_next_line"
                 ]
             },
             {
@@ -153,7 +154,8 @@
                     "hit_long_line",
                     "edited_this_frame",
                     "without_text",
-                    "font_not_loaded"
+                    "font_not_loaded",
+                    "trailing_spaces_next_line"
                 ]
             },
             {
@@ -401,6 +403,8 @@
                     "scroll_counts_rows",
                     "scrollback_limit_counts_rows",
                     "resize_rewraps",
+                    "rewrap_trims_scrollback",
+                    "trailing_spaces_move_cursor",
                     "prompt_root_and_scope",
                     "lines_keep_scope",
                     "ctrl_a_e",
@@ -411,7 +415,17 @@
                     "history_filter",
                     "autosuggest",
                     "hint_on_first_open",
-                    "type_from_script"
+                    "type_from_script",
+                    "complete_command_unique",
+                    "complete_command_ambiguous",
+                    "complete_help_topic",
+                    "complete_entity_in_scope",
+                    "complete_dotted_path",
+                    "complete_entity_with_children",
+                    "complete_not_in_string",
+                    "complete_cycle",
+                    "complete_escape_closes_list",
+                    "complete_typing_closes_list"
                 ]
             },
             {
