@@ -4,6 +4,7 @@ using box.transform
 using box.geometry
 using box.material
 using box.spatial
+using box.movement
 
 template CanalLeafLobe {
   prop rx: f32 = 1
@@ -113,19 +114,41 @@ template CanalReeds {
 
 template CanalLily {
   prop seed: f32 = 0
-  for i in 0..5 {
-    const a = i * 2.399 + seed
-    { (IsA, CanalLeafLight); Position: {math.sin(a) * 0.32, 0.012, math.cos(a) * 0.32}; Cylinder: {radius: 0.12 + (i % 2) * 0.04, length: 0.012, segments: 12} }
+  const bob = 1.1 + seed * 0.2
+  SpatialIgnore
+  AngularVelocity: {0, 0.05, 0}
+  sway {
+    AngularVelocity: {bob, 0, 0}
+    pad {
+      Position: {0, 0, 0.01}
+      AngularVelocity: {-bob, 0, 0}
+      for i in 0..5 {
+        const a = i * 2.399 + seed
+        { (IsA, CanalLeafLight); Position: {math.sin(a) * 0.32, 0.02, math.cos(a) * 0.32}; Cylinder: {radius: 0.12 + (i % 2) * 0.04, length: 0.012, segments: 12} }
+      }
+      { Position: {0.1, 0.06, 0.1}; IcoSphere: {radius: 0.05, segments: 1}; Rgb: {246, 238, 226}; Emissive: {strength: 0.1, color: {255, 240, 220}} }
+    }
   }
-  { Position: {0.1, 0.05, 0.1}; IcoSphere: {radius: 0.05, segments: 1}; Rgb: {246, 238, 226}; Emissive: {strength: 0.1, color: {255, 240, 220}} }
 }
 
 template CanalDuck {
-  body { Position: {0, 0.09, 0}; Scale: {1.45, 0.8, 0.9}; Sphere: {radius: 0.12, segments: 12, smooth: true}; Rgb: {198, 188, 164}; PbrMaterial: {roughness: 0.8} }
-  tail { Position: {-0.17, 0.13, 0}; Cone: {radius: 0.05, length: 0.1, segments: 6}; Rotation: {0, 0, 0.8}; Rgb: {60, 54, 46} }
-  neck { Position: {0.14, 0.2, 0}; Cylinder: {radius: 0.035, length: 0.16, segments: 8}; Rgb: {240, 236, 226} }
-  head { Position: {0.15, 0.3, 0}; Sphere: {radius: 0.06, segments: 10, smooth: true}; Rgb: {28, 86, 56}; PbrMaterial: {roughness: 0.3} }
-  bill { Position: {0.22, 0.29, 0}; Scale: {1, 0.35, 0.6}; Sphere: {radius: 0.045, segments: 8}; Rgb: {226, 164, 50} }
+  prop radius: f32 = 0.7
+  prop bob: f32 = 1.5
+  SpatialIgnore
+  AngularVelocity: {0, 0.25, 0}
+  sway {
+    Position: {0, 0, radius}
+    AngularVelocity: {bob, 0, 0}
+    bird {
+      Position: {0, 0, 0.012}
+      AngularVelocity: {-bob, 0, 0}
+      body { Position: {0, 0.09, 0}; Scale: {1.45, 0.8, 0.9}; Sphere: {radius: 0.12, segments: 12, smooth: true}; Rgb: {198, 188, 164}; PbrMaterial: {roughness: 0.8} }
+      tail { Position: {-0.17, 0.13, 0}; Cone: {radius: 0.05, length: 0.1, segments: 6}; Rotation: {0, 0, 0.8}; Rgb: {60, 54, 46} }
+      neck { Position: {0.14, 0.2, 0}; Cylinder: {radius: 0.035, length: 0.16, segments: 8}; Rgb: {240, 236, 226} }
+      head { Position: {0.15, 0.3, 0}; Sphere: {radius: 0.06, segments: 10, smooth: true}; Rgb: {28, 86, 56}; PbrMaterial: {roughness: 0.3} }
+      bill { Position: {0.22, 0.29, 0}; Scale: {1, 0.35, 0.6}; Sphere: {radius: 0.045, segments: 8}; Rgb: {226, 164, 50} }
+    }
+  }
 }
 
 template CanalFence {
