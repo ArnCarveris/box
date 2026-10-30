@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { extname, join, resolve } from 'node:path';
+import { dirname, extname, join, resolve } from 'node:path';
 
 const USAGE = `Checks the shader error path of the browser build in headless Chrome.
 
@@ -37,6 +37,24 @@ function parse(argv) {
   return opts;
 }
 
+// macOS holds a quarantined app at its first launch check, which a headless session never
+// passes, so fail at once instead of "chrome did not start" after the connect timeout
+function checkQuarantine(chrome) {
+  if (process.platform !== 'darwin') return;
+  let app = resolve(chrome);
+  while (!app.endsWith('.app')) {
+    if (dirname(app) === app) return;
+    app = dirname(app);
+  }
+  const xattr = spawnSync('xattr', ['-p', 'com.apple.quarantine', app], { stdio: 'ignore' });
+  if (xattr.error || xattr.status !== 0) return;
+  console.error(`FAIL: ${app} has the com.apple.quarantine attribute, so macOS holds Chrome at ` +
+    'its first launch check. Open Chrome once from the Finder, or run\n' +
+    `  xattr -dr com.apple.quarantine "${app}"\n` +
+    'or pass --chrome with a copy without the attribute.');
+  process.exit(2);
+}
+
 function serve(dir) {
   const server = createServer((req, res) => {
     const file = join(dir, decodeURIComponent(new URL(req.url, 'http://x').pathname));
@@ -61,6 +79,7 @@ async function connect(port) {
 
 async function main() {
   const opts = parse(process.argv.slice(2));
+  checkQuarantine(opts.chrome);
   const server = await serve(opts.dir);
   const profile = mkdtempSync(join(tmpdir(), 'box-web-'));
   const debugPort = 20000 + Math.floor(Math.random() * 20000);
