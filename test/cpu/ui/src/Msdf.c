@@ -886,6 +886,18 @@ typedef struct {
     double points[16][2];
 } msdf_corner_shape_t;
 
+/* The "X", with its corner at the left notch of the crossing, and the "k", with its corner at
+ * the notch of the arms next to the stem, shared by Msdf_corner_shapes and Msdf_corner_sweep. */
+static const msdf_corner_shape_t msdf_corner_x = {"X", 40.0 / 2000.0, {560, 760}, 12, {
+    {60, 0}, {560, 760}, {80, 1500}, {310, 1500}, {650, 850}, {990, 1500},
+    {1220, 1500}, {740, 760}, {1240, 0}, {1010, 0}, {650, 670}, {290, 0}
+}};
+
+static const msdf_corner_shape_t msdf_corner_k = {"k", 40.0 / 2000.0, {400, 640}, 13, {
+    {150, 0}, {150, 1600}, {340, 1600}, {340, 690}, {760, 1100}, {990, 1100},
+    {560, 700}, {400, 640}, {570, 580}, {1010, 0}, {790, 0}, {340, 590}, {340, 0}
+}};
+
 /* Generates each shape with its corner at each of the offsets and checks the field, as
  * Msdf_corner_shapes describes, adding the points it finds wrong and sharp to the counts. */
 static void msdf_check_corner_shapes(
@@ -1020,14 +1032,8 @@ void Msdf_corner_shapes(void) {
             {50, 1500}, {310, 1500}, {580, 330}, {880, 1500}, {1120, 1500}, {1420, 330},
             {1690, 1500}, {1950, 1500}, {1530, 0}, {1300, 0}, {1000, 1100}, {700, 0}, {470, 0}
         }},
-        {"X", 40.0 / 2000.0, {560, 760}, 12, {
-            {60, 0}, {560, 760}, {80, 1500}, {310, 1500}, {650, 850}, {990, 1500},
-            {1220, 1500}, {740, 760}, {1240, 0}, {1010, 0}, {650, 670}, {290, 0}
-        }},
-        {"k", 40.0 / 2000.0, {400, 640}, 13, {
-            {150, 0}, {150, 1600}, {340, 1600}, {340, 690}, {760, 1100}, {990, 1100},
-            {560, 700}, {400, 640}, {570, 580}, {1010, 0}, {790, 0}, {340, 590}, {340, 0}
-        }},
+        msdf_corner_x,
+        msdf_corner_k,
         {"V", 16.0 / 2000.0, {600, 700}, 7, {
             {0, 0}, {0, 1500}, {400, 1500}, {600, 700}, {800, 1500}, {1200, 1500}, {1200, 0}
         }}
@@ -1054,15 +1060,6 @@ void Msdf_corner_shapes(void) {
  * (7, 13), (13, 13), (13, 25), (15, 7), (15, 13), (17, 7) and (17, 13), where the exact distance
  * interpolated the same way is on the wrong side too, and "k" at (1, 3), next to the corner. */
 void Msdf_corner_sweep(void) {
-    const msdf_corner_shape_t x_shape = {"X", 40.0 / 2000.0, {560, 760}, 12, {
-        {60, 0}, {560, 760}, {80, 1500}, {310, 1500}, {650, 850}, {990, 1500},
-        {1220, 1500}, {740, 760}, {1240, 0}, {1010, 0}, {650, 670}, {290, 0}
-    }};
-    const msdf_corner_shape_t k_shape = {"k", 40.0 / 2000.0, {400, 640}, 13, {
-        {150, 0}, {150, 1600}, {340, 1600}, {340, 690}, {760, 1100}, {990, 1100},
-        {560, 700}, {400, 640}, {570, 580}, {1010, 0}, {790, 0}, {340, 590}, {340, 0}
-    }};
-
     // Fractions of a texel, in 32nds, at which the chosen corner lands, in x and y
     const double x_offsets[][2] = {
         {17, 3}, {25, 1}, {25, 3}, {25, 7}, {25, 31}
@@ -1081,13 +1078,13 @@ void Msdf_corner_sweep(void) {
         offsets[i][1] = x_offsets[i][1] / 32.0;
     }
 
-    msdf_check_corner_shapes(&x_shape, 1, offsets, x_count, &wrong, &sharp);
+    msdf_check_corner_shapes(&msdf_corner_x, 1, offsets, x_count, &wrong, &sharp);
     for (i = 0; i < k_count; i ++) {
         offsets[i][0] = k_offsets[i][0] / 32.0;
         offsets[i][1] = k_offsets[i][1] / 32.0;
     }
 
-    msdf_check_corner_shapes(&k_shape, 1, offsets, k_count, &wrong, &sharp);
+    msdf_check_corner_shapes(&msdf_corner_k, 1, offsets, k_count, &wrong, &sharp);
     test_int(wrong, 0);
     test_int(sharp, 0);
 }

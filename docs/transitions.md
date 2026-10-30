@@ -342,10 +342,36 @@ transition of their own (an entity that transitions only `Position` and has a `R
 
 - The shadow atlas caches spot and point light tiles and renders a tile again when a caster
   region reaches it (`box_render_shadow_touched`). The game thread does not know where the
-  resolver puts a moving caster, so in every frame a scene has a moving caster, and in the
-  frame after, the extract records a region over the whole scene: every tile of the scene
-  renders again and no shadow stays behind. A slot that rekeys at the start or the end records
-  the region of the slot it leaves (`box_draws_slot_remove`) and of the slot it gets.
+  resolver puts a moving caster, but it knows a range of every value it can render: values
+  interpolate per field with timing functions that do not overshoot (`box_transition_ease`),
+  and a transition starts from the value rendered at that time, so each rendered field lies
+  between the minimum and maximum of the targets the component had since it was last idle.
+  The private per entity state keeps that range per field for `Position`, `Rotation` and
+  `Scale` (`lo` and `hi` of `box_transition_slot_t`): a start of a component whose transition
+  no longer runs resets it to the last target, any other start widens it with the new target.
+- Each frame a caster slot moves, the slot system records a region of its scene that holds
+  every pose the resolver can render it at in that frame, instead of the whole scene, so the
+  tiles of the other lights stay cached. It carries the world matrix of each node as a range,
+  element by element (`box_draw_transition_range_t`, `src/render/transition_bounds.c`), through
+  the products the resolver computes: the range of the parent node, or the target world matrix
+  of the parent, times the target chain, times the range of the local matrix, which
+  `box_draws_range_local` builds from the ranges of the fields as `box_transform_local` does
+  (Ry * Rx * Rz from the ranges of the sines and cosines, every rotation element kept within
+  -1 to 1, the columns scaled, the position). A child under a moving parent gets the range of
+  its node, so it sweeps with its parent, through `ChildOf` and `Parent` alike. A translation
+  alone gives the bounds at the start and the target pose and every pose between them; a
+  rotation or scale gives a box around its sweep.
+- The region of a slot is `box_draws_shadow_bounds` (`src/render/batch.c`) of the range times
+  the target chain of the slot: the region math of `box_draws_shadow_region`, shared, with the
+  local bounds of the mesh or, for a surface instance, of its surface record, through every
+  transform between the minimum and maximum of each element. Without the mesh of the batch the
+  slot records a region over the whole scene.
+- The regions of a frame are recorded again in the next one, so the tiles a caster was in
+  during its last moving frame render again when it stops and no shadow stays behind. A slot
+  that rekeys at the start or the end records the region of the slot it leaves
+  (`box_draws_slot_remove`) and of the slot it gets. None of this runs while no scene keeps
+  shadow tiles (`shadow_record`), and an entity without `Transition` records what it did
+  before.
 - A slot that rekeys moves to another page slot, whose Hi-Z history word is that of the
   instance that had it before, as for any key change. The history only decides what the early
   phase draws (`etc/shaders/cull.wgsl`): the late phase tests every instance in the frustum
@@ -577,9 +603,12 @@ resolver returns from a packet without records in 2 ns.
 ## Tests
 
 - `test/cpu/core` (`Transition`): the component, its validation and the timing functions.
-- `test/cpu/render` (`Transition`, `TransitionMaterial`, `TransitionTintOpacity`): the records
-  of the game thread and the values of the resolver with the null backend.
-- `test/gpu/render`: the rendered transforms, materials, tints and opacity on a GPU.
+- `test/cpu/render` (`Transition`, `TransitionMaterial`, `TransitionTintOpacity`,
+  `TransitionShadow`): the records of the game thread and the values of the resolver with the
+  null backend, and the shadow regions of moving casters, interrupted and nested.
+- `test/gpu/render`: the rendered transforms, materials, tints and opacity on a GPU, and in
+  `ShadowCache` (`transition_*`) that a caster that transitions renders the tile of its light
+  only, also on the frame it ends in, and the tiles of the other lights stay cached.
 - `test/integration/visual/transitions_*.flecs`: renders frozen in the middle of a transition,
   compared with their baselines: a transform transition with children
   (`transitions_transform`), a shadow caster mid move (`transitions_shadow`), material color and

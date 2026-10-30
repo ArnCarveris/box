@@ -419,6 +419,14 @@
                 ]
             },
             {
+                "id": "TransitionShadow",
+                "testcases": [
+                    "interrupted",
+                    "nested_childof",
+                    "nested_parent"
+                ]
+            },
+            {
                 "id": "TransitionMaterial",
                 "testcases": [
                     "rgb_mesh",
