@@ -735,3 +735,273 @@ void Transition_no_transition_no_records(void) {
 
     tr_fini(world, null);
 }
+
+void Transition_spec_change_keeps_running(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_world(&null);
+    ecs_entity_t e = tr_entity(world, &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+    ecs_set(world, e, Position, {4, 0, 0});
+    tr_frames(world, 3);
+    test_flt(tr_position(world, e).x, 2);
+
+    box_transition_set(world, e, ecs_id(Position), &(TransitionSpec){ .duration = 2.0f });
+    tr_frame(world);
+    test_int(tr_records(null, BOX_RENDER_TRANSITION_START), 0);
+    test_flt(tr_position(world, e).x, 3);
+    tr_frame(world);
+    test_flt(tr_position(world, e).x, 4);
+    test_int(box_render_transition_test_active(world), 0);
+
+    ecs_set(world, e, Position, {0, 0, 0});
+    tr_frame(world);
+    test_flt(tr_position(world, e).x, 4);
+    tr_frame(world);
+    test_flt(tr_position(world, e).x, 3.5f);
+    tr_frame(world);
+    test_flt(tr_position(world, e).x, 3);
+
+    tr_fini(world, null);
+}
+
+void Transition_new_map_snaps(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_world(&null);
+    ecs_entity_t source = ecs_new(world);
+    box_transition_set(world, source, ecs_id(Rgb), &(TransitionSpec){ .duration = 1.0f });
+
+    ecs_entity_t e = tr_entity(world, &(TransitionSpec){ .duration = 1.0f });
+    ecs_set(world, e, Rgb, {0, 0, 0});
+    box_transition_set(world, e, ecs_id(Rgb), &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+
+    ecs_set(world, e, Position, {4, 0, 0});
+    ecs_set(world, e, Rgb, {200, 0, 0});
+    tr_frames(world, 2);
+    test_flt(tr_position(world, e).x, 1);
+    test_int(tr_rgb(world, e).r, 50);
+
+    ecs_set_id(world, e, ecs_id(Transition), sizeof(Transition),
+        ecs_get(world, source, Transition));
+    test_assert(box_transition_get(world, e, ecs_id(Position)) == NULL);
+    tr_frame(world);
+    test_flt(tr_position(world, e).x, 4);
+    test_int(tr_rgb(world, e).r, 100);
+    test_int(box_render_transition_test_active(world), 1);
+
+    tr_frames(world, 2);
+    test_int(tr_rgb(world, e).r, 200);
+    test_int(box_render_transition_test_active(world), 0);
+
+    tr_fini(world, null);
+}
+
+void Transition_invalid_entry_snaps(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_world(&null);
+    ecs_entity_t e = tr_entity(world, &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+    ecs_set(world, e, Position, {4, 0, 0});
+    tr_frames(world, 2);
+    test_flt(tr_position(world, e).x, 1);
+
+    int level = ecs_log_set_level(-4);
+    box_transition_set(world, e, ecs_id(Position), &(TransitionSpec){ .duration = -1.0f });
+    ecs_log_set_level(level);
+    tr_frame(world);
+    test_flt(tr_position(world, e).x, 4);
+    test_int(box_render_transition_test_active(world), 0);
+
+    ecs_set(world, e, Position, {0, 0, 0});
+    tr_frame(world);
+    test_int(tr_records(null, BOX_RENDER_TRANSITION_START), 0);
+    test_int(box_render_transition_test_active(world), 0);
+
+    box_transition_set(world, e, ecs_id(Position), &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+    test_flt(tr_position(world, e).x, 0);
+    test_int(box_render_transition_test_active(world), 0);
+
+    ecs_set(world, e, Position, {4, 0, 0});
+    tr_frames(world, 3);
+    test_flt(tr_position(world, e).x, 2);
+
+    tr_fini(world, null);
+}
+
+void Transition_active_agrees(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_world(&null);
+    ecs_entity_t e = tr_entity(world, &(TransitionSpec){ .duration = 0.5f, .delay = 0.25f });
+    ecs_entity_t d = tr_entity(world, &(TransitionSpec){ .delay = 0.5f });
+    tr_frame(world);
+    const box_render_transitions_t *s = box_render_transitions_get(world);
+    uint32_t node_e = box_render_transition_test_node(world, e);
+    uint32_t node_d = box_render_transition_test_node(world, d);
+    int32_t i, active = 0;
+    for (i = 0; i < 16; i ++) {
+        if (i == 1 || i == 3 || i == 9) {
+            ecs_set(world, e, Position, {(float)i, 0, 0});
+        }
+
+        if (i == 2) {
+            ecs_set(world, d, Position, {1, 0, 0});
+        }
+
+        tr_frame(world);
+        bool active_e = box_render_transitions_active(
+            s, node_e, BOX_RENDER_TRANSITION_POSITION, null->time);
+        bool active_d = box_render_transitions_node_active(s, node_d, null->time);
+        test_int(box_render_transition_test_active(world), active_e + active_d);
+        test_bool(active_e, tr_position(world, e).x != ecs_get(world, e, Position)->x);
+        test_bool(active_d, tr_position(world, d).x != ecs_get(world, d, Position)->x);
+        active += active_e + active_d;
+    }
+
+    test_assert(active > 0);
+    test_int(box_render_transition_test_active(world), 0);
+    tr_fini(world, null);
+}
+
+/** Allocations made through the OS API since the counter was installed */
+static int32_t tr_allocs;
+
+/** malloc of the OS API before the counter */
+static ecs_os_api_malloc_t tr_malloc_prev;
+
+/** realloc of the OS API before the counter */
+static ecs_os_api_realloc_t tr_realloc_prev;
+
+/** calloc of the OS API before the counter */
+static ecs_os_api_calloc_t tr_calloc_prev;
+
+/** Count an allocation and forward it to the previous malloc.
+ *
+ * @param size Bytes
+ * @return The memory
+ */
+static void* tr_malloc(
+    ecs_size_t size)
+{
+    tr_allocs ++;
+
+    return tr_malloc_prev(size);
+}
+
+/** Count an allocation and forward it to the previous realloc.
+ *
+ * @param ptr The memory to grow
+ * @param size Bytes
+ * @return The memory
+ */
+static void* tr_realloc(
+    void *ptr,
+    ecs_size_t size)
+{
+    tr_allocs ++;
+
+    return tr_realloc_prev(ptr, size);
+}
+
+/** Count an allocation and forward it to the previous calloc.
+ *
+ * @param size Bytes
+ * @return The zeroed memory
+ */
+static void* tr_calloc(
+    ecs_size_t size)
+{
+    tr_allocs ++;
+
+    return tr_calloc_prev(size);
+}
+
+/** Add a start record of Position to a packet.
+ *
+ * @param p The packet
+ * @param node The node id
+ * @param x The target x
+ */
+static void tr_start(
+    box_render_packet_t *p,
+    uint32_t node,
+    float x)
+{
+    box_render_transition_record_t *r = box_render_packet_transition(
+        p, BOX_RENDER_TRANSITION_START, node);
+    Position v = { x, 0, 0 };
+    r->component = BOX_RENDER_TRANSITION_POSITION;
+    r->duration = 1.0f;
+    r->start = p->time;
+    box_render_transition_pack(BOX_RENDER_TRANSITION_POSITION, &v, r->value);
+}
+
+void Transition_resolver_no_allocation(void) {
+    // engine_core/transition
+    ecs_world_t *world = ecs_init();
+    box_render_transition_table_t t;
+    box_render_packet_t p;
+    box_render_transition_table_init(&t);
+    box_render_packet_init(&p);
+    uint32_t node;
+    for (node = 1; node <= 8; node ++) {
+        box_render_packet_transition(&p, BOX_RENDER_TRANSITION_CREATE, node);
+        tr_start(&p, node, 0);
+    }
+
+    box_render_transition_resolve(&t, &p);
+    box_render_packet_reset(&p);
+    for (node = 1; node <= 8; node ++) {
+        tr_start(&p, node, 4);
+    }
+
+    box_render_packet_reset(&p);
+    tr_malloc_prev = ecs_os_api.malloc_;
+    tr_realloc_prev = ecs_os_api.realloc_;
+    tr_calloc_prev = ecs_os_api.calloc_;
+    ecs_os_api.malloc_ = tr_malloc;
+    ecs_os_api.realloc_ = tr_realloc;
+    ecs_os_api.calloc_ = tr_calloc;
+    tr_allocs = 0;
+
+    int32_t frame;
+    for (frame = 0; frame < 8; frame ++) {
+        p.time = frame * (double)TR_DELTA;
+        if (frame == 0 || frame == 2) {
+            for (node = 1; node <= 8; node ++) {
+                tr_start(&p, node, (float)(frame + 4));
+            }
+        }
+
+        if (frame == 3) {
+            box_render_packet_transition(&p, BOX_RENDER_TRANSITION_DESTROY, 8);
+            box_render_packet_transition(&p, BOX_RENDER_TRANSITION_CREATE, 8);
+            tr_start(&p, 8, 1);
+            tr_start(&p, 8, 2);
+        }
+
+        box_render_transition_resolve(&t, &p);
+        test_assert(box_render_transition_table_active(&t) > 0 || frame > 5);
+        box_render_packet_reset(&p);
+    }
+
+    ecs_os_api.malloc_ = tr_malloc_prev;
+    ecs_os_api.realloc_ = tr_realloc_prev;
+    ecs_os_api.calloc_ = tr_calloc_prev;
+    test_int(tr_allocs, 0);
+    test_int(box_render_transition_table_active(&t), 0);
+
+    Position v;
+    test_assert(box_render_transition_table_value(&t, 1, BOX_RENDER_TRANSITION_POSITION, &v));
+    test_flt(v.x, 6);
+    test_assert(box_render_transition_table_value(&t, 8, BOX_RENDER_TRANSITION_POSITION, &v));
+    test_flt(v.x, 2);
+
+    box_render_packet_fini(&p);
+    box_render_transition_table_fini(&t);
+    ecs_fini(world);
+}

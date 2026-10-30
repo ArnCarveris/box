@@ -373,7 +373,12 @@
                     "time_paused",
                     "time_scale_half",
                     "main_thread_same_values",
-                    "no_transition_no_records"
+                    "no_transition_no_records",
+                    "spec_change_keeps_running",
+                    "new_map_snaps",
+                    "invalid_entry_snaps",
+                    "active_agrees",
+                    "resolver_no_allocation"
                 ]
             }
         ]

@@ -1504,7 +1504,7 @@ int32_t box_render_transition_table_active(
 typedef struct box_render_transitions_t box_render_transitions_t;
 
 /** Register the system that detects the changes of transitioned components and sends the
- * transition records, the first system of RenderExtract.
+ * transition records, a system of RenderExtract.
  *
  * @param world The world
  */

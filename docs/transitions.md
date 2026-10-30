@@ -119,7 +119,7 @@ patches them into the packet before the backend sees it.
   record in the packet data, so the resolver can patch it. After the last active frame the
   normal stream holds the target, so the render thread needs no end logic.
 
-Implemented in `src/render/transitions.c`, the first system of `RenderExtract`:
+Implemented in `src/render/transitions.c`, a system of `RenderExtract`:
 
 - The query is `Transition(self|up IsA)` with `EcsQueryMatchPrefab`, so a prefab and each of its
   instances get their own node and state. Only owned values are compared: an inherited
@@ -132,7 +132,9 @@ Implemented in `src/render/transitions.c`, the first system of `RenderExtract`:
   `CREATE` and `DESTROY` of a node, and `START` of a component with its target, `delay`,
   `duration`, timing function and start time (`packet->time`). A first value, and a snap
   (an entry or a component removed), is a `START` with a `delay` and `duration` of 0, which sets
-  the value without a transition. Removing `Transition` and deleting the entity both send
+  the value without a transition. After a snap the component is not tracked until it has a
+  valid entry and a value again; that value is then a first value and does not animate.
+  Removing `Transition` and deleting the entity both send
   `DESTROY`: the normal stream already holds the target.
 - `box_render_transitions_active()` says whether a node and component is active at the packet
   time. It and the resolver both decide with `box_render_transition_running()`, from the same
