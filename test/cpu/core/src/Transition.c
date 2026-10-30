@@ -266,6 +266,14 @@ static void transition_churn(
     test_int(ecs_map_count(ecs_get(world, copy, Transition)), 2);
     test_assert(box_transition_get(world, copy, ecs_id(Scale)) == NULL);
 
+    ecs_entity_t overriding = ecs_new_w_pair(world, EcsIsA, prefab);
+    ecs_add(world, overriding, Transition);
+    test_assert(ecs_owns(world, overriding, Transition));
+    test_int(ecs_map_count(ecs_get(world, overriding, Transition)), 2);
+    test_assert(box_transition_get(world, overriding, ecs_id(Rgb)) !=
+        box_transition_get(world, prefab, ecs_id(Rgb)));
+    ecs_delete(world, overriding);
+
     ecs_entity_t plain = ecs_new(world);
     box_transition_set(world, plain, ecs_id(Tint), &(TransitionSpec){ .duration = 1.0f });
     ecs_remove(world, plain, Transition);
@@ -327,7 +335,13 @@ void Transition_not_transitionable(void) {
     test_assert(box_transition_valid(world, ecs_id(Position),
         box_transition_get(world, e, ecs_id(Position))));
 
+    transition_capture_begin();
     box_transition_set(world, e, ecs_id(Scale), &(TransitionSpec){ .duration = 1.0f });
+    errors = transition_capture_end();
+    test_assert(errors != NULL);
+    test_assert(strstr(errors, "PbrTextures") != NULL);
+    test_assert(strstr(errors, "Scale") == NULL);
+    ecs_os_free(errors);
     test_int(ecs_map_count(ecs_get(world, e, Transition)), 3);
     ecs_progress(world, 0.1f);
     ecs_delete(world, e);
