@@ -1512,12 +1512,13 @@ void Transition_transform_end_matches_target(void) {
     }
 
     for (i = 0; i < 4; i ++) {
-        box_render_transform_t rendered, target;
+        box_render_transform_t rendered, plain_rendered, target;
         tr_frame(world);
         test_assert(tr_rendered(world, null, e, &rendered));
-        test_assert(!tr_rendered(world, null, plain, &rendered));
+        test_assert(!tr_rendered(world, null, plain, &plain_rendered));
         tr_target(world, plain, &target);
-        test_assert(!ecs_os_memcmp_t(&rendered, &target, box_render_transform_t));
+        test_assert(!ecs_os_memcmp_t(&plain_rendered, &target, box_render_transform_t));
+        test_assert(ecs_os_memcmp_t(&rendered, &target, box_render_transform_t) != 0);
     }
 
     tr_frame(world);
@@ -1581,6 +1582,172 @@ void Transition_transform_child_childof(void) {
 void Transition_transform_child_parent(void) {
     // engine_core/transition
     tr_child_follows(true);
+}
+
+void Transition_transform_child_surface(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_entity_t parent = tr_shape(world, 0, 0);
+    ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, parent);
+    ecs_set(world, child, Position, {0, 1, 0});
+    ecs_set(world, child, EllipsoidShell, {
+        .radius = {1, 2, 0.5f},
+        .longitude_start = 0, .longitude_end = 2 * (float)GLM_PI,
+        .latitude_start = -(float)GLM_PI_2, .latitude_end = (float)GLM_PI_2 });
+    ecs_set(world, child, Rgb, {20, 100, 200});
+    box_transition_set(world, parent, ecs_id(Position), &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+    test_assert(ecs_get(world, child, ShapeMesh)->surface.p[0][0] != 0.0f);
+
+    ecs_set(world, parent, Position, {4, 0, 0});
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        mat4 m;
+        box_render_surface_t surface;
+        tr_frame(world);
+        test_assert(ecs_has_id(world, child, TransitionTransform));
+        box_draw_batch_t *b = tr_batch(world, child);
+        test_assert(b->key.dynamic_transform);
+        box_draws_surface(&surface, ecs_get(world, child, ShapeMesh));
+        test_assert(surface.p[0][0] != 0.0f);
+        test_assert(!ecs_os_memcmp_t(box_draws_slot_surface(b,
+            ecs_get(world, child, DrawSlot)->slot), &surface, box_render_surface_t));
+        tr_at((float)i, 0, 0, m);
+        tr_test_pose(world, null, parent, NULL, &(Position){(float)i, 0, 0}, NULL, NULL);
+        tr_test_pose(world, null, child, m, &(Position){0, 1, 0}, NULL, NULL);
+    }
+
+    tr_frame(world);
+    tr_test_static(world, null, parent);
+    tr_test_static(world, null, child);
+    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 4);
+    tr_fini(world, null);
+}
+
+void Transition_transform_parent_of_node(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_entity_t root = tr_shape(world, 0, 0);
+    ecs_set(world, root, Position, {1, 2, 0});
+    ecs_set(world, root, Rotation, {0, (float)GLM_PI_2, 0});
+    ecs_set(world, root, Scale, {2, 2, 2});
+    ecs_entity_t node = ecs_new(world);
+    ecs_set(world, node, EcsParent, {root});
+    ecs_set(world, node, Box, {1, 1, 1});
+    ecs_set(world, node, Position, {0, 0, 0});
+    ecs_entity_t leaf = ecs_new(world);
+    ecs_set(world, leaf, EcsParent, {node});
+    ecs_set(world, leaf, Box, {1, 1, 1});
+    ecs_set(world, leaf, Position, {0, 1, 0});
+    box_transition_set(world, node, ecs_id(Position), &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+
+    mat4 r;
+    box_transform_local(&(Position){1, 2, 0}, &(Rotation){0, (float)GLM_PI_2, 0},
+        &(Scale){2, 2, 2}, r);
+    ecs_set(world, node, Position, {4, 0, 0});
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        mat4 n, rn;
+        tr_frame(world);
+        test_assert(ecs_has_id(world, node, TransitionTransform));
+        test_assert(ecs_has_id(world, leaf, TransitionTransform));
+        test_assert(!ecs_has_id(world, root, TransitionTransform));
+        tr_at((float)i, 0, 0, n);
+        glm_mul(r, n, rn);
+        tr_test_pose(world, null, node, r, &(Position){(float)i, 0, 0}, NULL, NULL);
+        tr_test_pose(world, null, leaf, rn, &(Position){0, 1, 0}, NULL, NULL);
+    }
+
+    tr_frame(world);
+    tr_test_static(world, null, root);
+    tr_test_static(world, null, node);
+    tr_test_static(world, null, leaf);
+    tr_fini(world, null);
+}
+
+void Transition_transform_reparent_into(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_entity_t parent = tr_shape(world, 0, 0);
+    ecs_entity_t other = tr_shape(world, 0, 0);
+    ecs_set(world, other, Position, {0, 1, 0});
+    box_transition_set(world, parent, ecs_id(Position), &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+    test_assert(!tr_batch(world, other)->key.dynamic_transform);
+
+    ecs_set(world, parent, Position, {4, 0, 0});
+    int32_t i;
+    for (i = 0; i < 2; i ++) {
+        tr_frame(world);
+        test_assert(!ecs_has_id(world, other, TransitionTransform));
+        tr_test_pose(world, null, parent, NULL, &(Position){(float)i, 0, 0}, NULL, NULL);
+        tr_test_pose(world, null, other, NULL, &(Position){0, 1, 0}, NULL, NULL);
+    }
+
+    ecs_add_pair(world, other, EcsChildOf, parent);
+    for (i = 2; i < 4; i ++) {
+        mat4 m;
+        tr_frame(world);
+        test_assert(ecs_has_id(world, other, TransitionTransform));
+        test_assert(tr_batch(world, other)->key.dynamic_transform);
+        tr_at((float)i, 0, 0, m);
+        tr_test_pose(world, null, parent, NULL, &(Position){(float)i, 0, 0}, NULL, NULL);
+        tr_test_pose(world, null, other, m, &(Position){0, 1, 0}, NULL, NULL);
+    }
+
+    tr_frame(world);
+    tr_test_static(world, null, parent);
+    tr_test_static(world, null, other);
+    test_flt(ecs_get(world, other, WorldTransform)->m[3][0], 4);
+    test_flt(ecs_get(world, other, WorldTransform)->m[3][1], 1);
+    tr_frame(world);
+    tr_test_static(world, null, other);
+    tr_fini(world, null);
+}
+
+void Transition_transform_reparent_out(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_entity_t parent = tr_shape(world, 0, 0);
+    ecs_entity_t child = tr_shape(world, parent, 0);
+    ecs_set(world, child, Position, {0, 1, 0});
+    box_transition_set(world, parent, ecs_id(Position), &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+
+    ecs_set(world, parent, Position, {4, 0, 0});
+    int32_t i;
+    for (i = 0; i < 2; i ++) {
+        mat4 m;
+        tr_frame(world);
+        test_assert(ecs_has_id(world, child, TransitionTransform));
+        tr_at((float)i, 0, 0, m);
+        tr_test_pose(world, null, child, m, &(Position){0, 1, 0}, NULL, NULL);
+    }
+
+    ecs_remove_pair(world, child, EcsChildOf, parent);
+    for (i = 2; i < 4; i ++) {
+        box_render_transform_t rendered, target;
+        tr_frame(world);
+        tr_test_pose(world, null, parent, NULL, &(Position){(float)i, 0, 0}, NULL, NULL);
+        tr_rendered(world, null, child, &rendered);
+        tr_target(world, child, &target);
+        tr_test_transform(&rendered, &target);
+        test_flt(target.rows[1][3], 1);
+    }
+
+    tr_frame(world);
+    tr_test_static(world, null, parent);
+    tr_test_static(world, null, child);
+    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 0);
+    test_flt(ecs_get(world, child, WorldTransform)->m[3][1], 1);
+    tr_frame(world);
+    tr_test_static(world, null, child);
+    tr_fini(world, null);
 }
 
 void Transition_transform_nested(void) {
