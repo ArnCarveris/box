@@ -90,10 +90,11 @@ static ecs_world_t* cookie_world(
     return world;
 }
 
-/** Create a headless world with a white rough wall on z = 0 facing the camera, which looks
- * along -Z and sees the same 8 units in 64x64 pixels as over the floor (column c is
- * x = (c + 0.5) / 8 - 4, row r is y = 4 - (r + 0.5) / 8), and a low sun 10 degrees above the
- * horizon behind the camera, without ambient light.
+/** Create a headless world with a white rough wall on z = 0 facing the camera, lit by a low
+ * sun 10 degrees above the horizon behind the camera, without ambient light.
+ *
+ * The camera looks along -Z and sees the same 8 units in 64x64 pixels as over the floor:
+ * column c is x = (c + 0.5) / 8 - 4, row r is y = 4 - (r + 0.5) / 8.
  *
  * @param sun Receives the sun
  * @return The world
@@ -792,10 +793,10 @@ void LightCookie_noise_coverage(void) {
 }
 
 /** The wall under the low sun moves the plane projection 1 / tan(10 degrees), about 5.7 units,
- * per unit up the wall: a pixel, 1/8 unit, spans 2.8 periods of the stripes of size 4, 1/4 unit
- * each. Threshold 0.5, softness 0.5 and strength 1 pass the stripes through, so every pixel of the
- * wall gets the light of the mean of the cookie over it, a half. A level from the footprint of a
- * horizontal surface aliases between dark and lit rows instead.
+ * per unit up the wall: a pixel, 1/8 unit, spans 2.8 periods of the stripes of size 4.
+ *
+ * The default remap passes the stripes through, so every pixel of the wall gets the light of the
+ * mean of the cookie over it, a half. The level of a horizontal surface aliases instead.
  */
 void LightCookie_steep_surface_lod(void) {
     // lighting/light_cookie
@@ -834,9 +835,10 @@ void LightCookie_steep_surface_lod(void) {
 }
 
 /** The light projection of the same wall reads the stripes along the light's Y axis, which is
- * 0.98 times the height on the wall: with size 16 a stripe is 4 pixels high and a texel larger
- * than a pixel, so the stripes stay sharp. Scaling the level by the stretch of the plane
- * projection would blur them toward a half.
+ * 0.98 times the height on the wall: with size 16 a stripe is 4 pixels high.
+ *
+ * A texel is larger than a pixel, so the stripes stay sharp. Scaling the level by the stretch of
+ * the plane projection would blur them toward a half.
  */
 void LightCookie_light_projection_lod_unchanged(void) {
     // lighting/light_cookie
