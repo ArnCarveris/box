@@ -170,6 +170,8 @@ typedef struct box_console_t {
     int32_t cursor;             /**< Byte of the input line the cursor sits before */
     ecs_vec_t spans;            /**< box_console_span_t of the input line */
     char *colored;              /**< The input line the spans were found for, NULL for none */
+    char *prompted;             /**< The prompt the input line was last drawn with, NULL for
+                                 *   none */
     ecs_vec_t typed;            /**< char of the text typed since the last update */
     bool pressed[BOX_KEY_COUNT];/**< Keys pressed since the last update */
     float wheel;                /**< Wheel movement since the last update */
@@ -595,7 +597,9 @@ int32_t box_console_scrollback_rows(
     box_console_t *con,
     const Console *console);
 
-/** Write the look, the size, the visible scrollback and the input line into the content.
+/** Write the look, the size, the visible scrollback and the input line into the content. The
+ * input line is drawn again, and its spans found again, when the prompt changed since it was last
+ * drawn, also when the scope of the session was deleted, renamed or moved outside a command.
  *
  * @param world The world
  * @param con The console state
