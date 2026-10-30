@@ -162,7 +162,8 @@ bool box_transition_supported(
         component == ecs_id(Tint) ||
         component == ecs_id(PbrMaterial) ||
         component == ecs_id(Emissive) ||
-        component == ecs_id(TextureTransform));
+        component == ecs_id(TextureTransform) ||
+        component == ecs_id(Transmission));
 }
 
 bool box_transition_valid(

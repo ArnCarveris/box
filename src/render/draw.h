@@ -198,8 +198,7 @@ typedef struct box_draw_transition_material_t {
     PbrMaterial pbr;        /**< PbrMaterial */
     Emissive emissive;      /**< Emissive */
     TextureTransform uv;    /**< TextureTransform */
-    bool transmissive;      /**< The material has Transmission, which does not transition */
-    Transmission transmission; /**< Transmission, when transmissive */
+    Transmission transmission; /**< Transmission */
     bool coated;            /**< The material has ClearCoat, which does not transition */
     ClearCoat clear_coat;   /**< ClearCoat, when coated */
     Opacity opacity;        /**< Opacity of the shape itself */

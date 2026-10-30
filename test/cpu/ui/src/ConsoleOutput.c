@@ -826,6 +826,57 @@ void ConsoleOutput_find_match(void) {
     ecs_fini(world);
 }
 
+void ConsoleOutput_find_match_escaped(void) {
+    // console/output
+    ecs_world_t *world = output_world();
+    ecs_entity_t things = ecs_entity(world, { .name = "things" });
+    ecs_entity_t xy = ecs_new_w_pair(world, EcsChildOf, things);
+    ecs_set_name(world, xy, "x.y");
+    ecs_entity_t wz = ecs_new_w_pair(world, EcsChildOf, things);
+    ecs_set_name(world, wz, "w\\z.q");
+
+    // A backslash in the pattern matches a backslash of the name, never the escape of a '.'
+    const ConsoleOutput *o = output_colors(world);
+    char *text = box_console_run(world, "find \\", NULL);
+    ecs_progress(world, 0);
+    test_assert(strstr(text, "x\\.y") == NULL);
+    ecs_os_free(text);
+    test_assert(output_find(world, "things.x\\.y", true) == 0);
+    ecs_entity_t row = output_find(world, "things.w\\z\\.q", true);
+    output_check(world, row, 0, 7, &o->dim);
+    output_check(world, row, 7, 8, &o->entity);
+    output_check(world, row, 8, 9, &o->match);
+    output_check(world, row, 9, 13, &o->entity);
+
+    // A pattern over an escaped '.' marks the escape with the '.'
+    output_run(world, "find x.y");
+    row = output_find(world, "things.x\\.y", true);
+    output_check(world, row, 0, 7, &o->dim);
+    output_check(world, row, 7, 11, &o->match);
+    output_run(world, "find z.q");
+    row = output_find(world, "things.w\\z\\.q", true);
+    output_check(world, row, 0, 7, &o->dim);
+    output_check(world, row, 7, 9, &o->entity);
+    output_check(world, row, 9, 13, &o->match);
+
+    // A backslash of the name before its '.' is shown as "\\.", the name part is all of it
+    ecs_entity_t vu = ecs_new_w_pair(world, EcsChildOf, things);
+    ecs_set_name(world, vu, "v\\.u");
+    output_run(world, "find \\.u");
+    row = output_find(world, "things.v\\\\.u", true);
+    output_check(world, row, 0, 7, &o->dim);
+    output_check(world, row, 7, 8, &o->entity);
+    output_check(world, row, 8, 12, &o->match);
+
+    // Name matches of grep too
+    output_run(world, "grep x.y");
+    row = output_find(world, "things.x\\.y", true);
+    output_check(world, row, 0, 7, &o->dim);
+    output_check(world, row, 7, 11, &o->match);
+
+    ecs_fini(world);
+}
+
 void ConsoleOutput_tree_many_children(void) {
     // console/output
     ecs_world_t *world = output_world();
@@ -874,7 +925,8 @@ void ConsoleOutput_error_no_blank_line(void) {
     test_assert(text[len - 1] == '^');
     ecs_os_free(text);
 
-    const ConsoleOutput *o = output_colors(world);
+    const Console *c = ecs_singleton_get(world, Console);
+    const ConsoleOutput *o = &c->output;
     ecs_entity_t err = output_find(world, "error: bad thing happened", true);
     ecs_entity_t detail = output_next(world, err);
     test_str(output_text(world, detail), "    1 + ");
@@ -891,6 +943,17 @@ void ConsoleOutput_error_no_blank_line(void) {
     test_assert(text[len - 1] != '\n');
     test_assert(text[len - 1] != '\r');
     ecs_os_free(text);
+    err = output_find(world, "error: 1: unresolved identifier 'nothing'", true);
+    output_check(world, err, 0, 7, &c->error);
+    output_check(world, err, 7, -1, &c->text);
+    detail = output_next(world, err);
+    test_str(output_text(world, detail), "nothing");
+    output_check(world, detail, 0, -1, &o->dim);
+    caret = output_next(world, detail);
+    test_str(output_text(world, caret), "^");
+    output_check(world, caret, 0, -1, &o->dim);
+    ecs_entity_t after = output_next(world, caret);
+    test_assert(!after || output_text(world, after)[0] != '\0');
 
     // A one line error that ends in a newline has no detail
     output_command(world, "failone", output_fail_one_cmd, false);

@@ -1,4 +1,5 @@
 include materials
+include shrub
 using flecs.script
 using box.transform
 using box.geometry
@@ -7,17 +8,57 @@ using box.material
 @tree Parent
 template KoreanLandscape {
   { Position: {0, -0.6, 0}; RoundedBox: {32, 1.15, 28, 0.45}; Rgb: {94, 105, 94}; PbrMaterial: {roughness: 1} }
-  { Position: {0, -0.035, 0}; RoundedBox: {31.8, 0.18, 27.8, 0.42}; Rgb: {183, 170, 136}; PbrMaterial: {roughness: 1} }
-  { Position: {0, 0.065, -0.2}; RoundedBox: {11.6, 0.12, 14, 0.16}; Rgb: {195, 185, 156} }
-  for row in 0..14 {
+  { Position: {0, -0.035, 0}; RoundedBox: {31.8, 0.18, 27.8, 0.42}; Rgb: {167, 150, 112}; PbrMaterial: {roughness: 1} }
+  { Position: {0, 0.065, -0.2}; RoundedBox: {11.6, 0.12, 14, 0.16}; Rgb: {186, 172, 138}; PbrMaterial: {roughness: 1} }
+  for i in 0..56 {
+    const x = (i * 71 % 280) * 0.1 - 14
+    const z = (i * 43 % 240) * 0.1 - 12
+    const tone = i % 4
+    { Position: {x, 0.058 + i * 0.0003, z}; Rotation: {0, i * 0.7, 0}; Scale: {1, 1, 0.62}; Cylinder: {radius: 0.55 + i % 5 * 0.24, length: 0.004, segments: 28}; Rgb: {160 + tone * 4, 144 + tone * 4, 107 + tone * 3}; PbrMaterial: {roughness: 1} }
+  }
+  for i in 0..34 {
+    const x = (i * 37 % 92) * 0.1 - 4.6
+    const z = (i * 53 % 116) * 0.1 - 6
+    const tone = i % 4
+    { Position: {x, 0.126 + i * 0.0003, z}; Rotation: {0, i * 0.9, 0}; Scale: {1, 1, 0.7}; Cylinder: {radius: 0.35 + i % 4 * 0.22, length: 0.003, segments: 28}; Rgb: {180 + tone * 3, 166 + tone * 3, 132 + tone * 3}; PbrMaterial: {roughness: 1} }
+  }
+  for i in 0..360 {
+    const x = (i * 97 % 310) * 0.1 - 15.5
+    const z = (i * 59 % 270) * 0.1 - 13.5
+    { Position: {x, 0.07, z}; Scale: {1.3, 0.5, 1}; IcoSphere: {radius: 0.022 + i % 4 * 0.012, segments: 0}; Rgb: {134 + i % 3 * 18, 124 + i % 3 * 16, 100 + i % 3 * 14}; PbrMaterial: {roughness: 1} }
+  }
+  for i in 0..240 {
+    const x = (i * 83 % 110) * 0.1 - 5.5
+    const z = (i * 47 % 134) * 0.1 - 6.9
+    { Position: {x, 0.132, z}; Scale: {1.3, 0.5, 1}; IcoSphere: {radius: 0.02 + i % 4 * 0.012, segments: 0}; Rgb: {150 + i % 3 * 18, 142 + i % 3 * 16, 116 + i % 3 * 14}; PbrMaterial: {roughness: 1} }
+  }
+  for row in 0..17 {
     for col in 0..4 {
-      { Position: {(col - 1.5) * 0.64, 0.15, -4.8 + row * 0.94}; RoundedBox: {0.61, 0.12, 0.9, 0.035}; Rgb: {160 + (row + col) % 3 * 7, 164 + (row + col) % 3 * 6, 153 + (row + col) % 3 * 5} }
+      const tone = (row * 5 + col * 3) % 4
+      { Position: {(col - 1.5) * 0.64 + (row % 2) * 0.03, 0.15, -4.8 + row * 0.94}; RoundedBox: {0.6, 0.12, 0.89, 0.035}; Rgb: {142 + tone * 9, 146 + tone * 8, 134 + tone * 8}; PbrMaterial: {roughness: 0.95} }
+    }
+  }
+  for row in 0..15 {
+    for side in 0..2 {
+      { Position: {(side - 0.5) * 2.76, 0.135, -4.8 + row * 1.1}; RoundedBox: {0.16, 0.08, 1.06, 0.02}; Rgb: {118, 118, 106} }
     }
   }
   for side in 0..2 {
-    { Position: {(side - 0.5) * 26, 0.07, -1}; RoundedBox: {4.5, 0.12, 23, 0.7}; Rgb: {128, 144, 99} }
+    { Position: {(side - 0.5) * 26, 0.07, -1}; RoundedBox: {4.5, 0.12, 23, 0.7}; Rgb: {108, 128, 76}; PbrMaterial: {roughness: 1} }
     for i in 0..23 {
       { Position: {(side - 0.5) * 25 + math.sin(i * 2.4) * 0.8, 0.18, -11.5 + i}; Scale: {0.5 + i % 3 * 0.13, 0.25, 0.4}; IcoSphere: {radius: 1, segments: 1}; Rgb: {132 + i % 3 * 9, 140 + i % 3 * 8, 120 + i % 3 * 7} }
+    }
+    for i in 0..26 {
+      const x = (side - 0.5) * 26 + (i * 37 % 24) * 0.1 - 1.2
+      const z = -11 + (i * 53 % 200) * 0.1
+      { Position: {x, 0.135, z}; Rotation: {0, i * 0.8, 0}; Scale: {1, 1, 0.7}; Cylinder: {radius: 0.4 + i % 4 * 0.2, length: 0.004, segments: 24}; Rgb: {88 + i % 4 * 12, 116 + i % 4 * 10, 62 + i % 4 * 6}; PbrMaterial: {roughness: 1} }
+    }
+    for i in 0..120 {
+      const x = (side - 0.5) * 26 + (i * 41 % 42) * 0.1 - 2.1
+      const z = -12.2 + (i * 61 % 225) * 0.1
+      for blade in 0..3 {
+        { Position: {x + blade * 0.05, 0.22, z + (blade - 1) * 0.03}; Rotation: {0.18 * (blade - 1), i * 0.7, (blade - 1) * 0.28}; Cone: {radius: 0.035, length: 0.26 + i % 3 * 0.06, segments: 4}; Rgb: {92 + i % 3 * 13, 128 + blade * 9, 66} }
+      }
     }
   }
   for side in 0..2 {
@@ -25,14 +66,32 @@ template KoreanLandscape {
       { Position: {(side - 0.5) * 14, 0.12, -5 + i * 0.9}; Rotation: {0, i * 0.31, 0}; Cylinder: {radius: 0.39, length: 0.14, segments: 7}; Rgb: {168, 170, 153} }
     }
   }
-  for i in 0..70 {
-    const a = i * 2.4
-    const x = math.sin(a) * 14.8
-    const z = math.cos(a * 0.7) * 12.8
-    if x * x > 120 {
-      for blade in 0..3 {
-        { Position: {x + blade * 0.07, 0.2, z}; Rotation: {0.2, a, (blade - 1) * 0.3}; Cone: {radius: 0.05, length: 0.4, segments: 4}; Rgb: {112, 130 + blade * 7, 76} }
-      }
+  { (IsA, KoreanWater); Position: {0, 0.08, 12.45}; Box: {30.6, 0.05, 1.36} }
+  for side in 0..2 {
+    const z = 12.45 + (side - 0.5) * 1.5
+    for i in 0..58 {
+      const tone = (i * 7 + side) % 4
+      { Position: {-15.15 + i * 0.53 + side * 0.2, 0.13, z + math.sin(i * 1.9) * 0.05}; Rotation: {0, i * 1.3, 0}; Scale: {1.25, 0.5, 0.8}; IcoSphere: {radius: 0.17 + i % 4 * 0.05, segments: 1}; Rgb: {118 + tone * 11, 120 + tone * 10, 110 + tone * 9}; PbrMaterial: {roughness: 1} }
     }
+  }
+  for i in 0..12 {
+    const x = -14 + (i * 67 % 280) * 0.1
+    if x * x > 3 {
+      { KoreanRock: {size: 0.34 + i % 3 * 0.1}; Position: {x, 0.07, 12.25 + (i % 3) * 0.2}; Rotation: {0, i * 1.1, 0} }
+    }
+  }
+  for slab in 0..3 {
+    { (IsA, KoreanStone); Position: {(slab - 1) * 0.92, 0.26, 12.45}; RoundedBox: {0.88, 0.16, 2.5, 0.03} }
+    { Position: {(slab - 1) * 0.92, 0.343, 12.45}; Box: {0.8, 0.008, 2.42}; Rgb: {166 - slab * 12, 167 - slab * 12, 152 - slab * 11}; PbrMaterial: {roughness: 1} }
+  }
+  for side in 0..2 {
+    const x = (side - 0.5) * 2.86
+    { (IsA, KoreanStone); Position: {x, 0.17, 12.45}; Box: {0.3, 0.26, 1.8} }
+    for end in 0..2 {
+      const z = 12.45 + (end - 0.5) * 2.2
+      { (IsA, KoreanStone); Position: {x, 0.5, z}; Box: {0.2, 0.5, 0.2} }
+      { (IsA, KoreanStone); Position: {x, 0.8, z}; Sphere: {radius: 0.12, segments: 10} }
+    }
+    { (IsA, KoreanStone); Position: {x, 0.6, 12.45}; Box: {0.1, 0.09, 2.1} }
   }
 }

@@ -7,6 +7,9 @@ using box.material
 
 @tree Parent
 template KoreanRoof {
+  prop ornate: bool = false
+  prop rafter: Rgb = {88, 56, 38}
+  prop rafter_end: Rgb = {176, 150, 104}
   { (IsA, KoreanRoofSurface); Position: {} }
   for side in 0..2 {
     const sign = side * 2 - 1
@@ -19,7 +22,8 @@ template KoreanRoof {
         const n = (seg + 1) / 10.0
         const y = 1.65 * (1 - t) * (1 - t) + 0.14 * t * t * t * t * t * t + corner * t * t * t * t
         const ny = 1.65 * (1 - n) * (1 - n) + 0.14 * n * n * n * n * n * n + corner * n * n * n * n
-        KoreanBeam(ax: u * (2.65 + 1.55 * t), ay: y + 0.035, az: sign * 2.9 * t, bx: u * (2.65 + 1.55 * n), by: ny + 0.035, bz: sign * 2.9 * n, radius: 0.046) {}
+        const wear = (tile * 7 + seg * 3 + side) % 5
+        KoreanBeam(ax: u * (2.65 + 1.55 * t), ay: y + 0.035, az: sign * 2.9 * t, bx: u * (2.65 + 1.55 * n), by: ny + 0.035, bz: sign * 2.9 * n, radius: 0.046, tint: {78 + wear * 6, 94 + wear * 6, 102 + wear * 5}) {}
       }
       { (IsA, KoreanTileEdge); Position: {u * 4.2, 0.175 + corner, sign * 2.92}; Rotation: {math.PI / 2, 0, 0}; Cylinder: {radius: 0.075, length: 0.07, segments: 12} }
       { (IsA, KoreanPaper); Position: {u * 4.2, 0.175 + corner, sign * 2.965}; Rotation: {math.PI / 2, 0, 0}; Torus: {radius: 0.035, tube: 0.009, segments: 10, rings: 4} }
@@ -31,8 +35,9 @@ template KoreanRoof {
       for seg in 0..10 {
         const t = seg / 10.0
         const n = (seg + 1) / 10.0
+        const wear = (tile * 7 + seg * 3 + side) % 5
         KoreanBeam(ax: sign * (2.65 + 1.55 * t), ay: 1.65 * (1 - t) * (1 - t) + 0.14 * t * t * t * t * t * t + corner * t * t * t * t + 0.04, az: u * 2.9 * t,
-          bx: sign * (2.65 + 1.55 * n), by: 1.65 * (1 - n) * (1 - n) + 0.14 * n * n * n * n * n * n + corner * n * n * n * n + 0.04, bz: u * 2.9 * n, radius: 0.046) {}
+          bx: sign * (2.65 + 1.55 * n), by: 1.65 * (1 - n) * (1 - n) + 0.14 * n * n * n * n * n * n + corner * n * n * n * n + 0.04, bz: u * 2.9 * n, radius: 0.046, tint: {78 + wear * 6, 94 + wear * 6, 102 + wear * 5}) {}
       }
     }
     for edge in 0..30 {
@@ -40,18 +45,70 @@ template KoreanRoof {
       const n = (edge - 14) / 15.0
       KoreanBeam(ax: u * 4.2, ay: 0.08 + 0.25 * u * u * u * u * u * u * u * u, az: sign * 2.9, bx: n * 4.2, by: 0.08 + 0.25 * n * n * n * n * n * n * n * n, bz: sign * 2.9, radius: 0.09, tint: {196, 192, 164}) {}
     }
+    for edge in 0..18 {
+      const u = (edge - 9) / 9.0
+      const n = (edge - 8) / 9.0
+      KoreanBeam(ax: sign * 4.2, ay: 0.08 + 0.25 * u * u * u * u * u * u * u * u, az: u * 2.9, bx: sign * 4.2, by: 0.08 + 0.25 * n * n * n * n * n * n * n * n, bz: n * 2.9, radius: 0.09, tint: {196, 192, 164}) {}
+    }
+    for beam in 0..23 {
+      const u = (beam - 11) / 11.6
+      const u2 = u * u
+      const corner = 0.25 * u2 * u2 * u2 * u2
+      const ay = 0.01 + corner * 0.37
+      const by = 0.03 + corner
+      KoreanBeam(ax: u * (2.65 + 1.55 * 0.78), ay: ay, az: sign * 2.9 * 0.78, bx: u * 4.14, by: by, bz: sign * 2.84, radius: 0.052, tint: rafter) {}
+      { Position: {u * 4.14, by, sign * 2.84}; Sphere: {radius: 0.058, segments: 8}; Rgb: rafter_end; PbrMaterial: {roughness: 0.8} }
+    }
+    for beam in 0..15 {
+      const u = (beam - 7) / 7.6
+      const u2 = u * u
+      const corner = 0.25 * u2 * u2 * u2 * u2
+      const ay = 0.01 + corner * 0.37
+      const by = 0.03 + corner
+      KoreanBeam(ax: sign * (2.65 + 1.55 * 0.78), ay: ay, az: u * 2.9 * 0.78, bx: sign * 4.14, by: by, bz: u * 2.84, radius: 0.052, tint: rafter) {}
+      { Position: {sign * 4.14, by, u * 2.84}; Sphere: {radius: 0.058, segments: 8}; Rgb: rafter_end; PbrMaterial: {roughness: 0.8} }
+    }
     for end in 0..2 {
+      const across = end * 2 - 1
       for seg in 0..10 {
         const t = seg / 10.0
         const n = (seg + 1) / 10.0
-        KoreanBeam(ax: sign * (2.65 + 1.55 * t), ay: 1.65 * (1 - t) * (1 - t) + 0.14 * t * t * t * t * t * t + 0.25 * t * t * t * t + 0.11, az: (end * 2 - 1) * 2.9 * t,
-          bx: sign * (2.65 + 1.55 * n), by: 1.65 * (1 - n) * (1 - n) + 0.14 * n * n * n * n * n * n + 0.25 * n * n * n * n + 0.11, bz: (end * 2 - 1) * 2.9 * n, radius: 0.095, tint: {133, 144, 143}) {}
+        KoreanBeam(ax: sign * (2.65 + 1.55 * t), ay: 1.65 * (1 - t) * (1 - t) + 0.14 * t * t * t * t * t * t + 0.25 * t * t * t * t + 0.11, az: across * 2.9 * t,
+          bx: sign * (2.65 + 1.55 * n), by: 1.65 * (1 - n) * (1 - n) + 0.14 * n * n * n * n * n * n + 0.25 * n * n * n * n + 0.11, bz: across * 2.9 * n, radius: 0.095, tint: {133, 144, 143}) {}
+      }
+      { Position: {sign * 4.2, 0.46, across * 2.9}; Sphere: {radius: 0.1, segments: 12, smooth: true}; Rgb: {133, 144, 143}; PbrMaterial: {roughness: 0.8} }
+      if ornate {
+        for figure in 0..4 {
+          const t = 0.56 + figure * 0.09
+          const y = 1.65 * (1 - t) * (1 - t) + 0.14 * t * t * t * t * t * t + 0.25 * t * t * t * t + 0.11
+          {
+            Position: {sign * (2.65 + 1.55 * t), y + 0.09, across * 2.9 * t}
+            { Position: {0, 0.02, 0}; Cone: {radius: 0.05, length: 0.1, segments: 8}; Rgb: {96, 108, 110} }
+            { Position: {0, 0.09, 0}; Sphere: {radius: 0.032, segments: 8}; Rgb: {96, 108, 110} }
+          }
+        }
+        {
+          Position: {sign * 4.14, 0.12, across * 2.84}
+          { (IsA, KoreanIron); Position: {0, -0.08, 0}; Cylinder: {radius: 0.006, length: 0.16, segments: 6} }
+          { (IsA, KoreanBronze); Position: {0, -0.2, 0}; Frustum: {radius_bottom: 0.06, radius_top: 0.03, length: 0.1, segments: 12} }
+          { (IsA, KoreanBronze); Position: {0, -0.31, 0}; Scale: {1, 0.45, 0.2}; Sphere: {radius: 0.05, segments: 8} }
+        }
       }
     }
   }
   { (IsA, KoreanTileEdge); Position: {0, 1.72, 0}; Rotation: {0, 0, math.PI / 2}; Cylinder: {radius: 0.14, length: 5.5, segments: 16} }
   { (IsA, KoreanPaper); Position: {0, 1.61, 0}; Box: {5.5, 0.16, 0.22} }
+  for layer in 0..3 {
+    { Position: {0, 1.53 + layer * 0.03, 0}; Box: {5.42, 0.022, 0.42 - layer * 0.07}; Rgb: {62 + layer * 12, 72 + layer * 12, 78 + layer * 12} }
+  }
+  for cap in 0..28 {
+    { (IsA, KoreanTile); Position: {(cap - 13.5) * 0.196, 1.72, 0}; Rotation: {0, 0, math.PI / 2}; Cylinder: {radius: 0.15, length: 0.022, segments: 16} }
+  }
   for end in 0..2 {
-    { Position: {(end - 0.5) * 5.45, 1.86, 0}; Rotation: {0, 0, (end - 0.5) * 0.5}; RoundedBox: {0.17, 0.48, 0.25, 0.04}; Rgb: {110, 121, 122} }
+    const sign = end * 2 - 1
+    for piece in 0..5 {
+      const rise = piece / 4.0
+      { Position: {sign * (2.68 + rise * rise * 0.16), 1.74 + rise * 0.46, 0}; Rotation: {0, 0, -sign * (0.1 + rise * 0.55)}; RoundedBox: {0.26 - rise * 0.1, 0.16, 0.3 - rise * 0.12, 0.035}; Rgb: {96 + piece * 5, 108 + piece * 5, 110 + piece * 5} }
+    }
   }
 }
