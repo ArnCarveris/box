@@ -546,6 +546,7 @@ void BoxConsoleImport(
     ecs_vec_init_t(NULL, &con->ui.lines, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &con->typed, char, 0);
     ecs_vec_init_t(NULL, &con->spans, box_console_span_t, 0);
+    ecs_vec_init_t(NULL, &con->args, box_console_arg_t, 0);
     ecs_vec_init_t(NULL, &con->complete.candidates, box_console_candidate_t, 0);
     con->complete.active = -1;
     ecs_singleton_set(world, ConsoleHost, { con });

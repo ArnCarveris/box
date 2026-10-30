@@ -330,9 +330,15 @@ ecs_entity_t box_console_syntax_resolve(
         if (len == 2 && !strncmp(ptr, "..", 2)) {
             result = result ? ecs_get_parent(world, result) : 0;
         } else if (len && (len != 1 || ptr[0] != '.')) {
-            char *name = flecs_asprintf("%.*s", len, ptr);
+            char buf[128];
+            char *name = len < (int32_t)sizeof(buf) ? buf : ecs_os_malloc(len + 1);
+            ecs_os_memcpy(name, ptr, len);
+            name[len] = '\0';
             result = ecs_lookup_child(world, result, name);
-            ecs_os_free(name);
+            if (name != buf) {
+                ecs_os_free(name);
+            }
+
             found[0] = result != 0;
         }
 
@@ -340,26 +346,6 @@ ecs_entity_t box_console_syntax_resolve(
     }
 
 done:
-    return result;
-}
-
-/** Test whether an entity argument resolves as the shell resolves it, $ is the singleton.
- *
- * @param world The world
- * @param scope The scope of the session, 0 for the root
- * @param text The argument
- * @return Whether the argument names an entity
- */
-static bool box_console_syntax_resolves(
-    const ecs_world_t *world,
-    ecs_entity_t scope,
-    const char *text)
-{
-    bool result = !strcmp(text, "$");
-    if (!result) {
-        box_console_syntax_resolve(world, scope, text, &result);
-    }
-
     return result;
 }
 
@@ -371,6 +357,7 @@ static bool box_console_syntax_resolves(
  * @param line The command line
  * @param t The token of the argument
  * @param spans The box_console_span_t of the line
+ * @param args Receives the box_console_arg_t of an entity argument, NULL to ignore
  */
 static void box_console_syntax_arg(
     const ecs_world_t *world,
@@ -378,7 +365,8 @@ static void box_console_syntax_arg(
     const ecs_script_parameter_t *param,
     const char *line,
     const box_console_token_t *t,
-    ecs_vec_t *spans)
+    ecs_vec_t *spans,
+    ecs_vec_t *args)
 {
     const EcsPrimitive *prim = ecs_get(world, param->type, EcsPrimitive);
     char c = line[t->start];
@@ -386,8 +374,16 @@ static void box_console_syntax_arg(
         (param->type == ecs_id(ecs_id_t) && c != '(');
     if (entity) {
         char *text = box_console_syntax_text(line, t);
+        bool found = !strcmp(text, "$");
+        ecs_entity_t e = found ? 0 : box_console_syntax_resolve(world, scope, text, &found);
         box_console_syntax_add(spans, t->start, t->end,
-            box_console_syntax_resolves(world, scope, text) ? BoxSyntaxEntity : BoxSyntaxMissing);
+            found ? BoxSyntaxEntity : BoxSyntaxMissing);
+        if (args && strcmp(text, "$")) {
+            *ecs_vec_append_t(NULL, args, box_console_arg_t) = (box_console_arg_t){
+                .text = text, .entity = e, .found = found };
+            text = NULL;
+        }
+
         ecs_os_free(text);
     } else if (t->quoted) {
         box_console_syntax_add(spans, t->start, t->end, BoxSyntaxString);
@@ -429,6 +425,7 @@ ecs_entity_t box_console_syntax_command(
  * @param tokens The tokens of the line
  * @param count Number of tokens
  * @param spans The box_console_span_t of the line
+ * @param args Receives the box_console_arg_t of the entity arguments, NULL to ignore
  */
 static void box_console_syntax_call(
     ecs_world_t *world,
@@ -436,7 +433,8 @@ static void box_console_syntax_call(
     const char *line,
     const box_console_token_t *tokens,
     int32_t count,
-    ecs_vec_t *spans)
+    ecs_vec_t *spans,
+    ecs_vec_t *args)
 {
     char *name = box_console_syntax_unquote(line, &tokens[0]);
     ecs_entity_t cmd = box_console_syntax_command(world, name);
@@ -457,7 +455,8 @@ static void box_console_syntax_call(
         if (i > argc) {
             box_console_syntax_add(spans, tokens[i].start, tokens[i].end, BoxSyntaxExtra);
         } else {
-            box_console_syntax_arg(world, scope, &params[i - 1], line, &tokens[i], spans);
+            box_console_syntax_arg(
+                world, scope, &params[i - 1], line, &tokens[i], spans, args);
         }
     }
 
@@ -469,11 +468,13 @@ void box_console_syntax(
     ecs_world_t *world,
     box_console_t *con,
     const char *line,
-    ecs_vec_t *spans)
+    ecs_vec_t *spans,
+    ecs_vec_t *args)
 {
     int32_t i, count = box_console_syntax_tokens(line, NULL, 0);
     box_console_token_t *tokens = NULL;
     ecs_vec_clear(spans);
+    box_console_syntax_args_clear(args);
     if (!count) {
         goto done;
     }
@@ -488,11 +489,42 @@ void box_console_syntax(
             box_console_syntax_add(spans, tokens[i].start, tokens[i].end, BoxSyntaxExtra);
         }
     } else {
-        box_console_syntax_call(world, con, line, tokens, count, spans);
+        box_console_syntax_call(world, con, line, tokens, count, spans, args);
     }
 
 done:
     ecs_os_free(tokens);
+}
+
+void box_console_syntax_args_clear(
+    ecs_vec_t *args)
+{
+    int32_t i, count = args ? ecs_vec_count(args) : 0;
+    box_console_arg_t *a = count ? ecs_vec_first_t(args, box_console_arg_t) : NULL;
+    for (i = 0; i < count; i ++) {
+        ecs_os_free(a[i].text);
+    }
+
+    if (args) {
+        ecs_vec_clear(args);
+    }
+}
+
+bool box_console_syntax_stale(
+    const ecs_world_t *world,
+    const box_console_t *con)
+{
+    int32_t i, count = ecs_vec_count(&con->args);
+    const box_console_arg_t *a = count ? ecs_vec_first_t(&con->args, box_console_arg_t) : NULL;
+    ecs_entity_t scope = count ? box_console_session_scope(world, con) : 0;
+    bool result = false;
+    for (i = 0; i < count && !result; i ++) {
+        bool found;
+        ecs_entity_t e = box_console_syntax_resolve(world, scope, a[i].text, &found);
+        result = found != a[i].found || e != a[i].entity;
+    }
+
+    return result;
 }
 
 char* box_console_syntax_token(

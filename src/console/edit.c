@@ -396,7 +396,7 @@ static void box_console_interrupt(
     char *prompt;
     ecs_vec_init_t(NULL, &spans, box_console_span_t, 0);
     ecs_vec_init_t(NULL, &prompt_spans, box_console_span_t, 0);
-    box_console_syntax(world, con, con->line, &spans);
+    box_console_syntax(world, con, con->line, &spans, NULL);
     prompt = box_console_prompt(world, con, &prompt_spans);
     box_console_echo(con, prompt, &prompt_spans, con->line, &spans, BOX_CONSOLE_INTERRUPT);
     ecs_vec_fini_t(NULL, &spans, box_console_span_t);
@@ -655,7 +655,7 @@ char* box_console_exec(
     box_console_out_init(&out);
     ecs_vec_init_t(NULL, &spans, box_console_span_t, 0);
     ecs_vec_init_t(NULL, &prompt_spans, box_console_span_t, 0);
-    box_console_syntax(world, con, line, &spans);
+    box_console_syntax(world, con, line, &spans, NULL);
     prompt = box_console_prompt(world, con, &prompt_spans);
     word = box_console_word(&p, &len);
     topic = box_console_word(&p, &topic_len);
@@ -963,6 +963,8 @@ void box_console_edit_fini(
     ecs_vec_fini_t(NULL, &con->ui.lines, ecs_entity_t);
     ecs_vec_fini_t(NULL, &con->typed, char);
     ecs_vec_fini_t(NULL, &con->spans, box_console_span_t);
+    box_console_syntax_args_clear(&con->args);
+    ecs_vec_fini_t(NULL, &con->args, box_console_arg_t);
     box_console_complete_close(con);
     ecs_vec_fini_t(NULL, &con->complete.candidates, box_console_candidate_t);
     ecs_os_free(con->colored);
