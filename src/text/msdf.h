@@ -253,9 +253,11 @@ float box_msdf_median3(
 float box_msdf_median(
     const float *v);
 
-/** Signed distance from a point to the nearest of a set of edges.
+/** Signed distance from a point to the nearest of a set of edges. Edges whose box is farther
+ * than the nearest edge so far are skipped, so the set should start with the likely nearest.
  *
  * @param edges The edges of the shape
+ * @param prep The constants of the edges of the shape
  * @param indices Indices of the edges of the set
  * @param count Number of edges of the set
  * @param p The point, in font units
@@ -263,8 +265,20 @@ float box_msdf_median(
  */
 double box_msdf_edges_distance(
     const box_msdf_edge_t *edges,
+    const box_msdf_prep_t *prep,
     const int32_t *indices,
     int32_t count,
+    box_msdf_point_t p);
+
+/** Check whether a point is inside the outline by the nonzero fill, as the sign of the field
+ * of a texel at the point would take it.
+ *
+ * @param shape The finished shape
+ * @param p The point, in font units
+ * @return Whether the point is inside
+ */
+bool box_msdf_inside(
+    const box_msdf_shape_t *shape,
     box_msdf_point_t p);
 
 /** Correct the artifacts of the field after msdfgen's MSDFErrorCorrection without a distance

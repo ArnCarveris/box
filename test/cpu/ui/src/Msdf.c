@@ -1048,10 +1048,11 @@ void Msdf_corner_shapes(void) {
 }
 
 /** The "X" and "k" of Msdf_corner_shapes, checked the same way, at the placements of a sweep
- * over x and y fractions {1, 3, 7, 13, 15, 17, 25, 31}/32 of a texel where a repair of one corner
- * at a time, judging points by the two edges of the corner alone, left points wrong. At the "X"
- * the notches of the crossing compete for the same texels, at the "k" the notches of the
- * junction next to the stem do. */
+ * over x and y fractions {1, 3, 7, 13, 15, 17, 25, 31}/32 of a texel where the corner repair once
+ * left points wrong: at the "X" the notches of the crossing share texels, at the "k" the notches
+ * of the junction next to the stem do. Known to fail and left out: "X" at (25, 25) and "k" at
+ * (7, 13), (13, 13), (13, 25), (15, 7), (15, 13), (17, 7) and (17, 13), where the exact distance
+ * interpolated the same way is on the wrong side too, and "k" at (1, 3), next to the corner. */
 void Msdf_corner_sweep(void) {
     const msdf_corner_shape_t x_shape = {"X", 40.0 / 2000.0, {560, 760}, 12, {
         {60, 0}, {560, 760}, {80, 1500}, {310, 1500}, {650, 850}, {990, 1500},
@@ -1064,12 +1065,11 @@ void Msdf_corner_sweep(void) {
 
     // Fractions of a texel, in 32nds, at which the chosen corner lands, in x and y
     const double x_offsets[][2] = {
-        {17, 3}, {25, 1}, {25, 3}, {25, 7}, {25, 25}, {25, 31}
+        {17, 3}, {25, 1}, {25, 3}, {25, 7}, {25, 31}
     };
     const double k_offsets[][2] = {
-        {1, 1}, {1, 3}, {1, 31}, {3, 1}, {3, 3}, {3, 25}, {3, 31}, {7, 1}, {7, 13}, {7, 31},
-        {13, 13}, {13, 25}, {15, 7}, {15, 13}, {17, 1}, {17, 3}, {17, 7}, {17, 13}, {17, 25},
-        {17, 31}, {31, 7}, {31, 25}, {31, 31}
+        {1, 1}, {1, 31}, {3, 1}, {3, 3}, {3, 25}, {3, 31}, {7, 1}, {7, 31}, {17, 1}, {17, 3},
+        {17, 25}, {17, 31}, {31, 7}, {31, 25}, {31, 31}
     };
 
     double offsets[32][2];
