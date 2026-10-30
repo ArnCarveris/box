@@ -1343,8 +1343,10 @@ void Console_trailing_spaces_move_cursor(void) {
     // A word typed after them starts the next row there
     console_type(world, "y");
     test_int(box_text_line(world, line, 0, NULL, NULL), 2);
-    test_int(console_check_cursor(world, spaces), 1);
-    test_flt(ecs_get(world, cursor, LayoutItem)->x, x);
+    TextCaret word;
+    test_assert(box_text_caret(world, line, CONSOLE_PROMPT_LEN + spaces, &word));
+    test_int(word.line, 1);
+    test_flt(word.x + ecs_get(world, line, TextBounds)->width * 0.5f, x);
     test_int(console_check_cursor(world, spaces + 1), 1);
 
     // Back to the spaces, the line ran with them does not gain an empty row in the scrollback

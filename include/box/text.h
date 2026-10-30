@@ -178,7 +178,8 @@ int32_t box_text_line(
  * and between words at Text.width, inside a word wider than the width, with its hang indent.
  *
  * Glyphs are only measured, not added to the atlas. An empty string has one line. Spaces at the
- * end that pass the width add the empty line of the caret after them, see Text.
+ * end that pass the width add the empty line of the caret after them, see Text; spaces before a
+ * newline or a word add none, the carets between spaces stay on their line past the width.
  *
  * @param world The world
  * @param text The Text, its font loaded when no other Text requested it before
