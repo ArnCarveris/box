@@ -703,8 +703,8 @@ void Material_clear_coat_defaults(void) {
     ecs_fini(world);
 }
 
-/** The record holds the clear coat as two unorm16 clamped to 0..1 and 0 without one, and a
- * transition of another component encodes the record again with it. */
+/** The record holds the clear coat as two unorm16 clamped to 0..1 and 0 without one or with a
+ * strength of 0, and a transition of another component encodes the record again with it. */
 void Material_clear_coat_pack(void) {
     // materials/pbr
     box_render_material_t record, plain;
@@ -731,7 +731,11 @@ void Material_clear_coat_pack(void) {
 
     ClearCoat high = { .strength = -1, .roughness = 3 };
     box_draws_material_pack(&record, &(box_draw_material_t){ .clear_coat = &high, .fade = 1 });
-    test_uint(record.clear_coat, 0xFFFFu << 16);
+    test_uint(record.clear_coat, 0);
+
+    ClearCoat bare = { .strength = 0, .roughness = 0.5f };
+    box_draws_material_pack(&record, &(box_draw_material_t){ .clear_coat = &bare, .fade = 1 });
+    test_uint(record.clear_coat, 0);
 
     box_draws_material_pack(&record, &(box_draw_material_t){ .clear_coat = &half, .fade = 1 });
     record.clear_coat = 0;

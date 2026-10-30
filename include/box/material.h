@@ -124,6 +124,9 @@ ECS_STRUCT(PbrMaterial, {
  * A dielectric of f0 0.04 on the geometric normal, not the normal map: direct light adds its GGX
  * lobe times Fc = F(l.h) * strength over 1 - Fc of the base, indirect light its reflection by its
  * split sum albedo over the rest. Emission is not attenuated; an unlit view ignores the coat.
+ *
+ * Transitionable (Transition): strength and roughness interpolate linearly by the timing
+ * function, through a strength of 0 too; adding or removing ClearCoat does not animate.
  */
 ECS_STRUCT(ClearCoat, {
     float strength;  /**< 0 no coat to 1 full coat */

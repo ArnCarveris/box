@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 178">
+<rect width="1024" height="178" fill="#164f38"/>
+<rect x="6" y="6" width="1012" height="166" fill="none" stroke="#e2ac38" stroke-width="5"/>
+<rect x="16" y="16" width="992" height="146" fill="none" stroke="#962020" stroke-width="5"/>
+<g fill="#962020" stroke="#e2ac38" stroke-width="3">
+<rect x="28" y="28" width="150" height="122" rx="10"/>
+<rect x="846" y="28" width="150" height="122" rx="10"/>
+</g>
+<g transform="translate(103 89)">
+<rect x="-46" y="-8" width="92" height="42" fill="#e6d8b4"/>
+<rect x="-46" y="-26" width="18" height="24" fill="#e6d8b4"/><rect x="28" y="-26" width="18" height="24" fill="#e6d8b4"/>
+<rect x="-14" y="-40" width="28" height="40" fill="#e6d8b4"/>
+<polygon points="-50,-26 -37,-44 -24,-26" fill="#2b5c94"/><polygon points="24,-26 37,-44 50,-26" fill="#2b5c94"/><polygon points="-18,-40 0,-58 18,-40" fill="#2b5c94"/>
+<rect x="-8" y="10" width="16" height="24" rx="8" fill="#3a2a1c"/>
+<path d="M-60 34 h120 v8 h-120z" fill="#3a7d48"/>
+</g>
+<g id="rose">
+<g transform="translate(921 89)">
+<circle r="36" fill="#d64a4a"/><circle r="24" cx="-5" cy="-5" fill="#ee7a6e"/><circle r="12" cx="-3" cy="-3" fill="#f6b0a0"/>
+<ellipse cx="-46" cy="30" rx="16" ry="8" fill="#3a7d48" transform="rotate(-30 -46 30)"/>
+<ellipse cx="46" cy="30" rx="16" ry="8" fill="#3a7d48" transform="rotate(30 46 30)"/>
+<circle cx="-46" cy="-30" r="12" fill="#e8c648"/><circle cx="46" cy="-30" r="12" fill="#f0efe0"/>
+</g>
+</g>
+<text x="512" y="108" font-family="serif" font-weight="bold" font-size="56" letter-spacing="7" text-anchor="middle" fill="#e2ac38" stroke="#7c1414" stroke-width="1.5">KINGFISHER</text>
+<text x="512" y="146" font-family="serif" font-size="24" letter-spacing="7" text-anchor="middle" fill="#efe6cc">GRAND UNION CARRYING CO</text>
+</svg>

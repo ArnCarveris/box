@@ -205,7 +205,7 @@ void box_cmd_render_size(
  * @param clearing Only consider views that clear
  * @return The view entity, 0 when there is none
  */
-static ecs_entity_t box_cmd_render_view(
+ecs_entity_t box_cmd_render_view(
     ecs_world_t *world,
     ecs_entity_t camera,
     ecs_entity_t root,
