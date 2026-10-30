@@ -405,6 +405,8 @@
                     "resize_rewraps",
                     "rewrap_trims_scrollback",
                     "rewrap_trim_waits_for_font",
+                    "rewrap_trim_font_failed",
+                    "rewrap_font_size_trim_waits_for_font",
                     "trailing_spaces_move_cursor",
                     "prompt_root_and_scope",
                     "lines_keep_scope",
