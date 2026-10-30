@@ -65,7 +65,7 @@ BUDGET_GROWTH = 1.3
 
 
 def key(app, name):
-    app.exec("key.press %s" % name)
+    app.exec("key_press %s" % name)
     app.wait_input()
 
 
@@ -112,7 +112,7 @@ def placed(app):
 
 
 def inventory(app):
-    slots = app.get(INVENTORY, "OreInventory")["slots"]
+    slots = app.get(INVENTORY, "oreelse.OreInventory")["slots"]
     return {entity(s["item"]): s["amount"] for s in slots if entity(s["item"])}
 
 
@@ -166,15 +166,15 @@ def check_base(app):
     production = WATTS["SolarPanel"] * len(by_prefab["SolarPanel"])
     app.check(MARGIN * raw <= production < MARGIN * raw + 4 * WATTS["SolarPanel"],
               "%d W of panels for %d W of consumers" % (production, raw))
-    app.wait_for("get %s OrePowerState.production" % POWER,
+    app.wait_for("get %s oreelse.OrePowerState.production" % POWER,
                  lambda out: float(out) > 0, what="the production of the panels")
-    power = app.get(POWER, "OrePowerState")
+    power = app.get(POWER, "oreelse.OrePowerState")
     app.check(abs(power["production"] - production) < 1e-3 and not power["blackout"] and
               power["production"] >= MARGIN * raw - 1e-3,
               "the power is %s for %d W of consumers" % (power, raw))
 
     # The astronaut on the free tile nearest to the center
-    pos = app.get(PLAYER, "Position")
+    pos = app.get(PLAYER, "box.transform.Position")
     tile = (round((pos["z"] - Z0) / TILE), round((pos["x"] - X0) / TILE))
     free = [(r, c) for r in range(ROWS) for c in range(ROWS)
             if (r, c) not in tiles and (r, c) not in deposits]
@@ -211,7 +211,7 @@ def begin(app):
     """Set up, wait for the game to play and pause it."""
     setup(app)
     app.wait_for(STATE % "Playing", "true")
-    app.wait_for("get %s OrePowerState.production" % POWER,
+    app.wait_for("get %s oreelse.OrePowerState.production" % POWER,
                  lambda out: float(out) > 0, what="the power of the base")
     set_state(app, "Paused")
 
@@ -249,7 +249,7 @@ def test_next_wave(app):
 
 def test_minutes(app):
     # The case's app quits first: two stress test apps at once outgrow the memory of a test box
-    app.expect("logs error", "")
+    app.expect("logs error", '""')
     app.quit()
     args = [a for a in app.args if a != "--stresstest"] + ["--stresstest=45"]
     log = app.log[:-len(".log")] + ".minutes.log" if app.log else None
@@ -259,7 +259,7 @@ def test_minutes(app):
         check_clock(other, 45)
         other.check(waves(other)["wave"] == 52, "the wave counter is %d at 45 minutes, not 52" %
                     waves(other)["wave"])
-        other.expect("logs error", "")
+        other.expect("logs error", '""')
         other.quit()
 
 
@@ -270,7 +270,7 @@ def test_restart(app):
     set_state(app, "Lost")
     key(app, "R")
     app.wait_for(STATE % "Playing", "true")
-    app.wait_for("get %s OrePowerState.production" % POWER,
+    app.wait_for("get %s oreelse.OrePowerState.production" % POWER,
                  lambda out: float(out) > 0, what="the power of the new base")
     set_state(app, "Paused")
     after = check_base(app)

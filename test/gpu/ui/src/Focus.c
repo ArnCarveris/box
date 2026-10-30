@@ -47,7 +47,7 @@ static void focus_run(
     ecs_entity_t s,
     const char *cmd)
 {
-    ecs_os_free(box_terminal_run(world, s, cmd, NULL));
+    ecs_os_free(box_command_run(world, s, cmd, NULL));
     while (box_input_pending(world)) {
         ecs_progress(world, 0);
     }
@@ -70,7 +70,7 @@ static int32_t focus_presses(
     ecs_entity_t action)
 {
     int32_t i, result = 0;
-    ecs_os_free(box_terminal_run(world, s, cmd, NULL));
+    ecs_os_free(box_command_run(world, s, cmd, NULL));
     for (i = 0; i < 4; i ++) {
         ecs_progress(world, 0);
         result += ecs_get(world, action, ActionState)->pressed;
@@ -117,20 +117,20 @@ void Focus_console_over_key_capture(void) {
         "  }\n"
         "}\n"
         "keys { Keys: {} }\n", true);
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_entity_t field = ecs_lookup(world, "hud.field");
     ecs_entity_t walk = ecs_lookup(world, "walk");
     const int32_t *downs = ecs_get_id(world, ecs_lookup(world, "keys"),
         ecs_lookup(world, "Keys.mut"));
     test_assert(downs != NULL);
     test_bool(box_ui_focus(world, field), true);
-    test_int(focus_presses(world, s, "key.press W", walk), 0);
+    test_int(focus_presses(world, s, "key_press W", walk), 0);
     downs = ecs_get_id(world, ecs_lookup(world, "keys"), ecs_lookup(world, "Keys.mut"));
     test_int(*downs, 1);
 
-    focus_run(world, s, "key.type `");
+    focus_run(world, s, "key_type `");
     test_bool(ecs_singleton_get(world, Console)->open, true);
-    focus_run(world, s, "key.type ls");
+    focus_run(world, s, "key_type ls");
     const Text *before = ecs_get(world, ecs_lookup(world, FOCUS_CONSOLE_BEFORE), Text);
     test_assert(before != NULL);
     test_str(before->value, "ls");
@@ -138,9 +138,9 @@ void Focus_console_over_key_capture(void) {
     test_int(*downs, 1);
     test_uint(ecs_singleton_get(world, FocusStatus)->focused, field);
 
-    focus_run(world, s, "key.press Escape");
+    focus_run(world, s, "key_press Escape");
     test_bool(ecs_singleton_get(world, Console)->open, false);
-    test_int(focus_presses(world, s, "key.press W", walk), 0);
+    test_int(focus_presses(world, s, "key_press W", walk), 0);
     downs = ecs_get_id(world, ecs_lookup(world, "keys"), ecs_lookup(world, "Keys.mut"));
     test_int(*downs, 2);
 
@@ -191,12 +191,12 @@ void Focus_render_to_texture(void) {
         "  Quad: {4, 2}\n"
         "  PbrTextures: {albedo: screen_texture}\n"
         "}\n", false);
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_entity_t button = ecs_lookup(world, "screen_ui.button");
-    focus_run(world, s, "mouse.click left [584, 360]");
+    focus_run(world, s, "mouse_click left [584, 360]");
     test_uint(ecs_singleton_get(world, FocusStatus)->focused, button);
     test_bool(ecs_has(world, button, Focused), true);
-    focus_run(world, s, "mouse.click left [702, 360]");
+    focus_run(world, s, "mouse_click left [702, 360]");
     test_uint(ecs_singleton_get(world, FocusStatus)->focused, 0);
 
     ecs_fini(world);
@@ -251,8 +251,8 @@ void Focus_tab_views_of_focused_surface(void) {
         "other_view {\n"
         "  View: {camera: other_ui.camera}\n"
         "}\n", false);
-    ecs_entity_t s = box_terminal_new(world);
-    focus_run(world, s, "key.press Tab");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    focus_run(world, s, "key_press Tab");
     test_uint(ecs_singleton_get(world, FocusStatus)->focused,
         ecs_lookup(world, "game_ui.form.ok"));
     test_bool(ecs_singleton_get(world, FocusStatus)->visible, true);

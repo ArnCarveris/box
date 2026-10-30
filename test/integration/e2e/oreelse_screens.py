@@ -89,7 +89,7 @@ def check_controls(app, screen):
 
 
 def move(app, cursor):
-    app.exec("mouse.move [%g, %g]" % cursor)
+    app.exec("mouse_move [%g, %g]" % cursor)
     app.wait_input()
     app.wait_frames(SETTLE)
 
@@ -164,20 +164,20 @@ def test_quality_button(app):
     app.check(color(app, QUALITY + ".face") == FACE, "the idle face is %s" %
               (color(app, QUALITY + ".face"),))
     move(app, ON_QUALITY)
-    app.wait_for("get %s.face Rgb" % QUALITY,
+    app.wait_for("get %s.face box.material.Rgb" % QUALITY,
                  lambda out: color(app, QUALITY + ".face") == FACE_HOVER,
                  what="the face of the button under the cursor")
 
     # Every click cycles the tier down and the view follows; the game stays paused
     for tier, label in CYCLE:
-        app.exec("mouse.click left")
+        app.exec("mouse_click left")
         app.wait_input()
         check_tier(app, tier)
         wait_shown(app, QUALITY + ".value", label)
         app.expect(STATE % "Paused", "true")
 
     move(app, OFF_QUALITY)
-    app.wait_for("get %s.face Rgb" % QUALITY,
+    app.wait_for("get %s.face box.material.Rgb" % QUALITY,
                  lambda out: color(app, QUALITY + ".face") == FACE,
                  what="the face of the button after the cursor left")
 

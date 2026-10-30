@@ -27,8 +27,9 @@ ARGS = ["--seed", str(SEED), "--fps", "20"]
 FPS = round(1 / float(DELTA_TIME))
 DT = float(DELTA_TIME)
 
-STATE = "has oreelse.OreGameState (oreelse.OreGameState, oreelse.OreGameState.%s)"
-CLOCK = "get oreelse.OreClock OreClock.elapsed"
+STATE = ("eval oreelse.OreGameState.has(flecs.script.core.pair("
+         "oreelse.OreGameState,oreelse.OreGameState.%s))")
+CLOCK = "get oreelse.OreClock oreelse.OreClock.elapsed"
 WAVES = "oreelse.OreWaveState"
 INVENTORY = "oreelse.OreInventory"
 POWER = "oreelse.OrePowerState"
@@ -117,14 +118,14 @@ def set_state(app, state):
 
 
 def resize(app, width, height):
-    app.exec("set window Surface {width: %d, height: %d}" % (width, height))
-    app.wait_for("get window SurfaceStatus.height", str(height))
+    app.exec("set window box.surface.Surface {width: %d, height: %d}" % (width, height))
+    app.wait_for("get window box.surface.SurfaceStatus.height", str(height))
 
 
 def setup(app):
     """Shrink the window and drop the shadows of the world view, so the software renderer keeps
     up."""
-    app.exec("set main_view View.shadows.enabled false")
+    app.exec("set main_view box.view.View.shadows.enabled false")
     resize(app, 320, 180)
 
 
@@ -132,7 +133,7 @@ def start(app):
     """Set up, leave the title screen with a key press and hold the waves off."""
     setup(app)
     app.expect(STATE % "Title", "true")
-    app.exec("key.press Space")
+    app.exec("key_press Space")
     app.wait_input()
     app.wait_for(STATE % "Playing", "true")
     put(app, WAVES, WAVES, {"timer": 100000, "left": 0, "spawn": [0, 0, 0, 0]})
@@ -149,7 +150,7 @@ def clock(app):
 
 def inventory(app):
     """The slots of the inventory in order: (item, amount), None for a free slot."""
-    slots = app.get(INVENTORY, "OreInventory")["slots"]
+    slots = app.get(INVENTORY, "oreelse.OreInventory")["slots"]
     return [(entity(s["item"]), s["amount"]) if entity(s["item"]) else None for s in slots]
 
 
@@ -165,23 +166,16 @@ def set_inventory(app, stacks):
     slots = [{"item": s[0], "amount": s[1]} for s in stacks]
     slots += [{"item": 0, "amount": 0}] * (SLOTS - len(slots))
     put(app, INVENTORY, INVENTORY, {"slots": slots})
-    app.wait_for("get %s OreInventory.slots[0].amount" % INVENTORY,
+    app.wait_for("get %s oreelse.OreInventory.slots[0].amount" % INVENTORY,
                  str(stacks[0][1]) if stacks else "0")
 
 
 def rows_of(app, expr):
     """Run a query of the port: the path and the value of the first field of every result."""
-    app.exec("query found %s" % expr)
-    app.exec("iter found")
     result = {}
-    done = False
-    while not done:
-        for line in app.exec("next 1000").splitlines():
-            done = done or line == "(end)"
-            if not line.strip() or line == "(end)":
-                continue
-            parts = line.split(" ", 1)
-            result[parts[0]] = parse_value(parts[1]) if len(parts) > 1 else None
+    for row in parse_value(app.exec('query "%s"' % expr)):
+        fields = row["fields"]
+        result[row["entity"]] = next(iter(fields[0]["value"].values())) if fields else None
     return result
 
 
@@ -198,7 +192,7 @@ def place(app, name, prefab, row, col, w=1, h=1):
     run_script(app, "using box.transform\n%s : %s {\n  Position: {%g, 0, %g}\n"
                     "  oreelse.OreBuilding: {row: %d, col: %d}\n}" %
                (name, prefab, x, z, row, col))
-    app.wait_for("has %s oreelse.OreBuilding" % name, "true")
+    app.wait_for("eval %s.has(oreelse.OreBuilding)" % name, "true")
 
 
 def place_pad(app, name, row, col):
@@ -214,11 +208,11 @@ def place_wall(app, name, row, col, hp):
     """Place a wall at hp of its hit points."""
     place(app, name, "Wall", row, col)
     put(app, name, "oreelse.OreHealth", {"value": hp})
-    app.wait_for("get %s OreHealth.value" % name, lambda out: float(out) == hp)
+    app.wait_for("get %s oreelse.OreHealth.value" % name, lambda out: float(out) == hp)
 
 
 def health(app, path):
-    return app.get(path, "OreHealth")["value"]
+    return app.get(path, "oreelse.OreHealth")["value"]
 
 
 def drones(app):
@@ -276,7 +270,7 @@ def measure(app, value, frames=MEASURE_FRAMES):
 
 
 def hover(app):
-    return app.get("oreelse.OreHover", "OreHover")
+    return app.get("oreelse.OreHover", "oreelse.OreHover")
 
 
 def point(h):
@@ -285,13 +279,13 @@ def point(h):
 
 
 def move_cursor(app, cursor):
-    app.exec("mouse.move [%g, %g]" % cursor)
+    app.exec("mouse_move [%g, %g]" % cursor)
     app.wait_input()
     app.wait_frames(SETTLE)
 
 
 def place_player(app, x, z):
-    app.exec("set %s Position {%g, 0, %g}" % (PLAYER, x, z))
+    app.exec("set %s box.transform.Position {%g, 0, %g}" % (PLAYER, x, z))
     app.wait_frames(SETTLE)
 
 
@@ -299,7 +293,7 @@ def aim_tile(app, row, col, cursor=CENTER):
     """Place the astronaut so that a cursor position (the center of the window) hovers the center
     of a tile."""
     move_cursor(app, cursor)
-    p = app.get(PLAYER, "Position")
+    p = app.get(PLAYER, "box.transform.Position")
     hx, hz = point(hover(app))
     x, z = tile_point(row, col)
     place_player(app, x - (hx - p["x"]), z - (hz - p["z"]))
@@ -309,7 +303,7 @@ def aim_tile(app, row, col, cursor=CENTER):
 
 
 def button(app, name, down):
-    app.exec("mouse.button %s %s" % (name, "true" if down else "false"))
+    app.exec("mouse_button %s %s" % (name, "true" if down else "false"))
     app.wait_input()
 
 
@@ -325,13 +319,14 @@ def test_pad_spawns_drones(app):
         app.check(d["state"] == "Docked" and not d["target"],
                   "a new drone is %s with the target %s" % (d["state"], d["target"]))
         a = (d["bay"] + 0.5) * 2 * math.pi / DRONES
-        p = app.get(path, "Position")
+        p = app.get(path, "box.transform.Position")
         want = (math.sin(a) * BAY_RADIUS, DOCK, math.cos(a) * BAY_RADIUS)
         app.check(all(abs(g - w) < 1e-4 for g, w in zip((p["x"], p["y"], p["z"]), want)),
                   "drone %d is docked at %s, not %s" % (d["bay"], p, want))
-        app.check(app.exec("has %s oreelse.OreHealth" % path) == "false",
+        app.check(app.exec("eval %s.has(oreelse.OreHealth)" % path) == "false",
                   "the drone %s has hit points" % path)
-        app.check(app.exec("has %s (IsA, RepairDrone)" % path) == "true",
+        app.check(app.exec("eval %s.has(flecs.script.core.pair(flecs.core.IsA,RepairDrone))" %
+                           path) == "true",
                   "the drone %s is no RepairDrone" % path)
 
     # Nothing to repair: they stay docked
@@ -342,7 +337,7 @@ def test_pad_spawns_drones(app):
     resize(app, 640, 360)
     aim_tile(app, 4, 4, WIDE_CENTER)
     button(app, "right", True)
-    app.wait_for("get %s OreInventory" % INVENTORY,
+    app.wait_for("get %s oreelse.OreInventory" % INVENTORY,
                  lambda out: any(s["item"] == "DronePad" and s["amount"] == 1
                                  for s in parse_value(out)["slots"]),
                  frames=round((DOZE_TIME + SWING_SLACK) * FPS), what="the pad demolished")
@@ -385,11 +380,11 @@ def test_repair_wall(app):
     rate = gained / played
     app.check(abs(rate - REPAIR) <= REPAIR * RATE_TOLERANCE,
               "the drone welds %.3f HP/s, not %g" % (rate, REPAIR))
-    p = app.get(repairing[0], "Position")
+    p = app.get(repairing[0], "box.transform.Position")
     app.check(abs(p["y"] - CRUISE) < 0.5, "the welding drone flies at %g" % p["y"])
 
     # Full after (300 - hp0) / 14 s, for 10 Iron
-    app.wait_for("get wall_a OreHealth.value", lambda out: float(out) >= WALL_HP,
+    app.wait_for("get wall_a oreelse.OreHealth.value", lambda out: float(out) >= WALL_HP,
                  frames=round(((WALL_HP - hp0) / REPAIR + 2) * FPS), what="the wall repaired")
     took = clock(app) - t0
     want = (WALL_HP - hp0) / REPAIR
@@ -511,7 +506,7 @@ def test_nearest_far(app):
 
     # It crosses the map and welds the wall
     hp = health(app, "wall_near")
-    app.wait_for("get wall_near OreHealth.value", lambda out: float(out) > hp + 1,
+    app.wait_for("get wall_near oreelse.OreHealth.value", lambda out: float(out) > hp + 1,
                  frames=flight_frames(near), what="the drone welding the near wall")
 
 
@@ -533,7 +528,7 @@ def test_no_iron(app):
 
     # With Iron it resumes and finishes the wall
     set_inventory(app, [(IRON, 100)])
-    app.wait_for("get wall_a OreHealth.value", lambda out: float(out) >= WALL_HP,
+    app.wait_for("get wall_a oreelse.OreHealth.value", lambda out: float(out) >= WALL_HP,
                  frames=flight_frames(14) + round((WALL_HP - hp) / REPAIR * FPS),
                  what="the wall repaired")
     # The credit is per drone: a drone other than the first may weld the rest, short of 10 HP
@@ -556,7 +551,7 @@ def test_blackout(app):
 
     # A blackout sends it home
     app.exec("rm pad_a_panel")
-    app.wait_for("get %s OrePowerState.blackout" % POWER, "true", what="the blackout")
+    app.wait_for("get %s oreelse.OrePowerState.blackout" % POWER, "true", what="the blackout")
     wait_until(app, lambda: all_docked(app, "pad_a"), flight_frames(14),
                "the drones docked in the blackout")
     hp = health(app, "wall_a")
@@ -568,6 +563,6 @@ def test_blackout(app):
 
     # The power back, it resumes welding
     place(app, "panel_b", "SolarPanel", 3, 5)
-    app.wait_for("get %s OrePowerState.blackout" % POWER, "false", what="the power back")
-    app.wait_for("get wall_a OreHealth.value", lambda out: float(out) > hp + 1,
+    app.wait_for("get %s oreelse.OrePowerState.blackout" % POWER, "false", what="the power back")
+    app.wait_for("get wall_a oreelse.OreHealth.value", lambda out: float(out) > hp + 1,
                  frames=flight_frames(14), what="the drone welding again")

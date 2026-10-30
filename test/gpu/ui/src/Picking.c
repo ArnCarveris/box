@@ -64,14 +64,14 @@ void Picking_screen_ui_over_3d(void) {
     test_assert(mut != 0);
     ecs_progress(world, 0);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [640, 360]", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_click left [640, 360]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, button, mut))->clicks, 1);
     test_int(((const Mut*)ecs_get_id(world, cube, mut))->clicks, 0);
 
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [690, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_click left [690, 360]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, button, mut))->clicks, 1);
@@ -153,8 +153,8 @@ void Picking_stacked_views_fall_through(void) {
     ecs_entity_t item = ecs_lookup(world, "menu.item");
     ecs_progress(world, 0);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [640, 360]", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_click left [640, 360]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, cube, mut))->clicks, 1);
@@ -166,7 +166,7 @@ void Picking_stacked_views_fall_through(void) {
     test_uint(status->hit, panel);
     test_uint(status->hit_view, ecs_lookup(world, "hud_view"));
 
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [940, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_click left [940, 360]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, item, mut))->clicks, 1);
@@ -235,8 +235,8 @@ void Picking_reverse_view_order(void) {
     ecs_entity_t second = ecs_lookup(world, "second.button");
     ecs_progress(world, 0);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [640, 360]", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_click left [640, 360]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, second, mut))->clicks, 1);
@@ -246,7 +246,7 @@ void Picking_reverse_view_order(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = ecs_lookup(world, "second.camera")});
     ecs_progress(world, 0);
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [640, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_click left [640, 360]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, second, mut))->clicks, 2);
@@ -254,7 +254,7 @@ void Picking_reverse_view_order(void) {
 
     ecs_delete(world, view);
     ecs_progress(world, 0);
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [640, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_click left [640, 360]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, second, mut))->clicks, 2);
@@ -322,15 +322,15 @@ void Picking_world_panel_occluded(void) {
     ecs_entity_t listener = ecs_lookup(world, "listener");
     ecs_progress(world, 0);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [578, 360]", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_click left [578, 360]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, panel, mut))->clicks, 0);
     test_int(((const Mut*)ecs_get_id(world, listener, screen_mut))->clicks, 1);
     test_uint(ecs_singleton_get(world, PickStatus)->hit, ecs_lookup(world, "blocker"));
 
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [702, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_click left [702, 360]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, panel, mut))->clicks, 1);
@@ -404,14 +404,14 @@ void Picking_render_to_texture(void) {
     ecs_entity_t button = ecs_lookup(world, "screen_ui.button");
     ecs_progress(world, 0);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [702, 360]", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_click left [702, 360]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, button, mut))->clicks, 0);
     test_uint(ecs_singleton_get(world, PickStatus)->hit, ecs_lookup(world, "quad"));
 
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [584, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_click left [584, 360]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     const Mut *m = ecs_get_id(world, button, mut);
@@ -478,20 +478,20 @@ void Picking_nameplate(void) {
     ecs_entity_t target = ecs_lookup(world, "target");
     ecs_progress(world, 0);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [765, 298]", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_click left [765, 298]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, plate, mut))->clicks, 1);
 
     ecs_set(world, target, Position, {-2, 0, 0});
     ecs_progress(world, 0);
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [765, 298]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_click left [765, 298]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, plate, mut))->clicks, 1);
 
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [515, 298]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_click left [515, 298]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, plate, mut))->clicks, 2);
@@ -561,8 +561,8 @@ void Picking_bubbling(void) {
     ecs_entity_t deco = ecs_lookup(world, "hud.panel.deco");
     ecs_progress(world, 0);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [640, 360]", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_click left [640, 360]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, label, mut))->clicks, 1);
@@ -570,14 +570,14 @@ void Picking_bubbling(void) {
     test_int(((const Mut*)ecs_get_id(world, panel, mut))->clicks, 1);
     test_uint(ecs_singleton_get(world, PickStatus)->handler, button);
 
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [740, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_click left [740, 360]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, deco, mut))->clicks, 1);
     test_int(((const Mut*)ecs_get_id(world, panel, mut))->clicks, 2);
     test_int(((const Mut*)ecs_get_id(world, button, mut))->clicks, 1);
 
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [540, 300]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_click left [540, 300]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, panel, mut))->clicks, 3);
@@ -633,14 +633,14 @@ void Picking_hover_enter_leave(void) {
     ecs_entity_t button = ecs_lookup(world, "hud.button");
     ecs_progress(world, 0);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "mouse.move [200, 200]", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_move [200, 200]", NULL));
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, button, mut))->enters, 0);
     test_bool(ecs_has(world, button, Hovered), false);
     test_uint(ecs_singleton_get(world, PickStatus)->target, 0);
 
-    ecs_os_free(box_terminal_run(world, s, "mouse.move [650, 365]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_move [650, 365]", NULL));
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, button, mut))->enters, 1);
     test_int(((const Mut*)ecs_get_id(world, button, mut))->leaves, 0);
@@ -652,12 +652,12 @@ void Picking_hover_enter_leave(void) {
     test_flt(status->cursor[0], 650);
     test_flt(status->cursor[1], 365);
 
-    ecs_os_free(box_terminal_run(world, s, "mouse.move [660, 370]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_move [660, 370]", NULL));
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, button, mut))->enters, 1);
     test_int(((const Mut*)ecs_get_id(world, button, mut))->leaves, 0);
 
-    ecs_os_free(box_terminal_run(world, s, "mouse.move [800, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_move [800, 360]", NULL));
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, button, mut))->leaves, 1);
     test_bool(ecs_has(world, button, Hovered), false);
@@ -712,8 +712,8 @@ void Picking_hover_follows_moving_element(void) {
     ecs_entity_t button = ecs_lookup(world, "hud.button");
     ecs_progress(world, 0);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "mouse.move [940, 160]", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_move [940, 160]", NULL));
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, button, mut))->enters, 0);
 
@@ -798,9 +798,9 @@ void Picking_press_drag_release(void) {
     ecs_entity_t slider = ecs_lookup(world, "hud.slider");
     ecs_progress(world, 0);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "mouse.move [600, 360]", NULL));
-    ecs_os_free(box_terminal_run(world, s, "mouse.button left true", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_move [600, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_button left true", NULL));
     ecs_progress(world, 0);
     const Mut *m = ecs_get_id(world, slider, mut);
     test_int(m->presses, 1);
@@ -809,7 +809,7 @@ void Picking_press_drag_release(void) {
     test_uint(ecs_singleton_get(world, PickStatus)->pressed, slider);
     int32_t drags = m->drags;
 
-    ecs_os_free(box_terminal_run(world, s, "mouse.sweep [600, 360] [680, 360] 4 4", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_sweep [600, 360] [680, 360] 4 4", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     ecs_progress(world, 0);
@@ -821,7 +821,7 @@ void Picking_press_drag_release(void) {
     test_int(m->releases, 0);
     test_bool(ecs_has(world, slider, Pressed), true);
 
-    ecs_os_free(box_terminal_run(world, s, "mouse.button left false", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_button left false", NULL));
     ecs_progress(world, 0);
     m = ecs_get_id(world, slider, mut);
     test_int(m->releases, 1);
@@ -882,14 +882,14 @@ void Picking_scroll(void) {
     ecs_entity_t list = ecs_lookup(world, "hud.list");
     ecs_progress(world, 0);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "mouse.move [100, 100]", NULL));
-    ecs_os_free(box_terminal_run(world, s, "mouse.scroll 0 -2", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_move [100, 100]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_scroll 0 -2", NULL));
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, list, mut))->scrolls, 0);
 
-    ecs_os_free(box_terminal_run(world, s, "mouse.move [640, 360]", NULL));
-    ecs_os_free(box_terminal_run(world, s, "mouse.scroll 0 -3", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_move [640, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_scroll 0 -3", NULL));
     ecs_progress(world, 0);
     const Mut *m = ecs_get_id(world, list, mut);
     test_int(m->scrolls, 1);
@@ -956,18 +956,18 @@ void Picking_layout_bounds(void) {
     test_flt(b->width, 170);
     test_flt(b->height, 60);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [565, 335]", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_click left [565, 335]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, menu, mut))->clicks, 1);
 
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [600, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_click left [600, 360]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, menu, mut))->clicks, 2);
 
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [677, 343]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_click left [677, 343]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, dot, mut))->clicks, 1);
@@ -1027,8 +1027,8 @@ void Picking_unhandled_goes_to_screen(void) {
     ecs_entity_t listener = ecs_lookup(world, "listener");
     ecs_progress(world, 0);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [640, 360]", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_click left [640, 360]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, cube, ecs_lookup(world, "Probe.mut")))->clicks, 0);
@@ -1040,7 +1040,7 @@ void Picking_unhandled_goes_to_screen(void) {
     test_bool(ecs_has(world, cube, Hovered), false);
 
     ecs_add(world, cube, Interactive);
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [640, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_click left [640, 360]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, cube, ecs_lookup(world, "Probe.mut")))->clicks, 1);
@@ -1125,16 +1125,16 @@ void Picking_capture_drag_leaves_element(void) {
     ecs_entity_t mut = ecs_lookup(world, "Probe.mut");
     ecs_entity_t slider = ecs_lookup(world, "hud.slider");
     ecs_entity_t other = ecs_lookup(world, "hud.other");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_progress(world, 0);
-    ecs_os_free(box_terminal_run(world, s, "mouse.move [600, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_move [600, 360]", NULL));
     ecs_progress(world, 0);
-    ecs_os_free(box_terminal_run(world, s, "mouse.button left true", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_button left true", NULL));
     ecs_progress(world, 0);
     const PickStatus *status = ecs_singleton_get(world, PickStatus);
     test_uint(status->captured, slider);
     test_uint(status->pressed, slider);
-    ecs_os_free(box_terminal_run(world, s, "mouse.sweep [600, 360] [960, 360] 6 6", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_sweep [600, 360] [960, 360] 6 6", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     ecs_progress(world, 0);
@@ -1160,7 +1160,7 @@ void Picking_capture_drag_leaves_element(void) {
     test_int(o->enters, 0);
     test_int(o->drags, 0);
     test_int(o->presses, 0);
-    ecs_os_free(box_terminal_run(world, s, "mouse.button left false", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_button left false", NULL));
     ecs_progress(world, 0);
     m = ecs_get_id(world, slider, mut);
     test_int(m->releases, 1);
@@ -1258,15 +1258,15 @@ void Picking_capture_drag_across_second_view(void) {
     ecs_entity_t mut = ecs_lookup(world, "Probe.mut");
     ecs_entity_t slider = ecs_lookup(world, "hud.slider");
     ecs_entity_t other = ecs_lookup(world, "hud.other");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_progress(world, 0);
-    ecs_os_free(box_terminal_run(world, s, "mouse.move [600, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_move [600, 360]", NULL));
     ecs_progress(world, 0);
-    ecs_os_free(box_terminal_run(world, s, "mouse.button left true", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_button left true", NULL));
     ecs_progress(world, 0);
     ecs_entity_t cover = ecs_lookup(world, "front.cover");
     test_uint(ecs_singleton_get(world, PickStatus)->captured, slider);
-    ecs_os_free(box_terminal_run(world, s, "mouse.sweep [600, 360] [800, 360] 4 4", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_sweep [600, 360] [800, 360] 4 4", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     ecs_progress(world, 0);
@@ -1285,13 +1285,13 @@ void Picking_capture_drag_across_second_view(void) {
     test_int(c->enters, 0);
     test_int(c->drags, 0);
     test_int(c->presses, 0);
-    ecs_os_free(box_terminal_run(world, s, "mouse.button left false", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_button left false", NULL));
     ecs_progress(world, 0);
     m = ecs_get_id(world, slider, mut);
     c = ecs_get_id(world, cover, mut);
     test_int(m->releases, 1);
     test_int(c->releases, 0);
-    ecs_os_free(box_terminal_run(world, s, "mouse.move [801, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_move [801, 360]", NULL));
     ecs_progress(world, 0);
     status = ecs_singleton_get(world, PickStatus);
     test_uint(status->captured, 0);
@@ -1375,13 +1375,13 @@ void Picking_capture_release_outside(void) {
     ecs_entity_t mut = ecs_lookup(world, "Probe.mut");
     ecs_entity_t slider = ecs_lookup(world, "hud.slider");
     ecs_entity_t other = ecs_lookup(world, "hud.other");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_progress(world, 0);
-    ecs_os_free(box_terminal_run(world, s, "mouse.move [600, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_move [600, 360]", NULL));
     ecs_progress(world, 0);
-    ecs_os_free(box_terminal_run(world, s, "mouse.button left true", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_button left true", NULL));
     ecs_progress(world, 0);
-    ecs_os_free(box_terminal_run(world, s, "mouse.move [2000, 1500]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_move [2000, 1500]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     const Mut *m = ecs_get_id(world, slider, mut);
@@ -1389,7 +1389,7 @@ void Picking_capture_release_outside(void) {
     test_flt(m->dx, 1400);
     test_bool(ecs_has(world, slider, Pressed), true);
     test_uint(ecs_singleton_get(world, PickStatus)->captured, slider);
-    ecs_os_free(box_terminal_run(world, s, "mouse.button left false", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_button left false", NULL));
     ecs_progress(world, 0);
     m = ecs_get_id(world, slider, mut);
     test_int(m->releases, 1);
@@ -1474,20 +1474,20 @@ void Picking_capture_cleared_after_release(void) {
     ecs_entity_t mut = ecs_lookup(world, "Probe.mut");
     ecs_entity_t slider = ecs_lookup(world, "hud.slider");
     ecs_entity_t other = ecs_lookup(world, "hud.other");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_progress(world, 0);
-    ecs_os_free(box_terminal_run(world, s, "mouse.move [600, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_move [600, 360]", NULL));
     ecs_progress(world, 0);
-    ecs_os_free(box_terminal_run(world, s, "mouse.button left true", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_button left true", NULL));
     ecs_progress(world, 0);
-    ecs_os_free(box_terminal_run(world, s, "mouse.move [940, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_move [940, 360]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
-    ecs_os_free(box_terminal_run(world, s, "mouse.button left false", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_button left false", NULL));
     ecs_progress(world, 0);
     test_uint(ecs_singleton_get(world, PickStatus)->captured, 0);
     test_int(((const Mut*)ecs_get_id(world, slider, mut))->releases, 1);
-    ecs_os_free(box_terminal_run(world, s, "mouse.move [942, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_move [942, 360]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     const PickStatus *status = ecs_singleton_get(world, PickStatus);
@@ -1495,23 +1495,23 @@ void Picking_capture_cleared_after_release(void) {
     test_bool(ecs_has(world, other, Hovered), true);
     test_bool(ecs_has(world, slider, Hovered), false);
     test_int(((const Mut*)ecs_get_id(world, other, mut))->enters, 1);
-    ecs_os_free(box_terminal_run(world, s, "mouse.move [600, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_move [600, 360]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
-    ecs_os_free(box_terminal_run(world, s, "mouse.move [940, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_move [940, 360]", NULL));
     ecs_progress(world, 0);
-    ecs_os_free(box_terminal_run(world, s, "mouse.button left true", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_button left true", NULL));
     ecs_progress(world, 0);
     test_uint(ecs_singleton_get(world, PickStatus)->captured, other);
     test_int(((const Mut*)ecs_get_id(world, other, mut))->presses, 1);
     test_int(((const Mut*)ecs_get_id(world, slider, mut))->presses, 1);
     int32_t drags = ((const Mut*)ecs_get_id(world, slider, mut))->drags;
-    ecs_os_free(box_terminal_run(world, s, "mouse.move [600, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_move [600, 360]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_uint(ecs_singleton_get(world, PickStatus)->target, other);
     test_int(((const Mut*)ecs_get_id(world, slider, mut))->drags, drags);
-    ecs_os_free(box_terminal_run(world, s, "mouse.button left false", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_button left false", NULL));
     ecs_progress(world, 0);
 
     ecs_fini(world);
@@ -1591,30 +1591,30 @@ void Picking_capture_cleared_when_deleted(void) {
     ecs_entity_t mut = ecs_lookup(world, "Probe.mut");
     ecs_entity_t slider = ecs_lookup(world, "hud.slider");
     ecs_entity_t other = ecs_lookup(world, "hud.other");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_progress(world, 0);
-    ecs_os_free(box_terminal_run(world, s, "mouse.move [600, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_move [600, 360]", NULL));
     ecs_progress(world, 0);
-    ecs_os_free(box_terminal_run(world, s, "mouse.button left true", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_button left true", NULL));
     ecs_progress(world, 0);
-    ecs_os_free(box_terminal_run(world, s, "mouse.move [650, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_move [650, 360]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_uint(ecs_singleton_get(world, PickStatus)->captured, slider);
     ecs_delete(world, slider);
-    ecs_os_free(box_terminal_run(world, s, "mouse.move [700, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_move [700, 360]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     const PickStatus *status = ecs_singleton_get(world, PickStatus);
     test_uint(status->captured, 0);
     test_uint(status->pressed, 0);
     test_uint(status->target, 0);
-    ecs_os_free(box_terminal_run(world, s, "mouse.move [942, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_move [942, 360]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_uint(ecs_singleton_get(world, PickStatus)->target, other);
     test_int(((const Mut*)ecs_get_id(world, other, mut))->drags, 0);
-    ecs_os_free(box_terminal_run(world, s, "mouse.button left false", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_button left false", NULL));
     ecs_progress(world, 0);
     test_uint(ecs_singleton_get(world, PickStatus)->captured, 0);
 
@@ -1692,8 +1692,8 @@ void Picking_focused_surface_views(void) {
     ecs_progress(world, 0);
     test_uint(ecs_singleton_get(world, Input)->surface, surface_b);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [640, 360]", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_click left [640, 360]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, cube_b, mut))->clicks, 1);
@@ -1702,7 +1702,7 @@ void Picking_focused_surface_views(void) {
     box_input_platform_push(world, &(InputEvent){
         .kind = InputFocus, .code = 1, .surface = surface_a });
     ecs_progress(world, 0);
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [640, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_click left [640, 360]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, cube_b, mut))->clicks, 1);

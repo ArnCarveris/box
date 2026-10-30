@@ -2,9 +2,9 @@
  * @file command/cmd_render.c
  * @brief Render commands: capture cameras and render entities, prefabs or templates on their own.
  *
- * Both commands write PNG files into the resources folder of the session and return their
- * names right away; the renderer writes a file once the GPU finished the frame that holds it,
- * at the latest on box_render_sync.
+ * Both commands create an empty PNG resource in the shell session and return it right away.
+ * The renderer replaces its file with the image in one rename once the GPU finished the frame
+ * that holds it, at the latest on box_render_sync, so a client reads an empty or whole image.
  *
  * A capture shows a camera as its view renders it, effects included. A render shows its
  * subject alone in a private scene, plain lit without shadows or effects, so the image does
@@ -17,9 +17,6 @@
 #include <float.h>
 #include <math.h>
 #include <string.h>
-
-/** Marker after the name of an image that the renderer has not written yet */
-#define BOX_CMD_RENDER_PENDING " (pending)"
 
 /** Width and height in pixels of the image of a render */
 #define BOX_CMD_RENDER_SIZE (512)
@@ -44,8 +41,6 @@ typedef struct box_cmd_render_job_t {
 /** State of the render commands of a world */
 typedef struct box_cmd_render_t {
     ecs_vec_t jobs;         /**< box_cmd_render_job_t */
-    int32_t captures;       /**< Images the capture command named */
-    int32_t renders;        /**< Images the render command named */
 } box_cmd_render_t;
 
 /** Free the state of the render commands.
@@ -65,55 +60,37 @@ static void box_cmd_render_free(
     ecs_os_free(state);
 }
 
-/** Name the next image of a session and get its path in the resources folder.
+/** Create the PNG resource of an image in the session of the command and get its file.
  *
  * @param ctx The call context
- * @param result The result, which gets the error
- * @param session The session entity
- * @param prefix Start of the file name
- * @param counter Counter of the images with this prefix
- * @param name Receives the file name, which the caller frees
- * @return The path, NULL in the browser, which writes no captures, when the session has no
- * folder, keeps no images or keeps as many images as it may that are still being written; the
- * caller frees it
+ * @param resource Receives the resource
+ * @return The file of the resource, NULL in the browser, which writes no captures, or when the
+ * command runs outside of a session; the caller frees it
  */
 static char* box_cmd_render_file(
     const ecs_function_ctx_t *ctx,
-    ecs_value_t *result,
-    ecs_entity_t session,
-    const char *prefix,
-    int32_t *counter,
-    char **name)
+    ecs_shell_resource_t *resource)
 {
-    const TerminalSession *s = ecs_get(ctx->world, session, TerminalSession);
+    ecs_world_t *world = ctx->world;
+    ecs_entity_t session = ecs_shell_get_session(world);
     char *path = NULL;
-    int kept;
-    name[0] = NULL;
 #ifdef __EMSCRIPTEN__
-    box_command_error(ctx, result, "captures are not available in the browser");
+    (void)session;
+    (void)resource;
+    ecs_err("captures are not available in the browser");
     goto done;
-#endif
-    if (!s || !s->dir) {
-        box_command_error(ctx, result, "the session has no folder");
+#else
+    if (!session) {
+        ecs_err("images are only written by commands that run in a shell session");
         goto done;
     }
 
-    name[0] = flecs_asprintf("%s_%d.png", prefix, counter[0] ++);
-    path = flecs_asprintf("%s/%s/%s", s->dir, BOX_TERMINAL_RESOURCES, name[0]);
-    kept = box_terminal_image(ctx->world, session, path);
-    if (kept == BOX_TERMINAL_IMAGE_NONE) {
-        box_command_error(ctx, result, "the session keeps no images, TerminalLimits.images is 0");
-    } else if (kept == BOX_TERMINAL_IMAGE_PENDING) {
-        box_command_error(ctx, result, "%d images are still being written, "
-            "TerminalLimits.images is %d", s->images_max, s->images_max);
+    if (ecs_shell_resource_create(world, session, "image/png", NULL, 0, resource)) {
+        goto done;
     }
 
-    if (kept) {
-        ecs_os_free(path);
-        ecs_os_free(name[0]);
-        path = name[0] = NULL;
-    }
-
+    path = box_command_resource_file(world, session, resource->name);
+#endif
 done:
     return path;
 }
@@ -243,85 +220,12 @@ static void box_cmd_render_clear(
     }
 }
 
-/** Resolve the camera of a capture, failing the command when the entity has no Camera.
- *
- * @param ctx The call context
- * @param result The result, which gets the error
- * @param session The session entity
- * @param path Path of the camera
- * @return The camera, 0 when the command failed
- */
-static ecs_entity_t box_cmd_render_camera(
-    const ecs_function_ctx_t *ctx,
-    ecs_value_t *result,
-    ecs_entity_t session,
-    const char *path)
-{
-    ecs_entity_t e = 0;
-    if (box_shell_resolve(ctx, result, session, path, BoxShellRead, &e)) {
-        e = 0;
-    } else if (!ecs_has(ctx->world, e, Camera)) {
-        box_command_error(ctx, result, "'%s' is not a camera", path);
-        e = 0;
-    }
-
-    return e;
-}
-
-/** Resolve the cameras of a capture line, separated by commas, spaces or brackets.
- *
- * @param ctx The call context
- * @param result The result, which gets the error
- * @param session The session entity
- * @param arg The camera paths, NULL or empty for the active camera
- * @param out Receives the cameras
- * @return 0 on success, -1 when the command failed
- */
-static int box_cmd_render_cameras(
-    const ecs_function_ctx_t *ctx,
-    ecs_value_t *result,
-    ecs_entity_t session,
-    const char *arg,
-    ecs_vec_t *out)
-{
-    ecs_world_t *world = ctx->world;
-    char *copy = ecs_os_strdup(arg ? arg : "");
-    char *token = strtok(copy, ", \t[]");
-    ecs_entity_t camera = 0;
-    int ret = -1;
-    while (token) {
-        camera = box_cmd_render_camera(ctx, result, session, token);
-        if (!camera) {
-            goto done;
-        }
-
-        ecs_vec_append_t(NULL, out, ecs_entity_t)[0] = camera;
-        token = strtok(NULL, ", \t[]");
-    }
-
-    if (!ecs_vec_count(out)) {
-        ecs_entity_t view = box_cmd_render_view(world, 0, box_cmd_render_view_root(world), false);
-        if (!view) {
-            box_command_error(ctx, result, "no active camera");
-            goto done;
-        }
-
-        ecs_vec_append_t(NULL, out, ecs_entity_t)[0] = ecs_get(world, view, View)->camera;
-    }
-
-    ret = 0;
-done:
-    ecs_os_free(copy);
-
-    return ret;
-}
-
-/** The capture command: write a PNG of the active camera or of each named camera.
+/** The capture command: write a PNG of the active camera or of a camera.
  *
  * @param ctx The call context
  * @param argc Number of arguments
- * @param argv The session and the camera paths
- * @param result Receives the names of the images in the resources folder
+ * @param argv The camera, omitted for the active camera
+ * @param result Receives the PNG resource
  */
 static void box_cmd_capture(
     const ecs_function_ctx_t *ctx,
@@ -330,43 +234,37 @@ static void box_cmd_capture(
     ecs_value_t *result)
 {
     ecs_world_t *world = ctx->world;
-    box_cmd_render_t *state = ctx->ctx;
-    ecs_entity_t session = *(ecs_entity_t*)argv[0].ptr;
-    const char *arg = argc > 1 ? *(char**)argv[1].ptr : NULL;
-    ecs_strbuf_t buf = ECS_STRBUF_INIT;
-    ecs_vec_t cameras;
-    int32_t i, width, height;
-    ecs_vec_init_t(NULL, &cameras, ecs_entity_t, 0);
-    if (box_cmd_render_cameras(ctx, result, session, arg, &cameras)) {
+    ecs_entity_t camera = argc > 0 ? *(ecs_entity_t*)argv[0].ptr : 0;
+    box_render_capture_desc_t desc = {0};
+    char *path = NULL;
+    if (argc > 0 && (!camera || !ecs_is_alive(world, camera) || !ecs_has(world, camera, Camera))) {
+        path = ecs_get_path(world, camera);
+        ecs_err("'%s' is not a camera", path);
         goto done;
     }
 
-    box_cmd_render_size(world, &width, &height);
-    for (i = 0; i < ecs_vec_count(&cameras); i ++) {
-        box_render_capture_desc_t desc = {
-            .camera = *ecs_vec_get_t(&cameras, ecs_entity_t, i),
-            .width = width,
-            .height = height
-        };
-
-        char *name = NULL;
-        char *path = box_cmd_render_file(ctx, result, session, "capture", &state->captures, &name);
-        if (!path) {
+    if (!camera) {
+        ecs_entity_t view = box_cmd_render_view(world, 0, box_cmd_render_view_root(world), false);
+        if (!view) {
+            ecs_err("no active camera");
             goto done;
         }
 
-        box_cmd_render_clear(world, desc.camera, &desc.clear);
-        desc.path = path;
-        box_render_capture(world, &desc);
-        ecs_strbuf_append(&buf, "%s%s%s", i ? "\n" : "", name, BOX_CMD_RENDER_PENDING);
-        ecs_os_free(name);
-        ecs_os_free(path);
+        camera = ecs_get(world, view, View)->camera;
     }
 
-    *(char**)result->ptr = ecs_strbuf_get(&buf);
+    path = box_cmd_render_file(ctx, result->ptr);
+    if (!path) {
+        goto done;
+    }
+
+    desc.camera = camera;
+    desc.path = path;
+    box_cmd_render_size(world, &desc.width, &desc.height);
+    box_cmd_render_clear(world, camera, &desc.clear);
+    box_render_capture(world, &desc);
 done:
-    ecs_strbuf_reset(&buf);
-    ecs_vec_fini_t(NULL, &cameras, ecs_entity_t);
+    ecs_os_free(path);
 }
 
 /** Check whether an entity belongs to the flecs scope.
@@ -416,7 +314,8 @@ static bool box_cmd_render_copies(
 {
     const ecs_type_info_t *ti = ecs_get_type_info(world, id);
     bool result = !ECS_IS_PAIR(id) && !box_cmd_render_builtin(world, id);
-    result = result && id != ecs_id(View) && id != ecs_id(Surface) && id != ecs_id(Terminal);
+    result = result && id != ecs_id(View) && id != ecs_id(Surface) &&
+        id != ecs_id(EcsCommandSession);
 
     return result && (!ti || ecs_get(world, id, EcsType));
 }
@@ -484,8 +383,8 @@ static ecs_entity_t box_cmd_render_copy(
  *
  * @param ctx The call context
  * @param argc Number of arguments
- * @param argv The session and the subject
- * @param result Receives the name of the image in the resources folder
+ * @param argv The subject
+ * @param result Receives the PNG resource
  */
 static void box_cmd_render(
     const ecs_function_ctx_t *ctx,
@@ -495,21 +394,27 @@ static void box_cmd_render(
 {
     ecs_world_t *world = ctx->world;
     box_cmd_render_t *state = ctx->ctx;
-    ecs_entity_t session = *(ecs_entity_t*)argv[0].ptr;
-    const char *arg = *(char**)argv[1].ptr;
-    ecs_entity_t subject = 0, root = 0, instance = 0;
-    char *name = NULL, *path = NULL;
+    ecs_entity_t subject = *(ecs_entity_t*)argv[0].ptr;
+    ecs_entity_t root = 0, instance = 0;
+    char *path = NULL;
     (void)argc;
-    if (box_shell_resolve(ctx, result, session, arg, BoxShellWrite, &subject)) {
+    if (!subject || !ecs_is_alive(world, subject)) {
+        ecs_err("entity #%u is not alive", (uint32_t)subject);
         goto done;
     }
 
-    path = box_cmd_render_file(ctx, result, session, "render", &state->renders, &name);
+    if (box_cmd_render_builtin(world, subject)) {
+        path = ecs_get_path(world, subject);
+        ecs_err("cannot render '%s', it is in the flecs scope", path);
+        goto done;
+    }
+
+    path = box_cmd_render_file(ctx, result->ptr);
     if (!path) {
         goto done;
     }
 
-    root = ecs_new_w_pair(world, EcsChildOf, session);
+    root = ecs_new_w_pair(world, EcsChildOf, ecs_shell_get_session(world));
     ecs_set(world, root, Scene, {0});
     if (ecs_has_id(world, subject, EcsPrefab)) {
         instance = ecs_new_w_pair(world, EcsChildOf, root);
@@ -527,9 +432,7 @@ static void box_cmd_render(
     job->path = path;
     job->requested = false;
     path = NULL;
-    *(char**)result->ptr = flecs_asprintf("%s%s", name, BOX_CMD_RENDER_PENDING);
 done:
-    ecs_os_free(name);
     ecs_os_free(path);
 }
 
@@ -715,21 +618,28 @@ void box_cmd_render_init(
         .immediate = true
     });
 
-    box_command_register(world, &(box_command_desc_t){
-        .name = "capture",
-        .brief = "Write a PNG of the active camera or of cameras a, b to resources next frame",
-        .params = {{
-            .name = "cameras", .type = ecs_id(ecs_string_t), .optional = true, .rest = true
-        }},
-        .callback = box_cmd_capture,
-        .ctx = state
-    });
+    box_command_register(world,
+        "Write a PNG of the active camera or of a camera to a resource next frame",
+        (ecs_function_desc_t){
+            .name = "capture",
+            .return_type = ecs_id(ecs_shell_resource_t),
+            .params = {
+                { .name = "camera", .type = ecs_id(ecs_entity_t), .optional = true,
+                  .brief = "Camera to capture (default: the active camera)" }
+            },
+            .callback = box_cmd_capture
+        });
 
-    box_command_register(world, &(box_command_desc_t){
-        .name = "render",
-        .brief = "Write a PNG of an entity, prefab or template on its own to resources next frame",
-        .params = {{ .name = "subject", .type = ecs_id(ecs_string_t), .path = true }},
-        .callback = box_cmd_render,
-        .ctx = state
-    });
+    box_command_register(world,
+        "Write a PNG of an entity, prefab or template on its own to a resource next frame",
+        (ecs_function_desc_t){
+            .name = "render",
+            .return_type = ecs_id(ecs_shell_resource_t),
+            .params = {
+                { .name = "subject", .type = ecs_id(ecs_entity_t),
+                  .brief = "Entity, prefab or template to render" }
+            },
+            .callback = box_cmd_render,
+            .ctx = state
+        });
 }

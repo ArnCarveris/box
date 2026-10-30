@@ -13,7 +13,7 @@ include apps/oreelse/etc/oreelse
 using box.surface
 using oreelse
 
-const hover = box.command.commands.mouse.move(0, "[233, 243]", false)
+const hover = box.command.commands.mouse_move("[233, 243]", false)
 
 window {
   Surface: {width: 640, height: 360}

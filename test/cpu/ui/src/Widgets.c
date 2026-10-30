@@ -42,9 +42,9 @@ static const char *widgets_muts[] = {
 static char* widgets_warnings(
     ecs_world_t *world)
 {
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     bool error = true;
-    char *result = box_terminal_run(world, s, "logs warning 100", &error);
+    char *result = box_command_run(world, s, "logs warning 100", &error);
     test_bool(error, false);
 
     return result;

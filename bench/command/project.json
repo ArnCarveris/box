@@ -2,7 +2,7 @@
     "id": "bench_command",
     "type": "application",
     "value": {
-        "description": "Benchmarks for command dispatch and the frame cost of open terminal sessions",
+        "description": "Benchmarks for running commands and the frame cost of open shell sessions",
         "public": false,
         "use": [
             "box"

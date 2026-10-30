@@ -246,7 +246,7 @@ static void sf_click(
     ecs_entity_t s,
     const char *cmd)
 {
-    ecs_os_free(box_terminal_run(world, s, cmd, NULL));
+    ecs_os_free(box_command_run(world, s, cmd, NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
 }
@@ -292,21 +292,21 @@ void ScrollFloat_scrolled_list_picks_row_under_cursor(void) {
     test_assert(list != 0 && r0 != 0 && r1 != 0 && r3 != 0);
     ecs_progress(world, 0);
 
-    ecs_entity_t s = box_terminal_new(world);
-    sf_click(world, s, "mouse.click left [640, 350]");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    sf_click(world, s, "mouse_click left [640, 350]");
     test_int(sf_clicks(world, r0), 1);
     test_int(sf_clicks(world, r1), 0);
 
     /* Scrolled by one row, the same point is over the next row */
     ecs_set(world, list, LayoutScroll, { .y = 20, .vertical = true });
     ecs_progress(world, 0);
-    sf_click(world, s, "mouse.click left [640, 350]");
+    sf_click(world, s, "mouse_click left [640, 350]");
     test_int(sf_clicks(world, r0), 1);
     test_int(sf_clicks(world, r1), 1);
 
     /* Row 3 lies below the view at this offset: clipped, it takes no click */
     test_flt(ecs_get(world, r3, Position)->y, -30);
-    sf_click(world, s, "mouse.click left [640, 395]");
+    sf_click(world, s, "mouse_click left [640, 395]");
     test_int(sf_clicks(world, r3), 0);
     test_int(sf_clicks(world, r0), 1);
     test_int(sf_clicks(world, r1), 1);
@@ -314,7 +314,7 @@ void ScrollFloat_scrolled_list_picks_row_under_cursor(void) {
     /* Scrolled to the end, row 3 is in view and takes the click */
     ecs_set(world, list, LayoutScroll, { .y = 60, .vertical = true });
     ecs_progress(world, 0);
-    sf_click(world, s, "mouse.click left [640, 350]");
+    sf_click(world, s, "mouse_click left [640, 350]");
     test_int(sf_clicks(world, r3), 1);
 
     ecs_fini(world);
@@ -440,20 +440,20 @@ void ScrollFloat_float_takes_click_over_sibling(void) {
     test_assert(list != 0 && sibling != 0);
     ecs_progress(world, 0);
 
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
 
     /* Where the list overlaps the sibling drawn after it */
-    sf_click(world, s, "mouse.click left [645, 370]");
+    sf_click(world, s, "mouse_click left [645, 370]");
     test_int(sf_clicks(world, list), 1);
     test_int(sf_clicks(world, sibling), 0);
 
     /* Below the view, outside its clip */
-    sf_click(world, s, "mouse.click left [630, 370]");
+    sf_click(world, s, "mouse_click left [630, 370]");
     test_int(sf_clicks(world, list), 2);
     test_int(sf_clicks(world, sibling), 0);
 
     /* The sibling where the list does not reach */
-    sf_click(world, s, "mouse.click left [655, 370]");
+    sf_click(world, s, "mouse_click left [655, 370]");
     test_int(sf_clicks(world, list), 2);
     test_int(sf_clicks(world, sibling), 1);
 

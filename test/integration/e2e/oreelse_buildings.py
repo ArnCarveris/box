@@ -24,8 +24,9 @@ ARGS = ["--seed", str(SEED), "--fps", "20"]
 # Frames per second of game time
 FPS = round(1 / float(DELTA_TIME))
 
-STATE = "has oreelse.OreGameState (oreelse.OreGameState, oreelse.OreGameState.%s)"
-TOAST = "get oreelse.OreToast OreToast.text"
+STATE = ("eval oreelse.OreGameState.has(flecs.script.core.pair("
+         "oreelse.OreGameState,oreelse.OreGameState.%s))")
+TOAST = "get oreelse.OreToast oreelse.OreToast.text"
 PLAYER = "astronaut"
 INVENTORY = "oreelse.OreInventory"
 PLACEMENT = "oreelse.OrePlacement"
@@ -99,13 +100,13 @@ def set_state(app, state):
 def setup(app):
     """Shrink the window and drop the shadows of the world view, so the software renderer keeps
     up."""
-    app.exec("set window Surface {width: 640, height: 360}")
-    app.exec("set main_view View.shadows.enabled false")
-    app.wait_for("get window SurfaceStatus.height", "360")
+    app.exec("set window box.surface.Surface {width: 640, height: 360}")
+    app.exec("set main_view box.view.View.shadows.enabled false")
+    app.wait_for("get window box.surface.SurfaceStatus.height", "360")
 
 
 def key(app, name, frames=None):
-    app.exec("key.press %s" % name + (" %d" % frames if frames else ""))
+    app.exec("key_press %s" % name + (" %d" % frames if frames else ""))
     app.wait_input()
 
 
@@ -125,7 +126,7 @@ def entity(value):
 
 def inventory(app):
     """The slots of the inventory in order: (item, amount), None for a free slot."""
-    slots = app.get(INVENTORY, "OreInventory")["slots"]
+    slots = app.get(INVENTORY, "oreelse.OreInventory")["slots"]
     return [(entity(s["item"]), s["amount"]) if entity(s["item"]) else None for s in slots]
 
 
@@ -142,7 +143,7 @@ def set_inventory(app, stacks):
     slots += [{"item": 0, "amount": 0}] * (SLOTS - len(slots))
     put(app, INVENTORY, INVENTORY, {"slots": slots})
     first = stacks[0]
-    app.wait_for("get %s OreInventory.slots[0].amount" % INVENTORY,
+    app.wait_for("get %s oreelse.OreInventory.slots[0].amount" % INVENTORY,
                  str(first[1]) if first else "0")
 
 
@@ -151,7 +152,7 @@ def wait_toast(app, text, frames=None):
 
 
 def placement(app):
-    p = app.get(PLACEMENT, "OrePlacement")
+    p = app.get(PLACEMENT, "oreelse.OrePlacement")
     p["selected"] = entity(p["selected"])
     return p
 
@@ -162,15 +163,10 @@ def selected(app):
 
 def rows_of(app, expr):
     """Run a query of the port: the path and the value of the first field of every result."""
-    app.exec("query found %s" % expr)
-    app.exec("iter found")
-    out = app.exec("next 1000")
     result = {}
-    for line in out.splitlines():
-        if not line.strip() or line == "(end)":
-            continue
-        parts = line.split(" ", 1)
-        result[parts[0]] = parse_value(parts[1]) if len(parts) > 1 else None
+    for row in parse_value(app.exec('query "%s"' % expr)):
+        fields = row["fields"]
+        result[row["entity"]] = next(iter(fields[0]["value"].values())) if fields else None
     return result
 
 
@@ -223,7 +219,7 @@ def tile_point(row, col, fx=0.5, fz=0.5):
 
 
 def hover(app):
-    return app.get("oreelse.OreHover", "OreHover")
+    return app.get("oreelse.OreHover", "oreelse.OreHover")
 
 
 def point(h):
@@ -232,17 +228,17 @@ def point(h):
 
 
 def player(app):
-    return app.get(PLAYER, "Position")
+    return app.get(PLAYER, "box.transform.Position")
 
 
 def move_cursor(app, cursor):
-    app.exec("mouse.move [%g, %g]" % cursor)
+    app.exec("mouse_move [%g, %g]" % cursor)
     app.wait_input()
     app.wait_frames(SETTLE)
 
 
 def place_player(app, x, z):
-    app.exec("set %s Position {%g, 0, %g}" % (PLAYER, x, z))
+    app.exec("set %s box.transform.Position {%g, 0, %g}" % (PLAYER, x, z))
     app.wait_frames(SETTLE)
 
 
@@ -252,8 +248,8 @@ OFFSETS = {}
 def offset(app, cursor):
     """The ground point a cursor position hovers, relative to the astronaut, per window size (the
     scenarios that import this one set theirs)."""
-    k = (cursor, app.exec("get window SurfaceStatus.width"),
-         app.exec("get window SurfaceStatus.height"))
+    k = (cursor, app.exec("get window box.surface.SurfaceStatus.width"),
+         app.exec("get window box.surface.SurfaceStatus.height"))
     if k not in OFFSETS:
         move_cursor(app, cursor)
         p = player(app)
@@ -278,14 +274,14 @@ def aim_tile(app, row, col, cursor=CENTER):
 
 
 def button(app, name, down):
-    app.exec("mouse.button %s %s" % (name, "true" if down else "false"))
+    app.exec("mouse_button %s %s" % (name, "true" if down else "false"))
     app.wait_input()
 
 
 def click(app, row, col):
     """Click the left button on a tile."""
     aim_tile(app, row, col)
-    app.exec("mouse.click left")
+    app.exec("mouse_click left")
     app.wait_input()
     app.wait_frames(SETTLE)
 
@@ -309,12 +305,12 @@ def release(app, row, col, fx=0.5, fz=0.5, shift=False):
     app.check(h["on_grid"] and (h["row"], h["col"]) == (row, col),
               "the release hovers %s, not the tile %s" % (h, (row, col)))
     if shift:
-        app.exec("key.down ShiftLeft")
+        app.exec("key_down ShiftLeft")
         app.wait_input()
     button(app, "left", False)
     app.wait_frames(SETTLE)
     if shift:
-        app.exec("key.up ShiftLeft")
+        app.exec("key_up ShiftLeft")
         app.wait_input()
 
 
@@ -325,8 +321,8 @@ def drag(app, anchor, dest, fx=0.5, fz=0.5, shift=False):
 
 def select(app, digit, expected):
     key(app, digit)
-    app.wait_for("get %s OrePlacement.selected" % PLACEMENT,
-                 lambda out: entity(out) == expected,
+    app.wait_for("get %s oreelse.OrePlacement.selected" % PLACEMENT,
+                 lambda out: entity(parse_value(out)) == expected,
                  what="the selection %s" % expected)
 
 
@@ -346,10 +342,11 @@ def test_craft_building(app):
     set_inventory(app, [("items.StoneBrick", 6)])
     run_script(app, "craft_result { oreelse.OreStack: {item: Wall, "
                     "amount: oreelse.craft_order(Wall, 1)} }")
-    app.check(app.get("craft_result", "OreStack")["amount"] == 1, "the order of a wall failed")
+    app.check(app.get("craft_result", "oreelse.OreStack")["amount"] == 1,
+              "the order of a wall failed")
     app.check(count(app, "items.StoneBrick") == 2,
               "the order took %d bricks, not 4" % (6 - count(app, "items.StoneBrick")))
-    app.wait_for("get %s OreInventory.slots[1].item" % INVENTORY, "Wall",
+    app.wait_for("get %s oreelse.OreInventory.slots[1].item" % INVENTORY, '"Wall"',
                  frames=round((1 + SWING_SLACK) * FPS), what="the crafted wall")
     app.check(count(app, "Wall") == 1, "the inventory holds %s" % inventory(app))
 
@@ -369,11 +366,11 @@ def test_click_and_rules(app):
     app.check(tiles(app, "Wall") == [(6, 6)], "the walls are at %s" % tiles(app, "Wall"))
     app.check(count(app, "Wall") == 2, "%d walls left, not 2" % count(app, "Wall"))
     path = building_at(app, 6, 6, "Wall")
-    p = app.get(path, "Position")
+    p = app.get(path, "box.transform.Position")
     x, z = tile_point(6, 6)
     app.check(abs(p["x"] - x) < 1e-4 and abs(p["z"] - z) < 1e-4,
               "the wall stands at %s, not at the tile center %s" % (p, (x, z)))
-    health = app.get(path, "OreHealth")
+    health = app.get(path, "oreelse.OreHealth")
     app.check(health["value"] == 300 and health["max"] == 300, "the wall has %s" % health)
 
     # A tile with a building takes no other
@@ -402,7 +399,7 @@ def test_click_and_rules(app):
     click(app, 4, 9)
     pads = buildings(app, "RocketPad")
     app.check(list(pads.values()) == [(4, 9)], "the rocket pads are %s" % pads)
-    p = app.get(list(pads)[0], "Position")
+    p = app.get(list(pads)[0], "box.transform.Position")
     x, z = tile_point(5, 10)
     app.check(abs(p["x"] - x) < 1e-4 and abs(p["z"] - z) < 1e-4,
               "the pad stands at %s, not at the center of its footprint %s" % (p, (x, z)))
@@ -469,7 +466,7 @@ def test_line_and_connectors(app):
     app.check(links == [(6, c, False) for c in range(6, 10)],
               "the connectors are %s" % links)
     for path, k in rows_of(app, "oreelse.OreConnector, (IsA, WallSegment)").items():
-        p = app.get(path, "Position")
+        p = app.get(path, "box.transform.Position")
         x, z = tile_point(k["row"], k["col"])
         app.check(abs(p["x"] - (x + TILE / 2)) < 1e-4 and abs(p["z"] - z) < 1e-4,
                   "the connector %s is at %s, not on the edge" % (k, p))
@@ -483,7 +480,7 @@ def test_line_and_connectors(app):
     # Demolishing a wall removes its connectors
     path = building_at(app, 6, 8)
     mine(app, 6, 8)
-    app.wait_for("get %s OreInventory.slots[0].amount" % INVENTORY, "4",
+    app.wait_for("get %s oreelse.OreInventory.slots[0].amount" % INVENTORY, "4",
                  frames=round((DOZE_TIME + SWING_SLACK) * FPS), what="the wall demolished")
     button(app, "right", False)
     app.wait_frames(SETTLE)
@@ -567,13 +564,15 @@ def test_escape_chain(app):
 
     # First the drag, then the selection, then the game pauses
     key(app, "Escape")
-    app.wait_for("get %s OrePlacement.dragging" % PLACEMENT, "false", what="the drag cancelled")
+    app.wait_for("get %s oreelse.OrePlacement.dragging" % PLACEMENT, "false",
+                 what="the drag cancelled")
     app.check(selected(app) == "Wall", "the first ESC cleared the selection")
     app.check(app.exec(STATE % "Playing") == "true", "the first ESC paused")
     button(app, "left", False)
 
     key(app, "Escape")
-    app.wait_for("get %s OrePlacement.selected" % PLACEMENT, lambda out: entity(out) is None,
+    app.wait_for("get %s oreelse.OrePlacement.selected" % PLACEMENT,
+                 lambda out: entity(parse_value(out)) is None,
                  what="the selection cleared")
     app.check(app.exec(STATE % "Playing") == "true", "the second ESC paused")
 
@@ -600,11 +599,11 @@ def test_selection_keys(app):
     select(app, "0", "Factory")
 
     # Shift and the digit select too
-    app.exec("key.down ShiftLeft")
+    app.exec("key_down ShiftLeft")
     app.wait_input()
     select(app, "1", "Wall")
     select(app, "1", None)
-    app.exec("key.up ShiftLeft")
+    app.exec("key_up ShiftLeft")
     app.wait_input()
 
 
@@ -618,19 +617,21 @@ def test_pipette(app):
     # The building under the cursor
     aim_tile(app, 6, 6)
     key(app, "Q")
-    app.wait_for("get %s OrePlacement.selected" % PLACEMENT, "Wall", what="the pipette's wall")
+    app.wait_for("get %s oreelse.OrePlacement.selected" % PLACEMENT, '"Wall"',
+                 what="the pipette's wall")
 
     # A deposit picks the drill
     dr, dc = deposit_tile(app)
     aim_tile(app, dr, dc)
     key(app, "Q")
-    app.wait_for("get %s OrePlacement.selected" % PLACEMENT, "Drill",
+    app.wait_for("get %s oreelse.OrePlacement.selected" % PLACEMENT, '"Drill"',
                  what="the pipette's drill")
 
     # Empty ground clears the selection
     aim_tile(app, 9, 9)
     key(app, "Q")
-    app.wait_for("get %s OrePlacement.selected" % PLACEMENT, lambda out: entity(out) is None,
+    app.wait_for("get %s oreelse.OrePlacement.selected" % PLACEMENT,
+                 lambda out: entity(parse_value(out)) is None,
                  what="the selection cleared")
 
     # Without drills the pipette warns and keeps the selection
@@ -660,13 +661,13 @@ def test_demolish(app):
     # An intact turret goes back into the inventory
     mine(app, 6, 6)
     app.wait_frames(10)
-    m = app.get(PLAYER, "OreMining")
+    m = app.get(PLAYER, "oreelse.OreMining")
     app.check(entity(m["target"]) == building_at(app, 6, 6) and 0 < m["progress"] < 1,
               "the swing is %s, not at the turret" % m)
     app.check(abs(m["left"] / (1 - m["progress"]) - DOZE_TIME) < 1e-3,
               "a swing at a building takes %g s, not %g" %
               (m["left"] / (1 - m["progress"]), DOZE_TIME))
-    app.wait_for("get %s OreInventory.slots[0].amount" % INVENTORY, "3",
+    app.wait_for("get %s oreelse.OreInventory.slots[0].amount" % INVENTORY, "3",
                  frames=round((DOZE_TIME + SWING_SLACK) * FPS), what="the turret back")
     button(app, "right", False)
     app.wait_frames(SETTLE)
@@ -676,7 +677,7 @@ def test_demolish(app):
     keep_selected(app, "4", "GunTurret")
     click(app, 6, 6)
     path = building_at(app, 6, 6)
-    app.exec("set %s OreHealth {value: 12, max: 120}" % path)
+    app.exec("set %s oreelse.OreHealth {value: 12, max: 120}" % path)
     demolish(app, 6, 6)
     wait_toast(app, "Salvaged 1 Iron plate, 1 Wire (10%)")
     app.check(not buildings(app), "the salvaged turret is still there")
@@ -695,7 +696,7 @@ def test_demolish(app):
     click(app, 6, 6)
     path = building_at(app, 6, 6)
     app.check(path is not None, "no turret placed with a full inventory")
-    app.exec("set %s OreHealth {value: 60, max: 120}" % path)
+    app.exec("set %s oreelse.OreHealth {value: 60, max: 120}" % path)
     mine(app, 6, 6)
     wait_toast(app, "Inventory full - can't salvage",
                frames=round((DOZE_TIME + SWING_SLACK) * FPS))
@@ -705,7 +706,7 @@ def test_demolish(app):
     app.check(count(app, "items.IronPlate") == 0, "the refused salvage gave %s" % inventory(app))
 
     # An intact building of a new kind does not fit a full inventory either
-    app.exec("set %s OreHealth {value: 120, max: 120}" % path)
+    app.exec("set %s oreelse.OreHealth {value: 120, max: 120}" % path)
     set_inventory(app, [(k, 1) for k, _ in full[1:]] + [("items.IronPlate", 1)])
     demolish(app, 6, 6)
     wait_toast(app, FULL)
@@ -718,7 +719,7 @@ def test_destroyed(app):
     select(app, "1", "Wall")
     click(app, 6, 6)
     path = building_at(app, 6, 6)
-    app.exec("set %s OreHealth {value: 0, max: 300}" % path)
+    app.exec("set %s oreelse.OreHealth {value: 0, max: 300}" % path)
     app.wait_frames(SETTLE)
     app.check(not buildings(app), "the wall at 0 health stands")
     app.check(count(app, "Wall") == 0, "the destroyed wall went into the inventory")
@@ -731,16 +732,17 @@ def test_jetpack(app):
     click(app, 6, 6)
     x, z = tile_point(6, 6)
     place_player(app, x, z)
-    app.wait_for("get %s Position.y" % PLAYER, lambda out: abs(float(out) - HOVER_HEIGHT) < 1e-4,
+    app.wait_for("get %s box.transform.Position.y" % PLAYER,
+                 lambda out: abs(float(out) - HOVER_HEIGHT) < 1e-4,
                  frames=FPS, what="the astronaut hovering at %g" % HOVER_HEIGHT)
-    app.check(app.get(PLAYER, "OrePlayer")["airborne"], "the astronaut is not airborne")
+    app.check(app.get(PLAYER, "oreelse.OrePlayer")["airborne"], "the astronaut is not airborne")
 
     # Next to the wall it comes down
     x, z = tile_point(6, 7)
-    app.exec("set %s Position {%g, %g, %g}" % (PLAYER, x, HOVER_HEIGHT, z))
+    app.exec("set %s box.transform.Position {%g, %g, %g}" % (PLAYER, x, HOVER_HEIGHT, z))
     app.wait_frames(10)
-    y = float(app.exec("get %s Position.y" % PLAYER))
+    y = float(app.exec("get %s box.transform.Position.y" % PLAYER))
     app.check(0 < y < HOVER_HEIGHT, "after 10 frames next to the wall the height is %g" % y)
-    app.wait_for("get %s Position.y" % PLAYER, lambda out: float(out) == 0,
+    app.wait_for("get %s box.transform.Position.y" % PLAYER, lambda out: float(out) == 0,
                  frames=FPS, what="the astronaut on the ground")
-    app.check(not app.get(PLAYER, "OrePlayer")["airborne"], "the astronaut is airborne")
+    app.check(not app.get(PLAYER, "oreelse.OrePlayer")["airborne"], "the astronaut is airborne")

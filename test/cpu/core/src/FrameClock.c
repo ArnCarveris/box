@@ -168,9 +168,9 @@ void FrameClock_fps_command(void) {
     fake_frame = 0;
     fake_slow_frame = -1;
     ecs_system(world, { .phase = EcsOnUpdate, .run = FakeWork });
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     bool error = false;
-    char *out = box_terminal_run(world, s, "fps", &error);
+    char *out = box_command_run(world, s, "fps", &error);
     test_bool(error, true);
     ecs_os_free(out);
 
@@ -180,7 +180,7 @@ void FrameClock_fps_command(void) {
 
     const char *names[] = { "fps", "frames" };
     for (int i = 0; i < 2; i ++) {
-        out = box_terminal_run(world, s, names[i], &error);
+        out = box_command_run(world, s, names[i], &error);
         test_bool(error, false);
         test_assert(out != NULL);
         test_assert(strstr(out, "100.0 fps") != NULL);
@@ -192,7 +192,7 @@ void FrameClock_fps_command(void) {
         ecs_os_free(out);
     }
 
-    out = box_terminal_run(world, s, "fps 50", &error);
+    out = box_command_run(world, s, "fps 50", &error);
     test_bool(error, false);
     test_assert(out != NULL && strstr(out, "cap 50 fps") != NULL);
     ecs_os_free(out);
@@ -203,12 +203,12 @@ void FrameClock_fps_command(void) {
         ecs_progress(world, 0);
     }
 
-    out = box_terminal_run(world, s, "frames", &error);
+    out = box_command_run(world, s, "frames", &error);
     test_bool(error, false);
     test_assert(out != NULL && strstr(out, "cap 50") != NULL);
     ecs_os_free(out);
 
-    out = box_terminal_run(world, s, "fps 0", &error);
+    out = box_command_run(world, s, "fps 0", &error);
     test_bool(error, false);
     ecs_os_free(out);
     test_flt(ecs_singleton_get(world, App)->fps, 0);
@@ -216,7 +216,7 @@ void FrameClock_fps_command(void) {
 
     const char *invalid[] = { "fps -1", "fps fast", "fps inf" };
     for (int i = 0; i < 3; i ++) {
-        out = box_terminal_run(world, s, invalid[i], &error);
+        out = box_command_run(world, s, invalid[i], &error);
         test_bool(error, true);
         ecs_os_free(out);
     }
