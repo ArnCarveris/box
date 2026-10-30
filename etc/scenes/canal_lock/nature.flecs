@@ -1,0 +1,139 @@
+include materials
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.spatial
+
+template CanalLeafLobe {
+  prop rx: f32 = 1
+  prop ry: f32 = 0.8
+  prop rz: f32 = 1
+  prop count: i32 = 40
+  prop card: f32 = 0.5
+  prop seed: f32 = 0
+
+  SpatialIgnore
+  filler_core : CanalLeaf { Position: {}; Scale: {rx * 0.74, ry * 0.74, rz * 0.74}; IcoSphere: {radius: 1, segments: 2, smooth: true} }
+  for i in 0..count {
+    const up = 1 - 2 * (i + 0.5) / count
+    const flat = math.sqrt(1 - up * up)
+    const az = i * 2.399963 + seed
+    const elevation = math.atan2(up, flat)
+    const nudge = math.sin(i * 12.9 + seed) * 0.16
+    const size = card * (0.82 + (i % 3) * 0.17)
+    if i % 3 == 0 {
+      { (IsA, CanalLeafCardWarm); Position: {math.sin(az) * flat * rx, up * ry, math.cos(az) * flat * rz}; Rotation: {-elevation + nudge, az + nudge, nudge * 3}; Quad: {size, size} }
+    } else {
+      { (IsA, CanalLeafCard); Position: {math.sin(az) * flat * rx, up * ry, math.cos(az) * flat * rz}; Rotation: {-elevation + nudge, az + nudge, nudge * 3}; Quad: {size, size} }
+    }
+  }
+}
+
+template CanalTree {
+  prop h: f32 = 4
+  prop seed: f32 = 1
+  const girth = h * 0.05
+  trunk : CanalBark { Position: {0, h * 0.27, 0}; Frustum: {radius_bottom: girth * 1.15, radius_top: girth * 0.62, length: h * 0.54, segments: 12, smooth: true}; TextureTransform: {scale_x: 2, scale_y: 2} }
+  flare : CanalBark { Position: {0, h * 0.03, 0}; Frustum: {radius_bottom: girth * 1.65, radius_top: girth * 1.12, length: h * 0.06, segments: 12, smooth: true} }
+  for i in 0..5 {
+    const a = i * 2.399 + seed
+    const tilt = 0.6 + (i % 3) * 0.14
+    { (IsA, CanalBark); Position: {math.sin(a) * h * 0.09, h * 0.56, math.cos(a) * h * 0.09}; Rotation: {math.cos(a) * tilt, 0, -math.sin(a) * tilt}; Frustum: {radius_bottom: girth * 0.42, radius_top: girth * 0.16, length: h * 0.3, segments: 8, smooth: true} }
+  }
+  for i in 0..5 {
+    const a = i * 2.399 + seed
+    const r = h * (0.2 + (i % 2) * 0.03)
+    CanalLeafLobe(rx: h * 0.2, ry: h * 0.16, rz: h * 0.2, count: 48, card: h * 0.18, seed: a) { Position: {math.sin(a) * r, h * (0.66 + (i % 3) * 0.06), math.cos(a) * r} }
+  }
+  CanalLeafLobe(rx: h * 0.3, ry: h * 0.24, rz: h * 0.3, count: 100, card: h * 0.2, seed: seed) { Position: {0, h * 0.8, 0} }
+}
+
+template CanalShrub {
+  prop size: f32 = 0.7
+  prop seed: f32 = 0
+  CanalLeafLobe(rx: size * 0.62, ry: size * 0.48, rz: size * 0.62, count: 42, card: size * 0.42, seed: seed) { Position: {0, size * 0.45, 0} }
+  CanalLeafLobe(rx: size * 0.36, ry: size * 0.3, rz: size * 0.36, count: 22, card: size * 0.34, seed: seed + 1) { Position: {size * 0.5, size * 0.3, size * 0.2} }
+}
+
+template CanalMeadow {
+  prop x0: f32 = 0
+  prop x1: f32 = 1
+  prop z0: f32 = 0
+  prop z1: f32 = 1
+  prop count: i32 = 60
+  prop seed: f32 = 0
+  prop gap_x0: f32 = 100
+  prop gap_x1: f32 = 100
+  prop gap_z0: f32 = 100
+  prop gap_z1: f32 = 100
+  SpatialIgnore
+  for i in 0..count {
+    const fx = (i * 0.61803398 + seed * 0.37) - math.floor(i * 0.61803398 + seed * 0.37)
+    const fz = (i * 0.75487767 + seed * 0.71) - math.floor(i * 0.75487767 + seed * 0.71)
+    const x = x0 + fx * (x1 - x0)
+    const z = z0 + fz * (z1 - z0)
+    const clear = x < gap_x0 || x > gap_x1 || z < gap_z0 || z > gap_z1
+    if clear {
+      const yaw = i * 2.399
+      const s = 0.24 + (i % 5) * 0.05
+      {
+        Position: {x, s * 0.5, z}
+        { (IsA, CanalTuftCard); Rotation: {0, yaw, 0}; Quad: {s, s} }
+        { (IsA, CanalTuftCard); Rotation: {0, yaw + 1.57, 0}; Quad: {s, s} }
+      }
+    }
+  }
+}
+
+template CanalPebbles {
+  prop count: i32 = 8
+  prop spread: f32 = 0.5
+  prop seed: f32 = 0
+  for i in 0..count {
+    const a = i * 2.399 + seed
+    const r = spread * (0.3 + (i % 4) * 0.23)
+    const s = 0.05 + (i % 3) * 0.035
+    { (IsA, CanalDarkStone); Position: {math.sin(a) * r, s * 0.4, math.cos(a) * r}; Scale: {1, 0.65, 1.2}; IcoSphere: {radius: s, segments: 1} }
+  }
+}
+
+template CanalReeds {
+  prop seed: f32 = 0
+  for i in 0..22 {
+    const a = i * 2.399 + seed
+    const r = 0.1 + (i % 6) * 0.14
+    const tall = 0.8 + (i % 4) * 0.24
+    { (IsA, CanalReed); Position: {math.sin(a) * r, tall / 2, math.cos(a) * r}; Rotation: {math.sin(a * 3) * 0.08, 0, math.cos(a * 2) * 0.08}; Frustum: {radius_bottom: 0.02, radius_top: 0.008, length: tall, segments: 5} }
+    if i % 3 == 0 {
+      { (IsA, CanalBark); Position: {math.sin(a) * r, tall * 0.92, math.cos(a) * r}; Capsule: {radius: 0.032, length: 0.14, segments: 6} }
+    }
+  }
+}
+
+template CanalLily {
+  prop seed: f32 = 0
+  for i in 0..5 {
+    const a = i * 2.399 + seed
+    { (IsA, CanalLeafLight); Position: {math.sin(a) * 0.32, 0.012, math.cos(a) * 0.32}; Cylinder: {radius: 0.12 + (i % 2) * 0.04, length: 0.012, segments: 12} }
+  }
+  { Position: {0.1, 0.05, 0.1}; IcoSphere: {radius: 0.05, segments: 1}; Rgb: {246, 238, 226}; Emissive: {strength: 0.1, color: {255, 240, 220}} }
+}
+
+template CanalDuck {
+  body { Position: {0, 0.09, 0}; Scale: {1.45, 0.8, 0.9}; Sphere: {radius: 0.12, segments: 12, smooth: true}; Rgb: {198, 188, 164}; PbrMaterial: {roughness: 0.8} }
+  tail { Position: {-0.17, 0.13, 0}; Cone: {radius: 0.05, length: 0.1, segments: 6}; Rotation: {0, 0, 0.8}; Rgb: {60, 54, 46} }
+  neck { Position: {0.14, 0.2, 0}; Cylinder: {radius: 0.035, length: 0.16, segments: 8}; Rgb: {240, 236, 226} }
+  head { Position: {0.15, 0.3, 0}; Sphere: {radius: 0.06, segments: 10, smooth: true}; Rgb: {28, 86, 56}; PbrMaterial: {roughness: 0.3} }
+  bill { Position: {0.22, 0.29, 0}; Scale: {1, 0.35, 0.6}; Sphere: {radius: 0.045, segments: 8}; Rgb: {226, 164, 50} }
+}
+
+template CanalFence {
+  prop length: f32 = 6
+  const posts = length / 1.2
+  for i in 0..posts + 1 {
+    { (IsA, CanalOldTimber); Position: {i * 1.2, 0.42, 0}; Rotation: {math.sin(i * 3.1) * 0.03, 0, math.sin(i * 5.3) * 0.03}; Box: {0.09, 0.84, 0.09} }
+  }
+  rail_a : CanalOldTimber { Position: {length / 2, 0.62, 0.05}; Box: {length, 0.07, 0.03} }
+  rail_b : CanalOldTimber { Position: {length / 2, 0.32, 0.05}; Box: {length, 0.07, 0.03} }
+}

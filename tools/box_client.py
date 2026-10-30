@@ -259,8 +259,9 @@ class App:
             self.last_output = out
             self.fail("the command failed (%d)" % status, cmd, out)
         results = reply.get("results") or [{}]
-        result = results[-1].get("result")
-        if results[-1].get("type") == "flecs.meta.value" and isinstance(result, dict) and \
+        last = results[-1] if isinstance(results[-1], dict) else {}
+        result = last.get("result")
+        if last.get("type") == "flecs.meta.value" and isinstance(result, dict) and \
                 len(result) == 1:
             result = next(iter(result.values()))
         return result

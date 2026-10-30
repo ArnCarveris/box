@@ -188,7 +188,8 @@ bool box_transition_supported(
         component == ecs_id(PbrMaterial) ||
         component == ecs_id(Emissive) ||
         component == ecs_id(TextureTransform) ||
-        component == ecs_id(Transmission));
+        component == ecs_id(Transmission) ||
+        component == ecs_id(ClearCoat));
 }
 
 bool box_transition_valid(

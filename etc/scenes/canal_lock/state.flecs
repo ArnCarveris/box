@@ -1,0 +1,13 @@
+export mut lock_high = false
+export mut lock_top_paddle = false
+export mut lock_bottom_paddle = false
+export mut lock_top_gate = false
+export mut lock_bottom_gate = false
+export mut lock_bridge_up = false
+export mut lock_boat_at: i32 = 0
+export mut lock_boat_up = true
+export mut lock_trips: i32 = 0
+export mut lock_busy_until: f64 = 0
+export mut lock_door_open = false
+export mut lock_lantern_on = false
+export mut lock_mill_on = false

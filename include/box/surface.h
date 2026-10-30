@@ -102,6 +102,26 @@ void box_surface_point_size(
     float *width,
     float *height);
 
+/** Get the size in points of the surface a view renders to.
+ *
+ * The first surface whose view_root is 0 or the parent of the view counts, in the order of the
+ * query; its size comes from box_surface_point_size. Without one the size is the default
+ * surface size, BOX_SURFACE_WIDTH by BOX_SURFACE_HEIGHT.
+ *
+ * @param world The world
+ * @param surfaces Query for Surface and an optional SurfaceStatus, NULL to make one for the call
+ * @param view The view
+ * @param width Out: the width in points
+ * @param height Out: the height in points
+ * @return Whether a surface renders the view
+ */
+bool box_surface_view_size(
+    ecs_world_t *world,
+    ecs_query_t *surfaces,
+    ecs_entity_t view,
+    float *width,
+    float *height);
+
 /** Register the box.surface module.
  *
  * @param world The world
