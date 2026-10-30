@@ -150,6 +150,7 @@ hud {
         Separator lighting_start()
         Checkbox shadows(label: "Shadows", value: true)
         Checkbox baked(label: "Baked lighting", value: true)
+        Checkbox gtao(label: "GTAO", value: true)
       }
     }
   }
@@ -226,7 +227,7 @@ view {
     },
     culling: {enabled: true, occlusion: true, min_dimension_px: 4},
     effects: [
-      {enabled: true, effect: gtao},
+      {enabled: hud.screen.options.body.gtao[Checkbox.mut].current, effect: gtao},
       {enabled: true, effect: sky},
       {enabled: true, effect: bloom},
       {enabled: true, effect: tonemap},
