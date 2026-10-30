@@ -606,6 +606,7 @@ WGPUComputePassEncoder box_gpu_compute_begin(
     ecs_assert(!writes ||
         writes->endOfPassWriteIndex < wgpuQuerySetGetCount(writes->querySet),
         ECS_INVALID_PARAMETER, "timestamp end index out of range of its query set");
+
     return wgpuCommandEncoderBeginComputePass(encoder,
         &(WGPUComputePassDescriptor){ .timestampWrites = writes });
 }
