@@ -332,6 +332,7 @@ static void box_console_append(
         box_console_line_t *l = ecs_vec_append_t(NULL, &con->lines, box_console_line_t);
         l->kind = kind;
         l->rows = 0;
+        l->strip = false;
         l->hang = shift ? shift : (int32_t)strspn(p, " \t");
         l->hang = l->hang < size + shift ? l->hang : size + shift;
         ecs_vec_init_t(NULL, &l->spans, box_console_span_t, 0);
@@ -349,10 +350,6 @@ static void box_console_append(
         }
     }
 }
-
-static void box_console_trim(
-    ecs_world_t *world,
-    box_console_t *con);
 
 /** Append a line that ran or was abandoned to the scrollback after the prompt it was typed
  * at, which the line keeps with the colors of its scope and $.
@@ -431,6 +428,7 @@ void box_console_greet(
     l->kind = BoxConsoleOutput;
     l->hang = 0;
     l->rows = 0;
+    l->strip = false;
     ecs_vec_init_t(NULL, &l->spans, box_console_span_t, 0);
     *ecs_vec_append_t(NULL, &l->spans, box_console_span_t) = (box_console_span_t){
         .start = (int32_t)(help - hint),
@@ -442,12 +440,7 @@ done:
     return;
 }
 
-/** Drop the oldest lines of the scrollback while it has more rows than the console keeps.
- *
- * @param world The world
- * @param con The console state
- */
-static void box_console_trim(
+void box_console_trim(
     ecs_world_t *world,
     box_console_t *con)
 {
@@ -471,6 +464,7 @@ static void box_console_trim(
 
     memmove(lines, &lines[drop], (size_t)(count - drop) * sizeof(box_console_line_t));
     ecs_vec_set_count_t(NULL, &con->lines, box_console_line_t, count - drop);
+    con->scroll = con->scroll < rows ? con->scroll : (rows > 0 ? rows : 0);
 done:
     return;
 }

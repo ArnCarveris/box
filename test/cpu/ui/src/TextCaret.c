@@ -645,3 +645,66 @@ void TextCaret_font_not_loaded(void) {
     test_int(box_text_line(world, e, 0, NULL, NULL), 0);
     ecs_fini(world);
 }
+
+void TextCaret_trailing_spaces_next_line(void) {
+    ecs_world_t *world = caret_world();
+    ecs_entity_t font = ecs_lookup(world, "box.text.DefaultFont");
+    caret_text(world, "loaded", 0, AlignLeft);
+    char value[128] = {0};
+    Text look = {.value = value, .size = 16, .width = 150, .font = font};
+    int32_t len = 0;
+    while (len < 100) {
+        value[len] = 'x';
+        if (box_text_break_lines(world, &look, NULL) > 1) {
+            value[len] = '\0';
+            break;
+        }
+
+        len ++;
+    }
+
+    test_assert(len < 100);
+    ecs_os_strcpy(value + len, "                ");
+    int32_t full = len;
+    len += 16;
+
+    // The caret after the spaces starts the next line at the left edge, an empty line
+    ecs_entity_t e = caret_text(world, value, 150, AlignLeft);
+    float w = ecs_get(world, e, TextBounds)->width;
+    int32_t start, end;
+    test_int(box_text_line(world, e, 0, NULL, NULL), 2);
+    TextCaret at = caret_at(world, e, len);
+    test_int(at.line, 1);
+    test_flt(at.x, -w * 0.5f);
+    test_flt(ecs_get(world, e, TextBounds)->height, 2 * at.height);
+    TextCaret before = caret_at(world, e, len - 1);
+    test_int(before.line, 0);
+    test_assert(before.x > at.x);
+    test_int(caret_at(world, e, full).line, 0);
+    box_text_line(world, e, 1, &start, &end);
+    test_int(start, len);
+    test_int(end, len);
+    test_int(caret_round_trip(world, e, len), len);
+
+    // A word after the spaces wraps to the next line as before
+    ecs_entity_t word = caret_text(world, "", 150, AlignLeft);
+    char *more = flecs_asprintf("%sy", value);
+    ecs_set(world, word, Text, {.value = more, .size = 16, .width = 150, .font = font});
+    ecs_progress(world, 0);
+    w = ecs_get(world, word, TextBounds)->width;
+    test_int(box_text_line(world, word, 0, NULL, NULL), 2);
+    at = caret_at(world, word, len);
+    test_int(at.line, 1);
+    test_flt(at.x, -w * 0.5f);
+    test_int(caret_at(world, word, len + 1).line, 1);
+    test_int(caret_at(world, word, len - 1).line, 0);
+    ecs_os_free(more);
+
+    // Without the spaces the caret after the line stays on it
+    value[full] = '\0';
+    ecs_entity_t one = caret_text(world, value, 150, AlignLeft);
+    test_int(box_text_line(world, one, 0, NULL, NULL), 1);
+    test_int(caret_at(world, one, full).line, 0);
+
+    ecs_fini(world);
+}

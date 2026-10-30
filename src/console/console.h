@@ -108,6 +108,8 @@ typedef struct box_console_line_t {
                                  *   a line that ran, the end of the indentation of others */
     int32_t rows;               /**< Rows the line wraps to at box_console_t.wrap, 0 until
                                  *   measured */
+    bool strip;                 /**< Spaces at its end pass the width, it is shown without them
+                                 *   so it does not gain the empty row of the caret after them */
 } box_console_line_t;
 
 /** A candidate of Tab completion */
@@ -182,6 +184,8 @@ typedef struct box_console_t {
     float wrap;                 /**< Width the rows of the scrollback lines were measured at */
     float wrap_size;            /**< Font size the rows of the scrollback were measured at */
     bool pending;               /**< A line could not be measured while its font loads */
+    bool trim;                  /**< The rows of the scrollback were reset, it is trimmed to
+                                 *   Console.scrollback once they are measured */
     ecs_entity_t font;          /**< Font of the console text, box.text.DefaultFont */
     bool shown;                 /**< The content is shown and the console takes the keyboard */
     bool enabled;               /**< The toggle action is enabled */
@@ -360,6 +364,16 @@ const char* box_console_ghost(
  * @param con The console state
  */
 void box_console_greet(
+    ecs_world_t *world,
+    box_console_t *con);
+
+/** Drop the oldest lines of the scrollback while it has more rows than Console.scrollback, and
+ * keep the scroll offset within the rows that are left.
+ *
+ * @param world The world
+ * @param con The console state
+ */
+void box_console_trim(
     ecs_world_t *world,
     box_console_t *con);
 
