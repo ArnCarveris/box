@@ -5,8 +5,8 @@
 
 static void Validation_logs(ecs_world_t *world, const char *expected)
 {
-    ecs_entity_t session = box_terminal_new(world);
-    char *out = box_terminal_run(world, session, "logs error 20", NULL);
+    ecs_entity_t session = ecs_shell_session_init(world, NULL);
+    char *out = box_command_run(world, session, "logs error 20", NULL);
     test_assert(out != NULL);
     test_assert(strstr(out, expected) != NULL);
     ecs_os_free(out);
@@ -18,8 +18,8 @@ void Validation_valid_mesh(void)
     ECS_IMPORT(world, Box);
     ecs_entity_t entity = ecs_entity(world, {.name = "subject"});
     ecs_set(world, entity, Box, {.x = 1, .y = 2, .z = 3});
-    ecs_entity_t session = box_terminal_new(world);
-    char *out = box_terminal_run(world, session, "logs error 20", NULL);
+    ecs_entity_t session = ecs_shell_session_init(world, NULL);
+    char *out = box_command_run(world, session, "logs error 20", NULL);
     test_str(out, "");
     ecs_os_free(out);
     ecs_fini(world);

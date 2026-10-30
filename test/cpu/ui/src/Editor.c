@@ -193,17 +193,17 @@ void Editor_open_from_script(void) {
 void Editor_open_from_command(void) {
     // editor/overlay
     ecs_world_t *world = editor_world();
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "edit", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "edit", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     editor_check_view(world);
 
-    ecs_os_free(box_terminal_run(world, s, "edit", NULL));
+    ecs_os_free(box_command_run(world, s, "edit", NULL));
     ecs_progress(world, 0);
     test_assert(ecs_lookup(world, BOX_EDITOR_VIEW) == 0);
 
-    ecs_os_free(box_terminal_run(world, s, "edit on", NULL));
+    ecs_os_free(box_command_run(world, s, "edit on", NULL));
     ecs_progress(world, 0);
     editor_check_view(world);
 

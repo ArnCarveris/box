@@ -185,7 +185,7 @@ void gallery_key(
  *
  * @param world The world
  * @param session The terminal session
- * @return Its path as the command prints it, owned by the caller
+ * @return Its path, "#0" for none, owned by the caller
  */
 char* gallery_focused(
     ecs_world_t *world,

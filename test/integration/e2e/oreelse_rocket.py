@@ -50,12 +50,12 @@ FILLER = ["items.Iron", "items.Copper", "items.Stone", "items.IronPlate", "items
 
 
 def rocket(app):
-    return app.get(ROCKET, "OreRocketState")
+    return app.get(ROCKET, "oreelse.OreRocketState")
 
 
 def wait_rocket(app, check, what, frames=None):
     """Wait until the rocket state passes a check; returns it."""
-    app.wait_for("get %s OreRocketState" % ROCKET, lambda out: check(parse_value(out)),
+    app.wait_for("get %s oreelse.OreRocketState" % ROCKET, lambda out: check(parse_value(out)),
                  frames=frames or 30, what=what)
     return rocket(app)
 
@@ -135,7 +135,7 @@ def test_install(app):
     app.check(model["engines"] == 4 and model["fuel"] == 1 and model["cargo"] == 1 and
               model["life_support"] == 0 and model["valid"] and not model["loaded"],
               "the model is %s" % model)
-    p = app.get("rocket", "Position")
+    p = app.get("rocket", "box.transform.Position")
     app.check(abs(p["x"] - x) < 1e-4 and abs(p["z"] - z) < 1e-4 and abs(p["y"] - BASE_Y) < 1e-4,
               "the model stands at %s" % p)
 
@@ -225,12 +225,12 @@ def test_cargo_launch(app):
     r = rocket(app)
     app.check(r["phase"] in ("Ascent", "OreLaunchPhaseAscent") and r["y"] > BASE_Y,
               "a second into the ascent the rocket is %s" % r)
-    p = app.get("rocket", "Position")
+    p = app.get("rocket", "box.transform.Position")
     app.check(p["y"] > BASE_Y + 1, "the model is at %s, the rocket at %g" % (p, r["y"]))
     app.check(rocket(app)["shipped"] == 0, "shipped before the arrival")
 
     # It arrives about 5.25 s after the launch
-    app.wait_for("get %s OreRocketState.shipped" % ROCKET, str(CAPACITY),
+    app.wait_for("get %s oreelse.OreRocketState.shipped" % ROCKET, str(CAPACITY),
                  frames=round((FLIGHT - IGNITION - 1 + 0.6) * FPS), what="25 Luminite shipped")
     wait_toast(app, "Shipment away!  +25 Luminite")
     r = rocket(app)
@@ -252,17 +252,17 @@ def test_crewed_launch(app):
     # The astronaut boards: on the pad, hidden, and it cannot walk
     r = wait_rocket(app, lambda r: r["aboard"], "the astronaut aboard")
     x, z = tile_point(*PAD_CENTER)
-    p = app.get(PLAYER, "Position")
+    p = app.get(PLAYER, "box.transform.Position")
     app.check(abs(p["x"] - x) < 1e-4 and abs(p["z"] - z) < 1e-4,
               "the astronaut is at %s, not on the pad" % p)
-    s = app.get(PLAYER, "Scale")
+    s = app.get(PLAYER, "box.transform.Scale")
     app.check(s["x"] < 0.01 and s["y"] < 0.01 and s["z"] < 0.01, "the astronaut shows: %s" % s)
-    app.exec("key.down D")
+    app.exec("key_down D")
     app.wait_input()
     app.wait_frames(10)
-    app.exec("key.up D")
+    app.exec("key_up D")
     app.wait_input()
-    p = app.get(PLAYER, "Position")
+    p = app.get(PLAYER, "box.transform.Position")
     app.check(abs(p["x"] - x) < 1e-4 and abs(p["z"] - z) < 1e-4,
               "the astronaut aboard walked to %s" % p)
     app.check(count(app, LUMINITE) == 10, "the rocket without bays loaded Luminite")
@@ -281,7 +281,8 @@ def test_demolish_pad(app):
 
     # The undamaged pad goes back into the inventory, the parts and the Luminite are lost
     mine(app, *PAD_CENTER)
-    app.wait_for("get %s OreRocketState.pad" % ROCKET, lambda out: out in ("0", "#0", ""),
+    app.wait_for("get %s oreelse.OreRocketState.pad" % ROCKET,
+                 lambda out: parse_value(out) in (0, "#0", None),
                  frames=round((DOZE_TIME + 1.5) * FPS), what="the pad demolished")
     button(app, "right", False)
     app.wait_frames(SETTLE)
@@ -296,7 +297,7 @@ def test_demolish_pad(app):
 
 
 def orders(app):
-    book = app.get(BOOK, "OreCraftBook")
+    book = app.get(BOOK, "oreelse.OreCraftBook")
     return [(o["item"], o["demand"]) for o in book["orders"][:book["count"]]]
 
 
@@ -306,18 +307,18 @@ def test_craft_keys(app):
 
     # F orders one engine
     key(app, "F")
-    app.wait_for("get %s OreCraftBook.count" % BOOK, "1", what="the order of an engine")
+    app.wait_for("get %s oreelse.OreCraftBook.count" % BOOK, "1", what="the order of an engine")
     app.check(orders(app) == [(ENGINE, 1)], "the order book holds %s" % orders(app))
     app.check(count(app, "items.IronPlate") == 92 and count(app, "items.CopperPlate") == 96,
               "the engine took %s" % inventory(app))
 
     # Shift and F order five in one order
-    app.exec("key.down ShiftLeft")
+    app.exec("key_down ShiftLeft")
     app.wait_input()
     key(app, "F")
-    app.exec("key.up ShiftLeft")
+    app.exec("key_up ShiftLeft")
     app.wait_input()
-    app.wait_for("get %s OreCraftBook.count" % BOOK, "2", what="the order of five engines")
+    app.wait_for("get %s oreelse.OreCraftBook.count" % BOOK, "2", what="the order of five engines")
     app.check(orders(app) == [(ENGINE, 1), (ENGINE, 5)], "the order book holds %s" % orders(app))
     app.check(count(app, "items.IronPlate") == 52 and count(app, "items.CopperPlate") == 76,
               "six engines took %s" % inventory(app))
@@ -327,6 +328,6 @@ def test_craft_keys(app):
                         ("items.Electronics", 4)])
     for k in ["G", "H", "J"]:
         key(app, k)
-    app.wait_for("get %s OreCraftBook.count" % BOOK, "5", what="the orders of G, H and J")
+    app.wait_for("get %s oreelse.OreCraftBook.count" % BOOK, "5", what="the orders of G, H and J")
     app.check(orders(app)[2:] == [(FUEL, 1), (CARGO, 1), (LIFE, 1)],
               "the order book holds %s" % orders(app))

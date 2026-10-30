@@ -14,3 +14,4 @@ test/integration/out
 core
 !core/
 core.[0-9]*
+.flecs

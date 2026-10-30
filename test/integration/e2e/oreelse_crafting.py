@@ -13,7 +13,7 @@ import json
 import urllib.error
 import urllib.request
 
-from box_client import DELTA_TIME
+from box_client import DELTA_TIME, parse_value
 
 APP = "apps/oreelse"
 SEED = 8
@@ -22,9 +22,10 @@ ARGS = ["--seed", str(SEED), "--fps", "20"]
 # Frames per second of game time
 FPS = round(1 / float(DELTA_TIME))
 
-STATE = "has oreelse.OreGameState (oreelse.OreGameState, oreelse.OreGameState.%s)"
-TOAST = "get oreelse.OreToast OreToast.text"
-CLOCK = "get oreelse.OreClock OreClock.elapsed"
+STATE = ("eval oreelse.OreGameState.has(flecs.script.core.pair("
+         "oreelse.OreGameState,oreelse.OreGameState.%s))")
+TOAST = "get oreelse.OreToast oreelse.OreToast.text"
+CLOCK = "get oreelse.OreClock oreelse.OreClock.elapsed"
 PLAYER = "astronaut"
 INVENTORY = "oreelse.OreInventory"
 BOOK = "oreelse.OreCraftBook"
@@ -93,7 +94,7 @@ def order(app, item, count=1):
     n = SCRIPTS[0] + 1
     run_script(app, "craft_result_%d { oreelse.OreStack: {item: %s, amount: "
                     "oreelse.craft_order(%s, %d)} }" % (n, item, item, count))
-    return app.get("craft_result_%d" % n, "OreStack")["amount"]
+    return app.get("craft_result_%d" % n, "oreelse.OreStack")["amount"]
 
 
 def cancel(app, order_id):
@@ -101,7 +102,7 @@ def cancel(app, order_id):
     n = SCRIPTS[0] + 1
     run_script(app, "craft_result_%d { oreelse.OreCanOrder: {value: "
                     "oreelse.craft_cancel(%d)} }" % (n, order_id))
-    return app.get("craft_result_%d" % n, "OreCanOrder")["value"]
+    return app.get("craft_result_%d" % n, "oreelse.OreCanOrder")["value"]
 
 
 def inventory_add(app, item, amount):
@@ -121,16 +122,16 @@ def set_state(app, state):
 def setup(app):
     """Shrink the window and drop the shadows of the world view, so the software renderer keeps
     up."""
-    app.exec("set window Surface {width: 640, height: 360}")
-    app.exec("set main_view View.shadows.enabled false")
-    app.wait_for("get window SurfaceStatus.height", "360")
+    app.exec("set window box.surface.Surface {width: 640, height: 360}")
+    app.exec("set main_view box.view.View.shadows.enabled false")
+    app.wait_for("get window box.surface.SurfaceStatus.height", "360")
 
 
 def start(app):
     """Set up, leave the title screen with a key press and pause the astronaut's crafting."""
     setup(app)
     app.expect(STATE % "Title", "true")
-    app.exec("key.press Space")
+    app.exec("key_press Space")
     app.wait_input()
     app.wait_for(STATE % "Playing", "true")
     worker(app, PLAYER, speed=1, paused=True)
@@ -138,7 +139,8 @@ def start(app):
 
 def worker(app, path, speed=1, paused=False):
     """Set the crafter of an idle worker, creating the entity when it does not exist."""
-    app.exec("touch %s" % path)
+    if path not in parse_value(app.exec("ls")):
+        app.exec("new %s" % path)
     app.exec("set %s oreelse.OreCrafter {speed: %g, paused: %s}" %
              (path, speed, "true" if paused else "false"))
 
@@ -146,11 +148,11 @@ def worker(app, path, speed=1, paused=False):
 def resume(app, speed, path=PLAYER):
     """Set the speed of a worker and let it work; it keeps its craft (set assigns only the
     members it names)."""
-    app.exec("set %s OreCrafter {speed: %g, paused: false}" % (path, speed))
+    app.exec("set %s oreelse.OreCrafter {speed: %g, paused: false}" % (path, speed))
 
 
 def crafter(app, path=PLAYER):
-    c = app.get(path, "OreCrafter")
+    c = app.get(path, "oreelse.OreCrafter")
     c["item"] = entity(c["item"])
     return c
 
@@ -162,7 +164,7 @@ def entity(value):
 
 def inventory(app):
     """The slots of the inventory in order: (item, amount), None for a free slot."""
-    slots = app.get(INVENTORY, "OreInventory")["slots"]
+    slots = app.get(INVENTORY, "oreelse.OreInventory")["slots"]
     return [(entity(s["item"]), s["amount"]) if entity(s["item"]) else None for s in slots]
 
 
@@ -180,12 +182,12 @@ def set_inventory(app, stacks):
     slots = [{"item": s[0], "amount": s[1]} for s in stacks]
     slots += [{"item": 0, "amount": 0}] * (SLOTS - len(slots))
     put(app, INVENTORY, INVENTORY, {"slots": slots})
-    app.wait_for("get %s OreInventory.slots[0].amount" % INVENTORY,
+    app.wait_for("get %s oreelse.OreInventory.slots[0].amount" % INVENTORY,
                  str(stacks[0][1]) if stacks else "0")
 
 
 def book(app):
-    return app.get(BOOK, "OreCraftBook")
+    return app.get(BOOK, "oreelse.OreCraftBook")
 
 
 def orders(app):
@@ -217,7 +219,7 @@ def only_order(app):
 
 
 def can_order(app, item):
-    return app.exec("get %s OreCanOrder.value" % item) == "true"
+    return app.exec("get %s oreelse.OreCanOrder.value" % item) == "true"
 
 
 def test_order_from_ore(app):
@@ -238,14 +240,14 @@ def test_order_from_ore(app):
 
     clock = float(app.exec(CLOCK))
     resume(app, FAST)
-    app.wait_for("get %s OreInventory.slots[0].item" % INVENTORY, ENGINE,
+    app.wait_for("get %s oreelse.OreInventory.slots[0].item" % INVENTORY, '"%s"' % ENGINE,
                  frames=CRAFT_FRAMES, what="the engine in the inventory")
     took = float(app.exec(CLOCK)) - clock
     work = (12 * PLATE_TIME + ENGINE_TIME) / FAST
     app.check(took >= work - 0.05, "the engine came after %g s, not after the %g s of its "
               "crafts" % (took, work))
     app.check(held(app) == {ENGINE: 1}, "the inventory holds %s" % held(app))
-    app.wait_for("get %s OreCraftBook.count" % BOOK, "0", what="the order removed")
+    app.wait_for("get %s oreelse.OreCraftBook.count" % BOOK, "0", what="the order removed")
 
 
 def test_borrow_parts(app):
@@ -300,8 +302,8 @@ def test_orders_oldest_first(app):
         app.check(o["pool"] == {"items.IronPlate": 8, "items.CopperPlate": 4},
                   "order %d holds %s, not parts of its own" % (o["id"], o["pool"]))
 
-    app.exec("set %s OreCrafter.paused false" % PLAYER)
-    app.wait_for("get %s OreCrafter.order" % PLAYER, str(first["id"]),
+    app.exec("set %s oreelse.OreCrafter.paused false" % PLAYER)
+    app.wait_for("get %s oreelse.OreCrafter.order" % PLAYER, str(first["id"]),
                  what="the worker on the first order")
     first, second = orders(app)
     app.check(first["pool"] == {} and second["pool"] == {"items.IronPlate": 8,
@@ -310,8 +312,8 @@ def test_orders_oldest_first(app):
     app.check(second["entries"][0]["running"] == 0, "the second order started too")
 
     # Skip to the end of the first engine: then the worker starts the second order
-    app.exec("set %s OreCrafter.left 0.05" % PLAYER)
-    app.wait_for("get %s OreCrafter.order" % PLAYER, str(second["id"]),
+    app.exec("set %s oreelse.OreCrafter.left 0.05" % PLAYER)
+    app.wait_for("get %s oreelse.OreCrafter.order" % PLAYER, str(second["id"]),
                  frames=SETTLE * 4, what="the worker on the second order")
     app.check(count(app, ENGINE) == 1, "the first engine was not delivered")
     app.check([o["id"] for o in orders(app)] == [second["id"]], "the first order stayed")
@@ -324,10 +326,10 @@ def test_two_workers(app):
     app.check(order(app, ENGINE) == 1, "the second order was not placed")
     first, second = orders(app)
     worker(app, "worker2")
-    app.exec("set %s OreCrafter.paused false" % PLAYER)
-    app.wait_for("get worker2 OreCrafter.order", str(first["id"]),
+    app.exec("set %s oreelse.OreCrafter.paused false" % PLAYER)
+    app.wait_for("get worker2 oreelse.OreCrafter.order", str(first["id"]),
                  what="the second worker on the oldest order")
-    app.wait_for("get %s OreCrafter.order" % PLAYER, str(first["id"]),
+    app.wait_for("get %s oreelse.OreCrafter.order" % PLAYER, str(first["id"]),
                  what="the astronaut on the oldest order")
     first, second = orders(app)
     app.check(first["entries"][0]["running"] == 2 and first["entries"][0]["active"],
@@ -347,7 +349,7 @@ def test_spare_wire(app):
     app.check(held(app) == {}, "the inventory holds %s" % held(app))
 
     resume(app, FAST)
-    app.wait_for("get %s OreCraftBook.count" % BOOK, "0", frames=CRAFT_FRAMES,
+    app.wait_for("get %s oreelse.OreCraftBook.count" % BOOK, "0", frames=CRAFT_FRAMES,
                  what="the order completed")
     app.check(held(app) == {"items.Electronics": 1, "items.Wire": 1},
               "the spare wire did not come back: %s" % held(app))
@@ -361,7 +363,7 @@ def test_cancel(app):
 
     # A slow worker keeps its first plate craft in progress
     resume(app, 0.01)
-    app.wait_for("get %s OreCrafter.item" % PLAYER, "items.IronPlate",
+    app.wait_for("get %s oreelse.OreCrafter.item" % PLAYER, '"items.IronPlate"',
                  what="a plate craft in progress")
 
     app.check(cancel(app, o["id"]), "the first cancel was refused")
@@ -424,7 +426,7 @@ def test_full_inventory_blocks_start(app):
     app.check(header["stalled"] and header["full"], "the header row is %s" % header)
 
     inventory_remove(app, "items.Stone", 1)
-    app.wait_for("get %s OreCraftBook.count" % BOOK, "0", frames=CRAFT_FRAMES,
+    app.wait_for("get %s oreelse.OreCraftBook.count" % BOOK, "0", frames=CRAFT_FRAMES,
                  what="the engine crafted once a slot freed")
     app.check(count(app, ENGINE) == 1, "the engine is not in the inventory: %s" % held(app))
 
@@ -434,14 +436,15 @@ def test_delivery_blocked(app):
     others = [(kind, 1) for kind in ["items.Iron", "items.Copper"] + OTHERS[:-1]]
     set_inventory(app, [("items.IronPlate", 8), ("items.CopperPlate", 4)] + others)
     app.check(order(app, ENGINE) == 1, "the engine was not ordered")
-    app.exec("set %s OreCrafter.paused false" % PLAYER)
-    app.wait_for("get %s OreCrafter.item" % PLAYER, ENGINE, what="the engine started")
+    app.exec("set %s oreelse.OreCrafter.paused false" % PLAYER)
+    app.wait_for("get %s oreelse.OreCrafter.item" % PLAYER, '"%s"' % ENGINE,
+                 what="the engine started")
 
     for kind in ["items.IronPlate", "items.CopperPlate", "Astronaut"]:
         inventory_add(app, kind, 1)
     app.check(len(held(app)) == SLOTS, "the inventory holds %d kinds" % len(held(app)))
-    app.exec("set %s OreCrafter.left 0.05" % PLAYER)
-    app.wait_for("get %s OreCrafter.left" % PLAYER, "0", what="the engine finished")
+    app.exec("set %s oreelse.OreCrafter.left 0.05" % PLAYER)
+    app.wait_for("get %s oreelse.OreCrafter.left" % PLAYER, "0", what="the engine finished")
     app.wait_frames(SETTLE)
 
     c = crafter(app)
@@ -452,7 +455,7 @@ def test_delivery_blocked(app):
               "the order is not stalled on the delivery: %s" % o)
 
     inventory_remove(app, "items.Stone", 1)
-    app.wait_for("get %s OreCraftBook.count" % BOOK, "0", what="the engine delivered")
+    app.wait_for("get %s oreelse.OreCraftBook.count" % BOOK, "0", what="the engine delivered")
     app.check(count(app, ENGINE) == 1, "the engine is not in the inventory: %s" % held(app))
 
 
@@ -461,7 +464,8 @@ def test_worker_deleted(app):
     set_inventory(app, [("items.IronPlate", 8), ("items.CopperPlate", 4)])
     app.check(order(app, ENGINE) == 1, "the engine was not ordered")
     worker(app, "worker2")
-    app.wait_for("get worker2 OreCrafter.item", ENGINE, what="the second worker on the engine")
+    app.wait_for("get worker2 oreelse.OreCrafter.item", '"%s"' % ENGINE,
+                 what="the second worker on the engine")
     o = only_order(app)
     app.check(o["pool"] == {} and o["entries"][0]["running"] == 1,
               "the craft did not take its inputs: %s" % o)
@@ -474,7 +478,7 @@ def test_worker_deleted(app):
     app.check(o["entries"][0]["running"] == 0, "the engine still runs: %s" % o["entries"])
 
     resume(app, FAST)
-    app.wait_for("get %s OreCraftBook.count" % BOOK, "0", frames=CRAFT_FRAMES,
+    app.wait_for("get %s oreelse.OreCraftBook.count" % BOOK, "0", frames=CRAFT_FRAMES,
                  what="the astronaut completed the engine")
     app.check(count(app, ENGINE) == 1, "the engine is not in the inventory: %s" % held(app))
 
@@ -484,7 +488,7 @@ def test_ninth_order(app):
     set_inventory(app, [("items.CopperPlate", 9)])
     for i in range(8):
         app.check(order(app, "items.Wire") == 1, "order %d was refused" % (i + 1))
-    app.wait_for("get items.Wire OreCanOrder.value", "false",
+    app.wait_for("get items.Wire oreelse.OreCanOrder.value", "false",
                  what="wire not orderable with 8 orders")
     app.check(order(app, "items.Wire") == 0, "a ninth order was placed")
     app.check(len(orders(app)) == 8, "the book holds %d orders" % len(orders(app)))
@@ -494,21 +498,23 @@ def test_ninth_order(app):
 def test_can_order(app):
     start(app)
     set_inventory(app, [])
-    app.wait_for("get %s OreCanOrder.value" % ENGINE, "false", what="no engine from nothing")
+    app.wait_for("get %s oreelse.OreCanOrder.value" % ENGINE, "false",
+                 what="no engine from nothing")
     app.check(not can_order(app, "items.Electronics"), "electronics orderable from nothing")
 
     set_inventory(app, [("items.Iron", 16), ("items.Copper", 8)])
-    app.wait_for("get %s OreCanOrder.value" % ENGINE, "true", what="an engine from its ore")
+    app.wait_for("get %s oreelse.OreCanOrder.value" % ENGINE, "true",
+                 what="an engine from its ore")
     app.check(can_order(app, "items.Electronics"), "electronics not orderable with 8 copper")
     app.check(not can_order(app, "items.RocketLifeSupport"), "life support orderable")
 
     set_inventory(app, [("items.Iron", 16), ("items.Copper", 7)])
-    app.wait_for("get %s OreCanOrder.value" % ENGINE, "false",
+    app.wait_for("get %s oreelse.OreCanOrder.value" % ENGINE, "false",
                  what="no engine with a copper missing")
 
 
 def needs(app):
-    n = app.get(NEEDS, "OreNeeds")
+    n = app.get(NEEDS, "oreelse.OreNeeds")
     return [(o["item"], o["have"], o["need"]) for o in n["ores"][:n["count"]]]
 
 
@@ -516,17 +522,18 @@ def test_needs(app):
     start(app)
     set_inventory(app, [("items.Iron", 10), ("items.IronPlate", 2)])
     put(app, NEEDS, NEEDS, {"item": ENGINE})
-    app.wait_for("get %s OreNeeds.count" % NEEDS, "2", what="the needs of the engine")
+    app.wait_for("get %s oreelse.OreNeeds.count" % NEEDS, "2", what="the needs of the engine")
     app.check(needs(app) == [("items.Iron", 14, 16), ("items.Copper", 0, 8)],
               "the engine needs %s, not Iron 14/16 and Copper 0/8" % needs(app))
 
     set_inventory(app, [("items.CopperPlate", 4), ("items.Iron", 20)])
-    app.wait_for("get %s OreNeeds.ores[1].have" % NEEDS, "8", what="the copper plates counted")
+    app.wait_for("get %s oreelse.OreNeeds.ores[1].have" % NEEDS, "8",
+                 what="the copper plates counted")
     app.check(needs(app) == [("items.Iron", 16, 16), ("items.Copper", 8, 8)],
               "with parts in stock the engine needs %s" % needs(app))
 
     set_inventory(app, [])
     put(app, NEEDS, NEEDS, {"item": "items.Electronics"})
-    app.wait_for("get %s OreNeeds.count" % NEEDS, "1", what="the needs of electronics")
+    app.wait_for("get %s oreelse.OreNeeds.count" % NEEDS, "1", what="the needs of electronics")
     app.check(needs(app) == [("items.Copper", 0, 4)],
               "electronics need %s, not Copper 0/4" % needs(app))

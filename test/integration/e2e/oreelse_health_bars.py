@@ -13,6 +13,7 @@ holds the building and the fraction) under health_bars.bars, laid out in the sce
 """
 import struct
 
+from box_client import parse_value
 from oreelse_critters import (  # noqa: F401 (ARGS)
     ARGS, FPS, PLAYER, PLAYER_HP, STATE, buildings, entity, health, hold_waves, place_player,
     rows_of, set_state, setup, spawn, start, tile_point, wait_until, wall)
@@ -21,7 +22,7 @@ APP = "apps/oreelse"
 
 VIEW = "health_bars_view"
 CAMERA = "health_bars.camera"
-LEVEL = "get oreelse.OreView OreView.level"
+LEVEL = "get oreelse.OreView oreelse.OreView.level"
 
 # The bar: height, margin above the box, narrowest shown (cfg.hpBarHeight, cfg.hpBarMargin,
 # cfg.hpBarMinWidth)
@@ -74,7 +75,7 @@ def wait_no_bar(app, building):
 
 
 def set_health(app, building, value, max_hp=WALL_HP):
-    app.exec("set %s OreHealth {value: %g, max: %g}" % (building, value, max_hp))
+    app.exec("set %s oreelse.OreHealth {value: %g, max: %g}" % (building, value, max_hp))
 
 
 def f32(x):
@@ -99,18 +100,18 @@ def fill_color(value, max_hp):
 
 
 def color(app, path):
-    c = app.get(path, "Rgb")
+    c = app.get(path, "box.material.Rgb")
     return (c["r"], c["g"], c["b"])
 
 
 def projected(app, bar):
     """The projection of the wall's box: left, right, top, bottom."""
-    b = app.get(bar, "ProjectedBounds")
+    b = app.get(bar, "box.projection.ProjectedBounds")
     return b["left"], b["right"], b["top"], b["bottom"]
 
 
 def width(app, bar):
-    return float(app.exec("get %s LayoutBounds.width" % bar))
+    return float(app.exec("get %s box.layout.LayoutBounds.width" % bar))
 
 
 def check_fill(app, bar, value, max_hp=WALL_HP):
@@ -118,8 +119,8 @@ def check_fill(app, bar, value, max_hp=WALL_HP):
     frac = value / max_hp
     w = width(app, bar)
     fill = bar + ".track.fill"
-    fw = float(app.exec("get %s LayoutBounds.width" % fill))
-    fh = float(app.exec("get %s LayoutBounds.height" % fill))
+    fw = float(app.exec("get %s box.layout.LayoutBounds.width" % fill))
+    fh = float(app.exec("get %s box.layout.LayoutBounds.height" % fill))
     app.check(abs(fw - (w - 2) * frac) < 0.01,
               "the fill at %g is %g wide in a bar of %g" % (frac, fw, w))
     app.check(abs(fh - (BAR_HEIGHT - 2)) < 0.01, "the fill is %g tall" % fh)
@@ -131,16 +132,16 @@ def check_fill(app, bar, value, max_hp=WALL_HP):
 
 def check_placed(app, bar):
     """The bar is as wide as the projected box and sits BAR_MARGIN above its top edge."""
-    app.check(app.exec("has %s box.projection.ProjectedHidden" % bar) == "false",
+    app.check(app.exec("eval %s.has(box.projection.ProjectedHidden)" % bar) == "false",
               "the bar is hidden")
     left, right, top, _ = projected(app, bar)
     w = width(app, bar)
-    h = float(app.exec("get %s LayoutBounds.height" % bar))
+    h = float(app.exec("get %s box.layout.LayoutBounds.height" % bar))
     app.check(abs(w - (right - left)) < 0.01,
               "the bar is %g wide over a box %g wide" % (w, right - left))
     app.check(w >= BAR_MIN, "the bar is only %g wide" % w)
     app.check(abs(h - BAR_HEIGHT) < 0.01, "the bar is %g tall" % h)
-    p = app.get(bar, "Position")
+    p = app.get(bar, "box.transform.Position")
     app.check(abs(p["x"] - (left + right) / 2) < 0.01,
               "the bar is centered at %g over a box from %g to %g" % (p["x"], left, right))
     app.check(abs(p["y"] - (top + BAR_MARGIN + BAR_HEIGHT / 2)) < 0.01,
@@ -214,8 +215,8 @@ def test_fill_and_repair(app):
     # Repaired to full: the bar goes
     set_health(app, w, WALL_HP)
     wait_no_bar(app, w)
-    app.check(entity(app.get(w, "OreHealthBar")["bar"]) is None,
-              "the repaired wall keeps the bar %s" % app.get(w, "OreHealthBar"))
+    app.check(entity(app.get(w, "oreelse.OreHealthBar")["bar"]) is None,
+              "the repaired wall keeps the bar %s" % app.get(w, "oreelse.OreHealthBar"))
     app.check(not bars(app), "bars left: %s" % bars(app))
 
     # Damaged again and destroyed: the wall and its bar go
@@ -230,29 +231,33 @@ def test_paused(app):
     # Not on the title screen
     setup(app)
     app.wait_frames(SETTLE)
-    app.check(entity(app.exec("get %s View.camera" % VIEW)) is None,
+    app.check(entity(app.get(VIEW, "box.view.View.camera")) is None,
               "the view of the bars draws on the title screen")
 
-    app.exec("key.press Space")
+    app.exec("key_press Space")
     app.wait_input()
-    app.wait_for("get %s View.camera" % VIEW, CAMERA, what="the view of the bars drawing")
+    app.wait_for("get %s box.view.View.camera" % VIEW, '"%s"' % CAMERA,
+                 what="the view of the bars drawing")
     w = near_wall(app)
     set_health(app, w, 150)
     bar = wait_bar(app, w, 0.5)
 
     # Paused: the view has no camera, the bar stays
     set_state(app, "Paused")
-    app.wait_for("get %s View.camera" % VIEW, lambda out: entity(out) is None,
+    app.wait_for("get %s box.view.View.camera" % VIEW,
+                 lambda out: entity(parse_value(out)) is None,
                  what="the view of the bars hidden")
     app.check(bar_of(app, w) == bar, "the bar is gone while paused")
 
     set_state(app, "Playing")
-    app.wait_for("get %s View.camera" % VIEW, CAMERA, what="the view of the bars drawing")
+    app.wait_for("get %s box.view.View.camera" % VIEW, '"%s"' % CAMERA,
+                 what="the view of the bars drawing")
     app.check(bar_of(app, w) == bar, "the bar was replaced")
 
     # Lost: hidden again
     set_state(app, "Lost")
-    app.wait_for("get %s View.camera" % VIEW, lambda out: entity(out) is None,
+    app.wait_for("get %s box.view.View.camera" % VIEW,
+                 lambda out: entity(parse_value(out)) is None,
                  what="the view of the bars hidden when lost")
 
 
@@ -266,10 +271,10 @@ def test_zoom(app):
 
     # Zoomed out to level 2 the wall looks smaller and the bar narrows with it; it is as wide as
     # the projected box in every frame
-    app.exec("mouse.move [320, 300]")
+    app.exec("mouse_move [320, 300]")
     app.wait_input()
     for level in (1, 2):
-        app.exec("mouse.scroll 0 -1")
+        app.exec("mouse_scroll 0 -1")
         app.wait_input()
         app.wait_for(LEVEL, str(level), what="zoom level %d" % level)
     set_state(app, "Paused")
@@ -281,7 +286,7 @@ def test_zoom(app):
     # Back at level 0 it is as wide as before
     set_state(app, "Playing")
     for level in (1, 0):
-        app.exec("mouse.scroll 0 1")
+        app.exec("mouse_scroll 0 1")
         app.wait_input()
         app.wait_for(LEVEL, str(level), what="zoom level %d" % level)
     set_state(app, "Paused")
@@ -314,17 +319,17 @@ def test_player(app):
     app.wait_frames(SETTLE)
     check_placed(app, bar)
     check_fill(app, bar, 40, PLAYER_HP)
-    before = app.get(bar, "Position")["x"]
+    before = app.get(bar, "box.transform.Position")["x"]
 
     # It follows the astronaut: 3 units east the bar is further right on screen
     set_state(app, "Playing")
-    app.exec("set %s OreHurt {since: 0}" % PLAYER)
+    app.exec("set %s oreelse.OreHurt {since: 0}" % PLAYER)
     place_player(app, x + 3, z)
     app.wait_frames(SETTLE)
     set_state(app, "Paused")
     app.wait_frames(SETTLE)
     app.check(bar_of(app, PLAYER) == bar, "the bar was replaced")
-    app.check(app.get(bar, "Position")["x"] != before,
+    app.check(app.get(bar, "box.transform.Position")["x"] != before,
               "the bar stayed at x %g as the astronaut moved" % before)
     check_placed(app, bar)
 
@@ -351,13 +356,13 @@ def test_player_aboard(app):
     place_pad(app, [("items.RocketLifeSupport", 1), ("items.RocketEngine", 4),
                     ("items.RocketFuelStorage", 1)])
     assemble(app, life=True)
-    app.exec("set %s OreHurt {since: 0}" % PLAYER)
+    app.exec("set %s oreelse.OreHurt {since: 0}" % PLAYER)
     set_health(app, PLAYER, 40, PLAYER_HP)
     wait_until(app, lambda: bar_of(app, PLAYER) is not None, 30, "the astronaut's bar")
 
     key(app, "P")
     wait_rocket(app, lambda r: r["aboard"], "the astronaut aboard")
     wait_no_bar(app, PLAYER)
-    app.check(app.get(PLAYER, "OreHealth")["value"] < PLAYER_HP,
-              "the astronaut aboard healed: %s" % app.get(PLAYER, "OreHealth"))
+    app.check(app.get(PLAYER, "oreelse.OreHealth")["value"] < PLAYER_HP,
+              "the astronaut aboard healed: %s" % app.get(PLAYER, "oreelse.OreHealth"))
     app.check(not bars(app), "bars left: %s" % bars(app))

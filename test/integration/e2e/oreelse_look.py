@@ -20,13 +20,13 @@ from oreelse_flow import ARGS, STATE, key, set_state, setup, start  # noqa: F401
 
 APP = "apps/oreelse"
 
-TIER = "get oreelse.OreQuality OreQuality.tier"
-SCALE = "get window Surface.resolution_scale"
-SHADOW_RESOLUTION = "get main_view View.shadows.resolution"
-SHADOW_DISTANCE = "get main_view View.shadows.max_distance"
-EFFECTS = "get main_view View.effects"
-CLOUDS = "get sun LightCookie.strength"
-DRIFT = "get sun LightCookie.offset"
+TIER = "get oreelse.OreQuality oreelse.OreQuality.tier"
+SCALE = "get window box.surface.Surface.resolution_scale"
+SHADOW_RESOLUTION = "get main_view box.view.View.shadows.resolution"
+SHADOW_DISTANCE = "get main_view box.view.View.shadows.max_distance"
+EFFECTS = "get main_view box.view.View.effects"
+CLOUDS = "get sun box.light.LightCookie.strength"
+DRIFT = "get sun box.light.LightCookie.offset"
 
 # The strength of the cloud shadows where the tier has them (OreCloudShadow of the sun)
 CLOUD_STRENGTH = 0.6
@@ -100,16 +100,16 @@ def check_tier(app, name):
     app.check(effects(app) == {"gtao": gtao, "bloom": bloom, "tonemap": True},
               "the effects of the world view are %s at %s" % (effects(app), name))
     # The tier does not turn on the shadows that setup turned off
-    app.expect("get main_view View.shadows.enabled", "false")
+    app.expect("get main_view box.view.View.shadows.enabled", "false")
 
 
 def scenery(app):
     """The positions of the first and last boulder and dune."""
-    return [app.get(e, "Position") for e in SCENERY]
+    return [app.get(e, "box.transform.Position") for e in SCENERY]
 
 
 def cycle(app):
-    app.exec("action.press actions.Quality")
+    app.exec("action_press actions.Quality")
     app.wait_input()
 
 

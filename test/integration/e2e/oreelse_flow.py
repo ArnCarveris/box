@@ -28,12 +28,13 @@ ARGS = ["--seed", str(SEED), "--fps", "20"]
 # Frames per second of game time
 FPS = round(1 / float(DELTA_TIME))
 
-STATE = "has oreelse.OreGameState (oreelse.OreGameState, oreelse.OreGameState.%s)"
-CLOCK = "get oreelse.OreClock OreClock.elapsed"
-TOAST = "get oreelse.OreToast OreToast.text"
-LEVEL = "get oreelse.OreView OreView.level"
-CAMERA = "get camera Position"
-CAMERA_PITCH = "get camera Rotation.x"
+STATE = ("eval oreelse.OreGameState.has(flecs.script.core.pair("
+         "oreelse.OreGameState,oreelse.OreGameState.%s))")
+CLOCK = "get oreelse.OreClock oreelse.OreClock.elapsed"
+TOAST = "get oreelse.OreToast oreelse.OreToast.text"
+LEVEL = "get oreelse.OreView oreelse.OreView.level"
+CAMERA = "get camera box.transform.Position"
+CAMERA_PITCH = "get camera box.transform.Rotation.x"
 PLAYER = "astronaut"
 
 # Walking speed in units per second and the run multiplier (cfg.walkSpeed, cfg.runMultiplier)
@@ -100,13 +101,13 @@ def toast(app, text, warn):
 def setup(app):
     """Shrink the window and drop the shadows of the world view, so the software renderer keeps
     up."""
-    app.exec("set window Surface {width: 640, height: 360}")
-    app.exec("set main_view View.shadows.enabled false")
-    app.wait_for("get window SurfaceStatus.height", "360")
+    app.exec("set window box.surface.Surface {width: 640, height: 360}")
+    app.exec("set main_view box.view.View.shadows.enabled false")
+    app.wait_for("get window box.surface.SurfaceStatus.height", "360")
 
 
 def key(app, name, frames=None):
-    app.exec("key.press %s" % name + (" %d" % frames if frames else ""))
+    app.exec("key_press %s" % name + (" %d" % frames if frames else ""))
     app.wait_input()
 
 
@@ -118,22 +119,14 @@ def start(app):
 
 
 def player(app):
-    return app.get(PLAYER, "Position")
+    return app.get(PLAYER, "box.transform.Position")
 
 
 def deposits(app):
     """The deposits of the map by path: their OreDeposit (resource, amount, capacity, row,
     col), from one query of the command port."""
-    app.exec("query ores oreelse.OreDeposit")
-    app.exec("iter ores")
-    out = app.exec("next 1000")
-    result = {}
-    for line in out.splitlines():
-        if not line.strip() or line == "(end)":
-            continue
-        path, value = line.split(" ", 1)
-        result[path] = parse_value(value)
-    return result
+    out = app.exec("query oreelse.OreDeposit")
+    return {row["entity"]: row["fields"][0]["value"]["OreDeposit"] for row in parse_value(out)}
 
 
 def layout(found):
@@ -237,7 +230,7 @@ def test_restart(app):
     key(app, "D", 30)
     app.check(player(app)["x"] > 1, "the astronaut did not walk away from the start")
     put(app, "oreelse.OreClock", "oreelse.OreClock", {"elapsed": 100})
-    app.exec("mouse.scroll 0 -1")
+    app.exec("mouse_scroll 0 -1")
     app.wait_input()
     app.wait_for(LEVEL, "1")
     set_state(app, "Lost")
@@ -262,7 +255,7 @@ def test_seeded_map(app):
     with App(app.binary, app.args, log=log, timeout=app.timeout, out=app.out,
              prefix=app.prefix + ".second") as other:
         second = deposits(other)
-        other.expect("logs error", "")
+        other.expect("logs error", '""')
         other.quit()
     app.check(layout(first) == layout(second),
               "two runs with --seed %d made different maps" % SEED)
@@ -276,20 +269,20 @@ def test_walk(app):
     pos = player(app)
     app.check(abs(pos["x"] - x - WALK) < WALK_TOLERANCE and pos["z"] == 0,
               "the astronaut walked to %s, not %g along +X" % (pos, WALK))
-    yaw = app.get(PLAYER, "Rotation.y")
+    yaw = app.get(PLAYER, "box.transform.Rotation.y")
     app.check(abs(yaw - math.pi / 2) < 1e-4, "the astronaut faces %g, not +X" % yaw)
 
     x = pos["x"]
-    app.exec("key.down ShiftLeft")
+    app.exec("key_down ShiftLeft")
     app.wait_input()
     key(app, "D", WALK_FRAMES)
-    app.exec("key.up ShiftLeft")
+    app.exec("key_up ShiftLeft")
     app.wait_input()
     pos = player(app)
     app.check(abs(pos["x"] - x - WALK * RUN) < WALK_TOLERANCE,
               "the astronaut ran to %s, not %g along +X" % (pos, WALK * RUN))
 
-    app.exec("set %s Position {%d, 0, 0}" % (PLAYER, MAP_CLAMP - 3))
+    app.exec("set %s box.transform.Position {%d, 0, 0}" % (PLAYER, MAP_CLAMP - 3))
     key(app, "D", WALK_FRAMES)
     pos = player(app)
     app.check(pos["x"] == MAP_CLAMP, "the astronaut stopped at %s, not at x = %d" %
@@ -310,17 +303,17 @@ def test_zoom(app):
 
     # The wheel zooms on the title screen too; down zooms out, up zooms in
     reaches(0)
-    app.exec("mouse.scroll 0 -1")
+    app.exec("mouse_scroll 0 -1")
     app.wait_input()
     reaches(1)
-    app.exec("mouse.scroll 0 -1")
+    app.exec("mouse_scroll 0 -1")
     app.wait_input()
     reaches(2)
-    app.exec("mouse.scroll 0 -1")
+    app.exec("mouse_scroll 0 -1")
     app.wait_input()
     app.wait_frames(5)
     app.expect(LEVEL, "2")
-    app.exec("mouse.scroll 0 1")
+    app.exec("mouse_scroll 0 1")
     app.wait_input()
     reaches(1)
 
