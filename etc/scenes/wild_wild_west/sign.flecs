@@ -1,0 +1,23 @@
+include materials
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.light
+using box.text
+
+
+@tree Parent
+template WestSign {
+  prop label: string = "DRY CREEK"
+  prop width: f32 = 4
+  prop height: f32 = 0.8
+  prop size: f32 = 0.45
+  prop tint: Rgb = {52, 69, 63}
+  board { Position: {}; Box: {width, height, 0.13}; Rgb: tint }
+  for side in 0..2 {
+    { Position: {0, (side - 0.5) * (height - 0.06), 0.085}; Box: {width, 0.055, 0.06}; Rgb: {206, 164, 94} }
+    { Position: {(side - 0.5) * (width - 0.06), 0, 0.085}; Box: {0.055, height, 0.06}; Rgb: {206, 164, 94} }
+  }
+  lettering { Position: {0, 0, 0.08}; Scale: {0.01, 0.01, 0.01}; Text: {value: label, size: size * 100}; Rgb: {248, 221, 165} }
+}

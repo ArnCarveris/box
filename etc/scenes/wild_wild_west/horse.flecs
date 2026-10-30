@@ -1,0 +1,35 @@
+include beam
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.light
+using box.text
+
+
+@tree Parent
+template WestHorse {
+  prop tint: Rgb = {112, 65, 37}
+  body { Position: {0, 1.23, 0}; Scale: {0.48, 0.65, 1}; Capsule: {radius: 0.68, length: 0.5, segments: 16, smooth: true}; Rotation: {math.PI / 2, 0, 0}; Rgb: tint }
+  neck { Position: {0, 1.73, 0.65}; Rotation: {0.42, 0, 0}; Scale: {0.7, 1, 1}; Capsule: {radius: 0.28, length: 0.75, segments: 12, smooth: true}; Rgb: tint }
+  head { Position: {0, 2.13, 0.99}; Rotation: {1.2, 0, 0}; Scale: {0.75, 1, 1}; Capsule: {radius: 0.24, length: 0.38, segments: 12, smooth: true}; Rgb: tint }
+  muzzle { Position: {0, 2.02, 1.28}; Scale: {1, 0.8, 1}; Sphere: {radius: 0.21, segments: 12, smooth: true}; Rgb: {61, 43, 31} }
+  for side in 0..2 {
+    const x = (side - 0.5) * 0.47
+    for end in 0..2 {
+      const z = (end - 0.5) * 1.05
+      WestBeam(ax: x, ay: 1.2, az: z, bx: x, by: 0.52, bz: z + (end - 0.5) * 0.13, width: 0.15, tint: tint) {}
+      WestBeam(ax: x, ay: 0.52, az: z + (end - 0.5) * 0.13, bx: x, by: 0.13, bz: z + 0.08, width: 0.1, tint: tint) {}
+      { Position: {x, 0.1, z + 0.12}; RoundedBox: {0.18, 0.18, 0.25, 0.035}; Rgb: {42, 36, 29} }
+    }
+    { Position: {(side - 0.5) * 0.26, 2.46, 0.83}; Rotation: {0.15, 0, (side - 0.5) * 0.35}; Cone: {radius: 0.075, length: 0.29, segments: 8}; Rgb: tint }
+    { Position: {(side - 0.5) * 0.37, 2.22, 0.99}; Sphere: {radius: 0.034, segments: 10}; Rgb: {16, 17, 15} }
+    { Position: {(side - 0.5) * 0.4, 2.14, 1.02}; Rotation: {0.45, 0, 0}; Box: {0.035, 0.29, 0.05}; Rgb: {41, 39, 31} }
+  }
+  for i in 0..7 {
+    { Position: {0, 1.59 + i * 0.12, 0.34 + i * 0.044}; Scale: {0.3, 1, 1}; Sphere: {radius: 0.17, segments: 8}; Rgb: {44, 33, 25} }
+  }
+  tail { Position: {0, 0.85, -0.95}; Rotation: {-0.3, 0, 0}; Capsule: {radius: 0.1, length: 0.8, segments: 10}; Rgb: {44, 33, 25} }
+  blanket { Position: {0, 1.58, -0.12}; RoundedBox: {0.85, 0.1, 0.85, 0.07}; Rgb: {144, 54, 37} }
+  saddle { Position: {0, 1.69, -0.12}; RoundedBox: {0.53, 0.18, 0.55, 0.09}; Rgb: {71, 45, 27} }
+}

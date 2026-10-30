@@ -1,0 +1,19 @@
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.light
+using box.text
+
+prefab WestTimber { Rgb: {103, 64, 38}; PbrMaterial: {roughness: 0.92} }
+prefab WestPlank { Rgb: {161, 114, 65}; PbrMaterial: {roughness: 0.86} }
+prefab WestCream { Rgb: {232, 207, 155}; PbrMaterial: {roughness: 0.8} }
+prefab WestRed { Rgb: {139, 52, 38}; PbrMaterial: {roughness: 0.85} }
+prefab WestTeal { Rgb: {62, 105, 101}; PbrMaterial: {roughness: 0.82} }
+prefab WestIron { Rgb: {49, 51, 48}; PbrMaterial: {metallic: 0.72, roughness: 0.63} }
+prefab WestSteel { Rgb: {140, 150, 144}; PbrMaterial: {metallic: 0.8, roughness: 0.4} }
+prefab WestBrass { Rgb: {190, 140, 58}; PbrMaterial: {metallic: 0.75, roughness: 0.34} }
+prefab WestGlass { Rgb: {44, 74, 76}; PbrMaterial: {metallic: 0.28, roughness: 0.18}; ClearCoat: {strength: 0.8, roughness: 0.12} }
+prefab WestCanvas { Rgb: {223, 204, 160}; PbrMaterial: {roughness: 0.98} }
+prefab WestSand { Rgb: {197, 151, 92}; PbrMaterial: {roughness: 1} }
+prefab WestStone { Rgb: {163, 86, 51}; PbrMaterial: {roughness: 0.97} }
