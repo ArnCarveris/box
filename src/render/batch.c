@@ -1661,7 +1661,7 @@ static void box_draws_fill_material(
             box_draws_material(out, &material);
             alpha = out->color[3];
         } else {
-            uint32_t id = box_draws_material_id(it->world, d, it->entities[i], true);
+            uint32_t id = box_draws_material_id(it->world, d, it->entities[i], true, true);
             box_render_mesh_shading_t *out = box_draws_slot_mesh_shading(b, slots[i].slot);
             box_render_mesh_shading_t was = *out;
             box_draws_material_changed(d, it->entities[i]);

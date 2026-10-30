@@ -278,7 +278,13 @@
                     "transmission_override_composes",
                     "transmission_prefab_change_reaches_slot",
                     "clear_coat_prefab_change_reaches_slot",
-                    "clear_coat_dynamic_material_repacks"
+                    "clear_coat_dynamic_material_repacks",
+                    "equal_materials_share_slot",
+                    "changed_material_takes_other_slot",
+                    "alone_changed_material_keeps_slot",
+                    "shared_slot_freed_with_last_owner",
+                    "transition_takes_private_slot",
+                    "dynamic_material_keeps_private_slot"
                 ]
             },
             {

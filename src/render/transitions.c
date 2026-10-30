@@ -746,6 +746,11 @@ static bool box_transition_material_reads(
  * every level. The ones that own a slot of the material table patch it, the drawn 2D entities
  * patch their shading.
  *
+ * A slot the transition patches is private to its owner for this frame
+ * (box_draws_material_private): an owner of a shared slot gets a private slot, so the owners it
+ * shared with keep their record, and returns to a shared slot in the first extract after the
+ * last frame the walk listed it.
+ *
  * A slot reads its value from its owner or an IsA base of it, and Transition is inherited over
  * IsA, so this reaches every affected slot and visits only entities with Transition.
  *
@@ -762,7 +767,7 @@ static bool box_transition_material_reads(
 static void box_transition_material_walk(
     ecs_world_t *world,
     box_render_transitions_t *s,
-    const box_render_draws_t *d,
+    box_render_draws_t *d,
     ecs_entity_t e,
     double time)
 {
@@ -777,12 +782,12 @@ static void box_transition_material_walk(
         }
 
         ecs_map_insert(&s->visited, cur, 1);
-        ecs_map_val_t *slot = ecs_map_get(&d->materials.owned, (ecs_map_key_t)cur);
-        if (slot) {
-            box_transition_material_t owned = { .entity = cur, .slot = (uint32_t)*slot };
+        if (box_draws_material_owns(d, cur)) {
+            box_transition_material_t owned = { .entity = cur };
             uint32_t found = box_transition_material_nodes(world, s, cur,
                 BOX_TRANSITION_MASK_TABLE, time, owned.nodes);
             if (found) {
+                owned.slot = box_draws_material_private(world, d, cur);
                 owned.shadow = (found & BOX_TRANSITION_MASK_SHADOW) != 0;
                 *ecs_vec_append_t(NULL, &s->material_slots, box_transition_material_t) = owned;
             }
@@ -948,7 +953,8 @@ static void box_transition_fade_tag(
  * the drawn 2D entities, which keep TransitionMaterial.
  *
  * The slots of the last frame upload again, so the frame after a transition ended has its
- * target. A frame without an active material transition visits no entity, and a frame with
+ * target; an owner of such a slot that the walk no longer lists returns to a shared slot in the
+ * extract of the batches, which uploads it. A frame without an active material transition visits no entity, and a frame with
  * one visits only the entities of its nodes and their IsA instances.
  *
  * @param world The world
