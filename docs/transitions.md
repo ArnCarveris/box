@@ -134,6 +134,11 @@ is a flecs map (`ecs_map_t`) keyed by the component entity whose values are allo
   which renders as smoothing. Writing an equal value does nothing.
 - Removing `Transition`, or removing the transitioned component, snaps to the target. Deleting
   the entity drops its transition.
+- Disabling an entity (`ecs_enable(world, e, false)`, which adds `EcsDisabled`) drops its
+  transition state like CSS `display: none`: a running transition is cancelled and the entity
+  renders nothing while disabled. Enabling it again is a first value that does not animate, so
+  it shows its current target, including a value written while it was disabled. Later changes
+  animate again from that target with the full `delay` and `duration`.
 - An entry removed from the `Transition` map (with `box_transition_remove`, or by a new map
   without it: a script reload, or an instance that sets its own map over the prefab's) snaps
   that component to its target, like removing `Transition`. So does an entry that becomes

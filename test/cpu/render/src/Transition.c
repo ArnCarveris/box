@@ -348,20 +348,23 @@ void Transition_add_transition_no_animation(void) {
     tr_fini(world, null);
 }
 
-/** Interrupt a transition at its midpoint, reading the values only at the end, so the packets
- * of the frames between are in flight together.
+/** Interrupt a transition twice while the ring is held, so the packets of the frames between,
+ * two of them with a start record, are queued together when the resolver sees the interrupts.
+ *
+ * The held ring accepts packets until all of them are in flight, so the frames it holds stay
+ * at most in_flight. RenderStatus is read as the submit of the last frame wrote it, since
+ * box_render_sync renders the held packets.
  *
  * @param in_flight Packets in flight
- * @param main_thread Whether the main thread renders
+ * @param held Frames the ring holds, from 2 to 4 and at most in_flight
  */
 static void tr_interrupt(
     int32_t in_flight,
-    bool main_thread)
+    int32_t held)
 {
     box_render_null_t *null;
     ecs_world_t *world = tr_world(&null);
-    ecs_singleton_set(world, RenderSettings, {
-        .in_flight = in_flight, .main_thread = main_thread });
+    ecs_singleton_set(world, RenderSettings, { .in_flight = in_flight });
     ecs_entity_t e = tr_entity(world, &(TransitionSpec){ .duration = 1.0f });
     tr_frames(world, 2);
 
@@ -369,16 +372,26 @@ static void tr_interrupt(
     tr_frames(world, 2);
     test_flt(tr_position(world, e).x, 1);
 
+    box_render_pause(world, true);
     ecs_set(world, e, Position, {0, 0, 0});
-    tr_frames(world, 1);
-    tr_frames(world, 1);
-    test_flt(tr_position(world, e).x, 1.5f);
-
+    ecs_progress(world, TR_DELTA);
     ecs_set(world, e, Position, {8, 0, 0});
-    tr_frames(world, 3);
-    test_flt(tr_position(world, e).x, 1.0f + (8.0f - 1.0f) * 0.5f);
+    int32_t i;
+    for (i = 1; i < held; i ++) {
+        ecs_progress(world, TR_DELTA);
+    }
 
-    tr_frames(world, 2);
+    const RenderStatus *status = ecs_singleton_get(world, RenderStatus);
+    test_bool(status->threaded, true);
+    test_assert(status->submitted - status->rendered > 1);
+    test_int(status->submitted - status->rendered, held);
+
+    box_render_pause(world, false);
+    box_render_sync(world);
+    test_flt(tr_position(world, e).x, 1.5f + (8.0f - 1.5f) * 0.25f * (float)(held - 2));
+    test_int(box_render_transition_test_active(world), 1);
+
+    tr_frames(world, 6 - held);
     test_flt(tr_position(world, e).x, 8);
     test_int(box_render_transition_test_active(world), 0);
 
@@ -412,12 +425,12 @@ void Transition_interrupt_midpoint(void) {
 
 void Transition_interrupt_in_flight_default(void) {
     // engine_core/transition
-    tr_interrupt(BOX_RENDER_IN_FLIGHT, false);
+    tr_interrupt(BOX_RENDER_IN_FLIGHT, BOX_RENDER_IN_FLIGHT);
 }
 
 void Transition_interrupt_in_flight_max(void) {
     // engine_core/transition
-    tr_interrupt(BOX_RENDER_IN_FLIGHT_MAX, false);
+    tr_interrupt(BOX_RENDER_IN_FLIGHT_MAX, 4);
 }
 
 void Transition_query_write_starts(void) {
@@ -526,6 +539,117 @@ void Transition_delete_entity_drops(void) {
     tr_frame(world);
     test_int(tr_records(null, BOX_RENDER_TRANSITION_DESTROY), 1);
     test_int(box_render_transition_test_node(world, e), 0);
+    test_int(box_render_transition_test_active(world), 0);
+
+    tr_fini(world, null);
+}
+
+void Transition_disable_entity_snaps(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_world(&null);
+    ecs_entity_t e = tr_entity(world, &(TransitionSpec){ .duration = 2.0f });
+    tr_frame(world);
+    ecs_set(world, e, Position, {4, 0, 0});
+    tr_frames(world, 5);
+    test_flt(tr_position(world, e).x, 2);
+    test_int(box_render_transition_test_active(world), 1);
+
+    ecs_enable(world, e, false);
+    tr_frame(world);
+    test_int(tr_records(null, BOX_RENDER_TRANSITION_DESTROY), 1);
+    test_int(box_render_transition_test_node(world, e), 0);
+    test_int(box_render_transition_test_active(world), 0);
+    tr_frame(world);
+
+    ecs_enable(world, e, true);
+    tr_frame(world);
+    test_int(tr_records(null, BOX_RENDER_TRANSITION_CREATE), 1);
+    test_assert(box_render_transition_test_node(world, e) != 0);
+    test_flt(tr_position(world, e).x, 4);
+    test_int(box_render_transition_test_active(world), 0);
+
+    tr_frame(world);
+    test_flt(tr_position(world, e).x, 4);
+    test_int(box_render_transition_test_active(world), 0);
+    test_flt(ecs_get(world, e, Position)->x, 4);
+
+    tr_fini(world, null);
+}
+
+void Transition_disabled_write_no_animation(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_world(&null);
+    ecs_entity_t e = tr_entity(world, &(TransitionSpec){ .duration = 1.0f });
+    tr_frames(world, 2);
+
+    ecs_enable(world, e, false);
+    tr_frame(world);
+    ecs_set(world, e, Position, {4, 0, 0});
+    tr_frame(world);
+    test_int(tr_records(null, BOX_RENDER_TRANSITION_START), 0);
+    test_int(box_render_transition_test_node(world, e), 0);
+
+    ecs_enable(world, e, true);
+    tr_frame(world);
+    test_flt(tr_position(world, e).x, 4);
+    test_int(box_render_transition_test_active(world), 0);
+    tr_frame(world);
+    test_flt(tr_position(world, e).x, 4);
+    test_int(box_render_transition_test_active(world), 0);
+
+    tr_fini(world, null);
+}
+
+void Transition_enable_animates_again(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_world(&null);
+    ecs_entity_t e = tr_entity(world, &(TransitionSpec){ .duration = 1.0f, .delay = 0.5f });
+    ecs_set(world, e, Rgb, {0, 0, 0});
+    box_transition_set(world, e, ecs_id(Rgb), &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+    uint32_t node = box_render_transition_test_node(world, e);
+    test_assert(node != 0);
+
+    ecs_set(world, e, Position, {4, 0, 0});
+    ecs_set(world, e, Rgb, {200, 0, 0});
+    tr_frames(world, 2);
+    test_flt(tr_position(world, e).x, 0);
+    test_int(tr_rgb(world, e).r, 50);
+    test_assert(box_render_transition_test_active(world) != 0);
+
+    ecs_enable(world, e, false);
+    tr_frame(world);
+    test_int(box_render_transition_test_node(world, e), 0);
+    test_int(box_render_transition_test_active(world), 0);
+    ecs_remove(world, e, Rgb);
+
+    ecs_enable(world, e, true);
+    tr_frame(world);
+    test_int(box_render_transition_test_node(world, e), node);
+    test_flt(tr_position(world, e).x, 4);
+    test_int(box_render_transition_test_active(world), 0);
+    Rgb rgb;
+    test_bool(box_render_transition_test_value(world, e, ecs_id(Rgb), &rgb), false);
+
+    ecs_set(world, e, Position, {8, 0, 0});
+    tr_frame(world);
+    test_int(tr_records(null, BOX_RENDER_TRANSITION_START), 1);
+    test_flt(tr_position(world, e).x, 4);
+    test_int(box_render_transition_test_active(world), 1);
+    tr_frame(world);
+    test_flt(tr_position(world, e).x, 4);
+    tr_frame(world);
+    test_flt(tr_position(world, e).x, 4);
+    test_int(box_render_transition_test_active(world), 1);
+    tr_frame(world);
+    test_flt(tr_position(world, e).x, 5);
+    tr_frame(world);
+    test_flt(tr_position(world, e).x, 6);
+    tr_frames(world, 2);
+    test_flt(tr_position(world, e).x, 8);
     test_int(box_render_transition_test_active(world), 0);
 
     tr_fini(world, null);
