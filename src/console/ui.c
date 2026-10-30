@@ -63,39 +63,59 @@ static void box_console_color(
     }
 }
 
-/** Copy the start of a string, turning its trailing spaces into no-break spaces, which text
- * layout measures, so what follows them is placed after them.
+/** Get the byte of a scrollback line its wrapped rows start under: the end of the prompt of a
+ * line that ran, the end of the leading indentation of other lines.
  *
- * @param value The string
- * @param size Number of bytes to copy
- * @return The copy, which the caller frees
+ * @param text The line
+ * @param kind What the line shows
+ * @return The byte
  */
-static char* box_console_hold_spaces(
-    const char *value,
-    int32_t size)
+static int32_t box_console_hang(
+    const char *text,
+    box_console_kind_t kind)
 {
-    int32_t end = size, i;
-    ecs_strbuf_t buf = ECS_STRBUF_INIT;
-    while (end > 0 && value[end - 1] == ' ') {
-        end --;
+    int32_t prompt = (int32_t)strlen(BOX_CONSOLE_PROMPT);
+    int32_t result = (int32_t)strspn(text, " \t");
+    if (kind == BoxConsoleCommand && !strncmp(text, BOX_CONSOLE_PROMPT, (size_t)prompt)) {
+        result = prompt;
     }
 
-    ecs_strbuf_appendstrn(&buf, value, end);
-    for (i = end; i < size; i ++) {
-        ecs_strbuf_appendstr(&buf, "\xC2\xA0");
-    }
-
-    char *result = ecs_strbuf_get(&buf);
-
-    return result ? result : ecs_os_strdup("");
+    return result;
 }
 
-/** Set the string, size and color of a text element when they differ; console lines never wrap.
+/** Get the Text a console line is drawn with: wrapped at the width of the panel and kept at
+ * those rows by the layout.
+ *
+ * @param con The console state
+ * @param console The Console singleton
+ * @param value The string
+ * @param hang Byte of the string the wrapped rows start under
+ * @return The Text, which borrows the string
+ */
+static Text box_console_look(
+    const box_console_t *con,
+    const Console *console,
+    const char *value,
+    int32_t hang)
+{
+    return (Text){
+        .value = ECS_CONST_CAST(char*, value),
+        .size = console->font_size,
+        .line_height = console->line_height,
+        .width = con->wrap,
+        .font = con->font,
+        .wrap = TextWrapNewlines,
+        .hang = hang
+    };
+}
+
+/** Set the string, size, wrap width and color of a text element when they differ.
  *
  * @param world The world
  * @param e The element
  * @param value The string
- * @param size Number of bytes of the string to show
+ * @param hang Byte of the string the wrapped rows start under
+ * @param con The console state
  * @param console The Console singleton
  * @param color The color
  */
@@ -103,15 +123,16 @@ static void box_console_text(
     ecs_world_t *world,
     ecs_entity_t e,
     const char *value,
-    int32_t size,
+    int32_t hang,
+    const box_console_t *con,
     const Console *console,
     rgb color)
 {
     const Text *cur = ecs_get(world, e, Text);
-    char *str = box_console_hold_spaces(value, size);
-    bool same = cur && cur->value && !strcmp(cur->value, str) &&
-        cur->size == console->font_size && cur->line_height == console->line_height &&
-        cur->wrap == TextWrapNewlines;
+    Text look = box_console_look(con, console, value, hang);
+    bool same = cur && cur->value && !strcmp(cur->value, value) &&
+        cur->size == look.size && cur->line_height == look.line_height &&
+        cur->width == look.width && cur->wrap == look.wrap && cur->hang == look.hang;
     if (!same) {
         if (!cur) {
             ecs_add(world, e, Text);
@@ -119,15 +140,15 @@ static void box_console_text(
 
         Text *t = ecs_get_mut(world, e, Text);
         ecs_os_free(t->value);
-        t->value = str;
-        str = NULL;
-        t->size = console->font_size;
-        t->line_height = console->line_height;
-        t->wrap = TextWrapNewlines;
+        t->value = ecs_os_strdup(value);
+        t->size = look.size;
+        t->line_height = look.line_height;
+        t->width = look.width;
+        t->wrap = look.wrap;
+        t->hang = look.hang;
         ecs_modified(world, e, Text);
     }
 
-    ecs_os_free(str);
     box_console_color(world, e, color);
 }
 
@@ -158,20 +179,6 @@ static rgb box_console_syntax_color(
     return result;
 }
 
-/** Move a byte offset of a shown part of a line to the string box_console_hold_spaces makes of
- * it, where every trailing space is a two byte no-break space.
- *
- * @param offset Byte of the part
- * @param kept Bytes of the part before its trailing spaces
- * @return Byte of the string
- */
-static int32_t box_console_held(
-    int32_t offset,
-    int32_t kept)
-{
-    return offset > kept ? kept + 2 * (offset - kept) : offset;
-}
-
 /** Test whether the TextSpans of an element are the given spans.
  *
  * @param cur The TextSpans, NULL when the element has none
@@ -196,42 +203,33 @@ static bool box_console_spans_same(
     return result;
 }
 
-/** Set the TextSpans of a text element to the spans of the part of a line it shows, when they
- * differ. Only the colors of the glyphs change, so the text is not laid out again.
+/** Set the TextSpans of a text element to the spans of the line it shows, when they differ.
+ * Only the colors of the glyphs change, so the text is not laid out again. The ranges are bytes
+ * of the string, so they hold on every row the string wraps to.
  *
  * @param world The world
  * @param e The element
  * @param spans The box_console_span_t of the line, NULL for none
- * @param value The part of the line the element shows
- * @param from Byte of the line the part starts at
- * @param size Bytes of the part
+ * @param shift Bytes in front of the line in the string of the element, the prompt
  * @param console The Console singleton
  */
 static void box_console_spans(
     ecs_world_t *world,
     ecs_entity_t e,
     const ecs_vec_t *spans,
-    const char *value,
-    int32_t from,
-    int32_t size,
+    int32_t shift,
     const Console *console)
 {
-    int32_t i, kept = size, count = 0, total = spans ? ecs_vec_count(spans) : 0;
+    int32_t i, count = 0, total = spans ? ecs_vec_count(spans) : 0;
     TextSpan *out = total ? ecs_os_malloc_n(TextSpan, total) : NULL;
     const TextSpans *cur = ecs_get(world, e, TextSpans);
-    while (kept > 0 && value[kept - 1] == ' ') {
-        kept --;
-    }
-
     for (i = 0; i < total; i ++) {
         const box_console_span_t *s = ecs_vec_get_t(spans, box_console_span_t, i);
-        int32_t start = (s->start > from ? s->start : from) - from;
-        int32_t end = (s->end < from + size ? s->end : from + size) - from;
-        if (end > start) {
+        if (s->end > s->start) {
             rgb c = box_console_syntax_color(console, s->kind);
             out[count ++] = (TextSpan){
-                .start = box_console_held(start, kept),
-                .end = box_console_held(end, kept),
+                .start = s->start + shift,
+                .end = s->end + shift,
                 .color = { c.r, c.g, c.b, 255 }
             };
         }
@@ -286,35 +284,38 @@ void box_console_ui_build(
     ui->beside = box_console_element(world, ui->screen, "beside");
     ui->content = box_console_element(world, ui->panel, "content");
     ecs_set(world, ui->content, Layout, { .direction = DirectionColumn });
+    ecs_add(world, ui->content, ClipChildren);
     ui->edge = box_console_element(world, ui->panel, "edge");
     ecs_set(world, ui->edge, Rect, {0, 0});
     ui->log = box_console_element(world, ui->content, "log");
     ecs_set(world, ui->log, Layout, { .direction = DirectionColumn, .v = VAlignBottom });
+    ecs_add(world, ui->log, ClipChildren);
     ui->input = box_console_element(world, ui->content, "input");
-    ecs_set(world, ui->input, Layout, { .direction = DirectionRow, .v = VAlignMiddle });
-    ui->prompt = box_console_text_element(world, ui->input, "prompt");
-    ui->before = box_console_text_element(world, ui->input, "before");
+    ecs_set(world, ui->input, Layout, { .direction = DirectionNone });
+    ui->line = box_console_text_element(world, ui->input, "line");
+    ecs_set(world, ui->line, LayoutItem, { .h = AlignLeft, .v = VAlignTop });
     ui->cursor = box_console_element(world, ui->input, "cursor");
-    ui->after = box_console_text_element(world, ui->input, "after");
+    ecs_set(world, ui->cursor, LayoutItem, { .h = AlignLeft, .v = VAlignTop });
+    if (!con->font) {
+        con->font = ecs_get(world, ui->line, Text)->font;
+    }
+
 done:
     return;
 }
 
-/** Make the number of scrollback line elements match the lines that fit in the panel.
+/** Make the number of scrollback elements match the lines and empty rows that are shown.
  *
  * @param world The world
  * @param con The console state
- * @param count Lines that fit
- * @param console The Console singleton
+ * @param count Elements shown
  */
 static void box_console_ui_lines(
     ecs_world_t *world,
     box_console_t *con,
-    int32_t count,
-    const Console *console)
+    int32_t count)
 {
     box_console_ui_t *ui = &con->ui;
-    int32_t i;
     while (ecs_vec_count(&ui->lines) > count) {
         ecs_delete(world, ecs_vec_last_t(&ui->lines, ecs_entity_t)[0]);
         ecs_vec_remove_last(&ui->lines);
@@ -326,10 +327,26 @@ static void box_console_ui_lines(
         ecs_vec_append_t(NULL, &ui->lines, ecs_entity_t)[0] =
             box_console_text_element(world, ui->log, name);
     }
+}
 
-    for (i = 0; i < count; i ++) {
-        ecs_set(world, ecs_vec_get_t(&ui->lines, ecs_entity_t, i)[0], LayoutItem, {
-            .height = { .mode = SizeModeFixed, .value = console->line_height }
+/** Set the height of an element to a number of rows when it differs.
+ *
+ * @param world The world
+ * @param e The element
+ * @param rows The rows
+ * @param console The Console singleton
+ */
+static void box_console_rows_height(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    int32_t rows,
+    const Console *console)
+{
+    float height = (float)rows * console->line_height;
+    const LayoutItem *cur = ecs_get(world, e, LayoutItem);
+    if (!cur || cur->height.mode != SizeModeFixed || cur->height.value != height) {
+        ecs_set(world, e, LayoutItem, {
+            .height = { .mode = SizeModeFixed, .value = height }
         });
     }
 }
@@ -378,7 +395,28 @@ static void box_console_space(
     ecs_set_ptr(world, e, LayoutItem, &item);
 }
 
-/** Lay out the panel on the surface and set the look of the console.
+/** Get the height of the panel and the width its lines wrap at, the width minus the padding.
+ *
+ * @param con The console state
+ * @param console The Console singleton
+ * @param height Receives the height of the panel
+ * @return The width, 0 for a panel too narrow to hold text
+ */
+static float box_console_panel_size(
+    const box_console_t *con,
+    const Console *console,
+    float *height)
+{
+    float share = console->width >= 1 ? 1 : (console->width > 0 ? console->width : 0);
+    float width = share * con->width - 2 * console->padding;
+    *height = console->height > 0 ? (console->height >= 1 ? 1 : console->height) * con->height
+        : 0;
+
+    return width > 0 ? width : 0;
+}
+
+/** Lay out the panel on the surface and set the look of the console. The rows of the
+ * scrollback lines are measured again when the width they wrap at or the font size changed.
  *
  * @param world The world
  * @param con The console state
@@ -390,11 +428,18 @@ static void box_console_ui_layout(
     const Console *console)
 {
     box_console_ui_t *ui = &con->ui;
-    float h = console->height > 0 ? console->height * con->height : 0;
-    float pad = console->padding, lh = console->line_height;
-    float room = h - 2 * pad - lh;
-    int32_t lines = lh > 0 && room > 0 ? (int32_t)floorf(room / lh) : 0;
+    float h, pad = console->padding;
+    float wrap = box_console_panel_size(con, console, &h);
+    int32_t i;
     LayoutItem item = {0};
+    if (wrap != con->wrap || console->font_size != con->wrap_size) {
+        con->wrap = wrap;
+        con->wrap_size = console->font_size;
+        for (i = 0; i < ecs_vec_count(&con->lines); i ++) {
+            ecs_vec_get_t(&con->lines, box_console_line_t, i)->rows = 0;
+        }
+    }
+
     if (con->surface) {
         ecs_set(world, ui->screen, LayoutFill, { con->surface });
     } else {
@@ -440,17 +485,121 @@ static void box_console_ui_layout(
         .width = { .mode = SizeModeGrow, .value = 1 },
         .height = { .mode = SizeModeGrow, .value = 1 }
     });
-    ecs_set(world, ui->input, LayoutItem, {
-        .width = { .mode = SizeModeGrow, .value = 1 },
-        .height = { .mode = SizeModeFixed, .value = lh }
-    });
     ecs_set(world, ui->cursor, Rect, {
         console->font_size > 0 ? ceilf(console->font_size / 10) : 0, console->font_size });
     box_console_color(world, ui->cursor, console->input);
-    box_console_ui_lines(world, con, lines, console);
+}
+
+/** Test whether the font of the console is still loading, so text it could not measure yet is
+ * measured again on a later frame. A font that failed to load is not waited for.
+ *
+ * @param world The world
+ * @param con The console state
+ * @return Whether the font loads
+ */
+static bool box_console_font_loading(
+    const ecs_world_t *world,
+    const box_console_t *con)
+{
+    bool alive = con->font && ecs_is_alive(world, con->font);
+    const FontStatus *status = alive ? ecs_get(world, con->font, FontStatus) : NULL;
+
+    return alive && (!status || status->state == FontLoading);
+}
+
+int32_t box_console_line_rows(
+    ecs_world_t *world,
+    box_console_t *con,
+    const Console *console,
+    box_console_line_t *l)
+{
+    if (!l->rows && con->wrap <= 0) {
+        l->rows = 1;
+    }
+
+    if (!l->rows) {
+        Text look = box_console_look(con, console, l->text, box_console_hang(l->text, l->kind));
+        l->rows = box_text_break_lines(world, &look, NULL);
+        con->pending = con->pending || (!l->rows && box_console_font_loading(world, con));
+    }
+
+    return l->rows > 0 ? l->rows : 1;
+}
+
+int32_t box_console_scrollback_rows(
+    ecs_world_t *world,
+    box_console_t *con,
+    const Console *console)
+{
+    int32_t i, result = 0;
+    for (i = 0; i < ecs_vec_count(&con->lines); i ++) {
+        result += box_console_line_rows(world, con, console,
+            ecs_vec_get_t(&con->lines, box_console_line_t, i));
+    }
+
+    return result;
+}
+
+/** Write the input line after the prompt into its text, wrapped at the width of the panel, and
+ * put the cursor on the caret of its row and column.
+ *
+ * @param world The world
+ * @param con The console state
+ * @param console The Console singleton
+ * @return The rows the input line wraps to
+ */
+static int32_t box_console_ui_input(
+    ecs_world_t *world,
+    box_console_t *con,
+    const Console *console)
+{
+    box_console_ui_t *ui = &con->ui;
+    int32_t prompt = (int32_t)strlen(BOX_CONSOLE_PROMPT), rows = 0;
+    char *value = flecs_asprintf("%s%s", BOX_CONSOLE_PROMPT, con->line);
+    float lh = console->line_height, x = 0, y = 0;
+    TextCaret caret = {0};
+    box_console_text(world, ui->line, value, prompt, con, console, console->input);
+    box_console_spans(world, ui->line, &con->spans, prompt, console);
+    ecs_os_free(value);
+    rows = box_text_line(world, ui->line, 0, NULL, NULL);
+    con->pending = con->pending || (!rows && box_console_font_loading(world, con));
+    rows = rows > 0 ? rows : 1;
+    if (box_text_caret(world, ui->line, prompt + con->cursor, &caret)) {
+        const TextBounds *b = ecs_get(world, ui->line, TextBounds);
+        const Rect *r = ecs_get(world, ui->cursor, Rect);
+        float right = con->wrap - (r ? r->width : 0);
+        x = caret.x + (b ? b->width * 0.5f : 0);
+        x = con->wrap > 0 && x > right ? right : x;
+        x = x > 0 ? x : 0;
+        y = (float)caret.line * lh;
+    }
+
+    y += (lh - console->font_size) * 0.5f;
+    const LayoutItem *cur = ecs_get(world, ui->cursor, LayoutItem);
+    if (!cur || cur->x != x || cur->y != -y) {
+        ecs_set(world, ui->cursor, LayoutItem, {
+            .h = AlignLeft, .v = VAlignTop, .x = x, .y = -y });
+    }
+
+    const LayoutItem *item = ecs_get(world, ui->input, LayoutItem);
+    float height = (float)rows * lh;
+    if (!item || item->height.value != height) {
+        ecs_set(world, ui->input, LayoutItem, {
+            .width = { .mode = SizeModeGrow, .value = 1 },
+            .height = { .mode = SizeModeFixed, .value = height }
+        });
+    }
+
+    return rows;
 }
 
 /** Write the visible part of the scrollback into the line elements.
+ *
+ * The window is the rows that fit, con->scroll rows up from the newest. Every line with a row
+ * in it gets an element as high as its rows, and empty rows fill the top of the window.
+ *
+ * The rows of the newest line under the window move under the bottom edge of the log, which
+ * clips them and the rows of the oldest line above the window.
  *
  * @param world The world
  * @param con The console state
@@ -461,17 +610,39 @@ static void box_console_ui_scrollback(
     box_console_t *con,
     const Console *console)
 {
-    int32_t i, visible = ecs_vec_count(&con->ui.lines), count = ecs_vec_count(&con->lines);
-    int32_t max = count - visible > 0 ? count - visible : 0;
+    int32_t i, visible = con->rows, count = ecs_vec_count(&con->lines);
+    int32_t total = box_console_scrollback_rows(world, con, console);
+    int32_t max = total - visible > 0 ? total - visible : 0;
+    int32_t below, last = count - 1, first, covered = 0, fill, shown;
     con->scroll = con->scroll > max ? max : con->scroll;
     con->scroll = con->scroll < 0 ? 0 : con->scroll;
-    for (i = 0; i < visible; i ++) {
+    below = con->scroll;
+    while (last >= 0) {
+        int32_t rows = box_console_line_rows(world, con, console,
+            ecs_vec_get_t(&con->lines, box_console_line_t, last));
+        if (rows > below) {
+            break;
+        }
+
+        below -= rows;
+        last --;
+    }
+
+    for (first = last; first >= 0 && covered < visible + below; first --) {
+        covered += box_console_line_rows(world, con, console,
+            ecs_vec_get_t(&con->lines, box_console_line_t, first));
+    }
+
+    first ++;
+    shown = visible > 0 && last >= 0 ? last - first + 1 : 0;
+    covered = shown ? covered : 0;
+    fill = visible > 0 && visible - covered + below > 0 ? visible - covered + below : 0;
+    box_console_ui_lines(world, con, fill + shown);
+    for (i = 0; i < fill + shown; i ++) {
         ecs_entity_t e = ecs_vec_get_t(&con->ui.lines, ecs_entity_t, i)[0];
-        int32_t at = count - con->scroll - visible + i;
-        const box_console_line_t *l = at >= 0 ?
-            ecs_vec_get_t(&con->lines, box_console_line_t, at) : NULL;
+        box_console_line_t *l = i >= fill ?
+            ecs_vec_get_t(&con->lines, box_console_line_t, first + i - fill) : NULL;
         const char *text = l ? l->text : "";
-        int32_t size = (int32_t)strlen(text);
         rgb color = console->text;
         if (l && l->kind == BoxConsoleCommand) {
             color = console->command;
@@ -479,8 +650,19 @@ static void box_console_ui_scrollback(
             color = console->error;
         }
 
-        box_console_text(world, e, text, size, console, color);
-        box_console_spans(world, e, l ? &l->spans : NULL, text, 0, size, console);
+        box_console_text(world, e, text, l ? box_console_hang(text, l->kind) : 0, con, console,
+            color);
+        box_console_spans(world, e, l ? &l->spans : NULL, 0, console);
+        box_console_rows_height(world, e, l ? box_console_line_rows(world, con, console, l) : 1,
+            console);
+    }
+
+    const Layout *layout = ecs_get(world, con->ui.log, Layout);
+    float under = shown ? -(float)below * console->line_height : 0;
+    if (!layout || layout->padding.bottom != under) {
+        ecs_set(world, con->ui.log, Layout, {
+            .direction = DirectionColumn, .v = VAlignBottom, .padding = { .bottom = under }
+        });
     }
 }
 
@@ -489,11 +671,15 @@ void box_console_ui_sync(
     box_console_t *con,
     const Console *console)
 {
-    box_console_ui_t *ui = &con->ui;
-    const char *prompt = BOX_CONSOLE_PROMPT;
+    float h, lh = console->line_height;
     if (con->relayout) {
         box_console_ui_layout(world, con, console);
         con->relayout = false;
+        con->refresh = true;
+    }
+
+    if (con->pending) {
+        con->pending = false;
         con->refresh = true;
     }
 
@@ -504,15 +690,12 @@ void box_console_ui_sync(
     }
 
     if (con->refresh) {
+        int32_t input = box_console_ui_input(world, con, console);
+        float room;
+        box_console_panel_size(con, console, &h);
+        room = h - 2 * console->padding - (float)input * lh;
+        con->rows = lh > 0 && room > 0 ? (int32_t)floorf(room / lh) : 0;
         box_console_ui_scrollback(world, con, console);
-        box_console_text(world, ui->prompt, prompt, (int32_t)strlen(prompt), console,
-            console->input);
-        box_console_text(world, ui->before, con->line, con->cursor, console, console->input);
-        box_console_spans(world, ui->before, &con->spans, con->line, 0, con->cursor, console);
-        box_console_text(world, ui->after, &con->line[con->cursor],
-            con->length - con->cursor, console, console->input);
-        box_console_spans(world, ui->after, &con->spans, &con->line[con->cursor],
-            con->cursor, con->length - con->cursor, console);
         con->refresh = false;
     }
 }

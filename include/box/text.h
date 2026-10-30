@@ -56,9 +56,9 @@ ECS_ENUM(TextWrap, {
 
 /** A string drawn as one quad per glyph in the local XY plane of the entity, facing +Z.
  *
- * Lengths are logical pixels. The block of lines is centered on the origin, y up, and
- * measures TextBounds. Lines break at newlines and, with a width, between words. In a layout a
- * Text fits its lines at Text.width and narrows to its widest word in a narrower parent.
+ * Lengths are logical pixels, the block of lines is centered on the origin, y up, and measures
+ * TextBounds. Lines break at newlines and at a width between words, inside a wider word. In a
+ * layout a Text fits its lines at Text.width and narrows to its widest word in a narrower parent.
  *
  * Color, opacity, emission and tint come from Rgb, Opacity, Emissive, Tint and BlendMode.
  */
@@ -70,6 +70,9 @@ ECS_STRUCT(Text, {
     Align align;        /**< Alignment of the lines inside the block */
     ecs_entity_t font;  /**< Entity with a Font, default box.text.DefaultFont, 0 for none */
     TextWrap wrap;      /**< How the lines follow the width of a layout, TextWrapWords */
+    int32_t hang;       /**< Byte of the first line whose caret x the lines a width wraps start
+                         *   at, as a hanging indent; 0 for the left edge, ignored past half
+                         *   the width */
 });
 
 /** A byte range of Text.value drawn in a color of its own */
@@ -167,6 +170,22 @@ int32_t box_text_line(
     int32_t line,
     int32_t *start,
     int32_t *end);
+
+/** Break a Text into its lines without an entity, as it lays out outside a layout: at newlines
+ * and between words at Text.width, inside a word wider than the width, with its hang indent.
+ *
+ * Glyphs are only measured, not added to the atlas. An empty string has one line.
+ *
+ * @param world The world
+ * @param text The Text, its font loaded when no other Text requested it before
+ * @param starts Receives the int32_t byte offset of the first character of every line, an
+ * initialized vector that is cleared first, NULL to only count
+ * @return The line count, 0 while the font is not loaded or for a Text without font
+ */
+int32_t box_text_break_lines(
+    ecs_world_t *world,
+    const Text *text,
+    ecs_vec_t *starts);
 
 /** Register the box.text module.
  *

@@ -7,7 +7,7 @@
 #include <box.h>
 #include <bake_test.h>
 
-#define FOCUS_CONSOLE_BEFORE "console.ui.screen.stack.panel.content.input.before"
+#define FOCUS_CONSOLE_LINE "console.ui.screen.stack.panel.content.input.line"
 
 /** Create a headless world with a surface and a script.
  *
@@ -131,9 +131,9 @@ void Focus_console_over_key_capture(void) {
     focus_run(world, s, "key_type `");
     test_bool(ecs_singleton_get(world, Console)->open, true);
     focus_run(world, s, "key_type ls");
-    const Text *before = ecs_get(world, ecs_lookup(world, FOCUS_CONSOLE_BEFORE), Text);
-    test_assert(before != NULL);
-    test_str(before->value, "ls");
+    const Text *line = ecs_get(world, ecs_lookup(world, FOCUS_CONSOLE_LINE), Text);
+    test_assert(line != NULL);
+    test_str(line->value, "> ls");
     downs = ecs_get_id(world, ecs_lookup(world, "keys"), ecs_lookup(world, "Keys.mut"));
     test_int(*downs, 1);
     test_uint(ecs_singleton_get(world, FocusStatus)->focused, field);

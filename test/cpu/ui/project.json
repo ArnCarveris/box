@@ -96,7 +96,13 @@
                     "leaving_the_tree_unwraps",
                     "lines_align_in_the_box",
                     "grow_paragraph_in_fit_card",
-                    "script_paragraph"
+                    "script_paragraph",
+                    "break_lines_match_layout",
+                    "long_word_breaks_inside",
+                    "hang_indents_wrapped_lines",
+                    "hang_long_word_breaks_at_hang",
+                    "hang_past_half_ignored",
+                    "hang_not_after_newline"
                 ]
             },
             {
@@ -387,7 +393,14 @@
                 "id": "Console",
                 "testcases": [
                     "covers_height_after_window_resize",
-                    "covers_height_after_surface_resize"
+                    "covers_height_after_surface_resize",
+                    "long_line_wraps",
+                    "wrapped_line_keeps_indent",
+                    "wrapped_spans_keep_colors",
+                    "input_line_wraps",
+                    "scroll_counts_rows",
+                    "scrollback_limit_counts_rows",
+                    "resize_rewraps"
                 ]
             },
             {

@@ -6,6 +6,7 @@
  * line, a word wider than the width breaks inside. The block is centered on the origin, y up.
  * A Text is measured at Text.width for box.layout, which can wrap it narrower afterwards.
  *
+ * A line a width wraps starts at the hang indent, the caret x of Text.hang on the first line.
  * The caret before every character and the byte range of every line are kept for editing.
  */
 
@@ -18,6 +19,9 @@
 typedef struct box_text_run_t {
     box_text_state_t *s;    /**< The registry, its placed and lines vectors are filled */
     float wrap;             /**< Width lines break at, 0 for newlines only */
+    float hang;             /**< Pen x the lines a width wraps start at */
+    int32_t hang_at;        /**< Byte of the first line whose pen x is the hang */
+    bool draw;              /**< Glyphs are drawn, so they are added to the atlas */
     float pen;              /**< Pen x of the line */
     float line_end;         /**< Right edge of the last glyph of the line */
     float word_x;           /**< Pen x of the first glyph of the current word */
@@ -74,21 +78,22 @@ static void box_text_wrap(
     box_text_placed_t *placed = ecs_vec_first(&run->s->placed);
     box_text_caret_t *carets = ecs_vec_first(&run->s->carets);
     if (run->word_start > run->line_start) {
+        float shift = run->word_x - run->hang;
         box_text_break(run, run->word_base, run->word_start,
             carets[run->word_caret].offset, run->word_caret);
         for (i = run->word_start; i < count; i ++) {
-            placed[i].x -= run->word_x;
+            placed[i].x -= shift;
             placed[i].line = run->line;
         }
 
         for (i = run->word_caret; i <= caret; i ++) {
-            carets[i].x -= run->word_x;
+            carets[i].x -= shift;
             carets[i].line = run->line;
         }
 
-        *x -= run->word_x;
-        run->line_end = count > run->word_start ? run->line_end - run->word_x : 0.0f;
-        run->word_x = 0.0f;
+        *x -= shift;
+        run->line_end = count > run->word_start ? run->line_end - shift : 0.0f;
+        run->word_x = run->hang;
         run->word_base = 0.0f;
     }
 
@@ -96,10 +101,10 @@ static void box_text_wrap(
         box_text_break(run, run->line_end, count, carets[caret].offset, caret);
         run->word_start = count;
         run->word_caret = caret;
-        run->word_x = 0.0f;
+        run->word_x = run->hang;
         run->word_base = 0.0f;
         run->line_end = 0.0f;
-        *x = 0.0f;
+        *x = run->hang;
     }
 }
 
@@ -172,7 +177,8 @@ static void box_text_char(
     c->x = x;
     c->line = run->line;
 
-    const box_text_atlas_glyph_t *area = box_text_font_glyph(world, run->s, font, glyph);
+    const box_text_atlas_glyph_t *area = run->draw ?
+        box_text_font_glyph(world, run->s, font, glyph) : NULL;
     box_text_placed_t *p = ecs_vec_append_t(NULL, &run->s->placed, box_text_placed_t);
     p->x = x;
     p->line = run->line;
@@ -185,7 +191,9 @@ static void box_text_char(
     }
 
 done:
-    return;
+    if (offset == run->hang_at && !c->line && run->wrap > 0.0f) {
+        run->hang = c->x <= run->wrap * 0.5f ? c->x : 0.0f;
+    }
 }
 
 /** Copy the carets and lines of a run into TextGlyphs, aligned and in the local space.
@@ -293,6 +301,8 @@ static void box_text_emit(
  * @param str The string
  * @param px Logical pixels per font unit
  * @param wrap Width lines break at, 0 for newlines only
+ * @param hang Byte of the first line whose pen x the lines a width wraps start at
+ * @param draw Add the glyphs to the atlas, false to only measure them
  * @return The finished run
  */
 static box_text_run_t box_text_run(
@@ -301,9 +311,12 @@ static box_text_run_t box_text_run(
     box_text_font_t *font,
     const char *str,
     float px,
-    float wrap)
+    float wrap,
+    int32_t hang,
+    bool draw)
 {
-    box_text_run_t result = { .s = s, .wrap = wrap, .prev = -1, .cr = -1 };
+    box_text_run_t result = {
+        .s = s, .wrap = wrap, .hang_at = hang, .draw = draw, .prev = -1, .cr = -1 };
     const char *p = str;
     ecs_vec_clear(&s->placed);
     ecs_vec_clear(&s->lines);
@@ -380,7 +393,8 @@ uint64_t box_text_key(
 {
     const char *str = text->value ? text->value : "";
     float sizes[3] = { text->size, text->line_height, text->width };
-    uint64_t ids[3] = { (uint64_t)text->align, (uint64_t)text->wrap, text->font };
+    uint64_t ids[4] = {
+        (uint64_t)text->align, (uint64_t)text->wrap, text->font, (uint64_t)text->hang };
     uint64_t result = box_text_hash(14695981039346656037ull, str, strlen(str) + 1);
     result = box_text_hash(result, sizes, sizeof(sizes));
 
@@ -445,13 +459,14 @@ static void box_text_typeset(
     float wrap = text->width > 0.0f ? text->width : 0.0f;
     float box = text->wrap == TextWrapWords ? glyphs->box : 0.0f;
     bool narrow = !measure && box > 0.0f && box < glyphs->natural[0];
-    box_text_run_t run = box_text_run(world, s, font, str, px, narrow ? box : wrap);
+    box_text_run_t run = box_text_run(world, s, font, str, px, narrow ? box : wrap,
+        text->hang, true);
     if (measure) {
         glyphs->natural[0] = box_text_widest(s);
         glyphs->natural[1] = (float)ecs_vec_count(&s->lines) * metrics[2];
         glyphs->longest = run.longest;
         if (box > 0.0f && box < glyphs->natural[0]) {
-            run = box_text_run(world, s, font, str, px, box);
+            run = box_text_run(world, s, font, str, px, box, text->hang, true);
         }
     }
 
@@ -476,6 +491,49 @@ void box_text_layout(
     const Text *text)
 {
     box_text_typeset(world, s, e, text, true);
+}
+
+int32_t box_text_break_lines(
+    ecs_world_t *world,
+    const Text *text,
+    ecs_vec_t *starts)
+{
+    box_text_state_t *s = box_text_state_get(world);
+    box_text_font_t *font = s && text->font ? box_text_font_of(world, s, text->font) : NULL;
+    const char *str = text->value ? text->value : "";
+    float ascent, descent, gap;
+    int32_t i, result = 0;
+    if (starts) {
+        ecs_vec_clear(starts);
+    }
+
+    if (!font || !font->face) {
+        goto done;
+    }
+
+    if (!str[0]) {
+        result = 1;
+        if (starts) {
+            *ecs_vec_append_t(NULL, starts, int32_t) = 0;
+        }
+
+        goto done;
+    }
+
+    float px = text->size / box_text_face_metrics(font->face, &ascent, &descent, &gap);
+    box_text_run(world, s, font, str, px, text->width > 0.0f ? text->width : 0.0f,
+        text->hang, false);
+    const box_text_row_t *rows = ecs_vec_first(&s->rows);
+    const box_text_caret_t *carets = ecs_vec_first(&s->carets);
+    int32_t caret_count = ecs_vec_count(&s->carets);
+    result = ecs_vec_count(&s->rows);
+    for (i = 0; starts && i < result; i ++) {
+        int32_t at = rows[i].caret < caret_count ? rows[i].caret : caret_count - 1;
+        *ecs_vec_append_t(NULL, starts, int32_t) = carets[at].offset;
+    }
+
+done:
+    return result;
 }
 
 bool box_text_measure(

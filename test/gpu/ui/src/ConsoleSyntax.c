@@ -6,6 +6,7 @@
 #include <box.h>
 #include <bake_test.h>
 #include <stdio.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include "render.h"
@@ -84,6 +85,48 @@ static void syntax_press(
     syntax_flush(world);
 }
 
+/** Get the input line of the console, after its prompt.
+ *
+ * @param world The world
+ * @return The input line
+ */
+static const char* syntax_input(
+    ecs_world_t *world)
+{
+    const Text *t = ecs_get(world, ecs_lookup(world, SYNTAX_INPUT ".line"), Text);
+    test_assert(t != NULL && t->value != NULL);
+    test_assert(!strncmp(t->value, "> ", 2));
+
+    return t->value + 2;
+}
+
+/** Get the byte of the input line the cursor of the console sits before, from the caret of
+ * the line the cursor element is placed on.
+ *
+ * @param world The world
+ * @return The byte after the prompt, -1 when no caret matches the cursor
+ */
+static int32_t syntax_cursor(
+    ecs_world_t *world)
+{
+    const Console *c = ecs_singleton_get(world, Console);
+    ecs_entity_t line = ecs_lookup(world, SYNTAX_INPUT ".line");
+    const LayoutItem *item = ecs_get(world, ecs_lookup(world, SYNTAX_INPUT ".cursor"),
+        LayoutItem);
+    float half = ecs_get(world, line, TextBounds)->width * 0.5f;
+    int32_t i, len = (int32_t)strlen(syntax_input(world)), result = -1;
+    for (i = 0; i <= len && result < 0; i ++) {
+        TextCaret caret;
+        test_assert(box_text_caret(world, line, 2 + i, &caret));
+        float y = (float)caret.line * c->line_height + (c->line_height - c->font_size) * 0.5f;
+        if (fabsf(caret.x + half - item->x) < 0.01f && fabsf(item->y + y) < 0.01f) {
+            result = i;
+        }
+    }
+
+    return result;
+}
+
 /** Empty the input line: move to its end and erase every character.
  *
  * @param world The world
@@ -91,14 +134,12 @@ static void syntax_press(
 static void syntax_clear(
     ecs_world_t *world)
 {
-    ecs_entity_t before = ecs_lookup(world, SYNTAX_INPUT ".before");
     box_input_key_press(world, KeyEnd, 1);
     syntax_flush(world);
-    syntax_press(world, KeyBackspace,
-        (int32_t)strlen(ecs_get(world, before, Text)->value));
+    syntax_press(world, KeyBackspace, (int32_t)strlen(syntax_input(world)));
 }
 
-/** Get the element of the input line before the cursor.
+/** Get the element of the prompt and the input line.
  *
  * @param world The world
  * @return The element
@@ -106,18 +147,7 @@ static void syntax_clear(
 static ecs_entity_t syntax_before(
     ecs_world_t *world)
 {
-    return ecs_lookup(world, SYNTAX_INPUT ".before");
-}
-
-/** Get the element of the input line after the cursor.
- *
- * @param world The world
- * @return The element
- */
-static ecs_entity_t syntax_after(
-    ecs_world_t *world)
-{
-    return ecs_lookup(world, SYNTAX_INPUT ".after");
+    return ecs_lookup(world, SYNTAX_INPUT ".line");
 }
 
 /** Get a line element of the console log counted from the bottom.
@@ -183,7 +213,7 @@ static int32_t syntax_count(
     return ts ? ecs_vec_count(&ts->spans) : 0;
 }
 
-/** Check a span of an element.
+/** Check a span of an element. On the input line the bytes count from after the prompt.
  *
  * @param world The world
  * @param e The element
@@ -204,8 +234,9 @@ static void syntax_span(
     test_assert(ts != NULL);
     test_assert(i < ecs_vec_count(&ts->spans));
     const TextSpan *s = ecs_vec_get_t(&ts->spans, TextSpan, i);
-    test_int(s->start, start);
-    test_int(s->end, end);
+    int32_t shift = e == ecs_lookup(world, SYNTAX_INPUT ".line") ? 2 : 0;
+    test_int(s->start, start + shift);
+    test_int(s->end, end + shift);
     test_int(s->color.r, color.r);
     test_int(s->color.g, color.g);
     test_int(s->color.b, color.b);
@@ -244,10 +275,10 @@ void ConsoleSyntax_command_name_known(void) {
     ecs_world_t *world = syntax_world();
     const ConsoleSyntax *c = syntax_colors(world);
     syntax_type(world, "ls");
-    test_str(ecs_get(world, syntax_before(world), Text)->value, "ls");
+    test_str(syntax_input(world), "ls");
     test_int(syntax_count(world, syntax_before(world)), 1);
     syntax_span(world, syntax_before(world), 0, 0, 2, c->name);
-    test_int(syntax_count(world, syntax_after(world)), 0);
+    test_int(syntax_cursor(world), 2);
 
     syntax_clear(world);
     test_int(syntax_count(world, syntax_before(world)), 0);
@@ -399,7 +430,7 @@ void ConsoleSyntax_strings(void) {
     ecs_world_t *world = syntax_world();
     const ConsoleSyntax *c = syntax_colors(world);
     syntax_type(world, "key_type \"a \\\"b\\\"\" 2");
-    test_str(ecs_get(world, syntax_before(world), Text)->value, "key_type \"a \\\"b\\\"\" 2");
+    test_str(syntax_input(world), "key_type \"a \\\"b\\\"\" 2");
     test_int(syntax_count(world, syntax_before(world)), 3);
     syntax_span(world, syntax_before(world), 1, 9, 18, c->string);
     syntax_span(world, syntax_before(world), 2, 19, 20, c->number);
@@ -407,8 +438,8 @@ void ConsoleSyntax_strings(void) {
     syntax_clear(world);
     syntax_type(world, "key_type \"a  ");
     test_int(syntax_count(world, syntax_before(world)), 2);
-    syntax_span(world, syntax_before(world), 1, 9, 15, c->string);
-    test_int((int32_t)strlen(ecs_get(world, syntax_before(world), Text)->value), 15);
+    syntax_span(world, syntax_before(world), 1, 9, 13, c->string);
+    test_int((int32_t)strlen(syntax_input(world)), 13);
 
     ecs_fini(world);
 }
@@ -421,7 +452,7 @@ void ConsoleSyntax_value_expression(void) {
         "set e box.transform.Position {x: 1.5, s: \"a b\", on: true, v: [-2, 3e-1]}";
     syntax_type(world, line);
     ecs_entity_t e = syntax_before(world);
-    test_str(ecs_get(world, e, Text)->value, line);
+    test_str(syntax_input(world), line);
     test_int(syntax_count(world, e), 9);
     syntax_span(world, e, 0, 0, 3, c->name);
     syntax_span(world, e, 1, 4, 5, c->missing);
@@ -475,14 +506,14 @@ void ConsoleSyntax_updates_while_typing(void) {
         ecs_progress(world, 0);
     }
 
-    test_str(ecs_get(world, e, Text)->value, "l");
+    test_str(syntax_input(world), "l");
     syntax_span(world, e, 0, 0, 1, c->unknown);
     box_input_key_type(world, "s", 1);
     while (box_input_pending(world)) {
         ecs_progress(world, 0);
     }
 
-    test_str(ecs_get(world, e, Text)->value, "ls");
+    test_str(syntax_input(world), "ls");
     syntax_span(world, e, 0, 0, 2, c->name);
     syntax_type(world, " things.alph");
     syntax_span(world, e, 1, 3, 14, c->missing);
@@ -503,37 +534,33 @@ void ConsoleSyntax_cursor_split_and_history(void) {
     ecs_world_t *world = syntax_world();
     const ConsoleSyntax *c = syntax_colors(world);
     ecs_entity(world, { .name = "things.alpha" });
-    ecs_entity_t before = syntax_before(world), after = syntax_after(world);
+    ecs_entity_t line = syntax_before(world);
     syntax_type(world, "get things.alpha");
     syntax_press(world, KeyLeft, 3);
-    test_str(ecs_get(world, before, Text)->value, "get things.al");
-    test_str(ecs_get(world, after, Text)->value, "pha");
-    test_int(syntax_count(world, before), 2);
-    syntax_span(world, before, 0, 0, 3, c->name);
-    syntax_span(world, before, 1, 4, 13, c->entity);
-    test_int(syntax_count(world, after), 1);
-    syntax_span(world, after, 0, 0, 3, c->entity);
+    test_str(syntax_input(world), "get things.alpha");
+    test_int(syntax_cursor(world), 13);
+    test_int(syntax_count(world, line), 2);
+    syntax_span(world, line, 0, 0, 3, c->name);
+    syntax_span(world, line, 1, 4, 16, c->entity);
 
     syntax_press(world, KeyHome, 1);
-    test_str(ecs_get(world, before, Text)->value, "");
-    test_int(syntax_count(world, before), 0);
-    test_int(syntax_count(world, after), 2);
-    syntax_span(world, after, 0, 0, 3, c->name);
-    syntax_span(world, after, 1, 4, 16, c->entity);
+    test_int(syntax_cursor(world), 0);
+    test_int(syntax_count(world, line), 2);
+    syntax_span(world, line, 0, 0, 3, c->name);
+    syntax_span(world, line, 1, 4, 16, c->entity);
 
     syntax_press(world, KeyRight, 4);
-    test_str(ecs_get(world, before, Text)->value, "get\xC2\xA0");
-    test_int(syntax_count(world, before), 1);
-    syntax_span(world, before, 0, 0, 3, c->name);
-    syntax_span(world, after, 0, 0, 12, c->entity);
+    test_int(syntax_cursor(world), 4);
+    test_int(syntax_count(world, line), 2);
 
     syntax_press(world, KeyEnter, 1);
-    test_int(syntax_count(world, before), 0);
-    test_int(syntax_count(world, after), 0);
+    test_str(syntax_input(world), "");
+    test_int(syntax_count(world, line), 0);
     syntax_press(world, KeyUp, 1);
-    test_str(ecs_get(world, before, Text)->value, "get things.alpha");
-    test_int(syntax_count(world, before), 2);
-    syntax_span(world, before, 1, 4, 16, c->entity);
+    test_str(syntax_input(world), "get things.alpha");
+    test_int(syntax_cursor(world), 16);
+    test_int(syntax_count(world, line), 2);
+    syntax_span(world, line, 1, 4, 16, c->entity);
 
     ecs_fini(world);
 }

@@ -443,3 +443,217 @@ void Wrap_script_paragraph(void) {
 
     ecs_fini(world);
 }
+
+/** Create a world whose default font is loaded, through a Text that uses it.
+ *
+ * @param font Receives box.text.DefaultFont
+ * @return The world
+ */
+static ecs_world_t* wrap_font_world(
+    ecs_entity_t *font)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    *font = ecs_lookup(world, "box.text.DefaultFont");
+    ecs_entity_t ref = ecs_new(world);
+    ecs_set(world, ref, Text, {.value = "loaded", .size = 16, .font = *font});
+    ecs_progress(world, 0);
+
+    return world;
+}
+
+/** Get the x of the caret before a byte of a Text.
+ *
+ * @param world The world
+ * @param e The entity with the Text
+ * @param offset The byte
+ * @param line Receives the line of the caret, may be NULL
+ * @return The x
+ */
+static float wrap_caret_x(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    int32_t offset,
+    int32_t *line)
+{
+    TextCaret caret = {0};
+    test_assert(box_text_caret(world, e, offset, &caret));
+    if (line) {
+        *line = caret.line;
+    }
+
+    return caret.x;
+}
+
+void Wrap_break_lines_match_layout(void) {
+    // console/wrap
+    ecs_entity_t font;
+    ecs_world_t *world = wrap_font_world(&font);
+    Text look = {.value = WRAP_PARAGRAPH, .size = 16, .width = 200, .font = font};
+    ecs_entity_t e = ecs_new(world);
+    ecs_set_ptr(world, e, Text, &look);
+    ecs_progress(world, 0);
+
+    ecs_vec_t starts;
+    ecs_vec_init_t(NULL, &starts, int32_t, 0);
+    int32_t count = box_text_break_lines(world, &look, &starts);
+    test_assert(count >= 3);
+    test_int(count, box_text_line(world, e, 0, NULL, NULL));
+    test_int(ecs_vec_count(&starts), count);
+    for (int32_t i = 0; i < count; i ++) {
+        int32_t start = -1;
+        box_text_line(world, e, i, &start, NULL);
+        test_int(*ecs_vec_get_t(&starts, int32_t, i), start);
+    }
+
+    test_int(box_text_break_lines(world, &look, NULL), count);
+
+    look.width = 0;
+    test_int(box_text_break_lines(world, &look, &starts), 1);
+    test_int(*ecs_vec_get_t(&starts, int32_t, 0), 0);
+    look.value = "";
+    test_int(box_text_break_lines(world, &look, &starts), 1);
+    look.value = "one\ntwo\n";
+    test_int(box_text_break_lines(world, &look, &starts), 3);
+    test_int(*ecs_vec_get_t(&starts, int32_t, 1), 4);
+    test_int(*ecs_vec_get_t(&starts, int32_t, 2), 8);
+    look.font = 0;
+    test_int(box_text_break_lines(world, &look, &starts), 0);
+    test_int(ecs_vec_count(&starts), 0);
+
+    ecs_vec_fini_t(NULL, &starts, int32_t);
+    ecs_fini(world);
+}
+
+void Wrap_long_word_breaks_inside(void) {
+    // console/wrap
+    ecs_entity_t font;
+    ecs_world_t *world = wrap_font_world(&font);
+    char word[201];
+    for (int32_t i = 0; i < 200; i ++) {
+        word[i] = (char)('a' + i % 26);
+    }
+
+    word[200] = '\0';
+    Text look = {.value = word, .size = 16, .line_height = 20, .width = 200, .font = font};
+    ecs_entity_t e = ecs_new(world);
+    ecs_set_ptr(world, e, Text, &look);
+    ecs_progress(world, 0);
+
+    ecs_vec_t starts;
+    ecs_vec_init_t(NULL, &starts, int32_t, 0);
+    int32_t count = box_text_break_lines(world, &look, &starts);
+    test_assert(count >= 4);
+    for (int32_t i = 1; i < count; i ++) {
+        test_assert(*ecs_vec_get_t(&starts, int32_t, i) >
+            *ecs_vec_get_t(&starts, int32_t, i - 1));
+    }
+
+    test_assert(ecs_get(world, e, TextBounds)->width <= 200);
+    test_flt(ecs_get(world, e, TextBounds)->height, (float)count * 20);
+    test_int(box_text_line(world, e, 0, NULL, NULL), count);
+
+    ecs_vec_fini_t(NULL, &starts, int32_t);
+    ecs_fini(world);
+}
+
+void Wrap_hang_indents_wrapped_lines(void) {
+    // console/wrap
+    ecs_entity_t font;
+    ecs_world_t *world = wrap_font_world(&font);
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Text, {
+        .value = "> " WRAP_PARAGRAPH, .size = 16, .width = 200, .font = font, .hang = 2 });
+    ecs_entity_t flat = ecs_new(world);
+    ecs_set(world, flat, Text, {
+        .value = "> " WRAP_PARAGRAPH, .size = 16, .width = 200, .font = font });
+    ecs_progress(world, 0);
+
+    int32_t lines = box_text_line(world, e, 0, NULL, NULL);
+    test_assert(lines >= 3);
+    float left = wrap_caret_x(world, e, 0, NULL);
+    float hang = wrap_caret_x(world, e, 2, NULL);
+    test_assert(hang > left);
+    for (int32_t i = 1; i < lines; i ++) {
+        int32_t start, line;
+        box_text_line(world, e, i, &start, NULL);
+        test_flt(wrap_caret_x(world, e, start, &line), hang);
+        test_int(line, i);
+    }
+
+    int32_t start;
+    box_text_line(world, flat, 1, &start, NULL);
+    test_flt(wrap_caret_x(world, flat, start, NULL), wrap_caret_x(world, flat, 0, NULL));
+    test_assert(ecs_get(world, e, TextBounds)->width <= 200);
+
+    const Text *t = ecs_get(world, e, Text);
+    test_int(box_text_break_lines(world, t, NULL), lines);
+
+    ecs_fini(world);
+}
+
+void Wrap_hang_long_word_breaks_at_hang(void) {
+    // console/wrap
+    ecs_entity_t font;
+    ecs_world_t *world = wrap_font_world(&font);
+    char value[203] = "  ";
+    for (int32_t i = 0; i < 200; i ++) {
+        value[2 + i] = (char)('a' + i % 26);
+    }
+
+    value[202] = '\0';
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Text, {.value = value, .size = 16, .width = 200, .font = font, .hang = 2});
+    ecs_progress(world, 0);
+
+    int32_t lines = box_text_line(world, e, 0, NULL, NULL);
+    test_assert(lines >= 4);
+    float hang = wrap_caret_x(world, e, 2, NULL);
+    test_assert(hang > wrap_caret_x(world, e, 0, NULL));
+    for (int32_t i = 1; i < lines; i ++) {
+        int32_t start;
+        box_text_line(world, e, i, &start, NULL);
+        test_flt(wrap_caret_x(world, e, start, NULL), hang);
+    }
+
+    test_assert(ecs_get(world, e, TextBounds)->width <= 200);
+
+    ecs_fini(world);
+}
+
+void Wrap_hang_past_half_ignored(void) {
+    // console/wrap
+    ecs_entity_t font;
+    ecs_world_t *world = wrap_font_world(&font);
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Text, {
+        .value = "a fairly long first part " WRAP_PARAGRAPH, .size = 16, .width = 200,
+        .font = font, .hang = 22 });
+    ecs_progress(world, 0);
+
+    test_assert(wrap_caret_x(world, e, 22, NULL) - wrap_caret_x(world, e, 0, NULL) > 100);
+    int32_t start;
+    test_assert(box_text_line(world, e, 0, NULL, NULL) >= 2);
+    box_text_line(world, e, 1, &start, NULL);
+    test_flt(wrap_caret_x(world, e, start, NULL), wrap_caret_x(world, e, 0, NULL));
+
+    ecs_fini(world);
+}
+
+void Wrap_hang_not_after_newline(void) {
+    // console/wrap
+    ecs_entity_t font;
+    ecs_world_t *world = wrap_font_world(&font);
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Text, {
+        .value = "> first\nsecond", .size = 16, .width = 200, .font = font, .hang = 2 });
+    ecs_progress(world, 0);
+
+    test_int(box_text_line(world, e, 0, NULL, NULL), 2);
+    test_flt(wrap_caret_x(world, e, 8, NULL), wrap_caret_x(world, e, 0, NULL));
+
+    ecs_fini(world);
+}
