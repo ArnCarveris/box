@@ -408,6 +408,16 @@
                     "script_missing_looked_for_on_open",
                     "follows_window_resize"
                 ]
+            },
+            {
+                "id": "Msdf",
+                "testcases": [
+                    "square",
+                    "square_hole",
+                    "overlapping_contours",
+                    "spike",
+                    "curves"
+                ]
             }
         ]
     }
