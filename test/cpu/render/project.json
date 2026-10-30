@@ -411,6 +411,7 @@
                     "cutoff_2d",
                     "cutoff_batch",
                     "prefab_one_slot",
+                    "unrelated_owners",
                     "instance_override",
                     "prefab_inherited_2d",
                     "text_rgb",

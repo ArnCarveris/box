@@ -648,17 +648,23 @@ done:
     return result;
 }
 
-/** Add the drawn 2D entities that read a material value of an entity: the entity and its IsA
- * instances, down every level, as candidates of the frame.
+/** Add what reads a material value of an entity: the entity and its IsA instances, down
+ * every level. The ones that own a slot of the material table patch it, the drawn 2D entities
+ * patch their shading.
+ *
+ * A slot reads its value from its owner or an IsA base of it, and Transition is inherited over
+ * IsA, so this reaches every affected slot and visits only entities with Transition.
  *
  * @param world The world
  * @param s The state of the extract
+ * @param d The draws, with the material table
  * @param e The entity of a node with an active material transition
  * @param time World time, the time of the packet
  */
-static void box_transition_shading_walk(
+static void box_transition_material_walk(
     ecs_world_t *world,
     box_render_transitions_t *s,
+    const box_render_draws_t *d,
     ecs_entity_t e,
     double time)
 {
@@ -673,6 +679,17 @@ static void box_transition_shading_walk(
         }
 
         ecs_map_insert(&s->visited, cur, 1);
+        ecs_map_val_t *slot = ecs_map_get(&d->materials.owned, (ecs_map_key_t)cur);
+        if (slot) {
+            box_transition_material_t owned = { .entity = cur, .slot = (uint32_t)*slot };
+            uint32_t found = box_transition_material_nodes(world, s, cur,
+                BOX_TRANSITION_MASK_TABLE, time, owned.nodes);
+            if (found) {
+                owned.shadow = (found & BOX_TRANSITION_MASK_SHADOW) != 0;
+                *ecs_vec_append_t(NULL, &s->material_slots, box_transition_material_t) = owned;
+            }
+        }
+
         uint32_t mask = box_transition_shading_mask(world, cur);
         box_transition_material_t item = { .entity = cur };
         if (mask && box_transition_material_nodes(world, s, cur, mask, time, item.nodes)) {
@@ -694,7 +711,8 @@ static void box_transition_shading_walk(
  * the drawn 2D entities, which keep TransitionMaterial.
  *
  * The slots of the last frame upload again, so the frame after a transition ended has its
- * target. A frame without an active material transition visits no entity.
+ * target. A frame without an active material transition visits no entity, and a frame with
+ * one visits only the entities of its nodes and their IsA instances.
  *
  * @param world The world
  * @param s The state of the extract
@@ -733,29 +751,22 @@ static void box_transition_materials(
         any = node->entity && box_transition_material_active(s, (uint32_t)i, p->time);
     }
 
+    if (ecs_map_count(&s->visited)) {
+        ecs_map_clear(&s->visited);
+    }
+
     d = any ? box_transition_draws(world, s) : NULL;
     if (!d) {
         goto tag;
     }
 
-    ecs_map_iter_t mit = ecs_map_iter(&d->materials.owned);
-    while (ecs_map_next(&mit)) {
-        box_transition_material_t item = {
-            .entity = (ecs_entity_t)ecs_map_key(&mit),
-            .slot = (uint32_t)ecs_map_value(&mit)
-        };
-        if (!ecs_is_alive(world, item.entity)) {
-            continue;
+    for (i = 1; i < count; i ++) {
+        const box_transition_node_t *node = ecs_vec_get_t(&s->nodes, box_transition_node_t, i);
+        if (node->entity && ecs_is_alive(world, node->entity) &&
+            box_transition_material_active(s, (uint32_t)i, p->time))
+        {
+            box_transition_material_walk(world, s, d, node->entity, p->time);
         }
-
-        uint32_t found = box_transition_material_nodes(world, s, item.entity,
-            BOX_TRANSITION_MASK_TABLE, p->time, item.nodes);
-        if (!found) {
-            continue;
-        }
-
-        item.shadow = (found & BOX_TRANSITION_MASK_SHADOW) != 0;
-        *ecs_vec_append_t(NULL, &s->material_slots, box_transition_material_t) = item;
     }
 
     for (i = 0; i < ecs_vec_count(&s->material_slots); i ++) {
@@ -764,19 +775,6 @@ static void box_transition_materials(
         box_draws_material_changed(d, item->entity);
         if (item->shadow && d->shadow_record) {
             *ecs_vec_append_t(NULL, &d->shadow_materials, uint32_t) = item->slot;
-        }
-    }
-
-    if (ecs_map_count(&s->visited)) {
-        ecs_map_clear(&s->visited);
-    }
-
-    for (i = 1; i < count; i ++) {
-        const box_transition_node_t *node = ecs_vec_get_t(&s->nodes, box_transition_node_t, i);
-        if (node->entity && ecs_is_alive(world, node->entity) &&
-            box_transition_material_active(s, (uint32_t)i, p->time))
-        {
-            box_transition_shading_walk(world, s, node->entity, p->time);
         }
     }
 
@@ -1389,6 +1387,12 @@ bool box_render_transitions_node_active(
     }
 
     return result;
+}
+
+int32_t box_render_transitions_material_visited(
+    const box_render_transitions_t *s)
+{
+    return ecs_map_count(&s->visited);
 }
 
 void box_render_transitions_init(

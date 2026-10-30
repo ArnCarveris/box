@@ -631,6 +631,60 @@ void TransitionMaterial_prefab_one_slot(void) {
     tr_fini(world, null);
 }
 
+void TransitionMaterial_unrelated_owners(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    box_render_transitions_t *s = box_render_transitions_get(world);
+    ecs_entity_t others[64];
+    box_render_material_t rendered, expected[64];
+    box_draw_material_t m;
+    int32_t i;
+    for (i = 0; i < 64; i ++) {
+        others[i] = tr_shape(world, 0, (float)(i % 8));
+        ecs_set(world, others[i], Rgb, {(uint8_t)i, 10, 20});
+    }
+
+    ecs_entity_t e = tr_shape(world, 0, 0);
+    ecs_set(world, e, Rgb, {0, 0, 0});
+    box_transition_set(world, e, ecs_id(Rgb), &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+    tr_frame(world);
+    uint32_t slot = ecs_get(world, e, MaterialId)->value;
+    for (i = 0; i < 64; i ++) {
+        uint32_t other = ecs_get(world, others[i], MaterialId)->value;
+        test_assert(other != slot);
+        box_draws_material_of(world, others[i], &m);
+        box_draws_material_pack(&expected[i], &m);
+    }
+
+    test_int(box_render_transitions_material_visited(s), 0);
+
+    ecs_set(world, e, Rgb, {200, 100, 40});
+    for (i = 0; i < 4; i ++) {
+        uint32_t k = (uint32_t)i;
+        int32_t j;
+        tr_frame(world);
+        test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 1);
+        test_int(box_render_transitions_material_visited(s), 1);
+        test_assert(tr_material_rendered(world, null, slot, &rendered));
+        test_uint(rendered.color, tr_color_word(50 * k, 25 * k, 10 * k));
+        for (j = 0; j < 64; j ++) {
+            uint32_t other = ecs_get(world, others[j], MaterialId)->value;
+            if (tr_material_rendered(world, null, other, &rendered)) {
+                test_assert(!ecs_os_memcmp(&rendered, &expected[j], ECS_SIZEOF(rendered)));
+            }
+        }
+    }
+
+    tr_frame(world);
+    test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 0);
+    test_int(box_render_transitions_material_visited(s), 0);
+    test_assert(tr_material_rendered(world, null, slot, &rendered));
+    test_uint(rendered.color, tr_color_word(200, 100, 40));
+    tr_fini(world, null);
+}
+
 void TransitionMaterial_instance_override(void) {
     // engine_core/transition
     box_render_null_t *null;

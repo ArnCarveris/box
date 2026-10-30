@@ -289,19 +289,22 @@ thread) and the encoding in `src/render/batch.c` and `src/render/materials.c`.
   (`box_draw_transition_material_t.nodes`), so a slot can read a transition of its own `Rgb`
   and one of an inherited `Emissive`.
 - **Mesh shapes** read the shared material table (`box_render_material_t`). In a frame with a
-  material transition, before the batches are sent, the extract walks the slots of the table
-  (one per prefab or owner of a `MaterialId`), finds the slots whose components have an active
-  node, and marks them to upload in the frame. The send records where each run of the table
-  went in the packet data (`box_draw_materials_t.uploaded`); after the batches, one `MATERIAL`
-  record per slot carries the byte offset of the record and its target material. Mesh slots
+  material transition, before the batches are sent, the extract walks the entity of each node
+  with an active material transition and its `IsA` instances, down every level. A slot reads
+  its value from its owner or an `IsA` base of it, so this reaches every affected slot, and
+  since `Transition` is inherited over `IsA` it visits only entities with `Transition`. Each
+  visited entity that owns a slot (`box_draw_materials_t.owned`) and reads an active node
+  marks its slot to upload in the frame; the slots of other owners are not visited. The send
+  records where each run of the table went in the packet data
+  (`box_draw_materials_t.uploaded`); after the batches, one `MATERIAL` record per slot carries
+  the byte offset of the record and its target material. Mesh slots
   are not rekeyed: their instance streams do not change, only the table record does. A slot
   of the last frame uploads once more, so the frame after the end holds the target.
-- **2D shapes and texts** carry their material inline (`box_render_shading_t`). The extract
-  walks the entity of each node with an active material transition and its `IsA` instances,
-  down every level, and gives each drawn 2D shape or text that reads an active value the
-  private tag `TransitionMaterial` (`(OnInstantiate, DontInherit)`). `box_draws_key` and the
-  glyph key make it `dynamic_material`; `DrawsOnTransitionMaterial` rekeys the slot when the tag
-  is added or removed. A dynamic_material batch uploads its shading run every frame and
+- **2D shapes and texts** carry their material inline (`box_render_shading_t`). The same
+  walk gives each drawn 2D shape or text that reads an active value the private tag
+  `TransitionMaterial` (`(OnInstantiate, DontInherit)`). `box_draws_key` and the glyph key
+  make it `dynamic_material`; `DrawsOnTransitionMaterial` rekeys the slot when the tag is
+  added or removed. A dynamic_material batch uploads its shading run every frame and
   remembers its packet data offset (`shading_frame`, `shading_data`); one `SHADING` record per
   shape slot and per glyph carries the offset of its `box_render_shading_t`. The tag is
   removed in the first frame without an active value, which rekeys the slot to its static
@@ -353,4 +356,6 @@ that has them, pays nothing per entity:
 The only observers the module adds are the OnSet validation of `Transition` itself,
 `DrawsOnTransitionTransform` and `DrawsOnTransitionMaterial`, on the private tags, which only
 entities a transition patches ever get. The material table records the runs it uploads, one
-entry per run, and a frame without an active material transition walks no slot or entity.
+entry per run. A frame without an active material transition walks no slot or entity, and a
+frame with one visits only the entities of its nodes and their `IsA` instances, never the other
+owners of the material table.

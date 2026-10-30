@@ -1602,6 +1602,15 @@ bool box_render_transitions_node_active(
     uint32_t node,
     double time);
 
+/** Count the entities the material extract visited in the last frame: the entities of the
+ * nodes with an active material transition and their IsA instances, 0 in a frame without one.
+ *
+ * @param s The state of the transition extract
+ * @return The entities
+ */
+int32_t box_render_transitions_material_visited(
+    const box_render_transitions_t *s);
+
 /** Get the transition resolver table of a ring, used by the consumer of its packets.
  *
  * @param ring The ring

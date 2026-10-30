@@ -225,7 +225,7 @@ void Transition_shadow_mid_transition(void) {
     ecs_fini(world);
 }
 
-/** A box in front of the camera, unlit, changes its Rgb from red to blue over a second. The
+/** A box in front of the camera, with the default lighting, changes its Rgb from red to blue over a second. The
  * frames render at progress 0, 1/4, 1/2 and 3/4 and then at the target: the red and blue
  * channels of its center pixel cross over while the game thread sees blue from the start.
  */
