@@ -229,6 +229,9 @@ static void box_surface_ctor(
 
 /** Give a surface its target handle and, unless it renders offscreen, its window.
  *
+ * Without glfw (the browser) the canvas is the window and box_window_new returns NULL, which is
+ * not a failure, so only glfw warns when it cannot open a window.
+ *
  * @param world The world
  * @param e The surface entity
  * @param s The surface
@@ -255,9 +258,11 @@ static void box_surface_open(
     impl->window_height = box_surface_points(s->height);
     impl->window = box_window_new(
         world, e, impl->window_width, impl->window_height, "box");
+#ifdef BOX_PLATFORM_GLFW
     if (!impl->window) {
         ecs_warn("cannot open a window, the surface renders offscreen");
     }
+#endif
 
 done:
     return;
