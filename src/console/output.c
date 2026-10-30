@@ -1470,8 +1470,10 @@ void box_console_out_run(
         ecs_os_free(path);
     }
 
-    if (!count && r.result.type && r.result.ptr) {
-        box_console_fmt_value(&fmt, r.result.type, r.result.ptr);
+    int32_t results = ecs_vec_count(&r.results);
+    ecs_value_t *last = results ? ecs_vec_get_t(&r.results, ecs_value_t, results - 1) : NULL;
+    if (!count && last && last->type && last->ptr) {
+        box_console_fmt_value(&fmt, last->type, last->ptr);
     }
 
     for (i = 0; i < count; i ++) {

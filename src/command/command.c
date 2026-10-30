@@ -147,7 +147,9 @@ char* box_command_run(
     ecs_strbuf_t buf = ECS_STRBUF_INIT;
     char **errors = ecs_vec_first(&r.errors);
     int32_t i, count = ecs_vec_count(&r.errors);
-    char *out = count ? NULL : box_command_format(world, &r.result);
+    int32_t results = ecs_vec_count(&r.results);
+    ecs_value_t *last = results ? ecs_vec_get_t(&r.results, ecs_value_t, results - 1) : NULL;
+    char *out = (count || !last) ? NULL : box_command_format(world, last);
     if (out) {
         ecs_strbuf_appendstr(&buf, out);
     }

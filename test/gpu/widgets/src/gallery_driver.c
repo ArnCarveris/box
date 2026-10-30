@@ -143,12 +143,14 @@ static char* gallery_get_member(
         goto done;
     }
 
-    if (r.result.type != ecs_id(ecs_value_t)) {
+    int32_t results = ecs_vec_count(&r.results);
+    ecs_value_t *last = results ? ecs_vec_get_t(&r.results, ecs_value_t, results - 1) : NULL;
+    if (!last || last->type != ecs_id(ecs_value_t)) {
         result = flecs_asprintf(BOX_COMMAND_ERROR "'%s' returned no value", line);
         goto done;
     }
 
-    const ecs_value_t *value = r.result.ptr;
+    const ecs_value_t *value = last->ptr;
     ecs_meta_cursor_t cur = ecs_meta_cursor(world, value->type, value->ptr);
     if (ecs_meta_push(&cur) || ecs_meta_dotmember(&cur, members + 1)) {
         result = flecs_asprintf(BOX_COMMAND_ERROR "'%s' has no member '%s'", arg, members + 1);

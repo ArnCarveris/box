@@ -145,8 +145,8 @@ slot run on a fourth page. The fifth batch of 1.5M holds 174,764 instances in a 
 | Extract, setup | 49.3 MB: transform 5.3, shading 1.8, surface 42.2; plus 6.4 MB of material records | 86% of the stream bytes |
 | Extract.unchanged | 480,000 per frame: the transforms of 10,000 `DynamicTransform` spheres | 0 |
 | Extract.changed_1pct | 532,224 per frame: 480,000 plus a transform scatter of 1,000 entries (52 each) | 0 |
-| Shapes2D.dynamic_material | 800,000 per frame: shading of 10,000 shapes | 0 |
-| Shapes2D.changed_1pct | 84,224 per frame: shading scatter of 1,000 entries (84 each) | 0 |
+| Shapes2D.dynamic_material | 640,000 per frame: shading of 10,000 shapes | 0 |
+| Shapes2D.changed_1pct | 68,096 per frame: shading scatter of 1,000 entries (68 each) | 0 |
 | Shapes2D.ui_tree_add_remove | 1,024 per frame for 1 added and 1 removed shape: segments of 68, 184 and 404 bytes (header and entries), each padded to 256 | 404 of 656 segment bytes |
 | Text.layout_10k | 51.2 MB per frame: transform 4.8, shading 8.0, surface 38.4 | 75% (74% over four frames) |
 | Text.changed_1pct | 92,000 per frame on average: transform and shading scatters of 675 glyphs | 0 |
