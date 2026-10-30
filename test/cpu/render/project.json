@@ -305,7 +305,9 @@
                     "new_shape2d_uploads_no_surface",
                     "changed_shape2d_uploads_no_surface",
                     "mesh_uploads_surface_next_to_shape2d",
-                    "text_relayout_uploads_no_surface"
+                    "text_relayout_uploads_no_surface",
+                    "shape2d_packed_color",
+                    "glyph_packed_color"
                 ]
             },
             {
@@ -481,7 +483,9 @@
                     "targets_on_game_thread",
                     "no_transition_no_records",
                     "dynamic_material_fade_in",
-                    "text_spans_fade"
+                    "text_spans_fade",
+                    "packed_color_opacity_2d",
+                    "packed_color_tint_2d"
                 ]
             }
         ]

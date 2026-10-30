@@ -77,7 +77,7 @@ from the shader code.
 | Stream | Mesh page | 2D page | Read on the GPU by |
 |---|---|---|---|
 | Transform | 48, `box_render_transform_t` | 48 | `cull.wgsl`, `mesh.wgsl`, `shadow.wgsl`, `bake_sh.wgsl`, `shape2d.wgsl` |
-| Shading | 16, `box_render_mesh_shading_t` | 80, `box_render_shading_t` | `mesh.wgsl`, `shadow.wgsl` (cutoff), `shape2d.wgsl` |
+| Shading | 16, `box_render_mesh_shading_t` | 64, `box_render_shading_t` | `mesh.wgsl`, `shadow.wgsl` (cutoff), `shape2d.wgsl` |
 | Surface | 384, `box_render_surface_t` | 384 | `mesh.wgsl` and `shadow.wgsl` through `place()`; not `shape2d.wgsl`, not `cull.wgsl` |
 | Total | 448 | 512 | |
 
@@ -432,7 +432,7 @@ need `CopySrc` usage. Touches `store.c`, `batch.c` and the buffer create in the 
 
 ### O4. Scatter entries
 
-An entry is the 4 byte slot plus the stride: 52 (transform), 20 (mesh shading), 84 (2D
+An entry is the 4 byte slot plus the stride: 52 (transform), 20 (mesh shading), 68 (2D
 shading), 388 (surface). Each page and stream segment adds a 16 byte header and is aligned to
 256. The slot word is 8% of a transform entry and 20% of a mesh shading entry. Most of the cost
 is in the 388 byte surface entries, which S1 and S2 remove for every slot that is not parametric.
