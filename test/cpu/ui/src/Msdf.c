@@ -1048,9 +1048,10 @@ void Msdf_corner_shapes(void) {
 }
 
 /** The "X" and "k" of Msdf_corner_shapes, checked the same way, at the placements of a sweep
- * over x and y fractions {1, 3, 7, 13, 15, 17, 25, 31}/32 of a texel where the corner repair
- * left points wrong. At the "X" the notches of the crossing compete for the same texels, at the
- * "k" the notches of the junction next to the stem do. */
+ * over x and y fractions {1, 3, 7, 13, 15, 17, 25, 31}/32 of a texel where a repair of one corner
+ * at a time, judging points by the two edges of the corner alone, left points wrong. At the "X"
+ * the notches of the crossing compete for the same texels, at the "k" the notches of the
+ * junction next to the stem do. */
 void Msdf_corner_sweep(void) {
     const msdf_corner_shape_t x_shape = {"X", 40.0 / 2000.0, {560, 760}, 12, {
         {60, 0}, {560, 760}, {80, 1500}, {310, 1500}, {650, 850}, {990, 1500},

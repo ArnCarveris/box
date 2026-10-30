@@ -471,16 +471,23 @@ static box_msdf_dist_t box_msdf_edge_distance(
         : box_msdf_line_distance(e, origin, param);
 }
 
-double box_msdf_corner_distance(
-    const box_msdf_edge_t *a,
-    const box_msdf_edge_t *b,
+double box_msdf_edges_distance(
+    const box_msdf_edge_t *edges,
+    const int32_t *indices,
+    int32_t count,
     box_msdf_point_t p)
 {
+    box_msdf_dist_t result = { INFINITY, 0.0 };
+    int32_t i;
     double param;
-    box_msdf_dist_t da = box_msdf_edge_distance(a, p, &param);
-    box_msdf_dist_t db = box_msdf_edge_distance(b, p, &param);
+    for (i = 0; i < count; i ++) {
+        box_msdf_dist_t d = box_msdf_edge_distance(&edges[indices[i]], p, &param);
+        if (box_msdf_less(d, result)) {
+            result = d;
+        }
+    }
 
-    return box_msdf_less(db, da) ? db.distance : da.distance;
+    return result.distance;
 }
 
 void box_msdf_shape_init(
