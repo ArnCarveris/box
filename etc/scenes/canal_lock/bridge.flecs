@@ -10,7 +10,7 @@ using box.transition
 
 template LockLiftSpanBody {
   deck_core : CanalOldTimber { Position: {0, -0.03, -3.4}; Box: {1.86, 0.06, 6.76} }
-  CanalFace(w: 1.86, h: 6.8, u: 0.6, v: 2.7) { (IsA, CanalDeckPlanks); Position: {0, 0.012, -3.4}; Rotation: {-math.PI / 2, 0, math.PI / 2} }
+  CanalFace(w: 1.86, h: 6.8, u: 0.6, v: 2.7) { (IsA, CanalDeckPlanks); Position: {0, 0.012, -3.4}; Rotation: {-math.PI / 2, 0, 0} }
   stringer_a : CanalOldTimber { Position: {-0.74, -0.14, -3.4}; Box: {0.16, 0.16, 6.8} }
   stringer_b : CanalOldTimber { Position: {0.74, -0.14, -3.4}; Box: {0.16, 0.16, 6.8} }
   for side in 0..2 {
