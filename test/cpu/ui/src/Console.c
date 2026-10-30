@@ -2026,3 +2026,51 @@ void Console_complete_typing_closes_list(void) {
 
     ecs_fini(world);
 }
+
+void Console_complete_hide_closes_list(void) {
+    // console/complete
+    ecs_world_t *world = console_open(640, 360, NULL);
+    console_type(world, "schema");
+    console_press(world, KeyTab, 1);
+    test_assert(console_menu_at(world, "schema_value") >= 0);
+
+    // Closing and opening the console again does not bring back the old candidates
+    ecs_singleton_get_mut(world, Console)->open = false;
+    ecs_singleton_modified(world, Console);
+    ecs_progress(world, 0);
+    ecs_singleton_get_mut(world, Console)->open = true;
+    ecs_singleton_modified(world, Console);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_str(console_menu(world), "");
+    test_flt(console_menu_height(world), 0);
+
+    // Tab computes the candidates again
+    console_press(world, KeyTab, 1);
+    test_assert(console_menu_at(world, "schema_value") >= 0);
+
+    ecs_fini(world);
+}
+
+void Console_complete_module_color(void) {
+    // console/complete
+    ecs_world_t *world = console_open(640, 360, NULL);
+    const Console *c = ecs_singleton_get(world, Console);
+    ecs_entity_t mod = ecs_entity(world, { .name = "zebra_mod" });
+    ecs_add_id(world, mod, EcsModule);
+    ecs_entity(world, { .name = "zebra_ent" });
+
+    // A module is drawn in the scope color, another entity in the entity color
+    console_type(world, "ls zebra");
+    console_press(world, KeyTab, 2);
+    test_str(console_typed(world), "ls zebra_");
+    int32_t at_mod = console_menu_at(world, "zebra_mod");
+    int32_t at_ent = console_menu_at(world, "zebra_ent");
+    test_assert(at_mod >= 0);
+    test_assert(at_ent >= 0);
+    ecs_entity_t menu = ecs_lookup(world, CONSOLE_MENU);
+    console_check_span(world, menu, at_mod, at_mod + 9, c->syntax.scope);
+    console_check_span(world, menu, at_ent, at_ent + 9, c->output.entity);
+
+    ecs_fini(world);
+}

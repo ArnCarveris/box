@@ -430,7 +430,9 @@
                     "complete_not_in_string",
                     "complete_cycle",
                     "complete_escape_closes_list",
-                    "complete_typing_closes_list"
+                    "complete_typing_closes_list",
+                    "complete_hide_closes_list",
+                    "complete_module_color"
                 ]
             },
             {
