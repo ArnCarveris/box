@@ -456,7 +456,9 @@
                     "light_no_effect",
                     "parent_relationship",
                     "targets_on_game_thread",
-                    "no_transition_no_records"
+                    "no_transition_no_records",
+                    "dynamic_material_fade_in",
+                    "text_spans_fade"
                 ]
             }
         ]

@@ -1,8 +1,8 @@
 /**
  * @file TransitionTintOpacity.c
  * @brief Tests of the TransitionTintOpacity suite: Tint and Opacity transitions, composed down
- * the hierarchy: the mesh and 2D shading the resolver patches, read from the last packet of the
- * null backend, and the blended batch of a shape during an Opacity transition.
+ * the hierarchy: the mesh, 2D and glyph shading the resolver patches, read from the last packet
+ * of the null backend, and the blended batch of a shape during an Opacity transition.
  *
  * The cases step the world with a fixed delta and a Linear transition of one second, so the
  * four frames after a change render at progress 0, 1/4, 1/2 and 3/4 and the fifth at the target.
@@ -1009,5 +1009,237 @@ void TransitionTintOpacity_no_transition_no_records(void) {
     test_assert(!ecs_has_id(world, child, TransitionOpacity));
     test_assert(!ecs_has_id(world, child, TransitionMaterial));
     test_assert(!tr_batch(world, child)->key.dynamic_material);
+    tr_fini(world, null);
+}
+
+void TransitionTintOpacity_dynamic_material_fade_in(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_entity_t e = tr_shape(world, 0);
+    ecs_entity_t reference = tr_shape(world, 0);
+    box_render_mesh_shading_t rendered, expected;
+    int32_t i;
+    ecs_add(world, e, DynamicMaterial);
+    ecs_add(world, reference, DynamicMaterial);
+    ecs_set(world, e, Opacity, {0.0f});
+    ecs_set(world, reference, Opacity, {1.0f});
+    tr_transition(world, e, ecs_id(Opacity));
+    tr_frame(world);
+    tr_frame(world);
+    box_draw_batch_t *b = tr_batch(world, e);
+    test_int(b->key.blend, AlphaBlend);
+    test_assert(b->key.dynamic_material);
+    test_assert(!box_draws_caster(b));
+    DrawSlot start = *ecs_get(world, e, DrawSlot);
+
+    ecs_set(world, e, Opacity, {1.0f});
+    for (i = 0; i < 4; i ++) {
+        Opacity mid = tr_opacity_at(0.0f, 1.0f, i);
+        tr_override_t o[TR_OVERRIDES] = {{ .entity = e, .opacity = &mid }};
+        tr_frame(world);
+        const DrawSlot *ds = ecs_get(world, e, DrawSlot);
+        test_flt(ecs_get(world, e, Opacity)->value, 1.0f);
+        test_assert(ecs_has_id(world, e, TransitionOpacity));
+        test_int(ds->batch, start.batch);
+        test_int(ds->slot, start.slot);
+        b = tr_batch(world, e);
+        test_int(b->key.blend, AlphaBlend);
+        test_assert(b->key.dynamic_material);
+        test_assert(!b->key.bake);
+        test_assert(!box_draws_caster(b));
+        test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_SHADING), 1);
+        rendered = tr_check_mesh(world, null, o, e);
+        test_assert(fabsf(rendered.alpha - mid.value) < TR_FLOAT_EPS);
+        test_assert(fabsf(rendered.alpha - (float)i / 4.0f) < TR_FLOAT_EPS);
+    }
+
+    tr_frame(world);
+    b = tr_batch(world, e);
+    test_assert(!ecs_has_id(world, e, TransitionOpacity));
+    test_assert(!ecs_has_id(world, e, TransitionMaterial));
+    test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_SHADING), 0);
+    test_int(b->key.blend, Opaque);
+    test_assert(b->key.dynamic_material);
+    test_assert(box_draws_caster(b));
+    test_int(ecs_get(world, e, DrawSlot)->batch, ecs_get(world, reference, DrawSlot)->batch);
+    rendered = tr_check_mesh(world, null, NULL, e);
+    tr_rendered(world, null, reference, &expected);
+    test_assert(!ecs_os_memcmp(rendered.tint, expected.tint, ECS_SIZEOF(rendered.tint)));
+    test_assert(!ecs_os_memcmp(&rendered.alpha, &expected.alpha, ECS_SIZEOF(float)));
+    test_flt(rendered.alpha, 1);
+    tr_fini(world, null);
+}
+
+/** The string of the text cases, one glyph per byte */
+#define TR_TEXT "fade"
+
+/** Create a Text with the font of the test assets, under a parent, colored by one span over
+ * the whole string.
+ *
+ * @param world The world
+ * @param parent ChildOf parent
+ * @param font The font
+ * @param color Display encoded color of the span
+ * @return The text
+ */
+static ecs_entity_t tr_text(
+    ecs_world_t *world,
+    ecs_entity_t parent,
+    ecs_entity_t font,
+    rgba color)
+{
+    ecs_entity_t e = ecs_new_w_pair(world, EcsChildOf, parent);
+    ecs_set(world, e, Position, {0, 1, 0});
+    ecs_set(world, e, Text, { .value = TR_TEXT, .size = 16, .font = font });
+    ecs_set(world, e, Rgb, {20, 200, 40});
+    TextSpans *spans = ecs_ensure(world, e, TextSpans);
+    *ecs_vec_append_t(NULL, &spans->spans, TextSpan) = (TextSpan){
+        .start = 0, .end = (int32_t)(sizeof(TR_TEXT) - 1), .color = color
+    };
+    ecs_modified(world, e, TextSpans);
+
+    return e;
+}
+
+/** Read the shading of a glyph slot as the backend got it in the last packet: the patched
+ * bytes of the run upload of a dynamic_material batch, else the static slot.
+ *
+ * @param world The world
+ * @param null The backend
+ * @param at The glyph slot
+ * @param out Receives the shading
+ */
+static void tr_glyph_rendered(
+    ecs_world_t *world,
+    const box_render_null_t *null,
+    const box_draw_glyph_slot_t *at,
+    box_render_shading_t *out)
+{
+    box_render_draws_t *d = box_draws_state(world);
+    box_draw_batch_t *b = box_draws_batch(d, at->batch);
+    uint32_t stride = (uint32_t)sizeof(box_render_shading_t);
+    bool found = false;
+    int32_t i;
+    box_render_sync(world);
+    *out = *box_draws_slot_shading(b, at->slot);
+    if (!b->key.dynamic_material) {
+        goto done;
+    }
+
+    uint32_t handle = box_draws_store_handle(box_draws_batch_store(d, b), b->page,
+        BOX_RENDER_STREAM_SHADING);
+    uint32_t offset = b->first * stride;
+    for (i = 0; i < ecs_vec_count(&null->last.uploads) && !found; i ++) {
+        const box_render_upload_t *u = ecs_vec_get_t(
+            &null->last.uploads, box_render_upload_t, i);
+        if (u->buffer == handle && u->offset == offset) {
+            ecs_os_memcpy(out, box_render_packet_data(&null->last,
+                u->data + (uint32_t)at->slot * stride), (ecs_size_t)stride);
+            found = true;
+        }
+    }
+
+    test_assert(found);
+done:
+    return;
+}
+
+void TransitionTintOpacity_text_spans_fade(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    const rgba color = {255, 64, 0, 128};
+    const Tint from = {0, 0, 255, 0}, to = {0, 0, 255, 200};
+    ecs_entity_t font = ecs_entity(world, { .name = "tr_font" });
+    ecs_set(world, font, Font, { .path = "test/assets/fonts/B612-Regular.ttf" });
+    ecs_entity_t parent = tr_group(world);
+    ecs_entity_t reference_parent = tr_group(world);
+    ecs_entity_t text = tr_text(world, parent, font, color);
+    ecs_entity_t reference = tr_text(world, reference_parent, font, color);
+    int32_t i, j, count = (int32_t)(sizeof(TR_TEXT) - 1);
+    ecs_set(world, parent, Opacity, {0.4f});
+    ecs_set_ptr(world, parent, Tint, &from);
+    ecs_set(world, reference_parent, Opacity, {1.0f});
+    ecs_set_ptr(world, reference_parent, Tint, &to);
+    tr_transition(world, parent, ecs_id(Opacity));
+    tr_transition(world, parent, ecs_id(Tint));
+    tr_frame(world);
+    tr_frame(world);
+    test_int(ecs_vec_count(&ecs_get(world, text, TextSlots)->slots), count);
+    test_int(ecs_vec_count(&ecs_get(world, reference, TextSlots)->slots), count);
+    test_assert(!ecs_has_id(world, text, TransitionOpacity));
+
+    ecs_set(world, parent, Opacity, {1.0f});
+    ecs_set_ptr(world, parent, Tint, &to);
+    for (i = 0; i < 4; i ++) {
+        Opacity opacity = tr_opacity_at(0.4f, 1.0f, i);
+        Tint tint = tr_tint_at(&from, &to, i);
+        tr_override_t o[TR_OVERRIDES] = {{ .entity = parent, .tint = &tint, .opacity = &opacity }};
+        box_draw_material_t m, span, target;
+        box_draw_tint_t inherited, target_inherited;
+        box_render_shading_t rendered, expected, target_shading;
+        Rgb rgb, target_rgb;
+        Opacity span_opacity, target_opacity;
+        tr_frame(world);
+        test_assert(ecs_has_id(world, text, TransitionOpacity));
+        test_assert(ecs_has_id(world, text, TransitionMaterial));
+        test_assert(!ecs_has_id(world, parent, TransitionOpacity));
+
+        box_draws_text_material(world, text, &target_inherited, &target);
+        box_draws_glyph_span_material(&target, &color, &span, &target_rgb, &target_opacity);
+        box_draws_material(&target_shading, &span);
+        box_draws_text_material(world, text, &inherited, &m);
+        m.fade = tr_fade(world, o, text, &inherited);
+        m.inherited = &inherited;
+        box_draws_glyph_span_material(&m, &color, &span, &rgb, &span_opacity);
+        box_draws_material(&expected, &span);
+
+        const TextSlots *ts = ecs_get(world, text, TextSlots);
+        test_int(ecs_vec_count(&ts->slots), count);
+        for (j = 0; j < count; j ++) {
+            const box_draw_glyph_slot_t *at = ecs_vec_get_t(
+                &ts->slots, box_draw_glyph_slot_t, j);
+            box_draw_batch_t *b = box_draws_batch(box_draws_state(world), at->batch);
+            int32_t c;
+            test_int(b->key.pipeline, BOX_RENDER_SHADER_SHAPE2D);
+            test_int(b->key.blend, AlphaBlend);
+            test_assert(b->key.dynamic_material);
+            tr_glyph_rendered(world, null, at, &rendered);
+            test_assert(fabsf(rendered.color[3] -
+                (float)color.a / 255.0f * opacity.value) < TR_FLOAT_EPS);
+            for (c = 0; c < 4; c ++) {
+                test_assert(fabsf(rendered.color[c] - expected.color[c]) < TR_FLOAT_EPS);
+            }
+
+            if (i == 2) {
+                test_assert(fabsf(rendered.color[2] - target_shading.color[2]) > TR_FLOAT_EPS);
+                test_assert(fabsf(rendered.color[3] - target_shading.color[3]) > TR_FLOAT_EPS);
+            }
+        }
+    }
+
+    tr_frame(world);
+    test_assert(!ecs_has_id(world, text, TransitionOpacity));
+    test_assert(!ecs_has_id(world, text, TransitionMaterial));
+    test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_SHADING), 0);
+    const TextSlots *ts = ecs_get(world, text, TextSlots);
+    const TextSlots *rs = ecs_get(world, reference, TextSlots);
+    test_int(ecs_vec_count(&ts->slots), count);
+    test_int(ecs_vec_count(&rs->slots), count);
+    for (j = 0; j < count; j ++) {
+        box_render_shading_t rendered, expected;
+        const box_draw_glyph_slot_t *at = ecs_vec_get_t(&ts->slots, box_draw_glyph_slot_t, j);
+        const box_draw_glyph_slot_t *ref = ecs_vec_get_t(&rs->slots, box_draw_glyph_slot_t, j);
+        test_assert(!box_draws_batch(box_draws_state(world), at->batch)->key.dynamic_material);
+        test_int(at->batch, ref->batch);
+        tr_glyph_rendered(world, null, at, &rendered);
+        tr_glyph_rendered(world, null, ref, &expected);
+        test_assert(!ecs_os_memcmp_t(&rendered, &expected, box_render_shading_t));
+    }
+
     tr_fini(world, null);
 }
