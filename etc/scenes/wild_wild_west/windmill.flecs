@@ -1,0 +1,53 @@
+include beam
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.light
+using box.text
+
+
+@tree Parent
+template WestWindmill {
+  for side in 0..2 {
+    for end in 0..2 {
+      const x = (side - 0.5) * 2
+      const z = (end - 0.5) * 2
+      WestBeam(ax: x, ay: 0, az: z, bx: x * 0.28, by: 7.6, bz: z * 0.28, width: 0.12, tint: {126, 133, 123}) {}
+    }
+    for level in 0..4 {
+      const low = 1 - level * 0.18
+      const high = low - 0.18
+      const y = level * 1.9
+      const s = side * 2 - 1
+      WestBeam(ax: -low, ay: y, az: s * low, bx: high, by: y + 1.9, bz: s * high, width: 0.055, tint: {94, 104, 96}) {}
+      WestBeam(ax: low, ay: y, az: s * low, bx: -high, by: y + 1.9, bz: s * high, width: 0.055, tint: {94, 104, 96}) {}
+      WestBeam(ax: s * low, ay: y, az: -low, bx: s * high, by: y + 1.9, bz: high, width: 0.055, tint: {94, 104, 96}) {}
+      { Position: {0, y + 0.1, s * low}; Box: {low * 2, 0.07, 0.07}; Rgb: {126, 133, 123} }
+    }
+  }
+  platform : WestPlank { Position: {0, 6.2, 0}; Box: {1.4, 0.12, 1.4} }
+  pump_rod : WestIron { Position: {0, 3.7, 0}; Cylinder: {radius: 0.035, length: 7.4, segments: 8} }
+  rotor {
+    Position: {0, 8.2, 0.55}
+    Rotation: {0, -0.25, 0}
+    hub : WestRed { Position: {}; Rotation: {math.PI / 2, 0, 0}; Cylinder: {radius: 0.21, length: 0.4, segments: 16} }
+    for i in 0..18 {
+      const a = i * math.PI / 9
+      {
+        Position: {}
+        Rotation: {0, 0, a}
+        spoke : WestSteel { Position: {0, 0.95, 0}; Box: {0.055, 1.8, 0.055} }
+        blade : WestSteel { Position: {0, 1.45, 0}; Rotation: {0, 0.35, -0.08}; BeveledPrism: {footprint: [{-0.12, -0.025}, {0.12, -0.025}, {0.23, 0.025}, {-0.23, 0.025}], depth: 0.85, bevel: 0.008} }
+      }
+    }
+    for ring in 0..2 {
+      { Position: {0, 0, -0.035}; Rotation: {math.PI / 2, 0, 0}; Torus: {radius: 0.94 + ring * 0.88, tube: 0.023, segments: 48, rings: 6}; Rgb: {126, 133, 123} }
+    }
+  }
+  tail_arm : WestIron { Position: {0, 8.1, -1.4}; Box: {0.07, 0.07, 2.8} }
+  tail : WestRed { Position: {0, 8.23, -2.5}; Box: {0.05, 0.8, 1.25} }
+  for i in 0..16 {
+    { Position: {0.47, 0.3 + i * 0.38, 0.5}; Box: {0.48, 0.045, 0.045}; Rgb: {126, 133, 123} }
+  }
+}
