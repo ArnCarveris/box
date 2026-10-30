@@ -8,15 +8,18 @@ tile: the texture wraps without a seam in both directions. Every octave is shift
 random offset so that the lattices of the octaves do not line up. The gradients and offsets come
 from random.Random seeded with the seed and the octave, so the same options write the same file.
 
-Mapping to 8 bit: with m the median of the fbm values and h the larger of m - p1 and p99 - m, where
-p1 and p99 are the 1st and 99th percentiles,
+Mapping to 8 bit: with m the median of the fbm values and p1 and p99 their 1st and 99th
+percentiles, the values are mapped piecewise linearly, p1 to 0, m to 0.5 and p99 to 1:
 
-    value = clamp(0.5 + 0.5 * (n - m) / h, 0, 1),    byte = round(255 * value)
+    value = clamp(0.5 - 0.5 * (m - n) / (m - p1), 0, 1)    for n <= m
+    value = clamp(0.5 + 0.5 * (n - m) / (p99 - m), 0, 1)   for n >  m
+    byte = round(255 * value)
 
-so the histogram is centered on 0.5 (half of the texels are below 0.5) and spans 0..1 with about
-1% of the texels clipped to 0 and to 1 (exactly 1% at the end that is farther from the median, a
-little less at the other). A cookie threshold of 0.5 covers half of the ground; since fbm values are
-roughly normally distributed the coverage of other thresholds t is close to, but steeper than, t.
+so the histogram is centered on 0.5 (half of the texels are below 0.5) and spans 0..1 with 1% of
+the texels clipped to 0 and 1% to 1. The two halves differ only slightly in scale, since fbm is
+nearly symmetric. A cookie threshold of 0.5 covers half of the ground; since fbm values are roughly
+normally distributed, the coverage of other thresholds t is close to t but steeper (about 0.08 at
+t = 0.2 and 0.9 at t = 0.8 for the default texture).
 
 etc/assets/textures/cloud_noise.png was written with the default options:
 
@@ -101,12 +104,13 @@ def quantize(values):
     median = 0.5 * (flat[(n - 1) // 2] + flat[n // 2])
     p1 = flat[int(0.01 * (n - 1))]
     p99 = flat[int(math.ceil(0.99 * (n - 1)))]
-    half = max(median - p1, p99 - median, 1e-12)
-    scale = 0.5 / half
+    low = 0.5 / max(median - p1, 1e-12)
+    high = 0.5 / max(p99 - median, 1e-12)
     rows = []
     for row in values:
-        rows.append(bytes(min(255, max(0, int(round(255.0 * (0.5 + (v - median) * scale)))))
-                          for v in row))
+        rows.append(bytes(min(255, max(0, int(round(
+            255.0 * (0.5 + (v - median) * (low if v <= median else high))))))
+            for v in row))
     return rows
 
 

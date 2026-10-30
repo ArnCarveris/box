@@ -75,13 +75,14 @@ class NoiseTextureTests(unittest.TestCase):
         texels = sorted(b for row in self.rows for b in row)
         n = len(texels)
         self.assertLessEqual(abs(texels[n // 2] - 127.5), 1.0)
-        self.assertLessEqual(abs(sum(texels) / n - 127.5), 8.0)
+        self.assertLessEqual(abs(sum(texels) / n - 127.5), 4.0)
         low = sum(1 for b in texels if b == 0) / n
         high = sum(1 for b in texels if b == 255) / n
-        self.assertGreater(low, 0.002)
-        self.assertLess(low, 0.02)
-        self.assertGreater(high, 0.002)
-        self.assertLess(high, 0.02)
+        # About 1% clipped at each end.
+        self.assertGreater(low, 0.007)
+        self.assertLess(low, 0.015)
+        self.assertGreater(high, 0.007)
+        self.assertLess(high, 0.015)
         # Spans most of 0..255: the 5th and 95th percentiles are well apart.
         self.assertLess(texels[int(0.05 * n)], 80)
         self.assertGreater(texels[int(0.95 * n)], 175)
@@ -90,6 +91,14 @@ class NoiseTextureTests(unittest.TestCase):
         texels = [b for row in self.rows for b in row]
         below = sum(1 for b in texels if b < 128) / len(texels)
         self.assertAlmostEqual(below, 0.5, delta=0.02)
+
+    def test_threshold_coverage(self):
+        """A threshold t covers about a t fraction: a little less below 0.5, more above."""
+        texels = [b for row in self.rows for b in row]
+        for t, low, high in ((0.25, 0.1, 0.25), (0.75, 0.75, 0.9)):
+            below = sum(1 for b in texels if b < t * 255) / len(texels)
+            self.assertGreaterEqual(below, low, t)
+            self.assertLessEqual(below, high, t)
 
     def test_png_roundtrip(self):
         rows = [bytes((x * 7 + y * 13) & 0xFF for x in range(9)) for y in range(5)]
@@ -109,6 +118,15 @@ class NoiseTextureTests(unittest.TestCase):
         path = os.path.join(self.dir.name, "cloud_noise_256.png")
         noise_texture.generate(path, size=256)
         self.assertEqual(noise_texture.read_png(path), noise_texture.read_png(TEST_TEXTURE))
+
+    def test_test_asset_wraps(self):
+        rows = noise_texture.read_png(TEST_TEXTURE)
+        self.assertEqual((len(rows), len(rows[0])), (256, 256))
+        inside = max(max_step(rows[y], rows[y + 1]) for y in range(len(rows) - 1))
+        self.assertLessEqual(max_step(rows[-1], rows[0]), inside)
+        columns = list(zip(*rows))
+        inside = max(max_step(columns[x], columns[x + 1]) for x in range(len(columns) - 1))
+        self.assertLessEqual(max_step(columns[-1], columns[0]), inside)
 
 
 class JsonResult(unittest.TextTestResult):
