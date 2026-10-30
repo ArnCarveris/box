@@ -444,14 +444,11 @@
                     "interrupted",
                     "nested_childof",
                     "nested_parent",
-<<<<<<< HEAD
+                    "plain_child",
                     "group_parent",
+                    "surface_instance",
                     "range_mul_single",
                     "bounds_corners"
-=======
-                    "plain_child",
-                    "surface_instance"
->>>>>>> fd374ff0cebd724de9ef5f38531a55c953e1fb1b
                 ]
             },
             {
