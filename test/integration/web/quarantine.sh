@@ -1,0 +1,47 @@
+#!/bin/sh
+# Checks that shader_error.mjs and transitions.mjs fail at once when the Chrome app has the
+# macOS quarantine attribute: builds a fake Foo.app with the attribute and a fake bin dir, runs
+# both scripts with --chrome pointing into it and expects exit status 2 with the message within
+# a few seconds. Then marks the attribute as approved in the Finder (flag 0x0040) and expects
+# the scripts to go on and start the fake Chrome, which never answers, without the message.
+# macOS only.
+set -u
+[ "$(uname)" = Darwin ] || { echo "SKIP: not macOS"; exit 0; }
+here=$(cd "$(dirname "$0")" && pwd)
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+mkdir -p "$tmp/Foo.app/Contents/MacOS" "$tmp/bin"
+printf '#!/bin/sh\nexit 0\n' > "$tmp/Foo.app/Contents/MacOS/foo"
+chmod +x "$tmp/Foo.app/Contents/MacOS/foo"
+: > "$tmp/bin/boxrun.html"
+xattr -w com.apple.quarantine "0081;00000000;test;" "$tmp/Foo.app"
+status=0
+for script in shader_error.mjs transitions.mjs; do
+  start=$(date +%s)
+  out=$(node "$here/$script" --chrome "$tmp/Foo.app/Contents/MacOS/foo" "$tmp/bin" 2>&1)
+  code=$?
+  secs=$(( $(date +%s) - start ))
+  if [ "$code" -eq 2 ] && [ "$secs" -lt 5 ] &&
+     printf '%s' "$out" | grep -q "Foo.app has the com.apple.quarantine attribute" &&
+     printf '%s' "$out" | grep -q "xattr -dr com.apple.quarantine"; then
+    echo "PASS $script (${secs}s)"
+  else
+    echo "FAIL $script: status $code after ${secs}s"
+    printf '%s\n' "$out"
+    status=1
+  fi
+done
+xattr -w com.apple.quarantine "00c1;00000000;test;" "$tmp/Foo.app"
+for script in shader_error.mjs transitions.mjs; do
+  out=$(node "$here/$script" --chrome "$tmp/Foo.app/Contents/MacOS/foo" "$tmp/bin" 2>&1)
+  code=$?
+  if [ "$code" -eq 2 ] && ! printf '%s' "$out" | grep -q "com.apple.quarantine" &&
+     printf '%s' "$out" | grep -q "chrome did not start"; then
+    echo "PASS $script (approved)"
+  else
+    echo "FAIL $script (approved): status $code"
+    printf '%s\n' "$out"
+    status=1
+  fi
+done
+exit $status
