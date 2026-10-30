@@ -417,7 +417,8 @@
                     "square_hole",
                     "overlapping_contours",
                     "spike",
-                    "curves"
+                    "curves",
+                    "reflex_corner"
                 ]
             }
         ]
