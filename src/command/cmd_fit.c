@@ -15,6 +15,9 @@
 /** Part of the frustum the content fills on its tightest axis */
 #define BOX_CMD_FIT_FILL (0.9f)
 
+/** Part of the depth of the content the far plane is raised past it */
+#define BOX_CMD_FIT_FAR_MARGIN (0.05f)
+
 /** Smallest extent of the content in world units, so a small mesh or a point does not put the
  * camera inside it */
 #define BOX_CMD_FIT_MIN_EXTENT (0.5f)
@@ -89,21 +92,33 @@ static void box_cmd_fit_collect(
     }
 }
 
-/** Get the aspect ratio of a camera: its own when set, else that of the surface shown first.
+/** Get the aspect ratio of a camera: its own when set, else that of the surface that renders
+ * the first view of the camera, else that of the surface shown first.
  *
  * @param world The world
- * @param camera The camera
+ * @param camera The camera entity
+ * @param cam The camera
  * @return Width over height
  */
 static float box_cmd_fit_aspect(
     ecs_world_t *world,
-    const Camera *camera)
+    ecs_entity_t camera,
+    const Camera *cam)
 {
-    int32_t width, height;
-    float result = camera->aspect_ratio;
+    float result = cam->aspect_ratio;
     if (result <= 0) {
-        box_cmd_render_size(world, &width, &height);
-        result = (float)width / (float)height;
+        ecs_entity_t view = box_cmd_render_view(world, camera, 0, false);
+        float width = 0, height = 0;
+        if (!view || !box_surface_view_size(world, NULL, view, &width, &height) ||
+            width <= 0 || height <= 0)
+        {
+            int32_t w, h;
+            box_cmd_render_size(world, &w, &h);
+            width = (float)w;
+            height = (float)h;
+        }
+
+        result = width / height;
     }
 
     return result;
@@ -180,7 +195,8 @@ static void box_cmd_fit_place(
 /** The fit command: move the active camera or a camera to a tight fit of its scene.
  *
  * The corners of a cube of the minimum extent around the center, along the axes of the
- * camera, join the corners of the content.
+ * camera, join the corners of the content. A far plane that does not reach the farthest corner
+ * is raised past it; it is never lowered, and a far plane of 0 (none) stays 0.
  *
  * @param ctx The call context
  * @param argc Number of arguments
@@ -216,10 +232,10 @@ static void box_cmd_fit(
     Camera *cam = ecs_get_mut(world, camera, Camera);
     float fov = cam->fov > 0 ? cam->fov : BOX_CAMERA_FOV;
     float near_ = cam->near_ > 0 ? cam->near_ : BOX_CAMERA_NEAR;
-    float aspect = box_cmd_fit_aspect(world, cam);
+    float aspect = box_cmd_fit_aspect(world, camera, cam);
     float tan_y = tanf(glm_rad(fov) * 0.5f) * BOX_CMD_FIT_FILL;
     float tan_x = tan_y * aspect;
-    float distance = -FLT_MAX, extent_x = 0, extent_y = 0;
+    float distance = -FLT_MAX, extent_x = 0, extent_y = 0, depth = -FLT_MAX;
     glm_vec3_center(content.min, content.max, center);
     box_cmd_fit_axes(ecs_get(world, camera, WorldTransform), right, up, forward);
 
@@ -249,13 +265,25 @@ static void box_cmd_fit(
         }
 
         distance = glm_max(distance, need);
+        depth = glm_max(depth, z);
         extent_x = glm_max(extent_x, x);
         extent_y = glm_max(extent_y, y);
     }
 
+    depth += distance;
+    bool modified = false;
     if (cam->ortho) {
         cam->ortho_height = glm_max(extent_y, extent_x / aspect) * 2.0f / BOX_CMD_FIT_FILL;
         cam->ortho_scale = 0;
+        modified = true;
+    }
+
+    if (cam->far_ > 0 && cam->far_ < depth) {
+        cam->far_ = depth * (1.0f + BOX_CMD_FIT_FAR_MARGIN);
+        modified = true;
+    }
+
+    if (modified) {
         ecs_modified(world, camera, Camera);
     }
 
