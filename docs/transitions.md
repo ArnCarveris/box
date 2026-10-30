@@ -598,9 +598,9 @@ resolver returns from a packet without records in 2 ns.
 ## Tests
 
 - `test/cpu/core` (`Transition`): the component, its validation and the timing functions.
-- `test/cpu/render` (`Transition`, `TransitionMaterial`, `TransitionTintOpacity`): the records
-  of the game thread and the values of the resolver with the null backend, and the shadow
-  regions of moving casters, interrupted and nested (`Transition_shadow_region_*`).
+- `test/cpu/render` (`Transition`, `TransitionMaterial`, `TransitionTintOpacity`,
+  `TransitionShadow`): the records of the game thread and the values of the resolver with the
+  null backend, and the shadow regions of moving casters, interrupted and nested.
 - `test/gpu/render`: the rendered transforms, materials, tints and opacity on a GPU, and in
   `ShadowCache` (`transition_*`) that a caster that transitions renders the tile of its light
   only, also on the frame it ends in, and the tiles of the other lights stay cached.

@@ -406,11 +406,16 @@
                     "transform_prefab_instances",
                     "transform_text_and_2d",
                     "transform_targets_on_game_thread",
-                    "shadow_region_interrupted",
-                    "shadow_region_nested_childof",
-                    "shadow_region_nested_parent",
                     "record_sizes",
                     "idle_no_work"
+                ]
+            },
+            {
+                "id": "TransitionShadow",
+                "testcases": [
+                    "interrupted",
+                    "nested_childof",
+                    "nested_parent"
                 ]
             },
             {
