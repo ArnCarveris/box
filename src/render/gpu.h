@@ -1829,8 +1829,7 @@ void box_gpu_capture_fini(
     box_gpu_target_t *t);
 
 /** Block on the device until every capture that is mapping wrote its file, the flush callback
- * of the backend; captures that a wait on an idle queue, or BOX_GPU_CAPTURE_POLLS waits in a
- * row, do not complete are abandoned, so none outlives the device.
+ * of the backend; captures a wait does not complete are abandoned, so none outlives the device.
  * The browser maps from its event loop, so there it returns at once.
  *
  * @param ctx The backend

@@ -111,26 +111,6 @@ static void box_render_count_present(
     ecs_os_mutex_unlock(ring->lock);
 }
 
-/** Log the captures of a packet the backend does not render, so that a capture whose PNG
- * never arrives has a cause in the log.
- *
- * @param p The packet
- * @param reason Why the packet is not rendered
- */
-static void box_render_drop_captures(
-    const box_render_packet_t *p,
-    const char *reason)
-{
-    int32_t i, count = ecs_vec_count(&p->targets);
-    for (i = 0; i < count; i ++) {
-        const box_render_target_t *t = ecs_vec_get_t(&p->targets, box_render_target_t, i);
-        if (t->capture_size) {
-            ecs_err("capture '%s' dropped: %s",
-                (const char*)box_render_packet_data(p, t->capture), reason);
-        }
-    }
-}
-
 /** Resolve the transitions of a packet, then hand it to the backend, which presents it, and
  * count the present.
  *
@@ -148,14 +128,11 @@ static void box_render_consume(
 {
     box_render_transition_resolve(&ring->transitions, p);
     if (!current) {
-        box_render_drop_captures(p, "its packet was built for a replaced backend");
         goto done;
     }
 
     if (ring->backend_ready && ring->backend.render) {
         ring->backend.render(ring->backend.ctx, p);
-    } else if (ring->backend_failed) {
-        box_render_drop_captures(p, "the render backend failed to initialize");
     }
 
     box_render_count_present(ring, p->fps > 0 ? 1.0 / (double)p->fps : 0, box_render_now());

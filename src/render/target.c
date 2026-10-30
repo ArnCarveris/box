@@ -696,12 +696,6 @@ void box_gpu_target_render(
 
     WGPUTexture texture = t ? box_gpu_target_acquire(gpu, t) : NULL;
     if (!texture) {
-        if (box_gpu_target_captures(frame)) {
-            ecs_err("capture '%s' skipped: its target has no image",
-                (const char*)box_render_packet_data(packet, frame->capture));
-            box_gpu_count(gpu, BOX_GPU_STAT_ERRORS);
-        }
-
         goto done;
     }
 

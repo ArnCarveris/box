@@ -13,11 +13,6 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
 
-/** Waits for the queue a flush makes without a capture completing before it gives up on the
- * captures, while the queue still has work: the map of a capture completes once the queue ran
- * the copy into its buffer */
-#define BOX_GPU_CAPTURE_POLLS (8)
-
 /** A capture on its way from the GPU to its PNG file */
 struct box_gpu_capture_t {
     box_gpu_t *gpu;                 /**< The backend, NULL once the backend abandoned it */
@@ -302,12 +297,11 @@ void box_gpu_capture_flush(
     void *ctx)
 {
     box_gpu_t *gpu = ctx;
-    int32_t count = ecs_vec_count(&gpu->captures), stalled = 0;
+    int32_t count = ecs_vec_count(&gpu->captures);
 #ifndef __EMSCRIPTEN__
     while (count && gpu->device) {
-        bool idle = wgpuDevicePoll(gpu->device, true, NULL);
-        stalled = ecs_vec_count(&gpu->captures) == count ? stalled + 1 : 0;
-        if (stalled && (idle || stalled >= BOX_GPU_CAPTURE_POLLS)) {
+        wgpuDevicePoll(gpu->device, true, NULL);
+        if (ecs_vec_count(&gpu->captures) == count) {
             ecs_err("%d captures did not complete", count);
             box_gpu_capture_abandon(gpu);
             break;
@@ -315,8 +309,6 @@ void box_gpu_capture_flush(
 
         count = ecs_vec_count(&gpu->captures);
     }
-#else
-    (void)stalled;
 #endif
 
     box_gpu_stats_publish(gpu);
