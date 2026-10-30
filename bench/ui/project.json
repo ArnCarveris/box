@@ -2,7 +2,7 @@
     "id": "bench_ui",
     "type": "application",
     "value": {
-        "description": "Benchmarks for the layout of box.layout with a 10k element tree and for picking",
+        "description": "Benchmarks for the layout of box.layout with a 10k element tree, for picking and for the fps panel",
         "public": false,
         "use": [
             "box"
@@ -41,6 +41,14 @@
                     "still_cursor_moving_wave_1600",
                     "still_cursor_ignored_wave_400",
                     "still_cursor_ignored_wave_1600"
+                ]
+            },
+            {
+                "id": "FpsPanel",
+                "benchcases": [
+                    "closed",
+                    "open_new_sample",
+                    "open_fixed_samples"
                 ]
             }
         ]

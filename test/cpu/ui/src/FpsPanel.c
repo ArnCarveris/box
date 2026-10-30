@@ -6,6 +6,7 @@
 
 #include <box.h>
 #include <bake_test.h>
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -86,7 +87,7 @@ static ecs_entity_t fps_check_view(
     return view;
 }
 
-/** Get a bar of the chart.
+/** Get a bar of the chart by the age of its sample: bar_N draws the slot N of the ring.
  *
  * @param world The world
  * @param i The bar, 0 for the oldest, BOX_FPS_BARS - 1 for the newest
@@ -97,7 +98,9 @@ static ecs_entity_t fps_bar(
     int32_t i)
 {
     char path[64];
-    snprintf(path, sizeof(path), "%s.bar_%d", BOX_FPS_CHART, i);
+    int32_t next = ecs_singleton_get(world, FrameSamples)->next;
+    int32_t slot = (next + i) % BOX_FPS_BARS;
+    snprintf(path, sizeof(path), "%s.bars.bar_%d", BOX_FPS_CHART, slot);
     ecs_entity_t result = ecs_lookup(world, path);
     test_assert(result != 0);
 
@@ -162,6 +165,15 @@ void FpsPanel_open_creates_view(void) {
     fps_bar(world, BOX_FPS_BARS - 1);
     test_assert(ecs_lookup(world, BOX_FPS_CHART ".line_60") != 0);
     test_assert(ecs_lookup(world, BOX_FPS_CHART ".line_30") != 0);
+    test_assert(ecs_lookup(world, BOX_FPS_CHART ".mark_60") != 0);
+    test_assert(ecs_lookup(world, BOX_FPS_CHART ".mark_30") != 0);
+
+    const Rect *chart = ecs_get(world, ecs_lookup(world, BOX_FPS_CHART), Rect);
+    ecs_entity_t newest = fps_bar(world, BOX_FPS_BARS - 1);
+    test_flt(ecs_get(world, newest, Rect)->width, 1);
+    ecs_entity_t strip = ecs_lookup(world, BOX_FPS_CHART ".bars");
+    test_flt(ecs_get(world, strip, Position)->x + ecs_get(world, newest, Position)->x,
+        chart->width * 0.5f - 0.5f);
 
     ecs_fini(world);
 }
@@ -293,6 +305,7 @@ void FpsPanel_top_right(void) {
 
     ecs_entity_t s = ecs_new(world);
     ecs_set(world, s, Surface, {.width = 640, .height = 360});
+    ecs_progress(world, 0);
     ecs_set(world, s, SurfaceStatus, {
         .width = 800, .height = 500, .point_width = 800, .point_height = 500,
         .render_width = 800, .render_height = 500, .window = true
@@ -318,6 +331,7 @@ void FpsPanel_no_input(void) {
     test_assert(!ecs_has(world, panel, KeyCapture));
     test_assert(!ecs_has(world, ecs_lookup(world, BOX_FPS_CHART), InputBlocker));
     test_assert(!ecs_has(world, fps_bar(world, 0), Interactive));
+    test_assert(ecs_has(world, ecs_lookup(world, BOX_FPS_UI), SpatialIgnore));
 
     ecs_fini(world);
 }
@@ -430,24 +444,41 @@ void FpsPanel_bars_follow_samples(void) {
     ecs_fini(world);
 }
 
+/** Count the children of an entity.
+ *
+ * @param world The world
+ * @param parent The parent
+ * @return The number of children
+ */
+static int32_t fps_children(
+    ecs_world_t *world,
+    ecs_entity_t parent)
+{
+    int32_t result = 0;
+    ecs_iter_t it = ecs_children(world, parent);
+    while (ecs_children_next(&it)) {
+        result += it.count;
+    }
+
+    return result;
+}
+
 void FpsPanel_bars_reused(void) {
     // fps/panel
     ecs_world_t *world = fps_world();
     fps_open(world, true);
 
     ecs_entity_t chart = ecs_lookup(world, BOX_FPS_CHART);
-    ecs_entity_t first = fps_bar(world, 0), last = fps_bar(world, BOX_FPS_BARS - 1);
-    ecs_entity_t label = ecs_lookup(world, BOX_FPS_LABEL);
-    ecs_entity_t panel = ecs_lookup(world, BOX_FPS_PANEL);
-    const LayoutItem *item = ecs_get(world, panel, LayoutItem);
-    test_assert(item != NULL);
-    int32_t children = 0;
-    ecs_iter_t it = ecs_children(world, chart);
-    while (ecs_children_next(&it)) {
-        children += it.count;
+    ecs_entity_t strip = ecs_lookup(world, BOX_FPS_CHART ".bars");
+    ecs_entity_t bars[BOX_FPS_BARS];
+    for (int32_t i = 0; i < BOX_FPS_BARS; i ++) {
+        bars[i] = fps_bar(world, i);
     }
 
-    test_int(children, BOX_FPS_BARS + 2);
+    ecs_entity_t label = ecs_lookup(world, BOX_FPS_LABEL);
+    test_assert(strip != 0);
+    test_int(fps_children(world, chart), 5);
+    test_int(fps_children(world, strip), BOX_FPS_BARS);
     for (int32_t f = 0; f < 10; f ++) {
         FrameSamples *samples = ecs_singleton_get_mut(world, FrameSamples);
         box_frame_samples_add(samples, f % 2 ? 12.0 : 45.0);
@@ -455,20 +486,88 @@ void FpsPanel_bars_reused(void) {
         ecs_progress(world, 0);
     }
 
-    test_assert(fps_bar(world, 0) == first);
-    test_assert(fps_bar(world, BOX_FPS_BARS - 1) == last);
-    test_assert(ecs_lookup(world, BOX_FPS_LABEL) == label);
-    fps_check_bar_color(world, last, BOX_FPS_GREEN);
-    fps_check_bar_color(world, fps_bar(world, BOX_FPS_BARS - 2), BOX_FPS_RED);
-    children = 0;
-    it = ecs_children(world, chart);
-    while (ecs_children_next(&it)) {
-        children += it.count;
+    for (int32_t i = 0; i < BOX_FPS_BARS; i ++) {
+        test_assert(fps_bar(world, i) == bars[(i + 10) % BOX_FPS_BARS]);
     }
 
-    test_int(children, BOX_FPS_BARS + 2);
+    test_assert(ecs_lookup(world, BOX_FPS_LABEL) == label);
+    fps_check_bar_color(world, fps_bar(world, BOX_FPS_BARS - 1), BOX_FPS_GREEN);
+    fps_check_bar_color(world, fps_bar(world, BOX_FPS_BARS - 2), BOX_FPS_RED);
+    test_int(fps_children(world, chart), 5);
+    test_int(fps_children(world, strip), BOX_FPS_BARS);
     test_assert(!ecs_has(world, ecs_get_parent(world, label), Layout));
     test_assert(!ecs_has(world, chart, Layout));
+
+    ecs_fini(world);
+}
+
+void FpsPanel_new_sample_moves_one_bar(void) {
+    // fps/panel
+    ecs_world_t *world = fps_world();
+    fps_open(world, true);
+
+    FrameSamples *samples = ecs_singleton_get_mut(world, FrameSamples);
+    for (int32_t i = 0; i < BOX_FPS_BARS + 7; i ++) {
+        box_frame_samples_add(samples, 1000.0 / 60.0);
+    }
+
+    ecs_singleton_modified(world, FrameSamples);
+    ecs_progress(world, 0);
+
+    ecs_entity_t strip = ecs_lookup(world, BOX_FPS_CHART ".bars");
+    float strip_x = ecs_get(world, strip, Position)->x;
+    Position before[BOX_FPS_BARS];
+    for (int32_t i = 0; i < BOX_FPS_BARS; i ++) {
+        before[i] = *ecs_get(world, fps_bar(world, i), Position);
+    }
+
+    samples = ecs_singleton_get_mut(world, FrameSamples);
+    box_frame_samples_add(samples, 1000.0 / 60.0);
+    ecs_singleton_modified(world, FrameSamples);
+    ecs_progress(world, 0);
+
+    test_flt(ecs_get(world, strip, Position)->x, strip_x - 1);
+    for (int32_t i = 1; i < BOX_FPS_BARS; i ++) {
+        const Position *p = ecs_get(world, fps_bar(world, i - 1), Position);
+        test_flt(p->x, before[i].x);
+        test_flt(p->y, before[i].y);
+    }
+
+    const Rect *chart = ecs_get(world, ecs_lookup(world, BOX_FPS_CHART), Rect);
+    ecs_entity_t newest = fps_bar(world, BOX_FPS_BARS - 1);
+    test_flt(ecs_get(world, strip, Position)->x + ecs_get(world, newest, Position)->x,
+        chart->width * 0.5f - 0.5f);
+
+    ecs_fini(world);
+}
+
+void FpsPanel_long_run(void) {
+    // fps/panel
+    ecs_world_t *world = fps_world();
+    fps_open(world, true);
+
+    ecs_entity_t strip = ecs_lookup(world, BOX_FPS_CHART ".bars");
+    const Rect *chart = ecs_get(world, ecs_lookup(world, BOX_FPS_CHART), Rect);
+    float right = chart->width * 0.5f;
+    for (int32_t f = 0; f < 100; f ++) {
+        FrameSamples *samples = ecs_singleton_get_mut(world, FrameSamples);
+        for (int32_t i = 0; i < BOX_FPS_BARS - 1; i ++) {
+            box_frame_samples_add(samples, i == BOX_FPS_BARS - 2 ? 45.0 : 10.0);
+        }
+
+        ecs_singleton_modified(world, FrameSamples);
+        ecs_progress(world, 0);
+
+        float x = ecs_get(world, strip, Position)->x;
+        test_assert(fabsf(x) < 1000 * BOX_FPS_BARS);
+        for (int32_t i = 0; i < BOX_FPS_BARS; i ++) {
+            const Position *p = ecs_get(world, fps_bar(world, i), Position);
+            test_flt(x + p->x, right - (float)(BOX_FPS_BARS - i) + 0.5f);
+        }
+
+        fps_check_bar_color(world, fps_bar(world, BOX_FPS_BARS - 1), BOX_FPS_RED);
+        fps_check_bar_color(world, fps_bar(world, BOX_FPS_BARS - 2), BOX_FPS_GREEN);
+    }
 
     ecs_fini(world);
 }

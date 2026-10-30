@@ -38,7 +38,8 @@ extern "C" {
 /** Path of the text line above the chart: the fps and the last frame time */
 #define BOX_FPS_LABEL "fps.ui.screen.panel.header.label"
 
-/** Path of the chart, whose children are the bars bar_0 (oldest) to bar_239 (newest) */
+/** Path of the chart. Its children are the strip "bars", the reference lines line_60 and line_30
+ * and their labels mark_60 and mark_30. bar_N in the strip draws FrameSamples.interval[N]. */
 #define BOX_FPS_CHART "fps.ui.screen.panel.chart"
 
 /** Width of the panel in points */

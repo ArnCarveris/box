@@ -441,7 +441,9 @@
                     "samples_ring",
                     "engine_records_samples",
                     "bars_follow_samples",
-                    "bars_reused"
+                    "bars_reused",
+                    "new_sample_moves_one_bar",
+                    "long_run"
                 ]
             },
             {

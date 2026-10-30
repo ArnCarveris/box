@@ -3,6 +3,9 @@
  * @brief Registers the box.fps module: the FpsPanel singleton and the system that opens, closes
  * and updates the fps panel, a chart of the frame samples in a scene and view of its own.
  *
+ * The chart holds one bar of one point per frame sample at its right, the reference lines over
+ * them and their labels in the gutter at its left.
+ *
  * The bars and the text line are children of elements without a Layout, so changing them each
  * frame lays nothing out; the panel is laid out only when it opens or the surface changes.
  */
@@ -33,6 +36,19 @@
 
 /** Height of the chart in points */
 #define BOX_FPS_CHART_H (BOX_FPS_HEIGHT - 2 * BOX_FPS_PADDING - BOX_FPS_LINE - BOX_FPS_SPACING)
+
+/** Width of a bar in points. Whole points put the edges of the bars between pixels, so
+ * neighboring bars meet without a seam of blended edges. */
+#define BOX_FPS_BAR_W (1.0f)
+
+/** Width of the plot, the bars, at the right of the chart in points */
+#define BOX_FPS_PLOT_W (BOX_FPS_BARS * BOX_FPS_BAR_W)
+
+/** Width of the gutter left of the plot that labels the reference lines in points */
+#define BOX_FPS_GUTTER (BOX_FPS_CHART_W - BOX_FPS_PLOT_W)
+
+/** Samples the strip of bars scrolls before its offsets start over, so they stay small */
+#define BOX_FPS_REBASE (BOX_FPS_BARS * 64)
 
 /** Steps per point the height of a bar is rounded to, so jitter below it sets nothing */
 #define BOX_FPS_STEPS (4.0f)
@@ -72,9 +88,16 @@ typedef struct box_fps_t {
     ecs_entity_t label;         /**< The text line */
     ecs_entity_t chart;         /**< Background of the chart, parent of the bars */
     ecs_entity_t lines[2];      /**< Reference lines at 60 and 30 fps */
-    ecs_entity_t bars[BOX_FPS_BARS]; /**< Bars from the oldest frame to the newest */
+    ecs_entity_t marks[2];      /**< Labels of the reference lines in the gutter */
+    ecs_entity_t strip;         /**< Parent of the bars, scrolls one bar left per sample */
+    ecs_entity_t bars[BOX_FPS_BARS]; /**< Bar of each slot of the ring of FrameSamples */
     float heights[BOX_FPS_BARS];     /**< Height each bar was set to */
+    float xs[BOX_FPS_BARS];          /**< x in the strip each bar was set to */
+    int32_t laps[BOX_FPS_BARS];      /**< Samples written to each slot since the rebase */
     uint8_t rates[BOX_FPS_BARS];     /**< box_fps_rate_t each bar was colored with */
+    int32_t next;               /**< FrameSamples.next of the last update, -1 for none */
+    int32_t total;              /**< Samples written since the rebase */
+    float strip_x;              /**< x the strip was set to */
     char text[64];              /**< String the text line was set to */
     box_fps_look_t look;        /**< Look the content was colored with */
     bool shown;                 /**< The content is shown */
@@ -210,20 +233,34 @@ static ecs_entity_t box_fps_element(
     return result;
 }
 
-/** Get the x of the center of a bar in the chart, whose origin is its center.
+/** Get the x of the center of the bar of a slot in the strip. A write moves the bar of the
+ * slot one plot width to the right, past the newest bar.
  *
- * @param i The bar, 0 for the oldest
+ * @param fps The panel state
+ * @param slot The slot of the ring of FrameSamples
  * @return The x in points
  */
 static float box_fps_bar_x(
-    int32_t i)
+    const box_fps_t *fps,
+    int32_t slot)
 {
-    float slot = BOX_FPS_CHART_W / (float)BOX_FPS_BARS;
-
-    return -BOX_FPS_CHART_W * 0.5f + ((float)i + 0.5f) * slot;
+    return ((float)(fps->laps[slot] * BOX_FPS_BARS + slot) + 0.5f) * BOX_FPS_BAR_W;
 }
 
-/** Create the bars, empty, and the reference lines over them.
+/** Get the x of the strip in the chart, whose origin is its center: one bar further left for
+ * every sample written, so the newest bar is against the right edge of the chart.
+ *
+ * @param fps The panel state
+ * @return The x in points
+ */
+static float box_fps_strip_x(
+    const box_fps_t *fps)
+{
+    return BOX_FPS_CHART_W * 0.5f - (float)(fps->total + BOX_FPS_BARS) * BOX_FPS_BAR_W;
+}
+
+/** Create the strip of bars, empty, the reference lines over them and their labels in the
+ * gutter. A reference line is centered in a row of points, so its 1 point covers whole pixels.
  *
  * @param world The world
  * @param fps The panel state
@@ -232,35 +269,49 @@ static void box_fps_chart_build(
     ecs_world_t *world,
     box_fps_t *fps)
 {
-    float slot = BOX_FPS_CHART_W / (float)BOX_FPS_BARS;
     float bottom = -BOX_FPS_CHART_H * 0.5f;
+    float left = BOX_FPS_CHART_W * 0.5f - BOX_FPS_PLOT_W;
     double refs[2] = { BOX_FPS_60_MS, BOX_FPS_30_MS };
     const char *names[2] = { "line_60", "line_30" };
+    const char *marks[2] = { "mark_60", "mark_30" };
+    const char *texts[2] = { "60 fps", "30 fps" };
     rgb green = BOX_FPS_GREEN;
     char name[32];
     int32_t i;
+    fps->strip = ecs_entity(world, { .name = "bars", .parent = fps->chart });
+    fps->strip_x = 0;
+    ecs_set(world, fps->strip, Position, { fps->strip_x, bottom, 0 });
     for (i = 0; i < BOX_FPS_BARS; i ++) {
         ecs_os_snprintf(name, sizeof(name), "bar_%d", i);
-        fps->bars[i] = ecs_entity(world, { .name = name, .parent = fps->chart });
-        ecs_set(world, fps->bars[i], Position, { box_fps_bar_x(i), bottom, 0 });
-        ecs_set(world, fps->bars[i], Rect, { slot, 0 });
+        fps->bars[i] = ecs_entity(world, { .name = name, .parent = fps->strip });
+        ecs_set(world, fps->bars[i], Position, { 0, 0, 0 });
+        ecs_set(world, fps->bars[i], Rect, { BOX_FPS_BAR_W, 0 });
         ecs_set(world, fps->bars[i], Rgb, { green.r, green.g, green.b });
         fps->heights[i] = 0;
+        fps->xs[i] = 0;
         fps->rates[i] = BoxFpsFast;
     }
 
+    fps->next = -1;
+
     for (i = 0; i < 2; i ++) {
-        float y = bottom + box_fps_bar_height(refs[i], BOX_FPS_CHART_H);
+        float y = floorf(bottom + box_fps_bar_height(refs[i], BOX_FPS_CHART_H)) + 0.5f;
         fps->lines[i] = ecs_entity(world, { .name = names[i], .parent = fps->chart });
         ecs_set(world, fps->lines[i], Position, { 0, y, 0 });
-        ecs_set(world, fps->lines[i], Line, {
-            -BOX_FPS_CHART_W * 0.5f, 0, BOX_FPS_CHART_W * 0.5f, 0, 1 });
+        ecs_set(world, fps->lines[i], Line, { left, 0, BOX_FPS_CHART_W * 0.5f, 0, 1 });
+        fps->marks[i] = ecs_entity(world, { .name = marks[i], .parent = fps->chart });
+        ecs_set(world, fps->marks[i], Position, {
+            -BOX_FPS_CHART_W * 0.5f + BOX_FPS_GUTTER * 0.5f, y, 0 });
+        ecs_add(world, fps->marks[i], Text);
+        ecs_get_mut(world, fps->marks[i], Text)->value = ecs_os_strdup(texts[i]);
+        ecs_modified(world, fps->marks[i], Text);
     }
 }
 
 /** Create the scene, camera, screen, panel, text line and chart of the content.
  *
- * The text line and the bars are children of elements without a Layout, out of the layout tree.
+ * The text line and the bars are children of elements without a Layout, out of the layout tree,
+ * and the scene has SpatialIgnore: moving bars cost no spatial update and picks pass through.
  *
  * @param world The world
  * @param fps The panel state
@@ -273,6 +324,7 @@ static void box_fps_build(
     ecs_entity_t header;
     fps->root = ecs_entity(world, { .name = "ui", .parent = box_fps_scope(world, fps) });
     ecs_set(world, fps->root, Scene, {0});
+    ecs_add(world, fps->root, SpatialIgnore);
     fps->camera = box_fps_element(world, fps->root, "camera");
     ecs_set(world, fps->camera, Position, {0, 0, 100});
     ecs_set(world, fps->camera, Camera, {
@@ -320,6 +372,25 @@ static void box_fps_build(
     ecs_os_memset_t(&fps->look, 0, box_fps_look_t);
 }
 
+/** Set the size of a text of the panel when it differs.
+ *
+ * @param world The world
+ * @param e The entity with the Text
+ * @param size The em size
+ */
+static void box_fps_text_size(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    float size)
+{
+    Text *t = ecs_get_mut(world, e, Text);
+    if (t && (t->size != size || t->line_height != BOX_FPS_LINE)) {
+        t->size = size;
+        t->line_height = BOX_FPS_LINE;
+        ecs_modified(world, e, Text);
+    }
+}
+
 /** Color the panel, the chart, the text line and the reference lines from the UI theme when
  * it changed since they were colored.
  *
@@ -331,7 +402,6 @@ static void box_fps_theme_sync(
     box_fps_t *fps)
 {
     box_fps_look_t look;
-    Text *t;
     int32_t i;
     box_fps_theme(world, &look);
     if (!memcmp(&look, &fps->look, sizeof(look))) {
@@ -351,14 +421,12 @@ static void box_fps_theme_sync(
     for (i = 0; i < 2; i ++) {
         ecs_set(world, fps->lines[i], Rgb, {
             look.text_muted.r, look.text_muted.g, look.text_muted.b });
+        ecs_set(world, fps->marks[i], Rgb, {
+            look.text_muted.r, look.text_muted.g, look.text_muted.b });
+        box_fps_text_size(world, fps->marks[i], look.font_size);
     }
 
-    t = ecs_get_mut(world, fps->label, Text);
-    if (t && (t->size != look.font_size || t->line_height != BOX_FPS_LINE)) {
-        t->size = look.font_size;
-        t->line_height = BOX_FPS_LINE;
-        ecs_modified(world, fps->label, Text);
-    }
+    box_fps_text_size(world, fps->label, look.font_size);
 
 done:
     return;
@@ -405,8 +473,39 @@ done:
     return;
 }
 
-/** Set the height and color of every bar from the samples, the newest on the right. A bar is
- * set only when its rounded height or its rate changed.
+/** Follow the ring of the samples: count the slots written since the last update, or start
+ * the offsets over on the first update and after BOX_FPS_REBASE samples.
+ *
+ * @param fps The panel state
+ * @param next FrameSamples.next, in 0..BOX_FPS_BARS - 1
+ */
+static void box_fps_advance(
+    box_fps_t *fps,
+    int32_t next)
+{
+    int32_t i, count;
+    if (fps->next < 0 || fps->total >= BOX_FPS_REBASE) {
+        fps->total = next;
+        for (i = 0; i < BOX_FPS_BARS; i ++) {
+            fps->laps[i] = i < next;
+        }
+    } else {
+        count = (next - fps->next + BOX_FPS_BARS) % BOX_FPS_BARS;
+        for (i = 0; i < count; i ++) {
+            fps->laps[(fps->next + i) % BOX_FPS_BARS] ++;
+        }
+
+        fps->total += count;
+    }
+
+    fps->next = next;
+}
+
+/** Set the strip and the bars from the samples, the newest on the right.
+ *
+ * The bar of a slot draws the sample of that slot of the ring. A new sample scrolls the strip
+ * one bar left and moves only the bar of its slot, to the right end, so a frame sets the strip
+ * and the few bars whose slot was written, rounded height or rate changed.
  *
  * @param world The world
  * @param fps The panel state
@@ -417,18 +516,33 @@ static void box_fps_bars_sync(
     box_fps_t *fps,
     const FrameSamples *samples)
 {
-    float slot = BOX_FPS_CHART_W / (float)BOX_FPS_BARS;
-    float bottom = -BOX_FPS_CHART_H * 0.5f;
+    int32_t next = samples ? samples->next % BOX_FPS_BARS : 0;
+    float x;
     int32_t i;
+    next = next < 0 ? next + BOX_FPS_BARS : next;
+    box_fps_advance(fps, next);
+    x = box_fps_strip_x(fps);
+    if (x != fps->strip_x) {
+        fps->strip_x = x;
+        ecs_set(world, fps->strip, Position, { x, -BOX_FPS_CHART_H * 0.5f, 0 });
+    }
+
     for (i = 0; i < BOX_FPS_BARS; i ++) {
-        double ms = samples ? box_frame_sample(samples, BOX_FPS_BARS - 1 - i) : 0;
+        int32_t age = (next - 1 - i + 2 * BOX_FPS_BARS) % BOX_FPS_BARS;
+        double ms = samples ? box_frame_sample(samples, age) : 0;
         float h = roundf(box_fps_bar_height(ms, BOX_FPS_CHART_H) * BOX_FPS_STEPS) /
             BOX_FPS_STEPS;
         box_fps_rate_t rate = box_fps_rate(ms);
-        if (h != fps->heights[i]) {
+        bool resized = h != fps->heights[i];
+        x = box_fps_bar_x(fps, i);
+        if (resized) {
             fps->heights[i] = h;
-            ecs_set(world, fps->bars[i], Rect, { slot, h });
-            ecs_set(world, fps->bars[i], Position, { box_fps_bar_x(i), bottom + h * 0.5f, 0 });
+            ecs_set(world, fps->bars[i], Rect, { BOX_FPS_BAR_W, h });
+        }
+
+        if (resized || x != fps->xs[i]) {
+            fps->xs[i] = x;
+            ecs_set(world, fps->bars[i], Position, { x, h * 0.5f, 0 });
         }
 
         if ((uint8_t)rate != fps->rates[i]) {
@@ -610,6 +724,7 @@ void BoxFpsImport(
     ECS_IMPORT(world, BoxText);
     ECS_IMPORT(world, BoxApp);
     ECS_IMPORT(world, BoxUi);
+    ECS_IMPORT(world, BoxSpatial);
 
     ECS_META_COMPONENT(world, FpsPanel);
     ecs_set_hooks(world, FpsPanel, { .ctor = flecs_default_ctor });
