@@ -21,6 +21,13 @@
  * stale timestamps or a stalled queue and are dropped */
 #define BOX_GPU_BAKE_MEASURE_MAX (1000.0)
 
+/** Timestamp queries of a readback: the beginning of the span, a scratch end of the pass that
+ * begins it, a scratch beginning of the pass that ends it and the end of the span. Every timed
+ * pass writes both of its timestamps: the browser (emdawnwebgpu) passes
+ * WGPU_QUERY_SET_INDEX_UNDEFINED on as the index 4294967295, out of range of the query set,
+ * which makes the pass and its command buffer invalid */
+#define BOX_GPU_BAKE_QUERIES (4)
+
 /** Byte alignment of the destination of a query resolve */
 #define BOX_GPU_BAKE_RESOLVE_ALIGN (256)
 
@@ -191,7 +198,8 @@ struct box_gpu_bake_t {
     WGPUBuffer clusters;            /**< One cluster that lists every point and spot light */
     ecs_vec_t view_data;            /**< Bytes of the view uniforms of a chunk */
     ecs_vec_t light_data;           /**< Words of the cluster buffer of a chunk */
-    WGPUQuerySet queries;           /**< Two timestamps per readback, NULL without the feature */
+    WGPUQuerySet queries;           /**< BOX_GPU_BAKE_QUERIES timestamps per readback, NULL
+                                     *   without the feature */
     WGPUBuffer resolve;             /**< Resolved timestamps */
     box_gpu_bake_readback_t readbacks[BOX_GPU_BAKE_READBACKS]; /**< Timestamp copies */
     box_gpu_bake_done_t done[BOX_GPU_BAKE_READBACKS]; /**< Measurements without timestamps */
@@ -226,6 +234,24 @@ void box_gpu_bake_queries_fini(
 void box_gpu_bake_readback_poll(
     box_gpu_t *gpu,
     box_gpu_bake_t *b);
+
+/** Describe the timestamps of a pass that begins or ends the span a readback measures. Both
+ * indices are in range; the end of the pass that begins the span and the beginning of the pass
+ * that ends it go to scratch queries the readback ignores.
+ *
+ * @param b The capture state
+ * @param readback Index of the readback
+ * @param first Whether the pass begins the span
+ * @param last Whether the pass ends the span
+ * @param out Receives the timestamps
+ * @return out
+ */
+const WGPUPassTimestampWrites* box_gpu_bake_writes(
+    const box_gpu_bake_t *b,
+    int32_t readback,
+    bool first,
+    bool last,
+    WGPUPassTimestampWrites *out);
 
 /** Find a free timestamp readback.
  *
