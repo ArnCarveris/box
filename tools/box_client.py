@@ -258,18 +258,9 @@ class App:
             out = "\n".join(errors) if errors else body
             self.last_output = out
             self.fail("the command failed (%d)" % status, cmd, out)
-<<<<<<< HEAD
-        results = reply.get("results")
-        if isinstance(results, list):
-            # The shell returns a value per statement; the line's result is the last one.
-            reply = results[-1] if results and isinstance(results[-1], dict) else {}
-        result = reply.get("result")
-        if reply.get("type") == "flecs.meta.value" and isinstance(result, dict) and \
-=======
         results = reply.get("results") or [{}]
         result = results[-1].get("result")
         if results[-1].get("type") == "flecs.meta.value" and isinstance(result, dict) and \
->>>>>>> 0015a606ea0f9888e09f93fa605c157897d21645
                 len(result) == 1:
             result = next(iter(result.values()))
         return result
