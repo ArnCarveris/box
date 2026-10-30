@@ -147,6 +147,17 @@ static uint32_t box_render_anisotropy(
     return result > 16 ? 16 : result;
 }
 
+/** Get the bytes of the image of a texture: four per pixel, one for a single channel image.
+ *
+ * @param tex The texture
+ * @return Bytes of its pixels
+ */
+static uint32_t box_render_texture_size(
+    const box_texture_t *tex)
+{
+    return (uint32_t)tex->width * (uint32_t)tex->height * (tex->single_channel ? 1u : 4u);
+}
+
 /** Send the image of a texture.
  *
  * @param p The packet
@@ -159,7 +170,7 @@ static uint32_t box_render_texture_send(
     box_textures_t *t,
     box_texture_t *tex)
 {
-    uint32_t size = (uint32_t)tex->width * (uint32_t)tex->height * 4;
+    uint32_t size = box_render_texture_size(tex);
     if (!tex->handle && ecs_vec_count(&t->free_handles)) {
         tex->handle = *ecs_vec_last_t(&t->free_handles, uint32_t);
         ecs_vec_remove_last(&t->free_handles);
@@ -171,6 +182,7 @@ static uint32_t box_render_texture_send(
         BOX_RENDER_CREATE, tex->handle, (uint32_t)sizeof(box_render_texture_desc_t) + size);
     desc->width = (uint32_t)tex->width;
     desc->height = (uint32_t)tex->height;
+    desc->single_channel = tex->single_channel;
     ecs_os_memcpy(desc + 1, tex->pixels, (ecs_size_t)size);
     tex->sent = true;
     tex->revision ++;
@@ -203,8 +215,7 @@ static void box_render_textures_send(
             continue;
         }
 
-        if (!all && bytes && bytes + (uint64_t)tex->width * (uint64_t)tex->height * 4 >
-            BOX_RENDER_TEXTURE_BUDGET)
+        if (!all && bytes && bytes + box_render_texture_size(tex) > BOX_RENDER_TEXTURE_BUDGET)
         {
             queued[kept ++] = queued[i];
             continue;

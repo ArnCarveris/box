@@ -251,6 +251,7 @@ static void box_texture_complete(
     tex->pixels = job->pixels;
     tex->width = job->width;
     tex->height = job->height;
+    tex->single_channel = job->single_channel;
     tex->loaded = true;
     job->pixels = NULL;
     if (!tex->queued) {
@@ -314,6 +315,7 @@ static void box_texture_request(
     job->request_height = path->height;
     job->quality = t->quality;
     job->linear = path->linear;
+    job->single_channel = path->single_channel;
     t->sync->refs ++;
     ecs_os_mutex_lock(t->sync->lock);
     t->sync->working ++;

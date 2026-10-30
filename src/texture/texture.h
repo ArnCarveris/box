@@ -30,10 +30,12 @@ typedef struct box_texture_t {
     ecs_entity_t entity;    /**< The texture entity */
     uint32_t generation;    /**< Bumped by every load request, older results are dropped */
     uint32_t handle;        /**< Backend handle, 0 before the first image was sent */
-    uint8_t *pixels;        /**< RGBA8 rows of the image, kept after it was sent so a restarted
-                             *   backend gets it again in its first packet */
+    uint8_t *pixels;        /**< RGBA8 rows of the image, or R8 rows of a single channel one,
+                             *   kept after it was sent so a restarted backend gets it again in
+                             *   its first packet */
     int32_t width;          /**< Width of the current image */
     int32_t height;         /**< Height of the current image */
+    bool single_channel;    /**< The current image has one R8 channel per pixel */
     uint32_t revision;      /**< Images sent to a backend, so a user of the image sees when it
                              *   changed under the same handle */
     bool loaded;            /**< A load succeeded, so the backend should have an image */
@@ -75,7 +77,10 @@ typedef struct box_texture_job_t {
     int32_t quality;            /**< Largest dimension of the result */
     bool linear;                /**< Encode the color channels of the result from linear light
                                  *   to sRGB (TexturePath.linear) */
-    uint8_t *pixels;            /**< RGBA8 rows of the result, NULL on failure */
+    bool single_channel;        /**< Keep only the red channel of the result, as stored
+                                 *   (TexturePath.single_channel) */
+    uint8_t *pixels;            /**< RGBA8 rows of the result, R8 rows for a single channel
+                                 *   one, NULL on failure */
     int32_t width;              /**< Width of the result */
     int32_t height;             /**< Height of the result */
     char *error;                /**< Why the decode failed, NULL on success */
@@ -85,12 +90,22 @@ typedef struct box_texture_job_t {
  */
 void box_texture_decode_init(void);
 
-/** Decode the image of a job into RGBA8 pixels, on a worker thread.
+/** Decode the image of a job into RGBA8 pixels, or R8 pixels of its red channel for a single
+ * channel job, on a worker thread.
  *
  * @param job The job, receives the pixels or the error, and the file it found with its stamp
  */
 void box_texture_decode(
     box_texture_job_t *job);
+
+/** Keep the red channel of RGBA8 pixels, in place: pixel i becomes byte i.
+ *
+ * @param pixels The pixels, which receive count R8 values
+ * @param count Number of pixels
+ */
+void box_texture_red_channel(
+    uint8_t *pixels,
+    int32_t count);
 
 /** Encode the color channels of RGBA8 pixels from linear light to sRGB, keeping alpha.
  *

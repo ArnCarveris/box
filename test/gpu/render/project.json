@@ -281,6 +281,13 @@
                 ]
             },
             {
+                "id": "TextureSingleChannel",
+                "testcases": [
+                    "albedo_red",
+                    "quality_caps"
+                ]
+            },
+            {
                 "id": "Light",
                 "testcases": [
                     "point_light_reaches_its_range",
