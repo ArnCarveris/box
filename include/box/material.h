@@ -166,7 +166,6 @@ ECS_STRUCT(TextureTransform, {
  * The ORM layer packs glTF's occlusion and metallic roughness textures, stored, not display
  * encoded: green multiplies PbrMaterial.roughness, blue PbrMaterial.metallic, red is the
  * indirect light occlusion (1 for unoccluded). A missing layer is white, a no-op.
-
  */
 ECS_STRUCT(PbrTextures, {
     ecs_entity_t albedo;    /**< Multiplied with the base color and opacity, display encoded;

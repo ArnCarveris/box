@@ -284,6 +284,7 @@
                 "id": "TextureSingleChannel",
                 "testcases": [
                     "albedo_red",
+                    "mips_average",
                     "quality_caps"
                 ]
             },
