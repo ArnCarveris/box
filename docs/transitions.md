@@ -91,8 +91,15 @@ ecs_set(world, e, Position, {4, 1, 0});
 ```
 
 `box_transition_set(world, e, ecs_id(Position), &spec)` adds or replaces one entry (an instance
-gets its own copy of an inherited map first), `box_transition_remove()` removes one (the same
-way), and `box_transition_get()` reads one. The storage is a flecs map (`ecs_map_t`) keyed by
+gets its own copy of an inherited map first), `box_transition_remove(world, e, ecs_id(Position))`
+removes one (the same way, leaving the prefab unchanged), and `box_transition_get()` reads one,
+owned or inherited. `box_transition_remove` frees the entry and emits OnSet. Removing the last
+entry leaves `Transition` with an empty map; use `ecs_remove(world, e, Transition)` to remove the
+component. Removing an entry the entity does not have does nothing: it does not add `Transition`
+or copy an inherited map. Both work deferred, on a stage (`it->stage` in a system, or
+`ecs_get_stage(world, 0)` until `ecs_merge`); several calls on one entity before the merge edit
+the same map. Deferred, `box_transition_remove` looks the entry up in the merged state, so it does
+not see an entry that `box_transition_set` added on the stage before the same merge. The storage is a flecs map (`ecs_map_t`) keyed by
 the component entity whose values are allocated `TransitionSpec`s, so
 `ecs_map_get_deref(map, TransitionSpec, ecs_id(Position))` also reads one.
 
