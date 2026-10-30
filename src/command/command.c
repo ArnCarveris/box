@@ -153,19 +153,6 @@ char* box_command_run(
     ecs_shell_result_t r = ecs_shell_run(world, session, line);
     ecs_strbuf_t buf = ECS_STRBUF_INIT;
     char **errors = ecs_vec_first(&r.errors);
-<<<<<<< HEAD
-    ecs_value_t *values = ecs_vec_first(&r.results);
-    int32_t i, count = ecs_vec_count(&r.errors);
-    int32_t value_count = count ? 0 : ecs_vec_count(&r.results);
-    for (i = 0; i < value_count; i ++) {
-        char *out = box_command_format(world, &values[i]);
-        if (out[0] && ecs_strbuf_written(&buf)) {
-            ecs_strbuf_appendch(&buf, '\n');
-        }
-
-        ecs_strbuf_appendstr(&buf, out);
-        ecs_os_free(out);
-=======
     ecs_value_t *results = ecs_vec_first(&r.results);
     int32_t i, count = ecs_vec_count(&r.errors);
     int32_t result_count = count ? 0 : ecs_vec_count(&r.results);
@@ -180,7 +167,6 @@ char* box_command_run(
         }
 
         box_command_format_buf(world, results[i].type, results[i].ptr, &buf);
->>>>>>> e5972a93d6a358ff7e884f700beb3959a8825bf3
     }
 
     for (i = 0; i < count; i ++) {
