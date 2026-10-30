@@ -311,7 +311,7 @@ done:
     return;
 }
 
-/** Remember an entity and the static shapes below it, whose look a Tint or Opacity changed.
+/** Remember an entity and the static shapes below it, whose look an Opacity changed.
  *
  * @param world The world
  * @param b The state
@@ -337,8 +337,9 @@ static void box_bake_record_tree(
     }
 }
 
-/** Remember the static shapes below the entities whose Tint or Opacity changed, which apply
- * to every shape below them. Nothing counts once the world quits, as for BakeOnChange.
+/** Remember the static shapes below the entities whose Opacity changed, which applies to every
+ * shape below them. Tint does not count: the captures ignore it. Nothing counts once the world
+ * quits, as for BakeOnChange.
  *
  * @param it The iterator of the observer
  */
@@ -766,7 +767,6 @@ void box_bake_observers(
         ecs_id(ClearCoat)
     };
     ecs_entity_t added[2] = { ecs_id(AlphaCutoff), ecs_id(Transmission) };
-    ecs_entity_t trees[2] = { ecs_id(Tint), ecs_id(Opacity) };
     ecs_entity_t flags[2] = { ManualTransform, NoBake };
     int32_t i;
     for (i = 0; i < 9; i ++) {
@@ -778,14 +778,12 @@ void box_bake_observers(
         });
     }
 
-    for (i = 0; i < 2; i ++) {
-        ecs_observer(world, {
-            .query.terms = {{ .id = trees[i] }},
-            .events = { EcsOnSet, EcsOnRemove },
-            .callback = BakeOnTree,
-            .ctx = b
-        });
-    }
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(Opacity) }},
+        .events = { EcsOnSet, EcsOnRemove },
+        .callback = BakeOnTree,
+        .ctx = b
+    });
 
     for (i = 0; i < 2; i ++) {
         ecs_observer(world, {

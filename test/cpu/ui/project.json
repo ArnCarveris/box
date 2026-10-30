@@ -417,6 +417,8 @@
                     "arg_entity_created",
                     "arg_entity_deleted",
                     "arg_entity_renamed",
+                    "command_registered",
+                    "command_deleted",
                     "ctrl_a_e",
                     "ctrl_u_k",
                     "ctrl_w",
@@ -437,6 +439,8 @@
                     "complete_escape_closes_list",
                     "complete_typing_closes_list",
                     "complete_hide_closes_list",
+                    "complete_hide_stale_candidates",
+                    "complete_view_deleted_closes_list",
                     "complete_module_color"
                 ]
             },

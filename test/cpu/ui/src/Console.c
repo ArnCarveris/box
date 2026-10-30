@@ -1073,6 +1073,82 @@ void Console_arg_entity_renamed(void) {
     ecs_fini(world);
 }
 
+/** Callback of the test command foo: does nothing.
+ *
+ * @param ctx Call context
+ * @param argc Number of arguments
+ * @param argv The arguments
+ * @param result Unused, foo returns nothing
+ */
+static void console_foo_cmd(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_value_t *result)
+{
+    (void)ctx; (void)argc; (void)argv; (void)result;
+}
+
+/** Register the test command foo in the scope of the box commands, with one entity parameter.
+ *
+ * @param world The world
+ * @return The command
+ */
+static ecs_entity_t console_foo(
+    ecs_world_t *world)
+{
+    ecs_entity_t result = ecs_function_init(world, &(ecs_function_desc_t){
+        .name = "foo",
+        .parent = ecs_lookup(world, BOX_COMMAND_SCOPE),
+        .params = {{ .name = "e", .type = ecs_id(ecs_entity_t) }},
+        .callback = console_foo_cmd
+    });
+    test_assert(result != 0);
+
+    return result;
+}
+
+void Console_command_registered(void) {
+    // console/syntax
+    ecs_world_t *world = console_open(640, 360, NULL);
+    const ConsoleSyntax *syntax = &ecs_singleton_get(world, Console)->syntax;
+    ecs_entity_t line = ecs_lookup(world, CONSOLE_INPUT ".line");
+    int32_t p = CONSOLE_PROMPT_LEN;
+    console_type(world, "foo x");
+    test_str(console_value(world), CONSOLE_PROMPT "foo x");
+    console_check_span(world, line, p, p + 3, syntax->unknown);
+
+    // Registering the command outside a command colors its name and argument without a key
+    console_foo(world);
+    ecs_progress(world, 0);
+    test_str(console_value(world), CONSOLE_PROMPT "foo x");
+    console_check_span(world, line, p, p + 3, syntax->name);
+    console_check_span(world, line, p + 4, p + 5, syntax->missing);
+
+    ecs_fini(world);
+}
+
+void Console_command_deleted(void) {
+    // console/syntax
+    ecs_world_t *world = console_open(640, 360, NULL);
+    const ConsoleSyntax *syntax = &ecs_singleton_get(world, Console)->syntax;
+    ecs_entity_t line = ecs_lookup(world, CONSOLE_INPUT ".line");
+    int32_t p = CONSOLE_PROMPT_LEN;
+    ecs_entity_t foo = console_foo(world);
+    ecs_entity(world, { .name = "x" });
+    console_type(world, "foo x");
+    console_check_span(world, line, p, p + 3, syntax->name);
+    console_check_span(world, line, p + 4, p + 5, syntax->entity);
+
+    // Deleting the command colors its name unknown without a key
+    ecs_delete(world, foo);
+    ecs_progress(world, 0);
+    test_str(console_value(world), CONSOLE_PROMPT "foo x");
+    console_check_span(world, line, p, p + 3, syntax->unknown);
+
+    ecs_fini(world);
+}
+
 void Console_ctrl_a_e(void) {
     // console/prompt
     ecs_world_t *world = console_open(640, 360, NULL);
@@ -2409,6 +2485,64 @@ void Console_complete_hide_closes_list(void) {
     ecs_singleton_modified(world, Console);
     ecs_progress(world, 0);
     ecs_progress(world, 0);
+    test_str(console_menu(world), "");
+    test_flt(console_menu_height(world), 0);
+
+    // Tab computes the candidates again
+    console_press(world, KeyTab, 1);
+    test_assert(console_menu_at(world, "schema_value") >= 0);
+
+    ecs_fini(world);
+}
+
+void Console_complete_hide_stale_candidates(void) {
+    // console/complete
+    ecs_world_t *world = console_open(640, 360, NULL);
+    ecs_entity(world, { .name = "zz_alpha" });
+    ecs_entity_t beta = ecs_entity(world, { .name = "zz_beta" });
+    console_type(world, "ls zz");
+    console_press(world, KeyTab, 1);
+    test_str(console_typed(world), "ls zz_");
+    console_press(world, KeyTab, 1);
+    test_assert(console_menu_at(world, "zz_alpha") >= 0);
+    test_assert(console_menu_at(world, "zz_beta") >= 0);
+
+    // An entity deleted while the console is hidden is not a candidate when it opens again
+    ecs_singleton_get_mut(world, Console)->open = false;
+    ecs_singleton_modified(world, Console);
+    ecs_progress(world, 0);
+    ecs_delete(world, beta);
+    ecs_singleton_get_mut(world, Console)->open = true;
+    ecs_singleton_modified(world, Console);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_str(console_menu(world), "");
+    test_assert(console_menu_at(world, "zz_beta") < 0);
+
+    // Tab completes the one name that is left
+    console_press(world, KeyTab, 1);
+    test_str(console_typed(world), "ls zz_alpha ");
+    test_assert(console_menu_at(world, "zz_beta") < 0);
+    console_press(world, KeyTab, 1);
+    test_assert(console_menu_at(world, "zz_beta") < 0);
+
+    ecs_fini(world);
+}
+
+void Console_complete_view_deleted_closes_list(void) {
+    // console/complete
+    ecs_world_t *world = console_open(640, 360, NULL);
+    console_type(world, "schema");
+    console_press(world, KeyTab, 1);
+    test_assert(console_menu_at(world, "schema_value") >= 0);
+
+    // Deleting the view rebuilds the console without the candidate list
+    ecs_entity_t view = ecs_lookup(world, "console.view");
+    test_assert(view != 0);
+    ecs_delete(world, view);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_bool(ecs_singleton_get(world, Console)->open, true);
     test_str(console_menu(world), "");
     test_flt(console_menu_height(world), 0);
 

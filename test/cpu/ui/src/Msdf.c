@@ -1017,7 +1017,19 @@ static void msdf_check_corner_shapes(
  * of its corners a small fraction of a texel off the texel centers or off the middle between
  * them, at several such offsets. Where the outline is at least a quarter texel away, the
  * interpolated median is on its side by at least a sixteenth of a texel; where it is at least a
- * 32nd of a texel away, the median is on its side. */
+ * 32nd of a texel away, the median is on its side.
+ *
+ * 16 texels per 2000 units is the smallest scale of the "V" the corner repair meets: over all
+ * 32 by 32 placements of its tip it passes at 16, fails at 1 at 14, at 130 at 12 and at 667 at
+ * 10. The points that fail are all within a quarter texel of the outline. About half of them lie
+ * on the walls of the notch between the cells around its tip and those around its mouth, which no
+ * corner repair tests; most others lie between the points the repair tests in a cell, so it never
+ * starts. A field of 3 channels that passes does exist at 12, but reaching it would take tests
+ * along the walls and denser points, not more moves of the repair.
+ *
+ * A spike a sixth of a texel wide and 1.6 texels tall, at 8 texels per 2000 units, is placed
+ * where the median and the interpolated true distance of the points inside it are both outside,
+ * and only the fill puts them inside: the repair must start from such points too. */
 void Msdf_corner_shapes(void) {
     const msdf_corner_shape_t shapes[] = {
         {"M", 40.0 / 2000.0, {700, 500}, 13, {
@@ -1049,6 +1061,16 @@ void Msdf_corner_shapes(void) {
     int32_t wrong = 0, sharp = 0;
     msdf_check_corner_shapes(shapes, (int32_t)(sizeof(shapes) / sizeof(shapes[0])),
         offsets, (int32_t)(sizeof(offsets) / sizeof(offsets[0])), &wrong, &sharp);
+
+    const msdf_corner_shape_t spike = {"spike", 8.0 / 2000.0, {600, 400}, 3, {
+        {580, 0}, {600, 400}, {620, 0}
+    }};
+    const double spike_offsets[][2] = {
+        {0.0, 0.0}, {30.0 / 32.0, 0.0}, {0.0, 30.0 / 32.0}, {2.0 / 32.0, 31.0 / 32.0}
+    };
+
+    msdf_check_corner_shapes(&spike, 1, spike_offsets,
+        (int32_t)(sizeof(spike_offsets) / sizeof(spike_offsets[0])), &wrong, &sharp);
     test_int(wrong, 0);
     test_int(sharp, 0);
 }
