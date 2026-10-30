@@ -69,6 +69,19 @@ app is built once and runs as a copy in .bake/integration like visual, and a sta
 refuses is retried the same way. A failure prints the failing command, its output and the tail
 of the log. The logs and captures go to <out>/e2e (test/integration/out by default), --json
 writes the results in the bake3 test report format, one suite per scenario.
+
+  integration.py local-env [--env name]
+
+local-env prints the folder of the bake3 local environment (--local-env[=name]) of the
+repository, for tools that take a build folder as an argument.
+
+visual, perf and e2e build with bake3 --local-env[=name] and look for the app binary in
+<local env>/build/<app>/<arch-os-cfg>/<app>, also under ~/.bake/<root id>/local_env. The local env
+is <repo>/.bake/local_env[/<name>], or <output_dir>/local_env[/<name>] when the bake.json of
+bake3 ($BAKE_HOME/bake.json, ~/bake3/bake.json without BAKE_HOME) sets output_dir, expanded like
+bake3 does (${id}, ${id underscore} with the id of the root project.json, ${env NAME}, a leading
+~, relative to the folder of bake.json). A bake.json that bake3 would refuse stops the run with
+an error naming it; a missing binary lists the folders searched.
 """
 import argparse
 import glob
@@ -384,21 +397,132 @@ def refusal_detail(run, args):
                 load_average(), os.cpu_count() or 1, run["load_wait"], guard_budget(args)))
 
 
-def app_binary(args):
+class BakeSettingsError(Exception):
+    """A bake.json that bake3 would refuse; the message names the file."""
+
+
+def bake_home(environ=None, cwd=ROOT):
+    """The global bake3 environment as bake3 resolves it when run from cwd."""
+    environ = os.environ if environ is None else environ
+    if environ.get("BAKE_LOCAL_ENV") == "1":
+        home = environ.get("BAKE_GLOBAL_HOME")
+    else:
+        home = environ.get("BAKE_HOME")
+    if not home:
+        return os.path.join(environ.get("HOME") or os.path.expanduser("~"), "bake3")
+    if os.path.isabs(home):
+        return home
+    # Like bake3: relative to cwd, unless an ancestor of cwd has it (the outermost one wins).
+    resolved = os.path.join(cwd, home)
+    probe = cwd
+    while True:
+        if os.path.exists(os.path.join(probe, home)):
+            resolved = os.path.join(probe, home)
+        parent = os.path.dirname(probe)
+        if parent == probe:
+            return resolved
+        probe = parent
+
+
+def expand_output_dir(value, base_dir, project_id, path, environ=None):
+    """Expands an output_dir setting of the bake.json at path for the project project_id."""
+    environ = os.environ if environ is None else environ
+    if value == "~" or value.startswith("~/"):
+        home = environ.get("HOME")
+        if not home:
+            raise BakeSettingsError("%s: cannot expand '~' in output_dir '%s': HOME is not set"
+                                    % (path, value))
+        value = os.path.join(home, value[2:]) if value[1:] else home
+    out = []
+    used_id = False
+    rest = value
+    while "${" in rest:
+        start = rest.index("${")
+        end = rest.find("}", start + 2)
+        if end < 0:
+            raise BakeSettingsError("%s: unterminated expression in output_dir '%s'"
+                                    % (path, value))
+        parts = rest[start + 2:end].split(None, 1)
+        kind = parts[0] if parts else ""
+        arg = parts[1].strip() if len(parts) > 1 else None
+        if kind == "id" and arg is None:
+            sub = project_id
+        elif kind == "id" and arg == "underscore":
+            sub = re.sub(r"[./]", "_", project_id)
+        elif kind == "env" and arg:
+            sub = environ.get(arg)
+            if not sub:
+                raise BakeSettingsError("%s: environment variable '%s' in output_dir '%s' is "
+                                        "not set" % (path, arg, value))
+        else:
+            raise BakeSettingsError("%s: unsupported expression '%s' in output_dir '%s' "
+                                    "(supported: ${id}, ${id underscore}, ${env <name>})"
+                                    % (path, rest[start:end + 1], value))
+        used_id = used_id or kind == "id"
+        out += [rest[:start], sub]
+        rest = rest[end + 1:]
+    expanded = "".join(out) + rest
+    if not used_id:
+        raise BakeSettingsError("%s: output_dir '%s' must contain ${id} or ${id underscore}"
+                                % (path, value))
+    if not expanded:
+        raise BakeSettingsError("%s: output_dir '%s' expands to an empty path" % (path, value))
+    return os.path.normpath(os.path.join(base_dir, expanded))
+
+
+def bake_output_dir(project_id, environ=None, cwd=ROOT):
+    """The output_dir bake.json sets for project_id, None when it sets none."""
+    home = bake_home(environ, cwd)
+    path = os.path.join(home, "bake.json")
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path) as f:
+            text = f.read()
+        # bake3 parses bake.json with comments.
+        text = re.sub(r'("(?:\\.|[^"\\])*")|/\*.*?\*/|//[^\n]*',
+                      lambda m: m.group(1) or "", text, flags=re.S)
+        settings = json.loads(text)
+    except (OSError, ValueError) as e:
+        raise BakeSettingsError("%s: cannot parse the bake3 settings: %s" % (path, e))
+    if not isinstance(settings, dict):
+        raise BakeSettingsError("%s: cannot parse the bake3 settings (expected a JSON object)"
+                                % path)
+    value = settings.get("output_dir")
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value:
+        raise BakeSettingsError("%s: output_dir must be a non-empty string" % path)
+    return expand_output_dir(value, home, project_id, path, environ)
+
+
+def local_env_dirs(env=None, environ=None):
+    """The bake3 local environments an app built with --local-env[=env] from ROOT may be in."""
+    with open(os.path.join(ROOT, "project.json")) as f:
+        root = json.load(f)["id"]
+    output_dir = bake_output_dir(root, environ)
+    bases = [output_dir or os.path.join(ROOT, ".bake"),
+             os.path.join(os.path.expanduser("~"), ".bake", root)]
+    return [os.path.join(base, "local_env", *([env] if env else [])) for base in bases]
+
+
+def app_binary(args, dirs):
+    """The newest binary of args.app in the build folders of dirs and the folders searched."""
     project = app_project(args.app)
     with open(os.path.join(ROOT, project, "project.json")) as f:
         name = json.load(f)["id"].split(".")[-1]
-    with open(os.path.join(ROOT, "project.json")) as f:
-        root = json.load(f)["id"]
-    env = [args.env] if args.env else []
+    searched = [os.path.join(d, "build", name, "*-%s" % (args.cfg or "debug")) for d in dirs]
     found = []
-    for base in (os.path.join(ROOT, ".bake"), os.path.join(os.path.expanduser("~"), ".bake", root)):
-        found += glob.glob(os.path.join(base, "local_env", *env, "build", name,
-                                        "*-%s" % (args.cfg or "debug"), name))
-    return max(found, key=os.path.getmtime) if found else None
+    for pattern in searched:
+        found += glob.glob(os.path.join(pattern, name))
+    return (max(found, key=os.path.getmtime) if found else None), searched
 
 
 def prepare_app(args):
+    try:
+        dirs = local_env_dirs(args.env)
+    except BakeSettingsError as e:
+        sys.exit("cannot locate the bake3 environment: %s" % e)
     env = "--local-env=" + args.env if args.env else "--local-env"
     cmd = ["bake3", "build", app_project(args.app), env]
     if args.cfg:
@@ -406,9 +530,10 @@ def prepare_app(args):
     proc = subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True)
     if proc.returncode:
         sys.exit("building %s failed:\n%s" % (args.app, (proc.stdout + proc.stderr)[-4000:]))
-    binary = app_binary(args)
+    binary, searched = app_binary(args, dirs)
     if not binary:
-        sys.exit("built %s but found no binary of it in the bake3 environment" % args.app)
+        sys.exit("built %s but found no binary of it in the bake3 environment; searched:\n  %s"
+                 % (args.app, "\n  ".join(searched)))
     os.makedirs(SNAPSHOT_DIR, exist_ok=True)
     snapshot = os.path.join(SNAPSHOT_DIR, "%s-%d" % (os.path.basename(binary), os.getpid()))
     shutil.copyfile(binary, snapshot)
@@ -1047,6 +1172,14 @@ def cmd_e2e(args):
     return 1 if failed else 0
 
 
+def cmd_local_env(args):
+    try:
+        print(local_env_dirs(args.env)[0])
+    except BakeSettingsError as e:
+        sys.exit("cannot locate the bake3 environment: %s" % e)
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -1104,6 +1237,9 @@ def main():
                      help="seconds the whole run waits at most for the load average to drop "
                      "to the core count when the load guard refuses a start")
     e2e.set_defaults(fn=cmd_e2e)
+    local_env = sub.add_parser("local-env", help="print the bake3 local environment folder")
+    local_env.add_argument("--env", help="bake3 local environment, the default one when absent")
+    local_env.set_defaults(fn=cmd_local_env)
     args = parser.parse_args()
 
     return args.fn(args)

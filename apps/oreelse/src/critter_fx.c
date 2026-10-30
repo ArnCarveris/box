@@ -209,7 +209,7 @@ ecs_entity_t ore_corpse_spawn(
         ecs_set(world, e, OreCorpse, { .age = 0, .depth = r * 2.0f + 1.0f });
         if (arsenal && arsenal->embers) {
             s = r * 2.0f;
-            embers = ecs_new_w_pair(world, EcsChildOf, e);
+            embers = ecs_new_w_parent(world, e, NULL);
             ecs_set(world, embers, Position, { 0, r * 0.5f, 0 });
             ecs_set(world, embers, Rotation, { 0, ore_random01(world) * 2.0f * GLM_PIf, 0 });
             ecs_set(world, embers, Scale, { s, s, s });
