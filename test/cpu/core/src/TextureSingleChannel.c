@@ -233,6 +233,7 @@ static void* record_malloc(
 {
     last_ptr = real_malloc(size);
     last_size = size;
+
     return last_ptr;
 }
 
@@ -242,6 +243,7 @@ static void* record_realloc(
 {
     last_ptr = real_realloc(ptr, size);
     last_size = size;
+
     return last_ptr;
 }
 
@@ -250,6 +252,7 @@ static void* record_calloc(
 {
     last_ptr = real_calloc(size);
     last_size = size;
+
     return last_ptr;
 }
 
