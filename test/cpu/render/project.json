@@ -378,7 +378,21 @@
                     "new_map_snaps",
                     "invalid_entry_snaps",
                     "active_agrees",
-                    "resolver_no_allocation"
+                    "resolver_no_allocation",
+                    "transform_position",
+                    "transform_rotation",
+                    "transform_scale",
+                    "transform_end_matches_target",
+                    "transform_child_childof",
+                    "transform_child_parent",
+                    "transform_nested",
+                    "transform_scale_zero",
+                    "transform_static_rekeys",
+                    "transform_delete_entity",
+                    "transform_delete_child",
+                    "transform_batch_moved",
+                    "transform_prefab_instances",
+                    "transform_targets_on_game_thread"
                 ]
             }
         ]

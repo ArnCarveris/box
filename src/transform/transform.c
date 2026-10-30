@@ -20,6 +20,29 @@ ECS_CTOR(WorldTransformVersion, ptr, {
     ptr->version = 0;
 })
 
+void box_transform_local(
+    const Position *p,
+    const Rotation *r,
+    const Scale *s,
+    mat4 out)
+{
+    if (r) {
+        glm_euler_yxz((vec3){ r->x, r->y, r->z }, out);
+    } else {
+        glm_mat4_identity(out);
+    }
+
+    if (s) {
+        glm_vec4_scale(out[0], s->x, out[0]);
+        glm_vec4_scale(out[1], s->y, out[1]);
+        glm_vec4_scale(out[2], s->z, out[2]);
+    }
+
+    out[3][0] = p->x;
+    out[3][1] = p->y;
+    out[3][2] = p->z;
+}
+
 void transformSingle(
     const WorldTransform *t_parent,
     WorldTransform *t,
@@ -31,22 +54,7 @@ void transformSingle(
 
     mat4 local;
     vec4 *m = t_parent ? local : t->m;
-
-    if (r) {
-        glm_euler_yxz((vec3){ r->x, r->y, r->z }, m);
-    } else {
-        glm_mat4_identity(m);
-    }
-
-    if (s) {
-        glm_vec4_scale(m[0], s->x, m[0]);
-        glm_vec4_scale(m[1], s->y, m[1]);
-        glm_vec4_scale(m[2], s->z, m[2]);
-    }
-
-    m[3][0] = p->x;
-    m[3][1] = p->y;
-    m[3][2] = p->z;
+    box_transform_local(p, r, s, m);
 
     if (t_parent) {
         glm_mul((vec4*)t_parent->m, local, t->m);

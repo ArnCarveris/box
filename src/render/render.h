@@ -1361,6 +1361,9 @@ typedef struct box_render_transition_node_t {
     bool alive;                     /**< A create record made it and no destroy dropped it */
     bool listed;                    /**< The node is in the active list */
     int32_t running;                /**< Values whose transition runs */
+    int64_t posed;                  /**< Frame of the packet whose pose record set world, so
+                                     *   a slot or child of a node without one is skipped */
+    mat4 world;                     /**< Rendered world matrix of the node in that packet */
     box_render_transition_value_t values[BOX_RENDER_TRANSITION_COMPONENTS]; /**< Values by
                                      *   box_render_transition_component_t */
 } box_render_transition_node_t;
@@ -1465,8 +1468,9 @@ void box_render_transition_table_init(
 void box_render_transition_table_fini(
     box_render_transition_table_t *t);
 
-/** Apply the transition records of a packet and evaluate every running transition at the
- * time of the packet, on the thread that consumes the packets, before the backend renders it.
+/** Apply the transition records of a packet, evaluate every running transition at its time
+ * and patch the transforms of its pose and slot records, parent nodes first, on the thread
+ * that consumes the packets, before the backend renders it.
  *
  * Returns at once when the packet has no records and no transition runs. Allocates only when
  * a record creates a node past the end of the table.
@@ -1510,6 +1514,21 @@ typedef struct box_render_transitions_t box_render_transitions_t;
  */
 void box_render_transitions_init(
     ecs_world_t *world);
+
+/** Register the system that sends the pose and slot records of the active transform
+ * transitions, a system of RenderExtract that runs after the batches were sent and before the
+ * shadow tiles take the regions of the casters.
+ *
+ * @param world The world
+ */
+void box_render_transitions_slots_init(
+    ecs_world_t *world);
+
+/** Private tag of the entities a transform transition moves in this frame: an entity with an
+ * active transition of Position, Rotation or Scale and its drawn descendants. It keys their
+ * slots as dynamic_transform and out of the bakes; the transition extract adds and removes it.
+ */
+extern ECS_TAG_DECLARE(TransitionTransform);
 
 /** Get the state of the transition extract of a world.
  *

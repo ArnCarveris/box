@@ -181,7 +181,8 @@ static void box_draws_text_key(
     key->blend = box_draws_blend(ecs_get(world, e, BlendMode), alpha, false);
     key->back_face = back_face ? (uint8_t)*back_face : (uint8_t)BackFaceCull;
     key->wrap = WrapClamp;
-    key->dynamic_transform = box_transform_dynamic(world, ecs_get_table(world, e));
+    key->dynamic_transform = box_transform_dynamic(world, ecs_get_table(world, e)) ||
+        ecs_has_id(world, e, TransitionTransform);
     key->dynamic_material = ecs_has_id(world, e, DynamicMaterial) ||
         ecs_get_target_for_id(world, e, EcsChildOf, DynamicMaterial) != 0;
 }

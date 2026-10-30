@@ -843,6 +843,13 @@
                     "profile_many_holes",
                     "loft_transform"
                 ]
+            },
+            {
+                "id": "Transition",
+                "testcases": [
+                    "shape_mid_transition",
+                    "shadow_mid_transition"
+                ]
             }
         ]
     }

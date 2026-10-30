@@ -6,9 +6,10 @@ in the rendered pixels.
 
 Status: the `Transition` component, its timing functions and its validation exist
 (`include/box/transition.h`), and so do the change detection of the game thread and the render
-thread resolver, which evaluates every transitioned value on the packet clock. Nothing patches
-instance or material data yet, so rendered output does not change; patching the transforms,
-materials, tint and opacity are the next steps of the epic.
+thread resolver, which evaluates every transitioned value on the packet clock. Transitions of
+`Position`, `Rotation` and `Scale` render, for the entity and its descendants (see
+[Transform transitions](#transform-transitions)). Material, tint and opacity transitions do not
+patch anything yet and are the next steps of the epic.
 
 ## What the application sees
 
@@ -95,7 +96,16 @@ storage is a flecs map (`ecs_map_t`) keyed by the component entity whose values 
 
 An entity with `ManualTransform` (`SurfaceAttachment`) is not corrected by a transition of an
 ancestor and renders at its target: its world matrix is not derived from its parent's, so the
-render thread has no chain to recompute it through.
+render thread has no chain to recompute it through. Its descendants render at their targets
+too, and so does an entity with `ManualTransform` that has a transform transition of its own.
+
+### Limitation: lights and cameras
+
+Lights and cameras are not drawn from instance streams: the light extract
+(`src/render/lights.c`) and the views (`src/render/render.c`) read `WorldTransform`, which is
+the target. A transition of `Position` or `Rotation` on an entity that is only a light or a
+camera does not show, and neither does a light or camera below a transitioning entity: they
+stay at their target. A shape on the same entity or below it moves; the light does not.
 
 ## Architecture
 
@@ -182,6 +192,72 @@ caching, and gives each slot a single byte location to patch. A private tag on t
 its affected descendants drives this and is removed at the end, which rekeys the slots back. The
 tag is checked only where the key is computed, which is not per frame.
 
+## Transform transitions
+
+Implemented in `src/render/transitions.c` (game thread) and `src/render/transition.c` (render
+thread).
+
+- A node *moves* in a frame when `Position`, `Rotation` or `Scale` is active at the packet time
+  (`box_render_transitions_active`), and it is not a prefab, has a `Position` and no
+  `ManualTransform`.
+- The extract walks from every moving node without a moving ancestor down its subtree, through
+  `ChildOf` and `Parent` (`ecs_get_parent`, `ecs_children`). Each descendant belongs to its
+  nearest moving ancestor; a moving descendant is a node of its own whose parent node is that
+  ancestor, so nodes come parent first. The walk skips prefabs and stops at an entity whose
+  world matrix is not derived from its parent's (`ManualTransform`, or a `WorldTransform`
+  without `Position`). The walk is made again every frame, so a new parent, slot or batch
+  during a transition is followed.
+- The drawn entities of the walk (with a `DrawSlot` or `TextSlots`) carry the private tag
+  `TransitionTransform` (`box.render.TransitionTransform`, `(OnInstantiate, DontInherit)`).
+  `box_draws_key` and the glyph key make it `dynamic_transform`, and not `bake`; the observer
+  `DrawsOnTransitionTransform` rekeys the slot when the tag is added or removed. The extract
+  system runs `immediate`, so the tag is added before `RenderExtractDraws` of the same frame
+  and removed in the first frame the node no longer moves. `box_transform_dynamic`, the
+  transform systems and `DynamicTransform` are unchanged: the entities keep their target
+  `WorldTransform`, and their slots hold the target, written on change as for a static shape.
+- A dynamic_transform batch uploads its transform run every frame; the batch remembers the
+  packet data offset of that upload (`transform_frame`, `transform_data`).
+- A second system, `RenderExtractTransitionSlots`, runs after `RenderExtractDraws` and before
+  the lights. For each moving node it sends a `POSE` record, and for each transform it moves
+  (its own shape, the shapes and glyphs of its descendants) a `SLOT` record with the byte
+  offset of the `box_render_transform_t` in the packet data. Both point at matrices in the
+  packet data:
+  - `POSE`: `box_render_transition_pose_t`, `rel` being the target locals from the parent node
+    down to the parent of the node, or the target world matrix of the parent without a parent
+    node, and the target `Position`, `Rotation` and `Scale` of the node.
+  - `SLOT`: the target locals from the node down to the entity, times the instance matrix of
+    the slot: the instance scale `box_draws_transform` folds in for 3D, 2D and surface shapes,
+    or the glyph quad (width, height, x, y) for text.
+- The resolver, after it evaluated the values of the packet, computes
+  `W_r(node) = W_r(parent node) * rel * L_r` per pose record in order, where `L_r` is
+  `box_transform_local` (shared with `transformSingle`, `Ry * Rx * Rz`, scale, translate) of the
+  rendered value of each component with an active transition and the target of the others,
+  and writes the three rows of `W_r(node) * rel(slot)` into each slot. No matrix is inverted,
+  so a scale of 0 works.
+- The frame after the last active frame sends no records: the tag is removed, the slot rekeys
+  to its static batch and holds its target, byte for byte as without a transition.
+- Cull, shadows and the forward passes read the patched transform stream. Draw order of
+  blended instances, picking, `box.spatial` and bakes use the target.
+
+Refinement of the design: the pose record carries the target values of the transform
+components of the node, so the resolver builds `L_r` also from components that have no
+transition of their own (an entity that transitions only `Position` and has a `Rotation`).
+
+### Shadows and Hi-Z
+
+- The shadow atlas caches spot and point light tiles and renders a tile again when a caster
+  region reaches it (`box_render_shadow_touched`). The game thread does not know where the
+  resolver puts a moving caster, so in every frame a scene has a moving caster, and in the
+  frame after, the extract records a region over the whole scene: every tile of the scene
+  renders again and no shadow stays behind. A slot that rekeys at the start or the end records
+  the region of the slot it leaves (`box_draws_slot_remove`) and of the slot it gets.
+- A slot that rekeys moves to another page slot, whose Hi-Z history word is that of the
+  instance that had it before, as for any key change. The history only decides what the early
+  phase draws (`etc/shaders/cull.wgsl`): the late phase tests every instance in the frustum
+  against the pyramid of this frame at its patched transform and draws it when the early phase
+  did not, then writes its history. A stale word costs at most one extra early draw and never
+  leaves the instance out. A moving instance writes its history at its rendered position.
+
 ## The fast path
 
 An application without transitions, and every entity without `Transition` in an application
@@ -194,4 +270,6 @@ that has them, pays nothing per entity:
   gains one empty vector.
 - The extract query has no matched tables when `Transition` is not used.
 
-The only observer the module adds is the OnSet validation of `Transition` itself.
+The only observers the module adds are the OnSet validation of `Transition` itself and
+`DrawsOnTransitionTransform`, on the private tag, which only entities a transform transition
+moves ever get.

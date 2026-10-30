@@ -229,6 +229,7 @@ static void box_transition_node_reset(
     ecs_os_memset_t(node, 0, box_render_transition_node_t);
     node->listed = listed;
     node->alive = alive;
+    node->posed = -1;
 }
 
 /** Get the value a component of a node renders at a time, without changing it.
@@ -344,7 +345,7 @@ static void box_transition_apply(
             if (node) {
                 box_transition_node_reset(node, false);
             }
-        } else {
+        } else if (r->op == BOX_RENDER_TRANSITION_START) {
             box_transition_start(t, r);
         }
     }
@@ -377,6 +378,155 @@ static void box_transition_evaluate(
     }
 }
 
+/** Get a component of a node as it renders: the evaluated value while its transition runs,
+ * else the target the pose record carries.
+ *
+ * @param node The node
+ * @param component The component
+ * @param target The target of the pose record
+ * @param out Receives the three floats of the value
+ */
+static void box_transition_pose_value(
+    const box_render_transition_node_t *node,
+    box_render_transition_component_t component,
+    const float *target,
+    float *out)
+{
+    const box_render_transition_value_t *v = &node->values[component];
+    if (v->active) {
+        ecs_os_memcpy(out, v->current, 3 * ECS_SIZEOF(float));
+    } else {
+        ecs_os_memcpy(out, target, 3 * ECS_SIZEOF(float));
+    }
+}
+
+/** Get a block of the packet data that a pose or slot record points at.
+ *
+ * @param p The packet
+ * @param offset Offset of the block
+ * @param size Bytes of the block
+ * @return The block, NULL when it is outside the data
+ */
+static void* box_transition_data(
+    box_render_packet_t *p,
+    uint32_t offset,
+    ecs_size_t size)
+{
+    void *result = NULL;
+    if ((int64_t)offset + size <= (int64_t)ecs_vec_count(&p->data)) {
+        result = ECS_OFFSET(ecs_vec_first(&p->data), offset);
+    }
+
+    return result;
+}
+
+/** Compute the rendered world matrix of a node from a pose record: the matrix of its parent
+ * node, the target chain to the node and the local matrix of its rendered pose.
+ *
+ * box_transform_local builds it as the transform systems do, so a pose at its target is the
+ * target matrix.
+ *
+ * @param t The table
+ * @param p The packet
+ * @param r The record
+ */
+static void box_transition_pose(
+    box_render_transition_table_t *t,
+    box_render_packet_t *p,
+    const box_render_transition_record_t *r)
+{
+    box_render_transition_node_t *node = box_transition_node_get(t, r->node);
+    const box_render_transition_node_t *parent = r->parent
+        ? box_transition_node_get(t, r->parent) : NULL;
+    box_render_transition_pose_t pose;
+    const void *src = box_transition_data(p, r->data, ECS_SIZEOF(pose));
+    Position position;
+    Rotation rotation;
+    Scale scale;
+    mat4 rel, local, chain;
+    if (!node || !node->alive || !src) {
+        goto done;
+    }
+
+    if (r->parent && (!parent || !parent->alive || parent->posed != p->frame)) {
+        goto done;
+    }
+
+    ecs_os_memcpy(&pose, src, ECS_SIZEOF(pose));
+    box_transition_pose_value(node, BOX_RENDER_TRANSITION_POSITION, pose.position, &position.x);
+    box_transition_pose_value(node, BOX_RENDER_TRANSITION_ROTATION, pose.rotation, &rotation.x);
+    box_transition_pose_value(node, BOX_RENDER_TRANSITION_SCALE, pose.scale, &scale.x);
+    box_transform_local(&position, &rotation, &scale, local);
+    ecs_os_memcpy(rel, pose.rel, ECS_SIZEOF(mat4));
+    if (parent) {
+        glm_mul(ECS_CONST_CAST(vec4*, parent->world), rel, chain);
+        glm_mul(chain, local, node->world);
+    } else {
+        glm_mul(rel, local, node->world);
+    }
+
+    node->posed = p->frame;
+done:
+    return;
+}
+
+/** Patch a transform slot of the packet data with the rows of the rendered matrix of its node
+ * times the target chain of the slot.
+ *
+ * @param t The table
+ * @param p The packet
+ * @param r The record
+ */
+static void box_transition_slot(
+    box_render_transition_table_t *t,
+    box_render_packet_t *p,
+    const box_render_transition_record_t *r)
+{
+    const box_render_transition_node_t *node = box_transition_node_get(t, r->node);
+    const void *src = box_transition_data(p, r->data, ECS_SIZEOF(mat4));
+    void *dst = box_transition_data(p, r->offset, ECS_SIZEOF(box_render_transform_t));
+    box_render_transform_t out;
+    mat4 rel, m;
+    int32_t row, col;
+    if (!node || !node->alive || node->posed != p->frame || !src || !dst) {
+        goto done;
+    }
+
+    ecs_os_memcpy(rel, src, ECS_SIZEOF(mat4));
+    glm_mul(ECS_CONST_CAST(vec4*, node->world), rel, m);
+    for (row = 0; row < 3; row ++) {
+        for (col = 0; col < 4; col ++) {
+            out.rows[row][col] = m[col][row];
+        }
+    }
+
+    ecs_os_memcpy(dst, &out, ECS_SIZEOF(box_render_transform_t));
+done:
+    return;
+}
+
+/** Apply the pose and slot records of a packet, in the order they were made, which puts a
+ * parent node before its children and every pose before the slots.
+ *
+ * @param t The table
+ * @param p The packet
+ */
+static void box_transition_patch(
+    box_render_transition_table_t *t,
+    box_render_packet_t *p)
+{
+    int32_t i, count = ecs_vec_count(&p->transitions);
+    const box_render_transition_record_t *records = ecs_vec_first(&p->transitions);
+    for (i = 0; i < count; i ++) {
+        const box_render_transition_record_t *r = &records[i];
+        if (r->op == BOX_RENDER_TRANSITION_POSE) {
+            box_transition_pose(t, p, r);
+        } else if (r->op == BOX_RENDER_TRANSITION_SLOT) {
+            box_transition_slot(t, p, r);
+        }
+    }
+}
+
 void box_render_transition_resolve(
     box_render_transition_table_t *t,
     box_render_packet_t *p)
@@ -403,6 +553,7 @@ void box_render_transition_resolve(
     }
 
     ecs_vec_set_count_t(NULL, &t->active, uint32_t, kept);
+    box_transition_patch(t, p);
 done:
     return;
 }

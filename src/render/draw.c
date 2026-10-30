@@ -539,12 +539,14 @@ static void box_draws_key(
         key->textures[0] = shape2d->texture;
     }
 
-    key->dynamic_transform = box_transform_dynamic(world, ecs_get_table(world, e));
+    key->dynamic_transform = box_transform_dynamic(world, ecs_get_table(world, e)) ||
+        ecs_has_id(world, e, TransitionTransform);
     key->dynamic_material = ecs_has_id(world, e, DynamicMaterial) ||
         ecs_get_target_for_id(world, e, EcsChildOf, DynamicMaterial) != 0;
     key->shadow = !shape2d && !ecs_has_id(world, e, NoShadow) &&
         !ecs_get_target_for_id(world, e, EcsChildOf, NoShadow);
     key->bake = !shape2d && key->blend == Opaque && !ecs_has_id(world, e, DynamicTransform) &&
+        !ecs_has_id(world, e, TransitionTransform) &&
         !ecs_has_id(world, e, ManualTransform) && !ecs_has_id(world, e, NoBake) &&
         !box_projection_anchored(world, e) && box_draws_baked(world, key->scene);
 }
@@ -917,6 +919,9 @@ static void box_draws_observers(
     box_draws_observer(world, d, "DrawsOnManualTransform", (ecs_observer_desc_t){
         .query.terms = {{ .id = ManualTransform }},
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnChange);
+    box_draws_observer(world, d, "DrawsOnTransitionTransform", (ecs_observer_desc_t){
+        .query.terms = {{ .id = TransitionTransform }},
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnChange);
     box_draws_observer(world, d, "DrawsOnLightBake", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(LightBake) }},
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnLightBake);
@@ -1089,12 +1094,7 @@ void box_render_draws_init(
     });
 }
 
-/** Get the state of the draw extract of a world.
- *
- * @param world The world
- * @return The state, NULL without the draw extract
- */
-static box_render_draws_t* box_draws_state(
+box_render_draws_t* box_draws_state(
     const ecs_world_t *world)
 {
     ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractDraws");

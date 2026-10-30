@@ -930,18 +930,45 @@ typedef enum box_render_transition_component_t {
 typedef enum box_render_transition_op_t {
     BOX_RENDER_TRANSITION_CREATE = 0,   /**< A node exists, with no values */
     BOX_RENDER_TRANSITION_DESTROY,      /**< A node no longer exists, its values are dropped */
-    BOX_RENDER_TRANSITION_START         /**< A component of a node has a new target */
+    BOX_RENDER_TRANSITION_START,        /**< A component of a node has a new target */
+    BOX_RENDER_TRANSITION_POSE,         /**< The rendered world matrix of a node with an active
+                                         *   transform transition, for this packet */
+    BOX_RENDER_TRANSITION_SLOT          /**< A transform in the packet data that a node moves,
+                                         *   patched with W_r(node) * rel (the target chain
+                                         *   from the node with the instance matrix) */
 } box_render_transition_op_t;
+
+/** What a pose record points at in the packet data: the target chain of a node and the target
+ * pose its own components fall back to when they do not transition.
+ *
+ * The rendered world matrix of the node is W_r(parent) * rel * L_r, or rel * L_r without a
+ * parent node, where L_r is the local matrix (box_transform_local) of the rendered position,
+ * rotation and scale. */
+typedef struct box_render_transition_pose_t {
+    float rel[4][4];        /**< Column major: the target locals from the parent node down to
+                             *   the parent of the node, or without a parent node the target
+                             *   world matrix of its parent (identity for a root) */
+    float position[3];      /**< Target Position */
+    float rotation[3];      /**< Target Rotation, 0 without one */
+    float scale[3];         /**< Target Scale, 1 without one */
+} box_render_transition_pose_t;
 
 /** A change the game thread found for the transition resolver of the render thread.
  *
  * A start without a previous value of the component, or with a duration and delay of 0, sets
  * the value without a transition; any other start transitions from the value the node renders
  * at the start time to the target. The records of a packet apply in the order they were made.
+ *
+ * Pose and slot records come every frame a node moves, parent nodes first, then the slots.
  */
 typedef struct box_render_transition_record_t {
     box_render_transition_op_t op;  /**< What the record does */
     uint32_t node;                  /**< Node id, from 1 */
+    uint32_t parent;                /**< Parent node of a pose, 0 for none */
+    uint32_t data;                  /**< Packet data offset of the box_render_transition_pose_t
+                                     *   of a pose, or of the rel matrix of a slot */
+    uint32_t offset;                /**< Packet data offset of the box_render_transform_t a
+                                     *   slot patches */
     box_render_transition_component_t component; /**< Component of a start */
     TimingFunction timing_function; /**< Curve of a start */
     float delay;                    /**< Seconds the value holds still after the start */

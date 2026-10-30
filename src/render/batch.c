@@ -337,6 +337,7 @@ int32_t box_draws_batch_ensure(
     b->bounds_dirty = false;
     b->bounded = false;
     b->was_ready = false;
+    b->transform_frame = -1;
     head = ecs_map_ensure(&d->lookup, hash);
     b->next = *head ? (int32_t)*head - 1 : -1;
     *head = (uint64_t)result + 1;
@@ -1076,6 +1077,10 @@ static void box_draws_upload_all(
             box_draws_store_handle(store, b->page, stream), offset, size);
         ecs_os_memcpy(dst, ecs_vec_first(data), (ecs_size_t)size);
         box_draws_count_bytes(d, stream, size);
+        if (stream == BOX_RENDER_STREAM_TRANSFORM) {
+            b->transform_frame = p->frame;
+            b->transform_data = ecs_vec_last_t(&p->uploads, box_render_upload_t)->data;
+        }
     }
 
     b->full &= (uint8_t)~(1 << stream);

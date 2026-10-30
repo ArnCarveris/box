@@ -82,6 +82,21 @@ bool box_transform_dynamic(
     const ecs_world_t *world,
     const ecs_table_t *table);
 
+/** Compute the local matrix of a pose, T * R * S, as the transform systems compose it into
+ * WorldTransform: the rotation is Ry * Rx * Rz (glm_euler_yxz), each column scaled, then the
+ * translation. Pure, so the render thread computes rendered transitions with it.
+ *
+ * @param p Local position
+ * @param r Local rotation, NULL for none
+ * @param s Local scale, NULL for none
+ * @param out Receives the matrix
+ */
+void box_transform_local(
+    const Position *p,
+    const Rotation *r,
+    const Scale *s,
+    mat4 out);
+
 /** Receives the entities whose WorldTransform a TransformStatic run changed, once per run
  * that changed any: every computed root and every descendant whose WorldTransform it wrote.
  *

@@ -4,13 +4,16 @@
  * the records it sends and the values the render thread evaluates on the packet clock.
  *
  * The cases render into the null backend and step the world with a fixed delta, never the wall
- * clock. Rendered values are read with the test only accessors of render_packet.h after
- * box_render_sync. Nothing patches instance data yet.
+ * clock. Rendered values are read after box_render_sync with the test only accessors of
+ * render_packet.h, rendered transforms from the patched copy of the last packet.
  */
 
 #include <box.h>
 #include <bake_test.h>
+#include <math.h>
 #include "render.h"
+#include "draw.h"
+#include "spatial.h"
 
 /** Seconds every frame advances the world, a power of two so the clock is exact */
 #define TR_DELTA (0.25f)
@@ -1004,4 +1007,674 @@ void Transition_resolver_no_allocation(void) {
     box_render_packet_fini(&p);
     box_render_transition_table_fini(&t);
     ecs_fini(world);
+}
+
+/** Create a world that renders into the null backend with a view, so the batches are sent.
+ *
+ * @param null Receives the backend
+ * @return The world
+ */
+static ecs_world_t* tr_scene(
+    box_render_null_t **null)
+{
+    ecs_world_t *world = tr_world(null);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 20});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+
+    return world;
+}
+
+/** Create a box shape.
+ *
+ * @param world The world
+ * @param parent ChildOf parent, 0 for none
+ * @param x Its x position
+ * @return The shape
+ */
+static ecs_entity_t tr_shape(
+    ecs_world_t *world,
+    ecs_entity_t parent,
+    float x)
+{
+    ecs_entity_t e = parent ? ecs_new_w_pair(world, EcsChildOf, parent) : ecs_new(world);
+    ecs_set(world, e, Position, {x, 0, 0});
+    ecs_set(world, e, Box, {1, 2, 3});
+    ecs_set(world, e, Rgb, {200, 100, 50});
+
+    return e;
+}
+
+/** Get the batch of the shape of an entity.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return The batch
+ */
+static box_draw_batch_t* tr_batch(
+    ecs_world_t *world,
+    ecs_entity_t e)
+{
+    box_render_draws_t *d = box_draws_state(world);
+    const DrawSlot *ds = ecs_get(world, e, DrawSlot);
+    test_assert(d != NULL);
+    test_assert(ds != NULL);
+    test_assert(ds->batch >= 0);
+
+    return box_draws_batch(d, ds->batch);
+}
+
+/** Read the transform of the shape of an entity as the backend got it in the last packet: the
+ * patched bytes of the run upload of a dynamic_transform batch, else the static slot the game
+ * thread keeps, which the backend has.
+ *
+ * @param world The world
+ * @param null The backend
+ * @param e The entity
+ * @param out Receives the transform
+ * @return Whether the slot was in a run upload of the last packet
+ */
+static bool tr_rendered(
+    ecs_world_t *world,
+    const box_render_null_t *null,
+    ecs_entity_t e,
+    box_render_transform_t *out)
+{
+    box_render_draws_t *d = box_draws_state(world);
+    const DrawSlot *ds = ecs_get(world, e, DrawSlot);
+    box_draw_batch_t *b = tr_batch(world, e);
+    bool result = false;
+    int32_t i;
+    box_render_sync(world);
+    *out = *box_draws_slot_transform(b, ds->slot);
+    if (!b->key.dynamic_transform) {
+        goto done;
+    }
+
+    uint32_t handle = box_draws_store_handle(box_draws_batch_store(d, b), b->page,
+        BOX_RENDER_STREAM_TRANSFORM);
+    uint32_t offset = b->first * (uint32_t)sizeof(box_render_transform_t);
+    for (i = 0; i < ecs_vec_count(&null->last.uploads) && !result; i ++) {
+        const box_render_upload_t *u = ecs_vec_get_t(
+            &null->last.uploads, box_render_upload_t, i);
+        if (u->buffer == handle && u->offset == offset) {
+            ecs_os_memcpy(out, box_render_packet_data(&null->last,
+                u->data + (uint32_t)ds->slot * (uint32_t)sizeof(box_render_transform_t)),
+                ECS_SIZEOF(box_render_transform_t));
+            result = true;
+        }
+    }
+
+    test_assert(result);
+done:
+    return result;
+}
+
+/** Compute the transform a shape renders with at a pose, as box_draws_transform writes it.
+ *
+ * @param world The world
+ * @param e The entity, whose shape gives the instance scale
+ * @param parent World matrix of the parent, NULL for none
+ * @param p Local position
+ * @param r Local rotation, NULL for none
+ * @param s Local scale, NULL for none
+ * @param out Receives the transform
+ */
+static void tr_pose(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    vec4 *parent,
+    const Position *p,
+    const Rotation *r,
+    const Scale *s,
+    box_render_transform_t *out)
+{
+    WorldTransform wt;
+    mat4 local;
+    box_transform_local(p, r, s, local);
+    if (parent) {
+        glm_mul(parent, local, wt.m);
+    } else {
+        glm_mat4_copy(local, wt.m);
+    }
+
+    box_draws_transform(out, &wt, ecs_get(world, e, ShapeMesh));
+}
+
+/** Compute the transform of the target of a shape, from its WorldTransform.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param out Receives the transform
+ */
+static void tr_target(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    box_render_transform_t *out)
+{
+    box_draws_transform(out, ecs_get(world, e, WorldTransform), ecs_get(world, e, ShapeMesh));
+}
+
+/** Check that two transforms are equal within float rounding.
+ *
+ * @param a A transform
+ * @param b A transform
+ */
+static void tr_test_transform(
+    const box_render_transform_t *a,
+    const box_render_transform_t *b)
+{
+    int32_t r, c;
+    for (r = 0; r < 3; r ++) {
+        for (c = 0; c < 4; c ++) {
+            test_assert(isfinite(a->rows[r][c]));
+            test_assert(fabsf(a->rows[r][c] - b->rows[r][c]) < 1e-4f);
+        }
+    }
+}
+
+/** Check the transform the shape of an entity renders with at a pose.
+ *
+ * @param world The world
+ * @param null The backend
+ * @param e The entity
+ * @param parent World matrix of the parent, NULL for none
+ * @param p Local position
+ * @param r Local rotation, NULL for none
+ * @param s Local scale, NULL for none
+ */
+static void tr_test_pose(
+    ecs_world_t *world,
+    const box_render_null_t *null,
+    ecs_entity_t e,
+    vec4 *parent,
+    const Position *p,
+    const Rotation *r,
+    const Scale *s)
+{
+    box_render_transform_t rendered, expected;
+    test_assert(tr_rendered(world, null, e, &rendered));
+    tr_pose(world, e, parent, p, r, s, &expected);
+    tr_test_transform(&rendered, &expected);
+}
+
+/** Check that the shape of an entity is back in a static batch and its slot holds its target,
+ * byte for byte.
+ *
+ * @param world The world
+ * @param null The backend
+ * @param e The entity
+ */
+static void tr_test_static(
+    ecs_world_t *world,
+    const box_render_null_t *null,
+    ecs_entity_t e)
+{
+    box_render_transform_t rendered, expected;
+    test_assert(!tr_rendered(world, null, e, &rendered));
+    test_assert(!ecs_has_id(world, e, TransitionTransform));
+    tr_target(world, e, &expected);
+    test_assert(!ecs_os_memcmp_t(&rendered, &expected, box_render_transform_t));
+}
+
+/** Get the local matrix of a position.
+ *
+ * @param x X
+ * @param y Y
+ * @param z Z
+ * @param out Receives the matrix
+ */
+static void tr_at(
+    float x,
+    float y,
+    float z,
+    mat4 out)
+{
+    box_transform_local(&(Position){x, y, z}, NULL, NULL, out);
+}
+
+void Transition_transform_position(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_entity_t e = tr_shape(world, 0, 0);
+    box_transition_set(world, e, ecs_id(Position), &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+    test_assert(!tr_batch(world, e)->key.dynamic_transform);
+
+    ecs_set(world, e, Position, {4, 0, 0});
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        tr_frame(world);
+        test_assert(ecs_has_id(world, e, TransitionTransform));
+        test_assert(tr_batch(world, e)->key.dynamic_transform);
+        tr_test_pose(world, null, e, NULL, &(Position){(float)i, 0, 0}, NULL, NULL);
+    }
+
+    tr_frame(world);
+    tr_test_static(world, null, e);
+    tr_fini(world, null);
+}
+
+void Transition_transform_rotation(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_entity_t e = tr_shape(world, 0, 1);
+    ecs_set(world, e, Rotation, {0, 0, 0});
+    box_transition_set(world, e, ecs_id(Rotation), &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+
+    ecs_set(world, e, Rotation, {0.4f, (float)GLM_PI_2, 0.2f});
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        float t = (float)i / 4.0f;
+        tr_frame(world);
+        tr_test_pose(world, null, e, NULL, &(Position){1, 0, 0},
+            &(Rotation){0.4f * t, (float)GLM_PI_2 * t, 0.2f * t}, NULL);
+    }
+
+    tr_frame(world);
+    tr_test_static(world, null, e);
+    tr_fini(world, null);
+}
+
+void Transition_transform_scale(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_entity_t e = tr_shape(world, 0, 0);
+    ecs_set(world, e, Scale, {1, 1, 1});
+    box_transition_set(world, e, ecs_id(Scale), &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+
+    ecs_set(world, e, Scale, {3, 5, 1});
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        float t = (float)i / 4.0f;
+        tr_frame(world);
+        tr_test_pose(world, null, e, NULL, &(Position){0, 0, 0}, NULL,
+            &(Scale){1 + 2 * t, 1 + 4 * t, 1});
+    }
+
+    tr_frame(world);
+    tr_test_static(world, null, e);
+    tr_fini(world, null);
+}
+
+void Transition_transform_end_matches_target(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_entity_t e = tr_shape(world, 0, 0);
+    ecs_entity_t plain = tr_shape(world, 0, 0);
+    ecs_set(world, e, Rotation, {0, 0, 0});
+    ecs_set(world, plain, Rotation, {0, 0, 0});
+    ecs_set(world, e, Scale, {1, 1, 1});
+    ecs_set(world, plain, Scale, {1, 1, 1});
+    TransitionSpec spec = { .duration = 1.0f, .timing_function = EaseInOut };
+    box_transition_set(world, e, ecs_id(Position), &spec);
+    box_transition_set(world, e, ecs_id(Rotation), &spec);
+    box_transition_set(world, e, ecs_id(Scale), &spec);
+    tr_frame(world);
+
+    ecs_entity_t both[2] = { e, plain };
+    int32_t i;
+    for (i = 0; i < 2; i ++) {
+        ecs_set(world, both[i], Position, {0.3f, -1.7f, 2.9f});
+        ecs_set(world, both[i], Rotation, {0.71f, -2.3f, 0.13f});
+        ecs_set(world, both[i], Scale, {0.37f, 1.9f, 3.1f});
+    }
+
+    for (i = 0; i < 4; i ++) {
+        box_render_transform_t rendered, target;
+        tr_frame(world);
+        test_assert(tr_rendered(world, null, e, &rendered));
+        test_assert(!tr_rendered(world, null, plain, &rendered));
+        tr_target(world, plain, &target);
+        test_assert(!ecs_os_memcmp_t(&rendered, &target, box_render_transform_t));
+    }
+
+    tr_frame(world);
+    tr_test_static(world, null, e);
+    box_render_transform_t a, b;
+    test_assert(!tr_rendered(world, null, e, &a));
+    test_assert(!tr_rendered(world, null, plain, &b));
+    test_assert(!ecs_os_memcmp_t(&a, &b, box_render_transform_t));
+    test_assert(!ecs_os_memcmp_t(ecs_get(world, e, WorldTransform),
+        ecs_get(world, plain, WorldTransform), WorldTransform));
+    tr_fini(world, null);
+}
+
+/** Check that a child follows a parent whose Position transitions, for a ChildOf or a Parent
+ * hierarchy.
+ *
+ * @param non_fragmenting Whether the child has a Parent component instead of a ChildOf pair
+ */
+static void tr_child_follows(
+    bool non_fragmenting)
+{
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_entity_t parent = tr_shape(world, 0, 0);
+    ecs_entity_t child;
+    if (non_fragmenting) {
+        child = ecs_new(world);
+        ecs_set(world, child, EcsParent, {parent});
+        ecs_set(world, child, Box, {1, 1, 1});
+    } else {
+        child = tr_shape(world, parent, 0);
+    }
+
+    ecs_set(world, child, Position, {0, 1, 0});
+    box_transition_set(world, parent, ecs_id(Position), &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+
+    ecs_set(world, parent, Position, {4, 0, 0});
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        mat4 m;
+        tr_frame(world);
+        test_assert(ecs_has_id(world, child, TransitionTransform));
+        tr_at((float)i, 0, 0, m);
+        tr_test_pose(world, null, parent, NULL, &(Position){(float)i, 0, 0}, NULL, NULL);
+        tr_test_pose(world, null, child, m, &(Position){0, 1, 0}, NULL, NULL);
+    }
+
+    tr_frame(world);
+    tr_test_static(world, null, parent);
+    tr_test_static(world, null, child);
+    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 4);
+    tr_fini(world, null);
+}
+
+void Transition_transform_child_childof(void) {
+    // engine_core/transition
+    tr_child_follows(false);
+}
+
+void Transition_transform_child_parent(void) {
+    // engine_core/transition
+    tr_child_follows(true);
+}
+
+void Transition_transform_nested(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_entity_t parent = tr_shape(world, 0, 0);
+    ecs_entity_t child = tr_shape(world, parent, 0);
+    ecs_entity_t leaf = tr_shape(world, child, 1);
+    box_transition_set(world, parent, ecs_id(Position), &(TransitionSpec){ .duration = 1.0f });
+    box_transition_set(world, child, ecs_id(Position), &(TransitionSpec){ .duration = 0.5f });
+    tr_frame(world);
+
+    ecs_set(world, parent, Position, {4, 0, 0});
+    ecs_set(world, child, Position, {0, 2, 0});
+    float child_y[4] = { 0, 1, 2, 2 };
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        mat4 p, c, pc;
+        tr_frame(world);
+        tr_at((float)i, 0, 0, p);
+        tr_at(0, child_y[i], 0, c);
+        glm_mul(p, c, pc);
+        tr_test_pose(world, null, parent, NULL, &(Position){(float)i, 0, 0}, NULL, NULL);
+        tr_test_pose(world, null, child, p, &(Position){0, child_y[i], 0}, NULL, NULL);
+        tr_test_pose(world, null, leaf, pc, &(Position){1, 0, 0}, NULL, NULL);
+    }
+
+    tr_frame(world);
+    tr_test_static(world, null, parent);
+    tr_test_static(world, null, child);
+    tr_test_static(world, null, leaf);
+    tr_fini(world, null);
+}
+
+void Transition_transform_scale_zero(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_entity_t parent = tr_shape(world, 0, 0);
+    ecs_entity_t child = tr_shape(world, parent, 0);
+    ecs_set(world, parent, Scale, {1, 1, 1});
+    ecs_set(world, child, Position, {0, 1, 0});
+    box_transition_set(world, parent, ecs_id(Scale), &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+
+    ecs_set(world, parent, Scale, {0, 0, 0});
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        float s = 1.0f - (float)i / 4.0f;
+        mat4 m;
+        tr_frame(world);
+        box_transform_local(&(Position){0, 0, 0}, NULL, &(Scale){s, s, s}, m);
+        tr_test_pose(world, null, child, m, &(Position){0, 1, 0}, NULL, NULL);
+    }
+
+    tr_frame(world);
+    tr_test_static(world, null, child);
+
+    ecs_set(world, parent, Scale, {1, 1, 1});
+    for (i = 0; i < 4; i ++) {
+        float s = (float)i / 4.0f;
+        mat4 m;
+        tr_frame(world);
+        box_transform_local(&(Position){0, 0, 0}, NULL, &(Scale){s, s, s}, m);
+        tr_test_pose(world, null, child, m, &(Position){0, 1, 0}, NULL, NULL);
+    }
+
+    tr_frame(world);
+    tr_test_static(world, null, child);
+    tr_fini(world, null);
+}
+
+void Transition_transform_static_rekeys(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_singleton_set(world, LightBake, {.probe_spacing = 2});
+    ecs_entity_t e = tr_shape(world, 0, 0);
+    box_transition_set(world, e, ecs_id(Position), &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+    box_draw_batch_t *b = tr_batch(world, e);
+    test_assert(!b->key.dynamic_transform);
+    test_assert(b->key.bake);
+
+    ecs_set(world, e, Position, {4, 0, 0});
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        tr_frame(world);
+        b = tr_batch(world, e);
+        test_assert(b->key.dynamic_transform);
+        test_assert(!b->key.bake);
+    }
+
+    tr_frame(world);
+    b = tr_batch(world, e);
+    test_assert(!b->key.dynamic_transform);
+    test_assert(b->key.bake);
+    tr_test_static(world, null, e);
+    test_flt(box_draws_slot_transform(b, ecs_get(world, e, DrawSlot)->slot)->rows[0][3], 4);
+
+    tr_frame(world);
+    tr_test_static(world, null, e);
+    tr_fini(world, null);
+}
+
+void Transition_transform_delete_entity(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_entity_t e = tr_shape(world, 0, 0);
+    ecs_entity_t child = tr_shape(world, e, 1);
+    ecs_entity_t other = tr_shape(world, 0, 0);
+    box_transition_set(world, e, ecs_id(Position), &(TransitionSpec){ .duration = 1.0f });
+    box_transition_set(world, other, ecs_id(Position), &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+
+    ecs_set(world, e, Position, {4, 0, 0});
+    ecs_set(world, other, Position, {0, 4, 0});
+    tr_frame(world);
+    tr_frame(world);
+    ecs_delete(world, e);
+    test_assert(!ecs_is_alive(world, child));
+
+    int32_t i;
+    for (i = 2; i < 4; i ++) {
+        tr_frame(world);
+        tr_test_pose(world, null, other, NULL, &(Position){0, (float)i, 0}, NULL, NULL);
+    }
+
+    tr_frame(world);
+    tr_test_static(world, null, other);
+    test_int(box_render_transition_test_active(world), 0);
+    tr_frame(world);
+    test_int(tr_records(null, BOX_RENDER_TRANSITION_POSE), 0);
+    test_int(tr_records(null, BOX_RENDER_TRANSITION_SLOT), 0);
+    tr_fini(world, null);
+}
+
+void Transition_transform_delete_child(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_entity_t e = tr_shape(world, 0, 0);
+    ecs_entity_t a = tr_shape(world, e, 1);
+    ecs_entity_t b = tr_shape(world, e, 2);
+    box_transition_set(world, e, ecs_id(Position), &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+
+    ecs_set(world, e, Position, {4, 0, 0});
+    tr_frame(world);
+    tr_frame(world);
+    ecs_delete(world, a);
+
+    int32_t i;
+    for (i = 2; i < 4; i ++) {
+        mat4 m;
+        tr_frame(world);
+        tr_at((float)i, 0, 0, m);
+        tr_test_pose(world, null, e, NULL, &(Position){(float)i, 0, 0}, NULL, NULL);
+        tr_test_pose(world, null, b, m, &(Position){2, 0, 0}, NULL, NULL);
+    }
+
+    tr_frame(world);
+    tr_test_static(world, null, e);
+    tr_test_static(world, null, b);
+    tr_fini(world, null);
+}
+
+void Transition_transform_batch_moved(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_entity_t e = tr_shape(world, 0, 0);
+    ecs_entity_t child = tr_shape(world, e, 1);
+    box_transition_set(world, e, ecs_id(Position), &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+
+    ecs_set(world, e, Position, {4, 0, 0});
+    tr_frame(world);
+    tr_frame(world);
+    int32_t batch = ecs_get(world, e, DrawSlot)->batch;
+    int32_t child_batch = ecs_get(world, child, DrawSlot)->batch;
+    ecs_add(world, e, NoShadow);
+    ecs_set(world, child, BackFaceMode, {BackFacePlain});
+
+    int32_t i;
+    for (i = 2; i < 4; i ++) {
+        mat4 m;
+        tr_frame(world);
+        test_assert(ecs_get(world, e, DrawSlot)->batch != batch);
+        test_assert(ecs_get(world, child, DrawSlot)->batch != child_batch);
+        tr_at((float)i, 0, 0, m);
+        tr_test_pose(world, null, e, NULL, &(Position){(float)i, 0, 0}, NULL, NULL);
+        tr_test_pose(world, null, child, m, &(Position){1, 0, 0}, NULL, NULL);
+    }
+
+    tr_frame(world);
+    tr_test_static(world, null, e);
+    tr_test_static(world, null, child);
+    tr_fini(world, null);
+}
+
+void Transition_transform_prefab_instances(void) {
+    // engine_core/transition
+    enum { COUNT = 64 };
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_set(world, prefab, Box, {1, 1, 1});
+    ecs_set(world, prefab, Rgb, {10, 200, 30});
+    box_transition_set(world, prefab, ecs_id(Position), &(TransitionSpec){ .duration = 1.0f });
+    ecs_entity_t instances[COUNT];
+    int32_t i, j;
+    for (i = 0; i < COUNT; i ++) {
+        instances[i] = ecs_new_w_pair(world, EcsIsA, prefab);
+        ecs_set(world, instances[i], Position, {(float)i, 0, 0});
+    }
+
+    tr_frame(world);
+    for (i = 0; i < COUNT; i ++) {
+        ecs_set(world, instances[i], Position, {(float)i, 4, 0});
+    }
+
+    for (j = 0; j < 4; j ++) {
+        tr_frame(world);
+        test_int(box_render_transition_test_active(world), COUNT);
+        test_assert(!ecs_has_id(world, prefab, TransitionTransform));
+        for (i = 0; i < COUNT; i ++) {
+            tr_test_pose(world, null, instances[i], NULL, &(Position){(float)i, (float)j, 0},
+                NULL, NULL);
+        }
+    }
+
+    test_int(tr_records(null, BOX_RENDER_TRANSITION_POSE), COUNT);
+    test_int(tr_records(null, BOX_RENDER_TRANSITION_SLOT), COUNT);
+    tr_frame(world);
+    for (i = 0; i < COUNT; i ++) {
+        tr_test_static(world, null, instances[i]);
+    }
+
+    tr_fini(world, null);
+}
+
+void Transition_transform_targets_on_game_thread(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_entity_t e = tr_shape(world, 0, 0);
+    ecs_entity_t child = tr_shape(world, e, 0);
+    ecs_set(world, child, Position, {0, 3, 0});
+    box_transition_set(world, e, ecs_id(Position), &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+
+    ecs_set(world, e, Position, {4, 0, 0});
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        vec3 min, max;
+        tr_frame(world);
+        test_flt(ecs_get(world, e, WorldTransform)->m[3][0], 4);
+        test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 4);
+        test_flt(ecs_get(world, child, WorldTransform)->m[3][1], 3);
+        test_assert(box_spatial_bounds(world, e, NULL, min, max));
+        test_flt((min[0] + max[0]) * 0.5f, 4);
+        test_assert(box_spatial_bounds(world, child, NULL, min, max));
+        test_flt((min[0] + max[0]) * 0.5f, 4);
+
+        box_spatial_hit_t hit = {0};
+        box_spatial_ray_t ray = { .origin = {4, 0, 10}, .dir = {0, 0, -1} };
+        test_assert(box_spatial_ray(world, &ray, &hit));
+        test_uint(hit.entity, e);
+        if (i < 3) {
+            box_spatial_ray_t old = { .origin = {(float)i, 0, 10}, .dir = {0, 0, -1} };
+            hit = (box_spatial_hit_t){0};
+            test_assert(!box_spatial_ray(world, &old, &hit));
+        }
+    }
+
+    tr_fini(world, null);
 }

@@ -122,7 +122,8 @@ typedef struct box_draw_key_t {
     bool cutout;            /**< A 3D shape with AlphaCutoff, alpha tested */
     uint8_t back_face;      /**< BackFaceMode */
     uint8_t wrap;           /**< TextureWrap of the texture samplers */
-    bool dynamic_transform; /**< The shapes have DynamicTransform, owned or inherited, so the
+    bool dynamic_transform; /**< The shapes have DynamicTransform, owned or inherited, or are
+                             *   moved by a transform transition (TransitionTransform), so the
                              *   transforms upload every frame */
     bool dynamic_material;  /**< The shapes or a ChildOf ancestor have DynamicMaterial, so the
                              *   shading uploads every frame */
@@ -216,6 +217,10 @@ typedef struct box_draw_batch_t {
     bool bounded;           /**< A slot holds a parametric surface, see center and extent */
     float center[3];        /**< Center of the local bounds of every slot, when bounded */
     float extent[3];        /**< Half size of the local bounds of every slot, when bounded */
+    int64_t transform_frame; /**< Frame of the packet the transform stream of its run was last
+                             *   uploaded in */
+    uint32_t transform_data; /**< Offset of that upload in the packet data, where the transform
+                             *   of slot i starts at i * sizeof(box_render_transform_t) */
     ecs_vec_t entities;     /**< ecs_entity_t per slot */
     ecs_vec_t glyphs;       /**< int32_t per slot of a glyph batch, the glyph of its Text */
     ecs_vec_t transforms;   /**< box_render_transform_t per slot */
@@ -320,6 +325,14 @@ typedef struct box_render_draws_t {
     bool shadow_record;         /**< Record shadow_regions, while a scene keeps shadow tiles */
     int32_t refs;               /**< Observers and systems that use the state */
 } box_render_draws_t;
+
+/** Get the state of the draw extract of a world.
+ *
+ * @param world The world
+ * @return The state, NULL without the draw extract
+ */
+box_render_draws_t* box_draws_state(
+    const ecs_world_t *world);
 
 /** Fill the conversion tables of the instance data, once per process.
  */
