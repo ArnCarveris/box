@@ -602,7 +602,8 @@ static int32_t box_console_ui_input(
     box_console_spans(world, ui->line, &spans, 0, console);
     ecs_vec_fini_t(NULL, &spans, box_console_span_t);
     ecs_os_free(value);
-    ecs_os_free(head);
+    ecs_os_free(con->prompted);
+    con->prompted = head;
     rows = box_text_line(world, ui->line, 0, NULL, NULL);
     con->pending = con->pending || (!rows && box_console_font_loading(world, con));
     rows = rows > 0 ? rows : 1;
@@ -784,6 +785,18 @@ void box_console_ui_sync(
     if (con->pending) {
         con->pending = false;
         con->refresh = true;
+    }
+
+    if (con->prompted) {
+        bool root = !box_console_session_scope(world, con);
+        char *prompt = root ? NULL : box_console_prompt(world, con, NULL);
+        if (strcmp(root ? BOX_CONSOLE_ROOT BOX_CONSOLE_SYMBOL : prompt, con->prompted)) {
+            con->refresh = true;
+            ecs_os_free(con->colored);
+            con->colored = NULL;
+        }
+
+        ecs_os_free(prompt);
     }
 
     if (con->refresh && (!con->colored || strcmp(con->colored, con->line))) {

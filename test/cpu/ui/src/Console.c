@@ -877,6 +877,70 @@ void Console_lines_keep_scope(void) {
     ecs_fini(world);
 }
 
+void Console_prompt_scope_deleted(void) {
+    // console/prompt
+    ecs_world_t *world = console_open(640, 360, NULL);
+    ecs_entity_t line = ecs_lookup(world, CONSOLE_INPUT ".line");
+    ecs_entity_t parent = ecs_entity(world, { .name = "parent" });
+    ecs_os_free(box_console_run(world, "cd parent", NULL));
+    ecs_os_free(box_console_run(world, "pwd", NULL));
+    ecs_progress(world, 0);
+    test_str(console_value(world), "parent $ ");
+
+    // Deleting the scope outside a command moves the prompt back to the root without a key
+    ecs_delete(world, parent);
+    ecs_progress(world, 0);
+    test_str(console_value(world), CONSOLE_PROMPT);
+    test_int(ecs_get(world, line, Text)->hang, CONSOLE_PROMPT_LEN);
+
+    // The line that ran in the scope keeps its prompt
+    test_assert(console_find_line(world, "parent $ pwd") != 0);
+
+    ecs_fini(world);
+}
+
+void Console_prompt_scope_renamed(void) {
+    // console/prompt
+    ecs_world_t *world = console_open(640, 360, NULL);
+    ecs_entity_t parent = ecs_entity(world, { .name = "parent" });
+    ecs_os_free(box_console_run(world, "cd parent", NULL));
+    ecs_progress(world, 0);
+    console_type(world, "ls");
+    test_str(console_value(world), "parent $ ls");
+
+    // Renaming the scope shows the new name, the typed text stays
+    ecs_set_name(world, parent, "renamed");
+    ecs_progress(world, 0);
+    test_str(console_value(world), "renamed $ ls");
+    test_assert(console_find_line(world, CONSOLE_PROMPT "cd parent") != 0);
+
+    ecs_fini(world);
+}
+
+void Console_prompt_scope_moved(void) {
+    // console/prompt
+    ecs_world_t *world = console_open(640, 360, NULL);
+    ecs_entity_t child = ecs_entity(world, { .name = "parent.child" });
+    ecs_entity_t parent = ecs_get_target(world, child, EcsChildOf, 0);
+    ecs_entity_t other = ecs_entity(world, { .name = "other" });
+    ecs_os_free(box_console_run(world, "cd parent.child", NULL));
+    ecs_progress(world, 0);
+    test_str(console_value(world), "parent.child $ ");
+
+    // Moving the parent of the scope shows the new path
+    test_assert(parent != 0);
+    ecs_add_pair(world, parent, EcsChildOf, other);
+    ecs_progress(world, 0);
+    test_str(console_value(world), "other.parent.child $ ");
+
+    // Moving the scope itself does the same
+    ecs_add_pair(world, child, EcsChildOf, other);
+    ecs_progress(world, 0);
+    test_str(console_value(world), "other.child $ ");
+
+    ecs_fini(world);
+}
+
 void Console_ctrl_a_e(void) {
     // console/prompt
     ecs_world_t *world = console_open(640, 360, NULL);
