@@ -151,6 +151,12 @@
                     "incremental_hot_reload",
                     "incremental_parent_component"
                 ]
+            },
+            {
+                "id": "Projection",
+                "testcases": [
+                    "offscreen_surface_resize"
+                ]
             }
         ]
     }

@@ -44,9 +44,9 @@ ECS_STRUCT(TexturePath, {
     bool linear;    /**< The color channels hold linear light, not sRGB, default off: they are
                      *   encoded to sRGB on load, so the layers that decode color read them as
                      *   they are stored. Alpha is kept; leave it off for ORM and normal maps */
-    bool single_channel; /**< Load as an R8Unorm texture with mips, default off: the red channel
-                          *   (a grayscale image's gray) as stored, not display encoded; linear
-                          *   has no effect. Layers sample it as (r, 0, 0, 1) */
+    bool single_channel; /**< Load as R8Unorm with mips, default off: the red channel as stored,
+                          *   linear has no effect. Layers, UI images, particle sprites and other
+                          *   bindings of its Texture sample it as (r, 0, 0, 1), as WebGPU does */
 });
 
 /** Progress of the load of a TexturePath */

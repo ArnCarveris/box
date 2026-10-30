@@ -218,3 +218,76 @@ void TextureSingleChannel_resized(void) {
 
     ecs_fini(world);
 }
+
+/** Real allocation functions, restored after cpu_copy_size */
+static ecs_os_api_malloc_t real_malloc;
+static ecs_os_api_realloc_t real_realloc;
+static ecs_os_api_calloc_t real_calloc;
+
+/** Last buffer allocated or reallocated and its size in bytes */
+static void *last_ptr;
+static ecs_size_t last_size;
+
+static void* record_malloc(
+    ecs_size_t size)
+{
+    last_ptr = real_malloc(size);
+    last_size = size;
+
+    return last_ptr;
+}
+
+static void* record_realloc(
+    void *ptr,
+    ecs_size_t size)
+{
+    last_ptr = real_realloc(ptr, size);
+    last_size = size;
+
+    return last_ptr;
+}
+
+static void* record_calloc(
+    ecs_size_t size)
+{
+    last_ptr = real_calloc(size);
+    last_size = size;
+
+    return last_ptr;
+}
+
+void TextureSingleChannel_cpu_copy_size(void) {
+    // materials/textures
+    ecs_world_t *world = ecs_init();
+    static const int32_t widths[2] = { 0, 8 };
+    static const int32_t sizes[2] = { 4 * 2, 8 * 4 };
+    int32_t i;
+    for (i = 0; i < 2; i ++) {
+        box_texture_job_t job = {
+            .path = RGB_PNG, .request_width = widths[i], .single_channel = true };
+
+        real_malloc = ecs_os_api.malloc_;
+        real_realloc = ecs_os_api.realloc_;
+        real_calloc = ecs_os_api.calloc_;
+        ecs_os_api.malloc_ = record_malloc;
+        ecs_os_api.realloc_ = record_realloc;
+        ecs_os_api.calloc_ = record_calloc;
+        last_ptr = NULL;
+        last_size = 0;
+        box_texture_decode(&job);
+        ecs_os_api.malloc_ = real_malloc;
+        ecs_os_api.realloc_ = real_realloc;
+        ecs_os_api.calloc_ = real_calloc;
+
+        test_assert(job.error == NULL);
+        test_assert(job.pixels != NULL);
+        test_int(job.width * job.height, sizes[i]);
+        test_assert(last_ptr == job.pixels);
+        test_int(last_size, sizes[i]);
+
+        ecs_os_free(job.pixels);
+        ecs_os_free(job.file);
+    }
+
+    ecs_fini(world);
+}
