@@ -23,7 +23,7 @@ Sizes are in bytes, and MB is 10^6 bytes.
   there are live instances. In the shipped scenes the 64 slot minimum run of small batches adds
   more.
 - A shape that owned a material component got an 80 byte record of its own in the material
-  table. In the Extract bench the table held 100,001 records whose contents take only 2 distinct
+  table. In the Extract bench the table held 100,001 records whose contents took only 2 distinct
   values. The table now shares records by content (O1, implemented) and holds 2.
 - The transform stream cannot shrink without loss. 23% of the instances of the Japanese garden
   scene have a sheared model matrix, which a TRS encoding cannot hold.
@@ -479,11 +479,12 @@ invocation: 97 words for a surface entry. That loop also shrinks with S1 and S2.
 A batch keeps a CPU copy of every stream of every slot (`transforms`, `shadings` or
 `mesh_shadings`, and `surfaces`). For a mesh slot that is 448 bytes, of which 384 are the
 surface. Every upload is copied into the packet data, then into the backend's write. The
-Extract setup packet carries 55.7 MB of data. `ShapeMesh` is another 464 bytes per entity, 400
-of which is `box_surface_data_t`. These copies do not reach the GPU, but they are on the path to
-it and count against memory: the 1M scenes did not fit in the job's 2 GiB. S1 and S2 drop the
-CPU surface copy of 2D and plain batches, saving 42 MB in Extract. `ShapeMesh` belongs to
-`box.geometry` and is out of scope here.
+Extract setup packet carried 57.3 MB of data before O1: 49.3 MB of streams and 8.0 MB of
+material records. With O1 the records take 160 bytes, and the packet carries 49.3 MB.
+`ShapeMesh` is another 464 bytes per entity, 400 of which is `box_surface_data_t`. These
+copies do not reach the GPU, but they are on the path to it and count against memory: the 1M
+scenes did not fit in the job's 2 GiB. S1 and S2 drop the CPU surface copy of 2D and plain
+batches, saving 42 MB in Extract. `ShapeMesh` belongs to `box.geometry` and is out of scope here.
 
 ## Ranked recommendations
 
