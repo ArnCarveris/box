@@ -1405,6 +1405,42 @@ void Transition_transform_position(void) {
     tr_fini(world, null);
 }
 
+void Transition_disable_drawn_entity(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_entity_t e = tr_shape(world, 0, 0);
+    box_transition_set(world, e, ecs_id(Position), &(TransitionSpec){ .duration = 1.0f });
+    box_transition_set(world, e, ecs_id(Rgb), &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+
+    ecs_set(world, e, Position, {4, 0, 0});
+    ecs_set(world, e, Rgb, {0, 0, 0});
+    tr_frames(world, 3);
+    test_assert(ecs_has_id(world, e, TransitionTransform));
+    test_int(box_render_transition_test_active(world), 1);
+
+    ecs_enable(world, e, false);
+    tr_frame(world);
+    test_int(box_render_transition_test_node(world, e), 0);
+    test_int(box_render_transition_test_active(world), 0);
+    test_assert(!ecs_has_id(world, e, TransitionTransform));
+    test_assert(!ecs_has_id(world, e, TransitionMaterial));
+    test_assert(!ecs_has_id(world, e, TransitionOpacity));
+    tr_frame(world);
+
+    ecs_enable(world, e, true);
+    tr_frame(world);
+    test_assert(box_render_transition_test_node(world, e) != 0);
+    test_int(box_render_transition_test_active(world), 0);
+    test_int(tr_rgb(world, e).r, 0);
+    tr_test_static(world, null, e);
+    tr_frame(world);
+    tr_test_static(world, null, e);
+
+    tr_fini(world, null);
+}
+
 void Transition_transform_rotation(void) {
     // engine_core/transition
     box_render_null_t *null;

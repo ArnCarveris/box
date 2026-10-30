@@ -378,6 +378,7 @@
                     "disable_entity_snaps",
                     "disabled_write_no_animation",
                     "enable_animates_again",
+                    "disable_drawn_entity",
                     "node_reuse",
                     "remove_entry_snaps",
                     "prefab_instances_own_state",
