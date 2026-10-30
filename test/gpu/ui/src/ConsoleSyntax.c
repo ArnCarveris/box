@@ -85,6 +85,27 @@ static void syntax_press(
     syntax_flush(world);
 }
 
+/** Get the bytes of the prompt in front of the string of an element: the scope of the session
+ * and $ on the input line and on lines that ran, which start with a scope without spaces and
+ * " $ ", nothing on output lines.
+ *
+ * @param world The world
+ * @param e The element
+ * @return The bytes
+ */
+static int32_t syntax_prompt(
+    ecs_world_t *world,
+    ecs_entity_t e)
+{
+    const Text *t = ecs_get(world, e, Text);
+    const char *sym = t && t->value ? strstr(t->value, " $ ") : NULL;
+    bool input = e == ecs_lookup(world, SYNTAX_INPUT ".line");
+    bool command = sym && sym > t->value && strchr(t->value, ' ') == sym;
+    test_assert(!input || sym != NULL);
+
+    return input || command ? (int32_t)(sym - t->value) + 3 : 0;
+}
+
 /** Get the input line of the console, after its prompt.
  *
  * @param world The world
@@ -93,11 +114,11 @@ static void syntax_press(
 static const char* syntax_input(
     ecs_world_t *world)
 {
-    const Text *t = ecs_get(world, ecs_lookup(world, SYNTAX_INPUT ".line"), Text);
+    ecs_entity_t e = ecs_lookup(world, SYNTAX_INPUT ".line");
+    const Text *t = ecs_get(world, e, Text);
     test_assert(t != NULL && t->value != NULL);
-    test_assert(!strncmp(t->value, "> ", 2));
 
-    return t->value + 2;
+    return t->value + syntax_prompt(world, e);
 }
 
 /** Get the byte of the input line the cursor of the console sits before, from the caret of
@@ -117,7 +138,7 @@ static int32_t syntax_cursor(
     int32_t i, len = (int32_t)strlen(syntax_input(world)), result = -1;
     for (i = 0; i <= len && result < 0; i ++) {
         TextCaret caret;
-        test_assert(box_text_caret(world, line, 2 + i, &caret));
+        test_assert(box_text_caret(world, line, syntax_prompt(world, line) + i, &caret));
         float y = (float)caret.line * c->line_height + (c->line_height - c->font_size) * 0.5f;
         if (fabsf(caret.x + half - item->x) < 0.01f && fabsf(item->y + y) < 0.01f) {
             result = i;
@@ -198,7 +219,8 @@ static ecs_entity_t syntax_find_line(
     return result;
 }
 
-/** Get the number of TextSpans of an element.
+/** Get the number of TextSpans of an element after its prompt, so not the spans of the scope
+ * and $ of the prompt.
  *
  * @param world The world
  * @param e The element
@@ -209,11 +231,16 @@ static int32_t syntax_count(
     ecs_entity_t e)
 {
     const TextSpans *ts = ecs_get(world, e, TextSpans);
+    int32_t i, result = 0, prompt = syntax_prompt(world, e);
+    for (i = 0; ts && i < ecs_vec_count(&ts->spans); i ++) {
+        result += ecs_vec_get_t(&ts->spans, TextSpan, i)->start >= prompt;
+    }
 
-    return ts ? ecs_vec_count(&ts->spans) : 0;
+    return result;
 }
 
-/** Check a span of an element. On the input line the bytes count from after the prompt.
+/** Check a span of an element. On the input line and on lines that ran the bytes count from
+ * after the prompt, whose spans come after those of the line.
  *
  * @param world The world
  * @param e The element
@@ -234,7 +261,7 @@ static void syntax_span(
     test_assert(ts != NULL);
     test_assert(i < ecs_vec_count(&ts->spans));
     const TextSpan *s = ecs_vec_get_t(&ts->spans, TextSpan, i);
-    int32_t shift = e == ecs_lookup(world, SYNTAX_INPUT ".line") ? 2 : 0;
+    int32_t shift = syntax_prompt(world, e);
     test_int(s->start, start + shift);
     test_int(s->end, end + shift);
     test_int(s->color.r, color.r);
@@ -326,10 +353,10 @@ void ConsoleSyntax_console_command(void) {
     ecs_os_free(box_console_run(world, "cls x", NULL));
     ecs_progress(world, 0);
     ecs_entity_t echo = syntax_log_line(world, 1);
-    test_str(ecs_get(world, echo, Text)->value, "> cls x");
+    test_str(ecs_get(world, echo, Text)->value, "~ $ cls x");
     test_int(syntax_count(world, echo), 2);
-    syntax_span(world, echo, 0, 2, 5, c->name);
-    syntax_span(world, echo, 1, 6, 7, c->extra);
+    syntax_span(world, echo, 0, 0, 3, c->name);
+    syntax_span(world, echo, 1, 4, 5, c->extra);
 
     ecs_fini(world);
 }
@@ -576,23 +603,23 @@ void ConsoleSyntax_echoed_keeps_colors(void) {
     ecs_os_free(box_console_run(world, "rm things.beta", NULL));
     ecs_progress(world, 0);
     test_assert(ecs_lookup(world, "things.beta") == 0);
-    ecs_entity_t rm = syntax_find_line(world, "> rm things.beta");
+    ecs_entity_t rm = syntax_find_line(world, "~ $ rm things.beta");
     test_int(syntax_count(world, rm), 2);
-    syntax_span(world, rm, 0, 2, 4, c->name);
-    syntax_span(world, rm, 1, 5, 16, c->entity);
+    syntax_span(world, rm, 0, 0, 2, c->name);
+    syntax_span(world, rm, 1, 3, 14, c->entity);
 
     ecs_delete(world, alpha);
     syntax_type(world, "get things.alpha");
     syntax_span(world, syntax_before(world), 1, 4, 16, c->missing);
-    ecs_entity_t get = syntax_find_line(world, "> get things.alpha");
-    syntax_span(world, get, 1, 6, 18, c->entity);
+    ecs_entity_t get = syntax_find_line(world, "~ $ get things.alpha");
+    syntax_span(world, get, 1, 4, 16, c->entity);
 
     syntax_press(world, KeyPageUp, 1);
     syntax_press(world, KeyPageDown, 1);
-    get = syntax_find_line(world, "> get things.alpha");
-    syntax_span(world, get, 1, 6, 18, c->entity);
-    rm = syntax_find_line(world, "> rm things.beta");
-    syntax_span(world, rm, 1, 5, 16, c->entity);
+    get = syntax_find_line(world, "~ $ get things.alpha");
+    syntax_span(world, get, 1, 4, 16, c->entity);
+    rm = syntax_find_line(world, "~ $ rm things.beta");
+    syntax_span(world, rm, 1, 3, 14, c->entity);
 
     ecs_fini(world);
 }
@@ -606,7 +633,7 @@ void ConsoleSyntax_output_lines_by_type(void) {
     ecs_os_free(box_console_run(world, "ls things", NULL));
     ecs_progress(world, 0);
     ecs_entity_t line = syntax_log_line(world, 1);
-    test_str(ecs_get(world, line, Text)->value, "> ls things");
+    test_str(ecs_get(world, line, Text)->value, "~ $ ls things");
     test_int(syntax_count(world, line), 2);
 
     // Output takes the colors of Console.output, not those of command lines
@@ -690,8 +717,8 @@ void ConsoleSyntax_session_plain_text(void) {
     syntax_press(world, KeyEnter, 1);
     ecs_os_free(box_console_run(world, "ls \"things\"", NULL));
     ecs_progress(world, 0);
-    test_int(syntax_count(world, syntax_find_line(world, "> ls things")), 2);
-    test_int(syntax_count(world, syntax_find_line(world, "> ls \"things\"")), 2);
+    test_int(syntax_count(world, syntax_find_line(world, "~ $ ls things")), 2);
+    test_int(syntax_count(world, syntax_find_line(world, "~ $ ls \"things\"")), 2);
 
     ecs_entity_t session = ecs_lookup(world, BOX_CONSOLE_SESSION);
     const EcsCommandSession *cs = ecs_get(world, session, EcsCommandSession);

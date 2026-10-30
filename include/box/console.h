@@ -3,14 +3,20 @@
  * @brief The in game console: an overlay that runs command lines in a flecs shell session.
  *
  * The toggle action (the grave key) opens and closes it. The console is UI content in its own
- * scene, drawn by its own view after every other view (at
- * BOX_VIEW_ORDER_CONSOLE), and takes the keyboard while open.
+ * scene, drawn by its own view after every other view (BOX_VIEW_ORDER_CONSOLE), and takes the
+ * keyboard while open. The first time it opens, a hint line starts the scrollback.
  *
+<<<<<<< HEAD
  * The console runs cls itself, so it never reaches the session: cls empties the scrollback and
  * Ctrl+L does the same without touching the input line. help in the console lists cls too.
  * Command lines are colored in the console only (ConsoleSyntax), never in sessions or logs.
  * Output is colored by the type of the result of the command (ConsoleOutput), like the terminal
  * of the flecs explorer, while box_command_run and HTTP sessions keep returning plain text.
+=======
+ * The prompt is bash-like, the scope of the session (~ at the root) and $, and every line that ran
+ * keeps its prompt. The console runs cls itself, help lists it too. Command lines are colored in
+ * the console only (ConsoleSyntax), never in sessions or logs.
+>>>>>>> 816d88441d159d7df3215ee7b1f1f6a2d512c8dd
  */
 
 #ifndef BOX_CONSOLE_H
@@ -62,6 +68,9 @@ ECS_STRUCT(ConsoleSyntax, {
     rgb boolean;    /**< Argument of a bool parameter, true or false in a value expression */
     rgb value;      /**< Value expression in brackets: {...}, [...] or (...) */
     rgb extra;      /**< Argument beyond the parameters of the command */
+    rgb scope;      /**< Scope of the session in the prompt, ~ at the root */
+    rgb symbol;     /**< The $ of the prompt */
+    rgb ghost;      /**< Rest of the history line the input line starts, drawn after the cursor */
 });
 
 /** Colors of the output of commands in the console, as Console.output.
@@ -106,9 +115,9 @@ ECS_STRUCT(ConsoleOutput, {
  * its resizes, a fraction of zero or less is a panel of zero size, one or more fills the axis.
  * Lines wrap at its width minus the padding, their rows under the prompt or the indentation.
  *
- * While open, typed and pasted text (Input.paste) and key presses go to the input line and no
- * action but the toggle sees the keyboard or mouse buttons. Enter runs the line, Up and Down walk
- * the lines that ran, Page Up, Page Down and the wheel scroll rows, Escape or the toggle close it.
+ * While open, text and key presses go to the input line and only the toggle sees the keyboard.
+ * Enter runs, Up/Down walk the history, Right/End accept the suggestion, Ctrl+A/E/U/K/W/C/L edit
+ * like readline, Page Up/Down and the wheel scroll and Escape closes, see the README console keys.
  */
 ECS_STRUCT(Console, {
     bool open;           /**< Shown and taking the keyboard, the toggle action flips it */
@@ -154,6 +163,19 @@ char* box_console_run(
     ecs_world_t *world,
     const char *line,
     bool *error);
+
+/** Type text into the input line of the console at the cursor, as if it was typed.
+ *
+ * Control characters are dropped. box.console.type(text) does the same in a script, which
+ * shows a line being typed, with its history suggestion, without input events.
+ *
+ * @param world The world
+ * @param text UTF-8 text
+ * @return The input line, which the caller frees
+ */
+char* box_console_type(
+    ecs_world_t *world,
+    const char *text);
 
 #ifdef __cplusplus
 }

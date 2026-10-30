@@ -877,3 +877,157 @@ void Msdf_reflex_corner(void) {
     test_int(sharp, 0);
     ecs_os_free(pixels);
 }
+
+/** More outlines with reflex and acute corners, checked like Msdf_reflex_corner: "M", "N", "W",
+ * "X" and "k" at BOX_TEXT_EM texels per 2000 units, and an acute "V" notch cut into a block at
+ * 16 texels per 2000 units, where the tip of the notch is a fraction of a texel wide. The arms
+ * of the "k" meet in a notch next to the stem, between the notches at the stem, as those of the
+ * "K" of Msdf_reflex_corner do. The clash of the channels
+ * shows where a corner lies close to a texel row or column, so each outline is placed with one
+ * of its corners a small fraction of a texel off the texel centers or off the middle between
+ * them, at several such offsets. Where the outline is at least a quarter texel away, the
+ * interpolated median is on its side by at least a sixteenth of a texel; where it is at least a
+ * 32nd of a texel away, the median is on its side. */
+void Msdf_corner_shapes(void) {
+    const struct {
+        const char *name;
+        double scale;
+        double corner[2];
+        int32_t count;
+        double points[16][2];
+    } shapes[] = {
+        {"M", 40.0 / 2000.0, {700, 500}, 13, {
+            {150, 0}, {150, 1500}, {400, 1500}, {700, 500}, {1000, 1500}, {1250, 1500},
+            {1250, 0}, {1060, 0}, {1060, 900}, {780, 250}, {620, 250}, {340, 900}, {340, 0}
+        }},
+        {"N", 40.0 / 2000.0, {1040, 380}, 10, {
+            {150, 0}, {150, 1500}, {370, 1500}, {1040, 380}, {1040, 1500}, {1230, 1500},
+            {1230, 0}, {1010, 0}, {340, 1120}, {340, 0}
+        }},
+        {"W", 40.0 / 2000.0, {580, 330}, 13, {
+            {50, 1500}, {310, 1500}, {580, 330}, {880, 1500}, {1120, 1500}, {1420, 330},
+            {1690, 1500}, {1950, 1500}, {1530, 0}, {1300, 0}, {1000, 1100}, {700, 0}, {470, 0}
+        }},
+        {"X", 40.0 / 2000.0, {560, 760}, 12, {
+            {60, 0}, {560, 760}, {80, 1500}, {310, 1500}, {650, 850}, {990, 1500},
+            {1220, 1500}, {740, 760}, {1240, 0}, {1010, 0}, {650, 670}, {290, 0}
+        }},
+        {"k", 40.0 / 2000.0, {400, 640}, 13, {
+            {150, 0}, {150, 1600}, {340, 1600}, {340, 690}, {760, 1100}, {990, 1100},
+            {560, 700}, {400, 640}, {570, 580}, {1010, 0}, {790, 0}, {340, 590}, {340, 0}
+        }},
+        {"V", 16.0 / 2000.0, {600, 700}, 7, {
+            {0, 0}, {0, 1500}, {400, 1500}, {600, 700}, {800, 1500}, {1200, 1500}, {1200, 0}
+        }}
+    };
+
+    // Fraction of a texel at which the chosen corner lands, in x and y
+    const double offsets[][2] = {
+        {13.0 / 32.0, 5.0 / 32.0}, {1.0 / 32.0, 15.0 / 32.0},
+        {31.0 / 32.0, 17.0 / 32.0}, {15.0 / 32.0, 31.0 / 32.0},
+        {17.0 / 32.0, 17.0 / 32.0}, {13.0 / 32.0, 1.0 / 32.0}, {9.0 / 32.0, 29.0 / 32.0}
+    };
+
+    int32_t shape_count = (int32_t)(sizeof(shapes) / sizeof(shapes[0]));
+    int32_t offset_count = (int32_t)(sizeof(offsets) / sizeof(offsets[0]));
+    int32_t n, o, i, s, x, y, c, checked = 0, wrong = 0, sharp = 0;
+    for (n = 0; n < shape_count; n ++) {
+        const double (*outline)[2] = shapes[n].points;
+        int32_t count = shapes[n].count;
+        double scale = shapes[n].scale, pad = 3.0;
+        double minx = 1e30, maxx = -1e30, miny = 1e30, maxy = -1e30;
+        for (i = 0; i < count; i ++) {
+            minx = fmin(minx, outline[i][0]);
+            maxx = fmax(maxx, outline[i][0]);
+            miny = fmin(miny, outline[i][1]);
+            maxy = fmax(maxy, outline[i][1]);
+        }
+
+        for (o = 0; o < offset_count; o ++) {
+            // Place the corner at the offset from a texel boundary of the field
+            double kx = shapes[n].corner[0], ky = shapes[n].corner[1];
+            double left = kx - (floor((kx - minx) * scale + pad) + offsets[o][0]) / scale;
+            double top = ky + (floor((maxy - ky) * scale + pad) + offsets[o][1]) / scale;
+            box_msdf_raster_t raster = {
+                .scale = scale, .left = left, .top = top,
+                .width = (int32_t)ceil((maxx - left) * scale + pad),
+                .height = (int32_t)ceil((top - miny) * scale + pad),
+                .range = 4.0
+            };
+            int32_t bytes = raster.width * raster.height * 4;
+
+            box_msdf_shape_t shape;
+            box_msdf_shape_init(&shape);
+            box_msdf_move_to(&shape, outline[0][0], outline[0][1]);
+            for (i = 1; i <= count; i ++) {
+                box_msdf_line_to(&shape, outline[i % count][0], outline[i % count][1]);
+            }
+
+            box_msdf_shape_finish(&shape);
+            uint8_t *pixels = ecs_os_malloc_n(uint8_t, bytes);
+            box_msdf_generate(&shape, &raster, pixels);
+            box_msdf_shape_fini(&shape);
+
+            // Interpolate the field at 32 by 32 points per texel between the texel centers
+            int32_t case_checked = 0, case_wrong = 0, case_sharp = 0;
+            for (y = 0; y < (raster.height - 1) * 32; y ++) {
+                for (x = 0; x < (raster.width - 1) * 32; x ++) {
+                    double u = 0.5 + (x + 0.5) / 32.0, v = 0.5 + (y + 0.5) / 32.0;
+                    double cx = raster.left + u / raster.scale;
+                    double cy = raster.top - v / raster.scale;
+                    double dist = 1e30;
+                    bool inside = false;
+                    for (s = 0; s < count; s ++) {
+                        double ax = outline[s][0], ay = outline[s][1];
+                        double dx = outline[(s + 1) % count][0] - ax;
+                        double dy = outline[(s + 1) % count][1] - ay;
+                        double t = ((cx - ax) * dx + (cy - ay) * dy) / (dx * dx + dy * dy);
+                        t = t < 0.0 ? 0.0 : (t > 1.0 ? 1.0 : t);
+                        double ex = ax + t * dx - cx, ey = ay + t * dy - cy;
+                        dist = fmin(dist, sqrt(ex * ex + ey * ey));
+                        if ((ay > cy) != (ay + dy > cy) && ax + (cy - ay) * dx / dy > cx) {
+                            inside = !inside;
+                        }
+                    }
+
+                    if (dist * raster.scale < 1.0 / 32.0) {
+                        continue;
+                    }
+
+                    int32_t tx = (int32_t)floor(u - 0.5), ty = (int32_t)floor(v - 0.5);
+                    double fx = u - 0.5 - tx, fy = v - 0.5 - ty, ch[3];
+                    for (c = 0; c < 3; c ++) {
+                        const uint8_t *t = &pixels[(ty * raster.width + tx) * 4 + c];
+                        const uint8_t *b = t + raster.width * 4;
+                        ch[c] = ((t[0] * (1.0 - fx) + t[4] * fx) * (1.0 - fy) +
+                            (b[0] * (1.0 - fx) + b[4] * fx) * fy) / 255.0;
+                    }
+
+                    double median = fmax(fmin(ch[0], ch[1]), fmin(fmax(ch[0], ch[1]), ch[2]));
+                    double field = (median - 0.5) * raster.range;
+                    case_sharp += inside ? field <= 0.0 : field >= 0.0;
+                    if (dist * raster.scale >= 0.25) {
+                        case_checked ++;
+                        case_wrong += inside ? field < 1.0 / 16.0 : field > -1.0 / 16.0;
+                    }
+                }
+            }
+
+            if (!case_checked || case_wrong || case_sharp) {
+                printf("Msdf corner shape %s at offset (%g, %g): checked %d, wrong %d, sharp %d\n",
+                    shapes[n].name, offsets[o][0], offsets[o][1],
+                    case_checked, case_wrong, case_sharp);
+            }
+
+            test_assert(case_checked > 0);
+            checked += case_checked;
+            wrong += case_wrong;
+            sharp += case_sharp;
+            ecs_os_free(pixels);
+        }
+    }
+
+    test_assert(checked > 0);
+    test_int(wrong, 0);
+    test_int(sharp, 0);
+}

@@ -49,6 +49,18 @@ static int32_t box_console_prev(
     return result;
 }
 
+/** Stop walking the history, so the next Up filters on the line as it is then.
+ *
+ * @param con The console state
+ */
+static void box_console_history_leave(
+    box_console_t *con)
+{
+    con->history_at = ecs_vec_count(&con->history);
+    ecs_os_free(con->draft);
+    con->draft = NULL;
+}
+
 /** Insert bytes at the cursor and move the cursor after them.
  *
  * @param con The console state
@@ -71,6 +83,7 @@ static void box_console_insert(
     con->length += size;
     con->cursor += size;
     con->refresh = true;
+    box_console_history_leave(con);
 done:
     return;
 }
@@ -91,6 +104,7 @@ static void box_console_erase(
         con->length -= to - from;
         con->cursor = from;
         con->refresh = true;
+        box_console_history_leave(con);
     }
 }
 
@@ -110,19 +124,16 @@ static void box_console_set_line(
     con->refresh = true;
 }
 
-/** Insert the printable part of the text typed since the last update.
- *
- * @param con The console state
- */
-static void box_console_type(
-    box_console_t *con)
+void box_console_insert_text(
+    box_console_t *con,
+    const char *text,
+    int32_t size)
 {
-    const char *typed = ecs_vec_first(&con->typed);
-    int32_t i, start = 0, count = ecs_vec_count(&con->typed);
-    for (i = 0; i <= count; i ++) {
-        unsigned char ch = i < count ? (unsigned char)typed[i] : 0;
+    int32_t i, start = 0;
+    for (i = 0; i <= size; i ++) {
+        unsigned char ch = i < size ? (unsigned char)text[i] : 0;
         if ((ch < 0x20 || ch == 0x7f) && i > start) {
-            box_console_insert(con, &typed[start], i - start);
+            box_console_insert(con, &text[start], i - start);
         }
 
         if (ch < 0x20 || ch == 0x7f) {
@@ -131,50 +142,94 @@ static void box_console_type(
     }
 }
 
-/** Show an older line of the history, keeping the line being edited as the draft.
+/** Test whether a line of the history starts with the line typed before the walk.
+ *
+ * @param con The console state
+ * @param at The line of the history
+ * @return Whether the walk shows it
+ */
+static bool box_console_history_match(
+    const box_console_t *con,
+    int32_t at)
+{
+    const char *line = ecs_vec_get_t(&con->history, char*, at)[0];
+    const char *filter = con->draft ? con->draft : "";
+
+    return !strncmp(line, filter, strlen(filter));
+}
+
+/** Show an older line of the history that starts with the line typed before the first Up,
+ * keeping that line as the draft.
  *
  * @param con The console state
  */
 static void box_console_history_prev(
     box_console_t *con)
 {
-    int32_t count = ecs_vec_count(&con->history);
-    if (con->history_at <= 0) {
-        goto done;
-    }
-
+    int32_t at, count = ecs_vec_count(&con->history);
     if (con->history_at >= count) {
         ecs_os_free(con->draft);
         con->draft = ecs_os_strdup(con->line);
+        con->history_at = count;
     }
 
-    con->history_at --;
-    box_console_set_line(con, ecs_vec_get_t(&con->history, char*, con->history_at)[0]);
-done:
-    return;
+    for (at = con->history_at - 1; at >= 0 && !box_console_history_match(con, at); at --) { }
+    if (at >= 0) {
+        con->history_at = at;
+        box_console_set_line(con, ecs_vec_get_t(&con->history, char*, at)[0]);
+    }
+
+    if (con->history_at >= count) {
+        box_console_history_leave(con);
+    }
 }
 
-/** Show a newer line of the history, or the draft after the newest one.
+/** Show a newer line of the history that starts with the draft, or the draft after the newest
+ * one.
  *
  * @param con The console state
  */
 static void box_console_history_next(
     box_console_t *con)
 {
-    int32_t count = ecs_vec_count(&con->history);
+    int32_t at, count = ecs_vec_count(&con->history);
     if (con->history_at >= count) {
         goto done;
     }
 
-    con->history_at ++;
-    if (con->history_at == count) {
-        box_console_set_line(con, con->draft);
+    for (at = con->history_at + 1; at < count && !box_console_history_match(con, at); at ++) { }
+    if (at < count) {
+        con->history_at = at;
+        box_console_set_line(con, ecs_vec_get_t(&con->history, char*, at)[0]);
     } else {
-        box_console_set_line(con, ecs_vec_get_t(&con->history, char*, con->history_at)[0]);
+        box_console_set_line(con, con->draft);
+        box_console_history_leave(con);
     }
 
 done:
     return;
+}
+
+const char* box_console_ghost(
+    const box_console_t *con)
+{
+    const char *result = NULL;
+    int32_t at = ecs_vec_count(&con->history) - 1;
+    if (!con->length || con->cursor != con->length || con->history_at < at + 1) {
+        goto done;
+    }
+
+    for (; at >= 0 && !result; at --) {
+        const char *line = ecs_vec_get_t(&con->history, char*, at)[0];
+        if ((int32_t)strlen(line) > con->length &&
+            !strncmp(line, con->line, (size_t)con->length))
+        {
+            result = &line[con->length];
+        }
+    }
+
+done:
+    return result;
 }
 
 /** Add a line to the history unless it repeats the newest one, and leave the history walk.
@@ -197,9 +252,7 @@ static void box_console_history_add(
         ecs_vec_append_t(NULL, &con->history, char*)[0] = ecs_os_strdup(line);
     }
 
-    con->history_at = ecs_vec_count(&con->history);
-    ecs_os_free(con->draft);
-    con->draft = NULL;
+    box_console_history_leave(con);
 }
 
 /** Free the text and spans of a scrollback line.
@@ -265,6 +318,8 @@ static void box_console_append(
         box_console_line_t *l = ecs_vec_append_t(NULL, &con->lines, box_console_line_t);
         l->kind = kind;
         l->rows = 0;
+        l->hang = shift ? shift : (int32_t)strspn(p, " \t");
+        l->hang = l->hang < size + shift ? l->hang : size + shift;
         ecs_vec_init_t(NULL, &l->spans, box_console_span_t, 0);
         box_console_line_spans(l, spans, (int32_t)(p - text), size, shift);
         if (first && prefix) {
@@ -279,6 +334,98 @@ static void box_console_append(
             p ++;
         }
     }
+}
+
+static void box_console_trim(
+    ecs_world_t *world,
+    box_console_t *con);
+
+/** Append a line that ran or was abandoned to the scrollback after the prompt it was typed
+ * at, which the line keeps with the colors of its scope and $.
+ *
+ * @param con The console state
+ * @param prompt The prompt
+ * @param prompt_spans The box_console_span_t of the prompt
+ * @param line The command line
+ * @param spans The box_console_span_t of the command line
+ * @param suffix Text after the line, NULL for none
+ */
+static void box_console_echo(
+    box_console_t *con,
+    const char *prompt,
+    const ecs_vec_t *prompt_spans,
+    const char *line,
+    const ecs_vec_t *spans,
+    const char *suffix)
+{
+    int32_t i, first = ecs_vec_count(&con->lines);
+    char *text = flecs_asprintf("%s%s", line, suffix ? suffix : "");
+    box_console_line_t *l;
+    box_console_append(con, prompt, text, BoxConsoleCommand, spans);
+    l = ecs_vec_get_t(&con->lines, box_console_line_t, first);
+    for (i = 0; i < ecs_vec_count(prompt_spans); i ++) {
+        *ecs_vec_append_t(NULL, &l->spans, box_console_span_t) =
+            *ecs_vec_get_t(prompt_spans, box_console_span_t, i);
+    }
+
+    ecs_os_free(text);
+}
+
+/** Append the input line to the scrollback after the current prompt, with ^C after it, and
+ * clear it without running it.
+ *
+ * @param world The world
+ * @param con The console state
+ */
+static void box_console_interrupt(
+    ecs_world_t *world,
+    box_console_t *con)
+{
+    ecs_vec_t spans, prompt_spans;
+    char *prompt;
+    ecs_vec_init_t(NULL, &spans, box_console_span_t, 0);
+    ecs_vec_init_t(NULL, &prompt_spans, box_console_span_t, 0);
+    box_console_syntax(world, con, con->line, &spans);
+    prompt = box_console_prompt(world, con, &prompt_spans);
+    box_console_echo(con, prompt, &prompt_spans, con->line, &spans, BOX_CONSOLE_INTERRUPT);
+    ecs_vec_fini_t(NULL, &spans, box_console_span_t);
+    ecs_vec_fini_t(NULL, &prompt_spans, box_console_span_t);
+    ecs_os_free(prompt);
+    box_console_set_line(con, "");
+    box_console_history_leave(con);
+    box_console_trim(world, con);
+    con->scroll = 0;
+}
+
+void box_console_greet(
+    ecs_world_t *world,
+    box_console_t *con)
+{
+    const char *hint = BOX_CONSOLE_HINT;
+    const char *help = strstr(hint, " " BOX_CONSOLE_HINT_HELP " ") + 1;
+    int32_t count = ecs_vec_count(&con->lines);
+    box_console_line_t *l;
+    if (con->greeted) {
+        goto done;
+    }
+
+    con->greeted = true;
+    ecs_vec_append_t(NULL, &con->lines, box_console_line_t);
+    l = ecs_vec_first_t(&con->lines, box_console_line_t);
+    memmove(&l[1], &l[0], (size_t)count * sizeof(box_console_line_t));
+    l->text = ecs_os_strdup(hint);
+    l->kind = BoxConsoleOutput;
+    l->hang = 0;
+    l->rows = 0;
+    ecs_vec_init_t(NULL, &l->spans, box_console_span_t, 0);
+    *ecs_vec_append_t(NULL, &l->spans, box_console_span_t) = (box_console_span_t){
+        .start = (int32_t)(help - hint),
+        .end = (int32_t)(help - hint) + (int32_t)strlen(BOX_CONSOLE_HINT_HELP),
+        .kind = BoxSyntaxName };
+    box_console_trim(world, con);
+    con->refresh = true;
+done:
+    return;
 }
 
 /** Drop the oldest lines of the scrollback while it has more rows than the console keeps.
@@ -483,12 +630,19 @@ char* box_console_exec(
     int32_t len, topic_len, skip, args;
     const box_console_command_t *cmd, *help_cmd = NULL;
     bool failed = false, help, help_group;
+<<<<<<< HEAD
     char *result = NULL;
     box_console_out_t out;
     ecs_vec_t spans;
     box_console_out_init(&out);
+=======
+    char *result = NULL, *prompt;
+    ecs_vec_t spans, prompt_spans;
+>>>>>>> 816d88441d159d7df3215ee7b1f1f6a2d512c8dd
     ecs_vec_init_t(NULL, &spans, box_console_span_t, 0);
+    ecs_vec_init_t(NULL, &prompt_spans, box_console_span_t, 0);
     box_console_syntax(world, con, line, &spans);
+    prompt = box_console_prompt(world, con, &prompt_spans);
     word = box_console_word(&p, &len);
     topic = box_console_word(&p, &topic_len);
     for (args = topic != NULL; box_console_word(&p, &skip); args ++) { }
@@ -512,8 +666,10 @@ char* box_console_exec(
     }
 
     box_console_history_add(con, line);
-    box_console_append(con, BOX_CONSOLE_PROMPT, line, BoxConsoleCommand, &spans);
+    box_console_echo(con, prompt, &prompt_spans, line, &spans, NULL);
     ecs_vec_fini_t(NULL, &spans, box_console_span_t);
+    ecs_vec_fini_t(NULL, &prompt_spans, box_console_span_t);
+    ecs_os_free(prompt);
     if (cmd) {
         char *text = cmd->run(world, con, args, &failed);
         if (failed) {
@@ -603,6 +759,84 @@ static void box_console_scroll(
     con->refresh = true;
 }
 
+/** Find the start of the word before the cursor: the whitespace before the cursor and the
+ * characters up to the whitespace before them, as Ctrl+W deletes.
+ *
+ * @param con The console state
+ * @return The first byte of the word
+ */
+static int32_t box_console_word_start(
+    const box_console_t *con)
+{
+    int32_t result = con->cursor;
+    while (result > 0 && (con->line[result - 1] == ' ' || con->line[result - 1] == '\t')) {
+        result --;
+    }
+
+    while (result > 0 && con->line[result - 1] != ' ' && con->line[result - 1] != '\t') {
+        result --;
+    }
+
+    return result;
+}
+
+/** Apply the readline keys pressed with Ctrl held: move to the start or end, delete to the
+ * start, the end or the start of the word, abandon the line or clear the scrollback.
+ *
+ * @param world The world
+ * @param con The console state
+ */
+static void box_console_chords(
+    ecs_world_t *world,
+    box_console_t *con)
+{
+    const bool *chord = con->chord;
+    if (chord[KeyA] || chord[KeyE]) {
+        con->cursor = chord[KeyA] ? 0 : con->length;
+        con->refresh = true;
+    }
+
+    if (chord[KeyU]) {
+        box_console_erase(con, 0, con->cursor);
+    }
+
+    if (chord[KeyK]) {
+        box_console_erase(con, con->cursor, con->length);
+        con->cursor = con->length;
+    }
+
+    if (chord[KeyW]) {
+        box_console_erase(con, box_console_word_start(con), con->cursor);
+    }
+
+    if (chord[KeyC]) {
+        box_console_interrupt(world, con);
+    }
+
+    if (chord[KeyL]) {
+        box_console_clear(con);
+    }
+}
+
+/** Accept the suggestion of the history: append the rest of the history line to the input.
+ *
+ * @param con The console state
+ * @return Whether there was a suggestion
+ */
+static bool box_console_accept(
+    box_console_t *con)
+{
+    const char *ghost = box_console_ghost(con);
+    char *rest = ghost ? ecs_os_strdup(ghost) : NULL;
+    if (rest) {
+        box_console_insert(con, rest, (int32_t)strlen(rest));
+    }
+
+    ecs_os_free(rest);
+
+    return rest != NULL;
+}
+
 bool box_console_edit(
     ecs_world_t *world,
     box_console_t *con)
@@ -610,7 +844,11 @@ bool box_console_edit(
     const bool *key = con->pressed;
     int32_t page = con->rows - 1;
     page = page > 0 ? page : 1;
-    box_console_type(con);
+    box_console_insert_text(con, ecs_vec_first(&con->typed), ecs_vec_count(&con->typed));
+    if ((key[KeyRight] || key[KeyEnd]) && box_console_accept(con)) {
+        con->pressed[KeyRight] = con->pressed[KeyEnd] = false;
+    }
+
     if (key[KeyBackspace]) {
         box_console_erase(con, box_console_prev(con, con->cursor), con->cursor);
     }
@@ -640,9 +878,7 @@ bool box_console_edit(
             (int32_t)(con->wheel * BOX_CONSOLE_WHEEL_LINES));
     }
 
-    if (con->clear) {
-        box_console_clear(con);
-    }
+    box_console_chords(world, con);
 
     if (key[KeyEnter] || key[KeyKpEnter]) {
         box_console_submit(world, con);

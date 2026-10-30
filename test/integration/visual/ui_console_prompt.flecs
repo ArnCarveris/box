@@ -1,0 +1,58 @@
+// The in game console with its bash-like prompt, open over a plain scene. The scrollback starts
+// with the hint line, then lines that ran at the root (~), in items and in items.lamp, each
+// after the prompt it ran at, the scope and the $ in their own colors. The input line at the
+// root is cd it, with the rest of the newest line that starts with it (ems.lamp) dimmed after
+// the cursor.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.console
+
+camera {
+  Position: {0, 2.5, 6}
+  Rotation: {-0.35, 0, 0}
+  Camera: {fov: 60}
+}
+
+main_view {
+  View: {
+    camera: camera,
+    clear: {enabled: true, color: {120, 150, 190, 255}}
+  }
+}
+
+sun {
+  Rotation: {0.7359, 2.3726, 0}
+  DirectionalLight: {intensity: 2 * flecs.script.math.PI}
+  Rgb: {255, 244, 225}
+}
+
+cube {
+  Position: {0, 0.5, 0}
+  Rotation: {0, 0.4, 0}
+  Box: {1, 1, 1}
+  Rgb: {220, 90, 60}
+  PbrMaterial: {roughness: 0.4, metallic: 0}
+}
+
+items {
+  lamp {
+    wick {}
+  }
+  rope {}
+}
+
+const enter_items: string = box.console.run("cd items")
+const list_items: string = box.console.run("ls")
+const enter_lamp: string = box.console.run("cd items.lamp")
+const list_lamp: string = box.console.run("ls")
+const leave: string = box.console.run("cd")
+const where: string = box.console.run("pwd")
+const typed: string = box.console.type("cd it")
+
+$ {
+  Console: {open: true}
+}

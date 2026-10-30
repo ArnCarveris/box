@@ -18,8 +18,13 @@ ECS_COMPONENT_DECLARE(ConsoleHost);
 #define BOX_CONSOLE_DEFAULT_HEIGHT (720.0f)
 
 /** Construct Console values: closed, the left half of the surface, light text on a dark panel,
+<<<<<<< HEAD
  * command lines colored in light tones, unknown names and extra arguments in the error color,
  * output in colors close to the dark theme of the flecs explorer.
+=======
+ * command lines colored in light tones, unknown names and extra arguments in the error color, the
+ * scope of the prompt in teal, its $ in grey and the suggestion of the history dimmed.
+>>>>>>> 816d88441d159d7df3215ee7b1f1f6a2d512c8dd
  *
  * @param ptr The components
  * @param count Number of components
@@ -56,6 +61,7 @@ static void box_console_ctor(
                 .string = {235, 210, 140},
                 .boolean = {255, 150, 200},
                 .value = {140, 225, 225},
+<<<<<<< HEAD
                 .extra = {255, 110, 100}
             },
             .output = {
@@ -83,6 +89,12 @@ static void box_console_ctor(
                 .cyan = {57, 197, 207},
                 .white = {240, 246, 252},
                 .grey = {139, 148, 158}
+=======
+                .extra = {255, 110, 100},
+                .scope = {80, 200, 200},
+                .symbol = {150, 160, 180},
+                .ghost = {95, 105, 125}
+>>>>>>> 816d88441d159d7df3215ee7b1f1f6a2d512c8dd
             }
         };
     }
@@ -102,9 +114,11 @@ static box_console_t* box_console_get(
     return host ? host->con : NULL;
 }
 
-/** Input was written: while the console is open, take the typed and pasted text, the key presses
- * and the wheel, and release every key and button but those of the toggle so no other action
- * fires.
+/** Input was written: while the console is open, take the typed and pasted text, the key presses,
+ * the keys pressed with Ctrl held (the readline keys of the input line) and the wheel, and
+ * release every key and button but those of the toggle so no other action fires.
+ *
+ * Ctrl is read from the keys the device holds, since the console releases it from Input.keys.
  *
  * @param it Iterator over the Input singleton
  */
@@ -114,16 +128,19 @@ static void box_console_capture(
     box_console_t *con = it->ctx;
     Input *in = ecs_field(it, Input, 0);
     bool keep[BOX_KEY_COUNT] = {0};
+    const InputDevice *dev;
     int32_t i, size;
+    bool ctrl;
     if (!con->shown || !it->count) {
         goto done;
     }
 
     box_input_action_keys(it->world, con->action, keep);
-    con->clear = con->clear || (in->keys[KeyL].pressed &&
-        (in->keys[KeyCtrlLeft].down || in->keys[KeyCtrlRight].down));
+    dev = box_input_device(it->world);
+    ctrl = dev && (dev->held[KeyCtrlLeft] || dev->held[KeyCtrlRight]);
     for (i = KeyNone + 1; i < BOX_KEY_COUNT; i ++) {
         con->pressed[i] = con->pressed[i] || in->keys[i].pressed;
+        con->chord[i] = con->chord[i] || (ctrl && in->keys[i].pressed);
         if (!keep[i]) {
             in->keys[i] = (KeyState){0};
         }
@@ -167,9 +184,9 @@ static void box_console_reset_input(
     box_console_t *con)
 {
     ecs_os_zeromem(&con->pressed);
+    ecs_os_zeromem(&con->chord);
     ecs_vec_clear(&con->typed);
     con->wheel = 0;
-    con->clear = false;
 }
 
 /** Enable the toggle action while the world has a Surface to show the console on.
@@ -265,6 +282,7 @@ static void box_console_show(
 {
     box_console_ui_build(world, con);
     box_console_view_create(world, con);
+    box_console_greet(world, con);
     con->shown = true;
     con->relayout = true;
     box_console_reset_input(con);
@@ -376,6 +394,42 @@ char* box_console_run(
     }
 
     result = box_console_exec(real, con, line, error);
+done:
+    return result;
+}
+
+/** Script function box.console.type(text): type text into the input line of the console.
+ *
+ * @param ctx Call context
+ * @param argc Number of arguments
+ * @param argv The text
+ * @param result Receives the input line
+ */
+static void box_console_type_function(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_value_t *result)
+{
+    const char *text = *(const char**)argv[0].ptr;
+    (void)argc;
+    *(char**)result->ptr = box_console_type(ctx->world, text ? text : "");
+}
+
+char* box_console_type(
+    ecs_world_t *world,
+    const char *text)
+{
+    ecs_world_t *real = ECS_CONST_CAST(ecs_world_t*, ecs_get_world(world));
+    box_console_t *con = box_console_get(real);
+    char *result = NULL;
+    if (!con) {
+        result = ecs_os_strdup("");
+        goto done;
+    }
+
+    box_console_insert_text(con, text, (int32_t)strlen(text));
+    result = ecs_os_strdup(con->line);
 done:
     return result;
 }
@@ -496,5 +550,13 @@ void BoxConsoleImport(
         .return_type = ecs_id(ecs_string_t),
         .params = {{ .name = "line", .type = ecs_id(ecs_string_t) }},
         .callback = box_console_run_function
+    });
+
+    ecs_function(world, {
+        .name = "type",
+        .parent = con->module,
+        .return_type = ecs_id(ecs_string_t),
+        .params = {{ .name = "text", .type = ecs_id(ecs_string_t) }},
+        .callback = box_console_type_function
     });
 }

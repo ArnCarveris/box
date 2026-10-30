@@ -400,7 +400,18 @@
                     "input_line_wraps",
                     "scroll_counts_rows",
                     "scrollback_limit_counts_rows",
-                    "resize_rewraps"
+                    "resize_rewraps",
+                    "prompt_root_and_scope",
+                    "lines_keep_scope",
+                    "ctrl_a_e",
+                    "ctrl_u_k",
+                    "ctrl_w",
+                    "ctrl_c",
+                    "ctrl_l",
+                    "history_filter",
+                    "autosuggest",
+                    "hint_on_first_open",
+                    "type_from_script"
                 ]
             },
             {
@@ -452,7 +463,8 @@
                     "overlapping_contours",
                     "spike",
                     "curves",
-                    "reflex_corner"
+                    "reflex_corner",
+                    "corner_shapes"
                 ]
             }
         ]
