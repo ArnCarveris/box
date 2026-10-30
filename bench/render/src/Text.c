@@ -9,6 +9,7 @@
 #include <box.h>
 #include <bake_bench.h>
 #include "render.h"
+#include "bench_memory.h"
 
 /** Texts of the scene */
 #define BENCH_TEXT_COUNT (10000)
@@ -34,25 +35,6 @@ static void bench_text_drop(
 
 /** Bytes of atlas texture data the backend received */
 static uint64_t bench_text_atlas_bytes;
-
-/** Report the stream upload counters and the allocated page buffers of the last extract.
- *
- * @param b The bench
- * @param stats Counters of the last extract
- */
-static void bench_text_memory(
-    bench_t *b,
-    const box_render_draws_stats_t *stats)
-{
-    bench_counter(b, "transform_bytes", (double)stats->transform_bytes);
-    bench_counter(b, "shading_bytes", (double)stats->shading_bytes);
-    bench_counter(b, "surface_bytes", (double)stats->surface_bytes);
-    bench_counter(b, "page_slots", (double)stats->page_slots);
-    bench_counter(b, "page_transform_bytes", (double)stats->page_transform_bytes);
-    bench_counter(b, "page_shading_bytes", (double)stats->page_shading_bytes);
-    bench_counter(b, "page_surface_bytes", (double)stats->page_surface_bytes);
-    bench_counter(b, "page_bytes", (double)stats->page_bytes);
-}
 
 /** Accept a packet without rendering it, counting the bytes of its texture data.
  *
@@ -127,7 +109,7 @@ void Text_layout_10k(
 
     bench_counter(b, "batches", (double)stats.batches);
     bench_counter(b, "instances", (double)stats.instances);
-    bench_text_memory(b, &stats);
+    bench_render_memory(b, &stats);
     box_render_sync(world);
     ecs_fini(world);
     ecs_os_free(texts);
@@ -184,7 +166,7 @@ void Text_changed_1pct(
 
     bench_counter(b, "batches", (double)stats.batches);
     bench_counter(b, "upload_bytes", (double)stats.upload_bytes);
-    bench_text_memory(b, &stats);
+    bench_render_memory(b, &stats);
     box_render_sync(world);
     ecs_fini(world);
     ecs_os_free(texts);

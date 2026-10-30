@@ -111,9 +111,13 @@ primitives scene has one instance of each of the 7 kinds; 6 have a render mesh.
 
 Bytes of the page buffers alive after setup. Slots are the slots of the page buffers. Instances
 are the live slots.
-The Extract, Shapes2D and Text suites of `bench/render` report these as the `page_slots`,
-`page_transform_bytes`, `page_shading_bytes`, `page_surface_bytes` and `page_bytes` counters of
-`box_render_draws_stats_t`, and reproduce their rows of this table.
+The Extract, Shapes2D, Text, Material and Cull suites of `bench/render` report these as the
+`page_slots`, `page_transform_bytes`, `page_shading_bytes`, `page_surface_bytes` and `page_bytes`
+counters of `box_render_draws_stats_t` (one helper, `bench_render_memory` in
+`bench/render/src/bench_memory.c`), and reproduce their rows of this table. Material reports them
+in every case, Cull after the measured frames of every case; the Cull suite needs a GPU. The
+counters cover both stores, so `Cull.town` reports the sum of its mesh and 2D rows: 8,448 slots
+and 3.8 MB.
 
 | Scene | Instances | Slots | Transform | Shading | Surface | Total | Surface share |
 |---|---|---|---|---|---|---|---|
