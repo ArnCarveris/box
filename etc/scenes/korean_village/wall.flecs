@@ -7,18 +7,32 @@ using box.material
 @tree Parent
 template KoreanWall {
   prop length: f32 = 5
+  prop tiles: i32 = 25
+  prop stones: i32 = 12
   { (IsA, KoreanStone); Position: {0, 0.24, 0}; Box: {length, 0.48, 0.5} }
   { (IsA, KoreanPlaster); Position: {0, 0.83, 0}; Box: {length, 0.75, 0.36} }
-  for course in 0..2 {
-    for i in 0..10 {
-      { Position: {(i - 4.5) * length / 10, 0.13 + course * 0.24, 0.26}; Box: {length / 10 - 0.025, 0.21, 0.025}; Rgb: {137 + i % 3 * 8, 140 + i % 3 * 7, 130 + i % 3 * 7} }
-    }
-  }
   for side in 0..2 {
+    const face = (side - 0.5) * 0.52
+    for course in 0..3 {
+      for i in 0..stones {
+        const tone = (i * 5 + course * 3 + side) % 4
+        const shift = (course % 2) * 0.25
+        { Position: {(i - (stones - 1) / 2.0 + shift - 0.125) * length / stones, 0.09 + course * 0.15, face}; RoundedBox: {length / stones - 0.03 - (i * 3 + course) % 3 * 0.03, 0.135, 0.05, 0.02}; Rgb: {128 + tone * 10, 130 + tone * 9, 118 + tone * 9} }
+      }
+    }
+    for i in 0..stones {
+      const tone = (i * 3 + side) % 3
+      { Position: {(i - (stones - 1) / 2.0) * length / stones, 0.52, face * 0.76}; Scale: {1, 0.7, 0.28}; IcoSphere: {radius: 0.09 + tone * 0.012, segments: 1}; Rgb: {126 + tone * 12, 124 + tone * 11, 110 + tone * 10} }
+    }
+    { (IsA, KoreanTimber); Position: {0, 1.17, (side - 0.5) * 0.37}; Box: {length, 0.05, 0.02} }
     { Position: {0, 1.25, (side - 0.5) * 0.31}; Rotation: {(side - 0.5) * 0.7, 0, 0}; Box: {length + 0.12, 0.085, 0.43}; Rgb: {59, 72, 78} }
-    for tile in 0..25 {
-      { Position: {(tile - 12) * length / 25, 1.29, (side - 0.5) * 0.32}; Rotation: {math.PI / 2 + (side - 0.5) * 0.7, 0, 0}; Cylinder: {radius: 0.035, length: 0.45, segments: 8}; Rgb: {93, 105, 108} }
+    for tile in 0..tiles {
+      const x = (tile - (tiles - 1) / 2.0) * length / tiles
+      const wear = (tile * 7 + side) % 4
+      { Position: {x, 1.29, (side - 0.5) * 0.32}; Rotation: {math.PI / 2 + (side - 0.5) * 0.7, 0, 0}; Cylinder: {radius: 0.035, length: 0.45, segments: 8}; Rgb: {84 + wear * 7, 96 + wear * 7, 100 + wear * 6} }
+      { (IsA, KoreanTileEdge); Position: {x, 1.2, (side - 0.5) * 0.59}; Rotation: {math.PI / 2 + (side - 0.5) * 0.7, 0, 0}; Cylinder: {radius: 0.042, length: 0.02, segments: 10} }
     }
   }
   { (IsA, KoreanTileEdge); Position: {0, 1.36, 0}; Rotation: {0, 0, math.PI / 2}; Cylinder: {radius: 0.065, length: length + 0.15, segments: 10} }
+  { (IsA, KoreanPaper); Position: {0, 1.31, 0}; Box: {length + 0.1, 0.04, 0.1} }
 }

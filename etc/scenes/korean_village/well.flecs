@@ -1,4 +1,5 @@
 include materials
+include beam
 using flecs.script
 using box.transform
 using box.geometry
@@ -9,12 +10,33 @@ template KoreanWell {
   { (IsA, KoreanStone); Position: {0, 0.12, 0}; Cylinder: {radius: 1.05, length: 0.24, segments: 8} }
   { (IsA, KoreanStone); Position: {0, 0.6, 0}; Tube: {radius: 0.8, thickness: 0.22, length: 0.85, segments: 8} }
   { (IsA, KoreanStone); Position: {0, 1.05, 0}; Tube: {radius: 0.88, thickness: 0.3, length: 0.15, segments: 8} }
-  { Position: {0, 0.48, 0}; Cylinder: {radius: 0.57, length: 0.03, segments: 24}; Rgb: {38, 80, 79}; PbrMaterial: {roughness: 0.08, metallic: 0.15} }
+  for course in 0..3 {
+    for block in 0..16 {
+      const a = (block + course * 0.5) * math.PI / 8
+      const tone = (block * 5 + course * 3) % 4
+      { Position: {math.sin(a) * 0.815, 0.33 + course * 0.2, math.cos(a) * 0.815}; Rotation: {0, a, 0}; RoundedBox: {0.29, 0.17, 0.06, 0.02}; Rgb: {124 + tone * 11, 126 + tone * 10, 114 + tone * 10} }
+    }
+  }
+  { (IsA, KoreanWater); Position: {0, 0.48, 0}; Cylinder: {radius: 0.57, length: 0.03, segments: 24} }
   for side in 0..2 {
     { (IsA, KoreanTimber); Position: {(side - 0.5) * 2.1, 1.3, 0}; Box: {0.13, 2.6, 0.13} }
+    { (IsA, KoreanStone); Position: {(side - 0.5) * 2.1, 0.08, 0}; Cylinder: {radius: 0.15, length: 0.14, segments: 8} }
   }
   { (IsA, KoreanTimber); Position: {0, 2.55, 0}; Box: {2.4, 0.14, 0.15} }
   { (IsA, KoreanTimber); Position: {0, 2.4, 0}; Rotation: {math.PI / 2, 0, 0}; Torus: {radius: 0.16, tube: 0.04, segments: 16, rings: 8} }
   { Position: {0.12, 1.8, 0}; Cylinder: {radius: 0.018, length: 1.2, segments: 8}; Rgb: {183, 160, 112} }
   { (IsA, KoreanTimber); Position: {0.12, 1.08, 0}; Tube: {radius: 0.2, thickness: 0.035, length: 0.3, segments: 12} }
+  for hoop in 0..2 {
+    { (IsA, KoreanIron); Position: {0.12, 0.98 + hoop * 0.2, 0}; Torus: {radius: 0.2, tube: 0.012, segments: 16, rings: 4} }
+  }
+  for side in 0..2 {
+    const sign = side * 2 - 1
+    for rib in 0..13 {
+      const x = (rib - 6) * 0.215
+      { Position: {x, 2.86, sign * 0.3}; Rotation: {math.PI / 2 + sign * 0.62, 0, 0}; Cylinder: {radius: 0.05, length: 0.82, segments: 8}; Rgb: {80 + rib % 4 * 7, 94 + rib % 4 * 7, 100 + rib % 4 * 6} }
+    }
+    { (IsA, KoreanTile); Position: {0, 2.82, sign * 0.3}; Rotation: {sign * 0.62, 0, 0}; Box: {2.85, 0.05, 0.8} }
+    { Position: {0, 2.6, sign * 0.34}; Rotation: {sign * -0.62, 0, 0}; Box: {0.08, 0.08, 0.7}; Rgb: {88, 56, 38} }
+  }
+  { (IsA, KoreanTileEdge); Position: {0, 3.09, 0}; Rotation: {0, 0, math.PI / 2}; Cylinder: {radius: 0.075, length: 2.95, segments: 12} }
 }
