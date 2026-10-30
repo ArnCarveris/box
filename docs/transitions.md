@@ -4,14 +4,13 @@
 like CSS transitions. The component itself holds the new value at once: transitions exist only
 in the rendered pixels.
 
-The feature is complete: transitions of `Position`, `Rotation` and `Scale` render for the
-entity and its descendants (see [Transform transitions](#transform-transitions)), transitions of
-`Rgb`, `AlphaCutoff`, `PbrMaterial`, `Emissive`, `TextureTransform`, `Transmission` and
-`ClearCoat` for mesh shapes, 2D shapes and texts (see
-[Material transitions](#material-transitions)), and transitions of `Tint` and `Opacity`
-composed down the hierarchy (see
-[Tint and opacity transitions](#tint-and-opacity-transitions)). It works on the render thread,
-in main thread mode (the browser) and with the null backend. What it does not do is listed in
+The feature is complete: transitions of `Position`, `Rotation` and `Scale` render for the entity and
+its descendants (see [Transform transitions](#transform-transitions)), transitions of `Rgb`,
+`AlphaCutoff`, `PbrMaterial`, `Emissive`, `TextureTransform`, `Transmission` and `ClearCoat` for
+mesh shapes, 2D shapes and texts (see [Material transitions](#material-transitions)), and
+transitions of `Tint` and `Opacity` composed down the hierarchy (see [Tint and opacity
+transitions](#tint-and-opacity-transitions)). It works on the render thread, in main thread mode
+(the browser) and with the null backend. What it does not do is listed in
 [Limitations](#limitations), and what it costs in [The fast path](#the-fast-path).
 
 ## What the application sees
@@ -115,9 +114,9 @@ is a flecs map (`ecs_map_t`) keyed by the component entity whose values are allo
   on the render thread. Only rendered pixels show it.
 - Transitionable: `Position`, `Rotation`, `Scale`, `Rgb`, `Opacity`, `AlphaCutoff`, `Tint`,
   `PbrMaterial`, `Emissive`, `TextureTransform`, `Transmission` and `ClearCoat`
-  (`box_transition_supported()`). Others are
-  rejected: `PbrTextures` holds handles that are part of the batch key, `WorldTransform` and
-  `MaterialId` are computed by the engine, and enums and tags have nothing to interpolate.
+  (`box_transition_supported()`). Others are rejected: `PbrTextures` holds handles that are part of
+  the batch key, `WorldTransform` and `MaterialId` are computed by the engine, and enums and tags
+  have nothing to interpolate.
 - A key that is not transitionable, or an entry with a negative `duration` or `delay`, logs an
   error naming the component when `Transition` is set, and the entry is ignored
   (`box_transition_valid()`). The rest of the map works; nothing asserts.
