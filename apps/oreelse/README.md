@@ -766,11 +766,15 @@ Three render quality tiers trade the look for speed; the button on the pause scr
 from High to Medium to Low and back to High. The game starts on High every time it is launched,
 and a restart keeps the tier.
 
-| Tier | Resolution | Shadow map | Shadow distance | Ambient occlusion | Bloom |
-| --- | --- | --- | --- | --- | --- |
-| Low | half | 1024 | 91 | off | off |
-| Medium | full | 2048 | 140 | off | on |
-| High | full | 4096 | 140 | on | on |
+| Tier | Resolution | Shadow map | Shadow distance | Ambient occlusion | Bloom | Cloud shadows |
+| --- | --- | --- | --- | --- | --- | --- |
+| Low | half | 1024 | 91 | off | off | off |
+| Medium | full | 2048 | 140 | off | on | on |
+| High | full | 4096 | 140 | on | on | on |
+
+The shadows of clouds drift over the map, 3 units a second, and cover about 45% of the ground.
+They drift with the clock of play, so they stand still while paused and on the title and end
+screens, and start over with a restart.
 
 ## Conventions of the port
 
@@ -809,9 +813,10 @@ The port follows these; new code keeps to them.
   on its own singleton (`ore_state_is`, `ore_state_set`). Gameplay systems run only while
   `Playing`, with a query term on `ore_state_pair(world, OreGameStatePlaying)` whose source is
   `OreGameState`. That is the only pause mechanism: no time scale, no frozen flags. Only the
-  camera and the render quality tier run in every state; outside play, systems only hide what
-  belongs to play (the tile markers, the placement preview, the health bars) and pause the
-  effects that play (the jet plume, the glints of the Luminite).
+  camera and the render quality tier (with the cloud shadows, which follow the clock of play) run
+  in every state; outside play, systems only hide what belongs to play (the tile markers, the
+  placement preview, the health bars) and pause the effects that play (the jet plume, the glints
+  of the Luminite).
 - **Input**: every key is a box `Action` with a `Binding` in `apps/oreelse/etc/input.flecs`.
   Actions that fire once are awaited by async loops that call an `oreelse` script function
   implemented in C (`ecs_async_function`, like `oreelse.cancel()`); held actions (walking,
@@ -933,6 +938,13 @@ original and for porting more of it.
 - **Lights**: `PointLight` has the same units, but box's falloff `(1 - (d/r)^4)^2 / d^2` is much
   brighter within a unit of the light than flecs-engine's `(1 - (d/r)^4) / (d^2 + 1)`; the small
   lamps are retuned by eye. The sun is a `DirectionalLight` with an `Atmosphere`.
+- **Cloud shadows**: the original's procedural `cloud_shadow` layer is a `LightCookie` on the sun
+  with the engine's CookieNoise texture (copied to `etc/assets/textures/cloud_noise.png`),
+  projected onto a plane 10 units up; `etc/oreelse.flecs` converts the original's settings next
+  to it. The original's drift stopped with the game, so `OreCloudShadow` on the sun holds the
+  drift velocity and the strength, and `OreCloudShadowApply` (`src/look.c`) moves the cookie's
+  offset over the clock of play rather than giving the cookie a velocity, which box advances in
+  every state; it sets the strength to 0 at the tiers without `cloud_shadows`.
 - **Particles**: flecs-engine's shared pools become one box layer per burst or emitter, with
   the pool's settings in its `ParticleAppearance`, `ParticleForces` and `ParticleCurves`
   (`etc/particles/pools.flecs`); the envelopes are sampled at t = 0, 1/3, 2/3, 1, angles are in
@@ -953,7 +965,6 @@ The rendering features box does not have:
 - **Surface wear and scorch**: flecs-engine's `SurfaceWear` and `SurfaceEffects` (dust, grime,
   scratches, grain, streaks, edge wear, burn), which age the buildings and scorch them where
   they take damage, and the C that drives them.
-- **Cloud shadows.**
 - **Stars**, and the top of atmosphere settings of the celestial light.
 - **Particles brighter than 1**: box clamps particle color and opacity to [0, 1], so the
   original's emissive glow, fire and ember pools are dimmer; additive halo layers make up for it
@@ -1119,7 +1130,7 @@ its tile in the grid.
 
 | File | Holds |
 | --- | --- |
-| `etc/oreelse.flecs` | The window, the camera, the sun, the atmosphere, the effects and the view, the render quality tier, the mining markers, the critter tiers and their death effects (`OreArsenal`), the one shot effects the C plays (`OreEffects`), the scene and view of the health bars (`OreHealthBars`), the HUD; includes the rest |
+| `etc/oreelse.flecs` | The window, the camera, the sun and its cloud shadows, the atmosphere, the effects and the view, the render quality tier, the mining markers, the critter tiers and their death effects (`OreArsenal`), the one shot effects the C plays (`OreEffects`), the scene and view of the health bars (`OreHealthBars`), the HUD; includes the rest |
 | `etc/config.flecs` | The constants `cfg.*` |
 | `etc/resources.flecs` | The item prefabs other than the buildings, with names and recipes |
 | `etc/buildings/*.flecs` | The building prefabs, models with their item, recipe, footprint, health and power, and the turrets' weapons |
@@ -1152,7 +1163,7 @@ its tile in the grid.
 | `etc/props/light.flecs` | The `Light` template of the lamps |
 | `etc/buildings/` | The building prefabs, one file per building, and the drone (see Building models) |
 | `etc/rocket/` | The `Rocket` template and its parts `RocketBell`, `RocketBay` and `RocketPort`, and the `PadClamp` template of the rocket pad |
-| `etc/assets/` | The original's textures (SVG), unchanged, and `terrain_dirt_orm.svg`; the color textures load with `linear: true` |
+| `etc/assets/` | The original's textures (SVG), unchanged, and `terrain_dirt_orm.svg`; the color textures load with `linear: true`. `textures/cloud_noise.png`, a copy of the engine's CookieNoise, is the cookie of the cloud shadows |
 | `etc/ui/palette.flecs` | The colors of the UI, `palette.*` |
 | `etc/ui/icons.flecs` | The icon textures, `icons.*`, which the items name with `OreIcon` |
 | `etc/ui/panel.flecs` | The `Panel` template, the chrome of every panel: the plate, its edge, the hazard strip and the `InputBlocker` |
@@ -1184,7 +1195,7 @@ its tile in the grid.
 | `src/power.c` | Production, demand and the blackout, the drills, the factories' crafters, the status lamps, `oreelse.power_set(category, level)` |
 | `src/rocket.c` | The rocket state, installing, uninstalling, loading, the launch and the flight, the look of the flight (`OreRocketFx`: the shake, the clamps, the flames and the smoke), `oreelse.rocket_install()`, `oreelse.rocket_uninstall()`, `oreelse.rocket_load()`, `oreelse.rocket_launch()`, `oreelse.craft_key()` |
 | `src/health_bars.c` | The health bars: a `HealthBar` instance per damaged building and over the damaged astronaut under `health_bars.bars`, its fraction set when the health changes, the bars' view shown while playing |
-| `src/look.c` | The render quality tiers, `oreelse.cycleQuality()`, `oreelse.srgb()` |
+| `src/look.c` | The render quality tiers, the cloud shadows (`OreCloudShadowApply`), `oreelse.cycleQuality()`, `oreelse.srgb()` |
 | `src/stresstest.c` | The stress test: the late game base every run of a `--stresstest` session starts with (`OreStressTestApply`) |
 | `src/stresstest.h` | The stress test's components (`OreStressTest`, `OreStressKit`) and `ore_placement_build`, included by `src/game.h` |
 | `tools/linear_colors.py` | The conversion of the original's world color bytes to the port's (see Colors), kept for reference |

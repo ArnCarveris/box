@@ -95,6 +95,7 @@ void OreelseImport(
     ECS_META_COMPONENT(world, OreQuality);
     ECS_META_COMPONENT(world, OreQualityTiers);
     ECS_META_COMPONENT(world, OreLook);
+    ECS_META_COMPONENT(world, OreCloudShadow);
     ECS_META_COMPONENT(world, OreBlastFlash);
     ECS_META_COMPONENT(world, OreLaunchPhase);
     ECS_META_COMPONENT(world, OreLaunchPad);

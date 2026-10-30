@@ -736,6 +736,7 @@ ECS_STRUCT(OreQualityTiers, {
     float shadow_distance[3];     /**< ShadowSettings.max_distance of the world view */
     bool gtao[3];                 /**< The Gtao effect of the world view runs */
     bool bloom[3];                /**< The Bloom effect of the world view runs */
+    bool cloud_shadows[3];        /**< The LightCookie of the sun casts the cloud shadows */
 });
 
 /** What the render quality tier applies to, a singleton oreelse.flecs sets: the world view and
@@ -745,6 +746,17 @@ ECS_STRUCT(OreLook, {
     ecs_entity_t view;  /**< The world view, its shadows and effects follow the tier */
     ecs_entity_t gtao;  /**< Gtao effect of the world view */
     ecs_entity_t bloom; /**< Bloom effect of the world view */
+});
+
+/** The cloud shadows of the original, on the sun next to its LightCookie (oreelse.flecs).
+ *
+ * OreCloudShadowApply sets the cookie's strength to strength at the tiers with cloud_shadows in
+ * cfg.quality and to 0 at the others, and its offset to velocity times OreClock.elapsed, so the
+ * clouds drift with the game's clock and stand still while paused, as the original's did.
+ */
+ECS_STRUCT(OreCloudShadow, {
+    float strength;    /**< LightCookie.strength where the tier has cloud shadows */
+    float velocity[2]; /**< World units per second the drift moves the offset by, X and Z */
 });
 
 /** The flash light of a play of an explosion or a combust, on the root of the instance.
@@ -1963,8 +1975,9 @@ bool ore_power_set(
 void ore_power_import(
     ecs_world_t *world);
 
-/** Register the look: the render quality tiers, oreelse.cycleQuality(), and oreelse.srgb(),
- * which encodes a world color byte of the original (linear light) for box.
+/** Register the look: the render quality tiers, the cloud shadows of the sun
+ * (OreCloudShadow), oreelse.cycleQuality(), and oreelse.srgb(), which encodes a world color byte
+ * of the original (linear light) for box.
  *
  * @param world The world
  */

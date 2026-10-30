@@ -1,6 +1,8 @@
 """Ore Else's render quality tiers driven through its command port: cycling the tier changes the
-resolution scale of the window and the shadows and effects of the world view as cfg.quality
-gives them, and the tier survives a restart, which builds the scenery of the new map.
+resolution scale of the window, the shadows and effects of the world view and the cloud shadows
+of the sun (the strength of its LightCookie) as cfg.quality gives them, and the tier survives a
+restart, which builds the scenery of the new map. The cloud shadows drift with the clock of play
+and stand still while paused.
 
 Every case runs in a fresh apps/oreelse process with its default scene
 (apps/oreelse/etc/oreelse.flecs) and a fixed session seed, and gets the App of
@@ -21,13 +23,18 @@ SCALE = "get window Surface.resolution_scale"
 SHADOW_RESOLUTION = "get main_view View.shadows.resolution"
 SHADOW_DISTANCE = "get main_view View.shadows.max_distance"
 EFFECTS = "get main_view View.effects"
+CLOUDS = "get sun LightCookie.strength"
+DRIFT = "get sun LightCookie.offset"
+
+# The strength of the cloud shadows where the tier has them (OreCloudShadow of the sun)
+CLOUD_STRENGTH = 0.6
 
 # The settings of every tier (cfg.quality): resolution scale, shadow resolution, shadow
-# distance, Gtao, Bloom
+# distance, Gtao, Bloom, cloud shadows
 TIERS = {
-    "Low": (2, 1024, 91, False, False),
-    "Medium": (1, 2048, 140, False, True),
-    "High": (1, 4096, 140, True, True),
+    "Low": (2, 1024, 91, False, False, False),
+    "Medium": (1, 2048, 140, False, True, True),
+    "High": (1, 4096, 140, True, True, True),
 }
 
 # The pause screen's button cycles the tier down from High, the tier of every start
@@ -50,11 +57,27 @@ def effects(app):
     return result
 
 
+def clouds(app):
+    """The strength of the cloud shadows of the sun, 0 where they are off."""
+    return float(app.exec(CLOUDS))
+
+
+def drift(app):
+    """The offset the drift of the cloud shadows moved the cookie of the sun by."""
+    return parse_value(app.exec(DRIFT))
+
+
+def cloud_strength(on):
+    """The strength of the cookie of the sun with the cloud shadows on or off."""
+    return CLOUD_STRENGTH if on else 0.0
+
+
 def matches(app, name):
-    """Whether the window and the world view have the settings of a tier."""
-    scale, resolution, distance, gtao, bloom = TIERS[name]
+    """Whether the window, the world view and the sun have the settings of a tier."""
+    scale, resolution, distance, gtao, bloom, cloud = TIERS[name]
     found = effects(app)
     return (float(app.exec(SCALE)) == scale
+            and abs(clouds(app) - cloud_strength(cloud)) < 1e-6
             and int(app.exec(SHADOW_RESOLUTION)) == resolution
             and float(app.exec(SHADOW_DISTANCE)) == distance
             and found.get("gtao") == gtao and found.get("bloom") == bloom
@@ -66,8 +89,10 @@ def check_tier(app, name):
     app.wait_for(TIER, lambda out: tier_name(out) == name, what="the tier %s" % name)
     app.wait_for(SCALE, lambda out: matches(app, name),
                  what="the settings of the tier %s" % name)
-    scale, resolution, distance, gtao, bloom = TIERS[name]
+    scale, resolution, distance, gtao, bloom, cloud = TIERS[name]
     app.expect(SHADOW_RESOLUTION, str(resolution))
+    app.check(abs(clouds(app) - cloud_strength(cloud)) < 1e-6,
+              "the cloud shadows have the strength %g at %s" % (clouds(app), name))
     app.check(float(app.exec(SHADOW_DISTANCE)) == distance,
               "the shadow distance is not %g at %s" % (distance, name))
     app.check(effects(app) == {"gtao": gtao, "bloom": bloom, "tonemap": True},
@@ -125,3 +150,39 @@ def test_restart_keeps_tier(app):
         app.check(a != b, "%s stayed at %s after the restart" % (name, a))
     cycle(app)
     check_tier(app, "High")
+
+
+def test_cloud_shadows(app):
+    setup(app)
+    check_tier(app, "High")
+
+    # The clouds stand still on the title screen, the clock of play does not run
+    before = drift(app)
+    app.wait_frames(5)
+    app.check(drift(app) == before, "the clouds drifted on the title screen")
+
+    # They drift while playing
+    start(app)
+    app.wait_frames(10)
+    playing = drift(app)
+    app.check(playing != before, "the clouds did not drift while playing")
+
+    # They stand still while paused, as everything else does, and are off at Low
+    key(app, "Escape")
+    app.wait_for(STATE % "Paused", "true")
+    paused = drift(app)
+    app.wait_frames(10)
+    app.check(drift(app) == paused, "the clouds drifted while paused")
+    cycle(app)
+    cycle(app)
+    check_tier(app, "Low")
+    app.check(clouds(app) == 0, "the cloud shadows are on at Low")
+
+    # Back at High they are on again and drift on from where they stood
+    cycle(app)
+    check_tier(app, "High")
+    app.check(drift(app) == paused, "the clouds moved over the cycle of the tier")
+    key(app, "Escape")
+    app.wait_for(STATE % "Playing", "true")
+    app.wait_frames(10)
+    app.check(drift(app) != paused, "the clouds did not drift on after the pause")
