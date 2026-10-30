@@ -28,7 +28,7 @@ void box_gpu_bake_queries_init(
 
     b->queries = wgpuDeviceCreateQuerySet(gpu->device, &(WGPUQuerySetDescriptor){
         .type = WGPUQueryType_Timestamp,
-        .count = 2 * BOX_GPU_BAKE_READBACKS
+        .count = BOX_GPU_BAKE_QUERIES * BOX_GPU_BAKE_READBACKS
     });
     b->resolve = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
         .usage = WGPUBufferUsage_QueryResolve | WGPUBufferUsage_CopySrc,
@@ -207,6 +207,23 @@ void box_gpu_bake_readback_poll(
     }
 }
 
+const WGPUPassTimestampWrites* box_gpu_bake_writes(
+    const box_gpu_bake_t *b,
+    int32_t readback,
+    bool first,
+    bool last,
+    WGPUPassTimestampWrites *out)
+{
+    uint32_t query = (uint32_t)readback * BOX_GPU_BAKE_QUERIES;
+    *out = (WGPUPassTimestampWrites){
+        .querySet = b->queries,
+        .beginningOfPassWriteIndex = first ? query : query + 2,
+        .endOfPassWriteIndex = last ? query + 3 : query + 1
+    };
+
+    return out;
+}
+
 /** Find a free timestamp readback.
  *
  * @param b The capture state
@@ -255,7 +272,8 @@ void box_gpu_bake_resolve(
         }
 
         for (i = 0; i < 2; i ++) {
-            wgpuCommandEncoderResolveQuerySet(encoder, b->queries, (uint32_t)r * 2 + i, 1,
+            wgpuCommandEncoderResolveQuerySet(encoder, b->queries,
+                (uint32_t)r * BOX_GPU_BAKE_QUERIES + i * (BOX_GPU_BAKE_QUERIES - 1), 1,
                 b->resolve, offset + i * BOX_GPU_BAKE_RESOLVE_ALIGN);
             wgpuCommandEncoderCopyBufferToBuffer(encoder, b->resolve,
                 offset + i * BOX_GPU_BAKE_RESOLVE_ALIGN, rb->buffer,
