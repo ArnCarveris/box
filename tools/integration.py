@@ -424,13 +424,14 @@ def render_scene(scene, png, args):
     with open(scene) as f:
         source = f.read()
     harness = os.path.join(os.path.dirname(png), scene_name(scene) + ".run.flecs")
-    # Include paths cannot leave the folder of the script: link etc and apps so a scene can
-    # include etc/... and a scene of a game apps/<game>/etc/<game>. The links are relative, since
-    # the checkout may be reached by another path elsewhere (a container that mounts it), and an
-    # older link is made again.
-    for folder in ("etc", "apps"):
+    # Include paths cannot leave the folder of the script: link etc, apps and test/assets so a
+    # scene can include etc/..., a scene of a game apps/<game>/etc/<game> and the test scripts
+    # test/assets/.... The links are relative, since the checkout may be reached by another path
+    # elsewhere (a container that mounts it), and an older link is made again.
+    for folder in ("etc", "apps", os.path.join("test", "assets")):
         link = os.path.join(os.path.dirname(png), folder)
-        target = os.path.relpath(os.path.join(ROOT, folder), os.path.dirname(png))
+        os.makedirs(os.path.dirname(link), exist_ok=True)
+        target = os.path.relpath(os.path.join(ROOT, folder), os.path.dirname(link))
         if os.path.islink(link) and os.readlink(link) != target:
             os.unlink(link)
         if not os.path.lexists(link):

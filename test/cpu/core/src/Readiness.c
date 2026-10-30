@@ -119,7 +119,7 @@ void Readiness_text_wait_timeout_warns(void)
 
     test_int(hold_started, 1);
     ecs_entity_t font = ecs_entity(world, { .name = "stuck_font" });
-    ecs_set(world, font, Font, { .path = "etc/fonts/B612-Regular.ttf" });
+    ecs_set(world, font, Font, { .path = "test/assets/fonts/B612-Regular.ttf" });
     ecs_entity_t label = ecs_new(world);
     ecs_set(world, label, Text, { .value = "ready?", .size = 16, .font = font });
     test_int(ecs_get(world, font, FontStatus)->state, FontLoading);
@@ -146,7 +146,7 @@ void Readiness_text_wait_timeout_warns(void)
 
     test_int(count, 2);
     test_assert(strstr(warnings, "1 font load(s) not applied yet (stuck_font "
-        "etc/fonts/B612-Regular.ttf)\n") != NULL);
+        "test/assets/fonts/B612-Regular.ttf)\n") != NULL);
     test_int(ecs_get(world, font, FontStatus)->state, FontLoading);
 
     ecs_os_ainc(&hold_release);

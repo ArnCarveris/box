@@ -1,0 +1,28 @@
+// The landing marking of a drone bay, the BayPad of the original: the bay texture and its
+// normal map on a quad. The drone pad wears it.
+//
+// The marking is a ring on a transparent background (transparent centre and corners). The original
+// has no alpha test, so it draws as a filled square; here the quad is alpha tested (AlphaCutoff, as
+// the flora), so only the ring draws and casts a shadow.
+
+using box.geometry
+using box.material
+using box.texture
+
+bay_tex {
+  TexturePath: {
+    path: "test/assets/materials/drone_bay.svg", width: 256, height: 256, linear: true
+  }
+}
+
+bay_norm {
+  TexturePath: {path: "test/assets/materials/drone_bay_normal.svg", width: 256, height: 256}
+}
+
+prefab BayPad {
+  Quad: {1.46, 1.46}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {metallic: 0.35, roughness: 0.58}
+  PbrTextures: {albedo: bay_tex, normal: bay_norm}
+  AlphaCutoff: {value: 0.5}
+}

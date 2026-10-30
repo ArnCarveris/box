@@ -17,7 +17,7 @@ spheres {
 
   axes {
     Environment: {resolution: 128}
-    EnvironmentImage: {path: "etc/environments/axes.hdr"}
+    EnvironmentImage: {path: "test/assets/environments/axes.hdr"}
   }
 
   darkness {

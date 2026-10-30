@@ -223,11 +223,11 @@ void Environment_c_defaults(void) {
     test_assert(ecs_has(world, literal, EnvironmentStatus));
 
     ecs_entity_t image = ecs_new(world);
-    ecs_set(world, image, EnvironmentImage, {.path = "etc/environments/axes.hdr"});
+    ecs_set(world, image, EnvironmentImage, {.path = "test/assets/environments/axes.hdr"});
     test_assert(ecs_has(world, image, Environment));
     test_assert(ecs_has(world, image, EnvironmentStatus));
     test_int(ecs_get(world, image, Environment)->resolution, 256);
-    test_str(ecs_get(world, image, EnvironmentImage)->path, "etc/environments/axes.hdr");
+    test_str(ecs_get(world, image, EnvironmentImage)->path, "test/assets/environments/axes.hdr");
 
     ecs_fini(world);
 }
@@ -469,7 +469,7 @@ void Environment_image_sent_once_per_version(void) {
     ecs_world_t *world = world_new(&null);
 
     ecs_entity_t source = ecs_new(world);
-    ecs_set(world, source, EnvironmentImage, {.path = "etc/environments/axes.hdr"});
+    ecs_set(world, source, EnvironmentImage, {.path = "test/assets/environments/axes.hdr"});
     const EnvironmentStatus *status = wait_status(world, source);
     test_assert(status->error == NULL);
     test_int(status->version, 1);
@@ -507,7 +507,7 @@ void Environment_image_sent_once_per_version(void) {
     frame(world);
     test_int(resources(null, BOX_RENDER_ENVIRONMENT_IMAGE, BOX_RENDER_UPDATE, NULL), 0);
 
-    ecs_set(world, source, EnvironmentImage, {.path = "etc/environments/sky.hdr"});
+    ecs_set(world, source, EnvironmentImage, {.path = "test/assets/environments/sky.hdr"});
     for (i = 0; i < 500 && ecs_get(world, source, EnvironmentStatus)->version == 2; i ++) {
         frame(world);
         ecs_os_sleep(0, 1000 * 1000);
@@ -529,7 +529,7 @@ void Environment_missing_file_sets_error(void) {
 
     ecs_log_set_level(-4);
     ecs_entity_t source = ecs_new(world);
-    ecs_set(world, source, EnvironmentImage, {.path = "etc/environments/missing.hdr"});
+    ecs_set(world, source, EnvironmentImage, {.path = "test/assets/environments/missing.hdr"});
     const EnvironmentStatus *status = wait_status(world, source);
     test_assert(status->error != NULL);
     test_assert(strstr(status->error, "missing.hdr") != NULL);
@@ -543,7 +543,7 @@ void Environment_missing_file_sets_error(void) {
     frame(world);
     test_assert(strstr(ecs_get(world, source, EnvironmentStatus)->error, "missing.hdr"));
 
-    ecs_set(world, source, EnvironmentImage, {.path = "etc/environments/axes.hdr"});
+    ecs_set(world, source, EnvironmentImage, {.path = "test/assets/environments/axes.hdr"});
     int32_t i;
     for (i = 0; i < 500 && !ecs_get(world, source, EnvironmentStatus)->version; i ++) {
         frame(world);
@@ -612,7 +612,7 @@ void Environment_image_file_change_reloads(void) {
     box_render_null_t *null;
     ecs_world_t *world = watched_world_new(&null);
     char *file = flecs_asprintf("%s/env.hdr", ecs_singleton_get(world, AppStatus)->tmp_dir);
-    copy_file("etc/environments/axes.hdr", file, 1000000000);
+    copy_file("test/assets/environments/axes.hdr", file, 1000000000);
 
     ecs_entity_t source = ecs_new(world);
     ecs_set(world, source, EnvironmentImage, {.path = file});
@@ -623,7 +623,7 @@ void Environment_image_file_change_reloads(void) {
     test_int(resources(null, BOX_RENDER_ENVIRONMENT_IMAGE, BOX_RENDER_UPDATE, NULL), 0);
     test_int(ecs_get(world, source, EnvironmentStatus)->version, 1);
 
-    copy_file("etc/environments/sky.hdr", file, 1000000100);
+    copy_file("test/assets/environments/sky.hdr", file, 1000000100);
     int32_t i, updates = 0;
     for (i = 0; i < 500 && ecs_get(world, source, EnvironmentStatus)->version == 1; i ++) {
         frame(world);
@@ -664,7 +664,7 @@ void Environment_image_file_removed_keeps_version(void) {
     box_render_null_t *null;
     ecs_world_t *world = watched_world_new(&null);
     char *file = flecs_asprintf("%s/gone.hdr", ecs_singleton_get(world, AppStatus)->tmp_dir);
-    copy_file("etc/environments/axes.hdr", file, 1000000000);
+    copy_file("test/assets/environments/axes.hdr", file, 1000000000);
 
     ecs_entity_t source = ecs_new(world);
     ecs_set(world, source, EnvironmentImage, {.path = file});
@@ -688,7 +688,7 @@ void Environment_image_file_removed_keeps_version(void) {
     test_int(resources(null, BOX_RENDER_ENVIRONMENT_IMAGE, BOX_RENDER_UPDATE, NULL), 0);
     test_int(ecs_get(world, source, EnvironmentStatus)->version, 1);
 
-    copy_file("etc/environments/sky.hdr", file, 1000000100);
+    copy_file("test/assets/environments/sky.hdr", file, 1000000100);
     for (i = 0; i < 500 && ecs_get(world, source, EnvironmentStatus)->version == 1; i ++) {
         frame(world);
         ecs_os_sleep(0, 1000 * 1000);

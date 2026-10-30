@@ -1,0 +1,633 @@
+// Widget gallery: the widgets of box.widgets in a screen space UI, each in its normal and
+// disabled state. The header holds the title, the status line with the last change and the
+// theme switch, which restyles the whole gallery. Below it a page scrolls the sections where the
+// window is too small for them: Basics (the simple widgets) and Text (the text fields) on top,
+// Containers (dropdowns, tabs, scroll views, a list view, collapsibles) and Form below. The form
+// edits a 3D preview rendered to a texture: its values apply with Apply or Enter in the name
+// field, Reset restores the defaults.
+//
+// Every widget works without a mouse: Tab moves the focus in reading order and scrolls the
+// focused widget into view, Enter, Space and the arrow keys operate it. The pointer shows what
+// can be clicked, typed into or is disabled.
+
+include widgets
+
+using flecs.script
+using box.transform
+using box.camera
+using box.view
+using box.light
+using box.surface
+using box.layout
+using box.geometry
+using box.material
+using box.text
+using box.input
+using box.picking
+using box.ui
+using box.widgets
+
+window {
+  Surface: {width: 1280, height: 800}
+}
+
+actions {
+  ping {
+    Action: {description: "Ping from the gallery"}
+  }
+}
+
+// The 200 entries of the list view of the Containers section
+const files = [
+  "scene_001.flecs", "texture_002.png", "mesh_003.glb", "shader_004.wgsl", "sound_005.ogg",
+  "font_006.ttf", "script_007.flecs", "prefab_008.flecs", "scene_009.flecs", "texture_010.png",
+  "mesh_011.glb", "shader_012.wgsl", "sound_013.ogg", "font_014.ttf", "script_015.flecs",
+  "prefab_016.flecs", "scene_017.flecs", "texture_018.png", "mesh_019.glb", "shader_020.wgsl",
+  "sound_021.ogg", "font_022.ttf", "script_023.flecs", "prefab_024.flecs", "scene_025.flecs",
+  "texture_026.png", "mesh_027.glb", "shader_028.wgsl", "sound_029.ogg", "font_030.ttf",
+  "script_031.flecs", "prefab_032.flecs", "scene_033.flecs", "texture_034.png", "mesh_035.glb",
+  "shader_036.wgsl", "sound_037.ogg", "font_038.ttf", "script_039.flecs", "prefab_040.flecs",
+  "scene_041.flecs", "texture_042.png", "mesh_043.glb", "shader_044.wgsl", "sound_045.ogg",
+  "font_046.ttf", "script_047.flecs", "prefab_048.flecs", "scene_049.flecs", "texture_050.png",
+  "mesh_051.glb", "shader_052.wgsl", "sound_053.ogg", "font_054.ttf", "script_055.flecs",
+  "prefab_056.flecs", "scene_057.flecs", "texture_058.png", "mesh_059.glb", "shader_060.wgsl",
+  "sound_061.ogg", "font_062.ttf", "script_063.flecs", "prefab_064.flecs", "scene_065.flecs",
+  "texture_066.png", "mesh_067.glb", "shader_068.wgsl", "sound_069.ogg", "font_070.ttf",
+  "script_071.flecs", "prefab_072.flecs", "scene_073.flecs", "texture_074.png", "mesh_075.glb",
+  "shader_076.wgsl", "sound_077.ogg", "font_078.ttf", "script_079.flecs", "prefab_080.flecs",
+  "scene_081.flecs", "texture_082.png", "mesh_083.glb", "shader_084.wgsl", "sound_085.ogg",
+  "font_086.ttf", "script_087.flecs", "prefab_088.flecs", "scene_089.flecs", "texture_090.png",
+  "mesh_091.glb", "shader_092.wgsl", "sound_093.ogg", "font_094.ttf", "script_095.flecs",
+  "prefab_096.flecs", "scene_097.flecs", "texture_098.png", "mesh_099.glb", "shader_100.wgsl",
+  "sound_101.ogg", "font_102.ttf", "script_103.flecs", "prefab_104.flecs", "scene_105.flecs",
+  "texture_106.png", "mesh_107.glb", "shader_108.wgsl", "sound_109.ogg", "font_110.ttf",
+  "script_111.flecs", "prefab_112.flecs", "scene_113.flecs", "texture_114.png", "mesh_115.glb",
+  "shader_116.wgsl", "sound_117.ogg", "font_118.ttf", "script_119.flecs", "prefab_120.flecs",
+  "scene_121.flecs", "texture_122.png", "mesh_123.glb", "shader_124.wgsl", "sound_125.ogg",
+  "font_126.ttf", "script_127.flecs", "prefab_128.flecs", "scene_129.flecs", "texture_130.png",
+  "mesh_131.glb", "shader_132.wgsl", "sound_133.ogg", "font_134.ttf", "script_135.flecs",
+  "prefab_136.flecs", "scene_137.flecs", "texture_138.png", "mesh_139.glb", "shader_140.wgsl",
+  "sound_141.ogg", "font_142.ttf", "script_143.flecs", "prefab_144.flecs", "scene_145.flecs",
+  "texture_146.png", "mesh_147.glb", "shader_148.wgsl", "sound_149.ogg", "font_150.ttf",
+  "script_151.flecs", "prefab_152.flecs", "scene_153.flecs", "texture_154.png", "mesh_155.glb",
+  "shader_156.wgsl", "sound_157.ogg", "font_158.ttf", "script_159.flecs", "prefab_160.flecs",
+  "scene_161.flecs", "texture_162.png", "mesh_163.glb", "shader_164.wgsl", "sound_165.ogg",
+  "font_166.ttf", "script_167.flecs", "prefab_168.flecs", "scene_169.flecs", "texture_170.png",
+  "mesh_171.glb", "shader_172.wgsl", "sound_173.ogg", "font_174.ttf", "script_175.flecs",
+  "prefab_176.flecs", "scene_177.flecs", "texture_178.png", "mesh_179.glb", "shader_180.wgsl",
+  "sound_181.ogg", "font_182.ttf", "script_183.flecs", "prefab_184.flecs", "scene_185.flecs",
+  "texture_186.png", "mesh_187.glb", "shader_188.wgsl", "sound_189.ogg", "font_190.ttf",
+  "script_191.flecs", "prefab_192.flecs", "scene_193.flecs", "texture_194.png", "mesh_195.glb",
+  "shader_196.wgsl", "sound_197.ogg", "font_198.ttf", "script_199.flecs", "prefab_200.flecs"
+]
+
+// An empty scene whose view paints the background of the theme behind the UI
+backdrop {
+  Scene: {}
+
+  camera {
+    Position: {0, 0, 100}
+    Camera: {ortho: true, ortho_scale: 1}
+  }
+}
+
+// What the form edits and the preview shows: a named shape, its color and size, whether it
+// casts a shadow and the light it stands in
+struct PreviewValues(
+  name: string, shape: i32, color: Rgb, size: f32, shadow: bool, light: string)
+
+const preview_defaults: PreviewValues = {
+  name: "Widget", shape: 0, color: {230, 140, 60}, size: 1, shadow: true, light: "Day"
+}
+
+const preview_shapes = ["Box", "Sphere", "Torus"]
+
+// The texture the preview renders into, which the form shows
+preview_texture {}
+
+// A view that clears to the background of the theme. A template of its own, so a new theme
+// changes it without restarting the async blocks of the gallery, which reads no theme.
+template BackdropView {
+  prop camera: entity = 0
+
+  const t = box.ui.theme[UiTheme]
+
+  View: {
+    camera: camera,
+    clear: {enabled: true, color: {t.background.r, t.background.g, t.background.b, 255}},
+    lighting: {enabled: false},
+    culling: {enabled: false}
+  }
+}
+
+template Gallery {
+  mut last: string = "none"
+  mut changes: i32 = 0
+  mut pings: i32 = 0
+  mut submitted: string = ""
+
+  // The form owns two sets of values: draft, what its widgets show, and applied, what the
+  // preview shows. A change of a widget reads the values of every widget into draft, Apply (or
+  // Enter in the name field) copies draft to applied, Reset assigns the defaults to draft,
+  // which the widgets take as their values.
+  mut draft: PreviewValues = preview_defaults
+  mut applied: PreviewValues = preview_defaults
+
+  async {
+    while true {
+      await on.pressed(actions.ping)
+      pings = pings + 1
+    }
+  }
+
+  // The background view is created before the UI view, so the UI draws over it
+  backdrop_view {
+    BackdropView: {camera: backdrop.camera}
+  }
+
+  // The 3D preview of the form: the shape on a floor under a sun, with the name above it. It
+  // reads applied only, so nothing in it moves until the form applies its values.
+  preview {
+    Scene: {}
+
+    camera {
+      Position: {0, 1.7, 4.6}
+      Rotation: {-0.3, 0, 0}
+      Camera: {fov: 40}
+    }
+
+    sun {
+      if applied.light == "Night" {
+        Rotation: {1.1, 2.8, 0}
+        DirectionalLight: {intensity: 0.6 * math.PI}
+        Rgb: {150, 170, 255}
+      } else if applied.light == "Dusk" {
+        Rotation: {0.3, 2.0, 0}
+        DirectionalLight: {intensity: 1.8 * math.PI}
+        Rgb: {255, 150, 90}
+      } else {
+        Rotation: {0.85, 2.4, 0}
+        DirectionalLight: {intensity: 2.2 * math.PI}
+        Rgb: {255, 246, 230}
+      }
+    }
+
+    ambient {
+      if applied.light == "Night" {
+        AmbientLight: {sky: {50, 60, 100}, ground: {20, 20, 30}, intensity: 0.5}
+      } else if applied.light == "Dusk" {
+        AmbientLight: {sky: {150, 110, 130}, ground: {70, 50, 40}, intensity: 0.6}
+      } else {
+        AmbientLight: {sky: {130, 150, 180}, ground: {80, 75, 65}, intensity: 0.8}
+      }
+    }
+
+    floor {
+      Position: {0, -0.05, 0}
+      Box: {6, 0.1, 6}
+      Rgb: {150, 155, 160}
+      PbrMaterial: {roughness: 0.9}
+    }
+
+    shape {
+      Scale: {applied.size, applied.size, applied.size}
+      Rgb: applied.color
+      PbrMaterial: {roughness: 0.5}
+
+      if applied.shape == 1 {
+        Position: {0, applied.size * 0.5, 0}
+        Sphere: {segments: 32, smooth: true, radius: 0.5}
+      } else if applied.shape == 2 {
+        Position: {0, applied.size * 0.55, 0}
+        Rotation: {1.1, 0, 0}
+        Torus: {segments: 32, rings: 16, smooth: true, radius: 0.38, tube: 0.16}
+      } else {
+        Position: {0, applied.size * 0.4, 0}
+        Rotation: {0, 0.6, 0}
+        Box: {0.8, 0.8, 0.8}
+      }
+
+      if !applied.shadow {
+        NoShadow
+      }
+    }
+
+    // The name in logical pixels scaled to world units, above the largest shape
+    label {
+      Position: {0, applied.size + 0.35, 0}
+      Scale: {0.006, 0.006, 0.006}
+      Text: {value: applied.name, size: 48}
+      Rgb: {255, 255, 255}
+      NoShadow
+    }
+  }
+
+  // The views of the preview surface, which draws them into preview_texture before the window
+  // draws the UI that shows it
+  preview_views {
+    view {
+      if applied.light == "Night" {
+        View: {
+          camera: preview.camera, clear: {enabled: true, color: {16, 20, 38, 255}},
+          shadows: {enabled: true}
+        }
+      } else if applied.light == "Dusk" {
+        View: {
+          camera: preview.camera, clear: {enabled: true, color: {196, 128, 110, 255}},
+          shadows: {enabled: true}
+        }
+      } else {
+        View: {
+          camera: preview.camera, clear: {enabled: true, color: {150, 186, 226, 255}},
+          shadows: {enabled: true}
+        }
+      }
+    }
+  }
+
+  preview_surface {
+    Surface: {width: 600, height: 450, texture: preview_texture, view_root: preview_views}
+  }
+
+  // Screen space UI: one logical pixel is one point, the root fills the window
+  hud {
+    Scene: {}
+
+    camera {
+      Position: {0, 0, 100}
+      Camera: {ortho: true, ortho_scale: 1}
+    }
+
+    root {
+      LayoutFill: {surface: window}
+      Layout: {direction: Column, spacing: 12, padding: {16, 16, 16, 16}}
+      FocusScope
+
+      // The status line follows every change reported below the root. A text field reports
+      // its edits itself and its TextInput again, only the TextInput counts.
+      async {
+        while true {
+          const e = await on.change(this)
+          const w = e.widget
+          if !w.has(TextEdit) {
+            changes = changes + 1
+            if w.has(Slider) {
+              last = "{w.name()}: {w[Slider.mut].current:.2}"
+            } else if w.has(Stepper) {
+              last = "{w.name()}: {w[Stepper.mut].current:.0}"
+            } else if w.has(Checkbox) {
+              last = "{w.name()}: {w[Checkbox.mut].current}"
+            } else if w.has(Switch) {
+              last = "{w.name()}: {w[Switch.mut].current}"
+            } else if w.has(RadioGroup) {
+              last = "{w.name()}: {w[RadioGroup.mut].current}"
+            } else if w.has(TextInput) && !w[TextInput].password {
+              last = "{w.name()}: {w[TextInput.mut].current}"
+            } else if w.has(Dropdown) {
+              last = "{w.name()}: {w[Dropdown.mut].current}"
+            } else if w.has(TabView) {
+              last = "{w.name()}: {w[TabView.mut].current}"
+            } else if w.has(ListView) {
+              last = "{w.name()}: {w[ListView.mut].current}"
+            } else if w.has(Collapsible) {
+              last = "{w.name()}: {w[Collapsible.mut].current}"
+            } else {
+              last = "{w.name()}"
+            }
+          }
+        }
+      }
+
+      // The header stays at the top while the page below it scrolls. The theme dropdown, the
+      // first Tab stop, picks the theme ThemeSwitch assigns.
+      header {
+        Layout: {direction: Row, spacing: 16, v: Middle}
+        LayoutItem: {width: {mode: Grow}}
+
+        Label title(text: "Widgets", variant: "heading")
+        Label status(text: "Last change: {last}", variant: "muted")
+        Label pings(text: "Pings: {pings}", variant: "caption")
+
+        gap {
+          LayoutItem: {width: {mode: Grow}}
+        }
+
+        Label theme_label(text: "Theme", variant: "muted")
+        Dropdown theme(options: ["Dark", "Light"], value: 0, width: 120)
+      }
+
+      // The page: the sections in two rows, scrolled both ways where the window is smaller than
+      // they are. It is no Tab stop of its own; Tab scrolls the widget it focuses into view.
+      ScrollView page(horizontal: true, focusable: false) {
+        top {
+          Layout: {direction: Row, spacing: 16}
+
+          Panel basics(title: "Basics", width: 600) {
+            labels {
+              Layout: {direction: Row, spacing: 16, v: Bottom}
+              Label heading(text: "Heading", variant: "heading")
+              Label body(text: "Body text")
+              Label muted(text: "Muted text", variant: "muted")
+              Label caption(text: "Caption", variant: "caption")
+            }
+
+            Separator labels_end()
+
+            buttons {
+              Layout: {direction: Row, spacing: 8, v: Middle}
+              Button save(label: "Save")
+              Button cancel(label: "Cancel", variant: "secondary")
+              Button more(label: "More", variant: "ghost")
+              Button remove(label: "Delete", variant: "danger")
+              Button ping(label: "Ping", variant: "secondary", action: actions.ping)
+              Button off(label: "Disabled", disabled: true)
+            }
+
+            toggles {
+              Layout: {direction: Row, spacing: 16, v: Middle}
+              Checkbox sound(label: "Sound")
+              Checkbox music(label: "Music", value: true)
+              Checkbox locked(label: "Locked", disabled: true)
+              Switch wifi(label: "Wi-Fi")
+              Switch airplane(label: "Airplane", value: true, disabled: true)
+            }
+
+            radios {
+              Layout: {direction: Row, spacing: 48}
+
+              RadioGroup size(value: "Medium") {
+                RadioButton small(label: "Small")
+                RadioButton medium(label: "Medium")
+                RadioButton large(label: "Large")
+                RadioButton huge(label: "Huge", disabled: true)
+              }
+
+              RadioGroup quality(value: "High", disabled: true) {
+                RadioButton low(label: "Low")
+                RadioButton high(label: "High")
+              }
+            }
+
+            Separator radios_end()
+
+            sliders {
+              Layout: {direction: Row, spacing: 24}
+              Slider volume(label: "Volume", width: 168, min: 0, max: 100, step: 10, value: 40, unit: "%")
+              Slider gain(label: "Gain", width: 168, min: 0, max: 1, step: 0, value: 0.5, decimals: 2)
+              Slider muted(label: "Disabled", width: 168, value: 70, disabled: true)
+            }
+
+            progress {
+              Layout: {direction: Row, spacing: 24}
+              ProgressBar download(label: "Download", value: 0.65, width: 168)
+              ProgressBar done(label: "Done", value: 1, width: 168)
+            }
+
+            steppers {
+              Layout: {direction: Row, spacing: 16, v: Middle}
+              Stepper count(min: 0, max: 5, value: 2)
+              Stepper fixed(min: 0, max: 5, value: 3, disabled: true)
+            }
+          }
+
+          Panel text(title: "Text", width: 280) {
+            TextInput name(label: "Name", placeholder: "Your name", width: 248)
+            TextInput secret(label: "Password", placeholder: "Password", password: true, width: 248)
+            TextInput off(label: "Disabled", value: "Not editable", disabled: true, width: 248)
+            TextInput fixed(label: "Read only", value: "Copy me", read_only: true, width: 248)
+
+            Separator fields_end()
+
+            // Enter in the message field shows its text in the label below it
+            submit {
+              Layout: {direction: Column, spacing: 8}
+
+              async {
+                while true {
+                  const e = await on.submit(this)
+                  if e.widget.has(TextInput) {
+                    submitted = e.widget[TextInput.mut].current
+                  }
+                }
+              }
+
+              TextInput message(label: "Message", placeholder: "Type and press Enter", width: 248)
+              Label echo(text: "Submitted: {submitted}", variant: "muted")
+            }
+          }
+        }
+
+        bottom {
+          Layout: {direction: Row, spacing: 16}
+
+          Panel containers(title: "Containers", width: 600) {
+            TabView tabs(width: 576, height: 100) {
+              Tab general(label: "General") {
+                toggles {
+                  Layout: {direction: Row, spacing: 16, v: Middle}
+                  Checkbox notify(label: "Notifications", value: true)
+                  Switch sync(label: "Sync")
+                }
+                Button apply(label: "Apply")
+              }
+
+              Tab audio(label: "Audio") {
+                Slider level(label: "Level", width: 200, value: 60, unit: "%")
+                Stepper channels(min: 1, max: 8, value: 2)
+              }
+
+              Tab display(label: "Display") {
+                RadioGroup mode(value: "Window") {
+                  RadioButton window(label: "Window")
+                  RadioButton full(label: "Fullscreen")
+                }
+              }
+            }
+
+            ScrollView notes(height: 280) {
+              Label intro(width: 540, text: "A scroll view clips its content and moves it with the wheel, its scroll bar and, while it has the focus, the arrow keys, PageUp, PageDown, Home and End. This paragraph is long enough to show the wrapping of a label inside the view. The list view below is a scroll view of its own: the wheel over it scrolls the list, elsewhere it scrolls this view. The dropdown under the list opens a list that floats over the edge of the view.")
+
+              ListView files(items: files, value: 0, height: 120)
+
+              picker {
+                Layout: {direction: Row, spacing: 8, v: Middle}
+                Label picker_label(text: "Format")
+                Dropdown format(options: ["PNG", "JPEG", "WebP", "AVIF", "TIFF"], value: 0)
+              }
+
+              Label usage(width: 540, text: "Tab moves the focus into the view and through the widgets in it. A widget scrolled out of the view is clipped: it is not drawn and the pointer passes through it to whatever lies under it.")
+
+              Button share(label: "Share", variant: "secondary")
+
+              Label outro(width: 540, variant: "muted", text: "The end of the scroll view.")
+            }
+
+            Collapsible details(title: "Details", width: 576) {
+              Label details_text(text: "Hidden until the section opens", variant: "muted")
+              Checkbox verbose(label: "Verbose output")
+            }
+
+            Collapsible advanced(title: "Advanced", value: true, width: 576) {
+              Switch experimental(label: "Experimental features")
+            }
+
+            quality_row {
+              Layout: {direction: Row, spacing: 8, v: Middle}
+              Label quality_label(text: "Quality")
+              Dropdown quality(options: ["Low", "Medium", "High", "Ultra", "Custom"], value: 1)
+            }
+          }
+
+          // The form: its widgets show draft, the preview applied. The widgets take the members
+          // of draft as their values, so assigning draft (Reset) moves them.
+          Panel form(title: "Form", width: 600) {
+            body {
+              Layout: {direction: Row, spacing: 16}
+
+              // Every change reads the values of all widgets, the Apply and Reset buttons
+              // report a change of their own
+              async {
+                while true {
+                  const e = await on.change(this)
+                  const w = e.widget
+                  if w.name() == "apply" && w.has(Button) {
+                    applied = draft
+                  } else if w.name() == "reset" && w.has(Button) {
+                    draft = preview_defaults
+                  } else if !w.has(TextEdit) {
+                    const c = this.lookup("controls")
+                    draft = {
+                      name: c.lookup("name")[TextInput.mut].current,
+                      shape: c.lookup("shape_row").lookup("shape")[Dropdown.mut].current,
+                      color: {
+                        c.lookup("red")[Slider.mut].current,
+                        c.lookup("green")[Slider.mut].current,
+                        c.lookup("blue")[Slider.mut].current
+                      },
+                      size: c.lookup("size_row").lookup("size")[Stepper.mut].current,
+                      shadow: c.lookup("shadow")[Checkbox.mut].current,
+                      light: c.lookup("light_row").lookup("light")[RadioGroup.mut].current
+                    }
+                  }
+                }
+              }
+
+              // Enter in the name field applies the values, as Apply does
+              async {
+                while true {
+                  const e = await on.submit(this)
+                  if e.widget.has(TextInput) {
+                    applied = draft
+                  }
+                }
+              }
+
+              controls {
+                Layout: {direction: Column, spacing: 8}
+                LayoutItem: {width: {mode: Fixed, value: 260}}
+
+                TextInput name(
+                  label: "Name", placeholder: "Shown in the preview", value: draft.name, width: 260)
+
+                shape_row {
+                  Layout: {direction: Row, spacing: 8, v: Middle}
+                  Label shape_label(text: "Shape", width: 48)
+                  Dropdown shape(options: preview_shapes, value: draft.shape, width: 204)
+                }
+
+                Slider red(label: "Red", width: 260, max: 255, value: draft.color.r)
+                Slider green(label: "Green", width: 260, max: 255, value: draft.color.g)
+                Slider blue(label: "Blue", width: 260, max: 255, value: draft.color.b)
+
+                size_row {
+                  Layout: {direction: Row, spacing: 8, v: Middle}
+                  Label size_label(text: "Size", width: 48)
+                  Stepper size(min: 0.5, max: 1.5, step: 0.25, value: draft.size, decimals: 2)
+                }
+
+                Checkbox shadow(label: "Cast a shadow", value: draft.shadow)
+
+                light_row {
+                  Layout: {direction: Row, spacing: 8}
+                  Label light_label(text: "Light", width: 48)
+
+                  RadioGroup light(value: draft.light) {
+                    RadioButton day(label: "Day")
+                    RadioButton dusk(label: "Dusk")
+                    RadioButton night(label: "Night")
+                  }
+                }
+
+                form_actions {
+                  Layout: {direction: Row, spacing: 8, v: Middle}
+                  Button apply(label: "Apply")
+                  Button reset(label: "Reset", variant: "secondary")
+                }
+              }
+
+              // The texture of the preview surface on a rect, as etc/scenes/ui.flecs shows its
+              // screen texture on its curved screen
+              preview {
+                Layout: {direction: Column, spacing: 8}
+
+                image {
+                  LayoutItem: {width: {mode: Fixed, value: 300}, height: {mode: Fixed, value: 225}}
+                  Rect: {1, 1}
+                  Image: {texture: preview_texture, u0: 0, v0: 0, u1: 1, v1: 1}
+                  Border: {radius: 4}
+                }
+
+                const shown = preview_shapes[applied.shape]
+                Label applied_text(width: 300, variant: "muted",
+                  text: "{applied.name}: {shown}, size {applied.size:.2}, {applied.light} light")
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // The UI view draws over the background without clearing it
+  hud_view {
+    View: {camera: hud.camera, lighting: {enabled: false}, culling: {enabled: false}}
+  }
+}
+
+gallery {
+  Gallery: {}
+}
+
+// The theme switch: the theme of every widget follows the theme dropdown of the header of a
+// gallery. Instantiated on the theme entity, it keeps the index of the theme in a mut of its own,
+// so it assigns the theme only when the dropdown changes it: every widget reads the theme, and a
+// new value restarts their async blocks. The theme entity belongs to box.ui, the template only
+// assigns its value.
+template ThemeSwitch {
+  prop source: entity = 0
+
+  mut index: i32 = 0
+
+  UiTheme: match index {
+    1: LightTheme
+    _: DarkTheme
+  }
+
+  async {
+    while true {
+      const e = await on.change(source)
+      const w = e.widget
+      if w.name() == "theme" && w.has(Dropdown) && w.parent().name() == "header" {
+        index = w[Dropdown.mut].current
+      }
+    }
+  }
+}
+
+box {
+  ui {
+    theme {
+      ThemeSwitch: {source: gallery}
+    }
+  }
+}

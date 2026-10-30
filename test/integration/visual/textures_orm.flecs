@@ -17,7 +17,7 @@ orm_scene {
 
   sky {
     Environment: {resolution: 64}
-    EnvironmentImage: {path: "etc/environments/sky.hdr"}
+    EnvironmentImage: {path: "test/assets/environments/sky.hdr"}
   }
 
   orm {

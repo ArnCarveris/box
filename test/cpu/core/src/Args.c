@@ -147,11 +147,11 @@ void Args_scene(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    char *argv[] = {"boxrun", "etc/scenes/default.flecs"};
+    char *argv[] = {"boxrun", "scenes/scene.flecs"};
     test_int(box_app_parse(world, 2, argv), 0);
 
     const App *app = ecs_singleton_get(world, App);
-    test_str(app->scene, "etc/scenes/default.flecs");
+    test_str(app->scene, "scenes/scene.flecs");
 
     ecs_fini(world);
 }

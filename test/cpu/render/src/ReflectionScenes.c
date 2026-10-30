@@ -15,7 +15,7 @@
 #include "spatial.h"
 
 /** Path of the garden scene in the repository */
-#define GARDEN_PATH "etc/scenes/japanese_garden.flecs"
+#define GARDEN_PATH "test/assets/scenes/japanese_garden.flecs"
 
 /** Path of this file in the repository, which locates the repository root */
 #define GARDEN_SOURCE "test/cpu/render/src/"
