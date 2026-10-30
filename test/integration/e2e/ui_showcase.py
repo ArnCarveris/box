@@ -2,17 +2,19 @@
 the screen space, world space and render-to-texture widgets, and the actions change the state,
 the 3D scene and the renders of the app.
 
-Every case runs in a fresh apps/uishowcase process with its default scene (1280x720) and gets
-the App of tools/box_client.py. The runner checks after every case that the app logged no
-error and quits cleanly. The coordinates are window points for 1280x720, each checked with
-PickStatus before it is clicked.
+Every case runs in a fresh apps/boxrun process with the showcase scene,
+test/assets/scenes/ui_showcase.flecs (named from the repository root, the scene the GPU suite
+test/gpu/uishowcase loads), and gets the App of tools/box_client.py. The scene declares its own
+1280x720 window Surface, so boxrun needs no --surface. The runner checks after every case that
+the app logged no error and quits cleanly. The coordinates are window points for 1280x720, the
+same as the GPU suite's, each checked with PickStatus before it is clicked.
 """
 import math
 
 from box_client import mean_luma
 
-APP = "apps/uishowcase"
-ARGS = []
+APP = "apps/boxrun"
+ARGS = ["test/assets/scenes/ui_showcase.flecs"]
 
 COUNTER = "[166, 298]"
 TOGGLE = "[47, 340]"
