@@ -862,6 +862,7 @@ void Transition_supported(void) {
     test_assert(box_transition_supported(world, ecs_id(PbrMaterial)));
     test_assert(box_transition_supported(world, ecs_id(Emissive)));
     test_assert(box_transition_supported(world, ecs_id(TextureTransform)));
+    test_assert(box_transition_supported(world, ecs_id(Transmission)));
 
     test_assert(!box_transition_supported(world, ecs_id(PbrTextures)));
     test_assert(!box_transition_supported(world, ecs_id(WorldTransform)));
@@ -870,6 +871,42 @@ void Transition_supported(void) {
     test_assert(!box_transition_supported(world, DynamicTransform));
     test_assert(!box_transition_supported(world, ecs_id(Transition)));
     test_assert(!box_transition_supported(world, 0));
+
+    ecs_fini(world);
+}
+
+void Transition_transmission_map(void) {
+    // engine_core/transition
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    transition_capture_begin();
+    int result = ecs_script_run(world, "transmission",
+        "using box.material\n"
+        "using box.transition\n"
+        "e {\n"
+        "  Transmission: {transmission_factor: 1, ior: 1.5}\n"
+        "  Transition: [Transmission: {duration: 0.5, timing_function: EaseOut}]\n"
+        "}\n", NULL);
+    char *errors = transition_capture_end();
+    test_int(result, 0);
+    test_assert(errors == NULL);
+
+    ecs_entity_t e = ecs_lookup(world, "e");
+    test_assert(e != 0);
+    test_int(ecs_map_count(ecs_get(world, e, Transition)), 1);
+    const TransitionSpec *t = box_transition_get(world, e, ecs_id(Transmission));
+    test_assert(t != NULL);
+    test_flt(t->duration, 0.5f);
+    test_int(t->timing_function, EaseOut);
+    test_assert(box_transition_valid(world, ecs_id(Transmission), t));
+
+    transition_capture_begin();
+    box_transition_set(world, e, ecs_id(Transmission), &(TransitionSpec){ .duration = 2.0f });
+    errors = transition_capture_end();
+    test_assert(errors == NULL);
+    test_flt(box_transition_get(world, e, ecs_id(Transmission))->duration, 2.0f);
+    test_int(ecs_map_count(ecs_get(world, e, Transition)), 1);
 
     ecs_fini(world);
 }

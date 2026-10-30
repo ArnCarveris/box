@@ -26,7 +26,8 @@ static const box_render_transition_component_t box_transition_material_component
     BOX_RENDER_TRANSITION_ALPHA_CUTOFF,
     BOX_RENDER_TRANSITION_PBR_MATERIAL,
     BOX_RENDER_TRANSITION_EMISSIVE,
-    BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM
+    BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM,
+    BOX_RENDER_TRANSITION_TRANSMISSION
 };
 
 /** Number of material components */
@@ -38,10 +39,11 @@ static const box_render_transition_component_t box_transition_material_component
 #define BOX_TRANSITION_MASK_TABLE \
     ((1u << BOX_RENDER_TRANSITION_RGB) | (1u << BOX_RENDER_TRANSITION_ALPHA_CUTOFF) | \
      (1u << BOX_RENDER_TRANSITION_PBR_MATERIAL) | (1u << BOX_RENDER_TRANSITION_EMISSIVE) | \
-     (1u << BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM))
+     (1u << BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM) | \
+     (1u << BOX_RENDER_TRANSITION_TRANSMISSION))
 
-/** Components the shading of a 2D shape reads: a 2D shape has no alpha test and its material
- * words hold its shape */
+/** Components the shading of a 2D shape reads: a 2D shape has no alpha test nor transmission
+ * and its material words hold its shape */
 #define BOX_TRANSITION_MASK_SHAPE \
     ((1u << BOX_RENDER_TRANSITION_RGB) | (1u << BOX_RENDER_TRANSITION_EMISSIVE) | \
      (1u << BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM))
@@ -172,6 +174,7 @@ static ecs_entity_t box_transition_id(
     case BOX_RENDER_TRANSITION_PBR_MATERIAL: result = ecs_id(PbrMaterial); break;
     case BOX_RENDER_TRANSITION_EMISSIVE: result = ecs_id(Emissive); break;
     case BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM: result = ecs_id(TextureTransform); break;
+    case BOX_RENDER_TRANSITION_TRANSMISSION: result = ecs_id(Transmission); break;
     case BOX_RENDER_TRANSITION_COMPONENTS: break;
     }
 

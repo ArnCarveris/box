@@ -44,6 +44,10 @@ ECS_STRUCT(TransitionSpec, {
  * instance that sets its own replaces the whole map. In script: Transition: [Position: {...}].
  * A key that is not transitionable or a negative duration or delay logs an error and is ignored.
  *
+ * Transitionable keys: Position, Rotation, Scale, Rgb, Opacity, AlphaCutoff, Tint, PbrMaterial,
+ * Emissive, TextureTransform and Transmission (box_transition_supported). Adding or removing a
+ * component does not animate, only a new value of a component the entity keeps.
+ *
  * The storage is a flecs map (ecs_map_t) keyed by the component entity, whose values are
  * allocated TransitionSpecs: read one with ecs_map_get_deref(map, TransitionSpec, component),
  * write one from C with box_transition_set() and remove one with box_transition_remove().
@@ -67,8 +71,8 @@ float box_transition_ease(
 
 /** Whether changes of a component can transition.
  *
- * Position, Rotation, Scale, Rgb, Opacity, AlphaCutoff, Tint, PbrMaterial, Emissive and
- * TextureTransform can. Every other id cannot.
+ * Position, Rotation, Scale, Rgb, Opacity, AlphaCutoff, Tint, PbrMaterial, Emissive,
+ * TextureTransform and Transmission can. Every other id cannot.
  *
  * @param world The world
  * @param component The component id

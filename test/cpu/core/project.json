@@ -302,6 +302,7 @@
                     "negative_duration",
                     "negative_delay",
                     "supported",
+                    "transmission_map",
                     "ease_end_points",
                     "ease_monotonic",
                     "ease_midpoints"
