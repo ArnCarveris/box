@@ -463,6 +463,24 @@
                 ]
             },
             {
+                "id": "LightCookie",
+                "testcases": [
+                    "default_settings",
+                    "no_texture_no_effect",
+                    "uniform_half",
+                    "ambient_unaffected",
+                    "strength_mixes",
+                    "threshold_softness",
+                    "tiles_repeat",
+                    "plane_projection",
+                    "light_projection",
+                    "velocity_moves",
+                    "particles_lit_by_cookie",
+                    "bake_ignores_cookie",
+                    "noise_coverage"
+                ]
+            },
+            {
                 "id": "Shadow",
                 "testcases": [
                     "splits_uniform",

@@ -182,6 +182,17 @@ void box_gpu_texture_mips(
 void box_gpu_materials_clear(
     box_gpu_t *gpu);
 
+/** Get the view a light cookie samples a texture through: every level as stored, so a texture
+ * that is not single channel reads its stored red channel, not decoded from sRGB.
+ *
+ * @param gpu The backend
+ * @param handle Texture handle
+ * @return The view, NULL when the backend has no image of the handle
+ */
+WGPUTextureView box_gpu_texture_cookie(
+    box_gpu_t *gpu,
+    uint32_t handle);
+
 /** Get the view a particle sprite samples a texture through, decoded from sRGB, and queue its
  * levels for generation in linear light.
  *
@@ -645,12 +656,25 @@ WGPUBuffer box_gpu_light_binding(
     const box_render_view_t *v,
     uint64_t *size);
 
+/** Write the light cookie members of the uniforms of a view: the LightCookie of its first
+ * directional light, applied when the view is lit and the backend has the image of its texture.
+ * The probe and reflection captures leave them zero, so they never apply a cookie.
+ *
+ * @param gpu The backend
+ * @param v The view
+ * @param u The uniforms
+ */
+void box_gpu_cookie_uniforms(
+    box_gpu_t *gpu,
+    const box_render_view_t *v,
+    box_gpu_view_uniforms_t *u);
+
 /** Create the bind group of the forward pass of a view with explicit buffers.
  *
  * @param gpu The backend
  * @param t The target whose aerial perspective volume of the view it binds, NULL for the
- * placeholder volume, the black environment, the zero environment SH, the empty shadow atlas and
- * the zero tile records of the probe and reflection captures
+ * placeholder volume, the black environment, the zero environment SH, the empty shadow atlas,
+ * the zero tile records and the white light cookie of the probe and reflection captures
  * @param v The view
  * @param uniforms Buffer with the uniforms, bound with a dynamic offset
  * @param clusters Cluster buffer of the view
@@ -668,7 +692,8 @@ WGPUBindGroup box_gpu_light_group_with(
     WGPUTextureView ao);
 
 /** Create the bind group of the forward pass of a view: its uniforms, lights, clusters, shadow
- * map, aerial perspective volume, environment, ambient occlusion, shadow atlas and tile records.
+ * map, aerial perspective volume, environment, ambient occlusion, shadow atlas, tile records and
+ * light cookie.
  *
  * @param gpu The backend
  * @param t The target

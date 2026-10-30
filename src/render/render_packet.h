@@ -335,6 +335,22 @@ typedef struct box_render_shadow_atlas_desc_t {
     int32_t resolution;     /**< Edge of the atlas in texels, a power of two */
 } box_render_shadow_atlas_desc_t;
 
+/** The LightCookie of the first directional light of a view, resolved for the backend */
+typedef struct box_render_view_cookie_t {
+    uint32_t texture;        /**< Backend handle of its texture, 0 for no cookie: no texture, a
+                              *   texture the backend has no image of yet, no effect */
+    uint32_t projection;     /**< LightCookieProjection */
+    float inv_size;          /**< One over the world units the texture repeats over */
+    float height;            /**< World Y of the plane of the Plane projection */
+    float offset[2];         /**< Offset plus velocity times the total time in world units,
+                              *   wrapped to [0, size) */
+    float threshold;         /**< Value at which the remapped cookie is half lit */
+    float softness;          /**< Half the range of values the remap ramps over */
+    float strength;          /**< Mix from no cookie to the remapped value */
+    float axis_x[3];         /**< Local X axis of the light in world space, normalized */
+    float axis_y[3];         /**< Local Y axis of the light in world space, normalized */
+} box_render_view_cookie_t;
+
 /** The lights a view is shaded with: the light buffer of its scene and its ambient light */
 typedef struct box_render_view_lights_t {
     bool enabled;            /**< Shade with the lights, else draw base color and emission */
@@ -346,6 +362,7 @@ typedef struct box_render_view_lights_t {
     float ambient_ground[4]; /**< Linear ambient light from below */
     float sun[3];            /**< Direction toward the first directional light, if any */
     float sun_color[3];      /**< Linear color times intensity of that light */
+    box_render_view_cookie_t cookie; /**< LightCookie of that light, texture 0 for none */
 } box_render_view_lights_t;
 
 /** The shadow settings of a view, resolved, with the view depths its cascades end at.

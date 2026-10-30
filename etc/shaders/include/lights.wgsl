@@ -7,7 +7,8 @@
 // its offset, followed by cluster_probes(count) indices into the reflection probe buffer of the
 // scene in blend order, at most CLUSTER_PROBES. The shadow members describe the cascaded shadow map of the first directional light,
 // see shadow.wgsl; the spot members the spot and point light tiles of the shadow atlas, see
-// spot_shadow.wgsl and point_shadow.wgsl.
+// spot_shadow.wgsl and point_shadow.wgsl; the cookie members the light cookie of the first
+// directional light, see cookie.wgsl.
 #pragma once
 
 struct View {
@@ -55,6 +56,16 @@ struct View {
     spot_config: vec4u,
     // x: depth bias, y: normal offset at grazing light, both in texels of a tile
     spot_bias: vec4f,
+    // Light cookie of the first directional light, see cookie.wgsl: x one over its size, y the
+    // height of its plane, z its threshold, w its softness
+    cookie: vec4f,
+    // x, y: its offset in world units, wrapped to [0, size), z: its strength
+    cookie_offset: vec4f,
+    // Local X and Y axes of the light in world space, of the light projection
+    cookie_x: vec4f,
+    cookie_y: vec4f,
+    // x: 1 when the view applies the cookie, y: its projection, 0 plane and 1 light
+    cookie_config: vec4u,
 };
 
 // shadow is the index of the tile record of a spot or point light in the shadow atlas of the

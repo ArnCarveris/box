@@ -8,10 +8,12 @@
 // A circle is shaded smoothstep(1, 0, d^2) over its quad, a sprite shows a frame of its sheet and
 // a billboard is the mesh of the corner buffer turned to face the camera. A soft particle fades
 // in front of the depth of the view (group 2), a lit one is shaded by the lights of the scene
-// with a wrapped diffuse term and an emitter with an appearance gets the aerial perspective of
+// with a wrapped diffuse term, the first directional light through its shadows and light cookie
+// (cookie.wgsl), and an emitter with an appearance gets the aerial perspective of
 // the view. An additive pool adds color times opacity, an alpha pool blends over the image.
 #include "include/lights.wgsl"
 #include "include/shadow.wgsl"
+#include "include/cookie.wgsl"
 #include "include/particle.wgsl"
 
 const PI: f32 = 3.141592653589793;
@@ -165,7 +167,11 @@ fn diffuse(n: vec3f, l: vec3f) -> f32 {
 // shadow map, the point and spot lights of the cluster of the fragment and the ambient light.
 fn particle_light(world: vec3f, n: vec3f) -> vec3f {
     var sum = ambient(n);
-    let shadow = shadow_factor(world, n);
+    var shadow = shadow_factor(world, n);
+    if (view.lights.x > 0u) {
+        shadow *= light_cookie(world, normalize(lights[0].position));
+    }
+
     for (var i = 0u; i < view.lights.x; i++) {
         let light = lights[i];
         let visible = select(1.0, shadow, i == 0u);

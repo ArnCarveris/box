@@ -1,0 +1,57 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+
+// A classic directional cookie: the sun carries a LightCookie of a grid (cookie_grid.png, white
+// with black lines and a black square in one cell, loaded single_channel) in its own space
+// (projection Light), repeating every 3 units. The sun is rolled about its axis, so the grid
+// lines run at an angle across the floor and the shapes, and softness 0 keeps the lines sharp.
+// The cookie scales only the direct sunlight: the ambient side of the shapes is unchanged.
+
+camera {
+  Position: {0, 6, 9}
+  Rotation: {-0.55, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {24, 26, 32, 255}}, shadows: {enabled: true}}
+}
+
+$ {
+  AmbientLight: {sky: {60, 64, 76}, ground: {30, 28, 26}}
+}
+
+grid {
+  TexturePath: {path: "test/integration/visual/assets/cookie_grid.png", single_channel: true}
+}
+
+sun {
+  Rotation: {1.1, 0.3, 0.4}
+  DirectionalLight: {intensity: 1.4 * flecs.script.math.PI}
+  Rgb: {255, 240, 220}
+  LightCookie: {texture: grid, projection: Light, size: 3, threshold: 0.5, softness: 0}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {14, 0.2, 10}
+  Rgb: {200, 200, 205}
+}
+
+ball {
+  Position: {-2.5, 1, 0}
+  Sphere: {segments: 32, smooth: true, radius: 1}
+  Rgb: {230, 230, 230}
+}
+
+block {
+  Position: {1.5, 0.8, -0.5}
+  Rotation: {0, 0.6, 0}
+  Box: {1.6, 1.6, 1.6}
+  Rgb: {220, 120, 90}
+}

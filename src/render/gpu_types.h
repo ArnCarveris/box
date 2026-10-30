@@ -538,6 +538,13 @@ typedef struct box_gpu_view_uniforms_t {
                                      *   texels, two unused */
     vec4 spot_bias;                 /**< Depth bias and normal offset at grazing light in texels
                                      *   of a tile, two unused */
+    vec4 cookie;                    /**< LightCookie of the first directional light: one over
+                                     *   its size, height of its plane, threshold, softness */
+    vec4 cookie_offset;             /**< Its wrapped offset in world units, strength, unused */
+    vec4 cookie_x;                  /**< Local X axis of the light, w unused */
+    vec4 cookie_y;                  /**< Local Y axis of the light, w unused */
+    uint32_t cookie_config[4];      /**< 1 when the view applies the cookie and 0 when not,
+                                     *   its LightCookieProjection, two unused */
 } box_gpu_view_uniforms_t;
 
 /** The shadow atlas of a scene: the depth texture its spot and point light tiles render into */
@@ -631,6 +638,8 @@ typedef struct box_gpu_t {
     WGPUSampler samplers[BOX_GPU_WRAPS][BOX_GPU_ANISOTROPY_LEVELS]; /**< Created on use */
     box_gpu_texture_t *white;       /**< Default of the albedo, emissive and ORM layers */
     box_gpu_texture_t *flat;        /**< Default of the normal layer, an unperturbed normal */
+    box_gpu_texture_t *no_cookie;   /**< 1x1 white R8 texture bound as the light cookie of the
+                                     *   views without one */
     ecs_map_t textures;             /**< Handle to box_gpu_texture_t */
     ecs_map_t materials;            /**< Key hash to the first box_gpu_material_t */
     ecs_vec_t mips;                 /**< uint32_t, textures whose mip levels are not generated */

@@ -1,7 +1,8 @@
 // Forward pass: draws shape meshes with a physically based surface, a GGX distribution with
 // height correlated Smith visibility and Schlick Fresnel, lit by the lights of the scene; the
 // first directional light is shadowed by its cascades, a spot or point light with a tile by the
-// shadow atlas of the scene (spot_shadow.wgsl, point_shadow.wgsl).
+// shadow atlas of the scene (spot_shadow.wgsl, point_shadow.wgsl), and the first directional
+// light is scaled by its light cookie (cookie.wgsl).
 // Instance normals use the cofactor matrix of the model rotation, the inverse transpose up to
 // a scale, so non-uniform scale keeps them perpendicular. Texture layers (group 1) are sampled
 // with the instance UV transform; the normal map uses a tangent frame from screen derivatives.
@@ -33,6 +34,7 @@
 #include "include/shadow.wgsl"
 #include "include/spot_shadow.wgsl"
 #include "include/point_shadow.wgsl"
+#include "include/cookie.wgsl"
 
 // BlendMode of the pipeline: the output is shaped for the blend equation it is drawn with.
 override blend_mode: u32 = 0u;
@@ -718,12 +720,16 @@ fn attenuation(light: Light, l: vec3f, dist: f32) -> f32 {
 }
 
 // Light inputs. Every direct light the forward pass uses comes from here: the directional
-// lights of the scene, the first one through its shadow map, then the point and spot lights
+// lights of the scene, the first one through its shadow map and light cookie, then the point and spot lights
 // of the cluster of the fragment, a spot or point light with a tile of the shadow atlas through
 // it.
 fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32) -> vec3f {
     var sum = vec3f(0.0);
-    let shadow = shadow_factor(world, s.geometric);
+    var shadow = shadow_factor(world, s.geometric);
+    if (view.lights.x > 0u) {
+        shadow *= light_cookie(world, normalize(lights[0].position));
+    }
+
     for (var i = 0u; i < view.lights.x; i++) {
         let light = lights[i];
         let visible = select(1.0, shadow, i == 0u);

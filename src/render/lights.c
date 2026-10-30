@@ -172,6 +172,8 @@ typedef struct box_render_lights_t {
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
     int32_t generation;         /**< Generation of that backend, see box_render_backend_t */
     box_render_lights_stats_t stats; /**< Counters of the last extract */
+    double time;                /**< Seconds the world advanced over the extracts, in double
+                                 *   precision for the offset of the light cookies */
 } box_render_lights_t;
 
 /** Fill the conversion table of display encoded channels, once per process.
@@ -1180,6 +1182,7 @@ static void box_lights_views(
             ? ecs_vec_get_t(&l->scenes, box_light_scene_t, index)
             : NULL;
         out->enabled = view ? view->lighting.enabled : true;
+        ecs_os_memset_t(&out->cookie, 0, box_render_view_cookie_t);
         const box_light_list_t *list = s ? &s->lists[BOX_LIGHTS_VIEW] : NULL;
         if (s && (s->has_lights || s->atmos_unlit)) {
             out->buffer = list->buffer;
@@ -1189,6 +1192,8 @@ static void box_lights_views(
                 box_render_light_t *sun = ecs_vec_first_t(&list->lights, box_render_light_t);
                 glm_vec3_copy(sun->position, out->sun);
                 glm_vec3_copy(sun->color, out->sun_color);
+                box_render_cookie_resolve(world,
+                    *ecs_vec_first_t(&list->entities, ecs_entity_t), l->time, &out->cookie);
             }
         } else {
             box_lights_send_default(l, p);
@@ -1624,6 +1629,7 @@ static void BoxRenderExtractLights(
     }
 
     ecs_os_memset_t(&l->stats, 0, box_render_lights_stats_t);
+    l->time += (double)it->delta_time;
     box_lights_reset(l);
     box_lights_collect_bakes(world, l);
     box_lights_collect_atmospheres(world, l);

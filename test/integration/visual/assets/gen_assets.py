@@ -91,6 +91,17 @@ def stripes(x, y):
     return (255, g, 255, 255)
 
 
+def cookie_grid(x, y):
+    """Light cookie of the cookie_pattern scene: white with black lines four texels wide every
+    32 texels and a black square in the top left cell, so a turn of the pattern shows; the scene
+    loads it single channel, which reads the red channel."""
+    cell = SIZE // 4
+    line = x % cell < 4 or y % cell < 4
+    mark = 10 <= x < 22 and 10 <= y < 22
+    v = 0 if line or mark else 255
+    return (v, v, v, 255)
+
+
 def orm(x, y):
     """ORM of four by four tiles with occluded grooves (red) between them, a smooth top and a
     rough bottom half per tile (green) and metal and dielectric columns (blue)."""
@@ -154,7 +165,8 @@ def leaf(x, y):
 def main():
     for name, fn in (("checker.png", checker), ("letter.png", letter),
                      ("bumps.png", bumps), ("stripes.png", stripes), ("ring.png", ring),
-                     ("orm.png", orm), ("fence.png", fence), ("leaf.png", leaf)):
+                     ("orm.png", orm), ("fence.png", fence), ("leaf.png", leaf),
+                     ("cookie_grid.png", cookie_grid)):
         write_png(name, SIZE, image(SIZE, fn))
         print("%s %d bytes" % (name, os.path.getsize(os.path.join(HERE, name))))
 

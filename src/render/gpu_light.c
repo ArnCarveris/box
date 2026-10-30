@@ -584,6 +584,52 @@ done:
     return s && s->module ? gpu->cluster : NULL;
 }
 
+void box_gpu_cookie_uniforms(
+    box_gpu_t *gpu,
+    const box_render_view_t *v,
+    box_gpu_view_uniforms_t *u)
+{
+    const box_render_view_cookie_t *c = &v->lights.cookie;
+    if (!v->lights.enabled || !v->lights.directional || !c->texture ||
+        !box_gpu_texture_cookie(gpu, c->texture))
+    {
+        goto done;
+    }
+
+    u->cookie[0] = c->inv_size;
+    u->cookie[1] = c->height;
+    u->cookie[2] = c->threshold;
+    u->cookie[3] = c->softness;
+    u->cookie_offset[0] = c->offset[0];
+    u->cookie_offset[1] = c->offset[1];
+    u->cookie_offset[2] = c->strength;
+    glm_vec3_copy(ECS_CONST_CAST(float*, c->axis_x), u->cookie_x);
+    glm_vec3_copy(ECS_CONST_CAST(float*, c->axis_y), u->cookie_y);
+    u->cookie_config[0] = 1;
+    u->cookie_config[1] = c->projection;
+done:
+    return;
+}
+
+/** Get the view of the light cookie a view binds.
+ *
+ * @param gpu The backend
+ * @param t The target, NULL for the probe and reflection captures
+ * @param v The view
+ * @return Its cookie texture, else the white one
+ */
+static WGPUTextureView box_gpu_cookie_view(
+    box_gpu_t *gpu,
+    const box_gpu_target_t *t,
+    const box_render_view_t *v)
+{
+    WGPUTextureView result = t && v->lights.cookie.texture
+        ? box_gpu_texture_cookie(gpu, v->lights.cookie.texture)
+        : NULL;
+
+    return result ? result : gpu->no_cookie->linear;
+}
+
 WGPUBuffer box_gpu_light_binding(
     box_gpu_t *gpu,
     const box_render_view_t *v,
@@ -704,7 +750,7 @@ WGPUBindGroup box_gpu_light_group_with(
         &gpu->buffers, box_gpu_buffer_t, BOX_RENDER_BUFFER_CLIPS);
     WGPUBuffer tiles = NULL;
     const box_gpu_atlas_t *atlas = t ? box_gpu_atlas_of(gpu, v, &tiles) : NULL;
-    WGPUBindGroupEntry entries[17] = {
+    WGPUBindGroupEntry entries[19] = {
         { .binding = 0, .buffer = uniforms, .size = sizeof(box_gpu_view_uniforms_t) },
         { .binding = 1, .buffer = lights, .size = size },
         { .binding = 2, .buffer = clusters, .size = wgpuBufferGetSize(clusters) },
@@ -732,13 +778,15 @@ WGPUBindGroup box_gpu_light_group_with(
             .binding = 16,
             .buffer = atlas ? tiles : gpu->no_tiles,
             .size = BOX_GPU_ATLAS_TILES_SIZE
-        }
+        },
+        [17] = { .binding = 17, .textureView = box_gpu_cookie_view(gpu, t, v) },
+        [18] = { .binding = 18, .sampler = box_gpu_texture_sampler(gpu, WrapRepeat, 1) }
     };
     box_gpu_atmosphere_bindings(gpu, t, v, &entries[9]);
     box_gpu_environment_bindings(gpu, t ? v : NULL, &entries[12]);
     WGPUBindGroupDescriptor desc = {
         .layout = gpu->view_layout,
-        .entryCount = 17,
+        .entryCount = 19,
         .entries = entries
     };
 

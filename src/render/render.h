@@ -206,6 +206,32 @@ void box_render_lights_stats(
 const void* box_render_lights_state(
     const ecs_world_t *world);
 
+/** Get the offset a LightCookie moves its pattern by at a time: its offset plus its velocity
+ * times the time, computed in double precision and wrapped to [0, size) on each axis.
+ *
+ * @param cookie The cookie, whose size is above 0
+ * @param time Seconds the world has advanced in total
+ * @param out Receives the two components in world units
+ */
+void box_render_cookie_offset(
+    const LightCookie *cookie,
+    double time,
+    float *out);
+
+/** Resolve the LightCookie of the first directional light of a view for the backend.
+ *
+ * @param world The world
+ * @param light The entity of the light
+ * @param time Seconds the world has advanced in total, in double precision
+ * @param out Receives the cookie, texture 0 when the light has none or it has no effect: no
+ *            texture, a texture without an image yet, a size at or below 0 or a strength of 0
+ */
+void box_render_cookie_resolve(
+    const ecs_world_t *world,
+    ecs_entity_t light,
+    double time,
+    box_render_view_cookie_t *out);
+
 /** Make the light extract attenuate the sun and moon of the scenes with an Atmosphere and
  * write their AtmosphereStatus, called by the import of box.atmosphere.
  *
