@@ -634,6 +634,23 @@ static void BoxSurfaceFromApp(
     ecs_enable(world, it->system, false);
 }
 
+void box_surface_point_size(
+    const Surface *surface,
+    const SurfaceStatus *status,
+    float *width,
+    float *height)
+{
+    if (status && status->point_width > 0 && status->point_height > 0) {
+        *width = (float)status->point_width;
+        *height = (float)status->point_height;
+    } else if (surface) {
+        *width = (float)surface->width;
+        *height = (float)surface->height;
+    } else {
+        *width = *height = 0;
+    }
+}
+
 void BoxSurfaceImport(
     ecs_world_t *world)
 {

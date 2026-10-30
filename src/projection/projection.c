@@ -66,13 +66,7 @@ static void box_projection_surface_size(
             }
 
             found = true;
-            if (st && st[i].point_width > 0 && st[i].point_height > 0) {
-                *width = (float)st[i].point_width;
-                *height = (float)st[i].point_height;
-            } else {
-                *width = (float)s[i].width;
-                *height = (float)s[i].height;
-            }
+            box_surface_point_size(&s[i], st ? &st[i] : NULL, width, height);
         }
     }
 

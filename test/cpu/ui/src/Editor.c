@@ -529,3 +529,54 @@ void Editor_script_missing_looked_for_on_open(void) {
     test_int(chdir(cwd), 0);
     test_int(rmdir(dir), 0);
 }
+
+/** Check that the editor screen covers a window and the docked panel follows its size.
+ *
+ * @param world The world
+ * @param w Width of the window in points
+ * @param h Height of the window in points
+ */
+static void editor_check_window(
+    ecs_world_t *world,
+    float w,
+    float h)
+{
+    const LayoutBounds *screen = ecs_get(world, ecs_lookup(world, BOX_EDITOR_SCREEN), LayoutBounds);
+    ecs_entity_t panel = ecs_lookup(world, BOX_EDITOR_PANEL);
+    test_assert(screen != NULL);
+    test_flt(screen->width, w);
+    test_flt(screen->height, h);
+    test_flt(ecs_get(world, panel, LayoutItem)->width.value, 0.25f * w);
+    const LayoutBounds *b = ecs_get(world, panel, LayoutBounds);
+    test_assert(b != NULL);
+    test_flt(b->width, 0.25f * w);
+    test_flt(b->height, h);
+}
+
+/** The editor fills the window after a resize, which only updates SurfaceStatus: the requested
+ * Surface size stays the same. */
+void Editor_follows_window_resize(void) {
+    // editor/overlay
+    ecs_world_t *world = editor_world();
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 640, .height = 360});
+    editor_open(world, true);
+    editor_check_window(world, 640, 360);
+
+    int32_t sizes[][2] = {{640, 600}, {960, 800}, {400, 200}};
+    for (int32_t i = 0; i < 3; i ++) {
+        int32_t w = sizes[i][0], h = sizes[i][1];
+        ecs_set(world, s, SurfaceStatus, {
+            .width = w, .height = h, .point_width = w, .point_height = h,
+            .render_width = w, .render_height = h, .window = true
+        });
+        ecs_progress(world, 0);
+        ecs_progress(world, 0);
+        const Surface *surface = ecs_get(world, s, Surface);
+        test_int(surface->width, 640);
+        test_int(surface->height, 360);
+        editor_check_window(world, (float)w, (float)h);
+    }
+
+    ecs_fini(world);
+}

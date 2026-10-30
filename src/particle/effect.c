@@ -517,13 +517,7 @@ static void box_particle_surface_size(
             }
 
             found = true;
-            if (status && status[i].point_width > 0 && status[i].point_height > 0) {
-                *width = (float)status[i].point_width;
-                *height = (float)status[i].point_height;
-            } else {
-                *width = (float)surfaces[i].width;
-                *height = (float)surfaces[i].height;
-            }
+            box_surface_point_size(&surfaces[i], status ? &status[i] : NULL, width, height);
         }
     }
 
