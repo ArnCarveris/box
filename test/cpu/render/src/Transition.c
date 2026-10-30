@@ -471,6 +471,7 @@ void Transition_remove_transition_snaps(void) {
     tr_frame(world);
     ecs_set(world, e, Position, {4, 0, 0});
     tr_frames(world, 2);
+    box_render_sync(world);
     test_int(box_render_transition_test_active(world), 1);
 
     ecs_remove(world, e, Transition);
@@ -491,6 +492,7 @@ void Transition_remove_component_snaps(void) {
     tr_frame(world);
     ecs_set(world, e, Position, {4, 0, 0});
     tr_frames(world, 2);
+    box_render_sync(world);
     test_int(box_render_transition_test_active(world), 1);
 
     ecs_remove(world, e, Position);
@@ -515,6 +517,7 @@ void Transition_delete_entity_drops(void) {
     tr_frame(world);
     ecs_set(world, e, Position, {4, 0, 0});
     tr_frames(world, 2);
+    box_render_sync(world);
     test_int(box_render_transition_test_active(world), 1);
 
     ecs_delete(world, e);
