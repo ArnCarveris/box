@@ -27,8 +27,6 @@
             },
             {
                 "id": "Render",
-                "setup": true,
-                "teardown": true,
                 "testcases": [
                     "capture_active_camera",
                     "capture_named_camera",
@@ -52,7 +50,8 @@
                     "gpu_capture_first_frame",
                     "gpu_capture_effects",
                     "gpu_render_isolated",
-                    "http_resource"
+                    "http_resource",
+                    "resources_in_tmp_dir"
                 ]
             }
         ]
