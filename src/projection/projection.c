@@ -32,49 +32,6 @@ typedef struct box_projection_lens_t {
     bool valid;        /**< The view exists and its camera has a Camera */
 } box_projection_lens_t;
 
-/** Find the size of the surface a view renders to.
- *
- * The first surface whose view_root is 0 or the parent of the view counts; its size in points
- * comes from box_surface_point_size (a window's SurfaceStatus, else the clamped requested size).
- * Without one the default surface size is used.
- *
- * @param world The world
- * @param surfaces Query for Surface and an optional SurfaceStatus
- * @param view The view
- * @param width Receives the width in points
- * @param height Receives the height in points
- */
-static void box_projection_surface_size(
-    ecs_world_t *world,
-    ecs_query_t *surfaces,
-    ecs_entity_t view,
-    float *width,
-    float *height)
-{
-    ecs_entity_t parent = ecs_get_parent(world, view);
-    bool found = false;
-    *width = BOX_SURFACE_WIDTH;
-    *height = BOX_SURFACE_HEIGHT;
-    ecs_iter_t it = ecs_query_iter(world, surfaces);
-    while (!found && ecs_query_next(&it)) {
-        const Surface *s = ecs_field(&it, Surface, 0);
-        const SurfaceStatus *st = ecs_field(&it, SurfaceStatus, 1);
-        int32_t i;
-        for (i = 0; i < it.count && !found; i ++) {
-            if (s[i].view_root && s[i].view_root != parent) {
-                continue;
-            }
-
-            found = true;
-            box_surface_point_size(&s[i], st ? &st[i] : NULL, width, height);
-        }
-    }
-
-    if (found) {
-        ecs_iter_fini(&it);
-    }
-}
-
 /** Build the lens of a view: the projection of its camera for its surface.
  *
  * @param world The world
@@ -104,7 +61,7 @@ static void box_projection_lens(
         }
 
         glm_mat4_inv(transform, inverse);
-        box_projection_surface_size(world, surfaces, view, &lens->width, &lens->height);
+        box_surface_view_size(world, surfaces, view, &lens->width, &lens->height);
         box_camera_projection(c, lens->width, lens->height, proj);
         glm_mat4_mul(proj, inverse, lens->view_proj);
     }

@@ -14,9 +14,7 @@
 #include <stdlib.h>
 #include "render.h"
 #include "draw.h"
-
-/** Seconds every frame advances the world, a power of two so the clock is exact */
-#define TR_DELTA (0.25f)
+#include "transition_test.h"
 
 /** Units of unorm16 a patched tint word may differ by from the expected one: the resolver
  * composes the tints in another order than box_draws_fade */
@@ -51,93 +49,6 @@ typedef struct tr_override_t {
 /** Most overrides of a case */
 #define TR_OVERRIDES (2)
 
-/** Create a world that renders into the null backend with a view, so the batches are sent.
- *
- * @param null Receives the backend
- * @return The world
- */
-static ecs_world_t* tr_scene(
-    box_render_null_t **null)
-{
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-    *null = box_render_null_new();
-    box_render_backend_t backend = box_render_null_backend(*null);
-    box_render_set_backend(world, &backend);
-    ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Position, {0, 0, 20});
-    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
-    ecs_entity_t view = ecs_new(world);
-    ecs_set(world, view, View, {.camera = camera});
-
-    return world;
-}
-
-/** Delete a world and its null backend.
- *
- * @param world The world
- * @param null The backend
- */
-static void tr_fini(
-    ecs_world_t *world,
-    box_render_null_t *null)
-{
-    ecs_fini(world);
-    box_render_null_free(null);
-}
-
-/** Run one frame and wait until the render thread resolved its packet.
- *
- * @param world The world
- */
-static void tr_frame(
-    ecs_world_t *world)
-{
-    ecs_progress(world, TR_DELTA);
-    box_render_sync(world);
-}
-
-/** Count the records of an op in the last packet, once the render thread resolved it.
- *
- * @param world The world
- * @param null The backend
- * @param op The op
- * @return The records
- */
-static int32_t tr_ops(
-    ecs_world_t *world,
-    const box_render_null_t *null,
-    box_render_transition_op_t op)
-{
-    int32_t i, result = 0;
-    box_render_sync(world);
-    for (i = 0; i < ecs_vec_count(&null->last.transitions); i ++) {
-        const box_render_transition_record_t *r = ecs_vec_get_t(
-            &null->last.transitions, box_render_transition_record_t, i);
-        result += r->op == op;
-    }
-
-    return result;
-}
-
-/** Create a box shape.
- *
- * @param world The world
- * @param parent ChildOf parent, 0 for none
- * @return The shape
- */
-static ecs_entity_t tr_shape(
-    ecs_world_t *world,
-    ecs_entity_t parent)
-{
-    ecs_entity_t e = parent ? ecs_new_w_pair(world, EcsChildOf, parent) : ecs_new(world);
-    ecs_set(world, e, Position, {0, 0, 0});
-    ecs_set(world, e, Box, {1, 2, 3});
-    ecs_set(world, e, Rgb, {200, 100, 50});
-
-    return e;
-}
-
 /** Create a 2D rectangle.
  *
  * @param world The world
@@ -170,25 +81,6 @@ static ecs_entity_t tr_group(
     return e;
 }
 
-/** Get the batch of the shape of an entity.
- *
- * @param world The world
- * @param e The entity
- * @return The batch
- */
-static box_draw_batch_t* tr_batch(
-    ecs_world_t *world,
-    ecs_entity_t e)
-{
-    box_render_draws_t *d = box_draws_state(world);
-    const DrawSlot *ds = ecs_get(world, e, DrawSlot);
-    test_assert(d != NULL);
-    test_assert(ds != NULL);
-    test_assert(ds->batch >= 0);
-
-    return box_draws_batch(d, ds->batch);
-}
-
 /** Read the shading slot of an entity as the backend got it in the last packet: the patched
  * bytes of the run upload of a dynamic_material batch, else the static slot.
  *
@@ -198,20 +90,17 @@ static box_draw_batch_t* tr_batch(
  * @param out Receives the shading, a box_render_shading_t for a 2D shape and a
  *        box_render_mesh_shading_t for a mesh
  */
-static void tr_rendered(
+static void tr_shading_rendered(
     ecs_world_t *world,
     const box_render_null_t *null,
     ecs_entity_t e,
     void *out)
 {
-    box_render_draws_t *d = box_draws_state(world);
     box_draw_batch_t *b = tr_batch(world, e);
     int32_t slot = ecs_get(world, e, DrawSlot)->slot;
     bool flat = b->key.pipeline == BOX_RENDER_SHADER_SHAPE2D;
     uint32_t stride = flat ? (uint32_t)sizeof(box_render_shading_t)
         : (uint32_t)sizeof(box_render_mesh_shading_t);
-    bool found = false;
-    int32_t i;
     box_render_sync(world);
     if (flat) {
         ecs_os_memcpy(out, box_draws_slot_shading(b, slot), (ecs_size_t)stride);
@@ -219,26 +108,7 @@ static void tr_rendered(
         ecs_os_memcpy(out, box_draws_slot_mesh_shading(b, slot), (ecs_size_t)stride);
     }
 
-    if (!b->key.dynamic_material) {
-        goto done;
-    }
-
-    uint32_t handle = box_draws_store_handle(box_draws_batch_store(d, b), b->page,
-        BOX_RENDER_STREAM_SHADING);
-    uint32_t offset = b->first * stride;
-    for (i = 0; i < ecs_vec_count(&null->last.uploads) && !found; i ++) {
-        const box_render_upload_t *u = ecs_vec_get_t(
-            &null->last.uploads, box_render_upload_t, i);
-        if (u->buffer == handle && u->offset == offset) {
-            ecs_os_memcpy(out, box_render_packet_data(&null->last,
-                u->data + (uint32_t)slot * stride), (ecs_size_t)stride);
-            found = true;
-        }
-    }
-
-    test_assert(found);
-done:
-    return;
+    tr_slot_rendered(world, null, b, slot, BOX_RENDER_STREAM_SHADING, stride, out);
 }
 
 /** Find the override of an entity.
@@ -393,7 +263,7 @@ static box_render_mesh_shading_t tr_check_mesh(
     box_render_mesh_shading_t rendered, expected;
     box_draw_material_t m;
     box_draw_tint_t tint;
-    tr_rendered(world, null, e, &rendered);
+    tr_shading_rendered(world, null, e, &rendered);
     tr_material(world, overrides, e, &tint, &m);
     box_draws_mesh_shading(&expected, rendered.material, &m);
     test_uint(rendered.material, expected.material);
@@ -443,7 +313,7 @@ static void tr_check_shape(
     box_draw_material_t m;
     box_draw_tint_t tint;
     int32_t i;
-    tr_rendered(world, null, e, &rendered);
+    tr_shading_rendered(world, null, e, &rendered);
     tr_material(world, overrides, e, &tint, &m);
     box_draws_material(&expected, &m);
     for (i = 0; i < 4; i ++) {
@@ -534,7 +404,7 @@ void TransitionTintOpacity_tint_mesh(void) {
     // engine_core/transition
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
-    ecs_entity_t e = tr_shape(world, 0);
+    ecs_entity_t e = tr_shape(world, 0, 0);
     const Tint from = {0, 0, 255, 0}, to = {0, 0, 255, 200};
     int32_t i;
     ecs_set_ptr(world, e, Tint, &from);
@@ -572,7 +442,7 @@ void TransitionTintOpacity_opacity_mesh(void) {
     // engine_core/transition
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
-    ecs_entity_t e = tr_shape(world, 0);
+    ecs_entity_t e = tr_shape(world, 0, 0);
     int32_t i;
     ecs_set(world, e, Opacity, {0.2f});
     tr_transition(world, e, ecs_id(Opacity));
@@ -633,7 +503,7 @@ void TransitionTintOpacity_tint_2d(void) {
     test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_SHADING), 0);
     box_draws_shape_material(world, e, ecs_get(world, e, DrawSlot), &m);
     box_draws_material(&expected, &m);
-    tr_rendered(world, null, e, &rendered);
+    tr_shading_rendered(world, null, e, &rendered);
     test_assert(!ecs_os_memcmp_t(&rendered, &expected, box_render_shading_t));
     tr_fini(world, null);
 }
@@ -659,7 +529,7 @@ void TransitionTintOpacity_opacity_2d(void) {
         test_assert(ecs_has_id(world, e, TransitionOpacity));
         test_int(tr_batch(world, e)->key.blend, AlphaBlend);
         tr_check_shape(world, null, o, e);
-        tr_rendered(world, null, e, &rendered);
+        tr_shading_rendered(world, null, e, &rendered);
         test_assert(fabsf(tr_channel(&rendered, 3) - mid.value) < TR_FLOAT_EPS);
     }
 
@@ -668,7 +538,7 @@ void TransitionTintOpacity_opacity_2d(void) {
     test_assert(!tr_batch(world, e)->key.dynamic_material);
     box_draws_shape_material(world, e, ecs_get(world, e, DrawSlot), &m);
     box_draws_material(&expected, &m);
-    tr_rendered(world, null, e, &rendered);
+    tr_shading_rendered(world, null, e, &rendered);
     test_assert(!ecs_os_memcmp_t(&rendered, &expected, box_render_shading_t));
     tr_fini(world, null);
 }
@@ -678,7 +548,7 @@ void TransitionTintOpacity_child_own_tint(void) {
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
     ecs_entity_t parent = tr_group(world);
-    ecs_entity_t child = tr_shape(world, parent);
+    ecs_entity_t child = tr_shape(world, parent, 0);
     ecs_entity_t rect = tr_rect(world, parent);
     const Tint from = {255, 0, 0, 0}, to = {255, 0, 0, 255};
     int32_t i;
@@ -716,8 +586,8 @@ void TransitionTintOpacity_nested(void) {
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
     ecs_entity_t parent = tr_group(world);
-    ecs_entity_t child = tr_shape(world, parent);
-    ecs_entity_t grandchild = tr_shape(world, child);
+    ecs_entity_t child = tr_shape(world, parent, 0);
+    ecs_entity_t grandchild = tr_shape(world, child, 0);
     const Tint from = {0, 255, 0, 0}, to = {0, 255, 0, 255};
     int32_t i;
     ecs_set(world, grandchild, Tint, {255, 0, 0, 100});
@@ -766,7 +636,7 @@ void TransitionTintOpacity_opacity_target_zero(void) {
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
     ecs_entity_t parent = tr_group(world);
-    ecs_entity_t child = tr_shape(world, parent);
+    ecs_entity_t child = tr_shape(world, parent, 0);
     int32_t i;
     ecs_set(world, parent, Opacity, {1.0f});
     tr_transition(world, parent, ecs_id(Opacity));
@@ -798,7 +668,7 @@ void TransitionTintOpacity_opacity_start_zero(void) {
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
     ecs_entity_t parent = tr_group(world);
-    ecs_entity_t child = tr_shape(world, parent);
+    ecs_entity_t child = tr_shape(world, parent, 0);
     int32_t i;
     ecs_set(world, parent, Opacity, {0.0f});
     tr_transition(world, parent, ecs_id(Opacity));
@@ -830,8 +700,8 @@ void TransitionTintOpacity_fade_in_batch(void) {
     // engine_core/transition
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
-    ecs_entity_t e = tr_shape(world, 0);
-    ecs_entity_t reference = tr_shape(world, 0);
+    ecs_entity_t e = tr_shape(world, 0, 0);
+    ecs_entity_t reference = tr_shape(world, 0, 0);
     int32_t i;
     ecs_set(world, e, Opacity, {0.0f});
     tr_transition(world, e, ecs_id(Opacity));
@@ -871,8 +741,8 @@ void TransitionTintOpacity_fade_out_batch(void) {
     // engine_core/transition
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
-    ecs_entity_t e = tr_shape(world, 0);
-    ecs_entity_t reference = tr_shape(world, 0);
+    ecs_entity_t e = tr_shape(world, 0, 0);
+    ecs_entity_t reference = tr_shape(world, 0, 0);
     int32_t i;
     ecs_set(world, e, Opacity, {1.0f});
     tr_transition(world, e, ecs_id(Opacity));
@@ -903,7 +773,7 @@ void TransitionTintOpacity_blend_mode_kept(void) {
     // engine_core/transition
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
-    ecs_entity_t e = tr_shape(world, 0);
+    ecs_entity_t e = tr_shape(world, 0, 0);
     int32_t i;
     ecs_set(world, e, BlendMode, {Additive});
     ecs_set(world, e, Opacity, {1.0f});
@@ -945,7 +815,7 @@ void TransitionTintOpacity_light_no_effect(void) {
     test_assert(!ecs_has_id(world, light, TransitionMaterial));
     test_assert(!ecs_has(world, light, DrawSlot));
 
-    ecs_entity_t child = tr_shape(world, light);
+    ecs_entity_t child = tr_shape(world, light, 0);
     tr_frame(world);
     tr_frame(world);
     test_assert(ecs_has_id(world, child, TransitionOpacity));
@@ -958,7 +828,7 @@ void TransitionTintOpacity_parent_relationship(void) {
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
     ecs_entity_t parent = tr_group(world);
-    ecs_entity_t child = tr_shape(world, 0);
+    ecs_entity_t child = tr_shape(world, 0, 0);
     int32_t i;
     ecs_set(world, child, EcsParent, {parent});
     ecs_set(world, parent, Opacity, {1.0f});
@@ -985,7 +855,7 @@ void TransitionTintOpacity_targets_on_game_thread(void) {
     // engine_core/transition
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
-    ecs_entity_t e = tr_shape(world, 0);
+    ecs_entity_t e = tr_shape(world, 0, 0);
     int32_t i;
     ecs_set(world, e, Opacity, {1.0f});
     ecs_set(world, e, Tint, {0, 0, 0, 0});
@@ -1016,7 +886,7 @@ void TransitionTintOpacity_no_transition_no_records(void) {
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
     ecs_entity_t parent = tr_group(world);
-    ecs_entity_t child = tr_shape(world, parent);
+    ecs_entity_t child = tr_shape(world, parent, 0);
     tr_frame(world);
     ecs_set(world, parent, Opacity, {0.5f});
     ecs_set(world, parent, Tint, {1, 2, 3, 4});
@@ -1032,8 +902,8 @@ void TransitionTintOpacity_dynamic_material_fade_in(void) {
     // engine_core/transition
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
-    ecs_entity_t e = tr_shape(world, 0);
-    ecs_entity_t reference = tr_shape(world, 0);
+    ecs_entity_t e = tr_shape(world, 0, 0);
+    ecs_entity_t reference = tr_shape(world, 0, 0);
     box_render_mesh_shading_t rendered, expected;
     int32_t i;
     ecs_add(world, e, DynamicMaterial);
@@ -1080,7 +950,7 @@ void TransitionTintOpacity_dynamic_material_fade_in(void) {
     test_assert(box_draws_caster(b));
     test_int(ecs_get(world, e, DrawSlot)->batch, ecs_get(world, reference, DrawSlot)->batch);
     rendered = tr_check_mesh(world, null, NULL, e);
-    tr_rendered(world, null, reference, &expected);
+    tr_shading_rendered(world, null, reference, &expected);
     test_assert(!ecs_os_memcmp(rendered.tint, expected.tint, ECS_SIZEOF(rendered.tint)));
     test_assert(!ecs_os_memcmp(&rendered.alpha, &expected.alpha, ECS_SIZEOF(float)));
     test_flt(rendered.alpha, 1);
@@ -1132,33 +1002,11 @@ static void tr_glyph_rendered(
     const box_draw_glyph_slot_t *at,
     box_render_shading_t *out)
 {
-    box_render_draws_t *d = box_draws_state(world);
-    box_draw_batch_t *b = box_draws_batch(d, at->batch);
-    uint32_t stride = (uint32_t)sizeof(box_render_shading_t);
-    bool found = false;
-    int32_t i;
+    box_draw_batch_t *b = box_draws_batch(box_draws_state(world), at->batch);
     box_render_sync(world);
     *out = *box_draws_slot_shading(b, at->slot);
-    if (!b->key.dynamic_material) {
-        goto done;
-    }
-
-    uint32_t handle = box_draws_store_handle(box_draws_batch_store(d, b), b->page,
-        BOX_RENDER_STREAM_SHADING);
-    uint32_t offset = b->first * stride;
-    for (i = 0; i < ecs_vec_count(&null->last.uploads) && !found; i ++) {
-        const box_render_upload_t *u = ecs_vec_get_t(
-            &null->last.uploads, box_render_upload_t, i);
-        if (u->buffer == handle && u->offset == offset) {
-            ecs_os_memcpy(out, box_render_packet_data(&null->last,
-                u->data + (uint32_t)at->slot * stride), (ecs_size_t)stride);
-            found = true;
-        }
-    }
-
-    test_assert(found);
-done:
-    return;
+    tr_slot_rendered(world, null, b, at->slot, BOX_RENDER_STREAM_SHADING,
+        (uint32_t)sizeof(box_render_shading_t), out);
 }
 
 void TransitionTintOpacity_text_spans_fade(void) {
@@ -1319,14 +1167,14 @@ void TransitionTintOpacity_packed_color_opacity_2d(void) {
         tr_frame(world);
         test_assert(ecs_has_id(world, e, TransitionOpacity));
         test_assert(tr_batch(world, e)->key.dynamic_material);
-        tr_rendered(world, null, e, &rendered);
+        tr_shading_rendered(world, null, e, &rendered);
         tr_check_packed(&rendered, expected);
         test_assert(rendered.emissive[3] > 0.0f);
     }
 
     tr_frame(world);
     test_assert(!ecs_has_id(world, e, TransitionOpacity));
-    tr_rendered(world, null, e, &rendered);
+    tr_shading_rendered(world, null, e, &rendered);
     tr_check_packed(&rendered, (float[]){
         tr_srgb_linear(200.0f / 255.0f),
         tr_srgb_linear(100.0f / 255.0f),
@@ -1365,13 +1213,13 @@ void TransitionTintOpacity_packed_color_tint_2d(void) {
         tr_frame(world);
         test_assert(ecs_has_id(world, e, TransitionMaterial));
         test_assert(tr_batch(world, e)->key.dynamic_material);
-        tr_rendered(world, null, e, &rendered);
+        tr_shading_rendered(world, null, e, &rendered);
         tr_check_packed(&rendered, expected);
     }
 
     tr_frame(world);
     test_assert(!ecs_has_id(world, e, TransitionMaterial));
-    tr_rendered(world, null, e, &rendered);
+    tr_shading_rendered(world, null, e, &rendered);
     tr_check_packed(&rendered, (float[]){ 0.0f, 0.0f, 1.0f, 0.5f });
     tr_fini(world, null);
 }

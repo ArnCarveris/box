@@ -2120,6 +2120,64 @@ void Console_complete_hide_closes_list(void) {
     ecs_fini(world);
 }
 
+void Console_complete_hide_stale_candidates(void) {
+    // console/complete
+    ecs_world_t *world = console_open(640, 360, NULL);
+    ecs_entity(world, { .name = "zz_alpha" });
+    ecs_entity_t beta = ecs_entity(world, { .name = "zz_beta" });
+    console_type(world, "ls zz");
+    console_press(world, KeyTab, 1);
+    test_str(console_typed(world), "ls zz_");
+    console_press(world, KeyTab, 1);
+    test_assert(console_menu_at(world, "zz_alpha") >= 0);
+    test_assert(console_menu_at(world, "zz_beta") >= 0);
+
+    // An entity deleted while the console is hidden is not a candidate when it opens again
+    ecs_singleton_get_mut(world, Console)->open = false;
+    ecs_singleton_modified(world, Console);
+    ecs_progress(world, 0);
+    ecs_delete(world, beta);
+    ecs_singleton_get_mut(world, Console)->open = true;
+    ecs_singleton_modified(world, Console);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_str(console_menu(world), "");
+    test_assert(console_menu_at(world, "zz_beta") < 0);
+
+    // Tab completes the one name that is left
+    console_press(world, KeyTab, 1);
+    test_str(console_typed(world), "ls zz_alpha ");
+    test_assert(console_menu_at(world, "zz_beta") < 0);
+    console_press(world, KeyTab, 1);
+    test_assert(console_menu_at(world, "zz_beta") < 0);
+
+    ecs_fini(world);
+}
+
+void Console_complete_view_deleted_closes_list(void) {
+    // console/complete
+    ecs_world_t *world = console_open(640, 360, NULL);
+    console_type(world, "schema");
+    console_press(world, KeyTab, 1);
+    test_assert(console_menu_at(world, "schema_value") >= 0);
+
+    // Deleting the view rebuilds the console without the candidate list
+    ecs_entity_t view = ecs_lookup(world, "console.view");
+    test_assert(view != 0);
+    ecs_delete(world, view);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_bool(ecs_singleton_get(world, Console)->open, true);
+    test_str(console_menu(world), "");
+    test_flt(console_menu_height(world), 0);
+
+    // Tab computes the candidates again
+    console_press(world, KeyTab, 1);
+    test_assert(console_menu_at(world, "schema_value") >= 0);
+
+    ecs_fini(world);
+}
+
 void Console_complete_module_color(void) {
     // console/complete
     ecs_world_t *world = console_open(640, 360, NULL);

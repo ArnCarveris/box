@@ -6,9 +6,10 @@ in the rendered pixels.
 
 The feature is complete: transitions of `Position`, `Rotation` and `Scale` render for the
 entity and its descendants (see [Transform transitions](#transform-transitions)), transitions of
-`Rgb`, `AlphaCutoff`, `PbrMaterial`, `Emissive`, `TextureTransform` and `Transmission` for mesh
-shapes, 2D shapes and texts (see [Material transitions](#material-transitions)), and transitions of `Tint`
-and `Opacity` composed down the hierarchy (see
+`Rgb`, `AlphaCutoff`, `PbrMaterial`, `Emissive`, `TextureTransform`, `Transmission` and
+`ClearCoat` for mesh shapes, 2D shapes and texts (see
+[Material transitions](#material-transitions)), and transitions of `Tint` and `Opacity`
+composed down the hierarchy (see
 [Tint and opacity transitions](#tint-and-opacity-transitions)). It works on the render thread,
 in main thread mode (the browser) and with the null backend. What it does not do is listed in
 [Limitations](#limitations), and what it costs in [The fast path](#the-fast-path).
@@ -113,7 +114,8 @@ is a flecs map (`ecs_map_t`) keyed by the component entity whose values are allo
 - There is no API, component, stat or query that returns the in-progress value. It exists only
   on the render thread. Only rendered pixels show it.
 - Transitionable: `Position`, `Rotation`, `Scale`, `Rgb`, `Opacity`, `AlphaCutoff`, `Tint`,
-  `PbrMaterial`, `Emissive`, `TextureTransform` and `Transmission` (`box_transition_supported()`). Others are
+  `PbrMaterial`, `Emissive`, `TextureTransform`, `Transmission` and `ClearCoat`
+  (`box_transition_supported()`). Others are
   rejected: `PbrTextures` holds handles that are part of the batch key, `WorldTransform` and
   `MaterialId` are computed by the engine, and enums and tags have nothing to interpolate.
 - A key that is not transitionable, or an entry with a negative `duration` or `delay`, logs an
@@ -400,7 +402,7 @@ Implemented in `src/render/transitions.c` (game thread), `src/render/transition.
 thread) and the encoding in `src/render/batch.c` and `src/render/materials.c`.
 
 - A node runs a *material transition* in a frame when `Rgb`, `AlphaCutoff`, `PbrMaterial`,
-  `Emissive`, `TextureTransform` or `Transmission` is active at the packet time
+  `Emissive`, `TextureTransform`, `Transmission` or `ClearCoat` is active at the packet time
   (`box_render_transitions_active`).
 - The value of a component that a record reads comes from the entity that owns it: the entity
   itself or the `IsA` base that has it (`ecs_get_target_for_id(world, e, EcsIsA, id)`). The
@@ -460,6 +462,13 @@ thread) and the encoding in `src/render/batch.c` and `src/render/materials.c`.
   `BOX_RENDER_TRANSITION_FIELDS` to 7: on 64 bit targets `box_render_transition_record_t` grew
   from 64 to 72 bytes and a `box_render_transition_value_t` of a node from 72 to 88, a cost only
   entities with `Transition` pay.
+- `ClearCoat` patches the material table only, like `Transmission`: 2D shapes and texts ignore
+  the coat. Its `strength` and `roughness` interpolate linearly and the slot is packed again
+  from the rendered values into its `clear_coat` word (two unorm16). The coat has no batch key
+  bit, so a strength that transitions to or from 0 keeps the batch, and a strength of 0 packs
+  the word of no coat (0). Adding or removing `ClearCoat` is a structural change and does not
+  animate. Its value is 8 bytes and 2 fields, within `BOX_RENDER_TRANSITION_VALUE` and
+  `BOX_RENDER_TRANSITION_FIELDS`.
 - While recording shadow regions, a slot whose `AlphaCutoff` or `TextureTransform` runs (and
   the frame after) goes to `shadow_materials`, so alpha tested casters render their tiles again.
 - Anything that reads `Rgb` into a material or shading record transitions: mesh shapes, 2D

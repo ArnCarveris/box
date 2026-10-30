@@ -435,6 +435,8 @@
                     "complete_escape_closes_list",
                     "complete_typing_closes_list",
                     "complete_hide_closes_list",
+                    "complete_hide_stale_candidates",
+                    "complete_view_deleted_closes_list",
                     "complete_module_color"
                 ]
             },

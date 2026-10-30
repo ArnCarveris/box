@@ -203,8 +203,7 @@ typedef struct box_draw_transition_material_t {
     Emissive emissive;      /**< Emissive */
     TextureTransform uv;    /**< TextureTransform */
     Transmission transmission; /**< Transmission */
-    bool coated;            /**< The material has ClearCoat, which does not transition */
-    ClearCoat clear_coat;   /**< ClearCoat, when coated */
+    ClearCoat clear_coat;   /**< ClearCoat */
     Opacity opacity;        /**< Opacity of the shape itself */
     Tint tint;              /**< Tint of the shape itself */
     box_draw_tint_t inherited; /**< Tints of the ancestors, when tinted */
@@ -687,7 +686,7 @@ void box_draws_color_unpack(
  *
  * The record holds the display encoded base color (the default color without Rgb), metallic,
  * roughness, emission, texture transform and AlphaCutoff (0 without one) clamped as the shading
- * was, the Transmission (factor 0 without one) and the ClearCoat (0 without one).
+ * was, the Transmission (factor 0 without one) and the ClearCoat (0 without one or at 0).
  *
  * Opacity, tints and the 2D shape are not.
  *

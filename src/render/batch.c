@@ -855,7 +855,7 @@ void box_draws_material_pack(
     out->thickness_factor = transmission ? transmission->thickness_factor : 0.0f;
     out->attenuation_distance = transmission
         ? transmission->attenuation_distance : BOX_MATERIAL_ATTENUATION_DISTANCE;
-    out->clear_coat = coat
+    out->clear_coat = coat && box_draws_unorm16(coat->strength)
         ? box_draws_unorm16(coat->strength) | (box_draws_unorm16(coat->roughness) << 16) : 0u;
     out->reserved[0] = 0;
     out->reserved[1] = 0;
