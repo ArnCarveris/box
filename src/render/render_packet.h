@@ -828,7 +828,7 @@ typedef struct box_render_material_t {
     float attenuation_distance; /**< Transmission.attenuation_distance,
                              *   BOX_MATERIAL_ATTENUATION_DISTANCE without one */
     uint32_t clear_coat;    /**< ClearCoat strength | roughness << 16, two unorm16 clamped to
-                             *   0..1, 0 without one */
+                             *   0..1, 0 without one or with a strength of 0 */
     uint32_t reserved[3];   /**< 0, pads the record to the 16 byte alignment of Material */
 } box_render_material_t;
 
@@ -971,6 +971,7 @@ typedef enum box_render_transition_component_t {
     BOX_RENDER_TRANSITION_EMISSIVE,         /**< Emissive */
     BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM, /**< TextureTransform */
     BOX_RENDER_TRANSITION_TRANSMISSION,     /**< Transmission */
+    BOX_RENDER_TRANSITION_CLEAR_COAT,       /**< ClearCoat */
     BOX_RENDER_TRANSITION_COMPONENTS        /**< Number of transitionable components */
 } box_render_transition_component_t;
 
