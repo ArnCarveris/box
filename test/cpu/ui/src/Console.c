@@ -1912,6 +1912,10 @@ void Console_complete_hide_closes_list(void) {
     test_str(console_menu(world), "");
     test_flt(console_menu_height(world), 0);
 
+    // Tab computes the candidates again
+    console_press(world, KeyTab, 1);
+    test_assert(console_menu_at(world, "schema_value") >= 0);
+
     ecs_fini(world);
 }
 
