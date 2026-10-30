@@ -196,6 +196,14 @@ static ecs_entity_t box_cmd_render_view_root(
     return s ? s->view_root : 0;
 }
 
+/** Get the camera of a command: the camera argument, else the camera of the first view of the
+ * surface shown first. Logs an error when the argument is not a camera or there is no camera.
+ *
+ * @param world The world
+ * @param argc Number of arguments
+ * @param argv The camera, omitted for the active camera
+ * @return The camera, 0 on an error
+ */
 ecs_entity_t box_cmd_render_camera(
     ecs_world_t *world,
     int32_t argc,
@@ -475,6 +483,15 @@ static void box_cmd_render_collect(
     ecs_vec_fini_t(NULL, &children, ecs_entity_t);
 }
 
+/** Get the 8 world space corners of the local bounds of the mesh of a shape, with the scale
+ * of its ShapeMesh and its WorldTransform.
+ *
+ * @param world The world
+ * @param cache The mesh cache
+ * @param e The entity
+ * @param out Receives the corners
+ * @return Whether the entity has a mesh in the cache
+ */
 bool box_cmd_render_corners(
     ecs_world_t *world,
     const box_mesh_cache_t *cache,

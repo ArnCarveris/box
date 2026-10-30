@@ -389,6 +389,32 @@ void Fit_skips_camera_children(void) {
     ecs_fini(world);
 }
 
+void Fit_skips_prefab_and_disabled(void) {
+    // command/fit
+    ecs_world_t *world = fit_world();
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    fit_camera(world, "camera", (Position){0, 0, 10}, (Rotation){0},
+        (Camera){ .fov = 60, .near_ = 0.1f, .far_ = 1000, .aspect_ratio = 1.0f }, true);
+    fit_box(world, 0, (Position){0, 0, 0}, (Box){1, 1, 1});
+    ecs_entity_t prefab = fit_box(world, 0, (Position){100, 0, 0}, (Box){1, 1, 1});
+    ecs_add_id(world, prefab, EcsPrefab);
+    fit_box(world, prefab, (Position){0, 10, 0}, (Box){1, 1, 1});
+    ecs_entity_t disabled = fit_box(world, 0, (Position){-100, 0, 0}, (Box){1, 1, 1});
+    ecs_enable(world, disabled, false);
+    ecs_progress(world, 0);
+    test_assert(ecs_has(world, prefab, ShapeMesh));
+    test_assert(ecs_has(world, disabled, ShapeMesh));
+
+    fit_result_t r;
+    fit_run(world, s, "fit", "camera", &r);
+    test_int(r.count, 1);
+    test_flt(r.center[0], 0);
+    test_flt(r.center[1], 0);
+    test_flt(r.center[2], 0);
+
+    ecs_fini(world);
+}
+
 void Fit_skips_console_and_editor(void) {
     // command/fit
     ecs_world_t *world = fit_world();

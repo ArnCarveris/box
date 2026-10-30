@@ -47,7 +47,7 @@ static bool box_cmd_fit_held(
 }
 
 /** Collect the content a camera draws: the meshes of its scene, without the camera and its
- * descendants.
+ * descendants. Prefabs and disabled entities are not drawn, so they do not count.
  *
  * @param world The world
  * @param camera The camera
@@ -63,6 +63,12 @@ static void box_cmd_fit_collect(
     ecs_iter_t it = ecs_each(world, ShapeMesh);
     while (ecs_each_next(&it)) {
         int32_t i, c;
+        if (ecs_table_has_id(world, it.table, EcsPrefab) ||
+            ecs_table_has_id(world, it.table, EcsDisabled))
+        {
+            continue;
+        }
+
         for (i = 0; i < it.count; i ++) {
             ecs_entity_t e = it.entities[i];
             vec3 corners[8];
