@@ -414,20 +414,23 @@ static void box_console_fmt_json(
     }
 }
 
-/** Color the occurrences of the pattern of the command in text that was appended, like the match
- * of a grep in the explorer. The case is folded for grep_i only, grep, find and script_grep
- * compare case sensitive as their flecs commands do.
+/** Color the occurrences of the pattern of the command in text, like the match of a grep in the
+ * explorer. The case is folded for grep_i only, grep, find and script_grep compare case sensitive
+ * as their flecs commands do.
  *
  * @param fmt The formatting state
- * @param text The text
+ * @param text The text that is matched
  * @param len Bytes of the text
- * @param at Byte of the output the text starts at
+ * @param at Byte of the output the shown text starts at
+ * @param map Byte of the shown text each byte of the text starts at, len + 1 entries, NULL when
+ * the text is the shown text
  */
-static void box_console_fmt_matches(
+static void box_console_fmt_matches_map(
     box_console_fmt_t *fmt,
     const char *text,
     int32_t len,
-    int32_t at)
+    int32_t at,
+    const int32_t *map)
 {
     int32_t i, j, plen = fmt->pattern ? (int32_t)strlen(fmt->pattern) : 0;
     bool fold = fmt->command && !strcmp(fmt->command, "grep_i");
@@ -449,10 +452,70 @@ static void box_console_fmt_matches(
         }
 
         if (j == plen) {
-            box_console_out_mark(fmt->out, BoxOutputMatch, at + i, at + i + plen);
+            int32_t from = map ? map[i] : i, to = map ? map[i + plen] : i + plen;
+            box_console_out_mark(fmt->out, BoxOutputMatch, at + from, at + to);
             i += plen - 1;
         }
     }
+
+done:
+    return;
+}
+
+/** Color the occurrences of the pattern of the command in text that was appended.
+ *
+ * @param fmt The formatting state
+ * @param text The text
+ * @param len Bytes of the text
+ * @param at Byte of the output the text starts at
+ */
+static void box_console_fmt_matches(
+    box_console_fmt_t *fmt,
+    const char *text,
+    int32_t len,
+    int32_t at)
+{
+    box_console_fmt_matches_map(fmt, text, len, at, NULL);
+}
+
+/** Color the occurrences of the pattern in a path that was appended. The flecs commands match the
+ * names of entities, so the pattern is matched against the unescaped path: ecs_get_path writes a
+ * '.' in a name as "\.", and a match that includes such a '.' covers its backslash too.
+ *
+ * @param fmt The formatting state
+ * @param shown The path as it was appended
+ * @param len Bytes of the path
+ * @param at Byte of the output the path starts at
+ */
+static void box_console_fmt_matches_path(
+    box_console_fmt_t *fmt,
+    const char *shown,
+    int32_t len,
+    int32_t at)
+{
+    char *text;
+    int32_t *map, i, count = 0;
+    if (!memchr(shown, '\\', (size_t)len)) {
+        box_console_fmt_matches(fmt, shown, len, at);
+        goto done;
+    }
+
+    text = ecs_os_malloc(len + 1);
+    map = ecs_os_malloc_n(int32_t, len + 1);
+    for (i = 0; i < len; i ++) {
+        map[count] = i;
+        if (shown[i] == '\\' && i + 1 < len && shown[i + 1] == '.') {
+            i ++;
+        }
+
+        text[count ++] = shown[i];
+    }
+
+    map[count] = len;
+    text[count] = '\0';
+    box_console_fmt_matches_map(fmt, text, count, at, map);
+    ecs_os_free(map);
+    ecs_os_free(text);
 
 done:
     return;
@@ -503,9 +566,9 @@ static void box_console_fmt_entity(
     box_console_out_add(fmt->out, BoxOutputDim, shown, name);
     box_console_out_add(fmt->out, BoxOutputEntity, &shown[name], len - name);
     if (match == BoxMatchPath) {
-        box_console_fmt_matches(fmt, shown, len, start);
+        box_console_fmt_matches_path(fmt, shown, len, start);
     } else if (match == BoxMatchName) {
-        box_console_fmt_matches(fmt, &shown[name], len - name, start + name);
+        box_console_fmt_matches_path(fmt, &shown[name], len - name, start + name);
     }
 
 done:
