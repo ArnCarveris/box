@@ -1,0 +1,19 @@
+include materials
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.light
+using box.text
+
+
+@tree Parent
+template WestWaterTrough {
+  bottom : WestTimber { Position: {0, 0.2, 0}; Box: {2.7, 0.2, 0.95} }
+  for side in 0..2 {
+    { Position: {0, 0.45, (side - 0.5) * 0.95}; Box: {2.8, 0.6, 0.1}; Rgb: {125, 89, 52} }
+    { Position: {(side - 0.5) * 2.7, 0.45, 0}; Box: {0.1, 0.6, 0.95}; Rgb: {125, 89, 52} }
+    { Position: {(side - 0.5) * 1.8, 0.45, 0.535}; Box: {0.07, 0.62, 0.035}; Rgb: {49, 51, 48} }
+  }
+  water { Position: {0, 0.62, 0}; Box: {2.6, 0.025, 0.84}; Rgb: {63, 99, 91}; PbrMaterial: {roughness: 0.12}; ClearCoat: {strength: 1, roughness: 0.06} }
+}

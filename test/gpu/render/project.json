@@ -475,7 +475,9 @@
                     "light_change_renders_its_tile",
                     "camera_move_renders_none",
                     "atlas_resolution_renders_all",
-                    "reused_equals_rendered"
+                    "reused_equals_rendered",
+                    "transition_position_renders_its_tile",
+                    "transition_rotation_scale_renders_its_tile"
                 ]
             },
             {

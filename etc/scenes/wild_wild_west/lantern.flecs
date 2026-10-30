@@ -1,0 +1,23 @@
+include materials
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.light
+using box.text
+
+
+@tree Parent
+template WestLantern {
+  bracket : WestIron { Position: {0, 0.36, -0.16}; Box: {0.07, 0.07, 0.4} }
+  loop : WestIron { Position: {0, 0.28, 0}; Rotation: {math.PI / 2, 0, 0}; Torus: {radius: 0.075, tube: 0.018, segments: 12, rings: 6} }
+  flame { Position: {}; RoundedBox: {0.19, 0.3, 0.19, 0.035}; Rgb: {255, 190, 77}; Emissive: {strength: 2.5, color: {255, 162, 51}} }
+  for x in 0..2 {
+    for z in 0..2 {
+      { Position: {(x - 0.5) * 0.24, 0, (z - 0.5) * 0.24}; Box: {0.027, 0.37, 0.027}; Rgb: {49, 51, 48} }
+    }
+    { Position: {0, (x - 0.5) * 0.36, 0}; Box: {0.3, 0.055, 0.3}; Rgb: {49, 51, 48} }
+  }
+  cap : WestIron { Position: {0, 0.22, 0}; Frustum: {radius_bottom: 0.22, radius_top: 0.07, length: 0.1, segments: 4} }
+  glow { Position: {0, 0, 0.18}; PointLight: {intensity: 7, range: 2.5}; Rgb: {255, 173, 83} }
+}

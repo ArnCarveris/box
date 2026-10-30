@@ -40,6 +40,9 @@ typedef struct box_cmd_render_job_t {
 /** State of the render commands of a world */
 typedef struct box_cmd_render_t {
     ecs_vec_t jobs;         /**< box_cmd_render_job_t */
+    char *tmp_dir;          /**< Temporary folder of the process the images go in, NULL when
+                             *   none was opened */
+    bool tmp_opened;        /**< The temporary folder was opened, or failed to open */
 } box_cmd_render_t;
 
 /** Free the state of the render commands.
@@ -56,8 +59,60 @@ static void box_cmd_render_free(
     }
 
     ecs_vec_fini_t(NULL, &state->jobs, box_cmd_render_job_t);
+    ecs_os_free(state->tmp_dir);
     ecs_os_free(state);
 }
+
+#ifndef __EMSCRIPTEN__
+
+/** Give a session without resources its resource folder in the temporary folder of the process,
+ * shell/<session> in /tmp/box/<pid>.
+ *
+ * flecs puts the folder in .flecs/shell/<session> of the working directory and deletes it with
+ * the session. Session ids repeat between processes, so processes in one directory would share
+ * the folder, and the first to close its session would delete the images of the others.
+ *
+ * Without a temporary folder the session keeps the folder of flecs.
+ *
+ * @param world The world
+ * @param state The state of the render commands
+ * @param session The session
+ */
+static void box_cmd_render_folder(
+    ecs_world_t *world,
+    box_cmd_render_t *state,
+    ecs_entity_t session)
+{
+    EcsCommandSession *s = ecs_get_mut(world, session, EcsCommandSession);
+    char *shell = NULL, *path = NULL;
+    if (!s || s->resource_path) {
+        goto done;
+    }
+
+    if (!state->tmp_opened) {
+        state->tmp_dir = box_app_tmp_open(world);
+        state->tmp_opened = true;
+    }
+
+    if (!state->tmp_dir) {
+        goto done;
+    }
+
+    shell = flecs_asprintf("%s/shell", state->tmp_dir);
+    path = flecs_asprintf("%s/%llu", shell, (unsigned long long)session);
+    if (ecs_os_mkdir(shell) || ecs_os_mkdir(path)) {
+        ecs_err("cannot create the resource folder '%s'", path);
+        goto done;
+    }
+
+    s->resource_path = path;
+    path = NULL;
+done:
+    ecs_os_free(shell);
+    ecs_os_free(path);
+}
+
+#endif
 
 /** Create the PNG resource of an image in the session of the command and get its file.
  *
@@ -84,6 +139,7 @@ static char* box_cmd_render_file(
         goto done;
     }
 
+    box_cmd_render_folder(world, ctx->ctx, session);
     if (ecs_shell_resource_create(world, session, "image/png", NULL, 0, resource)) {
         goto done;
     }
@@ -668,7 +724,8 @@ void box_cmd_render_init(
                 { .name = "camera", .type = ecs_id(ecs_entity_t), .optional = true,
                   .brief = "Camera to capture (default: the active camera)" }
             },
-            .callback = box_cmd_capture
+            .callback = box_cmd_capture,
+            .ctx = state
         });
 
     box_command_register(world,

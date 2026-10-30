@@ -1,0 +1,4 @@
+include saloon
+using box.transform
+
+asset { WestSaloon: {}; Position: {} }

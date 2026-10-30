@@ -8,37 +8,12 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/stat.h>
 #include <unistd.h>
 #include "render.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_STATIC
 #include <stb_image.h>
-
-/** Working directory of the test process, restored by the teardown */
-static char render_cwd[4096];
-
-/** Directory of the test process, so that the resources of the shell sessions of tests that
- * run in parallel do not share a folder: flecs names it by the session id, which is the same in
- * every test, and removes it when the session closes. The engine finds its files, such as the
- * shaders, from a parent of the working directory. */
-static char render_dir[64];
-
-void Render_setup(void) {
-    test_assert(getcwd(render_cwd, sizeof(render_cwd)) != NULL);
-    snprintf(render_dir, sizeof(render_dir), ".flecs/command_gpu_%d", (int)getpid());
-    mkdir(".flecs", 0700);
-    test_int(mkdir(render_dir, 0700), 0);
-    test_int(chdir(render_dir), 0);
-}
-
-void Render_teardown(void) {
-    rmdir(".flecs/shell");
-    rmdir(".flecs");
-    test_int(chdir(render_cwd), 0);
-    test_int(rmdir(render_dir), 0);
-}
 
 void Render_capture_active_camera(void) {
     // command/render
@@ -1001,4 +976,35 @@ void Render_http_resource(void) {
 
     ecs_rest_server_fini(srv);
     ecs_fini(world);
+}
+
+void Render_resources_in_tmp_dir(void) {
+    // command/render
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+
+    ecs_entity_t camera = ecs_entity(world, { .name = "cam" });
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    test_assert(ecs_singleton_get(world, AppStatus)->tmp_dir == NULL);
+
+    ecs_os_free(box_command_run(world, s, "capture cam", NULL));
+    char *tmp = flecs_asprintf("/tmp/box/%d", (int)getpid());
+    char *expect = flecs_asprintf("%s/shell/%llu/1", tmp, (unsigned long long)s);
+    char *path = box_command_resource_file(world, s, "1");
+    test_str(path, expect);
+    test_assert(access(path, F_OK) == 0);
+
+    ecs_delete(world, s);
+    test_assert(access(path, F_OK) != 0);
+    ecs_fini(world);
+    test_assert(access(tmp, F_OK) != 0);
+
+    ecs_os_free(path);
+    ecs_os_free(expect);
+    ecs_os_free(tmp);
+    box_render_null_free(null);
 }

@@ -44,6 +44,9 @@
 /** Tiles of the scene */
 #define CACHE_TILES (3)
 
+/** Seconds a frame of a transition case advances the world, a quarter of each transition */
+#define CACHE_DELTA (0.25f)
+
 /** The entities of the scene */
 typedef struct cache_scene_t {
     ecs_world_t *world;     /**< The world */
@@ -198,17 +201,20 @@ static void cache_first(
     test_int(stats.shadow_passes, 1);
 }
 
-/** Run a frame and read what it changed of the counters of the shadow atlas.
+/** Run a frame that advances the world by a delta and read what it changed of the counters of
+ * the shadow atlas.
  *
  * @param world The world
+ * @param delta Seconds the frame advances the world, 0 for the time measured
  * @return The counters of the frame
  */
-static cache_frame_t cache_frame(
-    ecs_world_t *world)
+static cache_frame_t cache_frame_at(
+    ecs_world_t *world,
+    float delta)
 {
     box_render_gpu_stats_t before, after;
     test_assert(box_render_gpu_stats(world, &before));
-    ecs_progress(world, 0);
+    ecs_progress(world, delta);
     box_render_sync(world);
     test_assert(box_render_gpu_stats(world, &after));
     test_int(ecs_singleton_get(world, RenderStatus)->shadow_tiles, CACHE_TILES);
@@ -220,6 +226,33 @@ static cache_frame_t cache_frame(
     };
 }
 
+/** Run a frame and read what it changed of the counters of the shadow atlas.
+ *
+ * @param world The world
+ * @return The counters of the frame
+ */
+static cache_frame_t cache_frame(
+    ecs_world_t *world)
+{
+    return cache_frame_at(world, 0);
+}
+
+/** Run a frame that advances the world by a delta and check that it renders no tile and
+ * records no atlas pass.
+ *
+ * @param world The world
+ * @param delta Seconds the frame advances the world, 0 for the time measured
+ */
+static void cache_none_at(
+    ecs_world_t *world,
+    float delta)
+{
+    cache_frame_t f = cache_frame_at(world, delta);
+    test_int(f.rendered, 0);
+    test_int(f.reused, CACHE_TILES);
+    test_int(f.passes, 0);
+}
+
 /** Run a frame and check that it renders no tile and records no atlas pass.
  *
  * @param world The world
@@ -227,10 +260,30 @@ static cache_frame_t cache_frame(
 static void cache_none(
     ecs_world_t *world)
 {
-    cache_frame_t f = cache_frame(world);
-    test_int(f.rendered, 0);
-    test_int(f.reused, CACHE_TILES);
-    test_int(f.passes, 0);
+    cache_none_at(world, 0);
+}
+
+/** Run a frame that advances the world by a delta and check that it renders one tile in one
+ * atlas pass and keeps the others.
+ *
+ * @param world The world
+ * @param tile Index of the tile that renders
+ * @param delta Seconds the frame advances the world, 0 for the time measured
+ */
+static void cache_one_at(
+    ecs_world_t *world,
+    int32_t tile,
+    float delta)
+{
+    box_render_cull_stats_t cull;
+    int32_t i;
+    cache_frame_t f = cache_frame_at(world, delta);
+    test_int(f.rendered, 1);
+    test_int(f.reused, CACHE_TILES - 1);
+    test_int(f.passes, 1);
+    for (i = 0; i < CACHE_TILES; i ++) {
+        test_bool(box_render_gpu_cull_tile(world, i, &cull), i == tile);
+    }
 }
 
 /** Run a frame and check that it renders one tile in one atlas pass and keeps the others.
@@ -242,15 +295,26 @@ static void cache_one(
     ecs_world_t *world,
     int32_t tile)
 {
-    box_render_cull_stats_t cull;
+    cache_one_at(world, tile, 0);
+}
+
+/** Run the frames of a transition of a second that starts in the next frame: the four frames
+ * at progress 0 to 3/4 and the frame it ends in render the tile of its caster and keep the
+ * others, and the frame after renders none.
+ *
+ * @param world The world
+ * @param tile Index of the tile of the caster
+ */
+static void cache_transition(
+    ecs_world_t *world,
+    int32_t tile)
+{
     int32_t i;
-    cache_frame_t f = cache_frame(world);
-    test_int(f.rendered, 1);
-    test_int(f.reused, CACHE_TILES - 1);
-    test_int(f.passes, 1);
-    for (i = 0; i < CACHE_TILES; i ++) {
-        test_bool(box_render_gpu_cull_tile(world, i, &cull), i == tile);
+    for (i = 0; i < 5; i ++) {
+        cache_one_at(world, tile, CACHE_DELTA);
     }
+
+    cache_none_at(world, CACHE_DELTA);
 }
 
 /** Check that a world has no device errors.
@@ -562,6 +626,58 @@ void ShadowCache_reused_equals_rendered(void) {
 
     test_bool(box_render_shadow_cache(s.world, true), true);
     cache_none(s.world);
+    cache_no_errors(s.world);
+    ecs_fini(s.world);
+}
+
+/* Slab A transitions its Position under spot light A, then is written every frame, which
+ * restarts its transition every frame; the tiles of spot light B and the point light stay */
+void ShadowCache_transition_position_renders_its_tile(void) {
+    // lighting/shadows
+    cache_scene_t s;
+    int32_t i;
+    cache_scene(&s);
+    box_transition_set(s.world, s.slab_a, ecs_id(Position), &(TransitionSpec){
+        .duration = 1.0f });
+    cache_first(&s);
+    cache_none_at(s.world, CACHE_DELTA);
+
+    ecs_set(s.world, s.slab_a, Position, {-8, 3, 1});
+    cache_transition(s.world, CACHE_SPOT_A);
+
+    for (i = 0; i < 3; i ++) {
+        ecs_set(s.world, s.slab_a, Position, {-8, 3, 1 - 0.3f * (float)(i + 1)});
+        cache_one_at(s.world, CACHE_SPOT_A, CACHE_DELTA);
+    }
+
+    for (i = 0; i < 4; i ++) {
+        cache_one_at(s.world, CACHE_SPOT_A, CACHE_DELTA);
+    }
+
+    cache_none_at(s.world, CACHE_DELTA);
+    cache_no_errors(s.world);
+    ecs_fini(s.world);
+}
+
+/* Slab B turns about y under spot light B, then the slab under the point light grows */
+void ShadowCache_transition_rotation_scale_renders_its_tile(void) {
+    // lighting/shadows
+    cache_scene_t s;
+    cache_scene(&s);
+    ecs_set(s.world, s.slab_b, Rotation, {0, 0, 0});
+    ecs_set(s.world, s.slab_point, Scale, {1, 1, 1});
+    box_transition_set(s.world, s.slab_b, ecs_id(Rotation), &(TransitionSpec){
+        .duration = 1.0f });
+    box_transition_set(s.world, s.slab_point, ecs_id(Scale), &(TransitionSpec){
+        .duration = 1.0f, .timing_function = EaseInOut });
+    cache_first(&s);
+    cache_none_at(s.world, CACHE_DELTA);
+
+    ecs_set(s.world, s.slab_b, Rotation, {0, 0.6f, 0});
+    cache_transition(s.world, CACHE_SPOT_B);
+
+    ecs_set(s.world, s.slab_point, Scale, {1.5f, 1, 1.5f});
+    cache_transition(s.world, CACHE_POINT);
     cache_no_errors(s.world);
     ecs_fini(s.world);
 }
