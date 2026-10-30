@@ -471,6 +471,18 @@ static box_msdf_dist_t box_msdf_edge_distance(
         : box_msdf_line_distance(e, origin, param);
 }
 
+double box_msdf_corner_distance(
+    const box_msdf_edge_t *a,
+    const box_msdf_edge_t *b,
+    box_msdf_point_t p)
+{
+    double param;
+    box_msdf_dist_t da = box_msdf_edge_distance(a, p, &param);
+    box_msdf_dist_t db = box_msdf_edge_distance(b, p, &param);
+
+    return box_msdf_less(db, da) ? db.distance : da.distance;
+}
+
 void box_msdf_shape_init(
     box_msdf_shape_t *shape)
 {
