@@ -539,7 +539,8 @@ typedef struct box_gpu_view_uniforms_t {
     uint32_t shadow_config[4];      /**< Cascades, 0 without shadows, width of the tent
                                      *   filter in texels, two unused */
     uint32_t reflection[4];         /**< Probes of the reflection probe buffer the view samples,
-                                     *   0 for none, three unused */
+                                     *   0 for none, 1 when the view ignores tints as the
+                                     *   captures do and 0 when not, two unused */
     vec4 aerial;                    /**< Aerial perspective: km per world unit, inverse of the
                                      *   volume distance in km, its slices, 1 when the view
                                      *   applies it and 0 when not */
