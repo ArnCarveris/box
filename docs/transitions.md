@@ -456,6 +456,8 @@ transition systems after checking a few counts. The sizes of the four packet rec
   `Transition` and 10,000 mesh instances, the cost of the walk of `IsA` instances, with the
   `material_visited` counter.
 
-Each case reports `transitions_ms` and `resolve_ms`, the time per frame in the two transition
-systems of the extract and in the resolver, which a world without `Transition` keeps at the
-noise level.
+Each scene case reports `transitions_ms`, the time per frame in the two transition systems of
+the extract, which a world without `Transition` keeps at the noise level, and
+`Transition_resolve_empty` times the resolver on a packet without records. The instances of the
+prefab cases inherit `Transition` over `IsA`, so each of them is a node that the extract compares
+every frame, idle or not: that is the cost of declaring `Transition` on a prefab, not of the walk.

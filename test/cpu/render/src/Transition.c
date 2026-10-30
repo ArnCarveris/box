@@ -48,7 +48,7 @@ static void tr_fini(
     box_render_null_free(null);
 }
 
-/** Run frames with the fixed delta.
+/** Run frames with the fixed delta and wait until the render thread resolved the last packet.
  *
  * @param world The world
  * @param count Frames to run
@@ -61,6 +61,8 @@ static void tr_frames(
     for (i = 0; i < count; i ++) {
         ecs_progress(world, TR_DELTA);
     }
+
+    box_render_sync(world);
 }
 
 /** Run one frame and wait until the render thread resolved its packet.
