@@ -3,8 +3,8 @@
  * @brief Persistent instanced batches and what a frame sends of them to the renderer.
  *
  * Every batch owns a run of slots of an instance page (store.c) with a transform, a shading and,
- * for a mesh batch, a surface stream. It uploads its run when the run is handed out, then the changed slots of
- * each stream through a segment of the change buffer per page and stream, which scatter copies.
+ * for a mesh batch, a surface stream. It uploads its run when the run is handed out, then the
+ * changed slots of each stream through a segment of the change buffer that scatter copies.
  *
  * Mesh and 2D batches take their runs from stores of their own, a mesh shading being a material
  * slot, a tint and an alpha. A batch with dynamic_transform uploads the transform stream of its

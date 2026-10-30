@@ -133,13 +133,12 @@
 /** Buffer handle of the first instance page, the first handle of the instance pages.
  *
  * Every batch draws a run of slots of one instance page: a storage buffer per stream of at most
- * BOX_DRAWS_CHUNK instances with the same slots, shared by the batches. A mesh page has
- * BOX_RENDER_INSTANCE_STREAMS streams, a 2D page BOX_RENDER_INSTANCE_STREAMS_2D, without the
- * surface stream, for which the backend binds a zero record.
- * box_render_batch_t.instances is the transform stream of the page, first_instance its slot.
+ * BOX_DRAWS_CHUNK instances, BOX_RENDER_INSTANCE_STREAMS for a mesh page and, without the surface
+ * stream, BOX_RENDER_INSTANCE_STREAMS_2D for a 2D page, for which the backend binds a zero record.
  *
- * Page p has the handle BOX_RENDER_BUFFER_FIRST + p * BOX_RENDER_INSTANCE_STREAMS + s for
- * stream s. A released page index is reused by the next page the store needs. */
+ * box_render_batch_t.instances is the transform stream of the page, first_instance its slot. Page
+ * p has the handle BOX_RENDER_BUFFER_FIRST + p * BOX_RENDER_INSTANCE_STREAMS + s for stream s. A
+ * released page index is reused by the next page the store needs. */
 #define BOX_RENDER_BUFFER_FIRST (16)
 
 /** Buffers of a mesh instance page, one per stream, at consecutive handles; the handles of

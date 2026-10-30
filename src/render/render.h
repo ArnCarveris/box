@@ -56,10 +56,9 @@ typedef struct box_render_draws_stats_t {
  * Shapes are instanced in batches keyed by scene, mesh, pipeline and whether their transform
  * and their material are dynamic, which persist between frames.
  *
- * A mesh instance page holds a transform, a shading and a surface stream, a 2D instance page a
- * transform and a shading stream. The transforms of
- * DynamicTransform shapes and the shading of DynamicMaterial shapes upload every frame; every
- * other stream is updated on change through the scatter pass, only the streams that changed.
+ * A mesh instance page holds a transform, a shading and a surface stream, a 2D page no surface
+ * stream. The transforms of DynamicTransform shapes and the shading of DynamicMaterial shapes
+ * upload every frame; the other streams upload the slots that changed through the scatter pass.
  *
  * @param world The world
  */

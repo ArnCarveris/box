@@ -571,7 +571,6 @@ void InstanceStore_page_memory_mesh_and_2d(void) {
     int64_t transform = (mesh + shape2d) * (int64_t)sizeof(box_render_transform_t);
     int64_t shading = mesh * (int64_t)sizeof(box_render_mesh_shading_t) +
         shape2d * (int64_t)sizeof(box_render_shading_t);
-    /* 2D pages have no surface stream */
     int64_t surface = mesh * (int64_t)sizeof(box_render_surface_t);
     test_int(stats.page_slots, mesh + shape2d);
     test_int(stats.page_transform_bytes, transform);

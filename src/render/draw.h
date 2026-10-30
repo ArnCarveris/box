@@ -7,10 +7,8 @@
  * BOX_DRAWS_CHUNK of them, so a key may have several batches.
  *
  * A batch owns a run of slots of an instance page (store.c), a buffer per stream with the same
- * slots; a change uploads only its streams. Mesh and 2D batches have stores of their own: a mesh
- * page has a transform, a shading and a surface stream, a mesh shading being a material slot
- * (materials.c), a tint and an alpha; a 2D page has a transform and a shading stream, nothing
- * reading surfaces of 2D shapes and glyphs, and the backend binds a zero surface record instead.
+ * slots; a change uploads only its streams. A mesh page has a transform, a shading and a surface
+ * stream, a 2D page of its own store no surface stream, for which the backend binds a zero record.
  */
 
 #ifndef BOX_RENDER_DRAW_H
@@ -22,8 +20,8 @@
 #include "../text/text.h"
 
 /** Instances of one batch and slots of one instance page: every stream of a page, the surface
- * stream of a mesh page being the largest, stays within the 128 MiB storage binding that every WebGPU device
- * supports, and a key with more shapes continues in another batch */
+ * stream of a mesh page being the largest, stays within the 128 MiB storage binding that every
+ * WebGPU device supports, and a key with more shapes continues in another batch */
 #define BOX_DRAWS_CHUNK ((uint32_t)((128u << 20) / sizeof(box_render_surface_t)))
 
 /** Slots the smallest run of a batch holds, and the smallest page buffer */
