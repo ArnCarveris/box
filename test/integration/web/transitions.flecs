@@ -1,10 +1,11 @@
 // The scene of the browser check of transitions (transitions.mjs), which renders on the main
-// thread. An orthographic camera shows one logical pixel per unit. At frame 30 SetAt moves
-// the white square from the grey start marker to the green target marker and turns the red
-// square blue, with linear transitions of 3 s (180 frames at the fixed delta of 1/60 s the check
-// passes), and fades the parent of the two small squares and lights the box, which the check
-// does not measure: they make the transform, material, fade and emissive streams of the frame
-// transition at once.
+// thread. The page opens a window only for a scene with a Surface; its 640x480 points fill the
+// viewport of the check, so the orthographic camera shows one logical pixel per unit. At frame
+// 30 SetAt moves the white square from the grey start marker to the green target marker and
+// turns the red square blue, with linear transitions of 3 s (180 frames at the fixed delta of
+// 1/60 s the check passes), and fades the parent of the two small circles and lights the box,
+// which the check does not measure: they make the transform, material, fade and emissive streams
+// of the frame transition at once.
 using box.transform
 using box.geometry
 using box.material
@@ -12,6 +13,11 @@ using box.camera
 using box.view
 using box.app
 using box.transition
+using box.surface
+
+window {
+  Surface: {width: 640, height: 480}
+}
 
 camera {
   Position: {0, 0, 100}
