@@ -36,15 +36,10 @@ fixtures were surveyed before choosing the assemblies and rendering setup.
 | PBR metallic and roughness, shared material prefabs | Weathered timber, painted siding, iron, steel, brass, canvas, sand |
 | ClearCoat, baked reflections | Window panes and trough water |
 | World-space Text with a custom Font | Shop signs, town marker, wanted poster in Rye |
-<<<<<<< HEAD
-| Directional, ambient, point and emissive lighting | Warm afternoon sun, cool sky fill, lanterns |
-| LightBake, ReflectionBake, GTAO, bloom, tonemapping, SMAA | Indirect light, contact shadows, restrained lantern glow, smooth edges |
-=======
 | Atmosphere, TimeOfDay, HeightFog | Dusty desert sky, a July afternoon sun at 34° latitude, haze |
 | Directional, point and emissive lighting | Afternoon sun, lanterns |
 | LightBake, ReflectionBake, GTAO, bloom, auto exposure, tonemapping, SMAA | Indirect light, contact shadows, restrained lantern glow, smooth edges |
 | Widgets | The options panel shared with `town.flecs` in `../cfg/hud.flecs` |
->>>>>>> 22b4cc77872472dca668e1a70cf81ac2e161cce4
 
 The survey also covered Mesh3, profile extrusion, sweep, loft, ellipsoid/torus shells,
 texture maps, and transmission. The selected shapes keep the assets
