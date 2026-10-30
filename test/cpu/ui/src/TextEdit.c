@@ -160,7 +160,7 @@ static void edit_run(
     char *cmd = flecs_vasprintf(fmt, args);
     va_end(args);
     bool error = true;
-    char *out = box_terminal_run(world, s, cmd, &error);
+    char *out = box_command_run(world, s, cmd, &error);
     if (error) {
         printf("command '%s' failed: %s\n", cmd, out);
     }
@@ -188,9 +188,9 @@ static void edit_chord(
     const char *mod,
     const char *key)
 {
-    edit_run(world, s, "key.down %s", mod);
-    edit_run(world, s, "key.press %s", key);
-    edit_run(world, s, "key.up %s", mod);
+    edit_run(world, s, "key_down %s", mod);
+    edit_run(world, s, "key_press %s", key);
+    edit_run(world, s, "key_up %s", mod);
 }
 
 /** Press a key a number of times.
@@ -208,7 +208,7 @@ static void edit_keys(
 {
     int32_t i;
     for (i = 0; i < count; i ++) {
-        edit_run(world, s, "key.press %s", key);
+        edit_run(world, s, "key_press %s", key);
     }
 }
 
@@ -451,7 +451,7 @@ static void edit_click(
 {
     char point[64];
     edit_point(world, offset, dx, point, sizeof(point));
-    edit_run(world, s, "mouse.click left %s", point);
+    edit_run(world, s, "mouse_click left %s", point);
 }
 
 /** Focus the first field with a click past its text, which puts the caret at the end.
@@ -465,7 +465,7 @@ static void edit_focus(
 {
     ecs_entity_t e = edit_field(world);
     const WorldTransform *t = ecs_get(world, e, WorldTransform);
-    edit_run(world, s, "mouse.click left [%.2f, %.2f]",
+    edit_run(world, s, "mouse_click left [%.2f, %.2f]",
         (double)(640 + t->m[3][0] + ecs_get(world, e, LayoutBounds)->width * 0.5f - 2),
         (double)(360 - t->m[3][1]));
     test_uint(ecs_singleton_get(world, FocusStatus)->focused, edit_field(world));
@@ -491,7 +491,7 @@ static Rect edit_rect(
 void TextEdit_adds_focus_and_parts(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world("TextEdit: {value: \"hello\"}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_entity_t e = edit_field(world);
     test_assert(ecs_has_id(world, e, Focusable));
     test_assert(ecs_has_id(world, e, Interactive));
@@ -523,7 +523,7 @@ void TextEdit_adds_focus_and_parts(void) {
 
     char point[64];
     edit_point(world, 2, 0, point, sizeof(point));
-    edit_run(world, s, "mouse.move %s", point);
+    edit_run(world, s, "mouse_move %s", point);
     test_uint(ecs_singleton_get(world, PickStatus)->target, e);
     test_uint(ecs_singleton_get(world, PickStatus)->handler, e);
     test_int(ecs_singleton_get(world, PickStatus)->shape, CursorText);
@@ -544,10 +544,10 @@ void TextEdit_adds_focus_and_parts(void) {
 void TextEdit_type_text(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world("TextEdit: {}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     edit_focus(world, s);
     edit_expect(world, 0, 0);
-    edit_run(world, s, "key.type hello");
+    edit_run(world, s, "key_type hello");
     test_str(edit_value(world), "hello");
     edit_expect(world, 5, 5);
     test_str(ecs_get(world, edit_parts(world, edit_field(world)).text, Text)->value, "hello");
@@ -559,11 +559,11 @@ void TextEdit_type_text(void) {
 void TextEdit_insert_middle(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world("TextEdit: {value: \"held\"}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     edit_focus(world, s);
     edit_expect(world, 4, 4);
     edit_keys(world, s, "Left", 1);
-    edit_run(world, s, "key.type \"lo wor\"");
+    edit_run(world, s, "key_type \"lo wor\"");
     test_str(edit_value(world), "hello word");
     edit_expect(world, 9, 9);
     ecs_fini(world);
@@ -572,14 +572,14 @@ void TextEdit_insert_middle(void) {
 void TextEdit_replace_selection(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world("TextEdit: {value: \"hello world\"}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     edit_focus(world, s);
     edit_keys(world, s, "Home", 1);
-    edit_run(world, s, "key.down ShiftLeft");
+    edit_run(world, s, "key_down ShiftLeft");
     edit_keys(world, s, "Right", 5);
-    edit_run(world, s, "key.up ShiftLeft");
+    edit_run(world, s, "key_up ShiftLeft");
     edit_expect(world, 0, 5);
-    edit_run(world, s, "key.type bye");
+    edit_run(world, s, "key_type bye");
     test_str(edit_value(world), "bye world");
     edit_expect(world, 3, 3);
     test_int(edit_probe(world)->changes, 3);
@@ -589,31 +589,31 @@ void TextEdit_replace_selection(void) {
 void TextEdit_max_length(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world("TextEdit: {max_length: 5}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     edit_focus(world, s);
-    edit_run(world, s, "key.type abcdefg");
+    edit_run(world, s, "key_type abcdefg");
     test_str(edit_value(world), "abcde");
     edit_expect(world, 5, 5);
     test_int(edit_probe(world)->changes, 5);
 
     edit_keys(world, s, "Home", 1);
     edit_keys(world, s, "Right", 1);
-    edit_run(world, s, "key.down ShiftLeft");
+    edit_run(world, s, "key_down ShiftLeft");
     edit_keys(world, s, "Right", 2);
-    edit_run(world, s, "key.up ShiftLeft");
+    edit_run(world, s, "key_up ShiftLeft");
     box_input_paste(world, "XYZW");
-    edit_run(world, s, "input.wait");
+    edit_run(world, s, "input_wait");
     test_str(edit_value(world), "aXYde");
     edit_expect(world, 3, 3);
 
     edit_set(world, "");
     box_input_paste(world, "\xC3\xA9\xE2\x82\xAC\xF0\x9F\x98\x80" "abc");
-    edit_run(world, s, "input.wait");
+    edit_run(world, s, "input_wait");
     test_str(edit_value(world), "\xC3\xA9\xE2\x82\xAC\xF0\x9F\x98\x80" "ab");
     edit_set(world, "abc");
     edit_keys(world, s, "End", 1);
     box_input_paste(world, "\xF0\x9F\x98\x80\xF0\x9F\x98\x80\xF0\x9F\x98\x80");
-    edit_run(world, s, "input.wait");
+    edit_run(world, s, "input_wait");
     test_str(edit_value(world), "abc\xF0\x9F\x98\x80\xF0\x9F\x98\x80");
     edit_expect(world, 11, 11);
     ecs_fini(world);
@@ -622,16 +622,16 @@ void TextEdit_max_length(void) {
 void TextEdit_control_characters(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world("TextEdit: {}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     edit_focus(world, s);
     box_input_paste(world, "a\tb\nc\r\nd\x01" "e\x7f" "f\rg\x1b");
-    edit_run(world, s, "input.wait");
+    edit_run(world, s, "input_wait");
     test_str(edit_value(world), "a b c def g");
     edit_expect(world, 11, 11);
     test_int(edit_probe(world)->changes, 1);
 
     box_input_paste(world, "\x01\x02");
-    edit_run(world, s, "input.wait");
+    edit_run(world, s, "input_wait");
     test_str(edit_value(world), "a b c def g");
     test_int(edit_probe(world)->changes, 1);
 
@@ -643,7 +643,7 @@ void TextEdit_control_characters(void) {
 void TextEdit_multi_byte(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world("TextEdit: {}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     edit_focus(world, s);
     edit_set(world, "a\xC3\xA9\xE2\x82\xAC\xF0\x9F\x98\x80" "b");
     edit_keys(world, s, "Home", 1);
@@ -668,7 +668,7 @@ void TextEdit_multi_byte(void) {
     edit_keys(world, s, "Right", 1);
     edit_keys(world, s, "Delete", 1);
     test_str(edit_value(world), "a\xE2\x82\xAC" "b");
-    edit_run(world, s, "key.type \xC3\xBC");
+    edit_run(world, s, "key_type \xC3\xBC");
     test_str(edit_value(world), "a\xC3\xBC\xE2\x82\xAC" "b");
     edit_expect(world, 3, 3);
     ecs_fini(world);
@@ -677,7 +677,7 @@ void TextEdit_multi_byte(void) {
 void TextEdit_ill_formed(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world("TextEdit: {}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     edit_focus(world, s);
     edit_set(world, "a\xE2\x82" "b\xF0\x9F" "c\xC0\xAF");
     edit_keys(world, s, "Home", 1);
@@ -713,7 +713,7 @@ void TextEdit_ill_formed(void) {
 void TextEdit_caret_moves(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world("TextEdit: {value: \"abc\"}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     edit_focus(world, s);
     edit_keys(world, s, "Home", 1);
     edit_expect(world, 0, 0);
@@ -727,9 +727,9 @@ void TextEdit_caret_moves(void) {
     edit_expect(world, 3, 3);
     edit_keys(world, s, "Left", 5);
     edit_expect(world, 0, 0);
-    edit_run(world, s, "key.down Right");
-    edit_run(world, s, "key.repeat Right 2");
-    edit_run(world, s, "key.up Right");
+    edit_run(world, s, "key_down Right");
+    edit_run(world, s, "key_repeat Right 2");
+    edit_run(world, s, "key_up Right");
     edit_expect(world, 3, 3);
     test_int(edit_probe(world)->changes, 0);
     test_str(edit_value(world), "abc");
@@ -739,7 +739,7 @@ void TextEdit_caret_moves(void) {
 void TextEdit_word_moves(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world("TextEdit: {value: \"hello, big  world\"}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     edit_focus(world, s);
     edit_keys(world, s, "Home", 1);
     int32_t right[] = {5, 6, 10, 17, 17};
@@ -755,9 +755,9 @@ void TextEdit_word_moves(void) {
         edit_expect(world, left[i], left[i]);
     }
 
-    edit_run(world, s, "key.down ShiftLeft");
+    edit_run(world, s, "key_down ShiftLeft");
     edit_chord(world, s, EDIT_WORD, "Right");
-    edit_run(world, s, "key.up ShiftLeft");
+    edit_run(world, s, "key_up ShiftLeft");
     edit_expect(world, 0, 5);
 
     edit_keys(world, s, "End", 1);
@@ -784,7 +784,7 @@ void TextEdit_word_moves(void) {
 void TextEdit_home_end(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world("TextEdit: {value: \"abc def\"}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     edit_focus(world, s);
     edit_keys(world, s, "Home", 1);
     edit_expect(world, 0, 0);
@@ -794,12 +794,12 @@ void TextEdit_home_end(void) {
     edit_expect(world, 0, 0);
     edit_keys(world, s, "Down", 1);
     edit_expect(world, 7, 7);
-    edit_run(world, s, "key.down ShiftLeft");
+    edit_run(world, s, "key_down ShiftLeft");
     edit_keys(world, s, "Home", 1);
     edit_expect(world, 7, 0);
     edit_keys(world, s, "Down", 1);
     edit_expect(world, 7, 7);
-    edit_run(world, s, "key.up ShiftLeft");
+    edit_run(world, s, "key_up ShiftLeft");
 #ifdef __APPLE__
     edit_chord(world, s, "SuperLeft", "Left");
     edit_expect(world, 0, 0);
@@ -812,27 +812,27 @@ void TextEdit_home_end(void) {
 void TextEdit_shift_selection(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world("TextEdit: {value: \"abcdef\"}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     edit_focus(world, s);
     edit_keys(world, s, "Home", 1);
-    edit_run(world, s, "key.down ShiftLeft");
+    edit_run(world, s, "key_down ShiftLeft");
     edit_keys(world, s, "Right", 3);
     edit_expect(world, 0, 3);
     edit_keys(world, s, "Left", 1);
     edit_expect(world, 0, 2);
-    edit_run(world, s, "key.up ShiftLeft");
+    edit_run(world, s, "key_up ShiftLeft");
     edit_keys(world, s, "Right", 1);
     edit_expect(world, 2, 2);
-    edit_run(world, s, "key.down ShiftRight");
+    edit_run(world, s, "key_down ShiftRight");
     edit_keys(world, s, "End", 1);
     edit_expect(world, 2, 6);
-    edit_run(world, s, "key.up ShiftRight");
+    edit_run(world, s, "key_up ShiftRight");
     edit_keys(world, s, "Left", 1);
     edit_expect(world, 2, 2);
 
-    edit_run(world, s, "key.down ShiftLeft");
+    edit_run(world, s, "key_down ShiftLeft");
     edit_keys(world, s, "Left", 2);
-    edit_run(world, s, "key.up ShiftLeft");
+    edit_run(world, s, "key_up ShiftLeft");
     edit_expect(world, 2, 0);
     edit_parts_t parts = edit_parts(world, edit_field(world));
     Rect sel = edit_rect(world, parts.selection);
@@ -848,13 +848,13 @@ void TextEdit_shift_selection(void) {
 void TextEdit_select_all(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world("TextEdit: {value: \"hello world\"}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     edit_focus(world, s);
     edit_keys(world, s, "Home", 1);
     edit_chord(world, s, EDIT_CMD, "A");
     edit_expect(world, 0, 11);
     test_str(edit_value(world), "hello world");
-    edit_run(world, s, "key.type x");
+    edit_run(world, s, "key_type x");
     test_str(edit_value(world), "x");
     edit_expect(world, 1, 1);
     test_int(edit_probe(world)->changes, 1);
@@ -866,13 +866,13 @@ void TextEdit_select_all(void) {
 void TextEdit_backspace_repeat(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world("TextEdit: {value: \"abcdef\"}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     edit_focus(world, s);
-    edit_run(world, s, "key.down Backspace");
+    edit_run(world, s, "key_down Backspace");
     test_str(edit_value(world), "abcde");
-    edit_run(world, s, "key.repeat Backspace 3");
+    edit_run(world, s, "key_repeat Backspace 3");
     test_str(edit_value(world), "ab");
-    edit_run(world, s, "key.up Backspace");
+    edit_run(world, s, "key_up Backspace");
     test_str(edit_value(world), "ab");
     edit_expect(world, 2, 2);
     test_int(edit_probe(world)->changes, 4);
@@ -887,7 +887,7 @@ void TextEdit_backspace_repeat(void) {
 void TextEdit_click_placement(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world("TextEdit: {value: \"hello\"}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     float w = edit_caret_x(world, 2) - edit_caret_x(world, 1);
     edit_click(world, s, 0, 1);
     test_uint(ecs_singleton_get(world, FocusStatus)->focused, edit_field(world));
@@ -917,19 +917,19 @@ void TextEdit_click_placement(void) {
 void TextEdit_drag_select(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world("TextEdit: {value: \"hello world\"}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     char from[64], to[64];
     edit_point(world, 0, 0, from, sizeof(from));
     edit_point(world, 5, 0, to, sizeof(to));
-    edit_run(world, s, "mouse.drag left %s %s", from, to);
+    edit_run(world, s, "mouse_drag left %s %s", from, to);
     test_uint(ecs_singleton_get(world, FocusStatus)->focused, edit_field(world));
     edit_expect(world, 0, 5);
     edit_wait(world);
     edit_point(world, 11, 0, from, sizeof(from));
     edit_point(world, 6, 0, to, sizeof(to));
-    edit_run(world, s, "mouse.drag left %s %s", from, to);
+    edit_run(world, s, "mouse_drag left %s %s", from, to);
     edit_expect(world, 11, 6);
-    edit_run(world, s, "key.type X");
+    edit_run(world, s, "key_type X");
     test_str(edit_value(world), "hello X");
     ecs_fini(world);
 }
@@ -939,17 +939,17 @@ void TextEdit_drag_scrolls(void) {
     ecs_world_t *world = edit_world(
         "TextEdit: {value: \"the quick brown fox jumps over\"}\n"
         "LayoutItem: {width: {mode: Fixed, value: 60}}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     char from[64];
     const WorldTransform *t = ecs_get(world, edit_field(world), WorldTransform);
     float x = 640 + t->m[3][0], y = 360 - t->m[3][1];
     int32_t i, last = 0;
     edit_point(world, 1, 0, from, sizeof(from));
-    edit_run(world, s, "mouse.move %s", from);
-    edit_run(world, s, "mouse.button left true");
+    edit_run(world, s, "mouse_move %s", from);
+    edit_run(world, s, "mouse_button left true");
     edit_expect(world, 1, 1);
     test_flt(edit_status(world).scroll, 0);
-    edit_run(world, s, "mouse.move [%.2f, %.2f]", (double)(x + 90), (double)y);
+    edit_run(world, s, "mouse_move [%.2f, %.2f]", (double)(x + 90), (double)y);
     for (i = 0; i < 120 && edit_status(world).caret < 30; i ++) {
         test_assert(edit_status(world).caret >= last);
         last = edit_status(world).caret;
@@ -958,15 +958,15 @@ void TextEdit_drag_scrolls(void) {
 
     edit_expect(world, 1, 30);
     test_assert(edit_status(world).scroll > 0);
-    edit_run(world, s, "mouse.move [%.2f, %.2f]", (double)(x - 90), (double)y);
+    edit_run(world, s, "mouse_move [%.2f, %.2f]", (double)(x - 90), (double)y);
     for (i = 0; i < 120 && edit_status(world).caret > 0; i ++) {
         ecs_progress(world, EDIT_DT);
     }
 
     edit_expect(world, 1, 0);
     test_flt(edit_status(world).scroll, 0);
-    edit_run(world, s, "mouse.button left false");
-    edit_run(world, s, "mouse.move [%.2f, %.2f]", (double)(x + 90), (double)y);
+    edit_run(world, s, "mouse_button left false");
+    edit_run(world, s, "mouse_move [%.2f, %.2f]", (double)(x + 90), (double)y);
     edit_expect(world, 1, 0);
     ecs_fini(world);
 }
@@ -974,7 +974,7 @@ void TextEdit_drag_scrolls(void) {
 void TextEdit_double_click_word(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world("TextEdit: {value: \"hello big  world\"}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     float w = edit_caret_x(world, 8) - edit_caret_x(world, 7);
     edit_click(world, s, 7, w * 0.5f);
     edit_expect(world, 7, 7);
@@ -1001,7 +1001,7 @@ void TextEdit_double_click_word(void) {
     edit_click(world, s, 7, 0.5f);
     edit_point(world, 7, 0.5f, from, sizeof(from));
     edit_point(world, 13, 0, to, sizeof(to));
-    edit_run(world, s, "mouse.drag left %s %s", from, to);
+    edit_run(world, s, "mouse_drag left %s %s", from, to);
     edit_expect(world, 6, 16);
     ecs_fini(world);
 }
@@ -1009,14 +1009,14 @@ void TextEdit_double_click_word(void) {
 void TextEdit_triple_click_all(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world("TextEdit: {value: \"hello big world\"}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     edit_click(world, s, 7, 1);
     edit_click(world, s, 7, 1);
     edit_click(world, s, 7, 1);
     edit_expect(world, 0, 15);
     edit_click(world, s, 7, 1);
     edit_expect(world, 7, 7);
-    edit_run(world, s, "key.type X");
+    edit_run(world, s, "key_type X");
     test_str(edit_value(world), "hello bXig world");
     ecs_fini(world);
 }
@@ -1024,7 +1024,7 @@ void TextEdit_triple_click_all(void) {
 void TextEdit_slow_clicks(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world("TextEdit: {value: \"hello big world\"}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     edit_click(world, s, 7, 1);
     edit_wait(world);
     edit_click(world, s, 7, 1);
@@ -1040,17 +1040,17 @@ void TextEdit_slow_clicks(void) {
 void TextEdit_shift_click(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world("TextEdit: {value: \"hello world\"}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     edit_click(world, s, 2, 0);
     edit_expect(world, 2, 2);
-    edit_run(world, s, "key.down ShiftLeft");
+    edit_run(world, s, "key_down ShiftLeft");
     edit_click(world, s, 8, 0);
     edit_expect(world, 2, 8);
     edit_click(world, s, 1, 0);
     edit_expect(world, 2, 1);
     edit_click(world, s, 1, 0);
     edit_expect(world, 2, 1);
-    edit_run(world, s, "key.up ShiftLeft");
+    edit_run(world, s, "key_up ShiftLeft");
     edit_wait(world);
     edit_click(world, s, 4, 0);
     edit_expect(world, 4, 4);
@@ -1060,11 +1060,11 @@ void TextEdit_shift_click(void) {
 void TextEdit_copy_paste(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world("TextEdit: {value: \"hello world\"}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     edit_focus(world, s);
-    edit_run(world, s, "key.down ShiftLeft");
+    edit_run(world, s, "key_down ShiftLeft");
     edit_keys(world, s, "Left", 5);
-    edit_run(world, s, "key.up ShiftLeft");
+    edit_run(world, s, "key_up ShiftLeft");
     edit_chord(world, s, EDIT_CMD, "C");
     test_str(box_input_clipboard_get(world), "world");
     test_str(edit_value(world), "hello world");
@@ -1074,7 +1074,7 @@ void TextEdit_copy_paste(void) {
     edit_expect(world, 16, 16);
     test_int(edit_probe(world)->changes, 1);
 
-    edit_run(world, s, "clipboard.set \"big \"");
+    edit_run(world, s, "clipboard_set \"big \"");
     edit_keys(world, s, "Home", 1);
     edit_keys(world, s, "Right", 6);
     edit_chord(world, s, EDIT_CMD, "V");
@@ -1084,7 +1084,7 @@ void TextEdit_copy_paste(void) {
     edit_chord(world, s, EDIT_CMD, "A");
     edit_chord(world, s, EDIT_CMD, "C");
     bool error = true;
-    char *out = box_terminal_run(world, s, "clipboard.get", &error);
+    char *out = box_command_run(world, s, "clipboard_get", &error);
     test_bool(error, false);
     test_str(out, "hello big worldworld");
     ecs_os_free(out);
@@ -1097,17 +1097,17 @@ void TextEdit_copy_paste(void) {
 void TextEdit_cut(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world("TextEdit: {value: \"hello world\"}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     edit_focus(world, s);
-    edit_run(world, s, "clipboard.set keep");
+    edit_run(world, s, "clipboard_set keep");
     edit_chord(world, s, EDIT_CMD, "X");
     test_str(edit_value(world), "hello world");
     test_str(box_input_clipboard_get(world), "keep");
     edit_keys(world, s, "Home", 1);
-    edit_run(world, s, "key.down ShiftLeft");
+    edit_run(world, s, "key_down ShiftLeft");
     edit_chord(world, s, EDIT_WORD, "Right");
     edit_keys(world, s, "Right", 1);
-    edit_run(world, s, "key.up ShiftLeft");
+    edit_run(world, s, "key_up ShiftLeft");
     edit_chord(world, s, EDIT_CMD, "X");
     test_str(edit_value(world), "world");
     test_str(box_input_clipboard_get(world), "hello ");
@@ -1122,10 +1122,10 @@ void TextEdit_cut(void) {
 void TextEdit_password(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world("TextEdit: {password: true}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     edit_parts_t parts = edit_parts(world, edit_field(world));
     edit_focus(world, s);
-    edit_run(world, s, "key.type s\xC3\xA9" "cret");
+    edit_run(world, s, "key_type s\xC3\xA9" "cret");
     test_str(edit_value(world), "s\xC3\xA9" "cret");
     edit_expect(world, 7, 7);
     test_str(ecs_get(world, parts.text, Text)->value,
@@ -1138,7 +1138,7 @@ void TextEdit_password(void) {
     const Position *text = ecs_get(world, parts.text, Position);
     test_flt(caret->x, text->x + edit_caret_x(world, 0) + x);
 
-    edit_run(world, s, "clipboard.set keep");
+    edit_run(world, s, "clipboard_set keep");
     edit_chord(world, s, EDIT_CMD, "A");
     edit_chord(world, s, EDIT_CMD, "C");
     test_str(box_input_clipboard_get(world), "keep");
@@ -1155,9 +1155,9 @@ void TextEdit_password(void) {
     edit_wait(world);
     char point[64];
     edit_point(world, 3, 1, point, sizeof(point));
-    edit_run(world, s, "mouse.click left %s", point);
+    edit_run(world, s, "mouse_click left %s", point);
     edit_expect(world, 1, 1);
-    edit_run(world, s, "mouse.click left %s", point);
+    edit_run(world, s, "mouse_click left %s", point);
     edit_expect(world, 0, 11);
     ecs_fini(world);
 }
@@ -1165,21 +1165,21 @@ void TextEdit_password(void) {
 void TextEdit_read_only(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world("TextEdit: {value: \"fixed text\", read_only: true}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     edit_focus(world, s);
     edit_expect(world, 10, 10);
-    edit_run(world, s, "key.type x");
+    edit_run(world, s, "key_type x");
     edit_keys(world, s, "Backspace", 1);
     edit_keys(world, s, "Home", 1);
     edit_keys(world, s, "Delete", 1);
-    edit_run(world, s, "clipboard.set keep");
+    edit_run(world, s, "clipboard_set keep");
     edit_chord(world, s, EDIT_CMD, "V");
     test_str(edit_value(world), "fixed text");
     edit_expect(world, 0, 0);
 
-    edit_run(world, s, "key.down ShiftLeft");
+    edit_run(world, s, "key_down ShiftLeft");
     edit_chord(world, s, EDIT_WORD, "Right");
-    edit_run(world, s, "key.up ShiftLeft");
+    edit_run(world, s, "key_up ShiftLeft");
     edit_expect(world, 0, 5);
     edit_chord(world, s, EDIT_CMD, "X");
     test_str(edit_value(world), "fixed text");
@@ -1195,9 +1195,9 @@ void TextEdit_read_only(void) {
 void TextEdit_enter_submits(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world("TextEdit: {}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     edit_focus(world, s);
-    edit_run(world, s, "key.type hi");
+    edit_run(world, s, "key_type hi");
     edit_keys(world, s, "Enter", 1);
     test_int(edit_probe(world)->submits, 1);
     test_int(edit_probe(world)->changes, 2);
@@ -1206,9 +1206,9 @@ void TextEdit_enter_submits(void) {
     test_uint(ecs_singleton_get(world, FocusStatus)->focused, edit_field(world));
     edit_keys(world, s, "KpEnter", 1);
     test_int(edit_probe(world)->submits, 2);
-    edit_run(world, s, "key.down Enter");
-    edit_run(world, s, "key.repeat Enter 3");
-    edit_run(world, s, "key.up Enter");
+    edit_run(world, s, "key_down Enter");
+    edit_run(world, s, "key_repeat Enter 3");
+    edit_run(world, s, "key_up Enter");
     test_int(edit_probe(world)->submits, 3);
     test_int(edit_probe(world)->changes, 2);
     ecs_fini(world);
@@ -1217,9 +1217,9 @@ void TextEdit_enter_submits(void) {
 void TextEdit_change_per_edit(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world("TextEdit: {}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     edit_focus(world, s);
-    edit_run(world, s, "key.type abc");
+    edit_run(world, s, "key_type abc");
     test_int(edit_probe(world)->changes, 3);
     test_uint(edit_probe(world)->widget, edit_field(world));
     edit_keys(world, s, "Left", 2);
@@ -1230,10 +1230,10 @@ void TextEdit_change_per_edit(void) {
     test_int(edit_probe(world)->changes, 4);
     test_str(edit_shown(world), "bc");
     edit_chord(world, s, EDIT_CMD, "A");
-    edit_run(world, s, "key.type z");
+    edit_run(world, s, "key_type z");
     test_int(edit_probe(world)->changes, 5);
     box_input_paste(world, "pasted");
-    edit_run(world, s, "input.wait");
+    edit_run(world, s, "input_wait");
     test_int(edit_probe(world)->changes, 6);
     test_str(edit_value(world), "zpasted");
     test_str(edit_shown(world), "zpasted");
@@ -1243,18 +1243,18 @@ void TextEdit_change_per_edit(void) {
 void TextEdit_set_value_no_change(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world("TextEdit: {}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     edit_focus(world, s);
-    edit_run(world, s, "key.type hello");
+    edit_run(world, s, "key_type hello");
     test_int(edit_probe(world)->changes, 5);
     edit_set(world, "hey");
     edit_expect(world, 3, 3);
     test_str(ecs_get(world, edit_parts(world, edit_field(world)).text, Text)->value, "hey");
     edit_set(world, "a much longer text");
     edit_expect(world, 3, 3);
-    edit_run(world, s, "key.down ShiftLeft");
+    edit_run(world, s, "key_down ShiftLeft");
     edit_keys(world, s, "End", 1);
-    edit_run(world, s, "key.up ShiftLeft");
+    edit_run(world, s, "key_up ShiftLeft");
     edit_expect(world, 3, 18);
     edit_set(world, "abcd");
     edit_expect(world, 3, 4);
@@ -1273,7 +1273,7 @@ void TextEdit_set_value_no_change(void) {
     edit_expect(world, 2, 2);
     test_int(edit_probe(world)->changes, 5);
     test_str(edit_shown(world), "xy");
-    edit_run(world, s, "key.type z");
+    edit_run(world, s, "key_type z");
     test_str(edit_value(world), "xyz");
     test_int(edit_probe(world)->changes, 6);
     ecs_fini(world);
@@ -1284,13 +1284,13 @@ void TextEdit_scroll_keeps_caret(void) {
     ecs_world_t *world = edit_world(
         "TextEdit: {}\n"
         "LayoutItem: {width: {mode: Fixed, value: 60}}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     edit_parts_t parts = edit_parts(world, edit_field(world));
     int32_t i;
     edit_focus(world, s);
     const char *text = "abcdefghijklmnopqrst";
     for (i = 0; text[i]; i ++) {
-        edit_run(world, s, "key.type %c", text[i]);
+        edit_run(world, s, "key_type %c", text[i]);
         float x = ecs_get(world, parts.caret, Position)->x;
         test_assert(x >= -30 && x <= 30);
     }
@@ -1324,11 +1324,11 @@ void TextEdit_scroll_keeps_caret(void) {
 void TextEdit_key_capture_binding(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world("TextEdit: {}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_entity_t hide = edit_e(world, "actions.hide");
     int32_t i, presses = 0;
     edit_focus(world, s);
-    ecs_os_free(box_terminal_run(world, s, "key.type hhh", NULL));
+    ecs_os_free(box_command_run(world, s, "key_type hhh", NULL));
     for (i = 0; i < 10; i ++) {
         ecs_progress(world, EDIT_DT);
         presses += ecs_get(world, hide, ActionState)->pressed;
@@ -1338,7 +1338,7 @@ void TextEdit_key_capture_binding(void) {
     test_int(presses, 0);
     edit_keys(world, s, "Escape", 1);
     test_uint(ecs_singleton_get(world, FocusStatus)->focused, 0);
-    ecs_os_free(box_terminal_run(world, s, "key.press H", NULL));
+    ecs_os_free(box_command_run(world, s, "key_press H", NULL));
     for (i = 0; i < 4; i ++) {
         ecs_progress(world, EDIT_DT);
         presses += ecs_get(world, hide, ActionState)->pressed;
@@ -1352,14 +1352,14 @@ void TextEdit_key_capture_binding(void) {
 void TextEdit_escape_blurs(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world("TextEdit: {value: \"abc\"}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     edit_parts_t parts = edit_parts(world, edit_field(world));
     test_bool(edit_status(world).focused, false);
     test_flt(edit_rect(world, parts.caret).width, 0);
     edit_focus(world, s);
-    edit_run(world, s, "key.down ShiftLeft");
+    edit_run(world, s, "key_down ShiftLeft");
     edit_keys(world, s, "Left", 2);
-    edit_run(world, s, "key.up ShiftLeft");
+    edit_run(world, s, "key_up ShiftLeft");
     test_bool(edit_status(world).focused, true);
     test_assert(edit_rect(world, parts.caret).width > 0);
     test_assert(edit_rect(world, parts.caret).height > 0);
@@ -1371,7 +1371,7 @@ void TextEdit_escape_blurs(void) {
     test_flt(edit_rect(world, parts.caret).width, 0);
     test_flt(edit_rect(world, parts.selection).width, 0);
     edit_expect(world, 3, 1);
-    edit_run(world, s, "key.type x");
+    edit_run(world, s, "key_type x");
     test_str(edit_value(world), "abc");
     ecs_fini(world);
 }
@@ -1379,12 +1379,12 @@ void TextEdit_escape_blurs(void) {
 void TextEdit_click_elsewhere_blurs(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world("TextEdit: {value: \"abc\"}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     edit_parts_t parts = edit_parts(world, edit_field(world));
     edit_focus(world, s);
     edit_chord(world, s, EDIT_CMD, "A");
     test_assert(edit_rect(world, parts.selection).width > 0);
-    edit_run(world, s, "mouse.click left [1200, 50]");
+    edit_run(world, s, "mouse_click left [1200, 50]");
     test_uint(ecs_singleton_get(world, FocusStatus)->focused, 0);
     test_bool(edit_status(world).focused, false);
     test_flt(edit_rect(world, parts.caret).width, 0);
@@ -1396,19 +1396,19 @@ void TextEdit_click_elsewhere_blurs(void) {
 void TextEdit_tab_between_fields(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world("TextEdit: {}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_entity_t other = edit_e(world, "hud.form.other");
     edit_focus(world, s);
-    edit_run(world, s, "key.type a");
+    edit_run(world, s, "key_type a");
     edit_keys(world, s, "Tab", 1);
     test_uint(ecs_singleton_get(world, FocusStatus)->focused, other);
     test_bool(edit_status(world).focused, false);
     test_bool(ecs_get(world, other, TextEditStatus)->focused, true);
-    edit_run(world, s, "key.type b");
+    edit_run(world, s, "key_type b");
     test_str(ecs_get(world, other, TextEdit)->value, "bother");
     edit_keys(world, s, "Tab", 1);
     test_uint(ecs_singleton_get(world, FocusStatus)->focused, edit_field(world));
-    edit_run(world, s, "key.type c");
+    edit_run(world, s, "key_type c");
     test_str(edit_value(world), "ac");
     ecs_fini(world);
 }
@@ -1416,7 +1416,7 @@ void TextEdit_tab_between_fields(void) {
 void TextEdit_placeholder(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world("TextEdit: {placeholder: \"Name\"}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     edit_parts_t parts = edit_parts(world, edit_field(world));
     const UiTheme *theme = ecs_get(world, ecs_lookup(world, "box.ui.theme"), UiTheme);
     test_str(ecs_get(world, parts.text, Text)->value, "Name");
@@ -1425,7 +1425,7 @@ void TextEdit_placeholder(void) {
     edit_expect(world, 0, 0);
     test_str(ecs_get(world, parts.text, Text)->value, "Name");
     test_flt(ecs_get(world, parts.caret, Position)->x, -100);
-    edit_run(world, s, "key.type a");
+    edit_run(world, s, "key_type a");
     test_str(ecs_get(world, parts.text, Text)->value, "a");
     test_int(ecs_get(world, parts.text, Rgb)->r, theme->text.r);
     edit_keys(world, s, "Backspace", 1);
@@ -1437,7 +1437,7 @@ void TextEdit_placeholder(void) {
 void TextEdit_caret_blink(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world("TextEdit: {value: \"abc\"}");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     edit_parts_t parts = edit_parts(world, edit_field(world));
     int32_t i, on = 0, off = 0, toggles = 0, first_off = -1;
     bool was = true;
@@ -1470,7 +1470,7 @@ void TextEdit_caret_blink(void) {
         ecs_progress(world, EDIT_DT);
     }
 
-    edit_run(world, s, "key.type x");
+    edit_run(world, s, "key_type x");
     test_assert(edit_rect(world, parts.caret).width > 0);
 
     UiTheme *theme = ecs_get_mut(world, ecs_lookup(world, "box.ui.theme"), UiTheme);

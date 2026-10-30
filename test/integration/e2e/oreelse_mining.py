@@ -21,8 +21,9 @@ ARGS = ["--seed", str(SEED), "--fps", "20"]
 # Frames per second of game time
 FPS = round(1 / float(DELTA_TIME))
 
-STATE = "has oreelse.OreGameState (oreelse.OreGameState, oreelse.OreGameState.%s)"
-TOAST = "get oreelse.OreToast OreToast.text"
+STATE = ("eval oreelse.OreGameState.has(flecs.script.core.pair("
+         "oreelse.OreGameState,oreelse.OreGameState.%s))")
+TOAST = "get oreelse.OreToast oreelse.OreToast.text"
 PLAYER = "astronaut"
 INVENTORY = "oreelse.OreInventory"
 MARKER = "markers.mine"
@@ -106,13 +107,13 @@ def set_state(app, state):
 def setup(app):
     """Shrink the window and drop the shadows of the world view, so the software renderer keeps
     up."""
-    app.exec("set window Surface {width: 640, height: 360}")
-    app.exec("set main_view View.shadows.enabled false")
-    app.wait_for("get window SurfaceStatus.height", "360")
+    app.exec("set window box.surface.Surface {width: 640, height: 360}")
+    app.exec("set main_view box.view.View.shadows.enabled false")
+    app.wait_for("get window box.surface.SurfaceStatus.height", "360")
 
 
 def key(app, name, frames=None):
-    app.exec("key.press %s" % name + (" %d" % frames if frames else ""))
+    app.exec("key_press %s" % name + (" %d" % frames if frames else ""))
     app.wait_input()
 
 
@@ -131,7 +132,7 @@ def entity(value):
 
 def inventory(app):
     """The slots of the inventory in order: (item, amount), None for a free slot."""
-    slots = app.get(INVENTORY, "OreInventory")["slots"]
+    slots = app.get(INVENTORY, "oreelse.OreInventory")["slots"]
     return [(entity(s["item"]), s["amount"]) if entity(s["item"]) else None for s in slots]
 
 
@@ -157,16 +158,8 @@ def set_inventory(app, stacks):
 def deposits(app):
     """The deposits of the map by path: their OreDeposit (resource, amount, capacity, row,
     col), from one query of the command port."""
-    app.exec("query ores oreelse.OreDeposit")
-    app.exec("iter ores")
-    out = app.exec("next 1000")
-    result = {}
-    for line in out.splitlines():
-        if not line.strip() or line == "(end)":
-            continue
-        path, value = line.split(" ", 1)
-        result[path] = parse_value(value)
-    return result
+    out = app.exec("query oreelse.OreDeposit")
+    return {row["entity"]: row["fields"][0]["value"]["OreDeposit"] for row in parse_value(out)}
 
 
 def deposit_of(app, kind, neighbor=False):
@@ -190,7 +183,7 @@ def tile_center(d):
 
 
 def hover(app):
-    return app.get("oreelse.OreHover", "OreHover")
+    return app.get("oreelse.OreHover", "oreelse.OreHover")
 
 
 def point(h):
@@ -199,11 +192,11 @@ def point(h):
 
 
 def player(app):
-    return app.get(PLAYER, "Position")
+    return app.get(PLAYER, "box.transform.Position")
 
 
 def move_cursor(app, cursor):
-    app.exec("mouse.move [%g, %g]" % cursor)
+    app.exec("mouse_move [%g, %g]" % cursor)
     app.wait_input()
     app.wait_frames(SETTLE)
 
@@ -217,7 +210,7 @@ def offset(app, cursor):
 
 
 def place(app, x, z):
-    app.exec("set %s Position {%g, 0, %g}" % (PLAYER, x, z))
+    app.exec("set %s box.transform.Position {%g, 0, %g}" % (PLAYER, x, z))
     app.wait_frames(SETTLE)
 
 
@@ -235,12 +228,12 @@ def aim(app, d, cursor=CENTER):
 
 
 def mouse(app, down):
-    app.exec("mouse.button right %s" % ("true" if down else "false"))
+    app.exec("mouse_button right %s" % ("true" if down else "false"))
     app.wait_input()
 
 
 def mining(app):
-    m = app.get(PLAYER, "OreMining")
+    m = app.get(PLAYER, "oreelse.OreMining")
     m["target"] = entity(m["target"])
     return m
 
@@ -251,24 +244,24 @@ def swing_time(m):
 
 
 def disabled(app, marker):
-    return app.exec("has %s flecs.core.Disabled" % marker) == "true"
+    return app.exec("eval %s.has(flecs.core.Disabled)" % marker) == "true"
 
 
 def check_marker(app, d, good):
     """The marker of a target in reach or out of reach shows on its tile, the other is
     hidden."""
     shown, hidden = (MARKER, MARKER_BAD) if good else (MARKER_BAD, MARKER)
-    app.wait_for("has %s flecs.core.Disabled" % shown, "false",
+    app.wait_for("eval %s.has(flecs.core.Disabled)" % shown, "false",
                  what="the %s marker shown" % shown)
     app.check(disabled(app, hidden), "the %s marker shows too" % hidden)
-    p = app.get(shown, "Position")
+    p = app.get(shown, "box.transform.Position")
     x, z = tile_center(d)
     app.check(abs(p["x"] - x) < 1e-4 and abs(p["y"] - 0.14) < 1e-4 and abs(p["z"] - z) < 1e-4,
               "the marker is at %s, not on the tile at (%g, 0.14, %g)" % (p, x, z))
 
 
 def check_no_marker(app):
-    app.wait_for("has %s flecs.core.Disabled" % MARKER, "true", what="no marker")
+    app.wait_for("eval %s.has(flecs.core.Disabled)" % MARKER, "true", what="no marker")
     app.check(disabled(app, MARKER_BAD), "the out of reach marker shows")
 
 
@@ -286,7 +279,7 @@ def test_starting_crate(app):
 
     # A restart brings the crate back
     set_inventory(app, [("items.Stone", 3), None, ("items.Wire", 5)])
-    app.wait_for("get %s OreInventory.slots[0].amount" % INVENTORY, "3")
+    app.wait_for("get %s oreelse.OreInventory.slots[0].amount" % INVENTORY, "3")
     set_state(app, "Lost")
     key(app, "R")
     app.wait_for(STATE % "Playing", "true")
@@ -302,7 +295,7 @@ def test_mine_stone_and_iron(app):
     app.check(distance <= REACH, "the tile is %g away, out of reach" % distance)
     check_no_marker(app)
 
-    clock = float(app.exec("get oreelse.OreClock OreClock.elapsed"))
+    clock = float(app.exec("get oreelse.OreClock oreelse.OreClock.elapsed"))
     mouse(app, True)
     app.wait_frames(10)
     m = mining(app)
@@ -311,9 +304,9 @@ def test_mine_stone_and_iron(app):
     app.check(abs(swing_time(m) - STONE_TIME) < 1e-3,
               "a swing at stone takes %g s, not %g" % (swing_time(m), STONE_TIME))
     check_marker(app, d, True)
-    app.wait_for("get %s OreInventory.slots[3].amount" % INVENTORY, "1",
+    app.wait_for("get %s oreelse.OreInventory.slots[3].amount" % INVENTORY, "1",
                  frames=round((STONE_TIME + SWING_SLACK) * FPS), what="1 stone mined")
-    took = float(app.exec("get oreelse.OreClock OreClock.elapsed")) - clock
+    took = float(app.exec("get oreelse.OreClock oreelse.OreClock.elapsed")) - clock
     app.check(took >= STONE_TIME - 0.05, "the stone was mined after %g s, not %g" %
               (took, STONE_TIME))
     app.check(inventory(app)[3] == ("items.Stone", 1),
@@ -337,9 +330,9 @@ def test_mine_stone_and_iron(app):
               "a swing at iron takes %g s, not %g" % (swing_time(m), IRON_TIME))
 
     # Skip ahead to the end of the swing
-    app.exec("set %s OreMining {target: %s, left: 0.25, progress: %g}" %
+    app.exec("set %s oreelse.OreMining {target: %s, left: 0.25, progress: %g}" %
              (PLAYER, path, 1 - 0.25 / IRON_TIME))
-    app.wait_for("get %s OreInventory.slots[4].amount" % INVENTORY, "1",
+    app.wait_for("get %s oreelse.OreInventory.slots[4].amount" % INVENTORY, "1",
                  frames=round((0.25 + SWING_SLACK) * FPS), what="1 iron mined")
     app.check(inventory(app)[4] == ("items.Iron", 1),
               "the iron is not in the fifth slot: %s" % inventory(app))
@@ -411,13 +404,13 @@ def test_out_of_reach(app):
 def test_last_ore(app):
     start(app)
     path, d, _ = deposit_of(app, "items.Stone")
-    app.exec("set %s OreDeposit {resource: items.Stone, amount: 1, capacity: %d, row: %d, "
+    app.exec("set %s oreelse.OreDeposit {resource: items.Stone, amount: 1, capacity: %d, row: %d, "
              "col: %d}" % (path, DEPOSIT_AMOUNT, d["row"], d["col"]))
-    app.wait_for("get %s OreDeposit.amount" % path, "1")
+    app.wait_for("get %s oreelse.OreDeposit.amount" % path, "1")
     aim(app, d)
 
     mouse(app, True)
-    app.wait_for("get %s OreInventory.slots[3].amount" % INVENTORY, "1",
+    app.wait_for("get %s oreelse.OreInventory.slots[3].amount" % INVENTORY, "1",
                  frames=round((STONE_TIME + SWING_SLACK) * FPS), what="the last stone mined")
     app.wait_frames(SETTLE)
     app.check(path not in deposits(app), "%s is still there with 0 ore" % path)
@@ -436,7 +429,7 @@ def test_inventory_full(app):
     start(app)
     full = [(kind, 1) for kind in OTHER_KINDS]
     set_inventory(app, full)
-    app.wait_for("get %s OreInventory.slots[14].amount" % INVENTORY, "1")
+    app.wait_for("get %s oreelse.OreInventory.slots[14].amount" % INVENTORY, "1")
     path, d, _ = deposit_of(app, "items.Stone")
     aim(app, d)
 
@@ -456,7 +449,7 @@ def test_inventory_full(app):
 def test_slot_frees(app):
     start(app)
     set_inventory(app, [("items.IronPlate", 16), ("items.Stone", 2), ("items.CopperPlate", 12)])
-    app.wait_for("get %s OreInventory.slots[1].amount" % INVENTORY, "2")
+    app.wait_for("get %s oreelse.OreInventory.slots[1].amount" % INVENTORY, "2")
 
     run_script(app, "const ok: bool = oreelse.inventory_remove(items.Stone, 1)")
     app.check(inventory(app)[:3] == [("items.IronPlate", 16), ("items.Stone", 1),
@@ -485,7 +478,7 @@ def test_slot_frees(app):
     path, d, _ = deposit_of(app, "items.Stone")
     aim(app, d)
     mouse(app, True)
-    app.wait_for("get %s OreInventory.slots[0].amount" % INVENTORY, "1",
+    app.wait_for("get %s oreelse.OreInventory.slots[0].amount" % INVENTORY, "1",
                  frames=round((STONE_TIME + SWING_SLACK) * FPS), what="1 stone mined")
     mouse(app, False)
     slots = inventory(app)
@@ -507,15 +500,15 @@ def test_hover_through_box(app):
 
     # A tall box over the ground under the cursors, between them and the camera
     x, z = tiles[0][2]
-    app.exec("touch blocker")
-    app.exec("set blocker Position {%g, 2, %g}" % (x, z))
-    app.exec("set blocker Box {14, 4, 10}")
-    app.exec("set blocker Rgb {90, 90, 90}")
+    app.exec("new blocker")
+    app.exec("set blocker box.transform.Position {%g, 2, %g}" % (x, z))
+    app.exec("set blocker box.geometry.Box {14, 4, 10}")
+    app.exec("set blocker box.material.Rgb {90, 90, 90}")
     app.wait_frames(SETTLE)
 
     for cursor, tile in zip(cursors, tiles):
         move_cursor(app, cursor)
-        app.check(app.get("box.picking.PickStatus", "PickStatus")["hit"] == "blocker",
+        app.check(app.get("box.picking.PickStatus", "box.picking.PickStatus")["hit"] == "blocker",
                   "the cursor at %s does not point at the box" % (cursor,))
         h = hover(app)
         app.check(h["on_grid"] and (h["row"], h["col"]) == tile[:2],

@@ -110,14 +110,14 @@ static void text_expect_focus(
  *
  * @param world The world
  * @param s The terminal session
- * @param text The text, quoted as the key.type command takes it
+ * @param text The text, quoted as the key_type command takes it
  */
 static void text_type(
     ecs_world_t *world,
     ecs_entity_t s,
     const char *text)
 {
-    ecs_os_free(gallery_run(world, s, "key.type %s", text));
+    ecs_os_free(gallery_run(world, s, "key_type %s", text));
     gallery_settle(world, s);
 }
 
@@ -137,9 +137,9 @@ static void text_shortcut(
 #else
     const char *mod = "CtrlLeft";
 #endif
-    ecs_os_free(gallery_run(world, s, "key.down %s", mod));
+    ecs_os_free(gallery_run(world, s, "key_down %s", mod));
     gallery_key(world, s, key);
-    ecs_os_free(gallery_run(world, s, "key.up %s", mod));
+    ecs_os_free(gallery_run(world, s, "key_up %s", mod));
     gallery_settle(world, s);
 }
 
@@ -149,19 +149,22 @@ void Text_scene_loads(void) {
     ecs_world_t *world = gallery_load(&s);
 
     gallery_expect(world, s, "logs warning 100", "");
-    gallery_expect(world, s, "get " TEXT ".heading Text.value", "\"Text\"");
-    gallery_expect(world, s, "get " TEXT ".name.caption Text.value", "\"Name\"");
-    gallery_expect(world, s, "get " TEXT ".name.field TextEdit.placeholder", "\"Your name\"");
-    gallery_expect(world, s, "get " TEXT ".name.field TextEdit.size", "14");
-    gallery_expect(world, s, "get " TEXT ".secret.field TextEdit.password", "true");
-    gallery_expect(world, s, "get " TEXT ".fixed.field TextEdit.read_only", "true");
-    gallery_expect(world, s, "get " TEXT ".fixed.field TextEdit.value", "\"Copy me\"");
-    gallery_expect(world, s, "has " TEXT ".name.field box.ui.Focusable", "true");
-    gallery_expect(world, s, "has " TEXT ".off.field box.ui.TextEdit", "false");
-    gallery_expect(world, s, "has " TEXT ".off.field box.ui.Focusable", "false");
-    gallery_expect(world, s, "get " TEXT ".off.field.shown Text.value", "\"Not editable\"");
-    gallery_expect(world, s, "get " TEXT ".off Opacity", "{value: 0.4499999881}");
-    gallery_expect(world, s, "get " TEXT ".submit.echo Text.value", "\"Submitted: \"");
+    gallery_expect(world, s, "get " TEXT ".heading box.text.Text.value", "\"Text\"");
+    gallery_expect(world, s, "get " TEXT ".name.caption box.text.Text.value", "\"Name\"");
+    gallery_expect(world, s, "get " TEXT ".name.field box.ui.TextEdit.placeholder",
+        "\"Your name\"");
+    gallery_expect(world, s, "get " TEXT ".name.field box.ui.TextEdit.size", "14");
+    gallery_expect(world, s, "get " TEXT ".secret.field box.ui.TextEdit.password", "true");
+    gallery_expect(world, s, "get " TEXT ".fixed.field box.ui.TextEdit.read_only", "true");
+    gallery_expect(world, s, "get " TEXT ".fixed.field box.ui.TextEdit.value", "\"Copy me\"");
+    test_bool(ecs_has_id(world, ecs_lookup(world, TEXT ".name.field"), Focusable), true);
+    test_bool(ecs_has(world, ecs_lookup(world, TEXT ".off.field"), TextEdit), false);
+    test_bool(ecs_has_id(world, ecs_lookup(world, TEXT ".off.field"), Focusable), false);
+    gallery_expect(world, s, "get " TEXT ".off.field.shown box.text.Text.value",
+        "\"Not editable\"");
+    gallery_expect(world, s, "get " TEXT ".off box.material.Opacity",
+        "{\"Opacity\":{\"value\":0.4499999881}}");
+    gallery_expect(world, s, "get " TEXT ".submit.echo box.text.Text.value", "\"Submitted: \"");
     text_expect_mut(world, s, "fixed", "current", "\"Copy me\"");
     text_expect_mut(world, s, "name", "current", "\"\"");
 
@@ -171,8 +174,9 @@ void Text_scene_loads(void) {
     test_flt(b->width, 248);
     test_flt(b->height, 28);
     gallery_hover(world, s, TEXT ".name.field", 0, 0, TEXT ".name.field");
-    gallery_expect(world, s, "get box.picking.PickStatus PickStatus.target", TEXT ".name.field");
-    gallery_expect(world, s, "get box.picking.PickStatus PickStatus.shape", "CursorText");
+    gallery_expect(world, s, "get $ box.picking.PickStatus.target",
+        "\"" TEXT ".name.field\"");
+    gallery_expect(world, s, "get $ box.picking.PickStatus.shape", "\"CursorText\"");
     text_expect_mut(world, s, "name", "hover", "true");
 
     ecs_fini(world);
@@ -186,15 +190,15 @@ void Text_type_name(void) {
     gallery_click(world, s, TEXT ".name.field", 0, 0, TEXT ".name.field");
     text_expect_focus(world, s, TEXT ".name.field");
     text_expect_mut(world, s, "name", "focused", "true");
-    gallery_expect(world, s, "get " TEXT ".name.field Border.color",
-        "{r: 120, g: 172, b: 240, a: 255}");
+    gallery_expect(world, s, "get " TEXT ".name.field box.geometry.Border.color",
+        "{\"r\":120, \"g\":172, \"b\":240, \"a\":255}");
     text_type(world, s, "Ada");
     text_expect_mut(world, s, "name", "current", "\"Ada\"");
-    gallery_expect(world, s, "get " TEXT ".name.field TextEdit.value", "\"Ada\"");
+    gallery_expect(world, s, "get " TEXT ".name.field box.ui.TextEdit.value", "\"Ada\"");
     test_str(ecs_get(world, text_part(world, TEXT ".name.field"), Text)->value, "Ada");
     test_int(gallery_changes(world, s), 3);
     gallery_expect(world, s, "get gallery Gallery.mut.last", "\"name: Ada\"");
-    gallery_expect(world, s, "get gallery.hud.root.header.status Text.value",
+    gallery_expect(world, s, "get gallery.hud.root.header.status box.text.Text.value",
         "\"Last change: name: Ada\"");
 
     gallery_key(world, s, "Backspace");
@@ -203,8 +207,8 @@ void Text_type_name(void) {
     gallery_key(world, s, "Escape");
     text_expect_focus(world, s, "#0");
     text_expect_mut(world, s, "name", "focused", "false");
-    gallery_expect(world, s, "get " TEXT ".name.field Border.color",
-        "{r: 142, g: 149, b: 160, a: 255}");
+    gallery_expect(world, s, "get " TEXT ".name.field box.geometry.Border.color",
+        "{\"r\":142, \"g\":149, \"b\":160, \"a\":255}");
 
     ecs_fini(world);
 }
@@ -221,10 +225,10 @@ void Text_password(void) {
     test_str(ecs_get(world, text_part(world, TEXT ".secret.field"), Text)->value,
         "\xE2\x80\xA2\xE2\x80\xA2\xE2\x80\xA2\xE2\x80\xA2\xE2\x80\xA2\xE2\x80\xA2\xE2\x80\xA2");
     gallery_expect(world, s, "get gallery Gallery.mut.last", "\"secret\"");
-    gallery_expect(world, s, "clipboard.set keep", "");
+    gallery_expect(world, s, "clipboard_set keep", "");
     text_shortcut(world, s, "A");
     text_shortcut(world, s, "C");
-    gallery_expect(world, s, "clipboard.get", "keep");
+    gallery_expect(world, s, "clipboard_get", "keep");
     text_shortcut(world, s, "X");
     text_expect_mut(world, s, "secret", "current", "\"hunter2\"");
 
@@ -259,9 +263,9 @@ void Text_read_only(void) {
     text_expect_mut(world, s, "fixed", "current", "\"Copy me\"");
     text_shortcut(world, s, "A");
     text_shortcut(world, s, "C");
-    gallery_expect(world, s, "clipboard.get", "Copy me");
+    gallery_expect(world, s, "clipboard_get", "Copy me");
     text_shortcut(world, s, "X");
-    gallery_expect(world, s, "get " TEXT ".fixed.field TextEdit.value", "\"Copy me\"");
+    gallery_expect(world, s, "get " TEXT ".fixed.field box.ui.TextEdit.value", "\"Copy me\"");
     test_int(gallery_changes(world, s), 0);
 
     ecs_fini(world);
@@ -282,9 +286,9 @@ void Text_tab_between(void) {
     gallery_key(world, s, "Tab");
     text_expect_focus(world, s, TEXT ".submit.message.field");
     text_type(world, s, "c");
-    ecs_os_free(gallery_run(world, s, "key.down ShiftLeft"));
+    ecs_os_free(gallery_run(world, s, "key_down ShiftLeft"));
     gallery_key(world, s, "Tab");
-    ecs_os_free(gallery_run(world, s, "key.up ShiftLeft"));
+    ecs_os_free(gallery_run(world, s, "key_up ShiftLeft"));
     gallery_settle(world, s);
     text_expect_focus(world, s, TEXT ".fixed.field");
 
@@ -292,7 +296,7 @@ void Text_tab_between(void) {
     text_expect_mut(world, s, "secret", "current", "\"b\"");
     text_expect_mut(world, s, "submit.message", "current", "\"c\"");
     test_int(gallery_changes(world, s), 3);
-    gallery_expect(world, s, "get " TEXT ".fixed.field Border.width", "2");
+    gallery_expect(world, s, "get " TEXT ".fixed.field box.geometry.Border.width", "2");
 
     ecs_fini(world);
 }
@@ -307,14 +311,16 @@ void Text_submit_label(void) {
     gallery_expect(world, s, "get gallery Gallery.mut.submitted", "\"\"");
     gallery_key(world, s, "Enter");
     gallery_expect(world, s, "get gallery Gallery.mut.submitted", "\"hello there\"");
-    gallery_expect(world, s, "get " TEXT ".submit.echo Text.value", "\"Submitted: hello there\"");
+    gallery_expect(world, s, "get " TEXT ".submit.echo box.text.Text.value",
+        "\"Submitted: hello there\"");
     text_expect_focus(world, s, TEXT ".submit.message.field");
 
     text_shortcut(world, s, "A");
     text_type(world, s, "bye");
-    gallery_expect(world, s, "get " TEXT ".submit.echo Text.value", "\"Submitted: hello there\"");
+    gallery_expect(world, s, "get " TEXT ".submit.echo box.text.Text.value",
+        "\"Submitted: hello there\"");
     gallery_key(world, s, "KpEnter");
-    gallery_expect(world, s, "get " TEXT ".submit.echo Text.value", "\"Submitted: bye\"");
+    gallery_expect(world, s, "get " TEXT ".submit.echo box.text.Text.value", "\"Submitted: bye\"");
 
     gallery_click(world, s, TEXT ".name.field", 0, 0, TEXT ".name.field");
     text_type(world, s, "x");
@@ -332,7 +338,7 @@ void Text_set_mut_no_change(void) {
     ecs_os_free(gallery_run(world, s, "set " TEXT ".name box.widgets.TextInput.mut "
         "{current: \"Bob\"}"));
     gallery_settle(world, s);
-    gallery_expect(world, s, "get " TEXT ".name.field TextEdit.value", "\"Bob\"");
+    gallery_expect(world, s, "get " TEXT ".name.field box.ui.TextEdit.value", "\"Bob\"");
     test_str(ecs_get(world, text_part(world, TEXT ".name.field"), Text)->value, "Bob");
     test_int(gallery_changes(world, s), 0);
 
@@ -353,7 +359,8 @@ void Text_light_theme(void) {
     ecs_entity_t fixed = text_part(world, TEXT ".fixed.field");
     ecs_entity_t name = text_part(world, TEXT ".name.field");
 
-    gallery_expect(world, s, "get " TEXT ".name.field Rgb", "{r: 38, g: 41, b: 48}");
+    gallery_expect(world, s, "get " TEXT ".name.field box.material.Rgb",
+        "{\"Rgb\":{\"r\":38, \"g\":41, \"b\":48}}");
     test_int(ecs_get(world, fixed, Rgb)->r, 214);
     test_int(ecs_get(world, name, Rgb)->r, 142);
     ecs_value_t v = ecs_const_var_get(world, light);
@@ -362,15 +369,17 @@ void Text_light_theme(void) {
     ecs_progress(world, 0);
     ecs_progress(world, 0);
 
-    gallery_expect(world, s, "get " TEXT ".name.field Rgb", "{r: 222, g: 226, b: 233}");
-    gallery_expect(world, s, "get " TEXT ".name.field Border.color",
-        "{r: 190, g: 196, b: 206, a: 255}");
-    gallery_expect(world, s, "get " TEXT ".name.caption Rgb", "{r: 102, g: 110, b: 122}");
+    gallery_expect(world, s, "get " TEXT ".name.field box.material.Rgb",
+        "{\"Rgb\":{\"r\":222, \"g\":226, \"b\":233}}");
+    gallery_expect(world, s, "get " TEXT ".name.field box.geometry.Border.color",
+        "{\"r\":190, \"g\":196, \"b\":206, \"a\":255}");
+    gallery_expect(world, s, "get " TEXT ".name.caption box.material.Rgb",
+        "{\"Rgb\":{\"r\":102, \"g\":110, \"b\":122}}");
     test_int(ecs_get(world, fixed, Rgb)->r, 33);
     test_int(ecs_get(world, name, Rgb)->r, 102);
     gallery_click(world, s, TEXT ".name.field", 0, 0, TEXT ".name.field");
-    gallery_expect(world, s, "get " TEXT ".name.field Border.color",
-        "{r: 38, g: 110, b: 220, a: 255}");
+    gallery_expect(world, s, "get " TEXT ".name.field box.geometry.Border.color",
+        "{\"r\":38, \"g\":110, \"b\":220, \"a\":255}");
     gallery_expect(world, s, "logs warning 100", "");
 
     ecs_fini(world);
@@ -388,15 +397,15 @@ void Text_capture_selection(void) {
     ecs_modified(world, ecs_lookup(world, "box.ui.theme"), UiTheme);
     gallery_click(world, s, TEXT ".name.field", 0, 0, TEXT ".name.field");
     text_type(world, s, "\"Grace Hopper\"");
-    ecs_os_free(gallery_run(world, s, "key.down ShiftLeft"));
+    ecs_os_free(gallery_run(world, s, "key_down ShiftLeft"));
     for (i = 0; i < 6; i ++) {
         gallery_key(world, s, "Left");
     }
 
-    ecs_os_free(gallery_run(world, s, "key.up ShiftLeft"));
+    ecs_os_free(gallery_run(world, s, "key_up ShiftLeft"));
     gallery_settle(world, s);
-    gallery_expect(world, s, "get " TEXT ".name.field TextEditStatus",
-        "{caret: 6, anchor: 12, scroll: 0, focused: true}");
+    gallery_expect(world, s, "get " TEXT ".name.field box.ui.TextEditStatus",
+        "{\"TextEditStatus\":{\"caret\":6, \"anchor\":12, \"scroll\":0, \"focused\":true}}");
 
     /* The capture reads pixels: render the window at its full size, which the gallery of the
      * tests divides */

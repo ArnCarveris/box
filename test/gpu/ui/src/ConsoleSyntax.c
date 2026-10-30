@@ -251,7 +251,7 @@ void ConsoleSyntax_command_name_known(void) {
 
     syntax_clear(world);
     test_int(syntax_count(world, syntax_before(world)), 0);
-    syntax_type(world, "  mouse.scroll");
+    syntax_type(world, "  mouse_scroll");
     syntax_span(world, syntax_before(world), 0, 2, 14, c->name);
 
     syntax_clear(world);
@@ -340,13 +340,15 @@ void ConsoleSyntax_entity_param_type(void) {
     ecs_world_t *world = syntax_world();
     const ConsoleSyntax *c = syntax_colors(world);
     ecs_entity(world, { .name = "things.alpha" });
-    syntax_type(world, "has things.alpha Position");
-    test_int(syntax_count(world, syntax_before(world)), 2);
+    syntax_type(world, "add things.alpha box.transform.Position");
+    test_int(syntax_count(world, syntax_before(world)), 3);
     syntax_span(world, syntax_before(world), 1, 4, 16, c->entity);
+    syntax_span(world, syntax_before(world), 2, 17, 39, c->entity);
 
     syntax_clear(world);
-    syntax_type(world, "has nothing Position");
+    syntax_type(world, "add nothing Position");
     syntax_span(world, syntax_before(world), 1, 4, 11, c->missing);
+    syntax_span(world, syntax_before(world), 2, 12, 20, c->missing);
 
     ecs_fini(world);
 }
@@ -360,13 +362,13 @@ void ConsoleSyntax_type_from_parameters(void) {
     syntax_span(world, syntax_before(world), 1, 4, 5, c->missing);
 
     syntax_clear(world);
-    syntax_type(world, "mouse.scroll 5 1");
+    syntax_type(world, "mouse_scroll 5 1");
     test_int(syntax_count(world, syntax_before(world)), 3);
     syntax_span(world, syntax_before(world), 1, 13, 14, c->number);
     syntax_span(world, syntax_before(world), 2, 15, 16, c->number);
 
     syntax_clear(world);
-    syntax_type(world, "key.type 5");
+    syntax_type(world, "key_type 5");
     test_int(syntax_count(world, syntax_before(world)), 1);
 
     ecs_fini(world);
@@ -376,17 +378,18 @@ void ConsoleSyntax_numbers_and_booleans(void) {
     // ui/console_syntax
     ecs_world_t *world = syntax_world();
     const ConsoleSyntax *c = syntax_colors(world);
-    syntax_type(world, "commands 10");
-    syntax_span(world, syntax_before(world), 1, 9, 11, c->number);
+    syntax_type(world, "logs error 10");
+    test_int(syntax_count(world, syntax_before(world)), 2);
+    syntax_span(world, syntax_before(world), 1, 11, 13, c->number);
 
     syntax_clear(world);
-    syntax_type(world, "mouse.move 10,20 true");
+    syntax_type(world, "mouse_move 10,20 true");
     test_int(syntax_count(world, syntax_before(world)), 2);
     syntax_span(world, syntax_before(world), 1, 17, 21, c->boolean);
 
     syntax_clear(world);
-    syntax_type(world, "input.focus off");
-    syntax_span(world, syntax_before(world), 1, 12, 15, c->boolean);
+    syntax_type(world, "input_focus false");
+    syntax_span(world, syntax_before(world), 1, 12, 17, c->boolean);
 
     ecs_fini(world);
 }
@@ -395,14 +398,14 @@ void ConsoleSyntax_strings(void) {
     // ui/console_syntax
     ecs_world_t *world = syntax_world();
     const ConsoleSyntax *c = syntax_colors(world);
-    syntax_type(world, "key.type \"a \\\"b\\\"\" 2");
-    test_str(ecs_get(world, syntax_before(world), Text)->value, "key.type \"a \\\"b\\\"\" 2");
+    syntax_type(world, "key_type \"a \\\"b\\\"\" 2");
+    test_str(ecs_get(world, syntax_before(world), Text)->value, "key_type \"a \\\"b\\\"\" 2");
     test_int(syntax_count(world, syntax_before(world)), 3);
     syntax_span(world, syntax_before(world), 1, 9, 18, c->string);
     syntax_span(world, syntax_before(world), 2, 19, 20, c->number);
 
     syntax_clear(world);
-    syntax_type(world, "key.type \"a  ");
+    syntax_type(world, "key_type \"a  ");
     test_int(syntax_count(world, syntax_before(world)), 2);
     syntax_span(world, syntax_before(world), 1, 9, 15, c->string);
     test_int((int32_t)strlen(ecs_get(world, syntax_before(world), Text)->value), 15);
@@ -414,29 +417,32 @@ void ConsoleSyntax_value_expression(void) {
     // ui/console_syntax
     ecs_world_t *world = syntax_world();
     const ConsoleSyntax *c = syntax_colors(world);
-    const char *line = "set e Position {x: 1.5, s: \"a b\", on: true, v: [-2, 3e-1]}";
+    const char *line =
+        "set e box.transform.Position {x: 1.5, s: \"a b\", on: true, v: [-2, 3e-1]}";
     syntax_type(world, line);
     ecs_entity_t e = syntax_before(world);
     test_str(ecs_get(world, e, Text)->value, line);
-    test_int(syntax_count(world, e), 8);
+    test_int(syntax_count(world, e), 9);
     syntax_span(world, e, 0, 0, 3, c->name);
     syntax_span(world, e, 1, 4, 5, c->missing);
-    syntax_span(world, e, 2, 15, (int32_t)strlen(line), c->value);
-    syntax_span(world, e, 3, syntax_at(line, "1.5"), syntax_at(line, "1.5") + 3, c->number);
-    syntax_span(world, e, 4, syntax_at(line, "\"a b\""), syntax_at(line, "\"a b\"") + 5,
+    syntax_span(world, e, 2, 6, 28, c->entity);
+    syntax_span(world, e, 3, 29, (int32_t)strlen(line), c->value);
+    syntax_span(world, e, 4, syntax_at(line, "1.5"), syntax_at(line, "1.5") + 3, c->number);
+    syntax_span(world, e, 5, syntax_at(line, "\"a b\""), syntax_at(line, "\"a b\"") + 5,
         c->string);
-    syntax_span(world, e, 5, syntax_at(line, "true"), syntax_at(line, "true") + 4,
+    syntax_span(world, e, 6, syntax_at(line, "true"), syntax_at(line, "true") + 4,
         c->boolean);
-    syntax_span(world, e, 6, syntax_at(line, "-2"), syntax_at(line, "-2") + 2, c->number);
-    syntax_span(world, e, 7, syntax_at(line, "3e-1"), syntax_at(line, "3e-1") + 4,
+    syntax_span(world, e, 7, syntax_at(line, "-2"), syntax_at(line, "-2") + 2, c->number);
+    syntax_span(world, e, 8, syntax_at(line, "3e-1"), syntax_at(line, "3e-1") + 4,
         c->number);
 
     syntax_clear(world);
     syntax_type(world, "set e Position [1, x2]");
     e = syntax_before(world);
-    test_int(syntax_count(world, e), 4);
-    syntax_span(world, e, 2, 15, 22, c->value);
-    syntax_span(world, e, 3, 16, 17, c->number);
+    test_int(syntax_count(world, e), 5);
+    syntax_span(world, e, 2, 6, 14, c->missing);
+    syntax_span(world, e, 3, 15, 22, c->value);
+    syntax_span(world, e, 4, 16, 17, c->number);
 
     ecs_fini(world);
 }
@@ -445,7 +451,7 @@ void ConsoleSyntax_extra_arguments(void) {
     // ui/console_syntax
     ecs_world_t *world = syntax_world();
     const ConsoleSyntax *c = syntax_colors(world);
-    syntax_type(world, "mouse.scroll 1 2 3 \"four\"");
+    syntax_type(world, "mouse_scroll 1 2 3 \"four\"");
     ecs_entity_t e = syntax_before(world);
     test_int(syntax_count(world, e), 5);
     syntax_span(world, e, 3, 17, 18, c->extra);
@@ -454,26 +460,6 @@ void ConsoleSyntax_extra_arguments(void) {
     syntax_clear(world);
     syntax_type(world, "frames now");
     syntax_span(world, syntax_before(world), 1, 7, 10, c->extra);
-
-    ecs_fini(world);
-}
-
-void ConsoleSyntax_rest_parameter(void) {
-    // ui/console_syntax
-    ecs_world_t *world = syntax_world();
-    const ConsoleSyntax *c = syntax_colors(world);
-    ecs_entity(world, { .name = "things.alpha" });
-    syntax_type(world, "has things.alpha Position, \"x y\" 5  ");
-    ecs_entity_t e = syntax_before(world);
-    test_int(syntax_count(world, e), 3);
-    syntax_span(world, e, 1, 4, 16, c->entity);
-    syntax_span(world, e, 2, 17, 34, c->string);
-
-    syntax_clear(world);
-    syntax_type(world, "set e Position {x: 1} {y: 2}");
-    e = syntax_before(world);
-    test_int(syntax_count(world, e), 3);
-    syntax_span(world, e, 2, 15, 28, c->string);
 
     ecs_fini(world);
 }
@@ -599,7 +585,7 @@ void ConsoleSyntax_output_lines_plain(void) {
 
     ecs_os_free(box_console_run(world, "ls two", NULL));
     ecs_progress(world, 0);
-    test_str(ecs_get(world, line, Text)->value, "a");
+    test_str(ecs_get(world, line, Text)->value, "two.a");
     test_int(syntax_count(world, line), 0);
     test_assert(!ecs_has(world, line, TextSpans));
     const Console *con = ecs_singleton_get(world, Console);
@@ -673,24 +659,20 @@ void ConsoleSyntax_session_plain_text(void) {
     test_int(syntax_count(world, syntax_find_line(world, "> ls \"things\"")), 2);
 
     ecs_entity_t session = ecs_lookup(world, BOX_CONSOLE_SESSION);
-    char *out = box_terminal_run(world, session, "commands", NULL);
-    test_str(out, "$ ls things\nalpha\n$ ls \"things\"\nalpha");
-    ecs_os_free(out);
+    const EcsCommandSession *cs = ecs_get(world, session, EcsCommandSession);
+    test_assert(cs != NULL);
+    test_int(ecs_vec_count(&cs->history), 2);
+    char **history = ecs_vec_first_t(&cs->history, char*);
+    char **results = ecs_vec_first_t(&cs->results, char*);
+    test_str(history[0], "ls things");
+    test_str(history[1], "ls \"things\"");
+    test_assert(strchr(history[0], '\x1b') == NULL);
+    test_assert(strchr(results[0], '\x1b') == NULL);
+    test_assert(strchr(results[1], '\x1b') == NULL);
 
-    const TerminalStatus *st = ecs_get(world, session, TerminalStatus);
-    char *path = flecs_asprintf("%s/commands.log", st->dir);
-    char log[512] = {0};
-    FILE *f = fopen(path, "r");
-    test_assert(f != NULL);
-    fread(log, 1, sizeof(log) - 1, f);
-    fclose(f);
-    test_str(log, "$ ls things\nalpha\n$ ls \"things\"\nalpha\n$ commands\n");
-    test_assert(strchr(log, '\x1b') == NULL);
-    ecs_os_free(path);
-
-    ecs_entity_t t = box_terminal_new(world);
-    out = box_terminal_run(world, t, "ls things", NULL);
-    test_str(out, "alpha");
+    ecs_entity_t t = ecs_shell_session_init(world, NULL);
+    char *out = box_command_run(world, t, "ls things", NULL);
+    test_str(out, "things.alpha");
     ecs_os_free(out);
 
     ecs_fini(world);
@@ -750,7 +732,7 @@ void ConsoleSyntax_capture(void) {
     ecs_singleton_modified(world, Console);
     ecs_progress(world, 0);
     ecs_os_free(box_console_run(world, "ls things.alpha", NULL));
-    ecs_os_free(box_console_run(world, "commands 7", NULL));
+    ecs_os_free(box_console_run(world, "logs error 7", NULL));
     syntax_type(world, "get things.alpha");
     int32_t i;
     for (i = 0; i < 100; i ++) {

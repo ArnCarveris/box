@@ -130,7 +130,7 @@ static void focus_run(
     ecs_entity_t s,
     const char *cmd)
 {
-    ecs_os_free(box_terminal_run(world, s, cmd, NULL));
+    ecs_os_free(box_command_run(world, s, cmd, NULL));
     while (box_input_pending(world)) {
         ecs_progress(world, 0);
     }
@@ -154,7 +154,7 @@ static int32_t focus_presses(
 {
     ecs_entity_t action = ecs_lookup(world, path);
     int32_t i, result = 0;
-    ecs_os_free(box_terminal_run(world, s, cmd, NULL));
+    ecs_os_free(box_command_run(world, s, cmd, NULL));
     for (i = 0; i < 4; i ++) {
         ecs_progress(world, 0);
         result += ecs_get(world, action, ActionState)->pressed;
@@ -231,16 +231,16 @@ void Focus_tags_and_status(void) {
 void Focus_click_focuses(void) {
     // ui/focus
     ecs_world_t *world = focus_world(FOCUS_FORM);
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_entity_t a = focus_e(world, "hud.form.a");
     ecs_entity_t b = focus_e(world, "hud.form.b");
-    focus_run(world, s, "mouse.click left [440, 260]");
+    focus_run(world, s, "mouse_click left [440, 260]");
     test_uint(focus_status(world)->focused, a);
     test_bool(focus_status(world)->visible, false);
     test_bool(ecs_has(world, a, Focused), true);
     test_int(focus_tagged(world), 1);
 
-    focus_run(world, s, "mouse.click left [640, 260]");
+    focus_run(world, s, "mouse_click left [640, 260]");
     test_uint(ecs_singleton_get(world, PickStatus)->target, focus_e(world, "hud.form.b.label"));
     test_uint(focus_status(world)->focused, b);
     test_uint(focus_status(world)->previous, a);
@@ -254,10 +254,10 @@ void Focus_click_focuses(void) {
 void Focus_any_button_focuses(void) {
     // ui/focus
     ecs_world_t *world = focus_world(FOCUS_FORM);
-    ecs_entity_t s = box_terminal_new(world);
-    focus_run(world, s, "mouse.click right [840, 260]");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    focus_run(world, s, "mouse_click right [840, 260]");
     test_uint(focus_status(world)->focused, focus_e(world, "hud.form.c"));
-    focus_run(world, s, "mouse.click middle [440, 260]");
+    focus_run(world, s, "mouse_click middle [440, 260]");
     test_uint(focus_status(world)->focused, focus_e(world, "hud.form.a"));
 
     ecs_fini(world);
@@ -266,18 +266,18 @@ void Focus_any_button_focuses(void) {
 void Focus_click_empty_clears(void) {
     // ui/focus
     ecs_world_t *world = focus_world(FOCUS_FORM);
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_entity_t b = focus_e(world, "hud.form.b");
-    focus_run(world, s, "mouse.click left [640, 260]");
+    focus_run(world, s, "mouse_click left [640, 260]");
     test_uint(focus_status(world)->focused, b);
-    focus_run(world, s, "mouse.click left [900, 360]");
+    focus_run(world, s, "mouse_click left [900, 360]");
     test_uint(focus_status(world)->focused, 0);
     test_uint(focus_status(world)->previous, b);
     test_int(focus_tagged(world), 0);
 
-    focus_run(world, s, "mouse.click left [640, 260]");
+    focus_run(world, s, "mouse_click left [640, 260]");
     test_uint(focus_status(world)->focused, b);
-    focus_run(world, s, "mouse.click left [1200, 50]");
+    focus_run(world, s, "mouse_click left [1200, 50]");
     test_uint(focus_status(world)->focused, 0);
 
     ecs_fini(world);
@@ -286,10 +286,10 @@ void Focus_click_empty_clears(void) {
 void Focus_click_non_focusable_clears(void) {
     // ui/focus
     ecs_world_t *world = focus_world(FOCUS_FORM);
-    ecs_entity_t s = box_terminal_new(world);
-    focus_run(world, s, "mouse.click left [440, 260]");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    focus_run(world, s, "mouse_click left [440, 260]");
     test_uint(focus_status(world)->focused, focus_e(world, "hud.form.a"));
-    focus_run(world, s, "mouse.click left [640, 460]");
+    focus_run(world, s, "mouse_click left [640, 460]");
     test_uint(ecs_singleton_get(world, PickStatus)->handler, focus_e(world, "hud.form.plain"));
     test_uint(focus_status(world)->focused, 0);
     test_int(focus_tagged(world), 0);
@@ -300,9 +300,9 @@ void Focus_click_non_focusable_clears(void) {
 void Focus_disable_clears(void) {
     // ui/focus
     ecs_world_t *world = focus_world(FOCUS_FORM);
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_entity_t a = focus_e(world, "hud.form.a");
-    focus_run(world, s, "mouse.click left [440, 260]");
+    focus_run(world, s, "mouse_click left [440, 260]");
     test_uint(focus_status(world)->focused, a);
     ecs_enable(world, a, false);
     ecs_progress(world, 0);
@@ -318,9 +318,9 @@ void Focus_disable_clears(void) {
 void Focus_delete_clears(void) {
     // ui/focus
     ecs_world_t *world = focus_world(FOCUS_FORM);
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_entity_t b = focus_e(world, "hud.form.b");
-    focus_run(world, s, "mouse.click left [640, 260]");
+    focus_run(world, s, "mouse_click left [640, 260]");
     test_uint(focus_status(world)->focused, b);
     ecs_delete(world, b);
     test_uint(focus_status(world)->focused, 0);
@@ -328,7 +328,7 @@ void Focus_delete_clears(void) {
     test_uint(focus_status(world)->focused, 0);
     test_int(focus_tagged(world), 0);
 
-    focus_run(world, s, "mouse.click left [440, 260]");
+    focus_run(world, s, "mouse_click left [440, 260]");
     test_uint(focus_status(world)->focused, focus_e(world, "hud.form.a"));
     ecs_delete(world, focus_e(world, "hud.form"));
     ecs_progress(world, 0);
@@ -341,9 +341,9 @@ void Focus_delete_clears(void) {
 void Focus_remove_focusable_clears(void) {
     // ui/focus
     ecs_world_t *world = focus_world(FOCUS_FORM);
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_entity_t c = focus_e(world, "hud.form.c");
-    focus_run(world, s, "mouse.click left [840, 260]");
+    focus_run(world, s, "mouse_click left [840, 260]");
     test_uint(focus_status(world)->focused, c);
     ecs_remove(world, c, Focusable);
     test_uint(focus_status(world)->focused, 0);
@@ -355,27 +355,27 @@ void Focus_remove_focusable_clears(void) {
 void Focus_tab_walks_draw_order(void) {
     // ui/focus
     ecs_world_t *world = focus_world(FOCUS_FORM);
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_entity_t a = focus_e(world, "hud.form.a");
     ecs_entity_t b = focus_e(world, "hud.form.b");
     ecs_entity_t c = focus_e(world, "hud.form.c");
-    focus_run(world, s, "key.press Tab");
+    focus_run(world, s, "key_press Tab");
     test_uint(focus_status(world)->focused, b);
     test_bool(focus_status(world)->visible, true);
     test_bool(ecs_has(world, b, Focused), true);
-    focus_run(world, s, "key.press Tab");
+    focus_run(world, s, "key_press Tab");
     test_uint(focus_status(world)->focused, a);
-    focus_run(world, s, "key.press Tab");
+    focus_run(world, s, "key_press Tab");
     test_uint(focus_status(world)->focused, c);
-    focus_run(world, s, "key.press Tab");
+    focus_run(world, s, "key_press Tab");
     test_uint(focus_status(world)->focused, b);
     test_uint(focus_status(world)->previous, c);
     test_int(focus_tagged(world), 1);
 
-    focus_run(world, s, "mouse.click left [440, 260]");
+    focus_run(world, s, "mouse_click left [440, 260]");
     test_uint(focus_status(world)->focused, a);
     test_bool(focus_status(world)->visible, false);
-    focus_run(world, s, "key.press Tab");
+    focus_run(world, s, "key_press Tab");
     test_uint(focus_status(world)->focused, c);
     test_bool(focus_status(world)->visible, true);
 
@@ -385,18 +385,18 @@ void Focus_tab_walks_draw_order(void) {
 void Focus_shift_tab_walks_back(void) {
     // ui/focus
     ecs_world_t *world = focus_world(FOCUS_FORM);
-    ecs_entity_t s = box_terminal_new(world);
-    focus_run(world, s, "key.down ShiftLeft");
-    focus_run(world, s, "key.press Tab");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    focus_run(world, s, "key_down ShiftLeft");
+    focus_run(world, s, "key_press Tab");
     test_uint(focus_status(world)->focused, focus_e(world, "hud.form.c"));
-    focus_run(world, s, "key.press Tab");
+    focus_run(world, s, "key_press Tab");
     test_uint(focus_status(world)->focused, focus_e(world, "hud.form.a"));
-    focus_run(world, s, "key.press Tab");
+    focus_run(world, s, "key_press Tab");
     test_uint(focus_status(world)->focused, focus_e(world, "hud.form.b"));
-    focus_run(world, s, "key.press Tab");
+    focus_run(world, s, "key_press Tab");
     test_uint(focus_status(world)->focused, focus_e(world, "hud.form.c"));
-    focus_run(world, s, "key.up ShiftLeft");
-    focus_run(world, s, "key.press Tab");
+    focus_run(world, s, "key_up ShiftLeft");
+    focus_run(world, s, "key_press Tab");
     test_uint(focus_status(world)->focused, focus_e(world, "hud.form.b"));
 
     ecs_fini(world);
@@ -427,16 +427,16 @@ void Focus_tab_ordered_children(void) {
         "    }\n"
         "  }\n"
         "}\n");
-    ecs_entity_t s = box_terminal_new(world);
-    focus_run(world, s, "key.press Tab");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    focus_run(world, s, "key_press Tab");
     test_uint(focus_status(world)->focused, focus_e(world, "hud.list.z"));
-    focus_run(world, s, "key.press Tab");
+    focus_run(world, s, "key_press Tab");
     test_uint(focus_status(world)->focused, focus_e(world, "hud.list.y"));
-    focus_run(world, s, "key.press Tab");
+    focus_run(world, s, "key_press Tab");
     test_uint(focus_status(world)->focused, focus_e(world, "hud.list.y.inner"));
-    focus_run(world, s, "key.press Tab");
+    focus_run(world, s, "key_press Tab");
     test_uint(focus_status(world)->focused, focus_e(world, "hud.list.x"));
-    focus_run(world, s, "key.press Tab");
+    focus_run(world, s, "key_press Tab");
     test_uint(focus_status(world)->focused, focus_e(world, "hud.list.z"));
 
     ecs_fini(world);
@@ -445,17 +445,17 @@ void Focus_tab_ordered_children(void) {
 void Focus_tab_skips_disabled(void) {
     // ui/focus
     ecs_world_t *world = focus_world(FOCUS_FORM);
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_entity_t a = focus_e(world, "hud.form.a");
     ecs_enable(world, a, false);
-    focus_run(world, s, "key.press Tab");
+    focus_run(world, s, "key_press Tab");
     test_uint(focus_status(world)->focused, focus_e(world, "hud.form.b"));
-    focus_run(world, s, "key.press Tab");
+    focus_run(world, s, "key_press Tab");
     test_uint(focus_status(world)->focused, focus_e(world, "hud.form.c"));
-    focus_run(world, s, "key.press Tab");
+    focus_run(world, s, "key_press Tab");
     test_uint(focus_status(world)->focused, focus_e(world, "hud.form.b"));
     ecs_enable(world, a, true);
-    focus_run(world, s, "key.press Tab");
+    focus_run(world, s, "key_press Tab");
     test_uint(focus_status(world)->focused, a);
 
     ecs_fini(world);
@@ -491,24 +491,24 @@ void Focus_tab_stays_in_nearest_scope(void) {
         "    }\n"
         "  }\n"
         "}\n");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_entity_t q = focus_e(world, "hud.outer.inner.q");
     ecs_entity_t r = focus_e(world, "hud.outer.inner.r");
     ecs_entity_t t = focus_e(world, "hud.other.t");
-    focus_run(world, s, "mouse.click left [640, 260]");
+    focus_run(world, s, "mouse_click left [640, 260]");
     test_uint(focus_status(world)->focused, q);
-    focus_run(world, s, "key.press Tab");
+    focus_run(world, s, "key_press Tab");
     test_uint(focus_status(world)->focused, r);
-    focus_run(world, s, "key.press Tab");
+    focus_run(world, s, "key_press Tab");
     test_uint(focus_status(world)->focused, q);
 
-    focus_run(world, s, "mouse.click left [940, 260]");
+    focus_run(world, s, "mouse_click left [940, 260]");
     test_uint(focus_status(world)->focused, t);
-    focus_run(world, s, "key.press Tab");
+    focus_run(world, s, "key_press Tab");
     test_uint(focus_status(world)->focused, t);
 
-    focus_run(world, s, "mouse.click left [340, 260]");
-    focus_run(world, s, "key.press Tab");
+    focus_run(world, s, "mouse_click left [340, 260]");
+    focus_run(world, s, "key_press Tab");
     test_uint(focus_status(world)->focused, q);
 
     ecs_fini(world);
@@ -523,13 +523,13 @@ void Focus_tab_without_scope_reaches_binding(void) {
         "    Focusable\n"
         "  }\n"
         "}\n");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_entity_t a = focus_e(world, "hud.a");
-    test_int(focus_presses(world, s, "key.press Tab", "actions.next"), 1);
+    test_int(focus_presses(world, s, "key_press Tab", "actions.next"), 1);
     test_uint(focus_status(world)->focused, 0);
-    focus_run(world, s, "mouse.click left [640, 360]");
+    focus_run(world, s, "mouse_click left [640, 360]");
     test_uint(focus_status(world)->focused, a);
-    test_int(focus_presses(world, s, "key.press Tab", "actions.next"), 1);
+    test_int(focus_presses(world, s, "key_press Tab", "actions.next"), 1);
     test_uint(focus_status(world)->focused, a);
     test_bool(focus_status(world)->visible, false);
 
@@ -539,10 +539,10 @@ void Focus_tab_without_scope_reaches_binding(void) {
 void Focus_tab_with_scope_kept_from_binding(void) {
     // ui/focus
     ecs_world_t *world = focus_world(FOCUS_FORM);
-    ecs_entity_t s = box_terminal_new(world);
-    test_int(focus_presses(world, s, "key.press Tab", "actions.next"), 0);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    test_int(focus_presses(world, s, "key_press Tab", "actions.next"), 0);
     test_uint(focus_status(world)->focused, focus_e(world, "hud.form.b"));
-    test_int(focus_presses(world, s, "key.press Tab", "actions.next"), 0);
+    test_int(focus_presses(world, s, "key_press Tab", "actions.next"), 0);
     test_uint(focus_status(world)->focused, focus_e(world, "hud.form.a"));
 
     ecs_fini(world);
@@ -551,16 +551,16 @@ void Focus_tab_with_scope_kept_from_binding(void) {
 void Focus_keyboard_focus_keeps_nav_keys(void) {
     // ui/focus
     ecs_world_t *world = focus_world(FOCUS_FORM);
-    ecs_entity_t s = box_terminal_new(world);
-    focus_run(world, s, "key.press Tab");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    focus_run(world, s, "key_press Tab");
     test_bool(focus_status(world)->visible, true);
-    test_int(focus_presses(world, s, "key.press Space", "actions.jump"), 0);
-    test_int(focus_presses(world, s, "key.press Enter", "actions.confirm"), 0);
-    test_int(focus_presses(world, s, "key.press Left", "actions.left"), 0);
-    test_int(focus_presses(world, s, "key.press W", "actions.walk"), 1);
-    focus_run(world, s, "key.down Space");
+    test_int(focus_presses(world, s, "key_press Space", "actions.jump"), 0);
+    test_int(focus_presses(world, s, "key_press Enter", "actions.confirm"), 0);
+    test_int(focus_presses(world, s, "key_press Left", "actions.left"), 0);
+    test_int(focus_presses(world, s, "key_press W", "actions.walk"), 1);
+    focus_run(world, s, "key_down Space");
     test_bool(ecs_singleton_get(world, Input)->keys[KeySpace].down, false);
-    focus_run(world, s, "key.up Space");
+    focus_run(world, s, "key_up Space");
     test_uint(focus_status(world)->focused, focus_e(world, "hud.form.b"));
 
     ecs_fini(world);
@@ -569,14 +569,14 @@ void Focus_keyboard_focus_keeps_nav_keys(void) {
 void Focus_pointer_focus_lets_keys_through(void) {
     // ui/focus
     ecs_world_t *world = focus_world(FOCUS_FORM);
-    ecs_entity_t s = box_terminal_new(world);
-    focus_run(world, s, "mouse.click left [640, 260]");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    focus_run(world, s, "mouse_click left [640, 260]");
     test_uint(focus_status(world)->focused, focus_e(world, "hud.form.b"));
     test_bool(focus_status(world)->visible, false);
-    test_int(focus_presses(world, s, "key.press Space", "actions.jump"), 1);
-    test_int(focus_presses(world, s, "key.press Enter", "actions.confirm"), 1);
-    test_int(focus_presses(world, s, "key.press Left", "actions.left"), 1);
-    test_int(focus_presses(world, s, "key.press W", "actions.walk"), 1);
+    test_int(focus_presses(world, s, "key_press Space", "actions.jump"), 1);
+    test_int(focus_presses(world, s, "key_press Enter", "actions.confirm"), 1);
+    test_int(focus_presses(world, s, "key_press Left", "actions.left"), 1);
+    test_int(focus_presses(world, s, "key_press W", "actions.walk"), 1);
 
     ecs_fini(world);
 }
@@ -584,21 +584,21 @@ void Focus_pointer_focus_lets_keys_through(void) {
 void Focus_key_capture_keeps_keys(void) {
     // ui/focus
     ecs_world_t *world = focus_world(FOCUS_CAPTURE);
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_entity_t field = focus_e(world, "hud.panel.field");
     char typed[16] = {0};
     int32_t i;
-    focus_run(world, s, "mouse.click left [640, 260]");
+    focus_run(world, s, "mouse_click left [640, 260]");
     test_uint(focus_status(world)->focused, field);
     test_bool(focus_status(world)->visible, false);
-    test_int(focus_presses(world, s, "key.press Space", "actions.jump"), 0);
-    test_int(focus_presses(world, s, "key.press W", "actions.walk"), 0);
-    test_int(focus_presses(world, s, "key.press Tab", "actions.next"), 0);
-    focus_run(world, s, "key.down Space");
+    test_int(focus_presses(world, s, "key_press Space", "actions.jump"), 0);
+    test_int(focus_presses(world, s, "key_press W", "actions.walk"), 0);
+    test_int(focus_presses(world, s, "key_press Tab", "actions.next"), 0);
+    focus_run(world, s, "key_down Space");
     test_bool(ecs_singleton_get(world, Input)->keys[KeySpace].down, false);
-    focus_run(world, s, "key.up Space");
+    focus_run(world, s, "key_up Space");
 
-    ecs_os_free(box_terminal_run(world, s, "key.type hi", NULL));
+    ecs_os_free(box_command_run(world, s, "key_type hi", NULL));
     for (i = 0; i < 8; i ++) {
         ecs_progress(world, 0);
         const Input *in = ecs_singleton_get(world, Input);
@@ -609,10 +609,10 @@ void Focus_key_capture_keeps_keys(void) {
     test_str(typed, "hi");
     test_str(box_ui_text(world), "");
 
-    focus_run(world, s, "mouse.click left [1200, 50]");
+    focus_run(world, s, "mouse_click left [1200, 50]");
     test_uint(focus_status(world)->focused, 0);
-    test_int(focus_presses(world, s, "key.press Space", "actions.jump"), 1);
-    test_int(focus_presses(world, s, "key.press W", "actions.walk"), 1);
+    test_int(focus_presses(world, s, "key_press Space", "actions.jump"), 1);
+    test_int(focus_presses(world, s, "key_press W", "actions.walk"), 1);
 
     ecs_fini(world);
 }
@@ -620,13 +620,13 @@ void Focus_key_capture_keeps_keys(void) {
 void Focus_key_capture_on_ancestor(void) {
     // ui/focus
     ecs_world_t *world = focus_world(FOCUS_CAPTURE);
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_entity_t inner = focus_e(world, "hud.panel.box.inner");
-    focus_run(world, s, "mouse.click left [640, 460]");
+    focus_run(world, s, "mouse_click left [640, 460]");
     test_uint(focus_status(world)->focused, inner);
-    test_int(focus_presses(world, s, "key.press W", "actions.walk"), 0);
+    test_int(focus_presses(world, s, "key_press W", "actions.walk"), 0);
     ecs_remove(world, focus_e(world, "hud.panel.box"), KeyCapture);
-    test_int(focus_presses(world, s, "key.press W", "actions.walk"), 1);
+    test_int(focus_presses(world, s, "key_press W", "actions.walk"), 1);
 
     ecs_fini(world);
 }
@@ -652,15 +652,15 @@ void Focus_key_capture_added_reactively(void) {
         "hud {\n"
         "  drop { Drop: {} }\n"
         "}\n");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_entity_t drop = focus_e(world, "hud.drop");
-    focus_run(world, s, "mouse.click left [640, 360]");
+    focus_run(world, s, "mouse_click left [640, 360]");
     test_uint(focus_status(world)->focused, drop);
     test_bool(ecs_has(world, drop, KeyCapture), true);
-    test_int(focus_presses(world, s, "key.press W", "actions.walk"), 0);
-    focus_run(world, s, "mouse.click left [640, 360]");
+    test_int(focus_presses(world, s, "key_press W", "actions.walk"), 0);
+    focus_run(world, s, "mouse_click left [640, 360]");
     test_bool(ecs_has(world, drop, KeyCapture), false);
-    test_int(focus_presses(world, s, "key.press W", "actions.walk"), 1);
+    test_int(focus_presses(world, s, "key_press W", "actions.walk"), 1);
 
     ecs_fini(world);
 }
@@ -702,9 +702,9 @@ void Focus_api_from_script(void) {
         "  }\n"
         "}\n"
         "mover { Mover: {} }\n");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_entity_t c = focus_e(world, "hud.form.c");
-    focus_run(world, s, "mouse.click left [640, 460]");
+    focus_run(world, s, "mouse_click left [640, 460]");
     const int32_t *moved = ecs_get_id(world, focus_e(world, "mover"),
         focus_e(world, "Mover.mut"));
     test_assert(moved != NULL);
@@ -731,12 +731,12 @@ void Focus_prefab_never_focused(void) {
         "    }\n"
         "  }\n"
         "}\n");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_entity_t prefab = focus_e(world, "Button");
     test_bool(box_ui_focus(world, prefab), false);
-    focus_run(world, s, "key.press Tab");
+    focus_run(world, s, "key_press Tab");
     test_uint(focus_status(world)->focused, focus_e(world, "hud.form.one"));
-    focus_run(world, s, "key.press Tab");
+    focus_run(world, s, "key_press Tab");
     test_uint(focus_status(world)->focused, focus_e(world, "hud.form.one"));
 
     ecs_fini(world);
@@ -745,10 +745,10 @@ void Focus_prefab_never_focused(void) {
 void Focus_key_repeat_state(void) {
     // ui/focus
     ecs_world_t *world = focus_world(FOCUS_FORM);
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     int32_t i, repeated = 0, pressed = 0;
-    ecs_os_free(box_terminal_run(world, s, "key.down Backspace", NULL));
-    ecs_os_free(box_terminal_run(world, s, "key.repeat Backspace 3", NULL));
+    ecs_os_free(box_command_run(world, s, "key_down Backspace", NULL));
+    ecs_os_free(box_command_run(world, s, "key_repeat Backspace 3", NULL));
     for (i = 0; i < 6; i ++) {
         ecs_progress(world, 0);
         const KeyState *k = &ecs_singleton_get(world, Input)->keys[KeyBackspace];
@@ -765,7 +765,7 @@ void Focus_key_repeat_state(void) {
     test_bool(ecs_singleton_get(world, Input)->keys[KeyBackspace].repeated, true);
     ecs_progress(world, 0);
     test_bool(ecs_singleton_get(world, Input)->keys[KeyBackspace].repeated, false);
-    focus_run(world, s, "key.up Backspace");
+    focus_run(world, s, "key_up Backspace");
     test_bool(ecs_singleton_get(world, Input)->keys[KeyBackspace].down, false);
 
     ecs_fini(world);
@@ -803,16 +803,16 @@ void Focus_tab_first_scope_of_front_view(void) {
         "top_view {\n"
         "  View: {camera: top.camera}\n"
         "}\n");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_entity_t item = focus_e(world, "top.menu.item");
-    focus_run(world, s, "key.press Tab");
+    focus_run(world, s, "key_press Tab");
     test_uint(focus_status(world)->focused, item);
-    focus_run(world, s, "key.press Tab");
+    focus_run(world, s, "key_press Tab");
     test_uint(focus_status(world)->focused, item);
     ecs_delete(world, focus_e(world, "top_view"));
-    focus_run(world, s, "mouse.click left [1200, 50]");
+    focus_run(world, s, "mouse_click left [1200, 50]");
     test_uint(focus_status(world)->focused, 0);
-    focus_run(world, s, "key.press Tab");
+    focus_run(world, s, "key_press Tab");
     test_uint(focus_status(world)->focused, focus_e(world, "hud.form.a"));
 
     ecs_fini(world);
@@ -894,28 +894,28 @@ void Focus_flecs_focus_is_focused(void) {
         "  }\n"
         "}\n"
         "mover { Mover: {} }\n");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_entity_t a = focus_e(world, "hud.form.a");
     ecs_entity_t b = focus_e(world, "hud.form.b");
     ecs_entity_t c = focus_e(world, "hud.form.c");
     test_uint(focus_flecs(world), 0);
 
-    focus_run(world, s, "key.press Tab");
+    focus_run(world, s, "key_press Tab");
     test_uint(focus_flecs(world), b);
     test_bool(focus_status(world)->visible, true);
-    focus_run(world, s, "key.press Tab");
+    focus_run(world, s, "key_press Tab");
     test_uint(focus_flecs(world), a);
 
-    focus_run(world, s, "mouse.click left [840, 260]");
+    focus_run(world, s, "mouse_click left [840, 260]");
     test_uint(focus_flecs(world), c);
     test_bool(focus_status(world)->visible, false);
 
-    focus_run(world, s, "mouse.click left [640, 260]");
+    focus_run(world, s, "mouse_click left [640, 260]");
     test_uint(ecs_singleton_get(world, PickStatus)->target, focus_e(world, "hud.form.b.label"));
     test_uint(focus_flecs(world), b);
     test_uint(focus_status(world)->previous, c);
 
-    focus_run(world, s, "mouse.click left [1200, 50]");
+    focus_run(world, s, "mouse_click left [1200, 50]");
     test_uint(focus_flecs(world), 0);
 
     test_bool(box_ui_focus(world, a), true);
@@ -925,7 +925,7 @@ void Focus_flecs_focus_is_focused(void) {
     test_bool(box_ui_focus(world, c), true);
     test_uint(focus_flecs(world), c);
 
-    focus_run(world, s, "mouse.click left [640, 460]");
+    focus_run(world, s, "mouse_click left [640, 460]");
     const ecs_entity_t *moved = ecs_get_id(world, focus_e(world, "mover"),
         focus_e(world, "Mover.mut"));
     test_assert(moved != NULL);
@@ -945,25 +945,25 @@ void Focus_press_non_focusable_keeps_flecs_focus(void) {
         FOCUS_FORM
         FOCUS_PROBE
         "probe { Probe: {target: hud} }\n");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_entity_t b = focus_e(world, "hud.form.b");
 
-    focus_run(world, s, "mouse.click left [640, 460]");
+    focus_run(world, s, "mouse_click left [640, 460]");
     test_uint(ecs_singleton_get(world, PickStatus)->handler, focus_e(world, "hud.form.plain"));
     test_uint(focus_flecs(world), 0);
     test_int(focus_probe(world, "probe")->focuses, 0);
     test_int(focus_probe(world, "probe")->blurs, 0);
-    focus_run(world, s, "mouse.click left [900, 360]");
+    focus_run(world, s, "mouse_click left [900, 360]");
     test_uint(focus_flecs(world), 0);
     test_int(focus_probe(world, "probe")->focuses, 0);
     test_int(focus_probe(world, "probe")->blurs, 0);
 
-    focus_run(world, s, "mouse.click left [600, 260]");
+    focus_run(world, s, "mouse_click left [600, 260]");
     test_uint(ecs_singleton_get(world, PickStatus)->target, b);
     test_uint(focus_flecs(world), b);
     test_int(focus_probe(world, "probe")->focuses, 1);
     test_int(focus_probe(world, "probe")->blurs, 0);
-    focus_run(world, s, "mouse.click left [640, 260]");
+    focus_run(world, s, "mouse_click left [640, 260]");
     test_uint(ecs_singleton_get(world, PickStatus)->target, focus_e(world, "hud.form.b.label"));
     test_uint(focus_flecs(world), b);
     test_int(focus_probe(world, "probe")->focuses, 1);
@@ -988,13 +988,13 @@ void Focus_script_focus_redirected_or_refused(void) {
         "  }\n"
         "}\n"
         "mover { Mover: {} }\n");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_entity_t a = focus_e(world, "hud.form.a");
     ecs_entity_t b = focus_e(world, "hud.form.b");
     ecs_entity_t c = focus_e(world, "hud.form.c");
     ecs_entity_t plain = focus_e(world, "hud.form.plain");
     typedef struct { ecs_entity_t redirected, refused; } mover_t;
-    focus_run(world, s, "mouse.click left [640, 460]");
+    focus_run(world, s, "mouse_click left [640, 460]");
     const mover_t *m = ecs_get_id(world, focus_e(world, "mover"), focus_e(world, "Mover.mut"));
     test_assert(m != NULL);
     test_uint(m->redirected, b);
@@ -1036,9 +1036,9 @@ void Focus_to_local_with_focus_hook(void) {
         "  }\n"
         "}\n"
         "local { Local: {} }\n");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     typedef struct { float x, y; ecs_entity_t target; } local_t;
-    focus_run(world, s, "mouse.click left [650, 255]");
+    focus_run(world, s, "mouse_click left [650, 255]");
     const local_t *l = ecs_get_id(world, focus_e(world, "local"), focus_e(world, "Local.mut"));
     test_assert(l != NULL);
     test_uint(l->target, focus_e(world, "hud.form.b.label"));

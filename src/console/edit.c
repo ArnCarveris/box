@@ -318,9 +318,10 @@ static ecs_entity_t box_console_session(
     box_console_t *con)
 {
     if (!con->session || !ecs_is_alive(world, con->session)) {
-        con->session = ecs_entity(world, {
-            .name = "session", .parent = box_console_scope(world, con) });
-        ecs_add(world, con->session, Terminal);
+        con->session = ecs_shell_session_init(world, &(ecs_shell_session_desc_t){
+            .entity = ecs_entity(world, {
+                .name = "session", .parent = box_console_scope(world, con) })
+        });
     }
 
     return con->session;
@@ -487,7 +488,7 @@ char* box_console_exec(
         box_console_help(&buf, help_cmd);
         result = ecs_strbuf_get(&buf);
     } else if (!cmd) {
-        result = box_terminal_run(world, box_console_session(world, con), line, &failed);
+        result = box_command_run(world, box_console_session(world, con), line, &failed);
     }
 
     if (help && !topic && !failed) {

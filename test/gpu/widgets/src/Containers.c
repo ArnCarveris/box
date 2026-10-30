@@ -160,7 +160,7 @@ static void containers_wheel(
     float dx,
     float dy)
 {
-    ecs_os_free(gallery_run(world, s, "mouse.scroll %.1f %.1f", (double)dx, (double)dy));
+    ecs_os_free(gallery_run(world, s, "mouse_scroll %.1f %.1f", (double)dx, (double)dy));
     gallery_settle(world, s);
 }
 
@@ -269,7 +269,7 @@ void Containers_scene_loads(void) {
     ecs_world_t *world = containers_load(&s);
 
     gallery_expect(world, s, "logs warning 100", "");
-    gallery_expect(world, s, "get " CONTAINERS ".heading Text.value", "\"Containers\"");
+    gallery_expect(world, s, "get " CONTAINERS ".heading box.text.Text.value", "\"Containers\"");
     containers_expect(world, s, TABS, "TabView", "current", "0");
     containers_expect(world, s, TABS, "TabView", "count", "3");
     containers_expect(world, s, TABS ".audio", "Tab", "index", "1");
@@ -280,8 +280,8 @@ void Containers_scene_loads(void) {
     containers_expect(world, s, NOTES, "ScrollView", "y", "0");
     containers_expect(world, s, DETAILS, "Collapsible", "current", "false");
     containers_expect(world, s, ADVANCED, "Collapsible", "current", "true");
-    gallery_expect(world, s, "get " QUALITY ".caption Text.value", "\"Medium\"");
-    gallery_expect(world, s, "get " FILES ".rows.row_0.caption Text.value",
+    gallery_expect(world, s, "get " QUALITY ".caption box.text.Text.value", "\"Medium\"");
+    gallery_expect(world, s, "get " FILES ".rows.row_0.caption box.text.Text.value",
         "\"scene_001.flecs\"");
     test_assert(ecs_lookup(world, QUALITY ".list.option_0") == 0);
     test_assert(ecs_has_id(world, ecs_lookup(world, NOTES), ClipChildren));
@@ -300,7 +300,7 @@ void Containers_scene_loads(void) {
     test_flt(general[3], page[1]);
     test_assert(page[3] > page[1]);
     test_flt(ecs_get(world, ecs_lookup(world, TABS ".audio"), LayoutBounds)->height, 0);
-    gallery_expect(world, s, "get " TABS ".bar.tab_2.caption Text.value", "\"Display\"");
+    gallery_expect(world, s, "get " TABS ".bar.tab_2.caption box.text.Text.value", "\"Display\"");
 
     ecs_fini(world);
 }
@@ -317,7 +317,8 @@ void Containers_dropdown_click_opens(void) {
     gallery_expect_focus(world, s, QUALITY);
     test_assert(ecs_has_id(world, quality, KeyCapture));
     test_assert(ecs_lookup(world, QUALITY ".list.option_4") != 0);
-    gallery_expect(world, s, "get " QUALITY ".list.option_3.caption Text.value", "\"Ultra\"");
+    gallery_expect(world, s, "get " QUALITY ".list.option_3.caption box.text.Text.value",
+        "\"Ultra\"");
 
     /* The list is as wide as the button, up to the rounding of the transforms of the page */
     float button[4], list[4];
@@ -370,7 +371,7 @@ void Containers_dropdown_click_selects(void) {
     gallery_click(world, s, QUALITY ".list.option_3", 0, 0, QUALITY);
     containers_expect(world, s, QUALITY, "Dropdown", "current", "3");
     containers_expect(world, s, QUALITY, "Dropdown", "open", "false");
-    gallery_expect(world, s, "get " QUALITY ".caption Text.value", "\"Ultra\"");
+    gallery_expect(world, s, "get " QUALITY ".caption box.text.Text.value", "\"Ultra\"");
     test_int(gallery_changes(world, s), 1);
     gallery_expect(world, s, "get gallery Gallery.mut.last", "\"quality: 3\"");
     gallery_expect_focus(world, s, QUALITY);
@@ -394,8 +395,10 @@ void Containers_dropdown_hover_highlights(void) {
     containers_expect(world, s, QUALITY, "Dropdown", "highlight", "0");
     gallery_hover(world, s, QUALITY ".list.option_4", 0.8f, 0.8f, QUALITY);
     containers_expect(world, s, QUALITY, "Dropdown", "highlight", "4");
-    gallery_expect(world, s, "get " QUALITY ".list.option_4 Rgb", "{r: 60, g: 65, b: 75}");
-    gallery_expect(world, s, "get " QUALITY ".list.option_0 Rgb", "{r: 46, g: 50, b: 58}");
+    gallery_expect(world, s, "get " QUALITY ".list.option_4 box.material.Rgb",
+        "{\"Rgb\":{\"r\":60, \"g\":65, \"b\":75}}");
+    gallery_expect(world, s, "get " QUALITY ".list.option_0 box.material.Rgb",
+        "{\"Rgb\":{\"r\":46, \"g\":50, \"b\":58}}");
 
     /* The keys move the highlight on from the hovered option */
     gallery_key(world, s, "Up");
@@ -461,7 +464,7 @@ void Containers_dropdown_escape_keeps(void) {
     gallery_key(world, s, "Escape");
     containers_expect(world, s, QUALITY, "Dropdown", "open", "false");
     containers_expect(world, s, QUALITY, "Dropdown", "current", "1");
-    gallery_expect(world, s, "get " QUALITY ".caption Text.value", "\"Medium\"");
+    gallery_expect(world, s, "get " QUALITY ".caption box.text.Text.value", "\"Medium\"");
     test_int(gallery_changes(world, s), 0);
     gallery_expect_focus(world, s, QUALITY);
 
@@ -488,10 +491,10 @@ void Containers_dropdown_press_outside_closes(void) {
     test_int(gallery_changes(world, s), 1);
 
     /* The closed list no longer takes the pointer where it was */
-    ecs_os_free(gallery_run(world, s, "mouse.move %s", point));
+    ecs_os_free(gallery_run(world, s, "mouse_move %s", point));
     gallery_settle(world, s);
-    char *handler = gallery_run(world, s, "get box.picking.PickStatus PickStatus.handler");
-    test_assert(strcmp(handler, QUALITY) != 0);
+    char *handler = gallery_run(world, s, "get $ box.picking.PickStatus.handler");
+    test_assert(strcmp(handler, "\"" QUALITY "\"") != 0);
     ecs_os_free(handler);
 
     /* A press on no widget clears the focus and closes the list too */
@@ -531,7 +534,7 @@ void Containers_dropdown_list_covers_below(void) {
     gallery_click(world, s, FORMAT, 0, 0, FORMAT);
     gallery_click(world, s, FORMAT ".list.option_2", 0, 0, FORMAT);
     containers_expect(world, s, FORMAT, "Dropdown", "current", "2");
-    gallery_expect(world, s, "get " FORMAT ".caption Text.value", "\"WebP\"");
+    gallery_expect(world, s, "get " FORMAT ".caption box.text.Text.value", "\"WebP\"");
     containers_expect(world, s, DETAILS, "Collapsible", "current", "false");
     test_int(gallery_changes(world, s), 1);
     gallery_expect(world, s, "get gallery Gallery.mut.last", "\"format: 2\"");
@@ -579,16 +582,16 @@ void Containers_dropdown_space_binding(void) {
 
     /* A click focuses without a visible focus, which leaves Space to the bindings */
     gallery_click(world, s, CONTAINERS ".quality_row.quality_label", 0, 0, PAGE);
-    test_int(containers_presses(world, s, "key.press Space", jump), 1);
+    test_int(containers_presses(world, s, "key_press Space", jump), 1);
 
     /* While the list is open the dropdown captures every key */
     gallery_click(world, s, QUALITY, 0, 0, QUALITY);
     containers_expect(world, s, QUALITY, "Dropdown", "open", "true");
-    test_int(containers_presses(world, s, "key.press Down", jump), 0);
-    test_int(containers_presses(world, s, "key.down Space", jump), 0);
+    test_int(containers_presses(world, s, "key_press Down", jump), 0);
+    test_int(containers_presses(world, s, "key_down Space", jump), 0);
     containers_expect(world, s, QUALITY, "Dropdown", "open", "false");
     containers_expect(world, s, QUALITY, "Dropdown", "current", "2");
-    test_int(containers_presses(world, s, "key.up Space", jump), 0);
+    test_int(containers_presses(world, s, "key_up Space", jump), 0);
     test_int(gallery_changes(world, s), 1);
 
     ecs_fini(world);
@@ -610,9 +613,12 @@ void Containers_tabs_click(void) {
     b = ecs_get(world, ecs_lookup(world, TABS ".general"), LayoutBounds);
     test_flt(b->width, 0);
     test_flt(b->height, 0);
-    gallery_expect(world, s, "get " TABS ".bar.tab_1.caption Rgb", "{r: 214, g: 218, b: 224}");
-    gallery_expect(world, s, "get " TABS ".bar.tab_0.caption Rgb", "{r: 142, g: 149, b: 160}");
-    gallery_expect(world, s, "get " TABS ".bar.tab_1.mark Rgb", "{r: 98, g: 168, b: 122}");
+    gallery_expect(world, s, "get " TABS ".bar.tab_1.caption box.material.Rgb",
+        "{\"Rgb\":{\"r\":214, \"g\":218, \"b\":224}}");
+    gallery_expect(world, s, "get " TABS ".bar.tab_0.caption box.material.Rgb",
+        "{\"Rgb\":{\"r\":142, \"g\":149, \"b\":160}}");
+    gallery_expect(world, s, "get " TABS ".bar.tab_1.mark box.material.Rgb",
+        "{\"Rgb\":{\"r\":98, \"g\":168, \"b\":122}}");
 
     /* The widgets of the shown page take the pointer */
     gallery_hover(world, s, TABS ".audio.channels", 0.75f, 0, TABS ".audio.channels");
@@ -635,12 +641,12 @@ void Containers_tabs_arrows(void) {
     ecs_world_t *world = containers_load(&s);
 
     containers_focus(world, s, TABS ".bar.tab_0");
-    gallery_expect(world, s, "get " TABS ".bar.tab_0 Border.width", "2");
+    gallery_expect(world, s, "get " TABS ".bar.tab_0 box.geometry.Border.width", "2");
     gallery_key(world, s, "Right");
     containers_expect(world, s, TABS, "TabView", "current", "1");
     gallery_expect_focus(world, s, TABS ".bar.tab_1");
-    gallery_expect(world, s, "get " TABS ".bar.tab_1 Border.width", "2");
-    gallery_expect(world, s, "get " TABS ".bar.tab_0 Border.width", "0");
+    gallery_expect(world, s, "get " TABS ".bar.tab_1 box.geometry.Border.width", "2");
+    gallery_expect(world, s, "get " TABS ".bar.tab_0 box.geometry.Border.width", "0");
     gallery_key(world, s, "Right");
     containers_expect(world, s, TABS, "TabView", "current", "2");
     gallery_expect_focus(world, s, TABS ".bar.tab_2");
@@ -657,7 +663,7 @@ void Containers_tabs_arrows(void) {
     gallery_expect_focus(world, s, TABS ".bar.tab_2");
     test_int(gallery_changes(world, s), 6);
     gallery_expect(world, s, "get gallery Gallery.mut.last", "\"tabs: 2\"");
-    gallery_expect(world, s, "get box.ui.FocusStatus FocusStatus.visible", "true");
+    gallery_expect(world, s, "get $ box.ui.FocusStatus.visible", "true");
 
     /* Enter and Space on the header of the selected tab change nothing */
     gallery_key(world, s, "Enter");
@@ -685,10 +691,10 @@ void Containers_tabs_one_tab_stop(void) {
     containers_focus(world, s, TABS ".bar.tab_0");
     gallery_key(world, s, "Tab");
     gallery_expect_focus(world, s, TABS ".general.toggles.notify");
-    ecs_os_free(gallery_run(world, s, "key.down ShiftLeft"));
+    ecs_os_free(gallery_run(world, s, "key_down ShiftLeft"));
     gallery_key(world, s, "Tab");
     gallery_key(world, s, "Tab");
-    ecs_os_free(gallery_run(world, s, "key.up ShiftLeft"));
+    ecs_os_free(gallery_run(world, s, "key_up ShiftLeft"));
     gallery_settle(world, s);
     gallery_expect_focus(world, s, TEXT ".submit.message.field");
 
@@ -710,12 +716,12 @@ void Containers_tabs_hidden_page(void) {
 
     /* The slider of the hidden Audio page is not picked where it lies */
     gallery_point(world, TABS ".audio.level", 0, 0.8f, point, sizeof(point));
-    ecs_os_free(gallery_run(world, s, "mouse.move %s", point));
+    ecs_os_free(gallery_run(world, s, "mouse_move %s", point));
     gallery_settle(world, s);
-    char *handler = gallery_run(world, s, "get box.picking.PickStatus PickStatus.handler");
-    test_assert(strcmp(handler, TABS ".audio.level") != 0);
+    char *handler = gallery_run(world, s, "get $ box.picking.PickStatus.handler");
+    test_assert(strcmp(handler, "\"" TABS ".audio.level\"") != 0);
     ecs_os_free(handler);
-    ecs_os_free(gallery_run(world, s, "mouse.click left %s", point));
+    ecs_os_free(gallery_run(world, s, "mouse_click left %s", point));
     gallery_settle(world, s);
     containers_expect(world, s, TABS ".audio.level", "Slider", "current", "60");
 
@@ -756,9 +762,9 @@ void Containers_scroll_wheel(void) {
     test_flt(containers_content(world, NOTES)->y, 0);
 
     /* The view does not scroll across, with or without shift */
-    ecs_os_free(gallery_run(world, s, "key.down ShiftLeft"));
+    ecs_os_free(gallery_run(world, s, "key_down ShiftLeft"));
     containers_wheel(world, s, 0, -1);
-    ecs_os_free(gallery_run(world, s, "key.up ShiftLeft"));
+    ecs_os_free(gallery_run(world, s, "key_up ShiftLeft"));
     gallery_settle(world, s);
     test_flt(containers_content(world, NOTES)->x, 0);
     test_flt(containers_content(world, NOTES)->y, 0);
@@ -806,12 +812,12 @@ void Containers_scroll_thumb_drag(void) {
         thumb - 4);
 
     containers_thumb(world, NOTES, 0.5f, from, sizeof(from));
-    ecs_os_free(gallery_run(world, s, "mouse.move %s", from));
+    ecs_os_free(gallery_run(world, s, "mouse_move %s", from));
     gallery_settle(world, s);
-    gallery_expect(world, s, "get box.picking.PickStatus PickStatus.handler", NOTES);
+    gallery_expect(world, s, "get $ box.picking.PickStatus.handler", "\"" NOTES "\"");
     ecs_os_snprintf(to, ECS_SIZEOF(to), "[%.1f, %.1f]", (double)(r[2] - 5),
         (double)(r[1] + thumb * 0.5f + travel * 0.5f));
-    ecs_os_free(gallery_run(world, s, "mouse.drag left %s %s", from, to));
+    ecs_os_free(gallery_run(world, s, "mouse_drag left %s %s", from, to));
     gallery_settle(world, s);
     test_assert(fabs(containers_content(world, NOTES)->y - max_y * 0.5) < 1);
     containers_expect(world, s, NOTES, "ScrollView", "drag", "0");
@@ -820,7 +826,7 @@ void Containers_scroll_thumb_drag(void) {
     containers_thumb(world, NOTES, 0.5f, from, sizeof(from));
     ecs_os_snprintf(to, ECS_SIZEOF(to), "[%.1f, %.1f]", (double)(r[2] - 5),
         (double)(r[3] + 100));
-    ecs_os_free(gallery_run(world, s, "mouse.drag left %s %s", from, to));
+    ecs_os_free(gallery_run(world, s, "mouse_drag left %s %s", from, to));
     gallery_settle(world, s);
     test_flt(containers_content(world, NOTES)->y, max_y);
     test_flt(containers_number(world, s, NOTES, "ScrollView", "y"), max_y);
@@ -828,7 +834,7 @@ void Containers_scroll_thumb_drag(void) {
     containers_thumb(world, NOTES, 0.5f, from, sizeof(from));
     ecs_os_snprintf(to, ECS_SIZEOF(to), "[%.1f, %.1f]", (double)(r[2] - 5),
         (double)(r[1] - 100));
-    ecs_os_free(gallery_run(world, s, "mouse.drag left %s %s", from, to));
+    ecs_os_free(gallery_run(world, s, "mouse_drag left %s %s", from, to));
     gallery_settle(world, s);
     test_flt(containers_content(world, NOTES)->y, 0);
 
@@ -889,7 +895,7 @@ void Containers_scroll_keys(void) {
     gallery_expect_focus(world, s, NOTES);
 
     /* The focus ring shows on the view */
-    gallery_expect(world, s, "get " NOTES " Border.width", "2");
+    gallery_expect(world, s, "get " NOTES " box.geometry.Border.width", "2");
 
     /* A widget in the view keeps its keys: Down moves the selection of the list view */
     gallery_key(world, s, "Tab");
@@ -939,12 +945,12 @@ void Containers_scroll_clips_picking(void) {
     containers_rect(world, NOTES ".share", share);
     test_assert(share[1] > notes[3]);
     gallery_point(world, NOTES ".share", 0, 0, point, sizeof(point));
-    ecs_os_free(gallery_run(world, s, "mouse.move %s", point));
+    ecs_os_free(gallery_run(world, s, "mouse_move %s", point));
     gallery_settle(world, s);
-    char *handler = gallery_run(world, s, "get box.picking.PickStatus PickStatus.handler");
-    test_assert(strcmp(handler, NOTES ".share") != 0);
+    char *handler = gallery_run(world, s, "get $ box.picking.PickStatus.handler");
+    test_assert(strcmp(handler, "\"" NOTES ".share\"") != 0);
     ecs_os_free(handler);
-    ecs_os_free(gallery_run(world, s, "mouse.click left %s", point));
+    ecs_os_free(gallery_run(world, s, "mouse_click left %s", point));
     gallery_settle(world, s);
     char *last = gallery_run(world, s, "get gallery Gallery.mut.last");
     test_assert(strcmp(last, "\"share\"") != 0);
@@ -964,10 +970,10 @@ void Containers_scroll_clips_picking(void) {
     test_assert(files[1] < notes[1]);
     ecs_os_snprintf(point, ECS_SIZEOF(point), "[%.1f, %.1f]", (double)(files[0] + 40),
         (double)((files[1] + notes[1]) * 0.5f));
-    ecs_os_free(gallery_run(world, s, "mouse.move %s", point));
+    ecs_os_free(gallery_run(world, s, "mouse_move %s", point));
     gallery_settle(world, s);
-    handler = gallery_run(world, s, "get box.picking.PickStatus PickStatus.handler");
-    test_assert(strcmp(handler, FILES) != 0);
+    handler = gallery_run(world, s, "get $ box.picking.PickStatus.handler");
+    test_assert(strcmp(handler, "\"" FILES "\"") != 0);
     ecs_os_free(handler);
 
     ecs_fini(world);
@@ -1010,13 +1016,15 @@ void Containers_list_click_selects(void) {
     test_int(gallery_changes(world, s), 1);
     gallery_expect(world, s, "get gallery Gallery.mut.last", "\"files: 2\"");
     gallery_expect_focus(world, s, FILES);
-    gallery_expect(world, s, "get " FILES ".selected_row LayoutItem.y", "-56");
-    gallery_expect(world, s, "get " FILES ".selected_row Rgb", "{r: 60, g: 104, b: 84}");
+    gallery_expect(world, s, "get " FILES ".selected_row box.layout.LayoutItem.y", "-56");
+    gallery_expect(world, s, "get " FILES ".selected_row box.material.Rgb",
+        "{\"Rgb\":{\"r\":60, \"g\":104, \"b\":84}}");
 
     /* Hovering another row marks it */
     gallery_hover(world, s, FILES ".rows.row_1", 0.5f, 0.5f, FILES);
     containers_expect(world, s, FILES, "ListView", "hover", "1");
-    gallery_expect(world, s, "get " FILES ".hover_row Rgb", "{r: 60, g: 65, b: 75}");
+    gallery_expect(world, s, "get " FILES ".hover_row box.material.Rgb",
+        "{\"Rgb\":{\"r\":60, \"g\":65, \"b\":75}}");
 
     /* A click on the selected row changes nothing, one on its caption selects as the row */
     gallery_click(world, s, FILES ".rows.row_2", 0.6f, 0.6f, FILES);
@@ -1137,7 +1145,7 @@ void Containers_list_200_items(void) {
 
     test_assert(ecs_lookup(world, FILES ".rows.row_199") != 0);
     test_assert(ecs_lookup(world, FILES ".rows.row_200") == 0);
-    gallery_expect(world, s, "get " FILES ".rows.row_199.caption Text.value",
+    gallery_expect(world, s, "get " FILES ".rows.row_199.caption box.text.Text.value",
         "\"prefab_200.flecs\"");
     containers_rect(world, FILES, list);
     test_flt(c->height, 200 * CONTAINERS_ROW + 2 * CONTAINERS_INSET);
@@ -1165,8 +1173,8 @@ void Containers_collapsible_click(void) {
     containers_rect(world, DETAILS, closed);
     containers_rect(world, ADVANCED, below);
     test_flt(closed[3] - closed[1], 32);
-    gallery_expect(world, s, "get " DETAILS ".head.chevron.first Line",
-        "{x1: -2, y1: 4, x2: 2, y2: 0, width: 1.5}");
+    gallery_expect(world, s, "get " DETAILS ".head.chevron.first box.geometry.Line",
+        "{\"Line\":{\"x1\":-2, \"y1\":4, \"x2\":2, \"y2\":0, \"width\":1.5}}");
 
     gallery_click(world, s, DETAILS ".head", 0, 0, DETAILS);
     containers_expect(world, s, DETAILS, "Collapsible", "current", "true");
@@ -1178,8 +1186,8 @@ void Containers_collapsible_click(void) {
     float moved[4];
     containers_rect(world, ADVANCED, moved);
     test_flt(moved[1] - below[1], open[3] - closed[3]);
-    gallery_expect(world, s, "get " DETAILS ".head.chevron.first Line",
-        "{x1: -4, y1: 2, x2: 0, y2: -2, width: 1.5}");
+    gallery_expect(world, s, "get " DETAILS ".head.chevron.first box.geometry.Line",
+        "{\"Line\":{\"x1\":-4, \"y1\":2, \"x2\":0, \"y2\":-2, \"width\":1.5}}");
 
     gallery_click(world, s, DETAILS ".head.caption", 0, 0, DETAILS);
     containers_expect(world, s, DETAILS, "Collapsible", "current", "false");
@@ -1196,16 +1204,16 @@ void Containers_collapsible_keys(void) {
     ecs_world_t *world = containers_load(&s);
 
     containers_focus(world, s, DETAILS);
-    gallery_expect(world, s, "get " DETAILS ".head Border.width", "2");
+    gallery_expect(world, s, "get " DETAILS ".head box.geometry.Border.width", "2");
     gallery_key(world, s, "Enter");
     containers_expect(world, s, DETAILS, "Collapsible", "current", "true");
     gallery_key(world, s, "Space");
     containers_expect(world, s, DETAILS, "Collapsible", "current", "false");
-    ecs_os_free(gallery_run(world, s, "key.down Space"));
+    ecs_os_free(gallery_run(world, s, "key_down Space"));
     gallery_settle(world, s);
     containers_expect(world, s, DETAILS, "Collapsible", "down", "true");
     containers_expect(world, s, DETAILS, "Collapsible", "current", "false");
-    ecs_os_free(gallery_run(world, s, "key.up Space"));
+    ecs_os_free(gallery_run(world, s, "key_up Space"));
     gallery_settle(world, s);
     containers_expect(world, s, DETAILS, "Collapsible", "down", "false");
     containers_expect(world, s, DETAILS, "Collapsible", "current", "true");
@@ -1223,10 +1231,10 @@ void Containers_collapsible_hides_content(void) {
 
     /* Closed, the check box under the header is not picked where it lies */
     gallery_point(world, DETAILS ".verbose", -0.8f, 0, point, sizeof(point));
-    ecs_os_free(gallery_run(world, s, "mouse.move %s", point));
+    ecs_os_free(gallery_run(world, s, "mouse_move %s", point));
     gallery_settle(world, s);
-    char *handler = gallery_run(world, s, "get box.picking.PickStatus PickStatus.handler");
-    test_assert(strcmp(handler, DETAILS ".verbose") != 0);
+    char *handler = gallery_run(world, s, "get $ box.picking.PickStatus.handler");
+    test_assert(strcmp(handler, "\"" DETAILS ".verbose\"") != 0);
     ecs_os_free(handler);
 
     /* Tab goes from the section to the next one */

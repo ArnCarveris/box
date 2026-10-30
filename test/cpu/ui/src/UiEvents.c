@@ -234,7 +234,7 @@ static void events_run(
     ecs_entity_t s,
     const char *cmd)
 {
-    ecs_os_free(box_terminal_run(world, s, cmd, NULL));
+    ecs_os_free(box_command_run(world, s, cmd, NULL));
     while (box_input_pending(world)) {
         ecs_progress(world, 0);
     }
@@ -346,10 +346,10 @@ void UiEvents_focus_blur_bubble(void) {
     ecs_world_t *world = events_world(
         "on_a { FocusProbe: {target: hud.form.a} }\n"
         "on_form { FocusProbe: {target: hud.form} }\n");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_entity_t a = events_e(world, "hud.form.a");
     ecs_entity_t b = events_e(world, "hud.form.b");
-    events_run(world, s, "mouse.click left [440, 260]");
+    events_run(world, s, "mouse_click left [440, 260]");
     test_int(events_focus(world, "on_a")->focus, 1);
     test_int(events_focus(world, "on_a")->blur, 0);
     test_uint(events_focus(world, "on_a")->last, a);
@@ -357,21 +357,21 @@ void UiEvents_focus_blur_bubble(void) {
     test_int(events_focus(world, "on_form")->focus, 1);
     test_uint(events_focus(world, "on_form")->last, a);
 
-    events_run(world, s, "mouse.click left [840, 260]");
+    events_run(world, s, "mouse_click left [840, 260]");
     test_int(events_focus(world, "on_a")->focus, 1);
     test_int(events_focus(world, "on_a")->blur, 1);
     test_int(events_focus(world, "on_form")->focus, 2);
     test_int(events_focus(world, "on_form")->blur, 1);
     test_uint(events_focus(world, "on_form")->last, b);
 
-    events_run(world, s, "key.press Tab");
+    events_run(world, s, "key_press Tab");
     test_uint(ecs_singleton_get(world, FocusStatus)->focused,
         events_e(world, "hud.form.group.slider"));
     test_int(events_focus(world, "on_form")->focus, 3);
     test_int(events_focus(world, "on_form")->blur, 2);
     test_bool(ecs_singleton_get(world, FocusStatus)->visible, true);
 
-    events_run(world, s, "mouse.click left [1200, 50]");
+    events_run(world, s, "mouse_click left [1200, 50]");
     test_int(events_focus(world, "on_form")->focus, 3);
     test_int(events_focus(world, "on_form")->blur, 3);
     test_int(events_focus(world, "on_a")->blur, 1);
@@ -384,9 +384,9 @@ void UiEvents_key_reports_key_and_modifiers(void) {
     ecs_world_t *world = events_world(
         "on_a { KeyProbe: {target: hud.form.a} }\n"
         "on_form { KeyProbe: {target: hud.form} }\n");
-    ecs_entity_t s = box_terminal_new(world);
-    events_run(world, s, "mouse.click left [440, 260]");
-    events_run(world, s, "key.press A");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    events_run(world, s, "mouse_click left [440, 260]");
+    events_run(world, s, "key_press A");
     test_int(events_key(world, "on_a")->downs, 1);
     test_int(events_key(world, "on_a")->ups, 1);
     test_str(events_key(world, "on_a")->key, "a");
@@ -394,16 +394,16 @@ void UiEvents_key_reports_key_and_modifiers(void) {
     test_int(events_key(world, "on_form")->downs, 1);
     test_int(events_key(world, "on_form")->ups, 1);
 
-    events_run(world, s, "key.down ShiftLeft");
-    events_run(world, s, "key.down CtrlLeft");
-    events_run(world, s, "key.press Z");
+    events_run(world, s, "key_down ShiftLeft");
+    events_run(world, s, "key_down CtrlLeft");
+    events_run(world, s, "key_press Z");
     test_str(events_key(world, "on_a")->key, "z");
     test_bool(events_key(world, "on_a")->shift, true);
     test_bool(events_key(world, "on_a")->ctrl, true);
     test_int(events_key(world, "on_a")->downs, 4);
     test_int(events_key(world, "on_a")->ups, 2);
-    events_run(world, s, "key.up ShiftLeft");
-    events_run(world, s, "key.up CtrlLeft");
+    events_run(world, s, "key_up ShiftLeft");
+    events_run(world, s, "key_up CtrlLeft");
     test_int(events_key(world, "on_a")->ups, 4);
     test_int(events_key(world, "on_a")->repeats, 0);
 
@@ -415,16 +415,16 @@ void UiEvents_key_nothing_when_not_focused(void) {
     ecs_world_t *world = events_world(
         "on_a { KeyProbe: {target: hud.form.a} }\n"
         "on_b { KeyProbe: {target: hud.form.b} }\n");
-    ecs_entity_t s = box_terminal_new(world);
-    events_run(world, s, "key.press A");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    events_run(world, s, "key_press A");
     test_int(events_key(world, "on_a")->downs, 0);
-    events_run(world, s, "mouse.click left [840, 260]");
-    events_run(world, s, "key.press A");
+    events_run(world, s, "mouse_click left [840, 260]");
+    events_run(world, s, "key_press A");
     test_int(events_key(world, "on_a")->downs, 0);
     test_int(events_key(world, "on_a")->ups, 0);
     test_int(events_key(world, "on_b")->downs, 1);
-    events_run(world, s, "mouse.click left [1200, 50]");
-    events_run(world, s, "key.press A");
+    events_run(world, s, "mouse_click left [1200, 50]");
+    events_run(world, s, "key_press A");
     test_int(events_key(world, "on_b")->downs, 1);
 
     ecs_fini(world);
@@ -434,15 +434,15 @@ void UiEvents_key_repeats(void) {
     // ui/events
     ecs_world_t *world = events_world(
         "on_a { KeyProbe: {target: hud.form.a} }\n");
-    ecs_entity_t s = box_terminal_new(world);
-    events_run(world, s, "mouse.click left [440, 260]");
-    events_run(world, s, "key.down Backspace");
-    events_run(world, s, "key.repeat Backspace 3");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    events_run(world, s, "mouse_click left [440, 260]");
+    events_run(world, s, "key_down Backspace");
+    events_run(world, s, "key_repeat Backspace 3");
     test_int(events_key(world, "on_a")->downs, 4);
     test_int(events_key(world, "on_a")->repeats, 3);
     test_int(events_key(world, "on_a")->ups, 0);
     test_str(events_key(world, "on_a")->key, "Backspace");
-    events_run(world, s, "key.up Backspace");
+    events_run(world, s, "key_up Backspace");
     test_int(events_key(world, "on_a")->ups, 1);
     test_int(events_key(world, "on_a")->repeats, 3);
 
@@ -454,11 +454,11 @@ void UiEvents_activate_click(void) {
     ecs_world_t *world = events_world(
         "on_b { ActivateProbe: {target: hud.form.b} }\n"
         "on_form { ActivateProbe: {target: hud.form} }\n");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_entity_t b = events_e(world, "hud.form.b");
     ecs_entity_t label = events_e(world, "hud.form.b.label");
     ecs_entity_t a = events_e(world, "hud.form.a");
-    events_run(world, s, "mouse.click left [840, 260]");
+    events_run(world, s, "mouse_click left [840, 260]");
     test_int(events_activate(world, "on_b")->raw, 1);
     test_uint(events_activate(world, "on_b")->hit, label);
     test_int(events_activate(world, "on_b")->count, 1);
@@ -467,15 +467,15 @@ void UiEvents_activate_click(void) {
     test_int(events_activate(world, "on_form")->count, 1);
     test_uint(events_activate(world, "on_form")->last, b);
 
-    events_run(world, s, "mouse.click left [880, 260]");
+    events_run(world, s, "mouse_click left [880, 260]");
     test_int(events_activate(world, "on_b")->count, 2);
     test_uint(events_activate(world, "on_b")->hit, b);
     test_uint(events_activate(world, "on_b")->last, b);
 
-    events_run(world, s, "mouse.click right [840, 260]");
+    events_run(world, s, "mouse_click right [840, 260]");
     test_int(events_activate(world, "on_b")->raw, 3);
     test_int(events_activate(world, "on_b")->count, 2);
-    events_run(world, s, "mouse.click left [440, 260]");
+    events_run(world, s, "mouse_click left [440, 260]");
     test_int(events_activate(world, "on_b")->raw, 3);
     test_int(events_activate(world, "on_b")->count, 2);
     test_int(events_activate(world, "on_form")->count, 3);
@@ -488,18 +488,18 @@ void UiEvents_activate_not_released_elsewhere(void) {
     // ui/events
     ecs_world_t *world = events_world(
         "on_b { ActivateProbe: {target: hud.form.b} }\n");
-    ecs_entity_t s = box_terminal_new(world);
-    events_run(world, s, "mouse.drag left [840, 260] [1200, 50]");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    events_run(world, s, "mouse_drag left [840, 260] [1200, 50]");
     test_int(events_activate(world, "on_b")->raw, 1);
     test_int(events_activate(world, "on_b")->count, 0);
-    events_run(world, s, "mouse.drag left [840, 260] [440, 260]");
+    events_run(world, s, "mouse_drag left [840, 260] [440, 260]");
     test_int(events_activate(world, "on_b")->raw, 2);
     test_int(events_activate(world, "on_b")->count, 0);
-    events_run(world, s, "mouse.drag left [840, 260] [1200, 50]");
-    events_run(world, s, "mouse.drag left [1200, 50] [840, 260]");
+    events_run(world, s, "mouse_drag left [840, 260] [1200, 50]");
+    events_run(world, s, "mouse_drag left [1200, 50] [840, 260]");
     test_int(events_activate(world, "on_b")->raw, 3);
     test_int(events_activate(world, "on_b")->count, 0);
-    events_run(world, s, "mouse.drag left [840, 260] [870, 270]");
+    events_run(world, s, "mouse_drag left [840, 260] [870, 270]");
     test_int(events_activate(world, "on_b")->raw, 4);
     test_int(events_activate(world, "on_b")->count, 1);
     test_uint(events_activate(world, "on_b")->last, events_e(world, "hud.form.b"));
@@ -511,20 +511,20 @@ void UiEvents_activate_enter(void) {
     // ui/events
     ecs_world_t *world = events_world(
         "on_b { ActivateProbe: {target: hud.form.b} }\n");
-    ecs_entity_t s = box_terminal_new(world);
-    events_run(world, s, "key.press Enter");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    events_run(world, s, "key_press Enter");
     test_int(events_activate(world, "on_b")->count, 0);
-    events_run(world, s, "key.press Tab");
-    events_run(world, s, "key.press Tab");
-    events_run(world, s, "key.press Tab");
+    events_run(world, s, "key_press Tab");
+    events_run(world, s, "key_press Tab");
+    events_run(world, s, "key_press Tab");
     test_uint(ecs_singleton_get(world, FocusStatus)->focused, events_e(world, "hud.form.b"));
-    events_run(world, s, "key.down Enter");
+    events_run(world, s, "key_down Enter");
     test_int(events_activate(world, "on_b")->count, 1);
     test_int(events_activate(world, "on_b")->keys, 1);
-    events_run(world, s, "key.repeat Enter 2");
-    events_run(world, s, "key.up Enter");
+    events_run(world, s, "key_repeat Enter 2");
+    events_run(world, s, "key_up Enter");
     test_int(events_activate(world, "on_b")->count, 1);
-    events_run(world, s, "key.press KpEnter");
+    events_run(world, s, "key_press KpEnter");
     test_int(events_activate(world, "on_b")->count, 2);
     test_int(events_activate(world, "on_b")->keys, 2);
     test_int(events_activate(world, "on_b")->raw, 2);
@@ -538,18 +538,18 @@ void UiEvents_activate_space_on_release(void) {
     // ui/events
     ecs_world_t *world = events_world(
         "on_b { ActivateProbe: {target: hud.form.b} }\n");
-    ecs_entity_t s = box_terminal_new(world);
-    events_run(world, s, "mouse.click left [840, 260]");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    events_run(world, s, "mouse_click left [840, 260]");
     test_int(events_activate(world, "on_b")->count, 1);
-    events_run(world, s, "key.down Space");
+    events_run(world, s, "key_down Space");
     test_int(events_activate(world, "on_b")->count, 1);
-    events_run(world, s, "key.up Space");
+    events_run(world, s, "key_up Space");
     test_int(events_activate(world, "on_b")->count, 2);
     test_int(events_activate(world, "on_b")->keys, 1);
 
-    events_run(world, s, "key.down Space");
-    events_run(world, s, "mouse.click left [440, 260]");
-    events_run(world, s, "key.up Space");
+    events_run(world, s, "key_down Space");
+    events_run(world, s, "mouse_click left [440, 260]");
+    events_run(world, s, "key_up Space");
     test_int(events_activate(world, "on_b")->count, 2);
     test_int(events_activate(world, "on_b")->raw, 2);
 
@@ -560,12 +560,12 @@ void UiEvents_key_capture_no_activate(void) {
     // ui/events
     ecs_world_t *world = events_world(
         "on_a { ActivateProbe: {target: hud.form.a} }\n");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_add(world, events_e(world, "hud.form.a"), KeyCapture);
-    events_run(world, s, "mouse.click left [440, 260]");
+    events_run(world, s, "mouse_click left [440, 260]");
     test_int(events_activate(world, "on_a")->count, 1);
-    events_run(world, s, "key.press Enter");
-    events_run(world, s, "key.press Space");
+    events_run(world, s, "key_press Enter");
+    events_run(world, s, "key_press Space");
     test_int(events_activate(world, "on_a")->raw, 3);
     test_int(events_activate(world, "on_a")->count, 1);
 
@@ -578,17 +578,17 @@ void UiEvents_activate_key_values(void) {
     ecs_world_t *world = events_world(
         "on_b { KeyProbe: {target: hud.form.b} }\n"
         "act_b { ActivateProbe: {target: hud.form.b} }\n");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_entity_t b = events_e(world, "hud.form.b");
     test_bool(box_ui_focus(world, b), true);
-    events_run(world, s, "key.down KpEnter");
+    events_run(world, s, "key_down KpEnter");
     test_str(events_key(world, "on_b")->key, "Enter");
     test_int(events_activate(world, "act_b")->count, 1);
-    events_run(world, s, "key.up KpEnter");
-    events_run(world, s, "key.down Space");
+    events_run(world, s, "key_up KpEnter");
+    events_run(world, s, "key_down Space");
     test_str(events_key(world, "on_b")->key, " ");
     test_int(events_activate(world, "act_b")->count, 1);
-    events_run(world, s, "key.up Space");
+    events_run(world, s, "key_up Space");
     test_str(events_key(world, "on_b")->key, " ");
     test_int(events_activate(world, "act_b")->count, 2);
     test_int(events_activate(world, "act_b")->keys, 2);
@@ -621,26 +621,26 @@ void UiEvents_enter_taps_trigger(void) {
         "    }\n"
         "  }\n"
         "}\n");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_entity_t go = events_e(world, "hud.form.go");
     ecs_entity_t play = events_e(world, "actions.play");
     int32_t i, presses = 0;
     test_bool(box_ui_focus(world, go), true);
-    ecs_os_free(box_terminal_run(world, s, "key.press Enter", NULL));
+    ecs_os_free(box_command_run(world, s, "key_press Enter", NULL));
     for (i = 0; i < 5; i ++) {
         ecs_progress(world, 0);
         presses += ecs_get(world, play, ActionState)->pressed;
     }
 
     test_int(presses, 1);
-    ecs_os_free(box_terminal_run(world, s, "key.down Space", NULL));
+    ecs_os_free(box_command_run(world, s, "key_down Space", NULL));
     for (i = 0; i < 5; i ++) {
         ecs_progress(world, 0);
         presses += ecs_get(world, play, ActionState)->pressed;
     }
 
     test_int(presses, 1);
-    ecs_os_free(box_terminal_run(world, s, "key.up Space", NULL));
+    ecs_os_free(box_command_run(world, s, "key_up Space", NULL));
     for (i = 0; i < 5; i ++) {
         ecs_progress(world, 0);
         presses += ecs_get(world, play, ActionState)->pressed;
@@ -663,27 +663,27 @@ void UiEvents_space_holds_trigger(void) {
         "    }\n"
         "  }\n"
         "}\n");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_entity_t go = events_e(world, "hud.form.go");
     ecs_entity_t play = events_e(world, "actions.play");
     test_bool(box_ui_focus(world, go), true);
-    events_run(world, s, "key.down Space");
+    events_run(world, s, "key_down Space");
     ecs_progress(world, 0);
     test_bool(ecs_get(world, play, ActionState)->down, true);
-    events_run(world, s, "key.repeat Space 2");
+    events_run(world, s, "key_repeat Space 2");
     test_bool(ecs_get(world, play, ActionState)->down, true);
-    events_run(world, s, "key.up Space");
+    events_run(world, s, "key_up Space");
     ecs_progress(world, 0);
     test_bool(ecs_get(world, play, ActionState)->down, false);
 
-    events_run(world, s, "key.down Space");
+    events_run(world, s, "key_down Space");
     ecs_progress(world, 0);
     test_bool(ecs_get(world, play, ActionState)->down, true);
     box_ui_focus(world, 0);
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_bool(ecs_get(world, play, ActionState)->down, false);
-    events_run(world, s, "key.up Space");
+    events_run(world, s, "key_up Space");
 
     ecs_fini(world);
 }
@@ -694,11 +694,11 @@ void UiEvents_change_on_widget_and_ancestor(void) {
         "on_slider { ChangeProbe: {target: hud.form.group.slider} }\n"
         "on_form { ChangeProbe: {target: hud.form} }\n"
         "on_a { ChangeProbe: {target: hud.form.a} }\n");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_entity_t slider = events_e(world, "hud.form.group.slider");
-    events_run(world, s, "mouse.click left [640, 460]");
+    events_run(world, s, "mouse_click left [640, 460]");
     test_uint(ecs_singleton_get(world, FocusStatus)->focused, slider);
-    events_run(world, s, "key.press Right");
+    events_run(world, s, "key_press Right");
     test_int(events_change(world, "on_slider")->changes, 1);
     test_uint(events_change(world, "on_slider")->widget, slider);
     test_int(events_change(world, "on_form")->changes, 1);
@@ -706,8 +706,8 @@ void UiEvents_change_on_widget_and_ancestor(void) {
     test_uint(events_change(world, "on_form")->widget, slider);
     test_int(events_change(world, "on_a")->changes, 0);
 
-    events_run(world, s, "key.press Right");
-    events_run(world, s, "key.press Right");
+    events_run(world, s, "key_press Right");
+    events_run(world, s, "key_press Right");
     test_int(events_change(world, "on_slider")->changes, 3);
     test_int(events_change(world, "on_form")->changes, 3);
     test_int(events_slider(world), 3);
@@ -721,15 +721,15 @@ void UiEvents_submit_on_widget_and_ancestor(void) {
     ecs_world_t *world = events_world(
         "on_slider { ChangeProbe: {target: hud.form.group.slider} }\n"
         "on_group { ChangeProbe: {target: hud.form.group} }\n");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_entity_t slider = events_e(world, "hud.form.group.slider");
     test_bool(box_ui_focus(world, slider), true);
-    events_run(world, s, "key.press Enter");
+    events_run(world, s, "key_press Enter");
     test_int(events_change(world, "on_slider")->submits, 1);
     test_int(events_change(world, "on_group")->submits, 1);
     test_uint(events_change(world, "on_group")->widget, slider);
     test_int(events_change(world, "on_group")->changes, 0);
-    events_run(world, s, "key.press Enter");
+    events_run(world, s, "key_press Enter");
     test_int(events_change(world, "on_slider")->submits, 2);
     test_int(events_change(world, "on_group")->submits, 2);
 
@@ -740,12 +740,12 @@ void UiEvents_change_once_per_report(void) {
     // ui/events
     ecs_world_t *world = events_world(
         "on_form { ChangeProbe: {target: hud.form} }\n");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     int32_t i;
     test_bool(box_ui_focus(world, events_e(world, "hud.form.group.slider")), true);
-    events_run(world, s, "key.down Right");
-    events_run(world, s, "key.repeat Right 4");
-    events_run(world, s, "key.up Right");
+    events_run(world, s, "key_down Right");
+    events_run(world, s, "key_repeat Right 4");
+    events_run(world, s, "key_up Right");
     for (i = 0; i < 5; i ++) {
         ecs_progress(world, 0);
     }
@@ -762,10 +762,10 @@ void UiEvents_focus_blur_target_related(void) {
         "on_a { FocusProbe: {target: hud.form.a} }\n"
         "on_b { FocusProbe: {target: hud.form.b} }\n"
         "on_form { FocusProbe: {target: hud.form} }\n");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_entity_t a = events_e(world, "hud.form.a");
     ecs_entity_t b = events_e(world, "hud.form.b");
-    events_run(world, s, "mouse.click left [440, 260]");
+    events_run(world, s, "mouse_click left [440, 260]");
     test_uint(ecs_script_get_focus(world), a);
     test_int(events_focus(world, "on_a")->focus, 1);
     test_uint(events_focus(world, "on_a")->last, a);
@@ -775,7 +775,7 @@ void UiEvents_focus_blur_target_related(void) {
     test_int(events_focus(world, "on_form")->focus, 1);
     test_int(events_focus(world, "on_form")->blur, 0);
 
-    events_run(world, s, "mouse.click left [840, 260]");
+    events_run(world, s, "mouse_click left [840, 260]");
     test_uint(ecs_script_get_focus(world), b);
     test_int(events_focus(world, "on_a")->focus, 1);
     test_int(events_focus(world, "on_a")->blur, 1);
@@ -792,7 +792,7 @@ void UiEvents_focus_blur_target_related(void) {
     test_uint(events_focus(world, "on_form")->blur_target, a);
     test_uint(events_focus(world, "on_form")->blur_related, b);
 
-    events_run(world, s, "mouse.click left [880, 260]");
+    events_run(world, s, "mouse_click left [880, 260]");
     test_int(events_focus(world, "on_b")->focus, 1);
     test_int(events_focus(world, "on_b")->blur, 0);
     test_int(events_focus(world, "on_form")->focus, 2);
@@ -828,7 +828,7 @@ void UiEvents_focus_blur_target_related(void) {
     test_uint(ecs_singleton_get(world, FocusStatus)->focused, 0);
     test_int(ecs_count_id(world, Focused), 0);
     test_int(events_focus(world, "on_form")->blur, 4);
-    events_run(world, s, "key.press Tab");
+    events_run(world, s, "key_press Tab");
     test_uint(ecs_script_get_focus(world), ecs_singleton_get(world, FocusStatus)->focused);
 
     ecs_fini(world);
@@ -841,11 +841,11 @@ void UiEvents_key_down_once_on_widget_and_parents(void) {
         "on_b { KeyProbe: {target: hud.form.b} }\n"
         "on_form { KeyProbe: {target: hud.form} }\n"
         "on_hud { KeyProbe: {target: hud} }\n");
-    ecs_entity_t s = box_terminal_new(world);
-    events_run(world, s, "mouse.click left [440, 260]");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    events_run(world, s, "mouse_click left [440, 260]");
     test_uint(ecs_script_get_focus(world), events_e(world, "hud.form.a"));
-    events_run(world, s, "key.press A");
-    events_run(world, s, "key.press B");
+    events_run(world, s, "key_press A");
+    events_run(world, s, "key_press B");
     test_int(events_key(world, "on_a")->downs, 2);
     test_int(events_key(world, "on_a")->ups, 2);
     test_str(events_key(world, "on_a")->key, "b");
@@ -856,7 +856,7 @@ void UiEvents_key_down_once_on_widget_and_parents(void) {
     test_int(events_key(world, "on_b")->downs, 0);
     test_int(events_key(world, "on_b")->ups, 0);
 
-    events_run(world, s, "key.press Tab");
+    events_run(world, s, "key_press Tab");
     test_uint(ecs_script_get_focus(world), events_e(world, "hud.form.b"));
     test_int(events_key(world, "on_a")->downs, 3);
     test_str(events_key(world, "on_a")->key, "Tab");
@@ -864,7 +864,7 @@ void UiEvents_key_down_once_on_widget_and_parents(void) {
     test_int(events_key(world, "on_b")->ups, 1);
     test_int(events_key(world, "on_form")->downs, 3);
     test_int(events_key(world, "on_form")->ups, 3);
-    events_run(world, s, "key.press Right");
+    events_run(world, s, "key_press Right");
     test_int(events_key(world, "on_b")->downs, 1);
     test_str(events_key(world, "on_b")->key, "ArrowRight");
     test_int(events_key(world, "on_a")->downs, 3);

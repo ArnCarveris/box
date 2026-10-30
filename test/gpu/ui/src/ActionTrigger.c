@@ -83,8 +83,8 @@ void ActionTrigger_render_to_texture(void) {
     int32_t i, presses = 0;
     ecs_progress(world, 0);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [702, 360]", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_click left [702, 360]", NULL));
     for (i = 0; i < 5; i ++) {
         ecs_progress(world, 0);
         presses += ecs_get(world, play, ActionState)->pressed;
@@ -93,7 +93,7 @@ void ActionTrigger_render_to_texture(void) {
     test_int(presses, 0);
     test_uint(ecs_singleton_get(world, PickStatus)->hit, ecs_lookup(world, "quad"));
 
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [584, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_click left [584, 360]", NULL));
     for (i = 0; i < 5; i ++) {
         ecs_progress(world, 0);
         presses += ecs_get(world, play, ActionState)->pressed;

@@ -103,13 +103,13 @@ void Blocking_stops_pass_through(void) {
     ecs_progress(world, 0);
     ecs_progress(world, 0);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [100, 600]", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_click left [100, 600]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, ground, mut))->clicks, 1);
 
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [640, 340]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_click left [640, 340]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, ground, mut))->clicks, 1);
@@ -118,7 +118,7 @@ void Blocking_stops_pass_through(void) {
     test_uint(status->target, panel);
     test_uint(status->handler, panel);
 
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [580, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_click left [580, 360]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, ground, mut))->clicks, 1);
@@ -126,26 +126,26 @@ void Blocking_stops_pass_through(void) {
     test_uint(status->target, label);
     test_uint(status->handler, panel);
 
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [700, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_click left [700, 360]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, button, mut))->clicks, 1);
     test_int(((const Mut*)ecs_get_id(world, ground, mut))->clicks, 1);
 
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [1040, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_click left [1040, 360]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, ground, mut))->clicks, 1);
     test_uint(ecs_singleton_get(world, PickStatus)->handler, menu);
 
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [240, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_click left [240, 360]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, ground, mut))->clicks, 2);
     test_uint(ecs_singleton_get(world, PickStatus)->target, ground);
 
     ecs_remove(world, panel, InputBlocker);
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [640, 340]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_click left [640, 340]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, ground, mut))->clicks, 3);
@@ -217,19 +217,19 @@ void Blocking_press_stays_on_panel(void) {
     ecs_progress(world, 0);
     ecs_progress(world, 0);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "mouse.move [640, 360]", NULL));
-    ecs_os_free(box_terminal_run(world, s, "mouse.button left true", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_move [640, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_button left true", NULL));
     ecs_progress(world, 0);
     test_bool(ecs_has(world, panel, Pressed), true);
     test_uint(ecs_singleton_get(world, PickStatus)->captured, panel);
 
-    ecs_os_free(box_terminal_run(world, s, "mouse.sweep [640, 360] [100, 600] 4 4", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_sweep [640, 360] [100, 600] 4 4", NULL));
     for (int32_t i = 0; i < 5; i ++) {
         ecs_progress(world, 0);
     }
 
-    ecs_os_free(box_terminal_run(world, s, "mouse.button left false", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_button left false", NULL));
     ecs_progress(world, 0);
     const Mut *m = ecs_get_id(world, ground, mut);
     test_int(m->presses, 0);
@@ -237,7 +237,7 @@ void Blocking_press_stays_on_panel(void) {
     test_bool(ecs_has(world, ground, Pressed), false);
     test_bool(ecs_has(world, panel, Pressed), false);
 
-    ecs_os_free(box_terminal_run(world, s, "mouse.button left true", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_button left true", NULL));
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, ground, mut))->presses, 1);
 

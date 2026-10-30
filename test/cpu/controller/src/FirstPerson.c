@@ -973,18 +973,18 @@ void FirstPerson_command_key(void) {
 
     ecs_entity_t fp = ecs_new(world);
     ecs_add(world, fp, FirstPersonController);
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_progress(world, 0.1f);
 
     bool error = true;
-    ecs_os_free(box_terminal_run(world, s, "key.down A", &error));
+    ecs_os_free(box_command_run(world, s, "key_down A", &error));
     test_bool(error, false);
     ecs_progress(world, 0.5f);
     test_flt(ecs_get(world, fp, Position)->x, -2);
 
-    ecs_os_free(box_terminal_run(world, s, "key.up A", &error));
+    ecs_os_free(box_command_run(world, s, "key_up A", &error));
     test_bool(error, false);
-    ecs_os_free(box_terminal_run(world, s, "key.press Space", &error));
+    ecs_os_free(box_command_run(world, s, "key_press Space", &error));
     test_bool(error, false);
     ecs_progress(world, 0.1f);
     test_assert(ecs_get(world, fp, Position)->y > 1.7f);
@@ -1000,28 +1000,28 @@ void FirstPerson_command_action(void) {
 
     ecs_entity_t fp = ecs_new(world);
     ecs_add(world, fp, FirstPersonController);
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_progress(world, 0.5f);
 
     bool error = true;
-    ecs_os_free(box_terminal_run(world, s,
-        "action.press box.controllers.first_person.Fly", &error));
+    ecs_os_free(box_command_run(world, s,
+        "action_press box.controllers.first_person.Fly", &error));
     test_bool(error, false);
     ecs_progress(world, 0.5f);
     test_bool(ecs_get(world, fp, FirstPersonController)->flying, true);
 
-    ecs_os_free(box_terminal_run(world, s,
-        "action.press box.controllers.first_person.Up 2", &error));
+    ecs_os_free(box_command_run(world, s,
+        "action_press box.controllers.first_person.Up 2", &error));
     test_bool(error, false);
     ecs_progress(world, 0.5f);
     ecs_progress(world, 0.5f);
     test_assert(fabsf(ecs_get(world, fp, Position)->y - 11.7f) < 0.0001f);
 
-    ecs_os_free(box_terminal_run(world, s,
-        "action.down box.controllers.first_person.Crouch", &error));
+    ecs_os_free(box_command_run(world, s,
+        "action_down box.controllers.first_person.Crouch", &error));
     test_bool(error, false);
-    ecs_os_free(box_terminal_run(world, s,
-        "action.press box.controllers.first_person.Fly", &error));
+    ecs_os_free(box_command_run(world, s,
+        "action_press box.controllers.first_person.Fly", &error));
     test_bool(error, false);
     for (int32_t i = 0; i < 20; i ++) {
         ecs_progress(world, 0.1f);

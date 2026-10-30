@@ -13,7 +13,7 @@ using oreelse
 // The cursor over the middle of the quality button. The button's center is 125 logical pixels
 // above the middle of the 1280x720 window, which the HUD camera at ortho_scale 0.5 shows at
 // half size: 62.5 points above the middle of the window
-const hover = box.command.commands.mouse.move(0, "[640, 298]", false)
+const hover = box.command.commands.mouse_move("[640, 298]", false)
 
 // The capture is 640x360: the HUD lays out for a 1280x720 window and its camera shows it at
 // half size, so the capture holds the whole screen as a 1280x720 window shows it

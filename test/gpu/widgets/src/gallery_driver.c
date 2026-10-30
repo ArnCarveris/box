@@ -6,6 +6,7 @@
 
 #include "gallery.h"
 #include <bake_test.h>
+#include <ctype.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
@@ -49,6 +50,185 @@ done:
     return result;
 }
 
+/** Find the members in the component argument of a get or set command line.
+ *
+ * The component is the path up to the first name that starts with an upper case letter, and
+ * the names after it as long as they name a component, such as the mut of a template.
+ *
+ * @param world The world
+ * @param arg The argument, such as box.widgets.Slider.mut.value
+ * @return The dot before the members in arg, NULL when there are none
+ */
+static const char* gallery_members(
+    const ecs_world_t *world,
+    const char *arg)
+{
+    const char *result = NULL, *name = arg;
+    char path[256];
+    while (name && name[0] && !isupper((unsigned char)name[0])) {
+        name = strchr(name, '.');
+        if (name) {
+            name ++;
+        }
+    }
+
+    if (!name || !name[0]) {
+        goto done;
+    }
+
+    result = strchr(name, '.');
+    while (result) {
+        const char *next = strchr(result + 1, '.');
+        int len = next ? (int)(next - arg) : (int)strlen(arg);
+        ecs_os_snprintf(path, ECS_SIZEOF(path), "%.*s", len, arg);
+        ecs_entity_t e = ecs_lookup(world, path);
+        if (!e || !ecs_has(world, e, EcsComponent)) {
+            goto done;
+        }
+
+        result = next;
+    }
+
+done:
+    return result;
+}
+
+/** Format the errors of a command result as box_command_run does.
+ *
+ * @param r The result
+ * @return The error lines, owned by the caller
+ */
+static char* gallery_errors(
+    const ecs_shell_result_t *r)
+{
+    ecs_strbuf_t buf = ECS_STRBUF_INIT;
+    char **errors = ecs_vec_first(&r->errors);
+    int32_t i, count = ecs_vec_count(&r->errors);
+    for (i = 0; i < count; i ++) {
+        if (i) {
+            ecs_strbuf_appendch(&buf, '\n');
+        }
+
+        ecs_strbuf_appendstr(&buf, BOX_COMMAND_ERROR);
+        ecs_strbuf_appendstr(&buf, errors[i]);
+    }
+
+    return ecs_strbuf_get(&buf);
+}
+
+/** Get a member of a component: run get for the component and format the member as JSON.
+ *
+ * @param world The world
+ * @param session The session
+ * @param entity The entity argument
+ * @param arg The component argument with the members
+ * @param members The dot before the members in arg
+ * @param error Set to whether the command failed
+ * @return The output, owned by the caller
+ */
+static char* gallery_get_member(
+    ecs_world_t *world,
+    ecs_entity_t session,
+    const char *entity,
+    const char *arg,
+    const char *members,
+    bool *error)
+{
+    char *result = NULL;
+    char *line = flecs_asprintf("get %s %.*s", entity, (int)(members - arg), arg);
+    ecs_shell_result_t r = ecs_shell_run(world, session, line);
+    *error = true;
+    if (ecs_vec_count(&r.errors)) {
+        result = gallery_errors(&r);
+        goto done;
+    }
+
+    if (r.result.type != ecs_id(ecs_value_t)) {
+        result = flecs_asprintf(BOX_COMMAND_ERROR "'%s' returned no value", line);
+        goto done;
+    }
+
+    const ecs_value_t *value = r.result.ptr;
+    ecs_meta_cursor_t cur = ecs_meta_cursor(world, value->type, value->ptr);
+    if (ecs_meta_push(&cur) || ecs_meta_dotmember(&cur, members + 1)) {
+        result = flecs_asprintf(BOX_COMMAND_ERROR "'%s' has no member '%s'", arg, members + 1);
+        goto done;
+    }
+
+    result = ecs_ptr_to_json(world, ecs_meta_get_type(&cur), ecs_meta_get_ptr(&cur));
+    *error = result == NULL;
+
+done:
+    ecs_shell_result_fini(world, &r);
+    ecs_os_free(line);
+
+    return result;
+}
+
+/** Run a command line with box_command_run, with member paths for get and set.
+ *
+ * "get e C.m.n" gets C and returns member m.n as JSON, "set e C.m.n v" runs
+ * "set e C {m: {n: v}}", which assigns only that member.
+ *
+ * @param world The world
+ * @param session The session
+ * @param line The command line
+ * @param error Set to whether the command failed
+ * @return The output, owned by the caller
+ */
+static char* gallery_command(
+    ecs_world_t *world,
+    ecs_entity_t session,
+    const char *line,
+    bool *error)
+{
+    char cmd[8], entity[256], arg[256];
+    const char *members = NULL, *name = NULL, *dot = NULL;
+    char *result = NULL;
+    int n = 0;
+    if (sscanf(line, "%7s %255s %255s %n", cmd, entity, arg, &n) != 3) {
+        goto run;
+    }
+
+    members = gallery_members(world, arg);
+    if (!members) {
+        goto run;
+    }
+
+    if (!strcmp(cmd, "get") && !line[n]) {
+        result = gallery_get_member(world, session, entity, arg, members, error);
+        goto done;
+    }
+
+    if (strcmp(cmd, "set") || !line[n]) {
+        goto run;
+    }
+
+    ecs_strbuf_t buf = ECS_STRBUF_INIT;
+    int32_t depth = 0;
+    ecs_strbuf_append(&buf, "set %s %.*s ", entity, (int)(members - arg), arg);
+    for (name = members + 1; name; name = dot ? dot + 1 : NULL, depth ++) {
+        dot = strchr(name, '.');
+        ecs_strbuf_append(&buf, "{%.*s: ", dot ? (int)(dot - name) : (int)strlen(name), name);
+    }
+
+    ecs_strbuf_appendstr(&buf, line + n);
+    for (; depth; depth --) {
+        ecs_strbuf_appendch(&buf, '}');
+    }
+
+    char *set = ecs_strbuf_get(&buf);
+    result = box_command_run(world, session, set, error);
+    ecs_os_free(set);
+    goto done;
+
+run:
+    result = box_command_run(world, session, line, error);
+
+done:
+    return result;
+}
+
 char* gallery_run(
     ecs_world_t *world,
     ecs_entity_t session,
@@ -60,7 +240,7 @@ char* gallery_run(
     char *line = flecs_vasprintf(fmt, args);
     va_end(args);
     bool error = true;
-    char *out = box_terminal_run(world, session, line, &error);
+    char *out = gallery_command(world, session, line, &error);
     if (error) {
         printf("command '%s' failed: %s\n", line, out);
     }
@@ -96,7 +276,7 @@ void gallery_settle_frames(
 {
     int32_t i;
     for (i = 0; i < 1000; i ++) {
-        char *out = gallery_run(world, session, "input.wait");
+        char *out = gallery_run(world, session, "input_wait");
         bool drained = !strcmp(out, "0");
         ecs_os_free(out);
         if (drained) {
@@ -233,9 +413,11 @@ void gallery_hover(
     char point[64];
     gallery_reveal(world, session, path);
     gallery_point(world, path, fx, fy, point, sizeof(point));
-    ecs_os_free(gallery_run(world, session, "mouse.move %s", point));
+    ecs_os_free(gallery_run(world, session, "mouse_move %s", point));
     gallery_settle(world, session);
-    gallery_expect(world, session, "get box.picking.PickStatus PickStatus.handler", handler);
+    char *expect = flecs_asprintf("\"%s\"", handler);
+    gallery_expect(world, session, "get $ box.picking.PickStatus.handler", expect);
+    ecs_os_free(expect);
 }
 
 void gallery_click(
@@ -249,7 +431,7 @@ void gallery_click(
     char point[64];
     gallery_hover(world, session, path, fx, fy, handler);
     gallery_point(world, path, fx, fy, point, sizeof(point));
-    ecs_os_free(gallery_run(world, session, "mouse.click left %s", point));
+    ecs_os_free(gallery_run(world, session, "mouse_click left %s", point));
     gallery_settle(world, session);
 }
 
@@ -258,7 +440,7 @@ void gallery_key(
     ecs_entity_t session,
     const char *key)
 {
-    ecs_os_free(gallery_run(world, session, "key.press %s", key));
+    ecs_os_free(gallery_run(world, session, "key_press %s", key));
     gallery_settle(world, session);
 }
 
@@ -266,7 +448,13 @@ char* gallery_focused(
     ecs_world_t *world,
     ecs_entity_t session)
 {
-    return gallery_run(world, session, "get box.ui.FocusStatus FocusStatus.focused");
+    char *result = gallery_run(world, session, "get $ box.ui.FocusStatus.focused");
+    size_t len = strlen(result);
+    test_assert(len > 2 && result[0] == '"' && result[len - 1] == '"');
+    memmove(result, result + 1, len - 2);
+    result[len - 2] = '\0';
+
+    return result;
 }
 
 char* gallery_mut(
@@ -390,7 +578,7 @@ ecs_world_t* gallery_load(
         ecs_progress(world, 0);
     }
 
-    *session = box_terminal_new(world);
+    *session = ecs_shell_session_init(world, NULL);
 
     return world;
 }

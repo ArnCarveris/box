@@ -280,8 +280,8 @@ void Editor_pick_panel_and_console(void) {
     test_assert(editor != 0);
     test_assert(console != 0);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "mouse.move [600, 200]", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_move [600, 200]", NULL));
     while (box_input_pending(world)) {
         ecs_progress(world, 0);
     }
@@ -293,7 +293,7 @@ void Editor_pick_panel_and_console(void) {
     test_uint(status->handler, panel);
     test_assert(!editor_in_scope(world, status->hit, BOX_CONSOLE_UI ".screen.stack"));
 
-    ecs_os_free(box_terminal_run(world, s, "mouse.move [100, 200]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_move [100, 200]", NULL));
     while (box_input_pending(world)) {
         ecs_progress(world, 0);
     }
@@ -317,9 +317,9 @@ void Editor_panel_blocks_game(void) {
     ecs_entity_t editor = ecs_lookup(world, BOX_EDITOR_VIEW);
     ecs_entity_t panel = ecs_lookup(world, BOX_EDITOR_PANEL);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "mouse.move [600, 200]", NULL));
-    ecs_os_free(box_terminal_run(world, s, "mouse.scroll 0 3", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_move [600, 200]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_scroll 0 3", NULL));
     while (box_input_pending(world)) {
         ecs_progress(world, 0);
     }
@@ -329,7 +329,7 @@ void Editor_panel_blocks_game(void) {
     test_uint(status->view, editor);
     test_uint(status->handler, panel);
 
-    ecs_os_free(box_terminal_run(world, s, "mouse.move [100, 200]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_move [100, 200]", NULL));
     while (box_input_pending(world)) {
         ecs_progress(world, 0);
     }

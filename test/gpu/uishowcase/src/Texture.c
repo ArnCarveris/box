@@ -39,7 +39,7 @@ static void texture_expect_reactor(
     bool on)
 {
     showcase_expect(world, session, "get showcase Showcase.mut.reactor", on ? "true" : "false");
-    showcase_expect(world, session, "get " TEXTURE_STATUS_PATH " Text.value",
+    showcase_expect(world, session, "get " TEXTURE_STATUS_PATH " box.text.Text.value",
         on ? "\"ONLINE\"" : "\"OFFLINE\"");
     test_bool(ecs_has(world, ecs_lookup(world, "showcase.core"), Emissive), on);
 }
@@ -54,7 +54,11 @@ static char* texture_hit_slice(
     ecs_world_t *world,
     ecs_entity_t session)
 {
-    char *result = showcase_run(world, session, "get box.picking.PickStatus PickStatus.hit");
+    char *result = showcase_run(world, session, "get $ box.picking.PickStatus.hit");
+    size_t len = strlen(result);
+    test_assert(len > 2 && result[0] == '"' && result[len - 1] == '"');
+    memmove(result, result + 1, len - 2);
+    result[len - 2] = '\0';
     test_assert(!strncmp(result, "showcase.screen.slice_", strlen("showcase.screen.slice_")));
 
     return result;
@@ -66,20 +70,22 @@ void Texture_hover_start_button(void) {
     ecs_world_t *world = showcase_load(&s);
 
     showcase_hover(world, s, TEXTURE_START, TEXTURE_START_PATH);
-    char *target = showcase_run(world, s, "get box.picking.PickStatus PickStatus.target");
-    test_assert(!strncmp(target, "showcase.screen_ui.", strlen("showcase.screen_ui.")));
+    char *target = showcase_run(world, s, "get $ box.picking.PickStatus.target");
+    test_assert(!strncmp(target, "\"showcase.screen_ui.", strlen("\"showcase.screen_ui.")));
     ecs_os_free(target);
-    showcase_expect(world, s, "get box.picking.PickStatus PickStatus.view",
-        "showcase.screen_views.view");
-    showcase_expect(world, s, "get box.picking.PickStatus PickStatus.hit_view",
-        "showcase.world_view");
+    showcase_expect(world, s, "get $ box.picking.PickStatus.view",
+        "\"showcase.screen_views.view\"");
+    showcase_expect(world, s, "get $ box.picking.PickStatus.hit_view",
+        "\"showcase.world_view\"");
     ecs_os_free(texture_hit_slice(world, s));
     showcase_expect(world, s, "get " TEXTURE_START_PATH " Button.mut.hover", "true");
-    showcase_expect(world, s, "get " TEXTURE_START_PATH " Rgb", "{r: 90, g: 140, b: 220}");
+    showcase_expect(world, s, "get " TEXTURE_START_PATH " box.material.Rgb",
+        "{\"Rgb\":{\"r\":90, \"g\":140, \"b\":220}}");
 
     showcase_hover(world, s, TEXTURE_FRAME, "#0");
     showcase_expect(world, s, "get " TEXTURE_START_PATH " Button.mut.hover", "false");
-    showcase_expect(world, s, "get " TEXTURE_START_PATH " Rgb", "{r: 60, g: 100, b: 170}");
+    showcase_expect(world, s, "get " TEXTURE_START_PATH " box.material.Rgb",
+        "{\"Rgb\":{\"r\":60, \"g\":100, \"b\":170}}");
 
     ecs_fini(world);
 }
@@ -115,8 +121,10 @@ void Texture_stop_on_other_slice(void) {
     showcase_hover(world, s, TEXTURE_STOP, TEXTURE_STOP_PATH);
     char *stop = texture_hit_slice(world, s);
     test_assert(strcmp(start, stop) != 0);
-    char *start_offset = showcase_run(world, s, "get %s TextureTransform.offset_x", start);
-    char *stop_offset = showcase_run(world, s, "get %s TextureTransform.offset_x", stop);
+    char *start_offset = showcase_run(world, s,
+        "get %s box.material.TextureTransform.offset_x", start);
+    char *stop_offset = showcase_run(world, s,
+        "get %s box.material.TextureTransform.offset_x", stop);
     test_assert(strtod(start_offset, NULL) < 0.5);
     test_assert(strtod(stop_offset, NULL) > 0.5);
     showcase_click(world, s, TEXTURE_STOP);
@@ -134,8 +142,8 @@ void Texture_screen_frame_does_nothing(void) {
     // uishowcase/texture
     ecs_entity_t s = 0;
     ecs_world_t *world = showcase_load(&s);
-    const char *state = "{clicks: 0, shadows: true, sun: 2, selected: false, last: \"none\", "
-        "lamp: false, paint: 0, reactor: false}";
+    const char *state = "{\"Showcase.mut\":{\"clicks\":0, \"shadows\":true, \"sun\":2, "
+        "\"selected\":false, \"last\":\"none\", \"lamp\":false, \"paint\":0, \"reactor\":false}}";
 
     showcase_hover(world, s, TEXTURE_FRAME, "#0");
     ecs_os_free(texture_hit_slice(world, s));

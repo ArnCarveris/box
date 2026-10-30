@@ -30,7 +30,7 @@ ROCKET = "oreelse.OreRocketState"
 POWER = "oreelse.OrePowerState"
 WAVES = "oreelse.OreWaveState"
 BLINK = "oreelse.OreBlink"
-LEVEL = "get oreelse.OreView OreView.level"
+LEVEL = "get oreelse.OreView oreelse.OreView.level"
 
 # The colors of the HUD, the original's bytes: the UI keeps them, decoded as sRGB
 # (apps/oreelse/README.md, Colors)
@@ -101,12 +101,12 @@ def shown(app, path):
 
 
 def color(app, path):
-    c = app.get(path, "Rgb")
+    c = app.get(path, "box.material.Rgb")
     return (c["r"], c["g"], c["b"])
 
 
 def bar_width(app, path):
-    return float(app.exec("get %s LayoutItem.width.value" % path))
+    return float(app.exec("get %s box.layout.LayoutItem.width.value" % path))
 
 
 def check_bar(app, gauge, bar, frac):
@@ -174,12 +174,12 @@ def test_health_and_mining(app):
     app.check(text(app, ALERT) is None, "the alert shows at full health")
 
     # At 45%: no alert
-    app.exec("set %s OreHealth {value: 45, max: 100}" % PLAYER)
+    app.exec("set %s oreelse.OreHealth {value: 45, max: 100}" % PLAYER)
     app.wait_frames(SETTLE)
     app.check(text(app, ALERT) is None, "the alert shows at 45%")
 
     # Below 30%: the suit breach alert blinks with the fast signal
-    app.exec("set %s OreHealth {value: 25, max: 100}" % PLAYER)
+    app.exec("set %s oreelse.OreHealth {value: 25, max: 100}" % PLAYER)
     wait_shown(app, ALERT, "! SUIT BREACH !")
     for fast, expected in ALERT_BLINK.items():
         put(app, BLINK, BLINK, {"fast": fast})
@@ -187,18 +187,18 @@ def test_health_and_mining(app):
         app.check(color(app, ALERT) == expected,
                   "the alert is %s with the fast blink %s" % (color(app, ALERT), fast))
 
-    app.exec("set %s OreHealth {value: 100, max: 100}" % PLAYER)
+    app.exec("set %s oreelse.OreHealth {value: 100, max: 100}" % PLAYER)
     wait_hidden(app, ALERT)
 
     # The mine progress bar shows while the progress is above 0
     app.check(not shown(app, MINE_BAR), "the mine bar shows without progress")
-    app.exec("set %s OreMining {target: 0, left: 1, progress: 0.5}" % PLAYER)
-    app.wait_for("get %s.fill LayoutItem.width.value" % MINE_BAR,
+    app.exec("set %s oreelse.OreMining {target: 0, left: 1, progress: 0.5}" % PLAYER)
+    app.wait_for("get %s.fill box.layout.LayoutItem.width.value" % MINE_BAR,
                  lambda out: abs(float(out) - (3 + (MINE_BAR_W - 3) * 0.5)) < 1e-3,
                  what="the mine bar half filled")
     app.check(color(app, MINE_BAR + ".fill") == MINE_FILL, "the mine bar fill is %s" %
               (color(app, MINE_BAR + ".fill"),))
-    app.exec("set %s OreMining {target: 0, left: 0, progress: 0}" % PLAYER)
+    app.exec("set %s oreelse.OreMining {target: 0, left: 0, progress: 0}" % PLAYER)
     app.wait_frames(SETTLE)
     app.check(not shown(app, MINE_BAR), "the mine bar shows after the progress ended")
 
@@ -245,9 +245,9 @@ def test_toast(app):
     wait_shown(app, TOAST_LINE, "Shipment away!  +25 Luminite")
     app.check(color(app, TOAST_LINE) == TEAL, "the message is %s" % (color(app, TOAST_LINE),))
     set_state(app, "Paused")
-    age = app.exec("get oreelse.OreToast OreToast.age")
+    age = app.exec("get oreelse.OreToast oreelse.OreToast.age")
     app.wait_frames(FPS)
-    app.expect("get oreelse.OreToast OreToast.age", age)
+    app.expect("get oreelse.OreToast oreelse.OreToast.age", age)
     app.check(text(app, TOAST_LINE) == "Shipment away!  +25 Luminite",
               "the toast went away while paused")
     set_state(app, "Playing")
@@ -306,7 +306,7 @@ def test_panel_blocks(app):
     # A click on the status bar does not reach the world: nothing is placed and no warning shows
     # (the tile under the cursor is out of reach, so a click that got through would warn)
     aim_tile(app, TILE[0], TILE[1], ON_PANEL)
-    app.exec("mouse.click left")
+    app.exec("mouse_click left")
     app.wait_input()
     app.wait_frames(SETTLE)
     app.check(tiles(app, "Wall") == [], "the click on the status bar placed %s" %
@@ -315,7 +315,7 @@ def test_panel_blocks(app):
     app.check(count(app, "Wall") == 5, "the click on the status bar spent a wall")
 
     # Nor does the wheel: the camera keeps its zoom level
-    app.exec("mouse.scroll 0 -1")
+    app.exec("mouse_scroll 0 -1")
     app.wait_input()
     app.wait_frames(SETTLE)
     app.expect(LEVEL, "0")
@@ -324,6 +324,6 @@ def test_panel_blocks(app):
     click(app, *TILE)
     app.check(tiles(app, "Wall") == [TILE], "the click off the panel placed %s" %
               tiles(app, "Wall"))
-    app.exec("mouse.scroll 0 -1")
+    app.exec("mouse_scroll 0 -1")
     app.wait_input()
     app.wait_for(LEVEL, "1", what="the wheel off the panel zooming out")

@@ -11,7 +11,7 @@ same as the GPU suite's, each checked with PickStatus before it is clicked.
 """
 import math
 
-from box_client import mean_luma
+from box_client import mean_luma, parse_value
 
 APP = "apps/boxrun"
 ARGS = ["test/assets/scenes/ui_showcase.flecs"]
@@ -34,7 +34,7 @@ LAMP_PATH = "showcase.control.lamp_button"
 START_PATH = "showcase.screen_ui.dashboard.controls.start"
 STOP_PATH = "showcase.screen_ui.dashboard.controls.stop"
 STATUS_PATH = "showcase.screen_ui.dashboard.head.status"
-PICK = "get box.picking.PickStatus PickStatus."
+PICK = "get box.picking.PickStatus box.picking.PickStatus."
 
 # The region of the 1280x720 capture around the lamp: the post, the ground it lights and the
 # side of the crate next to it. With the lamp on its mean luminance rises by about 38 of 255; a
@@ -50,20 +50,20 @@ def number(out):
 
 def hover(app, point, handler):
     """Move the cursor to point and wait until PickStatus.handler is handler."""
-    app.exec("mouse.move %s" % point)
+    app.exec("mouse_move %s" % point)
     app.wait_input()
-    app.wait_for(PICK + "handler", handler)
+    app.wait_for(PICK + "handler", '"%s"' % handler)
 
 
 def click(app, point, handler):
     """Check the handler at point, then click it and run the input."""
     hover(app, point, handler)
-    app.exec("mouse.click left %s" % point)
+    app.exec("mouse_click left %s" % point)
     app.wait_input()
 
 
 def key(app, name):
-    app.exec("key.press %s" % name)
+    app.exec("key_press %s" % name)
     app.wait_input()
 
 
@@ -74,30 +74,30 @@ def state(member):
 def test_screen_button(app):
     hover(app, COUNTER, COUNTER_PATH)
     for _ in range(3):
-        app.exec("mouse.click left %s" % COUNTER)
+        app.exec("mouse_click left %s" % COUNTER)
     app.wait_input()
     app.wait_for(state("clicks"), "3")
-    app.wait_for("get %s.text Text.value" % COUNTER_PATH, '"Clicks: 3"')
+    app.wait_for("get %s.text box.text.Text.value" % COUNTER_PATH, '"Clicks: 3"')
     app.expect(state("last"), '"count"')
 
     key(app, "C")
     app.wait_for(state("clicks"), "4")
-    app.wait_for("get %s.text Text.value" % COUNTER_PATH, '"Clicks: 4"')
+    app.wait_for("get %s.text box.text.Text.value" % COUNTER_PATH, '"Clicks: 4"')
 
 
 def test_screen_toggle_and_slider(app):
-    app.expect("get showcase.world_view View.shadows.enabled", "true")
+    app.expect("get showcase.world_view box.view.View.shadows.enabled", "true")
     click(app, TOGGLE, TOGGLE_PATH)
-    app.wait_for("get showcase.world_view View.shadows.enabled", "false")
+    app.wait_for("get showcase.world_view box.view.View.shadows.enabled", "false")
     app.expect(state("last"), '"shadows"')
 
     # The light has the intensity of the slider times pi, the unit of DirectionalLight
-    app.wait_for("get showcase.sun DirectionalLight.intensity",
+    app.wait_for("get showcase.sun box.light.DirectionalLight.intensity",
                  lambda out: abs(number(out) - 2 * math.pi) < 1e-4, what="an intensity of 2 pi")
     hover(app, KNOB, SLIDER_PATH)
-    app.exec("mouse.drag left %s %s" % (KNOB, KNOB_RIGHT))
+    app.exec("mouse_drag left %s %s" % (KNOB, KNOB_RIGHT))
     app.wait_input()
-    out = app.wait_for("get showcase.sun DirectionalLight.intensity",
+    out = app.wait_for("get showcase.sun box.light.DirectionalLight.intensity",
                        lambda out: 2.5 * math.pi < number(out) < 3 * math.pi,
                        what="an intensity in (2.5 pi, 3 pi)")
     sun = app.get("showcase", "Showcase.mut.sun")
@@ -107,8 +107,8 @@ def test_screen_toggle_and_slider(app):
 
 def test_hud_blocks_scene(app):
     hover(app, PANEL_OVER_CRATE, PANEL)
-    app.expect(PICK + "hit", PANEL)
-    app.exec("mouse.click left %s" % PANEL_OVER_CRATE)
+    app.expect(PICK + "hit", '"%s"' % PANEL)
+    app.exec("mouse_click left %s" % PANEL_OVER_CRATE)
     app.wait_input()
     app.wait_frames(5)
     app.expect(state("selected"), "false")
@@ -116,19 +116,19 @@ def test_hud_blocks_scene(app):
 
     click(app, CRATE, "showcase.crate")
     app.wait_for(state("selected"), "true")
-    app.wait_for("get showcase.crate Tint", "{r: 255, g: 220, b: 90, a: 150}")
+    app.wait_for("get showcase.crate box.material.Tint", '{"r": 255, "g": 220, "b": 90, "a": 150}')
     app.expect(state("last"), '"select"')
 
 
 def test_world_lamp(app):
     hover(app, WORLD_LAMP, LAMP_PATH)
-    app.expect(PICK + "view", "showcase.world_view")
-    app.expect("get showcase.lamp PointLight.intensity", "0")
+    app.expect(PICK + "view", '"showcase.world_view"')
+    app.expect("get showcase.lamp box.light.PointLight.intensity", "0")
     dark = mean_luma(app.capture("lamp_off"), LAMP_REGION)
 
-    app.exec("mouse.click left %s" % WORLD_LAMP)
+    app.exec("mouse_click left %s" % WORLD_LAMP)
     app.wait_input()
-    app.wait_for("get showcase.lamp PointLight.intensity", lambda out: number(out) > 5,
+    app.wait_for("get showcase.lamp box.light.PointLight.intensity", lambda out: number(out) > 5,
                  what="an intensity above 5")
     app.expect(state("lamp"), "true")
     lit = mean_luma(app.capture("lamp_on"), LAMP_REGION)
@@ -137,35 +137,35 @@ def test_world_lamp(app):
               "than %d brighter" % (LAMP_REGION, lit, dark, LAMP_BRIGHTER))
 
     key(app, "L")
-    app.wait_for("get showcase.lamp PointLight.intensity", "0")
+    app.wait_for("get showcase.lamp box.light.PointLight.intensity", "0")
     app.expect(state("lamp"), "false")
 
 
 def test_texture_reactor(app):
-    app.expect("get %s Text.value" % STATUS_PATH, '"OFFLINE"')
+    app.expect("get %s box.text.Text.value" % STATUS_PATH, '"OFFLINE"')
     hover(app, TEXTURE_START, START_PATH)
-    target = app.exec(PICK + "target")
+    target = parse_value(app.exec(PICK + "target"))
     app.check(target.startswith("showcase.screen_ui."),
               "PickStatus.target %s is not in the UI scene of the texture" % target)
-    start = app.exec(PICK + "hit")
+    start = parse_value(app.exec(PICK + "hit"))
     app.check(start.startswith("showcase.screen.slice_"),
               "PickStatus.hit %s is not a slice of the screen" % start)
-    app.exec("mouse.click left %s" % TEXTURE_START)
+    app.exec("mouse_click left %s" % TEXTURE_START)
     app.wait_input()
     app.wait_for(state("reactor"), "true")
-    app.wait_for("get %s Text.value" % STATUS_PATH, '"ONLINE"')
+    app.wait_for("get %s box.text.Text.value" % STATUS_PATH, '"ONLINE"')
 
     hover(app, TEXTURE_STOP, STOP_PATH)
-    stop = app.exec(PICK + "hit")
+    stop = parse_value(app.exec(PICK + "hit"))
     app.check(stop.startswith("showcase.screen.slice_") and stop != start,
               "STOP is on %s, START on %s: not another slice" % (stop, start))
-    app.exec("mouse.click left %s" % TEXTURE_STOP)
+    app.exec("mouse_click left %s" % TEXTURE_STOP)
     app.wait_input()
     app.wait_for(state("reactor"), "false")
-    app.wait_for("get %s Text.value" % STATUS_PATH, '"OFFLINE"')
+    app.wait_for("get %s box.text.Text.value" % STATUS_PATH, '"OFFLINE"')
     app.expect(state("last"), '"reactor_stop"')
 
 
 def test_quit(app):
-    app.expect("logs error", "")
+    app.expect("logs error", '""')
     app.quit()

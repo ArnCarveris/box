@@ -26,10 +26,11 @@ ARGS = ["--seed", str(SEED), "--fps", "20"]
 FPS = round(1 / float(DELTA_TIME))
 DT = float(DELTA_TIME)
 
-STATE = "has oreelse.OreGameState (oreelse.OreGameState, oreelse.OreGameState.%s)"
-CLOCK = "get oreelse.OreClock OreClock.elapsed"
+STATE = ("eval oreelse.OreGameState.has(flecs.script.core.pair("
+         "oreelse.OreGameState,oreelse.OreGameState.%s))")
+CLOCK = "get oreelse.OreClock oreelse.OreClock.elapsed"
 WAVES = "oreelse.OreWaveState"
-WAVE = "get oreelse.OreWaveState OreWaveState.%s"
+WAVE = "get oreelse.OreWaveState oreelse.OreWaveState.%s"
 PLAYER = "astronaut"
 
 # The tile grid (cfg.x0, cfg.z0, cfg.tile)
@@ -121,9 +122,9 @@ def set_state(app, state):
 def setup(app):
     """Shrink the window and drop the shadows of the world view, so the software renderer keeps
     up."""
-    app.exec("set window Surface {width: 640, height: 360}")
-    app.exec("set main_view View.shadows.enabled false")
-    app.wait_for("get window SurfaceStatus.height", "360")
+    app.exec("set window box.surface.Surface {width: 640, height: 360}")
+    app.exec("set main_view box.view.View.shadows.enabled false")
+    app.wait_for("get window box.surface.SurfaceStatus.height", "360")
 
 
 def start(app):
@@ -131,7 +132,7 @@ def start(app):
     does not shoot the critters of the case."""
     setup(app)
     app.expect(STATE % "Title", "true")
-    app.exec("key.press Space")
+    app.exec("key_press Space")
     app.wait_input()
     app.wait_for(STATE % "Playing", "true")
     hold_pistol(app)
@@ -139,7 +140,7 @@ def start(app):
 
 def hold_pistol(app):
     """Keep the astronaut's pistol from firing: its timer far off."""
-    app.exec("set %s OreAttackTimer {value: %g}" % (PLAYER, PISTOL_HOLD))
+    app.exec("set %s oreelse.OreAttackTimer {value: %g}" % (PLAYER, PISTOL_HOLD))
 
 
 def entity(value):
@@ -152,7 +153,7 @@ def clock(app):
 
 
 def waves(app):
-    return app.get(WAVES, "OreWaveState")
+    return app.get(WAVES, "oreelse.OreWaveState")
 
 
 def put_waves(app, **fields):
@@ -166,17 +167,10 @@ def hold_waves(app):
 
 def rows_of(app, expr):
     """Run a query of the port: the path and the value of the first field of every result."""
-    app.exec("query found %s" % expr)
-    app.exec("iter found")
     result = {}
-    done = False
-    while not done:
-        for line in app.exec("next 1000").splitlines():
-            done = done or line == "(end)"
-            if not line.strip() or line == "(end)":
-                continue
-            parts = line.split(" ", 1)
-            result[parts[0]] = parse_value(parts[1]) if len(parts) > 1 else None
+    for row in parse_value(app.exec('query "%s"' % expr)):
+        fields = row["fields"]
+        result[row["entity"]] = next(iter(fields[0]["value"].values())) if fields else None
     return result
 
 
@@ -193,7 +187,7 @@ def spawn(app, prefab, x, z):
     """Spawn a critter with oreelse.spawn_critter(): its path."""
     name = run_script(app, "@NAME { oreelse.OreStack: {item: "
                            "oreelse.spawn_critter(%s, %.4f, %.4f), amount: 1} }" % (prefab, x, z))
-    path = entity(app.get(name, "OreStack")["item"])
+    path = entity(app.get(name, "oreelse.OreStack")["item"])
     app.check(path is not None, "oreelse.spawn_critter(%s) spawned nothing" % prefab)
     return path
 
@@ -210,20 +204,20 @@ def tile_point(row, col):
 
 
 def position(app, path):
-    p = app.get(path, "Position")
+    p = app.get(path, "box.transform.Position")
     return p["x"], p["z"]
 
 
 def target(app, path):
-    return entity(app.get(path, "OreTarget")["value"])
+    return entity(app.get(path, "oreelse.OreTarget")["value"])
 
 
 def health(app, path):
-    return app.get(path, "OreHealth")["value"]
+    return float(app.get(path, "oreelse.OreHealth")["value"])
 
 
 def place_player(app, x, z):
-    app.exec("set %s Position {%g, 0, %g}" % (PLAYER, x, z))
+    app.exec("set %s box.transform.Position {%g, 0, %g}" % (PLAYER, x, z))
 
 
 def wait_until(app, condition, frames, what):
@@ -423,7 +417,7 @@ def test_walk_and_targets(app):
 
     # Without the astronaut in range or a building the mite walks to the origin
     mite = spawn(app, "Mite", 30, 30)
-    app.exec("set %s OreCritter {retarget: 0.5, jitter: 0, attacking: false}" % mite)
+    app.exec("set %s oreelse.OreCritter {retarget: 0.5, jitter: 0, attacking: false}" % mite)
     x0, z0 = position(app, mite)
     walked, took = measure(app, lambda: -math.hypot(*position(app, mite)))
     app.check(abs(walked - MITE_SPEED * took) < 0.02,
@@ -435,17 +429,17 @@ def test_walk_and_targets(app):
     app.check(target(app, mite) is None, "the mite targets %s" % target(app, mite))
 
     # The astronaut 16 units away is no target, 10 units away it is
-    app.exec("set %s Position {20, 0, 0}" % mite)
+    app.exec("set %s box.transform.Position {20, 0, 0}" % mite)
     place_player(app, 20, 16)
     app.wait_frames(2)
     set_state(app, "Playing")
     app.wait_frames(round(2 * RETARGET * FPS))
     set_state(app, "Paused")
     app.check(target(app, mite) is None, "the mite targets %s 16 units away" % target(app, mite))
-    app.exec("set %s Position {20, 0, 0}" % mite)
+    app.exec("set %s box.transform.Position {20, 0, 0}" % mite)
     place_player(app, 10, 0)
     set_state(app, "Playing")
-    app.wait_for("get %s OreTarget.value" % mite, PLAYER, frames=2 * FPS,
+    app.wait_for("get %s oreelse.OreTarget.value" % mite, '"%s"' % PLAYER, frames=2 * FPS,
                  what="the mite going for the astronaut")
 
     # A building closer than the astronaut wins: the wall 3 units west, the astronaut 10 units
@@ -454,10 +448,10 @@ def test_walk_and_targets(app):
     row, col = 23, 39
     wx, wz = tile_point(row, col)
     w = wall(app, row, col)
-    app.exec("set %s Position {%g, 0, %g}" % (mite, wx + 3, wz))
+    app.exec("set %s box.transform.Position {%g, 0, %g}" % (mite, wx + 3, wz))
     place_player(app, wx + 13, wz)
     set_state(app, "Playing")
-    app.wait_for("get %s OreTarget.value" % mite, w, frames=2 * FPS,
+    app.wait_for("get %s oreelse.OreTarget.value" % mite, '"%s"' % w, frames=2 * FPS,
                  what="the mite going for the wall")
 
     # It chews the wall at 4 HP/s
@@ -465,16 +459,17 @@ def test_walk_and_targets(app):
     lost, took = measure(app, lambda: -health(app, w))
     app.check(abs(lost / took - MITE_DAMAGE) < RATE_TOLERANCE,
               "the wall lost %g HP in %g s, not %g HP/s" % (lost, took, MITE_DAMAGE))
-    app.check(app.get(mite, "OreCritter")["attacking"], "the mite chewing is not attacking")
-    v = app.get(mite, "OreVelocity")
+    app.check(app.get(mite, "oreelse.OreCritter")["attacking"],
+              "the mite chewing is not attacking")
+    v = app.get(mite, "oreelse.OreVelocity")
     app.check(v["x"] == 0 and v["z"] == 0, "the attacking mite has the velocity %s" % v)
 
     # At 0 the wall is deleted and the tile is free; the mite goes for the astronaut
-    app.exec("set %s OreHealth {value: 0.5, max: 300}" % w)
+    app.exec("set %s oreelse.OreHealth {value: 0.5, max: 300}" % w)
     set_state(app, "Playing")
     wait_until(app, lambda: w not in buildings(app), FPS, "the wall deleted")
     app.check(not buildings(app), "buildings left: %s" % buildings(app))
-    app.wait_for("get %s OreTarget.value" % mite, PLAYER, frames=2 * FPS,
+    app.wait_for("get %s oreelse.OreTarget.value" % mite, '"%s"' % PLAYER, frames=2 * FPS,
                  what="the mite back on the astronaut")
 
 
@@ -489,13 +484,14 @@ def test_probe(app):
     wx, wz = tile_point(row, col)
     place_player(app, wx - 8, wz)
     mite = spawn(app, "Mite", wx + 4, wz)
-    app.exec("set %s OreCritter {retarget: 100, jitter: 0, attacking: false}" % mite)
-    app.exec("set %s OreTarget {value: %s}" % (mite, PLAYER))
+    app.exec("set %s oreelse.OreCritter {retarget: 100, jitter: 0, attacking: false}" % mite)
+    app.exec("set %s oreelse.OreTarget {value: %s}" % (mite, PLAYER))
     w = wall(app, row, col)
     set_state(app, "Playing")
-    app.wait_for("get %s OreTarget.value" % mite, w, frames=FPS, what="the probe taking the wall")
+    app.wait_for("get %s oreelse.OreTarget.value" % mite, '"%s"' % w, frames=FPS,
+                 what="the probe taking the wall")
     set_state(app, "Paused")
-    retarget = app.get(mite, "OreCritter")["retarget"]
+    retarget = app.get(mite, "oreelse.OreCritter")["retarget"]
     app.check(0 < retarget <= RETARGET + 1e-4,
               "after the probe the retarget timer is %g, not %g" % (retarget, RETARGET))
     x, z = position(app, mite)
@@ -512,7 +508,7 @@ def test_separation(app):
     a = spawn(app, "Mite", 30, 20)
     b = spawn(app, "Mite", 30, 20)
     for m in (a, b):
-        app.exec("set %s OreCritter {retarget: 0.5, jitter: 0, attacking: false}" % m)
+        app.exec("set %s oreelse.OreCritter {retarget: 0.5, jitter: 0, attacking: false}" % m)
     set_state(app, "Playing")
     app.wait_frames(30)
     set_state(app, "Paused")
@@ -525,7 +521,7 @@ def test_separation(app):
     beh = spawn(app, "Behemoth", bx, bz)
     mites = [spawn(app, "Mite", bx + 1.5, bz + dz) for dz in (-0.6, 0, 0.6)]
     for c in [beh] + mites:
-        app.exec("set %s OreSpeed {value: 0}" % c)
+        app.exec("set %s oreelse.OreSpeed {value: 0}" % c)
     set_state(app, "Playing")
     app.wait_frames(45)
     set_state(app, "Paused")
@@ -543,8 +539,8 @@ def test_player_health(app):
     start(app)
     hold_waves(app)
     set_state(app, "Paused")
-    app.check(app.get(PLAYER, "OreHealth") == {"value": PLAYER_HP, "max": PLAYER_HP},
-              "the astronaut has %s" % app.get(PLAYER, "OreHealth"))
+    app.check(app.get(PLAYER, "oreelse.OreHealth") == {"value": PLAYER_HP, "max": PLAYER_HP},
+              "the astronaut has %s" % app.get(PLAYER, "oreelse.OreHealth"))
 
     # A mite next to the astronaut chews it at 4 HP/s, and every bite starts the hurt timer over
     place_player(app, 20, 20)
@@ -554,27 +550,28 @@ def test_player_health(app):
     lost, took = measure(app, lambda: -health(app, PLAYER))
     app.check(abs(lost / took - MITE_DAMAGE) < RATE_TOLERANCE,
               "the astronaut lost %g HP in %g s, not %g HP/s" % (lost, took, MITE_DAMAGE))
-    app.check(app.get(PLAYER, "OreHurt")["since"] < 2 * DT + 1e-4,
-              "the hurt timer is at %g while chewed" % app.get(PLAYER, "OreHurt")["since"])
+    app.check(app.get(PLAYER, "oreelse.OreHurt")["since"] < 2 * DT + 1e-4,
+              "the hurt timer is at %g while chewed" % app.get(PLAYER, "oreelse.OreHurt")["since"])
 
     # Without damage it does not regenerate before 5 s
-    app.exec("set %s OreHealth {value: 0, max: 12}" % mite)
-    app.exec("set %s OreHurt {since: 0}" % PLAYER)
+    app.exec("set %s oreelse.OreHealth {value: 0, max: 12}" % mite)
+    app.exec("set %s oreelse.OreHurt {since: 0}" % PLAYER)
     gained, took = measure(app, lambda: health(app, PLAYER))
     app.check(not critters(app), "the mite at 0 HP is still there")
     app.check(gained == 0, "the astronaut gained %g HP %g s after it was hurt" % (gained, took))
 
     # After 5 s it regenerates 2 HP/s, up to its maximum
-    app.exec("set %s OreHurt {since: %g}" % (PLAYER, REGEN_DELAY))
+    app.exec("set %s oreelse.OreHurt {since: %g}" % (PLAYER, REGEN_DELAY))
     gained, took = measure(app, lambda: health(app, PLAYER))
     app.check(abs(gained / took - REGEN) < RATE_TOLERANCE,
               "the astronaut regenerated %g HP in %g s, not %g HP/s" % (gained, took, REGEN))
-    app.exec("set %s OreHealth {value: %g, max: %g}" % (PLAYER, PLAYER_HP - 0.05, PLAYER_HP))
+    app.exec("set %s oreelse.OreHealth {value: %g, max: %g}" %
+             (PLAYER, PLAYER_HP - 0.05, PLAYER_HP))
     measure(app, lambda: 0)
     app.check(health(app, PLAYER) == PLAYER_HP, "the regen went to %g" % health(app, PLAYER))
 
     # At 0 HP the game is lost
-    app.exec("set %s OreHealth {value: 1, max: %g}" % (PLAYER, PLAYER_HP))
+    app.exec("set %s oreelse.OreHealth {value: 1, max: %g}" % (PLAYER, PLAYER_HP))
     spawn(app, "Mite", 20.5, 20)
     set_state(app, "Playing")
     app.wait_for(STATE % "Lost", "true", frames=2 * FPS, what="the game lost")
@@ -589,10 +586,10 @@ def test_kills(app):
     a = spawn(app, "Mite", 30, 20)
     b = spawn(app, "Skitter", 20, 30)
     c = spawn(app, "Mite", 30, 30)
-    app.check(app.get(b, "OreHealth") == {"value": 50, "max": 50},
-              "the skitter has %s" % app.get(b, "OreHealth"))
-    app.exec("set %s OreHealth {value: 0, max: 12}" % a)
-    app.exec("set %s OreHealth {value: -3, max: 50}" % b)
+    app.check(app.get(b, "oreelse.OreHealth") == {"value": 50, "max": 50},
+              "the skitter has %s" % app.get(b, "oreelse.OreHealth"))
+    app.exec("set %s oreelse.OreHealth {value: 0, max: 12}" % a)
+    app.exec("set %s oreelse.OreHealth {value: -3, max: 50}" % b)
     set_state(app, "Playing")
     app.wait_for(WAVE % "kills", "2", frames=FPS, what="two kills")
     set_state(app, "Paused")

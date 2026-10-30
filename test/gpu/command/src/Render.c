@@ -35,19 +35,18 @@ void Render_capture_active_camera(void) {
     ecs_set(world, box, Emissive, {.strength = 1, .color = {255, 0, 0}});
     ecs_entity_t surface = ecs_new(world);
     ecs_set(world, surface, Surface, {.width = 32, .height = 32, .resolution_scale = 1});
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_progress(world, 0);
 
     bool error = true;
-    char *out = box_terminal_run(world, s, "capture", &error);
+    char *out = box_command_run(world, s, "capture", &error);
     test_bool(error, false);
-    test_str(out, "capture_0.png (pending)");
+    test_str(out, "{\"name\":\"1\", \"content_type\":\"image/png\"}");
     ecs_os_free(out);
     ecs_progress(world, 0);
     box_render_sync(world);
 
-    char *path = flecs_asprintf("%s/resources/capture_0.png",
-        ecs_get(world, s, TerminalStatus)->dir);
+    char *path = box_command_resource_file(world, s, "1");
     int w = 0, h = 0, n = 0;
     unsigned char *px = stbi_load(path, &w, &h, &n, 4);
     test_assert(px != NULL);
@@ -92,17 +91,16 @@ void Render_capture_named_camera(void) {
     ecs_set(world, other, Position, {0, 0, 5});
     ecs_entity_t surface = ecs_new(world);
     ecs_set(world, surface, Surface, {.width = 16, .height = 16, .resolution_scale = 1});
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_progress(world, 0);
 
-    char *out = box_terminal_run(world, s, "capture level.other", NULL);
-    test_str(out, "capture_0.png (pending)");
+    char *out = box_command_run(world, s, "capture level.other", NULL);
+    test_str(out, "{\"name\":\"1\", \"content_type\":\"image/png\"}");
     ecs_os_free(out);
     ecs_progress(world, 0);
     box_render_sync(world);
 
-    char *path = flecs_asprintf("%s/resources/capture_0.png",
-        ecs_get(world, s, TerminalStatus)->dir);
+    char *path = box_command_resource_file(world, s, "1");
     int w = 0, h = 0, n = 0;
     unsigned char *px = stbi_load(path, &w, &h, &n, 4);
     test_assert(px != NULL);
@@ -143,17 +141,19 @@ void Render_capture_batch(void) {
     ecs_set(world, green, Emissive, {.strength = 1, .color = {0, 255, 0}});
     ecs_entity_t surface = ecs_new(world);
     ecs_set(world, surface, Surface, {.width = 16, .height = 16, .resolution_scale = 1});
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_progress(world, 0);
 
-    char *out = box_terminal_run(world, s, "capture a, b", NULL);
-    test_str(out, "capture_0.png (pending)\ncapture_1.png (pending)");
+    char *out = box_command_run(world, s, "capture a", NULL);
+    test_str(out, "{\"name\":\"1\", \"content_type\":\"image/png\"}");
+    ecs_os_free(out);
+    out = box_command_run(world, s, "capture b", NULL);
+    test_str(out, "{\"name\":\"2\", \"content_type\":\"image/png\"}");
     ecs_os_free(out);
     ecs_progress(world, 0);
     box_render_sync(world);
 
-    const char *dir = ecs_get(world, s, TerminalStatus)->dir;
-    char *path = flecs_asprintf("%s/resources/capture_0.png", dir);
+    char *path = box_command_resource_file(world, s, "1");
     int w = 0, h = 0, n = 0;
     unsigned char *px = stbi_load(path, &w, &h, &n, 4);
     test_assert(px != NULL);
@@ -162,7 +162,7 @@ void Render_capture_batch(void) {
     stbi_image_free(px);
     ecs_os_free(path);
 
-    path = flecs_asprintf("%s/resources/capture_1.png", dir);
+    path = box_command_resource_file(world, s, "2");
     px = stbi_load(path, &w, &h, &n, 4);
     test_assert(px != NULL);
     test_assert(px[(8 * 16 + 8) * 4] < 40);
@@ -170,62 +170,6 @@ void Render_capture_batch(void) {
 
     stbi_image_free(px);
     ecs_os_free(path);
-    ecs_fini(world);
-}
-
-void Render_capture_bracket_list(void) {
-    // command/render
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-    App *app = ecs_singleton_get_mut(world, App);
-    app->headless = true;
-    ecs_singleton_modified(world, App);
-
-    ecs_entity_t a = ecs_entity(world, { .name = "a" });
-    ecs_set(world, a, Position, {-10, 0, 5});
-    ecs_set(world, a, Camera, {.fov = 60, .near_ = 0.1f});
-    ecs_entity_t b = ecs_entity(world, { .name = "b" });
-    ecs_set(world, b, Position, {10, 0, 5});
-    ecs_set(world, b, Camera, {.fov = 60, .near_ = 0.1f});
-    ecs_entity_t red = ecs_new(world);
-    ecs_set(world, red, Position, {-10, 0, 0});
-    ecs_set(world, red, Box, {2, 2, 2});
-    ecs_set(world, red, Rgb, {0, 0, 0});
-    ecs_set(world, red, PbrMaterial, {.metallic = 1, .roughness = 1});
-    ecs_set(world, red, Emissive, {.strength = 1, .color = {255, 0, 0}});
-    ecs_entity_t green = ecs_new(world);
-    ecs_set(world, green, Position, {10, 0, 0});
-    ecs_set(world, green, Box, {2, 2, 2});
-    ecs_set(world, green, Rgb, {0, 0, 0});
-    ecs_set(world, green, PbrMaterial, {.metallic = 1, .roughness = 1});
-    ecs_set(world, green, Emissive, {.strength = 1, .color = {0, 255, 0}});
-    ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 16, .height = 16, .resolution_scale = 1});
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_progress(world, 0);
-
-    char *out = box_terminal_run(world, s, "capture [b, a, b]", NULL);
-    test_str(out,
-        "capture_0.png (pending)\ncapture_1.png (pending)\ncapture_2.png (pending)");
-    ecs_os_free(out);
-    ecs_progress(world, 0);
-    box_render_sync(world);
-
-    const char *dir = ecs_get(world, s, TerminalStatus)->dir;
-    bool green_expected[3] = {true, false, true};
-    int32_t i;
-    for (i = 0; i < 3; i ++) {
-        char *path = flecs_asprintf("%s/resources/capture_%d.png", dir, i);
-        int w = 0, h = 0, n = 0;
-        unsigned char *px = stbi_load(path, &w, &h, &n, 4);
-        test_assert(px != NULL);
-        unsigned char *c = &px[(8 * 16 + 8) * 4];
-        test_bool(c[1] > 200, green_expected[i]);
-        test_bool(c[0] > 200, !green_expected[i]);
-        stbi_image_free(px);
-        ecs_os_free(path);
-    }
-
     ecs_fini(world);
 }
 
@@ -243,15 +187,14 @@ void Render_capture_size_of_surface(void) {
     ecs_set(world, view, View, {.camera = camera});
     ecs_entity_t surface = ecs_new(world);
     ecs_set(world, surface, Surface, {.width = 320, .height = 200, .resolution_scale = 1});
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_progress(world, 0);
 
-    ecs_os_free(box_terminal_run(world, s, "capture", NULL));
+    ecs_os_free(box_command_run(world, s, "capture", NULL));
     ecs_progress(world, 0);
     box_render_sync(world);
 
-    char *path = flecs_asprintf("%s/resources/capture_0.png",
-        ecs_get(world, s, TerminalStatus)->dir);
+    char *path = box_command_resource_file(world, s, "1");
     int w = 0, h = 0, n = 0;
     unsigned char *px = stbi_load(path, &w, &h, &n, 4);
     test_assert(px != NULL);
@@ -282,14 +225,13 @@ void Render_capture_clear_of_view(void) {
     ecs_set(world, view_b, View, {.camera = b});
     ecs_entity_t surface = ecs_new(world);
     ecs_set(world, surface, Surface, {.width = 8, .height = 8, .resolution_scale = 1});
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
 
-    ecs_os_free(box_terminal_run(world, s, "capture b", NULL));
+    ecs_os_free(box_command_run(world, s, "capture b", NULL));
     ecs_progress(world, 0);
     box_render_sync(world);
 
-    char *path = flecs_asprintf("%s/resources/capture_0.png",
-        ecs_get(world, s, TerminalStatus)->dir);
+    char *path = box_command_resource_file(world, s, "1");
     int w = 0, h = 0, n = 0, i, wrong = 0;
     unsigned char *px = stbi_load(path, &w, &h, &n, 4);
     test_assert(px != NULL);
@@ -318,21 +260,20 @@ void Render_capture_not_a_camera(void) {
     ecs_entity(world, { .name = "thing" });
     ecs_entity_t surface = ecs_new(world);
     ecs_set(world, surface, Surface, {.width = 8, .height = 8, .resolution_scale = 1});
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
 
     bool error = false;
-    char *out = box_terminal_run(world, s, "capture a, thing", &error);
+    char *out = box_command_run(world, s, "capture thing", &error);
     test_bool(error, true);
     test_str(out, "error: 'thing' is not a camera");
     ecs_os_free(out);
     ecs_progress(world, 0);
     box_render_sync(world);
 
-    char *path = flecs_asprintf("%s/resources/capture_0.png",
-        ecs_get(world, s, TerminalStatus)->dir);
-    test_assert(fopen(path, "rb") == NULL);
+    const EcsCommandSession *cs = ecs_get(world, s, EcsCommandSession);
+    test_int(ecs_vec_count(&cs->resources), 0);
+    test_assert(cs->resource_path == NULL);
 
-    ecs_os_free(path);
     ecs_fini(world);
 }
 
@@ -344,11 +285,12 @@ void Render_capture_unknown_camera(void) {
     box_render_backend_t backend = box_render_null_backend(null);
     box_render_set_backend(world, &backend);
 
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     bool error = false;
-    char *out = box_terminal_run(world, s, "capture nope", &error);
+    char *out = box_command_run(world, s, "capture nope", &error);
     test_bool(error, true);
-    test_str(out, "error: no entity 'nope'");
+    test_assert(strstr(out,
+        "error: invalid argument 'nope' for parameter 'camera' of command 'capture'") != NULL);
     ecs_os_free(out);
 
     ecs_fini(world);
@@ -365,9 +307,9 @@ void Render_capture_no_active_camera(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     bool error = false;
-    char *out = box_terminal_run(world, s, "capture", &error);
+    char *out = box_command_run(world, s, "capture", &error);
     test_bool(error, true);
     test_str(out, "error: no active camera");
     ecs_os_free(out);
@@ -410,15 +352,14 @@ void Render_capture_view_root_of_surface(void) {
     ecs_entity_t surface = ecs_new(world);
     ecs_set(world, surface, Surface, {.width = 16, .height = 16, .view_root = root,
         .resolution_scale = 1});
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_progress(world, 0);
 
-    ecs_os_free(box_terminal_run(world, s, "capture", NULL));
+    ecs_os_free(box_command_run(world, s, "capture", NULL));
     ecs_progress(world, 0);
     box_render_sync(world);
 
-    char *path = flecs_asprintf("%s/resources/capture_0.png",
-        ecs_get(world, s, TerminalStatus)->dir);
+    char *path = box_command_resource_file(world, s, "1");
     int w = 0, h = 0, n = 0;
     unsigned char *px = stbi_load(path, &w, &h, &n, 4);
     test_assert(px != NULL);
@@ -458,18 +399,17 @@ void Render_render_prefab_private_scene(void) {
     ecs_set(world, floor, Rgb, {0, 0, 0});
     ecs_set(world, floor, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, floor, Emissive, {.strength = 1, .color = {0, 0, 255}});
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
 
     bool error = true;
-    char *out = box_terminal_run(world, s, "render Crate", &error);
+    char *out = box_command_run(world, s, "render Crate", &error);
     test_bool(error, false);
-    test_str(out, "render_0.png (pending)");
+    test_str(out, "{\"name\":\"1\", \"content_type\":\"image/png\"}");
     ecs_os_free(out);
     ecs_progress(world, 0);
     box_render_sync(world);
 
-    char *path = flecs_asprintf("%s/resources/render_0.png",
-        ecs_get(world, s, TerminalStatus)->dir);
+    char *path = box_command_resource_file(world, s, "1");
     int w = 0, h = 0, n = 0, i, red = 0, green = 0, blue = 0;
     unsigned char *px = stbi_load(path, &w, &h, &n, 4);
     test_assert(px != NULL);
@@ -500,9 +440,9 @@ void Render_render_scene_deleted_next_frame(void) {
     ecs_entity_t prefab = ecs_entity(world, { .name = "Crate" });
     ecs_add_id(world, prefab, EcsPrefab);
     ecs_set(world, prefab, Box, {1, 1, 1});
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
 
-    ecs_os_free(box_terminal_run(world, s, "render Crate", NULL));
+    ecs_os_free(box_command_run(world, s, "render Crate", NULL));
     ecs_progress(world, 0);
     test_int(ecs_count(world, Scene), 1);
 
@@ -553,18 +493,17 @@ void Render_render_template(void) {
             "  }\n"
             "}\n"
     }) != 0);
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
 
     bool error = true;
-    char *out = box_terminal_run(world, s, "render Pillar", &error);
+    char *out = box_command_run(world, s, "render Pillar", &error);
     test_bool(error, false);
-    test_str(out, "render_0.png (pending)");
+    test_str(out, "{\"name\":\"1\", \"content_type\":\"image/png\"}");
     ecs_os_free(out);
     ecs_progress(world, 0);
     box_render_sync(world);
 
-    char *path = flecs_asprintf("%s/resources/render_0.png",
-        ecs_get(world, s, TerminalStatus)->dir);
+    char *path = box_command_resource_file(world, s, "1");
     int w = 0, h = 0, n = 0, i, red = 0, green = 0, blue = 0;
     unsigned char *px = stbi_load(path, &w, &h, &n, 4);
     test_assert(px != NULL);
@@ -605,11 +544,11 @@ void Render_render_entity_copy(void) {
     ecs_set(world, wheel, Sphere, {.radius = 0.3f});
     ecs_entity_t other = ecs_new(world);
     ecs_set(world, other, Box, {1, 1, 1});
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_progress(world, 0);
 
-    char *out = box_terminal_run(world, s, "render car", NULL);
-    test_str(out, "render_0.png (pending)");
+    char *out = box_command_run(world, s, "render car", NULL);
+    test_str(out, "{\"name\":\"1\", \"content_type\":\"image/png\"}");
     ecs_os_free(out);
     ecs_progress(world, 0);
 
@@ -663,15 +602,14 @@ void Render_render_fits_bounds(void) {
     ecs_set(world, e, Rgb, {0, 0, 0});
     ecs_set(world, e, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, e, Emissive, {.strength = 1, .color = {255, 0, 0}});
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_progress(world, 0);
 
-    ecs_os_free(box_terminal_run(world, s, "render cube", NULL));
+    ecs_os_free(box_command_run(world, s, "render cube", NULL));
     ecs_progress(world, 0);
     box_render_sync(world);
 
-    char *path = flecs_asprintf("%s/resources/render_0.png",
-        ecs_get(world, s, TerminalStatus)->dir);
+    char *path = box_command_resource_file(world, s, "1");
     int w = 0, h = 0, n = 0, x, y, red = 0, edge = 0;
     double cx = 0, cy = 0;
     unsigned char *px = stbi_load(path, &w, &h, &n, 4);
@@ -708,11 +646,12 @@ void Render_render_unknown(void) {
     box_render_backend_t backend = box_render_null_backend(null);
     box_render_set_backend(world, &backend);
 
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     bool error = false;
-    char *out = box_terminal_run(world, s, "render nope", &error);
+    char *out = box_command_run(world, s, "render nope", &error);
     test_bool(error, true);
-    test_str(out, "error: no entity 'nope'");
+    test_assert(strstr(out,
+        "error: invalid argument 'nope' for parameter 'subject' of command 'render'") != NULL);
     ecs_os_free(out);
 
     ecs_progress(world, 0);
@@ -730,11 +669,11 @@ void Render_render_builtin(void) {
     box_render_backend_t backend = box_render_null_backend(null);
     box_render_set_backend(world, &backend);
 
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     bool error = false;
-    char *out = box_terminal_run(world, s, "render /flecs.core", &error);
+    char *out = box_command_run(world, s, "render flecs.core", &error);
     test_bool(error, true);
-    test_str(out, "error: '/flecs.core' is builtin");
+    test_str(out, "error: cannot render 'flecs.core', it is in the flecs scope");
     ecs_os_free(out);
     test_int(ecs_count(world, Scene), 0);
 
@@ -753,9 +692,9 @@ void Render_render_session_closed(void) {
     ecs_entity_t prefab = ecs_entity(world, { .name = "Crate" });
     ecs_add_id(world, prefab, EcsPrefab);
     ecs_set(world, prefab, Box, {1, 1, 1});
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
 
-    ecs_os_free(box_terminal_run(world, s, "render Crate", NULL));
+    ecs_os_free(box_command_run(world, s, "render Crate", NULL));
     ecs_delete(world, s);
     ecs_progress(world, 0);
     test_int(ecs_count(world, Scene), 0);
@@ -781,19 +720,19 @@ void Render_names_unique(void) {
     ecs_entity_t prefab = ecs_entity(world, { .name = "Crate" });
     ecs_add_id(world, prefab, EcsPrefab);
     ecs_set(world, prefab, Box, {1, 1, 1});
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
 
-    char *out = box_terminal_run(world, s, "capture cam", NULL);
-    test_str(out, "capture_0.png (pending)");
+    char *out = box_command_run(world, s, "capture cam", NULL);
+    test_str(out, "{\"name\":\"1\", \"content_type\":\"image/png\"}");
     ecs_os_free(out);
-    out = box_terminal_run(world, s, "capture cam", NULL);
-    test_str(out, "capture_1.png (pending)");
+    out = box_command_run(world, s, "capture cam", NULL);
+    test_str(out, "{\"name\":\"2\", \"content_type\":\"image/png\"}");
     ecs_os_free(out);
-    out = box_terminal_run(world, s, "render Crate", NULL);
-    test_str(out, "render_0.png (pending)");
+    out = box_command_run(world, s, "render Crate", NULL);
+    test_str(out, "{\"name\":\"3\", \"content_type\":\"image/png\"}");
     ecs_os_free(out);
-    out = box_terminal_run(world, s, "render Crate", NULL);
-    test_str(out, "render_1.png (pending)");
+    out = box_command_run(world, s, "render Crate", NULL);
+    test_str(out, "{\"name\":\"4\", \"content_type\":\"image/png\"}");
     ecs_os_free(out);
 
     ecs_fini(world);
@@ -815,15 +754,14 @@ void Render_gpu_capture_png(void) {
         .camera = camera, .clear = {.enabled = true, .color = {255, 128, 0, 255}}});
     ecs_entity_t surface = ecs_new(world);
     ecs_set(world, surface, Surface, {.width = 64, .height = 32, .resolution_scale = 1});
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_progress(world, 0);
 
-    ecs_os_free(box_terminal_run(world, s, "capture", NULL));
+    ecs_os_free(box_command_run(world, s, "capture", NULL));
     ecs_progress(world, 0);
     box_render_sync(world);
 
-    char *path = flecs_asprintf("%s/resources/capture_0.png",
-        ecs_get(world, s, TerminalStatus)->dir);
+    char *path = box_command_resource_file(world, s, "1");
     int w = 0, h = 0, n = 0, i, wrong = 0;
     unsigned char *px = stbi_load(path, &w, &h, &n, 4);
     test_assert(px != NULL);
@@ -863,11 +801,10 @@ void Render_gpu_capture_first_frame(void) {
     ecs_set(world, shape, Rgb, {0, 0, 0});
     ecs_set(world, shape, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, shape, Emissive, {.strength = 1, .color = {255, 0, 0}});
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
 
-    ecs_os_free(box_terminal_run(world, s, "capture", NULL));
-    char *path = flecs_asprintf("%s/resources/capture_0.png",
-        ecs_get(world, s, TerminalStatus)->dir);
+    ecs_os_free(box_command_run(world, s, "capture", NULL));
+    char *path = box_command_resource_file(world, s, "1");
     int i;
     for (i = 0; i < 10; i ++) {
         ecs_progress(world, 0);
@@ -923,14 +860,13 @@ void Render_gpu_capture_effects(void) {
     ecs_entity_t surface = ecs_new(world);
     ecs_set(world, surface, Surface, {.width = 64, .height = 64,
         .write_to_file = "capture_effects.png", .resolution_scale = 1});
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
 
-    ecs_os_free(box_terminal_run(world, s, "capture", NULL));
+    ecs_os_free(box_command_run(world, s, "capture", NULL));
     ecs_progress(world, 1.0f / 60);
     box_render_sync(world);
 
-    char *capture = flecs_asprintf("%s/resources/capture_0.png",
-        ecs_get(world, s, TerminalStatus)->dir);
+    char *capture = box_command_resource_file(world, s, "1");
     char *frame = flecs_asprintf("%s/capture_effects.png",
         ecs_singleton_get(world, AppStatus)->tmp_dir);
     int w = 0, h = 0, n = 0, fw = 0, fh = 0, i, k;
@@ -970,16 +906,15 @@ void Render_gpu_render_isolated(void) {
     ecs_set(world, wall, Position, {0, 0, 0});
     ecs_set(world, wall, Box, {50, 50, 50});
     ecs_set(world, wall, Rgb, {255, 0, 0});
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
 
-    char *out = box_terminal_run(world, s, "render Ball", NULL);
-    test_str(out, "render_0.png (pending)");
+    char *out = box_command_run(world, s, "render Ball", NULL);
+    test_str(out, "{\"name\":\"1\", \"content_type\":\"image/png\"}");
     ecs_os_free(out);
     ecs_progress(world, 0);
     box_render_sync(world);
 
-    char *path = flecs_asprintf("%s/resources/render_0.png",
-        ecs_get(world, s, TerminalStatus)->dir);
+    char *path = box_command_resource_file(world, s, "1");
     int w = 0, h = 0, n = 0, i, red = 0, blue = 0;
     unsigned char *px = stbi_load(path, &w, &h, &n, 4);
     test_assert(px != NULL);
@@ -1009,23 +944,28 @@ void Render_http_resource(void) {
     ecs_entity_t prefab = ecs_entity(world, { .name = "Ball" });
     ecs_add_id(world, prefab, EcsPrefab);
     ecs_set(world, prefab, Sphere, {.radius = 1});
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_http_server_t *srv = ecs_rest_server_init(world, NULL);
+    test_assert(srv != NULL);
 
-    char *path = flecs_asprintf("/terminal/exec?session=%s&cmd=render%%20Ball",
-        ecs_get_name(world, s));
+    char *path = flecs_asprintf("/shell/session/%llu", (unsigned long long)s);
     ecs_http_reply_t reply = ECS_HTTP_REPLY_INIT;
-    test_int(box_command_request(world, "GET", path, NULL, &reply), 200);
+    test_int(ecs_http_server_request(srv, "PUT", path, "render Ball", &reply), 0);
+    test_int(reply.code, 200);
     char *body = ecs_strbuf_get(&reply.body);
-    test_str(body, "render_0.png (pending)");
+    test_str(body, "{\"type\":\"flecs.script.shell.resource\", "
+        "\"result\":{\"name\":\"1\", \"content_type\":\"image/png\"}, \"errors\":[]}");
     ecs_os_free(body);
     ecs_os_free(path);
 
     ecs_progress(world, 0);
     box_render_sync(world);
 
-    path = flecs_asprintf("/resource/render_0.png?session=%s", ecs_get_name(world, s));
+    path = flecs_asprintf("/shell/session/%llu/resource/1", (unsigned long long)s);
     ecs_http_reply_t res = ECS_HTTP_REPLY_INIT;
-    test_int(box_command_request(world, "GET", path, NULL, &res), 200);
+    test_int(ecs_http_server_request(srv, "GET", path, NULL, &res), 0);
+    test_int(res.code, 200);
+    test_str(res.content_type, "image/png");
     int32_t size = ecs_strbuf_written(&res.body);
     body = ecs_strbuf_get(&res.body);
     test_assert(size > 8);
@@ -1033,5 +973,6 @@ void Render_http_resource(void) {
     ecs_os_free(body);
     ecs_os_free(path);
 
+    ecs_rest_server_fini(srv);
     ecs_fini(world);
 }

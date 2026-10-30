@@ -89,7 +89,7 @@ static void trigger_run(
     ecs_entity_t s,
     const char *cmd)
 {
-    ecs_os_free(box_terminal_run(world, s, cmd, NULL));
+    ecs_os_free(box_command_run(world, s, cmd, NULL));
 }
 
 /** Get the counts of the Counter probe.
@@ -181,11 +181,11 @@ void ActionTrigger_zero_values_trigger_nothing(void) {
     ecs_set(world, a, ActionTrigger, { .action = play });
     ecs_set(world, b, ActionTrigger, { .action = 0, .button = KeyMouseLeft });
     test_int(ecs_get(world, a, ActionTrigger)->button, KeyNone);
-    ecs_entity_t s = box_terminal_new(world);
-    trigger_run(world, s, "mouse.click left [440, 360]");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    trigger_run(world, s, "mouse_click left [440, 360]");
     test_int(trigger_presses(world, "actions.play", 5), 0);
     test_uint(ecs_singleton_get(world, PickStatus)->handler, a);
-    trigger_run(world, s, "mouse.click left [840, 360]");
+    trigger_run(world, s, "mouse_click left [840, 360]");
     test_int(trigger_presses(world, "actions.play", 5), 0);
     test_uint(ecs_singleton_get(world, PickStatus)->handler, b);
     test_int(trigger_counts(world)->presses, 0);
@@ -203,8 +203,8 @@ void ActionTrigger_click_taps_once(void) {
         "  }\n"
         "}\n");
     ecs_entity_t play = ecs_lookup(world, "hud.play");
-    ecs_entity_t s = box_terminal_new(world);
-    trigger_run(world, s, "mouse.click left [610, 350]");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    trigger_run(world, s, "mouse_click left [610, 350]");
     ecs_progress(world, 0);
     test_bool(trigger_state(world, "actions.play")->down, false);
     ecs_progress(world, 0);
@@ -247,10 +247,10 @@ void ActionTrigger_three_clicks(void) {
         "    ActionTrigger: {action: actions.play}\n"
         "  }\n"
         "}\n");
-    ecs_entity_t s = box_terminal_new(world);
-    trigger_run(world, s, "mouse.click left [640, 360]");
-    trigger_run(world, s, "mouse.click left [650, 360]");
-    trigger_run(world, s, "mouse.click left [660, 360]");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    trigger_run(world, s, "mouse_click left [640, 360]");
+    trigger_run(world, s, "mouse_click left [650, 360]");
+    trigger_run(world, s, "mouse_click left [660, 360]");
     test_int(trigger_presses(world, "actions.play", 12), 3);
     test_int(trigger_counts(world)->presses, 3);
     test_int(trigger_counts(world)->releases, 3);
@@ -269,20 +269,20 @@ void ActionTrigger_release_outside(void) {
         "  }\n"
         "}\n");
     ecs_entity_t play = ecs_lookup(world, "hud.play");
-    ecs_entity_t s = box_terminal_new(world);
-    trigger_run(world, s, "mouse.move [640, 360]");
-    trigger_run(world, s, "mouse.button left true");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    trigger_run(world, s, "mouse_move [640, 360]");
+    trigger_run(world, s, "mouse_button left true");
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_uint(ecs_singleton_get(world, PickStatus)->captured, play);
-    trigger_run(world, s, "mouse.move [100, 100]");
+    trigger_run(world, s, "mouse_move [100, 100]");
     ecs_progress(world, 0);
-    trigger_run(world, s, "mouse.button left false");
+    trigger_run(world, s, "mouse_button left false");
     test_int(trigger_presses(world, "actions.play", 5), 0);
     test_int(trigger_counts(world)->presses, 0);
     test_int(trigger_counts(world)->releases, 0);
 
-    trigger_run(world, s, "mouse.click left [640, 360]");
+    trigger_run(world, s, "mouse_click left [640, 360]");
     test_int(trigger_presses(world, "actions.play", 5), 1);
 
     ecs_fini(world);
@@ -297,9 +297,9 @@ void ActionTrigger_press_mode(void) {
         "    ActionTrigger: {action: actions.play, mode: ActionTriggerPress}\n"
         "  }\n"
         "}\n");
-    ecs_entity_t s = box_terminal_new(world);
-    trigger_run(world, s, "mouse.move [640, 360]");
-    trigger_run(world, s, "mouse.button left true");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    trigger_run(world, s, "mouse_move [640, 360]");
+    trigger_run(world, s, "mouse_button left true");
     ecs_progress(world, 0);
     test_bool(trigger_state(world, "actions.play")->down, false);
     ecs_progress(world, 0);
@@ -310,7 +310,7 @@ void ActionTrigger_press_mode(void) {
     test_int(trigger_counts(world)->presses, 1);
     test_int(trigger_counts(world)->releases, 1);
 
-    trigger_run(world, s, "mouse.button left false");
+    trigger_run(world, s, "mouse_button left false");
     test_int(trigger_presses(world, "actions.play", 4), 0);
     test_int(trigger_counts(world)->presses, 1);
 
@@ -335,8 +335,8 @@ static void trigger_hold_start(
     ecs_world_t *world,
     ecs_entity_t s)
 {
-    trigger_run(world, s, "mouse.move [640, 360]");
-    trigger_run(world, s, "mouse.button left true");
+    trigger_run(world, s, "mouse_move [640, 360]");
+    trigger_run(world, s, "mouse_button left true");
     ecs_progress(world, 0);
     test_bool(trigger_state(world, "actions.play")->down, false);
     ecs_progress(world, 0);
@@ -348,9 +348,9 @@ static void trigger_hold_start(
 void ActionTrigger_hold_released_outside(void) {
     // ui/action_trigger
     ecs_world_t *world = trigger_world(TRIGGER_HOLD_SCENE);
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     trigger_hold_start(world, s);
-    trigger_run(world, s, "mouse.move [900, 500]");
+    trigger_run(world, s, "mouse_move [900, 500]");
     ecs_progress(world, 0);
     const ActionState *state = trigger_state(world, "actions.play");
     test_bool(state->down, true);
@@ -364,7 +364,7 @@ void ActionTrigger_hold_released_outside(void) {
     test_bool(trigger_state(world, "actions.play")->down, true);
     test_int(trigger_counts(world)->releases, 0);
 
-    trigger_run(world, s, "mouse.button left false");
+    trigger_run(world, s, "mouse_button left false");
     ecs_progress(world, 0);
     test_bool(trigger_state(world, "actions.play")->down, true);
     ecs_progress(world, 0);
@@ -379,13 +379,13 @@ void ActionTrigger_hold_released_outside(void) {
 void ActionTrigger_hold_released_by_delete(void) {
     // ui/action_trigger
     ecs_world_t *world = trigger_world(TRIGGER_HOLD_SCENE);
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     trigger_hold_start(world, s);
     ecs_delete(world, ecs_lookup(world, "hud.play"));
     ecs_progress(world, 0);
     test_bool(trigger_state(world, "actions.play")->released, true);
     test_bool(trigger_state(world, "actions.play")->down, false);
-    trigger_run(world, s, "mouse.button left false");
+    trigger_run(world, s, "mouse_button left false");
     test_int(trigger_presses(world, "actions.play", 3), 0);
     test_int(trigger_counts(world)->presses, 1);
     test_int(trigger_counts(world)->releases, 1);
@@ -396,7 +396,7 @@ void ActionTrigger_hold_released_by_delete(void) {
 void ActionTrigger_hold_released_by_remove(void) {
     // ui/action_trigger
     ecs_world_t *world = trigger_world(TRIGGER_HOLD_SCENE);
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     trigger_hold_start(world, s);
     ecs_remove(world, ecs_lookup(world, "hud.play"), ActionTrigger);
     ecs_progress(world, 0);
@@ -410,9 +410,9 @@ void ActionTrigger_hold_released_by_remove(void) {
 void ActionTrigger_hold_released_by_reset(void) {
     // ui/action_trigger
     ecs_world_t *world = trigger_world(TRIGGER_HOLD_SCENE);
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     trigger_hold_start(world, s);
-    trigger_run(world, s, "input.reset");
+    trigger_run(world, s, "input_reset");
     ecs_progress(world, 0);
     test_bool(trigger_state(world, "actions.play")->released, true);
     test_bool(trigger_state(world, "actions.play")->down, false);
@@ -426,7 +426,7 @@ void ActionTrigger_hold_released_by_reset(void) {
 void ActionTrigger_hold_released_by_focus_loss(void) {
     // ui/action_trigger
     ecs_world_t *world = trigger_world(TRIGGER_HOLD_SCENE);
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     trigger_hold_start(world, s);
     box_input_focus(world, false);
     ecs_progress(world, 0);
@@ -447,10 +447,10 @@ void ActionTrigger_right_button_ignores_left(void) {
         "    ActionTrigger: {action: actions.play, button: MouseRight}\n"
         "  }\n"
         "}\n");
-    ecs_entity_t s = box_terminal_new(world);
-    trigger_run(world, s, "mouse.click left [640, 360]");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    trigger_run(world, s, "mouse_click left [640, 360]");
     test_int(trigger_presses(world, "actions.play", 5), 0);
-    trigger_run(world, s, "mouse.click right [640, 360]");
+    trigger_run(world, s, "mouse_click right [640, 360]");
     test_int(trigger_presses(world, "actions.play", 5), 1);
     test_int(trigger_counts(world)->presses, 1);
 
@@ -473,9 +473,9 @@ void ActionTrigger_blocker_keeps_binding_up(void) {
         "    }\n"
         "  }\n"
         "}\n");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     int32_t i, play = 0, fire = 0;
-    trigger_run(world, s, "mouse.click left [640, 360]");
+    trigger_run(world, s, "mouse_click left [640, 360]");
     for (i = 0; i < 6; i ++) {
         ecs_progress(world, 0);
         play += trigger_state(world, "actions.play")->pressed;
@@ -488,7 +488,7 @@ void ActionTrigger_blocker_keeps_binding_up(void) {
 
     ecs_remove(world, ecs_lookup(world, "hud.panel"), InputBlocker);
     play = fire = 0;
-    trigger_run(world, s, "mouse.click left [640, 360]");
+    trigger_run(world, s, "mouse_click left [640, 360]");
     for (i = 0; i < 6; i ++) {
         ecs_progress(world, 0);
         play += trigger_state(world, "actions.play")->pressed;
@@ -517,14 +517,14 @@ void ActionTrigger_world_space_element(void) {
         "  Rect: {400, 200}\n"
         "  ActionTrigger: {action: actions.play}\n"
         "}\n");
-    ecs_entity_t s = box_terminal_new(world);
-    trigger_run(world, s, "mouse.click left [640, 360]");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    trigger_run(world, s, "mouse_click left [640, 360]");
     test_int(trigger_presses(world, "actions.play", 5), 1);
     test_uint(ecs_singleton_get(world, PickStatus)->handler, ecs_lookup(world, "panel"));
     test_int(trigger_counts(world)->presses, 1);
     test_int(trigger_counts(world)->releases, 1);
 
-    trigger_run(world, s, "mouse.click left [100, 100]");
+    trigger_run(world, s, "mouse_click left [100, 100]");
     test_int(trigger_presses(world, "actions.play", 5), 0);
 
     ecs_fini(world);
@@ -545,8 +545,8 @@ void ActionTrigger_shape(void) {
         "  Box: {2, 2, 2}\n"
         "  ActionTrigger: {action: actions.play, mode: ActionTriggerHold}\n"
         "}\n");
-    ecs_entity_t s = box_terminal_new(world);
-    trigger_run(world, s, "mouse.drag left [640, 360] [700, 400] 2 2");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    trigger_run(world, s, "mouse_drag left [640, 360] [700, 400] 2 2");
     int32_t i, presses = 0, downs = 0;
     for (i = 0; i < 8; i ++) {
         ecs_progress(world, 0);
@@ -573,35 +573,35 @@ void ActionTrigger_binding_keeps_action_down(void) {
         "  play { space { Binding: {key: Space} } }\n"
         "}\n"
         TRIGGER_HOLD_SCENE);
-    ecs_entity_t s = box_terminal_new(world);
-    trigger_run(world, s, "key.down Space");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    trigger_run(world, s, "key_down Space");
     ecs_progress(world, 0);
     test_bool(trigger_state(world, "actions.play")->pressed, true);
-    trigger_run(world, s, "mouse.move [640, 360]");
-    trigger_run(world, s, "mouse.button left true");
+    trigger_run(world, s, "mouse_move [640, 360]");
+    trigger_run(world, s, "mouse_button left true");
     ecs_progress(world, 0);
     ecs_progress(world, 0);
-    trigger_run(world, s, "mouse.button left false");
+    trigger_run(world, s, "mouse_button left false");
     test_int(trigger_presses(world, "actions.play", 4), 0);
     test_bool(trigger_state(world, "actions.play")->down, true);
     test_int(trigger_counts(world)->releases, 0);
 
-    trigger_run(world, s, "key.up Space");
+    trigger_run(world, s, "key_up Space");
     ecs_progress(world, 0);
     test_bool(trigger_state(world, "actions.play")->released, true);
     test_int(trigger_counts(world)->presses, 1);
     test_int(trigger_counts(world)->releases, 1);
 
-    trigger_run(world, s, "action.down actions.play");
+    trigger_run(world, s, "action_down actions.play");
     ecs_progress(world, 0);
     test_bool(trigger_state(world, "actions.play")->pressed, true);
-    trigger_run(world, s, "mouse.button left true");
+    trigger_run(world, s, "mouse_button left true");
     ecs_progress(world, 0);
     ecs_progress(world, 0);
-    trigger_run(world, s, "mouse.button left false");
+    trigger_run(world, s, "mouse_button left false");
     test_int(trigger_presses(world, "actions.play", 4), 0);
     test_bool(trigger_state(world, "actions.play")->down, true);
-    trigger_run(world, s, "action.up actions.play");
+    trigger_run(world, s, "action_up actions.play");
     ecs_progress(world, 0);
     test_bool(trigger_state(world, "actions.play")->released, true);
     test_int(trigger_counts(world)->presses, 2);
@@ -623,12 +623,12 @@ void ActionTrigger_trigger_on_ancestor_does_nothing(void) {
         "    }\n"
         "  }\n"
         "}\n");
-    ecs_entity_t s = box_terminal_new(world);
-    trigger_run(world, s, "mouse.click left [640, 360]");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    trigger_run(world, s, "mouse_click left [640, 360]");
     test_int(trigger_presses(world, "actions.play", 5), 0);
     test_uint(ecs_singleton_get(world, PickStatus)->handler,
         ecs_lookup(world, "hud.panel.button"));
-    trigger_run(world, s, "mouse.click left [520, 300]");
+    trigger_run(world, s, "mouse_click left [520, 300]");
     test_int(trigger_presses(world, "actions.play", 5), 1);
     test_uint(ecs_singleton_get(world, PickStatus)->handler, ecs_lookup(world, "hud.panel"));
 
@@ -645,14 +645,14 @@ void ActionTrigger_disabled_element(void) {
         "  }\n"
         "}\n");
     ecs_entity_t play = ecs_lookup(world, "hud.play");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_enable(world, play, false);
-    trigger_run(world, s, "mouse.click left [640, 360]");
+    trigger_run(world, s, "mouse_click left [640, 360]");
     test_int(trigger_presses(world, "actions.play", 5), 0);
     test_int(trigger_counts(world)->presses, 0);
 
     ecs_enable(world, play, true);
-    trigger_run(world, s, "mouse.click left [640, 360]");
+    trigger_run(world, s, "mouse_click left [640, 360]");
     test_int(trigger_presses(world, "actions.play", 5), 1);
 
     ecs_fini(world);
@@ -673,10 +673,10 @@ void ActionTrigger_deleted_action(void) {
         "  }\n"
         "}\n");
     ecs_entity_t play = ecs_lookup(world, "hud.play");
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_delete(world, ecs_lookup(world, "actions.play"));
-    trigger_run(world, s, "mouse.click left [640, 360]");
-    trigger_run(world, s, "mouse.click left [840, 360]");
+    trigger_run(world, s, "mouse_click left [640, 360]");
+    trigger_run(world, s, "mouse_click left [840, 360]");
     int32_t i;
     for (i = 0; i < 6; i ++) {
         ecs_progress(world, 0);

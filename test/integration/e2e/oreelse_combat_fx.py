@@ -21,6 +21,7 @@ so a pause that comes a few frames late on a loaded machine still finds the shor
 """
 import math
 
+from box_client import parse_value
 from oreelse_critters import (FPS, buildings, health, hold_waves, place_player, rows_of,
                               run_script, set_state, start, wait_until)
 from oreelse_weapons import FAR, TURRET, building, instances, once, powered, still, turret_at
@@ -29,7 +30,7 @@ APP = "apps/oreelse"
 SEED = 8
 ARGS = ["--seed", str(SEED), "--fps", "20"]
 
-PARTICLES = "get box.particle.ParticleStats ParticleStats.particles"
+PARTICLES = "get box.particle.ParticleStats box.particle.ParticleStats.particles"
 
 # The skitter's and the brute's radius (etc/critters), the aim of the beam (cfg.turretAimPerRadius)
 # and the set back of its sparks (cfg.turretHitInset)
@@ -79,12 +80,12 @@ def near(a, b, tolerance=TOLERANCE):
 
 
 def light(app, path):
-    return float(app.exec("get %s PointLight.intensity" % path))
+    return float(app.exec("get %s box.light.PointLight.intensity" % path))
 
 
 def state_of(app, path):
     """The playback state of an emitter, ParticlePlaying, ParticlePaused or ParticleStopped."""
-    return app.exec("get %s ParticlePlayback.state" % path).strip().split(".")[-1]
+    return parse_value(app.exec("get %s box.particle.ParticlePlayback.state" % path))
 
 
 def check_state(app, path, state, what):
@@ -116,7 +117,7 @@ def played(app, name):
 
 
 def point(app, path):
-    p = app.get(path, "Position")
+    p = app.get(path, "box.transform.Position")
     return p["x"], p["y"], p["z"]
 
 
@@ -164,9 +165,10 @@ def test_laser_fx(app):
     # While it fires both play and light their lights at their peaks
     set_state(app, "Playing")
     wait_until(app, lambda: health(app, skitter) < SPONGE, FPS, "the laser burning")
-    app.wait_for("get %s PointLight.intensity" % glow, lambda out: near(float(out), GLOW_PEAK),
+    app.wait_for("get %s box.light.PointLight.intensity" % glow,
+                 lambda out: near(float(out), GLOW_PEAK),
                  frames=FPS, what="the glow's light at %g" % GLOW_PEAK)
-    app.wait_for("get %s PointLight.intensity" % sparks,
+    app.wait_for("get %s box.light.PointLight.intensity" % sparks,
                  lambda out: near(float(out), SPARKS_PEAK), frames=FPS,
                  what="the sparks' light at %g" % SPARKS_PEAK)
     app.check(int(app.exec(PARTICLES)) > 0, "the firing laser spawned no particles")
@@ -189,7 +191,7 @@ def test_laser_fx(app):
     check_state(app, glow, "ParticlePaused", "the glow while paused")
     sx, sy, sz = point(app, skitter)
     aim = math.atan2(sx - tx, sz - tz)
-    head = app.get(part(app, laser, "LaserTurret", "head"), "Rotation")
+    head = app.get(part(app, laser, "LaserTurret", "head"), "box.transform.Rotation")
     app.check(near(head["y"], aim, 1e-4), "the head aims at %g, not %g" % (head["y"], aim))
     s, c = math.sin(aim), math.cos(aim)
     lens = (tx + LASER_HEAD[0] + LASER_LENS[0] * c + LASER_LENS[2] * s,
@@ -207,10 +209,10 @@ def test_laser_fx(app):
 
     # Once the skitter is out of range the laser stops firing: the glow and the sparks stop,
     # their lights go out at once and the beam is gone
-    app.exec("set %s Position {%g, 0, %g}" % (skitter, tx + 30, tz))
+    app.exec("set %s box.transform.Position {%g, 0, %g}" % (skitter, tx + 30, tz))
     set_state(app, "Playing")
-    app.wait_for("get %s ParticlePlayback.state" % glow,
-                 lambda out: out.endswith("ParticleStopped"), frames=FPS,
+    app.wait_for("get %s box.particle.ParticlePlayback.state" % glow,
+                 lambda out: parse_value(out).endswith("ParticleStopped"), frames=FPS,
                  what="the glow stopped")
     app.wait_frames(2)
     set_state(app, "Paused")
@@ -236,7 +238,8 @@ def test_gun_fx(app):
 
     # The shot flashes the muzzle light at most at its peak and throws sparks at the muzzle
     set_state(app, "Playing")
-    app.wait_for("get %s PointLight.intensity" % flash, lambda out: float(out) > 0, frames=FPS,
+    app.wait_for("get %s box.light.PointLight.intensity" % flash, lambda out: float(out) > 0,
+                 frames=FPS,
                  what="the muzzle flash lit")
     set_state(app, "Paused")
     first = light(app, flash)
@@ -250,14 +253,14 @@ def test_gun_fx(app):
 
     # It fades to 0 within peak / fade seconds, before the tracer reaches the skitter 9 away
     set_state(app, "Playing")
-    app.wait_for("get %s PointLight.intensity" % flash, "0", frames=frames(fade),
+    app.wait_for("get %s box.light.PointLight.intensity" % flash, "0", frames=frames(fade),
                  what="the muzzle flash faded to 0 after %g s" % fade)
 
     # The tracer's hit on the skitter bursts into sparks and a puff where it hits; the muzzle
     # stays dark without another shot
     wait_until(app, lambda: health(app, skitter) < SPONGE, FPS, "the gun turret's hit")
     set_state(app, "Paused")
-    app.expect("get %s PointLight.intensity" % flash, "0")
+    app.expect("get %s box.light.PointLight.intensity" % flash, "0")
     puffs = played(app, "HitPuff")
     app.check(len(puffs) == 1, "the hit puffs are %s, not one" % list(puffs))
     at = point(app, list(puffs)[0])
@@ -285,17 +288,18 @@ def test_missile_fx(app):
     # The launch flashes the missile turret's muzzle light, throws sparks and blows the launch
     # back from the pods, turned to the aim of the head
     set_state(app, "Playing")
-    app.wait_for("get %s PointLight.intensity" % flash, lambda out: float(out) > 0, frames=FPS,
+    app.wait_for("get %s box.light.PointLight.intensity" % flash, lambda out: float(out) > 0,
+                 frames=FPS,
                  what="the missile turret's flash lit")
     set_state(app, "Paused")
     first = light(app, flash)
     app.check(first <= peak + TOLERANCE, "the flash is at %g, above %g" % (first, peak))
     app.check(len(instances(app, "Missile")) == 1, "the launch fired no missile")
-    aim = app.get(part(app, turret, "MissileTurret", "head"), "Rotation")["y"]
+    aim = app.get(part(app, turret, "MissileTurret", "head"), "box.transform.Rotation")["y"]
     app.check(near(aim, math.pi / 2, 1e-4), "the head aims at %g" % aim)
     launches = played(app, "MissileLaunch")
     app.check(len(launches) == 1, "the launches are %s, not one" % list(launches))
-    turned = app.get(list(launches)[0], "Rotation")
+    turned = app.get(list(launches)[0], "box.transform.Rotation")
     app.check(near(turned["y"], aim, 1e-4) and turned["x"] == 0 and turned["z"] == 0,
               "the launch is turned by %s, not %g about y" % (turned, aim))
     app.check(played_at(app, "SparkBurst", point(app, list(launches)[0]), 1e-3),
@@ -305,8 +309,8 @@ def test_missile_fx(app):
     # The missile points along its velocity, in box's Euler order (Ry * Rx * Rz turns +Z to
     # (sin y cos x, -sin x, cos y cos x)); it climbs or dives toward its aim, so both angles count
     missile = list(instances(app, "Missile"))[0]
-    r = app.get(missile, "Rotation")
-    v = app.get(missile, "OreProjectile")
+    r = app.get(missile, "box.transform.Rotation")
+    v = app.get(missile, "oreelse.OreProjectile")
     speed = math.sqrt(v["vx"] ** 2 + v["vy"] ** 2 + v["vz"] ** 2)
     forward = (math.sin(r["y"]) * math.cos(r["x"]), -math.sin(r["x"]),
                math.cos(r["y"]) * math.cos(r["x"]))
@@ -317,15 +321,16 @@ def test_missile_fx(app):
 
     # Its trail lingers after it, pauses with the game and plays again with it
     trail = part(app, missile, "Missile", "trail")
-    app.check(app.get(trail, "ParticleEmitter")["linger"] is True, "the trail does not linger")
+    app.check(app.get(trail, "box.particle.ParticleEmitter")["linger"] is True,
+              "the trail does not linger")
     check_state(app, trail, "ParticlePaused", "the trail while paused")
     set_state(app, "Playing")
-    app.wait_for("get %s ParticlePlayback.state" % trail,
-                 lambda out: out.endswith("ParticlePlaying"), frames=FPS,
+    app.wait_for("get %s box.particle.ParticlePlayback.state" % trail,
+                 lambda out: parse_value(out).endswith("ParticlePlaying"), frames=FPS,
                  what="the trail playing again")
 
     # The flash fades to 0
-    app.wait_for("get %s PointLight.intensity" % flash, "0", frames=frames(fade),
+    app.wait_for("get %s box.light.PointLight.intensity" % flash, "0", frames=frames(fade),
                  what="the flash faded to 0 after %g s" % fade)
 
     # It hits the brute and explodes at scale 1 (splash 5), with its flash light
@@ -335,9 +340,9 @@ def test_missile_fx(app):
     app.check(len(booms) == 1, "the explosions are %s, not one" % list(booms))
     check_boom(app, list(booms)[0], 1)
     lit = flash_light(app)
-    app.check(near(float(app.exec("get %s EffectFlash.intensity" % lit)), BOOM_PEAK),
+    app.check(near(float(app.exec("get %s box.particle.EffectFlash.intensity" % lit)), BOOM_PEAK),
               "the explosion's flash does not peak at %g" % BOOM_PEAK)
-    app.check(near(float(app.exec("get %s PointLight.range" % lit)), BOOM_RANGE),
+    app.check(near(float(app.exec("get %s box.light.PointLight.range" % lit)), BOOM_RANGE),
               "the explosion's flash does not reach %g" % BOOM_RANGE)
     app.check(int(app.exec(PARTICLES)) > 0, "the explosion spawned no particles")
     app.check(health(app, brute) == SPONGE - 150, "the brute has %g HP" % health(app, brute))
@@ -396,7 +401,7 @@ def test_wall_explodes(app):
     app.check(not playing(app, "BoomBurst"), "an explosion plays before the wall is destroyed")
 
     # At 0 HP it is destroyed: it is gone and explodes 0.55 above its tile at 0.8
-    app.exec("set %s OreHealth {value: 0, max: 300}" % wall)
+    app.exec("set %s oreelse.OreHealth {value: 0, max: 300}" % wall)
     set_state(app, "Playing")
     wait_until(app, lambda: wall not in buildings(app), FPS, "the wall destroyed")
     set_state(app, "Paused")
@@ -408,8 +413,9 @@ def test_wall_explodes(app):
     app.check(close(at, (tx, WRECK_Y, tz), 1e-3), "the wall exploded at %s, not %s" % (
         at, (tx, WRECK_Y, tz)))
     lit = flash_light(app)
-    app.check(near(float(app.exec("get %s EffectFlash.intensity" % lit)),
+    app.check(near(float(app.exec("get %s box.particle.EffectFlash.intensity" % lit)),
                    BOOM_PEAK * WRECK_SCALE),
               "the flash of the wall's explosion does not peak at %g" % (BOOM_PEAK * WRECK_SCALE))
-    app.check(near(float(app.exec("get %s PointLight.range" % lit)), BOOM_RANGE * WRECK_SCALE),
+    app.check(near(float(app.exec("get %s box.light.PointLight.range" % lit)),
+                   BOOM_RANGE * WRECK_SCALE),
               "the flash of the wall's explosion does not reach %g" % (BOOM_RANGE * WRECK_SCALE))
