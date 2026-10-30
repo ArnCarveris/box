@@ -56,11 +56,9 @@ ECS_ENUM(TextWrap, {
 
 /** A string drawn as one quad per glyph in the local XY plane of the entity, facing +Z.
  *
- * Lengths are logical pixels. The block of lines is centered on the origin, y up, and
- * measures TextBounds. Lines break at newlines and, with a width, between words; a word wider
- * than the width breaks inside. A line a width wraps starts at the hang indent, newlines start
- * at the left edge. In a layout a Text fits its lines at Text.width and narrows to its widest
- * word in a narrower parent.
+ * Lengths are logical pixels, the block of lines is centered on the origin, y up, and measures
+ * TextBounds. Lines break at newlines and at a width between words, inside a wider word. In a
+ * layout a Text fits its lines at Text.width and narrows to its widest word in a narrower parent.
  *
  * Color, opacity, emission and tint come from Rgb, Opacity, Emissive, Tint and BlendMode.
  */

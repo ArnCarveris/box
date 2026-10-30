@@ -1,7 +1,7 @@
 // The in game console with lines longer than its panel, open over a plain scene: a long
-// command wraps between words with its syntax colors on every row and its continuation rows
-// after the prompt, a long help line wraps between words, and an entity path longer than a
-// row breaks inside the word.
+// command wraps between words with its syntax colors (value, numbers, extra arguments) on every
+// row and its continuation rows after the prompt, its long error and a long help line wrap
+// between words, and an entity path longer than a row breaks inside the word.
 using box.transform
 using box.geometry
 using box.material
@@ -41,7 +41,7 @@ paths {
   an_entity_name_much_longer_than_one_row_of_the_console_that_breaks_inside_the_word {}
 }
 
-const long_command: string = box.console.run("get cube box.transform.Position and then some extra arguments that make the line wrap")
+const long_command: string = box.console.run("set cube box.transform.Position \{x: 0, y: 0.5, z: 0} with extra arguments that wrap")
 const long_output: string = box.console.run("help cls")
 const long_word: string = box.console.run("ls paths")
 

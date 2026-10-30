@@ -490,6 +490,23 @@ static void box_console_ui_layout(
     box_console_color(world, ui->cursor, console->input);
 }
 
+/** Test whether the font of the console is still loading, so text it could not measure yet is
+ * measured again on a later frame. A font that failed to load is not waited for.
+ *
+ * @param world The world
+ * @param con The console state
+ * @return Whether the font loads
+ */
+static bool box_console_font_loading(
+    const ecs_world_t *world,
+    const box_console_t *con)
+{
+    bool alive = con->font && ecs_is_alive(world, con->font);
+    const FontStatus *status = alive ? ecs_get(world, con->font, FontStatus) : NULL;
+
+    return alive && (!status || status->state == FontLoading);
+}
+
 int32_t box_console_line_rows(
     ecs_world_t *world,
     box_console_t *con,
@@ -503,7 +520,7 @@ int32_t box_console_line_rows(
     if (!l->rows) {
         Text look = box_console_look(con, console, l->text, box_console_hang(l->text, l->kind));
         l->rows = box_text_break_lines(world, &look, NULL);
-        con->pending = con->pending || !l->rows;
+        con->pending = con->pending || (!l->rows && box_console_font_loading(world, con));
     }
 
     return l->rows > 0 ? l->rows : 1;
@@ -545,7 +562,7 @@ static int32_t box_console_ui_input(
     box_console_spans(world, ui->line, &con->spans, prompt, console);
     ecs_os_free(value);
     rows = box_text_line(world, ui->line, 0, NULL, NULL);
-    con->pending = con->pending || !rows;
+    con->pending = con->pending || (!rows && box_console_font_loading(world, con));
     rows = rows > 0 ? rows : 1;
     if (box_text_caret(world, ui->line, prompt + con->cursor, &caret)) {
         const TextBounds *b = ecs_get(world, ui->line, TextBounds);

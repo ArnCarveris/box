@@ -64,18 +64,13 @@ ECS_STRUCT(ConsoleSyntax, {
 
 /** The console singleton: whether it is open and how it looks.
  *
- * The panel is a layout: a root that fills the surface in points holds the panel, which takes
- * the width and height fractions of the surface from the top left. It follows the surface when
- * it is resized. A fraction of zero or less is a panel of zero size, one or more fills the axis.
+ * The panel takes the width and height fractions of the surface from the top left and follows
+ * its resizes, a fraction of zero or less is a panel of zero size, one or more fills the axis.
+ * Lines wrap at its width minus the padding, their rows under the prompt or the indentation.
  *
  * While open, typed and pasted text (Input.paste) and key presses go to the input line and no
  * action but the toggle sees the keyboard or mouse buttons. Enter runs the line, Up and Down walk
- * the lines that ran, Page Up, Page Down and the wheel scroll, Escape or the toggle close it.
- *
- * Lines longer than the panel wrap at its width minus the padding, between words and inside a
- * word longer than a row. Rows a line wraps to start after the prompt of a line that ran or
- * of the input line, and under the leading indentation of an output line. Scrolling and the
- * scrollback count rows.
+ * the lines that ran, Page Up, Page Down and the wheel scroll rows, Escape or the toggle close it.
  */
 ECS_STRUCT(Console, {
     bool open;           /**< Shown and taking the keyboard, the toggle action flips it */
