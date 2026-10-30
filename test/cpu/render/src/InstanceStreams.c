@@ -30,6 +30,9 @@
 /** Bytes of one instance in the surface stream */
 #define SURFACE ((int64_t)sizeof(box_render_surface_t))
 
+/** Slots of the smallest run, BOX_DRAWS_MIN_CAPACITY of the extract */
+#define MIN_RUN ((int64_t)64)
+
 /** Create a world that renders with a null backend and has a view.
  *
  * @param null Receives the backend
@@ -291,6 +294,16 @@ void InstanceStreams_static_change_scatters_its_stream(void) {
     test_bytes(&stats, 0, 0);
 
     ecs_set(world, boxes[5], Rgb, {0, 255, 0});
+    stats = frame(world);
+    test_int(stats.scatters, 1);
+    test_int(stats.scattered, 1);
+    test_bytes(&stats, 0, segment_size(1, SHADING));
+    test_int(stats.material_bytes, MATERIAL);
+
+    stats = frame(world);
+    test_bytes(&stats, 0, 0);
+
+    ecs_set(world, boxes[5], Rgb, {0, 128, 0});
     stats = frame(world);
     test_int(stats.scatters, 0);
     test_bytes(&stats, 0, 0);
@@ -742,6 +755,159 @@ void InstanceStreams_text_changed_while_disabled(void) {
     frame(world);
     test_int(ecs_vec_count(&ecs_get(world, text, TextGlyphs)->glyphs), 3);
     test_int(ecs_vec_count(&ecs_get(world, text, TextSlots)->slots), 3);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** Add a 2D rectangle.
+ *
+ * @param world The world
+ * @param x Its x position
+ * @return The rectangle
+ */
+static ecs_entity_t rect_new(
+    ecs_world_t *world,
+    float x)
+{
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {x, 0, 0});
+    ecs_set(world, e, Rect, {10, 10});
+    ecs_set(world, e, Rgb, {200, 100, 50});
+
+    return e;
+}
+
+/** New 2D shapes upload their transforms and shading and no surface: 2D pages have no surface
+ * stream. */
+void InstanceStreams_new_shape2d_uploads_no_surface(void) {
+    // gpu_instance_data/instance_surface_2d
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    int32_t i;
+    for (i = 0; i < COUNT; i ++) {
+        rect_new(world, (float)i * 20);
+    }
+
+    box_render_draws_stats_t stats = frame(world);
+    test_int(stats.transform_bytes, COUNT * TRANSFORM);
+    test_int(stats.shading_bytes, COUNT * SHADING_2D);
+    test_int(stats.surface_bytes, 0);
+    test_int(stats.page_slots, MIN_RUN);
+    test_int(stats.page_surface_bytes, 0);
+    test_int(stats.page_bytes, MIN_RUN * (TRANSFORM + SHADING_2D));
+
+    stats = frame(world);
+    test_bytes(&stats, 0, 0);
+    test_int(stats.page_surface_bytes, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** A changed 2D shape, moved or reshaped, uploads no surface. */
+void InstanceStreams_changed_shape2d_uploads_no_surface(void) {
+    // gpu_instance_data/instance_surface_2d
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t rects[COUNT];
+    int32_t i;
+    for (i = 0; i < COUNT; i ++) {
+        rects[i] = rect_new(world, (float)i * 20);
+    }
+
+    frame(world);
+    box_render_draws_stats_t stats = frame(world);
+    test_bytes(&stats, 0, 0);
+
+    ecs_set(world, rects[3], Position, {60, 5, 0});
+    stats = frame(world);
+    test_int(stats.surface_bytes, 0);
+    test_assert(stats.transform_bytes >= segment_size(1, TRANSFORM));
+    test_int(stats.upload_bytes, stats.transform_bytes + stats.shading_bytes);
+    test_int(stats.page_surface_bytes, 0);
+
+    ecs_set(world, rects[5], Rect, {12, 8});
+    stats = frame(world);
+    test_int(stats.surface_bytes, 0);
+    test_assert(stats.upload_bytes > 0);
+    test_int(stats.upload_bytes, stats.transform_bytes + stats.shading_bytes);
+    test_int(stats.page_surface_bytes, 0);
+
+    ecs_set(world, rects[7], Rgb, {0, 255, 0});
+    stats = frame(world);
+    test_int(stats.surface_bytes, 0);
+    test_int(stats.upload_bytes, stats.transform_bytes + stats.shading_bytes);
+    test_int(stats.page_surface_bytes, 0);
+
+    ecs_delete(world, rects[0]);
+    stats = frame(world);
+    test_int(stats.surface_bytes, 0);
+    test_int(stats.upload_bytes, stats.transform_bytes + stats.shading_bytes);
+    test_int(stats.page_surface_bytes, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** Meshes keep their surface stream next to 2D shapes, which have none. */
+void InstanceStreams_mesh_uploads_surface_next_to_shape2d(void) {
+    // gpu_instance_data/instance_surface_2d
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    int32_t i;
+    for (i = 0; i < COUNT; i ++) {
+        box_new(world, 0, (float)i);
+        rect_new(world, (float)i * 20);
+    }
+
+    box_render_draws_stats_t stats = frame(world);
+    test_int(stats.transform_bytes, 2 * COUNT * TRANSFORM);
+    test_int(stats.shading_bytes, COUNT * (SHADING + SHADING_2D));
+    test_int(stats.surface_bytes, COUNT * SURFACE);
+    test_int(stats.page_surface_bytes, MIN_RUN * SURFACE);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** A text laid out again writes the transforms and shading of its glyphs and no surface. */
+void InstanceStreams_text_relayout_uploads_no_surface(void) {
+    // gpu_instance_data/instance_surface_2d
+    box_render_null_t *null;
+    ecs_world_t *world = text_world_new(&null);
+    ecs_entity_t text = ecs_new(world);
+    text_set(world, text, "relayout");
+    box_render_draws_stats_t stats = frame(world);
+    box_render_draws_stats_t next = frame(world);
+    test_int(ecs_vec_count(&ecs_get(world, text, TextSlots)->slots), 8);
+    test_assert(stats.shading_bytes + next.shading_bytes >= 8 * SHADING_2D);
+    test_int(stats.surface_bytes + next.surface_bytes, 0);
+    test_int(next.page_surface_bytes, 0);
+
+    stats = frame(world);
+    test_int(stats.surface_bytes, 0);
+
+    text_set(world, text, "reworded");
+    stats = frame(world);
+    next = frame(world);
+    test_int(ecs_vec_count(&ecs_get(world, text, TextSlots)->slots), 8);
+    test_assert(stats.shading_bytes + next.shading_bytes > 0);
+    test_int(stats.surface_bytes + next.surface_bytes, 0);
+    test_int(next.page_surface_bytes, 0);
+
+    ecs_set(world, text, Position, {5, 1, 0});
+    stats = frame(world);
+    test_assert(stats.transform_bytes > 0);
+    test_int(stats.surface_bytes, 0);
+    test_int(stats.upload_bytes, stats.transform_bytes + stats.shading_bytes);
+    test_int(stats.page_surface_bytes, 0);
+
+    text_set(world, text, "a much longer text");
+    stats = frame(world);
+    next = frame(world);
+    test_int(stats.surface_bytes + next.surface_bytes, 0);
+    test_int(next.page_surface_bytes, 0);
 
     ecs_fini(world);
     box_render_null_free(null);

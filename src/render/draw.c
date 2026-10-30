@@ -7,8 +7,8 @@
  * changed: a moved shape its transform, a recolored one its shading.
  *
  * Static streams are written once per change, the transforms of DynamicTransform and the
- * shading of DynamicMaterial shapes per frame. A mesh instance references a slot of the
- * material table (materials.c), so a material change packs a slot, not the instances.
+ * shading of DynamicMaterial shapes per frame. A mesh instance references a slot of the material
+ * table (materials.c), so a material change packs a slot or moves its owner to another one.
  */
 
 #include "draw.h"
@@ -619,9 +619,9 @@ done:
  * A shape that keeps its slot writes the streams of its change, plus its shading when the clip
  * index of a 2D shape changed; a shape that gets a slot writes every stream.
  *
- * The shading of a mesh shape is the slot of the material table it renders with, its tint and
- * its alpha; a mesh shape that owns a MaterialId gets a slot of its own there, and gives it back
- * when it is no longer drawn by the mesh pipeline.
+ * The shading of a mesh shape is its slot of the material table, its tint and its alpha. A mesh
+ * shape that owns a MaterialId takes its slot here, private in a DynamicMaterial batch, and gives
+ * it back when it is no longer drawn by the mesh pipeline.
  *
  * @param world The world
  * @param d The state
@@ -677,6 +677,7 @@ static void box_draws_update_shape(
     b = box_draws_batch(d, s->batch);
     kinds = BOX_DRAW_ALL;
 write:
+    kinds &= box_draws_batch_kinds(b);
     if (kept && d->shadow_record && box_draws_caster(b)) {
         was_transform = *box_draws_slot_transform(b, s->slot);
         was_surface = *box_draws_slot_surface(b, s->slot);
@@ -705,7 +706,7 @@ write:
         box_draws_material(box_draws_slot_shading(b, s->slot), &material);
     } else if (kinds & BOX_DRAW_SHADING) {
         box_draws_mesh_shading(box_draws_slot_mesh_shading(b, s->slot),
-            box_draws_material_id(world, d, e, true), &material);
+            box_draws_material_id(world, d, e, true, b->key.dynamic_material), &material);
     }
 
     if (kinds & BOX_DRAW_SURFACE) {
@@ -830,6 +831,7 @@ static void BoxRenderExtractDraws(
     d->stats.shading_bytes = 0;
     d->stats.surface_bytes = 0;
     d->stats.material_bytes = 0;
+    box_draws_materials_resolve(world, d);
     box_draws_process(world, d);
     box_draws_clips_send(world, d, p);
     box_draws_order_update(world, d);
@@ -1113,11 +1115,10 @@ void box_render_draws_init(
         }
     }, BOX_RENDER_BUFFER_FIRST, BOX_DRAWS_CHUNK);
     box_draws_store_init(&d->stores[BOX_DRAWS_STORE_2D], &(box_draw_layout_t){
-        .streams = BOX_DRAWS_STREAMS,
+        .streams = BOX_RENDER_INSTANCE_STREAMS_2D,
         .stride = {
             [BOX_RENDER_STREAM_TRANSFORM] = (uint32_t)sizeof(box_render_transform_t),
-            [BOX_RENDER_STREAM_SHADING] = (uint32_t)sizeof(box_render_shading_t),
-            [BOX_RENDER_STREAM_SURFACE] = (uint32_t)sizeof(box_render_surface_t)
+            [BOX_RENDER_STREAM_SHADING] = (uint32_t)sizeof(box_render_shading_t)
         }
     }, BOX_RENDER_BUFFER_FIRST_2D, BOX_DRAWS_CHUNK);
     d->chunk = BOX_DRAWS_CHUNK;

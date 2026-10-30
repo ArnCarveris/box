@@ -96,9 +96,11 @@ static void bench_material(
         ecs_set(world, e, Opacity, {dynamic ? 1.0f : 0.5f});
     }
 
-    ecs_progress(world, 0);
-    ecs_progress(world, 0);
     box_render_draws_stats_t stats = {0};
+    ecs_progress(world, 0);
+    box_render_draws_stats(world, &stats);
+    int64_t setup_material_bytes = stats.material_bytes;
+    ecs_progress(world, 0);
     double frames = 0;
     uint64_t start = bench_material_instructions();
     bench_set_items(b, BENCH_MATERIAL_SHAPES);
@@ -112,6 +114,9 @@ static void bench_material(
     }
 
     bench_counter(b, "upload_bytes", (double)stats.upload_bytes);
+    bench_counter(b, "material_bytes", (double)stats.material_bytes);
+    bench_counter(b, "materials", (double)stats.materials);
+    bench_counter(b, "setup_material_bytes", (double)setup_material_bytes);
     box_render_sync(world);
     bench_counter(b, "instructions", (double)(bench_material_instructions() - start));
     bench_counter(b, "frames", frames);
@@ -170,9 +175,11 @@ void Material_tint_subtree(
         ecs_set(world, e, Rgb, {50, 100, 200});
     }
 
-    ecs_progress(world, 0);
-    ecs_progress(world, 0);
     box_render_draws_stats_t stats = {0};
+    ecs_progress(world, 0);
+    box_render_draws_stats(world, &stats);
+    int64_t setup_material_bytes = stats.material_bytes;
+    ecs_progress(world, 0);
     uint8_t strength = 0;
     double frames = 0;
     uint64_t start = bench_material_instructions();
@@ -190,6 +197,8 @@ void Material_tint_subtree(
     bench_counter(b, "instructions", (double)(bench_material_instructions() - start));
     bench_counter(b, "frames", frames);
     bench_counter(b, "upload_bytes", (double)stats.upload_bytes);
+    bench_counter(b, "materials", (double)stats.materials);
+    bench_counter(b, "setup_material_bytes", (double)setup_material_bytes);
     box_render_sync(world);
     ecs_fini(world);
 }

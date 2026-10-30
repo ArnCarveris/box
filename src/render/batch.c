@@ -2,11 +2,17 @@
  * @file render/batch.c
  * @brief Persistent instanced batches and what a frame sends of them to the renderer.
  *
+<<<<<<< HEAD
  * Every batch owns a run of slots of an instance page (store.c) with a transform, a shading and
  * a surface stream. It uploads its run when the run is handed out, then the changed slots of
  * each stream through a segment of the change buffer per page and stream, which scatter copies.
  * A batch that outgrows its run moves to a larger one, and the GPU copies the instances it had
  * from the old run (box_render_copy_t) before the changed slots are written over them.
+=======
+ * Every batch owns a run of slots of an instance page (store.c) with a transform, a shading and,
+ * for a mesh batch, a surface stream. It uploads its run when the run is handed out, then the
+ * changed slots of each stream through a segment of the change buffer that scatter copies.
+>>>>>>> 26c00eda586d304f362705071c9f4de902d3bf1a
  *
  * Mesh and 2D batches take their runs from stores of their own, a mesh shading being a material
  * slot, a tint and an alpha. A batch with dynamic_transform uploads the transform stream of its
@@ -210,17 +216,23 @@ box_draw_store_t* box_draws_batch_store(
     return &d->stores[box_draws_is_2d(b) ? BOX_DRAWS_STORE_2D : BOX_DRAWS_STORE_MESH];
 }
 
+uint8_t box_draws_batch_kinds(
+    const box_draw_batch_t *b)
+{
+    return box_draws_is_2d(b) ? BOX_DRAW_BOTH : BOX_DRAW_ALL;
+}
+
 box_render_surface_t* box_draws_slot_surface(
     box_draw_batch_t *b,
     int32_t slot)
 {
-    return ecs_vec_get_t(&b->surfaces, box_render_surface_t, slot);
+    return box_draws_is_2d(b) ? NULL : ecs_vec_get_t(&b->surfaces, box_render_surface_t, slot);
 }
 
 /** Get the instance data of a stream of a batch.
  *
  * @param b The batch
- * @param stream The stream
+ * @param stream The stream, one of the layout of the store of the batch
  * @return The vector of the stream, one element per slot
  */
 static ecs_vec_t* box_draws_stream(
@@ -336,9 +348,13 @@ int32_t box_draws_batch_ensure(
     b->page = -1;
     b->first = 0;
     b->capacity = 0;
+<<<<<<< HEAD
     b->full = BOX_DRAW_ALL;
     b->sent = 0;
     b->from_count = 0;
+=======
+    b->full = box_draws_batch_kinds(b);
+>>>>>>> 26c00eda586d304f362705071c9f4de902d3bf1a
     b->bounds_dirty = false;
     b->bounded = false;
     b->was_ready = false;
@@ -406,6 +422,7 @@ void box_draws_slot_changed(
     uint8_t kinds)
 {
     int32_t s;
+    kinds &= box_draws_batch_kinds(b);
     if ((kinds & BOX_DRAW_SURFACE) &&
         (b->bounded || box_draws_slot_surface(b, slot)->p[0][0] != 0.0f))
     {
@@ -443,13 +460,13 @@ int32_t box_draws_slot_add(
     } else {
         ecs_os_memset_t(ecs_vec_append_t(NULL, &b->mesh_shadings, box_render_mesh_shading_t),
             0, box_render_mesh_shading_t);
+        ecs_os_memset_t(ecs_vec_append_t(NULL, &b->surfaces, box_render_surface_t), 0,
+            box_render_surface_t);
     }
 
     *ecs_vec_append_t(NULL, &b->entities, ecs_entity_t) = e;
     ecs_os_memset_t(ecs_vec_append_t(NULL, &b->transforms, box_render_transform_t), 0,
         box_render_transform_t);
-    ecs_os_memset_t(ecs_vec_append_t(NULL, &b->surfaces, box_render_surface_t), 0,
-        box_render_surface_t);
 
     return result;
 }
@@ -509,7 +526,7 @@ bool box_draws_shadow_bounds(
     vec3 min, max;
     int32_t c, r, k;
     bool result = false;
-    if (surface->p[0][0] != 0.0f) {
+    if (surface && surface->p[0][0] != 0.0f) {
         for (r = 0; r < 3; r ++) {
             min[r] = surface->p[22][r] - surface->p[23][r];
             max[r] = surface->p[22][r] + surface->p[23][r];
@@ -670,14 +687,14 @@ void box_draws_slot_remove(
             *box_draws_slot_shading(b, slot) = *box_draws_slot_shading(b, last);
         } else {
             *box_draws_slot_mesh_shading(b, slot) = *box_draws_slot_mesh_shading(b, last);
+            *box_draws_slot_surface(b, slot) = *box_draws_slot_surface(b, last);
         }
 
-        *box_draws_slot_surface(b, slot) = *box_draws_slot_surface(b, last);
         if (s) {
             s->slot = slot;
         }
 
-        box_draws_slot_changed(b, slot, BOX_DRAW_ALL);
+        box_draws_slot_changed(b, slot, box_draws_batch_kinds(b));
     }
 
     if (b->bounded) {
@@ -687,7 +704,10 @@ void box_draws_slot_remove(
     ecs_vec_remove_last(&b->entities);
     ecs_vec_remove_last(&b->transforms);
     ecs_vec_remove_last(flat ? &b->shadings : &b->mesh_shadings);
-    ecs_vec_remove_last(&b->surfaces);
+    if (!flat) {
+        ecs_vec_remove_last(&b->surfaces);
+    }
+
     if (b->key.atlas) {
         ecs_vec_remove_last(&b->glyphs);
     }
@@ -1014,9 +1034,13 @@ void box_draws_reset_backend(
         b->page = -1;
         b->first = 0;
         b->capacity = 0;
+<<<<<<< HEAD
         b->full = BOX_DRAW_ALL;
         b->sent = 0;
         b->from_count = 0;
+=======
+        b->full = box_draws_batch_kinds(b);
+>>>>>>> 26c00eda586d304f362705071c9f4de902d3bf1a
         box_draws_changed_clear(b);
     }
 
@@ -1076,10 +1100,15 @@ static void box_draws_reserve(
     b->page = page;
     b->first = first;
     b->capacity = capacity;
+<<<<<<< HEAD
     if (!b->from_count) {
         b->full = BOX_DRAW_ALL;
         box_draws_changed_clear(b);
     }
+=======
+    b->full = box_draws_batch_kinds(b);
+    box_draws_changed_clear(b);
+>>>>>>> 26c00eda586d304f362705071c9f4de902d3bf1a
 done:
     return;
 }
@@ -1103,9 +1132,18 @@ static void box_draws_pages(
                 continue;
             }
 
+<<<<<<< HEAD
             for (s = 0; s < store->layout.streams; s ++) {
                 d->stats.kept_pages ++;
                 d->stats.kept_bytes += (int64_t)kept * store->layout.stride[s];
+=======
+            for (i = 0; i < count; i ++) {
+                box_draw_batch_t *b = box_draws_batch(d, i);
+                if (b->alive && b->page == pg && box_draws_batch_store(d, b) == store) {
+                    b->full = box_draws_batch_kinds(b);
+                    box_draws_changed_clear(b);
+                }
+>>>>>>> 26c00eda586d304f362705071c9f4de902d3bf1a
             }
         }
     }
@@ -1438,11 +1476,15 @@ static void box_draws_send_batch(
     uint8_t dynamic = box_draws_dynamic_kinds(b);
     bool moved = box_draws_from_held(d, b);
     int32_t s;
+<<<<<<< HEAD
     if (b->from_count && !moved) {
         b->full = BOX_DRAW_ALL;
     }
 
     for (s = 0; s < BOX_DRAWS_STREAMS; s ++) {
+=======
+    for (s = 0; s < store->layout.streams; s ++) {
+>>>>>>> 26c00eda586d304f362705071c9f4de902d3bf1a
         uint32_t entries = (uint32_t)ecs_vec_count(&b->changed[s]);
         if ((dynamic | b->full) & (1 << s)) {
             box_draws_upload_all(p, d, b, s);
@@ -1678,7 +1720,7 @@ static void box_draws_send_changes(
         pages = ecs_vec_count(&store->pages);
         for (i = 0; i < pages; i ++) {
             box_draw_page_t *pg = box_draws_store_page(store, i);
-            for (s = 0; s < BOX_DRAWS_STREAMS; s ++) {
+            for (s = 0; s < store->layout.streams; s ++) {
                 uint64_t size = box_draws_segment_size(store, s, pg->entries[s]);
                 pg->offset[s] = offset;
                 pg->written[s] = 0;
@@ -1702,7 +1744,7 @@ static void box_draws_send_changes(
         pages = ecs_vec_count(&store->pages);
         for (i = 0; i < pages; i ++) {
             box_draw_page_t *pg = box_draws_store_page(store, i);
-            for (s = 0; s < BOX_DRAWS_STREAMS; s ++) {
+            for (s = 0; s < store->layout.streams; s ++) {
                 uint32_t *header = (uint32_t*)(data + pg->offset[s]);
                 if (!pg->entries[s]) {
                     continue;
@@ -1832,7 +1874,7 @@ static void box_draws_fill_material(
             box_draws_material(out, &material);
             alpha = out->color[3];
         } else {
-            uint32_t id = box_draws_material_id(it->world, d, it->entities[i], true);
+            uint32_t id = box_draws_material_id(it->world, d, it->entities[i], true, true);
             box_render_mesh_shading_t *out = box_draws_slot_mesh_shading(b, slots[i].slot);
             box_render_mesh_shading_t was = *out;
             box_draws_material_changed(d, it->entities[i]);

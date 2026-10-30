@@ -117,9 +117,11 @@ void box_transition_set(
  * OnSet is emitted. Removing the last entry leaves Transition with an empty map; it does not
  * remove the component. Works deferred, like box_transition_set().
  *
- * Without an entry for the component, owned or inherited, nothing happens: no Transition is
- * added, no map is copied and no OnSet is emitted. Deferred, the entry is looked up in the merged
- * state, so an entry set on the same stage before the merge is not seen.
+ * Deferred, it also removes an entry that box_transition_set() added on the same stage before
+ * the merge, also when the entity did not own Transition yet (it had none or inherited the map).
+ *
+ * Without an entry for the component, owned, inherited or pending on the stage, nothing happens:
+ * no Transition is added, no map is copied and no OnSet is emitted.
  *
  * @param world The world
  * @param entity The entity
