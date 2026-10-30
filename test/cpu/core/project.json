@@ -317,6 +317,7 @@
                     "implied_not_copied",
                     "implied_authored",
                     "added_not_copied",
+                    "set_last",
                     "script_first_zero",
                     "script_first_zero_after_rotation",
                     "script_first_added",
