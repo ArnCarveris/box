@@ -332,6 +332,12 @@
                     "script_last_added",
                     "script_last_written"
                 ]
+            },
+            {
+                "id": "WindowWarning",
+                "testcases": [
+                    "no_warning_without_glfw"
+                ]
             }
         ]
     }

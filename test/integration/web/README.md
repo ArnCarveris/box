@@ -28,7 +28,22 @@ node test/integration/web/transitions.mjs \
     "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
 ```
 
-When Chrome hangs at the start ("chrome did not start", while `Google Chrome --version` does
-not return either), macOS is holding it at the first launch check of a quarantined app, such as
-one installed by Homebrew, and no one can confirm the dialog of a headless session. Open
-Chrome once from the Finder, or remove the `com.apple.quarantine` attribute of the app.
+Before starting Chrome on macOS, both scripts check the `.app` bundle that contains the Chrome
+executable (after resolving symlinks) for the `com.apple.quarantine` attribute
+(`xattr -p com.apple.quarantine <app>`).
+macOS holds a quarantined app, such as one installed by Homebrew, at its first launch check, and
+no one can confirm the dialog of a headless session, so the scripts fail at once with exit status
+2 and name the app instead of reporting "chrome did not start" after the connect timeout. Open
+Chrome once from the Finder and confirm the dialog, run `xattr -dr com.apple.quarantine <app>`, or
+pass `--chrome` with a copy without the attribute. Confirming the dialog keeps the attribute but
+sets its user-approved flag (`0x0040` in the first field, e.g. `0081;...` becomes `00c1;...`); the
+scripts accept such an approved app. The check is skipped off macOS, without `xattr`, and for a
+Chrome outside a `.app` bundle. `quarantine.sh` checks this with a fake `Foo.app`, first
+quarantined (the scripts fail at once), then approved (they go on to start it):
+
+```sh
+test/integration/web/quarantine.sh
+```
+
+When Chrome still hangs at the start ("chrome did not start", while `Google Chrome --version`
+does not return either), look for another launch check holding it the same way.
