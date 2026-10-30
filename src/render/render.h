@@ -24,6 +24,16 @@ typedef struct box_render_draws_stats_t {
     int32_t scatters;           /**< Scatters the last extract sent, one per instance page with
                                  *   static changes */
     int32_t pages;              /**< Instance pages alive */
+    int64_t page_slots;         /**< Slots the buffers of the instance pages alive hold, of both
+                                 *   stores: their capacity, not the live instances */
+    int64_t page_transform_bytes; /**< Bytes of the transform buffers of the instance pages
+                                 *   alive, of both stores */
+    int64_t page_shading_bytes; /**< Bytes of the shading buffers of the instance pages alive,
+                                 *   of both stores */
+    int64_t page_surface_bytes; /**< Bytes of the surface buffers of the instance pages alive,
+                                 *   of both stores */
+    int64_t page_bytes;         /**< Bytes of every buffer of the instance pages alive, the sum
+                                 *   of the bytes of the streams */
     int64_t upload_bytes;       /**< Bytes the last extract uploaded into instance buffers, the
                                  *   sum of the bytes of the streams */
     int64_t transform_bytes;    /**< Bytes the last extract uploaded into the transform streams:

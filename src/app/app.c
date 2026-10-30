@@ -180,9 +180,144 @@ done:
     clock->pace = pace;
 }
 
-/** Check whether a component of a SetAt entity is one the engine added: another of its
- * components adds it through the With trait (SetAt adds Disabled, a material component adds
+/** Private state of a SetAt entity, added with SetAt through With: the components written to
+ * the entity since it has SetAt, and the components it had before SetAt was added.
+ */
+typedef struct SetAtWritten {
+    ecs_vec_t written;  /**< ecs_id_t of the components set since the entity has SetAt */
+    ecs_vec_t before;   /**< ecs_id_t of the components the entity had before SetAt */
+} SetAtWritten;
+
+static ECS_COMPONENT_DECLARE(SetAtWritten);
+
+/** Destruct SetAtWritten components.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_app_set_at_written_dtor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    SetAtWritten *w = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        ecs_vec_fini_t(NULL, &w[i].written, ecs_id_t);
+        ecs_vec_fini_t(NULL, &w[i].before, ecs_id_t);
+    }
+}
+
+/** Move SetAtWritten components.
+ *
+ * @param dst The destination components
+ * @param src The source components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_app_set_at_written_move(
+    void *dst,
+    void *src,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    box_app_set_at_written_dtor(dst, count, ti);
+    ecs_os_memcpy(dst, src, ti->size * count);
+    ecs_os_memset(src, 0, ti->size * count);
+}
+
+/** Copy SetAtWritten components, as when a prefab with SetAt is instantiated.
+ *
+ * @param dst The destination components
+ * @param src The source components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_app_set_at_written_copy(
+    void *dst,
+    const void *src,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    SetAtWritten *d = dst;
+    const SetAtWritten *s = src;
+    int32_t i;
+    box_app_set_at_written_dtor(dst, count, ti);
+    for (i = 0; i < count; i ++) {
+        d[i].written = ecs_vec_copy_t(NULL, &s[i].written, ecs_id_t);
+        d[i].before = ecs_vec_copy_t(NULL, &s[i].before, ecs_id_t);
+    }
+}
+
+/** Check whether a list of ids holds an id.
+ *
+ * @param ids The list of ecs_id_t
+ * @param id The id
+ * @return Whether the list holds id
+ */
+static bool box_app_set_at_has(
+    const ecs_vec_t *ids,
+    ecs_id_t id)
+{
+    const ecs_id_t *array = ecs_vec_first_t(ids, ecs_id_t);
+    int32_t i, count = ecs_vec_count(ids);
+    bool result = false;
+    for (i = 0; i < count && !result; i ++) {
+        result = array[i] == id;
+    }
+
+    return result;
+}
+
+/** Record a component written to SetAt entities: OnSet of any component of an entity with
+ * SetAt. A component that With adds without a value gets OnAdd but no OnSet, so it is not
+ * recorded.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxAppSetAtOnSet(
+    ecs_iter_t *it)
+{
+    ecs_id_t id = it->event_id;
+    bool skip = ECS_IS_PAIR(id) || id == ecs_id(SetAt) || id == ecs_id(SetAtWritten);
+    int32_t i;
+    for (i = 0; i < it->count && !skip; i ++) {
+        SetAtWritten *w = ecs_get_mut(it->world, it->entities[i], SetAtWritten);
+        if (w && !box_app_set_at_has(&w->written, id)) {
+            ecs_vec_append_t(NULL, &w->written, ecs_id_t)[0] = id;
+        }
+    }
+}
+
+/** Record the components a SetAt entity had before SetAt was added, as when a script body
+ * writes SetAt after the other components.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxAppSetAtOnAdd(
+    ecs_iter_t *it)
+{
+    const ecs_type_t *type = it->other_table ? ecs_table_get_type(it->other_table) : NULL;
+    int32_t i, j;
+    for (i = 0; i < it->count && type; i ++) {
+        SetAtWritten *w = ecs_get_mut(it->world, it->entities[i], SetAtWritten);
+        for (j = 0; w && j < type->count; j ++) {
+            ecs_id_t id = type->array[j];
+            if (!ECS_IS_PAIR(id) && !box_app_set_at_has(&w->before, id)) {
+                ecs_vec_append_t(NULL, &w->before, ecs_id_t)[0] = id;
+            }
+        }
+    }
+}
+
+/** Check whether a component a SetAt entity had before SetAt was added is one the engine
+ * added: another of its components adds it through the With trait (a material component adds
  * MaterialId, Rotation adds Position) and it still holds the value it was constructed with.
+ *
+ * Only these components are compared by value: they were written, if at all, before the
+ * entity had SetAt.
  *
  * @param world The world
  * @param type The type of the entity
@@ -222,8 +357,9 @@ static bool box_app_set_at_implied(
     return result;
 }
 
-/** Copy the components of a SetAt entity to its target entity, except pairs, tags, SetAt and
- * the components the engine added.
+/** Copy the components written to a SetAt entity to its target entity: the ones set since it
+ * has SetAt, and the ones it had before, except those the engine added. Pairs, tags, SetAt and
+ * the components only added are not copied.
  *
  * @param world The world
  * @param from The entity with SetAt
@@ -234,14 +370,18 @@ static void box_app_set_at_copy(
     ecs_entity_t from,
     ecs_entity_t to)
 {
+    const SetAtWritten *w = ecs_get(world, from, SetAtWritten);
     const ecs_type_t *type = ecs_get_type(world, from);
     int32_t i;
-    for (i = 0; i < type->count; i ++) {
+    for (i = 0; i < type->count && w; i ++) {
         ecs_id_t id = type->array[i];
-        const ecs_type_info_t *ti = ECS_IS_PAIR(id) || id == ecs_id(SetAt)
-            ? NULL : ecs_get_type_info(world, id);
+        bool written = box_app_set_at_has(&w->written, id);
+        bool before = !written && box_app_set_at_has(&w->before, id);
+        const ecs_type_info_t *ti = (written || before) && !ECS_IS_PAIR(id) &&
+            id != ecs_id(SetAt) && id != ecs_id(SetAtWritten)
+                ? ecs_get_type_info(world, id) : NULL;
         const void *value = ti ? ecs_get_id(world, from, id) : NULL;
-        if (value && !box_app_set_at_implied(world, type, id, ti, value)) {
+        if (value && (written || !box_app_set_at_implied(world, type, id, ti, value))) {
             ecs_set_id(world, to, id, (size_t)ti->size, value);
         }
     }
@@ -621,7 +761,15 @@ void BoxAppImport(
     ECS_META_COMPONENT(world, FileWatchStatus);
     box_owned_hooks(world, FileWatchStatus, BOX_OWNED_STR(FileWatchStatus, last));
     ECS_META_COMPONENT(world, SetAt);
+    ECS_COMPONENT_DEFINE(world, SetAtWritten);
+    ecs_set_hooks(world, SetAtWritten, {
+        .ctor = flecs_default_ctor,
+        .dtor = box_app_set_at_written_dtor,
+        .move = box_app_set_at_written_move,
+        .copy = box_app_set_at_written_copy
+    });
     ecs_add_pair(world, ecs_id(SetAt), EcsWith, EcsDisabled);
+    ecs_add_pair(world, ecs_id(SetAt), EcsWith, ecs_id(SetAtWritten));
 
     ecs_singleton_set(world, AppStatus, {0});
     ecs_singleton_set(world, FrameTiming, {0});
@@ -633,6 +781,29 @@ void BoxAppImport(
         .query.terms = {{ .id = ecs_id(App) }},
         .events = { EcsOnSet },
         .callback = BoxAppOnSet
+    });
+
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "AppSetAtOnSet" }),
+        .query = {
+            .terms = {
+                { .id = EcsWildcard },
+                { .id = ecs_id(SetAtWritten), .inout = EcsInOutFilter }
+            },
+            .flags = EcsQueryMatchDisabled
+        },
+        .events = { EcsOnSet },
+        .callback = BoxAppSetAtOnSet
+    });
+
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "AppSetAtOnAdd" }),
+        .query = {
+            .terms = {{ .id = ecs_id(SetAt) }},
+            .flags = EcsQueryMatchDisabled
+        },
+        .events = { EcsOnAdd },
+        .callback = BoxAppSetAtOnAdd
     });
 
     box_app_clock_t *clock = box_app_clock_new();

@@ -932,14 +932,17 @@ typedef enum box_render_transition_component_t {
     BOX_RENDER_TRANSITION_PBR_MATERIAL,     /**< PbrMaterial */
     BOX_RENDER_TRANSITION_EMISSIVE,         /**< Emissive */
     BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM, /**< TextureTransform */
+    BOX_RENDER_TRANSITION_TRANSMISSION,     /**< Transmission */
     BOX_RENDER_TRANSITION_COMPONENTS        /**< Number of transitionable components */
 } box_render_transition_component_t;
 
-/** Bytes of the largest transitionable component, the size of a value in a record */
-#define BOX_RENDER_TRANSITION_VALUE (16)
+/** Bytes of the largest transitionable component (Transmission), the size of a value in a
+ * record, a multiple of 4 so a value holds floats */
+#define BOX_RENDER_TRANSITION_VALUE (20)
 
-/** Fields of the transitionable component with the most fields */
-#define BOX_RENDER_TRANSITION_FIELDS (4)
+/** Fields of the transitionable component with the most fields: Transmission, four floats and
+ * the three bytes of its attenuation color */
+#define BOX_RENDER_TRANSITION_FIELDS (7)
 
 /** What a transition record does */
 typedef enum box_render_transition_op_t {

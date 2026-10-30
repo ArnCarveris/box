@@ -176,6 +176,7 @@ static void tr_material_set(
     case BOX_RENDER_TRANSITION_PBR_MATERIAL: m->pbr = value; break;
     case BOX_RENDER_TRANSITION_EMISSIVE: m->emissive = value; break;
     case BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM: m->uv = value; break;
+    case BOX_RENDER_TRANSITION_TRANSMISSION: m->transmission = value; break;
     default: test_assert(false); break;
     }
 }
@@ -339,6 +340,16 @@ static const TextureTransform tr_uv_from = {1, 1, 0, 0}, tr_uv_to = {2, 3, 1, -1
 /** The AlphaCutoff case */
 static const AlphaCutoff tr_cutoff_from = {0.25f}, tr_cutoff_to = {0.75f};
 
+/** The Transmission case: every float and color channel steps by an exact amount each quarter */
+static const Transmission tr_transmission_from = {
+    .transmission_factor = 0, .ior = 1, .thickness_factor = 0, .attenuation_distance = 1,
+    .attenuation_color = {0, 0, 0}
+};
+static const Transmission tr_transmission_to = {
+    .transmission_factor = 1, .ior = 2, .thickness_factor = 4, .attenuation_distance = 5,
+    .attenuation_color = {200, 100, 40}
+};
+
 /** Get the case of a component, once the world registered the components.
  *
  * @param c The component
@@ -378,6 +389,12 @@ static tr_material_case_t tr_case(
         result.size = ECS_SIZEOF(AlphaCutoff);
         result.from = &tr_cutoff_from;
         result.to = &tr_cutoff_to;
+        break;
+    case BOX_RENDER_TRANSITION_TRANSMISSION:
+        result.component = ecs_id(Transmission);
+        result.size = ECS_SIZEOF(Transmission);
+        result.from = &tr_transmission_from;
+        result.to = &tr_transmission_to;
         break;
     default:
         test_assert(false);
@@ -510,6 +527,203 @@ void TransitionMaterial_emissive_mesh(void) {
 void TransitionMaterial_pbr_mesh(void) {
     // engine_core/transition
     tr_test_mesh_material(BOX_RENDER_TRANSITION_PBR_MATERIAL);
+}
+
+/** Check the Transmission words of a record of the material table against the Transmission
+ * case at a progress of k quarters.
+ *
+ * @param r The record
+ * @param k Quarters, 0 to 4
+ */
+static void tr_transmission_check(
+    const box_render_material_t *r,
+    uint32_t k)
+{
+    float t = (float)k / 4.0f;
+    test_flt(r->transmission_factor, t);
+    test_flt(r->ior, 1.0f + t);
+    test_flt(r->thickness_factor, 4.0f * t);
+    test_flt(r->attenuation_distance, 1.0f + 4.0f * t);
+    test_uint(r->attenuation_color, tr_color_word(50 * k, 25 * k, 10 * k));
+}
+
+/** Check that every Transmission word of a record of the material table lies strictly between
+ * the two values of the Transmission case.
+ *
+ * @param r The record
+ */
+static void tr_transmission_between(
+    const box_render_material_t *r)
+{
+    const Transmission *a = &tr_transmission_from, *b = &tr_transmission_to;
+    test_assert(r->transmission_factor > a->transmission_factor);
+    test_assert(r->transmission_factor < b->transmission_factor);
+    test_assert(r->ior > a->ior && r->ior < b->ior);
+    test_assert(r->thickness_factor > a->thickness_factor);
+    test_assert(r->thickness_factor < b->thickness_factor);
+    test_assert(r->attenuation_distance > a->attenuation_distance);
+    test_assert(r->attenuation_distance < b->attenuation_distance);
+    test_assert((r->attenuation_color & 0xFF) > a->attenuation_color.r);
+    test_assert((r->attenuation_color & 0xFF) < b->attenuation_color.r);
+    test_assert(((r->attenuation_color >> 8) & 0xFF) > a->attenuation_color.g);
+    test_assert(((r->attenuation_color >> 8) & 0xFF) < b->attenuation_color.g);
+    test_assert(((r->attenuation_color >> 16) & 0xFF) > a->attenuation_color.b);
+    test_assert(((r->attenuation_color >> 16) & 0xFF) < b->attenuation_color.b);
+}
+
+void TransitionMaterial_transmission_mesh(void) {
+    // engine_core/transition
+    tr_test_mesh_material(BOX_RENDER_TRANSITION_TRANSMISSION);
+
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_entity_t e = tr_shape(world, 0, 0);
+    box_render_material_t rendered;
+    int32_t i;
+    ecs_set_ptr(world, e, Transmission, &tr_transmission_from);
+    box_transition_set(world, e, ecs_id(Transmission), &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+    tr_frame(world);
+    uint32_t slot = ecs_get(world, e, MaterialId)->value;
+    test_assert(slot != 0 && slot != UINT32_MAX);
+
+    ecs_set_ptr(world, e, Transmission, &tr_transmission_to);
+    for (i = 0; i < 4; i ++) {
+        tr_frame(world);
+        test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 1);
+        test_assert(tr_material_rendered(world, null, slot, &rendered));
+        tr_transmission_check(&rendered, (uint32_t)i);
+        if (i) {
+            tr_transmission_between(&rendered);
+        }
+    }
+
+    tr_frame(world);
+    test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 0);
+    test_assert(tr_material_rendered(world, null, slot, &rendered));
+    tr_transmission_check(&rendered, 4);
+    tr_fini(world, null);
+}
+
+void TransitionMaterial_transmission_prefab(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    box_render_transitions_t *s = box_render_transitions_get(world);
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_entity_t instances[8];
+    box_render_material_t rendered;
+    const Transmission own = {
+        .transmission_factor = 0.5f, .ior = 1.25f, .thickness_factor = 2,
+        .attenuation_distance = 3, .attenuation_color = {10, 20, 30}
+    };
+    int32_t i;
+    ecs_set(world, prefab, Box, {1, 1, 1});
+    ecs_set_ptr(world, prefab, Transmission, &tr_transmission_from);
+    box_transition_set(world, prefab, ecs_id(Transmission),
+        &(TransitionSpec){ .duration = 1.0f });
+    for (i = 0; i < 8; i ++) {
+        instances[i] = ecs_new_w_pair(world, EcsIsA, prefab);
+        ecs_set(world, instances[i], Position, {(float)i, 0, 0});
+    }
+
+    ecs_entity_t over = ecs_new_w_pair(world, EcsIsA, prefab);
+    ecs_set(world, over, Position, {0, 2, 0});
+    ecs_set_ptr(world, over, Transmission, &own);
+    tr_frame(world);
+    tr_frame(world);
+    uint32_t slot_p = ecs_get(world, prefab, MaterialId)->value;
+    uint32_t slot_o = ecs_get(world, over, MaterialId)->value;
+    test_assert(ecs_owns(world, over, MaterialId));
+    test_assert(slot_o != slot_p);
+    int32_t batch = ecs_get(world, instances[0], DrawSlot)->batch;
+    for (i = 0; i < 8; i ++) {
+        const DrawSlot *ds = ecs_get(world, instances[i], DrawSlot);
+        test_assert(!ecs_owns(world, instances[i], MaterialId));
+        test_assert(tr_batch(world, instances[i])->key.transmissive);
+        test_uint(box_draws_slot_mesh_shading(tr_batch(world, instances[i]), ds->slot)->material,
+            slot_p);
+    }
+
+    ecs_set_ptr(world, prefab, Transmission, &tr_transmission_to);
+    for (i = 0; i < 4; i ++) {
+        int32_t j;
+        tr_frame(world);
+        test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 1);
+        test_int(box_render_transitions_material_visited(s), 2);
+        test_assert(tr_material_rendered(world, null, slot_p, &rendered));
+        tr_transmission_check(&rendered, (uint32_t)i);
+        if (i) {
+            tr_transmission_between(&rendered);
+        }
+
+        if (tr_material_rendered(world, null, slot_o, &rendered)) {
+            test_flt(rendered.transmission_factor, own.transmission_factor);
+            test_flt(rendered.ior, own.ior);
+            test_uint(rendered.attenuation_color, tr_color_word(10, 20, 30));
+        }
+
+        for (j = 0; j < 8; j ++) {
+            const DrawSlot *ds = ecs_get(world, instances[j], DrawSlot);
+            test_assert(!ecs_has_id(world, instances[j], TransitionMaterial));
+            test_assert(!ecs_os_memcmp_t(ecs_get(world, instances[j], Transmission),
+                &tr_transmission_to, Transmission));
+            test_int(ds->batch, batch);
+            test_uint(box_draws_slot_mesh_shading(tr_batch(world, instances[j]),
+                ds->slot)->material, slot_p);
+        }
+    }
+
+    tr_frame(world);
+    test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 0);
+    test_assert(tr_material_rendered(world, null, slot_p, &rendered));
+    tr_transmission_check(&rendered, 4);
+    tr_fini(world, null);
+}
+
+void TransitionMaterial_transmission_keeps_batch(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_entity_t e = tr_shape(world, 0, 0);
+    box_render_material_t rendered;
+    int32_t i;
+    ecs_set(world, e, Transmission, { .transmission_factor = 0, .ior = 1.5f });
+    box_transition_set(world, e, ecs_id(Transmission), &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+    tr_frame(world);
+    uint32_t slot = ecs_get(world, e, MaterialId)->value;
+    int32_t batch = ecs_get(world, e, DrawSlot)->batch;
+    int32_t at = ecs_get(world, e, DrawSlot)->slot;
+    test_assert(tr_batch(world, e)->key.transmissive);
+
+    ecs_set(world, e, Transmission, { .transmission_factor = 1, .ior = 1.5f });
+    for (i = 0; i < 4; i ++) {
+        tr_frame(world);
+        test_int(ecs_get(world, e, DrawSlot)->batch, batch);
+        test_int(ecs_get(world, e, DrawSlot)->slot, at);
+        test_assert(tr_batch(world, e)->key.transmissive);
+        test_assert(!ecs_has_id(world, e, TransitionMaterial));
+        test_assert(tr_material_rendered(world, null, slot, &rendered));
+        test_flt(rendered.transmission_factor, 0.25f * (float)i);
+    }
+
+    tr_frame(world);
+    test_int(ecs_get(world, e, DrawSlot)->batch, batch);
+    test_assert(tr_material_rendered(world, null, slot, &rendered));
+    test_flt(rendered.transmission_factor, 1.0f);
+
+    ecs_set(world, e, Transmission, { .transmission_factor = 0, .ior = 1.5f });
+    for (i = 0; i < 5; i ++) {
+        tr_frame(world);
+        test_int(ecs_get(world, e, DrawSlot)->batch, batch);
+        test_int(ecs_get(world, e, DrawSlot)->slot, at);
+        test_assert(tr_batch(world, e)->key.transmissive);
+        test_assert(tr_material_rendered(world, null, slot, &rendered));
+        test_flt(rendered.transmission_factor, 1.0f - 0.25f * (float)i);
+    }
+
+    tr_fini(world, null);
 }
 
 void TransitionMaterial_uv_mesh(void) {

@@ -254,7 +254,9 @@
                     "outgrown_run_moves",
                     "lowered_pages_spread",
                     "dynamic_uploads_one_range_per_batch",
-                    "new_backend_sends_pages_again"
+                    "new_backend_sends_pages_again",
+                    "page_memory_mesh_and_2d",
+                    "page_memory_drops_with_released_pages"
                 ]
             },
             {
@@ -432,6 +434,9 @@
                     "rgb_mesh",
                     "emissive_mesh",
                     "pbr_mesh",
+                    "transmission_mesh",
+                    "transmission_prefab",
+                    "transmission_keeps_batch",
                     "uv_mesh",
                     "cutoff_mesh",
                     "rgb_2d",

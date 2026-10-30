@@ -188,6 +188,10 @@ async function main() {
     await send('Runtime.enable');
     await send('Log.enable');
     await send('Page.enable');
+    // The viewport of the scene's 640x480 surface, so the canvas shows it unscaled; headless
+    // Chrome leaves less than the window size to the page
+    await send('Emulation.setDeviceMetricsOverride',
+      { width: 640, height: 480, deviceScaleFactor: 1, mobile: false });
     const port = server.address().port;
     const hash = encodeURIComponent(`--delta-time ${DELTA_TIME} ${SCENE}`);
     await send('Page.navigate',

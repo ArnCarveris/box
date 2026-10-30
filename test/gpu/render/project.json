@@ -867,7 +867,8 @@
                 "testcases": [
                     "shape_mid_transition",
                     "shadow_mid_transition",
-                    "mesh_color_mid_transition"
+                    "mesh_color_mid_transition",
+                    "shape_ends_before_scatter_shader_compiles"
                 ]
             },
             {

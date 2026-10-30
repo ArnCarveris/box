@@ -1832,8 +1832,19 @@ void box_draws_send(
 
 done:
     d->stats.pages = 0;
+    d->stats.page_slots = 0;
+    int64_t bytes[BOX_DRAWS_STREAMS] = {0};
     for (i = 0; i < BOX_DRAWS_STORES; i ++) {
         d->stats.pages += d->stores[i].alive;
+        box_draws_store_memory(&d->stores[i], &d->stats.page_slots, bytes);
+    }
+
+    d->stats.page_transform_bytes = bytes[BOX_RENDER_STREAM_TRANSFORM];
+    d->stats.page_shading_bytes = bytes[BOX_RENDER_STREAM_SHADING];
+    d->stats.page_surface_bytes = bytes[BOX_RENDER_STREAM_SURFACE];
+    d->stats.page_bytes = 0;
+    for (i = 0; i < BOX_DRAWS_STREAMS; i ++) {
+        d->stats.page_bytes += bytes[i];
     }
 
     d->stats.materials = d->materials.alive;

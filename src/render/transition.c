@@ -19,6 +19,23 @@
 #define BOX_TRANSITION_U8(T, m) \
     { (uint16_t)offsetof(T, m), BOX_RENDER_TRANSITION_U8 }
 
+/* A value of a record or the table holds every transitionable component */
+_Static_assert(sizeof(Position) <= BOX_RENDER_TRANSITION_VALUE, "Position fits a value");
+_Static_assert(sizeof(Rotation) <= BOX_RENDER_TRANSITION_VALUE, "Rotation fits a value");
+_Static_assert(sizeof(Scale) <= BOX_RENDER_TRANSITION_VALUE, "Scale fits a value");
+_Static_assert(sizeof(Rgb) <= BOX_RENDER_TRANSITION_VALUE, "Rgb fits a value");
+_Static_assert(sizeof(Opacity) <= BOX_RENDER_TRANSITION_VALUE, "Opacity fits a value");
+_Static_assert(sizeof(AlphaCutoff) <= BOX_RENDER_TRANSITION_VALUE, "AlphaCutoff fits a value");
+_Static_assert(sizeof(Tint) <= BOX_RENDER_TRANSITION_VALUE, "Tint fits a value");
+_Static_assert(sizeof(PbrMaterial) <= BOX_RENDER_TRANSITION_VALUE, "PbrMaterial fits a value");
+_Static_assert(sizeof(Emissive) <= BOX_RENDER_TRANSITION_VALUE, "Emissive fits a value");
+_Static_assert(sizeof(TextureTransform) <= BOX_RENDER_TRANSITION_VALUE,
+    "TextureTransform fits a value");
+_Static_assert(sizeof(Transmission) <= BOX_RENDER_TRANSITION_VALUE, "Transmission fits a value");
+_Static_assert(BOX_RENDER_TRANSITION_VALUE % sizeof(float) == 0, "A value holds floats");
+_Static_assert(BOX_RENDER_TRANSITION_COMPONENTS <= 16,
+    "box_draw_transition_material_t.present holds a bit per component");
+
 /** Layout of every transitionable component, indexed by box_render_transition_component_t */
 static const box_render_transition_layout_t box_transition_layouts[
     BOX_RENDER_TRANSITION_COMPONENTS] =
@@ -60,7 +77,15 @@ static const box_render_transition_layout_t box_transition_layouts[
         BOX_TRANSITION_FLOAT(TextureTransform, scale_x),
         BOX_TRANSITION_FLOAT(TextureTransform, scale_y),
         BOX_TRANSITION_FLOAT(TextureTransform, offset_x),
-        BOX_TRANSITION_FLOAT(TextureTransform, offset_y) } }
+        BOX_TRANSITION_FLOAT(TextureTransform, offset_y) } },
+    [BOX_RENDER_TRANSITION_TRANSMISSION] = { ECS_SIZEOF(Transmission), 7, {
+        BOX_TRANSITION_FLOAT(Transmission, transmission_factor),
+        BOX_TRANSITION_FLOAT(Transmission, ior),
+        BOX_TRANSITION_FLOAT(Transmission, thickness_factor),
+        BOX_TRANSITION_FLOAT(Transmission, attenuation_distance),
+        BOX_TRANSITION_U8(Transmission, attenuation_color.r),
+        BOX_TRANSITION_U8(Transmission, attenuation_color.g),
+        BOX_TRANSITION_U8(Transmission, attenuation_color.b) } }
 };
 
 const box_render_transition_layout_t* box_render_transition_layout(
@@ -660,6 +685,7 @@ static void* box_transition_material_value(
     case BOX_RENDER_TRANSITION_PBR_MATERIAL: result = &material->pbr; break;
     case BOX_RENDER_TRANSITION_EMISSIVE: result = &material->emissive; break;
     case BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM: result = &material->uv; break;
+    case BOX_RENDER_TRANSITION_TRANSMISSION: result = &material->transmission; break;
     case BOX_RENDER_TRANSITION_OPACITY: result = &material->opacity; break;
     case BOX_RENDER_TRANSITION_TINT: result = &material->tint; break;
     case BOX_RENDER_TRANSITION_POSITION:
