@@ -553,6 +553,8 @@ static void editor_check_window(
     test_flt(b->height, h);
 }
 
+/** The editor fills the window after a resize, which only updates SurfaceStatus: the requested
+ * Surface size stays the same. */
 void Editor_follows_window_resize(void) {
     // editor/overlay
     ecs_world_t *world = editor_world();
@@ -561,7 +563,6 @@ void Editor_follows_window_resize(void) {
     editor_open(world, true);
     editor_check_window(world, 640, 360);
 
-    // A window resize only updates SurfaceStatus, the requested Surface size stays the same
     int32_t sizes[][2] = {{640, 600}, {960, 800}, {400, 200}};
     for (int32_t i = 0; i < 3; i ++) {
         int32_t w = sizes[i][0], h = sizes[i][1];
