@@ -504,6 +504,10 @@ static void BoxDrawsOnLightBake(
  * A shape under an active Opacity transition (TransitionOpacity) is keyed as if its alpha were
  * below 1, as it renders below its target alpha during the transition.
  *
+ * A 3D shape that has or inherits Transmission is transmissive whatever its factor: it draws in
+ * the sorted blended pass (AlphaBlend), is not alpha tested and casts no shadow, whatever its
+ * BlendMode, Opacity and AlphaCutoff.
+ *
  * @param world The world
  * @param d The state
  * @param e The entity
@@ -551,6 +555,13 @@ static void box_draws_key(
         ecs_get_target_for_id(world, e, EcsChildOf, DynamicMaterial) != 0;
     key->shadow = !shape2d && !ecs_has_id(world, e, NoShadow) &&
         !ecs_get_target_for_id(world, e, EcsChildOf, NoShadow);
+    key->transmissive = !shape2d && ecs_get(world, e, Transmission) != NULL;
+    if (key->transmissive) {
+        key->blend = AlphaBlend;
+        key->cutout = false;
+        key->shadow = false;
+    }
+
     key->bake = !shape2d && key->blend == Opaque && !ecs_has_id(world, e, DynamicTransform) &&
         !ecs_has_id(world, e, TransitionTransform) &&
         !ecs_has_id(world, e, TransitionMaterial) &&
@@ -721,6 +732,7 @@ void box_draws_shape_material(
         .pbr = ecs_get(world, e, PbrMaterial),
         .emissive = ecs_get(world, e, Emissive),
         .uv = ecs_get(world, e, TextureTransform),
+        .transmission = ecs_get(world, e, Transmission),
         .shape2d = ecs_get(world, e, Shape2D),
         .tint = ecs_get(world, e, Tint),
         .inherited = s->tinted ? &s->tint : NULL,

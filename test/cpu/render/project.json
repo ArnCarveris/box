@@ -41,7 +41,11 @@
                     "alpha_cutoff_batches",
                     "alpha_cutoff_prefab_and_dynamic",
                     "oreelse_fan_cutout",
-                    "oreelse_bay_cutout"
+                    "oreelse_bay_cutout",
+                    "transmission_defaults",
+                    "transmission_pack",
+                    "transmission_override_permutations",
+                    "transmission_dynamic_material_keeps_batch"
                 ]
             },
             {
@@ -266,7 +270,11 @@
                     "lights_2d_texts_get_no_slot",
                     "dynamic_material_own_slot_repacks",
                     "dynamic_material_instance_uploads_shading",
-                    "table_grows"
+                    "table_grows",
+                    "transmission_brings_material_id",
+                    "transmission_prefab_slot",
+                    "transmission_override_composes",
+                    "transmission_prefab_change_reaches_slot"
                 ]
             },
             {

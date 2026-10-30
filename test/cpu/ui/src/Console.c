@@ -604,6 +604,45 @@ void Console_scrollback_limit_counts_rows(void) {
     ecs_fini(world);
 }
 
+/** Count the rows of the scrollback lines the console shows, without the empty rows that fill
+ * the top of the log.
+ *
+ * @param world The world
+ * @return The rows
+ */
+static int32_t console_shown_rows(
+    ecs_world_t *world)
+{
+    ecs_entity_t lines[256];
+    int32_t i, count = console_log_lines(world, lines, 256), result = 0;
+    for (i = 0; i < count; i ++) {
+        const Text *t = ecs_get(world, lines[i], Text);
+        result += t->value && t->value[0] ? box_text_line(world, lines[i], 0, NULL, NULL) : 0;
+    }
+
+    return result;
+}
+
+/** Count the scrollback elements that show a line.
+ *
+ * @param world The world
+ * @param value The line
+ * @return The elements
+ */
+static int32_t console_count_line(
+    ecs_world_t *world,
+    const char *value)
+{
+    ecs_entity_t lines[256];
+    int32_t i, count = console_log_lines(world, lines, 256), result = 0;
+    for (i = 0; i < count; i ++) {
+        const Text *t = ecs_get(world, lines[i], Text);
+        result += t->value && !strcmp(t->value, value);
+    }
+
+    return result;
+}
+
 /** Count the times the Text of an entity is set.
  *
  * @param it Iterator over the entities whose Text was set
@@ -873,6 +912,95 @@ void Console_lines_keep_scope(void) {
     console_check_span(world, root, 0, 1, syntax->scope);
     test_assert(console_find_line(world, "parent $ pwd") != 0);
     test_str(console_value(world), "parent $ ");
+
+    ecs_fini(world);
+}
+
+void Console_prompt_scope_deleted(void) {
+    // console/prompt
+    ecs_world_t *world = console_open(640, 360, NULL);
+    ecs_entity_t line = ecs_lookup(world, CONSOLE_INPUT ".line");
+    ecs_entity_t parent = ecs_entity(world, { .name = "parent" });
+    ecs_os_free(box_console_run(world, "cd parent", NULL));
+    ecs_os_free(box_console_run(world, "pwd", NULL));
+    ecs_progress(world, 0);
+    test_str(console_value(world), "parent $ ");
+
+    // Deleting the scope outside a command moves the prompt back to the root without a key
+    ecs_delete(world, parent);
+    ecs_progress(world, 0);
+    test_str(console_value(world), CONSOLE_PROMPT);
+    test_int(ecs_get(world, line, Text)->hang, CONSOLE_PROMPT_LEN);
+
+    // The line that ran in the scope keeps its prompt
+    test_assert(console_find_line(world, "parent $ pwd") != 0);
+
+    ecs_fini(world);
+}
+
+void Console_prompt_scope_renamed(void) {
+    // console/prompt
+    ecs_world_t *world = console_open(640, 360, NULL);
+    ecs_entity_t parent = ecs_entity(world, { .name = "parent" });
+    ecs_os_free(box_console_run(world, "cd parent", NULL));
+    ecs_progress(world, 0);
+    console_type(world, "ls");
+    test_str(console_value(world), "parent $ ls");
+
+    // Renaming the scope shows the new name, the typed text stays
+    ecs_set_name(world, parent, "renamed");
+    ecs_progress(world, 0);
+    test_str(console_value(world), "renamed $ ls");
+    test_assert(console_find_line(world, CONSOLE_PROMPT "cd parent") != 0);
+
+    ecs_fini(world);
+}
+
+void Console_prompt_scope_moved(void) {
+    // console/prompt
+    ecs_world_t *world = console_open(640, 360, NULL);
+    ecs_entity_t child = ecs_entity(world, { .name = "parent.child" });
+    ecs_entity_t parent = ecs_get_target(world, child, EcsChildOf, 0);
+    ecs_entity_t other = ecs_entity(world, { .name = "other" });
+    ecs_os_free(box_console_run(world, "cd parent.child", NULL));
+    ecs_progress(world, 0);
+    test_str(console_value(world), "parent.child $ ");
+
+    // Moving the parent of the scope shows the new path
+    test_assert(parent != 0);
+    ecs_add_pair(world, parent, EcsChildOf, other);
+    ecs_progress(world, 0);
+    test_str(console_value(world), "other.parent.child $ ");
+
+    // Moving the scope itself does the same
+    ecs_add_pair(world, child, EcsChildOf, other);
+    ecs_progress(world, 0);
+    test_str(console_value(world), "other.child $ ");
+
+    ecs_fini(world);
+}
+
+void Console_prompt_scope_spans(void) {
+    // console/prompt
+    ecs_world_t *world = console_open(640, 360, NULL);
+    const ConsoleSyntax *syntax = &ecs_singleton_get(world, Console)->syntax;
+    ecs_entity_t line = ecs_lookup(world, CONSOLE_INPUT ".line");
+    ecs_entity_t parent = ecs_entity(world, { .name = "parent" });
+    ecs_entity(world, { .name = "parent.item" });
+    ecs_os_free(box_console_run(world, "cd parent", NULL));
+    ecs_progress(world, 0);
+    console_type(world, "ls item");
+    test_str(console_value(world), "parent $ ls item");
+    console_check_span(world, line, 0, 6, syntax->scope);
+    console_check_span(world, line, 12, 16, syntax->entity);
+
+    // Deleting the scope colors the prompt and resolves the typed entity from the root
+    ecs_delete(world, parent);
+    ecs_progress(world, 0);
+    test_str(console_value(world), CONSOLE_PROMPT "ls item");
+    console_check_span(world, line, 0, 1, syntax->scope);
+    console_check_span(world, line, 2, 3, syntax->symbol);
+    console_check_span(world, line, 7, 11, syntax->missing);
 
     ecs_fini(world);
 }
@@ -1185,6 +1313,150 @@ void Console_type_from_script(void) {
     test_str(console_value(world), CONSOLE_PROMPT "cd items");
     test_str(console_typed(world), "cd it");
     console_check_cursor(world, 5);
+
+    ecs_fini(world);
+}
+
+void Console_rewrap_trims_scrollback(void) {
+    // console/wrap
+    ecs_entity_t s;
+    ecs_world_t *world = console_open(640, 360, &s);
+    const Console *c = ecs_singleton_get(world, Console);
+    float lh = c->line_height;
+    int32_t limit = 24;
+    Console *w = ecs_singleton_get_mut(world, Console);
+    w->width = 1;
+    w->scrollback = limit;
+    ecs_singleton_modified(world, Console);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    for (int32_t i = 0; i < 10; i ++) {
+        ecs_os_free(box_console_run(world, CONSOLE_LONG_COMMAND, NULL));
+    }
+
+    ecs_progress(world, 0);
+    ecs_entity_t cmd = console_find_line(world, CONSOLE_PROMPT CONSOLE_LONG_COMMAND);
+    test_assert(cmd != 0);
+    int32_t wide = box_text_line(world, cmd, 0, NULL, NULL);
+
+    // Scrolled to the oldest line that is kept
+    for (int32_t i = 0; i < 20; i ++) {
+        box_input_mouse_scroll(world, 0, 1);
+    }
+
+    console_settle(world);
+
+    // Half the width wraps the lines to more rows: the oldest lines are dropped without
+    // running another command
+    ecs_singleton_get_mut(world, Console)->width = 0.5f;
+    ecs_singleton_modified(world, Console);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    cmd = console_find_line(world, CONSOLE_PROMPT CONSOLE_LONG_COMMAND);
+    test_assert(cmd != 0);
+    int32_t narrow = console_check_fits(world, cmd, CONSOLE_WRAP);
+    test_assert(narrow > wide);
+
+    // The scroll offset stays valid: the lines shown fill the window
+    ecs_entity_t log = ecs_lookup(world, CONSOLE_LOG);
+    ecs_entity_t lines[256];
+    int32_t i, count = console_log_lines(world, lines, 256), rows = 0;
+    int32_t visible = (int32_t)floorf(ecs_get(world, log, LayoutBounds)->height / lh);
+    float under = -ecs_get(world, log, Layout)->padding.bottom;
+    test_assert(count > 0);
+    test_assert(under >= 0);
+    for (i = 0; i < count; i ++) {
+        const Text *t = ecs_get(world, lines[i], Text);
+        test_assert(t->value && t->value[0]);
+        rows += box_text_line(world, lines[i], 0, NULL, NULL);
+    }
+
+    test_assert(under < (float)box_text_line(world, lines[count - 1], 0, NULL, NULL) * lh);
+    test_assert(rows - (int32_t)(under / lh + 0.5f) >= visible);
+
+    // A taller surface shows the whole scrollback, which keeps at most the limit of rows
+    ecs_set(world, s, Surface, {.width = 640, .height = 1200, .resolution_scale = 1});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_assert(console_shown_rows(world) <= limit);
+    test_assert(console_shown_rows(world) > limit - narrow - 1);
+    test_flt(ecs_get(world, log, Layout)->padding.bottom, 0);
+    test_assert(console_count_line(world, CONSOLE_PROMPT CONSOLE_LONG_COMMAND) > 0);
+
+    ecs_fini(world);
+}
+
+void Console_trailing_spaces_move_cursor(void) {
+    // console/wrap
+    ecs_world_t *world = console_open(640, 360, NULL);
+    const Console *c = ecs_singleton_get(world, Console);
+    float lh = c->line_height;
+    ecs_entity_t input = ecs_lookup(world, CONSOLE_INPUT);
+    ecs_entity_t line = ecs_lookup(world, CONSOLE_INPUT ".line");
+    ecs_entity_t cursor = ecs_lookup(world, CONSOLE_INPUT ".cursor");
+    char typed[256] = {0};
+    int32_t len = 0;
+
+    // A line that fills the first row
+    while (len < 200) {
+        console_type(world, "x");
+        typed[len ++] = 'x';
+        if (box_text_line(world, line, 0, NULL, NULL) > 1) {
+            break;
+        }
+    }
+
+    test_assert(len < 200);
+    console_press(world, KeyBackspace, 1);
+    typed[-- len] = '\0';
+    test_int(box_text_line(world, line, 0, NULL, NULL), 1);
+    test_flt(ecs_get(world, input, LayoutBounds)->height, lh);
+    test_int(console_check_cursor(world, len), 0);
+
+    // Spaces past the right edge move the cursor to the next row, under the start of the line
+    console_type(world, "            ");
+    int32_t spaces = len + 12;
+    test_int(box_text_line(world, line, 0, NULL, NULL), 2);
+    test_flt(ecs_get(world, input, LayoutBounds)->height, 2 * lh);
+    test_int(console_check_cursor(world, spaces), 1);
+    TextCaret hang;
+    test_assert(box_text_caret(world, line, CONSOLE_PROMPT_LEN, &hang));
+    float x = hang.x + ecs_get(world, line, TextBounds)->width * 0.5f;
+    test_flt(ecs_get(world, cursor, LayoutItem)->x, x);
+    test_assert(x > 0);
+
+    // The log gives up the row
+    float log_h = ecs_get(world, ecs_lookup(world, CONSOLE_LOG), LayoutBounds)->height;
+    test_flt(log_h, 360 - 2 * c->padding - 2 * lh);
+
+    // A word typed after them starts the next row there
+    console_type(world, "y");
+    test_int(box_text_line(world, line, 0, NULL, NULL), 2);
+    TextCaret word;
+    test_assert(box_text_caret(world, line, CONSOLE_PROMPT_LEN + spaces, &word));
+    test_int(word.line, 1);
+    test_flt(word.x + ecs_get(world, line, TextBounds)->width * 0.5f, x);
+    test_int(console_check_cursor(world, spaces + 1), 1);
+
+    // Back to the spaces, the line ran with them does not gain an empty row in the scrollback
+    console_press(world, KeyBackspace, 1);
+    test_int(console_check_cursor(world, spaces), 1);
+    console_press(world, KeyEnter, 1);
+    test_flt(ecs_get(world, input, LayoutBounds)->height, lh);
+    ecs_entity_t lines[256];
+    int32_t i, count = console_log_lines(world, lines, 256), found = 0;
+    for (i = 0; i < count; i ++) {
+        const Text *t = ecs_get(world, lines[i], Text);
+        if (t->value && !strncmp(t->value, CONSOLE_PROMPT, CONSOLE_PROMPT_LEN) &&
+            !strncmp(t->value + CONSOLE_PROMPT_LEN, typed, (size_t)len))
+        {
+            found ++;
+            test_int(box_text_line(world, lines[i], 0, NULL, NULL), 1);
+            test_flt(ecs_get(world, lines[i], LayoutItem)->height.value, lh);
+        }
+    }
+
+    test_int(found, 1);
 
     ecs_fini(world);
 }

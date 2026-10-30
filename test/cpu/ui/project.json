@@ -102,7 +102,8 @@
                     "hang_indents_wrapped_lines",
                     "hang_long_word_breaks_at_hang",
                     "hang_past_half_ignored",
-                    "hang_not_after_newline"
+                    "hang_not_after_newline",
+                    "trailing_spaces_caret_next_line"
                 ]
             },
             {
@@ -153,7 +154,8 @@
                     "hit_long_line",
                     "edited_this_frame",
                     "without_text",
-                    "font_not_loaded"
+                    "font_not_loaded",
+                    "trailing_spaces_next_line"
                 ]
             },
             {
@@ -401,8 +403,14 @@
                     "scroll_counts_rows",
                     "scrollback_limit_counts_rows",
                     "resize_rewraps",
+                    "rewrap_trims_scrollback",
+                    "trailing_spaces_move_cursor",
                     "prompt_root_and_scope",
                     "lines_keep_scope",
+                    "prompt_scope_deleted",
+                    "prompt_scope_renamed",
+                    "prompt_scope_moved",
+                    "prompt_scope_spans",
                     "ctrl_a_e",
                     "ctrl_u_k",
                     "ctrl_w",

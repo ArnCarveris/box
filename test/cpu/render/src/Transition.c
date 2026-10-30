@@ -473,6 +473,7 @@ void Transition_remove_transition_snaps(void) {
     tr_frame(world);
     ecs_set(world, e, Position, {4, 0, 0});
     tr_frames(world, 2);
+    box_render_sync(world);
     test_int(box_render_transition_test_active(world), 1);
 
     ecs_remove(world, e, Transition);
@@ -493,6 +494,7 @@ void Transition_remove_component_snaps(void) {
     tr_frame(world);
     ecs_set(world, e, Position, {4, 0, 0});
     tr_frames(world, 2);
+    box_render_sync(world);
     test_int(box_render_transition_test_active(world), 1);
 
     ecs_remove(world, e, Position);
@@ -517,6 +519,7 @@ void Transition_delete_entity_drops(void) {
     tr_frame(world);
     ecs_set(world, e, Position, {4, 0, 0});
     tr_frames(world, 2);
+    box_render_sync(world);
     test_int(box_render_transition_test_active(world), 1);
 
     ecs_delete(world, e);
@@ -1784,7 +1787,7 @@ void Transition_record_sizes(void) {
     test_int(ECS_SIZEOF(box_render_transform_t), 48);
     test_int(ECS_SIZEOF(box_render_mesh_shading_t), 16);
     test_int(ECS_SIZEOF(box_render_shading_t), 80);
-    test_int(ECS_SIZEOF(box_render_material_t), 48);
+    test_int(ECS_SIZEOF(box_render_material_t), 64);
 }
 
 void Transition_idle_no_work(void) {

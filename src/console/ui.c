@@ -428,7 +428,8 @@ static float box_console_panel_size(
 }
 
 /** Lay out the panel on the surface and set the look of the console. The rows of the
- * scrollback lines are measured again when the width they wrap at or the font size changed.
+ * scrollback lines are measured again when the width they wrap at or the font size changed,
+ * and the scrollback is trimmed to them in the next sync.
  *
  * @param world The world
  * @param con The console state
@@ -450,6 +451,8 @@ static void box_console_ui_layout(
         for (i = 0; i < ecs_vec_count(&con->lines); i ++) {
             ecs_vec_get_t(&con->lines, box_console_line_t, i)->rows = 0;
         }
+
+        con->trim = true;
     }
 
     if (con->surface) {
@@ -531,7 +534,15 @@ int32_t box_console_line_rows(
 
     if (!l->rows) {
         Text look = box_console_look(con, console, l->text, l->hang);
-        l->rows = box_text_break_lines(world, &look, NULL);
+        int32_t len = (int32_t)strlen(l->text);
+        bool spaces = len && (l->text[len - 1] == ' ' || l->text[len - 1] == '\t');
+        ecs_vec_t starts;
+        ecs_vec_init_t(NULL, &starts, int32_t, 0);
+        l->rows = box_text_break_lines(world, &look, spaces ? &starts : NULL);
+        l->strip = spaces && l->rows > 1 &&
+            ecs_vec_last_t(&starts, int32_t)[0] == len;
+        l->rows -= l->strip ? 1 : 0;
+        ecs_vec_fini_t(NULL, &starts, int32_t);
         con->pending = con->pending || (!l->rows && box_console_font_loading(world, con));
     }
 
@@ -555,6 +566,9 @@ int32_t box_console_scrollback_rows(
 /** Write the input line after the prompt of the session into its text, wrapped at the width of
  * the panel, with the suggestion of the history dimmed after it, and put the cursor on the caret
  * of its row and column. The prompt takes the error color while the bell of Tab rings.
+ *
+ * Spaces at the end past the right edge put the caret after them on the next row. The cursor
+ * stays left of the edge for a caret between such spaces.
  *
  * @param world The world
  * @param con The console state
@@ -602,7 +616,8 @@ static int32_t box_console_ui_input(
     box_console_spans(world, ui->line, &spans, 0, console);
     ecs_vec_fini_t(NULL, &spans, box_console_span_t);
     ecs_os_free(value);
-    ecs_os_free(head);
+    ecs_os_free(con->prompted);
+    con->prompted = head;
     rows = box_text_line(world, ui->line, 0, NULL, NULL);
     con->pending = con->pending || (!rows && box_console_font_loading(world, con));
     rows = rows > 0 ? rows : 1;
@@ -697,6 +712,53 @@ static int32_t box_console_ui_menu(
     return rows;
 }
 
+/** Test whether the input line was drawn with the prompt the session has now. The path of the
+ * scope is matched name by name against the drawn prompt, so a scope that did not change costs no
+ * allocation. Names that a path would escape or skip build the prompt to compare instead.
+ *
+ * @param world The world
+ * @param con The console state
+ * @return Whether the drawn prompt is the current one
+ */
+static bool box_console_ui_prompted(
+    ecs_world_t *world,
+    const box_console_t *con)
+{
+    const char *drawn = con->prompted;
+    ecs_entity_t e = box_console_session_scope(world, con);
+    int32_t end = (int32_t)strlen(drawn) - (int32_t)strlen(BOX_CONSOLE_SYMBOL);
+    bool same = end >= 0 && !strcmp(&drawn[end], BOX_CONSOLE_SYMBOL);
+    char *prompt = NULL;
+    if (same && !e) {
+        same = !strncmp(drawn, BOX_CONSOLE_ROOT, (size_t)end) && !BOX_CONSOLE_ROOT[end];
+    }
+
+    while (same && e) {
+        const char *name = ecs_get_name(world, e);
+        int32_t len = name ? (int32_t)strlen(name) : 0;
+        ecs_entity_t parent = ecs_get_parent(world, e);
+        if (!len || strchr(name, '.') || parent == EcsFlecsCore) {
+            prompt = box_console_prompt(world, con, NULL);
+            same = !strcmp(prompt, drawn);
+            break;
+        }
+
+        same = end >= len && !strncmp(&drawn[end - len], name, (size_t)len);
+        end -= len;
+        if (same && parent) {
+            same = end > 0 && drawn[end - 1] == '.';
+            end --;
+        }
+
+        same = same && (parent || !end);
+        e = parent;
+    }
+
+    ecs_os_free(prompt);
+
+    return same;
+}
+
 /** Write the visible part of the scrollback into the line elements.
  *
  * The window is the rows that fit, con->scroll rows up from the newest. Every line with a row
@@ -746,7 +808,9 @@ static void box_console_ui_scrollback(
         ecs_entity_t e = ecs_vec_get_t(&con->ui.lines, ecs_entity_t, i)[0];
         box_console_line_t *l = i >= fill ?
             ecs_vec_get_t(&con->lines, box_console_line_t, first + i - fill) : NULL;
+        int32_t rows = l ? box_console_line_rows(world, con, console, l) : 1;
         const char *text = l ? l->text : "";
+        char *stripped = NULL;
         rgb color = console->text;
         if (l && l->kind == BoxConsoleCommand) {
             color = console->command;
@@ -754,10 +818,20 @@ static void box_console_ui_scrollback(
             color = console->error;
         }
 
+        if (l && l->strip) {
+            int32_t len = (int32_t)strlen(text);
+            while (len && (text[len - 1] == ' ' || text[len - 1] == '\t')) {
+                len --;
+            }
+
+            stripped = flecs_asprintf("%.*s", len, text);
+            text = stripped;
+        }
+
         box_console_text(world, e, text, l ? l->hang : 0, con, console, color);
         box_console_spans(world, e, l ? &l->spans : NULL, 0, console);
-        box_console_rows_height(world, e, l ? box_console_line_rows(world, con, console, l) : 1,
-            console);
+        box_console_rows_height(world, e, rows, console);
+        ecs_os_free(stripped);
     }
 
     const Layout *layout = ecs_get(world, con->ui.log, Layout);
@@ -767,6 +841,36 @@ static void box_console_ui_scrollback(
             .direction = DirectionColumn, .v = VAlignBottom, .padding = { .bottom = under }
         });
     }
+}
+
+/** Trim the scrollback to Console.scrollback again after its rows were reset, once every line
+ * is measured: a line whose font still loads would count as one row, so the trim waits for a
+ * later sync while con->pending is set by the lines.
+ *
+ * @param world The world
+ * @param con The console state
+ * @param console The Console singleton
+ */
+static void box_console_ui_retrim(
+    ecs_world_t *world,
+    box_console_t *con,
+    const Console *console)
+{
+    bool pending = con->pending;
+    if (!con->trim) {
+        goto done;
+    }
+
+    con->pending = false;
+    box_console_scrollback_rows(world, con, console);
+    if (!con->pending) {
+        box_console_trim(world, con);
+        con->trim = false;
+    }
+
+    con->pending = con->pending || pending;
+done:
+    return;
 }
 
 void box_console_ui_sync(
@@ -786,6 +890,12 @@ void box_console_ui_sync(
         con->refresh = true;
     }
 
+    if (con->prompted && !box_console_ui_prompted(world, con)) {
+        con->refresh = true;
+        ecs_os_free(con->colored);
+        con->colored = NULL;
+    }
+
     if (con->refresh && (!con->colored || strcmp(con->colored, con->line))) {
         box_console_syntax(world, con, con->line, &con->spans);
         ecs_os_free(con->colored);
@@ -799,6 +909,7 @@ void box_console_ui_sync(
         box_console_panel_size(con, console, &h);
         room = h - 2 * console->padding - (float)(input + menu) * lh;
         con->rows = lh > 0 && room > 0 ? (int32_t)floorf(room / lh) : 0;
+        box_console_ui_retrim(world, con, console);
         box_console_ui_scrollback(world, con, console);
         con->refresh = false;
     }

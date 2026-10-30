@@ -319,8 +319,8 @@ static void BoxMaterialsOnIsA(
  * Owners of a slot pack it again; flecs does not propagate past an owner of the component, so a
  * slot that owns the changed field is left alone. 2D shapes and texts write their shading again.
  *
- * Mesh shapes reference the slot and write nothing, unless an added or removed AlphaCutoff
- * changes their batch.
+ * Mesh shapes reference the slot and write nothing, unless an added or removed AlphaCutoff or
+ * Transmission changes their batch.
  *
  * @param it The iterator of the observer
  */
@@ -340,7 +340,8 @@ static void BoxMaterialsOnComponent(
     bool inline_ = !ecs_table_has_id(world, table, ecs_id(ShapeMesh)) ||
         ecs_table_has_id(world, table, ecs_id(Shape2D)) ||
         ecs_table_has_id(world, table, ecs_id(Text));
-    bool keyed = it->event_id == ecs_id(AlphaCutoff) && it->event != EcsOnSet;
+    bool keyed = (it->event_id == ecs_id(AlphaCutoff) || it->event_id == ecs_id(Transmission)) &&
+        it->event != EcsOnSet;
     bool mark = !prefab && (inline_ || keyed);
     for (i = 0; i < it->count; i ++) {
         if (owners) {
@@ -360,13 +361,13 @@ void box_draws_materials_observers(
     ecs_world_t *world,
     box_render_draws_t *d)
 {
-    ecs_entity_t components[5] = {
+    ecs_entity_t components[6] = {
         ecs_id(Rgb), ecs_id(PbrMaterial), ecs_id(Emissive), ecs_id(TextureTransform),
-        ecs_id(AlphaCutoff)
+        ecs_id(AlphaCutoff), ecs_id(Transmission)
     };
-    const char *names[5] = {
+    const char *names[6] = {
         "DrawsOnColor", "DrawsOnPbrMaterial", "DrawsOnEmissive", "DrawsOnTextureTransform",
-        "DrawsOnAlphaCutoff"
+        "DrawsOnAlphaCutoff", "DrawsOnTransmission"
     };
     int32_t i;
     box_draws_observer(world, d, "MaterialsOnPrefab", (ecs_observer_desc_t){
@@ -391,7 +392,9 @@ void box_draws_materials_observers(
         .query.flags = EcsQueryMatchPrefab,
         .events = { EcsOnAdd, EcsOnRemove } }, BoxMaterialsOnIsA);
 
-    for (i = 0; i < 5; i ++) {
+    for (i = 0; i < 6; i ++) {
+        bool keyed = components[i] == ecs_id(AlphaCutoff) ||
+            components[i] == ecs_id(Transmission);
         box_draws_observer(world, d, names[i], (ecs_observer_desc_t){
             .query.terms = {{
                 .id = components[i],
@@ -399,8 +402,7 @@ void box_draws_materials_observers(
                 .trav = EcsIsA
             }},
             .query.flags = EcsQueryMatchPrefab,
-            .events = { EcsOnSet, EcsOnRemove,
-                components[i] == ecs_id(AlphaCutoff) ? EcsOnAdd : 0 } },
+            .events = { EcsOnSet, EcsOnRemove, keyed ? EcsOnAdd : 0 } },
             BoxMaterialsOnComponent);
     }
 }
@@ -417,6 +419,7 @@ void box_draws_material_of(
         out->emissive = ecs_get(world, owner, Emissive);
         out->uv = ecs_get(world, owner, TextureTransform);
         out->cutoff = ecs_get(world, owner, AlphaCutoff);
+        out->transmission = ecs_get(world, owner, Transmission);
     }
 }
 
