@@ -17,3 +17,5 @@ prefab WestGlass { Rgb: {44, 74, 76}; PbrMaterial: {metallic: 0.28, roughness: 0
 prefab WestCanvas { Rgb: {223, 204, 160}; PbrMaterial: {roughness: 0.98} }
 prefab WestSand { Rgb: {197, 151, 92}; PbrMaterial: {roughness: 1} }
 prefab WestStone { Rgb: {163, 86, 51}; PbrMaterial: {roughness: 0.97} }
+
+WestFont { Font: {path: "etc/scenes/wild_wild_west/fonts/Rye-Regular.ttf"} }

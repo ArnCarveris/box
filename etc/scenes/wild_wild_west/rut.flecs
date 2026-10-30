@@ -1,0 +1,22 @@
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+
+
+@tree Parent
+template WestRut {
+  prop ax: f32 = 0
+  prop az: f32 = 0
+  prop bx: f32 = 1
+  prop bz: f32 = 0
+  prop width: f32 = 0.2
+  prop tint: Rgb = {170, 128, 76}
+  const dx = bx - ax
+  const dz = bz - az
+  Position: {(ax + bx) / 2, 0.112, (az + bz) / 2}
+  Rotation: {0, -math.atan2(dz, dx), 0}
+  Box: {math.sqrt(dx * dx + dz * dz) + width / 2, 0.012, width}
+  Rgb: tint
+  PbrMaterial: {roughness: 1}
+}
