@@ -578,8 +578,8 @@ not each instance, and the prefab is the one node.
 
 ### The cost
 
-The numbers of the cases above, from `bench/render` in a release build on an Apple M6 (arm64
-macOS), per frame. Run them with
+The numbers of the cases above, from `bench/render` in a release build on Apple silicon (an
+arm64 Linux VM with 4 cores), per frame. Run them with
 `bake3 run --cfg release bench/render --local-env -- Transition` and update this table when the
 extract or the resolver change. The frame is the `ns/iter` of the case; `transitions_ms` is the
 counter of the same name (its total, a time per frame measured over separate frames with system
@@ -587,27 +587,28 @@ time measurement on, so it is not a part of the frame column and can even exceed
 
 | Case                          | Frame (ms) | `transitions_ms` | Note                          |
 |-------------------------------|-----------:|-----------------:|-------------------------------|
-| `Transition_none_static`      |      0.069 |          0.00008 | baseline, no `Transition`     |
-| `Transition_none_dynamic`     |      0.266 |          0.00008 | baseline, 1% moved per frame  |
-| `Transition_one_idle`         |      0.070 |          0.00016 | one shape with `Transition`   |
-| `Transition_one_active`       |      0.070 |          0.00038 | one shape restarted per frame |
-| `Transition_idle_1000`        |      0.107 |            0.079 | 1000 idle nodes               |
-| `Transition_active_1000`      |      0.474 |            0.143 | 1000 active nodes             |
-| `Transition_prefab_rgb_idle`  |      TODO |             TODO | 10,000 inheriting instances   |
-| `Transition_prefab_rgb_active`|      TODO |             TODO | the same, prefab `Rgb` active |
-| `Transition_resolve_empty`    |   0.000002 |                - | resolver on an empty packet   |
+| `Transition_none_static`      |      0.076 |          0.00013 | baseline, no `Transition`     |
+| `Transition_none_dynamic`     |      0.338 |          0.00016 | baseline, 1% moved per frame  |
+| `Transition_one_idle`         |      0.076 |          0.00021 | one shape with `Transition`   |
+| `Transition_one_active`       |      0.078 |          0.00046 | one shape restarted per frame |
+| `Transition_idle_1000`        |      0.127 |            0.053 | 1000 idle nodes               |
+| `Transition_active_1000`      |      0.612 |            0.198 | 1000 active nodes             |
+| `Transition_prefab_rgb_idle`  |      0.014 |          0.00024 | 10,000 inheriting instances   |
+| `Transition_prefab_rgb_active`|      0.017 |          0.00039 | the same, prefab `Rgb` active |
+| `Transition_resolve_empty`    |   0.000001 |                - | resolver on an empty packet   |
 
 What to read from them: the frame of `Transition_one_*` equals that of `Transition_none_static`
-within noise (0.070 and 0.069 ms), so the 110,000 other shapes do not pay for one shape with
-`Transition`, and a world without it spends 0.08 µs per frame in the two transition systems. An
-idle node costs one compare per transitioned component per frame, about 80 ns (0.079 ms for
+within noise (0.076 to 0.078 ms), so the 110,000 other shapes do not pay for one shape with
+`Transition`, and a world without it spends 0.13 µs per frame in the two transition systems. An
+idle node costs one compare per transitioned component per frame, about 50 ns (0.053 ms for
 1000). An active node adds its records and its patches, and an active transform node the walk of
-its subtree: 1000 active nodes take 0.143 ms in the extract and rekey their slots to dynamic
-batches, which makes their frame 0.474 ms. Declaring `Transition` on a prefab costs nearly
+its subtree: 1000 active nodes take 0.198 ms in the extract and rekey their slots to dynamic
+batches, which makes their frame 0.612 ms. Declaring `Transition` on a prefab costs nearly
 nothing for instances that own none of its listed values: they are no nodes, so 10,000 of them
-idle near the level of `Transition_none_static` (TODO ms, was 0.467 ms when every instance was a
-node), and while the prefab's `Rgb` runs the walk visits the prefab alone (`material_visited` 1). The
-resolver returns from a packet without records in 2 ns.
+idle at the level of `Transition_none_static` (0.00024 ms in the transition systems and a
+0.014 ms frame, against 0.30 ms and 0.368 ms when every instance was a node), and while the
+prefab's `Rgb` runs the walk visits the prefab alone (`material_visited` 1). The resolver returns
+from a packet without records in 1.5 ns.
 
 ## Tests
 

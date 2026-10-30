@@ -860,7 +860,6 @@ void TransitionMaterial_prefab_instance_override_node(void) {
     test_int(box_render_transition_test_node(world, a), 0);
     test_int(box_render_transition_test_node(world, b), 0);
 
-    /* The first value the instance owns sets without a transition */
     ecs_set(world, a, Rgb, {0, 0, 0});
     tr_frame(world);
     test_assert(box_render_transition_test_node(world, a) != 0);
@@ -875,7 +874,6 @@ void TransitionMaterial_prefab_instance_override_node(void) {
         test_uint(rendered.color, tr_color_word(0, 0, 0));
     }
 
-    /* A later change of its own value animates */
     ecs_set(world, a, Rgb, {200, 100, 40});
     for (i = 0; i < 4; i ++) {
         uint32_t k = (uint32_t)i;
@@ -890,7 +888,6 @@ void TransitionMaterial_prefab_instance_override_node(void) {
     test_assert(tr_material_rendered(world, null, slot_a, &rendered));
     test_uint(rendered.color, tr_color_word(200, 100, 40));
 
-    /* Removing the override destroys the node and renders the inherited target */
     ecs_set(world, a, Rgb, {0, 0, 0});
     tr_frame(world);
     ecs_remove(world, a, Rgb);
@@ -904,6 +901,9 @@ void TransitionMaterial_prefab_instance_override_node(void) {
     box_draws_material_of(world, a, &m);
     box_draws_material_pack(&expected, &m);
     test_uint(expected.color, tr_color_word(200, 100, 40));
+    const box_draw_materials_t *table = &box_draws_state(world)->materials;
+    test_assert(!ecs_os_memcmp_t(&expected, ecs_vec_get_t(&table->records,
+        box_render_material_t, (int32_t)slot), box_render_material_t));
     if (tr_material_rendered(world, null, slot, &rendered)) {
         test_uint(rendered.color, tr_color_word(200, 100, 40));
     }
