@@ -1947,7 +1947,7 @@ void Transition_record_sizes(void) {
     test_int(ECS_SIZEOF(box_render_transform_t), 48);
     test_int(ECS_SIZEOF(box_render_mesh_shading_t), 16);
     test_int(ECS_SIZEOF(box_render_shading_t), 80);
-    test_int(ECS_SIZEOF(box_render_material_t), 64);
+    test_int(ECS_SIZEOF(box_render_material_t), 80);
 }
 
 void Transition_idle_no_work(void) {

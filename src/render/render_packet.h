@@ -815,6 +815,9 @@ typedef struct box_render_material_t {
     float thickness_factor; /**< Transmission.thickness_factor, 0 without one */
     float attenuation_distance; /**< Transmission.attenuation_distance,
                              *   BOX_MATERIAL_ATTENUATION_DISTANCE without one */
+    uint32_t clear_coat;    /**< ClearCoat strength | roughness << 16, two unorm16 clamped to
+                             *   0..1, 0 without one */
+    uint32_t reserved[3];   /**< 0, pads the record to the 16 byte alignment of Material */
 } box_render_material_t;
 
 /** Shading of a mesh instance, the shading stream of a mesh instance page, MeshShading of

@@ -45,7 +45,9 @@
                     "transmission_defaults",
                     "transmission_pack",
                     "transmission_override_permutations",
-                    "transmission_dynamic_material_keeps_batch"
+                    "transmission_dynamic_material_keeps_batch",
+                    "clear_coat_defaults",
+                    "clear_coat_pack"
                 ]
             },
             {
@@ -274,7 +276,9 @@
                     "transmission_brings_material_id",
                     "transmission_prefab_slot",
                     "transmission_override_composes",
-                    "transmission_prefab_change_reaches_slot"
+                    "transmission_prefab_change_reaches_slot",
+                    "clear_coat_prefab_change_reaches_slot",
+                    "clear_coat_dynamic_material_repacks"
                 ]
             },
             {

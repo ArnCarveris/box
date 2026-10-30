@@ -1,0 +1,211 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+
+// Clear coat (ClearCoat) over rough bases in a room open at the top, lit by a sun from above
+// and behind the camera, with a box projected room probe of a bright window and two colored
+// panels. The top row of rough red balls has a coat of roughness 0.1 and strength 0, 0.25, 0.5,
+// 0.75 and 1 from left to right: a second, sharp highlight and a sharp reflection of the panels
+// grow over the soft one of the base. The middle row has a full coat of roughness 0, 0.15, 0.3,
+// 0.5 and 0.8: the second highlight widens and dims. Below, a rough gold metal with a smooth
+// coat next to the same metal without one, and two normal mapped panels, the right one coated,
+// whose coat reflects the window smoothly over the bumps.
+room {
+  Scene: {}
+  ReflectionBake: {resolution: 128}
+  AmbientLight: {intensity: 0.15}
+
+  camera {
+    Position: {0, 1.9, 5.6}
+    Rotation: {-0.12, 0, 0}
+    Camera: {fov: 55}
+  }
+
+  sun {
+    Rotation: {0.7, 2.7, 0}
+    DirectionalLight: {intensity: 4}
+  }
+
+  floor {
+    Position: {0, -0.1, 0}
+    Box: {12, 0.2, 14}
+    Rgb: {70, 70, 74}
+    PbrMaterial: {roughness: 0.8}
+  }
+
+  back_wall {
+    Position: {0, 2.5, -4.1}
+    Box: {12, 5, 0.2}
+    Rgb: {50, 52, 58}
+  }
+
+  left_wall {
+    Position: {-6.1, 2.5, 1}
+    Box: {0.2, 5, 10}
+    Rgb: {50, 52, 58}
+  }
+
+  right_wall {
+    Position: {6.1, 2.5, 1}
+    Box: {0.2, 5, 10}
+    Rgb: {50, 52, 58}
+  }
+
+  front_wall {
+    Position: {0, 2.5, 6.1}
+    Box: {12, 5, 0.2}
+    Rgb: {50, 52, 58}
+  }
+
+  window {
+    Position: {0, 3.2, 5.95}
+    Box: {6, 1.2, 0.1}
+    Rgb: {0, 0, 0}
+    Emissive: {strength: 3, color: {255, 250, 240}}
+  }
+
+  blue_panel {
+    Position: {-5.95, 2.4, 1}
+    Box: {0.1, 1.6, 3}
+    Rgb: {0, 0, 0}
+    Emissive: {strength: 2, color: {60, 110, 255}}
+  }
+
+  green_panel {
+    Position: {5.95, 2.4, 1}
+    Box: {0.1, 1.6, 3}
+    Rgb: {0, 0, 0}
+    Emissive: {strength: 2, color: {60, 255, 90}}
+  }
+
+  probe {
+    Position: {0, 2.5, 1}
+    ReflectionProbe: {extent: {6.2, 2.6, 5.2}, blend: 0.2, projection: {6, 2.5, 5}}
+  }
+
+  strength_0 {
+    Position: {-3, 3, 0}
+    Sphere: {segments: 48, smooth: true, radius: 0.55}
+    Rgb: {170, 25, 20}
+    PbrMaterial: {roughness: 0.65}
+    ClearCoat: {strength: 0, roughness: 0.1}
+  }
+
+  strength_1 {
+    Position: {-1.5, 3, 0}
+    Sphere: {segments: 48, smooth: true, radius: 0.55}
+    Rgb: {170, 25, 20}
+    PbrMaterial: {roughness: 0.65}
+    ClearCoat: {strength: 0.25, roughness: 0.1}
+  }
+
+  strength_2 {
+    Position: {0, 3, 0}
+    Sphere: {segments: 48, smooth: true, radius: 0.55}
+    Rgb: {170, 25, 20}
+    PbrMaterial: {roughness: 0.65}
+    ClearCoat: {strength: 0.5, roughness: 0.1}
+  }
+
+  strength_3 {
+    Position: {1.5, 3, 0}
+    Sphere: {segments: 48, smooth: true, radius: 0.55}
+    Rgb: {170, 25, 20}
+    PbrMaterial: {roughness: 0.65}
+    ClearCoat: {strength: 0.75, roughness: 0.1}
+  }
+
+  strength_4 {
+    Position: {3, 3, 0}
+    Sphere: {segments: 48, smooth: true, radius: 0.55}
+    Rgb: {170, 25, 20}
+    PbrMaterial: {roughness: 0.65}
+    ClearCoat: {strength: 1, roughness: 0.1}
+  }
+
+  roughness_0 {
+    Position: {-3, 1.7, 0}
+    Sphere: {segments: 48, smooth: true, radius: 0.55}
+    Rgb: {20, 60, 160}
+    PbrMaterial: {roughness: 0.65}
+    ClearCoat: {roughness: 0}
+  }
+
+  roughness_1 {
+    Position: {-1.5, 1.7, 0}
+    Sphere: {segments: 48, smooth: true, radius: 0.55}
+    Rgb: {20, 60, 160}
+    PbrMaterial: {roughness: 0.65}
+    ClearCoat: {roughness: 0.15}
+  }
+
+  roughness_2 {
+    Position: {0, 1.7, 0}
+    Sphere: {segments: 48, smooth: true, radius: 0.55}
+    Rgb: {20, 60, 160}
+    PbrMaterial: {roughness: 0.65}
+    ClearCoat: {roughness: 0.3}
+  }
+
+  roughness_3 {
+    Position: {1.5, 1.7, 0}
+    Sphere: {segments: 48, smooth: true, radius: 0.55}
+    Rgb: {20, 60, 160}
+    PbrMaterial: {roughness: 0.65}
+    ClearCoat: {roughness: 0.5}
+  }
+
+  roughness_4 {
+    Position: {3, 1.7, 0}
+    Sphere: {segments: 48, smooth: true, radius: 0.55}
+    Rgb: {20, 60, 160}
+    PbrMaterial: {roughness: 0.65}
+    ClearCoat: {roughness: 0.8}
+  }
+
+  coated_metal {
+    Position: {-3.4, 0.55, 1.2}
+    Sphere: {segments: 48, smooth: true, radius: 0.55}
+    Rgb: {230, 190, 110}
+    PbrMaterial: {metallic: 1, roughness: 0.6}
+    ClearCoat: {strength: 1, roughness: 0.05}
+  }
+
+  plain_metal {
+    Position: {-2.1, 0.55, 1.2}
+    Sphere: {segments: 48, smooth: true, radius: 0.55}
+    Rgb: {230, 190, 110}
+    PbrMaterial: {metallic: 1, roughness: 0.6}
+  }
+
+  bumps {
+    TexturePath: {path: "test/integration/visual/assets/bumps.png"}
+  }
+
+  bumpy_panel {
+    Position: {0.6, 0.75, 1.2}
+    Rotation: {-0.35, 0.2, 0}
+    Quad: {1.4, 1.4}
+    Rgb: {30, 110, 60}
+    PbrMaterial: {roughness: 0.5}
+    PbrTextures: {normal: bumps}
+  }
+
+  coated_bumpy_panel {
+    Position: {2.4, 0.75, 1.2}
+    Rotation: {-0.35, -0.2, 0}
+    Quad: {1.4, 1.4}
+    Rgb: {30, 110, 60}
+    PbrMaterial: {roughness: 0.5}
+    PbrTextures: {normal: bumps}
+    ClearCoat: {strength: 1, roughness: 0.02}
+  }
+}
+
+room_view {
+  View: {camera: room.camera, clear: {enabled: true, color: {0, 0, 0, 255}}}
+}
