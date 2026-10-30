@@ -70,6 +70,8 @@ typedef struct box_draw_page_t {
     uint32_t top;           /**< End of its highest run, the slots its buffers must hold */
     int32_t runs;           /**< Runs handed out */
     ecs_vec_t holes;        /**< box_draw_hole_t below top by first slot, never adjacent */
+    uint32_t serial;        /**< Bumped when the page is released, so a run of the released
+                             *   page is told apart from a run of a page that reuses its index */
     uint32_t entries[BOX_DRAWS_STREAMS]; /**< Scatter entries of the frame per stream */
     uint32_t offset[BOX_DRAWS_STREAMS];  /**< Byte offset of the scatter segment of each stream
                                           *   in the change buffer */
@@ -268,6 +270,14 @@ typedef struct box_draw_batch_t {
     uint32_t capacity;      /**< Slots of its run */
     uint8_t full;           /**< box_draw_kind_t, streams that upload every instance instead of
                              *   the changed slots */
+    uint32_t sent;          /**< Slots of its run the GPU holds the instances of: the instances
+                             *   it had when it was last sent, 0 before */
+    int32_t from_page;      /**< Page of the run it moved out of in this extract */
+    uint32_t from_first;    /**< First slot of that run */
+    uint32_t from_count;    /**< Slots of that run whose instances the GPU copies into the new
+                             *   run instead of uploading them, 0 when it did not move */
+    uint32_t from_serial;   /**< Serial of that page when the batch moved, see
+                             *   box_draw_page_t */
     bool ready;             /**< The backend has the mesh and the instances this frame */
     bool was_ready;         /**< It had them in the last frame, so a caster batch that gets
                              *   them records the regions of its slots */
@@ -980,12 +990,14 @@ void box_draws_store_free(
     uint32_t count);
 
 /** Make the buffers of a page hold its runs, creating them again by doubling up to the slots of
- * the page. A created buffer has none of the instances of the runs in it.
+ * the page. A buffer created again keeps the bytes of the buffer it replaces
+ * (BOX_RENDER_BUFFER_KEEP), so the runs of the page keep their instances; a buffer created for
+ * the first time has none of them.
  *
  * @param s The store
  * @param p The packet
  * @param page Index of the page
- * @return Whether the buffers were created, so every run of the page must upload
+ * @return Whether the buffers were created
  */
 bool box_draws_store_reserve(
     box_draw_store_t *s,

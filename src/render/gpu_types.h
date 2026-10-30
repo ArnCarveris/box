@@ -761,6 +761,9 @@ typedef struct box_gpu_t {
     int32_t scatter_revision;       /**< Revision of the shader the pipeline was made with */
     ecs_map_t meshes;               /**< Handle to box_gpu_mesh_t */
     ecs_map_t buffers;              /**< Handle to box_gpu_buffer_t */
+    WGPUBuffer copy_staging;        /**< Staging buffer of the copies of a packet, NULL until
+                                     *   a packet has copies */
+    uint64_t copy_staging_size;     /**< Bytes of copy_staging, at most BOX_RENDER_COPY_MAX */
     ecs_map_t targets;              /**< Handle to box_gpu_target_t */
     ecs_map_t shaders;              /**< Handle to box_gpu_shader_t */
     ecs_vec_t results;              /**< box_render_shader_result_t not yet taken */

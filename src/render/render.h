@@ -36,6 +36,12 @@ typedef struct box_render_draws_stats_t {
                                  *   of the bytes of the streams */
     int64_t upload_bytes;       /**< Bytes the last extract uploaded into instance buffers, the
                                  *   sum of the bytes of the streams */
+    int32_t copies;             /**< GPU copies the last extract sent, one per stream of a batch
+                                 *   whose run moved, which copy its instances from its old run */
+    int64_t copy_bytes;         /**< Bytes those copies move on the GPU, not uploaded */
+    int32_t kept_pages;         /**< Page buffers the last extract created again larger, which
+                                 *   keep their instances through a GPU copy */
+    int64_t kept_bytes;         /**< Bytes of instances those buffers keep, not uploaded */
     int64_t transform_bytes;    /**< Bytes the last extract uploaded into the transform streams:
                                  *   the runs of batches whose transforms upload (every frame for
                                  *   DynamicTransform) and the scatter segments of moved slots */
@@ -1165,6 +1171,14 @@ void* box_render_packet_upload(
  * @return The zeroed scatter
  */
 box_render_scatter_t* box_render_packet_scatter(
+    box_render_packet_t *p);
+
+/** Append a GPU copy between buffers to a packet.
+ *
+ * @param p The packet
+ * @return The zeroed copy
+ */
+box_render_copy_t* box_render_packet_buffer_copy(
     box_render_packet_t *p);
 
 /** Append a resource change to a packet.

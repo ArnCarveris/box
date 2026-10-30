@@ -196,6 +196,75 @@ static const box_render_batch_t* batch_of(
     return result;
 }
 
+/** Count the copies of the last packet from a run of a buffer into another of the same
+ * buffer.
+ *
+ * @param null The backend
+ * @param buffer The buffer
+ * @param src_offset Byte offset of the source
+ * @param dst_offset Byte offset of the destination
+ * @param size Bytes copied
+ * @return The copies
+ */
+static int32_t copy_of(
+    const box_render_null_t *null,
+    uint32_t buffer,
+    uint32_t src_offset,
+    uint32_t dst_offset,
+    uint32_t size)
+{
+    int32_t i, result = 0;
+    for (i = 0; i < ecs_vec_count(&null->last.copies); i ++) {
+        const box_render_copy_t *c = ecs_vec_get_t(&null->last.copies, box_render_copy_t, i);
+        result += c->src == buffer && c->dst == buffer && c->src_offset == src_offset &&
+            c->dst_offset == dst_offset && c->size == size;
+    }
+
+    return result;
+}
+
+/** Find the description of a buffer create of the last packet.
+ *
+ * @param null The backend
+ * @param handle The handle
+ * @return The description, NULL when the packet does not create the buffer
+ */
+static const box_render_buffer_desc_t* created(
+    const box_render_null_t *null,
+    uint32_t handle)
+{
+    const box_render_buffer_desc_t *result = NULL;
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&null->last.resources); i ++) {
+        const box_render_resource_t *r = ecs_vec_get_t(
+            &null->last.resources, box_render_resource_t, i);
+        if (r->kind == BOX_RENDER_BUFFER && r->op == BOX_RENDER_CREATE &&
+            r->handle == handle && r->size >= sizeof(box_render_buffer_desc_t))
+        {
+            result = box_render_packet_data(&null->last, r->data);
+        }
+    }
+
+    return result;
+}
+
+/** Bytes of one instance of a stream of a mesh page.
+ *
+ * @param stream The stream
+ * @return The bytes
+ */
+static uint32_t stride_of(
+    int32_t stream)
+{
+    uint32_t strides[BOX_RENDER_INSTANCE_STREAMS] = {
+        [BOX_RENDER_STREAM_TRANSFORM] = (uint32_t)sizeof(box_render_transform_t),
+        [BOX_RENDER_STREAM_SHADING] = (uint32_t)sizeof(box_render_mesh_shading_t),
+        [BOX_RENDER_STREAM_SURFACE] = (uint32_t)sizeof(box_render_surface_t)
+    };
+
+    return strides[stream];
+}
+
 /** Get the bytes of a scatter segment as the extract aligns it.
  *
  * @param entries Entries of the segment
@@ -373,17 +442,20 @@ void InstanceStore_outgrown_run_moves(void) {
     test_assert(moved != NULL);
     test_uint(moved->first_instance, MIN_RUN * 2);
     test_uint(batch_of(null, 3)->first_instance, MIN_RUN);
-    test_int(uploads_at(null, BOX_RENDER_BUFFER_FIRST, MIN_RUN * 2 * STRIDE), 1);
+
+    /* The two instances it had are copied from the old run, the new ones upload after them */
+    test_int(uploads_at(null, BOX_RENDER_BUFFER_FIRST, MIN_RUN * 2 * STRIDE), 0);
+    test_int(uploads_at(null, BOX_RENDER_BUFFER_FIRST, (MIN_RUN * 2 + 2) * STRIDE), 1);
     test_int(uploads_at(null, BOX_RENDER_BUFFER_FIRST, 0), 0);
     for (i = 0; i < ecs_vec_count(&null->last.uploads); i ++) {
         const box_render_upload_t *u = ecs_vec_get_t(
             &null->last.uploads, box_render_upload_t, i);
-        if (u->buffer == BOX_RENDER_BUFFER_FIRST && u->offset == MIN_RUN * 2 *
-            STRIDE)
-        {
-            test_uint(u->size, (MIN_RUN + 2) * STRIDE);
+        if (u->buffer == BOX_RENDER_BUFFER_FIRST && u->offset == (MIN_RUN * 2 + 2) * STRIDE) {
+            test_uint(u->size, MIN_RUN * STRIDE);
         }
     }
+
+    test_int(copy_of(null, BOX_RENDER_BUFFER_FIRST, 0, MIN_RUN * 2 * STRIDE, 2 * STRIDE), 1);
 
     stats = frame(world);
     test_int(stats.upload_bytes, 0);
@@ -634,6 +706,215 @@ void InstanceStore_page_memory_drops_with_released_pages(void) {
     test_int(stats.pages, 3);
     test_int(stats.page_slots, 3 * 4);
     test_int(stats.page_bytes, 3 * 4 * (int64_t)INSTANCE);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void InstanceStore_grown_page_keeps_instances(void) {
+    // gpu_instance_data/instance_page_copy
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    int32_t i, s;
+    for (i = 0; i < 2; i ++) {
+        shape_new(world, 3, (float)i, false);
+    }
+
+    frame(world);
+    for (s = 0; s < BOX_RENDER_INSTANCE_STREAMS; s ++) {
+        const box_render_buffer_desc_t *desc = created(null, PAGE(0) + (uint32_t)s);
+        test_assert(desc != NULL);
+        test_uint(desc->size, (uint64_t)MIN_RUN * stride_of(s));
+        test_assert(desc->usage & BOX_RENDER_BUFFER_COPY);
+        test_assert(!(desc->usage & BOX_RENDER_BUFFER_KEEP));
+    }
+
+    /* A second batch takes the run after the first, so the page buffers double; they keep the
+     * instances of the first batch, which uploads nothing */
+    for (i = 0; i < 3; i ++) {
+        shape_new(world, 4, (float)i, false);
+    }
+
+    box_render_draws_stats_t stats = frame(world);
+    test_int(stats.pages, 1);
+    test_uint(batch_of(null, 2)->first_instance, 0);
+    test_uint(batch_of(null, 3)->first_instance, MIN_RUN);
+    for (s = 0; s < BOX_RENDER_INSTANCE_STREAMS; s ++) {
+        const box_render_buffer_desc_t *desc = created(null, PAGE(0) + (uint32_t)s);
+        test_assert(desc != NULL);
+        test_uint(desc->size, (uint64_t)MIN_RUN * 2 * stride_of(s));
+        test_assert(desc->usage & BOX_RENDER_BUFFER_COPY);
+        test_assert(desc->usage & BOX_RENDER_BUFFER_KEEP);
+        test_assert(desc->usage & BOX_RENDER_BUFFER_STORAGE);
+        test_int(uploads_at(null, PAGE(0) + (uint32_t)s, 0), 0);
+        test_int(uploads_at(null, PAGE(0) + (uint32_t)s, MIN_RUN * stride_of(s)), 1);
+    }
+
+    int64_t bytes;
+    test_int(page_uploads(null, &bytes), BOX_RENDER_INSTANCE_STREAMS);
+    test_int(bytes, 3 * INSTANCE);
+    test_int(stats.upload_bytes, 3 * INSTANCE);
+    test_int(stats.kept_pages, BOX_RENDER_INSTANCE_STREAMS);
+    test_int(stats.kept_bytes, MIN_RUN * INSTANCE);
+    test_int(stats.copies, 0);
+    test_int(ecs_vec_count(&null->last.copies), 0);
+    test_int(null->kept, BOX_RENDER_INSTANCE_STREAMS);
+
+    stats = frame(world);
+    test_int(stats.upload_bytes, 0);
+    test_int(stats.kept_pages, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void InstanceStore_moved_run_copies_instances(void) {
+    // gpu_instance_data/instance_page_copy
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    int32_t i, s;
+    for (i = 0; i < 2; i ++) {
+        shape_new(world, 3, (float)i, false);
+    }
+
+    for (i = 0; i < 3; i ++) {
+        shape_new(world, 4, (float)i, false);
+    }
+
+    frame(world);
+    for (i = 0; i < (int32_t)MIN_RUN; i ++) {
+        shape_new(world, 3, (float)i, false);
+    }
+
+    /* The first batch moves from slot 0 to slot 128, past the second batch, and the page grows
+     * from 128 to 256 slots in the same frame */
+    box_render_draws_stats_t stats = frame(world);
+    test_uint(batch_of(null, MIN_RUN + 2)->first_instance, MIN_RUN * 2);
+    test_int(ecs_vec_count(&null->last.copies), BOX_RENDER_INSTANCE_STREAMS);
+    test_int(stats.copies, BOX_RENDER_INSTANCE_STREAMS);
+    test_int(stats.copy_bytes, 2 * INSTANCE);
+    test_int(stats.kept_pages, BOX_RENDER_INSTANCE_STREAMS);
+    for (s = 0; s < BOX_RENDER_INSTANCE_STREAMS; s ++) {
+        uint32_t stride = stride_of(s), buffer = PAGE(0) + (uint32_t)s;
+        const box_render_copy_t *c = ecs_vec_get_t(&null->last.copies, box_render_copy_t, s);
+        test_uint(c->src, buffer);
+        test_uint(c->dst, buffer);
+        test_uint(c->src_offset, 0);
+        test_uint(c->dst_offset, MIN_RUN * 2 * stride);
+        test_uint(c->size, 2 * stride);
+        test_uint((c->src_offset | c->dst_offset | c->size) % BOX_RENDER_COPY_ALIGN, 0);
+        test_assert(created(null, buffer)->usage & BOX_RENDER_BUFFER_KEEP);
+        test_int(uploads_at(null, buffer, MIN_RUN * 2 * stride), 0);
+        test_int(uploads_at(null, buffer, (MIN_RUN * 2 + 2) * stride), 1);
+    }
+
+    /* Only the new instances upload, nothing of the two moved ones or of the second batch */
+    int64_t bytes;
+    test_int(page_uploads(null, &bytes), BOX_RENDER_INSTANCE_STREAMS);
+    test_int(bytes, MIN_RUN * INSTANCE);
+    test_int(stats.upload_bytes, MIN_RUN * INSTANCE);
+    test_int(stats.scatters, 0);
+    test_int(null->copies, BOX_RENDER_INSTANCE_STREAMS);
+    test_int(null->copy_bytes, 2 * INSTANCE);
+
+    stats = frame(world);
+    test_int(stats.upload_bytes, 0);
+    test_int(stats.copies, 0);
+    test_int(ecs_vec_count(&null->last.copies), 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void InstanceStore_moved_run_scatters_copied_changes(void) {
+    // gpu_instance_data/instance_page_copy
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t first[4];
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        first[i] = shape_new(world, 3, (float)i, false);
+    }
+
+    frame(world);
+    ecs_set(world, first[1], Position, {1, 3, 0});
+    for (i = 0; i < (int32_t)MIN_RUN; i ++) {
+        shape_new(world, 3, (float)i, false);
+    }
+
+    /* The changed transform of slot 1 scatters over the copy of the four instances; the other
+     * streams only copy them */
+    box_render_draws_stats_t stats = frame(world);
+    const box_render_batch_t *moved = batch_of(null, MIN_RUN + 4);
+    test_assert(moved != NULL);
+    uint32_t at = moved->first_instance;
+    test_assert(at != 0);
+    test_int(stats.copies, BOX_RENDER_INSTANCE_STREAMS);
+    test_int(copy_of(null, PAGE(0), 0, at * STRIDE, 4 * STRIDE), 1);
+    test_int(stats.scatters, 1);
+    test_int(stats.scattered, 1);
+    test_int(ecs_vec_count(&null->last.scatters), 1);
+    const box_render_scatter_t *sc = ecs_vec_first(&null->last.scatters);
+    test_uint(sc->buffer, PAGE(0));
+    test_uint(sc->count, 1);
+    test_int(uploads_at(null, PAGE(0), (at + 4) * STRIDE), 1);
+    int64_t bytes;
+    test_int(page_uploads(null, &bytes), BOX_RENDER_INSTANCE_STREAMS);
+    test_int(bytes, MIN_RUN * INSTANCE);
+
+    const box_render_upload_t *changes = NULL;
+    for (i = 0; i < ecs_vec_count(&null->last.uploads); i ++) {
+        const box_render_upload_t *u = ecs_vec_get_t(
+            &null->last.uploads, box_render_upload_t, i);
+        if (u->buffer == BOX_RENDER_BUFFER_CHANGES) {
+            changes = u;
+        }
+    }
+
+    test_assert(changes != NULL);
+    const uint32_t *words = box_render_packet_data(&null->last, changes->data + sc->offset);
+    test_uint(words[0], 1);
+    test_uint(words[BOX_RENDER_SCATTER_HEADER], at + 1);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void InstanceStore_moved_out_of_released_page_uploads(void) {
+    // gpu_instance_data/instance_page_copy
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    box_render_draws_page(world, (int32_t)MIN_RUN * 2);
+    int32_t i, j;
+    for (i = 0; i < 3; i ++) {
+        for (j = 0; j < 2; j ++) {
+            shape_new(world, 3 + i, (float)j, false);
+        }
+    }
+
+    box_render_draws_stats_t stats = frame(world);
+    test_int(stats.pages, 2);
+    test_uint(batch_of(null, 2) != NULL, true);
+
+    /* The third batch, alone in page 1, outgrows its run and fits no page: it moves to page 2
+     * and page 1 is released before the copies would run, so it uploads every instance */
+    for (i = 0; i < (int32_t)MIN_RUN; i ++) {
+        shape_new(world, 5, (float)i, false);
+    }
+
+    stats = frame(world);
+    test_int(stats.pages, 2);
+    test_int(buffer_ops(null, BOX_RENDER_DESTROY, PAGE(1)), 1);
+    const box_render_batch_t *moved = batch_of(null, MIN_RUN + 2);
+    test_assert(moved != NULL);
+    test_uint(moved->instances, PAGE(2));
+    test_uint(moved->first_instance, 0);
+    test_int(stats.copies, 0);
+    test_int(ecs_vec_count(&null->last.copies), 0);
+    int64_t bytes;
+    test_int(page_uploads(null, &bytes), BOX_RENDER_INSTANCE_STREAMS);
+    test_int(bytes, (MIN_RUN + 2) * INSTANCE);
+    test_int(uploads_at(null, PAGE(2), 0), 1);
 
     ecs_fini(world);
     box_render_null_free(null);

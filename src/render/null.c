@@ -60,8 +60,26 @@ static void box_render_null_render(
     null->resources += ecs_vec_count(&packet->resources);
     null->targets += ecs_vec_count(&packet->targets);
     null->transitions += ecs_vec_count(&packet->transitions);
+    null->copies += ecs_vec_count(&packet->copies);
     for (i = 0; i < ecs_vec_count(&packet->uploads); i ++) {
         null->bytes += ecs_vec_get_t(&packet->uploads, box_render_upload_t, i)->size;
+    }
+
+    for (i = 0; i < ecs_vec_count(&packet->copies); i ++) {
+        null->copy_bytes += ecs_vec_get_t(&packet->copies, box_render_copy_t, i)->size;
+    }
+
+    for (i = 0; i < ecs_vec_count(&packet->resources); i ++) {
+        const box_render_resource_t *r = ecs_vec_get_t(
+            &packet->resources, box_render_resource_t, i);
+        const box_render_buffer_desc_t *desc = r->size >= sizeof(box_render_buffer_desc_t)
+            ? box_render_packet_data(packet, r->data)
+            : NULL;
+        if (r->kind == BOX_RENDER_BUFFER && r->op == BOX_RENDER_CREATE && desc &&
+            (desc->usage & BOX_RENDER_BUFFER_KEEP))
+        {
+            null->kept ++;
+        }
     }
 
     box_render_packet_reset(&null->last);

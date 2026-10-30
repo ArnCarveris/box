@@ -565,6 +565,12 @@ void box_gpu_draw_fini(
 
     ecs_map_fini(&gpu->meshes);
     ecs_map_fini(&gpu->buffers);
+    if (gpu->copy_staging) {
+        wgpuBufferRelease(gpu->copy_staging);
+        gpu->copy_staging = NULL;
+        gpu->copy_staging_size = 0;
+    }
+
     ecs_vec_fini_t(NULL, &gpu->view_data, uint8_t);
     box_gpu_forward_reset(gpu);
     ecs_map_fini(&gpu->forward);
@@ -698,6 +704,53 @@ done:
     return;
 }
 
+/** Check whether a buffer can be the source of GPU copies.
+ *
+ * @param b The buffer
+ * @return Whether it was created with CopySrc usage
+ */
+static bool box_gpu_buffer_copyable(
+    const box_gpu_buffer_t *b)
+{
+    return (b->usage & (BOX_RENDER_BUFFER_STORAGE | BOX_RENDER_BUFFER_COPY)) != 0;
+}
+
+/** Copy the bytes a buffer created again has in common with the buffer it replaces from the old
+ * one, before the old one is released. The copy is submitted on its own, ahead of the copies,
+ * uploads and scatters of the packet, which the queue runs after it.
+ *
+ * @param gpu The backend
+ * @param from The buffer replaced
+ * @param to The buffer created
+ */
+static void box_gpu_buffer_keep(
+    box_gpu_t *gpu,
+    const box_gpu_buffer_t *from,
+    const box_gpu_buffer_t *to)
+{
+    uint64_t size = from->size < to->size ? from->size : to->size;
+    size &= ~(uint64_t)(BOX_RENDER_COPY_ALIGN - 1);
+    if (!size) {
+        goto done;
+    }
+
+    if (!box_gpu_buffer_copyable(from)) {
+        ecs_err("buffer of %llu bytes cannot be kept, it was not created as a copy source",
+            (unsigned long long)from->size);
+        box_gpu_count(gpu, BOX_GPU_STAT_ERRORS);
+        goto done;
+    }
+
+    WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
+    wgpuCommandEncoderCopyBufferToBuffer(encoder, from->buffer, 0, to->buffer, 0, size);
+    WGPUCommandBuffer commands = wgpuCommandEncoderFinish(encoder, NULL);
+    wgpuQueueSubmit(gpu->queue, 1, &commands);
+    wgpuCommandBufferRelease(commands);
+    wgpuCommandEncoderRelease(encoder);
+done:
+    return;
+}
+
 void box_gpu_buffer_apply(
     box_gpu_t *gpu,
     box_render_resource_op_t op,
@@ -705,11 +758,11 @@ void box_gpu_buffer_apply(
     const box_render_buffer_desc_t *desc)
 {
     box_gpu_buffer_t *b = ecs_map_get_deref(&gpu->buffers, box_gpu_buffer_t, handle);
+    box_gpu_buffer_t *created = NULL;
     WGPUBufferUsage usage = 0;
     box_gpu_instance_page_changed(gpu, handle);
     if (b) {
         ecs_map_remove(&gpu->buffers, handle);
-        box_gpu_buffer_free(gpu, b);
     }
 
     if (op == BOX_RENDER_DESTROY || !desc || !desc->size) {
@@ -720,22 +773,159 @@ void box_gpu_buffer_apply(
         usage |= WGPUBufferUsage_Vertex;
     }
 
+    if (desc->usage & (BOX_RENDER_BUFFER_STORAGE | BOX_RENDER_BUFFER_COPY)) {
+        usage |= WGPUBufferUsage_CopySrc;
+    }
+
     if (desc->usage & BOX_RENDER_BUFFER_STORAGE) {
-        usage |= WGPUBufferUsage_Storage | WGPUBufferUsage_CopySrc;
+        usage |= WGPUBufferUsage_Storage;
     }
 
     if (desc->usage & BOX_RENDER_BUFFER_UNIFORM) {
         usage |= WGPUBufferUsage_Uniform;
     }
 
-    b = ecs_os_calloc_t(box_gpu_buffer_t);
-    b->buffer = box_gpu_buffer_new(gpu, desc->size, usage);
-    ecs_vec_init_t(NULL, &b->mesh_groups, box_gpu_instance_group_t, 0);
-    b->size = desc->size;
-    b->usage = desc->usage;
-    b->version = ++ gpu->buffer_writes;
-    ecs_map_insert_ptr(&gpu->buffers, handle, b);
+    created = ecs_os_calloc_t(box_gpu_buffer_t);
+    created->buffer = box_gpu_buffer_new(gpu, desc->size, usage);
+    ecs_vec_init_t(NULL, &created->mesh_groups, box_gpu_instance_group_t, 0);
+    created->size = desc->size;
+    created->usage = desc->usage;
+    created->version = ++ gpu->buffer_writes;
+    if (b && (desc->usage & BOX_RENDER_BUFFER_KEEP)) {
+        box_gpu_buffer_keep(gpu, b, created);
+    }
+
+    ecs_map_insert_ptr(&gpu->buffers, handle, created);
     box_gpu_count(gpu, BOX_GPU_STAT_BUFFER_CREATED);
+done:
+    if (b) {
+        box_gpu_buffer_free(gpu, b);
+    }
+
+    return;
+}
+
+/** Get the staging buffer the copies of a packet go through, holding at least a size.
+ *
+ * @param gpu The backend
+ * @param size Bytes it must hold
+ * @return The buffer
+ */
+static WGPUBuffer box_gpu_copy_staging(
+    box_gpu_t *gpu,
+    uint64_t size)
+{
+    if (gpu->copy_staging_size < size) {
+        uint64_t capacity = gpu->copy_staging_size ? gpu->copy_staging_size : 64 * 1024;
+        while (capacity < size) {
+            capacity *= 2;
+        }
+
+        capacity = capacity > BOX_RENDER_COPY_MAX ? BOX_RENDER_COPY_MAX : capacity;
+        if (gpu->copy_staging) {
+            wgpuBufferRelease(gpu->copy_staging);
+        }
+
+        gpu->copy_staging = box_gpu_buffer_new(gpu, capacity, WGPUBufferUsage_CopySrc);
+        gpu->copy_staging_size = capacity;
+    }
+
+    return gpu->copy_staging;
+}
+
+/** Find the buffers of a copy of a packet and check the copy against them.
+ *
+ * @param gpu The backend
+ * @param c The copy
+ * @param src Receives the source buffer
+ * @param dst Receives the destination buffer
+ * @return Whether the copy is valid
+ */
+static bool box_gpu_copy_buffers(
+    box_gpu_t *gpu,
+    const box_render_copy_t *c,
+    box_gpu_buffer_t **src,
+    box_gpu_buffer_t **dst)
+{
+    *src = ecs_map_get_deref(&gpu->buffers, box_gpu_buffer_t, c->src);
+    *dst = ecs_map_get_deref(&gpu->buffers, box_gpu_buffer_t, c->dst);
+
+    return *src && *dst && box_gpu_buffer_copyable(*src) &&
+        !((c->src_offset | c->dst_offset | c->size) & (BOX_RENDER_COPY_ALIGN - 1)) &&
+        (uint64_t)c->src_offset + c->size <= (*src)->size &&
+        (uint64_t)c->dst_offset + c->size <= (*dst)->size;
+}
+
+/** Get the bytes a copy takes in the staging buffer.
+ *
+ * @param c The copy
+ * @return Its size rounded up to BOX_RENDER_COPY_ALIGN
+ */
+static uint64_t box_gpu_copy_staged(
+    const box_render_copy_t *c)
+{
+    return ((uint64_t)c->size + BOX_RENDER_COPY_ALIGN - 1) &
+        ~(uint64_t)(BOX_RENDER_COPY_ALIGN - 1);
+}
+
+void box_gpu_copy(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet)
+{
+    int32_t i, count = ecs_vec_count(&packet->copies);
+    uint64_t total = 0, offset = 0;
+    box_gpu_buffer_t *src, *dst;
+    if (!count) {
+        goto done;
+    }
+
+    for (i = 0; i < count; i ++) {
+        total += box_gpu_copy_staged(ecs_vec_get_t(&packet->copies, box_render_copy_t, i));
+    }
+
+    if (total > BOX_RENDER_COPY_MAX) {
+        ecs_err("copies of %llu bytes exceed the %llu bytes of a packet",
+            (unsigned long long)total, (unsigned long long)BOX_RENDER_COPY_MAX);
+        box_gpu_count(gpu, BOX_GPU_STAT_ERRORS);
+        goto done;
+    }
+
+    /* Source and destination of a copy may be the same buffer, which copyBufferToBuffer does
+     * not allow, so every source is copied into the staging buffer first and every
+     * destination written from there after: each copy reads its source as it was before the
+     * copies of the packet */
+    WGPUBuffer staging = box_gpu_copy_staging(gpu, total);
+    WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
+    for (i = 0; i < count; i ++) {
+        const box_render_copy_t *c = ecs_vec_get_t(&packet->copies, box_render_copy_t, i);
+        if (!box_gpu_copy_buffers(gpu, c, &src, &dst)) {
+            ecs_err("copy of %u bytes from %u in buffer %u to %u in buffer %u is invalid",
+                c->size, c->src_offset, c->src, c->dst_offset, c->dst);
+            box_gpu_count(gpu, BOX_GPU_STAT_ERRORS);
+        } else if (c->size) {
+            wgpuCommandEncoderCopyBufferToBuffer(encoder, src->buffer, c->src_offset,
+                staging, offset, c->size);
+        }
+
+        offset += box_gpu_copy_staged(c);
+    }
+
+    offset = 0;
+    for (i = 0; i < count; i ++) {
+        const box_render_copy_t *c = ecs_vec_get_t(&packet->copies, box_render_copy_t, i);
+        if (c->size && box_gpu_copy_buffers(gpu, c, &src, &dst)) {
+            wgpuCommandEncoderCopyBufferToBuffer(encoder, staging, offset,
+                dst->buffer, c->dst_offset, c->size);
+            dst->version = ++ gpu->buffer_writes;
+        }
+
+        offset += box_gpu_copy_staged(c);
+    }
+
+    WGPUCommandBuffer commands = wgpuCommandEncoderFinish(encoder, NULL);
+    wgpuQueueSubmit(gpu->queue, 1, &commands);
+    wgpuCommandBufferRelease(commands);
+    wgpuCommandEncoderRelease(encoder);
 done:
     return;
 }
