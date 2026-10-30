@@ -38,7 +38,8 @@ static ecs_world_t* bench_fps_world(
     return world;
 }
 
-/** Run frames that each add a sample, so every bar of an open panel moves one slot.
+/** Run frames that each add a sample, so every bar of an open panel moves one slot. The sample
+ * is notified with ecs_singleton_modified, as the engine does.
  *
  * @param b The bench
  * @param open Whether the panel is open
@@ -52,6 +53,7 @@ static void bench_fps_shifting(
     while (bench_iter(b)) {
         FrameSamples *samples = ecs_singleton_get_mut(world, FrameSamples);
         box_frame_samples_add(samples, 10.0 + (double)(i ++ % 31));
+        ecs_singleton_modified(world, FrameSamples);
         ecs_progress(world, 0);
     }
 
