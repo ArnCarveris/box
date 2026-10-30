@@ -644,8 +644,8 @@ void box_surface_point_size(
         *width = (float)status->point_width;
         *height = (float)status->point_height;
     } else if (surface) {
-        *width = (float)surface->width;
-        *height = (float)surface->height;
+        *width = (float)box_surface_points(surface->width);
+        *height = (float)box_surface_points(surface->height);
     } else {
         *width = *height = 0;
     }

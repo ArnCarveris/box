@@ -727,7 +727,7 @@ fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32) -> vec3f {
     var sum = vec3f(0.0);
     var shadow = shadow_factor(world, s.geometric);
     if (view.lights.x > 0u) {
-        shadow *= light_cookie(world, normalize(lights[0].position));
+        shadow *= light_cookie(world, normalize(lights[0].position), s.geometric);
     }
 
     for (var i = 0u; i < view.lights.x; i++) {

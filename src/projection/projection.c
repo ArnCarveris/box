@@ -35,7 +35,7 @@ typedef struct box_projection_lens_t {
 /** Find the size of the surface a view renders to.
  *
  * The first surface whose view_root is 0 or the parent of the view counts; its size in points
- * comes from box_surface_point_size (a window's SurfaceStatus, else the requested size).
+ * comes from box_surface_point_size (a window's SurfaceStatus, else the clamped requested size).
  * Without one the default surface size is used.
  *
  * @param world The world

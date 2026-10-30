@@ -477,7 +477,9 @@
                     "velocity_moves",
                     "particles_lit_by_cookie",
                     "bake_ignores_cookie",
-                    "noise_coverage"
+                    "noise_coverage",
+                    "steep_surface_lod",
+                    "light_projection_lod_unchanged"
                 ]
             },
             {
