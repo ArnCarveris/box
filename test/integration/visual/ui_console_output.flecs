@@ -2,6 +2,7 @@
 // flecs explorer, open over a plain scene: help with its groups, command names, parameters,
 // types and descriptions, a tree with dimmed guides and entity names, ls with dimmed parent
 // paths, a value from get with its member names and numbers, and an error with its error: label.
+// Small text on a wide panel keeps the tail of help and every later result on screen.
 using box.transform
 using box.geometry
 using box.material
@@ -61,5 +62,5 @@ const read: string = box.console.run("get cube box.transform.Position")
 const failed: string = box.console.run("rm nothing")
 
 $ {
-  Console: {open: true}
+  Console: {open: true, width: 0.8, font_size: 11, line_height: 13}
 }

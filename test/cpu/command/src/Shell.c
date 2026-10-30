@@ -269,7 +269,7 @@ void Shell_run_text_unchanged(void) {
 
     out = box_command_run(world, s, "get cube box.transform.Position", &error);
     test_bool(error, false);
-    test_str(out, "{\"x\":1, \"y\":2, \"z\":3}");
+    test_str(out, "{\"Position\":{\"x\":1, \"y\":2, \"z\":3}}");
     ecs_os_free(out);
 
     out = box_command_run(world, s, "help ls", &error);
