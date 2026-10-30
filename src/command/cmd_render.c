@@ -123,7 +123,7 @@ static ecs_entity_t box_cmd_render_surface(
  * @param width Receives the width in pixels
  * @param height Receives the height in pixels
  */
-static void box_cmd_render_size(
+void box_cmd_render_size(
     ecs_world_t *world,
     int32_t *width,
     int32_t *height)
@@ -150,7 +150,7 @@ static void box_cmd_render_size(
  * @param clearing Only consider views that clear
  * @return The view entity, 0 when there is none
  */
-static ecs_entity_t box_cmd_render_view(
+ecs_entity_t box_cmd_render_view(
     ecs_world_t *world,
     ecs_entity_t camera,
     ecs_entity_t root,
@@ -188,7 +188,7 @@ static ecs_entity_t box_cmd_render_view(
  * @param world The world
  * @return The view root of the surface, 0 for every view
  */
-static ecs_entity_t box_cmd_render_view_root(
+ecs_entity_t box_cmd_render_view_root(
     ecs_world_t *world)
 {
     ecs_entity_t surface = box_cmd_render_surface(world);

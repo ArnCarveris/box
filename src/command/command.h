@@ -50,6 +50,46 @@ void box_cmd_input_init(
 void box_cmd_render_init(
     ecs_world_t *world);
 
+/** Get the size of the images of the capture command: the size of the surface shown first.
+ *
+ * @param world The world
+ * @param width Receives the width in pixels
+ * @param height Receives the height in pixels
+ */
+void box_cmd_render_size(
+    ecs_world_t *world,
+    int32_t *width,
+    int32_t *height);
+
+/** Find the first view, in render order (View.order, then creation), that renders a camera.
+ *
+ * @param world The world
+ * @param camera The camera, 0 for any camera with a Camera
+ * @param root Parent the view must have, 0 for any parent
+ * @param clearing Only consider views that clear
+ * @return The view entity, 0 when there is none
+ */
+ecs_entity_t box_cmd_render_view(
+    ecs_world_t *world,
+    ecs_entity_t camera,
+    ecs_entity_t root,
+    bool clearing);
+
+/** Get the parent of the views the surface shown first renders.
+ *
+ * @param world The world
+ * @return The view root of the surface, 0 for every view
+ */
+ecs_entity_t box_cmd_render_view_root(
+    ecs_world_t *world);
+
+/** Register the fit command that moves a camera to a tight fit of its scene.
+ *
+ * @param world The world
+ */
+void box_cmd_fit_init(
+    ecs_world_t *world);
+
 /** Register the fps and frames commands that print the frame timing.
  *
  * @param world The world
