@@ -365,7 +365,6 @@ void box_console_greet(
     ecs_world_t *world,
     box_console_t *con);
 
-<<<<<<< HEAD
 /** Drop the oldest lines of the scrollback while it has more rows than Console.scrollback, and
  * keep the scroll offset within the rows that are left.
  *
@@ -375,7 +374,7 @@ void box_console_greet(
 void box_console_trim(
     ecs_world_t *world,
     box_console_t *con);
-=======
+
 /** Find the entity an entity argument names, as the shell resolves it.
  *
  * A path that starts with . or .. is relative to the scope and separated by /, other names
@@ -413,7 +412,6 @@ bool box_console_syntax_word_at(
     const char *line,
     int32_t cursor,
     box_console_word_t *out);
->>>>>>> e7e38d3cc55c858be23079db754a07b59bfc09c2
 
 /** Find the command of a name as the shell does: the first function with that name in the
  * scopes of EcsScriptShell.command_paths.

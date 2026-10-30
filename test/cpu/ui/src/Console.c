@@ -1228,7 +1228,6 @@ void Console_type_from_script(void) {
     ecs_fini(world);
 }
 
-<<<<<<< HEAD
 void Console_rewrap_trims_scrollback(void) {
     // console/wrap
     ecs_entity_t s;
@@ -1294,7 +1293,85 @@ void Console_rewrap_trims_scrollback(void) {
     test_assert(console_shown_rows(world) > limit - narrow - 1);
     test_flt(ecs_get(world, log, Layout)->padding.bottom, 0);
     test_assert(console_count_line(world, CONSOLE_PROMPT CONSOLE_LONG_COMMAND) > 0);
-=======
+
+    ecs_fini(world);
+}
+
+void Console_trailing_spaces_move_cursor(void) {
+    // console/wrap
+    ecs_world_t *world = console_open(640, 360, NULL);
+    const Console *c = ecs_singleton_get(world, Console);
+    float lh = c->line_height;
+    ecs_entity_t input = ecs_lookup(world, CONSOLE_INPUT);
+    ecs_entity_t line = ecs_lookup(world, CONSOLE_INPUT ".line");
+    ecs_entity_t cursor = ecs_lookup(world, CONSOLE_INPUT ".cursor");
+    char typed[256] = {0};
+    int32_t len = 0;
+
+    // A line that fills the first row
+    while (len < 200) {
+        console_type(world, "x");
+        typed[len ++] = 'x';
+        if (box_text_line(world, line, 0, NULL, NULL) > 1) {
+            break;
+        }
+    }
+
+    test_assert(len < 200);
+    console_press(world, KeyBackspace, 1);
+    typed[-- len] = '\0';
+    test_int(box_text_line(world, line, 0, NULL, NULL), 1);
+    test_flt(ecs_get(world, input, LayoutBounds)->height, lh);
+    test_int(console_check_cursor(world, len), 0);
+
+    // Spaces past the right edge move the cursor to the next row, under the start of the line
+    console_type(world, "            ");
+    int32_t spaces = len + 12;
+    test_int(box_text_line(world, line, 0, NULL, NULL), 2);
+    test_flt(ecs_get(world, input, LayoutBounds)->height, 2 * lh);
+    test_int(console_check_cursor(world, spaces), 1);
+    TextCaret hang;
+    test_assert(box_text_caret(world, line, CONSOLE_PROMPT_LEN, &hang));
+    float x = hang.x + ecs_get(world, line, TextBounds)->width * 0.5f;
+    test_flt(ecs_get(world, cursor, LayoutItem)->x, x);
+    test_assert(x > 0);
+
+    // The log gives up the row
+    float log_h = ecs_get(world, ecs_lookup(world, CONSOLE_LOG), LayoutBounds)->height;
+    test_flt(log_h, 360 - 2 * c->padding - 2 * lh);
+
+    // A word typed after them starts the next row there
+    console_type(world, "y");
+    test_int(box_text_line(world, line, 0, NULL, NULL), 2);
+    TextCaret word;
+    test_assert(box_text_caret(world, line, CONSOLE_PROMPT_LEN + spaces, &word));
+    test_int(word.line, 1);
+    test_flt(word.x + ecs_get(world, line, TextBounds)->width * 0.5f, x);
+    test_int(console_check_cursor(world, spaces + 1), 1);
+
+    // Back to the spaces, the line ran with them does not gain an empty row in the scrollback
+    console_press(world, KeyBackspace, 1);
+    test_int(console_check_cursor(world, spaces), 1);
+    console_press(world, KeyEnter, 1);
+    test_flt(ecs_get(world, input, LayoutBounds)->height, lh);
+    ecs_entity_t lines[256];
+    int32_t i, count = console_log_lines(world, lines, 256), found = 0;
+    for (i = 0; i < count; i ++) {
+        const Text *t = ecs_get(world, lines[i], Text);
+        if (t->value && !strncmp(t->value, CONSOLE_PROMPT, CONSOLE_PROMPT_LEN) &&
+            !strncmp(t->value + CONSOLE_PROMPT_LEN, typed, (size_t)len))
+        {
+            found ++;
+            test_int(box_text_line(world, lines[i], 0, NULL, NULL), 1);
+            test_flt(ecs_get(world, lines[i], LayoutItem)->height.value, lh);
+        }
+    }
+
+    test_int(found, 1);
+
+    ecs_fini(world);
+}
+
 /** Path of the candidate list of Tab completion under the input line */
 #define CONSOLE_MENU "console.ui.screen.stack.panel.content.menu"
 
@@ -1382,84 +1459,10 @@ void Console_complete_command_unique(void) {
 
     // Completing the name does not run the line
     test_assert(console_find_line(world, CONSOLE_PROMPT "pwd") == 0);
->>>>>>> e7e38d3cc55c858be23079db754a07b59bfc09c2
 
     ecs_fini(world);
 }
 
-<<<<<<< HEAD
-void Console_trailing_spaces_move_cursor(void) {
-    // console/wrap
-    ecs_world_t *world = console_open(640, 360, NULL);
-    const Console *c = ecs_singleton_get(world, Console);
-    float lh = c->line_height;
-    ecs_entity_t input = ecs_lookup(world, CONSOLE_INPUT);
-    ecs_entity_t line = ecs_lookup(world, CONSOLE_INPUT ".line");
-    ecs_entity_t cursor = ecs_lookup(world, CONSOLE_INPUT ".cursor");
-    char typed[256] = {0};
-    int32_t len = 0;
-
-    // A line that fills the first row
-    while (len < 200) {
-        console_type(world, "x");
-        typed[len ++] = 'x';
-        if (box_text_line(world, line, 0, NULL, NULL) > 1) {
-            break;
-        }
-    }
-
-    test_assert(len < 200);
-    console_press(world, KeyBackspace, 1);
-    typed[-- len] = '\0';
-    test_int(box_text_line(world, line, 0, NULL, NULL), 1);
-    test_flt(ecs_get(world, input, LayoutBounds)->height, lh);
-    test_int(console_check_cursor(world, len), 0);
-
-    // Spaces past the right edge move the cursor to the next row, under the start of the line
-    console_type(world, "            ");
-    int32_t spaces = len + 12;
-    test_int(box_text_line(world, line, 0, NULL, NULL), 2);
-    test_flt(ecs_get(world, input, LayoutBounds)->height, 2 * lh);
-    test_int(console_check_cursor(world, spaces), 1);
-    TextCaret hang;
-    test_assert(box_text_caret(world, line, CONSOLE_PROMPT_LEN, &hang));
-    float x = hang.x + ecs_get(world, line, TextBounds)->width * 0.5f;
-    test_flt(ecs_get(world, cursor, LayoutItem)->x, x);
-    test_assert(x > 0);
-
-    // The log gives up the row
-    float log_h = ecs_get(world, ecs_lookup(world, CONSOLE_LOG), LayoutBounds)->height;
-    test_flt(log_h, 360 - 2 * c->padding - 2 * lh);
-
-    // A word typed after them starts the next row there
-    console_type(world, "y");
-    test_int(box_text_line(world, line, 0, NULL, NULL), 2);
-    TextCaret word;
-    test_assert(box_text_caret(world, line, CONSOLE_PROMPT_LEN + spaces, &word));
-    test_int(word.line, 1);
-    test_flt(word.x + ecs_get(world, line, TextBounds)->width * 0.5f, x);
-    test_int(console_check_cursor(world, spaces + 1), 1);
-
-    // Back to the spaces, the line ran with them does not gain an empty row in the scrollback
-    console_press(world, KeyBackspace, 1);
-    test_int(console_check_cursor(world, spaces), 1);
-    console_press(world, KeyEnter, 1);
-    test_flt(ecs_get(world, input, LayoutBounds)->height, lh);
-    ecs_entity_t lines[256];
-    int32_t i, count = console_log_lines(world, lines, 256), found = 0;
-    for (i = 0; i < count; i ++) {
-        const Text *t = ecs_get(world, lines[i], Text);
-        if (t->value && !strncmp(t->value, CONSOLE_PROMPT, CONSOLE_PROMPT_LEN) &&
-            !strncmp(t->value + CONSOLE_PROMPT_LEN, typed, (size_t)len))
-        {
-            found ++;
-            test_int(box_text_line(world, lines[i], 0, NULL, NULL), 1);
-            test_flt(ecs_get(world, lines[i], LayoutItem)->height.value, lh);
-        }
-    }
-
-    test_int(found, 1);
-=======
 void Console_complete_command_ambiguous(void) {
     // console/complete
     ecs_world_t *world = console_open(640, 360, NULL);
@@ -1798,7 +1801,6 @@ void Console_complete_typing_closes_list(void) {
     line = box_console_complete(world, true);
     test_str(line, "schema_value");
     ecs_os_free(line);
->>>>>>> e7e38d3cc55c858be23079db754a07b59bfc09c2
 
     ecs_fini(world);
 }
