@@ -183,12 +183,16 @@ sky {
   }
 }
 
+exposure {
+  AutoExposure: {min_log_luma: -10.8}
+}
+
 bloom {
   Bloom: {intensity: 0.25, threshold: 1, threshold_softness: 0.5}
 }
 
 tonemap {
-  Tonemap: {}
+  Tonemap: {auto_exposure: exposure}
 }
 
 smaa {
