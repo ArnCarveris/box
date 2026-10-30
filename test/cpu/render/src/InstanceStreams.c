@@ -975,7 +975,8 @@ void InstanceStreams_shape2d_packed_color(void) {
     ecs_set(world, e, Rgb, {255, 0, 128});
     ecs_set(world, e, Opacity, {2.0f});
     box_render_draws_stats_t stats = frame(world);
-    test_int(stats.shading_bytes, segment_size(1, SHADING_2D));
+    // A lone shape uploads its run: a 68 byte entry is not smaller than the 64 byte run
+    test_int(stats.shading_bytes, SHADING_2D);
     shading = shading_of(world, e);
     test_packed_color(shading, 1.0f, 0.0f, srgb_linear(128), 1.0f);
     test_uint(shading->color[0] & 0xFFFFu, 65535);
