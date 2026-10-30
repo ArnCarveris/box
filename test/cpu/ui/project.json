@@ -442,7 +442,8 @@
                     "overlapping_contours",
                     "spike",
                     "curves",
-                    "reflex_corner"
+                    "reflex_corner",
+                    "corner_shapes"
                 ]
             }
         ]
