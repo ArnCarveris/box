@@ -430,6 +430,13 @@ copies, which run on the GPU timeline instead of through `writeBuffer` staging. 
 need `CopySrc` usage. Touches `store.c`, `batch.c` and the buffer create in the backend
 (`gpu.c`). Effort: medium.
 
+Implemented: a grown page is created with `BOX_RENDER_BUFFER_KEEP`, which the backend honors by
+copying the old buffer into the new one before it releases it. A moved run sends one
+`box_render_copy_t` per stream from its old run, run after the resources and before the uploads
+and scatters through a staging buffer (source and destination are often the same page), and only
+the slots it got since its last send upload. The draw stats count `copies`, `copy_bytes`,
+`kept_pages` and `kept_bytes`.
+
 ### O4. Scatter entries
 
 An entry is the 4 byte slot plus the stride: 52 (transform), 20 (mesh shading), 84 (2D

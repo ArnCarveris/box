@@ -256,7 +256,11 @@
                     "dynamic_uploads_one_range_per_batch",
                     "new_backend_sends_pages_again",
                     "page_memory_mesh_and_2d",
-                    "page_memory_drops_with_released_pages"
+                    "page_memory_drops_with_released_pages",
+                    "grown_page_keeps_instances",
+                    "moved_run_copies_instances",
+                    "moved_run_scatters_copied_changes",
+                    "moved_out_of_released_page_uploads"
                 ]
             },
             {

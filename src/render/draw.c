@@ -822,6 +822,10 @@ static void BoxRenderExtractDraws(
     d->stats.scattered = 0;
     d->stats.scatters = 0;
     d->stats.upload_bytes = 0;
+    d->stats.copies = 0;
+    d->stats.copy_bytes = 0;
+    d->stats.kept_pages = 0;
+    d->stats.kept_bytes = 0;
     d->stats.transform_bytes = 0;
     d->stats.shading_bytes = 0;
     d->stats.surface_bytes = 0;

@@ -5,6 +5,8 @@
  * Every batch owns a run of slots of an instance page (store.c) with a transform, a shading and
  * a surface stream. It uploads its run when the run is handed out, then the changed slots of
  * each stream through a segment of the change buffer per page and stream, which scatter copies.
+ * A batch that outgrows its run moves to a larger one, and the GPU copies the instances it had
+ * from the old run (box_render_copy_t) before the changed slots are written over them.
  *
  * Mesh and 2D batches take their runs from stores of their own, a mesh shading being a material
  * slot, a tint and an alpha. A batch with dynamic_transform uploads the transform stream of its
@@ -335,6 +337,8 @@ int32_t box_draws_batch_ensure(
     b->first = 0;
     b->capacity = 0;
     b->full = BOX_DRAW_ALL;
+    b->sent = 0;
+    b->from_count = 0;
     b->bounds_dirty = false;
     b->bounded = false;
     b->was_ready = false;
@@ -391,6 +395,8 @@ static void box_draws_batch_free(
     b->page = -1;
     b->first = 0;
     b->capacity = 0;
+    b->sent = 0;
+    b->from_count = 0;
     *ecs_vec_append_t(NULL, &d->free_batches, int32_t) = index;
 }
 
@@ -1009,6 +1015,8 @@ void box_draws_reset_backend(
         b->first = 0;
         b->capacity = 0;
         b->full = BOX_DRAW_ALL;
+        b->sent = 0;
+        b->from_count = 0;
         box_draws_changed_clear(b);
     }
 
@@ -1022,7 +1030,11 @@ void box_draws_reset_backend(
 }
 
 /** Give a batch a run of slots that holds all its instances, moving it to a new run when it
- * outgrew its run; a moved batch uploads every instance and its old run is freed.
+ * outgrew its run; its old run is freed.
+ *
+ * A moved batch remembers the old run and the instances the GPU holds in it, which the send
+ * copies into the new run (box_draws_send_batch); its changed slots stay queued and are written
+ * over the copy. A batch the GPU holds no instances of uploads every instance.
  *
  * @param p The packet
  * @param d The state
@@ -1051,21 +1063,29 @@ static void box_draws_reserve(
     }
 
     box_draws_store_alloc(store, capacity, &page, &first);
+    b->from_count = 0;
     if (b->page >= 0) {
+        b->from_page = b->page;
+        b->from_first = b->first;
+        b->from_count = b->sent < b->capacity ? b->sent : b->capacity;
+        b->from_count = b->from_count < count ? b->from_count : count;
+        b->from_serial = box_draws_store_page(store, b->page)->serial;
         box_draws_store_free(store, p, b->page, b->first, b->capacity);
     }
 
     b->page = page;
     b->first = first;
     b->capacity = capacity;
-    b->full = BOX_DRAW_ALL;
-    box_draws_changed_clear(b);
+    if (!b->from_count) {
+        b->full = BOX_DRAW_ALL;
+        box_draws_changed_clear(b);
+    }
 done:
     return;
 }
 
-/** Make the buffers of every page hold their runs; the batches of a page whose buffers were
- * created again upload every instance into them.
+/** Make the buffers of every page hold their runs. A buffer created again keeps the instances
+ * of the buffer it replaces through a GPU copy, so no batch of the page uploads for it.
  *
  * @param p The packet
  * @param d The state
@@ -1074,21 +1094,56 @@ static void box_draws_pages(
     box_render_packet_t *p,
     box_render_draws_t *d)
 {
-    int32_t i, pg, st, count = ecs_vec_count(&d->batches);
+    int32_t pg, st, s;
     for (st = 0; st < BOX_DRAWS_STORES; st ++) {
         box_draw_store_t *store = &d->stores[st];
         for (pg = 0; pg < ecs_vec_count(&store->pages); pg ++) {
-            if (!box_draws_store_reserve(store, p, pg)) {
+            uint32_t kept = box_draws_store_page(store, pg)->capacity;
+            if (!box_draws_store_reserve(store, p, pg) || !kept) {
                 continue;
             }
 
-            for (i = 0; i < count; i ++) {
-                box_draw_batch_t *b = box_draws_batch(d, i);
-                if (b->alive && b->page == pg && box_draws_batch_store(d, b) == store) {
-                    b->full = BOX_DRAW_ALL;
-                    box_draws_changed_clear(b);
-                }
+            for (s = 0; s < store->layout.streams; s ++) {
+                d->stats.kept_pages ++;
+                d->stats.kept_bytes += (int64_t)kept * store->layout.stride[s];
             }
+        }
+    }
+}
+
+/** Upload the instances of a stream of a batch from a slot to the end into its run; the
+ * changed slots of the stream stay queued.
+ *
+ * @param p The packet
+ * @param d The state
+ * @param b The batch
+ * @param stream The stream
+ * @param from First slot uploaded, 0 for every instance
+ */
+static void box_draws_upload_from(
+    box_render_packet_t *p,
+    box_render_draws_t *d,
+    box_draw_batch_t *b,
+    int32_t stream,
+    uint32_t from)
+{
+    box_draw_store_t *store = box_draws_batch_store(d, b);
+    ecs_vec_t *data = box_draws_stream(b, stream);
+    uint32_t stride = store->layout.stride[stream];
+    uint32_t count = (uint32_t)ecs_vec_count(data);
+    uint32_t size = from < count ? (count - from) * stride : 0;
+    uint32_t offset = (b->first + from) * stride;
+    if (size) {
+        void *dst = box_render_packet_upload(p,
+            box_draws_store_handle(store, b->page, stream), offset, size);
+        ecs_os_memcpy(dst, ECS_OFFSET(ecs_vec_first(data), from * stride), (ecs_size_t)size);
+        box_draws_count_bytes(d, stream, size);
+        if (!from && stream == BOX_RENDER_STREAM_TRANSFORM) {
+            b->transform_frame = p->frame;
+            b->transform_data = ecs_vec_last_t(&p->uploads, box_render_upload_t)->data;
+        } else if (!from && stream == BOX_RENDER_STREAM_SHADING) {
+            b->shading_frame = p->frame;
+            b->shading_data = ecs_vec_last_t(&p->uploads, box_render_upload_t)->data;
         }
     }
 }
@@ -1106,27 +1161,61 @@ static void box_draws_upload_all(
     box_draw_batch_t *b,
     int32_t stream)
 {
-    box_draw_store_t *store = box_draws_batch_store(d, b);
-    ecs_vec_t *data = box_draws_stream(b, stream);
-    uint32_t stride = store->layout.stride[stream];
-    uint32_t size = (uint32_t)ecs_vec_count(data) * stride;
-    uint32_t offset = b->first * stride;
-    if (size) {
-        void *dst = box_render_packet_upload(p,
-            box_draws_store_handle(store, b->page, stream), offset, size);
-        ecs_os_memcpy(dst, ecs_vec_first(data), (ecs_size_t)size);
-        box_draws_count_bytes(d, stream, size);
-        if (stream == BOX_RENDER_STREAM_TRANSFORM) {
-            b->transform_frame = p->frame;
-            b->transform_data = ecs_vec_last_t(&p->uploads, box_render_upload_t)->data;
-        } else if (stream == BOX_RENDER_STREAM_SHADING) {
-            b->shading_frame = p->frame;
-            b->shading_data = ecs_vec_last_t(&p->uploads, box_render_upload_t)->data;
-        }
-    }
-
+    box_draws_upload_from(p, d, b, stream, 0);
     b->full &= (uint8_t)~(1 << stream);
     ecs_vec_clear(&b->changed[stream]);
+}
+
+/** Copy the first slots of a stream of a moved batch from its old run into its new run on the
+ * GPU.
+ *
+ * @param p The packet
+ * @param d The state
+ * @param b The batch
+ * @param stream The stream
+ * @param count Slots copied
+ */
+static void box_draws_copy(
+    box_render_packet_t *p,
+    box_render_draws_t *d,
+    const box_draw_batch_t *b,
+    int32_t stream,
+    uint32_t count)
+{
+    box_draw_store_t *store = box_draws_batch_store(d, b);
+    uint32_t stride = store->layout.stride[stream];
+    box_render_copy_t *c = box_render_packet_buffer_copy(p);
+    c->src = box_draws_store_handle(store, b->from_page, stream);
+    c->src_offset = b->from_first * stride;
+    c->dst = box_draws_store_handle(store, b->page, stream);
+    c->dst_offset = b->first * stride;
+    c->size = count * stride;
+    d->stats.copies ++;
+    d->stats.copy_bytes += c->size;
+}
+
+/** Check whether the run a batch moved out of still holds its instances on the GPU: its page
+ * was not released in the extract, which applies before the copies.
+ *
+ * @param d The state
+ * @param b The batch
+ * @return Whether the instances can be copied from the old run
+ */
+static bool box_draws_from_held(
+    box_render_draws_t *d,
+    const box_draw_batch_t *b)
+{
+    box_draw_store_t *store = box_draws_batch_store(d, b);
+    const box_draw_page_t *pg;
+    bool result = false;
+    if (!b->from_count || b->from_page >= ecs_vec_count(&store->pages)) {
+        goto done;
+    }
+
+    pg = box_draws_store_page(store, b->from_page);
+    result = pg->alive && pg->serial == b->from_serial;
+done:
+    return result;
 }
 
 /** Get the bytes of one scatter entry of a stream: the slot and the instance data.
@@ -1252,9 +1341,80 @@ static void box_draws_batch_page(
     }
 }
 
+/** Send a stream of a batch that moved to a new run.
+ *
+ * The GPU copies the instances it holds in the old run into the new run, and the slots past
+ * them, which the batch got since its last send, upload. The changed slots among the copied ones
+ * go into the scatter segment of the page and stream, unless they are not smaller than the slots
+ * from the first of them to the end of the copy or the segments of the frame would outgrow the
+ * change buffer; the copy stops at the first changed slot then and the upload starts there. A
+ * stream whose copy would make the copies of the frame outgrow BOX_RENDER_COPY_MAX uploads its
+ * run.
+ *
+ * @param p The packet
+ * @param d The state
+ * @param b The batch
+ * @param stream The stream
+ * @param changes Bytes the scatter segments of the frame take, updated
+ * @param copies Bytes the copies of the frame move, updated
+ */
+static void box_draws_send_moved(
+    box_render_packet_t *p,
+    box_render_draws_t *d,
+    box_draw_batch_t *b,
+    int32_t stream,
+    uint64_t *changes,
+    uint64_t *copies)
+{
+    box_draw_store_t *store = box_draws_batch_store(d, b);
+    box_draw_page_t *pg = box_draws_store_page(store, b->page);
+    ecs_vec_t *changed = &b->changed[stream];
+    int32_t *slots = ecs_vec_first(changed);
+    int32_t i, count = ecs_vec_count(changed);
+    uint32_t stride = store->layout.stride[stream];
+    uint32_t held = b->from_count, first = held, entries = 0;
+    if (*copies + (uint64_t)held * stride > BOX_RENDER_COPY_MAX) {
+        box_draws_upload_all(p, d, b, stream);
+        goto done;
+    }
+
+    for (i = 0; i < count; i ++) {
+        if ((uint32_t)slots[i] < held) {
+            first = (uint32_t)slots[i] < first ? (uint32_t)slots[i] : first;
+            slots[entries ++] = slots[i];
+        }
+    }
+
+    ecs_vec_set_count_t(NULL, changed, int32_t, (int32_t)entries);
+    if (entries) {
+        uint64_t grow = box_draws_segment_size(store, stream, pg->entries[stream] + entries) -
+            box_draws_segment_size(store, stream, pg->entries[stream]);
+        if ((uint64_t)entries * box_draws_entry_size(store, stream) >=
+            (uint64_t)(held - first) * stride || *changes + grow > BOX_DRAWS_MAX_CHANGES)
+        {
+            held = first;
+            ecs_vec_clear(changed);
+        } else {
+            pg->entries[stream] += entries;
+            *changes += grow;
+        }
+    }
+
+    if (held) {
+        box_draws_copy(p, d, b, stream, held);
+        *copies += (uint64_t)held * stride;
+    }
+
+    box_draws_upload_from(p, d, b, stream, held);
+done:
+    return;
+}
+
 /** Upload the instances of a batch it needs this frame and add its draw.
  *
- * A stream the batch uploads every frame, or every instance of, uploads its run.
+ * A stream the batch uploads every frame, or every instance of, uploads its run. Any other
+ * stream of a batch that moved to a new run copies the instances of its old run on the GPU
+ * (box_draws_send_moved).
  *
  * The changed slots of any other stream go into the scatter segment of its page and stream,
  * unless they are not smaller than its run or the segments of the frame would outgrow the
@@ -1264,21 +1424,30 @@ static void box_draws_batch_page(
  * @param d The state
  * @param b The batch
  * @param changes Bytes the scatter segments of the frame take, updated
+ * @param copies Bytes the copies of the frame move, updated
  */
 static void box_draws_send_batch(
     box_render_packet_t *p,
     box_render_draws_t *d,
     box_draw_batch_t *b,
-    uint64_t *changes)
+    uint64_t *changes,
+    uint64_t *copies)
 {
     box_draw_store_t *store = box_draws_batch_store(d, b);
     uint32_t count = (uint32_t)ecs_vec_count(&b->entities);
     uint8_t dynamic = box_draws_dynamic_kinds(b);
+    bool moved = box_draws_from_held(d, b);
     int32_t s;
+    if (b->from_count && !moved) {
+        b->full = BOX_DRAW_ALL;
+    }
+
     for (s = 0; s < BOX_DRAWS_STREAMS; s ++) {
         uint32_t entries = (uint32_t)ecs_vec_count(&b->changed[s]);
         if ((dynamic | b->full) & (1 << s)) {
             box_draws_upload_all(p, d, b, s);
+        } else if (moved) {
+            box_draws_send_moved(p, d, b, s, changes, copies);
         } else if (entries) {
             box_draw_page_t *pg = box_draws_store_page(store, b->page);
             uint64_t grow = box_draws_segment_size(store, s, pg->entries[s] + entries) -
@@ -1295,6 +1464,8 @@ static void box_draws_send_batch(
         }
     }
 
+    b->from_count = 0;
+    b->sent = count;
     b->ready = true;
     if (b->key.blend != Opaque || b->key.pipeline == BOX_RENDER_SHADER_SHAPE2D) {
         goto done;
@@ -1752,7 +1923,7 @@ void box_draws_send(
 {
     box_mesh_cache_t *cache = box_mesh_cache_of(world);
     int32_t i, count = ecs_vec_count(&d->batches);
-    uint64_t changes = 0;
+    uint64_t changes = 0, copies = 0;
     bool views = ecs_vec_count(&p->views) != 0;
     d->textures = box_textures_get(world);
     d->world = world;
@@ -1811,7 +1982,7 @@ void box_draws_send(
         }
 
         if (b->ready) {
-            box_draws_send_batch(p, d, b, &changes);
+            box_draws_send_batch(p, d, b, &changes, &copies);
         }
 
         if (b->ready && b->key.blend != Opaque &&
