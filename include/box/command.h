@@ -59,6 +59,17 @@ char* box_command_run(
     const char *line,
     bool *error);
 
+/** Get the value of the last command that ran in a shell result.
+ *
+ * A command line can contain multiple commands, ecs_shell_run returns one value per command.
+ * The value of the line is the value of its last command.
+ *
+ * @param r The result of ecs_shell_run
+ * @return The value, NULL when no command ran
+ */
+const ecs_value_t* box_command_value(
+    const ecs_shell_result_t *r);
+
 /** Get the file of a resource that a command created in a session.
  *
  * The flecs shell keeps the resources of a session in .flecs/shell/<session> under the working

@@ -229,10 +229,10 @@ static void box_cmd_fit(
         goto done;
     }
 
+    float aspect = box_cmd_fit_aspect(world, camera, ecs_get(world, camera, Camera));
     Camera *cam = ecs_get_mut(world, camera, Camera);
     float fov = cam->fov > 0 ? cam->fov : BOX_CAMERA_FOV;
     float near_ = cam->near_ > 0 ? cam->near_ : BOX_CAMERA_NEAR;
-    float aspect = box_cmd_fit_aspect(world, camera, cam);
     float tan_y = tanf(glm_rad(fov) * 0.5f) * BOX_CMD_FIT_FILL;
     float tan_x = tan_y * aspect;
     float distance = -FLT_MAX, extent_x = 0, extent_y = 0, depth = -FLT_MAX;

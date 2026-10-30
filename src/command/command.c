@@ -137,6 +137,13 @@ char* box_command_format(
     return result ? result : ecs_os_strdup("");
 }
 
+const ecs_value_t* box_command_value(
+    const ecs_shell_result_t *r)
+{
+    int32_t count = ecs_vec_count(&r->results);
+    return count ? &ecs_vec_get_t(&r->results, ecs_value_t, count - 1)[0] : NULL;
+}
+
 char* box_command_run(
     ecs_world_t *world,
     ecs_entity_t session,
@@ -147,7 +154,8 @@ char* box_command_run(
     ecs_strbuf_t buf = ECS_STRBUF_INIT;
     char **errors = ecs_vec_first(&r.errors);
     int32_t i, count = ecs_vec_count(&r.errors);
-    char *out = count ? NULL : box_command_format(world, &r.result);
+    const ecs_value_t *last = box_command_value(&r);
+    char *out = (count || !last) ? NULL : box_command_format(world, last);
     if (out) {
         ecs_strbuf_appendstr(&buf, out);
     }
