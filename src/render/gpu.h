@@ -550,12 +550,12 @@ void box_gpu_mesh_apply(
 
 /** Create or release a buffer from a BOX_RENDER_BUFFER resource.
  *
- * @param gpu The backend
- * @param op What happens to the buffer
- * @param handle Handle of the buffer
  * A create with BOX_RENDER_BUFFER_KEEP that replaces a buffer copies the bytes the two have
  * in common from the old buffer on the GPU before releasing it.
  *
+ * @param gpu The backend
+ * @param op What happens to the buffer
+ * @param handle Handle of the buffer
  * @param desc Size and usage, NULL for a release
  */
 void box_gpu_buffer_apply(

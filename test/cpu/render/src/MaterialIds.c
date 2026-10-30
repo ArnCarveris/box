@@ -210,11 +210,13 @@ void MaterialIds_prefab_instances_share_slot(void) {
         instance_new(world, prefab, (float)(COUNT + i));
     }
 
+    /* The batch outgrows its run: the GPU copies the instances it had, the new ones upload */
     stats = frame(world);
     test_int(stats.materials, 2);
     test_int(stats.material_bytes, 0);
-    test_int(stats.transform_bytes, 2 * COUNT * TRANSFORM);
-    test_int(stats.shading_bytes, 2 * COUNT * SHADING);
+    test_int(stats.transform_bytes, COUNT * TRANSFORM);
+    test_int(stats.shading_bytes, COUNT * SHADING);
+    test_int(stats.copies, 3);
 
     ecs_fini(world);
     box_render_null_free(null);

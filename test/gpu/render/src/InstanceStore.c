@@ -256,3 +256,74 @@ void InstanceStore_moved_run_and_grown_page_keep_records(void) {
     batch_matches(world, b[0]);
     ecs_fini(world);
 }
+
+/** Add a polygon.
+ *
+ * @param world The world
+ * @param sides Sides of the polygon, which select its mesh
+ * @param x Its x position
+ * @param y Its y position
+ * @return The shape
+ */
+static ecs_entity_t ngon_new(
+    ecs_world_t *world,
+    int32_t sides,
+    float x,
+    float y)
+{
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {x, y, 0});
+    ecs_set(world, e, NGon, {.sides = sides, .radius = 0.5f});
+    ecs_set(world, e, Rgb, {(uint8_t)(40 * sides), 50, 50});
+
+    return e;
+}
+
+void InstanceStore_moved_run_reused_in_same_frame(void) {
+    // gpu_instance_data/instance_page_copy
+    ecs_world_t *world = world_new();
+    ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
+    ecs_entity_t a[4], b[4], c = 0;
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        a[i] = ngon_new(world, 3, (float)i - 10, 0);
+        b[i] = ngon_new(world, 4, (float)i - 10, 4);
+    }
+
+    frames(world, 3);
+    box_render_draws_t *d = box_draws_state(world);
+    test_uint(box_draws_batch(d, ecs_get(world, a[0], DrawSlot)->batch)->first, 0);
+    test_uint(box_draws_batch(d, ecs_get(world, b[0], DrawSlot)->batch)->first, 64);
+
+    /* The first batch moves past the second, and a new batch with the mesh of the second takes
+     * the run it left in the same frame: its upload writes the old run after the copy read it.
+     * The second batch scatters a change in the same frame */
+    for (i = 0; i < 64; i ++) {
+        ngon_new(world, 3, (float)(i % 16) - 8, (float)(i / 16) - 8);
+    }
+
+    for (i = 0; i < 3; i ++) {
+        c = ngon_new(world, 4, (float)i, 8);
+        ecs_add(world, c, DynamicTransform);
+    }
+
+    ecs_set(world, b[1], Position, {-9, 5, 0});
+    box_render_gpu_stats_t after = frames(world, 1);
+    box_render_draws_stats_t stats;
+    box_render_draws_stats(world, &stats);
+    test_uint(box_draws_batch(d, ecs_get(world, a[0], DrawSlot)->batch)->first, 128);
+    test_uint(box_draws_batch(d, ecs_get(world, c, DrawSlot)->batch)->first, 0);
+    test_int(stats.copies, BOX_RENDER_INSTANCE_STREAMS);
+    test_int(stats.scattered, 1);
+    test_int(after.errors, 0);
+    batch_matches(world, a[0]);
+    batch_matches(world, b[0]);
+    batch_matches(world, c);
+
+    after = frames(world, 2);
+    test_int(after.errors, 0);
+    batch_matches(world, a[0]);
+    batch_matches(world, b[0]);
+    batch_matches(world, c);
+    ecs_fini(world);
+}

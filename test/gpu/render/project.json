@@ -692,7 +692,8 @@
                 "testcases": [
                     "instance_binds_do_not_grow_with_batches",
                     "scatters_follow_pages_with_changes",
-                    "moved_run_and_grown_page_keep_records"
+                    "moved_run_and_grown_page_keep_records",
+                    "moved_run_reused_in_same_frame"
                 ]
             },
             {
