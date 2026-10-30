@@ -6,27 +6,28 @@ using box.camera
 using box.view
 using box.light
 
-// Clear coat (ClearCoat) over rough bases in a dim room lit by a sun through the open top, with
-// a box projected room probe of bright panels. The top row of rough red balls has a coat of
-// strength 0, 0.25, 0.5, 0.75 and 1 from left to right: a second, sharp highlight and a sharp
-// reflection of the panels grow over the soft one of the base. The middle row has a full coat
-// of roughness 0, 0.15, 0.3, 0.5 and 0.8: the second highlight widens and dims. Below, a rough
-// gold metal with a smooth coat next to the same metal without one, and two normal mapped
-// panels, the right one coated, whose coat reflects the panels smoothly over the bumps.
+// Clear coat (ClearCoat) over rough bases in a room open at the top, lit by a sun from above
+// and behind the camera, with a box projected room probe of a bright window and two colored
+// panels. The top row of rough red balls has a coat of roughness 0.1 and strength 0, 0.25, 0.5,
+// 0.75 and 1 from left to right: a second, sharp highlight and a sharp reflection of the panels
+// grow over the soft one of the base. The middle row has a full coat of roughness 0, 0.15, 0.3,
+// 0.5 and 0.8: the second highlight widens and dims. Below, a rough gold metal with a smooth
+// coat next to the same metal without one, and two normal mapped panels, the right one coated,
+// whose coat reflects the window smoothly over the bumps.
 room {
   Scene: {}
   ReflectionBake: {resolution: 128}
   AmbientLight: {intensity: 0.15}
 
   camera {
-    Position: {0, 1.9, 6.4}
+    Position: {0, 1.9, 5.6}
     Rotation: {-0.12, 0, 0}
     Camera: {fov: 55}
   }
 
   sun {
-    Rotation: {-0.9, 0.5, 0}
-    DirectionalLight: {intensity: 2.5}
+    Rotation: {0.7, 2.7, 0}
+    DirectionalLight: {intensity: 4}
   }
 
   floor {
@@ -91,7 +92,7 @@ room {
     Sphere: {segments: 48, smooth: true, radius: 0.55}
     Rgb: {170, 25, 20}
     PbrMaterial: {roughness: 0.65}
-    ClearCoat: {strength: 0}
+    ClearCoat: {strength: 0, roughness: 0.1}
   }
 
   strength_1 {
@@ -99,7 +100,7 @@ room {
     Sphere: {segments: 48, smooth: true, radius: 0.55}
     Rgb: {170, 25, 20}
     PbrMaterial: {roughness: 0.65}
-    ClearCoat: {strength: 0.25}
+    ClearCoat: {strength: 0.25, roughness: 0.1}
   }
 
   strength_2 {
@@ -107,7 +108,7 @@ room {
     Sphere: {segments: 48, smooth: true, radius: 0.55}
     Rgb: {170, 25, 20}
     PbrMaterial: {roughness: 0.65}
-    ClearCoat: {strength: 0.5}
+    ClearCoat: {strength: 0.5, roughness: 0.1}
   }
 
   strength_3 {
@@ -115,7 +116,7 @@ room {
     Sphere: {segments: 48, smooth: true, radius: 0.55}
     Rgb: {170, 25, 20}
     PbrMaterial: {roughness: 0.65}
-    ClearCoat: {strength: 0.75}
+    ClearCoat: {strength: 0.75, roughness: 0.1}
   }
 
   strength_4 {
@@ -123,7 +124,7 @@ room {
     Sphere: {segments: 48, smooth: true, radius: 0.55}
     Rgb: {170, 25, 20}
     PbrMaterial: {roughness: 0.65}
-    ClearCoat: {strength: 1}
+    ClearCoat: {strength: 1, roughness: 0.1}
   }
 
   roughness_0 {

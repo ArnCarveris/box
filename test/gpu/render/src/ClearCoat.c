@@ -205,20 +205,34 @@ static int coat_peak(
     return best;
 }
 
-/** Count the pixels of a clear coat capture whose channel sum is above a threshold.
+/** Count the pixels where a coated capture is brighter than an uncoated one by at least half
+ * of its largest difference, the area of the highlight of the coat at half its height.
  *
- * @param px The pixels
- * @param threshold The threshold
+ * @param coated The capture with a coat
+ * @param plain The same capture without one
+ * @param peak Receives the largest difference of the channel sums
  * @return The count
  */
-static int coat_count(
-    const unsigned char *px,
-    int threshold)
+static int coat_half_width(
+    const unsigned char *coated,
+    const unsigned char *plain,
+    int *peak)
 {
-    int count = 0, i;
-    for (i = 0; i < COAT_W * COAT_H; i ++) {
-        count += px[i * 4] + px[i * 4 + 1] + px[i * 4 + 2] > threshold;
+    int best = 0, count = 0, i, j;
+    for (j = 0; j < COAT_H; j ++) {
+        for (i = 0; i < COAT_W; i ++) {
+            int d = coat_sum(coated, i, j) - coat_sum(plain, i, j);
+            best = d > best ? d : best;
+        }
     }
+
+    for (j = 0; j < COAT_H; j ++) {
+        for (i = 0; i < COAT_W; i ++) {
+            count += 2 * (coat_sum(coated, i, j) - coat_sum(plain, i, j)) >= best;
+        }
+    }
+
+    *peak = best;
 
     return count;
 }
@@ -297,14 +311,18 @@ void ClearCoat_clear_coat_roughness_widens(void) {
     // materials/pbr
     ClearCoat smooth = {.strength = 1, .roughness = 0.1f};
     ClearCoat rough = {.strength = 1, .roughness = 0.5f};
+    unsigned char *plain = coat_highlight(NULL, 5, true, "coat_widens_plain.png");
     unsigned char *a = coat_highlight(&smooth, 5, true, "coat_smooth.png");
     unsigned char *b = coat_highlight(&rough, 5, true, "coat_rough.png");
-    int smooth_peak = coat_peak(a, 0, COAT_W, NULL, NULL);
-    int rough_peak = coat_peak(b, 0, COAT_W, NULL, NULL);
-    test_assert(rough_peak < smooth_peak - 60);
-    test_assert(coat_count(b, 180) > coat_count(a, 180));
-    test_assert(coat_count(b, 180) > 8);
+    int smooth_peak = 0, rough_peak = 0;
+    int smooth_width = coat_half_width(a, plain, &smooth_peak);
+    int rough_width = coat_half_width(b, plain, &rough_peak);
+    test_assert(smooth_peak > 300);
+    test_assert(rough_peak > 30);
+    test_assert(rough_peak < smooth_peak / 2);
+    test_assert(rough_width > smooth_width * 2);
 
+    stbi_image_free(plain);
     stbi_image_free(a);
     stbi_image_free(b);
 }
