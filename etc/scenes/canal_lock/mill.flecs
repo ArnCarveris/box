@@ -1,0 +1,109 @@
+include materials
+include state
+include control
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.movement
+using box.particle
+using box.transition
+
+template LockMillWheelBody {
+  hub : CanalOldTimber { Rotation: {math.PI / 2, 0, 0}; Cylinder: {radius: 0.26, length: 1.05, segments: 14, smooth: true} }
+  rim_a : CanalTimber { Position: {0, 0, 0.42}; Rotation: {math.PI / 2, 0, 0}; Torus: {radius: 1.5, tube: 0.05, segments: 48, rings: 6} }
+  rim_b : CanalTimber { Position: {0, 0, -0.42}; Rotation: {math.PI / 2, 0, 0}; Torus: {radius: 1.5, tube: 0.05, segments: 48, rings: 6} }
+  ring_a : CanalRust { Position: {0, 0, 0.42}; Rotation: {math.PI / 2, 0, 0}; Torus: {radius: 0.75, tube: 0.022, segments: 28, rings: 5} }
+  ring_b : CanalRust { Position: {0, 0, -0.42}; Rotation: {math.PI / 2, 0, 0}; Torus: {radius: 0.75, tube: 0.022, segments: 28, rings: 5} }
+  for i in 0..8 {
+    const a = i * math.PI / 4
+    {
+      Rotation: {0, 0, a}
+      { (IsA, CanalTimber); Position: {0.75, 0, 0.42 + (i % 2) * 0.016}; Box: {1.5, 0.09, 0.08} }
+      { (IsA, CanalTimber); Position: {0.75, 0, -0.42 - (i % 2) * 0.016}; Box: {1.5, 0.09, 0.08} }
+    }
+  }
+  for i in 0..18 {
+    const a = i * math.PI / 9
+    {
+      Rotation: {0, 0, a}
+      { (IsA, CanalOldTimber); Position: {1.52, 0, (i % 2) * 0.012}; Rotation: {0, 0, 0.32}; Box: {0.38, 0.045, 0.8} }
+    }
+  }
+}
+
+template LockMillWheel {
+  const speed = match lock_mill_on { true: 1.15; _: 0.0 }
+
+  AngularVelocity: {0, 0, speed}
+
+  LockMillWheelBody body()
+}
+
+template LockMillSluice : LockControl {
+  const lift = match lock_mill_on { true: 0.42; _: 0.0 }
+  Transition: [Tint: {duration: 0.12}]
+  post_a : CanalOldTimber { Position: {0, 0.65, 0.6}; Box: {0.18, 1.3, 0.18} }
+  post_b : CanalOldTimber { Position: {0, 0.65, -0.6}; Box: {0.18, 1.3, 0.18} }
+  top_beam : CanalOldTimber { Position: {0, 1.3, 0}; Box: {0.24, 0.16, 1.44} }
+  board {
+    Position: {0, lift, 0}
+    Transition: [Position: {duration: 0.8, timing_function: EaseInOut}]
+    gate : CanalPlanks { Position: {0, 0.3, 0}; Box: {0.08, 0.74, 1.02}; TextureTransform: {scale_x: 0.4, scale_y: 0.6} }
+    rod : CanalIron { Position: {0, 1.04, 0}; Cylinder: {radius: 0.03, length: 0.84, segments: 8} }
+    handle : CanalRed { Position: {0, 1.46, 0}; RoundedBox: {0.08, 0.08, 0.6, 0.015, segments: 1} }
+  }
+  async {
+    while true {
+      await on.click(this)
+      lock_mill_on = !lock_mill_on
+    }
+  }
+}
+
+template LockMill {
+  pond_bed : CanalMud { Position: {3.3, 0.02, 0}; Box: {4.7, 0.04, 3.9} }
+  pond : CanalPondWater { Position: {3.3, 0.1, 0}; Rotation: {-math.PI / 2, 0, 0}; Quad: {4.8, 4}; TextureTransform: {scale_x: 1, scale_y: 0.8} }
+  rim_w : CanalCoping { Position: {0.86, 0.1, 0}; RoundedBox: {0.26, 0.2, 4.54, 0.03, segments: 1} }
+  rim_e : CanalCoping { Position: {5.8, 0.1, 0}; RoundedBox: {0.26, 0.2, 4.54, 0.03, segments: 1} }
+  rim_n : CanalCopingOld { Position: {3.33, 0.1, -2.14}; RoundedBox: {4.68, 0.2, 0.26, 0.03, segments: 1} }
+  rim_s : CanalCopingOld { Position: {3.33, 0.1, 2.14}; RoundedBox: {4.68, 0.2, 0.26, 0.03, segments: 1} }
+
+  flume_floor : CanalOldTimber { Position: {-0.08, 0.15, 0}; Box: {1.96, 0.07, 1.1} }
+  flume_a : CanalPlanks { Position: {-0.08, 0.3, 0.57}; Box: {2.0, 0.3, 0.06}; TextureTransform: {scale_x: 0.8, scale_y: 0.2} }
+  flume_b : CanalPlanks { Position: {-0.08, 0.3, -0.57}; Box: {2.0, 0.3, 0.06}; TextureTransform: {scale_x: 0.8, scale_y: 0.2} }
+  flume_water : CanalPondWater { Position: {-0.08, 0.225, 0}; Rotation: {-math.PI / 2, 0, 0}; Quad: {1.96, 1.06}; TextureTransform: {scale_x: 0.5, scale_y: 0.25} }
+  for s in 0..2 {
+    const sz = (s * 2 - 1) * 0.64
+    { (IsA, CanalOldTimber); Position: {-0.75, -0.48, sz}; Rotation: {0, 0, 0.0}; Box: {0.1, 1.3, 0.1} }
+  }
+  LockMillSluice sluice() { Position: {0.68, 0.1, 0} }
+
+  bearing_a : CanalStone { Position: {-1.6, -0.58, 0.72}; RoundedBox: {0.42, 1.2, 0.14, 0.02, segments: 1} }
+  bearing_b : CanalStone { Position: {-1.6, -0.58, -0.72}; RoundedBox: {0.42, 1.2, 0.14, 0.02, segments: 1} }
+  axle : CanalIron { Position: {-1.6, 0.05, 0}; Rotation: {math.PI / 2, 0, 0}; Cylinder: {radius: 0.06, length: 1.6, segments: 12, smooth: true} }
+  LockMillWheel wheel() { Position: {-1.6, 0.05, 0} }
+
+  flow {
+    Position: {-1.04, 0.2, 0}
+    ParticleEmitter: {
+      max: 1800,
+      rate: match lock_mill_on { true: 700; _: 0 },
+      shape: EmitterBox, extents: {0.02, 0.02, 0.42},
+      direction: {-1, -0.1, 0}, spread: 8, speed: {0.7, 1.2},
+      lifetime: {0.55, 0.95}, size: {0.025, 0.08}, opacity: {0.3, 0.75},
+      acceleration: {0, -7, 0}, color: {224, 240, 244}, seed: 11
+    }
+  }
+  tail_foam {
+    Position: {-1.8, -1.08, 0}
+    ParticleEmitter: {
+      max: 800,
+      rate: match lock_mill_on { true: 320; _: 0 },
+      shape: EmitterBox, extents: {0.5, 0.01, 0.42},
+      direction: {0, 1, 0}, spread: 45, speed: {0.3, 0.8},
+      lifetime: {0.5, 1.1}, size: {0.025, 0.08}, opacity: {0.25, 0.6},
+      acceleration: {0, -2.5, 0}, color: {228, 240, 244}, seed: 12
+    }
+  }
+}
