@@ -961,6 +961,19 @@ bool box_draws_store_reserve(
     box_render_packet_t *p,
     int32_t page);
 
+/** Add the slots and the bytes per stream of the page buffers of a store.
+ *
+ * Only the pages alive whose buffers are created count, with the slots their buffers hold.
+ *
+ * @param s The store
+ * @param slots Incremented by the slots of the page buffers
+ * @param bytes Incremented by the bytes of the page buffers, per stream
+ */
+void box_draws_store_memory(
+    const box_draw_store_t *s,
+    int64_t *slots,
+    int64_t bytes[BOX_DRAWS_STREAMS]);
+
 /** Get a page of a store.
  *
  * @param s The store
