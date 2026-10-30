@@ -18,9 +18,16 @@ struct Material {
     cutoff: f32,
     // Linear emitted color times its strength
     emissive: vec3f,
-    reserved: u32,
+    // Display encoded Transmission.attenuation_color, r | g << 8 | b << 16, white without one
+    attenuation_color: u32,
     // TextureTransform: u scale, v scale, u offset, v offset
     uv: vec4f,
+    // Transmission: factor (0 without one), index of refraction, thickness and the distance at
+    // which light has the attenuation color
+    transmission_factor: f32,
+    ior: f32,
+    thickness_factor: f32,
+    attenuation_distance: f32,
 };
 
 // Record of a material id; an id past the table reads the default material of slot 0.

@@ -290,6 +290,14 @@
                     "prefab_inherited",
                     "instance_set_copies",
                     "no_leak",
+                    "remove_owned",
+                    "remove_inherited",
+                    "remove_inherited_missing",
+                    "remove_last",
+                    "deferred_set",
+                    "system_set",
+                    "deferred_remove",
+                    "deferred_no_leak",
                     "not_transitionable",
                     "negative_duration",
                     "negative_delay",
@@ -297,6 +305,17 @@
                     "ease_end_points",
                     "ease_monotonic",
                     "ease_midpoints"
+                ]
+            },
+            {
+                "id": "SetAt",
+                "testcases": [
+                    "runs_at_frame",
+                    "frame_zero_runs_first",
+                    "from_script",
+                    "no_entity",
+                    "implied_not_copied",
+                    "implied_authored"
                 ]
             }
         ]

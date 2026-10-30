@@ -1,0 +1,65 @@
+// A shadow caster in the middle of a move. The ball starts on the left; SetAt moves it to the
+// right at the start of the second frame, with a linear duration of 0.05 s (three frames at the
+// fixed delta of 1/60 s), so the render of the third frame shows it a third of the way. The ball
+// and its shadow on the floor render at the same in between place: the shadow passes read the
+// patched transform stream, and no shadow stays behind at the start or appears at the target.
+// The spot light caches its atlas tile, which the moving caster renders again.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.app
+using box.transition
+
+camera {
+  Position: {0, 6, 10}
+  Rotation: {-0.5, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {8, 8, 12, 255}}, shadows: {enabled: true}}
+}
+
+$ {
+  AmbientLight: {intensity: 0.1}
+}
+
+sun {
+  Rotation: {0.9, 2.5, 0}
+  DirectionalLight: {intensity: 2 * flecs.script.math.PI}
+  Rgb: {255, 248, 235}
+}
+
+spot {
+  Position: {0, 5, 0}
+  Rotation: {1.5708, 0, 0}
+  SpotLight: {intensity: 30 * flecs.script.math.PI, range: 9, inner_angle: 25, outer_angle: 40, shadows: true}
+  Rgb: {255, 200, 140}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {16, 0.2, 10}
+  Rgb: {200, 200, 200}
+}
+
+pillar {
+  Position: {0, 0.75, -2.5}
+  Box: {0.6, 1.5, 0.6}
+  Rgb: {230, 230, 230}
+}
+
+ball {
+  Position: {-4.5, 1.2, 0}
+  Sphere: {segments: 32, smooth: true, radius: 0.7}
+  Rgb: {230, 90, 70}
+  Transition: [Position: {duration: 0.05}]
+}
+
+change_ball {
+  SetAt: {frame: 1, entity: ball}
+  Position: {4.5, 1.2, 0}
+}

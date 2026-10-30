@@ -1,0 +1,67 @@
+// Modeled on flecs-engine's transparency_fog.flecs: an opaque reference box and a transmissive
+// pane in front of a box of the same color, at 30, 130 and 420 units in the aerial perspective
+// of the atmosphere, every pair scaled by its distance so it covers the same pixels. One unit is
+// 20 m (units_per_km 50), so the haze shows. The panes fade into the distance like the opaque
+// references.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.atmosphere
+
+camera {
+  Position: {0, 2, 0}
+  Camera: {fov: 12, far_: 0}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {0, 0, 0, 255}}}
+}
+
+sun {
+  Rotation: {0.5, 2.6, 0}
+  DirectionalLight: {intensity: 3 * flecs.script.math.PI}
+  Rgb: {255, 255, 255}
+}
+
+$ {
+  Atmosphere: {units_per_km: 50, sun: sun}
+}
+
+// A pair at a distance d, scaled by d / 30, in column i from the left
+prefab Pair {
+  reference {
+    Position: {-0.9, 0, 0}
+    Box: {1.4, 1.4, 0.4}
+    Rgb: {200, 70, 50}
+  }
+  pane {
+    Position: {0.9, 0, 0}
+    Box: {1.4, 1.4, 0.1}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.1}
+    Transmission: {transmission_factor: 1, ior: 1.1, thickness_factor: 0.1}
+  }
+  backing {
+    Position: {0.9, 0, -0.6}
+    Box: {1.4, 1.4, 0.4}
+    Rgb: {200, 70, 50}
+  }
+}
+
+pair_30 : Pair {
+  Position: {-3.6, 2, -30}
+  Scale: {1, 1, 1}
+}
+
+pair_130 : Pair {
+  Position: {0, 2, -130}
+  Scale: {4.3333, 4.3333, 4.3333}
+}
+
+pair_420 : Pair {
+  Position: {50.4, 2, -420}
+  Scale: {14, 14, 14}
+}

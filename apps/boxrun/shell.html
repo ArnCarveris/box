@@ -39,7 +39,22 @@
   }
   canvas.addEventListener('pointerdown', function () { canvas.focus(); });
   var args = location.hash ? decodeURIComponent(location.hash.slice(1)).split(' ') : [];
-  navigator.gpu.requestAdapter({ powerPreference: 'high-performance' }).then(function (adapter) {
+  // ?preload=<path> (repeatable) fetches a file of the server into the same path of the page's
+  // file system before main runs, so a check can open a scene that is not embedded from etc
+  var preload = new URLSearchParams(location.search).getAll('preload');
+  var files = [];
+  Promise.all(preload.map(function (path) {
+    return fetch(path).then(function (response) {
+      if (!response.ok) {
+        throw new Error('Cannot fetch ' + path + ': ' + response.status);
+      }
+      return response.arrayBuffer();
+    }).then(function (data) {
+      files.push({ path: path, data: new Uint8Array(data) });
+    });
+  })).then(function () {
+    return navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
+  }).then(function (adapter) {
     if (!adapter) {
       throw new Error('No WebGPU adapter.');
     }
@@ -54,13 +69,23 @@
         fail('The WebGPU device was lost.', info.message);
       }
     });
-    return {{{ EXPORT_NAME }}}({
+    var options = {
       canvas: canvas,
       preinitializedWebGPUDevice: device,
       arguments: args.filter(function (a) { return a.length; }),
       print: function (text) { console.log(text); },
-      printErr: function (text) { console.error(text); }
-    });
+      printErr: function (text) { console.error(text); },
+      preRun: [function (module) {
+        files.forEach(function (file) {
+          var dir = file.path.substring(0, file.path.lastIndexOf('/'));
+          if (dir) {
+            module.FS.mkdirTree(dir);
+          }
+          module.FS.writeFile(file.path, file.data);
+        });
+      }]
+    };
+    return {{{ EXPORT_NAME }}}(options);
   }).then(function (Module) {
     window.Module = Module;
     overlay.classList.add('hidden');

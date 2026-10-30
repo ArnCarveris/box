@@ -69,6 +69,12 @@ typedef struct box_gpu_effects_t box_gpu_effects_t;
 /** Pipelines of the ambient occlusion (Gtao) and its images per target and view */
 typedef struct box_gpu_gtao_t box_gpu_gtao_t;
 
+/** Pipelines and white fallback of the opaque snapshot of transmission */
+typedef struct box_gpu_transmission_t box_gpu_transmission_t;
+
+/** Opaque snapshot of a target that transmissive draws sample, with its blur pyramid */
+typedef struct box_gpu_snapshot_t box_gpu_snapshot_t;
+
 /** Edge in texels of the shadow map of the probe captures */
 #define BOX_GPU_CAPTURE_SHADOW_RESOLUTION (2048)
 
@@ -106,6 +112,8 @@ typedef struct box_gpu_target_t {
     WGPUBuffer readback;            /**< Idle buffer the next capture copies the image into */
     uint64_t readback_size;         /**< Bytes of the idle readback buffer */
     box_gpu_capture_t *capture;     /**< Copy recorded in this frame, not yet mapped */
+    box_gpu_snapshot_t *snapshot;   /**< Opaque snapshot of the views with transmissive draws,
+                                     *   NULL until one draws */
 } box_gpu_target_t;
 
 /** A compiled shader module */
@@ -764,6 +772,7 @@ typedef struct box_gpu_t {
     uint32_t canvas;                /**< Target presented on the page canvas, 0 for none */
     box_gpu_effects_t *effects;     /**< Effect passes of the views */
     box_gpu_gtao_t *gtao;           /**< Ambient occlusion of the views */
+    box_gpu_transmission_t *transmission; /**< Opaque snapshots of transmission */
     uint32_t rendering;             /**< Target that is rendering, materials cannot sample it */
     bool timestamps;                /**< The device has timestamp queries */
     bool clip_distances;            /**< The device has clip distances */
@@ -805,6 +814,7 @@ typedef enum box_gpu_stat_t {
     BOX_GPU_STAT_DRAW,              /**< A draw call was recorded */
     BOX_GPU_STAT_PREPASS,           /**< A depth prepass render pass was recorded */
     BOX_GPU_STAT_PREPASS_DRAW,      /**< A draw call was recorded in a depth prepass */
+    BOX_GPU_STAT_TRANSMISSION_SNAPSHOT, /**< An opaque snapshot of a view was recorded */
     BOX_GPU_STAT_SCATTER,           /**< A scatter dispatch was recorded */
     BOX_GPU_STAT_INSTANCE_BIND,     /**< An instance bind group was set in a pass or bundle */
     BOX_GPU_STAT_CULL_DISPATCH,     /**< A dispatch of the cull pass of a view was recorded */

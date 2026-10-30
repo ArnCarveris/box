@@ -672,6 +672,9 @@ void box_gpu_count(
     case BOX_GPU_STAT_PREPASS_DRAW:
         gpu->pending.prepass_draws ++;
         break;
+    case BOX_GPU_STAT_TRANSMISSION_SNAPSHOT:
+        gpu->pending.transmission_snapshots ++;
+        break;
     case BOX_GPU_STAT_SCATTER:
         gpu->pending.scatters ++;
         break;
@@ -722,6 +725,7 @@ void box_gpu_stats_publish(
     s->draws += p->draws;
     s->prepasses += p->prepasses;
     s->prepass_draws += p->prepass_draws;
+    s->transmission_snapshots += p->transmission_snapshots;
     s->instance_binds += p->instance_binds;
     s->cull_dispatches += p->cull_dispatches;
     s->cull_instance_dispatches += p->cull_instance_dispatches;

@@ -1,0 +1,95 @@
+// The scene of the browser check of transitions (transitions.mjs), which renders on the main
+// thread. An orthographic camera shows one logical pixel per unit. At frame 30 SetAt moves
+// the white square from the grey start marker to the green target marker and turns the red
+// square blue, with linear transitions of 3 s (180 frames at the fixed delta of 1/60 s the check
+// passes), and fades the parent of the two small squares and lights the box, which the check
+// does not measure: they make the transform, material, fade and emissive streams of the frame
+// transition at once.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.app
+using box.transition
+
+camera {
+  Position: {0, 0, 100}
+  Camera: {ortho: true, ortho_scale: 1}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {10, 12, 20, 255}}}
+}
+
+start_marker {
+  Position: {-150, -80, 0}
+  Rect: {12, 12}
+  Rgb: {128, 128, 128}
+}
+
+target_marker {
+  Position: {150, -80, 0}
+  Rect: {12, 12}
+  Rgb: {0, 200, 0}
+}
+
+mover {
+  Position: {-150, 0, 0}
+  Rect: {30, 30}
+  Rgb: {255, 255, 255}
+  Transition: [Position: {duration: 3}]
+}
+
+shifter {
+  Position: {0, 80, 0}
+  Rect: {30, 30}
+  Rgb: {255, 0, 0}
+  Transition: [Rgb: {duration: 3}]
+}
+
+fading {
+  Position: {-200, 170, 0}
+  Opacity: {1}
+  Transition: [Opacity: {duration: 3}]
+
+  left {
+    Position: {-10, 0, 0}
+    Circle: {8}
+    Rgb: {250, 200, 60}
+  }
+
+  right {
+    Position: {10, 0, 0}
+    Circle: {8}
+    Rgb: {250, 200, 60}
+  }
+}
+
+glow {
+  Position: {200, 170, 0}
+  Box: {30, 30, 30}
+  Rgb: {0, 0, 0}
+  Emissive: {strength: 1, color: {255, 120, 40}}
+  Transition: [Emissive: {duration: 3}]
+}
+
+change_mover {
+  SetAt: {frame: 30, entity: mover}
+  Position: {150, 0, 0}
+}
+
+change_shifter {
+  SetAt: {frame: 30, entity: shifter}
+  Rgb: {0, 0, 255}
+}
+
+change_fading {
+  SetAt: {frame: 30, entity: fading}
+  Opacity: {0.2}
+}
+
+change_glow {
+  SetAt: {frame: 30, entity: glow}
+  Emissive: {strength: 1, color: {60, 220, 255}}
+}

@@ -743,7 +743,8 @@ WGPUBindGroup box_gpu_light_group_with(
     WGPUBuffer uniforms,
     WGPUBuffer clusters,
     WGPUTextureView shadow,
-    WGPUTextureView ao)
+    WGPUTextureView ao,
+    WGPUTextureView snapshot)
 {
     uint64_t size = 0;
     WGPUBuffer lights = box_gpu_light_binding(gpu, v, &size);
@@ -754,7 +755,7 @@ WGPUBindGroup box_gpu_light_group_with(
         &gpu->buffers, box_gpu_buffer_t, BOX_RENDER_BUFFER_CLIPS);
     WGPUBuffer tiles = NULL;
     const box_gpu_atlas_t *atlas = t ? box_gpu_atlas_of(gpu, v, &tiles) : NULL;
-    WGPUBindGroupEntry entries[19] = {
+    WGPUBindGroupEntry entries[20] = {
         { .binding = 0, .buffer = uniforms, .size = sizeof(box_gpu_view_uniforms_t) },
         { .binding = 1, .buffer = lights, .size = size },
         { .binding = 2, .buffer = clusters, .size = wgpuBufferGetSize(clusters) },
@@ -787,13 +788,17 @@ WGPUBindGroup box_gpu_light_group_with(
         [18] = {
             .binding = 18,
             .sampler = box_gpu_texture_sampler(gpu, WrapRepeat, BOX_GPU_COOKIE_ANISOTROPY)
+        },
+        [19] = {
+            .binding = 19,
+            .textureView = snapshot ? snapshot : box_gpu_transmission_view(gpu, NULL)
         }
     };
     box_gpu_atmosphere_bindings(gpu, t, v, &entries[9]);
     box_gpu_environment_bindings(gpu, t ? v : NULL, &entries[12]);
     WGPUBindGroupDescriptor desc = {
         .layout = gpu->view_layout,
-        .entryCount = 19,
+        .entryCount = 20,
         .entries = entries
     };
 
@@ -805,10 +810,11 @@ WGPUBindGroup box_gpu_light_group(
     const box_gpu_target_t *t,
     const box_render_view_t *v,
     int32_t slot,
-    WGPUTextureView ao)
+    WGPUTextureView ao,
+    WGPUTextureView snapshot)
 {
     return box_gpu_light_group_with(gpu, t, v, gpu->view_buffer,
-        box_gpu_cluster_buffer(gpu, t, v), box_gpu_shadow_binding(gpu, v), ao);
+        box_gpu_cluster_buffer(gpu, t, v), box_gpu_shadow_binding(gpu, v), ao, snapshot);
 }
 
 void box_gpu_light_purge(

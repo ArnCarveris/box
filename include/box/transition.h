@@ -45,8 +45,8 @@ ECS_STRUCT(TransitionSpec, {
  * A key that is not transitionable or a negative duration or delay logs an error and is ignored.
  *
  * The storage is a flecs map (ecs_map_t) keyed by the component entity, whose values are
- * allocated TransitionSpecs: read one with ecs_map_get_deref(map, TransitionSpec, component), and
- * write one from C with box_transition_set().
+ * allocated TransitionSpecs: read one with ecs_map_get_deref(map, TransitionSpec, component),
+ * write one from C with box_transition_set() and remove one with box_transition_remove().
  */
 typedef ecs_map_t Transition;
 
@@ -109,9 +109,13 @@ void box_transition_set(
 
 /** Remove the transition of one component of an entity.
  *
- * An entity that inherits Transition gets its own copy first, so the other entries stay. A
- * running transition of the component snaps to its target. Nothing happens when the entity has
- * no entry for the component.
+ * An inherited map is copied first, so the prefab is unchanged. The TransitionSpec is freed and
+ * OnSet is emitted. Removing the last entry leaves Transition with an empty map; it does not
+ * remove the component. Works deferred, like box_transition_set().
+ *
+ * Without an entry for the component, owned or inherited, nothing happens: no Transition is
+ * added, no map is copied and no OnSet is emitted. Deferred, the entry is looked up in the merged
+ * state, so an entry set on the same stage before the merge is not seen.
  *
  * @param world The world
  * @param entity The entity

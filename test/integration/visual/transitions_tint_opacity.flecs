@@ -1,0 +1,132 @@
+// Tint and opacity transitions on parents with children, frozen in the middle. SetAt changes
+// the values at the start of the second frame, with linear durations of 0.05 s (three frames at
+// the fixed delta of 1/60 s), so the render of the third frame shows each a third of the way:
+// - tinted: no tint to a strong blue tint, its ball and block a third of the way to blue
+// - fading: opacity 1 to 0.1, its ball and block blended at 0.7 over the floor stripes
+// - nested: a parent and a child that both transition their Tint, composed in order
+// - appearing: opacity 0 to 1, a third visible, blended while it runs
+// The children have no Transition of their own; they follow their parents.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.app
+using box.transition
+
+camera {
+  Position: {0, 3.2, 9}
+  Rotation: {-0.3, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {30, 34, 44, 255}}}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {16, 0.2, 8}
+  Rgb: {200, 200, 205}
+}
+
+for i in 0..8 {
+  {
+    Position: {i * 2 - 7, 0.01, -0.6}
+    Box: {1, 0.02, 3}
+    Rgb: {40, 40, 40}
+  }
+}
+
+tinted {
+  Position: {-4.2, 0, 0}
+  Tint: {r: 0, g: 0, b: 255, a: 0}
+  Transition: [Tint: {duration: 0.05}]
+  ball {
+    Position: {0, 0.6, 0}
+    Sphere: {segments: 32, smooth: true, radius: 0.6}
+    Rgb: {255, 220, 120}
+  }
+  block {
+    Position: {0, 1.7, 0}
+    Box: {0.8, 0.8, 0.8}
+    Rgb: {255, 220, 120}
+  }
+}
+
+fading {
+  Position: {-1.4, 0, 0}
+  Opacity: {1}
+  Transition: [Opacity: {duration: 0.05}]
+  ball {
+    Position: {0, 0.6, 0}
+    Sphere: {segments: 32, smooth: true, radius: 0.6}
+    Rgb: {230, 70, 60}
+  }
+  block {
+    Position: {0, 1.7, 0}
+    Box: {0.8, 0.8, 0.8}
+    Rgb: {230, 70, 60}
+  }
+}
+
+nested {
+  Position: {1.4, 0, 0}
+  Tint: {r: 255, g: 0, b: 0, a: 0}
+  Transition: [Tint: {duration: 0.05}]
+  ball {
+    Position: {0, 0.6, 0}
+    Sphere: {segments: 32, smooth: true, radius: 0.6}
+    Rgb: {255, 255, 255}
+  }
+  inner {
+    Tint: {r: 0, g: 255, b: 0, a: 0}
+    Transition: [Tint: {duration: 0.05}]
+    block {
+      Position: {0, 1.7, 0}
+      Box: {0.8, 0.8, 0.8}
+      Rgb: {255, 255, 255}
+    }
+  }
+}
+
+appearing {
+  Position: {4.2, 0, 0}
+  Opacity: {0}
+  Transition: [Opacity: {duration: 0.05}]
+  ball {
+    Position: {0, 0.6, 0}
+    Sphere: {segments: 32, smooth: true, radius: 0.6}
+    Rgb: {60, 200, 90}
+  }
+  block {
+    Position: {0, 1.7, 0}
+    Box: {0.8, 0.8, 0.8}
+    Rgb: {60, 200, 90}
+  }
+}
+
+change_tinted {
+  SetAt: {frame: 1, entity: tinted}
+  Tint: {r: 0, g: 0, b: 255, a: 255}
+}
+
+change_fading {
+  SetAt: {frame: 1, entity: fading}
+  Opacity: {0.1}
+}
+
+change_nested {
+  SetAt: {frame: 1, entity: nested}
+  Tint: {r: 255, g: 0, b: 0, a: 200}
+}
+
+change_inner {
+  SetAt: {frame: 1, entity: nested.inner}
+  Tint: {r: 0, g: 255, b: 0, a: 200}
+}
+
+change_appearing {
+  SetAt: {frame: 1, entity: appearing}
+  Opacity: {1}
+}

@@ -698,3 +698,161 @@ void MaterialIds_table_grows(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+/** Check the Transmission fields of a record.
+ *
+ * @param record The record
+ * @param t The Transmission it was packed from
+ */
+static void transmission_check(
+    const box_render_material_t *record,
+    const Transmission *t)
+{
+    test_flt(record->transmission_factor, t->transmission_factor);
+    test_flt(record->ior, t->ior);
+    test_flt(record->thickness_factor, t->thickness_factor);
+    test_flt(record->attenuation_distance, t->attenuation_distance);
+    test_uint(record->attenuation_color, color_word(t->attenuation_color.r,
+        t->attenuation_color.g, t->attenuation_color.b));
+}
+
+void MaterialIds_transmission_brings_material_id(void) {
+    // materials/transmission
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t glass = ecs_new(world);
+    ecs_set(world, glass, Box, {1, 1, 1});
+    ecs_set(world, glass, Transmission, {.transmission_factor = 0.9f, .ior = 1.2f,
+        .thickness_factor = 2, .attenuation_distance = 3, .attenuation_color = {75, 200, 255}});
+    ecs_entity_t plain = ecs_new(world);
+    ecs_set(world, plain, Position, {2, 0, 0});
+    ecs_set(world, plain, Box, {1, 1, 1});
+    frame(world);
+
+    test_bool(ecs_owns(world, glass, MaterialId), true);
+    uint32_t id = id_of(world, glass);
+    test_assert(id != 0 && id != UINT32_MAX);
+    test_uint(shading_of(world, glass)->material, id);
+    transmission_check(record_of(world, id), ecs_get(world, glass, Transmission));
+    test_uint(record_of(world, id)->attenuation_color, 75u | (200u << 8) | (255u << 16));
+
+    test_uint(shading_of(world, plain)->material, 0);
+    const box_render_material_t *def = record_of(world, 0);
+    test_flt(def->transmission_factor, 0);
+    test_flt(def->ior, 1.5f);
+    test_flt(def->thickness_factor, 0);
+    test_flt(def->attenuation_distance, 1e10f);
+    test_uint(def->attenuation_color, 0xFFFFFFu);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void MaterialIds_transmission_prefab_slot(void) {
+    // materials/transmission
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t prefab = prefab_new(world);
+    ecs_set(world, prefab, Transmission, {.transmission_factor = 1, .ior = 1.45f,
+        .thickness_factor = 0.5f, .attenuation_distance = 2,
+        .attenuation_color = {150, 210, 255}});
+    ecs_entity_t a = instance_new(world, prefab, 0);
+    ecs_entity_t b = instance_new(world, prefab, 1);
+    box_render_draws_stats_t stats = frame(world);
+
+    uint32_t id = id_of(world, prefab);
+    test_assert(id != 0 && id != UINT32_MAX);
+    test_int(stats.materials, 2);
+    test_bool(ecs_owns(world, a, MaterialId), false);
+    test_bool(ecs_owns(world, b, MaterialId), false);
+    test_uint(shading_of(world, a)->material, id);
+    test_uint(shading_of(world, b)->material, id);
+    transmission_check(record_of(world, id), ecs_get(world, prefab, Transmission));
+
+    const DrawSlot *slot = ecs_get(world, a, DrawSlot);
+    test_bool(box_draws_batch(draws_of(world), slot->batch)->key.transmissive, true);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void MaterialIds_transmission_override_composes(void) {
+    // materials/transmission
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t prefab = prefab_new(world);
+    ecs_set(world, prefab, Rgb, {200, 100, 50});
+    ecs_set(world, prefab, PbrMaterial, {.metallic = 0.25f, .roughness = 0.5f});
+    ecs_set(world, prefab, Transmission, {.transmission_factor = 0.5f, .ior = 1.3f,
+        .thickness_factor = 1, .attenuation_distance = 4, .attenuation_color = {10, 20, 30}});
+    ecs_entity_t a = instance_new(world, prefab, 0);
+    ecs_entity_t b = instance_new(world, prefab, 1);
+    frame(world);
+    uint32_t shared = id_of(world, prefab);
+
+    ecs_set(world, a, Transmission, {.transmission_factor = 1, .ior = 1.7f,
+        .thickness_factor = 2, .attenuation_distance = 8, .attenuation_color = {40, 50, 60}});
+    box_render_draws_stats_t stats = frame(world);
+    test_bool(ecs_owns(world, a, MaterialId), true);
+    uint32_t own = id_of(world, a);
+    test_assert(own != shared && own != 0 && own != UINT32_MAX);
+    test_int(stats.materials, 3);
+    test_uint(shading_of(world, a)->material, own);
+    test_uint(shading_of(world, b)->material, shared);
+    const box_render_material_t *record = record_of(world, own);
+    transmission_check(record, ecs_get(world, a, Transmission));
+    test_uint(record->color, color_word(200, 100, 50));
+    test_flt(record->metallic, 0.25f);
+    test_flt(record->roughness, 0.5f);
+    transmission_check(record_of(world, shared), ecs_get(world, prefab, Transmission));
+
+    ecs_set(world, b, Rgb, {0, 255, 0});
+    frame(world);
+    uint32_t tinted = id_of(world, b);
+    test_assert(tinted != shared && tinted != own);
+    test_uint(record_of(world, tinted)->color, color_word(0, 255, 0));
+    transmission_check(record_of(world, tinted), ecs_get(world, prefab, Transmission));
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void MaterialIds_transmission_prefab_change_reaches_slot(void) {
+    // materials/transmission
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t prefab = prefab_new(world);
+    ecs_set(world, prefab, Transmission, {.transmission_factor = 0.5f, .ior = 1.3f,
+        .thickness_factor = 1, .attenuation_distance = 4, .attenuation_color = {10, 20, 30}});
+    ecs_entity_t a = instance_new(world, prefab, 0);
+    ecs_entity_t b = instance_new(world, prefab, 1);
+    ecs_set(world, b, Rgb, {0, 255, 0});
+    frame(world);
+    frame(world);
+    uint32_t shared = id_of(world, prefab);
+    uint32_t own = id_of(world, b);
+    test_uint(shading_of(world, a)->material, shared);
+    test_assert(own != shared);
+
+    ecs_set(world, prefab, Transmission, {.transmission_factor = 1, .ior = 1.6f,
+        .thickness_factor = 3, .attenuation_distance = 5, .attenuation_color = {70, 80, 90}});
+    box_render_draws_stats_t stats = frame(world);
+    test_int(stats.material_bytes, 2 * MATERIAL);
+    test_int(stats.upload_bytes, 0);
+    const Transmission *t = ecs_get(world, prefab, Transmission);
+    transmission_check(record_of(world, shared), t);
+    transmission_check(record_of(world, own), t);
+    test_uint(record_of(world, own)->color, color_word(0, 255, 0));
+
+    ecs_remove(world, prefab, Transmission);
+    frame(world);
+    test_flt(record_of(world, shared)->transmission_factor, 0);
+    test_flt(record_of(world, shared)->ior, 1.5f);
+    test_uint(record_of(world, shared)->attenuation_color, 0xFFFFFFu);
+    test_flt(record_of(world, own)->transmission_factor, 0);
+    test_bool(box_draws_batch(draws_of(world),
+        ecs_get(world, a, DrawSlot)->batch)->key.transmissive, false);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
