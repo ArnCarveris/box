@@ -954,8 +954,8 @@ void Render_http_resource(void) {
     test_int(ecs_http_server_request(srv, "PUT", path, "render Ball", &reply), 0);
     test_int(reply.code, 200);
     char *body = ecs_strbuf_get(&reply.body);
-    test_str(body, "{\"type\":\"flecs.script.shell.resource\", "
-        "\"result\":{\"name\":\"1\", \"content_type\":\"image/png\"}, \"errors\":[]}");
+    test_str(body, "{\"results\":[{\"type\":\"flecs.script.shell.resource\", "
+        "\"result\":{\"name\":\"1\", \"content_type\":\"image/png\"}}], \"errors\":[]}");
     ecs_os_free(body);
     ecs_os_free(path);
 
