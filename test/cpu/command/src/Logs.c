@@ -137,3 +137,21 @@ void Logs_no_color_codes(void) {
     ecs_os_free(out);
     ecs_fini(world);
 }
+
+void Logs_empty_is_string(void) {
+    // command/terminal
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_warn("w1");
+
+    ecs_shell_result_t r = ecs_shell_run(world, s, "logs error");
+    test_int(ecs_vec_count(&r.errors), 0);
+    test_assert(r.result.type == ecs_id(ecs_string_t));
+    test_assert(r.result.ptr != NULL);
+    test_str(*(char**)r.result.ptr, "");
+
+    ecs_shell_result_fini(world, &r);
+    ecs_fini(world);
+}
