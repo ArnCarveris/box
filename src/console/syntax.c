@@ -267,13 +267,7 @@ static void box_console_syntax_value(
     }
 }
 
-/** Get the scope of the console session.
- *
- * @param world The world
- * @param con The console state
- * @return The scope, 0 for the root
- */
-static ecs_entity_t box_console_syntax_scope(
+ecs_entity_t box_console_syntax_scope(
     const ecs_world_t *world,
     const box_console_t *con)
 {
@@ -378,14 +372,7 @@ static void box_console_syntax_arg(
     }
 }
 
-/** Find the command of a name as the shell does: the first function with that name in the
- * scopes of EcsScriptShell.command_paths.
- *
- * @param world The world
- * @param name The command name
- * @return The function, 0 when no command has that name
- */
-static ecs_entity_t box_console_syntax_command(
+ecs_entity_t box_console_syntax_command(
     const ecs_world_t *world,
     const char *name)
 {
@@ -476,4 +463,23 @@ void box_console_syntax(
 
 done:
     ecs_os_free(tokens);
+}
+
+char* box_console_syntax_token(
+    const char *line,
+    int32_t index)
+{
+    box_console_token_t t;
+    int32_t at = 0, i = 0;
+    char *result = NULL;
+    while (!result && box_console_syntax_scan(line, at, &t)) {
+        if (i == index) {
+            result = box_console_syntax_unquote(line, &t);
+        }
+
+        at = t.end;
+        i ++;
+    }
+
+    return result;
 }

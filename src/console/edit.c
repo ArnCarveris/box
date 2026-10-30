@@ -443,27 +443,32 @@ bool box_console_is_command(
     return box_console_command(word, len) != NULL;
 }
 
-/** Append the console group of help: a header and the console commands with their briefs.
+/** Append the console group of help: a header and the console commands with their briefs, in
+ * the colors of the groups and commands of the session help.
  *
- * @param buf The buffer
+ * @param out The output
  * @param only The command to list, NULL for all of them
  */
 static void box_console_help(
-    ecs_strbuf_t *buf,
+    box_console_out_t *out,
     const box_console_command_t *only)
 {
-    int32_t i, width = 0;
-    ecs_strbuf_appendstr(buf, BOX_CONSOLE_HELP_GROUP " (console only)");
+    int32_t i, len, width = 0;
+    box_console_out_add(out, BoxOutputGroup, BOX_CONSOLE_HELP_GROUP, -1);
+    box_console_out_add(out, BoxOutputDim, " (console only)", -1);
     for (i = 0; i < BOX_CONSOLE_COMMAND_COUNT; i ++) {
-        int32_t len = (int32_t)strlen(box_console_commands[i].name);
+        len = (int32_t)strlen(box_console_commands[i].name);
         width = len > width ? len : width;
     }
 
     for (i = 0; i < BOX_CONSOLE_COMMAND_COUNT; i ++) {
         const box_console_command_t *cmd = &box_console_commands[i];
         if (!only || only == cmd) {
-            ecs_strbuf_append(buf, "\n%-*s%s", width + BOX_CONSOLE_HELP_GAP, cmd->name,
-                cmd->brief);
+            len = (int32_t)strlen(cmd->name);
+            box_console_out_add(out, BoxSpanNone, "\n", 1);
+            box_console_out_add(out, BoxOutputCommand, cmd->name, len);
+            ecs_strbuf_append(&out->buf, "%*s", width + BOX_CONSOLE_HELP_GAP - len, "");
+            box_console_out_add(out, BoxOutputBrief, cmd->brief, -1);
         }
     }
 }
@@ -479,7 +484,9 @@ char* box_console_exec(
     const box_console_command_t *cmd, *help_cmd = NULL;
     bool failed = false, help, help_group;
     char *result = NULL;
+    box_console_out_t out;
     ecs_vec_t spans;
+    box_console_out_init(&out);
     ecs_vec_init_t(NULL, &spans, box_console_span_t, 0);
     box_console_syntax(world, con, line, &spans);
     word = box_console_word(&p, &len);
@@ -491,34 +498,40 @@ char* box_console_exec(
     help_group = help && topic && topic_len == (int32_t)strlen(BOX_CONSOLE_HELP_GROUP) &&
         !strncmp(topic, BOX_CONSOLE_HELP_GROUP, (size_t)topic_len);
     if (help_cmd || help_group) {
-        ecs_strbuf_t buf = ECS_STRBUF_INIT;
-        box_console_help(&buf, help_cmd);
-        result = ecs_strbuf_get(&buf);
+        box_console_help(&out, help_cmd);
     } else if (!cmd) {
-        result = box_command_run(world, box_console_session(world, con), line, &failed);
+        box_console_out_run(world, con, box_console_session(world, con), line, &out, &failed);
     }
 
     if (help && !topic && !failed) {
-        ecs_strbuf_t buf = ECS_STRBUF_INIT;
-        ecs_strbuf_appendstr(&buf, result);
-        ecs_strbuf_appendstr(&buf, result[0] ? "\n\n" : "");
-        box_console_help(&buf, NULL);
-        ecs_os_free(result);
-        result = ecs_strbuf_get(&buf);
+        if (box_console_out_len(&out)) {
+            box_console_out_add(&out, BoxSpanNone, "\n\n", 2);
+        }
+
+        box_console_help(&out, NULL);
     }
 
     box_console_history_add(con, line);
     box_console_append(con, BOX_CONSOLE_PROMPT, line, BoxConsoleCommand, &spans);
     ecs_vec_fini_t(NULL, &spans, box_console_span_t);
     if (cmd) {
-        result = cmd->run(world, con, args, &failed);
+        char *text = cmd->run(world, con, args, &failed);
+        if (failed) {
+            box_console_out_error(&out, text);
+        } else {
+            box_console_out_ansi(&out, BoxSpanNone, text, -1);
+        }
+
+        ecs_os_free(text);
     }
 
+    result = box_console_out_text(&out);
     if (result[0]) {
         box_console_append(con, NULL, result, failed ? BoxConsoleError : BoxConsoleOutput,
-            NULL);
+            &out.spans);
     }
 
+    box_console_out_fini(&out);
     box_console_trim(world, con);
     con->scroll = 0;
     con->refresh = true;

@@ -597,7 +597,7 @@ void ConsoleSyntax_echoed_keeps_colors(void) {
     ecs_fini(world);
 }
 
-void ConsoleSyntax_output_lines_plain(void) {
+void ConsoleSyntax_output_lines_by_type(void) {
     // ui/console_syntax
     ecs_world_t *world = syntax_world();
     ecs_entity(world, { .name = "things.alpha" });
@@ -608,14 +608,21 @@ void ConsoleSyntax_output_lines_plain(void) {
     ecs_entity_t line = syntax_log_line(world, 1);
     test_str(ecs_get(world, line, Text)->value, "> ls things");
     test_int(syntax_count(world, line), 2);
-    test_int(syntax_count(world, syntax_log_line(world, 0)), 0);
+
+    // Output takes the colors of Console.output, not those of command lines
+    const Console *con = ecs_singleton_get(world, Console);
+    ecs_entity_t out = syntax_log_line(world, 0);
+    test_str(ecs_get(world, out, Text)->value, "things.alpha");
+    test_int(syntax_count(world, out), 2);
+    syntax_span(world, out, 0, 0, 7, con->output.dim);
+    syntax_span(world, out, 1, 7, 12, con->output.entity);
 
     ecs_os_free(box_console_run(world, "ls two", NULL));
     ecs_progress(world, 0);
     test_str(ecs_get(world, line, Text)->value, "two.a");
-    test_int(syntax_count(world, line), 0);
-    test_assert(!ecs_has(world, line, TextSpans));
-    const Console *con = ecs_singleton_get(world, Console);
+    test_int(syntax_count(world, line), 2);
+    syntax_span(world, line, 0, 0, 4, con->output.dim);
+    syntax_span(world, line, 1, 4, 5, con->output.entity);
     const Rgb *color = ecs_get(world, line, Rgb);
     test_int(color->r, con->text.r);
     test_int(color->g, con->text.g);
@@ -624,7 +631,8 @@ void ConsoleSyntax_output_lines_plain(void) {
     ecs_os_free(box_console_run(world, "get nothing", NULL));
     ecs_progress(world, 0);
     ecs_entity_t err = syntax_log_line(world, 0);
-    test_int(syntax_count(world, err), 0);
+    test_int(syntax_count(world, err), 2);
+    syntax_span(world, err, 0, 0, 7, con->error);
     color = ecs_get(world, err, Rgb);
     test_int(color->r, con->error.r);
     test_int(color->g, con->error.g);

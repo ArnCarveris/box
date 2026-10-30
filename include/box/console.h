@@ -9,6 +9,8 @@
  * The console runs cls itself, so it never reaches the session: cls empties the scrollback and
  * Ctrl+L does the same without touching the input line. help in the console lists cls too.
  * Command lines are colored in the console only (ConsoleSyntax), never in sessions or logs.
+ * Output is colored by the type of the result of the command (ConsoleOutput), like the terminal
+ * of the flecs explorer, while box_command_run and HTTP sessions keep returning plain text.
  */
 
 #ifndef BOX_CONSOLE_H
@@ -48,7 +50,7 @@ extern "C" {
  * session.
  *
  * The input line is colored as it is typed; a line that ran keeps the colors it had then.
- * Output keeps Console.text and Console.error, other parts Console.input or Console.command.
+ * Output is colored with ConsoleOutput, other parts Console.input or Console.command.
  */
 ECS_STRUCT(ConsoleSyntax, {
     rgb name;       /**< Name of a known command or console command */
@@ -60,6 +62,42 @@ ECS_STRUCT(ConsoleSyntax, {
     rgb boolean;    /**< Argument of a bool parameter, true or false in a value expression */
     rgb value;      /**< Value expression in brackets: {...}, [...] or (...) */
     rgb extra;      /**< Argument beyond the parameters of the command */
+});
+
+/** Colors of the output of commands in the console, as Console.output.
+ *
+ * The console shows the result of a command by its type, like the terminal of the flecs
+ * explorer: entity paths relative to the scope of the session with the parent part dimmed, tree
+ * guides, query rows, grouped help, entity info, documentation, grep matches, script lines with
+ * script syntax colors, diffs and values as JSON. Errors start with "error: " in Console.error,
+ * the further lines of an error are dimmed. ANSI color codes in output become the ANSI colors.
+ * Text without a color of its own is Console.text.
+ */
+ECS_STRUCT(ConsoleOutput, {
+    rgb dim;        /**< Parent part of paths, tree guides, line numbers, error details */
+    rgb entity;     /**< Entity names */
+    rgb component;  /**< Components and ids */
+    rgb key;        /**< Member names of values and labels of fields */
+    rgb number;     /**< Numbers */
+    rgb string;     /**< Strings */
+    rgb boolean;    /**< true and false */
+    rgb keyword;    /**< null and keywords of flecs script */
+    rgb command;    /**< Command names in help */
+    rgb param;      /**< Parameters of commands in help */
+    rgb type;       /**< Types of parameters in help */
+    rgb brief;      /**< Descriptions of commands and parameters in help */
+    rgb group;      /**< Group headers of help */
+    rgb match;      /**< Text a grep matched */
+    rgb added;      /**< Added lines of a diff */
+    rgb removed;    /**< Removed lines of a diff */
+    rgb red;        /**< ANSI red, code 31 */
+    rgb green;      /**< ANSI green, code 32 */
+    rgb yellow;     /**< ANSI yellow, code 33 */
+    rgb blue;       /**< ANSI blue, code 34 */
+    rgb magenta;    /**< ANSI magenta, code 35 */
+    rgb cyan;       /**< ANSI cyan, code 36 */
+    rgb white;      /**< ANSI white, code 37 */
+    rgb grey;       /**< ANSI grey, code 90 */
 });
 
 /** The console singleton: whether it is open and how it looks.
@@ -82,11 +120,12 @@ ECS_STRUCT(Console, {
     int32_t scrollback;  /**< Rows of output the console keeps, default 1000 */
     rgba background;     /**< Color of the panel, default translucent dark blue */
     rgb border;          /**< Color of the line along the bottom edge */
-    rgb text;            /**< Color of the output of a command */
+    rgb text;            /**< Color of output without a color of its own */
     rgb command;         /**< Color of a line that ran, echoed after the prompt */
-    rgb error;           /**< Color of the output of a failed command */
+    rgb error;           /**< Color of the error: label of a failed command */
     rgb input;           /**< Color of the input line and its cursor */
     ConsoleSyntax syntax;/**< Colors of the parts of command lines, see ConsoleSyntax */
+    ConsoleOutput output;/**< Colors of the output of commands, see ConsoleOutput */
 });
 
 /** Register the box.console module.
@@ -102,7 +141,9 @@ void BoxConsoleImport(
 /** Run a line in the console as if it was typed and entered.
  *
  * The line and its output are added to the scrollback and the input history, cls empties the
- * scrollback and returns an empty output. box.console.run(line) does the same in a script.
+ * scrollback and returns an empty output. The output is the text the console shows, which for
+ * structured results (trees, query rows, entity info, ...) is laid out for reading and differs
+ * from the text of box_command_run. box.console.run(line) does the same in a script.
  *
  * @param world The world
  * @param line The command line

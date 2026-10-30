@@ -152,7 +152,7 @@ static void box_console_text(
     box_console_color(world, e, color);
 }
 
-/** Get the color of a part of a command line.
+/** Get the color of a part of a command line or of output.
  *
  * @param console The Console singleton
  * @param kind What the part is
@@ -163,7 +163,8 @@ static rgb box_console_syntax_color(
     box_console_syntax_t kind)
 {
     const ConsoleSyntax *c = &console->syntax;
-    rgb result = c->extra;
+    const ConsoleOutput *o = &console->output;
+    rgb result = console->text;
     switch (kind) {
     case BoxSyntaxName: result = c->name; break;
     case BoxSyntaxUnknown: result = c->unknown; break;
@@ -174,6 +175,33 @@ static rgb box_console_syntax_color(
     case BoxSyntaxBoolean: result = c->boolean; break;
     case BoxSyntaxValue: result = c->value; break;
     case BoxSyntaxExtra: result = c->extra; break;
+    case BoxOutputText: result = console->text; break;
+    case BoxOutputError: result = console->error; break;
+    case BoxOutputDim: result = o->dim; break;
+    case BoxOutputEntity: result = o->entity; break;
+    case BoxOutputComponent: result = o->component; break;
+    case BoxOutputKey: result = o->key; break;
+    case BoxOutputNumber: result = o->number; break;
+    case BoxOutputString: result = o->string; break;
+    case BoxOutputBoolean: result = o->boolean; break;
+    case BoxOutputKeyword: result = o->keyword; break;
+    case BoxOutputCommand: result = o->command; break;
+    case BoxOutputParam: result = o->param; break;
+    case BoxOutputType: result = o->type; break;
+    case BoxOutputBrief: result = o->brief; break;
+    case BoxOutputGroup: result = o->group; break;
+    case BoxOutputMatch: result = o->match; break;
+    case BoxOutputAdded: result = o->added; break;
+    case BoxOutputRemoved: result = o->removed; break;
+    case BoxOutputRed: result = o->red; break;
+    case BoxOutputGreen: result = o->green; break;
+    case BoxOutputYellow: result = o->yellow; break;
+    case BoxOutputBlue: result = o->blue; break;
+    case BoxOutputMagenta: result = o->magenta; break;
+    case BoxOutputCyan: result = o->cyan; break;
+    case BoxOutputWhite: result = o->white; break;
+    case BoxOutputGrey: result = o->grey; break;
+    case BoxSpanNone: break;
     }
 
     return result;

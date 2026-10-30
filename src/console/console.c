@@ -18,7 +18,8 @@ ECS_COMPONENT_DECLARE(ConsoleHost);
 #define BOX_CONSOLE_DEFAULT_HEIGHT (720.0f)
 
 /** Construct Console values: closed, the left half of the surface, light text on a dark panel,
- * command lines colored in light tones, unknown names and extra arguments in the error color.
+ * command lines colored in light tones, unknown names and extra arguments in the error color,
+ * output in colors close to the dark theme of the flecs explorer.
  *
  * @param ptr The components
  * @param count Number of components
@@ -56,6 +57,32 @@ static void box_console_ctor(
                 .boolean = {255, 150, 200},
                 .value = {140, 225, 225},
                 .extra = {255, 110, 100}
+            },
+            .output = {
+                .dim = {125, 133, 150},
+                .entity = {88, 166, 255},
+                .component = {126, 231, 135},
+                .key = {121, 192, 255},
+                .number = {210, 168, 255},
+                .string = {255, 203, 107},
+                .boolean = {255, 123, 114},
+                .keyword = {255, 123, 172},
+                .command = {88, 166, 255},
+                .param = {255, 166, 87},
+                .type = {126, 231, 135},
+                .brief = {175, 184, 198},
+                .group = {240, 246, 252},
+                .match = {255, 214, 10},
+                .added = {86, 211, 100},
+                .removed = {248, 81, 73},
+                .red = {248, 81, 73},
+                .green = {86, 211, 100},
+                .yellow = {227, 179, 65},
+                .blue = {88, 166, 255},
+                .magenta = {188, 140, 255},
+                .cyan = {57, 197, 207},
+                .white = {240, 246, 252},
+                .grey = {139, 148, 158}
             }
         };
     }
@@ -414,6 +441,7 @@ void BoxConsoleImport(
     ECS_IMPORT(world, BoxCommand);
 
     ECS_META_COMPONENT(world, ConsoleSyntax);
+    ECS_META_COMPONENT(world, ConsoleOutput);
     ECS_META_COMPONENT(world, Console);
     ecs_set_hooks(world, Console, { .ctor = box_console_ctor });
     ECS_COMPONENT_DEFINE(world, ConsoleHost);
