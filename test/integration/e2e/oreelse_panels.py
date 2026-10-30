@@ -81,19 +81,19 @@ OFF_HOVER = (34, 37, 44)
 def start(app):
     """Set up in a 640x480 window, leave the title screen and pause the astronaut's crafting."""
     setup(app)
-    app.exec("set window Surface {width: %d, height: %d}" % (WIDTH, HEIGHT))
-    app.wait_for("get window SurfaceStatus.height", str(HEIGHT))
+    app.exec("set window box.surface.Surface {width: %d, height: %d}" % (WIDTH, HEIGHT))
+    app.wait_for("get window box.surface.SurfaceStatus.height", str(HEIGHT))
     app.expect(STATE % "Title", "true")
     key(app, "Space")
     app.wait_for(STATE % "Playing", "true")
     free_area(app)
-    app.exec("set %s OreCrafter {speed: 1, paused: true}" % PLAYER)
+    app.exec("set %s oreelse.OreCrafter {speed: 1, paused: true}" % PLAYER)
 
 
 def click_at(app, point):
     """Click the left button at a point of the window."""
     move_cursor(app, point)
-    app.exec("mouse.click left")
+    app.exec("mouse_click left")
     app.wait_input()
     app.wait_frames(SETTLE)
 
@@ -118,7 +118,7 @@ def order(app, item, units):
 
 
 def book(app):
-    return app.get(BOOK, "OreCraftBook")
+    return app.get(BOOK, "oreelse.OreCraftBook")
 
 
 def demands(app):
@@ -136,11 +136,11 @@ def row_label(order_id, name):
 
 
 def levels(app):
-    return app.get(ALLOC, "OrePowerAlloc")["level"]
+    return app.get(ALLOC, "oreelse.OrePowerAlloc")["level"]
 
 
 def wait_levels(app, expected):
-    app.wait_for("get %s OrePowerAlloc" % ALLOC,
+    app.wait_for("get %s oreelse.OrePowerAlloc" % ALLOC,
                  lambda out: parse_value(out)["level"] == expected,
                  what="the levels %s" % expected)
 
@@ -172,7 +172,7 @@ def test_queue(app):
     app.check(color(app, header) == ROW_HOVER, "the hovered header is %s" %
               (color(app, header),))
     click_at(app, row_point(0, rows))
-    app.wait_for("get %s OreCraftBook.orders[0].demand" % BOOK, "1",
+    app.wait_for("get %s oreelse.OreCraftBook.orders[0].demand" % BOOK, "1",
                  what="one unit cancelled")
     wait_shown(app, row_label(oid, "RocketEngine"), "Rocket engine (1x)")
     app.check(count(app, "items.Iron") == 16 and count(app, "items.Copper") == 8,
@@ -183,14 +183,14 @@ def test_queue(app):
     # no worker is on it
     move_cursor(app, row_point(1, row_count(app)))
     app.wait_frames(SETTLE)
-    faces = [line for line in app.exec("get %s" % header).splitlines()
-             if line.startswith("box.material.Rgb")]
+    faces = [c for c in parse_value(app.exec("cat %s" % header))["components"]
+             if c["id"] == ["box.material.Rgb"]]
     app.check(faces == [], "the header keeps a face after the cursor left it: %s" % faces)
 
     # The last unit: the order is gone and the queue with it
     click_at(app, row_point(0, row_count(app)))
-    app.wait_for("get %s OreCraftBook.count" % BOOK, "0", what="the order cancelled")
-    app.wait_for("get %s OreCraftBook.row_count" % BOOK, "0", what="no rows")
+    app.wait_for("get %s oreelse.OreCraftBook.count" % BOOK, "0", what="the order cancelled")
+    app.wait_for("get %s oreelse.OreCraftBook.row_count" % BOOK, "0", what="no rows")
     app.wait_frames(SETTLE)
     app.check(not shown(app, QUEUE), "the queue shows without orders")
 
@@ -207,8 +207,9 @@ def test_queue_hover_while_crafting(app):
               (color(app, header),))
 
     # A slow craft changes the book every frame: the header stays lit under the cursor
-    app.exec("set %s OreCrafter {speed: 0.1, paused: false}" % PLAYER)
-    app.wait_for("get %s OreCraftBook.rows[1].progress" % BOOK, lambda out: float(out) > 0.05,
+    app.exec("set %s oreelse.OreCrafter {speed: 0.1, paused: false}" % PLAYER)
+    app.wait_for("get %s oreelse.OreCraftBook.rows[1].progress" % BOOK,
+                 lambda out: float(out) > 0.05,
                  what="the craft under way")
     for _ in range(3):
         app.wait_frames(2)
@@ -402,7 +403,7 @@ def test_panel_blocks(app):
     # no warning, no wall spent
     for cursor, tile in ((ON_POWER, (10, 5)), (ON_ROCKET, (5, 5))):
         aim_tile(app, tile[0], tile[1], cursor)
-        app.exec("mouse.click left")
+        app.exec("mouse_click left")
         app.wait_input()
         app.wait_frames(SETTLE)
         app.check(tiles(app, "Wall") == [], "the click on the panel at %s placed %s" %

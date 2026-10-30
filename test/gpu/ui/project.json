@@ -193,7 +193,6 @@
                     "strings",
                     "value_expression",
                     "extra_arguments",
-                    "rest_parameter",
                     "updates_while_typing",
                     "cursor_split_and_history",
                     "echoed_keeps_colors",

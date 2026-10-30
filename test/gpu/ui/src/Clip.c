@@ -561,8 +561,8 @@ void Clip_picking_follows_clip(void) {
     test_assert(mut != 0);
     ecs_progress(world, 0);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [670, 360]", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_click left [670, 360]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, child, mut))->clicks, 1);
@@ -570,19 +570,19 @@ void Clip_picking_follows_clip(void) {
 
     ecs_add_id(world, panel, ClipChildren);
     ecs_progress(world, 0);
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [670, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_click left [670, 360]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, child, mut))->clicks, 1);
     test_int(((const Mut*)ecs_get_id(world, behind, mut))->clicks, 1);
 
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [640, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_click left [640, 360]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, child, mut))->clicks, 2);
     test_int(((const Mut*)ecs_get_id(world, behind, mut))->clicks, 1);
 
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left [580, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_click left [580, 360]", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, child, mut))->clicks, 2);

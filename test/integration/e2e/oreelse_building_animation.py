@@ -16,7 +16,7 @@ tells how much play the frames were.
 """
 import math
 
-from box_client import srgb
+from box_client import parse_value, srgb
 from oreelse_power import (DRILL, ENGINE, FACTORY, PANEL, PLAYER, crafter, deposit_of, deposits,
                            entity, lamps_of, order, orders, place, play, rows_of, run_script,
                            set_state, start, wait_lamps, wait_power)
@@ -68,7 +68,7 @@ def parts(app, path, component, count):
 
 def spins(app, paths):
     """The Rotation.y of every part."""
-    return {p: app.get(p, "Rotation")["y"] for p in paths}
+    return {p: app.get(p, "box.transform.Rotation")["y"] for p in paths}
 
 
 def stroke(phase):
@@ -77,12 +77,12 @@ def stroke(phase):
 
 def piston(app, path):
     """The phase of a piston and the position of its part."""
-    return app.get(path, "OrePiston")["phase"], app.get(path, "Position")
+    return app.get(path, "oreelse.OrePiston")["phase"], app.get(path, "box.transform.Position")
 
 
 def check_piston(app, path, spec, axis, phase):
     """Check that the part of a piston sits where its phase puts it."""
-    p = app.get(path, "Position")
+    p = app.get(path, "box.transform.Position")
     want = spec["rest"] - spec["travel"] * stroke(phase)
     app.check(abs(p[axis] - want) < TOLERANCE,
               "at the phase %g the piston %s is at %s %g, not %g" % (phase, path, axis, p[axis],
@@ -90,14 +90,14 @@ def check_piston(app, path, spec, axis, phase):
 
 
 def playback(app, emitter):
-    return app.exec("get %s ParticlePlayback.state" % emitter).split(".")[-1]
+    return parse_value(app.exec("get %s box.particle.ParticlePlayback.state" % emitter))
 
 
 def wait_playback(app, emitters, state, what):
     """Wait until every emitter is in a playback state."""
     def shows(_):
         return all(playback(app, e).endswith(state) for e in emitters)
-    app.wait_for("get oreelse.OreClock OreClock.elapsed", shows, what=what)
+    app.wait_for("get oreelse.OreClock oreelse.OreClock.elapsed", shows, what=what)
 
 
 def check_playback(app, emitters, state, what):
@@ -120,10 +120,11 @@ def working_factory(app):
     for i in range(4):
         place(app, "panel_%d" % i, "SolarPanel", 4, 3 + i)
     place(app, "factory_a", "Factory", 6, 6, 2, 2)
-    app.wait_for("has factory_a oreelse.OreCrafter", "true", what="the factory's crafter")
+    app.wait_for("eval factory_a.has(oreelse.OreCrafter)", "true", what="the factory's crafter")
     wait_power(app, 4 * PANEL, FACTORY, False)
     app.check(order(app, ENGINE, 1) == 1, "the order of an engine failed")
-    app.wait_for("get factory_a OreCrafter.item", lambda out: entity(out) == ENGINE,
+    app.wait_for("get factory_a oreelse.OreCrafter.item",
+                 lambda out: entity(parse_value(out)) == ENGINE,
                  what="the factory crafting the engine")
     return "factory_a"
 
@@ -136,7 +137,7 @@ def drill_on_stone(app):
     place(app, "panel_a", "SolarPanel", 4, 4)
     place(app, "drill_a", "Drill", row, col)
     wait_power(app, PANEL, DRILL, False)
-    app.wait_for("get drill_a OreDrill.running", "true", what="the drill mining")
+    app.wait_for("get drill_a oreelse.OreDrill.running", "true", what="the drill mining")
     found = [p for p, d in deposits(app).items() if (d["row"], d["col"]) == (row, col)]
     app.check(len(found) == 1, "the deposits of the tile %s are %s" % ((row, col), found))
     return "drill_a", found[0]
@@ -148,7 +149,7 @@ def cancel(app, order_id):
     name = "anim_cancel_%d" % RESULTS[0]
     run_script(app, "%s { oreelse.OreCanOrder: {value: oreelse.craft_cancel(%d)} }" %
                (name, order_id))
-    return app.get(name, "OreCanOrder")["value"]
+    return app.get(name, "oreelse.OreCanOrder")["value"]
 
 
 def test_factory(app):
@@ -178,7 +179,7 @@ def test_factory(app):
     app.check(abs(moved - phase - RAM["speed"] * played) < RAM["speed"] * 2 * DT + TOLERANCE,
               "in %.3f s of work the ram's phase went from %g to %g" % (played, phase, moved))
     check_piston(app, ram, RAM, "y", moved)
-    intensity = app.get(glow, "PointLight")["intensity"]
+    intensity = app.get(glow, "box.light.PointLight")["intensity"]
     app.check(intensity > 0, "the work glow of a working factory is dark")
     wait_playback(app, steam, "Paused", "the steam frozen while paused")
 
@@ -214,7 +215,8 @@ def test_factory(app):
     # With its queue empty it stands idle
     set_state(app, "Playing")
     app.check(cancel(app, orders(app)[0]["id"]), "the cancel of the engine was refused")
-    app.wait_for("get factory_a OreCrafter.item", lambda out: entity(out) is None,
+    app.wait_for("get factory_a oreelse.OreCrafter.item",
+                 lambda out: entity(parse_value(out)) is None,
                  what="the factory idle")
     app.check(not orders(app), "the queue is not empty: %s" % orders(app))
     wait_playback(app, steam, "Stopped", "the steam stopped with the queue empty")
@@ -257,7 +259,7 @@ def test_drill(app):
     # The deposit gone, the drill stands idle, its bit back at rest and the dust stopped
     set_state(app, "Playing")
     app.exec("rm %s" % deposit)
-    app.wait_for("get drill_a OreDrill.running", "false", what="the drill idle")
+    app.wait_for("get drill_a oreelse.OreDrill.running", "false", what="the drill idle")
     wait_playback(app, dust, "Stopped", "the dust stopped without a deposit")
     set_state(app, "Paused")
     before = spins(app, [bit])
@@ -267,7 +269,7 @@ def test_drill(app):
     for path in pistons:
         app.check(piston(app, path)[0] == phases[path],
                   "without a deposit the piston %s moved" % path)
-    y = app.get(bit, "Position")["y"]
+    y = app.get(bit, "box.transform.Position")["y"]
     app.check(abs(y - BIT_REST) < 1e-6, "the idle drill's bit is at %g, not at rest" % y)
 
 
@@ -310,7 +312,7 @@ def test_status_lamp_light(app):
     # With power the lamps shine steadily
     for _ in range(3):
         for b in bulbs:
-            light = app.get(b, "PointLight")["intensity"]
+            light = app.get(b, "box.light.PointLight")["intensity"]
             app.check(abs(light - STATUS_LIGHT) < 1e-4,
                       "the status lamp %s shines at %g, not %g" % (b, light, STATUS_LIGHT))
         app.wait_frames(5)
@@ -319,10 +321,10 @@ def test_status_lamp_light(app):
     app.exec("rm panel_a")
     wait_power(app, 0, DRILL, True)
     bulb = bulbs[0]
-    app.wait_for("get %s PointLight.intensity" % bulb, lambda out: float(out) == 0,
+    app.wait_for("get %s box.light.PointLight.intensity" % bulb, lambda out: float(out) == 0,
                  frames=120, what="the dead lamp's light in its off half")
-    app.wait_for("get %s PointLight.intensity" % bulb,
+    app.wait_for("get %s box.light.PointLight.intensity" % bulb,
                  lambda out: abs(float(out) - STATUS_LIGHT) < 1e-4,
                  frames=120, what="the dead lamp's light in its on half")
-    app.wait_for("get %s PointLight.intensity" % bulb, lambda out: float(out) == 0,
+    app.wait_for("get %s box.light.PointLight.intensity" % bulb, lambda out: float(out) == 0,
                  frames=120, what="the dead lamp's light off again")

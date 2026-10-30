@@ -35,18 +35,10 @@ def plants(app):
 
 
 def positions(app):
-    """The positions of the plants of the run: path -> Position. A row of the query holds the
-    values of both fields, so only the first, up to its closing brace, is parsed."""
-    app.exec("query found box.transform.Position, oreelse.OreFlora")
-    app.exec("iter found")
-    out = app.exec("next 1000")
-    result = {}
-    for line in out.splitlines():
-        if not line.strip() or line == "(end)":
-            continue
-        path, values = line.split(" ", 1)
-        result[path] = parse_value(values[:values.index("}") + 1])
-    return result
+    """The positions of the plants of the run: path -> Position, the first field of a row of
+    the query."""
+    out = app.exec('query "box.transform.Position, oreelse.OreFlora"')
+    return {row["entity"]: row["fields"][0]["value"]["Position"] for row in parse_value(out)}
 
 
 def tile_of(p):
@@ -96,24 +88,24 @@ def pick(app, found):
 
 
 def height(app, path):
-    return float(app.exec("get %s Position.y" % path))
+    return float(app.exec("get %s box.transform.Position.y" % path))
 
 
 def wait_height(app, path, y, what):
-    app.wait_for("get %s Position.y" % path, lambda out: abs(float(out) - y) < 1e-4,
+    app.wait_for("get %s box.transform.Position.y" % path, lambda out: abs(float(out) - y) < 1e-4,
                  frames=SETTLE * 4, what=what)
 
 
 def place_wall(app, path, tile):
     """Place a wall on the tile of a plant: the plant sinks out of sight, where it stood."""
-    before = app.get(path, "Position")
+    before = app.get(path, "box.transform.Position")
     set_inventory(app, [("Wall", 1)])
     select(app, "1", "Wall")
     click(app, *tile)
     app.check(building_at(app, tile[0], tile[1], "Wall") is not None,
               "no wall on the plant's tile %s" % (tile,))
     wait_height(app, path, -SINK, "the plant %s %g under the wall" % (path, SINK))
-    after = app.get(path, "Position")
+    after = app.get(path, "box.transform.Position")
     app.check(after["x"] == before["x"] and after["z"] == before["z"],
               "the plant moved from %s to %s" % (before, after))
 

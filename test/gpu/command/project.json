@@ -18,23 +18,11 @@
             {
                 "id": "Limits",
                 "testcases": [
-                    "i32_out_of_range",
                     "f64_not_finite",
                     "sweep_steps_out_of_range",
                     "drag_steps_out_of_range",
                     "action_drag_steps_out_of_range",
-                    "dur_out_of_range",
-                    "next_count_out_of_range",
-                    "session_cap",
-                    "session_cap_set",
-                    "idle_session_closed",
-                    "history_bounded",
-                    "history_default_bounded",
-                    "log_rotated",
-                    "images_bounded",
-                    "images_pending_not_evicted",
-                    "images_evicted_once_written",
-                    "next_out_of_range_keeps_iteration"
+                    "dur_out_of_range"
                 ]
             },
             {
@@ -43,7 +31,6 @@
                     "capture_active_camera",
                     "capture_named_camera",
                     "capture_batch",
-                    "capture_bracket_list",
                     "capture_size_of_surface",
                     "capture_clear_of_view",
                     "capture_not_a_camera",

@@ -1087,18 +1087,18 @@ void Camera_command_key(void) {
     cc->acceleration = 1e9f;
     cc->deceleration = 1e9f;
     cc->turn_deceleration = 1e9f;
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
 
     bool error = true;
-    ecs_os_free(box_terminal_run(world, s, "key.down A", &error));
+    ecs_os_free(box_command_run(world, s, "key_down A", &error));
     test_bool(error, false);
     ecs_progress(world, 0.5f);
     ecs_progress(world, 0.5f);
     test_flt(ecs_get(world, cam, Position)->x, -10);
 
-    ecs_os_free(box_terminal_run(world, s, "key.up A", &error));
+    ecs_os_free(box_command_run(world, s, "key_up A", &error));
     test_bool(error, false);
-    ecs_os_free(box_terminal_run(world, s, "key.press Q 2", &error));
+    ecs_os_free(box_command_run(world, s, "key_press Q 2", &error));
     test_bool(error, false);
     for (int32_t i = 0; i < 3; i ++) {
         ecs_progress(world, 0.5f);
@@ -1124,10 +1124,10 @@ void Camera_command_drag(void) {
     cc->acceleration = 1e9f;
     cc->deceleration = 1e9f;
     cc->turn_deceleration = 1e9f;
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
 
     bool error = true;
-    ecs_os_free(box_terminal_run(world, s, "mouse.drag right [0, 0] [50, -100] 4 4", &error));
+    ecs_os_free(box_command_run(world, s, "mouse_drag right [0, 0] [50, -100] 4 4", &error));
     test_bool(error, false);
     for (int32_t i = 0; i < 8; i ++) {
         ecs_progress(world, 0.5f);
@@ -1153,10 +1153,10 @@ void Camera_command_action(void) {
     cc->acceleration = 1e9f;
     cc->deceleration = 1e9f;
     cc->turn_deceleration = 1e9f;
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
 
     bool error = true;
-    ecs_os_free(box_terminal_run(world, s, "action.press box.controllers.camera.Back 2", &error));
+    ecs_os_free(box_command_run(world, s, "action_press box.controllers.camera.Back 2", &error));
     test_bool(error, false);
     for (int32_t i = 0; i < 3; i ++) {
         ecs_progress(world, 0.5f);
@@ -1164,9 +1164,9 @@ void Camera_command_action(void) {
 
     test_flt(ecs_get(world, cam, Position)->z, 10);
 
-    ecs_os_free(box_terminal_run(world, s, "action.down box.controllers.camera.Fast", &error));
+    ecs_os_free(box_command_run(world, s, "action_down box.controllers.camera.Fast", &error));
     test_bool(error, false);
-    ecs_os_free(box_terminal_run(world, s, "action.press box.controllers.camera.Right", &error));
+    ecs_os_free(box_command_run(world, s, "action_press box.controllers.camera.Right", &error));
     test_bool(error, false);
     for (int32_t i = 0; i < 2; i ++) {
         ecs_progress(world, 0.5f);

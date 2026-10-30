@@ -15,7 +15,7 @@ frames the commands take.
 """
 import math
 
-from box_client import srgb
+from box_client import parse_value, srgb
 from oreelse_critters import (FPS, WAVE, critters, hold_waves, measure, place_player, position,
                               rows_of, run_script, set_state, spawn, start, wait_until, waves)
 
@@ -47,7 +47,7 @@ CHAR = dict(zip("rgba", srgb((40, 36, 34)) + (255,)))
 MITE_DEPTH = 2 * MITE_RADIUS + 1
 
 INDEX = "oreelse.OreCritterIndex"
-PARTICLES = "get box.particle.ParticleStats ParticleStats.particles"
+PARTICLES = "get box.particle.ParticleStats box.particle.ParticleStats.particles"
 
 # Tolerance of a pose against the walk cycle read back through the port
 POSE_TOLERANCE = 2e-3
@@ -67,16 +67,16 @@ def legs(app, critter):
 
 
 def anim(app, critter):
-    return app.get(critter, "OreCritter")["anim"]
+    return app.get(critter, "oreelse.OreCritter")["anim"]
 
 
 def check_pose(app, critter):
     """Check a mite's pose against its walk cycle: the bob |sin(anim)| * bob (0 while it
     attacks), the waddle sin(anim / 2) * 0.07 and every leg at sin(anim + phase) * swing (times
     0.35 while it attacks). Returns its OreCritter and its height."""
-    c = app.get(critter, "OreCritter")
-    p = app.get(critter, "Position")
-    r = app.get(critter, "Rotation")
+    c = app.get(critter, "oreelse.OreCritter")
+    p = app.get(critter, "box.transform.Position")
+    r = app.get(critter, "box.transform.Rotation")
     a = c["anim"]
     bob = 0 if c["attacking"] else abs(math.sin(a)) * MITE_BOB
     app.check(abs(p["y"] - bob) < POSE_TOLERANCE,
@@ -86,7 +86,7 @@ def check_pose(app, critter):
               "at the walk cycle %g the mite waddles %g, not %g" % (a, r["z"], waddle))
     scale = ATTACK_SWING if c["attacking"] else 1
     for path, limb in legs(app, critter).items():
-        x = app.get(path, "Rotation")["x"]
+        x = app.get(path, "box.transform.Rotation")["x"]
         want = math.sin(a + limb["phase"]) * limb["swing"] * scale
         app.check(abs(x - want) < POSE_TOLERANCE,
                   "at the walk cycle %g the leg %s swings %g, not %g" % (a, path, x, want))
@@ -95,11 +95,14 @@ def check_pose(app, critter):
 
 def indexed(app):
     """The critters in the spatial index the turrets search, read after two frames of play: it
-    is rebuilt every frame of play and empty while paused. The index has no copy hook, so it is
-    read through a query instead of get. The game is paused after."""
+    is rebuilt every frame of play and empty while paused. The index has no copy hook, so the
+    shell does not show its value: it is read through the REST endpoint of the port. The game is
+    paused after."""
     set_state(app, "Playing")
     app.wait_frames(2)
-    count = rows_of(app, INDEX)[INDEX]["count"]
+    status, body = app.request("component/" + INDEX.replace(".", "/"), {"component": INDEX})
+    app.check(status == 200, "GET %s failed (%d): %s" % (INDEX, status, body))
+    count = parse_value(body)["count"]
     set_state(app, "Paused")
     return count
 
@@ -119,7 +122,7 @@ def kill(app, critter):
     """Kill a critter: 0 hit points, played until the kill counts and two frames more, so its
     corpse is there and charred. The game is paused after."""
     kills = waves(app)["kills"]
-    app.exec("set %s OreHealth {value: 0, max: 12}" % critter)
+    app.exec("set %s oreelse.OreHealth {value: 0, max: 12}" % critter)
     set_state(app, "Playing")
     app.wait_for(WAVE % "kills", str(kills + 1), frames=FPS, what="the kill")
     app.wait_frames(2)
@@ -129,7 +132,7 @@ def kill(app, critter):
 def still_mite(app, x, z):
     """Spawn a mite that stands where it is (speed 0): its path."""
     mite = spawn(app, "Mite", x, z)
-    app.exec("set %s OreSpeed {value: 0}" % mite)
+    app.exec("set %s oreelse.OreSpeed {value: 0}" % mite)
     return mite
 
 
@@ -164,7 +167,8 @@ def test_walk(app):
 
     # A mite walking to the origin: its walk cycle advances by dt * speed * step
     mite = spawn(app, "Mite", 30, 30)
-    app.exec("set %s OreCritter {retarget: 0.5, jitter: 0, attacking: false, anim: 0}" % mite)
+    app.exec("set %s oreelse.OreCritter {retarget: 0.5, jitter: 0, attacking: false, anim: 0}" %
+             mite)
     advanced, took = measure(app, lambda: anim(app, mite))
     want = MITE_SPEED * MITE_STEP * took
     app.check(abs(advanced - want) < want * 0.02,
@@ -177,7 +181,7 @@ def test_walk(app):
         c, y = check_pose(app, mite)
         app.check(not c["attacking"], "the walking mite attacks")
         heights.append(y)
-        swings.add(round(app.get(list(legs(app, mite))[0], "Rotation")["x"], 4))
+        swings.add(round(app.get(list(legs(app, mite))[0], "box.transform.Rotation")["x"], 4))
         measure(app, lambda: 0, frames=3)
     app.check(max(heights) > MITE_BOB * 0.1,
               "the walking mite does not bob: its heights were %s" % heights)
@@ -193,7 +197,7 @@ def test_attack(app):
     place_player(app, 20, 20)
     mite = spawn(app, "Mite", 20.5, 20)
     set_state(app, "Playing")
-    app.wait_for("get %s OreCritter.attacking" % mite, "true", frames=2 * FPS,
+    app.wait_for("get %s oreelse.OreCritter.attacking" % mite, "true", frames=2 * FPS,
                  what="the mite attacking")
     measure(app, lambda: 0, frames=2)
     c, y = check_pose(app, mite)
@@ -221,7 +225,7 @@ def test_corpse(app):
     mite = still_mite(app, 20, -30)
     measure(app, lambda: 0, frames=2)
     x, z = position(app, mite)
-    yaw = app.get(mite, "Rotation")["y"]
+    yaw = app.get(mite, "box.transform.Rotation")["y"]
     kill(app, mite)
 
     # The kill counts, the critter is gone and the combust played
@@ -237,19 +241,20 @@ def test_corpse(app):
     found = corpses(app, "Mite")
     app.check(len(found) == 1 and len(corpses(app)) == 1, "the corpses are %s" % list(found))
     corpse = list(found)[0]
-    p = app.get(corpse, "Position")
+    p = app.get(corpse, "box.transform.Position")
     app.check(abs(p["x"] - x) < 1e-3 and abs(p["z"] - z) < 1e-3 and p["y"] == 0,
               "the corpse lies at %s, the mite died at %s" % (p, (x, z)))
-    a, b, c = original_angles(app.get(corpse, "Rotation"))
+    a, b, c = original_angles(app.get(corpse, "box.transform.Rotation"))
     app.check(TIP[0] - 1e-3 <= a <= TIP[1] + 1e-3 and abs(c) <= ROLL + 1e-3 and
               abs(b - yaw) < 1e-3,
               "the corpse is turned by %s in the original's order, the mite headed %g" %
               ((a, b, c), yaw))
-    s = app.get(corpse, "Scale")
+    s = app.get(corpse, "box.transform.Scale")
     app.check(abs(s["x"] - 1) < 1e-4 and abs(s["y"] - SQUASH) < 1e-4 and abs(s["z"] - 1) < 1e-4,
               "the corpse is scaled %s" % s)
-    app.check(app.get(corpse, "Tint") == CHAR, "the corpse is tinted %s" % app.get(corpse, "Tint"))
-    o = app.get(corpse, "OreCorpse")
+    app.check(app.get(corpse, "box.material.Tint") == CHAR,
+              "the corpse is tinted %s" % app.get(corpse, "box.material.Tint"))
+    o = app.get(corpse, "oreelse.OreCorpse")
     app.check(abs(o["depth"] - MITE_DEPTH) < 1e-4 and 0 < o["age"] < 1,
               "the fresh corpse has %s" % o)
 
@@ -275,7 +280,7 @@ def test_corpse(app):
               "the mite on the corpse was pushed to %s" % ((ox, oz),))
     count = indexed(app)
     app.check(count == 1, "the spatial index holds %d critters" % count)
-    q = app.get(corpse, "Position")
+    q = app.get(corpse, "box.transform.Position")
     app.check(q["x"] == p["x"] and q["z"] == p["z"], "the corpse moved to %s" % q)
     app.check(not under(app, corpse, "oreelse.OreCritter") and
               corpse not in critters(app), "the corpse is a critter")
@@ -289,7 +294,7 @@ def test_splat(app):
 
     # Without a death burst a critter splats; it still leaves a corpse
     mite = still_mite(app, 20, -30)
-    app.exec("set %s OreDeathBurst {burst: 0}" % mite)
+    app.exec("set %s oreelse.OreDeathBurst {burst: 0}" % mite)
     kill(app, mite)
     playing = effects(app)
     app.check("SplatBurst" in playing and "CombustBurst" not in playing,
@@ -304,23 +309,24 @@ def test_sink(app):
     set_state(app, "Paused")
     kill(app, still_mite(app, 20, -30))
     corpse = list(corpses(app))[0]
-    depth = app.get(corpse, "OreCorpse")["depth"]
+    depth = app.get(corpse, "oreelse.OreCorpse")["depth"]
 
     # Before 4 s it lies on the ground
-    app.exec("set %s OreCorpse {age: %g, depth: %g}" % (corpse, CORPSE_TIME - 1, depth))
-    sank, took = measure(app, lambda: app.get(corpse, "Position")["y"])
-    app.check(sank == 0 and app.get(corpse, "Position")["y"] == 0,
+    app.exec("set %s oreelse.OreCorpse {age: %g, depth: %g}" % (corpse, CORPSE_TIME - 1, depth))
+    sank, took = measure(app, lambda: app.get(corpse, "box.transform.Position")["y"])
+    app.check(sank == 0 and app.get(corpse, "box.transform.Position")["y"] == 0,
               "the corpse sank %g at %g s" % (-sank, CORPSE_TIME - 1 + took))
 
     # After 4 s it sinks at 0.7 units a second
-    app.exec("set %s OreCorpse {age: %g, depth: %g}" % (corpse, CORPSE_TIME + 0.1, depth))
-    sank, took = measure(app, lambda: app.get(corpse, "Position")["y"])
+    app.exec("set %s oreelse.OreCorpse {age: %g, depth: %g}" % (corpse, CORPSE_TIME + 0.1, depth))
+    sank, took = measure(app, lambda: app.get(corpse, "box.transform.Position")["y"])
     app.check(abs(-sank / took - CORPSE_SINK) < 0.02,
               "the corpse sank %g in %g s, not %g a second" % (-sank, took, CORPSE_SINK))
 
     # 2 r + 1 below the ground it is deleted
-    p = app.get(corpse, "Position")
-    app.exec("set %s Position {%g, %g, %g}" % (corpse, p["x"], -(depth - 0.02), p["z"]))
+    p = app.get(corpse, "box.transform.Position")
+    app.exec("set %s box.transform.Position {%g, %g, %g}" %
+             (corpse, p["x"], -(depth - 0.02), p["z"]))
     set_state(app, "Playing")
     wait_until(app, lambda: not corpses(app), FPS, "the sunk corpse deleted")
     set_state(app, "Paused")
@@ -342,7 +348,7 @@ def test_cap(app):
     before = corpses(app)
     app.check(len(before) == CORPSE_CAP, "the script laid %d corpses" % len(before))
     oldest = sorted(before)[0]
-    app.exec("set %s OreCorpse {age: 2, depth: %g}" % (oldest, MITE_DEPTH))
+    app.exec("set %s oreelse.OreCorpse {age: 2, depth: %g}" % (oldest, MITE_DEPTH))
 
     # The 101st corpse takes the place of the oldest
     kill(app, still_mite(app, 20, -30))

@@ -202,7 +202,7 @@ done:
  *
  * @param ctx The call context
  * @param argc Number of arguments
- * @param argv The session, the level and the count
+ * @param argv The level and the count
  * @param result Receives the output
  */
 static void box_log_command(
@@ -211,13 +211,13 @@ static void box_log_command(
     const ecs_value_t *argv,
     ecs_value_t *result)
 {
-    (void)argc;
-    const char *name = *(char**)argv[1].ptr;
-    int32_t count = *(ecs_i32_t*)argv[2].ptr;
+    (void)ctx;
+    const char *name = argc > 0 ? *(char**)argv[0].ptr : NULL;
+    int32_t count = argc > 1 ? *(ecs_i32_t*)argv[1].ptr : 0;
     ecs_strbuf_t buf = ECS_STRBUF_INIT;
     int32_t level, i, first, matched = 0;
     if (box_log_parse_level(name, &level)) {
-        box_command_error(ctx, result, "unknown log level '%s'", name);
+        ecs_err("unknown log level '%s'", name);
         goto done;
     }
 
@@ -254,14 +254,16 @@ void box_logs_init(
     box_log_users ++;
     ecs_atfini(world, box_log_fini, NULL);
 
-    box_command_register(world, &(box_command_desc_t){
-        .name = "logs",
-        .brief = "Show the last count log messages at level or more severe",
-        .params = {
-            { .name = "level", .type = ecs_id(ecs_string_t), .optional = true },
-            { .name = "count", .type = ecs_id(ecs_i32_t), .optional = true }
-        },
-        .callback = box_log_command,
-        .quiet = true
-    });
+    box_command_register(world, "Show the last count log messages at level or more severe",
+        (ecs_function_desc_t){
+            .name = "logs",
+            .return_type = ecs_id(ecs_string_t),
+            .params = {
+                { .name = "level", .type = ecs_id(ecs_string_t), .optional = true,
+                  .brief = "fatal, error, warning, info, debug or a number (default: all)" },
+                { .name = "count", .type = ecs_id(ecs_i32_t), .optional = true,
+                  .brief = "Messages to show (default: 20)" }
+            },
+            .callback = box_log_command
+        });
 }

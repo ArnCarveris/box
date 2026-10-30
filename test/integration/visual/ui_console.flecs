@@ -73,7 +73,7 @@ items {
 }
 
 const listed: string = box.console.run("ls items")
-const read: string = box.console.run("get cube Position")
+const read: string = box.console.run("get cube box.transform.Position")
 const failed: string = box.console.run("rm nothing")
 
 $ {

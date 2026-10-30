@@ -1095,7 +1095,7 @@ def run_case(path, module, name, fn, binary, out, args):
         if app.exit_code is None and not app.running():
             app.fail("the app exited with %s during the case" % app.proc.poll())
         if app.exit_code is None:
-            app.expect("logs error", "")
+            app.expect("logs error", '""')
             app.quit()
         result["status"] = "pass"
     except box_client.Refused as e:

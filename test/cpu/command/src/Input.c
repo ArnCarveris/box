@@ -12,11 +12,11 @@ void Input_key_press(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     bool error = true;
-    char *out = box_terminal_run(world, s, "key.press W", &error);
+    char *out = box_command_run(world, s, "key_press W", &error);
     test_bool(error, false);
-    test_str(out, "");
+    test_str(out, "2");
     ecs_os_free(out);
 
     ecs_progress(world, 0);
@@ -37,8 +37,8 @@ void Input_key_press_dur(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "key.press space 3", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "key_press space 3", NULL));
 
     int32_t i;
     for (i = 0; i < 3; i ++) {
@@ -57,9 +57,9 @@ void Input_key_press_unknown(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     bool error = false;
-    char *out = box_terminal_run(world, s, "key.press Nope", &error);
+    char *out = box_command_run(world, s, "key_press Nope", &error);
     test_bool(error, true);
     test_str(out, "error: unknown key 'Nope'");
     ecs_os_free(out);
@@ -74,9 +74,9 @@ void Input_key_press_negative_dur(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     bool error = false;
-    char *out = box_terminal_run(world, s, "key.press W -2", &error);
+    char *out = box_command_run(world, s, "key_press W -2", &error);
     test_bool(error, true);
     test_str(out, "error: dur: negative frame count -2");
     ecs_os_free(out);
@@ -91,14 +91,14 @@ void Input_key_down_up(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "key.down ArrowLeft", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "key_down ArrowLeft", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_bool(ecs_singleton_get(world, Input)->keys[KeyLeft].down, true);
 
-    ecs_os_free(box_terminal_run(world, s, "key.up ArrowLeft", NULL));
+    ecs_os_free(box_command_run(world, s, "key_up ArrowLeft", NULL));
     ecs_progress(world, 0);
     test_bool(ecs_singleton_get(world, Input)->keys[KeyLeft].down, false);
     test_bool(ecs_singleton_get(world, Input)->keys[KeyLeft].released, true);
@@ -111,9 +111,9 @@ void Input_key_type(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     bool error = true;
-    char *out = box_terminal_run(world, s, "key.type \"h i\"", &error);
+    char *out = box_command_run(world, s, "key_type \"h i\"", &error);
     test_bool(error, false);
     ecs_os_free(out);
 
@@ -145,8 +145,8 @@ void Input_key_type_dur(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "key.type ab 2", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "key_type ab 2", NULL));
 
     ecs_progress(world, 0);
     test_str(ecs_singleton_get(world, Input)->text, "a");
@@ -165,11 +165,11 @@ void Input_mouse_move(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     bool error = true;
-    char *out = box_terminal_run(world, s, "mouse.move [10, 20.5]", &error);
+    char *out = box_command_run(world, s, "mouse_move [10, 20.5]", &error);
     test_bool(error, false);
-    test_str(out, "");
+    test_str(out, "1");
     ecs_os_free(out);
 
     ecs_progress(world, 0);
@@ -178,7 +178,7 @@ void Input_mouse_move(void) {
     test_flt(in->mouse.position[1], 20.5);
     test_bool(in->mouse.pinned, true);
 
-    ecs_os_free(box_terminal_run(world, s, "mouse.move 30,40", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_move 30,40", NULL));
     ecs_progress(world, 0);
     in = ecs_singleton_get(world, Input);
     test_flt(in->mouse.position[0], 30);
@@ -195,8 +195,8 @@ void Input_mouse_move_normalized(void) {
     ECS_IMPORT(world, Box);
 
     box_input_queue(world, &(InputEvent){ .kind = InputResize, .value = { 200, 100 } });
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "mouse.move {0.5 0.25} true", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_move {0.5 0.25} true", NULL));
 
     ecs_progress(world, 0);
     const Input *in = ecs_singleton_get(world, Input);
@@ -211,18 +211,18 @@ void Input_mouse_move_invalid(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     bool error = false;
-    char *out = box_terminal_run(world, s, "mouse.move [10]", &error);
+    char *out = box_command_run(world, s, "mouse_move [10]", &error);
     test_bool(error, true);
     test_str(out, "error: pos: invalid position '[10]'");
     ecs_os_free(out);
 
-    out = box_terminal_run(world, s, "mouse.move [10, 20, 30]", &error);
+    out = box_command_run(world, s, "mouse_move [10, 20, 30]", &error);
     test_bool(error, true);
     ecs_os_free(out);
 
-    out = box_terminal_run(world, s, "mouse.move here", &error);
+    out = box_command_run(world, s, "mouse_move here", &error);
     test_bool(error, true);
     ecs_os_free(out);
 
@@ -236,9 +236,9 @@ void Input_mouse_sweep(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     bool error = true;
-    char *out = box_terminal_run(world, s, "mouse.sweep [0, 0] [100, 0] 4 4", &error);
+    char *out = box_command_run(world, s, "mouse_sweep [0, 0] [100, 0] 4 4", &error);
     test_bool(error, false);
     ecs_os_free(out);
 
@@ -259,8 +259,8 @@ void Input_mouse_sweep_default_steps(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "mouse.sweep [0, 0] [0, 100]", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_sweep [0, 0] [0, 100]", NULL));
 
     ecs_progress(world, 0);
     ecs_progress(world, 0);
@@ -282,13 +282,13 @@ void Input_mouse_release(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "mouse.move [1, 2]", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_move [1, 2]", NULL));
     ecs_progress(world, 0);
     test_bool(ecs_singleton_get(world, Input)->mouse.pinned, true);
 
     bool error = true;
-    char *out = box_terminal_run(world, s, "mouse.release", &error);
+    char *out = box_command_run(world, s, "mouse_release", &error);
     test_bool(error, false);
     ecs_os_free(out);
 
@@ -303,16 +303,16 @@ void Input_mouse_button(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "mouse.button left true", NULL));
-    ecs_os_free(box_terminal_run(world, s, "mouse.button MouseRight on", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_button left true", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_button MouseRight true", NULL));
     ecs_progress(world, 0);
     const Input *in = ecs_singleton_get(world, Input);
     test_bool(in->keys[KeyMouseLeft].down, true);
     test_bool(in->keys[KeyMouseRight].down, true);
     test_bool(in->keys[KeyLeft].down, false);
 
-    ecs_os_free(box_terminal_run(world, s, "mouse.button Left false", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_button Left false", NULL));
     ecs_progress(world, 0);
     in = ecs_singleton_get(world, Input);
     test_bool(in->keys[KeyMouseLeft].down, false);
@@ -326,14 +326,14 @@ void Input_mouse_button_unknown(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     bool error = false;
-    char *out = box_terminal_run(world, s, "mouse.button W true", &error);
+    char *out = box_command_run(world, s, "mouse_button W true", &error);
     test_bool(error, true);
     test_str(out, "error: unknown button 'W'");
     ecs_os_free(out);
 
-    out = box_terminal_run(world, s, "mouse.button left maybe", &error);
+    out = box_command_run(world, s, "mouse_button left maybe", &error);
     test_bool(error, true);
     ecs_os_free(out);
 
@@ -347,9 +347,9 @@ void Input_mouse_click(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     bool error = true;
-    char *out = box_terminal_run(world, s, "mouse.click right [5, 6]", &error);
+    char *out = box_command_run(world, s, "mouse_click right [5, 6]", &error);
     test_bool(error, false);
     ecs_os_free(out);
 
@@ -370,8 +370,8 @@ void Input_mouse_click_no_pos(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "mouse.click left", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_click left", NULL));
     ecs_progress(world, 0);
     const Input *in = ecs_singleton_get(world, Input);
     test_bool(in->keys[KeyMouseLeft].pressed, true);
@@ -385,8 +385,8 @@ void Input_mouse_click_dur(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "mouse.click middle - 3", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_click middle - 3", NULL));
     test_assert(box_input_pending(world) > 0);
 
     int32_t i;
@@ -407,9 +407,9 @@ void Input_mouse_drag(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     bool error = true;
-    char *out = box_terminal_run(world, s, "mouse.drag left [0, 0] [10, 0] 2 2", &error);
+    char *out = box_command_run(world, s, "mouse_drag left [0, 0] [10, 0] 2 2", &error);
     test_bool(error, false);
     ecs_os_free(out);
 
@@ -436,19 +436,19 @@ void Input_mouse_drag_invalid(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     bool error = false;
-    char *out = box_terminal_run(world, s, "mouse.drag left [0, 0] nowhere", &error);
+    char *out = box_command_run(world, s, "mouse_drag left [0, 0] nowhere", &error);
     test_bool(error, true);
     test_str(out, "error: to: invalid position 'nowhere'");
     ecs_os_free(out);
 
-    out = box_terminal_run(world, s, "mouse.drag Space [0, 0] [1, 1]", &error);
+    out = box_command_run(world, s, "mouse_drag Space [0, 0] [1, 1]", &error);
     test_bool(error, true);
     test_str(out, "error: unknown button 'Space'");
     ecs_os_free(out);
 
-    out = box_terminal_run(world, s, "mouse.drag left [0, 0] [1, 1] -1", &error);
+    out = box_command_run(world, s, "mouse_drag left [0, 0] [1, 1] -1", &error);
     test_bool(error, true);
     test_str(out, "error: steps: negative frame count -1");
     ecs_os_free(out);
@@ -463,8 +463,8 @@ void Input_mouse_scroll(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "mouse.scroll 0 -1.5", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_scroll 0 -1.5", NULL));
     ecs_progress(world, 0);
     const Input *in = ecs_singleton_get(world, Input);
     test_flt(in->mouse.scroll[0], 0);
@@ -481,19 +481,19 @@ void Input_input_reset(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "key.down W", NULL));
-    ecs_os_free(box_terminal_run(world, s, "mouse.move [3, 4]", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "key_down W", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_move [3, 4]", NULL));
     ecs_progress(world, 0);
     test_bool(ecs_singleton_get(world, Input)->keys[KeyW].down, true);
 
-    ecs_os_free(box_terminal_run(world, s, "key.type hello", NULL));
+    ecs_os_free(box_command_run(world, s, "key_type hello", NULL));
     test_assert(box_input_pending(world) > 0);
 
     bool error = true;
-    char *out = box_terminal_run(world, s, "input.reset", &error);
+    char *out = box_command_run(world, s, "input_reset", &error);
     test_bool(error, false);
-    test_str(out, "");
+    test_str(out, "1");
     ecs_os_free(out);
 
     ecs_progress(world, 0);
@@ -512,12 +512,12 @@ void Input_input_focus(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "key.down W", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "key_down W", NULL));
     ecs_progress(world, 0);
 
     bool error = true;
-    char *out = box_terminal_run(world, s, "input.focus false", &error);
+    char *out = box_command_run(world, s, "input_focus false", &error);
     test_bool(error, false);
     ecs_os_free(out);
 
@@ -526,7 +526,7 @@ void Input_input_focus(void) {
     test_bool(in->focused, false);
     test_bool(in->keys[KeyW].down, false);
 
-    ecs_os_free(box_terminal_run(world, s, "input.focus true", NULL));
+    ecs_os_free(box_command_run(world, s, "input_focus true", NULL));
     ecs_progress(world, 0);
     test_bool(ecs_singleton_get(world, Input)->focused, true);
 
@@ -538,13 +538,13 @@ void Input_input_focus_invalid(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     bool error = false;
-    char *out = box_terminal_run(world, s, "input.focus maybe", &error);
+    char *out = box_command_run(world, s, "input_focus maybe", &error);
     test_bool(error, true);
     ecs_os_free(out);
 
-    out = box_terminal_run(world, s, "input.focus", &error);
+    out = box_command_run(world, s, "input_focus", &error);
     test_bool(error, true);
     ecs_os_free(out);
 
@@ -558,9 +558,9 @@ void Input_input_wait_empty(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     bool error = true;
-    char *out = box_terminal_run(world, s, "input.wait", &error);
+    char *out = box_command_run(world, s, "input_wait", &error);
     test_bool(error, false);
     test_str(out, "0");
     ecs_os_free(out);
@@ -573,15 +573,15 @@ void Input_input_wait_pending(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "key.press W 3", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "key_press W 3", NULL));
 
-    char *out = box_terminal_run(world, s, "input.wait", NULL);
+    char *out = box_command_run(world, s, "input_wait", NULL);
     test_str(out, "4");
     ecs_os_free(out);
 
     ecs_progress(world, 0);
-    out = box_terminal_run(world, s, "input.wait", NULL);
+    out = box_command_run(world, s, "input_wait", NULL);
     test_str(out, "3");
     ecs_os_free(out);
 
@@ -590,7 +590,7 @@ void Input_input_wait_pending(void) {
         ecs_progress(world, 0);
     }
 
-    out = box_terminal_run(world, s, "input.wait", NULL);
+    out = box_command_run(world, s, "input_wait", NULL);
     test_str(out, "0");
     ecs_os_free(out);
     test_bool(ecs_singleton_get(world, Input)->keys[KeyW].released, true);
@@ -603,10 +603,10 @@ void Input_input_wait_sweep(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "mouse.sweep [0, 0] [8, 0] 4 8", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_sweep [0, 0] [8, 0] 4 8", NULL));
 
-    char *out = box_terminal_run(world, s, "input.wait", NULL);
+    char *out = box_command_run(world, s, "input_wait", NULL);
     test_str(out, "9");
     ecs_os_free(out);
 
@@ -616,7 +616,7 @@ void Input_input_wait_sweep(void) {
         ecs_progress(world, 0);
     }
 
-    out = box_terminal_run(world, s, "input.wait", NULL);
+    out = box_command_run(world, s, "input_wait", NULL);
     test_str(out, "0");
     ecs_os_free(out);
     test_flt(ecs_singleton_get(world, Input)->mouse.position[0], 8);
@@ -632,11 +632,11 @@ void Input_action_press(void) {
     ecs_entity_t jump = ecs_entity(world, { .name = "Jump" });
     ecs_set(world, jump, Action, { .description = "Jump up" });
 
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     bool error = true;
-    char *out = box_terminal_run(world, s, "action.press Jump", &error);
+    char *out = box_command_run(world, s, "action_press Jump", &error);
     test_bool(error, false);
-    test_str(out, "");
+    test_str(out, "2");
     ecs_os_free(out);
 
     ecs_progress(world, 0);
@@ -660,8 +660,8 @@ void Input_action_press_dur(void) {
     ecs_entity_t jump = ecs_entity(world, { .name = "Jump" });
     ecs_set(world, jump, Action, { 0 });
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "action.press Jump 3", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "action_press Jump 3", NULL));
 
     int32_t i;
     for (i = 0; i < 3; i ++) {
@@ -683,8 +683,8 @@ void Input_action_down_up(void) {
     ecs_entity_t fire = ecs_entity(world, { .name = "Fire" });
     ecs_set(world, fire, Action, { 0 });
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "action.down Fire", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "action_down Fire", NULL));
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     ecs_progress(world, 0);
@@ -692,7 +692,7 @@ void Input_action_down_up(void) {
     test_bool(st->down, true);
     test_bool(st->pressed, false);
 
-    ecs_os_free(box_terminal_run(world, s, "action.up Fire", NULL));
+    ecs_os_free(box_command_run(world, s, "action_up Fire", NULL));
     ecs_progress(world, 0);
     st = ecs_get(world, fire, ActionState);
     test_bool(st->down, false);
@@ -709,13 +709,13 @@ void Input_action_by_name(void) {
     ecs_entity_t jump = ecs_entity(world, { .name = "controls.Jump" });
     ecs_set(world, jump, Action, { 0 });
 
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     bool error = true;
-    char *out = box_terminal_run(world, s, "action.down Jump", &error);
+    char *out = box_command_run(world, s, "action_down Jump", &error);
     test_bool(error, false);
     ecs_os_free(out);
 
-    ecs_os_free(box_terminal_run(world, s, "action.press controls.Jump", &error));
+    ecs_os_free(box_command_run(world, s, "action_press controls.Jump", &error));
     test_bool(error, false);
 
     ecs_progress(world, 0);
@@ -734,10 +734,10 @@ void Input_action_relative_to_cwd(void) {
     ecs_entity_t b = ecs_entity(world, { .name = "menu.Jump" });
     ecs_set(world, b, Action, { 0 });
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "cd menu", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "cd menu", NULL));
     bool error = true;
-    char *out = box_terminal_run(world, s, "action.down Jump", &error);
+    char *out = box_command_run(world, s, "action_down Jump", &error);
     test_bool(error, false);
     ecs_os_free(out);
 
@@ -758,9 +758,9 @@ void Input_action_ambiguous(void) {
     ecs_entity_t b = ecs_entity(world, { .name = "menu.Jump" });
     ecs_set(world, b, Action, { 0 });
 
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     bool error = false;
-    char *out = box_terminal_run(world, s, "action.down Jump", &error);
+    char *out = box_command_run(world, s, "action_down Jump", &error);
     test_bool(error, true);
     test_str(out, "error: ambiguous action 'Jump', 2 match");
     ecs_os_free(out);
@@ -776,19 +776,19 @@ void Input_action_unknown(void) {
 
     ecs_entity(world, { .name = "Thing" });
 
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     bool error = false;
-    char *out = box_terminal_run(world, s, "action.press Nope", &error);
+    char *out = box_command_run(world, s, "action_press Nope", &error);
     test_bool(error, true);
     test_str(out, "error: no action 'Nope'");
     ecs_os_free(out);
 
-    out = box_terminal_run(world, s, "action.up Thing", &error);
+    out = box_command_run(world, s, "action_up Thing", &error);
     test_bool(error, true);
     test_str(out, "error: 'Thing' is not an action");
     ecs_os_free(out);
 
-    out = box_terminal_run(world, s, "action.drag Nope [0, 0] [1, 1]", &error);
+    out = box_command_run(world, s, "action_drag Nope [0, 0] [1, 1]", &error);
     test_bool(error, true);
     test_str(out, "error: no action 'Nope'");
     ecs_os_free(out);
@@ -807,14 +807,14 @@ void Input_action_prefab_ignored(void) {
     ecs_add_id(world, p, EcsPrefab);
     ecs_set(world, p, Action, { 0 });
 
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     bool error = false;
-    char *out = box_terminal_run(world, s, "action.down Jump", &error);
+    char *out = box_command_run(world, s, "action_down Jump", &error);
     test_bool(error, true);
     test_str(out, "error: no action 'Jump'");
     ecs_os_free(out);
 
-    out = box_terminal_run(world, s, "action.list", NULL);
+    out = box_command_run(world, s, "action_list", NULL);
     test_str(out, "");
     ecs_os_free(out);
 
@@ -829,9 +829,9 @@ void Input_action_drag(void) {
     ecs_entity_t pan = ecs_entity(world, { .name = "Pan" });
     ecs_set(world, pan, Action, { 0 });
 
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     bool error = true;
-    char *out = box_terminal_run(world, s, "action.drag Pan [0, 0] [10, 4] 2 2", &error);
+    char *out = box_command_run(world, s, "action_drag Pan [0, 0] [10, 4] 2 2", &error);
     test_bool(error, false);
     ecs_os_free(out);
 
@@ -864,12 +864,12 @@ void Input_action_list(void) {
     ecs_entity_t fire = ecs_entity(world, { .name = "controls.Fire" });
     ecs_set(world, fire, Action, { 0 });
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "action.down Fire", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "action_down Fire", NULL));
     ecs_progress(world, 0);
 
     bool error = true;
-    char *out = box_terminal_run(world, s, "action.list", &error);
+    char *out = box_command_run(world, s, "action_list", &error);
     test_bool(error, false);
     test_str(out, "controls.Fire (down)\ncontrols.Jump: Jump up");
     ecs_os_free(out);
@@ -882,9 +882,9 @@ void Input_action_list_empty(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     bool error = true;
-    char *out = box_terminal_run(world, s, "action.list", &error);
+    char *out = box_command_run(world, s, "action_list", &error);
     test_bool(error, false);
     test_str(out, "");
     ecs_os_free(out);
@@ -898,43 +898,16 @@ void Input_not_imported(void) {
     ECS_IMPORT(world, BoxApp);
     ECS_IMPORT(world, BoxCommand);
 
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     bool error = false;
-    char *out = box_terminal_run(world, s, "key.press W", &error);
+    char *out = box_command_run(world, s, "key_press W", &error);
     test_bool(error, true);
     test_str(out, "error: box.input is not imported");
     ecs_os_free(out);
 
-    out = box_terminal_run(world, s, "action.list", &error);
+    out = box_command_run(world, s, "action_list", &error);
     test_bool(error, true);
     ecs_os_free(out);
-
-    ecs_fini(world);
-}
-
-void Input_http_exec(void) {
-    // input/commands
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-
-    ecs_entity_t s = box_terminal_new(world);
-    char *path = flecs_asprintf("/terminal/exec?session=%s&cmd=key.press%%20Enter%%202",
-        ecs_get_name(world, s));
-    ecs_http_reply_t reply = ECS_HTTP_REPLY_INIT;
-    test_int(box_command_request(world, "GET", path, NULL, &reply), 200);
-    ecs_os_free(ecs_strbuf_get(&reply.body));
-    ecs_os_free(path);
-
-    path = flecs_asprintf("/terminal/exec?session=%s&cmd=input.wait", ecs_get_name(world, s));
-    ecs_http_reply_t wait = ECS_HTTP_REPLY_INIT;
-    test_int(box_command_request(world, "GET", path, NULL, &wait), 200);
-    char *body = ecs_strbuf_get(&wait.body);
-    test_str(body, "3");
-    ecs_os_free(body);
-    ecs_os_free(path);
-
-    ecs_progress(world, 0);
-    test_bool(ecs_singleton_get(world, Input)->keys[KeyEnter].down, true);
 
     ecs_fini(world);
 }
@@ -945,11 +918,11 @@ void Input_commands_are_script_functions(void) {
     ECS_IMPORT(world, Box);
 
     const char *names[] = {
-        "key.press", "key.down", "key.up", "key.type",
-        "mouse.move", "mouse.sweep", "mouse.release", "mouse.button",
-        "mouse.click", "mouse.drag", "mouse.scroll",
-        "input.reset", "input.focus", "input.wait",
-        "action.press", "action.down", "action.up", "action.drag", "action.list"
+        "key_press", "key_down", "key_up", "key_type",
+        "mouse_move", "mouse_sweep", "mouse_release", "mouse_button",
+        "mouse_click", "mouse_drag", "mouse_scroll",
+        "input_reset", "input_focus", "input_wait",
+        "action_press", "action_down", "action_up", "action_drag", "action_list"
     };
 
     int32_t i;

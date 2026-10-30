@@ -23,8 +23,8 @@ from oreelse_flow import ARGS, FPS, setup  # noqa: F401 (ARGS)
 
 APP = "apps/oreelse"
 
-PARTICLES = "get box.particle.ParticleStats ParticleStats.particles"
-EFFECTS = "get box.particle.ParticleStats ParticleStats.effects"
+PARTICLES = "get box.particle.ParticleStats box.particle.ParticleStats.particles"
+EFFECTS = "get box.particle.ParticleStats box.particle.ParticleStats.effects"
 
 # The one shot effects: the particles their layers burst, halo layers included, and the longest
 # lifetime of their layers in seconds (lifetime.max), when the instance retires
@@ -100,24 +100,17 @@ def script(app, name, code):
               "the script %s failed (%d): %s" % (name, status, body))
 
 
-def query(app, name, component):
+def query(app, component):
     """The entities with a component and its values, by path."""
-    app.exec("query %s %s" % (name, component))
-    app.exec("iter %s" % name)
-    out = app.exec("next 1000")
-    result = {}
-    for line in out.splitlines():
-        if not line.strip() or line == "(end)":
-            continue
-        path, value = line.split(" ", 1)
-        result[path] = parse_value(value)
-    return result
+    out = app.exec("query %s" % component)
+    return {row["entity"]: next(iter(row["fields"][0]["value"].values()))
+            for row in parse_value(out)}
 
 
 def playing(app):
     """The playing effect instances by the name of their template, with their ParticleEffect."""
     result = {}
-    for value in query(app, "fx", "box.particle.ParticleEffect").values():
+    for value in query(app, "box.particle.ParticleEffect").values():
         result[str(value["effect"]).split(".")[-1]] = value
     return result
 
@@ -184,29 +177,32 @@ def check_emitter(app, name):
     entity = "fx_%s" % name
     code = "%s { Position: {0, 1, 6}\n  %s: {} }" % (entity, name)
     script(app, entity, "using box.transform\n" + code)
-    app.wait_for("get %s%s ParticleEmitter.rate" % (entity, layers[0]),
+    app.wait_for("get %s%s box.particle.ParticleEmitter.rate" % (entity, layers[0]),
                  lambda out: float(out) > 0, what="the emitter of %s" % name)
 
     for layer in layers:
-        app.exec("set %s%s ParticlePlayback {state: ParticlePlaying}" % (entity, layer))
+        app.exec("set %s%s box.particle.ParticlePlayback {state: ParticlePlaying}" %
+                 (entity, layer))
     app.wait_for(PARTICLES, lambda out: int(out) > 0, frames=FPS,
                  what="the particles of %s while it plays" % name)
     if peak:
-        app.wait_for("get %s PointLight.intensity" % entity,
+        app.wait_for("get %s box.light.PointLight.intensity" % entity,
                      lambda out: near(float(out), peak), what="the light of %s at %g" % (
                          name, peak))
 
     for layer in layers:
-        app.exec("set %s%s ParticlePlayback {state: ParticleStopped}" % (entity, layer))
+        app.exec("set %s%s box.particle.ParticlePlayback {state: ParticleStopped}" %
+                 (entity, layer))
     if peak:
-        app.wait_for("get %s PointLight.intensity" % entity, "0",
+        app.wait_for("get %s box.light.PointLight.intensity" % entity, "0",
                      what="the light of %s off once stopped" % name)
     app.wait_for(PARTICLES, "0", frames=frames(longest),
                  what="the particles of %s gone after %g s" % (name, longest))
     app.wait_frames(5)
     app.expect(PARTICLES, "0")
     for layer in layers:
-        state = app.exec("get %s%s ParticlePlayback.state" % (entity, layer))
+        state = parse_value(app.exec("get %s%s box.particle.ParticlePlayback.state" %
+                                     (entity, layer)))
         app.check(state.endswith("ParticleStopped"), "%s%s is %s, not stopped" % (
             entity, layer, state))
 
@@ -236,7 +232,7 @@ def flash_light(app, name):
     """The path of the light of the one playing instance of an effect with an EffectFlash."""
     found = {}
     app.wait_for(EFFECTS, lambda out: int(out) > 0, what="the play of %s" % name)
-    for path in query(app, "flashes", "box.particle.EffectFlash"):
+    for path in query(app, "box.particle.EffectFlash"):
         found[path] = True
     app.check(len(found) == 1, "%d lights flash, not the one of %s" % (len(found), name))
     return next(iter(found))
@@ -245,17 +241,17 @@ def flash_light(app, name):
 def check_flash(app, light, peak, range_, fade):
     """The light of a flash has the range of its play from its first frame and fades from at
     most its peak to 0."""
-    first = float(app.exec("get %s PointLight.intensity" % light))
+    first = float(app.exec("get %s box.light.PointLight.intensity" % light))
     app.check(0 <= first <= peak + TOLERANCE, "the flash is at %g, above its peak %g" % (
         first, peak))
-    app.check(near(float(app.exec("get %s PointLight.range" % light)), range_),
+    app.check(near(float(app.exec("get %s box.light.PointLight.range" % light)), range_),
               "the flash does not reach %g" % range_)
-    app.check(near(float(app.exec("get %s EffectFlash.intensity" % light)), peak),
+    app.check(near(float(app.exec("get %s box.particle.EffectFlash.intensity" % light)), peak),
               "the flash does not peak at %g" % peak)
-    app.wait_for("get %s PointLight.intensity" % light, "0", frames=frames(fade),
+    app.wait_for("get %s box.light.PointLight.intensity" % light, "0", frames=frames(fade),
                  what="the flash faded to 0 after %g s" % fade)
     app.wait_frames(5)
-    app.expect("get %s PointLight.intensity" % light, "0")
+    app.expect("get %s box.light.PointLight.intensity" % light, "0")
 
 
 def test_explosion_flash(app):
@@ -264,8 +260,9 @@ def test_explosion_flash(app):
     script(app, "fx_boom", "using oreelse\nconst boom: entity = "
            "oreelse.explosion(BoomBurst, {0, 0.55, 6}, %g)" % scale)
     light = flash_light(app, "BoomBurst")
-    app.check(app.get(light, "Rgb") == dict(zip("rgb", srgb((255, 190, 118)))),
-              "the flash of the explosion is %s, not warm white" % app.get(light, "Rgb"))
+    app.check(app.get(light, "box.material.Rgb") == dict(zip("rgb", srgb((255, 190, 118)))),
+              "the flash of the explosion is %s, not warm white" %
+              app.get(light, "box.material.Rgb"))
     check_flash(app, light, BOOM_PEAK * scale, BOOM_RANGE * scale, BOOM_FADE)
     app.wait_for(EFFECTS, "0", frames=frames(ONE_SHOTS["BoomBurst"][1]))
     app.expect(PARTICLES, "0")
@@ -287,18 +284,20 @@ def test_muzzle_flash(app):
     setup(app)
     script(app, "fx_muzzle", "using box.transform\nfx_muzzle { Position: {0, 1, 6}\n"
            "  MuzzleFlash: {} }")
-    app.wait_for("get fx_muzzle PointLight.range", "4.5", what="the muzzle flash")
+    app.wait_for("get fx_muzzle box.light.PointLight.range", "4.5", what="the muzzle flash")
     app.wait_frames(3)
-    app.expect("get fx_muzzle PointLight.intensity", "0")
+    app.expect("get fx_muzzle box.light.PointLight.intensity", "0")
 
     # Every shot plays it from the start: it lights at its peak and fades to 0, spawning nothing
     for _ in range(2):
-        app.exec("set fx_muzzle ParticlePlayback {state: ParticlePlaying, reset: true}")
-        app.wait_for("get fx_muzzle PointLight.intensity", lambda out: float(out) > 0,
+        app.exec("set fx_muzzle box.particle.ParticlePlayback "
+                 "{state: ParticlePlaying, reset: true}")
+        app.wait_for("get fx_muzzle box.light.PointLight.intensity", lambda out: float(out) > 0,
                      what="the muzzle flash lit")
-        first = float(app.exec("get fx_muzzle PointLight.intensity"))
+        first = float(app.exec("get fx_muzzle box.light.PointLight.intensity"))
         app.check(first <= MUZZLE_PEAK + TOLERANCE, "the muzzle flash is at %g, above %g" % (
             first, MUZZLE_PEAK))
-        app.wait_for("get fx_muzzle PointLight.intensity", "0", frames=frames(MUZZLE_FADE),
+        app.wait_for("get fx_muzzle box.light.PointLight.intensity", "0",
+                     frames=frames(MUZZLE_FADE),
                      what="the muzzle flash faded to 0 after %g s" % MUZZLE_FADE)
         app.expect(PARTICLES, "0")

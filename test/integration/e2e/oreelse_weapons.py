@@ -65,29 +65,29 @@ def building(app, prefab, row, col):
     code = ("using box.transform\n@NAME : %s {\n  Position: {%g, 0, %g}\n"
             "  oreelse.OreBuilding: {row: %d, col: %d}\n}" % (prefab, x, z, row, col))
     name = run_script(app, code)
-    app.wait_for("has %s oreelse.OreBuilding" % name, "true")
+    app.wait_for("eval %s.has(oreelse.OreBuilding)" % name, "true")
     return name
 
 
 def still(app, prefab, x, z, hp=None):
     """Spawn a critter that stands where it is (speed 0), with hp hit points when given."""
     critter = spawn(app, prefab, x, z)
-    app.exec("set %s OreSpeed {value: 0}" % critter)
+    app.exec("set %s oreelse.OreSpeed {value: 0}" % critter)
     if hp is not None:
-        app.exec("set %s OreHealth {value: %g, max: %g}" % (critter, hp, hp))
+        app.exec("set %s oreelse.OreHealth {value: %g, max: %g}" % (critter, hp, hp))
     return critter
 
 
 def set_levels(app, mining, weapons, construction):
     put(app, ALLOC, ALLOC, {"level": [mining, weapons, construction]})
-    app.wait_for("get %s OrePowerAlloc" % ALLOC,
+    app.wait_for("get %s oreelse.OrePowerAlloc" % ALLOC,
                  lambda out: parse_value(out)["level"] == [mining, weapons, construction])
 
 
 def wait_blackout(app, blackout):
     """Play until the power state is in a blackout or out of it."""
     set_state(app, "Playing")
-    app.wait_for("get %s OrePowerState.blackout" % POWER, "true" if blackout else "false",
+    app.wait_for("get %s oreelse.OrePowerState.blackout" % POWER, "true" if blackout else "false",
                  frames=FPS, what="the blackout %s" % blackout)
 
 
@@ -109,7 +109,7 @@ def turret_at():
 def once(app, turret):
     """Let a turret fire only once: its first shot goes at once, the next one after an interval
     set far off."""
-    app.exec("set %s OreAttackInterval {value: 100000}" % turret)
+    app.exec("set %s oreelse.OreAttackInterval {value: 100000}" % turret)
 
 
 def check_gun_rate(app, lost, took, what):
@@ -132,13 +132,13 @@ def test_pistol(app):
 
     # A mite 10 units away is out of range: no shot, and the timer holds at 0
     far = still(app, "Mite", px + 10, pz)
-    app.exec("set %s OreAttackTimer {value: 0}" % PLAYER)
+    app.exec("set %s oreelse.OreAttackTimer {value: 0}" % PLAYER)
     set_state(app, "Playing")
     app.wait_frames(FPS)
     set_state(app, "Paused")
     app.check(health(app, far) == MITE_HP, "the mite 10 units away has %g HP" % health(app, far))
     app.check(not instances(app, "Tracer"), "the pistol fired at the mite 10 units away")
-    timer = app.get(PLAYER, "OreAttackTimer")["value"]
+    timer = app.get(PLAYER, "oreelse.OreAttackTimer")["value"]
     app.check(timer == 0, "without a target the pistol's timer is at %g" % timer)
 
     # A mite 8 units away is shot at once: a hit takes 6 HP and the second kills it
@@ -187,7 +187,7 @@ def test_gun_turret(app):
     # Back from level 0 it has no shot in flight: measure once the first one landed
     wait_until(app, lambda: health(app, skitter) < hp, FPS, "the gun turret's hit in a blackout")
     lost, took = measure(app, lambda: -health(app, skitter), RATE_FRAMES)
-    app.check(app.get(POWER, "OrePowerState")["blackout"], "the blackout ended")
+    app.check(app.get(POWER, "oreelse.OrePowerState")["blackout"], "the blackout ended")
     check_gun_rate(app, lost, took, "in a blackout")
 
 
@@ -202,14 +202,15 @@ def test_gun_lead(app):
     # looking for another target: it crosses in front of the turret at 6.8 units a second
     place_player(app, tx + 6, tz + 30)
     mite = spawn(app, "Mite", tx + 6, tz - 6)
-    app.exec("set %s OreCritter {retarget: 100, jitter: 0, attacking: false}" % mite)
-    app.exec("set %s OreTarget {value: %s}" % (mite, PLAYER))
+    app.exec("set %s oreelse.OreCritter {retarget: 100, jitter: 0, attacking: false}" % mite)
+    app.exec("set %s oreelse.OreTarget {value: %s}" % (mite, PLAYER))
     set_state(app, "Playing")
     wait_until(app, lambda: mite not in critters(app) or health(app, mite) < MITE_HP, 2 * FPS,
                "the crossing mite hit")
     set_state(app, "Paused")
     if mite in critters(app):
-        x, z = app.get(mite, "Position")["x"], app.get(mite, "Position")["z"]
+        x, z = app.get(mite, "box.transform.Position")["x"], app.get(mite,
+                                                                     "box.transform.Position")["z"]
         app.check(z > tz - 6 + 0.5, "the mite at %s did not walk" % ((x, z),))
 
 
@@ -335,17 +336,18 @@ def test_missile_reacquire(app):
     wait_until(app, lambda: instances(app, "Missile"), FPS, "the missile")
     set_state(app, "Paused")
     missile = list(instances(app, "Missile"))[0]
-    app.check(entity(app.get(missile, "OreTarget")["value"]) == first,
-              "the missile flies to %s, not the mite" % app.get(missile, "OreTarget")["value"])
+    app.check(entity(app.get(missile, "oreelse.OreTarget")["value"]) == first,
+              "the missile flies to %s, not the mite" %
+              app.get(missile, "oreelse.OreTarget")["value"])
 
     # Its target dies; another mite stands 3 ahead of it and 3 to the side, within 6
-    p = app.get(missile, "Position")
-    v = app.get(missile, "OreProjectile")
+    p = app.get(missile, "box.transform.Position")
+    v = app.get(missile, "oreelse.OreProjectile")
     speed = math.hypot(v["vx"], v["vz"])
     dx, dz = v["vx"] / speed, v["vz"] / speed
     other = still(app, "Mite", p["x"] + 3 * dx - 3 * dz, p["z"] + 3 * dz + 3 * dx)
     kills = waves(app)["kills"]
-    app.exec("set %s OreHealth {value: 0, max: %g}" % (first, MITE_HP))
+    app.exec("set %s oreelse.OreHealth {value: 0, max: %g}" % (first, MITE_HP))
     set_state(app, "Playing")
     wait_until(app, lambda: other not in critters(app), 2 * FPS,
                "the missile taking the other mite")

@@ -162,9 +162,9 @@ void PickingCost_drag_moves_in_one_frame_keep_delta(void) {
     ecs_entity_t slider = ecs_lookup(world, "hud.slider");
     ecs_progress(world, 0);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "mouse.move [600, 360]", NULL));
-    ecs_os_free(box_terminal_run(world, s, "mouse.button left true", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_move [600, 360]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_button left true", NULL));
     ecs_progress(world, 0);
     box_input_mouse_move(world, 610, 360, false);
     box_input_mouse_move(world, 625, 361, false);
@@ -177,7 +177,7 @@ void PickingCost_drag_moves_in_one_frame_keep_delta(void) {
     test_flt(ecs_singleton_get(world, PickStatus)->drag[0], 90);
     test_bool(ecs_has(world, slider, Pressed), true);
 
-    ecs_os_free(box_terminal_run(world, s, "mouse.button left false", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_button left false", NULL));
     ecs_progress(world, 0);
     m = ecs_get_id(world, slider, mut);
     test_int(m->releases, 1);
@@ -406,8 +406,8 @@ void PickingCost_disabled_on_press_not_targeted(void) {
     ecs_progress(world, 0);
     test_uint(ecs_singleton_get(world, PickStatus)->target, popup);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, s, "mouse.button left true", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_button left true", NULL));
     ecs_progress(world, 0);
     test_bool(ecs_has_id(world, popup, EcsDisabled), true);
     test_uint(ecs_singleton_get(world, PickStatus)->target, 0);

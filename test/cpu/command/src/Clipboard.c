@@ -1,6 +1,6 @@
 /**
  * @file Clipboard.c
- * @brief Tests for the clipboard.set and clipboard.get commands and pasting what they set.
+ * @brief Tests for the clipboard_set and clipboard_get commands and pasting what they set.
  */
 
 #include <box.h>
@@ -10,7 +10,7 @@
 /** Run a command that must succeed and return its output.
  *
  * @param world The world
- * @param s The terminal session
+ * @param s The shell session
  * @param cmd The command
  * @return The output, which the caller frees
  */
@@ -20,7 +20,7 @@ static char* clipboard_run(
     const char *cmd)
 {
     bool error = true;
-    char *out = box_terminal_run(world, s, cmd, &error);
+    char *out = box_command_run(world, s, cmd, &error);
     test_bool(error, false);
 
     return out;
@@ -31,18 +31,18 @@ void Clipboard_set_get(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
-    char *out = clipboard_run(world, s, "clipboard.set hello");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    char *out = clipboard_run(world, s, "clipboard_set hello");
     test_str(out, "");
     ecs_os_free(out);
     test_str(box_input_clipboard_get(world), "hello");
 
-    out = clipboard_run(world, s, "clipboard.get");
+    out = clipboard_run(world, s, "clipboard_get");
     test_str(out, "hello");
     ecs_os_free(out);
 
     box_input_clipboard_set(world, "from the api");
-    out = clipboard_run(world, s, "clipboard.get");
+    out = clipboard_run(world, s, "clipboard_get");
     test_str(out, "from the api");
     ecs_os_free(out);
 
@@ -54,9 +54,9 @@ void Clipboard_set_spaces(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(clipboard_run(world, s, "clipboard.set   two  words and more  "));
-    char *out = clipboard_run(world, s, "clipboard.get");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(clipboard_run(world, s, "clipboard_set   \"two  words and more\"  "));
+    char *out = clipboard_run(world, s, "clipboard_get");
     test_str(out, "two  words and more");
     ecs_os_free(out);
 
@@ -68,13 +68,13 @@ void Clipboard_get_empty(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
-    char *out = clipboard_run(world, s, "clipboard.get");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    char *out = clipboard_run(world, s, "clipboard_get");
     test_str(out, "");
     ecs_os_free(out);
 
-    test_assert(ecs_lookup(world, "box.command.commands.clipboard.set") != 0);
-    test_assert(ecs_has(world, ecs_lookup(world, "box.command.commands.clipboard.get"),
+    test_assert(ecs_lookup(world, "box.command.commands.clipboard_set") != 0);
+    test_assert(ecs_has(world, ecs_lookup(world, "box.command.commands.clipboard_get"),
         EcsScriptFunction));
 
     ecs_fini(world);
@@ -85,10 +85,10 @@ void Clipboard_set_missing_text(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     box_input_clipboard_set(world, "kept");
     bool error = false;
-    char *out = box_terminal_run(world, s, "clipboard.set", &error);
+    char *out = box_command_run(world, s, "clipboard_set", &error);
     test_bool(error, true);
     ecs_os_free(out);
     test_str(box_input_clipboard_get(world), "kept");
@@ -101,16 +101,16 @@ void Clipboard_paste_shortcut(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
-    ecs_os_free(clipboard_run(world, s, "clipboard.set pasted text"));
-    ecs_os_free(clipboard_run(world, s, "key.press V"));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(clipboard_run(world, s, "clipboard_set \"pasted text\""));
+    ecs_os_free(clipboard_run(world, s, "key_press V"));
     ecs_progress(world, 0);
     test_assert(ecs_singleton_get(world, Input)->paste == NULL);
     ecs_progress(world, 0);
 
-    ecs_os_free(clipboard_run(world, s, "key.down Control"));
-    ecs_os_free(clipboard_run(world, s, "key.press V"));
-    ecs_os_free(clipboard_run(world, s, "key.up Control"));
+    ecs_os_free(clipboard_run(world, s, "key_down Control"));
+    ecs_os_free(clipboard_run(world, s, "key_press V"));
+    ecs_os_free(clipboard_run(world, s, "key_up Control"));
     ecs_progress(world, 0);
     test_str(ecs_singleton_get(world, Input)->paste, "pasted text");
     ecs_progress(world, 0);
@@ -124,15 +124,15 @@ void Clipboard_utf8(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     ecs_os_free(clipboard_run(world, s,
-        "clipboard.set gr\xc3\xbc\xc3\x9f \xe2\x86\x92 \xf0\x9f\x93\x8b"));
-    char *out = clipboard_run(world, s, "clipboard.get");
+        "clipboard_set \"gr\xc3\xbc\xc3\x9f \xe2\x86\x92 \xf0\x9f\x93\x8b\""));
+    char *out = clipboard_run(world, s, "clipboard_get");
     test_str(out, "gr\xc3\xbc\xc3\x9f \xe2\x86\x92 \xf0\x9f\x93\x8b");
     ecs_os_free(out);
 
-    ecs_os_free(clipboard_run(world, s, "key.down CtrlLeft"));
-    ecs_os_free(clipboard_run(world, s, "key.press V"));
+    ecs_os_free(clipboard_run(world, s, "key_down CtrlLeft"));
+    ecs_os_free(clipboard_run(world, s, "key_press V"));
     ecs_progress(world, 0);
     test_str(ecs_singleton_get(world, Input)->paste,
         "gr\xc3\xbc\xc3\x9f \xe2\x86\x92 \xf0\x9f\x93\x8b");
