@@ -1,7 +1,8 @@
 /**
  * @file FpsPanel.c
  * @brief The fps panel renders after the editor and before the console when all three are open,
- * in the top right corner of the surface, its chart red for frames slower than 30 fps.
+ * in the top right corner of the surface, its chart red for frames slower than 30 fps, and clicks
+ * over it go to the game.
  */
 
 #include <box.h>
@@ -19,6 +20,26 @@
 
 /** Height of the surface of the tests in points */
 #define FPS_H (360)
+
+/** Test whether an entity is a scope or below it.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param scope Path of the scope
+ * @return Whether e is the scope or one of its descendants
+ */
+static bool fps_in_scope(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    const char *scope)
+{
+    ecs_entity_t root = ecs_lookup(world, scope);
+    while (e && e != root) {
+        e = ecs_get_parent(world, e);
+    }
+
+    return root != 0 && e == root;
+}
 
 /** Create a headless world with the widget library, a game view that clears to blue, a full
  * window of fixed samples over the top of the chart and a surface that is written to a file.
@@ -171,6 +192,56 @@ void FpsPanel_between_editor_and_console(void) {
     test_assert(!fps_pixel(px, 600, 300, (Rgb){0, 0, 255}));
     test_assert(!fps_pixel(px, 600, 300, (Rgb){red.r, red.g, red.b}));
     stbi_image_free(px);
+
+    ecs_fini(world);
+}
+
+void FpsPanel_click_reaches_game(void) {
+    // fps/panel
+    ecs_entity_t game;
+    ecs_world_t *world = fps_world("fps_click.png", &game);
+    ecs_entity_t wall = ecs_new(world);
+    ecs_set(world, wall, Position, {0, 0, 0});
+    ecs_set(world, wall, Box, {20, 20, 1});
+    ecs_add(world, wall, Interactive);
+    ecs_progress(world, 0);
+
+    FpsPanel *p = ecs_singleton_get_mut(world, FpsPanel);
+    p->open = true;
+    ecs_singleton_modified(world, FpsPanel);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_entity_t fps = ecs_lookup(world, BOX_FPS_VIEW);
+    test_assert(fps != 0);
+    test_assert(ecs_lookup(world, BOX_FPS_PANEL) != 0);
+
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_move [600, 60]", NULL));
+    while (box_input_pending(world)) {
+        ecs_progress(world, 0);
+    }
+
+    ecs_progress(world, 0);
+    const PickStatus *status = ecs_singleton_get(world, PickStatus);
+    test_uint(status->view, game);
+    test_uint(status->target, wall);
+    test_uint(status->handler, wall);
+    test_assert(status->view != fps);
+    test_assert(!fps_in_scope(world, status->handler, BOX_FPS_UI));
+
+    ecs_os_free(box_command_run(world, s, "mouse_click left [600, 60]", NULL));
+    while (box_input_pending(world)) {
+        ecs_progress(world, 0);
+    }
+
+    ecs_progress(world, 0);
+    status = ecs_singleton_get(world, PickStatus);
+    test_uint(status->view, game);
+    test_uint(status->target, wall);
+    test_uint(status->handler, wall);
+    test_assert(status->view != fps);
+    test_assert(!fps_in_scope(world, status->target, BOX_FPS_UI));
+    test_assert(!fps_in_scope(world, status->handler, BOX_FPS_UI));
 
     ecs_fini(world);
 }

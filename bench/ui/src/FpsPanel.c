@@ -4,7 +4,8 @@
  *
  * Every case runs a headless frame of an empty world with a full window of frame samples that
  * the engine does not add to (hold). The difference between the cases is the cost of the panel:
- * closed, open with a new sample every frame so every bar moves, and open with fixed samples.
+ * closed, open with a new sample every frame so the strip scrolls and one bar is rewritten, and
+ * open with fixed samples.
  */
 
 #include <box.h>
@@ -38,8 +39,13 @@ static ecs_world_t* bench_fps_world(
     return world;
 }
 
+<<<<<<< HEAD
 /** Run frames that each add a sample, so every bar of an open panel moves one slot. The sample
  * is notified with ecs_singleton_modified, as the engine does.
+=======
+/** Run frames that each add a sample, so the strip of an open panel scrolls one slot and only
+ * the bar of the new sample is rewritten.
+>>>>>>> be0a21117ee999f5df7019a0468196770b21c2d4
  *
  * @param b The bench
  * @param open Whether the panel is open
