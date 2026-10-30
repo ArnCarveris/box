@@ -698,6 +698,53 @@ static int32_t box_console_ui_menu(
     return rows;
 }
 
+/** Test whether the input line was drawn with the prompt the session has now. The path of the
+ * scope is matched name by name against the drawn prompt, so a scope that did not change costs no
+ * allocation. Names that a path would escape or skip build the prompt to compare instead.
+ *
+ * @param world The world
+ * @param con The console state
+ * @return Whether the drawn prompt is the current one
+ */
+static bool box_console_ui_prompted(
+    ecs_world_t *world,
+    const box_console_t *con)
+{
+    const char *drawn = con->prompted;
+    ecs_entity_t e = box_console_session_scope(world, con);
+    int32_t end = (int32_t)strlen(drawn) - (int32_t)strlen(BOX_CONSOLE_SYMBOL);
+    bool same = end >= 0 && !strcmp(&drawn[end], BOX_CONSOLE_SYMBOL);
+    char *prompt = NULL;
+    if (same && !e) {
+        same = !strncmp(drawn, BOX_CONSOLE_ROOT, (size_t)end) && !BOX_CONSOLE_ROOT[end];
+    }
+
+    while (same && e) {
+        const char *name = ecs_get_name(world, e);
+        int32_t len = name ? (int32_t)strlen(name) : 0;
+        ecs_entity_t parent = ecs_get_parent(world, e);
+        if (!len || strchr(name, '.') || parent == EcsFlecsCore) {
+            prompt = box_console_prompt(world, con, NULL);
+            same = !strcmp(prompt, drawn);
+            break;
+        }
+
+        same = end >= len && !strncmp(&drawn[end - len], name, (size_t)len);
+        end -= len;
+        if (same && parent) {
+            same = end > 0 && drawn[end - 1] == '.';
+            end --;
+        }
+
+        same = same && (parent || !end);
+        e = parent;
+    }
+
+    ecs_os_free(prompt);
+
+    return same;
+}
+
 /** Write the visible part of the scrollback into the line elements.
  *
  * The window is the rows that fit, con->scroll rows up from the newest. Every line with a row
@@ -787,16 +834,10 @@ void box_console_ui_sync(
         con->refresh = true;
     }
 
-    if (con->prompted) {
-        bool root = !box_console_session_scope(world, con);
-        char *prompt = root ? NULL : box_console_prompt(world, con, NULL);
-        if (strcmp(root ? BOX_CONSOLE_ROOT BOX_CONSOLE_SYMBOL : prompt, con->prompted)) {
-            con->refresh = true;
-            ecs_os_free(con->colored);
-            con->colored = NULL;
-        }
-
-        ecs_os_free(prompt);
+    if (con->prompted && !box_console_ui_prompted(world, con)) {
+        con->refresh = true;
+        ecs_os_free(con->colored);
+        con->colored = NULL;
     }
 
     if (con->refresh && (!con->colored || strcmp(con->colored, con->line))) {

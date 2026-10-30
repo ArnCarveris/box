@@ -941,6 +941,31 @@ void Console_prompt_scope_moved(void) {
     ecs_fini(world);
 }
 
+void Console_prompt_scope_spans(void) {
+    // console/prompt
+    ecs_world_t *world = console_open(640, 360, NULL);
+    const ConsoleSyntax *syntax = &ecs_singleton_get(world, Console)->syntax;
+    ecs_entity_t line = ecs_lookup(world, CONSOLE_INPUT ".line");
+    ecs_entity_t parent = ecs_entity(world, { .name = "parent" });
+    ecs_entity(world, { .name = "parent.item" });
+    ecs_os_free(box_console_run(world, "cd parent", NULL));
+    ecs_progress(world, 0);
+    console_type(world, "ls item");
+    test_str(console_value(world), "parent $ ls item");
+    console_check_span(world, line, 0, 6, syntax->scope);
+    console_check_span(world, line, 12, 16, syntax->entity);
+
+    // Deleting the scope colors the prompt and resolves the typed entity from the root
+    ecs_delete(world, parent);
+    ecs_progress(world, 0);
+    test_str(console_value(world), CONSOLE_PROMPT "ls item");
+    console_check_span(world, line, 0, 1, syntax->scope);
+    console_check_span(world, line, 2, 3, syntax->symbol);
+    console_check_span(world, line, 7, 11, syntax->missing);
+
+    ecs_fini(world);
+}
+
 void Console_ctrl_a_e(void) {
     // console/prompt
     ecs_world_t *world = console_open(640, 360, NULL);

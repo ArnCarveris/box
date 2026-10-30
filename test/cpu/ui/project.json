@@ -406,6 +406,7 @@
                     "prompt_scope_deleted",
                     "prompt_scope_renamed",
                     "prompt_scope_moved",
+                    "prompt_scope_spans",
                     "ctrl_a_e",
                     "ctrl_u_k",
                     "ctrl_w",
