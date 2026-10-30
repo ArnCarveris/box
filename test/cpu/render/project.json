@@ -443,7 +443,9 @@
                 "testcases": [
                     "interrupted",
                     "nested_childof",
-                    "nested_parent"
+                    "nested_parent",
+                    "plain_child",
+                    "surface_instance"
                 ]
             },
             {

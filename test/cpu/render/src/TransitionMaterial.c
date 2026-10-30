@@ -11,144 +11,7 @@
 #include <bake_test.h>
 #include "render.h"
 #include "draw.h"
-
-/** Seconds every frame advances the world, a power of two so the clock is exact */
-#define TR_DELTA (0.25f)
-
-/** Create a world that renders into the null backend.
- *
- * @param null Receives the backend
- * @return The world
- */
-static ecs_world_t* tr_world(
-    box_render_null_t **null)
-{
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-    *null = box_render_null_new();
-    box_render_backend_t backend = box_render_null_backend(*null);
-    box_render_set_backend(world, &backend);
-
-    return world;
-}
-
-/** Delete a world and its null backend.
- *
- * @param world The world
- * @param null The backend
- */
-static void tr_fini(
-    ecs_world_t *world,
-    box_render_null_t *null)
-{
-    ecs_fini(world);
-    box_render_null_free(null);
-}
-
-/** Run one frame and wait until the render thread resolved its packet.
- *
- * @param world The world
- */
-static void tr_frame(
-    ecs_world_t *world)
-{
-    ecs_progress(world, TR_DELTA);
-    box_render_sync(world);
-}
-
-/** Read the rendered Rgb of an entity.
- *
- * @param world The world
- * @param e The entity
- * @return The value the resolver computed for the last packet
- */
-static Rgb tr_rgb(
-    ecs_world_t *world,
-    ecs_entity_t e)
-{
-    Rgb result = {0};
-    box_render_sync(world);
-    test_assert(box_render_transition_test_value(world, e, ecs_id(Rgb), &result));
-
-    return result;
-}
-
-/** Count the records of an op in the last packet.
- *
- * @param null The backend
- * @param op The op
- * @return The records
- */
-static int32_t tr_records(
-    const box_render_null_t *null,
-    box_render_transition_op_t op)
-{
-    int32_t i, result = 0;
-    for (i = 0; i < ecs_vec_count(&null->last.transitions); i ++) {
-        const box_render_transition_record_t *r = ecs_vec_get_t(
-            &null->last.transitions, box_render_transition_record_t, i);
-        result += r->op == op;
-    }
-
-    return result;
-}
-
-/** Create a world that renders into the null backend with a view, so the batches are sent.
- *
- * @param null Receives the backend
- * @return The world
- */
-static ecs_world_t* tr_scene(
-    box_render_null_t **null)
-{
-    ecs_world_t *world = tr_world(null);
-    ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Position, {0, 0, 20});
-    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
-    ecs_entity_t view = ecs_new(world);
-    ecs_set(world, view, View, {.camera = camera});
-
-    return world;
-}
-
-/** Create a box shape.
- *
- * @param world The world
- * @param parent ChildOf parent, 0 for none
- * @param x Its x position
- * @return The shape
- */
-static ecs_entity_t tr_shape(
-    ecs_world_t *world,
-    ecs_entity_t parent,
-    float x)
-{
-    ecs_entity_t e = parent ? ecs_new_w_pair(world, EcsChildOf, parent) : ecs_new(world);
-    ecs_set(world, e, Position, {x, 0, 0});
-    ecs_set(world, e, Box, {1, 2, 3});
-    ecs_set(world, e, Rgb, {200, 100, 50});
-
-    return e;
-}
-
-/** Get the batch of the shape of an entity.
- *
- * @param world The world
- * @param e The entity
- * @return The batch
- */
-static box_draw_batch_t* tr_batch(
-    ecs_world_t *world,
-    ecs_entity_t e)
-{
-    box_render_draws_t *d = box_draws_state(world);
-    const DrawSlot *ds = ecs_get(world, e, DrawSlot);
-    test_assert(d != NULL);
-    test_assert(ds != NULL);
-    test_assert(ds->batch >= 0);
-
-    return box_draws_batch(d, ds->batch);
-}
+#include "transition_test.h"
 
 /** A material component, the value a case starts from and the one it transitions to */
 typedef struct tr_material_case_t {
@@ -232,23 +95,6 @@ static bool tr_material_rendered(
     return result;
 }
 
-/** Count the records of an op in the last packet, once the render thread resolved it.
- *
- * @param world The world
- * @param null The backend
- * @param op The op
- * @return The records
- */
-static int32_t tr_ops(
-    ecs_world_t *world,
-    const box_render_null_t *null,
-    box_render_transition_op_t op)
-{
-    box_render_sync(world);
-
-    return tr_records(null, op);
-}
-
 /** Read a shading slot of a 2D batch as the backend got it in the last packet: the patched
  * bytes of the run upload of a dynamic_material batch, else the static slot.
  *
@@ -265,32 +111,10 @@ static void tr_shading_slot(
     int32_t slot,
     box_render_shading_t *out)
 {
-    box_render_draws_t *d = box_draws_state(world);
-    bool found = false;
-    int32_t i;
     box_render_sync(world);
     *out = *box_draws_slot_shading(b, slot);
-    if (!b->key.dynamic_material) {
-        goto done;
-    }
-
-    uint32_t handle = box_draws_store_handle(box_draws_batch_store(d, b), b->page,
-        BOX_RENDER_STREAM_SHADING);
-    uint32_t offset = b->first * (uint32_t)sizeof(box_render_shading_t);
-    for (i = 0; i < ecs_vec_count(&null->last.uploads) && !found; i ++) {
-        const box_render_upload_t *u = ecs_vec_get_t(
-            &null->last.uploads, box_render_upload_t, i);
-        if (u->buffer == handle && u->offset == offset) {
-            ecs_os_memcpy(out, box_render_packet_data(&null->last,
-                u->data + (uint32_t)slot * (uint32_t)sizeof(box_render_shading_t)),
-                ECS_SIZEOF(box_render_shading_t));
-            found = true;
-        }
-    }
-
-    test_assert(found);
-done:
-    return;
+    tr_slot_rendered(world, null, b, slot, BOX_RENDER_STREAM_SHADING,
+        (uint32_t)sizeof(box_render_shading_t), out);
 }
 
 /** Read the shading of the 2D shape of an entity as the backend got it in the last packet.
