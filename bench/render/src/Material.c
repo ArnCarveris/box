@@ -9,6 +9,7 @@
 #include <box.h>
 #include <bake_bench.h>
 #include "render.h"
+#include "bench_memory.h"
 #ifdef __APPLE__
 #include <libproc.h>
 #include <unistd.h>
@@ -117,6 +118,7 @@ static void bench_material(
     bench_counter(b, "material_bytes", (double)stats.material_bytes);
     bench_counter(b, "materials", (double)stats.materials);
     bench_counter(b, "setup_material_bytes", (double)setup_material_bytes);
+    bench_render_memory(b, &stats);
     box_render_sync(world);
     bench_counter(b, "instructions", (double)(bench_material_instructions() - start));
     bench_counter(b, "frames", frames);
@@ -199,6 +201,7 @@ void Material_tint_subtree(
     bench_counter(b, "upload_bytes", (double)stats.upload_bytes);
     bench_counter(b, "materials", (double)stats.materials);
     bench_counter(b, "setup_material_bytes", (double)setup_material_bytes);
+    bench_render_memory(b, &stats);
     box_render_sync(world);
     ecs_fini(world);
 }
@@ -247,6 +250,7 @@ void Material_dynamic_material_dynamic_parents(
     }
 
     bench_counter(b, "upload_bytes", (double)stats.upload_bytes);
+    bench_render_memory(b, &stats);
     box_render_sync(world);
     ecs_fini(world);
 }

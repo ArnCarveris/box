@@ -10,6 +10,7 @@
 #include <box.h>
 #include <bake_bench.h>
 #include "render.h"
+#include "bench_memory.h"
 #ifdef __APPLE__
 #include <libproc.h>
 #include <unistd.h>
@@ -52,25 +53,6 @@ static void bench_render_drop(
 {
     (void)ctx;
     (void)packet;
-}
-
-/** Report the stream upload counters and the allocated page buffers of the last extract.
- *
- * @param b The bench
- * @param stats Counters of the last extract
- */
-static void bench_extract_memory(
-    bench_t *b,
-    const box_render_draws_stats_t *stats)
-{
-    bench_counter(b, "transform_bytes", (double)stats->transform_bytes);
-    bench_counter(b, "shading_bytes", (double)stats->shading_bytes);
-    bench_counter(b, "surface_bytes", (double)stats->surface_bytes);
-    bench_counter(b, "page_slots", (double)stats->page_slots);
-    bench_counter(b, "page_transform_bytes", (double)stats->page_transform_bytes);
-    bench_counter(b, "page_shading_bytes", (double)stats->page_shading_bytes);
-    bench_counter(b, "page_surface_bytes", (double)stats->page_surface_bytes);
-    bench_counter(b, "page_bytes", (double)stats->page_bytes);
 }
 
 /** Run frames of a scene with static and dynamic shapes, moving a share of the static ones.
@@ -148,7 +130,7 @@ static void bench_render_extract(
     bench_counter(b, "scattered", (double)stats.scattered);
     bench_counter(b, "materials", (double)stats.materials);
     bench_counter(b, "setup_material_bytes", (double)setup_material_bytes);
-    bench_extract_memory(b, &stats);
+    bench_render_memory(b, &stats);
     if (sets) {
         bench_counter(b, "observers_per_set", (double)observers / (double)sets);
     }
