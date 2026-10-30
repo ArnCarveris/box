@@ -371,9 +371,11 @@
                     "requeued_probes_keep_values",
                     "edge_changes_keep_the_volume",
                     "deleting_uncaptured_shapes_rebakes_nothing",
-                    "parent_tint_and_prefab_textures_rebake",
+                    "parent_opacity_and_prefab_textures_rebake",
                     "newly_valid_probe_hidden_until_baked",
-                    "full_rebakes_keep_values"
+                    "full_rebakes_keep_values",
+                    "tint_rebakes_nothing",
+                    "bake_ignores_tint"
                 ]
             },
             {

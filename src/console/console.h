@@ -179,6 +179,10 @@ typedef struct box_console_t {
     char *colored;              /**< The input line the spans were found for, NULL for none */
     ecs_vec_t args;             /**< box_console_arg_t of the entity arguments of the input line
                                  *   when its spans were found */
+    char *command_name;         /**< Unquoted first token of the input line when its spans were
+                                 *   found, NULL for none or a built-in command */
+    ecs_entity_t command;       /**< Script function command_name resolved to, 0 for none */
+    bool callable;              /**< The command had an EcsScriptFunction with a callback */
     char *prompted;             /**< The prompt the input line was last drawn with, NULL for
                                  *   none */
     ecs_vec_t typed;            /**< char of the text typed since the last update */
@@ -193,6 +197,8 @@ typedef struct box_console_t {
     float wrap;                 /**< Width the rows of the scrollback lines were measured at */
     float wrap_size;            /**< Font size the rows of the scrollback were measured at */
     bool pending;               /**< A line could not be measured while its font loads */
+    bool failed;                /**< A line could not be measured because its font failed to
+                                 *   load, it is measured again once the font loads */
     bool trim;                  /**< The rows of the scrollback were reset, it is trimmed to
                                  *   Console.scrollback once they are measured */
     ecs_entity_t font;          /**< Font of the console text, box.text.DefaultFont */
@@ -327,7 +333,8 @@ bool box_console_is_command(
  * @param con The console state
  * @param line The command line
  * @param spans Receives the box_console_span_t of the line, later ones over earlier ones
- * @param args Receives the box_console_arg_t of its entity arguments, NULL to ignore
+ * @param args Receives the box_console_arg_t of its entity arguments, NULL to ignore. When not
+ * NULL the line is the input line, and the command it names is stored in con as well.
  */
 void box_console_syntax(
     ecs_world_t *world,
@@ -343,9 +350,9 @@ void box_console_syntax(
 void box_console_syntax_args_clear(
     ecs_vec_t *args);
 
-/** Test whether an entity argument of the input line no longer resolves to the entity it
- * resolved to when the spans of the line were found, after entities were created, deleted,
- * renamed or moved outside a command.
+/** Test whether the command or an entity argument of the input line no longer resolves to the
+ * entity it resolved to when the spans of the line were found, after entities or script
+ * functions were created, deleted, renamed or moved outside a command.
  *
  * @param world The world
  * @param con The console state

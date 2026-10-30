@@ -202,7 +202,8 @@ the same entity shows the transition, the light does not.
 Light and reflection bakes, and probe captures, use the material table and shading as the
 frame they run in has them. A change of a material component invalidates bakes on the game
 thread as without a transition, so a capture that runs while the transition does sees the
-value it renders at then, not the target.
+value it renders at then, not the target. `Tint` is the exception: captures ignore it, so it
+never invalidates a bake and a capture sees the color without it, whether it transitions or not.
 
 ## Architecture
 
@@ -381,6 +382,13 @@ transition of their own (an entity that transitions only `Position` and has a `R
   (`box_draws_slot_remove`) and of the slot it gets. None of this runs while no scene keeps
   shadow tiles (`shadow_record`), and an entity without `Transition` records what it did
   before.
+- The range math runs only where a region reads it. Before the walk, `box_transition_casting`
+  marks the walk items with a caster slot at or below them, and the others carry no range. A
+  product with a single matrix on one side (`box_draws_range_mul`) takes two products per
+  term, or one on both sides. A rotation axis that does not run takes its sine and cosine
+  directly. The region multiplies only the three rows it reads, and `box_draws_shadow_bounds`
+  sums the least and largest term of each coordinate instead of transforming 8 corners. Each
+  gives the same bits as the full interval math.
 - A slot that rekeys moves to another page slot, whose Hi-Z history word is that of the
   instance that had it before, as for any key change. The history only decides what the early
   phase draws (`etc/shaders/cull.wgsl`): the late phase tests every instance in the frustum
@@ -490,8 +498,9 @@ thread) and the encoding in `src/render/batch.c`.
   belongs to its nearest fading ancestor; a fading descendant is a node of its own whose parent
   is that ancestor, so nodes come parent first.
 - Every drawn entity of the walk (mesh, 2D shape or text) carries `TransitionMaterial`, so its
-  slot is `dynamic_material` and out of the bakes, its shading run uploads every frame and its
-  shading has one byte location to patch. A 2D shape or text that a material transition did not
+  slot is `dynamic_material`, its shading run uploads every frame and its shading has one byte
+  location to patch. A mesh under a `Tint` transition stays in the bakes, which ignore `Tint`;
+  `TransitionOpacity` below keeps one under an `Opacity` transition out of them. A 2D shape or text that a material transition did not
   list joins the shadings to patch.
 - Every drawn entity at or below a node with an active `Opacity` transition also carries the
   private tag `TransitionOpacity` (`(OnInstantiate, DontInherit)`). `box_draws_key` and the
@@ -586,6 +595,13 @@ transition systems after checking a few counts. The sizes of the four packet rec
 - `Transition_prefab_rgb_idle` and `Transition_prefab_rgb_active`: one prefab with `Rgb` and
   `Transition` and 10,000 mesh instances, the cost of the walk of `IsA` instances, with the
   `material_visited` counter.
+- `Transition_casters_*` and `Transition_shadeless_move_1000_shadows`: the range math of the
+  shadow regions. They use their own scene, a lit view, a floor and 16 spot lights over 1000
+  boxes, and restart the targets every frame. The cases are 1000 moving casters with shadow
+  tiles on and off (`move_1000_shadows`, `move_1000_no_shadows`), 1000 casters turning and
+  scaling (`turn_1000_shadows`), one turning box with 1000 plain caster children
+  (`parent_1000_shadows`), and 1000 moving boxes with `NoShadow` (`shadeless`), which carry no
+  range. The `shadow_record` counter is 1 while the shadow tiles are on.
 
 Each scene case reports `transitions_ms`, the time per frame in the two transition systems of
 the extract, which a world without `Transition` keeps at the noise level, and
@@ -627,6 +643,22 @@ idle at the level of `Transition_none_static` (0.00024 ms in the transition syst
 0.014 ms frame, against 0.30 ms and 0.368 ms when every instance was a node), and while the
 prefab's `Rgb` runs the walk visits the prefab alone (`material_visited` 1). The resolver returns
 from a packet without records in 1.5 ns.
+
+The caster cases, from a release build on the same machine, are the medians of 5 runs
+alternated with a build without the range math, on a busy machine (about 10% noise). The
+range math is the `transitions_ms` of `casters_move_1000_shadows` minus that of
+`casters_move_1000_no_shadows`. Plain products for single matrices, sines of fixed axes, three
+row regions and the per term bounds took it from 0.12 ms (21% of the frame) to 0.045 ms (10%).
+With the caster check, 1000 boxes with `NoShadow` pay only that check (a 0.35 ms frame, 0.41
+ms without it).
+
+| Case (`Transition_`)            | Frame (ms) | `transitions_ms` | No range math (ms) |
+|---------------------------------|-----------:|-----------------:|-------------------:|
+| `casters_move_1000_shadows`     |      0.446 |            0.158 |              0.445 |
+| `casters_move_1000_no_shadows`  |      0.342 |            0.113 |              0.347 |
+| `casters_turn_1000_shadows`     |      0.595 |            0.229 |              0.566 |
+| `casters_parent_1000_shadows`   |      0.213 |            0.055 |              0.271 |
+| `shadeless_move_1000_shadows`   |      0.319 |            0.122 |                  - |
 
 ## Tests
 

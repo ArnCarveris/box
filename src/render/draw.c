@@ -564,7 +564,6 @@ static void box_draws_key(
 
     key->bake = !shape2d && key->blend == Opaque && !ecs_has_id(world, e, DynamicTransform) &&
         !ecs_has_id(world, e, TransitionTransform) &&
-        !ecs_has_id(world, e, TransitionMaterial) &&
         !ecs_has_id(world, e, ManualTransform) && !ecs_has_id(world, e, NoBake) &&
         !box_projection_anchored(world, e) && box_draws_baked(world, key->scene);
 }

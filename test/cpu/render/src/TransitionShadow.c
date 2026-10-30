@@ -287,6 +287,35 @@ void TransitionShadow_plain_child(void) {
     tr_fini(world, null);
 }
 
+/* A parent without a shape moves a caster child: the parent has no caster slot of its own but
+ * needs its range for the child, whose regions hold the pose it renders */
+void TransitionShadow_group_parent(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    box_render_shadow_region_t bounds;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_vec_t *regions = tr_regions(world);
+    ecs_entity_t parent = ecs_new(world);
+    ecs_set(world, parent, Position, {0, 0, 0});
+    ecs_entity_t child = tr_shape(world, parent, 1);
+    box_transition_set(world, parent, ecs_id(Position), &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+
+    ecs_set(world, parent, Position, {4, 0, 0});
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        ecs_vec_clear(regions);
+        tr_frame(world);
+        tr_rendered_bounds(world, null, child, &bounds);
+        tr_test_regions(regions, &bounds, 0.4f, 5.6f);
+    }
+
+    tr_frame(world);
+    tr_frame(world);
+    tr_test_static(world, null, child);
+    tr_fini(world, null);
+}
+
 /** Get the world bounds of the local bounds of the ShapeMesh of an entity at the transform the
  * backend got in the last packet, without the region math of the draws.
  *
@@ -381,5 +410,132 @@ void TransitionShadow_surface_instance(void) {
     tr_frame(world);
     tr_test_within(regions, -4.1f, 8.1f);
     tr_test_static(world, null, e);
+    tr_fini(world, null);
+}
+
+/** Get the range of a product with the interval math of every element, the reference of the
+ * plain products box_draws_range_mul takes for a single matrix.
+ *
+ * @param a The range of the left matrix
+ * @param b The range of the right matrix
+ * @param out Receives the range of a * b
+ */
+static void tr_range_reference(
+    const box_draw_transition_range_t *a,
+    const box_draw_transition_range_t *b,
+    box_draw_transition_range_t *out)
+{
+    int32_t col, row, k;
+    for (col = 0; col < 4; col ++) {
+        for (row = 0; row < 4; row ++) {
+            float lo = 0.0f, hi = 0.0f;
+            for (k = 0; k < 4; k ++) {
+                float p0 = a->lo[k][row] * b->lo[col][k];
+                float p1 = a->lo[k][row] * b->hi[col][k];
+                float p2 = a->hi[k][row] * b->lo[col][k];
+                float p3 = a->hi[k][row] * b->hi[col][k];
+                lo += glm_min(glm_min(p0, p1), glm_min(p2, p3));
+                hi += glm_max(glm_max(p0, p1), glm_max(p2, p3));
+            }
+
+            out->lo[col][row] = lo;
+            out->hi[col][row] = hi;
+        }
+    }
+}
+
+/* The product of ranges with a single matrix on either side, or both, matches the interval
+ * math bit for bit, and that of two single matrices is their glm_mul */
+void TransitionShadow_range_mul_single(void) {
+    // engine_core/transition
+    box_draw_transition_range_t single, range, got, expected;
+    const box_draw_transition_range_t *pairs[4][2] = {
+        {&single, &range}, {&range, &single}, {&single, &single}, {&range, &range}
+    };
+    mat4 m, product;
+    int32_t i, col, row;
+    for (col = 0; col < 4; col ++) {
+        for (row = 0; row < 4; row ++) {
+            float v = (float)((col * 7 + row * 5) % 11) * 0.37f - 1.8f;
+            m[col][row] = v;
+            range.lo[col][row] = -v * 0.5f - 0.25f;
+            range.hi[col][row] = range.lo[col][row] + (float)((col + row) % 3) * 0.6f;
+        }
+    }
+
+    box_draws_range_point(m, &single);
+    for (i = 0; i < 4; i ++) {
+        box_draws_range_mul(pairs[i][0], pairs[i][1], &got);
+        tr_range_reference(pairs[i][0], pairs[i][1], &expected);
+        test_assert(!ecs_os_memcmp_t(&got, &expected, box_draw_transition_range_t));
+    }
+
+    box_draws_range_mul(&single, &single, &got);
+    glm_mat4_mul(m, m, product);
+    for (col = 0; col < 4; col ++) {
+        for (row = 0; row < 4; row ++) {
+            test_assert(got.lo[col][row] == got.hi[col][row]);
+            test_flt(got.lo[col][row], product[col][row]);
+        }
+    }
+
+    tr_range_reference(&single, &range, &expected);
+    box_draws_range_mul(&single, &range, &range);
+    test_assert(!ecs_os_memcmp_t(&range, &expected, box_draw_transition_range_t));
+}
+
+/* The bounds of a slot at every transform between two transforms are those of the 8 corners of
+ * its local bounds, bit for bit, for terms of either sign and transforms that are equal */
+void TransitionShadow_bounds_corners(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    box_render_shadow_region_t got, expected;
+    box_render_transform_t lo, hi;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_entity_t e = tr_shape(world, 0, 1);
+    tr_frame(world);
+
+    box_draw_batch_t *b = tr_batch(world, e);
+    const box_mesh_t *mesh = box_mesh_cache_get(box_mesh_cache_of(world), b->key.mesh);
+    test_assert(mesh != NULL);
+    int32_t i, c, r, k;
+    for (i = 0; i < 2; i ++) {
+        for (r = 0; r < 3; r ++) {
+            for (k = 0; k < 4; k ++) {
+                lo.rows[r][k] = (float)((r * 5 + k * 3) % 7) * 0.43f - 1.3f;
+                hi.rows[r][k] = i ? lo.rows[r][k] :
+                    lo.rows[r][k] + (float)((r + k) % 3) * 0.71f;
+            }
+        }
+
+        test_assert(box_draws_shadow_bounds(world, b, &lo, &hi, NULL, &got));
+        glm_vec3_fill(expected.min, FLT_MAX);
+        glm_vec3_fill(expected.max, -FLT_MAX);
+        for (c = 0; c < 8; c ++) {
+            vec3 local = {
+                (c & 1) ? mesh->max[0] : mesh->min[0],
+                (c & 2) ? mesh->max[1] : mesh->min[1],
+                (c & 4) ? mesh->max[2] : mesh->min[2]
+            };
+            for (r = 0; r < 3; r ++) {
+                float world_lo = 0.0f, world_hi = 0.0f;
+                for (k = 0; k < 3; k ++) {
+                    float a = lo.rows[r][k] * local[k], z = hi.rows[r][k] * local[k];
+                    world_lo += glm_min(a, z);
+                    world_hi += glm_max(a, z);
+                }
+
+                world_lo += lo.rows[r][3];
+                world_hi += hi.rows[r][3];
+                expected.min[r] = glm_min(expected.min[r], world_lo);
+                expected.max[r] = glm_max(expected.max[r], world_hi);
+            }
+        }
+
+        test_assert(got.scene == b->key.scene);
+        test_assert(!ecs_os_memcmp_t(&got.min, &expected.min, vec3));
+        test_assert(!ecs_os_memcmp_t(&got.max, &expected.max, vec3));
+    }
+
     tr_fini(world, null);
 }

@@ -723,6 +723,7 @@ static void box_gpu_bake_face(
     glm_mat4_mul(proj, rv->view_matrix, u->view_proj);
     glm_vec3_copy(eye, u->camera);
     u->camera[3] = 1;
+    u->reflection[1] = 1;
     u->viewport[0] = edge;
     u->viewport[1] = edge;
     u->viewport[2] = 1.0f / edge;

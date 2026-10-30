@@ -222,7 +222,9 @@ struct VertexShading {
 
 fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material) -> VertexShading {
     var o: VertexShading;
-    o.color = vec4f(material_color(material, mesh_shading_tint(shading)), shading.alpha);
+    let tint = select(mesh_shading_tint(shading), vec4f(0.0, 0.0, 0.0, 1.0),
+        view.reflection.y != 0u);
+    o.color = vec4f(material_color(material, tint), shading.alpha);
     o.material = vec2f(material.metallic, material.roughness);
     o.uv = v.uv * material.uv.xy + material.uv.zw;
     if (surface_data.p[0].x != 0.0) {
