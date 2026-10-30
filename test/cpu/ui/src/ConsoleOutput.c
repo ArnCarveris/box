@@ -319,6 +319,65 @@ static void output_fail_cmd(
     ecs_err("bad thing happened\n    1 + \n        ^");
 }
 
+/** Callback of the test command failnl: logs an error with a source excerpt below it that ends
+ * in a newline.
+ *
+ * @param ctx Call context
+ * @param argc Number of arguments
+ * @param argv The arguments
+ * @param result Unused
+ */
+static void output_fail_nl_cmd(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_value_t *result)
+{
+    (void)ctx; (void)argc; (void)argv; (void)result;
+    ecs_err("bad thing happened\n    1 + \n        ^\n");
+}
+
+/** Callback of the test command failone: logs a one line error that ends in a newline.
+ *
+ * @param ctx Call context
+ * @param argc Number of arguments
+ * @param argv The arguments
+ * @param result Unused
+ */
+static void output_fail_one_cmd(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_value_t *result)
+{
+    (void)ctx; (void)argc; (void)argv; (void)result;
+    ecs_err("just this\n");
+}
+
+/** Add a component with a string member, Label { label }, to an entity.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param label The string
+ */
+static void output_label(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    const char *label)
+{
+    ecs_entity_t c = ecs_lookup(world, "Label");
+    if (!c) {
+        c = ecs_struct(world, {
+            .entity = ecs_entity(world, { .name = "Label" }),
+            .members = {{ .name = "label", .type = ecs_id(ecs_string_t) }}
+        });
+    }
+
+    test_assert(c != 0);
+    char *str = (char*)label;
+    ecs_set_id(world, e, c, sizeof(char*), &str);
+}
+
 /** Register a test command in the scope of the box commands.
  *
  * @param world The world
@@ -702,6 +761,179 @@ void ConsoleOutput_text_differs_from_command(void) {
     test_assert(strstr(plain, "`- ") == NULL);
     test_assert(strstr(plain, "\"depth\"") != NULL);
     ecs_os_free(plain);
+
+    ecs_fini(world);
+}
+
+void ConsoleOutput_grep_case(void) {
+    // console/output
+    ecs_world_t *world = output_world();
+    ecs_entity_t e = ecs_entity(world, { .name = "alpha" });
+    output_label(world, e, "Alpha alpine");
+    output_run(world, "grep Alp");
+
+    // grep is case sensitive: the name does not match, only the exact case is marked
+    const ConsoleOutput *o = output_colors(world);
+    test_assert(output_find(world, "alpha", true) == 0);
+    ecs_entity_t row = output_find(world, "alpha  Label: ", false);
+    output_check(world, row, 0, 5, &o->entity);
+    output_check_part(world, row, "Alp", &o->match);
+    const char *text = output_text(world, row);
+    const char *alpine = strstr(text, "alpine");
+    test_assert(alpine != NULL);
+    output_check(world, row, (int32_t)(alpine - text), (int32_t)(alpine - text) + 3, NULL);
+
+    // grep_i folds the case, both occurrences and the name are marked
+    output_run(world, "grep_i Alp");
+    ecs_entity_t name = output_find(world, "alpha", true);
+    output_check(world, name, 0, 3, &o->match);
+    output_check(world, name, 3, 5, &o->entity);
+    row = output_find(world, "alpha  Label: ", false);
+    output_check(world, row, 0, 5, &o->entity);
+    output_check_part(world, row, "Alp", &o->match);
+    text = output_text(world, row);
+    alpine = strstr(text, "alpine");
+    test_assert(alpine != NULL);
+    output_check(world, row, (int32_t)(alpine - text), (int32_t)(alpine - text) + 3, &o->match);
+
+    ecs_fini(world);
+}
+
+void ConsoleOutput_find_match(void) {
+    // console/output
+    ecs_world_t *world = output_world();
+    ecs_entity(world, { .name = "alps.alpha" });
+    ecs_entity(world, { .name = "alps.beta" });
+    output_run(world, "find alp");
+
+    // find matches names only, the parent part of the path is not marked
+    const ConsoleOutput *o = output_colors(world);
+    ecs_entity_t alpha = output_find(world, "alps.alpha", true);
+    output_check(world, alpha, 0, 5, &o->dim);
+    output_check(world, alpha, 5, 8, &o->match);
+    output_check(world, alpha, 8, 10, &o->entity);
+    ecs_entity_t alps = output_find(world, "alps", true);
+    output_check(world, alps, 0, 3, &o->match);
+    output_check(world, alps, 3, 4, &o->entity);
+    test_assert(output_find(world, "alps.beta", true) == 0);
+
+    // Other commands that return entities mark nothing
+    output_run(world, "ls alps");
+    alpha = output_find(world, "alps.alpha", true);
+    output_check(world, alpha, 0, 5, &o->dim);
+    output_check(world, alpha, 5, 10, &o->entity);
+
+    ecs_fini(world);
+}
+
+void ConsoleOutput_tree_many_children(void) {
+    // console/output
+    ecs_world_t *world = output_world();
+    ecs_entity_t big = ecs_entity(world, { .name = "things.big" });
+    ecs_entity_t last = 0;
+    int32_t i;
+    for (i = 0; i < 20000; i ++) {
+        char name[16];
+        ecs_os_snprintf(name, sizeof(name), "c%05d", i);
+        last = ecs_entity(world, { .name = name, .parent = big });
+    }
+
+    ecs_entity(world, { .name = "leaf", .parent = last });
+    char *text = box_console_run(world, "tree things", NULL);
+    ecs_progress(world, 0);
+    test_assert(!strncmp(text, "big\n|- c00000\n|- c00001\n", 24));
+    test_assert(strstr(text, "\n|- c10000\n") != NULL);
+    size_t len = strlen(text);
+    const char *end = "\n|- c19998\n`- c19999\n   `- leaf";
+    test_assert(len > strlen(end));
+    test_str(&text[len - strlen(end)], end);
+    ecs_os_free(text);
+
+    const ConsoleOutput *o = output_colors(world);
+    ecs_entity_t row = output_find(world, "`- c19999", true);
+    output_check(world, row, 0, 3, &o->dim);
+    output_check(world, row, 3, 9, &o->entity);
+    ecs_entity_t leaf = output_find(world, "   `- leaf", true);
+    output_check(world, leaf, 0, 6, &o->dim);
+    output_check(world, leaf, 6, 10, &o->entity);
+    row = output_find(world, "|- c19998", true);
+    output_check(world, row, 0, 3, &o->dim);
+    output_check(world, row, 3, 9, &o->entity);
+
+    ecs_fini(world);
+}
+
+void ConsoleOutput_error_no_blank_line(void) {
+    // console/output
+    ecs_world_t *world = output_world();
+    output_command(world, "failnl", output_fail_nl_cmd, false);
+    char *text = box_console_run(world, "failnl", NULL);
+    ecs_progress(world, 0);
+    size_t len = strlen(text);
+    test_assert(len > 0);
+    test_assert(text[len - 1] == '^');
+    ecs_os_free(text);
+
+    const ConsoleOutput *o = output_colors(world);
+    ecs_entity_t err = output_find(world, "error: bad thing happened", true);
+    ecs_entity_t detail = output_next(world, err);
+    test_str(output_text(world, detail), "    1 + ");
+    ecs_entity_t caret = output_next(world, detail);
+    test_str(output_text(world, caret), "        ^");
+    output_check(world, caret, 0, -1, &o->dim);
+    test_assert(output_find(world, "        ^", true) == caret);
+
+    // The error of a builtin command with its source excerpt
+    text = box_console_run(world, "rm nothing", NULL);
+    ecs_progress(world, 0);
+    len = strlen(text);
+    test_assert(len > 0);
+    test_assert(text[len - 1] != '\n');
+    test_assert(text[len - 1] != '\r');
+    ecs_os_free(text);
+
+    // A one line error that ends in a newline has no detail
+    output_command(world, "failone", output_fail_one_cmd, false);
+    text = box_console_run(world, "failone", NULL);
+    test_str(text, "error: just this");
+    ecs_os_free(text);
+
+    ecs_fini(world);
+}
+
+void ConsoleOutput_script_block_comment(void) {
+    // console/output
+    ecs_world_t *world = output_world();
+    ecs_entity_t s = ecs_script(world, {
+        .entity = ecs_entity(world, { .name = "level" }),
+        .code = "e {}\n/* one\n   two\n   three */ f {}\n// a /* b\nh {}"
+    });
+    test_assert(s != 0);
+    output_run(world, "script_read level");
+
+    const ConsoleOutput *o = output_colors(world);
+    ecs_entity_t first = output_find(world, "2  /* one", true);
+    output_check(world, first, 0, 1, &o->dim);
+    output_check(world, first, 3, -1, &o->dim);
+    ecs_entity_t two = output_find(world, "3     two", true);
+    output_check(world, two, 0, 1, &o->dim);
+    output_check(world, two, 3, -1, &o->dim);
+    ecs_entity_t three = output_find(world, "4     three */ f {}", true);
+    output_check(world, three, 3, 14, &o->dim);
+    output_check(world, three, 14, 15, NULL);
+    output_check(world, three, 15, 16, &o->entity);
+
+    // A /* in a line comment does not start a block comment
+    ecs_entity_t note = output_find(world, "5  // a /* b", true);
+    output_check(world, note, 3, -1, &o->dim);
+    ecs_entity_t h = output_find(world, "6  h {}", true);
+    output_check(world, h, 3, 4, &o->entity);
+    output_check(world, h, 4, -1, NULL);
+
+    // The state does not carry into the next command
+    output_run(world, "script_read level");
+    ecs_entity_t e = output_find(world, "1  e {}", true);
+    output_check(world, e, 3, 4, &o->entity);
 
     ecs_fini(world);
 }

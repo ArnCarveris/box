@@ -450,7 +450,12 @@
                     "ansi_string",
                     "string_plain",
                     "restyle_keeps_text",
-                    "text_differs_from_command"
+                    "text_differs_from_command",
+                    "grep_case",
+                    "find_match",
+                    "tree_many_children",
+                    "error_no_blank_line",
+                    "script_block_comment"
                 ]
             },
             {
