@@ -405,6 +405,85 @@ void FpsPanel_engine_records_samples(void) {
     ecs_fini(world);
 }
 
+/** Count the OnSet events of FrameSamples in the int32_t of the observer context. The term has
+ * a fixed source, so it->count is 0 and each call is one event.
+ *
+ * @param it Iterator of the observer
+ */
+static void fps_samples_on_set(
+    ecs_iter_t *it)
+{
+    int32_t *fired = it->ctx;
+    (*fired) ++;
+}
+
+/** Observe OnSet of FrameSamples.
+ *
+ * @param world The world
+ * @param fired The counter of events
+ */
+static void fps_observe_samples(
+    ecs_world_t *world,
+    int32_t *fired)
+{
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(FrameSamples), .src.id = ecs_id(FrameSamples) }},
+        .events = { EcsOnSet },
+        .callback = fps_samples_on_set,
+        .ctx = fired
+    });
+}
+
+void FpsPanel_engine_notifies_samples(void) {
+    // fps/panel
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    int32_t fired = 0;
+    fps_observe_samples(world, &fired);
+    for (int32_t i = 0; i < 4; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    const FrameSamples *samples = ecs_singleton_get(world, FrameSamples);
+    test_assert(samples->count > 0);
+    test_int(fired, samples->count);
+
+    int32_t before = fired;
+    int32_t count = samples->count;
+    ecs_progress(world, 0);
+    test_int(ecs_singleton_get(world, FrameSamples)->count, count + 1);
+    test_int(fired, before + 1);
+
+    ecs_fini(world);
+}
+
+void FpsPanel_engine_hold_no_notify(void) {
+    // fps/panel
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+
+    int32_t fired = 0;
+    fps_observe_samples(world, &fired);
+    FrameSamples *held = ecs_singleton_get_mut(world, FrameSamples);
+    held->hold = true;
+    held->count = 0;
+    held->next = 0;
+    ecs_singleton_modified(world, FrameSamples);
+    test_int(fired, 1);
+
+    fired = 0;
+    for (int32_t i = 0; i < 4; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    test_int(fired, 0);
+    test_int(ecs_singleton_get(world, FrameSamples)->count, 0);
+
+    ecs_fini(world);
+}
+
 void FpsPanel_bars_follow_samples(void) {
     // fps/panel
     ecs_world_t *world = fps_world();

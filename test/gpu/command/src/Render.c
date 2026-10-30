@@ -8,11 +8,37 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include "render.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_STATIC
 #include <stb_image.h>
+
+/** Working directory of the test process, restored by the teardown */
+static char render_cwd[4096];
+
+/** Directory of the test process, so that the resources of the shell sessions of tests that
+ * run in parallel do not share a folder: flecs names it by the session id, which is the same in
+ * every test, and removes it when the session closes. The engine finds its files, such as the
+ * shaders, from a parent of the working directory. */
+static char render_dir[64];
+
+void Render_setup(void) {
+    test_assert(getcwd(render_cwd, sizeof(render_cwd)) != NULL);
+    snprintf(render_dir, sizeof(render_dir), ".flecs/command_gpu_%d", (int)getpid());
+    mkdir(".flecs", 0700);
+    test_int(mkdir(render_dir, 0700), 0);
+    test_int(chdir(render_dir), 0);
+}
+
+void Render_teardown(void) {
+    rmdir(".flecs/shell");
+    rmdir(".flecs");
+    test_int(chdir(render_cwd), 0);
+    test_int(rmdir(render_dir), 0);
+}
 
 void Render_capture_active_camera(void) {
     // command/render

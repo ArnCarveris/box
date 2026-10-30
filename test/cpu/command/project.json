@@ -10,7 +10,8 @@
     "lang.c": {
         "include": [
             "../../../src/command",
-            "../../../src/render"
+            "../../../src/render",
+            "../../../src/geometry"
         ]
     },
     "test": {
@@ -126,6 +127,27 @@
                 "id": "Particle",
                 "testcases": [
                     "playback_states"
+                ]
+            },
+            {
+                "id": "Fit",
+                "testcases": [
+                    "frames_scene",
+                    "keeps_direction",
+                    "named_camera",
+                    "skips_other_scene",
+                    "skips_camera_children",
+                    "skips_prefab_and_disabled",
+                    "skips_console_and_editor",
+                    "orthographic",
+                    "camera_with_parent",
+                    "camera_controller",
+                    "rotated_mesh",
+                    "small_mesh",
+                    "no_content",
+                    "no_active_camera",
+                    "not_a_camera",
+                    "help_lists_fit"
                 ]
             }
         ]
