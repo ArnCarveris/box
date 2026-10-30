@@ -330,9 +330,6 @@ done:
 
 /** System that updates the cameras, targets and gallery layout of design mode.
  *
- * Only a window's SurfaceStatus overrides the requested Surface size: offscreen the status
- * is the requested size of the last render extract, a frame behind a change of the request.
- *
  * @param it The iterator.
  */
 static void BoxDesignUpdate(
@@ -380,8 +377,7 @@ static void BoxDesignUpdate(
 
     const SurfaceStatus *status = ecs_get(world, design->surface, SurfaceStatus);
     float point_width, point_height;
-    box_surface_point_size(surface, status && status->window ? status : NULL,
-        &point_width, &point_height);
+    box_surface_point_size(surface, status, &point_width, &point_height);
     int32_t width = (int32_t)point_width;
     int32_t height = (int32_t)point_height;
     width = width > 1 ? width : 2;

@@ -85,9 +85,10 @@ ECS_STRUCT(SurfaceStatus, {
 
 /** Get the size of a surface in points.
  *
- * The size in SurfaceStatus when it is set (both point sizes above 0), else the requested
- * Surface size: a window resize only updates SurfaceStatus, not the requested size. Without
- * either the size is 0.
+ * For a window the size in SurfaceStatus when it is set (both point sizes above 0): a window
+ * resize only updates SurfaceStatus, not the requested size. Else the requested Surface size:
+ * offscreen the status is a copy of the request written at render extract, so it is a frame
+ * behind a change of the request. Without either the size is 0.
  *
  * @param surface The surface, NULL when it has none
  * @param status The status of the surface, NULL when it has none yet
