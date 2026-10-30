@@ -292,8 +292,11 @@ thread) and the encoding in `src/render/batch.c` and `src/render/materials.c`.
   material transition, before the batches are sent, the extract walks the entity of each node
   with an active material transition and its `IsA` instances, down every level. A slot reads
   its value from its owner or an `IsA` base of it, so this reaches every affected slot, and
-  since `Transition` is inherited over `IsA` it visits only entities with `Transition`. Each
-  visited entity that owns a slot (`box_draw_materials_t.owned`) and reads an active node
+  since `Transition` is inherited over `IsA` it visits only entities with `Transition`. The
+  instances are checked per table: a table whose entities own no slot (no `MaterialId` of their
+  own) and have no 2D or text shading is skipped, except for those of its entities that are
+  `IsA` bases themselves, so a prefab with 10,000 mesh instances that inherit its `Rgb` visits
+  the prefab alone. Each visited entity that owns a slot (`box_draw_materials_t.owned`) and reads an active node
   marks its slot to upload in the frame; the slots of other owners are not visited. The send
   records where each run of the table went in the packet data
   (`box_draw_materials_t.uploaded`); after the batches, one `MATERIAL` record per slot carries
@@ -428,5 +431,31 @@ The only observers the module adds are the OnSet validation of `Transition` itse
 private tags, which only entities a transition patches ever get. A frame without an active
 `Tint` or `Opacity` transition walks no entity for them. The material table records the runs it uploads, one
 entry per run. A frame without an active material transition walks no slot or entity, and a
-frame with one visits only the entities of its nodes and their `IsA` instances, never the other
-owners of the material table.
+frame with one visits only the entities of its nodes and those of their `IsA` instances that
+own a slot, have 2D or text shading or are bases themselves, never the other owners of the
+material table.
+
+The slot system (`RenderExtractTransitionSlots`) stores the state of the batches when it is
+registered, so no frame looks it up by name, and a world without `Transition` returns from both
+transition systems after checking a few counts. The sizes of the four packet records are
+`_Static_assert`ed in `src/render/batch.c` and checked by `Transition_record_sizes` of
+`test/cpu/render`.
+
+### Measuring it
+
+`bench/render` (`Transition.c`) has the cases that measure it, each against the same scene of
+100k static and 10k dynamic shapes:
+
+- `Transition_none_static` and `Transition_none_dynamic`: no `Transition`, without and with 1%
+  of the static shapes moved per frame.
+- `Transition_one_idle` and `Transition_one_active`: the same scene with `Transition` on one
+  shape, idle or restarted every frame, to show that the other shapes don't pay.
+- `Transition_idle_1000` and `Transition_active_1000`: 1000 shapes with `Transition`, idle and
+  active, the cost to users of the feature.
+- `Transition_prefab_rgb_idle` and `Transition_prefab_rgb_active`: one prefab with `Rgb` and
+  `Transition` and 10,000 mesh instances, the cost of the walk of `IsA` instances, with the
+  `material_visited` counter.
+
+Each case reports `transitions_ms` and `resolve_ms`, the time per frame in the two transition
+systems of the extract and in the resolver, which a world without `Transition` keeps at the
+noise level.

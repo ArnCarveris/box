@@ -2,7 +2,7 @@
     "id": "bench_render",
     "type": "application",
     "value": {
-        "description": "Benchmarks for the packet data, the extract of the instanced batches and lights, the shadow pass, the frustum and occlusion cull passes, the effect passes, the baked lighting, prefab instantiation the atmosphere extract and the particle passes of box.render",
+        "description": "Benchmarks for the packet data, the extract of the instanced batches and lights, the shadow pass, the frustum and occlusion cull passes, the effect passes, the baked lighting, prefab instantiation, the atmosphere extract, the particle passes and the transitions of box.render",
         "public": false,
         "use": [
             "box"
@@ -27,6 +27,20 @@
                     "unchanged",
                     "changed_1pct",
                     "baked_idle"
+                ]
+            },
+            {
+                "id": "Transition",
+                "benchcases": [
+                    "none_static",
+                    "none_dynamic",
+                    "one_idle",
+                    "one_active",
+                    "idle_1000",
+                    "active_1000",
+                    "prefab_rgb_idle",
+                    "prefab_rgb_active",
+                    "resolve_empty"
                 ]
             },
             {

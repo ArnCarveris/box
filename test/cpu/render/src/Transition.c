@@ -1776,3 +1776,89 @@ void Transition_transform_text_and_2d(void) {
     tr_test_glyphs(world, null, text, &(Position){40, 1, 0}, false);
     tr_fini(world, null);
 }
+
+void Transition_record_sizes(void) {
+    // engine_core/transition
+    test_int(ECS_SIZEOF(box_render_transform_t), 48);
+    test_int(ECS_SIZEOF(box_render_mesh_shading_t), 16);
+    test_int(ECS_SIZEOF(box_render_shading_t), 80);
+    test_int(ECS_SIZEOF(box_render_material_t), 48);
+}
+
+void Transition_idle_no_work(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_world(&null);
+    box_render_transitions_t *s = box_render_transitions_get(world);
+    ecs_entity_t shapes[64];
+    int32_t i, frame;
+    for (i = 0; i < 64; i ++) {
+        shapes[i] = ecs_new(world);
+        if (i % 2) {
+            ecs_add(world, shapes[i], DynamicTransform);
+        }
+
+        ecs_set(world, shapes[i], Position, {(float)i, 0, 0});
+        ecs_set(world, shapes[i], Box, {1, 1, 1});
+        ecs_set(world, shapes[i], Rgb, {200, 100, 50});
+    }
+
+    ecs_entity_t rect = ecs_new(world);
+    ecs_set(world, rect, Position, {0, 8, 0});
+    ecs_set(world, rect, Rect, {10, 20});
+    for (frame = 0; frame < 4; frame ++) {
+        for (i = 0; i < 64; i ++) {
+            ecs_set(world, shapes[i], Position, {(float)i, (float)frame, 0});
+            ecs_set(world, shapes[i], Rgb, {(uint8_t)(frame * 10), 100, 50});
+        }
+
+        tr_frame(world);
+        test_int(box_render_transition_test_active(world), 0);
+        test_int(box_render_transitions_material_visited(s), 0);
+        test_int(ecs_vec_count(&null->last.transitions), 0);
+    }
+
+    test_int(null->transitions, 0);
+    for (i = 0; i < 64; i ++) {
+        test_int(box_render_transition_test_node(world, shapes[i]), 0);
+        test_assert(!ecs_has_id(world, shapes[i], TransitionTransform));
+        test_assert(!ecs_has_id(world, shapes[i], TransitionMaterial));
+        test_assert(!ecs_has_id(world, shapes[i], TransitionOpacity));
+    }
+
+    ecs_entity_t q = ecs_lookup(world, "box.render.RenderTransitions");
+    test_assert(q != 0);
+    test_int(ecs_query_count(ecs_query_get(world, q)).tables, 0);
+
+    ecs_entity_t extract = ecs_lookup(world, "box.render.RenderExtractTransitions");
+    ecs_entity_t slots = ecs_lookup(world, "box.render.RenderExtractTransitionSlots");
+    test_assert(extract != 0);
+    test_assert(slots != 0);
+    box_render_transition_table_t t;
+    box_render_packet_t p;
+    box_render_transition_table_init(&t);
+    box_render_packet_init(&p);
+    tr_malloc_prev = ecs_os_api.malloc_;
+    tr_realloc_prev = ecs_os_api.realloc_;
+    tr_calloc_prev = ecs_os_api.calloc_;
+    ecs_os_api.malloc_ = tr_malloc;
+    ecs_os_api.realloc_ = tr_realloc;
+    ecs_os_api.calloc_ = tr_calloc;
+    tr_allocs = 0;
+    for (frame = 0; frame < 8; frame ++) {
+        ecs_run(world, extract, 0, NULL);
+        ecs_run(world, slots, 0, NULL);
+        box_render_transition_resolve(&t, &p);
+    }
+
+    ecs_os_api.malloc_ = tr_malloc_prev;
+    ecs_os_api.realloc_ = tr_realloc_prev;
+    ecs_os_api.calloc_ = tr_calloc_prev;
+    test_int(tr_allocs, 0);
+    test_int(box_render_transition_table_active(&t), 0);
+    test_int(ecs_vec_count(&p.transitions), 0);
+    box_render_packet_fini(&p);
+    box_render_transition_table_fini(&t);
+
+    tr_fini(world, null);
+}
