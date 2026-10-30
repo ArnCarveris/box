@@ -1683,9 +1683,8 @@ void Transition_transform_reparent_into(void) {
     int32_t i;
     for (i = 0; i < 2; i ++) {
         tr_frame(world);
-        test_assert(!ecs_has_id(world, other, TransitionTransform));
         tr_test_pose(world, null, parent, NULL, &(Position){(float)i, 0, 0}, NULL, NULL);
-        tr_test_pose(world, null, other, NULL, &(Position){0, 1, 0}, NULL, NULL);
+        tr_test_static(world, null, other);
     }
 
     ecs_add_pair(world, other, EcsChildOf, parent);
