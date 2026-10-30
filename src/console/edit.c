@@ -966,6 +966,7 @@ void box_console_edit_fini(
     box_console_complete_close(con);
     ecs_vec_fini_t(NULL, &con->complete.candidates, box_console_candidate_t);
     ecs_os_free(con->colored);
+    ecs_os_free(con->prompted);
     ecs_os_free(con->draft);
     ecs_os_free(con->line);
 }
