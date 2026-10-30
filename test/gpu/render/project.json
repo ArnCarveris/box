@@ -479,7 +479,9 @@
                     "bake_ignores_cookie",
                     "noise_coverage",
                     "steep_surface_lod",
-                    "light_projection_lod_unchanged"
+                    "light_projection_lod_unchanged",
+                    "grazing_view_lod",
+                    "steep_surface_keeps_horizontal_detail"
                 ]
             },
             {

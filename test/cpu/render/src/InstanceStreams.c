@@ -557,13 +557,30 @@ static float slot_x(
     return box_draws_slot_transform(box_draws_batch(s->ctx, slot->batch), slot->slot)->rows[0][3];
 }
 
+/** Create a headless world for texts: its frames wait for the font and glyph jobs in flight,
+ * so the default font is loaded once the first text is laid out.
+ *
+ * @param null Receives the backend
+ * @return The world
+ */
+static ecs_world_t* text_world_new(
+    box_render_null_t **null)
+{
+    ecs_world_t *world = world_new(null);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    return world;
+}
+
 /** A disabled mesh shape, 2D shape and text leave their batches, and take their slots again
  * once enabled.
  */
 void InstanceStreams_disabled_shapes_leave_batches(void) {
     // renderer/draws
     box_render_null_t *null;
-    ecs_world_t *world = world_new(&null);
+    ecs_world_t *world = text_world_new(&null);
     ecs_entity_t mesh = box_new(world, 0, 0);
     ecs_entity_t rect = ecs_new(world);
     ecs_set(world, rect, Position, {0, 0, 0});
@@ -658,23 +675,6 @@ void InstanceStreams_created_disabled_draws_once_enabled(void) {
 
     ecs_fini(world);
     box_render_null_free(null);
-}
-
-/** Create a headless world for texts: its frames wait for the font and glyph jobs in flight,
- * so the default font is loaded once the first text is laid out.
- *
- * @param null Receives the backend
- * @return The world
- */
-static ecs_world_t* text_world_new(
-    box_render_null_t **null)
-{
-    ecs_world_t *world = world_new(null);
-    App *app = ecs_singleton_get_mut(world, App);
-    app->headless = true;
-    ecs_singleton_modified(world, App);
-
-    return world;
 }
 
 /** Create a text with the default font.
