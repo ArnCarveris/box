@@ -535,7 +535,8 @@ static void trans_same_batch(
 void Transition_transmission_mid_transition(void) {
     // engine_core/transition
     const int32_t bg[3] = {200, 220, 230}, red[3] = {255, 60, 60};
-    int32_t black[3] = {0, 0, 0}, tinted[3], c;
+    const int32_t black[3] = {0, 0, 0};
+    int32_t tinted[3], c;
     for (c = 0; c < 3; c ++) {
         tinted[c] = trans_srgb(trans_lin(bg[c]) * trans_lin(red[c]));
     }
@@ -580,7 +581,7 @@ void Transition_transmission_mid_transition(void) {
     test_assert(abs(trans_channel(px, 2, 2, 0) - bg[0]) <= 2);
     test_assert(abs(trans_channel(px, 2, 2, 1) - bg[1]) <= 2);
     test_assert(abs(trans_channel(px, 2, 2, 2) - bg[2]) <= 2);
-    trans_center_is(px, black, TRANS_DARK / 2);
+    trans_center_is(px, black, 3);
     stbi_image_free(px);
     int32_t batch = ecs_get(world, e, DrawSlot)->batch;
     int32_t slot = ecs_get(world, e, DrawSlot)->slot;
@@ -592,7 +593,7 @@ void Transition_transmission_mid_transition(void) {
         .attenuation_color = {255, 255, 255}});
     px = trans_capture(world, "transition_transmission_2.png");
     test_flt(ecs_get(world, e, Transmission)->transmission_factor, 1);
-    trans_center_is(px, black, TRANS_DARK / 2);
+    trans_center_is(px, black, 3);
     stbi_image_free(px);
     trans_same_batch(world, e, batch, slot);
 
