@@ -415,6 +415,8 @@
                     "arg_entity_created",
                     "arg_entity_deleted",
                     "arg_entity_renamed",
+                    "command_registered",
+                    "command_deleted",
                     "ctrl_a_e",
                     "ctrl_u_k",
                     "ctrl_w",

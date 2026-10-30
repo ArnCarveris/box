@@ -1073,6 +1073,82 @@ void Console_arg_entity_renamed(void) {
     ecs_fini(world);
 }
 
+/** Callback of the test command foo: does nothing.
+ *
+ * @param ctx Call context
+ * @param argc Number of arguments
+ * @param argv The arguments
+ * @param result Unused, foo returns nothing
+ */
+static void console_foo_cmd(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_value_t *result)
+{
+    (void)ctx; (void)argc; (void)argv; (void)result;
+}
+
+/** Register the test command foo in the scope of the box commands, with one entity parameter.
+ *
+ * @param world The world
+ * @return The command
+ */
+static ecs_entity_t console_foo(
+    ecs_world_t *world)
+{
+    ecs_entity_t result = ecs_function_init(world, &(ecs_function_desc_t){
+        .name = "foo",
+        .parent = ecs_lookup(world, BOX_COMMAND_SCOPE),
+        .params = {{ .name = "e", .type = ecs_id(ecs_entity_t) }},
+        .callback = console_foo_cmd
+    });
+    test_assert(result != 0);
+
+    return result;
+}
+
+void Console_command_registered(void) {
+    // console/syntax
+    ecs_world_t *world = console_open(640, 360, NULL);
+    const ConsoleSyntax *syntax = &ecs_singleton_get(world, Console)->syntax;
+    ecs_entity_t line = ecs_lookup(world, CONSOLE_INPUT ".line");
+    int32_t p = CONSOLE_PROMPT_LEN;
+    console_type(world, "foo x");
+    test_str(console_value(world), CONSOLE_PROMPT "foo x");
+    console_check_span(world, line, p, p + 3, syntax->unknown);
+
+    // Registering the command outside a command colors its name and argument without a key
+    console_foo(world);
+    ecs_progress(world, 0);
+    test_str(console_value(world), CONSOLE_PROMPT "foo x");
+    console_check_span(world, line, p, p + 3, syntax->name);
+    console_check_span(world, line, p + 4, p + 5, syntax->missing);
+
+    ecs_fini(world);
+}
+
+void Console_command_deleted(void) {
+    // console/syntax
+    ecs_world_t *world = console_open(640, 360, NULL);
+    const ConsoleSyntax *syntax = &ecs_singleton_get(world, Console)->syntax;
+    ecs_entity_t line = ecs_lookup(world, CONSOLE_INPUT ".line");
+    int32_t p = CONSOLE_PROMPT_LEN;
+    ecs_entity_t foo = console_foo(world);
+    ecs_entity(world, { .name = "x" });
+    console_type(world, "foo x");
+    console_check_span(world, line, p, p + 3, syntax->name);
+    console_check_span(world, line, p + 4, p + 5, syntax->entity);
+
+    // Deleting the command colors its name unknown without a key
+    ecs_delete(world, foo);
+    ecs_progress(world, 0);
+    test_str(console_value(world), CONSOLE_PROMPT "foo x");
+    console_check_span(world, line, p, p + 3, syntax->unknown);
+
+    ecs_fini(world);
+}
+
 void Console_ctrl_a_e(void) {
     // console/prompt
     ecs_world_t *world = console_open(640, 360, NULL);
