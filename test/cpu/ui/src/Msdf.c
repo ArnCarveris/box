@@ -1025,7 +1025,11 @@ static void msdf_check_corner_shapes(
  * on the walls of the notch between the cells around its tip and those around its mouth, which no
  * corner repair tests; most others lie between the points the repair tests in a cell, so it never
  * starts. A field of 3 channels that passes does exist at 12, but reaching it would take tests
- * along the walls and denser points, not more moves of the repair. */
+ * along the walls and denser points, not more moves of the repair.
+ *
+ * A spike a sixth of a texel wide and 1.6 texels tall, at 8 texels per 2000 units, is placed
+ * where the median and the interpolated true distance of the points inside it are both outside,
+ * and only the fill puts them inside: the repair must start from such points too. */
 void Msdf_corner_shapes(void) {
     const msdf_corner_shape_t shapes[] = {
         {"M", 40.0 / 2000.0, {700, 500}, 13, {
@@ -1057,6 +1061,16 @@ void Msdf_corner_shapes(void) {
     int32_t wrong = 0, sharp = 0;
     msdf_check_corner_shapes(shapes, (int32_t)(sizeof(shapes) / sizeof(shapes[0])),
         offsets, (int32_t)(sizeof(offsets) / sizeof(offsets[0])), &wrong, &sharp);
+
+    const msdf_corner_shape_t spike = {"spike", 8.0 / 2000.0, {600, 400}, 3, {
+        {580, 0}, {600, 400}, {620, 0}
+    }};
+    const double spike_offsets[][2] = {
+        {0.0, 0.0}, {30.0 / 32.0, 0.0}, {0.0, 30.0 / 32.0}, {2.0 / 32.0, 31.0 / 32.0}
+    };
+
+    msdf_check_corner_shapes(&spike, 1, spike_offsets,
+        (int32_t)(sizeof(spike_offsets) / sizeof(spike_offsets[0])), &wrong, &sharp);
     test_int(wrong, 0);
     test_int(sharp, 0);
 }
