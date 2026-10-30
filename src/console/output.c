@@ -1470,8 +1470,16 @@ void box_console_out_run(
         ecs_os_free(path);
     }
 
-    if (!count && r.result.type && r.result.ptr) {
-        box_console_fmt_value(&fmt, r.result.type, r.result.ptr);
+    ecs_value_t *results = ecs_vec_first(&r.results);
+    int32_t result_count = count ? 0 : ecs_vec_count(&r.results);
+    for (i = 0; i < result_count; i ++) {
+        if (results[i].type && results[i].ptr) {
+            if (box_console_out_len(out)) {
+                box_console_out_add(out, BoxSpanNone, "\n", 1);
+            }
+
+            box_console_fmt_value(&fmt, results[i].type, results[i].ptr);
+        }
     }
 
     for (i = 0; i < count; i ++) {

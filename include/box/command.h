@@ -43,9 +43,9 @@ void BoxCommandImport(
 
 /** Run a command line in a shell session and format its result as text.
  *
- * The result is formatted with box_command_format. When the command logged errors the output
- * is only the errors, one per line that starts with BOX_COMMAND_ERROR, as a command that logs
- * an error still returns a value.
+ * The result of each command is formatted with box_command_format, one per line. When the
+ * commands logged errors the output is only the errors, one per line that starts with
+ * BOX_COMMAND_ERROR, as a command that logs an error still returns a value.
  *
  * @param world The world
  * @param session The session, created with ecs_shell_session_init
