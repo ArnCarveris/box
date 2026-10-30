@@ -201,6 +201,7 @@ void BoxCommandImport(
     box_logs_init(world);
     box_cmd_input_init(world);
     box_cmd_render_init(world);
+    box_cmd_fit_init(world);
     box_cmd_frames_init(world);
     box_cmd_edit_init(world);
 }

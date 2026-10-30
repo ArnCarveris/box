@@ -13,7 +13,6 @@
 
 #include "command.h"
 #include "../render/render.h"
-#include "../geometry/mesh_cache.h"
 #include <float.h>
 #include <math.h>
 #include <string.h>
@@ -123,7 +122,7 @@ static ecs_entity_t box_cmd_render_surface(
  * @param width Receives the width in pixels
  * @param height Receives the height in pixels
  */
-static void box_cmd_render_size(
+void box_cmd_render_size(
     ecs_world_t *world,
     int32_t *width,
     int32_t *height)
@@ -197,6 +196,37 @@ static ecs_entity_t box_cmd_render_view_root(
     return s ? s->view_root : 0;
 }
 
+/** Get the camera of a command: the camera argument, else the camera of the first view of the
+ * surface shown first. Logs an error when the argument is not a camera or there is no camera.
+ *
+ * @param world The world
+ * @param argc Number of arguments
+ * @param argv The camera, omitted for the active camera
+ * @return The camera, 0 on an error
+ */
+ecs_entity_t box_cmd_render_camera(
+    ecs_world_t *world,
+    int32_t argc,
+    const ecs_value_t *argv)
+{
+    ecs_entity_t result = argc > 0 ? *(ecs_entity_t*)argv[0].ptr : 0;
+    if (argc > 0 && (!result || !ecs_is_alive(world, result) || !ecs_has(world, result, Camera))) {
+        char *path = ecs_get_path(world, result);
+        ecs_err("'%s' is not a camera", path);
+        ecs_os_free(path);
+        result = 0;
+    } else if (!result) {
+        ecs_entity_t view = box_cmd_render_view(world, 0, box_cmd_render_view_root(world), false);
+        if (view) {
+            result = ecs_get(world, view, View)->camera;
+        } else {
+            ecs_err("no active camera");
+        }
+    }
+
+    return result;
+}
+
 /** Get the clear of a capture: of the first view of the camera when it clears, else of the
  * first view that clears.
  *
@@ -234,23 +264,11 @@ static void box_cmd_capture(
     ecs_value_t *result)
 {
     ecs_world_t *world = ctx->world;
-    ecs_entity_t camera = argc > 0 ? *(ecs_entity_t*)argv[0].ptr : 0;
+    ecs_entity_t camera = box_cmd_render_camera(world, argc, argv);
     box_render_capture_desc_t desc = {0};
     char *path = NULL;
-    if (argc > 0 && (!camera || !ecs_is_alive(world, camera) || !ecs_has(world, camera, Camera))) {
-        path = ecs_get_path(world, camera);
-        ecs_err("'%s' is not a camera", path);
-        goto done;
-    }
-
     if (!camera) {
-        ecs_entity_t view = box_cmd_render_view(world, 0, box_cmd_render_view_root(world), false);
-        if (!view) {
-            ecs_err("no active camera");
-            goto done;
-        }
-
-        camera = ecs_get(world, view, View)->camera;
+        goto done;
     }
 
     path = box_cmd_render_file(ctx, result->ptr);
@@ -465,21 +483,20 @@ static void box_cmd_render_collect(
     ecs_vec_fini_t(NULL, &children, ecs_entity_t);
 }
 
-/** Grow bounds by the world space box of the mesh of a shape.
+/** Get the 8 world space corners of the local bounds of the mesh of a shape, with the scale
+ * of its ShapeMesh and its WorldTransform.
  *
  * @param world The world
  * @param cache The mesh cache
  * @param e The entity
- * @param min The minimum corner
- * @param max The maximum corner
- * @return Whether the entity has a mesh
+ * @param out Receives the corners
+ * @return Whether the entity has a mesh in the cache
  */
-static bool box_cmd_render_grow(
+bool box_cmd_render_corners(
     ecs_world_t *world,
     const box_mesh_cache_t *cache,
     ecs_entity_t e,
-    vec3 min,
-    vec3 max)
+    vec3 out[8])
 {
     const ShapeMesh *shape = ecs_get(world, e, ShapeMesh);
     const box_mesh_t *mesh = shape && cache ? box_mesh_cache_get(cache, shape->mesh) : NULL;
@@ -503,14 +520,38 @@ static bool box_cmd_render_grow(
             ((i & 4) ? mesh->max[2] : mesh->min[2]) * shape->scale[2]
         };
 
-        vec3 world_pos;
-        glm_mat4_mulv3(m, local, 1.0f, world_pos);
-        glm_vec3_minv(min, world_pos, min);
-        glm_vec3_maxv(max, world_pos, max);
+        glm_mat4_mulv3(m, local, 1.0f, out[i]);
     }
 
 done:
     return mesh != NULL;
+}
+
+/** Grow bounds by the world space box of the mesh of a shape.
+ *
+ * @param world The world
+ * @param cache The mesh cache
+ * @param e The entity
+ * @param min The minimum corner
+ * @param max The maximum corner
+ * @return Whether the entity has a mesh
+ */
+static bool box_cmd_render_grow(
+    ecs_world_t *world,
+    const box_mesh_cache_t *cache,
+    ecs_entity_t e,
+    vec3 min,
+    vec3 max)
+{
+    vec3 corners[8];
+    int32_t i;
+    bool result = box_cmd_render_corners(world, cache, e, corners);
+    for (i = 0; result && i < 8; i ++) {
+        glm_vec3_minv(min, corners[i], min);
+        glm_vec3_maxv(max, corners[i], max);
+    }
+
+    return result;
 }
 
 /** Ask for the image of a render, with a camera that frames the bounds of its subject.
