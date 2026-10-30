@@ -660,6 +660,23 @@ void InstanceStreams_created_disabled_draws_once_enabled(void) {
     box_render_null_free(null);
 }
 
+/** Create a headless world for texts: its frames wait for the font and glyph jobs in flight,
+ * so the default font is loaded once the first text is laid out.
+ *
+ * @param null Receives the backend
+ * @return The world
+ */
+static ecs_world_t* text_world_new(
+    box_render_null_t **null)
+{
+    ecs_world_t *world = world_new(null);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    return world;
+}
+
 /** Create a text with the default font.
  *
  * @param world The world
@@ -681,7 +698,7 @@ static void text_set(
 void InstanceStreams_text_created_disabled(void) {
     // renderer/draws
     box_render_null_t *null;
-    ecs_world_t *world = world_new(&null);
+    ecs_world_t *world = text_world_new(&null);
     text_set(world, ecs_new(world), "warm");
     frame(world);
     frame(world);
@@ -707,7 +724,7 @@ void InstanceStreams_text_created_disabled(void) {
 void InstanceStreams_text_changed_while_disabled(void) {
     // renderer/draws
     box_render_null_t *null;
-    ecs_world_t *world = world_new(&null);
+    ecs_world_t *world = text_world_new(&null);
     ecs_entity_t text = ecs_new(world);
     text_set(world, text, "disabled");
     frame(world);
