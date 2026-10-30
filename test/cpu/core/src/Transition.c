@@ -750,6 +750,246 @@ void Transition_deferred_no_leak(void) {
     ecs_fini(world);
 }
 
+void Transition_deferred_remove_pending(void) {
+    // engine_core/transition
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t e = ecs_new(world);
+    ecs_world_t *stage = ecs_get_stage(world, 0);
+    box_transition_set(stage, e, ecs_id(Position), &(TransitionSpec){ .duration = 1.0f });
+    box_transition_remove(stage, e, ecs_id(Position));
+    test_assert(!ecs_has(world, e, Transition));
+    ecs_merge(stage);
+
+    /* The set added Transition, the remove leaves it with an empty map */
+    test_assert(box_transition_get(world, e, ecs_id(Position)) == NULL);
+    test_assert(ecs_owns(world, e, Transition));
+    test_int(ecs_map_count(ecs_get(world, e, Transition)), 0);
+
+    ecs_entity_t two = ecs_new(world);
+    box_transition_set(stage, two, ecs_id(Position), &(TransitionSpec){ .duration = 1.0f });
+    box_transition_set(stage, two, ecs_id(Rgb), &(TransitionSpec){ .duration = 2.0f });
+    box_transition_remove(stage, two, ecs_id(Position));
+    ecs_merge(stage);
+    test_int(ecs_map_count(ecs_get(world, two, Transition)), 1);
+    test_assert(box_transition_get(world, two, ecs_id(Position)) == NULL);
+    test_flt(box_transition_get(world, two, ecs_id(Rgb))->duration, 2.0f);
+
+    ecs_entity_t owner = ecs_new(world);
+    box_transition_set(world, owner, ecs_id(Rgb), &(TransitionSpec){ .duration = 2.0f });
+    box_transition_set(stage, owner, ecs_id(Position), &(TransitionSpec){ .duration = 1.0f });
+    box_transition_remove(stage, owner, ecs_id(Position));
+    ecs_merge(stage);
+    test_int(ecs_map_count(ecs_get(world, owner, Transition)), 1);
+    test_assert(box_transition_get(world, owner, ecs_id(Position)) == NULL);
+    test_flt(box_transition_get(world, owner, ecs_id(Rgb))->duration, 2.0f);
+
+    ecs_fini(world);
+}
+
+void Transition_deferred_remove_pending_inherited(void) {
+    // engine_core/transition
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    transition_deferred_t d = transition_deferred_new(world);
+
+    ecs_world_t *stage = ecs_get_stage(world, 0);
+    ecs_readonly_begin(world, false);
+    box_transition_set(stage, d.inst, ecs_id(Scale), &(TransitionSpec){ .duration = 3.0f });
+    box_transition_set(stage, d.inst, ecs_id(Opacity), &(TransitionSpec){ .duration = 4.0f });
+    box_transition_remove(stage, d.inst, ecs_id(Scale));
+    test_assert(!ecs_owns(world, d.inst, Transition));
+    ecs_readonly_end(world);
+
+    test_assert(ecs_owns(world, d.inst, Transition));
+    test_int(ecs_map_count(ecs_get(world, d.inst, Transition)), 3);
+    test_assert(box_transition_get(world, d.inst, ecs_id(Scale)) == NULL);
+    test_flt(box_transition_get(world, d.inst, ecs_id(Position))->duration, 1.0f);
+    test_flt(box_transition_get(world, d.inst, ecs_id(Rgb))->duration, 2.0f);
+    test_flt(box_transition_get(world, d.inst, ecs_id(Opacity))->duration, 4.0f);
+
+    test_int(ecs_map_count(ecs_get(world, d.prefab, Transition)), 2);
+    test_flt(box_transition_get(world, d.prefab, ecs_id(Position))->duration, 1.0f);
+    test_flt(box_transition_get(world, d.prefab, ecs_id(Rgb))->duration, 2.0f);
+    test_assert(box_transition_get(world, d.prefab, ecs_id(Scale)) == NULL);
+
+    ecs_entity_t inst2 = ecs_new_w_pair(world, EcsIsA, d.prefab);
+    ecs_readonly_begin(world, false);
+    box_transition_set(stage, inst2, ecs_id(Scale), &(TransitionSpec){ .duration = 3.0f });
+    box_transition_remove(stage, inst2, ecs_id(Rgb));
+    box_transition_remove(stage, inst2, ecs_id(Scale));
+    ecs_readonly_end(world);
+    test_int(ecs_map_count(ecs_get(world, inst2, Transition)), 1);
+    test_flt(box_transition_get(world, inst2, ecs_id(Position))->duration, 1.0f);
+    test_assert(box_transition_get(world, inst2, ecs_id(Rgb)) == NULL);
+    test_assert(box_transition_get(world, inst2, ecs_id(Scale)) == NULL);
+    test_int(ecs_map_count(ecs_get(world, d.prefab, Transition)), 2);
+
+    ecs_fini(world);
+}
+
+/** Set then remove Scale on the plain entity and the instance, in one run.
+ *
+ * @param it Iterator of the system, ctx points at the entities
+ */
+static void transition_system_set_remove(
+    ecs_iter_t *it)
+{
+    transition_deferred_t *d = it->ctx;
+    box_transition_set(it->stage, d->plain, ecs_id(Scale), &(TransitionSpec){ .duration = 5.0f });
+    box_transition_set(it->stage, d->plain, ecs_id(Opacity),
+        &(TransitionSpec){ .duration = 6.0f });
+    box_transition_remove(it->stage, d->plain, ecs_id(Scale));
+    box_transition_set(it->stage, d->inst, ecs_id(Scale), &(TransitionSpec){ .duration = 3.0f });
+    box_transition_remove(it->stage, d->inst, ecs_id(Scale));
+}
+
+void Transition_system_remove_pending(void) {
+    // engine_core/transition
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    transition_deferred_t d = transition_deferred_new(world);
+    ecs_entity_t system = ecs_entity(world, { .name = "TransitionSetRemove" });
+    ecs_add_pair(world, system, EcsDependsOn, EcsOnUpdate);
+    system = ecs_system(world, {
+        .entity = system,
+        .callback = transition_system_set_remove,
+        .ctx = &d
+    });
+    test_assert(system != 0);
+
+    ecs_progress(world, 0.1f);
+
+    test_int(ecs_map_count(ecs_get(world, d.plain, Transition)), 1);
+    test_assert(box_transition_get(world, d.plain, ecs_id(Scale)) == NULL);
+    test_flt(box_transition_get(world, d.plain, ecs_id(Opacity))->duration, 6.0f);
+    test_assert(ecs_owns(world, d.inst, Transition));
+    test_int(ecs_map_count(ecs_get(world, d.inst, Transition)), 2);
+    test_assert(box_transition_get(world, d.inst, ecs_id(Scale)) == NULL);
+    test_int(ecs_map_count(ecs_get(world, d.prefab, Transition)), 2);
+
+    ecs_delete(world, system);
+    ecs_fini(world);
+}
+
+void Transition_deferred_remove_missing(void) {
+    // engine_core/transition
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    transition_deferred_t d = transition_deferred_new(world);
+    int32_t sets = 0;
+    transition_observe_set(world, &sets);
+
+    ecs_world_t *stage = ecs_get_stage(world, 0);
+    box_transition_remove(stage, d.plain, ecs_id(Scale));
+    box_transition_remove(stage, d.inst, ecs_id(Scale));
+    ecs_merge(stage);
+    test_int(sets, 0);
+    test_assert(!ecs_has(world, d.plain, Transition));
+    test_assert(!ecs_owns(world, d.inst, Transition));
+    test_assert(ecs_get(world, d.inst, Transition) == ecs_get(world, d.prefab, Transition));
+
+    ecs_readonly_begin(world, false);
+    box_transition_remove(stage, d.plain, ecs_id(Scale));
+    box_transition_remove(stage, d.inst, ecs_id(Scale));
+    ecs_readonly_end(world);
+    test_int(sets, 0);
+    test_assert(!ecs_has(world, d.plain, Transition));
+    test_assert(!ecs_owns(world, d.inst, Transition));
+    test_int(ecs_map_count(ecs_get(world, d.prefab, Transition)), 2);
+
+    ecs_fini(world);
+}
+
+void Transition_deferred_set_remove_set(void) {
+    // engine_core/transition
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    transition_deferred_t d = transition_deferred_new(world);
+    ecs_world_t *stage = ecs_get_stage(world, 0);
+    box_transition_set(stage, d.plain, ecs_id(Scale), &(TransitionSpec){ .duration = 1.0f });
+    box_transition_remove(stage, d.plain, ecs_id(Scale));
+    box_transition_set(stage, d.plain, ecs_id(Scale), &(TransitionSpec){ .duration = 2.0f });
+    box_transition_set(stage, d.inst, ecs_id(Scale), &(TransitionSpec){ .duration = 3.0f });
+    box_transition_remove(stage, d.inst, ecs_id(Scale));
+    box_transition_set(stage, d.inst, ecs_id(Scale), &(TransitionSpec){ .duration = 4.0f });
+    ecs_merge(stage);
+
+    test_int(ecs_map_count(ecs_get(world, d.plain, Transition)), 1);
+    test_flt(box_transition_get(world, d.plain, ecs_id(Scale))->duration, 2.0f);
+    test_int(ecs_map_count(ecs_get(world, d.inst, Transition)), 3);
+    test_flt(box_transition_get(world, d.inst, ecs_id(Scale))->duration, 4.0f);
+    test_int(ecs_map_count(ecs_get(world, d.prefab, Transition)), 2);
+
+    ecs_fini(world);
+}
+
+/** Set and remove pending entries on a stage, then delete the entities.
+ *
+ * @param world The world
+ * @param prefab Prefab with Position and Rgb entries
+ */
+static void transition_pending_churn(
+    ecs_world_t *world,
+    ecs_entity_t prefab)
+{
+    ecs_entity_t inst = ecs_new_w_pair(world, EcsIsA, prefab);
+    ecs_entity_t plain = ecs_new(world);
+    ecs_entity_t missing = ecs_new_w_pair(world, EcsIsA, prefab);
+
+    ecs_world_t *stage = ecs_get_stage(world, 0);
+    box_transition_set(stage, plain, ecs_id(Scale), &(TransitionSpec){ .duration = 1.0f });
+    box_transition_remove(stage, plain, ecs_id(Scale));
+    box_transition_set(stage, plain, ecs_id(Scale), &(TransitionSpec){ .duration = 2.0f });
+    box_transition_set(stage, inst, ecs_id(Scale), &(TransitionSpec){ .duration = 3.0f });
+    box_transition_remove(stage, inst, ecs_id(Scale));
+    box_transition_remove(stage, inst, ecs_id(Rgb));
+    box_transition_remove(stage, missing, ecs_id(Scale));
+    ecs_merge(stage);
+
+    test_int(ecs_map_count(ecs_get(world, plain, Transition)), 1);
+    test_int(ecs_map_count(ecs_get(world, inst, Transition)), 1);
+    test_assert(box_transition_get(world, inst, ecs_id(Scale)) == NULL);
+    test_assert(!ecs_owns(world, missing, Transition));
+
+    ecs_readonly_begin(world, false);
+    box_transition_set(stage, missing, ecs_id(Scale), &(TransitionSpec){ .duration = 3.0f });
+    box_transition_remove(stage, missing, ecs_id(Scale));
+    ecs_delete(stage, plain);
+    ecs_readonly_end(world);
+    test_int(ecs_map_count(ecs_get(world, missing, Transition)), 2);
+
+    ecs_delete(world, inst);
+    ecs_delete(world, missing);
+}
+
+void Transition_deferred_remove_pending_no_leak(void) {
+    // engine_core/transition
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    box_transition_set(world, prefab, ecs_id(Position), &(TransitionSpec){ .duration = 1.0f });
+    box_transition_set(world, prefab, ecs_id(Rgb), &(TransitionSpec){ .duration = 2.0f });
+
+    transition_pending_churn(world, prefab);
+    int64_t before = transition_live_allocs();
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        transition_pending_churn(world, prefab);
+    }
+
+    test_int(transition_live_allocs(), before);
+
+    ecs_delete(world, prefab);
+    ecs_fini(world);
+}
+
 void Transition_not_transitionable(void) {
     // engine_core/transition
     ecs_world_t *world = ecs_init();
