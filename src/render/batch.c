@@ -2,17 +2,12 @@
  * @file render/batch.c
  * @brief Persistent instanced batches and what a frame sends of them to the renderer.
  *
-<<<<<<< HEAD
- * Every batch owns a run of slots of an instance page (store.c) with a transform, a shading and
- * a surface stream. It uploads its run when the run is handed out, then the changed slots of
- * each stream through a segment of the change buffer per page and stream, which scatter copies.
- * A batch that outgrows its run moves to a larger one, and the GPU copies the instances it had
- * from the old run (box_render_copy_t) before the changed slots are written over them.
-=======
  * Every batch owns a run of slots of an instance page (store.c) with a transform, a shading and,
  * for a mesh batch, a surface stream. It uploads its run when the run is handed out, then the
- * changed slots of each stream through a segment of the change buffer that scatter copies.
->>>>>>> 26c00eda586d304f362705071c9f4de902d3bf1a
+ * changed slots of each stream through a segment of the change buffer per page and stream, which
+ * scatter copies. A batch that outgrows its run moves to a larger one, and the GPU copies the
+ * instances it had from the old run (box_render_copy_t) before the changed slots are written
+ * over them.
  *
  * Mesh and 2D batches take their runs from stores of their own, a mesh shading being a material
  * slot, a tint and an alpha. A batch with dynamic_transform uploads the transform stream of its
@@ -348,13 +343,9 @@ int32_t box_draws_batch_ensure(
     b->page = -1;
     b->first = 0;
     b->capacity = 0;
-<<<<<<< HEAD
-    b->full = BOX_DRAW_ALL;
+    b->full = box_draws_batch_kinds(b);
     b->sent = 0;
     b->from_count = 0;
-=======
-    b->full = box_draws_batch_kinds(b);
->>>>>>> 26c00eda586d304f362705071c9f4de902d3bf1a
     b->bounds_dirty = false;
     b->bounded = false;
     b->was_ready = false;
@@ -1034,13 +1025,9 @@ void box_draws_reset_backend(
         b->page = -1;
         b->first = 0;
         b->capacity = 0;
-<<<<<<< HEAD
-        b->full = BOX_DRAW_ALL;
+        b->full = box_draws_batch_kinds(b);
         b->sent = 0;
         b->from_count = 0;
-=======
-        b->full = box_draws_batch_kinds(b);
->>>>>>> 26c00eda586d304f362705071c9f4de902d3bf1a
         box_draws_changed_clear(b);
     }
 
@@ -1100,15 +1087,10 @@ static void box_draws_reserve(
     b->page = page;
     b->first = first;
     b->capacity = capacity;
-<<<<<<< HEAD
     if (!b->from_count) {
-        b->full = BOX_DRAW_ALL;
+        b->full = box_draws_batch_kinds(b);
         box_draws_changed_clear(b);
     }
-=======
-    b->full = box_draws_batch_kinds(b);
-    box_draws_changed_clear(b);
->>>>>>> 26c00eda586d304f362705071c9f4de902d3bf1a
 done:
     return;
 }
@@ -1132,18 +1114,9 @@ static void box_draws_pages(
                 continue;
             }
 
-<<<<<<< HEAD
             for (s = 0; s < store->layout.streams; s ++) {
                 d->stats.kept_pages ++;
                 d->stats.kept_bytes += (int64_t)kept * store->layout.stride[s];
-=======
-            for (i = 0; i < count; i ++) {
-                box_draw_batch_t *b = box_draws_batch(d, i);
-                if (b->alive && b->page == pg && box_draws_batch_store(d, b) == store) {
-                    b->full = box_draws_batch_kinds(b);
-                    box_draws_changed_clear(b);
-                }
->>>>>>> 26c00eda586d304f362705071c9f4de902d3bf1a
             }
         }
     }
@@ -1476,15 +1449,11 @@ static void box_draws_send_batch(
     uint8_t dynamic = box_draws_dynamic_kinds(b);
     bool moved = box_draws_from_held(d, b);
     int32_t s;
-<<<<<<< HEAD
     if (b->from_count && !moved) {
-        b->full = BOX_DRAW_ALL;
+        b->full = box_draws_batch_kinds(b);
     }
 
-    for (s = 0; s < BOX_DRAWS_STREAMS; s ++) {
-=======
     for (s = 0; s < store->layout.streams; s ++) {
->>>>>>> 26c00eda586d304f362705071c9f4de902d3bf1a
         uint32_t entries = (uint32_t)ecs_vec_count(&b->changed[s]);
         if ((dynamic | b->full) & (1 << s)) {
             box_draws_upload_all(p, d, b, s);
