@@ -677,6 +677,7 @@ static void box_draws_update_shape(
     b = box_draws_batch(d, s->batch);
     kinds = BOX_DRAW_ALL;
 write:
+    kinds &= box_draws_batch_kinds(b);
     if (kept && d->shadow_record && box_draws_caster(b)) {
         was_transform = *box_draws_slot_transform(b, s->slot);
         was_surface = *box_draws_slot_surface(b, s->slot);
@@ -1109,11 +1110,10 @@ void box_render_draws_init(
         }
     }, BOX_RENDER_BUFFER_FIRST, BOX_DRAWS_CHUNK);
     box_draws_store_init(&d->stores[BOX_DRAWS_STORE_2D], &(box_draw_layout_t){
-        .streams = BOX_DRAWS_STREAMS,
+        .streams = BOX_RENDER_INSTANCE_STREAMS_2D,
         .stride = {
             [BOX_RENDER_STREAM_TRANSFORM] = (uint32_t)sizeof(box_render_transform_t),
-            [BOX_RENDER_STREAM_SHADING] = (uint32_t)sizeof(box_render_shading_t),
-            [BOX_RENDER_STREAM_SURFACE] = (uint32_t)sizeof(box_render_surface_t)
+            [BOX_RENDER_STREAM_SHADING] = (uint32_t)sizeof(box_render_shading_t)
         }
     }, BOX_RENDER_BUFFER_FIRST_2D, BOX_DRAWS_CHUNK);
     d->chunk = BOX_DRAWS_CHUNK;

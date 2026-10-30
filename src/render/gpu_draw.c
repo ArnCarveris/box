@@ -317,11 +317,14 @@ void box_gpu_instance_layouts_fini(
 
 /** Create a bind group of the streams of an instance page and surface assets.
  *
+ * A page without a surface stream, a 2D page, binds gpu->no_surfaces at binding 3.
+ *
  * A group with the shading stream binds the material table too, or the default record before
  * the main thread sent one.
  *
  * @param gpu The backend
- * @param streams The buffers of the streams of the page, by stream
+ * @param streams The buffers of the streams of the page, by stream, NULL for the surface
+ * stream of a page without one
  * @param assets The surface assets
  * @param size Bytes of the surface assets
  * @param shading Bind the shading stream too, instance_layout, else transform_layout
@@ -337,12 +340,14 @@ static WGPUBindGroup box_gpu_instance_group_new(
     const box_gpu_buffer_t *transforms = streams[BOX_RENDER_STREAM_TRANSFORM];
     const box_gpu_buffer_t *shadings = streams[BOX_RENDER_STREAM_SHADING];
     const box_gpu_buffer_t *surfaces = streams[BOX_RENDER_STREAM_SURFACE];
+    WGPUBuffer surface_buffer = surfaces ? surfaces->buffer : gpu->no_surfaces;
+    uint64_t surface_size = surfaces ? surfaces->size : sizeof(box_render_surface_t);
     const box_gpu_buffer_t *materials = ecs_map_get_deref(
         &gpu->buffers, box_gpu_buffer_t, BOX_RENDER_BUFFER_MATERIALS);
     WGPUBindGroupEntry entry[5] = {
         {.binding = 0, .buffer = transforms->buffer, .size = transforms->size},
         {.binding = 1, .buffer = assets, .size = size},
-        {.binding = 3, .buffer = surfaces->buffer, .size = surfaces->size},
+        {.binding = 3, .buffer = surface_buffer, .size = surface_size},
         {.binding = 2, .buffer = shadings->buffer, .size = shadings->size},
         {
             .binding = 4,
@@ -366,9 +371,10 @@ WGPUBindGroup box_gpu_instance_group(
     bool shading)
 {
     WGPUBindGroup result = NULL;
-    box_gpu_buffer_t *streams[BOX_RENDER_INSTANCE_STREAMS];
-    int32_t i;
-    for (i = 0; i < BOX_RENDER_INSTANCE_STREAMS; i ++) {
+    box_gpu_buffer_t *streams[BOX_RENDER_INSTANCE_STREAMS] = {0};
+    int32_t i, count = page >= BOX_RENDER_BUFFER_FIRST_2D
+        ? BOX_RENDER_INSTANCE_STREAMS_2D : BOX_RENDER_INSTANCE_STREAMS;
+    for (i = 0; i < count; i ++) {
         streams[i] = ecs_map_get_deref(&gpu->buffers, box_gpu_buffer_t, page + (uint32_t)i);
         if (!streams[i] || !(streams[i]->usage & BOX_RENDER_BUFFER_STORAGE)) {
             goto done;

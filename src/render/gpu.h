@@ -1424,6 +1424,7 @@ void box_gpu_cull_fini(
  * instance_layout binds the transform stream (0), the surface assets of the mesh (1), the shading
  * stream (2), the surface stream (3) and the material table (4); transform_layout every binding
  * but the shading stream and the material table. Only the transform stream is visible to compute.
+ * A 2D page has no surface stream and binds gpu->no_surfaces at 3.
  *
  * @param gpu The backend
  */

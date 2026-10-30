@@ -301,7 +301,11 @@
                     "enabled_shape_takes_current_transform",
                     "created_disabled_draws_once_enabled",
                     "text_created_disabled",
-                    "text_changed_while_disabled"
+                    "text_changed_while_disabled",
+                    "new_shape2d_uploads_no_surface",
+                    "changed_shape2d_uploads_no_surface",
+                    "mesh_uploads_surface_next_to_shape2d",
+                    "text_relayout_uploads_no_surface"
                 ]
             },
             {

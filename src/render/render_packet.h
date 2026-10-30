@@ -132,16 +132,22 @@
 
 /** Buffer handle of the first instance page, the first handle of the instance pages.
  *
- * Every batch draws a run of slots of one instance page: BOX_RENDER_INSTANCE_STREAMS storage
- * buffers of at most BOX_DRAWS_CHUNK instances with the same slots, shared by the batches.
+ * Every batch draws a run of slots of one instance page: a storage buffer per stream of at most
+ * BOX_DRAWS_CHUNK instances with the same slots, shared by the batches. A mesh page has
+ * BOX_RENDER_INSTANCE_STREAMS streams, a 2D page BOX_RENDER_INSTANCE_STREAMS_2D, without the
+ * surface stream, for which the backend binds a zero record.
  * box_render_batch_t.instances is the transform stream of the page, first_instance its slot.
  *
  * Page p has the handle BOX_RENDER_BUFFER_FIRST + p * BOX_RENDER_INSTANCE_STREAMS + s for
  * stream s. A released page index is reused by the next page the store needs. */
 #define BOX_RENDER_BUFFER_FIRST (16)
 
-/** Buffers of an instance page, one per stream, at consecutive handles */
+/** Buffers of a mesh instance page, one per stream, at consecutive handles; the handles of
+ * every page, 2D pages included, leave room for this many */
 #define BOX_RENDER_INSTANCE_STREAMS (3)
+
+/** Buffers of a 2D instance page: the transform and the shading stream */
+#define BOX_RENDER_INSTANCE_STREAMS_2D (2)
 
 /** Buffer handle of the first instance page of the 2D shapes and glyphs; the pages from
  * BOX_RENDER_BUFFER_FIRST hold the meshes. Page p of the 2D pages has the handle
@@ -156,7 +162,8 @@
  * a mesh page, box_render_shading_t per slot of a 2D page */
 #define BOX_RENDER_STREAM_SHADING (1)
 
-/** Stream of the surface parameters of an instance page, box_render_surface_t per slot */
+/** Stream of the surface parameters of a mesh instance page, box_render_surface_t per slot;
+ * 2D pages have none */
 #define BOX_RENDER_STREAM_SURFACE (2)
 
 /** Byte alignment of a scatter segment in the change buffer, the storage offset alignment */

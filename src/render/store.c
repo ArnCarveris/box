@@ -2,7 +2,9 @@
  * @file render/store.c
  * @brief Instance pages shared by every batch and the slot allocator of their runs.
  *
- * A page is one GPU buffer per stream of its layout, holding at most the slots of the page. Its
+ * A page is one GPU buffer per stream of its layout, holding at most the slots of the page; its
+ * handles leave room for BOX_DRAWS_STREAMS buffers whatever its layout, so the backend finds the
+ * first buffer of a page from any of its handles. Its
  * buffers start small and double up to that size, created again when its runs reach past them.
  *
  * Free slots below the end of the highest run are kept as holes, so a freed run merges with the
@@ -84,7 +86,7 @@ uint32_t box_draws_store_handle(
     int32_t page,
     int32_t stream)
 {
-    return s->base + (uint32_t)page * (uint32_t)s->layout.streams + (uint32_t)stream;
+    return s->base + (uint32_t)page * (uint32_t)BOX_DRAWS_STREAMS + (uint32_t)stream;
 }
 
 /** Take a run out of the free slots of a page, the lowest that fit.
