@@ -1,0 +1,101 @@
+include korean_village/hall
+include korean_village/house
+include korean_village/gate
+include korean_village/wall
+include korean_village/onggi
+include korean_village/pine
+include korean_village/lantern
+include korean_village/bench
+include korean_village/well
+include korean_village/landscape
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.surface
+using box.controllers
+using box.atmosphere
+
+window { Surface: {width: 1600, height: 1100, vsync: true} }
+korean_contact { Gtao: {radius: 0.6, final_value_power: 1.7} }
+korean_bloom { Bloom: {intensity: 0.08, threshold: 1.8} }
+korean_film { Tonemap: {} }
+korean_edges { Smaa: {} }
+
+korean_village {
+  Scene: {}
+  AmbientLight: {sky: {180, 202, 215}, ground: {128, 111, 82}, intensity: 0.35}
+  ReflectionBake: {resolution: 64, budget_ms: 2, scene_probe: true, scene_probe_height: 2}
+  camera {
+    Position: {-31, 26, 37}
+    Rotation: {-0.55, -0.697, 0}
+    Camera: {fov: 40, near_: 0.1, far_: 160}
+    CameraController: {speed: 10}
+  }
+  detail_camera {
+    Position: {-7, 6.8, 3.5}
+    Rotation: {-0.24, -0.55, 0}
+    Camera: {fov: 48, near_: 0.1, far_: 100}
+    CameraController: {speed: 5}
+  }
+  sun {
+    Rotation: {0.68, -0.85, 0}
+    DirectionalLight: {intensity: 2 * math.PI}
+    Rgb: {255, 247, 229}
+  }
+  sky {
+    Atmosphere: {sun: sun, units_per_km: 100, ground_albedo: {160, 151, 120}}
+    TimeOfDay: {hour: 14.5, day_of_year: 245, latitude: 36, north: 200, sun: sun}
+  }
+  LightBake: {environment: sky, probe_spacing: 2.5, bounds_padding: 0.5, bounces: 1, capture_size: 32, budget_ms: 6}
+  landscape { KoreanLandscape: {}; Position: {} }
+  hall { KoreanHall: {}; Position: {0, 0.12, -7.6}; Scale: {1.12, 1.12, 1.12} }
+  west_house { KoreanHouse: {}; Position: {-9.3, 0.12, -5.8}; Rotation: {0, math.PI / 2, 0} }
+  west_workshop { KoreanHouse: {}; Position: {-9.3, 0.12, 2.2}; Rotation: {0, math.PI / 2, 0} }
+  east_house { KoreanHouse: {}; Position: {9.3, 0.12, -5.8}; Rotation: {0, -math.PI / 2, 0} }
+  east_kitchen { KoreanHouse: {}; Position: {9.3, 0.12, 2.2}; Rotation: {0, -math.PI / 2, 0} }
+  gate { KoreanGate: {}; Position: {0, 0.12, 10.4} }
+  for side in 0..2 {
+    { KoreanWall: {length: 10.7}; Position: {(side - 0.5) * 15.4, 0.12, 10.4} }
+    for i in 0..4 {
+      { KoreanWall: {length: 5.5}; Position: {(side - 0.5) * 29.5, 0.12, -9.4 + i * 5.6}; Rotation: {0, math.PI / 2, 0} }
+    }
+    { KoreanLantern: {}; Position: {(side - 0.5) * 5.4, 0.13, 8.6} }
+    { KoreanLantern: {}; Position: {(side - 0.5) * 5.7, 0.13, -3.4} }
+    for i in 0..2 {
+      { KoreanPine: {variant: side + i * 2}; Position: {(side - 0.5) * 25.5, 0.13, -10 + i * 15.6}; Scale: {0.92, 0.92, 0.92} }
+    }
+  }
+  for i in 0..5 {
+    { KoreanWall: {length: 5.8}; Position: {(i - 2) * 5.9, 0.12, -12.3} }
+  }
+  courtyard_pine { KoreanPine: {variant: 1.2}; Position: {-4.3, 0.13, 3.9}; Scale: {0.85, 0.85, 0.85} }
+  well { KoreanWell: {}; Position: {4.2, 0.13, 4.8} }
+  jar_terrace : KoreanStone { Position: {8.7, 0.2, 7.6}; RoundedBox: {4, 0.25, 2.5, 0.12} }
+  for row in 0..2 {
+    for i in 0..4 {
+      { KoreanOnggi: {size: 0.72 + (i + row) % 3 * 0.15}; Position: {7.3 + i * 0.94, 0.33, 7.1 + row * 1.03} }
+    }
+  }
+  for i in 0..3 {
+    { KoreanOnggi: {size: 0.65 + i * 0.12}; Position: {-6.8, 0.13, -9.6 + i * 0.88} }
+  }
+  bench { KoreanBench: {}; Position: {-4.2, 0.13, 5.6} }
+  for i in 0..7 {
+    { Position: {-4.3 + math.sin(i * 0.9) * 1.1, 0.22, 3.9 + math.cos(i * 0.9) * 0.85}; Scale: {0.35, 0.2, 0.3}; IcoSphere: {radius: 1, segments: 1}; Rgb: {136, 144, 125} }
+  }
+}
+
+main_view {
+  View: {
+    camera: korean_village.camera,
+    clear: {enabled: true, color: {174, 193, 194, 255}},
+    lighting: {enabled: true, baked: true, reflections: true, atmosphere: true, environment: {source: korean_village.sky, intensity: 1.1, background: false}},
+    shadows: {enabled: true, resolution: 2048, max_distance: 110},
+    effects: [{effect: korean_contact}, {effect: korean_bloom}, {effect: korean_film}, {effect: korean_edges}]
+  }
+}

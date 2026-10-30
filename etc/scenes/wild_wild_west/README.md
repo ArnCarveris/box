@@ -35,14 +35,17 @@ fixtures were surveyed before choosing the assemblies and rendering setup.
 | BeveledPrism, IcoSphere | Layered sandstone, windmill blades, scattered stones |
 | PBR metallic and roughness, shared material prefabs | Weathered timber, painted siding, iron, steel, brass, canvas, sand |
 | ClearCoat, baked reflections | Window panes and trough water |
-| World-space Text | Shop signs, town marker, wanted poster |
-| Directional, ambient, point and emissive lighting | Warm afternoon sun, cool sky fill, lanterns |
-| LightBake, ReflectionBake, GTAO, bloom, tonemapping, SMAA | Indirect light, contact shadows, restrained lantern glow, smooth edges |
+| World-space Text with a custom Font | Shop signs, town marker, wanted poster in Rye |
+| Atmosphere, TimeOfDay, HeightFog | Dusty desert sky, a July afternoon sun at 34° latitude, haze |
+| Directional, point and emissive lighting | Afternoon sun, lanterns |
+| LightBake, ReflectionBake, GTAO, bloom, auto exposure, tonemapping, SMAA | Indirect light, contact shadows, restrained lantern glow, smooth edges |
+| Widgets | The options panel shared with `town.flecs` in `../cfg/hud.flecs` |
 
 The survey also covered Mesh3, profile extrusion, sweep, loft, ellipsoid/torus shells,
-texture maps, transmission, atmosphere, and height fog. The selected shapes keep the assets
+texture maps, and transmission. The selected shapes keep the assets
 self-contained and readable at the default camera distance. All details are geometry or
-engine text; no external texture, mesh, or font downloads are required.
+engine text. The only external asset is the Rye font in `fonts/`, under the SIL Open Font
+License; no texture or mesh downloads are required.
 
 ## Assets
 
@@ -53,7 +56,7 @@ this directory when moving the scene.
 - Buildings: `saloon`, `general_store`, `sheriff`; shared `storefront`, `window`, `sign`, `lantern`.
 - Railway and utilities: `railway`, `handcar`, `telegraph`, `water_tower`, `windmill`.
 - Street and corral: `wagon`, `wheel`, `horse`, `cowboy`, `corral`, `fence`, `water_trough`, `hitching_rail`.
-- Supplies and scenery: `barrel`, `crate`, `freight`, `town_marker`, `landscape`, `mesa`, `cactus`, `scrub`.
+- Supplies and scenery: `barrel`, `crate`, `freight`, `town_marker`, `landscape`, `mesa`, `cactus`, `scrub`, `rut`.
 - Shared construction: `materials`, `beam`.
 
 The `inspect_*.flecs` entry points isolate the saloon, wagon, and windmill for design mode:
