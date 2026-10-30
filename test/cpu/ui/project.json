@@ -411,6 +411,7 @@
             },
             {
                 "id": "Msdf",
+                "setup": true,
                 "testcases": [
                     "square",
                     "square_hole",

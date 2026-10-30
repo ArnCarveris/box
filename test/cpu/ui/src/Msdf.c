@@ -41,6 +41,11 @@ typedef struct msdf_cmd_t {
     double y;   /**< y of the end */
 } msdf_cmd_t;
 
+/* The cases call no flecs function that would set up the OS API they allocate with. */
+void Msdf_setup(void) {
+    ecs_os_set_api_defaults();
+}
+
 /** A square: the field of four lines and four right angle corners. */
 void Msdf_square(void) {
     const char *name = "square";
