@@ -10,7 +10,9 @@ const USAGE = `Checks the shader error path of the browser build in headless Chr
   node test/integration/web/shader_error.mjs [--chrome <path>] [--out <dir>] <bin dir>
 
 <bin dir> holds boxrun.html, .js and .wasm, e.g.
-.bake/local_env/<env>/wasm32-Emscripten/debug/bin. The page is served on a free localhost
+.bake/local_env/<env>/wasm32-Emscripten/debug/bin, or under <output_dir>/local_env when
+bake3's bake.json sets output_dir; "$(tools/integration.py local-env --env <env>)" prints the
+local env folder either way. The page is served on a free localhost
 port and opened with etc/scenes/default.flecs; the check breaks /etc/shaders/mesh.wgsl in the
 page's file system, then restores it. It passes when the break logs one compile error with its
 line, no WebGPU object turns invalid and the scene keeps rendering. Exits 0 on a pass, 1 on a

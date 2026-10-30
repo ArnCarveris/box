@@ -72,6 +72,7 @@ using box.material
 using box.camera
 using box.view
 using box.light
+using box.texture
 using box.effects
 using box.surface
 using box.atmosphere
@@ -90,6 +91,38 @@ camera {
   DynamicTransform
 }
 
+// The cloud shadows of the original's cloud_shadow {strength: 0.6, scale: 13, coverage: 0.45,
+// softness: 0.35, speed: 3, direction: 0.7}, which darkened the direct sun by
+// 1 - smoothstep(thr - soft, thr + soft, n) * strength with thr = 1 - coverage, n two octaves of
+// value noise at world XZ / scale plus the drift. The sun's LightCookie casts them with the
+// seamless fbm noise of the engine's CookieNoise (etc/assets/textures/cloud_noise.png, copied
+// here), read as stored:
+// - size: the base octave of the texture has 8 cells across the tile, so 8 * 13 = 104 world
+//   units make a cell of about 13 units, the original's scale.
+// - threshold: the cookie is the transmittance t, shaded where t is below the threshold, so
+//   the threshold is about the coverage (the original's noise above 1 - coverage). The texture
+//   is a little steeper than t (CookieNoise): 42% of its texels are below 0.45 and 45% below
+//   0.47, so 0.47 shades the original's 45% of the ground.
+// - softness: the cookie ramps linearly over 2 * softness of t around the threshold, the
+//   original's smoothstep over 2 * soft of n. The texture spreads wider than the two octaves of
+//   value noise (a deviation of 0.23 against about 0.16) and the smoothstep is 1.5 times
+//   steeper at its middle than a linear ramp, which about cancel: 0.35 * 0.23 / 0.16 / 1.5 =
+//   0.34, so the same 0.35 gives edges as soft as the original's.
+// - strength: mix(1, lit, 0.6) darkens a fully clouded spot to 0.4, as 1 - 1 * 0.6 did.
+// - velocity: 3 units per second along the heading 0.7 radians around world Y,
+//   3 * (cos 0.7, sin 0.7) along world X and Z, added to the position read as the original
+//   added its drift. OreCloudShadowApply (src/look.c) moves the cookie's offset by it over the
+//   clock of play, as the original's drift stopped while paused, and sets the strength to 0 at
+//   the tiers without cloud_shadows (cfg.quality).
+// - height: the original shaded the ground right under its noise; the cookie reads the noise
+//   where the ray toward the sun crosses the plane at height 10, which this sun (l.y 0.70) puts
+//   about 10 units toward it (1.02 per unit of height), less than a cell, and above the
+//   buildings and the plants, which all take the shadows. Only a rocket climbing above it
+//   leaves them.
+cloud_noise {
+  TexturePath: {path: "apps/oreelse/etc/assets/textures/cloud_noise.png", single_channel: true}
+}
+
 // The sun of the original shines from (-1.4, 1.8, 1.2) toward the origin, its +Z along
 // -(-1.4, 1.8, 1.2), in its warm color. The original's moon has no light and its stars and top
 // of atmosphere light are not ported
@@ -97,6 +130,11 @@ sun {
   Rotation: {asin(1.8 / sqrt(1.96 + 3.24 + 1.44)), atan2(1.4, -1.2), 0}
   DirectionalLight: {intensity: 1.5}
   Rgb: {255, 232, 212}
+  LightCookie: {
+    texture: cloud_noise, projection: Plane, size: 8 * 13, height: 10,
+    threshold: 0.47, softness: 0.35, strength: 0.6
+  }
+  OreCloudShadow: {strength: 0.6, velocity: [3 * cos(0.7), 3 * sin(0.7)]}
 }
 
 // The sky lit by the sun. The Atmosphere singleton is also the environment the world view takes

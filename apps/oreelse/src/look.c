@@ -1,8 +1,9 @@
 /**
  * @file look.c
  * @brief The look: the render quality tier of OreQuality applied to the surfaces and the world
- * view, the script function oreelse.cycleQuality() the pause screen's button calls, and the
- * script function oreelse.srgb() of the colors computed in script.
+ * view, the cloud shadows of the sun (OreCloudShadow), the script function
+ * oreelse.cycleQuality() the pause screen's button calls, and the script function oreelse.srgb()
+ * of the colors computed in script.
  *
  * The settings of every tier are cfg.quality (etc/config.flecs). The tier starts High at every
  * start of the app (oreelse.flecs) and a restart keeps it.
@@ -120,6 +121,46 @@ static void OreQualityApply(
     }
 }
 
+/** Drive the cloud shadows of the sun: the strength of its LightCookie, OreCloudShadow.strength
+ * at the tiers with cfg.quality.cloud_shadows and 0 (no cookie) at the others, and its offset,
+ * the drift of OreCloudShadow.velocity over OreClock.elapsed wrapped to the size of the cookie.
+ *
+ * The original's clouds drifted with the game's time, which stops while paused, so the drift
+ * follows the clock of play, not the cookie's velocity, which box advances in every state: the
+ * clouds stand still on the title, pause and end screens, and a restart starts them over.
+ *
+ * It runs every frame in every state and writes only what differs.
+ *
+ * @param it Iterator over the lights with a LightCookie and an OreCloudShadow, with the
+ * OreQuality and OreClock singletons
+ */
+static void OreCloudShadowApply(
+    ecs_iter_t *it)
+{
+    LightCookie *cookie = ecs_field(it, LightCookie, 0);
+    const OreCloudShadow *clouds = ecs_field(it, OreCloudShadow, 1);
+    const OreQuality *quality = ecs_field(it, OreQuality, 2);
+    const OreClock *clock = ecs_field(it, OreClock, 3);
+    OreQualityTiers tiers = ecs_const_var_get_t(it->world, "cfg.quality", OreQualityTiers);
+    int32_t i, j, tier = (int32_t)quality->tier;
+    tier = tier < 0 ? 0 : tier;
+    tier = tier >= ORE_QUALITY_TIERS ? ORE_QUALITY_TIERS - 1 : tier;
+
+    for (i = 0; i < it->count; i ++) {
+        double size = cookie[i].size > 0 ? (double)cookie[i].size : 1.0;
+        bool changed = ore_look_float(&cookie[i].strength,
+            tiers.cloud_shadows[tier] ? clouds[i].strength : 0.0f);
+        for (j = 0; j < 2; j ++) {
+            double v = fmod((double)clouds[i].velocity[j] * (double)clock->elapsed, size);
+            changed |= ore_look_float(&cookie[i].offset[j], (float)(v < 0 ? v + size : v));
+        }
+
+        if (changed) {
+            ecs_modified(it->stage, it->entities[i], LightCookie);
+        }
+    }
+}
+
 /** Cycle the render quality tier down, High to Medium to Low and back to High, as the
  * original's pause screen button does.
  *
@@ -186,6 +227,18 @@ void ore_look_import(
             { .id = ecs_id(OreLook), .src.id = ecs_id(OreLook), .inout = EcsIn }
         },
         .callback = OreQualityApply
+    });
+
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "OreCloudShadowApply" }),
+        .phase = EcsPreStore,
+        .query.terms = {
+            { .id = ecs_id(LightCookie), .inout = EcsInOut },
+            { .id = ecs_id(OreCloudShadow), .inout = EcsIn },
+            { .id = ecs_id(OreQuality), .src.id = ecs_id(OreQuality), .inout = EcsIn },
+            { .id = ecs_id(OreClock), .src.id = ecs_id(OreClock), .inout = EcsIn }
+        },
+        .callback = OreCloudShadowApply
     });
 
     ecs_async_function(world, {
