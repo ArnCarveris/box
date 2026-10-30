@@ -720,9 +720,9 @@ fn attenuation(light: Light, l: vec3f, dist: f32) -> f32 {
 }
 
 // Light inputs. Every direct light the forward pass uses comes from here: the directional
-// lights of the scene, the first one through its shadow map and light cookie, then the point and spot lights
-// of the cluster of the fragment, a spot or point light with a tile of the shadow atlas through
-// it.
+// lights of the scene, the first one through its shadow map and light cookie, then the point
+// and spot lights of the cluster of the fragment, a spot or point light with a tile of the
+// shadow atlas through it.
 fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32) -> vec3f {
     var sum = vec3f(0.0);
     var shadow = shadow_factor(world, s.geometric);

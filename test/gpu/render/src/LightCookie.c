@@ -631,8 +631,9 @@ void LightCookie_particles_lit_by_cookie(void) {
     stbi_image_free(images[1]);
 }
 
-/** The sun shines straight down, so the wall facing the camera has only the light the floor
- * bounces, which the captures bake: a black moving cookie on the sun leaves it unchanged.
+/** The sun shines from behind the wall down onto the floor in front of it, so the wall facing
+ * the camera has only the light the floor bounces, which the captures bake: a black moving
+ * cookie on the sun leaves it unchanged.
  */
 void LightCookie_bake_ignores_cookie(void) {
     // lighting/light_cookie
@@ -660,7 +661,7 @@ void LightCookie_bake_ignores_cookie(void) {
         ecs_set(world, wall, Rgb, {255, 255, 255});
 
         ecs_entity_t sun = ecs_new_w_pair(world, EcsChildOf, scene);
-        ecs_set(world, sun, Rotation, {(float)GLM_PI_2, 0, 0});
+        ecs_set(world, sun, Rotation, {(float)GLM_PI_2 - 0.3f, 0, 0});
         ecs_set(world, sun, DirectionalLight, {.intensity = 2 * GLM_PIf});
         ecs_entity_t black = cookie_texture(world, COOKIE_BLACK_PNG);
         if (i) {
@@ -713,13 +714,14 @@ void LightCookie_bake_ignores_cookie(void) {
     stbi_image_free(images[1]);
 }
 
-/** The view covers exactly one tile of the noise with threshold 0.5 and softness 0: with no
- * ambient about half of the floor is black, as half of the stored texels are below 128.
+/** The view covers exactly one tile of the noise with threshold 0.5 and softness 0: about half
+ * of the floor is at the level of the ambient light alone, as half of the stored texels are
+ * below 128.
  */
 void LightCookie_noise_coverage(void) {
     // lighting/light_cookie
     ecs_entity_t sun;
-    ecs_world_t *world = cookie_world(0, &sun);
+    ecs_world_t *world = cookie_world(1, &sun);
     ecs_entity_t noise = cookie_texture(world, COOKIE_NOISE_PNG);
     LightCookie *c = cookie_set(world, sun, noise, 8, 0);
     c->threshold = 0.5f;
@@ -727,16 +729,21 @@ void LightCookie_noise_coverage(void) {
     c->strength = 1;
     ecs_modified(world, sun, LightCookie);
     unsigned char *px = cookie_capture(world, "coverage.png", 2);
+    ecs_remove(world, sun, LightCookie);
+    ecs_set(world, sun, DirectionalLight, {.intensity = 0});
+    unsigned char *ambient = cookie_capture(world, "coverage_ambient.png", 2);
 
     int32_t i, dark = 0;
     for (i = 0; i < SIZE * SIZE; i ++) {
-        dark += px[i * 4 + 1] <= 2;
+        dark += abs((int32_t)px[i * 4 + 1] - (int32_t)ambient[i * 4 + 1]) <= 2;
     }
 
     float coverage = (float)dark / (float)(SIZE * SIZE);
+    test_assert(lum(ambient, 32, 32) > 0.01f);
     test_assert(coverage > 0.45f);
     test_assert(coverage < 0.55f);
 
     stbi_image_free(px);
+    stbi_image_free(ambient);
     ecs_fini(world);
 }

@@ -8,8 +8,8 @@ using box.light
 
 // Cloud shadows: the sun carries a LightCookie of the seamless fbm noise (CookieNoise, the
 // 256 texel copy of the tests, loaded single_channel so its stored values are read), projected
-// along the sun onto a plane 30 units up and repeating every 40 units. Threshold 0.55 and
-// softness 0.15 leave a few soft edged clouds in view, drifting with a slow wind. The cookie
+// along the sun onto a plane 30 units up and repeating every 60 units. Threshold 0.4 and
+// softness 0.12 leave a few soft edged clouds in view, drifting with a slow wind. The cookie
 // scales only the direct sunlight, so the shadowed ground and the sides of the shapes away from
 // the sun keep their ambient light.
 
@@ -35,7 +35,7 @@ sun {
   Rotation: {0.85, 0.5, 0}
   DirectionalLight: {intensity: 1.6 * flecs.script.math.PI}
   Rgb: {255, 244, 228}
-  LightCookie: {texture: clouds, size: 40, height: 30, threshold: 0.55, softness: 0.15, velocity: {1.5, 0.5}}
+  LightCookie: {texture: clouds, size: 60, height: 30, threshold: 0.4, softness: 0.12, velocity: {1.5, 0.5}}
 }
 
 ground {
