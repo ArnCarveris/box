@@ -34,6 +34,7 @@
 #include "box/ui.h"
 #include "box/console.h"
 #include "box/editor.h"
+#include "box/fps.h"
 #include "box/atmosphere.h"
 #include "box/particle.h"
 

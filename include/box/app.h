@@ -105,6 +105,19 @@ ECS_STRUCT(FrameTiming, {
     int64_t total_dropped;  /**< Dropped frames since the world started */
 });
 
+/** Wall time between the starts of the recent frames, one sample per frame: the intervals of
+ * FrameTiming, written by the engine at the start of every frame while hold is false.
+ *
+ * Read the samples with box_frame_sample. Tests and captures that show fixed samples write
+ * interval, count and next and set hold. The size of interval is BOX_FRAME_WINDOW.
+ */
+ECS_STRUCT(FrameSamples, {
+    double interval[240];   /**< Intervals in milliseconds, a ring of BOX_FRAME_WINDOW */
+    int32_t count;          /**< Samples stored, at most BOX_FRAME_WINDOW */
+    int32_t next;           /**< Slot the next sample goes to */
+    bool hold;              /**< The engine adds no samples, so fixed samples stay */
+});
+
 /** Seconds between two passes over the watched files when FileWatch is not set */
 #define BOX_FILE_WATCH_INTERVAL (0.25f)
 
@@ -164,6 +177,25 @@ int box_app_parse(
  */
 char* box_app_locate(
     const char *path);
+
+/** Add a sample to FrameSamples, over the oldest one when the ring is full.
+ *
+ * @param samples The samples
+ * @param interval_ms The interval of the frame in milliseconds
+ */
+void box_frame_samples_add(
+    FrameSamples *samples,
+    double interval_ms);
+
+/** Get a sample of FrameSamples by its age.
+ *
+ * @param samples The samples
+ * @param age 0 for the newest sample, 1 for the one before it
+ * @return The interval in milliseconds, 0 when there is no sample of that age
+ */
+double box_frame_sample(
+    const FrameSamples *samples,
+    int32_t age);
 
 /** Block the calling thread with an OS sleep until a time on the ecs_os_get_time clock.
  *

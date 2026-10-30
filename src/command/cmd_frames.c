@@ -1,14 +1,19 @@
 /**
  * @file command/cmd_frames.c
- * @brief The fps and frames commands: the frame rate cap and the timing of the recent frames.
+ * @brief The fps and frames commands: the fps panel, the frame rate cap and the timing of the
+ * recent frames.
  *
- * Both print FrameTiming and RenderStatus in a few lines: the rate, the cap, vsync, the delta
- * against the wall time, the presents and the late and dropped frames. fps <rate> sets App.fps.
+ * fps toggles FpsPanel.open, box.fps opens and closes the panel from that change, and fps <rate>
+ * sets App.fps. frames prints FrameTiming and RenderStatus in a few lines: the rate, the cap,
+ * vsync, the delta against the wall time, the presents and the late and dropped frames.
  */
 
 #include "command.h"
 #include <float.h>
 #include <math.h>
+
+/** Path of the FpsPanel singleton, looked up because box.fps is imported after box.command */
+#define BOX_CMD_FPS_COMPONENT "box.fps.FpsPanel"
 
 /** Append the line of a range of frame times.
  *
@@ -117,8 +122,38 @@ static void box_cmd_frames(
     box_cmd_frames_print(ctx, result);
 }
 
-/** The fps command: set App.fps, the target fps of flecs, when given a rate, else print the
- * timing of the recent frames like frames.
+/** Toggle FpsPanel.open and return the new state.
+ *
+ * @param ctx The call context
+ * @param result Receives "true" when the panel is now open, else "false"
+ */
+static void box_cmd_fps_toggle(
+    const ecs_function_ctx_t *ctx,
+    ecs_value_t *result)
+{
+    ecs_world_t *world = ctx->world;
+    ecs_entity_t comp = ecs_lookup(world, BOX_CMD_FPS_COMPONENT);
+    FpsPanel *panel;
+    if (!comp || comp != ecs_id(FpsPanel)) {
+        ecs_err("box.fps is not imported");
+        goto done;
+    }
+
+    panel = ecs_singleton_get_mut(world, FpsPanel);
+    if (!panel) {
+        ecs_err("the world has no FpsPanel");
+        goto done;
+    }
+
+    panel->open = !panel->open;
+    ecs_singleton_modified(world, FpsPanel);
+    *(char**)result->ptr = ecs_os_strdup(panel->open ? "true" : "false");
+done:
+    return;
+}
+
+/** The fps command: set App.fps, the target fps of flecs, when given a rate, else toggle the
+ * fps panel.
  *
  * @param ctx The call context
  * @param argc Number of arguments
@@ -134,7 +169,7 @@ static void box_cmd_fps(
     double fps;
     App *app;
     if (argc < 1) {
-        box_cmd_frames_print(ctx, result);
+        box_cmd_fps_toggle(ctx, result);
         goto done;
     }
 
@@ -166,13 +201,13 @@ void box_cmd_frames_init(
     ecs_world_t *world)
 {
     box_command_register(world,
-        "Set the frame rate cap, 0 for none, or show the frame timing like frames",
+        "Show or hide the fps panel, or set the frame rate cap, 0 for none",
         (ecs_function_desc_t){
             .name = "fps",
             .return_type = ecs_id(ecs_string_t),
             .params = {
                 { .name = "rate", .type = ecs_id(ecs_f64_t), .optional = true,
-                  .brief = "Frame rate cap, 0 for none (default: show the timing)" }
+                  .brief = "Frame rate cap, 0 for none (default: toggle the panel)" }
             },
             .callback = box_cmd_fps
         });

@@ -295,6 +295,12 @@
                     "pick_panel_and_console",
                     "panel_blocks_game"
                 ]
+            },
+            {
+                "id": "FpsPanel",
+                "testcases": [
+                    "between_editor_and_console"
+                ]
             }
         ]
     }

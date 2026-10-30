@@ -41,6 +41,9 @@ typedef struct box_app_clock_t {
     box_app_series_t dropped;   /**< 1 for a recent dropped frame, else 0 */
 } box_app_clock_t;
 
+_Static_assert(sizeof(((FrameSamples*)0)->interval) == BOX_FRAME_WINDOW * sizeof(double),
+    "FrameSamples.interval holds BOX_FRAME_WINDOW samples");
+
 /** Name of the system whose context is the clock of the frame loop */
 #define BOX_APP_TIMING_SYSTEM "box.app.FrameTimingUpdate"
 
@@ -218,6 +221,48 @@ static double box_app_series_range(
     return sum;
 }
 
+/** Get the slot of a ring of FrameSamples, from a slot that a script may have set out of range.
+ *
+ * @param slot The slot
+ * @return The slot in 0..BOX_FRAME_WINDOW - 1
+ */
+static int32_t box_frame_slot(
+    int32_t slot)
+{
+    int32_t result = slot % BOX_FRAME_WINDOW;
+
+    return result < 0 ? result + BOX_FRAME_WINDOW : result;
+}
+
+void box_frame_samples_add(
+    FrameSamples *samples,
+    double interval_ms)
+{
+    int32_t slot = box_frame_slot(samples->next);
+    samples->interval[slot] = interval_ms;
+    samples->next = box_frame_slot(slot + 1);
+    if (samples->count < 0) {
+        samples->count = 0;
+    }
+
+    if (samples->count < BOX_FRAME_WINDOW) {
+        samples->count ++;
+    }
+}
+
+double box_frame_sample(
+    const FrameSamples *samples,
+    int32_t age)
+{
+    int32_t count = samples->count < BOX_FRAME_WINDOW ? samples->count : BOX_FRAME_WINDOW;
+    double result = 0;
+    if (age >= 0 && age < count) {
+        result = samples->interval[box_frame_slot(samples->next - 1 - age)];
+    }
+
+    return result;
+}
+
 /** Get the clock of the frame loop of a world.
  *
  * @param world The world
@@ -246,6 +291,7 @@ static void BoxAppTiming(
         ? ecs_singleton_get(it->world, RenderStatus)
         : NULL;
     FrameTiming *timing = ecs_singleton_get_mut(it->world, FrameTiming);
+    FrameSamples *samples = ecs_singleton_get_mut(it->world, FrameSamples);
     FrameRange counts;
     double now = box_app_wall_time();
     double delta = (double)ecs_get_world_info(it->world)->delta_time_raw * 1000.0;
@@ -261,6 +307,10 @@ static void BoxAppTiming(
     dropped = target > 0 && interval > target * BOX_FRAME_DROPPED;
     box_app_series_add(&clock->delta, delta);
     box_app_series_add(&clock->interval, interval);
+    if (samples && !samples->hold) {
+        box_frame_samples_add(samples, interval);
+    }
+
     box_app_series_add(&clock->error, fabs(delta - interval));
     box_app_series_add(&clock->late, late);
     box_app_series_add(&clock->dropped, dropped);
@@ -452,6 +502,8 @@ void BoxAppImport(
     ECS_META_COMPONENT(world, AppStatus);
     ECS_META_COMPONENT(world, FrameRange);
     ECS_META_COMPONENT(world, FrameTiming);
+    ECS_META_COMPONENT(world, FrameSamples);
+    ecs_set_hooks(world, FrameSamples, { .ctor = flecs_default_ctor });
     box_owned_hooks(world, App, BOX_OWNED_STR(App, scene), BOX_OWNED_STR(App, camera),
         BOX_OWNED_STR(App, out));
     box_owned_hooks(world, AppStatus, BOX_OWNED_STR(AppStatus, tmp_dir));
@@ -461,6 +513,7 @@ void BoxAppImport(
 
     ecs_singleton_set(world, AppStatus, {0});
     ecs_singleton_set(world, FrameTiming, {0});
+    ecs_singleton_add(world, FrameSamples);
     box_file_watch_init(world);
 
     ecs_observer(world, {

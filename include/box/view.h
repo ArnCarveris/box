@@ -102,6 +102,9 @@ ECS_STRUCT(ViewEffect, {
  */
 #define BOX_VIEW_ORDER_EDITOR (1000000)
 
+/** Order of the view of the fps panel: over the editor, under the console */
+#define BOX_VIEW_ORDER_FPS (1500000)
+
 /** Order of the view of the in game console, which renders after every other view */
 #define BOX_VIEW_ORDER_CONSOLE (2000000)
 
@@ -120,7 +123,8 @@ ECS_STRUCT(View, {
     CullSettings culling;           /**< Cull settings */
     ecs_vec(ViewEffect) effects;    /**< Post process effects */
     int32_t order;                  /**< Render order, default 0; box's overlays use
-                                     *   BOX_VIEW_ORDER_EDITOR and BOX_VIEW_ORDER_CONSOLE */
+                                     *   BOX_VIEW_ORDER_EDITOR, BOX_VIEW_ORDER_FPS and
+                                     *   BOX_VIEW_ORDER_CONSOLE */
 });
 
 /** Component added to scene root.

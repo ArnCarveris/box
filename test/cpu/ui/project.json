@@ -423,6 +423,28 @@
                 ]
             },
             {
+                "id": "FpsPanel",
+                "testcases": [
+                    "closed_by_default",
+                    "open_creates_view",
+                    "close_removes_view",
+                    "reopen",
+                    "open_from_script",
+                    "command_toggles",
+                    "command_rate_keeps_panel",
+                    "help_brief",
+                    "view_order",
+                    "top_right",
+                    "no_input",
+                    "bar_colors",
+                    "bar_height_clamp",
+                    "samples_ring",
+                    "engine_records_samples",
+                    "bars_follow_samples",
+                    "bars_reused"
+                ]
+            },
+            {
                 "id": "Msdf",
                 "setup": true,
                 "testcases": [

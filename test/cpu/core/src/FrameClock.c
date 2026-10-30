@@ -170,7 +170,7 @@ void FrameClock_fps_command(void) {
     ecs_system(world, { .phase = EcsOnUpdate, .run = FakeWork });
     ecs_entity_t s = ecs_shell_session_init(world, NULL);
     bool error = false;
-    char *out = box_command_run(world, s, "fps", &error);
+    char *out = box_command_run(world, s, "frames", &error);
     test_bool(error, true);
     ecs_os_free(out);
 
@@ -178,19 +178,16 @@ void FrameClock_fps_command(void) {
         ecs_progress(world, 0);
     }
 
-    const char *names[] = { "fps", "frames" };
-    for (int i = 0; i < 2; i ++) {
-        out = box_command_run(world, s, names[i], &error);
-        test_bool(error, false);
-        test_assert(out != NULL);
-        test_assert(strstr(out, "100.0 fps") != NULL);
-        test_assert(strstr(out, "delta") != NULL);
-        test_assert(strstr(out, "interval") != NULL);
-        test_assert(strstr(out, "0 late") != NULL);
-        test_assert(strstr(out, "no cap") != NULL);
-        test_assert(strstr(out, "refresh") == NULL);
-        ecs_os_free(out);
-    }
+    out = box_command_run(world, s, "frames", &error);
+    test_bool(error, false);
+    test_assert(out != NULL);
+    test_assert(strstr(out, "100.0 fps") != NULL);
+    test_assert(strstr(out, "delta") != NULL);
+    test_assert(strstr(out, "interval") != NULL);
+    test_assert(strstr(out, "0 late") != NULL);
+    test_assert(strstr(out, "no cap") != NULL);
+    test_assert(strstr(out, "refresh") == NULL);
+    ecs_os_free(out);
 
     out = box_command_run(world, s, "fps 50", &error);
     test_bool(error, false);
