@@ -868,21 +868,23 @@ void InstanceStreams_text_relayout_uploads_no_surface(void) {
     ecs_world_t *world = text_world_new(&null);
     ecs_entity_t text = ecs_new(world);
     text_set(world, text, "relayout");
-    frame(world);
     box_render_draws_stats_t stats = frame(world);
+    box_render_draws_stats_t next = frame(world);
     test_int(ecs_vec_count(&ecs_get(world, text, TextSlots)->slots), 8);
-    test_int(stats.surface_bytes, 0);
-    test_int(stats.page_surface_bytes, 0);
+    test_assert(stats.shading_bytes + next.shading_bytes >= 8 * SHADING_2D);
+    test_int(stats.surface_bytes + next.surface_bytes, 0);
+    test_int(next.page_surface_bytes, 0);
 
     stats = frame(world);
     test_int(stats.surface_bytes, 0);
 
-    text_set(world, text, "laid out");
+    text_set(world, text, "reworded");
     stats = frame(world);
-    stats = frame(world);
+    next = frame(world);
     test_int(ecs_vec_count(&ecs_get(world, text, TextSlots)->slots), 8);
-    test_int(stats.surface_bytes, 0);
-    test_int(stats.page_surface_bytes, 0);
+    test_assert(stats.shading_bytes + next.shading_bytes > 0);
+    test_int(stats.surface_bytes + next.surface_bytes, 0);
+    test_int(next.page_surface_bytes, 0);
 
     ecs_set(world, text, Position, {5, 1, 0});
     stats = frame(world);
@@ -893,7 +895,7 @@ void InstanceStreams_text_relayout_uploads_no_surface(void) {
 
     text_set(world, text, "a much longer text");
     stats = frame(world);
-    box_render_draws_stats_t next = frame(world);
+    next = frame(world);
     test_int(stats.surface_bytes + next.surface_bytes, 0);
     test_int(next.page_surface_bytes, 0);
 
