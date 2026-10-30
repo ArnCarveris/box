@@ -155,12 +155,6 @@ char* box_command_run(
     char **errors = ecs_vec_first(&r.errors);
     ecs_value_t *results = ecs_vec_first(&r.results);
     int32_t i, count = ecs_vec_count(&r.errors);
-<<<<<<< HEAD
-    const ecs_value_t *last = box_command_value(&r);
-    char *out = (count || !last) ? NULL : box_command_format(world, last);
-    if (out) {
-        ecs_strbuf_appendstr(&buf, out);
-=======
     int32_t result_count = count ? 0 : ecs_vec_count(&r.results);
 
     for (i = 0; i < result_count; i ++) {
@@ -173,7 +167,6 @@ char* box_command_run(
         }
 
         box_command_format_buf(world, results[i].type, results[i].ptr, &buf);
->>>>>>> a8b5c6219466fa3d8ac0e15354c128d562b40b74
     }
 
     for (i = 0; i < count; i ++) {

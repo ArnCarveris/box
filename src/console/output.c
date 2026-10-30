@@ -1470,11 +1470,6 @@ void box_console_out_run(
         ecs_os_free(path);
     }
 
-<<<<<<< HEAD
-    const ecs_value_t *last = box_command_value(&r);
-    if (!count && last && last->type && last->ptr) {
-        box_console_fmt_value(&fmt, last->type, last->ptr);
-=======
     ecs_value_t *results = ecs_vec_first(&r.results);
     int32_t result_count = count ? 0 : ecs_vec_count(&r.results);
     for (i = 0; i < result_count; i ++) {
@@ -1485,7 +1480,6 @@ void box_console_out_run(
 
             box_console_fmt_value(&fmt, results[i].type, results[i].ptr);
         }
->>>>>>> a8b5c6219466fa3d8ac0e15354c128d562b40b74
     }
 
     for (i = 0; i < count; i ++) {
