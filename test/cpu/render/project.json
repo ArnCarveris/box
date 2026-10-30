@@ -393,7 +393,9 @@
                     "transform_batch_moved",
                     "transform_prefab_instances",
                     "transform_text_and_2d",
-                    "transform_targets_on_game_thread"
+                    "transform_targets_on_game_thread",
+                    "record_sizes",
+                    "idle_no_work"
                 ]
             },
             {
@@ -411,6 +413,7 @@
                     "cutoff_2d",
                     "cutoff_batch",
                     "prefab_one_slot",
+                    "prefab_nested_instance",
                     "unrelated_owners",
                     "instance_override",
                     "prefab_inherited_2d",

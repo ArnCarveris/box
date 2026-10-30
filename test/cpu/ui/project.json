@@ -415,7 +415,17 @@
                     "history_filter",
                     "autosuggest",
                     "hint_on_first_open",
-                    "type_from_script"
+                    "type_from_script",
+                    "complete_command_unique",
+                    "complete_command_ambiguous",
+                    "complete_help_topic",
+                    "complete_entity_in_scope",
+                    "complete_dotted_path",
+                    "complete_entity_with_children",
+                    "complete_not_in_string",
+                    "complete_cycle",
+                    "complete_escape_closes_list",
+                    "complete_typing_closes_list"
                 ]
             },
             {

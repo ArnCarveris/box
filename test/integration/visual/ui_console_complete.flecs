@@ -1,0 +1,60 @@
+// The in game console with the candidate list of Tab completion open under the prompt, over a
+// plain scene. The session is in items and the input line is cat with an empty argument: Tab
+// listed the children of items, colored by kind (the Glow component, the other entities), and
+// two more Tabs made ladder, the second of them, the active candidate, highlighted in the list
+// and inserted after cat.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.console
+
+camera {
+  Position: {0, 2.5, 6}
+  Rotation: {-0.35, 0, 0}
+  Camera: {fov: 60}
+}
+
+main_view {
+  View: {
+    camera: camera,
+    clear: {enabled: true, color: {120, 150, 190, 255}}
+  }
+}
+
+sun {
+  Rotation: {0.7359, 2.3726, 0}
+  DirectionalLight: {intensity: 2 * flecs.script.math.PI}
+  Rgb: {255, 244, 225}
+}
+
+cube {
+  Position: {0, 0.5, 0}
+  Rotation: {0, 0.4, 0}
+  Box: {1, 1, 1}
+  Rgb: {220, 90, 60}
+  PbrMaterial: {roughness: 0.4, metallic: 0}
+}
+
+items {
+  struct Glow(intensity: f32)
+  lamp {
+    wick {}
+  }
+  ladder {}
+  lantern {}
+  rope {}
+  toolbox {}
+}
+
+const enter_items: string = box.console.run("cd items")
+const typed: string = box.console.type("cat ")
+const listed: string = box.console.complete(false)
+const cycled: string = box.console.complete(false)
+const cycled_again: string = box.console.complete(false)
+
+$ {
+  Console: {open: true}
+}
