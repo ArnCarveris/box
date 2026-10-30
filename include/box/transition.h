@@ -109,14 +109,13 @@ void box_transition_set(
 
 /** Remove the transition of one component of an entity.
  *
- * An entity that inherits Transition gets its own copy first, so the other entries stay and the
- * prefab is unchanged. The allocated TransitionSpec is freed and OnSet is emitted. A running
- * transition of the component snaps to its target. Removing the last entry leaves Transition on
- * the entity with an empty map; it does not remove the component. Nothing happens when the
- * entity has no entry for the component, owned or inherited: Transition is not added, an
- * inherited map is not copied and OnSet is not emitted. Works deferred on a stage, like
- * box_transition_set(); there the entry is looked up in the merged state, so an entry set on the
- * stage before the same merge is not seen.
+ * An inherited map is copied first, so the prefab is unchanged. The TransitionSpec is freed and
+ * OnSet is emitted. Removing the last entry leaves Transition with an empty map; it does not
+ * remove the component. Works deferred, like box_transition_set().
+ *
+ * Without an entry for the component, owned or inherited, nothing happens: no Transition is
+ * added, no map is copied and no OnSet is emitted. Deferred, the entry is looked up in the merged
+ * state, so an entry set on the same stage before the merge is not seen.
  *
  * @param world The world
  * @param entity The entity

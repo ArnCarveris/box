@@ -60,6 +60,34 @@ static int64_t transition_live_allocs(void) {
     return ecs_os_api_malloc_count + ecs_os_api_calloc_count - ecs_os_api_free_count;
 }
 
+/** Count an OnSet of Transition.
+ *
+ * @param it Iterator over the entities whose Transition was set, ctx points at the count
+ */
+static void transition_count_set(
+    ecs_iter_t *it)
+{
+    int32_t *count = it->ctx;
+    *count += it->count;
+}
+
+/** Count OnSet events of Transition.
+ *
+ * @param world The world
+ * @param count The count to increase
+ */
+static void transition_observe_set(
+    ecs_world_t *world,
+    int32_t *count)
+{
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(Transition) }},
+        .events = { EcsOnSet },
+        .callback = transition_count_set,
+        .ctx = count
+    });
+}
+
 /** Whether two floats are within a tolerance.
  *
  * @param a First value
@@ -316,8 +344,11 @@ void Transition_remove_owned(void) {
     box_transition_set(world, e, ecs_id(Scale), &(TransitionSpec){ .duration = 3.0f });
     const Transition *map = ecs_get(world, e, Transition);
     test_int(ecs_map_count(map), 3);
+    int32_t sets = 0;
+    transition_observe_set(world, &sets);
 
     box_transition_remove(world, e, ecs_id(Rgb));
+    test_int(sets, 1);
     test_assert(ecs_owns(world, e, Transition));
     test_assert(ecs_get(world, e, Transition) == map);
     test_int(ecs_map_count(map), 2);
@@ -327,6 +358,7 @@ void Transition_remove_owned(void) {
 
     box_transition_remove(world, e, ecs_id(Rgb));
     box_transition_remove(world, e, ecs_id(Opacity));
+    test_int(sets, 1);
     test_int(ecs_map_count(ecs_get(world, e, Transition)), 2);
     test_flt(box_transition_get(world, e, ecs_id(Position))->duration, 1.0f);
     test_flt(box_transition_get(world, e, ecs_id(Scale))->duration, 3.0f);
@@ -334,6 +366,7 @@ void Transition_remove_owned(void) {
     ecs_entity_t plain = ecs_new(world);
     box_transition_remove(world, plain, ecs_id(Position));
     test_assert(!ecs_has(world, plain, Transition));
+    test_int(sets, 1);
 
     ecs_fini(world);
 }
@@ -376,8 +409,11 @@ void Transition_remove_inherited_missing(void) {
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
     box_transition_set(world, prefab, ecs_id(Position), &(TransitionSpec){ .duration = 1.0f });
     ecs_entity_t inst = ecs_new_w_pair(world, EcsIsA, prefab);
+    int32_t sets = 0;
+    transition_observe_set(world, &sets);
 
     box_transition_remove(world, inst, ecs_id(Rgb));
+    test_int(sets, 0);
     test_assert(ecs_has(world, inst, Transition));
     test_assert(!ecs_owns(world, inst, Transition));
     test_assert(ecs_get(world, inst, Transition) == ecs_get(world, prefab, Transition));
@@ -394,10 +430,14 @@ void Transition_remove_last(void) {
     ecs_entity_t e = ecs_new(world);
     box_transition_set(world, e, ecs_id(Position), &(TransitionSpec){ .duration = 1.0f });
 
+    int32_t sets = 0;
+    transition_observe_set(world, &sets);
+
     transition_capture_begin();
     box_transition_remove(world, e, ecs_id(Position));
     char *errors = transition_capture_end();
     test_assert(errors == NULL);
+    test_int(sets, 1);
 
     test_assert(ecs_owns(world, e, Transition));
     const Transition *map = ecs_get(world, e, Transition);
@@ -616,9 +656,12 @@ void Transition_deferred_remove(void) {
     test_flt(box_transition_get(world, d.prefab, ecs_id(Rgb))->duration, 2.0f);
 
     ecs_entity_t missing = ecs_new_w_pair(world, EcsIsA, d.prefab);
+    int32_t sets = 0;
+    transition_observe_set(world, &sets);
     box_transition_remove(stage, missing, ecs_id(Scale));
     box_transition_remove(stage, d.plain, ecs_id(Position));
     ecs_merge(stage);
+    test_int(sets, 0);
     test_assert(!ecs_owns(world, missing, Transition));
     test_int(ecs_map_count(ecs_get(world, d.plain, Transition)), 1);
 
