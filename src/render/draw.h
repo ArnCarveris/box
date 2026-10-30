@@ -533,6 +533,10 @@ bool box_draws_caster(
  * element, between two transforms: those of its local bounds, from its surface record for a
  * surface instance or else from the mesh of the batch. Equal transforms give one transform.
  *
+ * Each term of a row picks its corner coordinate apart from the others and rounded sums keep
+ * their order, so the sums of the least and the largest terms are the bounds of the 8 corners,
+ * bit for bit, with a quarter of the products.
+ *
  * @param world The world, whose mesh cache has the mesh of the batch
  * @param b The batch
  * @param lo The minimum of each element of the transform

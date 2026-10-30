@@ -158,8 +158,13 @@ void box_draws_range_local(
     box_draw_transition_range_t ry, rx, rz;
     int32_t i, col, row;
     for (i = 0; i < 3; i ++) {
-        box_draws_range_wave(lo[1][i], hi[1][i], false, &sin_lo[i], &sin_hi[i]);
-        box_draws_range_wave(lo[1][i], hi[1][i], true, &cos_lo[i], &cos_hi[i]);
+        if (lo[1][i] == hi[1][i]) {
+            sin_lo[i] = sin_hi[i] = sinf(lo[1][i]);
+            cos_lo[i] = cos_hi[i] = cosf(lo[1][i]);
+        } else {
+            box_draws_range_wave(lo[1][i], hi[1][i], false, &sin_lo[i], &sin_hi[i]);
+            box_draws_range_wave(lo[1][i], hi[1][i], true, &cos_lo[i], &cos_hi[i]);
+        }
     }
 
     box_draws_range_point(GLM_MAT4_IDENTITY, &ry);
@@ -283,15 +288,21 @@ void box_draws_range_region(
     mat4 rel,
     box_render_shadow_region_t *out)
 {
-    box_draw_transition_range_t m;
     box_render_transform_t lo, hi;
-    int32_t row, col;
-    box_draws_range_point(rel, &m);
-    box_draws_range_mul(range, &m, &m);
+    int32_t row, col, k;
     for (row = 0; row < 3; row ++) {
         for (col = 0; col < 4; col ++) {
-            lo.rows[row][col] = m.lo[col][row];
-            hi.rows[row][col] = m.hi[col][row];
+            float p_lo = 0.0f, p_hi = 0.0f;
+            for (k = 0; k < 4; k ++) {
+                float t_lo, t_hi;
+                box_draws_range_scale(rel[col][k], range->lo[k][row], range->hi[k][row],
+                    &t_lo, &t_hi);
+                p_lo += t_lo;
+                p_hi += t_hi;
+            }
+
+            lo.rows[row][col] = p_lo;
+            hi.rows[row][col] = p_hi;
         }
     }
 

@@ -515,7 +515,7 @@ bool box_draws_shadow_bounds(
     const box_mesh_cache_t *cache = NULL;
     const box_mesh_t *mesh = NULL;
     vec3 min, max;
-    int32_t c, r, k;
+    int32_t r, k;
     bool result = false;
     if (surface && surface->p[0][0] != 0.0f) {
         for (r = 0; r < 3; r ++) {
@@ -534,29 +534,19 @@ bool box_draws_shadow_bounds(
     }
 
     out->scene = b->key.scene;
-    glm_vec3_fill(out->min, FLT_MAX);
-    glm_vec3_fill(out->max, -FLT_MAX);
-    for (c = 0; c < 8; c ++) {
-        vec3 local = {
-            (c & 1) ? max[0] : min[0],
-            (c & 2) ? max[1] : min[1],
-            (c & 4) ? max[2] : min[2]
-        };
-        for (r = 0; r < 3; r ++) {
-            const float *row_lo = lo->rows[r];
-            const float *row_hi = hi->rows[r];
-            float world_lo = 0.0f, world_hi = 0.0f;
-            for (k = 0; k < 3; k ++) {
-                float a = row_lo[k] * local[k], z = row_hi[k] * local[k];
-                world_lo += glm_min(a, z);
-                world_hi += glm_max(a, z);
-            }
-
-            world_lo += row_lo[3];
-            world_hi += row_hi[3];
-            out->min[r] = glm_min(out->min[r], world_lo);
-            out->max[r] = glm_max(out->max[r], world_hi);
+    for (r = 0; r < 3; r ++) {
+        const float *row_lo = lo->rows[r];
+        const float *row_hi = hi->rows[r];
+        float world_lo = 0.0f, world_hi = 0.0f;
+        for (k = 0; k < 3; k ++) {
+            float p0 = row_lo[k] * min[k], p1 = row_lo[k] * max[k];
+            float p2 = row_hi[k] * min[k], p3 = row_hi[k] * max[k];
+            world_lo += glm_min(glm_min(p0, p1), glm_min(p2, p3));
+            world_hi += glm_max(glm_max(p0, p1), glm_max(p2, p3));
         }
+
+        out->min[r] = world_lo + row_lo[3];
+        out->max[r] = world_hi + row_hi[3];
     }
 
     result = true;

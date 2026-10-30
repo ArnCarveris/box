@@ -44,6 +44,7 @@
                     "casters_move_1000_no_shadows",
                     "casters_turn_1000_shadows",
                     "casters_parent_1000_shadows",
+                    "shadeless_move_1000_shadows",
                     "resolve_empty"
                 ]
             },

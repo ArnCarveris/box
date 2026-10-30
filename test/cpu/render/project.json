@@ -445,7 +445,8 @@
                     "nested_childof",
                     "nested_parent",
                     "group_parent",
-                    "range_mul_single"
+                    "range_mul_single",
+                    "bounds_corners"
                 ]
             },
             {

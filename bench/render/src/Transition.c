@@ -7,7 +7,8 @@
  * and report the ms per frame of the transition systems. The large scene is that of Extract.c.
  *
  * The caster cases move 1000 boxes under shadowed spot lights, against the same scene without
- * shadows, to measure the range math of the shadow regions.
+ * shadows, to measure the range math of the shadow regions, and the shadeless case moves 1000
+ * boxes with NoShadow under the same lights, which need no range.
  */
 
 #include <box.h>
@@ -192,10 +193,12 @@ static void bench_tr_caster_place(
  * @param b The state of the case
  * @param children Whether the boxes are plain children of one transitioning box, which is the
  * only shape with Transition
+ * @param cast Whether the boxes cast shadows, else they have NoShadow
  */
 static void bench_tr_caster_scene(
     bench_tr_t *b,
-    bool children)
+    bool children,
+    bool cast)
 {
     ecs_world_t *world = b->world;
     TransitionSpec spec = { .duration = 0.5f, .timing_function = EaseInOut };
@@ -220,6 +223,10 @@ static void bench_tr_caster_scene(
         ecs_set_ptr(world, e, Position, &at);
         ecs_set(world, e, Box, {0.4f, 0.8f, 0.4f});
         ecs_set(world, e, Rgb, {200, 120, 80});
+        if (!cast) {
+            ecs_add(world, e, NoShadow);
+        }
+
         if (b->mode == BENCH_TR_TURN) {
             ecs_set(world, e, Rotation, {0, 0, 0});
             ecs_set(world, e, Scale, {1, 1, 1});
@@ -394,15 +401,17 @@ static void bench_tr_large(
  * @param mode BENCH_TR_MOVE or BENCH_TR_TURN
  * @param shadows Whether the spot lights have shadows, which turns the shadow tiles on
  * @param children Whether the boxes are plain children of one transitioning box
+ * @param cast Whether the boxes cast shadows, else they have NoShadow
  */
 static void bench_tr_casters(
     bench_t *bench,
     bench_tr_mode_t mode,
     bool shadows,
-    bool children)
+    bool children,
+    bool cast)
 {
     bench_tr_t b = { .world = bench_tr_lit_world(shadows), .mode = mode };
-    bench_tr_caster_scene(&b, children);
+    bench_tr_caster_scene(&b, children, cast);
     bench_tr_run(bench, &b);
 }
 
@@ -480,28 +489,35 @@ void Transition_casters_move_1000_shadows(
     bench_t *b)
 {
     // engine_core/transition
-    bench_tr_casters(b, BENCH_TR_MOVE, true, false);
+    bench_tr_casters(b, BENCH_TR_MOVE, true, false, true);
 }
 
 void Transition_casters_move_1000_no_shadows(
     bench_t *b)
 {
     // engine_core/transition
-    bench_tr_casters(b, BENCH_TR_MOVE, false, false);
+    bench_tr_casters(b, BENCH_TR_MOVE, false, false, true);
 }
 
 void Transition_casters_turn_1000_shadows(
     bench_t *b)
 {
     // engine_core/transition
-    bench_tr_casters(b, BENCH_TR_TURN, true, false);
+    bench_tr_casters(b, BENCH_TR_TURN, true, false, true);
 }
 
 void Transition_casters_parent_1000_shadows(
     bench_t *b)
 {
     // engine_core/transition
-    bench_tr_casters(b, BENCH_TR_TURN, true, true);
+    bench_tr_casters(b, BENCH_TR_TURN, true, true, true);
+}
+
+void Transition_shadeless_move_1000_shadows(
+    bench_t *b)
+{
+    // engine_core/transition
+    bench_tr_casters(b, BENCH_TR_MOVE, true, false, false);
 }
 
 void Transition_resolve_empty(
