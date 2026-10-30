@@ -174,17 +174,18 @@ static void box_draws_text_key(
     box_draw_key_t *key)
 {
     const BackFaceMode *back_face = ecs_get(world, e, BackFaceMode);
+    bool fading = ecs_has_id(world, e, TransitionOpacity);
     ecs_os_memset_t(key, 0, box_draw_key_t);
     key->scene = box_render_scene_of(world, e);
     key->mesh = d->text_mesh;
     key->pipeline = BOX_RENDER_SHADER_SHAPE2D;
-    key->blend = box_draws_blend(ecs_get(world, e, BlendMode), alpha, false);
+    key->blend = box_draws_blend(ecs_get(world, e, BlendMode), fading ? 0.0f : alpha, false);
     key->back_face = back_face ? (uint8_t)*back_face : (uint8_t)BackFaceCull;
     key->wrap = WrapClamp;
     key->dynamic_transform = box_transform_dynamic(world, ecs_get_table(world, e)) ||
         ecs_has_id(world, e, TransitionTransform);
     key->dynamic_material = ecs_has_id(world, e, DynamicMaterial) ||
-        ecs_has_id(world, e, TransitionMaterial) ||
+        ecs_has_id(world, e, TransitionMaterial) || fading ||
         ecs_get_target_for_id(world, e, EcsChildOf, DynamicMaterial) != 0;
 }
 

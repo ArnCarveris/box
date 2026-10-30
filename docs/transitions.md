@@ -10,8 +10,8 @@ thread resolver, which evaluates every transitioned value on the packet clock. T
 `Position`, `Rotation` and `Scale` render, for the entity and its descendants (see
 [Transform transitions](#transform-transitions)), and so do transitions of `Rgb`,
 `AlphaCutoff`, `PbrMaterial`, `Emissive` and `TextureTransform` (see
-[Material transitions](#material-transitions)). Tint and opacity transitions do not patch
-anything yet and are the next step of the epic.
+[Material transitions](#material-transitions)), and so do transitions of `Tint` and `Opacity`,
+composed down the hierarchy (see [Tint and opacity transitions](#tint-and-opacity-transitions)).
 
 ## What the application sees
 
@@ -341,6 +341,76 @@ Refinements of the design:
   `box_render_transitions_init`, instead of a lookup of the system by name. The extract keeps
   the batch state it found the first time (`box_draws_state` still looks it up by name).
 
+## Tint and opacity transitions
+
+Implemented in `src/render/transitions.c` (game thread), `src/render/transition.c` (render
+thread) and the encoding in `src/render/batch.c`.
+
+- `Tint` composes down `ChildOf` and `Parent`, and `Opacity` multiplies down the hierarchy
+  (`box_draws_fade`). A node *fades* in a frame when its `Tint` or `Opacity` is active at the
+  packet time and it is not a prefab. Neither is inherited over `IsA`, so the node is the entity
+  itself.
+- Before the batches are sent, the extract walks from every fading node without a fading
+  ancestor down its subtree, through `ChildOf` and `Parent`, skipping prefabs. It does not stop
+  at `ManualTransform`: tints and opacity do not depend on the transform. Each descendant
+  belongs to its nearest fading ancestor; a fading descendant is a node of its own whose parent
+  is that ancestor, so nodes come parent first.
+- Every drawn entity of the walk (mesh, 2D shape or text) carries `TransitionMaterial`, so its
+  slot is `dynamic_material` and out of the bakes, its shading run uploads every frame and its
+  shading has one byte location to patch. A 2D shape or text that a material transition did not
+  list joins the shadings to patch.
+- Every drawn entity at or below a node with an active `Opacity` transition also carries the
+  private tag `TransitionOpacity` (`(OnInstantiate, DontInherit)`). `box_draws_key` and the
+  glyph key compute the blend of a tagged shape as if its alpha were below 1, unless its
+  `BlendMode` says otherwise (`box_draws_blend`): a shape from opacity 0 to 1 has target 1 but
+  renders below 1, so it draws blended during the transition and casts no shadow. The tag is
+  removed in the first frame the transition no longer runs, `DrawsOnTransitionOpacity` rekeys the
+  slot, and it is back in the batch of its target, casting shadows again when it is opaque. The
+  tag is only checked where the key is computed; the per instance alpha check of the dynamic
+  shading path (`box_draws_fill_material`) is unchanged.
+- **No division.** A composed tint is an affine map of the display encoded color, `c * keep +
+  add`, and composing two is ordered, so the value of a node cannot be taken out of a composed
+  value (and an opacity of 0 cannot be divided out). After the batches, the extract sends per
+  fading node, parent first, a `FADE` record (`box_render_transition_fade_t`): the composed tint
+  and alpha of the entities strictly between its parent node and it (of every ancestor without
+  a parent node, `box_draws_fade`), and its target `Tint` and `Opacity`. The resolver composes
+  the rendered value of the parent node, that chain and the rendered value of the node, and
+  keeps both what is above the node and what it passes down.
+- Per drawn entity the shading record (`SHADING`) carries the nearest fading node
+  (`box_draw_transition_material_t.fade_node`) and the composed tint and alpha of the entities
+  strictly between the node and the entity (`fade_rel`, `fade_alpha`). The resolver replaces the
+  inherited tints and fade of the record by the node's composed value followed by that chain;
+  when the entity is the node itself (`fade_self`) it inherits what the node renders above it,
+  and its own `Tint` and `Opacity` are the rendered values of the node. The record then encodes
+  with the functions of the game thread: `box_draws_mesh_shading` for the tint and alpha of a
+  mesh shading (`BOX_DRAW_TRANSITION_MESH`, the material slot word is kept), and
+  `box_draws_material` for a 2D shape (color, emission, material and UV words, so the tinted
+  border color follows) and a glyph (color and emission).
+- A glyph of a colored `TextSpans` span renders with the alpha of the span times the rendered
+  `Opacity` of its text (`opacity_scale`).
+- A record whose node did not get a `FADE` record in the packet leaves the bytes as written: the
+  target.
+- `Opacity` and `Tint` on a light or another entity without a shape have no render effect
+  except through descendants: the entity gets no tag and no shading record, only its `FADE`
+  record, which its descendants read.
+- An alpha tested shadow caster (a mesh with `AlphaCutoff`, which keeps its opaque batch) under
+  a fading node records its region every frame of the transition, as its shadow reads the alpha.
+- The frame after the last active frame sends no records: the tags are removed, the slot rekeys
+  to its static batch and holds its target, byte for byte as without a transition.
+
+Refinements of the design:
+
+- The design asked for one record per slot with every ancestor node's own value left out, and
+  the resolver multiplying in the rendered values while walking the parent nodes. Tints compose
+  in order, not by multiplication, so the values left out must be put back at their place in the
+  chain: the game thread sends the chain between two nodes once per node (`FADE`, like `POSE`
+  for transforms) and the chain between the node and the entity per slot, and the resolver
+  composes them parent node first. Opacity, which commutes, goes the same way.
+- A `DynamicMaterial` shape under an active `Opacity` transition has its blend checked against
+  its target alpha by the dynamic shading path every frame, which marks it to rekey; the key it
+  gets is the blended one it has, so it stays in its slot. This costs a rekey check per frame
+  for such shapes only, and keeps the per instance branch out of that path.
+
 ## The fast path
 
 An application without transitions, and every entity without `Transition` in an application
@@ -354,8 +424,9 @@ that has them, pays nothing per entity:
 - The extract query has no matched tables when `Transition` is not used.
 
 The only observers the module adds are the OnSet validation of `Transition` itself,
-`DrawsOnTransitionTransform` and `DrawsOnTransitionMaterial`, on the private tags, which only
-entities a transition patches ever get. The material table records the runs it uploads, one
+`DrawsOnTransitionTransform`, `DrawsOnTransitionMaterial` and `DrawsOnTransitionOpacity`, on the
+private tags, which only entities a transition patches ever get. A frame without an active
+`Tint` or `Opacity` transition walks no entity for them. The material table records the runs it uploads, one
 entry per run. A frame without an active material transition walks no slot or entity, and a
 frame with one visits only the entities of its nodes and their `IsA` instances, never the other
 owners of the material table.

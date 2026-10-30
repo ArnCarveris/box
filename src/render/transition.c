@@ -230,6 +230,7 @@ static void box_transition_node_reset(
     node->listed = listed;
     node->alive = alive;
     node->posed = -1;
+    node->faded = -1;
 }
 
 /** Get the value a component of a node renders at a time, without changing it.
@@ -505,6 +506,143 @@ done:
     return;
 }
 
+/** Get the Tint and Opacity a node renders: the evaluated value while its transition runs,
+ * else the target the fade record carries.
+ *
+ * @param node The node
+ * @param fade The fade record
+ * @param tint Receives the tint, r, g, b, a
+ * @param opacity Receives the opacity, 1 without one
+ * @return Whether the node has a Tint
+ */
+static bool box_transition_fade_own(
+    const box_render_transition_node_t *node,
+    const box_render_transition_fade_t *fade,
+    uint8_t *tint,
+    float *opacity)
+{
+    const box_render_transition_value_t *t = &node->values[BOX_RENDER_TRANSITION_TINT];
+    const box_render_transition_value_t *o = &node->values[BOX_RENDER_TRANSITION_OPACITY];
+    bool result = (fade->present & (1u << BOX_RENDER_TRANSITION_TINT)) != 0;
+    *opacity = 1.0f;
+    if (fade->present & (1u << BOX_RENDER_TRANSITION_OPACITY)) {
+        *opacity = fade->opacity;
+        if (o->active) {
+            ecs_os_memcpy(opacity, o->current, ECS_SIZEOF(float));
+        }
+    }
+
+    if (result) {
+        ecs_os_memcpy(tint, fade->tint, 4);
+        if (t->active) {
+            ecs_os_memcpy(tint, t->current, 4);
+        }
+    }
+
+    return result;
+}
+
+/** Compute the rendered tints and opacity of a node from a fade record: what its parent node
+ * renders, the composed values of the entities between them, and the rendered Tint and Opacity
+ * of the node, in the order box_draws_fade and box_draws_mesh_shading apply them.
+ *
+ * Nothing is divided, so an opacity of 0 works.
+ *
+ * @param t The table
+ * @param p The packet
+ * @param r The record
+ */
+static void box_transition_fade(
+    box_render_transition_table_t *t,
+    box_render_packet_t *p,
+    const box_render_transition_record_t *r)
+{
+    box_render_transition_node_t *node = box_transition_node_get(t, r->node);
+    const box_render_transition_node_t *parent = r->parent
+        ? box_transition_node_get(t, r->parent) : NULL;
+    box_render_transition_fade_t fade;
+    const void *src = box_transition_data(p, r->data, ECS_SIZEOF(fade));
+    uint8_t tint[4];
+    float opacity;
+    int32_t i;
+    if (!node || !node->alive || !src) {
+        goto done;
+    }
+
+    if (r->parent && (!parent || !parent->alive || parent->faded != p->frame)) {
+        goto done;
+    }
+
+    ecs_os_memcpy(&fade, src, ECS_SIZEOF(fade));
+    node->above_keep = fade.keep;
+    node->above_alpha = fade.alpha;
+    for (i = 0; i < 3; i ++) {
+        node->above_add[i] = fade.add[i];
+        if (parent) {
+            node->above_add[i] += parent->fade_add[i] * fade.keep;
+        }
+    }
+
+    if (parent) {
+        node->above_keep *= parent->fade_keep;
+        node->above_alpha *= parent->fade_alpha;
+    }
+
+    node->fade_keep = node->above_keep;
+    glm_vec3_copy(node->above_add, node->fade_add);
+    if (box_transition_fade_own(node, &fade, tint, &opacity)) {
+        float a = (float)tint[3] / 255.0f;
+        for (i = 0; i < 3; i ++) {
+            node->fade_add[i] = node->fade_add[i] * (1.0f - a) + (float)tint[i] / 255.0f * a;
+        }
+
+        node->fade_keep *= 1.0f - a;
+    }
+
+    node->fade_alpha = node->above_alpha * glm_clamp(opacity, 0.0f, 1.0f);
+    node->faded = p->frame;
+done:
+    return;
+}
+
+/** Replace the tints and fade of the ancestors of a material by those its fade node renders.
+ *
+ * @param t The table
+ * @param p The packet
+ * @param material The material
+ * @return Whether the node rendered in this packet, false to leave the record as it is
+ */
+static bool box_transition_material_fade(
+    const box_render_transition_table_t *t,
+    const box_render_packet_t *p,
+    box_draw_transition_material_t *material)
+{
+    const box_render_transition_node_t *node = box_transition_node_get(t, material->fade_node);
+    bool result = node && node->alive && node->faded == p->frame;
+    const box_draw_tint_t *rel = &material->fade_rel;
+    int32_t i;
+    if (!result) {
+        goto done;
+    }
+
+    material->tinted = true;
+    if (material->fade_self) {
+        glm_vec3_copy(ECS_CONST_CAST(float*, node->above_add), material->inherited.add);
+        material->inherited.keep = node->above_keep;
+        material->fade = node->above_alpha;
+        goto done;
+    }
+
+    for (i = 0; i < 3; i ++) {
+        material->inherited.add[i] = node->fade_add[i] * rel->keep + rel->add[i];
+    }
+
+    material->inherited.keep = node->fade_keep * rel->keep;
+    material->fade = node->fade_alpha * material->fade_alpha;
+done:
+    return result;
+}
+
 /** Get the value of a component in the target material of a material or shading record.
  *
  * @param material The material
@@ -522,11 +660,11 @@ static void* box_transition_material_value(
     case BOX_RENDER_TRANSITION_PBR_MATERIAL: result = &material->pbr; break;
     case BOX_RENDER_TRANSITION_EMISSIVE: result = &material->emissive; break;
     case BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM: result = &material->uv; break;
+    case BOX_RENDER_TRANSITION_OPACITY: result = &material->opacity; break;
+    case BOX_RENDER_TRANSITION_TINT: result = &material->tint; break;
     case BOX_RENDER_TRANSITION_POSITION:
     case BOX_RENDER_TRANSITION_ROTATION:
     case BOX_RENDER_TRANSITION_SCALE:
-    case BOX_RENDER_TRANSITION_OPACITY:
-    case BOX_RENDER_TRANSITION_TINT:
     case BOX_RENDER_TRANSITION_COMPONENTS:
         break;
     }
@@ -549,18 +687,32 @@ static void box_transition_material(
 {
     box_draw_transition_material_t material;
     const void *src = box_transition_data(p, r->data, ECS_SIZEOF(material));
-    ecs_size_t size = r->op == BOX_RENDER_TRANSITION_MATERIAL
-        ? ECS_SIZEOF(box_render_material_t) : ECS_SIZEOF(box_render_shading_t);
-    void *dst = box_transition_data(p, r->offset, size);
+    ecs_size_t size = ECS_SIZEOF(box_render_material_t);
+    void *dst;
     int32_t c;
-    if (!src || !dst) {
+    if (!src) {
         goto done;
     }
 
     ecs_os_memcpy(&material, src, ECS_SIZEOF(material));
     if (r->op == BOX_RENDER_TRANSITION_MATERIAL) {
         material.kind = BOX_DRAW_TRANSITION_TABLE;
-    } else if (material.kind == BOX_DRAW_TRANSITION_TABLE) {
+    } else if (material.kind == BOX_DRAW_TRANSITION_TABLE ||
+        material.kind > BOX_DRAW_TRANSITION_MESH)
+    {
+        goto done;
+    } else if (material.kind == BOX_DRAW_TRANSITION_MESH) {
+        size = ECS_SIZEOF(box_render_mesh_shading_t);
+    } else {
+        size = ECS_SIZEOF(box_render_shading_t);
+    }
+
+    dst = box_transition_data(p, r->offset, size);
+    if (!dst) {
+        goto done;
+    }
+
+    if (material.fade_node && !box_transition_material_fade(t, p, &material)) {
         goto done;
     }
 
@@ -577,6 +729,10 @@ static void box_transition_material(
 
         ecs_os_memcpy(value, node->values[c].current,
             box_render_transition_layout(component)->size);
+        if (component == BOX_RENDER_TRANSITION_OPACITY) {
+            material.opacity.value = glm_clamp(material.opacity.value, 0.0f, 1.0f) *
+                material.opacity_scale;
+        }
     }
 
     box_draws_transition_encode(&material, dst);
@@ -584,8 +740,9 @@ done:
     return;
 }
 
-/** Apply the pose and slot records of a packet, in the order they were made, which puts a
- * parent node before its children and every pose before the slots.
+/** Apply the pose, slot, fade and material records of a packet, in the order they were made,
+ * which puts a parent node before its children and every pose and fade before the records that
+ * read it.
  *
  * @param t The table
  * @param p The packet
@@ -606,6 +763,8 @@ static void box_transition_patch(
             r->op == BOX_RENDER_TRANSITION_SHADING)
         {
             box_transition_material(t, p, r);
+        } else if (r->op == BOX_RENDER_TRANSITION_FADE) {
+            box_transition_fade(t, p, r);
         }
     }
 }

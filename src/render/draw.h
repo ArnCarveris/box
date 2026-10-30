@@ -170,7 +170,9 @@ typedef struct box_draw_material_t {
 typedef enum box_draw_transition_kind_t {
     BOX_DRAW_TRANSITION_TABLE = 0,  /**< A box_render_material_t of the material table */
     BOX_DRAW_TRANSITION_SHAPE,      /**< The box_render_shading_t of a 2D shape */
-    BOX_DRAW_TRANSITION_GLYPH       /**< The box_render_shading_t of a glyph */
+    BOX_DRAW_TRANSITION_GLYPH,      /**< The box_render_shading_t of a glyph */
+    BOX_DRAW_TRANSITION_MESH        /**< The box_render_mesh_shading_t of a mesh shape: its tint
+                                     *   and alpha */
 } box_draw_transition_kind_t;
 
 /** The target material of a record a material transition patches, as the game thread encoded
@@ -196,6 +198,15 @@ typedef struct box_draw_transition_material_t {
     box_draw_tint_t inherited; /**< Tints of the ancestors, when tinted */
     float fade;             /**< Product of the Opacity of the ancestors */
     Shape2D shape2d;        /**< The 2D shape of a shape record */
+    uint32_t fade_node;     /**< Nearest node at or above the entity with an active Tint or
+                             *   Opacity transition, 0 for none: the resolver replaces
+                             *   inherited and fade by the values it renders */
+    bool fade_self;         /**< The entity is that node: it inherits what the node renders
+                             *   above it, and its own Tint and Opacity are values of the node */
+    box_draw_tint_t fade_rel; /**< Composed tints of the entities strictly between the node and
+                             *   the entity, applied after those of the node */
+    float fade_alpha;       /**< Product of the opacities of those entities */
+    float opacity_scale;    /**< Factor of the own Opacity, the alpha of the span of a glyph */
 } box_draw_transition_material_t;
 
 /** A blended instance of a view, ordered back to front by its view depth */
@@ -597,12 +608,12 @@ void box_draws_transition_target(
     const box_draw_material_t *material,
     box_draw_transition_kind_t kind);
 
-/** Encode a record from a material transition, with the encoding of the game thread: a table
- * record with box_draws_material_pack, the color, emission and UV of the shading of a 2D shape
- * and the color and emission of a glyph with box_draws_material.
+/** Encode a record from a material transition with the encoding of the game thread: a table
+ * record with box_draws_material_pack, a 2D shading (color, emission, material, UV words) or a
+ * glyph (color, emission) with box_draws_material, a mesh shading with box_draws_mesh_shading.
  *
- * The other words of a shading (the shape, the clip, the rank, the atlas area of a glyph) do
- * not depend on a transitioned component and are left as they are.
+ * The other words (the clip, the rank, the atlas area of a glyph, the material slot of a mesh)
+ * do not depend on a transitioned component and are left as they are.
  *
  * Pure: reads no world, so the resolver calls it on the render thread.
  *

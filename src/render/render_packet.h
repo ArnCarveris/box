@@ -939,9 +939,30 @@ typedef enum box_render_transition_op_t {
     BOX_RENDER_TRANSITION_MATERIAL,     /**< A box_render_material_t of the material table in
                                          *   the packet data, packed again from the rendered
                                          *   values of the nodes that own its components */
-    BOX_RENDER_TRANSITION_SHADING       /**< A box_render_shading_t of a 2D shape or a glyph in
-                                         *   the packet data, written again the same way */
+    BOX_RENDER_TRANSITION_SHADING,      /**< A box_render_shading_t of a 2D shape or a glyph, or
+                                         *   a box_render_mesh_shading_t of a mesh shape, in the
+                                         *   packet data, written again the same way */
+    BOX_RENDER_TRANSITION_FADE          /**< The rendered tints and opacity of a node with an
+                                         *   active Tint or Opacity transition, for this packet,
+                                         *   composed from its parent node */
 } box_render_transition_op_t;
+
+/** What a fade record points at in the packet data: the composed Tint and Opacity of the
+ * entities between a node and its parent node, and the target Tint and Opacity of the node.
+ *
+ * A tint maps a display encoded color c to c * keep + add. The node composes its parent node,
+ * these and its own values in that order; nothing is divided, so an opacity of 0 works. */
+typedef struct box_render_transition_fade_t {
+    float add[3];           /**< Composed tints from the parent node down to the parent of the
+                             *   node, both excluded, or of every ancestor without a parent
+                             *   node, weighted by what the later tints keep */
+    float keep;             /**< Product of one minus the strength of those tints */
+    float alpha;            /**< Product of the opacities of those entities */
+    float opacity;          /**< Target Opacity of the node, when present */
+    uint8_t tint[4];        /**< Target Tint of the node, r, g, b, a, when present */
+    uint32_t present;       /**< 1 << BOX_RENDER_TRANSITION_TINT and
+                             *   1 << BOX_RENDER_TRANSITION_OPACITY when the node has them */
+} box_render_transition_fade_t;
 
 /** What a pose record points at in the packet data: the target chain of a node and the target
  * pose its own components fall back to when they do not transition.
@@ -965,15 +986,16 @@ typedef struct box_render_transition_pose_t {
  * at the start time to the target. The records of a packet apply in the order they were made.
  *
  * Pose and slot records come every frame a node moves, parent nodes first, then the slots;
- * material and shading records every frame a material component runs, one per record.
+ * fade records every frame a Tint or Opacity runs, parent nodes first; then material and
+ * shading records every frame they run, one per record.
  */
 typedef struct box_render_transition_record_t {
     box_render_transition_op_t op;  /**< What the record does */
     uint32_t node;                  /**< Node id, from 1 */
-    uint32_t parent;                /**< Parent node of a pose, 0 for none */
-    uint32_t data;                  /**< Packet data offset of the pose of a pose record, the
-                                     *   rel matrix of a slot or the target material
-                                     *   (box_draw_transition_material_t) of a material */
+    uint32_t parent;                /**< Parent node of a pose or a fade, 0 for none */
+    uint32_t data;                  /**< Packet data offset of the pose of a pose, the rel
+                                     *   matrix of a slot, the box_render_transition_fade_t of a
+                                     *   fade or the box_draw_transition_material_t of the rest */
     uint32_t offset;                /**< Packet data offset of the box_render_transform_t a
                                      *   slot patches, or of the record a material or shading
                                      *   record patches */

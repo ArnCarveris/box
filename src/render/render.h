@@ -1364,6 +1364,18 @@ typedef struct box_render_transition_node_t {
     int64_t posed;                  /**< Frame of the packet whose pose record set world, so
                                      *   a slot or child of a node without one is skipped */
     mat4 world;                     /**< Rendered world matrix of the node in that packet */
+    int64_t faded;                  /**< Frame of the packet whose fade record set the tints
+                                     *   and alphas below, so a slot or child of a node without
+                                     *   one is skipped */
+    float above_add[3];             /**< Composed tints of the ancestors of the node, rendered:
+                                     *   the color c becomes c * above_keep + above_add */
+    float above_keep;               /**< See above_add */
+    float above_alpha;              /**< Product of the rendered opacities of the ancestors */
+    float fade_add[3];              /**< Composed tints of the node and its ancestors, rendered,
+                                     *   what its descendants inherit */
+    float fade_keep;                /**< See fade_add */
+    float fade_alpha;               /**< Product of the rendered opacities of the node and its
+                                     *   ancestors */
     box_render_transition_value_t values[BOX_RENDER_TRANSITION_COMPONENTS]; /**< Values by
                                      *   box_render_transition_component_t */
 } box_render_transition_node_t;
@@ -1530,12 +1542,20 @@ void box_render_transitions_slots_init(
  */
 extern ECS_TAG_DECLARE(TransitionTransform);
 
-/** Private tag of the drawn 2D shapes and texts whose shading an active material transition
- * patches in this frame, of their own value or of one they inherit over IsA.
+/** Private tag of the drawn entities whose shading an active transition patches in this
+ * frame: the 2D shapes and texts of a material transition, and every drawn shape or text at or
+ * below an entity with an active Tint or Opacity transition.
  *
- * It keys their slots as dynamic_material; the transition extract adds and removes it. Mesh
- * shapes do not get it: they read the material table, whose slot the transition patches. */
+ * It keys their slots as dynamic_material and out of the bakes; the transition extract adds and
+ * removes it. A mesh shape of a material transition alone reads the patched material table. */
 extern ECS_TAG_DECLARE(TransitionMaterial);
+
+/** Private tag of the drawn entities at or below an entity with an active Opacity transition.
+ *
+ * Their key is computed as if their alpha were below 1 (box_draws_blend), so they draw in a
+ * blended batch and cast no shadow while the transition runs; the transition extract adds and
+ * removes it, which rekeys them to the batch of their target at the end. */
+extern ECS_TAG_DECLARE(TransitionOpacity);
 
 /** Singleton that holds the state of the transition extract, set by
  * box_render_transitions_init, so box_render_transitions_get reads it without a lookup */

@@ -851,6 +851,13 @@
                     "shadow_mid_transition",
                     "mesh_color_mid_transition"
                 ]
+            },
+            {
+                "id": "TransitionTintOpacity",
+                "testcases": [
+                    "tint_mid_transition",
+                    "opacity_mid_transition"
+                ]
             }
         ]
     }

@@ -419,6 +419,26 @@
                     "no_transition_no_records",
                     "transitions_get_no_lookup"
                 ]
+            },
+            {
+                "id": "TransitionTintOpacity",
+                "testcases": [
+                    "tint_mesh",
+                    "opacity_mesh",
+                    "tint_2d",
+                    "opacity_2d",
+                    "child_own_tint",
+                    "nested",
+                    "opacity_target_zero",
+                    "opacity_start_zero",
+                    "fade_in_batch",
+                    "fade_out_batch",
+                    "blend_mode_kept",
+                    "light_no_effect",
+                    "parent_relationship",
+                    "targets_on_game_thread",
+                    "no_transition_no_records"
+                ]
             }
         ]
     }

@@ -501,6 +501,9 @@ static void BoxDrawsOnLightBake(
 
 /** Compute the batch key of a shape.
  *
+ * A shape under an active Opacity transition (TransitionOpacity) is keyed as if its alpha were
+ * below 1, as it renders below its target alpha during the transition.
+ *
  * @param world The world
  * @param d The state
  * @param e The entity
@@ -520,9 +523,11 @@ static void box_draws_key(
     const PbrTextures *textures = ecs_get(world, e, PbrTextures);
     const TextureWrap *wrap = ecs_get(world, e, TextureWrap);
     const Shape2D *shape2d = ecs_get(world, e, Shape2D);
+    bool fading = ecs_has_id(world, e, TransitionOpacity);
     ecs_os_memset_t(key, 0, box_draw_key_t);
     key->cutout = box_draws_cutout(ecs_get(world, e, AlphaCutoff), shape2d);
-    key->blend = box_draws_blend(ecs_get(world, e, BlendMode), alpha, key->cutout);
+    key->blend = box_draws_blend(ecs_get(world, e, BlendMode), fading ? 0.0f : alpha,
+        key->cutout);
     key->back_face = back_face ? (uint8_t)*back_face : (uint8_t)BackFaceCull;
     key->wrap = wrap ? (uint8_t)*wrap : (uint8_t)WrapRepeat;
     if (textures) {
@@ -542,12 +547,13 @@ static void box_draws_key(
     key->dynamic_transform = box_transform_dynamic(world, ecs_get_table(world, e)) ||
         ecs_has_id(world, e, TransitionTransform);
     key->dynamic_material = ecs_has_id(world, e, DynamicMaterial) ||
-        ecs_has_id(world, e, TransitionMaterial) ||
+        ecs_has_id(world, e, TransitionMaterial) || fading ||
         ecs_get_target_for_id(world, e, EcsChildOf, DynamicMaterial) != 0;
     key->shadow = !shape2d && !ecs_has_id(world, e, NoShadow) &&
         !ecs_get_target_for_id(world, e, EcsChildOf, NoShadow);
     key->bake = !shape2d && key->blend == Opaque && !ecs_has_id(world, e, DynamicTransform) &&
         !ecs_has_id(world, e, TransitionTransform) &&
+        !ecs_has_id(world, e, TransitionMaterial) &&
         !ecs_has_id(world, e, ManualTransform) && !ecs_has_id(world, e, NoBake) &&
         !box_projection_anchored(world, e) && box_draws_baked(world, key->scene);
 }
@@ -938,6 +944,9 @@ static void box_draws_observers(
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnChange);
     box_draws_observer(world, d, "DrawsOnTransitionMaterial", (ecs_observer_desc_t){
         .query.terms = {{ .id = TransitionMaterial }},
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnChange);
+    box_draws_observer(world, d, "DrawsOnTransitionOpacity", (ecs_observer_desc_t){
+        .query.terms = {{ .id = TransitionOpacity }},
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnChange);
     box_draws_observer(world, d, "DrawsOnLightBake", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(LightBake) }},
