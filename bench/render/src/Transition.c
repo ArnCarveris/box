@@ -3,17 +3,17 @@
  * @brief Benchmarks for the cost of transitions: what the paths that don't use them pay, which
  * must be nothing, and what users of the feature pay.
  *
- * A world with 100k static and 10k dynamic shapes, the scene of Extract.c, runs frames against a
- * backend that drops the packets, so a case measures the main thread.
+ * Frames run against a backend that drops the packets, so a case measures the main thread,
+ * and report the ms per frame of the transition systems. The large scene is that of Extract.c.
  *
- * The cases without Transition are the base: one shape with an idle or active transition must
- * cost what they do, 1000 show the cost of the feature, and the prefab cases the IsA walk of a
- * material transition. A case also reports the ms per frame of the transition systems.
+ * The caster cases move 1000 boxes under shadowed spot lights, against the same scene without
+ * shadows, to measure the range math of the shadow regions.
  */
 
 #include <box.h>
 #include <bake_bench.h>
 #include "render.h"
+#include "draw.h"
 
 /** Static shapes of the scene */
 #define BENCH_TR_STATIC (100000)
@@ -27,6 +27,15 @@
 /** Instances of the prefab of the prefab cases */
 #define BENCH_TR_INSTANCES (10000)
 
+/** Shadow casters of the caster cases */
+#define BENCH_TR_CASTERS (1000)
+
+/** Casters per row of the caster cases */
+#define BENCH_TR_CASTER_ROW (40)
+
+/** Spot lights of the caster cases, on a 4 by 4 grid */
+#define BENCH_TR_SPOTS (16)
+
 /** Frames the time of the systems is measured over after a case */
 #define BENCH_TR_TIMED (32)
 
@@ -35,7 +44,10 @@ typedef enum bench_tr_mode_t {
     BENCH_TR_NONE,          /**< No Transition, nothing changes */
     BENCH_TR_NONE_DYNAMIC,  /**< No Transition, 1% of the static shapes move per frame */
     BENCH_TR_IDLE,          /**< Shapes with Transition whose values do not change */
-    BENCH_TR_ACTIVE         /**< Shapes with Transition whose values change every frame */
+    BENCH_TR_ACTIVE,        /**< Shapes with Transition whose values change every frame */
+    BENCH_TR_MOVE,          /**< Shapes with a Position transition, restarted every frame */
+    BENCH_TR_TURN           /**< Shapes with Rotation and Scale transitions, restarted every
+                             *   frame */
 } bench_tr_mode_t;
 
 /** State of a running case */
@@ -119,6 +131,113 @@ static void bench_tr_scene(
     b->user_count = users;
 }
 
+/** Create a world that drops its packets, lit with shadows, with a floor and spot lights
+ * over the area of the caster cases.
+ *
+ * @param shadows Whether the spot lights have shadows, which turns the shadow tiles on
+ * @return The world
+ */
+static ecs_world_t* bench_tr_lit_world(
+    bool shadows)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_backend_t backend = { .render = bench_tr_drop };
+    box_render_set_backend(world, &backend);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 30, 45});
+    ecs_set(world, camera, Rotation, {-0.6f, 0, 0});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true,
+        .culling = {.enabled = true, .occlusion = true, .min_dimension_px = 1},
+        .shadows = {.enabled = true, .cascades = 4, .resolution = 2048,
+            .max_distance = 100, .split_lambda = 0.7f, .depth_bias = 2,
+            .normal_offset = 2, .filter_size = 3, .fade = 0.2f, .blend = 0.1f}});
+    ecs_entity_t floor = ecs_new(world);
+    ecs_set(world, floor, Position, {0, -0.1f, 0});
+    ecs_set(world, floor, Box, {60, 0.2f, 40});
+    ecs_set(world, floor, Rgb, {90, 96, 104});
+    int32_t i;
+    for (i = 0; i < BENCH_TR_SPOTS; i ++) {
+        ecs_entity_t spot = ecs_new(world);
+        ecs_set(world, spot, Position, {(float)(i % 4) * 10.0f - 15.0f, 12,
+            (float)(i / 4) * 7.0f - 10.5f});
+        ecs_set(world, spot, Rotation, {1.3f, 0, 0});
+        ecs_set(world, spot, SpotLight, {.intensity = 200 * GLM_PIf, .range = 30,
+            .inner_angle = 30, .outer_angle = 40, .shadows = shadows,
+            .shadow_resolution = 512});
+    }
+
+    return world;
+}
+
+/** Get the place of a caster of the caster cases on its grid.
+ *
+ * @param i The caster
+ * @param out Receives its position
+ */
+static void bench_tr_caster_place(
+    int32_t i,
+    Position *out)
+{
+    out->x = (float)(i % BENCH_TR_CASTER_ROW) - (float)BENCH_TR_CASTER_ROW * 0.5f;
+    out->y = 0.5f;
+    out->z = (float)(i / BENCH_TR_CASTER_ROW) - 12.5f;
+}
+
+/** Create the 1000 boxes of the caster cases, each with transitions of the components the mode
+ * changes, or children of one box with them.
+ *
+ * @param b The state of the case
+ * @param children Whether the boxes are plain children of one transitioning box, which is the
+ * only shape with Transition
+ */
+static void bench_tr_caster_scene(
+    bench_tr_t *b,
+    bool children)
+{
+    ecs_world_t *world = b->world;
+    TransitionSpec spec = { .duration = 0.5f, .timing_function = EaseInOut };
+    ecs_entity_t parent = 0;
+    int32_t i, first = 0;
+    b->shapes = ecs_os_malloc_n(ecs_entity_t, BENCH_TR_CASTERS + 1);
+    if (children) {
+        parent = b->shapes[0] = ecs_new(world);
+        ecs_set(world, parent, Position, {0, 0, 0});
+        ecs_set(world, parent, Rotation, {0, 0, 0});
+        ecs_set(world, parent, Scale, {1, 1, 1});
+        ecs_set(world, parent, Box, {0.5f, 0.5f, 0.5f});
+        ecs_set(world, parent, Rgb, {200, 100, 50});
+        first = 1;
+    }
+
+    for (i = 0; i < BENCH_TR_CASTERS; i ++) {
+        ecs_entity_t e = b->shapes[first + i] = parent
+            ? ecs_new_w_pair(world, EcsChildOf, parent) : ecs_new(world);
+        Position at;
+        bench_tr_caster_place(i, &at);
+        ecs_set_ptr(world, e, Position, &at);
+        ecs_set(world, e, Box, {0.4f, 0.8f, 0.4f});
+        ecs_set(world, e, Rgb, {200, 120, 80});
+        if (b->mode == BENCH_TR_TURN) {
+            ecs_set(world, e, Rotation, {0, 0, 0});
+            ecs_set(world, e, Scale, {1, 1, 1});
+        }
+    }
+
+    b->users = b->shapes;
+    b->user_count = children ? 1 : BENCH_TR_CASTERS;
+    for (i = 0; i < b->user_count; i ++) {
+        if (b->mode == BENCH_TR_MOVE) {
+            box_transition_set(world, b->users[i], ecs_id(Position), &spec);
+        } else {
+            box_transition_set(world, b->users[i], ecs_id(Rotation), &spec);
+            box_transition_set(world, b->users[i], ecs_id(Scale), &spec);
+        }
+    }
+}
+
 /** Create the scene of one prefab with Rgb and Transition and 10k mesh instances that inherit
  * its Rgb.
  *
@@ -174,6 +293,22 @@ static void bench_tr_frame(
         }
     }
 
+    if (b->mode == BENCH_TR_MOVE) {
+        for (i = 0; i < b->user_count; i ++) {
+            Position at;
+            bench_tr_caster_place(i, &at);
+            at.y += y;
+            ecs_set_ptr(world, b->users[i], Position, &at);
+        }
+    }
+
+    if (b->mode == BENCH_TR_TURN) {
+        for (i = 0; i < b->user_count; i ++) {
+            ecs_set(world, b->users[i], Rotation, {0, y * 4.0f, y});
+            ecs_set(world, b->users[i], Scale, {1 + y, 1, 1 + y});
+        }
+    }
+
     b->frame ++;
     ecs_progress(world, 0);
 }
@@ -216,6 +351,8 @@ static void bench_tr_run(
     }
 
     box_render_sync(world);
+    box_render_draws_t *d = box_draws_state(world);
+    bench_counter(bench, "shadow_record", d && d->shadow_record ? 1.0 : 0.0);
     bench_counter(bench, "material_visited", (double)visited);
     bench_counter(bench, "resolver_active", (double)box_render_transition_test_active(world));
 
@@ -248,6 +385,24 @@ static void bench_tr_large(
 {
     bench_tr_t b = { .world = bench_tr_world(), .mode = mode };
     bench_tr_scene(&b, users);
+    bench_tr_run(bench, &b);
+}
+
+/** Run a caster case: 1000 boxes under spot lights.
+ *
+ * @param bench The benchmark
+ * @param mode BENCH_TR_MOVE or BENCH_TR_TURN
+ * @param shadows Whether the spot lights have shadows, which turns the shadow tiles on
+ * @param children Whether the boxes are plain children of one transitioning box
+ */
+static void bench_tr_casters(
+    bench_t *bench,
+    bench_tr_mode_t mode,
+    bool shadows,
+    bool children)
+{
+    bench_tr_t b = { .world = bench_tr_lit_world(shadows), .mode = mode };
+    bench_tr_caster_scene(&b, children);
     bench_tr_run(bench, &b);
 }
 
@@ -319,6 +474,34 @@ void Transition_prefab_rgb_active(
 {
     // engine_core/transition
     bench_tr_prefab(b, BENCH_TR_ACTIVE);
+}
+
+void Transition_casters_move_1000_shadows(
+    bench_t *b)
+{
+    // engine_core/transition
+    bench_tr_casters(b, BENCH_TR_MOVE, true, false);
+}
+
+void Transition_casters_move_1000_no_shadows(
+    bench_t *b)
+{
+    // engine_core/transition
+    bench_tr_casters(b, BENCH_TR_MOVE, false, false);
+}
+
+void Transition_casters_turn_1000_shadows(
+    bench_t *b)
+{
+    // engine_core/transition
+    bench_tr_casters(b, BENCH_TR_TURN, true, false);
+}
+
+void Transition_casters_parent_1000_shadows(
+    bench_t *b)
+{
+    // engine_core/transition
+    bench_tr_casters(b, BENCH_TR_TURN, true, true);
 }
 
 void Transition_resolve_empty(

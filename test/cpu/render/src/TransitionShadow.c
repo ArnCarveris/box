@@ -407,3 +407,103 @@ void TransitionShadow_nested_parent(void) {
     // engine_core/transition
     tr_shadow_child(true);
 }
+
+/* A parent without a shape moves a caster child: the parent has no caster slot of its own but
+ * needs its range for the child, whose regions hold the pose it renders */
+void TransitionShadow_group_parent(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    box_render_shadow_region_t bounds;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_vec_t *regions = tr_regions(world);
+    ecs_entity_t parent = ecs_new(world);
+    ecs_set(world, parent, Position, {0, 0, 0});
+    ecs_entity_t child = tr_shape(world, parent, 1);
+    box_transition_set(world, parent, ecs_id(Position), &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+
+    ecs_set(world, parent, Position, {4, 0, 0});
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        ecs_vec_clear(regions);
+        tr_frame(world);
+        tr_rendered_bounds(world, null, child, &bounds);
+        tr_test_regions(regions, &bounds, 0.4f, 5.6f);
+    }
+
+    tr_frame(world);
+    tr_frame(world);
+    tr_test_static(world, null, child);
+    tr_fini(world, null);
+}
+
+/** Get the range of a product with the interval math of every element, the reference of the
+ * plain products box_draws_range_mul takes for a single matrix.
+ *
+ * @param a The range of the left matrix
+ * @param b The range of the right matrix
+ * @param out Receives the range of a * b
+ */
+static void tr_range_reference(
+    const box_draw_transition_range_t *a,
+    const box_draw_transition_range_t *b,
+    box_draw_transition_range_t *out)
+{
+    int32_t col, row, k;
+    for (col = 0; col < 4; col ++) {
+        for (row = 0; row < 4; row ++) {
+            float lo = 0.0f, hi = 0.0f;
+            for (k = 0; k < 4; k ++) {
+                float p0 = a->lo[k][row] * b->lo[col][k];
+                float p1 = a->lo[k][row] * b->hi[col][k];
+                float p2 = a->hi[k][row] * b->lo[col][k];
+                float p3 = a->hi[k][row] * b->hi[col][k];
+                lo += glm_min(glm_min(p0, p1), glm_min(p2, p3));
+                hi += glm_max(glm_max(p0, p1), glm_max(p2, p3));
+            }
+
+            out->lo[col][row] = lo;
+            out->hi[col][row] = hi;
+        }
+    }
+}
+
+/* The product of ranges with a single matrix on either side, or both, matches the interval
+ * math bit for bit, and that of two single matrices is their glm_mul */
+void TransitionShadow_range_mul_single(void) {
+    // engine_core/transition
+    box_draw_transition_range_t single, range, got, expected;
+    const box_draw_transition_range_t *pairs[4][2] = {
+        {&single, &range}, {&range, &single}, {&single, &single}, {&range, &range}
+    };
+    mat4 m, product;
+    int32_t i, col, row;
+    for (col = 0; col < 4; col ++) {
+        for (row = 0; row < 4; row ++) {
+            float v = (float)((col * 7 + row * 5) % 11) * 0.37f - 1.8f;
+            m[col][row] = v;
+            range.lo[col][row] = -v * 0.5f - 0.25f;
+            range.hi[col][row] = range.lo[col][row] + (float)((col + row) % 3) * 0.6f;
+        }
+    }
+
+    box_draws_range_point(m, &single);
+    for (i = 0; i < 4; i ++) {
+        box_draws_range_mul(pairs[i][0], pairs[i][1], &got);
+        tr_range_reference(pairs[i][0], pairs[i][1], &expected);
+        test_assert(!ecs_os_memcmp_t(&got, &expected, box_draw_transition_range_t));
+    }
+
+    box_draws_range_mul(&single, &single, &got);
+    glm_mat4_mul(m, m, product);
+    for (col = 0; col < 4; col ++) {
+        for (row = 0; row < 4; row ++) {
+            test_assert(got.lo[col][row] == got.hi[col][row]);
+            test_flt(got.lo[col][row], product[col][row]);
+        }
+    }
+
+    tr_range_reference(&single, &range, &expected);
+    box_draws_range_mul(&single, &range, &range);
+    test_assert(!ecs_os_memcmp_t(&range, &expected, box_draw_transition_range_t));
+}
