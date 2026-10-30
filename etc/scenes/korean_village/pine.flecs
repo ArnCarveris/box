@@ -1,0 +1,29 @@
+include beam
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+
+@tree Parent
+template KoreanPine {
+  prop variant: f32 = 0
+  for seg in 0..6 {
+    const t = seg / 6.0
+    const n = (seg + 1) / 6.0
+    KoreanBeam(ax: math.sin(t * 3) * 0.7, ay: t * 4.9, az: 0, bx: math.sin(n * 3) * 0.7, by: n * 4.9, bz: 0.1 * n, radius: 0.21 - t * 0.12, tint: {110, 73, 48}) {}
+  }
+  for branch in 0..8 {
+    const a = branch * 2.4 + variant
+    const y = 2.6 + branch * 0.3
+    const spread = 1.85 - branch * 0.12
+    const x = math.sin(a) * spread + 0.3
+    const z = math.cos(a) * spread
+    KoreanBeam(ax: 0.5, ay: y - 0.35, az: 0, bx: x, by: y + 0.2, bz: z, radius: 0.07, tint: {103, 69, 43}) {}
+    for clump in 0..5 {
+      { Position: {x + math.sin(clump * 2.4) * 0.55, y + 0.25 + math.sin(clump * 1.8) * 0.13, z + math.cos(clump * 2.4) * 0.48}; Scale: {1.25, 0.43, 1}; IcoSphere: {radius: 0.74, segments: 1, smooth: true}; Rgb: {48 + clump % 3 * 8, 90 + clump % 3 * 9, 61 + clump % 3 * 5} }
+    }
+  }
+  for root in 0..5 {
+    KoreanBeam(ax: 0, ay: 0.14, az: 0, bx: math.sin(root * 1.257) * 0.7, by: 0.04, bz: math.cos(root * 1.257) * 0.7, radius: 0.08, tint: {110, 73, 48}) {}
+  }
+}

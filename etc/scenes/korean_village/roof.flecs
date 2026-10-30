@@ -1,0 +1,57 @@
+include roof_surface
+include beam
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+
+@tree Parent
+template KoreanRoof {
+  { (IsA, KoreanRoofSurface); Position: {} }
+  for side in 0..2 {
+    const sign = side * 2 - 1
+    for tile in 0..31 {
+      const u = (tile - 15) / 15.0
+      const u2 = u * u
+      const corner = 0.25 * u2 * u2 * u2 * u2
+      for seg in 0..10 {
+        const t = seg / 10.0
+        const n = (seg + 1) / 10.0
+        const y = 1.65 * (1 - t) * (1 - t) + 0.14 * t * t * t * t * t * t + corner * t * t * t * t
+        const ny = 1.65 * (1 - n) * (1 - n) + 0.14 * n * n * n * n * n * n + corner * n * n * n * n
+        KoreanBeam(ax: u * (2.65 + 1.55 * t), ay: y + 0.035, az: sign * 2.9 * t, bx: u * (2.65 + 1.55 * n), by: ny + 0.035, bz: sign * 2.9 * n, radius: 0.046) {}
+      }
+      { (IsA, KoreanTileEdge); Position: {u * 4.2, 0.175 + corner, sign * 2.92}; Rotation: {math.PI / 2, 0, 0}; Cylinder: {radius: 0.075, length: 0.07, segments: 12} }
+      { (IsA, KoreanPaper); Position: {u * 4.2, 0.175 + corner, sign * 2.965}; Rotation: {math.PI / 2, 0, 0}; Torus: {radius: 0.035, tube: 0.009, segments: 10, rings: 4} }
+    }
+    for tile in 0..19 {
+      const u = (tile - 9) / 9.0
+      const u2 = u * u
+      const corner = 0.25 * u2 * u2 * u2 * u2
+      for seg in 0..10 {
+        const t = seg / 10.0
+        const n = (seg + 1) / 10.0
+        KoreanBeam(ax: sign * (2.65 + 1.55 * t), ay: 1.65 * (1 - t) * (1 - t) + 0.14 * t * t * t * t * t * t + corner * t * t * t * t + 0.04, az: u * 2.9 * t,
+          bx: sign * (2.65 + 1.55 * n), by: 1.65 * (1 - n) * (1 - n) + 0.14 * n * n * n * n * n * n + corner * n * n * n * n + 0.04, bz: u * 2.9 * n, radius: 0.046) {}
+      }
+    }
+    for edge in 0..30 {
+      const u = (edge - 15) / 15.0
+      const n = (edge - 14) / 15.0
+      KoreanBeam(ax: u * 4.2, ay: 0.08 + 0.25 * u * u * u * u * u * u * u * u, az: sign * 2.9, bx: n * 4.2, by: 0.08 + 0.25 * n * n * n * n * n * n * n * n, bz: sign * 2.9, radius: 0.09, tint: {196, 192, 164}) {}
+    }
+    for end in 0..2 {
+      for seg in 0..10 {
+        const t = seg / 10.0
+        const n = (seg + 1) / 10.0
+        KoreanBeam(ax: sign * (2.65 + 1.55 * t), ay: 1.65 * (1 - t) * (1 - t) + 0.14 * t * t * t * t * t * t + 0.25 * t * t * t * t + 0.11, az: (end * 2 - 1) * 2.9 * t,
+          bx: sign * (2.65 + 1.55 * n), by: 1.65 * (1 - n) * (1 - n) + 0.14 * n * n * n * n * n * n + 0.25 * n * n * n * n + 0.11, bz: (end * 2 - 1) * 2.9 * n, radius: 0.095, tint: {133, 144, 143}) {}
+      }
+    }
+  }
+  { (IsA, KoreanTileEdge); Position: {0, 1.72, 0}; Rotation: {0, 0, math.PI / 2}; Cylinder: {radius: 0.14, length: 5.5, segments: 16} }
+  { (IsA, KoreanPaper); Position: {0, 1.61, 0}; Box: {5.5, 0.16, 0.22} }
+  for end in 0..2 {
+    { Position: {(end - 0.5) * 5.45, 1.86, 0}; Rotation: {0, 0, (end - 0.5) * 0.5}; RoundedBox: {0.17, 0.48, 0.25, 0.04}; Rgb: {110, 121, 122} }
+  }
+}

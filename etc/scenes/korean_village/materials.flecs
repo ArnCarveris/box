@@ -1,0 +1,17 @@
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+
+prefab KoreanTimber { Rgb: {99, 60, 39}; PbrMaterial: {roughness: 0.88} }
+prefab KoreanRed { Rgb: {167, 58, 43}; PbrMaterial: {roughness: 0.72} }
+prefab KoreanGreen { Rgb: {38, 111, 85}; PbrMaterial: {roughness: 0.74} }
+prefab KoreanMint { Rgb: {119, 178, 137}; PbrMaterial: {roughness: 0.8} }
+prefab KoreanBlue { Rgb: {39, 88, 122}; PbrMaterial: {roughness: 0.76} }
+prefab KoreanGold { Rgb: {232, 181, 79}; PbrMaterial: {roughness: 0.72} }
+prefab KoreanPaper { Rgb: {233, 222, 187}; PbrMaterial: {roughness: 0.97} }
+prefab KoreanPlaster { Rgb: {220, 209, 178}; PbrMaterial: {roughness: 0.97} }
+prefab KoreanStone { Rgb: {154, 155, 143}; PbrMaterial: {roughness: 0.96} }
+prefab KoreanTile { Rgb: {54, 65, 74}; PbrMaterial: {roughness: 0.67} }
+prefab KoreanTileEdge { Rgb: {89, 105, 114}; PbrMaterial: {roughness: 0.64} }
+prefab KoreanGlaze { Rgb: {91, 53, 32}; PbrMaterial: {roughness: 0.29}; ClearCoat: {strength: 0.65, roughness: 0.23} }
