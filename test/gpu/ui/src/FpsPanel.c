@@ -2,7 +2,7 @@
  * @file FpsPanel.c
  * @brief The fps panel renders after the editor and before the console when all three are open,
  * in the top right corner of the surface, its chart red for frames slower than 30 fps, and clicks
- * over it go to the game.
+ * and the mouse wheel over it go to the game.
  */
 
 #include <box.h>
@@ -242,6 +242,70 @@ void FpsPanel_click_reaches_game(void) {
     test_assert(status->view != fps);
     test_assert(!fps_in_scope(world, status->target, BOX_FPS_UI));
     test_assert(!fps_in_scope(world, status->handler, BOX_FPS_UI));
+
+    ecs_fini(world);
+}
+
+void FpsPanel_scroll_reaches_game(void) {
+    // fps/panel
+    ecs_entity_t game;
+    ecs_world_t *world = fps_world("fps_scroll.png", &game);
+    test_assert(ecs_script(world, { .code =
+        "using flecs.script\n"
+        "using box.transform\n"
+        "using box.geometry\n"
+        "using box.picking\n"
+        "template Probe {\n"
+        "  mut scrolls: i32 = 0\n"
+        "  async {\n"
+        "    while true {\n"
+        "      await on.scroll(this)\n"
+        "      scrolls = scrolls + 1\n"
+        "    }\n"
+        "  }\n"
+        "}\n"
+        "wall {\n"
+        "  Position: {0, 0, 0}\n"
+        "  Box: {20, 20, 1}\n"
+        "  Interactive\n"
+        "  Probe: {}\n"
+        "}\n" }) != 0);
+
+    typedef struct { int32_t scrolls; } Mut;
+    ecs_entity_t mut = ecs_lookup(world, "Probe.mut");
+    ecs_entity_t wall = ecs_lookup(world, "wall");
+    test_assert(mut != 0);
+    test_assert(wall != 0);
+    ecs_progress(world, 0);
+
+    FpsPanel *p = ecs_singleton_get_mut(world, FpsPanel);
+    p->open = true;
+    ecs_singleton_modified(world, FpsPanel);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_entity_t fps = ecs_lookup(world, BOX_FPS_VIEW);
+    test_assert(fps != 0);
+    test_assert(ecs_lookup(world, BOX_FPS_PANEL) != 0);
+    test_int(((const Mut*)ecs_get_id(world, wall, mut))->scrolls, 0);
+
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_move [600, 60]", NULL));
+    ecs_os_free(box_command_run(world, s, "mouse_scroll 0 3", NULL));
+    float scroll = 0;
+    while (box_input_pending(world)) {
+        ecs_progress(world, 0);
+        scroll += ecs_singleton_get(world, Input)->mouse.scroll[1];
+    }
+
+    ecs_progress(world, 0);
+    scroll += ecs_singleton_get(world, Input)->mouse.scroll[1];
+    const PickStatus *status = ecs_singleton_get(world, PickStatus);
+    test_uint(status->view, game);
+    test_uint(status->handler, wall);
+    test_assert(status->view != fps);
+    test_assert(!fps_in_scope(world, status->handler, BOX_FPS_UI));
+    test_flt(scroll, 3);
+    test_int(((const Mut*)ecs_get_id(world, wall, mut))->scrolls, 1);
 
     ecs_fini(world);
 }

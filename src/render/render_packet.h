@@ -760,7 +760,13 @@ typedef struct box_render_atmosphere_env_t {
 typedef enum box_render_buffer_usage_t {
     BOX_RENDER_BUFFER_INSTANCE = 1 << 0, /**< Per instance vertex data of batches */
     BOX_RENDER_BUFFER_STORAGE = 1 << 1,  /**< Read and written by compute shaders */
-    BOX_RENDER_BUFFER_UNIFORM = 1 << 2   /**< Bound as uniforms */
+    BOX_RENDER_BUFFER_UNIFORM = 1 << 2,  /**< Bound as uniforms */
+    BOX_RENDER_BUFFER_COPY = 1 << 3,     /**< Source of GPU copies (box_render_copy_t), such as
+                                          *   an instance page whose runs move */
+    BOX_RENDER_BUFFER_KEEP = 1 << 4      /**< A create that replaces a buffer of the handle
+                                          *   copies the bytes the two have in common from the
+                                          *   old buffer on the GPU before releasing it, which
+                                          *   needs BOX_RENDER_BUFFER_COPY on the old buffer */
 } box_render_buffer_usage_t;
 
 /** The area of a ClipChildren element as shape2d.wgsl reads it from the clip buffer.
@@ -869,6 +875,32 @@ typedef struct box_render_scatter_t {
     uint32_t size;          /**< Bytes of the segment */
     uint32_t count;         /**< Instances the segment holds */
 } box_render_scatter_t;
+
+/** Byte alignment of the offsets and sizes of a copy between buffers, the copy alignment of
+ * WebGPU */
+#define BOX_RENDER_COPY_ALIGN (4)
+
+/** Bytes the copies of one packet move at most together: the backend copies them through one
+ * staging buffer, below the 256 MiB buffer size every WebGPU device supports */
+#define BOX_RENDER_COPY_MAX ((uint64_t)128 << 20)
+
+/** GPU copy of bytes from one buffer into another or into the same one, such as the instances
+ * of a run of an instance page that moved to another run.
+ *
+ * The copies of a packet run after its resources and before its uploads and scatters, which
+ * write the slots that changed over the copied ones. Every copy reads its source as it was
+ * before the copies of the packet, so one copy may write where another reads, and source and
+ * destination may overlap. The offsets and the size are BOX_RENDER_COPY_ALIGN multiples and the
+ * sizes of a packet add up to at most BOX_RENDER_COPY_MAX; the source has
+ * BOX_RENDER_BUFFER_COPY.
+ */
+typedef struct box_render_copy_t {
+    uint32_t src;           /**< Handle of the buffer read */
+    uint32_t src_offset;    /**< Byte offset in it */
+    uint32_t dst;           /**< Handle of the buffer written */
+    uint32_t dst_offset;    /**< Byte offset in it */
+    uint32_t size;          /**< Bytes copied */
+} box_render_copy_t;
 
 /** Description of a BOX_RENDER_SHADER create or update, followed by its code and its label.
  *
@@ -1044,8 +1076,8 @@ typedef struct box_render_transition_record_t {
 /** Everything the renderer needs of one frame, filled on the main thread.
  *
  * The vectors keep their storage when the packet is reused, so a frame that needs no more
- * than an earlier one does not allocate. Resources apply first, then uploads, then the
- * scatters, then every target is cleared, drawn by its views and presented.
+ * than an earlier one does not allocate. Resources apply first, then the copies, then uploads,
+ * then the scatters, then every target is cleared, drawn by its views and presented.
  */
 typedef struct box_render_packet_t {
     int64_t frame;          /**< Frame the packet was extracted in */
@@ -1058,6 +1090,8 @@ typedef struct box_render_packet_t {
     ecs_vec_t resources;    /**< box_render_resource_t in the order they were made */
     ecs_vec_t uploads;      /**< box_render_upload_t in the order they were made */
     ecs_vec_t scatters;     /**< box_render_scatter_t, run after the uploads */
+    ecs_vec_t copies;       /**< box_render_copy_t, run after the resources and before the
+                             *   uploads */
     ecs_vec_t views;        /**< box_render_view_t in render order */
     ecs_vec_t batches;      /**< box_render_batch_t */
     ecs_vec_t targets;      /**< box_render_target_t in the order they render */
@@ -1113,6 +1147,10 @@ typedef struct box_render_null_t {
     int64_t batches;            /**< Batches received in total */
     int64_t uploads;            /**< Uploads received in total */
     int64_t scatters;           /**< Scatters received in total */
+    int64_t copies;             /**< Copies between buffers received in total */
+    int64_t copy_bytes;         /**< Bytes those copies move in total */
+    int64_t kept;               /**< Buffer creates received in total that keep the contents of
+                                 *   the buffer they replace (BOX_RENDER_BUFFER_KEEP) */
     int64_t resources;          /**< Resource changes received in total */
     int64_t bytes;              /**< Upload bytes received in total */
     int64_t targets;            /**< Targets received in total */

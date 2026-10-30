@@ -298,6 +298,16 @@ void InstanceStreams_static_change_scatters_its_stream(void) {
 
     ecs_set(world, boxes[5], Rgb, {0, 255, 0});
     stats = frame(world);
+    test_int(stats.scatters, 1);
+    test_int(stats.scattered, 1);
+    test_bytes(&stats, 0, segment_size(1, SHADING));
+    test_int(stats.material_bytes, MATERIAL);
+
+    stats = frame(world);
+    test_bytes(&stats, 0, 0);
+
+    ecs_set(world, boxes[5], Rgb, {0, 128, 0});
+    stats = frame(world);
     test_int(stats.scatters, 0);
     test_bytes(&stats, 0, 0);
     test_int(stats.material_bytes, MATERIAL);

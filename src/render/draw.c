@@ -7,8 +7,8 @@
  * changed: a moved shape its transform, a recolored one its shading.
  *
  * Static streams are written once per change, the transforms of DynamicTransform and the
- * shading of DynamicMaterial shapes per frame. A mesh instance references a slot of the
- * material table (materials.c), so a material change packs a slot, not the instances.
+ * shading of DynamicMaterial shapes per frame. A mesh instance references a slot of the material
+ * table (materials.c), so a material change packs a slot or moves its owner to another one.
  */
 
 #include "draw.h"
@@ -619,9 +619,9 @@ done:
  * A shape that keeps its slot writes the streams of its change, plus its shading when the clip
  * index of a 2D shape changed; a shape that gets a slot writes every stream.
  *
- * The shading of a mesh shape is the slot of the material table it renders with, its tint and
- * its alpha; a mesh shape that owns a MaterialId gets a slot of its own there, and gives it back
- * when it is no longer drawn by the mesh pipeline.
+ * The shading of a mesh shape is its slot of the material table, its tint and its alpha. A mesh
+ * shape that owns a MaterialId takes its slot here, private in a DynamicMaterial batch, and gives
+ * it back when it is no longer drawn by the mesh pipeline.
  *
  * @param world The world
  * @param d The state
@@ -706,7 +706,7 @@ write:
         box_draws_material(box_draws_slot_shading(b, s->slot), &material);
     } else if (kinds & BOX_DRAW_SHADING) {
         box_draws_mesh_shading(box_draws_slot_mesh_shading(b, s->slot),
-            box_draws_material_id(world, d, e, true), &material);
+            box_draws_material_id(world, d, e, true, b->key.dynamic_material), &material);
     }
 
     if (kinds & BOX_DRAW_SURFACE) {
@@ -823,10 +823,15 @@ static void BoxRenderExtractDraws(
     d->stats.scattered = 0;
     d->stats.scatters = 0;
     d->stats.upload_bytes = 0;
+    d->stats.copies = 0;
+    d->stats.copy_bytes = 0;
+    d->stats.kept_pages = 0;
+    d->stats.kept_bytes = 0;
     d->stats.transform_bytes = 0;
     d->stats.shading_bytes = 0;
     d->stats.surface_bytes = 0;
     d->stats.material_bytes = 0;
+    box_draws_materials_resolve(world, d);
     box_draws_process(world, d);
     box_draws_clips_send(world, d, p);
     box_draws_order_update(world, d);
