@@ -43,6 +43,10 @@
 /** Reflection probes a cluster lists at most, CLUSTER_PROBES of etc/shaders/include/lights.wgsl */
 #define BOX_GPU_CLUSTER_PROBES (8)
 
+/** Anisotropic samples of the cookie sampler, which filters along the long axis of the footprint
+ * the analytic uv gradients of etc/shaders/include/cookie.wgsl give */
+#define BOX_GPU_COOKIE_ANISOTROPY (16)
+
 /** Cull passes after which the cluster buffer of a view that no target rendered is released */
 #define BOX_GPU_CLUSTER_IDLE (240)
 
@@ -780,7 +784,10 @@ WGPUBindGroup box_gpu_light_group_with(
             .size = BOX_GPU_ATLAS_TILES_SIZE
         },
         [17] = { .binding = 17, .textureView = box_gpu_cookie_view(gpu, t, v) },
-        [18] = { .binding = 18, .sampler = box_gpu_texture_sampler(gpu, WrapRepeat, 1) }
+        [18] = {
+            .binding = 18,
+            .sampler = box_gpu_texture_sampler(gpu, WrapRepeat, BOX_GPU_COOKIE_ANISOTROPY)
+        }
     };
     box_gpu_atmosphere_bindings(gpu, t, v, &entries[9]);
     box_gpu_environment_bindings(gpu, t ? v : NULL, &entries[12]);
