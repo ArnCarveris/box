@@ -746,8 +746,51 @@ static bool box_msdf_corner_short(
     return result;
 }
 
+/** Check whether a point of a cell lies on a side of the outline, or less than
+ * BOX_MSDF_CORNER_SHARP off it, from the true distance of the texels of the cell alone.
+ *
+ * The true distance changes by at most the distance moved, so a texel whose true distance is on
+ * the side by more than its distance from the point, less BOX_MSDF_CORNER_SHARP, holds the point
+ * there. A texel far from the outline keeps less than its distance, so it only holds less.
+ *
+ * The interpolated true distance of a point cannot tell this: at the rounded-off tip of a notch
+ * or a spike narrower than a texel it is on the side opposite to the fill.
+ *
+ * @param gen The generation
+ * @param tx Column of the upper left texel of the cell
+ * @param ty Row of the upper left texel of the cell
+ * @param fx Position of the point between the columns
+ * @param fy Position of the point between the rows
+ * @param inside The side, true for inside
+ * @return Whether a texel holds the point on the side
+ */
+static bool box_msdf_corner_held(
+    const box_msdf_gen_t *gen,
+    int32_t tx,
+    int32_t ty,
+    double fx,
+    double fy,
+    bool inside)
+{
+    const box_msdf_raster_t *r = gen->raster;
+    int32_t k;
+    bool result = false;
+    for (k = 0; k < 4 && !result; k ++) {
+        float a = gen->values[((ty + (k >> 1)) * r->width + tx + (k & 1)) * 4 + 3];
+        double onto = (a - 0.5) * r->range * (inside ? 1.0 : -1.0) + BOX_MSDF_CORNER_SHARP;
+        double dx = (k & 1) - fx, dy = (k >> 1) - fy;
+        result = onto > 0.0 && onto * onto > dx * dx + dy * dy;
+    }
+
+    return result;
+}
+
 /** Check whether every channel and the true distance of the four texels of a cell are at least
  * BOX_MSDF_CORNER_MARGIN onto the same side, so that no point of the cell can be short of it.
+ *
+ * Every point of the cell is within half a diagonal of a texel, so the true distance of the
+ * texels must also be that far onto the side, less BOX_MSDF_CORNER_SHARP, for each of them to hold
+ * every point there as box_msdf_corner_held does.
  *
  * @param gen The generation
  * @param tx Column of the upper left texel of the cell
@@ -760,26 +803,34 @@ static bool box_msdf_corner_far(
     int32_t ty)
 {
     const box_msdf_raster_t *r = gen->raster;
-    float lo = 1.0f, hi = 0.0f;
+    double held = GLM_SQRT1_2 - BOX_MSDF_CORNER_SHARP;
+    float lo = 1.0f, hi = 0.0f, alo = 1.0f, ahi = 0.0f;
     int32_t k, c;
     for (k = 0; k < 4; k ++) {
         const float *v = &gen->values[((ty + (k >> 1)) * r->width + tx + (k & 1)) * 4];
-        for (c = 0; c < 4; c ++) {
+        for (c = 0; c < 3; c ++) {
             lo = glm_min(lo, v[c]);
             hi = glm_max(hi, v[c]);
         }
+
+        alo = glm_min(alo, v[3]);
+        ahi = glm_max(ahi, v[3]);
     }
 
-    return (lo - 0.5) * r->range >= BOX_MSDF_CORNER_MARGIN ||
-        (0.5 - hi) * r->range >= BOX_MSDF_CORNER_MARGIN;
+    return ((lo - 0.5) * r->range >= BOX_MSDF_CORNER_MARGIN && (alo - 0.5) * r->range > held) ||
+        ((0.5 - hi) * r->range >= BOX_MSDF_CORNER_MARGIN && (0.5 - ahi) * r->range > held);
 }
 
 /** Check whether a point of the block around a corner needs the repair: a deep point short of
  * BOX_MSDF_CORNER_MARGIN, or a point from BOX_MSDF_CORNER_SHARP on that is on the wrong side. One
  * that is only short of BOX_MSDF_CORNER_NEAR is lifted by the repair but does not start it.
  *
- * Only a point whose median is not BOX_MSDF_CORNER_MARGIN onto the side of the interpolated true
- * distance can be, so only for those it finds the side from the edges near the corner.
+ * A point whose median is BOX_MSDF_CORNER_MARGIN onto the side of the interpolated true distance
+ * can only be wrong where the fill puts it on the other side. So it finds the side from the edges
+ * near the corner only for the others and for those box_msdf_corner_held does not hold there.
+ *
+ * A point box_msdf_corner_held holds is at most BOX_MSDF_CORNER_SHARP onto the other side, too
+ * close to the outline to start the repair.
  *
  * @param gen The generation
  * @param block The block
@@ -806,7 +857,9 @@ static bool box_msdf_corner_clashes(
                     double fx = (sx + 0.5) / n, fy = (sy + 0.5) / n, v[4];
                     box_msdf_bilinear(gen, tx, ty, fx, fy, v);
                     double m = fmax(fmin(v[0], v[1]), fmin(fmax(v[0], v[1]), v[2]));
-                    if ((m - 0.5) * r->range * (v[3] > 0.5 ? 1 : -1) >= BOX_MSDF_CORNER_MARGIN) {
+                    if ((m - 0.5) * r->range * (v[3] > 0.5 ? 1 : -1) >= BOX_MSDF_CORNER_MARGIN &&
+                        box_msdf_corner_held(gen, tx, ty, fx, fy, v[3] > 0.5))
+                    {
                         continue;
                     }
 
