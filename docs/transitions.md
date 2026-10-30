@@ -98,8 +98,9 @@ entry leaves `Transition` with an empty map; use `ecs_remove(world, e, Transitio
 component. Removing an entry the entity does not have does nothing: it does not add `Transition`
 or copy an inherited map. Both work deferred, on a stage (`it->stage` in a system, or
 `ecs_get_stage(world, 0)` until `ecs_merge`); several calls on one entity before the merge edit
-the same map. Deferred, `box_transition_remove` looks the entry up in the merged state, so it does
-not see an entry that `box_transition_set` added on the stage before the same merge. The storage
+the same map. Deferred, `box_transition_remove` also removes an entry that `box_transition_set`
+added on the same stage before the merge, also on an entity that did not own `Transition` yet; an
+entity without an entry, owned, inherited or pending, still gets nothing. The storage
 is a flecs map (`ecs_map_t`) keyed by the component entity whose values are allocated
 `TransitionSpec`s, so `ecs_map_get_deref(map, TransitionSpec, ecs_id(Position))` also reads one.
 
