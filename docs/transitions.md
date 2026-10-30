@@ -334,7 +334,7 @@ Refinements of the design:
 
 - For a 2D shape, `PbrMaterial` and `AlphaCutoff` change nothing in its shading (its material
   words hold the shape, and 2D shapes are not alpha tested), so they do not tag or patch it.
-- `box_render_transitions_get` reads the state from the `RenderTransitions` singleton, set in
+- `box_render_transitions_get` reads the state from the `RenderTransitionState` singleton, set in
   `box_render_transitions_init`, instead of a lookup of the system by name. The extract keeps
   the batch state it found the first time (`box_draws_state` still looks it up by name).
 

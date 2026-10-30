@@ -1539,15 +1539,15 @@ extern ECS_TAG_DECLARE(TransitionMaterial);
 
 /** Singleton that holds the state of the transition extract, set by
  * box_render_transitions_init, so box_render_transitions_get reads it without a lookup */
-typedef struct RenderTransitions {
+typedef struct RenderTransitionState {
     box_render_transitions_t *state; /**< The state, owned by RenderExtractTransitions */
-} RenderTransitions;
+} RenderTransitionState;
 
-/** Component id of RenderTransitions */
-extern ECS_COMPONENT_DECLARE(RenderTransitions);
+/** Component id of RenderTransitionState */
+extern ECS_COMPONENT_DECLARE(RenderTransitionState);
 
-/** Get the state of the transition extract of a world, from the RenderTransitions singleton,
- * without a name lookup.
+/** Get the state of the transition extract of a world, from the RenderTransitionState
+ * singleton, without a name lookup.
  *
  * @param world The world
  * @return The state, NULL without the extract

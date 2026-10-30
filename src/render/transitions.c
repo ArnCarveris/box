@@ -17,7 +17,7 @@
 
 ECS_TAG_DECLARE(TransitionTransform);
 ECS_TAG_DECLARE(TransitionMaterial);
-ECS_COMPONENT_DECLARE(RenderTransitions);
+ECS_COMPONENT_DECLARE(RenderTransitionState);
 
 /** Material components whose transitions patch the material table and the 2D shading */
 static const box_render_transition_component_t box_transition_material_components[] = {
@@ -1348,8 +1348,8 @@ static void box_transitions_free(
 box_render_transitions_t* box_render_transitions_get(
     const ecs_world_t *world)
 {
-    const RenderTransitions *t = ecs_id(RenderTransitions)
-        ? ecs_singleton_get(world, RenderTransitions) : NULL;
+    const RenderTransitionState *t = ecs_id(RenderTransitionState)
+        ? ecs_singleton_get(world, RenderTransitionState) : NULL;
 
     return t ? t->state : NULL;
 }
@@ -1399,7 +1399,7 @@ void box_render_transitions_init(
     ecs_add_pair(world, TransitionTransform, EcsOnInstantiate, EcsDontInherit);
     ECS_TAG_DEFINE(world, TransitionMaterial);
     ecs_add_pair(world, TransitionMaterial, EcsOnInstantiate, EcsDontInherit);
-    ECS_COMPONENT_DEFINE(world, RenderTransitions);
+    ECS_COMPONENT_DEFINE(world, RenderTransitionState);
     ecs_map_init(&s->by_entity, NULL);
     ecs_map_init(&s->moving, NULL);
     ecs_map_init(&s->tagged, NULL);
@@ -1437,7 +1437,7 @@ void box_render_transitions_init(
         .ctx_free = box_transitions_free,
         .immediate = true
     });
-    ecs_singleton_set(world, RenderTransitions, { .state = s });
+    ecs_singleton_set(world, RenderTransitionState, { .state = s });
 }
 
 void box_render_transitions_slots_init(

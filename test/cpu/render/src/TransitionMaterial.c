@@ -1,6 +1,6 @@
 /**
  * @file TransitionMaterial.c
- * @brief Tests of the Transition suite for material transitions: the records of the material
+ * @brief Tests of the TransitionMaterial suite: material transitions: the records of the material
  * table and the 2D shading the resolver patches, read from the last packet of the null backend.
  *
  * The cases step the world with a fixed delta and a Linear transition of one second, so the
@@ -323,16 +323,81 @@ static uint32_t tr_color_word(
     return r | (g << 8) | (b << 16);
 }
 
+/** The Rgb case: every channel steps by an integer each quarter */
+static const Rgb tr_rgb_from = {0, 0, 0}, tr_rgb_to = {200, 100, 40};
+
+/** The Emissive case */
+static const Emissive tr_emissive_from = { .strength = 0, .color = {0, 0, 0} };
+static const Emissive tr_emissive_to = { .strength = 4, .color = {200, 100, 40} };
+
+/** The PbrMaterial case */
+static const PbrMaterial tr_pbr_from = {0, 1}, tr_pbr_to = {1, 0};
+
+/** The TextureTransform case */
+static const TextureTransform tr_uv_from = {1, 1, 0, 0}, tr_uv_to = {2, 3, 1, -1};
+
+/** The AlphaCutoff case */
+static const AlphaCutoff tr_cutoff_from = {0.25f}, tr_cutoff_to = {0.75f};
+
+/** Get the case of a component, once the world registered the components.
+ *
+ * @param c The component
+ * @return The case
+ */
+static tr_material_case_t tr_case(
+    box_render_transition_component_t c)
+{
+    tr_material_case_t result = { .c = c };
+    switch (c) {
+    case BOX_RENDER_TRANSITION_RGB:
+        result.component = ecs_id(Rgb);
+        result.size = ECS_SIZEOF(Rgb);
+        result.from = &tr_rgb_from;
+        result.to = &tr_rgb_to;
+        break;
+    case BOX_RENDER_TRANSITION_EMISSIVE:
+        result.component = ecs_id(Emissive);
+        result.size = ECS_SIZEOF(Emissive);
+        result.from = &tr_emissive_from;
+        result.to = &tr_emissive_to;
+        break;
+    case BOX_RENDER_TRANSITION_PBR_MATERIAL:
+        result.component = ecs_id(PbrMaterial);
+        result.size = ECS_SIZEOF(PbrMaterial);
+        result.from = &tr_pbr_from;
+        result.to = &tr_pbr_to;
+        break;
+    case BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM:
+        result.component = ecs_id(TextureTransform);
+        result.size = ECS_SIZEOF(TextureTransform);
+        result.from = &tr_uv_from;
+        result.to = &tr_uv_to;
+        break;
+    case BOX_RENDER_TRANSITION_ALPHA_CUTOFF:
+        result.component = ecs_id(AlphaCutoff);
+        result.size = ECS_SIZEOF(AlphaCutoff);
+        result.from = &tr_cutoff_from;
+        result.to = &tr_cutoff_to;
+        break;
+    default:
+        test_assert(false);
+        break;
+    }
+
+    return result;
+}
+
 /** Run a material transition of a mesh shape: the record of its slot of the material table
  * at the start, midpoint and end, the batch it keeps and the target on the game thread.
  *
- * @param mc The case
+ * @param c The component
  */
 static void tr_test_mesh_material(
-    const tr_material_case_t *mc)
+    box_render_transition_component_t c)
 {
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
+    tr_material_case_t case_ = tr_case(c), *mc = &case_;
     ecs_entity_t e = tr_shape(world, 0, 0);
     box_render_material_t rendered, expected;
     box_draw_material_t m;
@@ -382,15 +447,16 @@ static void tr_test_mesh_material(
 /** Run a material transition of a 2D shape: its shading at the start, midpoint and end. The
  * components a 2D shape does not render (PbrMaterial, AlphaCutoff) leave it static.
  *
- * @param mc The case
+ * @param c The component
  * @param patched Whether the component changes the shading of a 2D shape
  */
 static void tr_test_shape_material(
-    const tr_material_case_t *mc,
+    box_render_transition_component_t c,
     bool patched)
 {
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
+    tr_material_case_t case_ = tr_case(c), *mc = &case_;
     ecs_entity_t e = ecs_new(world);
     box_render_shading_t rendered, expected;
     box_draw_material_t m;
@@ -431,131 +497,57 @@ static void tr_test_shape_material(
     tr_fini(world, null);
 }
 
-/** The Rgb case: every channel steps by an integer each quarter */
-static const Rgb tr_rgb_from = {0, 0, 0}, tr_rgb_to = {200, 100, 40};
-
-/** The Emissive case */
-static const Emissive tr_emissive_from = { .strength = 0, .color = {0, 0, 0} };
-static const Emissive tr_emissive_to = { .strength = 4, .color = {200, 100, 40} };
-
-/** The PbrMaterial case */
-static const PbrMaterial tr_pbr_from = {0, 1}, tr_pbr_to = {1, 0};
-
-/** The TextureTransform case */
-static const TextureTransform tr_uv_from = {1, 1, 0, 0}, tr_uv_to = {2, 3, 1, -1};
-
-/** The AlphaCutoff case */
-static const AlphaCutoff tr_cutoff_from = {0.25f}, tr_cutoff_to = {0.75f};
-
-/** Get the case of a component.
- *
- * @param c The component
- * @return The case
- */
-static tr_material_case_t tr_case(
-    box_render_transition_component_t c)
-{
-    tr_material_case_t result = { .c = c };
-    switch (c) {
-    case BOX_RENDER_TRANSITION_RGB:
-        result.component = ecs_id(Rgb);
-        result.size = ECS_SIZEOF(Rgb);
-        result.from = &tr_rgb_from;
-        result.to = &tr_rgb_to;
-        break;
-    case BOX_RENDER_TRANSITION_EMISSIVE:
-        result.component = ecs_id(Emissive);
-        result.size = ECS_SIZEOF(Emissive);
-        result.from = &tr_emissive_from;
-        result.to = &tr_emissive_to;
-        break;
-    case BOX_RENDER_TRANSITION_PBR_MATERIAL:
-        result.component = ecs_id(PbrMaterial);
-        result.size = ECS_SIZEOF(PbrMaterial);
-        result.from = &tr_pbr_from;
-        result.to = &tr_pbr_to;
-        break;
-    case BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM:
-        result.component = ecs_id(TextureTransform);
-        result.size = ECS_SIZEOF(TextureTransform);
-        result.from = &tr_uv_from;
-        result.to = &tr_uv_to;
-        break;
-    case BOX_RENDER_TRANSITION_ALPHA_CUTOFF:
-        result.component = ecs_id(AlphaCutoff);
-        result.size = ECS_SIZEOF(AlphaCutoff);
-        result.from = &tr_cutoff_from;
-        result.to = &tr_cutoff_to;
-        break;
-    default:
-        test_assert(false);
-        break;
-    }
-
-    return result;
-}
-
-void Transition_material_rgb_mesh(void) {
+void TransitionMaterial_rgb_mesh(void) {
     // engine_core/transition
-    tr_material_case_t mc = tr_case(BOX_RENDER_TRANSITION_RGB);
-    tr_test_mesh_material(&mc);
+    tr_test_mesh_material(BOX_RENDER_TRANSITION_RGB);
 }
 
-void Transition_material_emissive_mesh(void) {
+void TransitionMaterial_emissive_mesh(void) {
     // engine_core/transition
-    tr_material_case_t mc = tr_case(BOX_RENDER_TRANSITION_EMISSIVE);
-    tr_test_mesh_material(&mc);
+    tr_test_mesh_material(BOX_RENDER_TRANSITION_EMISSIVE);
 }
 
-void Transition_material_pbr_mesh(void) {
+void TransitionMaterial_pbr_mesh(void) {
     // engine_core/transition
-    tr_material_case_t mc = tr_case(BOX_RENDER_TRANSITION_PBR_MATERIAL);
-    tr_test_mesh_material(&mc);
+    tr_test_mesh_material(BOX_RENDER_TRANSITION_PBR_MATERIAL);
 }
 
-void Transition_material_uv_mesh(void) {
+void TransitionMaterial_uv_mesh(void) {
     // engine_core/transition
-    tr_material_case_t mc = tr_case(BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM);
-    tr_test_mesh_material(&mc);
+    tr_test_mesh_material(BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM);
 }
 
-void Transition_material_cutoff_mesh(void) {
+void TransitionMaterial_cutoff_mesh(void) {
     // engine_core/transition
-    tr_material_case_t mc = tr_case(BOX_RENDER_TRANSITION_ALPHA_CUTOFF);
-    tr_test_mesh_material(&mc);
+    tr_test_mesh_material(BOX_RENDER_TRANSITION_ALPHA_CUTOFF);
 }
 
-void Transition_material_rgb_2d(void) {
+void TransitionMaterial_rgb_2d(void) {
     // engine_core/transition
-    tr_material_case_t mc = tr_case(BOX_RENDER_TRANSITION_RGB);
-    tr_test_shape_material(&mc, true);
+    tr_test_shape_material(BOX_RENDER_TRANSITION_RGB, true);
 }
 
-void Transition_material_emissive_2d(void) {
+void TransitionMaterial_emissive_2d(void) {
     // engine_core/transition
-    tr_material_case_t mc = tr_case(BOX_RENDER_TRANSITION_EMISSIVE);
-    tr_test_shape_material(&mc, true);
+    tr_test_shape_material(BOX_RENDER_TRANSITION_EMISSIVE, true);
 }
 
-void Transition_material_pbr_2d(void) {
+void TransitionMaterial_pbr_2d(void) {
     // engine_core/transition
-    tr_material_case_t mc = tr_case(BOX_RENDER_TRANSITION_PBR_MATERIAL);
-    tr_test_shape_material(&mc, false);
+    tr_test_shape_material(BOX_RENDER_TRANSITION_PBR_MATERIAL, false);
 }
 
-void Transition_material_uv_2d(void) {
+void TransitionMaterial_uv_2d(void) {
     // engine_core/transition
-    tr_material_case_t mc = tr_case(BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM);
-    tr_test_shape_material(&mc, true);
+    tr_test_shape_material(BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM, true);
 }
 
-void Transition_material_cutoff_2d(void) {
+void TransitionMaterial_cutoff_2d(void) {
     // engine_core/transition
-    tr_material_case_t mc = tr_case(BOX_RENDER_TRANSITION_ALPHA_CUTOFF);
-    tr_test_shape_material(&mc, false);
+    tr_test_shape_material(BOX_RENDER_TRANSITION_ALPHA_CUTOFF, false);
 }
 
-void Transition_material_cutoff_batch(void) {
+void TransitionMaterial_cutoff_batch(void) {
     // engine_core/transition
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
@@ -588,7 +580,7 @@ void Transition_material_cutoff_batch(void) {
     tr_fini(world, null);
 }
 
-void Transition_material_prefab_one_slot(void) {
+void TransitionMaterial_prefab_one_slot(void) {
     // engine_core/transition
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
@@ -639,7 +631,7 @@ void Transition_material_prefab_one_slot(void) {
     tr_fini(world, null);
 }
 
-void Transition_material_instance_override(void) {
+void TransitionMaterial_instance_override(void) {
     // engine_core/transition
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
@@ -699,7 +691,7 @@ void Transition_material_instance_override(void) {
     tr_fini(world, null);
 }
 
-void Transition_material_prefab_inherited_2d(void) {
+void TransitionMaterial_prefab_inherited_2d(void) {
     // engine_core/transition
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
@@ -748,7 +740,7 @@ void Transition_material_prefab_inherited_2d(void) {
     tr_fini(world, null);
 }
 
-void Transition_material_text_rgb(void) {
+void TransitionMaterial_text_rgb(void) {
     // engine_core/transition
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
@@ -800,7 +792,7 @@ void Transition_material_text_rgb(void) {
     tr_fini(world, null);
 }
 
-void Transition_material_target_on_game_thread(void) {
+void TransitionMaterial_target_on_game_thread(void) {
     // engine_core/transition
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
@@ -830,7 +822,7 @@ void Transition_material_target_on_game_thread(void) {
     tr_fini(world, null);
 }
 
-void Transition_material_no_transition_no_records(void) {
+void TransitionMaterial_no_transition_no_records(void) {
     // engine_core/transition
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
@@ -848,13 +840,16 @@ void Transition_material_no_transition_no_records(void) {
     tr_fini(world, null);
 }
 
-void Transition_transitions_get_no_lookup(void) {
+void TransitionMaterial_transitions_get_no_lookup(void) {
     // engine_core/transition
     box_render_null_t *null;
     ecs_world_t *world = tr_world(&null);
-    const RenderTransitions *t = ecs_singleton_get(world, RenderTransitions);
+    const RenderTransitionState *t = ecs_singleton_get(world, RenderTransitionState);
     test_assert(t != NULL);
     test_assert(t->state != NULL);
     test_assert(box_render_transitions_get(world) == t->state);
+    ecs_entity_t q = ecs_lookup(world, "box.render.RenderTransitions");
+    test_assert(q != ecs_id(RenderTransitionState));
+    test_assert(ecs_query_get(world, q) != NULL);
     tr_fini(world, null);
 }
