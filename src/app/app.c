@@ -297,8 +297,10 @@ static void BoxAppSetAtOnSet(
 
 /** State of the SetAt observers. The writes to SetAt entities are recorded by one OnSet observer
  * per component that a table with SetAtWritten has, created while the world has SetAt entities.
+ *
  * A wildcard OnSet observer would make flecs emit OnSet for every set of every table that
- * exists while it does, even after it is deleted, since flecs never clears the table flags.
+ * exists while it does, even after it is deleted, since flecs never clears the table flags. The
+ * tables of a component a SetAt entity wrote keep emitting OnSet for it for the same reason.
  */
 typedef struct box_app_set_at_t {
     ecs_entity_t module;    /**< The box.app module */
@@ -439,45 +441,39 @@ static void box_app_set_at_add_type(
 }
 
 /** Record the components a SetAt entity had before SetAt was added, as when a script body
- * writes SetAt after the other components, and the ones added with it, and count the SetAt
- * entities: the first one added creates the observers of AppSetAtOnSet, the last one removed
- * or deleted deletes them.
+ * writes SetAt after the other components, and the ones added with it.
  *
- * A stage merge adds the components of an entity that the stage set in one operation, so they
- * are added with SetAt. Their OnSet follows, except for a component with a low id and no OnSet
- * hook or observer when the stage queued the set (a light, before a SetAt entity was written
- * one): flecs then copies the value without OnSet. These are copied when they no longer hold
- * their constructed value.
+ * Count the SetAt entities: the first one added creates the observers of AppSetAtOnSet, the
+ * last one removed or deleted deletes them.
+ *
+ * A stage merge adds the components the stage set on an entity with SetAt. A component with a
+ * low id and no OnSet hook or observer when the stage queued the set (a light) gets no OnSet:
+ * it is copied when it no longer holds its constructed value.
  *
  * @param it The iterator of the observer
  */
-static void BoxAppSetAtOnAdd(
+static void BoxAppSetAtOnAddRemove(
     ecs_iter_t *it)
 {
     ecs_world_t *world = (ecs_world_t*)ecs_get_world(it->world);
     box_app_set_at_t *state = it->ctx;
-    if (ecs_is_fini(world)) {
-        return;
-    }
-
-    if (it->event == EcsOnRemove) {
+    bool add = !ecs_is_fini(world) && it->event == EcsOnAdd;
+    if (!ecs_is_fini(world) && it->event == EcsOnRemove) {
         state->count -= it->count;
         if (state->count <= 0) {
             state->count = 0;
             box_app_set_at_unobserve(world, state);
         }
-
-        return;
+    } else if (add) {
+        state->count += it->count;
+        if (!state->scope) {
+            box_app_set_at_observe(world, state);
+        }
     }
 
-    state->count += it->count;
-    if (!state->scope) {
-        box_app_set_at_observe(world, state);
-    }
-
-    const ecs_type_t *before = it->other_table ? ecs_table_get_type(it->other_table) : NULL;
+    const ecs_type_t *before = add && it->other_table ? ecs_table_get_type(it->other_table) : NULL;
     int32_t i;
-    for (i = 0; i < it->count; i ++) {
+    for (i = 0; i < it->count && add; i ++) {
         SetAtWritten *w = ecs_get_mut(it->world, it->entities[i], SetAtWritten);
         if (w) {
             if (before) {
@@ -511,6 +507,7 @@ static bool box_app_set_at_constructed(
     }
 
     ecs_os_free(constructed);
+
     return result;
 }
 
@@ -547,8 +544,9 @@ static bool box_app_set_at_implied(
 
 /** Copy the components written to a SetAt entity to its target entity: the ones set since it
  * has SetAt, the ones it had before, except those the engine added, and the ones added with
- * SetAt that no longer hold their constructed value. Pairs, tags, SetAt and the components only
- * added are not copied.
+ * SetAt that no longer hold their constructed value.
+ *
+ * Pairs, tags, SetAt and the components only added are not copied.
  *
  * @param world The world
  * @param from The entity with SetAt
@@ -985,7 +983,7 @@ void BoxAppImport(
             .flags = EcsQueryMatchDisabled
         },
         .events = { EcsOnAdd, EcsOnRemove },
-        .callback = BoxAppSetAtOnAdd,
+        .callback = BoxAppSetAtOnAddRemove,
         .ctx = set_at,
         .ctx_free = box_app_set_at_free
     });

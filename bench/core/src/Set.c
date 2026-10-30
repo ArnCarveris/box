@@ -11,7 +11,8 @@
 
 /** A component without hooks or observers. */
 typedef struct BenchValue {
-    float x, y;
+    float x;    /**< First value */
+    float y;    /**< Second value */
 } BenchValue;
 
 /** Create entities with BenchValue in a world with every box module.
@@ -34,6 +35,7 @@ static ecs_entity_t* bench_set_entities(
     }
 
     *component = ecs_id(BenchValue);
+
     return entities;
 }
 

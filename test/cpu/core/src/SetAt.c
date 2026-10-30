@@ -359,12 +359,12 @@ void SetAt_script_last_written(void) {
 
 /** A component without hooks or observers. */
 typedef struct SetAtValue {
-    int32_t value;
+    int32_t value;  /**< The value */
 } SetAtValue;
 
 /** A second component without hooks or observers, never written to a SetAt entity. */
 typedef struct SetAtOther {
-    int32_t value;
+    int32_t value;  /**< The value */
 } SetAtOther;
 
 /** Check whether the writes to SetAt entities are recorded: AppSetAtOnSet, the parent of their
