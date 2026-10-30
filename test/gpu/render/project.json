@@ -375,7 +375,8 @@
                     "newly_valid_probe_hidden_until_baked",
                     "full_rebakes_keep_values",
                     "tint_rebakes_nothing",
-                    "bake_ignores_tint"
+                    "bake_ignores_tint",
+                    "same_transform_rebakes_nothing"
                 ]
             },
             {

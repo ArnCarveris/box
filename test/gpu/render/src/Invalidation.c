@@ -1165,3 +1165,61 @@ void Invalidation_bake_ignores_tint(void) {
     ecs_os_free(path);
     ecs_fini(world);
 }
+
+void Invalidation_same_transform_rebakes_nothing(void) {
+    // baked_lighting/invalidation
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t scene = ecs_new(world);
+    ecs_add(world, scene, Scene);
+    ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
+        .capture_size = 8, .budget_ms = 2, .bounces = 0});
+    ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, camera, Position, {0, 4, 10});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true,
+        .lighting.baked = true});
+    ecs_entity_t floor = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, floor, Position, {0, -0.1f, 0});
+    ecs_set(world, floor, Box, {48, 0.2f, 4});
+    ecs_entity_t group = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, group, Position, {-12, 0, 0});
+    ecs_set(world, group, Rotation, {0, 0.5f, 0});
+    ecs_entity_t block = ecs_new_w_pair(world, EcsChildOf, group);
+    ecs_set(world, block, Position, {0, 0.5f, 0});
+    ecs_set(world, block, Box, {1, 1, 1});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 32, .height = 24, .resolution_scale = 1});
+
+    int32_t frames = 0, j;
+    while (!ecs_get(world, scene, LightBakeStatus)->converged && frames < 5000) {
+        ecs_progress(world, 0);
+        box_render_sync(world);
+        frames ++;
+    }
+
+    const LightBakeStatus *status = ecs_get(world, scene, LightBakeStatus);
+    test_bool(status->converged, true);
+    int32_t baked = status->baked;
+    ecs_set(world, group, Position, {-12, 0, 0});
+    ecs_set(world, group, Rotation, {0, 0.5f, 0});
+    for (j = 0; j < 3; j ++) {
+        ecs_progress(world, 0);
+        box_render_sync(world);
+        status = ecs_get(world, scene, LightBakeStatus);
+        test_bool(status->converged, true);
+        test_int(status->baked, baked);
+    }
+
+    ecs_set(world, group, Position, {-11, 0, 0});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    test_bool(ecs_get(world, scene, LightBakeStatus)->converged, false);
+
+    ecs_fini(world);
+}

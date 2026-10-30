@@ -291,7 +291,8 @@ static void transformTree(
  * @param e The dirty entity
  * @param version The transform version of the current frame
  * @param moved Receives the entity when its subtree is computed, and every descendant whose
- * world transform is written
+ * world transform is written. A world transform computed before that comes out the same leaves
+ * the subtree as it is and passes nothing: a dirty descendant is a root of its own.
  */
 static void transformRoot(
     const ecs_world_t *world,
@@ -326,15 +327,20 @@ static void transformRoot(
         const Rotation *r = ecs_get(world, e, Rotation);
         const Scale *s = ecs_get(world, e, Scale);
 
+        bool changed = true;
         if (t && p) {
+            WorldTransform was = *t;
             transformSingle(t_parent, t, p, r, s);
+            changed = !v || !v->version || memcmp(&was, t, sizeof(WorldTransform));
             if (v) {
                 v->version = version;
             }
         }
 
-        ecs_vec_append_t(NULL, moved, ecs_entity_t)[0] = e;
-        transformTree(world, e, t ? t : t_parent, version, moved);
+        if (changed) {
+            ecs_vec_append_t(NULL, moved, ecs_entity_t)[0] = e;
+            transformTree(world, e, t ? t : t_parent, version, moved);
+        }
     }
 }
 
