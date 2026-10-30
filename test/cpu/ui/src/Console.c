@@ -1188,3 +1188,436 @@ void Console_type_from_script(void) {
 
     ecs_fini(world);
 }
+
+/** Path of the candidate list of Tab completion under the input line */
+#define CONSOLE_MENU "console.ui.screen.stack.panel.content.menu"
+
+/** Hold Shift, tap Tab and release Shift, then draw the console.
+ *
+ * @param world The world
+ */
+static void console_shift_tab(
+    ecs_world_t *world)
+{
+    box_input_key(world, KeyShiftLeft, true);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_input_key_press(world, KeyTab, 1);
+    box_input_key(world, KeyShiftLeft, false);
+    console_settle(world);
+}
+
+/** Get the string of the candidate list of the console.
+ *
+ * @param world The world
+ * @return The string, empty while the list is closed
+ */
+static const char* console_menu(
+    ecs_world_t *world)
+{
+    ecs_entity_t menu = ecs_lookup(world, CONSOLE_MENU);
+    test_assert(menu != 0);
+    const Text *t = ecs_get(world, menu, Text);
+    test_assert(t != NULL && t->value != NULL);
+
+    return t->value;
+}
+
+/** Get the height the candidate list takes under the input line.
+ *
+ * @param world The world
+ * @return The height in points, 0 while the list is closed
+ */
+static float console_menu_height(
+    ecs_world_t *world)
+{
+    const LayoutItem *item = ecs_get(world, ecs_lookup(world, CONSOLE_MENU), LayoutItem);
+    test_assert(item != NULL);
+
+    return item->height.value;
+}
+
+/** Find the byte a word starts at in the candidate list.
+ *
+ * @param world The world
+ * @param word The word
+ * @return The byte, -1 when the list does not show it
+ */
+static int32_t console_menu_at(
+    ecs_world_t *world,
+    const char *word)
+{
+    const char *value = console_menu(world);
+    const char *p = strstr(value, word);
+
+    return p ? (int32_t)(p - value) : -1;
+}
+
+void Console_complete_command_unique(void) {
+    // console/complete
+    ecs_world_t *world = console_open(640, 360, NULL);
+    console_type(world, "pw");
+    console_press(world, KeyTab, 1);
+    test_str(console_typed(world), "pwd ");
+    console_check_cursor(world, 4);
+    test_str(console_menu(world), "");
+    test_flt(console_menu_height(world), 0);
+
+    // The console commands complete too
+    console_ctrl(world, KeyU);
+    console_type(world, "cl");
+    console_press(world, KeyTab, 1);
+    test_str(console_typed(world), "cl");
+    test_assert(console_menu_at(world, "cls") >= 0);
+    test_assert(console_menu_at(world, "clear") >= 0);
+    console_type(world, "s");
+    console_press(world, KeyTab, 1);
+    test_str(console_typed(world), "cls ");
+
+    // Completing the name does not run the line
+    test_assert(console_find_line(world, CONSOLE_PROMPT "pwd") == 0);
+
+    ecs_fini(world);
+}
+
+void Console_complete_command_ambiguous(void) {
+    // console/complete
+    ecs_world_t *world = console_open(640, 360, NULL);
+    const Console *c = ecs_singleton_get(world, Console);
+    console_type(world, "sche");
+
+    // The common prefix of schema and schema_value is inserted, the list stays closed
+    console_press(world, KeyTab, 1);
+    test_str(console_typed(world), "schema");
+    test_str(console_menu(world), "");
+
+    // The prefix adds nothing now: the list opens under the prompt, the line stays
+    console_press(world, KeyTab, 1);
+    test_str(console_typed(world), "schema");
+    test_str(console_menu(world), "schema  schema_value");
+    test_flt(console_menu_height(world), c->line_height);
+    ecs_entity_t menu = ecs_lookup(world, CONSOLE_MENU);
+    console_check_span(world, menu, 0, 6, c->output.command);
+    console_check_span(world, menu, 8, 20, c->output.command);
+
+    // The list takes its rows from the scrollback
+    float log_h = ecs_get(world, ecs_lookup(world, CONSOLE_LOG), LayoutBounds)->height;
+    test_flt(log_h, 360 - 2 * c->padding - 2 * c->line_height);
+
+    // A word nothing starts with rings the bell on the prompt and changes nothing
+    console_ctrl(world, KeyU);
+    test_str(console_menu(world), "");
+    console_type(world, "zzz");
+    console_press(world, KeyTab, 1);
+    test_str(console_typed(world), "zzz");
+    test_str(console_menu(world), "");
+    ecs_entity_t line = ecs_lookup(world, CONSOLE_INPUT ".line");
+    console_check_span(world, line, 0, 1, c->error);
+
+    ecs_fini(world);
+}
+
+void Console_complete_help_topic(void) {
+    // console/complete
+    ecs_world_t *world = console_open(640, 360, NULL);
+    console_type(world, "help pw");
+    console_press(world, KeyTab, 1);
+    test_str(console_typed(world), "help pwd ");
+
+    // The help group of the console commands is a topic too
+    console_ctrl(world, KeyU);
+    console_type(world, "help con");
+    console_press(world, KeyTab, 1);
+    test_str(console_typed(world), "help console ");
+
+    // The second argument of help completes nothing
+    console_type(world, "pw");
+    console_press(world, KeyTab, 1);
+    test_str(console_typed(world), "help console pw");
+
+    // Neither does a string parameter of another command
+    console_ctrl(world, KeyU);
+    console_type(world, "eval pw");
+    console_press(world, KeyTab, 1);
+    test_str(console_typed(world), "eval pw");
+
+    ecs_fini(world);
+}
+
+void Console_complete_entity_in_scope(void) {
+    // console/complete
+    ecs_world_t *world = console_open(640, 360, NULL);
+    const Console *c = ecs_singleton_get(world, Console);
+    ecs_entity(world, { .name = "parent.child_alpha" });
+    ecs_entity(world, { .name = "parent.child_beta" });
+    ecs_entity(world, { .name = "parent.other" });
+    ecs_entity(world, { .name = "outside" });
+    ecs_os_free(box_console_run(world, "cd parent", NULL));
+    ecs_progress(world, 0);
+
+    // Names complete from the children of the session scope
+    console_type(world, "cat ot");
+    console_press(world, KeyTab, 1);
+    test_str(console_value(world), "parent $ cat other ");
+
+    // Only from that one parent
+    console_ctrl(world, KeyU);
+    console_type(world, "cat outs");
+    console_press(world, KeyTab, 1);
+    test_str(console_value(world), "parent $ cat outs");
+
+    // Several children: the common prefix, then the list in the entity color
+    console_ctrl(world, KeyU);
+    console_type(world, "cat c");
+    console_press(world, KeyTab, 1);
+    test_str(console_value(world), "parent $ cat child_");
+    console_press(world, KeyTab, 1);
+    test_str(console_menu(world), "child_alpha  child_beta");
+    console_check_span(world, ecs_lookup(world, CONSOLE_MENU), 0, 11, c->output.entity);
+
+    // An entity argument after the first completes too, a component in the component color
+    console_ctrl(world, KeyU);
+    ecs_os_free(box_console_run(world, "cd", NULL));
+    ecs_progress(world, 0);
+    ecs_entity_t pos = ecs_component_init(world, &(ecs_component_desc_t){
+        .entity = ecs_entity(world, { .name = "Position2" }),
+        .type = { .size = 8, .alignment = 4 }
+    });
+    test_assert(pos != 0);
+    ecs_entity(world, { .name = "Position3" });
+    console_type(world, "get outside Posi");
+    console_press(world, KeyTab, 1);
+    test_str(console_typed(world), "get outside Position");
+    console_press(world, KeyTab, 1);
+    int32_t at = console_menu_at(world, "Position2");
+    test_assert(at >= 0);
+    console_check_span(world, ecs_lookup(world, CONSOLE_MENU), at, at + 9,
+        c->output.component);
+
+    ecs_fini(world);
+}
+
+void Console_complete_dotted_path(void) {
+    // console/complete
+    ecs_world_t *world = console_open(640, 360, NULL);
+    ecs_entity(world, { .name = "galaxy.star_one" });
+    ecs_entity(world, { .name = "galaxy.star_two" });
+    ecs_entity(world, { .name = "galaxy.planet" });
+    ecs_entity(world, { .name = "star_root" });
+
+    // The part after the last dot completes from the children of the part before it
+    console_type(world, "cat galaxy.star_t");
+    console_press(world, KeyTab, 1);
+    test_str(console_typed(world), "cat galaxy.star_two ");
+
+    console_ctrl(world, KeyU);
+    console_type(world, "cat galaxy.");
+    console_press(world, KeyTab, 1);
+    test_str(console_typed(world), "cat galaxy.");
+    test_str(console_menu(world), "planet  star_one  star_two");
+
+    // The parent resolves from the session scope like the shell resolves it
+    console_ctrl(world, KeyU);
+    ecs_os_free(box_console_run(world, "cd galaxy", NULL));
+    ecs_entity(world, { .name = "galaxy.planet.moon" });
+    ecs_progress(world, 0);
+    console_type(world, "ls planet.m");
+    console_press(world, KeyTab, 1);
+    test_str(console_value(world), "galaxy $ ls planet.moon ");
+
+    // A parent that does not resolve completes nothing
+    console_ctrl(world, KeyU);
+    console_type(world, "ls nothing.m");
+    console_press(world, KeyTab, 1);
+    test_str(console_value(world), "galaxy $ ls nothing.m");
+
+    ecs_fini(world);
+}
+
+void Console_complete_entity_with_children(void) {
+    // console/complete
+    ecs_world_t *world = console_open(640, 360, NULL);
+    ecs_entity(world, { .name = "warehouse.shelf.box" });
+    ecs_entity(world, { .name = "warehouse.crate" });
+
+    // An entity with children gets a dot, so the next Tab completes its children
+    console_type(world, "ls wareh");
+    console_press(world, KeyTab, 1);
+    test_str(console_typed(world), "ls warehouse.");
+    console_type(world, "sh");
+    console_press(world, KeyTab, 1);
+    test_str(console_typed(world), "ls warehouse.shelf.");
+    console_press(world, KeyTab, 1);
+    test_str(console_typed(world), "ls warehouse.shelf.box ");
+
+    // One without children a space
+    console_ctrl(world, KeyU);
+    console_type(world, "ls warehouse.cr");
+    console_press(world, KeyTab, 1);
+    test_str(console_typed(world), "ls warehouse.crate ");
+
+    ecs_fini(world);
+}
+
+void Console_complete_not_in_string(void) {
+    // console/complete
+    ecs_world_t *world = console_open(640, 360, NULL);
+    ecs_entity(world, { .name = "galaxy" });
+
+    // Not inside a string
+    console_type(world, "cat \"gal");
+    console_press(world, KeyTab, 1);
+    test_str(console_typed(world), "cat \"gal");
+    test_str(console_menu(world), "");
+
+    // Not inside a value expression
+    console_ctrl(world, KeyU);
+    console_type(world, "set galaxy Position {x: gal");
+    console_press(world, KeyTab, 1);
+    test_str(console_typed(world), "set galaxy Position {x: gal");
+
+    // Nor in a string parameter: the path of mv
+    console_ctrl(world, KeyU);
+    console_type(world, "mv galaxy gal");
+    console_press(world, KeyTab, 1);
+    test_str(console_typed(world), "mv galaxy gal");
+
+    // A bare word after a closed string still completes
+    console_ctrl(world, KeyU);
+    console_type(world, "get \"galaxy\" gal");
+    console_press(world, KeyTab, 1);
+    test_str(console_typed(world), "get \"galaxy\" galaxy ");
+
+    ecs_fini(world);
+}
+
+void Console_complete_cycle(void) {
+    // console/complete
+    ecs_world_t *world = console_open(640, 360, NULL);
+    const Console *c = ecs_singleton_get(world, Console);
+    console_type(world, "schema");
+    console_press(world, KeyTab, 1);
+    test_str(console_menu(world), "schema  schema_value");
+
+    // Tab inserts the next candidate and highlights it
+    console_press(world, KeyTab, 1);
+    test_str(console_typed(world), "schema");
+    test_assert(console_menu_at(world, "schema") == 0);
+    ecs_entity_t menu = ecs_lookup(world, CONSOLE_MENU);
+    console_check_span(world, menu, 0, 6, c->output.match);
+    test_assert(strstr(console_menu(world), "\n") != NULL);
+    console_press(world, KeyTab, 1);
+    test_str(console_typed(world), "schema_value");
+    console_check_span(world, menu, 8, 20, c->output.match);
+    console_check_cursor(world, 12);
+
+    // Past the last it wraps to the first
+    console_press(world, KeyTab, 1);
+    test_str(console_typed(world), "schema");
+
+    // Shift+Tab cycles back, wrapping to the last
+    console_shift_tab(world);
+    test_str(console_typed(world), "schema_value");
+    console_shift_tab(world);
+    test_str(console_typed(world), "schema");
+    console_shift_tab(world);
+    test_str(console_typed(world), "schema_value");
+
+    // Enter accepts the active candidate without running the line
+    console_press(world, KeyEnter, 1);
+    test_str(console_typed(world), "schema_value ");
+    test_str(console_menu(world), "");
+    test_assert(console_find_line(world, CONSOLE_PROMPT "schema_value") == 0);
+
+    // With the list closed Enter runs the line again
+    console_press(world, KeyEnter, 1);
+    test_assert(console_find_line(world, CONSOLE_PROMPT "schema_value ") != 0);
+
+    // Past the visible limit the list ends with the number of candidates it does not show
+    for (int32_t i = 0; i < 40; i ++) {
+        char name[32];
+        ecs_os_snprintf(name, sizeof(name), "many.c%02d", i);
+        ecs_entity(world, { .name = name });
+    }
+
+    console_type(world, "ls many.");
+    console_press(world, KeyTab, 1);
+    test_str(console_typed(world), "ls many.c");
+    console_press(world, KeyTab, 1);
+    test_assert(strstr(console_menu(world), "... 16 more") != NULL);
+    int32_t more = console_menu_at(world, "... 16 more");
+    console_check_span(world, menu, more - 2, more + 11, c->output.dim);
+
+    // Cycling past the limit scrolls the shown candidates
+    console_shift_tab(world);
+    test_str(console_typed(world), "ls many.c39");
+    test_assert(console_menu_at(world, "c39") >= 0);
+    test_assert(console_menu_at(world, "c00") < 0);
+
+    ecs_fini(world);
+}
+
+void Console_complete_escape_closes_list(void) {
+    // console/complete
+    ecs_world_t *world = console_open(640, 360, NULL);
+    console_type(world, "schema");
+    console_press(world, KeyTab, 2);
+    test_str(console_typed(world), "schema");
+    test_assert(console_menu(world)[0] != '\0');
+
+    // Escape closes the list, the console stays open with the line
+    console_press(world, KeyEscape, 1);
+    test_str(console_menu(world), "");
+    test_flt(console_menu_height(world), 0);
+    test_bool(ecs_singleton_get(world, Console)->open, true);
+    test_str(console_typed(world), "schema");
+
+    // The next Escape closes the console
+    console_press(world, KeyEscape, 1);
+    test_bool(ecs_singleton_get(world, Console)->open, false);
+
+    ecs_fini(world);
+}
+
+void Console_complete_typing_closes_list(void) {
+    // console/complete
+    ecs_world_t *world = console_open(640, 360, NULL);
+    console_type(world, "schema");
+    console_press(world, KeyTab, 2);
+    test_str(console_typed(world), "schema");
+    test_assert(console_menu(world)[0] != '\0');
+
+    // Typing closes the list and keeps the text, the candidate Tab inserted included
+    console_type(world, "_");
+    test_str(console_menu(world), "");
+    test_str(console_typed(world), "schema_");
+
+    console_press(world, KeyBackspace, 1);
+    console_press(world, KeyTab, 1);
+    console_press(world, KeyTab, 1);
+    test_str(console_typed(world), "schema");
+    console_press(world, KeyLeft, 1);
+    test_str(console_menu(world), "");
+    test_str(console_typed(world), "schema");
+
+    // So does a line that runs from a script
+    console_press(world, KeyEnd, 1);
+    console_press(world, KeyTab, 1);
+    test_assert(console_menu(world)[0] != '\0');
+    ecs_os_free(box_console_run(world, "pwd", NULL));
+    ecs_progress(world, 0);
+    test_str(console_menu(world), "");
+
+    // Completing from a script cycles like Tab
+    char *line = box_console_complete(world, false);
+    test_str(line, "schema");
+    ecs_os_free(line);
+    line = box_console_complete(world, false);
+    test_str(line, "schema");
+    ecs_os_free(line);
+    line = box_console_complete(world, true);
+    test_str(line, "schema_value");
+    ecs_os_free(line);
+
+    ecs_fini(world);
+}
