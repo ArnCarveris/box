@@ -1,5 +1,5 @@
 // A transform transition with children, frozen in the middle. The scene starts with the rig on
-// the left; ScriptAt changes its Position, Rotation and Scale at the start of the second frame,
+// the left; SetAt changes its Position, Rotation and Scale at the start of the second frame,
 // with a linear duration of 0.05 s (three frames at the fixed delta of 1/60 s). The render of the
 // third frame is one frame into the transition, a third of the way: the rig and its two children
 // render between the grey start marker on the left and the green target marker on the right,
@@ -24,7 +24,7 @@ main_view {
 }
 
 sun {
-  Rotation: {-0.9, 0.5, 0}
+  Rotation: {0.7, 2.4, 0}
   DirectionalLight: {intensity: 2 * flecs.script.math.PI}
   Rgb: {255, 250, 240}
 }
@@ -76,13 +76,9 @@ rig {
   }
 }
 
-change {
-  ScriptAt: {frame: 1, code: `
-    using box.transform
-    rig {
-      Position: {4, 0.6, 0}
-      Rotation: {0, 1.5, 0}
-      Scale: {1.6, 1.6, 1.6}
-    }
-  `}
+change_rig {
+  SetAt: {frame: 1, entity: rig}
+  Position: {4, 0.6, 0}
+  Rotation: {0, 1.5, 0}
+  Scale: {1.6, 1.6, 1.6}
 }

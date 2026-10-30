@@ -1,4 +1,4 @@
-// 2D shape and UI element transitions, frozen in the middle. ScriptAt changes the values at the
+// 2D shape and UI element transitions, frozen in the middle. SetAt changes the values at the
 // start of the second frame, with linear durations of 0.05 s (three frames at the fixed delta of
 // 1/60 s), so the render of the third frame shows each a third of the way:
 // - card: a rounded 2D rect that moves right, turns and goes from orange to blue, between its
@@ -54,13 +54,14 @@ card {
 
 ui {
   Layout: {direction: Row, spacing: 24, padding: {12, 12, 12, 12}}
-  LayoutItem: {width: {mode: Fixed, value: 520}, height: {mode: Fixed, value: 120}}
+  LayoutItem: {width: {mode: Fixed, value: 520}}
   Position: {0, -80, 0}
   Rect: {1, 1}
   Rgb: {40, 44, 56}
   Border: {width: 1, radius: 8, color: {90, 110, 150, 255}}
 
   button {
+    Position: {0, 0, 1}
     Layout: {padding: {8, 8, 14, 14}, h: Center, v: Middle}
     LayoutItem: {v: Middle}
     Rect: {1, 1}
@@ -69,6 +70,7 @@ ui {
     Transition: [Rgb: {duration: 0.05}]
 
     label {
+      Position: {0, 0, 1}
       Text: {value: "Apply", size: 22}
       Rgb: {255, 255, 255}
       Transition: [Rgb: {duration: 0.05}]
@@ -76,6 +78,7 @@ ui {
   }
 
   toast {
+    Position: {0, 0, 1}
     Layout: {padding: {8, 8, 14, 14}, h: Center, v: Middle}
     LayoutItem: {v: Middle}
     Rect: {1, 1}
@@ -85,27 +88,31 @@ ui {
     Transition: [Opacity: {duration: 0.05}]
 
     message {
+      Position: {0, 0, 1}
       Text: {value: "Saved", size: 22}
       Rgb: {255, 255, 255}
     }
   }
 }
 
-change {
-  ScriptAt: {frame: 1, code: `
-    using box.transform
-    using box.material
-    card {
-      Position: {200, 90, 1}
-      Rotation: {0, 0, 1.2}
-      Rgb: {60, 110, 240}
-    }
-    ui {
-      button {
-        Rgb: {150, 230, 160}
-        label { Rgb: {0, 0, 0} }
-      }
-      toast { Opacity: {0} }
-    }
-  `}
+change_card {
+  SetAt: {frame: 1, entity: card}
+  Position: {200, 90, 1}
+  Rotation: {0, 0, 1.2}
+  Rgb: {60, 110, 240}
+}
+
+change_button {
+  SetAt: {frame: 1, entity: ui.button}
+  Rgb: {150, 230, 160}
+}
+
+change_label {
+  SetAt: {frame: 1, entity: ui.button.label}
+  Rgb: {0, 0, 0}
+}
+
+change_toast {
+  SetAt: {frame: 1, entity: ui.toast}
+  Opacity: {0}
 }

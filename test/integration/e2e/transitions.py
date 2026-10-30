@@ -5,20 +5,23 @@ Every case runs in a fresh apps/boxrun process with test/assets/scenes/transitio
 from the repository root) on a 320x180 surface and gets the App of tools/box_client.py; the
 runner checks after every case that the app logged no error and quits cleanly. The scene is 2D
 and orthographic with one pixel per unit, so a capture shows the square at its rendered place and
-color. Its transitions are linear and last 1 s, 60 frames at the fixed delta of 1/60 s: the
-frames between the set and the capture are far fewer, so the capture is in between, and after
-TRANSITION_FRAMES more frames it is at the target.
+color. Its transitions are linear and last 1 s, 60 frames at the fixed delta of 1/60 s. --fps 60
+caps the app at that rate: uncapped, a headless app runs about 70 frames per command and more
+before a capture arrives, past the end of the transition. Capped, a few frames pass between the
+set and the capture, so the capture is in between, and after TRANSITION_FRAMES more frames it is
+at the target.
 """
 from box_client import DELTA_TIME, parse_value
 
 APP = "apps/boxrun"
-ARGS = ["--surface", "320x180", "test/assets/scenes/transitions.flecs"]
+ARGS = ["--fps", "60", "--surface", "320x180", "test/assets/scenes/transitions.flecs"]
 
 FPS = round(1 / float(DELTA_TIME))
 # The transitions of the scene last 1 s; a few frames more for the frames in flight
 TRANSITION_FRAMES = FPS + 10
 # Pixels or channel values a capture must be away from the start and the target to count as in
-# between: one frame moves the square 200 / 60 = 3.3 px and the color 255 / 60 = 4.25
+# between: one frame moves the square 200 / 60 = 3.3 px and the color 255 / 60 = 4.25, and the
+# capture after the set is about six frames in
 MARGIN = 2
 
 

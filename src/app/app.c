@@ -180,14 +180,81 @@ done:
     clock->pace = pace;
 }
 
-/** Run the ScriptAt code whose frame has come, then remove the component.
+/** Check whether a component of a SetAt entity is one the engine added: another of its
+ * components adds it through the With trait (SetAt adds Disabled, a material component adds
+ * MaterialId, Rotation adds Position) and it still holds the value it was constructed with.
  *
- * The entities are collected first, since running the code and removing the component change
+ * @param world The world
+ * @param type The type of the entity
+ * @param id The component
+ * @param ti The type info of the component
+ * @param value The value of the component
+ * @return Whether the component is not copied
+ */
+static bool box_app_set_at_implied(
+    const ecs_world_t *world,
+    const ecs_type_t *type,
+    ecs_id_t id,
+    const ecs_type_info_t *ti,
+    const void *value)
+{
+    bool result = false;
+    int32_t i;
+    for (i = 0; i < type->count && !result; i ++) {
+        ecs_id_t other = type->array[i];
+        result = !ECS_IS_PAIR(other) && other != id && ecs_has_pair(world, other, EcsWith, id);
+    }
+
+    if (result) {
+        void *constructed = ecs_os_calloc(ti->size);
+        if (ti->hooks.ctor) {
+            ti->hooks.ctor(constructed, 1, ti);
+        }
+
+        result = !ecs_os_memcmp(constructed, value, ti->size);
+        if (ti->hooks.dtor) {
+            ti->hooks.dtor(constructed, 1, ti);
+        }
+
+        ecs_os_free(constructed);
+    }
+
+    return result;
+}
+
+/** Copy the components of a SetAt entity to its target entity, except pairs, tags, SetAt and
+ * the components the engine added.
+ *
+ * @param world The world
+ * @param from The entity with SetAt
+ * @param to The entity that receives the values
+ */
+static void box_app_set_at_copy(
+    ecs_world_t *world,
+    ecs_entity_t from,
+    ecs_entity_t to)
+{
+    const ecs_type_t *type = ecs_get_type(world, from);
+    int32_t i;
+    for (i = 0; i < type->count; i ++) {
+        ecs_id_t id = type->array[i];
+        const ecs_type_info_t *ti = ECS_IS_PAIR(id) || id == ecs_id(SetAt)
+            ? NULL : ecs_get_type_info(world, id);
+        const void *value = ti ? ecs_get_id(world, from, id) : NULL;
+        if (value && !box_app_set_at_implied(world, type, id, ti, value)) {
+            ecs_set_id(world, to, id, (size_t)ti->size, value);
+        }
+    }
+}
+
+/** Set the values of the SetAt entities whose frame has come, then delete them.
+ *
+ * The entities are collected first, since setting the values and deleting the entities change
  * the tables the query iterates.
  *
  * @param it The iterator of the system
  */
-static void BoxAppScriptAt(
+static void BoxAppSetAt(
     ecs_iter_t *it)
 {
     ecs_world_t *world = it->world;
@@ -196,7 +263,7 @@ static void BoxAppScriptAt(
     ecs_vec_t due = {0};
     int32_t i, count;
     while (ecs_query_next(it)) {
-        const ScriptAt *s = ecs_field(it, ScriptAt, 0);
+        const SetAt *s = ecs_field(it, SetAt, 0);
         for (i = 0; i < it->count; i ++) {
             if (frame >= s[i].frame) {
                 ecs_vec_append_t(NULL, &due, ecs_entity_t)[0] = it->entities[i];
@@ -207,16 +274,16 @@ static void BoxAppScriptAt(
     count = ecs_vec_count(&due);
     for (i = 0; i < count; i ++) {
         ecs_entity_t e = ecs_vec_get_t(&due, ecs_entity_t, i)[0];
-        const ScriptAt *s = ecs_get(world, e, ScriptAt);
-        char *code = s && s->code ? ecs_os_strdup(s->code) : NULL;
-        char *name = ecs_get_path(world, e);
-        ecs_remove(world, e, ScriptAt);
-        if (code && ecs_script_run(world, name, code, NULL)) {
-            ecs_err("ScriptAt of '%s' failed", name);
+        ecs_entity_t to = ecs_get(world, e, SetAt)->entity;
+        if (to && ecs_is_alive(world, to)) {
+            box_app_set_at_copy(world, e, to);
+        } else {
+            char *name = ecs_get_path(world, e);
+            ecs_err("SetAt of '%s' has no entity", name);
+            ecs_os_free(name);
         }
 
-        ecs_os_free(name);
-        ecs_os_free(code);
+        ecs_delete(world, e);
     }
 
     ecs_vec_fini_t(NULL, &due, ecs_entity_t);
@@ -552,8 +619,8 @@ void BoxAppImport(
     ECS_META_COMPONENT(world, FileWatch);
     ECS_META_COMPONENT(world, FileWatchStatus);
     box_owned_hooks(world, FileWatchStatus, BOX_OWNED_STR(FileWatchStatus, last));
-    ECS_META_COMPONENT(world, ScriptAt);
-    box_owned_hooks(world, ScriptAt, BOX_OWNED_STR(ScriptAt, code));
+    ECS_META_COMPONENT(world, SetAt);
+    ecs_add_pair(world, ecs_id(SetAt), EcsWith, EcsDisabled);
 
     ecs_singleton_set(world, AppStatus, {0});
     ecs_singleton_set(world, FrameTiming, {0});
@@ -577,10 +644,13 @@ void BoxAppImport(
     });
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "AppScriptAt" }),
-        .query.terms = {{ .id = ecs_id(ScriptAt) }},
+        .entity = ecs_entity(world, { .name = "AppSetAt" }),
+        .query = {
+            .terms = {{ .id = ecs_id(SetAt) }},
+            .flags = EcsQueryMatchDisabled
+        },
         .phase = EcsPreFrame,
-        .run = BoxAppScriptAt,
+        .run = BoxAppSetAt,
         .immediate = true
     });
 

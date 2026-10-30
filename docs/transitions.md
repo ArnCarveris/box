@@ -532,27 +532,35 @@ every frame, idle or not: that is the cost of declaring `Transition` on a prefab
 
 ### The cost
 
-The numbers of the cases above, from `bench/render` in a release build, per frame. Run them with
-`bake3 run --cfg release bench/render -- Transition` and update this table when the extract or
-the resolver change.
+The numbers of the cases above, from `bench/render` in a release build on an Apple M6 (arm64
+macOS), per frame. Run them with
+`bake3 run --cfg release bench/render --local-env -- Transition` and update this table when the
+extract or the resolver change. The frame is the `ns/iter` of the case; `transitions_ms` is the
+counter of the same name (its total, a time per frame measured over separate frames with system
+time measurement on, so it is not a part of the frame column and can even exceed it).
 
 | Case                          | Frame (ms) | `transitions_ms` | Note                          |
 |-------------------------------|-----------:|-----------------:|-------------------------------|
-| `Transition_none_static`      |        TBD |              TBD | baseline, no `Transition`     |
-| `Transition_none_dynamic`     |        TBD |              TBD | baseline, 1% moved per frame  |
-| `Transition_one_idle`         |        TBD |              TBD | one shape with `Transition`   |
-| `Transition_one_active`       |        TBD |              TBD | one shape restarted per frame |
-| `Transition_idle_1000`        |        TBD |              TBD | 1000 idle nodes               |
-| `Transition_active_1000`      |        TBD |              TBD | 1000 active nodes             |
-| `Transition_prefab_rgb_idle`  |        TBD |              TBD | 10,000 inheriting instances   |
-| `Transition_prefab_rgb_active`|        TBD |              TBD | the same, prefab `Rgb` active |
-| `Transition_resolve_empty`    |        TBD |                - | resolver on an empty packet   |
+| `Transition_none_static`      |      0.069 |          0.00008 | baseline, no `Transition`     |
+| `Transition_none_dynamic`     |      0.266 |          0.00008 | baseline, 1% moved per frame  |
+| `Transition_one_idle`         |      0.070 |          0.00016 | one shape with `Transition`   |
+| `Transition_one_active`       |      0.070 |          0.00038 | one shape restarted per frame |
+| `Transition_idle_1000`        |      0.107 |            0.079 | 1000 idle nodes               |
+| `Transition_active_1000`      |      0.474 |            0.143 | 1000 active nodes             |
+| `Transition_prefab_rgb_idle`  |      0.349 |            0.467 | 10,000 inheriting instances   |
+| `Transition_prefab_rgb_active`|      0.348 |            0.347 | the same, prefab `Rgb` active |
+| `Transition_resolve_empty`    |   0.000002 |                - | resolver on an empty packet   |
 
-What to read from them: the frame of `Transition_none_*` equals that of the same scene before the
-feature within noise, and so does that of `Transition_one_*` (the other shapes do not pay). An
-idle node costs one compare per transitioned component per frame. An active node adds its
-records and its patches, and an active transform node the walk of its subtree. Declaring
-`Transition` on a prefab makes every instance a node that is compared every frame.
+What to read from them: the frame of `Transition_one_*` equals that of `Transition_none_static`
+within noise (0.070 and 0.069 ms), so the 110,000 other shapes do not pay for one shape with
+`Transition`, and a world without it spends 0.08 µs per frame in the two transition systems. An
+idle node costs one compare per transitioned component per frame, about 80 ns (0.079 ms for
+1000). An active node adds its records and its patches, and an active transform node the walk of
+its subtree: 1000 active nodes take 0.143 ms in the extract and rekey their slots to dynamic
+batches, which makes their frame 0.474 ms. Declaring `Transition` on a prefab makes every
+instance a node that is compared every frame, 0.35 to 0.47 ms for 10,000 instances whether the
+prefab's `Rgb` runs or not; the walk itself visits the prefab alone (`material_visited` 1). The
+resolver returns from a packet without records in 2 ns.
 
 ## Tests
 
@@ -566,13 +574,16 @@ records and its patches, and an active transform node the walk of its subtree. D
   emissive transitions with a delayed one and a prefab (`transitions_material`), tint and opacity
   on parents with children (`transitions_tint_opacity`) and a 2D shape and UI elements
   (`transitions_2d_ui`). A scene cannot change a value after its first frame by itself, and the
-  first value never animates, so each changes its values with `ScriptAt` (`box.app`) at frame 1,
-  at the start of the second frame. The harness runs three frames at the fixed delta of 1/60 s,
-  and every transition lasts 0.05 s, so the rendered frame is one frame, a third of the way, into
-  every transition, at a world time of 3/60 s. No scene reads the wall clock.
+  first value never animates, so each changes its values with `SetAt` (`box.app`) at frame 1,
+  at the start of the second frame: an entity with `SetAt: {frame: 1, entity: ball}` and the
+  new values, which it copies to `ball` then. The harness runs three frames at the fixed delta of
+  1/60 s, and every transition is linear over 0.05 s, so the rendered frame is one frame, a third
+  of the way, into every transition, at a world time of 3/60 s. No scene reads the wall clock.
 - `test/integration/e2e/transitions.py`: through the shell of `apps/boxrun`, a `set` of
   `Position` or `Rgb` is returned by `get` in the next command, while a `capture` of the same
-  frames shows the square in between, and the target after the transition.
+  frames shows the square in between, and the target after the transition. The app runs capped
+  at 60 fps (`--fps 60`), since uncapped a headless app runs past a transition of 1 s between
+  two commands.
 - `test/integration/web/transitions.mjs`: the browser build, which renders on the main thread,
   with a scene that moves, recolors, fades and lights at once; the square passes in between and
   ends at its target, with no error.

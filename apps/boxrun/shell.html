@@ -75,13 +75,13 @@
       arguments: args.filter(function (a) { return a.length; }),
       print: function (text) { console.log(text); },
       printErr: function (text) { console.error(text); },
-      preRun: [function () {
+      preRun: [function (module) {
         files.forEach(function (file) {
           var dir = file.path.substring(0, file.path.lastIndexOf('/'));
           if (dir) {
-            options.FS.mkdirTree(dir);
+            module.FS.mkdirTree(dir);
           }
-          options.FS.writeFile(file.path, file.data);
+          module.FS.writeFile(file.path, file.data);
         });
       }]
     };

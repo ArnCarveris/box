@@ -1,4 +1,4 @@
-// Material color and emissive transitions, frozen in the middle. ScriptAt changes the values at
+// Material color and emissive transitions, frozen in the middle. SetAt changes the values at
 // the start of the second frame, with linear durations of 0.05 s (three frames at the fixed delta
 // of 1/60 s), so the render of the third frame shows each a third of the way:
 // - color: red to blue, a red purple
@@ -28,7 +28,7 @@ main_view {
 }
 
 sun {
-  Rotation: {-0.8, 0.4, 0}
+  Rotation: {0.7, 2.4, 0}
   DirectionalLight: {intensity: 2 * flecs.script.math.PI}
   Rgb: {255, 255, 255}
 }
@@ -101,16 +101,28 @@ for i in 0..5 {
   }
 }
 
-change {
-  ScriptAt: {frame: 1, code: `
-    using box.material
-    color { Rgb: {40, 80, 230} }
-    emissive { Emissive: {strength: 3, color: {60, 220, 255}} }
-    both {
-      Rgb: {40, 80, 230}
-      Emissive: {strength: 3, color: {60, 220, 255}}
-    }
-    delayed { Rgb: {40, 80, 230} }
-    Ball { Rgb: {40, 80, 230} }
-  `}
+change_color {
+  SetAt: {frame: 1, entity: color}
+  Rgb: {40, 80, 230}
+}
+
+change_emissive {
+  SetAt: {frame: 1, entity: emissive}
+  Emissive: {strength: 3, color: {60, 220, 255}}
+}
+
+change_both {
+  SetAt: {frame: 1, entity: both}
+  Rgb: {40, 80, 230}
+  Emissive: {strength: 3, color: {60, 220, 255}}
+}
+
+change_delayed {
+  SetAt: {frame: 1, entity: delayed}
+  Rgb: {40, 80, 230}
+}
+
+change_ball {
+  SetAt: {frame: 1, entity: Ball}
+  Rgb: {40, 80, 230}
 }

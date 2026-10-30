@@ -145,17 +145,16 @@ ECS_STRUCT(FileWatchStatus, {
     char *last;         /**< The file that changed last, NULL before the first change */
 });
 
-/** Script code that runs once, at the start of the frame after AppStatus.frame reached frame,
- * before the systems of that frame, and is then removed from its entity.
+/** Sets the other components of its entity on entity at the start of the frame after
+ * AppStatus.frame reached frame, then deletes its entity. With it a scene changes itself at a
+ * known frame, as the visual scenes of transitions do. SetAt adds Disabled to its entity.
  *
- * A scene uses it to change itself at a known frame: with a fixed delta (--delta-time) and a
- * frame limit the frame that changes and the frame that is rendered are at known world times,
- * which is how the visual scenes of transitions freeze the middle of a transition. The code runs
- * with ecs_script_run at the root scope; an error is logged and the component is removed too.
+ * Not copied: pairs, tags, SetAt and a component that another adds with With while it holds its
+ * constructed value (MaterialId, or a Position of zeros next to a Rotation or Scale).
  */
-ECS_STRUCT(ScriptAt, {
-    int32_t frame;      /**< Frames completed (AppStatus.frame) before the code runs */
-    char *code;         /**< flecs script code */
+ECS_STRUCT(SetAt, {
+    int32_t frame;          /**< Frames completed (AppStatus.frame) before the values are set */
+    ecs_entity_t entity;    /**< Entity that receives the values */
 });
 
 /** Register the box.app module.

@@ -1,4 +1,4 @@
-// Tint and opacity transitions on parents with children, frozen in the middle. ScriptAt changes
+// Tint and opacity transitions on parents with children, frozen in the middle. SetAt changes
 // the values at the start of the second frame, with linear durations of 0.05 s (three frames at
 // the fixed delta of 1/60 s), so the render of the third frame shows each a third of the way:
 // - tinted: no tint to a strong blue tint, its ball and block a third of the way to blue
@@ -106,15 +106,27 @@ appearing {
   }
 }
 
-change {
-  ScriptAt: {frame: 1, code: `
-    using box.material
-    tinted { Tint: {r: 0, g: 0, b: 255, a: 255} }
-    fading { Opacity: {0.1} }
-    nested {
-      Tint: {r: 255, g: 0, b: 0, a: 200}
-      inner { Tint: {r: 0, g: 255, b: 0, a: 200} }
-    }
-    appearing { Opacity: {1} }
-  `}
+change_tinted {
+  SetAt: {frame: 1, entity: tinted}
+  Tint: {r: 0, g: 0, b: 255, a: 255}
+}
+
+change_fading {
+  SetAt: {frame: 1, entity: fading}
+  Opacity: {0.1}
+}
+
+change_nested {
+  SetAt: {frame: 1, entity: nested}
+  Tint: {r: 255, g: 0, b: 0, a: 200}
+}
+
+change_inner {
+  SetAt: {frame: 1, entity: nested.inner}
+  Tint: {r: 0, g: 255, b: 0, a: 200}
+}
+
+change_appearing {
+  SetAt: {frame: 1, entity: appearing}
+  Opacity: {1}
 }

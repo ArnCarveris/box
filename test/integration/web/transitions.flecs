@@ -1,5 +1,5 @@
 // The scene of the browser check of transitions (transitions.mjs), which renders on the main
-// thread. An orthographic camera shows one logical pixel per unit. At frame 30 ScriptAt moves
+// thread. An orthographic camera shows one logical pixel per unit. At frame 30 SetAt moves
 // the white square from the grey start marker to the green target marker and turns the red
 // square blue, with linear transitions of 3 s (180 frames at the fixed delta of 1/60 s the check
 // passes), and fades the parent of the two small squares and lights the box, which the check
@@ -74,13 +74,22 @@ glow {
   Transition: [Emissive: {duration: 3}]
 }
 
-change {
-  ScriptAt: {frame: 30, code: `
-    using box.transform
-    using box.material
-    mover { Position: {150, 0, 0} }
-    shifter { Rgb: {0, 0, 255} }
-    fading { Opacity: {0.2} }
-    glow { Emissive: {strength: 1, color: {60, 220, 255}} }
-  `}
+change_mover {
+  SetAt: {frame: 30, entity: mover}
+  Position: {150, 0, 0}
+}
+
+change_shifter {
+  SetAt: {frame: 30, entity: shifter}
+  Rgb: {0, 0, 255}
+}
+
+change_fading {
+  SetAt: {frame: 30, entity: fading}
+  Opacity: {0.2}
+}
+
+change_glow {
+  SetAt: {frame: 30, entity: glow}
+  Emissive: {strength: 1, color: {60, 220, 255}}
 }

@@ -300,12 +300,14 @@
                 ]
             },
             {
-                "id": "ScriptAt",
+                "id": "SetAt",
                 "testcases": [
                     "runs_at_frame",
                     "frame_zero_runs_first",
                     "from_script",
-                    "error_removed"
+                    "no_entity",
+                    "implied_not_copied",
+                    "implied_authored"
                 ]
             }
         ]
