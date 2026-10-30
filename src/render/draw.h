@@ -218,6 +218,13 @@ typedef struct box_draw_transition_material_t {
     float opacity_scale;    /**< Factor of the own Opacity, the alpha of the span of a glyph */
 } box_draw_transition_material_t;
 
+/** A matrix known to lie, element by element, between two matrices: the world matrices a node
+ * of a transform transition can render with in a frame */
+typedef struct box_draw_transition_range_t {
+    mat4 lo;                    /**< Minimum of each element */
+    mat4 hi;                    /**< Maximum of each element */
+} box_draw_transition_range_t;
+
 /** A blended instance of a view, ordered back to front by its view depth */
 typedef struct box_draw_sorted_t {
     float depth;            /**< View space z of the instance origin, smaller is farther */
@@ -491,6 +498,26 @@ uint8_t box_draws_dynamic_kinds(
 bool box_draws_caster(
     const box_draw_batch_t *b);
 
+/** Compute the world bounds of a slot of a batch at every transform that lies, element by
+ * element, between two transforms: those of its local bounds, from its surface record for a
+ * surface instance or else from the mesh of the batch. Equal transforms give one transform.
+ *
+ * @param world The world, whose mesh cache has the mesh of the batch
+ * @param b The batch
+ * @param lo The minimum of each element of the transform
+ * @param hi The maximum of each element of the transform
+ * @param surface The surface of the slot
+ * @param out Receives the bounds, with the scene of the batch
+ * @return Whether the bounds are known, false when the mesh of the batch is missing or empty
+ */
+bool box_draws_shadow_bounds(
+    const ecs_world_t *world,
+    const box_draw_batch_t *b,
+    const box_render_transform_t *lo,
+    const box_render_transform_t *hi,
+    const box_render_surface_t *surface,
+    box_render_shadow_region_t *out);
+
 /** Record the world bounds a caster slot of a batch has with a transform and a surface, while
  * the state records the regions of changed shadow casters; nothing for a batch of no caster.
  *
@@ -634,6 +661,58 @@ void box_draws_transition_target(
 void box_draws_transition_encode(
     const box_draw_transition_material_t *material,
     void *dst);
+
+/** Make the range of a single matrix.
+ *
+ * @param m The matrix
+ * @param out Receives the range
+ */
+void box_draws_range_point(
+    mat4 m,
+    box_draw_transition_range_t *out);
+
+/** Get the range of the product of two matrices that lie in ranges, element by element in the
+ * order of glm_mul, so the range of the product of two single matrices is their glm_mul.
+ *
+ * @param a The range of the left matrix
+ * @param b The range of the right matrix
+ * @param out Receives the range of a * b, which may be a or b
+ */
+void box_draws_range_mul(
+    const box_draw_transition_range_t *a,
+    const box_draw_transition_range_t *b,
+    box_draw_transition_range_t *out);
+
+/** Get the range of the local matrices box_transform_local builds from a position, rotation
+ * and scale whose fields lie in ranges: Ry * Rx * Rz, its columns scaled, then the position.
+ * An element of a rotation never leaves -1 to 1, which bounds a long sweep.
+ *
+ * @param lo Minimum of each field of the position, the rotation and the scale, in that order
+ * @param hi Maximum of each field of them
+ * @param out Receives the range
+ */
+void box_draws_range_local(
+    vec3 lo[3],
+    vec3 hi[3],
+    box_draw_transition_range_t *out);
+
+/** Get the world bounds of a slot of a caster batch at every matrix of a range times the
+ * target chain of the slot (box_draws_shadow_bounds), or the whole scene without its mesh.
+ *
+ * @param world The world, whose mesh cache has the mesh of the batch
+ * @param b The batch
+ * @param slot The slot
+ * @param range The range of the world matrices of the node that moves the slot
+ * @param rel The target chain from the node down to the instance, with the instance matrix
+ * @param out Receives the bounds
+ */
+void box_draws_range_region(
+    const ecs_world_t *world,
+    box_draw_batch_t *b,
+    int32_t slot,
+    const box_draw_transition_range_t *range,
+    mat4 rel,
+    box_render_shadow_region_t *out);
 
 /** Get the material components a slot of the material table is packed from: those its owner
  * owns or inherits.
