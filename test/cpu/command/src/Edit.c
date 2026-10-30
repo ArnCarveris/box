@@ -21,7 +21,7 @@ static void edit_run(
     const char *expect)
 {
     bool error = true;
-    char *out = box_terminal_run(world, s, line, &error);
+    char *out = box_command_run(world, s, line, &error);
     test_bool(error, false);
     test_str(out, expect);
     ecs_os_free(out);
@@ -32,16 +32,16 @@ void Edit_toggle(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     test_bool(ecs_singleton_get(world, Editor)->open, false);
 
-    edit_run(world, s, "edit", "editor open");
+    edit_run(world, s, "edit", "true");
     test_bool(ecs_singleton_get(world, Editor)->open, true);
 
-    edit_run(world, s, "edit", "editor closed");
+    edit_run(world, s, "edit", "false");
     test_bool(ecs_singleton_get(world, Editor)->open, false);
 
-    edit_run(world, s, "edit", "editor open");
+    edit_run(world, s, "edit", "true");
     test_bool(ecs_singleton_get(world, Editor)->open, true);
 
     ecs_fini(world);
@@ -52,17 +52,17 @@ void Edit_on_off(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
-    edit_run(world, s, "edit on", "editor open");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    edit_run(world, s, "edit on", "true");
     test_bool(ecs_singleton_get(world, Editor)->open, true);
 
-    edit_run(world, s, "edit on", "editor open");
+    edit_run(world, s, "edit on", "true");
     test_bool(ecs_singleton_get(world, Editor)->open, true);
 
-    edit_run(world, s, "edit off", "editor closed");
+    edit_run(world, s, "edit off", "false");
     test_bool(ecs_singleton_get(world, Editor)->open, false);
 
-    edit_run(world, s, "edit off", "editor closed");
+    edit_run(world, s, "edit off", "false");
     test_bool(ecs_singleton_get(world, Editor)->open, false);
 
     ecs_fini(world);
@@ -74,8 +74,8 @@ void Edit_keeps_other_members(void) {
     ECS_IMPORT(world, Box);
 
     ecs_singleton_set(world, Editor, { .width = 0.4f, .side = EditorSideLeft });
-    ecs_entity_t s = box_terminal_new(world);
-    edit_run(world, s, "edit on", "editor open");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    edit_run(world, s, "edit on", "true");
     const Editor *e = ecs_singleton_get(world, Editor);
     test_bool(e->open, true);
     test_flt(e->width, 0.4f);
@@ -89,9 +89,9 @@ void Edit_invalid_state(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
     bool error = false;
-    char *out = box_terminal_run(world, s, "edit maybe", &error);
+    char *out = box_command_run(world, s, "edit maybe", &error);
     test_bool(error, true);
     test_assert(!strncmp(out, BOX_COMMAND_ERROR, strlen(BOX_COMMAND_ERROR)));
     test_assert(strstr(out, "maybe") != NULL);
@@ -130,8 +130,8 @@ void Edit_set_from_script(void) {
     test_flt(e->width, 0.3f);
     test_int(e->side, EditorSideLeft);
 
-    ecs_entity_t s = box_terminal_new(world);
-    edit_run(world, s, "edit", "editor closed");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    edit_run(world, s, "edit", "false");
 
     ecs_fini(world);
 }
@@ -145,37 +145,15 @@ void Edit_help_lists_edit(void) {
     test_assert(f != 0);
     test_assert(ecs_has(world, f, EcsScriptFunction));
 
-    ecs_entity_t s = box_terminal_new(world);
-    char *out = box_terminal_run(world, s, "help", NULL);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    char *out = box_command_run(world, s, "help", NULL);
     test_assert(!strncmp(out, "edit ", 5) || strstr(out, "\nedit ") != NULL);
     ecs_os_free(out);
 
-    out = box_terminal_run(world, s, "help edit", NULL);
+    out = box_command_run(world, s, "help edit", NULL);
     test_assert(strstr(out, "edit [state]") != NULL);
     ecs_os_free(out);
 
-    out = box_terminal_run(world, s, "man edit", NULL);
-    test_str(out, "usage: edit [state]\nbrief: Open or close the editor, toggle without a state");
-    ecs_os_free(out);
-
-    ecs_fini(world);
-}
-
-void Edit_http_exec(void) {
-    // command/edit
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-
-    ecs_entity_t s = box_terminal_new(world);
-    char *path = flecs_asprintf("/terminal/exec?session=%s&cmd=edit%%20on",
-        ecs_get_name(world, s));
-    ecs_http_reply_t reply = ECS_HTTP_REPLY_INIT;
-    test_int(box_command_request(world, "GET", path, NULL, &reply), 200);
-    char *body = ecs_strbuf_get(&reply.body);
-    test_str(body, "editor open");
-    ecs_os_free(body);
-    ecs_os_free(path);
-    test_bool(ecs_singleton_get(world, Editor)->open, true);
 
     ecs_fini(world);
 }
@@ -188,31 +166,15 @@ void Edit_from_console(void) {
     bool error = true;
     char *out = box_console_run(world, "edit", &error);
     test_bool(error, false);
-    test_str(out, "editor open");
+    test_str(out, "true");
     ecs_os_free(out);
     test_bool(ecs_singleton_get(world, Editor)->open, true);
 
     out = box_console_run(world, "edit off", &error);
     test_bool(error, false);
-    test_str(out, "editor closed");
+    test_str(out, "false");
     ecs_os_free(out);
     test_bool(ecs_singleton_get(world, Editor)->open, false);
-
-    ecs_fini(world);
-}
-
-void Edit_logged(void) {
-    // command/edit
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-
-    ecs_entity_t s = box_terminal_new(world);
-    edit_run(world, s, "edit on", "editor open");
-
-    char *out = box_terminal_run(world, s, "commands", NULL);
-    test_assert(strstr(out, "$ edit on") != NULL);
-    test_assert(strstr(out, "editor open") != NULL);
-    ecs_os_free(out);
 
     ecs_fini(world);
 }

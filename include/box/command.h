@@ -1,9 +1,13 @@
 /**
  * @file box/command.h
- * @brief Terminal sessions that run command lines over HTTP.
+ * @brief Box commands for the flecs script shell: input, captures, frame timing, the editor
+ * and the log, as script functions in box.command.commands.
  *
- * Commands are flecs script functions under box.command.commands. Every session is an
- * entity with a Terminal component, its own folder and a log of the lines it ran.
+ * Sessions, parsing and the builtin commands (ls, get, set, query, ...) are the flecs shell's.
+ * box.command.commands is searched first, so a box command overrides a builtin of its name.
+ *
+ * Sessions are opened with ecs_shell_session_init and run with ecs_shell_run, or remotely
+ * with the shell endpoints of the flecs REST API (PUT /shell/session).
  */
 
 #ifndef BOX_COMMAND_H
@@ -11,178 +15,81 @@
 
 #include <flecs.h>
 
-#ifdef BOX_COMMAND_IMPL
-#define ECS_META_IMPL IMPL
-#else
-#define ECS_META_IMPL EXTERN
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/** Prefix of the message of a failed command */
+/** Prefix of an error line in the output of box_command_run */
 #define BOX_COMMAND_ERROR "error: "
 
-/** Most steps of a cursor walk (mouse.sweep, mouse.drag, action.drag) */
+/** Path of the scope that holds the box commands */
+#define BOX_COMMAND_SCOPE "box.command.commands"
+
+/** Most steps of a cursor walk (mouse_sweep, mouse_drag, action_drag) */
 #define BOX_COMMAND_STEPS_MAX (1000)
 
 /** Most frames a command argument such as dur may span */
 #define BOX_COMMAND_FRAMES_MAX (36000)
 
-/** Most rows a next command prints */
-#define BOX_COMMAND_NEXT_MAX (1000)
-
-/** Default of TerminalLimits.sessions */
-#define BOX_TERMINAL_SESSIONS (16)
-
-/** Default of TerminalLimits.idle_timeout in seconds */
-#define BOX_TERMINAL_IDLE_TIMEOUT (1800.0)
-
-/** Default of TerminalLimits.history */
-#define BOX_TERMINAL_HISTORY (1000)
-
-/** Default of TerminalLimits.log_size in bytes */
-#define BOX_TERMINAL_LOG_SIZE (1024 * 1024)
-
-/** Default of TerminalLimits.images */
-#define BOX_TERMINAL_IMAGES (100)
-
-/** A terminal session; adding it creates the session folder, removing it deletes it */
-ECS_STRUCT(Terminal, {
-    char *cwd;          /**< Scope that entity arguments resolve against, NULL for the root */
-});
-
-/** State of a terminal session, written by the engine */
-ECS_STRUCT(TerminalStatus, {
-    char *dir;          /**< Session folder, /tmp/box/<pid>/<session> */
-    int32_t commands;   /**< Command lines the session ran */
-});
-
-/** Singleton that serves the terminal, resource and REST endpoints on a port */
-ECS_STRUCT(TerminalServer, {
-    int32_t port;       /**< Port to listen on, 0 stops the server */
-});
-
-/** Singleton with the limits of the terminal sessions, added with its defaults on import.
- *
- * The session cap and the idle timeout apply to sessions opened with box_terminal_new
- * (/terminal/new), not to entities a scene gives a Terminal, and changes apply at once.
- *
- * history, log_size and images are read when a session opens: a change applies to sessions
- * opened afterwards and leaves open sessions as they are.
- */
-ECS_STRUCT(TerminalLimits, {
-    int32_t sessions;       /**< Sessions box_terminal_new keeps open at once */
-    double idle_timeout;    /**< Seconds without a command before such a session is closed */
-    int32_t history;        /**< Command lines a session keeps for the commands command */
-    int32_t log_size;       /**< Bytes of commands.log before it moves to commands.log.1 */
-    int32_t images;         /**< Images of the render commands a session keeps, pending too */
-});
-
-/** A parameter of a command, after the session parameter every command has */
-typedef struct box_command_param_t {
-    const char *name;   /**< Parameter name */
-    ecs_entity_t type;  /**< ecs_string_t, ecs_i32_t, ecs_f64_t, ecs_bool_t or ecs_entity_t */
-    bool optional;      /**< The argument may be omitted and is then zero */
-    bool rest;          /**< Last string parameter that takes the remainder of the line */
-    bool path;          /**< String parameter that names an existing entity as a shell path */
-} box_command_param_t;
-
-/** Describes a command for box_command_register */
-typedef struct box_command_desc_t {
-    const char *name;                       /**< Command name, may contain dots */
-    const char *brief;                      /**< One line description */
-    box_command_param_t params[FLECS_SCRIPT_FUNCTION_ARGS_MAX - 1]; /**< Parameters */
-    ecs_function_callback_t callback;       /**< Writes a char* into result->ptr */
-    void *ctx;                              /**< Passed to the callback as ctx->ctx */
-    bool quiet;                             /**< The result is not logged, only the line */
-} box_command_desc_t;
-
 /** Register the box.command module.
+ *
+ * Imports the flecs script shell and adds box.command.commands to the front of
+ * EcsScriptShell.command_paths.
  *
  * @param world The world
  */
 void BoxCommandImport(
     ecs_world_t *world);
 
-/** Register a command as a script function under box.command.commands.
+/** Run a command line in a shell session and format its result as text.
  *
- * The function gets the session entity as its first argument, then the parameters.
- *
- * @param world The world
- * @param desc The command
- * @return The function entity
- */
-ecs_entity_t box_command_register(
-    ecs_world_t *world,
-    const box_command_desc_t *desc);
-
-/** Fail a command: set its result to an error message.
- *
- * @param ctx The call context of the command
- * @param result The result of the command
- * @param fmt Format of the message, which gets the BOX_COMMAND_ERROR prefix
- * @param ... The format arguments
- */
-void box_command_error(
-    const ecs_function_ctx_t *ctx,
-    ecs_value_t *result,
-    const char *fmt,
-    ...);
-
-/** Open a terminal session with a unique handle.
+ * The result is formatted with box_command_format. When the command logged errors the output
+ * is only the errors, one per line that starts with BOX_COMMAND_ERROR, as a command that logs
+ * an error still returns a value.
  *
  * @param world The world
- * @return The session entity, its name is the handle
+ * @param session The session, created with ecs_shell_session_init
+ * @param line The command line
+ * @param error Set to whether the command logged an error, NULL to ignore
+ * @return The output, which the caller frees
  */
-ecs_entity_t box_terminal_new(
-    ecs_world_t *world);
-
-/** Find a terminal session by its handle.
- *
- * @param world The world
- * @param handle The session handle
- * @return The session entity, 0 when there is none
- */
-ecs_entity_t box_terminal_lookup(
-    ecs_world_t *world,
-    const char *handle);
-
-/** Run a command line in a session and log it.
- *
- * @param world The world
- * @param session The session entity
- * @param line The command name followed by its arguments
- * @param error Set to whether the command failed, NULL to ignore
- * @return The command output, which the caller frees
- */
-char* box_terminal_run(
+char* box_command_run(
     ecs_world_t *world,
     ecs_entity_t session,
     const char *line,
     bool *error);
 
-/** Serve one request of the terminal, resource or REST endpoints without a socket.
+/** Get the file of a resource that a command created in a session.
+ *
+ * The flecs shell keeps the resources of a session in .flecs/shell/<session> under the working
+ * directory.
  *
  * @param world The world
- * @param method The HTTP method, such as "GET"
- * @param path The URL encoded path with its query, such as "/terminal/new"
- * @param body The request body, NULL for none
- * @param reply Receives the reply, initialized with ECS_HTTP_REPLY_INIT by the caller
- * @return The HTTP status code
+ * @param session The session
+ * @param name The name of the resource, as ecs_shell_resource_t.name
+ * @return The path of the file, which the caller frees, NULL when the session has no resources
  */
-int box_command_request(
-    ecs_world_t *world,
-    const char *method,
-    const char *path,
-    const char *body,
-    ecs_http_reply_t *reply);
+char* box_command_resource_file(
+    const ecs_world_t *world,
+    ecs_entity_t session,
+    const char *name);
+
+/** Format a command result as text.
+ *
+ * A string is returned as is, an entity as its path, a command that help returned as its usage
+ * and description, the elements of a vector or array one per line in the same way, and any
+ * other value as JSON.
+ *
+ * @param world The world
+ * @param value The value, an empty value formats as an empty string
+ * @return The text, which the caller frees
+ */
+char* box_command_format(
+    const ecs_world_t *world,
+    const ecs_value_t *value);
 
 #ifdef __cplusplus
 }
 #endif
-
-#undef ECS_META_IMPL
 
 #endif

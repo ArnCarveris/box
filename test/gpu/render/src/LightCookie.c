@@ -36,6 +36,9 @@
 /** Stripes 2 rows high, alternately 0 and 255 */
 #define COOKIE_STRIPES_PNG "test/assets/textures/cookie_stripes.png"
 
+/** Stripes 2 columns wide, alternately 0 and 255 */
+#define COOKIE_COLUMNS_PNG "test/assets/textures/cookie_columns.png"
+
 /** Seamless fbm noise, half of its texels below 128 */
 #define COOKIE_NOISE_PNG "test/assets/textures/cloud_noise_256.png"
 
@@ -90,6 +93,30 @@ static ecs_world_t* cookie_world(
     return world;
 }
 
+/** Find the camera of a world.
+ *
+ * @param world The world
+ * @return The camera
+ */
+static ecs_entity_t cookie_camera(
+    ecs_world_t *world)
+{
+    ecs_entity_t camera = 0;
+    ecs_query_t *q = ecs_query(world, { .terms = {{ ecs_id(Camera) }} });
+    ecs_iter_t it = ecs_query_iter(world, q);
+    while (ecs_query_next(&it)) {
+        int32_t i;
+        for (i = 0; i < it.count; i ++) {
+            camera = it.entities[i];
+        }
+    }
+
+    ecs_query_fini(q);
+    test_assert(camera != 0);
+
+    return camera;
+}
+
 /** Create a headless world with a white rough wall on z = 0 facing the camera, lit by a low
  * sun 10 degrees above the horizon behind the camera, without ambient light.
  *
@@ -113,18 +140,7 @@ static ecs_world_t* wall_world(
 
     ecs_set(world, *sun, Rotation, {(float)GLM_PI - glm_rad(10), 0, 0});
 
-    ecs_entity_t camera = 0;
-    ecs_query_t *q = ecs_query(world, { .terms = {{ ecs_id(Camera) }} });
-    ecs_iter_t it = ecs_query_iter(world, q);
-    while (ecs_query_next(&it)) {
-        int32_t i;
-        for (i = 0; i < it.count; i ++) {
-            camera = it.entities[i];
-        }
-    }
-
-    ecs_query_fini(q);
-    test_assert(camera != 0);
+    ecs_entity_t camera = cookie_camera(world);
     ecs_set(world, camera, Position, {0, 0, 10});
     ecs_set(world, camera, Rotation, {0, 0, 0});
 
@@ -864,6 +880,111 @@ void LightCookie_light_projection_lod_unchanged(void) {
 
     test_assert(low < 0.1f);
     test_assert(high > 0.9f);
+
+    stbi_image_free(none);
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+/** A perspective camera 1 unit above a wide floor looks along -Z, 5 degrees down, with a field
+ * of view of 8 degrees: the top rows see the floor 1 to 3 degrees below the horizon, 20 to 55
+ * units away.
+ *
+ * A pixel there covers 0.04 to 0.08 units across the view and 1 to 3 units along it, while the
+ * stripes of size 8 repeat every half unit along Z.
+ *
+ * The sun is straight up and the default remap passes the stripes through. A footprint that
+ * follows the pixel across the view picks the finest level, where the rows land on the stripes
+ * at arbitrary phases; the footprint along the view averages them to a half in every row.
+ */
+void LightCookie_grazing_view_lod(void) {
+    // lighting/light_cookie
+    ecs_entity_t sun;
+    ecs_world_t *world = cookie_world(0, &sun);
+    ecs_delete_with(world, ecs_id(Box));
+
+    ecs_entity_t floor = ecs_new(world);
+    ecs_set(world, floor, Position, {0, -0.1f, 0});
+    ecs_set(world, floor, Box, {1000, 0.2f, 1000});
+    ecs_set(world, floor, Rgb, {255, 255, 255});
+    ecs_set(world, floor, PbrMaterial, {.roughness = 1});
+
+    ecs_entity_t camera = cookie_camera(world);
+    ecs_set(world, camera, Position, {0, 1, 0});
+    ecs_set(world, camera, Rotation, {-glm_rad(5), 0, 0});
+    ecs_set(world, camera, Camera, {.fov = 8, .near_ = 0.1f, .far_ = 1000});
+
+    ecs_entity_t stripes = cookie_texture(world, COOKIE_STRIPES_PNG);
+    unsigned char *none = cookie_capture(world, "grazing_none.png", 2);
+    LightCookie *c = cookie_set(world, sun, stripes, 8, 0);
+    c->height = 50;
+    ecs_modified(world, sun, LightCookie);
+    unsigned char *px = cookie_capture(world, "grazing_stripes.png", 2);
+
+    int32_t r, col, count = 0;
+    float sum = 0, sum2 = 0;
+    for (r = 2; r < 16; r ++) {
+        for (col = 8; col < SIZE - 8; col ++) {
+            float n = lum(none, col, r);
+            test_assert(n > 0.02f);
+            float ratio = lum(px, col, r) / n;
+            sum += ratio;
+            sum2 += ratio * ratio;
+            count ++;
+        }
+    }
+
+    float mean = sum / (float)count;
+    float variance = sum2 / (float)count - mean * mean;
+    test_assert(fabsf(mean - 0.5f) < 0.1f);
+    test_assert(variance < 0.005f);
+
+    stbi_image_free(none);
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+/** The wall of steep_surface_lod under the sun 10 degrees up behind the camera, whose
+ * horizontal direction is the wall's normal.
+ *
+ * A step up the wall moves the plane projection along Z, along the columns of the cookie, and a
+ * step across it moves it along X: with size 8 a texel is a pixel and the columns repeat every
+ * 4 pixels.
+ *
+ * The footprint is long only up the wall, so neighboring columns keep the contrast of the
+ * stripes. The isotropic bound of the stretch, 6.8, would blur them to a half.
+ */
+void LightCookie_steep_surface_keeps_horizontal_detail(void) {
+    // lighting/light_cookie
+    ecs_entity_t sun;
+    ecs_world_t *world = wall_world(&sun);
+    ecs_entity_t columns = cookie_texture(world, COOKIE_COLUMNS_PNG);
+    unsigned char *none = cookie_capture(world, "horizontal_none.png", 2);
+    LightCookie *c = cookie_set(world, sun, columns, 8, 0);
+    c->height = 50;
+    ecs_modified(world, sun, LightCookie);
+    unsigned char *px = cookie_capture(world, "horizontal_columns.png", 2);
+
+    int32_t r, col, count = 0;
+    float steps = 0, low = 1, high = 0;
+    for (r = 8; r < SIZE - 8; r ++) {
+        for (col = 8; col < SIZE - 8; col ++) {
+            float n = lum(none, col, r);
+            float next = lum(none, col + 1, r);
+            test_assert(n > 0.2f);
+            test_assert(next > 0.2f);
+            float ratio = lum(px, col, r) / n;
+            steps += fabsf(lum(px, col + 1, r) / next - ratio);
+            low = glm_min(low, ratio);
+            high = glm_max(high, ratio);
+            count ++;
+        }
+    }
+
+    steps /= (float)count;
+    test_assert(steps > 0.25f);
+    test_assert(low < 0.2f);
+    test_assert(high > 0.8f);
 
     stbi_image_free(none);
     stbi_image_free(px);

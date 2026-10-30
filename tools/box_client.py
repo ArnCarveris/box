@@ -1,24 +1,35 @@
 #!/usr/bin/env python3
-"""Drives a box app through its command port, with the Python standard library only.
+"""Drives a box app through the flecs shell endpoints of its REST port, with the Python standard
+library only.
 
   app = App(binary, ["etc/scenes/x.flecs"], log="out/x.log")
   app.start()                      # --headless --delta-time 1/60 --timeout <s> --port <port> <args>
-  app.exec("mouse.move [166, 298]")
-  app.wait_input()                 # input.wait until 0
+  app.exec("mouse_move [166, 298]")
+  app.wait_input()                 # input_wait until 0
   app.wait_for("get showcase Showcase.mut.clicks", "3")
   app.get("box.picking.PickStatus", "PickStatus")["handler"]
   app.edit("on")                   # edit on, True while the editor is open
   width, height, rows = app.capture()
   app.quit()                       # exit 0 within 10 s, /tmp/box/<pid> removed
 
-start waits until /terminal/new answers and fails with the tail of the log when the process
-exits first (Refused when the load guard refused it). Every command that fails raises Failure
-with the command, its output and the log tail. The process runs in its own process group, which
-kill (and leaving a with block on an error) kills, so no app keeps running. The output of the
-process goes to the log file, which is kept.
+start opens a shell session (PUT /shell/session) once the port answers and fails with the tail of
+the log when the process exits first (Refused when the load guard refused it). exec runs a command
+line in the session (PUT /shell/session/<id>) and returns its result as JSON text: the value of
+the reply, see text. Every command that fails raises Failure with the command, its output and the
+log tail. The process runs in its own process group, which kill (and leaving a with block on an
+error) kills, so no app keeps running. The output of the process goes to the log file, which is
+kept.
+
+exec adds member paths to the get and set commands of the shell, which take a whole component:
+"get e Position.y" gets Position and returns its y member, get also takes elements as in
+"Inventory.slots[0].amount". "set e View.shadows.enabled false" runs
+"set e View {shadows: {enabled: false}}", which assigns only that member. The component is the
+path up to the first name that starts with an upper case letter, or a longer one when that is
+not a component (the mut of a template, as in Showcase.mut.clicks), the members follow it.
 """
 import json
 import os
+import re
 import shutil
 import signal
 import socket
@@ -31,7 +42,6 @@ import urllib.request
 
 from integration import ANSI, ROOT, read_png
 
-ERROR = "error: "
 START_TIMEOUT = 60
 DELTA_TIME = "0.016666667"
 REQUEST_TIMEOUT = 30
@@ -63,101 +73,47 @@ def free_port():
         return s.getsockname()[1]
 
 
-class Parser:
-    """Parses a value as get prints it: numbers, true and false, quoted strings, struct values
-    {a: 1, b: "x"} as dicts, arrays [1, 2] as lists, anything else (entity paths) as a string."""
-
-    def __init__(self, text):
-        self.text = text
-        self.pos = 0
-
-    def fail(self, what):
-        raise ValueError("%s at %d of %r" % (what, self.pos, self.text))
-
-    def skip(self):
-        while self.pos < len(self.text) and self.text[self.pos] in " \t\r\n":
-            self.pos += 1
-
-    def peek(self):
-        self.skip()
-        return self.text[self.pos] if self.pos < len(self.text) else ""
-
-    def expect(self, ch):
-        if self.peek() != ch:
-            self.fail("expected %r" % ch)
-        self.pos += 1
-
-    def value(self):
-        ch = self.peek()
-        if ch == "{":
-            return self.struct()
-        if ch == "[":
-            return self.array()
-        if ch == '"':
-            return self.string()
-        return self.word()
-
-    def struct(self):
-        self.expect("{")
-        result = {}
-        while self.peek() != "}":
-            start = self.pos
-            while self.pos < len(self.text) and self.text[self.pos] not in ":,}":
-                self.pos += 1
-            key = self.text[start:self.pos].strip()
-            self.expect(":")
-            result[key] = self.value()
-            if self.peek() == ",":
-                self.pos += 1
-        self.expect("}")
-        return result
-
-    def array(self):
-        self.expect("[")
-        result = []
-        while self.peek() != "]":
-            result.append(self.value())
-            if self.peek() == ",":
-                self.pos += 1
-        self.expect("]")
-        return result
-
-    def string(self):
-        end = self.pos + 1
-        while end < len(self.text) and self.text[end] != '"':
-            end += 2 if self.text[end] == "\\" else 1
-        if end >= len(self.text):
-            self.fail("unterminated string")
-        raw = self.text[self.pos:end + 1]
-        self.pos = end + 1
-        return json.loads(raw)
-
-    def word(self):
-        start = self.pos
-        while self.pos < len(self.text) and self.text[self.pos] not in ",}]":
-            self.pos += 1
-        word = self.text[start:self.pos].strip()
-        if word in ("true", "false"):
-            return word == "true"
-        try:
-            return int(word)
-        except ValueError:
-            pass
-        try:
-            return float(word)
-        except ValueError:
-            return word
-
-    def parse(self):
-        result = self.value()
-        if self.peek():
-            self.fail("trailing text")
-        return result
-
-
 def parse_value(text):
-    """Parse the output of get into Python values, see Parser."""
-    return Parser(text.strip()).parse()
+    """Parse the output of exec, which is JSON text, into Python values."""
+    return json.loads(text)
+
+
+def text(value):
+    """The output of exec for a result: empty for no result, else the result as JSON."""
+    return "" if value is None else json.dumps(value)
+
+
+def split_member(path):
+    """Split a component path with members, such as box.app.AppStatus.frame or
+    oreelse.OreInventory.slots[0].amount, into the component (box.app.AppStatus) and its member
+    names and element indices (["frame"], ["slots", 0, "amount"]): the component ends at the first
+    name that starts with an upper case letter."""
+    splits = split_members(path)
+    return splits[0] if splits else (path, [])
+
+
+def split_members(path):
+    """Every way to split a component path into a component and its members, see split_member,
+    the shortest component first: a component can be a child of another, such as the mut of a
+    template (Showcase.mut.clicks)."""
+    names = path.split(".")
+    first = next((i for i, name in enumerate(names) if name[:1].isupper()), None)
+    result = []
+    for i in range(first if first is not None else len(names), len(names)):
+        if "[" in names[i]:
+            break
+        members = []
+        for member in names[i + 1:]:
+            for key, index in MEMBER.findall(member):
+                members.append(key if key else int(index))
+        result.append((".".join(names[:i + 1]), members))
+    return result
+
+
+MEMBER = re.compile(r"(\w+)|\[(\d+)\]")
+UNRESOLVED = re.compile(r"unresolved identifier|parameter 'component'|is not a component")
+GET_MEMBER = re.compile(r"^get\s+(\S+)\s+([A-Za-z_][\w.\[\]]*)\s*$")
+SET_MEMBER = re.compile(r"^set\s+(\S+)\s+([A-Za-z_][\w.]*)\s+(.+)$", re.S)
 
 
 def srgb(color):
@@ -185,7 +141,7 @@ def mean_luma(image, box):
 
 
 class App:
-    """A headless app process with a terminal session on its command port."""
+    """A headless app process with a shell session on its REST port."""
 
     def __init__(self, binary, args=(), log=None, timeout=90, out=None, prefix="app"):
         self.binary = binary
@@ -247,16 +203,16 @@ class App:
                     raise kind("the app exited with %d before its port answered" % code,
                                None, None, tail)
                 try:
-                    status, body = self.request("terminal/new")
+                    status, body = self.request("shell/session", method="PUT")
                     if status == 200 and body:
-                        self.session = body
+                        self.session = json.loads(body)["session"]
                         return self
-                    self.fail("/terminal/new answered %d" % status, "terminal/new", body)
+                    self.fail("/shell/session answered %d" % status, "shell/session", body)
                 except (urllib.error.URLError, ConnectionError, socket.timeout):
                     pass
                 if time.time() > limit:
                     self.fail("the port did not answer within %d s" % START_TIMEOUT,
-                              "terminal/new", "")
+                              "shell/session", "")
                 time.sleep(0.05)
         except BaseException:
             self.kill()
@@ -267,10 +223,12 @@ class App:
             if params else ""
         return "http://127.0.0.1:%d/%s%s" % (self.port, path, query)
 
-    def request(self, path, params=None, binary=False):
-        """GET a path of the command port: the status code and the body."""
+    def request(self, path, params=None, binary=False, method="GET", data=None):
+        """Send a request to the REST port: the status code and the body."""
+        req = urllib.request.Request(self.url(path, params), method=method,
+                                     data=data.encode() if data is not None else None)
         try:
-            with urllib.request.urlopen(self.url(path, params), timeout=REQUEST_TIMEOUT) as r:
+            with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as r:
                 status, body = r.status, r.read()
         except urllib.error.HTTPError as e:
             status, body = e.code, e.read()
@@ -279,21 +237,88 @@ class App:
     def running(self):
         return self.proc is not None and self.proc.poll() is None
 
-    def exec(self, cmd):
-        """Run a command line in the session; raise Failure when it fails."""
-        self.last_command = cmd
-        self.last_output = None
+    def run(self, cmd):
+        """Run a command line in the session as the shell gets it and return its result as a
+        Python value, None when it returned none; raise Failure when it fails."""
         if time.time() > self.deadline:
             self.fail("the case ran out of its %d s" % self.timeout, cmd, "")
         if not self.running():
             self.fail("the app is not running (exit %s)" % self.proc.poll(), cmd, "")
         try:
-            status, out = self.request("terminal/exec", {"session": self.session, "cmd": cmd})
+            status, body = self.request("shell/session/%s" % self.session, method="PUT",
+                                        data=cmd)
         except (urllib.error.URLError, ConnectionError, socket.timeout) as e:
             self.fail("no answer: %s" % e, cmd, "")
-        self.last_output = out
-        if out.startswith(ERROR) or status != 200:
+        try:
+            reply = json.loads(body)
+        except ValueError:
+            reply = None
+        if status != 200 or not isinstance(reply, dict) or reply.get("errors"):
+            errors = reply.get("errors") if isinstance(reply, dict) else None
+            out = "\n".join(errors) if errors else body
+            self.last_output = out
             self.fail("the command failed (%d)" % status, cmd, out)
+        result = reply.get("result")
+        if reply.get("type") == "flecs.meta.value" and isinstance(result, dict) and \
+                len(result) == 1:
+            result = next(iter(result.values()))
+        return result
+
+    def member(self, component, members, value):
+        """Get a member of a component value by its names and element indices."""
+        for member in members:
+            if isinstance(member, int):
+                found = isinstance(value, list) and member < len(value)
+            else:
+                found = isinstance(value, dict) and member in value
+            if not found:
+                self.last_output = text(value)
+                self.fail("%s has no member %s" % (component, member), None, text(value))
+            value = value[member]
+        return value
+
+    def component(self, line, splits, member=None):
+        """Run line with the component of each split of a member path in turn, the shortest
+        first, until one runs and has the members: the component, its members and the result,
+        or the member of the result when member is given. Only a component that does not
+        resolve or lacks the members moves on to the next split; any other failure, or the
+        failure of the first split when no split works, is raised."""
+        first = None
+        for component, members in splits:
+            try:
+                value = self.run(line % component)
+                if member:
+                    value = member(component, members, value)
+                return component, members, value
+            except Failure as e:
+                if not UNRESOLVED.search(str(e.output or "")) and \
+                        not str(e).startswith("%s has no member" % component):
+                    raise
+                first = first or e
+        raise first
+
+    def exec(self, cmd):
+        """Run a command line in the session and return its result as JSON text, see text. get
+        and set take member paths, see the module documentation."""
+        self.last_command = cmd
+        self.last_output = None
+        get = GET_MEMBER.match(cmd)
+        put = SET_MEMBER.match(cmd)
+        if get and split_member(get.group(2))[1]:
+            value = self.component("get %s %%s" % get.group(1), split_members(get.group(2)),
+                                   self.member)[2]
+        elif put and split_member(put.group(2))[1]:
+            splits = []
+            for component, members in split_members(put.group(2)):
+                expr = put.group(3)
+                for member in reversed(members):
+                    expr = "{%s: %s}" % (member, expr)
+                splits.append(("%s %s" % (component, expr), []))
+            value = self.component("set %s %%s" % put.group(1), splits)[2]
+        else:
+            value = self.run(cmd)
+        out = text(value)
+        self.last_output = out
         return out
 
     def get(self, entity, component=None):
@@ -306,7 +331,7 @@ class App:
             self.fail("cannot parse the output: %s" % e, line, out)
 
     def frame(self):
-        return int(self.exec("get box.app.AppStatus AppStatus.frame"))
+        return int(self.exec("get $ box.app.AppStatus.frame"))
 
     def wait_frames(self, frames):
         """Let a number of frames pass, to check that something does not happen."""
@@ -315,17 +340,17 @@ class App:
             pass
 
     def wait_input(self, frames=INPUT_FRAMES):
-        """Poll input.wait until the input queue is drained."""
+        """Poll input_wait until the input queue is drained."""
         start = None
         while True:
-            out = self.exec("input.wait")
+            out = self.exec("input_wait")
             if out.strip() == "0":
                 return
             frame = self.frame()
             start = frame if start is None else start
             if frame - start > frames:
                 self.fail("the input queue is not drained after %d frames" % frames,
-                          "input.wait", out)
+                          "input_wait", out)
 
     def wait_for(self, cmd, predicate, frames=WAIT_FRAMES, what=None):
         """Run cmd until predicate(output) holds, or until the output equals predicate when it is
@@ -360,9 +385,9 @@ class App:
         Returns whether the editor is open now; the view follows in the next frame."""
         cmd = "edit" if state is None else "edit %s" % state
         out = self.exec(cmd)
-        if out not in ("editor open", "editor closed"):
+        if out not in ("true", "false"):
             self.fail("unexpected output %r" % out, cmd, out)
-        return out == "editor open"
+        return out == "true"
 
     def check(self, condition, message):
         """Fail with message and the last command when condition is false."""
@@ -375,12 +400,12 @@ class App:
         <prefix>.<name>.png."""
         line = "capture" + (" %s" % camera if camera else "")
         out = self.exec(line)
-        resource = out.split("\n")[0].split(" ")[0]
+        resource = parse_value(out)["name"]
         start = None
         while True:
-            status, body = self.request("resource/" + resource, {"session": self.session},
+            status, body = self.request("shell/session/%s/resource/%s" % (self.session, resource),
                                         binary=True)
-            if status == 200:
+            if status == 200 and body:
                 break
             frame = self.frame()
             start = frame if start is None else start

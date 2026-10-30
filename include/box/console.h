@@ -1,6 +1,6 @@
 /**
  * @file box/console.h
- * @brief The in game console: an overlay that runs command lines through a terminal session.
+ * @brief The in game console: an overlay that runs command lines in a flecs shell session.
  *
  * The toggle action (the grave key) opens and closes it. The console is UI content in its own
  * scene, drawn by its own view after every other view (at
@@ -32,7 +32,7 @@ extern "C" {
 /** Name of the root entity of the console content, its view and its session */
 #define BOX_CONSOLE_SCOPE "console"
 
-/** Path of the terminal session the console runs its lines on */
+/** Path of the shell session the console runs its lines in */
 #define BOX_CONSOLE_SESSION "console.session"
 
 /** Path of the scene root of the console content */
@@ -43,8 +43,9 @@ extern "C" {
 
 /** Colors of the parts of a command line in the console, as Console.syntax.
  *
- * Lines are split as the dispatcher splits them: the first token is the command name, the
- * others take the color of the type of their parameter. Entities resolve from the session cwd.
+ * Lines are split as the flecs shell splits them: the first token is the command name, the
+ * others take the color of the type of their parameter. Entities resolve from the scope of the
+ * session.
  *
  * The input line is colored as it is typed; a line that ran keeps the colors it had then.
  * Output keeps Console.text and Console.error, other parts Console.input or Console.command.
@@ -52,12 +53,12 @@ extern "C" {
 ECS_STRUCT(ConsoleSyntax, {
     rgb name;       /**< Name of a known command or console command */
     rgb unknown;    /**< Name of no command */
-    rgb entity;     /**< Entity argument that resolves from the cwd of the session */
+    rgb entity;     /**< Entity argument that resolves from the scope of the session */
     rgb missing;    /**< Entity argument that does not resolve */
-    rgb number;     /**< Argument of an i32 or f64 parameter, a number in a value expression */
-    rgb string;     /**< Quoted argument, a string in a value expression, a rest parameter */
+    rgb number;     /**< Argument of a numeric parameter, a number in a value expression */
+    rgb string;     /**< Quoted argument or a string in a value expression */
     rgb boolean;    /**< Argument of a bool parameter, true or false in a value expression */
-    rgb value;      /**< Value expression in brackets, {...} or [...], of a string parameter */
+    rgb value;      /**< Value expression in brackets: {...}, [...] or (...) */
     rgb extra;      /**< Argument beyond the parameters of the command */
 });
 

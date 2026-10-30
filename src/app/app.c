@@ -288,7 +288,7 @@ done:
     return;
 }
 
-/** Serve the terminal and REST endpoints on a port, only REST without box.command.
+/** Serve the REST API, which includes the shell endpoints, on a port.
  *
  * The browser cannot listen on a port and has no threads for the server, so the web build
  * serves nothing.
@@ -306,13 +306,7 @@ static void box_app_serve(
 #else
     ECS_IMPORT(world, FlecsStats);
     ecs_enable(world, ecs_id(FlecsStats), true);
-    ecs_entity_t server = ecs_lookup(world, "box.command.TerminalServer");
-    if (server) {
-        TerminalServer value = { .port = port };
-        ecs_set_id(world, server, server, sizeof(TerminalServer), &value);
-    } else {
-        ecs_singleton_set(world, EcsRest, { .port = (uint16_t)port });
-    }
+    ecs_singleton_set(world, EcsRest, { .port = (uint16_t)port });
 #endif
 }
 
@@ -378,10 +372,7 @@ static int box_app_start(
 
     if (app->scene && app->scene[0]) {
         char *scene = box_app_locate(app->scene);
-        ecs_entity_t script = ecs_script(world, {
-            .entity = ecs_entity(world, { .name = "box.app.scene" }),
-            .filename = scene
-        });
+        ecs_entity_t script = ecs_script(world, { .filename = scene });
         const EcsScript *loaded = script ? ecs_get(world, script, EcsScript) : NULL;
         ecs_os_free(scene);
         if (!loaded || !loaded->script || loaded->error) {

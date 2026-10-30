@@ -917,8 +917,7 @@ static void box_gpu_cull_pass(
     const WGPUPassTimestampWrites *writes)
 {
     if (!*pass) {
-        *pass = wgpuCommandEncoderBeginComputePass(encoder,
-            &(WGPUComputePassDescriptor){ .timestampWrites = writes });
+        *pass = box_gpu_compute_begin(encoder, writes);
     }
 }
 

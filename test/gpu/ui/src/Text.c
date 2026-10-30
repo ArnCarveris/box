@@ -985,7 +985,7 @@ void Text_oversized_warns_once_per_font(void) {
     test_int((long)fwrite(data, 1, (size_t)size, f), size);
     fclose(f);
 
-    ecs_entity_t t = box_terminal_new(world);
+    ecs_entity_t t = ecs_shell_session_init(world, NULL);
     ecs_entity_t font = ecs_new(world);
     ecs_set(world, font, Font, {.path = path});
     ecs_entity_t e = ecs_new(world);
@@ -997,7 +997,7 @@ void Text_oversized_warns_once_per_font(void) {
     ecs_progress(world, 0);
 
     int32_t warnings = 0;
-    char *out = box_terminal_run(world, t, "logs warning 100", NULL);
+    char *out = box_command_run(world, t, "logs warning 100", NULL);
     const char *p = out;
     while ((p = strstr(p, "larger than an atlas page"))) {
         warnings ++;
@@ -1016,7 +1016,7 @@ void Text_oversized_warns_once_per_font(void) {
     ecs_progress(world, 0);
 
     warnings = 0;
-    out = box_terminal_run(world, t, "logs warning 100", NULL);
+    out = box_command_run(world, t, "logs warning 100", NULL);
     p = out;
     while ((p = strstr(p, "larger than an atlas page"))) {
         warnings ++;

@@ -9,7 +9,6 @@
 #include "command.h"
 #include <float.h>
 #include <math.h>
-#include <stdlib.h>
 
 /** Append the line of a range of frame times.
  *
@@ -72,7 +71,7 @@ static void box_cmd_frames_print(
     const RenderStatus *render = ecs_singleton_get(ctx->world, RenderStatus);
     ecs_strbuf_t buf = ECS_STRBUF_INIT;
     if (!timing || !timing->frames) {
-        box_command_error(ctx, result, "no frame timing yet, run a frame first");
+        ecs_err("no frame timing yet, run a frame first");
         goto done;
     }
 
@@ -104,7 +103,7 @@ done:
  *
  * @param ctx The call context
  * @param argc Number of arguments
- * @param argv The session
+ * @param argv No arguments
  * @param result Receives the output
  */
 static void box_cmd_frames(
@@ -123,7 +122,7 @@ static void box_cmd_frames(
  *
  * @param ctx The call context
  * @param argc Number of arguments
- * @param argv The session and the rate
+ * @param argv The rate
  * @param result Receives the output
  */
 static void box_cmd_fps(
@@ -132,24 +131,22 @@ static void box_cmd_fps(
     const ecs_value_t *argv,
     ecs_value_t *result)
 {
-    const char *arg = argc > 1 ? *(char**)argv[1].ptr : NULL;
-    char *end = NULL;
     double fps;
     App *app;
-    if (!arg || !arg[0]) {
+    if (argc < 1) {
         box_cmd_frames_print(ctx, result);
         goto done;
     }
 
-    fps = strtod(arg, &end);
-    if (end[0] || !isfinite(fps) || fps < 0 || fps > FLT_MAX) {
-        box_command_error(ctx, result, "invalid rate '%s', expected a number >= 0", arg);
+    fps = *(ecs_f64_t*)argv[0].ptr;
+    if (!isfinite(fps) || fps < 0 || fps > FLT_MAX) {
+        ecs_err("invalid rate %g, expected a number >= 0", fps);
         goto done;
     }
 
     app = ecs_singleton_get_mut(ctx->world, App);
     if (!app) {
-        box_command_error(ctx, result, "box.app is not imported");
+        ecs_err("box.app is not imported");
         goto done;
     }
 
@@ -168,16 +165,23 @@ done:
 void box_cmd_frames_init(
     ecs_world_t *world)
 {
-    box_command_register(world, &(box_command_desc_t){
-        .name = "fps",
-        .brief = "Set the frame rate cap, 0 for none, or show the frame timing like frames",
-        .params = {{ .name = "rate", .type = ecs_id(ecs_string_t), .optional = true }},
-        .callback = box_cmd_fps
-    });
+    box_command_register(world,
+        "Set the frame rate cap, 0 for none, or show the frame timing like frames",
+        (ecs_function_desc_t){
+            .name = "fps",
+            .return_type = ecs_id(ecs_string_t),
+            .params = {
+                { .name = "rate", .type = ecs_id(ecs_f64_t), .optional = true,
+                  .brief = "Frame rate cap, 0 for none (default: show the timing)" }
+            },
+            .callback = box_cmd_fps
+        });
 
-    box_command_register(world, &(box_command_desc_t){
-        .name = "frames",
-        .brief = "Show the frame rate and timing: delta against wall time, presents, late, dropped",
-        .callback = box_cmd_frames
-    });
+    box_command_register(world,
+        "Show the frame rate and timing: delta against wall time, presents, late, dropped",
+        (ecs_function_desc_t){
+            .name = "frames",
+            .return_type = ecs_id(ecs_string_t),
+            .callback = box_cmd_frames
+        });
 }

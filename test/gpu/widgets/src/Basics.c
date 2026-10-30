@@ -129,21 +129,24 @@ void Basics_scene_loads(void) {
     gallery_expect(world, s, "get gallery Gallery.mut.changes", "0");
     gallery_expect(world, s, "get gallery Gallery.mut.pings", "0");
     gallery_expect(world, s, "get gallery Gallery.mut.submitted", "\"\"");
-    gallery_expect(world, s, "get gallery.hud.root.header.status Text.value",
+    gallery_expect(world, s, "get gallery.hud.root.header.status box.text.Text.value",
         "\"Last change: none\"");
-    gallery_expect(world, s, "get " BASICS ".heading Text.value", "\"Basics\"");
-    gallery_expect(world, s, "get " BASICS ".heading Rgb", "{r: 214, g: 218, b: 224}");
-    gallery_expect(world, s, "get " BASICS ".buttons.save Rgb", "{r: 98, g: 168, b: 122}");
-    gallery_expect(world, s, "get " BASICS ".buttons.save.caption Text.value", "\"Save\"");
-    gallery_expect(world, s, "get gallery.backdrop_view View.clear.color",
-        "{r: 32, g: 35, b: 41, a: 255}");
+    gallery_expect(world, s, "get " BASICS ".heading box.text.Text.value", "\"Basics\"");
+    gallery_expect(world, s, "get " BASICS ".heading box.material.Rgb",
+        "{\"Rgb\":{\"r\":214, \"g\":218, \"b\":224}}");
+    gallery_expect(world, s, "get " BASICS ".buttons.save box.material.Rgb",
+        "{\"Rgb\":{\"r\":98, \"g\":168, \"b\":122}}");
+    gallery_expect(world, s, "get " BASICS ".buttons.save.caption box.text.Text.value", "\"Save\"");
+    gallery_expect(world, s, "get gallery.backdrop_view box.view.View.clear.color",
+        "{\"r\":32, \"g\":35, \"b\":41, \"a\":255}");
     basics_expect_mut(world, s, "toggles.music", "Checkbox", "current", "true");
     basics_expect_mut(world, s, "radios.size", "RadioGroup", "current", "\"Medium\"");
     basics_expect_mut(world, s, "sliders.volume", "Slider", "current", "40");
     basics_expect_mut(world, s, "steppers.count", "Stepper", "current", "2");
     basics_expect_mut(world, s, "progress.download", "ProgressBar", "current", "0.6499999762");
-    gallery_expect(world, s, "get " BASICS ".sliders.volume.head.amount Text.value", "\"40%\"");
-    gallery_expect(world, s, "get " BASICS ".progress.download.head.amount Text.value",
+    gallery_expect(world, s, "get " BASICS ".sliders.volume.head.amount box.text.Text.value",
+        "\"40%\"");
+    gallery_expect(world, s, "get " BASICS ".progress.download.head.amount box.text.Text.value",
         "\"65%\"");
     basics_expect_focus(world, s, "#0");
 
@@ -167,7 +170,7 @@ void Basics_button_click(void) {
     gallery_click(world, s, BASICS ".buttons.save", 0, 0, BASICS ".buttons.save");
     test_int(gallery_changes(world, s), 1);
     gallery_expect(world, s, "get gallery Gallery.mut.last", "\"save\"");
-    gallery_expect(world, s, "get gallery.hud.root.header.status Text.value",
+    gallery_expect(world, s, "get gallery.hud.root.header.status box.text.Text.value",
         "\"Last change: save\"");
     basics_expect_focus(world, s, BASICS ".buttons.save");
 
@@ -189,14 +192,14 @@ void Basics_button_release_outside(void) {
     gallery_hover(world, s, BASICS ".buttons.save", 0, 0, BASICS ".buttons.save");
     gallery_point(world, BASICS ".buttons.save", 0, 0, from, sizeof(from));
     gallery_point(world, BASICS ".buttons.cancel", 0, 0, to, sizeof(to));
-    ecs_os_free(gallery_run(world, s, "mouse.drag left %s %s", from, to));
+    ecs_os_free(gallery_run(world, s, "mouse_drag left %s %s", from, to));
     gallery_settle(world, s);
     test_int(gallery_changes(world, s), 0);
     basics_expect_mut(world, s, "buttons.save", "Button", "down", "false");
     basics_expect_mut(world, s, "buttons.cancel", "Button", "down", "false");
 
     gallery_hover(world, s, BASICS ".buttons.save", 0, 0, BASICS ".buttons.save");
-    ecs_os_free(gallery_run(world, s, "mouse.click right %s", from));
+    ecs_os_free(gallery_run(world, s, "mouse_click right %s", from));
     gallery_settle(world, s);
     test_int(gallery_changes(world, s), 0);
     gallery_click(world, s, BASICS ".buttons.save", 0, 0, BASICS ".buttons.save");
@@ -228,11 +231,11 @@ void Basics_button_space(void) {
     ecs_world_t *world = gallery_load(&s);
 
     basics_tab_to(world, s, BASICS ".buttons.remove");
-    ecs_os_free(gallery_run(world, s, "key.down Space"));
+    ecs_os_free(gallery_run(world, s, "key_down Space"));
     gallery_settle(world, s);
     basics_expect_mut(world, s, "buttons.remove", "Button", "down", "true");
     test_int(gallery_changes(world, s), 0);
-    ecs_os_free(gallery_run(world, s, "key.up Space"));
+    ecs_os_free(gallery_run(world, s, "key_up Space"));
     gallery_settle(world, s);
     basics_expect_mut(world, s, "buttons.remove", "Button", "down", "false");
     test_int(gallery_changes(world, s), 1);
@@ -379,8 +382,8 @@ void Basics_radio_arrows(void) {
     gallery_key(world, s, "Down");
     basics_expect_mut(world, s, "radios.size", "RadioGroup", "current", "\"Small\"");
     basics_expect_focus(world, s, BASICS ".radios.size.small");
-    gallery_expect(world, s, "get box.ui.FocusStatus FocusStatus.previous",
-        BASICS ".radios.size.large");
+    gallery_expect(world, s, "get $ box.ui.FocusStatus.previous",
+        "\"" BASICS ".radios.size.large\"");
 
     gallery_key(world, s, "Up");
     basics_expect_mut(world, s, "radios.size", "RadioGroup", "current", "\"Large\"");
@@ -410,9 +413,9 @@ void Basics_radio_one_tab_stop(void) {
     basics_tab_to(world, s, BASICS ".radios.size.medium");
     gallery_key(world, s, "Tab");
     basics_expect_focus(world, s, BASICS ".sliders.volume");
-    ecs_os_free(gallery_run(world, s, "key.down ShiftLeft"));
+    ecs_os_free(gallery_run(world, s, "key_down ShiftLeft"));
     gallery_key(world, s, "Tab");
-    ecs_os_free(gallery_run(world, s, "key.up ShiftLeft"));
+    ecs_os_free(gallery_run(world, s, "key_up ShiftLeft"));
     gallery_settle(world, s);
     basics_expect_focus(world, s, BASICS ".radios.size.medium");
 
@@ -437,17 +440,18 @@ void Basics_slider_drag(void) {
     gallery_hover(world, s, volume, fx, fy, volume);
     basics_slider_point(world, volume, 0.4f, from, sizeof(from));
     basics_slider_point(world, volume, 0.8f, to, sizeof(to));
-    ecs_os_free(gallery_run(world, s, "mouse.drag left %s %s", from, to));
+    ecs_os_free(gallery_run(world, s, "mouse_drag left %s %s", from, to));
     gallery_settle(world, s);
     basics_expect_mut(world, s, "sliders.volume", "Slider", "current", "80");
-    gallery_expect(world, s, "get " BASICS ".sliders.volume.head.amount Text.value", "\"80%\"");
+    gallery_expect(world, s, "get " BASICS ".sliders.volume.head.amount box.text.Text.value",
+        "\"80%\"");
     test_assert(gallery_changes(world, s) >= 1);
     gallery_expect(world, s, "get gallery Gallery.mut.last", "\"volume: 80.00\"");
     basics_expect_focus(world, s, volume);
 
     basics_slider_point(world, volume, 0.8f, from, sizeof(from));
     basics_slider_point(world, volume, 0.2f, to, sizeof(to));
-    ecs_os_free(gallery_run(world, s, "mouse.drag left %s %s", from, to));
+    ecs_os_free(gallery_run(world, s, "mouse_drag left %s %s", from, to));
     gallery_settle(world, s);
     basics_expect_mut(world, s, "sliders.volume", "Slider", "current", "20");
 
@@ -511,7 +515,8 @@ void Basics_slider_arrows(void) {
     basics_expect_focus(world, s, BASICS ".sliders.gain");
     gallery_key(world, s, "Right");
     test_flt(gallery_number(world, s, "sliders.gain", "Slider", "current"), 0.51);
-    gallery_expect(world, s, "get " BASICS ".sliders.gain.head.amount Text.value", "\"0.51\"");
+    gallery_expect(world, s, "get " BASICS ".sliders.gain.head.amount box.text.Text.value",
+        "\"0.51\"");
     gallery_key(world, s, "PageDown");
     test_flt(gallery_number(world, s, "sliders.gain", "Slider", "current"), 0.41);
 
@@ -529,7 +534,8 @@ void Basics_slider_home_end(void) {
     gallery_key(world, s, "Home");
     basics_expect_mut(world, s, "sliders.volume", "Slider", "current", "0");
     test_int(gallery_changes(world, s), 2);
-    gallery_expect(world, s, "get " BASICS ".sliders.volume.head.amount Text.value", "\"0%\"");
+    gallery_expect(world, s, "get " BASICS ".sliders.volume.head.amount box.text.Text.value",
+        "\"0%\"");
 
     ecs_fini(world);
 }
@@ -573,13 +579,13 @@ void Basics_slider_clamping(void) {
     gallery_hover(world, s, volume, fx, fy, volume);
     basics_slider_point(world, volume, 0.4f, from, sizeof(from));
     basics_slider_point(world, volume, 3.0f, to, sizeof(to));
-    ecs_os_free(gallery_run(world, s, "mouse.drag left %s %s", from, to));
+    ecs_os_free(gallery_run(world, s, "mouse_drag left %s %s", from, to));
     gallery_settle(world, s);
     basics_expect_mut(world, s, "sliders.volume", "Slider", "current", "100");
 
     basics_slider_point(world, volume, 1.0f, from, sizeof(from));
     basics_slider_point(world, volume, -3.0f, to, sizeof(to));
-    ecs_os_free(gallery_run(world, s, "mouse.drag left %s %s", from, to));
+    ecs_os_free(gallery_run(world, s, "mouse_drag left %s %s", from, to));
     gallery_settle(world, s);
     basics_expect_mut(world, s, "sliders.volume", "Slider", "current", "0");
 
@@ -608,7 +614,8 @@ void Basics_stepper_buttons(void) {
     basics_expect_mut(world, s, "steppers.count", "Stepper", "part", "1");
     gallery_click(world, s, count, BASICS_PLUS, 0, count);
     basics_expect_mut(world, s, "steppers.count", "Stepper", "current", "3");
-    gallery_expect(world, s, "get " BASICS ".steppers.count.amount.digits Text.value", "\"3\"");
+    gallery_expect(world, s, "get " BASICS ".steppers.count.amount.digits box.text.Text.value",
+        "\"3\"");
     test_int(gallery_changes(world, s), 1);
     gallery_expect(world, s, "get gallery Gallery.mut.last", "\"count: 3\"");
 
@@ -620,8 +627,8 @@ void Basics_stepper_buttons(void) {
     gallery_click(world, s, count, BASICS_PLUS, 0, count);
     basics_expect_mut(world, s, "steppers.count", "Stepper", "current", "5");
     test_int(gallery_changes(world, s), 3);
-    gallery_expect(world, s, "get " BASICS ".steppers.count.plus.sign Rgb",
-        "{r: 142, g: 149, b: 160}");
+    gallery_expect(world, s, "get " BASICS ".steppers.count.plus.sign box.material.Rgb",
+        "{\"Rgb\":{\"r\":142, \"g\":149, \"b\":160}}");
 
     gallery_click(world, s, count, 0, 0, count);
     test_int(gallery_changes(world, s), 3);
@@ -635,8 +642,8 @@ void Basics_stepper_buttons(void) {
 
     basics_expect_mut(world, s, "steppers.count", "Stepper", "current", "0");
     test_int(gallery_changes(world, s), 8);
-    gallery_expect(world, s, "get " BASICS ".steppers.count.minus.sign Rgb",
-        "{r: 142, g: 149, b: 160}");
+    gallery_expect(world, s, "get " BASICS ".steppers.count.minus.sign box.material.Rgb",
+        "{\"Rgb\":{\"r\":142, \"g\":149, \"b\":160}}");
 
     ecs_fini(world);
 }
@@ -693,8 +700,10 @@ void Basics_disabled_ignore_clicks(void) {
     basics_expect_mut(world, s, "sliders.muted", "Slider", "current", "70");
     basics_expect_mut(world, s, "steppers.fixed", "Stepper", "current", "3");
 
-    gallery_expect(world, s, "get " BASICS ".buttons.off Opacity", "{value: 0.4499999881}");
-    gallery_expect(world, s, "get " BASICS ".radios.quality Opacity", "{value: 0.4499999881}");
+    gallery_expect(world, s, "get " BASICS ".buttons.off box.material.Opacity",
+        "{\"Opacity\":{\"value\":0.4499999881}}");
+    gallery_expect(world, s, "get " BASICS ".radios.quality box.material.Opacity",
+        "{\"Opacity\":{\"value\":0.4499999881}}");
     test_assert(!ecs_has(world, ecs_lookup(world, BASICS ".buttons.save"), Opacity));
 
     ecs_fini(world);
@@ -748,7 +757,7 @@ void Basics_tab_order(void) {
         basics_expect_focus(world, s, order[i]);
     }
 
-    gallery_expect(world, s, "get box.ui.FocusStatus FocusStatus.visible", "true");
+    gallery_expect(world, s, "get $ box.ui.FocusStatus.visible", "true");
     test_int(gallery_changes(world, s), 0);
 
     ecs_fini(world);
@@ -758,35 +767,40 @@ void Basics_focus_ring_after_tab(void) {
     // widgets/basics
     ecs_entity_t s = 0;
     ecs_world_t *world = gallery_load(&s);
-    const char *ring = "{width: 2, radius: 4, color: {r: 120, g: 172, b: 240, a: 255}}";
+    const char *ring = "{\"Border\":{\"width\":2, \"radius\":4, "
+        "\"color\":{\"r\":120, \"g\":172, \"b\":240, \"a\":255}}}";
 
     gallery_click(world, s, BASICS ".buttons.cancel", 0, 0, BASICS ".buttons.cancel");
     basics_expect_focus(world, s, BASICS ".buttons.cancel");
     basics_expect_mut(world, s, "buttons.cancel", "Button", "focused", "true");
-    gallery_expect(world, s, "get " BASICS ".buttons.cancel Border",
-        "{width: 1, radius: 4, color: {r: 70, g: 76, b: 87, a: 255}}");
+    gallery_expect(world, s, "get " BASICS ".buttons.cancel box.geometry.Border",
+        "{\"Border\":{\"width\":1, \"radius\":4, "
+        "\"color\":{\"r\":70, \"g\":76, \"b\":87, \"a\":255}}}");
 
     gallery_key(world, s, "Tab");
     basics_expect_focus(world, s, BASICS ".buttons.more");
-    gallery_expect(world, s, "get " BASICS ".buttons.more Border", ring);
-    gallery_expect(world, s, "get " BASICS ".buttons.cancel Border",
-        "{width: 1, radius: 4, color: {r: 70, g: 76, b: 87, a: 255}}");
+    gallery_expect(world, s, "get " BASICS ".buttons.more box.geometry.Border", ring);
+    gallery_expect(world, s, "get " BASICS ".buttons.cancel box.geometry.Border",
+        "{\"Border\":{\"width\":1, \"radius\":4, "
+        "\"color\":{\"r\":70, \"g\":76, \"b\":87, \"a\":255}}}");
 
     gallery_click(world, s, BASICS ".buttons.more", 0, 0, BASICS ".buttons.more");
-    gallery_expect(world, s, "get box.ui.FocusStatus FocusStatus.visible", "false");
-    gallery_expect(world, s, "get " BASICS ".buttons.more Border",
-        "{width: 0, radius: 4, color: {r: 0, g: 0, b: 0, a: 255}}");
+    gallery_expect(world, s, "get $ box.ui.FocusStatus.visible", "false");
+    gallery_expect(world, s, "get " BASICS ".buttons.more box.geometry.Border",
+        "{\"Border\":{\"width\":0, \"radius\":4, "
+        "\"color\":{\"r\":0, \"g\":0, \"b\":0, \"a\":255}}}");
 
     basics_tab_to(world, s, BASICS ".toggles.sound");
-    gallery_expect(world, s, "get " BASICS ".toggles.sound.box Border.width", "2");
+    gallery_expect(world, s, "get " BASICS ".toggles.sound.box box.geometry.Border.width", "2");
     basics_tab_to(world, s, BASICS ".radios.size.medium");
-    gallery_expect(world, s, "get " BASICS ".radios.size.medium.indicator Border.width", "2");
+    gallery_expect(world, s,
+        "get " BASICS ".radios.size.medium.indicator box.geometry.Border.width", "2");
     basics_tab_to(world, s, BASICS ".sliders.volume");
-    gallery_expect(world, s, "get " BASICS ".sliders.volume.track.knob Border.color",
-        "{r: 120, g: 172, b: 240, a: 255}");
+    gallery_expect(world, s, "get " BASICS ".sliders.volume.track.knob box.geometry.Border.color",
+        "{\"r\":120, \"g\":172, \"b\":240, \"a\":255}");
     basics_tab_to(world, s, BASICS ".steppers.count");
-    gallery_expect(world, s, "get " BASICS ".steppers.count Border.width", "2");
-    gallery_expect(world, s, "get " BASICS ".toggles.sound.box Border.width", "1");
+    gallery_expect(world, s, "get " BASICS ".steppers.count box.geometry.Border.width", "2");
+    gallery_expect(world, s, "get " BASICS ".toggles.sound.box box.geometry.Border.width", "1");
 
     ecs_fini(world);
 }
@@ -800,19 +814,22 @@ void Basics_light_theme(void) {
     test_assert(theme != 0);
     test_assert(light != 0);
 
-    gallery_expect(world, s, "get " BASICS ".buttons.save Rgb", "{r: 98, g: 168, b: 122}");
+    gallery_expect(world, s, "get " BASICS ".buttons.save box.material.Rgb",
+        "{\"Rgb\":{\"r\":98, \"g\":168, \"b\":122}}");
     ecs_value_t v = ecs_const_var_get(world, light);
     test_assert(v.type == ecs_id(UiTheme));
     test_assert(v.ptr != NULL);
     ecs_set_id(world, theme, ecs_id(UiTheme), sizeof(UiTheme), v.ptr);
     ecs_progress(world, 0);
 
-    gallery_expect(world, s, "get " BASICS ".buttons.save Rgb", "{r: 44, g: 128, b: 82}");
-    gallery_expect(world, s, "get " BASICS " Rgb", "{r: 250, g: 251, b: 253}");
-    gallery_expect(world, s, "get " BASICS ".buttons.save.caption Rgb",
-        "{r: 255, g: 255, b: 255}");
-    gallery_expect(world, s, "get gallery.backdrop_view View.clear.color",
-        "{r: 232, g: 235, b: 240, a: 255}");
+    gallery_expect(world, s, "get " BASICS ".buttons.save box.material.Rgb",
+        "{\"Rgb\":{\"r\":44, \"g\":128, \"b\":82}}");
+    gallery_expect(world, s, "get " BASICS " box.material.Rgb",
+        "{\"Rgb\":{\"r\":250, \"g\":251, \"b\":253}}");
+    gallery_expect(world, s, "get " BASICS ".buttons.save.caption box.material.Rgb",
+        "{\"Rgb\":{\"r\":255, \"g\":255, \"b\":255}}");
+    gallery_expect(world, s, "get gallery.backdrop_view box.view.View.clear.color",
+        "{\"r\":232, \"g\":235, \"b\":240, \"a\":255}");
     gallery_expect(world, s, "logs warning 100", "");
 
     ecs_fini(world);
@@ -828,7 +845,8 @@ void Basics_set_mut_no_change(void) {
         "{current: true}"));
     ecs_progress(world, 0);
     test_assert(ecs_lookup(world, BASICS ".toggles.sound.box.mark") != 0);
-    gallery_expect(world, s, "get " BASICS ".toggles.sound.box Rgb", "{r: 98, g: 168, b: 122}");
+    gallery_expect(world, s, "get " BASICS ".toggles.sound.box box.material.Rgb",
+        "{\"Rgb\":{\"r\":98, \"g\":168, \"b\":122}}");
 
     ecs_os_free(gallery_run(world, s, "set " BASICS ".sliders.volume box.widgets.Slider.mut "
         "{current: 80}"));
@@ -837,10 +855,12 @@ void Basics_set_mut_no_change(void) {
     ecs_os_free(gallery_run(world, s, "set " BASICS ".steppers.count box.widgets.Stepper.mut "
         "{current: 4}"));
     ecs_progress(world, 0);
-    gallery_expect(world, s, "get " BASICS ".sliders.volume.head.amount Text.value", "\"80%\"");
+    gallery_expect(world, s, "get " BASICS ".sliders.volume.head.amount box.text.Text.value",
+        "\"80%\"");
     test_assert(ecs_lookup(world, BASICS ".radios.size.small.indicator.dot") != 0);
     test_assert(ecs_lookup(world, BASICS ".radios.size.medium.indicator.dot") == 0);
-    gallery_expect(world, s, "get " BASICS ".steppers.count.amount.digits Text.value", "\"4\"");
+    gallery_expect(world, s, "get " BASICS ".steppers.count.amount.digits box.text.Text.value",
+        "\"4\"");
 
     test_int(gallery_changes(world, s), 0);
     gallery_expect(world, s, "get gallery Gallery.mut.last", "\"none\"");

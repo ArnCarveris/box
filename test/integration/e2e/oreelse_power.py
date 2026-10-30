@@ -24,8 +24,9 @@ ARGS = ["--seed", str(SEED), "--fps", "20"]
 FPS = round(1 / float(DELTA_TIME))
 DT = float(DELTA_TIME)
 
-STATE = "has oreelse.OreGameState (oreelse.OreGameState, oreelse.OreGameState.%s)"
-TOAST = "get oreelse.OreToast OreToast.text"
+STATE = ("eval oreelse.OreGameState.has(flecs.script.core.pair("
+         "oreelse.OreGameState,oreelse.OreGameState.%s))")
+TOAST = "get oreelse.OreToast oreelse.OreToast.text"
 PLAYER = "astronaut"
 INVENTORY = "oreelse.OreInventory"
 BOOK = "oreelse.OreCraftBook"
@@ -120,16 +121,16 @@ def set_state(app, state):
 def setup(app):
     """Shrink the window and drop the shadows of the world view, so the software renderer keeps
     up."""
-    app.exec("set window Surface {width: 640, height: 360}")
-    app.exec("set main_view View.shadows.enabled false")
-    app.wait_for("get window SurfaceStatus.height", "360")
+    app.exec("set window box.surface.Surface {width: 640, height: 360}")
+    app.exec("set main_view box.view.View.shadows.enabled false")
+    app.wait_for("get window box.surface.SurfaceStatus.height", "360")
 
 
 def start(app):
     """Set up and leave the title screen with a key press."""
     setup(app)
     app.expect(STATE % "Title", "true")
-    app.exec("key.press Space")
+    app.exec("key_press Space")
     app.wait_input()
     app.wait_for(STATE % "Playing", "true")
 
@@ -141,7 +142,7 @@ def entity(value):
 
 def inventory(app):
     """The slots of the inventory in order: (item, amount), None for a free slot."""
-    slots = app.get(INVENTORY, "OreInventory")["slots"]
+    slots = app.get(INVENTORY, "oreelse.OreInventory")["slots"]
     return [(entity(s["item"]), s["amount"]) if entity(s["item"]) else None for s in slots]
 
 
@@ -157,21 +158,16 @@ def set_inventory(app, stacks):
     slots = [{"item": s[0], "amount": s[1]} for s in stacks]
     slots += [{"item": 0, "amount": 0}] * (SLOTS - len(slots))
     put(app, INVENTORY, INVENTORY, {"slots": slots})
-    app.wait_for("get %s OreInventory.slots[0].amount" % INVENTORY,
+    app.wait_for("get %s oreelse.OreInventory.slots[0].amount" % INVENTORY,
                  str(stacks[0][1]) if stacks else "0")
 
 
 def rows_of(app, expr):
     """Run a query of the port: the path and the value of the first field of every result."""
-    app.exec("query found %s" % expr)
-    app.exec("iter found")
-    out = app.exec("next 1000")
     result = {}
-    for line in out.splitlines():
-        if not line.strip() or line == "(end)":
-            continue
-        parts = line.split(" ", 1)
-        result[parts[0]] = parse_value(parts[1]) if len(parts) > 1 else None
+    for row in parse_value(app.exec('query "%s"' % expr)):
+        fields = row["fields"]
+        result[row["entity"]] = next(iter(fields[0]["value"].values())) if fields else None
     return result
 
 
@@ -207,11 +203,11 @@ def place(app, name, prefab, row, col, w=1, h=1):
     run_script(app, "using box.transform\n%s : %s {\n  Position: {%g, 0, %g}\n"
                     "  oreelse.OreBuilding: {row: %d, col: %d}\n}" %
                (name, prefab, x, z, row, col))
-    app.wait_for("has %s oreelse.OreBuilding" % name, "true")
+    app.wait_for("eval %s.has(oreelse.OreBuilding)" % name, "true")
 
 
 def power(app):
-    return app.get(POWER, "OrePowerState")
+    return app.get(POWER, "oreelse.OrePowerState")
 
 
 def wait_power(app, production, demand, blackout):
@@ -222,18 +218,18 @@ def wait_power(app, production, demand, blackout):
         return (abs(p["production"] - production) < 1e-3 and
                 abs(p["demand"] - demand) < 1e-3 and p["blackout"] == blackout and
                 abs(p["ratio"] - ratio) < 1e-4)
-    app.wait_for("get %s OrePowerState" % POWER, matches,
+    app.wait_for("get %s oreelse.OrePowerState" % POWER, matches,
                  what="production %g, demand %g, blackout %s" % (production, demand, blackout))
 
 
 def set_levels(app, mining, weapons, construction):
     put(app, ALLOC, ALLOC, {"level": [mining, weapons, construction]})
-    app.wait_for("get %s OrePowerAlloc" % ALLOC,
+    app.wait_for("get %s oreelse.OrePowerAlloc" % ALLOC,
                  lambda out: parse_value(out)["level"] == [mining, weapons, construction])
 
 
 def levels(app):
-    return app.get(ALLOC, "OrePowerAlloc")["level"]
+    return app.get(ALLOC, "oreelse.OrePowerAlloc")["level"]
 
 
 def power_set(app, category, level):
@@ -242,11 +238,11 @@ def power_set(app, category, level):
     n = SCRIPTS[0] + 1
     run_script(app, "power_result_%d { oreelse.OreCanOrder: {value: "
                     "oreelse.power_set(%d, %d)} }" % (n, category, level))
-    return app.get("power_result_%d" % n, "OreCanOrder")["value"]
+    return app.get("power_result_%d" % n, "oreelse.OreCanOrder")["value"]
 
 
 def clock(app):
-    return app.get("oreelse.OreClock", "OreClock")["elapsed"]
+    return app.get("oreelse.OreClock", "oreelse.OreClock")["elapsed"]
 
 
 def play(app, frames):
@@ -259,18 +255,18 @@ def play(app, frames):
 
 
 def drill_state(app, path):
-    return app.get(path, "OreDrill")
+    return app.get(path, "oreelse.OreDrill")
 
 
 def crafter(app, path):
-    c = app.get(path, "OreCrafter")
+    c = app.get(path, "oreelse.OreCrafter")
     c["item"] = entity(c["item"])
     return c
 
 
 def orders(app):
     """The orders oldest first, each with its entries and pool cut to their counts."""
-    b = app.get(BOOK, "OreCraftBook")
+    b = app.get(BOOK, "oreelse.OreCraftBook")
     result = []
     for o in b["orders"][:b["count"]]:
         o["entries"] = o["entries"][:o["entry_count"]]
@@ -284,11 +280,11 @@ def order(app, item, units):
     n = SCRIPTS[0] + 1
     run_script(app, "craft_result_%d { oreelse.OreStack: {item: %s, amount: "
                     "oreelse.craft_order(%s, %d)} }" % (n, item, item, units))
-    return app.get("craft_result_%d" % n, "OreStack")["amount"]
+    return app.get("craft_result_%d" % n, "oreelse.OreStack")["amount"]
 
 
 def hover(app):
-    return app.get("oreelse.OreHover", "OreHover")
+    return app.get("oreelse.OreHover", "oreelse.OreHover")
 
 
 def point(h):
@@ -297,20 +293,20 @@ def point(h):
 
 
 def move_cursor(app, cursor):
-    app.exec("mouse.move [%g, %g]" % cursor)
+    app.exec("mouse_move [%g, %g]" % cursor)
     app.wait_input()
     app.wait_frames(SETTLE)
 
 
 def place_player(app, x, z):
-    app.exec("set %s Position {%g, 0, %g}" % (PLAYER, x, z))
+    app.exec("set %s box.transform.Position {%g, 0, %g}" % (PLAYER, x, z))
     app.wait_frames(SETTLE)
 
 
 def aim_tile(app, row, col):
     """Place the astronaut so that the center of the window hovers the center of a tile."""
     move_cursor(app, CENTER)
-    p = app.get(PLAYER, "Position")
+    p = app.get(PLAYER, "box.transform.Position")
     hx, hz = point(hover(app))
     x, z = tile_point(row, col)
     place_player(app, x - (hx - p["x"]), z - (hz - p["z"]))
@@ -320,7 +316,7 @@ def aim_tile(app, row, col):
 
 
 def button(app, name, down):
-    app.exec("mouse.button %s %s" % (name, "true" if down else "false"))
+    app.exec("mouse_button %s %s" % (name, "true" if down else "false"))
     app.wait_input()
 
 
@@ -332,8 +328,8 @@ def lamps_of(app, owner):
 
 def lamp(app, path):
     """The color and the emissive strength of a bulb."""
-    rgb = app.get(path, "Rgb")
-    return (rgb["r"], rgb["g"], rgb["b"]), app.get(path, "Emissive")["strength"]
+    rgb = app.get(path, "box.material.Rgb")
+    return (rgb["r"], rgb["g"], rgb["b"]), app.get(path, "box.material.Emissive")["strength"]
 
 
 def wait_lamps(app, owner, color, what):
@@ -341,7 +337,7 @@ def wait_lamps(app, owner, color, what):
     def shows(_):
         bulbs = lamps_of(app, owner)
         return bulbs and all(lamp(app, b)[0] == color for b in bulbs)
-    app.wait_for("get %s OrePowerState" % POWER, shows, what=what)
+    app.wait_for("get %s oreelse.OrePowerState" % POWER, shows, what=what)
 
 
 def test_production_and_demand(app):
@@ -430,7 +426,7 @@ def test_drill(app):
 
     # In a blackout the drill holds its progress
     set_state(app, "Paused")
-    app.exec("set drill_a OreDrill {timer: 1.2}")
+    app.exec("set drill_a oreelse.OreDrill {timer: 1.2}")
     played = play(app, 12)
     app.check(played > 0, "no play passed")
     d = drill_state(app, "drill_a")
@@ -447,7 +443,7 @@ def test_drill(app):
 
     # At level 4 every 0.75 s
     set_levels(app, 4, 1, 1)
-    app.exec("set drill_a OreDrill {timer: 1.2}")
+    app.exec("set drill_a oreelse.OreDrill {timer: 1.2}")
     stone = count(app, "items.Stone")
     played = play(app, 24)
     app.check(check_drill(app, "drill_a", 1.2, stone, played, 2) >= 1,
@@ -455,7 +451,7 @@ def test_drill(app):
 
     # At level 0 not at all
     set_levels(app, 0, 3, 3)
-    app.exec("set drill_a OreDrill {timer: 1.2}")
+    app.exec("set drill_a oreelse.OreDrill {timer: 1.2}")
     stone = count(app, "items.Stone")
     played = play(app, 12)
     check_drill(app, "drill_a", 1.2, stone, played, 0)
@@ -469,20 +465,20 @@ def test_factory(app):
     for i in range(5):
         place(app, "panel_%d" % i, "SolarPanel", 4, 3 + i)
     place(app, "factory_a", "Factory", 6, 6, 2, 2)
-    app.wait_for("has factory_a oreelse.OreCrafter", "true", what="the factory's crafter")
+    app.wait_for("eval factory_a.has(oreelse.OreCrafter)", "true", what="the factory's crafter")
     wait_power(app, 5 * PANEL, FACTORY, False)
     c = crafter(app, "factory_a")
     app.check(c["speed"] == 1 and not c["paused"], "the factory's crafter is %s" % c)
 
     # Its speed is the Construction multiplier: 2 at level 4, 1.5 at 3, stopped at 0
     set_levels(app, 2, 0, 4)
-    app.wait_for("get factory_a OreCrafter.speed", lambda out: float(out) == 2,
+    app.wait_for("get factory_a oreelse.OreCrafter.speed", lambda out: float(out) == 2,
                  what="the factory at speed 2")
     set_levels(app, 1, 2, 3)
-    app.wait_for("get factory_a OreCrafter.speed", lambda out: float(out) == 1.5,
+    app.wait_for("get factory_a oreelse.OreCrafter.speed", lambda out: float(out) == 1.5,
                  what="the factory at speed 1.5")
     set_levels(app, 2, 2, 0)
-    app.wait_for("get factory_a OreCrafter.paused", "true", what="the factory stopped")
+    app.wait_for("get factory_a oreelse.OreCrafter.paused", "true", what="the factory stopped")
 
     # An order of two engines, nobody working on it yet
     set_inventory(app, [("items.IronPlate", 16), ("items.CopperPlate", 8)])
@@ -494,7 +490,7 @@ def test_factory(app):
 
     # With the factory working too, the two crafts run at once: twice the rate
     set_levels(app, 2, 2, 2)
-    app.exec("set %s OreCrafter {paused: false}" % PLAYER)
+    app.exec("set %s oreelse.OreCrafter {paused: false}" % PLAYER)
     play(app, 12)
     player, factory = crafter(app, PLAYER), crafter(app, "factory_a")
     app.check(player["item"] == ENGINE and factory["item"] == ENGINE,
@@ -530,7 +526,7 @@ def test_factory(app):
     set_state(app, "Playing")
     aim_tile(app, 7, 6)
     button(app, "right", True)
-    app.wait_for("get %s OreInventory" % INVENTORY,
+    app.wait_for("get %s oreelse.OreInventory" % INVENTORY,
                  lambda out: any(s["item"] == "Factory" and s["amount"] == 1
                                  for s in parse_value(out)["slots"]),
                  frames=round((DOZE_TIME + SWING_SLACK) * FPS), what="the factory demolished")
@@ -551,7 +547,7 @@ def test_player_crafts_in_blackout(app):
     wait_power(app, 0, DRILL, True)
     set_inventory(app, [("items.Iron", 2)])
     app.check(order(app, "items.IronPlate", 1) == 1, "the order of an iron plate failed")
-    app.wait_for("get %s OreInventory" % INVENTORY,
+    app.wait_for("get %s oreelse.OreInventory" % INVENTORY,
                  lambda out: any(s["item"] == "items.IronPlate" and s["amount"] == 1
                                  for s in parse_value(out)["slots"]),
                  frames=2 * FPS, what="the iron plate crafted in a blackout")
@@ -583,9 +579,10 @@ def test_lamps(app):
     wait_power(app, 0, DRILL * 6 / BARS, True)
     wait_lamps(app, "drill_a", DEAD, "the drill's lamps red in a blackout")
     bulb = lamps_of(app, "drill_a")[0]
-    app.wait_for("get %s Emissive.strength" % bulb, lambda out: float(out) == 0,
+    app.wait_for("get %s box.material.Emissive.strength" % bulb, lambda out: float(out) == 0,
                  frames=2 * FPS, what="the dead lamp in its off half")
-    app.wait_for("get %s Emissive.strength" % bulb, lambda out: abs(float(out) - DRILL_LAMP) < 1e-4,
+    app.wait_for("get %s box.material.Emissive.strength" % bulb,
+                 lambda out: abs(float(out) - DRILL_LAMP) < 1e-4,
                  frames=2 * FPS, what="the dead lamp in its on half")
     for _ in range(3):
         for b in lamps_of(app, "gun_a"):

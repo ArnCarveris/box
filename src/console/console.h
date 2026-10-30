@@ -31,7 +31,7 @@ typedef enum box_console_syntax_t {
     BoxSyntaxEntity,    /**< Entity argument that resolves */
     BoxSyntaxMissing,   /**< Entity argument that does not resolve */
     BoxSyntaxNumber,    /**< Number argument or number in a value expression */
-    BoxSyntaxString,    /**< Quoted argument, string in a value expression, rest parameter */
+    BoxSyntaxString,    /**< Quoted argument or string in a value expression */
     BoxSyntaxBoolean,   /**< Bool argument or true or false in a value expression */
     BoxSyntaxValue,     /**< Value expression in brackets */
     BoxSyntaxExtra      /**< Argument beyond the parameters of the command */
@@ -76,7 +76,7 @@ typedef struct box_console_t {
     ecs_entity_t module;        /**< The box.console module */
     ecs_entity_t scope;         /**< Root entity of the content, the view and the session */
     ecs_entity_t action;        /**< The toggle action */
-    ecs_entity_t session;       /**< Terminal session, created by the first line that runs */
+    ecs_entity_t session;       /**< Shell session, created by the first line that runs */
     ecs_entity_t view;          /**< View of the content while the console is open */
     box_console_ui_t ui;        /**< The content */
     ecs_vec_t lines;            /**< box_console_line_t of the scrollback */
@@ -152,8 +152,8 @@ bool box_console_is_command(
     const char *word,
     int32_t len);
 
-/** Find the colored parts of a command line, from the tokens the dispatcher splits it into and
- * the parameters of its command. Entity arguments resolve from the cwd of the console session.
+/** Find the colored parts of a command line, from the tokens the shell splits it into and the
+ * parameters of its command. Entity arguments resolve from the scope of the console session.
  *
  * @param world The world
  * @param con The console state

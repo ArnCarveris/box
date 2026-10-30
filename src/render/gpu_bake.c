@@ -587,8 +587,7 @@ static bool box_gpu_bake_cull(
         goto done;
     }
 
-    WGPUComputePassEncoder pass = wgpuCommandEncoderBeginComputePass(encoder,
-        &(WGPUComputePassDescriptor){ .timestampWrites = writes });
+    WGPUComputePassEncoder pass = box_gpu_compute_begin(encoder, writes);
     WGPUBindGroup page = NULL;
     wgpuComputePassEncoderSetPipeline(pass, b->cull);
     for (d = 0; d < draws; d ++) {
@@ -1092,8 +1091,7 @@ static void box_gpu_bake_project_record(
         .entryCount = 6,
         .entries = entries
     });
-    WGPUComputePassEncoder cpass = wgpuCommandEncoderBeginComputePass(encoder,
-        &(WGPUComputePassDescriptor){ .timestampWrites = writes });
+    WGPUComputePassEncoder cpass = box_gpu_compute_begin(encoder, writes);
     wgpuComputePassEncoderSetPipeline(cpass, pipeline);
     wgpuComputePassEncoderSetBindGroup(cpass, 0, group, 0, NULL);
     wgpuComputePassEncoderDispatchWorkgroups(cpass, (uint32_t)count, 1, 1);
@@ -1314,17 +1312,7 @@ static void box_gpu_bake_chunk_capture(
 
     wgpuQueueWriteBuffer(gpu->queue, b->uniforms, 0, ecs_vec_first(&b->view_data),
         (size_t)faces * BOX_GPU_VIEW_STRIDE);
-    uint32_t query = (uint32_t)timer->readback * 2;
-    WGPUPassTimestampWrites begin = {
-        .querySet = b->queries,
-        .beginningOfPassWriteIndex = query,
-        .endOfPassWriteIndex = WGPU_QUERY_SET_INDEX_UNDEFINED
-    };
-    WGPUPassTimestampWrites end = {
-        .querySet = b->queries,
-        .beginningOfPassWriteIndex = WGPU_QUERY_SET_INDEX_UNDEFINED,
-        .endOfPassWriteIndex = query + 1
-    };
+    WGPUPassTimestampWrites begin, end;
     bool timed = timer->readback != -1;
     WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
     if (pass->environment) {
@@ -1333,7 +1321,9 @@ static void box_gpu_bake_chunk_capture(
     }
 
     if (box_gpu_bake_cull(gpu, b, encoder, count,
-        timed && !timer->begun ? &begin : NULL))
+        timed && !timer->begun
+            ? box_gpu_bake_writes(b, timer->readback, true, false, &begin)
+            : NULL))
     {
         timer->begun |= timed;
     }
@@ -1348,10 +1338,11 @@ static void box_gpu_bake_chunk_capture(
         *shadow ? *shadow : gpu->shadow_empty_view, pass->ambient);
     if (pass->bake) {
         box_gpu_bake_project(gpu, b, encoder, pipeline, pass, probes, count,
-            timed ? &end : NULL);
+            timed ? box_gpu_bake_writes(b, timer->readback, false, true, &end) : NULL);
     } else {
         timed = box_gpu_bake_store(gpu, b, encoder, pipeline, pass, probes, count,
-            timed ? &end : NULL) && timed;
+            timed ? box_gpu_bake_writes(b, timer->readback, false, true, &end) : NULL)
+            && timed;
     }
 
     timer->ended |= timed;

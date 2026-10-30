@@ -438,8 +438,7 @@ static void box_gpu_env_record(
         mips = source->mips;
     }
 
-    WGPUComputePassEncoder pass = wgpuCommandEncoderBeginComputePass(encoder,
-        &(WGPUComputePassDescriptor){ .timestampWrites = writes });
+    WGPUComputePassEncoder pass = box_gpu_compute_begin(encoder, writes);
     box_gpu_reflect_mip_chain(gpu, pass, e->params, sizeof(box_gpu_bake_params_t), levels,
         e->resolution, mips, faces);
     if (source) {
@@ -504,17 +503,14 @@ void box_gpu_environment_process(
     count = ecs_vec_count(&s->due);
     box_gpu_bake_t *b = gpu->bake;
     int32_t readback = box_gpu_bake_readback(b);
-    uint32_t query = (uint32_t)readback * 2;
     WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
     for (i = 0; i < count; i ++) {
         box_gpu_environment_t *e = *ecs_vec_get_t(&s->due, box_gpu_environment_t*, i);
-        WGPUPassTimestampWrites writes = {
-            .querySet = b->queries,
-            .beginningOfPassWriteIndex = i == 0 ? query : WGPU_QUERY_SET_INDEX_UNDEFINED,
-            .endOfPassWriteIndex = i == count - 1 ? query + 1 : WGPU_QUERY_SET_INDEX_UNDEFINED
-        };
+        WGPUPassTimestampWrites writes;
         bool timed = readback != -1 && (i == 0 || i == count - 1);
-        box_gpu_env_record(gpu, s, encoder, e, timed ? &writes : NULL);
+        box_gpu_env_record(gpu, s, encoder, e, timed
+            ? box_gpu_bake_writes(b, readback, i == 0, i == count - 1, &writes)
+            : NULL);
         e->processed = e->written;
         e->processed_filter = e->filter;
         e->runs ++;

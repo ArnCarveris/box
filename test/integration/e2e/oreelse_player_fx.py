@@ -22,7 +22,8 @@ from oreelse_mining import DEPOSIT_AMOUNT, STONE_TIME, aim, amount, deposit_of, 
 
 APP = "apps/oreelse"
 
-STATE = "has oreelse.OreGameState (oreelse.OreGameState, oreelse.OreGameState.%s)"
+STATE = ("eval oreelse.OreGameState.has(flecs.script.core.pair("
+         "oreelse.OreGameState,oreelse.OreGameState.%s))")
 JET = PLAYER + ".jet"
 
 # The glints of a Luminite deposit, the layer of its DepositSparkle (etc/deposits.flecs)
@@ -58,7 +59,7 @@ def plays(app, name):
     result = []
     for path, value in rows_of(app, "box.particle.ParticleEffect").items():
         if str(value["effect"]).split(".")[-1] == name:
-            p = app.get(path, "Position")
+            p = app.get(path, "box.transform.Position")
             result.append((p["x"], p["y"], p["z"]))
     return result
 
@@ -83,29 +84,26 @@ def wait_play(app, name, at, frames=FPS):
 
 
 def limb(app, name):
-    return float(app.exec("get %s.%s Rotation.x" % (PLAYER, name)))
+    return float(app.exec("get %s.%s box.transform.Rotation.x" % (PLAYER, name)))
 
 
 def limbs(app):
     """The swing (Rotation.x) of every limb of the astronaut, read in one frame."""
-    app.exec("query found box.transform.Rotation, oreelse.OreLimb")
-    app.exec("iter found")
     result = {}
-    for line in app.exec("next 1000").splitlines():
-        path, _, fields = line.partition(" ")
-        parent, _, name = path.rpartition(".")
+    for row in parse_value(app.exec('query "box.transform.Rotation, oreelse.OreLimb"')):
+        parent, _, name = row["entity"].rpartition(".")
         if parent == PLAYER:
-            rotation = fields[:fields.index("}") + 1]
-            result[name] = parse_value(rotation)["x"]
+            result[name] = row["fields"][0]["value"]["Rotation"]["x"]
     return result
 
 
 def playback(app, emitter=JET):
-    return app.exec("get %s ParticlePlayback.state" % emitter).split(".")[-1]
+    return parse_value(app.exec("get %s box.particle.ParticlePlayback.state" % emitter))
 
 
 def wait_playback(app, state, frames=FPS, emitter=JET):
-    app.wait_for("get %s ParticlePlayback.state" % emitter, lambda out: out.endswith(state),
+    app.wait_for("get %s box.particle.ParticlePlayback.state" % emitter,
+                 lambda out: parse_value(out).endswith(state),
                  frames=frames, what="%s %s" % (emitter, state))
 
 
@@ -115,7 +113,7 @@ def test_walk(app):
         app.check(limb(app, name) == 0, "%s stands at %g, not straight" % (name, limb(app, name)))
 
     # Walking east the legs swing opposite to each other, and each arm with the opposite leg
-    app.exec("key.down D")
+    app.exec("key_down D")
     app.wait_input()
     app.wait_frames(10)
     largest = {name: 0 for name in LIMBS}
@@ -132,29 +130,30 @@ def test_walk(app):
         app.check(abs(values["arm_left"] / LIMBS["arm_left"] -
                       values["leg_right"] / LIMBS["leg_right"]) < 0.02,
                   "the left arm does not swing with the right leg: %s" % values)
-        heights.append(app.get(PLAYER, "Position")["y"])
+        heights.append(app.get(PLAYER, "box.transform.Position")["y"])
         app.wait_frames(2)
     for name, value in largest.items():
         app.check(value > LIMBS[name] * 0.4, "%s swung at most %g while walking" % (name, value))
     app.check(all(-TOLERANCE <= y <= BOB + TOLERANCE for y in heights) and max(heights) > 0.01,
               "the astronaut bobbed through %s, not up to %g" % (heights, BOB))
-    gait = app.get(PLAYER, "OrePlayerGait")
+    gait = app.get(PLAYER, "oreelse.OrePlayerGait")
     app.check(0 <= gait["cycle"] < 2 * math.pi, "the walk cycle is at %s" % gait)
 
     # Every half step on the ground kicks up dust at the astronaut's feet
-    z = app.get(PLAYER, "Position")["z"]
+    z = app.get(PLAYER, "box.transform.Position")["z"]
     wait_until(app, lambda: any(abs(p[1] - FOOT_DUST_Y) < TOLERANCE and abs(p[2] - z) < TOLERANCE
                                 for p in plays(app, "FootDust")),
                FPS, "the foot dust of a step")
 
     # Standing still the limbs come back straight and the astronaut stands on the ground
-    app.exec("key.up D")
+    app.exec("key_up D")
     app.wait_input()
     app.wait_frames(FPS)
     for name in LIMBS:
         app.check(abs(limb(app, name)) < TOLERANCE, "%s stays at %g after the walk" % (
             name, limb(app, name)))
-    app.check(app.get(PLAYER, "Position")["y"] == 0, "the astronaut does not stand on the ground")
+    app.check(app.get(PLAYER, "box.transform.Position")["y"] == 0,
+              "the astronaut does not stand on the ground")
 
 
 def test_jet_plume(app):
@@ -169,7 +168,8 @@ def test_jet_plume(app):
     click(app, 6, 6)
     x, z = tile_point(6, 6)
     place_player(app, x, z)
-    app.wait_for("get %s Position.y" % PLAYER, lambda out: abs(float(out) - HOVER_HEIGHT) < 1e-4,
+    app.wait_for("get %s box.transform.Position.y" % PLAYER,
+                 lambda out: abs(float(out) - HOVER_HEIGHT) < 1e-4,
                  frames=FPS, what="the astronaut hovering at %g" % HOVER_HEIGHT)
     wait_playback(app, "ParticlePlaying")
 
@@ -189,8 +189,8 @@ def test_jet_plume(app):
 
     # Next to the wall the astronaut comes down and the plume stops
     x, z = tile_point(6, 7)
-    app.exec("set %s Position {%g, %g, %g}" % (PLAYER, x, HOVER_HEIGHT, z))
-    app.wait_for("get %s Position.y" % PLAYER, lambda out: float(out) == 0,
+    app.exec("set %s box.transform.Position {%g, %g, %g}" % (PLAYER, x, HOVER_HEIGHT, z))
+    app.wait_for("get %s box.transform.Position.y" % PLAYER, lambda out: float(out) == 0,
                  frames=FPS, what="the astronaut on the ground")
     wait_playback(app, "ParticleStopped", frames=SETTLE)
 
@@ -199,31 +199,32 @@ def test_mined_deposit(app):
     start(app)
     path, d, _ = deposit_of(app, "items.Stone")
     half = DEPOSIT_AMOUNT // 2
-    app.exec("set %s OreDeposit {resource: items.Stone, amount: %d, capacity: %d, row: %d, "
-             "col: %d}" % (path, half, DEPOSIT_AMOUNT, d["row"], d["col"]))
-    app.wait_for("get %s OreDeposit.amount" % path, str(half))
+    app.exec("set %s oreelse.OreDeposit {resource: items.Stone, amount: %d, capacity: %d, "
+             "row: %d, col: %d}" % (path, half, DEPOSIT_AMOUNT, d["row"], d["col"]))
+    app.wait_for("get %s oreelse.OreDeposit.amount" % path, str(half))
     aim(app, d)
     x, z = tile_point(d["row"], d["col"])
 
     mouse(app, True)
-    app.wait_for("get %s OreDeposit.amount" % path, str(half - 1),
+    app.wait_for("get %s oreelse.OreDeposit.amount" % path, str(half - 1),
                  frames=round((STONE_TIME + SWING_SLACK) * FPS), what="a stone mined")
     wait_play(app, "MineBurst", (x, MINE_Y, z))
     mouse(app, False)
 
     s = SCALE_MIN + (1 - SCALE_MIN) * (half - 1) / DEPOSIT_AMOUNT
-    scale = app.get(path, "Scale")
+    scale = app.get(path, "box.transform.Scale")
     app.check(near((scale["x"], scale["y"], scale["z"]), (s, s, s), 1e-4),
-              "the deposit at %d of %d is scaled %s, not %g" % (half - 1, DEPOSIT_AMOUNT, scale, s))
+              "the deposit at %d of %d is scaled %s, not %g" %
+              (half - 1, DEPOSIT_AMOUNT, scale, s))
     app.check(not plays(app, "PoofBurst"), "the deposit poofed with ore left")
 
 
 def test_used_up_deposit(app):
     start(app)
     path, d, _ = deposit_of(app, "items.Stone")
-    app.exec("set %s OreDeposit {resource: items.Stone, amount: 1, capacity: %d, row: %d, "
+    app.exec("set %s oreelse.OreDeposit {resource: items.Stone, amount: 1, capacity: %d, row: %d, "
              "col: %d}" % (path, DEPOSIT_AMOUNT, d["row"], d["col"]))
-    app.wait_for("get %s OreDeposit.amount" % path, "1")
+    app.wait_for("get %s oreelse.OreDeposit.amount" % path, "1")
     aim(app, d)
     x, z = tile_point(d["row"], d["col"])
 
@@ -264,10 +265,10 @@ def test_place_and_demolish(app):
 def test_death(app):
     start(app)
     place_player(app, 4, 30)
-    p = app.get(PLAYER, "Position")
-    app.exec("set %s OreHealth {value: 0, max: 100}" % PLAYER)
+    p = app.get(PLAYER, "box.transform.Position")
+    app.exec("set %s oreelse.OreHealth {value: 0, max: 100}" % PLAYER)
     app.wait_for(STATE % "Lost", "true", frames=SETTLE, what="the game lost")
-    r = app.get(PLAYER, "Rotation")
+    r = app.get(PLAYER, "box.transform.Rotation")
     app.check(near((r["x"], r["y"], r["z"]), (DEATH_PITCH, 0, 0)),
               "the dead astronaut is turned %s, not fallen over" % r)
     wait_play(app, "SplatBurst", (p["x"], p["y"] + SPLAT_LIFT, p["z"]), frames=SETTLE)
@@ -275,9 +276,9 @@ def test_death(app):
               len(plays(app, "SplatBurst")))
 
     # A restart stands it up again
-    app.exec("key.press R")
+    app.exec("key_press R")
     app.wait_input()
     app.wait_for(STATE % "Playing", "true")
-    r = app.get(PLAYER, "Rotation")
+    r = app.get(PLAYER, "box.transform.Rotation")
     app.check(near((r["x"], r["y"], r["z"]), (0, math.pi, 0)),
               "after a restart the astronaut is turned %s" % r)

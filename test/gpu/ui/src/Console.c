@@ -68,14 +68,14 @@ void Console_toggle_closes(void) {
     ecs_set(world, s, Surface, {.width = 640, .height = 360, .resolution_scale = 1});
     ecs_progress(world, 0);
 
-    ecs_entity_t t = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, t, "key.type `", NULL));
+    ecs_entity_t t = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, t, "key_type `", NULL));
     while (box_input_pending(world)) {
         ecs_progress(world, 0);
     }
 
     test_bool(ecs_singleton_get(world, Console)->open, true);
-    ecs_os_free(box_terminal_run(world, t, "key.type a`", NULL));
+    ecs_os_free(box_command_run(world, t, "key_type a`", NULL));
     while (box_input_pending(world)) {
         ecs_progress(world, 0);
     }
@@ -86,7 +86,7 @@ void Console_toggle_closes(void) {
         Text);
     test_str(before->value, "a");
 
-    ecs_os_free(box_terminal_run(world, t, "key.type `", NULL));
+    ecs_os_free(box_command_run(world, t, "key_type `", NULL));
     while (box_input_pending(world)) {
         ecs_progress(world, 0);
     }
@@ -173,9 +173,9 @@ void Console_typing_goes_to_input(void) {
     ecs_set(world, s, Surface, {.width = 640, .height = 360, .resolution_scale = 1});
     ecs_progress(world, 0);
 
-    ecs_entity_t t = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, t, "key.type `", NULL));
-    ecs_os_free(box_terminal_run(world, t, "key.type \"ls things\"", NULL));
+    ecs_entity_t t = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, t, "key_type `", NULL));
+    ecs_os_free(box_command_run(world, t, "key_type \"ls things\"", NULL));
     while (box_input_pending(world)) {
         ecs_progress(world, 0);
     }
@@ -243,16 +243,16 @@ void Console_close_restores_actions(void) {
     ecs_set(world, jump, Binding, { .key = KeyJ });
     ecs_progress(world, 0);
 
-    ecs_entity_t t = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, t, "key.type `j", NULL));
-    ecs_os_free(box_terminal_run(world, t, "key.press Escape", NULL));
+    ecs_entity_t t = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, t, "key_type `j", NULL));
+    ecs_os_free(box_command_run(world, t, "key_press Escape", NULL));
     while (box_input_pending(world)) {
         ecs_progress(world, 0);
         test_bool(ecs_get(world, jump, ActionState)->down, false);
     }
 
     test_bool(ecs_singleton_get(world, Console)->open, false);
-    ecs_os_free(box_terminal_run(world, t, "key.press J 2", NULL));
+    ecs_os_free(box_command_run(world, t, "key_press J 2", NULL));
     ecs_progress(world, 0);
     test_bool(ecs_get(world, jump, ActionState)->pressed, true);
     ecs_progress(world, 0);
@@ -276,16 +276,16 @@ void Console_enter_runs_line(void) {
     ecs_entity(world, { .name = "things.beta" });
     ecs_progress(world, 0);
 
-    ecs_entity_t t = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, t, "key.type `", NULL));
-    ecs_os_free(box_terminal_run(world, t, "key.type \"ls things\"", NULL));
-    ecs_os_free(box_terminal_run(world, t, "key.press Enter", NULL));
+    ecs_entity_t t = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, t, "key_type `", NULL));
+    ecs_os_free(box_command_run(world, t, "key_type \"ls things\"", NULL));
+    ecs_os_free(box_command_run(world, t, "key_press Enter", NULL));
     while (box_input_pending(world)) {
         ecs_progress(world, 0);
     }
 
     const Console *c = ecs_singleton_get(world, Console);
-    const char *expect[] = {"> ls things", "alpha", "beta"};
+    const char *expect[] = {"> ls things", "things.alpha", "things.beta"};
     int32_t i, lines = 0;
     while (true) {
         char name[64];
@@ -336,21 +336,11 @@ void Console_line_logged_in_session(void) {
 
     ecs_entity_t session = ecs_lookup(world, BOX_CONSOLE_SESSION);
     test_assert(session != 0);
-    test_assert(ecs_has(world, session, Terminal));
-    const TerminalStatus *st = ecs_get(world, session, TerminalStatus);
-    test_int(st->commands, 1);
-    char *path = flecs_asprintf("%s/commands.log", st->dir);
-    char log[256] = {0};
-    FILE *f = fopen(path, "r");
-    test_assert(f != NULL);
-    fread(log, 1, sizeof(log) - 1, f);
-    fclose(f);
-    test_str(log, "$ ls things\nalpha\n");
-    ecs_os_free(path);
-
-    char *out = box_terminal_run(world, session, "commands", NULL);
-    test_str(out, "$ ls things\nalpha");
-    ecs_os_free(out);
+    const EcsCommandSession *cs = ecs_get(world, session, EcsCommandSession);
+    test_assert(cs != NULL);
+    test_int(ecs_vec_count(&cs->history), 1);
+    test_str(ecs_vec_first_t(&cs->history, char*)[0], "ls things");
+    test_assert(strstr(ecs_vec_first_t(&cs->results, char*)[0], "things.alpha") != NULL);
 
     ecs_fini(world);
 }
@@ -530,7 +520,7 @@ void Console_scroll(void) {
     test_assert(lines < 40);
     ecs_entity_t first = ecs_lookup(world, CONSOLE_LOG ".line_0");
     char expect[32];
-    ecs_os_snprintf(expect, sizeof(expect), "c%02d", 40 - lines);
+    ecs_os_snprintf(expect, sizeof(expect), "many.c%02d", 40 - lines);
     test_str(ecs_get(world, first, Text)->value, expect);
 
     box_input_key_press(world, KeyPageUp, 1);
@@ -538,12 +528,12 @@ void Console_scroll(void) {
         ecs_progress(world, 0);
     }
 
-    ecs_os_snprintf(expect, sizeof(expect), "c%02d", 40 - lines - (lines - 1));
+    ecs_os_snprintf(expect, sizeof(expect), "many.c%02d", 40 - lines - (lines - 1));
     test_str(ecs_get(world, first, Text)->value, expect);
 
     box_input_mouse_scroll(world, 0, -1);
     ecs_progress(world, 0);
-    ecs_os_snprintf(expect, sizeof(expect), "c%02d", 40 - lines - (lines - 1) + 3);
+    ecs_os_snprintf(expect, sizeof(expect), "many.c%02d", 40 - lines - (lines - 1) + 3);
     test_str(ecs_get(world, first, Text)->value, expect);
 
     box_input_key_press(world, KeyPageDown, 1);
@@ -552,7 +542,7 @@ void Console_scroll(void) {
         ecs_progress(world, 0);
     }
 
-    ecs_os_snprintf(expect, sizeof(expect), "c%02d", 40 - lines);
+    ecs_os_snprintf(expect, sizeof(expect), "many.c%02d", 40 - lines);
     test_str(ecs_get(world, first, Text)->value, expect);
 
     ecs_fini(world);
@@ -710,7 +700,7 @@ void Console_run_from_script(void) {
         "result {\n"
         "  Text: {value: $out}\n"
         "}\n", NULL) == 0);
-    test_str(ecs_get(world, ecs_lookup(world, "result"), Text)->value, "alpha");
+    test_str(ecs_get(world, ecs_lookup(world, "result"), Text)->value, "things.alpha");
 
     ecs_singleton_set(world, Console, {.open = true, .height = 0.5f, .font_size = 16,
         .line_height = 20, .padding = 10, .scrollback = 100});
@@ -718,7 +708,7 @@ void Console_run_from_script(void) {
     test_str(ecs_get(world, ecs_lookup(world, CONSOLE_LOG ".line_5"), Text)->value,
         "> ls things");
     test_str(ecs_get(world, ecs_lookup(world, CONSOLE_LOG ".line_6"), Text)->value,
-        "alpha");
+        "things.alpha");
 
     box_input_key_press(world, KeyUp, 1);
     while (box_input_pending(world)) {
@@ -754,7 +744,7 @@ void Console_scrollback_limit(void) {
         char name[96];
         ecs_os_snprintf(name, sizeof(name),
             CONSOLE_LOG ".line_%d", i);
-        const char *expect = i == 14 ? "alpha" : i == 15 ? "beta" : "";
+        const char *expect = i == 14 ? "things.alpha" : i == 15 ? "things.beta" : "";
         test_str(ecs_get(world, ecs_lookup(world, name), Text)->value, expect);
     }
 
@@ -1012,8 +1002,8 @@ void Console_paste_long(void) {
     ecs_set(world, s, Surface, {.width = 640, .height = 360, .resolution_scale = 1});
     ecs_progress(world, 0);
 
-    ecs_entity_t t = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, t, "key.type `", NULL));
+    ecs_entity_t t = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, t, "key_type `", NULL));
     while (box_input_pending(world)) {
         ecs_progress(world, 0);
     }
@@ -1046,15 +1036,15 @@ void Console_null_text(void) {
     ecs_set(world, s, Surface, {.width = 640, .height = 360, .resolution_scale = 1});
     ecs_progress(world, 0);
 
-    ecs_entity_t t = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, t, "key.type `", NULL));
+    ecs_entity_t t = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, t, "key_type `", NULL));
     while (box_input_pending(world)) {
         ecs_progress(world, 0);
     }
 
     ecs_singleton_set(world, Input, { .focused = true });
     ecs_progress(world, 0);
-    ecs_os_free(box_terminal_run(world, t, "key.type \"ab\"", NULL));
+    ecs_os_free(box_command_run(world, t, "key_type \"ab\"", NULL));
     while (box_input_pending(world)) {
         ecs_progress(world, 0);
     }
@@ -1205,8 +1195,8 @@ static const char* console_paste_line(
 void Console_paste_shortcut(void) {
     // widgets/clipboard_cursor
     ecs_world_t *world = console_paste_world(true);
-    ecs_entity_t t = box_terminal_new(world);
-    ecs_os_free(box_terminal_run(world, t, "clipboard.set echo pasted", NULL));
+    ecs_entity_t t = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, t, "clipboard_set \"echo pasted\"", NULL));
     box_input_key(world, KeyCtrlLeft, true);
     ecs_progress(world, 0);
     ecs_progress(world, 0);
@@ -1365,7 +1355,7 @@ void Console_cls_clears_scrollback(void) {
     test_int(console_cls_lines(world, &shown), lines);
     test_int(shown, 2);
     test_str(console_cls_line(world, 1), "> ls things");
-    test_str(console_cls_line(world, 0), "alpha");
+    test_str(console_cls_line(world, 0), "things.alpha");
 
     ecs_fini(world);
 }
@@ -1460,7 +1450,7 @@ void Console_cls_with_args_error(void) {
     ecs_os_free(out);
 
     ecs_entity_t session = ecs_lookup(world, BOX_CONSOLE_SESSION);
-    test_int(ecs_get(world, session, TerminalStatus)->commands, 1);
+    test_int(ecs_vec_count(&ecs_get(world, session, EcsCommandSession)->history), 1);
 
     ecs_fini(world);
 }
@@ -1475,20 +1465,11 @@ void Console_cls_not_in_session(void) {
 
     ecs_entity_t session = ecs_lookup(world, BOX_CONSOLE_SESSION);
     test_assert(session != 0);
-    const TerminalStatus *st = ecs_get(world, session, TerminalStatus);
-    test_int(st->commands, 1);
-    char *path = flecs_asprintf("%s/commands.log", st->dir);
-    char log[256] = {0};
-    FILE *f = fopen(path, "r");
-    test_assert(f != NULL);
-    fread(log, 1, sizeof(log) - 1, f);
-    fclose(f);
-    test_str(log, "$ ls things\nalpha\n");
-    ecs_os_free(path);
-
-    char *out = box_terminal_run(world, session, "commands", NULL);
-    test_str(out, "$ ls things\nalpha");
-    ecs_os_free(out);
+    const EcsCommandSession *cs = ecs_get(world, session, EcsCommandSession);
+    test_assert(cs != NULL);
+    test_int(ecs_vec_count(&cs->history), 1);
+    test_str(ecs_vec_first_t(&cs->history, char*)[0], "ls things");
+    test_assert(strstr(ecs_vec_first_t(&cs->results, char*)[0], "things.alpha") != NULL);
 
     ecs_fini(world);
 }
@@ -1534,9 +1515,9 @@ void Console_cls_unknown_over_session(void) {
     ecs_entity(world, { .name = "things.alpha" });
     console_cls_enter(world, "ls things");
 
-    ecs_entity_t t = box_terminal_new(world);
+    ecs_entity_t t = ecs_shell_session_init(world, NULL);
     bool error = false;
-    char *out = box_terminal_run(world, t, "cls", &error);
+    char *out = box_command_run(world, t, "cls", &error);
     test_bool(error, true);
     test_assert(strstr(out, "unknown command 'cls'") != NULL);
     ecs_os_free(out);
@@ -1578,7 +1559,7 @@ void Console_help_lists_console_commands(void) {
 
     out = box_console_run(world, "help ls", &error);
     test_bool(error, false);
-    test_assert(!strncmp(out, "usage: ls", 9));
+    test_assert(!strncmp(out, "ls [scope]  ", 12));
     test_assert(strstr(out, "console only") == NULL);
     ecs_os_free(out);
 
@@ -1588,8 +1569,8 @@ void Console_help_lists_console_commands(void) {
 void Console_help_over_session_no_console(void) {
     // ui/console
     ecs_world_t *world = console_paste_world(true);
-    ecs_entity_t t = box_terminal_new(world);
-    char *out = box_terminal_run(world, t, "help", NULL);
+    ecs_entity_t t = ecs_shell_session_init(world, NULL);
+    char *out = box_command_run(world, t, "help", NULL);
     test_assert(strstr(out, "\nhelp") != NULL || !strncmp(out, "help", 4));
     test_assert(strstr(out, "console only") == NULL);
     test_assert(strstr(out, "\ncls") == NULL);
@@ -1597,7 +1578,7 @@ void Console_help_over_session_no_console(void) {
     ecs_os_free(out);
 
     bool error = false;
-    out = box_terminal_run(world, t, "help cls", &error);
+    out = box_command_run(world, t, "help cls", &error);
     test_bool(error, true);
     ecs_os_free(out);
 
@@ -1605,7 +1586,7 @@ void Console_help_over_session_no_console(void) {
     test_assert(strstr(out, "console only") != NULL);
     ecs_os_free(out);
 
-    out = box_terminal_run(world, ecs_lookup(world, BOX_CONSOLE_SESSION), "help", NULL);
+    out = box_command_run(world, ecs_lookup(world, BOX_CONSOLE_SESSION), "help", NULL);
     test_assert(strstr(out, "console only") == NULL);
     ecs_os_free(out);
 

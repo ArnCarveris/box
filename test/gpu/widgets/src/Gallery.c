@@ -99,7 +99,7 @@ static void gallery_press(
     ecs_entity_t s,
     const char *key)
 {
-    ecs_os_free(gallery_run(world, s, "key.press %s", key));
+    ecs_os_free(gallery_run(world, s, "key_press %s", key));
     gallery_step(world, s);
 }
 
@@ -121,7 +121,7 @@ static void gallery_tap(
     char point[64];
     gallery_reveal(world, s, path);
     gallery_point(world, path, fx, fy, point, sizeof(point));
-    ecs_os_free(gallery_run(world, s, "mouse.click left %s", point));
+    ecs_os_free(gallery_run(world, s, "mouse_click left %s", point));
     gallery_step(world, s);
 }
 
@@ -145,23 +145,25 @@ static void gallery_over(
     char point[64];
     gallery_reveal(world, s, path);
     gallery_point(world, path, fx, fy, point, sizeof(point));
-    ecs_os_free(gallery_run(world, s, "mouse.move %s", point));
+    ecs_os_free(gallery_run(world, s, "mouse_move %s", point));
     gallery_settle_frames(world, s, 1);
-    gallery_expect(world, s, "get box.picking.PickStatus PickStatus.handler", handler);
+    char *expect = flecs_asprintf("\"%s\"", handler);
+    gallery_expect(world, s, "get $ box.picking.PickStatus.handler", expect);
+    ecs_os_free(expect);
 }
 
 /** Type text and run the input.
  *
  * @param world The world
  * @param s The terminal session
- * @param text The text, quoted as the key.type command takes it
+ * @param text The text, quoted as the key_type command takes it
  */
 static void gallery_type(
     ecs_world_t *world,
     ecs_entity_t s,
     const char *text)
 {
-    ecs_os_free(gallery_run(world, s, "key.type %s", text));
+    ecs_os_free(gallery_run(world, s, "key_type %s", text));
     gallery_step(world, s);
 }
 
@@ -181,9 +183,9 @@ static void gallery_shortcut(
 #else
     const char *mod = "CtrlLeft";
 #endif
-    ecs_os_free(gallery_run(world, s, "key.down %s", mod));
+    ecs_os_free(gallery_run(world, s, "key_down %s", mod));
     gallery_press(world, s, key);
-    ecs_os_free(gallery_run(world, s, "key.up %s", mod));
+    ecs_os_free(gallery_run(world, s, "key_up %s", mod));
     gallery_step(world, s);
 }
 
@@ -263,7 +265,9 @@ static void gallery_expect_cursor_here(
     PointerCursor shape)
 {
     gallery_settle_frames(world, s, 1);
-    gallery_expect(world, s, "get box.picking.PickStatus PickStatus.handler", handler);
+    char *expect = flecs_asprintf("\"%s\"", handler);
+    gallery_expect(world, s, "get $ box.picking.PickStatus.handler", expect);
+    ecs_os_free(expect);
     test_int(ecs_singleton_get(world, PickStatus)->shape, shape);
     test_int(box_input_cursor_get(world), shape);
 }
@@ -280,16 +284,19 @@ static void gallery_expect_preview_defaults(
 {
     ecs_entity_t shape = ecs_lookup(world, PREVIEW ".shape");
     test_assert(shape != 0);
-    gallery_expect(world, s, "get " PREVIEW ".label Text.value", "\"Widget\"");
+    gallery_expect(world, s, "get " PREVIEW ".label box.text.Text.value", "\"Widget\"");
     test_bool(ecs_has(world, shape, Box), true);
     test_bool(ecs_has(world, shape, Sphere), false);
     test_bool(ecs_has(world, shape, Torus), false);
     test_bool(ecs_has_id(world, shape, NoShadow), false);
-    gallery_expect(world, s, "get " PREVIEW ".shape Rgb", "{r: 230, g: 140, b: 60}");
-    gallery_expect(world, s, "get " PREVIEW ".shape Scale", "{x: 1, y: 1, z: 1}");
-    gallery_expect(world, s, "get " PREVIEW ".sun Rgb", "{r: 255, g: 246, b: 230}");
-    gallery_expect(world, s, "get " PREVIEW_VIEW " View.clear.color",
-        "{r: 150, g: 186, b: 226, a: 255}");
+    gallery_expect(world, s, "get " PREVIEW ".shape box.material.Rgb",
+        "{\"Rgb\":{\"r\":230, \"g\":140, \"b\":60}}");
+    gallery_expect(world, s, "get " PREVIEW ".shape box.transform.Scale",
+        "{\"Scale\":{\"x\":1, \"y\":1, \"z\":1}}");
+    gallery_expect(world, s, "get " PREVIEW ".sun box.material.Rgb",
+        "{\"Rgb\":{\"r\":255, \"g\":246, \"b\":230}}");
+    gallery_expect(world, s, "get " PREVIEW_VIEW " box.view.View.clear.color",
+        "{\"r\":150, \"g\":186, \"b\":226, \"a\":255}");
 }
 
 /** Check that the widgets of the form show the defaults.
@@ -302,15 +309,15 @@ static void gallery_expect_form_defaults(
     ecs_entity_t s)
 {
     gallery_expect_mut(world, s, NAME, "TextInput", "current", "\"Widget\"");
-    gallery_expect(world, s, "get " NAME ".field TextEdit.value", "\"Widget\"");
+    gallery_expect(world, s, "get " NAME ".field box.ui.TextEdit.value", "\"Widget\"");
     gallery_expect_mut(world, s, SHAPE, "Dropdown", "current", "0");
-    gallery_expect(world, s, "get " SHAPE ".caption Text.value", "\"Box\"");
+    gallery_expect(world, s, "get " SHAPE ".caption box.text.Text.value", "\"Box\"");
     gallery_expect_mut(world, s, RED, "Slider", "current", "230");
     gallery_expect_mut(world, s, GREEN, "Slider", "current", "140");
     gallery_expect_mut(world, s, BLUE, "Slider", "current", "60");
-    gallery_expect(world, s, "get " RED ".head.amount Text.value", "\"230\"");
+    gallery_expect(world, s, "get " RED ".head.amount box.text.Text.value", "\"230\"");
     gallery_expect_mut(world, s, SIZE, "Stepper", "current", "1");
-    gallery_expect(world, s, "get " SIZE ".amount.digits Text.value", "\"1.00\"");
+    gallery_expect(world, s, "get " SIZE ".amount.digits box.text.Text.value", "\"1.00\"");
     gallery_expect_mut(world, s, SHADOW, "Checkbox", "current", "true");
     gallery_expect_mut(world, s, LIGHT, "RadioGroup", "current", "\"Day\"");
 }
@@ -325,11 +332,13 @@ void Gallery_scene_loads(void) {
     int32_t i;
 
     gallery_expect(world, s, "logs warning 100", "");
-    gallery_expect(world, s, "get " HEADER ".title Text.value", "\"Widgets\"");
-    gallery_expect(world, s, "get " HEADER ".theme.caption Text.value", "\"Dark\"");
+    gallery_expect(world, s, "get " HEADER ".title box.text.Text.value", "\"Widgets\"");
+    gallery_expect(world, s, "get " HEADER ".theme.caption box.text.Text.value", "\"Dark\"");
     gallery_expect_mut(world, s, HEADER ".theme", "Dropdown", "current", "0");
-    gallery_expect(world, s, "get gallery.preview_surface Surface.texture", "preview_texture");
-    gallery_expect(world, s, "get " FORM ".body.preview.image Image.texture", "preview_texture");
+    gallery_expect(world, s, "get gallery.preview_surface box.surface.Surface.texture",
+        "\"preview_texture\"");
+    gallery_expect(world, s, "get " FORM ".body.preview.image box.geometry.Image.texture",
+        "\"preview_texture\"");
     gallery_expect_focus(world, s, "#0");
     gallery_expect_form_defaults(world, s);
     gallery_expect_preview_defaults(world, s);
@@ -340,7 +349,7 @@ void Gallery_scene_loads(void) {
     test_assert(c->max_y > 0);
     test_flt(c->max_x, 0);
     for (i = 0; i < 4; i ++) {
-        char *line = flecs_asprintf("get %s.heading Text.value", sections[i]);
+        char *line = flecs_asprintf("get %s.heading box.text.Text.value", sections[i]);
         gallery_expect(world, s, line, titles[i]);
         ecs_os_free(line);
         gallery_reveal(world, s, sections[i]);
@@ -362,25 +371,35 @@ void Gallery_theme_switch(void) {
     ecs_entity_t s = 0;
     ecs_world_t *world = gallery_load(&s);
 
-    gallery_expect(world, s, "get " BASICS ".buttons.save Rgb", "{r: 98, g: 168, b: 122}");
-    gallery_expect(world, s, "get " TEXT ".name.field Rgb", "{r: 38, g: 41, b: 48}");
-    gallery_expect(world, s, "get " BASICS " Rgb", "{r: 46, g: 50, b: 58}");
-    gallery_expect(world, s, "get " FORM " Rgb", "{r: 46, g: 50, b: 58}");
+    gallery_expect(world, s, "get " BASICS ".buttons.save box.material.Rgb",
+        "{\"Rgb\":{\"r\":98, \"g\":168, \"b\":122}}");
+    gallery_expect(world, s, "get " TEXT ".name.field box.material.Rgb",
+        "{\"Rgb\":{\"r\":38, \"g\":41, \"b\":48}}");
+    gallery_expect(world, s, "get " BASICS " box.material.Rgb",
+        "{\"Rgb\":{\"r\":46, \"g\":50, \"b\":58}}");
+    gallery_expect(world, s, "get " FORM " box.material.Rgb",
+        "{\"Rgb\":{\"r\":46, \"g\":50, \"b\":58}}");
 
     /* A click opens the theme dropdown, a click on Light picks it */
     gallery_tap(world, s, HEADER ".theme", 0, 0);
     gallery_expect_mut(world, s, HEADER ".theme", "Dropdown", "open", "true");
     gallery_tap(world, s, HEADER ".theme.list.option_1", 0, 0);
     gallery_expect_mut(world, s, HEADER ".theme", "Dropdown", "current", "1");
-    gallery_expect(world, s, "get " HEADER ".theme.caption Text.value", "\"Light\"");
-    gallery_expect(world, s, "get box.ui.theme UiTheme.background", "{r: 232, g: 235, b: 240}");
-    gallery_expect(world, s, "get " BASICS ".buttons.save Rgb", "{r: 44, g: 128, b: 82}");
-    gallery_expect(world, s, "get " TEXT ".name.field Rgb", "{r: 222, g: 226, b: 233}");
-    gallery_expect(world, s, "get " BASICS " Rgb", "{r: 250, g: 251, b: 253}");
-    gallery_expect(world, s, "get " FORM " Rgb", "{r: 250, g: 251, b: 253}");
-    gallery_expect(world, s, "get " HEADER ".title Rgb", "{r: 33, g: 37, b: 43}");
-    gallery_expect(world, s, "get gallery.backdrop_view View.clear.color",
-        "{r: 232, g: 235, b: 240, a: 255}");
+    gallery_expect(world, s, "get " HEADER ".theme.caption box.text.Text.value", "\"Light\"");
+    gallery_expect(world, s, "get box.ui.theme box.ui.UiTheme.background",
+        "{\"r\":232, \"g\":235, \"b\":240}");
+    gallery_expect(world, s, "get " BASICS ".buttons.save box.material.Rgb",
+        "{\"Rgb\":{\"r\":44, \"g\":128, \"b\":82}}");
+    gallery_expect(world, s, "get " TEXT ".name.field box.material.Rgb",
+        "{\"Rgb\":{\"r\":222, \"g\":226, \"b\":233}}");
+    gallery_expect(world, s, "get " BASICS " box.material.Rgb",
+        "{\"Rgb\":{\"r\":250, \"g\":251, \"b\":253}}");
+    gallery_expect(world, s, "get " FORM " box.material.Rgb",
+        "{\"Rgb\":{\"r\":250, \"g\":251, \"b\":253}}");
+    gallery_expect(world, s, "get " HEADER ".title box.material.Rgb",
+        "{\"Rgb\":{\"r\":33, \"g\":37, \"b\":43}}");
+    gallery_expect(world, s, "get gallery.backdrop_view box.view.View.clear.color",
+        "{\"r\":232, \"g\":235, \"b\":240, \"a\":255}");
     gallery_expect(world, s, "get gallery Gallery.mut.last", "\"theme: 1\"");
 
     /* The keys pick Dark again: Down opens the list at Light, Up highlights Dark, Enter */
@@ -390,11 +409,14 @@ void Gallery_theme_switch(void) {
     gallery_press(world, s, "Enter");
     gallery_expect_mut(world, s, HEADER ".theme", "Dropdown", "current", "0");
     gallery_expect_mut(world, s, HEADER ".theme", "Dropdown", "open", "false");
-    gallery_expect(world, s, "get " BASICS ".buttons.save Rgb", "{r: 98, g: 168, b: 122}");
-    gallery_expect(world, s, "get " TEXT ".name.field Rgb", "{r: 38, g: 41, b: 48}");
-    gallery_expect(world, s, "get " BASICS " Rgb", "{r: 46, g: 50, b: 58}");
-    gallery_expect(world, s, "get gallery.backdrop_view View.clear.color",
-        "{r: 32, g: 35, b: 41, a: 255}");
+    gallery_expect(world, s, "get " BASICS ".buttons.save box.material.Rgb",
+        "{\"Rgb\":{\"r\":98, \"g\":168, \"b\":122}}");
+    gallery_expect(world, s, "get " TEXT ".name.field box.material.Rgb",
+        "{\"Rgb\":{\"r\":38, \"g\":41, \"b\":48}}");
+    gallery_expect(world, s, "get " BASICS " box.material.Rgb",
+        "{\"Rgb\":{\"r\":46, \"g\":50, \"b\":58}}");
+    gallery_expect(world, s, "get gallery.backdrop_view box.view.View.clear.color",
+        "{\"r\":32, \"g\":35, \"b\":41, \"a\":255}");
 
     /* The widgets keep their state across the switch */
     gallery_expect_mut(world, s, BASICS ".toggles.music", "Checkbox", "current", "true");
@@ -433,7 +455,7 @@ void Gallery_form_apply(void) {
     char from[64], to[64];
     gallery_point(world, BLUE ".track.knob", 0, 0, from, sizeof(from));
     gallery_point(world, BLUE, 0.98f, fy, to, sizeof(to));
-    ecs_os_free(gallery_run(world, s, "mouse.drag left %s %s", from, to));
+    ecs_os_free(gallery_run(world, s, "mouse_drag left %s %s", from, to));
     gallery_step(world, s);
     double blue = gallery_value(world, s, "get " BLUE " box.widgets.Slider.mut.current");
     test_assert(blue > 240 && blue < 255.5);
@@ -453,7 +475,7 @@ void Gallery_form_apply(void) {
     gallery_expect(world, s, "get gallery Gallery.mut.draft.size", "1.25");
 
     gallery_tap(world, s, APPLY, 0, 0);
-    gallery_expect(world, s, "get " PREVIEW ".label Text.value", "\"Ada\"");
+    gallery_expect(world, s, "get " PREVIEW ".label box.text.Text.value", "\"Ada\"");
     test_bool(ecs_has(world, shape, Torus), true);
     test_bool(ecs_has(world, shape, Box), false);
     test_bool(ecs_has(world, shape, Sphere), false);
@@ -462,15 +484,18 @@ void Gallery_form_apply(void) {
     test_int(rgb->r, 255);
     test_int(rgb->g, 0);
     test_int(rgb->b, (int32_t)blue);
-    gallery_expect(world, s, "get " PREVIEW ".shape Scale", "{x: 1.25, y: 1.25, z: 1.25}");
+    gallery_expect(world, s, "get " PREVIEW ".shape box.transform.Scale",
+        "{\"Scale\":{\"x\":1.25, \"y\":1.25, \"z\":1.25}}");
     test_bool(ecs_has_id(world, shape, NoShadow), true);
-    gallery_expect(world, s, "get " PREVIEW ".sun Rgb", "{r: 150, g: 170, b: 255}");
-    char *intensity = gallery_run(world, s, "get " PREVIEW ".sun DirectionalLight.intensity");
+    gallery_expect(world, s, "get " PREVIEW ".sun box.material.Rgb",
+        "{\"Rgb\":{\"r\":150, \"g\":170, \"b\":255}}");
+    char *intensity = gallery_run(world, s,
+        "get " PREVIEW ".sun box.light.DirectionalLight.intensity");
     test_assert(fabs(strtod(intensity, NULL) - 0.6 * GLM_PI) < 1e-5);
     ecs_os_free(intensity);
-    gallery_expect(world, s, "get " PREVIEW_VIEW " View.clear.color",
-        "{r: 16, g: 20, b: 38, a: 255}");
-    gallery_expect(world, s, "get " FORM ".body.preview.applied_text Text.value",
+    gallery_expect(world, s, "get " PREVIEW_VIEW " box.view.View.clear.color",
+        "{\"r\":16, \"g\":20, \"b\":38, \"a\":255}");
+    gallery_expect(world, s, "get " FORM ".body.preview.applied_text box.text.Text.value",
         "\"Ada: Torus, size 1.25, Night light\"");
 
     /* The form keeps its values after Apply, a second Apply changes nothing */
@@ -501,7 +526,7 @@ void Gallery_form_reset(void) {
     gallery_tap(world, s, LIGHT ".dusk", 0, 0);
     gallery_tap(world, s, APPLY, 0, 0);
     test_bool(ecs_has(world, shape, Sphere), true);
-    gallery_expect(world, s, "get " PREVIEW ".label Text.value", "\"Grace\"");
+    gallery_expect(world, s, "get " PREVIEW ".label box.text.Text.value", "\"Grace\"");
 
     /* Reset puts the defaults back in the widgets, without a change of their own */
     int32_t changes = gallery_changes(world, s);
@@ -509,13 +534,14 @@ void Gallery_form_reset(void) {
     test_int(gallery_changes(world, s), changes + 1);
     gallery_expect(world, s, "get gallery Gallery.mut.last", "\"reset\"");
     gallery_expect_form_defaults(world, s);
-    gallery_expect(world, s, "get " SHADOW ".box Rgb", "{r: 98, g: 168, b: 122}");
+    gallery_expect(world, s, "get " SHADOW ".box box.material.Rgb",
+        "{\"Rgb\":{\"r\":98, \"g\":168, \"b\":122}}");
     test_assert(ecs_lookup(world, LIGHT ".day.indicator.dot") != 0);
     test_assert(ecs_lookup(world, LIGHT ".dusk.indicator.dot") == 0);
 
     /* The preview keeps the applied values until Apply */
     test_bool(ecs_has(world, shape, Sphere), true);
-    gallery_expect(world, s, "get " PREVIEW ".label Text.value", "\"Grace\"");
+    gallery_expect(world, s, "get " PREVIEW ".label box.text.Text.value", "\"Grace\"");
     gallery_tap(world, s, APPLY, 0, 0);
     gallery_expect_preview_defaults(world, s);
 
@@ -540,11 +566,11 @@ void Gallery_form_enter_applies(void) {
     gallery_tap(world, s, SHAPE ".list.option_1", 0, 0);
     gallery_tap(world, s, NAME ".field", 0.9f, 0);
     gallery_type(world, s, "s");
-    gallery_expect(world, s, "get " PREVIEW ".label Text.value", "\"Widget\"");
+    gallery_expect(world, s, "get " PREVIEW ".label box.text.Text.value", "\"Widget\"");
     test_bool(ecs_has(world, shape, Box), true);
 
     gallery_press(world, s, "Enter");
-    gallery_expect(world, s, "get " PREVIEW ".label Text.value", "\"Widgets\"");
+    gallery_expect(world, s, "get " PREVIEW ".label box.text.Text.value", "\"Widgets\"");
     test_bool(ecs_has(world, shape, Sphere), true);
     gallery_expect_focus(world, s, NAME ".field");
 
@@ -590,7 +616,7 @@ void Gallery_tab_order(void) {
     }
 
     test_assert(found);
-    gallery_expect(world, s, "get box.ui.FocusStatus FocusStatus.visible", "true");
+    gallery_expect(world, s, "get $ box.ui.FocusStatus.visible", "true");
 
     /* The focused field is scrolled into the page view */
     float page[4], r[4];
@@ -613,7 +639,7 @@ void Gallery_keyboard_only(void) {
     /* From nothing focused Shift+Tab wraps to the last widget in reading order, Reset, and walks
      * back through the form to its name field */
     gallery_expect_focus(world, s, "#0");
-    ecs_os_free(gallery_run(world, s, "key.down ShiftLeft"));
+    ecs_os_free(gallery_run(world, s, "key_down ShiftLeft"));
     gallery_press(world, s, "Tab");
     gallery_expect_focus(world, s, RESET);
     for (i = 0; i < 12 && !found; i ++) {
@@ -624,10 +650,10 @@ void Gallery_keyboard_only(void) {
         ecs_os_free(focused);
     }
 
-    ecs_os_free(gallery_run(world, s, "key.up ShiftLeft"));
+    ecs_os_free(gallery_run(world, s, "key_up ShiftLeft"));
     gallery_step(world, s);
     test_assert(found);
-    gallery_expect(world, s, "get box.ui.FocusStatus FocusStatus.visible", "true");
+    gallery_expect(world, s, "get $ box.ui.FocusStatus.visible", "true");
 
     /* The focused field is scrolled into the page view */
     float page[4], r[4];
@@ -661,9 +687,9 @@ void Gallery_keyboard_only(void) {
     gallery_expect_focus(world, s, LIGHT ".dusk");
     gallery_tab_expect(world, s, APPLY);
     gallery_tab_expect(world, s, RESET);
-    ecs_os_free(gallery_run(world, s, "key.down ShiftLeft"));
+    ecs_os_free(gallery_run(world, s, "key_down ShiftLeft"));
     gallery_press(world, s, "Tab");
-    ecs_os_free(gallery_run(world, s, "key.up ShiftLeft"));
+    ecs_os_free(gallery_run(world, s, "key_up ShiftLeft"));
     gallery_step(world, s);
     gallery_expect_focus(world, s, APPLY);
 
@@ -678,14 +704,17 @@ void Gallery_keyboard_only(void) {
 
     /* Apply with Enter */
     gallery_press(world, s, "Enter");
-    gallery_expect(world, s, "get " PREVIEW ".label Text.value", "\"Kim\"");
+    gallery_expect(world, s, "get " PREVIEW ".label box.text.Text.value", "\"Kim\"");
     test_bool(ecs_has(world, shape, Sphere), true);
-    gallery_expect(world, s, "get " PREVIEW ".shape Rgb", "{r: 0, g: 255, b: 62}");
-    gallery_expect(world, s, "get " PREVIEW ".shape Scale", "{x: 1.5, y: 1.5, z: 1.5}");
+    gallery_expect(world, s, "get " PREVIEW ".shape box.material.Rgb",
+        "{\"Rgb\":{\"r\":0, \"g\":255, \"b\":62}}");
+    gallery_expect(world, s, "get " PREVIEW ".shape box.transform.Scale",
+        "{\"Scale\":{\"x\":1.5, \"y\":1.5, \"z\":1.5}}");
     test_bool(ecs_has_id(world, shape, NoShadow), true);
-    gallery_expect(world, s, "get " PREVIEW ".sun Rgb", "{r: 255, g: 150, b: 90}");
-    gallery_expect(world, s, "get " PREVIEW_VIEW " View.clear.color",
-        "{r: 196, g: 128, b: 110, a: 255}");
+    gallery_expect(world, s, "get " PREVIEW ".sun box.material.Rgb",
+        "{\"Rgb\":{\"r\":255, \"g\":150, \"b\":90}}");
+    gallery_expect(world, s, "get " PREVIEW_VIEW " box.view.View.clear.color",
+        "{\"r\":196, \"g\":128, \"b\":110, \"a\":255}");
 
     /* Reset with Space restores the widgets, the focus stays on it */
     gallery_press(world, s, "Tab");
@@ -726,11 +755,11 @@ void Gallery_cursors(void) {
     gallery_rect(world, TEXT, text);
     gallery_rect(world, PAGE, page);
     test_assert(page[2] - text[2] > 100);
-    ecs_os_free(gallery_run(world, s, "mouse.move [%.1f, %.1f]",
+    ecs_os_free(gallery_run(world, s, "mouse_move [%.1f, %.1f]",
         (double)((text[2] + page[2]) * 0.5f), (double)((text[1] + text[3]) * 0.5f)));
     gallery_expect_cursor_here(world, s, PAGE, CursorDefault);
     gallery_point(world, HEADER ".gap", 0, 0, point, sizeof(point));
-    ecs_os_free(gallery_run(world, s, "mouse.move %s", point));
+    ecs_os_free(gallery_run(world, s, "mouse_move %s", point));
     gallery_expect_cursor_here(world, s, "#0", CursorDefault);
 
     /* The containers and the form */
@@ -796,11 +825,11 @@ void Gallery_resize(void) {
 
     /* The wheel over the page scrolls it, the header stays */
     gallery_rect(world, BASICS, basics);
-    ecs_os_free(gallery_run(world, s, "mouse.move [%.1f, %.1f]",
+    ecs_os_free(gallery_run(world, s, "mouse_move [%.1f, %.1f]",
         (double)(basics[0] + 40), (double)(basics[1] + 10)));
     gallery_step(world, s);
-    gallery_expect(world, s, "get box.picking.PickStatus PickStatus.handler", PAGE);
-    ecs_os_free(gallery_run(world, s, "mouse.scroll 0 -3"));
+    gallery_expect(world, s, "get $ box.picking.PickStatus.handler", "\"" PAGE "\"");
+    ecs_os_free(gallery_run(world, s, "mouse_scroll 0 -3"));
     gallery_step(world, s);
     gallery_rect(world, BASICS, after);
     gallery_expect_at(after[1], basics[1] - 120);
