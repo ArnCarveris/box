@@ -291,14 +291,86 @@ static void BoxAppSetAtOnSet(
     }
 }
 
+/** State of the SetAt observers: the observer that records writes exists only while the world
+ * has SetAt entities, so that worlds without them keep the fast paths of ecs_set and
+ * ecs_modified for components without OnSet observers.
+ */
+typedef struct box_app_set_at_t {
+    ecs_entity_t module;    /**< The box.app module, parent of the observer */
+    ecs_entity_t observer;  /**< AppSetAtOnSet, 0 while the world has no SetAt entity */
+    int32_t count;          /**< SetAt entities in the world */
+} box_app_set_at_t;
+
+/** Create the observer that records the components written to SetAt entities: OnSet of every
+ * component, which makes flecs emit OnSet for every set in the world while it exists.
+ *
+ * @param world The world
+ * @param state The state of the SetAt observers
+ */
+static void box_app_set_at_observe(
+    ecs_world_t *world,
+    box_app_set_at_t *state)
+{
+    state->observer = ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "AppSetAtOnSet", .parent = state->module }),
+        .query = {
+            .terms = {
+                { .id = EcsWildcard },
+                { .id = ecs_id(SetAtWritten), .inout = EcsInOutFilter }
+            },
+            .flags = EcsQueryMatchDisabled
+        },
+        .events = { EcsOnSet },
+        .callback = BoxAppSetAtOnSet
+    });
+}
+
+/** Delete the observer that records the components written to SetAt entities.
+ *
+ * @param world The world
+ * @param state The state of the SetAt observers
+ */
+static void box_app_set_at_unobserve(
+    ecs_world_t *world,
+    box_app_set_at_t *state)
+{
+    ecs_entity_t observer = state->observer;
+    state->observer = 0;
+    if (observer) {
+        ecs_delete(world, observer);
+    }
+}
+
 /** Record the components a SetAt entity had before SetAt was added, as when a script body
- * writes SetAt after the other components.
+ * writes SetAt after the other components, and count the SetAt entities: the first one added
+ * creates AppSetAtOnSet, the last one removed or deleted deletes it.
  *
  * @param it The iterator of the observer
  */
 static void BoxAppSetAtOnAdd(
     ecs_iter_t *it)
 {
+    ecs_world_t *world = (ecs_world_t*)ecs_get_world(it->world);
+    box_app_set_at_t *state = it->ctx;
+    if (ecs_is_fini(world)) {
+        return;
+    }
+
+    if (it->event == EcsOnRemove) {
+        state->count -= it->count;
+        if (state->count <= 0) {
+            state->count = 0;
+            box_app_set_at_unobserve(world, state);
+        }
+
+        return;
+    }
+
+    state->count += it->count;
+    if (!state->observer) {
+        box_app_set_at_observe(world, state);
+    }
+
     const ecs_type_t *type = it->other_table ? ecs_table_get_type(it->other_table) : NULL;
     int32_t i, j;
     for (i = 0; i < it->count && type; i ++) {
@@ -783,18 +855,13 @@ void BoxAppImport(
         .callback = BoxAppOnSet
     });
 
-    ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "AppSetAtOnSet" }),
-        .query = {
-            .terms = {
-                { .id = EcsWildcard },
-                { .id = ecs_id(SetAtWritten), .inout = EcsInOutFilter }
-            },
-            .flags = EcsQueryMatchDisabled
-        },
-        .events = { EcsOnSet },
-        .callback = BoxAppSetAtOnSet
-    });
+    /* AppSetAtOnSet is created when the first SetAt entity is added. Creating it once now
+     * makes flecs emit OnSet for the sets and modifies queued in a stage before that first SetAt
+     * is merged, which are decided when queued, so their writes are recorded as before. */
+    box_app_set_at_t *set_at = ecs_os_calloc_t(box_app_set_at_t);
+    set_at->module = ecs_id(BoxApp);
+    box_app_set_at_observe(world, set_at);
+    box_app_set_at_unobserve(world, set_at);
 
     ecs_observer(world, {
         .entity = ecs_entity(world, { .name = "AppSetAtOnAdd" }),
@@ -802,8 +869,10 @@ void BoxAppImport(
             .terms = {{ .id = ecs_id(SetAt) }},
             .flags = EcsQueryMatchDisabled
         },
-        .events = { EcsOnAdd },
-        .callback = BoxAppSetAtOnAdd
+        .events = { EcsOnAdd, EcsOnRemove },
+        .callback = BoxAppSetAtOnAdd,
+        .ctx = set_at,
+        .ctx_free = ecs_os_api.free_
     });
 
     box_app_clock_t *clock = box_app_clock_new();

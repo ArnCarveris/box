@@ -330,7 +330,10 @@
                     "script_first_zero_after_rotation",
                     "script_first_added",
                     "script_last_added",
-                    "script_last_written"
+                    "script_last_written",
+                    "observer_on_demand",
+                    "deferred_first",
+                    "prefab_instance"
                 ]
             }
         ]

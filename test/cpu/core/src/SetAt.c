@@ -356,3 +356,120 @@ void SetAt_script_last_written(void) {
         "  SetAt: {frame: 1, entity: e}\n"
         "}\n", 5, 0.5f);
 }
+
+/** Look up the observer that records the writes to SetAt entities.
+ *
+ * @param world The world
+ * @return The observer, 0 while the world has no SetAt entity
+ */
+static ecs_entity_t set_at_observer(
+    ecs_world_t *world)
+{
+    ecs_entity_t o = ecs_lookup(world, "box.app.AppSetAtOnSet");
+    test_assert(!o || ecs_observer_get(world, o) != NULL);
+    return o;
+}
+
+void SetAt_observer_on_demand(void) {
+    ecs_entity_t e;
+    ecs_world_t *world = set_at_world(&e);
+    ecs_progress(world, 0.1f);
+    test_assert(set_at_observer(world) == 0);
+
+    ecs_entity_t first = ecs_new(world);
+    ecs_set(world, first, SetAt, { .frame = 2, .entity = e });
+    test_assert(set_at_observer(world) != 0);
+    ecs_set(world, first, Position, {1, 2, 3});
+    ecs_entity_t other = ecs_new(world);
+    ecs_set(world, other, SetAt, { .frame = 3, .entity = e });
+    ecs_set(world, other, Scale, {2, 2, 2});
+    ecs_delete(world, other);
+    test_assert(set_at_observer(world) != 0);
+
+    ecs_progress(world, 0.1f);
+    ecs_progress(world, 0.1f);
+    test_assert(set_at_observer(world) != 0);
+    ecs_progress(world, 0.1f);
+    test_bool(ecs_is_alive(world, first), false);
+    test_flt(ecs_get(world, e, Position)->x, 1);
+    test_bool(ecs_has(world, e, Scale), false);
+    test_assert(set_at_observer(world) == 0);
+
+    ecs_entity_t second = ecs_new(world);
+    ecs_set(world, second, SetAt, { .frame = 4, .entity = e });
+    test_assert(set_at_observer(world) != 0);
+    ecs_set(world, second, Position, {0, 0, 0});
+    ecs_set(world, second, Rotation, {0, 0.5f, 0});
+    ecs_progress(world, 0.1f);
+    test_flt(ecs_get(world, e, Position)->x, 1);
+    ecs_progress(world, 0.1f);
+    test_bool(ecs_is_alive(world, second), false);
+    const Position *p = ecs_get(world, e, Position);
+    test_flt(p->x, 0);
+    test_flt(p->y, 0);
+    test_flt(p->z, 0);
+    test_flt(ecs_get(world, e, Rotation)->y, 0.5f);
+    test_assert(set_at_observer(world) == 0);
+
+    ecs_entity_t removed = ecs_new(world);
+    ecs_set(world, removed, SetAt, { .frame = 9, .entity = e });
+    test_assert(set_at_observer(world) != 0);
+    ecs_remove(world, removed, SetAt);
+    test_assert(set_at_observer(world) == 0);
+
+    ecs_fini(world);
+}
+
+void SetAt_deferred_first(void) {
+    ecs_entity_t e;
+    ecs_world_t *world = set_at_world(&e);
+    ecs_set(world, e, Position, {1, 2, 3});
+    ecs_progress(world, 0.1f);
+    test_assert(set_at_observer(world) == 0);
+
+    ecs_entity_t s = ecs_new(world);
+    ecs_world_t *stage = ecs_get_stage(world, 0);
+    ecs_set(stage, s, SetAt, { .frame = 1, .entity = e });
+    ecs_set(stage, s, Rotation, {0, 0.5f, 0});
+    ecs_set(stage, s, Position, {0, 0, 0});
+    ecs_set(stage, s, Rgb, {40, 50, 60});
+    ecs_merge(stage);
+    test_assert(set_at_observer(world) != 0);
+
+    ecs_progress(world, 0.1f);
+    test_bool(ecs_is_alive(world, s), false);
+    const Position *p = ecs_get(world, e, Position);
+    test_flt(p->x, 0);
+    test_flt(p->y, 0);
+    test_flt(p->z, 0);
+    test_flt(ecs_get(world, e, Rotation)->y, 0.5f);
+    test_int(ecs_get(world, e, Rgb)->r, 40);
+    test_assert(set_at_observer(world) == 0);
+
+    ecs_fini(world);
+}
+
+void SetAt_prefab_instance(void) {
+    ecs_entity_t e;
+    ecs_world_t *world = set_at_world(&e);
+    ecs_progress(world, 0.1f);
+
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_set(world, prefab, SetAt, { .frame = 1, .entity = e });
+    ecs_set(world, prefab, Rgb, {40, 50, 60});
+    test_assert(set_at_observer(world) == 0);
+
+    ecs_entity_t inst = ecs_new_w_pair(world, EcsIsA, prefab);
+    test_assert(set_at_observer(world) != 0);
+    test_bool(ecs_has_id(world, inst, EcsDisabled), true);
+
+    ecs_progress(world, 0.1f);
+    test_bool(ecs_is_alive(world, inst), false);
+    const Rgb *c = ecs_get(world, e, Rgb);
+    test_assert(c != NULL);
+    test_int(c->r, 40);
+    test_bool(ecs_is_alive(world, prefab), true);
+    test_assert(set_at_observer(world) == 0);
+
+    ecs_fini(world);
+}
