@@ -1,5 +1,5 @@
 // flecs-engine's transmissive.flecs: 8 x 8 glass spheres over a grid of metal tiles, rougher to
-// the right (roughness x / 8) and refracting more toward the back (ior 1 + y / 10), each 2 units
+// the left (+X, roughness x / 8) and refracting more toward the back (ior 1 + y / 10), each 2 units
 // thick with a blue attenuation over 2 units. The camera looks at what flecs-engine's LookAt
 // {-1.909, 6.432, -19.5} gives; box adds a sun and a sky where flecs-engine has its own light.
 using box.transform
@@ -20,9 +20,10 @@ main_view {
   View: {camera: camera, clear: {enabled: true, color: {0, 0, 0, 255}}}
 }
 
-// flecs-engine's light at Position3 {1, 1, 1}: from 35 degrees above the horizon
+// flecs-engine's light at Position3 {1, 1, 1}: from 35 degrees above the horizon, travelling
+// along -(1, 1, 1)
 sun {
-  Rotation: {0.6155, 0.7854, 0}
+  Rotation: {0.6155, -2.3562, 0}
   DirectionalLight: {intensity: 3 * flecs.script.math.PI}
   Rgb: {255, 255, 255}
 }

@@ -72,9 +72,8 @@ ECS_STRUCT(Opacity, {
  * 0..1, it is discarded; otherwise it is written as opaque.
  *
  * With an Opaque or missing BlendMode it draws in the opaque pass whatever its Opacity, with its
- * holes in depth, shadows, probe and reflection captures and BackFacePlain back faces. Otherwise
- * it stays in the sorted blended pass, casts no shadow and the cutoff discards there as well;
- * a shape with Transmission ignores it.
+ * holes in depth, shadows, captures and BackFacePlain back faces; otherwise it discards in the
+ * sorted blended pass and casts no shadow. A shape with Transmission ignores it.
  */
 ECS_STRUCT(AlphaCutoff, {
     float value; /**< Alpha below which a fragment is discarded */

@@ -169,7 +169,8 @@ static ecs_entity_t tr_surface(
     return e;
 }
 
-/** Run frames and read the counters of the GPU backend after them.
+/** Run frames and read the counters of the GPU backend after them. Before the first frame
+ * with a surface there is no backend and the counters are all 0.
  *
  * @param world The world
  * @param count Frames to run
@@ -186,7 +187,7 @@ static box_render_gpu_stats_t tr_frames(
         box_render_sync(world);
     }
 
-    test_bool(box_render_gpu_stats(world, &stats), true);
+    test_bool(box_render_gpu_stats(world, &stats) || !count, true);
 
     return stats;
 }
@@ -230,8 +231,7 @@ static unsigned char* tr_render(
     int32_t width,
     int32_t height)
 {
-    box_render_gpu_stats_t before, after;
-    test_bool(box_render_gpu_stats(world, &before), true);
+    box_render_gpu_stats_t before = tr_frames(world, 0), after;
     tr_surface(world, width, height, file);
     after = tr_frames(world, 3);
     test_int(after.errors, before.errors);
@@ -275,6 +275,7 @@ static float tr_lin(
     int32_t c)
 {
     float v = (float)c / 255.0f;
+
     return v <= 0.04045f ? v / 12.92f : powf((v + 0.055f) / 1.055f, 2.4f);
 }
 
@@ -288,6 +289,7 @@ static int32_t tr_srgb(
 {
     lin = lin < 0.0f ? 0.0f : (lin > 1.0f ? 1.0f : lin);
     float v = lin <= 0.0031308f ? lin * 12.92f : 1.055f * powf(lin, 1.0f / 2.4f) - 0.055f;
+
     return (int32_t)(v * 255.0f + 0.5f);
 }
 
@@ -438,6 +440,8 @@ void Transmission_fresnel_ior(void) {
     test_assert(p[0] < p[4]);
 }
 
+/** A thickness equal to the attenuation distance gives the attenuation color, half of it keeps
+ * the square root of the color. */
 void Transmission_attenuation_color(void) {
     // materials/transmission
     uint8_t bg[3] = { 230, 230, 230 }, white[3] = { 255, 255, 255 };
@@ -455,7 +459,6 @@ void Transmission_attenuation_color(void) {
         test_assert(abs((int32_t)p[c] - want) <= 2);
     }
 
-    /* Half the distance through the volume keeps the square root of the color */
     t.thickness_factor = 1;
     tr_center("attenuation_half.png", bg, &t, white, p);
     for (c = 0; c < 3; c ++) {
@@ -505,7 +508,7 @@ static int32_t tr_edge(
     tr_view(world, tr_camera(world, 0), true, false);
     tr_wall(world, -10, -10, 20, 40, 255, 0, 0);
     tr_wall(world, 10, -10, 20, 40, 0, 0, 255);
-    ecs_entity_t glass = tr_glass(world, 0, -4, 4 / scale, 3 / scale, 1, ior, thickness);
+    ecs_entity_t glass = tr_glass(world, 0, -4, 4, 3, 1, ior, thickness);
     ecs_set(world, glass, Rotation, {0, 0.5f, 0});
     ecs_set(world, glass, Scale, {scale, scale, scale});
     ecs_set(world, glass, PbrMaterial, {.metallic = 0, .roughness = roughness});
@@ -534,6 +537,12 @@ static int32_t tr_edge(
     return result;
 }
 
+/** Without refraction the edge stays at the middle of the capture. The front face looks toward
+ * +X, so the refracted ray bends toward -X: the glass samples the background left of each pixel
+ * and the edge it shows moves right, further for a thicker glass.
+ *
+ * The thickness is in the frame of the instance, whose scale includes the size of the box:
+ * scaling the glass by 2 moves the edge as far as twice the thickness. */
 void Transmission_refraction_offsets_edge(void) {
     // materials/transmission
     float sharp;
@@ -545,17 +554,12 @@ void Transmission_refraction_offsets_edge(void) {
         scaled);
     test_assert(straight > 0 && bent > 0 && thin > 0 && scaled > 0);
 
-    /* Without refraction the edge stays at the middle of the capture */
     test_assert(abs(straight - TR_EDGE_W / 2) <= 1);
 
-    /* The front face looks toward +X, so the refracted ray bends toward -X: the glass samples
-     * the background left of each pixel and the edge it shows moves right */
     test_assert(bent > straight + 3);
     test_assert(thin > straight + 1);
     test_assert(bent > thin);
 
-    /* The thickness is in the frame of the instance: scaling the glass by 2 moves the edge as
-     * far as twice the thickness */
     test_assert(scaled > thin + 1);
     test_assert(abs(scaled - bent) <= 2);
 }
@@ -571,6 +575,8 @@ void Transmission_roughness_blurs(void) {
     test_assert(blurred < sharp * 0.5f);
 }
 
+/** Factor f is own diffuse * (1 - f) + specular + transmitted * f, so the half is the mean of
+ * the opaque and the fully transmissive surface in linear light. */
 void Transmission_partial_factor_keeps_diffuse(void) {
     // materials/transmission
     float factors[3] = { 0, 0.5f, 1 };
@@ -592,8 +598,6 @@ void Transmission_partial_factor_keeps_diffuse(void) {
         ecs_fini(world);
     }
 
-    /* Factor f is own diffuse * (1 - f) + specular + transmitted * f, so the half is the mean
-     * of the opaque and the fully transmissive surface in linear light */
     bool apart = false;
     for (c = 0; c < 3; c ++) {
         int32_t want = tr_srgb((tr_lin(p[0][c]) + tr_lin(p[2][c])) * 0.5f);
@@ -609,6 +613,7 @@ void Transmission_partial_factor_keeps_diffuse(void) {
     test_assert(apart);
 }
 
+/** Without a light the sphere shows the background, with one the highlight adds to it. */
 void Transmission_specular_on_top(void) {
     // materials/transmission
     unsigned char p[2][4];
@@ -638,52 +643,46 @@ void Transmission_specular_on_top(void) {
         ecs_fini(world);
     }
 
-    /* Without a light the sphere shows the background, with one the highlight adds to it */
     tr_expect(p[0], 30, 30, 30, 3);
     for (c = 0; c < 3; c ++) {
         test_assert(p[1][c] > p[0][c] + 30);
     }
 }
 
+/** Two blended quads around a deep glass box (front face z -3, origin z -6): one behind its
+ * front face that sorts after it shows over it, as the glass writes no depth; one behind it that
+ * sorts before it shows only outside it, where the glass shows the green wall.
+ *
+ * The glass casts no shadow: the ground around it looks as it does without it, while an opaque
+ * box in its place shades it. */
 void Transmission_no_depth_write_no_shadow(void) {
     // materials/transmission
     ecs_world_t *world = tr_world();
     tr_view(world, tr_camera(world, 0), true, false);
     tr_wall(world, 0, -12, 40, 40, 0, 200, 0);
 
-    /* A deep glass box: its front face at z -3, its origin at z -6, columns 14 to 50 */
     ecs_entity_t glass = tr_glass(world, 0, -6, 2, 4, 1, 1, 0);
     ecs_set(world, glass, Box, {2, 4, 6});
 
-    /* A blended quad behind the front face of the glass whose origin is nearer than that of
-     * the glass, so it sorts after the glass: it only shows over the glass when the glass did
-     * not write its depth */
     ecs_entity_t late = tr_wall(world, 0.8f, -4.5f, 1, 1, 200, 0, 0);
     ecs_set(world, late, Opacity, {0.5f});
 
-    /* A blended quad behind the glass that sorts before it, half out of the glass: columns 6
-     * to 29 */
     ecs_entity_t early = tr_wall(world, -2.5f, -9.5f, 4, 2, 0, 0, 200);
     ecs_set(world, early, Opacity, {0.5f});
     unsigned char *px = tr_render(world, "order.png", TR_SIZE, TR_SIZE);
 
-    /* Through the glass: the green wall, the early quad included */
     tr_expect(tr_px(px, TR_SIZE, 26, 32), 0, 200, 0, 3);
     tr_expect(tr_px(px, TR_SIZE, 20, 32), 0, 200, 0, 3);
 
-    /* The late quad blends over the glass */
     int32_t x = 32 + (int32_t)(0.8f / 4.5f / 0.57735f * 32.0f);
     tr_expect(tr_px(px, TR_SIZE, x, 32), tr_srgb(tr_lin(200) * 0.5f),
         tr_srgb(tr_lin(200) * 0.5f), 0, 3);
 
-    /* The early quad shows outside the glass only */
     tr_expect(tr_px(px, TR_SIZE, 10, 32), 0, tr_srgb(tr_lin(200) * 0.5f),
         tr_srgb(tr_lin(200) * 0.5f), 3);
     stbi_image_free(px);
     ecs_fini(world);
 
-    /* The glass casts no shadow: the ground around it looks as it does without it, while an
-     * opaque box in its place shades it */
     const char *head =
         "using box.transform\n"
         "using box.geometry\n"
@@ -731,6 +730,9 @@ void Transmission_no_depth_write_no_shadow(void) {
     ecs_os_free(with_box);
 }
 
+/** Through the front glass only the wall shows. Beside it the shape behind shows: the blended
+ * quad over the wall, or the glass behind, which tints the green wall by its blue albedo to
+ * black. */
 void Transmission_blended_not_in_snapshot(void) {
     // materials/transmission
     int32_t k;
@@ -750,11 +752,8 @@ void Transmission_blended_not_in_snapshot(void) {
         unsigned char *px = tr_render(world, k ? "behind_glass.png" : "behind_blend.png",
             TR_SIZE, TR_SIZE);
 
-        /* Through the front glass: the wall alone */
         tr_expect(tr_px(px, TR_SIZE, 32, 32), 0, 200, 0, 3);
 
-        /* Beside it the shape behind shows: the blended quad over the wall, or the glass
-         * behind, which tints the green wall by its blue albedo to black */
         const unsigned char *beside = tr_px(px, TR_SIZE, 12, 32);
         if (k == 0) {
             tr_expect(beside, tr_srgb(tr_lin(200) * 0.5f), tr_srgb(tr_lin(200) * 0.5f), 0, 3);
@@ -767,44 +766,60 @@ void Transmission_blended_not_in_snapshot(void) {
     }
 }
 
+/** A sunlit atmosphere over an emissive red box. A literal, because no world exists yet to
+ * give flecs_asprintf its allocator. */
+#define TR_SKY_HEAD \
+    "using box.transform\n" \
+    "using box.geometry\n" \
+    "using box.material\n" \
+    "using box.camera\n" \
+    "using box.view\n" \
+    "using box.light\n" \
+    "using box.atmosphere\n" \
+    "camera { Position: {0, 2, 0}\n Camera: {fov: 60, near_: 0.1, far_: 0} }\n" \
+    "sun { Rotation: {0.6, 0.5, 0}\n" \
+    "  DirectionalLight: {intensity: 3 * flecs.script.math.PI} }\n" \
+    "sky { Atmosphere: {units_per_km: 100, sun: sun} }\n" \
+    "main_view { View: {camera: camera, clear: {enabled: true, color: {0, 0, 0, 255}}," \
+    " effects: [{effect: sky}]} }\n" \
+    "red { Position: {0, 1, -8}\n Box: {3, 1.6, 0.5}\n Rgb: {0, 0, 0}\n" \
+    "  PbrMaterial: {metallic: 1, roughness: 1}\n" \
+    "  Emissive: {strength: 1, color: {255, 0, 0}} }\n"
+
+/** Below the middle the red box, above it the sky, both through the glass. The glass adds its
+ * own reflection of the sky on top, which lifts the dark channels of the box: the specular of a
+ * dielectric is about 4% of the sky at normal incidence. */
 void Transmission_opaque_and_sky_in_snapshot(void) {
     // materials/transmission
-    const char *head =
-        "using box.transform\n"
-        "using box.geometry\n"
-        "using box.material\n"
-        "using box.camera\n"
-        "using box.view\n"
-        "using box.light\n"
-        "using box.atmosphere\n"
-        "camera { Position: {0, 2, 0}\n Camera: {fov: 60, near_: 0.1, far_: 0} }\n"
-        "sun { Rotation: {0.6, 0.5, 0}\n"
-        "  DirectionalLight: {intensity: 3 * flecs.script.math.PI} }\n"
-        "sky { Atmosphere: {units_per_km: 100, sun: sun} }\n"
-        "main_view { View: {camera: camera, clear: {enabled: true, color: {0, 0, 0, 255}},"
-        " effects: [{effect: sky}]} }\n"
-        "red { Position: {0, 1, -8}\n Box: {3, 1.6, 0.5}\n Rgb: {0, 0, 0}\n"
-        "  PbrMaterial: {metallic: 1, roughness: 1}\n"
-        "  Emissive: {strength: 1, color: {255, 0, 0}} }\n";
-    char *with_glass = flecs_asprintf("%s"
+    const char *head = TR_SKY_HEAD;
+    const char *with_glass = TR_SKY_HEAD
         "glass { Position: {0, 2, -3}\n Box: {2.4, 2.4, 0.1}\n Rgb: {255, 255, 255}\n"
         "  PbrMaterial: {roughness: 0}\n"
-        "  Transmission: {transmission_factor: 1, ior: 1} }\n", head);
+        "  Transmission: {transmission_factor: 1, ior: 1} }\n";
     unsigned char *a = tr_script(head, "sky_bare.png", TR_SIZE, TR_SIZE);
     unsigned char *b = tr_script(with_glass, "sky_glass.png", TR_SIZE, TR_SIZE);
 
-    /* Below the middle the red box, above it the sky, both through the glass */
     const unsigned char *box = tr_px(a, TR_SIZE, 32, 38);
     const unsigned char *sky = tr_px(a, TR_SIZE, 32, 22);
     test_assert(box[0] > box[2] + 40);
     test_assert(sky[2] > sky[0]);
-    tr_expect(tr_px(b, TR_SIZE, 32, 38), box[0], box[1], box[2], 8);
     tr_expect(tr_px(b, TR_SIZE, 32, 22), sky[0], sky[1], sky[2], 12);
+
+    const unsigned char *seen = tr_px(b, TR_SIZE, 32, 38);
+    int32_t c;
+    for (c = 0; c < 3; c ++) {
+        float extra = tr_lin(seen[c]) - tr_lin(box[c]);
+        printf("channel %d: box %d, through the glass %d\n", c, box[c], seen[c]);
+        test_assert(extra >= -0.01f);
+        test_assert(extra <= 0.06f * tr_lin(sky[c]) + 0.01f);
+    }
+
     stbi_image_free(a);
     stbi_image_free(b);
-    ecs_os_free(with_glass);
 }
 
+/** A second view of a scene without transmissive shapes copies nothing, and once the glass
+ * loses its Transmission no view copies its image. */
 void Transmission_snapshot_counter(void) {
     // materials/transmission
     ecs_world_t *world = tr_world();
@@ -812,7 +827,6 @@ void Transmission_snapshot_counter(void) {
     tr_wall(world, 0, -10, 40, 40, 200, 120, 60);
     ecs_entity_t glass = tr_glass(world, 0, -4, 3, 3, 1, 1, 0);
 
-    /* A second view of a scene without transmissive shapes */
     ecs_entity_t scene = ecs_new(world);
     ecs_set(world, scene, Scene, {0});
     ecs_entity_t other = tr_view(world, tr_camera(world, scene), true, false);
@@ -831,7 +845,6 @@ void Transmission_snapshot_counter(void) {
     test_int(after.transmission_snapshots - before.transmission_snapshots, 3);
     test_int(after.errors, before.errors);
 
-    /* Without transmissive shapes no view copies its image */
     ecs_remove(world, glass, Transmission);
     tr_frames(world, 2);
     before = tr_frames(world, 0);
@@ -867,6 +880,7 @@ void Transmission_resize_recreates_snapshot(void) {
     ecs_fini(world);
 }
 
+/** The second view renders last and sees its own snapshot, not that of the first. */
 void Transmission_two_views_one_target(void) {
     // materials/transmission
     ecs_world_t *world = tr_world();
@@ -886,7 +900,6 @@ void Transmission_two_views_one_target(void) {
     unsigned char *px = tr_render(world, "two_views.png", TR_SIZE, TR_SIZE);
     box_render_gpu_stats_t after = tr_frames(world, 1);
 
-    /* The second view renders last and sees its own snapshot, not that of the first */
     tr_expect(tr_px(px, TR_SIZE, 32, 32), 0, 200, 0, 3);
     tr_expect(tr_px(px, TR_SIZE, 2, 2), 0, 200, 0, 1);
     stbi_image_free(px);
@@ -898,6 +911,8 @@ void Transmission_two_views_one_target(void) {
     ecs_fini(world);
 }
 
+/** An unlit view draws the emission of the wall as its color, behind the glass as well. A view
+ * with effects renders into its HDR image, which the snapshot copies. */
 void Transmission_view_without_effects(void) {
     // materials/transmission
     uint8_t bg[3] = { 200, 160, 120 };
@@ -911,14 +926,12 @@ void Transmission_view_without_effects(void) {
         unsigned char *px = tr_render(world, k ? "plain_lit.png" : "plain_unlit.png",
             TR_SIZE, TR_SIZE);
 
-        /* The unlit view draws the emission of the wall as its color */
         tr_expect(tr_px(px, TR_SIZE, 32, 32), tr_srgb(tr_lin(bg[0]) * 0.96f),
             tr_srgb(tr_lin(bg[1]) * 0.96f), tr_srgb(tr_lin(bg[2]) * 0.96f), 3);
         stbi_image_free(px);
         ecs_fini(world);
     }
 
-    /* A view with effects renders into its HDR image, which the snapshot copies */
     const char *script =
         "using box.transform\n"
         "using box.geometry\n"
@@ -945,6 +958,7 @@ void Transmission_view_without_effects(void) {
     stbi_image_free(px);
 }
 
+/** An opaque box behind the glass, which the occlusion test keeps, shows through it. */
 void Transmission_occlusion_view_transmits(void) {
     // materials/transmission
     int32_t k;
@@ -954,7 +968,6 @@ void Transmission_occlusion_view_transmits(void) {
         tr_wall(world, 0, -10, 40, 40, 200, 120, 60);
         tr_glass(world, 0, -4, 3, 3, 1, 1, 0);
 
-        /* An opaque box behind the glass, which the occlusion test keeps */
         ecs_entity_t box = tr_wall(world, 0.8f, -7, 1, 1, 0, 0, 200);
         ecs_set(world, box, Box, {1, 1, 1});
         box_render_gpu_stats_t before = tr_frames(world, 0);

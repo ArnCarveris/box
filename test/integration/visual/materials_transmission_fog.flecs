@@ -13,7 +13,7 @@ using box.atmosphere
 
 camera {
   Position: {0, 2, 0}
-  Camera: {fov: 50, far_: 0}
+  Camera: {fov: 12, far_: 0}
 }
 
 main_view {
@@ -21,7 +21,7 @@ main_view {
 }
 
 sun {
-  Rotation: {0.7, 0.4, 0}
+  Rotation: {0.5, 2.6, 0}
   DirectionalLight: {intensity: 3 * flecs.script.math.PI}
   Rgb: {255, 255, 255}
 }
@@ -52,7 +52,7 @@ prefab Pair {
 }
 
 pair_30 : Pair {
-  Position: {-4, 2, -30}
+  Position: {-3.6, 2, -30}
   Scale: {1, 1, 1}
 }
 
@@ -62,6 +62,6 @@ pair_130 : Pair {
 }
 
 pair_420 : Pair {
-  Position: {56, 2, -420}
+  Position: {50.4, 2, -420}
   Scale: {14, 14, 14}
 }

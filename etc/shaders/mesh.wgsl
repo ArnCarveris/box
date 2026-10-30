@@ -857,10 +857,6 @@ fn shade(s: Surface, v: vec3f, world: vec3f) -> vec3f {
     return lit.diffuse + lit.specular;
 }
 
-// Color of a fragment seen through the atmosphere between it and the camera, shaped for the
-// blend equation: a fragment that covers the target is attenuated and adds the in scattered
-// light weighted by its coverage, light added to or taken from the target is only attenuated,
-// and a filter of the target is left as it is.
 // In scattered light (rgb) and transmittance (a) of the atmosphere between a fragment and the
 // camera, from one trilinear tap of the aerial perspective volume.
 fn aerial_sample(pos: vec4f, world: vec3f) -> vec4f {
@@ -871,6 +867,10 @@ fn aerial_sample(pos: vec4f, world: vec3f) -> vec4f {
     return textureSampleLevel(aerial_volume, aerial_sampler, vec3f(uv, w), 0.0);
 }
 
+// Color of a fragment seen through the atmosphere between it and the camera, shaped for the
+// blend equation: a fragment that covers the target is attenuated and adds the in scattered
+// light weighted by its coverage, light added to or taken from the target is only attenuated,
+// and a filter of the target is left as it is.
 fn aerial_perspective(color: vec3f, alpha: f32, pos: vec4f, world: vec3f) -> vec3f {
     let ap = aerial_sample(pos, world);
     switch blend_mode {

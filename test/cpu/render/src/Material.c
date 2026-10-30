@@ -407,6 +407,8 @@ void Material_transmission_defaults(void) {
     ecs_fini(world);
 }
 
+/** The record holds the values and the attenuation color of a Transmission and its defaults
+ * without one; a transition of another component encodes the record again with them. */
 void Material_transmission_pack(void) {
     // materials/transmission
     box_render_material_t record;
@@ -437,7 +439,6 @@ void Material_transmission_pack(void) {
     test_flt(record.roughness, 0.125f);
     test_uint(record.color, 204u | (204u << 8) | (204u << 16));
 
-    /* A transition of another component encodes the record again with the Transmission */
     box_draw_transition_material_t target;
     box_render_material_t encoded;
     box_draws_transition_target(&target, &(box_draw_material_t){

@@ -13,7 +13,7 @@ using box.atmosphere
 using box.effects
 
 gtao {
-  Gtao: {radius: 0.8}
+  Gtao: {radius: 1.5}
 }
 
 camera {
@@ -27,8 +27,8 @@ main_view {
 }
 
 sun {
-  Rotation: {0.9, 2.6, 0}
-  DirectionalLight: {intensity: 3 * flecs.script.math.PI}
+  Rotation: {0.9, -0.5, 0}
+  DirectionalLight: {intensity: 1.5 * flecs.script.math.PI}
   Rgb: {255, 255, 255}
 }
 
