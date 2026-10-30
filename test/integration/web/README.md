@@ -34,9 +34,12 @@ executable (after resolving symlinks) for the `com.apple.quarantine` attribute
 macOS holds a quarantined app, such as one installed by Homebrew, at its first launch check, and
 no one can confirm the dialog of a headless session, so the scripts fail at once with exit status
 2 and name the app instead of reporting "chrome did not start" after the connect timeout. Open
-Chrome once from the Finder, run `xattr -dr com.apple.quarantine <app>`, or pass `--chrome` with a
-copy without the attribute. The check is skipped off macOS, without `xattr`, and for a Chrome
-outside a `.app` bundle. `quarantine.sh` checks this with a fake quarantined `Foo.app`:
+Chrome once from the Finder and confirm the dialog, run `xattr -dr com.apple.quarantine <app>`, or
+pass `--chrome` with a copy without the attribute. Confirming the dialog keeps the attribute but
+sets its user-approved flag (`0x0040` in the first field, e.g. `0081;...` becomes `00c1;...`); the
+scripts accept such an approved app. The check is skipped off macOS, without `xattr`, and for a
+Chrome outside a `.app` bundle. `quarantine.sh` checks this with a fake `Foo.app`, first
+quarantined (the scripts fail at once), then approved (they go on to start it):
 
 ```sh
 test/integration/web/quarantine.sh

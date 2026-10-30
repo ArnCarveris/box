@@ -49,7 +49,8 @@ function parse(argv) {
 }
 
 // macOS holds a quarantined app at its first launch check, which a headless session never
-// passes, so fail at once instead of "chrome did not start" after the connect timeout
+// passes, so fail at once instead of "chrome did not start" after the connect timeout. Approving
+// the app in the Finder keeps the attribute but sets the user-approved flag 0x0040, which passes.
 function checkQuarantine(chrome) {
   if (process.platform !== 'darwin') return;
   let app = existsSync(chrome) ? realpathSync(chrome) : resolve(chrome);
@@ -57,10 +58,11 @@ function checkQuarantine(chrome) {
     if (dirname(app) === app) return;
     app = dirname(app);
   }
-  const xattr = spawnSync('xattr', ['-p', 'com.apple.quarantine', app], { stdio: 'ignore' });
+  const xattr = spawnSync('xattr', ['-p', 'com.apple.quarantine', app], { encoding: 'utf8' });
   if (xattr.error || xattr.status !== 0) return;
+  if (parseInt(xattr.stdout.split(';')[0], 16) & 0x0040) return;
   console.error(`FAIL: ${app} has the com.apple.quarantine attribute, so macOS holds Chrome at ` +
-    'its first launch check. Open Chrome once from the Finder, or run\n' +
+    'its first launch check. Open Chrome once from the Finder and confirm it, or run\n' +
     `  xattr -dr com.apple.quarantine "${app}"\n` +
     'or pass --chrome with a copy without the attribute.');
   process.exit(2);
