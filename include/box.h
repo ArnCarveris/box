@@ -37,6 +37,7 @@
 #include "box/fps.h"
 #include "box/atmosphere.h"
 #include "box/particle.h"
+#include "box/transition.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -471,16 +471,31 @@ static box_msdf_dist_t box_msdf_edge_distance(
         : box_msdf_line_distance(e, origin, param);
 }
 
-double box_msdf_corner_distance(
-    const box_msdf_edge_t *a,
-    const box_msdf_edge_t *b,
+double box_msdf_edges_distance(
+    const box_msdf_edge_t *edges,
+    const box_msdf_prep_t *prep,
+    const int32_t *indices,
+    int32_t count,
     box_msdf_point_t p)
 {
+    box_msdf_dist_t result = { INFINITY, 0.0 };
+    int32_t i;
     double param;
-    box_msdf_dist_t da = box_msdf_edge_distance(a, p, &param);
-    box_msdf_dist_t db = box_msdf_edge_distance(b, p, &param);
+    for (i = 0; i < count; i ++) {
+        const box_msdf_prep_t *ep = &prep[indices[i]];
+        double dx = fmax(fmax(ep->min.x - p.x, p.x - ep->max.x), 0.0);
+        double dy = fmax(fmax(ep->min.y - p.y, p.y - ep->max.y), 0.0);
+        if (dx * dx + dy * dy > result.distance * result.distance) {
+            continue;
+        }
 
-    return box_msdf_less(db, da) ? db.distance : da.distance;
+        box_msdf_dist_t d = box_msdf_edge_distance(&edges[indices[i]], p, &param);
+        if (box_msdf_less(d, result)) {
+            result = d;
+        }
+    }
+
+    return result.distance;
 }
 
 void box_msdf_shape_init(
@@ -1036,6 +1051,38 @@ static void box_msdf_crossings(
             a = b;
         }
     }
+}
+
+bool box_msdf_inside(
+    const box_msdf_shape_t *shape,
+    box_msdf_point_t p)
+{
+    int32_t i, s, winding = 0, count = ecs_vec_count(&shape->edges);
+    const box_msdf_edge_t *edges = ecs_vec_first(&shape->edges);
+    for (i = 0; i < count; i ++) {
+        int32_t steps = edges[i].degree == 2 ? BOX_MSDF_FLATTEN : 1;
+        if (p.y < fmin(fmin(edges[i].p[0].y, edges[i].p[1].y), edges[i].p[2].y) ||
+            p.y >= fmax(fmax(edges[i].p[0].y, edges[i].p[1].y), edges[i].p[2].y))
+        {
+            continue;
+        }
+
+        box_msdf_point_t a = edges[i].p[0];
+        for (s = 1; s <= steps; s ++) {
+            box_msdf_point_t b = s == steps
+                ? edges[i].p[2]
+                : box_msdf_at(&edges[i], (double)s / steps);
+            if ((a.y <= p.y) != (b.y <= p.y) &&
+                a.x + (p.y - a.y) * (b.x - a.x) / (b.y - a.y) > p.x)
+            {
+                winding += b.y > a.y ? 1 : -1;
+            }
+
+            a = b;
+        }
+    }
+
+    return winding != 0;
 }
 
 /** Order crossings by x.

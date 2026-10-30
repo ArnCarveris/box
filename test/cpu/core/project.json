@@ -280,6 +280,24 @@
                     "resized",
                     "cpu_copy_size"
                 ]
+            },
+            {
+                "id": "Transition",
+                "testcases": [
+                    "design_script",
+                    "omitted_fields",
+                    "set_from_c",
+                    "prefab_inherited",
+                    "instance_set_copies",
+                    "no_leak",
+                    "not_transitionable",
+                    "negative_duration",
+                    "negative_delay",
+                    "supported",
+                    "ease_end_points",
+                    "ease_monotonic",
+                    "ease_midpoints"
+                ]
             }
         ]
     }

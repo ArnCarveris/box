@@ -63,26 +63,6 @@ static void box_console_color(
     }
 }
 
-/** Get the byte of a scrollback line its wrapped rows start under: the end of the prompt of a
- * line that ran, the end of the leading indentation of other lines.
- *
- * @param text The line
- * @param kind What the line shows
- * @return The byte
- */
-static int32_t box_console_hang(
-    const char *text,
-    box_console_kind_t kind)
-{
-    int32_t prompt = (int32_t)strlen(BOX_CONSOLE_PROMPT);
-    int32_t result = (int32_t)strspn(text, " \t");
-    if (kind == BoxConsoleCommand && !strncmp(text, BOX_CONSOLE_PROMPT, (size_t)prompt)) {
-        result = prompt;
-    }
-
-    return result;
-}
-
 /** Get the Text a console line is drawn with: wrapped at the width of the panel and kept at
  * those rows by the layout.
  *
@@ -152,7 +132,7 @@ static void box_console_text(
     box_console_color(world, e, color);
 }
 
-/** Get the color of a part of a command line.
+/** Get the color of a part of a command line or of output.
  *
  * @param console The Console singleton
  * @param kind What the part is
@@ -163,7 +143,8 @@ static rgb box_console_syntax_color(
     box_console_syntax_t kind)
 {
     const ConsoleSyntax *c = &console->syntax;
-    rgb result = c->extra;
+    const ConsoleOutput *o = &console->output;
+    rgb result = console->text;
     switch (kind) {
     case BoxSyntaxName: result = c->name; break;
     case BoxSyntaxUnknown: result = c->unknown; break;
@@ -174,6 +155,36 @@ static rgb box_console_syntax_color(
     case BoxSyntaxBoolean: result = c->boolean; break;
     case BoxSyntaxValue: result = c->value; break;
     case BoxSyntaxExtra: result = c->extra; break;
+    case BoxSyntaxScope: result = c->scope; break;
+    case BoxSyntaxSymbol: result = c->symbol; break;
+    case BoxSyntaxGhost: result = c->ghost; break;
+    case BoxOutputText: result = console->text; break;
+    case BoxOutputError: result = console->error; break;
+    case BoxOutputDim: result = o->dim; break;
+    case BoxOutputEntity: result = o->entity; break;
+    case BoxOutputComponent: result = o->component; break;
+    case BoxOutputKey: result = o->key; break;
+    case BoxOutputNumber: result = o->number; break;
+    case BoxOutputString: result = o->string; break;
+    case BoxOutputBoolean: result = o->boolean; break;
+    case BoxOutputKeyword: result = o->keyword; break;
+    case BoxOutputCommand: result = o->command; break;
+    case BoxOutputParam: result = o->param; break;
+    case BoxOutputType: result = o->type; break;
+    case BoxOutputBrief: result = o->brief; break;
+    case BoxOutputGroup: result = o->group; break;
+    case BoxOutputMatch: result = o->match; break;
+    case BoxOutputAdded: result = o->added; break;
+    case BoxOutputRemoved: result = o->removed; break;
+    case BoxOutputRed: result = o->red; break;
+    case BoxOutputGreen: result = o->green; break;
+    case BoxOutputYellow: result = o->yellow; break;
+    case BoxOutputBlue: result = o->blue; break;
+    case BoxOutputMagenta: result = o->magenta; break;
+    case BoxOutputCyan: result = o->cyan; break;
+    case BoxOutputWhite: result = o->white; break;
+    case BoxOutputGrey: result = o->grey; break;
+    case BoxSpanNone: break;
     }
 
     return result;
@@ -518,7 +529,7 @@ int32_t box_console_line_rows(
     }
 
     if (!l->rows) {
-        Text look = box_console_look(con, console, l->text, box_console_hang(l->text, l->kind));
+        Text look = box_console_look(con, console, l->text, l->hang);
         l->rows = box_text_break_lines(world, &look, NULL);
         con->pending = con->pending || (!l->rows && box_console_font_loading(world, con));
     }
@@ -540,8 +551,9 @@ int32_t box_console_scrollback_rows(
     return result;
 }
 
-/** Write the input line after the prompt into its text, wrapped at the width of the panel, and
- * put the cursor on the caret of its row and column.
+/** Write the input line after the prompt of the session into its text, wrapped at the width of
+ * the panel, with the suggestion of the history dimmed after it, and put the cursor on the caret
+ * of its row and column.
  *
  * @param world The world
  * @param con The console state
@@ -554,13 +566,41 @@ static int32_t box_console_ui_input(
     const Console *console)
 {
     box_console_ui_t *ui = &con->ui;
-    int32_t prompt = (int32_t)strlen(BOX_CONSOLE_PROMPT), rows = 0;
-    char *value = flecs_asprintf("%s%s", BOX_CONSOLE_PROMPT, con->line);
+    const char *ghost = box_console_ghost(con);
+    ecs_vec_t spans, head_spans;
+    ecs_vec_init_t(NULL, &spans, box_console_span_t, 0);
+    ecs_vec_init_t(NULL, &head_spans, box_console_span_t, 0);
+    char *head = box_console_prompt(world, con, &head_spans);
+    int32_t i, prompt = (int32_t)strlen(head), rows = 0;
+    char *value = flecs_asprintf("%s%s%s", head, con->line, ghost ? ghost : "");
     float lh = console->line_height, x = 0, y = 0;
     TextCaret caret = {0};
+    for (i = 0; i < ecs_vec_count(&con->spans); i ++) {
+        box_console_span_t sp = *ecs_vec_get_t(&con->spans, box_console_span_t, i);
+        sp.start += prompt;
+        sp.end += prompt;
+        *ecs_vec_append_t(NULL, &spans, box_console_span_t) = sp;
+    }
+
+    for (i = 0; i < ecs_vec_count(&head_spans); i ++) {
+        *ecs_vec_append_t(NULL, &spans, box_console_span_t) =
+            *ecs_vec_get_t(&head_spans, box_console_span_t, i);
+    }
+
+    ecs_vec_fini_t(NULL, &head_spans, box_console_span_t);
+
+    if (ghost) {
+        *ecs_vec_append_t(NULL, &spans, box_console_span_t) = (box_console_span_t){
+            .start = prompt + con->length,
+            .end = prompt + con->length + (int32_t)strlen(ghost),
+            .kind = BoxSyntaxGhost };
+    }
+
     box_console_text(world, ui->line, value, prompt, con, console, console->input);
-    box_console_spans(world, ui->line, &con->spans, prompt, console);
+    box_console_spans(world, ui->line, &spans, 0, console);
+    ecs_vec_fini_t(NULL, &spans, box_console_span_t);
     ecs_os_free(value);
+    ecs_os_free(head);
     rows = box_text_line(world, ui->line, 0, NULL, NULL);
     con->pending = con->pending || (!rows && box_console_font_loading(world, con));
     rows = rows > 0 ? rows : 1;
@@ -650,8 +690,7 @@ static void box_console_ui_scrollback(
             color = console->error;
         }
 
-        box_console_text(world, e, text, l ? box_console_hang(text, l->kind) : 0, con, console,
-            color);
+        box_console_text(world, e, text, l ? l->hang : 0, con, console, color);
         box_console_spans(world, e, l ? &l->spans : NULL, 0, console);
         box_console_rows_height(world, e, l ? box_console_line_rows(world, con, console, l) : 1,
             console);

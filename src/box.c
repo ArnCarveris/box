@@ -57,4 +57,5 @@ void BoxImport(
     ECS_IMPORT(world, BoxFps);
     ECS_IMPORT(world, BoxAtmosphere);
     ECS_IMPORT(world, BoxParticle);
+    ECS_IMPORT(world, BoxTransition);
 }

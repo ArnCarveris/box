@@ -3,12 +3,12 @@
  * @brief The in game console: an overlay that runs command lines in a flecs shell session.
  *
  * The toggle action (the grave key) opens and closes it. The console is UI content in its own
- * scene, drawn by its own view after every other view (at
- * BOX_VIEW_ORDER_CONSOLE), and takes the keyboard while open.
+ * scene, drawn by its own view after every other view (BOX_VIEW_ORDER_CONSOLE), and takes the
+ * keyboard while open. The first time it opens, a hint line starts the scrollback.
  *
- * The console runs cls itself, so it never reaches the session: cls empties the scrollback and
- * Ctrl+L does the same without touching the input line. help in the console lists cls too.
- * Command lines are colored in the console only (ConsoleSyntax), never in sessions or logs.
+ * The prompt is the session scope (~ at the root) and $, and every line that ran keeps it. The
+ * console runs cls itself. Command lines (ConsoleSyntax) and output by result type (ConsoleOutput)
+ * are colored in the console only, never in sessions, logs or box_command_run.
  */
 
 #ifndef BOX_CONSOLE_H
@@ -48,7 +48,7 @@ extern "C" {
  * session.
  *
  * The input line is colored as it is typed; a line that ran keeps the colors it had then.
- * Output keeps Console.text and Console.error, other parts Console.input or Console.command.
+ * Output is colored with ConsoleOutput, other parts Console.input or Console.command.
  */
 ECS_STRUCT(ConsoleSyntax, {
     rgb name;       /**< Name of a known command or console command */
@@ -60,6 +60,44 @@ ECS_STRUCT(ConsoleSyntax, {
     rgb boolean;    /**< Argument of a bool parameter, true or false in a value expression */
     rgb value;      /**< Value expression in brackets: {...}, [...] or (...) */
     rgb extra;      /**< Argument beyond the parameters of the command */
+    rgb scope;      /**< Scope of the session in the prompt, ~ at the root */
+    rgb symbol;     /**< The $ of the prompt */
+    rgb ghost;      /**< Rest of the history line the input line starts, drawn after the cursor */
+});
+
+/** Colors of the output of commands in the console, as Console.output.
+ *
+ * The console shows the result of a command by its type, like the flecs explorer terminal:
+ * entity paths, trees, query rows, help, entity info, docs, grep matches, scripts, diffs, values.
+ *
+ * Errors start with "error: " in Console.error, the further lines of an error are dimmed. ANSI
+ * color codes in output become the ANSI colors. Text without a color of its own is Console.text.
+ */
+ECS_STRUCT(ConsoleOutput, {
+    rgb dim;        /**< Parent part of paths, tree guides, line numbers, error details */
+    rgb entity;     /**< Entity names */
+    rgb component;  /**< Components and ids */
+    rgb key;        /**< Member names of values and labels of fields */
+    rgb number;     /**< Numbers */
+    rgb string;     /**< Strings */
+    rgb boolean;    /**< true and false */
+    rgb keyword;    /**< null and keywords of flecs script */
+    rgb command;    /**< Command names in help */
+    rgb param;      /**< Parameters of commands in help */
+    rgb type;       /**< Types of parameters in help */
+    rgb brief;      /**< Descriptions of commands and parameters in help */
+    rgb group;      /**< Group headers of help */
+    rgb match;      /**< Text a grep matched */
+    rgb added;      /**< Added lines of a diff */
+    rgb removed;    /**< Removed lines of a diff */
+    rgb red;        /**< ANSI red, code 31 */
+    rgb green;      /**< ANSI green, code 32 */
+    rgb yellow;     /**< ANSI yellow, code 33 */
+    rgb blue;       /**< ANSI blue, code 34 */
+    rgb magenta;    /**< ANSI magenta, code 35 */
+    rgb cyan;       /**< ANSI cyan, code 36 */
+    rgb white;      /**< ANSI white, code 37 */
+    rgb grey;       /**< ANSI grey, code 90 */
 });
 
 /** The console singleton: whether it is open and how it looks.
@@ -68,9 +106,9 @@ ECS_STRUCT(ConsoleSyntax, {
  * its resizes, a fraction of zero or less is a panel of zero size, one or more fills the axis.
  * Lines wrap at its width minus the padding, their rows under the prompt or the indentation.
  *
- * While open, typed and pasted text (Input.paste) and key presses go to the input line and no
- * action but the toggle sees the keyboard or mouse buttons. Enter runs the line, Up and Down walk
- * the lines that ran, Page Up, Page Down and the wheel scroll rows, Escape or the toggle close it.
+ * While open, text and key presses go to the input line and only the toggle sees the keyboard.
+ * Enter runs, Up/Down walk the history, Right/End accept the suggestion, Ctrl+A/E/U/K/W/C/L edit
+ * like readline, Page Up/Down and the wheel scroll and Escape closes, see the README console keys.
  */
 ECS_STRUCT(Console, {
     bool open;           /**< Shown and taking the keyboard, the toggle action flips it */
@@ -82,11 +120,12 @@ ECS_STRUCT(Console, {
     int32_t scrollback;  /**< Rows of output the console keeps, default 1000 */
     rgba background;     /**< Color of the panel, default translucent dark blue */
     rgb border;          /**< Color of the line along the bottom edge */
-    rgb text;            /**< Color of the output of a command */
+    rgb text;            /**< Color of output without a color of its own */
     rgb command;         /**< Color of a line that ran, echoed after the prompt */
-    rgb error;           /**< Color of the output of a failed command */
+    rgb error;           /**< Color of the error: label of a failed command */
     rgb input;           /**< Color of the input line and its cursor */
     ConsoleSyntax syntax;/**< Colors of the parts of command lines, see ConsoleSyntax */
+    ConsoleOutput output;/**< Colors of the output of commands, see ConsoleOutput */
 });
 
 /** Register the box.console module.
@@ -102,7 +141,10 @@ void BoxConsoleImport(
 /** Run a line in the console as if it was typed and entered.
  *
  * The line and its output are added to the scrollback and the input history, cls empties the
- * scrollback and returns an empty output. box.console.run(line) does the same in a script.
+ * scrollback. box.console.run(line) does the same in a script.
+ *
+ * The output is the text the console shows, which for structured results (trees, query rows,
+ * entity info, ...) is laid out for reading and differs from the text of box_command_run.
  *
  * @param world The world
  * @param line The command line
@@ -113,6 +155,19 @@ char* box_console_run(
     ecs_world_t *world,
     const char *line,
     bool *error);
+
+/** Type text into the input line of the console at the cursor, as if it was typed.
+ *
+ * Control characters are dropped. box.console.type(text) does the same in a script, which
+ * shows a line being typed, with its history suggestion, without input events.
+ *
+ * @param world The world
+ * @param text UTF-8 text
+ * @return The input line, which the caller frees
+ */
+char* box_console_type(
+    ecs_world_t *world,
+    const char *text);
 
 #ifdef __cplusplus
 }

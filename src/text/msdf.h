@@ -253,23 +253,39 @@ float box_msdf_median3(
 float box_msdf_median(
     const float *v);
 
-/** Signed distance from a point to the nearer of the two edges that meet at a corner.
+/** Signed distance from a point to the nearest of a set of edges. Edges whose box is farther
+ * than the nearest edge so far are skipped, so the set should start with the likely nearest.
  *
- * @param a The edge that ends at the corner
- * @param b The edge that starts at the corner
+ * @param edges The edges of the shape
+ * @param prep The constants of the edges of the shape
+ * @param indices Indices of the edges of the set
+ * @param count Number of edges of the set
  * @param p The point, in font units
- * @return The distance in font units, positive inside
+ * @return The distance in font units, positive inside, infinite for an empty set
  */
-double box_msdf_corner_distance(
-    const box_msdf_edge_t *a,
-    const box_msdf_edge_t *b,
+double box_msdf_edges_distance(
+    const box_msdf_edge_t *edges,
+    const box_msdf_prep_t *prep,
+    const int32_t *indices,
+    int32_t count,
+    box_msdf_point_t p);
+
+/** Check whether a point is inside the outline by the nonzero fill, as the sign of the field
+ * of a texel at the point would take it.
+ *
+ * @param shape The finished shape
+ * @param p The point, in font units
+ * @return Whether the point is inside
+ */
+bool box_msdf_inside(
+    const box_msdf_shape_t *shape,
     box_msdf_point_t p);
 
 /** Correct the artifacts of the field after msdfgen's MSDFErrorCorrection without a distance
  * check: protect corners and edges, then flatten the texels whose interpolation leaves the range
  * their distance allows. Around each corner where the interpolated median leaves the side the
- * distance of the corner edges gives, move the clashing channels without changing the median of
- * their texel.
+ * distance of the edges near the corner gives, move the clashing channels without changing the
+ * median of their texel.
  *
  * @param gen The generation
  */

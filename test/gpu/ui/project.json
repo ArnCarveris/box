@@ -196,7 +196,7 @@
                     "updates_while_typing",
                     "cursor_split_and_history",
                     "echoed_keeps_colors",
-                    "output_lines_plain",
+                    "output_lines_by_type",
                     "color_change_no_relayout",
                     "session_plain_text",
                     "capture"

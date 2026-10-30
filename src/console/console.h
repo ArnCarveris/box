@@ -14,8 +14,21 @@
 /** Rows one wheel step scrolls */
 #define BOX_CONSOLE_WHEEL_LINES (3)
 
-/** Prompt in front of the input line and of the lines that ran */
-#define BOX_CONSOLE_PROMPT "> "
+/** Scope of the prompt while the session is at the root */
+#define BOX_CONSOLE_ROOT "~"
+
+/** Symbol of the prompt after the scope, with the space before and after it */
+#define BOX_CONSOLE_SYMBOL " $ "
+
+/** Echoed after a line that Ctrl+C abandoned */
+#define BOX_CONSOLE_INTERRUPT "^C"
+
+/** Name of the command the hint line points to */
+#define BOX_CONSOLE_HINT_HELP "help"
+
+/** Line that starts the scrollback the first time the console opens */
+#define BOX_CONSOLE_HINT "Flecs Shell  type " BOX_CONSOLE_HINT_HELP \
+    " for a list of possible commands"
 
 /** What a line of the scrollback shows, which picks its color */
 typedef enum box_console_kind_t {
@@ -34,10 +47,40 @@ typedef enum box_console_syntax_t {
     BoxSyntaxString,    /**< Quoted argument or string in a value expression */
     BoxSyntaxBoolean,   /**< Bool argument or true or false in a value expression */
     BoxSyntaxValue,     /**< Value expression in brackets */
-    BoxSyntaxExtra      /**< Argument beyond the parameters of the command */
+    BoxSyntaxExtra,     /**< Argument beyond the parameters of the command */
+    BoxSyntaxScope,     /**< Scope of the session in the prompt */
+    BoxSyntaxSymbol,    /**< The $ of the prompt */
+    BoxSyntaxGhost,     /**< Suggested rest of the input line from the history */
+    BoxOutputText,      /**< Output in Console.text, the message of an error */
+    BoxOutputError,     /**< The error: label of an error, Console.error */
+    BoxOutputDim,       /**< Parent part of a path, tree guides, line numbers, error details */
+    BoxOutputEntity,    /**< Entity name */
+    BoxOutputComponent, /**< Component or id */
+    BoxOutputKey,       /**< Member name of a value, label of a field */
+    BoxOutputNumber,    /**< Number */
+    BoxOutputString,    /**< String */
+    BoxOutputBoolean,   /**< true or false */
+    BoxOutputKeyword,   /**< null, keyword of flecs script */
+    BoxOutputCommand,   /**< Command name in help */
+    BoxOutputParam,     /**< Parameter in help */
+    BoxOutputType,      /**< Type of a parameter in help */
+    BoxOutputBrief,     /**< Description in help */
+    BoxOutputGroup,     /**< Group header of help */
+    BoxOutputMatch,     /**< Text a grep matched */
+    BoxOutputAdded,     /**< Added line of a diff */
+    BoxOutputRemoved,   /**< Removed line of a diff */
+    BoxOutputRed,       /**< ANSI red */
+    BoxOutputGreen,     /**< ANSI green */
+    BoxOutputYellow,    /**< ANSI yellow */
+    BoxOutputBlue,      /**< ANSI blue */
+    BoxOutputMagenta,   /**< ANSI magenta */
+    BoxOutputCyan,      /**< ANSI cyan */
+    BoxOutputWhite,     /**< ANSI white */
+    BoxOutputGrey,      /**< ANSI grey */
+    BoxSpanNone         /**< No color of its own, never stored in a span */
 } box_console_syntax_t;
 
-/** A colored byte range of a command line */
+/** A colored byte range of a command line or of output */
 typedef struct box_console_span_t {
     int32_t start;              /**< First byte */
     int32_t end;                /**< Byte after the range */
@@ -49,6 +92,8 @@ typedef struct box_console_line_t {
     char *text;                 /**< The line without its newline */
     box_console_kind_t kind;    /**< What the line shows */
     ecs_vec_t spans;            /**< box_console_span_t of a line that ran, in bytes of text */
+    int32_t hang;               /**< Byte its wrapped rows start under: the end of the prompt of
+                                 *   a line that ran, the end of the indentation of others */
     int32_t rows;               /**< Rows the line wraps to at box_console_t.wrap, 0 until
                                  *   measured */
 } box_console_line_t;
@@ -83,7 +128,8 @@ typedef struct box_console_t {
     ecs_vec_t lines;            /**< box_console_line_t of the scrollback */
     ecs_vec_t history;          /**< char* of the lines that ran, oldest first */
     int32_t history_at;         /**< Line of the history being edited, count for the draft */
-    char *draft;                /**< Line that was edited before walking the history */
+    char *draft;                /**< Line that was typed before walking the history, the lines
+                                 *   the walk shows start with it */
     char *line;                 /**< The input line, UTF-8 */
     int32_t length;             /**< Bytes of the input line */
     int32_t cursor;             /**< Byte of the input line the cursor sits before */
@@ -92,7 +138,8 @@ typedef struct box_console_t {
     ecs_vec_t typed;            /**< char of the text typed since the last update */
     bool pressed[BOX_KEY_COUNT];/**< Keys pressed since the last update */
     float wheel;                /**< Wheel movement since the last update */
-    bool clear;                 /**< Ctrl+L was pressed since the last update */
+    bool chord[BOX_KEY_COUNT];  /**< Keys pressed with Ctrl held since the last update */
+    bool greeted;               /**< The hint line was added, the console opened before */
     int32_t scroll;             /**< Scrollback rows scrolled up from the newest */
     int32_t rows;               /**< Scrollback rows that fit in the panel above the input */
     float wrap;                 /**< Width the rows of the scrollback lines were measured at */
@@ -120,6 +167,17 @@ typedef struct box_console_t {
 ecs_entity_t box_console_scope(
     ecs_world_t *world,
     box_console_t *con);
+
+/** Insert the printable part of text at the cursor.
+ *
+ * @param con The console state
+ * @param text The text
+ * @param size Bytes of the text
+ */
+void box_console_insert_text(
+    box_console_t *con,
+    const char *text,
+    int32_t size);
 
 /** Insert typed text at the cursor and apply the keys pressed since the last update.
  *
@@ -171,6 +229,173 @@ void box_console_syntax(
     box_console_t *con,
     const char *line,
     ecs_vec_t *spans);
+
+/** Get the scope of the console session.
+ *
+ * @param world The world
+ * @param con The console state
+ * @return The scope, 0 for the root or before the session exists
+ */
+ecs_entity_t box_console_session_scope(
+    const ecs_world_t *world,
+    const box_console_t *con);
+
+/** Get the prompt of the console session: its scope, ~ at the root, and $.
+ *
+ * @param world The world
+ * @param con The console state
+ * @param spans Receives the box_console_span_t of the scope and the $, NULL to ignore
+ * @return The prompt, which the caller frees
+ */
+char* box_console_prompt(
+    const ecs_world_t *world,
+    const box_console_t *con,
+    ecs_vec_t *spans);
+
+/** Get the suggestion of the history for the input line: the rest of the newest line that ran
+ * that starts with the input and is longer, while the cursor is at the end of a line that is
+ * not empty and the history is not being walked.
+ *
+ * @param con The console state
+ * @return The rest of the history line, NULL for no suggestion
+ */
+const char* box_console_ghost(
+    const box_console_t *con);
+
+/** Add the hint line in front of the scrollback, the first time only, and drop the oldest lines
+ * while the scrollback has more rows than the console keeps.
+ *
+ * @param world The world
+ * @param con The console state
+ */
+void box_console_greet(
+    ecs_world_t *world,
+    box_console_t *con);
+
+/** Find the command of a name as the shell does: the first function with that name in the
+ * scopes of EcsScriptShell.command_paths.
+ *
+ * @param world The world
+ * @param name The command name
+ * @return The function, 0 when no command has that name
+ */
+ecs_entity_t box_console_syntax_command(
+    const ecs_world_t *world,
+    const char *name);
+
+/** Copy a token of a command line as the shell passes it, without its quotes or backticks.
+ *
+ * @param line The command line
+ * @param index The token, 0 for the command name
+ * @return The text, which the caller frees, NULL when the line has fewer tokens
+ */
+char* box_console_syntax_token(
+    const char *line,
+    int32_t index);
+
+/** Text of console output being built and the colored ranges of its bytes */
+typedef struct box_console_out_t {
+    ecs_strbuf_t buf;           /**< The text */
+    ecs_vec_t spans;            /**< box_console_span_t of the text, later ones over earlier ones */
+} box_console_out_t;
+
+/** Start an empty output.
+ *
+ * @param out The output
+ */
+void box_console_out_init(
+    box_console_out_t *out);
+
+/** Free the text and the spans of an output.
+ *
+ * @param out The output
+ */
+void box_console_out_fini(
+    box_console_out_t *out);
+
+/** Get the bytes written to an output.
+ *
+ * @param out The output
+ * @return The length of the text
+ */
+int32_t box_console_out_len(
+    box_console_out_t *out);
+
+/** Append text to an output in a color.
+ *
+ * @param out The output
+ * @param kind What the text is, BoxSpanNone for no color of its own
+ * @param text The text
+ * @param len Bytes of the text, -1 for all of it
+ */
+void box_console_out_add(
+    box_console_out_t *out,
+    box_console_syntax_t kind,
+    const char *text,
+    int32_t len);
+
+/** Color a range of the text of an output.
+ *
+ * @param out The output
+ * @param kind What the range is, BoxSpanNone adds nothing
+ * @param start First byte
+ * @param end Byte after the range
+ */
+void box_console_out_mark(
+    box_console_out_t *out,
+    box_console_syntax_t kind,
+    int32_t start,
+    int32_t end);
+
+/** Take the text of an output, the spans stay with it.
+ *
+ * @param out The output
+ * @return The text, which the caller frees
+ */
+char* box_console_out_text(
+    box_console_out_t *out);
+
+/** Append an error: the error: label, the first line of the message and its further lines
+ * dimmed. ANSI color codes in the message become colors.
+ *
+ * @param out The output
+ * @param msg The message, with or without the BOX_COMMAND_ERROR prefix
+ */
+void box_console_out_error(
+    box_console_out_t *out,
+    const char *msg);
+
+/** Append text in which ANSI color codes (ESC[0;31m, or [[0;31m) become colors.
+ *
+ * @param out The output
+ * @param base What text outside of a color code is, BoxSpanNone for no color of its own
+ * @param text The text
+ * @param len Bytes of the text, -1 for all of it
+ */
+void box_console_out_ansi(
+    box_console_out_t *out,
+    box_console_syntax_t base,
+    const char *text,
+    int32_t len);
+
+/** Run a line in a shell session and append its result as the console shows it: laid out and
+ * colored by the type of the result, like the terminal widgets of the flecs explorer, or the
+ * errors the command logged.
+ *
+ * @param world The world
+ * @param con The console state
+ * @param session The session
+ * @param line The command line
+ * @param out The output
+ * @param error Set to whether the command logged an error
+ */
+void box_console_out_run(
+    ecs_world_t *world,
+    box_console_t *con,
+    ecs_entity_t session,
+    const char *line,
+    box_console_out_t *out,
+    bool *error);
 
 /** Empty the scrollback and reset the scroll position, keeping the input line and history.
  *
