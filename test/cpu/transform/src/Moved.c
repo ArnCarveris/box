@@ -368,3 +368,53 @@ void Moved_ctx_free_on_fini(void) {
     ecs_fini(world);
     test_int(log.freed, 1);
 }
+
+void Moved_same_value_passes_nothing(void) {
+    // core_fixes/transform_changed
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxTransform);
+    moved_log_t log = {0};
+    box_transform_on_moved(world, OnMoved, &log, NULL);
+
+    ecs_entity_t root = ecs_new(world);
+    ecs_set(world, root, Position, {1.0f, 2.0f, 3.0f});
+    ecs_set(world, root, Rotation, {0.5f, 0.0f, 0.0f});
+    ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, root);
+    ecs_set(world, child, Position, {1.0f, 0.0f, 0.0f});
+    ecs_progress(world, 0);
+
+    log = (moved_log_t){0};
+    ecs_set(world, root, Position, {1.0f, 2.0f, 3.0f});
+    ecs_set(world, root, Rotation, {0.5f, 0.0f, 0.0f});
+    ecs_progress(world, 0);
+    test_int(log.calls, 0);
+    test_int(log.count, 0);
+
+    ecs_set(world, root, Position, {2.0f, 2.0f, 3.0f});
+    ecs_progress(world, 0);
+    test_int(log.calls, 1);
+    test_int(log.count, 2);
+
+    ecs_fini(world);
+}
+
+void Moved_new_entity_at_origin_passes_entity(void) {
+    // core_fixes/transform_changed
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxTransform);
+    moved_log_t log = {0};
+    box_transform_on_moved(world, OnMoved, &log, NULL);
+
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {0.0f, 0.0f, 0.0f});
+    ecs_progress(world, 0);
+
+    bool found = false;
+    for (int32_t i = 0; i < log.count; i ++) {
+        found |= log.entities[i] == e;
+    }
+
+    test_bool(found, true);
+
+    ecs_fini(world);
+}

@@ -9,6 +9,7 @@
 #include <box.h>
 #include <bake_bench.h>
 #include "render.h"
+#include "bench_memory.h"
 
 /** Static 2D shapes of the scene */
 #define BENCH_SHAPES2D_STATIC (100000)
@@ -30,25 +31,6 @@
 
 /** 2D shapes under the clip panels of the clipped scene */
 #define BENCH_SHAPES2D_CLIPPED (1000)
-
-/** Report the stream upload counters and the allocated page buffers of the last extract.
- *
- * @param b The bench
- * @param stats Counters of the last extract
- */
-static void bench_shapes2d_memory(
-    bench_t *b,
-    const box_render_draws_stats_t *stats)
-{
-    bench_counter(b, "transform_bytes", (double)stats->transform_bytes);
-    bench_counter(b, "shading_bytes", (double)stats->shading_bytes);
-    bench_counter(b, "surface_bytes", (double)stats->surface_bytes);
-    bench_counter(b, "page_slots", (double)stats->page_slots);
-    bench_counter(b, "page_transform_bytes", (double)stats->page_transform_bytes);
-    bench_counter(b, "page_shading_bytes", (double)stats->page_shading_bytes);
-    bench_counter(b, "page_surface_bytes", (double)stats->page_surface_bytes);
-    bench_counter(b, "page_bytes", (double)stats->page_bytes);
-}
 
 /** Accept a packet without rendering it.
  *
@@ -117,7 +99,7 @@ void Shapes2D_dynamic_material(
 
     bench_counter(b, "batches", (double)stats.batches);
     bench_counter(b, "upload_bytes", (double)stats.upload_bytes);
-    bench_shapes2d_memory(b, &stats);
+    bench_render_memory(b, &stats);
     box_render_sync(world);
     ecs_fini(world);
 }
@@ -181,7 +163,7 @@ void Shapes2D_changed_1pct(
 
     bench_counter(b, "batches", (double)stats.batches);
     bench_counter(b, "upload_bytes", (double)stats.upload_bytes);
-    bench_shapes2d_memory(b, &stats);
+    bench_render_memory(b, &stats);
     box_render_sync(world);
     ecs_fini(world);
     ecs_os_free(shapes);
@@ -236,7 +218,7 @@ void Shapes2D_ui_tree_idle(
     }
 
     bench_counter(b, "batches", (double)stats.batches);
-    bench_shapes2d_memory(b, &stats);
+    bench_render_memory(b, &stats);
     box_render_sync(world);
     ecs_fini(world);
 }
@@ -302,7 +284,7 @@ void Shapes2D_ui_tree_add_remove(
     }
 
     bench_counter(b, "batches", (double)stats.batches);
-    bench_shapes2d_memory(b, &stats);
+    bench_render_memory(b, &stats);
     box_render_sync(world);
     ecs_fini(world);
     ecs_os_free(panels);
@@ -367,7 +349,7 @@ void Shapes2D_clipped_1000_moving_clips(
     bench_counter(b, "batches", (double)stats.batches);
     bench_counter(b, "clips", (double)stats.clips);
     bench_counter(b, "clip_bytes", (double)stats.clip_bytes);
-    bench_shapes2d_memory(b, &stats);
+    bench_render_memory(b, &stats);
     box_render_sync(world);
     ecs_fini(world);
 }
