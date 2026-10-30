@@ -522,6 +522,26 @@ static bool box_console_font_loading(
     return alive && (!status || status->state == FontLoading);
 }
 
+/** Note that text of the console measured no rows. While the font loads the text is measured
+ * again on the next sync. A font that failed is not waited for, but the console refreshes once
+ * the font loads again, so the text gets its real rows.
+ *
+ * @param world The world
+ * @param con The console state
+ */
+static void box_console_unmeasured(
+    const ecs_world_t *world,
+    box_console_t *con)
+{
+    bool alive = con->font && ecs_is_alive(world, con->font);
+    const FontStatus *status = alive ? ecs_get(world, con->font, FontStatus) : NULL;
+    if (box_console_font_loading(world, con)) {
+        con->pending = true;
+    } else if (status && status->state == FontFailed) {
+        con->failed = true;
+    }
+}
+
 int32_t box_console_line_rows(
     ecs_world_t *world,
     box_console_t *con,
@@ -543,7 +563,9 @@ int32_t box_console_line_rows(
             ecs_vec_last_t(&starts, int32_t)[0] == len;
         l->rows -= l->strip ? 1 : 0;
         ecs_vec_fini_t(NULL, &starts, int32_t);
-        con->pending = con->pending || (!l->rows && box_console_font_loading(world, con));
+        if (!l->rows) {
+            box_console_unmeasured(world, con);
+        }
     }
 
     return l->rows > 0 ? l->rows : 1;
@@ -619,7 +641,10 @@ static int32_t box_console_ui_input(
     ecs_os_free(con->prompted);
     con->prompted = head;
     rows = box_text_line(world, ui->line, 0, NULL, NULL);
-    con->pending = con->pending || (!rows && box_console_font_loading(world, con));
+    if (!rows) {
+        box_console_unmeasured(world, con);
+    }
+
     rows = rows > 0 ? rows : 1;
     if (box_text_caret(world, ui->line, prompt + con->cursor, &caret)) {
         const TextBounds *b = ecs_get(world, ui->line, TextBounds);
@@ -703,7 +728,10 @@ static int32_t box_console_ui_menu(
     ecs_os_free(text);
     if (count) {
         rows = box_text_line(world, con->ui.menu, 0, NULL, NULL);
-        con->pending = con->pending || (!rows && box_console_font_loading(world, con));
+        if (!rows) {
+            box_console_unmeasured(world, con);
+        }
+
         rows = rows > 0 ? rows : 1;
     }
 
@@ -847,6 +875,9 @@ static void box_console_ui_scrollback(
  * is measured: a line whose font still loads would count as one row, so the trim waits for a
  * later sync while con->pending is set by the lines.
  *
+ * A line whose font failed counts as one row without waiting, and the trim stays set so it
+ * runs again once the line gets its real rows.
+ *
  * @param world The world
  * @param con The console state
  * @param console The Console singleton
@@ -856,19 +887,21 @@ static void box_console_ui_retrim(
     box_console_t *con,
     const Console *console)
 {
-    bool pending = con->pending;
+    bool pending = con->pending, failed = con->failed;
     if (!con->trim) {
         goto done;
     }
 
     con->pending = false;
+    con->failed = false;
     box_console_scrollback_rows(world, con, console);
     if (!con->pending) {
         box_console_trim(world, con);
-        con->trim = false;
+        con->trim = con->failed;
     }
 
     con->pending = con->pending || pending;
+    con->failed = con->failed || failed;
 done:
     return;
 }
@@ -888,6 +921,15 @@ void box_console_ui_sync(
     if (con->pending) {
         con->pending = false;
         con->refresh = true;
+    }
+
+    if (con->failed) {
+        const FontStatus *status = con->font && ecs_is_alive(world, con->font) ?
+            ecs_get(world, con->font, FontStatus) : NULL;
+        if (!status || status->state != FontFailed) {
+            con->failed = false;
+            con->refresh = true;
+        }
     }
 
     if (con->prompted && !box_console_ui_prompted(world, con)) {

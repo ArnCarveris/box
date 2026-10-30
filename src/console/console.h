@@ -193,6 +193,8 @@ typedef struct box_console_t {
     float wrap;                 /**< Width the rows of the scrollback lines were measured at */
     float wrap_size;            /**< Font size the rows of the scrollback were measured at */
     bool pending;               /**< A line could not be measured while its font loads */
+    bool failed;                /**< A line could not be measured because its font failed to
+                                 *   load, it is measured again once the font loads */
     bool trim;                  /**< The rows of the scrollback were reset, it is trimmed to
                                  *   Console.scrollback once they are measured */
     ecs_entity_t font;          /**< Font of the console text, box.text.DefaultFont */
