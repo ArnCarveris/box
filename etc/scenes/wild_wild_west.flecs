@@ -1,0 +1,105 @@
+include wild_wild_west/town_marker
+include wild_wild_west/hitching_rail
+include wild_wild_west/freight
+include wild_wild_west/corral
+include wild_wild_west/landscape
+include wild_wild_west/saloon
+include wild_wild_west/general_store
+include wild_wild_west/sheriff
+include wild_wild_west/wagon
+include wild_wild_west/horse
+include wild_wild_west/windmill
+include wild_wild_west/water_tower
+include wild_wild_west/railway
+include wild_wild_west/handcar
+include wild_wild_west/cowboy
+include wild_wild_west/telegraph
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.surface
+using box.controllers
+
+window { Surface: {width: 1600, height: 1100, vsync: true} }
+west_contact_shadows { Gtao: {radius: 0.65, final_value_power: 1.8} }
+west_lantern_bloom { Bloom: {intensity: 0.1, threshold: 1.8} }
+west_film { Tonemap: {} }
+west_edges { Smaa: {} }
+
+wild_wild_west {
+  Scene: {}
+  AmbientLight: {sky: {173, 195, 210}, ground: {153, 112, 69}, intensity: 0.5}
+  LightBake: {probe_spacing: 2.5, bounds_padding: 0.4, bounces: 1, capture_size: 32, budget_ms: 6}
+  ReflectionBake: {resolution: 64, budget_ms: 2, scene_probe: true, scene_probe_height: 3}
+
+  camera {
+    Position: {-34, 29, 44}
+    Rotation: {-0.54, -0.658, 0}
+    Camera: {fov: 40, near_: 0.1, far_: 200}
+    CameraController: {speed: 12}
+  }
+  street_camera {
+    Position: {-20, 9, 21}
+    Rotation: {-0.2, -0.64, 0}
+    Camera: {fov: 48, near_: 0.1, far_: 200}
+    CameraController: {speed: 7}
+  }
+  corral_camera {
+    Position: {25, 16, 25}
+    Rotation: {-0.4, 0.62, 0}
+    Camera: {fov: 46, near_: 0.1, far_: 200}
+    CameraController: {speed: 8}
+  }
+  afternoon {
+    Rotation: {0.72, -2.35, 0}
+    DirectionalLight: {intensity: 5.2}
+    Rgb: {255, 224, 177}
+  }
+
+  landscape { WestLandscape: {}; Position: {} }
+  saloon { WestSaloon: {}; Position: {-8.9, 0.11, -7.4} }
+  general_store { WestGeneralStore: {}; Position: {-1.35, 0.11, -7.4} }
+  sheriff { WestSheriff: {}; Position: {5.6, 0.11, -7.4} }
+  windmill { WestWindmill: {}; Position: {13.8, 0.11, -7.2} }
+  water_tower { WestWaterTower: {}; Position: {12.6, 0.11, -0.6} }
+  wagon { WestWagon: {}; Position: {-7.2, 0.11, 3.8}; Rotation: {0, -0.7, 0} }
+  waiting_horse { WestHorse: {}; Position: {-2.4, 0.11, -1.2}; Rotation: {0, -1.35, 0} }
+  corral { WestCorral: {}; Position: {8.5, 0.11, 4.2} }
+  handcar { WestHandcar: {}; Position: {7.5, 0.29, 11.8} }
+  rancher { WestCowboy: {}; Position: {2.7, 0.11, 0.7}; Rotation: {0, 1.4, 0} }
+  saloon_patron { WestCowboy: {}; Position: {-9.9, 0.59, -3.9}; Rotation: {0, -0.2, 0} }
+  station_hand { WestCowboy: {shirt: {154, 84, 48}}; Position: {9.5, 0.11, 10.1}; Rotation: {0, -0.9, 0} }
+  railway { WestRailway: {}; Position: {0, 0.11, 11.8} }
+  for i in 0..3 {
+    WestTelegraph() { Position: {-15.6 + i * 15.6, 0.11, 9.4} }
+  }
+  for span in 0..2 {
+    for wire in 0..2 {
+      for segment in 0..18 {
+        const t = segment / 18.0
+        const n = (segment + 1) / 18.0
+        WestBeam(ax: -16.45 + span * 15.6 + t * 15.6 + wire * 1.71, ay: 5.44 - 2.6 * t * (1 - t), az: 9.4,
+          bx: -16.45 + span * 15.6 + n * 15.6 + wire * 1.71, by: 5.44 - 2.6 * n * (1 - n), bz: 9.4,
+          width: 0.018, tint: {59, 53, 40}) {}
+      }
+    }
+  }
+  freight { WestFreight: {}; Position: {-13.3, 0.11, 3.8} }
+  hitching_rail { WestHitchingRail: {}; Position: {-1.4, 0.11, -2.2} }
+  town_marker { WestTownMarker: {}; Position: {-12.7, 0.11, 8} }
+}
+
+main_view {
+  View: {
+    camera: wild_wild_west.camera,
+    clear: {enabled: true, color: {108, 136, 146, 255}},
+    lighting: {enabled: true, baked: true, reflections: true},
+    shadows: {enabled: true, resolution: 2048, max_distance: 130},
+    effects: [{effect: west_contact_shadows}, {effect: west_lantern_bloom}, {effect: west_film}, {effect: west_edges}]
+  }
+}

@@ -490,25 +490,23 @@ bool box_draws_caster(
         b->key.blend == Opaque && !b->key.atlas;
 }
 
-void box_draws_shadow_region(
+bool box_draws_shadow_bounds(
     const ecs_world_t *world,
-    box_render_draws_t *d,
     const box_draw_batch_t *b,
-    const box_render_transform_t *transform,
-    const box_render_surface_t *surface)
+    const box_render_transform_t *lo,
+    const box_render_transform_t *hi,
+    const box_render_surface_t *surface,
+    box_render_shadow_region_t *out)
 {
     const box_mesh_cache_t *cache = NULL;
     const box_mesh_t *mesh = NULL;
-    vec3 lo, hi;
-    int32_t c, r;
-    if (!d->shadow_record || !box_draws_caster(b)) {
-        goto done;
-    }
-
+    vec3 min, max;
+    int32_t c, r, k;
+    bool result = false;
     if (surface->p[0][0] != 0.0f) {
         for (r = 0; r < 3; r ++) {
-            lo[r] = surface->p[22][r] - surface->p[23][r];
-            hi[r] = surface->p[22][r] + surface->p[23][r];
+            min[r] = surface->p[22][r] - surface->p[23][r];
+            max[r] = surface->p[22][r] + surface->p[23][r];
         }
     } else {
         cache = box_mesh_cache_of(world);
@@ -517,31 +515,54 @@ void box_draws_shadow_region(
             goto done;
         }
 
-        glm_vec3_copy(ECS_CONST_CAST(float*, mesh->min), lo);
-        glm_vec3_copy(ECS_CONST_CAST(float*, mesh->max), hi);
+        glm_vec3_copy(ECS_CONST_CAST(float*, mesh->min), min);
+        glm_vec3_copy(ECS_CONST_CAST(float*, mesh->max), max);
     }
 
-    box_render_shadow_region_t *out = ecs_vec_append_t(
-        NULL, &d->shadow_regions, box_render_shadow_region_t);
     out->scene = b->key.scene;
     glm_vec3_fill(out->min, FLT_MAX);
     glm_vec3_fill(out->max, -FLT_MAX);
     for (c = 0; c < 8; c ++) {
         vec3 local = {
-            (c & 1) ? hi[0] : lo[0],
-            (c & 2) ? hi[1] : lo[1],
-            (c & 4) ? hi[2] : lo[2]
+            (c & 1) ? max[0] : min[0],
+            (c & 2) ? max[1] : min[1],
+            (c & 4) ? max[2] : min[2]
         };
         for (r = 0; r < 3; r ++) {
-            const float *row = transform->rows[r];
-            float world_r = row[0] * local[0] + row[1] * local[1] + row[2] * local[2] + row[3];
-            out->min[r] = glm_min(out->min[r], world_r);
-            out->max[r] = glm_max(out->max[r], world_r);
+            const float *row_lo = lo->rows[r];
+            const float *row_hi = hi->rows[r];
+            float world_lo = 0.0f, world_hi = 0.0f;
+            for (k = 0; k < 3; k ++) {
+                float a = row_lo[k] * local[k], z = row_hi[k] * local[k];
+                world_lo += glm_min(a, z);
+                world_hi += glm_max(a, z);
+            }
+
+            world_lo += row_lo[3];
+            world_hi += row_hi[3];
+            out->min[r] = glm_min(out->min[r], world_lo);
+            out->max[r] = glm_max(out->max[r], world_hi);
         }
     }
 
+    result = true;
 done:
-    return;
+    return result;
+}
+
+void box_draws_shadow_region(
+    const ecs_world_t *world,
+    box_render_draws_t *d,
+    const box_draw_batch_t *b,
+    const box_render_transform_t *transform,
+    const box_render_surface_t *surface)
+{
+    box_render_shadow_region_t region;
+    if (d->shadow_record && box_draws_caster(b) &&
+        box_draws_shadow_bounds(world, b, transform, transform, surface, &region))
+    {
+        *ecs_vec_append_t(NULL, &d->shadow_regions, box_render_shadow_region_t) = region;
+    }
 }
 
 /** Record the regions of every slot of a caster batch, which the tiles did not draw while the

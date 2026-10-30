@@ -63,6 +63,10 @@ typedef struct box_transition_slot_t {
     float duration;                 /**< Duration of the last start */
     double start;                   /**< Time of the last start */
     uint8_t value[BOX_RENDER_TRANSITION_VALUE]; /**< The last target sent */
+    float lo[3];                    /**< Per field minimum of the targets sent since the
+                                     *   component was last idle, which bounds the value it
+                                     *   renders: Position, Rotation and Scale only */
+    float hi[3];                    /**< Per field maximum of those targets */
 } box_transition_slot_t;
 
 /** Private state of an entity with Transition */
@@ -109,8 +113,12 @@ struct box_render_transitions_t {
                                      *   last extract that kept it */
     ecs_vec_t tag_add;              /**< ecs_entity_t that get TransitionTransform */
     ecs_vec_t tag_remove;           /**< ecs_entity_t that lose TransitionTransform */
-    ecs_vec_t shadow_scenes;        /**< ecs_entity_t, scenes with a moving shadow caster */
-    ecs_vec_t shadow_last;          /**< ecs_entity_t, those of the last frame */
+    ecs_vec_t ranges;               /**< box_draw_transition_range_t per item: the world
+                                     *   matrices the node of the item can render with, while
+                                     *   the draws record shadow regions */
+    ecs_vec_t shadow_regions;       /**< box_render_shadow_region_t, the bounds of every pose
+                                     *   the moving shadow casters can render at this frame */
+    ecs_vec_t shadow_last;          /**< box_render_shadow_region_t, those of the last frame */
     box_render_draws_t *draws;      /**< State of the batches, stored when the slot system is
                                      *   registered, so no frame looks it up by name */
     ecs_vec_t material_slots;       /**< box_transition_material_t, the slots of the material
@@ -271,11 +279,45 @@ static void box_transition_send(
     ecs_os_memcpy(r->value, slot->value, BOX_RENDER_TRANSITION_VALUE);
 }
 
+/** Set or widen the per field range of the targets of a transform component.
+ *
+ * @param component The component, nothing for one other than Position, Rotation or Scale
+ * @param slot The slot of the component
+ * @param value A target, in the layout of the component
+ * @param reset Whether the range becomes the target alone
+ */
+static void box_transition_range_add(
+    box_render_transition_component_t component,
+    box_transition_slot_t *slot,
+    const uint8_t *value,
+    bool reset)
+{
+    const box_render_transition_layout_t *layout;
+    int32_t i;
+    if (component > BOX_RENDER_TRANSITION_SCALE) {
+        goto done;
+    }
+
+    layout = box_render_transition_layout(component);
+    for (i = 0; i < 3 && i < layout->count; i ++) {
+        float v;
+        ecs_os_memcpy(&v, ECS_OFFSET(value, layout->fields[i].offset), ECS_SIZEOF(float));
+        slot->lo[i] = reset ? v : glm_min(slot->lo[i], v);
+        slot->hi[i] = reset ? v : glm_max(slot->hi[i], v);
+    }
+done:
+    return;
+}
+
 /** Compare a transitioned component of an entity to the last target sent and send what
  * changed.
  *
  * The first value sets without a transition, a changed value starts one with the spec of the
  * entry, and a value whose entry or component is gone snaps to its target.
+ *
+ * A transform component keeps the per field range of its targets since it was last idle: the
+ * resolver starts from the value it renders, and the timing functions do not overshoot, so
+ * every value it renders lies in that range, without the game thread knowing a start value.
  *
  * @param p The packet
  * @param node The node id
@@ -300,15 +342,24 @@ static void box_transition_compare(
     if (spec && value) {
         if (!slot->present) {
             ecs_os_memcpy(slot->value, packed, BOX_RENDER_TRANSITION_VALUE);
+            box_transition_range_add(component, slot, packed, true);
             slot->present = true;
             box_transition_send(p, node, component, slot, NULL);
         } else if (!box_render_transition_equal(component, slot->value, packed)) {
+            if (!box_render_transition_running(
+                slot->start, slot->delay, slot->duration, p->time))
+            {
+                box_transition_range_add(component, slot, slot->value, true);
+            }
+
+            box_transition_range_add(component, slot, packed, false);
             ecs_os_memcpy(slot->value, packed, BOX_RENDER_TRANSITION_VALUE);
             box_transition_send(p, node, component, slot, spec);
         }
     } else if (slot->present) {
         if (value) {
             ecs_os_memcpy(slot->value, packed, BOX_RENDER_TRANSITION_VALUE);
+            box_transition_range_add(component, slot, packed, true);
         }
 
         box_transition_send(p, node, component, slot, NULL);
@@ -1076,42 +1127,66 @@ static uint32_t box_transition_matrix(
     return result;
 }
 
+/** Get the target world matrix of the parent of a node without a parent node: that of its
+ * nearest ancestor with a WorldTransform, identity for none.
+ *
+ * @param world The world
+ * @param e The entity of the node
+ * @param out Receives the matrix
+ */
+static void box_transition_parent_world(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    mat4 out)
+{
+    const WorldTransform *parent = NULL;
+    ecs_entity_t cur = ecs_get_parent(world, e);
+    while (cur && !parent) {
+        parent = ecs_get(world, cur, WorldTransform);
+        cur = ecs_get_parent(world, cur);
+    }
+
+    if (parent) {
+        ecs_os_memcpy(out, parent->m, ECS_SIZEOF(mat4));
+    } else {
+        glm_mat4_identity(out);
+    }
+}
+
 /** Send the pose record of a node: the target chain from its parent node, or the target world
  * matrix of its parent without a parent node, and its target pose.
  *
+ * With a range, get the world matrices it can render with: those of its parent node times the
+ * chain and its local matrices, from the targets range of each component that runs.
+ *
  * @param world The world
+ * @param s The state of the extract
  * @param p The packet
  * @param item The item of the node
- * @param rel The target chain from the parent node, NULL without a parent node
+ * @param rel The target chain from the parent node, or the world matrix of the parent
+ * @param up The range of the parent node, NULL without a parent node
+ * @param range Receives the range of the node, NULL to skip it
  */
 static void box_transition_send_pose(
     const ecs_world_t *world,
+    const box_render_transitions_t *s,
     box_render_packet_t *p,
     const box_transition_item_t *item,
-    vec4 *rel)
+    vec4 *rel,
+    const box_draw_transition_range_t *up,
+    box_draw_transition_range_t *range)
 {
     box_render_transition_pose_t pose = {0};
     const Position *position = ecs_get(world, item->entity, Position);
     const Rotation *rotation = ecs_get(world, item->entity, Rotation);
     const Scale *scale = ecs_get(world, item->entity, Scale);
+    const box_transition_node_t *node = box_transition_node(s, item->node);
+    float *targets[3] = { pose.position, pose.rotation, pose.scale };
+    box_draw_transition_range_t chain, local;
+    vec3 lo[3], hi[3];
     uint32_t offset = 0;
-    if (rel) {
-        ecs_os_memcpy(pose.rel, rel, ECS_SIZEOF(mat4));
-    } else {
-        const WorldTransform *parent = NULL;
-        ecs_entity_t cur = ecs_get_parent(world, item->entity);
-        while (cur && !parent) {
-            parent = ecs_get(world, cur, WorldTransform);
-            cur = ecs_get_parent(world, cur);
-        }
-
-        if (parent) {
-            ecs_os_memcpy(pose.rel, parent->m, ECS_SIZEOF(mat4));
-        } else {
-            ecs_os_memcpy(pose.rel, GLM_MAT4_IDENTITY, ECS_SIZEOF(mat4));
-        }
-    }
-
+    int32_t c;
+    ecs_os_memcpy(pose.rel, rel, ECS_SIZEOF(mat4));
     if (position) {
         pose.position[0] = position->x;
         pose.position[1] = position->y;
@@ -1134,11 +1209,28 @@ static void box_transition_send_pose(
         p, BOX_RENDER_TRANSITION_POSE, item->node);
     r->parent = item->parent;
     r->data = offset;
+    for (c = 0; range && c < 3; c ++) {
+        bool runs = node && box_render_transitions_active(
+            s, item->node, (box_render_transition_component_t)c, p->time);
+        glm_vec3_copy(runs ? ECS_CONST_CAST(float*, node->slots[c].lo) : targets[c], lo[c]);
+        glm_vec3_copy(runs ? ECS_CONST_CAST(float*, node->slots[c].hi) : targets[c], hi[c]);
+    }
+
+    if (range) {
+        box_draws_range_point(rel, &chain);
+        if (up) {
+            box_draws_range_mul(up, &chain, &chain);
+        }
+
+        box_draws_range_local(lo, hi, &local);
+        box_draws_range_mul(&chain, &local, range);
+    }
 }
 
 /** Send the slot record of a transform a node moves, when its batch uploaded its run into this
- * packet; a moving shadow caster marks its scene.
+ * packet; a moving shadow caster records the bounds of the poses it can render at.
  *
+ * @param world The world
  * @param s The state of the extract
  * @param d The state of the batches
  * @param p The packet
@@ -1146,20 +1238,22 @@ static void box_transition_send_pose(
  * @param batch Index of the batch
  * @param slot The slot
  * @param rel The target chain from the node down to the instance
+ * @param range The range of the world matrices of the node, NULL when the draws record no
+ * shadow regions
  */
 static void box_transition_send_slot(
+    const ecs_world_t *world,
     box_render_transitions_t *s,
     box_render_draws_t *d,
     box_render_packet_t *p,
     uint32_t node,
     int32_t batch,
     int32_t slot,
-    mat4 rel)
+    mat4 rel,
+    const box_draw_transition_range_t *range)
 {
     box_draw_batch_t *b = batch >= 0 && batch < ecs_vec_count(&d->batches)
         ? box_draws_batch(d, batch) : NULL;
-    int32_t i;
-    bool found = false;
     if (!b || !b->alive || !b->key.dynamic_transform || b->transform_frame != p->frame ||
         slot < 0 || slot >= ecs_vec_count(&b->transforms))
     {
@@ -1170,16 +1264,9 @@ static void box_transition_send_slot(
         p, BOX_RENDER_TRANSITION_SLOT, node);
     r->data = box_transition_matrix(p, rel);
     r->offset = b->transform_data + (uint32_t)slot * (uint32_t)sizeof(box_render_transform_t);
-    if (!d->shadow_record || !box_draws_caster(b)) {
-        goto done;
-    }
-
-    for (i = 0; i < ecs_vec_count(&s->shadow_scenes) && !found; i ++) {
-        found = *ecs_vec_get_t(&s->shadow_scenes, ecs_entity_t, i) == b->key.scene;
-    }
-
-    if (!found) {
-        *ecs_vec_append_t(NULL, &s->shadow_scenes, ecs_entity_t) = b->key.scene;
+    if (range && d->shadow_record && box_draws_caster(b)) {
+        box_draws_range_region(world, b, slot, range, rel, ecs_vec_append_t(
+            NULL, &s->shadow_regions, box_render_shadow_region_t));
     }
 done:
     return;
@@ -1195,6 +1282,8 @@ done:
  * @param p The packet
  * @param item The item of the entity
  * @param rel The target chain from the node down to the entity
+ * @param range The range of the world matrices of its node, NULL when the draws record no
+ * shadow regions
  */
 static void box_transition_send_slots(
     const ecs_world_t *world,
@@ -1202,7 +1291,8 @@ static void box_transition_send_slots(
     box_render_draws_t *d,
     box_render_packet_t *p,
     const box_transition_item_t *item,
-    vec4 *rel)
+    vec4 *rel,
+    const box_draw_transition_range_t *range)
 {
     const DrawSlot *ds = ecs_get(world, item->entity, DrawSlot);
     const ShapeMesh *shape = ecs_get(world, item->entity, ShapeMesh);
@@ -1220,7 +1310,7 @@ static void box_transition_send_slots(
         instance[1][1] = shape->scale[1];
         instance[2][2] = shape->scale[2];
         glm_mul(rel, instance, m);
-        box_transition_send_slot(s, d, p, item->node, ds->batch, ds->slot, m);
+        box_transition_send_slot(world, s, d, p, item->node, ds->batch, ds->slot, m, range);
     }
 
     count = ts && tg ? ecs_vec_count(&ts->slots) : 0;
@@ -1237,17 +1327,15 @@ static void box_transition_send_slots(
         instance[3][0] = g->x;
         instance[3][1] = g->y;
         glm_mul(rel, instance, m);
-        box_transition_send_slot(s, d, p, item->node, at->batch, at->slot, m);
+        box_transition_send_slot(world, s, d, p, item->node, at->batch, at->slot, m, range);
     }
 done:
     return;
 }
 
-/** Record a region over the whole of every scene with a moving shadow caster in this frame or
- * the last one, so the shadow atlas renders every tile of the scene.
- *
- * The game thread does not know where the resolver puts a caster, and the tiles it was in
- * during the last frame must render again when it stops.
+/** Record the regions of the poses the moving shadow casters can render at in this frame and
+ * in the last one, so the shadow atlas renders the tiles a caster passes through and, when it
+ * stops, those it was in during the last frame, and no shadow stays behind.
  *
  * @param s The state of the extract
  * @param d The state of the batches
@@ -1256,22 +1344,21 @@ static void box_transition_shadows(
     box_render_transitions_t *s,
     box_render_draws_t *d)
 {
-    int32_t l, i;
-    ecs_vec_t *lists[2] = { &s->shadow_scenes, &s->shadow_last };
+    int32_t l;
+    ecs_vec_t *lists[2] = { &s->shadow_regions, &s->shadow_last };
     for (l = 0; d->shadow_record && l < 2; l ++) {
-        for (i = 0; i < ecs_vec_count(lists[l]); i ++) {
-            box_render_shadow_region_t *out = ecs_vec_append_t(
-                NULL, &d->shadow_regions, box_render_shadow_region_t);
-            out->scene = *ecs_vec_get_t(lists[l], ecs_entity_t, i);
-            glm_vec3_fill(out->min, -FLT_MAX);
-            glm_vec3_fill(out->max, FLT_MAX);
+        int32_t count = ecs_vec_count(lists[l]);
+        if (count) {
+            ecs_os_memcpy_n(ecs_vec_grow_t(NULL, &d->shadow_regions,
+                box_render_shadow_region_t, count), ecs_vec_first(lists[l]),
+                box_render_shadow_region_t, count);
         }
     }
 
     ecs_vec_t tmp = s->shadow_last;
-    s->shadow_last = s->shadow_scenes;
-    s->shadow_scenes = tmp;
-    ecs_vec_clear(&s->shadow_scenes);
+    s->shadow_last = s->shadow_regions;
+    s->shadow_regions = tmp;
+    ecs_vec_clear(&s->shadow_regions);
 }
 
 /** Send a material or shading record: the target material with the nodes of the components
@@ -1689,26 +1776,48 @@ static void BoxRenderExtractTransitionSlots(
 
     p = box_render_packet(world);
     ecs_vec_set_count_t(NULL, &s->rels, mat4, count);
+    ecs_vec_set_count_t(NULL, &s->ranges, box_draw_transition_range_t,
+        d->shadow_record ? count : 0);
     for (i = 0; i < count; i ++) {
         const box_transition_item_t *item = ecs_vec_get_t(
             &s->items, box_transition_item_t, i);
         vec4 *rel = *ecs_vec_get_t(&s->rels, mat4, i);
         vec4 *up = item->up >= 0 ? *ecs_vec_get_t(&s->rels, mat4, item->up) : NULL;
+        box_draw_transition_range_t *range = d->shadow_record
+            ? ecs_vec_get_t(&s->ranges, box_draw_transition_range_t, i) : NULL;
+        const box_draw_transition_range_t *up_range = range && item->up >= 0
+            ? ecs_vec_get_t(&s->ranges, box_draw_transition_range_t, item->up) : NULL;
         if (!ecs_is_alive(world, item->entity)) {
             glm_mat4_identity(rel);
+            if (range) {
+                box_draws_range_point(GLM_MAT4_IDENTITY, range);
+            }
+
             continue;
         }
 
         if (item->is_node) {
-            box_transition_send_pose(world, p, item, item->parent ? up : NULL);
+            mat4 parent;
+            if (item->parent) {
+                box_transition_send_pose(world, s, p, item, up, up_range, range);
+            } else {
+                box_transition_parent_world(world, item->entity, parent);
+                box_transition_send_pose(world, s, p, item, parent, NULL, range);
+            }
+
             glm_mat4_identity(rel);
         } else {
             mat4 local;
             box_transition_target_local(world, item->entity, local);
             glm_mul(up, local, rel);
+            if (range && up_range) {
+                *range = *up_range;
+            } else if (range) {
+                box_draws_range_point(GLM_MAT4_IDENTITY, range);
+            }
         }
 
-        box_transition_send_slots(world, s, d, p, item, rel);
+        box_transition_send_slots(world, s, d, p, item, rel, range);
     }
 
     box_transition_shadows(s, d);
@@ -1744,8 +1853,9 @@ static void box_transitions_free(
     ecs_vec_fini_t(NULL, &s->rels, mat4);
     ecs_vec_fini_t(NULL, &s->tag_add, ecs_entity_t);
     ecs_vec_fini_t(NULL, &s->tag_remove, ecs_entity_t);
-    ecs_vec_fini_t(NULL, &s->shadow_scenes, ecs_entity_t);
-    ecs_vec_fini_t(NULL, &s->shadow_last, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &s->ranges, box_draw_transition_range_t);
+    ecs_vec_fini_t(NULL, &s->shadow_regions, box_render_shadow_region_t);
+    ecs_vec_fini_t(NULL, &s->shadow_last, box_render_shadow_region_t);
     ecs_os_free(s);
 }
 
@@ -1832,8 +1942,9 @@ void box_render_transitions_init(
     ecs_vec_init_t(NULL, &s->rels, mat4, 0);
     ecs_vec_init_t(NULL, &s->tag_add, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &s->tag_remove, ecs_entity_t, 0);
-    ecs_vec_init_t(NULL, &s->shadow_scenes, ecs_entity_t, 0);
-    ecs_vec_init_t(NULL, &s->shadow_last, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &s->ranges, box_draw_transition_range_t, 0);
+    ecs_vec_init_t(NULL, &s->shadow_regions, box_render_shadow_region_t, 0);
+    ecs_vec_init_t(NULL, &s->shadow_last, box_render_shadow_region_t, 0);
     s->query = ecs_query(world, {
         .entity = ecs_entity(world, { .name = "RenderTransitions" }),
         .terms = {{
