@@ -58,7 +58,7 @@
 /** Channels of a corner the repair pushes at most */
 #define BOX_MSDF_CORNER_PASSES (4)
 
-/** Step by which the repair pushes a channel away from the median of its texel */
+/** Step by which the repair moves a channel without changing the median of its texel */
 #define BOX_MSDF_CORNER_STEP (1.0f / 16.0f)
 
 /** Steps by which the repair pushes a channel at most */
@@ -811,9 +811,9 @@ static int32_t box_msdf_corner_rewrong(
     return result;
 }
 
-/** Push, one at a time, a channel of one of the four texels around a corner away from the median
- * of the texel by the smallest step that leaves the fewest points of the block wrong, as long as
- * it leaves fewer.
+/** Move, one at a time, a channel of one of the four texels around a corner up or down, without
+ * changing the median of the texel, by the step that leaves the fewest points of the block wrong,
+ * as long as it leaves fewer.
  *
  * @param gen The generation
  * @param prev The edge that ends at the corner
@@ -890,8 +890,8 @@ static void box_msdf_push_corner(
  * the wrong side in a thin band next to the corner, which the protected texels let pass.
  *
  * Flattening a texel there would also erase the edges its other channels shape, such as those
- * of a nearby corner. Instead push a channel of one of the four texels around the corner away
- * from the median of the texel, which keeps the median and the edges the texel shapes.
+ * of a nearby corner. Instead move a channel of one of the four texels around the corner without
+ * changing the median of the texel, which keeps the edges the texel shapes.
  *
  * @param gen The generation
  * @param prev The edge that ends at the corner
