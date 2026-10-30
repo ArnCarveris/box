@@ -4,5 +4,10 @@
 
 ```sh
 bake3 --target em --local-env=<name> apps/boxrun
-node test/integration/web/shader_error.mjs .bake/local_env/<name>/wasm32-Emscripten/debug/bin
+node test/integration/web/shader_error.mjs \
+    "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
 ```
+
+The page lands in `.bake/local_env/<name>/wasm32-Emscripten/debug/bin`, or in
+`<output_dir>/local_env/<name>/...` when bake3's `bake.json` sets `output_dir`;
+`tools/integration.py local-env --env <name>` prints the local env folder either way.
