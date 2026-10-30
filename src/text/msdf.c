@@ -59,6 +59,9 @@
  * distance, far above the error of double precision */
 #define BOX_MSDF_BOUND_SLACK (1e-9)
 
+/** Texels of a row a span of edges covers before the edges of a contour are culled again */
+#define BOX_MSDF_SPAN (8)
+
 /** The nearest edges a contour had at the previous texel and their distances at the point */
 typedef struct box_msdf_probe_t {
     int32_t edge[3];          /**< Edge of each channel, -1 for none */
@@ -1338,7 +1341,162 @@ static void box_msdf_probe(
     }
 }
 
-/** Run every edge of each contour through the selectors of the contour.
+/** Compute the row terms of an end of an edge.
+ *
+ * @param end Receives the terms
+ * @param at The end
+ * @param dir Unit direction away from the edge
+ * @param bis Unit bisector, pointing away from the corner
+ * @param y The y of the row
+ */
+static void box_msdf_cull_end(
+    box_msdf_cull_end_t *end,
+    box_msdf_point_t at,
+    box_msdf_point_t dir,
+    box_msdf_point_t bis,
+    double y)
+{
+    double dy = y - at.y;
+    end->x0 = at.x;
+    end->ux = dir.x;
+    end->uy = dir.y;
+    end->bx = bis.x;
+    end->ahead = dy * dir.y;
+    end->side = dy * bis.y;
+    end->perp = dy * dir.x;
+}
+
+/** Compute the constants of every edge for a row, and start the spans of the contours anew.
+ *
+ * @param gen The generation, its cull and span are filled
+ * @param y The y of the row
+ */
+static void box_msdf_cull_row(
+    box_msdf_gen_t *gen,
+    double y)
+{
+    const box_msdf_edge_t *edges = ecs_vec_first(&gen->shape->edges);
+    int32_t i, count = ecs_vec_count(&gen->shape->edges);
+    int32_t contours = ecs_vec_count(&gen->shape->contours);
+    for (i = 0; i < count; i ++) {
+        const box_msdf_prep_t *ep = &gen->prep[i];
+        box_msdf_cull_t *cull = &gen->cull[i];
+        box_msdf_cull_end(&cull->a, edges[i].p[0],
+            (box_msdf_point_t){ -ep->a_dir.x, -ep->a_dir.y }, ep->a_bis, y);
+        box_msdf_cull_end(&cull->b, edges[i].p[2], ep->b_dir,
+            (box_msdf_point_t){ -ep->b_bis.x, -ep->b_bis.y }, y);
+        cull->dy = fmax(fmax(ep->min.y - y, y - ep->max.y), 0.0);
+        cull->slack = BOX_MSDF_BOUND_SLACK * (ep->extent + fabs(y));
+    }
+
+    for (i = 0; i < contours; i ++) {
+        gen->span[i].x1 = -BOX_MSDF_FAR;
+    }
+}
+
+/** Whether an end of an edge has no perpendicular distance up to a limit along a span.
+ *
+ * The terms are linear in x, so their extremes along the span are at its ends.
+ *
+ * @param end The terms of the end
+ * @param x0 The x of the first texel
+ * @param x1 The x of the last texel
+ * @param limit The limit
+ * @param margin Margin for rounding
+ * @return Whether each texel lies behind the end, on the other side of the corner bisector, or
+ *         farther than the limit from the line through the end
+ */
+static bool box_msdf_cull_end_far(
+    const box_msdf_cull_end_t *end,
+    double x0,
+    double x1,
+    double limit,
+    double margin)
+{
+    double d0 = x0 - end->x0, d1 = x1 - end->x0;
+    double p0 = d0 * end->uy - end->perp, p1 = d1 * end->uy - end->perp;
+
+    return fmax(d0 * end->ux, d1 * end->ux) + end->ahead < -margin ||
+        fmax(d0 * end->bx, d1 * end->bx) + end->side < -margin ||
+        fmin(p0, p1) > limit + margin || fmax(p0, p1) < -limit - margin;
+}
+
+/** Whether an edge can be left out of the texels of a span: it is farther than the limit, and
+ * so are the perpendicular distances at its ends.
+ *
+ * Where the probe limits of the channels of the edge stay below the limit, the edge cannot be
+ * the nearest edge, and a perpendicular distance above it loses to the pseudo distance of the
+ * nearest edge, so the field is the same as with the edge.
+ *
+ * @param gen The generation
+ * @param edge Index of the edge
+ * @param x0 The x of the first texel
+ * @param x1 The x of the last texel
+ * @param limit The limit
+ * @return Whether the edge can be left out
+ */
+static bool box_msdf_culled(
+    const box_msdf_gen_t *gen,
+    int32_t edge,
+    double x0,
+    double x1,
+    double limit)
+{
+    const box_msdf_cull_t *cull = &gen->cull[edge];
+    const box_msdf_prep_t *ep = &gen->prep[edge];
+    double margin = 2.0 * (cull->slack + BOX_MSDF_BOUND_SLACK * fmax(fabs(x0), fabs(x1)));
+    double dx = fmax(fmax(ep->min.x - x1, x0 - ep->max.x), 0.0);
+
+    return fmax(dx, cull->dy) * (1.0 - BOX_MSDF_BOUND_SLACK) - 2.0 * margin > limit &&
+        box_msdf_cull_end_far(&cull->a, x0, x1, limit, margin) &&
+        box_msdf_cull_end_far(&cull->b, x0, x1, limit, margin);
+}
+
+/** Start a span of a contour at a texel: the edges that are not culled along the next texels
+ * of the row, up to limits that leave room for the nearest distances to grow.
+ *
+ * @param gen The generation
+ * @param k Index of the contour
+ * @param first Index of the first edge of the contour
+ * @param count Number of edges of the contour
+ * @param x The x of the texel
+ * @param probe The probe of the texel, with the limit of each channel
+ */
+static void box_msdf_span(
+    box_msdf_gen_t *gen,
+    int32_t k,
+    int32_t first,
+    int32_t count,
+    double x,
+    const box_msdf_probe_t *probe)
+{
+    const box_msdf_edge_t *edges = ecs_vec_first(&gen->shape->edges);
+    box_msdf_span_t *span = &gen->span[k];
+    double x1 = x + (double)BOX_MSDF_SPAN / gen->raster->scale;
+    int32_t i, c;
+    span->x1 = x1;
+    for (c = 0; c < 3; c ++) {
+        span->limit[c] = probe->limit[c] + (x1 - x);
+    }
+
+    span->count = 0;
+    for (i = 0; i < count; i ++) {
+        double limit = 0.0;
+        for (c = 0; c < 3; c ++) {
+            if (edges[first + i].color & (1 << c)) {
+                limit = fmax(limit, span->limit[c]);
+            }
+        }
+
+        if (!box_msdf_culled(gen, first + i, x, x1, limit)) {
+            gen->span_edges[first + span->count] = first + i;
+            span->count ++;
+        }
+    }
+}
+
+/** Run the edges of each contour through the selectors of the contour, leaving out the edges
+ * the span of the contour culls.
  *
  * @param gen The generation, its multi and contour scratch are filled
  * @param p The point
@@ -1352,11 +1510,18 @@ static void box_msdf_contours(
     int32_t i, k, first = 0, contours = ecs_vec_count(&gen->shape->contours);
     box_msdf_probe_t probe;
     for (k = 0; k < contours; k ++) {
+        const box_msdf_span_t *span = &gen->span[k];
         int32_t count = counts[k];
         box_msdf_probe(&gen->multi[k], edges, p, &probe);
         box_msdf_multi_init(&gen->multi[k]);
-        for (i = 0; i < count; i ++) {
-            int32_t edge = first + i;
+        if (p.x > span->x1 || !(probe.limit[0] <= span->limit[0]) ||
+            !(probe.limit[1] <= span->limit[1]) || !(probe.limit[2] <= span->limit[2]))
+        {
+            box_msdf_span(gen, k, first, count, p.x, &probe);
+        }
+
+        for (i = 0; i < span->count; i ++) {
+            int32_t edge = gen->span_edges[first + i];
             box_msdf_add_edge(&gen->multi[k], edges, gen->prep, &probe, edge,
                 edges[edge].color, p);
         }
@@ -1500,6 +1665,7 @@ static void box_msdf_row(
     double to_value = raster->scale / raster->range;
     int32_t x, c;
     box_msdf_crossings(gen->shape, y, crossings);
+    box_msdf_cull_row(gen, y);
     const box_msdf_cross_t *cross = ecs_vec_first(crossings);
     int32_t count = ecs_vec_count(crossings);
     for (x = 0; x < raster->width; x ++) {
@@ -1547,6 +1713,9 @@ void box_msdf_generate(
     gen.stencil = ecs_os_calloc_n(uint8_t, texels);
     gen.windings = ecs_os_malloc_n(int32_t, contours);
     gen.prep = ecs_os_malloc_n(box_msdf_prep_t, ecs_vec_count(&shape->edges));
+    gen.cull = ecs_os_malloc_n(box_msdf_cull_t, ecs_vec_count(&shape->edges));
+    gen.span = ecs_os_malloc_n(box_msdf_span_t, contours);
+    gen.span_edges = ecs_os_malloc_n(int32_t, ecs_vec_count(&shape->edges));
     gen.multi = ecs_os_malloc_n(box_msdf_multi_t, contours);
     gen.contour = ecs_os_malloc_n(box_msdf_value_t, contours);
     box_msdf_windings(shape, gen.windings, NULL);
@@ -1568,6 +1737,9 @@ void box_msdf_generate(
 
     ecs_os_free(gen.contour);
     ecs_os_free(gen.multi);
+    ecs_os_free(gen.span_edges);
+    ecs_os_free(gen.span);
+    ecs_os_free(gen.cull);
     ecs_os_free(gen.prep);
     ecs_os_free(gen.windings);
     ecs_os_free(gen.stencil);

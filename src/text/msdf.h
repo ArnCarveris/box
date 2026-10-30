@@ -76,12 +76,43 @@ typedef struct box_msdf_prep_t {
     double extent;          /**< Largest magnitude of a coordinate of the edge, plus one */
 } box_msdf_prep_t;
 
+/** Terms of an end of an edge that rule out its perpendicular distance at the texels of a row.
+ * At a texel x, x - x0 times the direction plus the row term gives the distance ahead of the
+ * end, the distance on the side of the corner bisector and the perpendicular distance. */
+typedef struct box_msdf_cull_end_t {
+    double x0;     /**< x of the end */
+    double ux;     /**< x of the unit direction away from the edge */
+    double uy;     /**< y of the unit direction away from the edge */
+    double bx;     /**< x of the unit bisector, pointing away from the corner */
+    double ahead;  /**< Row term of the distance ahead of the end */
+    double side;   /**< Row term of the distance along the bisector */
+    double perp;   /**< Row term of the perpendicular distance */
+} box_msdf_cull_end_t;
+
+/** Constants of an edge for the texels of one row, to skip the edge where it cannot matter */
+typedef struct box_msdf_cull_t {
+    box_msdf_cull_end_t a; /**< The start */
+    box_msdf_cull_end_t b; /**< The end */
+    double dy;             /**< Distance from the row to the box around the edge */
+    double slack;          /**< Margin for the rounding of the row, without the texel x */
+} box_msdf_cull_t;
+
+/** Edges of a contour that are not culled along a span of a row */
+typedef struct box_msdf_span_t {
+    double x1;       /**< x of the last texel of the span, the span starts anew after it */
+    double limit[3]; /**< Largest limit of each channel at a texel the edges hold for */
+    int32_t count;   /**< Number of edges, stored from the first edge of the contour on */
+} box_msdf_span_t;
+
 /** State of the generation of one field */
 typedef struct box_msdf_gen_t {
     const box_msdf_shape_t *shape;   /**< The shape */
     const box_msdf_raster_t *raster; /**< The texels */
     int32_t *windings;               /**< Orientation of each contour: 1, -1 or 0 */
     box_msdf_prep_t *prep;           /**< Constants of each edge */
+    box_msdf_cull_t *cull;           /**< Constants of each edge for the current row */
+    box_msdf_span_t *span;           /**< Span of each contour in the current row */
+    int32_t *span_edges;             /**< Edges of the spans, in the slots of each contour */
     box_msdf_multi_t *multi;         /**< Scratch selectors, one per contour, the nearest edges
                                       *   of the previous texel until a texel resets them */
     box_msdf_value_t *contour;       /**< Scratch distances, one per contour */
