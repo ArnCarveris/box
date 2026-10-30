@@ -172,5 +172,187 @@ void SetAt_implied_authored(void) {
     test_flt(p->z, 9);
     test_flt(ecs_get(world, e, Scale)->x, 2);
 
+    ecs_entity_t origin = ecs_new(world);
+    ecs_set(world, origin, SetAt, { .frame = 2, .entity = e });
+    ecs_set(world, origin, Position, {0, 0, 0});
+    ecs_set(world, origin, Rotation, {0, 0.5f, 0});
+
+    ecs_progress(world, 0.1f);
+    p = ecs_get(world, e, Position);
+    test_flt(p->x, 0);
+    test_flt(p->y, 0);
+    test_flt(p->z, 0);
+    const Rotation *r = ecs_get(world, e, Rotation);
+    test_flt(r->x, 0);
+    test_flt(r->y, 0.5f);
+    test_flt(r->z, 0);
+    test_bool(ecs_is_alive(world, origin), false);
+
     ecs_fini(world);
+}
+
+void SetAt_added_not_copied(void) {
+    ecs_entity_t e;
+    ecs_world_t *world = set_at_world(&e);
+    ecs_set(world, e, Position, {1, 2, 3});
+    ecs_set(world, e, Box, {1, 1, 1});
+    ecs_set(world, e, Rgb, {1, 2, 3});
+    ecs_progress(world, 0.1f);
+    MaterialId id = *ecs_get(world, e, MaterialId);
+
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, SetAt, { .frame = 1, .entity = e });
+    ecs_set(world, s, Rotation, {0, 0.5f, 0});
+    ecs_set(world, s, Rgb, {40, 50, 60});
+    test_bool(ecs_has(world, s, Position), true);
+    test_bool(ecs_has(world, s, MaterialId), true);
+
+    ecs_progress(world, 0.1f);
+    test_bool(ecs_is_alive(world, s), false);
+    const Position *p = ecs_get(world, e, Position);
+    test_flt(p->x, 1);
+    test_flt(p->y, 2);
+    test_flt(p->z, 3);
+    test_flt(ecs_get(world, e, Rotation)->y, 0.5f);
+    test_int(ecs_get(world, e, Rgb)->r, 40);
+    test_uint(ecs_get(world, e, MaterialId)->value, id.value);
+
+    ecs_progress(world, 0.1f);
+    ecs_fini(world);
+}
+
+void SetAt_set_last(void) {
+    ecs_entity_t e;
+    ecs_world_t *world = set_at_world(&e);
+    ecs_set(world, e, Position, {1, 2, 3});
+    ecs_set(world, e, Box, {1, 1, 1});
+    ecs_set(world, e, Rgb, {1, 2, 3});
+    ecs_progress(world, 0.1f);
+    MaterialId id = *ecs_get(world, e, MaterialId);
+
+    ecs_entity_t turn = ecs_new(world);
+    ecs_set(world, turn, Rotation, {0, 0.5f, 0});
+    ecs_set(world, turn, Rgb, {40, 50, 60});
+    ecs_set(world, turn, SetAt, { .frame = 1, .entity = e });
+    ecs_entity_t move = ecs_new(world);
+    ecs_set(world, move, Position, {5, 0, 0});
+    ecs_set(world, move, Scale, {2, 2, 2});
+    ecs_set(world, move, SetAt, { .frame = 2, .entity = e });
+
+    ecs_progress(world, 0.1f);
+    test_bool(ecs_is_alive(world, turn), false);
+    const Position *p = ecs_get(world, e, Position);
+    test_flt(p->x, 1);
+    test_flt(p->y, 2);
+    test_flt(p->z, 3);
+    test_flt(ecs_get(world, e, Rotation)->y, 0.5f);
+    test_int(ecs_get(world, e, Rgb)->r, 40);
+    test_uint(ecs_get(world, e, MaterialId)->value, id.value);
+
+    ecs_progress(world, 0.1f);
+    test_bool(ecs_is_alive(world, move), false);
+    p = ecs_get(world, e, Position);
+    test_flt(p->x, 5);
+    test_flt(p->y, 0);
+    test_flt(ecs_get(world, e, Scale)->x, 2);
+
+    ecs_fini(world);
+}
+
+/** Run a scene that changes e with SetAt at frame 1, then check e after the frame.
+ *
+ * @param scene The scene, with SetAt entities whose entity is e
+ * @param x Expected Position.x of e
+ * @param y Expected Rotation.y of e
+ */
+static void set_at_script_check(
+    const char *scene,
+    float x,
+    float y)
+{
+    ecs_entity_t e;
+    ecs_world_t *world = set_at_world(&e);
+    ecs_set(world, e, Position, {1, 2, 3});
+    ecs_set(world, e, Box, {1, 1, 1});
+    ecs_set(world, e, Rgb, {1, 2, 3});
+    ecs_progress(world, 0.1f);
+    MaterialId id = *ecs_get(world, e, MaterialId);
+
+    test_int(ecs_script_run(world, "scene", scene, NULL), 0);
+    ecs_progress(world, 0.1f);
+    test_assert(ecs_lookup(world, "change") == 0);
+
+    const Position *p = ecs_get(world, e, Position);
+    test_flt(p->x, x);
+    test_flt(p->y, x == 1 ? 2 : 0);
+    test_flt(p->z, x == 1 ? 3 : 0);
+    test_flt(ecs_get(world, e, Rotation)->y, y);
+    test_int(ecs_get(world, e, Rgb)->r, 40);
+    test_uint(ecs_get(world, e, MaterialId)->value, id.value);
+
+    ecs_progress(world, 0.1f);
+    ecs_fini(world);
+}
+
+void SetAt_script_first_zero(void) {
+    set_at_script_check(
+        "using box.app\n"
+        "using box.transform\n"
+        "using box.material\n"
+        "change {\n"
+        "  SetAt: {frame: 1, entity: e}\n"
+        "  Position: {0, 0, 0}\n"
+        "  Rotation: {0, 0.5, 0}\n"
+        "  Rgb: {40, 50, 60}\n"
+        "}\n", 0, 0.5f);
+}
+
+void SetAt_script_first_zero_after_rotation(void) {
+    set_at_script_check(
+        "using box.app\n"
+        "using box.transform\n"
+        "using box.material\n"
+        "change {\n"
+        "  SetAt: {frame: 1, entity: e}\n"
+        "  Rotation: {0, 0.5, 0}\n"
+        "  Position: {0, 0, 0}\n"
+        "  Rgb: {40, 50, 60}\n"
+        "}\n", 0, 0.5f);
+}
+
+void SetAt_script_first_added(void) {
+    set_at_script_check(
+        "using box.app\n"
+        "using box.transform\n"
+        "using box.material\n"
+        "change {\n"
+        "  SetAt: {frame: 1, entity: e}\n"
+        "  Rotation: {0, 0.5, 0}\n"
+        "  Rgb: {40, 50, 60}\n"
+        "}\n", 1, 0.5f);
+}
+
+void SetAt_script_last_added(void) {
+    set_at_script_check(
+        "using box.app\n"
+        "using box.transform\n"
+        "using box.material\n"
+        "change {\n"
+        "  Rotation: {0, 0.5, 0}\n"
+        "  Rgb: {40, 50, 60}\n"
+        "  SetAt: {frame: 1, entity: e}\n"
+        "}\n", 1, 0.5f);
+}
+
+void SetAt_script_last_written(void) {
+    set_at_script_check(
+        "using box.app\n"
+        "using box.transform\n"
+        "using box.material\n"
+        "change {\n"
+        "  Position: {5, 0, 0}\n"
+        "  Rotation: {0, 0.5, 0}\n"
+        "  Rgb: {40, 50, 60}\n"
+        "  SetAt: {frame: 1, entity: e}\n"
+        "}\n", 5, 0.5f);
 }

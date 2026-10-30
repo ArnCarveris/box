@@ -316,7 +316,14 @@
                     "from_script",
                     "no_entity",
                     "implied_not_copied",
-                    "implied_authored"
+                    "implied_authored",
+                    "added_not_copied",
+                    "set_last",
+                    "script_first_zero",
+                    "script_first_zero_after_rotation",
+                    "script_first_added",
+                    "script_last_added",
+                    "script_last_written"
                 ]
             }
         ]

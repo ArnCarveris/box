@@ -76,12 +76,15 @@
       print: function (text) { console.log(text); },
       printErr: function (text) { console.error(text); },
       preRun: [function (module) {
+        // Not every emscripten version passes the module to preRun callbacks; the factory
+        // assigns its exports (FS among them) to the options object either way
+        var fs = (module && module.FS) || options.FS;
         files.forEach(function (file) {
           var dir = file.path.substring(0, file.path.lastIndexOf('/'));
           if (dir) {
-            module.FS.mkdirTree(dir);
+            fs.mkdirTree(dir);
           }
-          module.FS.writeFile(file.path, file.data);
+          fs.writeFile(file.path, file.data);
         });
       }]
     };

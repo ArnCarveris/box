@@ -277,3 +277,47 @@ void Transition_mesh_color_mid_transition(void) {
     trans_no_errors(world);
     ecs_fini(world);
 }
+
+/** The red box of shape_mid_transition moves to x = 2 while the GPU backend applies compile
+ * outcomes after the frame, the way the browser does.
+ *
+ * The box shares its batch with the floor, so the frame that ends the transition scatters its
+ * slot, the first scatter of the world: it sends the scatter shader on demand, whose module
+ * arrives only with the next packet. The box still ends at x = 2.
+ */
+void Transition_shape_ends_before_scatter_shader_compiles(void) {
+    // engine_core/transition
+    ecs_world_t *world = trans_world();
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {-2, 0.5f, 0});
+    ecs_set(world, e, Box, {1, 1, 1});
+    ecs_set(world, e, Rgb, {255, 0, 0});
+    box_transition_set(world, e, ecs_id(Position), &(TransitionSpec){ .duration = 1.0f });
+    unsigned char *px = trans_capture(world, "transition_scatter_0.png");
+    test_assert(trans_channel(px, 11, 32, 1) < TRANS_DARK);
+    stbi_image_free(px);
+
+    box_render_gpu_stats_t before;
+    test_assert(box_render_gpu_stats(world, &before));
+    test_bool(box_render_gpu_compile_delivery(world, BOX_RENDER_COMPILE_NEXT_PACKET), true);
+    ecs_set(world, e, Position, {2, 0.5f, 0});
+    int32_t i;
+    for (i = 1; i <= 5; i ++) {
+        char file[64];
+        snprintf(file, sizeof(file), "transition_scatter_%d.png", i);
+        stbi_image_free(trans_capture(world, file));
+    }
+
+    px = trans_capture(world, "transition_scatter_6.png");
+    test_assert(trans_channel(px, 53, 32, 1) < TRANS_DARK);
+    test_assert(trans_channel(px, 53, 32, 0) > TRANS_LIT);
+    test_assert(trans_channel(px, 32, 32, 1) > TRANS_LIT);
+    test_assert(trans_channel(px, 11, 32, 1) > TRANS_LIT);
+    stbi_image_free(px);
+
+    box_render_gpu_stats_t after;
+    test_assert(box_render_gpu_stats(world, &after));
+    test_assert(after.scattered > before.scattered);
+    trans_no_errors(world);
+    ecs_fini(world);
+}
