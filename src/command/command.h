@@ -8,6 +8,7 @@
 
 #include <box.h>
 #include "../app/app.h"
+#include "../geometry/mesh_cache.h"
 
 /** Register a command as a script function in box.command.commands.
  *
@@ -61,28 +62,6 @@ void box_cmd_render_size(
     int32_t *width,
     int32_t *height);
 
-/** Find the first view, in render order (View.order, then creation), that renders a camera.
- *
- * @param world The world
- * @param camera The camera, 0 for any camera with a Camera
- * @param root Parent the view must have, 0 for any parent
- * @param clearing Only consider views that clear
- * @return The view entity, 0 when there is none
- */
-ecs_entity_t box_cmd_render_view(
-    ecs_world_t *world,
-    ecs_entity_t camera,
-    ecs_entity_t root,
-    bool clearing);
-
-/** Get the parent of the views the surface shown first renders.
- *
- * @param world The world
- * @return The view root of the surface, 0 for every view
- */
-ecs_entity_t box_cmd_render_view_root(
-    ecs_world_t *world);
-
 /** Get the camera of a command: the camera argument, else the camera of the first view of the
  * surface shown first. Logs an error when the argument is not a camera or there is no camera.
  *
@@ -95,6 +74,21 @@ ecs_entity_t box_cmd_render_camera(
     ecs_world_t *world,
     int32_t argc,
     const ecs_value_t *argv);
+
+/** Get the 8 world space corners of the local bounds of the mesh of a shape, with the scale
+ * of its ShapeMesh and its WorldTransform.
+ *
+ * @param world The world
+ * @param cache The mesh cache
+ * @param e The entity
+ * @param out Receives the corners
+ * @return Whether the entity has a mesh in the cache
+ */
+bool box_cmd_render_corners(
+    ecs_world_t *world,
+    const box_mesh_cache_t *cache,
+    ecs_entity_t e,
+    vec3 out[8]);
 
 /** Register the fit command that moves a camera to a tight fit of its scene.
  *

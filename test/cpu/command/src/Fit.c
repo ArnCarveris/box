@@ -399,8 +399,6 @@ void Fit_skips_console_and_editor(void) {
     }) != 0);
     ecs_os_free(widgets);
 
-    ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 640, .height = 360});
     fit_camera(world, "camera", (Position){0, 0, 10}, (Rotation){0},
         (Camera){ .fov = 60, .near_ = 0.1f, .far_ = 1000, .aspect_ratio = 1.0f }, true);
     fit_box(world, 0, (Position){0, 0, 0}, (Box){1, 1, 1});
@@ -413,6 +411,19 @@ void Fit_skips_console_and_editor(void) {
     ecs_progress(world, 0);
     test_assert(ecs_lookup(world, BOX_CONSOLE_VIEW) != 0);
     test_assert(ecs_lookup(world, BOX_EDITOR_VIEW) != 0);
+
+    // The console and the editor draw meshes of their own
+    const box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    int32_t meshes = 0;
+    ecs_iter_t it = ecs_each(world, ShapeMesh);
+    while (ecs_each_next(&it)) {
+        const ShapeMesh *shapes = ecs_field(&it, ShapeMesh, 0);
+        for (int32_t i = 0; i < it.count; i ++) {
+            meshes += box_mesh_cache_get(cache, shapes[i].mesh) != NULL;
+        }
+    }
+
+    test_assert(meshes > 1);
 
     ecs_entity_t s = ecs_shell_session_init(world, NULL);
     fit_result_t r;

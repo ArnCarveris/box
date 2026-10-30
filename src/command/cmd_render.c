@@ -13,7 +13,6 @@
 
 #include "command.h"
 #include "../render/render.h"
-#include "../geometry/mesh_cache.h"
 #include <float.h>
 #include <math.h>
 #include <string.h>
@@ -150,7 +149,7 @@ void box_cmd_render_size(
  * @param clearing Only consider views that clear
  * @return The view entity, 0 when there is none
  */
-ecs_entity_t box_cmd_render_view(
+static ecs_entity_t box_cmd_render_view(
     ecs_world_t *world,
     ecs_entity_t camera,
     ecs_entity_t root,
@@ -188,7 +187,7 @@ ecs_entity_t box_cmd_render_view(
  * @param world The world
  * @return The view root of the surface, 0 for every view
  */
-ecs_entity_t box_cmd_render_view_root(
+static ecs_entity_t box_cmd_render_view_root(
     ecs_world_t *world)
 {
     ecs_entity_t surface = box_cmd_render_surface(world);
@@ -476,21 +475,11 @@ static void box_cmd_render_collect(
     ecs_vec_fini_t(NULL, &children, ecs_entity_t);
 }
 
-/** Grow bounds by the world space box of the mesh of a shape.
- *
- * @param world The world
- * @param cache The mesh cache
- * @param e The entity
- * @param min The minimum corner
- * @param max The maximum corner
- * @return Whether the entity has a mesh
- */
-static bool box_cmd_render_grow(
+bool box_cmd_render_corners(
     ecs_world_t *world,
     const box_mesh_cache_t *cache,
     ecs_entity_t e,
-    vec3 min,
-    vec3 max)
+    vec3 out[8])
 {
     const ShapeMesh *shape = ecs_get(world, e, ShapeMesh);
     const box_mesh_t *mesh = shape && cache ? box_mesh_cache_get(cache, shape->mesh) : NULL;
@@ -514,14 +503,38 @@ static bool box_cmd_render_grow(
             ((i & 4) ? mesh->max[2] : mesh->min[2]) * shape->scale[2]
         };
 
-        vec3 world_pos;
-        glm_mat4_mulv3(m, local, 1.0f, world_pos);
-        glm_vec3_minv(min, world_pos, min);
-        glm_vec3_maxv(max, world_pos, max);
+        glm_mat4_mulv3(m, local, 1.0f, out[i]);
     }
 
 done:
     return mesh != NULL;
+}
+
+/** Grow bounds by the world space box of the mesh of a shape.
+ *
+ * @param world The world
+ * @param cache The mesh cache
+ * @param e The entity
+ * @param min The minimum corner
+ * @param max The maximum corner
+ * @return Whether the entity has a mesh
+ */
+static bool box_cmd_render_grow(
+    ecs_world_t *world,
+    const box_mesh_cache_t *cache,
+    ecs_entity_t e,
+    vec3 min,
+    vec3 max)
+{
+    vec3 corners[8];
+    int32_t i;
+    bool result = box_cmd_render_corners(world, cache, e, corners);
+    for (i = 0; result && i < 8; i ++) {
+        glm_vec3_minv(min, corners[i], min);
+        glm_vec3_maxv(max, corners[i], max);
+    }
+
+    return result;
 }
 
 /** Ask for the image of a render, with a camera that frames the bounds of its subject.

@@ -9,7 +9,6 @@
 
 #include "command.h"
 #include "../render/render.h"
-#include "../geometry/mesh_cache.h"
 #include <float.h>
 #include <math.h>
 
@@ -47,43 +46,6 @@ static bool box_cmd_fit_held(
     return e == camera;
 }
 
-/** Add the world space corners of the mesh of a shape to the content.
- *
- * @param mesh The mesh
- * @param shape The shape, its scale applies to the mesh
- * @param transform The world transform of the shape, NULL for none
- * @param content The content
- */
-static void box_cmd_fit_add(
-    const box_mesh_t *mesh,
-    const ShapeMesh *shape,
-    const WorldTransform *transform,
-    box_cmd_fit_content_t *content)
-{
-    mat4 m;
-    int32_t i;
-    if (transform) {
-        ecs_os_memcpy_t(m, transform->m, mat4);
-    } else {
-        glm_mat4_identity(m);
-    }
-
-    for (i = 0; i < 8; i ++) {
-        vec3 local = {
-            ((i & 1) ? mesh->max[0] : mesh->min[0]) * shape->scale[0],
-            ((i & 2) ? mesh->max[1] : mesh->min[1]) * shape->scale[1],
-            ((i & 4) ? mesh->max[2] : mesh->min[2]) * shape->scale[2]
-        };
-
-        float *corner = *ecs_vec_append_t(NULL, &content->corners, vec3);
-        glm_mat4_mulv3(m, local, 1.0f, corner);
-        glm_vec3_minv(content->min, corner, content->min);
-        glm_vec3_maxv(content->max, corner, content->max);
-    }
-
-    content->count ++;
-}
-
 /** Collect the content a camera draws: the meshes of its scene, without the camera and its
  * descendants.
  *
@@ -98,32 +60,27 @@ static void box_cmd_fit_collect(
 {
     const box_mesh_cache_t *cache = box_mesh_cache_of(world);
     ecs_entity_t scene = box_render_scene_of(world, camera);
-    ecs_query_t *q = ecs_query(world, {
-        .terms = {
-            { .id = ecs_id(ShapeMesh) },
-            { .id = ecs_id(WorldTransform), .oper = EcsOptional }
-        }
-    });
-
-    ecs_iter_t it = ecs_query_iter(world, q);
-    while (ecs_query_next(&it)) {
-        const ShapeMesh *shapes = ecs_field(&it, ShapeMesh, 0);
-        const WorldTransform *transforms = ecs_field(&it, WorldTransform, 1);
-        int32_t i;
+    ecs_iter_t it = ecs_each(world, ShapeMesh);
+    while (ecs_each_next(&it)) {
+        int32_t i, c;
         for (i = 0; i < it.count; i ++) {
             ecs_entity_t e = it.entities[i];
-            const box_mesh_t *mesh = cache ? box_mesh_cache_get(cache, shapes[i].mesh) : NULL;
-            if (!mesh || box_render_scene_of(world, e) != scene ||
-                box_cmd_fit_held(world, e, camera))
+            vec3 corners[8];
+            if (box_render_scene_of(world, e) != scene || box_cmd_fit_held(world, e, camera) ||
+                !box_cmd_render_corners(world, cache, e, corners))
             {
                 continue;
             }
 
-            box_cmd_fit_add(mesh, &shapes[i], transforms ? &transforms[i] : NULL, content);
+            for (c = 0; c < 8; c ++) {
+                glm_vec3_copy(corners[c], *ecs_vec_append_t(NULL, &content->corners, vec3));
+                glm_vec3_minv(content->min, corners[c], content->min);
+                glm_vec3_maxv(content->max, corners[c], content->max);
+            }
+
+            content->count ++;
         }
     }
-
-    ecs_query_fini(q);
 }
 
 /** Get the aspect ratio of a camera: its own when set, else that of the surface shown first.
