@@ -442,6 +442,13 @@ static void box_console_syntax_call(
     const ecs_script_parameter_t *params;
     ecs_entity_t scope;
     int32_t i, argc;
+    if (args) {
+        con->command_name = name;
+        con->command = cmd;
+        con->callable = f && f->callback;
+        name = NULL;
+    }
+
     if (!f || !f->callback) {
         box_console_syntax_add(spans, tokens[0].start, tokens[0].end, BoxSyntaxUnknown);
         goto done;
@@ -475,6 +482,13 @@ void box_console_syntax(
     box_console_token_t *tokens = NULL;
     ecs_vec_clear(spans);
     box_console_syntax_args_clear(args);
+    if (args) {
+        ecs_os_free(con->command_name);
+        con->command_name = NULL;
+        con->command = 0;
+        con->callable = false;
+    }
+
     if (!count) {
         goto done;
     }
@@ -518,6 +532,12 @@ bool box_console_syntax_stale(
     const box_console_arg_t *a = count ? ecs_vec_first_t(&con->args, box_console_arg_t) : NULL;
     ecs_entity_t scope = count ? box_console_session_scope(world, con) : 0;
     bool result = false;
+    if (con->command_name) {
+        ecs_entity_t cmd = box_console_syntax_command(world, con->command_name);
+        const EcsScriptFunction *f = cmd ? ecs_get(world, cmd, EcsScriptFunction) : NULL;
+        result = cmd != con->command || (f && f->callback) != con->callable;
+    }
+
     for (i = 0; i < count && !result; i ++) {
         bool found;
         ecs_entity_t e = box_console_syntax_resolve(world, scope, a[i].text, &found);
