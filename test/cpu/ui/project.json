@@ -432,7 +432,8 @@
                     "spike",
                     "curves",
                     "reflex_corner",
-                    "corner_shapes"
+                    "corner_shapes",
+                    "corner_sweep"
                 ]
             }
         ]

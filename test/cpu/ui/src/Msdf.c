@@ -878,59 +878,25 @@ void Msdf_reflex_corner(void) {
     ecs_os_free(pixels);
 }
 
-/** More outlines with reflex and acute corners, checked like Msdf_reflex_corner: "M", "N", "W",
- * "X" and "k" at BOX_TEXT_EM texels per 2000 units, and an acute "V" notch cut into a block at
- * 16 texels per 2000 units, where the tip of the notch is a fraction of a texel wide. The arms
- * of the "k" meet in a notch next to the stem, between the notches at the stem, as those of the
- * "K" of Msdf_reflex_corner do. The clash of the channels
- * shows where a corner lies close to a texel row or column, so each outline is placed with one
- * of its corners a small fraction of a texel off the texel centers or off the middle between
- * them, at several such offsets. Where the outline is at least a quarter texel away, the
- * interpolated median is on its side by at least a sixteenth of a texel; where it is at least a
- * 32nd of a texel away, the median is on its side. */
-void Msdf_corner_shapes(void) {
-    const struct {
-        const char *name;
-        double scale;
-        double corner[2];
-        int32_t count;
-        double points[16][2];
-    } shapes[] = {
-        {"M", 40.0 / 2000.0, {700, 500}, 13, {
-            {150, 0}, {150, 1500}, {400, 1500}, {700, 500}, {1000, 1500}, {1250, 1500},
-            {1250, 0}, {1060, 0}, {1060, 900}, {780, 250}, {620, 250}, {340, 900}, {340, 0}
-        }},
-        {"N", 40.0 / 2000.0, {1040, 380}, 10, {
-            {150, 0}, {150, 1500}, {370, 1500}, {1040, 380}, {1040, 1500}, {1230, 1500},
-            {1230, 0}, {1010, 0}, {340, 1120}, {340, 0}
-        }},
-        {"W", 40.0 / 2000.0, {580, 330}, 13, {
-            {50, 1500}, {310, 1500}, {580, 330}, {880, 1500}, {1120, 1500}, {1420, 330},
-            {1690, 1500}, {1950, 1500}, {1530, 0}, {1300, 0}, {1000, 1100}, {700, 0}, {470, 0}
-        }},
-        {"X", 40.0 / 2000.0, {560, 760}, 12, {
-            {60, 0}, {560, 760}, {80, 1500}, {310, 1500}, {650, 850}, {990, 1500},
-            {1220, 1500}, {740, 760}, {1240, 0}, {1010, 0}, {650, 670}, {290, 0}
-        }},
-        {"k", 40.0 / 2000.0, {400, 640}, 13, {
-            {150, 0}, {150, 1600}, {340, 1600}, {340, 690}, {760, 1100}, {990, 1100},
-            {560, 700}, {400, 640}, {570, 580}, {1010, 0}, {790, 0}, {340, 590}, {340, 0}
-        }},
-        {"V", 16.0 / 2000.0, {600, 700}, 7, {
-            {0, 0}, {0, 1500}, {400, 1500}, {600, 700}, {800, 1500}, {1200, 1500}, {1200, 0}
-        }}
-    };
+typedef struct {
+    const char *name;
+    double scale;
+    double corner[2];
+    int32_t count;
+    double points[16][2];
+} msdf_corner_shape_t;
 
-    // Fraction of a texel at which the chosen corner lands, in x and y
-    const double offsets[][2] = {
-        {13.0 / 32.0, 5.0 / 32.0}, {1.0 / 32.0, 15.0 / 32.0},
-        {31.0 / 32.0, 17.0 / 32.0}, {15.0 / 32.0, 31.0 / 32.0},
-        {17.0 / 32.0, 17.0 / 32.0}, {13.0 / 32.0, 1.0 / 32.0}, {9.0 / 32.0, 29.0 / 32.0}
-    };
-
-    int32_t shape_count = (int32_t)(sizeof(shapes) / sizeof(shapes[0]));
-    int32_t offset_count = (int32_t)(sizeof(offsets) / sizeof(offsets[0]));
-    int32_t n, o, i, s, x, y, c, checked = 0, wrong = 0, sharp = 0;
+/* Generates each shape with its corner at each of the offsets and checks the field, as
+ * Msdf_corner_shapes describes, adding the points it finds wrong and sharp to the counts. */
+static void msdf_check_corner_shapes(
+    const msdf_corner_shape_t *shapes,
+    int32_t shape_count,
+    const double (*offsets)[2],
+    int32_t offset_count,
+    int32_t *wrong,
+    int32_t *sharp)
+{
+    int32_t n, o, i, s, x, y, c, checked = 0;
     for (n = 0; n < shape_count; n ++) {
         const double (*outline)[2] = shapes[n].points;
         int32_t count = shapes[n].count;
@@ -1021,13 +987,106 @@ void Msdf_corner_shapes(void) {
 
             test_assert(case_checked > 0);
             checked += case_checked;
-            wrong += case_wrong;
-            sharp += case_sharp;
+            *wrong += case_wrong;
+            *sharp += case_sharp;
             ecs_os_free(pixels);
         }
     }
 
     test_assert(checked > 0);
+}
+
+/** More outlines with reflex and acute corners, checked like Msdf_reflex_corner: "M", "N", "W",
+ * "X" and "k" at BOX_TEXT_EM texels per 2000 units, and an acute "V" notch cut into a block at
+ * 16 texels per 2000 units, where the tip of the notch is a fraction of a texel wide. The arms
+ * of the "k" meet in a notch next to the stem, between the notches at the stem, as those of the
+ * "K" of Msdf_reflex_corner do. The clash of the channels
+ * shows where a corner lies close to a texel row or column, so each outline is placed with one
+ * of its corners a small fraction of a texel off the texel centers or off the middle between
+ * them, at several such offsets. Where the outline is at least a quarter texel away, the
+ * interpolated median is on its side by at least a sixteenth of a texel; where it is at least a
+ * 32nd of a texel away, the median is on its side. */
+void Msdf_corner_shapes(void) {
+    const msdf_corner_shape_t shapes[] = {
+        {"M", 40.0 / 2000.0, {700, 500}, 13, {
+            {150, 0}, {150, 1500}, {400, 1500}, {700, 500}, {1000, 1500}, {1250, 1500},
+            {1250, 0}, {1060, 0}, {1060, 900}, {780, 250}, {620, 250}, {340, 900}, {340, 0}
+        }},
+        {"N", 40.0 / 2000.0, {1040, 380}, 10, {
+            {150, 0}, {150, 1500}, {370, 1500}, {1040, 380}, {1040, 1500}, {1230, 1500},
+            {1230, 0}, {1010, 0}, {340, 1120}, {340, 0}
+        }},
+        {"W", 40.0 / 2000.0, {580, 330}, 13, {
+            {50, 1500}, {310, 1500}, {580, 330}, {880, 1500}, {1120, 1500}, {1420, 330},
+            {1690, 1500}, {1950, 1500}, {1530, 0}, {1300, 0}, {1000, 1100}, {700, 0}, {470, 0}
+        }},
+        {"X", 40.0 / 2000.0, {560, 760}, 12, {
+            {60, 0}, {560, 760}, {80, 1500}, {310, 1500}, {650, 850}, {990, 1500},
+            {1220, 1500}, {740, 760}, {1240, 0}, {1010, 0}, {650, 670}, {290, 0}
+        }},
+        {"k", 40.0 / 2000.0, {400, 640}, 13, {
+            {150, 0}, {150, 1600}, {340, 1600}, {340, 690}, {760, 1100}, {990, 1100},
+            {560, 700}, {400, 640}, {570, 580}, {1010, 0}, {790, 0}, {340, 590}, {340, 0}
+        }},
+        {"V", 16.0 / 2000.0, {600, 700}, 7, {
+            {0, 0}, {0, 1500}, {400, 1500}, {600, 700}, {800, 1500}, {1200, 1500}, {1200, 0}
+        }}
+    };
+
+    // Fraction of a texel at which the chosen corner lands, in x and y
+    const double offsets[][2] = {
+        {13.0 / 32.0, 5.0 / 32.0}, {1.0 / 32.0, 15.0 / 32.0},
+        {31.0 / 32.0, 17.0 / 32.0}, {15.0 / 32.0, 31.0 / 32.0},
+        {17.0 / 32.0, 17.0 / 32.0}, {13.0 / 32.0, 1.0 / 32.0}, {9.0 / 32.0, 29.0 / 32.0}
+    };
+
+    int32_t wrong = 0, sharp = 0;
+    msdf_check_corner_shapes(shapes, (int32_t)(sizeof(shapes) / sizeof(shapes[0])),
+        offsets, (int32_t)(sizeof(offsets) / sizeof(offsets[0])), &wrong, &sharp);
+    test_int(wrong, 0);
+    test_int(sharp, 0);
+}
+
+/** The "X" and "k" of Msdf_corner_shapes, checked the same way, at the placements of a sweep
+ * over x and y fractions {1, 3, 7, 13, 15, 17, 25, 31}/32 of a texel where the corner repair
+ * left points wrong. At the "X" the notches of the crossing compete for the same texels, at the
+ * "k" the notches of the junction next to the stem do. */
+void Msdf_corner_sweep(void) {
+    const msdf_corner_shape_t x_shape = {"X", 40.0 / 2000.0, {560, 760}, 12, {
+        {60, 0}, {560, 760}, {80, 1500}, {310, 1500}, {650, 850}, {990, 1500},
+        {1220, 1500}, {740, 760}, {1240, 0}, {1010, 0}, {650, 670}, {290, 0}
+    }};
+    const msdf_corner_shape_t k_shape = {"k", 40.0 / 2000.0, {400, 640}, 13, {
+        {150, 0}, {150, 1600}, {340, 1600}, {340, 690}, {760, 1100}, {990, 1100},
+        {560, 700}, {400, 640}, {570, 580}, {1010, 0}, {790, 0}, {340, 590}, {340, 0}
+    }};
+
+    // Fractions of a texel, in 32nds, at which the chosen corner lands, in x and y
+    const double x_offsets[][2] = {
+        {17, 3}, {25, 1}, {25, 3}, {25, 7}, {25, 25}, {25, 31}
+    };
+    const double k_offsets[][2] = {
+        {1, 1}, {1, 3}, {1, 31}, {3, 1}, {3, 3}, {3, 25}, {3, 31}, {7, 1}, {7, 13}, {7, 31},
+        {13, 13}, {13, 25}, {15, 7}, {15, 13}, {17, 1}, {17, 3}, {17, 7}, {17, 13}, {17, 25},
+        {17, 31}, {31, 7}, {31, 25}, {31, 31}
+    };
+
+    double offsets[32][2];
+    int32_t i, wrong = 0, sharp = 0;
+    int32_t x_count = (int32_t)(sizeof(x_offsets) / sizeof(x_offsets[0]));
+    int32_t k_count = (int32_t)(sizeof(k_offsets) / sizeof(k_offsets[0]));
+    for (i = 0; i < x_count; i ++) {
+        offsets[i][0] = x_offsets[i][0] / 32.0;
+        offsets[i][1] = x_offsets[i][1] / 32.0;
+    }
+
+    msdf_check_corner_shapes(&x_shape, 1, offsets, x_count, &wrong, &sharp);
+    for (i = 0; i < k_count; i ++) {
+        offsets[i][0] = k_offsets[i][0] / 32.0;
+        offsets[i][1] = k_offsets[i][1] / 32.0;
+    }
+
+    msdf_check_corner_shapes(&k_shape, 1, offsets, k_count, &wrong, &sharp);
     test_int(wrong, 0);
     test_int(sharp, 0);
 }
