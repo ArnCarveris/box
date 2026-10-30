@@ -304,10 +304,46 @@ char* box_console_prompt(
     return result;
 }
 
-/** Test whether an entity argument resolves as the shell resolves it.
- *
- * $ is the singleton, a path that starts with . or .. is relative to the scope, other names
- * resolve from the scope and its parents, then from the root.
+ecs_entity_t box_console_syntax_resolve(
+    const ecs_world_t *world,
+    ecs_entity_t scope,
+    const char *text,
+    bool *found)
+{
+    bool relative = text[0] == '.' && (!text[1] || text[1] == '/' ||
+        (text[1] == '.' && (!text[2] || text[2] == '/')));
+    ecs_entity_t result = 0;
+    const char *ptr = text;
+    found[0] = false;
+    if (!relative) {
+        result = scope ? ecs_lookup_path_w_sep(world, scope, text, ".", NULL, true) : 0;
+        result = result ? result : ecs_lookup(world, text);
+        found[0] = result != 0;
+        goto done;
+    }
+
+    result = scope;
+    found[0] = true;
+    while (ptr[0] && found[0]) {
+        const char *slash = strchr(ptr, '/');
+        int32_t len = slash ? (int32_t)(slash - ptr) : (int32_t)strlen(ptr);
+        if (len == 2 && !strncmp(ptr, "..", 2)) {
+            result = result ? ecs_get_parent(world, result) : 0;
+        } else if (len && (len != 1 || ptr[0] != '.')) {
+            char *name = flecs_asprintf("%.*s", len, ptr);
+            result = ecs_lookup_child(world, result, name);
+            ecs_os_free(name);
+            found[0] = result != 0;
+        }
+
+        ptr += len + (ptr[len] == '/');
+    }
+
+done:
+    return result;
+}
+
+/** Test whether an entity argument resolves as the shell resolves it, $ is the singleton.
  *
  * @param world The world
  * @param scope The scope of the session, 0 for the root
@@ -319,37 +355,11 @@ static bool box_console_syntax_resolves(
     ecs_entity_t scope,
     const char *text)
 {
-    bool relative = text[0] == '.' && (!text[1] || text[1] == '/' ||
-        (text[1] == '.' && (!text[2] || text[2] == '/')));
-    bool result = true;
-    ecs_entity_t e = scope;
-    const char *ptr = text;
-    if (!strcmp(text, "$")) {
-        goto done;
+    bool result = !strcmp(text, "$");
+    if (!result) {
+        box_console_syntax_resolve(world, scope, text, &result);
     }
 
-    if (!relative) {
-        result = (scope && ecs_lookup_path_w_sep(world, scope, text, ".", NULL, true)) ||
-            ecs_lookup(world, text);
-        goto done;
-    }
-
-    while (ptr[0] && result) {
-        const char *slash = strchr(ptr, '/');
-        int32_t len = slash ? (int32_t)(slash - ptr) : (int32_t)strlen(ptr);
-        if (len == 2 && !strncmp(ptr, "..", 2)) {
-            e = e ? ecs_get_parent(world, e) : 0;
-        } else if (len && (len != 1 || ptr[0] != '.')) {
-            char *name = flecs_asprintf("%.*s", len, ptr);
-            e = ecs_lookup_child(world, e, name);
-            ecs_os_free(name);
-            result = e != 0;
-        }
-
-        ptr += len + (ptr[len] == '/');
-    }
-
-done:
     return result;
 }
 
@@ -500,6 +510,44 @@ char* box_console_syntax_token(
         at = t.end;
         i ++;
     }
+
+    return result;
+}
+
+bool box_console_syntax_word_at(
+    const char *line,
+    int32_t cursor,
+    box_console_word_t *out)
+{
+    char *head = flecs_asprintf("%.*s", cursor, line);
+    box_console_token_t t, first = {0}, last = {0};
+    int32_t at = 0, count = 0;
+    bool result = false;
+    *out = (box_console_word_t){0};
+    while (box_console_syntax_scan(head, at, &t)) {
+        first = count ? first : t;
+        last = t;
+        at = t.end;
+        count ++;
+    }
+
+    if (count && last.end == cursor) {
+        out->start = last.start;
+        out->index = count - 1;
+        result = !last.quoted && !strpbrk(&head[last.start], "\"(){}[]`");
+    } else {
+        out->start = cursor;
+        out->index = count;
+        result = true;
+    }
+
+    out->end = cursor;
+    if (result && out->index > 0) {
+        out->command = first.quoted ? NULL : box_console_syntax_text(head, &first);
+        result = out->command != NULL;
+    }
+
+    ecs_os_free(head);
 
     return result;
 }

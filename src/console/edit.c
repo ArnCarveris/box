@@ -124,6 +124,20 @@ static void box_console_set_line(
     con->refresh = true;
 }
 
+void box_console_replace(
+    box_console_t *con,
+    int32_t from,
+    int32_t to,
+    const char *text)
+{
+    from = from < 0 ? 0 : (from > con->length ? con->length : from);
+    to = to < from ? from : (to > con->length ? con->length : to);
+    box_console_erase(con, from, to);
+    con->cursor = from;
+    box_console_insert(con, text, (int32_t)strlen(text));
+    con->refresh = true;
+}
+
 void box_console_insert_text(
     box_console_t *con,
     const char *text,
@@ -505,9 +519,6 @@ typedef struct box_console_command_t {
 /** Spaces between the name column and the brief, as help lists the session commands */
 #define BOX_CONSOLE_HELP_GAP (2)
 
-/** Name of the help group of the console commands */
-#define BOX_CONSOLE_HELP_GROUP "console"
-
 /** The cls command: empty the scrollback, including the line of cls itself.
  *
  * @param world The world
@@ -590,6 +601,19 @@ bool box_console_is_command(
     return box_console_command(word, len) != NULL;
 }
 
+const char* box_console_command_at(
+    int32_t index,
+    const char **brief)
+{
+    const box_console_command_t *cmd = index >= 0 && index < BOX_CONSOLE_COMMAND_COUNT ?
+        &box_console_commands[index] : NULL;
+    if (brief) {
+        brief[0] = cmd ? cmd->brief : NULL;
+    }
+
+    return cmd ? cmd->name : NULL;
+}
+
 /** Append the console group of help: a header and the console commands with their briefs, in
  * the colors of the groups and commands of the session help.
  *
@@ -633,6 +657,7 @@ char* box_console_exec(
     char *result = NULL, *prompt;
     box_console_out_t out;
     ecs_vec_t spans, prompt_spans;
+    box_console_complete_close(con);
     box_console_out_init(&out);
     ecs_vec_init_t(NULL, &spans, box_console_span_t, 0);
     ecs_vec_init_t(NULL, &prompt_spans, box_console_span_t, 0);
@@ -832,13 +857,48 @@ static bool box_console_accept(
     return rest != NULL;
 }
 
+/** Test whether a key leaves the candidate list open: Tab cycles it, Enter accepts, Escape
+ * closes it and modifiers do nothing on their own.
+ *
+ * @param key The key
+ * @return Whether the key keeps the list
+ */
+static bool box_console_keeps_list(
+    Key key)
+{
+    return key == KeyTab || key == KeyEnter || key == KeyKpEnter || key == KeyEscape ||
+        (key >= KeyShiftLeft && key <= KeySuperRight);
+}
+
+/** Close the candidate list when text was typed or a key edits or moves in the line, which
+ * keeps the text Tab inserted.
+ *
+ * @param con The console state
+ */
+static void box_console_list_typed(
+    box_console_t *con)
+{
+    bool other = ecs_vec_count(&con->typed) > 0;
+    int32_t i;
+    for (i = KeyNone + 1; i < BOX_KEY_COUNT && !other; i ++) {
+        other = con->pressed[i] && !box_console_keeps_list((Key)i);
+    }
+
+    if (other && con->complete.open) {
+        box_console_complete_close(con);
+    }
+}
+
 bool box_console_edit(
     ecs_world_t *world,
     box_console_t *con)
 {
     const bool *key = con->pressed;
     int32_t page = con->rows - 1;
+    bool escape = key[KeyEscape], listed;
     page = page > 0 ? page : 1;
+    box_console_list_typed(con);
+    listed = con->complete.open;
     box_console_insert_text(con, ecs_vec_first(&con->typed), ecs_vec_count(&con->typed));
     if ((key[KeyRight] || key[KeyEnd]) && box_console_accept(con)) {
         con->pressed[KeyRight] = con->pressed[KeyEnd] = false;
@@ -875,11 +935,21 @@ bool box_console_edit(
 
     box_console_chords(world, con);
 
-    if (key[KeyEnter] || key[KeyKpEnter]) {
+    if (key[KeyTab] && !escape) {
+        box_console_complete_tab(world, con, con->shifted[KeyTab]);
+    }
+
+    if ((key[KeyEnter] || key[KeyKpEnter]) && !box_console_complete_accept(world, con)) {
+        box_console_complete_close(con);
         box_console_submit(world, con);
     }
 
-    return key[KeyEscape];
+    if (escape && listed) {
+        box_console_complete_close(con);
+        escape = false;
+    }
+
+    return escape;
 }
 
 void box_console_edit_fini(
@@ -899,6 +969,8 @@ void box_console_edit_fini(
     ecs_vec_fini_t(NULL, &con->ui.lines, ecs_entity_t);
     ecs_vec_fini_t(NULL, &con->typed, char);
     ecs_vec_fini_t(NULL, &con->spans, box_console_span_t);
+    box_console_complete_close(con);
+    ecs_vec_fini_t(NULL, &con->complete.candidates, box_console_candidate_t);
     ecs_os_free(con->colored);
     ecs_os_free(con->draft);
     ecs_os_free(con->line);

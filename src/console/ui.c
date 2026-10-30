@@ -307,6 +307,7 @@ void box_console_ui_build(
     ecs_set(world, ui->line, LayoutItem, { .h = AlignLeft, .v = VAlignTop });
     ui->cursor = box_console_element(world, ui->input, "cursor");
     ecs_set(world, ui->cursor, LayoutItem, { .h = AlignLeft, .v = VAlignTop });
+    ui->menu = box_console_text_element(world, ui->content, "menu");
     if (!con->font) {
         con->font = ecs_get(world, ui->line, Text)->font;
     }
@@ -553,7 +554,7 @@ int32_t box_console_scrollback_rows(
 
 /** Write the input line after the prompt of the session into its text, wrapped at the width of
  * the panel, with the suggestion of the history dimmed after it, and put the cursor on the caret
- * of its row and column.
+ * of its row and column. The prompt takes the error color while the bell of Tab rings.
  *
  * @param world The world
  * @param con The console state
@@ -583,8 +584,9 @@ static int32_t box_console_ui_input(
     }
 
     for (i = 0; i < ecs_vec_count(&head_spans); i ++) {
-        *ecs_vec_append_t(NULL, &spans, box_console_span_t) =
-            *ecs_vec_get_t(&head_spans, box_console_span_t, i);
+        box_console_span_t sp = *ecs_vec_get_t(&head_spans, box_console_span_t, i);
+        sp.kind = con->complete.bell > 0 ? BoxOutputError : sp.kind;
+        *ecs_vec_append_t(NULL, &spans, box_console_span_t) = sp;
     }
 
     ecs_vec_fini_t(NULL, &head_spans, box_console_span_t);
@@ -629,6 +631,68 @@ static int32_t box_console_ui_input(
             .height = { .mode = SizeModeFixed, .value = height }
         });
     }
+
+    return rows;
+}
+
+/** Write the candidate list of Tab completion under the input line, like the menu of the
+ * explorer terminal: the labels in the colors of their kind, the active one highlighted, wrapped
+ * at the width of the panel, a dimmed "... N more" past BOX_CONSOLE_COMPLETE_VISIBLE.
+ *
+ * The description of the active candidate follows on its own row. A closed list takes no rows.
+ *
+ * @param world The world
+ * @param con The console state
+ * @param console The Console singleton
+ * @return The rows the list wraps to
+ */
+static int32_t box_console_ui_menu(
+    ecs_world_t *world,
+    box_console_t *con,
+    const Console *console)
+{
+    const box_console_complete_t *cc = &con->complete;
+    const box_console_candidate_t *c = ecs_vec_first(&cc->candidates);
+    int32_t i, rows = 0, count = cc->open ? ecs_vec_count(&cc->candidates) : 0;
+    int32_t first = cc->active >= BOX_CONSOLE_COMPLETE_VISIBLE ?
+        cc->active - BOX_CONSOLE_COMPLETE_VISIBLE + 1 : 0;
+    int32_t last = first + BOX_CONSOLE_COMPLETE_VISIBLE < count ?
+        first + BOX_CONSOLE_COMPLETE_VISIBLE : count;
+    box_console_out_t out;
+    char *text;
+    box_console_out_init(&out);
+    for (i = first; i < last; i ++) {
+        if (i > first) {
+            box_console_out_add(&out, BoxSpanNone, "  ", 2);
+        }
+
+        box_console_out_add(&out, i == cc->active ? BoxOutputMatch : c[i].kind, c[i].label, -1);
+    }
+
+    if (count && (count - (last - first) > 0 || cc->capped)) {
+        char *more = flecs_asprintf("  ... %d%s more", count - (last - first),
+            cc->capped ? "+" : "");
+        box_console_out_add(&out, BoxOutputDim, more, -1);
+        ecs_os_free(more);
+    }
+
+    if (count && cc->active >= 0 && c[cc->active].brief) {
+        box_console_out_add(&out, BoxSpanNone, "\n", 1);
+        box_console_out_add(&out, BoxOutputBrief, c[cc->active].brief, -1);
+    }
+
+    text = box_console_out_text(&out);
+    box_console_text(world, con->ui.menu, text, 0, con, console, console->text);
+    box_console_spans(world, con->ui.menu, &out.spans, 0, console);
+    box_console_out_fini(&out);
+    ecs_os_free(text);
+    if (count) {
+        rows = box_text_line(world, con->ui.menu, 0, NULL, NULL);
+        con->pending = con->pending || (!rows && box_console_font_loading(world, con));
+        rows = rows > 0 ? rows : 1;
+    }
+
+    box_console_rows_height(world, con->ui.menu, rows, console);
 
     return rows;
 }
@@ -730,9 +794,10 @@ void box_console_ui_sync(
 
     if (con->refresh) {
         int32_t input = box_console_ui_input(world, con, console);
+        int32_t menu = box_console_ui_menu(world, con, console);
         float room;
         box_console_panel_size(con, console, &h);
-        room = h - 2 * console->padding - (float)input * lh;
+        room = h - 2 * console->padding - (float)(input + menu) * lh;
         con->rows = lh > 0 && room > 0 ? (int32_t)floorf(room / lh) : 0;
         box_console_ui_scrollback(world, con, console);
         con->refresh = false;
