@@ -86,16 +86,8 @@ static void box_editor_measure(
         const Surface *s = ecs_field(&it, Surface, 0);
         for (i = 0; i < it.count && !found; i ++) {
             if (!s[i].texture) {
-                /* Prefer the real size in points: a window resize only updates
-                 * SurfaceStatus, not the requested Surface size. */
-                const SurfaceStatus *st = ecs_get(world, it.entities[i], SurfaceStatus);
-                if (st && st->point_width > 0 && st->point_height > 0) {
-                    w = (float)st->point_width;
-                    h = (float)st->point_height;
-                } else {
-                    w = (float)s[i].width;
-                    h = (float)s[i].height;
-                }
+                box_surface_point_size(&s[i],
+                    ecs_get(world, it.entities[i], SurfaceStatus), &w, &h);
                 surface = it.entities[i];
                 found = true;
             }

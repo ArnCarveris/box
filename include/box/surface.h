@@ -83,6 +83,23 @@ ECS_STRUCT(SurfaceStatus, {
     bool window;            /**< The surface presents to a window, not to an offscreen texture */
 });
 
+/** Get the size of a surface in points.
+ *
+ * The size in SurfaceStatus when it is set (both point sizes above 0), else the requested
+ * Surface size: a window resize only updates SurfaceStatus, not the requested size. Without
+ * either the size is 0.
+ *
+ * @param surface The surface, NULL when it has none
+ * @param status The status of the surface, NULL when it has none yet
+ * @param width Out: the width in points
+ * @param height Out: the height in points
+ */
+void box_surface_point_size(
+    const Surface *surface,
+    const SurfaceStatus *status,
+    float *width,
+    float *height);
+
 /** Register the box.surface module.
  *
  * @param world The world

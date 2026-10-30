@@ -397,7 +397,8 @@
                     "close_clears_focus",
                     "view_order_with_console",
                     "script_reload",
-                    "script_missing_looked_for_on_open"
+                    "script_missing_looked_for_on_open",
+                    "follows_window_resize"
                 ]
             }
         ]
