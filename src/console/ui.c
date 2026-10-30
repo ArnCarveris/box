@@ -896,8 +896,14 @@ void box_console_ui_sync(
         con->colored = NULL;
     }
 
+    if (con->colored && box_console_syntax_stale(world, con)) {
+        con->refresh = true;
+        ecs_os_free(con->colored);
+        con->colored = NULL;
+    }
+
     if (con->refresh && (!con->colored || strcmp(con->colored, con->line))) {
-        box_console_syntax(world, con, con->line, &con->spans);
+        box_console_syntax(world, con, con->line, &con->spans, &con->args);
         ecs_os_free(con->colored);
         con->colored = ecs_os_strdup(con->line);
     }

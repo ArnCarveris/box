@@ -47,7 +47,7 @@ void box_draws_transition_target(
     }
 
     if (material->transmission) {
-        out->transmissive = true;
+        out->present |= 1u << BOX_RENDER_TRANSITION_TRANSMISSION;
         out->transmission = *material->transmission;
     }
 
@@ -108,7 +108,8 @@ void box_draws_transition_encode(
             &material->emissive),
         .uv = box_draws_transition_part(material, BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM,
             &material->uv),
-        .transmission = material->transmissive ? &material->transmission : NULL,
+        .transmission = box_draws_transition_part(material, BOX_RENDER_TRANSITION_TRANSMISSION,
+            &material->transmission),
         .clear_coat = material->coated ? &material->clear_coat : NULL,
         .tint = box_draws_transition_part(material, BOX_RENDER_TRANSITION_TINT,
             &material->tint),

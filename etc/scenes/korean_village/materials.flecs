@@ -15,3 +15,10 @@ prefab KoreanStone { Rgb: {154, 155, 143}; PbrMaterial: {roughness: 0.96} }
 prefab KoreanTile { Rgb: {54, 65, 74}; PbrMaterial: {roughness: 0.67} }
 prefab KoreanTileEdge { Rgb: {89, 105, 114}; PbrMaterial: {roughness: 0.64} }
 prefab KoreanGlaze { Rgb: {91, 53, 32}; PbrMaterial: {roughness: 0.29}; ClearCoat: {strength: 0.65, roughness: 0.23} }
+prefab KoreanLitPaper { Rgb: {236, 222, 182}; PbrMaterial: {roughness: 0.97}; Emissive: {strength: 0.12, color: {255, 186, 110}} }
+prefab KoreanBark { Rgb: {78, 56, 42}; PbrMaterial: {roughness: 1} }
+prefab KoreanBronze { Rgb: {92, 124, 104}; PbrMaterial: {metallic: 0.75, roughness: 0.48} }
+prefab KoreanIron { Rgb: {58, 56, 50}; PbrMaterial: {metallic: 0.65, roughness: 0.55} }
+prefab KoreanStraw { Rgb: {176, 148, 92}; PbrMaterial: {roughness: 1} }
+prefab KoreanSignGround { Rgb: {28, 39, 45}; PbrMaterial: {roughness: 0.55} }
+prefab KoreanWater { Rgb: {42, 88, 92}; PbrMaterial: {roughness: 0.06, metallic: 0.1}; ClearCoat: {strength: 1, roughness: 0.04} }

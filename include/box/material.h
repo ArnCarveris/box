@@ -154,6 +154,10 @@ ECS_STRUCT(Emissive, {
  * It shows the image of its view before the blended pass (no blended or transmissive shapes)
  * where the ray refracted by ior leaves thickness_factor times the scale, blurred by roughness,
  * absorbed toward attenuation_color and tinted by Rgb, with its own specular light on top.
+ *
+ * Transitionable (Transition): the four floats interpolate linearly by the timing function and
+ * attenuation_color per channel like Rgb. The shape keeps its transmissive batch while its
+ * factor moves, through 0 too; adding or removing Transmission changes the batch at once.
  */
 ECS_STRUCT(Transmission, {
     float transmission_factor;  /**< 0 opaque to 1 fully transmissive */
