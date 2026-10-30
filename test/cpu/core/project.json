@@ -277,7 +277,8 @@
                     "rgb_png",
                     "linear_ignored",
                     "change_reloads",
-                    "resized"
+                    "resized",
+                    "cpu_copy_size"
                 ]
             }
         ]
