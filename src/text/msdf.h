@@ -65,12 +65,25 @@ typedef struct box_msdf_value_t {
     double v[4]; /**< Red, green, blue and true distance in font units */
 } box_msdf_value_t;
 
+/** Constants of an edge that every texel uses, computed once per field */
+typedef struct box_msdf_prep_t {
+    box_msdf_point_t a_dir; /**< Unit direction at the start, zero for a degenerate edge */
+    box_msdf_point_t b_dir; /**< Unit direction at the end, zero for a degenerate edge */
+    box_msdf_point_t a_bis; /**< Unit bisector of the corner at the start */
+    box_msdf_point_t b_bis; /**< Unit bisector of the corner at the end */
+    box_msdf_point_t min;   /**< Lower corner of the box around the points of the edge */
+    box_msdf_point_t max;   /**< Upper corner of the box around the points of the edge */
+    double extent;          /**< Largest magnitude of a coordinate of the edge, plus one */
+} box_msdf_prep_t;
+
 /** State of the generation of one field */
 typedef struct box_msdf_gen_t {
     const box_msdf_shape_t *shape;   /**< The shape */
     const box_msdf_raster_t *raster; /**< The texels */
     int32_t *windings;               /**< Orientation of each contour: 1, -1 or 0 */
-    box_msdf_multi_t *multi;         /**< Scratch selectors, one per contour */
+    box_msdf_prep_t *prep;           /**< Constants of each edge */
+    box_msdf_multi_t *multi;         /**< Scratch selectors, one per contour, the nearest edges
+                                      *   of the previous texel until a texel resets them */
     box_msdf_value_t *contour;       /**< Scratch distances, one per contour */
     float *values;                   /**< Four floats per texel, 0.5 on the outline */
     uint8_t *stencil;                /**< BOX_MSDF_ERROR and BOX_MSDF_PROTECTED per texel */
