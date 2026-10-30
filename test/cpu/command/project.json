@@ -31,6 +31,7 @@
                     "run_missing_argument",
                     "run_not_a_session",
                     "format_vector",
+                    "run_text_unchanged",
                     "help_lists_box_commands",
                     "history",
                     "script_call",

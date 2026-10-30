@@ -241,6 +241,63 @@ void Shell_format_vector(void) {
     ecs_fini(world);
 }
 
+void Shell_run_text_unchanged(void) {
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity(world, { .name = "things.alpha.leaf" });
+    ecs_entity(world, { .name = "things.beta" });
+    ecs_entity_t cube = ecs_entity(world, { .name = "cube" });
+    ecs_set(world, cube, Position, {1, 2, 3});
+
+    // The console colors its own output, sessions keep the plain text: full paths, JSON for
+    // structured results, help without groups and errors without color codes
+    ecs_os_free(box_console_run(world, "tree things", NULL));
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    bool error = true;
+    char *out = box_command_run(world, s, "ls things", &error);
+    test_bool(error, false);
+    test_str(out, "things.alpha\nthings.beta");
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "tree things", &error);
+    test_bool(error, false);
+    test_str(out,
+        "{\"entity\":\"things.alpha\", \"depth\":0}\n"
+        "{\"entity\":\"things.alpha.leaf\", \"depth\":1}\n"
+        "{\"entity\":\"things.beta\", \"depth\":0}");
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "get cube box.transform.Position", &error);
+    test_bool(error, false);
+    test_str(out, "{\"Position\":{\"x\":1, \"y\":2, \"z\":3}}");
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "help ls", &error);
+    test_bool(error, false);
+    test_str(out, "ls [scope]  Direct children\n"
+        "    scope: Scope to list (default: session scope)");
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "help", &error);
+    test_bool(error, false);
+    test_assert(strstr(out, "\n\n") == NULL);
+    test_assert(strstr(out, "console only") == NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "key_press Nope", &error);
+    test_bool(error, true);
+    test_str(out, BOX_COMMAND_ERROR "unknown key 'Nope'");
+    ecs_os_free(out);
+
+    // The session of the console too
+    out = box_command_run(world, ecs_lookup(world, BOX_CONSOLE_SESSION), "ls things", &error);
+    test_bool(error, false);
+    test_str(out, "things.alpha\nthings.beta");
+    ecs_os_free(out);
+
+    ecs_fini(world);
+}
+
 void Shell_help_lists_box_commands(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
