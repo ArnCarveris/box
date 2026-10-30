@@ -6,15 +6,10 @@
  * are dynamic and whether they cast shadows, one swap-removed slot per entity and at most
  * BOX_DRAWS_CHUNK of them, so a key may have several batches.
  *
-<<<<<<< HEAD
- * A batch owns a run of slots of an instance page (store.c), a buffer per stream (transform,
- * shading, surface) with the same slots; a change uploads only its streams. Mesh and 2D batches
- * have stores of their own: a mesh shading is a tint, an alpha and a shared material slot.
-=======
  * A batch owns a run of slots of an instance page (store.c), a buffer per stream with the same
  * slots; a change uploads only its streams. A mesh page has a transform, a shading and a surface
  * stream, a 2D page of its own store no surface stream, for which the backend binds a zero record.
->>>>>>> 4513b9de4bfe20335a2ee4dfe88db2f11baf59d4
+ * A mesh shading is a tint, an alpha and a shared material slot (materials.c).
  */
 
 #ifndef BOX_RENDER_DRAW_H

@@ -146,12 +146,9 @@ static void bench_render_extract(
     bench_counter(b, "instructions", (double)(bench_extract_instructions() - start));
     bench_counter(b, "frames", frames);
     bench_counter(b, "scattered", (double)stats.scattered);
-<<<<<<< HEAD
     bench_counter(b, "materials", (double)stats.materials);
     bench_counter(b, "setup_material_bytes", (double)setup_material_bytes);
-=======
     bench_extract_memory(b, &stats);
->>>>>>> 4513b9de4bfe20335a2ee4dfe88db2f11baf59d4
     if (sets) {
         bench_counter(b, "observers_per_set", (double)observers / (double)sets);
     }
