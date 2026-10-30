@@ -105,8 +105,8 @@ pointer, also `it->world` in an immediate system or in an observer that runs dur
 never deferred by flecs: they apply at once, so a remove after a set always sees the entry and
 nothing is tracked. One limit: on an entity without `Transition`, a `box_transition_set`, an
 `ecs_remove` of `Transition` (or `ecs_clear`, `ecs_delete`) and a `box_transition_remove` on one
-stage leave an empty `Transition` after the merge, because flecs dropped the pending value. The storage
-is a flecs map (`ecs_map_t`) keyed by the component entity whose values are allocated
+stage leave an empty `Transition` after the merge, because flecs dropped the pending value. The
+storage is a flecs map (`ecs_map_t`) keyed by the component entity whose values are allocated
 `TransitionSpec`s, so `ecs_map_get_deref(map, TransitionSpec, ecs_id(Position))` also reads one.
 
 ### Rules
