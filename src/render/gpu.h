@@ -582,6 +582,8 @@ void box_gpu_upload(
  * @param frame The target of the packet
  * @param encoder The encoder of the frame
  * @param color The texture view the views render into
+ * @param texture The texture of that view, which the opaque snapshot of a view without effects
+ * copies
  */
 void box_gpu_draw_views(
     box_gpu_t *gpu,
@@ -589,7 +591,8 @@ void box_gpu_draw_views(
     const box_render_packet_t *packet,
     const box_render_target_t *frame,
     WGPUCommandEncoder encoder,
-    WGPUTextureView color);
+    WGPUTextureView color,
+    WGPUTexture texture);
 
 /** Create the layouts of the cluster pass and the empty light buffer.
  *
@@ -694,6 +697,8 @@ void box_gpu_cookie_uniforms(
  * @param clusters Cluster buffer of the view
  * @param shadow Array view of the shadow map the view samples
  * @param ao Ambient occlusion image of the view (box_gpu_gtao_begin), NULL for the white image
+ * @param snapshot Opaque snapshot of the view (box_gpu_transmission_view), NULL for the white
+ * image, as the probe and reflection captures bind
  * @return The bind group, released by the caller
  */
 WGPUBindGroup box_gpu_light_group_with(
@@ -703,17 +708,20 @@ WGPUBindGroup box_gpu_light_group_with(
     WGPUBuffer uniforms,
     WGPUBuffer clusters,
     WGPUTextureView shadow,
-    WGPUTextureView ao);
+    WGPUTextureView ao,
+    WGPUTextureView snapshot);
 
 /** Create the bind group of the forward pass of a view: its uniforms, lights, clusters, shadow
- * map, aerial perspective volume, environment, ambient occlusion, shadow atlas, tile records and
- * light cookie.
+ * map, aerial perspective volume, environment, ambient occlusion, shadow atlas, tile records,
+ * light cookie and opaque snapshot.
  *
  * @param gpu The backend
  * @param t The target
  * @param v The view
  * @param slot Slot of the view in the view buffer
  * @param ao Ambient occlusion image of the view (box_gpu_gtao_begin), NULL for the white image
+ * @param snapshot Opaque snapshot of the view (box_gpu_transmission_view), NULL for the white
+ * image
  * @return The bind group, released by the caller
  */
 WGPUBindGroup box_gpu_light_group(
@@ -721,7 +729,8 @@ WGPUBindGroup box_gpu_light_group(
     const box_gpu_target_t *t,
     const box_render_view_t *v,
     int32_t slot,
-    WGPUTextureView ao);
+    WGPUTextureView ao,
+    WGPUTextureView snapshot);
 
 /** Create the layouts, sampler and empty shadow map of the shadow pass.
  *
@@ -1175,6 +1184,14 @@ WGPUTextureView box_gpu_effects_begin(
     const box_render_packet_t *packet,
     const box_render_view_t *v);
 
+/** Get the texture of the HDR image box_gpu_effects_begin returned for the view being drawn.
+ *
+ * @param gpu The backend
+ * @return The texture, NULL when the view has no effects
+ */
+WGPUTexture box_gpu_effects_image(
+    box_gpu_t *gpu);
+
 /** Record the effect passes of a view over its HDR image, the last one writing the target.
  *
  * @param gpu The backend
@@ -1265,6 +1282,73 @@ void box_gpu_gtao_record(
 void box_gpu_gtao_sweep(
     box_gpu_t *gpu,
     const box_render_packet_t *packet);
+
+/** Create the bind group layout, sampler and white fallback of the opaque snapshot of
+ * transmission.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_transmission_init(
+    box_gpu_t *gpu);
+
+/** Release the pipelines, layout, sampler and white fallback of the opaque snapshot.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_transmission_fini(
+    box_gpu_t *gpu);
+
+/** Get the opaque snapshot a view copies its image into, when it has a transmissive draw.
+ *
+ * It has the render size of the target and the format of the color target of the view, made
+ * again when either changes. A color target that cannot be copied gets none, logged once.
+ *
+ * @param gpu The backend
+ * @param t The target
+ * @param packet The packet
+ * @param slot Slot of the view in the view buffer, whose cull view lists its draws
+ * @param source Texture of the color attachment of the view
+ * @param format Format of the color attachment of the view
+ * @return The snapshot, NULL for none
+ */
+box_gpu_snapshot_t* box_gpu_transmission_begin(
+    box_gpu_t *gpu,
+    box_gpu_target_t *t,
+    const box_render_packet_t *packet,
+    int32_t slot,
+    WGPUTexture source,
+    WGPUTextureFormat format);
+
+/** Get the view of every mip of a snapshot, which group 0 of the forward pass binds.
+ *
+ * @param gpu The backend
+ * @param s The snapshot, NULL for the white fallback
+ * @return The view
+ */
+WGPUTextureView box_gpu_transmission_view(
+    box_gpu_t *gpu,
+    const box_gpu_snapshot_t *s);
+
+/** Copy the color attachment of a view into mip 0 of its snapshot and blur every mip above
+ * from the one below (a Jimenez 13 tap downsample). Called between two render passes.
+ *
+ * @param gpu The backend
+ * @param s The snapshot
+ * @param encoder The encoder of the frame
+ * @param source Texture of the color attachment, at least as large as the snapshot
+ */
+void box_gpu_transmission_record(
+    box_gpu_t *gpu,
+    box_gpu_snapshot_t *s,
+    WGPUCommandEncoder encoder,
+    WGPUTexture source);
+
+/** Release the snapshot of a target.
+ *
+ * @param t The target
+ */
+void box_gpu_transmission_release(
+    box_gpu_target_t *t);
 
 /** Create the area texture of SMAA from the data of the reference: 160 x 560 RG8Unorm.
  *

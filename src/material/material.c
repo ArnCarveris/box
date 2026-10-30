@@ -86,6 +86,30 @@ static void box_pbr_material_ctor(
     }
 }
 
+/** Construct Transmission values of a surface without volume: no transmission, the index of
+ * refraction of glass and no absorption.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_transmission_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    Transmission *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (Transmission){
+            .ior = BOX_MATERIAL_IOR,
+            .attenuation_distance = BOX_MATERIAL_ATTENUATION_DISTANCE,
+            .attenuation_color = { 255, 255, 255 }
+        };
+    }
+}
+
 /** Construct TextureTransform values that leave the texture coordinates unchanged.
  *
  * @param ptr The components
@@ -118,6 +142,7 @@ void BoxMaterialImport(
     ECS_META_COMPONENT(world, Tint);
     ECS_META_COMPONENT(world, PbrMaterial);
     ECS_META_COMPONENT(world, Emissive);
+    ECS_META_COMPONENT(world, Transmission);
     ECS_META_COMPONENT(world, BlendMode);
     ECS_META_COMPONENT(world, BackFaceMode);
     ECS_META_COMPONENT(world, TextureWrap);
@@ -127,16 +152,17 @@ void BoxMaterialImport(
     ecs_set_hooks(world, AlphaCutoff, { .ctor = box_alpha_cutoff_ctor });
     ecs_set_hooks(world, PbrMaterial, { .ctor = box_pbr_material_ctor });
     ecs_set_hooks(world, TextureTransform, { .ctor = box_texture_transform_ctor });
+    ecs_set_hooks(world, Transmission, { .ctor = box_transmission_ctor });
     ecs_set_hooks(world, MaterialId, { .ctor = box_material_id_ctor });
     ecs_add_pair(world, ecs_id(MaterialId), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(PbrTextures), EcsOnInstantiate, EcsInherit);
 
-    ecs_entity_t materials[5] = {
+    ecs_entity_t materials[6] = {
         ecs_id(Rgb), ecs_id(PbrMaterial), ecs_id(Emissive), ecs_id(TextureTransform),
-        ecs_id(AlphaCutoff)
+        ecs_id(AlphaCutoff), ecs_id(Transmission)
     };
     int32_t i;
-    for (i = 0; i < 5; i ++) {
+    for (i = 0; i < 6; i ++) {
         ecs_add_pair(world, materials[i], EcsOnInstantiate, EcsInherit);
         ecs_add_pair(world, materials[i], EcsWith, ecs_id(MaterialId));
     }

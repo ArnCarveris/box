@@ -1,0 +1,98 @@
+// flecs-engine's transparency_bg.flecs: an alpha blended, a transmissive and an additive pane,
+// each standing half against the sky and half against a wall, with a nook of two boxes behind
+// it, and the same nook beside the glass with nothing in front. The sky shows through every
+// pane with its tint; the ambient occlusion of the nooks shows through the panes and is not
+// drawn on them.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.atmosphere
+using box.effects
+
+gtao {
+  Gtao: {radius: 0.8}
+}
+
+camera {
+  Position: {0, 3, -6}
+  Rotation: {0, flecs.script.math.PI, 0}
+  Camera: {fov: 60, far_: 0}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {0, 0, 0, 255}}, effects: [{effect: gtao}]}
+}
+
+sun {
+  Rotation: {0.9, 2.6, 0}
+  DirectionalLight: {intensity: 3 * flecs.script.math.PI}
+  Rgb: {255, 255, 255}
+}
+
+$ {
+  Atmosphere: {units_per_km: 1000, sun: sun}
+}
+
+ground {
+  Position: {0, -0.1, 5}
+  Box: {60, 0.2, 40}
+  Rgb: {120, 118, 112}
+  PbrMaterial: {roughness: 0.9}
+}
+
+wall {
+  Position: {0, 3, 16}
+  Box: {40, 6, 1}
+  Rgb: {180, 176, 168}
+}
+
+// A nook of two boxes on the ground at x, against the wall
+prefab Nook {
+  tall {
+    Position: {-0.45, 0.9, 0}
+    Box: {0.7, 1.8, 0.7}
+    Rgb: {200, 196, 190}
+  }
+  low {
+    Position: {0.4, 0.4, -0.2}
+    Box: {0.9, 0.8, 1.1}
+    Rgb: {200, 196, 190}
+  }
+}
+
+nook_alpha : Nook { Position: {-4.8, 0, 8} }
+nook_glass : Nook { Position: {0, 0, 8} }
+nook_beside : Nook { Position: {2.4, 0, 8} }
+nook_additive : Nook { Position: {4.8, 0, 8} }
+
+// The quads face -Z, toward the camera
+alpha_pane {
+  Position: {-4.8, 3.5, 4}
+  Rotation: {0, flecs.script.math.PI, 0}
+  Quad: {2.6, 5}
+  Rgb: {60, 190, 225}
+  Opacity: {value: 0.3}
+  PbrMaterial: {roughness: 0.08}
+}
+
+glass_pane {
+  Position: {0, 3.5, 4}
+  Box: {2.6, 5, 0.3}
+  Rgb: {235, 245, 255}
+  PbrMaterial: {roughness: 0.18}
+  Transmission: {transmission_factor: 1, ior: 1.45, thickness_factor: 0.5,
+    attenuation_distance: 2, attenuation_color: {150, 210, 255}}
+}
+
+additive_pane {
+  Position: {4.8, 3.5, 4}
+  Rotation: {0, flecs.script.math.PI, 0}
+  Quad: {2.6, 5}
+  Rgb: {255, 120, 50}
+  Opacity: {value: 0.55}
+  BlendMode: {Additive}
+  Emissive: {strength: 0.5, color: {255, 120, 50}}
+}

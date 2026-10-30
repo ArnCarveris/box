@@ -28,6 +28,10 @@
 // times the albedo alpha, is below the cutoff of their material, once every texture is sampled.
 // A lit view draws its opaque meshes depth only first (vs_depth, vs_depth_cutout and
 // fs_depth_cutout), then shades them with depth compare Equal and without the alpha test.
+// A transmissive pipeline (transmissive, Transmission) draws in the sorted blended stream
+// without blending: it refracts the opaque snapshot of the view (opaque_snapshot), reduced by
+// its Fresnel reflection, absorbed over its volume and tinted by its albedo, and adds its own
+// specular light and emission on top.
 #include "include/instance.wgsl"
 #include "include/material.wgsl"
 #include "include/lights.wgsl"
@@ -41,6 +45,10 @@ override blend_mode: u32 = 0u;
 
 // The pipeline alpha tests its fragments against the cutoff of their material (AlphaCutoff).
 override alpha_cutout: bool = false;
+
+// The pipeline draws Transmission shapes: no alpha test, no blending, no depth writes, and the
+// opaque snapshot of the view shows through them.
+override transmissive: bool = false;
 
 const PI: f32 = 3.141592653589793;
 const MIN_ROUGHNESS: f32 = 0.045;
@@ -78,6 +86,11 @@ const MIN_ROUGHNESS: f32 = 0.045;
 // Ambient occlusion of the view (Gtao) at the render size, read at the pixel of a fragment; a
 // view without Gtao, and the probe and reflection captures, bind a 1x1 white image.
 @group(0) @binding(14) var gtao_image: texture_2d<f32>;
+
+// Opaque snapshot of the view for transmission (gpu_transmission.c): its image before the
+// blended draws and a blur pyramid, mip k + 1 downsampled from mip k. A view without
+// transmissive draws, and the captures, bind a 1x1 white image.
+@group(0) @binding(19) var opaque_snapshot: texture_2d<f32>;
 
 @group(2) @binding(0) var<storage, read> transforms: array<InstanceTransform>;
 @group(2) @binding(1) var<storage, read> surface_assets: array<vec4f>;
@@ -147,6 +160,11 @@ struct VertexOut {
     @location(4) material: vec2f,
     @location(5) uv: vec2f,
     @location(6) @interpolate(flat) cutoff: f32,
+    // Transmission of the material: factor, index of refraction, thickness and attenuation
+    // distance, its linear attenuation color and the scale of the instance along its axes
+    @location(7) @interpolate(flat) transmission: vec4f,
+    @location(8) @interpolate(flat) attenuation: vec3f,
+    @location(9) @interpolate(flat) model_scale: vec3f,
 };
 
 // A vertex placed in the world: the model matrix of its instance, the normal of its mesh or
@@ -252,6 +270,10 @@ fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material) -> Vert
     o.material = s.material;
     o.cutoff = material.cutoff;
     o.uv = s.uv;
+    o.transmission = vec4f(material.transmission_factor, material.ior,
+        material.thickness_factor, material.attenuation_distance);
+    o.attenuation = material_linear(unpack4x8unorm(material.attenuation_color).rgb);
+    o.model_scale = vec3f(length(c0), length(c1), length(c2));
     return o;
 }
 
@@ -688,8 +710,15 @@ fn env_brdf(roughness: f32, ndv: f32) -> vec2f {
     return vec2f(-1.04, 1.04) * a004 + r.zw;
 }
 
+// Light reflected toward the eye, split into its diffuse and specular parts; the emission is
+// part of the specular one.
+struct Lit {
+    diffuse: vec3f,
+    specular: vec3f,
+};
+
 // Light reflected toward the eye by one light arriving from direction l with a radiance.
-fn brdf(s: Surface, v: vec3f, l: vec3f, radiance: vec3f) -> vec3f {
+fn brdf(s: Surface, v: vec3f, l: vec3f, radiance: vec3f) -> Lit {
     let n = s.normal;
     let a = s.roughness * s.roughness;
     let f0 = mix(vec3f(0.04), s.albedo, s.metallic);
@@ -702,7 +731,7 @@ fn brdf(s: Surface, v: vec3f, l: vec3f, radiance: vec3f) -> vec3f {
     let f = fresnel_schlick(ldh, f0);
     let specular = distribution_ggx(ndh, a) * visibility_smith(ndv, ndl, a) * f;
     let diffuse = (vec3f(1.0) - f) * diffuse_color / PI;
-    return (diffuse + specular) * radiance * ndl;
+    return Lit(diffuse * radiance * ndl, specular * radiance * ndl);
 }
 
 // Distance below which a point or spot light stops getting brighter, so a surface at the light
@@ -723,8 +752,8 @@ fn attenuation(light: Light, l: vec3f, dist: f32) -> f32 {
 // lights of the scene, the first one through its shadow map and light cookie, then the point
 // and spot lights of the cluster of the fragment, a spot or point light with a tile of the
 // shadow atlas through it.
-fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32) -> vec3f {
-    var sum = vec3f(0.0);
+fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32) -> Lit {
+    var sum = Lit(vec3f(0.0), vec3f(0.0));
     var shadow = shadow_factor(world, s.geometric);
     if (view.lights.x > 0u) {
         shadow *= light_cookie(world, normalize(lights[0].position), s.geometric);
@@ -733,7 +762,9 @@ fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32) -> vec3f {
     for (var i = 0u; i < view.lights.x; i++) {
         let light = lights[i];
         let visible = select(1.0, shadow, i == 0u);
-        sum += brdf(s, v, normalize(light.position), light.color) * visible;
+        let lit = brdf(s, v, normalize(light.position), light.color);
+        sum.diffuse += lit.diffuse * visible;
+        sum.specular += lit.specular * visible;
     }
 
     if (view.lights.y > view.lights.x) {
@@ -749,7 +780,9 @@ fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32) -> vec3f {
                 visible = punctual_shadow(light, world, s.geometric);
             }
 
-            sum += brdf(s, v, l, light.color * attenuation(light, l, dist)) * visible;
+            let lit = brdf(s, v, l, light.color * attenuation(light, l, dist));
+            sum.diffuse += lit.diffuse * visible;
+            sum.specular += lit.specular * visible;
         }
     }
 
@@ -768,9 +801,12 @@ fn specular_occlusion(ndv: f32, ao: f32, a: f32) -> f32 {
     return clamp(pow(ndv + ao, exp2(-16.0 * a - 1.0)) - 1.0 + ao, 0.0, 1.0);
 }
 
-fn shade(s: Surface, v: vec3f, world: vec3f) -> vec3f {
+// Light a surface reflects toward the eye, the indirect and direct diffuse light apart from
+// the indirect and direct specular light and the emission. An unlit view shows the albedo as
+// the diffuse part and the emission as the specular one.
+fn shade_split(s: Surface, v: vec3f, world: vec3f) -> Lit {
     if (view.lights.z == 0u) {
-        return s.albedo + s.emissive;
+        return Lit(s.albedo, s.emissive);
     }
 
     let n = s.normal;
@@ -811,20 +847,32 @@ fn shade(s: Surface, v: vec3f, world: vec3f) -> vec3f {
         specular_occlusion(ndv, s.occlusion, a);
     let indirect_diffuse = (vec3f(1.0) - specular_albedo) * diffuse_color * diffuse_light *
         s.occlusion;
-    return lights_direct(s, v, world, cluster) + indirect_diffuse + indirect_specular +
-        s.emissive;
+    let direct = lights_direct(s, v, world, cluster);
+    return Lit(direct.diffuse + indirect_diffuse, direct.specular + indirect_specular +
+        s.emissive);
+}
+
+fn shade(s: Surface, v: vec3f, world: vec3f) -> vec3f {
+    let lit = shade_split(s, v, world);
+    return lit.diffuse + lit.specular;
 }
 
 // Color of a fragment seen through the atmosphere between it and the camera, shaped for the
 // blend equation: a fragment that covers the target is attenuated and adds the in scattered
 // light weighted by its coverage, light added to or taken from the target is only attenuated,
 // and a filter of the target is left as it is.
-fn aerial_perspective(color: vec3f, alpha: f32, pos: vec4f, world: vec3f) -> vec3f {
+// In scattered light (rgb) and transmittance (a) of the atmosphere between a fragment and the
+// camera, from one trilinear tap of the aerial perspective volume.
+fn aerial_sample(pos: vec4f, world: vec3f) -> vec4f {
     let uv = pos.xy * view.viewport.zw;
     let km = length(world - view.camera.xyz) * view.aerial.x;
     let slices = view.aerial.z;
     let w = (km * view.aerial.y * (slices - 1.0) + 0.5) / slices;
-    let ap = textureSampleLevel(aerial_volume, aerial_sampler, vec3f(uv, w), 0.0);
+    return textureSampleLevel(aerial_volume, aerial_sampler, vec3f(uv, w), 0.0);
+}
+
+fn aerial_perspective(color: vec3f, alpha: f32, pos: vec4f, world: vec3f) -> vec3f {
+    let ap = aerial_sample(pos, world);
     switch blend_mode {
         case 0u, 1u: {
             return color * ap.a + ap.rgb;
@@ -858,8 +906,75 @@ fn output(color: vec3f, alpha: f32) -> vec4f {
     }
 }
 
+// Color of a transmissive fragment (Transmission), as flecs-engine shades it: the opaque
+// snapshot seen where the ray refracted by the index of refraction leaves a volume of the
+// thickness of the material times the scale of the instance, at a mip that follows the
+// roughness, reduced by the Fresnel reflection of the index (Schlick), absorbed toward the
+// attenuation color over the attenuation distance (Beer-Lambert) and tinted by the albedo. The
+// transmission factor replaces the diffuse light by it; the specular light and the emission are
+// added on top. The atmosphere between the fragment and the camera attenuates its own light
+// and the transmitted light and adds its in scattered light by what is not transmitted. A
+// factor of 0 is the lit surface. It writes no depth, so it takes no ambient occlusion of the
+// view, which belongs to what is behind it.
+fn transmission(f: VertexOut, s: Surface) -> vec4f {
+    var ap = vec4f(0.0, 0.0, 0.0, 1.0);
+    if (view.aerial.w > 0.0) {
+        ap = aerial_sample(f.pos, f.world);
+    }
+
+    let v = normalize(view.camera.xyz - f.world);
+    let reflected = shade_split(s, v, f.world);
+    let factor = f.transmission.x;
+    let ior = f.transmission.y;
+    let thickness = f.transmission.z;
+    let att_distance = f.transmission.w;
+    if (factor <= 0.0) {
+        let lit = reflected.diffuse + reflected.specular;
+        return vec4f(lit * ap.a + ap.rgb, s.alpha);
+    }
+
+    let ndotv = saturate(dot(s.normal, v));
+
+    // Fresnel reflection (Schlick with IOR-derived F0)
+    let ior_ratio = (1.0 - ior) / (1.0 + ior);
+    let f0_ior = ior_ratio * ior_ratio;
+    let fx = 1.0 - ndotv;
+    let fx2 = fx * fx;
+    let fresnel = f0_ior + (1.0 - f0_ior) * (fx2 * fx2 * fx);
+
+    // Screen-space refraction: project refracted exit point through VP
+    let refracted = refract(-v, s.normal, 1.0 / max(ior, 0.001));
+    let exit_pos = f.world + normalize(refracted) * thickness * f.model_scale;
+    let exit_clip = view.view_proj * vec4f(exit_pos, 1.0);
+    var screen_uv = exit_clip.xy / exit_clip.w * vec2f(0.5, -0.5) + vec2f(0.5, 0.5);
+    screen_uv = clamp(screen_uv, vec2f(0.0), vec2f(1.0));
+
+    // Sample opaque scene at refracted UV with roughness-dependent LOD
+    let max_mip = max(f32(textureNumLevels(opaque_snapshot)) - 1.0, 0.0);
+    let bg_lod = s.roughness * max_mip;
+    let background = textureSampleLevel(opaque_snapshot, reflection_sampler, screen_uv,
+        bg_lod).rgb;
+
+    // Beer-Lambert absorption
+    let att_color = max(f.attenuation, vec3f(0.001));
+    let att_ratio = thickness / max(att_distance, 0.001);
+    let transmittance = pow(att_color, vec3f(att_ratio));
+    let transmitted = (1.0 - fresnel) * background * transmittance * s.albedo;
+
+    // Blend: transmission replaces diffuse, specular always added on top
+    let tf = saturate(factor);
+    let own = reflected.diffuse * (1.0 - tf) + reflected.specular;
+    let seen = mix(background * (1.0 - fresnel), transmitted, ap.a);
+    let final_color = own * ap.a + ap.rgb * (1.0 - tf) + seen * tf;
+    return vec4f(final_color, 1.0);
+}
+
 @fragment fn fs(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
     var s = surface(f, front);
+    if (transmissive) {
+        return transmission(f, s);
+    }
+
     if (alpha_cutout && s.alpha < f.cutoff) {
         discard;
     }

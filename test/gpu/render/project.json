@@ -858,6 +858,28 @@
                     "tint_mid_transition",
                     "opacity_mid_transition"
                 ]
+            },
+            {
+                "id": "Transmission",
+                "testcases": [
+                    "factor_zero_matches_blended_path",
+                    "sees_background",
+                    "fresnel_ior",
+                    "attenuation_color",
+                    "albedo_tints",
+                    "refraction_offsets_edge",
+                    "roughness_blurs",
+                    "partial_factor_keeps_diffuse",
+                    "specular_on_top",
+                    "no_depth_write_no_shadow",
+                    "blended_not_in_snapshot",
+                    "opaque_and_sky_in_snapshot",
+                    "snapshot_counter",
+                    "resize_recreates_snapshot",
+                    "two_views_one_target",
+                    "view_without_effects",
+                    "occlusion_view_transmits"
+                ]
             }
         ]
     }
