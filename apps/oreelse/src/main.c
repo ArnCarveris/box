@@ -81,9 +81,9 @@ static int ore_stresstest_parse(
     return result;
 }
 
-/** Load the widget library etc/scenes/ui/widgets.flecs, set the game scene as the default, take the seed of the session and the stress test from
- * the command line, parse the rest into the App singleton, where a scene argument replaces the
- * default, and run the world.
+/** Load the widget library etc/scenes/ui/widgets.flecs, set the game scene as the default, take
+ * the seed of the session and the stress test from the command line, parse the rest into the App
+ * singleton, where a scene argument replaces the default, and run the world.
  *
  * @param argc Argument count
  * @param argv Argument array

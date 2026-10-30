@@ -99,11 +99,15 @@ camera {
 // here), read as stored:
 // - size: the base octave of the texture has 8 cells across the tile, so 8 * 13 = 104 world
 //   units make a cell of about 13 units, the original's scale.
-// - threshold: the cookie is the transmittance t, shaded where t is below the threshold, and
-//   about the fraction t of the texels is below t (CookieNoise), so 0.45 shades about 45% of
-//   the ground, the original's coverage (its noise above 1 - coverage).
-// - softness: the cookie ramps over 2 * softness of t around the threshold as the original's
-//   smoothstep over 2 * soft of n, so the same 0.35 gives edges as soft as the original's.
+// - threshold: the cookie is the transmittance t, shaded where t is below the threshold, so
+//   the threshold is about the coverage (the original's noise above 1 - coverage). The texture
+//   is a little steeper than t (CookieNoise): 42% of its texels are below 0.45 and 45% below
+//   0.47, so 0.47 shades the original's 45% of the ground.
+// - softness: the cookie ramps linearly over 2 * softness of t around the threshold, the
+//   original's smoothstep over 2 * soft of n. The texture spreads wider than the two octaves of
+//   value noise (a deviation of 0.23 against about 0.16) and the smoothstep is 1.5 times
+//   steeper at its middle than a linear ramp, which about cancel: 0.35 * 0.23 / 0.16 / 1.5 =
+//   0.34, so the same 0.35 gives edges as soft as the original's.
 // - strength: mix(1, lit, 0.6) darkens a fully clouded spot to 0.4, as 1 - 1 * 0.6 did.
 // - velocity: 3 units per second along the heading 0.7 radians around world Y,
 //   3 * (cos 0.7, sin 0.7) along world X and Z, added to the position read as the original
@@ -128,7 +132,7 @@ sun {
   Rgb: {255, 232, 212}
   LightCookie: {
     texture: cloud_noise, projection: Plane, size: 8 * 13, height: 10,
-    threshold: 0.45, softness: 0.35, strength: 0.6
+    threshold: 0.47, softness: 0.35, strength: 0.6
   }
   OreCloudShadow: {strength: 0.6, velocity: [3 * cos(0.7), 3 * sin(0.7)]}
 }

@@ -13,6 +13,8 @@ the tier with the Quality action, which the pause screen's button raises. The ga
 singleton of the oreelse module, written through the REST endpoints of the port (put of
 oreelse_flow).
 """
+import math
+
 from box_client import parse_value
 from oreelse_flow import ARGS, STATE, key, set_state, setup, start  # noqa: F401 (ARGS)
 
@@ -166,6 +168,9 @@ def test_cloud_shadows(app):
     app.wait_frames(10)
     playing = drift(app)
     app.check(playing != before, "the clouds did not drift while playing")
+    # along the original's heading, 0.7 radians from world X toward Z
+    heading = math.atan2(playing["y"] - before["y"], playing["x"] - before["x"])
+    app.check(abs(heading - 0.7) < 0.01, "the clouds drift along %g radians" % heading)
 
     # They stand still while paused, as everything else does, and are off at Low
     key(app, "Escape")

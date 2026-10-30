@@ -1,8 +1,9 @@
 /**
  * @file look.c
  * @brief The look: the render quality tier of OreQuality applied to the surfaces and the world
- * view, the cloud shadows of the sun (OreCloudShadow), the script function oreelse.cycleQuality() the pause screen's button calls, and the
- * script function oreelse.srgb() of the colors computed in script.
+ * view, the cloud shadows of the sun (OreCloudShadow), the script function
+ * oreelse.cycleQuality() the pause screen's button calls, and the script function oreelse.srgb()
+ * of the colors computed in script.
  *
  * The settings of every tier are cfg.quality (etc/config.flecs). The tier starts High at every
  * start of the app (oreelse.flecs) and a restart keeps it.
@@ -124,11 +125,11 @@ static void OreQualityApply(
  * at the tiers with cfg.quality.cloud_shadows and 0 (no cookie) at the others, and its offset,
  * the drift of OreCloudShadow.velocity over OreClock.elapsed wrapped to the size of the cookie.
  *
- * The original's cloud shadows drifted with the game's time, which stops while paused, so the
- * drift follows the clock of play rather than the cookie's velocity, which box advances with the
- * frame time in every state: the clouds stand still on the title, pause and end screens and a
- * restart, which resets the clock, starts them over. It runs every frame in every state and
- * writes only what differs.
+ * The original's clouds drifted with the game's time, which stops while paused, so the drift
+ * follows the clock of play, not the cookie's velocity, which box advances in every state: the
+ * clouds stand still on the title, pause and end screens, and a restart starts them over.
+ *
+ * It runs every frame in every state and writes only what differs.
  *
  * @param it Iterator over the lights with a LightCookie and an OreCloudShadow, with the
  * OreQuality and OreClock singletons

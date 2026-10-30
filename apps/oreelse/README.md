@@ -1197,6 +1197,7 @@ its tile in the grid.
 | `src/health_bars.c` | The health bars: a `HealthBar` instance per damaged building and over the damaged astronaut under `health_bars.bars`, its fraction set when the health changes, the bars' view shown while playing |
 | `src/look.c` | The render quality tiers, the cloud shadows (`OreCloudShadowApply`), `oreelse.cycleQuality()`, `oreelse.srgb()` |
 | `src/stresstest.c` | The stress test: the late game base every run of a `--stresstest` session starts with (`OreStressTestApply`) |
+| `src/look.h` | The look's components (`OreRenderQuality`, `OreQuality`, `OreQualityTiers`, `OreLook`, `OreCloudShadow`) and `ore_look_import`, included by `src/game.h` |
 | `src/stresstest.h` | The stress test's components (`OreStressTest`, `OreStressKit`) and `ore_placement_build`, included by `src/game.h` |
 | `tools/linear_colors.py` | The conversion of the original's world color bytes to the port's (see Colors), kept for reference |
 | `src/particles.c` | The helpers that play the effects (`ore_burst`, `ore_burst_aimed`, `ore_explosion`, `ore_combust`), the flash of their lights, `oreelse.explosion()`, `oreelse.combust()` |
