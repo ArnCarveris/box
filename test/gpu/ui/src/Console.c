@@ -14,6 +14,12 @@
 #define CONSOLE_INPUT "console.ui.screen.stack.panel.content.input"
 #define CONSOLE_LOG "console.ui.screen.stack.panel.content.log"
 
+/** Prompt of the console session at the root */
+#define CONSOLE_PROMPT "~ $ "
+
+/** Bytes of the prompt at the root */
+#define CONSOLE_PROMPT_LEN (4)
+
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_STATIC
 #include <stb_image.h>
@@ -28,9 +34,9 @@ static const char* console_input(
 {
     const Text *t = ecs_get(world, ecs_lookup(world, CONSOLE_INPUT ".line"), Text);
     test_assert(t != NULL && t->value != NULL);
-    test_assert(!strncmp(t->value, "> ", 2));
+    test_assert(!strncmp(t->value, CONSOLE_PROMPT, CONSOLE_PROMPT_LEN));
 
-    return t->value + 2;
+    return t->value + CONSOLE_PROMPT_LEN;
 }
 
 /** Get the x of the cursor of the console from the left of the input line.
@@ -61,7 +67,7 @@ static int32_t console_cursor(
     int32_t i, len = (int32_t)strlen(console_input(world)), result = -1;
     for (i = 0; i <= len && result < 0; i ++) {
         TextCaret caret;
-        test_assert(box_text_caret(world, line, 2 + i, &caret));
+        test_assert(box_text_caret(world, line, CONSOLE_PROMPT_LEN + i, &caret));
         float y = (float)caret.line * c->line_height + (c->line_height - c->font_size) * 0.5f;
         if (fabsf(caret.x + half - item->x) < 0.01f && fabsf(item->y + y) < 0.01f) {
             result = i;
@@ -362,7 +368,7 @@ void Console_enter_runs_line(void) {
     }
 
     const Console *c = ecs_singleton_get(world, Console);
-    const char *expect[] = {"> ls things", "things.alpha", "things.beta"};
+    const char *expect[] = {CONSOLE_PROMPT "ls things", "things.alpha", "things.beta"};
     int32_t i, lines = 0;
     while (true) {
         char name[64];
@@ -477,15 +483,17 @@ void Console_history(void) {
     box_input_key_press(world, KeyEnter, 1);
     box_input_key_type(world, "man ls", 1);
     box_input_key_press(world, KeyEnter, 1);
-    box_input_key_type(world, "dra", 1);
+    box_input_key_type(world, "ls", 1);
+    box_input_key_press(world, KeyEnter, 1);
     while (box_input_pending(world)) {
         ecs_progress(world, 0);
     }
 
-    const char *expect[] = {"man ls", "ls", "ls", "man ls", "dra"};
-    Key keys[] = {KeyUp, KeyUp, KeyUp, KeyDown, KeyDown};
+    // An empty line walks every line, Down past the newest restores it
+    const char *expect[] = {"ls", "man ls", "ls", "ls", "man ls", "ls", ""};
+    Key keys[] = {KeyUp, KeyUp, KeyUp, KeyUp, KeyDown, KeyDown, KeyDown};
     int32_t i;
-    for (i = 0; i < 5; i ++) {
+    for (i = 0; i < 7; i ++) {
         box_input_key_press(world, keys[i], 1);
         while (box_input_pending(world)) {
             ecs_progress(world, 0);
@@ -778,7 +786,7 @@ void Console_run_from_script(void) {
         .line_height = 20, .padding = 10, .scrollback = 100});
     ecs_progress(world, 0);
     test_str(ecs_get(world, ecs_lookup(world, CONSOLE_LOG ".line_5"), Text)->value,
-        "> ls things");
+        CONSOLE_PROMPT "ls things");
     test_str(ecs_get(world, ecs_lookup(world, CONSOLE_LOG ".line_6"), Text)->value,
         "things.alpha");
 
@@ -1211,8 +1219,9 @@ void Console_caret_steps_match_glyphs(void) {
     }
 
     const Text *look = ecs_get(world, ecs_lookup(world, CONSOLE_INPUT ".line"), Text);
-    const char *glyphs[4] = { "> ", "> \xEF\xBF\xBD", "> \xEF\xBF\xBD\xEF\xBF\xBD",
-        "> \xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD" };
+    const char *glyphs[4] = { CONSOLE_PROMPT, CONSOLE_PROMPT "\xEF\xBF\xBD",
+        CONSOLE_PROMPT "\xEF\xBF\xBD\xEF\xBF\xBD",
+        CONSOLE_PROMPT "\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD" };
     ecs_entity_t refs[4];
     int32_t i;
     for (i = 0; i < 4; i ++) {
@@ -1437,7 +1446,7 @@ void Console_cls_clears_scrollback(void) {
     console_cls_enter(world, "ls things");
     test_int(console_cls_lines(world, &shown), lines);
     test_int(shown, 2);
-    test_str(console_cls_line(world, 1), "> ls things");
+    test_str(console_cls_line(world, 1), CONSOLE_PROMPT "ls things");
     test_str(console_cls_line(world, 0), "things.alpha");
 
     ecs_fini(world);
@@ -1450,7 +1459,7 @@ void Console_ctrl_l_clears_keeps_input(void) {
     ecs_entity(world, { .name = "things.alpha" });
     console_cls_enter(world, "ls things");
     console_cls_lines(world, &shown);
-    test_int(shown, 2);
+    test_int(shown, 3);
 
     box_input_key_type(world, "abc", 1);
     box_input_key_press(world, KeyLeft, 1);
@@ -1513,9 +1522,9 @@ void Console_cls_with_args_error(void) {
     console_cls_enter(world, "ls things");
     console_cls_enter(world, "cls x");
     console_cls_lines(world, &shown);
-    test_int(shown, 4);
-    test_str(console_cls_line(world, 3), "> ls things");
-    test_str(console_cls_line(world, 1), "> cls x");
+    test_int(shown, 5);
+    test_str(console_cls_line(world, 3), CONSOLE_PROMPT "ls things");
+    test_str(console_cls_line(world, 1), CONSOLE_PROMPT "cls x");
     test_str(console_cls_line(world, 0), BOX_COMMAND_ERROR "cls takes no arguments, got 1");
     const Console *c = ecs_singleton_get(world, Console);
     char name[64];
@@ -1565,7 +1574,7 @@ void Console_cls_from_run(void) {
     ecs_os_free(box_console_run(world, "ls things", NULL));
     ecs_progress(world, 0);
     console_cls_lines(world, &shown);
-    test_int(shown, 2);
+    test_int(shown, 3);
 
     bool error = true;
     char *out = box_console_run(world, "cls", &error);
@@ -1608,7 +1617,7 @@ void Console_cls_unknown_over_session(void) {
 
     ecs_progress(world, 0);
     console_cls_lines(world, &shown);
-    test_int(shown, 2);
+    test_int(shown, 3);
 
     ecs_fini(world);
 }

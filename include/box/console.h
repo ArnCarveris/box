@@ -9,6 +9,10 @@
  * The console runs cls itself, so it never reaches the session: cls empties the scrollback and
  * Ctrl+L does the same without touching the input line. help in the console lists cls too.
  * Command lines are colored in the console only (ConsoleSyntax), never in sessions or logs.
+ *
+ * The prompt is bash-like: the scope of the session (~ for the root, otherwise its path) and $.
+ * Every line that ran keeps the prompt it was typed at. The first time the console opens, a hint
+ * line starts the scrollback.
  */
 
 #ifndef BOX_CONSOLE_H
@@ -60,6 +64,9 @@ ECS_STRUCT(ConsoleSyntax, {
     rgb boolean;    /**< Argument of a bool parameter, true or false in a value expression */
     rgb value;      /**< Value expression in brackets: {...}, [...] or (...) */
     rgb extra;      /**< Argument beyond the parameters of the command */
+    rgb scope;      /**< Scope of the session in the prompt, ~ at the root */
+    rgb symbol;     /**< The $ of the prompt */
+    rgb ghost;      /**< Rest of the history line the input line starts, drawn after the cursor */
 });
 
 /** The console singleton: whether it is open and how it looks.
@@ -70,7 +77,13 @@ ECS_STRUCT(ConsoleSyntax, {
  *
  * While open, typed and pasted text (Input.paste) and key presses go to the input line and no
  * action but the toggle sees the keyboard or mouse buttons. Enter runs the line, Up and Down walk
- * the lines that ran, Page Up, Page Down and the wheel scroll rows, Escape or the toggle close it.
+ * the lines that ran that start with the text typed before the first Up, Down past the newest
+ * restores that text. Page Up, Page Down and the wheel scroll rows, Escape or the toggle close it.
+ *
+ * Readline keys: Ctrl+A and Ctrl+E move to the start and end, Ctrl+U and Ctrl+K delete to the
+ * start and end, Ctrl+W deletes the word before the cursor, Ctrl+C abandons the line (echoed with
+ * ^C, nothing runs) and Ctrl+L clears the scrollback. With the cursor at the end, the rest of the
+ * newest line that ran that starts with the input is drawn dimmed after it, Right or End accept it.
  */
 ECS_STRUCT(Console, {
     bool open;           /**< Shown and taking the keyboard, the toggle action flips it */
@@ -113,6 +126,19 @@ char* box_console_run(
     ecs_world_t *world,
     const char *line,
     bool *error);
+
+/** Type text into the input line of the console at the cursor, as if it was typed.
+ *
+ * Control characters are dropped. box.console.type(text) does the same in a script, which
+ * shows a line being typed, with its history suggestion, without input events.
+ *
+ * @param world The world
+ * @param text UTF-8 text
+ * @return The input line, which the caller frees
+ */
+char* box_console_type(
+    ecs_world_t *world,
+    const char *text);
 
 #ifdef __cplusplus
 }

@@ -113,6 +113,15 @@ void Console_covers_height_after_surface_resize(void) {
 /** Path of the input line of the console */
 #define CONSOLE_INPUT "console.ui.screen.stack.panel.content.input"
 
+/** Prompt of the console session at the root */
+#define CONSOLE_PROMPT "~ $ "
+
+/** Bytes of the prompt at the root */
+#define CONSOLE_PROMPT_LEN (4)
+
+/** Hint line the scrollback starts with the first time the console opens */
+#define CONSOLE_HINT "Flecs Shell  type help for a list of possible commands"
+
 /** A command line that runs as cls with arguments, long enough to wrap into several rows */
 #define CONSOLE_LONG_COMMAND "cls alpha bravo charlie delta echo foxtrot golf hotel india " \
     "juliett kilo lima mike november oscar papa quebec romeo sierra tango uniform victor"
@@ -281,7 +290,7 @@ void Console_long_line_wraps(void) {
     ecs_os_free(box_console_run(world, "ls long", NULL));
     ecs_progress(world, 0);
 
-    ecs_entity_t cmd = console_find_line(world, "> " CONSOLE_LONG_COMMAND);
+    ecs_entity_t cmd = console_find_line(world, CONSOLE_PROMPT CONSOLE_LONG_COMMAND);
     test_assert(cmd != 0);
     test_assert(console_check_fits(world, cmd, CONSOLE_WRAP) >= 3);
 
@@ -322,11 +331,11 @@ void Console_wrapped_line_keeps_indent(void) {
     ecs_progress(world, 0);
 
     // Rows of a line that ran start after the prompt
-    ecs_entity_t cmd = console_find_line(world, "> " CONSOLE_LONG_COMMAND);
+    ecs_entity_t cmd = console_find_line(world, CONSOLE_PROMPT CONSOLE_LONG_COMMAND);
     test_assert(cmd != 0);
-    test_int(ecs_get(world, cmd, Text)->hang, 2);
+    test_int(ecs_get(world, cmd, Text)->hang, CONSOLE_PROMPT_LEN);
     TextCaret prompt, row;
-    test_assert(box_text_caret(world, cmd, 2, &prompt));
+    test_assert(box_text_caret(world, cmd, CONSOLE_PROMPT_LEN, &prompt));
     int32_t rows = box_text_line(world, cmd, 0, NULL, NULL);
     test_assert(rows >= 2);
     for (int32_t i = 1; i < rows; i ++) {
@@ -346,24 +355,24 @@ void Console_wrapped_spans_keep_colors(void) {
     ecs_os_free(box_console_run(world, CONSOLE_LONG_COMMAND, NULL));
     ecs_progress(world, 0);
 
-    const char *value = "> " CONSOLE_LONG_COMMAND;
+    const char *value = CONSOLE_PROMPT CONSOLE_LONG_COMMAND;
     ecs_entity_t cmd = console_find_line(world, value);
     test_assert(cmd != 0);
     test_assert(box_text_line(world, cmd, 0, NULL, NULL) >= 3);
     const ConsoleSyntax *syntax = &ecs_singleton_get(world, Console)->syntax;
     int32_t i, len = (int32_t)strlen(value), word = -1;
     bool last_row_colored = false;
-    for (i = 2; i < len; i ++) {
+    for (i = CONSOLE_PROMPT_LEN; i < len; i ++) {
         const TextSpan *s = console_span_at(world, cmd, i);
         if (value[i] == ' ') {
             test_assert(s == NULL);
             continue;
         }
 
-        word += i == 2 || value[i - 1] == ' ';
+        word += i == CONSOLE_PROMPT_LEN || value[i - 1] == ' ';
         test_assert(s != NULL);
         test_assert(s->start <= i && s->end > i);
-        test_assert(s->start == 2 || value[s->start - 1] == ' ');
+        test_assert(s->start == CONSOLE_PROMPT_LEN || value[s->start - 1] == ' ');
         test_assert(s->end == len || value[s->end] == ' ');
         const rgb *expect = word ? &syntax->extra : &syntax->name;
         test_int(s->color.r, expect->r);
@@ -376,7 +385,24 @@ void Console_wrapped_spans_keep_colors(void) {
     }
 
     test_assert(last_row_colored);
-    test_assert(console_span_at(world, cmd, 0) == NULL);
+
+    // The prompt keeps the colors of its scope and $, not the spaces around the $
+    const TextSpan *scope = console_span_at(world, cmd, 0);
+    const TextSpan *symbol = console_span_at(world, cmd, 2);
+    test_assert(scope != NULL);
+    test_int(scope->start, 0);
+    test_int(scope->end, 1);
+    test_int(scope->color.r, syntax->scope.r);
+    test_int(scope->color.g, syntax->scope.g);
+    test_int(scope->color.b, syntax->scope.b);
+    test_assert(symbol != NULL);
+    test_int(symbol->start, 2);
+    test_int(symbol->end, 3);
+    test_int(symbol->color.r, syntax->symbol.r);
+    test_int(symbol->color.g, syntax->symbol.g);
+    test_int(symbol->color.b, syntax->symbol.b);
+    test_assert(console_span_at(world, cmd, 1) == NULL);
+    test_assert(console_span_at(world, cmd, 3) == NULL);
 
     ecs_fini(world);
 }
@@ -395,7 +421,7 @@ static int32_t console_check_cursor(
     ecs_entity_t line = ecs_lookup(world, CONSOLE_INPUT ".line");
     ecs_entity_t cursor = ecs_lookup(world, CONSOLE_INPUT ".cursor");
     TextCaret caret;
-    test_assert(box_text_caret(world, line, 2 + offset, &caret));
+    test_assert(box_text_caret(world, line, CONSOLE_PROMPT_LEN + offset, &caret));
     const LayoutItem *item = ecs_get(world, cursor, LayoutItem);
     float x = caret.x + ecs_get(world, line, TextBounds)->width * 0.5f;
     test_flt(item->x, x);
@@ -416,8 +442,8 @@ void Console_input_line_wraps(void) {
     ecs_entity_t input = ecs_lookup(world, CONSOLE_INPUT);
     ecs_entity_t line = ecs_lookup(world, CONSOLE_INPUT ".line");
     test_assert(line != 0);
-    test_str(ecs_get(world, line, Text)->value, "> " CONSOLE_LONG_COMMAND);
-    test_int(ecs_get(world, line, Text)->hang, 2);
+    test_str(ecs_get(world, line, Text)->value, CONSOLE_PROMPT CONSOLE_LONG_COMMAND);
+    test_int(ecs_get(world, line, Text)->hang, CONSOLE_PROMPT_LEN);
     int32_t rows = box_text_line(world, line, 0, NULL, NULL);
     test_assert(rows >= 3);
     test_assert(ecs_get(world, line, TextBounds)->width <= CONSOLE_WRAP);
@@ -440,17 +466,17 @@ void Console_input_line_wraps(void) {
 
     int32_t start;
     box_text_line(world, line, 1, &start, NULL);
-    test_assert(start > 2);
+    test_assert(start > CONSOLE_PROMPT_LEN);
     box_input_key_press(world, KeyHome, 1);
-    for (int32_t i = 0; i < start - 2; i ++) {
+    for (int32_t i = 0; i < start - CONSOLE_PROMPT_LEN; i ++) {
         box_input_key_press(world, KeyRight, 1);
     }
 
     console_settle(world);
-    test_int(console_check_cursor(world, start - 2), 1);
+    test_int(console_check_cursor(world, start - CONSOLE_PROMPT_LEN), 1);
     box_input_key_press(world, KeyLeft, 1);
     console_settle(world);
-    test_int(console_check_cursor(world, start - 3), 0);
+    test_int(console_check_cursor(world, start - CONSOLE_PROMPT_LEN - 1), 0);
     box_input_key_press(world, KeyEnd, 1);
     console_settle(world);
     test_int(console_check_cursor(world, len), rows - 1);
@@ -458,9 +484,9 @@ void Console_input_line_wraps(void) {
     // Running the line gives the rows back to the log
     box_input_key_press(world, KeyEnter, 1);
     console_settle(world);
-    test_str(ecs_get(world, line, Text)->value, "> ");
+    test_str(ecs_get(world, line, Text)->value, CONSOLE_PROMPT);
     test_flt(ecs_get(world, input, LayoutBounds)->height, lh);
-    test_assert(console_find_line(world, "> " CONSOLE_LONG_COMMAND) != 0);
+    test_assert(console_find_line(world, CONSOLE_PROMPT CONSOLE_LONG_COMMAND) != 0);
 
     ecs_fini(world);
 }
@@ -490,7 +516,7 @@ void Console_scroll_counts_rows(void) {
     test_assert(output >= 1);
     test_assert(output < CONSOLE_WHEEL_ROWS);
     ecs_entity_t cmd = lines[count - 2];
-    test_str(ecs_get(world, cmd, Text)->value, "> " CONSOLE_LONG_COMMAND);
+    test_str(ecs_get(world, cmd, Text)->value, CONSOLE_PROMPT CONSOLE_LONG_COMMAND);
     int32_t rows = box_text_line(world, cmd, 0, NULL, NULL);
     test_assert(rows > CONSOLE_WHEEL_ROWS);
     test_flt(ecs_get(world, log, Layout)->padding.bottom, 0);
@@ -509,7 +535,7 @@ void Console_scroll_counts_rows(void) {
     box_input_mouse_scroll(world, 0, 1);
     console_settle(world);
     count = console_log_lines(world, lines, 256);
-    test_str(ecs_get(world, lines[count - 1], Text)->value, "> " CONSOLE_LONG_COMMAND);
+    test_str(ecs_get(world, lines[count - 1], Text)->value, CONSOLE_PROMPT CONSOLE_LONG_COMMAND);
     test_flt(ecs_get(world, log, Layout)->padding.bottom,
         -(float)(CONSOLE_WHEEL_ROWS - output) * lh);
     ecs_os_snprintf(expect, sizeof(expect), "many.c%02d", 40 - above - CONSOLE_WHEEL_ROWS);
@@ -549,7 +575,7 @@ void Console_scrollback_limit_counts_rows(void) {
     ecs_world_t *world = console_open(640, 360, NULL);
     ecs_os_free(box_console_run(world, CONSOLE_LONG_COMMAND, NULL));
     ecs_progress(world, 0);
-    ecs_entity_t cmd = console_find_line(world, "> " CONSOLE_LONG_COMMAND);
+    ecs_entity_t cmd = console_find_line(world, CONSOLE_PROMPT CONSOLE_LONG_COMMAND);
     test_assert(cmd != 0);
     int32_t rows = box_text_line(world, cmd, 0, NULL, NULL);
     test_assert(rows >= 3);
@@ -568,8 +594,8 @@ void Console_scrollback_limit_counts_rows(void) {
     }
 
     test_assert(kept <= rows + 2);
-    test_assert(console_find_line(world, "> " CONSOLE_LONG_COMMAND) == 0);
-    test_assert(console_find_line(world, "> cls x") != 0);
+    test_assert(console_find_line(world, CONSOLE_PROMPT CONSOLE_LONG_COMMAND) == 0);
+    test_assert(console_find_line(world, CONSOLE_PROMPT "cls x") != 0);
 
     ecs_fini(world);
 }
@@ -594,7 +620,7 @@ void Console_resize_rewraps(void) {
     ecs_world_t *world = console_open(640, 360, &s);
     ecs_os_free(box_console_run(world, CONSOLE_LONG_COMMAND, NULL));
     ecs_progress(world, 0);
-    ecs_entity_t cmd = console_find_line(world, "> " CONSOLE_LONG_COMMAND);
+    ecs_entity_t cmd = console_find_line(world, CONSOLE_PROMPT CONSOLE_LONG_COMMAND);
     test_assert(cmd != 0);
     int32_t narrow = console_check_fits(world, cmd, CONSOLE_WRAP);
     test_assert(narrow >= 3);
@@ -615,14 +641,14 @@ void Console_resize_rewraps(void) {
     ecs_set(world, s, Surface, {.width = 640, .height = 365, .resolution_scale = 1});
     ecs_progress(world, 0);
     ecs_progress(world, 0);
-    test_assert(console_find_line(world, "> " CONSOLE_LONG_COMMAND) == cmd);
+    test_assert(console_find_line(world, CONSOLE_PROMPT CONSOLE_LONG_COMMAND) == cmd);
     test_int(sets, 0);
 
     // A wider surface wraps it at the new width
     ecs_set(world, s, Surface, {.width = 1280, .height = 365, .resolution_scale = 1});
     ecs_progress(world, 0);
     ecs_progress(world, 0);
-    cmd = console_find_line(world, "> " CONSOLE_LONG_COMMAND);
+    cmd = console_find_line(world, CONSOLE_PROMPT CONSOLE_LONG_COMMAND);
     test_assert(cmd != 0);
     int32_t wide = console_check_fits(world, cmd, 640 - 20);
     test_assert(wide < narrow);
@@ -633,10 +659,524 @@ void Console_resize_rewraps(void) {
     ecs_singleton_modified(world, Console);
     ecs_progress(world, 0);
     ecs_progress(world, 0);
-    cmd = console_find_line(world, "> " CONSOLE_LONG_COMMAND);
+    cmd = console_find_line(world, CONSOLE_PROMPT CONSOLE_LONG_COMMAND);
     test_assert(console_check_fits(world, cmd, CONSOLE_WRAP) == narrow);
     test_flt(ecs_get(world, ecs_lookup(world, CONSOLE_INPUT ".line"), Text)->width,
         CONSOLE_WRAP);
+
+    ecs_fini(world);
+}
+
+/** Hold Ctrl, tap a key and release Ctrl, then draw the console.
+ *
+ * @param world The world
+ * @param key The key
+ */
+static void console_ctrl(
+    ecs_world_t *world,
+    Key key)
+{
+    box_input_key(world, KeyCtrlLeft, true);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_input_key_press(world, key, 1);
+    box_input_key(world, KeyCtrlLeft, false);
+    console_settle(world);
+}
+
+/** Tap a key a number of times, then draw the console.
+ *
+ * @param world The world
+ * @param key The key
+ * @param count Number of taps
+ */
+static void console_press(
+    ecs_world_t *world,
+    Key key,
+    int32_t count)
+{
+    for (int32_t i = 0; i < count; i ++) {
+        box_input_key_press(world, key, 1);
+    }
+
+    console_settle(world);
+}
+
+/** Type text into the console, then draw it.
+ *
+ * @param world The world
+ * @param text The text
+ */
+static void console_type(
+    ecs_world_t *world,
+    const char *text)
+{
+    box_input_key_type(world, text, 1);
+    console_settle(world);
+}
+
+/** Get the string of the input line of the console, its prompt and suggestion included.
+ *
+ * @param world The world
+ * @return The string
+ */
+static const char* console_value(
+    ecs_world_t *world)
+{
+    const Text *t = ecs_get(world, ecs_lookup(world, CONSOLE_INPUT ".line"), Text);
+    test_assert(t != NULL && t->value != NULL);
+
+    return t->value;
+}
+
+/** Find the span of the input line in the color of the history suggestion.
+ *
+ * @param world The world
+ * @return The span, NULL when the input line shows no suggestion
+ */
+static const TextSpan* console_ghost(
+    ecs_world_t *world)
+{
+    ecs_entity_t line = ecs_lookup(world, CONSOLE_INPUT ".line");
+    const TextSpans *spans = ecs_get(world, line, TextSpans);
+    const rgb *ghost = &ecs_singleton_get(world, Console)->syntax.ghost;
+    const TextSpan *result = NULL;
+    for (int32_t i = 0; spans && i < ecs_vec_count(&spans->spans); i ++) {
+        const TextSpan *s = ecs_vec_get_t(&spans->spans, TextSpan, i);
+        if (s->color.r == ghost->r && s->color.g == ghost->g && s->color.b == ghost->b) {
+            result = s;
+        }
+    }
+
+    return result;
+}
+
+/** Get the input line of the console after the root prompt, without the history suggestion.
+ *
+ * @param world The world
+ * @return The text, valid until the next call
+ */
+static const char* console_typed(
+    ecs_world_t *world)
+{
+    static char buf[512];
+    const char *value = console_value(world);
+    const TextSpan *ghost = console_ghost(world);
+    int32_t end = ghost ? ghost->start : (int32_t)strlen(value);
+    test_assert(!strncmp(value, CONSOLE_PROMPT, CONSOLE_PROMPT_LEN));
+    test_assert(end - CONSOLE_PROMPT_LEN < (int32_t)sizeof(buf));
+    ecs_os_snprintf(buf, sizeof(buf), "%.*s", end - CONSOLE_PROMPT_LEN,
+        &value[CONSOLE_PROMPT_LEN]);
+
+    return buf;
+}
+
+/** Check the color of a span of a text element.
+ *
+ * @param world The world
+ * @param e The element
+ * @param start First byte of the span
+ * @param end Byte after the span
+ * @param color The color
+ */
+static void console_check_span(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    int32_t start,
+    int32_t end,
+    rgb color)
+{
+    const TextSpan *s = console_span_at(world, e, start);
+    test_assert(s != NULL);
+    test_int(s->start, start);
+    test_int(s->end, end);
+    test_int(s->color.r, color.r);
+    test_int(s->color.g, color.g);
+    test_int(s->color.b, color.b);
+}
+
+void Console_prompt_root_and_scope(void) {
+    // console/prompt
+    ecs_world_t *world = console_open(640, 360, NULL);
+    const ConsoleSyntax *syntax = &ecs_singleton_get(world, Console)->syntax;
+    ecs_entity_t line = ecs_lookup(world, CONSOLE_INPUT ".line");
+    ecs_entity(world, { .name = "parent.child" });
+
+    // At the root the prompt is ~ and $, in their own colors
+    test_str(console_value(world), CONSOLE_PROMPT);
+    test_int(ecs_get(world, line, Text)->hang, CONSOLE_PROMPT_LEN);
+    console_check_span(world, line, 0, 1, syntax->scope);
+    console_check_span(world, line, 2, 3, syntax->symbol);
+    test_assert(console_span_at(world, line, 1) == NULL);
+    console_check_cursor(world, 0);
+
+    // cd from the input line moves the prompt right away
+    console_type(world, "cd parent.child");
+    console_press(world, KeyEnter, 1);
+    test_str(console_value(world), "parent.child $ ");
+    test_int(ecs_get(world, line, Text)->hang, 15);
+    console_check_span(world, line, 0, 12, syntax->scope);
+    console_check_span(world, line, 13, 14, syntax->symbol);
+    test_assert(console_find_line(world, CONSOLE_PROMPT "cd parent.child") != 0);
+
+    // Typed text follows the prompt and the cursor stays on the input
+    console_type(world, "ls");
+    test_str(console_value(world), "parent.child $ ls");
+    TextCaret caret;
+    test_assert(box_text_caret(world, line, 17, &caret));
+
+    // cd from a script does the same, back at the root
+    ecs_os_free(box_console_run(world, "cd", NULL));
+    ecs_progress(world, 0);
+    test_str(console_value(world), CONSOLE_PROMPT "ls");
+
+    ecs_fini(world);
+}
+
+void Console_lines_keep_scope(void) {
+    // console/prompt
+    ecs_world_t *world = console_open(640, 360, NULL);
+    const ConsoleSyntax *syntax = &ecs_singleton_get(world, Console)->syntax;
+    ecs_entity(world, { .name = "parent" });
+    ecs_os_free(box_console_run(world, "cd parent", NULL));
+    ecs_os_free(box_console_run(world, "pwd", NULL));
+    ecs_os_free(box_console_run(world, "cd", NULL));
+    ecs_os_free(box_console_run(world, "pwd", NULL));
+    ecs_progress(world, 0);
+
+    // Every line keeps the prompt it ran at, also after the scope moved on
+    ecs_entity_t cd = console_find_line(world, CONSOLE_PROMPT "cd parent");
+    ecs_entity_t pwd = console_find_line(world, "parent $ pwd");
+    ecs_entity_t back = console_find_line(world, "parent $ cd");
+    ecs_entity_t root = console_find_line(world, CONSOLE_PROMPT "pwd");
+    test_assert(cd != 0);
+    test_assert(pwd != 0);
+    test_assert(back != 0);
+    test_assert(root != 0);
+    test_int(ecs_get(world, pwd, Text)->hang, 9);
+    console_check_span(world, pwd, 0, 6, syntax->scope);
+    console_check_span(world, pwd, 7, 8, syntax->symbol);
+    console_check_span(world, pwd, 9, 12, syntax->name);
+    console_check_span(world, cd, 0, 1, syntax->scope);
+    test_str(console_value(world), CONSOLE_PROMPT);
+
+    // Going back into the scope does not change the lines that ran at the root
+    ecs_os_free(box_console_run(world, "cd parent", NULL));
+    ecs_progress(world, 0);
+    test_assert(console_find_line(world, CONSOLE_PROMPT "pwd") == root);
+    test_str(console_value(world), "parent $ ");
+
+    ecs_fini(world);
+}
+
+void Console_ctrl_a_e(void) {
+    // console/prompt
+    ecs_world_t *world = console_open(640, 360, NULL);
+    console_type(world, "alpha beta");
+    console_check_cursor(world, 10);
+    console_ctrl(world, KeyA);
+    console_check_cursor(world, 0);
+    test_str(console_typed(world), "alpha beta");
+
+    // Typing goes to the start
+    console_type(world, "x");
+    test_str(console_typed(world), "xalpha beta");
+    console_check_cursor(world, 1);
+    console_ctrl(world, KeyE);
+    console_check_cursor(world, 11);
+    console_type(world, "y");
+    test_str(console_typed(world), "xalpha betay");
+
+    ecs_fini(world);
+}
+
+void Console_ctrl_u_k(void) {
+    // console/prompt
+    ecs_world_t *world = console_open(640, 360, NULL);
+    console_type(world, "one two three");
+    console_press(world, KeyLeft, 5);
+    console_check_cursor(world, 8);
+
+    // Ctrl+K deletes to the end, the cursor stays
+    console_ctrl(world, KeyK);
+    test_str(console_typed(world), "one two ");
+    console_check_cursor(world, 8);
+
+    // Ctrl+U deletes to the start
+    console_press(world, KeyLeft, 4);
+    console_ctrl(world, KeyU);
+    test_str(console_typed(world), "two ");
+    console_check_cursor(world, 0);
+
+    // At the start Ctrl+U and at the end Ctrl+K delete nothing
+    console_ctrl(world, KeyU);
+    test_str(console_typed(world), "two ");
+    console_ctrl(world, KeyE);
+    console_ctrl(world, KeyK);
+    test_str(console_typed(world), "two ");
+    console_check_cursor(world, 4);
+
+    ecs_fini(world);
+}
+
+void Console_ctrl_w(void) {
+    // console/prompt
+    ecs_world_t *world = console_open(640, 360, NULL);
+    console_type(world, "get cube  Position");
+
+    // Ctrl+W deletes the word before the cursor, with the spaces between it and the cursor
+    console_ctrl(world, KeyW);
+    test_str(console_typed(world), "get cube  ");
+    console_ctrl(world, KeyW);
+    test_str(console_typed(world), "get ");
+    console_check_cursor(world, 4);
+
+    // From inside a word only the part before the cursor goes
+    console_type(world, "cube");
+    console_press(world, KeyLeft, 2);
+    console_ctrl(world, KeyW);
+    test_str(console_typed(world), "get be");
+    console_check_cursor(world, 4);
+    console_ctrl(world, KeyW);
+    console_ctrl(world, KeyW);
+    test_str(console_typed(world), "be");
+    console_check_cursor(world, 0);
+
+    ecs_fini(world);
+}
+
+void Console_ctrl_c(void) {
+    // console/prompt
+    ecs_world_t *world = console_open(640, 360, NULL);
+    ecs_entity(world, { .name = "things.alpha" });
+    console_type(world, "ls things");
+    console_press(world, KeyLeft, 3);
+    console_ctrl(world, KeyC);
+
+    // The line is echoed with ^C after it and cleared, nothing runs
+    test_str(console_value(world), CONSOLE_PROMPT);
+    console_check_cursor(world, 0);
+    ecs_entity_t echo = console_find_line(world, CONSOLE_PROMPT "ls things^C");
+    test_assert(echo != 0);
+    test_int(ecs_get(world, echo, Text)->hang, CONSOLE_PROMPT_LEN);
+    test_assert(console_find_line(world, "things.alpha") == 0);
+    const ConsoleSyntax *syntax = &ecs_singleton_get(world, Console)->syntax;
+    console_check_span(world, echo, 0, 1, syntax->scope);
+    console_check_span(world, echo, 4, 6, syntax->name);
+
+    // The line is not in the history
+    console_press(world, KeyUp, 1);
+    test_str(console_value(world), CONSOLE_PROMPT);
+
+    // An empty line is echoed too
+    console_ctrl(world, KeyC);
+    ecs_entity_t lines[256];
+    int32_t count = console_log_lines(world, lines, 256);
+    test_str(ecs_get(world, lines[count - 1], Text)->value, CONSOLE_PROMPT "^C");
+
+    ecs_fini(world);
+}
+
+void Console_ctrl_l(void) {
+    // console/prompt
+    ecs_world_t *world = console_open(640, 360, NULL);
+    ecs_entity(world, { .name = "things.alpha" });
+    ecs_os_free(box_console_run(world, "ls things", NULL));
+    ecs_progress(world, 0);
+    test_assert(console_find_line(world, CONSOLE_PROMPT "ls things") != 0);
+    test_assert(console_find_line(world, "things.alpha") != 0);
+
+    console_type(world, "abc");
+    console_ctrl(world, KeyL);
+    test_assert(console_find_line(world, CONSOLE_PROMPT "ls things") == 0);
+    test_assert(console_find_line(world, "things.alpha") == 0);
+    test_assert(console_find_line(world, CONSOLE_HINT) == 0);
+    test_str(console_typed(world), "abc");
+    test_bool(ecs_singleton_get(world, Console)->open, true);
+
+    ecs_fini(world);
+}
+
+void Console_history_filter(void) {
+    // console/prompt
+    ecs_world_t *world = console_open(640, 360, NULL);
+    ecs_os_free(box_console_run(world, "ls alpha", NULL));
+    ecs_os_free(box_console_run(world, "pwd", NULL));
+    ecs_os_free(box_console_run(world, "ls gamma", NULL));
+    ecs_os_free(box_console_run(world, "help", NULL));
+    ecs_progress(world, 0);
+
+    // Up walks the lines that start with the text typed before it
+    console_type(world, "ls");
+    console_press(world, KeyUp, 1);
+    test_str(console_typed(world), "ls gamma");
+    console_press(world, KeyUp, 1);
+    test_str(console_typed(world), "ls alpha");
+    console_press(world, KeyUp, 1);
+    test_str(console_typed(world), "ls alpha");
+
+    // Down walks back and past the newest restores the typed text
+    console_press(world, KeyDown, 1);
+    test_str(console_typed(world), "ls gamma");
+    console_press(world, KeyDown, 1);
+    test_str(console_typed(world), "ls");
+    console_check_cursor(world, 2);
+    console_press(world, KeyDown, 1);
+    test_str(console_typed(world), "ls");
+
+    // Text that starts no line walks nothing
+    console_type(world, "x");
+    console_press(world, KeyUp, 1);
+    test_str(console_typed(world), "lsx");
+
+    // An empty line walks every line
+    console_ctrl(world, KeyU);
+    console_press(world, KeyUp, 1);
+    test_str(console_typed(world), "help");
+    console_press(world, KeyUp, 1);
+    test_str(console_typed(world), "ls gamma");
+    console_press(world, KeyUp, 1);
+    test_str(console_typed(world), "pwd");
+
+    // Editing a line of the walk filters the next walk on the edited line
+    console_press(world, KeyBackspace, 2);
+    test_str(console_typed(world), "p");
+    console_press(world, KeyUp, 1);
+    test_str(console_typed(world), "pwd");
+    console_press(world, KeyDown, 1);
+    test_str(console_typed(world), "p");
+
+    ecs_fini(world);
+}
+
+void Console_autosuggest(void) {
+    // console/prompt
+    ecs_world_t *world = console_open(640, 360, NULL);
+    const ConsoleSyntax *syntax = &ecs_singleton_get(world, Console)->syntax;
+    ecs_entity_t line = ecs_lookup(world, CONSOLE_INPUT ".line");
+    ecs_os_free(box_console_run(world, "ls things", NULL));
+    ecs_os_free(box_console_run(world, "help", NULL));
+    ecs_progress(world, 0);
+    test_assert(console_ghost(world) == NULL);
+
+    // The rest of the newest line that starts with the input is drawn dimmed after the cursor
+    console_type(world, "ls");
+    test_str(console_value(world), CONSOLE_PROMPT "ls things");
+    console_check_span(world, line, 6, 13, syntax->ghost);
+    test_str(console_typed(world), "ls");
+    console_check_cursor(world, 2);
+
+    // Right accepts it
+    console_press(world, KeyRight, 1);
+    test_str(console_value(world), CONSOLE_PROMPT "ls things");
+    test_assert(console_ghost(world) == NULL);
+    console_check_cursor(world, 9);
+
+    // It goes when the input no longer matches and comes back when it does
+    console_press(world, KeyBackspace, 6);
+    test_str(console_typed(world), "ls ");
+    test_assert(console_ghost(world) != NULL);
+    console_type(world, "x");
+    test_str(console_value(world), CONSOLE_PROMPT "ls x");
+    test_assert(console_ghost(world) == NULL);
+    console_press(world, KeyBackspace, 1);
+    test_assert(console_ghost(world) != NULL);
+
+    // End accepts it too
+    console_press(world, KeyEnd, 1);
+    test_str(console_value(world), CONSOLE_PROMPT "ls things");
+    test_assert(console_ghost(world) == NULL);
+
+    // Only with the cursor at the end
+    console_ctrl(world, KeyU);
+    console_type(world, "h");
+    test_str(console_value(world), CONSOLE_PROMPT "help");
+    console_press(world, KeyLeft, 1);
+    test_str(console_value(world), CONSOLE_PROMPT "h");
+    test_assert(console_ghost(world) == NULL);
+    console_press(world, KeyRight, 1);
+    console_check_cursor(world, 1);
+    test_str(console_value(world), CONSOLE_PROMPT "help");
+    console_press(world, KeyRight, 1);
+    test_str(console_value(world), CONSOLE_PROMPT "help");
+    test_assert(console_ghost(world) == NULL);
+    console_check_cursor(world, 4);
+
+    // Enter runs only the typed text; a line no longer than the input suggests nothing, an
+    // older longer one still does
+    console_ctrl(world, KeyU);
+    console_type(world, "ls");
+    test_assert(console_ghost(world) != NULL);
+    console_press(world, KeyEnter, 1);
+    test_assert(console_find_line(world, CONSOLE_PROMPT "ls") != 0);
+    test_assert(console_ghost(world) == NULL);
+    console_type(world, "ls");
+    test_str(console_value(world), CONSOLE_PROMPT "ls things");
+    console_ctrl(world, KeyU);
+    console_type(world, "help");
+    test_assert(console_ghost(world) == NULL);
+    test_str(console_value(world), CONSOLE_PROMPT "help");
+
+    // Walking the history shows no suggestion
+    console_ctrl(world, KeyU);
+    console_press(world, KeyUp, 2);
+    test_str(console_value(world), CONSOLE_PROMPT "help");
+    test_assert(console_ghost(world) == NULL);
+
+    ecs_fini(world);
+}
+
+void Console_hint_on_first_open(void) {
+    // console/prompt
+    ecs_world_t *world = console_open(640, 360, NULL);
+    const ConsoleSyntax *syntax = &ecs_singleton_get(world, Console)->syntax;
+    ecs_entity_t hint = console_find_line(world, CONSOLE_HINT);
+    test_assert(hint != 0);
+    console_check_span(world, hint, 18, 22, syntax->name);
+
+    // Lines that run come after it, closing and opening again does not add it again
+    ecs_os_free(box_console_run(world, "pwd", NULL));
+    ecs_singleton_get_mut(world, Console)->open = false;
+    ecs_singleton_modified(world, Console);
+    ecs_progress(world, 0);
+    ecs_singleton_get_mut(world, Console)->open = true;
+    ecs_singleton_modified(world, Console);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_entity_t lines[256];
+    int32_t i, count = console_log_lines(world, lines, 256), found = 0, at = -1;
+    for (i = 0; i < count; i ++) {
+        const Text *t = ecs_get(world, lines[i], Text);
+        if (!strcmp(t->value, CONSOLE_HINT)) {
+            found ++;
+            at = i;
+        }
+    }
+
+    test_int(found, 1);
+    test_str(ecs_get(world, lines[at + 1], Text)->value, CONSOLE_PROMPT "pwd");
+
+    ecs_fini(world);
+}
+
+void Console_type_from_script(void) {
+    // console/prompt
+    ecs_world_t *world = console_open(640, 360, NULL);
+    ecs_os_free(box_console_run(world, "cd items", NULL));
+    ecs_os_free(box_console_run(world, "cd", NULL));
+    test_assert(ecs_script_run(world, "type",
+        "const typed: string = box.console.type(\"cd i\")\n", NULL) == 0);
+    ecs_progress(world, 0);
+    test_str(console_typed(world), "cd i");
+
+    // Control characters are dropped, the suggestion follows the typed text
+    char *line = box_console_type(world, "\tt\n");
+    test_str(line, "cd it");
+    ecs_os_free(line);
+    ecs_progress(world, 0);
+    test_str(console_value(world), CONSOLE_PROMPT "cd items");
+    test_str(console_typed(world), "cd it");
+    console_check_cursor(world, 5);
 
     ecs_fini(world);
 }

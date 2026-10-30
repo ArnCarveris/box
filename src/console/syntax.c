@@ -267,13 +267,7 @@ static void box_console_syntax_value(
     }
 }
 
-/** Get the scope of the console session.
- *
- * @param world The world
- * @param con The console state
- * @return The scope, 0 for the root
- */
-static ecs_entity_t box_console_syntax_scope(
+ecs_entity_t box_console_session_scope(
     const ecs_world_t *world,
     const box_console_t *con)
 {
@@ -286,6 +280,26 @@ static ecs_entity_t box_console_syntax_scope(
     if (s && s->scope && ecs_is_alive(world, s->scope)) {
         result = s->scope;
     }
+
+    return result;
+}
+
+char* box_console_prompt(
+    const ecs_world_t *world,
+    const box_console_t *con,
+    ecs_vec_t *spans)
+{
+    ecs_entity_t scope = box_console_session_scope(world, con);
+    char *path = scope ? ecs_get_path(world, scope) : NULL;
+    const char *name = path && path[0] ? path : BOX_CONSOLE_ROOT;
+    int32_t len = (int32_t)strlen(name);
+    char *result = flecs_asprintf("%s" BOX_CONSOLE_SYMBOL, name);
+    if (spans) {
+        box_console_syntax_add(spans, 0, len, BoxSyntaxScope);
+        box_console_syntax_add(spans, len + 1, len + 2, BoxSyntaxSymbol);
+    }
+
+    ecs_os_free(path);
 
     return result;
 }
@@ -432,7 +446,7 @@ static void box_console_syntax_call(
         goto done;
     }
 
-    scope = box_console_syntax_scope(world, con);
+    scope = box_console_session_scope(world, con);
     box_console_syntax_add(spans, tokens[0].start, tokens[0].end, BoxSyntaxName);
     argc = ecs_vec_count(&f->params);
     params = ecs_vec_first(&f->params);
