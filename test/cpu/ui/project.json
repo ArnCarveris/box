@@ -267,6 +267,12 @@
                 ]
             },
             {
+                "id": "LayoutFill",
+                "testcases": [
+                    "offscreen_surface_resize"
+                ]
+            },
+            {
                 "id": "Focus",
                 "testcases": [
                     "tags_and_status",
