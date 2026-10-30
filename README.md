@@ -43,10 +43,10 @@ Next to the builtin commands of the shell (`ls`, `cd`, `get`, `set`, `query`, th
 commands, ...) box adds `key_press`, `mouse_click`, `action_press` and the other input commands,
 `capture` and `render` (PNG resources, fetched with
 `GET /shell/session/<id>/resource/<name>`), `fit`, `fps`, `frames`, `edit` and `logs`. `help`
-lists them all. `fit [camera]` moves the active camera, or a camera, back along its view until it
-sees every mesh of its scene, keeping its direction. `fps` shows or hides a chart of the recent frames at the top right (green at 60 fps or
-faster, yellow under 60, red under 30) and `fps <rate>` caps the frame rate, `fps 0` removes the
-cap; `frames` prints the frame timing. `tools/box_client.py` drives an app over these endpoints
+lists them all. `fit [camera]` moves the active camera, or a camera, along its view until it
+tightly frames every mesh of its scene, keeping its direction. `fps` shows or hides a chart of
+the recent frames at the top right (green at 60 fps or faster, yellow under 60, red under 30)
+and `fps <rate>` caps the frame rate, `fps 0` removes the cap; `frames` prints the frame timing. `tools/box_client.py` drives an app over these endpoints
 for the e2e tests.
 
 [shell]: https://github.com/SanderMertens/flecs/blob/master/docs/FlecsShell.md

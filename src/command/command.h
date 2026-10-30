@@ -83,6 +83,19 @@ ecs_entity_t box_cmd_render_view(
 ecs_entity_t box_cmd_render_view_root(
     ecs_world_t *world);
 
+/** Get the camera of a command: the camera argument, else the camera of the first view of the
+ * surface shown first. Logs an error when the argument is not a camera or there is no camera.
+ *
+ * @param world The world
+ * @param argc Number of arguments
+ * @param argv The camera, omitted for the active camera
+ * @return The camera, 0 on an error
+ */
+ecs_entity_t box_cmd_render_camera(
+    ecs_world_t *world,
+    int32_t argc,
+    const ecs_value_t *argv);
+
 /** Register the fit command that moves a camera to a tight fit of its scene.
  *
  * @param world The world

@@ -231,7 +231,7 @@ static void box_cmd_fit(
     ecs_value_t *result)
 {
     ecs_world_t *world = ctx->world;
-    ecs_entity_t camera = argc > 0 ? *(ecs_entity_t*)argv[0].ptr : 0;
+    ecs_entity_t camera = box_cmd_render_camera(world, argc, argv);
     box_cmd_fit_content_t content = {
         .min = { FLT_MAX, FLT_MAX, FLT_MAX },
         .max = { -FLT_MAX, -FLT_MAX, -FLT_MAX }
@@ -240,20 +240,8 @@ static void box_cmd_fit(
     char *path = NULL;
     int32_t i;
     ecs_vec_init_t(NULL, &content.corners, vec3, 0);
-    if (argc > 0 && (!camera || !ecs_is_alive(world, camera) || !ecs_has(world, camera, Camera))) {
-        path = ecs_get_path(world, camera);
-        ecs_err("'%s' is not a camera", path);
-        goto done;
-    }
-
     if (!camera) {
-        ecs_entity_t view = box_cmd_render_view(world, 0, box_cmd_render_view_root(world), false);
-        if (!view) {
-            ecs_err("no active camera");
-            goto done;
-        }
-
-        camera = ecs_get(world, view, View)->camera;
+        goto done;
     }
 
     box_cmd_fit_collect(world, camera, &content);

@@ -197,6 +197,29 @@ ecs_entity_t box_cmd_render_view_root(
     return s ? s->view_root : 0;
 }
 
+ecs_entity_t box_cmd_render_camera(
+    ecs_world_t *world,
+    int32_t argc,
+    const ecs_value_t *argv)
+{
+    ecs_entity_t result = argc > 0 ? *(ecs_entity_t*)argv[0].ptr : 0;
+    if (argc > 0 && (!result || !ecs_is_alive(world, result) || !ecs_has(world, result, Camera))) {
+        char *path = ecs_get_path(world, result);
+        ecs_err("'%s' is not a camera", path);
+        ecs_os_free(path);
+        result = 0;
+    } else if (!result) {
+        ecs_entity_t view = box_cmd_render_view(world, 0, box_cmd_render_view_root(world), false);
+        if (view) {
+            result = ecs_get(world, view, View)->camera;
+        } else {
+            ecs_err("no active camera");
+        }
+    }
+
+    return result;
+}
+
 /** Get the clear of a capture: of the first view of the camera when it clears, else of the
  * first view that clears.
  *
@@ -234,23 +257,11 @@ static void box_cmd_capture(
     ecs_value_t *result)
 {
     ecs_world_t *world = ctx->world;
-    ecs_entity_t camera = argc > 0 ? *(ecs_entity_t*)argv[0].ptr : 0;
+    ecs_entity_t camera = box_cmd_render_camera(world, argc, argv);
     box_render_capture_desc_t desc = {0};
     char *path = NULL;
-    if (argc > 0 && (!camera || !ecs_is_alive(world, camera) || !ecs_has(world, camera, Camera))) {
-        path = ecs_get_path(world, camera);
-        ecs_err("'%s' is not a camera", path);
-        goto done;
-    }
-
     if (!camera) {
-        ecs_entity_t view = box_cmd_render_view(world, 0, box_cmd_render_view_root(world), false);
-        if (!view) {
-            ecs_err("no active camera");
-            goto done;
-        }
-
-        camera = ecs_get(world, view, View)->camera;
+        goto done;
     }
 
     path = box_cmd_render_file(ctx, result->ptr);

@@ -27,6 +27,8 @@
             },
             {
                 "id": "Render",
+                "setup": true,
+                "teardown": true,
                 "testcases": [
                     "capture_active_camera",
                     "capture_named_camera",
