@@ -8,7 +8,7 @@
  * description of the fields of each component, so a new component is an entry of the table.
  */
 
-#include "render.h"
+#include "draw.h"
 #include <stddef.h>
 
 /** A float field of a component */
@@ -505,6 +505,85 @@ done:
     return;
 }
 
+/** Get the value of a component in the target material of a material or shading record.
+ *
+ * @param material The material
+ * @param component The component
+ * @return The value, NULL for a component that is not a material component
+ */
+static void* box_transition_material_value(
+    box_draw_transition_material_t *material,
+    box_render_transition_component_t component)
+{
+    void *result = NULL;
+    switch (component) {
+    case BOX_RENDER_TRANSITION_RGB: result = &material->color; break;
+    case BOX_RENDER_TRANSITION_ALPHA_CUTOFF: result = &material->cutoff; break;
+    case BOX_RENDER_TRANSITION_PBR_MATERIAL: result = &material->pbr; break;
+    case BOX_RENDER_TRANSITION_EMISSIVE: result = &material->emissive; break;
+    case BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM: result = &material->uv; break;
+    case BOX_RENDER_TRANSITION_POSITION:
+    case BOX_RENDER_TRANSITION_ROTATION:
+    case BOX_RENDER_TRANSITION_SCALE:
+    case BOX_RENDER_TRANSITION_OPACITY:
+    case BOX_RENDER_TRANSITION_TINT:
+    case BOX_RENDER_TRANSITION_COMPONENTS:
+        break;
+    }
+
+    return result;
+}
+
+/** Patch a record of the material table or a 2D shading in the packet data: the target
+ * material of the record with the rendered value of each component that has a node, encoded
+ * with the functions of the game thread (box_draws_transition_encode).
+ *
+ * @param t The table
+ * @param p The packet
+ * @param r The record
+ */
+static void box_transition_material(
+    box_render_transition_table_t *t,
+    box_render_packet_t *p,
+    const box_render_transition_record_t *r)
+{
+    box_draw_transition_material_t material;
+    const void *src = box_transition_data(p, r->data, ECS_SIZEOF(material));
+    ecs_size_t size = r->op == BOX_RENDER_TRANSITION_MATERIAL
+        ? ECS_SIZEOF(box_render_material_t) : ECS_SIZEOF(box_render_shading_t);
+    void *dst = box_transition_data(p, r->offset, size);
+    int32_t c;
+    if (!src || !dst) {
+        goto done;
+    }
+
+    ecs_os_memcpy(&material, src, ECS_SIZEOF(material));
+    if (r->op == BOX_RENDER_TRANSITION_MATERIAL) {
+        material.kind = BOX_DRAW_TRANSITION_TABLE;
+    } else if (material.kind == BOX_DRAW_TRANSITION_TABLE) {
+        goto done;
+    }
+
+    for (c = 0; c < BOX_RENDER_TRANSITION_COMPONENTS; c ++) {
+        box_render_transition_component_t component = (box_render_transition_component_t)c;
+        const box_render_transition_node_t *node = material.nodes[c]
+            ? box_transition_node_get(t, material.nodes[c]) : NULL;
+        void *value = box_transition_material_value(&material, component);
+        if (!node || !node->alive || !node->values[c].present || !value ||
+            !(material.present & (1u << c)))
+        {
+            continue;
+        }
+
+        ecs_os_memcpy(value, node->values[c].current,
+            box_render_transition_layout(component)->size);
+    }
+
+    box_draws_transition_encode(&material, dst);
+done:
+    return;
+}
+
 /** Apply the pose and slot records of a packet, in the order they were made, which puts a
  * parent node before its children and every pose before the slots.
  *
@@ -523,6 +602,10 @@ static void box_transition_patch(
             box_transition_pose(t, p, r);
         } else if (r->op == BOX_RENDER_TRANSITION_SLOT) {
             box_transition_slot(t, p, r);
+        } else if (r->op == BOX_RENDER_TRANSITION_MATERIAL ||
+            r->op == BOX_RENDER_TRANSITION_SHADING)
+        {
+            box_transition_material(t, p, r);
         }
     }
 }

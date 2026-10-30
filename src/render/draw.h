@@ -166,6 +166,38 @@ typedef struct box_draw_material_t {
     uint32_t rank;              /**< Rank of a 2D shape or glyph in the draw order of its tree */
 } box_draw_material_t;
 
+/** What the record a material transition patches is */
+typedef enum box_draw_transition_kind_t {
+    BOX_DRAW_TRANSITION_TABLE = 0,  /**< A box_render_material_t of the material table */
+    BOX_DRAW_TRANSITION_SHAPE,      /**< The box_render_shading_t of a 2D shape */
+    BOX_DRAW_TRANSITION_GLYPH       /**< The box_render_shading_t of a glyph */
+} box_draw_transition_kind_t;
+
+/** The target material of a record a material transition patches, as the game thread encoded
+ * the record from it, in the packet data of a material or shading record.
+ *
+ * The resolver replaces the value of each component that has a node by the value the node
+ * renders and encodes the record again with the functions the game thread used, so a component
+ * at its target gives the bytes of the record without a transition. */
+typedef struct box_draw_transition_material_t {
+    uint32_t nodes[BOX_RENDER_TRANSITION_COMPONENTS]; /**< By component, the node that owns the
+                             *   value and runs a transition of it, 0 to keep the target */
+    uint16_t present;       /**< 1 << box_render_transition_component_t per component the
+                             *   material has */
+    uint8_t kind;           /**< box_draw_transition_kind_t */
+    bool tinted;            /**< inherited holds the tints of the ancestors */
+    Rgb color;              /**< Rgb */
+    AlphaCutoff cutoff;     /**< AlphaCutoff */
+    PbrMaterial pbr;        /**< PbrMaterial */
+    Emissive emissive;      /**< Emissive */
+    TextureTransform uv;    /**< TextureTransform */
+    Opacity opacity;        /**< Opacity of the shape itself */
+    Tint tint;              /**< Tint of the shape itself */
+    box_draw_tint_t inherited; /**< Tints of the ancestors, when tinted */
+    float fade;             /**< Product of the Opacity of the ancestors */
+    Shape2D shape2d;        /**< The 2D shape of a shape record */
+} box_draw_transition_material_t;
+
 /** A blended instance of a view, ordered back to front by its view depth */
 typedef struct box_draw_sorted_t {
     float depth;            /**< View space z of the instance origin, smaller is farther */
@@ -221,6 +253,10 @@ typedef struct box_draw_batch_t {
                              *   uploaded in */
     uint32_t transform_data; /**< Offset of that upload in the packet data, where the transform
                              *   of slot i starts at i * sizeof(box_render_transform_t) */
+    int64_t shading_frame;  /**< Frame of the packet the shading stream of its run was last
+                             *   uploaded in */
+    uint32_t shading_data;  /**< Offset of that upload in the packet data, where the shading of
+                             *   slot i of a 2D batch starts at i * sizeof(box_render_shading_t) */
     ecs_vec_t entities;     /**< ecs_entity_t per slot */
     ecs_vec_t glyphs;       /**< int32_t per slot of a glyph batch, the glyph of its Text */
     ecs_vec_t transforms;   /**< box_render_transform_t per slot */
@@ -248,6 +284,13 @@ typedef struct box_draw_clips_t {
     bool dirty;             /**< A record changed since the last upload */
 } box_draw_clips_t;
 
+/** Consecutive records of the material table one send uploaded */
+typedef struct box_draw_material_upload_t {
+    uint32_t first;         /**< First slot */
+    uint32_t count;         /**< Slots */
+    uint32_t data;          /**< Offset of the records in the packet data */
+} box_draw_material_upload_t;
+
 /** The material table: a slot per prefab or mesh shape that owns material components, slot 0
  * the default material, as the main thread packed it and what the GPU still needs of it.
  *
@@ -264,6 +307,8 @@ typedef struct box_draw_materials_t {
     uint32_t capacity;      /**< Records the table buffer holds, 0 before it is created */
     int32_t alive;          /**< Slots alive, slot 0 included */
     bool overflow;          /**< An id past what the binding holds was logged */
+    int64_t uploaded_frame; /**< Frame of the packet of the last send that uploaded */
+    ecs_vec_t uploaded;     /**< box_draw_material_upload_t of that send */
 } box_draw_materials_t;
 
 /** The root of a changed subtree and the streams the change writes for each of its entities */
@@ -539,6 +584,103 @@ void box_draws_material(
 void box_draws_material_pack(
     box_render_material_t *out,
     const box_draw_material_t *material);
+
+/** Copy the material components of a record into the target material of a material
+ * transition, with no node.
+ *
+ * @param out The target material
+ * @param material Material components the record was encoded from
+ * @param kind box_draw_transition_kind_t of the record
+ */
+void box_draws_transition_target(
+    box_draw_transition_material_t *out,
+    const box_draw_material_t *material,
+    box_draw_transition_kind_t kind);
+
+/** Encode a record from a material transition, with the encoding of the game thread: a table
+ * record with box_draws_material_pack, the color, emission and UV of the shading of a 2D shape
+ * and the color and emission of a glyph with box_draws_material.
+ *
+ * The other words of a shading (the shape, the clip, the rank, the atlas area of a glyph) do
+ * not depend on a transitioned component and are left as they are.
+ *
+ * Pure: reads no world, so the resolver calls it on the render thread.
+ *
+ * @param material The material, with the rendered values of its nodes
+ * @param dst The record in the packet data, unaligned
+ */
+void box_draws_transition_encode(
+    const box_draw_transition_material_t *material,
+    void *dst);
+
+/** Get the material components a slot of the material table is packed from: those its owner
+ * owns or inherits.
+ *
+ * @param world The world
+ * @param owner The owner, 0 for the default material
+ * @param out Receives the material
+ */
+void box_draws_material_of(
+    const ecs_world_t *world,
+    ecs_entity_t owner,
+    box_draw_material_t *out);
+
+/** Get the material components the shading of a 2D shape is written from.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param s Its DrawSlot, whose fade, tints, clip and rank are read
+ * @param out Receives the material
+ */
+void box_draws_shape_material(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    const DrawSlot *s,
+    box_draw_material_t *out);
+
+/** Get the material components the glyphs of a Text are written from.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param tint Receives the tints of the ancestors that out points at
+ * @param out Receives the material
+ */
+void box_draws_text_material(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    box_draw_tint_t *tint,
+    box_draw_material_t *out);
+
+/** Get the material a glyph in a colored span is written from: the color of the span and its
+ * alpha times the opacity of the text.
+ *
+ * @param material Material components of the text
+ * @param color Display encoded color of the span
+ * @param out Receives the material, pointing at rgb and opacity
+ * @param rgb Receives the color of the span
+ * @param opacity Receives the opacity of the glyph
+ */
+void box_draws_glyph_span_material(
+    const box_draw_material_t *material,
+    const rgba *color,
+    box_draw_material_t *out,
+    Rgb *rgb,
+    Opacity *opacity);
+
+/** Get the offset in the packet data of a record of the material table that the last send
+ * uploaded.
+ *
+ * @param d The state
+ * @param slot The slot
+ * @param frame Frame of the packet
+ * @param out Receives the offset
+ * @return Whether the send of that packet uploaded the slot
+ */
+bool box_draws_material_data(
+    const box_render_draws_t *d,
+    uint32_t slot,
+    int64_t frame,
+    uint32_t *out);
 
 /** Write the shading of a mesh instance: the slot of its material, the tints of its ancestors
  * composed with its own Tint, and its alpha.

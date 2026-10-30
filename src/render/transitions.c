@@ -7,13 +7,52 @@
  * included, compares each transitioned component to the last target it sent. Entities without
  * Transition are not visited, and a world that does not use Transition matches no table.
  *
- * Entities an active transform transition moves carry TransitionTransform (dynamic_transform);
- * a second system, after the batches were sent, sends the pose and slot records for them.
+ * Entities an active transform transition moves carry TransitionTransform (dynamic_transform),
+ * the 2D shapes and texts a material transition patches TransitionMaterial (dynamic_material);
+ * a second system, after the batches were sent, sends the records that patch them.
  */
 
 #include "draw.h"
+#include <string.h>
 
 ECS_TAG_DECLARE(TransitionTransform);
+ECS_TAG_DECLARE(TransitionMaterial);
+ECS_COMPONENT_DECLARE(RenderTransitions);
+
+/** Material components whose transitions patch the material table and the 2D shading */
+static const box_render_transition_component_t box_transition_material_components[] = {
+    BOX_RENDER_TRANSITION_RGB,
+    BOX_RENDER_TRANSITION_ALPHA_CUTOFF,
+    BOX_RENDER_TRANSITION_PBR_MATERIAL,
+    BOX_RENDER_TRANSITION_EMISSIVE,
+    BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM
+};
+
+/** Number of material components */
+#define BOX_TRANSITION_MATERIALS \
+    ((int32_t)(sizeof(box_transition_material_components) / \
+        sizeof(box_transition_material_components[0])))
+
+/** Components a slot of the material table reads */
+#define BOX_TRANSITION_MASK_TABLE \
+    ((1u << BOX_RENDER_TRANSITION_RGB) | (1u << BOX_RENDER_TRANSITION_ALPHA_CUTOFF) | \
+     (1u << BOX_RENDER_TRANSITION_PBR_MATERIAL) | (1u << BOX_RENDER_TRANSITION_EMISSIVE) | \
+     (1u << BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM))
+
+/** Components the shading of a 2D shape reads: a 2D shape has no alpha test and its material
+ * words hold its shape */
+#define BOX_TRANSITION_MASK_SHAPE \
+    ((1u << BOX_RENDER_TRANSITION_RGB) | (1u << BOX_RENDER_TRANSITION_EMISSIVE) | \
+     (1u << BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM))
+
+/** Components the shading of a glyph reads */
+#define BOX_TRANSITION_MASK_GLYPH \
+    ((1u << BOX_RENDER_TRANSITION_RGB) | (1u << BOX_RENDER_TRANSITION_EMISSIVE))
+
+/** Components whose change an alpha tested shadow caster reads through the material table */
+#define BOX_TRANSITION_MASK_SHADOW \
+    ((1u << BOX_RENDER_TRANSITION_ALPHA_CUTOFF) | \
+     (1u << BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM))
 
 /** A transitioned component of an entity, as the extract last sent it */
 typedef struct box_transition_slot_t {
@@ -62,7 +101,27 @@ struct box_render_transitions_t {
     ecs_vec_t tag_remove;           /**< ecs_entity_t that lose TransitionTransform */
     ecs_vec_t shadow_scenes;        /**< ecs_entity_t, scenes with a moving shadow caster */
     ecs_vec_t shadow_last;          /**< ecs_entity_t, those of the last frame */
+    box_render_draws_t *draws;      /**< State of the batches, once the extract found it */
+    ecs_vec_t material_slots;       /**< box_transition_material_t, the slots of the material
+                                     *   table an active material transition patches in this
+                                     *   frame, kept until the next so their target uploads */
+    ecs_vec_t shadings;             /**< box_transition_material_t, the 2D shapes and texts an
+                                     *   active material transition patches in this frame */
+    ecs_map_t tagged_material;      /**< Entity with TransitionMaterial to the stamp of the last
+                                     *   extract that kept it */
+    ecs_map_t visited;              /**< Entity to 1, entities the walk of IsA instances saw */
+    ecs_vec_t instances;            /**< ecs_entity_t, stack of the walk of IsA instances */
 };
+
+/** A record an active material transition patches: a slot of the material table or a drawn
+ * 2D shape or text, and the node of each of its components that runs a transition */
+typedef struct box_transition_material_t {
+    ecs_entity_t entity;            /**< Owner of the slot, or the drawn entity */
+    uint32_t slot;                  /**< Slot of the material table */
+    bool shadow;                    /**< An AlphaCutoff or TextureTransform of the slot runs */
+    uint32_t nodes[BOX_RENDER_TRANSITION_COMPONENTS]; /**< Node of a component that runs a
+                                     *   transition, 0 for the target */
+} box_transition_material_t;
 
 /** Get the component id of a transitionable component.
  *
@@ -349,6 +408,64 @@ static void box_transition_walk(
     }
 }
 
+/** Keep a private tag on an entity in this frame, queueing its add when it does not have it.
+ *
+ * @param s The state of the extract
+ * @param tagged The entities with the tag to the stamp of the last extract that kept them
+ * @param e The entity
+ */
+static void box_transition_keep(
+    box_render_transitions_t *s,
+    ecs_map_t *tagged,
+    ecs_entity_t e)
+{
+    ecs_map_val_t *stamp = ecs_map_ensure(tagged, e);
+    if (!*stamp) {
+        *ecs_vec_append_t(NULL, &s->tag_add, ecs_entity_t) = e;
+    }
+
+    *stamp = (ecs_map_val_t)s->stamp;
+}
+
+/** Take a private tag from the entities this frame did not keep it on and give it to the new
+ * ones, which rekeys their slots.
+ *
+ * @param world The world
+ * @param s The state of the extract
+ * @param tagged The entities with the tag to the stamp of the last extract that kept them
+ * @param tag The tag
+ */
+static void box_transition_retag(
+    ecs_world_t *world,
+    box_render_transitions_t *s,
+    ecs_map_t *tagged,
+    ecs_entity_t tag)
+{
+    int32_t i;
+    ecs_map_iter_t mit = ecs_map_iter(tagged);
+    while (ecs_map_next(&mit)) {
+        if (ecs_map_value(&mit) != (ecs_map_val_t)s->stamp) {
+            *ecs_vec_append_t(NULL, &s->tag_remove, ecs_entity_t) =
+                (ecs_entity_t)ecs_map_key(&mit);
+        }
+    }
+
+    for (i = 0; i < ecs_vec_count(&s->tag_remove); i ++) {
+        ecs_entity_t e = *ecs_vec_get_t(&s->tag_remove, ecs_entity_t, i);
+        ecs_map_remove(tagged, e);
+        if (ecs_is_alive(world, e)) {
+            ecs_remove_id(world, e, tag);
+        }
+    }
+
+    for (i = 0; i < ecs_vec_count(&s->tag_add); i ++) {
+        ecs_add_id(world, *ecs_vec_get_t(&s->tag_add, ecs_entity_t, i), tag);
+    }
+
+    ecs_vec_clear(&s->tag_add);
+    ecs_vec_clear(&s->tag_remove);
+}
+
 /** Give TransitionTransform to the drawn entities of the walk and take it from those that
  * left it, which rekeys their slots. Called outside of every iteration, as the tag moves the
  * entities to other tables.
@@ -369,33 +486,10 @@ static void box_transition_tag(
             continue;
         }
 
-        ecs_map_val_t *stamp = ecs_map_ensure(&s->tagged, e);
-        if (!*stamp) {
-            *ecs_vec_append_t(NULL, &s->tag_add, ecs_entity_t) = e;
-        }
-
-        *stamp = (ecs_map_val_t)s->stamp;
+        box_transition_keep(s, &s->tagged, e);
     }
 
-    ecs_map_iter_t mit = ecs_map_iter(&s->tagged);
-    while (ecs_map_next(&mit)) {
-        if (ecs_map_value(&mit) != (ecs_map_val_t)s->stamp) {
-            *ecs_vec_append_t(NULL, &s->tag_remove, ecs_entity_t) =
-                (ecs_entity_t)ecs_map_key(&mit);
-        }
-    }
-
-    for (i = 0; i < ecs_vec_count(&s->tag_remove); i ++) {
-        ecs_entity_t e = *ecs_vec_get_t(&s->tag_remove, ecs_entity_t, i);
-        ecs_map_remove(&s->tagged, e);
-        if (ecs_is_alive(world, e)) {
-            ecs_remove_id(world, e, TransitionTransform);
-        }
-    }
-
-    for (i = 0; i < ecs_vec_count(&s->tag_add); i ++) {
-        ecs_add_id(world, *ecs_vec_get_t(&s->tag_add, ecs_entity_t, i), TransitionTransform);
-    }
+    box_transition_retag(world, s, &s->tagged, TransitionTransform);
 }
 
 /** Find the entities the active transform transitions move in this frame, nodes first and
@@ -446,6 +540,250 @@ static void box_transition_affect(
     box_transition_tag(world, s);
 done:
     return;
+}
+
+/** Get the state of the batches, found once.
+ *
+ * @param world The world
+ * @param s The state of the extract
+ * @return The state, NULL without the draw extract
+ */
+static box_render_draws_t* box_transition_draws(
+    const ecs_world_t *world,
+    box_render_transitions_t *s)
+{
+    if (!s->draws) {
+        s->draws = box_draws_state(world);
+    }
+
+    return s->draws;
+}
+
+/** Find the nodes whose running transitions a record reads: for each material component of
+ * a mask, the node of the entity the value comes from, the entity itself or the IsA base that
+ * owns it, when the transition of that node runs.
+ *
+ * @param world The world
+ * @param s The state of the extract
+ * @param e The entity the record is encoded from
+ * @param mask 1 << box_render_transition_component_t per component the record reads
+ * @param time World time, the time of the packet
+ * @param out Receives the nodes, 0 for a component at its target
+ * @return 1 << component per component with a node, 0 for none
+ */
+static uint32_t box_transition_material_nodes(
+    const ecs_world_t *world,
+    const box_render_transitions_t *s,
+    ecs_entity_t e,
+    uint32_t mask,
+    double time,
+    uint32_t *out)
+{
+    uint32_t result = 0;
+    int32_t i;
+    ecs_os_memset(out, 0, ECS_SIZEOF(uint32_t) * BOX_RENDER_TRANSITION_COMPONENTS);
+    for (i = 0; i < BOX_TRANSITION_MATERIALS; i ++) {
+        box_render_transition_component_t c = box_transition_material_components[i];
+        if (!(mask & (1u << c))) {
+            continue;
+        }
+
+        ecs_entity_t owner = ecs_get_target_for_id(world, e, EcsIsA, box_transition_id(c));
+        uint32_t node = owner ? box_render_transitions_node(s, owner) : 0;
+        if (node && box_render_transitions_active(s, node, c, time)) {
+            out[c] = node;
+            result |= 1u << c;
+        }
+    }
+
+    return result;
+}
+
+/** Check whether a node has an active transition of a material component.
+ *
+ * @param s The state of the extract
+ * @param node The node id
+ * @param time World time, the time of the packet
+ * @return Whether one of its material components is active
+ */
+static bool box_transition_material_active(
+    const box_render_transitions_t *s,
+    uint32_t node,
+    double time)
+{
+    bool result = false;
+    int32_t i;
+    for (i = 0; i < BOX_TRANSITION_MATERIALS && !result; i ++) {
+        result = box_render_transitions_active(
+            s, node, box_transition_material_components[i], time);
+    }
+
+    return result;
+}
+
+/** Get the components the shading of a drawn 2D entity reads, 0 for an entity without 2D
+ * shading: its 2D shape and the glyphs of its Text.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return 1 << box_render_transition_component_t per component
+ */
+static uint32_t box_transition_shading_mask(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    uint32_t result = 0;
+    if (ecs_has_id(world, e, EcsPrefab)) {
+        goto done;
+    }
+
+    if (ecs_has(world, e, DrawSlot) && ecs_has(world, e, Shape2D)) {
+        result |= BOX_TRANSITION_MASK_SHAPE;
+    }
+
+    if (ecs_has(world, e, TextSlots)) {
+        result |= BOX_TRANSITION_MASK_GLYPH;
+    }
+done:
+    return result;
+}
+
+/** Add the drawn 2D entities that read a material value of an entity: the entity and its IsA
+ * instances, down every level, as candidates of the frame.
+ *
+ * @param world The world
+ * @param s The state of the extract
+ * @param e The entity of a node with an active material transition
+ * @param time World time, the time of the packet
+ */
+static void box_transition_shading_walk(
+    ecs_world_t *world,
+    box_render_transitions_t *s,
+    ecs_entity_t e,
+    double time)
+{
+    int32_t i;
+    ecs_vec_clear(&s->instances);
+    *ecs_vec_append_t(NULL, &s->instances, ecs_entity_t) = e;
+    while (ecs_vec_count(&s->instances)) {
+        ecs_entity_t cur = *ecs_vec_last_t(&s->instances, ecs_entity_t);
+        ecs_vec_remove_last(&s->instances);
+        if (ecs_map_get(&s->visited, cur)) {
+            continue;
+        }
+
+        ecs_map_insert(&s->visited, cur, 1);
+        uint32_t mask = box_transition_shading_mask(world, cur);
+        box_transition_material_t item = { .entity = cur };
+        if (mask && box_transition_material_nodes(world, s, cur, mask, time, item.nodes)) {
+            *ecs_vec_append_t(NULL, &s->shadings, box_transition_material_t) = item;
+            box_transition_keep(s, &s->tagged_material, cur);
+        }
+
+        ecs_iter_t it = ecs_each_id(world, ecs_pair(EcsIsA, cur));
+        while (ecs_each_next(&it)) {
+            for (i = 0; i < it.count; i ++) {
+                *ecs_vec_append_t(NULL, &s->instances, ecs_entity_t) = it.entities[i];
+            }
+        }
+    }
+}
+
+/** Find what the active material transitions patch in this frame, before the batches and the
+ * material table are sent: the slots of the material table, which upload in this frame, and
+ * the drawn 2D entities, which keep TransitionMaterial.
+ *
+ * The slots of the last frame upload again, so the frame after a transition ended has its
+ * target. A frame without an active material transition visits no entity.
+ *
+ * @param world The world
+ * @param s The state of the extract
+ * @param p The packet, NULL when no entity has Transition
+ */
+static void box_transition_materials(
+    ecs_world_t *world,
+    box_render_transitions_t *s,
+    const box_render_packet_t *p)
+{
+    int32_t i, count = ecs_vec_count(&s->nodes);
+    bool any = false;
+    box_render_draws_t *d = NULL;
+    ecs_vec_clear(&s->shadings);
+    ecs_vec_clear(&s->tag_add);
+    ecs_vec_clear(&s->tag_remove);
+    if (ecs_vec_count(&s->material_slots)) {
+        d = box_transition_draws(world, s);
+    }
+
+    for (i = 0; d && i < ecs_vec_count(&s->material_slots); i ++) {
+        const box_transition_material_t *item = ecs_vec_get_t(
+            &s->material_slots, box_transition_material_t, i);
+        if (ecs_is_alive(world, item->entity)) {
+            box_draws_material_changed(d, item->entity);
+        }
+
+        if (item->shadow && d->shadow_record) {
+            *ecs_vec_append_t(NULL, &d->shadow_materials, uint32_t) = item->slot;
+        }
+    }
+
+    ecs_vec_clear(&s->material_slots);
+    for (i = 1; p && i < count && !any; i ++) {
+        const box_transition_node_t *node = ecs_vec_get_t(&s->nodes, box_transition_node_t, i);
+        any = node->entity && box_transition_material_active(s, (uint32_t)i, p->time);
+    }
+
+    d = any ? box_transition_draws(world, s) : NULL;
+    if (!d) {
+        goto tag;
+    }
+
+    ecs_map_iter_t mit = ecs_map_iter(&d->materials.owned);
+    while (ecs_map_next(&mit)) {
+        box_transition_material_t item = {
+            .entity = (ecs_entity_t)ecs_map_key(&mit),
+            .slot = (uint32_t)ecs_map_value(&mit)
+        };
+        if (!ecs_is_alive(world, item.entity)) {
+            continue;
+        }
+
+        uint32_t found = box_transition_material_nodes(world, s, item.entity,
+            BOX_TRANSITION_MASK_TABLE, p->time, item.nodes);
+        if (!found) {
+            continue;
+        }
+
+        item.shadow = (found & BOX_TRANSITION_MASK_SHADOW) != 0;
+        *ecs_vec_append_t(NULL, &s->material_slots, box_transition_material_t) = item;
+    }
+
+    for (i = 0; i < ecs_vec_count(&s->material_slots); i ++) {
+        const box_transition_material_t *item = ecs_vec_get_t(
+            &s->material_slots, box_transition_material_t, i);
+        box_draws_material_changed(d, item->entity);
+        if (item->shadow && d->shadow_record) {
+            *ecs_vec_append_t(NULL, &d->shadow_materials, uint32_t) = item->slot;
+        }
+    }
+
+    if (ecs_map_count(&s->visited)) {
+        ecs_map_clear(&s->visited);
+    }
+
+    for (i = 1; i < count; i ++) {
+        const box_transition_node_t *node = ecs_vec_get_t(&s->nodes, box_transition_node_t, i);
+        if (node->entity && ecs_is_alive(world, node->entity) &&
+            box_transition_material_active(s, (uint32_t)i, p->time))
+        {
+            box_transition_shading_walk(world, s, node->entity, p->time);
+        }
+    }
+
+tag:
+    if (ecs_map_count(&s->tagged_material)) {
+        box_transition_retag(world, s, &s->tagged_material, TransitionMaterial);
+    }
 }
 
 /** Find the changes of the transitioned components of the entities with Transition, send the
@@ -519,6 +857,7 @@ static void BoxRenderExtractTransitions(
     }
 
     box_transition_affect(world, s, ecs_map_count(&s->by_entity) ? p : NULL);
+    box_transition_materials(world, s, ecs_map_count(&s->by_entity) ? p : NULL);
 }
 
 /** Get the local matrix of the target pose of an entity, identity without a Position.
@@ -756,6 +1095,177 @@ static void box_transition_shadows(
     ecs_vec_clear(&s->shadow_scenes);
 }
 
+/** Send a material or shading record: the target material with the nodes of the components
+ * that run, copied into the packet data, and the record it patches.
+ *
+ * @param p The packet
+ * @param op BOX_RENDER_TRANSITION_MATERIAL or BOX_RENDER_TRANSITION_SHADING
+ * @param material The target material with its nodes
+ * @param offset Packet data offset of the record to patch
+ */
+static void box_transition_send_material(
+    box_render_packet_t *p,
+    box_render_transition_op_t op,
+    const box_draw_transition_material_t *material,
+    uint32_t offset)
+{
+    uint32_t data = 0, node = 0;
+    int32_t c;
+    void *dst = box_render_packet_reserve(p, (uint32_t)sizeof(*material), &data);
+    ecs_os_memcpy(dst, material, ECS_SIZEOF(*material));
+    for (c = 0; c < BOX_RENDER_TRANSITION_COMPONENTS && !node; c ++) {
+        node = material->nodes[c];
+    }
+
+    box_render_transition_record_t *r = box_render_packet_transition(p, op, node);
+    r->data = data;
+    r->offset = offset;
+}
+
+/** Get the packet data offset of the shading of a slot of a 2D batch that uploaded its run
+ * into this packet.
+ *
+ * @param d The state of the batches
+ * @param p The packet
+ * @param batch Index of the batch
+ * @param slot The slot
+ * @param out Receives the offset
+ * @return Whether the batch uploaded the shading of the slot
+ */
+static bool box_transition_shading_data(
+    box_render_draws_t *d,
+    const box_render_packet_t *p,
+    int32_t batch,
+    int32_t slot,
+    uint32_t *out)
+{
+    box_draw_batch_t *b = batch >= 0 && batch < ecs_vec_count(&d->batches)
+        ? box_draws_batch(d, batch) : NULL;
+    bool result = b && b->alive && b->key.dynamic_material && b->shading_frame == p->frame &&
+        slot >= 0 && slot < ecs_vec_count(&b->shadings);
+    if (result) {
+        *out = b->shading_data + (uint32_t)slot * (uint32_t)sizeof(box_render_shading_t);
+    }
+
+    return result;
+}
+
+/** Send the shading records of the glyphs of a Text, as box_draws_text_update writes them: a
+ * glyph in a colored span renders with the color of the span, which no Rgb transition changes.
+ *
+ * @param world The world
+ * @param d The state of the batches
+ * @param p The packet
+ * @param item The text and its nodes
+ */
+static void box_transition_send_glyphs(
+    const ecs_world_t *world,
+    box_render_draws_t *d,
+    box_render_packet_t *p,
+    const box_transition_material_t *item)
+{
+    const TextSlots *ts = ecs_get(world, item->entity, TextSlots);
+    const TextGlyphs *tg = ecs_get(world, item->entity, TextGlyphs);
+    const TextSpans *spans = ecs_get(world, item->entity, TextSpans);
+    const Text *text = spans && ecs_vec_count(&spans->spans)
+        ? ecs_get(world, item->entity, Text) : NULL;
+    int32_t length = text && text->value ? (int32_t)strlen(text->value) : 0;
+    box_draw_transition_material_t base, span;
+    box_draw_material_t material, m;
+    box_draw_tint_t tint;
+    Rgb rgb;
+    Opacity opacity;
+    int32_t i, count = ts && tg ? ecs_vec_count(&ts->slots) : 0;
+    uint32_t offset;
+    if (!count || !ecs_has(world, item->entity, Text)) {
+        goto done;
+    }
+
+    if (ecs_vec_count(&tg->glyphs) < count) {
+        count = ecs_vec_count(&tg->glyphs);
+    }
+
+    box_draws_text_material(world, item->entity, &tint, &material);
+    box_draws_transition_target(&base, &material, BOX_DRAW_TRANSITION_GLYPH);
+    ecs_os_memcpy(base.nodes, item->nodes, ECS_SIZEOF(base.nodes));
+    for (i = 0; i < count; i ++) {
+        const box_draw_glyph_slot_t *at = ecs_vec_get_t(&ts->slots, box_draw_glyph_slot_t, i);
+        const box_text_glyph_t *g = ecs_vec_get_t(&tg->glyphs, box_text_glyph_t, i);
+        const rgba *color = length ? box_text_span_color(spans, length, g->offset) : NULL;
+        if (!box_transition_shading_data(d, p, at->batch, at->slot, &offset)) {
+            continue;
+        }
+
+        if (!color) {
+            box_transition_send_material(p, BOX_RENDER_TRANSITION_SHADING, &base, offset);
+            continue;
+        }
+
+        box_draws_glyph_span_material(&material, color, &m, &rgb, &opacity);
+        box_draws_transition_target(&span, &m, BOX_DRAW_TRANSITION_GLYPH);
+        ecs_os_memcpy(span.nodes, item->nodes, ECS_SIZEOF(span.nodes));
+        span.nodes[BOX_RENDER_TRANSITION_RGB] = 0;
+        box_transition_send_material(p, BOX_RENDER_TRANSITION_SHADING, &span, offset);
+    }
+done:
+    return;
+}
+
+/** Send a material record for every slot of the material table an active material transition
+ * patches and that the table uploaded into this packet, and a shading record for the 2D shape
+ * and the glyphs of every drawn entity it patches whose batch uploaded its shading.
+ *
+ * @param world The world
+ * @param s The state of the extract
+ * @param d The state of the batches
+ * @param p The packet
+ */
+static void box_transition_send_materials(
+    const ecs_world_t *world,
+    box_render_transitions_t *s,
+    box_render_draws_t *d,
+    box_render_packet_t *p)
+{
+    box_draw_transition_material_t target;
+    box_draw_material_t material;
+    uint32_t offset;
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&s->material_slots); i ++) {
+        const box_transition_material_t *item = ecs_vec_get_t(
+            &s->material_slots, box_transition_material_t, i);
+        if (!ecs_is_alive(world, item->entity) ||
+            !box_draws_material_data(d, item->slot, p->frame, &offset))
+        {
+            continue;
+        }
+
+        box_draws_material_of(world, item->entity, &material);
+        box_draws_transition_target(&target, &material, BOX_DRAW_TRANSITION_TABLE);
+        ecs_os_memcpy(target.nodes, item->nodes, ECS_SIZEOF(target.nodes));
+        box_transition_send_material(p, BOX_RENDER_TRANSITION_MATERIAL, &target, offset);
+    }
+
+    for (i = 0; i < ecs_vec_count(&s->shadings); i ++) {
+        const box_transition_material_t *item = ecs_vec_get_t(
+            &s->shadings, box_transition_material_t, i);
+        if (!ecs_is_alive(world, item->entity)) {
+            continue;
+        }
+
+        const DrawSlot *ds = ecs_get(world, item->entity, DrawSlot);
+        if (ds && ecs_has(world, item->entity, Shape2D) &&
+            box_transition_shading_data(d, p, ds->batch, ds->slot, &offset))
+        {
+            box_draws_shape_material(world, item->entity, ds, &material);
+            box_draws_transition_target(&target, &material, BOX_DRAW_TRANSITION_SHAPE);
+            ecs_os_memcpy(target.nodes, item->nodes, ECS_SIZEOF(target.nodes));
+            box_transition_send_material(p, BOX_RENDER_TRANSITION_SHADING, &target, offset);
+        }
+
+        box_transition_send_glyphs(world, d, p, item);
+    }
+}
+
 /** Send the pose of every node the walk of this frame found, parent nodes first, and a slot
  * record for every transform it moves that a batch uploaded into the packet, after the
  * batches were sent.
@@ -767,9 +1277,13 @@ static void BoxRenderExtractTransitionSlots(
 {
     box_render_transitions_t *s = it->ctx;
     ecs_world_t *world = it->world;
-    box_render_draws_t *d = box_draws_state(world);
+    box_render_draws_t *d = box_transition_draws(world, s);
     box_render_packet_t *p;
     int32_t i, count = ecs_vec_count(&s->items);
+    if (d && (ecs_vec_count(&s->material_slots) || ecs_vec_count(&s->shadings))) {
+        box_transition_send_materials(world, s, d, box_render_packet(world));
+    }
+
     if (!d || (!count && !ecs_vec_count(&s->shadow_last))) {
         goto done;
     }
@@ -814,6 +1328,11 @@ static void box_transitions_free(
     ecs_map_fini(&s->by_entity);
     ecs_map_fini(&s->moving);
     ecs_map_fini(&s->tagged);
+    ecs_map_fini(&s->tagged_material);
+    ecs_map_fini(&s->visited);
+    ecs_vec_fini_t(NULL, &s->material_slots, box_transition_material_t);
+    ecs_vec_fini_t(NULL, &s->shadings, box_transition_material_t);
+    ecs_vec_fini_t(NULL, &s->instances, ecs_entity_t);
     ecs_vec_fini_t(NULL, &s->nodes, box_transition_node_t);
     ecs_vec_fini_t(NULL, &s->free, uint32_t);
     ecs_vec_fini_t(NULL, &s->items, box_transition_item_t);
@@ -829,10 +1348,10 @@ static void box_transitions_free(
 box_render_transitions_t* box_render_transitions_get(
     const ecs_world_t *world)
 {
-    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractTransitions");
-    const ecs_system_t *sys = system ? ecs_system_get(world, system) : NULL;
+    const RenderTransitions *t = ecs_id(RenderTransitions)
+        ? ecs_singleton_get(world, RenderTransitions) : NULL;
 
-    return sys ? sys->ctx : NULL;
+    return t ? t->state : NULL;
 }
 
 uint32_t box_render_transitions_node(
@@ -878,9 +1397,17 @@ void box_render_transitions_init(
     box_render_transitions_t *s = ecs_os_calloc_t(box_render_transitions_t);
     ECS_TAG_DEFINE(world, TransitionTransform);
     ecs_add_pair(world, TransitionTransform, EcsOnInstantiate, EcsDontInherit);
+    ECS_TAG_DEFINE(world, TransitionMaterial);
+    ecs_add_pair(world, TransitionMaterial, EcsOnInstantiate, EcsDontInherit);
+    ECS_COMPONENT_DEFINE(world, RenderTransitions);
     ecs_map_init(&s->by_entity, NULL);
     ecs_map_init(&s->moving, NULL);
     ecs_map_init(&s->tagged, NULL);
+    ecs_map_init(&s->tagged_material, NULL);
+    ecs_map_init(&s->visited, NULL);
+    ecs_vec_init_t(NULL, &s->material_slots, box_transition_material_t, 0);
+    ecs_vec_init_t(NULL, &s->shadings, box_transition_material_t, 0);
+    ecs_vec_init_t(NULL, &s->instances, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &s->nodes, box_transition_node_t, 0);
     ecs_vec_init_t(NULL, &s->free, uint32_t, 0);
     ecs_vec_init_t(NULL, &s->items, box_transition_item_t, 0);
@@ -910,6 +1437,7 @@ void box_render_transitions_init(
         .ctx_free = box_transitions_free,
         .immediate = true
     });
+    ecs_singleton_set(world, RenderTransitions, { .state = s });
 }
 
 void box_render_transitions_slots_init(

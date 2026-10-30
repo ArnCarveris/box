@@ -542,6 +542,7 @@ static void box_draws_key(
     key->dynamic_transform = box_transform_dynamic(world, ecs_get_table(world, e)) ||
         ecs_has_id(world, e, TransitionTransform);
     key->dynamic_material = ecs_has_id(world, e, DynamicMaterial) ||
+        ecs_has_id(world, e, TransitionMaterial) ||
         ecs_get_target_for_id(world, e, EcsChildOf, DynamicMaterial) != 0;
     key->shadow = !shape2d && !ecs_has_id(world, e, NoShadow) &&
         !ecs_get_target_for_id(world, e, EcsChildOf, NoShadow);
@@ -633,18 +634,7 @@ static void box_draws_update_shape(
     if (drawn) {
         s->fade = box_draws_fade(world, e, &s->tint);
         s->tinted = s->tint.keep < 1.0f;
-        material = (box_draw_material_t){
-            .color = ecs_get(world, e, Rgb),
-            .opacity = ecs_get(world, e, Opacity),
-            .cutoff = ecs_get(world, e, AlphaCutoff),
-            .pbr = ecs_get(world, e, PbrMaterial),
-            .emissive = ecs_get(world, e, Emissive),
-            .uv = ecs_get(world, e, TextureTransform),
-            .shape2d = ecs_get(world, e, Shape2D),
-            .tint = ecs_get(world, e, Tint),
-            .inherited = s->tinted ? &s->tint : NULL,
-            .fade = s->fade
-        };
+        box_draws_shape_material(world, e, s, &material);
         box_draws_key(world, d, e, shape, box_draws_alpha(&material), &key);
     }
 
@@ -710,6 +700,30 @@ write:
     box_draws_slot_changed(b, s->slot, kinds);
 done:
     return;
+}
+
+void box_draws_shape_material(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    const DrawSlot *s,
+    box_draw_material_t *out)
+{
+    *out = (box_draw_material_t){
+        .color = ecs_get(world, e, Rgb),
+        .opacity = ecs_get(world, e, Opacity),
+        .cutoff = ecs_get(world, e, AlphaCutoff),
+        .pbr = ecs_get(world, e, PbrMaterial),
+        .emissive = ecs_get(world, e, Emissive),
+        .uv = ecs_get(world, e, TextureTransform),
+        .shape2d = ecs_get(world, e, Shape2D),
+        .tint = ecs_get(world, e, Tint),
+        .inherited = s->tinted ? &s->tint : NULL,
+        .fade = s->fade
+    };
+    if (out->shape2d) {
+        out->clip = s->clip;
+        out->rank = s->rank;
+    }
 }
 
 /** Bring a changed entity into the batches of its shape and text and write their instances.
@@ -921,6 +935,9 @@ static void box_draws_observers(
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnChange);
     box_draws_observer(world, d, "DrawsOnTransitionTransform", (ecs_observer_desc_t){
         .query.terms = {{ .id = TransitionTransform }},
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnChange);
+    box_draws_observer(world, d, "DrawsOnTransitionMaterial", (ecs_observer_desc_t){
+        .query.terms = {{ .id = TransitionMaterial }},
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnChange);
     box_draws_observer(world, d, "DrawsOnLightBake", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(LightBake) }},

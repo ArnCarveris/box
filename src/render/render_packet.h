@@ -933,9 +933,14 @@ typedef enum box_render_transition_op_t {
     BOX_RENDER_TRANSITION_START,        /**< A component of a node has a new target */
     BOX_RENDER_TRANSITION_POSE,         /**< The rendered world matrix of a node with an active
                                          *   transform transition, for this packet */
-    BOX_RENDER_TRANSITION_SLOT          /**< A transform in the packet data that a node moves,
+    BOX_RENDER_TRANSITION_SLOT,         /**< A transform in the packet data that a node moves,
                                          *   patched with W_r(node) * rel (the target chain
                                          *   from the node with the instance matrix) */
+    BOX_RENDER_TRANSITION_MATERIAL,     /**< A box_render_material_t of the material table in
+                                         *   the packet data, packed again from the rendered
+                                         *   values of the nodes that own its components */
+    BOX_RENDER_TRANSITION_SHADING       /**< A box_render_shading_t of a 2D shape or a glyph in
+                                         *   the packet data, written again the same way */
 } box_render_transition_op_t;
 
 /** What a pose record points at in the packet data: the target chain of a node and the target
@@ -959,16 +964,19 @@ typedef struct box_render_transition_pose_t {
  * the value without a transition; any other start transitions from the value the node renders
  * at the start time to the target. The records of a packet apply in the order they were made.
  *
- * Pose and slot records come every frame a node moves, parent nodes first, then the slots.
+ * Pose and slot records come every frame a node moves, parent nodes first, then the slots;
+ * material and shading records every frame a material component runs, one per record.
  */
 typedef struct box_render_transition_record_t {
     box_render_transition_op_t op;  /**< What the record does */
     uint32_t node;                  /**< Node id, from 1 */
     uint32_t parent;                /**< Parent node of a pose, 0 for none */
-    uint32_t data;                  /**< Packet data offset of the box_render_transition_pose_t
-                                     *   of a pose, or of the rel matrix of a slot */
+    uint32_t data;                  /**< Packet data offset of the pose of a pose record, the
+                                     *   rel matrix of a slot or the target material
+                                     *   (box_draw_transition_material_t) of a material */
     uint32_t offset;                /**< Packet data offset of the box_render_transform_t a
-                                     *   slot patches */
+                                     *   slot patches, or of the record a material or shading
+                                     *   record patches */
     box_render_transition_component_t component; /**< Component of a start */
     TimingFunction timing_function; /**< Curve of a start */
     float delay;                    /**< Seconds the value holds still after the start */

@@ -1530,7 +1530,24 @@ void box_render_transitions_slots_init(
  */
 extern ECS_TAG_DECLARE(TransitionTransform);
 
-/** Get the state of the transition extract of a world.
+/** Private tag of the drawn 2D shapes and texts whose shading an active material transition
+ * patches in this frame, of their own value or of one they inherit over IsA.
+ *
+ * It keys their slots as dynamic_material; the transition extract adds and removes it. Mesh
+ * shapes do not get it: they read the material table, whose slot the transition patches. */
+extern ECS_TAG_DECLARE(TransitionMaterial);
+
+/** Singleton that holds the state of the transition extract, set by
+ * box_render_transitions_init, so box_render_transitions_get reads it without a lookup */
+typedef struct RenderTransitions {
+    box_render_transitions_t *state; /**< The state, owned by RenderExtractTransitions */
+} RenderTransitions;
+
+/** Component id of RenderTransitions */
+extern ECS_COMPONENT_DECLARE(RenderTransitions);
+
+/** Get the state of the transition extract of a world, from the RenderTransitions singleton,
+ * without a name lookup.
  *
  * @param world The world
  * @return The state, NULL without the extract

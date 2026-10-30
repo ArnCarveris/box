@@ -393,7 +393,25 @@
                     "transform_batch_moved",
                     "transform_prefab_instances",
                     "transform_text_and_2d",
-                    "transform_targets_on_game_thread"
+                    "transform_targets_on_game_thread",
+                    "material_rgb_mesh",
+                    "material_emissive_mesh",
+                    "material_pbr_mesh",
+                    "material_uv_mesh",
+                    "material_cutoff_mesh",
+                    "material_rgb_2d",
+                    "material_emissive_2d",
+                    "material_pbr_2d",
+                    "material_uv_2d",
+                    "material_cutoff_2d",
+                    "material_cutoff_batch",
+                    "material_prefab_one_slot",
+                    "material_instance_override",
+                    "material_prefab_inherited_2d",
+                    "material_text_rgb",
+                    "material_target_on_game_thread",
+                    "material_no_transition_no_records",
+                    "transitions_get_no_lookup"
                 ]
             }
         ]

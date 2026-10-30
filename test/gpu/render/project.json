@@ -848,7 +848,8 @@
                 "id": "Transition",
                 "testcases": [
                     "shape_mid_transition",
-                    "shadow_mid_transition"
+                    "shadow_mid_transition",
+                    "mesh_color_mid_transition"
                 ]
             }
         ]

@@ -8,8 +8,10 @@ Status: the `Transition` component, its timing functions and its validation exis
 (`include/box/transition.h`), and so do the change detection of the game thread and the render
 thread resolver, which evaluates every transitioned value on the packet clock. Transitions of
 `Position`, `Rotation` and `Scale` render, for the entity and its descendants (see
-[Transform transitions](#transform-transitions)). Material, tint and opacity transitions do not
-patch anything yet and are the next steps of the epic.
+[Transform transitions](#transform-transitions)), and so do transitions of `Rgb`,
+`AlphaCutoff`, `PbrMaterial`, `Emissive` and `TextureTransform` (see
+[Material transitions](#material-transitions)). Tint and opacity transitions do not patch
+anything yet and are the next step of the epic.
 
 ## What the application sees
 
@@ -106,6 +108,19 @@ Lights and cameras are not drawn from instance streams: the light extract
 the target. A transition of `Position` or `Rotation` on an entity that is only a light or a
 camera does not show, and neither does a light or camera below a transitioning entity: they
 stay at their target. A shape on the same entity or below it moves; the light does not.
+
+### Limitation: light color
+
+Lights take their color from `Rgb` (`src/render/lights.c`), which does not go through the
+material table or a shading record. A light renders with its target color at once; a shape on
+the same entity shows the transition, the light does not.
+
+### Limitation: bakes and captures
+
+Light and reflection bakes, and probe captures, use the material table and shading as the
+frame they run in has them. A change of a material component invalidates bakes on the game
+thread as without a transition, so a capture that runs while the transition does sees the
+value it renders at then, not the target.
 
 ## Architecture
 
@@ -258,6 +273,71 @@ transition of their own (an entity that transitions only `Position` and has a `R
   did not, then writes its history. A stale word costs at most one extra early draw and never
   leaves the instance out. A moving instance writes its history at its rendered position.
 
+## Material transitions
+
+Implemented in `src/render/transitions.c` (game thread), `src/render/transition.c` (render
+thread) and the encoding in `src/render/batch.c` and `src/render/materials.c`.
+
+- A node runs a *material transition* in a frame when `Rgb`, `AlphaCutoff`, `PbrMaterial`,
+  `Emissive` or `TextureTransform` is active at the packet time
+  (`box_render_transitions_active`).
+- The value of a component that a record reads comes from the entity that owns it: the entity
+  itself or the `IsA` base that has it (`ecs_get_target_for_id(world, e, EcsIsA, id)`). The
+  record reads the rendered value of the node of that owner, so one prefab change animates its
+  material table slot and every instance that inherits it, and an instance that owns the value
+  has a transition of its own. A record keeps the node of each of its components
+  (`box_draw_transition_material_t.nodes`), so a slot can read a transition of its own `Rgb`
+  and one of an inherited `Emissive`.
+- **Mesh shapes** read the shared material table (`box_render_material_t`). In a frame with a
+  material transition, before the batches are sent, the extract walks the slots of the table
+  (one per prefab or owner of a `MaterialId`), finds the slots whose components have an active
+  node, and marks them to upload in the frame. The send records where each run of the table
+  went in the packet data (`box_draw_materials_t.uploaded`); after the batches, one `MATERIAL`
+  record per slot carries the byte offset of the record and its target material. Mesh slots
+  are not rekeyed: their instance streams do not change, only the table record does. A slot
+  of the last frame uploads once more, so the frame after the end holds the target.
+- **2D shapes and texts** carry their material inline (`box_render_shading_t`). The extract
+  walks the entity of each node with an active material transition and its `IsA` instances,
+  down every level, and gives each drawn 2D shape or text that reads an active value the
+  private tag `TransitionMaterial` (`(OnInstantiate, DontInherit)`). `box_draws_key` and the
+  glyph key make it `dynamic_material`; `DrawsOnTransitionMaterial` rekeys the slot when the tag
+  is added or removed. A dynamic_material batch uploads its shading run every frame and
+  remembers its packet data offset (`shading_frame`, `shading_data`); one `SHADING` record per
+  shape slot and per glyph carries the offset of its `box_render_shading_t`. The tag is
+  removed in the first frame without an active value, which rekeys the slot to its static
+  batch with its target, byte for byte.
+- **Shared encoding.** The game thread encodes records from component values with
+  `box_draws_material_pack` (table) and `box_draws_material` (2D shading), over a
+  `box_draw_material_t` of component pointers. The record data
+  (`box_draw_transition_material_t`) holds the target value of every component the record is
+  encoded from, the tints and fade of a 2D shading and the `Shape2D`. The resolver copies it,
+  replaces the value of each component with a node by the value the node renders and calls
+  `box_draws_transition_encode`, which runs the same functions: display bytes for the table
+  color, linear emission times strength, clamped metallic, roughness and cutoff, tints mixed in
+  display encoding before linearization. A component at its target gives the bytes of the
+  record without a transition.
+- A 2D shading record writes the color, emission and UV words; a glyph record the color and
+  emission. The other words (the shape in `material` and `emissive.w`, the clip, the rank, the
+  atlas area of a glyph) do not depend on a transitioned component and stay as written.
+  A glyph in a colored `TextSpans` span renders with the color of the span, which an `Rgb`
+  transition does not change.
+- `AlphaCutoff` is part of the batch key only through `box_draws_cutout`, whether a cutoff is
+  set, so a transition of its value keeps the batch: the shape has its cutout batch as long as
+  its target has a cutoff, and removing `AlphaCutoff` rekeys it at once.
+- While recording shadow regions, a slot whose `AlphaCutoff` or `TextureTransform` runs (and
+  the frame after) goes to `shadow_materials`, so alpha tested casters render their tiles again.
+- Anything that reads `Rgb` into a material or shading record transitions: mesh shapes, 2D
+  shapes and the glyphs of texts. `SurfaceMaterial`, `Border`, `AmbientLight` and other color
+  fields outside `src/material`, and light color, do not.
+
+Refinements of the design:
+
+- For a 2D shape, `PbrMaterial` and `AlphaCutoff` change nothing in its shading (its material
+  words hold the shape, and 2D shapes are not alpha tested), so they do not tag or patch it.
+- `box_render_transitions_get` reads the state from the `RenderTransitions` singleton, set in
+  `box_render_transitions_init`, instead of a lookup of the system by name. The extract keeps
+  the batch state it found the first time (`box_draws_state` still looks it up by name).
+
 ## The fast path
 
 An application without transitions, and every entity without `Transition` in an application
@@ -270,6 +350,7 @@ that has them, pays nothing per entity:
   gains one empty vector.
 - The extract query has no matched tables when `Transition` is not used.
 
-The only observers the module adds are the OnSet validation of `Transition` itself and
-`DrawsOnTransitionTransform`, on the private tag, which only entities a transform transition
-moves ever get.
+The only observers the module adds are the OnSet validation of `Transition` itself,
+`DrawsOnTransitionTransform` and `DrawsOnTransitionMaterial`, on the private tags, which only
+entities a transition patches ever get. The material table records the runs it uploads, one
+entry per run, and a frame without an active material transition walks no slot or entity.

@@ -184,6 +184,7 @@ static void box_draws_text_key(
     key->dynamic_transform = box_transform_dynamic(world, ecs_get_table(world, e)) ||
         ecs_has_id(world, e, TransitionTransform);
     key->dynamic_material = ecs_has_id(world, e, DynamicMaterial) ||
+        ecs_has_id(world, e, TransitionMaterial) ||
         ecs_get_target_for_id(world, e, EcsChildOf, DynamicMaterial) != 0;
 }
 
@@ -307,15 +308,43 @@ static void box_draws_glyph_span(
         goto done;
     }
 
-    m = *material;
-    rgb = (Rgb){ color->r, color->g, color->b };
-    opacity.value = material->opacity ? glm_clamp(material->opacity->value, 0.0f, 1.0f) : 1.0f;
-    opacity.value *= (float)color->a / 255.0f;
-    m.color = &rgb;
-    m.opacity = &opacity;
+    box_draws_glyph_span_material(material, color, &m, &rgb, &opacity);
     box_draws_glyph(transform_out, shading_out, transform, g, &m);
 done:
     return;
+}
+
+void box_draws_glyph_span_material(
+    const box_draw_material_t *material,
+    const rgba *color,
+    box_draw_material_t *out,
+    Rgb *rgb,
+    Opacity *opacity)
+{
+    *out = *material;
+    *rgb = (Rgb){ color->r, color->g, color->b };
+    opacity->value = material->opacity
+        ? glm_clamp(material->opacity->value, 0.0f, 1.0f) : 1.0f;
+    opacity->value *= (float)color->a / 255.0f;
+    out->color = rgb;
+    out->opacity = opacity;
+}
+
+void box_draws_text_material(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    box_draw_tint_t *tint,
+    box_draw_material_t *out)
+{
+    float fade = box_draws_fade(world, e, tint);
+    *out = (box_draw_material_t){
+        .color = ecs_get(world, e, Rgb),
+        .opacity = ecs_get(world, e, Opacity),
+        .emissive = ecs_get(world, e, Emissive),
+        .tint = ecs_get(world, e, Tint),
+        .inherited = tint->keep < 1.0f ? tint : NULL,
+        .fade = fade
+    };
 }
 
 void box_draws_text_update(
@@ -329,17 +358,19 @@ void box_draws_text_update(
         !ecs_has_id(world, e, EcsDisabled);
     int32_t i, count = drawn ? ecs_vec_count(&tg->glyphs) : 0;
     const box_text_glyph_t *glyphs = drawn ? ecs_vec_first(&tg->glyphs) : NULL;
-    box_draw_tint_t tint;
+    box_draw_tint_t tint = { .keep = 1.0f };
     box_draw_key_t key;
-    float fade = count ? box_draws_fade(world, e, &tint) : 1.0f;
     box_draw_material_t material = {
         .color = ecs_get(world, e, Rgb),
         .opacity = ecs_get(world, e, Opacity),
         .emissive = ecs_get(world, e, Emissive),
         .tint = ecs_get(world, e, Tint),
-        .inherited = count && tint.keep < 1.0f ? &tint : NULL,
-        .fade = fade
+        .fade = 1.0f
     };
+    if (count) {
+        box_draws_text_material(world, e, &tint, &material);
+    }
+
     const TextSpans *spans = count ? ecs_get(world, e, TextSpans) : NULL;
     const Text *text = spans && ecs_vec_count(&spans->spans) ? ecs_get(world, e, Text) : NULL;
     int32_t length = text && text->value ? (int32_t)strlen(text->value) : 0;

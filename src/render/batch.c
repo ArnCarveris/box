@@ -338,6 +338,7 @@ int32_t box_draws_batch_ensure(
     b->bounded = false;
     b->was_ready = false;
     b->transform_frame = -1;
+    b->shading_frame = -1;
     head = ecs_map_ensure(&d->lookup, hash);
     b->next = *head ? (int32_t)*head - 1 : -1;
     *head = (uint64_t)result + 1;
@@ -783,6 +784,118 @@ void box_draws_material_pack(
     out->uv[3] = uv ? uv->offset_y : 0.0f;
 }
 
+void box_draws_transition_target(
+    box_draw_transition_material_t *out,
+    const box_draw_material_t *material,
+    box_draw_transition_kind_t kind)
+{
+    ecs_os_memset_t(out, 0, box_draw_transition_material_t);
+    out->kind = (uint8_t)kind;
+    out->fade = material->fade;
+    if (material->color) {
+        out->present |= 1u << BOX_RENDER_TRANSITION_RGB;
+        out->color = *material->color;
+    }
+
+    if (material->cutoff) {
+        out->present |= 1u << BOX_RENDER_TRANSITION_ALPHA_CUTOFF;
+        out->cutoff = *material->cutoff;
+    }
+
+    if (material->pbr) {
+        out->present |= 1u << BOX_RENDER_TRANSITION_PBR_MATERIAL;
+        out->pbr = *material->pbr;
+    }
+
+    if (material->emissive) {
+        out->present |= 1u << BOX_RENDER_TRANSITION_EMISSIVE;
+        out->emissive = *material->emissive;
+    }
+
+    if (material->uv) {
+        out->present |= 1u << BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM;
+        out->uv = *material->uv;
+    }
+
+    if (material->opacity) {
+        out->present |= 1u << BOX_RENDER_TRANSITION_OPACITY;
+        out->opacity = *material->opacity;
+    }
+
+    if (material->tint) {
+        out->present |= 1u << BOX_RENDER_TRANSITION_TINT;
+        out->tint = *material->tint;
+    }
+
+    if (material->inherited) {
+        out->tinted = true;
+        out->inherited = *material->inherited;
+    }
+
+    if (material->shape2d && kind == BOX_DRAW_TRANSITION_SHAPE) {
+        out->shape2d = *material->shape2d;
+    }
+}
+
+/** Get a component of a material transition, NULL when the material does not have it.
+ *
+ * @param material The material
+ * @param component The component
+ * @param value The value of the component in the material
+ * @return value or NULL
+ */
+static const void* box_draws_transition_part(
+    const box_draw_transition_material_t *material,
+    box_render_transition_component_t component,
+    const void *value)
+{
+    return (material->present & (1u << component)) ? value : NULL;
+}
+
+void box_draws_transition_encode(
+    const box_draw_transition_material_t *material,
+    void *dst)
+{
+    box_draw_material_t m = {
+        .color = box_draws_transition_part(material, BOX_RENDER_TRANSITION_RGB,
+            &material->color),
+        .opacity = box_draws_transition_part(material, BOX_RENDER_TRANSITION_OPACITY,
+            &material->opacity),
+        .cutoff = box_draws_transition_part(material, BOX_RENDER_TRANSITION_ALPHA_CUTOFF,
+            &material->cutoff),
+        .pbr = box_draws_transition_part(material, BOX_RENDER_TRANSITION_PBR_MATERIAL,
+            &material->pbr),
+        .emissive = box_draws_transition_part(material, BOX_RENDER_TRANSITION_EMISSIVE,
+            &material->emissive),
+        .uv = box_draws_transition_part(material, BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM,
+            &material->uv),
+        .tint = box_draws_transition_part(material, BOX_RENDER_TRANSITION_TINT,
+            &material->tint),
+        .inherited = material->tinted ? &material->inherited : NULL,
+        .shape2d = material->kind == BOX_DRAW_TRANSITION_SHAPE ? &material->shape2d : NULL,
+        .fade = material->fade
+    };
+    box_render_material_t record;
+    box_render_shading_t shading;
+    if (material->kind == BOX_DRAW_TRANSITION_TABLE) {
+        box_draws_material_pack(&record, &m);
+        ecs_os_memcpy(dst, &record, ECS_SIZEOF(record));
+        goto done;
+    }
+
+    box_draws_material(&shading, &m);
+    ecs_os_memcpy(ECS_OFFSET(dst, offsetof(box_render_shading_t, color)), shading.color,
+        ECS_SIZEOF(vec4));
+    ecs_os_memcpy(ECS_OFFSET(dst, offsetof(box_render_shading_t, emissive)), shading.emissive,
+        ECS_SIZEOF(float) * 3);
+    if (material->kind == BOX_DRAW_TRANSITION_SHAPE) {
+        ecs_os_memcpy(ECS_OFFSET(dst, offsetof(box_render_shading_t, uv)), shading.uv,
+            ECS_SIZEOF(vec4));
+    }
+done:
+    return;
+}
+
 /** Convert a value from 0 to 1 to unorm16.
  *
  * @param value The value
@@ -1080,6 +1193,9 @@ static void box_draws_upload_all(
         if (stream == BOX_RENDER_STREAM_TRANSFORM) {
             b->transform_frame = p->frame;
             b->transform_data = ecs_vec_last_t(&p->uploads, box_render_upload_t)->data;
+        } else if (stream == BOX_RENDER_STREAM_SHADING) {
+            b->shading_frame = p->frame;
+            b->shading_data = ecs_vec_last_t(&p->uploads, box_render_upload_t)->data;
         }
     }
 

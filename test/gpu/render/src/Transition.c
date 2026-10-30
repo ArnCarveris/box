@@ -1,7 +1,8 @@
 /**
  * @file Transition.c
- * @brief Tests that transform transitions render, with the GPU backend: a shape and the shadow
- * of a caster are drawn where the transition is, not at the target the game thread sees.
+ * @brief Tests that transform and material transitions render, with the GPU backend: a shape
+ * and the shadow of a caster are drawn where the transition is and a mesh in the color it is
+ * at, not at the target the game thread sees.
  *
  * The camera looks straight down from 4 units above a white floor into a 64x64 image with a 90
  * degree camera: world x = 0 lands on column 32 and a world unit on the floor is 8 pixels. The
@@ -11,6 +12,7 @@
 #include <box.h>
 #include <bake_test.h>
 #include <math.h>
+#include <stdlib.h>
 #include "render.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -217,6 +219,57 @@ void Transition_shadow_mid_transition(void) {
     px = trans_capture(world, "transition_shadow_6.png");
     test_assert(trans_channel(px, 56, 32, 0) < TRANS_DARK);
     test_assert(trans_channel(px, 32, 32, 0) > TRANS_LIT);
+    stbi_image_free(px);
+
+    trans_no_errors(world);
+    ecs_fini(world);
+}
+
+/** A box in front of the camera, unlit, changes its Rgb from red to blue over a second. The
+ * frames render at progress 0, 1/4, 1/2 and 3/4 and then at the target: the red and blue
+ * channels of its center pixel cross over while the game thread sees blue from the start.
+ */
+void Transition_mesh_color_mid_transition(void) {
+    // engine_core/transition
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 6});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Box, {2, 2, 2});
+    ecs_set(world, e, Rgb, {255, 0, 0});
+    box_transition_set(world, e, ecs_id(Rgb), &(TransitionSpec){ .duration = 1.0f });
+    unsigned char *px = trans_capture(world, "transition_color_0.png");
+    int32_t mid = TRANS_SIZE / 2;
+    test_assert(trans_channel(px, mid, mid, 0) > trans_channel(px, mid, mid, 2) + 60);
+    stbi_image_free(px);
+
+    ecs_set(world, e, Rgb, {0, 0, 255});
+    px = trans_capture(world, "transition_color_1.png");
+    test_assert(trans_channel(px, mid, mid, 0) > trans_channel(px, mid, mid, 2) + 60);
+    stbi_image_free(px);
+
+    stbi_image_free(trans_capture(world, "transition_color_2.png"));
+    px = trans_capture(world, "transition_color_3.png");
+    test_int(ecs_get(world, e, Rgb)->r, 0);
+    test_int(ecs_get(world, e, Rgb)->b, 255);
+    int32_t r = trans_channel(px, mid, mid, 0), b = trans_channel(px, mid, mid, 2);
+    test_assert(r > 40);
+    test_assert(b > 40);
+    test_assert(abs(r - b) < 40);
+    test_assert(trans_channel(px, mid, mid, 1) < TRANS_DARK);
+    stbi_image_free(px);
+
+    stbi_image_free(trans_capture(world, "transition_color_4.png"));
+    px = trans_capture(world, "transition_color_5.png");
+    test_assert(trans_channel(px, mid, mid, 2) > trans_channel(px, mid, mid, 0) + 60);
     stbi_image_free(px);
 
     trans_no_errors(world);

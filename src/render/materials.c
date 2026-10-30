@@ -109,7 +109,9 @@ void box_draws_materials_init(
     ecs_vec_init_t(NULL, &m->marked, bool, 0);
     ecs_vec_init_t(NULL, &m->dirty, uint32_t, 0);
     ecs_vec_init_t(NULL, &m->free, uint32_t, 0);
+    ecs_vec_init_t(NULL, &m->uploaded, box_draw_material_upload_t, 0);
     ecs_map_init(&m->owned, NULL);
+    m->uploaded_frame = -1;
     ecs_os_memset_t(ecs_vec_append_t(NULL, &m->records, box_render_material_t), 0,
         box_render_material_t);
     *ecs_vec_append_t(NULL, &m->owners, ecs_entity_t) = 0;
@@ -127,6 +129,7 @@ void box_draws_materials_fini(
     ecs_vec_fini_t(NULL, &m->marked, bool);
     ecs_vec_fini_t(NULL, &m->dirty, uint32_t);
     ecs_vec_fini_t(NULL, &m->free, uint32_t);
+    ecs_vec_fini_t(NULL, &m->uploaded, box_draw_material_upload_t);
     ecs_map_fini(&m->owned);
 }
 
@@ -402,6 +405,21 @@ void box_draws_materials_observers(
     }
 }
 
+void box_draws_material_of(
+    const ecs_world_t *world,
+    ecs_entity_t owner,
+    box_draw_material_t *out)
+{
+    *out = (box_draw_material_t){ .fade = 1.0f };
+    if (owner) {
+        out->color = ecs_get(world, owner, Rgb);
+        out->pbr = ecs_get(world, owner, PbrMaterial);
+        out->emissive = ecs_get(world, owner, Emissive);
+        out->uv = ecs_get(world, owner, TextureTransform);
+        out->cutoff = ecs_get(world, owner, AlphaCutoff);
+    }
+}
+
 /** Pack the record of a slot from the material components its owner owns or inherits.
  *
  * @param world The world
@@ -413,16 +431,30 @@ static void box_materials_pack(
     ecs_entity_t owner,
     box_render_material_t *out)
 {
-    box_draw_material_t material = { .fade = 1.0f };
-    if (owner) {
-        material.color = ecs_get(world, owner, Rgb);
-        material.pbr = ecs_get(world, owner, PbrMaterial);
-        material.emissive = ecs_get(world, owner, Emissive);
-        material.uv = ecs_get(world, owner, TextureTransform);
-        material.cutoff = ecs_get(world, owner, AlphaCutoff);
+    box_draw_material_t material;
+    box_draws_material_of(world, owner, &material);
+    box_draws_material_pack(out, &material);
+}
+
+bool box_draws_material_data(
+    const box_render_draws_t *d,
+    uint32_t slot,
+    int64_t frame,
+    uint32_t *out)
+{
+    const box_draw_materials_t *m = &d->materials;
+    int32_t i, count = m->uploaded_frame == frame ? ecs_vec_count(&m->uploaded) : 0;
+    bool result = false;
+    for (i = 0; i < count && !result; i ++) {
+        const box_draw_material_upload_t *u = ecs_vec_get_t(
+            &m->uploaded, box_draw_material_upload_t, i);
+        if (slot >= u->first && slot - u->first < u->count) {
+            *out = u->data + (slot - u->first) * (uint32_t)sizeof(box_render_material_t);
+            result = true;
+        }
     }
 
-    box_draws_material_pack(out, &material);
+    return result;
 }
 
 /** Order slots ascending.
@@ -459,6 +491,12 @@ static void box_materials_upload(
     ecs_os_memcpy(dst, ecs_vec_get_t(&d->materials.records, box_render_material_t,
         (int32_t)first), (ecs_size_t)size);
     d->stats.material_bytes += size;
+    *ecs_vec_append_t(NULL, &d->materials.uploaded, box_draw_material_upload_t) =
+        (box_draw_material_upload_t){
+            .first = first,
+            .count = count,
+            .data = ecs_vec_last_t(&p->uploads, box_render_upload_t)->data
+        };
 }
 
 void box_draws_materials_send(
@@ -470,6 +508,8 @@ void box_draws_materials_send(
     int32_t i, j, count = ecs_vec_count(&m->dirty);
     uint32_t *dirty = ecs_vec_first_t(&m->dirty, uint32_t);
     uint32_t total = (uint32_t)ecs_vec_count(&m->records);
+    ecs_vec_clear(&m->uploaded);
+    m->uploaded_frame = p->frame;
     for (i = 0; i < count; i ++) {
         uint32_t slot = dirty[i];
         ecs_entity_t owner = box_materials_owner(m, slot);
