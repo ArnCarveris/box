@@ -18,8 +18,9 @@ percentiles, the values are mapped piecewise linearly, p1 to 0, m to 0.5 and p99
 so the histogram is centered on 0.5 (half of the texels are below 0.5) and spans 0..1 with 1% of
 the texels clipped to 0 and 1% to 1. The two halves differ only slightly in scale, since fbm is
 nearly symmetric. A cookie threshold of 0.5 covers half of the ground; since fbm values are roughly
-normally distributed, the coverage of other thresholds t is close to t but steeper (about 0.08 at
-t = 0.2 and 0.9 at t = 0.8 for the default texture).
+normally distributed, the coverage of other thresholds t is close to t but steeper: in the
+default texture 0.096 of the texels are below 0.2 (a byte of 51) and 0.895 below 0.8 (a byte of
+204), so about 0.1 at t = 0.2 and 0.9 at t = 0.8.
 
 etc/assets/textures/cloud_noise.png was written with the default options:
 

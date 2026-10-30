@@ -3,9 +3,8 @@
  * @brief Light components; color comes from the entity's Rgb and direction from its transform.
  *
  * A light lights only its scene (nearest Scene ancestor, else the default scene); a scene
- * without light entities gets a default sun of intensity pi unless it has a valid Atmosphere,
- * View.lighting.enabled false draws
- * base color plus emission unlit. Intensity is irradiance, see DirectionalLight.
+ * without lights gets a default sun of intensity pi unless it has a valid Atmosphere. Intensity
+ * is irradiance, see DirectionalLight; View.lighting.enabled false draws base color and emission.
  *
  * The ambient of a scene sums its AmbientLight components, set on the Scene root (a singleton
  * for the default scene); a scene without one gets the default sky and ground.
@@ -53,6 +52,44 @@ ECS_STRUCT(DirectionalLight, {
     LightBakeMode bake; /**< Part of the light in the bake of its scene, default Mixed; a sun
                          *   moved by a time of day should be Mixed or Realtime, as a Baked
                          *   one keeps the light of its baked state within the thresholds */
+});
+
+/** How a LightCookie maps world positions onto its texture */
+ECS_ENUM(LightCookieProjection, {
+    LightCookieProjectionPlane = 0, /**< Along the light onto the horizontal plane at height:
+                                     *   the pattern stays fixed in the world and its shadows
+                                     *   move over the ground as the light turns, as clouds do */
+    LightCookieProjectionLight = 1  /**< In the plane of the local X and Y axes of the light,
+                                     *   so the pattern follows its rotation */
+});
+
+/** A tileable single channel texture whose value scales the direct light (diffuse, specular
+ * and shadows) of the DirectionalLight it is set on, in the forward pass and for lit particles:
+ * noise for cloud shadows, a mask for a classic cookie. Ambient and captures are not affected.
+ *
+ * Only the first directional light of a scene, the one with the cascaded shadows, uses its
+ * cookie; on another light it has no effect yet. Neither has a size at or below 0 or strength 0.
+ */
+ECS_STRUCT(LightCookie, {
+    ecs_entity_t texture; /**< TexturePath with single_channel, 0 for none, read as stored;
+                           *   another texture reads its stored red channel (no sRGB decoding);
+                           *   no effect until it is loaded */
+    LightCookieProjection projection; /**< Plane: p moves along the direction l toward the
+                           *   light to q = p + l * (height - p.y) / l.y, read at q.xz; Light:
+                           *   read at p along the local X and Y of the light. Default Plane */
+    float size;           /**< World units the texture repeats over, default 4000 */
+    float height;         /**< World Y of the plane, Plane only, default 1500: positions at or
+                           *   above it and a light at or below the horizon are not affected */
+    vec2 offset;          /**< World units the pattern is moved by, along world X and Z (Plane)
+                           *   or the local X and Y of the light (Light), default 0 */
+    vec2 velocity;        /**< Wind: world units per second the pattern moves along the same
+                           *   axes, default 0; offset plus velocity times the total time is
+                           *   computed in double precision and wrapped to size */
+    float threshold;      /**< The value t read is remapped to lit = saturate((t - threshold) /
+                           *   (2 * softness) + 0.5), default 0.5 */
+    float softness;       /**< Default 0.5, which with threshold 0.5 passes t through; 0 is a
+                           *   hard step at threshold */
+    float strength;       /**< The cookie is mix(1, lit, strength), default 1 */
 });
 
 /** Omnidirectional light. Intensity is the irradiance on a facing surface 1 unit away: at
@@ -271,6 +308,7 @@ ECS_STRUCT(EnvironmentImage, {
  *
  * In a scene with LightBake the views are shadowed by the first directional light that is not
  * Baked and the probe captures by the first one they shade surfaces with (see LightBakeMode).
+ * The LightCookie of the first directional light of the views scales its direct light.
  *
  * @param world The world
  */

@@ -198,6 +198,7 @@ void box_gpu_texture_init(
     gpu->material_layout = wgpuDeviceCreateBindGroupLayout(gpu->device, &layout);
     gpu->white = box_gpu_texture_new(gpu, 1, 1, box_gpu_white, false);
     gpu->flat = box_gpu_texture_new(gpu, 1, 1, box_gpu_flat, false);
+    gpu->no_cookie = box_gpu_texture_new(gpu, 1, 1, box_gpu_white, true);
     ecs_map_init(&gpu->textures, NULL);
     ecs_map_init(&gpu->materials, NULL);
     ecs_vec_init_t(NULL, &gpu->mips, uint32_t, 0);
@@ -233,6 +234,11 @@ void box_gpu_texture_fini(
     if (gpu->flat) {
         box_gpu_texture_free(gpu->flat);
         gpu->flat = NULL;
+    }
+
+    if (gpu->no_cookie) {
+        box_gpu_texture_free(gpu->no_cookie);
+        gpu->no_cookie = NULL;
     }
 
     if (gpu->material_layout) {
@@ -625,6 +631,17 @@ WGPUTextureView box_gpu_texture_color(
     box_gpu_material_mips(gpu, textures);
 
     return box_gpu_material_view(gpu, textures[0], 0);
+}
+
+WGPUTextureView box_gpu_texture_cookie(
+    box_gpu_t *gpu,
+    uint32_t handle)
+{
+    box_gpu_texture_t *tex = handle && !(handle & BOX_RENDER_TEXTURE_TARGET)
+        ? ecs_map_get_deref(&gpu->textures, box_gpu_texture_t, handle)
+        : NULL;
+
+    return tex ? tex->linear : NULL;
 }
 
 WGPUBindGroup box_gpu_material_group(

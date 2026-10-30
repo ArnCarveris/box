@@ -53,7 +53,7 @@ static WGPUBuffer box_gpu_buffer_new(
 void box_gpu_draw_init(
     box_gpu_t *gpu)
 {
-    WGPUBindGroupLayoutEntry entries[17] = {
+    WGPUBindGroupLayoutEntry entries[19] = {
         {
             .binding = 0,
             .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
@@ -166,9 +166,22 @@ void box_gpu_draw_init(
                 .type = WGPUBufferBindingType_Uniform,
                 .minBindingSize = BOX_GPU_ATLAS_TILES_SIZE
             }
+        },
+        {
+            .binding = 17,
+            .visibility = WGPUShaderStage_Fragment,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Float,
+                .viewDimension = WGPUTextureViewDimension_2D
+            }
+        },
+        {
+            .binding = 18,
+            .visibility = WGPUShaderStage_Fragment,
+            .sampler = { .type = WGPUSamplerBindingType_Filtering }
         }
     };
-    WGPUBindGroupLayoutDescriptor layout = { .entryCount = 17, .entries = entries };
+    WGPUBindGroupLayoutDescriptor layout = { .entryCount = 19, .entries = entries };
     box_gpu_cull_init(gpu);
     box_gpu_volume_init(gpu);
     box_gpu_reflect_init(gpu);
@@ -1281,6 +1294,7 @@ static int32_t box_gpu_view_write(
         box_gpu_atlas_uniforms(gpu, v, u);
         box_gpu_atmosphere_uniforms(gpu, v, u);
         box_gpu_environment_uniforms(gpu, v, u);
+        box_gpu_cookie_uniforms(gpu, v, u);
         box_gpu_cull_add(gpu, t, packet, i, result, proj, u);
         result ++;
     }

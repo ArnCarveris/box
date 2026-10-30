@@ -25,6 +25,29 @@ static void box_directional_light_ctor(
     }
 }
 
+/** Construct LightCookie values without a texture: a Plane projection repeating over 4000
+ * units at a height of 1500, still, passing the values of its texture through at full strength.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_light_cookie_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    LightCookie *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (LightCookie){
+            .projection = LightCookieProjectionPlane, .size = 4000.0f, .height = 1500.0f,
+            .threshold = 0.5f, .softness = 0.5f, .strength = 1.0f
+        };
+    }
+}
+
 /** Construct PointLight values at full intensity with the default range, Mixed, without
  * shadows.
  *
@@ -302,6 +325,9 @@ void BoxLightImport(
     ecs_set_hooks(world, PointLight, { .ctor = box_point_light_ctor });
     ecs_set_hooks(world, SpotLight, { .ctor = box_spot_light_ctor });
     ecs_set_hooks(world, AmbientLight, { .ctor = box_ambient_light_ctor });
+    ECS_META_COMPONENT(world, LightCookieProjection);
+    ECS_META_COMPONENT(world, LightCookie);
+    ecs_set_hooks(world, LightCookie, { .ctor = box_light_cookie_ctor });
     ECS_META_COMPONENT(world, ShadowAtlas);
     ecs_set_hooks(world, ShadowAtlas, { .ctor = box_shadow_atlas_ctor });
     ECS_META_COMPONENT(world, LightBake);
