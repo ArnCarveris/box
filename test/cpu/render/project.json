@@ -503,7 +503,9 @@
                     "dynamic_material_fade_in",
                     "text_spans_fade",
                     "packed_color_opacity_2d",
-                    "packed_color_tint_2d"
+                    "packed_color_tint_2d",
+                    "tint_stays_in_bake",
+                    "opacity_stays_out_of_bake"
                 ]
             }
         ]

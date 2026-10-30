@@ -203,7 +203,8 @@ the same entity shows the transition, the light does not.
 Light and reflection bakes, and probe captures, use the material table and shading as the
 frame they run in has them. A change of a material component invalidates bakes on the game
 thread as without a transition, so a capture that runs while the transition does sees the
-value it renders at then, not the target.
+value it renders at then, not the target. `Tint` is the exception: captures ignore it, so it
+never invalidates a bake and a capture sees the color without it, whether it transitions or not.
 
 ## Architecture
 
@@ -491,8 +492,9 @@ thread) and the encoding in `src/render/batch.c`.
   belongs to its nearest fading ancestor; a fading descendant is a node of its own whose parent
   is that ancestor, so nodes come parent first.
 - Every drawn entity of the walk (mesh, 2D shape or text) carries `TransitionMaterial`, so its
-  slot is `dynamic_material` and out of the bakes, its shading run uploads every frame and its
-  shading has one byte location to patch. A 2D shape or text that a material transition did not
+  slot is `dynamic_material`, its shading run uploads every frame and its shading has one byte
+  location to patch. A mesh under a `Tint` transition stays in the bakes, which ignore `Tint`;
+  `TransitionOpacity` below keeps one under an `Opacity` transition out of them. A 2D shape or text that a material transition did not
   list joins the shadings to patch.
 - Every drawn entity at or below a node with an active `Opacity` transition also carries the
   private tag `TransitionOpacity` (`(OnInstantiate, DontInherit)`). `box_draws_key` and the

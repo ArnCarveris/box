@@ -85,6 +85,9 @@ ECS_STRUCT(AlphaCutoff, {
  * It is not transparency (Opacity) and applies to every shape below it through ChildOf and
  * Parent, composed from the root down: a child's tint mixes the result of its ancestors'. An
  * albedo texture multiplies the tinted color; emission is not tinted.
+ *
+ * Light and reflection bakes ignore it: they capture the color without the tint, and changing a
+ * tint rebakes nothing.
  */
 ECS_STRUCT(Tint, {
     uint8_t r;  /**< Red of the tint color */
