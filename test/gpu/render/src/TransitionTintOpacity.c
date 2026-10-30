@@ -182,7 +182,7 @@ void TransitionTintOpacity_opacity_mid_transition(void) {
     test_flt(ecs_get(world, parent, Opacity)->value, 0);
     int32_t mid = tto_center(px, 0);
     test_assert(mid > TTO_DARK);
-    test_assert(mid < full - 15);
+    test_assert(mid < full - 40);
     stbi_image_free(px);
 
     stbi_image_free(tto_capture(world, "transition_opacity_4.png"));
