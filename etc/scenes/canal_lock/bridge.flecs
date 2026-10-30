@@ -1,0 +1,68 @@
+include materials
+include state
+include control
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.app
+using box.transition
+
+template LockLiftSpanBody {
+  deck_core : CanalOldTimber { Position: {0, -0.03, -3.4}; Box: {1.86, 0.06, 6.76} }
+  CanalFace(w: 1.86, h: 6.8, u: 0.6, v: 2.7) { (IsA, CanalDeckPlanks); Position: {0, 0.012, -3.4}; Rotation: {-math.PI / 2, 0, math.PI / 2} }
+  stringer_a : CanalOldTimber { Position: {-0.74, -0.14, -3.4}; Box: {0.16, 0.16, 6.8} }
+  stringer_b : CanalOldTimber { Position: {0.74, -0.14, -3.4}; Box: {0.16, 0.16, 6.8} }
+  for side in 0..2 {
+    const x = (side * 2 - 1) * 0.91
+    for i in 0..9 {
+      { (IsA, CanalWhite); Position: {x, 0.4, -0.2 - i * 0.8}; RoundedBox: {0.055, 0.78, 0.055, 0.01, segments: 1} }
+    }
+    { (IsA, CanalWhite); Position: {x, 0.8, -3.4}; RoundedBox: {0.08, 0.06, 6.6, 0.015, segments: 1} }
+    { (IsA, CanalWhite); Position: {x, 0.42, -3.4}; RoundedBox: {0.04, 0.04, 6.56, 0.01, segments: 1} }
+    { (IsA, CanalWhite); Position: {x * 1.2, 0.04, 1.4}; RoundedBox: {0.18, 0.2, 2.8, 0.02, segments: 1} }
+  }
+  counterweight : CanalDarkStone { Position: {0, 0.08, 2.5}; RoundedBox: {2.3, 0.6, 0.8, 0.04, segments: 1} }
+  for i in 0..4 {
+    { (IsA, CanalIron); Position: {-0.84 + i * 0.56, 0.4, 2.5}; Sphere: {radius: 0.05, segments: 8} }
+  }
+}
+
+template LockLiftSpan : LockControl {
+  const angle = match lock_bridge_up { true: 1.32; _: 0.0 }
+
+  Rotation: {angle, 0, 0}
+  Transition: [
+    Rotation: {duration: 3.5, timing_function: EaseInOut},
+    Tint: {duration: 0.12}
+  ]
+
+  LockLiftSpanBody body()
+
+  async {
+    while true {
+      await on.click(this)
+      const now = AppStatus[AppStatus].elapsed
+      if now >= lock_busy_until {
+        lock_bridge_up = !lock_bridge_up
+        hover = false
+        lock_busy_until = now + 3.6
+      }
+    }
+  }
+}
+
+template LockLiftBridge {
+  abutment_s : CanalStone { Position: {0, -0.22, 3.86}; RoundedBox: {3.1, 0.65, 1.1, 0.04, segments: 1}; TextureTransform: {scale_x: 3, scale_y: 0.7} }
+  abutment_n : CanalStone { Position: {0, -0.22, -3.86}; RoundedBox: {3.1, 0.65, 1.1, 0.04, segments: 1}; TextureTransform: {scale_x: 3, scale_y: 0.7} }
+  pit_rim_w : CanalDarkStone { Position: {-1.5, 0.02, 5.6}; RoundedBox: {0.16, 0.12, 2.5, 0.02, segments: 1} }
+  pit_rim_e : CanalDarkStone { Position: {1.5, 0.02, 5.6}; RoundedBox: {0.16, 0.12, 2.5, 0.02, segments: 1} }
+  pit_rim_s : CanalDarkStone { Position: {0, 0.02, 6.9}; RoundedBox: {3.16, 0.12, 0.16, 0.02, segments: 1} }
+  pit : CanalBlack { Position: {0, 0.018, 5.6}; Rotation: {-math.PI / 2, 0, 0}; Quad: {2.86, 2.44} }
+  for side in 0..2 {
+    const x = (side * 2 - 1) * 1.28
+    { (IsA, CanalIron); Position: {x, 0.33, 3.5}; RoundedBox: {0.2, 0.42, 0.42, 0.03, segments: 1} }
+    { (IsA, CanalBlack); Position: {x * 1.13, 0.5, 3.72}; Cylinder: {radius: 0.09, length: 0.56, segments: 12, smooth: true} }
+  }
+  LockLiftSpan span() { Position: {0, 0.33, 3.3} }
+}

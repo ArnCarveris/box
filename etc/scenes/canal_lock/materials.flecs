@@ -1,0 +1,100 @@
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+
+canal_tex_chamber { TexturePath: {path: "etc/scenes/canal_lock/textures/chamber_wall.jpg"} }
+canal_tex_chamber_normal { TexturePath: {path: "etc/scenes/canal_lock/textures/chamber_wall_normal.jpg"} }
+canal_tex_chamber_orm { TexturePath: {path: "etc/scenes/canal_lock/textures/chamber_wall_orm.jpg"} }
+canal_tex_ashlar { TexturePath: {path: "etc/scenes/canal_lock/textures/ashlar.jpg"} }
+canal_tex_ashlar_normal { TexturePath: {path: "etc/scenes/canal_lock/textures/ashlar_normal.jpg"} }
+canal_tex_stone { TexturePath: {path: "etc/scenes/canal_lock/textures/stone.jpg"} }
+canal_tex_stone_normal { TexturePath: {path: "etc/scenes/canal_lock/textures/stone_normal.jpg"} }
+canal_tex_brick { TexturePath: {path: "etc/scenes/canal_lock/textures/brick.jpg"} }
+canal_tex_brick_normal { TexturePath: {path: "etc/scenes/canal_lock/textures/brick_normal.jpg"} }
+canal_tex_wood { TexturePath: {path: "etc/scenes/canal_lock/textures/wood.jpg"} }
+canal_tex_wood_normal { TexturePath: {path: "etc/scenes/canal_lock/textures/wood_normal.jpg"} }
+canal_tex_table { TexturePath: {path: "etc/scenes/canal_lock/textures/table.jpg"} }
+canal_tex_slate { TexturePath: {path: "etc/scenes/canal_lock/textures/slate.jpg"} }
+canal_tex_slate_normal { TexturePath: {path: "etc/scenes/canal_lock/textures/slate_normal.jpg"} }
+canal_tex_plaster { TexturePath: {path: "etc/scenes/canal_lock/textures/plaster.jpg"} }
+canal_tex_plaster_normal { TexturePath: {path: "etc/scenes/canal_lock/textures/plaster_normal.jpg"} }
+canal_tex_bark { TexturePath: {path: "etc/scenes/canal_lock/textures/bark.jpg"} }
+canal_tex_bark_normal { TexturePath: {path: "etc/scenes/canal_lock/textures/bark_normal.jpg"} }
+canal_tex_strata { TexturePath: {path: "etc/scenes/canal_lock/textures/strata.jpg"} }
+canal_tex_strata_normal { TexturePath: {path: "etc/scenes/canal_lock/textures/strata_normal.jpg"} }
+canal_tex_water_normal { TexturePath: {path: "etc/scenes/canal_lock/textures/water_normal.jpg"} }
+canal_tex_ground { TexturePath: {path: "etc/scenes/canal_lock/textures/ground.jpg", width: 2048} }
+canal_tex_leaves { TexturePath: {path: "etc/scenes/canal_lock/textures/leaves.png"} }
+canal_tex_tuft { TexturePath: {path: "etc/scenes/canal_lock/textures/tuft.png"} }
+canal_tex_boat_side { TexturePath: {path: "etc/scenes/canal_lock/textures/boat_side.svg", width: 1024} }
+canal_tex_plate { TexturePath: {path: "etc/scenes/canal_lock/textures/plate.svg", width: 512} }
+
+prefab CanalChamberWall { Rgb: {255, 255, 255}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: canal_tex_chamber, normal: canal_tex_chamber_normal, orm: canal_tex_chamber_orm} }
+prefab CanalAshlar { Rgb: {232, 226, 212}; PbrMaterial: {roughness: 0.92}; PbrTextures: {albedo: canal_tex_ashlar, normal: canal_tex_ashlar_normal} }
+prefab CanalStone { Rgb: {176, 170, 154}; PbrMaterial: {roughness: 0.92}; PbrTextures: {albedo: canal_tex_stone, normal: canal_tex_stone_normal} }
+prefab CanalDarkStone { Rgb: {112, 108, 98}; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: canal_tex_stone, normal: canal_tex_stone_normal} }
+prefab CanalCoping { Rgb: {214, 206, 186}; PbrMaterial: {roughness: 0.84}; PbrTextures: {albedo: canal_tex_stone, normal: canal_tex_stone_normal} }
+prefab CanalCopingOld { Rgb: {186, 178, 158}; PbrMaterial: {roughness: 0.88}; PbrTextures: {albedo: canal_tex_stone, normal: canal_tex_stone_normal} }
+prefab CanalCopingPale { Rgb: {228, 222, 204}; PbrMaterial: {roughness: 0.82}; PbrTextures: {albedo: canal_tex_stone, normal: canal_tex_stone_normal} }
+prefab CanalBrick { Rgb: {240, 226, 214}; PbrMaterial: {roughness: 0.92}; PbrTextures: {albedo: canal_tex_brick, normal: canal_tex_brick_normal} }
+prefab CanalPlaster { Rgb: {240, 230, 206}; PbrMaterial: {roughness: 0.94}; PbrTextures: {albedo: canal_tex_plaster, normal: canal_tex_plaster_normal} }
+prefab CanalSlate { Rgb: {232, 232, 236}; PbrMaterial: {roughness: 0.58}; PbrTextures: {albedo: canal_tex_slate, normal: canal_tex_slate_normal} }
+prefab CanalStrata { Rgb: {255, 255, 255}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: canal_tex_strata, normal: canal_tex_strata_normal} }
+prefab CanalGround { Rgb: {255, 255, 255}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: canal_tex_ground} }
+
+prefab CanalPlanks { Rgb: {168, 124, 84}; PbrMaterial: {roughness: 0.78}; PbrTextures: {albedo: canal_tex_wood, normal: canal_tex_wood_normal} }
+prefab CanalGatePlanks { Rgb: {122, 86, 56}; PbrMaterial: {roughness: 0.66}; PbrTextures: {albedo: canal_tex_wood, normal: canal_tex_wood_normal} }
+prefab CanalDeckPlanks { Rgb: {176, 156, 128}; PbrMaterial: {roughness: 0.86}; PbrTextures: {albedo: canal_tex_wood, normal: canal_tex_wood_normal} }
+prefab CanalWalnut { Rgb: {86, 52, 32}; PbrMaterial: {roughness: 0.38}; ClearCoat: {strength: 0.7, roughness: 0.16}; PbrTextures: {albedo: canal_tex_wood, normal: canal_tex_wood_normal} }
+prefab CanalTimber { Rgb: {122, 88, 58}; PbrMaterial: {roughness: 0.82}; PbrTextures: {albedo: canal_tex_bark, normal: canal_tex_bark_normal} }
+prefab CanalOldTimber { Rgb: {92, 72, 54}; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: canal_tex_bark, normal: canal_tex_bark_normal} }
+prefab CanalBark { Rgb: {122, 98, 78}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: canal_tex_bark, normal: canal_tex_bark_normal} }
+
+prefab CanalTable { Rgb: {56, 42, 32}; PbrMaterial: {roughness: 0.46}; PbrTextures: {albedo: canal_tex_table} }
+prefab CanalBlack { Rgb: {26, 26, 28}; PbrMaterial: {roughness: 0.34}; ClearCoat: {strength: 0.25, roughness: 0.3} }
+prefab CanalBitumen { Rgb: {18, 18, 20}; PbrMaterial: {roughness: 0.52}; PbrTextures: {normal: canal_tex_stone_normal} }
+prefab CanalWhite { Rgb: {232, 228, 214}; PbrMaterial: {roughness: 0.4}; ClearCoat: {strength: 0.3, roughness: 0.3} }
+prefab CanalIron { Rgb: {58, 56, 56}; PbrMaterial: {metallic: 0.85, roughness: 0.5}; PbrTextures: {normal: canal_tex_stone_normal} }
+prefab CanalRust { Rgb: {112, 66, 44}; PbrMaterial: {metallic: 0.55, roughness: 0.72}; PbrTextures: {normal: canal_tex_stone_normal} }
+prefab CanalBrass { Rgb: {222, 176, 84}; PbrMaterial: {metallic: 1, roughness: 0.24} }
+prefab CanalRed { Rgb: {150, 32, 32}; PbrMaterial: {roughness: 0.36}; ClearCoat: {strength: 0.75, roughness: 0.14} }
+prefab CanalGreen { Rgb: {22, 80, 56}; PbrMaterial: {roughness: 0.36}; ClearCoat: {strength: 0.75, roughness: 0.14} }
+prefab CanalYellow { Rgb: {226, 172, 56}; PbrMaterial: {roughness: 0.4}; ClearCoat: {strength: 0.6, roughness: 0.18} }
+prefab CanalBlue { Rgb: {32, 72, 120}; PbrMaterial: {roughness: 0.36}; ClearCoat: {strength: 0.75, roughness: 0.14} }
+prefab CanalBoatSide { Rgb: {255, 255, 255}; PbrMaterial: {roughness: 0.34}; ClearCoat: {strength: 0.75, roughness: 0.14}; PbrTextures: {albedo: canal_tex_boat_side} }
+prefab CanalBrassPlate { Rgb: {255, 255, 255}; PbrMaterial: {metallic: 0.25, roughness: 0.4}; PbrTextures: {albedo: canal_tex_plate} }
+
+prefab CanalWater {
+  Rgb: {48, 110, 108}
+  PbrMaterial: {metallic: 0, roughness: 0.12}
+  ClearCoat: {strength: 0.7, roughness: 0.04}
+  PbrTextures: {normal: canal_tex_water_normal}
+}
+prefab CanalPondWater { Rgb: {38, 76, 70}; PbrMaterial: {roughness: 0.06}; ClearCoat: {strength: 1, roughness: 0.03}; PbrTextures: {normal: canal_tex_water_normal} }
+prefab CanalResin { Rgb: {42, 92, 84}; PbrMaterial: {roughness: 0.1}; ClearCoat: {strength: 1, roughness: 0.05} }
+prefab CanalMud { Rgb: {74, 78, 56}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: canal_tex_stone, normal: canal_tex_stone_normal} }
+prefab CanalEarth { Rgb: {66, 48, 36}; PbrMaterial: {roughness: 1} }
+prefab CanalGrass { Rgb: {88, 118, 54}; PbrMaterial: {roughness: 1} }
+prefab CanalLeaf { Rgb: {32, 56, 26}; PbrMaterial: {roughness: 1} }
+prefab CanalLeafLight { Rgb: {40, 68, 30}; PbrMaterial: {roughness: 1} }
+prefab CanalLeafCard { Rgb: {74, 118, 48}; PbrMaterial: {roughness: 0.8}; AlphaCutoff: {0.45}; BackFaceMode: BackFacePlain; PbrTextures: {albedo: canal_tex_leaves} }
+prefab CanalLeafCardWarm { Rgb: {112, 142, 56}; PbrMaterial: {roughness: 0.8}; AlphaCutoff: {0.45}; BackFaceMode: BackFacePlain; PbrTextures: {albedo: canal_tex_leaves} }
+prefab CanalTuftCard { Rgb: {116, 150, 62}; PbrMaterial: {roughness: 0.9}; AlphaCutoff: {0.4}; BackFaceMode: BackFacePlain; PbrTextures: {albedo: canal_tex_tuft} }
+prefab CanalReed { Rgb: {134, 142, 70}; PbrMaterial: {roughness: 0.9} }
+prefab CanalSkin { Rgb: {206, 158, 126}; PbrMaterial: {roughness: 0.7} }
+prefab CanalCloth { Rgb: {64, 72, 92}; PbrMaterial: {roughness: 0.95} }
+prefab CanalRope { Rgb: {176, 152, 106}; PbrMaterial: {roughness: 1}; PbrTextures: {normal: canal_tex_bark_normal} }
+prefab CanalGlass { Rgb: {52, 66, 74}; PbrMaterial: {roughness: 0.05}; ClearCoat: {strength: 1, roughness: 0.03} }
+
+template CanalFace {
+  prop w: f32 = 1
+  prop h: f32 = 1
+  prop u: f32 = 1
+  prop v: f32 = 1
+  prop ou: f32 = 0
+  prop ov: f32 = 0
+  Quad: {w, h}
+  TextureTransform: {scale_x: u, scale_y: v, offset_x: ou, offset_y: ov}
+}

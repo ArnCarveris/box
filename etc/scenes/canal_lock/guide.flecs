@@ -1,0 +1,62 @@
+include state
+using flecs.script
+using box.layout
+using box.geometry
+using box.material
+using box.text
+using box.picking
+using box.ui
+
+template LockGuide {
+  const t = box.ui.theme[UiTheme]
+  const going_low = lock_boat_at == 0 || (lock_boat_at == 1 && !lock_boat_up)
+
+  Layout: {direction: Column, spacing: 6, padding: {12, 12, 14, 14}}
+  LayoutItem: {width: {mode: Fixed, value: 400}}
+  Rect: {1, 1}
+  Rgb: t.surface
+  Border: {width: 1, radius: 6, color: {t.border.r, t.border.g, t.border.b, 255}}
+  InputBlocker
+
+  title {
+    Text: {value: "CANAL LOCK", size: t.font_size * 0.8}
+    Rgb: t.text_muted
+  }
+
+  step {
+    LayoutItem: {width: {mode: Grow}}
+    Rgb: t.text
+    if going_low {
+      if lock_top_gate {
+        Text: {value: "Click a top gate beam to close the top gates.", size: t.font_size}
+      } else if lock_top_paddle {
+        Text: {value: "Click the top paddle gear to lower it.", size: t.font_size}
+      } else if lock_high {
+        Text: {value: "Click the bottom paddle gear to empty the chamber.", size: t.font_size}
+      } else if !lock_bottom_gate {
+        Text: {value: "Click a bottom gate beam to open the bottom gates.", size: t.font_size}
+      } else if !lock_bridge_up {
+        Text: {value: "Click the white lift bridge to raise it.", size: t.font_size}
+      } else {
+        Text: {value: "Click the narrowboat to send it through.", size: t.font_size}
+      }
+    } else {
+      if lock_bottom_gate {
+        Text: {value: "Click a bottom gate beam to close the bottom gates.", size: t.font_size}
+      } else if lock_bottom_paddle {
+        Text: {value: "Click the bottom paddle gear to lower it.", size: t.font_size}
+      } else if !lock_high {
+        Text: {value: "Click the top paddle gear to fill the chamber.", size: t.font_size}
+      } else if !lock_top_gate {
+        Text: {value: "Click a top gate beam to open the top gates.", size: t.font_size}
+      } else {
+        Text: {value: "Click the narrowboat to send it through.", size: t.font_size}
+      }
+    }
+  }
+
+  trips {
+    Text: {value: "Trips through the lock: {lock_trips}", size: t.small_font_size}
+    Rgb: t.text_muted
+  }
+}

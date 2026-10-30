@@ -5,10 +5,12 @@
 
 #include <box.h>
 #include <bake_test.h>
+#include <float.h>
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
 #include "mesh_cache.h"
+#include "render.h"
 
 /** Margin in world units of the frustum checks */
 #define FIT_EPSILON (1e-3f)
@@ -683,4 +685,150 @@ void Fit_help_lists_fit(void) {
     ecs_os_free(out);
 
     ecs_fini(world);
+}
+
+/** Get the largest depth of corners seen from a camera.
+ *
+ * @param world The world
+ * @param camera The camera
+ * @param corners The corners
+ * @param count Number of corners
+ * @return The largest distance along the view direction
+ */
+static float fit_depth(
+    ecs_world_t *world,
+    ecs_entity_t camera,
+    vec3 *corners,
+    int32_t count)
+{
+    const WorldTransform *t = ecs_get(world, camera, WorldTransform);
+    test_assert(t != NULL);
+    vec3 eye, back;
+    float result = -FLT_MAX;
+    fit_eye(world, camera, eye);
+    glm_vec3_normalize_to((float*)t->m[2], back);
+    for (int32_t i = 0; i < count; i ++) {
+        vec3 d;
+        glm_vec3_sub(corners[i], eye, d);
+        result = glm_max(result, -glm_vec3_dot(d, back));
+    }
+
+    return result;
+}
+
+void Fit_far_plane_raised(void) {
+    // command/fit
+    ecs_world_t *world = fit_world();
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_entity_t camera = fit_camera(world, "camera", (Position){0, 0, 5}, (Rotation){0},
+        (Camera){ .fov = 60, .near_ = 0.1f, .far_ = 10, .aspect_ratio = 1.0f }, true);
+    ecs_entity_t box = fit_box(world, 0, (Position){0, 0, 0}, (Box){40, 40, 40});
+    ecs_progress(world, 0);
+
+    vec3 corners[8];
+    fit_corners(world, box, corners);
+
+    fit_result_t r;
+    fit_run(world, s, "fit", "camera", &r);
+    test_int(r.count, 1);
+    ecs_progress(world, 0);
+
+    const Camera *cam = ecs_get(world, camera, Camera);
+    test_assert(cam->far_ > 10);
+    test_assert(fit_depth(world, camera, corners, 8) <= cam->far_);
+    fit_check_tight(world, camera, &r, corners, 8);
+
+    ecs_fini(world);
+}
+
+void Fit_far_plane_kept(void) {
+    // command/fit
+    ecs_world_t *world = fit_world();
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_entity_t covered = fit_camera(world, "covered", (Position){0, 0, 50}, (Rotation){0},
+        (Camera){ .fov = 60, .near_ = 0.1f, .far_ = 500, .aspect_ratio = 1.0f }, true);
+    ecs_entity_t infinite = fit_camera(world, "infinite", (Position){0, 0, 50}, (Rotation){0},
+        (Camera){ .fov = 60, .near_ = 0.1f, .far_ = 0, .aspect_ratio = 1.0f }, false);
+    ecs_entity_t box = fit_box(world, 0, (Position){0, 0, 0}, (Box){40, 40, 40});
+    ecs_progress(world, 0);
+
+    vec3 corners[8];
+    fit_corners(world, box, corners);
+
+    fit_result_t r;
+    fit_run(world, s, "fit covered", "covered", &r);
+    test_int(r.count, 1);
+    fit_run(world, s, "fit infinite", "infinite", &r);
+    test_int(r.count, 1);
+    ecs_progress(world, 0);
+
+    test_assert(fit_depth(world, covered, corners, 8) <= 500);
+    test_flt(ecs_get(world, covered, Camera)->far_, 500);
+    test_flt(ecs_get(world, infinite, Camera)->far_, 0);
+
+    ecs_fini(world);
+}
+
+/** Create an offscreen surface with a view root and a view under it.
+ *
+ * @param world The world
+ * @param width Width in points
+ * @param height Height in points
+ * @param camera Camera of the view
+ * @return The surface
+ */
+static ecs_entity_t fit_surface(
+    ecs_world_t *world,
+    int32_t width,
+    int32_t height,
+    ecs_entity_t camera)
+{
+    ecs_entity_t root = ecs_new(world);
+    ecs_entity_t view = ecs_new_w_pair(world, EcsChildOf, root);
+    ecs_set(world, view, View, { .camera = camera });
+    ecs_entity_t result = ecs_new(world);
+    ecs_set(world, result, Surface, {
+        .width = width, .height = height, .texture = ecs_new(world), .view_root = root });
+
+    return result;
+}
+
+void Fit_aspect_of_view_surface(void) {
+    // command/fit
+    ecs_world_t *world = fit_world();
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_entity_t other = fit_camera(world, "other", (Position){0, 0, 50}, (Rotation){0},
+        (Camera){ .fov = 60, .near_ = 0.1f, .far_ = 1000 }, false);
+    ecs_entity_t camera = fit_camera(world, "camera", (Position){0, 0, 50}, (Rotation){0},
+        (Camera){ .fov = 60, .near_ = 0.1f, .far_ = 1000 }, false);
+    fit_surface(world, 1000, 500, other);
+    fit_surface(world, 500, 1000, camera);
+    ecs_entity_t box = fit_box(world, 0, (Position){0, 0, 0}, (Box){4, 4, 1});
+    ecs_progress(world, 0);
+
+    vec3 corners[8];
+    fit_corners(world, box, corners);
+
+    fit_result_t r;
+    fit_run(world, s, "fit camera", "camera", &r);
+    test_int(r.count, 1);
+    ecs_progress(world, 0);
+
+    // The second surface is 500x1000: the box fills the width of the view
+    const WorldTransform *t = ecs_get(world, camera, WorldTransform);
+    vec3 eye, closer;
+    fit_eye(world, camera, eye);
+    test_assert(fabsf(glm_vec3_distance(eye, r.center) - r.distance) < FIT_ROUNDED);
+    test_bool(fit_inside(t, eye, 60, 0.5f, 0.1f, corners, 8), true);
+    glm_vec3_sub(eye, r.center, closer);
+    glm_vec3_scale(closer, 0.9f, closer);
+    glm_vec3_add(closer, r.center, closer);
+    test_bool(fit_inside(t, closer, 60, 0.5f, 0.1f, corners, 8), false);
+
+    ecs_fini(world);
+    box_render_null_free(null);
 }

@@ -62,6 +62,20 @@ void box_cmd_render_size(
     int32_t *width,
     int32_t *height);
 
+/** Find the first view, in render order (View.order, then creation), that renders a camera.
+ *
+ * @param world The world
+ * @param camera The camera, 0 for any camera with a Camera
+ * @param root Parent the view must have, 0 for any parent
+ * @param clearing Only consider views that clear
+ * @return The view entity, 0 when there is none
+ */
+ecs_entity_t box_cmd_render_view(
+    ecs_world_t *world,
+    ecs_entity_t camera,
+    ecs_entity_t root,
+    bool clearing);
+
 /** Get the camera of a command: the camera argument, else the camera of the first view of the
  * surface shown first. Logs an error when the argument is not a camera or there is no camera.
  *
