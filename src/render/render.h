@@ -24,6 +24,16 @@ typedef struct box_render_draws_stats_t {
     int32_t scatters;           /**< Scatters the last extract sent, one per instance page with
                                  *   static changes */
     int32_t pages;              /**< Instance pages alive */
+    int64_t page_slots;         /**< Slots the buffers of the instance pages alive hold, of both
+                                 *   stores: their capacity, not the live instances */
+    int64_t page_transform_bytes; /**< Bytes of the transform buffers of the instance pages
+                                 *   alive, of both stores */
+    int64_t page_shading_bytes; /**< Bytes of the shading buffers of the instance pages alive,
+                                 *   of both stores */
+    int64_t page_surface_bytes; /**< Bytes of the surface buffers of the instance pages alive,
+                                 *   of both stores */
+    int64_t page_bytes;         /**< Bytes of every buffer of the instance pages alive, the sum
+                                 *   of the bytes of the streams */
     int64_t upload_bytes;       /**< Bytes the last extract uploaded into instance buffers, the
                                  *   sum of the bytes of the streams */
     int64_t transform_bytes;    /**< Bytes the last extract uploaded into the transform streams:
@@ -32,8 +42,9 @@ typedef struct box_render_draws_stats_t {
     int64_t shading_bytes;      /**< Bytes the last extract uploaded into the shading streams:
                                  *   the runs of batches whose shading uploads (every frame
                                  *   for DynamicMaterial) and scatter segments of materials */
-    int64_t surface_bytes;      /**< Bytes the last extract uploaded into the surface streams,
-                                 *   runs and scatter segments, only when a ShapeMesh changed */
+    int64_t surface_bytes;      /**< Bytes the last extract uploaded into the surface streams
+                                 *   of the mesh pages, runs and scatter segments, only when a
+                                 *   ShapeMesh changed; 2D pages have no surface stream */
     int32_t clips;              /**< ClipChildren elements in the clip buffer */
     int64_t clip_bytes;         /**< Bytes the last extract uploaded into the clip buffer */
     int32_t materials;          /**< Slots of the material table alive, slot 0 included */
@@ -45,9 +56,9 @@ typedef struct box_render_draws_stats_t {
  * Shapes are instanced in batches keyed by scene, mesh, pipeline and whether their transform
  * and their material are dynamic, which persist between frames.
  *
- * An instance page holds a transform, a shading and a surface stream. The transforms of
- * DynamicTransform shapes and the shading of DynamicMaterial shapes upload every frame; every
- * other stream is updated on change through the scatter pass, only the streams that changed.
+ * A mesh instance page holds a transform, a shading and a surface stream, a 2D page no surface
+ * stream. The transforms of DynamicTransform shapes and the shading of DynamicMaterial shapes
+ * upload every frame; the other streams upload the slots that changed through the scatter pass.
  *
  * @param world The world
  */

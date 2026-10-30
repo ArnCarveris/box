@@ -108,6 +108,10 @@ void box_gpu_cull_init(
         .usage = WGPUBufferUsage_Storage,
         .size = sizeof(vec4)
     });
+    gpu->no_surfaces = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
+        .usage = WGPUBufferUsage_Storage,
+        .size = sizeof(box_render_surface_t)
+    });
     c->layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
         &(WGPUBindGroupLayoutDescriptor){ .entryCount = 8, .entries = entries });
     box_gpu_hiz_init(gpu);
@@ -276,6 +280,7 @@ void box_gpu_cull_fini(
     box_gpu_instance_layouts_fini(gpu);
 
     box_gpu_cull_release(&gpu->no_assets);
+    box_gpu_cull_release(&gpu->no_surfaces);
 }
 
 /** Get the cull pipelines, created again when the cull shader was recompiled.

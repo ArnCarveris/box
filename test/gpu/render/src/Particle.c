@@ -302,6 +302,8 @@ void Particle_additive_never_darkens(void) {
     stbi_image_free(px[1]);
 }
 
+/** The unlit view draws one forward pass, which the soft pool splits: the particles draw last,
+ * in one more pass that reads the depth. Without a soft pool there is no split. */
 void Particle_soft_fades_near_wall(void) {
     // particle/soft
     ecs_world_t *world = world_new("soft.png");
@@ -326,8 +328,27 @@ void Particle_soft_fades_near_wall(void) {
     test_assert(faded > 4);
     test_assert(pixel_at(px, -2.5f, 2.5f)[1] < 8);
     test_int(ecs_singleton_get(world, ParticleStats)->particles, 3);
-
     stbi_image_free(px);
+
+    box_render_gpu_stats_t before, after;
+    test_assert(box_render_gpu_stats(world, &before));
+    ecs_progress(world, 1.0f / 60.0f);
+    box_render_sync(world);
+    test_assert(box_render_gpu_stats(world, &after));
+    test_int(after.forward_passes - before.forward_passes, 2);
+
+    ecs_set(world, near_soft, ParticleAppearance, {.softness = 0});
+    ecs_set(world, open_soft, ParticleAppearance, {.softness = 0});
+    ecs_progress(world, 1.0f / 60.0f);
+    ecs_progress(world, 1.0f / 60.0f);
+    box_render_sync(world);
+    test_assert(box_render_gpu_stats(world, &before));
+    ecs_progress(world, 1.0f / 60.0f);
+    box_render_sync(world);
+    test_assert(box_render_gpu_stats(world, &after));
+    test_int(after.forward_passes - before.forward_passes, 1);
+    test_int(after.errors, before.errors);
+
     ecs_fini(world);
 }
 

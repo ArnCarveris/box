@@ -111,6 +111,9 @@ primitives scene has one instance of each of the 7 kinds; 6 have a render mesh.
 
 Bytes of the page buffers alive after setup. Slots are the slots of the page buffers. Instances
 are the live slots.
+The Extract, Shapes2D and Text suites of `bench/render` report these as the `page_slots`,
+`page_transform_bytes`, `page_shading_bytes`, `page_surface_bytes` and `page_bytes` counters of
+`box_render_draws_stats_t`, and reproduce their rows of this table.
 
 | Scene | Instances | Slots | Transform | Shading | Surface | Total | Surface share |
 |---|---|---|---|---|---|---|---|

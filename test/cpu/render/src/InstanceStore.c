@@ -544,3 +544,97 @@ void InstanceStore_new_backend_sends_pages_again(void) {
     box_render_null_free(null);
     box_render_null_free(second);
 }
+
+void InstanceStore_page_memory_mesh_and_2d(void) {
+    // gpu_instance_data/instance_memory_counters
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    int32_t i, j;
+    for (i = 0; i < 3; i ++) {
+        for (j = 0; j < 5; j ++) {
+            shape_new(world, 3 + i, (float)j, false);
+        }
+    }
+
+    for (i = 0; i < 10; i ++) {
+        ecs_entity_t e = ecs_new(world);
+        ecs_set(world, e, Position, {(float)i * 20, 0, 0});
+        ecs_set(world, e, Rect, {10, 10});
+    }
+
+    box_render_draws_stats_t stats = frame(world);
+    test_int(stats.pages, 2);
+
+    /* Three mesh runs of MIN_RUN slots end at 3 * MIN_RUN, so the mesh page buffers double
+     * from MIN_RUN to 4 * MIN_RUN slots; the 2D batch fits the smallest buffer */
+    int64_t mesh = 4 * MIN_RUN, shape2d = MIN_RUN;
+    int64_t transform = (mesh + shape2d) * (int64_t)sizeof(box_render_transform_t);
+    int64_t shading = mesh * (int64_t)sizeof(box_render_mesh_shading_t) +
+        shape2d * (int64_t)sizeof(box_render_shading_t);
+    int64_t surface = mesh * (int64_t)sizeof(box_render_surface_t);
+    test_int(stats.page_slots, mesh + shape2d);
+    test_int(stats.page_transform_bytes, transform);
+    test_int(stats.page_shading_bytes, shading);
+    test_int(stats.page_surface_bytes, surface);
+    test_int(stats.page_bytes, transform + shading + surface);
+
+    /* The counters describe the buffers, not the uploads: they hold on a frame without
+     * changes */
+    stats = frame(world);
+    test_int(stats.upload_bytes, 0);
+    test_int(stats.page_slots, mesh + shape2d);
+    test_int(stats.page_bytes, transform + shading + surface);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void InstanceStore_page_memory_drops_with_released_pages(void) {
+    // gpu_instance_data/instance_memory_counters
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    box_render_draws_chunk(world, 2);
+    box_render_draws_page(world, 4);
+    ecs_entity_t shapes[6][2];
+    int32_t i, j;
+    for (i = 0; i < 6; i ++) {
+        for (j = 0; j < 2; j ++) {
+            shapes[i][j] = shape_new(world, 3 + i, (float)j, false);
+        }
+    }
+
+    box_render_draws_stats_t stats = frame(world);
+    test_int(stats.pages, 3);
+    test_int(stats.page_slots, 3 * 4);
+    test_int(stats.page_transform_bytes, 3 * 4 * (int64_t)sizeof(box_render_transform_t));
+    test_int(stats.page_shading_bytes, 3 * 4 * (int64_t)sizeof(box_render_mesh_shading_t));
+    test_int(stats.page_surface_bytes, 3 * 4 * (int64_t)sizeof(box_render_surface_t));
+    test_int(stats.page_bytes, 3 * 4 * (int64_t)INSTANCE);
+
+    for (i = 2; i < 4; i ++) {
+        for (j = 0; j < 2; j ++) {
+            ecs_delete(world, shapes[i][j]);
+        }
+    }
+
+    stats = frame(world);
+    test_int(stats.pages, 2);
+    test_int(buffer_ops(null, BOX_RENDER_DESTROY, PAGE(1)), 1);
+    test_int(stats.page_slots, 2 * 4);
+    test_int(stats.page_transform_bytes, 2 * 4 * (int64_t)sizeof(box_render_transform_t));
+    test_int(stats.page_shading_bytes, 2 * 4 * (int64_t)sizeof(box_render_mesh_shading_t));
+    test_int(stats.page_surface_bytes, 2 * 4 * (int64_t)sizeof(box_render_surface_t));
+    test_int(stats.page_bytes, 2 * 4 * (int64_t)INSTANCE);
+
+    for (j = 0; j < 2; j ++) {
+        shape_new(world, 30, (float)j, false);
+    }
+
+    stats = frame(world);
+    test_int(stats.pages, 3);
+    test_int(stats.page_slots, 3 * 4);
+    test_int(stats.page_bytes, 3 * 4 * (int64_t)INSTANCE);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}

@@ -75,6 +75,10 @@ typedef struct box_gpu_transmission_t box_gpu_transmission_t;
 /** Opaque snapshot of a target that transmissive draws sample, with its blur pyramid */
 typedef struct box_gpu_snapshot_t box_gpu_snapshot_t;
 
+/** Opaque snapshots a target keeps, one per color format its views render in: the format of
+ * the target for views without effects, BOX_GPU_HDR_FORMAT for views with effects */
+#define BOX_GPU_SNAPSHOT_FORMATS (2)
+
 /** Edge in texels of the shadow map of the probe captures */
 #define BOX_GPU_CAPTURE_SHADOW_RESOLUTION (2048)
 
@@ -112,8 +116,9 @@ typedef struct box_gpu_target_t {
     WGPUBuffer readback;            /**< Idle buffer the next capture copies the image into */
     uint64_t readback_size;         /**< Bytes of the idle readback buffer */
     box_gpu_capture_t *capture;     /**< Copy recorded in this frame, not yet mapped */
-    box_gpu_snapshot_t *snapshot;   /**< Opaque snapshot of the views with transmissive draws,
-                                     *   NULL until one draws */
+    box_gpu_snapshot_t *snapshots[BOX_GPU_SNAPSHOT_FORMATS]; /**< Opaque snapshots of the
+                                     *   format of the target, then of BOX_GPU_HDR_FORMAT, NULL
+                                     *   until a view draws a transmissive shape in that format */
 } box_gpu_target_t;
 
 /** A compiled shader module */
@@ -745,6 +750,8 @@ typedef struct box_gpu_t {
                                      *   cull, the shadow casters and the capture cull */
     WGPUBuffer no_assets;           /**< One zero vec4, the surface assets of the draws of
                                      *   meshes without any */
+    WGPUBuffer no_surfaces;         /**< One zero box_render_surface_t, the surface stream of
+                                     *   the pages without one, the 2D pages */
     WGPUBuffer no_materials;        /**< One default material record, the material table of
                                      *   the draws before the main thread sent one */
     box_gpu_cull_t cull;            /**< Cull pass state */
@@ -815,6 +822,8 @@ typedef enum box_gpu_stat_t {
     BOX_GPU_STAT_PREPASS,           /**< A depth prepass render pass was recorded */
     BOX_GPU_STAT_PREPASS_DRAW,      /**< A draw call was recorded in a depth prepass */
     BOX_GPU_STAT_TRANSMISSION_SNAPSHOT, /**< An opaque snapshot of a view was recorded */
+    BOX_GPU_STAT_TRANSMISSION_TEXTURE, /**< A snapshot texture was created */
+    BOX_GPU_STAT_FORWARD_PASS,      /**< A forward render pass of a view was begun */
     BOX_GPU_STAT_SCATTER,           /**< A scatter dispatch was recorded */
     BOX_GPU_STAT_INSTANCE_BIND,     /**< An instance bind group was set in a pass or bundle */
     BOX_GPU_STAT_CULL_DISPATCH,     /**< A dispatch of the cull pass of a view was recorded */

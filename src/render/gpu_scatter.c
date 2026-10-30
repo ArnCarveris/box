@@ -7,7 +7,8 @@
  * only uploads the instances that changed.
  *
  * The extract sends one scatter per page with static changes, so a frame records one bind
- * group and one dispatch per such page.
+ * group and one dispatch per such page. Until the module of the shader arrives, which in the
+ * browser is after the frame that first sends it, the changes are written with the queue.
  */
 
 #include "gpu.h"
@@ -148,6 +149,68 @@ done:
     return result;
 }
 
+/** Write the changed instances of a scatter into their slots with the queue, for the frames
+ * before the module of the scatter shader arrives.
+ *
+ * @param gpu The backend
+ * @param packet The packet, whose upload of the change buffer holds the segment
+ * @param sc The scatter
+ * @return Instances written, 0 when the scatter was skipped
+ */
+static uint32_t box_gpu_scatter_write(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet,
+    const box_render_scatter_t *sc)
+{
+    uint32_t result = 0;
+    const uint8_t *segment = NULL;
+    box_gpu_buffer_t *dst = ecs_map_get_deref(&gpu->buffers, box_gpu_buffer_t, sc->buffer);
+    int32_t i;
+    for (i = ecs_vec_count(&packet->uploads) - 1; i >= 0 && !segment; i --) {
+        const box_render_upload_t *u = ecs_vec_get_t(&packet->uploads, box_render_upload_t, i);
+        if (u->buffer == sc->changes && sc->offset >= u->offset &&
+            (uint64_t)sc->offset + sc->size <= (uint64_t)u->offset + u->size)
+        {
+            segment = (const uint8_t*)box_render_packet_data(packet, u->data) +
+                (sc->offset - u->offset);
+        }
+    }
+
+    uint32_t header[BOX_RENDER_SCATTER_HEADER] = {0};
+    if (segment && sc->size >= sizeof(header)) {
+        ecs_os_memcpy(header, segment, ECS_SIZEOF(header));
+    }
+
+    uint64_t bytes = (uint64_t)header[1] * sizeof(uint32_t);
+    if (!dst || !segment || !header[1] || header[0] != sc->count ||
+        sizeof(header) + (uint64_t)sc->count * (bytes + sizeof(uint32_t)) > sc->size)
+    {
+        ecs_err("scatter of %u instances into buffer %u is invalid", sc->count, sc->buffer);
+        box_gpu_count(gpu, BOX_GPU_STAT_ERRORS);
+        goto done;
+    }
+
+    const uint8_t *entry = segment + sizeof(header);
+    uint32_t n;
+    for (n = 0; n < sc->count; n ++, entry += sizeof(uint32_t) + bytes) {
+        uint32_t slot;
+        ecs_os_memcpy(&slot, entry, ECS_SIZEOF(uint32_t));
+        if (((uint64_t)slot + 1) * bytes > dst->size) {
+            ecs_err("scatter slot %u is outside buffer %u", slot, sc->buffer);
+            box_gpu_count(gpu, BOX_GPU_STAT_ERRORS);
+            continue;
+        }
+
+        wgpuQueueWriteBuffer(gpu->queue, dst->buffer, (uint64_t)slot * bytes,
+            entry + sizeof(uint32_t), (size_t)bytes);
+        result ++;
+    }
+
+    dst->version = ++ gpu->buffer_writes;
+done:
+    return result;
+}
+
 void box_gpu_scatter(
     box_gpu_t *gpu,
     const box_render_packet_t *packet)
@@ -161,8 +224,11 @@ void box_gpu_scatter(
 
     pipeline = box_gpu_scatter_pipeline(gpu);
     if (!pipeline) {
-        ecs_err("scatter shader is not available, %d scatters skipped", count);
-        box_gpu_count(gpu, BOX_GPU_STAT_ERRORS);
+        for (i = 0; i < count; i ++) {
+            copied += box_gpu_scatter_write(gpu, packet,
+                ecs_vec_get_t(&packet->scatters, box_render_scatter_t, i));
+        }
+
         goto done;
     }
 
@@ -180,8 +246,9 @@ void box_gpu_scatter(
     wgpuQueueSubmit(gpu->queue, 1, &commands);
     wgpuCommandBufferRelease(commands);
     wgpuCommandEncoderRelease(encoder);
-    gpu->pending.scattered += (int32_t)copied;
 done:
+    gpu->pending.scattered += (int32_t)copied;
+
     return;
 }
 

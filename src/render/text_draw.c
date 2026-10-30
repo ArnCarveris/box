@@ -385,7 +385,7 @@ void box_draws_text_update(
     box_draws_text_key(world, d, e, alpha, &key);
     TextSlots *ts = ecs_get_mut(world, e, TextSlots);
     if (!box_draws_text_fits(d, ts, glyphs, count, &key)) {
-        kinds = BOX_DRAW_ALL;
+        kinds = BOX_DRAW_BOTH;
         box_draws_text_remove(world, d, e);
         for (i = 0; i < count; i ++) {
             key.atlas = glyphs[i].page;

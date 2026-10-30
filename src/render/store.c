@@ -2,8 +2,9 @@
  * @file render/store.c
  * @brief Instance pages shared by every batch and the slot allocator of their runs.
  *
- * A page is one GPU buffer per stream of its layout, holding at most the slots of the page. Its
- * buffers start small and double up to that size, created again when its runs reach past them.
+ * A page is one GPU buffer per stream of its layout, which starts small and doubles up to the
+ * slots of the page when its runs reach past it. Its handles leave room for BOX_DRAWS_STREAMS
+ * buffers whatever its layout, so the backend finds its first buffer from any of its handles.
  *
  * Free slots below the end of the highest run are kept as holes, so a freed run merges with the
  * free slots next to it; the slots past that end are free as well.
@@ -60,12 +61,31 @@ box_draw_page_t* box_draws_store_page(
     return ecs_vec_get_t(&s->pages, box_draw_page_t, page);
 }
 
+void box_draws_store_memory(
+    const box_draw_store_t *s,
+    int64_t *slots,
+    int64_t bytes[BOX_DRAWS_STREAMS])
+{
+    int32_t i, j;
+    for (i = 0; i < ecs_vec_count(&s->pages); i ++) {
+        const box_draw_page_t *pg = ecs_vec_get_t(&s->pages, box_draw_page_t, i);
+        if (!pg->alive || !pg->capacity) {
+            continue;
+        }
+
+        *slots += pg->capacity;
+        for (j = 0; j < s->layout.streams; j ++) {
+            bytes[j] += (int64_t)pg->capacity * s->layout.stride[j];
+        }
+    }
+}
+
 uint32_t box_draws_store_handle(
     const box_draw_store_t *s,
     int32_t page,
     int32_t stream)
 {
-    return s->base + (uint32_t)page * (uint32_t)s->layout.streams + (uint32_t)stream;
+    return s->base + (uint32_t)page * (uint32_t)BOX_DRAWS_STREAMS + (uint32_t)stream;
 }
 
 /** Take a run out of the free slots of a page, the lowest that fit.

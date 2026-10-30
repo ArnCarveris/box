@@ -6,9 +6,15 @@
  * are dynamic and whether they cast shadows, one swap-removed slot per entity and at most
  * BOX_DRAWS_CHUNK of them, so a key may have several batches.
  *
+<<<<<<< HEAD
  * A batch owns a run of slots of an instance page (store.c), a buffer per stream (transform,
  * shading, surface) with the same slots; a change uploads only its streams. Mesh and 2D batches
  * have stores of their own: a mesh shading is a tint, an alpha and a shared material slot.
+=======
+ * A batch owns a run of slots of an instance page (store.c), a buffer per stream with the same
+ * slots; a change uploads only its streams. A mesh page has a transform, a shading and a surface
+ * stream, a 2D page of its own store no surface stream, for which the backend binds a zero record.
+>>>>>>> 4513b9de4bfe20335a2ee4dfe88db2f11baf59d4
  */
 
 #ifndef BOX_RENDER_DRAW_H
@@ -20,14 +26,15 @@
 #include "../text/text.h"
 
 /** Instances of one batch and slots of one instance page: every stream of a page, the surface
- * stream being the largest, stays within the 128 MiB storage binding that every WebGPU device
- * supports, and a key with more shapes continues in another batch */
+ * stream of a mesh page being the largest, stays within the 128 MiB storage binding that every
+ * WebGPU device supports, and a key with more shapes continues in another batch */
 #define BOX_DRAWS_CHUNK ((uint32_t)((128u << 20) / sizeof(box_render_surface_t)))
 
 /** Slots the smallest run of a batch holds, and the smallest page buffer */
 #define BOX_DRAWS_MIN_CAPACITY (64)
 
-/** Buffers of an instance page at most, one per stream of its layout */
+/** Buffers of an instance page at most, one per stream of its layout; the handles of a page
+ * leave room for all of them, see BOX_RENDER_INSTANCE_STREAMS */
 #define BOX_DRAWS_STREAMS (BOX_RENDER_INSTANCE_STREAMS)
 
 /** Store of the instance pages of the mesh batches */
@@ -288,7 +295,7 @@ typedef struct box_draw_batch_t {
     ecs_vec_t transforms;   /**< box_render_transform_t per slot */
     ecs_vec_t shadings;     /**< box_render_shading_t per slot of a 2D batch */
     ecs_vec_t mesh_shadings; /**< box_render_mesh_shading_t per slot of a mesh batch */
-    ecs_vec_t surfaces;     /**< box_render_surface_t per slot */
+    ecs_vec_t surfaces;     /**< box_render_surface_t per slot of a mesh batch */
     ecs_vec_t changed[BOX_DRAWS_STREAMS]; /**< int32_t per stream, slots whose data of a stream
                              *   that does not upload every frame the GPU does not have */
 } box_draw_batch_t;
@@ -525,7 +532,7 @@ bool box_draws_caster(
  * @param b The batch
  * @param lo The minimum of each element of the transform
  * @param hi The maximum of each element of the transform
- * @param surface The surface of the slot
+ * @param surface The surface of the slot, NULL for a batch without surfaces
  * @param out Receives the bounds, with the scene of the batch
  * @return Whether the bounds are known, false when the mesh of the batch is missing or empty
  */
@@ -593,11 +600,20 @@ box_draw_store_t* box_draws_batch_store(
     box_render_draws_t *d,
     const box_draw_batch_t *b);
 
+/** Get the streams the instance pages of a batch have: every stream for a mesh batch, the
+ * transform and the shading for a 2D shape or glyph batch.
+ *
+ * @param b The batch
+ * @return box_draw_kind_t, a bit per stream of its pages
+ */
+uint8_t box_draws_batch_kinds(
+    const box_draw_batch_t *b);
+
 /** Get the surface of a slot.
  *
  * @param b The batch
  * @param slot The slot
- * @return The surface
+ * @return The surface, NULL for a 2D batch, whose pages have no surface stream
  */
 box_render_surface_t* box_draws_slot_surface(
     box_draw_batch_t *b,
@@ -980,6 +996,19 @@ bool box_draws_store_reserve(
     box_draw_store_t *s,
     box_render_packet_t *p,
     int32_t page);
+
+/** Add the slots and the bytes per stream of the page buffers of a store.
+ *
+ * Only the pages alive whose buffers are created count, with the slots their buffers hold.
+ *
+ * @param s The store
+ * @param slots Incremented by the slots of the page buffers
+ * @param bytes Incremented by the bytes of the page buffers, per stream
+ */
+void box_draws_store_memory(
+    const box_draw_store_t *s,
+    int64_t *slots,
+    int64_t bytes[BOX_DRAWS_STREAMS]);
 
 /** Get a page of a store.
  *

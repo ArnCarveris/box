@@ -317,11 +317,14 @@ void box_gpu_instance_layouts_fini(
 
 /** Create a bind group of the streams of an instance page and surface assets.
  *
+ * A page without a surface stream, a 2D page, binds gpu->no_surfaces at binding 3.
+ *
  * A group with the shading stream binds the material table too, or the default record before
  * the main thread sent one.
  *
  * @param gpu The backend
- * @param streams The buffers of the streams of the page, by stream
+ * @param streams The buffers of the streams of the page, by stream, NULL for the surface
+ * stream of a page without one
  * @param assets The surface assets
  * @param size Bytes of the surface assets
  * @param shading Bind the shading stream too, instance_layout, else transform_layout
@@ -337,12 +340,14 @@ static WGPUBindGroup box_gpu_instance_group_new(
     const box_gpu_buffer_t *transforms = streams[BOX_RENDER_STREAM_TRANSFORM];
     const box_gpu_buffer_t *shadings = streams[BOX_RENDER_STREAM_SHADING];
     const box_gpu_buffer_t *surfaces = streams[BOX_RENDER_STREAM_SURFACE];
+    WGPUBuffer surface_buffer = surfaces ? surfaces->buffer : gpu->no_surfaces;
+    uint64_t surface_size = surfaces ? surfaces->size : sizeof(box_render_surface_t);
     const box_gpu_buffer_t *materials = ecs_map_get_deref(
         &gpu->buffers, box_gpu_buffer_t, BOX_RENDER_BUFFER_MATERIALS);
     WGPUBindGroupEntry entry[5] = {
         {.binding = 0, .buffer = transforms->buffer, .size = transforms->size},
         {.binding = 1, .buffer = assets, .size = size},
-        {.binding = 3, .buffer = surfaces->buffer, .size = surfaces->size},
+        {.binding = 3, .buffer = surface_buffer, .size = surface_size},
         {.binding = 2, .buffer = shadings->buffer, .size = shadings->size},
         {
             .binding = 4,
@@ -366,9 +371,10 @@ WGPUBindGroup box_gpu_instance_group(
     bool shading)
 {
     WGPUBindGroup result = NULL;
-    box_gpu_buffer_t *streams[BOX_RENDER_INSTANCE_STREAMS];
-    int32_t i;
-    for (i = 0; i < BOX_RENDER_INSTANCE_STREAMS; i ++) {
+    box_gpu_buffer_t *streams[BOX_RENDER_INSTANCE_STREAMS] = {0};
+    int32_t i, count = page >= BOX_RENDER_BUFFER_FIRST_2D
+        ? BOX_RENDER_INSTANCE_STREAMS_2D : BOX_RENDER_INSTANCE_STREAMS;
+    for (i = 0; i < count; i ++) {
         streams[i] = ecs_map_get_deref(&gpu->buffers, box_gpu_buffer_t, page + (uint32_t)i);
         if (!streams[i] || !(streams[i]->usage & BOX_RENDER_BUFFER_STORAGE)) {
             goto done;
@@ -1387,13 +1393,16 @@ typedef struct box_gpu_view_pass_t {
                                      *   copies */
 } box_gpu_view_pass_t;
 
-/** Begin a pass of a view that continues the image and depth of the pass before it.
+/** Begin a pass of a view that continues the image and depth of the pass before it, counted
+ * among the forward passes.
  *
+ * @param gpu The backend
  * @param vp The pass of the view
  * @param read_only Whether the depth is read only, so the pass can sample it
  * @return The pass
  */
 static WGPURenderPassEncoder box_gpu_view_pass_continue(
+    box_gpu_t *gpu,
     const box_gpu_view_pass_t *vp,
     bool read_only)
 {
@@ -1419,6 +1428,8 @@ static WGPURenderPassEncoder box_gpu_view_pass_continue(
         .colorAttachments = &attachment,
         .depthStencilAttachment = &depth
     };
+
+    box_gpu_count(gpu, BOX_GPU_STAT_FORWARD_PASS);
 
     return wgpuCommandEncoderBeginRenderPass(vp->encoder, &desc);
 }
@@ -1454,14 +1465,14 @@ static bool box_gpu_draw_particles(
     } else {
         wgpuRenderPassEncoderEnd(vp->pass);
         wgpuRenderPassEncoderRelease(vp->pass);
-        vp->pass = box_gpu_view_pass_continue(vp, true);
+        vp->pass = box_gpu_view_pass_continue(gpu, vp, true);
         wgpuRenderPassEncoderSetBindGroup(vp->pass, 0, group, 1, &offset);
         box_gpu_particles_draw(gpu, vp->pass, format, v, vp->depth);
         rebind = !last;
         if (!last) {
             wgpuRenderPassEncoderEnd(vp->pass);
             wgpuRenderPassEncoderRelease(vp->pass);
-            vp->pass = box_gpu_view_pass_continue(vp, false);
+            vp->pass = box_gpu_view_pass_continue(gpu, vp, false);
         }
     }
 
@@ -1494,7 +1505,7 @@ static void box_gpu_draw_snapshot(
     wgpuRenderPassEncoderRelease(vp->pass);
     box_gpu_transmission_record(gpu, vp->snapshot, vp->encoder, vp->source);
     vp->snapshot = NULL;
-    vp->pass = box_gpu_view_pass_continue(vp, false);
+    vp->pass = box_gpu_view_pass_continue(gpu, vp, false);
     wgpuRenderPassEncoderSetBindGroup(vp->pass, 0, group, 1, &offset);
     wgpuRenderPassEncoderSetBindGroup(vp->pass, 3, box_gpu_volume_group(gpu, v), 0, NULL);
 }
@@ -1613,6 +1624,9 @@ static void box_gpu_draw_batches(
 
 /** Record a render pass of a view and its draws of one phase.
  *
+ * Counts the pass among the forward passes, and each pass the opaque snapshot and soft
+ * particles split it into (box_gpu_view_pass_continue).
+ *
  * @param gpu The backend
  * @param t The target
  * @param encoder The encoder of the frame
@@ -1683,6 +1697,7 @@ static void box_gpu_draw_pass(
     uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
     WGPUTextureFormat format = hdr ? BOX_GPU_HDR_FORMAT : t->format;
     vp.pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+    box_gpu_count(gpu, BOX_GPU_STAT_FORWARD_PASS);
     if (phase != 2) {
         box_gpu_environment_draw_background(gpu, vp.pass, format, v, offset);
     }

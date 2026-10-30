@@ -867,7 +867,8 @@
                 "testcases": [
                     "shape_mid_transition",
                     "shadow_mid_transition",
-                    "mesh_color_mid_transition"
+                    "mesh_color_mid_transition",
+                    "shape_ends_before_scatter_shader_compiles"
                 ]
             },
             {
@@ -896,7 +897,10 @@
                     "resize_recreates_snapshot",
                     "two_views_one_target",
                     "view_without_effects",
-                    "occlusion_view_transmits"
+                    "occlusion_view_transmits",
+                    "forward_passes_by_phase",
+                    "two_formats_one_target",
+                    "first_frame_not_dark"
                 ]
             }
         ]
