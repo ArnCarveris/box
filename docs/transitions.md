@@ -442,8 +442,9 @@ thread) and the encoding in `src/render/batch.c` and `src/render/materials.c`.
   (`transmissive`), so a factor that transitions to or from 0 keeps the shape in its
   transmissive batch; adding or removing `Transmission` rekeys it at once and does not animate.
   Its value is 20 bytes and 7 fields, which set `BOX_RENDER_TRANSITION_VALUE` to 20 and
-  `BOX_RENDER_TRANSITION_FIELDS` to 7: `box_render_transition_record_t` grew from 64 to 72 bytes
-  (on 64 bit targets), a cost only entities with `Transition` pay.
+  `BOX_RENDER_TRANSITION_FIELDS` to 7: on 64 bit targets `box_render_transition_record_t` grew
+  from 64 to 72 bytes and a `box_render_transition_value_t` of a node from 72 to 88, a cost only
+  entities with `Transition` pay.
 - While recording shadow regions, a slot whose `AlphaCutoff` or `TextureTransform` runs (and
   the frame after) goes to `shadow_materials`, so alpha tested casters render their tiles again.
 - Anything that reads `Rgb` into a material or shading record transitions: mesh shapes, 2D
