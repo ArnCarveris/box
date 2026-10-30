@@ -1,0 +1,66 @@
+// The in game console with output colored by the type of each result, like the terminal of the
+// flecs explorer, open over a plain scene: help with its groups, command names, parameters,
+// types and descriptions, a tree with dimmed guides and entity names, ls with dimmed parent
+// paths, a value from get with its member names and numbers, and an error with its error: label.
+// Small text on a wide panel keeps the tail of help and every later result on screen.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.console
+
+camera {
+  Position: {0, 2.5, 6}
+  Rotation: {-0.35, 0, 0}
+  Camera: {fov: 60}
+}
+
+main_view {
+  View: {
+    camera: camera,
+    clear: {enabled: true, color: {120, 150, 190, 255}}
+  }
+}
+
+sun {
+  Rotation: {0.7359, 2.3726, 0}
+  DirectionalLight: {intensity: 2 * flecs.script.math.PI}
+  Rgb: {255, 244, 225}
+}
+
+$ {
+  AmbientLight: {sky: {90, 110, 140}, ground: {40, 36, 30}, intensity: 0.6}
+}
+
+cube {
+  Position: {0, 0.5, 0}
+  Rotation: {0, 0.4, 0}
+  Box: {1, 1, 1}
+  Rgb: {220, 90, 60}
+  PbrMaterial: {roughness: 0.4, metallic: 0}
+}
+
+items {
+  lamp {
+    bulb {}
+    shade {}
+  }
+  rope {
+    knot {
+      loop {}
+    }
+  }
+  torch {}
+}
+
+const helped: string = box.console.run("help")
+const tree: string = box.console.run("tree items")
+const listed: string = box.console.run("ls items.lamp")
+const read: string = box.console.run("get cube box.transform.Position")
+const failed: string = box.console.run("rm nothing")
+
+$ {
+  Console: {open: true, width: 0.8, font_size: 11, line_height: 13}
+}

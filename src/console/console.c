@@ -18,7 +18,8 @@ ECS_COMPONENT_DECLARE(ConsoleHost);
 #define BOX_CONSOLE_DEFAULT_HEIGHT (720.0f)
 
 /** Construct Console values: closed, the left half of the surface, light text on a dark panel,
- * command lines colored in light tones, unknown names and extra arguments in the error color.
+ * command lines colored in light tones, unknown names and extra arguments in the error color, the
+ * prompt in teal and grey, the history suggestion dimmed, output in explorer dark theme colors.
  *
  * @param ptr The components
  * @param count Number of components
@@ -55,7 +56,36 @@ static void box_console_ctor(
                 .string = {235, 210, 140},
                 .boolean = {255, 150, 200},
                 .value = {140, 225, 225},
-                .extra = {255, 110, 100}
+                .extra = {255, 110, 100},
+                .scope = {80, 200, 200},
+                .symbol = {150, 160, 180},
+                .ghost = {95, 105, 125}
+            },
+            .output = {
+                .dim = {125, 133, 150},
+                .entity = {88, 166, 255},
+                .component = {126, 231, 135},
+                .key = {121, 192, 255},
+                .number = {210, 168, 255},
+                .string = {255, 203, 107},
+                .boolean = {255, 123, 114},
+                .keyword = {255, 123, 172},
+                .command = {88, 166, 255},
+                .param = {255, 166, 87},
+                .type = {126, 231, 135},
+                .brief = {175, 184, 198},
+                .group = {240, 246, 252},
+                .match = {255, 214, 10},
+                .added = {86, 211, 100},
+                .removed = {248, 81, 73},
+                .red = {248, 81, 73},
+                .green = {86, 211, 100},
+                .yellow = {227, 179, 65},
+                .blue = {88, 166, 255},
+                .magenta = {188, 140, 255},
+                .cyan = {57, 197, 207},
+                .white = {240, 246, 252},
+                .grey = {139, 148, 158}
             }
         };
     }
@@ -75,9 +105,11 @@ static box_console_t* box_console_get(
     return host ? host->con : NULL;
 }
 
-/** Input was written: while the console is open, take the typed and pasted text, the key presses
- * and the wheel, and release every key and button but those of the toggle so no other action
- * fires.
+/** Input was written: while the console is open, take the typed and pasted text, the key presses,
+ * the keys pressed with Ctrl held (the readline keys of the input line) and the wheel, and
+ * release every key and button but those of the toggle so no other action fires.
+ *
+ * Ctrl is read from the keys the device holds, since the console releases it from Input.keys.
  *
  * @param it Iterator over the Input singleton
  */
@@ -87,16 +119,19 @@ static void box_console_capture(
     box_console_t *con = it->ctx;
     Input *in = ecs_field(it, Input, 0);
     bool keep[BOX_KEY_COUNT] = {0};
+    const InputDevice *dev;
     int32_t i, size;
+    bool ctrl;
     if (!con->shown || !it->count) {
         goto done;
     }
 
     box_input_action_keys(it->world, con->action, keep);
-    con->clear = con->clear || (in->keys[KeyL].pressed &&
-        (in->keys[KeyCtrlLeft].down || in->keys[KeyCtrlRight].down));
+    dev = box_input_device(it->world);
+    ctrl = dev && (dev->held[KeyCtrlLeft] || dev->held[KeyCtrlRight]);
     for (i = KeyNone + 1; i < BOX_KEY_COUNT; i ++) {
         con->pressed[i] = con->pressed[i] || in->keys[i].pressed;
+        con->chord[i] = con->chord[i] || (ctrl && in->keys[i].pressed);
         if (!keep[i]) {
             in->keys[i] = (KeyState){0};
         }
@@ -140,9 +175,9 @@ static void box_console_reset_input(
     box_console_t *con)
 {
     ecs_os_zeromem(&con->pressed);
+    ecs_os_zeromem(&con->chord);
     ecs_vec_clear(&con->typed);
     con->wheel = 0;
-    con->clear = false;
 }
 
 /** Enable the toggle action while the world has a Surface to show the console on.
@@ -238,6 +273,7 @@ static void box_console_show(
 {
     box_console_ui_build(world, con);
     box_console_view_create(world, con);
+    box_console_greet(world, con);
     con->shown = true;
     con->relayout = true;
     box_console_reset_input(con);
@@ -353,6 +389,42 @@ done:
     return result;
 }
 
+/** Script function box.console.type(text): type text into the input line of the console.
+ *
+ * @param ctx Call context
+ * @param argc Number of arguments
+ * @param argv The text
+ * @param result Receives the input line
+ */
+static void box_console_type_function(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_value_t *result)
+{
+    const char *text = *(const char**)argv[0].ptr;
+    (void)argc;
+    *(char**)result->ptr = box_console_type(ctx->world, text ? text : "");
+}
+
+char* box_console_type(
+    ecs_world_t *world,
+    const char *text)
+{
+    ecs_world_t *real = ECS_CONST_CAST(ecs_world_t*, ecs_get_world(world));
+    box_console_t *con = box_console_get(real);
+    char *result = NULL;
+    if (!con) {
+        result = ecs_os_strdup("");
+        goto done;
+    }
+
+    box_console_insert_text(con, text, (int32_t)strlen(text));
+    result = ecs_os_strdup(con->line);
+done:
+    return result;
+}
+
 ecs_entity_t box_console_scope(
     ecs_world_t *world,
     box_console_t *con)
@@ -414,6 +486,7 @@ void BoxConsoleImport(
     ECS_IMPORT(world, BoxCommand);
 
     ECS_META_COMPONENT(world, ConsoleSyntax);
+    ECS_META_COMPONENT(world, ConsoleOutput);
     ECS_META_COMPONENT(world, Console);
     ecs_set_hooks(world, Console, { .ctor = box_console_ctor });
     ECS_COMPONENT_DEFINE(world, ConsoleHost);
@@ -468,5 +541,13 @@ void BoxConsoleImport(
         .return_type = ecs_id(ecs_string_t),
         .params = {{ .name = "line", .type = ecs_id(ecs_string_t) }},
         .callback = box_console_run_function
+    });
+
+    ecs_function(world, {
+        .name = "type",
+        .parent = con->module,
+        .return_type = ecs_id(ecs_string_t),
+        .params = {{ .name = "text", .type = ecs_id(ecs_string_t) }},
+        .callback = box_console_type_function
     });
 }

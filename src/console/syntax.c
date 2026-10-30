@@ -267,13 +267,7 @@ static void box_console_syntax_value(
     }
 }
 
-/** Get the scope of the console session.
- *
- * @param world The world
- * @param con The console state
- * @return The scope, 0 for the root
- */
-static ecs_entity_t box_console_syntax_scope(
+ecs_entity_t box_console_session_scope(
     const ecs_world_t *world,
     const box_console_t *con)
 {
@@ -286,6 +280,26 @@ static ecs_entity_t box_console_syntax_scope(
     if (s && s->scope && ecs_is_alive(world, s->scope)) {
         result = s->scope;
     }
+
+    return result;
+}
+
+char* box_console_prompt(
+    const ecs_world_t *world,
+    const box_console_t *con,
+    ecs_vec_t *spans)
+{
+    ecs_entity_t scope = box_console_session_scope(world, con);
+    char *path = scope ? ecs_get_path(world, scope) : NULL;
+    const char *name = path && path[0] ? path : BOX_CONSOLE_ROOT;
+    int32_t len = (int32_t)strlen(name);
+    char *result = flecs_asprintf("%s" BOX_CONSOLE_SYMBOL, name);
+    if (spans) {
+        box_console_syntax_add(spans, 0, len, BoxSyntaxScope);
+        box_console_syntax_add(spans, len + 1, len + 2, BoxSyntaxSymbol);
+    }
+
+    ecs_os_free(path);
 
     return result;
 }
@@ -378,14 +392,7 @@ static void box_console_syntax_arg(
     }
 }
 
-/** Find the command of a name as the shell does: the first function with that name in the
- * scopes of EcsScriptShell.command_paths.
- *
- * @param world The world
- * @param name The command name
- * @return The function, 0 when no command has that name
- */
-static ecs_entity_t box_console_syntax_command(
+ecs_entity_t box_console_syntax_command(
     const ecs_world_t *world,
     const char *name)
 {
@@ -432,7 +439,7 @@ static void box_console_syntax_call(
         goto done;
     }
 
-    scope = box_console_syntax_scope(world, con);
+    scope = box_console_session_scope(world, con);
     box_console_syntax_add(spans, tokens[0].start, tokens[0].end, BoxSyntaxName);
     argc = ecs_vec_count(&f->params);
     params = ecs_vec_first(&f->params);
@@ -476,4 +483,23 @@ void box_console_syntax(
 
 done:
     ecs_os_free(tokens);
+}
+
+char* box_console_syntax_token(
+    const char *line,
+    int32_t index)
+{
+    box_console_token_t t;
+    int32_t at = 0, i = 0;
+    char *result = NULL;
+    while (!result && box_console_syntax_scan(line, at, &t)) {
+        if (i == index) {
+            result = box_console_syntax_unquote(line, &t);
+        }
+
+        at = t.end;
+        i ++;
+    }
+
+    return result;
 }
