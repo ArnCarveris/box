@@ -1,6 +1,7 @@
 /**
  * @file box/material.h
- * @brief Material components: color, opacity, tint, PBR parameters, emission and transmission.
+ * @brief Material components: color, opacity, tint, PBR parameters, clear coat, emission and
+ * transmission.
  *
  * The box.material module resolves tints through the hierarchy and registers
  * the material layers a scene applies on top of the sampled surface.
@@ -24,9 +25,9 @@ extern "C" {
 /** Slot of the material table a shape renders with, set by the engine and read only for
  * applications, inherited by instances.
  *
- * Rgb, PbrMaterial, Emissive, Transmission, TextureTransform and AlphaCutoff bring it along. A
- * prefab that owns one gets a slot its instances share, a 3D shape that owns one a slot of its
- * own, composed of what it owns and what it still inherits.
+ * Rgb, PbrMaterial, ClearCoat, Emissive, Transmission, TextureTransform and AlphaCutoff bring
+ * it along. A prefab that owns one gets a slot its instances share, a 3D shape that owns one a
+ * slot of its own, composed of what it owns and what it still inherits.
  *
  * Slot 0 is the default material, of a shape without any material component. An owned id that
  * was never handed a slot (a light, a 2D shape, a text) is UINT32_MAX.
@@ -108,6 +109,25 @@ ECS_STRUCT(Tint, {
 ECS_STRUCT(PbrMaterial, {
     float metallic;  /**< 0 dielectric to 1 metal */
     float roughness; /**< 0 mirror to 1 fully diffuse */
+});
+
+/** Strength of a constructed ClearCoat: a full coat */
+#define BOX_MATERIAL_CLEAR_COAT_STRENGTH (1.0f)
+
+/** Roughness of a constructed ClearCoat: a mirror like lacquer */
+#define BOX_MATERIAL_CLEAR_COAT_ROUGHNESS (0.0f)
+
+/** Thin dielectric layer over a 3D mesh (car paint, lacquer), glTF's KHR_materials_clearcoat,
+ * default strength 1 and roughness 0, inherited like Rgb; a field a scene does not set keeps its
+ * default, both clamp to 0..1. Only 3D meshes have a coat, 2D shapes and text ignore it.
+ *
+ * A dielectric of f0 0.04 on the geometric normal, not the normal map: direct light adds its GGX
+ * lobe times Fc = F(l.h) * strength over 1 - Fc of the base, indirect light its reflection by its
+ * split sum albedo over the rest. Emission is not attenuated; an unlit view ignores the coat.
+ */
+ECS_STRUCT(ClearCoat, {
+    float strength;  /**< 0 no coat to 1 full coat */
+    float roughness; /**< Roughness of the coat, 0 mirror to 1 fully diffuse */
 });
 
 /** Emitted light, inherited by instances, like Rgb. Tints do not apply to it. */

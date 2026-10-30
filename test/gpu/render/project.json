@@ -216,6 +216,22 @@
                 ]
             },
             {
+                "id": "ClearCoat",
+                "testcases": [
+                    "clear_coat_highlight",
+                    "clear_coat_strength_zero_unchanged",
+                    "clear_coat_roughness_widens",
+                    "clear_coat_attenuates_base",
+                    "clear_coat_indirect",
+                    "clear_coat_ignores_normal_map",
+                    "clear_coat_emission_not_attenuated",
+                    "clear_coat_ignored_by_unlit",
+                    "clear_coat_ignored_by_2d",
+                    "clear_coat_prefab",
+                    "clear_coat_change_and_remove"
+                ]
+            },
+            {
                 "id": "Tint",
                 "testcases": [
                     "mix_by_strength",

@@ -856,3 +856,68 @@ void MaterialIds_transmission_prefab_change_reaches_slot(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+void MaterialIds_clear_coat_prefab_change_reaches_slot(void) {
+    // materials/material_ids
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t prefab = prefab_new(world);
+    ecs_set(world, prefab, ClearCoat, {.strength = 1, .roughness = 0.5f});
+    ecs_entity_t a = instance_new(world, prefab, 0);
+    ecs_entity_t b = instance_new(world, prefab, 1);
+    ecs_set(world, b, Rgb, {0, 255, 0});
+    ecs_entity_t c = instance_new(world, prefab, 2);
+    ecs_set(world, c, ClearCoat, {.strength = 0.5f, .roughness = 0});
+    frame(world);
+    frame(world);
+    uint32_t shared = id_of(world, prefab);
+    uint32_t own = id_of(world, b);
+    uint32_t coat = id_of(world, c);
+    test_uint(shading_of(world, a)->material, shared);
+    test_assert(own != shared);
+    test_assert(coat != shared && coat != own);
+    test_uint(record_of(world, shared)->clear_coat, 0xFFFFu | (32768u << 16));
+    test_uint(record_of(world, own)->clear_coat, 0xFFFFu | (32768u << 16));
+    test_uint(record_of(world, coat)->clear_coat, 32768u);
+    test_uint(record_of(world, 0)->clear_coat, 0);
+
+    ecs_set(world, prefab, ClearCoat, {.strength = 0.25f, .roughness = 1});
+    box_render_draws_stats_t stats = frame(world);
+    test_int(stats.material_bytes, 2 * MATERIAL);
+    test_int(stats.upload_bytes, 0);
+    test_uint(record_of(world, shared)->clear_coat, 16384u | (0xFFFFu << 16));
+    test_uint(record_of(world, own)->clear_coat, 16384u | (0xFFFFu << 16));
+    test_uint(record_of(world, own)->color, color_word(0, 255, 0));
+    test_uint(record_of(world, coat)->clear_coat, 32768u);
+
+    ecs_remove(world, prefab, ClearCoat);
+    frame(world);
+    test_uint(record_of(world, shared)->clear_coat, 0);
+    test_uint(record_of(world, own)->clear_coat, 0);
+    test_uint(record_of(world, coat)->clear_coat, 32768u);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void MaterialIds_clear_coat_dynamic_material_repacks(void) {
+    // materials/material_ids
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t e = ecs_new(world);
+    ecs_add(world, e, DynamicMaterial);
+    ecs_set(world, e, Box, {1, 1, 1});
+    ecs_set(world, e, ClearCoat, {.strength = 0, .roughness = 0});
+    frame(world);
+    uint32_t id = id_of(world, e);
+    test_assert(id != 0 && id != UINT32_MAX);
+    test_uint(record_of(world, id)->clear_coat, 0);
+
+    ClearCoat *coat = ecs_get_mut(world, e, ClearCoat);
+    coat->strength = 1;
+    frame(world);
+    test_uint(record_of(world, id)->clear_coat, 0xFFFFu);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
