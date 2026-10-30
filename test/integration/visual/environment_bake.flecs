@@ -86,7 +86,7 @@ outside {
 
   sky {
     Environment: {resolution: 128}
-    EnvironmentImage: {path: "etc/environments/sky.hdr"}
+    EnvironmentImage: {path: "test/assets/environments/sky.hdr"}
   }
 
   darkness {

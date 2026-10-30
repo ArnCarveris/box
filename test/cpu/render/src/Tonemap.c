@@ -78,13 +78,13 @@ void Tonemap_lut_first_texels(void) {
 void Tonemap_lut_missing_file_fails(void) {
     // lighting/effects
     char *error = NULL;
-    uint32_t *lut = box_render_tony_load("etc/luts/missing.dds", &error);
+    uint32_t *lut = box_render_tony_load("test/assets/luts/missing.dds", &error);
     test_assert(lut == NULL);
     test_assert(error != NULL);
     ecs_os_free(error);
 
     error = NULL;
-    lut = box_render_tony_load("etc/luts/README.md", &error);
+    lut = box_render_tony_load("test/assets/luts/invalid.dds", &error);
     test_assert(lut == NULL);
     test_assert(error != NULL);
     ecs_os_free(error);

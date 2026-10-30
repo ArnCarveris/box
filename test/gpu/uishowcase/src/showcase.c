@@ -11,7 +11,7 @@
 #include <unistd.h>
 
 /** Path of the showcase scene in the repository */
-#define SHOWCASE_SCENE "etc/scenes/ui_showcase.flecs"
+#define SHOWCASE_SCENE "test/assets/scenes/ui_showcase.flecs"
 
 /** Find the scene in the working directory or one of its ancestors.
  *

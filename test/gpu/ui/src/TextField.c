@@ -53,7 +53,7 @@ void TextField_overlapping_contours_no_seam(void) {
     app->headless = true;
     ecs_singleton_modified(world, App);
 
-    char *src = box_shader_locate("etc/fonts/B612-Regular.ttf");
+    char *src = box_shader_locate("test/assets/fonts/B612-Regular.ttf");
     test_assert(src != NULL);
     FILE *f = fopen(src, "rb");
     test_assert(f != NULL);
@@ -428,7 +428,7 @@ void TextField_glyphs_added_mid_run(void) {
 void TextField_budget_more_glyphs_than_a_page(void) {
     // ui_fixes/atlas_upload
     ecs_os_init();
-    char *src = box_shader_locate("etc/fonts/B612-Regular.ttf");
+    char *src = box_shader_locate("test/assets/fonts/B612-Regular.ttf");
     test_assert(src != NULL);
     FILE *f = fopen(src, "rb");
     test_assert(f != NULL);
@@ -536,7 +536,7 @@ void TextField_budget_more_glyphs_than_a_page(void) {
 void TextField_small_budget_reuses_pages(void) {
     // ui_fixes/atlas_upload
     ecs_os_init();
-    char *src = box_shader_locate("etc/fonts/B612-Regular.ttf");
+    char *src = box_shader_locate("test/assets/fonts/B612-Regular.ttf");
     test_assert(src != NULL);
     FILE *f = fopen(src, "rb");
     test_assert(f != NULL);
@@ -841,7 +841,7 @@ void TextField_rotated_small_text_same_ink(void) {
 void TextField_budget_keeps_shown_pages(void) {
     // ui_fixes/atlas_upload
     ecs_os_init();
-    char *src = box_shader_locate("etc/fonts/B612-Regular.ttf");
+    char *src = box_shader_locate("test/assets/fonts/B612-Regular.ttf");
     test_assert(src != NULL);
     FILE *f = fopen(src, "rb");
     test_assert(f != NULL);
@@ -961,7 +961,7 @@ void TextField_budget_keeps_shown_pages(void) {
 void TextField_budget_values_in_one_frame(void) {
     // ui_fixes/atlas_upload
     ecs_os_init();
-    char *src = box_shader_locate("etc/fonts/B612-Regular.ttf");
+    char *src = box_shader_locate("test/assets/fonts/B612-Regular.ttf");
     test_assert(src != NULL);
     FILE *f = fopen(src, "rb");
     test_assert(f != NULL);
@@ -1093,7 +1093,7 @@ static void text_field_count_destroyed(
 void TextField_budget_releases_idle_pages(void) {
     // ui_fixes/atlas_upload
     ecs_os_init();
-    char *src = box_shader_locate("etc/fonts/B612-Regular.ttf");
+    char *src = box_shader_locate("test/assets/fonts/B612-Regular.ttf");
     test_assert(src != NULL);
     FILE *f = fopen(src, "rb");
     test_assert(f != NULL);

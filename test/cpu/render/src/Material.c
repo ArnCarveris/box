@@ -365,10 +365,10 @@ static void oreelse_cutout(
 
 /* The fan faces of the factory, round blades on a transparent background */
 void Material_oreelse_fan_cutout(void) {
-    oreelse_cutout("apps/oreelse/etc/materials/fan.flecs", "FanDisc");
+    oreelse_cutout("test/assets/materials/fan.flecs", "FanDisc");
 }
 
 /* The landing marking of the drone pad, a ring transparent inside and out */
 void Material_oreelse_bay_cutout(void) {
-    oreelse_cutout("apps/oreelse/etc/materials/drone_bay.flecs", "BayPad");
+    oreelse_cutout("test/assets/materials/drone_bay.flecs", "BayPad");
 }

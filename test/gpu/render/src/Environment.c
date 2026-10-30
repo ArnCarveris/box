@@ -28,7 +28,7 @@ void Environment_axes_faces_show_axis_colors(void) {
     ecs_set(world, surface, Surface, {.width = 32, .height = 32, .resolution_scale = 1});
     ecs_entity_t source = ecs_new(world);
     ecs_set(world, source, Environment, {.resolution = RES});
-    ecs_set(world, source, EnvironmentImage, {.path = "etc/environments/axes.hdr"});
+    ecs_set(world, source, EnvironmentImage, {.path = "test/assets/environments/axes.hdr"});
 
     static float texels[RES * RES * 4];
     bool read = false;

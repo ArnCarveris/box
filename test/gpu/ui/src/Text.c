@@ -299,7 +299,7 @@ void Text_font_change_reloads(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t font = ecs_new(world);
-    ecs_set(world, font, Font, {.path = "etc/fonts/missing.ttf"});
+    ecs_set(world, font, Font, {.path = "test/assets/fonts/missing.ttf"});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Text, {.value = "Fonts", .size = 20, .font = font});
     ecs_log_set_level(-4);
@@ -312,7 +312,7 @@ void Text_font_change_reloads(void) {
     test_assert(status->error != NULL);
     test_flt(ecs_get(world, e, TextBounds)->width, 0);
 
-    ecs_set(world, font, Font, {.path = "etc/fonts/B612-Regular.ttf"});
+    ecs_set(world, font, Font, {.path = "test/assets/fonts/B612-Regular.ttf"});
     ecs_progress(world, 0);
     status = ecs_get(world, font, FontStatus);
     test_int(status->state, FontReady);
@@ -320,7 +320,7 @@ void Text_font_change_reloads(void) {
     float w = ecs_get(world, e, TextBounds)->width;
     test_assert(w > 0);
 
-    ecs_set(world, font, Font, {.path = "etc/fonts/missing.ttf"});
+    ecs_set(world, font, Font, {.path = "test/assets/fonts/missing.ttf"});
     ecs_progress(world, 0);
     status = ecs_get(world, font, FontStatus);
     test_int(status->state, FontFailed);
@@ -344,7 +344,7 @@ void Text_default_font_removed(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t font = ecs_new(world);
-    ecs_set(world, font, Font, {.path = "etc/fonts/B612-Regular.ttf"});
+    ecs_set(world, font, Font, {.path = "test/assets/fonts/B612-Regular.ttf"});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Text, {.value = "Fallback", .size = 20, .font = font});
     ecs_progress(world, 0);
@@ -826,7 +826,7 @@ void Text_oversized_glyph_missing(void) {
     app->headless = true;
     ecs_singleton_modified(world, App);
 
-    char *src = box_shader_locate("etc/fonts/B612-Regular.ttf");
+    char *src = box_shader_locate("test/assets/fonts/B612-Regular.ttf");
     test_assert(src != NULL);
     FILE *f = fopen(src, "rb");
     test_assert(f != NULL);
@@ -942,7 +942,7 @@ void Text_oversized_warns_once_per_font(void) {
     app->headless = true;
     ecs_singleton_modified(world, App);
 
-    char *src = box_shader_locate("etc/fonts/B612-Regular.ttf");
+    char *src = box_shader_locate("test/assets/fonts/B612-Regular.ttf");
     test_assert(src != NULL);
     FILE *f = fopen(src, "rb");
     test_assert(f != NULL);
@@ -1040,7 +1040,7 @@ void Text_font_without_units_fails(void) {
     app->headless = true;
     ecs_singleton_modified(world, App);
 
-    char *src = box_shader_locate("etc/fonts/B612-Regular.ttf");
+    char *src = box_shader_locate("test/assets/fonts/B612-Regular.ttf");
     test_assert(src != NULL);
     FILE *f = fopen(src, "rb");
     test_assert(f != NULL);
@@ -1147,7 +1147,7 @@ void Text_font_file_change_reloads(void) {
     ecs_singleton_modified(world, App);
     ecs_singleton_set(world, FileWatch, {.interval = 0});
 
-    char *src = box_shader_locate("etc/fonts/B612-Regular.ttf");
+    char *src = box_shader_locate("test/assets/fonts/B612-Regular.ttf");
     test_assert(src != NULL);
     FILE *f = fopen(src, "rb");
     test_assert(f != NULL);
@@ -1224,7 +1224,7 @@ void Text_recursive_composite_missing(void) {
     app->headless = true;
     ecs_singleton_modified(world, App);
 
-    char *src = box_shader_locate("etc/fonts/B612-Regular.ttf");
+    char *src = box_shader_locate("test/assets/fonts/B612-Regular.ttf");
     test_assert(src != NULL);
     FILE *f = fopen(src, "rb");
     test_assert(f != NULL);
@@ -1360,7 +1360,7 @@ void Text_composite_limits(void) {
     app->headless = true;
     ecs_singleton_modified(world, App);
 
-    char *src = box_shader_locate("etc/fonts/B612-Regular.ttf");
+    char *src = box_shader_locate("test/assets/fonts/B612-Regular.ttf");
     test_assert(src != NULL);
     FILE *f = fopen(src, "rb");
     test_assert(f != NULL);
@@ -1555,7 +1555,7 @@ void Text_font_tables_outside_file(void) {
     app->headless = true;
     ecs_singleton_modified(world, App);
 
-    char *src = box_shader_locate("etc/fonts/B612-Regular.ttf");
+    char *src = box_shader_locate("test/assets/fonts/B612-Regular.ttf");
     test_assert(src != NULL);
     FILE *f = fopen(src, "rb");
     test_assert(f != NULL);
