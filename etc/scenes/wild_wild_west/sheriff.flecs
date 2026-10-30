@@ -26,8 +26,8 @@ template WestSheriff {
   handle : WestIron { Position: {-0.18, 1.53, 2.73}; Rotation: {math.PI / 2, 0, 0}; Torus: {radius: 0.065, tube: 0.019, segments: 12, rings: 6} }
   notice : WestTimber { Position: {-2, 1.92, 2.55}; Box: {0.77, 1.05, 0.06} }
   paper { Position: {-2, 1.92, 2.595}; Box: {0.65, 0.91, 0.02}; Rgb: {229, 204, 151} }
-  wanted { Position: {-2, 2.22, 2.615}; Scale: {0.01, 0.01, 0.01}; Text: {value: "WANTED", size: 12}; Rgb: {62, 43, 30} }
-  reward { Position: {-2, 1.62, 2.615}; Scale: {0.01, 0.01, 0.01}; Text: {value: "500 DOLLARS", size: 8}; Rgb: {62, 43, 30} }
+  wanted { Position: {-2, 2.22, 2.615}; Scale: {0.01, 0.01, 0.01}; Text: {value: "WANTED", size: 12, font: WestFont}; Rgb: {62, 43, 30} }
+  reward { Position: {-2, 1.62, 2.615}; Scale: {0.01, 0.01, 0.01}; Text: {value: "500 DOLLARS", size: 8, font: WestFont}; Rgb: {62, 43, 30} }
   silhouette { Position: {-2, 1.94, 2.62}; Scale: {0.75, 1, 0.1}; Sphere: {radius: 0.12, segments: 10}; Rgb: {83, 63, 43} }
   hat { Position: {-2, 2.03, 2.63}; Box: {0.31, 0.04, 0.025}; Rgb: {83, 63, 43} }
   bench : WestPlank { Position: {1.5, 0.92, 3.3}; Box: {2, 0.12, 0.55} }
