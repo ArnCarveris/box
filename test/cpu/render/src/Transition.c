@@ -1066,9 +1066,53 @@ static box_draw_batch_t* tr_batch(
     return box_draws_batch(d, ds->batch);
 }
 
-/** Read the transform of the shape of an entity as the backend got it in the last packet: the
- * patched bytes of the run upload of a dynamic_transform batch, else the static slot the game
- * thread keeps, which the backend has.
+/** Read a transform slot of a batch as the backend got it in the last packet: the patched
+ * bytes of the run upload of a dynamic_transform batch, else the static slot the game thread
+ * keeps, which the backend has.
+ *
+ * @param world The world
+ * @param null The backend
+ * @param b The batch
+ * @param slot The slot
+ * @param out Receives the transform
+ * @return Whether the slot was in a run upload of the last packet
+ */
+static bool tr_slot_rendered(
+    ecs_world_t *world,
+    const box_render_null_t *null,
+    box_draw_batch_t *b,
+    int32_t slot,
+    box_render_transform_t *out)
+{
+    box_render_draws_t *d = box_draws_state(world);
+    bool result = false;
+    int32_t i;
+    box_render_sync(world);
+    *out = *box_draws_slot_transform(b, slot);
+    if (!b->key.dynamic_transform) {
+        goto done;
+    }
+
+    uint32_t handle = box_draws_store_handle(box_draws_batch_store(d, b), b->page,
+        BOX_RENDER_STREAM_TRANSFORM);
+    uint32_t offset = b->first * (uint32_t)sizeof(box_render_transform_t);
+    for (i = 0; i < ecs_vec_count(&null->last.uploads) && !result; i ++) {
+        const box_render_upload_t *u = ecs_vec_get_t(
+            &null->last.uploads, box_render_upload_t, i);
+        if (u->buffer == handle && u->offset == offset) {
+            ecs_os_memcpy(out, box_render_packet_data(&null->last,
+                u->data + (uint32_t)slot * (uint32_t)sizeof(box_render_transform_t)),
+                ECS_SIZEOF(box_render_transform_t));
+            result = true;
+        }
+    }
+
+    test_assert(result);
+done:
+    return result;
+}
+
+/** Read the transform of the shape of an entity as the backend got it in the last packet.
  *
  * @param world The world
  * @param null The backend
@@ -1082,34 +1126,8 @@ static bool tr_rendered(
     ecs_entity_t e,
     box_render_transform_t *out)
 {
-    box_render_draws_t *d = box_draws_state(world);
-    const DrawSlot *ds = ecs_get(world, e, DrawSlot);
-    box_draw_batch_t *b = tr_batch(world, e);
-    bool result = false;
-    int32_t i;
-    box_render_sync(world);
-    *out = *box_draws_slot_transform(b, ds->slot);
-    if (!b->key.dynamic_transform) {
-        goto done;
-    }
-
-    uint32_t handle = box_draws_store_handle(box_draws_batch_store(d, b), b->page,
-        BOX_RENDER_STREAM_TRANSFORM);
-    uint32_t offset = b->first * (uint32_t)sizeof(box_render_transform_t);
-    for (i = 0; i < ecs_vec_count(&null->last.uploads) && !result; i ++) {
-        const box_render_upload_t *u = ecs_vec_get_t(
-            &null->last.uploads, box_render_upload_t, i);
-        if (u->buffer == handle && u->offset == offset) {
-            ecs_os_memcpy(out, box_render_packet_data(&null->last,
-                u->data + (uint32_t)ds->slot * (uint32_t)sizeof(box_render_transform_t)),
-                ECS_SIZEOF(box_render_transform_t));
-            result = true;
-        }
-    }
-
-    test_assert(result);
-done:
-    return result;
+    return tr_slot_rendered(world, null, tr_batch(world, e),
+        ecs_get(world, e, DrawSlot)->slot, out);
 }
 
 /** Compute the transform a shape renders with at a pose, as box_draws_transform writes it.
@@ -1676,5 +1694,85 @@ void Transition_transform_targets_on_game_thread(void) {
         }
     }
 
+    tr_fini(world, null);
+}
+
+/** Check the glyphs of a text at a pose, as box_draws_glyph writes them.
+ *
+ * @param world The world
+ * @param null The backend
+ * @param e The text
+ * @param p Local position
+ * @param moving Whether the glyphs are patched in a run upload, else in a static batch
+ */
+static void tr_test_glyphs(
+    ecs_world_t *world,
+    const box_render_null_t *null,
+    ecs_entity_t e,
+    const Position *p,
+    bool moving)
+{
+    box_render_draws_t *d = box_draws_state(world);
+    const TextSlots *ts = ecs_get(world, e, TextSlots);
+    const TextGlyphs *tg = ecs_get(world, e, TextGlyphs);
+    int32_t i, r, count = ecs_vec_count(&ts->slots);
+    mat4 m;
+    test_assert(count > 0);
+    test_int(ecs_vec_count(&tg->glyphs), count);
+    box_transform_local(p, NULL, NULL, m);
+    for (i = 0; i < count; i ++) {
+        const box_draw_glyph_slot_t *at = ecs_vec_get_t(&ts->slots, box_draw_glyph_slot_t, i);
+        const box_text_glyph_t *g = ecs_vec_get_t(&tg->glyphs, box_text_glyph_t, i);
+        box_render_transform_t rendered, expected;
+        test_bool(tr_slot_rendered(world, null, box_draws_batch(d, at->batch), at->slot,
+            &rendered), moving);
+        for (r = 0; r < 3; r ++) {
+            expected.rows[r][0] = m[0][r] * g->width;
+            expected.rows[r][1] = m[1][r] * g->height;
+            expected.rows[r][2] = m[2][r];
+            expected.rows[r][3] = m[0][r] * g->x + m[1][r] * g->y + m[3][r];
+        }
+
+        tr_test_transform(&rendered, &expected);
+    }
+}
+
+void Transition_transform_text_and_2d(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    ecs_entity_t text = ecs_new(world);
+    ecs_set(world, text, Position, {0, 1, 0});
+    ecs_set(world, text, Text, {
+        .value = "move", .size = 16, .font = ecs_lookup(world, "box.text.DefaultFont")
+    });
+    ecs_entity_t rect = ecs_new(world);
+    ecs_set(world, rect, Position, {0, 0, 0});
+    ecs_set(world, rect, Rect, {10, 20});
+    TransitionSpec spec = { .duration = 1.0f };
+    box_transition_set(world, text, ecs_id(Position), &spec);
+    box_transition_set(world, rect, ecs_id(Position), &spec);
+    tr_frame(world);
+    tr_frame(world);
+    test_int(ecs_vec_count(&ecs_get(world, text, TextGlyphs)->glyphs), 4);
+
+    ecs_set(world, text, Position, {40, 1, 0});
+    ecs_set(world, rect, Position, {0, 80, 0});
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        tr_frame(world);
+        test_assert(ecs_has_id(world, text, TransitionTransform));
+        test_assert(ecs_has_id(world, rect, TransitionTransform));
+        tr_test_glyphs(world, null, text, &(Position){10.0f * (float)i, 1, 0}, true);
+        tr_test_pose(world, null, rect, NULL, &(Position){0, 20.0f * (float)i, 0}, NULL, NULL);
+    }
+
+    tr_frame(world);
+    test_assert(!ecs_has_id(world, text, TransitionTransform));
+    tr_test_static(world, null, rect);
+    tr_test_glyphs(world, null, text, &(Position){40, 1, 0}, false);
     tr_fini(world, null);
 }

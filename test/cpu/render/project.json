@@ -392,6 +392,7 @@
                     "transform_delete_child",
                     "transform_batch_moved",
                     "transform_prefab_instances",
+                    "transform_text_and_2d",
                     "transform_targets_on_game_thread"
                 ]
             }

@@ -401,6 +401,9 @@ static void box_transition_tag(
 /** Find the entities the active transform transitions move in this frame, nodes first and
  * parent nodes before their children, and keep TransitionTransform on the drawn ones.
  *
+ * Clearing a map allocates its buckets again, so a frame without moving nodes leaves the map
+ * as it is and allocates nothing.
+ *
  * @param world The world
  * @param s The state of the extract
  * @param p The packet, NULL when no entity has Transition
@@ -412,7 +415,10 @@ static void box_transition_affect(
 {
     int32_t i, count = ecs_vec_count(&s->nodes);
     ecs_vec_clear(&s->items);
-    ecs_map_clear(&s->moving);
+    if (ecs_map_count(&s->moving)) {
+        ecs_map_clear(&s->moving);
+    }
+
     if (!ecs_map_count(&s->by_entity) && !ecs_map_count(&s->tagged)) {
         goto done;
     }
@@ -584,7 +590,7 @@ static void box_transition_send_pose(
         if (parent) {
             ecs_os_memcpy(pose.rel, parent->m, ECS_SIZEOF(mat4));
         } else {
-            glm_mat4_identity(pose.rel);
+            ecs_os_memcpy(pose.rel, GLM_MAT4_IDENTITY, ECS_SIZEOF(mat4));
         }
     }
 
