@@ -39,6 +39,13 @@ static const char *box_console_script_keywords[] = {
     "match", "new", "export", "default", NULL
 };
 
+/** Which part of an entity path the pattern of a command is highlighted in */
+typedef enum box_console_match_t {
+    BoxMatchNone,           /**< No part */
+    BoxMatchPath,           /**< The whole shown path, grep name matches */
+    BoxMatchName            /**< The name after the parent part, find matches */
+} box_console_match_t;
+
 /** State of formatting one result */
 typedef struct box_console_fmt_t {
     const ecs_world_t *world;   /**< The world */
@@ -47,6 +54,7 @@ typedef struct box_console_fmt_t {
     const char *command;        /**< Name of the command, NULL for none */
     const char *pattern;        /**< First argument of the command, the text a grep looks for */
     int32_t number_width;       /**< Digits of the widest line number of script lines */
+    bool comment;               /**< Whether the next script line starts inside a block comment */
     ecs_entity_t types[BoxTypeCount]; /**< The result types, 0 for a type that is not there */
 } box_console_fmt_t;
 
@@ -203,7 +211,7 @@ void box_console_out_error(
     box_console_out_t *out,
     const char *msg)
 {
-    int32_t prefix = (int32_t)strlen(BOX_COMMAND_ERROR);
+    int32_t prefix = (int32_t)strlen(BOX_COMMAND_ERROR), len, first;
     const char *nl;
     msg = msg ? msg : "";
     if (!strncmp(msg, BOX_COMMAND_ERROR, (size_t)prefix)) {
@@ -211,10 +219,20 @@ void box_console_out_error(
     }
 
     box_console_out_add(out, BoxOutputError, BOX_COMMAND_ERROR, prefix);
-    nl = strchr(msg, '\n');
-    box_console_out_ansi(out, BoxOutputText, msg, nl ? (int32_t)(nl - msg) : -1);
+    len = (int32_t)strlen(msg);
+    while (len > 0 && (msg[len - 1] == '\n' || msg[len - 1] == '\r')) {
+        len --;
+    }
+
+    nl = memchr(msg, '\n', (size_t)len);
+    first = nl ? (int32_t)(nl - msg) : len;
+    while (first > 0 && msg[first - 1] == '\r') {
+        first --;
+    }
+
+    box_console_out_ansi(out, BoxOutputText, msg, first);
     if (nl) {
-        box_console_out_ansi(out, BoxOutputDim, nl, -1);
+        box_console_out_ansi(out, BoxOutputDim, nl, len - (int32_t)(nl - msg));
     }
 }
 
@@ -396,8 +414,9 @@ static void box_console_fmt_json(
     }
 }
 
-/** Color the occurrences of the pattern of the command in text that was appended, case
- * insensitive, like the match of a grep in the explorer.
+/** Color the occurrences of the pattern of the command in text that was appended, like the match
+ * of a grep in the explorer. The case is folded for grep_i only, grep, find and script_grep
+ * compare case sensitive as their flecs commands do.
  *
  * @param fmt The formatting state
  * @param text The text
@@ -411,6 +430,7 @@ static void box_console_fmt_matches(
     int32_t at)
 {
     int32_t i, j, plen = fmt->pattern ? (int32_t)strlen(fmt->pattern) : 0;
+    bool fold = fmt->command && !strcmp(fmt->command, "grep_i");
     if (!plen) {
         goto done;
     }
@@ -418,8 +438,11 @@ static void box_console_fmt_matches(
     for (i = 0; i + plen <= len; i ++) {
         for (j = 0; j < plen; j ++) {
             char a = text[i + j], b = fmt->pattern[j];
-            a = a >= 'A' && a <= 'Z' ? (char)(a - 'A' + 'a') : a;
-            b = b >= 'A' && b <= 'Z' ? (char)(b - 'A' + 'a') : b;
+            if (fold) {
+                a = a >= 'A' && a <= 'Z' ? (char)(a - 'A' + 'a') : a;
+                b = b >= 'A' && b <= 'Z' ? (char)(b - 'A' + 'a') : b;
+            }
+
             if (a != b) {
                 break;
             }
@@ -440,12 +463,12 @@ done:
  *
  * @param fmt The formatting state
  * @param e The entity
- * @param match Whether to color the occurrences of the pattern in the path
+ * @param match The part of the path to color the occurrences of the pattern in
  */
 static void box_console_fmt_entity(
     box_console_fmt_t *fmt,
     ecs_entity_t e,
-    bool match)
+    box_console_match_t match)
 {
     const ecs_world_t *world = fmt->world;
     char *path = NULL, *scope = NULL;
@@ -479,8 +502,10 @@ static void box_console_fmt_entity(
 
     box_console_out_add(fmt->out, BoxOutputDim, shown, name);
     box_console_out_add(fmt->out, BoxOutputEntity, &shown[name], len - name);
-    if (match) {
+    if (match == BoxMatchPath) {
         box_console_fmt_matches(fmt, shown, len, start);
+    } else if (match == BoxMatchName) {
+        box_console_fmt_matches(fmt, &shown[name], len - name, start + name);
     }
 
 done:
@@ -501,7 +526,7 @@ static void box_console_fmt_name(
     if (name) {
         box_console_out_add(fmt->out, BoxOutputEntity, name, -1);
     } else {
-        box_console_fmt_entity(fmt, e, false);
+        box_console_fmt_entity(fmt, e, BoxMatchNone);
     }
 }
 
@@ -550,14 +575,24 @@ static void box_console_fmt_lines(
  *
  * @param fmt The formatting state
  * @param text The code
+ * @param comment Whether the line starts inside a block comment, receives whether the next line
+ * does, NULL for code that does not continue on a next line
  */
 static void box_console_fmt_script(
     box_console_fmt_t *fmt,
-    const char *text)
+    const char *text,
+    bool *comment)
 {
     box_console_out_t *out = fmt->out;
     int32_t start = box_console_out_len(out), len = (int32_t)strlen(text), at = 0, from, i;
     box_console_out_add(out, BoxSpanNone, text, len);
+    if (comment && *comment) {
+        const char *end = strstr(text, "*/");
+        at = end ? (int32_t)(end - text) + 2 : len;
+        box_console_out_mark(out, BoxOutputDim, start, start + at);
+        *comment = end == NULL;
+    }
+
     while (at < len) {
         char c = text[at], next = at + 1 < len ? text[at + 1] : '\0';
         bool after_word = at > 0 && box_console_out_word(text[at - 1]);
@@ -569,6 +604,9 @@ static void box_console_fmt_script(
             const char *end = strstr(&text[at + 2], "*/");
             at = end ? (int32_t)(end - text) + 2 : len;
             box_console_out_mark(out, BoxOutputDim, start + from, start + at);
+            if (comment && !end) {
+                *comment = true;
+            }
         } else if (c == '"' || c == '`') {
             at = box_console_out_string(text, at, len);
             box_console_out_mark(out, BoxOutputString, start + from, start + at);
@@ -772,29 +810,48 @@ end:
     return;
 }
 
-/** Test whether a node of a tree has a later node at a depth before the tree leaves that depth:
- * whether its ancestor at that depth, or itself, has a next sibling.
+/** Find for every node of a tree and every depth from 1 to its own whether the ancestor of the
+ * node at that depth, or the node itself, has a next sibling.
  *
- * @param nodes The nodes
+ * One backward pass keeps per depth whether the first later node at that depth or above is at it.
+ *
+ * @param nodes The nodes, in depth first order
  * @param count Number of nodes
- * @param i The node
- * @param depth The depth
- * @return Whether there is a next sibling at the depth
+ * @param offsets Receives for every node where its depths start in the result
+ * @return For every node and depth 1 to its depth whether there is a next sibling at the depth,
+ * free with ecs_os_free
  */
-static bool box_console_tree_more(
+static bool* box_console_tree_more(
     const ecs_shell_tree_node_t *nodes,
     int32_t count,
-    int32_t i,
-    int32_t depth)
+    int32_t *offsets)
 {
-    bool result = false;
-    int32_t j;
-    for (j = i + 1; j < count; j ++) {
-        if (nodes[j].depth <= depth) {
-            result = nodes[j].depth == depth;
-            break;
-        }
+    int32_t i, d, total = 0, max = 0, top = 0;
+    bool *result, *more;
+    for (i = 0; i < count; i ++) {
+        int32_t depth = nodes[i].depth > 0 ? nodes[i].depth : 0;
+        offsets[i] = total;
+        total += depth;
+        max = depth > max ? depth : max;
     }
+
+    result = ecs_os_calloc_n(bool, total ? total : 1);
+    more = ecs_os_calloc_n(bool, max + 1);
+    for (i = count - 1; i >= 0; i --) {
+        int32_t depth = nodes[i].depth > 0 ? nodes[i].depth : 0;
+        for (d = 1; d <= depth; d ++) {
+            result[offsets[i] + d - 1] = more[d];
+        }
+
+        for (d = depth + 1; d <= top; d ++) {
+            more[d] = false;
+        }
+
+        more[depth] = true;
+        top = depth;
+    }
+
+    ecs_os_free(more);
 
     return result;
 }
@@ -812,7 +869,10 @@ static void box_console_fmt_tree(
     int32_t count)
 {
     int32_t i, d;
+    int32_t *offsets = ecs_os_malloc_n(int32_t, count ? count : 1);
+    bool *more = box_console_tree_more(nodes, count, offsets);
     for (i = 0; i < count; i ++) {
+        const bool *m = &more[offsets[i]];
         int32_t start;
         if (i) {
             box_console_out_add(fmt->out, BoxSpanNone, "\n", 1);
@@ -820,18 +880,19 @@ static void box_console_fmt_tree(
 
         start = box_console_out_len(fmt->out);
         for (d = 1; d < nodes[i].depth; d ++) {
-            ecs_strbuf_appendstr(&fmt->out->buf,
-                box_console_tree_more(nodes, count, i, d) ? "|  " : "   ");
+            ecs_strbuf_appendstr(&fmt->out->buf, m[d - 1] ? "|  " : "   ");
         }
 
         if (nodes[i].depth > 0) {
-            ecs_strbuf_appendstr(&fmt->out->buf,
-                box_console_tree_more(nodes, count, i, nodes[i].depth) ? "|- " : "`- ");
+            ecs_strbuf_appendstr(&fmt->out->buf, m[nodes[i].depth - 1] ? "|- " : "`- ");
         }
 
         box_console_out_mark(fmt->out, BoxOutputDim, start, box_console_out_len(fmt->out));
         box_console_fmt_name(fmt, nodes[i].entity);
     }
+
+    ecs_os_free(more);
+    ecs_os_free(offsets);
 }
 
 /** Append a component and its value, Component: value.
@@ -863,7 +924,7 @@ static void box_console_fmt_row(
     const ecs_shell_component_value_t *fields = ecs_vec_first(&row->fields);
     int32_t i, count = ecs_vec_count(&row->fields);
     if (row->entity) {
-        box_console_fmt_entity(fmt, row->entity, false);
+        box_console_fmt_entity(fmt, row->entity, BoxMatchNone);
     }
 
     for (i = 0; i < count; i ++) {
@@ -889,7 +950,7 @@ static void box_console_fmt_inspect(
     const ecs_id_t *ids = ecs_vec_first(&info->ids);
     int32_t i;
     char id[32];
-    box_console_fmt_entity(fmt, info->entity, false);
+    box_console_fmt_entity(fmt, info->entity, BoxMatchNone);
     ecs_os_snprintf(id, sizeof(id), "  #%llu", (unsigned long long)info->id);
     box_console_out_add(fmt->out, BoxOutputDim, id, -1);
     for (i = 0; i < ecs_vec_count(&info->components); i ++) {
@@ -934,7 +995,7 @@ static void box_console_fmt_doc(
     box_console_fmt_t *fmt,
     const ecs_shell_doc_info_t *doc)
 {
-    box_console_fmt_entity(fmt, doc->entity, false);
+    box_console_fmt_entity(fmt, doc->entity, BoxMatchNone);
     box_console_fmt_field(fmt, "name", doc->name, BoxSpanNone);
     box_console_fmt_field(fmt, "brief", doc->brief, BoxSpanNone);
     box_console_fmt_field(fmt, "detail", doc->detail, BoxSpanNone);
@@ -953,7 +1014,7 @@ static void box_console_fmt_grep(
     const ecs_shell_grep_match_t *m)
 {
     int32_t start, len;
-    box_console_fmt_entity(fmt, m->entity, m->id == 0);
+    box_console_fmt_entity(fmt, m->entity, m->id ? BoxMatchNone : BoxMatchPath);
     if (m->id) {
         box_console_out_add(fmt->out, BoxSpanNone, "  ", 2);
         box_console_fmt_id(fmt, m->id);
@@ -1009,7 +1070,7 @@ static void box_console_fmt_script_info(
     const ecs_shell_script_info_t *s)
 {
     char lines[32];
-    box_console_fmt_entity(fmt, s->script, false);
+    box_console_fmt_entity(fmt, s->script, BoxMatchNone);
     if (s->filename) {
         box_console_out_add(fmt->out, BoxSpanNone, "  ", 2);
         box_console_out_add(fmt->out, BoxOutputString, s->filename, -1);
@@ -1041,7 +1102,7 @@ static void box_console_fmt_script_line(
 {
     box_console_fmt_line_number(fmt, l->line);
     box_console_out_add(fmt->out, BoxSpanNone, "  ", 2);
-    box_console_fmt_script(fmt, l->text ? l->text : "");
+    box_console_fmt_script(fmt, l->text ? l->text : "", &fmt->comment);
 }
 
 /** Append a script and a line of it: script:line.
@@ -1058,7 +1119,7 @@ static void box_console_fmt_location(
     int32_t column)
 {
     char at[32];
-    box_console_fmt_entity(fmt, script, false);
+    box_console_fmt_entity(fmt, script, BoxMatchNone);
     if (column) {
         ecs_os_snprintf(at, sizeof(at), ":%d:%d", line, column);
     } else {
@@ -1082,7 +1143,7 @@ static void box_console_fmt_script_match(
     box_console_fmt_location(fmt, m->script, m->line, 0);
     box_console_out_add(fmt->out, BoxSpanNone, "  ", 2);
     start = box_console_out_len(fmt->out);
-    box_console_fmt_script(fmt, text);
+    box_console_fmt_script(fmt, text, NULL);
     box_console_fmt_matches(fmt, text, (int32_t)strlen(text), start);
 }
 
@@ -1099,14 +1160,14 @@ static void box_console_fmt_script_location(
     box_console_fmt_location(fmt, l->script, l->line, l->column);
     if (l->statement) {
         box_console_out_add(fmt->out, BoxSpanNone, "  ", 2);
-        box_console_fmt_script(fmt, l->statement);
+        box_console_fmt_script(fmt, l->statement, NULL);
     }
 
     if (l->template_) {
         box_console_out_add(fmt->out, BoxSpanNone, "\n  ", 3);
         box_console_out_add(fmt->out, BoxOutputKey, "template", -1);
         box_console_out_add(fmt->out, BoxOutputDim, ": ", 2);
-        box_console_fmt_entity(fmt, l->template_, false);
+        box_console_fmt_entity(fmt, l->template_, BoxMatchNone);
     }
 }
 
@@ -1119,7 +1180,7 @@ static void box_console_fmt_script_error(
     box_console_fmt_t *fmt,
     const ecs_shell_script_error_t *e)
 {
-    box_console_fmt_entity(fmt, e->script, false);
+    box_console_fmt_entity(fmt, e->script, BoxMatchNone);
     box_console_out_add(fmt->out, BoxSpanNone, "  ", 2);
     box_console_out_error(fmt->out, e->error);
 }
@@ -1234,6 +1295,7 @@ static void box_console_fmt_elements(
         }
 
         fmt->number_width = box_console_digits(max);
+        fmt->comment = false;
     }
 
     for (i = 0; i < count; i ++) {
@@ -1244,6 +1306,7 @@ static void box_console_fmt_elements(
         box_console_fmt_value(fmt, type, ECS_ELEM(elems, ti->size, i));
     }
 
+    fmt->comment = false;
 done:
     return;
 }
@@ -1271,7 +1334,9 @@ static void box_console_fmt_value(
             box_console_out_ansi(fmt->out, BoxSpanNone, str, -1);
         }
     } else if (type == ecs_id(ecs_entity_t)) {
-        box_console_fmt_entity(fmt, *(const ecs_entity_t*)ptr, false);
+        bool find = fmt->command && !strcmp(fmt->command, "find");
+        box_console_fmt_entity(fmt, *(const ecs_entity_t*)ptr,
+            find ? BoxMatchName : BoxMatchNone);
     } else if (type == ecs_id(ecs_id_t)) {
         box_console_fmt_id(fmt, *(const ecs_id_t*)ptr);
     } else if (type == ecs_id(ecs_value_t)) {
