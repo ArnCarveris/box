@@ -32,6 +32,10 @@
 // without blending: it refracts the opaque snapshot of the view (opaque_snapshot), reduced by
 // its Fresnel reflection, absorbed over its volume and tinted by its albedo, and adds its own
 // specular light and emission on top.
+// A clear coated material (ClearCoat) has a dielectric layer of f0 0.04 over its base, on the
+// geometric normal and of its own roughness: a GGX lobe in direct light and a second specular
+// lookup in indirect light, which take what they reflect from the base. Without a coat (strength
+// 0) a fragment skips both.
 #include "include/instance.wgsl"
 #include "include/material.wgsl"
 #include "include/lights.wgsl"
@@ -160,6 +164,8 @@ struct VertexOut {
     @location(4) material: vec2f,
     @location(5) uv: vec2f,
     @location(6) @interpolate(flat) cutoff: f32,
+    // ClearCoat of the material: strength and roughness, 0 strength without one
+    @location(10) @interpolate(flat) clear_coat: vec2f,
     // Transmission of the material: factor, index of refraction, thickness and attenuation
     // distance, its linear attenuation color and the scale of the instance along its axes
     @location(7) @interpolate(flat) transmission: vec4f,
@@ -269,6 +275,7 @@ fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material) -> Vert
     o.emissive = material.emissive;
     o.material = s.material;
     o.cutoff = material.cutoff;
+    o.clear_coat = unpack2x16unorm(material.clear_coat);
     o.uv = s.uv;
     o.transmission = vec4f(material.transmission_factor, material.ior,
         material.thickness_factor, material.attenuation_distance);
@@ -621,7 +628,8 @@ fn reflections(world: vec3f, spec: vec3f, roughness: f32, cluster: u32, fallback
 // camera, except that an alpha tested one takes the albedo alpha, so its holes go through both
 // sides. The occlusion scales the indirect light only. geometric is the interpolated vertex
 // normal before the normal map, negated on back faces as normal is, which the shadow lookup
-// is offset along.
+// is offset along. coat and coat_roughness are the strength and roughness of the clear coat,
+// material constants that apply on both faces; the coat lies on geometric.
 struct Surface {
     albedo: vec3f,
     alpha: f32,
@@ -631,6 +639,8 @@ struct Surface {
     emissive: vec3f,
     normal: vec3f,
     geometric: vec3f,
+    coat: f32,
+    coat_roughness: f32,
 };
 
 // Tangent frame from the screen derivatives of the position and the UVs (cotangent frame),
@@ -667,6 +677,8 @@ fn surface(f: VertexOut, front: bool) -> Surface {
     s.emissive = f.emissive;
     s.normal = -geometric;
     s.geometric = -geometric;
+    s.coat = clamp(f.clear_coat.x, 0.0, 1.0);
+    s.coat_roughness = clamp(f.clear_coat.y, MIN_ROUGHNESS, 1.0);
     if (front) {
         s.albedo *= albedo.rgb;
         s.alpha *= albedo.a;
@@ -717,7 +729,9 @@ struct Lit {
     specular: vec3f,
 };
 
-// Light reflected toward the eye by one light arriving from direction l with a radiance.
+// Light reflected toward the eye by one light arriving from direction l with a radiance. A clear
+// coat reflects the GGX lobe of its normal and roughness times its Fresnel Fc, and the base below
+// it 1 - Fc of what it reflects without one.
 fn brdf(s: Surface, v: vec3f, l: vec3f, radiance: vec3f) -> Lit {
     let n = s.normal;
     let a = s.roughness * s.roughness;
@@ -731,7 +745,21 @@ fn brdf(s: Surface, v: vec3f, l: vec3f, radiance: vec3f) -> Lit {
     let f = fresnel_schlick(ldh, f0);
     let specular = distribution_ggx(ndh, a) * visibility_smith(ndv, ndl, a) * f;
     let diffuse = (vec3f(1.0) - f) * diffuse_color / PI;
-    return Lit(diffuse * radiance * ndl, specular * radiance * ndl);
+    var lit = Lit(diffuse * radiance * ndl, specular * radiance * ndl);
+    if (s.coat > 0.0) {
+        let nc = s.geometric;
+        let ac = s.coat_roughness * s.coat_roughness;
+        let ndv_coat = max(dot(nc, v), 1e-4);
+        let ndl_coat = max(dot(nc, l), 0.0);
+        let ndh_coat = max(dot(nc, h), 0.0);
+        let ldh_coat = ldh;
+        let fc = fresnel_schlick(ldh_coat, vec3f(0.04)).x * s.coat;
+        let coat_specular = distribution_ggx(ndh_coat, ac) *
+            visibility_smith(ndv_coat, ndl_coat, ac) * fc;
+        lit.diffuse *= 1.0 - fc;
+        lit.specular = lit.specular * (1.0 - fc) + coat_specular * radiance * ndl_coat;
+    }
+    return lit;
 }
 
 // Distance below which a point or spot light stops getting brighter, so a surface at the light
@@ -801,6 +829,27 @@ fn specular_occlusion(ndv: f32, ao: f32, a: f32) -> f32 {
     return clamp(pow(ndv + ao, exp2(-16.0 * a - 1.0)) - 1.0 + ao, 0.0, 1.0);
 }
 
+// Indirect light of a fragment at a normal n, its diffuse part in direction n and its specular
+// part along spec at a perceptual roughness: the ambient or the probe volume, then for the
+// specular part the reflection probes of its cluster or the environment of the view. Every
+// texture it reads is read with textureSampleLevel, so it may run in non uniform control flow.
+fn indirect_light(world: vec3f, n: vec3f, spec: vec3f, roughness: f32, cluster: u32) -> Indirect {
+    var e: Indirect;
+    if (volume.size.w == 0u) {
+        e = Indirect(ambient(n), ambient(spec));
+    } else {
+        e = volume_irradiance(world, n, spec);
+    }
+
+    if (view.reflection.x > 0u) {
+        e.specular = reflections(world, spec, roughness, cluster, e.specular);
+    } else if (view.environment.w > 0.0) {
+        e.specular = environment_radiance(spec, roughness, e.specular);
+    }
+
+    return e;
+}
+
 // Light a surface reflects toward the eye, the indirect and direct diffuse light apart from
 // the indirect and direct specular light and the emission. An unlit view shows the albedo as
 // the diffuse part and the emission as the specular one.
@@ -817,36 +866,39 @@ fn shade_split(s: Surface, v: vec3f, world: vec3f) -> Lit {
     let ab = env_brdf(s.roughness, ndv);
     let r = reflect(-v, n);
     let spec = mix(r, n, a);
-    var specular_light: vec3f;
-    var diffuse_light: vec3f;
-    if (volume.size.w == 0u) {
-        specular_light = ambient(spec);
-        diffuse_light = ambient(n);
-    } else {
-        let e = volume_irradiance(world, n, spec);
-        specular_light = e.specular;
-        diffuse_light = e.diffuse;
-    }
-
     var cluster = 0u;
     if (view.lights.y > view.lights.x || view.grid.w > 0u) {
         cluster = cluster_index(view, cluster_view_position(view, world));
     }
 
-    if (view.reflection.x > 0u) {
-        specular_light = reflections(world, spec, s.roughness, cluster, specular_light);
-    } else if (view.environment.w > 0.0) {
-        specular_light = environment_radiance(spec, s.roughness, specular_light);
-    }
+    let e = indirect_light(world, n, spec, s.roughness, cluster);
+    let specular_light = e.specular;
+    let diffuse_light = e.diffuse;
 
     // The split sum scale and bias already integrate the Fresnel over the GGX lobe of the
     // roughness, so the grazing reflection of a rough surface fades without a roughness aware
     // f90. What the lobe reflects is not available to the diffuse term, as 1 - F in brdf().
     let specular_albedo = f0 * ab.x + ab.y;
-    let indirect_specular = specular_albedo * specular_light *
+    var indirect_specular = specular_albedo * specular_light *
         specular_occlusion(ndv, s.occlusion, a);
-    let indirect_diffuse = (vec3f(1.0) - specular_albedo) * diffuse_color * diffuse_light *
+    var indirect_diffuse = (vec3f(1.0) - specular_albedo) * diffuse_color * diffuse_light *
         s.occlusion;
+
+    // The clear coat reflects the light along the reflection about its own normal at its own
+    // roughness, by the split sum albedo of a dielectric, and the base below it what it does not.
+    if (s.coat > 0.0) {
+        let nc = s.geometric;
+        let ac = s.coat_roughness * s.coat_roughness;
+        let ndv_coat = max(dot(nc, v), 1e-4);
+        let ab_coat = env_brdf(s.coat_roughness, ndv_coat);
+        let spec_coat = mix(reflect(-v, nc), nc, ac);
+        let coat_light = indirect_light(world, nc, spec_coat, s.coat_roughness, cluster).specular;
+        let coat_albedo = (0.04 * ab_coat.x + ab_coat.y) * s.coat;
+        indirect_specular = indirect_specular * (1.0 - coat_albedo) +
+            coat_albedo * coat_light * specular_occlusion(ndv_coat, s.occlusion, ac);
+        indirect_diffuse *= 1.0 - coat_albedo;
+    }
+
     let direct = lights_direct(s, v, world, cluster);
     return Lit(direct.diffuse + indirect_diffuse, direct.specular + indirect_specular +
         s.emissive);

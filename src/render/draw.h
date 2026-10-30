@@ -162,6 +162,7 @@ typedef struct box_draw_material_t {
     const Emissive *emissive;   /**< Emitted light */
     const TextureTransform *uv; /**< Scale and offset of the texture coordinates */
     const Transmission *transmission; /**< Light passing through a 3D shape */
+    const ClearCoat *clear_coat; /**< Dielectric layer over a 3D shape, ignored by 2D shapes */
     const Tint *tint;           /**< Tint of the shape itself, applied after the inherited */
     const box_draw_tint_t *inherited; /**< Composed tints of the ancestors, NULL for none */
     const Shape2D *shape2d;     /**< Resolved 2D shape, NULL for a 3D shape */
@@ -199,6 +200,8 @@ typedef struct box_draw_transition_material_t {
     TextureTransform uv;    /**< TextureTransform */
     bool transmissive;      /**< The material has Transmission, which does not transition */
     Transmission transmission; /**< Transmission, when transmissive */
+    bool coated;            /**< The material has ClearCoat, which does not transition */
+    ClearCoat clear_coat;   /**< ClearCoat, when coated */
     Opacity opacity;        /**< Opacity of the shape itself */
     Tint tint;              /**< Tint of the shape itself */
     box_draw_tint_t inherited; /**< Tints of the ancestors, when tinted */
@@ -593,7 +596,9 @@ void box_draws_material(
  *
  * The record holds the display encoded base color (the default color without Rgb), metallic,
  * roughness, emission, texture transform and AlphaCutoff (0 without one) clamped as the shading
- * was, and the Transmission (factor 0 without one). Opacity, tints and the 2D shape are not.
+ * was, the Transmission (factor 0 without one) and the ClearCoat (0 without one).
+ *
+ * Opacity, tints and the 2D shape are not.
  *
  * @param out The record
  * @param material Material components of the owner

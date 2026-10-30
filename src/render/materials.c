@@ -361,13 +361,13 @@ void box_draws_materials_observers(
     ecs_world_t *world,
     box_render_draws_t *d)
 {
-    ecs_entity_t components[6] = {
+    ecs_entity_t components[7] = {
         ecs_id(Rgb), ecs_id(PbrMaterial), ecs_id(Emissive), ecs_id(TextureTransform),
-        ecs_id(AlphaCutoff), ecs_id(Transmission)
+        ecs_id(AlphaCutoff), ecs_id(Transmission), ecs_id(ClearCoat)
     };
-    const char *names[6] = {
+    const char *names[7] = {
         "DrawsOnColor", "DrawsOnPbrMaterial", "DrawsOnEmissive", "DrawsOnTextureTransform",
-        "DrawsOnAlphaCutoff", "DrawsOnTransmission"
+        "DrawsOnAlphaCutoff", "DrawsOnTransmission", "DrawsOnClearCoat"
     };
     int32_t i;
     box_draws_observer(world, d, "MaterialsOnPrefab", (ecs_observer_desc_t){
@@ -392,7 +392,7 @@ void box_draws_materials_observers(
         .query.flags = EcsQueryMatchPrefab,
         .events = { EcsOnAdd, EcsOnRemove } }, BoxMaterialsOnIsA);
 
-    for (i = 0; i < 6; i ++) {
+    for (i = 0; i < 7; i ++) {
         bool keyed = components[i] == ecs_id(AlphaCutoff) ||
             components[i] == ecs_id(Transmission);
         box_draws_observer(world, d, names[i], (ecs_observer_desc_t){
@@ -420,6 +420,7 @@ void box_draws_material_of(
         out->uv = ecs_get(world, owner, TextureTransform);
         out->cutoff = ecs_get(world, owner, AlphaCutoff);
         out->transmission = ecs_get(world, owner, Transmission);
+        out->clear_coat = ecs_get(world, owner, ClearCoat);
     }
 }
 
