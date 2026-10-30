@@ -317,7 +317,9 @@
                     "new_shape2d_uploads_no_surface",
                     "changed_shape2d_uploads_no_surface",
                     "mesh_uploads_surface_next_to_shape2d",
-                    "text_relayout_uploads_no_surface"
+                    "text_relayout_uploads_no_surface",
+                    "shape2d_packed_color",
+                    "glyph_packed_color"
                 ]
             },
             {
@@ -441,7 +443,9 @@
                 "testcases": [
                     "interrupted",
                     "nested_childof",
-                    "nested_parent"
+                    "nested_parent",
+                    "plain_child",
+                    "surface_instance"
                 ]
             },
             {
@@ -453,6 +457,10 @@
                     "transmission_mesh",
                     "transmission_prefab",
                     "transmission_keeps_batch",
+                    "clear_coat_mesh",
+                    "clear_coat_prefab",
+                    "clear_coat_keeps_batch",
+                    "clear_coat_2d",
                     "uv_mesh",
                     "cutoff_mesh",
                     "rgb_2d",
@@ -493,7 +501,9 @@
                     "targets_on_game_thread",
                     "no_transition_no_records",
                     "dynamic_material_fade_in",
-                    "text_spans_fade"
+                    "text_spans_fade",
+                    "packed_color_opacity_2d",
+                    "packed_color_tint_2d"
                 ]
             }
         ]

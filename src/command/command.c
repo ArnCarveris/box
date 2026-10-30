@@ -137,6 +137,13 @@ char* box_command_format(
     return result ? result : ecs_os_strdup("");
 }
 
+const ecs_value_t* box_command_value(
+    const ecs_shell_result_t *r)
+{
+    int32_t count = ecs_vec_count(&r->results);
+    return count ? &ecs_vec_get_t(&r->results, ecs_value_t, count - 1)[0] : NULL;
+}
+
 char* box_command_run(
     ecs_world_t *world,
     ecs_entity_t session,

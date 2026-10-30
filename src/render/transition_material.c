@@ -52,7 +52,7 @@ void box_draws_transition_target(
     }
 
     if (material->clear_coat) {
-        out->coated = true;
+        out->present |= 1u << BOX_RENDER_TRANSITION_CLEAR_COAT;
         out->clear_coat = *material->clear_coat;
     }
 
@@ -110,7 +110,8 @@ void box_draws_transition_encode(
             &material->uv),
         .transmission = box_draws_transition_part(material, BOX_RENDER_TRANSITION_TRANSMISSION,
             &material->transmission),
-        .clear_coat = material->coated ? &material->clear_coat : NULL,
+        .clear_coat = box_draws_transition_part(material, BOX_RENDER_TRANSITION_CLEAR_COAT,
+            &material->clear_coat),
         .tint = box_draws_transition_part(material, BOX_RENDER_TRANSITION_TINT,
             &material->tint),
         .inherited = material->tinted ? &material->inherited : NULL,
@@ -135,7 +136,7 @@ void box_draws_transition_encode(
 
     box_draws_material(&shading, &m);
     ecs_os_memcpy(ECS_OFFSET(dst, offsetof(box_render_shading_t, color)), shading.color,
-        ECS_SIZEOF(vec4));
+        ECS_SIZEOF(shading.color));
     ecs_os_memcpy(ECS_OFFSET(dst, offsetof(box_render_shading_t, emissive)), shading.emissive,
         ECS_SIZEOF(float) * 3);
     if (material->kind == BOX_DRAW_TRANSITION_SHAPE) {

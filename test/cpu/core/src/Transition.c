@@ -1114,6 +1114,7 @@ void Transition_supported(void) {
     test_assert(box_transition_supported(world, ecs_id(Emissive)));
     test_assert(box_transition_supported(world, ecs_id(TextureTransform)));
     test_assert(box_transition_supported(world, ecs_id(Transmission)));
+    test_assert(box_transition_supported(world, ecs_id(ClearCoat)));
 
     test_assert(!box_transition_supported(world, ecs_id(PbrTextures)));
     test_assert(!box_transition_supported(world, ecs_id(WorldTransform)));
@@ -1157,6 +1158,42 @@ void Transition_transmission_map(void) {
     errors = transition_capture_end();
     test_assert(errors == NULL);
     test_flt(box_transition_get(world, e, ecs_id(Transmission))->duration, 2.0f);
+    test_int(ecs_map_count(ecs_get(world, e, Transition)), 1);
+
+    ecs_fini(world);
+}
+
+void Transition_clear_coat_map(void) {
+    // engine_core/transition
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    transition_capture_begin();
+    int result = ecs_script_run(world, "clear_coat",
+        "using box.material\n"
+        "using box.transition\n"
+        "e {\n"
+        "  ClearCoat: {strength: 1, roughness: 0.25}\n"
+        "  Transition: [ClearCoat: {duration: 0.5, timing_function: EaseInOut}]\n"
+        "}\n", NULL);
+    char *errors = transition_capture_end();
+    test_int(result, 0);
+    test_assert(errors == NULL);
+
+    ecs_entity_t e = ecs_lookup(world, "e");
+    test_assert(e != 0);
+    test_int(ecs_map_count(ecs_get(world, e, Transition)), 1);
+    const TransitionSpec *t = box_transition_get(world, e, ecs_id(ClearCoat));
+    test_assert(t != NULL);
+    test_flt(t->duration, 0.5f);
+    test_int(t->timing_function, EaseInOut);
+    test_assert(box_transition_valid(world, ecs_id(ClearCoat), t));
+
+    transition_capture_begin();
+    box_transition_set(world, e, ecs_id(ClearCoat), &(TransitionSpec){ .duration = 2.0f });
+    errors = transition_capture_end();
+    test_assert(errors == NULL);
+    test_flt(box_transition_get(world, e, ecs_id(ClearCoat))->duration, 2.0f);
     test_int(ecs_map_count(ecs_get(world, e, Transition)), 1);
 
     ecs_fini(world);

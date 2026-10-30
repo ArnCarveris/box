@@ -321,3 +321,108 @@ void Transition_shape_ends_before_scatter_shader_compiles(void) {
     trans_no_errors(world);
     ecs_fini(world);
 }
+
+/** Create the world of the clear coat case: a lit view without ambient light or sun, the camera
+ * 6 units in front of a rough dark 4x4 quad with a coat of strength 1, and a point light 3 units
+ * in front of the quad, whose coat shows its highlight at the center of the image.
+ *
+ * @param roughness Roughness of the coat
+ * @param quad Receives the quad
+ * @return The world
+ */
+static ecs_world_t* trans_coat_world(
+    float roughness,
+    ecs_entity_t *quad)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 6});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
+        .color = {0, 0, 0, 255}}, .lighting.enabled = true});
+    ecs_singleton_set(world, AmbientLight, {.intensity = 0});
+    ecs_entity_t sun = ecs_new(world);
+    ecs_set(world, sun, DirectionalLight, {.intensity = 0});
+
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Quad, {4, 4});
+    ecs_set(world, e, Rgb, {40, 40, 40});
+    ecs_set(world, e, PbrMaterial, {.metallic = 0, .roughness = 1});
+    ecs_set(world, e, ClearCoat, {.strength = 1, .roughness = roughness});
+    ecs_entity_t light = ecs_new(world);
+    ecs_set(world, light, Position, {0, 0, 3});
+    ecs_set(world, light, PointLight, {.intensity = 5, .range = 20});
+    *quad = e;
+
+    return world;
+}
+
+/** Get the brightest pixel of an image as the sum of its channels.
+ *
+ * @param px The pixels
+ * @return The largest channel sum
+ */
+static int32_t trans_peak(
+    const unsigned char *px)
+{
+    int32_t best = 0, x, y;
+    for (y = 0; y < TRANS_SIZE; y ++) {
+        for (x = 0; x < TRANS_SIZE; x ++) {
+            int32_t sum = trans_channel(px, x, y, 0) + trans_channel(px, x, y, 1) +
+                trans_channel(px, x, y, 2);
+            best = sum > best ? sum : best;
+        }
+    }
+
+    return best;
+}
+
+/** A coated quad under a point light changes the roughness of its coat from 0 to 1 over a
+ * second: mid transition its highlight peaks between the peaks of the two end values, and at
+ * the end it peaks as a quad that has the rough coat from the start.
+ */
+void Transition_clear_coat_mid_transition(void) {
+    // materials/pbr
+    ecs_entity_t e = 0, still = 0;
+    ecs_world_t *rough = trans_coat_world(1, &still);
+    stbi_image_free(trans_capture(rough, "transition_coat_rough_0.png"));
+    unsigned char *px = trans_capture(rough, "transition_coat_rough_1.png");
+    int32_t end_peak = trans_peak(px);
+    stbi_image_free(px);
+    trans_no_errors(rough);
+    ecs_fini(rough);
+
+    ecs_world_t *world = trans_coat_world(0, &e);
+    box_transition_set(world, e, ecs_id(ClearCoat), &(TransitionSpec){ .duration = 1.0f });
+    stbi_image_free(trans_capture(world, "transition_coat_0.png"));
+    px = trans_capture(world, "transition_coat_1.png");
+    int32_t start_peak = trans_peak(px);
+    stbi_image_free(px);
+    test_assert(start_peak > end_peak + 60);
+
+    ecs_set(world, e, ClearCoat, {.strength = 1, .roughness = 1});
+    px = trans_capture(world, "transition_coat_2.png");
+    test_assert(trans_peak(px) > end_peak + 60);
+    stbi_image_free(px);
+
+    stbi_image_free(trans_capture(world, "transition_coat_3.png"));
+    px = trans_capture(world, "transition_coat_4.png");
+    test_flt(ecs_get(world, e, ClearCoat)->roughness, 1);
+    int32_t mid_peak = trans_peak(px);
+    test_assert(mid_peak < start_peak - 20);
+    test_assert(mid_peak > end_peak + 20);
+    stbi_image_free(px);
+
+    stbi_image_free(trans_capture(world, "transition_coat_5.png"));
+    px = trans_capture(world, "transition_coat_6.png");
+    test_assert(abs(trans_peak(px) - end_peak) <= 3);
+    stbi_image_free(px);
+
+    trans_no_errors(world);
+    ecs_fini(world);
+}

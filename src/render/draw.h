@@ -203,8 +203,7 @@ typedef struct box_draw_transition_material_t {
     Emissive emissive;      /**< Emissive */
     TextureTransform uv;    /**< TextureTransform */
     Transmission transmission; /**< Transmission */
-    bool coated;            /**< The material has ClearCoat, which does not transition */
-    ClearCoat clear_coat;   /**< ClearCoat, when coated */
+    ClearCoat clear_coat;   /**< ClearCoat */
     Opacity opacity;        /**< Opacity of the shape itself */
     Tint tint;              /**< Tint of the shape itself */
     box_draw_tint_t inherited; /**< Tints of the ancestors, when tinted */
@@ -648,7 +647,8 @@ void box_draws_surface(
  *
  * The base color is mixed toward the tints of the ancestors from the root down and then toward
  * the tint of the shape, in display encoding, before it and the emission are converted to
- * linear light. The alpha is the opacity of the shape times the opacity of its ancestors.
+ * linear light. The alpha is the opacity of the shape times the opacity of its ancestors. The
+ * color and alpha are stored as unorm16x4 (box_draws_color_pack).
  *
  * The clip index goes into ids[0].
  *
@@ -659,11 +659,30 @@ void box_draws_material(
     box_render_shading_t *out,
     const box_draw_material_t *material);
 
+/** Pack a linear color and alpha into the color of a 2D shading as unorm16x4: r | g << 16,
+ * b | a << 16, each channel clamped to 0..1.
+ *
+ * @param out Two words receiving the packed color
+ * @param color The color, r, g, b, a
+ */
+void box_draws_color_pack(
+    uint32_t *out,
+    const float *color);
+
+/** Unpack the unorm16x4 color of a 2D shading, as unpack2x16unorm does.
+ *
+ * @param out Four floats receiving r, g, b, a
+ * @param packed The two words of the packed color
+ */
+void box_draws_color_unpack(
+    float *out,
+    const uint32_t *packed);
+
 /** Pack the material components of the owner of a slot into its record of the material table.
  *
  * The record holds the display encoded base color (the default color without Rgb), metallic,
  * roughness, emission, texture transform and AlphaCutoff (0 without one) clamped as the shading
- * was, the Transmission (factor 0 without one) and the ClearCoat (0 without one).
+ * was, the Transmission (factor 0 without one) and the ClearCoat (0 without one or at 0).
  *
  * Opacity, tints and the 2D shape are not.
  *

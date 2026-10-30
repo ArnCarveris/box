@@ -797,18 +797,27 @@ typedef struct box_render_transform_t {
 } box_render_transform_t;
 
 /** Shading constants of a 2D shape or glyph, the shading stream of a 2D instance page, which
- * changes with its material.
+ * changes with its material, Shape2DShading of shape2d.wgsl.
  *
- * A 2D instance holds the words of its shape in material (see shape2d.wgsl) and its clip index
- * in ids[0].
+ * The words of emissive.w and material depend on what the instance draws (box_draws_shape2d,
+ * box_draws_glyph):
+ * - A rectangle (Rect, Circle): emissive.w is its width over its height, material.x its corner
+ *   radius and material.y its border width in units of half its smaller side, material.zw its
+ *   linear border color as four half floats (r | g << 16, b | a << 16).
+ * - A line: emissive.w is its negated width, material.xy its start and material.zw its end.
+ * - A glyph of a Text: emissive.w is 0, material.xy the distance range of its atlas page,
+ *   material.zw 0 and uv the area of the glyph on the page.
+ * - A shape without a 2D shape: material.xy metallic and roughness, emissive.w and material.zw 0.
  */
 typedef struct box_render_shading_t {
-    vec4 color;             /**< Linear base color, alpha is the opacity with its ancestors */
-    vec4 emissive;          /**< Linear emitted color times its strength, w unused */
-    vec4 material;          /**< Metallic, roughness, zw unused (the words of a 2D shape) */
+    vec4 emissive;          /**< Linear emitted color times its strength; w the aspect, the
+                             *   negated line width or 0 for a glyph */
+    vec4 material;          /**< The words of the shape, or metallic and roughness */
     vec4 uv;                /**< TextureTransform: u scale, v scale, u offset, v offset */
-    uint32_t ids[4];        /**< Clip index of a 2D instance (0 for none), its rank in the draw
-                             *   order of its tree, two reserved 0 */
+    uint32_t color[2];      /**< Linear base color and alpha (the opacity with its ancestors) as
+                             *   unorm16x4: r | g << 16, b | a << 16 (box_draws_color_pack) */
+    uint32_t ids[2];        /**< Clip index of a 2D instance (0 for none), its rank in the draw
+                             *   order of its tree */
 } box_render_shading_t;
 
 /** A record of the material table (BOX_RENDER_BUFFER_MATERIALS), Material of material.wgsl: the
@@ -828,7 +837,7 @@ typedef struct box_render_material_t {
     float attenuation_distance; /**< Transmission.attenuation_distance,
                              *   BOX_MATERIAL_ATTENUATION_DISTANCE without one */
     uint32_t clear_coat;    /**< ClearCoat strength | roughness << 16, two unorm16 clamped to
-                             *   0..1, 0 without one */
+                             *   0..1, 0 without one or with a strength of 0 */
     uint32_t reserved[3];   /**< 0, pads the record to the 16 byte alignment of Material */
 } box_render_material_t;
 
@@ -971,6 +980,7 @@ typedef enum box_render_transition_component_t {
     BOX_RENDER_TRANSITION_EMISSIVE,         /**< Emissive */
     BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM, /**< TextureTransform */
     BOX_RENDER_TRANSITION_TRANSMISSION,     /**< Transmission */
+    BOX_RENDER_TRANSITION_CLEAR_COAT,       /**< ClearCoat */
     BOX_RENDER_TRANSITION_COMPONENTS        /**< Number of transitionable components */
 } box_render_transition_component_t;
 

@@ -11,144 +11,7 @@
 #include <bake_test.h>
 #include "render.h"
 #include "draw.h"
-
-/** Seconds every frame advances the world, a power of two so the clock is exact */
-#define TR_DELTA (0.25f)
-
-/** Create a world that renders into the null backend.
- *
- * @param null Receives the backend
- * @return The world
- */
-static ecs_world_t* tr_world(
-    box_render_null_t **null)
-{
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-    *null = box_render_null_new();
-    box_render_backend_t backend = box_render_null_backend(*null);
-    box_render_set_backend(world, &backend);
-
-    return world;
-}
-
-/** Delete a world and its null backend.
- *
- * @param world The world
- * @param null The backend
- */
-static void tr_fini(
-    ecs_world_t *world,
-    box_render_null_t *null)
-{
-    ecs_fini(world);
-    box_render_null_free(null);
-}
-
-/** Run one frame and wait until the render thread resolved its packet.
- *
- * @param world The world
- */
-static void tr_frame(
-    ecs_world_t *world)
-{
-    ecs_progress(world, TR_DELTA);
-    box_render_sync(world);
-}
-
-/** Read the rendered Rgb of an entity.
- *
- * @param world The world
- * @param e The entity
- * @return The value the resolver computed for the last packet
- */
-static Rgb tr_rgb(
-    ecs_world_t *world,
-    ecs_entity_t e)
-{
-    Rgb result = {0};
-    box_render_sync(world);
-    test_assert(box_render_transition_test_value(world, e, ecs_id(Rgb), &result));
-
-    return result;
-}
-
-/** Count the records of an op in the last packet.
- *
- * @param null The backend
- * @param op The op
- * @return The records
- */
-static int32_t tr_records(
-    const box_render_null_t *null,
-    box_render_transition_op_t op)
-{
-    int32_t i, result = 0;
-    for (i = 0; i < ecs_vec_count(&null->last.transitions); i ++) {
-        const box_render_transition_record_t *r = ecs_vec_get_t(
-            &null->last.transitions, box_render_transition_record_t, i);
-        result += r->op == op;
-    }
-
-    return result;
-}
-
-/** Create a world that renders into the null backend with a view, so the batches are sent.
- *
- * @param null Receives the backend
- * @return The world
- */
-static ecs_world_t* tr_scene(
-    box_render_null_t **null)
-{
-    ecs_world_t *world = tr_world(null);
-    ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Position, {0, 0, 20});
-    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
-    ecs_entity_t view = ecs_new(world);
-    ecs_set(world, view, View, {.camera = camera});
-
-    return world;
-}
-
-/** Create a box shape.
- *
- * @param world The world
- * @param parent ChildOf parent, 0 for none
- * @param x Its x position
- * @return The shape
- */
-static ecs_entity_t tr_shape(
-    ecs_world_t *world,
-    ecs_entity_t parent,
-    float x)
-{
-    ecs_entity_t e = parent ? ecs_new_w_pair(world, EcsChildOf, parent) : ecs_new(world);
-    ecs_set(world, e, Position, {x, 0, 0});
-    ecs_set(world, e, Box, {1, 2, 3});
-    ecs_set(world, e, Rgb, {200, 100, 50});
-
-    return e;
-}
-
-/** Get the batch of the shape of an entity.
- *
- * @param world The world
- * @param e The entity
- * @return The batch
- */
-static box_draw_batch_t* tr_batch(
-    ecs_world_t *world,
-    ecs_entity_t e)
-{
-    box_render_draws_t *d = box_draws_state(world);
-    const DrawSlot *ds = ecs_get(world, e, DrawSlot);
-    test_assert(d != NULL);
-    test_assert(ds != NULL);
-    test_assert(ds->batch >= 0);
-
-    return box_draws_batch(d, ds->batch);
-}
+#include "transition_test.h"
 
 /** A material component, the value a case starts from and the one it transitions to */
 typedef struct tr_material_case_t {
@@ -177,6 +40,7 @@ static void tr_material_set(
     case BOX_RENDER_TRANSITION_EMISSIVE: m->emissive = value; break;
     case BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM: m->uv = value; break;
     case BOX_RENDER_TRANSITION_TRANSMISSION: m->transmission = value; break;
+    case BOX_RENDER_TRANSITION_CLEAR_COAT: m->clear_coat = value; break;
     default: test_assert(false); break;
     }
 }
@@ -232,23 +96,6 @@ static bool tr_material_rendered(
     return result;
 }
 
-/** Count the records of an op in the last packet, once the render thread resolved it.
- *
- * @param world The world
- * @param null The backend
- * @param op The op
- * @return The records
- */
-static int32_t tr_ops(
-    ecs_world_t *world,
-    const box_render_null_t *null,
-    box_render_transition_op_t op)
-{
-    box_render_sync(world);
-
-    return tr_records(null, op);
-}
-
 /** Read a shading slot of a 2D batch as the backend got it in the last packet: the patched
  * bytes of the run upload of a dynamic_material batch, else the static slot.
  *
@@ -265,32 +112,10 @@ static void tr_shading_slot(
     int32_t slot,
     box_render_shading_t *out)
 {
-    box_render_draws_t *d = box_draws_state(world);
-    bool found = false;
-    int32_t i;
     box_render_sync(world);
     *out = *box_draws_slot_shading(b, slot);
-    if (!b->key.dynamic_material) {
-        goto done;
-    }
-
-    uint32_t handle = box_draws_store_handle(box_draws_batch_store(d, b), b->page,
-        BOX_RENDER_STREAM_SHADING);
-    uint32_t offset = b->first * (uint32_t)sizeof(box_render_shading_t);
-    for (i = 0; i < ecs_vec_count(&null->last.uploads) && !found; i ++) {
-        const box_render_upload_t *u = ecs_vec_get_t(
-            &null->last.uploads, box_render_upload_t, i);
-        if (u->buffer == handle && u->offset == offset) {
-            ecs_os_memcpy(out, box_render_packet_data(&null->last,
-                u->data + (uint32_t)slot * (uint32_t)sizeof(box_render_shading_t)),
-                ECS_SIZEOF(box_render_shading_t));
-            found = true;
-        }
-    }
-
-    test_assert(found);
-done:
-    return;
+    tr_slot_rendered(world, null, b, slot, BOX_RENDER_STREAM_SHADING,
+        (uint32_t)sizeof(box_render_shading_t), out);
 }
 
 /** Read the shading of the 2D shape of an entity as the backend got it in the last packet.
@@ -350,6 +175,10 @@ static const Transmission tr_transmission_to = {
     .attenuation_color = {200, 100, 40}
 };
 
+/** The ClearCoat case: both fields rise, so both unorm16 halves of the packed word do */
+static const ClearCoat tr_coat_from = { .strength = 0.25f, .roughness = 0 };
+static const ClearCoat tr_coat_to = { .strength = 1, .roughness = 1 };
+
 /** Get the case of a component, once the world registered the components.
  *
  * @param c The component
@@ -395,6 +224,12 @@ static tr_material_case_t tr_case(
         result.size = ECS_SIZEOF(Transmission);
         result.from = &tr_transmission_from;
         result.to = &tr_transmission_to;
+        break;
+    case BOX_RENDER_TRANSITION_CLEAR_COAT:
+        result.component = ecs_id(ClearCoat);
+        result.size = ECS_SIZEOF(ClearCoat);
+        result.from = &tr_coat_from;
+        result.to = &tr_coat_to;
         break;
     default:
         test_assert(false);
@@ -724,6 +559,201 @@ void TransitionMaterial_transmission_keeps_batch(void) {
     }
 
     tr_fini(world, null);
+}
+
+/** Get the unorm16 of a value as the material table packs it.
+ *
+ * @param value The value
+ * @return The unorm16
+ */
+static uint32_t tr_unorm16(
+    float value)
+{
+    return (uint32_t)(glm_clamp(value, 0.0f, 1.0f) * 65535.0f + 0.5f);
+}
+
+/** Get the packed clear_coat word of a ClearCoat.
+ *
+ * @param coat The coat
+ * @return The word
+ */
+static uint32_t tr_coat_word(
+    const ClearCoat *coat)
+{
+    return tr_unorm16(coat->strength) | (tr_unorm16(coat->roughness) << 16);
+}
+
+/** Check the clear_coat word of a record of the material table against the ClearCoat case at a
+ * progress of k quarters, and that both halves lie strictly between the two values in between.
+ *
+ * @param r The record
+ * @param k Quarters, 0 to 4
+ */
+static void tr_coat_check(
+    const box_render_material_t *r,
+    uint32_t k)
+{
+    float t = (float)k / 4.0f;
+    ClearCoat expected = {
+        .strength = tr_coat_from.strength + (tr_coat_to.strength - tr_coat_from.strength) * t,
+        .roughness = tr_coat_from.roughness + (tr_coat_to.roughness - tr_coat_from.roughness) * t
+    };
+    test_uint(r->clear_coat, tr_coat_word(&expected));
+    if (k && k < 4) {
+        uint32_t from = tr_coat_word(&tr_coat_from), to = tr_coat_word(&tr_coat_to);
+        test_assert((r->clear_coat & 0xFFFFu) > (from & 0xFFFFu));
+        test_assert((r->clear_coat & 0xFFFFu) < (to & 0xFFFFu));
+        test_assert((r->clear_coat >> 16) > (from >> 16));
+        test_assert((r->clear_coat >> 16) < (to >> 16));
+    }
+}
+
+void TransitionMaterial_clear_coat_mesh(void) {
+    // engine_core/transition
+    tr_test_mesh_material(BOX_RENDER_TRANSITION_CLEAR_COAT);
+
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_entity_t e = tr_shape(world, 0, 0);
+    box_render_material_t rendered;
+    int32_t i;
+    ecs_set_ptr(world, e, ClearCoat, &tr_coat_from);
+    box_transition_set(world, e, ecs_id(ClearCoat), &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+    tr_frame(world);
+    uint32_t slot = ecs_get(world, e, MaterialId)->value;
+    test_assert(slot != 0 && slot != UINT32_MAX);
+
+    ecs_set_ptr(world, e, ClearCoat, &tr_coat_to);
+    for (i = 0; i < 4; i ++) {
+        tr_frame(world);
+        test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 1);
+        test_assert(tr_material_rendered(world, null, slot, &rendered));
+        tr_coat_check(&rendered, (uint32_t)i);
+    }
+
+    tr_frame(world);
+    test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 0);
+    test_assert(tr_material_rendered(world, null, slot, &rendered));
+    tr_coat_check(&rendered, 4);
+    test_uint(rendered.clear_coat, tr_coat_word(&tr_coat_to));
+    tr_fini(world, null);
+}
+
+void TransitionMaterial_clear_coat_prefab(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    box_render_transitions_t *s = box_render_transitions_get(world);
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_entity_t instances[8];
+    box_render_material_t rendered;
+    const ClearCoat own = { .strength = 0.5f, .roughness = 0.25f };
+    int32_t i;
+    ecs_set(world, prefab, Box, {1, 1, 1});
+    ecs_set_ptr(world, prefab, ClearCoat, &tr_coat_from);
+    box_transition_set(world, prefab, ecs_id(ClearCoat), &(TransitionSpec){ .duration = 1.0f });
+    for (i = 0; i < 8; i ++) {
+        instances[i] = ecs_new_w_pair(world, EcsIsA, prefab);
+        ecs_set(world, instances[i], Position, {(float)i, 0, 0});
+    }
+
+    ecs_entity_t over = ecs_new_w_pair(world, EcsIsA, prefab);
+    ecs_set(world, over, Position, {0, 2, 0});
+    ecs_set_ptr(world, over, ClearCoat, &own);
+    tr_frame(world);
+    tr_frame(world);
+    uint32_t slot_p = ecs_get(world, prefab, MaterialId)->value;
+    uint32_t slot_o = ecs_get(world, over, MaterialId)->value;
+    test_assert(ecs_owns(world, over, MaterialId));
+    test_assert(slot_o != slot_p);
+    int32_t batch = ecs_get(world, instances[0], DrawSlot)->batch;
+    for (i = 0; i < 8; i ++) {
+        const DrawSlot *ds = ecs_get(world, instances[i], DrawSlot);
+        test_assert(!ecs_owns(world, instances[i], MaterialId));
+        test_uint(box_draws_slot_mesh_shading(tr_batch(world, instances[i]), ds->slot)->material,
+            slot_p);
+    }
+
+    ecs_set_ptr(world, prefab, ClearCoat, &tr_coat_to);
+    for (i = 0; i < 4; i ++) {
+        int32_t j;
+        tr_frame(world);
+        test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 1);
+        test_int(box_render_transitions_material_visited(s), 2);
+        test_assert(tr_material_rendered(world, null, slot_p, &rendered));
+        tr_coat_check(&rendered, (uint32_t)i);
+        if (tr_material_rendered(world, null, slot_o, &rendered)) {
+            test_uint(rendered.clear_coat, tr_coat_word(&own));
+        }
+
+        for (j = 0; j < 8; j ++) {
+            const DrawSlot *ds = ecs_get(world, instances[j], DrawSlot);
+            test_assert(!ecs_has_id(world, instances[j], TransitionMaterial));
+            test_assert(!ecs_os_memcmp_t(ecs_get(world, instances[j], ClearCoat),
+                &tr_coat_to, ClearCoat));
+            test_int(ds->batch, batch);
+            test_uint(box_draws_slot_mesh_shading(tr_batch(world, instances[j]),
+                ds->slot)->material, slot_p);
+        }
+    }
+
+    tr_frame(world);
+    test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 0);
+    test_assert(tr_material_rendered(world, null, slot_p, &rendered));
+    tr_coat_check(&rendered, 4);
+    tr_fini(world, null);
+}
+
+void TransitionMaterial_clear_coat_keeps_batch(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_entity_t e = tr_shape(world, 0, 0);
+    box_render_material_t rendered;
+    int32_t i;
+    ecs_set(world, e, ClearCoat, { .strength = 0, .roughness = 0.5f });
+    box_transition_set(world, e, ecs_id(ClearCoat), &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+    tr_frame(world);
+    uint32_t slot = ecs_get(world, e, MaterialId)->value;
+    int32_t batch = ecs_get(world, e, DrawSlot)->batch;
+    int32_t at = ecs_get(world, e, DrawSlot)->slot;
+    test_uint(ecs_vec_get_t(&box_draws_state(world)->materials.records,
+        box_render_material_t, (int32_t)slot)->clear_coat, 0);
+
+    ecs_set(world, e, ClearCoat, { .strength = 1, .roughness = 0.5f });
+    for (i = 0; i < 4; i ++) {
+        ClearCoat expected = { .strength = 0.25f * (float)i, .roughness = 0.5f };
+        tr_frame(world);
+        test_int(ecs_get(world, e, DrawSlot)->batch, batch);
+        test_int(ecs_get(world, e, DrawSlot)->slot, at);
+        test_assert(!ecs_has_id(world, e, TransitionMaterial));
+        test_assert(tr_material_rendered(world, null, slot, &rendered));
+        test_uint(rendered.clear_coat, i ? tr_coat_word(&expected) : 0u);
+    }
+
+    tr_frame(world);
+    test_int(ecs_get(world, e, DrawSlot)->batch, batch);
+    test_assert(tr_material_rendered(world, null, slot, &rendered));
+    test_uint(rendered.clear_coat, tr_coat_word(&(ClearCoat){ 1, 0.5f }));
+
+    ecs_set(world, e, ClearCoat, { .strength = 0, .roughness = 0.5f });
+    for (i = 0; i < 5; i ++) {
+        ClearCoat expected = { .strength = 1.0f - 0.25f * (float)i, .roughness = 0.5f };
+        tr_frame(world);
+        test_int(ecs_get(world, e, DrawSlot)->batch, batch);
+        test_int(ecs_get(world, e, DrawSlot)->slot, at);
+        test_assert(tr_material_rendered(world, null, slot, &rendered));
+        test_uint(rendered.clear_coat, i < 4 ? tr_coat_word(&expected) : 0u);
+    }
+
+    tr_fini(world, null);
+}
+
+void TransitionMaterial_clear_coat_2d(void) {
+    // engine_core/transition
+    tr_test_shape_material(BOX_RENDER_TRANSITION_CLEAR_COAT, false);
 }
 
 void TransitionMaterial_uv_mesh(void) {
