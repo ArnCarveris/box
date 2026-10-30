@@ -5,8 +5,10 @@ like CSS transitions. The component itself holds the new value at once: transiti
 in the rendered pixels.
 
 Status: the `Transition` component, its timing functions and its validation exist
-(`include/box/transition.h`). Nothing animates yet; detecting changes and the render thread
-resolver are the next steps of the epic.
+(`include/box/transition.h`), and so do the change detection of the game thread and the render
+thread resolver, which evaluates every transitioned value on the packet clock. Nothing patches
+instance or material data yet, so rendered output does not change; patching the transforms,
+materials, tint and opacity are the next steps of the epic.
 
 ## What the application sees
 
@@ -38,7 +40,8 @@ and (0.42, 0, 0.58, 1). `box_transition_ease(fn, t)` evaluates them; it is pure 
 nothing, so the render thread can call it.
 
 From C, `box_transition_set(world, e, ecs_id(Position), &spec)` adds or replaces one entry (an
-instance gets its own copy of an inherited map first), and `box_transition_get()` reads one. The
+instance gets its own copy of an inherited map first), `box_transition_remove()` removes one
+(the same way), and `box_transition_get()` reads one. The
 storage is a flecs map (`ecs_map_t`) keyed by the component entity whose values are allocated
 `TransitionSpec`s, so `ecs_map_get_deref(map, TransitionSpec, ecs_id(Position))` also reads one.
 
@@ -71,6 +74,11 @@ storage is a flecs map (`ecs_map_t`) keyed by the component entity whose values 
   which renders as smoothing. Writing an equal value does nothing.
 - Removing `Transition`, or removing the transitioned component, snaps to the target. Deleting
   the entity drops its transition.
+- An entry removed from the `Transition` map (with `box_transition_remove`, or by a new map
+  without it: a script reload, or an instance that sets its own map over the prefab's) snaps
+  that component to its target, like removing `Transition`. So does an entry that becomes
+  invalid. An entry whose spec changes keeps a running transition until the next value change,
+  which uses the new spec.
 - `duration: 0` with `delay: 0` is no transition. `duration: 0` with a delay switches after the
   delay.
 - `Rotation` interpolates per Euler axis without wrapping. `Rgb`, `Tint` and emissive color
@@ -111,6 +119,25 @@ patches them into the packet before the backend sees it.
   record in the packet data, so the resolver can patch it. After the last active frame the
   normal stream holds the target, so the render thread needs no end logic.
 
+Implemented in `src/render/transitions.c`, the first system of `RenderExtract`:
+
+- The query is `Transition(self|up IsA)` with `EcsQueryMatchPrefab`, so a prefab and each of its
+  instances get their own node and state. Only owned values are compared: an inherited
+  material value transitions on the prefab that owns it.
+- Values are compared and sent field by field in the layout of the component, with the padding
+  zeroed, so an equal write never starts a transition.
+- Node ids start at 1 and are reused, after the frame that destroyed them, without carrying any
+  state over: the create record resets the node on the render thread.
+- Records (`box_render_transition_record_t`, in `box_render_packet_t.transitions`):
+  `CREATE` and `DESTROY` of a node, and `START` of a component with its target, `delay`,
+  `duration`, timing function and start time (`packet->time`). A first value, and a snap
+  (an entry or a component removed), is a `START` with a `delay` and `duration` of 0, which sets
+  the value without a transition. Removing `Transition` and deleting the entity both send
+  `DESTROY`: the normal stream already holds the target.
+- `box_render_transitions_active()` says whether a node and component is active at the packet
+  time. It and the resolver both decide with `box_render_transition_running()`, from the same
+  start time, `delay` and `duration`, so they agree on the last active packet.
+
 ### Render thread, `src/render/transition.c`
 
 Called from `box_render_consume` in `src/render/ring.c` before `backend.render`, so it works on
@@ -120,7 +147,19 @@ null backend.
 - It keeps a table indexed by node id with the from, current and target value and the curve per
   component. It applies the packet's records, evaluates each active node, and patches the packet
   bytes.
-- The table is not backend state, so it survives device loss.
+- The table is not backend state, so it survives device loss. The records of a packet that
+  the ring drops because it was built for an older backend generation still apply, as they are
+  not sent again.
+- Values are stored as raw bytes in the layout of their component, with a table of fields per
+  component (offset and kind, `float` or `uint8_t`), so a new transitionable component is a
+  table entry. `uint8_t` fields interpolate in float and round.
+- A start transitions from the value of the running curve at the start time of the new record,
+  so an interrupt never jumps, whatever the number of packets in flight.
+- It allocates only when a create record grows the table; the active list is sized with it.
+- Tests read the value of a node with `box_render_transition_test_value()`, declared in
+  `src/render/render_packet.h` next to the null backend, after `box_render_sync`. It exists so
+  that tests can check values without a GPU and is not reachable from a public header, a
+  component, a stat or the shell.
 
 ### Hierarchy
 

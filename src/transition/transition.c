@@ -188,6 +188,23 @@ void box_transition_set(
     ecs_modified_id(world, entity, ecs_id(Transition));
 }
 
+void box_transition_remove(
+    ecs_world_t *world,
+    ecs_entity_t entity,
+    ecs_entity_t component)
+{
+    if (!box_transition_get(world, entity, component)) {
+        goto done;
+    }
+
+    Transition *map = ecs_ensure_id(world, entity, ecs_id(Transition), sizeof(Transition));
+    ecs_map_init_if(map, NULL);
+    ecs_os_free(ecs_map_remove_ptr(map, component));
+    ecs_modified_id(world, entity, ecs_id(Transition));
+done:
+    return;
+}
+
 const TransitionSpec* box_transition_get(
     const ecs_world_t *world,
     ecs_entity_t entity,

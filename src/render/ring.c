@@ -51,6 +51,8 @@ struct box_render_ring_t {
     int32_t device_losses;          /**< Backend restarts after the device was lost */
     int32_t generation;             /**< Generation of the backend state, which the acquire
                                      *   publishes in backend.generation for the extract */
+    box_render_transition_table_t transitions; /**< Transition resolver of the consumer, not
+                                     *   backend state */
 };
 
 /** Read the clock the frame loop measures with.
@@ -109,20 +111,33 @@ static void box_render_count_present(
     ecs_os_mutex_unlock(ring->lock);
 }
 
-/** Hand a packet to the backend, which presents it, and count the present.
+/** Resolve the transitions of a packet, then hand it to the backend, which presents it, and
+ * count the present.
+ *
+ * The transition records of a packet built for an older generation of the backend still apply,
+ * as the transition table is not backend state and the extract does not send them again.
  *
  * @param ring The ring
  * @param p The packet
+ * @param current Whether the packet was built for the current generation, else it is dropped
  */
 static void box_render_consume(
     box_render_ring_t *ring,
-    const box_render_packet_t *p)
+    box_render_packet_t *p,
+    bool current)
 {
+    box_render_transition_resolve(&ring->transitions, p);
+    if (!current) {
+        goto done;
+    }
+
     if (ring->backend_ready && ring->backend.render) {
         ring->backend.render(ring->backend.ctx, p);
     }
 
     box_render_count_present(ring, p->fps > 0 ? 1.0 / (double)p->fps : 0, box_render_now());
+done:
+    return;
 }
 
 /** Run the init of the backend on the calling thread.
@@ -204,16 +219,14 @@ done:
  */
 static void box_render_take(
     box_render_ring_t *ring,
-    const box_render_packet_t *p)
+    box_render_packet_t *p)
 {
     bool current;
     box_render_backend_recover(ring);
     ecs_os_mutex_lock(ring->lock);
     current = p->generation == ring->generation;
     ecs_os_mutex_unlock(ring->lock);
-    if (current) {
-        box_render_consume(ring, p);
-    }
+    box_render_consume(ring, p, current);
 }
 
 /** Check whether the render thread may take a packet, called with the lock held.
@@ -399,6 +412,7 @@ box_render_ring_t* box_render_ring_new(void)
     }
 
     result->count = BOX_RENDER_IN_FLIGHT;
+    box_render_transition_table_init(&result->transitions);
     result->main_thread = !ecs_os_has_threading();
     result->lock = ecs_os_mutex_new();
     result->can_write = ecs_os_cond_new();
@@ -423,6 +437,7 @@ void box_render_ring_free(
         box_render_packet_fini(&ring->packets[i]);
     }
 
+    box_render_transition_table_fini(&ring->transitions);
     ecs_os_cond_free(ring->can_read);
     ecs_os_cond_free(ring->can_write);
     ecs_os_mutex_free(ring->lock);
@@ -576,4 +591,10 @@ void box_render_ring_status(
     status->presents_early = ring->presents_early;
     status->device_losses = ring->device_losses;
     ecs_os_mutex_unlock(ring->lock);
+}
+
+box_render_transition_table_t* box_render_ring_transitions(
+    box_render_ring_t *ring)
+{
+    return &ring->transitions;
 }

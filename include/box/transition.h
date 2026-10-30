@@ -107,6 +107,21 @@ void box_transition_set(
     ecs_entity_t component,
     const TransitionSpec *spec);
 
+/** Remove the transition of one component of an entity.
+ *
+ * An entity that inherits Transition gets its own copy first, so the other entries stay. A
+ * running transition of the component snaps to its target. Nothing happens when the entity has
+ * no entry for the component.
+ *
+ * @param world The world
+ * @param entity The entity
+ * @param component The component of the entry
+ */
+void box_transition_remove(
+    ecs_world_t *world,
+    ecs_entity_t entity,
+    ecs_entity_t component);
+
 /** Get the transition of one component of an entity, owned or inherited.
  *
  * @param world The world

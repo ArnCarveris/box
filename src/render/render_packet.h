@@ -904,6 +904,53 @@ typedef struct box_render_batch_t {
                                  *   order */
 } box_render_batch_t;
 
+/** Components whose rendered value can transition, the index of their entry in the layout table
+ * of the resolver (box_render_transition_layout) */
+typedef enum box_render_transition_component_t {
+    BOX_RENDER_TRANSITION_POSITION = 0,     /**< Position */
+    BOX_RENDER_TRANSITION_ROTATION,         /**< Rotation */
+    BOX_RENDER_TRANSITION_SCALE,            /**< Scale */
+    BOX_RENDER_TRANSITION_RGB,              /**< Rgb */
+    BOX_RENDER_TRANSITION_OPACITY,          /**< Opacity */
+    BOX_RENDER_TRANSITION_ALPHA_CUTOFF,     /**< AlphaCutoff */
+    BOX_RENDER_TRANSITION_TINT,             /**< Tint */
+    BOX_RENDER_TRANSITION_PBR_MATERIAL,     /**< PbrMaterial */
+    BOX_RENDER_TRANSITION_EMISSIVE,         /**< Emissive */
+    BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM, /**< TextureTransform */
+    BOX_RENDER_TRANSITION_COMPONENTS        /**< Number of transitionable components */
+} box_render_transition_component_t;
+
+/** Bytes of the largest transitionable component, the size of a value in a record */
+#define BOX_RENDER_TRANSITION_VALUE (16)
+
+/** Fields of the transitionable component with the most fields */
+#define BOX_RENDER_TRANSITION_FIELDS (4)
+
+/** What a transition record does */
+typedef enum box_render_transition_op_t {
+    BOX_RENDER_TRANSITION_CREATE = 0,   /**< A node exists, with no values */
+    BOX_RENDER_TRANSITION_DESTROY,      /**< A node no longer exists, its values are dropped */
+    BOX_RENDER_TRANSITION_START         /**< A component of a node has a new target */
+} box_render_transition_op_t;
+
+/** A change the game thread found for the transition resolver of the render thread.
+ *
+ * A start without a previous value of the component, or with a duration and delay of 0, sets
+ * the value without a transition; any other start transitions from the value the node renders
+ * at the start time to the target. The records of a packet apply in the order they were made.
+ */
+typedef struct box_render_transition_record_t {
+    box_render_transition_op_t op;  /**< What the record does */
+    uint32_t node;                  /**< Node id, from 1 */
+    box_render_transition_component_t component; /**< Component of a start */
+    TimingFunction timing_function; /**< Curve of a start */
+    float delay;                    /**< Seconds the value holds still after the start */
+    float duration;                 /**< Seconds from the end of the delay to the target */
+    double start;                   /**< World time of the start, the time of its packet */
+    uint8_t value[BOX_RENDER_TRANSITION_VALUE]; /**< Target in the layout of the component,
+                                     *   padding zeroed */
+} box_render_transition_record_t;
+
 /** Everything the renderer needs of one frame, filled on the main thread.
  *
  * The vectors keep their storage when the packet is reused, so a frame that needs no more
@@ -931,6 +978,8 @@ typedef struct box_render_packet_t {
     ecs_vec_t particles;    /**< box_render_particle_pool_t, simulated after the scatters */
     ecs_vec_t shadow_atlases; /**< box_render_shadow_atlas_t, the atlases with tiles */
     ecs_vec_t shadow_tiles; /**< box_render_shadow_tile_t of those atlases */
+    ecs_vec_t transitions;  /**< box_render_transition_record_t in the order they were made,
+                             *   empty in a world without Transition */
     ecs_vec_t data;         /**< Bytes the resources and uploads point into */
     int32_t generation;     /**< Backend generation the extract built it for, the ring drops a
                              *   packet of an older generation instead of rendering it */
@@ -977,7 +1026,48 @@ typedef struct box_render_null_t {
     int64_t resources;          /**< Resource changes received in total */
     int64_t bytes;              /**< Upload bytes received in total */
     int64_t targets;            /**< Targets received in total */
+    int64_t transitions;        /**< Transition records received in total */
     box_render_packet_t last;   /**< Copy of the last packet */
 } box_render_null_t;
+
+/* Test only access to the transition resolver.
+ *
+ * The in-progress value of a transition exists only on the render thread and only rendered
+ * pixels show it: no public header, component, stat or shell command returns it. These exist so
+ * that tests can check the values the resolver computes without a GPU, with the null backend.
+ * Call them on the main thread after box_render_sync, while no packet is being rendered. */
+
+/** Get the value the transition resolver computed for a component of an entity in the last
+ * packet it resolved, for tests.
+ *
+ * @param world The world
+ * @param entity The entity, which has Transition
+ * @param component The component id, one that box_transition_supported accepts
+ * @param out Receives the value in the layout of the component, the size of the component
+ * @return Whether the entity has a node and the node has a value of the component
+ */
+bool box_render_transition_test_value(
+    ecs_world_t *world,
+    ecs_entity_t entity,
+    ecs_entity_t component,
+    void *out);
+
+/** Get the node id the extract gave an entity, for tests.
+ *
+ * @param world The world
+ * @param entity The entity
+ * @return The node id, 0 when the entity has no node
+ */
+uint32_t box_render_transition_test_node(
+    ecs_world_t *world,
+    ecs_entity_t entity);
+
+/** Get the number of nodes with a running transition in the transition resolver, for tests.
+ *
+ * @param world The world
+ * @return Nodes the resolver evaluates per packet
+ */
+int32_t box_render_transition_test_active(
+    ecs_world_t *world);
 
 #endif

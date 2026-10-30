@@ -1083,6 +1083,18 @@ void box_render_packet_copy(
     box_render_packet_t *dst,
     const box_render_packet_t *src);
 
+/** Append a transition record to a packet.
+ *
+ * @param p The packet
+ * @param op What the record does
+ * @param node The node id
+ * @return The record, zeroed but for op and node
+ */
+box_render_transition_record_t* box_render_packet_transition(
+    box_render_packet_t *p,
+    box_render_transition_op_t op,
+    uint32_t node);
+
 /** Get the packet of the current frame, acquiring it on first use in the frame.
  *
  * Only call this from the main thread during the RenderExtract phase. It waits when every
@@ -1310,6 +1322,257 @@ void box_render_ring_sync(
 void box_render_ring_status(
     box_render_ring_t *ring,
     RenderStatus *status);
+
+/** Kind of a field of a transitionable component */
+typedef enum box_render_transition_kind_t {
+    BOX_RENDER_TRANSITION_F32 = 0,  /**< float, interpolated linearly */
+    BOX_RENDER_TRANSITION_U8        /**< uint8_t, interpolated in float and rounded */
+} box_render_transition_kind_t;
+
+/** A field of a transitionable component */
+typedef struct box_render_transition_field_t {
+    uint16_t offset;                /**< Byte offset in the component */
+    uint16_t kind;                  /**< box_render_transition_kind_t */
+} box_render_transition_field_t;
+
+/** The fields of a transitionable component, the only description the resolver has of it */
+typedef struct box_render_transition_layout_t {
+    int32_t size;                   /**< Size of the component, at most
+                                     *   BOX_RENDER_TRANSITION_VALUE */
+    int32_t count;                  /**< Fields */
+    box_render_transition_field_t fields[BOX_RENDER_TRANSITION_FIELDS]; /**< The fields */
+} box_render_transition_layout_t;
+
+/** Transition of one component of a node on the render thread */
+typedef struct box_render_transition_value_t {
+    bool present;                   /**< A record set the component */
+    bool active;                    /**< The transition runs */
+    TimingFunction timing_function; /**< Curve */
+    float delay;                    /**< Seconds the value holds still after the start */
+    float duration;                 /**< Seconds from the end of the delay to the target */
+    double start;                   /**< World time of the start */
+    uint8_t from[BOX_RENDER_TRANSITION_VALUE];    /**< Value at the start */
+    uint8_t current[BOX_RENDER_TRANSITION_VALUE]; /**< Value at the time of the last packet */
+    uint8_t target[BOX_RENDER_TRANSITION_VALUE];  /**< Value at the end */
+} box_render_transition_value_t;
+
+/** A transition node on the render thread, one per entity with Transition */
+typedef struct box_render_transition_node_t {
+    bool alive;                     /**< A create record made it and no destroy dropped it */
+    bool listed;                    /**< The node is in the active list */
+    int32_t running;                /**< Values whose transition runs */
+    box_render_transition_value_t values[BOX_RENDER_TRANSITION_COMPONENTS]; /**< Values by
+                                     *   box_render_transition_component_t */
+} box_render_transition_node_t;
+
+/** Transition resolver state of the consumer of the packets, not backend state, so it survives
+ * a device loss and a new backend */
+typedef struct box_render_transition_table_t {
+    ecs_vec_t nodes;                /**< box_render_transition_node_t by node id, 0 unused */
+    ecs_vec_t active;               /**< uint32_t ids of the nodes with a running transition,
+                                     *   its size at least the count of nodes */
+} box_render_transition_table_t;
+
+/** Get the field layout of a transitionable component.
+ *
+ * @param component The component
+ * @return The layout
+ */
+const box_render_transition_layout_t* box_render_transition_layout(
+    box_render_transition_component_t component);
+
+/** Copy the fields of a component value into a value of a record or the table, zeroing the
+ * padding, so values compare and copy as bytes.
+ *
+ * @param component The component
+ * @param src The component value
+ * @param dst Receives BOX_RENDER_TRANSITION_VALUE bytes
+ */
+void box_render_transition_pack(
+    box_render_transition_component_t component,
+    const void *src,
+    void *dst);
+
+/** Check whether two values of a component have the same bytes in every field.
+ *
+ * @param component The component
+ * @param a A value
+ * @param b A value
+ * @return Whether no field differs
+ */
+bool box_render_transition_equal(
+    box_render_transition_component_t component,
+    const void *a,
+    const void *b);
+
+/** Interpolate two values of a component per field: floats linearly, uint8_t fields in float,
+ * rounded. 0 and 1 give the exact end values.
+ *
+ * @param component The component
+ * @param from The value at 0
+ * @param to The value at 1
+ * @param t Eased progress
+ * @param out Receives the value, BOX_RENDER_TRANSITION_VALUE bytes
+ */
+void box_render_transition_mix(
+    box_render_transition_component_t component,
+    const void *from,
+    const void *to,
+    float t,
+    void *out);
+
+/** Linear progress of a transition at a time: 0 until the delay passed, then up to 1 over the
+ * duration. A duration of 0 jumps from 0 to 1 at the end of the delay.
+ *
+ * @param start World time of the start
+ * @param delay Seconds of delay
+ * @param duration Seconds of the transition
+ * @param time World time
+ * @return The progress, 0 to 1
+ */
+float box_render_transition_progress(
+    double start,
+    float delay,
+    float duration,
+    double time);
+
+/** Check whether a transition runs at a time, its progress under 1. The game thread and the
+ * resolver both decide with this function, so they agree on the last active packet.
+ *
+ * @param start World time of the start
+ * @param delay Seconds of delay
+ * @param duration Seconds of the transition
+ * @param time World time, the time of a packet
+ * @return Whether the rendered value is not yet the target
+ */
+bool box_render_transition_running(
+    double start,
+    float delay,
+    float duration,
+    double time);
+
+/** Create an empty transition table.
+ *
+ * @param t The table
+ */
+void box_render_transition_table_init(
+    box_render_transition_table_t *t);
+
+/** Free a transition table.
+ *
+ * @param t The table
+ */
+void box_render_transition_table_fini(
+    box_render_transition_table_t *t);
+
+/** Apply the transition records of a packet and evaluate every running transition at the
+ * time of the packet, on the thread that consumes the packets, before the backend renders it.
+ *
+ * Returns at once when the packet has no records and no transition runs. Allocates only when
+ * a record creates a node past the end of the table.
+ *
+ * @param t The table
+ * @param p The packet
+ */
+void box_render_transition_resolve(
+    box_render_transition_table_t *t,
+    box_render_packet_t *p);
+
+/** Get the value of a component of a node at the time of the last resolved packet.
+ *
+ * @param t The table
+ * @param node The node id
+ * @param component The component
+ * @param out Receives the value, the size of the component
+ * @return Whether the node exists and has a value of the component
+ */
+bool box_render_transition_table_value(
+    const box_render_transition_table_t *t,
+    uint32_t node,
+    box_render_transition_component_t component,
+    void *out);
+
+/** Get the number of nodes with a running transition.
+ *
+ * @param t The table
+ * @return The nodes
+ */
+int32_t box_render_transition_table_active(
+    const box_render_transition_table_t *t);
+
+/** Game thread state of the transition extract */
+typedef struct box_render_transitions_t box_render_transitions_t;
+
+/** Register the system that detects the changes of transitioned components and sends the
+ * transition records, the first system of RenderExtract.
+ *
+ * @param world The world
+ */
+void box_render_transitions_init(
+    ecs_world_t *world);
+
+/** Get the state of the transition extract of a world.
+ *
+ * @param world The world
+ * @return The state, NULL without the extract
+ */
+box_render_transitions_t* box_render_transitions_get(
+    const ecs_world_t *world);
+
+/** Get the transitionable component of a component id.
+ *
+ * @param component The component id
+ * @param out Receives the transitionable component
+ * @return Whether the id is transitionable
+ */
+bool box_render_transition_component(
+    ecs_entity_t component,
+    box_render_transition_component_t *out);
+
+/** Get the node id of an entity.
+ *
+ * @param s The state of the transition extract
+ * @param entity The entity
+ * @return The node id, 0 when the entity has no node
+ */
+uint32_t box_render_transitions_node(
+    const box_render_transitions_t *s,
+    ecs_entity_t entity);
+
+/** Check whether the transition of a component of a node runs at a time, as the resolver
+ * decides it: from the same start time, delay and duration, with box_render_transition_running.
+ *
+ * @param s The state of the transition extract
+ * @param node The node id
+ * @param component The component
+ * @param time World time, the time of the packet
+ * @return Whether the resolver renders a value other than the target at that time
+ */
+bool box_render_transitions_active(
+    const box_render_transitions_t *s,
+    uint32_t node,
+    box_render_transition_component_t component,
+    double time);
+
+/** Check whether any component of a node has a running transition at a time.
+ *
+ * @param s The state of the transition extract
+ * @param node The node id
+ * @param time World time, the time of the packet
+ * @return Whether one of its components is active
+ */
+bool box_render_transitions_node_active(
+    const box_render_transitions_t *s,
+    uint32_t node,
+    double time);
+
+/** Get the transition resolver table of a ring, used by the consumer of its packets.
+ *
+ * @param ring The ring
+ * @return The table
+ */
+box_render_transition_table_t* box_render_ring_transitions(
+    box_render_ring_t *ring);
 
 #include "particles.h"
 

@@ -349,6 +349,32 @@
                     "render_runtime_change",
                     "compare"
                 ]
+            },
+            {
+                "id": "Transition",
+                "testcases": [
+                    "target_on_game_thread",
+                    "values_float",
+                    "values_rgb",
+                    "delay_holds",
+                    "spawn_no_animation",
+                    "add_transition_no_animation",
+                    "interrupt_midpoint",
+                    "interrupt_in_flight_default",
+                    "interrupt_in_flight_max",
+                    "query_write_starts",
+                    "equal_write_nothing",
+                    "remove_transition_snaps",
+                    "remove_component_snaps",
+                    "delete_entity_drops",
+                    "node_reuse",
+                    "remove_entry_snaps",
+                    "prefab_instances_own_state",
+                    "time_paused",
+                    "time_scale_half",
+                    "main_thread_same_values",
+                    "no_transition_no_records"
+                ]
             }
         ]
     }

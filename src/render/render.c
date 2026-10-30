@@ -149,6 +149,34 @@ void box_render_sync(
     }
 }
 
+uint32_t box_render_transition_test_node(
+    ecs_world_t *world,
+    ecs_entity_t entity)
+{
+    return box_render_transitions_node(box_render_transitions_get(world), entity);
+}
+
+bool box_render_transition_test_value(
+    ecs_world_t *world,
+    ecs_entity_t entity,
+    ecs_entity_t component,
+    void *out)
+{
+    box_render_transition_component_t c;
+    uint32_t node = box_render_transition_test_node(world, entity);
+    box_render_transition_table_t *t = box_render_ring_transitions(box_render_get_ring(world));
+
+    return node && box_render_transition_component(component, &c) &&
+        box_render_transition_table_value(t, node, c, out);
+}
+
+int32_t box_render_transition_test_active(
+    ecs_world_t *world)
+{
+    return box_render_transition_table_active(
+        box_render_ring_transitions(box_render_get_ring(world)));
+}
+
 /** Wait for the packets in flight before the world is deleted, so that the captures they
  * write land before the fini actions registered later, such as the removal of
  * AppStatus.tmp_dir, run.
@@ -287,6 +315,7 @@ void BoxRenderImport(
     ECS_IMPORT(world, BoxLight);
     ECS_IMPORT(world, BoxEffects);
     ECS_IMPORT(world, BoxText);
+    ECS_IMPORT(world, BoxTransition);
 
     ECS_META_COMPONENT(world, RenderSettings);
     ECS_META_COMPONENT(world, RenderStatus);
@@ -327,6 +356,7 @@ void BoxRenderImport(
         .run = BoxRenderExtractViews
     });
 
+    box_render_transitions_init(world);
     box_render_scenes_init(world);
     box_render_captures_init(world);
     box_render_textures_init(world);
