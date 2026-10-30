@@ -99,6 +99,13 @@ typedef struct box_console_span_t {
     box_console_syntax_t kind;  /**< What the range is */
 } box_console_span_t;
 
+/** An entity argument of the input line and what it resolved to when its spans were found */
+typedef struct box_console_arg_t {
+    char *text;                 /**< The argument as typed */
+    ecs_entity_t entity;        /**< Entity it resolved to, 0 when missing */
+    bool found;                 /**< It resolved, also to the root for a relative path */
+} box_console_arg_t;
+
 /** One line of the scrollback */
 typedef struct box_console_line_t {
     char *text;                 /**< The line without its newline */
@@ -170,6 +177,8 @@ typedef struct box_console_t {
     int32_t cursor;             /**< Byte of the input line the cursor sits before */
     ecs_vec_t spans;            /**< box_console_span_t of the input line */
     char *colored;              /**< The input line the spans were found for, NULL for none */
+    ecs_vec_t args;             /**< box_console_arg_t of the entity arguments of the input line
+                                 *   when its spans were found */
     char *prompted;             /**< The prompt the input line was last drawn with, NULL for
                                  *   none */
     ecs_vec_t typed;            /**< char of the text typed since the last update */
@@ -318,12 +327,33 @@ bool box_console_is_command(
  * @param con The console state
  * @param line The command line
  * @param spans Receives the box_console_span_t of the line, later ones over earlier ones
+ * @param args Receives the box_console_arg_t of its entity arguments, NULL to ignore
  */
 void box_console_syntax(
     ecs_world_t *world,
     box_console_t *con,
     const char *line,
-    ecs_vec_t *spans);
+    ecs_vec_t *spans,
+    ecs_vec_t *args);
+
+/** Free the texts of the box_console_arg_t of a line and empty it.
+ *
+ * @param args The box_console_arg_t, NULL to ignore
+ */
+void box_console_syntax_args_clear(
+    ecs_vec_t *args);
+
+/** Test whether an entity argument of the input line no longer resolves to the entity it
+ * resolved to when the spans of the line were found, after entities were created, deleted,
+ * renamed or moved outside a command.
+ *
+ * @param world The world
+ * @param con The console state
+ * @return Whether the spans of the input line must be found again
+ */
+bool box_console_syntax_stale(
+    const ecs_world_t *world,
+    const box_console_t *con);
 
 /** Get the scope of the console session.
  *
@@ -597,9 +627,11 @@ int32_t box_console_scrollback_rows(
     box_console_t *con,
     const Console *console);
 
-/** Write the look, the size, the visible scrollback and the input line into the content. The
- * input line is drawn again, and its spans found again, when the prompt changed since it was last
- * drawn, also when the scope of the session was deleted, renamed or moved outside a command.
+/** Write the look, the size, the visible scrollback and the input line into the content.
+ *
+ * The input line is drawn again, and its spans found again, when the prompt changed since it was
+ * last drawn, also when the scope of the session was deleted, renamed or moved outside a command,
+ * and when an entity argument no longer resolves to the entity it resolved to.
  *
  * @param world The world
  * @param con The console state

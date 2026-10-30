@@ -1,0 +1,25 @@
+include materials
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+
+KoreanJarProfile {
+  Path2D: {start: {0.27, 0}, segments: [
+    {kind: CubicBezier, control1: {0.39, 0.08}, control2: {0.53, 0.4}, end: {0.46, 0.66}},
+    {kind: CubicBezier, control1: {0.43, 0.81}, control2: {0.31, 0.85}, end: {0.32, 0.95}}
+  ]}
+}
+prefab KoreanJarBody : KoreanGlaze { Lathe: {profile: KoreanJarProfile, cap_start: true, cap_end: true, segments: 32, rings: 20} }
+@tree Parent
+template KoreanOnggi {
+  prop size: f32 = 1
+  Scale: {size, size, size}
+  { (IsA, KoreanJarBody); Position: {} }
+  { (IsA, KoreanGlaze); Position: {0, 0.94, 0}; Torus: {radius: 0.325, tube: 0.038, segments: 24, rings: 8} }
+  { (IsA, KoreanGlaze); Position: {0, 0.98, 0}; Scale: {1, 0.22, 1}; HemiSphere: {radius: 0.37, segments: 24, smooth: true} }
+  { (IsA, KoreanGlaze); Position: {0, 1.07, 0}; Sphere: {radius: 0.055, segments: 12} }
+  for band in 0..2 {
+    { Position: {0, 0.33 + band * 0.26, 0}; Torus: {radius: 0.46, tube: 0.012, segments: 32, rings: 6}; Rgb: {125, 86, 52}; PbrMaterial: {roughness: 0.38} }
+  }
+}

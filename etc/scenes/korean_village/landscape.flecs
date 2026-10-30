@@ -1,0 +1,38 @@
+include materials
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+
+@tree Parent
+template KoreanLandscape {
+  { Position: {0, -0.6, 0}; RoundedBox: {32, 1.15, 28, 0.45}; Rgb: {94, 105, 94}; PbrMaterial: {roughness: 1} }
+  { Position: {0, -0.035, 0}; RoundedBox: {31.8, 0.18, 27.8, 0.42}; Rgb: {183, 170, 136}; PbrMaterial: {roughness: 1} }
+  { Position: {0, 0.065, -0.2}; RoundedBox: {11.6, 0.12, 14, 0.16}; Rgb: {195, 185, 156} }
+  for row in 0..14 {
+    for col in 0..4 {
+      { Position: {(col - 1.5) * 0.64, 0.15, -4.8 + row * 0.94}; RoundedBox: {0.61, 0.12, 0.9, 0.035}; Rgb: {160 + (row + col) % 3 * 7, 164 + (row + col) % 3 * 6, 153 + (row + col) % 3 * 5} }
+    }
+  }
+  for side in 0..2 {
+    { Position: {(side - 0.5) * 26, 0.07, -1}; RoundedBox: {4.5, 0.12, 23, 0.7}; Rgb: {128, 144, 99} }
+    for i in 0..23 {
+      { Position: {(side - 0.5) * 25 + math.sin(i * 2.4) * 0.8, 0.18, -11.5 + i}; Scale: {0.5 + i % 3 * 0.13, 0.25, 0.4}; IcoSphere: {radius: 1, segments: 1}; Rgb: {132 + i % 3 * 9, 140 + i % 3 * 8, 120 + i % 3 * 7} }
+    }
+  }
+  for side in 0..2 {
+    for i in 0..13 {
+      { Position: {(side - 0.5) * 14, 0.12, -5 + i * 0.9}; Rotation: {0, i * 0.31, 0}; Cylinder: {radius: 0.39, length: 0.14, segments: 7}; Rgb: {168, 170, 153} }
+    }
+  }
+  for i in 0..70 {
+    const a = i * 2.4
+    const x = math.sin(a) * 14.8
+    const z = math.cos(a * 0.7) * 12.8
+    if x * x > 120 {
+      for blade in 0..3 {
+        { Position: {x + blade * 0.07, 0.2, z}; Rotation: {0.2, a, (blade - 1) * 0.3}; Cone: {radius: 0.05, length: 0.4, segments: 4}; Rgb: {112, 130 + blade * 7, 76} }
+      }
+    }
+  }
+}

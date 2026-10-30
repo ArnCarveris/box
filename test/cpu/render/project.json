@@ -445,6 +445,8 @@
                     "cutoff_batch",
                     "prefab_one_slot",
                     "prefab_nested_instance",
+                    "prefab_instances_no_node",
+                    "prefab_instance_override_node",
                     "unrelated_owners",
                     "instance_override",
                     "prefab_inherited_2d",

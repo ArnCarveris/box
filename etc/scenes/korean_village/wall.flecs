@@ -1,0 +1,24 @@
+include materials
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+
+@tree Parent
+template KoreanWall {
+  prop length: f32 = 5
+  { (IsA, KoreanStone); Position: {0, 0.24, 0}; Box: {length, 0.48, 0.5} }
+  { (IsA, KoreanPlaster); Position: {0, 0.83, 0}; Box: {length, 0.75, 0.36} }
+  for course in 0..2 {
+    for i in 0..10 {
+      { Position: {(i - 4.5) * length / 10, 0.13 + course * 0.24, 0.26}; Box: {length / 10 - 0.025, 0.21, 0.025}; Rgb: {137 + i % 3 * 8, 140 + i % 3 * 7, 130 + i % 3 * 7} }
+    }
+  }
+  for side in 0..2 {
+    { Position: {0, 1.25, (side - 0.5) * 0.31}; Rotation: {(side - 0.5) * 0.7, 0, 0}; Box: {length + 0.12, 0.085, 0.43}; Rgb: {59, 72, 78} }
+    for tile in 0..25 {
+      { Position: {(tile - 12) * length / 25, 1.29, (side - 0.5) * 0.32}; Rotation: {math.PI / 2 + (side - 0.5) * 0.7, 0, 0}; Cylinder: {radius: 0.035, length: 0.45, segments: 8}; Rgb: {93, 105, 108} }
+    }
+  }
+  { (IsA, KoreanTileEdge); Position: {0, 1.36, 0}; Rotation: {0, 0, math.PI / 2}; Cylinder: {radius: 0.065, length: length + 0.15, segments: 10} }
+}

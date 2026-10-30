@@ -1010,6 +1010,121 @@ void TransitionMaterial_prefab_nested_instance(void) {
     tr_fini(world, null);
 }
 
+void TransitionMaterial_prefab_instances_no_node(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_entity_t instances[64];
+    box_render_material_t rendered;
+    int32_t i;
+    ecs_set(world, prefab, Box, {1, 1, 1});
+    ecs_set(world, prefab, Rgb, {0, 0, 0});
+    box_transition_set(world, prefab, ecs_id(Rgb), &(TransitionSpec){ .duration = 1.0f });
+    for (i = 0; i < 64; i ++) {
+        instances[i] = ecs_new_w_pair(world, EcsIsA, prefab);
+        ecs_set(world, instances[i], Position, {(float)(i % 8), (float)(i / 8), 0});
+    }
+
+    tr_frame(world);
+    tr_frame(world);
+    uint32_t slot = ecs_get(world, prefab, MaterialId)->value;
+    test_assert(box_render_transition_test_node(world, prefab) != 0);
+    for (i = 0; i < 64; i ++) {
+        test_int(box_render_transition_test_node(world, instances[i]), 0);
+    }
+
+    ecs_set(world, prefab, Rgb, {200, 100, 40});
+    for (i = 0; i < 4; i ++) {
+        uint32_t k = (uint32_t)i;
+        int32_t j;
+        tr_frame(world);
+        test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 1);
+        test_assert(tr_material_rendered(world, null, slot, &rendered));
+        test_uint(rendered.color, tr_color_word(50 * k, 25 * k, 10 * k));
+        for (j = 0; j < 64; j ++) {
+            test_int(box_render_transition_test_node(world, instances[j]), 0);
+        }
+    }
+
+    tr_frame(world);
+    test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 0);
+    test_assert(tr_material_rendered(world, null, slot, &rendered));
+    test_uint(rendered.color, tr_color_word(200, 100, 40));
+    tr_fini(world, null);
+}
+
+void TransitionMaterial_prefab_instance_override_node(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    box_render_material_t rendered, expected;
+    box_draw_material_t m;
+    int32_t i;
+    ecs_set(world, prefab, Box, {1, 1, 1});
+    ecs_set(world, prefab, Rgb, {200, 100, 40});
+    box_transition_set(world, prefab, ecs_id(Rgb), &(TransitionSpec){ .duration = 1.0f });
+    ecs_entity_t a = ecs_new_w_pair(world, EcsIsA, prefab);
+    ecs_set(world, a, Position, {0, 0, 0});
+    ecs_entity_t b = ecs_new_w_pair(world, EcsIsA, prefab);
+    ecs_set(world, b, Position, {2, 0, 0});
+    tr_frame(world);
+    tr_frame(world);
+    test_int(box_render_transition_test_node(world, a), 0);
+    test_int(box_render_transition_test_node(world, b), 0);
+
+    ecs_set(world, a, Rgb, {0, 0, 0});
+    tr_frame(world);
+    test_assert(box_render_transition_test_node(world, a) != 0);
+    test_int(box_render_transition_test_node(world, b), 0);
+    test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 0);
+    tr_frame(world);
+    test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 0);
+    test_assert(ecs_owns(world, a, MaterialId));
+    uint32_t slot_a = ecs_get(world, a, MaterialId)->value;
+    test_assert(slot_a != ecs_get(world, prefab, MaterialId)->value);
+    if (tr_material_rendered(world, null, slot_a, &rendered)) {
+        test_uint(rendered.color, tr_color_word(0, 0, 0));
+    }
+
+    ecs_set(world, a, Rgb, {200, 100, 40});
+    for (i = 0; i < 4; i ++) {
+        uint32_t k = (uint32_t)i;
+        tr_frame(world);
+        test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 1);
+        test_assert(tr_material_rendered(world, null, slot_a, &rendered));
+        test_uint(rendered.color, tr_color_word(50 * k, 25 * k, 10 * k));
+    }
+
+    tr_frame(world);
+    test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 0);
+    test_assert(tr_material_rendered(world, null, slot_a, &rendered));
+    test_uint(rendered.color, tr_color_word(200, 100, 40));
+
+    ecs_set(world, a, Rgb, {0, 0, 0});
+    tr_frame(world);
+    ecs_remove(world, a, Rgb);
+    tr_frame(world);
+    test_int(box_render_transition_test_node(world, a), 0);
+    tr_frame(world);
+    test_int(box_render_transition_test_node(world, a), 0);
+    test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 0);
+    const DrawSlot *ds = ecs_get(world, a, DrawSlot);
+    uint32_t slot = box_draws_slot_mesh_shading(tr_batch(world, a), ds->slot)->material;
+    box_draws_material_of(world, a, &m);
+    box_draws_material_pack(&expected, &m);
+    test_uint(expected.color, tr_color_word(200, 100, 40));
+    const box_draw_materials_t *table = &box_draws_state(world)->materials;
+    test_assert(!ecs_os_memcmp_t(&expected, ecs_vec_get_t(&table->records,
+        box_render_material_t, (int32_t)slot), box_render_material_t));
+    if (tr_material_rendered(world, null, slot, &rendered)) {
+        test_uint(rendered.color, tr_color_word(200, 100, 40));
+    }
+
+    tr_fini(world, null);
+}
+
 void TransitionMaterial_prefab_inherited_2d(void) {
     // engine_core/transition
     box_render_null_t *null;
