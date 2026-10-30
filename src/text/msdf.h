@@ -267,8 +267,8 @@ double box_msdf_corner_distance(
 
 /** Correct the artifacts of the field after msdfgen's MSDFErrorCorrection without a distance
  * check: protect corners and edges, then flatten the texels whose interpolation leaves the range
- * their distance allows. Around each corner, flatten the texels whose channels clash where the
- * interpolated median leaves the side the distance of the corner edges gives.
+ * their distance allows. Around each corner where the interpolated median leaves the side the
+ * distance of the corner edges gives, push the clashing channels away from the median.
  *
  * @param gen The generation
  */

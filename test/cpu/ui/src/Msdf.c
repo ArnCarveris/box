@@ -801,7 +801,8 @@ void Msdf_curves(void) {
  * is at least a quarter texel away, the median of the field interpolated between the texels the
  * way a linear sampler does is on the side of the outline by at least a sixteenth of a texel: at
  * the 8 pixels per texel of the GPU test, a pixel 2 pixels from the edge is fully covered or
- * fully uncovered. */
+ * fully uncovered. Where it is at least a 32nd of a texel away, the median is on its side, so
+ * the notches between the arms and the stem keep their tips. */
 void Msdf_reflex_corner(void) {
     const double outline[][2] = {
         {190, 0}, {190, 1290}, {160, 1500}, {400, 1520}, {400, 856}, {941, 1500}, {1163, 1500},
@@ -828,7 +829,7 @@ void Msdf_reflex_corner(void) {
     box_msdf_shape_fini(&shape);
 
     // Interpolate the field at 32 by 32 points per texel between the texel centers
-    int32_t checked = 0, wrong = 0;
+    int32_t checked = 0, wrong = 0, sharp = 0;
     for (y = 0; y < (raster.height - 1) * 32; y ++) {
         for (x = 0; x < (raster.width - 1) * 32; x ++) {
             double u = 0.5 + (x + 0.5) / 32.0, v = 0.5 + (y + 0.5) / 32.0;
@@ -848,7 +849,7 @@ void Msdf_reflex_corner(void) {
                 }
             }
 
-            if (dist * raster.scale < 0.25) {
+            if (dist * raster.scale < 1.0 / 32.0) {
                 continue;
             }
 
@@ -863,12 +864,16 @@ void Msdf_reflex_corner(void) {
 
             double median = fmax(fmin(ch[0], ch[1]), fmin(fmax(ch[0], ch[1]), ch[2]));
             double field = (median - 0.5) * raster.range;
-            checked ++;
-            wrong += inside ? field < 1.0 / 16.0 : field > -1.0 / 16.0;
+            sharp += inside ? field <= 0.0 : field >= 0.0;
+            if (dist * raster.scale >= 0.25) {
+                checked ++;
+                wrong += inside ? field < 1.0 / 16.0 : field > -1.0 / 16.0;
+            }
         }
     }
 
     test_assert(checked > 0);
     test_int(wrong, 0);
+    test_int(sharp, 0);
     ecs_os_free(pixels);
 }
