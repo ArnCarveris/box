@@ -39,6 +39,19 @@ typedef struct box_render_gpu_stats_t {
     int32_t prepass_draws;      /**< Draw calls recorded in the depth prepasses */
     int32_t transmission_snapshots; /**< Opaque snapshots recorded for transmission, one per
                                  *   frame of each view that draws a Transmission shape */
+    int32_t transmission_textures; /**< Snapshot textures created for transmission: a target
+                                 *   keeps one per color format its views render transmissive
+                                 *   shapes in (its own and the HDR format of the views with
+                                 *   effects), created again only when its render size changes */
+    int32_t forward_passes;     /**< Forward render passes begun for the views: the pass of
+                                 *   each phase (one for a view without occlusion or with a
+                                 *   depth prepass, two for a view that culls by occlusion
+                                 *   without one: the early and the late pass), plus each pass
+                                 *   the transmission split continues in after the opaque
+                                 *   snapshot (one) and the soft particle split (one for the
+                                 *   particles, one more when draws follow them). Not the depth
+                                 *   prepasses, the snapshot downsample passes, nor the shadow,
+                                 *   cull, atmosphere, particle simulation or effect passes */
     int32_t instance_binds;     /**< Instance bind groups set in the cull, depth prepass,
                                  *   forward, shadow and capture passes, only when the page or
                                  *   surface assets differ from the ones bound last in the pass */

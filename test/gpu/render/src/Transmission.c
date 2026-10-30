@@ -819,7 +819,10 @@ void Transmission_opaque_and_sky_in_snapshot(void) {
 }
 
 /** A second view of a scene without transmissive shapes copies nothing, and once the glass
- * loses its Transmission no view copies its image. */
+ * loses its Transmission no view copies its image.
+ *
+ * Both views are lit and draw opaque meshes, so they draw a depth prepass and one forward pass
+ * each (phase 3); the view with the glass continues in one more after its snapshot. */
 void Transmission_snapshot_counter(void) {
     // materials/transmission
     ecs_world_t *world = tr_world();
@@ -841,8 +844,10 @@ void Transmission_snapshot_counter(void) {
     box_render_gpu_stats_t after = tr_frames(world, 1);
     test_int(after.transmission_snapshots - before.transmission_snapshots, 1);
     test_int(after.passes - before.passes, 2);
+    test_int(after.forward_passes - before.forward_passes, 3);
     after = tr_frames(world, 2);
     test_int(after.transmission_snapshots - before.transmission_snapshots, 3);
+    test_int(after.forward_passes - before.forward_passes, 9);
     test_int(after.errors, before.errors);
 
     ecs_remove(world, glass, Transmission);
@@ -851,6 +856,7 @@ void Transmission_snapshot_counter(void) {
     after = tr_frames(world, 3);
     test_int(after.transmission_snapshots - before.transmission_snapshots, 0);
     test_int(after.passes - before.passes, 6);
+    test_int(after.forward_passes - before.forward_passes, 6);
     test_int(after.errors, before.errors);
 
     ecs_fini(world);
@@ -981,4 +987,161 @@ void Transmission_occlusion_view_transmits(void) {
         stbi_image_free(px);
         ecs_fini(world);
     }
+}
+
+/** A view that culls by occlusion without a depth prepass (unlit) draws an early and a late
+ * forward pass, one with a prepass (lit) a single one; the glass adds the pass its late or only
+ * pass continues in after the snapshot. */
+void Transmission_forward_passes_by_phase(void) {
+    // materials/transmission
+    int32_t k;
+    for (k = 0; k < 2; k ++) {
+        bool lit = k == 1;
+        int32_t passes = lit ? 1 : 2;
+        ecs_world_t *world = tr_world();
+        tr_view(world, tr_camera(world, 0), lit, true);
+        tr_wall(world, 0, -10, 40, 40, 200, 120, 60);
+        ecs_entity_t glass = tr_glass(world, 0, -4, 3, 3, 1, 1, 0);
+        tr_surface(world, TR_SIZE, TR_SIZE, NULL);
+
+        box_render_gpu_stats_t before = tr_frames(world, 4);
+        box_render_gpu_stats_t after = tr_frames(world, 2);
+        printf("%s view: %d forward passes, %d prepasses in 2 frames with the glass\n",
+            lit ? "lit" : "unlit", after.forward_passes - before.forward_passes,
+            after.prepasses - before.prepasses);
+        test_int(after.transmission_snapshots - before.transmission_snapshots, 2);
+        test_int(after.prepasses - before.prepasses, lit ? 4 : 0);
+        test_int(after.forward_passes - before.forward_passes, 2 * (passes + 1));
+
+        ecs_remove(world, glass, Transmission);
+        tr_frames(world, 2);
+        before = tr_frames(world, 0);
+        after = tr_frames(world, 2);
+        test_int(after.transmission_snapshots - before.transmission_snapshots, 0);
+        test_int(after.forward_passes - before.forward_passes, 2 * passes);
+        test_int(after.errors, before.errors);
+        ecs_fini(world);
+    }
+}
+
+/** The first view has effects and renders into its HDR image: a white glass over the wall. The
+ * second, without effects, renders into the target without clearing it, in a scene of its own
+ * with a smaller glass tinted by its albedo, which shows the image of the first view through it.
+ *
+ * Each samples the snapshot of its own format. The target keeps both, so once they exist no
+ * snapshot texture is made again while each view still records one per frame. */
+void Transmission_two_formats_one_target(void) {
+    // materials/transmission
+    ecs_world_t *world = tr_world();
+    ecs_entity_t gtao = ecs_new(world);
+    ecs_add(world, gtao, Gtao);
+    View value = {.camera = tr_camera(world, 0),
+        .clear = {.enabled = true, .color = {0, 0, 0, 255}},
+        .lighting = {.enabled = true}};
+    ecs_vec_init_t(NULL, &value.effects, ViewEffect, 1);
+    *ecs_vec_append_t(NULL, &value.effects, ViewEffect) = (ViewEffect){
+        .enabled = true, .effect = gtao };
+    ecs_entity_t hdr = ecs_new(world);
+    ecs_set_ptr(world, hdr, View, &value);
+    ecs_vec_fini_t(NULL, &value.effects, ViewEffect);
+    tr_wall(world, 0, -10, 40, 40, 200, 160, 120);
+    tr_glass(world, 0, -4, 3, 3, 1, 1, 0);
+
+    uint8_t tint[3] = { 255, 128, 255 };
+    ecs_entity_t scene = ecs_new(world);
+    ecs_set(world, scene, Scene, {0});
+    ecs_entity_t plain = ecs_new(world);
+    ecs_set(world, plain, View, {.camera = tr_camera(world, scene),
+        .clear = {.enabled = false}, .order = 1});
+    ecs_entity_t tinted = tr_glass(world, -0.8f, -4, 1, 1, 1, 1, 0);
+    ecs_add_pair(world, tinted, EcsChildOf, scene);
+    ecs_set(world, tinted, Rgb, {tint[0], tint[1], tint[2]});
+
+    tr_surface(world, TR_SIZE, TR_SIZE, "two_formats.png");
+    box_render_gpu_stats_t before = tr_frames(world, 4);
+    box_render_gpu_stats_t after = tr_frames(world, 3);
+    printf("snapshot textures: %d after warm up, %d made in 3 frames, %d snapshots\n",
+        before.transmission_textures, after.transmission_textures -
+        before.transmission_textures, after.transmission_snapshots -
+        before.transmission_snapshots);
+    test_int(before.transmission_textures, 2);
+    test_int(after.transmission_textures - before.transmission_textures, 0);
+    test_int(after.transmission_snapshots - before.transmission_snapshots, 6);
+    test_int(after.errors, 0);
+
+    unsigned char *px = tr_load(world, "two_formats.png", TR_SIZE, TR_SIZE);
+    const unsigned char *wall = tr_px(px, TR_SIZE, 2, 2);
+    test_assert(wall[0] > 150);
+    tr_expect(tr_px(px, TR_SIZE, 44, 32), wall[0], wall[1], wall[2], 3);
+    tr_expect(tr_px(px, TR_SIZE, 21, 32), tr_srgb(tr_lin(wall[0]) * tr_lin(tint[0])),
+        tr_srgb(tr_lin(wall[1]) * tr_lin(tint[1])),
+        tr_srgb(tr_lin(wall[2]) * tr_lin(tint[2])), 3);
+    stbi_image_free(px);
+
+    before = after;
+    after = tr_frames(world, 2);
+    test_int(after.transmission_textures - before.transmission_textures, 0);
+    test_int(after.transmission_snapshots - before.transmission_snapshots, 4);
+    test_int(after.errors, 0);
+    ecs_fini(world);
+}
+
+/** Frames rendered from a fresh world in first_frame_not_dark */
+#define TR_FIRST_FRAMES (12)
+
+/** A rough glass tinted green-less by its albedo over a bright wall, rendered from a fresh
+ * world. The first frame that shows the glass (the wall drawn, the center darker than it in
+ * green) must not be darker than the frames after it: before the downsample shader exists the
+ * glass samples the sharp snapshot, not blur mips that were never written. */
+void Transmission_first_frame_not_dark(void) {
+    // materials/transmission
+    ecs_world_t *world = tr_world();
+    tr_view(world, tr_camera(world, 0), true, false);
+    tr_wall(world, 0, -10, 40, 40, 230, 230, 230);
+    ecs_entity_t glass = tr_glass(world, 0, -4, 3, 3, 1, 1, 0);
+    ecs_set(world, glass, Rgb, {255, 128, 255});
+    ecs_set(world, glass, PbrMaterial, {.metallic = 0, .roughness = 1});
+    tr_surface(world, TR_SIZE, TR_SIZE, "first_frame.png");
+    char *path = flecs_asprintf("%s/first_frame.png",
+        ecs_singleton_get(world, AppStatus)->tmp_dir);
+    unsigned char seen[TR_FIRST_FRAMES][4];
+    int32_t i, c, count = 0;
+    for (i = 0; i < TR_FIRST_FRAMES; i ++) {
+        tr_frames(world, 1);
+        int w = 0, h = 0, n = 0;
+        unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+        if (!px) {
+            continue;
+        }
+
+        remove(path);
+        test_int(w, TR_SIZE);
+        test_int(h, TR_SIZE);
+        const unsigned char *center = tr_px(px, TR_SIZE, TR_SIZE / 2, TR_SIZE / 2);
+        const unsigned char *corner = tr_px(px, TR_SIZE, 2, 2);
+        printf("frame %d: center %d %d %d, corner %d %d %d\n", i, center[0], center[1],
+            center[2], corner[0], corner[1], corner[2]);
+        if (count || (corner[1] > 150 && center[1] + 40 < corner[1])) {
+            ecs_os_memcpy(seen[count], center, 4);
+            count ++;
+        }
+
+        stbi_image_free(px);
+    }
+
+    test_assert(count >= 3);
+    for (i = 1; i < count; i ++) {
+        for (c = 0; c < 3; c ++) {
+            if ((int32_t)seen[0][c] + 3 < (int32_t)seen[i][c]) {
+                printf("channel %d: first frame %d, frame %d after it %d\n", c, seen[0][c],
+                    i, seen[i][c]);
+            }
+
+            test_assert((int32_t)seen[0][c] + 3 >= (int32_t)seen[i][c]);
+        }
+    }
+
+    test_int(tr_frames(world, 0).errors, 0);
+    ecs_os_free(path);
+    ecs_fini(world);
 }

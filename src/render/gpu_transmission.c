@@ -6,8 +6,9 @@
  * before its first blended draw and blurs every mip from the one below (Jimenez downsample,
  * etc/shaders/transmission.wgsl); its transmissive draws sample it at their roughness.
  *
- * A target has one snapshot at its render size in the format of its views' color attachment,
- * which each view overwrites in turn. A view without transmissive draws binds a white image.
+ * A target has one snapshot per color format of its views, at its render size. Until the
+ * downsample shader compiles only mip 0 is copied and bound, so a rough shape samples the
+ * sharp image. Views without transmissive draws bind a white image.
  */
 
 #include "gpu.h"
@@ -19,13 +20,17 @@
 
 struct box_gpu_snapshot_t {
     WGPUTexture texture;            /**< The snapshot and its blur pyramid */
-    WGPUTextureView view;           /**< View of every mip, which the forward pass samples */
+    WGPUTextureView view;           /**< View of every mip, which the forward pass samples once
+                                     *   the pyramid is blurred */
     WGPUTextureView mips[BOX_GPU_SNAPSHOT_MIPS]; /**< View of each mip */
     WGPUBindGroup groups[BOX_GPU_SNAPSHOT_MIPS]; /**< Group i samples mip i - 1, from 1 */
     uint32_t width;                 /**< Width of mip 0, the render width of the target */
     uint32_t height;                /**< Height of mip 0, the render height of the target */
     uint32_t mip_count;             /**< Mip levels */
     WGPUTextureFormat format;       /**< Format of the color attachment it copies */
+    WGPURenderPipeline pipeline;    /**< Downsample pipeline of its format in this frame, NULL
+                                     *   until the shader exists, which leaves the mips above 0
+                                     *   unwritten and unsampled */
 };
 
 struct box_gpu_transmission_t {
@@ -226,6 +231,7 @@ static box_gpu_snapshot_t* box_gpu_snapshot_new(
         .sampleCount = 1
     });
     result->view = wgpuTextureCreateView(result->texture, NULL);
+    box_gpu_count(gpu, BOX_GPU_STAT_TRANSMISSION_TEXTURE);
     for (i = 0; i < result->mip_count; i ++) {
         result->mips[i] = wgpuTextureCreateView(result->texture, &(WGPUTextureViewDescriptor){
             .format = format,
@@ -253,10 +259,13 @@ static box_gpu_snapshot_t* box_gpu_snapshot_new(
     return result;
 }
 
-void box_gpu_transmission_release(
-    box_gpu_target_t *t)
+/** Release a snapshot.
+ *
+ * @param s The snapshot, NULL for none
+ */
+static void box_gpu_snapshot_free(
+    box_gpu_snapshot_t *s)
 {
-    box_gpu_snapshot_t *s = t->snapshot;
     uint32_t i;
     if (!s) {
         goto done;
@@ -273,9 +282,18 @@ void box_gpu_transmission_release(
     wgpuTextureViewRelease(s->view);
     wgpuTextureRelease(s->texture);
     ecs_os_free(s);
-    t->snapshot = NULL;
 done:
     return;
+}
+
+void box_gpu_transmission_release(
+    box_gpu_target_t *t)
+{
+    int32_t i;
+    for (i = 0; i < BOX_GPU_SNAPSHOT_FORMATS; i ++) {
+        box_gpu_snapshot_free(t->snapshots[i]);
+        t->snapshots[i] = NULL;
+    }
 }
 
 /** Check whether a view draws a transmissive batch.
@@ -311,7 +329,7 @@ box_gpu_snapshot_t* box_gpu_transmission_begin(
     WGPUTextureFormat format)
 {
     box_gpu_transmission_t *tr = gpu->transmission;
-    box_gpu_snapshot_t *result = NULL;
+    box_gpu_snapshot_t *result = NULL, **slot_of_format;
     uint32_t width = (uint32_t)(t->desc.render_width > 0 ? t->desc.render_width : 1);
     uint32_t height = (uint32_t)(t->desc.render_height > 0 ? t->desc.render_height : 1);
     if (!tr || !box_gpu_transmission_draws(gpu, packet, slot)) {
@@ -328,14 +346,16 @@ box_gpu_snapshot_t* box_gpu_transmission_begin(
         goto done;
     }
 
-    result = t->snapshot;
+    slot_of_format = &t->snapshots[format == t->format ? 0 : 1];
+    result = *slot_of_format;
     if (!result || result->width != width || result->height != height ||
         result->format != format)
     {
-        box_gpu_transmission_release(t);
-        result = t->snapshot = box_gpu_snapshot_new(gpu, width, height, format);
+        box_gpu_snapshot_free(result);
+        result = *slot_of_format = box_gpu_snapshot_new(gpu, width, height, format);
     }
 
+    result->pipeline = box_gpu_transmission_pipeline(gpu, format);
 done:
     return result;
 }
@@ -344,7 +364,12 @@ WGPUTextureView box_gpu_transmission_view(
     box_gpu_t *gpu,
     const box_gpu_snapshot_t *s)
 {
-    return s ? s->view : gpu->transmission->white_view;
+    WGPUTextureView result = gpu->transmission->white_view;
+    if (s) {
+        result = s->pipeline ? s->view : s->mips[0];
+    }
+
+    return result;
 }
 
 void box_gpu_transmission_record(
@@ -353,13 +378,13 @@ void box_gpu_transmission_record(
     WGPUCommandEncoder encoder,
     WGPUTexture source)
 {
-    WGPURenderPipeline pipeline = box_gpu_transmission_pipeline(gpu, s->format);
+    WGPURenderPipeline pipeline = s->pipeline;
     uint32_t i;
     wgpuCommandEncoderCopyTextureToTexture(encoder,
         &(WGPUTexelCopyTextureInfo){ .texture = source, .aspect = WGPUTextureAspect_All },
         &(WGPUTexelCopyTextureInfo){ .texture = s->texture, .aspect = WGPUTextureAspect_All },
         &(WGPUExtent3D){ s->width, s->height, 1 });
-    for (i = 1; i < s->mip_count; i ++) {
+    for (i = 1; pipeline && i < s->mip_count; i ++) {
         WGPURenderPassColorAttachment attachment = {
             .view = s->mips[i],
             .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
@@ -371,12 +396,9 @@ void box_gpu_transmission_record(
                 .colorAttachmentCount = 1,
                 .colorAttachments = &attachment
             });
-        if (pipeline) {
-            wgpuRenderPassEncoderSetPipeline(pass, pipeline);
-            wgpuRenderPassEncoderSetBindGroup(pass, 0, s->groups[i], 0, NULL);
-            wgpuRenderPassEncoderDraw(pass, 3, 1, 0, 0);
-        }
-
+        wgpuRenderPassEncoderSetPipeline(pass, pipeline);
+        wgpuRenderPassEncoderSetBindGroup(pass, 0, s->groups[i], 0, NULL);
+        wgpuRenderPassEncoderDraw(pass, 3, 1, 0, 0);
         wgpuRenderPassEncoderEnd(pass);
         wgpuRenderPassEncoderRelease(pass);
     }
