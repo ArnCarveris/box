@@ -6,9 +6,10 @@
  * are dynamic and whether they cast shadows, one swap-removed slot per entity and at most
  * BOX_DRAWS_CHUNK of them, so a key may have several batches.
  *
- * A batch owns a run of slots of an instance page (store.c), a buffer per stream (transform,
- * shading, surface) with the same slots; a change uploads only its streams. Mesh and 2D batches
- * have stores of their own: a mesh shading is a material slot (materials.c), a tint and an alpha.
+ * A batch owns a run of slots of an instance page (store.c), a buffer per stream with the same
+ * slots; a change uploads only its streams. A mesh page has a transform, a shading and a surface
+ * stream, a 2D page of its own store no surface stream, for which the backend binds a zero record.
+ * A mesh shading is a tint, an alpha and a shared material slot (materials.c).
  */
 
 #ifndef BOX_RENDER_DRAW_H
@@ -20,14 +21,15 @@
 #include "../text/text.h"
 
 /** Instances of one batch and slots of one instance page: every stream of a page, the surface
- * stream being the largest, stays within the 128 MiB storage binding that every WebGPU device
- * supports, and a key with more shapes continues in another batch */
+ * stream of a mesh page being the largest, stays within the 128 MiB storage binding that every
+ * WebGPU device supports, and a key with more shapes continues in another batch */
 #define BOX_DRAWS_CHUNK ((uint32_t)((128u << 20) / sizeof(box_render_surface_t)))
 
 /** Slots the smallest run of a batch holds, and the smallest page buffer */
 #define BOX_DRAWS_MIN_CAPACITY (64)
 
-/** Buffers of an instance page at most, one per stream of its layout */
+/** Buffers of an instance page at most, one per stream of its layout; the handles of a page
+ * leave room for all of them, see BOX_RENDER_INSTANCE_STREAMS */
 #define BOX_DRAWS_STREAMS (BOX_RENDER_INSTANCE_STREAMS)
 
 /** Store of the instance pages of the mesh batches */
@@ -68,6 +70,8 @@ typedef struct box_draw_page_t {
     uint32_t top;           /**< End of its highest run, the slots its buffers must hold */
     int32_t runs;           /**< Runs handed out */
     ecs_vec_t holes;        /**< box_draw_hole_t below top by first slot, never adjacent */
+    uint32_t serial;        /**< Bumped when the page is released, so a run of the released
+                             *   page is told apart from a run of a page that reuses its index */
     uint32_t entries[BOX_DRAWS_STREAMS]; /**< Scatter entries of the frame per stream */
     uint32_t offset[BOX_DRAWS_STREAMS];  /**< Byte offset of the scatter segment of each stream
                                           *   in the change buffer */
@@ -266,6 +270,14 @@ typedef struct box_draw_batch_t {
     uint32_t capacity;      /**< Slots of its run */
     uint8_t full;           /**< box_draw_kind_t, streams that upload every instance instead of
                              *   the changed slots */
+    uint32_t sent;          /**< Slots of its run the GPU holds the instances of: the instances
+                             *   it had when it was last sent, 0 before */
+    int32_t from_page;      /**< Page of the run it moved out of in this extract */
+    uint32_t from_first;    /**< First slot of that run */
+    uint32_t from_count;    /**< Slots of that run whose instances the GPU copies into the new
+                             *   run instead of uploading them, 0 when it did not move */
+    uint32_t from_serial;   /**< Serial of that page when the batch moved, see
+                             *   box_draw_page_t */
     bool ready;             /**< The backend has the mesh and the instances this frame */
     bool was_ready;         /**< It had them in the last frame, so a caster batch that gets
                              *   them records the regions of its slots */
@@ -288,7 +300,7 @@ typedef struct box_draw_batch_t {
     ecs_vec_t transforms;   /**< box_render_transform_t per slot */
     ecs_vec_t shadings;     /**< box_render_shading_t per slot of a 2D batch */
     ecs_vec_t mesh_shadings; /**< box_render_mesh_shading_t per slot of a mesh batch */
-    ecs_vec_t surfaces;     /**< box_render_surface_t per slot */
+    ecs_vec_t surfaces;     /**< box_render_surface_t per slot of a mesh batch */
     ecs_vec_t changed[BOX_DRAWS_STREAMS]; /**< int32_t per stream, slots whose data of a stream
                              *   that does not upload every frame the GPU does not have */
 } box_draw_batch_t;
@@ -317,19 +329,39 @@ typedef struct box_draw_material_upload_t {
     uint32_t data;          /**< Offset of the records in the packet data */
 } box_draw_material_upload_t;
 
-/** The material table: a slot per prefab or mesh shape that owns material components, slot 0
- * the default material, as the main thread packed it and what the GPU still needs of it.
+/** A slot of the material table: shared by the owners whose material packs to its record, or
+ * private to one owner */
+typedef struct box_draw_material_slot_t {
+    ecs_entity_t owner;     /**< Owner of a private slot, 0 for a shared or free slot */
+    uint64_t hash;          /**< Hash of the record of a shared slot */
+    int32_t refs;           /**< Owners of a shared slot, slot 0 one more; 0 for a private or
+                             *   free slot */
+    int32_t stamp;          /**< box_draw_materials_t.stamp when the walk of a running material
+                             *   transition last took the private slot */
+    uint8_t flags;          /**< Lists the slot is in and why it is private (materials.c) */
+} box_draw_material_slot_t;
+
+/** The material table, slot 0 the default material, as the main thread packed it and what the
+ * GPU still needs of it.
+ *
+ * Mesh shapes that own material components share a slot per distinct record, with reference
+ * counts. Prefabs, shapes of DynamicMaterial batches and shapes with a running material
+ * transition own a private slot, which is packed from its owner and patched by slot.
  *
  * Slots are handed out from the free list, last freed first, else after the highest slot, so
  * the same adds and removes give the same slots.
  */
 typedef struct box_draw_materials_t {
     ecs_vec_t records;      /**< box_render_material_t per slot, as packed last */
-    ecs_vec_t owners;       /**< ecs_entity_t per slot, 0 for slot 0 and free slots */
-    ecs_vec_t marked;       /**< bool per slot, the slot is in dirty */
+    ecs_vec_t slots;        /**< box_draw_material_slot_t per slot */
     ecs_vec_t dirty;        /**< uint32_t, slots the next send packs and uploads */
     ecs_vec_t free;         /**< uint32_t, freed slots */
-    ecs_map_t owned;        /**< Owner entity to its slot */
+    ecs_map_t owned;        /**< Owner entity to its slot, with a pending bit above the low 32
+                             *   bits while the owner of a shared slot waits to be hashed */
+    ecs_map_t contents;     /**< Hash of a record to the shared slot that holds it */
+    ecs_vec_t pending;      /**< ecs_entity_t, owners of shared slots whose material changed */
+    ecs_vec_t transiting;   /**< uint32_t, private slots of running material transitions */
+    int32_t stamp;          /**< Extracts the table resolved, which dates the transitions */
     uint32_t capacity;      /**< Records the table buffer holds, 0 before it is created */
     int32_t alive;          /**< Slots alive, slot 0 included */
     bool overflow;          /**< An id past what the binding holds was logged */
@@ -505,7 +537,7 @@ bool box_draws_caster(
  * @param b The batch
  * @param lo The minimum of each element of the transform
  * @param hi The maximum of each element of the transform
- * @param surface The surface of the slot
+ * @param surface The surface of the slot, NULL for a batch without surfaces
  * @param out Receives the bounds, with the scene of the batch
  * @return Whether the bounds are known, false when the mesh of the batch is missing or empty
  */
@@ -573,11 +605,20 @@ box_draw_store_t* box_draws_batch_store(
     box_render_draws_t *d,
     const box_draw_batch_t *b);
 
+/** Get the streams the instance pages of a batch have: every stream for a mesh batch, the
+ * transform and the shading for a 2D shape or glyph batch.
+ *
+ * @param b The batch
+ * @return box_draw_kind_t, a bit per stream of its pages
+ */
+uint8_t box_draws_batch_kinds(
+    const box_draw_batch_t *b);
+
 /** Get the surface of a slot.
  *
  * @param b The batch
  * @param slot The slot
- * @return The surface
+ * @return The surface, NULL for a 2D batch, whose pages have no surface stream
  */
 box_render_surface_t* box_draws_slot_surface(
     box_draw_batch_t *b,
@@ -607,7 +648,8 @@ void box_draws_surface(
  *
  * The base color is mixed toward the tints of the ancestors from the root down and then toward
  * the tint of the shape, in display encoding, before it and the emission are converted to
- * linear light. The alpha is the opacity of the shape times the opacity of its ancestors.
+ * linear light. The alpha is the opacity of the shape times the opacity of its ancestors. The
+ * color and alpha are stored as unorm16x4 (box_draws_color_pack).
  *
  * The clip index goes into ids[0].
  *
@@ -617,6 +659,25 @@ void box_draws_surface(
 void box_draws_material(
     box_render_shading_t *out,
     const box_draw_material_t *material);
+
+/** Pack a linear color and alpha into the color of a 2D shading as unorm16x4: r | g << 16,
+ * b | a << 16, each channel clamped to 0..1.
+ *
+ * @param out Two words receiving the packed color
+ * @param color The color, r, g, b, a
+ */
+void box_draws_color_pack(
+    uint32_t *out,
+    const float *color);
+
+/** Unpack the unorm16x4 color of a 2D shading, as unpack2x16unorm does.
+ *
+ * @param out Four floats receiving r, g, b, a
+ * @param packed The two words of the packed color
+ */
+void box_draws_color_unpack(
+    float *out,
+    const uint32_t *packed);
 
 /** Pack the material components of the owner of a slot into its record of the material table.
  *
@@ -949,12 +1010,14 @@ void box_draws_store_free(
     uint32_t count);
 
 /** Make the buffers of a page hold its runs, creating them again by doubling up to the slots of
- * the page. A created buffer has none of the instances of the runs in it.
+ * the page. A buffer created again keeps the bytes of the buffer it replaces
+ * (BOX_RENDER_BUFFER_KEEP), so the runs of the page keep their instances; a buffer created for
+ * the first time has none of them.
  *
  * @param s The store
  * @param p The packet
  * @param page Index of the page
- * @return Whether the buffers were created, so every run of the page must upload
+ * @return Whether the buffers were created
  */
 bool box_draws_store_reserve(
     box_draw_store_t *s,
@@ -1021,11 +1084,12 @@ void box_draws_materials_reset(
     box_render_draws_t *d);
 
 /** Register the observers that hand out and free the slots of the material table and pack them
- * again when a material component of their owner, or one they inherit, changes.
+ * again, or hash the material of their owners again, when a material component of their owner,
+ * or one they inherit, changes.
  *
- * A prefab gets a slot when it gets its MaterialId; a mesh shape that owns a MaterialId gets
- * one in the extract (box_draws_material_id). Both are freed when the owner loses its
- * MaterialId or is deleted.
+ * A prefab gets a private slot when it gets its MaterialId, a mesh shape that owns one takes a
+ * slot in the extract (box_draws_material_id). A private slot is freed when its owner loses its
+ * MaterialId or is deleted, a shared slot with its last owner.
  *
  * @param world The world
  * @param d The state
@@ -1036,23 +1100,30 @@ void box_draws_materials_observers(
 
 /** Get the slot of the material table an entity renders with.
  *
- * A mesh shape that owns a MaterialId renders with a slot of its own, handed out when it has
- * none. Any other entity renders with the MaterialId it inherits, or slot 0, and gives back an
- * own slot it had. A slot past what the binding holds is logged once and renders as slot 0.
+ * A mesh shape that owns a MaterialId renders with the shared slot of its material, which it
+ * takes or creates when it has none or its material changed since, or with a private slot while
+ * it is in a DynamicMaterial batch or a material transition runs.
+ *
+ * Any other entity renders with the MaterialId it inherits, or slot 0, and gives back an own
+ * slot it had. A slot past what the binding holds is logged once and renders as slot 0.
  *
  * @param world The world
  * @param d The state
  * @param e The entity
  * @param mesh Whether the entity is drawn by the mesh pipeline
+ * @param dynamic Whether the entity is in a DynamicMaterial batch, which packs its record every
+ * frame
  * @return The slot
  */
 uint32_t box_draws_material_id(
     ecs_world_t *world,
     box_render_draws_t *d,
     ecs_entity_t e,
-    bool mesh);
+    bool mesh,
+    bool dynamic);
 
-/** Give back the own slot of an entity that stops being a mesh shape, not the slot of a prefab.
+/** Give back the own slot of an entity that stops being a mesh shape, or its share of a shared
+ * slot, not the slot of a prefab.
  *
  * @param world The world
  * @param d The state
@@ -1063,7 +1134,8 @@ void box_draws_material_release(
     box_render_draws_t *d,
     ecs_entity_t e);
 
-/** Pack the slot an entity owns again in the next send, when it owns one.
+/** Pack the private slot an entity owns again in the next send, or hash the material of the
+ * owner of a shared slot again in the next box_draws_materials_resolve.
  *
  * @param d The state
  * @param e The entity
@@ -1073,9 +1145,53 @@ bool box_draws_material_changed(
     box_render_draws_t *d,
     ecs_entity_t e);
 
-/** Pack the changed slots of the material table and upload them: merged runs of consecutive
- * slots, or the whole table when its buffer is created. While recording shadow regions, the
- * slots whose cutoff or UV transform changed go to shadow_materials.
+/** Check whether an entity owns a slot of the material table, private or shared.
+ *
+ * @param d The state
+ * @param e The entity
+ * @return Whether it owns one
+ */
+bool box_draws_material_owns(
+    const box_render_draws_t *d,
+    ecs_entity_t e);
+
+/** Give the owner of a slot a private slot for a running material transition, which patches
+ * its record by slot, for the extract of this frame.
+ *
+ * The walk of the active material transitions calls it in every frame the transition runs,
+ * before the extract of the batches. A shared slot the owner holds alone turns private in place;
+ * else the owner gets a new slot and its sharers keep theirs.
+ *
+ * The first box_draws_materials_resolve after a frame that did not take the slot returns the
+ * owner to a shared slot, unless it is a prefab or in a DynamicMaterial batch.
+ *
+ * @param world The world
+ * @param d The state
+ * @param e The entity
+ * @return Its private slot, UINT32_MAX when it owns no slot
+ */
+uint32_t box_draws_material_private(
+    ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e);
+
+/** Bring the owners of shared slots to the slot of their material at the start of the extract.
+ *
+ * Hashes the material of each owner whose material changed and returns the owners whose
+ * material transition ended to a shared slot. An owner whose slot changes writes its shading.
+ *
+ * @param world The world
+ * @param d The state
+ */
+void box_draws_materials_resolve(
+    ecs_world_t *world,
+    box_render_draws_t *d);
+
+/** Pack the changed private slots of the material table from their owners and upload the
+ * changed slots: merged runs of consecutive slots, or the whole table when its buffer is created.
+ *
+ * A shared slot uploads the record it was hashed with, a freed slot nothing. While recording
+ * shadow regions, the slots whose cutoff or UV transform changed go to shadow_materials.
  *
  * @param world The world
  * @param d The state

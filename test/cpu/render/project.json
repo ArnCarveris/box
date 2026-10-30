@@ -256,7 +256,11 @@
                     "dynamic_uploads_one_range_per_batch",
                     "new_backend_sends_pages_again",
                     "page_memory_mesh_and_2d",
-                    "page_memory_drops_with_released_pages"
+                    "page_memory_drops_with_released_pages",
+                    "grown_page_keeps_instances",
+                    "moved_run_copies_instances",
+                    "moved_run_scatters_copied_changes",
+                    "moved_out_of_released_page_uploads"
                 ]
             },
             {
@@ -280,7 +284,15 @@
                     "transmission_override_composes",
                     "transmission_prefab_change_reaches_slot",
                     "clear_coat_prefab_change_reaches_slot",
-                    "clear_coat_dynamic_material_repacks"
+                    "clear_coat_dynamic_material_repacks",
+                    "equal_materials_share_slot",
+                    "changed_material_takes_other_slot",
+                    "alone_changed_material_keeps_slot",
+                    "shared_slot_freed_with_last_owner",
+                    "transition_takes_private_slot",
+                    "dynamic_material_keeps_private_slot",
+                    "base_slot_change_reaches_instances",
+                    "shared_cutoff_change_records_shadow"
                 ]
             },
             {
@@ -301,7 +313,13 @@
                     "enabled_shape_takes_current_transform",
                     "created_disabled_draws_once_enabled",
                     "text_created_disabled",
-                    "text_changed_while_disabled"
+                    "text_changed_while_disabled",
+                    "new_shape2d_uploads_no_surface",
+                    "changed_shape2d_uploads_no_surface",
+                    "mesh_uploads_surface_next_to_shape2d",
+                    "text_relayout_uploads_no_surface",
+                    "shape2d_packed_color",
+                    "glyph_packed_color"
                 ]
             },
             {
@@ -477,7 +495,9 @@
                     "targets_on_game_thread",
                     "no_transition_no_records",
                     "dynamic_material_fade_in",
-                    "text_spans_fade"
+                    "text_spans_fade",
+                    "packed_color_opacity_2d",
+                    "packed_color_tint_2d"
                 ]
             }
         ]

@@ -238,8 +238,8 @@ class App:
         return self.proc is not None and self.proc.poll() is None
 
     def run(self, cmd):
-        """Run a command line in the session as the shell gets it and return its result as a
-        Python value, None when it returned none; raise Failure when it fails."""
+        """Run a command line in the session as the shell gets it and return the result of its
+        last command as a Python value, None when it returned none; raise Failure when it fails."""
         if time.time() > self.deadline:
             self.fail("the case ran out of its %d s" % self.timeout, cmd, "")
         if not self.running():
@@ -259,9 +259,14 @@ class App:
             self.last_output = out
             self.fail("the command failed (%d)" % status, cmd, out)
         results = reply.get("results") or [{}]
+<<<<<<< HEAD
         last = results[-1] if isinstance(results[-1], dict) else {}
         result = last.get("result")
         if last.get("type") == "flecs.meta.value" and isinstance(result, dict) and \
+=======
+        result = results[-1].get("result")
+        if results[-1].get("type") == "flecs.meta.value" and isinstance(result, dict) and \
+>>>>>>> a8b5c6219466fa3d8ac0e15354c128d562b40b74
                 len(result) == 1:
             result = next(iter(result.values()))
         return result

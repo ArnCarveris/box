@@ -3,7 +3,10 @@
  * @brief Instance pages shared by every batch and the slot allocator of their runs.
  *
  * A page is one GPU buffer per stream of its layout, holding at most the slots of the page. Its
- * buffers start small and double up to that size, created again when its runs reach past them.
+ * buffers start small and double up to that size, created again when its runs reach past them;
+ * the backend copies the old buffers into the new ones, so the runs keep their instances. Its
+ * handles leave room for BOX_DRAWS_STREAMS buffers whatever its layout, so the backend finds its
+ * first buffer from any of its handles.
  *
  * Free slots below the end of the highest run are kept as holes, so a freed run merges with the
  * free slots next to it; the slots past that end are free as well.
@@ -84,7 +87,7 @@ uint32_t box_draws_store_handle(
     int32_t page,
     int32_t stream)
 {
-    return s->base + (uint32_t)page * (uint32_t)s->layout.streams + (uint32_t)stream;
+    return s->base + (uint32_t)page * (uint32_t)BOX_DRAWS_STREAMS + (uint32_t)stream;
 }
 
 /** Take a run out of the free slots of a page, the lowest that fit.
@@ -195,6 +198,7 @@ static void box_draws_page_release(
     pg->alive = false;
     pg->capacity = 0;
     pg->top = 0;
+    pg->serial ++;
     s->alive --;
 }
 
@@ -281,7 +285,8 @@ bool box_draws_store_reserve(
             BOX_RENDER_CREATE, box_draws_store_handle(s, page, i),
             sizeof(box_render_buffer_desc_t));
         desc->size = (uint64_t)capacity * s->layout.stride[i];
-        desc->usage = BOX_RENDER_BUFFER_INSTANCE | BOX_RENDER_BUFFER_STORAGE;
+        desc->usage = BOX_RENDER_BUFFER_INSTANCE | BOX_RENDER_BUFFER_STORAGE |
+            BOX_RENDER_BUFFER_COPY | (pg->capacity ? BOX_RENDER_BUFFER_KEEP : 0);
     }
 
     pg->capacity = capacity;

@@ -132,16 +132,21 @@
 
 /** Buffer handle of the first instance page, the first handle of the instance pages.
  *
- * Every batch draws a run of slots of one instance page: BOX_RENDER_INSTANCE_STREAMS storage
- * buffers of at most BOX_DRAWS_CHUNK instances with the same slots, shared by the batches.
- * box_render_batch_t.instances is the transform stream of the page, first_instance its slot.
+ * Every batch draws a run of slots of one instance page: a storage buffer per stream of at most
+ * BOX_DRAWS_CHUNK instances, BOX_RENDER_INSTANCE_STREAMS for a mesh page and, without the surface
+ * stream, BOX_RENDER_INSTANCE_STREAMS_2D for a 2D page, for which the backend binds a zero record.
  *
- * Page p has the handle BOX_RENDER_BUFFER_FIRST + p * BOX_RENDER_INSTANCE_STREAMS + s for
- * stream s. A released page index is reused by the next page the store needs. */
+ * box_render_batch_t.instances is the transform stream of the page, first_instance its slot. Page
+ * p has the handle BOX_RENDER_BUFFER_FIRST + p * BOX_RENDER_INSTANCE_STREAMS + s for stream s. A
+ * released page index is reused by the next page the store needs. */
 #define BOX_RENDER_BUFFER_FIRST (16)
 
-/** Buffers of an instance page, one per stream, at consecutive handles */
+/** Buffers of a mesh instance page, one per stream, at consecutive handles; the handles of
+ * every page, 2D pages included, leave room for this many */
 #define BOX_RENDER_INSTANCE_STREAMS (3)
+
+/** Buffers of a 2D instance page: the transform and the shading stream */
+#define BOX_RENDER_INSTANCE_STREAMS_2D (2)
 
 /** Buffer handle of the first instance page of the 2D shapes and glyphs; the pages from
  * BOX_RENDER_BUFFER_FIRST hold the meshes. Page p of the 2D pages has the handle
@@ -156,7 +161,8 @@
  * a mesh page, box_render_shading_t per slot of a 2D page */
 #define BOX_RENDER_STREAM_SHADING (1)
 
-/** Stream of the surface parameters of an instance page, box_render_surface_t per slot */
+/** Stream of the surface parameters of a mesh instance page, box_render_surface_t per slot;
+ * 2D pages have none */
 #define BOX_RENDER_STREAM_SURFACE (2)
 
 /** Byte alignment of a scatter segment in the change buffer, the storage offset alignment */
@@ -754,7 +760,13 @@ typedef struct box_render_atmosphere_env_t {
 typedef enum box_render_buffer_usage_t {
     BOX_RENDER_BUFFER_INSTANCE = 1 << 0, /**< Per instance vertex data of batches */
     BOX_RENDER_BUFFER_STORAGE = 1 << 1,  /**< Read and written by compute shaders */
-    BOX_RENDER_BUFFER_UNIFORM = 1 << 2   /**< Bound as uniforms */
+    BOX_RENDER_BUFFER_UNIFORM = 1 << 2,  /**< Bound as uniforms */
+    BOX_RENDER_BUFFER_COPY = 1 << 3,     /**< Source of GPU copies (box_render_copy_t), such as
+                                          *   an instance page whose runs move */
+    BOX_RENDER_BUFFER_KEEP = 1 << 4      /**< A create that replaces a buffer of the handle
+                                          *   copies the bytes the two have in common from the
+                                          *   old buffer on the GPU before releasing it, which
+                                          *   needs BOX_RENDER_BUFFER_COPY on the old buffer */
 } box_render_buffer_usage_t;
 
 /** The area of a ClipChildren element as shape2d.wgsl reads it from the clip buffer.
@@ -785,18 +797,27 @@ typedef struct box_render_transform_t {
 } box_render_transform_t;
 
 /** Shading constants of a 2D shape or glyph, the shading stream of a 2D instance page, which
- * changes with its material.
+ * changes with its material, Shape2DShading of shape2d.wgsl.
  *
- * A 2D instance holds the words of its shape in material (see shape2d.wgsl) and its clip index
- * in ids[0].
+ * The words of emissive.w and material depend on what the instance draws (box_draws_shape2d,
+ * box_draws_glyph):
+ * - A rectangle (Rect, Circle): emissive.w is its width over its height, material.x its corner
+ *   radius and material.y its border width in units of half its smaller side, material.zw its
+ *   linear border color as four half floats (r | g << 16, b | a << 16).
+ * - A line: emissive.w is its negated width, material.xy its start and material.zw its end.
+ * - A glyph of a Text: emissive.w is 0, material.xy the distance range of its atlas page,
+ *   material.zw 0 and uv the area of the glyph on the page.
+ * - A shape without a 2D shape: material.xy metallic and roughness, emissive.w and material.zw 0.
  */
 typedef struct box_render_shading_t {
-    vec4 color;             /**< Linear base color, alpha is the opacity with its ancestors */
-    vec4 emissive;          /**< Linear emitted color times its strength, w unused */
-    vec4 material;          /**< Metallic, roughness, zw unused (the words of a 2D shape) */
+    vec4 emissive;          /**< Linear emitted color times its strength; w the aspect, the
+                             *   negated line width or 0 for a glyph */
+    vec4 material;          /**< The words of the shape, or metallic and roughness */
     vec4 uv;                /**< TextureTransform: u scale, v scale, u offset, v offset */
-    uint32_t ids[4];        /**< Clip index of a 2D instance (0 for none), its rank in the draw
-                             *   order of its tree, two reserved 0 */
+    uint32_t color[2];      /**< Linear base color and alpha (the opacity with its ancestors) as
+                             *   unorm16x4: r | g << 16, b | a << 16 (box_draws_color_pack) */
+    uint32_t ids[2];        /**< Clip index of a 2D instance (0 for none), its rank in the draw
+                             *   order of its tree */
 } box_render_shading_t;
 
 /** A record of the material table (BOX_RENDER_BUFFER_MATERIALS), Material of material.wgsl: the
@@ -854,6 +875,32 @@ typedef struct box_render_scatter_t {
     uint32_t size;          /**< Bytes of the segment */
     uint32_t count;         /**< Instances the segment holds */
 } box_render_scatter_t;
+
+/** Byte alignment of the offsets and sizes of a copy between buffers, the copy alignment of
+ * WebGPU */
+#define BOX_RENDER_COPY_ALIGN (4)
+
+/** Bytes the copies of one packet move at most together: the backend copies them through one
+ * staging buffer, below the 256 MiB buffer size every WebGPU device supports */
+#define BOX_RENDER_COPY_MAX ((uint64_t)128 << 20)
+
+/** GPU copy of bytes from one buffer into another or into the same one, such as the instances
+ * of a run of an instance page that moved to another run.
+ *
+ * The copies of a packet run after its resources and before its uploads and scatters, which
+ * write the slots that changed over the copied ones. Every copy reads its source as it was
+ * before the copies of the packet, so one copy may write where another reads, and source and
+ * destination may overlap. The offsets and the size are BOX_RENDER_COPY_ALIGN multiples and the
+ * sizes of a packet add up to at most BOX_RENDER_COPY_MAX; the source has
+ * BOX_RENDER_BUFFER_COPY.
+ */
+typedef struct box_render_copy_t {
+    uint32_t src;           /**< Handle of the buffer read */
+    uint32_t src_offset;    /**< Byte offset in it */
+    uint32_t dst;           /**< Handle of the buffer written */
+    uint32_t dst_offset;    /**< Byte offset in it */
+    uint32_t size;          /**< Bytes copied */
+} box_render_copy_t;
 
 /** Description of a BOX_RENDER_SHADER create or update, followed by its code and its label.
  *
@@ -1029,8 +1076,8 @@ typedef struct box_render_transition_record_t {
 /** Everything the renderer needs of one frame, filled on the main thread.
  *
  * The vectors keep their storage when the packet is reused, so a frame that needs no more
- * than an earlier one does not allocate. Resources apply first, then uploads, then the
- * scatters, then every target is cleared, drawn by its views and presented.
+ * than an earlier one does not allocate. Resources apply first, then the copies, then uploads,
+ * then the scatters, then every target is cleared, drawn by its views and presented.
  */
 typedef struct box_render_packet_t {
     int64_t frame;          /**< Frame the packet was extracted in */
@@ -1043,6 +1090,8 @@ typedef struct box_render_packet_t {
     ecs_vec_t resources;    /**< box_render_resource_t in the order they were made */
     ecs_vec_t uploads;      /**< box_render_upload_t in the order they were made */
     ecs_vec_t scatters;     /**< box_render_scatter_t, run after the uploads */
+    ecs_vec_t copies;       /**< box_render_copy_t, run after the resources and before the
+                             *   uploads */
     ecs_vec_t views;        /**< box_render_view_t in render order */
     ecs_vec_t batches;      /**< box_render_batch_t */
     ecs_vec_t targets;      /**< box_render_target_t in the order they render */
@@ -1098,6 +1147,10 @@ typedef struct box_render_null_t {
     int64_t batches;            /**< Batches received in total */
     int64_t uploads;            /**< Uploads received in total */
     int64_t scatters;           /**< Scatters received in total */
+    int64_t copies;             /**< Copies between buffers received in total */
+    int64_t copy_bytes;         /**< Bytes those copies move in total */
+    int64_t kept;               /**< Buffer creates received in total that keep the contents of
+                                 *   the buffer they replace (BOX_RENDER_BUFFER_KEEP) */
     int64_t resources;          /**< Resource changes received in total */
     int64_t bytes;              /**< Upload bytes received in total */
     int64_t targets;            /**< Targets received in total */

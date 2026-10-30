@@ -36,14 +36,21 @@ typedef struct box_render_draws_stats_t {
                                  *   of the bytes of the streams */
     int64_t upload_bytes;       /**< Bytes the last extract uploaded into instance buffers, the
                                  *   sum of the bytes of the streams */
+    int32_t copies;             /**< GPU copies the last extract sent, one per stream of a batch
+                                 *   whose run moved, which copy its instances from its old run */
+    int64_t copy_bytes;         /**< Bytes those copies move on the GPU, not uploaded */
+    int32_t kept_pages;         /**< Page buffers the last extract created again larger, which
+                                 *   keep their instances through a GPU copy */
+    int64_t kept_bytes;         /**< Bytes of instances those buffers keep, not uploaded */
     int64_t transform_bytes;    /**< Bytes the last extract uploaded into the transform streams:
                                  *   the runs of batches whose transforms upload (every frame for
                                  *   DynamicTransform) and the scatter segments of moved slots */
     int64_t shading_bytes;      /**< Bytes the last extract uploaded into the shading streams:
                                  *   the runs of batches whose shading uploads (every frame
                                  *   for DynamicMaterial) and scatter segments of materials */
-    int64_t surface_bytes;      /**< Bytes the last extract uploaded into the surface streams,
-                                 *   runs and scatter segments, only when a ShapeMesh changed */
+    int64_t surface_bytes;      /**< Bytes the last extract uploaded into the surface streams
+                                 *   of the mesh pages, runs and scatter segments, only when a
+                                 *   ShapeMesh changed; 2D pages have no surface stream */
     int32_t clips;              /**< ClipChildren elements in the clip buffer */
     int64_t clip_bytes;         /**< Bytes the last extract uploaded into the clip buffer */
     int32_t materials;          /**< Slots of the material table alive, slot 0 included */
@@ -55,9 +62,9 @@ typedef struct box_render_draws_stats_t {
  * Shapes are instanced in batches keyed by scene, mesh, pipeline and whether their transform
  * and their material are dynamic, which persist between frames.
  *
- * An instance page holds a transform, a shading and a surface stream. The transforms of
- * DynamicTransform shapes and the shading of DynamicMaterial shapes upload every frame; every
- * other stream is updated on change through the scatter pass, only the streams that changed.
+ * A mesh instance page holds a transform, a shading and a surface stream, a 2D page no surface
+ * stream. The transforms of DynamicTransform shapes and the shading of DynamicMaterial shapes
+ * upload every frame; the other streams upload the slots that changed through the scatter pass.
  *
  * @param world The world
  */
@@ -1164,6 +1171,14 @@ void* box_render_packet_upload(
  * @return The zeroed scatter
  */
 box_render_scatter_t* box_render_packet_scatter(
+    box_render_packet_t *p);
+
+/** Append a GPU copy between buffers to a packet.
+ *
+ * @param p The packet
+ * @return The zeroed copy
+ */
+box_render_copy_t* box_render_packet_buffer_copy(
     box_render_packet_t *p);
 
 /** Append a resource change to a packet.

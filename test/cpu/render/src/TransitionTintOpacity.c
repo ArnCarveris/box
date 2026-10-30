@@ -25,6 +25,22 @@
 /** Difference a patched alpha or color may have from the expected one */
 #define TR_FLOAT_EPS (1e-4f)
 
+/** Get a channel of the unorm16x4 color of a 2D shading.
+ *
+ * @param shading The shading
+ * @param c The channel, r, g, b, a
+ * @return The channel from 0 to 1
+ */
+static float tr_channel(
+    const box_render_shading_t *shading,
+    int32_t c)
+{
+    float color[4];
+    box_draws_color_unpack(color, shading->color);
+
+    return color[c];
+}
+
 /** A value of an entity that a case renders instead of the target of the entity */
 typedef struct tr_override_t {
     ecs_entity_t entity;            /**< The entity, 0 for none */
@@ -431,7 +447,7 @@ static void tr_check_shape(
     tr_material(world, overrides, e, &tint, &m);
     box_draws_material(&expected, &m);
     for (i = 0; i < 4; i ++) {
-        test_assert(fabsf(rendered.color[i] - expected.color[i]) < TR_FLOAT_EPS);
+        test_assert(fabsf(tr_channel(&rendered, i) - tr_channel(&expected, i)) < TR_FLOAT_EPS);
         test_assert(fabsf(rendered.uv[i] - expected.uv[i]) < TR_FLOAT_EPS);
     }
 
@@ -644,7 +660,7 @@ void TransitionTintOpacity_opacity_2d(void) {
         test_int(tr_batch(world, e)->key.blend, AlphaBlend);
         tr_check_shape(world, null, o, e);
         tr_rendered(world, null, e, &rendered);
-        test_assert(fabsf(rendered.color[3] - mid.value) < TR_FLOAT_EPS);
+        test_assert(fabsf(tr_channel(&rendered, 3) - mid.value) < TR_FLOAT_EPS);
     }
 
     tr_frame(world);
@@ -1209,15 +1225,18 @@ void TransitionTintOpacity_text_spans_fade(void) {
             test_int(b->key.blend, AlphaBlend);
             test_assert(b->key.dynamic_material);
             tr_glyph_rendered(world, null, at, &rendered);
-            test_assert(fabsf(rendered.color[3] -
+            test_assert(fabsf(tr_channel(&rendered, 3) -
                 (float)color.a / 255.0f * opacity.value) < TR_FLOAT_EPS);
             for (c = 0; c < 4; c ++) {
-                test_assert(fabsf(rendered.color[c] - expected.color[c]) < TR_FLOAT_EPS);
+                test_assert(fabsf(tr_channel(&rendered, c) - tr_channel(&expected, c)) <
+                    TR_FLOAT_EPS);
             }
 
             if (i == 2) {
-                test_assert(fabsf(rendered.color[2] - target_shading.color[2]) > TR_FLOAT_EPS);
-                test_assert(fabsf(rendered.color[3] - target_shading.color[3]) > TR_FLOAT_EPS);
+                test_assert(fabsf(tr_channel(&rendered, 2) -
+                    tr_channel(&target_shading, 2)) > TR_FLOAT_EPS);
+                test_assert(fabsf(tr_channel(&rendered, 3) -
+                    tr_channel(&target_shading, 3)) > TR_FLOAT_EPS);
             }
         }
     }
@@ -1241,5 +1260,118 @@ void TransitionTintOpacity_text_spans_fade(void) {
         test_assert(!ecs_os_memcmp_t(&rendered, &expected, box_render_shading_t));
     }
 
+    tr_fini(world, null);
+}
+
+/** Units of unorm16 a packed channel of a patched 2D shading may differ by from the exact one */
+#define TR_PACKED_EPS (4)
+
+/** Convert a display encoded channel from 0 to 1 to linear light with the exact sRGB curve.
+ *
+ * @param c The channel
+ * @return The linear value
+ */
+static float tr_srgb_linear(
+    float c)
+{
+    return c <= 0.04045f ? c / 12.92f : powf((c + 0.055f) / 1.055f, 2.4f);
+}
+
+/** Check that the unorm16x4 color of a 2D shading is near a linear color and alpha.
+ *
+ * @param shading The shading
+ * @param expected Linear r, g, b and the alpha
+ */
+static void tr_check_packed(
+    const box_render_shading_t *shading,
+    const float *expected)
+{
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        test_assert(expected[i] >= 0.0f && expected[i] <= 1.0f);
+        int32_t word = (int32_t)((shading->color[i / 2] >> (16 * (i % 2))) & 0xFFFFu);
+        int32_t exact = (int32_t)(expected[i] * 65535.0f + 0.5f);
+        test_assert(abs(word - exact) <= TR_PACKED_EPS);
+    }
+}
+
+void TransitionTintOpacity_packed_color_opacity_2d(void) {
+    // gpu_instance_data/instance_streams
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_entity_t e = tr_rect(world, 0);
+    box_render_shading_t rendered;
+    int32_t i;
+    ecs_set(world, e, Opacity, {0.2f});
+    tr_transition(world, e, ecs_id(Opacity));
+    tr_frame(world);
+    tr_frame(world);
+
+    ecs_set(world, e, Opacity, {0.9f});
+    for (i = 0; i < 4; i ++) {
+        Opacity mid = tr_opacity_at(0.2f, 0.9f, i);
+        float expected[4] = {
+            tr_srgb_linear(200.0f / 255.0f),
+            tr_srgb_linear(100.0f / 255.0f),
+            tr_srgb_linear(50.0f / 255.0f),
+            mid.value
+        };
+        tr_frame(world);
+        test_assert(ecs_has_id(world, e, TransitionOpacity));
+        test_assert(tr_batch(world, e)->key.dynamic_material);
+        tr_rendered(world, null, e, &rendered);
+        tr_check_packed(&rendered, expected);
+        test_assert(rendered.emissive[3] > 0.0f);
+    }
+
+    tr_frame(world);
+    test_assert(!ecs_has_id(world, e, TransitionOpacity));
+    tr_rendered(world, null, e, &rendered);
+    tr_check_packed(&rendered, (float[]){
+        tr_srgb_linear(200.0f / 255.0f),
+        tr_srgb_linear(100.0f / 255.0f),
+        tr_srgb_linear(50.0f / 255.0f),
+        0.9f });
+    tr_fini(world, null);
+}
+
+void TransitionTintOpacity_packed_color_tint_2d(void) {
+    // gpu_instance_data/instance_streams
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_entity_t parent = tr_group(world);
+    ecs_entity_t e = tr_rect(world, parent);
+    const Tint from = {0, 0, 255, 0}, to = {0, 0, 255, 255};
+    const float base[3] = { 200.0f / 255.0f, 100.0f / 255.0f, 50.0f / 255.0f };
+    box_render_shading_t rendered;
+    int32_t i, c;
+    ecs_set(world, e, Opacity, {0.5f});
+    ecs_set_ptr(world, parent, Tint, &from);
+    tr_transition(world, parent, ecs_id(Tint));
+    tr_frame(world);
+    tr_frame(world);
+
+    ecs_set_ptr(world, parent, Tint, &to);
+    for (i = 0; i < 4; i ++) {
+        Tint mid = tr_tint_at(&from, &to, i);
+        float a = (float)mid.a / 255.0f;
+        const uint8_t *own = &mid.r;
+        float expected[4];
+        for (c = 0; c < 3; c ++) {
+            expected[c] = tr_srgb_linear(base[c] * (1.0f - a) + (float)own[c] / 255.0f * a);
+        }
+
+        expected[3] = 0.5f;
+        tr_frame(world);
+        test_assert(ecs_has_id(world, e, TransitionMaterial));
+        test_assert(tr_batch(world, e)->key.dynamic_material);
+        tr_rendered(world, null, e, &rendered);
+        tr_check_packed(&rendered, expected);
+    }
+
+    tr_frame(world);
+    test_assert(!ecs_has_id(world, e, TransitionMaterial));
+    tr_rendered(world, null, e, &rendered);
+    tr_check_packed(&rendered, (float[]){ 0.0f, 0.0f, 1.0f, 0.5f });
     tr_fini(world, null);
 }

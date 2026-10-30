@@ -11,6 +11,9 @@
 #include <bake_test.h>
 #include "render.h"
 #include "draw.h"
+#include <math.h>
+#include <stddef.h>
+#include <stdlib.h>
 
 /** Shapes of the cases with many shapes */
 #define COUNT (10)
@@ -29,6 +32,9 @@
 
 /** Bytes of one instance in the surface stream */
 #define SURFACE ((int64_t)sizeof(box_render_surface_t))
+
+/** Slots of the smallest run, BOX_DRAWS_MIN_CAPACITY of the extract */
+#define MIN_RUN ((int64_t)64)
 
 /** Create a world that renders with a null backend and has a view.
  *
@@ -170,7 +176,7 @@ static int64_t scattered_clip(
 
         const uint32_t *words = box_render_packet_data(&null->last, changes->data + sc->offset);
         test_uint(words[1], (uint32_t)(SHADING_2D / 4));
-        result = words[BOX_RENDER_SCATTER_HEADER + 1 + 16];
+        result = words[BOX_RENDER_SCATTER_HEADER + 1 + offsetof(box_render_shading_t, ids) / 4];
     }
 
     return result;
@@ -291,6 +297,16 @@ void InstanceStreams_static_change_scatters_its_stream(void) {
     test_bytes(&stats, 0, 0);
 
     ecs_set(world, boxes[5], Rgb, {0, 255, 0});
+    stats = frame(world);
+    test_int(stats.scatters, 1);
+    test_int(stats.scattered, 1);
+    test_bytes(&stats, 0, segment_size(1, SHADING));
+    test_int(stats.material_bytes, MATERIAL);
+
+    stats = frame(world);
+    test_bytes(&stats, 0, 0);
+
+    ecs_set(world, boxes[5], Rgb, {0, 128, 0});
     stats = frame(world);
     test_int(stats.scatters, 0);
     test_bytes(&stats, 0, 0);
@@ -742,6 +758,280 @@ void InstanceStreams_text_changed_while_disabled(void) {
     frame(world);
     test_int(ecs_vec_count(&ecs_get(world, text, TextGlyphs)->glyphs), 3);
     test_int(ecs_vec_count(&ecs_get(world, text, TextSlots)->slots), 3);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** Add a 2D rectangle.
+ *
+ * @param world The world
+ * @param x Its x position
+ * @return The rectangle
+ */
+static ecs_entity_t rect_new(
+    ecs_world_t *world,
+    float x)
+{
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {x, 0, 0});
+    ecs_set(world, e, Rect, {10, 10});
+    ecs_set(world, e, Rgb, {200, 100, 50});
+
+    return e;
+}
+
+/** New 2D shapes upload their transforms and shading and no surface: 2D pages have no surface
+ * stream. */
+void InstanceStreams_new_shape2d_uploads_no_surface(void) {
+    // gpu_instance_data/instance_surface_2d
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    int32_t i;
+    for (i = 0; i < COUNT; i ++) {
+        rect_new(world, (float)i * 20);
+    }
+
+    box_render_draws_stats_t stats = frame(world);
+    test_int(stats.transform_bytes, COUNT * TRANSFORM);
+    test_int(stats.shading_bytes, COUNT * SHADING_2D);
+    test_int(stats.surface_bytes, 0);
+    test_int(stats.page_slots, MIN_RUN);
+    test_int(stats.page_surface_bytes, 0);
+    test_int(stats.page_bytes, MIN_RUN * (TRANSFORM + SHADING_2D));
+
+    stats = frame(world);
+    test_bytes(&stats, 0, 0);
+    test_int(stats.page_surface_bytes, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** A changed 2D shape, moved or reshaped, uploads no surface. */
+void InstanceStreams_changed_shape2d_uploads_no_surface(void) {
+    // gpu_instance_data/instance_surface_2d
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t rects[COUNT];
+    int32_t i;
+    for (i = 0; i < COUNT; i ++) {
+        rects[i] = rect_new(world, (float)i * 20);
+    }
+
+    frame(world);
+    box_render_draws_stats_t stats = frame(world);
+    test_bytes(&stats, 0, 0);
+
+    ecs_set(world, rects[3], Position, {60, 5, 0});
+    stats = frame(world);
+    test_int(stats.surface_bytes, 0);
+    test_assert(stats.transform_bytes >= segment_size(1, TRANSFORM));
+    test_int(stats.upload_bytes, stats.transform_bytes + stats.shading_bytes);
+    test_int(stats.page_surface_bytes, 0);
+
+    ecs_set(world, rects[5], Rect, {12, 8});
+    stats = frame(world);
+    test_int(stats.surface_bytes, 0);
+    test_assert(stats.upload_bytes > 0);
+    test_int(stats.upload_bytes, stats.transform_bytes + stats.shading_bytes);
+    test_int(stats.page_surface_bytes, 0);
+
+    ecs_set(world, rects[7], Rgb, {0, 255, 0});
+    stats = frame(world);
+    test_int(stats.surface_bytes, 0);
+    test_int(stats.upload_bytes, stats.transform_bytes + stats.shading_bytes);
+    test_int(stats.page_surface_bytes, 0);
+
+    ecs_delete(world, rects[0]);
+    stats = frame(world);
+    test_int(stats.surface_bytes, 0);
+    test_int(stats.upload_bytes, stats.transform_bytes + stats.shading_bytes);
+    test_int(stats.page_surface_bytes, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** Meshes keep their surface stream next to 2D shapes, which have none. */
+void InstanceStreams_mesh_uploads_surface_next_to_shape2d(void) {
+    // gpu_instance_data/instance_surface_2d
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    int32_t i;
+    for (i = 0; i < COUNT; i ++) {
+        box_new(world, 0, (float)i);
+        rect_new(world, (float)i * 20);
+    }
+
+    box_render_draws_stats_t stats = frame(world);
+    test_int(stats.transform_bytes, 2 * COUNT * TRANSFORM);
+    test_int(stats.shading_bytes, COUNT * (SHADING + SHADING_2D));
+    test_int(stats.surface_bytes, COUNT * SURFACE);
+    test_int(stats.page_surface_bytes, MIN_RUN * SURFACE);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** A text laid out again writes the transforms and shading of its glyphs and no surface. */
+void InstanceStreams_text_relayout_uploads_no_surface(void) {
+    // gpu_instance_data/instance_surface_2d
+    box_render_null_t *null;
+    ecs_world_t *world = text_world_new(&null);
+    ecs_entity_t text = ecs_new(world);
+    text_set(world, text, "relayout");
+    box_render_draws_stats_t stats = frame(world);
+    box_render_draws_stats_t next = frame(world);
+    test_int(ecs_vec_count(&ecs_get(world, text, TextSlots)->slots), 8);
+    test_assert(stats.shading_bytes + next.shading_bytes >= 8 * SHADING_2D);
+    test_int(stats.surface_bytes + next.surface_bytes, 0);
+    test_int(next.page_surface_bytes, 0);
+
+    stats = frame(world);
+    test_int(stats.surface_bytes, 0);
+
+    text_set(world, text, "reworded");
+    stats = frame(world);
+    next = frame(world);
+    test_int(ecs_vec_count(&ecs_get(world, text, TextSlots)->slots), 8);
+    test_assert(stats.shading_bytes + next.shading_bytes > 0);
+    test_int(stats.surface_bytes + next.surface_bytes, 0);
+    test_int(next.page_surface_bytes, 0);
+
+    ecs_set(world, text, Position, {5, 1, 0});
+    stats = frame(world);
+    test_assert(stats.transform_bytes > 0);
+    test_int(stats.surface_bytes, 0);
+    test_int(stats.upload_bytes, stats.transform_bytes + stats.shading_bytes);
+    test_int(stats.page_surface_bytes, 0);
+
+    text_set(world, text, "a much longer text");
+    stats = frame(world);
+    next = frame(world);
+    test_int(stats.surface_bytes + next.surface_bytes, 0);
+    test_int(next.page_surface_bytes, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** Units of unorm16 a packed channel may differ by from the exact one: the extract converts
+ * display encoded channels to linear light with a table */
+#define UNORM_EPS (2)
+
+/** Convert a display encoded channel to linear light with the exact sRGB curve.
+ *
+ * @param value The channel
+ * @return The linear value
+ */
+static float srgb_linear(
+    uint8_t value)
+{
+    float c = (float)value / 255.0f;
+
+    return c <= 0.04045f ? c / 12.92f : powf((c + 0.055f) / 1.055f, 2.4f);
+}
+
+/** Check that the packed unorm16x4 color of a 2D shading is near a linear color and alpha.
+ *
+ * @param shading The shading
+ * @param r Linear red
+ * @param g Linear green
+ * @param b Linear blue
+ * @param a Alpha
+ */
+static void test_packed_color(
+    const box_render_shading_t *shading,
+    float r,
+    float g,
+    float b,
+    float a)
+{
+    float expected[4] = { r, g, b, a };
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        int32_t word = (int32_t)((shading->color[i / 2] >> (16 * (i % 2))) & 0xFFFFu);
+        int32_t exact = (int32_t)(expected[i] * 65535.0f + 0.5f);
+        test_assert(abs(word - exact) <= UNORM_EPS);
+    }
+
+    float unpacked[4];
+    box_draws_color_unpack(unpacked, shading->color);
+    for (i = 0; i < 4; i ++) {
+        test_assert(fabsf(unpacked[i] - expected[i]) < 1e-4f);
+    }
+}
+
+/** A 2D shape packs its linear color and alpha as unorm16x4 into a 64 byte shading record,
+ * which a scatter entry carries in 68 bytes. */
+void InstanceStreams_shape2d_packed_color(void) {
+    // gpu_instance_data/instance_streams
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    test_int(SHADING_2D, 64);
+    test_int(segment_size(1, SHADING_2D),
+        (BOX_RENDER_SCATTER_HEADER * 4 + 68 + BOX_RENDER_SCATTER_ALIGN - 1) /
+            BOX_RENDER_SCATTER_ALIGN * BOX_RENDER_SCATTER_ALIGN);
+    ecs_entity_t e = rect_new(world, 0);
+    ecs_set(world, e, Opacity, {0.5f});
+    frame(world);
+    frame(world);
+
+    const box_render_shading_t *shading = shading_of(world, e);
+    test_packed_color(shading, srgb_linear(200), srgb_linear(100), srgb_linear(50), 0.5f);
+    test_assert(shading->emissive[3] > 0.0f);
+
+    ecs_set(world, e, Rgb, {255, 0, 128});
+    ecs_set(world, e, Opacity, {2.0f});
+    box_render_draws_stats_t stats = frame(world);
+    // A lone shape uploads its run: a 68 byte entry is not smaller than the 64 byte run
+    test_int(stats.shading_bytes, SHADING_2D);
+    shading = shading_of(world, e);
+    test_packed_color(shading, 1.0f, 0.0f, srgb_linear(128), 1.0f);
+    test_uint(shading->color[0] & 0xFFFFu, 65535);
+    test_uint(shading->color[0] >> 16, 0);
+    test_uint(shading->color[1] >> 16, 65535);
+
+    ecs_set(world, e, Opacity, {-1.0f});
+    frame(world);
+    test_uint(shading_of(world, e)->color[1] >> 16, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** The glyphs of a Text pack the linear color and alpha of the Text as unorm16x4, with an
+ * emissive.w of 0. */
+void InstanceStreams_glyph_packed_color(void) {
+    // gpu_instance_data/instance_streams
+    box_render_null_t *null;
+    ecs_world_t *world = text_world_new(&null);
+    ecs_entity_t font = ecs_entity(world, { .name = "packed_font" });
+    ecs_set(world, font, Font, { .path = "test/assets/fonts/B612-Regular.ttf" });
+    ecs_entity_t text = ecs_new(world);
+    ecs_set(world, text, Position, {0, 1, 0});
+    ecs_set(world, text, Rgb, {20, 200, 40});
+    ecs_set(world, text, Opacity, {0.25f});
+    ecs_set(world, text, Text, { .value = "packed", .size = 16, .font = font });
+    frame(world);
+    frame(world);
+    frame(world);
+
+    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractDraws");
+    const ecs_system_t *s = ecs_system_get(world, system);
+    test_assert(s != NULL && s->ctx != NULL);
+    const TextSlots *ts = ecs_get(world, text, TextSlots);
+    test_assert(ts != NULL);
+    test_int(ecs_vec_count(&ts->slots), 6);
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&ts->slots); i ++) {
+        const box_draw_glyph_slot_t *at = ecs_vec_get_t(&ts->slots, box_draw_glyph_slot_t, i);
+        const box_render_shading_t *shading = box_draws_slot_shading(
+            box_draws_batch(s->ctx, at->batch), at->slot);
+        test_packed_color(shading, srgb_linear(20), srgb_linear(200), srgb_linear(40), 0.25f);
+        test_flt(shading->emissive[3], 0);
+    }
 
     ecs_fini(world);
     box_render_null_free(null);

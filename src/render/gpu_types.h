@@ -750,6 +750,8 @@ typedef struct box_gpu_t {
                                      *   cull, the shadow casters and the capture cull */
     WGPUBuffer no_assets;           /**< One zero vec4, the surface assets of the draws of
                                      *   meshes without any */
+    WGPUBuffer no_surfaces;         /**< One zero box_render_surface_t, the surface stream of
+                                     *   the pages without one, the 2D pages */
     WGPUBuffer no_materials;        /**< One default material record, the material table of
                                      *   the draws before the main thread sent one */
     box_gpu_cull_t cull;            /**< Cull pass state */
@@ -759,6 +761,9 @@ typedef struct box_gpu_t {
     int32_t scatter_revision;       /**< Revision of the shader the pipeline was made with */
     ecs_map_t meshes;               /**< Handle to box_gpu_mesh_t */
     ecs_map_t buffers;              /**< Handle to box_gpu_buffer_t */
+    WGPUBuffer copy_staging;        /**< Staging buffer of the copies of a packet, NULL until
+                                     *   a packet has copies */
+    uint64_t copy_staging_size;     /**< Bytes of copy_staging, at most BOX_RENDER_COPY_MAX */
     ecs_map_t targets;              /**< Handle to box_gpu_target_t */
     ecs_map_t shaders;              /**< Handle to box_gpu_shader_t */
     ecs_vec_t results;              /**< box_render_shader_result_t not yet taken */

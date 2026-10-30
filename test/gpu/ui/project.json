@@ -300,7 +300,8 @@
                 "id": "FpsPanel",
                 "testcases": [
                     "between_editor_and_console",
-                    "click_reaches_game"
+                    "click_reaches_game",
+                    "scroll_reaches_game"
                 ]
             }
         ]

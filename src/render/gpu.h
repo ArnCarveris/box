@@ -550,6 +550,9 @@ void box_gpu_mesh_apply(
 
 /** Create or release a buffer from a BOX_RENDER_BUFFER resource.
  *
+ * A create with BOX_RENDER_BUFFER_KEEP that replaces a buffer copies the bytes the two have
+ * in common from the old buffer on the GPU before releasing it.
+ *
  * @param gpu The backend
  * @param op What happens to the buffer
  * @param handle Handle of the buffer
@@ -560,6 +563,18 @@ void box_gpu_buffer_apply(
     box_render_resource_op_t op,
     uint32_t handle,
     const box_render_buffer_desc_t *desc);
+
+/** Run the copies between buffers of a packet, after its resources and before its uploads.
+ *
+ * Every source is copied into a staging buffer, then every destination from it, so a copy reads
+ * its source as it was before the copies of the packet, even within one buffer.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+void box_gpu_copy(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
 
 /** Write the uploads of a packet into their buffers.
  *
@@ -1434,6 +1449,8 @@ void box_gpu_cull_fini(
  * instance_layout binds the transform stream (0), the surface assets of the mesh (1), the shading
  * stream (2), the surface stream (3) and the material table (4); transform_layout every binding
  * but the shading stream and the material table. Only the transform stream is visible to compute.
+ *
+ * A 2D page has no surface stream and binds gpu->no_surfaces at 3.
  *
  * @param gpu The backend
  */

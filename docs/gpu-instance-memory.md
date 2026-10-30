@@ -77,7 +77,7 @@ from the shader code.
 | Stream | Mesh page | 2D page | Read on the GPU by |
 |---|---|---|---|
 | Transform | 48, `box_render_transform_t` | 48 | `cull.wgsl`, `mesh.wgsl`, `shadow.wgsl`, `bake_sh.wgsl`, `shape2d.wgsl` |
-| Shading | 16, `box_render_mesh_shading_t` | 80, `box_render_shading_t` | `mesh.wgsl`, `shadow.wgsl` (cutoff), `shape2d.wgsl` |
+| Shading | 16, `box_render_mesh_shading_t` | 64, `box_render_shading_t` | `mesh.wgsl`, `shadow.wgsl` (cutoff), `shape2d.wgsl` |
 | Surface | 384, `box_render_surface_t` | 384 | `mesh.wgsl` and `shadow.wgsl` through `place()`; not `shape2d.wgsl`, not `cull.wgsl` |
 | Total | 448 | 512 | |
 
@@ -145,8 +145,8 @@ slot run on a fourth page. The fifth batch of 1.5M holds 174,764 instances in a 
 | Extract, setup | 49.3 MB: transform 5.3, shading 1.8, surface 42.2; plus 6.4 MB of material records | 86% of the stream bytes |
 | Extract.unchanged | 480,000 per frame: the transforms of 10,000 `DynamicTransform` spheres | 0 |
 | Extract.changed_1pct | 532,224 per frame: 480,000 plus a transform scatter of 1,000 entries (52 each) | 0 |
-| Shapes2D.dynamic_material | 800,000 per frame: shading of 10,000 shapes | 0 |
-| Shapes2D.changed_1pct | 84,224 per frame: shading scatter of 1,000 entries (84 each) | 0 |
+| Shapes2D.dynamic_material | 640,000 per frame: shading of 10,000 shapes | 0 |
+| Shapes2D.changed_1pct | 68,096 per frame: shading scatter of 1,000 entries (68 each) | 0 |
 | Shapes2D.ui_tree_add_remove | 1,024 per frame for 1 added and 1 removed shape: segments of 68, 184 and 404 bytes (header and entries), each padded to 256 | 404 of 656 segment bytes |
 | Text.layout_10k | 51.2 MB per frame: transform 4.8, shading 8.0, surface 38.4 | 75% (74% over four frames) |
 | Text.changed_1pct | 92,000 per frame on average: transform and shading scatters of 675 glyphs | 0 |
@@ -430,9 +430,18 @@ copies, which run on the GPU timeline instead of through `writeBuffer` staging. 
 need `CopySrc` usage. Touches `store.c`, `batch.c` and the buffer create in the backend
 (`gpu.c`). Effort: medium.
 
+Implemented: a grown page is created with `BOX_RENDER_BUFFER_KEEP`, which the backend honors by
+copying the old buffer into the new one before it releases it. A moved run sends one
+`box_render_copy_t` per stream from its old run, run after the resources and before the uploads
+and scatters through a staging buffer (source and destination are often the same page), and only
+the slots it got since its last send upload. The draw stats count `copies`, `copy_bytes`,
+`kept_pages` and `kept_bytes`. Measured with the null backend, the spawn scene uploads 57.6 → 29.4
+MB for its 28.7 MB of records; the rest is the slot words and segment padding of the scatters of
+the frames without a move. Its 6 moves copy 28.2 MB on the GPU instead.
+
 ### O4. Scatter entries
 
-An entry is the 4 byte slot plus the stride: 52 (transform), 20 (mesh shading), 84 (2D
+An entry is the 4 byte slot plus the stride: 52 (transform), 20 (mesh shading), 68 (2D
 shading), 388 (surface). Each page and stream segment adds a 16 byte header and is aligned to
 256. The slot word is 8% of a transform entry and 20% of a mesh shading entry. Most of the cost
 is in the 388 byte surface entries, which S1 and S2 remove for every slot that is not parametric.

@@ -68,13 +68,14 @@ struct Shape2DTransform {
 };
 
 // The shading stream of the 2D instance page (box_render_shading_t, see instance.wgsl) with the
-// material words read as integers.
+// material words read as integers. color is the linear color and alpha as unorm16x4: r | g << 16,
+// b | a << 16.
 struct Shape2DShading {
-    color: vec4f,
     emissive: vec4f,
     shape: vec4u,
     uv: vec4f,
-    ids: vec4u,
+    color: vec2u,
+    ids: vec2u,
 };
 
 @group(2) @binding(0) var<storage, read> transforms: array<Shape2DTransform>;
@@ -173,7 +174,7 @@ fn pixels_per_unit(mvp: mat4x4f, clip: vec4f, dir: vec2f) -> f32 {
     o.local = q;
     o.uv = vec2f(q.x / (2.0 * extent.x) + 0.5, 0.5 - q.y / (2.0 * extent.y));
     o.extent = extent;
-    o.color = inst.color;
+    o.color = vec4f(unpack2x16unorm(inst.color.x), unpack2x16unorm(inst.color.y));
     o.emissive = inst.emissive.rgb;
     o.uv_transform = inst.uv;
     o.glyph = select(0.0, 1.0, glyph);

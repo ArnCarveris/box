@@ -1,14 +1,15 @@
 /**
  * @file render/materials.c
- * @brief The material table: one GPU record per prefab or mesh shape that owns its material.
+ * @brief The material table: GPU records shared by content with reference counts, and private
+ * records of prefabs and of the shapes whose record changes every frame.
  *
- * A prefab gets a slot when it gets its MaterialId, which its instances inherit; a mesh shape
- * that owns a MaterialId gets a slot of its own in the extract, packed field by field from what
- * it owns and what it still inherits. Slot 0 is the default material. Freed slots are reused.
+ * Mesh shapes that own a MaterialId share the slot of the record their material packs to, found
+ * by its hash; slot 0, the default material, is never freed. A material change hashes its owners
+ * in the next extract, and a frame without one hashes nothing (box_draws_materials_resolve).
  *
- * A change of a material component packs the slot of its owner again and, through the events
- * flecs propagates down IsA, every slot that inherits the field from it; the instances that
- * render with a changed slot are not touched.
+ * Prefabs, shapes of DynamicMaterial batches and shapes with a running material transition own
+ * a private slot, packed from its owner in the send that uploads it, so a prefab change uploads
+ * one record and transitions.c can patch the record by slot (box_materials_transitions_end).
  */
 
 #include "draw.h"
@@ -16,17 +17,49 @@
 /** Slot of the default material */
 #define BOX_MATERIALS_DEFAULT (0u)
 
-/** Get the owner entity of a slot.
+/** No slot */
+#define BOX_MATERIALS_NONE (UINT32_MAX)
+
+/** Bit of an owned value: the owner shares a record and its material changed since it was
+ * hashed, so the next resolve hashes it again */
+#define BOX_MATERIALS_PENDING (1ull << 32)
+
+/** Flags of a slot of the material table */
+typedef enum box_materials_flag_t {
+    BOX_MATERIALS_MARKED = 1 << 0,      /**< The slot is in dirty */
+    BOX_MATERIALS_LISTED = 1 << 1,      /**< The slot is the one contents holds for its hash */
+    BOX_MATERIALS_DYNAMIC = 1 << 2,     /**< Private for a shape of a DynamicMaterial batch */
+    BOX_MATERIALS_TRANSITION = 1 << 3,  /**< Private for a running material transition */
+    BOX_MATERIALS_TRANSITING = 1 << 4   /**< The slot is in transiting */
+} box_materials_flag_t;
+
+/** Flags a slot keeps when it changes hands: the lists it is in */
+#define BOX_MATERIALS_LISTS (BOX_MATERIALS_MARKED | BOX_MATERIALS_TRANSITING)
+
+/** Get a slot of the table.
  *
  * @param m The table
  * @param slot The slot
- * @return The owner, 0 for slot 0 and free slots
+ * @return Its state
  */
-static ecs_entity_t box_materials_owner(
+static box_draw_material_slot_t* box_materials_slot(
     box_draw_materials_t *m,
     uint32_t slot)
 {
-    return *ecs_vec_get_t(&m->owners, ecs_entity_t, (int32_t)slot);
+    return ecs_vec_get_t(&m->slots, box_draw_material_slot_t, (int32_t)slot);
+}
+
+/** Get the record of a slot.
+ *
+ * @param m The table
+ * @param slot The slot
+ * @return The record
+ */
+static box_render_material_t* box_materials_record(
+    box_draw_materials_t *m,
+    uint32_t slot)
+{
+    return ecs_vec_get_t(&m->records, box_render_material_t, (int32_t)slot);
 }
 
 /** Pack a slot again in the next send, unless it is already queued.
@@ -38,22 +71,98 @@ static void box_materials_mark(
     box_draw_materials_t *m,
     uint32_t slot)
 {
-    bool *marked = ecs_vec_get_t(&m->marked, bool, (int32_t)slot);
-    if (!*marked) {
-        *marked = true;
+    box_draw_material_slot_t *s = box_materials_slot(m, slot);
+    if (!(s->flags & BOX_MATERIALS_MARKED)) {
+        s->flags |= BOX_MATERIALS_MARKED;
         *ecs_vec_append_t(NULL, &m->dirty, uint32_t) = slot;
     }
 }
 
-/** Hand out a slot to an owner: the last freed slot, else the one after the highest.
+/** Hash a packed record.
+ *
+ * @param record The record
+ * @return The hash
+ */
+static uint64_t box_materials_hash(
+    const box_render_material_t *record)
+{
+    const uint32_t *words = (const uint32_t*)record;
+    uint64_t h = 0xCBF29CE484222325ull;
+    int32_t i;
+    for (i = 0; i < (int32_t)(sizeof(box_render_material_t) / sizeof(uint32_t)); i ++) {
+        h = (h ^ words[i]) * 0x100000001B3ull;
+        h ^= h >> 29;
+    }
+
+    return h ^ (h >> 32);
+}
+
+/** Find the shared slot of a content.
  *
  * @param m The table
- * @param owner The owner
- * @return The slot, packed in the next send
+ * @param hash Hash of the record
+ * @param record The record
+ * @return The slot, BOX_MATERIALS_NONE when no listed slot holds the content
  */
-static uint32_t box_materials_take(
+static uint32_t box_materials_find(
     box_draw_materials_t *m,
-    ecs_entity_t owner)
+    uint64_t hash,
+    const box_render_material_t *record)
+{
+    ecs_map_val_t *found = ecs_map_get(&m->contents, (ecs_map_key_t)hash);
+    uint32_t result = BOX_MATERIALS_NONE;
+    if (found && !ecs_os_memcmp_t(box_materials_record(m, (uint32_t)*found), record,
+        box_render_material_t))
+    {
+        result = (uint32_t)*found;
+    }
+
+    return result;
+}
+
+/** List a shared slot under the hash of its record, unless another slot holds the hash: a
+ * content whose hash collides keeps a slot that is not found.
+ *
+ * @param m The table
+ * @param slot The slot
+ * @param hash Hash of its record
+ */
+static void box_materials_list(
+    box_draw_materials_t *m,
+    uint32_t slot,
+    uint64_t hash)
+{
+    box_draw_material_slot_t *s = box_materials_slot(m, slot);
+    s->hash = hash;
+    if (!ecs_map_get(&m->contents, (ecs_map_key_t)hash)) {
+        ecs_map_insert(&m->contents, (ecs_map_key_t)hash, (ecs_map_val_t)slot);
+        s->flags |= BOX_MATERIALS_LISTED;
+    }
+}
+
+/** Take a slot out of the lookup by content.
+ *
+ * @param m The table
+ * @param slot The slot
+ */
+static void box_materials_unlist(
+    box_draw_materials_t *m,
+    uint32_t slot)
+{
+    box_draw_material_slot_t *s = box_materials_slot(m, slot);
+    if (s->flags & BOX_MATERIALS_LISTED) {
+        ecs_map_remove(&m->contents, (ecs_map_key_t)s->hash);
+        s->flags &= (uint8_t)~BOX_MATERIALS_LISTED;
+    }
+}
+
+/** Hand out a slot: the last freed slot, else the one after the highest.
+ *
+ * @param m The table
+ * @return The slot, without owners and packed in the next send
+ */
+static uint32_t box_materials_alloc(
+    box_draw_materials_t *m)
 {
     uint32_t result;
     if (ecs_vec_count(&m->free)) {
@@ -63,19 +172,232 @@ static uint32_t box_materials_take(
         result = (uint32_t)ecs_vec_count(&m->records);
         ecs_os_memset_t(ecs_vec_append_t(NULL, &m->records, box_render_material_t), 0,
             box_render_material_t);
-        *ecs_vec_append_t(NULL, &m->owners, ecs_entity_t) = 0;
-        *ecs_vec_append_t(NULL, &m->marked, bool) = false;
+        ecs_os_memset_t(ecs_vec_append_t(NULL, &m->slots, box_draw_material_slot_t), 0,
+            box_draw_material_slot_t);
     }
 
-    *ecs_vec_get_t(&m->owners, ecs_entity_t, (int32_t)result) = owner;
-    ecs_map_insert(&m->owned, (ecs_map_key_t)owner, (ecs_map_val_t)result);
+    box_draw_material_slot_t *s = box_materials_slot(m, result);
+    s->owner = 0;
+    s->refs = 0;
+    s->flags &= BOX_MATERIALS_LISTS;
     m->alive ++;
     box_materials_mark(m, result);
 
     return result;
 }
 
-/** Put the slot of an owner on the free list.
+/** Put a slot on the free list.
+ *
+ * @param m The table
+ * @param slot The slot
+ */
+static void box_materials_free(
+    box_draw_materials_t *m,
+    uint32_t slot)
+{
+    box_materials_unlist(m, slot);
+    box_draw_material_slot_t *s = box_materials_slot(m, slot);
+    s->owner = 0;
+    s->refs = 0;
+    s->flags &= BOX_MATERIALS_LISTS;
+    *ecs_vec_append_t(NULL, &m->free, uint32_t) = slot;
+    m->alive --;
+}
+
+/** Release the use of a slot by one owner: a private slot is freed, a shared slot with its last
+ * owner. Slot 0 is never freed.
+ *
+ * @param m The table
+ * @param slot The slot
+ */
+static void box_materials_drop(
+    box_draw_materials_t *m,
+    uint32_t slot)
+{
+    box_draw_material_slot_t *s = box_materials_slot(m, slot);
+    if (s->owner) {
+        box_materials_free(m, slot);
+    } else if (s->refs > 0) {
+        s->refs --;
+        if (!s->refs && slot != BOX_MATERIALS_DEFAULT) {
+            box_materials_free(m, slot);
+        }
+    }
+}
+
+/** Pack the record of an owner from the material components it owns or inherits.
+ *
+ * @param world The world
+ * @param owner The owner, 0 for the default material
+ * @param out The record
+ */
+static void box_materials_pack(
+    const ecs_world_t *world,
+    ecs_entity_t owner,
+    box_render_material_t *out)
+{
+    box_draw_material_t material;
+    box_draws_material_of(world, owner, &material);
+    box_draws_material_pack(out, &material);
+}
+
+/** Record the shadow regions of the alpha tested casters that render with a slot whose cutoff
+ * or UV transform changed, while shadow regions are recorded.
+ *
+ * @param d The state
+ * @param slot The slot
+ * @param was Its record before
+ * @param record Its record now
+ */
+static void box_materials_shadow(
+    box_render_draws_t *d,
+    uint32_t slot,
+    const box_render_material_t *was,
+    const box_render_material_t *record)
+{
+    if (d->shadow_record && (was->cutoff != record->cutoff ||
+        ecs_os_memcmp(was->uv, record->uv, ECS_SIZEOF(float) * 4)))
+    {
+        *ecs_vec_append_t(NULL, &d->shadow_materials, uint32_t) = slot;
+    }
+}
+
+/** Hash the material of an owner and give it the shared record of that content.
+ *
+ * The owner takes the listed slot of its content, else the slot it had when it held it alone
+ * (shared or private), packed again in place, else a new slot. It releases the slot it had when
+ * it moves.
+ *
+ * @param world The world
+ * @param d The state
+ * @param e The owner
+ * @param old Its slot, BOX_MATERIALS_NONE for none
+ * @return The shared slot
+ */
+static uint32_t box_materials_share(
+    const ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e,
+    uint32_t old)
+{
+    box_draw_materials_t *m = &d->materials;
+    box_render_material_t record;
+    box_materials_pack(world, e, &record);
+    uint64_t hash = box_materials_hash(&record);
+    uint32_t result = box_materials_find(m, hash, &record);
+    if (result != BOX_MATERIALS_NONE) {
+        if (result != old) {
+            if (old != BOX_MATERIALS_NONE) {
+                box_materials_drop(m, old);
+            }
+
+            box_materials_slot(m, result)->refs ++;
+        }
+
+        goto done;
+    }
+
+    if (old != BOX_MATERIALS_NONE && old != BOX_MATERIALS_DEFAULT) {
+        box_draw_material_slot_t *s = box_materials_slot(m, old);
+        if (s->owner == e || (!s->owner && s->refs == 1)) {
+            box_materials_unlist(m, old);
+            s->owner = 0;
+            s->refs = 1;
+            s->flags &= BOX_MATERIALS_LISTS;
+            box_materials_shadow(d, old, box_materials_record(m, old), &record);
+            *box_materials_record(m, old) = record;
+            box_materials_list(m, old, hash);
+            box_materials_mark(m, old);
+            result = old;
+            goto done;
+        }
+    }
+
+    if (old != BOX_MATERIALS_NONE) {
+        box_materials_drop(m, old);
+    }
+
+    result = box_materials_alloc(m);
+    *box_materials_record(m, result) = record;
+    box_materials_slot(m, result)->refs = 1;
+    box_materials_list(m, result, hash);
+done:
+    return result;
+}
+
+/** Give an owner a private record.
+ *
+ * A shared slot the owner holds alone turns private in place; else the owner releases its slot
+ * and gets a new one. The slot is packed from the owner in the next send.
+ *
+ * @param m The table
+ * @param e The owner
+ * @param old Its slot, BOX_MATERIALS_NONE for none
+ * @return The private slot
+ */
+static uint32_t box_materials_private(
+    box_draw_materials_t *m,
+    ecs_entity_t e,
+    uint32_t old)
+{
+    uint32_t result;
+    if (old != BOX_MATERIALS_NONE) {
+        box_draw_material_slot_t *s = box_materials_slot(m, old);
+        if (s->owner == e) {
+            result = old;
+            goto done;
+        }
+
+        if (old != BOX_MATERIALS_DEFAULT && s->refs == 1) {
+            box_materials_unlist(m, old);
+            s->refs = 0;
+            s->owner = e;
+            s->flags &= BOX_MATERIALS_LISTS;
+            box_materials_mark(m, old);
+            result = old;
+            goto done;
+        }
+
+        box_materials_drop(m, old);
+    }
+
+    result = box_materials_alloc(m);
+    box_materials_slot(m, result)->owner = e;
+done:
+    return result;
+}
+
+/** Store the slot of an owner, which clears its pending change, and set its MaterialId. The IsA
+ * instances that inherit the MaterialId of an owner whose slot changed write their shading again.
+ *
+ * @param world The world
+ * @param d The state
+ * @param e The owner
+ * @param slot Its slot
+ * @param mark Whether the owner writes its shading again
+ */
+static void box_materials_set(
+    ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e,
+    uint32_t slot,
+    bool mark)
+{
+    *ecs_map_ensure(&d->materials.owned, (ecs_map_key_t)e) = (ecs_map_val_t)slot;
+    MaterialId *id = ecs_get_mut(world, e, MaterialId);
+    if (id && id->value != slot) {
+        id->value = slot;
+        if (ecs_id_in_use(world, ecs_pair(EcsIsA, e))) {
+            ecs_modified(world, e, MaterialId);
+        }
+    }
+
+    if (mark) {
+        box_draws_mark(world, d, e, BOX_DRAW_SHADING);
+    }
+}
+
+/** Put the slot of an owner on the free list, or release its share of it.
  *
  * @param m The table
  * @param owner The owner
@@ -91,10 +413,8 @@ static bool box_materials_give(
         goto done;
     }
 
-    *ecs_vec_get_t(&m->owners, ecs_entity_t, (int32_t)*slot) = 0;
-    *ecs_vec_append_t(NULL, &m->free, uint32_t) = (uint32_t)*slot;
+    box_materials_drop(m, (uint32_t)*slot);
     ecs_map_remove(&m->owned, (ecs_map_key_t)owner);
-    m->alive --;
 done:
     return result;
 }
@@ -105,17 +425,21 @@ void box_draws_materials_init(
     box_draw_materials_t *m = &d->materials;
     ecs_os_memset_t(m, 0, box_draw_materials_t);
     ecs_vec_init_t(NULL, &m->records, box_render_material_t, 0);
-    ecs_vec_init_t(NULL, &m->owners, ecs_entity_t, 0);
-    ecs_vec_init_t(NULL, &m->marked, bool, 0);
+    ecs_vec_init_t(NULL, &m->slots, box_draw_material_slot_t, 0);
     ecs_vec_init_t(NULL, &m->dirty, uint32_t, 0);
     ecs_vec_init_t(NULL, &m->free, uint32_t, 0);
+    ecs_vec_init_t(NULL, &m->pending, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &m->transiting, uint32_t, 0);
     ecs_vec_init_t(NULL, &m->uploaded, box_draw_material_upload_t, 0);
     ecs_map_init(&m->owned, NULL);
+    ecs_map_init(&m->contents, NULL);
     m->uploaded_frame = -1;
-    ecs_os_memset_t(ecs_vec_append_t(NULL, &m->records, box_render_material_t), 0,
-        box_render_material_t);
-    *ecs_vec_append_t(NULL, &m->owners, ecs_entity_t) = 0;
-    *ecs_vec_append_t(NULL, &m->marked, bool) = false;
+    box_render_material_t *record = ecs_vec_append_t(NULL, &m->records, box_render_material_t);
+    box_draws_material_pack(record, &(box_draw_material_t){ .fade = 1.0f });
+    box_draw_material_slot_t *s = ecs_vec_append_t(NULL, &m->slots, box_draw_material_slot_t);
+    ecs_os_memset_t(s, 0, box_draw_material_slot_t);
+    s->refs = 1;
+    box_materials_list(m, BOX_MATERIALS_DEFAULT, box_materials_hash(record));
     m->alive = 1;
     box_materials_mark(m, BOX_MATERIALS_DEFAULT);
 }
@@ -125,12 +449,14 @@ void box_draws_materials_fini(
 {
     box_draw_materials_t *m = &d->materials;
     ecs_vec_fini_t(NULL, &m->records, box_render_material_t);
-    ecs_vec_fini_t(NULL, &m->owners, ecs_entity_t);
-    ecs_vec_fini_t(NULL, &m->marked, bool);
+    ecs_vec_fini_t(NULL, &m->slots, box_draw_material_slot_t);
     ecs_vec_fini_t(NULL, &m->dirty, uint32_t);
     ecs_vec_fini_t(NULL, &m->free, uint32_t);
+    ecs_vec_fini_t(NULL, &m->pending, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &m->transiting, uint32_t);
     ecs_vec_fini_t(NULL, &m->uploaded, box_draw_material_upload_t);
     ecs_map_fini(&m->owned);
+    ecs_map_fini(&m->contents);
 }
 
 void box_draws_materials_reset(
@@ -144,12 +470,128 @@ bool box_draws_material_changed(
     ecs_entity_t e)
 {
     box_draw_materials_t *m = &d->materials;
-    ecs_map_val_t *slot = ecs_map_get(&m->owned, (ecs_map_key_t)e);
-    if (slot) {
-        box_materials_mark(m, (uint32_t)*slot);
+    ecs_map_val_t *own = ecs_map_get(&m->owned, (ecs_map_key_t)e);
+    if (!own) {
+        goto done;
     }
 
-    return slot != NULL;
+    uint32_t slot = (uint32_t)*own;
+    if (box_materials_slot(m, slot)->owner == e) {
+        box_materials_mark(m, slot);
+    } else if (!(*own & BOX_MATERIALS_PENDING)) {
+        *own |= BOX_MATERIALS_PENDING;
+        *ecs_vec_append_t(NULL, &m->pending, ecs_entity_t) = e;
+    }
+
+done:
+    return own != NULL;
+}
+
+bool box_draws_material_owns(
+    const box_render_draws_t *d,
+    ecs_entity_t e)
+{
+    return ecs_map_get(&d->materials.owned, (ecs_map_key_t)e) != NULL;
+}
+
+uint32_t box_draws_material_private(
+    ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e)
+{
+    box_draw_materials_t *m = &d->materials;
+    ecs_map_val_t *own = ecs_map_get(&m->owned, (ecs_map_key_t)e);
+    uint32_t result = BOX_MATERIALS_NONE;
+    if (!own) {
+        goto done;
+    }
+
+    uint32_t old = (uint32_t)*own;
+    result = box_materials_private(m, e, old);
+    if (result != old || (*own & BOX_MATERIALS_PENDING)) {
+        box_materials_set(world, d, e, result, result != old);
+    }
+
+    box_draw_material_slot_t *s = box_materials_slot(m, result);
+    s->flags |= BOX_MATERIALS_TRANSITION;
+    s->stamp = m->stamp;
+    if (!(s->flags & BOX_MATERIALS_TRANSITING)) {
+        s->flags |= BOX_MATERIALS_TRANSITING;
+        *ecs_vec_append_t(NULL, &m->transiting, uint32_t) = result;
+    }
+
+done:
+    return result;
+}
+
+/** End the material transitions that the walk of this frame did not take: their owners return
+ * to a shared record.
+ *
+ * A transition starts when the walk first takes the owner with box_draws_material_private: a
+ * shared slot it holds alone turns private in place, else it gets a new slot and its sharers keep
+ * theirs. Each frame the walk takes the slot it is stamped, and the walk uploads it again after.
+ *
+ * At the end the owner takes the shared slot of its content and frees the private one, or its
+ * slot turns shared in place. A prefab or a shape of a DynamicMaterial batch stays private.
+ *
+ * @param world The world
+ * @param d The state
+ */
+static void box_materials_transitions_end(
+    ecs_world_t *world,
+    box_render_draws_t *d)
+{
+    box_draw_materials_t *m = &d->materials;
+    int32_t i, kept = 0;
+    for (i = 0; i < ecs_vec_count(&m->transiting); i ++) {
+        uint32_t slot = *ecs_vec_get_t(&m->transiting, uint32_t, i);
+        box_draw_material_slot_t *s = box_materials_slot(m, slot);
+        ecs_entity_t e = s->owner;
+        if (e && (s->flags & BOX_MATERIALS_TRANSITION) && s->stamp == m->stamp) {
+            *ecs_vec_get_t(&m->transiting, uint32_t, kept ++) = slot;
+            continue;
+        }
+
+        s->flags &= (uint8_t)~(BOX_MATERIALS_TRANSITION | BOX_MATERIALS_TRANSITING);
+        if (e && !(s->flags & BOX_MATERIALS_DYNAMIC) && ecs_is_alive(world, e) &&
+            !ecs_has_id(world, e, EcsPrefab))
+        {
+            uint32_t shared = box_materials_share(world, d, e, slot);
+            box_materials_set(world, d, e, shared, shared != slot);
+        }
+    }
+
+    ecs_vec_set_count_t(NULL, &m->transiting, uint32_t, kept);
+}
+
+void box_draws_materials_resolve(
+    ecs_world_t *world,
+    box_render_draws_t *d)
+{
+    box_draw_materials_t *m = &d->materials;
+    int32_t i;
+    box_materials_transitions_end(world, d);
+    for (i = 0; i < ecs_vec_count(&m->pending); i ++) {
+        ecs_entity_t e = *ecs_vec_get_t(&m->pending, ecs_entity_t, i);
+        ecs_map_val_t *own = ecs_map_get(&m->owned, (ecs_map_key_t)e);
+        if (!own || !(*own & BOX_MATERIALS_PENDING)) {
+            continue;
+        }
+
+        uint32_t slot = (uint32_t)*own;
+        *own = (ecs_map_val_t)slot;
+        if (box_materials_slot(m, slot)->owner == e || !ecs_is_alive(world, e)) {
+            continue;
+        }
+
+        uint32_t shared = box_materials_share(world, d, e, slot);
+        if (shared != slot) {
+            box_materials_set(world, d, e, shared, true);
+        }
+    }
+
+    ecs_vec_clear(&m->pending);
+    m->stamp ++;
 }
 
 void box_draws_material_release(
@@ -176,25 +618,31 @@ uint32_t box_draws_material_id(
     ecs_world_t *world,
     box_render_draws_t *d,
     ecs_entity_t e,
-    bool mesh)
+    bool mesh,
+    bool dynamic)
 {
     box_draw_materials_t *m = &d->materials;
     ecs_map_val_t *own = ecs_map_get(&m->owned, (ecs_map_key_t)e);
     uint32_t result = BOX_MATERIALS_DEFAULT;
     if (mesh && ecs_owns(world, e, MaterialId)) {
-        if (own) {
-            result = (uint32_t)*own;
-            goto check;
+        uint32_t old = own ? (uint32_t)*own : BOX_MATERIALS_NONE;
+        bool pending = own && (*own & BOX_MATERIALS_PENDING);
+        box_draw_material_slot_t *s = own ? box_materials_slot(m, old) : NULL;
+        if (dynamic) {
+            result = box_materials_private(m, e, old);
+            box_materials_slot(m, result)->flags |= BOX_MATERIALS_DYNAMIC;
+        } else if (s && s->owner == e) {
+            s->flags &= (uint8_t)~BOX_MATERIALS_DYNAMIC;
+            result = (s->flags & BOX_MATERIALS_TRANSITION)
+                ? old : box_materials_share(world, d, e, old);
+        } else if (!own || pending) {
+            result = box_materials_share(world, d, e, old);
+        } else {
+            result = old;
         }
 
-        result = box_materials_take(m, e);
-        MaterialId *id = ecs_get_mut(world, e, MaterialId);
-        if (id) {
-            id->value = result;
-        }
-
-        if (ecs_id_in_use(world, ecs_pair(EcsIsA, e))) {
-            ecs_modified(world, e, MaterialId);
+        if (result != old || pending) {
+            box_materials_set(world, d, e, result, false);
         }
 
         goto check;
@@ -223,8 +671,8 @@ check:
     return result;
 }
 
-/** Hand a prefab that got its MaterialId a slot of its own, or keep the slot an entity that
- * became a prefab already had.
+/** Hand a prefab that got its MaterialId a private slot, or keep the slot an entity that became
+ * a prefab already had, which turns private.
  *
  * @param it The iterator of the observer
  */
@@ -237,12 +685,11 @@ static void BoxMaterialsOnPrefab(
     int32_t i;
     for (i = 0; !ecs_is_fini(it->world) && i < it->count; i ++) {
         ecs_map_val_t *slot = ecs_map_get(&m->owned, (ecs_map_key_t)it->entities[i]);
-        if (slot) {
-            ids[i].value = (uint32_t)*slot;
-            box_materials_mark(m, (uint32_t)*slot);
-        } else {
-            ids[i].value = box_materials_take(m, it->entities[i]);
-        }
+        uint32_t result = box_materials_private(m, it->entities[i],
+            slot ? (uint32_t)*slot : BOX_MATERIALS_NONE);
+        *ecs_map_ensure(&m->owned, (ecs_map_key_t)it->entities[i]) = (ecs_map_val_t)result;
+        ids[i].value = result;
+        box_materials_mark(m, result);
     }
 }
 
@@ -266,8 +713,9 @@ static void BoxMaterialsOnOwn(
     }
 }
 
-/** Free the slot of an entity that loses its MaterialId or is deleted, prefabs included; a
- * shape that stays renders with the id it inherits again.
+/** Free the private slot of an entity that loses its MaterialId or is deleted, prefabs included,
+ * or release its share of a shared slot; a shape that stays renders with the id it inherits
+ * again.
  *
  * @param it The iterator of the observer
  */
@@ -297,8 +745,8 @@ static void BoxMaterialsOnInherited(
     }
 }
 
-/** Pack the slot of an entity that got or lost an IsA base again, from what it inherits now, and
- * write its shading again, whose id may come from the new base.
+/** Pack the record of an entity that got or lost an IsA base again, from what it inherits now,
+ * and write its shading again, whose id may come from the new base.
  *
  * @param it The iterator of the observer
  */
@@ -316,11 +764,12 @@ static void BoxMaterialsOnIsA(
 /** Follow a set or removal of a material component on its owner, or on a base that propagates
  * it to the entities that inherit it, which the default source of the term matches.
  *
- * Owners of a slot pack it again; flecs does not propagate past an owner of the component, so a
- * slot that owns the changed field is left alone. 2D shapes and texts write their shading again.
+ * Owners of a private slot pack it again, owners of a shared slot hash their material in the
+ * next extract; flecs does not propagate past an owner of the component, so an owner of the
+ * changed field is left alone. 2D shapes and texts write their shading again.
  *
  * Mesh shapes reference the slot and write nothing, unless an added or removed AlphaCutoff or
- * Transmission changes their batch.
+ * Transmission changes their batch, or the owner of a shared slot moves to another slot.
  *
  * @param it The iterator of the observer
  */
@@ -424,22 +873,6 @@ void box_draws_material_of(
     }
 }
 
-/** Pack the record of a slot from the material components its owner owns or inherits.
- *
- * @param world The world
- * @param owner The owner, 0 for the default material
- * @param out The record
- */
-static void box_materials_pack(
-    const ecs_world_t *world,
-    ecs_entity_t owner,
-    box_render_material_t *out)
-{
-    box_draw_material_t material;
-    box_draws_material_of(world, owner, &material);
-    box_draws_material_pack(out, &material);
-}
-
 bool box_draws_material_data(
     const box_render_draws_t *d,
     uint32_t slot,
@@ -514,22 +947,25 @@ void box_draws_materials_send(
     uint32_t total = (uint32_t)ecs_vec_count(&m->records);
     ecs_vec_clear(&m->uploaded);
     m->uploaded_frame = p->frame;
-    for (i = 0; i < count; i ++) {
+    for (i = 0, j = 0; i < count; i ++) {
         uint32_t slot = dirty[i];
-        ecs_entity_t owner = box_materials_owner(m, slot);
-        *ecs_vec_get_t(&m->marked, bool, (int32_t)slot) = false;
-        if (slot == BOX_MATERIALS_DEFAULT || (owner && ecs_is_alive(world, owner))) {
-            box_render_material_t *record = ecs_vec_get_t(
-                &m->records, box_render_material_t, (int32_t)slot);
+        box_draw_material_slot_t *s = box_materials_slot(m, slot);
+        ecs_entity_t owner = s->owner;
+        s->flags &= (uint8_t)~BOX_MATERIALS_MARKED;
+        if (!owner && !s->refs) {
+            continue;
+        }
+
+        dirty[j ++] = slot;
+        if (owner && ecs_is_alive(world, owner)) {
+            box_render_material_t *record = box_materials_record(m, slot);
             box_render_material_t was = *record;
             box_materials_pack(world, owner, record);
-            if (d->shadow_record && (was.cutoff != record->cutoff ||
-                ecs_os_memcmp(was.uv, record->uv, ECS_SIZEOF(float) * 4)))
-            {
-                *ecs_vec_append_t(NULL, &d->shadow_materials, uint32_t) = slot;
-            }
+            box_materials_shadow(d, slot, &was, record);
         }
     }
+
+    count = j;
 
     if (!m->capacity || total > m->capacity) {
         uint32_t capacity = m->capacity ? m->capacity : BOX_RENDER_MATERIALS_MIN;

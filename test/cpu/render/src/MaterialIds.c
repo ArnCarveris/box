@@ -1,7 +1,7 @@
 /**
  * @file MaterialIds.c
- * @brief Tests for the material table: which prefabs and shapes get a slot, what a slot is
- * packed from, and what a material change uploads.
+ * @brief Tests for the material table: which prefabs and shapes get a slot, which shapes share
+ * one by content, what a slot is packed from, and what a material change uploads.
  *
  * Every case renders with the null backend and reads the counters of the extract, the slots of
  * the material table it keeps and the shading of the mesh instances.
@@ -210,11 +210,13 @@ void MaterialIds_prefab_instances_share_slot(void) {
         instance_new(world, prefab, (float)(COUNT + i));
     }
 
+    /* The batch outgrows its run: the GPU copies the instances it had, the new ones upload */
     stats = frame(world);
     test_int(stats.materials, 2);
     test_int(stats.material_bytes, 0);
-    test_int(stats.transform_bytes, 2 * COUNT * TRANSFORM);
-    test_int(stats.shading_bytes, 2 * COUNT * SHADING);
+    test_int(stats.transform_bytes, COUNT * TRANSFORM);
+    test_int(stats.shading_bytes, COUNT * SHADING);
+    test_int(stats.copies, 3);
 
     ecs_fini(world);
     box_render_null_free(null);
@@ -917,6 +919,459 @@ void MaterialIds_clear_coat_dynamic_material_repacks(void) {
     coat->strength = 1;
     frame(world);
     test_uint(record_of(world, id)->clear_coat, 0xFFFFu);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** Create a box shape with a color.
+ *
+ * @param world The world
+ * @param x Its x position
+ * @param r Red
+ * @param g Green
+ * @param b Blue
+ * @return The shape
+ */
+static ecs_entity_t shape_new(
+    ecs_world_t *world,
+    float x,
+    uint8_t r,
+    uint8_t g,
+    uint8_t b)
+{
+    ecs_entity_t result = ecs_new(world);
+    ecs_set(world, result, Position, {x, 0, 0});
+    ecs_set(world, result, Box, {1, 1, 1});
+    ecs_set(world, result, Rgb, {r, g, b});
+
+    return result;
+}
+
+void MaterialIds_equal_materials_share_slot(void) {
+    // gpu_instance_data/material_dedup
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t shapes[COUNT];
+    int32_t i;
+    for (i = 0; i < COUNT; i ++) {
+        shapes[i] = shape_new(world, (float)i, 10, 200, 30);
+        ecs_set(world, shapes[i], PbrMaterial, {.metallic = 0.5f, .roughness = 0.25f});
+    }
+
+    ecs_entity_t plain = shape_new(world, -1, 204, 204, 204);
+    box_render_draws_stats_t stats = frame(world);
+    uint32_t id = id_of(world, shapes[0]);
+    test_assert(id != 0 && id != UINT32_MAX);
+    test_int(stats.materials, 2);
+    test_int(stats.material_bytes, 2 * MATERIAL);
+    for (i = 0; i < COUNT; i ++) {
+        test_bool(ecs_owns(world, shapes[i], MaterialId), true);
+        test_uint(id_of(world, shapes[i]), id);
+        test_uint(shading_of(world, shapes[i])->material, id);
+    }
+
+    test_uint(record_of(world, id)->color, color_word(10, 200, 30));
+    test_flt(record_of(world, id)->metallic, 0.5f);
+    test_flt(record_of(world, id)->roughness, 0.25f);
+    test_uint(id_of(world, plain), 0);
+    test_uint(shading_of(world, plain)->material, 0);
+
+    stats = frame(world);
+    test_int(stats.material_bytes, 0);
+    test_int(stats.upload_bytes, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void MaterialIds_changed_material_takes_other_slot(void) {
+    // gpu_instance_data/material_dedup
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t a = shape_new(world, 0, 10, 200, 30);
+    ecs_entity_t b = shape_new(world, 1, 10, 200, 30);
+    ecs_entity_t c = shape_new(world, 2, 10, 200, 30);
+    ecs_entity_t d = shape_new(world, 3, 50, 60, 70);
+    frame(world);
+    frame(world);
+    uint32_t shared = id_of(world, a);
+    uint32_t other = id_of(world, d);
+    test_assert(other != shared);
+
+    ecs_set(world, b, Rgb, {1, 2, 3});
+    box_render_draws_stats_t stats = frame(world);
+    uint32_t moved = id_of(world, b);
+    test_assert(moved != shared && moved != other && moved != 0);
+    test_int(stats.materials, 4);
+    test_int(stats.material_bytes, MATERIAL);
+    test_int(stats.scattered, 1);
+    test_int(stats.transform_bytes, 0);
+    test_int(stats.surface_bytes, 0);
+    test_uint(shading_of(world, b)->material, moved);
+    test_uint(record_of(world, moved)->color, color_word(1, 2, 3));
+    test_uint(shading_of(world, a)->material, shared);
+    test_uint(shading_of(world, c)->material, shared);
+    test_uint(id_of(world, a), shared);
+    test_uint(id_of(world, c), shared);
+    test_uint(record_of(world, shared)->color, color_word(10, 200, 30));
+
+    ecs_set(world, b, Rgb, {50, 60, 70});
+    stats = frame(world);
+    test_int(stats.materials, 3);
+    test_int(stats.material_bytes, 0);
+    test_int(stats.scattered, 1);
+    test_uint(id_of(world, b), other);
+    test_uint(shading_of(world, b)->material, other);
+    test_uint(shading_of(world, d)->material, other);
+
+    ecs_set(world, a, Rgb, {90, 90, 90});
+    ecs_set(world, a, Rgb, {10, 200, 30});
+    stats = frame(world);
+    test_int(stats.materials, 3);
+    test_int(stats.material_bytes, 0);
+    test_int(stats.upload_bytes, 0);
+    test_uint(shading_of(world, a)->material, shared);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void MaterialIds_alone_changed_material_keeps_slot(void) {
+    // gpu_instance_data/material_dedup
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t a = shape_new(world, 0, 10, 200, 30);
+    ecs_entity_t b = shape_new(world, 1, 50, 60, 70);
+    frame(world);
+    frame(world);
+    uint32_t own = id_of(world, a);
+
+    ecs_set(world, a, Rgb, {1, 2, 3});
+    box_render_draws_stats_t stats = frame(world);
+    test_uint(id_of(world, a), own);
+    test_int(stats.materials, 3);
+    test_int(stats.material_bytes, MATERIAL);
+    test_int(stats.upload_bytes, 0);
+    test_int(stats.scatters, 0);
+    test_uint(record_of(world, own)->color, color_word(1, 2, 3));
+
+    ecs_set(world, a, Rgb, {50, 60, 70});
+    stats = frame(world);
+    test_uint(id_of(world, a), id_of(world, b));
+    test_uint(shading_of(world, a)->material, id_of(world, b));
+    test_int(stats.materials, 2);
+    test_int(stats.material_bytes, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void MaterialIds_shared_slot_freed_with_last_owner(void) {
+    // gpu_instance_data/material_dedup
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t a = shape_new(world, 0, 10, 200, 30);
+    ecs_entity_t b = shape_new(world, 1, 10, 200, 30);
+    ecs_entity_t c = shape_new(world, 2, 10, 200, 30);
+    ecs_entity_t keep = shape_new(world, 3, 50, 60, 70);
+    box_render_draws_stats_t stats = frame(world);
+    uint32_t shared = id_of(world, a);
+    test_int(stats.materials, 3);
+
+    ecs_delete(world, a);
+    stats = frame(world);
+    test_int(stats.materials, 3);
+    test_uint(shading_of(world, b)->material, shared);
+
+    ecs_remove(world, b, MaterialId);
+    stats = frame(world);
+    test_int(stats.materials, 3);
+    test_uint(shading_of(world, b)->material, 0);
+    test_uint(shading_of(world, c)->material, shared);
+
+    ecs_delete(world, c);
+    stats = frame(world);
+    test_int(stats.materials, 2);
+    test_uint(shading_of(world, keep)->material, id_of(world, keep));
+
+    ecs_entity_t e = shape_new(world, 4, 1, 2, 3);
+    stats = frame(world);
+    test_int(stats.materials, 3);
+    test_uint(id_of(world, e), shared);
+    test_uint(shading_of(world, e)->material, shared);
+    test_int(stats.material_bytes, MATERIAL);
+    test_uint(record_of(world, shared)->color, color_word(1, 2, 3));
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** Run a frame of a fixed quarter second, which material transitions advance by.
+ *
+ * @param world The world
+ * @return The counters of the batches of the frame
+ */
+static box_render_draws_stats_t step(
+    ecs_world_t *world)
+{
+    box_render_draws_stats_t stats;
+    ecs_progress(world, 0.25f);
+    box_render_sync(world);
+    box_render_draws_stats(world, &stats);
+
+    return stats;
+}
+
+/** Check that shapes render with a slot that holds a color.
+ *
+ * @param world The world
+ * @param shapes The shapes
+ * @param count Number of shapes
+ * @param slot The slot
+ * @param color The packed color of its record
+ */
+static void sharers_check(
+    ecs_world_t *world,
+    const ecs_entity_t *shapes,
+    int32_t count,
+    uint32_t slot,
+    uint32_t color)
+{
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        test_uint(id_of(world, shapes[i]), slot);
+        test_uint(shading_of(world, shapes[i])->material, slot);
+    }
+
+    test_uint(record_of(world, slot)->color, color);
+}
+
+void MaterialIds_transition_takes_private_slot(void) {
+    // gpu_instance_data/material_dedup
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t others[3];
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        others[i] = shape_new(world, (float)i, 200, 100, 50);
+    }
+
+    ecs_entity_t e = shape_new(world, 3, 200, 100, 50);
+    box_transition_set(world, e, ecs_id(Rgb), &(TransitionSpec){ .duration = 1.0f });
+    step(world);
+    box_render_draws_stats_t stats = step(world);
+    uint32_t shared = id_of(world, e);
+    uint32_t a = color_word(200, 100, 50);
+    test_int(stats.materials, 2);
+    sharers_check(world, others, 3, shared, a);
+
+    ecs_set(world, e, Rgb, {0, 0, 0});
+    stats = step(world);
+    uint32_t own = id_of(world, e);
+    test_assert(own != shared && own != 0 && own != UINT32_MAX);
+    test_uint(shading_of(world, e)->material, own);
+    test_int(stats.materials, 3);
+    test_int(stats.scattered, 1);
+    sharers_check(world, others, 3, shared, a);
+    for (i = 0; i < 3; i ++) {
+        stats = step(world);
+        test_uint(id_of(world, e), own);
+        test_uint(shading_of(world, e)->material, own);
+        test_int(stats.material_bytes, MATERIAL);
+        test_int(stats.scattered, 0);
+        sharers_check(world, others, 3, shared, a);
+    }
+
+    stats = step(world);
+    test_uint(id_of(world, e), own);
+    test_uint(shading_of(world, e)->material, own);
+    test_int(stats.materials, 3);
+    test_uint(record_of(world, own)->color, color_word(0, 0, 0));
+    sharers_check(world, others, 3, shared, a);
+
+    stats = step(world);
+    test_int(stats.material_bytes, 0);
+    test_uint(id_of(world, e), own);
+
+    ecs_set(world, e, Rgb, {200, 100, 50});
+    stats = step(world);
+    test_uint(id_of(world, e), own);
+    test_uint(shading_of(world, e)->material, own);
+    test_int(stats.materials, 3);
+    sharers_check(world, others, 3, shared, a);
+    for (i = 0; i < 3; i ++) {
+        step(world);
+        test_uint(shading_of(world, e)->material, own);
+        sharers_check(world, others, 3, shared, a);
+    }
+
+    stats = step(world);
+    test_int(stats.materials, 2);
+    test_int(stats.scattered, 1);
+    test_uint(id_of(world, e), shared);
+    test_uint(shading_of(world, e)->material, shared);
+    sharers_check(world, others, 3, shared, a);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void MaterialIds_dynamic_material_keeps_private_slot(void) {
+    // gpu_instance_data/material_dedup
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t still = shape_new(world, 0, 10, 200, 30);
+    ecs_entity_t a = shape_new(world, 1, 10, 200, 30);
+    ecs_entity_t b = shape_new(world, 2, 10, 200, 30);
+    ecs_add_id(world, a, DynamicMaterial);
+    ecs_add_id(world, b, DynamicMaterial);
+    box_render_draws_stats_t stats = frame(world);
+    uint32_t shared = id_of(world, still);
+    uint32_t ida = id_of(world, a), idb = id_of(world, b);
+    test_assert(ida != shared && idb != shared && ida != idb);
+    test_assert(ida != 0 && idb != 0);
+    test_int(stats.materials, 4);
+    test_uint(shading_of(world, a)->material, ida);
+    test_uint(shading_of(world, b)->material, idb);
+    test_uint(record_of(world, ida)->color, color_word(10, 200, 30));
+    test_uint(record_of(world, idb)->color, color_word(10, 200, 30));
+
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        ecs_get_mut(world, a, Rgb)->r = (uint8_t)(20 * i);
+        stats = frame(world);
+        test_int(stats.materials, 4);
+        test_int(stats.material_bytes, 2 * MATERIAL);
+        test_uint(id_of(world, a), ida);
+        test_uint(id_of(world, b), idb);
+        test_uint(record_of(world, ida)->color, color_word(20 * (uint32_t)i, 200, 30));
+        test_uint(record_of(world, shared)->color, color_word(10, 200, 30));
+    }
+
+    ecs_remove_id(world, b, DynamicMaterial);
+    stats = frame(world);
+    test_int(stats.materials, 3);
+    test_uint(id_of(world, b), shared);
+    test_uint(shading_of(world, b)->material, shared);
+    test_uint(shading_of(world, still)->material, shared);
+    test_uint(id_of(world, a), ida);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void MaterialIds_base_slot_change_reaches_instances(void) {
+    // gpu_instance_data/material_dedup
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t base = shape_new(world, 0, 10, 200, 30);
+    ecs_entity_t other = shape_new(world, 1, 10, 200, 30);
+    ecs_entity_t inst = instance_new(world, base, 2);
+    ecs_entity_t nested = instance_new(world, inst, 3);
+    ecs_set(world, inst, Box, {2, 2, 2});
+    ecs_set(world, nested, Box, {3, 3, 3});
+    frame(world);
+    frame(world);
+    uint32_t shared = id_of(world, base);
+    test_bool(ecs_owns(world, inst, MaterialId), false);
+    test_bool(ecs_owns(world, nested, ShapeMesh), true);
+    test_uint(id_of(world, other), shared);
+    test_uint(shading_of(world, inst)->material, shared);
+    test_uint(shading_of(world, nested)->material, shared);
+
+    ecs_set(world, base, Rgb, {1, 2, 3});
+    box_render_draws_stats_t stats = frame(world);
+    uint32_t moved = id_of(world, base);
+    test_assert(moved != shared && moved != 0);
+    test_int(stats.scattered, 3);
+    test_uint(shading_of(world, base)->material, moved);
+    test_uint(shading_of(world, inst)->material, moved);
+    test_uint(shading_of(world, nested)->material, moved);
+    test_uint(shading_of(world, other)->material, shared);
+
+    ecs_delete(world, other);
+    ecs_set(world, base, Rgb, {10, 200, 30});
+    stats = frame(world);
+    test_int(stats.materials, 2);
+    test_uint(shading_of(world, base)->material, moved);
+    test_uint(shading_of(world, inst)->material, moved);
+    test_uint(shading_of(world, nested)->material, moved);
+
+    stats = frame(world);
+    test_int(stats.scattered, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** Stop the light extract, which takes and clears the shadow regions every frame, and have the
+ * draws record them, so a case reads the regions of each frame.
+ *
+ * @param world The world
+ * @return box_render_shadow_region_t, the regions recorded since the case cleared them
+ */
+static ecs_vec_t* regions_of(
+    ecs_world_t *world)
+{
+    ecs_entity_t lights = ecs_lookup(world, "box.render.RenderExtractLights");
+    test_assert(lights != 0);
+    ecs_enable(world, lights, false);
+    box_render_draws_shadow_record(world, true);
+    ecs_vec_t *result = box_render_draws_shadow_regions(world);
+    test_assert(result != NULL);
+
+    return result;
+}
+
+/** Check that shadow regions were recorded since they were cleared, all left of an x.
+ *
+ * @param regions The regions
+ * @param max_x Largest x a region may reach
+ */
+static void regions_check(
+    const ecs_vec_t *regions,
+    float max_x)
+{
+    int32_t i;
+    test_assert(ecs_vec_count(regions) > 0);
+    for (i = 0; i < ecs_vec_count(regions); i ++) {
+        test_assert(ecs_vec_get_t(regions, box_render_shadow_region_t, i)->max[0] <= max_x);
+    }
+}
+
+void MaterialIds_shared_cutoff_change_records_shadow(void) {
+    // gpu_instance_data/material_dedup
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_vec_t *regions = regions_of(world);
+    ecs_entity_t a = shape_new(world, 0, 10, 200, 30);
+    ecs_entity_t b = shape_new(world, 6, 10, 200, 30);
+    ecs_set(world, a, AlphaCutoff, {0.25f});
+    ecs_set(world, b, AlphaCutoff, {0.25f});
+    frame(world);
+    frame(world);
+    uint32_t shared = id_of(world, a);
+    test_uint(id_of(world, b), shared);
+    ecs_vec_clear(regions);
+
+    ecs_set(world, a, AlphaCutoff, {0.5f});
+    frame(world);
+    uint32_t own = id_of(world, a);
+    test_assert(own != shared);
+    regions_check(regions, 3);
+    ecs_vec_clear(regions);
+
+    ecs_set(world, a, AlphaCutoff, {0.75f});
+    box_render_draws_stats_t stats = frame(world);
+    test_uint(id_of(world, a), own);
+    test_int(stats.scatters, 0);
+    test_flt(record_of(world, own)->cutoff, 0.75f);
+    regions_check(regions, 3);
+    ecs_vec_clear(regions);
+
+    frame(world);
+    test_int(ecs_vec_count(regions), 0);
 
     ecs_fini(world);
     box_render_null_free(null);
