@@ -1,0 +1,59 @@
+// The scene of the browser check of transmission (transmission.mjs), which renders on the main
+// thread, after Transmission_first_frame_not_dark of test/gpu/render. The page opens a window
+// only for a scene with a Surface; its 640x480 points fill the viewport of the check. The camera
+// at the origin looks down -Z at an emissive wall of black albedo that fills the view with one
+// bright flat color, lit by a sun that travels away from the camera. At frame 30 SetAt gives the
+// rough (roughness 1), fully transmissive glass its Box, so it is drawn and requests
+// etc/shaders/transmission.wgsl only then: the browser delivers the compile outcome after the
+// frame, so its first frame is drawn before the downsample pipeline of the snapshot exists. The
+// glass is centered in the view and tinted, which lowers the green of what it lets through.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.app
+using box.surface
+
+window {
+  Surface: {width: 640, height: 480}
+}
+
+camera {
+  Position: {0, 0, 0}
+  Camera: {fov: 60, near_: 0.1, far_: 1000}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {0, 0, 0, 255}}}
+}
+
+sun {
+  Rotation: {0, flecs.script.math.PI, 0}
+  DirectionalLight: {intensity: 2}
+  Rgb: {255, 255, 255}
+}
+
+wall {
+  Position: {0, 0, -10}
+  Box: {40, 40, 0.1}
+  Rgb: {0, 0, 0}
+  PbrMaterial: {metallic: 1, roughness: 1}
+  Emissive: {strength: 1, color: {235, 205, 120}}
+}
+
+// No geometry until frame 30, so nothing transmissive is drawn and no transmission shader is
+// requested before
+glass {
+  Position: {0, 0, -4}
+  Rgb: {255, 128, 255}
+  PbrMaterial: {metallic: 0, roughness: 1}
+  Transmission: {transmission_factor: 1, ior: 1, thickness_factor: 0,
+    attenuation_distance: 100000, attenuation_color: {255, 255, 255}}
+}
+
+show_glass {
+  SetAt: {frame: 30, entity: glass}
+  Box: {3, 3, 0.2}
+}

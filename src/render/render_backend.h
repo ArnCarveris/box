@@ -44,7 +44,11 @@ typedef struct box_render_gpu_stats_t {
                                  *   Transmission shape, again only when its render size changes */
     int32_t forward_passes;     /**< Forward render passes begun for the views: one per frame,
                                  *   two (early and late) for a view that culls by occlusion
-                                 *   without a depth prepass, which is an unlit one.
+                                 *   without a depth prepass.
+                                 *
+                                 *   A view has none when it is unlit, its camera has no depth,
+                                 *   the mesh shader is not compiled yet or none of its culled
+                                 *   batches draws in it, as a lit view with only blended draws.
                                  *
                                  *   Plus the passes a view continues in after a split: one
                                  *   after its opaque snapshot of transmission, one for soft
