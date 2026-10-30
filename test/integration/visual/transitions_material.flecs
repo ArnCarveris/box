@@ -1,0 +1,116 @@
+// Material color and emissive transitions, frozen in the middle. ScriptAt changes the values at
+// the start of the second frame, with linear durations of 0.05 s (three frames at the fixed delta
+// of 1/60 s), so the render of the third frame shows each a third of the way:
+// - color: red to blue, a red purple
+// - emissive: dark to a bright cyan glow, a third of the strength and of the way from orange
+// - both: the color and the emission of one sphere at once
+// - delayed: the same color change with a delay of 1 s, which still renders red
+// - prefab: two instances that inherit Rgb from one prefab, whose one change animates both
+// The cubes behind each sphere show the start (left) and target (right) colors without a
+// transition.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.app
+using box.transition
+
+camera {
+  Position: {0, 2.6, 9}
+  Rotation: {-0.25, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {10, 10, 14, 255}}}
+}
+
+sun {
+  Rotation: {-0.8, 0.4, 0}
+  DirectionalLight: {intensity: 2 * flecs.script.math.PI}
+  Rgb: {255, 255, 255}
+}
+
+$ {
+  AmbientLight: {intensity: 0.2}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {16, 0.2, 8}
+  Rgb: {50, 50, 56}
+}
+
+color {
+  Position: {-4.8, 0.7, 0}
+  Sphere: {segments: 32, smooth: true, radius: 0.6}
+  Rgb: {230, 40, 40}
+  Transition: [Rgb: {duration: 0.05}]
+}
+
+emissive {
+  Position: {-2.4, 0.7, 0}
+  Sphere: {segments: 32, smooth: true, radius: 0.6}
+  Rgb: {30, 30, 30}
+  Emissive: {strength: 0, color: {255, 120, 40}}
+  Transition: [Emissive: {duration: 0.05}]
+}
+
+both {
+  Position: {0, 0.7, 0}
+  Sphere: {segments: 32, smooth: true, radius: 0.6}
+  Rgb: {230, 40, 40}
+  Emissive: {strength: 0, color: {255, 120, 40}}
+  Transition: [Rgb: {duration: 0.05}, Emissive: {duration: 0.05}]
+}
+
+delayed {
+  Position: {2.4, 0.7, 0}
+  Sphere: {segments: 32, smooth: true, radius: 0.6}
+  Rgb: {230, 40, 40}
+  Transition: [Rgb: {duration: 0.05, delay: 1}]
+}
+
+prefab Ball {
+  Sphere: {segments: 32, smooth: true, radius: 0.28}
+  Rgb: {230, 40, 40}
+  Transition: [Rgb: {duration: 0.05}]
+}
+
+prefab_a : Ball {
+  Position: {4.5, 1.0, 0}
+}
+
+prefab_b : Ball {
+  Position: {5.1, 0.4, 0}
+}
+
+for i in 0..5 {
+  {
+    Position: {i * 2.4 - 5.1, 0.25, -1.4}
+    Box: {0.5, 0.5, 0.5}
+    Rgb: {230, 40, 40}
+  }
+
+  {
+    Position: {i * 2.4 - 4.5, 0.25, -1.4}
+    Box: {0.5, 0.5, 0.5}
+    Rgb: {40, 80, 230}
+  }
+}
+
+change {
+  ScriptAt: {frame: 1, code: `
+    using box.material
+    color { Rgb: {40, 80, 230} }
+    emissive { Emissive: {strength: 3, color: {60, 220, 255}} }
+    both {
+      Rgb: {40, 80, 230}
+      Emissive: {strength: 3, color: {60, 220, 255}}
+    }
+    delayed { Rgb: {40, 80, 230} }
+    Ball { Rgb: {40, 80, 230} }
+  `}
+}

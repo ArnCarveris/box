@@ -1,0 +1,111 @@
+// 2D shape and UI element transitions, frozen in the middle. ScriptAt changes the values at the
+// start of the second frame, with linear durations of 0.05 s (three frames at the fixed delta of
+// 1/60 s), so the render of the third frame shows each a third of the way:
+// - card: a rounded 2D rect that moves right, turns and goes from orange to blue, between its
+//   grey start outline and its green target outline
+// - button: a UI element in a layout whose Rgb goes from dark to a light green, with its label,
+//   whose text Rgb goes from white to black
+// - toast: a UI panel with a text child whose Opacity goes from 1 to 0, blended at 0.7
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.layout
+using box.text
+using box.app
+using box.transition
+
+camera {
+  Position: {0, 0, 100}
+  Camera: {ortho: true, ortho_scale: 1}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {236, 238, 242, 255}}}
+}
+
+start_outline {
+  Position: {-200, 90, 0}
+  Rect: {104, 64}
+  Rgb: {236, 238, 242}
+  Border: {width: 2, radius: 12, color: {150, 150, 150, 255}}
+}
+
+target_outline {
+  Position: {200, 90, 0}
+  Rect: {104, 64}
+  Rgb: {236, 238, 242}
+  Border: {width: 2, radius: 12, color: {60, 200, 90, 255}}
+}
+
+card {
+  Position: {-200, 90, 1}
+  Rotation: {0, 0, 0}
+  Rect: {100, 60}
+  Rgb: {250, 150, 50}
+  Border: {radius: 10}
+  Transition: [
+    Position: {duration: 0.05},
+    Rotation: {duration: 0.05},
+    Rgb: {duration: 0.05}
+  ]
+}
+
+ui {
+  Layout: {direction: Row, spacing: 24, padding: {12, 12, 12, 12}}
+  LayoutItem: {width: {mode: Fixed, value: 520}, height: {mode: Fixed, value: 120}}
+  Position: {0, -80, 0}
+  Rect: {1, 1}
+  Rgb: {40, 44, 56}
+  Border: {width: 1, radius: 8, color: {90, 110, 150, 255}}
+
+  button {
+    Layout: {padding: {8, 8, 14, 14}, h: Center, v: Middle}
+    LayoutItem: {v: Middle}
+    Rect: {1, 1}
+    Rgb: {30, 60, 40}
+    Border: {radius: 6}
+    Transition: [Rgb: {duration: 0.05}]
+
+    label {
+      Text: {value: "Apply", size: 22}
+      Rgb: {255, 255, 255}
+      Transition: [Rgb: {duration: 0.05}]
+    }
+  }
+
+  toast {
+    Layout: {padding: {8, 8, 14, 14}, h: Center, v: Middle}
+    LayoutItem: {v: Middle}
+    Rect: {1, 1}
+    Rgb: {200, 60, 60}
+    Border: {radius: 6}
+    Opacity: {1}
+    Transition: [Opacity: {duration: 0.05}]
+
+    message {
+      Text: {value: "Saved", size: 22}
+      Rgb: {255, 255, 255}
+    }
+  }
+}
+
+change {
+  ScriptAt: {frame: 1, code: `
+    using box.transform
+    using box.material
+    card {
+      Position: {200, 90, 1}
+      Rotation: {0, 0, 1.2}
+      Rgb: {60, 110, 240}
+    }
+    ui {
+      button {
+        Rgb: {150, 230, 160}
+        label { Rgb: {0, 0, 0} }
+      }
+      toast { Opacity: {0} }
+    }
+  `}
+}

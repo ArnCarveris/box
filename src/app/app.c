@@ -180,6 +180,48 @@ done:
     clock->pace = pace;
 }
 
+/** Run the ScriptAt code whose frame has come, then remove the component.
+ *
+ * The entities are collected first, since running the code and removing the component change
+ * the tables the query iterates.
+ *
+ * @param it The iterator of the system
+ */
+static void BoxAppScriptAt(
+    ecs_iter_t *it)
+{
+    ecs_world_t *world = it->world;
+    const AppStatus *status = ecs_singleton_get(world, AppStatus);
+    int32_t frame = status ? status->frame : 0;
+    ecs_vec_t due = {0};
+    int32_t i, count;
+    while (ecs_query_next(it)) {
+        const ScriptAt *s = ecs_field(it, ScriptAt, 0);
+        for (i = 0; i < it->count; i ++) {
+            if (frame >= s[i].frame) {
+                ecs_vec_append_t(NULL, &due, ecs_entity_t)[0] = it->entities[i];
+            }
+        }
+    }
+
+    count = ecs_vec_count(&due);
+    for (i = 0; i < count; i ++) {
+        ecs_entity_t e = ecs_vec_get_t(&due, ecs_entity_t, i)[0];
+        const ScriptAt *s = ecs_get(world, e, ScriptAt);
+        char *code = s && s->code ? ecs_os_strdup(s->code) : NULL;
+        char *name = ecs_get_path(world, e);
+        ecs_remove(world, e, ScriptAt);
+        if (code && ecs_script_run(world, name, code, NULL)) {
+            ecs_err("ScriptAt of '%s' failed", name);
+        }
+
+        ecs_os_free(name);
+        ecs_os_free(code);
+    }
+
+    ecs_vec_fini_t(NULL, &due, ecs_entity_t);
+}
+
 /** Add a sample to a series of FrameTiming.
  *
  * @param series The series
@@ -510,6 +552,8 @@ void BoxAppImport(
     ECS_META_COMPONENT(world, FileWatch);
     ECS_META_COMPONENT(world, FileWatchStatus);
     box_owned_hooks(world, FileWatchStatus, BOX_OWNED_STR(FileWatchStatus, last));
+    ECS_META_COMPONENT(world, ScriptAt);
+    box_owned_hooks(world, ScriptAt, BOX_OWNED_STR(ScriptAt, code));
 
     ecs_singleton_set(world, AppStatus, {0});
     ecs_singleton_set(world, FrameTiming, {0});
@@ -530,6 +574,14 @@ void BoxAppImport(
         .run = BoxAppTiming,
         .ctx = clock,
         .ctx_free = box_app_clock_free
+    });
+
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "AppScriptAt" }),
+        .query.terms = {{ .id = ecs_id(ScriptAt) }},
+        .phase = EcsPreFrame,
+        .run = BoxAppScriptAt,
+        .immediate = true
     });
 
     ecs_system(world, {

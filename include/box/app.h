@@ -145,6 +145,19 @@ ECS_STRUCT(FileWatchStatus, {
     char *last;         /**< The file that changed last, NULL before the first change */
 });
 
+/** Script code that runs once, at the start of the frame after AppStatus.frame reached frame,
+ * before the systems of that frame, and is then removed from its entity.
+ *
+ * A scene uses it to change itself at a known frame: with a fixed delta (--delta-time) and a
+ * frame limit the frame that changes and the frame that is rendered are at known world times,
+ * which is how the visual scenes of transitions freeze the middle of a transition. The code runs
+ * with ecs_script_run at the root scope; an error is logged and the component is removed too.
+ */
+ECS_STRUCT(ScriptAt, {
+    int32_t frame;      /**< Frames completed (AppStatus.frame) before the code runs */
+    char *code;         /**< flecs script code */
+});
+
 /** Register the box.app module.
  *
  * @param world The world

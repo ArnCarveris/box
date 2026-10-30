@@ -4,14 +4,14 @@
 like CSS transitions. The component itself holds the new value at once: transitions exist only
 in the rendered pixels.
 
-Status: the `Transition` component, its timing functions and its validation exist
-(`include/box/transition.h`), and so do the change detection of the game thread and the render
-thread resolver, which evaluates every transitioned value on the packet clock. Transitions of
-`Position`, `Rotation` and `Scale` render, for the entity and its descendants (see
-[Transform transitions](#transform-transitions)), and so do transitions of `Rgb`,
-`AlphaCutoff`, `PbrMaterial`, `Emissive` and `TextureTransform` (see
-[Material transitions](#material-transitions)), and so do transitions of `Tint` and `Opacity`,
-composed down the hierarchy (see [Tint and opacity transitions](#tint-and-opacity-transitions)).
+The feature is complete: transitions of `Position`, `Rotation` and `Scale` render for the
+entity and its descendants (see [Transform transitions](#transform-transitions)), transitions of
+`Rgb`, `AlphaCutoff`, `PbrMaterial`, `Emissive` and `TextureTransform` for mesh shapes, 2D
+shapes and texts (see [Material transitions](#material-transitions)), and transitions of `Tint`
+and `Opacity` composed down the hierarchy (see
+[Tint and opacity transitions](#tint-and-opacity-transitions)). It works on the render thread,
+in main thread mode (the browser) and with the null backend. What it does not do is listed in
+[Limitations](#limitations), and what it costs in [The fast path](#the-fast-path).
 
 ## What the application sees
 
@@ -42,11 +42,61 @@ e {
 and (0.42, 0, 0.58, 1). `box_transition_ease(fn, t)` evaluates them; it is pure and allocates
 nothing, so the render thread can call it.
 
-From C, `box_transition_set(world, e, ecs_id(Position), &spec)` adds or replaces one entry (an
-instance gets its own copy of an inherited map first), `box_transition_remove()` removes one
-(the same way), and `box_transition_get()` reads one. The
-storage is a flecs map (`ecs_map_t`) keyed by the component entity whose values are allocated
-`TransitionSpec`s, so `ecs_map_get_deref(map, TransitionSpec, ecs_id(Position))` also reads one.
+### Authoring from script
+
+`Transition` is written like any component, as a map of component names to specs, after
+`using box.transition`. A prefab can declare it for all its instances:
+
+```flecs
+using box.transform
+using box.material
+using box.transition
+
+prefab Crate {
+  Box: {1, 1, 1}
+  Rgb: {200, 150, 80}
+  Transition: [Rgb: {duration: 0.3}, Position: {duration: 0.2, timing_function: EaseOut}]
+}
+
+crate : Crate {
+  Position: {0, 0.5, 0}
+}
+```
+
+Then any later write animates, from script, the shell or C, however it is written:
+
+```flecs
+crate { Position: {3, 0.5, 0} }   // moves over 0.2 s
+Crate { Rgb: {40, 80, 230} }       // every instance that inherits Rgb fades to blue over 0.3 s
+```
+
+From the shell, `set crate box.transform.Position {x: 3, y: 0.5, z: 0}` does the same, and the
+next `get crate box.transform.Position` returns `{x: 3, y: 0.5, z: 0}`, the target.
+
+### Authoring from C
+
+```c
+#include <box.h>
+
+ecs_entity_t e = ecs_entity(world, { .name = "e" });
+ecs_set(world, e, Position, {0, 1, 0});
+ecs_set(world, e, Rgb, {255, 0, 0});
+box_transition_set(world, e, ecs_id(Position), &(TransitionSpec){
+    .duration = 0.5f, .timing_function = EaseInOut });
+box_transition_set(world, e, ecs_id(Rgb), &(TransitionSpec){
+    .duration = 1.0f, .delay = 0.25f });
+
+// Later: the component holds the target at once, the pixels follow
+ecs_set(world, e, Position, {4, 1, 0});
+```
+
+`box_transition_set(world, e, ecs_id(Position), &spec)` adds or replaces one entry (an instance
+gets its own copy of an inherited map first), `box_transition_remove()` removes one (the same
+way), and `box_transition_get()` reads one. The storage is a flecs map (`ecs_map_t`) keyed by
+the component entity whose values are allocated `TransitionSpec`s, so
+`ecs_map_get_deref(map, TransitionSpec, ecs_id(Position))` also reads one.
+
+### Rules
 
 - The application sets a component as always (`ecs_set`, script, a query writing a field). The
   component holds that value immediately and keeps holding it. `ecs_get`, the shell `get`, REST,
@@ -93,6 +143,24 @@ storage is a flecs map (`ecs_map_t`) keyed by the component entity whose values 
   prefab change animates its one material table slot.
 - Draw order from `Position` z, batch membership by target value, picking and bakes use
   targets.
+
+## Limitations
+
+In short, what a transition does not animate, each explained below or in its section:
+
+- An entity with `ManualTransform` (`SurfaceAttachment`) under a transitioning ancestor, and its
+  descendants, render at their targets ([manual transforms](#limitation-manual-transforms)).
+- Lights and cameras stay at their target place, and a light at its target color
+  ([lights and cameras](#limitation-lights-and-cameras), [light color](#limitation-light-color)).
+- Light and reflection bakes and probe captures that run during a transition see the rendered
+  value of their frame ([bakes and captures](#limitation-bakes-and-captures)).
+- Draw order of blended shapes, picking, `box.spatial`, collision and bakes use targets.
+- `Rotation` takes the short or the long way as its Euler angles say: no wrapping.
+- A glyph in a colored `TextSpans` span keeps the color of the span through an `Rgb`
+  transition, and `SurfaceMaterial`, `Border`, `AmbientLight` and other colors outside
+  `src/material` do not transition ([material transitions](#material-transitions)).
+- A value written every frame restarts its transition every frame: it renders smoothed, never
+  reaching a moving target before it stops.
 
 ### Limitation: manual transforms
 
@@ -296,13 +364,13 @@ thread) and the encoding in `src/render/batch.c` and `src/render/materials.c`.
   instances are checked per table: a table whose entities own no slot (no `MaterialId` of their
   own) and have no 2D or text shading is skipped, except for those of its entities that are
   `IsA` bases themselves, so a prefab with 10,000 mesh instances that inherit its `Rgb` visits
-  the prefab alone. Each visited entity that owns a slot (`box_draw_materials_t.owned`) and reads an active node
-  marks its slot to upload in the frame; the slots of other owners are not visited. The send
-  records where each run of the table went in the packet data
+  the prefab alone. Each visited entity that owns a slot (`box_draw_materials_t.owned`) and
+  reads an active node marks its slot to upload in the frame; the slots of other owners are not
+  visited. The send records where each run of the table went in the packet data
   (`box_draw_materials_t.uploaded`); after the batches, one `MATERIAL` record per slot carries
-  the byte offset of the record and its target material. Mesh slots
-  are not rekeyed: their instance streams do not change, only the table record does. A slot
-  of the last frame uploads once more, so the frame after the end holds the target.
+  the byte offset of the record and its target material. Mesh slots are not rekeyed: their
+  instance streams do not change, only the table record does. A slot of the last frame uploads
+  once more, so the frame after the end holds the target.
 - **2D shapes and texts** carry their material inline (`box_render_shading_t`). The same
   walk gives each drawn 2D shape or text that reads an active value the private tag
   `TransitionMaterial` (`(OnInstantiate, DontInherit)`). `box_draws_key` and the glyph key
@@ -429,11 +497,11 @@ that has them, pays nothing per entity:
 The only observers the module adds are the OnSet validation of `Transition` itself,
 `DrawsOnTransitionTransform`, `DrawsOnTransitionMaterial` and `DrawsOnTransitionOpacity`, on the
 private tags, which only entities a transition patches ever get. A frame without an active
-`Tint` or `Opacity` transition walks no entity for them. The material table records the runs it uploads, one
-entry per run. A frame without an active material transition walks no slot or entity, and a
-frame with one visits only the entities of its nodes and those of their `IsA` instances that
-own a slot, have 2D or text shading or are bases themselves, never the other owners of the
-material table.
+`Tint` or `Opacity` transition walks no entity for them. The material table records the runs it
+uploads, one entry per run. A frame without an active material transition walks no slot or
+entity, and a frame with one visits only the entities of its nodes and those of their `IsA`
+instances that own a slot, have 2D or text shading or are bases themselves, never the other
+owners of the material table.
 
 The slot system (`RenderExtractTransitionSlots`) stores the state of the batches when it is
 registered, so no frame looks it up by name, and a world without `Transition` returns from both
@@ -461,3 +529,50 @@ the extract, which a world without `Transition` keeps at the noise level, and
 `Transition_resolve_empty` times the resolver on a packet without records. The instances of the
 prefab cases inherit `Transition` over `IsA`, so each of them is a node that the extract compares
 every frame, idle or not: that is the cost of declaring `Transition` on a prefab, not of the walk.
+
+### The cost
+
+The numbers of the cases above, from `bench/render` in a release build, per frame. Run them with
+`bake3 run --cfg release bench/render -- Transition` and update this table when the extract or
+the resolver change.
+
+| Case                          | Frame (ms) | `transitions_ms` | Note                          |
+|-------------------------------|-----------:|-----------------:|-------------------------------|
+| `Transition_none_static`      |        TBD |              TBD | baseline, no `Transition`     |
+| `Transition_none_dynamic`     |        TBD |              TBD | baseline, 1% moved per frame  |
+| `Transition_one_idle`         |        TBD |              TBD | one shape with `Transition`   |
+| `Transition_one_active`       |        TBD |              TBD | one shape restarted per frame |
+| `Transition_idle_1000`        |        TBD |              TBD | 1000 idle nodes               |
+| `Transition_active_1000`      |        TBD |              TBD | 1000 active nodes             |
+| `Transition_prefab_rgb_idle`  |        TBD |              TBD | 10,000 inheriting instances   |
+| `Transition_prefab_rgb_active`|        TBD |              TBD | the same, prefab `Rgb` active |
+| `Transition_resolve_empty`    |        TBD |                - | resolver on an empty packet   |
+
+What to read from them: the frame of `Transition_none_*` equals that of the same scene before the
+feature within noise, and so does that of `Transition_one_*` (the other shapes do not pay). An
+idle node costs one compare per transitioned component per frame. An active node adds its
+records and its patches, and an active transform node the walk of its subtree. Declaring
+`Transition` on a prefab makes every instance a node that is compared every frame.
+
+## Tests
+
+- `test/cpu/core` (`Transition`): the component, its validation and the timing functions.
+- `test/cpu/render` (`Transition`, `TransitionMaterial`, `TransitionTintOpacity`): the records
+  of the game thread and the values of the resolver with the null backend.
+- `test/gpu/render`: the rendered transforms, materials, tints and opacity on a GPU.
+- `test/integration/visual/transitions_*.flecs`: renders frozen in the middle of a transition,
+  compared with their baselines: a transform transition with children
+  (`transitions_transform`), a shadow caster mid move (`transitions_shadow`), material color and
+  emissive transitions with a delayed one and a prefab (`transitions_material`), tint and opacity
+  on parents with children (`transitions_tint_opacity`) and a 2D shape and UI elements
+  (`transitions_2d_ui`). A scene cannot change a value after its first frame by itself, and the
+  first value never animates, so each changes its values with `ScriptAt` (`box.app`) at frame 1,
+  at the start of the second frame. The harness runs three frames at the fixed delta of 1/60 s,
+  and every transition lasts 0.05 s, so the rendered frame is one frame, a third of the way, into
+  every transition, at a world time of 3/60 s. No scene reads the wall clock.
+- `test/integration/e2e/transitions.py`: through the shell of `apps/boxrun`, a `set` of
+  `Position` or `Rgb` is returned by `get` in the next command, while a `capture` of the same
+  frames shows the square in between, and the target after the transition.
+- `test/integration/web/transitions.mjs`: the browser build, which renders on the main thread,
+  with a scene that moves, recolors, fades and lights at once; the square passes in between and
+  ends at its target, with no error.

@@ -298,6 +298,15 @@
                     "ease_monotonic",
                     "ease_midpoints"
                 ]
+            },
+            {
+                "id": "ScriptAt",
+                "testcases": [
+                    "runs_at_frame",
+                    "frame_zero_runs_first",
+                    "from_script",
+                    "error_removed"
+                ]
             }
         ]
     }
