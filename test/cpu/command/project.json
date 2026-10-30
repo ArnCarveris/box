@@ -49,8 +49,7 @@
                     "default_all_levels",
                     "numeric_level",
                     "unknown_level",
-                    "no_color_codes",
-                    "empty_is_string"
+                    "no_color_codes"
                 ]
             },
             {

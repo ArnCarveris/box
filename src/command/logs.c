@@ -237,9 +237,7 @@ static void box_log_command(
     }
 
     ecs_os_mutex_unlock(box_log_lock);
-    /* An empty string, not NULL, without messages: the shell returns a NULL string as null */
-    *(char**)result->ptr = ecs_strbuf_written(&buf) ?
-        ecs_strbuf_get(&buf) : ecs_os_strdup("");
+    *(char**)result->ptr = ecs_strbuf_get(&buf);
 done:
     return;
 }
