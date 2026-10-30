@@ -1020,6 +1020,11 @@ static void box_transition_materials(
  * creation of a node for each new one and the destruction of the nodes of entities that lost
  * Transition or were deleted.
  *
+ * An entity that owns Transition is a node. An entity that inherits it over IsA is a node only
+ * when its table owns one of the values the map lists with a valid entry: the map is the same
+ * for the whole table, so its entries are looked up and validated once per table, and a table
+ * of instances that own none of them is skipped.
+ *
  * @param it The iterator of the system
  */
 static void BoxRenderExtractTransitions(
@@ -1035,13 +1040,31 @@ static void BoxRenderExtractTransitions(
         const Transition *maps = ecs_field(&qit, Transition, 0);
         bool shared = !ecs_field_is_self(&qit, 0);
         void *columns[BOX_RENDER_TRANSITION_COMPONENTS];
+        const TransitionSpec *specs[BOX_RENDER_TRANSITION_COMPONENTS];
+        bool owns = !shared;
         if (!p) {
             p = box_render_packet(world);
         }
 
         for (c = 0; c < BOX_RENDER_TRANSITION_COMPONENTS; c ++) {
-            columns[c] = ecs_table_get_id(world, qit.table,
-                box_transition_id((box_render_transition_component_t)c), qit.offset);
+            ecs_entity_t cid = box_transition_id((box_render_transition_component_t)c);
+            columns[c] = ecs_table_get_id(world, qit.table, cid, qit.offset);
+            specs[c] = NULL;
+            if (shared && ecs_map_is_init(&maps[0])) {
+                specs[c] = ecs_map_get_deref(&maps[0], TransitionSpec, cid);
+                if (specs[c] && !box_transition_valid(world, cid, specs[c])) {
+                    specs[c] = NULL;
+                }
+            }
+
+            owns |= specs[c] && columns[c];
+        }
+
+        /* The transition of an inherited value belongs to the entity that owns it, so the
+         * instances of a table that own none of the values of the map they inherit send
+         * nothing and are no nodes. The node one of them had is destroyed below. */
+        if (!owns) {
+            continue;
         }
 
         for (i = 0; i < qit.count; i ++) {
@@ -1055,13 +1078,16 @@ static void BoxRenderExtractTransitions(
             for (c = 0; c < BOX_RENDER_TRANSITION_COMPONENTS; c ++) {
                 box_render_transition_component_t component =
                     (box_render_transition_component_t)c;
-                ecs_entity_t cid = box_transition_id(component);
-                const TransitionSpec *spec = ecs_map_is_init(map)
-                    ? ecs_map_get_deref(map, TransitionSpec, cid) : NULL;
+                const TransitionSpec *spec = specs[c];
                 const void *value = columns[c] ? ECS_ELEM(columns[c],
                     box_render_transition_layout(component)->size, i) : NULL;
-                if (spec && !box_transition_valid(world, cid, spec)) {
-                    spec = NULL;
+                if (!shared) {
+                    ecs_entity_t cid = box_transition_id(component);
+                    spec = ecs_map_is_init(map)
+                        ? ecs_map_get_deref(map, TransitionSpec, cid) : NULL;
+                    if (spec && !box_transition_valid(world, cid, spec)) {
+                        spec = NULL;
+                    }
                 }
 
                 box_transition_compare(p, id, component, &node->slots[c], spec, value);
