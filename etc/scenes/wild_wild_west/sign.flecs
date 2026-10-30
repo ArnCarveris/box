@@ -19,5 +19,5 @@ template WestSign {
     { Position: {0, (side - 0.5) * (height - 0.06), 0.085}; Box: {width, 0.055, 0.06}; Rgb: {206, 164, 94} }
     { Position: {(side - 0.5) * (width - 0.06), 0, 0.085}; Box: {0.055, height, 0.06}; Rgb: {206, 164, 94} }
   }
-  lettering { Position: {0, 0, 0.08}; Scale: {0.01, 0.01, 0.01}; Text: {value: label, size: size * 100}; Rgb: {248, 221, 165} }
+  lettering { Position: {0, 0, 0.08}; Scale: {0.01, 0.01, 0.01}; Text: {value: label, size: size * 100, font: WestFont}; Rgb: {248, 221, 165} }
 }
