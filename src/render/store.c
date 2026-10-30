@@ -60,6 +60,25 @@ box_draw_page_t* box_draws_store_page(
     return ecs_vec_get_t(&s->pages, box_draw_page_t, page);
 }
 
+void box_draws_store_memory(
+    const box_draw_store_t *s,
+    int64_t *slots,
+    int64_t bytes[BOX_DRAWS_STREAMS])
+{
+    int32_t i, j;
+    for (i = 0; i < ecs_vec_count(&s->pages); i ++) {
+        const box_draw_page_t *pg = ecs_vec_get_t(&s->pages, box_draw_page_t, i);
+        if (!pg->alive || !pg->capacity) {
+            continue;
+        }
+
+        *slots += pg->capacity;
+        for (j = 0; j < s->layout.streams; j ++) {
+            bytes[j] += (int64_t)pg->capacity * s->layout.stride[j];
+        }
+    }
+}
+
 uint32_t box_draws_store_handle(
     const box_draw_store_t *s,
     int32_t page,

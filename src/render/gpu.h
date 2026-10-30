@@ -1300,8 +1300,11 @@ void box_gpu_transmission_fini(
 
 /** Get the opaque snapshot a view copies its image into, when it has a transmissive draw.
  *
- * It has the render size of the target and the format of the color target of the view, made
- * again when either changes. A color target that cannot be copied gets none, logged once.
+ * It has the render size of the target and the format of the color target of the view. The
+ * target keeps one per format (BOX_GPU_SNAPSHOT_FORMATS), each made again only when the render
+ * size or its own format changes, so views of both formats do not recreate them every frame.
+ *
+ * A color target that cannot be copied gets none, logged once.
  *
  * @param gpu The backend
  * @param t The target
@@ -1319,7 +1322,11 @@ box_gpu_snapshot_t* box_gpu_transmission_begin(
     WGPUTexture source,
     WGPUTextureFormat format);
 
-/** Get the view of every mip of a snapshot, which group 0 of the forward pass binds.
+/** Get the view of a snapshot which group 0 of the forward pass binds.
+ *
+ * Every mip once the downsample pipeline of its format exists, else only mip 0: until
+ * etc/shaders/transmission.wgsl compiles a rough shape samples the sharp image, not mips that
+ * were never blurred.
  *
  * @param gpu The backend
  * @param s The snapshot, NULL for the white fallback
@@ -1332,6 +1339,9 @@ WGPUTextureView box_gpu_transmission_view(
 /** Copy the color attachment of a view into mip 0 of its snapshot and blur every mip above
  * from the one below (a Jimenez 13 tap downsample). Called between two render passes.
  *
+ * Until the downsample pipeline exists only mip 0 is written, which is all the view of the
+ * snapshot shows then (box_gpu_transmission_view).
+ *
  * @param gpu The backend
  * @param s The snapshot
  * @param encoder The encoder of the frame
@@ -1343,7 +1353,7 @@ void box_gpu_transmission_record(
     WGPUCommandEncoder encoder,
     WGPUTexture source);
 
-/** Release the snapshot of a target.
+/** Release the snapshots of a target, of every format.
  *
  * @param t The target
  */

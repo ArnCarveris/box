@@ -1387,13 +1387,16 @@ typedef struct box_gpu_view_pass_t {
                                      *   copies */
 } box_gpu_view_pass_t;
 
-/** Begin a pass of a view that continues the image and depth of the pass before it.
+/** Begin a pass of a view that continues the image and depth of the pass before it, counted
+ * among the forward passes.
  *
+ * @param gpu The backend
  * @param vp The pass of the view
  * @param read_only Whether the depth is read only, so the pass can sample it
  * @return The pass
  */
 static WGPURenderPassEncoder box_gpu_view_pass_continue(
+    box_gpu_t *gpu,
     const box_gpu_view_pass_t *vp,
     bool read_only)
 {
@@ -1419,6 +1422,8 @@ static WGPURenderPassEncoder box_gpu_view_pass_continue(
         .colorAttachments = &attachment,
         .depthStencilAttachment = &depth
     };
+
+    box_gpu_count(gpu, BOX_GPU_STAT_FORWARD_PASS);
 
     return wgpuCommandEncoderBeginRenderPass(vp->encoder, &desc);
 }
@@ -1454,14 +1459,14 @@ static bool box_gpu_draw_particles(
     } else {
         wgpuRenderPassEncoderEnd(vp->pass);
         wgpuRenderPassEncoderRelease(vp->pass);
-        vp->pass = box_gpu_view_pass_continue(vp, true);
+        vp->pass = box_gpu_view_pass_continue(gpu, vp, true);
         wgpuRenderPassEncoderSetBindGroup(vp->pass, 0, group, 1, &offset);
         box_gpu_particles_draw(gpu, vp->pass, format, v, vp->depth);
         rebind = !last;
         if (!last) {
             wgpuRenderPassEncoderEnd(vp->pass);
             wgpuRenderPassEncoderRelease(vp->pass);
-            vp->pass = box_gpu_view_pass_continue(vp, false);
+            vp->pass = box_gpu_view_pass_continue(gpu, vp, false);
         }
     }
 
@@ -1494,7 +1499,7 @@ static void box_gpu_draw_snapshot(
     wgpuRenderPassEncoderRelease(vp->pass);
     box_gpu_transmission_record(gpu, vp->snapshot, vp->encoder, vp->source);
     vp->snapshot = NULL;
-    vp->pass = box_gpu_view_pass_continue(vp, false);
+    vp->pass = box_gpu_view_pass_continue(gpu, vp, false);
     wgpuRenderPassEncoderSetBindGroup(vp->pass, 0, group, 1, &offset);
     wgpuRenderPassEncoderSetBindGroup(vp->pass, 3, box_gpu_volume_group(gpu, v), 0, NULL);
 }
@@ -1613,6 +1618,9 @@ static void box_gpu_draw_batches(
 
 /** Record a render pass of a view and its draws of one phase.
  *
+ * Counts the pass among the forward passes, and each pass the opaque snapshot and soft
+ * particles split it into (box_gpu_view_pass_continue).
+ *
  * @param gpu The backend
  * @param t The target
  * @param encoder The encoder of the frame
@@ -1683,6 +1691,7 @@ static void box_gpu_draw_pass(
     uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
     WGPUTextureFormat format = hdr ? BOX_GPU_HDR_FORMAT : t->format;
     vp.pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+    box_gpu_count(gpu, BOX_GPU_STAT_FORWARD_PASS);
     if (phase != 2) {
         box_gpu_environment_draw_background(gpu, vp.pass, format, v, offset);
     }
