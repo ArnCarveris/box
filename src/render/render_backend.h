@@ -48,7 +48,7 @@ typedef struct box_render_gpu_stats_t {
                                  *
                                  *   A view has none when it is unlit, its camera has no depth,
                                  *   the mesh shader is not compiled yet or none of its culled
-                                 *   batches draws in it, as a lit view with only blended draws.
+                                 *   batches draws in it (only blended or transmissive draws).
                                  *
                                  *   Plus the passes a view continues in after a split: one
                                  *   after its opaque snapshot of transmission, one for soft
