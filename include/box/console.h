@@ -71,6 +71,11 @@ ECS_STRUCT(ConsoleSyntax, {
  * While open, typed and pasted text (Input.paste) and key presses go to the input line and no
  * action but the toggle sees the keyboard or mouse buttons. Enter runs the line, Up and Down walk
  * the lines that ran, Page Up, Page Down and the wheel scroll, Escape or the toggle close it.
+ *
+ * Lines longer than the panel wrap at its width minus the padding, between words and inside a
+ * word longer than a row. Rows a line wraps to start after the prompt of a line that ran or
+ * of the input line, and under the leading indentation of an output line. Scrolling and the
+ * scrollback count rows.
  */
 ECS_STRUCT(Console, {
     bool open;           /**< Shown and taking the keyboard, the toggle action flips it */
@@ -79,7 +84,7 @@ ECS_STRUCT(Console, {
     float font_size;     /**< Em size of the text in points, default 16 */
     float line_height;   /**< Points from one line to the next, default 20 */
     float padding;       /**< Points between the edges of the panel and the text, default 10 */
-    int32_t scrollback;  /**< Lines of output the console keeps, default 1000 */
+    int32_t scrollback;  /**< Rows of output the console keeps, default 1000 */
     rgba background;     /**< Color of the panel, default translucent dark blue */
     rgb border;          /**< Color of the line along the bottom edge */
     rgb text;            /**< Color of the output of a command */

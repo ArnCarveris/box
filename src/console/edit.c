@@ -264,6 +264,7 @@ static void box_console_append(
         int32_t shift = first && prefix ? (int32_t)strlen(prefix) : 0;
         box_console_line_t *l = ecs_vec_append_t(NULL, &con->lines, box_console_line_t);
         l->kind = kind;
+        l->rows = 0;
         ecs_vec_init_t(NULL, &l->spans, box_console_span_t, 0);
         box_console_line_spans(l, spans, (int32_t)(p - text), size, shift);
         if (first && prefix) {
@@ -280,7 +281,7 @@ static void box_console_append(
     }
 }
 
-/** Drop the oldest lines of the scrollback beyond the number the console keeps.
+/** Drop the oldest lines of the scrollback while it has more rows than the console keeps.
  *
  * @param world The world
  * @param con The console state
@@ -291,9 +292,15 @@ static void box_console_trim(
 {
     const Console *console = ecs_singleton_get(world, Console);
     int32_t keep = console && console->scrollback > 0 ? console->scrollback : 0;
-    int32_t i, count = ecs_vec_count(&con->lines), drop = count - keep;
+    int32_t i, count = ecs_vec_count(&con->lines), drop = 0;
+    int32_t rows = console ? box_console_scrollback_rows(world, con, console) : count;
     box_console_line_t *lines = ecs_vec_first_t(&con->lines, box_console_line_t);
-    if (drop <= 0) {
+    while (drop < count && rows > keep) {
+        rows -= console ? box_console_line_rows(world, con, console, &lines[drop]) : 1;
+        drop ++;
+    }
+
+    if (!drop) {
         goto done;
     }
 
@@ -301,8 +308,8 @@ static void box_console_trim(
         box_console_line_fini(&lines[i]);
     }
 
-    memmove(lines, &lines[drop], (size_t)keep * sizeof(box_console_line_t));
-    ecs_vec_set_count_t(NULL, &con->lines, box_console_line_t, keep);
+    memmove(lines, &lines[drop], (size_t)(count - drop) * sizeof(box_console_line_t));
+    ecs_vec_set_count_t(NULL, &con->lines, box_console_line_t, count - drop);
 done:
     return;
 }
@@ -556,18 +563,22 @@ static void box_console_submit(
     ecs_os_free(line);
 }
 
-/** Scroll the scrollback by a number of lines, positive toward older lines.
+/** Scroll the scrollback by a number of rows, positive toward older rows.
  *
+ * @param world The world
  * @param con The console state
- * @param lines Lines to scroll
+ * @param rows Rows to scroll
  */
 static void box_console_scroll(
+    ecs_world_t *world,
     box_console_t *con,
-    int32_t lines)
+    int32_t rows)
 {
-    int32_t visible = ecs_vec_count(&con->ui.lines);
-    int32_t max = ecs_vec_count(&con->lines) - visible;
-    con->scroll += lines;
+    const Console *console = ecs_singleton_get(world, Console);
+    int32_t total = console ? box_console_scrollback_rows(world, con, console) :
+        ecs_vec_count(&con->lines);
+    int32_t max = total - con->rows;
+    con->scroll += rows;
     if (con->scroll > max) {
         con->scroll = max;
     }
@@ -584,7 +595,7 @@ bool box_console_edit(
     box_console_t *con)
 {
     const bool *key = con->pressed;
-    int32_t page = ecs_vec_count(&con->ui.lines) - 1;
+    int32_t page = con->rows - 1;
     page = page > 0 ? page : 1;
     box_console_type(con);
     if (key[KeyBackspace]) {
@@ -612,7 +623,7 @@ bool box_console_edit(
     }
 
     if (key[KeyPageUp] || key[KeyPageDown] || con->wheel != 0) {
-        box_console_scroll(con, (key[KeyPageUp] ? page : 0) - (key[KeyPageDown] ? page : 0) +
+        box_console_scroll(world, con, (key[KeyPageUp] ? page : 0) - (key[KeyPageDown] ? page : 0) +
             (int32_t)(con->wheel * BOX_CONSOLE_WHEEL_LINES));
     }
 

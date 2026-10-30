@@ -11,7 +11,7 @@
 /** Lines of input history the console keeps */
 #define BOX_CONSOLE_HISTORY_MAX (256)
 
-/** Lines one wheel step scrolls */
+/** Rows one wheel step scrolls */
 #define BOX_CONSOLE_WHEEL_LINES (3)
 
 /** Prompt in front of the input line and of the lines that ran */
@@ -49,6 +49,8 @@ typedef struct box_console_line_t {
     char *text;                 /**< The line without its newline */
     box_console_kind_t kind;    /**< What the line shows */
     ecs_vec_t spans;            /**< box_console_span_t of a line that ran, in bytes of text */
+    int32_t rows;               /**< Rows the line wraps to at box_console_t.wrap, 0 until
+                                 *   measured */
 } box_console_line_t;
 
 /** Entities of the console content, created the first time it opens */
@@ -62,13 +64,12 @@ typedef struct box_console_ui_t {
     ecs_entity_t beside;        /**< Space right of the panel */
     ecs_entity_t edge;          /**< Line along the right edge of the panel */
     ecs_entity_t content;       /**< Layout column of the scrollback and the input line */
-    ecs_entity_t log;           /**< Layout column of the visible scrollback lines */
-    ecs_entity_t input;         /**< Layout row of the input line */
-    ecs_entity_t prompt;        /**< Text of the prompt */
-    ecs_entity_t before;        /**< Text of the input line before the cursor */
-    ecs_entity_t cursor;        /**< Rectangle of the cursor */
-    ecs_entity_t after;         /**< Text of the input line after the cursor */
-    ecs_vec_t lines;            /**< ecs_entity_t of the text of every visible line */
+    ecs_entity_t log;           /**< Layout column of the visible scrollback lines, clipped */
+    ecs_entity_t input;         /**< Element of the input line and its cursor */
+    ecs_entity_t line;          /**< Text of the prompt and the input line, wrapped */
+    ecs_entity_t cursor;        /**< Rectangle of the cursor, placed on the caret of the line */
+    ecs_vec_t lines;            /**< ecs_entity_t of the text of every visible line, and of an
+                                 *   empty row for every row the scrollback does not fill */
 } box_console_ui_t;
 
 /** State of the console of a world, owned by the module */
@@ -92,7 +93,12 @@ typedef struct box_console_t {
     bool pressed[BOX_KEY_COUNT];/**< Keys pressed since the last update */
     float wheel;                /**< Wheel movement since the last update */
     bool clear;                 /**< Ctrl+L was pressed since the last update */
-    int32_t scroll;             /**< Scrollback lines scrolled up from the newest */
+    int32_t scroll;             /**< Scrollback rows scrolled up from the newest */
+    int32_t rows;               /**< Scrollback rows that fit in the panel above the input */
+    float wrap;                 /**< Width the rows of the scrollback lines were measured at */
+    float wrap_size;            /**< Font size the rows of the scrollback were measured at */
+    bool pending;               /**< A line could not be measured while its font loads */
+    ecs_entity_t font;          /**< Font of the console text, box.text.DefaultFont */
     bool shown;                 /**< The content is shown and the console takes the keyboard */
     bool enabled;               /**< The toggle action is enabled */
     bool relayout;              /**< Look or surface size changed since the last sync */
@@ -195,6 +201,33 @@ void box_console_edit_fini(
 void box_console_ui_build(
     ecs_world_t *world,
     box_console_t *con);
+
+/** Get the rows a scrollback line wraps to at the width of the panel, measuring it when its
+ * rows are not known for that width yet.
+ *
+ * @param world The world
+ * @param con The console state
+ * @param console The Console singleton
+ * @param l The line
+ * @return The rows, 1 while the font of the console loads
+ */
+int32_t box_console_line_rows(
+    ecs_world_t *world,
+    box_console_t *con,
+    const Console *console,
+    box_console_line_t *l);
+
+/** Get the rows the whole scrollback wraps to at the width of the panel.
+ *
+ * @param world The world
+ * @param con The console state
+ * @param console The Console singleton
+ * @return The rows
+ */
+int32_t box_console_scrollback_rows(
+    ecs_world_t *world,
+    box_console_t *con,
+    const Console *console);
 
 /** Write the look, the size, the visible scrollback and the input line into the content.
  *

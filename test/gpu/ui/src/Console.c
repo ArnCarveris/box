@@ -6,6 +6,7 @@
 #include <box.h>
 #include <bake_test.h>
 #include <stdio.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include "render.h"
@@ -16,6 +17,89 @@
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_STATIC
 #include <stb_image.h>
+
+/** Get the input line of the console, after its prompt.
+ *
+ * @param world The world
+ * @return The input line
+ */
+static const char* console_input(
+    ecs_world_t *world)
+{
+    const Text *t = ecs_get(world, ecs_lookup(world, CONSOLE_INPUT ".line"), Text);
+    test_assert(t != NULL && t->value != NULL);
+    test_assert(!strncmp(t->value, "> ", 2));
+
+    return t->value + 2;
+}
+
+/** Get the x of the cursor of the console from the left of the input line.
+ *
+ * @param world The world
+ * @return The x
+ */
+static float console_cursor_x(
+    ecs_world_t *world)
+{
+    return ecs_get(world, ecs_lookup(world, CONSOLE_INPUT ".cursor"), LayoutItem)->x;
+}
+
+/** Get the byte of the input line the cursor of the console sits before, from the caret of
+ * the line the cursor element is placed on.
+ *
+ * @param world The world
+ * @return The byte after the prompt, -1 when no caret matches the cursor
+ */
+static int32_t console_cursor(
+    ecs_world_t *world)
+{
+    const Console *c = ecs_singleton_get(world, Console);
+    ecs_entity_t line = ecs_lookup(world, CONSOLE_INPUT ".line");
+    const LayoutItem *item = ecs_get(world, ecs_lookup(world, CONSOLE_INPUT ".cursor"),
+        LayoutItem);
+    float half = ecs_get(world, line, TextBounds)->width * 0.5f;
+    int32_t i, len = (int32_t)strlen(console_input(world)), result = -1;
+    for (i = 0; i <= len && result < 0; i ++) {
+        TextCaret caret;
+        test_assert(box_text_caret(world, line, 2 + i, &caret));
+        float y = (float)caret.line * c->line_height + (c->line_height - c->font_size) * 0.5f;
+        if (fabsf(caret.x + half - item->x) < 0.01f && fabsf(item->y + y) < 0.01f) {
+            result = i;
+        }
+    }
+
+    return result;
+}
+
+/** Get the input line of the console before its cursor.
+ *
+ * @param world The world
+ * @return The text, valid until the next call
+ */
+static const char* console_before(
+    ecs_world_t *world)
+{
+    static char buf[4096];
+    int32_t at = console_cursor(world);
+    test_assert(at >= 0);
+    ecs_os_snprintf(buf, sizeof(buf), "%.*s", at, console_input(world));
+
+    return buf;
+}
+
+/** Get the input line of the console after its cursor.
+ *
+ * @param world The world
+ * @return The text
+ */
+static const char* console_after(
+    ecs_world_t *world)
+{
+    int32_t at = console_cursor(world);
+    test_assert(at >= 0);
+
+    return console_input(world) + at;
+}
 
 void Console_toggle_opens(void) {
     // ui/console
@@ -50,9 +134,7 @@ void Console_toggle_opens(void) {
     test_bool(v->shadows.enabled, false);
     test_bool(v->culling.enabled, false);
     test_int(ecs_vec_count(&v->effects), 0);
-    const Text *before = ecs_get(world, ecs_lookup(world, CONSOLE_INPUT ".before"),
-        Text);
-    test_str(before->value, "");
+    test_str(console_before(world), "");
 
     ecs_fini(world);
 }
@@ -82,9 +164,7 @@ void Console_toggle_closes(void) {
 
     test_bool(ecs_singleton_get(world, Console)->open, false);
     test_assert(ecs_lookup(world, "console.view") == 0);
-    const Text *before = ecs_get(world, ecs_lookup(world, CONSOLE_INPUT ".before"),
-        Text);
-    test_str(before->value, "a");
+    test_str(console_before(world), "a");
 
     ecs_os_free(box_command_run(world, t, "key_type `", NULL));
     while (box_input_pending(world)) {
@@ -180,10 +260,8 @@ void Console_typing_goes_to_input(void) {
         ecs_progress(world, 0);
     }
 
-    ecs_entity_t before = ecs_lookup(world, CONSOLE_INPUT ".before");
-    ecs_entity_t after = ecs_lookup(world, CONSOLE_INPUT ".after");
-    test_str(ecs_get(world, before, Text)->value, "ls things");
-    test_str(ecs_get(world, after, Text)->value, "");
+    test_str(console_before(world), "ls things");
+    test_str(console_after(world), "");
     test_str(ecs_singleton_get(world, Input)->text, "");
 
     ecs_fini(world);
@@ -223,8 +301,7 @@ void Console_typing_fires_no_actions(void) {
 
     ecs_progress(world, 0);
     test_bool(ecs_get(world, jump, ActionState)->down, false);
-    test_str(ecs_get(world, ecs_lookup(world, CONSOLE_INPUT ".before"), Text)->value,
-        "jj");
+    test_str(console_before(world), "jj");
 
     ecs_fini(world);
 }
@@ -310,8 +387,7 @@ void Console_enter_runs_line(void) {
         test_int(color->b, want->b);
     }
 
-    test_str(ecs_get(world, ecs_lookup(world, CONSOLE_INPUT ".before"), Text)->value,
-        "");
+    test_str(console_before(world), "");
 
     ecs_fini(world);
 }
@@ -406,7 +482,6 @@ void Console_history(void) {
         ecs_progress(world, 0);
     }
 
-    ecs_entity_t before = ecs_lookup(world, CONSOLE_INPUT ".before");
     const char *expect[] = {"man ls", "ls", "ls", "man ls", "dra"};
     Key keys[] = {KeyUp, KeyUp, KeyUp, KeyDown, KeyDown};
     int32_t i;
@@ -416,7 +491,7 @@ void Console_history(void) {
             ecs_progress(world, 0);
         }
 
-        test_str(ecs_get(world, before, Text)->value, expect[i]);
+        test_str(console_before(world), expect[i]);
     }
 
     ecs_fini(world);
@@ -441,10 +516,8 @@ void Console_cursor_editing(void) {
         ecs_progress(world, 0);
     }
 
-    ecs_entity_t before = ecs_lookup(world, CONSOLE_INPUT ".before");
-    ecs_entity_t after = ecs_lookup(world, CONSOLE_INPUT ".after");
-    test_str(ecs_get(world, before, Text)->value, "ab");
-    test_str(ecs_get(world, after, Text)->value, "cd");
+    test_str(console_before(world), "ab");
+    test_str(console_after(world), "cd");
 
     box_input_key_press(world, KeyBackspace, 1);
     box_input_key_press(world, KeyDelete, 1);
@@ -452,16 +525,16 @@ void Console_cursor_editing(void) {
         ecs_progress(world, 0);
     }
 
-    test_str(ecs_get(world, before, Text)->value, "a");
-    test_str(ecs_get(world, after, Text)->value, "d");
+    test_str(console_before(world), "a");
+    test_str(console_after(world), "d");
 
     box_input_key_press(world, KeyHome, 1);
     while (box_input_pending(world)) {
         ecs_progress(world, 0);
     }
 
-    test_str(ecs_get(world, before, Text)->value, "");
-    test_str(ecs_get(world, after, Text)->value, "ad");
+    test_str(console_before(world), "");
+    test_str(console_after(world), "ad");
 
     box_input_key_press(world, KeyEnd, 1);
     box_input_key_type(world, "x ", 1);
@@ -469,15 +542,15 @@ void Console_cursor_editing(void) {
         ecs_progress(world, 0);
     }
 
-    test_str(ecs_get(world, before, Text)->value, "adx\xC2\xA0");
-    test_str(ecs_get(world, after, Text)->value, "");
-    float x = ecs_get(world, before, TextBounds)->width;
+    test_str(console_before(world), "adx ");
+    test_str(console_after(world), "");
+    float x = console_cursor_x(world);
     box_input_key_type(world, " ", 1);
     while (box_input_pending(world)) {
         ecs_progress(world, 0);
     }
 
-    test_assert(ecs_get(world, before, TextBounds)->width > x);
+    test_assert(console_cursor_x(world) > x);
 
     ecs_fini(world);
 }
@@ -630,9 +703,8 @@ void Console_rebuilt_after_delete(void) {
     ecs_delete(world, ecs_lookup(world, BOX_CONSOLE_SCOPE));
     ecs_progress(world, 0);
     test_assert(ecs_lookup(world, BOX_CONSOLE_VIEW) != 0);
-    ecs_entity_t before = ecs_lookup(world, CONSOLE_INPUT ".before");
-    test_assert(before != 0);
-    test_str(ecs_get(world, before, Text)->value, "ab");
+    test_assert(ecs_lookup(world, CONSOLE_INPUT ".line") != 0);
+    test_str(console_before(world), "ab");
 
     box_input_key_press(world, KeyEnter, 1);
     while (box_input_pending(world)) {
@@ -669,7 +741,7 @@ void Console_look_from_script(void) {
     test_flt(ecs_get(world, bg, Rect)->height, 90);
     test_int(ecs_get(world, bg, Rgb)->r, 255);
     test_flt(ecs_get(world, bg, Opacity)->value, 128.0f / 255.0f);
-    ecs_entity_t prompt = ecs_lookup(world, CONSOLE_INPUT ".prompt");
+    ecs_entity_t prompt = ecs_lookup(world, CONSOLE_INPUT ".line");
     test_flt(ecs_get(world, prompt, Text)->size, 24);
     test_flt(ecs_get(world, prompt, Text)->line_height, 30);
     test_int(ecs_get(world, prompt, Rgb)->g, 255);
@@ -715,8 +787,7 @@ void Console_run_from_script(void) {
         ecs_progress(world, 0);
     }
 
-    test_str(ecs_get(world, ecs_lookup(world, CONSOLE_INPUT ".before"), Text)->value,
-        "ls things");
+    test_str(console_before(world), "ls things");
 
     ecs_fini(world);
 }
@@ -967,9 +1038,10 @@ void Console_panel_keeps_fraction_with_long_text(void) {
     ecs_progress(world, 0);
     ecs_progress(world, 0);
 
-    ecs_entity_t before = ecs_lookup(world, CONSOLE_INPUT ".before");
-    test_str(ecs_get(world, before, Text)->value, line);
-    test_assert(ecs_get(world, before, TextBounds)->width > 640);
+    ecs_entity_t input = ecs_lookup(world, CONSOLE_INPUT ".line");
+    test_str(console_input(world), line);
+    test_assert(ecs_get(world, input, TextBounds)->width <= 300);
+    test_assert(box_text_line(world, input, 0, NULL, NULL) > 1);
     ecs_entity_t log = ecs_lookup(world, CONSOLE_LOG);
     float widest = 0;
     ecs_iter_t it = ecs_children(world, log);
@@ -980,7 +1052,8 @@ void Console_panel_keeps_fraction_with_long_text(void) {
         }
     }
 
-    test_assert(widest > 640);
+    test_assert(widest > 0);
+    test_assert(widest <= 300);
     ecs_entity_t stack = ecs_lookup(world, "console.ui.screen.stack");
     ecs_entity_t panel = ecs_lookup(world, "console.ui.screen.stack.panel");
     test_flt(ecs_get(world, stack, LayoutBounds)->width, 320);
@@ -1018,8 +1091,7 @@ void Console_paste_long(void) {
     ecs_progress(world, 0);
     ecs_progress(world, 0);
 
-    ecs_entity_t before = ecs_lookup(world, CONSOLE_INPUT ".before");
-    test_str(ecs_get(world, before, Text)->value, paste);
+    test_str(console_before(world), paste);
     test_str(ecs_singleton_get(world, Input)->text, "");
 
     ecs_fini(world);
@@ -1049,8 +1121,7 @@ void Console_null_text(void) {
         ecs_progress(world, 0);
     }
 
-    ecs_entity_t before = ecs_lookup(world, CONSOLE_INPUT ".before");
-    test_str(ecs_get(world, before, Text)->value, "ab");
+    test_str(console_before(world), "ab");
 
     ecs_fini(world);
 }
@@ -1073,9 +1144,7 @@ void Console_cursor_ill_formed(void) {
 
     ecs_singleton_set(world, Input, { .text = "a\x80\x80\xE2\x82" "b", .focused = true });
     ecs_progress(world, 0);
-    ecs_entity_t before = ecs_lookup(world, CONSOLE_INPUT ".before");
-    ecs_entity_t after = ecs_lookup(world, CONSOLE_INPUT ".after");
-    test_str(ecs_get(world, before, Text)->value, "a\x80\x80\xE2\x82" "b");
+    test_str(console_before(world), "a\x80\x80\xE2\x82" "b");
 
     const char *expect[5] = { "a\x80\x80\xE2\x82", "a\x80\x80", "a\x80", "a", "" };
     for (int32_t i = 0; i < 5; i ++) {
@@ -1084,7 +1153,7 @@ void Console_cursor_ill_formed(void) {
             ecs_progress(world, 0);
         }
 
-        test_str(ecs_get(world, before, Text)->value, expect[i]);
+        test_str(console_before(world), expect[i]);
     }
 
     box_input_key_press(world, KeyRight, 1);
@@ -1094,18 +1163,35 @@ void Console_cursor_ill_formed(void) {
         ecs_progress(world, 0);
     }
 
-    test_str(ecs_get(world, before, Text)->value, "a\x80");
-    test_str(ecs_get(world, after, Text)->value, "\xE2\x82" "b");
+    test_str(console_before(world), "a\x80");
+    test_str(console_after(world), "\xE2\x82" "b");
 
     box_input_key_press(world, KeyBackspace, 1);
     while (box_input_pending(world)) {
         ecs_progress(world, 0);
     }
 
-    test_str(ecs_get(world, before, Text)->value, "a");
-    test_str(ecs_get(world, after, Text)->value, "\xE2\x82" "b");
+    test_str(console_before(world), "a");
+    test_str(console_after(world), "\xE2\x82" "b");
 
     ecs_fini(world);
+}
+
+/** Get the x of the caret after the last character of a Text, from the left of its block.
+ *
+ * @param world The world
+ * @param e The entity with the Text
+ * @return The x
+ */
+static float console_ref_end(
+    ecs_world_t *world,
+    ecs_entity_t e)
+{
+    TextCaret caret;
+    const Text *t = ecs_get(world, e, Text);
+    test_assert(box_text_caret(world, e, (int32_t)strlen(t->value), &caret));
+
+    return caret.x + ecs_get(world, e, TextBounds)->width * 0.5f;
 }
 
 void Console_caret_steps_match_glyphs(void) {
@@ -1124,10 +1210,9 @@ void Console_caret_steps_match_glyphs(void) {
         ecs_progress(world, 0);
     }
 
-    ecs_entity_t before = ecs_lookup(world, CONSOLE_INPUT ".before");
-    const Text *look = ecs_get(world, before, Text);
-    const char *glyphs[4] = { "", "\xEF\xBF\xBD", "\xEF\xBF\xBD\xEF\xBF\xBD",
-        "\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD" };
+    const Text *look = ecs_get(world, ecs_lookup(world, CONSOLE_INPUT ".line"), Text);
+    const char *glyphs[4] = { "> ", "> \xEF\xBF\xBD", "> \xEF\xBF\xBD\xEF\xBF\xBD",
+        "> \xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD" };
     ecs_entity_t refs[4];
     int32_t i;
     for (i = 0; i < 4; i ++) {
@@ -1138,16 +1223,14 @@ void Console_caret_steps_match_glyphs(void) {
 
     ecs_singleton_set(world, Input, { .text = "\xC0\xAF\xE2\x82", .focused = true });
     ecs_progress(world, 0);
-    test_flt(ecs_get(world, before, TextBounds)->width,
-        ecs_get(world, refs[3], TextBounds)->width);
+    test_flt(console_cursor_x(world), console_ref_end(world, refs[3]));
     for (i = 2; i >= 0; i --) {
         box_input_key_press(world, KeyLeft, 1);
         while (box_input_pending(world)) {
             ecs_progress(world, 0);
         }
 
-        test_flt(ecs_get(world, before, TextBounds)->width,
-            ecs_get(world, refs[i], TextBounds)->width);
+        test_flt(console_cursor_x(world), console_ref_end(world, refs[i]));
     }
 
     ecs_fini(world);
@@ -1189,7 +1272,7 @@ static ecs_world_t* console_paste_world(
 static const char* console_paste_line(
     ecs_world_t *world)
 {
-    return ecs_get(world, ecs_lookup(world, CONSOLE_INPUT ".before"), Text)->value;
+    return console_before(world);
 }
 
 void Console_paste_shortcut(void) {
@@ -1384,7 +1467,7 @@ void Console_ctrl_l_clears_keeps_input(void) {
     test_assert(console_cls_lines(world, &shown) > 0);
     test_int(shown, 0);
     test_str(console_paste_line(world), "ab");
-    test_str(ecs_get(world, ecs_lookup(world, CONSOLE_INPUT ".after"), Text)->value, "c");
+    test_str(console_after(world), "c");
     test_bool(ecs_singleton_get(world, Console)->open, true);
 
     ecs_os_free(box_console_run(world, "ls things", NULL));
