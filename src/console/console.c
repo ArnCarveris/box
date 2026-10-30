@@ -18,13 +18,8 @@ ECS_COMPONENT_DECLARE(ConsoleHost);
 #define BOX_CONSOLE_DEFAULT_HEIGHT (720.0f)
 
 /** Construct Console values: closed, the left half of the surface, light text on a dark panel,
-<<<<<<< HEAD
- * command lines colored in light tones, unknown names and extra arguments in the error color,
- * output in colors close to the dark theme of the flecs explorer.
-=======
  * command lines colored in light tones, unknown names and extra arguments in the error color, the
- * scope of the prompt in teal, its $ in grey and the suggestion of the history dimmed.
->>>>>>> 816d88441d159d7df3215ee7b1f1f6a2d512c8dd
+ * prompt in teal and grey, the history suggestion dimmed, output in explorer dark theme colors.
  *
  * @param ptr The components
  * @param count Number of components
@@ -61,8 +56,10 @@ static void box_console_ctor(
                 .string = {235, 210, 140},
                 .boolean = {255, 150, 200},
                 .value = {140, 225, 225},
-<<<<<<< HEAD
-                .extra = {255, 110, 100}
+                .extra = {255, 110, 100},
+                .scope = {80, 200, 200},
+                .symbol = {150, 160, 180},
+                .ghost = {95, 105, 125}
             },
             .output = {
                 .dim = {125, 133, 150},
@@ -89,12 +86,6 @@ static void box_console_ctor(
                 .cyan = {57, 197, 207},
                 .white = {240, 246, 252},
                 .grey = {139, 148, 158}
-=======
-                .extra = {255, 110, 100},
-                .scope = {80, 200, 200},
-                .symbol = {150, 160, 180},
-                .ghost = {95, 105, 125}
->>>>>>> 816d88441d159d7df3215ee7b1f1f6a2d512c8dd
             }
         };
     }

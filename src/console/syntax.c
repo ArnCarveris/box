@@ -267,11 +267,7 @@ static void box_console_syntax_value(
     }
 }
 
-<<<<<<< HEAD
-ecs_entity_t box_console_syntax_scope(
-=======
 ecs_entity_t box_console_session_scope(
->>>>>>> 816d88441d159d7df3215ee7b1f1f6a2d512c8dd
     const ecs_world_t *world,
     const box_console_t *con)
 {

@@ -630,15 +630,10 @@ char* box_console_exec(
     int32_t len, topic_len, skip, args;
     const box_console_command_t *cmd, *help_cmd = NULL;
     bool failed = false, help, help_group;
-<<<<<<< HEAD
-    char *result = NULL;
-    box_console_out_t out;
-    ecs_vec_t spans;
-    box_console_out_init(&out);
-=======
     char *result = NULL, *prompt;
+    box_console_out_t out;
     ecs_vec_t spans, prompt_spans;
->>>>>>> 816d88441d159d7df3215ee7b1f1f6a2d512c8dd
+    box_console_out_init(&out);
     ecs_vec_init_t(NULL, &spans, box_console_span_t, 0);
     ecs_vec_init_t(NULL, &prompt_spans, box_console_span_t, 0);
     box_console_syntax(world, con, line, &spans);

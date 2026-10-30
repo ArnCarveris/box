@@ -155,7 +155,9 @@ static rgb box_console_syntax_color(
     case BoxSyntaxBoolean: result = c->boolean; break;
     case BoxSyntaxValue: result = c->value; break;
     case BoxSyntaxExtra: result = c->extra; break;
-<<<<<<< HEAD
+    case BoxSyntaxScope: result = c->scope; break;
+    case BoxSyntaxSymbol: result = c->symbol; break;
+    case BoxSyntaxGhost: result = c->ghost; break;
     case BoxOutputText: result = console->text; break;
     case BoxOutputError: result = console->error; break;
     case BoxOutputDim: result = o->dim; break;
@@ -183,11 +185,6 @@ static rgb box_console_syntax_color(
     case BoxOutputWhite: result = o->white; break;
     case BoxOutputGrey: result = o->grey; break;
     case BoxSpanNone: break;
-=======
-    case BoxSyntaxScope: result = c->scope; break;
-    case BoxSyntaxSymbol: result = c->symbol; break;
-    case BoxSyntaxGhost: result = c->ghost; break;
->>>>>>> 816d88441d159d7df3215ee7b1f1f6a2d512c8dd
     }
 
     return result;

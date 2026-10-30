@@ -1331,7 +1331,7 @@ void box_console_out_run(
     box_console_fmt_t fmt = {
         .world = world,
         .out = out,
-        .scope = box_console_syntax_scope(world, con),
+        .scope = box_console_session_scope(world, con),
         .command = command,
         .pattern = pattern
     };

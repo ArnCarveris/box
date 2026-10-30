@@ -48,7 +48,9 @@ typedef enum box_console_syntax_t {
     BoxSyntaxBoolean,   /**< Bool argument or true or false in a value expression */
     BoxSyntaxValue,     /**< Value expression in brackets */
     BoxSyntaxExtra,     /**< Argument beyond the parameters of the command */
-<<<<<<< HEAD
+    BoxSyntaxScope,     /**< Scope of the session in the prompt */
+    BoxSyntaxSymbol,    /**< The $ of the prompt */
+    BoxSyntaxGhost,     /**< Suggested rest of the input line from the history */
     BoxOutputText,      /**< Output in Console.text, the message of an error */
     BoxOutputError,     /**< The error: label of an error, Console.error */
     BoxOutputDim,       /**< Parent part of a path, tree guides, line numbers, error details */
@@ -76,11 +78,6 @@ typedef enum box_console_syntax_t {
     BoxOutputWhite,     /**< ANSI white */
     BoxOutputGrey,      /**< ANSI grey */
     BoxSpanNone         /**< No color of its own, never stored in a span */
-=======
-    BoxSyntaxScope,     /**< Scope of the session in the prompt */
-    BoxSyntaxSymbol,    /**< The $ of the prompt */
-    BoxSyntaxGhost      /**< Suggested rest of the input line from the history */
->>>>>>> 816d88441d159d7df3215ee7b1f1f6a2d512c8dd
 } box_console_syntax_t;
 
 /** A colored byte range of a command line or of output */
@@ -94,13 +91,9 @@ typedef struct box_console_span_t {
 typedef struct box_console_line_t {
     char *text;                 /**< The line without its newline */
     box_console_kind_t kind;    /**< What the line shows */
-<<<<<<< HEAD
-    ecs_vec_t spans;            /**< box_console_span_t of the line, in bytes of text */
-=======
     ecs_vec_t spans;            /**< box_console_span_t of a line that ran, in bytes of text */
     int32_t hang;               /**< Byte its wrapped rows start under: the end of the prompt of
                                  *   a line that ran, the end of the indentation of others */
->>>>>>> 816d88441d159d7df3215ee7b1f1f6a2d512c8dd
     int32_t rows;               /**< Rows the line wraps to at box_console_t.wrap, 0 until
                                  *   measured */
 } box_console_line_t;
@@ -241,12 +234,43 @@ void box_console_syntax(
  *
  * @param world The world
  * @param con The console state
-<<<<<<< HEAD
- * @return The scope, 0 for the root or while there is no session
+ * @return The scope, 0 for the root or before the session exists
  */
-ecs_entity_t box_console_syntax_scope(
+ecs_entity_t box_console_session_scope(
     const ecs_world_t *world,
     const box_console_t *con);
+
+/** Get the prompt of the console session: its scope, ~ at the root, and $.
+ *
+ * @param world The world
+ * @param con The console state
+ * @param spans Receives the box_console_span_t of the scope and the $, NULL to ignore
+ * @return The prompt, which the caller frees
+ */
+char* box_console_prompt(
+    const ecs_world_t *world,
+    const box_console_t *con,
+    ecs_vec_t *spans);
+
+/** Get the suggestion of the history for the input line: the rest of the newest line that ran
+ * that starts with the input and is longer, while the cursor is at the end of a line that is
+ * not empty and the history is not being walked.
+ *
+ * @param con The console state
+ * @return The rest of the history line, NULL for no suggestion
+ */
+const char* box_console_ghost(
+    const box_console_t *con);
+
+/** Add the hint line in front of the scrollback, the first time only, and drop the oldest lines
+ * while the scrollback has more rows than the console keeps.
+ *
+ * @param world The world
+ * @param con The console state
+ */
+void box_console_greet(
+    ecs_world_t *world,
+    box_console_t *con);
 
 /** Find the command of a name as the shell does: the first function with that name in the
  * scopes of EcsScriptShell.command_paths.
@@ -372,45 +396,6 @@ void box_console_out_run(
     const char *line,
     box_console_out_t *out,
     bool *error);
-=======
- * @return The scope, 0 for the root or before the session exists
- */
-ecs_entity_t box_console_session_scope(
-    const ecs_world_t *world,
-    const box_console_t *con);
-
-/** Get the prompt of the console session: its scope, ~ at the root, and $.
- *
- * @param world The world
- * @param con The console state
- * @param spans Receives the box_console_span_t of the scope and the $, NULL to ignore
- * @return The prompt, which the caller frees
- */
-char* box_console_prompt(
-    const ecs_world_t *world,
-    const box_console_t *con,
-    ecs_vec_t *spans);
-
-/** Get the suggestion of the history for the input line: the rest of the newest line that ran
- * that starts with the input and is longer, while the cursor is at the end of a line that is
- * not empty and the history is not being walked.
- *
- * @param con The console state
- * @return The rest of the history line, NULL for no suggestion
- */
-const char* box_console_ghost(
-    const box_console_t *con);
-
-/** Add the hint line in front of the scrollback, the first time only, and drop the oldest lines
- * while the scrollback has more rows than the console keeps.
- *
- * @param world The world
- * @param con The console state
- */
-void box_console_greet(
-    ecs_world_t *world,
-    box_console_t *con);
->>>>>>> 816d88441d159d7df3215ee7b1f1f6a2d512c8dd
 
 /** Empty the scrollback and reset the scroll position, keeping the input line and history.
  *

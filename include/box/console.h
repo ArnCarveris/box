@@ -6,17 +6,9 @@
  * scene, drawn by its own view after every other view (BOX_VIEW_ORDER_CONSOLE), and takes the
  * keyboard while open. The first time it opens, a hint line starts the scrollback.
  *
-<<<<<<< HEAD
- * The console runs cls itself, so it never reaches the session: cls empties the scrollback and
- * Ctrl+L does the same without touching the input line. help in the console lists cls too.
- * Command lines are colored in the console only (ConsoleSyntax), never in sessions or logs.
- * Output is colored by the type of the result of the command (ConsoleOutput), like the terminal
- * of the flecs explorer, while box_command_run and HTTP sessions keep returning plain text.
-=======
- * The prompt is bash-like, the scope of the session (~ at the root) and $, and every line that ran
- * keeps its prompt. The console runs cls itself, help lists it too. Command lines are colored in
- * the console only (ConsoleSyntax), never in sessions or logs.
->>>>>>> 816d88441d159d7df3215ee7b1f1f6a2d512c8dd
+ * The prompt is the session scope (~ at the root) and $, and every line that ran keeps it. The
+ * console runs cls itself. Command lines (ConsoleSyntax) and output by result type (ConsoleOutput)
+ * are colored in the console only, never in sessions, logs or box_command_run.
  */
 
 #ifndef BOX_CONSOLE_H
@@ -75,12 +67,11 @@ ECS_STRUCT(ConsoleSyntax, {
 
 /** Colors of the output of commands in the console, as Console.output.
  *
- * The console shows the result of a command by its type, like the terminal of the flecs
- * explorer: entity paths relative to the scope of the session with the parent part dimmed, tree
- * guides, query rows, grouped help, entity info, documentation, grep matches, script lines with
- * script syntax colors, diffs and values as JSON. Errors start with "error: " in Console.error,
- * the further lines of an error are dimmed. ANSI color codes in output become the ANSI colors.
- * Text without a color of its own is Console.text.
+ * The console shows the result of a command by its type, like the flecs explorer terminal:
+ * entity paths, trees, query rows, help, entity info, docs, grep matches, scripts, diffs, values.
+ *
+ * Errors start with "error: " in Console.error, the further lines of an error are dimmed. ANSI
+ * color codes in output become the ANSI colors. Text without a color of its own is Console.text.
  */
 ECS_STRUCT(ConsoleOutput, {
     rgb dim;        /**< Parent part of paths, tree guides, line numbers, error details */
@@ -150,9 +141,10 @@ void BoxConsoleImport(
 /** Run a line in the console as if it was typed and entered.
  *
  * The line and its output are added to the scrollback and the input history, cls empties the
- * scrollback and returns an empty output. The output is the text the console shows, which for
- * structured results (trees, query rows, entity info, ...) is laid out for reading and differs
- * from the text of box_command_run. box.console.run(line) does the same in a script.
+ * scrollback. box.console.run(line) does the same in a script.
+ *
+ * The output is the text the console shows, which for structured results (trees, query rows,
+ * entity info, ...) is laid out for reading and differs from the text of box_command_run.
  *
  * @param world The world
  * @param line The command line
