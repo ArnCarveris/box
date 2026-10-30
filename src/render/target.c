@@ -139,7 +139,8 @@ static WGPUTextureFormat box_gpu_canvas_srgb(
 /** Create the surface of the page canvas and pick its format.
  *
  * Canvases only take formats without sRGB encoding, so the canvas is configured with the
- * preferred format and the views render into an sRGB view of its image.
+ * preferred format and the views render into an sRGB view of its image, which is also a copy
+ * source where the browser allows it, for the opaque snapshot of transmission.
  *
  * @param gpu The backend
  * @param t The target
@@ -161,6 +162,8 @@ static void box_gpu_canvas_surface(
         if (caps.formatCount) {
             t->format = box_gpu_canvas_srgb(caps.formats[0]);
         }
+
+        t->usage |= caps.usages & WGPUTextureUsage_CopySrc;
 
         wgpuSurfaceCapabilitiesFreeMembers(caps);
     }
@@ -483,6 +486,7 @@ static void box_gpu_target_free(
     box_gpu_target_t *t)
 {
     box_gpu_target_release(gpu, t);
+    box_gpu_transmission_release(t);
     box_gpu_capture_fini(t);
     if (t->surface) {
         wgpuSurfaceUnconfigure(t->surface);
@@ -670,7 +674,7 @@ static void box_gpu_target_scene_draw(
     WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
     WGPUCommandBuffer commands;
     box_gpu_clear(encoder, t->scene_view, frame->clear);
-    box_gpu_draw_views(gpu, t, packet, frame, encoder, t->scene_view);
+    box_gpu_draw_views(gpu, t, packet, frame, encoder, t->scene_view, t->scene);
     commands = wgpuCommandEncoderFinish(encoder, NULL);
     wgpuQueueSubmit(gpu->queue, 1, &commands);
     wgpuCommandBufferRelease(commands);
@@ -701,7 +705,7 @@ void box_gpu_target_render(
         box_gpu_blit(gpu, t, encoder, view);
     } else {
         box_gpu_clear(encoder, view, frame->clear);
-        box_gpu_draw_views(gpu, t, packet, frame, encoder, view);
+        box_gpu_draw_views(gpu, t, packet, frame, encoder, view, texture);
     }
 
     if (box_gpu_target_captures(frame)) {

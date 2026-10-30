@@ -145,6 +145,18 @@ ECS_STRUCT(FileWatchStatus, {
     char *last;         /**< The file that changed last, NULL before the first change */
 });
 
+/** Sets the other components of its entity on entity at the start of the frame after
+ * AppStatus.frame reached frame, then deletes its entity. With it a scene changes itself at a
+ * known frame, as the visual scenes of transitions do. SetAt adds Disabled to its entity.
+ *
+ * Not copied: pairs, tags, SetAt and a component that another adds with With while it holds its
+ * constructed value (MaterialId, or a Position of zeros next to a Rotation or Scale).
+ */
+ECS_STRUCT(SetAt, {
+    int32_t frame;          /**< Frames completed (AppStatus.frame) before the values are set */
+    ecs_entity_t entity;    /**< Entity that receives the values */
+});
+
 /** Register the box.app module.
  *
  * @param world The world

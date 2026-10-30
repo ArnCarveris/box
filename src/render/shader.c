@@ -445,7 +445,8 @@ static void box_shader_changed(
  * may process environments, or it builds atmosphere LUTs and the packet has an atmosphere, or
  * it converts environment images or draws environment backgrounds and the packet carries an
  * image or a view with a background, or it simulates or draws particles
- * and the packet has a particle pool
+ * and the packet has a particle pool, or it blurs the opaque snapshot and a batch is
+ * transmissive
  */
 static bool box_shader_used(
     const box_render_packet_t *p,
@@ -483,8 +484,10 @@ static bool box_shader_used(
     }
 
     for (i = 0; i < ecs_vec_count(&p->batches); i ++) {
-        uint32_t used = ecs_vec_get_t(&p->batches, box_render_batch_t, i)->pipeline;
-        if (used == pipeline || used == also) {
+        const box_render_batch_t *b = ecs_vec_get_t(&p->batches, box_render_batch_t, i);
+        if (b->pipeline == pipeline || b->pipeline == also ||
+            (handle == BOX_RENDER_SHADER_TRANSMISSION && b->transmissive))
+        {
             result = true;
             break;
         }
@@ -793,4 +796,6 @@ void BoxShaderImport(
         BOX_RENDER_SHADER_PARTICLE_SIM, true);
     box_shader_builtin(world, state, builtin, "particle_draw",
         "etc/shaders/particle_draw.wgsl", BOX_RENDER_SHADER_PARTICLE_DRAW, true);
+    box_shader_builtin(world, state, builtin, "transmission", "etc/shaders/transmission.wgsl",
+        BOX_RENDER_SHADER_TRANSMISSION, true);
 }

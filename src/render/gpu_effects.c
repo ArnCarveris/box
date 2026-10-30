@@ -1526,8 +1526,15 @@ static box_gpu_fx_target_t* box_gpu_fx_target(
     result->width = t->desc.render_width;
     result->height = t->desc.render_height;
     for (i = 0; i < 2; i ++) {
-        result->hdr[i] = box_gpu_fx_texture(gpu, (uint32_t)result->width,
-            (uint32_t)result->height, BOX_GPU_HDR_FORMAT, 1);
+        result->hdr[i] = wgpuDeviceCreateTexture(gpu->device, &(WGPUTextureDescriptor){
+            .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding |
+                WGPUTextureUsage_CopySrc,
+            .dimension = WGPUTextureDimension_2D,
+            .size = { (uint32_t)result->width, (uint32_t)result->height, 1 },
+            .format = BOX_GPU_HDR_FORMAT,
+            .mipLevelCount = 1,
+            .sampleCount = 1
+        });
         result->hdr_views[i] = wgpuTextureCreateView(result->hdr[i], NULL);
     }
 
@@ -1554,6 +1561,14 @@ WGPUTextureView box_gpu_effects_begin(
     result = fx->current->hdr_views[0];
 done:
     return result;
+}
+
+WGPUTexture box_gpu_effects_image(
+    box_gpu_t *gpu)
+{
+    box_gpu_effects_t *fx = gpu->effects;
+
+    return fx && fx->current ? fx->current->hdr[0] : NULL;
 }
 
 /** Record one effect pass of a chain.

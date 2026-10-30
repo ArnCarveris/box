@@ -747,7 +747,8 @@ void box_bake_lights(
 }
 
 /** Register the observers of the changes of static shapes that rebake the probes near them,
- * AlphaCutoff also when it is added, as its holes change what the captures see.
+ * AlphaCutoff and Transmission also when they are added, as its holes change what the captures
+ * see and a transmissive shape leaves them.
  *
  * The terms take the default source, so the change of a material component of a prefab
  * reaches the instances that inherit it.
@@ -763,6 +764,7 @@ void box_bake_observers(
         ecs_id(Rgb), ecs_id(Emissive), ecs_id(PbrMaterial), ecs_id(BlendMode),
         ecs_id(BackFaceMode), ecs_id(TextureWrap), ecs_id(TextureTransform), ecs_id(ShapeMesh)
     };
+    ecs_entity_t added[2] = { ecs_id(AlphaCutoff), ecs_id(Transmission) };
     ecs_entity_t trees[2] = { ecs_id(Tint), ecs_id(Opacity) };
     ecs_entity_t flags[2] = { ManualTransform, NoBake };
     int32_t i;
@@ -784,12 +786,14 @@ void box_bake_observers(
         });
     }
 
-    ecs_observer(world, {
-        .query.terms = {{ .id = ecs_id(AlphaCutoff) }},
-        .events = { EcsOnAdd, EcsOnSet, EcsOnRemove },
-        .callback = BakeOnChange,
-        .ctx = b
-    });
+    for (i = 0; i < 2; i ++) {
+        ecs_observer(world, {
+            .query.terms = {{ .id = added[i] }},
+            .events = { EcsOnAdd, EcsOnSet, EcsOnRemove },
+            .callback = BakeOnChange,
+            .ctx = b
+        });
+    }
 
     box_transform_on_dynamic(world, BakeOnChange, b, NULL);
     for (i = 0; i < 2; i ++) {

@@ -1,0 +1,65 @@
+// flecs-engine's transmissive.flecs: 8 x 8 glass spheres over a grid of metal tiles, rougher to
+// the left (+X, roughness x / 8) and refracting more toward the back (ior 1 + y / 10), each 2 units
+// thick with a blue attenuation over 2 units. The camera looks at what flecs-engine's LookAt
+// {-1.909, 6.432, -19.5} gives; box adds a sun and a sky where flecs-engine has its own light.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.atmosphere
+
+camera {
+  Position: {-1.914, 7.035, -20.393}
+  Rotation: {-0.5937, 3.1472, 0}
+  Camera: {fov: 60, far_: 0}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {0, 0, 0, 255}}}
+}
+
+// flecs-engine's light at Position3 {1, 1, 1}: from 35 degrees above the horizon, travelling
+// along -(1, 1, 1)
+sun {
+  Rotation: {0.6155, -2.3562, 0}
+  DirectionalLight: {intensity: 3 * flecs.script.math.PI}
+  Rgb: {255, 255, 255}
+}
+
+$ {
+  Atmosphere: {units_per_km: 1000, sun: sun}
+}
+
+ground {
+  Rotation: {-flecs.script.math.PI / 2, 0, 0}
+  Quad: {100, 100}
+  Rgb: {50, 50, 50}
+}
+
+for x in 0..8 {
+  for y in 0..8 {
+    {
+      Position: {x * 4 - 16, 1.5, y * 4 - 16 + 1}
+      IcoSphere: {segments: 1 + 2 * ((x + y) % 2), smooth: (x + y) % 2 == 1, radius: 1}
+      Rgb: {250, 230, 180}
+      PbrMaterial: {roughness: x / 8.0}
+      Transmission: {transmission_factor: 0.9, ior: 1.0 + y / 10.0, thickness_factor: 2,
+        attenuation_distance: 2, attenuation_color: {75, 200, 255}}
+    }
+  }
+}
+
+grid {
+  for x in 0..20 {
+    for y in 0..20 {
+      {
+        Position: {x * 2 - 20, 0.15, y * 2 - 20}
+        Box: {1, 0.3, 1}
+        Rgb: {0, 2 * x + 15, 2 * y + 15}
+        PbrMaterial: {metallic: 1, roughness: 0.2}
+      }
+    }
+  }
+}

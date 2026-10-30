@@ -120,6 +120,9 @@ typedef struct box_draw_key_t {
     uint32_t pipeline;      /**< Shader handle of the pipeline */
     uint8_t blend;          /**< Resolved BlendMode, Opaque unless the shape blends */
     bool cutout;            /**< A 3D shape with AlphaCutoff, alpha tested */
+    bool transmissive;      /**< A 3D shape that has or inherits Transmission: blend is
+                             *   AlphaBlend, so it draws in the sorted blended pass, cutout and
+                             *   shadow are false */
     uint8_t back_face;      /**< BackFaceMode */
     uint8_t wrap;           /**< TextureWrap of the texture samplers */
     bool dynamic_transform; /**< The shapes have DynamicTransform, owned or inherited, or are
@@ -158,6 +161,7 @@ typedef struct box_draw_material_t {
     const PbrMaterial *pbr;     /**< Metallic and roughness */
     const Emissive *emissive;   /**< Emitted light */
     const TextureTransform *uv; /**< Scale and offset of the texture coordinates */
+    const Transmission *transmission; /**< Light passing through a 3D shape */
     const Tint *tint;           /**< Tint of the shape itself, applied after the inherited */
     const box_draw_tint_t *inherited; /**< Composed tints of the ancestors, NULL for none */
     const Shape2D *shape2d;     /**< Resolved 2D shape, NULL for a 3D shape */
@@ -193,6 +197,8 @@ typedef struct box_draw_transition_material_t {
     PbrMaterial pbr;        /**< PbrMaterial */
     Emissive emissive;      /**< Emissive */
     TextureTransform uv;    /**< TextureTransform */
+    bool transmissive;      /**< The material has Transmission, which does not transition */
+    Transmission transmission; /**< Transmission, when transmissive */
     Opacity opacity;        /**< Opacity of the shape itself */
     Tint tint;              /**< Tint of the shape itself */
     box_draw_tint_t inherited; /**< Tints of the ancestors, when tinted */
@@ -585,9 +591,9 @@ void box_draws_material(
 
 /** Pack the material components of the owner of a slot into its record of the material table.
  *
- * The record holds the display encoded base color (the default color without Rgb), metallic and
- * roughness, the linear emission times its strength, the texture transform and the AlphaCutoff
- * (0 without one), clamped as the shading was. Opacity, tints and the 2D shape are not in it.
+ * The record holds the display encoded base color (the default color without Rgb), metallic,
+ * roughness, emission, texture transform and AlphaCutoff (0 without one) clamped as the shading
+ * was, and the Transmission (factor 0 without one). Opacity, tints and the 2D shape are not.
  *
  * @param out The record
  * @param material Material components of the owner

@@ -1,6 +1,6 @@
 /**
  * @file box/material.h
- * @brief Material components: color, opacity, tint, PBR parameters and emission.
+ * @brief Material components: color, opacity, tint, PBR parameters, emission and transmission.
  *
  * The box.material module resolves tints through the hierarchy and registers
  * the material layers a scene applies on top of the sampled surface.
@@ -24,9 +24,9 @@ extern "C" {
 /** Slot of the material table a shape renders with, set by the engine and read only for
  * applications, inherited by instances.
  *
- * Rgb, PbrMaterial, Emissive, TextureTransform and AlphaCutoff bring it along, so the owner of a
- * material component owns a MaterialId. A prefab that owns one gets a slot its instances share, a
- * 3D shape that owns one a slot of its own, composed of what it owns and what it still inherits.
+ * Rgb, PbrMaterial, Emissive, Transmission, TextureTransform and AlphaCutoff bring it along. A
+ * prefab that owns one gets a slot its instances share, a 3D shape that owns one a slot of its
+ * own, composed of what it owns and what it still inherits.
  *
  * Slot 0 is the default material, of a shape without any material component. An owned id that
  * was never handed a slot (a light, a 2D shape, a text) is UINT32_MAX.
@@ -54,7 +54,7 @@ ECS_STRUCT(Rgb, {
  *
  * A shape whose resulting alpha is under 1 is drawn by the sorted blended pass and casts no
  * shadow; at 1 it stays in its opaque batch. A shape with AlphaCutoff tests the alpha against
- * its cutoff in the opaque pass instead.
+ * its cutoff in the opaque pass instead. A shape with Transmission ignores it.
  */
 ECS_STRUCT(Opacity, {
     float value; /**< Opacity */
@@ -72,8 +72,8 @@ ECS_STRUCT(Opacity, {
  * 0..1, it is discarded; otherwise it is written as opaque.
  *
  * With an Opaque or missing BlendMode it draws in the opaque pass whatever its Opacity, with its
- * holes in depth, shadows, probe and reflection captures and BackFacePlain back faces. Otherwise
- * it stays in the sorted blended pass, casts no shadow and the cutoff discards there as well.
+ * holes in depth, shadows, captures and BackFacePlain back faces; otherwise it discards in the
+ * sorted blended pass and casts no shadow. A shape with Transmission ignores it.
  */
 ECS_STRUCT(AlphaCutoff, {
     float value; /**< Alpha below which a fragment is discarded */
@@ -116,7 +116,37 @@ ECS_STRUCT(Emissive, {
     Rgb color;      /**< Emission color */
 });
 
-/** Equation the fragments of a material are combined with, default Opaque */
+/** Index of refraction of a constructed Transmission and of a surface without one */
+#define BOX_MATERIAL_IOR (1.5f)
+
+/** Attenuation distance of a constructed Transmission and of a surface without one: light is
+ * not absorbed */
+#define BOX_MATERIAL_ATTENUATION_DISTANCE (1e10f)
+
+/** Light passing through a 3D shape (glass), inherited by instances like Rgb, default factor 0,
+ * ior 1.5, thickness 0, attenuation distance 1e10 and a white attenuation color; a field a scene
+ * does not set keeps its default.
+ *
+ * A shape with it, whatever its factor, draws in the sorted blended pass, back to front with the
+ * alpha blended and additive shapes, without blending or depth writes. It casts no shadow, is not
+ * in the probe, reflection or bake captures and ignores Opacity, BlendMode and AlphaCutoff.
+ *
+ * It shows the image of its view before the blended pass (no blended or transmissive shapes)
+ * where the ray refracted by ior leaves thickness_factor times the scale, blurred by roughness,
+ * absorbed toward attenuation_color and tinted by Rgb, with its own specular light on top.
+ */
+ECS_STRUCT(Transmission, {
+    float transmission_factor;  /**< 0 opaque to 1 fully transmissive */
+    float ior;                  /**< Index of refraction */
+    float thickness_factor;     /**< World units a ray travels through the volume, times the
+                                 *   scale */
+    float attenuation_distance; /**< Distance at which light has the attenuation color */
+    Rgb attenuation_color;      /**< Color of the light after attenuation_distance, display
+                                 *   encoded */
+});
+
+/** Equation the fragments of a material are combined with, default Opaque. A shape with
+ * Transmission ignores it. */
 ECS_ENUM(BlendMode, {
     Opaque = 0,             /**< No blending, the fragment replaces the target */
     AlphaBlend = 1,         /**< Source over, the fragment is weighted by its alpha */

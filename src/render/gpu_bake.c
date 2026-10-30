@@ -918,7 +918,7 @@ static void box_gpu_bake_bundles(
 
     box_gpu_bake_hold(s, true);
     s->faces_group = box_gpu_light_group_with(gpu, NULL, rv, b->uniforms, b->clusters, shadow,
-        NULL);
+        NULL, NULL);
     s->bundles = ecs_os_calloc_n(WGPURenderBundle, count);
     s->bundle_count = count;
     for (i = 0; i < count; i ++) {

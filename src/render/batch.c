@@ -32,7 +32,7 @@ static const uint8_t box_draws_image_color[3] = { 255, 255, 255 };
 _Static_assert(sizeof(box_render_transform_t) == 48, "InstanceTransform of instance.wgsl");
 _Static_assert(sizeof(box_render_shading_t) == 80, "Shape2DShading of shape2d.wgsl");
 _Static_assert(sizeof(box_render_mesh_shading_t) == 16, "MeshShading of instance.wgsl");
-_Static_assert(sizeof(box_render_material_t) == 48, "Material of material.wgsl");
+_Static_assert(sizeof(box_render_material_t) == 64, "Material of material.wgsl");
 
 /** Bytes of the header of a scatter segment */
 #define BOX_DRAWS_HEADER ((uint32_t)(BOX_RENDER_SCATTER_HEADER * sizeof(uint32_t)))
@@ -131,8 +131,8 @@ static uint64_t box_draws_hash(
     h ^= ((uint64_t)key->mesh + 0x632BE59BD9B4E019ull) * 0xC2B2AE3D27D4EB4Full;
     h ^= (((uint64_t)key->pipeline * 2 + key->dynamic_transform) * 2 + key->dynamic_material) *
         0x165667B19E3779F9ull;
-    h ^= ((((uint64_t)key->blend * 2 + key->back_face) * 4 + key->wrap) * 2 + key->cutout + 1) *
-        0x27D4EB2F165667C5ull;
+    h ^= (((((uint64_t)key->blend * 2 + key->back_face) * 4 + key->wrap) * 2 + key->cutout) * 2 +
+        key->transmissive + 1) * 0x27D4EB2F165667C5ull;
     for (i = 0; i < BOX_RENDER_TEXTURE_SLOTS; i ++) {
         h = (h ^ (h >> 31)) * 0x9E3779B97F4A7C15ull + key->textures[i];
     }
@@ -155,6 +155,7 @@ static bool box_draws_key_eq(
 {
     return a->scene == b->scene && a->mesh == b->mesh && a->pipeline == b->pipeline &&
         a->blend == b->blend && a->cutout == b->cutout && a->back_face == b->back_face &&
+        a->transmissive == b->transmissive &&
         a->dynamic_transform == b->dynamic_transform &&
         a->dynamic_material == b->dynamic_material &&
         a->wrap == b->wrap && !ecs_os_memcmp(a->textures, b->textures, ECS_SIZEOF(a->textures)) &&
@@ -768,6 +769,7 @@ void box_draws_material_pack(
     const Emissive *emissive = material->emissive;
     const PbrMaterial *pbr = material->pbr;
     const TextureTransform *uv = material->uv;
+    const Transmission *transmission = material->transmission;
     const uint8_t *base = color ? &color->r : box_draws_default_color;
     float strength = emissive && emissive->strength > 0.0f ? emissive->strength : 0.0f;
     out->color = (uint32_t)base[0] | ((uint32_t)base[1] << 8) | ((uint32_t)base[2] << 16);
@@ -777,11 +779,20 @@ void box_draws_material_pack(
     out->emissive[0] = emissive ? box_draws_linear(emissive->color.r) * strength : 0.0f;
     out->emissive[1] = emissive ? box_draws_linear(emissive->color.g) * strength : 0.0f;
     out->emissive[2] = emissive ? box_draws_linear(emissive->color.b) * strength : 0.0f;
-    out->reserved = 0;
+    out->attenuation_color = transmission
+        ? (uint32_t)transmission->attenuation_color.r |
+            ((uint32_t)transmission->attenuation_color.g << 8) |
+            ((uint32_t)transmission->attenuation_color.b << 16)
+        : 0xFFFFFFu;
     out->uv[0] = uv ? uv->scale_x : 1.0f;
     out->uv[1] = uv ? uv->scale_y : 1.0f;
     out->uv[2] = uv ? uv->offset_x : 0.0f;
     out->uv[3] = uv ? uv->offset_y : 0.0f;
+    out->transmission_factor = transmission ? transmission->transmission_factor : 0.0f;
+    out->ior = transmission ? transmission->ior : BOX_MATERIAL_IOR;
+    out->thickness_factor = transmission ? transmission->thickness_factor : 0.0f;
+    out->attenuation_distance = transmission
+        ? transmission->attenuation_distance : BOX_MATERIAL_ATTENUATION_DISTANCE;
 }
 
 void box_draws_transition_target(
@@ -818,6 +829,11 @@ void box_draws_transition_target(
     if (material->uv) {
         out->present |= 1u << BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM;
         out->uv = *material->uv;
+    }
+
+    if (material->transmission) {
+        out->transmissive = true;
+        out->transmission = *material->transmission;
     }
 
     if (material->opacity) {
@@ -872,6 +888,7 @@ void box_draws_transition_encode(
             &material->emissive),
         .uv = box_draws_transition_part(material, BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM,
             &material->uv),
+        .transmission = material->transmissive ? &material->transmission : NULL,
         .tint = box_draws_transition_part(material, BOX_RENDER_TRANSITION_TINT,
             &material->tint),
         .inherited = material->tinted ? &material->inherited : NULL,
@@ -1395,6 +1412,7 @@ static void box_draws_send_batch(
     out->blend = b->key.blend;
     out->back_face = b->key.back_face;
     out->cutout = b->key.cutout;
+    out->transmissive = b->key.transmissive;
     out->shadow = b->key.shadow;
     out->bake = b->key.bake;
     out->mesh = b->key.mesh;
@@ -1506,6 +1524,7 @@ static void box_draws_send_blended(
             out->blend = b->key.blend;
             out->back_face = b->key.back_face;
             out->cutout = b->key.cutout;
+            out->transmissive = b->key.transmissive;
             out->shadow = b->key.shadow;
             out->mesh = b->key.mesh;
             box_draws_batch_textures(d, b, out);
@@ -1683,7 +1702,7 @@ static const void* box_draws_at(
  * shape writes its whole material.
  *
  * A shape whose resolved blend mode or alpha test no longer matches its batch is queued to
- * move.
+ * move, unless it is transmissive, which ignores both.
  *
  * @param it The query result
  * @param d The state
@@ -1763,7 +1782,7 @@ static void box_draws_fill_material(
 
         bool cutout = box_draws_cutout(material.cutoff, material.shape2d);
         uint8_t blend = box_draws_blend(box_draws_at(modes, mode_step, i), alpha, cutout);
-        if (blend != b->key.blend || cutout != b->key.cutout) {
+        if (!b->key.transmissive && (blend != b->key.blend || cutout != b->key.cutout)) {
             box_draws_mark(it->world, d, it->entities[i], BOX_DRAW_ALL);
         }
     }

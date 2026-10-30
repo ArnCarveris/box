@@ -63,6 +63,9 @@
 /** Shader handle of the engine shader of the SMAA passes */
 #define BOX_RENDER_SHADER_SMAA (49)
 
+/** Shader handle of the engine shader that blurs the opaque snapshot of transmission */
+#define BOX_RENDER_SHADER_TRANSMISSION (50)
+
 /** Cascades of the shadow map of a view at most */
 #define BOX_RENDER_SHADOW_CASCADES (4)
 
@@ -804,8 +807,14 @@ typedef struct box_render_material_t {
     float roughness;        /**< PbrMaterial.roughness, clamped to 0..1 */
     float cutoff;           /**< AlphaCutoff clamped to 0..1, 0 without one */
     float emissive[3];      /**< Linear emitted color times its strength */
-    uint32_t reserved;      /**< 0 */
+    uint32_t attenuation_color; /**< Transmission.attenuation_color, display encoded bytes:
+                             *   r | g << 8 | b << 16, white without Transmission */
     float uv[4];            /**< TextureTransform: u scale, v scale, u offset, v offset */
+    float transmission_factor; /**< Transmission.transmission_factor, 0 without one */
+    float ior;              /**< Transmission.ior, BOX_MATERIAL_IOR without one */
+    float thickness_factor; /**< Transmission.thickness_factor, 0 without one */
+    float attenuation_distance; /**< Transmission.attenuation_distance,
+                             *   BOX_MATERIAL_ATTENUATION_DISTANCE without one */
 } box_render_material_t;
 
 /** Shading of a mesh instance, the shading stream of a mesh instance page, MeshShading of
@@ -885,6 +894,9 @@ typedef struct box_render_batch_t {
     bool cutout;                /**< The pipeline alpha tests against the cutoff of the
                                  *   instances (AlphaCutoff), in the opaque pass after the
                                  *   plain opaque batches and in the shadow pass */
+    bool transmissive;          /**< The instances have Transmission: a blended draw of a view
+                                 *   whose pipeline does not blend nor write depth and samples
+                                 *   the snapshot of the opaque image of the view */
     bool shadow;                /**< The instances cast shadows, false for NoShadow */
     bool bake;                  /**< Static 3D instances without NoBake of a scene with LightBake or
                                  *   ReflectionBake, drawn by the captures */
