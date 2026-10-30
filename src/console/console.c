@@ -19,7 +19,7 @@ ECS_COMPONENT_DECLARE(ConsoleHost);
 
 /** Construct Console values: closed, the left half of the surface, light text on a dark panel,
  * command lines colored in light tones, unknown names and extra arguments in the error color, the
- * scope of the prompt in green, its $ in grey and the suggestion of the history dimmed.
+ * scope of the prompt in teal, its $ in grey and the suggestion of the history dimmed.
  *
  * @param ptr The components
  * @param count Number of components
@@ -57,7 +57,7 @@ static void box_console_ctor(
                 .boolean = {255, 150, 200},
                 .value = {140, 225, 225},
                 .extra = {255, 110, 100},
-                .scope = {120, 220, 140},
+                .scope = {80, 200, 200},
                 .symbol = {150, 160, 180},
                 .ghost = {95, 105, 125}
             }
@@ -83,6 +83,8 @@ static box_console_t* box_console_get(
  * the keys pressed with Ctrl held (the readline keys of the input line) and the wheel, and
  * release every key and button but those of the toggle so no other action fires.
  *
+ * Ctrl is read from the keys the device holds, since the console releases it from Input.keys.
+ *
  * @param it Iterator over the Input singleton
  */
 static void box_console_capture(
@@ -91,6 +93,7 @@ static void box_console_capture(
     box_console_t *con = it->ctx;
     Input *in = ecs_field(it, Input, 0);
     bool keep[BOX_KEY_COUNT] = {0};
+    const InputDevice *dev;
     int32_t i, size;
     bool ctrl;
     if (!con->shown || !it->count) {
@@ -98,7 +101,8 @@ static void box_console_capture(
     }
 
     box_input_action_keys(it->world, con->action, keep);
-    ctrl = in->keys[KeyCtrlLeft].down || in->keys[KeyCtrlRight].down;
+    dev = box_input_device(it->world);
+    ctrl = dev && (dev->held[KeyCtrlLeft] || dev->held[KeyCtrlRight]);
     for (i = KeyNone + 1; i < BOX_KEY_COUNT; i ++) {
         con->pressed[i] = con->pressed[i] || in->keys[i].pressed;
         con->chord[i] = con->chord[i] || (ctrl && in->keys[i].pressed);
@@ -243,7 +247,7 @@ static void box_console_show(
 {
     box_console_ui_build(world, con);
     box_console_view_create(world, con);
-    box_console_greet(con);
+    box_console_greet(world, con);
     con->shown = true;
     con->relayout = true;
     box_console_reset_input(con);

@@ -398,6 +398,7 @@ static void box_console_interrupt(
 }
 
 void box_console_greet(
+    ecs_world_t *world,
     box_console_t *con)
 {
     const char *hint = BOX_CONSOLE_HINT;
@@ -421,6 +422,7 @@ void box_console_greet(
         .start = (int32_t)(help - hint),
         .end = (int32_t)(help - hint) + (int32_t)strlen(BOX_CONSOLE_HINT_HELP),
         .kind = BoxSyntaxName };
+    box_console_trim(world, con);
     con->refresh = true;
 done:
     return;

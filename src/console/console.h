@@ -235,11 +235,14 @@ char* box_console_prompt(
 const char* box_console_ghost(
     const box_console_t *con);
 
-/** Add the hint line in front of the scrollback, the first time only.
+/** Add the hint line in front of the scrollback, the first time only, and drop the oldest lines
+ * while the scrollback has more rows than the console keeps.
  *
+ * @param world The world
  * @param con The console state
  */
 void box_console_greet(
+    ecs_world_t *world,
     box_console_t *con);
 
 /** Empty the scrollback and reset the scroll position, keeping the input line and history.

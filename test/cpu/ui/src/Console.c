@@ -35,7 +35,8 @@ static void console_window_resize(
 }
 
 /** Check that the panel and its scrollback lines cover the full height of the window: the
- * panel is as high as the window and the visible lines fill the log up to less than one line.
+ * panel is as high as the window and the rows of the visible lines fill the log up to less than
+ * one row.
  *
  * @param world The world
  * @param h Height of the window in points
@@ -52,7 +53,10 @@ static void console_check_covers(
     test_assert(log != 0);
     ecs_iter_t it = ecs_children(world, log);
     while (ecs_children_next(&it)) {
-        lines += it.count;
+        for (int32_t i = 0; i < it.count; i ++) {
+            int32_t rows = box_text_line(world, it.entities[i], 0, NULL, NULL);
+            lines += rows > 1 ? rows : 1;
+        }
     }
 
     float log_h = ecs_get(world, log, LayoutBounds)->height;
@@ -863,7 +867,11 @@ void Console_lines_keep_scope(void) {
     // Going back into the scope does not change the lines that ran at the root
     ecs_os_free(box_console_run(world, "cd parent", NULL));
     ecs_progress(world, 0);
-    test_assert(console_find_line(world, CONSOLE_PROMPT "pwd") == root);
+    root = console_find_line(world, CONSOLE_PROMPT "pwd");
+    test_assert(root != 0);
+    test_int(ecs_get(world, root, Text)->hang, CONSOLE_PROMPT_LEN);
+    console_check_span(world, root, 0, 1, syntax->scope);
+    test_assert(console_find_line(world, "parent $ pwd") != 0);
     test_str(console_value(world), "parent $ ");
 
     ecs_fini(world);

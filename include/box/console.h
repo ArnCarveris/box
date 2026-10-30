@@ -3,16 +3,12 @@
  * @brief The in game console: an overlay that runs command lines in a flecs shell session.
  *
  * The toggle action (the grave key) opens and closes it. The console is UI content in its own
- * scene, drawn by its own view after every other view (at
- * BOX_VIEW_ORDER_CONSOLE), and takes the keyboard while open.
+ * scene, drawn by its own view after every other view (BOX_VIEW_ORDER_CONSOLE), and takes the
+ * keyboard while open. The first time it opens, a hint line starts the scrollback.
  *
- * The console runs cls itself, so it never reaches the session: cls empties the scrollback and
- * Ctrl+L does the same without touching the input line. help in the console lists cls too.
- * Command lines are colored in the console only (ConsoleSyntax), never in sessions or logs.
- *
- * The prompt is bash-like: the scope of the session (~ for the root, otherwise its path) and $.
- * Every line that ran keeps the prompt it was typed at. The first time the console opens, a hint
- * line starts the scrollback.
+ * The prompt is bash-like, the scope of the session (~ at the root) and $, and every line that ran
+ * keeps its prompt. The console runs cls itself, help lists it too. Command lines are colored in
+ * the console only (ConsoleSyntax), never in sessions or logs.
  */
 
 #ifndef BOX_CONSOLE_H
@@ -75,15 +71,9 @@ ECS_STRUCT(ConsoleSyntax, {
  * its resizes, a fraction of zero or less is a panel of zero size, one or more fills the axis.
  * Lines wrap at its width minus the padding, their rows under the prompt or the indentation.
  *
- * While open, typed and pasted text (Input.paste) and key presses go to the input line and no
- * action but the toggle sees the keyboard or mouse buttons. Enter runs the line, Up and Down walk
- * the lines that ran that start with the text typed before the first Up, Down past the newest
- * restores that text. Page Up, Page Down and the wheel scroll rows, Escape or the toggle close it.
- *
- * Readline keys: Ctrl+A and Ctrl+E move to the start and end, Ctrl+U and Ctrl+K delete to the
- * start and end, Ctrl+W deletes the word before the cursor, Ctrl+C abandons the line (echoed with
- * ^C, nothing runs) and Ctrl+L clears the scrollback. With the cursor at the end, the rest of the
- * newest line that ran that starts with the input is drawn dimmed after it, Right or End accept it.
+ * While open, text and key presses go to the input line and only the toggle sees the keyboard.
+ * Enter runs, Up/Down walk the history, Right/End accept the suggestion, Ctrl+A/E/U/K/W/C/L edit
+ * like readline, Page Up/Down and the wheel scroll and Escape closes, see the README console keys.
  */
 ECS_STRUCT(Console, {
     bool open;           /**< Shown and taking the keyboard, the toggle action flips it */
