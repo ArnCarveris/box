@@ -1,0 +1,25 @@
+include fence
+include horse
+include water_trough
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+
+@tree Parent
+template WestCorral {
+  WestFence(length: 8, bays: 4) { Position: {0, 0, 3.2} }
+  WestFence(length: 6.4, bays: 3) { Position: {4, 0, 0}; Rotation: {0, math.PI / 2, 0} }
+  WestFence(length: 6.4, bays: 3) { Position: {-4, 0, 0}; Rotation: {0, math.PI / 2, 0} }
+  WestFence(length: 4.8, bays: 2) { Position: {1.6, 0, -3.2} }
+  WestFence(length: 2.8, bays: 1) { Position: {-3.9, 0, -2}; Rotation: {0, -0.9, 0} }
+  WestHorse(tint: {154, 103, 61}) { Position: {0.2, 0, 0.2}; Rotation: {0, -0.6, 0} }
+  WestHorse(tint: {186, 177, 150}) { Position: {2.4, 0, -1.9}; Rotation: {0, -1.2, 0}; Scale: {0.9, 0.9, 0.9} }
+  WestWaterTrough() { Position: {2.9, 0, 1.3}; Rotation: {0, math.PI / 2, 0} }
+  for i in 0..3 {
+    { Position: {-2.4 + i * 0.8, 0.38, 2.2}; RoundedBox: {0.74, 0.65, 0.55, 0.08}; Rgb: {190 + i * 9, 157 + i * 5, 78} }
+    for tie in 0..2 {
+      { Position: {-2.4 + i * 0.8 + (tie - 0.5) * 0.42, 0.38, 2.2}; Box: {0.028, 0.66, 0.56}; Rgb: {103, 81, 42} }
+    }
+  }
+}

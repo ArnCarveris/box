@@ -298,6 +298,7 @@ static void box_console_hide(
     con->view = 0;
     con->shown = false;
     box_console_reset_input(con);
+    box_console_complete_close(con);
 }
 
 /** Toggle, edit and draw the console after the actions of the frame resolved.

@@ -401,6 +401,10 @@
                     "transform_end_matches_target",
                     "transform_child_childof",
                     "transform_child_parent",
+                    "transform_child_surface",
+                    "transform_parent_of_node",
+                    "transform_reparent_into",
+                    "transform_reparent_out",
                     "transform_nested",
                     "transform_scale_zero",
                     "transform_static_rekeys",
@@ -466,7 +470,9 @@
                     "light_no_effect",
                     "parent_relationship",
                     "targets_on_game_thread",
-                    "no_transition_no_records"
+                    "no_transition_no_records",
+                    "dynamic_material_fade_in",
+                    "text_spans_fade"
                 ]
             }
         ]
