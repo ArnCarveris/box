@@ -859,6 +859,15 @@ void ConsoleOutput_find_match_escaped(void) {
     output_check(world, row, 7, 9, &o->entity);
     output_check(world, row, 9, 13, &o->match);
 
+    // A backslash of the name before its '.' is shown as "\\.", the name part is all of it
+    ecs_entity_t vu = ecs_new_w_pair(world, EcsChildOf, things);
+    ecs_set_name(world, vu, "v\\.u");
+    output_run(world, "find \\.u");
+    row = output_find(world, "things.v\\\\.u", true);
+    output_check(world, row, 0, 7, &o->dim);
+    output_check(world, row, 7, 8, &o->entity);
+    output_check(world, row, 8, 12, &o->match);
+
     // Name matches of grep too
     output_run(world, "grep x.y");
     row = output_find(world, "things.x\\.y", true);

@@ -556,7 +556,7 @@ static void box_console_fmt_entity(
 
     len = (int32_t)strlen(shown);
     for (i = 0; i < len; i ++) {
-        if (shown[i] == '\\' && i + 1 < len) {
+        if (shown[i] == '\\' && i + 1 < len && shown[i + 1] == '.') {
             i ++;
         } else if (shown[i] == '.') {
             name = i + 1;
