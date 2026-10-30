@@ -435,6 +435,7 @@ static void box_draws_atlas_page(
         (uint32_t)(sizeof(box_render_texture_region_t) + (size_t)w * (size_t)h * 4));
     region->texture.width = (uint32_t)page->size;
     region->texture.height = (uint32_t)page->size;
+    region->texture.single_channel = false;
     region->x = (uint32_t)x;
     region->y = (uint32_t)y;
     region->width = (uint32_t)w;

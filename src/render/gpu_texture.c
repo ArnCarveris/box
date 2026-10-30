@@ -5,6 +5,8 @@
  * A texture is uploaded into its first mip level; the blit pipeline renders every further
  * level from the one above it, in linear light for the color layers. Batches bind their
  * layers as one cached bind group.
+ *
+ * A single channel texture is R8Unorm, sampled and averaged as stored by every layer.
  */
 
 #include "gpu.h"
@@ -32,6 +34,7 @@ typedef enum box_gpu_mip_space_t {
 typedef struct box_gpu_texture_entry_t {
     box_gpu_texture_t base;     /**< The texture, first so the entry is used as one */
     box_gpu_mip_space_t space;  /**< Space of the generated levels or of the layer that binds it */
+    bool single;                /**< BOX_GPU_TEXTURE_SINGLE, whose levels average stored values */
 } box_gpu_texture_entry_t;
 
 /** Count the mip levels of a full chain.
@@ -84,42 +87,54 @@ static WGPUTextureView box_gpu_texture_view(
  * @param gpu The backend
  * @param width Width in pixels
  * @param height Height in pixels
- * @param pixels RGBA8 rows, the first row is the top of the image
+ * @param pixels RGBA8 rows, or R8 rows of a single channel texture, the first row is the top
+ * of the image
+ * @param single Whether the texture has a single channel, BOX_GPU_TEXTURE_SINGLE
  * @return The texture
  */
 static box_gpu_texture_t* box_gpu_texture_new(
     box_gpu_t *gpu,
     uint32_t width,
     uint32_t height,
-    const uint8_t *pixels)
+    const uint8_t *pixels,
+    bool single)
 {
     box_gpu_texture_entry_t *entry = ecs_os_calloc_t(box_gpu_texture_entry_t);
     box_gpu_texture_t *result = &entry->base;
-    WGPUTextureFormat srgb = BOX_GPU_TEXTURE_SRGB;
+    WGPUTextureFormat format = single ? BOX_GPU_TEXTURE_SINGLE : BOX_GPU_TEXTURE_FORMAT;
+    WGPUTextureFormat srgb = single ? BOX_GPU_TEXTURE_SINGLE : BOX_GPU_TEXTURE_SRGB;
+    uint32_t texel = single ? 1 : 4;
     result->mips = box_gpu_mip_count(width, height);
     WGPUTextureDescriptor desc = {
         .usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst |
             WGPUTextureUsage_RenderAttachment,
         .dimension = WGPUTextureDimension_2D,
         .size = { width, height, 1 },
-        .format = BOX_GPU_TEXTURE_FORMAT,
+        .format = format,
         .mipLevelCount = result->mips,
         .sampleCount = 1,
-        .viewFormatCount = 1,
-        .viewFormats = &srgb
+        .viewFormatCount = single ? 0 : 1,
+        .viewFormats = single ? NULL : &srgb
     };
+    entry->single = single;
+    if (single) {
+        entry->space = BOX_GPU_MIP_LINEAR;
+    }
+
     result->texture = wgpuDeviceCreateTexture(gpu->device, &desc);
-    result->linear = box_gpu_texture_view(
-        result->texture, BOX_GPU_TEXTURE_FORMAT, 0, result->mips);
+    result->linear = box_gpu_texture_view(result->texture, format, 0, result->mips);
     result->srgb = box_gpu_texture_view(result->texture, srgb, 0, result->mips);
     result->mipped = result->mips == 1;
     WGPUTexelCopyTextureInfo dst = {
         .texture = result->texture,
         .aspect = WGPUTextureAspect_All
     };
-    WGPUTexelCopyBufferLayout layout = { .bytesPerRow = width * 4, .rowsPerImage = height };
+    WGPUTexelCopyBufferLayout layout = {
+        .bytesPerRow = width * texel,
+        .rowsPerImage = height
+    };
     WGPUExtent3D extent = { width, height, 1 };
-    wgpuQueueWriteTexture(gpu->queue, &dst, pixels, (size_t)width * height * 4, &layout,
+    wgpuQueueWriteTexture(gpu->queue, &dst, pixels, (size_t)width * height * texel, &layout,
         &extent);
 
     return result;
@@ -181,8 +196,8 @@ void box_gpu_texture_init(
         .entries = entries
     };
     gpu->material_layout = wgpuDeviceCreateBindGroupLayout(gpu->device, &layout);
-    gpu->white = box_gpu_texture_new(gpu, 1, 1, box_gpu_white);
-    gpu->flat = box_gpu_texture_new(gpu, 1, 1, box_gpu_flat);
+    gpu->white = box_gpu_texture_new(gpu, 1, 1, box_gpu_white, false);
+    gpu->flat = box_gpu_texture_new(gpu, 1, 1, box_gpu_flat, false);
     ecs_map_init(&gpu->textures, NULL);
     ecs_map_init(&gpu->materials, NULL);
     ecs_vec_init_t(NULL, &gpu->mips, uint32_t, 0);
@@ -336,8 +351,12 @@ void box_gpu_texture_apply(
         goto done;
     }
 
-    tex = box_gpu_texture_new(gpu, desc->width, desc->height, (const uint8_t*)(desc + 1));
-    ((box_gpu_texture_entry_t*)tex)->space = space;
+    tex = box_gpu_texture_new(gpu, desc->width, desc->height, (const uint8_t*)(desc + 1),
+        desc->single_channel);
+    if (!desc->single_channel) {
+        ((box_gpu_texture_entry_t*)tex)->space = space;
+    }
+
     ecs_map_insert_ptr(&gpu->textures, handle, tex);
     if (!tex->mipped) {
         *ecs_vec_append_t(NULL, &gpu->mips, uint32_t) = handle;
@@ -351,6 +370,7 @@ done:
  *
  * The sRGB space samples and writes the levels through the sRGB view, so the filter averages
  * linear light and the result is encoded again; the linear space averages the stored values.
+ * A single channel texture always averages its stored values, in its R8 format.
  *
  * @param gpu The backend
  * @param tex The texture
@@ -363,9 +383,13 @@ static void box_gpu_texture_mip_chain(
     box_gpu_mip_space_t space,
     WGPUCommandEncoder encoder)
 {
-    WGPUTextureFormat format = space == BOX_GPU_MIP_SRGB
-        ? BOX_GPU_TEXTURE_SRGB
-        : BOX_GPU_TEXTURE_FORMAT;
+    if (((box_gpu_texture_entry_t*)tex)->single) {
+        space = BOX_GPU_MIP_LINEAR;
+    }
+
+    WGPUTextureFormat format = ((box_gpu_texture_entry_t*)tex)->single
+        ? BOX_GPU_TEXTURE_SINGLE
+        : space == BOX_GPU_MIP_SRGB ? BOX_GPU_TEXTURE_SRGB : BOX_GPU_TEXTURE_FORMAT;
     WGPURenderPipeline pipeline = box_gpu_blit_pipeline(gpu, format);
     uint32_t level;
     for (level = 1; pipeline && level < tex->mips; level ++) {
@@ -425,7 +449,7 @@ static void box_gpu_texture_mips_usage(
             box_gpu_texture_t *tex = handle && !(handle & BOX_RENDER_TEXTURE_TARGET)
                 ? ecs_map_get_deref(&gpu->textures, box_gpu_texture_t, handle)
                 : NULL;
-            if (tex && !tex->mipped) {
+            if (tex && !tex->mipped && !((box_gpu_texture_entry_t*)tex)->single) {
                 ((box_gpu_texture_entry_t*)tex)->space = BOX_GPU_MIP_SRGB;
             }
         }
@@ -530,7 +554,8 @@ static uint64_t box_gpu_material_hash(
 /** Queue the textures a new bind group binds in a color layer whose levels average stored values.
  *
  * The next frame generates their levels again in linear light, which then stays: a texture
- * shared by a color and a data layer is filtered as color.
+ * shared by a color and a data layer is filtered as color. A single channel texture keeps its
+ * levels, which every layer reads as stored.
  *
  * @param gpu The backend
  * @param textures Texture handles of the layers, 0 for the default
@@ -545,7 +570,9 @@ static void box_gpu_material_mips(
             ? ecs_map_get_deref(&gpu->textures, box_gpu_texture_t, textures[i])
             : NULL;
         box_gpu_texture_entry_t *entry = (box_gpu_texture_entry_t*)tex;
-        if (!tex || tex->mips == 1 || !tex->mipped || entry->space == BOX_GPU_MIP_SRGB) {
+        if (!tex || tex->mips == 1 || !tex->mipped || entry->single ||
+            entry->space == BOX_GPU_MIP_SRGB)
+        {
             continue;
         }
 

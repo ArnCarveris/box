@@ -267,6 +267,19 @@
                     "svg_encoded",
                     "change_reloads"
                 ]
+            },
+            {
+                "id": "TextureSingleChannel",
+                "testcases": [
+                    "red_channel",
+                    "default_off",
+                    "gray_png",
+                    "rgb_png",
+                    "linear_ignored",
+                    "change_reloads",
+                    "resized",
+                    "cpu_copy_size"
+                ]
             }
         ]
     }

@@ -169,7 +169,8 @@ ECS_STRUCT(TextureTransform, {
  */
 ECS_STRUCT(PbrTextures, {
     ecs_entity_t albedo;    /**< Multiplied with the base color and opacity, display encoded;
-                             *   its alpha only shows with a blend mode or AlphaCutoff */
+                             *   its alpha only shows with a blend mode or AlphaCutoff. Any layer
+                             *   samples a TexturePath.single_channel one as (r, 0, 0, 1), stored */
     ecs_entity_t emissive;  /**< Multiplied with the Emissive color times its strength */
     ecs_entity_t orm;       /**< Occlusion (red), roughness (green) and metallic (blue), stored */
     ecs_entity_t normal;    /**< Tangent space normal map, green points up the image */

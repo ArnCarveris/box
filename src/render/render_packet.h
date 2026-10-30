@@ -514,14 +514,17 @@ typedef struct box_render_mesh_desc_t {
     uint32_t index_count;   /**< Indices after the vertices */
 } box_render_mesh_desc_t;
 
-/** Description of a BOX_RENDER_TEXTURE create, followed by its RGBA8 pixels row by row.
+/** Description of a BOX_RENDER_TEXTURE create, followed by its RGBA8 pixels row by row, or its
+ * R8 pixels for a single channel texture.
  *
  * The first row is the top of the image, at v 0. Creating an existing handle replaces the
- * image; the backend generates the mip levels.
+ * image; the backend generates the mip levels. A single channel texture is sampled as
+ * (r, 0, 0, 1) by every layer, without sRGB decoding.
  */
 typedef struct box_render_texture_desc_t {
     uint32_t width;         /**< Width in pixels */
     uint32_t height;        /**< Height in pixels */
+    bool single_channel;    /**< The pixels are R8, one byte each; false for an update */
 } box_render_texture_desc_t;
 
 /** Description of a BOX_RENDER_TEXTURE update, followed by the RGBA8 pixels of its region row

@@ -5,6 +5,9 @@
  * Raster formats decode with stb_image, SVG files render with resvg at the requested size;
  * the result is scaled to the requested size and capped to the texture quality. A linear image
  * (TexturePath.linear) has its color channels encoded to sRGB last.
+ *
+ * A single channel image (TexturePath.single_channel) keeps only its red channel as stored, in a
+ * buffer shrunk to one byte per pixel.
  */
 
 #include "texture.h"
@@ -266,6 +269,16 @@ void box_texture_encode_linear(
     }
 }
 
+void box_texture_red_channel(
+    uint8_t *pixels,
+    int32_t count)
+{
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        pixels[i] = pixels[i * 4];
+    }
+}
+
 void box_texture_decode_init(void)
 {
     if (!box_texture_svg_lock) {
@@ -296,7 +309,10 @@ void box_texture_decode(
     }
 
     ecs_os_free(data);
-    if (job->linear && job->pixels) {
+    if (job->single_channel && job->pixels) {
+        box_texture_red_channel(job->pixels, job->width * job->height);
+        job->pixels = ecs_os_realloc(job->pixels, job->width * job->height);
+    } else if (job->linear && job->pixels) {
         box_texture_encode_linear(job->pixels, job->width * job->height);
     }
 

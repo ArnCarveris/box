@@ -23,13 +23,16 @@
 #define BOX_GPU_OFFSCREEN_FORMAT (WGPUTextureFormat_RGBA8UnormSrgb)
 
 /** Color formats the blit pipeline is created for, at most */
-#define BOX_GPU_BLIT_FORMATS (6)
+#define BOX_GPU_BLIT_FORMATS (8)
 
 /** Format of sampled textures, which albedo and emissive layers read through an sRGB view */
 #define BOX_GPU_TEXTURE_FORMAT (WGPUTextureFormat_RGBA8Unorm)
 
 /** Format of the view of a texture that decodes display encoded colors */
 #define BOX_GPU_TEXTURE_SRGB (WGPUTextureFormat_RGBA8UnormSrgb)
+
+/** Format of single channel sampled textures, which every layer reads as stored */
+#define BOX_GPU_TEXTURE_SINGLE (WGPUTextureFormat_R8Unorm)
 
 /** TextureWrap modes the samplers are created for */
 #define BOX_GPU_WRAPS (3)
@@ -125,9 +128,11 @@ typedef struct box_gpu_mesh_t {
 
 /** A sampled texture with its mip chain and the two views the layers bind */
 typedef struct box_gpu_texture_t {
-    WGPUTexture texture;            /**< The texture, BOX_GPU_TEXTURE_FORMAT */
+    WGPUTexture texture;            /**< The texture, BOX_GPU_TEXTURE_FORMAT or
+                                     *   BOX_GPU_TEXTURE_SINGLE */
     WGPUTextureView linear;         /**< View of every mip level as stored */
-    WGPUTextureView srgb;           /**< View of every mip level decoded from sRGB */
+    WGPUTextureView srgb;           /**< View of every mip level decoded from sRGB, as stored
+                                     *   for a single channel texture */
     uint32_t mips;                  /**< Mip levels of the texture */
     bool mipped;                    /**< The levels below the first were generated */
 } box_gpu_texture_t;

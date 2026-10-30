@@ -29,9 +29,9 @@ ECS_STRUCT(Texture, {
 
 /** Texture loaded from an image file, which writes Texture and TextureStatus.
  *
- * Raster formats load with stb_image, a file ending in .svg is rendered by resvg at the
- * requested size; with one requested dimension the other keeps the aspect ratio. Set linear
- * for an image made for engines that sample color textures without decoding them from sRGB.
+ * Raster formats load with stb_image, .svg files render with resvg at the requested size (one
+ * dimension keeps the aspect ratio). Set linear for images made to be sampled without sRGB
+ * decoding, single_channel for a mask such as a light cookie: R8Unorm, a quarter of RGBA8.
  *
  * The largest dimension is capped by Surface.texture_quality. Changing a member loads the
  * image again, and so does a change of its file that FileWatch (box/app.h) sees; the previous
@@ -44,6 +44,9 @@ ECS_STRUCT(TexturePath, {
     bool linear;    /**< The color channels hold linear light, not sRGB, default off: they are
                      *   encoded to sRGB on load, so the layers that decode color read them as
                      *   they are stored. Alpha is kept; leave it off for ORM and normal maps */
+    bool single_channel; /**< Load as R8Unorm with mips, default off: the red channel as stored,
+                          *   linear has no effect. Layers, UI images, particle sprites and other
+                          *   bindings of its Texture sample it as (r, 0, 0, 1), as WebGPU does */
 });
 
 /** Progress of the load of a TexturePath */
