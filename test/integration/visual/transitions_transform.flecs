@@ -1,0 +1,84 @@
+// A transform transition with children, frozen in the middle. The scene starts with the rig on
+// the left; SetAt changes its Position, Rotation and Scale at the start of the second frame,
+// with a linear duration of 0.05 s (three frames at the fixed delta of 1/60 s). The render of the
+// third frame is one frame into the transition, a third of the way: the rig and its two children
+// render between the grey start marker on the left and the green target marker on the right,
+// turned and scaled a third of the way, while every game thread reader sees the target.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.app
+using box.transition
+
+camera {
+  Position: {0, 3, 9}
+  Rotation: {-0.3, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {24, 28, 36, 255}}}
+}
+
+sun {
+  Rotation: {0.7, 2.4, 0}
+  DirectionalLight: {intensity: 2 * flecs.script.math.PI}
+  Rgb: {255, 250, 240}
+}
+
+$ {
+  AmbientLight: {intensity: 0.3}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {14, 0.2, 6}
+  Rgb: {90, 94, 100}
+}
+
+start_marker {
+  Position: {-4, 0.02, 1.6}
+  Box: {0.6, 0.04, 0.6}
+  Rgb: {160, 160, 160}
+}
+
+target_marker {
+  Position: {4, 0.02, 1.6}
+  Box: {0.6, 0.04, 0.6}
+  Rgb: {60, 200, 90}
+}
+
+rig {
+  Position: {-4, 0.6, 0}
+  Rotation: {0, 0, 0}
+  Scale: {1, 1, 1}
+  Box: {0.8, 0.8, 0.8}
+  Rgb: {230, 120, 60}
+  Transition: [
+    Position: {duration: 0.05},
+    Rotation: {duration: 0.05},
+    Scale: {duration: 0.05}
+  ]
+
+  arm {
+    Position: {0, 1.1, 0}
+    Sphere: {segments: 24, smooth: true, radius: 0.35}
+    Rgb: {80, 150, 240}
+
+    hand {
+      Position: {0.7, 0, 0}
+      Box: {0.3, 0.3, 0.3}
+      Rgb: {240, 220, 80}
+    }
+  }
+}
+
+change_rig {
+  SetAt: {frame: 1, entity: rig}
+  Position: {4, 0.6, 0}
+  Rotation: {0, 1.5, 0}
+  Scale: {1.6, 1.6, 1.6}
+}

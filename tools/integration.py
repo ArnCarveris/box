@@ -10,7 +10,9 @@ visual renders every <dir>/<scene>.flecs (test/integration/visual by default) he
 boxrun, a static camera and a fixed delta (--delta-time 1/60), and compares the last frame with
 <dir>/baseline/<scene>.png. A scene fails when the difference is strong and widespread: the
 largest channel delta is above 24 and more than 200 pixels have a channel off by more than 16,
-so GPU speckle and faint drift pass. A missing baseline fails too.
+so GPU speckle and faint drift pass. A missing baseline fails too. A scene that has to change
+after its first frame, such as one frozen in the middle of a transition, does so with the
+box.app.SetAt component at a frame, never with the wall clock.
 
 --update-baseline <scene> renders that scene and stores the render as its baseline; repeat it
 for more scenes. Scenes are names or paths; without any, every scene of the folder runs.
