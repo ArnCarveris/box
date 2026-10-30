@@ -405,7 +405,8 @@ void FpsPanel_engine_records_samples(void) {
     ecs_fini(world);
 }
 
-/** Count the OnSet events of FrameSamples in the int32_t of the observer context.
+/** Count the OnSet events of FrameSamples in the int32_t of the observer context. The term has
+ * a fixed source, so it->count is 0 and each call is one event.
  *
  * @param it Iterator of the observer
  */
@@ -413,7 +414,7 @@ static void fps_samples_on_set(
     ecs_iter_t *it)
 {
     int32_t *fired = it->ctx;
-    *fired += it->count;
+    (*fired) ++;
 }
 
 /** Observe OnSet of FrameSamples.
