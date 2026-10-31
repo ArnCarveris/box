@@ -780,23 +780,13 @@ typedef struct box_gpu_t {
     int32_t scatter_revision;       /**< Revision of the shader the pipeline was made with */
     ecs_map_t meshes;               /**< Handle to box_gpu_mesh_t */
     ecs_map_t buffers;              /**< Handle to box_gpu_buffer_t */
-    WGPUBuffer copy_staging;        /**< Staging buffer of the copies of a packet that cannot
-                                     *   copy directly, NULL until a packet stages a copy.
+    WGPUBuffer copy_staging;        /**< Staging buffer of the staged copies of a packet, NULL
+                                     *   until one stages: the smallest power of two from 64 KiB
+                                     *   that holds them, at most BOX_RENDER_COPY_MAX.
                                      *
-                                     *   It grows to the smallest power of two from 64 KiB that
-                                     *   holds the staged bytes of a packet, at most
-                                     *   BOX_RENDER_COPY_MAX.
-                                     *
-                                     *   It is released once BOX_RENDER_COPY_STAGING_FRAMES
-                                     *   packets in a row staged nothing, so a burst does not
-                                     *   keep a large buffer for good.
-                                     *
-                                     *   Every BOX_RENDER_COPY_STAGING_FRAMES packets it is
-                                     *   created again smaller when the most bytes a packet
-                                     *   among them staged fit in a smaller size.
-                                     *
-                                     *   So while copies keep being staged it is created at
-                                     *   most once per that many packets, never every frame. */
+                                     *   Released after BOX_RENDER_COPY_STAGING_FRAMES packets
+                                     *   without staged copies, else shrunk at most once per that
+                                     *   many to what the most a packet among them staged needs */
     uint64_t copy_staging_size;     /**< Bytes of copy_staging, at most BOX_RENDER_COPY_MAX */
     uint64_t copy_staging_peak;     /**< Largest staged bytes of a packet since the last check
                                      *   whether copy_staging shrinks */

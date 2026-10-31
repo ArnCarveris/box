@@ -471,7 +471,9 @@ within one buffer, or that read a range another copy writes, go through the stag
 staging buffer is released after `BOX_RENDER_COPY_STAGING_FRAMES` (60) packets in a row without
 staged copies, and shrunk every 60 packets to what the largest staged packet among them needed.
 The GPU stats report `copies_direct`, `copies_staged`, `copy_staging` (its bytes now) and
-`copy_staging_peak`.
+`copy_staging_peak`. In the spawn scene, on wgpu-native and in the browser build alike, the one
+batch moves within its page, so its 6 moves stage 18 copies and copy none directly; the staging
+buffer peaks at 16 MiB in the last move and is released 60 frames later, ending at 0.
 
 ### O4. Scatter entries
 
