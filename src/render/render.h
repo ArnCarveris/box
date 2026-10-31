@@ -131,7 +131,8 @@ bool box_render_clip_hides(
  * the slots that keep every buffer of its pages within the 128 MiB storage binding every WebGPU
  * device supports.
  *
- * The size applies to every store, capped by its chunk; shapes added after a change follow it.
+ * The size applies to every store, capped by the slots its layout allows (128 MiB over its
+ * largest stride); shapes added after a change follow it.
  *
  * @param world The world
  * @param instances Instances per batch, at least 1
@@ -143,7 +144,8 @@ void box_render_draws_chunk(
 /** Set the slots of an instance page, for tests.
  *
  * The default of each store is its chunk, 128 MiB over its largest stride, the storage binding
- * every WebGPU device supports; the size applies to every store, capped by its chunk.
+ * every WebGPU device supports; the size applies to every store, capped by the slots its layout
+ * allows.
  *
  * A batch never spans pages, so a key also continues in another batch once a batch holds this
  * many shapes. Pages created after the change hold at most this many slots.
