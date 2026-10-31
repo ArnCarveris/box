@@ -503,6 +503,16 @@ the slots it got since its last send upload. The draw stats count `copies`, `cop
 MB for its 28.7 MB of records; the rest is the slot words and segment padding of the scatters of
 the frames without a move. Its 6 moves copy 28.2 MB on the GPU instead.
 
+Follow-up: a copy between two different buffers whose source no other copy of the packet writes,
+such as a run that moves to another page, runs as one direct `copyBufferToBuffer`; only copies
+within one buffer, or that read a range another copy writes, go through the staging buffer. The
+staging buffer is released after `BOX_RENDER_COPY_STAGING_FRAMES` (60) packets in a row without
+staged copies, and shrunk every 60 packets to what the largest staged packet among them needed.
+The GPU stats report `copies_direct`, `copies_staged`, `copy_staging` (its bytes now) and
+`copy_staging_peak`. In the spawn scene, on wgpu-native and in the browser build alike, the one
+batch moves within its page, so its 6 moves stage 18 copies and copy none directly; the staging
+buffer peaks at 16 MiB in the last move and is released 60 frames later, ending at 0.
+
 ### O4. Scatter entries
 
 An entry is the 4 byte slot plus the stride: 52 (transform), 20 (mesh shading), 68 (2D

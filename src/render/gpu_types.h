@@ -184,6 +184,24 @@ typedef struct box_gpu_buffer_t {
     uint64_t version;               /**< Write that last changed it, unique across buffers */
 } box_gpu_buffer_t;
 
+/** How box_gpu_copy runs a copy of a packet */
+typedef enum box_gpu_copy_mode_t {
+    BOX_GPU_COPY_SKIP,              /**< Invalid or empty, not run */
+    BOX_GPU_COPY_DIRECT,            /**< From the source buffer into the destination buffer */
+    BOX_GPU_COPY_STAGED             /**< Through the staging buffer: source and destination are
+                                     *   the same buffer, or another copy of the packet writes a
+                                     *   range of the source it reads */
+} box_gpu_copy_mode_t;
+
+/** Range a copy of a packet writes, sorted by buffer and offset to find the copies whose source
+ * another copy writes */
+typedef struct box_gpu_copy_write_t {
+    uint32_t buffer;                /**< Handle of the buffer written */
+    uint64_t start;                 /**< First byte written */
+    uint64_t end;                   /**< Byte past the last one written, then the largest end
+                                     *   of the ranges of the buffer up to this one */
+} box_gpu_copy_write_t;
+
 /** Levels of a depth pyramid at most, enough for a 16384 pixel axis */
 #define BOX_GPU_HIZ_LEVELS (15)
 
@@ -762,9 +780,21 @@ typedef struct box_gpu_t {
     int32_t scatter_revision;       /**< Revision of the shader the pipeline was made with */
     ecs_map_t meshes;               /**< Handle to box_gpu_mesh_t */
     ecs_map_t buffers;              /**< Handle to box_gpu_buffer_t */
-    WGPUBuffer copy_staging;        /**< Staging buffer of the copies of a packet, NULL until
-                                     *   a packet has copies */
+    WGPUBuffer copy_staging;        /**< Staging buffer of the staged copies of a packet, NULL
+                                     *   until one stages: the smallest power of two from 64 KiB
+                                     *   that holds them, at most BOX_RENDER_COPY_MAX.
+                                     *
+                                     *   Released after BOX_RENDER_COPY_STAGING_FRAMES packets
+                                     *   without staged copies, else shrunk at most once per that
+                                     *   many to what the most a packet among them staged needs */
     uint64_t copy_staging_size;     /**< Bytes of copy_staging, at most BOX_RENDER_COPY_MAX */
+    uint64_t copy_staging_peak;     /**< Largest staged bytes of a packet since the last check
+                                     *   whether copy_staging shrinks */
+    int32_t copy_staging_frames;    /**< Packets since that check */
+    int32_t copy_staging_idle;      /**< Packets in a row that staged nothing, at most
+                                     *   BOX_RENDER_COPY_STAGING_FRAMES */
+    ecs_vec_t copy_writes;          /**< box_gpu_copy_write_t, scratch of box_gpu_copy */
+    ecs_vec_t copy_modes;           /**< box_gpu_copy_mode_t by copy, scratch of box_gpu_copy */
     ecs_map_t targets;              /**< Handle to box_gpu_target_t */
     ecs_map_t shaders;              /**< Handle to box_gpu_shader_t */
     ecs_vec_t results;              /**< box_render_shader_result_t not yet taken */
@@ -835,7 +865,9 @@ typedef enum box_gpu_stat_t {
     BOX_GPU_STAT_SHADOW_TILE,       /**< A shadow atlas tile was rendered */
     BOX_GPU_STAT_SHADOW_REUSED,     /**< A shadow atlas tile was kept from an earlier frame */
     BOX_GPU_STAT_SHADOW_PASS,       /**< A shadow atlas render pass was recorded */
-    BOX_GPU_STAT_SHADOW_DRAW        /**< A draw call was recorded in a cascade or a tile */
+    BOX_GPU_STAT_SHADOW_DRAW,       /**< A draw call was recorded in a cascade or a tile */
+    BOX_GPU_STAT_COPY_DIRECT,       /**< A copy went from its source to its destination */
+    BOX_GPU_STAT_COPY_STAGED        /**< A copy went through the staging buffer */
 } box_gpu_stat_t;
 
 #ifdef __EMSCRIPTEN__
