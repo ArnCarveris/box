@@ -2,10 +2,9 @@
  * @file Parametric.c
  * @brief Benchmarks for a scene with parametric surfaces next to plain meshes.
  *
- * The scene is about the size of the spaceship scene: about 8,800 instances, of which a few
- * hundred have a parametric surface of each of the seven kinds (sweep, loft, lathe, ellipsoid
- * shell, torus shell, beveled prism and profile extrusion), the rest plain boxes, spheres and
- * polygons. Its profiles and paths are made in code, so the bench needs no asset files.
+ * The scene is about the size of the spaceship scene: about 8,800 instances, a few hundred with
+ * a parametric surface of each of the seven kinds, the rest plain boxes, spheres and polygons.
+ * Its profiles and paths are made in code, so the bench needs no asset files.
  *
  * The extract case runs frames against a backend that drops the packets, so it measures the
  * main thread and reports the instance memory counters; the GPU case renders headless frames

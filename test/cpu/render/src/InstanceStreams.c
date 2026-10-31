@@ -955,16 +955,20 @@ void InstanceStreams_parametric_shape_uploads_surface(void) {
     stats = frame(world);
     test_int(stats.upload_bytes, 0);
 
-    /* A new radius keeps the mesh and writes every stream of the slot, the surface too */
+    /* A new radius bakes another render mesh, so the torus moves to a new batch of the surface
+     * store, which uploads every stream of its run; the last torus moves into its old slot,
+     * which scatters every stream too */
     ecs_set(world, tori[4], TorusShell, {
         .radius = 2, .tube = 0.25f,
         .ring_start = 0, .ring_end = 2 * (float)GLM_PI,
         .tube_start = 0, .tube_end = 2 * (float)GLM_PI });
     stats = frame(world);
+    test_int(stats.batches, 3);
     test_int(stats.scatters, 3);
-    test_int(stats.transform_bytes, segment_size(1, TRANSFORM));
-    test_int(stats.shading_bytes, segment_size(1, SHADING));
-    test_int(stats.surface_bytes, segment_size(1, SURFACE));
+    test_int(stats.transform_bytes, TRANSFORM + segment_size(1, TRANSFORM));
+    test_int(stats.shading_bytes, SHADING + segment_size(1, SHADING));
+    test_int(stats.surface_bytes, SURFACE + segment_size(1, SURFACE));
+    test_int(stats.page_surface_bytes, 2 * MIN_RUN * SURFACE);
 
     /* A moved torus writes its transform only */
     ecs_set(world, tori[6], Position, {6, 2, 0});

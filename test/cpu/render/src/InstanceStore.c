@@ -3,9 +3,8 @@
  * @brief Tests for the instance pages every batch shares: runs, pages, uploads and scatters.
  *
  * Every case renders with the null backend and reads the packets it received. A batch per
- * mesh is made with regular polygons of distinct side counts, plain meshes whose pages have the
- * transform and the shading stream; shapes with a parametric surface have pages of their own
- * with the surface stream too.
+ * mesh is made with regular polygons of distinct side counts, plain meshes without a surface
+ * stream; shapes with a parametric surface have pages of their own with the surface stream.
  */
 
 #include <box.h>
@@ -205,6 +204,29 @@ static const box_render_batch_t* batch_of(
         const box_render_batch_t *b = ecs_vec_get_t(
             &null->last.batches, box_render_batch_t, i);
         if (b->instance_count == count) {
+            result = b;
+        }
+    }
+
+    return result;
+}
+
+/** Find the draw of the last packet that draws the instances of a page.
+ *
+ * @param null The backend
+ * @param page Handle of the transform stream of the page
+ * @return The draw, NULL when there is none
+ */
+static const box_render_batch_t* batch_page(
+    const box_render_null_t *null,
+    uint32_t page)
+{
+    const box_render_batch_t *result = NULL;
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&null->last.batches); i ++) {
+        const box_render_batch_t *b = ecs_vec_get_t(
+            &null->last.batches, box_render_batch_t, i);
+        if (b->instances == page) {
             result = b;
         }
     }
@@ -1183,7 +1205,8 @@ void InstanceStore_shape_moves_to_surface_store_and_back(void) {
     test_int(ecs_get(world, stay, DrawSlot)->slot, 0);
     test_int(stats.surface_bytes, SURFACE);
     test_int(stats.page_surface_bytes, MIN_RUN * SURFACE);
-    test_uint(batch_of(null, 1) != NULL, true);
+    test_assert(batch_page(null, SURFACE_PAGE(0)) != NULL);
+    test_uint(batch_page(null, SURFACE_PAGE(0))->instance_count, 1);
     for (s = 0; s < BOX_RENDER_INSTANCE_STREAMS; s ++) {
         test_int(buffer_ops(null, BOX_RENDER_CREATE, SURFACE_PAGE(0) + (uint32_t)s), 1);
         test_int(uploads_at(null, SURFACE_PAGE(0) + (uint32_t)s, 0), 1);
@@ -1201,34 +1224,42 @@ void InstanceStore_shape_moves_to_surface_store_and_back(void) {
     stats = frame(world);
     test_int(stats.upload_bytes, 0);
 
-    /* Loses the surface: back into the plain batch, after the instance that stayed; the batch
-     * of the surface store is empty, so its run and its page are released */
+    /* Loses the surface: back into the plain batch, after the instance that stayed. The batch
+     * of the surface store is empty, so its run is released; page 0 of a store keeps its
+     * buffers, as it does for every store */
     ecs_set(world, moving, Box, {1, 1, 1});
     stats = frame(world);
     test_store_of(world, moving, false);
     test_int(ecs_get(world, moving, DrawSlot)->batch, plain_index);
     test_int(ecs_get(world, moving, DrawSlot)->slot, 1);
     test_int(ecs_vec_count(&plain->entities), 2);
-    test_int(stats.pages, 1);
+    test_int(stats.batches, 1);
     test_int(stats.surface_bytes, 0);
-    test_int(stats.page_surface_bytes, 0);
-    test_int(stats.page_bytes, MIN_RUN * INSTANCE);
+    test_int(stats.upload_bytes, stats.transform_bytes + stats.shading_bytes);
     for (s = 0; s < BOX_RENDER_INSTANCE_STREAMS; s ++) {
-        test_int(buffer_ops(null, BOX_RENDER_DESTROY, SURFACE_PAGE(0) + (uint32_t)s), 1);
+        test_int(uploads_at(null, SURFACE_PAGE(0) + (uint32_t)s, 0), 0);
         test_int(buffer_ops(null, BOX_RENDER_DESTROY, PAGE(0) + (uint32_t)s), 0);
     }
+
+    test_assert(batch_page(null, SURFACE_PAGE(0)) == NULL);
+    test_assert(batch_page(null, PAGE(0)) != NULL);
+    test_uint(batch_page(null, PAGE(0))->instance_count, 2);
 
     stats = frame(world);
     test_int(stats.upload_bytes, 0);
 
-    /* And gains it again: the surface store hands out its lowest page again */
+    /* And gains it again: the surface store hands out the lowest run of its page 0 again,
+     * which keeps its buffers */
     torus_set(world, moving);
     stats = frame(world);
     test_store_of(world, moving, true);
     test_int(ecs_vec_count(&plain->entities), 1);
     test_int(stats.surface_bytes, SURFACE);
-    test_uint(batch_of(null, 1) != NULL, true);
-    test_int(buffer_ops(null, BOX_RENDER_CREATE, SURFACE_PAGE(0) + BOX_RENDER_STREAM_SURFACE), 1);
+    test_int(stats.page_surface_bytes, MIN_RUN * SURFACE);
+    test_assert(batch_page(null, SURFACE_PAGE(0)) != NULL);
+    test_uint(batch_page(null, SURFACE_PAGE(0))->first_instance, 0);
+    test_int(buffer_ops(null, BOX_RENDER_CREATE, SURFACE_PAGE(0) + BOX_RENDER_STREAM_SURFACE), 0);
+    test_int(uploads_at(null, SURFACE_PAGE(0) + BOX_RENDER_STREAM_SURFACE, 0), 1);
 
     ecs_fini(world);
     box_render_null_free(null);

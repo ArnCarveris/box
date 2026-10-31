@@ -508,10 +508,6 @@ static void BoxDrawsOnLightBake(
  * the sorted blended pass (AlphaBlend), is not alpha tested and casts no shadow, whatever its
  * BlendMode, Opacity and AlphaCutoff.
  *
- * A shape with a parametric surface goes to a batch with the surface stream; a render mesh exists
- * only for a surface and the grid mesh of a kind 7 surface is keyed by its profile, so the mesh
- * already tells the surfaces apart and the bit only selects the store.
- *
  * @param world The world
  * @param d The state
  * @param e The entity

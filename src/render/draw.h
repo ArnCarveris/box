@@ -4,14 +4,11 @@
  *
  * Shapes live in batches keyed by scene, mesh, pipeline, whether their transform and material
  * are dynamic, whether they cast shadows and whether they have a parametric surface, one
- * swap-removed slot per entity and at most
- * BOX_DRAWS_CHUNK of them, so a key may have several batches.
+ * swap-removed slot per entity and at most BOX_DRAWS_CHUNK of them.
  *
- * A batch owns a run of slots of an instance page (store.c), a buffer per stream with the same
- * slots; a change uploads only its streams. A mesh page of the surface store has a transform, a
- * shading and a surface stream; a plain mesh page and a 2D page, each of its own store, have no
- * surface stream, for which the backend binds a zero record.
- * A mesh shading is a tint, an alpha and a shared material slot (materials.c).
+ * A batch owns a run of slots of an instance page (store.c), a buffer per stream; a change
+ * uploads only its streams. Only the pages of the surface store have a surface stream, plain mesh
+ * and 2D pages bind a zero record. A mesh shading is a tint, an alpha and a material slot.
  */
 
 #ifndef BOX_RENDER_DRAW_H
@@ -23,9 +20,8 @@
 #include "../text/text.h"
 
 /** Instances of one batch and slots of one instance page: every stream of a page stays within
- * the 128 MiB storage binding that every WebGPU device supports, and a key with more shapes
- * continues in another batch. Derived from the surface stream, the largest, which only the pages
- * of the surface store have; the plain mesh and 2D pages share the chunk */
+ * the 128 MiB storage binding of every WebGPU device. Derived from the surface stream, which only
+ * the surface store has; the plain mesh and 2D pages, with smaller streams, share the chunk */
 #define BOX_DRAWS_CHUNK ((uint32_t)((128u << 20) / sizeof(box_render_surface_t)))
 
 /** Slots the smallest run of a batch holds, and the smallest page buffer */
@@ -143,8 +139,9 @@ typedef struct box_draw_key_t {
     bool dynamic_material;  /**< The shapes or a ChildOf ancestor have DynamicMaterial, so the
                              *   shading uploads every frame */
     bool shadow;            /**< Instances cast shadows, false under NoShadow */
-    bool surface;           /**< The shapes have a parametric surface, so the batch has the
-                             *   surface stream and its pages are of the surface store */
+    bool surface;           /**< The shapes have a parametric surface: the batch has the
+                             *   surface stream, its pages are of the surface store. The mesh
+                             *   already tells surfaces apart, the bit selects the store */
     bool bake;              /**< Static 3D instances without NoBake of a scene with LightBake or
                              *   ReflectionBake, drawn by the captures */
     ecs_entity_t textures[BOX_RENDER_TEXTURE_SLOTS]; /**< Texture entities of PbrTextures */
