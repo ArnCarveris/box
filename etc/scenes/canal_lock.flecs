@@ -7,9 +7,9 @@ include canal_lock/narrowboat
 include canal_lock/cottage
 include canal_lock/mill
 include canal_lock/nature
-include canal_lock/guide
 include ui/widgets
 include cfg/hud
+
 using flecs.script
 using box.transform
 using box.geometry
@@ -218,14 +218,6 @@ scroll_low_neck { SetAt: {frame: 2, entity: canal_lock.low_neck}; TextureTransfo
 scroll_high { SetAt: {frame: 2, entity: canal_lock.high_water}; TextureTransform: {scale_x: 14.5 / 5, scale_y: 6 / 5, offset_x: 6.5 / 5 + 300, offset_y: -3 / 5 + 720} }
 scroll_high_neck { SetAt: {frame: 2, entity: canal_lock.high_neck}; TextureTransform: {scale_x: 0.5 / 5, scale_y: 3.2 / 5, offset_x: 6 / 5 + 300, offset_y: -1.6 / 5 + 720} }
 scroll_chamber { SetAt: {frame: 2, entity: canal_lock.chamber_water.surface}; TextureTransform: {scale_x: 11.37 / 5, scale_y: 3.2 / 5, offset_x: -5.37 / 5 + 300, offset_y: -1.6 / 5 + 720} }
-
-hud {
-  guide_screen {
-    LayoutFill: {surface: window}
-    Layout: {direction: Column, padding: {16, 16, 16, 16}, h: Left}
-    LockGuide guide()
-  }
-}
 
 main_view {
   View: {
