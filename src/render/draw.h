@@ -4,7 +4,7 @@
  *
  * Shapes live in batches keyed by scene, mesh, pipeline, whether their transform and material
  * are dynamic, whether they cast shadows and whether they have a parametric surface, one
- * swap-removed slot per entity and at most BOX_DRAWS_CHUNK of them.
+ * swap-removed slot per entity and at most the chunk of its store (box_draw_store_t.chunk).
  *
  * A batch owns a run of slots of an instance page (store.c), a buffer per stream; a change
  * uploads only its streams. Only the pages of the surface store have a surface stream, plain mesh
@@ -19,10 +19,17 @@
 #include "../texture/texture.h"
 #include "../text/text.h"
 
-/** Instances of one batch and slots of one instance page: every stream of a page stays within
- * the 128 MiB storage binding of every WebGPU device. Derived from the surface stream, which only
- * the surface store has; the plain mesh and 2D pages, with smaller streams, share the chunk */
-#define BOX_DRAWS_CHUNK ((uint32_t)((128u << 20) / sizeof(box_render_surface_t)))
+/** Bytes of the largest buffer of an instance page: the 128 MiB storage binding every WebGPU
+ * device supports. The backend requests the default limits, whose maxStorageBufferBindingSize
+ * is this and whose maxBufferSize is larger, so a page buffer never exceeds either */
+#define BOX_DRAWS_PAGE_BYTES (128u << 20)
+
+/** Instances of one batch and slots of one instance page of the surface store, the smallest
+ * chunk of any store: BOX_DRAWS_PAGE_BYTES over its largest stride, the surface stream.
+ *
+ * Each store derives its chunk from its own largest stride (box_draws_layout_chunk), so plain
+ * mesh pages hold 128 MiB / 48 slots and 2D pages 128 MiB / 64 */
+#define BOX_DRAWS_CHUNK ((uint32_t)(BOX_DRAWS_PAGE_BYTES / sizeof(box_render_surface_t)))
 
 /** Slots the smallest run of a batch holds, and the smallest page buffer */
 #define BOX_DRAWS_MIN_CAPACITY (16)
@@ -98,7 +105,11 @@ typedef struct box_draw_page_t {
 typedef struct box_draw_store_t {
     box_draw_layout_t layout;   /**< Buffers of a page and their strides */
     uint32_t base;              /**< Handle of the first buffer of the first page */
-    uint32_t slots;             /**< Slots a new page holds at most */
+    uint32_t max;               /**< Slots a page may hold at most, BOX_DRAWS_PAGE_BYTES over
+                                 *   the largest stride of the layout */
+    uint32_t slots;             /**< Slots a new page holds at most, up to max */
+    uint32_t chunk;             /**< Instances a batch holds before a key starts another, max
+                                 *   unless lowered for tests */
     ecs_vec_t pages;            /**< box_draw_page_t by page index */
     int32_t alive;              /**< Pages alive */
 } box_draw_store_t;
@@ -407,7 +418,6 @@ typedef struct box_render_draws_t {
     ecs_vec_t sorted;           /**< box_draw_sorted_t, blended instances of one view */
     box_draw_store_t stores[BOX_DRAWS_STORES]; /**< Instance pages of the batches, by layout */
     box_draw_materials_t materials; /**< The material table */
-    uint32_t chunk;             /**< Instances a batch holds before a key starts another */
     uint32_t changes_size;      /**< Bytes of the change buffer, 0 before it is created */
     const box_textures_t *textures; /**< Registry the texture handles resolve from in a send */
     const ecs_world_t *world;   /**< World of the send, whose surfaces render texture entities */
@@ -610,6 +620,17 @@ box_render_shading_t* box_draws_slot_shading(
 box_render_mesh_shading_t* box_draws_slot_mesh_shading(
     box_draw_batch_t *b,
     int32_t slot);
+
+/** Get the instances a batch of a key holds before the key continues in another batch: the
+ * chunk of the store of the key, at most the slots of its pages.
+ *
+ * @param d The state
+ * @param key The key
+ * @return The instances
+ */
+uint32_t box_draws_key_limit(
+    box_render_draws_t *d,
+    const box_draw_key_t *key);
 
 /** Get the store of the instance pages of a batch.
  *
@@ -1008,18 +1029,26 @@ void box_draws_send(
     box_render_draws_t *d,
     box_render_packet_t *p);
 
-/** Initialize a store of instance pages, without pages.
+/** Get the slots a page of a layout holds at most: BOX_DRAWS_PAGE_BYTES over its largest
+ * stride, so no buffer of the page exceeds it.
+ *
+ * @param layout Buffers of a page and their strides
+ * @return The slots, at least 1
+ */
+uint32_t box_draws_layout_chunk(
+    const box_draw_layout_t *layout);
+
+/** Initialize a store of instance pages, without pages. Its pages hold and its batches keep at
+ * most the chunk of its layout (box_draws_layout_chunk).
  *
  * @param s The store
  * @param layout Buffers of a page and their strides
  * @param base Handle of the first buffer of the first page
- * @param slots Slots a page holds at most
  */
 void box_draws_store_init(
     box_draw_store_t *s,
     const box_draw_layout_t *layout,
-    uint32_t base,
-    uint32_t slots);
+    uint32_t base);
 
 /** Release the memory of a store. The buffers of its pages are not released.
  *

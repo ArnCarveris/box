@@ -1285,6 +1285,57 @@ void InstanceStore_shape_moves_to_surface_store_and_back(void) {
     box_render_null_free(null);
 }
 
+/** Each store derives its chunk from the largest stride of its layout, so that no page buffer
+ * exceeds 128 MiB: 2D pages from the 2D shading, plain mesh pages from the transform and
+ * surface pages from the surface record. */
+void InstanceStore_store_chunk_from_largest_stride(void) {
+    // gpu_instance_data/store_chunk_size
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    box_render_draws_t *d = box_draws_state(world);
+    uint32_t page = 128u << 20, i;
+    uint32_t mesh = (uint32_t)(sizeof(box_render_transform_t) >
+        sizeof(box_render_mesh_shading_t) ? sizeof(box_render_transform_t) :
+        sizeof(box_render_mesh_shading_t));
+    uint32_t shape2d = (uint32_t)(sizeof(box_render_transform_t) >
+        sizeof(box_render_shading_t) ? sizeof(box_render_transform_t) :
+        sizeof(box_render_shading_t));
+    test_uint(mesh, 48);
+    test_uint(shape2d, 64);
+    test_uint(d->stores[BOX_DRAWS_STORE_MESH].chunk, page / mesh);
+    test_uint(d->stores[BOX_DRAWS_STORE_MESH].chunk, 2796202);
+    test_uint(d->stores[BOX_DRAWS_STORE_2D].chunk, page / shape2d);
+    test_uint(d->stores[BOX_DRAWS_STORE_2D].chunk, 2097152);
+    test_uint(d->stores[BOX_DRAWS_STORE_SURFACE].chunk, page / SURFACE);
+    test_uint(d->stores[BOX_DRAWS_STORE_SURFACE].chunk, 349525);
+    test_uint(BOX_DRAWS_CHUNK, 349525);
+    for (i = 0; i < BOX_DRAWS_STORES; i ++) {
+        const box_draw_store_t *s = &d->stores[i];
+        test_uint(s->slots, s->chunk);
+        test_uint(s->max, s->chunk);
+        for (int32_t j = 0; j < s->layout.streams; j ++) {
+            test_assert((uint64_t)s->max * s->layout.stride[j] <= page);
+        }
+    }
+
+    /* The test sizes lower every store, capped by its own chunk */
+    box_render_draws_chunk(world, 3000000);
+    box_render_draws_page(world, 3000000);
+    test_uint(d->stores[BOX_DRAWS_STORE_MESH].chunk, 2796202);
+    test_uint(d->stores[BOX_DRAWS_STORE_MESH].slots, 2796202);
+    test_uint(d->stores[BOX_DRAWS_STORE_SURFACE].chunk, 349525);
+    test_uint(d->stores[BOX_DRAWS_STORE_SURFACE].slots, 349525);
+    box_render_draws_chunk(world, 2);
+    box_render_draws_page(world, 4);
+    for (i = 0; i < BOX_DRAWS_STORES; i ++) {
+        test_uint(d->stores[i].chunk, 2);
+        test_uint(d->stores[i].slots, 4);
+    }
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
 void InstanceStore_grow_steps(void) {
     // gpu_instance_data/instance_growth
     static const uint32_t steps[] = {16, 24, 36, 56, 84, 128, 192, 288, 432, 648};
@@ -1364,6 +1415,44 @@ void InstanceStore_runs_grow_by_half(void) {
         test_uint(desc->size % BOX_RENDER_COPY_ALIGN, 0);
         test_assert(desc->usage & BOX_RENDER_BUFFER_KEEP);
     }
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** A plain mesh batch is not split at the chunk of the surface store, 349,525 instances, while
+ * a batch with a parametric surface is: plain boxes fill one batch of one page past it. */
+void InstanceStore_plain_batch_not_split_at_surface_chunk(void) {
+    // gpu_instance_data/store_chunk_size
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    uint32_t count = BOX_DRAWS_CHUNK + 1, i;
+    for (i = 0; i < count; i ++) {
+        box_new(world, (float)(i % 1000));
+    }
+
+    ecs_entity_t parametric = ecs_new(world);
+    ecs_set(world, parametric, Position, {0, 2, 0});
+    torus_set(world, parametric);
+
+    box_render_draws_stats_t stats = frame(world);
+    test_int(stats.batches, 2);
+    test_int(stats.pages, 2);
+    /* The surface store keys a batch only up to its chunk: its batch continues in another
+     * once it holds 349,525 instances */
+    const box_render_batch_t *plain = batch_of(null, count);
+    test_assert(plain != NULL);
+    test_uint(plain->instances, PAGE(0));
+    test_uint(plain->first_instance, 0);
+    test_assert(batch_page(null, PAGE(1)) == NULL);
+
+    box_render_draws_t *d = box_draws_state(world);
+    box_draw_batch_t *b = batch_get(world, parametric);
+    test_bool(b->key.surface, true);
+    test_uint(box_draws_key_limit(d, &b->key), BOX_DRAWS_CHUNK);
+    box_draw_key_t key = b->key;
+    key.surface = false;
+    test_uint(box_draws_key_limit(d, &key), 2796202);
 
     ecs_fini(world);
     box_render_null_free(null);

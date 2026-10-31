@@ -225,10 +225,11 @@ path.
   compilers are likely to keep the full copy today. The new check costs one `arrayLength` and a
   compare. This could not be timed without a GPU. Cull is unchanged, since it reads only
   transforms. Scatter loses the surface segments of mesh pages.
-- Slots per page: the chunk is derived from the surface stride (`BOX_DRAWS_CHUNK`), so plain
-  batches still split at 349,525 instances. A follow-up can derive the chunk per store from the
-  store's largest stride. 128 MiB / 48 gives 2,796,202 slots, so the 1M box scenes become one
-  batch and one cull job range.
+- Slots per page: the chunk was derived from the surface stride (`BOX_DRAWS_CHUNK`), so plain
+  batches still split at 349,525 instances. Done in the StoreChunkSize follow-up: each store
+  derives its chunk from its own largest stride (`box_draws_layout_chunk`), 128 MiB / 48 =
+  2,796,202 slots for plain meshes, 128 MiB / 64 = 2,097,152 for 2D and 349,525 for surfaces,
+  so the 1M box scenes are one batch, one page and one cull job range.
 - Touches `draw.h` (key, stores), `draw.c` (`box_draws_key`, store setup), `batch.c` (store
   choice, the `surfaces` vector only for surface batches), `gpu_draw.c` (the bind group),
   `mesh.wgsl`, `shadow.wgsl` and `include/instance.wgsl` (docs), and the `InstanceStreams` tests.

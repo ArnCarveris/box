@@ -133,9 +133,11 @@
 /** Buffer handle of the first instance page, the first handle of the instance pages.
  *
  * Every batch draws a run of slots of one instance page: a storage buffer per stream of at most
- * BOX_DRAWS_CHUNK instances. A mesh page with parametric surfaces has BOX_RENDER_INSTANCE_STREAMS,
- * a plain mesh page and a 2D page have BOX_RENDER_INSTANCE_STREAMS_PLAIN, without the surface
- * stream, for which the backend binds a zero record.
+ * the chunk of its store, 128 MiB over the largest stride of its layout (box_draws_layout_chunk;
+ * BOX_DRAWS_CHUNK for the surface store). A mesh page with parametric surfaces has
+ * BOX_RENDER_INSTANCE_STREAMS, a plain mesh page and a 2D page have
+ * BOX_RENDER_INSTANCE_STREAMS_PLAIN, without the surface stream, for which the backend binds a
+ * zero record.
  *
  * box_render_batch_t.instances is the transform stream of the page, first_instance its slot. The
  * pages from BOX_RENDER_BUFFER_FIRST hold the plain meshes: page p has the handle
