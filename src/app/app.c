@@ -181,13 +181,11 @@ done:
 }
 
 /** Private state of a SetAt entity, added with SetAt through With: the components written to
- * the entity since it has SetAt, the components it had before SetAt was added, and the ones
- * added in the same operation as SetAt.
+ * the entity since it has SetAt and the components it had before SetAt was added.
  */
 typedef struct SetAtWritten {
     ecs_vec_t written;  /**< ecs_id_t of the components set since the entity has SetAt */
     ecs_vec_t before;   /**< ecs_id_t of the components the entity had before SetAt */
-    ecs_vec_t batched;  /**< ecs_id_t of the components added with SetAt, as by a stage merge */
 } SetAtWritten;
 
 static ECS_COMPONENT_DECLARE(SetAtWritten);
@@ -209,7 +207,6 @@ static void box_app_set_at_written_dtor(
     for (i = 0; i < count; i ++) {
         ecs_vec_fini_t(NULL, &w[i].written, ecs_id_t);
         ecs_vec_fini_t(NULL, &w[i].before, ecs_id_t);
-        ecs_vec_fini_t(NULL, &w[i].batched, ecs_id_t);
     }
 }
 
@@ -251,7 +248,6 @@ static void box_app_set_at_written_copy(
     for (i = 0; i < count; i ++) {
         d[i].written = ecs_vec_copy_t(NULL, &s[i].written, ecs_id_t);
         d[i].before = ecs_vec_copy_t(NULL, &s[i].before, ecs_id_t);
-        d[i].batched = ecs_vec_copy_t(NULL, &s[i].batched, ecs_id_t);
     }
 }
 
@@ -415,40 +411,29 @@ static void BoxAppSetAtOnTable(
     }
 }
 
-/** Add the non pair ids of a type to a list of ids, except those another type has.
+/** Add the non pair ids of a type to a list of ids.
  *
  * @param ids The list of ecs_id_t
  * @param type The type
- * @param except The type whose ids are not added, or NULL
  */
 static void box_app_set_at_add_type(
     ecs_vec_t *ids,
-    const ecs_type_t *type,
-    const ecs_type_t *except)
+    const ecs_type_t *type)
 {
-    int32_t i, j;
+    int32_t i;
     for (i = 0; i < type->count; i ++) {
         ecs_id_t id = type->array[i];
-        bool skip = ECS_IS_PAIR(id) || box_app_set_at_has(ids, id);
-        for (j = 0; except && j < except->count && !skip; j ++) {
-            skip = except->array[j] == id;
-        }
-
-        if (!skip) {
+        if (!ECS_IS_PAIR(id) && !box_app_set_at_has(ids, id)) {
             ecs_vec_append_t(NULL, ids, ecs_id_t)[0] = id;
         }
     }
 }
 
 /** Record the components a SetAt entity had before SetAt was added, as when a script body
- * writes SetAt after the other components, and the ones added with it.
+ * writes SetAt after the other components.
  *
  * Count the SetAt entities: the first one added creates the observers of AppSetAtOnSet, the
  * last one removed or deleted deletes them.
- *
- * A stage merge adds the components the stage set on an entity with SetAt. A component with a
- * low id and no OnSet hook or observer when the stage queued the set (a light) gets no OnSet:
- * it is copied when it no longer holds its constructed value.
  *
  * @param it The iterator of the observer
  */
@@ -473,15 +458,10 @@ static void BoxAppSetAtOnAddRemove(
 
     const ecs_type_t *before = add && it->other_table ? ecs_table_get_type(it->other_table) : NULL;
     int32_t i;
-    for (i = 0; i < it->count && add; i ++) {
+    for (i = 0; i < it->count && before; i ++) {
         SetAtWritten *w = ecs_get_mut(it->world, it->entities[i], SetAtWritten);
         if (w) {
-            if (before) {
-                box_app_set_at_add_type(&w->before, before, NULL);
-            }
-
-            box_app_set_at_add_type(
-                &w->batched, ecs_get_type(it->world, it->entities[i]), before);
+            box_app_set_at_add_type(&w->before, before);
         }
     }
 }
@@ -543,8 +523,12 @@ static bool box_app_set_at_implied(
 }
 
 /** Copy the components written to a SetAt entity to its target entity: the ones set since it
- * has SetAt, the ones it had before, except those the engine added, and the ones added with
- * SetAt that no longer hold their constructed value.
+ * has SetAt, the ones it had before, except those the engine added, and the other ones that no
+ * longer hold their constructed value.
+ *
+ * A stage merge sets a low id component without OnSet when it had no OnSet hook or observer as
+ * the stage queued the set (a light), with SetAt or in a later batch: such an unrecorded write
+ * is copied when it differs from the constructed value.
  *
  * Pairs, tags, SetAt and the components only added are not copied.
  *
@@ -564,14 +548,13 @@ static void box_app_set_at_copy(
         ecs_id_t id = type->array[i];
         bool written = box_app_set_at_has(&w->written, id);
         bool before = !written && box_app_set_at_has(&w->before, id);
-        bool batched = !written && !before && box_app_set_at_has(&w->batched, id);
-        const ecs_type_info_t *ti = (written || before || batched) && !ECS_IS_PAIR(id) &&
+        const ecs_type_info_t *ti = !ECS_IS_PAIR(id) &&
             id != ecs_id(SetAt) && id != ecs_id(SetAtWritten)
                 ? ecs_get_type_info(world, id) : NULL;
         const void *value = ti ? ecs_get_id(world, from, id) : NULL;
         if (value && (written ||
             (before && !box_app_set_at_implied(world, type, id, ti, value)) ||
-            (batched && !box_app_set_at_constructed(ti, value))))
+            (!before && !box_app_set_at_constructed(ti, value))))
         {
             ecs_set_id(world, to, id, (size_t)ti->size, value);
         }

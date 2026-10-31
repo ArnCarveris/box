@@ -333,7 +333,8 @@
                     "script_last_written",
                     "observer_on_demand",
                     "deferred_first",
-                    "prefab_instance"
+                    "prefab_instance",
+                    "deferred_later_batch"
                 ]
             }
         ]

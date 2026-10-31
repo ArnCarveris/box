@@ -559,3 +559,28 @@ void SetAt_prefab_instance(void) {
 
     ecs_fini(world);
 }
+
+void SetAt_deferred_later_batch(void) {
+    ecs_entity_t e;
+    ecs_world_t *world = set_at_world(&e);
+    ecs_progress(world, 0.1f);
+
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, SetAt, { .frame = 2, .entity = e });
+    test_bool(set_at_active(world), true);
+    ecs_readonly_begin(world, false);
+    ecs_set(ecs_get_stage(world, 0), s, PointLight, { .intensity = 3, .range = 20 });
+    ecs_readonly_end(world);
+    test_bool(ecs_has(world, s, PointLight), true);
+
+    ecs_progress(world, 0.1f);
+    ecs_progress(world, 0.1f);
+    test_bool(ecs_is_alive(world, s), false);
+    const PointLight *light = ecs_get(world, e, PointLight);
+    test_assert(light != NULL);
+    test_flt(light->intensity, 3);
+    test_flt(light->range, 20);
+    test_bool(set_at_active(world), false);
+
+    ecs_fini(world);
+}
