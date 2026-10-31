@@ -1450,7 +1450,7 @@ void box_gpu_cull_fini(
  * stream (2), the surface stream (3) and the material table (4); transform_layout every binding
  * but the shading stream and the material table. Only the transform stream is visible to compute.
  *
- * A 2D page has no surface stream and binds gpu->no_surfaces at 3.
+ * A plain mesh page and a 2D page have no surface stream and bind gpu->no_surfaces at 3.
  *
  * @param gpu The backend
  */

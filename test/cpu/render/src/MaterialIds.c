@@ -216,7 +216,7 @@ void MaterialIds_prefab_instances_share_slot(void) {
     test_int(stats.material_bytes, 0);
     test_int(stats.transform_bytes, COUNT * TRANSFORM);
     test_int(stats.shading_bytes, COUNT * SHADING);
-    test_int(stats.copies, 3);
+    test_int(stats.copies, BOX_RENDER_INSTANCE_STREAMS_PLAIN);
 
     ecs_fini(world);
     box_render_null_free(null);

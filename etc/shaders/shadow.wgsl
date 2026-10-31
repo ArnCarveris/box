@@ -90,9 +90,13 @@ struct PointCutoutOut {
 #endif
 };
 
-// World position of a vertex of a caster; sets surface_data to the surface of its instance.
+// World position of a vertex of a caster; sets surface_data to the surface of its instance. A
+// plain mesh page binds one zero record as its surface stream, so the record is loaded only for a
+// slot inside the buffer and surface_data stays zero otherwise, the plain mesh path.
 fn caster_world(slot: u32, vertex: vec3f) -> vec3f {
-    surface_data = surfaces[slot];
+    if (slot < arrayLength(&surfaces)) {
+        surface_data = surfaces[slot];
+    }
     let model = instance_model(transforms[slot]);
     var position = vertex;
     if (surface_data.p[19].x != 0.0) {

@@ -2,7 +2,7 @@
     "id": "bench_render",
     "type": "application",
     "value": {
-        "description": "Benchmarks for the packet data, the extract of the instanced batches and lights, the shadow pass, the frustum and occlusion cull passes, the effect passes, the baked lighting, prefab instantiation, the atmosphere extract, the particle passes and the transitions of box.render",
+        "description": "Benchmarks for the packet data, the extract of the instanced batches and lights, the shadow pass, the frustum and occlusion cull passes, the effect passes, the baked lighting, prefab instantiation, the atmosphere extract, the particle passes, the transitions and a scene with parametric surfaces of box.render",
         "public": false,
         "use": [
             "box"
@@ -10,7 +10,8 @@
     },
     "lang.c": {
         "include": [
-            "../../src/render"
+            "../../src/render",
+            "../../src/geometry"
         ]
     },
     "bench": {
@@ -158,6 +159,13 @@
                 "benchcases": [
                     "gpu_10k",
                     "gpu_10k_lit_culled"
+                ]
+            },
+            {
+                "id": "Parametric",
+                "benchcases": [
+                    "extract_spaceship_size",
+                    "gpu_spaceship_size"
                 ]
             },
             {

@@ -260,7 +260,10 @@
                     "grown_page_keeps_instances",
                     "moved_run_copies_instances",
                     "moved_run_scatters_copied_changes",
-                    "moved_out_of_released_page_uploads"
+                    "moved_out_of_released_page_uploads",
+                    "parametric_shapes_use_surface_store",
+                    "every_surface_kind_uses_surface_store",
+                    "shape_moves_to_surface_store_and_back"
                 ]
             },
             {
@@ -316,7 +319,9 @@
                     "text_changed_while_disabled",
                     "new_shape2d_uploads_no_surface",
                     "changed_shape2d_uploads_no_surface",
-                    "mesh_uploads_surface_next_to_shape2d",
+                    "plain_mesh_uploads_no_surface_next_to_shape2d",
+                    "changed_plain_mesh_uploads_no_surface",
+                    "parametric_shape_uploads_surface",
                     "text_relayout_uploads_no_surface",
                     "shape2d_packed_color",
                     "glyph_packed_color"

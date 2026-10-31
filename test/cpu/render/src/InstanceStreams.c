@@ -1,7 +1,8 @@
 /**
  * @file InstanceStreams.c
- * @brief Tests for the transform and shading streams of the instance pages: which stream a
- * dynamic tag uploads every frame and which stream a static change scatters.
+ * @brief Tests for the streams of the instance pages: which stream a dynamic tag uploads every
+ * frame and which stream a static change scatters. Plain meshes and 2D shapes have no surface
+ * stream; only shapes with a parametric surface upload one.
  *
  * Every case renders with the null backend and reads the byte counters of the extract, which
  * count the run uploads and the scatter segments of each stream.
@@ -195,7 +196,7 @@ void InstanceStreams_dynamic_transform_uploads_transforms(void) {
     test_int(stats.dynamic, COUNT);
     test_int(stats.transform_bytes, COUNT * TRANSFORM);
     test_int(stats.shading_bytes, COUNT * SHADING);
-    test_int(stats.surface_bytes, COUNT * SURFACE);
+    test_int(stats.surface_bytes, 0);
     for (i = 0; i < 3; i ++) {
         stats = frame(world);
         test_bytes(&stats, COUNT * TRANSFORM, 0);
@@ -401,7 +402,7 @@ void InstanceStreams_toggle_dynamic_transform(void) {
     test_int(stats.dynamic, 1);
     test_int(stats.transform_bytes, TRANSFORM);
     test_int(stats.shading_bytes, SHADING);
-    test_int(stats.surface_bytes, SURFACE);
+    test_int(stats.surface_bytes, 0);
     for (i = 0; i < 3; i ++) {
         stats = frame(world);
         test_bytes(&stats, TRANSFORM, 0);
@@ -853,9 +854,9 @@ void InstanceStreams_changed_shape2d_uploads_no_surface(void) {
     box_render_null_free(null);
 }
 
-/** Meshes keep their surface stream next to 2D shapes, which have none. */
-void InstanceStreams_mesh_uploads_surface_next_to_shape2d(void) {
-    // gpu_instance_data/instance_surface_2d
+/** Plain meshes upload and allocate no surface next to 2D shapes, which have none either. */
+void InstanceStreams_plain_mesh_uploads_no_surface_next_to_shape2d(void) {
+    // gpu_instance_data/instance_surface_mesh
     box_render_null_t *null;
     ecs_world_t *world = world_new(&null);
     int32_t i;
@@ -867,8 +868,109 @@ void InstanceStreams_mesh_uploads_surface_next_to_shape2d(void) {
     box_render_draws_stats_t stats = frame(world);
     test_int(stats.transform_bytes, 2 * COUNT * TRANSFORM);
     test_int(stats.shading_bytes, COUNT * (SHADING + SHADING_2D));
+    test_int(stats.surface_bytes, 0);
+    test_int(stats.page_surface_bytes, 0);
+    test_int(stats.page_bytes, MIN_RUN * (2 * TRANSFORM + SHADING + SHADING_2D));
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** Add a torus shell, a shape with a parametric surface.
+ *
+ * @param world The world
+ * @param x Its x position
+ * @param radius Distance from its axis to the center of its tube
+ * @return The torus
+ */
+static ecs_entity_t torus_new(
+    ecs_world_t *world,
+    float x,
+    float radius)
+{
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {x, 0, 0});
+    ecs_set(world, e, TorusShell, {
+        .radius = radius, .tube = 0.25f,
+        .ring_start = 0, .ring_end = 2 * (float)GLM_PI,
+        .tube_start = 0, .tube_end = 2 * (float)GLM_PI });
+    ecs_set(world, e, Rgb, {200, 100, 50});
+
+    return e;
+}
+
+/** A changed plain mesh writes its transform and shading and no surface. */
+void InstanceStreams_changed_plain_mesh_uploads_no_surface(void) {
+    // gpu_instance_data/instance_surface_mesh
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t boxes[COUNT];
+    int32_t i;
+    for (i = 0; i < COUNT; i ++) {
+        boxes[i] = box_new(world, 0, (float)i);
+    }
+
+    frame(world);
+    box_render_draws_stats_t stats = frame(world);
+    test_bytes(&stats, 0, 0);
+
+    /* A new size sets the ShapeMesh, which writes every stream of the batch */
+    ecs_set(world, boxes[3], Box, {2, 1, 1});
+    stats = frame(world);
+    test_int(stats.scatters, 2);
+    test_bytes(&stats, segment_size(1, TRANSFORM), segment_size(1, SHADING));
+    test_int(stats.page_surface_bytes, 0);
+
+    ecs_delete(world, boxes[0]);
+    stats = frame(world);
+    test_int(stats.surface_bytes, 0);
+    test_int(stats.upload_bytes, stats.transform_bytes + stats.shading_bytes);
+    test_int(stats.page_surface_bytes, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** Shapes with a parametric surface upload and allocate their surface stream next to plain
+ * meshes, which do not, and scatter a changed surface. */
+void InstanceStreams_parametric_shape_uploads_surface(void) {
+    // gpu_instance_data/instance_surface_mesh
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t tori[COUNT];
+    int32_t i;
+    for (i = 0; i < COUNT; i ++) {
+        box_new(world, 0, (float)i);
+        tori[i] = torus_new(world, (float)i, 1);
+    }
+
+    box_render_draws_stats_t stats = frame(world);
+    test_int(stats.transform_bytes, 2 * COUNT * TRANSFORM);
+    test_int(stats.shading_bytes, 2 * COUNT * SHADING);
     test_int(stats.surface_bytes, COUNT * SURFACE);
+    test_int(stats.upload_bytes, 2 * COUNT * (TRANSFORM + SHADING) + COUNT * SURFACE);
     test_int(stats.page_surface_bytes, MIN_RUN * SURFACE);
+    test_int(stats.page_bytes, 2 * MIN_RUN * (TRANSFORM + SHADING) + MIN_RUN * SURFACE);
+
+    stats = frame(world);
+    test_int(stats.upload_bytes, 0);
+
+    /* A new radius keeps the mesh and writes every stream of the slot, the surface too */
+    ecs_set(world, tori[4], TorusShell, {
+        .radius = 2, .tube = 0.25f,
+        .ring_start = 0, .ring_end = 2 * (float)GLM_PI,
+        .tube_start = 0, .tube_end = 2 * (float)GLM_PI });
+    stats = frame(world);
+    test_int(stats.scatters, 3);
+    test_int(stats.transform_bytes, segment_size(1, TRANSFORM));
+    test_int(stats.shading_bytes, segment_size(1, SHADING));
+    test_int(stats.surface_bytes, segment_size(1, SURFACE));
+
+    /* A moved torus writes its transform only */
+    ecs_set(world, tori[6], Position, {6, 2, 0});
+    stats = frame(world);
+    test_int(stats.scatters, 1);
+    test_bytes(&stats, segment_size(1, TRANSFORM), 0);
 
     ecs_fini(world);
     box_render_null_free(null);

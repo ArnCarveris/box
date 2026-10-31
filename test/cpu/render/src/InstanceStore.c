@@ -3,12 +3,16 @@
  * @brief Tests for the instance pages every batch shares: runs, pages, uploads and scatters.
  *
  * Every case renders with the null backend and reads the packets it received. A batch per
- * mesh is made with regular polygons of distinct side counts.
+ * mesh is made with regular polygons of distinct side counts, plain meshes whose pages have the
+ * transform and the shading stream; shapes with a parametric surface have pages of their own
+ * with the surface stream too.
  */
 
 #include <box.h>
 #include <bake_test.h>
 #include "render.h"
+#include "draw.h"
+#include "../../../geometry_assets.h"
 
 /** Bytes of one scatter entry of the transform stream: the slot and the transform */
 #define ENTRY ((int64_t)sizeof(uint32_t) + (int64_t)sizeof(box_render_transform_t))
@@ -19,12 +23,24 @@
 /** Bytes of one instance in the transform stream */
 #define STRIDE ((uint32_t)sizeof(box_render_transform_t))
 
-/** Bytes of one instance in every stream */
-#define INSTANCE ((uint32_t)(sizeof(box_render_transform_t) + sizeof(box_render_mesh_shading_t) + \
-    sizeof(box_render_surface_t)))
+/** Bytes of one plain mesh instance in every stream of its page */
+#define INSTANCE ((uint32_t)(sizeof(box_render_transform_t) + sizeof(box_render_mesh_shading_t)))
 
-/** Handle of the transform stream of a page */
+/** Bytes of one instance in the surface stream */
+#define SURFACE ((uint32_t)sizeof(box_render_surface_t))
+
+/** Bytes of one instance with a parametric surface in every stream of its page */
+#define SURFACE_INSTANCE (INSTANCE + SURFACE)
+
+/** Streams of a plain mesh page */
+#define STREAMS (BOX_RENDER_INSTANCE_STREAMS_PLAIN)
+
+/** Handle of the transform stream of a plain mesh page */
 #define PAGE(index) (BOX_RENDER_BUFFER_FIRST + (uint32_t)(index) * BOX_RENDER_INSTANCE_STREAMS)
+
+/** Handle of the transform stream of a mesh page with the surface stream */
+#define SURFACE_PAGE(index) \
+    (BOX_RENDER_BUFFER_FIRST_SURFACE + (uint32_t)(index) * BOX_RENDER_INSTANCE_STREAMS)
 
 /** Create a world that renders with a null backend and has a view.
  *
@@ -603,7 +619,7 @@ void InstanceStore_new_backend_sends_pages_again(void) {
     test_int(buffer_ops(second, BOX_RENDER_CREATE, PAGE(0)), 1);
     test_int(buffer_ops(second, BOX_RENDER_CREATE, PAGE(1)), 1);
     int64_t bytes;
-    test_int(page_uploads(second, &bytes), 4 * BOX_RENDER_INSTANCE_STREAMS);
+    test_int(page_uploads(second, &bytes), 4 * STREAMS);
     test_int(bytes, 4 * 2 * INSTANCE);
     for (i = 0; i < 4; i ++) {
         const box_render_batch_t *b = ecs_vec_get_t(
@@ -643,7 +659,7 @@ void InstanceStore_page_memory_mesh_and_2d(void) {
     int64_t transform = (mesh + shape2d) * (int64_t)sizeof(box_render_transform_t);
     int64_t shading = mesh * (int64_t)sizeof(box_render_mesh_shading_t) +
         shape2d * (int64_t)sizeof(box_render_shading_t);
-    int64_t surface = mesh * (int64_t)sizeof(box_render_surface_t);
+    int64_t surface = 0;
     test_int(stats.page_slots, mesh + shape2d);
     test_int(stats.page_transform_bytes, transform);
     test_int(stats.page_shading_bytes, shading);
@@ -680,7 +696,7 @@ void InstanceStore_page_memory_drops_with_released_pages(void) {
     test_int(stats.page_slots, 3 * 4);
     test_int(stats.page_transform_bytes, 3 * 4 * (int64_t)sizeof(box_render_transform_t));
     test_int(stats.page_shading_bytes, 3 * 4 * (int64_t)sizeof(box_render_mesh_shading_t));
-    test_int(stats.page_surface_bytes, 3 * 4 * (int64_t)sizeof(box_render_surface_t));
+    test_int(stats.page_surface_bytes, 0);
     test_int(stats.page_bytes, 3 * 4 * (int64_t)INSTANCE);
 
     for (i = 2; i < 4; i ++) {
@@ -695,7 +711,7 @@ void InstanceStore_page_memory_drops_with_released_pages(void) {
     test_int(stats.page_slots, 2 * 4);
     test_int(stats.page_transform_bytes, 2 * 4 * (int64_t)sizeof(box_render_transform_t));
     test_int(stats.page_shading_bytes, 2 * 4 * (int64_t)sizeof(box_render_mesh_shading_t));
-    test_int(stats.page_surface_bytes, 2 * 4 * (int64_t)sizeof(box_render_surface_t));
+    test_int(stats.page_surface_bytes, 0);
     test_int(stats.page_bytes, 2 * 4 * (int64_t)INSTANCE);
 
     for (j = 0; j < 2; j ++) {
@@ -721,7 +737,7 @@ void InstanceStore_grown_page_keeps_instances(void) {
     }
 
     frame(world);
-    for (s = 0; s < BOX_RENDER_INSTANCE_STREAMS; s ++) {
+    for (s = 0; s < STREAMS; s ++) {
         const box_render_buffer_desc_t *desc = created(null, PAGE(0) + (uint32_t)s);
         test_assert(desc != NULL);
         test_uint(desc->size, (uint64_t)MIN_RUN * stride_of(s));
@@ -739,7 +755,7 @@ void InstanceStore_grown_page_keeps_instances(void) {
     test_int(stats.pages, 1);
     test_uint(batch_of(null, 2)->first_instance, 0);
     test_uint(batch_of(null, 3)->first_instance, MIN_RUN);
-    for (s = 0; s < BOX_RENDER_INSTANCE_STREAMS; s ++) {
+    for (s = 0; s < STREAMS; s ++) {
         const box_render_buffer_desc_t *desc = created(null, PAGE(0) + (uint32_t)s);
         test_assert(desc != NULL);
         test_uint(desc->size, (uint64_t)MIN_RUN * 2 * stride_of(s));
@@ -751,14 +767,14 @@ void InstanceStore_grown_page_keeps_instances(void) {
     }
 
     int64_t bytes;
-    test_int(page_uploads(null, &bytes), BOX_RENDER_INSTANCE_STREAMS);
+    test_int(page_uploads(null, &bytes), STREAMS);
     test_int(bytes, 3 * INSTANCE);
     test_int(stats.upload_bytes, 3 * INSTANCE);
-    test_int(stats.kept_pages, BOX_RENDER_INSTANCE_STREAMS);
+    test_int(stats.kept_pages, STREAMS);
     test_int(stats.kept_bytes, MIN_RUN * INSTANCE);
     test_int(stats.copies, 0);
     test_int(ecs_vec_count(&null->last.copies), 0);
-    test_int(null->kept, BOX_RENDER_INSTANCE_STREAMS);
+    test_int(null->kept, STREAMS);
 
     stats = frame(world);
     test_int(stats.upload_bytes, 0);
@@ -790,11 +806,11 @@ void InstanceStore_moved_run_copies_instances(void) {
      * from 128 to 256 slots in the same frame */
     box_render_draws_stats_t stats = frame(world);
     test_uint(batch_of(null, MIN_RUN + 2)->first_instance, MIN_RUN * 2);
-    test_int(ecs_vec_count(&null->last.copies), BOX_RENDER_INSTANCE_STREAMS);
-    test_int(stats.copies, BOX_RENDER_INSTANCE_STREAMS);
+    test_int(ecs_vec_count(&null->last.copies), STREAMS);
+    test_int(stats.copies, STREAMS);
     test_int(stats.copy_bytes, 2 * INSTANCE);
-    test_int(stats.kept_pages, BOX_RENDER_INSTANCE_STREAMS);
-    for (s = 0; s < BOX_RENDER_INSTANCE_STREAMS; s ++) {
+    test_int(stats.kept_pages, STREAMS);
+    for (s = 0; s < STREAMS; s ++) {
         uint32_t stride = stride_of(s), buffer = PAGE(0) + (uint32_t)s;
         const box_render_copy_t *c = ecs_vec_get_t(&null->last.copies, box_render_copy_t, s);
         test_uint(c->src, buffer);
@@ -810,11 +826,11 @@ void InstanceStore_moved_run_copies_instances(void) {
 
     /* Only the new instances upload, nothing of the two moved ones or of the second batch */
     int64_t bytes;
-    test_int(page_uploads(null, &bytes), BOX_RENDER_INSTANCE_STREAMS);
+    test_int(page_uploads(null, &bytes), STREAMS);
     test_int(bytes, MIN_RUN * INSTANCE);
     test_int(stats.upload_bytes, MIN_RUN * INSTANCE);
     test_int(stats.scatters, 0);
-    test_int(null->copies, BOX_RENDER_INSTANCE_STREAMS);
+    test_int(null->copies, STREAMS);
     test_int(null->copy_bytes, 2 * INSTANCE);
 
     stats = frame(world);
@@ -849,7 +865,7 @@ void InstanceStore_moved_run_scatters_copied_changes(void) {
     test_assert(moved != NULL);
     uint32_t at = moved->first_instance;
     test_assert(at != 0);
-    test_int(stats.copies, BOX_RENDER_INSTANCE_STREAMS);
+    test_int(stats.copies, STREAMS);
     test_int(copy_of(null, PAGE(0), 0, at * STRIDE, 4 * STRIDE), 1);
     test_int(stats.scatters, 1);
     test_int(stats.scattered, 1);
@@ -859,7 +875,7 @@ void InstanceStore_moved_run_scatters_copied_changes(void) {
     test_uint(sc->count, 1);
     test_int(uploads_at(null, PAGE(0), (at + 4) * STRIDE), 1);
     int64_t bytes;
-    test_int(page_uploads(null, &bytes), BOX_RENDER_INSTANCE_STREAMS);
+    test_int(page_uploads(null, &bytes), STREAMS);
     test_int(bytes, MIN_RUN * INSTANCE);
 
     const box_render_upload_t *changes = NULL;
@@ -912,9 +928,307 @@ void InstanceStore_moved_out_of_released_page_uploads(void) {
     test_int(stats.copies, 0);
     test_int(ecs_vec_count(&null->last.copies), 0);
     int64_t bytes;
-    test_int(page_uploads(null, &bytes), BOX_RENDER_INSTANCE_STREAMS);
+    test_int(page_uploads(null, &bytes), STREAMS);
     test_int(bytes, (MIN_RUN + 2) * INSTANCE);
     test_int(uploads_at(null, PAGE(2), 0), 1);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** Add a box, a plain mesh.
+ *
+ * @param world The world
+ * @param x Its x position
+ * @return The box
+ */
+static ecs_entity_t box_new(
+    ecs_world_t *world,
+    float x)
+{
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {x, 0, 0});
+    ecs_set(world, e, Box, {1, 1, 1});
+
+    return e;
+}
+
+/** Give a shape a torus shell, so its ShapeMesh gets a parametric surface.
+ *
+ * @param world The world
+ * @param e The shape
+ */
+static void torus_set(
+    ecs_world_t *world,
+    ecs_entity_t e)
+{
+    ecs_set(world, e, TorusShell, {
+        .radius = 1, .tube = 0.25f,
+        .ring_start = 0, .ring_end = 2 * (float)GLM_PI,
+        .tube_start = 0, .tube_end = 2 * (float)GLM_PI });
+}
+
+/** Get the batch of a shape as the extract keeps it.
+ *
+ * @param world The world
+ * @param e The shape
+ * @return Its batch
+ */
+static box_draw_batch_t* batch_get(
+    ecs_world_t *world,
+    ecs_entity_t e)
+{
+    const DrawSlot *slot = ecs_get(world, e, DrawSlot);
+    test_assert(slot != NULL && slot->batch >= 0);
+
+    return box_draws_batch(box_draws_state(world), slot->batch);
+}
+
+/** Check that a shape is in a batch of the store of its surface and that the batch keeps
+ * surfaces only with the surface stream.
+ *
+ * @param world The world
+ * @param e The shape
+ * @param surface Whether the shape has a parametric surface
+ */
+static void test_store_of(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    bool surface)
+{
+    box_render_draws_t *d = box_draws_state(world);
+    box_draw_batch_t *b = batch_get(world, e);
+    int32_t slot = ecs_get(world, e, DrawSlot)->slot;
+    test_bool(b->key.surface, surface);
+    test_assert(box_draws_batch_store(d, b) ==
+        &d->stores[surface ? BOX_DRAWS_STORE_SURFACE : BOX_DRAWS_STORE_MESH]);
+    test_uint(box_draws_batch_kinds(b), surface ? BOX_DRAW_ALL : BOX_DRAW_BOTH);
+    test_int(ecs_vec_count(&b->surfaces), surface ? ecs_vec_count(&b->entities) : 0);
+    if (surface) {
+        test_assert(box_draws_slot_surface(b, slot)->p[0][0] != 0.0f);
+    } else {
+        test_assert(box_draws_slot_surface(b, slot) == NULL);
+        test_assert(!b->bounded);
+    }
+}
+
+/** Plain meshes take pages without the surface stream, shapes with a parametric surface pages
+ * of the surface store with all three streams. */
+void InstanceStore_parametric_shapes_use_surface_store(void) {
+    // gpu_instance_data/instance_surface_mesh
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t plain[4], parametric[3];
+    int32_t i, s;
+    for (i = 0; i < 4; i ++) {
+        plain[i] = shape_new(world, 3, (float)i, false);
+    }
+
+    for (i = 0; i < 3; i ++) {
+        parametric[i] = ecs_new(world);
+        ecs_set(world, parametric[i], Position, {(float)i, 2, 0});
+        torus_set(world, parametric[i]);
+    }
+
+    box_render_draws_stats_t stats = frame(world);
+    for (i = 0; i < 4; i ++) {
+        test_store_of(world, plain[i], false);
+    }
+
+    for (i = 0; i < 3; i ++) {
+        test_store_of(world, parametric[i], true);
+    }
+
+    test_int(stats.pages, 2);
+    test_uint(batch_of(null, 4)->instances, PAGE(0));
+    test_uint(batch_of(null, 3)->instances, SURFACE_PAGE(0));
+    test_int(stats.transform_bytes, 7 * STRIDE);
+    test_int(stats.shading_bytes, 7 * (int64_t)sizeof(box_render_mesh_shading_t));
+    test_int(stats.surface_bytes, 3 * SURFACE);
+    test_int(stats.page_slots, 2 * MIN_RUN);
+    test_int(stats.page_surface_bytes, MIN_RUN * SURFACE);
+    test_int(stats.page_bytes, MIN_RUN * (INSTANCE + SURFACE_INSTANCE));
+
+    /* The plain page has no surface buffer, the surface page one of MIN_RUN records */
+    for (s = 0; s < BOX_RENDER_INSTANCE_STREAMS; s ++) {
+        bool plain_stream = s != BOX_RENDER_STREAM_SURFACE;
+        test_int(buffer_ops(null, BOX_RENDER_CREATE, PAGE(0) + (uint32_t)s), plain_stream);
+        const box_render_buffer_desc_t *desc = created(null, SURFACE_PAGE(0) + (uint32_t)s);
+        test_assert(desc != NULL);
+        test_uint(desc->size, (uint64_t)MIN_RUN * stride_of(s));
+        test_int(uploads_at(null, PAGE(0) + (uint32_t)s, 0), plain_stream);
+        test_int(uploads_at(null, SURFACE_PAGE(0) + (uint32_t)s, 0), 1);
+    }
+
+    stats = frame(world);
+    test_int(stats.upload_bytes, 0);
+
+    /* A moved plain mesh scatters its transform only; a moved parametric shape its transform
+     * into the surface page */
+    ecs_set(world, plain[1], Position, {1, 1, 0});
+    ecs_set(world, parametric[1], Position, {1, 3, 0});
+    stats = frame(world);
+    test_int(stats.surface_bytes, 0);
+    test_int(stats.shading_bytes, 0);
+    test_int(stats.scatters, 2);
+    test_int(stats.scattered, 2);
+    for (i = 0; i < ecs_vec_count(&null->last.scatters); i ++) {
+        const box_render_scatter_t *sc = ecs_vec_get_t(
+            &null->last.scatters, box_render_scatter_t, i);
+        test_assert(sc->buffer == PAGE(0) || sc->buffer == SURFACE_PAGE(0));
+    }
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** Every kind of parametric surface keys its shape into the surface store; the other meshes,
+ * whatever their shape, stay plain. */
+void InstanceStore_every_surface_kind_uses_surface_store(void) {
+    // gpu_instance_data/instance_surface_mesh
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t kinds[7];
+    int32_t i;
+    for (i = 0; i < 7; i ++) {
+        kinds[i] = ecs_new(world);
+        ecs_set(world, kinds[i], Position, {(float)i * 3, 0, 0});
+    }
+
+    Sweep sweep = test_sweep(world);
+    ecs_set_ptr(world, kinds[0], Sweep, &sweep);
+
+    ecs_entity_t square = test_profile(world,
+        (vec2[]){{-1, -1}, {1, -1}, {1, 1}, {-1, 1}}, 4, NULL, 0);
+    Loft loft = {.cap_start = true, .cap_end = true};
+    *ecs_vec_append_t(NULL, &loft.sections, LoftSection) =
+        (LoftSection){.profile = square, .scale = {0.5f, 0.5f}};
+    *ecs_vec_append_t(NULL, &loft.sections, LoftSection) =
+        (LoftSection){.profile = square, .offset = {0, 1, 0}, .scale = {1, 1}};
+    ecs_set_ptr(world, kinds[1], Loft, &loft);
+    ecs_vec_fini_t(NULL, &loft.sections, LoftSection);
+
+    Lathe lathe = {.cap_start = true, .cap_end = true};
+    vec2 wall[2] = {{1, -1}, {1, 1}};
+    lathe.profile = test_path2(world, wall, 2, false);
+    ecs_set_ptr(world, kinds[2], Lathe, &lathe);
+
+    ecs_set(world, kinds[3], EllipsoidShell, {
+        .radius = {1, 0.5f, 1}, .longitude_end = 2 * (float)GLM_PI,
+        .latitude_start = -(float)GLM_PI_2, .latitude_end = (float)GLM_PI_2 });
+    torus_set(world, kinds[4]);
+
+    BeveledPrism prism = {.depth = 1, .bevel = 0.1f};
+    vec2 corners[4] = {{-1, -1}, {1, -1}, {1, 1}, {-1, 1}};
+    ecs_vec_init_t(NULL, &prism.footprint, vec2, 4);
+    ecs_vec_set_count_t(NULL, &prism.footprint, vec2, 4);
+    ecs_os_memcpy(ecs_vec_first(&prism.footprint), corners, ECS_SIZEOF(corners));
+    ecs_set_ptr(world, kinds[5], BeveledPrism, &prism);
+    ecs_vec_fini_t(NULL, &prism.footprint, vec2);
+
+    ecs_set(world, kinds[6], ProfileExtrusion, {.profile = square, .depth = 1,
+        .cap_start = true, .cap_end = true});
+
+    ecs_entity_t box = box_new(world, -3), polygon = shape_new(world, 5, -6, false);
+    ecs_entity_t sphere = ecs_new(world);
+    ecs_set(world, sphere, Position, {-9, 0, 0});
+    ecs_set(world, sphere, Sphere, {.segments = 8, .radius = 0.5f});
+    box_render_draws_stats_t stats = frame(world);
+    for (i = 0; i < 7; i ++) {
+        test_store_of(world, kinds[i], true);
+        test_flt(box_draws_slot_surface(batch_get(world, kinds[i]),
+            ecs_get(world, kinds[i], DrawSlot)->slot)->p[0][0], (float)(i + 1));
+    }
+
+    test_store_of(world, box, false);
+    test_store_of(world, polygon, false);
+    test_store_of(world, sphere, false);
+    /* Seven runs of MIN_RUN slots end at 7 * MIN_RUN, so the surface page buffers double from
+     * MIN_RUN to 8 * MIN_RUN slots */
+    test_int(stats.surface_bytes, 7 * SURFACE);
+    test_int(stats.page_surface_bytes, 8 * MIN_RUN * SURFACE);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** A shape whose ShapeMesh gains a parametric surface moves from the plain store to the surface
+ * store, and back when it loses it; its old slot is released each time. */
+void InstanceStore_shape_moves_to_surface_store_and_back(void) {
+    // gpu_instance_data/instance_surface_mesh
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t moving = box_new(world, 0), stay = box_new(world, 2);
+    int32_t s;
+    frame(world);
+    box_render_draws_stats_t stats = frame(world);
+    test_int(stats.upload_bytes, 0);
+    box_draw_batch_t *plain = batch_get(world, stay);
+    int32_t plain_index = ecs_get(world, stay, DrawSlot)->batch;
+    test_store_of(world, moving, false);
+    test_int(ecs_get(world, moving, DrawSlot)->batch, plain_index);
+    test_int(ecs_get(world, moving, DrawSlot)->slot, 0);
+    test_int(ecs_vec_count(&plain->entities), 2);
+
+    /* Gains a surface: a batch of the surface store, which uploads all three streams of its
+     * run; the plain batch releases the slot, and its last instance moves into it */
+    torus_set(world, moving);
+    stats = frame(world);
+    test_int(stats.pages, 2);
+    test_store_of(world, moving, true);
+    test_store_of(world, stay, false);
+    test_assert(ecs_get(world, moving, DrawSlot)->batch != plain_index);
+    test_int(ecs_vec_count(&plain->entities), 1);
+    test_uint(*ecs_vec_get_t(&plain->entities, ecs_entity_t, 0), stay);
+    test_int(ecs_get(world, stay, DrawSlot)->slot, 0);
+    test_int(stats.surface_bytes, SURFACE);
+    test_int(stats.page_surface_bytes, MIN_RUN * SURFACE);
+    test_uint(batch_of(null, 1) != NULL, true);
+    for (s = 0; s < BOX_RENDER_INSTANCE_STREAMS; s ++) {
+        test_int(buffer_ops(null, BOX_RENDER_CREATE, SURFACE_PAGE(0) + (uint32_t)s), 1);
+        test_int(uploads_at(null, SURFACE_PAGE(0) + (uint32_t)s, 0), 1);
+    }
+
+    test_int(buffer_ops(null, BOX_RENDER_CREATE, PAGE(0) + BOX_RENDER_STREAM_SURFACE), 0);
+    test_int(uploads_at(null, PAGE(0) + BOX_RENDER_STREAM_SURFACE, 0), 0);
+    for (s = 0; s < ecs_vec_count(&null->last.scatters); s ++) {
+        const box_render_scatter_t *sc = ecs_vec_get_t(
+            &null->last.scatters, box_render_scatter_t, s);
+        test_assert(sc->buffer == PAGE(0) + BOX_RENDER_STREAM_TRANSFORM ||
+            sc->buffer == PAGE(0) + BOX_RENDER_STREAM_SHADING);
+    }
+
+    stats = frame(world);
+    test_int(stats.upload_bytes, 0);
+
+    /* Loses the surface: back into the plain batch, after the instance that stayed; the batch
+     * of the surface store is empty, so its run and its page are released */
+    ecs_set(world, moving, Box, {1, 1, 1});
+    stats = frame(world);
+    test_store_of(world, moving, false);
+    test_int(ecs_get(world, moving, DrawSlot)->batch, plain_index);
+    test_int(ecs_get(world, moving, DrawSlot)->slot, 1);
+    test_int(ecs_vec_count(&plain->entities), 2);
+    test_int(stats.pages, 1);
+    test_int(stats.surface_bytes, 0);
+    test_int(stats.page_surface_bytes, 0);
+    test_int(stats.page_bytes, MIN_RUN * INSTANCE);
+    for (s = 0; s < BOX_RENDER_INSTANCE_STREAMS; s ++) {
+        test_int(buffer_ops(null, BOX_RENDER_DESTROY, SURFACE_PAGE(0) + (uint32_t)s), 1);
+        test_int(buffer_ops(null, BOX_RENDER_DESTROY, PAGE(0) + (uint32_t)s), 0);
+    }
+
+    stats = frame(world);
+    test_int(stats.upload_bytes, 0);
+
+    /* And gains it again: the surface store hands out its lowest page again */
+    torus_set(world, moving);
+    stats = frame(world);
+    test_store_of(world, moving, true);
+    test_int(ecs_vec_count(&plain->entities), 1);
+    test_int(stats.surface_bytes, SURFACE);
+    test_uint(batch_of(null, 1) != NULL, true);
+    test_int(buffer_ops(null, BOX_RENDER_CREATE, SURFACE_PAGE(0) + BOX_RENDER_STREAM_SURFACE), 1);
 
     ecs_fini(world);
     box_render_null_free(null);

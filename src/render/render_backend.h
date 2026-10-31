@@ -422,6 +422,19 @@ bool box_render_gpu_read_buffer(
     uint32_t size,
     void *out);
 
+/** Get the bytes of a buffer the GPU backend of a world created for a handle.
+ *
+ * Only call this when the main thread renders (RenderSettings.main_thread), after
+ * box_render_sync, as box_render_gpu_read_buffer.
+ *
+ * @param world The world
+ * @param handle Handle of the buffer
+ * @return The bytes, 0 when the backend has no buffer for the handle or is not the GPU backend
+ */
+uint64_t box_render_gpu_buffer_size(
+    ecs_world_t *world,
+    uint32_t handle);
+
 /** Read back what the cull pass of a view kept in the last target the GPU backend rendered.
  *
  * Only call this when the main thread renders (RenderSettings.main_thread), after

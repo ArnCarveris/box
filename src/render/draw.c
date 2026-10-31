@@ -508,6 +508,10 @@ static void BoxDrawsOnLightBake(
  * the sorted blended pass (AlphaBlend), is not alpha tested and casts no shadow, whatever its
  * BlendMode, Opacity and AlphaCutoff.
  *
+ * A shape with a parametric surface goes to a batch with the surface stream; a render mesh exists
+ * only for a surface and the grid mesh of a kind 7 surface is keyed by its profile, so the mesh
+ * already tells the surfaces apart and the bit only selects the store.
+ *
  * @param world The world
  * @param d The state
  * @param e The entity
@@ -544,6 +548,7 @@ static void box_draws_key(
     key->scene = box_draws_scene(world, d, e);
     key->mesh = shape->render_mesh ? shape->render_mesh : shape->mesh;
     key->pipeline = shape2d ? BOX_RENDER_SHADER_SHAPE2D : BOX_RENDER_SHADER_MESH;
+    key->surface = shape->surface.p[0][0] != 0.0f;
     if (shape2d && shape2d->texture) {
         key->textures[0] = shape2d->texture;
     }
@@ -579,7 +584,8 @@ static void box_draws_key(
  * @param b The batch of the slot
  * @param slot The slot
  * @param was_transform The transform the slot had, NULL for a new slot
- * @param was_surface The surface the slot had, NULL for a new slot
+ * @param was_surface The surface the slot had, NULL for a new slot or a batch without the
+ * surface stream
  * @param kinds box_draw_kind_t, the streams the change wrote
  */
 static void box_draws_shadow_update(
@@ -602,7 +608,7 @@ static void box_draws_shadow_update(
     if (!was_transform) {
         box_draws_shadow_region(world, d, b, transform, surface);
     } else if (ecs_os_memcmp_t(was_transform, transform, box_render_transform_t) ||
-        ecs_os_memcmp_t(was_surface, surface, box_render_surface_t) ||
+        (surface && ecs_os_memcmp_t(was_surface, surface, box_render_surface_t)) ||
         (b->key.cutout && (kinds & BOX_DRAW_SHADING)))
     {
         box_draws_shadow_region(world, d, b, was_transform, was_surface);
@@ -644,7 +650,7 @@ static void box_draws_update_shape(
     const ShapeMesh *shape = ecs_get(world, e, ShapeMesh);
     bool drawn = shape && shape->mesh && !ecs_has_id(world, e, EcsPrefab) &&
         !ecs_has_id(world, e, EcsDisabled);
-    bool kept = false, recorded = false;
+    bool kept = false, recorded = false, surfaced = false;
     s->dirty = false;
     d->stats.processed ++;
     if (drawn) {
@@ -678,9 +684,14 @@ static void box_draws_update_shape(
 write:
     kinds &= box_draws_batch_kinds(b);
     if (kept && d->shadow_record && box_draws_caster(b)) {
+        const box_render_surface_t *surface = box_draws_slot_surface(b, s->slot);
         was_transform = *box_draws_slot_transform(b, s->slot);
-        was_surface = *box_draws_slot_surface(b, s->slot);
+        if (surface) {
+            was_surface = *surface;
+        }
+
         recorded = true;
+        surfaced = surface != NULL;
     }
 
     if (material.shape2d) {
@@ -713,7 +724,7 @@ write:
     }
 
     box_draws_shadow_update(world, d, b, s->slot, recorded ? &was_transform : NULL,
-        recorded ? &was_surface : NULL, kinds);
+        surfaced ? &was_surface : NULL, kinds);
     box_draws_slot_changed(b, s->slot, kinds);
 done:
     return;
@@ -1106,13 +1117,20 @@ void box_render_draws_init(
     box_draws_clips_init(d);
     box_draws_materials_init(d);
     box_draws_store_init(&d->stores[BOX_DRAWS_STORE_MESH], &(box_draw_layout_t){
+        .streams = BOX_RENDER_INSTANCE_STREAMS_PLAIN,
+        .stride = {
+            [BOX_RENDER_STREAM_TRANSFORM] = (uint32_t)sizeof(box_render_transform_t),
+            [BOX_RENDER_STREAM_SHADING] = (uint32_t)sizeof(box_render_mesh_shading_t)
+        }
+    }, BOX_RENDER_BUFFER_FIRST, BOX_DRAWS_CHUNK);
+    box_draws_store_init(&d->stores[BOX_DRAWS_STORE_SURFACE], &(box_draw_layout_t){
         .streams = BOX_DRAWS_STREAMS,
         .stride = {
             [BOX_RENDER_STREAM_TRANSFORM] = (uint32_t)sizeof(box_render_transform_t),
             [BOX_RENDER_STREAM_SHADING] = (uint32_t)sizeof(box_render_mesh_shading_t),
             [BOX_RENDER_STREAM_SURFACE] = (uint32_t)sizeof(box_render_surface_t)
         }
-    }, BOX_RENDER_BUFFER_FIRST, BOX_DRAWS_CHUNK);
+    }, BOX_RENDER_BUFFER_FIRST_SURFACE, BOX_DRAWS_CHUNK);
     box_draws_store_init(&d->stores[BOX_DRAWS_STORE_2D], &(box_draw_layout_t){
         .streams = BOX_RENDER_INSTANCE_STREAMS_2D,
         .stride = {
