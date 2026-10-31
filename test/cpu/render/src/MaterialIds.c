@@ -1361,6 +1361,36 @@ void MaterialIds_prefab_from_shared_slot_same_color(void) {
     box_render_null_free(null);
 }
 
+void MaterialIds_prefab_from_shared_slot_deferred(void) {
+    // gpu_instance_data/material_prefab_slot
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t base = shape_new(world, 0, 10, 200, 30);
+    ecs_entity_t inst = instance_new(world, base, 2);
+    ecs_entity_t other = shape_new(world, 1, 10, 200, 30);
+    frame(world);
+    frame(world);
+    uint32_t shared = id_of(world, base);
+    test_uint(id_of(world, other), shared);
+    test_uint(shading_of(world, inst)->material, shared);
+
+    ecs_world_t *stage = ecs_get_stage(world, 0);
+    ecs_readonly_begin(world, false);
+    ecs_add_id(stage, base, EcsPrefab);
+    test_assert(!ecs_has_id(world, base, EcsPrefab));
+    ecs_readonly_end(world);
+    frame(world);
+    frame(world);
+    uint32_t own = id_of(world, base);
+    test_assert(own != shared);
+    test_uint(id_of(world, other), shared);
+    test_uint(shading_of(world, inst)->material, own);
+    test_uint(shading_of(world, other)->material, shared);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
 /** Stop the light extract, which takes and clears the shadow regions every frame, and have the
  * draws record them, so a case reads the regions of each frame.
  *
