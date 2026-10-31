@@ -656,18 +656,14 @@ void box_surface_point_size(
     }
 }
 
-bool box_surface_view_size(
+ecs_entity_t box_surface_of_view(
     ecs_world_t *world,
     ecs_query_t *surfaces,
-    ecs_entity_t view,
-    float *width,
-    float *height)
+    ecs_entity_t view)
 {
     ecs_query_t *q = surfaces;
     ecs_entity_t parent = view ? ecs_get_parent(world, view) : 0;
-    bool found = false;
-    *width = BOX_SURFACE_WIDTH;
-    *height = BOX_SURFACE_HEIGHT;
+    ecs_entity_t result = 0;
     if (!q) {
         q = ecs_query(world, {
             .terms = {
@@ -678,21 +674,19 @@ bool box_surface_view_size(
     }
 
     ecs_iter_t it = ecs_query_iter(world, q);
-    while (!found && ecs_query_next(&it)) {
+    while (!result && ecs_query_next(&it)) {
         const Surface *s = ecs_field(&it, Surface, 0);
-        const SurfaceStatus *st = ecs_field(&it, SurfaceStatus, 1);
         int32_t i;
-        for (i = 0; i < it.count && !found; i ++) {
+        for (i = 0; i < it.count && !result; i ++) {
             if (s[i].view_root && s[i].view_root != parent) {
                 continue;
             }
 
-            found = true;
-            box_surface_point_size(&s[i], st ? &st[i] : NULL, width, height);
+            result = it.entities[i];
         }
     }
 
-    if (found) {
+    if (result) {
         ecs_iter_fini(&it);
     }
 
@@ -700,7 +694,25 @@ bool box_surface_view_size(
         ecs_query_fini(q);
     }
 
-    return found;
+    return result;
+}
+
+bool box_surface_view_size(
+    ecs_world_t *world,
+    ecs_query_t *surfaces,
+    ecs_entity_t view,
+    float *width,
+    float *height)
+{
+    ecs_entity_t surface = box_surface_of_view(world, surfaces, view);
+    *width = BOX_SURFACE_WIDTH;
+    *height = BOX_SURFACE_HEIGHT;
+    if (surface) {
+        box_surface_point_size(ecs_get(world, surface, Surface),
+            ecs_get(world, surface, SurfaceStatus), width, height);
+    }
+
+    return surface != 0;
 }
 
 void BoxSurfaceImport(

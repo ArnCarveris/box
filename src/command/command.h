@@ -51,7 +51,8 @@ void box_cmd_input_init(
 void box_cmd_render_init(
     ecs_world_t *world);
 
-/** Get the size of the images of the capture command: the size of the surface shown first.
+/** Get the size of the images of the render command, and of a capture or fit that finds no
+ * surface for its camera: the size in pixels of the surface shown first.
  *
  * @param world The world
  * @param width Receives the width in pixels

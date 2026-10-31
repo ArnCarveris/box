@@ -149,6 +149,7 @@
                     "not_a_camera",
                     "help_lists_fit",
                     "far_plane_raised",
+                    "far_plane_raised_ortho",
                     "far_plane_kept",
                     "aspect_of_view_surface"
                 ]

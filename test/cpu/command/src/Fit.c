@@ -741,6 +741,32 @@ void Fit_far_plane_raised(void) {
     ecs_fini(world);
 }
 
+void Fit_far_plane_raised_ortho(void) {
+    // command/fit
+    ecs_world_t *world = fit_world();
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_entity_t camera = fit_camera(world, "camera", (Position){0, 0, 5}, (Rotation){0},
+        (Camera){ .near_ = 0.1f, .far_ = 10, .aspect_ratio = 1.0f, .ortho = true,
+            .ortho_height = 10, .ortho_scale = 1 }, true);
+    ecs_entity_t box = fit_box(world, 0, (Position){0, 0, 0}, (Box){40, 40, 40});
+    ecs_progress(world, 0);
+
+    vec3 corners[8];
+    fit_corners(world, box, corners);
+
+    fit_result_t r;
+    fit_run(world, s, "fit", "camera", &r);
+    test_int(r.count, 1);
+    ecs_progress(world, 0);
+
+    const Camera *cam = ecs_get(world, camera, Camera);
+    test_bool(cam->ortho, true);
+    test_assert(cam->far_ > 10);
+    test_assert(fit_depth(world, camera, corners, 8) <= cam->far_);
+
+    ecs_fini(world);
+}
+
 void Fit_far_plane_kept(void) {
     // command/fit
     ecs_world_t *world = fit_world();

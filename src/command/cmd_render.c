@@ -172,18 +172,19 @@ static ecs_entity_t box_cmd_render_surface(
     return result;
 }
 
-/** Get the size of the images of the capture command: the size of the surface shown first.
+/** Get the size in pixels of a surface: its status when set, else its request.
  *
  * @param world The world
- * @param width Receives the width in pixels
- * @param height Receives the height in pixels
+ * @param surface The surface, 0 for none
+ * @param width Receives the width in pixels, BOX_SURFACE_WIDTH without a size
+ * @param height Receives the height in pixels, BOX_SURFACE_HEIGHT without a size
  */
-void box_cmd_render_size(
+static void box_cmd_render_surface_size(
     ecs_world_t *world,
+    ecs_entity_t surface,
     int32_t *width,
     int32_t *height)
 {
-    ecs_entity_t surface = box_cmd_render_surface(world);
     const SurfaceStatus *status = surface ? ecs_get(world, surface, SurfaceStatus) : NULL;
     const Surface *desc = surface ? ecs_get(world, surface, Surface) : NULL;
     width[0] = BOX_SURFACE_WIDTH;
@@ -195,6 +196,21 @@ void box_cmd_render_size(
         width[0] = desc->width;
         height[0] = desc->height;
     }
+}
+
+/** Get the size of the images of the render command, and of a capture or fit that finds no
+ * surface for its camera: the size in pixels of the surface shown first.
+ *
+ * @param world The world
+ * @param width Receives the width in pixels
+ * @param height Receives the height in pixels
+ */
+void box_cmd_render_size(
+    ecs_world_t *world,
+    int32_t *width,
+    int32_t *height)
+{
+    box_cmd_render_surface_size(world, box_cmd_render_surface(world), width, height);
 }
 
 /** Find the first view, in render order (View.order, then creation), that renders a camera.
@@ -306,6 +322,29 @@ static void box_cmd_render_clear(
     }
 }
 
+/** Get the size of the image of a capture: the size in pixels of the surface that renders the
+ * first view of the camera, else box_cmd_render_size.
+ *
+ * @param world The world
+ * @param camera The camera
+ * @param width Receives the width in pixels
+ * @param height Receives the height in pixels
+ */
+static void box_cmd_render_capture_size(
+    ecs_world_t *world,
+    ecs_entity_t camera,
+    int32_t *width,
+    int32_t *height)
+{
+    ecs_entity_t view = box_cmd_render_view(world, camera, 0, false);
+    ecs_entity_t surface = view ? box_surface_of_view(world, NULL, view) : 0;
+    if (surface) {
+        box_cmd_render_surface_size(world, surface, width, height);
+    } else {
+        box_cmd_render_size(world, width, height);
+    }
+}
+
 /** The capture command: write a PNG of the active camera or of a camera.
  *
  * @param ctx The call context
@@ -334,7 +373,7 @@ static void box_cmd_capture(
 
     desc.camera = camera;
     desc.path = path;
-    box_cmd_render_size(world, &desc.width, &desc.height);
+    box_cmd_render_capture_size(world, camera, &desc.width, &desc.height);
     box_cmd_render_clear(world, camera, &desc.clear);
     box_render_capture(world, &desc);
 done:

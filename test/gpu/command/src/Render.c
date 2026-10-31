@@ -373,6 +373,48 @@ void Render_capture_view_root_of_surface(void) {
     ecs_fini(world);
 }
 
+void Render_capture_size_of_view_surface(void) {
+    // command/render
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t a = ecs_entity(world, { .name = "a" });
+    ecs_set(world, a, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t b = ecs_entity(world, { .name = "b" });
+    ecs_set(world, b, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t first = ecs_new(world);
+    ecs_set(world, first, Surface, {.width = 1000, .height = 500, .resolution_scale = 1});
+    ecs_entity_t root = ecs_new(world);
+    ecs_entity_t second = ecs_new(world);
+    ecs_set(world, second, Surface, {.width = 500, .height = 1000, .view_root = root,
+        .resolution_scale = 1});
+    ecs_entity_t view_a = ecs_new(world);
+    ecs_set(world, view_a, View, {.camera = a});
+    ecs_entity_t view_b = ecs_new_w_pair(world, EcsChildOf, root);
+    ecs_set(world, view_b, View, {.camera = b});
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_progress(world, 0);
+
+    ecs_os_free(box_command_run(world, s, "capture b", NULL));
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    char *path = box_command_resource_file(world, s, "1");
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_int(w, 500);
+    test_int(h, 1000);
+    test_assert(first != 0 && second != 0 && view_a != 0);
+
+    stbi_image_free(px);
+    ecs_os_free(path);
+    ecs_fini(world);
+}
+
 void Render_render_prefab_private_scene(void) {
     // command/render
     ecs_world_t *world = ecs_init();
