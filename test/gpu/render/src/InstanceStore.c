@@ -3,13 +3,18 @@
  * @brief Tests for the instance pages every batch shares, as the GPU backend binds them.
  *
  * A batch per mesh is made with regular polygons of distinct side counts in front of an
- * orthographic camera, with a sun so the shadow cascades draw them as well.
+ * orthographic camera, with a sun so the shadow cascades draw them as well. The polygons are
+ * plain meshes, whose pages have no surface stream.
  */
 
 #include <box.h>
 #include <bake_test.h>
 #include "render.h"
 #include "draw.h"
+
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_STATIC
+#include <stb_image.h>
 
 /** Create a headless world with a view of the polygons, a sun and a surface.
  *
@@ -169,16 +174,13 @@ static void batch_matches_in(
 {
     box_render_draws_t *d = box_draws_state(world);
     box_draw_batch_t *b = box_draws_batch(d, ecs_get(world, shape, DrawSlot)->batch);
+    box_draw_store_t *store = box_draws_batch_store(d, b);
     const ecs_vec_t *streams[BOX_RENDER_INSTANCE_STREAMS] = {
         &b->transforms, &b->mesh_shadings, &b->surfaces
     };
-    uint32_t strides[BOX_RENDER_INSTANCE_STREAMS] = {
-        (uint32_t)sizeof(box_render_transform_t),
-        (uint32_t)sizeof(box_render_mesh_shading_t),
-        (uint32_t)sizeof(box_render_surface_t)
-    };
     uint32_t count = (uint32_t)ecs_vec_count(&b->entities);
     int32_t s;
+<<<<<<< HEAD
     test_assert(b->page == page);
     for (s = 0; s < BOX_RENDER_INSTANCE_STREAMS; s ++) {
         uint32_t size = count * strides[s];
@@ -187,6 +189,15 @@ static void batch_matches_in(
         void *gpu = ecs_os_malloc((ecs_size_t)size);
         test_bool(box_render_gpu_read_buffer(world, handle, b->first * strides[s], size, gpu),
             true);
+=======
+    test_assert(b->page == 0);
+    for (s = 0; s < store->layout.streams; s ++) {
+        uint32_t stride = store->layout.stride[s];
+        uint32_t size = count * stride;
+        void *gpu = ecs_os_malloc((ecs_size_t)size);
+        test_bool(box_render_gpu_read_buffer(world, box_draws_store_handle(store, b->page, s),
+            b->first * stride, size, gpu), true);
+>>>>>>> 4f251d3b7d016fe0f77ba8180d60ff47f8058b0c
         test_assert(!ecs_os_memcmp(gpu, ecs_vec_first(streams[s]), (ecs_size_t)size));
         ecs_os_free(gpu);
     }
@@ -241,8 +252,8 @@ void InstanceStore_moved_run_and_grown_page_keep_records(void) {
     box_render_gpu_stats_t after = frames(world, 1);
     box_render_draws_stats_t stats;
     box_render_draws_stats(world, &stats);
-    test_int(stats.copies, BOX_RENDER_INSTANCE_STREAMS);
-    test_int(stats.kept_pages, BOX_RENDER_INSTANCE_STREAMS);
+    test_int(stats.copies, BOX_RENDER_INSTANCE_STREAMS_PLAIN);
+    test_int(stats.kept_pages, BOX_RENDER_INSTANCE_STREAMS_PLAIN);
     test_int(after.errors, 0);
     batch_matches(world, a[0]);
     batch_matches(world, b[0]);
@@ -260,7 +271,7 @@ void InstanceStore_moved_run_and_grown_page_keep_records(void) {
 
     after = frames(world, 1);
     box_render_draws_stats(world, &stats);
-    test_int(stats.copies, BOX_RENDER_INSTANCE_STREAMS);
+    test_int(stats.copies, BOX_RENDER_INSTANCE_STREAMS_PLAIN);
     test_int(stats.scattered, 2);
     test_int(after.errors, 0);
     batch_matches(world, a[0]);
@@ -329,7 +340,7 @@ void InstanceStore_moved_run_reused_in_same_frame(void) {
     box_render_draws_stats(world, &stats);
     test_uint(box_draws_batch(d, ecs_get(world, a[0], DrawSlot)->batch)->first, 128);
     test_uint(box_draws_batch(d, ecs_get(world, c, DrawSlot)->batch)->first, 0);
-    test_int(stats.copies, BOX_RENDER_INSTANCE_STREAMS);
+    test_int(stats.copies, BOX_RENDER_INSTANCE_STREAMS_PLAIN);
     test_int(stats.scattered, 1);
     test_int(after.errors, 0);
     batch_matches(world, a[0]);
@@ -344,6 +355,7 @@ void InstanceStore_moved_run_reused_in_same_frame(void) {
     ecs_fini(world);
 }
 
+<<<<<<< HEAD
 void InstanceStore_run_moved_to_other_page_copies_directly(void) {
     // gpu_instance_data/copy_staging_release
     ecs_world_t *world = world_new();
@@ -616,5 +628,156 @@ void InstanceStore_staging_shrinks_while_copies_continue(void) {
     test_int(after.copy_staging, 64 * 1024);
     test_int(after.copy_staging_peak, 512 * 1024);
     test_int(after.errors, 0);
+=======
+/** Check that a pixel of a capture has a channel above a level and the others below another.
+ *
+ * @param px The pixels of the 64x64 capture
+ * @param x The column
+ * @param y The row, from the top
+ * @param channel The channel that is lit, 0 red, 1 green, 2 blue, 3 for all three
+ */
+static void test_lit(
+    const unsigned char *px,
+    int32_t x,
+    int32_t y,
+    int32_t channel)
+{
+    const unsigned char *p = &px[(y * 64 + x) * 4];
+    int32_t c;
+    for (c = 0; c < 3; c ++) {
+        if (channel == 3 || c == channel) {
+            test_assert(p[c] > 150);
+        } else {
+            test_assert(p[c] < 60);
+        }
+    }
+}
+
+/** A 2D shape, the glyphs of a text and plain meshes draw in one frame from pages without a
+ * surface buffer, which bind the zero record of the backend; the page of a shape with a
+ * parametric surface has one. */
+void InstanceStore_plain_pages_bind_no_surface_buffer(void) {
+    // gpu_instance_data/instance_surface_mesh
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 50});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f,
+        .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+
+    /* Top left a red rect, top right a white text */
+    ecs_entity_t rect = ecs_new(world);
+    ecs_set(world, rect, Position, {-16, 16, 0});
+    ecs_set(world, rect, Rect, {20, 12});
+    ecs_set(world, rect, Rgb, {255, 0, 0});
+    ecs_entity_t font = ecs_entity(world, { .name = "surface_mesh_font" });
+    ecs_set(world, font, Font, { .path = "test/assets/fonts/B612-Regular.ttf" });
+    ecs_entity_t text = ecs_new(world);
+    ecs_set(world, text, Position, {16, 16, 0});
+    ecs_set(world, text, Text, {.value = "HH", .size = 14, .font = font});
+    ecs_set(world, text, Rgb, {255, 255, 255});
+
+    /* Bottom left two green boxes of one plain batch: slot 1 is past the zero record */
+    ecs_entity_t boxes[2];
+    int32_t i;
+    for (i = 0; i < 2; i ++) {
+        boxes[i] = ecs_new(world);
+        ecs_set(world, boxes[i], Position, {-24 + (float)i * 14, -16, 0});
+        ecs_set(world, boxes[i], Box, {8, 8, 8});
+        ecs_set(world, boxes[i], Rgb, {0, 0, 0});
+        ecs_set(world, boxes[i], Emissive, {.color = {0, 255, 0}, .strength = 1});
+    }
+
+    /* Bottom right a blue torus facing the camera */
+    ecs_entity_t torus = ecs_new(world);
+    ecs_set(world, torus, Position, {16, -16, 0});
+    ecs_set(world, torus, Rotation, {(float)GLM_PI_2, 0, 0});
+    ecs_set(world, torus, TorusShell, {
+        .radius = 9, .tube = 3,
+        .ring_start = 0, .ring_end = 2 * (float)GLM_PI,
+        .tube_start = 0, .tube_end = 2 * (float)GLM_PI });
+    ecs_set(world, torus, Rgb, {0, 0, 0});
+    ecs_set(world, torus, Emissive, {.color = {0, 0, 255}, .strength = 1});
+
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 64, .height = 64, .resolution_scale = 1,
+        .write_to_file = "surface_mesh.png"});
+    box_render_gpu_stats_t stats = frames(world, 4);
+    test_int(stats.errors, 0);
+
+    /* The 2D page and the plain mesh page have their transform and shading buffers, and no
+     * surface buffer; the page of the torus has all three */
+    box_render_draws_t *d = box_draws_state(world);
+    box_draw_store_t *plain = &d->stores[BOX_DRAWS_STORE_MESH];
+    box_draw_batch_t *b = box_draws_batch(d, ecs_get(world, rect, DrawSlot)->batch);
+    test_int(b->page, 0);
+    const TextSlots *slots = ecs_get(world, text, TextSlots);
+    test_assert(slots != NULL && ecs_vec_count(&slots->slots) == 2);
+    b = box_draws_batch(d, ecs_vec_first_t(&slots->slots, box_draw_glyph_slot_t)->batch);
+    test_int(b->page, 0);
+    test_assert(box_draws_batch_store(d, b) == &d->stores[BOX_DRAWS_STORE_2D]);
+    test_assert(box_render_gpu_buffer_size(world,
+        BOX_RENDER_BUFFER_FIRST_2D + BOX_RENDER_STREAM_TRANSFORM) > 0);
+    test_assert(box_render_gpu_buffer_size(world,
+        BOX_RENDER_BUFFER_FIRST_2D + BOX_RENDER_STREAM_SHADING) > 0);
+    test_uint(box_render_gpu_buffer_size(world,
+        BOX_RENDER_BUFFER_FIRST_2D + BOX_RENDER_STREAM_SURFACE), 0);
+
+    b = box_draws_batch(d, ecs_get(world, boxes[0], DrawSlot)->batch);
+    test_int(ecs_vec_count(&b->entities), 2);
+    test_int(b->page, 0);
+    test_assert(box_draws_batch_store(d, b) == plain);
+    test_uint(box_draws_store_handle(plain, 0, BOX_RENDER_STREAM_TRANSFORM),
+        BOX_RENDER_BUFFER_FIRST);
+    test_assert(box_render_gpu_buffer_size(world,
+        box_draws_store_handle(plain, 0, BOX_RENDER_STREAM_TRANSFORM)) > 0);
+    test_assert(box_render_gpu_buffer_size(world,
+        box_draws_store_handle(plain, 0, BOX_RENDER_STREAM_SHADING)) > 0);
+    test_uint(box_render_gpu_buffer_size(world,
+        box_draws_store_handle(plain, 0, BOX_RENDER_STREAM_SURFACE)), 0);
+
+    b = box_draws_batch(d, ecs_get(world, torus, DrawSlot)->batch);
+    test_assert(b->key.surface);
+    box_draw_store_t *store = box_draws_batch_store(d, b);
+    test_assert(store == &d->stores[BOX_DRAWS_STORE_SURFACE]);
+    test_assert(box_render_gpu_buffer_size(world,
+        box_draws_store_handle(store, b->page, BOX_RENDER_STREAM_SURFACE)) >=
+            sizeof(box_render_surface_t));
+
+    /* Every shape rendered */
+    char *path = flecs_asprintf("%s/surface_mesh.png",
+        ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_int(w, 64);
+    test_int(h, 64);
+    test_lit(px, 16, 16, 0);
+    test_lit(px, 8, 48, 1);
+    test_lit(px, 22, 48, 1);
+    test_lit(px, 39, 48, 2);
+    test_lit(px, 57, 48, 2);
+    test_assert(px[(48 * 64 + 48) * 4 + 2] < 60);
+
+    int32_t x, y, lit = 0;
+    for (y = 0; y < 32; y ++) {
+        for (x = 33; x < 64; x ++) {
+            const unsigned char *p = &px[(y * 64 + x) * 4];
+            lit += p[0] > 150 && p[1] > 150 && p[2] > 150;
+        }
+    }
+
+    test_assert(lit > 10);
+    stbi_image_free(px);
+    ecs_os_free(path);
+>>>>>>> 4f251d3b7d016fe0f77ba8180d60ff47f8058b0c
     ecs_fini(world);
 }

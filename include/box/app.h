@@ -152,12 +152,17 @@ ECS_STRUCT(FileWatchStatus, {
  * AppStatus.frame reached frame, then deletes its entity. With it a scene changes itself at a
  * known frame, as the visual scenes of transitions do. SetAt adds Disabled to its entity.
  *
- * Copied: every component written to the entity (ecs_set, a script assignment), whatever its
- * value, so Position: {0, 0, 0} next to a Rotation moves entity to the origin. Not copied: pairs,
- * tags, SetAt and the components only added, such as the MaterialId a material component or the
- * Position a Rotation or Scale adds with With. Writes are recorded once the entity has SetAt, so
- * write SetAt first in a script body: of the components the entity had before SetAt was added,
- * one that another adds with With is copied only when it no longer holds its constructed value.
+ * Copied: every component written to it (ecs_set, a script assignment), whatever its value, so
+ * Position: {0, 0, 0} next to a Rotation moves entity to the origin. Not copied: pairs, tags,
+ * SetAt and the components only added, such as the MaterialId or Position added with With.
+ *
+ * Writes are recorded once the entity has SetAt: write SetAt first in a script body. A component
+ * another adds With before SetAt, or a stage merges without OnSet (a light), is copied only when
+ * it differs from its constructed value. SetAt logs a warning, naming its entity and the
+ * component, when such a component holds its constructed value as SetAt is added (Position:
+ * {0, 0, 0} before Rotation and SetAt), since it cannot tell whether it was written; components
+ * the engine computes, such as MaterialId, do not warn. The observers exist only while SetAt
+ * entities do.
  */
 ECS_STRUCT(SetAt, {
     int32_t frame;          /**< Frames completed (AppStatus.frame) before the values are set */

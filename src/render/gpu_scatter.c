@@ -341,6 +341,30 @@ done:
     return result;
 }
 
+uint64_t box_render_gpu_buffer_size(
+    ecs_world_t *world,
+    uint32_t handle)
+{
+    uint64_t result = 0;
+    box_render_gpu_stats_t stats;
+    if (!box_render_gpu_stats(world, &stats) || !stats.ready) {
+        goto done;
+    }
+
+    box_gpu_t *gpu = box_render_get_backend(world)->ctx;
+    bool renders = ecs_os_thread_self() == gpu->thread;
+    ecs_assert(renders, ECS_INVALID_OPERATION,
+        "box_render_gpu_buffer_size needs RenderSettings.main_thread and box_render_sync");
+    if (!renders) {
+        goto done;
+    }
+
+    const box_gpu_buffer_t *b = ecs_map_get_deref(&gpu->buffers, box_gpu_buffer_t, handle);
+    result = b ? b->size : 0;
+done:
+    return result;
+}
+
 #else
 
 bool box_render_gpu_read_buffer(
@@ -357,6 +381,16 @@ bool box_render_gpu_read_buffer(
     (void)out;
 
     return false;
+}
+
+uint64_t box_render_gpu_buffer_size(
+    ecs_world_t *world,
+    uint32_t handle)
+{
+    (void)world;
+    (void)handle;
+
+    return 0;
 }
 
 #endif

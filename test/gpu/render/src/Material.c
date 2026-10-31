@@ -626,9 +626,12 @@ void Material_change_uploads_only_changed(void) {
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
-    ecs_entity_t shapes[20];
+    /* A plain mesh uploads 64 bytes, no surface, and the change a scatter segment of at least
+     * 256 bytes and a material record, so the full upload needs enough shapes to be 5 times
+     * larger */
+    ecs_entity_t shapes[100];
     int32_t i;
-    for (i = 0; i < 20; i ++) {
+    for (i = 0; i < 100; i ++) {
         shapes[i] = ecs_new(world);
         ecs_set(world, shapes[i], Box, {1, 1, 1});
     }

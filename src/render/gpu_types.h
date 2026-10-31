@@ -770,7 +770,7 @@ typedef struct box_gpu_t {
     WGPUBuffer no_assets;           /**< One zero vec4, the surface assets of the draws of
                                      *   meshes without any */
     WGPUBuffer no_surfaces;         /**< One zero box_render_surface_t, the surface stream of
-                                     *   the pages without one, the 2D pages */
+                                     *   the pages without one, the plain mesh and 2D pages */
     WGPUBuffer no_materials;        /**< One default material record, the material table of
                                      *   the draws before the main thread sent one */
     box_gpu_cull_t cull;            /**< Cull pass state */
