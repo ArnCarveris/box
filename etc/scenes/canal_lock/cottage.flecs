@@ -67,22 +67,23 @@ template LockLanternBody {
   }
 }
 
+template LockLanternGlass {
+  Box: {0.25, 0.36, 0.25}
+  if lock_lantern_on {
+    Rgb: {255, 226, 160}
+    Emissive: {strength: 5, color: {255, 182, 96}}
+  } else {
+    Rgb: {120, 128, 128}
+    Emissive: {strength: 0, color: {255, 182, 96}}
+  }
+  PbrMaterial: {roughness: 0.15}
+  Transition: [Emissive: {duration: 0.5}, Rgb: {duration: 0.5}]
+}
+
 template LockLantern : LockControl {
   Transition: [Tint: {duration: 0.12}]
   LockLanternBody body()
-  glass {
-    Position: {0, 2.4, 0}
-    Box: {0.25, 0.36, 0.25}
-    if lock_lantern_on {
-      Rgb: {255, 226, 160}
-      Emissive: {strength: 5, color: {255, 182, 96}}
-    } else {
-      Rgb: {120, 128, 128}
-      Emissive: {strength: 0, color: {255, 182, 96}}
-    }
-    PbrMaterial: {roughness: 0.15}
-    Transition: [Emissive: {duration: 0.5}, Rgb: {duration: 0.5}]
-  }
+  LockLanternGlass glass() { Position: {0, 2.4, 0} }
   flame {
     Position: {0, 2.4, 0}
     Rgb: {255, 196, 120}

@@ -371,9 +371,12 @@
                     "requeued_probes_keep_values",
                     "edge_changes_keep_the_volume",
                     "deleting_uncaptured_shapes_rebakes_nothing",
-                    "parent_tint_and_prefab_textures_rebake",
+                    "parent_opacity_and_prefab_textures_rebake",
                     "newly_valid_probe_hidden_until_baked",
-                    "full_rebakes_keep_values"
+                    "full_rebakes_keep_values",
+                    "tint_rebakes_nothing",
+                    "bake_ignores_tint",
+                    "same_transform_rebakes_nothing"
                 ]
             },
             {
@@ -871,7 +874,10 @@
                     "shadow_mid_transition",
                     "mesh_color_mid_transition",
                     "shape_ends_before_scatter_shader_compiles",
-                    "clear_coat_mid_transition"
+                    "clear_coat_mid_transition",
+                    "transmission_mid_transition",
+                    "mesh_color_shared_slot_transition",
+                    "mesh_color_shared_slot_transition_back"
                 ]
             },
             {
@@ -902,6 +908,7 @@
                     "view_without_effects",
                     "occlusion_view_transmits",
                     "forward_passes_by_phase",
+                    "forward_passes_lit_no_prepass",
                     "two_formats_one_target",
                     "first_frame_not_dark"
                 ]

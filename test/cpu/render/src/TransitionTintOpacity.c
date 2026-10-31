@@ -1223,3 +1223,63 @@ void TransitionTintOpacity_packed_color_tint_2d(void) {
     tr_check_packed(&rendered, (float[]){ 0.0f, 0.0f, 1.0f, 0.5f });
     tr_fini(world, null);
 }
+
+void TransitionTintOpacity_tint_stays_in_bake(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_entity_t scene = ecs_new(world);
+    ecs_add(world, scene, Scene);
+    ecs_set(world, scene, LightBake, {.probe_spacing = 2, .capture_size = 8, .budget_ms = 2});
+    ecs_entity_t e = tr_shape(world, scene, 0);
+    int32_t i;
+    ecs_set(world, e, Tint, {0, 0, 255, 0});
+    tr_transition(world, e, ecs_id(Tint));
+    tr_frame(world);
+    tr_frame(world);
+    test_assert(tr_batch(world, e)->key.bake);
+
+    ecs_set(world, e, Tint, {0, 0, 255, 200});
+    for (i = 0; i < 4; i ++) {
+        tr_frame(world);
+        box_draw_batch_t *b = tr_batch(world, e);
+        test_assert(ecs_has_id(world, e, TransitionMaterial));
+        test_assert(b->key.dynamic_material);
+        test_assert(b->key.bake);
+    }
+
+    tr_frame(world);
+    tr_frame(world);
+    box_draw_batch_t *b = tr_batch(world, e);
+    test_assert(!ecs_has_id(world, e, TransitionMaterial));
+    test_assert(!b->key.dynamic_material);
+    test_assert(b->key.bake);
+
+    tr_fini(world, null);
+}
+
+void TransitionTintOpacity_opacity_stays_out_of_bake(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_entity_t scene = ecs_new(world);
+    ecs_add(world, scene, Scene);
+    ecs_set(world, scene, LightBake, {.probe_spacing = 2, .capture_size = 8, .budget_ms = 2});
+    ecs_entity_t e = tr_shape(world, scene, 0);
+    int32_t i;
+    ecs_set(world, e, Opacity, {1.0f});
+    tr_transition(world, e, ecs_id(Opacity));
+    tr_frame(world);
+    tr_frame(world);
+    test_assert(tr_batch(world, e)->key.bake);
+
+    ecs_set(world, e, Opacity, {0.5f});
+    for (i = 0; i < 4; i ++) {
+        tr_frame(world);
+        box_draw_batch_t *b = tr_batch(world, e);
+        test_assert(ecs_has_id(world, e, TransitionOpacity));
+        test_assert(!b->key.bake);
+    }
+
+    tr_fini(world, null);
+}

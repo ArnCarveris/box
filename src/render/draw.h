@@ -532,6 +532,10 @@ bool box_draws_caster(
  * element, between two transforms: those of its local bounds, from its surface record for a
  * surface instance or else from the mesh of the batch. Equal transforms give one transform.
  *
+ * Each term of a row picks its corner coordinate apart from the others and rounded sums keep
+ * their order, so the sums of the least and the largest terms are the bounds of the 8 corners,
+ * bit for bit, with a quarter of the products.
+ *
  * @param world The world, whose mesh cache has the mesh of the batch
  * @param b The batch
  * @param lo The minimum of each element of the transform
@@ -732,6 +736,7 @@ void box_draws_range_point(
 
 /** Get the range of the product of two matrices that lie in ranges, element by element in the
  * order of glm_mul, so the range of the product of two single matrices is their glm_mul.
+ * A single matrix operand takes plain products, with the same result as the interval math.
  *
  * @param a The range of the left matrix
  * @param b The range of the right matrix
@@ -754,6 +759,57 @@ void box_draws_range_local(
     vec3 lo[3],
     vec3 hi[3],
     box_draw_transition_range_t *out);
+
+/** Get the local matrix of the target pose of an entity, identity without a Position.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param out Receives the matrix
+ */
+void box_draws_target_local(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    mat4 out);
+
+/** Get the target world matrix of the parent of a node without a parent node: that of its
+ * nearest ancestor with a WorldTransform, identity for none.
+ *
+ * @param world The world
+ * @param e The entity of the node
+ * @param out Receives the matrix
+ */
+void box_draws_parent_world(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    mat4 out);
+
+/** Get the range of the world matrices of a node: the range of its parent node times its
+ * chain, times the range of its local matrices.
+ *
+ * @param rel The target chain from the parent node, or the world matrix of the parent
+ * @param up The range of the parent node, NULL without a parent node
+ * @param lo The minimum of the position, rotation and scale
+ * @param hi The maximum of the position, rotation and scale
+ * @param out Receives the range
+ */
+void box_draws_range_pose(
+    mat4 rel,
+    const box_draw_transition_range_t *up,
+    vec3 lo[3],
+    vec3 hi[3],
+    box_draw_transition_range_t *out);
+
+/** Check whether the shape or a glyph of an entity has a slot in an alive shadow caster batch.
+ *
+ * @param world The world
+ * @param d The state of the batches
+ * @param e The entity, alive
+ * @return Whether it has
+ */
+bool box_draws_entity_casts(
+    const ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e);
 
 /** Get the world bounds of a slot of a caster batch at every matrix of a range times the
  * target chain of the slot (box_draws_shadow_bounds), or the whole scene without its mesh.

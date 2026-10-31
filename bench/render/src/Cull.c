@@ -14,6 +14,7 @@
 #include <string.h>
 #include <unistd.h>
 #include "render.h"
+#include "bench_memory.h"
 #ifdef __APPLE__
 #include <libproc.h>
 #endif
@@ -38,7 +39,9 @@ static uint64_t bench_cull_instructions(void)
 /** Run the measured frames of a world, waiting for the GPU after each, and add the counters.
  *
  * The cull_gpu_ns counter is the GPU time of the cull passes of the views read back over the
- * frames (timestamp queries), cull_passes the passes it covers.
+ * frames (timestamp queries), cull_passes the passes it covers. The memory counters are the
+ * stream uploads of the last frame and the page buffers alive after the measured frames, of the
+ * mesh and 2D instances together.
  *
  * @param b The benchmark
  * @param world The world
@@ -68,6 +71,9 @@ static void bench_cull_frames(
     bench_counter(b, "frames", frames);
     bench_counter(b, "cull_gpu_ns", (double)(after.cull_ns - before.cull_ns));
     bench_counter(b, "cull_passes", (double)(after.cull_passes - before.cull_passes));
+    box_render_draws_stats_t stats = {0};
+    box_render_draws_stats(world, &stats);
+    bench_render_memory(b, &stats);
 }
 
 /** Boxes along x */

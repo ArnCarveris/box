@@ -1024,6 +1024,40 @@ void Transmission_forward_passes_by_phase(void) {
     }
 }
 
+/** A lit view that culls by occlusion but has no opaque draws, only a transmissive glass or a
+ * blended pane, has no depth prepass either (box_gpu_draw_prepasses), so it draws an early and
+ * a late forward pass, plus the pass the glass continues the late one in after its snapshot. */
+void Transmission_forward_passes_lit_no_prepass(void) {
+    // materials/transmission
+    int32_t k;
+    for (k = 0; k < 2; k ++) {
+        bool transmissive = k == 0;
+        ecs_world_t *world = tr_world();
+        tr_view(world, tr_camera(world, 0), true, true);
+        ecs_entity_t glass = tr_glass(world, 0, -4, 3, 3, 1, 1, 0);
+        if (!transmissive) {
+            ecs_remove(world, glass, Transmission);
+            ecs_set(world, glass, Opacity, {0.5f});
+        }
+
+        tr_surface(world, TR_SIZE, TR_SIZE, NULL);
+
+        box_render_gpu_stats_t before = tr_frames(world, 4);
+        box_render_gpu_stats_t after = tr_frames(world, 2);
+        printf("%s shape: %d forward passes, %d prepasses, %d snapshots in 2 frames\n",
+            transmissive ? "transmissive" : "blended",
+            after.forward_passes - before.forward_passes, after.prepasses - before.prepasses,
+            after.transmission_snapshots - before.transmission_snapshots);
+        test_int(after.prepasses - before.prepasses, 0);
+        test_int(after.prepass_draws - before.prepass_draws, 0);
+        test_int(after.transmission_snapshots - before.transmission_snapshots,
+            transmissive ? 2 : 0);
+        test_int(after.forward_passes - before.forward_passes, 2 * (transmissive ? 3 : 2));
+        test_int(after.errors, 0);
+        ecs_fini(world);
+    }
+}
+
 /** The first view has effects and renders into its HDR image: a white glass over the wall. The
  * second, without effects, renders into the target without clearing it, in a scene of its own
  * with a smaller glass tinted by its albedo, which shows the image of the first view through it.

@@ -14,6 +14,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include "render.h"
+#include "draw.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_STATIC
@@ -422,6 +423,447 @@ void Transition_clear_coat_mid_transition(void) {
     px = trans_capture(world, "transition_coat_6.png");
     test_assert(abs(trans_peak(px) - end_peak) <= 3);
     stbi_image_free(px);
+
+    trans_no_errors(world);
+    ecs_fini(world);
+}
+
+/** Convert a display encoded byte to linear light.
+ *
+ * @param c The byte
+ * @return The linear value
+ */
+static float trans_lin(
+    int32_t c)
+{
+    float v = (float)c / 255.0f;
+
+    return v <= 0.04045f ? v / 12.92f : powf((v + 0.055f) / 1.055f, 2.4f);
+}
+
+/** Convert linear light to a display encoded byte.
+ *
+ * @param lin The linear value
+ * @return The byte
+ */
+static int32_t trans_srgb(
+    float lin)
+{
+    lin = lin < 0.0f ? 0.0f : (lin > 1.0f ? 1.0f : lin);
+    float v = lin <= 0.0031308f ? lin * 12.92f : 1.055f * powf(lin, 1.0f / 2.4f) - 0.055f;
+
+    return (int32_t)(v * 255.0f + 0.5f);
+}
+
+/** Check the center pixel of an image against expected channels.
+ *
+ * @param px The pixels
+ * @param want Expected red, green and blue
+ * @param tolerance Largest difference per channel
+ */
+static void trans_center_is(
+    const unsigned char *px,
+    const int32_t want[3],
+    int32_t tolerance)
+{
+    int32_t mid = TRANS_SIZE / 2, c;
+    for (c = 0; c < 3; c ++) {
+        int32_t got = trans_channel(px, mid, mid, c);
+        if (abs(got - want[c]) > tolerance) {
+            printf("channel %d: got %d, want %d\n", c, got, want[c]);
+        }
+
+        test_assert(abs(got - want[c]) <= tolerance);
+    }
+}
+
+/** Check that a center channel is clearly between two values.
+ *
+ * @param px The pixels
+ * @param channel 0 red, 1 green, 2 blue
+ * @param a One end
+ * @param b The other end
+ */
+static void trans_center_between(
+    const unsigned char *px,
+    int32_t channel,
+    int32_t a,
+    int32_t b)
+{
+    int32_t mid = TRANS_SIZE / 2, got = trans_channel(px, mid, mid, channel);
+    int32_t lo = a < b ? a : b, hi = a < b ? b : a;
+    if (got < lo + 20 || got > hi - 20) {
+        printf("channel %d: got %d, want between %d and %d\n", channel, got, lo, hi);
+    }
+
+    test_assert(got >= lo + 20);
+    test_assert(got <= hi - 20);
+}
+
+/** Check that a shape is still drawn from the same slot of a transmissive batch.
+ *
+ * @param world The world
+ * @param e The shape
+ * @param batch Its batch
+ * @param slot Its slot
+ */
+static void trans_same_batch(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    int32_t batch,
+    int32_t slot)
+{
+    const DrawSlot *ds = ecs_get(world, e, DrawSlot);
+    test_assert(ds != NULL);
+    test_int(ds->batch, batch);
+    test_int(ds->slot, slot);
+    test_assert(box_draws_batch(box_draws_state(world), batch)->key.transmissive);
+}
+
+/** A smooth white glass slab 4 units in front of the camera, of index of refraction 1 and
+ * thickness and attenuation distance 1, over an emissive wall 10 units away in a lit view
+ * without light. Its Transmission transitions twice over a second each:
+ *
+ * - transmission_factor 0 to 1: the unlit glass shows black at the start and the wall at the
+ *   end, sampled from the opaque snapshot.
+ * - attenuation_color white to red: the transmitted wall keeps its color at the start and is
+ *   absorbed down to the wall times the color at the end.
+ *
+ * Mid transition the center pixel is between the two ends on the channels that change, the
+ * game thread sees the target from the start, and the glass keeps its slot of its batch.
+ */
+void Transition_transmission_mid_transition(void) {
+    // engine_core/transition
+    const int32_t bg[3] = {200, 220, 230}, red[3] = {255, 60, 60};
+    const int32_t black[3] = {0, 0, 0};
+    int32_t tinted[3], c;
+    for (c = 0; c < 3; c ++) {
+        tinted[c] = trans_srgb(trans_lin(bg[c]) * trans_lin(red[c]));
+    }
+
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
+    ecs_singleton_set(world, AmbientLight, {.intensity = 0});
+    ecs_entity_t light = ecs_new(world);
+    ecs_set(world, light, Position, {1000, 1000, 1000});
+    ecs_set(world, light, PointLight, {.intensity = 0, .range = 0.1f});
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 0});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f, .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera,
+        .clear = {.enabled = true, .color = {0, 0, 0, 255}}, .lighting = {.enabled = true}});
+
+    ecs_entity_t wall = ecs_new(world);
+    ecs_set(world, wall, Position, {0, 0, -10});
+    ecs_set(world, wall, Box, {40, 40, 0.1f});
+    ecs_set(world, wall, Rgb, {0, 0, 0});
+    ecs_set(world, wall, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, wall, Emissive, {.strength = 1,
+        .color = {(uint8_t)bg[0], (uint8_t)bg[1], (uint8_t)bg[2]}});
+
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {0, 0, -4});
+    ecs_set(world, e, Box, {3, 3, 0.2f});
+    ecs_set(world, e, Rgb, {255, 255, 255});
+    ecs_set(world, e, PbrMaterial, {.metallic = 0, .roughness = 0});
+    ecs_set(world, e, Transmission, {.transmission_factor = 0, .ior = 1,
+        .thickness_factor = 1, .attenuation_distance = 1,
+        .attenuation_color = {255, 255, 255}});
+    box_transition_set(world, e, ecs_id(Transmission), &(TransitionSpec){ .duration = 1.0f });
+
+    stbi_image_free(trans_capture(world, "transition_transmission_0.png"));
+    unsigned char *px = trans_capture(world, "transition_transmission_1.png");
+    test_assert(abs(trans_channel(px, 2, 2, 0) - bg[0]) <= 2);
+    test_assert(abs(trans_channel(px, 2, 2, 1) - bg[1]) <= 2);
+    test_assert(abs(trans_channel(px, 2, 2, 2) - bg[2]) <= 2);
+    trans_center_is(px, black, 3);
+    stbi_image_free(px);
+    int32_t batch = ecs_get(world, e, DrawSlot)->batch;
+    int32_t slot = ecs_get(world, e, DrawSlot)->slot;
+    trans_same_batch(world, e, batch, slot);
+
+    /* transmission_factor 0 to 1 */
+    ecs_set(world, e, Transmission, {.transmission_factor = 1, .ior = 1,
+        .thickness_factor = 1, .attenuation_distance = 1,
+        .attenuation_color = {255, 255, 255}});
+    px = trans_capture(world, "transition_transmission_2.png");
+    test_flt(ecs_get(world, e, Transmission)->transmission_factor, 1);
+    trans_center_is(px, black, 3);
+    stbi_image_free(px);
+    trans_same_batch(world, e, batch, slot);
+
+    stbi_image_free(trans_capture(world, "transition_transmission_3.png"));
+    trans_same_batch(world, e, batch, slot);
+    px = trans_capture(world, "transition_transmission_4.png");
+    test_flt(ecs_get(world, e, Transmission)->transmission_factor, 1);
+    for (c = 0; c < 3; c ++) {
+        trans_center_between(px, c, black[c], bg[c]);
+    }
+
+    stbi_image_free(px);
+    trans_same_batch(world, e, batch, slot);
+
+    stbi_image_free(trans_capture(world, "transition_transmission_5.png"));
+    px = trans_capture(world, "transition_transmission_6.png");
+    trans_center_is(px, bg, 3);
+    stbi_image_free(px);
+    trans_same_batch(world, e, batch, slot);
+
+    /* attenuation_color white to red */
+    ecs_set(world, e, Transmission, {.transmission_factor = 1, .ior = 1,
+        .thickness_factor = 1, .attenuation_distance = 1,
+        .attenuation_color = {(uint8_t)red[0], (uint8_t)red[1], (uint8_t)red[2]}});
+    px = trans_capture(world, "transition_transmission_7.png");
+    test_int(ecs_get(world, e, Transmission)->attenuation_color.g, red[1]);
+    trans_center_is(px, bg, 3);
+    stbi_image_free(px);
+    trans_same_batch(world, e, batch, slot);
+
+    stbi_image_free(trans_capture(world, "transition_transmission_8.png"));
+    trans_same_batch(world, e, batch, slot);
+    px = trans_capture(world, "transition_transmission_9.png");
+    test_int(ecs_get(world, e, Transmission)->attenuation_color.g, red[1]);
+    int32_t mid = TRANS_SIZE / 2;
+    test_assert(abs(trans_channel(px, mid, mid, 0) - bg[0]) <= 3);
+    trans_center_between(px, 1, bg[1], tinted[1]);
+    trans_center_between(px, 2, bg[2], tinted[2]);
+    stbi_image_free(px);
+    trans_same_batch(world, e, batch, slot);
+
+    stbi_image_free(trans_capture(world, "transition_transmission_10.png"));
+    px = trans_capture(world, "transition_transmission_11.png");
+    test_int(ecs_get(world, e, Transmission)->attenuation_color.b, red[2]);
+    trans_center_is(px, tinted, 3);
+    stbi_image_free(px);
+    trans_same_batch(world, e, batch, slot);
+
+    trans_no_errors(world);
+    ecs_fini(world);
+}
+
+/** Column of the center of the left box of the shared slot cases */
+#define TRANS_LEFT (16)
+
+/** Column of the center of the right box of the shared slot cases */
+#define TRANS_RIGHT (48)
+
+/** Create the world of the shared slot cases: the view of mesh_color_mid_transition with two
+ * 1.5 unit boxes at x = -1.5 and x = 1.5, centered on about columns 16 and 48 of row 32.
+ *
+ * @param left Color of the left box
+ * @param right Color of the right box
+ * @param a Receives the left box
+ * @param b Receives the right box
+ * @return The world
+ */
+static ecs_world_t* trans_pair_world(
+    Rgb left,
+    Rgb right,
+    ecs_entity_t *a,
+    ecs_entity_t *b)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 6});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+
+    *a = ecs_new(world);
+    ecs_set(world, *a, Position, {-1.5f, 0, 0});
+    ecs_set(world, *a, Box, {1.5f, 1.5f, 1.5f});
+    ecs_set_ptr(world, *a, Rgb, &left);
+    *b = ecs_new(world);
+    ecs_set(world, *b, Position, {1.5f, 0, 0});
+    ecs_set(world, *b, Box, {1.5f, 1.5f, 1.5f});
+    ecs_set_ptr(world, *b, Rgb, &right);
+
+    return world;
+}
+
+/** Get the material slot of a shape.
+ *
+ * @param world The world
+ * @param e The shape
+ * @return Its MaterialId, UINT32_MAX when it has none
+ */
+static uint32_t trans_slot(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    const MaterialId *id = ecs_get(world, e, MaterialId);
+
+    return id ? id->value : UINT32_MAX;
+}
+
+/** Check that a box is drawn red: no green, and red well above blue.
+ *
+ * @param px The pixels
+ * @param x Column of the center of the box
+ */
+static void trans_is_red(
+    const unsigned char *px,
+    int32_t x)
+{
+    int32_t r = trans_channel(px, x, 32, 0), g = trans_channel(px, x, 32, 1);
+    int32_t b = trans_channel(px, x, 32, 2);
+    if (!(g < TRANS_DARK && r > b + 60)) {
+        printf("column %d: got %d %d %d, want red\n", x, r, g, b);
+    }
+
+    test_assert(g < TRANS_DARK);
+    test_assert(r > b + 60);
+}
+
+/** Check that a box is drawn blue: no green, and blue well above red.
+ *
+ * @param px The pixels
+ * @param x Column of the center of the box
+ */
+static void trans_is_blue(
+    const unsigned char *px,
+    int32_t x)
+{
+    int32_t r = trans_channel(px, x, 32, 0), g = trans_channel(px, x, 32, 1);
+    int32_t b = trans_channel(px, x, 32, 2);
+    if (!(g < TRANS_DARK && b > r + 60)) {
+        printf("column %d: got %d %d %d, want blue\n", x, r, g, b);
+    }
+
+    test_assert(g < TRANS_DARK);
+    test_assert(b > r + 60);
+}
+
+/** Run the frames of a red to blue or blue to red transition of the box at column x, which
+ * starts on the frame of the change, and check every frame up to two frames after its end.
+ *
+ * The frames render at progress 0, 1/4, 1/2, 3/4 and then at the target. The box keeps the
+ * start color on the first frame, the channel of the start color only falls and the one of the
+ * target only rises from frame to frame, the middle frame is in between, and from the frame the
+ * transition ends the box has the target color. No frame has green, which the white default
+ * material would show.
+ *
+ * @param world The world
+ * @param x Column of the center of the transitioning box
+ * @param to_blue Whether the box goes from red to blue, else from blue to red
+ * @param check Called on every frame to check the other box
+ * @param name Prefix of the image files
+ */
+static void trans_pair_frames(
+    ecs_world_t *world,
+    int32_t x,
+    bool to_blue,
+    void(*check)(const unsigned char*),
+    const char *name)
+{
+    int32_t from = to_blue ? 0 : 2, to = to_blue ? 2 : 0;
+    int32_t prev_from = 255, prev_to = 0, i;
+    for (i = 1; i <= 7; i ++) {
+        char file[64];
+        snprintf(file, sizeof(file), "%s_%d.png", name, i);
+        unsigned char *px = trans_capture(world, file);
+        int32_t f = trans_channel(px, x, 32, from), t = trans_channel(px, x, 32, to);
+        int32_t g = trans_channel(px, x, 32, 1);
+        printf("%s frame %d: from %d, to %d, green %d\n", name, i, f, t, g);
+        test_assert(g < TRANS_DARK);
+        test_assert(f <= prev_from + 3);
+        test_assert(t >= prev_to - 3);
+        if (i == 1) {
+            if (to_blue) {
+                trans_is_red(px, x);
+            } else {
+                trans_is_blue(px, x);
+            }
+        } else if (i == 3) {
+            test_assert(f > 40);
+            test_assert(t > 40);
+            test_assert(abs(f - t) < 40);
+        } else if (i >= 5) {
+            if (to_blue) {
+                trans_is_blue(px, x);
+            } else {
+                trans_is_red(px, x);
+            }
+        }
+
+        check(px);
+        prev_from = f;
+        prev_to = t;
+        stbi_image_free(px);
+    }
+}
+
+/** Check that the right box is red.
+ *
+ * @param px The pixels
+ */
+static void trans_right_red(
+    const unsigned char *px)
+{
+    trans_is_red(px, TRANS_RIGHT);
+}
+
+/** Two red boxes share a material slot, and only the left one has a transition on Rgb. It
+ * changes to blue: it moves to a private slot when the transition starts and to the shared slot
+ * of blue when it ends, and neither switch shows as a frame of another color. The right box
+ * keeps its slot and stays red in every frame.
+ */
+void Transition_mesh_color_shared_slot_transition(void) {
+    // gpu_instance_data/material_dedup
+    ecs_entity_t a, b;
+    ecs_world_t *world = trans_pair_world(
+        (Rgb){255, 0, 0}, (Rgb){255, 0, 0}, &a, &b);
+    box_transition_set(world, a, ecs_id(Rgb), &(TransitionSpec){ .duration = 1.0f });
+    unsigned char *px = trans_capture(world, "transition_shared_0.png");
+    trans_is_red(px, TRANS_LEFT);
+    trans_is_red(px, TRANS_RIGHT);
+    stbi_image_free(px);
+    uint32_t shared = trans_slot(world, b);
+    test_assert(shared != UINT32_MAX);
+    test_uint(trans_slot(world, a), shared);
+
+    ecs_set(world, a, Rgb, {0, 0, 255});
+    trans_pair_frames(world, TRANS_LEFT, true, trans_right_red, "transition_shared");
+    test_uint(trans_slot(world, b), shared);
+    test_assert(trans_slot(world, a) != shared);
+    test_assert(trans_slot(world, a) != UINT32_MAX);
+
+    trans_no_errors(world);
+    ecs_fini(world);
+}
+
+/** A blue box with a transition on Rgb next to a red box changes to red: when the transition
+ * ends it moves to the shared slot of the red box, with no frame of another color, and the red
+ * box stays red in every frame.
+ */
+void Transition_mesh_color_shared_slot_transition_back(void) {
+    // gpu_instance_data/material_dedup
+    ecs_entity_t a, b;
+    ecs_world_t *world = trans_pair_world(
+        (Rgb){0, 0, 255}, (Rgb){255, 0, 0}, &a, &b);
+    box_transition_set(world, a, ecs_id(Rgb), &(TransitionSpec){ .duration = 1.0f });
+    unsigned char *px = trans_capture(world, "transition_shared_back_0.png");
+    trans_is_blue(px, TRANS_LEFT);
+    trans_is_red(px, TRANS_RIGHT);
+    stbi_image_free(px);
+    uint32_t red = trans_slot(world, b);
+    test_assert(red != UINT32_MAX);
+    test_assert(trans_slot(world, a) != red);
+
+    ecs_set(world, a, Rgb, {255, 0, 0});
+    trans_pair_frames(world, TRANS_LEFT, false, trans_right_red, "transition_shared_back");
+    test_uint(trans_slot(world, b), red);
+    test_uint(trans_slot(world, a), red);
 
     trans_no_errors(world);
     ecs_fini(world);

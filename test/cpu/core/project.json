@@ -304,6 +304,13 @@
                     "deferred_remove_missing",
                     "deferred_set_remove_set",
                     "deferred_remove_pending_no_leak",
+                    "deferred_world_remove_pending",
+                    "deferred_world_remove_pending_inherited",
+                    "system_world_remove_pending",
+                    "observer_world_remove_pending",
+                    "deferred_world_remove_missing",
+                    "deferred_remove_after_component_remove",
+                    "deferred_world_no_leak",
                     "not_transitionable",
                     "negative_duration",
                     "negative_delay",
@@ -335,6 +342,12 @@
                     "deferred_first",
                     "prefab_instance",
                     "deferred_later_batch"
+                ]
+            },
+            {
+                "id": "WindowWarning",
+                "testcases": [
+                    "no_warning_without_glfw"
                 ]
             }
         ]
