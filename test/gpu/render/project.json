@@ -696,7 +696,11 @@
                     "instance_binds_do_not_grow_with_batches",
                     "scatters_follow_pages_with_changes",
                     "moved_run_and_grown_page_keep_records",
-                    "moved_run_reused_in_same_frame"
+                    "moved_run_reused_in_same_frame",
+                    "run_moved_to_other_page_copies_directly",
+                    "staged_copies_read_old_bytes",
+                    "staging_released_after_frames_without_copies",
+                    "staging_shrinks_while_copies_continue"
                 ]
             },
             {

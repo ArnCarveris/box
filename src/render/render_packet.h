@@ -880,8 +880,9 @@ typedef struct box_render_scatter_t {
  * WebGPU */
 #define BOX_RENDER_COPY_ALIGN (4)
 
-/** Bytes the copies of one packet move at most together: the backend copies them through one
- * staging buffer, below the 256 MiB buffer size every WebGPU device supports */
+/** Bytes the copies of one packet move at most together: the backend copies those within one
+ * buffer, or that read what another copy writes, through one staging buffer, below the 256 MiB
+ * buffer size every WebGPU device supports */
 #define BOX_RENDER_COPY_MAX ((uint64_t)128 << 20)
 
 /** GPU copy of bytes from one buffer into another or into the same one, such as the instances
