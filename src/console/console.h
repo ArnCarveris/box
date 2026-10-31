@@ -473,6 +473,23 @@ char* box_console_syntax_token(
     const char *line,
     int32_t index);
 
+/** Find the next command of a line with several commands, as the shell splits it.
+ *
+ * A ; outside a string, three backticks and ()/{}/[] nesting ends a command. Empty commands
+ * between separators are skipped, as the shell skips them.
+ *
+ * @param line The command line
+ * @param at Byte to search from, the end of the previous command or 0
+ * @param start Receives the first byte of the command
+ * @param end Receives the byte after the last token of the command
+ * @return Whether there is a command
+ */
+bool box_console_syntax_split(
+    const char *line,
+    int32_t at,
+    int32_t *start,
+    int32_t *end);
+
 /** Text of console output being built and the colored ranges of its bytes */
 typedef struct box_console_out_t {
     ecs_strbuf_t buf;           /**< The text */
