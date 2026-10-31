@@ -96,8 +96,8 @@ static unsigned char* shadow_capture(
         e = ecs_entity(world, { .name = "capture" });
     }
 
-    ecs_set(world, e, Surface, {.width = size, .height = size, .write_to_file = file,
-        .resolution_scale = 1});
+    ecs_set(world, e, Surface, {.width = size, .height = size,
+        .write_to_file = ECS_CONST_CAST(char*, file), .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 

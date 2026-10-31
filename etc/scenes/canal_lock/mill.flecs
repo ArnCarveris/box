@@ -40,18 +40,26 @@ template LockMillWheel {
   LockMillWheelBody body()
 }
 
-template LockMillSluice : LockControl {
-  const lift = match lock_mill_on { true: 0.42; _: 0.0 }
-  Transition: [Tint: {duration: 0.12}]
+template LockMillSluiceBody {
   post_a : CanalOldTimber { Position: {0, 0.65, 0.6}; Box: {0.18, 1.3, 0.18} }
   post_b : CanalOldTimber { Position: {0, 0.65, -0.6}; Box: {0.18, 1.3, 0.18} }
   top_beam : CanalOldTimber { Position: {0, 1.3, 0}; Box: {0.24, 0.16, 1.44} }
+}
+
+template LockMillSluiceBoard {
+  gate : CanalPlanks { Position: {0, 0.3, 0}; Box: {0.08, 0.74, 1.02}; TextureTransform: {scale_x: 0.4, scale_y: 0.6} }
+  rod : CanalIron { Position: {0, 1.04, 0}; Cylinder: {radius: 0.03, length: 0.84, segments: 8} }
+  handle : CanalRed { Position: {0, 1.46, 0}; RoundedBox: {0.08, 0.08, 0.6, 0.015, segments: 1} }
+}
+
+template LockMillSluice : LockControl {
+  const lift = match lock_mill_on { true: 0.42; _: 0.0 }
+  Transition: [Tint: {duration: 0.12}]
+  LockMillSluiceBody body()
   board {
     Position: {0, lift, 0}
     Transition: [Position: {duration: 0.8, timing_function: EaseInOut}]
-    gate : CanalPlanks { Position: {0, 0.3, 0}; Box: {0.08, 0.74, 1.02}; TextureTransform: {scale_x: 0.4, scale_y: 0.6} }
-    rod : CanalIron { Position: {0, 1.04, 0}; Cylinder: {radius: 0.03, length: 0.84, segments: 8} }
-    handle : CanalRed { Position: {0, 1.46, 0}; RoundedBox: {0.08, 0.08, 0.6, 0.015, segments: 1} }
+    LockMillSluiceBoard body()
   }
   async {
     while true {

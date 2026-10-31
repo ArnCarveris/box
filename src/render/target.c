@@ -140,7 +140,10 @@ static WGPUTextureFormat box_gpu_canvas_srgb(
  *
  * Canvases only take formats without sRGB encoding, so the canvas is configured with the
  * preferred format and the views render into an sRGB view of its image, which is also a copy
- * source where the browser allows it, for the opaque snapshot of transmission.
+ * source for the opaque snapshot of transmission and captures.
+ *
+ * A canvas takes copy source usage with any of its formats, and emdawnwebgpu reports no
+ * usages in its capabilities, so the usage is not taken from them.
  *
  * @param gpu The backend
  * @param t The target
@@ -157,13 +160,11 @@ static void box_gpu_canvas_surface(
     WGPUSurfaceCapabilities caps = {0};
     t->surface = wgpuInstanceCreateSurface(gpu->instance, &desc);
     t->format = WGPUTextureFormat_BGRA8UnormSrgb;
-    t->usage = WGPUTextureUsage_RenderAttachment;
+    t->usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc;
     if (wgpuSurfaceGetCapabilities(t->surface, NULL, &caps) == WGPUStatus_Success) {
         if (caps.formatCount) {
             t->format = box_gpu_canvas_srgb(caps.formats[0]);
         }
-
-        t->usage |= caps.usages & WGPUTextureUsage_CopySrc;
 
         wgpuSurfaceCapabilitiesFreeMembers(caps);
     }

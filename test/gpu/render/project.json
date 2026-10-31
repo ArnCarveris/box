@@ -375,7 +375,8 @@
                     "newly_valid_probe_hidden_until_baked",
                     "full_rebakes_keep_values",
                     "tint_rebakes_nothing",
-                    "bake_ignores_tint"
+                    "bake_ignores_tint",
+                    "same_transform_rebakes_nothing"
                 ]
             },
             {
@@ -905,6 +906,7 @@
                     "view_without_effects",
                     "occlusion_view_transmits",
                     "forward_passes_by_phase",
+                    "forward_passes_lit_no_prepass",
                     "two_formats_one_target",
                     "first_frame_not_dark"
                 ]
