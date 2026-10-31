@@ -337,3 +337,79 @@ void BatchChunks_lowered_pages_render_like_defaults(void) {
     stbi_image_free(images[0]);
     stbi_image_free(images[1]);
 }
+
+void BatchChunks_batch_over_cull_window_splits_frustums(void) {
+    // gpu_instance_data/store_chunk_size
+    unsigned char *images[2] = {NULL, NULL};
+    int32_t slots[2] = {0, 0};
+    int32_t run, i;
+    for (run = 0; run < 2; run ++) {
+        ecs_world_t *world = ecs_init();
+        ECS_IMPORT(world, Box);
+        App *app = ecs_singleton_get_mut(world, App);
+        app->headless = true;
+        ecs_singleton_modified(world, App);
+
+        ecs_entity_t camera = ecs_new(world);
+        ecs_set(world, camera, Position, {0, 4, 14});
+        ecs_set(world, camera, Rotation, {-0.25f, 0, 0});
+        ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+        ecs_entity_t view = ecs_new(world);
+        ecs_add(world, view, View);
+        View *v = ecs_get_mut(world, view, View);
+        v->camera = camera;
+        v->clear = (ClearSettings){.enabled = true, .color = {20, 20, 30, 255}};
+        v->shadows.enabled = true;
+        v->culling = (CullSettings){.enabled = true, .occlusion = true};
+        ecs_modified(world, view, View);
+        ecs_entity_t sun = ecs_new(world);
+        ecs_set(world, sun, Rotation, {0.5423041f, 2.3679806f, -0.4669112f});
+        ecs_set(world, sun, DirectionalLight, {.intensity = 1.5f * GLM_PIf});
+        for (i = 0; i < 100; i ++) {
+            ecs_entity_t e = ecs_new(world);
+            ecs_set(world, e, Position, {(float)(i % 10) - 4.5f, (float)((i * 7) % 3) * 0.5f,
+                -(float)(i / 10)});
+            ecs_set(world, e, Box, {0.6f, 0.6f, 0.6f});
+            ecs_set(world, e, Rgb, {40, (uint8_t)(100 + i), 200});
+        }
+
+        ecs_entity_t s = ecs_new(world);
+        ecs_set(world, s, Surface, {.width = 64, .height = 64, .resolution_scale = 1,
+            .write_to_file = run ? "split.png" : "whole.png"});
+        ecs_progress(world, 1.0f / 60);
+        box_render_sync(world);
+        if (run) {
+            test_bool(box_render_gpu_cull_window(world, 256), true);
+        }
+
+        for (i = 0; i < 4; i ++) {
+            ecs_progress(world, 1.0f / 60);
+            box_render_sync(world);
+        }
+
+        box_render_gpu_stats_t stats;
+        test_bool(box_render_gpu_stats(world, &stats), true);
+        test_int(stats.errors, 0);
+        slots[run] = stats.cull_page_slots;
+        char *path = flecs_asprintf("%s/%s", ecs_singleton_get(world, AppStatus)->tmp_dir,
+            run ? "split.png" : "whole.png");
+        int w = 0, h = 0, n = 0;
+        images[run] = stbi_load(path, &w, &h, &n, 4);
+        test_assert(images[run] != NULL);
+        ecs_os_free(path);
+        ecs_fini(world);
+    }
+
+    test_assert(slots[0] > 256);
+    test_assert(slots[1] <= 256);
+    int32_t off = 0;
+    for (i = 0; i < 64 * 64 * 4; i ++) {
+        if (abs((int32_t)images[0][i] - (int32_t)images[1][i]) > 8) {
+            off ++;
+        }
+    }
+
+    test_int(off, 0);
+    stbi_image_free(images[0]);
+    stbi_image_free(images[1]);
+}

@@ -4,10 +4,11 @@
  * and updates the fps panel, a chart of the frame samples in a scene and view of its own.
  *
  * The chart holds one bar of one point per frame sample at its right, the reference lines over
- * them and their labels in the gutter at its left.
+ * them and their labels in the gutter at its left. Its vertical axis is linear in fps, from
+ * BOX_FPS_CHART_FPS at the bottom to 0 fps at the top.
  *
- * The bars and the text line are children of elements without a Layout, so changing them each
- * frame lays nothing out; the panel is laid out only when it opens or the surface changes.
+ * The bars are children of an element without a Layout, so changing them each frame lays
+ * nothing out; the panel is laid out only when it opens or the surface changes.
  */
 
 #define BOX_FPS_IMPL
@@ -25,17 +26,14 @@
 /** Points between the edges of the panel and its content */
 #define BOX_FPS_PADDING (8.0f)
 
-/** Points between the text line and the chart */
-#define BOX_FPS_SPACING (4.0f)
-
-/** Height of the text line in points */
-#define BOX_FPS_LINE (16.0f)
+/** Height of the label of a reference line in points */
+#define BOX_FPS_MARK_H (16.0f)
 
 /** Width of the chart in points */
 #define BOX_FPS_CHART_W (BOX_FPS_WIDTH - 2 * BOX_FPS_PADDING)
 
 /** Height of the chart in points */
-#define BOX_FPS_CHART_H (BOX_FPS_HEIGHT - 2 * BOX_FPS_PADDING - BOX_FPS_LINE - BOX_FPS_SPACING)
+#define BOX_FPS_CHART_H (BOX_FPS_HEIGHT - 2 * BOX_FPS_PADDING)
 
 /** Width of a bar in points. Whole points put the edges of the bars between pixels, so
  * neighboring bars meet without a seam of blended edges. */
@@ -59,6 +57,9 @@
 /** Frame time of 30 fps in milliseconds */
 #define BOX_FPS_30_MS (1000.0 / 30.0)
 
+/** Reference lines of the chart: 60, 30 and 0 fps */
+#define BOX_FPS_REFS (3)
+
 /** Rate of a frame, the color of its bar */
 typedef enum box_fps_rate_t {
     BoxFpsFast = 0,     /**< 60 fps or faster, green */
@@ -71,9 +72,8 @@ typedef struct box_fps_look_t {
     Rgb surface;        /**< Background of the panel */
     Rgb surface_alt;    /**< Background of the chart */
     Rgb border;         /**< Edge of the panel */
-    Rgb text;           /**< The text line */
-    Rgb text_muted;     /**< The reference lines */
-    float font_size;    /**< Em size of the text line */
+    Rgb text_muted;     /**< The reference lines and their labels */
+    float font_size;    /**< Em size of the labels of the reference lines */
     float radius;       /**< Corner radius of the panel */
 } box_fps_look_t;
 
@@ -85,10 +85,9 @@ typedef struct box_fps_t {
     ecs_entity_t camera;        /**< Orthographic camera at one point per unit */
     ecs_entity_t screen;        /**< Layout root that fills the surface */
     ecs_entity_t panel;         /**< The panel, at the top right of the screen */
-    ecs_entity_t label;         /**< The text line */
     ecs_entity_t chart;         /**< Background of the chart, parent of the bars */
-    ecs_entity_t lines[2];      /**< Reference lines at 60 and 30 fps */
-    ecs_entity_t marks[2];      /**< Labels of the reference lines in the gutter */
+    ecs_entity_t lines[BOX_FPS_REFS]; /**< Reference lines at 60, 30 and 0 fps */
+    ecs_entity_t marks[BOX_FPS_REFS]; /**< Labels of the reference lines in the gutter */
     ecs_entity_t strip;         /**< Parent of the bars, scrolls one bar left per sample */
     ecs_entity_t bars[BOX_FPS_BARS]; /**< Bar of each slot of the ring of FrameSamples */
     float heights[BOX_FPS_BARS];     /**< Height each bar was set to */
@@ -98,7 +97,6 @@ typedef struct box_fps_t {
     int32_t next;               /**< FrameSamples.next of the last update, -1 for none */
     int32_t total;              /**< Samples written since the rebase */
     float strip_x;              /**< x the strip was set to */
-    char text[64];              /**< String the text line was set to */
     box_fps_look_t look;        /**< Look the content was colored with */
     bool shown;                 /**< The content is shown */
     bool relayout;              /**< The surface changed since the screen was sized */
@@ -154,10 +152,12 @@ float box_fps_bar_height(
     double interval_ms,
     float chart_height)
 {
-    double ms = interval_ms < BOX_FPS_CHART_MS ? interval_ms : BOX_FPS_CHART_MS;
     float result = 0;
     if (interval_ms > 0 && chart_height > 0) {
-        result = (float)(ms / BOX_FPS_CHART_MS) * chart_height;
+        double fps = 1000.0 / interval_ms;
+        float least = chart_height < 1 ? chart_height : 1;
+        result = (float)(1.0 - fps / BOX_FPS_CHART_FPS) * chart_height;
+        result = result > least ? result : least;
     }
 
     return result;
@@ -179,7 +179,6 @@ static void box_fps_theme(
         look->surface = t->surface;
         look->surface_alt = t->surface_alt;
         look->border = t->border;
-        look->text = t->text;
         look->text_muted = t->text_muted;
         look->font_size = t->small_font_size > 0 ? t->small_font_size : t->font_size;
         look->radius = t->radius;
@@ -187,7 +186,6 @@ static void box_fps_theme(
         look->surface = (Rgb){ 32, 35, 41 };
         look->surface_alt = (Rgb){ 22, 24, 29 };
         look->border = (Rgb){ 60, 64, 72 };
-        look->text = (Rgb){ 220, 222, 228 };
         look->text_muted = (Rgb){ 120, 125, 135 };
         look->font_size = 12;
         look->radius = 4;
@@ -262,6 +260,9 @@ static float box_fps_strip_x(
 /** Create the strip of bars, empty, the reference lines over them and their labels in the
  * gutter. A reference line is centered in a row of points, so its 1 point covers whole pixels.
  *
+ * The line at 0 fps is the top row of the chart and its label is inset below the top edge, so
+ * both stay inside the chart.
+ *
  * @param world The world
  * @param fps The panel state
  */
@@ -270,11 +271,12 @@ static void box_fps_chart_build(
     box_fps_t *fps)
 {
     float bottom = -BOX_FPS_CHART_H * 0.5f;
+    float top = BOX_FPS_CHART_H * 0.5f;
     float left = BOX_FPS_CHART_W * 0.5f - BOX_FPS_PLOT_W;
-    double refs[2] = { BOX_FPS_60_MS, BOX_FPS_30_MS };
-    const char *names[2] = { "line_60", "line_30" };
-    const char *marks[2] = { "mark_60", "mark_30" };
-    const char *texts[2] = { "60 fps", "30 fps" };
+    double refs[BOX_FPS_REFS] = { BOX_FPS_60_MS, BOX_FPS_30_MS, HUGE_VAL };
+    const char *names[BOX_FPS_REFS] = { "line_60", "line_30", "line_0" };
+    const char *marks[BOX_FPS_REFS] = { "mark_60", "mark_30", "mark_0" };
+    const char *texts[BOX_FPS_REFS] = { "60 fps", "30 fps", "0 fps" };
     rgb green = BOX_FPS_GREEN;
     char name[32];
     int32_t i;
@@ -294,23 +296,27 @@ static void box_fps_chart_build(
 
     fps->next = -1;
 
-    for (i = 0; i < 2; i ++) {
-        float y = floorf(bottom + box_fps_bar_height(refs[i], BOX_FPS_CHART_H)) + 0.5f;
+    for (i = 0; i < BOX_FPS_REFS; i ++) {
+        float h = box_fps_bar_height(refs[i], BOX_FPS_CHART_H);
+        float y, mark_y;
+        h = h < BOX_FPS_CHART_H - 1 ? h : BOX_FPS_CHART_H - 1;
+        y = floorf(bottom + h) + 0.5f;
+        mark_y = y < top - BOX_FPS_MARK_H * 0.5f ? y : top - BOX_FPS_MARK_H * 0.5f;
         fps->lines[i] = ecs_entity(world, { .name = names[i], .parent = fps->chart });
         ecs_set(world, fps->lines[i], Position, { 0, y, 0 });
         ecs_set(world, fps->lines[i], Line, { left, 0, BOX_FPS_CHART_W * 0.5f, 0, 1 });
         fps->marks[i] = ecs_entity(world, { .name = marks[i], .parent = fps->chart });
         ecs_set(world, fps->marks[i], Position, {
-            -BOX_FPS_CHART_W * 0.5f + BOX_FPS_GUTTER * 0.5f, y, 0 });
+            -BOX_FPS_CHART_W * 0.5f + BOX_FPS_GUTTER * 0.5f, mark_y, 0 });
         ecs_add(world, fps->marks[i], Text);
         ecs_get_mut(world, fps->marks[i], Text)->value = ecs_os_strdup(texts[i]);
         ecs_modified(world, fps->marks[i], Text);
     }
 }
 
-/** Create the scene, camera, screen, panel, text line and chart of the content.
+/** Create the scene, camera, screen, panel and chart of the content.
  *
- * The text line and the bars are children of elements without a Layout, out of the layout tree,
+ * The bars are children of elements without a Layout, out of the layout tree,
  * and the scene has SpatialIgnore: moving bars cost no spatial update and picks pass through.
  *
  * @param world The world
@@ -321,7 +327,6 @@ static void box_fps_build(
     box_fps_t *fps)
 {
     float pad = BOX_FPS_PADDING;
-    ecs_entity_t header;
     fps->root = ecs_entity(world, { .name = "ui", .parent = box_fps_scope(world, fps) });
     ecs_set(world, fps->root, Scene, {0});
     ecs_add(world, fps->root, SpatialIgnore);
@@ -343,7 +348,6 @@ static void box_fps_build(
     ecs_set(world, fps->panel, Layout, {
         .direction = DirectionColumn,
         .padding = { pad, pad, pad, pad },
-        .spacing = BOX_FPS_SPACING,
         .h = AlignLeft,
         .v = VAlignTop
     });
@@ -353,14 +357,6 @@ static void box_fps_build(
     });
     ecs_set(world, fps->panel, Rect, { BOX_FPS_WIDTH, BOX_FPS_HEIGHT });
 
-    header = box_fps_element(world, fps->panel, "header");
-    ecs_set(world, header, LayoutItem, {
-        .width = { .mode = SizeModeFixed, .value = BOX_FPS_CHART_W },
-        .height = { .mode = SizeModeFixed, .value = BOX_FPS_LINE }
-    });
-    fps->label = box_fps_element(world, header, "label");
-    ecs_add(world, fps->label, Text);
-
     fps->chart = box_fps_element(world, fps->panel, "chart");
     ecs_set(world, fps->chart, LayoutItem, {
         .width = { .mode = SizeModeFixed, .value = BOX_FPS_CHART_W },
@@ -368,7 +364,6 @@ static void box_fps_build(
     });
     ecs_set(world, fps->chart, Rect, { BOX_FPS_CHART_W, BOX_FPS_CHART_H });
     box_fps_chart_build(world, fps);
-    fps->text[0] = '\0';
     ecs_os_memset_t(&fps->look, 0, box_fps_look_t);
 }
 
@@ -384,14 +379,14 @@ static void box_fps_text_size(
     float size)
 {
     Text *t = ecs_get_mut(world, e, Text);
-    if (t && (t->size != size || t->line_height != BOX_FPS_LINE)) {
+    if (t && (t->size != size || t->line_height != BOX_FPS_MARK_H)) {
         t->size = size;
-        t->line_height = BOX_FPS_LINE;
+        t->line_height = BOX_FPS_MARK_H;
         ecs_modified(world, e, Text);
     }
 }
 
-/** Color the panel, the chart, the text line and the reference lines from the UI theme when
+/** Color the panel, the chart, the reference lines and their labels from the UI theme when
  * it changed since they were colored.
  *
  * @param world The world
@@ -417,56 +412,12 @@ static void box_fps_theme_sync(
     });
     ecs_set(world, fps->chart, Rgb, {
         look.surface_alt.r, look.surface_alt.g, look.surface_alt.b });
-    ecs_set(world, fps->label, Rgb, { look.text.r, look.text.g, look.text.b });
-    for (i = 0; i < 2; i ++) {
+    for (i = 0; i < BOX_FPS_REFS; i ++) {
         ecs_set(world, fps->lines[i], Rgb, {
             look.text_muted.r, look.text_muted.g, look.text_muted.b });
         ecs_set(world, fps->marks[i], Rgb, {
             look.text_muted.r, look.text_muted.g, look.text_muted.b });
         box_fps_text_size(world, fps->marks[i], look.font_size);
-    }
-
-    box_fps_text_size(world, fps->label, look.font_size);
-
-done:
-    return;
-}
-
-/** Write the fps, the mean of the samples as the frames command computes it, and the last
- * frame time into the text line when the string changed.
- *
- * @param world The world
- * @param fps The panel state
- * @param samples The frame samples, NULL for none
- */
-static void box_fps_label_sync(
-    ecs_world_t *world,
-    box_fps_t *fps,
-    const FrameSamples *samples)
-{
-    char text[64];
-    double sum = 0, mean, last = samples ? box_frame_sample(samples, 0) : 0;
-    int32_t i, count = samples ? samples->count : 0;
-    Text *t;
-    count = count < BOX_FRAME_WINDOW ? count : BOX_FRAME_WINDOW;
-    count = count > 0 ? count : 0;
-    for (i = 0; i < count; i ++) {
-        sum += box_frame_sample(samples, i);
-    }
-
-    mean = count ? sum / (double)count : 0;
-    ecs_os_snprintf(text, sizeof(text), "%.1f fps  %.1f ms", mean > 0 ? 1000.0 / mean : 0.0,
-        last);
-    if (!strcmp(text, fps->text)) {
-        goto done;
-    }
-
-    ecs_os_strcpy(fps->text, text);
-    t = ecs_get_mut(world, fps->label, Text);
-    if (t) {
-        ecs_os_free(t->value);
-        t->value = ecs_os_strdup(text);
-        ecs_modified(world, fps->label, Text);
     }
 
 done:
@@ -674,7 +625,7 @@ static void BoxFpsUpdate(
     }
 
     if (fps->shown && (!ecs_is_alive(world, fps->view) || !ecs_is_alive(world, fps->root) ||
-        !ecs_is_alive(world, fps->chart) || !ecs_is_alive(world, fps->label)))
+        !ecs_is_alive(world, fps->chart)))
     {
         box_fps_hide(world, fps);
     }
@@ -690,7 +641,6 @@ static void BoxFpsUpdate(
 
     samples = ecs_singleton_get(world, FrameSamples);
     box_fps_theme_sync(world, fps);
-    box_fps_label_sync(world, fps, samples);
     box_fps_bars_sync(world, fps, samples);
 done:
     return;

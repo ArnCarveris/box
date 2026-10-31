@@ -13,16 +13,29 @@
 
 #include "draw.h"
 
+uint32_t box_draws_layout_chunk(
+    const box_draw_layout_t *layout)
+{
+    uint32_t stride = 1;
+    int32_t i;
+    for (i = 0; i < layout->streams; i ++) {
+        stride = layout->stride[i] > stride ? layout->stride[i] : stride;
+    }
+
+    return BOX_DRAWS_PAGE_BYTES / stride;
+}
+
 void box_draws_store_init(
     box_draw_store_t *s,
     const box_draw_layout_t *layout,
-    uint32_t base,
-    uint32_t slots)
+    uint32_t base)
 {
     ecs_os_memset_t(s, 0, box_draw_store_t);
     s->layout = *layout;
     s->base = base;
-    s->slots = slots;
+    s->max = box_draws_layout_chunk(layout);
+    s->slots = s->max;
+    s->chunk = s->max;
     ecs_vec_init_t(NULL, &s->pages, box_draw_page_t, 0);
 }
 

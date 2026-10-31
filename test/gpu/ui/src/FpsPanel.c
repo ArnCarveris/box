@@ -66,7 +66,7 @@ static ecs_world_t* fps_world(
     FrameSamples *samples = ecs_singleton_get_mut(world, FrameSamples);
     samples->hold = true;
     for (int32_t i = 0; i < BOX_FRAME_WINDOW; i ++) {
-        box_frame_samples_add(samples, BOX_FPS_CHART_MS * 2);
+        box_frame_samples_add(samples, 200.0);
     }
 
     ecs_singleton_modified(world, FrameSamples);
