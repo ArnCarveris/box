@@ -1,0 +1,49 @@
+include materials
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+
+assets {
+  @tree Parent
+  template RoadMarkings {
+    prop rows: i32 = 3
+    prop columns: i32 = 3
+
+    const halfRows = (rows - 1) / 2.0
+    const halfColumns = (columns - 1) / 2.0
+
+    for road in 0..(rows + 1) {
+      for dash in 0..(columns * 4) {
+        {
+          Position: {(dash - (columns * 4 - 1) / 2.0) * 2, 0.048, (road - rows / 2.0) * 8}
+          Box: {0.85, 0.012, 0.055}
+          Rgb: TownCream
+        }
+      }
+    }
+    for road in 0..(columns + 1) {
+      for dash in 0..(rows * 4) {
+        {
+          Position: {(road - columns / 2.0) * 8, 0.048, (dash - (rows * 4 - 1) / 2.0) * 2}
+          Box: {0.055, 0.012, 0.85}
+          Rgb: TownCream
+        }
+      }
+    }
+    for row in 0..(rows - 1) {
+      for col in 0..(columns - 1) {
+        {
+          Position: {(col - halfColumns + 0.5) * 8 + 1.25, 0.052, (row - halfRows + 0.5) * 8}
+          for i in 0..5 {
+            {
+              Position: {0, 0, (i - 2) * 0.29}
+              Box: {0.65, 0.014, 0.16}
+              Rgb: TownCream
+            }
+          }
+        }
+      }
+    }
+  }
+}

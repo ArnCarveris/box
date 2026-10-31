@@ -1,0 +1,49 @@
+include roof
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+
+assets {
+  @tree Parent
+  template TiledRoof : Roof {
+    const span = width + 0.6
+    const run = depth + 0.65
+
+    {
+      Position: {0, 0.58, 0}
+      TrianglePrism: {span, 1.16, run}
+      Rgb: color
+    }
+    for side in 0..2 {
+      for course in 0..5 {
+        const distance = (course + 0.5) * span / 10
+        {
+          Position: {(side * 2 - 1) * distance, 1.2 - distance * 2.32 / span, 0}
+          Rotation: {0, 0, (1 - side * 2) * math.atan(2.32 / span)}
+          Box: {span / 10 + 0.12, 0.1, run + 0.24}
+          Rgb: color
+        }
+      }
+    }
+    for i in 0..16 {
+      {
+        Position: {0, 0, -run / 2 + (i + 0.5) * run / 16}
+        for side in 0..2 {
+          {
+            Position: {(side * 2 - 1) * span / 4, 0.66, 0}
+            Rotation: {0, 0, (1 - side * 2) * math.atan(2.32 / span)}
+            Box: {math.sqrt(span * span / 4 + 1.3456), 0.04, 0.035}
+            Rgb: {94, 111, 122}
+          }
+        }
+      }
+    }
+    {
+      Position: {0, 1.24, 0}
+      Rotation: {math.PI / 2, 0, 0}
+      Cylinder: {radius: 0.13, length: run + 0.42, segments: 12}
+      Rgb: color
+    }
+  }
+}

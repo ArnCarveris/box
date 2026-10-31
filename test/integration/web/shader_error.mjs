@@ -4,6 +4,7 @@ import { createServer } from 'node:http';
 import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, extname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const USAGE = `Checks the shader error path of the browser build in headless Chrome.
 
@@ -13,11 +14,13 @@ const USAGE = `Checks the shader error path of the browser build in headless Chr
 .bake/local_env/<env>/wasm32-Emscripten/debug/bin, or under <output_dir>/local_env when
 bake3's bake.json sets output_dir; "$(tools/integration.py local-env --env <env>)" prints the
 local env folder either way. The page is served on a free localhost
-port and opened with etc/scenes/default.flecs; the check breaks /etc/shaders/mesh.wgsl in the
-page's file system, then restores it. It passes when the break logs one compile error with its
+port and opened with test/integration/web/shader_error.flecs, which the page preloads from the
+same server; the check breaks /etc/shaders/mesh.wgsl in the page's file system, then restores it. It passes when the break logs one compile error with its
 line, no WebGPU object turns invalid and the scene keeps rendering. Exits 0 on a pass, 1 on a
 failure and 2 when Chrome or the page cannot start.`;
 
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+const SCENE = '/test/integration/web/shader_error.flecs';
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.wasm': 'application/wasm' };
 const CHROME_DEFAULT = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -59,8 +62,11 @@ function checkQuarantine(chrome) {
 
 function serve(dir) {
   const server = createServer((req, res) => {
-    const file = join(dir, decodeURIComponent(new URL(req.url, 'http://x').pathname));
-    if (!file.startsWith(dir) || !existsSync(file)) { res.writeHead(404); res.end(); return; }
+    const path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+    const file = path === SCENE ? join(ROOT, path) : join(dir, path);
+    if ((path !== SCENE && !file.startsWith(dir)) || !existsSync(file)) {
+      res.writeHead(404); res.end(); return;
+    }
     res.writeHead(200, { 'Content-Type': MIME[extname(file)] || 'application/octet-stream' });
     res.end(readFileSync(file));
   });
@@ -121,7 +127,8 @@ async function main() {
     await send('Log.enable');
     await send('Page.enable');
     const port = server.address().port;
-    await send('Page.navigate', { url: `http://127.0.0.1:${port}/boxrun.html#etc/scenes/default.flecs` });
+    await send('Page.navigate',
+      { url: `http://127.0.0.1:${port}/boxrun.html?preload=${SCENE}#${encodeURIComponent(SCENE)}` });
     for (let i = 0; i < 100 && !(await evaluate('!!(window.Module && Module.FS)')); i++) {
       await sleep(200);
     }

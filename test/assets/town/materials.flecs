@@ -1,0 +1,9 @@
+using box.material
+
+export const TownTimber: Rgb = {91, 65, 57}
+export const TownRoofTile: Rgb = {66, 83, 99}
+export const TownCream: Rgb = {248, 230, 196}
+export const TownGlass: Rgb = {119, 176, 183}
+export const TownIron: Rgb = {62, 77, 80}
+export const TownLeaf: Rgb = {112, 158, 109}
+export const TownPink: Rgb = {242, 178, 191}

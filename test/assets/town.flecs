@@ -1,0 +1,14 @@
+include town/town
+include ui/widgets
+include cfg/default
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+
+camera {
+  Position: {-23.767, 7.484, 30.355}
+  Rotation: {-0.1141, -0.6959, 0}
+}
+
+assets.Town sakura_machi(rows: 4, columns: 4, seed: 42)

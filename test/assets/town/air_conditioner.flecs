@@ -1,0 +1,47 @@
+include materials
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+
+assets {
+  @tree Parent
+  template AirConditioner {
+    {
+      Position: {}
+      Box: {0.95, 0.58, 0.4}
+      Rgb: {232, 231, 215}
+    }
+    {
+      Position: {-0.17, 0, 0.215}
+      Rotation: {math.PI / 2, 0, 0}
+      Cylinder: {radius: 0.21, length: 0.035, segments: 20}
+      Rgb: TownIron
+    }
+    {
+      Position: {-0.17, 0, 0.24}
+      Rotation: {math.PI / 2, 0, 0}
+      Torus: {radius: 0.16, tube: 0.025, segments: 20, rings: 6}
+      Rgb: {173, 184, 177}
+    }
+    for i in 0..5 {
+      {
+        Position: {0.29, -0.17 + i * 0.08, 0.22}
+        Box: {0.2, 0.025, 0.025}
+        Rgb: TownIron
+      }
+    }
+    for i in 0..2 {
+      {
+        Position: {-0.32 + i * 0.64, -0.35, -0.05}
+        Box: {0.07, 0.12, 0.62}
+        Rgb: TownIron
+      }
+    }
+    {
+      Position: {0.55, -0.35, -0.1}
+      Cylinder: {radius: 0.035, length: 1.05, segments: 8}
+      Rgb: TownCream
+    }
+  }
+}

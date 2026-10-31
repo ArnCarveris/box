@@ -1,0 +1,101 @@
+include materials
+include facade
+include roof
+include timber_facade
+include tiled_roof
+include shopfront
+include window
+include planter
+include air_conditioner
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+
+assets {
+  @tree Parent
+  template Building {
+    prop facade: template Facade = TimberFacade
+    prop floors: i32 = 2
+    prop width: f32 = 4.4
+    prop depth: f32 = 4.2
+    prop floorHeight: f32 = 2.5
+    prop color: Rgb = {242, 218, 177}
+    prop accent: Rgb = {181, 81, 72}
+    prop roof: template Roof = TiledRoof
+    prop roofColor: Rgb = {66, 83, 99}
+    prop shop: bool = true
+
+    const height = floors * floorHeight
+
+    {
+      Position: {0, height / 2, 0}
+      Box: {width, height, depth}
+      Rgb: color
+    }
+    {
+      Position: {0, 0.12, 0}
+      Box: {width + 0.16, 0.24, depth + 0.16}
+      Rgb: {178, 176, 158}
+    }
+    for floor in 0..floors {
+      if floor == 0 && shop {
+        Shopfront(width: width, accent: accent) { Position: {0, 0, depth / 2} }
+      } else if floor == 0 {
+        {
+          Position: {0, 0, depth / 2}
+          Window(width: 0.95, height: 1.9, frame: TownTimber) {
+            Position: {width * 0.23, 1.04, 0.15}
+          }
+          Window(width: width * 0.36, height: 1.05, frame: TownCream) {
+            Position: {-width * 0.22, 1.4, 0.15}
+          }
+          {
+            Position: {width * 0.23, 0.08, 0.38}
+            Box: {1.18, 0.16, 0.75}
+            Rgb: TownCream
+          }
+          {
+            Position: {width * 0.23, 2.12, 0.35}
+            Box: {1.35, 0.1, 0.85}
+            Rgb: accent
+          }
+          Planter(blossoms: true) { Position: {-width * 0.3, 0, 0.5} }
+        }
+      } else {
+        {
+          Position: {0, floor * floorHeight, depth / 2}
+          facade: {width: width, height: floorHeight, color: color}
+        }
+      }
+      for side in 0..2 {
+        {
+          Position: {(side * 2 - 1) * width / 2, floor * floorHeight, 0}
+          Rotation: {0, (side * 2 - 1) * math.PI / 2, 0}
+          Window(width: depth * 0.36, height: 1.1, frame: TownCream) {
+            Position: {0.3, 1.5, 0.1}
+          }
+          AirConditioner() { Position: {-0.4, 0.56, 0.25} }
+        }
+      }
+      {
+        Position: {0, floor * floorHeight, -depth / 2}
+        Rotation: {0, math.PI, 0}
+        Window(width: width * 0.45, height: 1.1, frame: TownCream) {
+          Position: {0, 1.45, 0.1}
+        }
+      }
+    }
+    for side in 0..2 {
+      {
+        Position: {(side * 2 - 1) * (width / 2 + 0.07), height / 2, -depth / 2}
+        Cylinder: {radius: 0.055, length: height, segments: 8}
+        Rgb: TownIron
+      }
+    }
+    {
+      Position: {0, height, 0}
+      roof: {width: width, depth: depth, color: roofColor}
+    }
+  }
+}

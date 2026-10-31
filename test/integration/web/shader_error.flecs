@@ -1,0 +1,84 @@
+// Default box scene: a lit cube on a ground plane with shadows and post effects.
+// Fly with WASD (QE for down/up, Shift to go faster), turn with the arrow keys or hold the right
+// mouse button to look around, and scroll to push the camera along the view.
+
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.surface
+using box.controllers
+
+$ {
+  LightBake: {probe_spacing: 0.3, bounds_padding: -0.3, capture_size: 128, bounces: 3, budget_ms: 16}
+}
+
+window {
+  Surface: {width: 1280, height: 720, vsync: true}
+}
+
+// Post effects, applied in the order the view lists them
+exposure {
+  AutoExposure: {}
+}
+
+bloom {
+  Bloom: {intensity: 0.2, threshold: 1}
+}
+
+gtao {
+  Gtao: {radius: 0.5, final_value_power: 2.2}
+}
+
+tonemap {
+  Tonemap: {auto_exposure: exposure}
+}
+
+// Anti aliasing on the tone mapped image
+smaa {
+  Smaa: {}
+}
+
+camera {
+  Position: {0, 2.5, 6}
+  Rotation: {-0.35, 0, 0}
+  Camera: {fov: 60}
+  CameraController: {}
+}
+
+main_view {
+  View: {
+    camera: camera,
+    clear: {enabled: true, color: {120, 150, 190, 255}},
+    shadows: {enabled: true},
+    effects: [{effect: gtao}, {effect: bloom}, {effect: tonemap}, {effect: smaa}]
+  }
+}
+
+sun {
+  Rotation: {0.7359, 2.3726, 0}
+  DirectionalLight: {intensity: 2 * flecs.script.math.PI}
+  Rgb: {255, 244, 225}
+}
+
+$ {
+  AmbientLight: {sky: {90, 110, 140}, ground: {40, 36, 30}, intensity: 0.6}
+}
+
+ground {
+  Position: {0, -0.05, 0}
+  Box: {20, 0.1, 20}
+  Rgb: {170, 170, 165}
+  PbrMaterial: {roughness: 0.9}
+}
+
+cube {
+  Position: {0, 0.5, 0}
+  Rotation: {0, 0.4, 0}
+  Box: {1, 1, 1}
+  Rgb: {220, 90, 60}
+  PbrMaterial: {roughness: 0.4, metallic: 0}
+}

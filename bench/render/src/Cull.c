@@ -315,8 +315,8 @@ void Cull_town(
     ecs_singleton_modified(world, App);
     ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
     ecs_script(world, {
-        .entity = ecs_new_from_path_w_sep(world, 0, "etc/scenes/town.flecs", "/", "/"),
-        .filename = "etc/scenes/town.flecs"
+        .entity = ecs_new_from_path_w_sep(world, 0, "test/assets/town.flecs", "/", "/"),
+        .filename = "test/assets/town.flecs"
     });
     int32_t i;
     for (i = 0; i < 3; i ++) {
