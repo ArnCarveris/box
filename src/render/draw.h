@@ -1061,6 +1061,22 @@ void box_draws_store_alloc(
     int32_t *page,
     uint32_t *first);
 
+/** Extend a run that ends at the top of its page in place, when the page has the slots.
+ *
+ * @param s The store
+ * @param page Index of the page
+ * @param first First slot of the run
+ * @param count Slots of the run
+ * @param extend Slots of the run after it is extended
+ * @return Whether the run was extended
+ */
+bool box_draws_store_extend(
+    box_draw_store_t *s,
+    int32_t page,
+    uint32_t first,
+    uint32_t count,
+    uint32_t extend);
+
 /** Free a run, merging it with the free slots next to it. A page without runs is released in
  * the packet, except the first page.
  *
@@ -1090,11 +1106,13 @@ uint32_t box_draws_grow(
     uint32_t count);
 
 /** Make the buffers of a page hold its runs, creating them again up to the slots of the page.
+ *
  * A page's first buffers hold its top, rounded up to BOX_DRAWS_GROW_ALIGN slots and at least
- * BOX_DRAWS_MIN_CAPACITY; a page that outgrows them grows by half, or to its top when that is
- * more. A buffer created again keeps the bytes of the buffer it replaces
- * (BOX_RENDER_BUFFER_KEEP), so the runs of the page keep their instances; a buffer created for
- * the first time has none of them.
+ * BOX_DRAWS_MIN_CAPACITY. A page that outgrows them grows by half, or to its top when that is
+ * more, which keeps the copies of a page that grows step by step in proportion to its slots.
+ *
+ * A buffer created again keeps the bytes of the buffer it replaces (BOX_RENDER_BUFFER_KEEP), so
+ * the runs of the page keep their instances; a buffer created for the first time has none.
  *
  * @param s The store
  * @param p The packet

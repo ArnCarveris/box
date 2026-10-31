@@ -879,6 +879,8 @@ void InstanceStore_moved_run_scatters_copied_changes(void) {
         first[i] = shape_new(world, 3, (float)i, false);
     }
 
+    /* A second batch above the first, so the first moves instead of growing in place */
+    shape_new(world, 4, 0, false);
     frame(world);
     ecs_set(world, first[1], Position, {1, 3, 0});
     for (i = 0; i < (int32_t)MIN_RUN; i ++) {
@@ -928,10 +930,14 @@ void InstanceStore_moved_out_of_released_page_uploads(void) {
     box_render_null_t *null;
     ecs_world_t *world = world_new(&null);
     box_render_draws_page(world, (int32_t)MIN_RUN * 2);
+    ecs_entity_t third[2];
     int32_t i, j;
-    for (i = 0; i < 3; i ++) {
+    for (i = 0; i < 4; i ++) {
         for (j = 0; j < 2; j ++) {
-            shape_new(world, 3 + i, (float)j, false);
+            ecs_entity_t e = shape_new(world, 3 + i, (float)j, false);
+            if (i == 2) {
+                third[j] = e;
+            }
         }
     }
 
@@ -939,10 +945,19 @@ void InstanceStore_moved_out_of_released_page_uploads(void) {
     test_int(stats.pages, 2);
     test_uint(batch_of(null, 2) != NULL, true);
 
-    /* The third batch, alone in page 1, outgrows its run and fits no page: it moves to page 2
-     * and page 1 is released before the copies would run, so it uploads every instance */
+    /* Without the third batch, the fourth is alone in page 1, above a hole */
+    for (j = 0; j < 2; j ++) {
+        ecs_delete(world, third[j]);
+    }
+
+    stats = frame(world);
+    test_int(stats.pages, 2);
+
+    /* The fourth batch outgrows its run, which cannot grow in place past the slots of the page
+     * and fits no page: it moves to page 2 and page 1 is released before the copies would run,
+     * so it uploads every instance */
     for (i = 0; i < (int32_t)MIN_RUN; i ++) {
-        shape_new(world, 5, (float)i, false);
+        shape_new(world, 6, (float)i, false);
     }
 
     stats = frame(world);
@@ -1418,6 +1433,48 @@ void InstanceStore_page_growth_stops_at_page_slots(void) {
     stats = frame(world);
     test_int(stats.pages, 2);
     test_int(stats.page_slots, 70 + MIN_RUN);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void InstanceStore_top_run_grows_in_place(void) {
+    // gpu_instance_data/instance_growth
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    int32_t i, s;
+    for (i = 0; i < 4; i ++) {
+        shape_new(world, 3, (float)i, false);
+    }
+
+    box_render_draws_stats_t stats = frame(world);
+    test_int(stats.page_slots, MIN_RUN);
+
+    /* The batch outgrows its run, which ends at the top of the page: the run grows in place to
+     * 24 slots, nothing is copied and only the page buffers grow, keeping the four instances */
+    for (i = 4; i < 20; i ++) {
+        shape_new(world, 3, (float)i, false);
+    }
+
+    stats = frame(world);
+    test_uint(batch_of(null, 20)->first_instance, 0);
+    test_int(stats.copies, 0);
+    test_int(ecs_vec_count(&null->last.copies), 0);
+    test_int(stats.kept_pages, STREAMS);
+    test_int(stats.page_slots, 24);
+    test_int(uploads_at(null, PAGE(0), 0), 0);
+    for (s = 0; s < STREAMS; s ++) {
+        const box_render_buffer_desc_t *desc = created(null, PAGE(0) + (uint32_t)s);
+        test_assert(desc != NULL);
+        test_uint(desc->size, (uint64_t)24 * stride_of(s));
+        test_assert(desc->usage & BOX_RENDER_BUFFER_KEEP);
+    }
+
+    /* No hole is left below it: the next batch starts at the end of the grown run */
+    shape_new(world, 4, 0, false);
+    stats = frame(world);
+    test_uint(batch_of(null, 1)->first_instance, 24);
+    test_uint(batch_of(null, 20)->first_instance, 0);
 
     ecs_fini(world);
     box_render_null_free(null);

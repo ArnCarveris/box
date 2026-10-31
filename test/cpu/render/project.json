@@ -267,7 +267,8 @@
                     "grow_steps",
                     "runs_grow_by_half",
                     "page_grows_by_half",
-                    "page_growth_stops_at_page_slots"
+                    "page_growth_stops_at_page_slots",
+                    "top_run_grows_in_place"
                 ]
             },
             {

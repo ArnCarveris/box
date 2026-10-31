@@ -233,6 +233,18 @@ void InstanceStore_moved_run_and_grown_page_keep_records(void) {
     batch_matches(world, a[0]);
     batch_matches(world, b[0]);
 
+    /* A third batch, too large for the old run of the first, takes the slots past it, so the
+     * first no longer ends at the top of the page and cannot grow in place */
+    for (i = 0; i < 20; i ++) {
+        ecs_entity_t e = ecs_new(world);
+        ecs_set(world, e, Position, {(float)i - 10, -5, 0});
+        ecs_set(world, e, NGon, {.sides = 5, .radius = 0.5f});
+        ecs_set(world, e, Rgb, {50, 50, 200});
+    }
+
+    after = frames(world, 1);
+    test_int(after.errors, 0);
+
     /* Moved again, to a run of 192 slots, with a changed instance among the copied ones, which
      * scatters over the copy, and a change of the second batch in the same frame */
     ecs_set(world, a[1], Position, {-12, 1, 0});
