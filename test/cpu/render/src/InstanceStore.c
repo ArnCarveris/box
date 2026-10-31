@@ -1285,7 +1285,6 @@ void InstanceStore_shape_moves_to_surface_store_and_back(void) {
     box_render_null_free(null);
 }
 
-<<<<<<< HEAD
 /** Each store derives its chunk from the largest stride of its layout, so that no page buffer
  * exceeds 128 MiB: 2D pages from the 2D shading, plain mesh pages from the transform and
  * surface pages from the surface record. */
@@ -1331,7 +1330,12 @@ void InstanceStore_store_chunk_from_largest_stride(void) {
     for (i = 0; i < BOX_DRAWS_STORES; i ++) {
         test_uint(d->stores[i].chunk, 2);
         test_uint(d->stores[i].slots, 4);
-=======
+    }
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
 void InstanceStore_grow_steps(void) {
     // gpu_instance_data/instance_growth
     static const uint32_t steps[] = {16, 24, 36, 56, 84, 128, 192, 288, 432, 648};
@@ -1410,14 +1414,12 @@ void InstanceStore_runs_grow_by_half(void) {
         test_uint(desc->size, (uint64_t)76 * stride_of(s));
         test_uint(desc->size % BOX_RENDER_COPY_ALIGN, 0);
         test_assert(desc->usage & BOX_RENDER_BUFFER_KEEP);
->>>>>>> 6094c703ac5405f8274a6626770139185e8b9eae
     }
 
     ecs_fini(world);
     box_render_null_free(null);
 }
 
-<<<<<<< HEAD
 /** A plain mesh batch is not split at the chunk of the surface store, 349,525 instances, while
  * a batch with a parametric surface is: plain boxes fill one batch of one page past it. */
 void InstanceStore_plain_batch_not_split_at_surface_chunk(void) {
@@ -1451,7 +1453,11 @@ void InstanceStore_plain_batch_not_split_at_surface_chunk(void) {
     box_draw_key_t key = b->key;
     key.surface = false;
     test_uint(box_draws_key_limit(d, &key), 2796202);
-=======
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
 void InstanceStore_page_grows_by_half(void) {
     // gpu_instance_data/instance_growth
     box_render_null_t *null;
@@ -1558,7 +1564,6 @@ void InstanceStore_top_run_grows_in_place(void) {
     stats = frame(world);
     test_uint(batch_of(null, 1)->first_instance, 24);
     test_uint(batch_of(null, 20)->first_instance, 0);
->>>>>>> 6094c703ac5405f8274a6626770139185e8b9eae
 
     ecs_fini(world);
     box_render_null_free(null);

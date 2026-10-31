@@ -264,16 +264,13 @@
                     "parametric_shapes_use_surface_store",
                     "every_surface_kind_uses_surface_store",
                     "shape_moves_to_surface_store_and_back",
-<<<<<<< HEAD
                     "store_chunk_from_largest_stride",
-                    "plain_batch_not_split_at_surface_chunk"
-=======
+                    "plain_batch_not_split_at_surface_chunk",
                     "grow_steps",
                     "runs_grow_by_half",
                     "page_grows_by_half",
                     "page_growth_stops_at_page_slots",
                     "top_run_grows_in_place"
->>>>>>> 6094c703ac5405f8274a6626770139185e8b9eae
                 ]
             },
             {
