@@ -180,24 +180,13 @@ static void batch_matches_in(
     };
     uint32_t count = (uint32_t)ecs_vec_count(&b->entities);
     int32_t s;
-<<<<<<< HEAD
     test_assert(b->page == page);
-    for (s = 0; s < BOX_RENDER_INSTANCE_STREAMS; s ++) {
-        uint32_t size = count * strides[s];
-        uint32_t handle = BOX_RENDER_BUFFER_FIRST +
-            (uint32_t)page * BOX_RENDER_INSTANCE_STREAMS + (uint32_t)s;
-        void *gpu = ecs_os_malloc((ecs_size_t)size);
-        test_bool(box_render_gpu_read_buffer(world, handle, b->first * strides[s], size, gpu),
-            true);
-=======
-    test_assert(b->page == 0);
     for (s = 0; s < store->layout.streams; s ++) {
         uint32_t stride = store->layout.stride[s];
         uint32_t size = count * stride;
         void *gpu = ecs_os_malloc((ecs_size_t)size);
         test_bool(box_render_gpu_read_buffer(world, box_draws_store_handle(store, b->page, s),
             b->first * stride, size, gpu), true);
->>>>>>> 4f251d3b7d016fe0f77ba8180d60ff47f8058b0c
         test_assert(!ecs_os_memcmp(gpu, ecs_vec_first(streams[s]), (ecs_size_t)size));
         ecs_os_free(gpu);
     }
@@ -355,7 +344,6 @@ void InstanceStore_moved_run_reused_in_same_frame(void) {
     ecs_fini(world);
 }
 
-<<<<<<< HEAD
 void InstanceStore_run_moved_to_other_page_copies_directly(void) {
     // gpu_instance_data/copy_staging_release
     ecs_world_t *world = world_new();
@@ -389,9 +377,9 @@ void InstanceStore_run_moved_to_other_page_copies_directly(void) {
     box_render_gpu_stats_t after = frames(world, 1);
     box_render_draws_stats_t stats;
     box_render_draws_stats(world, &stats);
-    test_int(stats.copies, BOX_RENDER_INSTANCE_STREAMS);
+    test_int(stats.copies, BOX_RENDER_INSTANCE_STREAMS_PLAIN);
     test_int(after.errors, 0);
-    test_int(after.copies_direct - before.copies_direct, BOX_RENDER_INSTANCE_STREAMS);
+    test_int(after.copies_direct - before.copies_direct, BOX_RENDER_INSTANCE_STREAMS_PLAIN);
     test_int(after.copies_staged - before.copies_staged, 0);
     test_int(after.copy_staging, 0);
     test_int(after.copy_staging_peak, 0);
@@ -583,7 +571,7 @@ void InstanceStore_staging_released_after_frames_without_copies(void) {
 
     box_render_gpu_stats_t after = frames(world, 0);
     test_int(after.errors, 0);
-    test_assert(after.copies_staged - before.copies_staged >= BOX_RENDER_INSTANCE_STREAMS);
+    test_assert(after.copies_staged - before.copies_staged >= BOX_RENDER_INSTANCE_STREAMS_PLAIN);
     test_assert(after.copy_staging > 0);
     test_assert(after.copy_staging_peak >= after.copy_staging);
     batch_matches(world, a[0]);
@@ -628,7 +616,9 @@ void InstanceStore_staging_shrinks_while_copies_continue(void) {
     test_int(after.copy_staging, 64 * 1024);
     test_int(after.copy_staging_peak, 512 * 1024);
     test_int(after.errors, 0);
-=======
+    ecs_fini(world);
+}
+
 /** Check that a pixel of a capture has a channel above a level and the others below another.
  *
  * @param px The pixels of the 64x64 capture
@@ -778,6 +768,5 @@ void InstanceStore_plain_pages_bind_no_surface_buffer(void) {
     test_assert(lit > 10);
     stbi_image_free(px);
     ecs_os_free(path);
->>>>>>> 4f251d3b7d016fe0f77ba8180d60ff47f8058b0c
     ecs_fini(world);
 }
