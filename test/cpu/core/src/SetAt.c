@@ -5,6 +5,7 @@
 
 #include <box.h>
 #include <bake_test.h>
+#include <string.h>
 
 /** Create a world with box imported and an entity e at the origin.
  *
@@ -581,6 +582,130 @@ void SetAt_deferred_later_batch(void) {
     test_flt(light->intensity, 3);
     test_flt(light->range, 20);
     test_bool(set_at_active(world), false);
+
+    ecs_fini(world);
+}
+
+static char set_at_warnings[4096];
+
+static void SetAtCaptureLog(
+    int32_t level,
+    const char *file,
+    int32_t line,
+    const char *msg)
+{
+    (void)file;
+    (void)line;
+    if (level == -2 &&
+        strlen(set_at_warnings) + strlen(msg) + 2 < sizeof(set_at_warnings))
+    {
+        strcat(set_at_warnings, msg);
+        strcat(set_at_warnings, "\n");
+    }
+}
+
+/** Run a scene on a world with e at {1, 2, 3}, capturing the warnings it logs, then run a frame
+ * so that its SetAt entities copy their values.
+ *
+ * @param scene The scene, with SetAt entities whose entity is e
+ * @param e Receives the entity
+ * @return The world
+ */
+static ecs_world_t* set_at_warn_run(
+    const char *scene,
+    ecs_entity_t *e)
+{
+    ecs_world_t *world = set_at_world(e);
+    ecs_set(world, *e, Position, {1, 2, 3});
+    ecs_progress(world, 0.1f);
+
+    set_at_warnings[0] = '\0';
+    int32_t level = ecs_log_set_level(-1);
+    bool colors = ecs_log_enable_colors(false);
+    ecs_os_api_log_t real_log = ecs_os_api.log_;
+    ecs_os_api.log_ = SetAtCaptureLog;
+    test_int(ecs_script_run(world, "scene", scene, NULL), 0);
+    ecs_progress(world, 0.1f);
+    ecs_os_api.log_ = real_log;
+    ecs_log_set_level(level);
+    ecs_log_enable_colors(colors);
+
+    return world;
+}
+
+void SetAt_warn_written_last(void) {
+    ecs_entity_t e;
+    ecs_world_t *world = set_at_warn_run(
+        "using box.app\n"
+        "using box.transform\n"
+        "change {\n"
+        "  Position: {0, 0, 0}\n"
+        "  Rotation: {0, 0.5, 0}\n"
+        "  SetAt: {frame: 1, entity: e}\n"
+        "}\n", &e);
+
+    test_assert(strstr(set_at_warnings, "SetAt of 'change'") != NULL);
+    test_assert(strstr(set_at_warnings, "Position") != NULL);
+    test_assert(strstr(set_at_warnings, "write SetAt first") != NULL);
+    test_flt(ecs_get(world, e, Position)->x, 1);
+    test_flt(ecs_get(world, e, Rotation)->y, 0.5f);
+
+    ecs_fini(world);
+}
+
+void SetAt_warn_none_written_first(void) {
+    ecs_entity_t e;
+    ecs_world_t *world = set_at_warn_run(
+        "using box.app\n"
+        "using box.transform\n"
+        "change {\n"
+        "  SetAt: {frame: 1, entity: e}\n"
+        "  Position: {0, 0, 0}\n"
+        "  Rotation: {0, 0.5, 0}\n"
+        "}\n", &e);
+
+    test_str(set_at_warnings, "");
+    const Position *p = ecs_get(world, e, Position);
+    test_flt(p->x, 0);
+    test_flt(p->y, 0);
+    test_flt(p->z, 0);
+    test_flt(ecs_get(world, e, Rotation)->y, 0.5f);
+
+    ecs_fini(world);
+}
+
+void SetAt_warn_none_material(void) {
+    ecs_entity_t e;
+    ecs_world_t *world = set_at_warn_run(
+        "using box.app\n"
+        "using box.material\n"
+        "change {\n"
+        "  Rgb: {40, 50, 60}\n"
+        "  SetAt: {frame: 1, entity: e}\n"
+        "}\n", &e);
+
+    test_str(set_at_warnings, "");
+    test_int(ecs_get(world, e, Rgb)->r, 40);
+
+    ecs_fini(world);
+}
+
+void SetAt_warn_none_not_constructed(void) {
+    ecs_entity_t e;
+    ecs_world_t *world = set_at_warn_run(
+        "using box.app\n"
+        "using box.transform\n"
+        "change {\n"
+        "  Position: {4, 5, 6}\n"
+        "  Rotation: {0, 0.5, 0}\n"
+        "  SetAt: {frame: 1, entity: e}\n"
+        "}\n", &e);
+
+    test_str(set_at_warnings, "");
+    const Position *p = ecs_get(world, e, Position);
+    test_flt(p->x, 4);
+    test_flt(p->y, 5);
+    test_flt(p->z, 6);
 
     ecs_fini(world);
 }

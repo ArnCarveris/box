@@ -136,6 +136,7 @@ static uint64_t box_draws_hash(
         0x165667B19E3779F9ull;
     h ^= (((((uint64_t)key->blend * 2 + key->back_face) * 4 + key->wrap) * 2 + key->cutout) * 2 +
         key->transmissive + 1) * 0x27D4EB2F165667C5ull;
+    h ^= (uint64_t)key->surface * 0x85EBCA77C2B2AE63ull;
     for (i = 0; i < BOX_RENDER_TEXTURE_SLOTS; i ++) {
         h = (h ^ (h >> 31)) * 0x9E3779B97F4A7C15ull + key->textures[i];
     }
@@ -162,7 +163,8 @@ static bool box_draws_key_eq(
         a->dynamic_transform == b->dynamic_transform &&
         a->dynamic_material == b->dynamic_material &&
         a->wrap == b->wrap && !ecs_os_memcmp(a->textures, b->textures, ECS_SIZEOF(a->textures)) &&
-        a->shadow == b->shadow && a->bake == b->bake && a->atlas == b->atlas;
+        a->shadow == b->shadow && a->bake == b->bake && a->atlas == b->atlas &&
+        a->surface == b->surface;
 }
 
 box_draw_batch_t* box_draws_batch(
@@ -204,24 +206,44 @@ static bool box_draws_is_2d(
     return b->key.pipeline == BOX_RENDER_SHADER_SHAPE2D;
 }
 
+/** Check whether a batch has the surface stream: a mesh batch with a parametric surface.
+ *
+ * @param b The batch
+ * @return Whether its pages are of the surface store
+ */
+static bool box_draws_has_surface(
+    const box_draw_batch_t *b)
+{
+    return b->key.surface && !box_draws_is_2d(b);
+}
+
 box_draw_store_t* box_draws_batch_store(
     box_render_draws_t *d,
     const box_draw_batch_t *b)
 {
-    return &d->stores[box_draws_is_2d(b) ? BOX_DRAWS_STORE_2D : BOX_DRAWS_STORE_MESH];
+    int32_t store = BOX_DRAWS_STORE_MESH;
+    if (box_draws_is_2d(b)) {
+        store = BOX_DRAWS_STORE_2D;
+    } else if (b->key.surface) {
+        store = BOX_DRAWS_STORE_SURFACE;
+    }
+
+    return &d->stores[store];
 }
 
 uint8_t box_draws_batch_kinds(
     const box_draw_batch_t *b)
 {
-    return box_draws_is_2d(b) ? BOX_DRAW_BOTH : BOX_DRAW_ALL;
+    return box_draws_has_surface(b) ? BOX_DRAW_ALL : BOX_DRAW_BOTH;
 }
 
 box_render_surface_t* box_draws_slot_surface(
     box_draw_batch_t *b,
     int32_t slot)
 {
-    return box_draws_is_2d(b) ? NULL : ecs_vec_get_t(&b->surfaces, box_render_surface_t, slot);
+    return box_draws_has_surface(b)
+        ? ecs_vec_get_t(&b->surfaces, box_render_surface_t, slot)
+        : NULL;
 }
 
 /** Get the instance data of a stream of a batch.
@@ -451,6 +473,9 @@ int32_t box_draws_slot_add(
     } else {
         ecs_os_memset_t(ecs_vec_append_t(NULL, &b->mesh_shadings, box_render_mesh_shading_t),
             0, box_render_mesh_shading_t);
+    }
+
+    if (box_draws_has_surface(b)) {
         ecs_os_memset_t(ecs_vec_append_t(NULL, &b->surfaces, box_render_surface_t), 0,
             box_render_surface_t);
     }
@@ -668,6 +693,9 @@ void box_draws_slot_remove(
             *box_draws_slot_shading(b, slot) = *box_draws_slot_shading(b, last);
         } else {
             *box_draws_slot_mesh_shading(b, slot) = *box_draws_slot_mesh_shading(b, last);
+        }
+
+        if (box_draws_has_surface(b)) {
             *box_draws_slot_surface(b, slot) = *box_draws_slot_surface(b, last);
         }
 
@@ -685,7 +713,7 @@ void box_draws_slot_remove(
     ecs_vec_remove_last(&b->entities);
     ecs_vec_remove_last(&b->transforms);
     ecs_vec_remove_last(flat ? &b->shadings : &b->mesh_shadings);
-    if (!flat) {
+    if (box_draws_has_surface(b)) {
         ecs_vec_remove_last(&b->surfaces);
     }
 
@@ -1052,8 +1080,9 @@ void box_draws_reset_backend(
     box_draws_materials_reset(d);
 }
 
-/** Give a batch a run of slots that holds all its instances, moving it to a new run when it
- * outgrew its run; its old run is freed.
+/** Give a batch a run of slots that holds all its instances. A batch that outgrew its run
+ * extends it in place when it ends at the top of its page, so nothing is copied and no hole is
+ * left, and otherwise moves to a new run; its old run is freed.
  *
  * A moved batch remembers the old run and the instances the GPU holds in it, which the send
  * copies into the new run (box_draws_send_batch); its changed slots stay queued and are written
@@ -1071,18 +1100,23 @@ static void box_draws_reserve(
     box_draw_store_t *store = box_draws_batch_store(d, b);
     uint32_t count = (uint32_t)ecs_vec_count(&b->entities);
     uint32_t limit = box_draws_limit(d);
-    uint32_t capacity = BOX_DRAWS_MIN_CAPACITY, first;
+    uint32_t capacity, first;
     int32_t page;
     if (b->page >= 0 && count <= b->capacity) {
         goto done;
     }
 
-    while (capacity < count) {
-        capacity *= 2;
-    }
+    capacity = box_draws_grow(0, count);
 
     if (capacity > limit && count <= limit) {
         capacity = limit;
+    }
+
+    if (b->page >= 0 &&
+        box_draws_store_extend(store, b->page, b->first, b->capacity, capacity))
+    {
+        b->capacity = capacity;
+        goto done;
     }
 
     box_draws_store_alloc(store, capacity, &page, &first);
@@ -1295,7 +1329,8 @@ void box_draws_batch_textures(
 }
 
 /** Compute the local bounds of the slots of a batch with parametric surfaces: the union of the
- * bounds of each surface, and of the mesh for a slot without one.
+ * bounds of each surface, and of the mesh for a slot without one. A plain mesh batch keeps no
+ * surfaces, so it is not bounded and draws with the bounds of its mesh.
  *
  * @param b The batch
  * @param cache The mesh cache

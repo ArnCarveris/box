@@ -133,24 +133,34 @@
 /** Buffer handle of the first instance page, the first handle of the instance pages.
  *
  * Every batch draws a run of slots of one instance page: a storage buffer per stream of at most
- * BOX_DRAWS_CHUNK instances, BOX_RENDER_INSTANCE_STREAMS for a mesh page and, without the surface
- * stream, BOX_RENDER_INSTANCE_STREAMS_2D for a 2D page, for which the backend binds a zero record.
+ * BOX_DRAWS_CHUNK instances. A mesh page with parametric surfaces has BOX_RENDER_INSTANCE_STREAMS,
+ * a plain mesh page and a 2D page have BOX_RENDER_INSTANCE_STREAMS_PLAIN, without the surface
+ * stream, for which the backend binds a zero record.
  *
- * box_render_batch_t.instances is the transform stream of the page, first_instance its slot. Page
- * p has the handle BOX_RENDER_BUFFER_FIRST + p * BOX_RENDER_INSTANCE_STREAMS + s for stream s. A
- * released page index is reused by the next page the store needs. */
+ * box_render_batch_t.instances is the transform stream of the page, first_instance its slot. The
+ * pages from BOX_RENDER_BUFFER_FIRST hold the plain meshes: page p has the handle
+ * BOX_RENDER_BUFFER_FIRST + p * BOX_RENDER_INSTANCE_STREAMS + s for stream s. A released page
+ * index is reused by the next page the store needs. */
 #define BOX_RENDER_BUFFER_FIRST (16)
 
-/** Buffers of a mesh instance page, one per stream, at consecutive handles; the handles of
- * every page, 2D pages included, leave room for this many */
+/** Buffers of a mesh instance page with parametric surfaces, one per stream, at consecutive
+ * handles; the handles of every page, plain and 2D pages included, leave room for this many */
 #define BOX_RENDER_INSTANCE_STREAMS (3)
 
-/** Buffers of a 2D instance page: the transform and the shading stream */
-#define BOX_RENDER_INSTANCE_STREAMS_2D (2)
+/** Buffers of a plain mesh or a 2D instance page: the transform and the shading stream */
+#define BOX_RENDER_INSTANCE_STREAMS_PLAIN (2)
 
-/** Buffer handle of the first instance page of the 2D shapes and glyphs; the pages from
- * BOX_RENDER_BUFFER_FIRST hold the meshes. Page p of the 2D pages has the handle
- * BOX_RENDER_BUFFER_FIRST_2D + p * BOX_RENDER_INSTANCE_STREAMS + s for stream s. */
+/** Buffers of a 2D instance page: the transform and the shading stream */
+#define BOX_RENDER_INSTANCE_STREAMS_2D (BOX_RENDER_INSTANCE_STREAMS_PLAIN)
+
+/** Buffer handle of the first instance page of the meshes with a parametric surface, which have
+ * the surface stream. Page p of these pages has the handle
+ * BOX_RENDER_BUFFER_FIRST_SURFACE + p * BOX_RENDER_INSTANCE_STREAMS + s for stream s. */
+#define BOX_RENDER_BUFFER_FIRST_SURFACE \
+    (BOX_RENDER_BUFFER_FIRST + BOX_RENDER_INSTANCE_STREAMS * 0x02000000u)
+
+/** Buffer handle of the first instance page of the 2D shapes and glyphs. Page p of the 2D pages
+ * has the handle BOX_RENDER_BUFFER_FIRST_2D + p * BOX_RENDER_INSTANCE_STREAMS + s for stream s. */
 #define BOX_RENDER_BUFFER_FIRST_2D \
     (BOX_RENDER_BUFFER_FIRST + BOX_RENDER_INSTANCE_STREAMS * 0x04000000u)
 
@@ -161,8 +171,8 @@
  * a mesh page, box_render_shading_t per slot of a 2D page */
 #define BOX_RENDER_STREAM_SHADING (1)
 
-/** Stream of the surface parameters of a mesh instance page, box_render_surface_t per slot;
- * 2D pages have none */
+/** Stream of the surface parameters of a mesh instance page with parametric surfaces,
+ * box_render_surface_t per slot; plain mesh pages and 2D pages have none */
 #define BOX_RENDER_STREAM_SURFACE (2)
 
 /** Byte alignment of a scatter segment in the change buffer, the storage offset alignment */
@@ -854,7 +864,11 @@ typedef struct box_render_mesh_shading_t {
 } box_render_mesh_shading_t;
 
 /** Surface parameters of an instance, the stream of an instance page that changes with its
- * ShapeMesh: the parametric surface the vertex shaders evaluate (surface.wgsl), 0 for a mesh.
+ * ShapeMesh: the parametric surface the vertex shaders evaluate (surface.wgsl).
+ *
+ * Only the batches of shapes with a parametric surface (box_draw_key_t.surface) have the stream,
+ * in the pages from BOX_RENDER_BUFFER_FIRST_SURFACE; a plain mesh has no record, and the vertex
+ * shaders leave its surface zero.
  *
  * p[0].x is the surface kind and p[22], p[23] the center and half extent of its local bounds. */
 typedef struct box_render_surface_t {
@@ -880,8 +894,9 @@ typedef struct box_render_scatter_t {
  * WebGPU */
 #define BOX_RENDER_COPY_ALIGN (4)
 
-/** Bytes the copies of one packet move at most together: the backend copies them through one
- * staging buffer, below the 256 MiB buffer size every WebGPU device supports */
+/** Bytes the copies of one packet move at most together: the backend copies those within one
+ * buffer, or that read what another copy writes, through one staging buffer, below the 256 MiB
+ * buffer size every WebGPU device supports */
 #define BOX_RENDER_COPY_MAX ((uint64_t)128 << 20)
 
 /** GPU copy of bytes from one buffer into another or into the same one, such as the instances

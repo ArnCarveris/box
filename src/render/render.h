@@ -24,14 +24,15 @@ typedef struct box_render_draws_stats_t {
     int32_t scatters;           /**< Scatters the last extract sent, one per instance page with
                                  *   static changes */
     int32_t pages;              /**< Instance pages alive */
-    int64_t page_slots;         /**< Slots the buffers of the instance pages alive hold, of both
-                                 *   stores: their capacity, not the live instances */
+    int64_t page_slots;         /**< Slots the buffers of the instance pages alive hold, of every
+                                 *   store: their capacity, not the live instances */
     int64_t page_transform_bytes; /**< Bytes of the transform buffers of the instance pages
-                                 *   alive, of both stores */
+                                 *   alive, of every store */
     int64_t page_shading_bytes; /**< Bytes of the shading buffers of the instance pages alive,
-                                 *   of both stores */
+                                 *   of every store */
     int64_t page_surface_bytes; /**< Bytes of the surface buffers of the instance pages alive,
-                                 *   of both stores */
+                                 *   which only the pages of the meshes with a parametric
+                                 *   surface have */
     int64_t page_bytes;         /**< Bytes of every buffer of the instance pages alive, the sum
                                  *   of the bytes of the streams */
     int64_t upload_bytes;       /**< Bytes the last extract uploaded into instance buffers, the
@@ -49,8 +50,9 @@ typedef struct box_render_draws_stats_t {
                                  *   the runs of batches whose shading uploads (every frame
                                  *   for DynamicMaterial) and scatter segments of materials */
     int64_t surface_bytes;      /**< Bytes the last extract uploaded into the surface streams
-                                 *   of the mesh pages, runs and scatter segments, only when a
-                                 *   ShapeMesh changed; 2D pages have no surface stream */
+                                 *   of the mesh pages with parametric surfaces, runs and
+                                 *   scatter segments, only when a ShapeMesh changed; plain mesh
+                                 *   and 2D pages have no surface stream */
     int32_t clips;              /**< ClipChildren elements in the clip buffer */
     int64_t clip_bytes;         /**< Bytes the last extract uploaded into the clip buffer */
     int32_t materials;          /**< Slots of the material table alive, slot 0 included */

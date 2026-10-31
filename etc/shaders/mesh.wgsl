@@ -178,7 +178,10 @@ struct VertexOut {
 // depth prepass entry points all place their vertices with it, and the clip position is
 // invariant, so the forward pass of a view with a depth prepass rasterizes the depths the
 // prepass wrote and tests them with Equal. It reads the transform and surface streams and the
-// surface assets only, which the plain prepass binds, and sets surface_data.
+// surface assets only, which the plain prepass binds, and sets surface_data. A plain mesh page
+// binds one zero record as its surface stream, so the record of a slot is loaded only when it is
+// inside the buffer, without relying on robust buffer access; surface_data stays zero otherwise,
+// which is the plain mesh path.
 struct Placed {
     model: mat4x4f,
     normal: vec3f,
@@ -187,7 +190,9 @@ struct Placed {
 };
 
 fn place(v: VertexIn) -> Placed {
-    surface_data = surfaces[v.slot];
+    if (v.slot < arrayLength(&surfaces)) {
+        surface_data = surfaces[v.slot];
+    }
     let model = instance_model(transforms[v.slot]);
     var position = v.position;
     var normal = v.normal;

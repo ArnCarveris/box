@@ -10,8 +10,10 @@
 //   color * keep + add) and its alpha. A 2D page holds the whole material of a 2D shape or glyph
 //   (Shape2DShading of shape2d.wgsl);
 // - binding 3, SurfaceData (box_render_surface_t): the parametric surface the vertex stage
-//   evaluates (surface.wgsl), zero for a plain mesh. Only mesh pages have this stream; a 2D page
-//   binds one zero record here, which shape2d.wgsl does not read;
+//   evaluates (surface.wgsl). Only the mesh pages of shapes with a parametric surface have this
+//   stream; a plain mesh page and a 2D page bind one zero record here. The vertex stages of
+//   mesh.wgsl and shadow.wgsl load the record of a slot only when it is inside the buffer, so a
+//   plain mesh keeps a zero surface_data, and shape2d.wgsl does not read it;
 // - binding 4, the material table (box_render_material_t), which every page binds.
 //
 // Binding 1 holds the surface assets of the mesh of the draw.

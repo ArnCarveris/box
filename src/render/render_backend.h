@@ -10,6 +10,11 @@
 
 #include "render_packet.h"
 
+/** Packets in a row without staged copies after which the GPU backend releases the staging
+ * buffer of the copies, and the packets after which it shrinks that buffer to what the largest
+ * staged copies of a packet among them needed */
+#define BOX_RENDER_COPY_STAGING_FRAMES (60)
+
 /** Counters of the GPU backend, written on the render thread */
 typedef struct box_render_gpu_stats_t {
     bool ready;                 /**< The device exists */
@@ -89,6 +94,14 @@ typedef struct box_render_gpu_stats_t {
     int32_t shadow_draws;       /**< Draw calls recorded in the shadow passes of the cascades
                                  *   and the atlas tiles, not those of the probe captures; a
                                  *   point light tile draws each caster draw once per octant */
+    int32_t copies_direct;      /**< Copies between buffers (box_render_copy_t) that went from
+                                 *   their source buffer straight into their destination */
+    int32_t copies_staged;      /**< Copies between buffers that went through the staging
+                                 *   buffer: within one buffer, or reading a range another copy
+                                 *   of their packet writes */
+    int64_t copy_staging;       /**< Bytes of the staging buffer of the copies now, 0 while it
+                                 *   is released (BOX_RENDER_COPY_STAGING_FRAMES) */
+    int64_t copy_staging_peak;  /**< Most bytes copy_staging held at a publish */
     bool clip_distances;        /**< The device has the clip distances feature, which clips the
                                  *   octants of the point light tiles */
 } box_render_gpu_stats_t;
@@ -425,6 +438,19 @@ bool box_render_gpu_read_buffer(
     uint32_t offset,
     uint32_t size,
     void *out);
+
+/** Get the bytes of a buffer the GPU backend of a world created for a handle.
+ *
+ * Only call this when the main thread renders (RenderSettings.main_thread), after
+ * box_render_sync, as box_render_gpu_read_buffer.
+ *
+ * @param world The world
+ * @param handle Handle of the buffer
+ * @return The bytes, 0 when the backend has no buffer for the handle or is not the GPU backend
+ */
+uint64_t box_render_gpu_buffer_size(
+    ecs_world_t *world,
+    uint32_t handle);
 
 /** Read back what the cull pass of a view kept in the last target the GPU backend rendered.
  *
