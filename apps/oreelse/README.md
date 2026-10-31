@@ -20,14 +20,6 @@ bake3 run apps/oreelse --local-env -- --headless --frames 10   # headless run, e
 bake3 run apps/oreelse --local-env -- --stresstest             # a late game base, see below
 bake3 --target em --local-env apps/oreelse                     # build for the browser
 
-python3 tools/integration.py e2e oreelse_flow oreelse_look     # the end-to-end scenarios
-python3 tools/integration.py e2e oreelse_mining oreelse_particles
-python3 tools/integration.py e2e oreelse_crafting oreelse_buildings oreelse_rocket
-python3 tools/integration.py e2e oreelse_power oreelse_critters oreelse_critter_fx
-python3 tools/integration.py e2e oreelse_player_fx oreelse_hud oreelse_building_animation
-python3 tools/integration.py e2e oreelse_weapons oreelse_flora oreelse_drones
-python3 tools/integration.py e2e oreelse_inventory_screen oreelse_health_bars oreelse_screens oreelse_combat_fx
-python3 tools/integration.py e2e oreelse_drone_rocket_fx oreelse_panels oreelse_stresstest
 python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
@@ -855,16 +847,8 @@ The port follows these; new code keeps to them.
   raises the plants of the tiles whose building changed.
 - **Systems write through `it->stage`** (`ecs_set`, `ecs_modified`, `ore_state_set`,
   `ore_toast`): the world is read only while the pipeline runs.
-- **Tests**: end-to-end scenarios over the command port, one file per area,
-  `test/integration/e2e/oreelse_<area>.py` (shrink the window, drop shadows and effects, count
-  frames at a fixed 1/60 s delta, run with `--seed`), and visual scenes in
-  `apps/oreelse/test/visual` with baselines. The test machines render in software at a few
-  frames per second, so scenarios set up state directly (components, singletons, timers)
-  instead of waiting minutes of game time, and keep their frame counts small. The commands of
-  the port do not write the entities of a module, which hold the game's singletons, so the
-  scenarios write those through the REST endpoints of the same port (`PUT /component/...`,
-  `put` in `oreelse_flow.py`). Visual scenes include `apps/oreelse/test/visual/setup/seed`
-  before the game for a fixed map.
+- **Tests**: visual scenes in `apps/oreelse/test/visual` with baselines. Visual scenes include
+  `apps/oreelse/test/visual/setup/seed` before the game for a fixed map.
 - **Visuals** are ported from the original as From flecs-engine to box describes, with the
   original's prefab and part names (`Ore`, `Astronaut`, `JetPlume`, `GroundSurface`, ...), and
   never as placeholder geometry. Animation runs in C systems that only run while `Playing`;

@@ -3,7 +3,7 @@
 // each other and the body bobbed up. The game plays, walked by a held action of the scene's own,
 // and the walk cycle (OrePlayerGait) and the limbs start in the stride, the half step before it
 // counted, so OrePlayerFx kicks up the dust on frame one; three frames old it is still too small
-// to show behind the boots (oreelse_player_fx.py checks it, particles_gallery shows FootDust)
+// to show behind the boots (particles_gallery shows FootDust)
 include apps/oreelse/test/visual/setup/seed
 include apps/oreelse/etc/oreelse
 
