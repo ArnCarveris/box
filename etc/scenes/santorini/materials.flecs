@@ -1,0 +1,11 @@
+using box.material
+
+export const IslandPlaster: Rgb = {244, 240, 222}
+export const IslandChalk: Rgb = {255, 252, 239}
+export const IslandCobalt: Rgb = {27, 86, 171}
+export const IslandAzure: Rgb = {52, 131, 191}
+export const IslandRecess: Rgb = {29, 56, 73}
+export const IslandWood: Rgb = {137, 102, 66}
+export const IslandClay: Rgb = {193, 111, 77}
+export const IslandLeaf: Rgb = {103, 133, 76}
+export const IslandIron: Rgb = {49, 69, 76}

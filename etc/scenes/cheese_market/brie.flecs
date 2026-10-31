@@ -1,0 +1,30 @@
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.surface
+using box.controllers
+using box.text
+
+@tree Parent
+template Brie {
+  prop radius: f32 = 0.27
+
+  body {
+    Position: {}
+    Cylinder: {radius: radius, length: 0.14, segments: 28, smooth: true}
+    Rgb: {246, 238, 208}
+    PbrMaterial: {roughness: 0.95}
+  }
+  for i in 0..6 {
+    {
+      Position: {0, 0.075, (i - 2.5) * radius * 0.24}
+      Box: {radius * 1.5, 0.008, 0.012}
+      Rgb: {219, 212, 177}
+    }
+  }
+}

@@ -1,3 +1,18 @@
+include santorini/materials
+include santorini/paving
+include santorini/blue_chapel
+include santorini/bell_tower
+include santorini/olive
+include santorini/pot
+include santorini/house
+include santorini/windmill
+include santorini/railing
+include santorini/stairs
+include santorini/pergola
+include santorini/cafe_table
+include santorini/sunshade
+include santorini/beam
+include santorini/fishing_boat
 using flecs.script
 using box.transform
 using box.geometry
@@ -9,612 +24,6 @@ using box.effects
 using box.surface
 using box.controllers
 using box.text
-
-const plaster: Rgb = {244, 240, 222}
-const chalk: Rgb = {255, 252, 239}
-const cobalt: Rgb = {27, 86, 171}
-const azure: Rgb = {52, 131, 191}
-const recess: Rgb = {29, 56, 73}
-const wood: Rgb = {137, 102, 66}
-const clay: Rgb = {193, 111, 77}
-const leaf: Rgb = {103, 133, 76}
-const iron: Rgb = {49, 69, 76}
-
-@tree Parent
-template IslandBeam {
-  prop ax: f32 = 0
-  prop ay: f32 = 0
-  prop az: f32 = 0
-  prop bx: f32 = 0
-  prop by: f32 = 1
-  prop bz: f32 = 0
-  prop radius: f32 = 0.025
-  prop tint: Rgb = {137, 102, 66}
-  const dx = bx - ax
-  const dy = by - ay
-  const dz = bz - az
-  const length = math.sqrt(dx * dx + dy * dy + dz * dz)
-  Position: {(ax + bx) / 2, (ay + by) / 2, (az + bz) / 2}
-  Rotation: {math.acos(dy / length), math.atan2(dx, dz), 0}
-  Cylinder: {radius: radius, length: length, segments: 8, smooth: true}
-  Rgb: tint
-}
-
-@tree Parent
-template IslandPot {
-  prop flowers: bool = false
-  prop size: f32 = 1
-  prop tint: Rgb = {218, 61, 134}
-  Scale: {size, size, size}
-  vessel {
-    Position: {0, 0.23, 0}
-    Frustum: {radius_bottom: 0.18, radius_top: 0.28, length: 0.46, segments: 16, smooth: true}
-    Rgb: clay
-  }
-  rim {
-    Position: {0, 0.44, 0}
-    Torus: {radius: 0.263, tube: 0.037, segments: 20, rings: 8, smooth: true}
-    Rgb: {221, 143, 101}
-  }
-  soil {
-    Position: {0, 0.445, 0}
-    Cylinder: {radius: 0.235, length: 0.025, segments: 16}
-    Rgb: {85, 70, 47}
-  }
-  for i in 0..9 {
-    const a = i * 2.4
-    {
-      Position: {math.sin(a) * 0.15, 0.58 + i % 3 * 0.09, math.cos(a) * 0.15}
-      Rotation: {math.sin(a) * 0.55, a, 0.35}
-      Scale: {0.55, 1.5, 0.7}
-      Sphere: {radius: 0.17, segments: 8, smooth: true}
-      Rgb: {99 + i % 3 * 8, 129 + i % 3 * 7, 72}
-    }
-    if flowers {
-      for p in 0..3 {
-        {
-          Position: {math.sin(a) * 0.22 + math.sin(p * 2.1) * 0.055, 0.79 + i % 3 * 0.07, math.cos(a) * 0.22 + math.cos(p * 2.1) * 0.055}
-          Scale: {1, 0.65, 1}
-          Sphere: {radius: 0.075, segments: 8}
-          Rgb: tint
-        }
-      }
-    }
-  }
-}
-
-@tree Parent
-template Bougainvillea {
-  prop width: f32 = 2.5
-  prop height: f32 = 2.8
-  prop tint: Rgb = {220, 52, 132}
-  IslandPot(size: 1.25) { Position: {-width * 0.42, 0, 0.18} }
-  for stem in 0..3 {
-    IslandBeam(ax: -width * 0.42, ay: 0.4, az: 0.1, bx: -width * 0.4 + stem * 0.14, by: height, bz: 0.08, radius: 0.035) {}
-    IslandBeam(ax: -width * 0.4 + stem * 0.14, ay: height, az: 0.08, bx: width * 0.42, by: height - stem * 0.13, bz: 0.08, radius: 0.024) {}
-  }
-  for i in 0..42 {
-    const t = i / 41.0
-    const x = -width * 0.48 + t * width
-    const y = height + math.sin(t * 4) * 0.17 - t * t * 0.48
-    {
-      Position: {x, y + math.sin(i * 7) * 0.18, 0.13 + math.cos(i * 3) * 0.14}
-      Scale: {1, 0.72, 0.8}
-      IcoSphere: {radius: 0.23, segments: 1}
-      Rgb: leaf
-    }
-    for j in 0..5 {
-      {
-        Position: {x + math.sin(j * 2.4 + i) * 0.18, y + math.cos(j * 3 + i) * 0.23, 0.29 + math.sin(j * 7) * 0.16}
-        Scale: {1, 0.7, 0.8}
-        IcoSphere: {radius: 0.095 + j % 2 * 0.035, segments: 1}
-        Rgb: tint
-      }
-    }
-  }
-  for i in 0..18 {
-    {
-      Position: {-width * 0.44 + math.sin(i * 2.4) * 0.19, 0.7 + i * (height - 0.7) / 18, 0.2}
-      IcoSphere: {radius: 0.17, segments: 1}
-      Rgb: tint
-    }
-  }
-}
-
-@tree Parent
-template IslandWindow {
-  prop tint: Rgb = {27, 86, 171}
-  prop shutters: bool = true
-  frame {
-    Position: {}
-    RoundedBox: {0.98, 1.25, 0.14, 0.055}
-    Rgb: chalk
-  }
-  shadow {
-    Position: {0, 0, 0.08}
-    Box: {0.76, 1.02, 0.035}
-    Rgb: recess
-  }
-  glass {
-    Position: {0, 0, 0.105}
-    Box: {0.62, 0.88, 0.02}
-    Rgb: {81, 139, 162}
-    PbrMaterial: {roughness: 0.22, metallic: 0.25}
-  }
-  for side in 0..2 {
-    {
-      Position: {(side - 0.5) * 0.71, 0, 0.13}
-      Box: {0.065, 1, 0.065}
-      Rgb: tint
-    }
-    {
-      Position: {0, (side - 0.5) * 0.95, 0.13}
-      Box: {0.76, 0.065, 0.065}
-      Rgb: tint
-    }
-    if shutters {
-      {
-        Position: {(side - 0.5) * 1.28, 0, 0.15}
-        Rotation: {0, (side - 0.5) * -0.3, 0}
-        panel {
-          Position: {}
-          RoundedBox: {0.4, 1.07, 0.07, 0.025}
-          Rgb: tint
-        }
-        for slat in 0..8 {
-          {
-            Position: {0, -0.43 + slat * 0.12, 0.052}
-            Rotation: {0.25, 0, 0}
-            Box: {0.3, 0.055, 0.055}
-            Rgb: {60, 123, 181}
-          }
-        }
-        hinge {
-          Position: {0, -0.28, 0.09}
-          Box: {0.23, 0.035, 0.02}
-          Rgb: iron
-        }
-      }
-    }
-  }
-  mullion { Position: {0, 0, 0.14}; Box: {0.045, 0.95, 0.05}; Rgb: tint }
-  crossbar { Position: {0, 0.03, 0.14}; Box: {0.7, 0.045, 0.05}; Rgb: tint }
-  sill { Position: {0, -0.65, 0.13}; RoundedBox: {1.13, 0.13, 0.4, 0.04}; Rgb: chalk }
-}
-
-@tree Parent
-template IslandDoor {
-  prop tint: Rgb = {27, 86, 171}
-  threshold { Position: {0, 0.05, 0.12}; RoundedBox: {1.32, 0.1, 0.65, 0.05}; Rgb: chalk }
-  opening { Position: {0, 0.91, 0}; Box: {1.08, 1.72, 0.07}; Rgb: recess }
-  for i in 0..18 {
-    const a = i * math.PI / 18
-    const b = (i + 1) * math.PI / 18
-    {
-      Position: {}
-      Mesh3: {vertices: [{0, 1.76, 0.04}, {math.cos(a) * 0.54, 1.76 + math.sin(a) * 0.54, 0.04}, {math.cos(b) * 0.54, 1.76 + math.sin(b) * 0.54, 0.04}], indices: [0, 1, 2]}
-      Rgb: tint
-      BackFaceMode: {BackFacePlain}
-    }
-    {
-      Position: {math.cos(a + math.PI / 36) * 0.61, 1.76 + math.sin(a + math.PI / 36) * 0.61, 0.045}
-      Rotation: {0, 0, a + math.PI / 36 - math.PI / 2}
-      RoundedBox: {0.125, 0.18, 0.17, 0.025}
-      Rgb: chalk
-    }
-  }
-  for i in 0..8 {
-    {
-      Position: {-0.455 + i * 0.13, 0.92, 0.05}
-      Box: {0.12, 1.65, 0.08}
-      Rgb: tint
-    }
-  }
-  for side in 0..2 {
-    {
-      Position: {(side - 0.5) * 1.22, 0.91, 0.04}
-      RoundedBox: {0.18, 1.82, 0.18, 0.04}
-      Rgb: chalk
-    }
-    for row in 0..2 {
-      {
-        Position: {(side - 0.5) * 0.48, 0.53 + row * 0.73, 0.101}
-        Box: {0.38, 0.48, 0.035}
-        Rgb: {35, 99, 176}
-      }
-    }
-    {
-      Position: {(side - 0.5) * 0.17, 0.95, 0.14}
-      Rotation: {math.PI / 2, 0, 0}
-      Torus: {radius: 0.055, tube: 0.014, segments: 12, rings: 6}
-      Rgb: {201, 165, 86}
-      PbrMaterial: {metallic: 0.7, roughness: 0.35}
-    }
-  }
-}
-
-@tree Parent
-template IslandRailing {
-  prop width: f32 = 3
-  prop tint: Rgb = {27, 86, 171}
-  for i in 0..11 {
-    {
-      Position: {-width / 2 + i * width / 10, 0.46, 0}
-      Cylinder: {radius: 0.024, length: 0.9, segments: 8}
-      Rgb: tint
-    }
-  }
-  for i in 0..2 {
-    IslandBeam(ax: -width / 2 - 0.05, ay: 0.17 + i * 0.75, bx: width / 2 + 0.05, by: 0.17 + i * 0.75, radius: 0.034, tint: tint) {}
-  }
-}
-
-@tree Parent
-template IslandLantern {
-  bracket { Position: {0, 0.13, 0.12}; Box: {0.035, 0.035, 0.37}; Rgb: iron }
-  glass {
-    Position: {0, -0.1, 0.26}
-    Box: {0.17, 0.28, 0.15}
-    Rgb: {255, 218, 139}
-    Emissive: {strength: 0.4, color: {255, 213, 125}}
-  }
-  for side in 0..2 {
-    for end in 0..2 {
-      { Position: {(side - 0.5) * 0.2, -0.1, 0.26 + (end - 0.5) * 0.18}; Box: {0.025, 0.32, 0.025}; Rgb: iron }
-    }
-    { Position: {0, -0.27 + side * 0.34, 0.26}; Box: {0.25, 0.04, 0.23}; Rgb: iron }
-  }
-  cap { Position: {0, 0.11, 0.26}; Rotation: {0, math.PI / 4, 0}; Cone: {radius: 0.19, length: 0.12, segments: 4}; Rgb: iron }
-}
-
-@tree Parent
-template IslandHouse {
-  prop width: f32 = 3.8
-  prop depth: f32 = 3.2
-  prop height: f32 = 3.2
-  prop tint: Rgb = {244, 240, 222}
-  prop trim: Rgb = {27, 86, 171}
-  prop balcony: bool = false
-  prop flowers: bool = false
-  prop terrace: bool = true
-  walls {
-    Position: {0, height / 2, 0}
-    RoundedBox: {width, height, depth, 0.13, segments: 4}
-    Rgb: tint
-    PbrMaterial: {roughness: 0.9}
-  }
-  foot { Position: {0, 0.12, 0}; RoundedBox: {width + 0.1, 0.24, depth + 0.1, 0.07}; Rgb: chalk }
-  roof { Position: {0, height + 0.035, 0}; RoundedBox: {width + 0.14, 0.17, depth + 0.14, 0.08}; Rgb: chalk }
-  IslandDoor(tint: trim) { Position: {-width * 0.22, 0.1, depth / 2 + 0.01} }
-  IslandWindow(tint: trim) { Position: {width * 0.25, 1.73, depth / 2 + 0.01}; Scale: {0.85, 0.85, 0.85} }
-  for side in 0..2 {
-    IslandWindow(tint: trim) { Position: {(side - 0.5) * (width + 0.02), 1.75, 0}; Rotation: {0, (side - 0.5) * math.PI, 0} }
-    IslandWindow(tint: trim, shutters: false) { Position: {(side - 0.5) * width * 0.49, 1.8, -depth / 2 - 0.01}; Rotation: {0, math.PI, 0}; Scale: {0.75, 0.8, 0.8} }
-  }
-  IslandLantern() { Position: {-width * 0.22 - 0.86, 2.2, depth / 2 + 0.03} }
-  IslandPot(flowers: true, size: 0.85) { Position: {width * 0.43, 0.13, depth / 2 + 0.39} }
-  if terrace {
-    for side in 0..2 {
-      { Position: {(side - 0.5) * width, height + 0.3, 0}; RoundedBox: {0.16, 0.5, depth + 0.12, 0.07}; Rgb: chalk }
-    }
-    { Position: {0, height + 0.3, -depth / 2}; RoundedBox: {width, 0.5, 0.16, 0.07}; Rgb: chalk }
-    IslandRailing(width: width - 0.25) { Position: {0, height + 0.12, depth / 2} }
-    IslandPot(flowers: true, size: 0.85) { Position: {-width / 2 + 0.45, height + 0.13, depth / 2 - 0.4} }
-    chimney {
-      Position: {width / 2 - 0.48, height + 0.52, -depth / 2 + 0.48}
-      Cylinder: {radius: 0.19, length: 0.85, segments: 16}
-      Rgb: plaster
-      cap { Position: {0, 0.48, 0}; Cylinder: {radius: 0.27, length: 0.12, segments: 16}; Rgb: chalk }
-      vent { Position: {0, 0.33, 0}; Cylinder: {radius: 0.2, length: 0.1, segments: 16}; Rgb: recess }
-    }
-  }
-  if balcony {
-    deck { Position: {0, 0.02, depth / 2 + 0.65}; RoundedBox: {width + 0.3, 0.2, 1.55, 0.07}; Rgb: chalk }
-    IslandRailing(width: width + 0.16) { Position: {0, 0.13, depth / 2 + 1.37} }
-    for side in 0..2 {
-      IslandRailing(width: 1.3) { Position: {(side - 0.5) * (width + 0.16), 0.13, depth / 2 + 0.71}; Rotation: {0, math.PI / 2, 0} }
-      IslandBeam(ax: (side - 0.5) * width * 0.8, ay: -1.1, az: depth / 2, bx: (side - 0.5) * width * 0.8, by: -0.05, bz: depth / 2 + 1.25, radius: 0.08, tint: plaster) {}
-    }
-  }
-  if flowers {
-    Bougainvillea(width: width * 0.85, height: height - 0.2) { Position: {0, 0.13, depth / 2 + 0.2} }
-  }
-}
-
-@tree Parent
-template IslandStairs {
-  prop width: f32 = 1.8
-  prop rise: f32 = 3
-  prop run: f32 = 4.2
-  prop steps: i32 = 16
-  for i in 0..steps {
-    const h = rise * (i + 1) / steps
-    {
-      Position: {0, h / 2, -run * (i + 0.5) / steps}
-      Box: {width, h, run / steps + 0.01}
-      Rgb: plaster
-    }
-    {
-      Position: {0, h + 0.018, -run * (i + 0.5) / steps}
-      Box: {width + 0.035, 0.035, run / steps - 0.018}
-      Rgb: chalk
-    }
-    for side in 0..2 {
-      {
-        Position: {(side - 0.5) * (width + 0.18), h / 2 + 0.28, -run * (i + 0.5) / steps}
-        RoundedBox: {0.22, h + 0.56, run / steps + 0.04, 0.055}
-        Rgb: chalk
-      }
-    }
-  }
-}
-
-@tree Parent
-template IslandCross {
-  upright { Position: {0, 0.3, 0}; Box: {0.07, 0.6, 0.07}; Rgb: chalk }
-  arms { Position: {0, 0.39, 0}; Box: {0.36, 0.065, 0.07}; Rgb: chalk }
-}
-
-@tree Parent
-template BlueChapel {
-  prop size: f32 = 1
-  Scale: {size, size, size}
-  nave { Position: {0, 1.65, 0}; RoundedBox: {4.4, 3.3, 5.3, 0.18, segments: 5}; Rgb: plaster }
-  base { Position: {0, 0.12, 0}; RoundedBox: {4.6, 0.24, 5.5, 0.1}; Rgb: chalk }
-  cornice { Position: {0, 3.27, 0}; RoundedBox: {4.55, 0.2, 5.42, 0.1}; Rgb: chalk }
-  drum { Position: {0, 3.86, -0.45}; Cylinder: {radius: 1.67, length: 1.12, segments: 48, smooth: true}; Rgb: plaster }
-  for i in 0..12 {
-    const a = i * math.PI / 6
-    {
-      Position: {math.sin(a) * 1.665, 3.85, -0.45 + math.cos(a) * 1.665}
-      Rotation: {0, a, 0}
-      frame { Position: {}; RoundedBox: {0.38, 0.71, 0.1, 0.16}; Rgb: chalk }
-      opening { Position: {0, 0, 0.06}; RoundedBox: {0.2, 0.53, 0.025, 0.095}; Rgb: recess }
-    }
-  }
-  dome_rim { Position: {0, 4.4, -0.45}; Cylinder: {radius: 1.83, length: 0.15, segments: 64, smooth: true}; Rgb: azure }
-  dome { Position: {0, 4.46, -0.45}; HemiSphere: {radius: 1.79, segments: 64, smooth: true}; Rgb: cobalt; PbrMaterial: {roughness: 0.7} }
-  crown { Position: {0, 6.26, -0.45}; Sphere: {radius: 0.12, segments: 16, smooth: true}; Rgb: chalk }
-  IslandCross() { Position: {0, 6.33, -0.45} }
-  IslandDoor() { Position: {0, 0.14, 2.66}; Scale: {1.15, 1.15, 1.15} }
-  for side in 0..2 {
-    IslandLantern() { Position: {(side - 0.5) * 2.4, 2.35, 2.67} }
-    IslandPot(flowers: true, size: 1.15, tint: {243, 179, 174}) { Position: {(side - 0.5) * 3.5, 0.24, 2.92} }
-    for i in 0..3 {
-      IslandWindow(shutters: false) { Position: {(side - 0.5) * 4.41, 1.95, -1.6 + i * 1.65}; Rotation: {0, (side - 0.5) * math.PI, 0}; Scale: {0.65, 0.9, 0.8} }
-    }
-  }
-  front_step { Position: {0, 0.055, 3.12}; RoundedBox: {2.7, 0.11, 0.8, 0.06}; Rgb: chalk }
-}
-
-@tree Parent
-template BellArch {
-  prop width: f32 = 1.1
-  prop height: f32 = 1.55
-  const radius = width / 2
-  for side in 0..2 {
-    { Position: {(side - 0.5) * (width + 0.22), (height - radius) / 2, 0}; RoundedBox: {0.23, height - radius, 0.46, 0.05}; Rgb: chalk }
-  }
-  for i in 0..20 {
-    const a = (i + 0.5) * math.PI / 20
-    {
-      Position: {math.cos(a) * (radius + 0.11), height - radius + math.sin(a) * (radius + 0.11), 0}
-      Rotation: {0, 0, a - math.PI / 2}
-      RoundedBox: {0.13, 0.24, 0.46, 0.035}
-      Rgb: chalk
-    }
-  }
-  axle { Position: {0, height - radius + 0.04, 0}; Box: {width, 0.07, 0.08}; Rgb: wood }
-  bell { Position: {0, height - radius - 0.26, 0}; Frustum: {radius_bottom: 0.22, radius_top: 0.1, length: 0.36, segments: 20, smooth: true}; Rgb: {176, 140, 74}; PbrMaterial: {metallic: 0.65, roughness: 0.4} }
-  lip { Position: {0, height - radius - 0.44, 0}; Torus: {radius: 0.21, tube: 0.035, segments: 20, rings: 8}; Rgb: {184, 147, 80} }
-  clapper { Position: {0, height - radius - 0.5, 0}; Sphere: {radius: 0.055, segments: 10}; Rgb: iron }
-  rope { Position: {0.08, 0.45, 0.05}; Cylinder: {radius: 0.012, length: 0.75, segments: 6}; Rgb: wood }
-}
-
-@tree Parent
-template BellTower {
-  plinth { Position: {0, 0.15, 0}; RoundedBox: {3.4, 0.3, 1.15, 0.08}; Rgb: chalk }
-  base { Position: {0, 0.65, 0}; RoundedBox: {3.05, 1, 0.75, 0.08}; Rgb: plaster }
-  for side in 0..2 {
-    BellArch() { Position: {(side - 0.5) * 1.42, 1.15, 0} }
-  }
-  ledge { Position: {0, 2.94, 0}; RoundedBox: {3.2, 0.16, 0.7, 0.06}; Rgb: chalk }
-  BellArch(width: 0.94, height: 1.32) { Position: {0, 3.02, 0} }
-  IslandCross() { Position: {0, 4.63, 0} }
-}
-
-@tree Parent
-template CafeChair {
-  seat { Position: {0, 0.45, 0}; RoundedBox: {0.48, 0.09, 0.48, 0.035}; Rgb: {194, 168, 118} }
-  for side in 0..2 {
-    for end in 0..2 {
-      { Position: {(side - 0.5) * 0.4, 0.23, (end - 0.5) * 0.4}; Box: {0.055, 0.46, 0.055}; Rgb: cobalt }
-    }
-    { Position: {(side - 0.5) * 0.4, 0.72, -0.2}; Box: {0.055, 0.56, 0.055}; Rgb: cobalt }
-    { Position: {0, 0.69 + side * 0.22, -0.2}; RoundedBox: {0.45, 0.11, 0.055, 0.02}; Rgb: cobalt }
-  }
-  for i in 0..6 {
-    { Position: {-0.19 + i * 0.076, 0.503, 0}; Box: {0.025, 0.008, 0.41}; Rgb: {161, 130, 85} }
-  }
-}
-
-@tree Parent
-template CafeTable {
-  top { Position: {0, 0.76, 0}; Cylinder: {radius: 0.57, length: 0.08, segments: 32, smooth: true}; Rgb: chalk }
-  edge { Position: {0, 0.77, 0}; Torus: {radius: 0.56, tube: 0.025, segments: 32, rings: 6}; Rgb: cobalt }
-  stem { Position: {0, 0.4, 0}; Cylinder: {radius: 0.055, length: 0.72, segments: 12}; Rgb: cobalt }
-  for i in 0..3 {
-    const a = i * math.PI * 2 / 3
-    IslandBeam(ax: 0, ay: 0.22, bx: math.sin(a) * 0.4, by: 0.05, bz: math.cos(a) * 0.4, radius: 0.035, tint: cobalt) {}
-    CafeChair() { Position: {math.sin(a) * 0.96, 0, math.cos(a) * 0.96}; Rotation: {0, a + math.PI, 0} }
-  }
-  for i in 0..2 {
-    saucer { Position: {-0.22 + i * 0.45, 0.814, 0.12}; Cylinder: {radius: 0.13, length: 0.022, segments: 20}; Rgb: cobalt }
-    cup { Position: {-0.22 + i * 0.45, 0.88, 0.12}; Tube: {radius: 0.075, thickness: 0.015, length: 0.12, segments: 20}; Rgb: chalk }
-    coffee { Position: {-0.22 + i * 0.45, 0.916, 0.12}; Cylinder: {radius: 0.058, length: 0.01, segments: 16}; Rgb: {72, 45, 27} }
-    handle { Position: {-0.12 + i * 0.45, 0.88, 0.12}; Rotation: {math.PI / 2, 0, 0}; Torus: {radius: 0.035, tube: 0.012, segments: 12, rings: 6}; Rgb: chalk }
-  }
-  vase { Position: {0, 0.91, -0.18}; Sphere: {radius: 0.09, segments: 16, smooth: true}; Scale: {0.7, 1.3, 0.7}; Rgb: azure }
-  sprig { Position: {0, 1.08, -0.18}; Scale: {0.5, 1.7, 0.7}; IcoSphere: {radius: 0.085, segments: 1}; Rgb: leaf }
-}
-
-@tree Parent
-template Sunshade {
-  prop radius: f32 = 1.6
-  pole { Position: {0, 1.55, 0}; Cylinder: {radius: 0.045, length: 3.1, segments: 12}; Rgb: wood }
-  foot { Position: {0, 0.09, 0}; Cylinder: {radius: 0.33, length: 0.18, segments: 16}; Rgb: plaster }
-  for i in 0..12 {
-    const a = i * math.PI / 6
-    const b = (i + 1) * math.PI / 6
-    {
-      Position: {}
-      Mesh3: {vertices: [{0, 3.2, 0}, {math.sin(a) * radius, 2.74, math.cos(a) * radius}, {math.sin(b) * radius, 2.74, math.cos(b) * radius}], indices: [0, 1, 2]}
-      BackFaceMode: {BackFacePlain}
-      if i % 2 == 0 { Rgb: azure } else { Rgb: chalk }
-    }
-    IslandBeam(ax: 0, ay: 3.17, bx: math.sin(a) * radius, by: 2.72, bz: math.cos(a) * radius, radius: 0.015, tint: plaster) {}
-    {
-      Position: {math.sin(a + math.PI / 12) * radius * 0.966, 2.67, math.cos(a + math.PI / 12) * radius * 0.966}
-      Rotation: {0, a + math.PI / 12, 0}
-      RoundedBox: {radius * 0.515, 0.17, 0.025, 0.045}
-      if i % 2 == 0 { Rgb: azure } else { Rgb: chalk }
-    }
-  }
-  finial { Position: {0, 3.23, 0}; Sphere: {radius: 0.08, segments: 12}; Rgb: wood }
-}
-
-@tree Parent
-template IslandPergola {
-  prop width: f32 = 4.3
-  prop depth: f32 = 3
-  for x in 0..2 {
-    for z in 0..2 {
-      { Position: {(x - 0.5) * width, 1.5, (z - 0.5) * depth}; Box: {0.14, 3, 0.14}; Rgb: wood }
-      { Position: {(x - 0.5) * width, 0.2, (z - 0.5) * depth}; Box: {0.24, 0.4, 0.24}; Rgb: chalk }
-    }
-    { Position: {(x - 0.5) * width, 3, 0}; Box: {0.17, 0.2, depth + 0.5}; Rgb: wood }
-  }
-  for i in 0..13 {
-    { Position: {-width / 2 - 0.12 + i * (width + 0.24) / 12, 3.14, 0}; Box: {0.075, 0.13, depth + 0.45}; Rgb: {167, 132, 86} }
-  }
-  for i in 0..22 {
-    { Position: {0, 3.23, -depth / 2 + i * depth / 21}; Cylinder: {radius: 0.025, length: width + 0.25, segments: 6}; Rotation: {0, 0, math.PI / 2}; Rgb: {191, 167, 118} }
-  }
-  Bougainvillea(width: width, height: 3.25) { Position: {0, 0, depth / 2} }
-}
-
-@tree Parent
-template IslandOlive {
-  IslandPot(size: 1.8) { Position: {} }
-  IslandBeam(ay: 0.5, bx: 0.1, by: 2.1, radius: 0.095) {}
-  for i in 0..7 {
-    const a = i * 2.4
-    IslandBeam(ax: 0.06, ay: 1.3, bx: math.sin(a) * 0.6, by: 2.1 + i % 3 * 0.2, bz: math.cos(a) * 0.6, radius: 0.04) {}
-    for j in 0..5 {
-      {
-        Position: {math.sin(a) * 0.65 + math.sin(j * 2.4) * 0.28, 2.08 + i % 3 * 0.2 + math.cos(j * 3) * 0.2, math.cos(a) * 0.65 + math.cos(j * 2.4) * 0.27}
-        Scale: {1, 0.65, 0.85}
-        IcoSphere: {radius: 0.32, segments: 1}
-        Rgb: {117 + j % 3 * 9, 141 + j % 3 * 8, 94 + j % 3 * 9}
-      }
-    }
-  }
-}
-
-@tree Parent
-template IslandWindmill {
-  tower { Position: {0, 2, 0}; Frustum: {radius_bottom: 1.35, radius_top: 1.05, length: 4, segments: 40, smooth: true}; Rgb: plaster }
-  base { Position: {0, 0.14, 0}; Cylinder: {radius: 1.45, length: 0.28, segments: 40, smooth: true}; Rgb: chalk }
-  cap { Position: {0, 4.48, 0}; Cone: {radius: 1.32, length: 1.1, segments: 40, smooth: true}; Rgb: {144, 84, 65} }
-  for i in 0..32 {
-    const a = i * math.PI / 16
-    IslandBeam(ax: math.sin(a) * 1.31, ay: 3.95, az: math.cos(a) * 1.31, bx: 0, by: 5.04, radius: 0.018, tint: {180, 115, 85}) {}
-  }
-  IslandDoor() { Position: {0, 0.14, 1.3}; Scale: {0.7, 0.78, 0.7} }
-  rotor {
-    Position: {0, 3.8, 1.45}
-    Rotation: {0, 0, 0.18}
-    hub { Position: {}; Rotation: {math.PI / 2, 0, 0}; Cylinder: {radius: 0.18, length: 0.55, segments: 16}; Rgb: wood }
-    for i in 0..8 {
-      const a = i * math.PI / 4
-      IslandBeam(ax: 0, ay: 0, az: 0.12, bx: math.sin(a) * 2.9, by: math.cos(a) * 2.9, bz: 0.12, radius: 0.035) {}
-      {
-        Position: {-0.48 * math.cos(a) + 1.74 * math.sin(a), 0.48 * math.sin(a) + 1.74 * math.cos(a), 0.15}
-        Rotation: {0, 0, math.PI - a}
-        RightTrianglePrism: {0.96, 2.08, 0.025}
-        Rgb: {251, 237, 204}
-        PbrMaterial: {roughness: 0.95}
-      }
-      IslandBeam(ax: math.sin(a) * 2.9, ay: math.cos(a) * 2.9, az: 0.12, bx: math.sin(a + math.PI / 4) * 2.9, by: math.cos(a + math.PI / 4) * 2.9, bz: 0.12, radius: 0.012, tint: {190, 170, 133}) {}
-    }
-  }
-}
-
-@tree Parent
-template FishingBoat {
-  prop tint: Rgb = {27, 86, 171}
-  hull {
-    Position: {0, 0.18, 0}
-    Mesh3: {vertices: [{0, -0.18, 1.9}, {-0.52, -0.25, 0.55}, {-0.45, -0.25, -1.3}, {0.45, -0.25, -1.3}, {0.52, -0.25, 0.55}, {0, 0.48, 2.08}, {-0.77, 0.38, 0.55}, {-0.65, 0.38, -1.4}, {0.65, 0.38, -1.4}, {0.77, 0.38, 0.55}], indices: [0, 1, 6, 0, 6, 5, 1, 2, 7, 1, 7, 6, 2, 3, 8, 2, 8, 7, 3, 4, 9, 3, 9, 8, 4, 0, 5, 4, 5, 9, 0, 4, 1, 1, 4, 3, 1, 3, 2]}
-    Rgb: tint
-    BackFaceMode: {BackFacePlain}
-  }
-  floor { Position: {0, 0.19, -0.2}; RoundedBox: {1.04, 0.12, 2.55, 0.22}; Rgb: {190, 150, 93} }
-  for i in 0..7 {
-    { Position: {-0.44 + i * 0.145, 0.257, -0.2}; Box: {0.013, 0.012, 2.26}; Rgb: wood }
-  }
-  for side in 0..2 {
-    const sign = side * 2 - 1
-    IslandBeam(ax: 0, ay: 0.67, az: 2.08, bx: sign * 0.77, by: 0.57, bz: 0.55, radius: 0.055, tint: chalk) {}
-    IslandBeam(ax: sign * 0.77, ay: 0.57, az: 0.55, bx: sign * 0.65, by: 0.57, bz: -1.4, radius: 0.055, tint: chalk) {}
-    for i in 0..2 {
-      {
-        Position: {sign * 0.75, 0.34, -0.65 + i * 1.1}
-        Rotation: {math.PI / 2, 0, math.PI / 2}
-        Torus: {radius: 0.19, tube: 0.065, segments: 20, rings: 8}
-        Rgb: iron
-      }
-    }
-  }
-  IslandBeam(ax: -0.65, ay: 0.57, az: -1.4, bx: 0.65, by: 0.57, bz: -1.4, radius: 0.055, tint: chalk) {}
-  for i in 0..3 {
-    { Position: {0, 0.47, -0.9 + i * 0.85}; Box: {1.2, 0.08, 0.25}; Rgb: chalk }
-  }
-  mast { Position: {0, 1.58, 0.4}; Cylinder: {radius: 0.035, length: 2.8, segments: 10}; Rgb: wood }
-  IslandBeam(ay: 2.94, az: 0.4, by: 0.62, bz: 1.95, radius: 0.009, tint: plaster) {}
-  IslandBeam(ay: 2.94, az: 0.4, by: 0.62, bz: -1.34, radius: 0.009, tint: plaster) {}
-  flag {
-    Position: {0, 2.65, 0.4}
-    for i in 0..9 {
-      { Position: {0.24, 0.23 - i * 0.05, 0}; Box: {0.48, 0.05, 0.012}; if i % 2 == 0 { Rgb: cobalt } else { Rgb: chalk } }
-    }
-  }
-  rope_coil { Position: {0.3, 0.54, -0.9}; Torus: {radius: 0.13, tube: 0.035, segments: 20, rings: 6}; Rgb: {196, 168, 119} }
-  basket { Position: {-0.22, 0.38, -0.25}; Cylinder: {radius: 0.2, length: 0.25, segments: 16}; Rgb: wood }
-  for i in 0..4 {
-    { Position: {-0.22, 0.28 + i * 0.065, -0.25}; Torus: {radius: 0.2, tube: 0.016, segments: 16, rings: 6}; Rgb: {192, 157, 100} }
-  }
-}
-
-@tree Parent
-template IslandPaving {
-  prop width: f32 = 5
-  prop depth: f32 = 3
-  prop columns: i32 = 8
-  prop rows: i32 = 5
-  slab { Position: {0, -0.07, 0}; RoundedBox: {width, 0.14, depth, 0.06}; Rgb: chalk }
-  for row in 0..rows {
-    for col in 0..columns {
-      const tone = (row * 7 + col * 13) % 5
-      {
-        Position: {-width / 2 + (col + 0.5) * width / columns, 0.008, -depth / 2 + (row + 0.5) * depth / rows}
-        Rotation: {0, math.sin(row * 8 + col * 3) * 0.04, 0}
-        RoundedBox: {width / columns - 0.06, 0.045, depth / rows - 0.06, 0.07}
-        Rgb: {182 + tone * 8, 179 + tone * 8, 163 + tone * 8}
-      }
-    }
-  }
-}
 
 window { Surface: {width: 1440, height: 960, vsync: true} }
 contact_shadows { Gtao: {radius: 0.6, final_value_power: 2.2} }
@@ -666,7 +75,7 @@ santorini {
     {
       Position: {0, top - 0.1, z}
       RoundedBox: {width + 0.12, 0.2, depth + 0.1, 0.35, segments: 4}
-      Rgb: plaster
+      Rgb: IslandPlaster
     }
     for layer in 0..3 {
       for i in 0..28 {
@@ -758,11 +167,11 @@ santorini {
     menu {
       Position: {2.1, 0.75, 1.7}
       Rotation: {-0.12, -0.25, 0}
-      frame { Position: {}; RoundedBox: {0.75, 1.15, 0.08, 0.04}; Rgb: wood }
-      board { Position: {0, 0, 0.045}; Box: {0.65, 1.03, 0.02}; Rgb: recess }
-      lettering { Position: {0, 0.05, 0.06}; Scale: {0.01, 0.01, 0.01}; Text: {value: "CAFE\n\nFRAPPE\nMEZE\n\nOIA", size: 12}; Rgb: chalk }
+      frame { Position: {}; RoundedBox: {0.75, 1.15, 0.08, 0.04}; Rgb: IslandWood }
+      board { Position: {0, 0, 0.045}; Box: {0.65, 1.03, 0.02}; Rgb: IslandRecess }
+      lettering { Position: {0, 0.05, 0.06}; Scale: {0.01, 0.01, 0.01}; Text: {value: "CAFE\n\nFRAPPE\nMEZE\n\nOIA", size: 12}; Rgb: IslandChalk }
       for side in 0..2 {
-        { Position: {(side - 0.5) * 0.65, -0.57, -0.12}; Rotation: {-0.2, 0, 0}; Box: {0.06, 0.45, 0.08}; Rgb: wood }
+        { Position: {(side - 0.5) * 0.65, -0.57, -0.12}; Rotation: {-0.2, 0, 0}; Box: {0.06, 0.45, 0.08}; Rgb: IslandWood }
       }
     }
     IslandRailing(width: 4.6) { Position: {0, 0.04, 2.95} }
@@ -783,22 +192,22 @@ santorini {
   laundry {
     Position: {-10.5, 6.1, 3.4}
     for side in 0..2 {
-      { Position: {(side - 0.5) * 2.9, 0.85, -0.55}; Cylinder: {radius: 0.028, length: 1.7, segments: 8}; Rgb: iron }
+      { Position: {(side - 0.5) * 2.9, 0.85, -0.55}; Cylinder: {radius: 0.028, length: 1.7, segments: 8}; Rgb: IslandIron }
     }
     for i in 0..12 {
       const x = -1.45 + i * 2.9 / 12
       const nx = -1.45 + (i + 1) * 2.9 / 12
-      IslandBeam(ax: x, ay: 1.65 - 0.18 * (1 - x * x / 2.1025), az: -0.55, bx: nx, by: 1.65 - 0.18 * (1 - nx * nx / 2.1025), bz: -0.55, radius: 0.012, tint: plaster) {}
+      IslandBeam(ax: x, ay: 1.65 - 0.18 * (1 - x * x / 2.1025), az: -0.55, bx: nx, by: 1.65 - 0.18 * (1 - nx * nx / 2.1025), bz: -0.55, radius: 0.012, tint: IslandPlaster) {}
     }
     for i in 0..5 {
       {
         Position: {-1.1 + i * 0.52, 1.1 + i % 2 * 0.06, -0.55}
         Rotation: {0.06, 0.08 * math.sin(i * 4), 0}
         Box: {0.42, 0.76 - i % 2 * 0.18, 0.018}
-        if i % 2 == 0 { Rgb: {90, 163, 194} } else { Rgb: chalk }
+        if i % 2 == 0 { Rgb: {90, 163, 194} } else { Rgb: IslandChalk }
       }
       for pin in 0..2 {
-        { Position: {-1.26 + i * 0.52 + pin * 0.32, 1.5, -0.54}; Box: {0.03, 0.09, 0.04}; Rgb: wood }
+        { Position: {-1.26 + i * 0.52 + pin * 0.32, 1.5, -0.54}; Box: {0.03, 0.09, 0.04}; Rgb: IslandWood }
       }
     }
   }
@@ -808,18 +217,18 @@ santorini {
     quay { Position: {0, -0.32, 0}; RoundedBox: {22, 0.65, 2.2, 0.13}; Rgb: {177, 170, 144} }
     IslandPaving(width: 22, depth: 2.2, columns: 35, rows: 4) { Position: {0, 0.02, 0} }
     for i in 0..31 {
-      { Position: {-10.65 + i * 0.71, -0.13, 1.08}; RoundedBox: {0.67, 0.29, 0.2, 0.035}; Rgb: plaster }
+      { Position: {-10.65 + i * 0.71, -0.13, 1.08}; RoundedBox: {0.67, 0.29, 0.2, 0.035}; Rgb: IslandPlaster }
     }
     for i in 0..7 {
-      { Position: {-9.6 + i * 3.2, 0.21, 0.85}; Cylinder: {radius: 0.08, length: 0.4, segments: 12}; Rgb: iron }
-      { Position: {-9.6 + i * 3.2, 0.4, 0.85}; Sphere: {radius: 0.105, segments: 12}; Rgb: iron }
+      { Position: {-9.6 + i * 3.2, 0.21, 0.85}; Cylinder: {radius: 0.08, length: 0.4, segments: 12}; Rgb: IslandIron }
+      { Position: {-9.6 + i * 3.2, 0.4, 0.85}; Sphere: {radius: 0.105, segments: 12}; Rgb: IslandIron }
     }
     IslandStairs(width: 1.65, rise: 2.4, run: 4.1, steps: 14) { Position: {-9.2, 0, -0.2}; Rotation: {0, math.PI / 2, 0} }
     IslandPaving(width: 1.7, depth: 3.4, columns: 3, rows: 6) { Position: {-13.3, 2.4, -1.1} }
     IslandOlive() { Position: {9.8, 0.04, 0}; Scale: {0.7, 0.7, 0.7} }
     IslandPot(flowers: true, size: 1.2) { Position: {-8.9, 0.04, -0.55} }
     for i in 0..3 {
-      { Position: {6.6 + i * 0.6, 0.25, -0.4}; Box: {0.52, 0.45, 0.6}; Rgb: wood }
+      { Position: {6.6 + i * 0.6, 0.25, -0.4}; Box: {0.52, 0.45, 0.6}; Rgb: IslandWood }
       for slat in 0..4 {
         { Position: {6.38 + i * 0.6 + slat * 0.145, 0.49, -0.4}; Box: {0.11, 0.045, 0.62}; Rgb: {188, 150, 95} }
       }
@@ -827,8 +236,8 @@ santorini {
   }
   FishingBoat() { Position: {-5.3, 0.04, 12.7}; Rotation: {0, 0.45, 0} }
   FishingBoat(tint: {182, 67, 48}) { Position: {5.3, 0.04, 12.5}; Rotation: {0, -0.38, 0}; Scale: {0.8, 0.8, 0.8} }
-  IslandBeam(ax: -5.1, ay: 0.6, az: 14.5, bx: -6.4, by: 1.04, bz: 10.1, radius: 0.015, tint: wood) {}
-  IslandBeam(ax: 4.6, ay: 0.55, az: 13.9, bx: 3.2, by: 1.04, bz: 10.1, radius: 0.015, tint: wood) {}
+  IslandBeam(ax: -5.1, ay: 0.6, az: 14.5, bx: -6.4, by: 1.04, bz: 10.1, radius: 0.015, tint: IslandWood) {}
+  IslandBeam(ax: 4.6, ay: 0.55, az: 13.9, bx: 3.2, by: 1.04, bz: 10.1, radius: 0.015, tint: IslandWood) {}
 
   for i in 0..5 {
     IslandPot(flowers: true, size: 0.85 + i % 2 * 0.3) { Position: {-12.6 + i * 5.7, 3.07, 6.85} }

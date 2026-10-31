@@ -1,0 +1,9 @@
+using box.material
+
+export const GardenCedar: Rgb = {109, 65, 53}
+export const GardenVermilion: Rgb = {191, 62, 48}
+export const GardenSlate: Rgb = {65, 83, 101}
+export const GardenStone: Rgb = {176, 183, 172}
+export const GardenMoss: Rgb = {99, 139, 104}
+export const GardenPaper: Rgb = {255, 225, 169}
+export const GardenBlossom: Rgb = {247, 181, 204}

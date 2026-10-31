@@ -1,0 +1,21 @@
+include power_pole
+include power_span
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+
+assets {
+  @tree Parent
+  template UtilityLine {
+    prop poles: i32 = 3
+    prop spacing: f32 = 8
+
+    for i in 0..poles {
+      PowerPole() { Position: {i * spacing, 0, 0} }
+      if i < poles - 1 {
+        PowerSpan(length: spacing) { Position: {i * spacing, 0, 0} }
+      }
+    }
+  }
+}

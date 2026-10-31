@@ -1,0 +1,83 @@
+include materials
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.surface
+using box.controllers
+using box.movement
+
+@tree Parent
+template StonePagoda {
+  foundation {
+    Position: {0, 0.18, 0}
+    RoundedBox: {3.6, 0.36, 3.6, 0.12}
+    Rgb: GardenStone
+  }
+  for tier in 0..3 {
+    const width = 2.8 - tier * 0.5
+    const y = 0.4 + tier * 1.35
+    {
+      Position: {0, y + 0.5, 0}
+      Box: {width * 0.63, 1, width * 0.63}
+      Rgb: {229, 212, 183}
+    }
+    for side in 0..4 {
+      {
+        Rotation: {0, side * math.PI / 2, 0}
+        for post in 0..3 {
+          {
+            Position: {(post - 1) * width * 0.3, y + 0.5, width * 0.325}
+            Box: {0.1, 1.1, 0.12}
+            Rgb: GardenVermilion
+          }
+        }
+        {
+          Position: {0, y + 0.53, width * 0.33}
+          Box: {width * 0.35, 0.53, 0.03}
+          Rgb: GardenPaper
+          Emissive: {strength: 3.4, color: {255, 188, 113}}
+        }
+        for bar in 0..4 {
+          {
+            Position: {(bar - 1.5) * width * 0.09, y + 0.53, width * 0.35}
+            Box: {0.035, 0.57, 0.035}
+            Rgb: GardenCedar
+          }
+        }
+      }
+    }
+    {
+      Position: {0, y + 1.12, 0}
+      Rotation: {0, math.PI / 4, 0}
+      Frustum: {radius_bottom: width * 0.84, radius_top: width * 0.33, length: 0.55, segments: 4}
+      Rgb: GardenSlate
+    }
+    for side in 0..4 {
+      {
+        Rotation: {0, side * math.PI / 2, 0}
+        {
+          Position: {0, y + 0.88, width * 0.59}
+          Box: {width * 1.23, 0.12, 0.16}
+          Rgb: {105, 124, 135}
+        }
+      }
+    }
+  }
+  finial {
+    Position: {0, 5.04, 0}
+    Cone: {radius: 0.22, length: 0.85, segments: 12}
+    Rgb: {192, 153, 90}
+  }
+  for i in 0..5 {
+    {
+      Position: {0, 4.71 + i * 0.14, 0}
+      Torus: {radius: 0.19 - i * 0.025, tube: 0.035, segments: 12, rings: 6}
+      Rgb: {192, 153, 90}
+    }
+  }
+}

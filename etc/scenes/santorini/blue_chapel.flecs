@@ -1,0 +1,49 @@
+include materials
+include cross
+include door
+include lantern
+include pot
+include window
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.surface
+using box.controllers
+using box.text
+
+@tree Parent
+template BlueChapel {
+  prop size: f32 = 1
+  Scale: {size, size, size}
+  nave { Position: {0, 1.65, 0}; RoundedBox: {4.4, 3.3, 5.3, 0.18, segments: 5}; Rgb: IslandPlaster }
+  base { Position: {0, 0.12, 0}; RoundedBox: {4.6, 0.24, 5.5, 0.1}; Rgb: IslandChalk }
+  cornice { Position: {0, 3.27, 0}; RoundedBox: {4.55, 0.2, 5.42, 0.1}; Rgb: IslandChalk }
+  drum { Position: {0, 3.86, -0.45}; Cylinder: {radius: 1.67, length: 1.12, segments: 48, smooth: true}; Rgb: IslandPlaster }
+  for i in 0..12 {
+    const a = i * math.PI / 6
+    {
+      Position: {math.sin(a) * 1.665, 3.85, -0.45 + math.cos(a) * 1.665}
+      Rotation: {0, a, 0}
+      frame { Position: {}; RoundedBox: {0.38, 0.71, 0.1, 0.16}; Rgb: IslandChalk }
+      opening { Position: {0, 0, 0.06}; RoundedBox: {0.2, 0.53, 0.025, 0.095}; Rgb: IslandRecess }
+    }
+  }
+  dome_rim { Position: {0, 4.4, -0.45}; Cylinder: {radius: 1.83, length: 0.15, segments: 64, smooth: true}; Rgb: IslandAzure }
+  dome { Position: {0, 4.46, -0.45}; HemiSphere: {radius: 1.79, segments: 64, smooth: true}; Rgb: IslandCobalt; PbrMaterial: {roughness: 0.7} }
+  crown { Position: {0, 6.26, -0.45}; Sphere: {radius: 0.12, segments: 16, smooth: true}; Rgb: IslandChalk }
+  IslandCross() { Position: {0, 6.33, -0.45} }
+  IslandDoor() { Position: {0, 0.14, 2.66}; Scale: {1.15, 1.15, 1.15} }
+  for side in 0..2 {
+    IslandLantern() { Position: {(side - 0.5) * 2.4, 2.35, 2.67} }
+    IslandPot(flowers: true, size: 1.15, tint: {243, 179, 174}) { Position: {(side - 0.5) * 3.5, 0.24, 2.92} }
+    for i in 0..3 {
+      IslandWindow(shutters: false) { Position: {(side - 0.5) * 4.41, 1.95, -1.6 + i * 1.65}; Rotation: {0, (side - 0.5) * math.PI, 0}; Scale: {0.65, 0.9, 0.8} }
+    }
+  }
+  front_step { Position: {0, 0.055, 3.12}; RoundedBox: {2.7, 0.11, 0.8, 0.06}; Rgb: IslandChalk }
+}

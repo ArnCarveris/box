@@ -1,0 +1,41 @@
+include materials
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.surface
+using box.controllers
+using box.text
+
+@tree Parent
+template MilkCan {
+  body {
+    Position: {0, 0.37, 0}
+    Cylinder: {radius: 0.24, length: 0.66, segments: 24, smooth: true}
+    Rgb: {168, 185, 181}
+    PbrMaterial: {metallic: 0.75, roughness: 0.28}
+  }
+  shoulder {
+    Position: {0, 0.75, 0}
+    Frustum: {radius_bottom: 0.24, radius_top: 0.14, length: 0.14, segments: 24, smooth: true}
+    Rgb: {177, 194, 188}
+    PbrMaterial: {metallic: 0.7, roughness: 0.3}
+  }
+  lid {
+    Position: {0, 0.87, 0}
+    Cylinder: {radius: 0.18, length: 0.065, segments: 24}
+    Rgb: MarketIron
+  }
+  for side in 0..2 {
+    {
+      Position: {(side - 0.5) * 0.5, 0.71, 0}
+      Rotation: {math.PI / 2, 0, 0}
+      Torus: {radius: 0.09, tube: 0.024, segments: 12, rings: 6}
+      Rgb: MarketIron
+    }
+  }
+}

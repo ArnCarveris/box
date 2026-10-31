@@ -1,0 +1,38 @@
+include materials
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+
+assets {
+  @tree Parent
+  template Window {
+    prop width: f32 = 1.2
+    prop height: f32 = 1.2
+    prop frame: Rgb = {91, 65, 57}
+    prop panes: i32 = 2
+
+    {
+      Position: {}
+      Box: {width, height, 0.13}
+      Rgb: frame
+    }
+    {
+      Position: {0, 0, 0.08}
+      Box: {width - 0.12, height - 0.12, 0.04}
+      Rgb: TownGlass
+    }
+    for i in 1..panes {
+      {
+        Position: {-width / 2 + width * i / panes, 0, 0.12}
+        Box: {0.045, height, 0.04}
+        Rgb: frame
+      }
+    }
+    {
+      Position: {0, -height / 2, 0.12}
+      Box: {width + 0.16, 0.09, 0.24}
+      Rgb: frame
+    }
+  }
+}

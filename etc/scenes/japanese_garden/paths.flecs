@@ -1,0 +1,56 @@
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.surface
+using box.controllers
+using box.movement
+
+@tree Parent
+template GardenPaths {
+  const xs = [-14.5, -10.8, -8.83, -8.575, -6.625, -4.175, -2.025, 2.55, 4.25, 9.2, 10.9, 14.2, 14.5]
+  const zs = [-7.775, -6.8, -5.825, -3.75, -1.85, 2.95, 4.85, 5.45, 5.525, 6.5, 7.475, 8.32, 13.65]
+
+  for xi in 0..12 {
+    for zi in 0..12 {
+      const x0 = xs[xi]
+      const x1 = xs[xi + 1]
+      const z0 = zs[zi]
+      const z1 = zs[zi + 1]
+      const x = (x0 + x1) / 2
+      const z = (z0 + z1) / 2
+      if (x > -14.5 && x < 14.5 && z > -7.775 && z < -5.825) ||
+        (x > -10.8 && x < 14.2 && z > 5.525 && z < 7.475) ||
+        (x > -8.575 && x < -6.625 && z > -6.8 && z < 6.5) ||
+        (x > -4.175 && x < -2.025 && z > 5.45 && z < 13.65) ||
+        (x > -8.83 && x < -8.575 && z > -3.75 && z < -1.85) ||
+        (x > -8.83 && x < -8.575 && z > 2.95 && z < 4.85) ||
+        (x > 2.55 && x < 4.25 && z > 7.475 && z < 8.32) ||
+        (x > 9.2 && x < 10.9 && z > 7.475 && z < 8.32) {
+        {
+          Position: {x, 0.085, z}
+          Box: {x1 - x0, 0.08, z1 - z0}
+          Rgb: {201, 198, 175}
+        }
+        const columns: i32 = math.ceil((x1 - x0) / 0.65)
+        const rows: i32 = math.ceil((z1 - z0) / 0.65)
+        const width = (x1 - x0) / columns
+        const depth = (z1 - z0) / rows
+        for col in 0..columns {
+          for row in 0..rows {
+            {
+              Position: {x0 + (col + 0.5) * width, 0.17, z0 + (row + 0.5) * depth}
+              Box: {width - 0.025, 0.09, depth - 0.025}
+              Rgb: {161 + (xi + zi + col + row) % 3 * 9, 169 + (xi + zi + col + row) % 3 * 7, 161 + (xi + zi + col + row) % 3 * 6}
+              PbrMaterial: {roughness: 0.28}
+            }
+          }
+        }
+      }
+    }
+  }
+}

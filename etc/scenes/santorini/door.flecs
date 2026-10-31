@@ -1,0 +1,63 @@
+include materials
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.surface
+using box.controllers
+using box.text
+
+@tree Parent
+template IslandDoor {
+  prop tint: Rgb = {27, 86, 171}
+  threshold { Position: {0, 0.05, 0.12}; RoundedBox: {1.32, 0.1, 0.65, 0.05}; Rgb: IslandChalk }
+  opening { Position: {0, 0.91, 0}; Box: {1.08, 1.72, 0.07}; Rgb: IslandRecess }
+  for i in 0..18 {
+    const a = i * math.PI / 18
+    const b = (i + 1) * math.PI / 18
+    {
+      Position: {}
+      Mesh3: {vertices: [{0, 1.76, 0.04}, {math.cos(a) * 0.54, 1.76 + math.sin(a) * 0.54, 0.04}, {math.cos(b) * 0.54, 1.76 + math.sin(b) * 0.54, 0.04}], indices: [0, 1, 2]}
+      Rgb: tint
+      BackFaceMode: {BackFacePlain}
+    }
+    {
+      Position: {math.cos(a + math.PI / 36) * 0.61, 1.76 + math.sin(a + math.PI / 36) * 0.61, 0.045}
+      Rotation: {0, 0, a + math.PI / 36 - math.PI / 2}
+      RoundedBox: {0.125, 0.18, 0.17, 0.025}
+      Rgb: IslandChalk
+    }
+  }
+  for i in 0..8 {
+    {
+      Position: {-0.455 + i * 0.13, 0.92, 0.05}
+      Box: {0.12, 1.65, 0.08}
+      Rgb: tint
+    }
+  }
+  for side in 0..2 {
+    {
+      Position: {(side - 0.5) * 1.22, 0.91, 0.04}
+      RoundedBox: {0.18, 1.82, 0.18, 0.04}
+      Rgb: IslandChalk
+    }
+    for row in 0..2 {
+      {
+        Position: {(side - 0.5) * 0.48, 0.53 + row * 0.73, 0.101}
+        Box: {0.38, 0.48, 0.035}
+        Rgb: {35, 99, 176}
+      }
+    }
+    {
+      Position: {(side - 0.5) * 0.17, 0.95, 0.14}
+      Rotation: {math.PI / 2, 0, 0}
+      Torus: {radius: 0.055, tube: 0.014, segments: 12, rings: 6}
+      Rgb: {201, 165, 86}
+      PbrMaterial: {metallic: 0.7, roughness: 0.35}
+    }
+  }
+}

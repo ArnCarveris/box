@@ -1,0 +1,24 @@
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.surface
+using box.controllers
+using box.movement
+
+@tree Parent
+template GardenLeaf {
+  prop tint: Rgb = {111, 145, 100}
+
+  Mesh3: {
+    vertices: [{0, 0, 0}, {-0.07, 0.005, 0.13}, {-0.045, 0.015, 0.23}, {0, 0, 0.34}, {0.045, 0.015, 0.23}, {0.07, 0.005, 0.13}, {0, 0.035, 0.16}],
+    indices: [0, 1, 6, 1, 2, 6, 2, 3, 6, 3, 4, 6, 4, 5, 6, 5, 0, 6]
+  }
+  Rgb: tint
+  BackFaceMode: {BackFacePlain}
+  PbrMaterial: {roughness: 0.85}
+}

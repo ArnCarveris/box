@@ -1,0 +1,120 @@
+include materials
+include timber_facade
+include stucco_facade
+include shutter_facade
+include lattice_facade
+include bay_facade
+include tiled_roof
+include flat_roof
+include shed_roof
+include dormer_roof
+include garden_roof
+include pavement
+include building
+include vending_machine
+include planter
+include cherry_tree
+include road_markings
+include utility_line
+include bench
+include bollard
+include traffic_cone
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+
+assets {
+  @tree Parent
+  template Town {
+    prop rows: i32 = 3
+    prop columns: i32 = 3
+    prop seed: u64 = 42
+
+    const halfRows = (rows - 1) / 2.0
+    const halfColumns = (columns - 1) / 2.0
+    const middleRow: i32 = (rows - 1) / 2
+    const middleColumn: i32 = (columns - 1) / 2
+
+    const facades = [TimberFacade, StuccoFacade, ShutterFacade, LatticeFacade, BayFacade]
+    const roofs = [TiledRoof, TiledRoof, FlatRoof, ShedRoof, DormerRoof, GardenRoof]
+    const sage: Rgb = {183, 207, 185}
+    const peach: Rgb = {239, 203, 178}
+    const blue: Rgb = {188, 211, 214}
+    const rose: Rgb = {227, 192, 190}
+    const plaster: Rgb = {237, 224, 199}
+    const red: Rgb = {181, 81, 72}
+    const teal: Rgb = {77, 139, 136}
+    const ochre: Rgb = {186, 142, 75}
+    const plum: Rgb = {135, 105, 128}
+    const patina: Rgb = {99, 132, 127}
+    const clay: Rgb = {141, 106, 93}
+    const walls = [TownCream, sage, peach, blue, rose, plaster]
+    const accents = [red, teal, ochre, plum]
+    const roofColors = [TownRoofTile, TownRoofTile, patina, clay]
+    const floorCounts = [1, 2, 2, 2, 2, 3]
+
+    base {
+      Position: {0, -0.42, 0}
+      Box: {columns * 8 + 2, 0.8, rows * 8 + 2}
+      Rgb: {170, 190, 168}
+    }
+    asphalt {
+      Position: {0, 0, 0}
+      Box: {columns * 8 + 1.5, 0.08, rows * 8 + 1.5}
+      Rgb: {101, 112, 115}
+    }
+    for row in 0..rows {
+      for col in 0..columns {
+        "lot_{row}_{col}" {
+          Position: {(col - halfColumns) * 8, 0.12, (row - halfRows) * 8}
+          Pavement() { Position: {} }
+          const rng: math.Rng = {seed: seed + row * 92821 + col * 68917}
+          const facadeKind = facades[rng.u(5)]
+          const roofKind = roofs[rng.u(6)]
+          const wallColor = walls[rng.u(6)]
+          const shopColor = accents[rng.u(4)]
+          const tileColor = roofColors[rng.u(4)]
+          const floors = floorCounts[rng.u(6)]
+          const width = 3.7 + rng.f(0.7)
+          const depth = 3.6 + rng.f(0.6)
+          const shop = rng.u(5) != 0
+
+          Building building(facade: facadeKind, roof: roofKind, floors: floors,
+            width: width, depth: depth, color: wallColor, accent: shopColor,
+            roofColor: tileColor, shop: shop) {
+            Position: {-0.3, 0.1, -0.35}
+          }
+
+          if rng.f(1) > 0.6 {
+            VendingMachine(color: accents[rng.u(4)]) { Position: {2.45, 0.1, 1.6} }
+          }
+
+          Planter() { Position: {2.52, 0.1, 2.45} }
+          CherryTree() { Position: {2.35, 0.1, -2.35} }
+        }
+      }
+    }
+    RoadMarkings markings(rows: rows, columns: columns) { Position: {} }
+    for row in 0..rows {
+      UtilityLine(poles: columns) {
+        Position: {-halfColumns * 8 - 2.85, 0.22, (row - halfRows) * 8 + 2.8}
+      }
+    }
+    for col in 0..columns {
+      if col % 2 == 0 {
+        Bench() { Position: {(col - halfColumns) * 8, 0.22, halfRows * 8 + 2.7} }
+      }
+    }
+    for i in 0..3 {
+      Bollard() {
+        Position: {(middleColumn - halfColumns) * 8 - 1 + i, 0.46, halfRows * 8 + 3.08}
+      }
+    }
+    for i in 0..2 {
+      TrafficCone() {
+        Position: {halfColumns * 8 + 3.15, 0.2, (middleRow - halfRows) * 8 - 0.5 + i * 0.8}
+      }
+    }
+  }
+}

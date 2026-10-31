@@ -1,0 +1,32 @@
+include materials
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.surface
+using box.controllers
+using box.text
+
+@tree Parent
+template MarketLabel {
+  prop label: string = "FARMHOUSE"
+  prop width: f32 = 1.1
+  prop size: f32 = 0.12
+  prop tint: Rgb = {250, 234, 196}
+
+  board {
+    Position: {}
+    Box: {width, 0.3, 0.045}
+    Rgb: MarketIron
+  }
+  lettering {
+    Position: {0, 0, 0.026}
+    Scale: {0.01, 0.01, 0.01}
+    Text: {value: label, size: size * 100}
+    Rgb: tint
+  }
+}

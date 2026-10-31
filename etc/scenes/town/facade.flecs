@@ -1,0 +1,8 @@
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+
+assets {
+  struct Facade(width: f32, height: f32, color: Rgb)
+}

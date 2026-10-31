@@ -1,0 +1,18 @@
+include materials
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.surface
+using box.controllers
+using box.text
+
+@tree Parent
+template IslandCross {
+  upright { Position: {0, 0.3, 0}; Box: {0.07, 0.6, 0.07}; Rgb: IslandChalk }
+  arms { Position: {0, 0.39, 0}; Box: {0.36, 0.065, 0.07}; Rgb: IslandChalk }
+}

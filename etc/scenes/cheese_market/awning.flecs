@@ -1,0 +1,52 @@
+include materials
+include beam
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.surface
+using box.controllers
+using box.text
+
+@tree Parent
+template MarketAwning {
+  prop tint: Rgb = {163, 65, 52}
+
+  for i in 0..12 {
+    const stripe = [tint, MarketCream]
+    {
+      Position: {(i - 5.5) * 0.38, 2.93, 0}
+      Rotation: {0.14, 0, 0}
+      Box: {0.38, 0.045, 2.45}
+      Rgb: stripe[i % 2]
+    }
+    {
+      Position: {(i - 5.5) * 0.38, 2.64, 1.2}
+      RoundedBox: {0.375, 0.35, 0.055, 0.09}
+      Rgb: stripe[i % 2]
+    }
+  }
+  for side in 0..2 {
+    {
+      Position: {(side - 0.5) * 4.25, 1.48, 1.03}
+      Cylinder: {radius: 0.055, length: 2.96, segments: 12}
+      Rgb: MarketOak
+    }
+    {
+      Position: {(side - 0.5) * 4.25, 3.02, 1.03}
+      Sphere: {radius: 0.09, segments: 12, smooth: true}
+      Rgb: MarketHoney
+    }
+    MarketBeam(ax: (side - 0.5) * 4.25, ay: 2.73, az: 1.12,
+      bx: (side - 0.5) * 4.25, by: 3.13, bz: -1.2, radius: 0.045, tint: MarketOak)
+  }
+  beam {
+    Position: {0, 2.73, 1.03}
+    Box: {4.4, 0.07, 0.08}
+    Rgb: MarketOak
+  }
+}

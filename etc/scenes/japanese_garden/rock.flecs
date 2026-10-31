@@ -1,0 +1,32 @@
+include materials
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.surface
+using box.controllers
+using box.movement
+
+@tree Parent
+template GardenRock {
+  prop size: f32 = 1
+
+  body {
+    Position: {0, size * 0.24, 0}
+    Rotation: {0.12, 0.4, 0.18}
+    Scale: {1.2, 0.65, 0.85}
+    IcoSphere: {radius: size * 0.6, segments: 1}
+    Rgb: GardenStone
+    PbrMaterial: {roughness: 0.95}
+  }
+  moss_cap {
+    Position: {-size * 0.08, size * 0.48, 0}
+    Scale: {1, 0.24, 0.7}
+    Sphere: {radius: size * 0.42, segments: 12, smooth: true}
+    Rgb: GardenMoss
+  }
+}

@@ -1,0 +1,29 @@
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.surface
+using box.controllers
+using box.text
+
+@tree Parent
+template Baguette {
+  loaf {
+    Position: {0, 0.12, 0}
+    Scale: {0.17, 0.12, 0.59}
+    Sphere: {radius: 1, segments: 20, smooth: true}
+    Rgb: {211, 143, 64}
+  }
+  for i in 0..5 {
+    {
+      Position: {0, 0.23 - math.abs(i - 2) * 0.013, (i - 2) * 0.18}
+      Rotation: {0, -0.45, 0}
+      RoundedBox: {0.23, 0.015, 0.045, 0.018}
+      Rgb: {249, 212, 144}
+    }
+  }
+}

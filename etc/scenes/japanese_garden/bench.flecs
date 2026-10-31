@@ -1,0 +1,35 @@
+include materials
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.surface
+using box.controllers
+using box.movement
+
+@tree Parent
+template GardenBench {
+  for i in 0..4 {
+    {
+      Position: {0, 0.48, (i - 1.5) * 0.14}
+      Box: {1.65, 0.09, 0.12}
+      Rgb: GardenCedar
+    }
+  }
+  for side in 0..2 {
+    {
+      Position: {(side - 0.5) * 1.15, 0.24, 0}
+      Box: {0.15, 0.48, 0.55}
+      Rgb: GardenStone
+    }
+    {
+      Position: {(side - 0.5) * 0.85, 0.57, 0}
+      RoundedBox: {0.54, 0.12, 0.45, 0.05}
+      Rgb: {173, 113, 128}
+    }
+  }
+}

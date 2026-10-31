@@ -1,0 +1,22 @@
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+
+assets {
+  @tree Parent
+  template Pavement {
+    {
+      Position: {}
+      Box: {6.4, 0.2, 6.4}
+      Rgb: {215, 210, 190}
+    }
+    for i in 0..8 {
+      {
+        Position: {(i - 3.5) * 0.8, 0.105, 2.83}
+        Box: {0.018, 0.012, 0.72}
+        Rgb: {177, 181, 165}
+      }
+    }
+  }
+}

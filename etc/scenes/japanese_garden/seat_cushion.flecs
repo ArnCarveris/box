@@ -1,0 +1,38 @@
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.surface
+using box.controllers
+using box.movement
+
+@tree Parent
+template SeatCushion {
+  prop tint: Rgb = {151, 109, 139}
+
+  RoundedBox: {0.62, 0.16, 0.62, 0.075}
+  Rgb: tint
+  PbrMaterial: {roughness: 1}
+  for side in 0..2 {
+    {
+      Position: {(side - 0.5) * 0.595, 0, 0}
+      RoundedBox: {0.012, 0.018, 0.48, 0.006}
+      Rgb: {218, 196, 162}
+    }
+    {
+      Position: {0, 0, (side - 0.5) * 0.595}
+      RoundedBox: {0.48, 0.018, 0.012, 0.006}
+      Rgb: {218, 196, 162}
+    }
+  }
+  button {
+    Position: {0, 0.081, 0}
+    Scale: {1, 0.3, 1}
+    Sphere: {radius: 0.026, segments: 8, smooth: true}
+    Rgb: {218, 196, 162}
+  }
+}

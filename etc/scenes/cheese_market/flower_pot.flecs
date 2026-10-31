@@ -1,0 +1,63 @@
+include beam
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.surface
+using box.controllers
+using box.text
+
+@tree Parent
+template FlowerPot {
+  prop tint: Rgb = {235, 175, 88}
+  prop size: f32 = 1
+
+  Scale: {size, size, size}
+  pot {
+    Position: {0, 0.24, 0}
+    Frustum: {radius_bottom: 0.22, radius_top: 0.32, length: 0.48, segments: 16}
+    Rgb: {181, 94, 63}
+  }
+  lip {
+    Position: {0, 0.46, 0}
+    Torus: {radius: 0.3, tube: 0.045, segments: 20, rings: 6}
+    Rgb: {211, 127, 85}
+  }
+  soil {
+    Position: {0, 0.45, 0}
+    Cylinder: {radius: 0.28, length: 0.025, segments: 16}
+    Rgb: {79, 64, 42}
+  }
+  for i in 0..13 {
+    const a = i * 2.4
+    const r = 0.09 + i % 4 * 0.065
+    const h = 0.65 + math.sin(i * 1.8) * 0.16
+    MarketBeam(ax: math.cos(a) * r, ay: 0.45, az: math.sin(a) * r,
+      bx: math.cos(a) * r * 1.2, by: h, bz: math.sin(a) * r * 1.2,
+      radius: 0.012, tint: {89, 119, 61});
+    {
+      Position: {math.cos(a) * r, 0.55, math.sin(a) * r}
+      Rotation: {0.4, a, 0.4}
+      Scale: {0.08, 0.025, 0.21}
+      Sphere: {radius: 1, segments: 8, smooth: true}
+      Rgb: {104, 142, 77}
+    }
+    for petal in 0..5 {
+      {
+        Position: {math.cos(a) * r * 1.2 + math.cos(petal * 1.257) * 0.045, h, math.sin(a) * r * 1.2 + math.sin(petal * 1.257) * 0.045}
+        Scale: {1, 0.55, 1}
+        Sphere: {radius: 0.045, segments: 8, smooth: true}
+        Rgb: tint
+      }
+    }
+    {
+      Position: {math.cos(a) * r * 1.2, h + 0.025, math.sin(a) * r * 1.2}
+      Sphere: {radius: 0.025, segments: 8}
+      Rgb: {249, 209, 89}
+    }
+  }
+}

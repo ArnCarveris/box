@@ -1,0 +1,8 @@
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+
+assets {
+  struct Roof(width: f32, depth: f32, color: Rgb)
+}

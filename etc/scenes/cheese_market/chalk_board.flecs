@@ -1,0 +1,39 @@
+include materials
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.surface
+using box.controllers
+using box.text
+
+@tree Parent
+template ChalkBoard {
+  prop label: string = "TODAY'S\nCHEESES\n\nBRIE   8\nGOUDA 12\nCOMTE 16"
+
+  for side in 0..2 {
+    {
+      Position: {0, 0.72, (side - 0.5) * 0.36}
+      Rotation: {(side - 0.5) * -0.4, 0, 0}
+      Box: {0.94, 1.4, 0.09}
+      Rgb: MarketHoney
+      if side == 1 {
+        face {
+          Position: {0, 0.08, 0.065}
+          Box: {0.79, 1.12, 0.035}
+          Rgb: MarketIron
+          writing {
+            Position: {0, 0, 0.023}
+            Scale: {0.01, 0.01, 0.01}
+            Text: {value: label, size: 11}
+            Rgb: MarketCream
+          }
+        }
+      }
+    }
+  }
+}

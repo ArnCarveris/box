@@ -1,0 +1,78 @@
+include materials
+include cheese_wheel
+include cheese_wedge
+include beam
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.surface
+using box.controllers
+using box.text
+
+@tree Parent
+template MarketFountain {
+  base {
+    Position: {0, 0.12, 0}
+    Cylinder: {radius: 1.85, length: 0.24, segments: 12}
+    Rgb: MarketStone
+  }
+  basin {
+    Position: {0, 0.43, 0}
+    Tube: {radius: 1.56, thickness: 0.2, length: 0.5, segments: 24}
+    Rgb: {209, 193, 161}
+  }
+  for i in 0..24 {
+    {
+      Position: {math.sin(i * math.PI / 12) * 1.46, 0.7, math.cos(i * math.PI / 12) * 1.46}
+      Rotation: {0, i * math.PI / 12, 0}
+      RoundedBox: {0.36, 0.12, 0.29, 0.035}
+      Rgb: {220, 204, 174}
+    }
+  }
+  water {
+    Position: {0, 0.5, 0}
+    Cylinder: {radius: 1.36, length: 0.03, segments: 48}
+    Rgb: {96, 156, 148}
+    PbrMaterial: {roughness: 0.08, metallic: 0.25}
+  }
+  pedestal {
+    Position: {0, 1.04, 0}
+    Frustum: {radius_bottom: 0.46, radius_top: 0.32, length: 1.3, segments: 8}
+    Rgb: MarketStone
+  }
+  crown {
+    Position: {0, 1.74, 0}
+    Cylinder: {radius: 0.69, length: 0.15, segments: 16}
+    Rgb: {220, 202, 166}
+  }
+  CheeseWheel(radius: 0.57, height: 0.28) { Position: {0, 1.83, 0} }
+  CheeseWedge() { Position: {0, 2.13, 0}; Rotation: {0, -0.35, 0} }
+  for i in 0..4 {
+    const a = i * math.PI / 2
+    {
+      Position: {math.sin(a) * 0.42, 1.32, math.cos(a) * 0.42}
+      Rotation: {math.PI / 2, a, 0}
+      Tube: {radius: 0.06, thickness: 0.02, length: 0.28, segments: 12}
+      Rgb: {149, 119, 62}
+    }
+    for segment in 0..7 {
+      const t = segment / 7.0
+      const n = (segment + 1.0) / 7
+      MarketBeam(ax: math.sin(a) * (0.54 + t * 0.48), ay: 1.32 - t * t * 0.8, az: math.cos(a) * (0.54 + t * 0.48),
+        bx: math.sin(a) * (0.54 + n * 0.48), by: 1.32 - n * n * 0.8, bz: math.cos(a) * (0.54 + n * 0.48),
+        radius: 0.018, tint: {176, 213, 201})
+    }
+    for ripple in 0..3 {
+      {
+        Position: {math.sin(a) * 1.02, 0.523, math.cos(a) * 1.02}
+        Torus: {radius: 0.08 + ripple * 0.07, tube: 0.008, segments: 20, rings: 4}
+        Rgb: {151, 196, 180}
+      }
+    }
+  }
+}

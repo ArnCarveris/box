@@ -1,0 +1,81 @@
+include tree_limb
+include blossom_spray
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.surface
+using box.controllers
+using box.movement
+
+@tree Parent
+template CherryTree {
+  prop variant: i32 = 0
+
+  const phase = variant * 0.43
+  const reach = 1 + math.sin(variant * 1.7) * 0.08
+
+  for i in 0..6 {
+    const angle = i * 1.047 + phase
+    TreeLimb(ax: math.cos(angle) * 0.1, ay: 0.18, az: math.sin(angle) * 0.1,
+      bx: math.cos(angle) * 0.47, by: 0.025, bz: math.sin(angle) * 0.47,
+      base: 0.1, tip: 0.018)
+  }
+  TreeLimb trunk_base(ax: 0, ay: 0.04, az: 0, bx: -0.12, by: 0.72, bz: 0.04,
+    base: 0.235, tip: 0.17, markings: true)
+  TreeLimb trunk_bend(ax: -0.12, ay: 0.69, az: 0.04, bx: 0.05, by: 1.35, bz: 0.09,
+    base: 0.175, tip: 0.125, markings: true)
+  TreeLimb trunk_fork(ax: 0.05, ay: 1.32, az: 0.09, bx: 0.13, by: 1.98, bz: -0.03,
+    base: 0.13, tip: 0.085, markings: true)
+  TreeLimb leader(ax: 0.13, ay: 1.94, az: -0.03, bx: 0, by: 2.65, bz: 0.1,
+    base: 0.09, tip: 0.025)
+
+  for i in 0..6 {
+    const angle = i * 2.4 + phase
+    const shoulder_x = 0.08 + math.cos(angle) * 0.62
+    const shoulder_y = 1.93 + math.sin(i * 1.7 + phase) * 0.18 + i * 0.055
+    const shoulder_z = math.sin(angle) * 0.62
+    const elbow_x = 0.08 + math.cos(angle + 0.12) * 1.12 * reach
+    const elbow_y = 2.45 + math.sin(i * 1.7 + phase) * 0.22 + i * 0.055
+    const elbow_z = math.sin(angle + 0.12) * 1.05 * reach
+    TreeLimb(ax: 0.1, ay: 1.5 + i * 0.085, az: 0.03,
+      bx: shoulder_x, by: shoulder_y, bz: shoulder_z, base: 0.095, tip: 0.063, markings: true)
+    TreeLimb(ax: shoulder_x, ay: shoulder_y, az: shoulder_z,
+      bx: elbow_x, by: elbow_y, bz: elbow_z, base: 0.066, tip: 0.038)
+    for j in 0..3 {
+      const twig_angle = angle + (j - 1) * 0.5
+      const tip_x = elbow_x + math.cos(twig_angle) * (0.36 + j * 0.08)
+      const tip_y = elbow_y + 0.27 + math.sin(j * 2.2 + i) * 0.15
+      const tip_z = elbow_z + math.sin(twig_angle) * (0.36 + j * 0.08)
+      TreeLimb(ax: elbow_x, ay: elbow_y, az: elbow_z,
+        bx: tip_x, by: tip_y, bz: tip_z, base: 0.036 - j * 0.005, tip: 0.009)
+      BlossomSpray(phase: angle + j * 1.7, blush: variant % 3 * 5) {
+        Position: {tip_x, tip_y, tip_z}
+        Rotation: {0.1 * math.sin(i + j), twig_angle, 0.08 * math.cos(i)}
+        Scale: {0.9 + j * 0.06, 1, 0.9 + j * 0.06}
+      }
+    }
+    TreeLimb(ax: 0, ay: 2.58, az: 0.1,
+      bx: math.cos(angle) * 0.46, by: 2.76 + i % 3 * 0.2, bz: math.sin(angle) * 0.46,
+      base: 0.026, tip: 0.006)
+    BlossomSpray(phase: angle, blush: variant % 3 * 5) {
+      Position: {math.cos(angle) * 0.46, 2.76 + i % 3 * 0.2, math.sin(angle) * 0.46}
+      Scale: {0.85, 0.85, 0.85}
+    }
+  }
+
+  for i in 0..32 {
+    const angle = i * 2.4 + phase
+    {
+      Position: {math.cos(angle) * (0.25 + i * 0.042), 0.018, math.sin(angle) * (0.25 + i * 0.042)}
+      Rotation: {0, angle, 0}
+      Scale: {1, 0.16, 0.65}
+      Sphere: {radius: 0.045, segments: 6, smooth: true}
+      Rgb: {250, 199 + i % 3 * 8, 213 + i % 3 * 6}
+    }
+  }
+}

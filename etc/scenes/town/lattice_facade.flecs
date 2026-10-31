@@ -1,0 +1,41 @@
+include materials
+include facade
+include window
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+
+assets {
+  @tree Parent
+  template LatticeFacade : Facade {
+    {
+      Position: {0, height / 2, 0}
+      Box: {width, height - 0.08, 0.18}
+      Rgb: color
+    }
+    Window(width: width * 0.8, height: height * 0.58, panes: 4) {
+      Position: {0, height * 0.54, 0.14}
+    }
+    for i in 0..15 {
+      {
+        Position: {(i - 7) * width * 0.059, height * 0.54, 0.36}
+        Box: {0.065, height * 0.66, 0.09}
+        Rgb: TownTimber
+      }
+    }
+    for i in 0..3 {
+      {
+        Position: {0, height * (0.22 + i * 0.32), 0.35}
+        Box: {width * 0.9, 0.09, 0.13}
+        Rgb: TownTimber
+      }
+    }
+    {
+      Position: {0, height - 0.08, 0.32}
+      Rotation: {0.15, 0, 0}
+      Box: {width + 0.16, 0.12, 0.72}
+      Rgb: TownRoofTile
+    }
+  }
+}

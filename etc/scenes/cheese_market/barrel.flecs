@@ -1,0 +1,47 @@
+include materials
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.surface
+using box.controllers
+using box.text
+
+@tree Parent
+template MarketBarrel {
+  for i in 0..16 {
+    const angle = i * math.PI / 8
+    {
+      Rotation: {0, angle, 0}
+      {
+        Position: {0, 0.52, 0.38}
+        RoundedBox: {0.155, 0.96, 0.1, 0.035}
+        Rgb: {137 + i % 3 * 13, 87 + i % 3 * 9, 48 + i % 3 * 4}
+      }
+    }
+  }
+  for i in 0..3 {
+    {
+      Position: {0, 0.13 + i * 0.38, 0}
+      Tube: {radius: 0.445, thickness: 0.025, length: 0.07, segments: 32}
+      Rgb: MarketIron
+      PbrMaterial: {metallic: 0.65, roughness: 0.4}
+    }
+  }
+  lid {
+    Position: {0, 0.99, 0}
+    Cylinder: {radius: 0.4, length: 0.055, segments: 24}
+    Rgb: MarketHoney
+  }
+  for i in 0..5 {
+    {
+      Position: {(i - 2) * 0.135, 1.02, 0}
+      Box: {0.012, 0.007, 0.56}
+      Rgb: MarketOak
+    }
+  }
+}

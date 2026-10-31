@@ -1,0 +1,47 @@
+include materials
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+
+assets {
+  @tree Parent
+  template PowerPole {
+    {
+      Position: {0, 3.6, 0}
+      Cylinder: {radius: 0.11, length: 7.2, segments: 12}
+      Rgb: {149, 151, 140}
+    }
+    {
+      Position: {0, 0.32, 0}
+      Cylinder: {radius: 0.17, length: 0.64, segments: 12}
+      Rgb: TownIron
+    }
+    for i in 0..2 {
+      {
+        Position: {0, 6.45 + i * 0.5, 0}
+        Box: {0.14, 0.12, 1.35}
+        Rgb: TownIron
+      }
+    }
+    for i in 0..3 {
+      {
+        Position: {0, 7.06, (i - 1) * 0.53}
+        Cylinder: {radius: 0.085, length: 0.2, segments: 10}
+        Rgb: TownCream
+      }
+    }
+    {
+      Position: {0.26, 5.8, 0}
+      Cylinder: {radius: 0.23, length: 0.65, segments: 12}
+      Rgb: {187, 199, 188}
+    }
+    for i in 0..4 {
+      {
+        Position: {0, 0.85 + i * 0.2, 0}
+        Cylinder: {radius: 0.115, length: 0.1, segments: 12}
+        Rgb: {233, 191, 85}
+      }
+    }
+  }
+}

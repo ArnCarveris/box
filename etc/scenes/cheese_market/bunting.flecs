@@ -1,0 +1,38 @@
+include materials
+include beam
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.surface
+using box.controllers
+using box.text
+
+@tree Parent
+template MarketBunting {
+  prop length: f32 = 12
+  prop flags: i32 = 20
+
+  const brick: Rgb = {174, 69, 52}
+  const gold: Rgb = {230, 173, 66}
+  const colors = [MarketCream, MarketSage, brick, gold]
+
+  for i in 0..flags {
+    const t = i * 1.0 / flags
+    const next = (i + 1.0) / flags
+    const y = -math.sin(t * math.PI) * 0.85
+    const next_y = -math.sin(next * math.PI) * 0.85
+    MarketBeam(ax: (t - 0.5) * length, ay: y, bx: (next - 0.5) * length, by: next_y, radius: 0.014);
+    {
+      Position: {(t - 0.5) * length + length / flags * 0.5, (y + next_y) / 2 - 0.2, 0}
+      Rotation: {0.1 * math.sin(i), 0, math.PI}
+      Triangle: {length / flags * 0.74, 0.4}
+      Rgb: colors[i % 4]
+      BackFaceMode: {BackFacePlain}
+    }
+  }
+}

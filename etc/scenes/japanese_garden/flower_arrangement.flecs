@@ -1,0 +1,39 @@
+include tree_limb
+include sakura_flower
+include leaf
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.surface
+using box.controllers
+using box.movement
+
+@tree Parent
+template FlowerArrangement {
+  prop tint: Rgb = {247, 181, 204}
+  prop phase: f32 = 0
+
+  for i in 0..3 {
+    const angle = phase + i * 2.4
+    const x = math.cos(angle) * (0.13 + i * 0.025)
+    const y = 0.34 + i * 0.1
+    const z = math.sin(angle) * (0.13 + i * 0.025)
+    TreeLimb(ax: 0, ay: 0, az: 0, bx: x, by: y, bz: z,
+      base: 0.012, tip: 0.005, tint: {100, 132, 82})
+    SakuraFlower(tint: tint) {
+      Position: {x, y, z}
+      Rotation: {0.5, angle, 0.3}
+      Scale: {1.25, 1.25, 1.25}
+    }
+    GardenLeaf(tint: {126, 159, 95}) {
+      Position: {x * 0.5, y * 0.5, z * 0.5}
+      Rotation: {-0.4, math.PI / 2 - angle, 0.3}
+      Scale: {0.8, 0.8, 0.8}
+    }
+  }
+}

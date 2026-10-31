@@ -1,0 +1,55 @@
+include materials
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.surface
+using box.controllers
+using box.text
+
+@tree Parent
+template IslandPot {
+  prop flowers: bool = false
+  prop size: f32 = 1
+  prop tint: Rgb = {218, 61, 134}
+  Scale: {size, size, size}
+  vessel {
+    Position: {0, 0.23, 0}
+    Frustum: {radius_bottom: 0.18, radius_top: 0.28, length: 0.46, segments: 16, smooth: true}
+    Rgb: IslandClay
+  }
+  rim {
+    Position: {0, 0.44, 0}
+    Torus: {radius: 0.263, tube: 0.037, segments: 20, rings: 8, smooth: true}
+    Rgb: {221, 143, 101}
+  }
+  soil {
+    Position: {0, 0.445, 0}
+    Cylinder: {radius: 0.235, length: 0.025, segments: 16}
+    Rgb: {85, 70, 47}
+  }
+  for i in 0..9 {
+    const a = i * 2.4
+    {
+      Position: {math.sin(a) * 0.15, 0.58 + i % 3 * 0.09, math.cos(a) * 0.15}
+      Rotation: {math.sin(a) * 0.55, a, 0.35}
+      Scale: {0.55, 1.5, 0.7}
+      Sphere: {radius: 0.17, segments: 8, smooth: true}
+      Rgb: {99 + i % 3 * 8, 129 + i % 3 * 7, 72}
+    }
+    if flowers {
+      for p in 0..3 {
+        {
+          Position: {math.sin(a) * 0.22 + math.sin(p * 2.1) * 0.055, 0.79 + i % 3 * 0.07, math.cos(a) * 0.22 + math.cos(p * 2.1) * 0.055}
+          Scale: {1, 0.65, 1}
+          Sphere: {radius: 0.075, segments: 8}
+          Rgb: tint
+        }
+      }
+    }
+  }
+}

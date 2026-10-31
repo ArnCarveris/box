@@ -1,0 +1,17 @@
+include materials
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+
+assets {
+  @tree Parent
+  template Bollard {
+    prop radius: f32 = 0.075
+    prop height: f32 = 0.52
+    prop color: Rgb = TownIron
+
+    Cylinder: {radius: radius, length: height, segments: 10}
+    Rgb: color
+  }
+}

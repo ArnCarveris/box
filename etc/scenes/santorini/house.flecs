@@ -1,0 +1,73 @@
+include materials
+include door
+include window
+include lantern
+include pot
+include railing
+include beam
+include bougainvillea
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.surface
+using box.controllers
+using box.text
+
+@tree Parent
+template IslandHouse {
+  prop width: f32 = 3.8
+  prop depth: f32 = 3.2
+  prop height: f32 = 3.2
+  prop tint: Rgb = {244, 240, 222}
+  prop trim: Rgb = {27, 86, 171}
+  prop balcony: bool = false
+  prop flowers: bool = false
+  prop terrace: bool = true
+  walls {
+    Position: {0, height / 2, 0}
+    RoundedBox: {width, height, depth, 0.13, segments: 4}
+    Rgb: tint
+    PbrMaterial: {roughness: 0.9}
+  }
+  foot { Position: {0, 0.12, 0}; RoundedBox: {width + 0.1, 0.24, depth + 0.1, 0.07}; Rgb: IslandChalk }
+  roof { Position: {0, height + 0.035, 0}; RoundedBox: {width + 0.14, 0.17, depth + 0.14, 0.08}; Rgb: IslandChalk }
+  IslandDoor(tint: trim) { Position: {-width * 0.22, 0.1, depth / 2 + 0.01} }
+  IslandWindow(tint: trim) { Position: {width * 0.25, 1.73, depth / 2 + 0.01}; Scale: {0.85, 0.85, 0.85} }
+  for side in 0..2 {
+    IslandWindow(tint: trim) { Position: {(side - 0.5) * (width + 0.02), 1.75, 0}; Rotation: {0, (side - 0.5) * math.PI, 0} }
+    IslandWindow(tint: trim, shutters: false) { Position: {(side - 0.5) * width * 0.49, 1.8, -depth / 2 - 0.01}; Rotation: {0, math.PI, 0}; Scale: {0.75, 0.8, 0.8} }
+  }
+  IslandLantern() { Position: {-width * 0.22 - 0.86, 2.2, depth / 2 + 0.03} }
+  IslandPot(flowers: true, size: 0.85) { Position: {width * 0.43, 0.13, depth / 2 + 0.39} }
+  if terrace {
+    for side in 0..2 {
+      { Position: {(side - 0.5) * width, height + 0.3, 0}; RoundedBox: {0.16, 0.5, depth + 0.12, 0.07}; Rgb: IslandChalk }
+    }
+    { Position: {0, height + 0.3, -depth / 2}; RoundedBox: {width, 0.5, 0.16, 0.07}; Rgb: IslandChalk }
+    IslandRailing(width: width - 0.25) { Position: {0, height + 0.12, depth / 2} }
+    IslandPot(flowers: true, size: 0.85) { Position: {-width / 2 + 0.45, height + 0.13, depth / 2 - 0.4} }
+    chimney {
+      Position: {width / 2 - 0.48, height + 0.52, -depth / 2 + 0.48}
+      Cylinder: {radius: 0.19, length: 0.85, segments: 16}
+      Rgb: IslandPlaster
+      cap { Position: {0, 0.48, 0}; Cylinder: {radius: 0.27, length: 0.12, segments: 16}; Rgb: IslandChalk }
+      vent { Position: {0, 0.33, 0}; Cylinder: {radius: 0.2, length: 0.1, segments: 16}; Rgb: IslandRecess }
+    }
+  }
+  if balcony {
+    deck { Position: {0, 0.02, depth / 2 + 0.65}; RoundedBox: {width + 0.3, 0.2, 1.55, 0.07}; Rgb: IslandChalk }
+    IslandRailing(width: width + 0.16) { Position: {0, 0.13, depth / 2 + 1.37} }
+    for side in 0..2 {
+      IslandRailing(width: 1.3) { Position: {(side - 0.5) * (width + 0.16), 0.13, depth / 2 + 0.71}; Rotation: {0, math.PI / 2, 0} }
+      IslandBeam(ax: (side - 0.5) * width * 0.8, ay: -1.1, az: depth / 2, bx: (side - 0.5) * width * 0.8, by: -0.05, bz: depth / 2 + 1.25, radius: 0.08, tint: IslandPlaster) {}
+    }
+  }
+  if flowers {
+    Bougainvillea(width: width * 0.85, height: height - 0.2) { Position: {0, 0.13, depth / 2 + 0.2} }
+  }
+}
