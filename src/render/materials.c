@@ -672,7 +672,8 @@ check:
 }
 
 /** Hand a prefab that got its MaterialId a private slot, or keep the slot an entity that became
- * a prefab already had, which turns private.
+ * a prefab already had, which turns private. An entity that shared its slot with other owners
+ * gets a new one, which its IsA instances learn from the OnSet of MaterialId.
  *
  * @param it The iterator of the observer
  */
@@ -688,8 +689,12 @@ static void BoxMaterialsOnPrefab(
         uint32_t result = box_materials_private(m, it->entities[i],
             slot ? (uint32_t)*slot : BOX_MATERIALS_NONE);
         *ecs_map_ensure(&m->owned, (ecs_map_key_t)it->entities[i]) = (ecs_map_val_t)result;
+        bool changed = ids[i].value != result;
         ids[i].value = result;
         box_materials_mark(m, result);
+        if (changed && ecs_id_in_use(it->world, ecs_pair(EcsIsA, it->entities[i]))) {
+            ecs_modified(it->world, it->entities[i], MaterialId);
+        }
     }
 }
 
