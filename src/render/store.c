@@ -3,7 +3,8 @@
  * @brief Instance pages shared by every batch and the slot allocator of their runs.
  *
  * A page is one GPU buffer per stream of its layout, holding at most the slots of the page. Its
- * buffers start small and double up to that size, created again when its runs reach past them;
+ * buffers start at the top of its runs and grow by half up to that size, created again when its
+ * runs reach past them;
  * the backend copies the old buffers into the new ones, so the runs keep their instances. Its
  * handles leave room for BOX_DRAWS_STREAMS buffers whatever its layout, so the backend finds its
  * first buffer from any of its handles.
@@ -259,21 +260,58 @@ done:
     return;
 }
 
+/** Round slots up to a multiple of BOX_DRAWS_GROW_ALIGN, at most UINT32_MAX rounded down.
+ *
+ * @param slots The slots
+ * @return The rounded slots
+ */
+static uint32_t box_draws_grow_align(
+    uint64_t slots)
+{
+    uint64_t result = (slots + BOX_DRAWS_GROW_ALIGN - 1) / BOX_DRAWS_GROW_ALIGN *
+        BOX_DRAWS_GROW_ALIGN;
+    uint64_t max = (uint64_t)UINT32_MAX / BOX_DRAWS_GROW_ALIGN * BOX_DRAWS_GROW_ALIGN;
+    return (uint32_t)(result < max ? result : max);
+}
+
+uint32_t box_draws_grow(
+    uint32_t capacity,
+    uint32_t count)
+{
+    uint32_t result = box_draws_grow_align(
+        capacity > BOX_DRAWS_MIN_CAPACITY ? capacity : BOX_DRAWS_MIN_CAPACITY);
+    while (result < count) {
+        uint32_t next = box_draws_grow_align((uint64_t)result + result / 2);
+        if (next == result) {
+            result = count;
+            break;
+        }
+
+        result = next;
+    }
+
+    return result;
+}
+
 bool box_draws_store_reserve(
     box_draw_store_t *s,
     box_render_packet_t *p,
     int32_t page)
 {
     box_draw_page_t *pg = ecs_vec_get_t(&s->pages, box_draw_page_t, page);
-    uint32_t capacity = pg->capacity ? pg->capacity : BOX_DRAWS_MIN_CAPACITY;
+    uint32_t capacity;
     bool result = false;
     int32_t i;
     if (!pg->alive || (pg->capacity && pg->top <= pg->capacity)) {
         goto done;
     }
 
-    while (capacity < pg->top) {
-        capacity *= 2;
+    /* Growing by half keeps the copies of a page that grows step by step in proportion to its
+     * slots; the first buffers hold just the top */
+    capacity = box_draws_grow_align(pg->capacity
+        ? (uint64_t)pg->capacity + pg->capacity / 2 : BOX_DRAWS_MIN_CAPACITY);
+    if (capacity < pg->top) {
+        capacity = box_draws_grow_align(pg->top);
     }
 
     if (capacity > pg->slots) {

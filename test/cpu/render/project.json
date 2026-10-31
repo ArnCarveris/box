@@ -263,7 +263,11 @@
                     "moved_out_of_released_page_uploads",
                     "parametric_shapes_use_surface_store",
                     "every_surface_kind_uses_surface_store",
-                    "shape_moves_to_surface_store_and_back"
+                    "shape_moves_to_surface_store_and_back",
+                    "grow_steps",
+                    "runs_grow_by_half",
+                    "page_grows_by_half",
+                    "page_growth_stops_at_page_slots"
                 ]
             },
             {

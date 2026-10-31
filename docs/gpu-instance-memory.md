@@ -444,6 +444,16 @@ slots, can be reduced as follows:
 Each of these makes runs move and pages grow more often. Without O3 that means more full
 re-uploads, so O3 should come first.
 
+Implemented: runs and page buffers grow by 1.5 (`box_draws_grow`, `box_draws_store_reserve`),
+rounded up to 4 slots (`BOX_DRAWS_GROW_ALIGN`), and the minimum run is 16 slots. Run steps are
+16, 24, 36, 56, 84, 128, 192, ... A page's first buffers hold just its top; a page that outgrows
+them grows by half, or to its top when that is more, up to the slots of the page. The factor of
+1.5 was chosen over 4,096 slot steps because a page that grows steadily, as in the spawn scene,
+would be created again and copied every 4,096 slots, a number of copies and copied bytes that
+grows with the square of its slots; with 1.5 the copied bytes stay below twice the final size.
+4,096 slot steps would also make every small page, such as a Text or Shapes2D scene's, hold at
+least 4,096 slots.
+
 ### O3. Full re-uploads when a run moves or a page grows
 
 When a page buffer is created again, `box_draws_pages` marks every batch of the page `full`, and

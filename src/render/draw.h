@@ -25,7 +25,12 @@
 #define BOX_DRAWS_CHUNK ((uint32_t)((128u << 20) / sizeof(box_render_surface_t)))
 
 /** Slots the smallest run of a batch holds, and the smallest page buffer */
-#define BOX_DRAWS_MIN_CAPACITY (64)
+#define BOX_DRAWS_MIN_CAPACITY (16)
+
+/** Slots every run and page buffer is a multiple of when it grows by half. Every stride is a
+ * multiple of 4 bytes, so run offsets, copies and buffer sizes stay multiples of the 4 bytes
+ * WebGPU requires (BOX_RENDER_COPY_ALIGN) */
+#define BOX_DRAWS_GROW_ALIGN (4)
 
 /** Buffers of an instance page at most, one per stream of its layout; the handles of a page
  * leave room for all of them, see BOX_RENDER_INSTANCE_STREAMS */
@@ -1072,8 +1077,22 @@ void box_draws_store_free(
     uint32_t first,
     uint32_t count);
 
-/** Make the buffers of a page hold its runs, creating them again by doubling up to the slots of
- * the page. A buffer created again keeps the bytes of the buffer it replaces
+/** Slots of the smallest growth step at or above a count: from a capacity, at least
+ * BOX_DRAWS_MIN_CAPACITY, each step adds half and rounds up to BOX_DRAWS_GROW_ALIGN slots. From
+ * the minimum the steps are 16, 24, 36, 56, 84, 128, 192, 288, ...
+ *
+ * @param capacity Slots to grow from, 0 for the minimum
+ * @param count Slots the result holds at least
+ * @return Slots of the step
+ */
+uint32_t box_draws_grow(
+    uint32_t capacity,
+    uint32_t count);
+
+/** Make the buffers of a page hold its runs, creating them again up to the slots of the page.
+ * A page's first buffers hold its top, rounded up to BOX_DRAWS_GROW_ALIGN slots and at least
+ * BOX_DRAWS_MIN_CAPACITY; a page that outgrows them grows by half, or to its top when that is
+ * more. A buffer created again keeps the bytes of the buffer it replaces
  * (BOX_RENDER_BUFFER_KEEP), so the runs of the page keep their instances; a buffer created for
  * the first time has none of them.
  *

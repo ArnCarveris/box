@@ -214,9 +214,9 @@ void InstanceStore_moved_run_and_grown_page_keep_records(void) {
     batch_matches(world, a[0]);
     batch_matches(world, b[0]);
 
-    /* The first batch outgrows its run of 64 slots and moves past the second, so the page grows
-     * from 128 to 256 slots in the same frame: the old buffers are copied into the new ones and
-     * the two old instances from the old run into the new run */
+    /* The first batch outgrows its run of 16 slots and moves to a run of 84 past the second, so
+     * the page grows from 32 to 116 slots in the same frame: the old buffers are copied into the
+     * new ones and the two old instances from the old run into the new run */
     for (i = 0; i < 64; i ++) {
         added[i] = ecs_new(world);
         ecs_set(world, added[i], Position, {(float)(i % 16) - 8, (float)(i / 16) - 8, 0});
@@ -233,7 +233,7 @@ void InstanceStore_moved_run_and_grown_page_keep_records(void) {
     batch_matches(world, a[0]);
     batch_matches(world, b[0]);
 
-    /* Moved again, past 128 slots, with a changed instance among the copied ones, which
+    /* Moved again, to a run of 192 slots, with a changed instance among the copied ones, which
      * scatters over the copy, and a change of the second batch in the same frame */
     ecs_set(world, a[1], Position, {-12, 1, 0});
     ecs_set(world, b[1], Position, {1, 6, 0});
@@ -295,7 +295,8 @@ void InstanceStore_moved_run_reused_in_same_frame(void) {
     frames(world, 3);
     box_render_draws_t *d = box_draws_state(world);
     test_uint(box_draws_batch(d, ecs_get(world, a[0], DrawSlot)->batch)->first, 0);
-    test_uint(box_draws_batch(d, ecs_get(world, b[0], DrawSlot)->batch)->first, 64);
+    test_uint(box_draws_batch(d, ecs_get(world, b[0], DrawSlot)->batch)->first,
+        BOX_DRAWS_MIN_CAPACITY);
 
     /* The first batch moves past the second, and a new batch with the mesh of the second takes
      * the run it left in the same frame: its upload writes the old run after the copy read it.
@@ -313,7 +314,8 @@ void InstanceStore_moved_run_reused_in_same_frame(void) {
     box_render_gpu_stats_t after = frames(world, 1);
     box_render_draws_stats_t stats;
     box_render_draws_stats(world, &stats);
-    test_uint(box_draws_batch(d, ecs_get(world, a[0], DrawSlot)->batch)->first, 128);
+    test_uint(box_draws_batch(d, ecs_get(world, a[0], DrawSlot)->batch)->first,
+        2 * BOX_DRAWS_MIN_CAPACITY);
     test_uint(box_draws_batch(d, ecs_get(world, c, DrawSlot)->batch)->first, 0);
     test_int(stats.copies, BOX_RENDER_INSTANCE_STREAMS_PLAIN);
     test_int(stats.scattered, 1);
