@@ -1099,8 +1099,9 @@ void box_draws_reset_backend(
     box_draws_materials_reset(d);
 }
 
-/** Give a batch a run of slots that holds all its instances, moving it to a new run when it
- * outgrew its run; its old run is freed.
+/** Give a batch a run of slots that holds all its instances. A batch that outgrew its run
+ * extends it in place when it ends at the top of its page, so nothing is copied and no hole is
+ * left, and otherwise moves to a new run; its old run is freed.
  *
  * A moved batch remembers the old run and the instances the GPU holds in it, which the send
  * copies into the new run (box_draws_send_batch); its changed slots stay queued and are written
@@ -1117,19 +1118,29 @@ static void box_draws_reserve(
 {
     box_draw_store_t *store = box_draws_batch_store(d, b);
     uint32_t count = (uint32_t)ecs_vec_count(&b->entities);
+<<<<<<< HEAD
     uint32_t limit = box_draws_limit(store);
     uint32_t capacity = BOX_DRAWS_MIN_CAPACITY, first;
+=======
+    uint32_t limit = box_draws_limit(d);
+    uint32_t capacity, first;
+>>>>>>> 6094c703ac5405f8274a6626770139185e8b9eae
     int32_t page;
     if (b->page >= 0 && count <= b->capacity) {
         goto done;
     }
 
-    while (capacity < count) {
-        capacity *= 2;
-    }
+    capacity = box_draws_grow(0, count);
 
     if (capacity > limit && count <= limit) {
         capacity = limit;
+    }
+
+    if (b->page >= 0 &&
+        box_draws_store_extend(store, b->page, b->first, b->capacity, capacity))
+    {
+        b->capacity = capacity;
+        goto done;
     }
 
     box_draws_store_alloc(store, capacity, &page, &first);

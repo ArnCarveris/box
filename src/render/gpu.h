@@ -564,10 +564,35 @@ void box_gpu_buffer_apply(
     uint32_t handle,
     const box_render_buffer_desc_t *desc);
 
+/** Check whether a buffer can be the source of GPU copies.
+ *
+ * @param b The buffer
+ * @return Whether it was created with CopySrc usage
+ */
+bool box_gpu_buffer_copyable(
+    const box_gpu_buffer_t *b);
+
+/** Create the state of the copies between buffers, without a staging buffer.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_copy_init(
+    box_gpu_t *gpu);
+
+/** Release the staging buffer of the copies and their state.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_copy_fini(
+    box_gpu_t *gpu);
+
 /** Run the copies between buffers of a packet, after its resources and before its uploads.
  *
- * Every source is copied into a staging buffer, then every destination from it, so a copy reads
- * its source as it was before the copies of the packet, even within one buffer.
+ * A copy between two buffers whose source no copy of the packet writes runs directly. The
+ * others, within one buffer or reading a range another copy writes, go through a staging
+ * buffer, so every copy reads its source as it was before the copies of the packet.
+ *
+ * Runs for every packet, which counts it for the release of the staging buffer.
  *
  * @param gpu The backend
  * @param packet The packet

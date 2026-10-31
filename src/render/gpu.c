@@ -706,6 +706,12 @@ void box_gpu_count(
     case BOX_GPU_STAT_SHADOW_DRAW:
         gpu->pending.shadow_draws ++;
         break;
+    case BOX_GPU_STAT_COPY_DIRECT:
+        gpu->pending.copies_direct ++;
+        break;
+    case BOX_GPU_STAT_COPY_STAGED:
+        gpu->pending.copies_staged ++;
+        break;
     }
 }
 
@@ -753,6 +759,13 @@ void box_gpu_stats_publish(
     s->shadow_reused += p->shadow_reused;
     s->shadow_passes += p->shadow_passes;
     s->shadow_draws += p->shadow_draws;
+    s->copies_direct += p->copies_direct;
+    s->copies_staged += p->copies_staged;
+    s->copy_staging = (int64_t)gpu->copy_staging_size;
+    if (s->copy_staging > s->copy_staging_peak) {
+        s->copy_staging_peak = s->copy_staging;
+    }
+
     for (i = 0; i < BOX_RENDER_ATMOS_PASSES; i ++) {
         s->atmosphere_ns[i] += p->atmosphere_ns[i];
         s->atmosphere_passes[i] += p->atmosphere_passes[i];

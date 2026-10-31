@@ -1454,14 +1454,11 @@ void box_console_out_run(
     ecs_shell_result_t r = ecs_shell_run(world, session, line);
     char **errors = ecs_vec_first(&r.errors);
     int32_t i, count = ecs_vec_count(&r.errors);
-    char *command = box_console_syntax_token(line, 0);
-    char *pattern = box_console_syntax_token(line, 1);
+    int32_t at = 0, start, end;
     box_console_fmt_t fmt = {
         .world = world,
         .out = out,
-        .scope = box_console_session_scope(world, con),
-        .command = command,
-        .pattern = pattern
+        .scope = box_console_session_scope(world, con)
     };
 
     for (i = 0; i < BoxTypeCount; i ++) {
@@ -1473,6 +1470,19 @@ void box_console_out_run(
     ecs_value_t *results = ecs_vec_first(&r.results);
     int32_t result_count = count ? 0 : ecs_vec_count(&r.results);
     for (i = 0; i < result_count; i ++) {
+        char *command = NULL, *pattern = NULL;
+        if (box_console_syntax_split(line, at, &start, &end)) {
+            char *text = flecs_asprintf("%.*s", end - start, &line[start]);
+            command = box_console_syntax_token(text, 0);
+            pattern = box_console_syntax_token(text, 1);
+            ecs_os_free(text);
+            at = end;
+        }
+
+        fmt.command = command;
+        fmt.pattern = pattern;
+        fmt.number_width = 0;
+        fmt.comment = false;
         if (results[i].type && results[i].ptr) {
             if (box_console_out_len(out)) {
                 box_console_out_add(out, BoxSpanNone, "\n", 1);
@@ -1480,6 +1490,9 @@ void box_console_out_run(
 
             box_console_fmt_value(&fmt, results[i].type, results[i].ptr);
         }
+
+        ecs_os_free(command);
+        ecs_os_free(pattern);
     }
 
     for (i = 0; i < count; i ++) {
@@ -1494,7 +1507,5 @@ void box_console_out_run(
         error[0] = count != 0;
     }
 
-    ecs_os_free(command);
-    ecs_os_free(pattern);
     ecs_shell_result_fini(world, &r);
 }
