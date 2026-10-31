@@ -28,7 +28,7 @@
  * chunk of any store: BOX_DRAWS_PAGE_BYTES over its largest stride, the surface stream.
  *
  * Each store derives its chunk from its own largest stride (box_draws_layout_chunk), so plain
- * mesh pages hold 128 MiB / 48 slots and 2D pages 128 MiB / 80 */
+ * mesh pages hold 128 MiB / 48 slots and 2D pages 128 MiB / 64 */
 #define BOX_DRAWS_CHUNK ((uint32_t)(BOX_DRAWS_PAGE_BYTES / sizeof(box_render_surface_t)))
 
 /** Slots the smallest run of a batch holds, and the smallest page buffer */

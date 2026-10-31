@@ -1281,10 +1281,11 @@ void InstanceStore_store_chunk_from_largest_stride(void) {
         sizeof(box_render_shading_t) ? sizeof(box_render_transform_t) :
         sizeof(box_render_shading_t));
     test_uint(mesh, 48);
-    test_uint(shape2d, 80);
+    test_uint(shape2d, 64);
     test_uint(d->stores[BOX_DRAWS_STORE_MESH].chunk, page / mesh);
     test_uint(d->stores[BOX_DRAWS_STORE_MESH].chunk, 2796202);
     test_uint(d->stores[BOX_DRAWS_STORE_2D].chunk, page / shape2d);
+    test_uint(d->stores[BOX_DRAWS_STORE_2D].chunk, 2097152);
     test_uint(d->stores[BOX_DRAWS_STORE_SURFACE].chunk, page / SURFACE);
     test_uint(d->stores[BOX_DRAWS_STORE_SURFACE].chunk, 349525);
     test_uint(BOX_DRAWS_CHUNK, 349525);
