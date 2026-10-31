@@ -663,7 +663,7 @@ ecs_entity_t box_surface_of_view(
 {
     ecs_query_t *q = surfaces;
     ecs_entity_t parent = view ? ecs_get_parent(world, view) : 0;
-    ecs_entity_t result = 0;
+    ecs_entity_t result = 0, fallback = 0;
     if (!q) {
         q = ecs_query(world, {
             .terms = {
@@ -678,11 +678,11 @@ ecs_entity_t box_surface_of_view(
         const Surface *s = ecs_field(&it, Surface, 0);
         int32_t i;
         for (i = 0; i < it.count && !result; i ++) {
-            if (s[i].view_root && s[i].view_root != parent) {
-                continue;
+            if (s[i].view_root && s[i].view_root == parent) {
+                result = it.entities[i];
+            } else if (!s[i].view_root && !fallback) {
+                fallback = it.entities[i];
             }
-
-            result = it.entities[i];
         }
     }
 
@@ -694,7 +694,7 @@ ecs_entity_t box_surface_of_view(
         ecs_query_fini(q);
     }
 
-    return result;
+    return result ? result : fallback;
 }
 
 bool box_surface_view_size(

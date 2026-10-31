@@ -104,8 +104,9 @@ void box_surface_point_size(
 
 /** Find the surface a view renders to.
  *
- * The first surface whose view_root is 0 or the parent of the view counts, in the order of the
- * query.
+ * The surface whose view_root is the parent of the view counts, else the first surface without
+ * a view_root in the order of the query, as surfaces without a view_root skip the views that
+ * another surface claims.
  *
  * @param world The world
  * @param surfaces Query for Surface and an optional SurfaceStatus, NULL to make one for the call
