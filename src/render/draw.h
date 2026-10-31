@@ -3,13 +3,12 @@
  * @brief Instanced batches of the forward pass, shared by the change tracking and the extract.
  *
  * Shapes live in batches keyed by scene, mesh, pipeline, whether their transform and material
- * are dynamic and whether they cast shadows, one swap-removed slot per entity and at most
- * BOX_DRAWS_CHUNK of them, so a key may have several batches.
+ * are dynamic, whether they cast shadows and whether they have a parametric surface, one
+ * swap-removed slot per entity and at most BOX_DRAWS_CHUNK of them.
  *
- * A batch owns a run of slots of an instance page (store.c), a buffer per stream with the same
- * slots; a change uploads only its streams. A mesh page has a transform, a shading and a surface
- * stream, a 2D page of its own store no surface stream, for which the backend binds a zero record.
- * A mesh shading is a tint, an alpha and a shared material slot (materials.c).
+ * A batch owns a run of slots of an instance page (store.c), a buffer per stream; a change
+ * uploads only its streams. Only the pages of the surface store have a surface stream, plain mesh
+ * and 2D pages bind a zero record. A mesh shading is a tint, an alpha and a material slot.
  */
 
 #ifndef BOX_RENDER_DRAW_H
@@ -20,9 +19,9 @@
 #include "../texture/texture.h"
 #include "../text/text.h"
 
-/** Instances of one batch and slots of one instance page: every stream of a page, the surface
- * stream of a mesh page being the largest, stays within the 128 MiB storage binding that every
- * WebGPU device supports, and a key with more shapes continues in another batch */
+/** Instances of one batch and slots of one instance page: every stream of a page stays within
+ * the 128 MiB storage binding of every WebGPU device. Derived from the surface stream, which only
+ * the surface store has; the plain mesh and 2D pages, with smaller streams, share the chunk */
 #define BOX_DRAWS_CHUNK ((uint32_t)((128u << 20) / sizeof(box_render_surface_t)))
 
 /** Slots the smallest run of a batch holds, and the smallest page buffer */
@@ -32,14 +31,19 @@
  * leave room for all of them, see BOX_RENDER_INSTANCE_STREAMS */
 #define BOX_DRAWS_STREAMS (BOX_RENDER_INSTANCE_STREAMS)
 
-/** Store of the instance pages of the mesh batches */
+/** Store of the instance pages of the plain mesh batches, without a parametric surface: the
+ * transform and the shading stream, from BOX_RENDER_BUFFER_FIRST */
 #define BOX_DRAWS_STORE_MESH (0)
 
 /** Store of the instance pages of the 2D shape and glyph batches */
 #define BOX_DRAWS_STORE_2D (1)
 
+/** Store of the instance pages of the mesh batches with a parametric surface: every stream,
+ * from BOX_RENDER_BUFFER_FIRST_SURFACE */
+#define BOX_DRAWS_STORE_SURFACE (2)
+
 /** Stores of instance pages, one per page layout */
-#define BOX_DRAWS_STORES (2)
+#define BOX_DRAWS_STORES (3)
 
 /** Streams of an instance that a change writes, a bit per stream of the instance pages */
 typedef enum box_draw_kind_t {
@@ -135,6 +139,9 @@ typedef struct box_draw_key_t {
     bool dynamic_material;  /**< The shapes or a ChildOf ancestor have DynamicMaterial, so the
                              *   shading uploads every frame */
     bool shadow;            /**< Instances cast shadows, false under NoShadow */
+    bool surface;           /**< The shapes have a parametric surface: the batch has the
+                             *   surface stream, its pages are of the surface store. The mesh
+                             *   already tells surfaces apart, the bit selects the store */
     bool bake;              /**< Static 3D instances without NoBake of a scene with LightBake or
                              *   ReflectionBake, drawn by the captures */
     ecs_entity_t textures[BOX_RENDER_TEXTURE_SLOTS]; /**< Texture entities of PbrTextures */
@@ -299,7 +306,8 @@ typedef struct box_draw_batch_t {
     ecs_vec_t transforms;   /**< box_render_transform_t per slot */
     ecs_vec_t shadings;     /**< box_render_shading_t per slot of a 2D batch */
     ecs_vec_t mesh_shadings; /**< box_render_mesh_shading_t per slot of a mesh batch */
-    ecs_vec_t surfaces;     /**< box_render_surface_t per slot of a mesh batch */
+    ecs_vec_t surfaces;     /**< box_render_surface_t per slot of a mesh batch with a parametric
+                             *   surface, empty for any other batch */
     ecs_vec_t changed[BOX_DRAWS_STREAMS]; /**< int32_t per stream, slots whose data of a stream
                              *   that does not upload every frame the GPU does not have */
 } box_draw_batch_t;
@@ -608,8 +616,8 @@ box_draw_store_t* box_draws_batch_store(
     box_render_draws_t *d,
     const box_draw_batch_t *b);
 
-/** Get the streams the instance pages of a batch have: every stream for a mesh batch, the
- * transform and the shading for a 2D shape or glyph batch.
+/** Get the streams the instance pages of a batch have: every stream for a mesh batch with a
+ * parametric surface, the transform and the shading for a plain mesh, 2D shape or glyph batch.
  *
  * @param b The batch
  * @return box_draw_kind_t, a bit per stream of its pages
@@ -621,7 +629,7 @@ uint8_t box_draws_batch_kinds(
  *
  * @param b The batch
  * @param slot The slot
- * @return The surface, NULL for a 2D batch, whose pages have no surface stream
+ * @return The surface, NULL for a plain mesh or 2D batch, whose pages have no surface stream
  */
 box_render_surface_t* box_draws_slot_surface(
     box_draw_batch_t *b,

@@ -101,6 +101,7 @@ static void bench_render_extract(
     ecs_progress(world, 0);
     box_render_draws_stats(world, &stats);
     int64_t setup_material_bytes = stats.material_bytes;
+    int64_t setup_upload_bytes = stats.upload_bytes;
     ecs_progress(world, 0);
     int64_t observers = 0, sets = 0;
     double frames = 0;
@@ -130,6 +131,7 @@ static void bench_render_extract(
     bench_counter(b, "scattered", (double)stats.scattered);
     bench_counter(b, "materials", (double)stats.materials);
     bench_counter(b, "setup_material_bytes", (double)setup_material_bytes);
+    bench_counter(b, "setup_upload_bytes", (double)setup_upload_bytes);
     bench_render_memory(b, &stats);
     if (sets) {
         bench_counter(b, "observers_per_set", (double)observers / (double)sets);

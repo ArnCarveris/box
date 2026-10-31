@@ -317,7 +317,9 @@ void box_gpu_instance_layouts_fini(
 
 /** Create a bind group of the streams of an instance page and surface assets.
  *
- * A page without a surface stream, a 2D page, binds gpu->no_surfaces at binding 3.
+ * A page without a surface stream, a plain mesh page or a 2D page, binds gpu->no_surfaces at
+ * binding 3: one zero record, so the vertex shaders, which load the record of a slot only inside
+ * the buffer, leave the surface of a plain mesh zero.
  *
  * A group with the shading stream binds the material table too, or the default record before
  * the main thread sent one.
@@ -372,8 +374,8 @@ WGPUBindGroup box_gpu_instance_group(
 {
     WGPUBindGroup result = NULL;
     box_gpu_buffer_t *streams[BOX_RENDER_INSTANCE_STREAMS] = {0};
-    int32_t i, count = page >= BOX_RENDER_BUFFER_FIRST_2D
-        ? BOX_RENDER_INSTANCE_STREAMS_2D : BOX_RENDER_INSTANCE_STREAMS;
+    bool surface = page >= BOX_RENDER_BUFFER_FIRST_SURFACE && page < BOX_RENDER_BUFFER_FIRST_2D;
+    int32_t i, count = surface ? BOX_RENDER_INSTANCE_STREAMS : BOX_RENDER_INSTANCE_STREAMS_PLAIN;
     for (i = 0; i < count; i ++) {
         streams[i] = ecs_map_get_deref(&gpu->buffers, box_gpu_buffer_t, page + (uint32_t)i);
         if (!streams[i] || !(streams[i]->usage & BOX_RENDER_BUFFER_STORAGE)) {
