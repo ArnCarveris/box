@@ -459,6 +459,7 @@
                     "nested_parent",
                     "plain_child",
                     "group_parent",
+                    "mixed_children",
                     "surface_instance",
                     "range_mul_single",
                     "bounds_corners"

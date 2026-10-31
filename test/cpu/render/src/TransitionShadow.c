@@ -316,6 +316,83 @@ void TransitionShadow_group_parent(void) {
     tr_fini(world, null);
 }
 
+/** Check the regions of a caster 3 units out along x and a NoShadow box 20 units out along -x,
+ * both plain children of a parent without a shape that turns about y and is sent back halfway:
+ * the regions of each frame hold the pose the caster renders and stay within -5.5 to 5.5, which
+ * no region of the NoShadow child is.
+ *
+ * @param no_shadow_first Whether the NoShadow child is created before the caster
+ */
+static void tr_shadow_mixed(
+    bool no_shadow_first)
+{
+    box_render_null_t *null;
+    box_render_shadow_region_t bounds, last;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_vec_t *regions = tr_regions(world);
+    ecs_entity_t parent = ecs_new(world);
+    ecs_entity_t caster = 0, hidden = 0;
+    int32_t i;
+    ecs_set(world, parent, Position, {0, 0, 0});
+    ecs_set(world, parent, Rotation, {0, 0, 0});
+    if (no_shadow_first) {
+        hidden = tr_shape(world, parent, -20);
+        ecs_add(world, hidden, NoShadow);
+        caster = tr_shape(world, parent, 3);
+    } else {
+        caster = tr_shape(world, parent, 3);
+        hidden = tr_shape(world, parent, -20);
+        ecs_add(world, hidden, NoShadow);
+    }
+
+    box_transition_set(world, parent, ecs_id(Rotation), &(TransitionSpec){
+        .duration = 1.0f, .timing_function = EaseInOut });
+    tr_frame(world);
+    test_assert(!ecs_has(world, caster, Transition));
+    test_assert(!ecs_has(world, hidden, Transition));
+
+    ecs_set(world, parent, Rotation, {0, (float)GLM_PI, 0});
+    for (i = 0; i < 2; i ++) {
+        ecs_vec_clear(regions);
+        tr_frame(world);
+        test_assert(ecs_has_id(world, caster, TransitionTransform));
+        tr_rendered_bounds(world, null, caster, &bounds);
+        tr_test_regions(regions, &bounds, -5.5f, 5.5f);
+        tr_test_within(regions, -5.5f, 5.5f);
+    }
+
+    ecs_set(world, parent, Rotation, {0, -0.5f, 0});
+    for (i = 0; i < 4; i ++) {
+        ecs_vec_clear(regions);
+        tr_frame(world);
+        tr_rendered_bounds(world, null, caster, &bounds);
+        tr_test_regions(regions, &bounds, -5.5f, 5.5f);
+        tr_test_within(regions, -5.5f, 5.5f);
+        last = bounds;
+    }
+
+    ecs_vec_clear(regions);
+    tr_frame(world);
+    test_assert(!ecs_has_id(world, caster, TransitionTransform));
+    tr_test_regions(regions, &last, -5.5f, 5.5f);
+
+    ecs_vec_clear(regions);
+    tr_frame(world);
+    tr_test_within(regions, -5.5f, 5.5f);
+    tr_test_static(world, null, caster);
+    tr_test_static(world, null, hidden);
+    tr_fini(world, null);
+}
+
+/* A turning parent with a caster child and a NoShadow child, created in either order: the mark
+ * of the caster reaches the parent whichever sibling the walk meets first, and the NoShadow
+ * child adds no region */
+void TransitionShadow_mixed_children(void) {
+    // engine_core/transition
+    tr_shadow_mixed(true);
+    tr_shadow_mixed(false);
+}
+
 /** Get the world bounds of the local bounds of the ShapeMesh of an entity at the transform the
  * backend got in the last packet, without the region math of the draws.
  *
