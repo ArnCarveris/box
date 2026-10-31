@@ -23,14 +23,7 @@ template LockPaddleCrank {
   handle : CanalBlack { Position: {0.34, 0.43, 0}; Rotation: {0, 0, math.PI / 2}; Cylinder: {radius: 0.045, length: 0.22, segments: 10} }
 }
 
-template LockPaddleGear : LockControl {
-  prop top: bool = false
-
-  const raised = (top && lock_top_paddle) || (!top && lock_bottom_paddle)
-  const lift = match raised { true: 0.85; _: 0 }
-
-  Transition: [Tint: {duration: 0.12}]
-
+template LockPaddleGearBody {
   plinth : CanalDarkStone { Position: {0, 0.08, 0}; RoundedBox: {0.86, 0.16, 0.86, 0.03, segments: 1} }
   base : CanalRed { Position: {0, 0.2, 0}; RoundedBox: {0.56, 0.08, 0.46, 0.02, segments: 1} }
   frame_a : CanalRed { Position: {-0.17, 0.82, 0}; Frustum: {radius_bottom: 0.1, radius_top: 0.065, length: 1.2, segments: 8} }
@@ -39,6 +32,17 @@ template LockPaddleGear : LockControl {
   for b in 0..4 {
     { (IsA, CanalBrass); Position: {-0.22 + (b % 2) * 0.44, 0.25, -0.16 + (b / 2) * 0.32}; Sphere: {radius: 0.025, segments: 8} }
   }
+}
+
+template LockPaddleGear : LockControl {
+  prop top: bool = false
+
+  const raised = (top && lock_top_paddle) || (!top && lock_bottom_paddle)
+  const lift = match raised { true: 0.85; _: 0 }
+
+  Transition: [Tint: {duration: 0.12}]
+
+  LockPaddleGearBody body()
 
   rack {
     Position: {0, lift, 0}

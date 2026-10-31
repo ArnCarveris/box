@@ -295,6 +295,9 @@
                     "transition_takes_private_slot",
                     "dynamic_material_keeps_private_slot",
                     "base_slot_change_reaches_instances",
+                    "prefab_from_shared_slot_reaches_instances",
+                    "prefab_from_shared_slot_same_color",
+                    "prefab_from_shared_slot_deferred",
                     "shared_cutoff_change_records_shadow"
                 ]
             },

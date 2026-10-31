@@ -897,7 +897,9 @@
                     "manual_write_after_pre_store",
                     "dynamic_removed_passes_subtree",
                     "position_removed_passes_entity",
-                    "ctx_free_on_fini"
+                    "ctx_free_on_fini",
+                    "same_value_passes_nothing",
+                    "new_entity_at_origin_passes_entity"
                 ]
             },
             {

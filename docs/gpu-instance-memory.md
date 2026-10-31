@@ -22,8 +22,9 @@ Sizes are in bytes, and MB is 10^6 bytes.
 - Runs and pages are allocated in powers of two, so a page holds 1.2 to 3.7 times as many slots as
   there are live instances. In the shipped scenes the 64 slot minimum run of small batches adds
   more.
-- A shape that owns a material component gets a 64 byte record of its own in the material table.
-  In the Extract bench the table holds 100,001 records whose contents take only 2 distinct values.
+- A shape that owned a material component got an 80 byte record of its own in the material
+  table. In the Extract bench the table held 100,001 records whose contents took only 2 distinct
+  values. The table now shares records by content (O1, implemented) and holds 2.
 - The transform stream cannot shrink without loss. 23% of the instances of the Japanese garden
   scene have a sheared model matrix, which a TRS encoding cannot hold.
 
@@ -153,7 +154,7 @@ slot run on a fourth page. The fifth batch of 1.5M holds 174,764 instances in a 
 
 | Scene | What a frame uploads | Surface share |
 |---|---|---|
-| Extract, setup | 49.3 MB: transform 5.3, shading 1.8, surface 42.2; plus 6.4 MB of material records | 86% of the stream bytes |
+| Extract, setup | 49.3 MB: transform 5.3, shading 1.8, surface 42.2; plus 8.0 MB of material records, 160 bytes after O1 | 86% of the stream bytes |
 | Extract.unchanged | 480,000 per frame: the transforms of 10,000 `DynamicTransform` spheres | 0 |
 | Extract.changed_1pct | 532,224 per frame: 480,000 plus a transform scatter of 1,000 entries (52 each) | 0 |
 | Shapes2D.dynamic_material | 640,000 per frame: shading of 10,000 shapes | 0 |
@@ -161,7 +162,7 @@ slot run on a fourth page. The fifth batch of 1.5M holds 174,764 instances in a 
 | Shapes2D.ui_tree_add_remove | 1,024 per frame for 1 added and 1 removed shape: segments of 68, 184 and 404 bytes (header and entries), each padded to 256 | 404 of 656 segment bytes |
 | Text.layout_10k | 51.2 MB per frame: transform 4.8, shading 8.0, surface 38.4 | 75% (74% over four frames) |
 | Text.changed_1pct | 92,000 per frame on average: transform and shading scatters of 675 glyphs | 0 |
-| Material.dynamic_material | 800,000 per frame: shading 160,000 and material records 640,000 | 0 |
+| Material.dynamic_material | 960,000 per frame: shading 160,000 and material records 800,000 | 0 |
 | Material.tint_subtree | 200,192 per frame: shading scatter of 10,000 entries (20 each) | 0 |
 | Transition.active_1000 | 2.97 MB over four frames; its batch key changes, so a run upload and a scatter of surfaces | 26% |
 | Spawn, 64 × 1,000 boxes | 57.6 MB in total for 28.7 MB of records: transform 6.3, shading 2.3, surface 49.0 | 85% |
@@ -335,7 +336,7 @@ instance has alpha 1 except in Material.blended_sort.
   64 → 56 after S2 (12.5%), and a shading scatter entry goes from 20 to 12 bytes.
   - Material.tint_subtree scatters 200,192 → about 120,000 per frame.
   - Material.dynamic_material uploads 160,000 → 80,000 of shading per frame, next to its
-    640,000 of material records (see O1).
+    800,000 of material records (see O1).
   - Render: one more dependent load in the vertex shader, for tinted instances only.
   - Touches `box_render_mesh_shading_t`, `box_draws_mesh_shading`, `instance.wgsl`,
     `mesh.wgsl`, `shadow.wgsl`, `transitions.c` and `transition.c`, which patch shading records
@@ -380,30 +381,44 @@ The 80 bytes per slot:
 
 ### O1. The material table
 
-`materials.c` gives every prefab, and every mesh shape that owns a material component, a record
-of its own. Records are not shared by content. Every bench scene sets `Rgb` per shape, so in
-those scenes each instance pays a 64 byte record in a buffer that doubles (`capacity`), next to
-its stream slots.
+`materials.c` gave every prefab, and every mesh shape that owns a material component, a record
+of its own. Records were not shared by content. Every bench scene sets `Rgb` per shape, so in
+those scenes each instance paid an 80 byte record (`box_render_material_t`) in a buffer that
+doubles (`capacity`), next to its stream slots. Measured before the change:
 
 | Scene | Records | Distinct contents | Buffer records | Buffer |
 |---|---|---|---|---|
-| Extract | 100,001 | 2 | 131,072 | 8.4 MB |
-| Material.tint_subtree | 110,001 | 3 | 131,072 | 8.4 MB |
-| Cull.many_batches_shadows | 20,001 | 2 | 32,768 | 2.1 MB |
-| Cull.town | 4,802 | 49 | 8,192 | 0.5 MB |
-| japanese_garden | 21,684 | 262 | 32,768 | 2.1 MB |
-| cheese_market | 19,028 | 130 | 32,768 | 2.1 MB |
-| spaceship (prefabs) | 330 | 39 | 512 | 0.03 MB |
+| Extract | 100,001 | 2 | 131,072 | 10.5 MB |
+| Material.tint_subtree | 110,001 | 3 | 131,072 | 10.5 MB |
+| Cull.many_batches_shadows | 20,001 | 2 | 32,768 | 2.6 MB |
+| Cull.town | 4,802 | 49 | 8,192 | 0.7 MB |
+| japanese_garden | 21,684 | 262 | 32,768 | 2.6 MB |
+| cheese_market | 19,028 | 130 | 32,768 | 2.6 MB |
+| spaceship (prefabs) | 330 | 39 | 512 | 0.04 MB |
 
-Deduplicating records by content, with reference counts, removes about 64 bytes per instance
-that owns its material. After S2 that is half of the mesh instance's GPU memory in these scenes.
-Extract's setup upload of 6.4 MB of records becomes 128 bytes. The cost is a hash on every
-material change. A shape whose material changes takes or creates another record. If the slot
-changes, its 16 byte shading scatters (a 20 byte entry), instead of the 64 byte record being
-repacked today. `DynamicMaterial` shapes and shapes with a running material transition keep a
-private record. They are repacked every frame (640,000 bytes per frame in
-Material.dynamic_material), and `transition.c` patches records by slot. Shader cost: none.
-Touches `materials.c`, `draw.h` and the material transition code. Effort: medium.
+Implemented: the table shares records by content, with reference counts. This removes about 80
+bytes per instance that owns its material. Prefabs, `DynamicMaterial` shapes and shapes with a
+running material transition keep private records, which `transition.c` patches by slot. Shader
+cost: none. The `materials`, `setup_material_bytes` and `material_bytes` counters of
+`bench/render` (release) report:
+
+| Scene | Records | Setup material upload | Per frame |
+|---|---|---|---|
+| Extract | 100,001 → 2 | 8,000,080 → 160 bytes | 0 |
+| Material.blended_sort, Material.tint_subtree | 110,001 → 3 | 8,800,080 → 240 bytes | 0 |
+| Material.dynamic_material | 110,001 → 10,002 | 8,800,080 → 800,160 bytes | 800,000 |
+
+The 10,000 shapes of Material.dynamic_material keep private records and upload 800,000 bytes per
+frame, as before. Frame timings did not change measurably: a steady frame hashes nothing.
+
+The content of a shape is hashed only when its material changes; the shape then takes or creates
+the record of its new content. A shape whose slot changes scatters only its 16 byte mesh shading
+(a 20 byte entry). When a material transition starts, the shape takes a private record, and when
+it ends, the shape returns to a shared record.
+
+Known cost: an inherited material transition gives every affected instance that owns a
+`MaterialId` a private record for its duration (`box_transition_material_walk`). N such
+instances upload N records per frame, and hash N records on the frame the transition ends.
 
 ### O2. Unused capacity of runs and pages
 
@@ -464,11 +479,12 @@ invocation: 97 words for a surface entry. That loop also shrinks with S1 and S2.
 A batch keeps a CPU copy of every stream of every slot (`transforms`, `shadings` or
 `mesh_shadings`, and `surfaces`). For a mesh slot that is 448 bytes, of which 384 are the
 surface. Every upload is copied into the packet data, then into the backend's write. The
-Extract setup packet carries 55.7 MB of data. `ShapeMesh` is another 464 bytes per entity, 400
-of which is `box_surface_data_t`. These copies do not reach the GPU, but they are on the path to
-it and count against memory: the 1M scenes did not fit in the job's 2 GiB. S1 and S2 drop the
-CPU surface copy of 2D and plain batches, saving 42 MB in Extract. `ShapeMesh` belongs to
-`box.geometry` and is out of scope here.
+Extract setup packet carried 57.3 MB of data before O1: 49.3 MB of streams and 8.0 MB of
+material records. With O1 the records take 160 bytes, and the packet carries 49.3 MB.
+`ShapeMesh` is another 464 bytes per entity, 400 of which is `box_surface_data_t`. These
+copies do not reach the GPU, but they are on the path to it and count against memory: the 1M
+scenes did not fit in the job's 2 GiB. S1 and S2 drop the CPU surface copy of 2D and plain
+batches, saving 42 MB in Extract. `ShapeMesh` belongs to `box.geometry` and is out of scope here.
 
 ## Ranked recommendations
 
@@ -483,9 +499,10 @@ Each item can become its own task. The savings use the measured scenes above.
    - Mesh slots go from 448 to 64 bytes, and mesh page memory and full uploads are 86% smaller.
    - Plain meshes skip the per vertex surface load.
    - Effort: medium. It reuses the zero buffer binding of item 1.
-3. **Deduplicate the material table by content (O1).**
-   - Removes the 64 byte record per instance of shapes that own their material: 100,001 → 2
+3. **Deduplicate the material table by content (O1).** Implemented.
+   - Removes the 80 byte record per instance of shapes that own their material: 100,001 → 2
      records in Extract, 4,802 → 49 in town.
+   - Extract's setup upload of material records goes from 8,000,080 to 160 bytes.
    - Effort: medium.
 4. **Copy grown pages and moved runs on the GPU instead of uploading them again (O3).**
    - Removes the repeated uploads of growth: spawning uploads half as much.
@@ -533,9 +550,6 @@ Rejected:
 - On a job with a GPU:
   - Time `Cull.town`, `Cull.shadows_100k` and `LargeBatch.instances_1m` before and after item 2,
     for the effect of the skipped surface load on the vertex stage. This was not measured here.
-- With item 3:
-  - Decide how a material transition takes a private record, and add tests for shapes that share
-    a record and then diverge.
 - With item 4:
   - Check that the `CopySrc` usage and `copyBufferToBuffer` on 128 MiB buffers behave on the
     Emscripten Dawn build as well as on wgpu-native.

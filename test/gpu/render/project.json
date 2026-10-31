@@ -375,7 +375,8 @@
                     "newly_valid_probe_hidden_until_baked",
                     "full_rebakes_keep_values",
                     "tint_rebakes_nothing",
-                    "bake_ignores_tint"
+                    "bake_ignores_tint",
+                    "same_transform_rebakes_nothing"
                 ]
             },
             {
@@ -875,7 +876,9 @@
                     "mesh_color_mid_transition",
                     "shape_ends_before_scatter_shader_compiles",
                     "clear_coat_mid_transition",
-                    "transmission_mid_transition"
+                    "transmission_mid_transition",
+                    "mesh_color_shared_slot_transition",
+                    "mesh_color_shared_slot_transition_back"
                 ]
             },
             {
@@ -906,6 +909,7 @@
                     "view_without_effects",
                     "occlusion_view_transmits",
                     "forward_passes_by_phase",
+                    "forward_passes_lit_no_prepass",
                     "two_formats_one_target",
                     "first_frame_not_dark"
                 ]

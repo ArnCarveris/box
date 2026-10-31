@@ -217,7 +217,8 @@ static box_transition_pending_t* box_transition_pending_get(
 }
 
 /** Whether ecs_ensure_id of Transition on a stage would put the map in a command value, so the
- * entity does not own Transition in the merged state.
+ * entity does not own Transition in the merged state. Only a stage defers: on the world pointer
+ * (also it->world) flecs runs the call at once, so nothing is pending and nothing is recorded.
  *
  * @param world The world or a stage
  * @param entity The entity

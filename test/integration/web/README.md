@@ -28,7 +28,27 @@ node test/integration/web/transitions.mjs \
     "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
 ```
 
-Before starting Chrome on macOS, both scripts check the `.app` bundle that contains the Chrome
+`transmission.mjs` checks that a rough transmissive shape is never dark in the browser before
+`etc/shaders/transmission.wgsl` compiles, the case `Transmission_first_frame_not_dark` of
+`test/gpu/render` simulates natively. It opens `test/integration/web/transmission.flecs` the same
+way, at the same fixed delta and size: a bright, flat emissive wall fills the view, and at frame
+30 the scene gives a tinted glass of roughness 1 and transmission factor 1 its box, which requests
+the transmission shader. The browser delivers the compile outcome after the frame, so the frames
+up to it sample the snapshot without the downsample pipeline. Before the page runs, the check
+replaces `requestAnimationFrame` so that it runs the frames of the main loop one at a time, with a
+screenshot after each, and wraps `createShaderModule`, `createRenderPipeline` and
+`getCurrentTexture` of WebGPU to record in which frame the transmission shader was created, its
+outcome arrived and its first pipeline was created, and which frame each screenshot shows. It
+passes when at least one frame showed the glass before that pipeline existed, the center of the
+glass is never black nor darker than its steady value (6 per channel), the image becomes steady
+and the log has no error and no invalid WebGPU object. It prints the frames and the centers:
+
+```sh
+node test/integration/web/transmission.mjs \
+    "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
+```
+
+Before starting Chrome on macOS, the scripts check the `.app` bundle that contains the Chrome
 executable (after resolving symlinks) for the `com.apple.quarantine` attribute
 (`xattr -p com.apple.quarantine <app>`).
 macOS holds a quarantined app, such as one installed by Homebrew, at its first launch check, and
