@@ -875,7 +875,9 @@
                     "mesh_color_mid_transition",
                     "shape_ends_before_scatter_shader_compiles",
                     "clear_coat_mid_transition",
-                    "transmission_mid_transition"
+                    "transmission_mid_transition",
+                    "mesh_color_shared_slot_transition",
+                    "mesh_color_shared_slot_transition_back"
                 ]
             },
             {
