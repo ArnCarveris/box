@@ -64,6 +64,8 @@ typedef struct box_render_gpu_stats_t {
                                  *   cull_instances, cull_ordered, cull_scan and cull_write,
                                  *   not the pyramid reductions nor the probe capture culls */
     int32_t cull_instance_dispatches; /**< cull_instances dispatches among cull_dispatches */
+    int32_t cull_page_slots;    /**< Most visible slots one cull page held, at most the
+                                 *   cull window unless one draw needs more */
     int32_t scatters;           /**< Scatter dispatches recorded */
     int32_t scattered;          /**< Instances the scatter dispatches copied */
     int32_t probes;             /**< Probes captured */

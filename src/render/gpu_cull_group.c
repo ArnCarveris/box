@@ -378,10 +378,10 @@ done:
     return;
 }
 
-/** Add the draws of a batch to the frustums of the group being added that draw it, with its
- * jobs and dispatches.
+/** Add the draws of a batch to some of the frustums of the group being added that draw it,
+ * with their jobs and dispatches.
  *
- * All its draws are in one page, so the scan words of its job are too. The early phase, or
+ * All these draws are in one page, so the scan words of their job are too. The early phase, or
  * the only one, tests every frustum of the mask in one job; a view that culls by occlusion
  * tests it again alone in a late job, the only job of its opaque 2D shapes.
  *
@@ -391,12 +391,12 @@ done:
  * @param packet The packet
  * @param group Index of the cull group
  * @param batch Index of the batch in the packet
- * @param mask Frustums of the group that draw it
+ * @param mask Frustums of the group that draw it, whose visible slots fit one page
  * @param filled Draws added to each frustum, updated
  * @param history History of the frustum with one, NULL for none
  * @param hist The frustum with a history, -1 for none
  */
-static void box_gpu_cull_batch_add(
+static void box_gpu_cull_batch_part(
     box_gpu_t *gpu,
     const box_render_packet_t *packet,
     int32_t group,
@@ -426,6 +426,9 @@ static void box_gpu_cull_batch_add(
     if (!pg || (pg->used && (uint64_t)pg->used + slots > c->window)) {
         pg = box_gpu_cull_page_next(c);
     }
+
+    ecs_assert(pg->used + slots <= c->window || box_gpu_cull_bits(mask) == 1,
+        ECS_INTERNAL_ERROR, NULL);
 
     for (f = 0; f < g->view_count; f ++) {
         if (!((mask >> f) & 1u)) {
@@ -492,6 +495,62 @@ static void box_gpu_cull_batch_add(
 
 done:
     return;
+}
+
+/** Add the draws of a batch to the frustums of the group being added that draw it, with its
+ * jobs and dispatches.
+ *
+ * Its draws in all the frustums of the mask go on one page when they fit the window. A large
+ * batch drawn by many frustums is split over parts of the mask instead, each a job on a page
+ * of its own, so that no page holds more than the window.
+ *
+ * The frustum with a history counts twice for its late phase. A part of one frustum may still
+ * exceed a lowered window.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ * @param group Index of the cull group
+ * @param batch Index of the batch in the packet
+ * @param mask Frustums of the group that draw it
+ * @param filled Draws added to each frustum, updated
+ * @param history History of the frustum with one, NULL for none
+ * @param hist The frustum with a history, -1 for none
+ */
+static void box_gpu_cull_batch_add(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet,
+    int32_t group,
+    int32_t batch,
+    uint32_t mask,
+    int32_t *filled,
+    box_gpu_cull_history_t *history,
+    int32_t hist)
+{
+    box_gpu_cull_t *c = &gpu->cull;
+    const box_render_batch_t *b = ecs_vec_get_t(&packet->batches, box_render_batch_t, batch);
+    const box_gpu_cull_group_t *g = ecs_vec_get_t(&c->groups, box_gpu_cull_group_t, group);
+    bool late = hist >= 0 && ((mask >> hist) & 1u) && b->view == -1 &&
+        b->pipeline == BOX_RENDER_SHADER_MESH;
+    uint32_t part = 0;
+    uint64_t slots = 0;
+    int32_t f;
+    for (f = 0; f < g->view_count; f ++) {
+        if (!((mask >> f) & 1u)) {
+            continue;
+        }
+
+        uint64_t own = (uint64_t)b->instance_count * ((late && f == hist) ? 2u : 1u);
+        if (part && slots + own > c->window) {
+            box_gpu_cull_batch_part(gpu, packet, group, batch, part, filled, history, hist);
+            part = 0;
+            slots = 0;
+        }
+
+        part |= 1u << f;
+        slots += own;
+    }
+
+    box_gpu_cull_batch_part(gpu, packet, group, batch, part, filled, history, hist);
 }
 
 /** Phases of the draws of a cull view, see box_gpu_cull_phase */
