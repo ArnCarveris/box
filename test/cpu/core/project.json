@@ -341,7 +341,11 @@
                     "observer_on_demand",
                     "deferred_first",
                     "prefab_instance",
-                    "deferred_later_batch"
+                    "deferred_later_batch",
+                    "warn_written_last",
+                    "warn_none_written_first",
+                    "warn_none_material",
+                    "warn_none_not_constructed"
                 ]
             },
             {

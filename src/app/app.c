@@ -429,6 +429,85 @@ static void box_app_set_at_add_type(
     }
 }
 
+static bool box_app_set_at_implied(
+    const ecs_world_t *world,
+    const ecs_type_t *type,
+    ecs_id_t id,
+    const ecs_type_info_t *ti,
+    const void *value);
+
+/** Components the engine computes and scripts do not write: one that another component adds
+ * with With and that still holds its constructed value is not reported as ambiguous. */
+static const char *box_app_set_at_computed[] = {
+    "box.material.MaterialId",
+    "box.layout.LayoutBounds",
+    "box.layout.LayoutContent",
+    "box.text.TextBounds",
+    "box.input.ActionState",
+    "box.ui.TextEditStatus",
+    NULL
+};
+
+/** Check whether a component is one the engine computes and scripts do not write.
+ *
+ * @param world The world
+ * @param id The component
+ * @return Whether the component is computed
+ */
+static bool box_app_set_at_is_computed(
+    const ecs_world_t *world,
+    ecs_id_t id)
+{
+    int32_t i;
+    for (i = 0; box_app_set_at_computed[i]; i ++) {
+        if (ecs_lookup(world, box_app_set_at_computed[i]) == id) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/** Warn, once per SetAt entity, when it had a component before SetAt was added that SetAt cannot
+ * tell was written: another of its components adds it with With and it holds its constructed
+ * value, as Position: {0, 0, 0} written before Rotation and SetAt. Such a component is not
+ * copied. Only components with reflection, which scripts can write, are reported.
+ *
+ * @param world The world
+ * @param e The SetAt entity
+ * @param before The type of the entity before SetAt was added
+ */
+static void box_app_set_at_warn(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    const ecs_type_t *before)
+{
+    const ecs_type_t *type = ecs_get_type(world, e);
+    int32_t i;
+    for (i = 0; i < before->count && type; i ++) {
+        ecs_id_t id = before->array[i];
+        if (ECS_IS_PAIR(id) || id == ecs_id(SetAt) || id == ecs_id(SetAtWritten) ||
+            id == EcsDisabled || !ecs_get(world, id, EcsType))
+        {
+            continue;
+        }
+
+        const ecs_type_info_t *ti = ecs_get_type_info(world, id);
+        const void *value = ti ? ecs_get_id(world, e, id) : NULL;
+        if (value && box_app_set_at_implied(world, type, id, ti, value) &&
+            !box_app_set_at_is_computed(world, id))
+        {
+            char *path = ecs_get_path(world, e);
+            char *component = ecs_get_path(world, id);
+            ecs_warn("SetAt of '%s' cannot tell whether %s was written before it: write SetAt "
+                "first in the body", path, component);
+            ecs_os_free(component);
+            ecs_os_free(path);
+            return;
+        }
+    }
+}
+
 /** Record the components a SetAt entity had before SetAt was added, as when a script body
  * writes SetAt after the other components.
  *
@@ -462,6 +541,7 @@ static void BoxAppSetAtOnAddRemove(
         SetAtWritten *w = ecs_get_mut(it->world, it->entities[i], SetAtWritten);
         if (w) {
             box_app_set_at_add_type(&w->before, before);
+            box_app_set_at_warn(it->world, it->entities[i], before);
         }
     }
 }

@@ -682,7 +682,10 @@ ms without it).
   (`transitions_2d_ui`). A scene cannot change a value after its first frame by itself, and the
   first value never animates, so each changes its values with `SetAt` (`box.app`) at frame 1,
   at the start of the second frame: an entity with `SetAt: {frame: 1, entity: ball}` and the
-  new values, which it copies to `ball` then. The harness runs three frames at the fixed delta of
+  new values, which it copies to `ball` then. `SetAt` is written first in each body: written
+  after a component that another adds with `With` and that holds its constructed value
+  (`Position: {0, 0, 0}` before `Rotation`), `SetAt` cannot tell it was written, does not copy
+  it and logs a warning. The harness runs three frames at the fixed delta of
   1/60 s, and every transition is linear over 0.05 s, so the rendered frame is one frame, a third
   of the way, into every transition, at a world time of 3/60 s. No scene reads the wall clock.
 - `test/integration/e2e/transitions.py`: through the shell of `apps/boxrun`, a `set` of
