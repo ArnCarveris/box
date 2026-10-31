@@ -319,7 +319,9 @@ void TransitionShadow_group_parent(void) {
 /** Check the regions of a caster 3 units out along x and a NoShadow box 20 units out along -x,
  * both plain children of a parent without a shape that turns about y and is sent back halfway:
  * the regions of each frame hold the pose the caster renders and stay within -5.5 to 5.5, which
- * no region of the NoShadow child is.
+ * no region of the NoShadow child is. The parent has OrderedChildren, so the walk, which lists
+ * children with ecs_children, meets them in the order they were created; without it both
+ * children would be listed table by table and the caster would always come first.
  *
  * @param no_shadow_first Whether the NoShadow child is created before the caster
  */
@@ -333,6 +335,7 @@ static void tr_shadow_mixed(
     ecs_entity_t parent = ecs_new(world);
     ecs_entity_t caster = 0, hidden = 0;
     int32_t i;
+    ecs_add_id(world, parent, EcsOrderedChildren);
     ecs_set(world, parent, Position, {0, 0, 0});
     ecs_set(world, parent, Rotation, {0, 0, 0});
     if (no_shadow_first) {
@@ -344,6 +347,13 @@ static void tr_shadow_mixed(
         hidden = tr_shape(world, parent, -20);
         ecs_add(world, hidden, NoShadow);
     }
+
+    ecs_iter_t it = ecs_children(world, parent);
+    test_assert(ecs_children_next(&it));
+    test_int(it.count, 2);
+    test_assert(it.entities[0] == (no_shadow_first ? hidden : caster));
+    test_assert(it.entities[1] == (no_shadow_first ? caster : hidden));
+    test_assert(!ecs_children_next(&it));
 
     box_transition_set(world, parent, ecs_id(Rotation), &(TransitionSpec){
         .duration = 1.0f, .timing_function = EaseInOut });
@@ -384,7 +394,7 @@ static void tr_shadow_mixed(
     tr_fini(world, null);
 }
 
-/* A turning parent with a caster child and a NoShadow child, created in either order: the mark
+/* A turning parent with a caster child and a NoShadow child, walked in either order: the mark
  * of the caster reaches the parent whichever sibling the walk meets first, and the NoShadow
  * child adds no region */
 void TransitionShadow_mixed_children(void) {
