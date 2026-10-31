@@ -35,7 +35,7 @@
 #define SURFACE ((int64_t)sizeof(box_render_surface_t))
 
 /** Slots of the smallest run, BOX_DRAWS_MIN_CAPACITY of the extract */
-#define MIN_RUN ((int64_t)64)
+#define MIN_RUN ((int64_t)16)
 
 /** Create a world that renders with a null backend and has a view.
  *

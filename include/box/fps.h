@@ -35,11 +35,9 @@ extern "C" {
 /** Path of the panel, anchored to the top right of the surface */
 #define BOX_FPS_PANEL "fps.ui.screen.panel"
 
-/** Path of the text line above the chart: the fps and the last frame time */
-#define BOX_FPS_LABEL "fps.ui.screen.panel.header.label"
-
-/** Path of the chart. Its children are the strip "bars", the reference lines line_60 and line_30
- * and their labels mark_60 and mark_30. bar_N in the strip draws FrameSamples.interval[N]. */
+/** Path of the chart. Its children are the strip "bars", the reference lines line_60, line_30 and
+ * line_0, at the top, and their labels mark_60, mark_30 and mark_0. bar_N in the strip draws
+ * FrameSamples.interval[N]. */
 #define BOX_FPS_CHART "fps.ui.screen.panel.chart"
 
 /** Width of the panel in points */
@@ -54,8 +52,9 @@ extern "C" {
 /** Bars of the chart, one per frame, the newest on the right */
 #define BOX_FPS_BARS BOX_FRAME_WINDOW
 
-/** Frame time at the top of the chart in milliseconds; longer frames are clamped to it */
-#define BOX_FPS_CHART_MS (40.0)
+/** Rate at the bottom of the chart in fps. The vertical axis of the chart is linear in fps, from
+ * this rate at the bottom to 0 fps at the top. */
+#define BOX_FPS_CHART_FPS (120.0)
 
 /** Milliseconds a frame may exceed 1000 / 60 and stay green, for the jitter of vsync */
 #define BOX_FPS_TOLERANCE_MS (0.5)
@@ -89,9 +88,13 @@ rgb box_fps_bar_color(
 
 /** Get the height of the bar of a frame in a chart.
  *
+ * The height is linear in the fps of the frame, 1000 / interval_ms: 0 fps at the top of the chart
+ * and BOX_FPS_CHART_FPS at the bottom, so a longer frame always draws a taller bar.
+ *
  * @param interval_ms The wall time of the frame in milliseconds
  * @param chart_height Height of the chart in points
- * @return The height in points, chart_height at BOX_FPS_CHART_MS and over, 0 without a time
+ * @return The height in points, chart_height * (1 - fps / BOX_FPS_CHART_FPS), under chart_height;
+ * 1 point at BOX_FPS_CHART_FPS and faster, 0 without a time
  */
 float box_fps_bar_height(
     double interval_ms,

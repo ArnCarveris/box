@@ -159,7 +159,6 @@ void FpsPanel_open_creates_view(void) {
     ecs_entity_t panel = ecs_lookup(world, BOX_FPS_PANEL);
     test_assert(panel != 0);
     test_assert(ecs_has(world, panel, Rect));
-    test_assert(ecs_lookup(world, BOX_FPS_LABEL) != 0);
     test_assert(ecs_lookup(world, BOX_FPS_CHART) != 0);
     fps_bar(world, 0);
     fps_bar(world, BOX_FPS_BARS - 1);
@@ -167,6 +166,8 @@ void FpsPanel_open_creates_view(void) {
     test_assert(ecs_lookup(world, BOX_FPS_CHART ".line_30") != 0);
     test_assert(ecs_lookup(world, BOX_FPS_CHART ".mark_60") != 0);
     test_assert(ecs_lookup(world, BOX_FPS_CHART ".mark_30") != 0);
+    test_assert(ecs_lookup(world, BOX_FPS_CHART ".line_0") != 0);
+    test_assert(ecs_lookup(world, BOX_FPS_CHART ".mark_0") != 0);
 
     const Rect *chart = ecs_get(world, ecs_lookup(world, BOX_FPS_CHART), Rect);
     ecs_entity_t newest = fps_bar(world, BOX_FPS_BARS - 1);
@@ -355,12 +356,17 @@ void FpsPanel_bar_colors(void) {
 void FpsPanel_bar_height_clamp(void) {
     // fps/panel
     test_flt(box_fps_bar_height(0, 80), 0);
-    test_flt(box_fps_bar_height(BOX_FPS_CHART_MS * 0.25, 80), 20);
-    test_flt(box_fps_bar_height(BOX_FPS_CHART_MS * 0.5, 80), 40);
-    test_flt(box_fps_bar_height(BOX_FPS_CHART_MS, 80), 80);
-    test_flt(box_fps_bar_height(BOX_FPS_CHART_MS * 2, 80), 80);
-    test_flt(box_fps_bar_height(1000, 80), 80);
-    test_assert(box_fps_bar_height(1000.0 / 30.0, 80) < 80);
+    test_flt(box_fps_bar_height(-5, 80), 0);
+    test_flt(box_fps_bar_height(1000.0 / 60.0, 80), 40);
+    test_flt(box_fps_bar_height(1000.0 / 30.0, 80), 60);
+    test_flt(box_fps_bar_height(1000.0 / BOX_FPS_CHART_FPS, 80), 1);
+    test_flt(box_fps_bar_height(1000.0 / 240.0, 80), 1);
+    test_flt(box_fps_bar_height(0.1, 80), 1);
+    test_assert(box_fps_bar_height(100, 80) < 80);
+    test_assert(box_fps_bar_height(1000, 80) < 80);
+    test_assert(box_fps_bar_height(100000, 80) < 80);
+    test_assert(box_fps_bar_height(100, 80) < box_fps_bar_height(1000, 80));
+    test_assert(box_fps_bar_height(1000, 80) < box_fps_bar_height(10000, 80));
     test_assert(box_fps_bar_height(1000.0 / 60.0, 80) <
         box_fps_bar_height(1000.0 / 30.0, 80));
 }
@@ -506,19 +512,14 @@ void FpsPanel_bars_follow_samples(void) {
         const Rect *r = ecs_get(world, bar, Rect);
         test_assert(r != NULL);
         test_assert(r->height > 0);
-        test_assert(r->height >= top || i == 4);
+        test_assert(r->height > top);
         top = r->height;
     }
 
-    const Rect *slow = ecs_get(world, fps_bar(world, BOX_FPS_BARS - 2), Rect);
+    const Rect *chart = ecs_get(world, ecs_lookup(world, BOX_FPS_CHART), Rect);
     const Rect *hitch = ecs_get(world, fps_bar(world, BOX_FPS_BARS - 1), Rect);
-    test_flt(hitch->height, slow->height);
+    test_assert(hitch->height < chart->height);
     test_flt(ecs_get(world, fps_bar(world, 0), Rect)->height, 0);
-
-    const Text *t = ecs_get(world, ecs_lookup(world, BOX_FPS_LABEL), Text);
-    test_assert(t != NULL && t->value != NULL);
-    test_assert(strstr(t->value, " fps") != NULL);
-    test_assert(strstr(t->value, "400.0 ms") != NULL);
 
     ecs_fini(world);
 }
@@ -554,9 +555,8 @@ void FpsPanel_bars_reused(void) {
         bars[i] = fps_bar(world, i);
     }
 
-    ecs_entity_t label = ecs_lookup(world, BOX_FPS_LABEL);
     test_assert(strip != 0);
-    test_int(fps_children(world, chart), 5);
+    test_int(fps_children(world, chart), 7);
     test_int(fps_children(world, strip), BOX_FPS_BARS);
     for (int32_t f = 0; f < 10; f ++) {
         FrameSamples *samples = ecs_singleton_get_mut(world, FrameSamples);
@@ -569,13 +569,13 @@ void FpsPanel_bars_reused(void) {
         test_assert(fps_bar(world, i) == bars[(i + 10) % BOX_FPS_BARS]);
     }
 
-    test_assert(ecs_lookup(world, BOX_FPS_LABEL) == label);
     fps_check_bar_color(world, fps_bar(world, BOX_FPS_BARS - 1), BOX_FPS_GREEN);
     fps_check_bar_color(world, fps_bar(world, BOX_FPS_BARS - 2), BOX_FPS_RED);
-    test_int(fps_children(world, chart), 5);
+    test_int(fps_children(world, chart), 7);
     test_int(fps_children(world, strip), BOX_FPS_BARS);
-    test_assert(!ecs_has(world, ecs_get_parent(world, label), Layout));
     test_assert(!ecs_has(world, chart, Layout));
+    test_assert(!ecs_has(world, strip, Layout));
+    test_assert(!ecs_has(world, fps_bar(world, 0), Layout));
 
     ecs_fini(world);
 }

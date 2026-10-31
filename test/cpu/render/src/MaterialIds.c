@@ -62,6 +62,21 @@ static box_render_draws_stats_t frame(
     return stats;
 }
 
+/** Get the bytes of a scatter segment of COUNT entries as the extract aligns it.
+ *
+ * @param stride Bytes of one record of the stream
+ * @return The bytes
+ */
+static int64_t scatter_bytes(
+    int64_t stride)
+{
+    int64_t size = BOX_RENDER_SCATTER_HEADER * (int64_t)sizeof(uint32_t) +
+        COUNT * ((int64_t)sizeof(uint32_t) + stride);
+
+    return (size + BOX_RENDER_SCATTER_ALIGN - 1) / BOX_RENDER_SCATTER_ALIGN *
+        BOX_RENDER_SCATTER_ALIGN;
+}
+
 /** Get the state of the batches of a world.
  *
  * @param world The world
@@ -210,13 +225,14 @@ void MaterialIds_prefab_instances_share_slot(void) {
         instance_new(world, prefab, (float)(COUNT + i));
     }
 
-    /* The batch outgrows its run: the GPU copies the instances it had, the new ones upload */
+    /* The batch outgrows its run, which grows in place at the top of its page: nothing is
+     * copied and the new instances scatter, a slot word and the record each */
     stats = frame(world);
     test_int(stats.materials, 2);
     test_int(stats.material_bytes, 0);
-    test_int(stats.transform_bytes, COUNT * TRANSFORM);
-    test_int(stats.shading_bytes, COUNT * SHADING);
-    test_int(stats.copies, BOX_RENDER_INSTANCE_STREAMS_PLAIN);
+    test_int(stats.transform_bytes, scatter_bytes(TRANSFORM));
+    test_int(stats.shading_bytes, scatter_bytes(SHADING));
+    test_int(stats.copies, 0);
 
     ecs_fini(world);
     box_render_null_free(null);

@@ -192,6 +192,56 @@ void Shell_run_command_error(void) {
     ecs_fini(world);
 }
 
+void Shell_run_multi_results(void) {
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    bool error = true;
+    // Each key_press returns the frames until the input queue is drained
+    char *out = box_command_run(world, s, "key_press W 2; key_press A 1", &error);
+    test_bool(error, false);
+    test_str(out, "3\n4");
+    ecs_os_free(out);
+
+    ecs_fini(world);
+}
+
+void Shell_run_multi_no_result(void) {
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    bool error = true;
+    char *out = box_command_run(world, s, "clipboard_set text; key_press W 2", &error);
+    test_bool(error, false);
+    test_str(out, "3");
+    ecs_os_free(out);
+
+    error = true;
+    // The queue of the first line is still pending, the key is released two frames later
+    out = box_command_run(world, s, "key_press W 2; clipboard_set text", &error);
+    test_bool(error, false);
+    test_str(out, "5");
+    ecs_os_free(out);
+
+    ecs_fini(world);
+}
+
+void Shell_run_multi_error(void) {
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    bool error = false;
+    char *out = box_command_run(world, s, "key_press W 2; key_press Nope", &error);
+    test_bool(error, true);
+    test_str(out, BOX_COMMAND_ERROR "unknown key 'Nope'");
+    ecs_os_free(out);
+
+    ecs_fini(world);
+}
+
 void Shell_run_missing_argument(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);

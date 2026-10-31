@@ -225,10 +225,11 @@ path.
   compilers are likely to keep the full copy today. The new check costs one `arrayLength` and a
   compare. This could not be timed without a GPU. Cull is unchanged, since it reads only
   transforms. Scatter loses the surface segments of mesh pages.
-- Slots per page: the chunk is derived from the surface stride (`BOX_DRAWS_CHUNK`), so plain
-  batches still split at 349,525 instances. A follow-up can derive the chunk per store from the
-  store's largest stride. 128 MiB / 48 gives 2,796,202 slots, so the 1M box scenes become one
-  batch and one cull job range.
+- Slots per page: the chunk was derived from the surface stride (`BOX_DRAWS_CHUNK`), so plain
+  batches still split at 349,525 instances. Done in the StoreChunkSize follow-up: each store
+  derives its chunk from its own largest stride (`box_draws_layout_chunk`), 128 MiB / 48 =
+  2,796,202 slots for plain meshes, 128 MiB / 64 = 2,097,152 for 2D and 349,525 for surfaces,
+  so the 1M box scenes are one batch, one page and one cull job range.
 - Touches `draw.h` (key, stores), `draw.c` (`box_draws_key`, store setup), `batch.c` (store
   choice, the `surfaces` vector only for surface batches), `gpu_draw.c` (the bind group),
   `mesh.wgsl`, `shadow.wgsl` and `include/instance.wgsl` (docs), and the `InstanceStreams` tests.
@@ -443,6 +444,44 @@ slots, can be reduced as follows:
 
 Each of these makes runs move and pages grow more often. Without O3 that means more full
 re-uploads, so O3 should come first.
+
+Implemented: runs and page buffers grow by 1.5 (`box_draws_grow`, `box_draws_store_reserve`),
+rounded up to 4 slots (`BOX_DRAWS_GROW_ALIGN`), and the minimum run is 16 slots. Run steps are
+16, 24, 36, 56, 84, 128, 192, ... A page's first buffers hold just its top; a page that outgrows
+them grows by half, or to its top when that is more, up to the slots of the page. A batch whose
+run ends at the top of its page extends the run in place (`box_draws_store_extend`) instead of
+moving: nothing is copied and no hole is left. Without that, the extra moves of the smaller
+steps left more holes: the spawn scene ended at 146,412 slots instead of 131,072, with 10 moves
+instead of 6.
+
+Measured with the backend that drops packets, before and after (slots, then page bytes):
+
+| Case | Before | After | 4,096 slot pages |
+| --- | --- | --- | --- |
+| Extract (110,000 instances) | 262,144, 16.8 MB | 137,568, 8.8 MB | 139,264, 8.9 MB |
+| Text.layout_10k (110,000 glyphs) | 131,072, 14.7 MB | 126,468, 14.2 MB | 126,976, 14.2 MB |
+| Shapes2D.dynamic_material | 262,144, 29.4 MB | 137,568, 15.4 MB | 139,264, 15.6 MB |
+| Shapes2D.changed_1pct | 131,072, 14.7 MB | 126,468, 14.2 MB | 126,976, 14.2 MB |
+| Shapes2D.ui_tree_idle | 16,384, 1.8 MB | 11,100, 1.2 MB | 12,288, 1.4 MB |
+| Shapes2D.clipped_1000_moving_clips | 1,024, 115 KB | 1,460, 164 KB | 4,096, 459 KB |
+| Parametric.extract_spaceship_size (8,792 instances) | 32,768, 8.4 MB | 13,880, 1.9 MB | 16,384, 2.6 MB |
+| Spawn, 64 × 1,000 boxes | 131,072, 8.4 MB | 84,312, 5.4 MB | 86,016, 5.5 MB |
+
+Text and Shapes2D.changed_1pct hold one batch of 110,000, whose run step is 126,468. The 1,000
+shapes of clipped_1000_moving_clips fall just past the step of 972, so their run of 1,460 is
+larger than the power of two; the factor of 1.5 bounds a run to 1.5 times its count instead of 2.
+
+The spawn scene moved its run 6 times before (12 copies of 4.0 MB) and grew its page 6 times
+(8.2 MB kept); after, nothing moves and the page grows 10 times (10.6 MB kept), so the GPU moves
+fewer bytes in total. Extract's setup creates every instance in its first frame and neither
+moves a run nor grows a page, before or after.
+
+The factor of 1.5 was chosen over 4,096 slot steps by these numbers: it holds as few or fewer
+slots in every case, most of all for small pages, which 4,096 slot steps round up to at least
+4,096 slots. With runs growing by half, the page tops jump past several 4,096 slot steps at
+once, so the steps save no growth either (7 against 10 in the spawn scene, 11.0 against 10.6 MB
+kept). A page whose top grows in small steps would be created again every 4,096 slots, so its
+copies grow with the square of its slots; with 1.5 the copied bytes stay below twice its size.
 
 ### O3. Full re-uploads when a run moves or a page grows
 

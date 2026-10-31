@@ -826,6 +826,101 @@ void ConsoleOutput_find_match(void) {
     ecs_fini(world);
 }
 
+void ConsoleOutput_multi_grep_i_first(void) {
+    // console/output
+    ecs_world_t *world = output_world();
+    ecs_entity_t e = ecs_entity(world, { .name = "alpha" });
+    output_label(world, e, "Alpha alphabet");
+    ecs_entity(world, { .name = "things.alps.one" });
+    output_run(world, "grep_i Alph; tree things");
+
+    // The grep_i result is case folded and marked as when grep_i runs alone
+    const ConsoleOutput *o = output_colors(world);
+    ecs_entity_t name = output_find(world, "alpha", true);
+    output_check(world, name, 0, 4, &o->match);
+    output_check(world, name, 4, 5, &o->entity);
+    ecs_entity_t row = output_find(world, "alpha  Label: ", false);
+    output_check(world, row, 0, 5, &o->entity);
+    output_check_part(world, row, "Alph", &o->match);
+    const char *text = output_text(world, row);
+    const char *alphabet = strstr(text, "alphabet");
+    test_assert(alphabet != NULL);
+    output_check(world, row, (int32_t)(alphabet - text), (int32_t)(alphabet - text) + 4,
+        &o->match);
+
+    // The tree result is formatted as when tree runs alone, without match spans
+    ecs_entity_t alps = output_find(world, "alps", true);
+    output_check(world, alps, 0, 4, &o->entity);
+    ecs_entity_t one = output_find(world, "`- one", true);
+    output_check(world, one, 0, 3, &o->dim);
+    output_check(world, one, 3, 6, &o->entity);
+
+    ecs_fini(world);
+}
+
+void ConsoleOutput_multi_grep_i_second(void) {
+    // console/output
+    ecs_world_t *world = output_world();
+    ecs_entity_t e = ecs_entity(world, { .name = "alpha" });
+    output_label(world, e, "Alpha alphabet");
+    ecs_entity(world, { .name = "things.alps.one" });
+    output_run(world, "tree things; grep_i Alph");
+
+    // The tree result is formatted as when tree runs alone
+    const ConsoleOutput *o = output_colors(world);
+    ecs_entity_t alps = output_find(world, "alps", true);
+    output_check(world, alps, 0, 4, &o->entity);
+    ecs_entity_t one = output_find(world, "`- one", true);
+    output_check(world, one, 0, 3, &o->dim);
+    output_check(world, one, 3, 6, &o->entity);
+
+    // The grep_i result is case folded and marked as when grep_i runs alone
+    ecs_entity_t name = output_find(world, "alpha", true);
+    output_check(world, name, 0, 4, &o->match);
+    output_check(world, name, 4, 5, &o->entity);
+    ecs_entity_t row = output_find(world, "alpha  Label: ", false);
+    output_check(world, row, 0, 5, &o->entity);
+    output_check_part(world, row, "Alph", &o->match);
+    const char *text = output_text(world, row);
+    const char *alphabet = strstr(text, "alphabet");
+    test_assert(alphabet != NULL);
+    output_check(world, row, (int32_t)(alphabet - text), (int32_t)(alphabet - text) + 4,
+        &o->match);
+
+    ecs_fini(world);
+}
+
+void ConsoleOutput_multi_find(void) {
+    // console/output
+    ecs_world_t *world = output_world();
+    ecs_entity(world, { .name = "alps.alpha" });
+    ecs_entity(world, { .name = "alps.beta" });
+
+    // A find second in the line marks its name matches
+    const ConsoleOutput *o = output_colors(world);
+    output_run(world, "ls alps; find alp");
+    ecs_entity_t alpha = output_find(world, "alps.alpha", true);
+    output_check(world, alpha, 0, 5, &o->dim);
+    output_check(world, alpha, 5, 8, &o->match);
+    output_check(world, alpha, 8, 10, &o->entity);
+
+    // A find first in the line does not mark the result of the next command
+    output_run(world, "find alp ; ls alps");
+    alpha = output_find(world, "alps.alpha", true);
+    output_check(world, alpha, 0, 5, &o->dim);
+    output_check(world, alpha, 5, 10, &o->entity);
+    ecs_entity_t beta = output_find(world, "alps.beta", true);
+    output_check(world, beta, 0, 5, &o->dim);
+    output_check(world, beta, 5, 9, &o->entity);
+
+    output_run(world, "find alp; ls alps");
+    alpha = output_find(world, "alps.alpha", true);
+    output_check(world, alpha, 0, 5, &o->dim);
+    output_check(world, alpha, 5, 10, &o->entity);
+
+    ecs_fini(world);
+}
+
 void ConsoleOutput_find_match_escaped(void) {
     // console/output
     ecs_world_t *world = output_world();

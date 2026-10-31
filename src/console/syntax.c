@@ -566,6 +566,62 @@ char* box_console_syntax_token(
     return result;
 }
 
+bool box_console_syntax_split(
+    const char *line,
+    int32_t at,
+    int32_t *start,
+    int32_t *end)
+{
+    while (box_console_syntax_space(line[at]) || line[at] == ';') {
+        at ++;
+    }
+
+    bool result = line[at] != '\0';
+    start[0] = at;
+    while (result) {
+        int32_t depth = 0;
+        while (box_console_syntax_space(line[at])) {
+            at ++;
+        }
+
+        if (!line[at] || line[at] == ';') {
+            break;
+        }
+
+        if (!strncmp(&line[at], "```", 3)) {
+            const char *close = strstr(&line[at + 3], "```");
+            at = close ? (int32_t)(close - line) + 3 : (int32_t)strlen(line);
+        } else if (line[at] == '"') {
+            at = box_console_syntax_skip_string(line, at);
+        } else {
+            while (line[at] &&
+                (depth > 0 || (!box_console_syntax_space(line[at]) && line[at] != ';')))
+            {
+                if (line[at] == '"') {
+                    at = box_console_syntax_skip_string(line, at);
+                    continue;
+                }
+
+                if (line[at] == '(' || line[at] == '{' || line[at] == '[') {
+                    depth ++;
+                } else if ((line[at] == ')' || line[at] == '}' || line[at] == ']') && depth) {
+                    depth --;
+                }
+
+                at ++;
+            }
+        }
+    }
+
+    while (at > start[0] && box_console_syntax_space(line[at - 1])) {
+        at --;
+    }
+
+    end[0] = at;
+
+    return result;
+}
+
 bool box_console_syntax_word_at(
     const char *line,
     int32_t cursor,

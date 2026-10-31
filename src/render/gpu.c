@@ -744,6 +744,10 @@ void box_gpu_stats_publish(
     s->instance_binds += p->instance_binds;
     s->cull_dispatches += p->cull_dispatches;
     s->cull_instance_dispatches += p->cull_instance_dispatches;
+    if (p->cull_page_slots > 0) {
+        s->cull_page_slots = p->cull_page_slots;
+    }
+
     s->scatters += p->scatters;
     s->scattered += p->scattered;
     s->cull_ns += p->cull_ns;

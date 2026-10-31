@@ -17,7 +17,7 @@
 #define ENTRY ((int64_t)sizeof(uint32_t) + (int64_t)sizeof(box_render_transform_t))
 
 /** Slots of the smallest run, BOX_DRAWS_MIN_CAPACITY of the extract */
-#define MIN_RUN (64u)
+#define MIN_RUN (16u)
 
 /** Bytes of one instance in the transform stream */
 #define STRIDE ((uint32_t)sizeof(box_render_transform_t))
@@ -675,9 +675,9 @@ void InstanceStore_page_memory_mesh_and_2d(void) {
     box_render_draws_stats_t stats = frame(world);
     test_int(stats.pages, 2);
 
-    /* Three mesh runs of MIN_RUN slots end at 3 * MIN_RUN, so the mesh page buffers double
-     * from MIN_RUN to 4 * MIN_RUN slots; the 2D batch fits the smallest buffer */
-    int64_t mesh = 4 * MIN_RUN, shape2d = MIN_RUN;
+    /* Three mesh runs of MIN_RUN slots end at 3 * MIN_RUN, which the first mesh page buffers
+     * hold exactly; the 2D batch fits the smallest buffer */
+    int64_t mesh = 3 * MIN_RUN, shape2d = MIN_RUN;
     int64_t transform = (mesh + shape2d) * (int64_t)sizeof(box_render_transform_t);
     int64_t shading = mesh * (int64_t)sizeof(box_render_mesh_shading_t) +
         shape2d * (int64_t)sizeof(box_render_shading_t);
@@ -767,8 +767,8 @@ void InstanceStore_grown_page_keeps_instances(void) {
         test_assert(!(desc->usage & BOX_RENDER_BUFFER_KEEP));
     }
 
-    /* A second batch takes the run after the first, so the page buffers double; they keep the
-     * instances of the first batch, which uploads nothing */
+    /* A second batch takes the run after the first, so the page buffers grow to its end, more
+     * than half again; they keep the instances of the first batch, which uploads nothing */
     for (i = 0; i < 3; i ++) {
         shape_new(world, 4, (float)i, false);
     }
@@ -824,10 +824,15 @@ void InstanceStore_moved_run_copies_instances(void) {
         shape_new(world, 3, (float)i, false);
     }
 
-    /* The first batch moves from slot 0 to slot 128, past the second batch, and the page grows
-     * from 128 to 256 slots in the same frame */
+    /* The first batch moves from slot 0 to a run of 24 slots at slot 32, past the second batch,
+     * and the page grows from 32 to 56 slots in the same frame */
     box_render_draws_stats_t stats = frame(world);
     test_uint(batch_of(null, MIN_RUN + 2)->first_instance, MIN_RUN * 2);
+    for (s = 0; s < STREAMS; s ++) {
+        test_uint(created(null, PAGE(0) + (uint32_t)s)->size,
+            (uint64_t)(MIN_RUN * 2 + 24) * stride_of(s));
+    }
+
     test_int(ecs_vec_count(&null->last.copies), STREAMS);
     test_int(stats.copies, STREAMS);
     test_int(stats.copy_bytes, 2 * INSTANCE);
@@ -874,6 +879,8 @@ void InstanceStore_moved_run_scatters_copied_changes(void) {
         first[i] = shape_new(world, 3, (float)i, false);
     }
 
+    /* A second batch above the first, so the first moves instead of growing in place */
+    shape_new(world, 4, 0, false);
     frame(world);
     ecs_set(world, first[1], Position, {1, 3, 0});
     for (i = 0; i < (int32_t)MIN_RUN; i ++) {
@@ -923,10 +930,14 @@ void InstanceStore_moved_out_of_released_page_uploads(void) {
     box_render_null_t *null;
     ecs_world_t *world = world_new(&null);
     box_render_draws_page(world, (int32_t)MIN_RUN * 2);
+    ecs_entity_t third[2];
     int32_t i, j;
-    for (i = 0; i < 3; i ++) {
+    for (i = 0; i < 4; i ++) {
         for (j = 0; j < 2; j ++) {
-            shape_new(world, 3 + i, (float)j, false);
+            ecs_entity_t e = shape_new(world, 3 + i, (float)j, false);
+            if (i == 2) {
+                third[j] = e;
+            }
         }
     }
 
@@ -934,10 +945,19 @@ void InstanceStore_moved_out_of_released_page_uploads(void) {
     test_int(stats.pages, 2);
     test_uint(batch_of(null, 2) != NULL, true);
 
-    /* The third batch, alone in page 1, outgrows its run and fits no page: it moves to page 2
-     * and page 1 is released before the copies would run, so it uploads every instance */
+    /* Without the third batch, the fourth is alone in page 1, above a hole */
+    for (j = 0; j < 2; j ++) {
+        ecs_delete(world, third[j]);
+    }
+
+    stats = frame(world);
+    test_int(stats.pages, 2);
+
+    /* The fourth batch outgrows its run, which cannot grow in place past the slots of the page
+     * and fits no page: it moves to page 2 and page 1 is released before the copies would run,
+     * so it uploads every instance */
     for (i = 0; i < (int32_t)MIN_RUN; i ++) {
-        shape_new(world, 5, (float)i, false);
+        shape_new(world, 6, (float)i, false);
     }
 
     stats = frame(world);
@@ -1165,10 +1185,10 @@ void InstanceStore_every_surface_kind_uses_surface_store(void) {
     test_store_of(world, box, false);
     test_store_of(world, polygon, false);
     test_store_of(world, sphere, false);
-    /* Seven runs of MIN_RUN slots end at 7 * MIN_RUN, so the surface page buffers double from
-     * MIN_RUN to 8 * MIN_RUN slots */
+    /* Seven runs of MIN_RUN slots end at 7 * MIN_RUN, which the first surface page buffers
+     * hold exactly */
     test_int(stats.surface_bytes, 7 * SURFACE);
-    test_int(stats.page_surface_bytes, 8 * MIN_RUN * SURFACE);
+    test_int(stats.page_surface_bytes, 7 * MIN_RUN * SURFACE);
 
     ecs_fini(world);
     box_render_null_free(null);
@@ -1260,6 +1280,290 @@ void InstanceStore_shape_moves_to_surface_store_and_back(void) {
     test_uint(batch_page(null, SURFACE_PAGE(0))->first_instance, 0);
     test_int(buffer_ops(null, BOX_RENDER_CREATE, SURFACE_PAGE(0) + BOX_RENDER_STREAM_SURFACE), 0);
     test_int(uploads_at(null, SURFACE_PAGE(0) + BOX_RENDER_STREAM_SURFACE, 0), 1);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** Each store derives its chunk from the largest stride of its layout, so that no page buffer
+ * exceeds 128 MiB: 2D pages from the 2D shading, plain mesh pages from the transform and
+ * surface pages from the surface record. */
+void InstanceStore_store_chunk_from_largest_stride(void) {
+    // gpu_instance_data/store_chunk_size
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    box_render_draws_t *d = box_draws_state(world);
+    uint32_t page = 128u << 20, i;
+    uint32_t mesh = (uint32_t)(sizeof(box_render_transform_t) >
+        sizeof(box_render_mesh_shading_t) ? sizeof(box_render_transform_t) :
+        sizeof(box_render_mesh_shading_t));
+    uint32_t shape2d = (uint32_t)(sizeof(box_render_transform_t) >
+        sizeof(box_render_shading_t) ? sizeof(box_render_transform_t) :
+        sizeof(box_render_shading_t));
+    test_uint(mesh, 48);
+    test_uint(shape2d, 64);
+    test_uint(d->stores[BOX_DRAWS_STORE_MESH].chunk, page / mesh);
+    test_uint(d->stores[BOX_DRAWS_STORE_MESH].chunk, 2796202);
+    test_uint(d->stores[BOX_DRAWS_STORE_2D].chunk, page / shape2d);
+    test_uint(d->stores[BOX_DRAWS_STORE_2D].chunk, 2097152);
+    test_uint(d->stores[BOX_DRAWS_STORE_SURFACE].chunk, page / SURFACE);
+    test_uint(d->stores[BOX_DRAWS_STORE_SURFACE].chunk, 349525);
+    test_uint(BOX_DRAWS_CHUNK, 349525);
+    for (i = 0; i < BOX_DRAWS_STORES; i ++) {
+        const box_draw_store_t *s = &d->stores[i];
+        test_uint(s->slots, s->chunk);
+        test_uint(s->max, s->chunk);
+        for (int32_t j = 0; j < s->layout.streams; j ++) {
+            test_assert((uint64_t)s->max * s->layout.stride[j] <= page);
+        }
+    }
+
+    /* The test sizes lower every store, capped by its own chunk */
+    box_render_draws_chunk(world, 3000000);
+    box_render_draws_page(world, 3000000);
+    test_uint(d->stores[BOX_DRAWS_STORE_MESH].chunk, 2796202);
+    test_uint(d->stores[BOX_DRAWS_STORE_MESH].slots, 2796202);
+    test_uint(d->stores[BOX_DRAWS_STORE_SURFACE].chunk, 349525);
+    test_uint(d->stores[BOX_DRAWS_STORE_SURFACE].slots, 349525);
+    box_render_draws_chunk(world, 2);
+    box_render_draws_page(world, 4);
+    for (i = 0; i < BOX_DRAWS_STORES; i ++) {
+        test_uint(d->stores[i].chunk, 2);
+        test_uint(d->stores[i].slots, 4);
+    }
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void InstanceStore_grow_steps(void) {
+    // gpu_instance_data/instance_growth
+    static const uint32_t steps[] = {16, 24, 36, 56, 84, 128, 192, 288, 432, 648};
+    int32_t i;
+    test_uint(BOX_DRAWS_MIN_CAPACITY, MIN_RUN);
+    test_uint(box_draws_grow(0, 0), MIN_RUN);
+    test_uint(box_draws_grow(0, 1), MIN_RUN);
+    for (i = 0; i < (int32_t)(sizeof(steps) / sizeof(steps[0])); i ++) {
+        test_uint(box_draws_grow(0, steps[i]), steps[i]);
+        if (i) {
+            test_uint(box_draws_grow(0, steps[i - 1] + 1), steps[i]);
+            test_uint(box_draws_grow(steps[i - 1], steps[i - 1] + 1), steps[i]);
+        }
+
+        test_uint(steps[i] % BOX_DRAWS_GROW_ALIGN, 0);
+    }
+
+    /* A capacity below the minimum grows from the minimum, one off the alignment from its
+     * rounded value */
+    test_uint(box_draws_grow(5, 6), MIN_RUN);
+    test_uint(box_draws_grow(17, 20), 20);
+    test_uint(box_draws_grow(17, 21), 32);
+
+    /* The steps stay within a factor of 1.5 of the count, past the minimum */
+    for (i = (int32_t)MIN_RUN + 1; i < 100000; i += 7) {
+        uint32_t step = box_draws_grow(0, (uint32_t)i);
+        test_assert(step >= (uint32_t)i);
+        test_assert((uint64_t)step * 2 <= (uint64_t)i * 3 + 2 * BOX_DRAWS_GROW_ALIGN);
+    }
+}
+
+void InstanceStore_runs_grow_by_half(void) {
+    // gpu_instance_data/instance_growth
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    int32_t i, s;
+    for (i = 0; i < 17; i ++) {
+        shape_new(world, 3, (float)i, false);
+    }
+
+    shape_new(world, 4, 0, false);
+
+    /* 17 instances take a run of 24 slots, so the second batch starts at slot 24 and the first
+     * page buffers hold the 40 slots of both runs */
+    box_render_draws_stats_t stats = frame(world);
+    test_int(stats.pages, 1);
+    test_uint(batch_of(null, 17)->first_instance, 0);
+    test_uint(batch_of(null, 1)->first_instance, 24);
+    test_int(stats.page_slots, 40);
+    for (s = 0; s < STREAMS; s ++) {
+        test_uint(created(null, PAGE(0) + (uint32_t)s)->size, (uint64_t)40 * stride_of(s));
+    }
+
+    /* Up to 24 instances the run holds them: nothing moves and no buffer grows */
+    for (i = 17; i < 24; i ++) {
+        shape_new(world, 3, (float)i, false);
+    }
+
+    stats = frame(world);
+    test_uint(batch_of(null, 24)->first_instance, 0);
+    test_int(stats.copies, 0);
+    test_int(stats.kept_pages, 0);
+    test_int(buffer_ops(null, BOX_RENDER_CREATE, PAGE(0)), 0);
+
+    /* The 25th moves the batch to a run of 36 slots at slot 40; the page grows from 40 slots by
+     * half to 60, then to the 76 slots its top reaches */
+    shape_new(world, 3, 24, false);
+    stats = frame(world);
+    test_uint(batch_of(null, 25)->first_instance, 40);
+    test_int(stats.copies, STREAMS);
+    test_int(stats.kept_pages, STREAMS);
+    test_int(stats.page_slots, 76);
+    for (s = 0; s < STREAMS; s ++) {
+        const box_render_buffer_desc_t *desc = created(null, PAGE(0) + (uint32_t)s);
+        test_assert(desc != NULL);
+        test_uint(desc->size, (uint64_t)76 * stride_of(s));
+        test_uint(desc->size % BOX_RENDER_COPY_ALIGN, 0);
+        test_assert(desc->usage & BOX_RENDER_BUFFER_KEEP);
+    }
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** A plain mesh batch is not split at the chunk of the surface store, 349,525 instances, while
+ * a batch with a parametric surface is: plain boxes fill one batch of one page past it. */
+void InstanceStore_plain_batch_not_split_at_surface_chunk(void) {
+    // gpu_instance_data/store_chunk_size
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    uint32_t count = BOX_DRAWS_CHUNK + 1, i;
+    for (i = 0; i < count; i ++) {
+        box_new(world, (float)(i % 1000));
+    }
+
+    ecs_entity_t parametric = ecs_new(world);
+    ecs_set(world, parametric, Position, {0, 2, 0});
+    torus_set(world, parametric);
+
+    box_render_draws_stats_t stats = frame(world);
+    test_int(stats.batches, 2);
+    test_int(stats.pages, 2);
+    /* The surface store keys a batch only up to its chunk: its batch continues in another
+     * once it holds 349,525 instances */
+    const box_render_batch_t *plain = batch_of(null, count);
+    test_assert(plain != NULL);
+    test_uint(plain->instances, PAGE(0));
+    test_uint(plain->first_instance, 0);
+    test_assert(batch_page(null, PAGE(1)) == NULL);
+
+    box_render_draws_t *d = box_draws_state(world);
+    box_draw_batch_t *b = batch_get(world, parametric);
+    test_bool(b->key.surface, true);
+    test_uint(box_draws_key_limit(d, &b->key), BOX_DRAWS_CHUNK);
+    box_draw_key_t key = b->key;
+    key.surface = false;
+    test_uint(box_draws_key_limit(d, &key), 2796202);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void InstanceStore_page_grows_by_half(void) {
+    // gpu_instance_data/instance_growth
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    int32_t i, s;
+    for (i = 0; i < 4; i ++) {
+        shape_new(world, 3 + i, 0, false);
+    }
+
+    /* Four runs of MIN_RUN slots: the first buffers hold their 64 slots */
+    box_render_draws_stats_t stats = frame(world);
+    test_int(stats.page_slots, 4 * MIN_RUN);
+
+    /* A fifth run ends at 80 slots, less than half again: the buffers grow by half to 96 */
+    shape_new(world, 7, 0, false);
+    stats = frame(world);
+    test_int(stats.kept_pages, STREAMS);
+    test_int(stats.page_slots, 96);
+    for (s = 0; s < STREAMS; s ++) {
+        test_uint(created(null, PAGE(0) + (uint32_t)s)->size, (uint64_t)96 * stride_of(s));
+    }
+
+    /* A sixth fits the 96 slots, so the buffers stay */
+    shape_new(world, 8, 0, false);
+    stats = frame(world);
+    test_int(stats.kept_pages, 0);
+    test_int(stats.page_slots, 96);
+    test_int(buffer_ops(null, BOX_RENDER_CREATE, PAGE(0)), 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void InstanceStore_page_growth_stops_at_page_slots(void) {
+    // gpu_instance_data/instance_growth
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    box_render_draws_page(world, 70);
+    int32_t i;
+    for (i = 0; i < 2; i ++) {
+        shape_new(world, 3 + i, 0, false);
+    }
+
+    box_render_draws_stats_t stats = frame(world);
+    test_int(stats.page_slots, 2 * MIN_RUN);
+
+    /* A third run ends at 48 slots, which half again holds */
+    shape_new(world, 5, 0, false);
+    stats = frame(world);
+    test_int(stats.pages, 1);
+    test_int(stats.page_slots, 48);
+
+    /* A fourth ends at 64; half again would be 72, past the 70 slots of the page */
+    shape_new(world, 6, 0, false);
+    stats = frame(world);
+    test_int(stats.pages, 1);
+    test_int(stats.page_slots, 70);
+    test_uint(created(null, PAGE(0))->size, (uint64_t)70 * STRIDE);
+
+    /* A fifth fits no more: it opens a second page, the first keeps its 70 slots */
+    shape_new(world, 7, 0, false);
+    stats = frame(world);
+    test_int(stats.pages, 2);
+    test_int(stats.page_slots, 70 + MIN_RUN);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void InstanceStore_top_run_grows_in_place(void) {
+    // gpu_instance_data/instance_growth
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    int32_t i, s;
+    for (i = 0; i < 4; i ++) {
+        shape_new(world, 3, (float)i, false);
+    }
+
+    box_render_draws_stats_t stats = frame(world);
+    test_int(stats.page_slots, MIN_RUN);
+
+    /* The batch outgrows its run, which ends at the top of the page: the run grows in place to
+     * 24 slots, nothing is copied and only the page buffers grow, keeping the four instances */
+    for (i = 4; i < 20; i ++) {
+        shape_new(world, 3, (float)i, false);
+    }
+
+    stats = frame(world);
+    test_uint(batch_of(null, 20)->first_instance, 0);
+    test_int(stats.copies, 0);
+    test_int(ecs_vec_count(&null->last.copies), 0);
+    test_int(stats.kept_pages, STREAMS);
+    test_int(stats.page_slots, 24);
+    test_int(uploads_at(null, PAGE(0), 0), 0);
+    for (s = 0; s < STREAMS; s ++) {
+        const box_render_buffer_desc_t *desc = created(null, PAGE(0) + (uint32_t)s);
+        test_assert(desc != NULL);
+        test_uint(desc->size, (uint64_t)24 * stride_of(s));
+        test_assert(desc->usage & BOX_RENDER_BUFFER_KEEP);
+    }
+
+    /* No hole is left below it: the next batch starts at the end of the grown run */
+    shape_new(world, 4, 0, false);
+    stats = frame(world);
+    test_uint(batch_of(null, 1)->first_instance, 24);
+    test_uint(batch_of(null, 20)->first_instance, 0);
 
     ecs_fini(world);
     box_render_null_free(null);

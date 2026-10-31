@@ -545,6 +545,10 @@ static void box_gpu_cull_page_upload(
 {
     box_gpu_cull_t *c = &gpu->cull;
     int32_t lists = ecs_vec_count(&pg->list_data);
+    if ((int64_t)pg->used > gpu->pending.cull_page_slots) {
+        gpu->pending.cull_page_slots = (int32_t)pg->used;
+    }
+
     grown |= box_gpu_cull_reserve(gpu, &pg->visible, &pg->visible_size,
         (uint64_t)pg->used * sizeof(uint32_t), WGPUBufferUsage_Storage | WGPUBufferUsage_Vertex);
     grown |= box_gpu_cull_reserve(gpu, &pg->lists, &pg->lists_size,
