@@ -165,11 +165,11 @@ static void box_attachment_set(
     for (int i = 0; i < it->count; i ++) {
         ecs_entity_t e = it->entities[i];
         if (!ecs_has_id(it->world, e, ManualTransform)) {
-            ecs_add_id(it->world, e, SurfaceOwnsManual);
-            ecs_add_id(it->world, e, ManualTransform);
+            ecs_add_id(it->stage, e, SurfaceOwnsManual);
+            ecs_add_id(it->stage, e, ManualTransform);
         }
 
-        box_attachment_update(it->world, e, 0, NULL);
+        box_attachment_update(it->stage, e, 0, NULL);
     }
 }
 

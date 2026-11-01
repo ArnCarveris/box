@@ -566,7 +566,7 @@ static void BoxSurfaceOnSet(
     int32_t i;
     for (i = 0; i < it->count; i ++) {
         ecs_entity_t texture = s[i].texture;
-        SurfaceImpl *impl = ecs_ensure(it->world, it->entities[i], SurfaceImpl);
+        SurfaceImpl *impl = ecs_ensure(it->stage, it->entities[i], SurfaceImpl);
         if (texture) {
             if (!impl->handle) {
                 impl->handle = ++ state->last_handle;
