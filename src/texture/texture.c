@@ -391,7 +391,7 @@ static void BoxTextureOnSet(
 
     for (i = 0; i < it->count; i ++) {
         box_file_watch_clear(it->world, t->watch, it->entities[i]);
-        box_texture_request(it->world, t, it->entities[i], &paths[i]);
+        box_texture_request(it->stage, t, it->entities[i], &paths[i]);
     }
 
 done:
