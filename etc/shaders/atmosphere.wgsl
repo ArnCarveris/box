@@ -271,6 +271,16 @@ fn sample_sky_lut(uv: vec2f) -> vec3f {
     return mix(a, b, t);
 }
 
+// The u of the sky view LUT of the azimuth of a world direction. atan2(0, 0) is undefined (NaN on
+// Metal), and the hand filtered u of sample_sky_lut would carry it into the result, so straight
+// up or down, where every azimuth is the same, takes the center column.
+fn sky_azimuth_u(rd: vec3f) -> f32 {
+    if (rd.x == 0.0 && rd.z == 0.0) {
+        return 0.5;
+    }
+    return atan2(rd.x, rd.z) / (2.0 * PI) + 0.5;
+}
+
 fn camera_radius() -> f32 {
     return bottom_radius() + max(u.view.x, BOX_ATMOS_PLANET_OFFSET);
 }
@@ -547,8 +557,7 @@ fn aerial(@builtin(global_invocation_id) gid: vec3u) {
             s.light = s.light + m.light * s.throughput;
         }
         let t = (s.throughput.x + s.throughput.y + s.throughput.z) / 3.0;
-        let horizon_u = atan2(rd.x, rd.z) / (2.0 * PI) + 0.5;
-        let horizon = sample_sky_lut(vec2f(horizon_u, 0.5));
+        let horizon = sample_sky_lut(vec2f(sky_azimuth_u(rd), 0.5));
         result = vec4f(mix(s.light, horizon, clamp(1.0 - t, 0.0, 1.0)), t);
     }
 
@@ -581,8 +590,7 @@ fn direction_to_sky_uv(rd: vec3f, r: f32) -> vec2f {
         v = 0.5 + 0.5 * sqrt(max(zenith - horizon, 0.0) / max(PI - horizon, 1e-6));
     }
 
-    let u_azimuth = atan2(rd.x, rd.z) / (2.0 * PI) + 0.5;
-    return vec2f(u_azimuth, clamp(v, 0.0, 1.0));
+    return vec2f(sky_azimuth_u(rd), clamp(v, 0.0, 1.0));
 }
 
 // Radiance of the sun disk in a direction seen from a radius, sun_cos and sin_sun the cosine and

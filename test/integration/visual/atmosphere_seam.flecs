@@ -1,6 +1,7 @@
 using box.transform
 using box.camera
 using box.view
+using box.material
 using box.light
 using box.effects
 using box.atmosphere
