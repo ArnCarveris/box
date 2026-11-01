@@ -1,0 +1,12 @@
+using box.geometry
+using box.material
+
+prefab CanopyBlade {
+  Mesh3: {
+    vertices: [{0, 0, 0}, {-0.3, 0.38, 0}, {0, 1, 0}, {0.3, 0.38, 0}, {0, 0.38, 0.12}],
+    indices: [0, 1, 4, 1, 2, 4, 2, 3, 4, 3, 0, 4]
+  }
+  Rgb: {66, 128, 61}
+  PbrMaterial: {roughness: 0.85}
+  BackFaceMode: BackFacePlain
+}

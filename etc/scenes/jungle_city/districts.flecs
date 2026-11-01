@@ -1,0 +1,97 @@
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+
+@tree Parent
+template CanopyDistricts {
+  prop columns: i32 = 10
+  prop rows: i32 = 9
+  prop spacing: f32 = 17
+  prop seed: i32 = 17
+  prop base_floors: i32 = 2
+  prop floor_variation: i32 = 2
+  prop center_floors: i32 = 8
+  prop trees_per_block: i32 = 7
+  const width = columns * spacing + 32
+  const depth = rows * spacing + 20
+
+  for x in 0..columns {
+    for z in 0..rows {
+      const rng: math.Rng = {seed: seed + x * 92821 + z * 68917}
+      const plants: math.Rng = {seed: seed + x * 193939 + z * 371389 + 9127}
+      const h = rng.u(100000)
+      const ivory: Rgb = {226, 235, 211}
+      const sage: Rgb = {160, 192, 158}
+      const sand: Rgb = {225, 202, 163}
+      const clay: Rgb = {193, 139, 107}
+      const pale: Rgb = {185, 218, 213}
+      const cedar: Rgb = {143, 91, 48}
+      const walnut: Rgb = {97, 63, 43}
+      const bamboo: Rgb = {186, 139, 80}
+      const woods = [cedar, walnut, bamboo]
+      const walls = [ivory, sage, sand, clay, pale]
+      const px = (x - (columns - 1) / 2.0) * spacing
+      const pz = (z - (rows - 1) / 2.0) * spacing
+      {
+        if px < -7 { Position: {px - 5, 0.2, pz} } else { Position: {px + 5, 0.2, pz} }
+        if px < -7 || px > 7 {
+          const nx = px / ((columns - 1) * spacing / 2)
+          const nz = pz / ((rows - 1) * spacing / 2)
+          const centrality = (1 - nx * nx) * (1 - nz * nz)
+          const floors: i32 = base_floors + rng.u(floor_variation) + math.floor(center_floors * centrality)
+          const families = match centrality > 0.55 {
+            true: [0, 0, 1, 1, 3, 3, 4]
+            false: [0, 1, 2, 2, 4, 4, 4]
+          }
+          const kind = families[rng.u(7)]
+          const wall = walls[rng.u(5)]
+          const timber: Rgb = woods[rng.u(3)]
+          const roof = rng.u(6)
+          const facade = rng.u(3)
+          const sx = 0.72 + centrality * 0.12 + rng.f(0.24)
+          const sz = 0.72 + centrality * 0.12 + rng.f(0.24)
+          if kind == 0 {
+            CanopyTower(floors: floors, variant: h, wall: wall, timber: timber, roof_style: roof, facade_style: facade) { Scale: {sx, 1, sz} }
+          } else if kind == 1 {
+            CanopyRotunda(floors: floors, variant: h, wall: wall, timber: timber, roof_style: roof, facade_style: facade) { Scale: {sx, 1, sz} }
+          } else if kind == 2 {
+            CanopyCascade(floors: floors, variant: h, wall: wall, timber: timber, roof_style: roof, facade_style: facade) { Scale: {sx, 1, sz} }
+          } else if kind == 3 {
+            CanopySpire(floors: floors, variant: h, wall: wall, timber: timber, roof_style: roof, facade_style: facade) { Scale: {sx, 1, sz} }
+          } else {
+            CanopyPods(floors: floors, variant: h, wall: wall, timber: timber, roof_style: roof, facade_style: facade) { Scale: {sx, 1, sz} }
+          }
+          landing : CanopyWood { Position: {0, 4.4, 4.6}; Box: {2.3, 0.2, 2.2} }
+          CanopyStreetlight() { Position: {-2, 4.5, 5.9} }
+          const labels = ["GARDENS", "CANOPY", "MARKET", "TRANSIT", "ATRIUM", "HABITAT", "BOTANICA"]
+          CanopySign(label: labels[rng.u(7)]) { Position: {1.5, 4.5, 4.6} }
+          if z < rows - 1 {
+            CanopyBridge(length: spacing, width: 1.8) { Position: {5.5, 4.4, spacing / 2}; Rotation: {0, math.PI / 2, 0} }
+          }
+          for t in 0..trees_per_block {
+            const a = plants.f(math.PI * 2)
+            const distance = 5.7 + plants.f(1.4)
+            CanopyTree(height: 5.4 + plants.f(6.5), variant: plants.u(100000)) { Position: {math.sin(a) * distance, 0, math.cos(a) * distance} }
+            CanopyFern(size: 0.9 + t % 3 * 0.3) { Position: {math.sin(a + 0.4) * 5.8, 0, math.cos(a + 0.4) * 5.8} }
+          }
+        }
+      }
+    }
+  }
+  for z in 0..rows {
+    CanopyBridge(length: width - 22, width: 2.4) { Position: {0, 4.6, (z - (rows - 1) / 2.0) * spacing + 5.5} }
+  }
+  for side in 0..2 {
+    const edge: math.Rng = {seed: seed + side * 197831 + 23741}
+    for i in 0..columns * 3 {
+      const edge_x = (i / (columns * 3.0 - 1) - 0.5) * (width - 7)
+      if edge_x < -9 || edge_x > 9 {
+        CanopyTree(height: 6 + edge.f(8), variant: edge.u(100000)) { Position: {edge_x, 0.2, (side - 0.5) * (depth - 8) + edge.f(2.6) - 1.3} }
+      }
+    }
+    for i in 0..rows * 3 {
+      CanopyTree(height: 7 + edge.f(9), variant: edge.u(100000)) { Position: {(side - 0.5) * (width - 7), 0.2, (i / (rows * 3.0 - 1) - 0.5) * (depth - 12)} }
+    }
+  }
+}

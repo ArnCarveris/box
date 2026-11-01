@@ -1,0 +1,14 @@
+using box.material
+
+prefab CanopyIvory { Rgb: {226, 235, 211}; PbrMaterial: {roughness: 0.48} }
+prefab CanopyWood { Rgb: {143, 91, 48}; PbrMaterial: {roughness: 0.76} }
+prefab CanopyBark { Rgb: {68, 66, 38}; PbrMaterial: {roughness: 0.95} }
+prefab CanopyGlass { Rgb: {24, 83, 78}; PbrMaterial: {metallic: 0.35, roughness: 0.23}; ClearCoat: {strength: 0.7, roughness: 0.12} }
+prefab CanopyLeaf { Rgb: {43, 104, 58}; PbrMaterial: {roughness: 0.87} }
+prefab CanopyLime { Rgb: {113, 153, 65}; PbrMaterial: {roughness: 0.85} }
+prefab CanopyJade { Rgb: {31, 78, 55}; PbrMaterial: {roughness: 0.9} }
+prefab CanopySoil { Rgb: {54, 63, 42}; PbrMaterial: {roughness: 1} }
+prefab CanopyWater { Rgb: {37, 133, 126}; PbrMaterial: {metallic: 0.4, roughness: 0.18}; ClearCoat: {strength: 0.8, roughness: 0.08} }
+prefab CanopyGlow { Rgb: {153, 242, 202}; Emissive: {strength: 0.8, color: {110, 234, 181}} }
+prefab CanopySolar { Rgb: {29, 59, 70}; PbrMaterial: {metallic: 0.6, roughness: 0.24} }
+prefab CanopyWindow { Rgb: {234, 198, 142}; Emissive: {strength: 1.6, color: {255, 202, 135}}; PbrMaterial: {roughness: 0.55} }

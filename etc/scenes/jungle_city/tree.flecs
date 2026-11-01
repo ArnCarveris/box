@@ -1,0 +1,66 @@
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+
+@tree Parent
+template CanopyTree {
+  prop height: f32 = 9
+  prop variant: i32 = 0
+  const rng: math.Rng = {seed: variant + 3217}
+  const palm = rng.u(3) == 0
+  const lean = rng.f(0.9) - 0.45
+  CanopyBranch(ay: 0, bx: lean, by: height * 0.8, radius: height * 0.026) {}
+  for i in 0..4 {
+    const a = i * math.PI / 2 + rng.f(0.6)
+    CanopyBranch(ax: math.sin(a) * height * 0.1, ay: 0.08, az: math.cos(a) * height * 0.1,
+      bx: 0, by: height * 0.15, radius: height * 0.02) {}
+  }
+  if palm {
+    for f in 0..9 {
+      const a = f * math.PI * 2 / 9 + rng.f(0.35)
+      const reach = height * (0.3 + rng.f(0.12))
+      for j in 0..5 {
+        const t = j / 5.0
+        const nt = (j + 1) / 5.0
+        const y = height * (0.8 + 0.4 * t - 0.5 * t * t)
+        const ny = height * (0.8 + 0.4 * nt - 0.5 * nt * nt)
+        CanopyBranch(ax: lean + math.sin(a) * reach * t, ay: y, az: math.cos(a) * reach * t,
+          bx: lean + math.sin(a) * reach * nt, by: ny, bz: math.cos(a) * reach * nt, radius: 0.035) {}
+        for side in 0..2 {
+          { (IsA, CanopyBlade);
+            Position: {lean + math.sin(a) * reach * nt, ny, math.cos(a) * reach * nt}
+            Rotation: {1.4, a + (side - 0.5) * 1.8, 0}
+            Scale: {height * 0.045, height * (0.14 - t * 0.08), height * 0.08}
+            Rgb: {65, 119 + f % 3 * 12, 49}
+          }
+        }
+      }
+    }
+  } else {
+    for b in 0..8 {
+      const a = rng.f(math.PI * 2)
+      const reach = height * (0.12 + rng.f(0.18))
+      const y = height * (0.64 + rng.f(0.29))
+      const bx = lean + math.sin(a) * reach
+      const bz = math.cos(a) * reach
+      CanopyBranch(ax: lean * 0.7, ay: height * 0.52, bx: bx, by: y, bz: bz, radius: height * 0.014) {}
+      for t in 0..3 {
+        const ta = a + (t - 1) * 0.9
+        const tx = bx + math.sin(ta) * height * 0.09
+        const tz = bz + math.cos(ta) * height * 0.09
+        const ty = y + rng.f(height * 0.09)
+        CanopyBranch(ax: bx, ay: y, az: bz, bx: tx, by: ty, bz: tz, radius: 0.025) {}
+        for l in 0..5 {
+          const la = l * 2.4 + rng.f(0.7)
+          { (IsA, CanopyBlade);
+            Position: {tx + math.sin(la) * 0.16, ty, tz + math.cos(la) * 0.16}
+            Rotation: {0.65 + rng.f(0.9), la, 0.15}
+            Scale: {height * (0.11 + rng.f(0.05)), height * (0.1 + rng.f(0.07)), height * 0.12}
+            Rgb: {40 + rng.u(35), 92 + rng.u(55), 40 + rng.u(25)}
+          }
+        }
+      }
+    }
+  }
+}

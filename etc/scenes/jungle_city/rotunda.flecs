@@ -1,0 +1,44 @@
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+
+@tree Parent
+template CanopyRotunda {
+  prop floors: i32 = 5
+  prop variant: i32 = 0
+  prop wall: Rgb = {226, 235, 211}
+  prop timber: Rgb = {143, 91, 48}
+  prop roof_style: i32 = 0
+  prop facade_style: i32 = 0
+  const windows: math.Rng = {seed: variant + 314159}
+  const height = floors * 3.2
+  core : CanopyGlass { Position: {0, height / 2 + 1.2, 0}; Cylinder: {radius: 2.8, length: height, segments: 24, smooth: true} }
+  for f in 0..floors + 1 {
+    const y = 1.2 + f * 3.2
+    const radius = 3.8 + math.sin(f * 1.2 + variant) * 0.45
+    { (IsA, CanopyIvory); Rgb: wall; Position: {0, y, 0}; Cylinder: {radius: radius, length: 0.28, segments: 32} }
+    { (IsA, CanopyWood); Rgb: timber; Position: {0, y - 0.2, 0}; Torus: {radius: radius - 0.15, tube: 0.15, segments: 32, rings: 6} }
+    if f < floors {
+      { (IsA, CanopyLeaf); Position: {0, y + 0.32, 0}; Tube: {radius: radius - 0.15, thickness: 0.45, length: 0.35, segments: 32} }
+      for i in 0..8 + facade_style * 4 {
+        const a = i * math.PI * 2 / (8 + facade_style * 4)
+        { (IsA, CanopyWood); Rgb: timber; Position: {math.sin(a) * 2.88, y + 1.6, math.cos(a) * 2.88}; Rotation: {0, a, 0}; Box: {0.14, 2.9, 0.18} }
+      }
+      for i in 0..8 {
+        const a = i * math.PI / 4
+        if windows.f(1) > 0.6 {
+          { (IsA, CanopyWindow); Position: {math.sin(a) * 2.82, y + 1.6, math.cos(a) * 2.82}; Rotation: {0, a, 0}; Box: {0.85, 1.5, 0.04} }
+        }
+      }
+      for i in 0..4 {
+        const a = i * math.PI / 2 + f * 0.7
+        CanopyVine(length: 2.1, phase: a) { Position: {math.sin(a) * radius, y + 0.4, math.cos(a) * radius} }
+      }
+    }
+  }
+  roof_garden : CanopyLeaf { Position: {0, height + 1.4, 0}; Cylinder: {radius: 3.1, length: 0.15, segments: 24} }
+  CanopyRoof(style: roof_style, variant: variant) { Position: {0, height + 1.5, 0} }
+  entrance : CanopyWood { Position: {0, 4.4, 4.1}; Box: {2.2, 0.2, 3.4} }
+  lift : CanopyIvory { Position: {2.8, 2.2, 3.8}; RoundedBox: {0.9, 4.4, 0.9, 0.2} }
+}

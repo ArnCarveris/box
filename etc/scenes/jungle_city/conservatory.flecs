@@ -1,0 +1,19 @@
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+
+@tree Parent
+template CanopyConservatory {
+  { (IsA, CanopyIvory); Position: {0, 0.4, 0}; Cylinder: {radius: 6.4, length: 0.8, segments: 48} }
+  { (IsA, CanopyGlass); Position: {0, 0.8, 0}; Scale: {1, 1.15, 1}; HemiSphere: {radius: 5.7, segments: 32, smooth: true} }
+  for i in 0..12 {
+    { (IsA, CanopyIvory); Position: {0, 0.8, 0}; Rotation: {-math.PI / 2, i * math.PI / 12, 0}; Scale: {1, 1, 1.15}; Tube: {radius: 5.77, thickness: 0.1, length: 0.12, arc: math.PI, segments: 32} }
+  }
+  { (IsA, CanopyWood); Position: {0, 2.6, 0}; Torus: {radius: 5.45, tube: 0.13, segments: 48, rings: 6} }
+  for i in 0..12 {
+    CanopyFern(size: 1.1) { Position: {math.sin(i * math.PI / 6) * 6, 0.8, math.cos(i * math.PI / 6) * 6} }
+  }
+  { (IsA, CanopyIvory); Position: {0, 8.2, 0}; Frustum: {length: 3, radius_bottom: 0.3, radius_top: 0.06, segments: 12} }
+  { (IsA, CanopyGlow); Position: {0, 9.8, 0}; Sphere: {radius: 0.18, segments: 12} }
+}

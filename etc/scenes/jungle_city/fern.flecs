@@ -1,0 +1,13 @@
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+
+@tree Parent
+template CanopyFern {
+  prop size: f32 = 1
+  for i in 0..7 {
+    const a = i * math.PI * 2 / 7
+    { (IsA, CanopyLime); Position: {math.sin(a) * size * 0.46, size * 0.45, math.cos(a) * size * 0.46}; Rotation: {0.8, a, 0}; Scale: {0.24 * size, 0.08 * size, size}; IcoSphere: {radius: 1, segments: 1} }
+  }
+}

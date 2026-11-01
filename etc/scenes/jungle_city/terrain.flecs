@@ -1,0 +1,22 @@
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+
+@tree Parent
+template CanopyTerrain {
+  prop width: f32 = 112
+  prop depth: f32 = 95
+  { (IsA, CanopySoil); Position: {0, -2.2, 0}; RoundedBox: {width, 4.4, depth, 2, segments: 4} }
+  { (IsA, CanopyJade); Position: {0, -0.05, 0}; RoundedBox: {width - 0.4, 0.4, depth - 0.4, 1.8, segments: 4} }
+  { (IsA, CanopyWater); Position: {0, 0.18, 0}; RoundedBox: {10, 0.16, depth - 1.2, 0.6} }
+  for side in 0..2 {
+    { (IsA, CanopyIvory); Position: {(side - 0.5) * 11.6, 0.24, 0}; RoundedBox: {1.6, 0.3, depth - 2, 0.3} }
+    for i in 0..24 {
+      CanopyFern(size: 0.7 + i % 3 * 0.2) { Position: {(side - 0.5) * 13.6, 0.2, (i / 24.0 - 0.48) * (depth - 3)} }
+    }
+  }
+  for i in 0..32 {
+    { (IsA, CanopyWater); Position: {math.sin(i * 7.1) * 3.5, 0.28, (i / 32.0 - 0.48) * (depth - 2)}; Box: {0.8 + i % 4 * 0.45, 0.018, 0.045}; Rgb: {104, 177, 153} }
+  }
+}
