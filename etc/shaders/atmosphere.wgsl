@@ -7,8 +7,9 @@
 // shortest and its horizon value, y the distance to the horizon; 40 midpoint steps.
 // multi_scattering (32x32): x the cosine of the sun zenith from -1 to 1, y the altitude;
 // psi_ms = L2 / (1 - F) over 64 directions of 20 steps, the ground bouncing ground_albedo.
-// sky_view (192x108): x the absolute world azimuth atan2(x, z), y the zenith angle, squared on
-// both sides of the horizon at y = 0.5; single scattering of the sun plus multi scattering and
+// sky_view (192x108): x the absolute world azimuth atan2(x, z), wrapping at world -Z where
+// sample_sky_lut blends the first and last column, y the zenith angle, squared on both sides of
+// the horizon at y = 0.5; single scattering of the sun plus multi scattering and
 // the single scattering of the moon times its illumination, integrated as (S - S T) / sigma_t,
 // plus the night floor that fades in as the sun sets.
 // aerial (32x32x32, a 3D texture): x and y the uv of the screen, slice z the in scatter (blended
@@ -254,6 +255,22 @@ fn sky_uv_to_direction(uv: vec2f, r: f32) -> vec3f {
     return vec3f(sz * sin(azimuth), cos(zenith), sz * cos(azimuth));
 }
 
+// The sky view LUT at a uv, the azimuth u wrapping and the zenith v clamped. The shared sampler
+// clamps both axes, so the two texels of u are each sampled at their center, where only v is
+// filtered, and blended here; texel 0 and the last texel then blend across world -Z, where
+// atan2(x, z) wraps from +pi to -pi, instead of each fading toward its own edge.
+fn sample_sky_lut(uv: vec2f) -> vec3f {
+    let width = f32(textureDimensions(sky_lut).x);
+    let x = uv.x * width - 0.5;
+    let x0 = floor(x);
+    let t = x - x0;
+    let u0 = (x0 - width * floor(x0 / width) + 0.5) / width;
+    let u1 = (x0 + 1.0 - width * floor((x0 + 1.0) / width) + 0.5) / width;
+    let a = textureSampleLevel(sky_lut, lut_sampler, vec2f(u0, uv.y), 0.0).rgb;
+    let b = textureSampleLevel(sky_lut, lut_sampler, vec2f(u1, uv.y), 0.0).rgb;
+    return mix(a, b, t);
+}
+
 fn camera_radius() -> f32 {
     return bottom_radius() + max(u.view.x, BOX_ATMOS_PLANET_OFFSET);
 }
@@ -411,8 +428,7 @@ const FOG_ZENITH_MIX: f32 = 0.15;
 
 // The sky view in a direction, from the camera
 fn sky_sample(rd: vec3f) -> vec3f {
-    return textureSampleLevel(sky_lut, lut_sampler, direction_to_sky_uv(rd, camera_radius()),
-        0.0).rgb;
+    return sample_sky_lut(direction_to_sky_uv(rd, camera_radius()));
 }
 
 // The sky view at the horizon toward the azimuth of a direction
@@ -531,8 +547,8 @@ fn aerial(@builtin(global_invocation_id) gid: vec3u) {
             s.light = s.light + m.light * s.throughput;
         }
         let t = (s.throughput.x + s.throughput.y + s.throughput.z) / 3.0;
-        let horizon_u = clamp(atan2(rd.x, rd.z) / (2.0 * PI) + 0.5, 0.0, 1.0);
-        let horizon = textureSampleLevel(sky_lut, lut_sampler, vec2f(horizon_u, 0.5), 0.0).rgb;
+        let horizon_u = atan2(rd.x, rd.z) / (2.0 * PI) + 0.5;
+        let horizon = sample_sky_lut(vec2f(horizon_u, 0.5));
         result = vec4f(mix(s.light, horizon, clamp(1.0 - t, 0.0, 1.0)), t);
     }
 
@@ -566,7 +582,7 @@ fn direction_to_sky_uv(rd: vec3f, r: f32) -> vec2f {
     }
 
     let u_azimuth = atan2(rd.x, rd.z) / (2.0 * PI) + 0.5;
-    return vec2f(clamp(u_azimuth, 0.0, 1.0), clamp(v, 0.0, 1.0));
+    return vec2f(u_azimuth, clamp(v, 0.0, 1.0));
 }
 
 // Radiance of the sun disk in a direction seen from a radius, sun_cos and sin_sun the cosine and
@@ -636,7 +652,7 @@ fn moon_disk(rd: vec3f, r: f32, moon_cos: f32, sin_moon: f32, aa_w: f32) -> vec3
     let moon_aa_w = max(fwidth(moon_cos) * min(1.0, u.moon_disk.y / max(sin_moon, 1e-6)), 1e-6);
     var uv = direction_to_sky_uv(rd, r);
     uv.y = min(uv.y, 0.5);
-    let sky = textureSampleLevel(sky_lut, lut_sampler, uv, 0.0).rgb;
+    let sky = sample_sky_lut(uv);
     return vec4f(sky + sun_disk(rd, r, sun_cos, sin_sun, aa_w) +
         moon_disk(rd, r, moon_cos, sin_moon, moon_aa_w), 1.0);
 }

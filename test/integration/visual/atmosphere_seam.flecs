@@ -1,0 +1,35 @@
+using box.transform
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.atmosphere
+
+// Only the sky at low sun, the camera looking 11 degrees up at world -Z, where atan2(x, z) of
+// the sky view LUT wraps from +pi to -pi, the sun 4 degrees up and about 25 degrees to the side.
+// The sky is smooth across the center of the image from the horizon, near the bottom, up; a
+// vertical line of brightness there is the seam of the first and last column of the LUT
+// blending toward their own edges instead of with each other.
+camera {
+  Position: {0, 2, 0}
+  Rotation: {0.2, 0, 0}
+  Camera: {fov: 50, far_: 0}
+}
+
+tonemap {
+  Tonemap: {}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {0, 0, 0, 255}}, effects: [{effect: tonemap}]}
+}
+
+sun {
+  Rotation: {0.07, 0.44, 0}
+  DirectionalLight: {intensity: 6 * flecs.script.math.PI}
+  Rgb: {255, 255, 255}
+}
+
+$ {
+  Atmosphere: {units_per_km: 100, sun_disk_intensity: 20, sun: sun}
+}
