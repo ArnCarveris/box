@@ -537,3 +537,64 @@ void ProbeCapture_perf_run_ignores_unviewed_scene(void) {
 
     ecs_fini(world);
 }
+
+void ProbeCapture_scene_grows_past_chunk_of_atlas(void) {
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t scene = ecs_new(world);
+    ecs_add(world, scene, Scene);
+    ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 0.5f,
+        .capture_size = 8, .budget_ms = 50, .bounces = 1});
+    ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, camera, Position, {0, 1, 5});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true,
+        .lighting.baked = true});
+    ecs_entity_t floor = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, floor, Position, {0, -0.1f, 0});
+    ecs_set(world, floor, Box, {4, 0.2f, 4});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 64, .height = 48, .resolution_scale = 1});
+
+    int32_t frame;
+    for (frame = 0; frame < 5000; frame ++) {
+        ecs_progress(world, 0);
+        box_render_sync(world);
+        if (ecs_get(world, scene, LightBakeStatus)->converged) {
+            break;
+        }
+    }
+
+    test_bool(ecs_get(world, scene, LightBakeStatus)->converged, true);
+
+    int32_t i;
+    for (i = 0; i < 6000; i ++) {
+        ecs_entity_t block = ecs_new_w_pair(world, EcsChildOf, scene);
+        ecs_set(world, block, Position, {(float)(i % 80) * 0.05f - 2, 0.1f,
+            (float)(i / 80) * 0.05f - 2});
+        ecs_set(world, block, Box, {0.04f, 0.04f, 0.04f});
+    }
+
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    test_bool(ecs_get(world, scene, LightBakeStatus)->converged, false);
+    for (frame = 0; frame < 5000; frame ++) {
+        ecs_progress(world, 0);
+        box_render_sync(world);
+        if (ecs_get(world, scene, LightBakeStatus)->converged) {
+            break;
+        }
+    }
+
+    box_render_gpu_stats_t stats;
+    test_bool(box_render_gpu_stats(world, &stats), true);
+    test_int(stats.errors, 0);
+    test_bool(ecs_get(world, scene, LightBakeStatus)->converged, true);
+
+    ecs_fini(world);
+}

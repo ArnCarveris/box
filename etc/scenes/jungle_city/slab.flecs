@@ -1,0 +1,37 @@
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+
+@tree Parent
+template CanopySlab {
+  prop floors: i32 = 5
+  prop variant: i32 = 0
+  prop wall: Rgb = {226, 235, 211}
+  prop timber: Rgb = {143, 91, 48}
+  prop roof_style: i32 = 0
+  prop facade_style: i32 = 0
+  const windows: math.Rng = {seed: variant + 314159}
+  for f in 0..floors {
+    const y = 1.2 + f * 3.2
+    const offset = math.sin(math.floor(f / 2.0) * 1.6 + variant) * 0.65
+    { (IsA, CanopyIvory); Rgb: wall; Position: {offset, y + 1.5, 0}; RoundedBox: {8.2, 3, 4.5, 0.35} }
+    { (IsA, CanopyWood); Rgb: timber; Position: {offset, y, 0}; RoundedBox: {8.8, 0.24, 5.4, 0.35} }
+    for side in 0..2 {
+      const z = (side - 0.5) * 4.56
+      for i in 0..4 {
+        const x = offset - 3 + i * 2
+        { (IsA, CanopyGlass); Position: {x, y + 1.6, z}; Box: {1.6, 2, 0.06} }
+        if windows.f(1) > 0.6 {
+          { (IsA, CanopyWindow); Position: {x, y + 1.6, z * 1.02}; Box: {1.2, 1.5, 0.03} }
+        }
+      }
+      { (IsA, CanopyLeaf); Position: {offset, y + 0.3, z * 1.13}; RoundedBox: {7.7, 0.4, 0.6, 0.12} }
+      CanopyVine(length: 1.5 + facade_style * 0.4, phase: variant + f) { Position: {offset - 2.6, y + 0.4, z * 1.2} }
+    }
+  }
+  roof : CanopyIvory { Rgb: wall; Position: {0, 1.2 + floors * 3.2, 0}; RoundedBox: {8.6, 0.3, 5.3, 0.35} }
+  CanopyRoof(style: roof_style, variant: variant) { Position: {0, 1.4 + floors * 3.2, 0} }
+  entrance : CanopyWood { Position: {0, 4.4, 3.8}; Box: {2.2, 0.2, 4} }
+  lift : CanopyIvory { Position: {3.6, 2.2, 3.5}; RoundedBox: {0.9, 4.4, 0.9, 0.2} }
+}

@@ -192,6 +192,7 @@ struct box_gpu_bake_t {
     ecs_vec_t job_data;             /**< Bytes of the jobs of the bake batch */
     ecs_vec_t list_data;            /**< uint32_t, the slots of its listed batches */
     uint32_t stride;                /**< Slots of a face, those of every batch */
+    int32_t chunk;
     box_gpu_bake_set_t sets[BOX_GPU_BAKE_KINDS]; /**< Atlas and bundles of each kind */
     WGPUBuffer uniforms;            /**< View uniforms of the faces of a chunk */
     WGPUBuffer params;              /**< box_gpu_bake_params_t of a chunk */

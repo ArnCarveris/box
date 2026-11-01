@@ -356,7 +356,8 @@
                     "budget_spreads_over_frames",
                     "invalid_capture_size_bakes_nothing",
                     "perf_run_measures_zero_budget",
-                    "perf_run_ignores_unviewed_scene"
+                    "perf_run_ignores_unviewed_scene",
+                    "scene_grows_past_chunk_of_atlas"
                 ]
             },
             {

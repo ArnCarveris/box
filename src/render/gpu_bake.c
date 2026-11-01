@@ -477,6 +477,7 @@ static void box_gpu_bake_draws(
     ecs_vec_clear(&b->draws);
     ecs_vec_clear(&b->list_data);
     b->stride = 0;
+    b->chunk = chunk;
     for (i = 0; i < count; i ++) {
         const box_render_batch_t *rb = ecs_vec_get_t(&packet->batches, box_render_batch_t, i);
         if (box_gpu_cull_capture_draws(gpu, rb, scene, -1)) {
@@ -893,7 +894,7 @@ static void box_gpu_bake_bundles(
     int32_t faces)
 {
     box_gpu_bake_key_t key;
-    int32_t i, count = glm_max(faces, s->probes * 6);
+    int32_t i, count = b->chunk * 6;
     ecs_os_memset_t(&key, 0, box_gpu_bake_key_t);
     key.lights = box_gpu_light_binding(gpu, rv, &key.lights_size);
     key.clusters = b->clusters;

@@ -12,6 +12,7 @@ template CanopyDistricts {
   prop base_floors: i32 = 2
   prop floor_variation: i32 = 2
   prop center_floors: i32 = 8
+  prop skyscraper_floors: i32 = 7
   prop trees_per_block: i32 = 7
   const width = columns * spacing + 32
   const depth = rows * spacing + 20
@@ -41,8 +42,8 @@ template CanopyDistricts {
           const centrality = (1 - nx * nx) * (1 - nz * nz)
           const floors: i32 = base_floors + rng.u(floor_variation) + math.floor(center_floors * centrality)
           const families = match centrality > 0.55 {
-            true: [0, 0, 1, 1, 3, 3, 4]
-            false: [0, 1, 2, 2, 4, 4, 4]
+            true: [0, 1, 3, 3, 4, 6, 6]
+            false: [0, 1, 2, 4, 5, 5, 6]
           }
           const kind = families[rng.u(7)]
           const wall = walls[rng.u(5)]
@@ -51,7 +52,12 @@ template CanopyDistricts {
           const facade = rng.u(3)
           const sx = 0.72 + centrality * 0.12 + rng.f(0.24)
           const sz = 0.72 + centrality * 0.12 + rng.f(0.24)
-          if kind == 0 {
+          if centrality > 0.9 && skyscraper_floors > 0 {
+            const landmark = (x + z * 2 + seed) % 6
+            const height_offsets = [7, -3, 2, 11, -1, 5]
+            const landmark_floors: i32 = math.max(12, floors + skyscraper_floors + height_offsets[landmark])
+            CanopySkyscraper(floorplan: landmark, floors: landmark_floors, variant: h, wall: wall, timber: timber, roof_style: roof, facade_style: facade) { Scale: {sx, 1, sz} }
+          } else if kind == 0 {
             CanopyTower(floors: floors, variant: h, wall: wall, timber: timber, roof_style: roof, facade_style: facade) { Scale: {sx, 1, sz} }
           } else if kind == 1 {
             CanopyRotunda(floors: floors, variant: h, wall: wall, timber: timber, roof_style: roof, facade_style: facade) { Scale: {sx, 1, sz} }
@@ -59,13 +65,15 @@ template CanopyDistricts {
             CanopyCascade(floors: floors, variant: h, wall: wall, timber: timber, roof_style: roof, facade_style: facade) { Scale: {sx, 1, sz} }
           } else if kind == 3 {
             CanopySpire(floors: floors, variant: h, wall: wall, timber: timber, roof_style: roof, facade_style: facade) { Scale: {sx, 1, sz} }
+          } else if kind == 5 {
+            CanopyCourtyard(floors: floors, variant: h, wall: wall, timber: timber, roof_style: roof, facade_style: facade) { Scale: {sx, 1, sz} }
+          } else if kind == 6 {
+            CanopySlab(floors: floors, variant: h, wall: wall, timber: timber, roof_style: roof, facade_style: facade) { Scale: {sx, 1, sz} }
           } else {
             CanopyPods(floors: floors, variant: h, wall: wall, timber: timber, roof_style: roof, facade_style: facade) { Scale: {sx, 1, sz} }
           }
           landing : CanopyWood { Position: {0, 4.4, 4.6}; Box: {2.3, 0.2, 2.2} }
           CanopyStreetlight() { Position: {-2, 4.5, 5.9} }
-          const labels = ["GARDENS", "CANOPY", "MARKET", "TRANSIT", "ATRIUM", "HABITAT", "BOTANICA"]
-          CanopySign(label: labels[rng.u(7)]) { Position: {1.5, 4.5, 4.6} }
           if z < rows - 1 {
             CanopyBridge(length: spacing, width: 1.8) { Position: {5.5, 4.4, spacing / 2}; Rotation: {0, math.PI / 2, 0} }
           }
