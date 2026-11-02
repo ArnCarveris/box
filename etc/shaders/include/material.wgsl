@@ -33,6 +33,9 @@ struct Material {
     // SpecularAnisotropy strength | rotation / 2 pi << 16 as two unorm16 (unpack2x16unorm), 0
     // without one
     anisotropy: u32,
+    // Sheen r | g << 8 | b << 16 | roughness << 24 as unorm8 (unpack4x8unorm), the color display
+    // encoded, 0 without one
+    sheen: u32,
 };
 
 // Record of a material id; an id past the table reads the default material of slot 0.

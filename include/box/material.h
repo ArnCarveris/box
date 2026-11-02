@@ -1,7 +1,7 @@
 /**
  * @file box/material.h
- * @brief Material components: color, opacity, tint, PBR parameters, clear coat, emission and
- * transmission.
+ * @brief Material components: color, opacity, tint, PBR parameters, clear coat, anisotropy, sheen,
+ * emission and transmission.
  *
  * The box.material module resolves tints through the hierarchy and registers
  * the material layers a scene applies on top of the sampled surface.
@@ -25,8 +25,8 @@ extern "C" {
 /** Slot of the material table a shape renders with, set by the engine and read only for
  * applications, inherited by instances.
  *
- * Rgb, PbrMaterial, ClearCoat, SpecularAnisotropy, Emissive, Transmission, TextureTransform
- * and AlphaCutoff bring it along. A prefab that owns one gets a slot its instances share, a 3D
+ * Rgb, PbrMaterial, ClearCoat, SpecularAnisotropy, Sheen, Emissive, Transmission,
+ * TextureTransform and AlphaCutoff bring it along. A prefab that owns one gets a slot its instances share, a 3D
  * shape that owns one a slot of its own, composed of what it owns and what it still inherits.
  *
  * Slot 0 is the default material, of a shape without any material component. An owned id that
@@ -158,6 +158,26 @@ ECS_STRUCT(SpecularAnisotropy, {
     float strength; /**< 0 isotropic to 1 fully stretched, clamped to 0..1 */
     float rotation; /**< Radians counter clockwise from the +U direction of the texture, around
                      *   the normal, wrapped to 0..2 pi */
+});
+
+/** Roughness of a constructed Sheen: a rim halfway between tight and broad */
+#define BOX_MATERIAL_SHEEN_ROUGHNESS (0.5f)
+
+/** Soft bright rim at grazing angles of a 3D mesh (velvet, cloth, dust), glTF's
+ * KHR_materials_sheen, default a white color and roughness 0.5, inherited like Rgb; a field a
+ * scene does not set keeps its default. A black color means no sheen. Only 3D meshes have it,
+ * 2D shapes and text ignore it.
+ *
+ * The model three.js uses: direct light adds a Charlie lobe with the Neubelt visibility times
+ * color, its roughness squared clamped to 0.07..1 before; indirect light adds the indirect
+ * diffuse light times color times an analytic fit of the sheen albedo and the occlusion. The base
+ * lobes lose energy by a constant 1 - 0.157 * max(color), with no lookup table. The sheen lies
+ * under the clear coat, which attenuates it with the rest of the base. Emission is not scaled; an
+ * unlit view ignores it.
+ */
+ECS_STRUCT(Sheen, {
+    Rgb color;       /**< Color of the sheen, display encoded, black for none */
+    float roughness; /**< 0 tight rim to 1 broad, clamped to 0..1 */
 });
 
 /** Emitted light, inherited by instances, like Rgb. Tints do not apply to it. */
