@@ -22,10 +22,6 @@
 /** Buffer handle of the shared buffer that holds the default sun */
 #define BOX_LIGHTS_DEFAULT_BUFFER (BOX_RENDER_BUFFER_LIGHT_FIRST)
 
-/** Aspect ratio the frustum of a camera that follows its surface is assumed to have at most
- * when the lights it sees are picked for shadow tiles, so a light it may see is never left out */
-#define BOX_LIGHTS_SHADOW_ASPECT (4.0f)
-
 /** Direction toward the default sun, in world space */
 static const float box_lights_sun[3] = { 0.35f, 0.8f, 0.5f };
 
@@ -154,6 +150,7 @@ typedef struct box_render_lights_t {
     ecs_query_t *atlases;       /**< Entities with ShadowAtlas */
     ecs_query_t *atmospheres;   /**< Entities with Atmosphere, NULL without box.atmosphere */
     ecs_query_t *times;         /**< Entities with TimeOfDay, NULL without box.atmosphere */
+    box_render_fog_t *fog;      /**< Fog volumes of the views, see box_render_fog_views */
     ecs_vec_t scenes;           /**< box_light_scene_t */
     ecs_map_t lookup;           /**< Scene root plus one to the index of its scene plus one */
     ecs_vec_t free_buffers;     /**< uint32_t, light buffer handles to reuse */
@@ -1299,50 +1296,6 @@ static bool box_lights_shadow_view(
         box_camera_has_depth(&v->camera_data);
 }
 
-/** Check whether a sphere may reach into the frustum of a view.
- *
- * A camera that follows the aspect of its surface is tested with the wide
- * BOX_LIGHTS_SHADOW_ASPECT, an orthographic one sized by its surface only by its depth range,
- * so a sphere the view may see is never left out.
- *
- * @param v The view
- * @param center World center of the sphere
- * @param radius Radius of the sphere
- * @return Whether the sphere is not entirely outside a plane of the frustum
- */
-static bool box_lights_view_sees(
-    const box_render_view_t *v,
-    const float *center,
-    float radius)
-{
-    const Camera *c = &v->camera_data;
-    bool sides = !c->ortho || c->ortho_scale <= 0, result = true;
-    float aspect = c->aspect_ratio > 0 ? c->aspect_ratio : BOX_LIGHTS_SHADOW_ASPECT;
-    mat4 proj, m;
-    int32_t i, j;
-    box_camera_projection(c, aspect, 1.0f, proj);
-    glm_mat4_mul(proj, ECS_CONST_CAST(vec4*, v->view_matrix), m);
-    for (i = sides ? 0 : 4; i < 6 && result; i ++) {
-        vec4 plane;
-        for (j = 0; j < 4; j ++) {
-            if (i < 4) {
-                plane[j] = m[j][3] + ((i & 1) ? -1.0f : 1.0f) * m[j][i / 2];
-            } else {
-                plane[j] = i == 4 ? m[j][3] - m[j][2] : m[j][2];
-            }
-        }
-
-        float len = sqrtf(plane[0] * plane[0] + plane[1] * plane[1] + plane[2] * plane[2]);
-        if (len > 1e-12f) {
-            float d = (plane[0] * center[0] + plane[1] * center[1] + plane[2] * center[2] +
-                plane[3]) / len;
-            result = d >= -radius;
-        }
-    }
-
-    return result;
-}
-
 /** Check whether a tile must render because it or its light changed since the last frame: it
  * is new, moved, resized, or its record, kind or shadow_resolution differ.
  *
@@ -1416,7 +1369,7 @@ static void box_lights_shadow_tiles(
             float d = glm_vec3_distance(ECS_CONST_CAST(float*, v->camera_transform[3]),
                 ECS_CONST_CAST(float*, light->position)) - light->range;
             distance = glm_min(distance, glm_max(d, 0.0f));
-            seen = seen || box_lights_view_sees(v, light->position, light->range);
+            seen = seen || box_render_view_sees(v, light->position, light->range);
         }
 
         if (seen) {
@@ -1643,6 +1596,7 @@ static void BoxRenderExtractLights(
     box_lights_shadows(world, l, p);
     box_lights_send(l, p);
     box_lights_views(world, l, p);
+    box_render_fog_views(world, l->fog, p, &l->stats);
     box_lights_atmos_status(it, l);
     RenderStatus *status = ecs_singleton_get_mut(world, RenderStatus);
     if (status) {
@@ -1676,6 +1630,7 @@ static void box_lights_free(
     ecs_vec_fini_t(NULL, &l->places, box_render_shadow_place_t);
     ecs_vec_fini_t(NULL, &l->candidates, int32_t);
     ecs_vec_fini_t(NULL, &l->views, int32_t);
+    box_render_fog_free(l->fog);
     ecs_map_fini(&l->lookup);
     ecs_os_free(l);
 }
@@ -1759,6 +1714,7 @@ void box_render_lights_init(
     l->ambient = box_lights_scene_query(world, ecs_id(AmbientLight), "RenderAmbientLights");
     l->bakes = box_lights_scene_query(world, ecs_id(LightBake), "RenderLightBakes");
     l->atlases = box_lights_scene_query(world, ecs_id(ShadowAtlas), "RenderShadowAtlases");
+    l->fog = box_render_fog_new(world);
 
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "RenderExtractLights" }),

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "curve.wgsl"
+
 struct SurfaceData {
     p: array<vec4f, 24>,
 };
@@ -54,19 +56,12 @@ fn sp(i: i32) -> vec3f {
     return sv(sf(i, 0), sf(i, 1), sf(i, 2));
 }
 
-fn surface_cubic(start: vec3f, control1: vec3f, control2: vec3f, end: vec3f, t: f32) -> vec3f {
-    var a = sv_mix(start, control1, t);
-    var b = sv_mix(control1, control2, t);
-    var c = sv_mix(control2, end, t);
-    return sv_mix(sv_mix(a, b, t), sv_mix(b, c, t), t);
-}
-
 fn surface_path(first: i32, count: i32, t: f32) -> vec3f {
     var parameter = t * f32(count);
     var index = i32(min(floor(parameter), f32(count - 1)));
     var local = parameter - f32(index);
     var base = first + index * 4;
-    return surface_cubic(sp(base), sp(base + 1), sp(base + 2), sp(base + 3), local);
+    return curve_cubic3(sp(base), sp(base + 1), sp(base + 2), sp(base + 3), local);
 }
 
 fn surface_curve(t: f32) -> vec3f {
@@ -189,7 +184,7 @@ fn surface_sweep_sample(region: i32, u: f32, v: f32) -> SurfaceSweepSample {
         normal = sv_mul(normal, -1.0);
     }
     var result: SurfaceSweepSample;
-    result.position = sv_add(surface_cubic(p0, p1, p2, p3, local),
+    result.position = sv_add(curve_cubic3(p0, p1, p2, p3, local),
         sv_mul(sv_add(sv_mul(axis, x), sv_mul(binormal, z)), taper));
     result.normal = normal;
     result.tangent = du;

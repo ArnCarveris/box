@@ -173,3 +173,26 @@ fn shadow_factor(world: vec3f, normal: vec3f) -> f32 {
     let fade = clamp((depth - view.shadow_params.x) / span, 0.0, 1.0);
     return mix(shadow, 1.0, fade);
 }
+
+// Fraction of the first directional light that reaches a point in a medium, such as a fog
+// volume, which has no surface: one bilinear comparison in the first cascade whose box holds the
+// point, with the depth bias of the cascade but no normal offset, no filter, no blend into the
+// next cascade and no fade. 1 without shadows, beyond them and past the last cascade.
+fn shadow_point(world: vec3f) -> f32 {
+    let count = view.shadow_config.x;
+    let depth = -(view.view * vec4f(world, 1.0)).z;
+    if (count == 0u || depth >= view.shadow_params.y) {
+        return 1.0;
+    }
+
+    for (var i = 0u; i < count; i++) {
+        if (shadow_box_edge(i, world) >= 0.0) {
+            let p = view.shadow_matrix[i] * vec4f(world, 1.0);
+            let uv = p.xy * vec2f(0.5, -0.5) + vec2f(0.5);
+            let compare = p.z + view.shadow_bias[i];
+            return textureSampleCompareLevel(shadow_map, shadow_sampler, uv, i, compare);
+        }
+    }
+
+    return 1.0;
+}

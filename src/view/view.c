@@ -7,8 +7,8 @@
 #include <box.h>
 
 /** Construct View values that are lit, sample the baked lighting and the reflection probes of
- * their scene, render its atmosphere, light with an environment at intensity 1, have the
- * documented shadow defaults and cull with occlusion and a smallest size of one pixel.
+ * their scene, render its atmosphere and fog volumes, light with an environment at intensity 1,
+ * have the documented shadow defaults and cull with occlusion and a smallest size of one pixel.
  *
  * The shadow lookup moves along the geometric normal by 2 texels times 1 - N.L: Esoterica's
  * offset scale, and the smallest offset that keeps a normal mapped floor under a 10 degree sun
@@ -35,6 +35,7 @@ static void box_view_ctor(
         values[i].lighting.baked = true;
         values[i].lighting.reflections = true;
         values[i].lighting.atmosphere = true;
+        values[i].lighting.fog_volumes = true;
         values[i].lighting.environment.intensity = 1.0f;
         values[i].shadows = (ShadowSettings){
             .cascades = 4,
