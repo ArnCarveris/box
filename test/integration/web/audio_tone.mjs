@@ -15,8 +15,8 @@ which runs from its own wasm in an AudioWorklet, while a scene renders.
 .bake/local_env/<env>/wasm32-Emscripten/debug/bin, or under <output_dir>/local_env when
 bake3's bake.json sets output_dir; "$(tools/integration.py local-env --env <env>)" prints the
 local env folder either way. The page is served on a free localhost port without COOP/COEP
-headers and opened with test/integration/web/audio_tone.flecs (?preload=) and ?tone=440, with
-the autoplay policy of a normal browser. The check expects the audio context suspended before a
+headers and opened with test/integration/web/audio_tone.flecs (?preload=) and ?tone=440,
+without an autoplay flag. The check expects the audio context suspended before a
 gesture while the scene renders, starts it with a trusted click of the DevTools protocol, taps
 the worklet with an AnalyserNode and expects 440 Hz at a peak of 0.25. A 500 ms busy loop on the
 main thread has to leave the audio clock and the quantum count advancing by its length and the
@@ -149,10 +149,9 @@ async function main() {
   const server = await serve(opts.dir);
   const profile = mkdtempSync(join(tmpdir(), 'box-web-'));
   const debugPort = 20000 + Math.floor(Math.random() * 20000);
-  // Headless Chrome may allow audio without a gesture; the policy of a normal browser is set
-  // explicitly, so the check proves that a gesture starts the audio
+  // No autoplay flag: Chrome keeps the context suspended until a gesture, which the check
+  // asserts, so a gesture has to start the audio
   const chrome = spawn(opts.chrome, ['--headless=new', '--enable-unsafe-webgpu',
-    '--autoplay-policy=document-user-activation-required',
     `--remote-debugging-port=${debugPort}`, `--user-data-dir=${profile}`, '--no-first-run',
     '--window-size=640,480', 'about:blank'], { stdio: 'ignore' });
   let status = 2;
@@ -217,7 +216,11 @@ async function main() {
     expect(isolation.isolated === false, 'the page is cross origin isolated');
     expect(!isolation.failed, `the audio failed (${isolation.failed})`);
 
-    // Before a gesture: suspended, while the scene renders
+    // Before a gesture: suspended, while the scene renders. The first frames wait for the
+    // shaders to compile, so the window starts once the scene draws
+    if (!(await waitFor('window.boxFrames >= 30', 20000))) {
+      throw new Error('the scene did not start rendering');
+    }
     const frames0 = await evaluate('window.boxFrames');
     await sleep(1000);
     const before = await evaluate('({ state: Module.boxAudio.ctx.state, ' +

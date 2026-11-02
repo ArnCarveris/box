@@ -52,10 +52,10 @@ node test/integration/web/transmission.mjs \
 from its own wasm in an AudioWorklet, without shared memory, and starts on a user gesture. It
 serves the page without COOP/COEP headers, so `crossOriginIsolated` is false, and opens
 `test/integration/web/audio_tone.flecs`, a turning box, with `?tone=440`, the temporary trigger
-of the tone. Chrome runs with `--autoplay-policy=document-user-activation-required`, the policy of
-a normal browser, so no audio starts without a gesture. Before a gesture the check expects the
-audio context suspended, frames drawn and no error in the log. A trusted click of the DevTools
-protocol (`Input.dispatchMouseEvent`) on the canvas has to start it; an `AnalyserNode` on the
+of the tone. Chrome runs without an autoplay flag, so no audio starts without a gesture. Once
+the scene draws, the check expects the audio context suspended before a gesture, frames drawn
+for a second and no error in the log. A trusted click of the DevTools protocol
+(`Input.dispatchMouseEvent`) on the canvas has to start it; an `AnalyserNode` on the
 worklet node then has to measure 440 Hz at a peak of 0.25. A 500 ms busy loop on the main thread
 has to leave the clock and the quantum count of the worklet advancing by its length, with the
 tone intact afterwards, and `Module._box_audio_web_tone(660, 0.25)`, a command sent from C, has

@@ -5,8 +5,9 @@ Usage: audio_core.py <core.c> <out dir> <project dir>   (bake3 rule of project.j
 
 bake3 runs it for src/audio/core/core.c before it compiles box, for every target. For a target
 other than Emscripten (the out dir of the build has no "Emscripten" in it) it does nothing. For
-Emscripten it compiles the C files of the folder of core.c with emcc into box_audio_core.wasm in
-the out dir, a module without imports and with its own memory, and writes its bytes as a C array
+Emscripten it compiles the C files of the folder of core.c with the clang of Emscripten into
+box_audio_core.wasm in the out dir, a freestanding module without imports, libc or start code and
+with its own memory, and writes its bytes as a C array
 to <project>/.bake/generated/box_audio_core_wasm.h, which src/audio/platform_web.c includes, so
 the core travels inside the main module and the page needs no extra file.
 
@@ -29,25 +30,35 @@ EXPORTS = [
     "box_audio_core_wasm_set_level",
 ]
 
+# clang, not emcc: emcc links start code and libc of its cache into a standalone wasm, which the
+# core does not need, so the build needs no cache and the module stays about 1 KB.
 FLAGS = [
-    "-O2", "-msimd128", "-std=c11", "-DBOX_AUDIO_CORE_WASM", "--no-entry",
-    "-sSTANDALONE_WASM", "-sINITIAL_MEMORY=1MB", "-sSTACK_SIZE=64KB",
-    "-sALLOW_MEMORY_GROWTH=0", "-sFILESYSTEM=0",
-    "-sEXPORTED_FUNCTIONS=" + ",".join("_" + name for name in EXPORTS),
-]
+    "--target=wasm32-unknown-unknown", "-O2", "-msimd128", "-std=c11", "-ffreestanding",
+    "-nostdlib", "-Wall", "-Werror", "-DBOX_AUDIO_CORE_WASM",
+    "-Wl,--no-entry", "-Wl,-z,stack-size=65536", "-Wl,--initial-memory=1048576",
+    "-Wl,--max-memory=1048576", "-Wl,--strip-all",
+] + ["-Wl,--export=" + name for name in EXPORTS]
 
 
-def find_emcc():
-    """Finds emcc on PATH, else in $EMSDK."""
-    emcc = os.environ.get("EMCC") or shutil.which("emcc")
-    if not emcc:
-        for var in ("EMSDK", "EMSDK_DIR"):
-            root = os.environ.get(var)
-            path = os.path.join(root, "upstream", "emscripten", "emcc") if root else None
-            if path and os.path.exists(path):
-                emcc = path
-                break
-    return emcc
+def find_clang():
+    """Finds the clang of Emscripten: the LLVM_ROOT of em-config, else next to emcc on PATH or
+    in $EMSDK."""
+    config = shutil.which("em-config")
+    if config:
+        result = subprocess.run([config, "LLVM_ROOT"], capture_output=True, text=True)
+        path = os.path.join(result.stdout.strip(), "clang")
+        if result.returncode == 0 and os.path.exists(path):
+            return path
+    emcc = shutil.which("emcc")
+    roots = [os.path.dirname(os.path.dirname(os.path.realpath(emcc)))] if emcc else []
+    for var in ("EMSDK", "EMSDK_DIR"):
+        if os.environ.get(var):
+            roots.append(os.path.join(os.environ[var], "upstream"))
+    for root in roots:
+        path = os.path.join(root, "bin", "clang")
+        if os.path.exists(path):
+            return path
+    return None
 
 
 def newest(paths):
@@ -106,16 +117,17 @@ def main(argv):
             and os.path.getmtime(stamp) >= newest(inputs)):
         return 0
 
-    emcc = find_emcc()
-    if not emcc:
-        print("audio_core.py: emcc not found, cannot build the audio core", file=sys.stderr)
+    clang = find_clang()
+    if not clang:
+        print("audio_core.py: the clang of Emscripten was not found, cannot build the audio core",
+            file=sys.stderr)
         return 1
 
     with tempfile.TemporaryDirectory(dir=out_dir) as tmp:
         built = os.path.join(tmp, "box_audio_core.wasm")
-        result = subprocess.run([emcc] + FLAGS + sources + ["-o", built])
+        result = subprocess.run([clang] + FLAGS + sources + ["-o", built])
         if result.returncode != 0:
-            print("audio_core.py: emcc failed to build the audio core", file=sys.stderr)
+            print("audio_core.py: clang failed to build the audio core", file=sys.stderr)
             return 1
         with open(built, "rb") as f:
             data = f.read()

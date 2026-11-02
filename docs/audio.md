@@ -53,21 +53,27 @@ and its worklet mode needs `-sASYNCIFY` on the whole binary.
 
 The `rules` of `project.json` run `tools/audio_core.py` for `src/audio/core/core.c` before box
 compiles, on every build of box. For a target other than Emscripten the script does nothing. For
-`--target em` it compiles the C files of `src/audio/core` with
+`--target em` it compiles the C files of `src/audio/core` with the clang of Emscripten (the
+`LLVM_ROOT` of `em-config`):
 
 ```sh
-emcc -O2 -msimd128 -std=c11 -DBOX_AUDIO_CORE_WASM --no-entry -sSTANDALONE_WASM \
-    -sINITIAL_MEMORY=1MB -sSTACK_SIZE=64KB -sALLOW_MEMORY_GROWTH=0 -sFILESYSTEM=0 \
-    -sEXPORTED_FUNCTIONS=_box_audio_core_wasm_init,... core.c wasm.c -o box_audio_core.wasm
+clang --target=wasm32-unknown-unknown -O2 -msimd128 -std=c11 -ffreestanding -nostdlib \
+    -DBOX_AUDIO_CORE_WASM -Wl,--no-entry -Wl,-z,stack-size=65536 \
+    -Wl,--initial-memory=1048576 -Wl,--max-memory=1048576 -Wl,--strip-all \
+    -Wl,--export=box_audio_core_wasm_init ... core.c wasm.c -o box_audio_core.wasm
 ```
 
-into `box_audio_core.wasm` in the generated folder of the build: a module of a few KB with its
-own memory, no imports (the sine needs no libm), and the exports of `src/audio/core/wasm.c`
-(`box_audio_core_wasm_init`, `_render`, `_left`, `_right`, `_set_frequency`, `_set_level`). It
-writes the bytes as a C array to `.bake/generated/box_audio_core_wasm.h` in the box folder,
-which `src/audio/platform_web.c` includes. The core is built with `-O2` in every configuration
-and the header is rewritten only when its bytes change, so the build is the same for every
-local env; a stamp skips the emcc run while the sources are older than it.
+into `box_audio_core.wasm` in the generated folder of the build: a freestanding module of about
+1 KB with its own memory, no imports (the sine needs no libm) and the exports of
+`src/audio/core/wasm.c` (`box_audio_core_wasm_init`, `_render`, `_left`, `_right`,
+`_set_frequency`, `_set_level`). It is not built with `emcc`: a standalone wasm of `emcc` links
+start code and libc from the Emscripten cache, which the core does not use, and building those
+for a new configuration fails when the cache folder is a symlink. The script writes the bytes as
+a C array to `.bake/generated/box_audio_core_wasm.h` in the box folder, which
+`src/audio/platform_web.c` includes; bake3 puts the generated folder of a build on the include
+path of test harnesses only, so the header needs a fixed path. The core is built with `-O2` in
+every configuration and the header is rewritten only when its bytes change, so the build is the
+same for every local env; a stamp skips the compile while the sources are older than it.
 
 So the core travels inside the main module and the page needs no extra file: every app that
 uses box gets it without setup, whatever its shell. At start, `platform_web.c` copies the bytes

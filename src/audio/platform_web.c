@@ -43,16 +43,7 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
             constructor(options) {
                 super();
                 var o = options.processorOptions;
-                var module = new WebAssembly.Module(o.core);
-                var imports = {};
-                WebAssembly.Module.imports(module).forEach(function(i) {
-                    imports[i.module] = imports[i.module] || {};
-                    imports[i.module][i.name] = function() { return 0; };
-                });
-                var core = new WebAssembly.Instance(module, imports).exports;
-                if (core._initialize) {
-                    core._initialize();
-                }
+                var core = new WebAssembly.Instance(new WebAssembly.Module(o.core), {}).exports;
                 core.box_audio_core_wasm_init(o.sampleRate);
                 this.core = core;
                 this.quantum = o.quantum;
