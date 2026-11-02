@@ -724,10 +724,10 @@ void box_draws_color_unpack(
  *
  * The record holds the display encoded base color (the default color without Rgb), metallic,
  * roughness, emission, texture transform and AlphaCutoff (0 without one) clamped as the shading
- * was, the Transmission (factor 0 without one), the ClearCoat (0 without one or at 0) and the
- * SpecularAnisotropy (0 without one or at 0).
+ * was, the Transmission (factor 0 without one), and the ClearCoat and SpecularAnisotropy.
  *
- * Opacity, tints and the 2D shape are not.
+ * ClearCoat and SpecularAnisotropy are 0 without one or at 0. Opacity, tints and the 2D shape
+ * are not.
  *
  * @param out The record
  * @param material Material components of the owner

@@ -5,6 +5,8 @@
  * Most cases look at a smooth metal quad facing the camera under a point light 3 units in front
  * of it. The U direction of a Quad runs along +x, so a rotation of 0 stretches its highlight
  * along the x axis of the image and a rotation of pi / 2 along the y axis.
+ *
+ * Rotation turns counter clockwise from +U: pi / 4 stretches the highlight toward the top right.
  */
 
 #include <box.h>
@@ -288,15 +290,25 @@ void SpecularAnisotropy_rotation_turns_highlight(void) {
     test_assert(abs(ax - by) <= 2 + ax / 8);
     test_assert(abs(ay - bx) <= 2 + ay / 8);
 
+    SpecularAnisotropy diagonal = {.strength = 0.6f, .rotation = GLM_PI_4f};
+    unsigned char *c = aniso_highlight(&diagonal, true, "aniso_diagonal.png");
+    test_assert(aniso_sum(c, 76, 36) > aniso_sum(c, 76, 60) * 2);
+    test_assert(aniso_sum(c, 52, 60) > aniso_sum(c, 52, 36) * 2);
+
     stbi_image_free(a);
     stbi_image_free(b);
+    stbi_image_free(c);
 }
 
-/** Render a smooth white metal quad facing the camera in a view that samples reflection probes,
- * with an infinitely distant probe that captures a black enclosure with a bright vertical bar
- * on its wall toward +z, the one the quad reflects back toward the camera.
+/** Render a smooth white metal cylinder along y in a view that samples reflection probes, with
+ * an infinitely distant probe that captures a black enclosure with a bright vertical bar on its
+ * wall toward +z, the one the cylinder reflects back toward the camera.
  *
- * @param anisotropy The SpecularAnisotropy of the quad, NULL for none
+ * A flat mirror reflects the same directions about the bent normal as about its own, so the
+ * stretch only shows on a curved surface. U runs around the axis of the cylinder: a rotation of
+ * 0 spreads the thin reflection of the bar across it, one of pi / 2 keeps it thin.
+ *
+ * @param anisotropy The SpecularAnisotropy of the cylinder, NULL for none
  * @param name File name of the capture
  * @return The pixels, 64x48, freed with stbi_image_free
  */
@@ -341,13 +353,14 @@ static unsigned char* aniso_probe(
     ecs_set(world, probe, Position, {0, 0, 0});
     ecs_set(world, probe, ReflectionProbe, {.extent = {3, 3, 3}, .offset = {6, 0, 0}});
 
-    ecs_entity_t quad = ecs_new_w_pair(world, EcsChildOf, scene);
-    ecs_set(world, quad, Position, {0, 0, 0});
-    ecs_set(world, quad, Quad, {3, 3});
-    ecs_set(world, quad, Rgb, {255, 255, 255});
-    ecs_set(world, quad, PbrMaterial, {.metallic = 1, .roughness = 0.05f});
+    ecs_entity_t cylinder = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, cylinder, Position, {0, 0, 0});
+    ecs_set(world, cylinder, Cylinder, {.segments = 64, .smooth = true, .length = 3,
+        .radius = 0.8f});
+    ecs_set(world, cylinder, Rgb, {255, 255, 255});
+    ecs_set(world, cylinder, PbrMaterial, {.metallic = 1, .roughness = 0.05f});
     if (anisotropy) {
-        ecs_set_ptr(world, quad, SpecularAnisotropy, anisotropy);
+        ecs_set_ptr(world, cylinder, SpecularAnisotropy, anisotropy);
     }
 
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
@@ -422,7 +435,7 @@ void SpecularAnisotropy_indirect_stretches_reflection(void) {
     test_assert(wide_peak > 100);
     test_assert(plain_width >= 2);
     test_assert(plain_width < PROBE_W / 3);
-    test_assert(wide_width * 2 >= plain_width * 3);
+    test_assert(wide_width >= plain_width * 3);
     test_assert(abs(same_width - plain_width) <= 2);
 
     stbi_image_free(plain);
