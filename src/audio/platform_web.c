@@ -170,11 +170,8 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
     }
 
     var audio = { ctx: ctx, node: null, pending: [], requests: {}, sounds: {}, id: 0,
-<<<<<<< HEAD
-        failed: 0, coreSize: size, events: [], queue: [], onevents: null };
-=======
-        failed: 0, coreSize: size, events: [], onevents: null, gestures: 0, resumes: 0 };
->>>>>>> 334a375f6783356bcc019585fc85f52c31ac133f
+        failed: 0, coreSize: size, events: [], queue: [], onevents: null, gestures: 0,
+        resumes: 0 };
     audio.post = function(m, transfer) {
         if (audio.node) {
             audio.node.port.postMessage(m, transfer || []);
