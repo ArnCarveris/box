@@ -63,7 +63,7 @@ template PowerBar {
   }
 
   const barGlow: f32 = match lit {
-    true: 0.18
+    true: 0.35
     false: 0
   }
 

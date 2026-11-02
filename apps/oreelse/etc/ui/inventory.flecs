@@ -26,17 +26,15 @@ template OreSlotFace {
   prop hover: bool = false
   prop down: bool = false
   prop tex: entity = 0
-  prop tone: Rgb = {240, 176, 58}
 
   const motion = OreUiMotion[OreUiMotion].scale
   const lit = hover && can && filled
   const lift: f32 = match down && lit { true: 0.94; _: match lit { true: 1.12; _: 1 } }
   const iconAlpha: f32 = match can { true: 1; _: 0.45 }
-  const haloAlpha: f32 = match selected { true: 0.5; _: match lit { true: 0.34; _: 0.1 } }
 
   const liveFace: Rgb = match lit {
-    true: {60, 64, 70}
-    false: {38, 41, 46}
+    true: {66, 72, 82}
+    false: {46, 50, 58}
   }
 
   const faceFilled: Rgb = match selected {
@@ -51,7 +49,7 @@ template OreSlotFace {
 
   const edgeLive: rgba = match lit {
     true: {240, 176, 58, 255}
-    false: {80, 84, 90, 255}
+    false: {88, 94, 106, 255}
   }
 
   const edgeFilled: rgba = match selected {
@@ -86,10 +84,6 @@ template OreSlotFace {
   }
 
   if filled {
-    OreHalo aura(size: slotSize * 1.3, color: tone, alpha: haloAlpha, z: 1) {
-      Transition: [Opacity: {duration: 0.16 * motion}]
-    }
-
     art {
       Position: {0, 6, 2}
       Scale: {lift, lift, 1}
@@ -136,9 +130,7 @@ template StockSlot : box.widgets.HeadlessButton {
   BlendMode: Additive
 
   if filled {
-    OreSlotFace face(
-      selected: active, hover: hover, down: down, tex: item[OreIcon].texture,
-      tone: match active { true: palette.amber; _: palette.text })
+    OreSlotFace face(selected: active, hover: hover, down: down, tex: item[OreIcon].texture)
 
     OreText count_label(
       text: "{count}", size: 15, font: ui_fonts.mono, color: palette.text,
@@ -528,7 +520,6 @@ template ItemInfoPanel {
   }
 
   Panel panel(width: infoWidth, height: infoHeight, capH: 6, aura: 0.14) {
-    OreHalo icon_glow(size: iconSize * 2, color: palette.amber, alpha: 0.2, x: -infoWidth / 2 + 42, y: infoHeight / 2 - 50, z: 0)
     OreGlyph icon(tex: item[OreIcon].texture, size: iconSize, x: 14, y: 22)
     OreText item_name(text: item[OreItem].name, size: 21, font: ui_fonts.stencil, color: palette.text, x: 82, y: 17)
     OreText note(text: noteText, size: infoText, font: ui_fonts.label, color: palette.amber, x: 82, y: 49)

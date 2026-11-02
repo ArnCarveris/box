@@ -19,8 +19,6 @@ bake3 run apps/oreelse --local-env -- --seed 42                # play the map of
 bake3 run apps/oreelse --local-env -- --headless --frames 10   # headless run, exits 0
 bake3 run apps/oreelse --local-env -- --stresstest             # a late game base, see below
 bake3 --target em --local-env apps/oreelse                     # build for the browser
-
-python3 tools/integration.py visual --dir apps/oreelse/test/visual --app oreelse
 ```
 
 `--seed N` seeds the map and every random choice of the game; without it the seed comes from
@@ -824,10 +822,11 @@ The port follows these; new code keeps to them.
   and text in Chakra Petch, readouts in Share Tech Mono (`etc/ui/fonts`, SIL Open Font License),
   brushed plates, hazard tape and amber and Luminite light. The parts are in `etc/ui/kit.flecs`.
   The HUD lays out on a virtual screen of at least 1280x720, which `OreScreenCamera` scales to the
-  window, so wider windows give it more room and larger windows show it larger. Its view has its
-  own `Bloom`, off at the Low tier, so only `Emissive` and bright colors of the UI glow, not the
-  world under it. `OreUiMotion.scale` multiplies the durations and delays of its transitions; the
-  visual scenes set it to 0 (`test/visual/setup/seed.flecs`), so they capture the settled UI.
+  window, so wider windows give it more room and larger windows show it larger. A window resize
+  only updates `SurfaceStatus`, so `OreHud` reads the size of a window there and not in `Surface`.
+  Its view has its own `Bloom`, off at the Low tier, whose threshold sits above the icons and
+  plain colors, so only strong `Emissive` of the UI glows, not the icons or the world under it.
+  `OreUiMotion.scale` multiplies the durations and delays of its transitions.
 - **Determinism**: `OreSeed {seed, run}` holds the session seed (`--seed N` or the time) and
   the runs since the start. `ore_seed_get(world, stream)` derives the seed of a stream of the
   current run: stream 0 seeds the C generator (`OreRandom`, drawn with `ore_random01`), and
@@ -853,8 +852,6 @@ The port follows these; new code keeps to them.
   raises the plants of the tiles whose building changed.
 - **Systems write through `it->stage`** (`ecs_set`, `ecs_modified`, `ore_state_set`,
   `ore_toast`): the world is read only while the pipeline runs.
-- **Tests**: visual scenes in `apps/oreelse/test/visual` with baselines. Visual scenes include
-  `apps/oreelse/test/visual/setup/seed` before the game for a fixed map.
 - **Visuals** are ported from the original as From flecs-engine to box describes, with the
   original's prefab and part names (`Ore`, `Astronaut`, `JetPlume`, `GroundSurface`, ...), and
   never as placeholder geometry. Animation runs in C systems that only run while `Playing`;
@@ -877,7 +874,7 @@ keeps the original's bytes:
   `round(255 * srgb_encode(b / 255))` per channel, alpha (and a `Tint`'s strength) unchanged.
   That covers the materials (`Rgb`), `Emissive`, the lights, the particle colors and color
   curves, the `Tint`s of the ghosts and corpses, the deposits, the flora, the sun and the clear
-  color. `tools/linear_colors.py` converted them once (`apply`, over `etc` and `test/visual`) and
+  color. `tools/linear_colors.py` converted them once (`apply`) and
   is kept for reference: `linear_colors.py encode r g b` gives the bytes of a new world color of
   the original, `linear_colors.py decode r g b` the original's bytes of a world color of the
   port, to read it against the original. The comments quote the original's bytes.

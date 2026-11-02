@@ -104,7 +104,7 @@ ECS_STRUCT(OreBlink, {
 });
 
 /** How fast the animations of the UI run, a singleton the UI scripts read: 1 in play, 0 shows
- * every element in its final state at once, which the visual scenes set.
+ * every element in its final state at once.
  */
 ECS_STRUCT(OreUiMotion, {
     float scale; /**< Multiplier of the durations and delays of the UI's transitions */

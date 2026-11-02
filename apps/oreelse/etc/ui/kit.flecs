@@ -44,20 +44,17 @@ fn ore_screen_scale(w: f32, h: f32) -> f32 {
 }
 
 template OreScreenCamera {
-  const s = window[Surface]
+  prop scale: f32 = 1
 
   Position: {0, 0, 100}
-  Camera: {ortho: true, ortho_scale: ore_screen_scale(s.width, s.height)}
+  Camera: {ortho: true, ortho_scale: scale}
 }
 
 template OreScreenRoot {
-  const s = window[Surface]
-  const k = ore_screen_scale(s.width, s.height)
+  prop width: f32 = 1280
+  prop height: f32 = 720
 
-  LayoutItem: {
-    width: {mode: Fixed, value: s.width / k},
-    height: {mode: Fixed, value: s.height / k}
-  }
+  LayoutItem: {width: {mode: Fixed, value: width}, height: {mode: Fixed, value: height}}
 }
 
 template OreOneShot {

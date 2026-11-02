@@ -7,6 +7,7 @@ using box.view
 using box.effects
 using box.layout
 using box.text
+using box.surface
 using box.transition
 using oreelse
 
@@ -150,7 +151,6 @@ template OreLuminiteGauge {
   Layout: {}
   LayoutItem: {h: Left, v: Top, x: 12, y: -11, width: {mode: Fixed, value: 130}, height: {mode: Fixed, value: 38}}
 
-  OreHalo glow(size: 58, color: palette.luminite, alpha: 0.42, x: -46, y: 0, z: 0)
   OreGlyph symbol(tex: icons.luminite, size: 30, y: 4)
 
   numbers {
@@ -193,10 +193,6 @@ template OreWaveGauge {
   Layout: {}
   LayoutItem: {h: Left, v: Top, x: 158, y: -11, width: {mode: Fixed, value: 170}, height: {mode: Fixed, value: 38}}
 
-  if spawning {
-    OreHalo glow(size: 240, height: 90, color: palette.red, alpha: match fast { true: 0.4; _: 0.1 }, z: 0)
-  }
-
   OreGlyph symbol(tex: icons.critter, size: 28, y: 4)
   OreText caption(text: waveText, size: 11, font: ui_fonts.label, color: waveColor, x: 36, y: 3)
   OreBar bar(width: 132, height: 11, frac: waveFrac, color: waveColor, glow: 0.6, notches: 10, seconds: 0.1, x: 36, y: 22)
@@ -234,7 +230,7 @@ template OreStatusDivider {
 }
 
 template OreHudBloom {
-  Bloom: {intensity: 0.5, threshold: 0.58, threshold_softness: 0.22}
+  Bloom: {intensity: 0.6, threshold: 0.85, threshold_softness: 0.08}
 }
 
 hud_bloom { OreHudBloom }
@@ -255,13 +251,28 @@ template OreHud {
   const rowCount = OreCraftBook[OreCraftBook].row_count
   const lowTier = OreQuality[OreQuality].tier == Low
 
+  const hasStatus = window?[SurfaceStatus]
+  const isWindow: bool = match hasStatus {
+    true: window[SurfaceStatus].window
+    false: false
+  }
+  const pointWidth: f32 = match isWindow {
+    true: window[SurfaceStatus].point_width
+    false: window[Surface].width
+  }
+  const pointHeight: f32 = match isWindow {
+    true: window[SurfaceStatus].point_height
+    false: window[Surface].height
+  }
+  const screenScale = ore_screen_scale(pointWidth, pointHeight)
+
   ui {
     Scene: {}
 
-    OreScreenCamera camera()
+    OreScreenCamera camera(scale: screenScale)
 
     screen {
-      OreScreenRoot: {}
+      OreScreenRoot: {width: pointWidth / screenScale, height: pointHeight / screenScale}
       Layout: {}
 
       if live {
