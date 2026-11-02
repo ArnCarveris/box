@@ -1,6 +1,6 @@
-// The scene of the browser check of the audio tone (audio_tone.mjs). The page opens a window
+// The scene of the browser check of the audio core (audio_core.mjs). The page opens a window
 // only for a scene with a Surface; its 640x480 points fill the viewport of the check. A box
-// turns all the time so every frame draws, which the check counts while the tone plays.
+// turns all the time so every frame draws, which the check counts while the voices play.
 using box.transform
 using box.geometry
 using box.material

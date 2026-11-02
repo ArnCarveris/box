@@ -36,6 +36,14 @@ struct Material {
     // Sheen r | g << 8 | b << 16 | roughness << 24 as unorm8 (unpack4x8unorm), the color display
     // encoded, 0 without one
     sheen: u32,
+    // DiffuseTransmission r | g << 8 | b << 16 | factor << 24 as unorm8 (unpack4x8unorm), the
+    // color display encoded, 0 without one
+    diffuse_transmission: u32,
+    // DiffuseTransmission.thickness, world units behind the surface of its shadow lookup
+    thickness: f32,
+    reserved0: u32,
+    reserved1: u32,
+    reserved2: u32,
 };
 
 // Record of a material id; an id past the table reads the default material of slot 0.

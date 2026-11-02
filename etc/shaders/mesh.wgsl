@@ -46,6 +46,14 @@
 // indirect diffuse light times an analytic fit of its albedo in indirect light, and a constant
 // energy compensation of the base lobes, 1 - 0.157 times the largest channel of its color. It
 // lies under the clear coat. Without it (a black color) a fragment skips all of it.
+// A material with diffuse transmission (DiffuseTransmission, KHR_materials_diffuse_transmission)
+// adds a second Lambert lobe on the inverted normal, of its linear color times the diffuse color
+// times its factor, and keeps 1 - factor of its front diffuse lobe. Direct light reaches it
+// through the shadow at the position thickness behind the surface along the view ray, looked up
+// with the inverted geometric normal, so a thin sheet does not shadow itself; indirect light from
+// the far side reaches it without ambient occlusion. The clear coat and the sheen attenuate it as
+// they do the front diffuse lobe. It stays in the opaque pass. Without it (factor 0) a fragment
+// skips all of it, and every texture it reads is read without implicit derivatives.
 #include "include/instance.wgsl"
 #include "include/material.wgsl"
 #include "include/lights.wgsl"
@@ -170,13 +178,17 @@ struct VertexOut {
     @location(3) emissive: vec3f,
     @location(4) material: vec2f,
     @location(5) uv: vec2f,
-    @location(6) @interpolate(flat) cutoff: f32,
+    // Flat scalars of the material: the AlphaCutoff in x and the thickness of the
+    // DiffuseTransmission in y; z and w are 0
+    @location(6) @interpolate(flat) scalars: vec4f,
     // ClearCoat of the material: strength and roughness, 0 strength without one
     @location(10) @interpolate(flat) clear_coat: vec2f,
     // SpecularAnisotropy of the material: strength and rotation over 2 pi, 0 strength without one
     @location(11) @interpolate(flat) anisotropy: vec2f,
     // Sheen of the material: linear color and roughness, a black color without one
     @location(12) @interpolate(flat) sheen: vec4f,
+    // DiffuseTransmission of the material: linear color and factor, 0 factor without one
+    @location(13) @interpolate(flat) diffuse_transmission: vec4f,
     // Transmission of the material: factor, index of refraction, thickness and attenuation
     // distance, its linear attenuation color and the scale of the instance along its axes
     @location(7) @interpolate(flat) transmission: vec4f,
@@ -292,11 +304,14 @@ fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material) -> Vert
     o.color = s.color;
     o.emissive = material.emissive;
     o.material = s.material;
-    o.cutoff = material.cutoff;
+    o.scalars = vec4f(material.cutoff, material.thickness, 0.0, 0.0);
     o.clear_coat = unpack2x16unorm(material.clear_coat);
     o.anisotropy = unpack2x16unorm(material.anisotropy);
     let sheen = unpack4x8unorm(material.sheen);
     o.sheen = vec4f(material_linear(sheen.rgb), sheen.a);
+    let diffuse_transmission = unpack4x8unorm(material.diffuse_transmission);
+    o.diffuse_transmission = vec4f(material_linear(diffuse_transmission.rgb),
+        diffuse_transmission.a);
     o.uv = s.uv;
     o.transmission = vec4f(material.transmission_factor, material.ior,
         material.thickness_factor, material.attenuation_distance);
@@ -622,7 +637,10 @@ fn reflections(world: vec3f, spec: vec3f, roughness: f32, cluster: u32, fallback
 // along tangent, perpendicular to normal, with bitangent = cross(normal, tangent); it is 0
 // without one and where the UVs give no direction. sheen is the linear color of the sheen,
 // black without one, and sheen_roughness its roughness clamped to 0.07..1, material constants
-// that apply on both faces.
+// that apply on both faces. back_factor is the factor of the diffuse transmission, 0 without
+// one, back_color the light its back lobe passes through, its linear color times the diffuse
+// color times the factor, and thickness the distance behind the surface of its shadow lookup;
+// they apply on front faces and plain back faces.
 struct Surface {
     albedo: vec3f,
     alpha: f32,
@@ -639,6 +657,9 @@ struct Surface {
     bitangent: vec3f,
     sheen: vec3f,
     sheen_roughness: f32,
+    back_color: vec3f,
+    back_factor: f32,
+    thickness: f32,
 };
 
 // Tangent frame from the screen derivatives of the position and the UVs (cotangent frame), its
@@ -705,6 +726,15 @@ fn surface(f: VertexOut, front: bool) -> Surface {
         s.geometric = geometric;
     } else if (alpha_cutout) {
         s.alpha *= albedo.a;
+    }
+
+    s.back_factor = clamp(f.diffuse_transmission.w, 0.0, 1.0);
+    s.back_color = vec3f(0.0);
+    s.thickness = 0.0;
+    if (s.back_factor > 0.0) {
+        s.back_color = max(f.diffuse_transmission.rgb, vec3f(0.0)) * s.albedo *
+            (1.0 - s.metallic) * s.back_factor;
+        s.thickness = max(f.scalars.y, 0.0);
     }
 
     // The direction of the anisotropy: the tangent of the frame turned by the rotation around
@@ -816,12 +846,16 @@ struct Lit {
 // coat reflects the GGX lobe of its normal and roughness times its Fresnel Fc, and the base below
 // it 1 - Fc of what it reflects without one. An anisotropic base stretches its lobe along the
 // tangent, its roughness there mixed toward 1 by the square of the strength. A sheen adds its
-// Charlie lobe on the mapped normal and scales the base by its compensation, below the coat.
+// Charlie lobe on the mapped normal and scales the base by its compensation, below the coat. A
+// diffuse transmission keeps 1 - its factor of the diffuse color.
 fn brdf(s: Surface, v: vec3f, l: vec3f, radiance: vec3f) -> Lit {
     let n = s.normal;
     let a = s.roughness * s.roughness;
     let f0 = mix(vec3f(0.04), s.albedo, s.metallic);
-    let diffuse_color = s.albedo * (1.0 - s.metallic);
+    var diffuse_color = s.albedo * (1.0 - s.metallic);
+    if (s.back_factor > 0.0) {
+        diffuse_color *= 1.0 - s.back_factor;
+    }
     let ndv = max(dot(n, v), 1e-4);
     let h = normalize(l + v);
     let ndl = max(dot(n, l), 0.0);
@@ -864,15 +898,44 @@ fn brdf(s: Surface, v: vec3f, l: vec3f, radiance: vec3f) -> Lit {
     return lit;
 }
 
+// Light passed through the surface toward the eye by the back lobe of a diffuse transmission, of
+// one light arriving from direction l with a radiance at the far side: a Lambert lobe on the
+// inverted normal, without a Fresnel term or a specular lobe. The sheen scales it by its
+// compensation and the clear coat by 1 - its Fresnel toward the eye, as they do the front
+// diffuse lobe.
+fn brdf_back(s: Surface, v: vec3f, l: vec3f, radiance: vec3f) -> vec3f {
+    var back = s.back_color / PI * radiance * max(dot(-s.normal, l), 0.0);
+    if (any(s.sheen > vec3f(0.0))) {
+        back *= sheen_compensation(s.sheen);
+    }
+    if (s.coat > 0.0) {
+        let ndv_coat = max(dot(s.geometric, v), 1e-4);
+        back *= 1.0 - fresnel_schlick(ndv_coat, vec3f(0.04)).x * s.coat;
+    }
+    return back;
+}
+
 // Light inputs. Every direct light the forward pass uses comes from here: the directional
 // lights of the scene, the first one through its shadow map and light cookie, then the point
 // and spot lights of the cluster of the fragment, a spot or point light with a tile of the
-// shadow atlas through it.
+// shadow atlas through it. The back lobe of a diffuse transmission (brdf_back) adds to the
+// diffuse part, with its shadow, cookie and attenuation at the position thickness behind the
+// surface along the view ray, looked up with the inverted geometric normal.
 fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32) -> Lit {
     var sum = Lit(vec3f(0.0), vec3f(0.0));
     var shadow = shadow_factor(world, s.geometric);
     if (view.lights.x > 0u) {
         shadow *= light_cookie(world, normalize(lights[0].position), s.geometric);
+    }
+
+    let back = s.back_factor > 0.0;
+    let world_back = world - v * s.thickness;
+    var shadow_back = 1.0;
+    if (back) {
+        shadow_back = shadow_factor(world_back, -s.geometric);
+        if (view.lights.x > 0u) {
+            shadow_back *= light_cookie(world_back, normalize(lights[0].position), -s.geometric);
+        }
     }
 
     for (var i = 0u; i < view.lights.x; i++) {
@@ -881,6 +944,11 @@ fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32) -> Lit {
         let lit = brdf(s, v, normalize(light.position), light.color);
         sum.diffuse += lit.diffuse * visible;
         sum.specular += lit.specular * visible;
+        if (back) {
+            let visible_back = select(1.0, shadow_back, i == 0u);
+            sum.diffuse += brdf_back(s, v, normalize(light.position), light.color) *
+                visible_back;
+        }
     }
 
     if (view.lights.y > view.lights.x) {
@@ -899,6 +967,18 @@ fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32) -> Lit {
             let lit = brdf(s, v, l, light.color * attenuation(light, l, dist));
             sum.diffuse += lit.diffuse * visible;
             sum.specular += lit.specular * visible;
+            if (back) {
+                let delta_back = light.position - world_back;
+                let dist_back = length(delta_back);
+                let l_back = delta_back / max(dist_back, 1e-4);
+                var visible_back = 1.0;
+                if (light.shadow < view.spot_config.x) {
+                    visible_back = punctual_shadow(light, world_back, -s.geometric);
+                }
+
+                sum.diffuse += brdf_back(s, v, l_back,
+                    light.color * attenuation(light, l_back, dist_back)) * visible_back;
+            }
         }
     }
 
@@ -940,7 +1020,9 @@ fn indirect_light(world: vec3f, n: vec3f, spec: vec3f, roughness: f32, cluster: 
 
 // Light a surface reflects toward the eye, the indirect and direct diffuse light apart from
 // the indirect and direct specular light and the emission. An unlit view shows the albedo as
-// the diffuse part and the emission as the specular one.
+// the diffuse part and the emission as the specular one. The back lobe of a diffuse
+// transmission adds the indirect diffuse light from the far side, in direction -n, without
+// ambient occlusion, which describes the front; the front keeps 1 - its factor.
 fn shade_split(s: Surface, v: vec3f, world: vec3f) -> Lit {
     if (view.lights.z == 0u) {
         return Lit(s.albedo, s.emissive);
@@ -949,7 +1031,10 @@ fn shade_split(s: Surface, v: vec3f, world: vec3f) -> Lit {
     let n = s.normal;
     let a = s.roughness * s.roughness;
     let f0 = mix(vec3f(0.04), s.albedo, s.metallic);
-    let diffuse_color = s.albedo * (1.0 - s.metallic);
+    var diffuse_color = s.albedo * (1.0 - s.metallic);
+    if (s.back_factor > 0.0) {
+        diffuse_color *= 1.0 - s.back_factor;
+    }
     let ndv = max(dot(n, v), 1e-4);
     let ab = env_brdf(s.roughness, ndv);
     var r = reflect(-v, n);
@@ -984,6 +1069,10 @@ fn shade_split(s: Surface, v: vec3f, world: vec3f) -> Lit {
         specular_occlusion(ndv, s.occlusion, a);
     var indirect_diffuse = (vec3f(1.0) - specular_albedo) * diffuse_color * diffuse_light *
         s.occlusion;
+    var indirect_back = vec3f(0.0);
+    if (s.back_factor > 0.0) {
+        indirect_back = s.back_color * indirect_light(world, -n, -n, 1.0, cluster).diffuse;
+    }
 
     // A sheen reflects the indirect diffuse light by the fit of its albedo, and the base keeps
     // its compensation of what it reflects without one; the coat below covers both.
@@ -993,6 +1082,7 @@ fn shade_split(s: Surface, v: vec3f, world: vec3f) -> Lit {
             s.occlusion;
         indirect_specular = indirect_specular * comp + indirect_sheen;
         indirect_diffuse *= comp;
+        indirect_back *= comp;
     }
 
     // The clear coat reflects the light along the reflection about its own normal at its own
@@ -1008,6 +1098,11 @@ fn shade_split(s: Surface, v: vec3f, world: vec3f) -> Lit {
         indirect_specular = indirect_specular * (1.0 - coat_albedo) +
             coat_albedo * coat_light * specular_occlusion(ndv_coat, s.occlusion, ac);
         indirect_diffuse *= 1.0 - coat_albedo;
+        indirect_back *= 1.0 - coat_albedo;
+    }
+
+    if (s.back_factor > 0.0) {
+        indirect_diffuse += indirect_back;
     }
 
     let direct = lights_direct(s, v, world, cluster);
@@ -1128,7 +1223,7 @@ fn transmission(f: VertexOut, s: Surface) -> vec4f {
         return transmission(f, s);
     }
 
-    if (alpha_cutout && s.alpha < f.cutoff) {
+    if (alpha_cutout && s.alpha < f.scalars.x) {
         discard;
     }
 

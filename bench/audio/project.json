@@ -1,0 +1,28 @@
+{
+    "id": "bench_audio",
+    "type": "application",
+    "value": {
+        "description": "Benchmarks for the audio core: voices mixed through buses, in ns per frame",
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "lang.c": {
+        "include": [
+            "../../src/audio/core"
+        ]
+    },
+    "bench": {
+        "benchsuites": [
+            {
+                "id": "Mix",
+                "benchcases": [
+                    "voices_64_buses_8",
+                    "silent_64_buses_8",
+                    "idle"
+                ]
+            }
+        ]
+    }
+}

@@ -249,6 +249,26 @@
                 ]
             },
             {
+                "id": "DiffuseTransmission",
+                "testcases": [
+                    "factor_zero_unchanged",
+                    "backlit_by_directional",
+                    "backlit_by_point",
+                    "backlit_by_spot",
+                    "factor_splits_energy",
+                    "color_tints",
+                    "metal_has_none",
+                    "shadow_on_back",
+                    "sheet_no_self_shadow",
+                    "thickness_closed_shape",
+                    "indirect_from_behind",
+                    "ignored_by_unlit",
+                    "ignored_by_2d",
+                    "prefab",
+                    "change_and_remove"
+                ]
+            },
+            {
                 "id": "SpecularAnisotropy",
                 "testcases": [
                     "strength_zero_unchanged",

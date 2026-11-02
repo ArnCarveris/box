@@ -1,0 +1,161 @@
+/**
+ * @file audio/core/command.c
+ * @brief Writes commands of the audio core into a byte buffer, as a transport sends them.
+ */
+
+#include "core.h"
+
+void box_audio_writer_init(
+    box_audio_writer_t *writer,
+    void *data,
+    int32_t capacity)
+{
+    writer->data = data;
+    writer->size = 0;
+    writer->capacity = data && capacity > 0 ? capacity : 0;
+}
+
+bool box_audio_write_bytes(
+    box_audio_writer_t *writer,
+    const void *data,
+    int32_t size)
+{
+    const uint8_t *bytes = data;
+    bool result = size >= 0 && writer->size + size <= writer->capacity;
+    int32_t i;
+    if (result) {
+        for (i = 0; i < size; i ++) {
+            writer->data[writer->size + i] = bytes[i];
+        }
+
+        writer->size += size;
+    }
+
+    return result;
+}
+
+/** Fill the header of a command.
+ *
+ * @param header The header
+ * @param type A box_audio_cmd_type_t
+ * @param size Bytes of the command
+ */
+static void box_audio_write_header(
+    box_audio_cmd_header_t *header,
+    box_audio_cmd_type_t type,
+    size_t size)
+{
+    header->type = (uint16_t)type;
+    header->size = (uint16_t)size;
+}
+
+bool box_audio_write_play(
+    box_audio_writer_t *writer,
+    uint32_t voice,
+    uint32_t sound,
+    uint32_t bus,
+    float volume,
+    float pan,
+    float pitch,
+    uint32_t flags)
+{
+    box_audio_cmd_play_t cmd;
+    box_audio_write_header(&cmd.header, BOX_AUDIO_CMD_PLAY, sizeof(cmd));
+    cmd.voice = voice;
+    cmd.sound = sound;
+    cmd.bus = bus;
+    cmd.volume = volume;
+    cmd.pan = pan;
+    cmd.pitch = pitch;
+    cmd.flags = flags;
+
+    return box_audio_write_bytes(writer, &cmd, (int32_t)sizeof(cmd));
+}
+
+bool box_audio_write_stop(
+    box_audio_writer_t *writer,
+    uint32_t voice)
+{
+    box_audio_cmd_stop_t cmd;
+    box_audio_write_header(&cmd.header, BOX_AUDIO_CMD_STOP, sizeof(cmd));
+    cmd.voice = voice;
+
+    return box_audio_write_bytes(writer, &cmd, (int32_t)sizeof(cmd));
+}
+
+/** Write a set command of a voice or a bus.
+ *
+ * @param writer The writer
+ * @param type BOX_AUDIO_CMD_VOICE_SET or BOX_AUDIO_CMD_BUS_SET
+ * @param target Handle of the voice or index of the bus
+ * @param param A box_audio_param_t
+ * @param value The value
+ * @return Whether the command fit
+ */
+static bool box_audio_write_set(
+    box_audio_writer_t *writer,
+    box_audio_cmd_type_t type,
+    uint32_t target,
+    box_audio_param_t param,
+    float value)
+{
+    box_audio_cmd_set_t cmd;
+    box_audio_write_header(&cmd.header, type, sizeof(cmd));
+    cmd.target = target;
+    cmd.param = (uint32_t)param;
+    cmd.value = value;
+
+    return box_audio_write_bytes(writer, &cmd, (int32_t)sizeof(cmd));
+}
+
+bool box_audio_write_voice_set(
+    box_audio_writer_t *writer,
+    uint32_t voice,
+    box_audio_param_t param,
+    float value)
+{
+    return box_audio_write_set(writer, BOX_AUDIO_CMD_VOICE_SET, voice, param, value);
+}
+
+bool box_audio_write_bus_set(
+    box_audio_writer_t *writer,
+    uint32_t bus,
+    box_audio_param_t param,
+    float value)
+{
+    return box_audio_write_set(writer, BOX_AUDIO_CMD_BUS_SET, bus, param, value);
+}
+
+bool box_audio_write_order(
+    box_audio_writer_t *writer,
+    const box_audio_route_t *routes,
+    int32_t count)
+{
+    box_audio_cmd_order_t cmd;
+    int32_t bytes = count * (int32_t)sizeof(box_audio_route_t);
+    bool result = false;
+    if (count < 0 || count > BOX_AUDIO_BUS_MAX || (count && !routes) ||
+        writer->size + (int32_t)sizeof(cmd) + bytes > writer->capacity)
+    {
+        goto done;
+    }
+
+    box_audio_write_header(&cmd.header, BOX_AUDIO_CMD_ORDER, sizeof(cmd) + (size_t)bytes);
+    cmd.count = (uint32_t)count;
+    result = box_audio_write_bytes(writer, &cmd, (int32_t)sizeof(cmd)) &&
+        box_audio_write_bytes(writer, routes, bytes);
+
+done:
+    return result;
+}
+
+bool box_audio_write_release(
+    box_audio_writer_t *writer,
+    uint32_t sound)
+{
+    box_audio_cmd_release_t cmd;
+    box_audio_write_header(&cmd.header, BOX_AUDIO_CMD_SOUND_RELEASE, sizeof(cmd));
+    cmd.sound = sound;
+
+    return box_audio_write_bytes(writer, &cmd, (int32_t)sizeof(cmd));
+}

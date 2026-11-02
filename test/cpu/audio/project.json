@@ -1,0 +1,107 @@
+{
+    "id": "audio",
+    "type": "application",
+    "value": {
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "lang.c": {
+        "include": [
+            "../../../src/audio/core"
+        ]
+    },
+    "test": {
+        "testsuites": [
+            {
+                "id": "Voice",
+                "testcases": [
+                    "plays_exactly",
+                    "plays_stereo",
+                    "ends",
+                    "release_after_end",
+                    "release_unused",
+                    "loop_seam",
+                    "loop_seam_pitch",
+                    "pitch_octave",
+                    "sound_rate",
+                    "set_pitch",
+                    "start_no_click",
+                    "stop_no_click",
+                    "cap_steals_quietest",
+                    "steal_no_click",
+                    "many_plays",
+                    "play_unknown_sound"
+                ]
+            },
+            {
+                "id": "Bus",
+                "testcases": [
+                    "master_default",
+                    "volume",
+                    "mute",
+                    "pan",
+                    "voice_pan",
+                    "chain",
+                    "send",
+                    "send_zero",
+                    "cycle_refused",
+                    "order_one_block",
+                    "not_in_order_silent",
+                    "voice_bus_change"
+                ]
+            },
+            {
+                "id": "Ramp",
+                "testcases": [
+                    "volume_step",
+                    "volume_up",
+                    "bus_volume_step",
+                    "pan_step",
+                    "mute_step",
+                    "send_step",
+                    "restart_midway"
+                ]
+            },
+            {
+                "id": "Limiter",
+                "testcases": [
+                    "full_voices",
+                    "quiet_unchanged",
+                    "recovers",
+                    "threshold"
+                ]
+            },
+            {
+                "id": "Robust",
+                "testcases": [
+                    "nan_input",
+                    "nan_stereo",
+                    "nan_commands",
+                    "denormal_input",
+                    "huge_chain",
+                    "zero_frames",
+                    "odd_frames",
+                    "one_frame_at_a_time",
+                    "unknown_commands",
+                    "events_overflow"
+                ]
+            },
+            {
+                "id": "Deterministic",
+                "testcases": [
+                    "two_runs",
+                    "two_cores_at_once"
+                ]
+            },
+            {
+                "id": "NoAlloc",
+                "testcases": [
+                    "render",
+                    "events_and_release"
+                ]
+            }
+        ]
+    }
+}
