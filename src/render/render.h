@@ -97,7 +97,8 @@ float box_render_clip_area(
 
 /** Check whether a world position is inside the clip areas of the ClipChildren ancestors of an
  * entity, in the local XY plane of each, as the 2D shader clips it; an empty area contains none.
- * The ancestors of a floating element (LayoutFloat without clip) do not clip it.
+ * The ancestors of a floating element (LayoutFloat without clip) do not clip it, and nothing
+ * inside a float that hides (box_render_float_hidden) contains the position.
  *
  * @param world The world
  * @param e The entity, whose own ClipChildren does not clip it
@@ -109,6 +110,20 @@ bool box_render_clip_contains(
     ecs_entity_t e,
     const float point[3]);
 
+/** Check whether a floating element hides while its anchor is clipped out (LayoutFloat with
+ * hide_clipped and without clip): the ClipChildren ancestors of the anchor, scroll views
+ * included, clip all of the anchor away, as box_render_clip_hides checks it without skipping
+ * the clips that scroll. An anchor inside another hide_clipped float that hides is clipped out
+ * too.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return Whether it is such a float and its anchor is clipped out
+ */
+bool box_render_float_hidden(
+    const ecs_world_t *world,
+    ecs_entity_t e);
+
 /** Check whether the ClipChildren ancestors of an entity clip all of it away.
  *
  * Its bounds (its LayoutBounds, else its Rect, else its origin) have no part of positive size
@@ -116,7 +131,8 @@ bool box_render_clip_contains(
  *
  * A clip that scrolls (with a LayoutScroll) is skipped so Tab can scroll its content into view,
  * and the ancestors of a floating element (LayoutFloat) do not clip it, unless it is a clipped
- * overlay (LayoutFloat.clip).
+ * overlay (LayoutFloat.clip). Everything inside a float that hides (box_render_float_hidden) is
+ * hidden.
  *
  * @param world The world
  * @param e The entity

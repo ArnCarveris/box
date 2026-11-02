@@ -7,6 +7,7 @@
 #include <bake_test.h>
 #include <math.h>
 #include "render.h"
+#include "draw.h"
 
 /** Create the root of the tests: a 400 by 400 column.
  *
@@ -952,4 +953,219 @@ void LayoutFloat_clip_overlay_inside_float(void) {
     test_bool(float_clip_keeps(world, "outer.list.bar", 52, -60), false);
 
     ecs_fini(world);
+}
+
+/** The reproduction of a float whose anchor scrolls out: scroll, a 100 by 100 ClipChildren
+ * scroll view at the origin, holds anchor, 100 by 40 at its top (10..50 on y), and 300 points of
+ * filler. The child list of anchor, 80 by 50, hangs below it: it spans -50..30 on x and -40..10
+ * on y, centered on -10, -15, before a scroll. The argument is appended to the LayoutFloat of
+ * list. */
+#define FLOAT_HIDE_REPRO(fl) \
+    "using box.layout\n" \
+    "using box.geometry\n" \
+    "using box.transform\n" \
+    "scroll {\n" \
+    "  Position: {0, 0, 0}\n" \
+    "  Layout: {direction: Column}\n" \
+    "  LayoutItem: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 100}}\n" \
+    "  LayoutScroll: {vertical: true}\n" \
+    "  ClipChildren\n" \
+    "  anchor {\n" \
+    "    Layout: {}\n" \
+    "    LayoutItem: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 40}}\n" \
+    "    Rect: {1, 1}\n" \
+    "    list {\n" \
+    "      LayoutFloat: {anchor_v: Bottom, v: Top" fl "}\n" \
+    "      Rect: {80, 50}\n" \
+    "      item {\n" \
+    "        Position: {0, 0, 0}\n" \
+    "        Rect: {10, 10}\n" \
+    "      }\n" \
+    "    }\n" \
+    "  }\n" \
+    "  filler {\n" \
+    "    LayoutItem: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 300}}\n" \
+    "    Rect: {1, 1}\n" \
+    "  }\n" \
+    "}\n"
+
+/** Set the vertical scroll offset of the scroll view of FLOAT_HIDE_REPRO and run one frame.
+ *
+ * @param world The world
+ * @param y The offset
+ */
+static void float_hide_scroll(
+    ecs_world_t *world,
+    float y)
+{
+    ecs_set(world, ecs_lookup(world, "scroll"), LayoutScroll, { .y = y, .vertical = true });
+    ecs_progress(world, 0);
+}
+
+/** Check whether the clips keep the center of an element of FLOAT_HIDE_REPRO, as picking
+ * checks it.
+ *
+ * @param world The world
+ * @param path Path of the element
+ * @return Whether a hit at its center is kept
+ */
+static bool float_hide_keeps_center(
+    ecs_world_t *world,
+    const char *path)
+{
+    float center[3];
+    float_clip_center(world, path, center);
+
+    return box_render_clip_contains(world, ecs_lookup(world, path), center);
+}
+
+void LayoutFloat_hide_clipped_anchor_scrolled_out(void) {
+    ecs_world_t *world = float_clip_world(FLOAT_HIDE_REPRO(", hide_clipped: true"));
+    ecs_entity_t list = ecs_lookup(world, "scroll.anchor.list");
+    ecs_entity_t item = ecs_lookup(world, "scroll.anchor.list.item");
+    test_assert(list != 0 && item != 0);
+    test_bool(ecs_get(world, list, LayoutFloat)->hide_clipped, true);
+
+    /* The anchor is in view: the list is shown, past the bottom of the scroll view too */
+    float center[3];
+    float_clip_center(world, "scroll.anchor.list", center);
+    test_flt(center[0], -10);
+    test_flt(center[1], -15);
+    test_bool(box_render_float_hidden(world, list), false);
+    test_bool(float_hide_keeps_center(world, "scroll.anchor.list"), true);
+    test_bool(float_hide_keeps_center(world, "scroll.anchor.list.item"), true);
+    test_bool(box_render_clip_hides(world, list), false);
+    float below[3] = { 0, -35, 0 };
+    test_bool(box_render_clip_contains(world, list, below), true);
+
+    /* Scrolled out, in the frame of the scroll: the list follows its anchor but hides, its
+     * descendants with it */
+    float_hide_scroll(world, 200);
+    float_clip_center(world, "scroll.anchor", center);
+    test_flt(center[1], 230);
+    test_bool(box_render_clip_contains(world, ecs_lookup(world, "scroll.anchor"), center), false);
+    float_clip_center(world, "scroll.anchor.list", center);
+    test_flt(center[1], 185);
+    test_bool(box_render_float_hidden(world, list), true);
+    test_bool(float_hide_keeps_center(world, "scroll.anchor.list"), false);
+    test_bool(float_hide_keeps_center(world, "scroll.anchor.list.item"), false);
+    test_bool(box_render_clip_hides(world, list), true);
+    test_bool(box_render_clip_hides(world, item), true);
+
+    /* Partly in view (40..80 on y), the anchor keeps the list shown */
+    float_hide_scroll(world, 30);
+    test_bool(box_render_float_hidden(world, list), false);
+    test_bool(float_hide_keeps_center(world, "scroll.anchor.list"), true);
+
+    /* Scrolled back in, shown again */
+    float_hide_scroll(world, 200);
+    test_bool(box_render_float_hidden(world, list), true);
+    float_hide_scroll(world, 0);
+    test_bool(box_render_float_hidden(world, list), false);
+    test_bool(float_hide_keeps_center(world, "scroll.anchor.list"), true);
+    test_bool(float_hide_keeps_center(world, "scroll.anchor.list.item"), true);
+
+    ecs_fini(world);
+}
+
+void LayoutFloat_no_hide_without_flag(void) {
+    ecs_world_t *world = float_clip_world(FLOAT_HIDE_REPRO(""));
+    ecs_entity_t list = ecs_lookup(world, "scroll.anchor.list");
+    test_assert(list != 0);
+
+    /* Without hide_clipped the list stays shown while its anchor is scrolled out */
+    float_hide_scroll(world, 200);
+    test_bool(box_render_float_hidden(world, list), false);
+    test_bool(float_hide_keeps_center(world, "scroll.anchor.list"), true);
+
+    /* The flag set at runtime takes effect, and cleared again it shows the list */
+    ecs_set(world, list, LayoutFloat, {
+        .v = VAlignTop, .anchor_v = VAlignBottom, .hide_clipped = true });
+    ecs_progress(world, 0);
+    test_bool(box_render_float_hidden(world, list), true);
+    test_bool(float_hide_keeps_center(world, "scroll.anchor.list"), false);
+
+    ecs_set(world, list, LayoutFloat, { .v = VAlignTop, .anchor_v = VAlignBottom });
+    ecs_progress(world, 0);
+    test_bool(box_render_float_hidden(world, list), false);
+    test_bool(float_hide_keeps_center(world, "scroll.anchor.list"), true);
+
+    ecs_fini(world);
+}
+
+void LayoutFloat_hide_clipped_clip_overlay_ignored(void) {
+    /* A clipped overlay stays clipped by its ancestors and does not take hide_clipped */
+    ecs_world_t *world = float_clip_world(FLOAT_HIDE_REPRO(", clip: true, hide_clipped: true"));
+    ecs_entity_t list = ecs_lookup(world, "scroll.anchor.list");
+    test_assert(list != 0);
+    test_bool(box_render_float_hidden(world, list), false);
+    test_bool(float_hide_keeps_center(world, "scroll.anchor.list"), true);
+
+    /* Scrolled out with its anchor, the scroll view clips it as any other child */
+    float_hide_scroll(world, 200);
+    test_bool(box_render_float_hidden(world, list), false);
+    test_bool(float_hide_keeps_center(world, "scroll.anchor.list"), false);
+    float inside[3] = { -10, 45, 0 };
+    test_bool(box_render_clip_contains(world, list, inside), true);
+
+    ecs_fini(world);
+}
+
+void LayoutFloat_hide_clipped_not_drawn(void) {
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 100});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    test_assert(ecs_script_run(world, "hide", FLOAT_HIDE_REPRO(", hide_clipped: true"),
+        NULL) == 0);
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractDraws");
+    test_assert(system != 0);
+    box_render_draws_t *d = ecs_system_get(world, system)->ctx;
+    ecs_entity_t list = ecs_lookup(world, "scroll.anchor.list");
+    ecs_entity_t item = ecs_lookup(world, "scroll.anchor.list.item");
+    test_assert(list != 0 && item != 0);
+
+    /* The list and its descendants take the clip of the list, which leaves the clip of the
+     * scroll view, and whose area holds everything while the anchor is in view */
+    const DrawSlot *slot = ecs_get(world, list, DrawSlot);
+    test_assert(slot != NULL);
+    int32_t clip = slot->clip;
+    test_assert(clip > 0);
+    test_int(ecs_get(world, item, DrawSlot)->clip, clip);
+    test_assert(clip != ecs_get(world, ecs_lookup(world, "scroll.filler"), DrawSlot)->clip);
+    const box_render_clip_t *record = ecs_vec_get_t(&d->clips.records, box_render_clip_t, clip);
+    test_assert(record->area[0] > 1e6f && record->area[1] > 1e6f);
+    test_flt(record->area[3], 0);
+
+    /* Scrolled out, the area is empty in the frame of the scroll, so nothing of it draws */
+    float_hide_scroll(world, 200);
+    test_int(ecs_get(world, list, DrawSlot)->clip, clip);
+    record = ecs_vec_get_t(&d->clips.records, box_render_clip_t, clip);
+    test_flt(record->area[0], 0);
+    test_flt(record->area[1], 0);
+
+    /* Back in view, it draws again */
+    float_hide_scroll(world, 0);
+    record = ecs_vec_get_t(&d->clips.records, box_render_clip_t, clip);
+    test_assert(record->area[0] > 1e6f && record->area[1] > 1e6f);
+
+    /* Without the flag the list no longer has a clip */
+    ecs_set(world, list, LayoutFloat, { .v = VAlignTop, .anchor_v = VAlignBottom });
+    ecs_progress(world, 0);
+    test_int(ecs_get(world, list, DrawSlot)->clip, 0);
+    test_int(ecs_get(world, item, DrawSlot)->clip, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
 }

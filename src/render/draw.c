@@ -260,9 +260,10 @@ static void BoxDrawsOnHierarchy(
     box_draws_on_move(it, BOX_DRAW_BOTH);
 }
 
-/** Follow an element that got or lost LayoutFloat, or whose clip changed: a float leaves the
- * clips of its ancestors and draws after the rest, a clipped overlay keeps the clips and draws
- * after its siblings, so the subtree takes its clip index again and the order is made again.
+/** Follow an element that got or lost LayoutFloat, or whose clip or hide_clipped changed: a
+ * float leaves the clips of its ancestors and draws after the rest, a clipped overlay keeps the
+ * clips and draws after its siblings, a float with hide_clipped gives its subtree its own clip
+ * index, so the subtree takes its clip index again and the order is made again.
  *
  * @param it The iterator of the observer
  */
@@ -279,18 +280,20 @@ static void BoxDrawsOnLayoutFloat(
         ecs_entity_t e = it->entities[i];
         const LayoutFloat *fl = it->event == EcsOnRemove ? NULL :
             ecs_get(it->world, e, LayoutFloat);
-        bool clip = fl && fl->clip, was = ecs_map_get(&d->overlays, e) != NULL;
-        if (it->event == EcsOnSet && clip == was) {
+        uint64_t flags = fl ? (fl->clip ? 1u : (fl->hide_clipped ? 2u : 0u)) : 0u;
+        const uint64_t *found = ecs_map_get(&d->overlays, e);
+        uint64_t was = found ? *found : 0;
+        if (it->event == EcsOnSet && flags == was) {
             continue;
         }
 
-        if (clip) {
-            ecs_map_ensure(&d->overlays, e)[0] = 1;
+        if (flags) {
+            ecs_map_ensure(&d->overlays, e)[0] = flags;
         } else {
             ecs_map_remove(&d->overlays, e);
         }
 
-        d->order_dirty = true;
+        d->order_dirty |= it->event != EcsOnSet || (flags & 1u) != (was & 1u);
         *ecs_vec_append_t(NULL, &d->moved, box_draw_moved_t) = (box_draw_moved_t){
             .root = e, .kinds = BOX_DRAW_BOTH
         };

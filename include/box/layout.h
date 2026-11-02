@@ -142,6 +142,15 @@ ECS_STRUCT(LayoutContent, {
  * hierarchy order, and ClipChildren ancestors of its parent do not clip it or its descendants.
  * It follows its anchor when the anchor moves, scrolls or resizes, in the same frame.
  *
+ * With hide_clipped the float and its descendants are neither drawn nor picked, and Tab skips
+ * them, while its anchor is clipped out: the area of the anchor (its LayoutBounds, else its Rect)
+ * is fully outside the area of one of the ClipChildren ancestors of the anchor, scroll views
+ * included, the way a dropdown list hides once its button scrolls out of view. An anchor that
+ * is still partly inside keeps the float shown, and the float is never clipped by those
+ * ancestors. It is checked against the world transforms each frame, so it takes effect in the
+ * frame of the scroll. An anchor inside another hide_clipped float is also clipped out while
+ * that float hides. A clipped overlay ignores it.
+ *
  * With clip the element is a clipped overlay instead, such as the scroll bars of a scroll view:
  * placed the same way, out of the flow and not shifted by a LayoutScroll of its parent, but the
  * ClipChildren ancestors of its parent clip it and its descendants as any other child, in the
@@ -166,6 +175,8 @@ ECS_STRUCT(LayoutFloat, {
     bool clip;           /**< A clipped overlay: the ClipChildren ancestors of its parent
                           *   still clip it, and it draws in the order of its parent, after its
                           *   siblings */
+    bool hide_clipped;   /**< Neither drawn nor picked while its anchor is fully clipped out by
+                          *   the ClipChildren ancestors of the anchor */
 });
 
 /** Makes an element take the size of a surface in points, the root of a layout that fills the

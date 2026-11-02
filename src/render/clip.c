@@ -38,6 +38,34 @@ static ecs_entity_t box_draws_clip_up(
     return result;
 }
 
+/** Most hide_clipped floats a check of whether a float hides goes through, its anchor inside
+ * another one */
+#define BOX_DRAWS_FLOAT_NEST (8)
+
+static bool box_draws_float_hidden(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    int32_t nest);
+
+/** Get the floating element that hides while its anchor is clipped out (LayoutFloat with
+ * hide_clipped and without clip) an entity is, else none.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return Its LayoutFloat, NULL when it is no such float
+ */
+static const LayoutFloat* box_draws_float_hiding(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    const LayoutFloat *result = e ? ecs_get(world, e, LayoutFloat) : NULL;
+    if (result && (result->clip || !result->hide_clipped)) {
+        result = NULL;
+    }
+
+    return result;
+}
+
 float box_render_clip_area(
     const ecs_world_t *world,
     ecs_entity_t e,
@@ -136,11 +164,11 @@ bool box_render_clip_contains(
     const float point[3])
 {
     box_render_clip_t clip;
-    ecs_entity_t cur = box_draws_clip_up(world, e);
+    ecs_entity_t top = e, cur = box_draws_clip_up(world, e);
     int32_t depth = 0, clips = 0;
     bool result = true;
     for (; cur && result && depth < BOX_DRAWS_CLIP_WALK && clips < BOX_RENDER_CLIP_DEPTH;
-        cur = box_draws_clip_up(world, cur))
+        top = cur, cur = box_draws_clip_up(world, cur))
     {
         if (ecs_has_id(world, cur, ClipChildren)) {
             box_draws_clip_record(world, cur, 0, &clip);
@@ -150,6 +178,10 @@ bool box_render_clip_contains(
         }
 
         depth ++;
+    }
+
+    if (result && !cur) {
+        result = !box_draws_float_hidden(world, top, 0);
     }
 
     return result;
@@ -182,15 +214,26 @@ static bool box_draws_clip_misses(
         hi[0] <= -c->area[0] || lo[1] >= c->area[1] || hi[1] <= -c->area[1];
 }
 
-bool box_render_clip_hides(
+/** Check whether the ClipChildren ancestors of an entity clip all of it away, or it is inside a
+ * hide_clipped float that hides.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param scroll Whether the clips that scroll (with a LayoutScroll) count
+ * @param nest hide_clipped floats the check already went through
+ * @return Whether no part of it is drawn
+ */
+static bool box_draws_clip_hides(
     const ecs_world_t *world,
-    ecs_entity_t e)
+    ecs_entity_t e,
+    bool scroll,
+    int32_t nest)
 {
     const WorldTransform *t = ecs_get(world, e, WorldTransform);
     box_render_clip_t clip;
     vec3 corners[4];
     float half[2];
-    ecs_entity_t cur = box_draws_clip_up(world, e);
+    ecs_entity_t top = e, cur = box_draws_clip_up(world, e);
     int32_t i, depth = 0, clips = 0;
     bool result = false;
     box_render_clip_area(world, e, half);
@@ -204,10 +247,10 @@ bool box_render_clip_hides(
     }
 
     for (; cur && !result && depth < BOX_DRAWS_CLIP_WALK && clips < BOX_RENDER_CLIP_DEPTH;
-        cur = box_draws_clip_up(world, cur))
+        top = cur, cur = box_draws_clip_up(world, cur))
     {
         if (ecs_has_id(world, cur, ClipChildren) &&
-            !ecs_has(world, cur, LayoutScroll))
+            (scroll || !ecs_has(world, cur, LayoutScroll)))
         {
             box_draws_clip_record(world, cur, 0, &clip);
             result = box_draws_clip_misses(&clip, ECS_CONST_CAST(const vec3*, corners));
@@ -217,7 +260,51 @@ bool box_render_clip_hides(
         depth ++;
     }
 
+    if (!result && !cur) {
+        result = box_draws_float_hidden(world, top, nest);
+    }
+
     return result;
+}
+
+/** Check whether an entity is a hide_clipped float whose anchor is clipped out.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param nest hide_clipped floats the check already went through
+ * @return Whether it hides
+ */
+static bool box_draws_float_hidden(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    int32_t nest)
+{
+    const LayoutFloat *fl = nest < BOX_DRAWS_FLOAT_NEST ? box_draws_float_hiding(world, e) : NULL;
+    bool result = false;
+    if (fl) {
+        ecs_entity_t anchor = fl->anchor;
+        if (!anchor || anchor == e || !ecs_is_alive(world, anchor)) {
+            anchor = ecs_get_parent(world, e);
+        }
+
+        result = anchor && box_draws_clip_hides(world, anchor, true, nest + 1);
+    }
+
+    return result;
+}
+
+bool box_render_float_hidden(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    return box_draws_float_hidden(world, e, 0);
+}
+
+bool box_render_clip_hides(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    return box_draws_clip_hides(world, e, false, 0);
 }
 
 void box_draws_clips_init(
@@ -225,6 +312,7 @@ void box_draws_clips_init(
 {
     box_draw_clips_t *c = &d->clips;
     ecs_map_init(&c->index, NULL);
+    ecs_map_init(&c->floats, NULL);
     ecs_vec_init_t(NULL, &c->entities, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &c->records, box_render_clip_t, 0);
     ecs_vec_init_t(NULL, &c->free, int32_t, 0);
@@ -237,6 +325,7 @@ void box_draws_clips_fini(
 {
     box_draw_clips_t *c = &d->clips;
     ecs_map_fini(&c->index);
+    ecs_map_fini(&c->floats);
     ecs_vec_fini_t(NULL, &c->entities, ecs_entity_t);
     ecs_vec_fini_t(NULL, &c->records, box_render_clip_t);
     ecs_vec_fini_t(NULL, &c->free, int32_t);
@@ -245,14 +334,17 @@ void box_draws_clips_fini(
 /** Get the clip index of an element, giving it one when it has none.
  *
  * @param c The clips
+ * @param map The map of the kind of clip: c->index for ClipChildren, c->floats for a
+ * hide_clipped float
  * @param e The element
  * @return The clip index
  */
 static int32_t box_draws_clip_index(
     box_draw_clips_t *c,
+    ecs_map_t *map,
     ecs_entity_t e)
 {
-    uint64_t *found = ecs_map_get(&c->index, e);
+    uint64_t *found = ecs_map_get(map, e);
     int32_t result;
     if (found) {
         result = (int32_t)*found;
@@ -270,7 +362,7 @@ static int32_t box_draws_clip_index(
 
     *ecs_vec_get_t(&c->entities, ecs_entity_t, result) = e;
     ecs_os_zeromem(ecs_vec_get_t(&c->records, box_render_clip_t, result));
-    ecs_map_insert(&c->index, e, (uint64_t)result);
+    ecs_map_insert(map, e, (uint64_t)result);
     c->dirty = true;
 done:
     return result;
@@ -281,15 +373,19 @@ int32_t box_draws_clip_of(
     box_render_draws_t *d,
     ecs_entity_t e)
 {
-    ecs_entity_t cur = d->clips.tagged > 0 ? box_draws_clip_up(world, e) : 0;
+    ecs_entity_t top = e, cur = d->clips.tagged > 0 ? box_draws_clip_up(world, e) : 0;
     int32_t depth = 0, result = 0;
-    for (; cur && depth < BOX_DRAWS_CLIP_WALK; cur = box_draws_clip_up(world, cur)) {
+    for (; cur && depth < BOX_DRAWS_CLIP_WALK; top = cur, cur = box_draws_clip_up(world, cur)) {
         if (ecs_has_id(world, cur, ClipChildren)) {
-            result = box_draws_clip_index(&d->clips, cur);
+            result = box_draws_clip_index(&d->clips, &d->clips.index, cur);
             break;
         }
 
         depth ++;
+    }
+
+    if (!result && !cur && d->clips.tagged > 0 && box_draws_float_hiding(world, top)) {
+        result = box_draws_clip_index(&d->clips, &d->clips.floats, top);
     }
 
     return result;
@@ -316,6 +412,27 @@ void box_draws_clip_removed(
     }
 }
 
+/** Compute the record of the clip of a hide_clipped float, which its draws and those of its
+ * descendants nest in: an empty area while its anchor is clipped out, else one that contains
+ * every position.
+ *
+ * @param world The world
+ * @param e The float
+ * @param out Receives the record
+ */
+static void box_draws_float_record(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    box_render_clip_t *out)
+{
+    ecs_os_zeromem(out);
+    if (!box_draws_float_hidden(world, e, 0)) {
+        out->x[0] = 1;
+        out->y[1] = 1;
+        out->area[0] = out->area[1] = 1e30f;
+    }
+}
+
 void box_draws_clips_send(
     const ecs_world_t *world,
     box_render_draws_t *d,
@@ -331,7 +448,20 @@ void box_draws_clips_send(
             continue;
         }
 
-        box_draws_clip_record(world, e, box_draws_clip_of(world, d, e), &record);
+        uint64_t *fl = ecs_map_get(&c->floats, e);
+        if (fl && *fl == (uint64_t)i) {
+            if (!ecs_is_alive(world, e) || !box_draws_float_hiding(world, e)) {
+                *ecs_vec_get_t(&c->entities, ecs_entity_t, i) = 0;
+                *ecs_vec_append_t(NULL, &c->free, int32_t) = i;
+                ecs_map_remove(&c->floats, e);
+                continue;
+            }
+
+            box_draws_float_record(world, e, &record);
+        } else {
+            box_draws_clip_record(world, e, box_draws_clip_of(world, d, e), &record);
+        }
+
         box_render_clip_t *cur = ecs_vec_get_t(&c->records, box_render_clip_t, i);
         if (ecs_os_memcmp_t(cur, &record, box_render_clip_t)) {
             *cur = record;
