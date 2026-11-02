@@ -50,7 +50,6 @@
                     "clear_coat_pack",
                     "specular_anisotropy_defaults",
                     "specular_anisotropy_pack"
-<<<<<<< HEAD
                 ]
             },
             {
@@ -67,8 +66,6 @@
                     "view_disabled_none",
                     "other_scene_none",
                     "moved_and_removed"
-=======
->>>>>>> 5ab8f45879a0bbb51aaafb20221fb3f4d21d2098
                 ]
             },
             {
