@@ -239,6 +239,37 @@ static void box_reflection_probe_ctor(
     }
 }
 
+/** Construct FogVolume values: a white box of 5 units each way with a density of 0.1 that
+ * scatters all it extinguishes, a forward phase of 0.3, faces that fade over 1 unit, full sun
+ * and ambient light and 24 march steps.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_fog_volume_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    FogVolume *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (FogVolume){
+            .extent = {5.0f, 5.0f, 5.0f},
+            .density = 0.1f,
+            .color = {255, 255, 255},
+            .absorption = 0.0f,
+            .asymmetry = 0.3f,
+            .edge_fade = 1.0f,
+            .sun_inscatter = 1.0f,
+            .ambient_inscatter = 1.0f,
+            .steps = 24
+        };
+    }
+}
+
 /** Add ReflectionBakeStatus to an entity that got ReflectionBake.
  *
  * @param it The observer iterator
@@ -342,6 +373,8 @@ void BoxLightImport(
     box_owned_hooks(world, ReflectionBakeStatus, BOX_OWNED_STR(ReflectionBakeStatus, error));
     ECS_META_COMPONENT(world, ReflectionProbe);
     ecs_set_hooks(world, ReflectionProbe, { .ctor = box_reflection_probe_ctor });
+    ECS_META_COMPONENT(world, FogVolume);
+    ecs_set_hooks(world, FogVolume, { .ctor = box_fog_volume_ctor });
     ECS_META_COMPONENT(world, EnvironmentFilter);
     ECS_META_COMPONENT(world, Environment);
     ecs_set_hooks(world, Environment, { .ctor = box_environment_ctor });

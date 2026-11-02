@@ -947,6 +947,28 @@
                     "two_formats_one_target",
                     "first_frame_not_dark"
                 ]
+            },
+            {
+                "id": "FogVolume",
+                "testcases": [
+                    "no_volume_no_pass",
+                    "density_transmittance",
+                    "scatter_albedo",
+                    "clips_to_depth",
+                    "camera_inside",
+                    "not_behind_camera",
+                    "edge_fade",
+                    "rotated_box",
+                    "shadow_shaft",
+                    "asymmetry_toward_sun",
+                    "overlap_order",
+                    "in_transmission_snapshot",
+                    "orthographic",
+                    "resize",
+                    "two_views",
+                    "view_disables",
+                    "not_in_captures"
+                ]
             }
         ]
     }

@@ -197,6 +197,7 @@
                     "recycle_total",
                     "recycle_not_same_frame",
                     "skip_unseen",
+                    "skip_view_surface",
                     "skip_distance",
                     "skip_without_view",
                     "merge_nearby",
