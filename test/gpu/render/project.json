@@ -1009,6 +1009,7 @@
                     "noise_varies",
                     "noise_scale",
                     "wind_moves",
+                    "wind_period",
                     "noise_deterministic",
                     "noise_device_loss",
                     "lights_zero_unchanged",

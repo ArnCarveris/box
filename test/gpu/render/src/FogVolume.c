@@ -1099,6 +1099,46 @@ void FogVolume_wind_moves(void) {
     }
 }
 
+/** A frame at a time T and one at T plus the period of the noise along the wind, 10 noise_scale
+ * over its speed, render the same pixels, while one half a period later does not. */
+void FogVolume_wind_period(void) {
+    // fog_volume/noise
+    const float scale = 4, speed = 2;
+    const float period = 10 * scale / speed;
+    ecs_world_t *world = fv_world(0);
+    fv_noise_volume(world, 1, scale, (float[]){speed, 0, 0});
+    fv_surface(world, FV_SIZE, FV_SIZE, "fog_wind_period.png");
+    box_render_gpu_stats_t before = fv_frames(world, 3), after;
+    ecs_progress(world, 1000);
+    box_render_sync(world);
+    unsigned char *a = fv_load(world, "fog_wind_period.png", FV_SIZE, FV_SIZE);
+    ecs_progress(world, period);
+    box_render_sync(world);
+    unsigned char *b = fv_load(world, "fog_wind_period.png", FV_SIZE, FV_SIZE);
+    ecs_progress(world, period / 2);
+    box_render_sync(world);
+    unsigned char *c = fv_load(world, "fog_wind_period.png", FV_SIZE, FV_SIZE);
+    test_bool(box_render_gpu_stats(world, &after), true);
+    test_int(after.errors, before.errors);
+
+    double same = fv_shifted_diff(a, b, 0), half = fv_shifted_diff(a, c, 0);
+    int32_t i, worst = 0;
+    for (i = 0; i < FV_SIZE * FV_SIZE * 4; i ++) {
+        int32_t d = abs((int32_t)a[i] - (int32_t)b[i]);
+        worst = d > worst ? d : worst;
+    }
+
+    printf("wind period: diff %.2f (worst %d), half period diff %.2f\n", same, worst, half);
+    test_assert(same < 0.5);
+    test_assert(worst <= 3);
+    test_assert(half > 4.0 * same + 2.0);
+
+    stbi_image_free(a);
+    stbi_image_free(b);
+    stbi_image_free(c);
+    ecs_fini(world);
+}
+
 /** Two headless runs of 7 frames with --delta-time render the same pixels at the last frame,
  * wind and all. */
 void FogVolume_noise_deterministic(void) {
