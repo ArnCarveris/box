@@ -18,6 +18,11 @@ typedef struct CurvePair {
 
 static ECS_COMPONENT_DECLARE(CurvePair);
 
+/* The math cases call no flecs function that would set up the OS API they allocate with. */
+void Curve_setup(void) {
+    ecs_os_set_api_defaults();
+}
+
 /** Make a curve that owns a copy of keys.
  *
  * @param kind The kind
@@ -288,6 +293,8 @@ void Curve_uneven_catmull_rom(void) {
     curve_free(&curve);
 }
 
+/* The numeric slopes at a key are one sided differences of second order, so the curvature of
+ * the short spans cancels. */
 void Curve_catmull_rom_slope_continuous(void) {
     // curve/math
     CurveKey keys[] = {{ 0.0f, 0.0f }, { 0.2f, 1.0f }, { 0.9f, -0.5f }, { 1.0f, 0.3f },
@@ -307,9 +314,12 @@ void Curve_catmull_rom_slope_continuous(void) {
         test_assert(fabsf(left - expected) < 1e-4f);
 
         float e = 1e-3f, t = keys[k].time, v = box_curve_value(&curve, t, 0.0f);
-        float numeric_left = (v - box_curve_value(&curve, t - e, 0.0f)) / e;
-        float numeric_right = (box_curve_value(&curve, t + e, 0.0f) - v) / e;
-        test_assert(fabsf(numeric_left - numeric_right) < 0.1f);
+        float numeric_left = (3.0f * v - 4.0f * box_curve_value(&curve, t - e, 0.0f) +
+            box_curve_value(&curve, t - 2.0f * e, 0.0f)) / (2.0f * e);
+        float numeric_right = (4.0f * box_curve_value(&curve, t + e, 0.0f) - 3.0f * v -
+            box_curve_value(&curve, t + 2.0f * e, 0.0f)) / (2.0f * e);
+        test_assert(fabsf(numeric_left - expected) < 1e-2f);
+        test_assert(fabsf(numeric_right - expected) < 1e-2f);
     }
 
     curve_free(&curve);

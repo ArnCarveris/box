@@ -324,6 +324,7 @@
             },
             {
                 "id": "Curve",
+                "setup": true,
                 "testcases": [
                     "linear",
                     "catmull_rom",
