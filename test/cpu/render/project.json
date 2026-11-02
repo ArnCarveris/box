@@ -47,7 +47,25 @@
                     "transmission_override_permutations",
                     "transmission_dynamic_material_keeps_batch",
                     "clear_coat_defaults",
-                    "clear_coat_pack"
+                    "clear_coat_pack",
+                    "specular_anisotropy_defaults",
+                    "specular_anisotropy_pack"
+                ]
+            },
+            {
+                "id": "FogVolume",
+                "testcases": [
+                    "defaults",
+                    "partial_script_keeps_others",
+                    "rotated_record",
+                    "clamped_values",
+                    "back_to_front",
+                    "limit_keeps_nearest",
+                    "frustum_culled",
+                    "unlit_view_none",
+                    "view_disabled_none",
+                    "other_scene_none",
+                    "moved_and_removed"
                 ]
             },
             {
@@ -295,6 +313,8 @@
                     "transmission_prefab_change_reaches_slot",
                     "clear_coat_prefab_change_reaches_slot",
                     "clear_coat_dynamic_material_repacks",
+                    "specular_anisotropy_brings_material_id",
+                    "specular_anisotropy_prefab_change_reaches_slot",
                     "equal_materials_share_slot",
                     "changed_material_takes_other_slot",
                     "alone_changed_material_keeps_slot",

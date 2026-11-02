@@ -232,6 +232,20 @@
                 ]
             },
             {
+                "id": "SpecularAnisotropy",
+                "testcases": [
+                    "strength_zero_unchanged",
+                    "stretches_highlight",
+                    "rotation_turns_highlight",
+                    "indirect_stretches_reflection",
+                    "degenerate_uvs_isotropic",
+                    "ignored_by_unlit",
+                    "ignored_by_2d",
+                    "prefab",
+                    "change_and_remove"
+                ]
+            },
+            {
                 "id": "Tint",
                 "testcases": [
                     "mix_by_strength",
@@ -932,6 +946,28 @@
                     "forward_passes_lit_no_prepass",
                     "two_formats_one_target",
                     "first_frame_not_dark"
+                ]
+            },
+            {
+                "id": "FogVolume",
+                "testcases": [
+                    "no_volume_no_pass",
+                    "density_transmittance",
+                    "scatter_albedo",
+                    "clips_to_depth",
+                    "camera_inside",
+                    "not_behind_camera",
+                    "edge_fade",
+                    "rotated_box",
+                    "shadow_shaft",
+                    "asymmetry_toward_sun",
+                    "overlap_order",
+                    "in_transmission_snapshot",
+                    "orthographic",
+                    "resize",
+                    "two_views",
+                    "view_disables",
+                    "not_in_captures"
                 ]
             }
         ]

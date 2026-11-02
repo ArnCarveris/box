@@ -30,6 +30,9 @@ struct Material {
     attenuation_distance: f32,
     // ClearCoat strength | roughness << 16 as two unorm16 (unpack2x16unorm), 0 without one
     clear_coat: u32,
+    // SpecularAnisotropy strength | rotation / 2 pi << 16 as two unorm16 (unpack2x16unorm), 0
+    // without one
+    anisotropy: u32,
 };
 
 // Record of a material id; an id past the table reads the default material of slot 0.

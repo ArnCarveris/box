@@ -16,6 +16,31 @@ typedef struct box_sv {
     float z; /**< Z coordinate */
 } box_sv;
 
+/** Evaluate a cubic Bezier of vectors with box_curve_cubic3, so that the surface code calls the
+ * same name as its WGSL twin, curve_cubic3 in etc/shaders/include/curve.wgsl.
+ *
+ * @param start The start point
+ * @param control1 The first control point
+ * @param control2 The second control point
+ * @param end The end point
+ * @param t The curve parameter in [0, 1]
+ * @return The point on the curve
+ */
+static box_sv curve_cubic3(
+    box_sv start,
+    box_sv control1,
+    box_sv control2,
+    box_sv end,
+    float t)
+{
+    vec3 out;
+    box_curve_cubic3((vec3){start.x, start.y, start.z},
+        (vec3){control1.x, control1.y, control1.z}, (vec3){control2.x, control2.y, control2.z},
+        (vec3){end.x, end.y, end.z}, t, out);
+
+    return (box_sv){out[0], out[1], out[2]};
+}
+
 /** Construct a vector.
  *
  * @param x The x coordinate
@@ -165,29 +190,6 @@ static box_sv sp(
     return sv(sf(d, i, 0), sf(d, i, 1), sf(d, i, 2));
 }
 
-/** Evaluate a cubic Bezier curve.
- *
- * @param start The start point
- * @param control1 The first control point
- * @param control2 The second control point
- * @param end The end point
- * @param t The curve parameter in [0, 1]
- * @return The point on the curve
- */
-static box_sv surface_cubic(
-    box_sv start,
-    box_sv control1,
-    box_sv control2,
-    box_sv end,
-    float t)
-{
-    box_sv a = sv_mix(start, control1, t);
-    box_sv b = sv_mix(control1, control2, t);
-    box_sv c = sv_mix(control2, end, t);
-
-    return sv_mix(sv_mix(a, b, t), sv_mix(b, c, t), t);
-}
-
 /** Evaluate a packed path of cubic segments, each stored as four consecutive vectors.
  *
  * @param d The surface data
@@ -207,7 +209,7 @@ static box_sv surface_path(
     float local = parameter - (float)index;
     int base = first + index * 4;
 
-    return surface_cubic(sp(d, base), sp(d, base + 1), sp(d, base + 2), sp(d, base + 3), local);
+    return curve_cubic3(sp(d, base), sp(d, base + 1), sp(d, base + 2), sp(d, base + 3), local);
 }
 
 /** Evaluate the primary path of the surface (sweep path or lathe profile).
@@ -421,7 +423,7 @@ static box_sweep_sample surface_sweep_sample(
     }
 
     box_sweep_sample result;
-    result.position = sv_add(surface_cubic(p0, p1, p2, p3, local),
+    result.position = sv_add(curve_cubic3(p0, p1, p2, p3, local),
         sv_mul(sv_add(sv_mul(axis, x), sv_mul(binormal, z)), taper));
     result.normal = normal;
     result.tangent = du;
@@ -824,15 +826,6 @@ static box_sv surface_normal(
     }
 
     return result;
-}
-
-void box_path_cubic_evaluate(const vec3 start, const vec3 control1, const vec3 control2,
-    const vec3 end, float t, vec3 out)
-{
-    box_sv value = surface_cubic(sv(start[0], start[1], start[2]),
-        sv(control1[0], control1[1], control1[2]), sv(control2[0], control2[1], control2[2]),
-        sv(end[0], end[1], end[2]), t);
-    glm_vec3_copy((vec3){value.x, value.y, value.z}, out);
 }
 
 void box_surface_sample(const box_surface_data_t *data, int region,

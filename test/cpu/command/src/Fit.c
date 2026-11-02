@@ -858,3 +858,45 @@ void Fit_aspect_of_view_surface(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+void Fit_aspect_of_claimed_view_surface(void) {
+    // command/fit
+    ecs_world_t *world = fit_world();
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_entity_t camera = fit_camera(world, "camera", (Position){0, 0, 50}, (Rotation){0},
+        (Camera){ .fov = 60, .near_ = 0.1f, .far_ = 1000 }, false);
+
+    // A wide surface without view_root first, then a tall surface that claims the view
+    ecs_entity_t wide = ecs_new(world);
+    ecs_set(world, wide, Surface, {
+        .width = 1000, .height = 500, .texture = ecs_new(world) });
+    fit_surface(world, 500, 1000, camera);
+    ecs_entity_t box = fit_box(world, 0, (Position){0, 0, 0}, (Box){4, 4, 1});
+    ecs_progress(world, 0);
+
+    vec3 corners[8];
+    fit_corners(world, box, corners);
+
+    fit_result_t r;
+    fit_run(world, s, "fit camera", "camera", &r);
+    test_int(r.count, 1);
+    ecs_progress(world, 0);
+
+    // The claiming surface is 500x1000: the box fills the width of the view
+    const WorldTransform *t = ecs_get(world, camera, WorldTransform);
+    vec3 eye, closer;
+    fit_eye(world, camera, eye);
+    test_assert(fabsf(glm_vec3_distance(eye, r.center) - r.distance) < FIT_ROUNDED);
+    test_bool(fit_inside(t, eye, 60, 0.5f, 0.1f, corners, 8), true);
+    glm_vec3_sub(eye, r.center, closer);
+    glm_vec3_scale(closer, 0.9f, closer);
+    glm_vec3_add(closer, r.center, closer);
+    test_bool(fit_inside(t, closer, 60, 0.5f, 0.1f, corners, 8), false);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
