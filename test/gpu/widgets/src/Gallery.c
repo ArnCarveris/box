@@ -767,7 +767,7 @@ void Gallery_cursors(void) {
         CONTAINERS ".tabs.bar.tab_1", CursorPointer);
     gallery_expect_cursor(world, s, CONTAINERS ".notes.files.rows.row_1", 0, 0,
         CONTAINERS ".notes.files", CursorPointer);
-    gallery_expect_cursor(world, s, CONTAINERS ".notes.vscroll", 0, -0.9f, CONTAINERS ".notes",
+    gallery_expect_cursor(world, s, CONTAINERS ".notes", 0.98f, -0.9f, CONTAINERS ".notes",
         CursorPointer);
     gallery_expect_cursor(world, s, CONTAINERS ".notes.intro", 0, 0, CONTAINERS ".notes",
         CursorDefault);
@@ -820,8 +820,8 @@ void Gallery_resize(void) {
     const LayoutContent *c = ecs_get(world, ecs_lookup(world, PAGE), LayoutContent);
     test_assert(c->max_x > 300);
     test_assert(c->max_y > 500);
-    test_assert(ecs_lookup(world, PAGE ".vscroll") != 0);
-    test_assert(ecs_lookup(world, PAGE ".hscroll") != 0);
+    test_assert(ecs_lookup(world, PAGE ".scrollbars.vscroll") != 0);
+    test_assert(ecs_lookup(world, PAGE ".scrollbars.hscroll") != 0);
 
     /* The wheel over the page scrolls it, the header stays */
     gallery_rect(world, BASICS, basics);
@@ -839,7 +839,7 @@ void Gallery_resize(void) {
     /* Every section scrolls into view, a widget at the far end too */
     gallery_reveal(world, s, FORM);
     gallery_rect(world, FORM, after);
-    test_assert(after[2] <= 784 - 10 + 0.5f);
+    test_assert(after[2] <= 784 - 11 + 0.5f);
     gallery_tap(world, s, APPLY, 0, 0);
     gallery_expect_focus(world, s, APPLY);
     gallery_rect(world, HEADER, moved);

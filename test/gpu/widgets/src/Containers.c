@@ -5,6 +5,7 @@
  */
 
 #include "gallery.h"
+#include "render.h"
 #include <bake_test.h>
 #include <math.h>
 #include <stdlib.h>
@@ -26,6 +27,9 @@
 
 /** Thickness of the scroll bar of a scroll view */
 #define CONTAINERS_BAR (10.0f)
+
+/** Points between the scroll bars and the edges of their view, its border */
+#define CONTAINERS_EDGE (1.0f)
 
 /** The smaller of two numbers */
 #define CONTAINERS_MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -183,10 +187,12 @@ static void containers_thumb(
     float r[4];
     containers_rect(world, path, r);
     float view = r[3] - r[1];
-    float thumb = view * view / c->height;
-    float at = c->max_y > 0 ? (view - thumb) * c->y / c->max_y : 0;
+    float track = view - 2 * CONTAINERS_EDGE;
+    float thumb = track * view / c->height;
+    float at = c->max_y > 0 ? (track - thumb) * c->y / c->max_y : 0;
     ecs_os_snprintf(out, (ecs_size_t)size, "[%.1f, %.1f]",
-        (double)(r[2] - CONTAINERS_BAR * 0.5f), (double)(r[1] + at + thumb * along));
+        (double)(r[2] - CONTAINERS_EDGE - CONTAINERS_BAR * 0.5f),
+        (double)(r[1] + CONTAINERS_EDGE + at + thumb * along));
 }
 
 /** Run a key or button command with a Space binding and count the frames it was pressed in.
@@ -263,6 +269,173 @@ static bool containers_tab_reaches(
     return result;
 }
 
+/** Check a window coordinate, which the transforms of the layout round a little.
+ *
+ * @param v The coordinate
+ * @param expect The coordinate it must be
+ */
+static void gallery_expect_at(
+    float v,
+    float expect)
+{
+    if (fabsf(v - expect) >= 0.01f) {
+        printf("coordinate %f, expected %f\n", (double)v, (double)expect);
+    }
+
+    test_assert(fabsf(v - expect) < 0.01f);
+}
+
+/** Check that a window coordinate is at most a bound, give or take the rounding.
+ *
+ * @param v The coordinate
+ * @param bound The bound
+ */
+static void gallery_expect_at_most(
+    float v,
+    float bound)
+{
+    if (v >= bound + 0.01f) {
+        printf("coordinate %f, expected at most %f\n", (double)v, (double)bound);
+    }
+
+    test_assert(v < bound + 0.01f);
+}
+
+/** Check that a window coordinate is at least a bound, give or take the rounding.
+ *
+ * @param v The coordinate
+ * @param bound The bound
+ */
+static void gallery_expect_at_least(
+    float v,
+    float bound)
+{
+    if (v <= bound - 0.01f) {
+        printf("coordinate %f, expected at least %f\n", (double)v, (double)bound);
+    }
+
+    test_assert(v > bound - 0.01f);
+}
+
+/** Get the window rectangle of a shape without LayoutBounds, such as a scroll bar, from its Rect.
+ *
+ * @param world The world
+ * @param path Path of the shape
+ * @param r Receives left, top, right and bottom in window points
+ */
+static void containers_shape(
+    ecs_world_t *world,
+    const char *path,
+    float r[4])
+{
+    ecs_entity_t e = ecs_lookup(world, path);
+    ecs_entity_t window = ecs_lookup(world, "window");
+    test_assert(e != 0);
+    const WorldTransform *t = ecs_get(world, e, WorldTransform);
+    const Rect *rect = ecs_get(world, e, Rect);
+    const SurfaceStatus *ss = ecs_get(world, window, SurfaceStatus);
+    test_assert(t != NULL && rect != NULL && ss != NULL);
+    float x = (float)ss->point_width * 0.5f + t->m[3][0];
+    float y = (float)ss->point_height * 0.5f - t->m[3][1];
+    r[0] = x - rect->width * 0.5f;
+    r[1] = y - rect->height * 0.5f;
+    r[2] = x + rect->width * 0.5f;
+    r[3] = y + rect->height * 0.5f;
+}
+
+/** Check whether the clips around an entity keep a window point of it, as the 2D shader and
+ * picking clip it.
+ *
+ * @param world The world
+ * @param path Path of the entity
+ * @param x Window x of the point
+ * @param y Window y of the point
+ * @return Whether no ClipChildren ancestor clips the point away
+ */
+static bool containers_clip_keeps(
+    ecs_world_t *world,
+    const char *path,
+    float x,
+    float y)
+{
+    ecs_entity_t e = ecs_lookup(world, path);
+    ecs_entity_t window = ecs_lookup(world, "window");
+    test_assert(e != 0);
+    const WorldTransform *t = ecs_get(world, e, WorldTransform);
+    const SurfaceStatus *ss = ecs_get(world, window, SurfaceStatus);
+    test_assert(t != NULL && ss != NULL);
+    float point[3] = {
+        x - (float)ss->point_width * 0.5f, (float)ss->point_height * 0.5f - y, t->m[3][2]
+    };
+
+    return box_render_clip_contains(world, e, point);
+}
+
+/** Scroll the page so that the top of an element is at a window y, as far as the page scrolls.
+ *
+ * @param world The world
+ * @param s The terminal session
+ * @param path Path of the element
+ * @param top Window y its top goes to
+ */
+static void containers_page_top(
+    ecs_world_t *world,
+    ecs_entity_t s,
+    const char *path,
+    float top)
+{
+    float r[4];
+    containers_rect(world, path, r);
+    const LayoutContent *c = containers_content(world, PAGE);
+    float y = c->y + r[1] - top;
+    y = y < 0 ? 0 : y > c->max_y ? c->max_y : y;
+    ecs_os_free(gallery_run(world, s, "set " PAGE " box.widgets.ScrollView.mut.y %.1f",
+        (double)y));
+    gallery_settle(world, s);
+}
+
+/** Get the handler PickStatus reports at a window point after moving the cursor there.
+ *
+ * @param world The world
+ * @param s The terminal session
+ * @param x Window x
+ * @param y Window y
+ * @return The handler as the get command prints it, owned by the caller
+ */
+static char* containers_handler_at(
+    ecs_world_t *world,
+    ecs_entity_t s,
+    float x,
+    float y)
+{
+    ecs_os_free(gallery_run(world, s, "mouse_move [%.1f, %.1f]", (double)x, (double)y));
+    gallery_settle(world, s);
+
+    return gallery_run(world, s, "get $ box.picking.PickStatus.handler");
+}
+
+/** Resize the window and run the frames that lay the gallery out again.
+ *
+ * @param world The world
+ * @param width Width in points
+ * @param height Height in points
+ */
+static void containers_resize(
+    ecs_world_t *world,
+    int32_t width,
+    int32_t height)
+{
+    ecs_entity_t window = ecs_lookup(world, "window");
+    int32_t i;
+    Surface *surface = ecs_get_mut(world, window, Surface);
+    surface->width = width;
+    surface->height = height;
+    ecs_modified(world, window, Surface);
+    for (i = 0; i < 4; i ++) {
+        ecs_progress(world, 0);
+    }
+}
+
 void Containers_scene_loads(void) {
     // widgets/containers
     ecs_entity_t s = 0;
@@ -285,7 +458,7 @@ void Containers_scene_loads(void) {
         "\"scene_001.flecs\"");
     test_assert(ecs_lookup(world, QUALITY ".list.option_0") == 0);
     test_assert(ecs_has_id(world, ecs_lookup(world, NOTES), ClipChildren));
-    test_assert(ecs_lookup(world, NOTES ".vscroll") != 0);
+    test_assert(ecs_lookup(world, NOTES ".scrollbars.vscroll") != 0);
     test_assert(containers_content(world, NOTES)->max_y > CONTAINERS_STEP);
 
     /* The headers of the tabs follow each other in a row above the page */
@@ -804,19 +977,21 @@ void Containers_scroll_thumb_drag(void) {
     char from[64], to[64];
     containers_rect(world, NOTES, r);
     float view = r[3] - r[1];
-    float thumb = view * view / c->height;
-    float travel = view - thumb;
+    float track = view - 2 * CONTAINERS_EDGE;
+    float thumb = track * view / c->height;
+    float travel = track - thumb;
+    float bar_x = r[2] - CONTAINERS_EDGE - CONTAINERS_BAR * 0.5f;
 
     /* The thumb is the visible fraction of the track */
-    test_flt(ecs_get(world, ecs_lookup(world, NOTES ".vscroll.knob"), Rect)->height,
+    test_flt(ecs_get(world, ecs_lookup(world, NOTES ".scrollbars.vscroll.knob"), Rect)->height,
         thumb - 4);
 
     containers_thumb(world, NOTES, 0.5f, from, sizeof(from));
     ecs_os_free(gallery_run(world, s, "mouse_move %s", from));
     gallery_settle(world, s);
     gallery_expect(world, s, "get $ box.picking.PickStatus.handler", "\"" NOTES "\"");
-    ecs_os_snprintf(to, ECS_SIZEOF(to), "[%.1f, %.1f]", (double)(r[2] - 5),
-        (double)(r[1] + thumb * 0.5f + travel * 0.5f));
+    ecs_os_snprintf(to, ECS_SIZEOF(to), "[%.1f, %.1f]", (double)bar_x,
+        (double)(r[1] + CONTAINERS_EDGE + thumb * 0.5f + travel * 0.5f));
     ecs_os_free(gallery_run(world, s, "mouse_drag left %s %s", from, to));
     gallery_settle(world, s);
     test_assert(fabs(containers_content(world, NOTES)->y - max_y * 0.5) < 1);
@@ -824,7 +999,7 @@ void Containers_scroll_thumb_drag(void) {
 
     /* Past the end of the track the offset stops at the end */
     containers_thumb(world, NOTES, 0.5f, from, sizeof(from));
-    ecs_os_snprintf(to, ECS_SIZEOF(to), "[%.1f, %.1f]", (double)(r[2] - 5),
+    ecs_os_snprintf(to, ECS_SIZEOF(to), "[%.1f, %.1f]", (double)bar_x,
         (double)(r[3] + 100));
     ecs_os_free(gallery_run(world, s, "mouse_drag left %s %s", from, to));
     gallery_settle(world, s);
@@ -832,7 +1007,7 @@ void Containers_scroll_thumb_drag(void) {
     test_flt(containers_number(world, s, NOTES, "ScrollView", "y"), max_y);
 
     containers_thumb(world, NOTES, 0.5f, from, sizeof(from));
-    ecs_os_snprintf(to, ECS_SIZEOF(to), "[%.1f, %.1f]", (double)(r[2] - 5),
+    ecs_os_snprintf(to, ECS_SIZEOF(to), "[%.1f, %.1f]", (double)bar_x,
         (double)(r[1] - 100));
     ecs_os_free(gallery_run(world, s, "mouse_drag left %s %s", from, to));
     gallery_settle(world, s);
@@ -1001,6 +1176,310 @@ void Containers_scroll_nested(void) {
     containers_wheel(world, s, 0, 1);
     test_flt(containers_content(world, FILES)->y, CONTAINERS_STEP);
     test_flt(containers_content(world, NOTES)->y, CONTAINERS_STEP);
+
+    ecs_fini(world);
+}
+
+void Containers_scroll_bar_clipped_by_page(void) {
+    // widgets/containers
+    ecs_entity_t s = 0;
+    ecs_world_t *world = gallery_load(&s);
+    float page[4], notes[4], bar[4], knob[4];
+
+    /* The notes view runs out of the bottom of the page */
+    gallery_rect(world, PAGE, page);
+    containers_page_top(world, s, NOTES, page[3] - 100);
+    containers_rect(world, NOTES, notes);
+    test_assert(notes[1] < page[3] && notes[3] > page[3] + 20);
+    test_assert(ecs_lookup(world, NOTES ".scrollbars") != 0);
+    test_bool(ecs_has(world, ecs_lookup(world, NOTES ".scrollbars"), LayoutFloat), false);
+    test_bool(ecs_has(world, ecs_lookup(world, NOTES ".scrollbars.vscroll"), LayoutFloat), false);
+
+    /* The track is drawn inside the page and clipped below it */
+    containers_shape(world, NOTES ".scrollbars.vscroll", bar);
+    test_assert(bar[3] > page[3] + 10);
+    float x = (bar[0] + bar[2]) * 0.5f;
+    test_bool(containers_clip_keeps(world, NOTES ".scrollbars.vscroll", x, page[3] - 20), true);
+    test_bool(containers_clip_keeps(world, NOTES ".scrollbars.vscroll", x, page[3] + 5), false);
+
+    /* At the end of its range the thumb lies below the page: not drawn, not picked */
+    float max_y = containers_content(world, NOTES)->max_y;
+    ecs_os_free(gallery_run(world, s, "set " NOTES " box.widgets.ScrollView.mut.y %.1f",
+        (double)max_y));
+    gallery_settle(world, s);
+    containers_shape(world, NOTES ".scrollbars.vscroll.knob", knob);
+    float y = page[3] + 6;
+    test_assert(knob[3] > y + 2);
+    test_bool(containers_clip_keeps(world, NOTES ".scrollbars.vscroll.knob", x, y), false);
+    if (knob[1] > page[3]) {
+        test_bool(box_render_clip_hides(world,
+            ecs_lookup(world, NOTES ".scrollbars.vscroll.knob")), true);
+    }
+
+    char *handler = containers_handler_at(world, s, x, y);
+    test_assert(strcmp(handler, "\"" NOTES "\"") != 0);
+    ecs_os_free(handler);
+
+    /* A press there does not grab the thumb */
+    ecs_os_free(gallery_run(world, s, "mouse_click left [%.1f, %.1f]", (double)x, (double)y));
+    gallery_settle(world, s);
+    containers_expect(world, s, NOTES, "ScrollView", "drag", "0");
+    test_flt(containers_content(world, NOTES)->y, max_y);
+
+    /* Scrolled past the top of the page, the bar does not draw or pick over the header */
+    ecs_os_free(gallery_run(world, s, "set " NOTES " box.widgets.ScrollView.mut.y 0"));
+    gallery_settle(world, s);
+    containers_page_top(world, s, NOTES, page[1] - 100);
+    containers_rect(world, NOTES, notes);
+    test_assert(notes[1] < page[1] - 20 && notes[3] > page[1]);
+    containers_shape(world, NOTES ".scrollbars.vscroll", bar);
+    test_assert(bar[1] < page[1] - 10);
+    test_bool(containers_clip_keeps(world, NOTES ".scrollbars.vscroll", x, page[1] - 5), false);
+    test_bool(containers_clip_keeps(world, NOTES ".scrollbars.vscroll", x, page[1] + 20), true);
+    handler = containers_handler_at(world, s, x, page[1] - 5);
+    test_assert(strcmp(handler, "\"" NOTES "\"") != 0);
+    ecs_os_free(handler);
+    gallery_expect(world, s, "logs warning 100", "");
+
+    ecs_fini(world);
+}
+
+void Containers_scroll_bar_inside_border(void) {
+    // widgets/containers
+    ecs_entity_t s = 0;
+    ecs_world_t *world = containers_load(&s);
+    float notes[4], bar[4], files[4];
+
+    /* The bar of the notes view keeps clear of its border: one point inside the right, top and
+     * bottom edges */
+    containers_rect(world, NOTES, notes);
+    containers_shape(world, NOTES ".scrollbars.vscroll", bar);
+    gallery_expect_at_most(bar[2], notes[2] - CONTAINERS_EDGE);
+    gallery_expect_at_least(bar[0], notes[2] - CONTAINERS_EDGE - CONTAINERS_BAR);
+    gallery_expect_at_least(bar[1], notes[1] + CONTAINERS_EDGE);
+    gallery_expect_at_most(bar[3], notes[3] - CONTAINERS_EDGE);
+    test_assert(bar[2] - bar[0] > CONTAINERS_BAR - 0.01f);
+
+    /* Its rounded corners follow the inside of the rounded border */
+    gallery_expect(world, s, "get " NOTES ".scrollbars.vscroll box.geometry.Border.radius", "3");
+
+    /* The same for the list view */
+    containers_rect(world, FILES, files);
+    containers_shape(world, FILES ".vscroll", bar);
+    gallery_expect_at_most(bar[2], files[2] - CONTAINERS_EDGE);
+    gallery_expect_at_least(bar[1], files[1] + CONTAINERS_EDGE);
+    gallery_expect_at_most(bar[3], files[3] - CONTAINERS_EDGE);
+
+    /* The rows of the list stay inside its border and left of its bar */
+    float row[4];
+    containers_rect(world, FILES ".selected_row", row);
+    gallery_expect_at_least(row[0], files[0] + CONTAINERS_EDGE);
+    gallery_expect_at_most(row[2], bar[0]);
+
+    ecs_fini(world);
+}
+
+void Containers_scroll_bar_opaque(void) {
+    // widgets/containers
+    ecs_entity_t s = 0;
+    ecs_world_t *world = containers_load(&s);
+
+    /* The track has a color of its own, the surface, and hides the content under it */
+    gallery_expect(world, s, "get " NOTES " box.material.Rgb",
+        "{\"Rgb\":{\"r\":38, \"g\":41, \"b\":48}}");
+    gallery_expect(world, s, "get " NOTES ".scrollbars.vscroll box.material.Rgb",
+        "{\"Rgb\":{\"r\":46, \"g\":50, \"b\":58}}");
+    gallery_expect(world, s, "get " FILES ".vscroll box.material.Rgb",
+        "{\"Rgb\":{\"r\":46, \"g\":50, \"b\":58}}");
+    const Opacity *o = ecs_get(world, ecs_lookup(world, NOTES ".scrollbars.vscroll"), Opacity);
+    test_assert(o == NULL || o->value == 1);
+    o = ecs_get(world, ecs_lookup(world, FILES ".vscroll"), Opacity);
+    test_assert(o == NULL || o->value == 1);
+
+    ecs_fini(world);
+}
+
+void Containers_scroll_bar_follows_scroll(void) {
+    // widgets/containers
+    ecs_entity_t s = 0;
+    ecs_world_t *world = containers_load(&s);
+    float before[4], after[4], knob_before[4], knob_after[4], notes[4];
+
+    /* The bars sit in the last child of the column, which the content offset moves; the bar
+     * stays where it is and only its thumb moves */
+    containers_rect(world, NOTES, notes);
+    containers_shape(world, NOTES ".scrollbars.vscroll", before);
+    containers_shape(world, NOTES ".scrollbars.vscroll.knob", knob_before);
+    gallery_expect_at(knob_before[1], notes[1] + CONTAINERS_EDGE + 2);
+    gallery_hover(world, s, NOTES, -0.99f, 0, NOTES);
+    containers_wheel(world, s, 0, -2);
+    test_flt(containers_content(world, NOTES)->y, 2 * CONTAINERS_STEP);
+    containers_shape(world, NOTES ".scrollbars.vscroll", after);
+    containers_shape(world, NOTES ".scrollbars.vscroll.knob", knob_after);
+    gallery_expect_at(after[0], before[0]);
+    gallery_expect_at(after[1], before[1]);
+    gallery_expect_at(after[3], before[3]);
+    test_assert(knob_after[1] > knob_before[1] + 1);
+
+    /* At the end the thumb ends at the end of the track */
+    containers_wheel(world, s, 0, -50);
+    containers_shape(world, NOTES ".scrollbars.vscroll", after);
+    containers_shape(world, NOTES ".scrollbars.vscroll.knob", knob_after);
+    gallery_expect_at(after[1], before[1]);
+    gallery_expect_at(knob_after[3], notes[3] - CONTAINERS_EDGE - 2);
+
+    /* The scroll bars stay last among the children, over the content */
+    ecs_entities_t children = ecs_get_ordered_children(world, ecs_lookup(world, NOTES));
+    test_assert(children.count > 1);
+    test_assert(children.ids[children.count - 1] == ecs_lookup(world, NOTES ".scrollbars"));
+
+    ecs_fini(world);
+}
+
+void Containers_scroll_corner(void) {
+    // widgets/containers
+    ecs_entity_t s = 0;
+    ecs_world_t *world = gallery_load(&s);
+    float page[4], v[4], h[4];
+
+    /* At 800x600 the page scrolls both ways; the tracks meet in the corner and cover it */
+    containers_resize(world, 800, 600);
+    gallery_rect(world, PAGE, page);
+    test_assert(ecs_lookup(world, PAGE ".scrollbars.vscroll") != 0);
+    test_assert(ecs_lookup(world, PAGE ".scrollbars.hscroll") != 0);
+    containers_shape(world, PAGE ".scrollbars.vscroll", v);
+    containers_shape(world, PAGE ".scrollbars.hscroll", h);
+    gallery_expect_at(v[2], page[2] - CONTAINERS_EDGE);
+    gallery_expect_at(v[3], page[3] - CONTAINERS_EDGE);
+    gallery_expect_at(h[2], page[2] - CONTAINERS_EDGE);
+    gallery_expect_at(h[3], page[3] - CONTAINERS_EDGE);
+    float cx = page[2] - CONTAINERS_EDGE - CONTAINERS_BAR * 0.5f;
+    float cy = page[3] - CONTAINERS_EDGE - CONTAINERS_BAR * 0.5f;
+    test_assert(cx > v[0] && cx < v[2] && cy > v[1] && cy < v[3]);
+    test_assert(cx > h[0] && cx < h[2] && cy > h[1] && cy < h[3]);
+
+    /* The corner belongs to the page and pages neither way */
+    float x = containers_content(world, PAGE)->x, y = containers_content(world, PAGE)->y;
+    char *handler = containers_handler_at(world, s, cx, cy);
+    test_str(handler, "\"" PAGE "\"");
+    ecs_os_free(handler);
+    ecs_os_free(gallery_run(world, s, "mouse_click left [%.1f, %.1f]", (double)cx, (double)cy));
+    gallery_settle(world, s);
+    test_flt(containers_content(world, PAGE)->x, x);
+    test_flt(containers_content(world, PAGE)->y, y);
+
+    /* The horizontal thumb moves along the track left of the vertical bar */
+    containers_shape(world, PAGE ".scrollbars.hscroll.knob", h);
+    gallery_expect_at_least(h[0], page[0] + CONTAINERS_EDGE);
+    gallery_expect_at_most(h[2], v[0]);
+    gallery_expect(world, s, "logs warning 100", "");
+
+    ecs_fini(world);
+}
+
+void Containers_scroll_gutter(void) {
+    // widgets/containers
+    ecs_entity_t s = 0;
+    ecs_world_t *world = gallery_load(&s);
+
+    /* At 1280x800 the page only scrolls down: no horizontal bar and no room for it */
+    test_flt(containers_content(world, PAGE)->max_x, 0);
+    test_assert(containers_content(world, PAGE)->max_y > 0);
+    test_assert(ecs_lookup(world, PAGE ".scrollbars.vscroll") != 0);
+    test_assert(ecs_lookup(world, PAGE ".scrollbars.hscroll") == 0);
+    const Layout *l = ecs_get(world, ecs_lookup(world, PAGE), Layout);
+    test_flt(l->padding.right, 8 + CONTAINERS_BAR);
+    test_flt(l->padding.bottom + l->spacing, 8);
+
+    /* Where everything fits there are no bars and no gutter */
+    containers_resize(world, 2400, 1800);
+    test_flt(containers_content(world, PAGE)->max_x, 0);
+    test_flt(containers_content(world, PAGE)->max_y, 0);
+    test_assert(ecs_lookup(world, PAGE ".scrollbars") == 0);
+    l = ecs_get(world, ecs_lookup(world, PAGE), Layout);
+    test_flt(l->padding.right, 8);
+    test_flt(l->padding.bottom, 8);
+
+    /* Where nothing fits both bars show, each with its room */
+    containers_resize(world, 800, 600);
+    test_assert(ecs_lookup(world, PAGE ".scrollbars.vscroll") != 0);
+    test_assert(ecs_lookup(world, PAGE ".scrollbars.hscroll") != 0);
+    l = ecs_get(world, ecs_lookup(world, PAGE), Layout);
+    test_flt(l->padding.right, 8 + CONTAINERS_BAR);
+    test_flt(l->padding.bottom + l->spacing, 8 + CONTAINERS_BAR);
+    gallery_expect(world, s, "logs warning 100", "");
+
+    ecs_fini(world);
+}
+
+void Containers_scroll_thumb_hover(void) {
+    // widgets/containers
+    ecs_entity_t s = 0;
+    ecs_world_t *world = containers_load(&s);
+    char point[64];
+
+    /* Over the thumb it lightens, elsewhere it does not */
+    containers_expect(world, s, NOTES, "ScrollView", "over", "0");
+    test_bool(ecs_has(world, ecs_lookup(world, NOTES ".scrollbars.vscroll.knob"), Tint), false);
+    containers_thumb(world, NOTES, 0.5f, point, sizeof(point));
+    ecs_os_free(gallery_run(world, s, "mouse_move %s", point));
+    gallery_settle(world, s);
+    gallery_expect(world, s, "get $ box.picking.PickStatus.handler", "\"" NOTES "\"");
+    containers_expect(world, s, NOTES, "ScrollView", "over", "1");
+    test_bool(ecs_has(world, ecs_lookup(world, NOTES ".scrollbars.vscroll.knob"), Tint), true);
+
+    /* Below the thumb on the track it does not */
+    gallery_hover(world, s, NOTES, 1.0f - CONTAINERS_BAR / 300.0f, 0.95f, NOTES);
+    containers_expect(world, s, NOTES, "ScrollView", "over", "0");
+    test_bool(ecs_has(world, ecs_lookup(world, NOTES ".scrollbars.vscroll.knob"), Tint), false);
+
+    /* Leaving the view ends the hover */
+    containers_thumb(world, NOTES, 0.5f, point, sizeof(point));
+    ecs_os_free(gallery_run(world, s, "mouse_move %s", point));
+    gallery_settle(world, s);
+    containers_expect(world, s, NOTES, "ScrollView", "over", "1");
+    gallery_hover(world, s, DETAILS ".head", 0, 0, DETAILS);
+    containers_expect(world, s, NOTES, "ScrollView", "over", "0");
+
+    /* The list view has it too */
+    gallery_hover(world, s, FILES, 1.0f - CONTAINERS_BAR / 300.0f, -0.9f, FILES);
+    containers_expect(world, s, FILES, "ListView", "over", "1");
+    test_bool(ecs_has(world, ecs_lookup(world, FILES ".vscroll.knob"), Tint), true);
+
+    ecs_fini(world);
+}
+
+void Containers_panel_title_clipped(void) {
+    // widgets/containers
+    ecs_entity_t s = 0;
+    ecs_world_t *world = gallery_load(&s);
+    float page[4], heading[4];
+
+    /* The title of a panel is part of its column, not a float that leaves the clip of the page */
+    ecs_entity_t e = ecs_lookup(world, CONTAINERS ".heading");
+    test_assert(e != 0);
+    test_bool(ecs_has(world, e, LayoutFloat), false);
+    ecs_entities_t children = ecs_get_ordered_children(world, ecs_lookup(world, CONTAINERS));
+    test_assert(children.count > 1);
+    test_assert(children.ids[0] == e);
+
+    /* It keeps its place above the first widget of the panel */
+    float panel[4], tabs[4];
+    containers_rect(world, CONTAINERS, panel);
+    containers_rect(world, CONTAINERS ".heading", heading);
+    containers_rect(world, TABS, tabs);
+    gallery_expect_at(heading[0], panel[0] + 12);
+    gallery_expect_at(heading[1], panel[1] + 12);
+    gallery_expect_at(tabs[1], heading[3] + 8);
+
+    /* Scrolled above the top of the page it is clipped away, not drawn over the header */
+    gallery_rect(world, PAGE, page);
+    containers_page_top(world, s, CONTAINERS, page[1] - 40);
+    containers_rect(world, CONTAINERS ".heading", heading);
+    test_assert(heading[3] < page[1]);
+    test_bool(box_render_clip_hides(world, e), true);
+    test_bool(containers_clip_keeps(world, CONTAINERS ".heading",
+        (heading[0] + heading[2]) * 0.5f, (heading[1] + heading[3]) * 0.5f), false);
 
     ecs_fini(world);
 }

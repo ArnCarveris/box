@@ -18,8 +18,9 @@
 /** Divides the render pixels of the surfaces of the gallery in the tests */
 #define GALLERY_RESOLUTION_SCALE (4.0f)
 
-/** Thickness of the scroll bars of the page, which cover its right and bottom edge */
-#define GALLERY_PAGE_BAR (10.0f)
+/** Points the scroll bars of the page cover along its right and bottom edge: their thickness
+ * and the border of the page outside them */
+#define GALLERY_PAGE_BAR (11.0f)
 
 /** Find the scene in the working directory or one of its ancestors.
  *

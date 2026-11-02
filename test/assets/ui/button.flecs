@@ -102,7 +102,8 @@ template HeadlessButton {
 }
 
 // A push button with a text label. variant is "primary" (the accent), "secondary" (a surface
-// with a border), "ghost" (no surface until hovered) or "danger".
+// with a border), "ghost" (on the surface of a panel, with no surface of its own until hovered)
+// or "danger".
 template Button : HeadlessButton {
   prop variant: string = "primary"
 
@@ -126,8 +127,6 @@ template Button : HeadlessButton {
     Rgb: t.pressed
   } else if hover {
     Rgb: t.hover
-  } else if variant == "ghost" {
-    Rgb: t.background
   } else {
     Rgb: t.surface
   }
