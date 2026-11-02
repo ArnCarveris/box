@@ -226,8 +226,10 @@ template Slider : HeadlessSlider {
       }
       Rect: {1, 1}
 
+      // Held, the knob takes the accent: the pressed color of the theme is close to the surface
+      // and hid the knob while it was dragged
       if down {
-        Rgb: t.pressed
+        Rgb: t.accent
       } else if hover {
         Rgb: t.text
       } else {
