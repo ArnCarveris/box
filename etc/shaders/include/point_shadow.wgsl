@@ -108,3 +108,34 @@ fn punctual_shadow(light: Light, world: vec3f, normal: vec3f) -> f32 {
     }
     return spot_shadow(light, world, normal);
 }
+
+// Fraction of a point light with a tile that reaches a position in a medium, without a normal:
+// one depth comparison of the octant the position lies in, no tent filter, for the many lookups
+// of a raymarch.
+fn point_shadow_point(light: Light, world: vec3f) -> f32 {
+    let tile = shadow_tiles[light.shadow];
+    let near_ = tile.params.x;
+    let far_ = tile.params.y;
+    let to = world - tile.light.xyz;
+    let uv = point_shadow_uv(to);
+    let along = dot(to, point_shadow_signs(uv) * POINT_SHADOW_AXIS);
+    if (along <= 0.0 || along >= far_) {
+        return 1.0;
+    }
+
+    let reference = point_shadow_depth(along, near_, far_,
+        view.spot_bias.x * along * tile.params.z);
+    let size = tile.rect.w;
+    let tap = clamp(tile.rect.xy + uv * tile.rect.z, tile.rect.xy + vec2f(0.5 * size),
+        tile.rect.xy + vec2f(tile.rect.z - 0.5 * size));
+    return textureSampleCompareLevel(shadow_atlas, shadow_sampler, tap, reference);
+}
+
+// Fraction of a spot or point light with a tile that reaches a position in a medium, one depth
+// comparison, as punctual_shadow with a zero normal but without its filter.
+fn punctual_shadow_point(light: Light, world: vec3f) -> f32 {
+    if (shadow_tiles[light.shadow].light.w > SHADOW_OCTAHEDRAL) {
+        return point_shadow_point(light, world);
+    }
+    return spot_shadow_point(light, world);
+}

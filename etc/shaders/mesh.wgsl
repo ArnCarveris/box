@@ -41,9 +41,15 @@
 // distribution and Smith visibility in direct light and a reflection about a bent normal in
 // indirect light. The clear coat stays isotropic. Without it (strength 0), and on a triangle whose
 // UVs are degenerate, a fragment skips both.
+// A material with a sheen (Sheen, KHR_materials_sheen) adds a soft rim at grazing angles over its
+// base, as three.js does: a Charlie distribution with the Neubelt visibility in direct light, the
+// indirect diffuse light times an analytic fit of its albedo in indirect light, and a constant
+// energy compensation of the base lobes, 1 - 0.157 times the largest channel of its color. It
+// lies under the clear coat. Without it (a black color) a fragment skips all of it.
 #include "include/instance.wgsl"
 #include "include/material.wgsl"
 #include "include/lights.wgsl"
+#include "include/attenuation.wgsl"
 #include "include/shadow.wgsl"
 #include "include/spot_shadow.wgsl"
 #include "include/point_shadow.wgsl"
@@ -169,6 +175,8 @@ struct VertexOut {
     @location(10) @interpolate(flat) clear_coat: vec2f,
     // SpecularAnisotropy of the material: strength and rotation over 2 pi, 0 strength without one
     @location(11) @interpolate(flat) anisotropy: vec2f,
+    // Sheen of the material: linear color and roughness, a black color without one
+    @location(12) @interpolate(flat) sheen: vec4f,
     // Transmission of the material: factor, index of refraction, thickness and attenuation
     // distance, its linear attenuation color and the scale of the instance along its axes
     @location(7) @interpolate(flat) transmission: vec4f,
@@ -287,6 +295,8 @@ fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material) -> Vert
     o.cutoff = material.cutoff;
     o.clear_coat = unpack2x16unorm(material.clear_coat);
     o.anisotropy = unpack2x16unorm(material.anisotropy);
+    let sheen = unpack4x8unorm(material.sheen);
+    o.sheen = vec4f(material_linear(sheen.rgb), sheen.a);
     o.uv = s.uv;
     o.transmission = vec4f(material.transmission_factor, material.ior,
         material.thickness_factor, material.attenuation_distance);
@@ -610,7 +620,9 @@ fn reflections(world: vec3f, spec: vec3f, roughness: f32, cluster: u32, fallback
 // material constants that apply on both faces; the coat lies on geometric. anisotropy is the
 // strength of the anisotropy of the base, a material constant that applies on both faces too,
 // along tangent, perpendicular to normal, with bitangent = cross(normal, tangent); it is 0
-// without one and where the UVs give no direction.
+// without one and where the UVs give no direction. sheen is the linear color of the sheen,
+// black without one, and sheen_roughness its roughness clamped to 0.07..1, material constants
+// that apply on both faces.
 struct Surface {
     albedo: vec3f,
     alpha: f32,
@@ -625,6 +637,8 @@ struct Surface {
     anisotropy: f32,
     tangent: vec3f,
     bitangent: vec3f,
+    sheen: vec3f,
+    sheen_roughness: f32,
 };
 
 // Tangent frame from the screen derivatives of the position and the UVs (cotangent frame), its
@@ -678,6 +692,8 @@ fn surface(f: VertexOut, front: bool) -> Surface {
     s.geometric = -geometric;
     s.coat = clamp(f.clear_coat.x, 0.0, 1.0);
     s.coat_roughness = clamp(f.clear_coat.y, MIN_ROUGHNESS, 1.0);
+    s.sheen = max(f.sheen.rgb, vec3f(0.0));
+    s.sheen_roughness = clamp(f.sheen.w, SHEEN_MIN_ROUGHNESS, 1.0);
     if (front) {
         s.albedo *= albedo.rgb;
         s.alpha *= albedo.a;
@@ -741,6 +757,39 @@ fn visibility_smith_anisotropic(at: f32, ab: f32, ndl: f32, ndv: f32,
     return saturate(0.5 / max(gv + gl, 1e-7));
 }
 
+// Smallest sheen roughness, as three.js clamps it.
+const SHEEN_MIN_ROUGHNESS: f32 = 0.07;
+
+// Charlie sheen distribution (Estevez and Kulla) at the squared roughness alpha.
+fn distribution_charlie(alpha: f32, ndh: f32) -> f32 {
+    let inv = 1.0 / alpha;
+    let cos2 = ndh * ndh;
+    let sin2 = max(1.0 - cos2, 0.0078125);
+    return (2.0 + inv) * pow(sin2, inv * 0.5) / (2.0 * PI);
+}
+
+// Sheen visibility of Neubelt and Pettineo.
+fn visibility_neubelt(ndv: f32, ndl: f32) -> f32 {
+    return saturate(1.0 / (4.0 * (ndl + ndv - ndl * ndv)));
+}
+
+// Analytic fit of the directional albedo of the Charlie sheen lobe, as three.js uses for image
+// based light.
+fn sheen_albedo(ndv: f32, roughness: f32) -> f32 {
+    let r2 = roughness * roughness;
+    let low = roughness < 0.25;
+    let a = select(-8.48 * r2 + 14.3 * roughness - 9.95, -339.2 * r2 + 161.4 * roughness - 25.9,
+        low);
+    let b = select(1.97 * r2 - 3.27 * roughness + 0.72, 44.0 * r2 - 23.7 * roughness + 3.26, low);
+    let bias = select(0.1 * (roughness - 0.25), 0.0, low);
+    return min(exp(a * ndv + b) + bias, PI);
+}
+
+// Energy the base lobes keep under a sheen of a linear color, a constant compensation.
+fn sheen_compensation(sheen: vec3f) -> f32 {
+    return 1.0 - 0.157 * max(max(sheen.r, sheen.g), sheen.b);
+}
+
 fn fresnel_schlick(cos_theta: f32, f0: vec3f) -> vec3f {
     let x = 1.0 - cos_theta;
     let x2 = x * x;
@@ -766,7 +815,8 @@ struct Lit {
 // Light reflected toward the eye by one light arriving from direction l with a radiance. A clear
 // coat reflects the GGX lobe of its normal and roughness times its Fresnel Fc, and the base below
 // it 1 - Fc of what it reflects without one. An anisotropic base stretches its lobe along the
-// tangent, its roughness there mixed toward 1 by the square of the strength.
+// tangent, its roughness there mixed toward 1 by the square of the strength. A sheen adds its
+// Charlie lobe on the mapped normal and scales the base by its compensation, below the coat.
 fn brdf(s: Surface, v: vec3f, l: vec3f, radiance: vec3f) -> Lit {
     let n = s.normal;
     let a = s.roughness * s.roughness;
@@ -790,6 +840,14 @@ fn brdf(s: Surface, v: vec3f, l: vec3f, radiance: vec3f) -> Lit {
     }
     let diffuse = (vec3f(1.0) - f) * diffuse_color / PI;
     var lit = Lit(diffuse * radiance * ndl, specular * radiance * ndl);
+    if (any(s.sheen > vec3f(0.0))) {
+        let alpha = s.sheen_roughness * s.sheen_roughness;
+        let comp = sheen_compensation(s.sheen);
+        let sheen_specular = s.sheen * distribution_charlie(alpha, ndh) *
+            visibility_neubelt(ndv, ndl);
+        lit.diffuse *= comp;
+        lit.specular = lit.specular * comp + sheen_specular * radiance * ndl;
+    }
     if (s.coat > 0.0) {
         let nc = s.geometric;
         let ac = s.coat_roughness * s.coat_roughness;
@@ -804,20 +862,6 @@ fn brdf(s: Surface, v: vec3f, l: vec3f, radiance: vec3f) -> Lit {
         lit.specular = lit.specular * (1.0 - fc) + coat_specular * radiance * ndl_coat;
     }
     return lit;
-}
-
-// Distance below which a point or spot light stops getting brighter, so a surface at the light
-// stays finite.
-const LIGHT_MIN_DISTANCE: f32 = 0.01;
-
-// Radiance of a point or spot light at a position: inverse square falloff, smoothly windowed
-// to zero at the range as in Frostbite's smoothDistanceAtt, times the smooth cone of a spot.
-fn attenuation(light: Light, l: vec3f, dist: f32) -> f32 {
-    let ratio = dist / max(light.range, 1e-4);
-    let window = clamp(1.0 - ratio * ratio * ratio * ratio, 0.0, 1.0);
-    let cone = clamp(dot(-l, light.direction) * light.spot_scale + light.spot_offset, 0.0, 1.0);
-    let near_ = max(dist, LIGHT_MIN_DISTANCE);
-    return window * window / (near_ * near_) * cone * cone;
 }
 
 // Light inputs. Every direct light the forward pass uses comes from here: the directional
@@ -940,6 +984,16 @@ fn shade_split(s: Surface, v: vec3f, world: vec3f) -> Lit {
         specular_occlusion(ndv, s.occlusion, a);
     var indirect_diffuse = (vec3f(1.0) - specular_albedo) * diffuse_color * diffuse_light *
         s.occlusion;
+
+    // A sheen reflects the indirect diffuse light by the fit of its albedo, and the base keeps
+    // its compensation of what it reflects without one; the coat below covers both.
+    if (any(s.sheen > vec3f(0.0))) {
+        let comp = sheen_compensation(s.sheen);
+        let indirect_sheen = e.diffuse * s.sheen * sheen_albedo(ndv, s.sheen_roughness) *
+            s.occlusion;
+        indirect_specular = indirect_specular * comp + indirect_sheen;
+        indirect_diffuse *= comp;
+    }
 
     // The clear coat reflects the light along the reflection about its own normal at its own
     // roughness, by the split sum albedo of a dielectric, and the base below it what it does not.

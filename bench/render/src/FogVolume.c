@@ -4,21 +4,29 @@
  *
  * A headless world renders 1000 boxes lit by a shadow casting sun into a 1280x720 offscreen
  * surface on the main thread and waits for the GPU after every frame, so a case measures a whole
- * frame; the volumes cover the whole image, the camera stands inside each of them.
+ * frame; the volumes cover the whole image, the camera stands inside each of them. The light
+ * cases add 16 point and spot lights over the boxes, 4 of them shadowed, to one volume.
  */
 
 #include <box.h>
 #include <bake_bench.h>
 #include "render.h"
 
+/** Lights of the light cases */
+#define BENCH_FOG_LIGHTS (16)
+
 /** Render frames of 1000 lit boxes inside fog volumes that cover the image.
  *
  * @param b The benchmark
  * @param volumes Fog volumes, all around the camera
+ * @param lights Point and spot lights over the boxes, every other one a spot
+ * @param light_inscatter FogVolume.light_inscatter of the volumes
  */
 static void bench_fog_volumes(
     bench_t *b,
-    int32_t volumes)
+    int32_t volumes,
+    int32_t lights,
+    float light_inscatter)
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -65,7 +73,22 @@ static void bench_fog_volumes(
         f->extent[1] = 20;
         f->extent[2] = 40;
         f->density = 0.02f;
+        f->light_inscatter = light_inscatter;
         ecs_modified(world, e, FogVolume);
+    }
+
+    for (i = 0; i < lights; i ++) {
+        ecs_entity_t e = ecs_new(world);
+        ecs_set(world, e, Position, {(float)(i % 4) * 12 - 18, 5, (float)(i / 4) * 10 - 18});
+        ecs_set(world, e, Rgb, {255, 210, 160});
+        if (i % 2) {
+            ecs_set(world, e, Rotation, {(float)GLM_PI_2, 0, 0});
+            ecs_set(world, e, SpotLight, {.intensity = 20 * GLM_PIf, .range = 10,
+                .inner_angle = 20, .outer_angle = 30, .shadows = i % 4 == 1});
+        } else {
+            ecs_set(world, e, PointLight, {.intensity = 10 * GLM_PIf, .range = 8,
+                .shadows = i % 8 == 0});
+        }
     }
 
     ecs_entity_t surface = ecs_new(world);
@@ -91,19 +114,33 @@ void FogVolume_none(
     bench_t *b)
 {
     // lighting/fog_volume
-    bench_fog_volumes(b, 0);
+    bench_fog_volumes(b, 0, 0, 1);
 }
 
 void FogVolume_one(
     bench_t *b)
 {
     // lighting/fog_volume
-    bench_fog_volumes(b, 1);
+    bench_fog_volumes(b, 1, 0, 1);
 }
 
 void FogVolume_sixteen(
     bench_t *b)
 {
     // lighting/fog_volume
-    bench_fog_volumes(b, 16);
+    bench_fog_volumes(b, 16, 0, 1);
+}
+
+void FogVolume_lights_off(
+    bench_t *b)
+{
+    // lighting/fog_volume
+    bench_fog_volumes(b, 1, BENCH_FOG_LIGHTS, 0);
+}
+
+void FogVolume_lights(
+    bench_t *b)
+{
+    // lighting/fog_volume
+    bench_fog_volumes(b, 1, BENCH_FOG_LIGHTS, 1);
 }

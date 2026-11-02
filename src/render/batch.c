@@ -897,6 +897,26 @@ static uint32_t box_draws_anisotropy_pack(
     return result;
 }
 
+/** Pack a Sheen into the sheen word of a material record: the display encoded color and the
+ * roughness clamped to 0..1 as a unorm8.
+ *
+ * @param sheen The component, NULL for none
+ * @return r | g << 8 | b << 16 | roughness << 24, 0 without one or with a black color
+ */
+static uint32_t box_draws_sheen_pack(
+    const Sheen *sheen)
+{
+    uint32_t result = 0u;
+    if (sheen && (sheen->color.r || sheen->color.g || sheen->color.b)) {
+        float roughness = isfinite(sheen->roughness) ? sheen->roughness : 0.0f;
+        uint32_t r = (uint32_t)(glm_clamp(roughness, 0.0f, 1.0f) * 255.0f + 0.5f);
+        result = (uint32_t)sheen->color.r | ((uint32_t)sheen->color.g << 8) |
+            ((uint32_t)sheen->color.b << 16) | (r << 24);
+    }
+
+    return result;
+}
+
 void box_draws_material_pack(
     box_render_material_t *out,
     const box_draw_material_t *material)
@@ -933,8 +953,8 @@ void box_draws_material_pack(
     out->clear_coat = coat && box_draws_unorm16(coat->strength)
         ? box_draws_unorm16(coat->strength) | (box_draws_unorm16(coat->roughness) << 16) : 0u;
     out->anisotropy = box_draws_anisotropy_pack(material->anisotropy);
-    out->reserved[0] = 0;
-    out->reserved[1] = 0;
+    out->sheen = box_draws_sheen_pack(material->sheen);
+    out->reserved = 0;
 }
 
 void box_draws_mesh_shading(
