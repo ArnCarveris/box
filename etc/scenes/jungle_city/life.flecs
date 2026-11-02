@@ -69,26 +69,49 @@ template CanopyBird {
 }
 
 @tree Parent
-template CanopyLife {
-  prop width: f32 = 200
-  prop depth: f32 = 170
-  prop seed: i32 = 17
+template CanopyFlock {
+  prop count: i32 = 14
+  prop phase: f32 = 0
   const red: Rgb = {206, 66, 48}
   const blue: Rgb = {46, 104, 196}
   const gold: Rgb = {232, 176, 56}
   const white: Rgb = {234, 232, 222}
   const plumage = [red, blue, gold, white]
-  flock {
-    Position: {-8, 46, -6}
-    for i in 0..14 {
-      const tone: Rgb = plumage[i % 4]
-      CanopyBird(radius: 26 + i * 4.3, speed: 0.1 + (i % 4) * 0.022, phase: i * 2.399963, color: tone) { Position: {0, (i % 5) * 7.5 - 14, 0} }
+  for i in 0..count {
+    const tone: Rgb = plumage[i % 4]
+    CanopyBird(radius: 26 + i * 4.3 * 14 / count, speed: 0.1 + (i % 4) * 0.022, phase: phase + i * 2.399963, color: tone) { Position: {0, (i % 5) * 7.5 - 14, 0} }
+  }
+}
+
+@tree Parent
+template CanopyLife {
+  prop width: f32 = 200
+  prop depth: f32 = 170
+  prop seed: i32 = 17
+  const density = width * depth / (202 * 173)
+  const flock_cell = 150
+  const flocks_x: i32 = 2 * math.floor((width / flock_cell - 1) / 2 + 0.5) + 1
+  const flocks_z: i32 = 2 * math.floor((depth / flock_cell - 1) / 2 + 0.5) + 1
+  const flock_birds: i32 = math.max(1, math.floor(14 * density / (flocks_x * flocks_z) + 0.5))
+  const pollen_max: i32 = 1800 * density
+  for fx in 0..flocks_x {
+    for fz in 0..flocks_z {
+      const g: math.Rng = {seed: seed + fx * 7919 + fz * 104729 + 613}
+      const dx = fx - (flocks_x - 1) / 2.0
+      const dz = fz - (flocks_z - 1) / 2.0
+      const roam = match dx == 0 && dz == 0 { true: 0.0; _: 1.0 }
+      const jx = (g.f(0.4) - 0.2) * width / flocks_x * roam
+      const jz = (g.f(0.4) - 0.2) * depth / flocks_z * roam
+      const jy = (g.f(16) - 8) * roam
+      CanopyFlock(count: flock_birds, phase: g.f(6.28) * roam) {
+        Position: {dx * width / flocks_x + jx - 8, 46 + jy, dz * depth / flocks_z + jz - 6}
+      }
     }
   }
   pollen {
     Position: {0, 9, 0}
     ParticleEmitter: {
-      max: 1800, rate: 150, shape: EmitterBox, extents: {width * 0.46, 8, depth * 0.46},
+      max: pollen_max, rate: 150 * density, shape: EmitterBox, extents: {width * 0.46, 8, depth * 0.46},
       direction: {0.6, 0.3, 0.2}, spread: 80, speed: {0.1, 0.5},
       lifetime: {8, 14}, size: {0.03, 0.07}, opacity: {0.35, 0.8},
       color: {255, 236, 170}, color_variance: {0, 20, 40}, seed: seed + 2
