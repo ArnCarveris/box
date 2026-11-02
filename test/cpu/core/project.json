@@ -10,6 +10,7 @@
     "lang.c": {
         "include": [
             "../../../src/app",
+            "../../../src/audio/core",
             "../../../src/jobs",
             "../../../src/render",
             "../../../src/texture"
@@ -379,6 +380,22 @@
                     "warn_none_written_first",
                     "warn_none_material",
                     "warn_none_not_constructed"
+                ]
+            },
+            {
+                "id": "AudioCore",
+                "testcases": [
+                    "silent_at_start",
+                    "sin_accuracy",
+                    "frequency_44100",
+                    "frequency_48000",
+                    "peak_level",
+                    "level_ramp",
+                    "set_frequency",
+                    "phase_continuous_across_blocks",
+                    "stereo_identical",
+                    "clamps",
+                    "invalid_sample_rate"
                 ]
             },
             {

@@ -662,6 +662,65 @@ void Effect_skip_unseen(void) {
     box_render_null_free(null);
 }
 
+/** Create a surface that renders into a texture.
+ *
+ * @param world The world
+ * @param width Width in pixels
+ * @param height Height in pixels
+ * @param view_root Parent of the views of the surface, 0 for none
+ * @return The surface
+ */
+static ecs_entity_t surface_new(
+    ecs_world_t *world,
+    int32_t width,
+    int32_t height,
+    ecs_entity_t view_root)
+{
+    ecs_entity_t result = ecs_new(world);
+    ecs_set(world, result, Surface, {
+        .width = width, .height = height, .texture = ecs_new(world), .view_root = view_root });
+
+    return result;
+}
+
+void Effect_skip_view_surface(void) {
+    // particle/effect
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+
+    // A wide surface without view_root first, then a tall surface that claims the only view
+    surface_new(world, 1000, 500, 0);
+    ecs_entity_t root = ecs_new(world);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f, .far_ = 100});
+    ecs_entity_t view = ecs_new_w_pair(world, EcsChildOf, root);
+    ecs_set(world, view, View, {.camera = camera});
+    surface_new(world, 500, 1000, root);
+    settings_set(world, (ParticleSettings){
+        .effect_max = 1, .effect_overflow = EffectSkip });
+
+    ecs_entity_t first = play(world, "Spark", 0, 0, 0, 1);
+    test_assert(first != 0);
+    frame(world);
+
+    // 10 in front of the camera the frustum is 5.77 high on each side: 2.89 wide at the
+    // aspect 0.5 of the tall surface, 11.5 at the aspect 2 of the wide one. x 8 is outside.
+    test_assert(play(world, "Spark", 8, 0, 0, 1) == 0);
+    ParticleStats stats = frame(world);
+    test_int(stats.dropped, 1);
+    test_int(stats.recycled, 0);
+
+    // x 2 is inside at either aspect
+    test_assert(play(world, "Spark", 2, 0, 0, 1) == first);
+    stats = frame(world);
+    test_int(stats.recycled, 1);
+    test_int(stats.dropped, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
 void Effect_skip_distance(void) {
     // particle/effect
     box_render_null_t *null;

@@ -486,46 +486,6 @@ static box_particle_effect_t* box_particle_effect_get(
     return result;
 }
 
-/** Find the size of the surface a view renders to: the first surface whose view_root is 0 or
- * the parent of the view, in points, else the default surface size.
- *
- * @param world The world
- * @param s The state
- * @param view The view
- * @param width Receives the width in points
- * @param height Receives the height in points
- */
-static void box_particle_surface_size(
-    const ecs_world_t *world,
-    box_particle_effects_t *s,
-    ecs_entity_t view,
-    float *width,
-    float *height)
-{
-    ecs_entity_t parent = ecs_get_parent(world, view);
-    bool found = false;
-    int32_t i;
-    *width = BOX_SURFACE_WIDTH;
-    *height = BOX_SURFACE_HEIGHT;
-    ecs_iter_t it = ecs_query_iter(world, s->surfaces);
-    while (!found && ecs_query_next(&it)) {
-        const Surface *surfaces = ecs_field(&it, Surface, 0);
-        const SurfaceStatus *status = ecs_field(&it, SurfaceStatus, 1);
-        for (i = 0; i < it.count && !found; i ++) {
-            if (surfaces[i].view_root && surfaces[i].view_root != parent) {
-                continue;
-            }
-
-            found = true;
-            box_surface_point_size(&surfaces[i], status ? &status[i] : NULL, width, height);
-        }
-    }
-
-    if (found) {
-        ecs_iter_fini(&it);
-    }
-}
-
 /** Check whether a view sees a point within a distance of its camera.
  *
  * @param world The world
@@ -569,7 +529,8 @@ static bool box_particle_view_sees(
     }
 
     glm_mat4_inv(transform, inverse);
-    box_particle_surface_size(world, s, view, &width, &height);
+    box_surface_view_size(ECS_CONST_CAST(ecs_world_t*, world), s->surfaces, view, &width,
+        &height);
     box_camera_projection(c, width, height, proj);
     glm_mat4_mul(proj, inverse, view_proj);
     glm_mat4_mulv(view_proj, point, clip);
