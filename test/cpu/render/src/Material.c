@@ -712,8 +712,8 @@ void Material_clear_coat_pack(void) {
     box_draws_material_pack(&record, &(box_draw_material_t){ .fade = 1 });
     test_uint(record.clear_coat, 0);
     test_uint(record.anisotropy, 0);
-    test_uint(record.reserved[0], 0);
-    test_uint(record.reserved[1], 0);
+    test_uint(record.sheen, 0);
+    test_uint(record.reserved, 0);
     plain = record;
 
     ClearCoat full = { .strength = 1, .roughness = 0 };
@@ -861,5 +861,112 @@ void Material_specular_anisotropy_pack(void) {
     box_draws_material(&a, &(box_draw_material_t){ .pbr = &pbr, .fade = 1 });
     box_draws_material(&b, &(box_draw_material_t){
         .anisotropy = &half, .pbr = &pbr, .fade = 1 });
+    test_assert(!ecs_os_memcmp_t(&a, &b, box_render_shading_t));
+}
+
+void Material_sheen_defaults(void) {
+    // materials/pbr
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_assert(ecs_script_run(world, "sheen",
+        "using box.material\n"
+        "rough { Sheen: {roughness: 0.25} }\n"
+        "red { Sheen: {color: {255, 0, 0}} }\n", NULL) == 0);
+
+    ecs_entity_t added = ecs_new(world);
+    ecs_add(world, added, Sheen);
+    const Sheen *s = ecs_get(world, added, Sheen);
+    test_assert(s != NULL);
+    test_uint(s->color.r, 255);
+    test_uint(s->color.g, 255);
+    test_uint(s->color.b, 255);
+    test_flt(s->roughness, BOX_MATERIAL_SHEEN_ROUGHNESS);
+    test_flt(s->roughness, 0.5f);
+    test_bool(ecs_owns(world, added, MaterialId), true);
+
+    s = ecs_get(world, ecs_lookup(world, "rough"), Sheen);
+    test_assert(s != NULL);
+    test_uint(s->color.r, 255);
+    test_uint(s->color.g, 255);
+    test_uint(s->color.b, 255);
+    test_flt(s->roughness, 0.25f);
+    test_bool(ecs_owns(world, ecs_lookup(world, "rough"), MaterialId), true);
+
+    s = ecs_get(world, ecs_lookup(world, "red"), Sheen);
+    test_assert(s != NULL);
+    test_uint(s->color.r, 255);
+    test_uint(s->color.g, 0);
+    test_uint(s->color.b, 0);
+    test_flt(s->roughness, 0.5f);
+
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_set(world, prefab, Sheen, {.color = {10, 20, 30}, .roughness = 0.75f});
+    ecs_entity_t instance = ecs_new_w_pair(world, EcsIsA, prefab);
+    test_bool(ecs_owns(world, instance, Sheen), false);
+    test_uint(ecs_get(world, instance, Sheen)->color.g, 20);
+    test_flt(ecs_get(world, instance, Sheen)->roughness, 0.75f);
+
+    ecs_fini(world);
+}
+
+/** The record holds the sheen as the display encoded color and the roughness as a unorm8
+ * clamped to 0..1, 0 without one or with a black color, and a transition of another component
+ * encodes the record again with it. */
+void Material_sheen_pack(void) {
+    // materials/pbr
+    box_render_material_t record, plain;
+    ecs_os_memset_t(&record, 0x55, box_render_material_t);
+    box_draws_material_pack(&record, &(box_draw_material_t){ .fade = 1 });
+    test_uint(record.sheen, 0);
+    test_uint(record.reserved, 0);
+    plain = record;
+    test_int(ECS_SIZEOF(box_render_material_t), 80);
+
+    Sheen white = { .color = {255, 255, 255}, .roughness = 1 };
+    box_draws_material_pack(&record, &(box_draw_material_t){ .sheen = &white, .fade = 1 });
+    test_uint(record.sheen, 0xFFFFFFFFu);
+
+    Sheen mixed = { .color = {0x12, 0x34, 0x56}, .roughness = 0.5f };
+    box_draws_material_pack(&record, &(box_draw_material_t){ .sheen = &mixed, .fade = 1 });
+    test_uint(record.sheen & 0xFFu, 0x12u);
+    test_uint((record.sheen >> 8) & 0xFFu, 0x34u);
+    test_uint((record.sheen >> 16) & 0xFFu, 0x56u);
+    test_uint(record.sheen >> 24, 128u);
+
+    Sheen tight = { .color = {255, 0, 0}, .roughness = 0 };
+    box_draws_material_pack(&record, &(box_draw_material_t){ .sheen = &tight, .fade = 1 });
+    test_uint(record.sheen, 0xFFu);
+
+    Sheen high = { .color = {0, 0, 1}, .roughness = 3 };
+    box_draws_material_pack(&record, &(box_draw_material_t){ .sheen = &high, .fade = 1 });
+    test_uint(record.sheen, (1u << 16) | (255u << 24));
+
+    Sheen low = { .color = {0, 1, 0}, .roughness = -1 };
+    box_draws_material_pack(&record, &(box_draw_material_t){ .sheen = &low, .fade = 1 });
+    test_uint(record.sheen, 1u << 8);
+
+    Sheen black = { .color = {0, 0, 0}, .roughness = 0.5f };
+    box_draws_material_pack(&record, &(box_draw_material_t){ .sheen = &black, .fade = 1 });
+    test_uint(record.sheen, 0);
+
+    box_draws_material_pack(&record, &(box_draw_material_t){ .sheen = &mixed, .fade = 1 });
+    record.sheen = 0;
+    test_assert(!ecs_os_memcmp_t(&record, &plain, box_render_material_t));
+
+    PbrMaterial pbr = { .metallic = 0.25f, .roughness = 0.125f };
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .sheen = &mixed, .pbr = &pbr, .fade = 1 });
+    box_draw_transition_material_t target;
+    box_render_material_t encoded;
+    box_draws_transition_target(&target, &(box_draw_material_t){
+        .sheen = &mixed, .pbr = &pbr, .fade = 1 }, BOX_DRAW_TRANSITION_TABLE);
+    box_draws_transition_encode(&target, &encoded);
+    test_assert(!ecs_os_memcmp_t(&encoded, &record, box_render_material_t));
+
+    box_render_shading_t a, b;
+    box_draws_material(&a, &(box_draw_material_t){ .pbr = &pbr, .fade = 1 });
+    box_draws_material(&b, &(box_draw_material_t){
+        .sheen = &mixed, .pbr = &pbr, .fade = 1 });
     test_assert(!ecs_os_memcmp_t(&a, &b, box_render_shading_t));
 }

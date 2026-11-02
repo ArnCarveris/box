@@ -258,6 +258,7 @@ static void box_fog_record(
     out->edge_fade = glm_max(fog->edge_fade, 0.0f);
     out->sun_inscatter = glm_max(fog->sun_inscatter, 0.0f);
     out->ambient_inscatter = glm_max(fog->ambient_inscatter, 0.0f);
+    out->light_inscatter = glm_max(fog->light_inscatter, 0.0f);
     out->steps = fog->steps < 4 ? 4 : fog->steps > 128 ? 128 : fog->steps;
     out->noise_strength = glm_clamp(fog->noise_strength, 0.0f, 1.0f);
     out->noise_scale = glm_max(fog->noise_scale, BOX_RENDER_FOG_NOISE_SCALE_MIN);
