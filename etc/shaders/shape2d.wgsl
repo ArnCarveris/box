@@ -206,11 +206,12 @@ fn erf_approx(x: f32) -> f32 {
 
 // Coverage of a shadow: the Gaussian falloff of the signed distance to the shadow box, the quad
 // of the given half extents minus 3 standard deviations on each side. The standard deviation is
-// widened by the footprint of the pixel, so the edge of a shadow without blur is anti-aliased.
+// widened by the footprint of the pixel, px in shape units, as by a Gaussian of 0.4 pixels (the
+// slope of a one pixel ramp), so the edge of a shadow without blur is anti-aliased.
 fn shadow_coverage(p: vec2f, extent: vec2f, radius: f32, sigma: f32, px: f32) -> f32 {
     let box_extent = max(extent - vec2f(3.0 * sigma), vec2f(0.0));
     let d = rounded_box(p, box_extent, radius);
-    let s = sqrt(sigma * sigma + 0.16 * px * px);
+    let s = max(sqrt(sigma * sigma + 0.16 * px * px), 1e-9);
     return 0.5 - 0.5 * erf_approx(d / (s * 1.41421356));
 }
 
@@ -317,7 +318,8 @@ fn ranked_depth(depth: f32, rank: u32) -> f32 {
     var alpha = select(shape_alpha, glyph_cover * f.color.a, glyph);
     var cover = select(shape_cover, glyph_cover, glyph);
     if (f.params.y < 0.0) {
-        cover = shadow_coverage(f.local, f.extent, f.params.x, -f.params.y, px);
+        cover = shadow_coverage(f.local, f.extent, f.params.x, -f.params.y,
+            max(footprint.x, footprint.y));
         color = f.color.rgb;
         alpha = cover * f.color.a;
     }
