@@ -225,6 +225,21 @@ box_render_fog_t* box_render_fog_new(
 void box_render_fog_free(
     box_render_fog_t *fog);
 
+/** Texels along each edge of the fog volume noise texture */
+#define BOX_RENDER_FOG_NOISE_SIZE (64)
+
+/** Generate the texels of the fog volume noise texture, the same on every call and platform.
+ *
+ * Four octaves of value noise that tile over the texture, of 2, 4, 8 and 16 lattice cells across
+ * with the amplitudes 1, 1/2, 1/4 and 1/8, from an integer hash of a fixed seed.
+ *
+ * They are remapped linearly so the lowest texel is 0 and the highest 255.
+ *
+ * @param out Receives BOX_RENDER_FOG_NOISE_SIZE^3 texels, x fastest, then y, then z
+ */
+void box_render_fog_noise(
+    uint8_t *out);
+
 /** Give every lit view with LightSettings.fog_volumes the FogVolumes of the scene of its camera
  * that may be in its frustum, back to front by the distance of their centers from the camera.
  *

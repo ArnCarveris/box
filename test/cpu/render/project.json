@@ -57,6 +57,9 @@
                 "testcases": [
                     "defaults",
                     "partial_script_keeps_others",
+                    "partial_noise_keeps_others",
+                    "noise_record",
+                    "noise_texture",
                     "rotated_record",
                     "clamped_values",
                     "back_to_front",
