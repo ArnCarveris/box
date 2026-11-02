@@ -12,6 +12,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_STATIC
+#include <stb_image.h>
+
+/** File the window writes for the captures */
+#define CONTAINERS_CAPTURE "containers_border.png"
+
 /** Paths of the widgets of the Containers section */
 #define TABS CONTAINERS ".tabs"
 #define NOTES CONTAINERS ".notes"
@@ -1838,6 +1845,107 @@ void Containers_scroll_ring_under_bar(void) {
     gallery_settle(world, s);
     test_assert(ecs_lookup(world, NOTES ".scrollbars.vscroll.ring_edge") == 0);
     test_assert(ecs_lookup(world, FILES ".scrollbars.vscroll.ring_edge") != 0);
+
+    ecs_fini(world);
+}
+
+/** Render the window at its full size into a PNG and read it back.
+ *
+ * @param world The world
+ * @param w Receives the width in pixels
+ * @param h Receives the height in pixels
+ * @return The RGBA pixels, freed with stbi_image_free
+ */
+static unsigned char* containers_capture(
+    ecs_world_t *world,
+    int32_t *w,
+    int32_t *h)
+{
+    ecs_entity_t window = ecs_lookup(world, "window");
+    int32_t i, n = 0;
+    Surface *surface = ecs_get_mut(world, window, Surface);
+    if (!surface->write_to_file) {
+        surface->write_to_file = ecs_os_strdup(CONTAINERS_CAPTURE);
+    }
+
+    surface->resolution_scale = 1.0f;
+    ecs_modified(world, window, Surface);
+    for (i = 0; i < 3; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_sync(world);
+    char *path = flecs_asprintf("%s/%s", ecs_singleton_get(world, AppStatus)->tmp_dir,
+        CONTAINERS_CAPTURE);
+    unsigned char *result = stbi_load(path, w, h, &n, 4);
+    test_assert(result != NULL);
+    const SurfaceStatus *ss = ecs_get(world, window, SurfaceStatus);
+    test_int(*w, ss->width);
+    test_int(*h, ss->height);
+    ecs_os_free(path);
+
+    return result;
+}
+
+void Containers_scroll_content_inside_border(void) {
+    // widgets/containers
+    ecs_entity_t s = 0;
+    ecs_world_t *world = containers_load(&s);
+    ecs_entity_t window = ecs_lookup(world, "window");
+    float notes[4], files[4];
+    int32_t w = 0, h = 0, w2 = 0, h2 = 0, x, checked = 0, differ = 0;
+
+    /* The border of the notes view before it scrolls, with nothing under its top edge */
+    test_flt(containers_content(world, NOTES)->y, 0);
+    gallery_expect(world, s, "get " NOTES " box.geometry.Border.width", "1");
+    unsigned char *before = containers_capture(world, &w, &h);
+
+    /* Scroll the view so that the list view inside it lies across its top edge */
+    containers_rect(world, NOTES, notes);
+    containers_rect(world, FILES, files);
+    const LayoutContent *c = containers_content(world, NOTES);
+    float y = files[1] - notes[1] + (files[3] - files[1]) * 0.5f;
+    y = y > c->max_y ? c->max_y : y;
+    test_assert(y > 0);
+    ecs_os_free(gallery_run(world, s, "set " NOTES " box.widgets.ScrollView.mut.y %.1f",
+        (double)y));
+    gallery_settle(world, s);
+    containers_rect(world, NOTES, notes);
+    containers_rect(world, FILES, files);
+    test_assert(files[1] < notes[1]);
+    test_assert(files[3] > notes[1] + 2);
+    unsigned char *after = containers_capture(world, &w2, &h2);
+    test_int(w2, w);
+    test_int(h2, h);
+
+    /* The pixels of the top border over the list view keep the color of the border: the list
+     * is clipped inside it. The corners and the scroll bar are left out. */
+    const SurfaceStatus *ss = ecs_get(world, window, SurfaceStatus);
+    float scale = (float)w / (float)ss->point_width;
+    float left = files[0] > notes[0] + 8 ? files[0] : notes[0] + 8;
+    float right = files[2] < notes[2] - 8 - CONTAINERS_BAR ? files[2] :
+        notes[2] - 8 - CONTAINERS_BAR;
+    int32_t x0 = (int32_t)(left * scale), x1 = (int32_t)(right * scale);
+    int32_t row = (int32_t)((notes[1] + 0.5f) * scale);
+    test_assert(x1 > x0);
+    test_assert(row >= 0 && row < h);
+    for (x = x0; x < x1; x ++) {
+        const unsigned char *p = &before[(row * w + x) * 4];
+        const unsigned char *q = &after[(row * w + x) * 4];
+        bool same = abs(p[0] - q[0]) <= 6 && abs(p[1] - q[1]) <= 6 && abs(p[2] - q[2]) <= 6;
+        if (!same && !differ) {
+            printf("border pixel %d, %d was %d %d %d, now %d %d %d\n", x, row, p[0], p[1],
+                p[2], q[0], q[1], q[2]);
+        }
+
+        differ += !same;
+        checked ++;
+    }
+
+    test_assert(checked > 10);
+    test_int(differ, 0);
+    stbi_image_free(before);
+    stbi_image_free(after);
 
     ecs_fini(world);
 }
