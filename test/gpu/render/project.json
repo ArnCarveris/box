@@ -232,6 +232,23 @@
                 ]
             },
             {
+                "id": "Sheen",
+                "testcases": [
+                    "black_unchanged",
+                    "brightens_grazing",
+                    "color_tints",
+                    "roughness_broadens",
+                    "indirect_only",
+                    "occluded_by_orm",
+                    "emission_not_scaled",
+                    "under_clear_coat",
+                    "ignored_by_unlit",
+                    "ignored_by_2d",
+                    "prefab",
+                    "change_and_remove"
+                ]
+            },
+            {
                 "id": "SpecularAnisotropy",
                 "testcases": [
                     "strength_zero_unchanged",
