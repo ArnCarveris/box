@@ -40,10 +40,11 @@ template HeadlessToggle {
     }
   }
 
+  // A disabled toggle ignores the pointer, so it never shows as hovered or pressed
   async {
     while true {
       await on.enter(this)
-      hover = true
+      hover = !disabled
       await on.leave(this)
       hover = false
     }
@@ -52,7 +53,7 @@ template HeadlessToggle {
   async {
     while true {
       await on.press(this)
-      down = true
+      down = !disabled
       await on.release(this)
       down = false
     }
@@ -136,6 +137,13 @@ template Checkbox : HeadlessToggle {
       Rgb: t.surface_alt
     }
 
+    // Checked, the box lightens while hovered and darkens while pressed, as a filled button
+    if current && down {
+      Tint: {0, 0, 0, 60}
+    } else if current && hover {
+      Tint: {255, 255, 255, 40}
+    }
+
     if ring {
       Border: {
         width: t.focus_width, radius: 3,
@@ -193,10 +201,19 @@ template Switch : HeadlessToggle {
 
     if current {
       Rgb: t.accent
-    } else if hover || down {
+    } else if down {
+      Rgb: t.pressed
+    } else if hover {
       Rgb: t.hover
     } else {
       Rgb: t.surface_alt
+    }
+
+    // On, the track lightens while hovered and darkens while pressed, as a filled button
+    if current && down {
+      Tint: {0, 0, 0, 60}
+    } else if current && hover {
+      Tint: {255, 255, 255, 40}
     }
 
     if ring {

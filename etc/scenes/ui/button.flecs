@@ -33,10 +33,11 @@ template HeadlessButton {
     Cursor: {CursorNotAllowed}
   }
 
+  // A disabled button ignores the pointer, so it never shows as hovered or pressed
   async {
     while true {
       await on.enter(this)
-      hover = true
+      hover = !disabled
       await on.leave(this)
       hover = false
     }
@@ -45,7 +46,7 @@ template HeadlessButton {
   async {
     while true {
       await on.press(this)
-      down = true
+      down = !disabled
       await on.release(this)
       down = false
     }
@@ -102,7 +103,8 @@ template HeadlessButton {
 }
 
 // A push button with a text label. variant is "primary" (the accent), "secondary" (a surface
-// with a border), "ghost" (no surface until hovered) or "danger".
+// with a border), "ghost" (on the surface of a panel, with no surface of its own until hovered)
+// or "danger".
 template Button : HeadlessButton {
   prop variant: string = "primary"
 
@@ -126,8 +128,6 @@ template Button : HeadlessButton {
     Rgb: t.pressed
   } else if hover {
     Rgb: t.hover
-  } else if variant == "ghost" {
-    Rgb: t.background
   } else {
     Rgb: t.surface
   }

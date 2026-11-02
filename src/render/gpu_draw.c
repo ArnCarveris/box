@@ -267,7 +267,9 @@ void box_gpu_instance_layouts_init(
         .attenuation_color = 0xFFFFFFu,
         .uv = { 1.0f, 1.0f, 0.0f, 0.0f },
         .ior = BOX_MATERIAL_IOR,
-        .attenuation_distance = BOX_MATERIAL_ATTENUATION_DISTANCE
+        .attenuation_distance = BOX_MATERIAL_ATTENUATION_DISTANCE,
+        .diffuse_transmission = 0u,
+        .thickness = 0.0f
     };
     WGPUBindGroupLayoutEntry entries[5] = {{
         .binding = 0,

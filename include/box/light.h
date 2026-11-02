@@ -298,7 +298,15 @@ ECS_STRUCT(FogVolume, {
                               *   lookup */
     int32_t steps;           /**< March steps across a volume, default 24, clamped to 4..128;
                               *   a ray that crosses part of the box takes its share of them,
-                              *   at least 4 */
+                              *   at least 4, or 8 with noise */
+    float noise_strength;    /**< 0 constant density, 1 the density goes from 0 to twice its
+                              *   value with a tileable 3D noise, clamped to 0..1, default 0 */
+    float noise_scale;       /**< World size of the largest billows, default 4. The noise is in
+                              *   world space, not in the box: a volume that moves or turns
+                              *   does not drag its billows along */
+    vec3 wind;               /**< World units per second the noise moves, times the world time,
+                              *   so a fixed --delta-time renders the same frames every run,
+                              *   default {0, 0, 0} */
 });
 
 /** How the mip levels of an environment cubemap are prefiltered from its first level */

@@ -51,7 +51,9 @@
                     "specular_anisotropy_defaults",
                     "specular_anisotropy_pack",
                     "sheen_defaults",
-                    "sheen_pack"
+                    "sheen_pack",
+                    "diffuse_transmission_defaults",
+                    "diffuse_transmission_pack"
                 ]
             },
             {
@@ -59,6 +61,9 @@
                 "testcases": [
                     "defaults",
                     "partial_script_keeps_others",
+                    "partial_noise_keeps_others",
+                    "noise_record",
+                    "noise_texture",
                     "light_inscatter_script_keeps_others",
                     "rotated_record",
                     "clamped_values",
@@ -324,6 +329,8 @@
                     "specular_anisotropy_prefab_change_reaches_slot",
                     "sheen_brings_material_id",
                     "sheen_prefab_change_reaches_slot",
+                    "diffuse_transmission_brings_material_id",
+                    "diffuse_transmission_prefab_change_reaches_slot",
                     "equal_materials_share_slot",
                     "changed_material_takes_other_slot",
                     "alone_changed_material_keeps_slot",

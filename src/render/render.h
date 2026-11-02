@@ -225,6 +225,23 @@ box_render_fog_t* box_render_fog_new(
 void box_render_fog_free(
     box_render_fog_t *fog);
 
+/** Texels along each edge of the fog volume noise texture */
+#define BOX_RENDER_FOG_NOISE_SIZE (64)
+
+/** Generate the texels of the fog volume noise texture, the same on every call and platform.
+ *
+ * Four octaves of value noise that tile over the texture, of 2, 4, 8 and 16 lattice cells across
+ * with the amplitudes 1, 1/2, 1/4 and 1/8, from an integer hash of a fixed seed.
+ *
+ * They are remapped as tools/noise_texture.py does, piecewise linearly from the 1st percentile
+ * to 0, the median to 0.5 and the 99th percentile to 1, clamped: half of the texels are below
+ * 0.5 and the texels fill 0..255, with 1% clipped to either end.
+ *
+ * @param out Receives BOX_RENDER_FOG_NOISE_SIZE^3 texels, x fastest, then y, then z
+ */
+void box_render_fog_noise(
+    uint8_t *out);
+
 /** Give every lit view with LightSettings.fog_volumes the FogVolumes of the scene of its camera
  * that may be in its frustum, back to front by the distance of their centers from the camera.
  *

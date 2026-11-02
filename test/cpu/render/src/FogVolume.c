@@ -10,6 +10,8 @@
 #include <box.h>
 #include <bake_test.h>
 #include <math.h>
+#include <stdlib.h>
+#include <string.h>
 #include "render.h"
 
 /** Warnings logged while the counting log hook is set */
@@ -176,6 +178,11 @@ void FogVolume_defaults(void) {
     test_flt(f->ambient_inscatter, 1);
     test_flt(f->light_inscatter, 1);
     test_int(f->steps, 24);
+    test_flt(f->noise_strength, 0);
+    test_flt(f->noise_scale, 4);
+    test_flt(f->wind[0], 0);
+    test_flt(f->wind[1], 0);
+    test_flt(f->wind[2], 0);
 
     ecs_entity_t added = ecs_new(world);
     ecs_add(world, added, FogVolume);
@@ -183,6 +190,9 @@ void FogVolume_defaults(void) {
     test_flt(f->density, 0.1f);
     test_flt(f->light_inscatter, 1);
     test_int(f->steps, 24);
+    test_flt(f->noise_strength, 0);
+    test_flt(f->noise_scale, 4);
+    test_flt(f->wind[0], 0);
 
     ecs_entity_t view = ecs_new(world);
     ecs_add(world, view, View);
@@ -236,8 +246,149 @@ void FogVolume_light_inscatter_script_keeps_others(void) {
     test_flt(f->sun_inscatter, 1);
     test_flt(f->ambient_inscatter, 1);
     test_int(f->steps, 24);
+    test_flt(f->noise_strength, 0);
+    test_flt(f->noise_scale, 4);
 
     ecs_fini(world);
+}
+
+void FogVolume_partial_noise_keeps_others(void) {
+    // fog_volume/noise
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_assert(ecs_script_run(world, "fog",
+        "using box.light\n"
+        "fog { FogVolume: {noise_strength: 0.6, wind: {1, 0, -2}} }\n", NULL) == 0);
+    const FogVolume *f = ecs_get(world, ecs_lookup(world, "fog"), FogVolume);
+    test_flt(f->noise_strength, 0.6f);
+    test_flt(f->wind[0], 1);
+    test_flt(f->wind[1], 0);
+    test_flt(f->wind[2], -2);
+    test_flt(f->noise_scale, 4);
+    test_flt(f->density, 0.1f);
+    test_flt(f->extent[0], 5);
+    test_flt(f->edge_fade, 1);
+    test_int(f->steps, 24);
+
+    test_assert(ecs_script_run(world, "fog2",
+        "using box.light\n"
+        "fog2 { FogVolume: {noise_scale: 9} }\n", NULL) == 0);
+    f = ecs_get(world, ecs_lookup(world, "fog2"), FogVolume);
+    test_flt(f->noise_scale, 9);
+    test_flt(f->noise_strength, 0);
+    test_flt(f->wind[0], 0);
+    test_flt(f->wind[2], 0);
+    test_flt(f->density, 0.1f);
+
+    ecs_fini(world);
+}
+
+void FogVolume_noise_record(void) {
+    // fog_volume/noise
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t view = view_new(world, 0);
+    ecs_entity_t plain = volume_new(world, 0, 0, 0, -5);
+    ecs_entity_t noisy = volume_new(world, 0, 0, 0, -20);
+    ecs_entity_t low = volume_new(world, 0, 0, 0, -35);
+    ecs_entity_t high = volume_new(world, 0, 0, 0, -50);
+    (void)plain;
+    FogVolume *f = ecs_get_mut(world, noisy, FogVolume);
+    f->noise_strength = 0.5f;
+    f->noise_scale = 7;
+    f->wind[0] = 1;
+    f->wind[1] = -2;
+    f->wind[2] = 3;
+    ecs_modified(world, noisy, FogVolume);
+    f = ecs_get_mut(world, low, FogVolume);
+    f->noise_strength = -1;
+    f->noise_scale = -3;
+    ecs_modified(world, low, FogVolume);
+    f = ecs_get_mut(world, high, FogVolume);
+    f->noise_strength = 4;
+    f->noise_scale = 0;
+    ecs_modified(world, high, FogVolume);
+    frame(world);
+
+    const box_render_view_t *v = packet_view(null, view);
+    test_int(v->fog_count, 4);
+    const box_render_fog_volume_t *r_high = record_of(null, v, 0);
+    const box_render_fog_volume_t *r_low = record_of(null, v, 1);
+    const box_render_fog_volume_t *r_noisy = record_of(null, v, 2);
+    const box_render_fog_volume_t *r_plain = record_of(null, v, 3);
+    test_flt(r_plain->center[2], -5);
+    test_flt(r_plain->noise_strength, 0);
+    test_flt(r_plain->noise_scale, 4);
+    test_flt(r_plain->wind[0], 0);
+    test_flt(r_plain->wind[1], 0);
+    test_flt(r_plain->wind[2], 0);
+
+    test_flt(r_noisy->center[2], -20);
+    test_flt(r_noisy->noise_strength, 0.5f);
+    test_flt(r_noisy->noise_scale, 7);
+    test_flt(r_noisy->wind[0], 1);
+    test_flt(r_noisy->wind[1], -2);
+    test_flt(r_noisy->wind[2], 3);
+    test_flt(r_noisy->density, 0.1f);
+    test_int(r_noisy->steps, 24);
+
+    test_flt(r_low->center[2], -35);
+    test_flt(r_low->noise_strength, 0);
+    test_flt(r_low->noise_scale, BOX_RENDER_FOG_NOISE_SCALE_MIN);
+    test_flt(r_high->center[2], -50);
+    test_flt(r_high->noise_strength, 1);
+    test_flt(r_high->noise_scale, BOX_RENDER_FOG_NOISE_SCALE_MIN);
+
+    ecs_fini(world);
+}
+
+/** The noise texture is the same on every call, fills 0 to 255 around a median of 128 and tiles:
+ * the step across an edge is no larger than the steps inside. */
+void FogVolume_noise_texture(void) {
+    // fog_volume/noise
+    const int32_t n = BOX_RENDER_FOG_NOISE_SIZE;
+    int32_t count = n * n * n, i, x, y, z, lo = 255, hi = 0, wrap = 0, inner = 0, below = 0;
+    ecs_os_set_api_defaults();
+    uint8_t *a = ecs_os_malloc(count), *b = ecs_os_malloc(count);
+    box_render_fog_noise(a);
+    box_render_fog_noise(b);
+    test_assert(!memcmp(a, b, (size_t)count));
+    double sum = 0;
+    for (i = 0; i < count; i ++) {
+        lo = a[i] < lo ? a[i] : lo;
+        hi = a[i] > hi ? a[i] : hi;
+        sum += a[i];
+        below += a[i] < 128;
+    }
+
+    test_int(lo, 0);
+    test_int(hi, 255);
+    test_assert(sum / count > 96 && sum / count < 160);
+    test_assert(below > count * 0.45 && below < count * 0.55);
+
+    for (z = 0; z < n; z ++) {
+        for (y = 0; y < n; y ++) {
+            const uint8_t *row = &a[(z * n + y) * n];
+            int32_t d = abs((int32_t)row[0] - (int32_t)row[n - 1]);
+            wrap = d > wrap ? d : wrap;
+            for (x = 1; x < n; x ++) {
+                d = abs((int32_t)row[x] - (int32_t)row[x - 1]);
+                inner = d > inner ? d : inner;
+            }
+
+            d = abs((int32_t)a[(z * n) * n + y] - (int32_t)a[(z * n + n - 1) * n + y]);
+            wrap = d > wrap ? d : wrap;
+            d = abs((int32_t)a[y * n + z] - (int32_t)a[((n - 1) * n + y) * n + z]);
+            wrap = d > wrap ? d : wrap;
+        }
+    }
+
+    test_assert(inner > 0);
+    test_assert(wrap <= inner);
+
+    ecs_os_free(a);
+    ecs_os_free(b);
 }
 
 void FogVolume_rotated_record(void) {

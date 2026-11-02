@@ -12,6 +12,7 @@
 
 #include <box.h>
 #include <bake_test.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -861,6 +862,34 @@ void FogVolume_not_in_captures(void) {
     test_assert(fabsf(sh_fogged - sh_clear) <= 0.02f * fabsf(sh_clear) + 1e-4f);
 }
 
+/** Add an absorbing volume with noise in front of the wall of an orthographic view: 2 units
+ * deep across the whole view, 4 pixels a unit.
+ *
+ * @param world The world
+ * @param strength FogVolume.noise_strength
+ * @param scale FogVolume.noise_scale
+ * @param wind FogVolume.wind
+ * @return The volume
+ */
+static ecs_entity_t fv_noise_volume(
+    ecs_world_t *world,
+    float strength,
+    float scale,
+    const float wind[3])
+{
+    fv_view(world, fv_ortho(world), true);
+    fv_wall(world, 0, -10, 40, FV_WALL);
+    ecs_entity_t e = fv_volume(world, (float[]){0, 0, 0}, (float[]){20, 20, 1}, 0.4f, 1);
+    FogVolume *f = ecs_get_mut(world, e, FogVolume);
+    f->steps = 128;
+    f->noise_strength = strength;
+    f->noise_scale = scale;
+    glm_vec3_copy(ECS_CONST_CAST(float*, wind), f->wind);
+    ecs_modified(world, e, FogVolume);
+
+    return e;
+}
+
 /** Add a white volume that scatters all it extinguishes, with hard edges, an isotropic phase
  * and 128 steps.
  *
@@ -886,6 +915,255 @@ static ecs_entity_t fv_lit_volume(
     ecs_modified(world, e, FogVolume);
 
     return e;
+}
+
+/** Measure the green of the pixels of a square capture inside a margin of 4 pixels.
+ *
+ * @param px The pixels
+ * @param mean Receives the mean
+ * @param deviation Receives the standard deviation
+ * @param neighbours Receives the mean difference of horizontally and vertically neighbouring
+ * pixels
+ */
+static void fv_measure(
+    const unsigned char *px,
+    double *mean,
+    double *deviation,
+    double *neighbours)
+{
+    double sum = 0, sq = 0, diff = 0;
+    int32_t x, y, count = 0, pairs = 0;
+    for (y = 4; y < FV_SIZE - 4; y ++) {
+        for (x = 4; x < FV_SIZE - 4; x ++) {
+            double g = fv_px(px, x, y)[1];
+            sum += g;
+            sq += g * g;
+            count ++;
+            if (x + 1 < FV_SIZE - 4) {
+                diff += abs((int32_t)fv_px(px, x + 1, y)[1] - (int32_t)fv_px(px, x, y)[1]);
+                pairs ++;
+            }
+
+            if (y + 1 < FV_SIZE - 4) {
+                diff += abs((int32_t)fv_px(px, x, y + 1)[1] - (int32_t)fv_px(px, x, y)[1]);
+                pairs ++;
+            }
+        }
+    }
+
+    *mean = sum / count;
+    *deviation = sqrt(fmax(sq / count - *mean * *mean, 0.0));
+    *neighbours = diff / pairs;
+}
+
+/** Mean difference of the green of two square captures, the second shifted by a number of
+ * columns: pixel x of the second against pixel x - shift of the first.
+ *
+ * @param a The first capture
+ * @param b The second capture
+ * @param shift Columns the second is shifted by
+ * @return The mean absolute difference
+ */
+static double fv_shifted_diff(
+    const unsigned char *a,
+    const unsigned char *b,
+    int32_t shift)
+{
+    double diff = 0;
+    int32_t x, y, count = 0;
+    for (y = 4; y < FV_SIZE - 4; y ++) {
+        for (x = 20; x < FV_SIZE - 20; x ++) {
+            diff += abs((int32_t)fv_px(b, x, y)[1] - (int32_t)fv_px(a, x - shift, y)[1]);
+            count ++;
+        }
+    }
+
+    return diff / count;
+}
+
+/** A volume with a noise_strength of 0 renders the same pixels as one with the defaults, the
+ * transmittance of its constant density, whatever its noise_scale and wind. */
+void FogVolume_noise_zero_unchanged(void) {
+    // fog_volume/noise
+    const char *files[2] = { "fog_noise_zero_a.png", "fog_noise_zero_b.png" };
+    unsigned char *px[2];
+    int32_t k;
+    for (k = 0; k < 2; k ++) {
+        ecs_world_t *world = fv_world(0);
+        fv_view(world, fv_camera(world, 0, 0), true);
+        fv_wall(world, 0, -20, 40, FV_WALL);
+        ecs_entity_t e = fv_volume(world, (float[]){0, 0, -10}, (float[]){20, 20, 2}, 0.2f, 1);
+        if (k) {
+            FogVolume *f = ecs_get_mut(world, e, FogVolume);
+            f->noise_strength = 0;
+            f->noise_scale = 1;
+            f->wind[0] = 30;
+            f->wind[2] = -10;
+            ecs_modified(world, e, FogVolume);
+        }
+
+        px[k] = fv_render(world, files[k]);
+        ecs_fini(world);
+    }
+
+    int32_t want = fv_srgb(fv_lin(FV_WALL) * expf(-0.2f * 4.0f));
+    fv_expect(fv_px(px[0], 32, 32), want, 4);
+    fv_expect(fv_px(px[0], 40, 24), want, 6);
+    test_assert(!memcmp(px[0], px[1], FV_SIZE * FV_SIZE * 4));
+    stbi_image_free(px[0]);
+    stbi_image_free(px[1]);
+}
+
+/** Noise of strength 1 varies the fog across the wall, which a strength of 0 fogs evenly,
+ * around about the same mean. */
+void FogVolume_noise_varies(void) {
+    // fog_volume/noise
+    double mean[2], deviation[2], neighbours[2];
+    int32_t k;
+    for (k = 0; k < 2; k ++) {
+        ecs_world_t *world = fv_world(0);
+        fv_noise_volume(world, (float)k, 4, (float[]){0, 0, 0});
+        unsigned char *px = fv_render(world, k ? "fog_noise_one.png" : "fog_noise_none.png");
+        fv_measure(px, &mean[k], &deviation[k], &neighbours[k]);
+        stbi_image_free(px);
+        ecs_fini(world);
+    }
+
+    printf("noise 0: mean %.1f deviation %.2f, noise 1: mean %.1f deviation %.2f\n",
+        mean[0], deviation[0], mean[1], deviation[1]);
+    test_assert(deviation[0] < 1.0);
+    test_assert(deviation[1] > 6.0);
+    test_assert(fabs(mean[1] - mean[0]) < 25.0);
+    test_assert(fabs(mean[0] - fv_srgb(fv_lin(FV_WALL) * expf(-0.8f))) < 4.0);
+}
+
+/** A larger noise_scale makes larger billows: neighbouring pixels differ less. */
+void FogVolume_noise_scale(void) {
+    // fog_volume/noise
+    double mean[2], deviation[2], neighbours[2];
+    int32_t k;
+    for (k = 0; k < 2; k ++) {
+        ecs_world_t *world = fv_world(0);
+        fv_noise_volume(world, 1, k ? 16.0f : 2.0f, (float[]){0, 0, 0});
+        unsigned char *px = fv_render(world, k ? "fog_noise_large.png" : "fog_noise_small.png");
+        fv_measure(px, &mean[k], &deviation[k], &neighbours[k]);
+        stbi_image_free(px);
+        ecs_fini(world);
+    }
+
+    printf("scale 2: neighbours %.2f deviation %.2f, scale 16: neighbours %.2f deviation %.2f\n",
+        neighbours[0], deviation[0], neighbours[1], deviation[1]);
+    test_assert(deviation[0] > 4.0);
+    test_assert(deviation[1] > 4.0);
+    test_assert(neighbours[0] > 2.0 * neighbours[1]);
+}
+
+/** With a fixed delta time a wind of 120 units a second along +X moves the fog 2 units, 8
+ * pixels, to the right each frame; without wind two frames are the same. */
+void FogVolume_wind_moves(void) {
+    // fog_volume/noise
+    int32_t k;
+    for (k = 0; k < 2; k ++) {
+        ecs_world_t *world = fv_world(0);
+        fv_noise_volume(world, 1, 8, (float[]){k ? 120.0f : 0.0f, 0, 0});
+        fv_surface(world, FV_SIZE, FV_SIZE, "fog_wind.png");
+        box_render_gpu_stats_t before = fv_frames(world, 3);
+        unsigned char *a = fv_load(world, "fog_wind.png", FV_SIZE, FV_SIZE);
+        box_render_gpu_stats_t after = fv_frames(world, 1);
+        unsigned char *b = fv_load(world, "fog_wind.png", FV_SIZE, FV_SIZE);
+        test_int(after.errors, before.errors);
+        if (!k) {
+            test_assert(!memcmp(a, b, FV_SIZE * FV_SIZE * 4));
+        } else {
+            int32_t shift, best = 0;
+            double best_diff = 1e30;
+            for (shift = -16; shift <= 16; shift ++) {
+                double d = fv_shifted_diff(a, b, shift);
+                if (d < best_diff) {
+                    best_diff = d;
+                    best = shift;
+                }
+            }
+
+            double still = fv_shifted_diff(a, b, 0);
+            printf("wind: best shift %d diff %.2f, unshifted diff %.2f\n", best, best_diff,
+                still);
+            test_assert(abs(best - 8) <= 1);
+            test_assert(best_diff < 2.0);
+            test_assert(still > 4.0 * best_diff + 2.0);
+        }
+
+        stbi_image_free(a);
+        stbi_image_free(b);
+        ecs_fini(world);
+    }
+}
+
+/** Two headless runs of 7 frames with --delta-time render the same pixels at the last frame,
+ * wind and all. */
+void FogVolume_noise_deterministic(void) {
+    // fog_volume/noise
+    const char *files[2] = { "fog_noise_run_a.png", "fog_noise_run_b.png" };
+    char *argv[] = {"boxrun", "--headless", "--frames", "7", "--delta-time", "0.016666667"};
+    unsigned char *px[2];
+    int32_t k;
+    for (k = 0; k < 2; k ++) {
+        ecs_world_t *world = fv_world(0);
+        test_int(box_app_parse(world, 6, argv), 0);
+        App *app = ecs_singleton_get_mut(world, App);
+        app->unguarded = true;
+        app->unpaced = true;
+        ecs_singleton_modified(world, App);
+        fv_noise_volume(world, 0.8f, 5, (float[]){1.5f, 0.5f, -0.75f});
+        fv_surface(world, FV_SIZE, FV_SIZE, files[k]);
+        test_int(box_app_run(world), 0);
+        box_render_sync(world);
+        test_int(ecs_get_world_info(world)->frame_count_total, 7);
+        px[k] = fv_load(world, files[k], FV_SIZE, FV_SIZE);
+        ecs_fini(world);
+    }
+
+    double mean, deviation, neighbours;
+    fv_measure(px[0], &mean, &deviation, &neighbours);
+    test_assert(deviation > 4.0);
+    test_assert(!memcmp(px[0], px[1], FV_SIZE * FV_SIZE * 4));
+    stbi_image_free(px[0]);
+    stbi_image_free(px[1]);
+}
+
+/** After a device loss the restarted backend makes the noise texture again: the fog renders
+ * the same billows as before. */
+void FogVolume_noise_device_loss(void) {
+    // fog_volume/noise
+    ecs_world_t *world = fv_world(0);
+    fv_noise_volume(world, 1, 4, (float[]){0, 0, 0});
+    unsigned char *before = fv_render(world, "fog_noise_lost.png");
+    double mean, deviation, neighbours;
+    fv_measure(before, &mean, &deviation, &neighbours);
+    test_assert(deviation > 6.0);
+    test_int(ecs_singleton_get(world, RenderStatus)->device_losses, 0);
+
+    const char *tmp = ecs_singleton_get(world, AppStatus)->tmp_dir;
+    char *path = flecs_asprintf("%s/fog_noise_lost.png", tmp);
+    remove(path);
+    box_render_gpu_lose_device(world);
+    int32_t i, wrong = 0;
+    for (i = 0; i < 4; i ++) {
+        ecs_progress(world, 0);
+        box_render_sync(world);
+    }
+
+    test_int(ecs_singleton_get(world, RenderStatus)->device_losses, 1);
+    unsigned char *after = fv_load(world, "fog_noise_lost.png", FV_SIZE, FV_SIZE);
+    for (i = 0; i < FV_SIZE * FV_SIZE * 4; i ++) {
+        wrong += abs((int32_t)after[i] - (int32_t)before[i]) > 2;
+    }
+
+    test_int(wrong, 0);
+    stbi_image_free(after);
+    stbi_image_free(before);
+    ecs_os_free(path);
+    ecs_fini(world);
 }
 
 /** Add a point light.

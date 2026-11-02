@@ -1,7 +1,7 @@
 /**
  * @file box/material.h
  * @brief Material components: color, opacity, tint, PBR parameters, clear coat, anisotropy, sheen,
- * emission and transmission.
+ * diffuse transmission, emission and transmission.
  *
  * The box.material module resolves tints through the hierarchy and registers
  * the material layers a scene applies on top of the sampled surface.
@@ -25,9 +25,9 @@ extern "C" {
 /** Slot of the material table a shape renders with, set by the engine and read only for
  * applications, inherited by instances.
  *
- * Rgb, PbrMaterial, ClearCoat, SpecularAnisotropy, Sheen, Emissive, Transmission, TextureTransform
- * and AlphaCutoff bring it along. A prefab that owns one gets a slot its instances share, a 3D
- * shape that owns one a slot of its own, composed of what it owns and what it still inherits.
+ * Rgb, PbrMaterial, ClearCoat, SpecularAnisotropy, Sheen, DiffuseTransmission, Emissive,
+ * Transmission, TextureTransform and AlphaCutoff bring it along. A prefab that owns one gets a
+ * slot its instances share, a 3D shape that owns one a slot of what it owns and still inherits.
  *
  * Slot 0 is the default material, of a shape without any material component. An owned id that
  * was never handed a slot (a light, a 2D shape, a text) is UINT32_MAX.
@@ -174,6 +174,25 @@ ECS_STRUCT(SpecularAnisotropy, {
 ECS_STRUCT(Sheen, {
     Rgb color;       /**< Color of the sheen, display encoded, black for none */
     float roughness; /**< 0 tight rim to 1 broad, clamped to 0..1 */
+});
+
+/** Factor of a constructed DiffuseTransmission: half of the diffuse light passes through */
+#define BOX_MATERIAL_DIFFUSE_TRANSMISSION_FACTOR (0.5f)
+
+/** Diffuse light passing through a thin 3D surface (leaf, paper, lampshade), glTF's
+ * KHR_materials_diffuse_transmission, default factor 0.5, white and thickness 0, inherited like
+ * Rgb; a field a scene does not set keeps its default. 2D shapes and text ignore it.
+ *
+ * A Lambert lobe on the inverted normal of base color * color * factor, the front keeping 1 -
+ * factor, none on metals. It stays in the opaque pass (depth, shadows, no snapshot), its shadow
+ * is not tinted, and a single sided quad needs BackFacePlain to be seen from behind.
+ */
+ECS_STRUCT(DiffuseTransmission, {
+    float factor;    /**< 0 all diffuse light is reflected to 1 all of it passes through,
+                      *   clamped to 0..1 */
+    Rgb color;       /**< Tint of the light that passes through, display encoded */
+    float thickness; /**< World units a ray travels through the surface for its shadow lookup,
+                      *   0 for a thin sheet */
 });
 
 /** Emitted light, inherited by instances, like Rgb. Tints do not apply to it. */

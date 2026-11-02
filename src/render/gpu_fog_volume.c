@@ -7,9 +7,9 @@
  * continues in a pass that reads its depth, where one instanced draw of 36 vertices per volume
  * marches the boxes back to front before the particles. Without volumes nothing is recorded.
  *
- * Group 0 is the view group, group 1 the records of the view, the inverse view projection of its
- * target and its depth. The uniforms and records of every draw of a packet follow each other in
- * one buffer, which grows when a draw does not fit.
+ * Group 1 holds the records of the view, the inverse view projection and time of the packet, the
+ * depth and the noise texture; the uniforms and records of every draw of a packet follow each
+ * other in one buffer, which grows when a draw does not fit.
  */
 
 #include "gpu.h"
@@ -21,7 +21,7 @@
 #define BOX_GPU_FOG_UNIFORM_STRIDE (256u)
 
 /** Bytes of the uniform of a draw, FogDraw in fog_volume.wgsl */
-#define BOX_GPU_FOG_UNIFORM_SIZE (64u)
+#define BOX_GPU_FOG_UNIFORM_SIZE (80u)
 
 /** Smallest buffer of the draws of a packet in bytes */
 #define BOX_GPU_FOG_BUFFER_MIN (16384u)
@@ -33,6 +33,9 @@
 /** Uniform of a draw, matching FogDraw in fog_volume.wgsl */
 typedef struct box_gpu_fog_uniforms_t {
     mat4 inv_view_proj;             /**< Clip space of the target to world */
+    float time;                     /**< World time of the packet in seconds, the noise moves
+                                     *   by the wind times it */
+    float _pad[3];                  /**< Padding to the size of FogDraw */
 } box_gpu_fog_uniforms_t;
 
 struct box_gpu_fog_volumes_t {
@@ -44,16 +47,82 @@ struct box_gpu_fog_volumes_t {
     WGPUBuffer buffer;              /**< Uniforms and records of the draws of the packet */
     uint64_t size;                  /**< Bytes of the buffer */
     uint64_t used;                  /**< Bytes of the buffer the draws of the packet took */
+    WGPUTexture noise;              /**< Noise texture, NULL until a volume with noise draws */
+    WGPUTextureView noise_view;     /**< View of the noise texture */
+    WGPUTexture placeholder;        /**< Texture of one texel views without noise bind */
+    WGPUTextureView placeholder_view; /**< View of the placeholder */
+    WGPUSampler sampler;            /**< Repeating trilinear sampler of the noise */
     bool unsupported;               /**< The device binds too few storage buffers in a fragment
                                      *   stage, so no volume draws */
 };
+
+/** Create an R8 3D texture that the fragment stage samples, filled with texels.
+ *
+ * @param gpu The backend
+ * @param size Texels along each edge
+ * @param texels The texels, x fastest, then y, then z
+ * @param view Receives the view of the texture
+ * @return The texture
+ */
+static WGPUTexture box_gpu_fog_texture(
+    box_gpu_t *gpu,
+    uint32_t size,
+    const uint8_t *texels,
+    WGPUTextureView *view)
+{
+    WGPUTexture result = wgpuDeviceCreateTexture(gpu->device, &(WGPUTextureDescriptor){
+        .usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst,
+        .dimension = WGPUTextureDimension_3D,
+        .size = { size, size, size },
+        .format = WGPUTextureFormat_R8Unorm,
+        .mipLevelCount = 1,
+        .sampleCount = 1
+    });
+    WGPUTexelCopyTextureInfo dst = { .texture = result, .aspect = WGPUTextureAspect_All };
+    WGPUTexelCopyBufferLayout layout = { .bytesPerRow = size, .rowsPerImage = size };
+    WGPUExtent3D extent = { size, size, size };
+    wgpuQueueWriteTexture(gpu->queue, &dst, texels, (size_t)size * size * size, &layout,
+        &extent);
+    *view = wgpuTextureCreateView(result, &(WGPUTextureViewDescriptor){
+        .format = WGPUTextureFormat_R8Unorm,
+        .dimension = WGPUTextureViewDimension_3D,
+        .mipLevelCount = 1,
+        .arrayLayerCount = 1,
+        .aspect = WGPUTextureAspect_All
+    });
+
+    return result;
+}
+
+/** Get the view of the noise texture, generated on the CPU when the first view with noise draws.
+ * It lives until the backend is released, so a backend restarted after a device loss makes it
+ * again; views without noise bind the placeholder instead.
+ *
+ * @param gpu The backend
+ * @return The view
+ */
+static WGPUTextureView box_gpu_fog_noise(
+    box_gpu_t *gpu)
+{
+    box_gpu_fog_volumes_t *f = gpu->fog_volumes;
+    if (!f->noise) {
+        const size_t n = BOX_RENDER_FOG_NOISE_SIZE;
+        uint8_t *texels = ecs_os_malloc(n * n * n);
+        box_render_fog_noise(texels);
+        f->noise = box_gpu_fog_texture(gpu, (uint32_t)n, texels, &f->noise_view);
+        ecs_os_free(texels);
+    }
+
+    return f->noise_view;
+}
 
 void box_gpu_fog_volumes_init(
     box_gpu_t *gpu)
 {
     box_gpu_fog_volumes_t *f = ecs_os_calloc_t(box_gpu_fog_volumes_t);
     WGPULimits limits = WGPU_LIMITS_INIT;
-    WGPUBindGroupLayoutEntry entries[3] = {
+    const uint8_t placeholder = 128;
+    WGPUBindGroupLayoutEntry entries[5] = {
         {
             .binding = 0,
             .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
@@ -77,10 +146,34 @@ void box_gpu_fog_volumes_init(
                 .sampleType = WGPUTextureSampleType_Depth,
                 .viewDimension = WGPUTextureViewDimension_2D
             }
+        },
+        {
+            .binding = 3,
+            .visibility = WGPUShaderStage_Fragment,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Float,
+                .viewDimension = WGPUTextureViewDimension_3D
+            }
+        },
+        {
+            .binding = 4,
+            .visibility = WGPUShaderStage_Fragment,
+            .sampler = { .type = WGPUSamplerBindingType_Filtering }
         }
     };
     f->layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
-        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 3, .entries = entries });
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 5, .entries = entries });
+    f->sampler = wgpuDeviceCreateSampler(gpu->device, &(WGPUSamplerDescriptor){
+        .addressModeU = WGPUAddressMode_Repeat,
+        .addressModeV = WGPUAddressMode_Repeat,
+        .addressModeW = WGPUAddressMode_Repeat,
+        .magFilter = WGPUFilterMode_Linear,
+        .minFilter = WGPUFilterMode_Linear,
+        .mipmapFilter = WGPUMipmapFilterMode_Linear,
+        .lodMaxClamp = 32.0f,
+        .maxAnisotropy = 1
+    });
+    f->placeholder = box_gpu_fog_texture(gpu, 1, &placeholder, &f->placeholder_view);
     WGPUBindGroupLayout groups[2] = { gpu->view_layout, f->layout };
     f->pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
         &(WGPUPipelineLayoutDescriptor){
@@ -132,6 +225,17 @@ void box_gpu_fog_volumes_fini(
         wgpuBufferRelease(f->buffer);
     }
 
+    if (f->noise_view) {
+        wgpuTextureViewRelease(f->noise_view);
+    }
+
+    if (f->noise) {
+        wgpuTextureRelease(f->noise);
+    }
+
+    wgpuTextureViewRelease(f->placeholder_view);
+    wgpuTextureRelease(f->placeholder);
+    wgpuSamplerRelease(f->sampler);
     wgpuPipelineLayoutRelease(f->pipeline_layout);
     wgpuBindGroupLayoutRelease(f->layout);
     ecs_os_free(f);
@@ -301,8 +405,18 @@ bool box_gpu_fog_volumes_draw(
         goto done;
     }
 
+    const box_render_fog_volume_t *fogs = ecs_vec_get_t(
+        &packet->fog_volumes, box_render_fog_volume_t, v->fog_first);
+    WGPUTextureView noise = f->placeholder_view;
     box_gpu_fog_uniforms_t u;
     mat4 proj, view_proj;
+    for (i = 0; i < v->fog_count; i ++) {
+        if (fogs[i].noise_strength > 0.0f) {
+            noise = box_gpu_fog_noise(gpu);
+            break;
+        }
+    }
+
     uint64_t records = (uint64_t)v->fog_count * sizeof(box_render_fog_volume_t);
     uint64_t offset = box_gpu_fog_reserve(gpu, BOX_GPU_FOG_UNIFORM_STRIDE + records);
     ecs_os_memset_t(&u, 0, box_gpu_fog_uniforms_t);
@@ -310,12 +424,12 @@ bool box_gpu_fog_volumes_draw(
         (float)t->desc.point_width, (float)t->desc.point_height, proj);
     glm_mat4_mul(proj, ECS_CONST_CAST(vec4*, v->view_matrix), view_proj);
     glm_mat4_inv(view_proj, u.inv_view_proj);
+    u.time = (float)packet->time;
     wgpuQueueWriteBuffer(gpu->queue, f->buffer, offset, &u, sizeof(u));
     wgpuQueueWriteBuffer(gpu->queue, f->buffer, offset + BOX_GPU_FOG_UNIFORM_STRIDE,
-        ecs_vec_get_t(&packet->fog_volumes, box_render_fog_volume_t, v->fog_first),
-        (size_t)records);
+        fogs, (size_t)records);
 
-    WGPUBindGroupEntry entries[3] = {
+    WGPUBindGroupEntry entries[5] = {
         {
             .binding = 0,
             .buffer = f->buffer,
@@ -331,11 +445,19 @@ bool box_gpu_fog_volumes_draw(
         {
             .binding = 2,
             .textureView = depth
+        },
+        {
+            .binding = 3,
+            .textureView = noise
+        },
+        {
+            .binding = 4,
+            .sampler = f->sampler
         }
     };
     WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
         .layout = f->layout,
-        .entryCount = 3,
+        .entryCount = 5,
         .entries = entries
     });
     wgpuRenderPassEncoderSetPipeline(pass, pipeline);
