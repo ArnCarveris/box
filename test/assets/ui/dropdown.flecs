@@ -127,10 +127,11 @@ template HeadlessDropdown {
     LayoutFloat: {h: Left, v: Top, anchor_h: Left, anchor_v: Bottom, y: -2, flip: true}
   }
 
+  // A disabled dropdown ignores the pointer, so it never shows as hovered or pressed
   async {
     while true {
       await on.enter(this)
-      hover = true
+      hover = !disabled
     }
   }
 
@@ -144,7 +145,7 @@ template HeadlessDropdown {
   async {
     while true {
       await on.press(this)
-      down = true
+      down = !disabled
     }
   }
 

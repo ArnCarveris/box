@@ -57,6 +57,7 @@
 #include "include/instance.wgsl"
 #include "include/material.wgsl"
 #include "include/lights.wgsl"
+#include "include/attenuation.wgsl"
 #include "include/shadow.wgsl"
 #include "include/spot_shadow.wgsl"
 #include "include/point_shadow.wgsl"
@@ -897,6 +898,7 @@ fn brdf(s: Surface, v: vec3f, l: vec3f, radiance: vec3f) -> Lit {
     return lit;
 }
 
+<<<<<<< HEAD
 // Light passed through the surface toward the eye by the back lobe of a diffuse transmission, of
 // one light arriving from direction l with a radiance at the far side: a Lambert lobe on the
 // inverted normal, without a Fresnel term or a specular lobe. The sheen scales it by its
@@ -928,6 +930,8 @@ fn attenuation(light: Light, l: vec3f, dist: f32) -> f32 {
     return window * window / (near_ * near_) * cone * cone;
 }
 
+=======
+>>>>>>> 29d75bad63d10ef24f243d2c23715db80adf1f85
 // Light inputs. Every direct light the forward pass uses comes from here: the directional
 // lights of the scene, the first one through its shadow map and light cookie, then the point
 // and spot lights of the cluster of the fragment, a spot or point light with a tile of the
