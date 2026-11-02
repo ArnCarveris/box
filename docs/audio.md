@@ -238,30 +238,21 @@ v.setUint32(28, 1, true);
 a.commands(v.buffer);
 ```
 
-<<<<<<< HEAD
-The automated check of Chrome is `test/integration/web/audio_tone.mjs`, and of Safari
-`test/integration/web/audio_tone_safari.mjs`, which drives real Safari through `safaridriver`
+The automated check of Chrome is `test/integration/web/audio_core.mjs`, and of Safari
+`test/integration/web/audio_core_safari.mjs`, which drives real Safari through `safaridriver`
 on macOS (see `test/integration/web/README.md`):
 
 ```sh
-node test/integration/web/audio_tone_safari.mjs "$BIN"
+node test/integration/web/audio_core_safari.mjs "$BIN"
 ```
 
 Safari automation has to be enabled once on the host, by an admin, with
 `sudo safaridriver --enable` and "Allow remote automation" in the Developer section of Safari
 Settings (Advanced > "Show features for web developers" shows it), and needs a logged-in GUI
 session; without it the check stops with exit status 2 and says so. Where it cannot run, check
-Safari by hand: open the same address in Safari on macOS, click the canvas, and expect the tone,
-the frequency change from the console and no `box.audio` warning in the console.
+Safari by hand: open the same address in Safari on macOS, click the canvas, run the snippet and
+expect the tone and no `box.audio` warning in the console.
 
 `Module.boxAudio.gestures` counts the key and mouse button events that reached the audio and
 `Module.boxAudio.resumes` the calls of `ctx.resume()` they made, which tells an input that never
 arrives from a resume the browser refuses.
-=======
-This is also the check for Safari, which the automated check cannot run: open the same address
-in Safari on macOS, click the canvas, run the snippet and expect the tone and no `box.audio`
-warning in the console.
-
-The automated check of Chrome is `test/integration/web/audio_core.mjs`, see
-`test/integration/web/README.md`.
->>>>>>> e50204c453094d1b2b28ba48ae97e3dc3accef3a

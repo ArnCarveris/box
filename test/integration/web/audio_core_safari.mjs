@@ -7,10 +7,10 @@ import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const USAGE = `Checks the audio of the browser build in Safari on macOS, driven by safaridriver over
-the W3C WebDriver HTTP API: a tone of the audio core, which runs from its own wasm in an
-AudioWorklet, while a scene renders.
+the W3C WebDriver HTTP API: the mixer of the audio core, which runs from its own wasm in an
+AudioWorklet, driven by command batches over the port while a scene renders.
 
-  node test/integration/web/audio_tone_safari.mjs [--safaridriver <path>] <bin dir>
+  node test/integration/web/audio_core_safari.mjs [--safaridriver <path>] <bin dir>
 
 <bin dir> holds boxrun.html, .js and .wasm, e.g.
 .bake/local_env/<env>/wasm32-Emscripten/debug/bin, or under <output_dir>/local_env when
@@ -23,7 +23,7 @@ when either is missing. It prints the Safari and macOS versions and stops when S
 WebGPU, which the page needs.
 
 The page is served on a free localhost port without COOP/COEP headers and opened with
-test/integration/web/audio_tone.flecs (?preload=) and ?tone=440. Safari WebDriver has no log
+test/integration/web/audio_core.flecs (?preload=). Safari WebDriver has no log
 endpoint, so the server injects a script at the top of the <head> of boxrun.html, before the
 page runs, which wraps console.log, info, warn and error, records uncaught errors and rejections,
 and counts the frames the page draws; the check reads that log from the page. The check expects
@@ -32,20 +32,23 @@ with WebDriver Actions (pointer down and up). When Safari does not take the clic
 (the context stays suspended without a failure), it tries a key press with Actions. It reports
 how many gestures reached the page (Module.boxAudio.gestures) and how many called resume()
 (Module.boxAudio.resumes), which tells a gesture that never arrives from a resume Safari
-refuses. Once the context runs, an AnalyserNode on the worklet node has to measure 440 Hz at a
-peak of 0.25, and a tone command sent from C (Module._box_audio_web_tone) has to change the
-frequency to 660 Hz. The frames keep advancing and the log has no error and no box.audio
+refuses. Once the context runs, it sends a sound of a 440 Hz sine at 0.25 (Module.boxAudio.sound)
+and a batch that plays it looped (Module.boxAudio.commands, the port that box_audio_web_apply
+of C posts to); an AnalyserNode on the worklet node has to measure 440 Hz at a peak of 0.25. A
+pitch command of 1.5 has to change the frequency to 660 Hz at the same peak, and
+Module._box_audio_web_apply and _box_audio_web_sound have to be exported. The frames keep advancing and the log has no error and no box.audio
 warning. Exits 0 on a pass, 1 on a failure and 2 when safaridriver, Safari or the page cannot
 start.`;
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
-const SCENE = '/test/integration/web/audio_tone.flecs';
+const SCENE = '/test/integration/web/audio_core.flecs';
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.wasm': 'application/wasm' };
 const SAFARIDRIVER_DEFAULT = '/usr/bin/safaridriver';
 const ELEMENT = 'element-6066-11e4-a52e-4f735466cecf';
 const TONE = 440;
 const CHANGED = 660;
 const LEVEL = 0.25;
+const PITCH = CHANGED / TONE;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Records the console and counts the frames the page draws, before the page runs
@@ -78,6 +81,32 @@ const INSTRUMENT = `(() => {
     return getCurrentTexture.call(this);
   };
 })();`;
+
+// Commands of src/audio/core/core.h, encoded as the core reads them: a header of a 16 bit
+// type and a 16 bit size, then 32 bit fields, little endian
+const PLAY = `(async () => {
+  const audio = Module.boxAudio;
+  const rate = audio.ctx.sampleRate;
+  const samples = new Float32Array(rate);
+  for (let i = 0; i < rate; i++) samples[i] = ${LEVEL} * Math.sin(2 * Math.PI * ${TONE} * i / rate);
+  const ok = await audio.sound(1, samples, 1, rate);
+  const v = new DataView(new ArrayBuffer(32));
+  v.setUint16(0, 1, true); v.setUint16(2, 32, true);
+  v.setUint32(4, 1, true); v.setUint32(8, 1, true); v.setUint32(12, 0, true);
+  v.setFloat32(16, 1, true); v.setFloat32(20, 0, true); v.setFloat32(24, 1, true);
+  v.setUint32(28, 1, true);
+  audio.commands(v.buffer);
+  return ok;
+})()`;
+
+// Sets the pitch ratio of the voice (BOX_AUDIO_CMD_VOICE_SET, BOX_AUDIO_PARAM_PITCH)
+const PITCH_COMMAND = `(() => {
+  const v = new DataView(new ArrayBuffer(16));
+  v.setUint16(0, 3, true); v.setUint16(2, 16, true);
+  v.setUint32(4, 1, true); v.setUint32(8, 2, true); v.setFloat32(12, ${PITCH}, true);
+  Module.boxAudio.commands(v.buffer);
+  return true;
+})()`;
 
 // Taps the worklet node with an AnalyserNode once, then measures the frequency of the tone from
 // its upward zero crossings and its peak, over the last 32768 frames
@@ -272,7 +301,7 @@ async function main() {
 
     const port = server.address().port;
     await wd('POST', '/url', { url: `http://127.0.0.1:${port}/boxrun.html` +
-      `?preload=${SCENE}&tone=${TONE}#${encodeURIComponent(SCENE)}` });
+      `?preload=${SCENE}#${encodeURIComponent(SCENE)}` });
 
     const gpu = await evaluate('(async () => { if (!navigator.gpu) return "none"; ' +
       'const a = await navigator.gpu.requestAdapter(); return a ? "adapter" : "no adapter"; })()');
@@ -363,25 +392,26 @@ async function main() {
     if (gesture) console.log(`the audio started on a ${gesture}`);
 
     if (running) {
+      const took = await evaluate(PLAY);
+      expect(took === true, 'the worklet did not take the sound');
       const tone = await evaluate(MEASURE);
-      console.log(`tone: ${tone.frequency.toFixed(2)} Hz, peak ${tone.peak.toFixed(4)}, ` +
+      console.log(`voice: ${tone.frequency.toFixed(2)} Hz, peak ${tone.peak.toFixed(4)}, ` +
         `sample rate ${tone.rate}`);
-      expect(Math.abs(tone.frequency - TONE) < 2, `the tone is not ${TONE} Hz`);
-      expect(Math.abs(tone.peak - LEVEL) < 0.02, `the peak of the tone is not ${LEVEL}`);
+      expect(Math.abs(tone.frequency - TONE) < 2, `the voice is not ${TONE} Hz`);
+      expect(Math.abs(tone.peak - LEVEL) < 0.02, `the peak of the voice is not ${LEVEL}`);
 
-      // A command sent from C reaches the core
-      const exported = await evaluate(`typeof Module._box_audio_web_tone === 'function'`);
-      expect(exported, 'Module._box_audio_web_tone is not exported');
-      if (exported) {
-        await evaluate(`(Module._box_audio_web_tone(${CHANGED}, ${LEVEL}), true)`);
-        await sleep(1000);
-        const changed = await evaluate(MEASURE);
-        console.log(`tone after the command: ${changed.frequency.toFixed(2)} Hz, peak ` +
-          `${changed.peak.toFixed(4)}`);
-        expect(Math.abs(changed.frequency - CHANGED) < 3, `the tone is not ${CHANGED} Hz`);
-        expect(Math.abs(changed.peak - LEVEL) < 0.02, 'the level changed with the frequency');
-      }
+      // A pitch command reaches the voice in the core
+      await evaluate(PITCH_COMMAND);
+      await sleep(1000);
+      const changed = await evaluate(MEASURE);
+      console.log(`voice after the pitch command: ${changed.frequency.toFixed(2)} Hz, peak ` +
+        `${changed.peak.toFixed(4)}`);
+      expect(Math.abs(changed.frequency - CHANGED) < 3, `the voice is not ${CHANGED} Hz`);
+      expect(Math.abs(changed.peak - LEVEL) < 0.02, 'the level changed with the pitch');
     }
+    const exported = await evaluate(`typeof Module._box_audio_web_apply === 'function' && ` +
+      `typeof Module._box_audio_web_sound === 'function'`);
+    expect(exported, 'Module._box_audio_web_apply or _box_audio_web_sound is not exported');
 
     // The scene kept rendering
     const frames1 = await evaluate('window.boxFrames');
