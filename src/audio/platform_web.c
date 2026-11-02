@@ -170,7 +170,7 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
     }
 
     var audio = { ctx: ctx, node: null, pending: [], requests: {}, sounds: {}, id: 0,
-        failed: 0, coreSize: size, events: [], onevents: null };
+        failed: 0, coreSize: size, events: [], onevents: null, gestures: 0, resumes: 0 };
     audio.post = function(m, transfer) {
         if (audio.node) {
             audio.node.port.postMessage(m, transfer || []);
@@ -273,10 +273,17 @@ EM_JS(int, box_audio_web_create, (const unsigned char *core, int size, int quant
 
 /** Resume the AudioContext when it is suspended. The promise of resume is not waited on; the
  * browser refuses it outside a gesture, which is not an error.
+ *
+ * Module.boxAudio counts the gestures that reach it and the calls of resume, which tells an
+ * input that never arrives from a resume the browser refuses.
  */
 EM_JS(void, box_audio_web_resume, (void), {
     var audio = Module.boxAudio;
+    if (audio) {
+        audio.gestures++;
+    }
     if (audio && !audio.failed && audio.ctx.state === 'suspended') {
+        audio.resumes++;
         audio.ctx.resume().catch(function() { });
     }
 });
